@@ -311,7 +311,7 @@ test("rename editor is tied to the exact directory and project and cancel discar
   assert.doesNotMatch(renderWorkspacePage(store.getState()), /id="selected-project-name-input"/);
 });
 
-test("selected GRT project shows read-only metadata and offers on-demand renaming", () => {
+test("selected LGZ project shows read-only metadata and offers on-demand renaming", () => {
   const html = renderWorkspacePage(createState({
     session: {
       projectId: 7,
@@ -581,7 +581,7 @@ test("synthetic legacy phased control is ignored", async () => {
   }
 });
 
-test("selected-project rename preserves the locked GRT recipe fields", async () => {
+test("selected-project rename preserves the locked LGZ recipe fields", async () => {
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const projectNameInput = createInput("project_editable");

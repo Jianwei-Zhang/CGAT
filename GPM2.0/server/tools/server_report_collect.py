@@ -241,7 +241,7 @@ def final_summary(root: Path, report_root: Path) -> dict:
     final["final_event_summary"] = event_summary(final.get("events", [])) if final else None
     final["notes"] = ["过程中的接受数不可相加作为最终修复数；最终状态以最终路径及协调后的事件为准。",
                       "gap 定义为连续至少 100 个 N；N 碱基数单独统计。",
-                      "原始主组装 → q0 表示初始构建；q0 → q4 表示 GRT 处理。N50 增加本身不证明质量改善。"]
+                      "原始主组装 → q0 表示初始构建；q0 → q4 表示 LGZ 处理。N50 增加本身不证明质量改善。"]
     return final
 
 
@@ -386,4 +386,4 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                 "App payload staged; the finalized report and payload are compressed together once after pipeline success."
             ],
         }
-    return {"summary": {}, "notes": ["执行情况见本阶段状态；GRT 子阶段记录单独列出。"]}
+    return {"summary": {}, "notes": ["执行情况见本阶段状态；LGZ 子阶段记录单独列出。"]}

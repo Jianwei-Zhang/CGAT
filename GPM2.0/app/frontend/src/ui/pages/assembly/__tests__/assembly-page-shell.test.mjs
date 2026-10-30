@@ -557,8 +557,8 @@ test("assembly page renders a localized non-danger notice with one action", () =
           open: true,
           id: "phased-grt-notice",
           mode: "notice",
-          title: "GRT 结果暂不可用",
-          message: "分型轨道暂不支持显示 GRT 预计算结果。关闭所有分型轨道后，即可恢复 GRT 结果。",
+          title: "LGZ 结果暂不可用",
+          message: "分型轨道暂不支持显示 LGZ 预计算结果。关闭所有分型轨道后，即可恢复 LGZ 结果。",
           confirmLabel: "我知道了",
         },
       },
@@ -566,7 +566,7 @@ test("assembly page renders a localized non-danger notice with one action", () =
   );
 
   assert.match(html, /data-assembly-confirm-mode="notice"/);
-  assert.match(html, /aria-label="GRT 结果暂不可用"/);
+  assert.match(html, /aria-label="LGZ 结果暂不可用"/);
   assert.match(html, />我知道了<\/button>/);
   assert.doesNotMatch(html, /assembly-confirm-title is-danger/);
   assert.doesNotMatch(html, /data-assembly-confirm-action="cancel"/);

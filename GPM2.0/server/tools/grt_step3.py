@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Run traceable GRT Step3 from a validated completed Step2 checkpoint."""
+"""Run traceable LGZ Step3 from a validated completed Step2 checkpoint."""
 
 from __future__ import annotations
 

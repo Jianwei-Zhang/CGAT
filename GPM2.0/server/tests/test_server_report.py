@@ -26,6 +26,13 @@ import test_run_all_runner as runner_fixture
 
 
 class ServerReportTests(unittest.TestCase):
+    def test_legacy_and_current_cache_prefixes_are_reported_identically(self):
+        for name in ("GRT", "LGZ"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                session = ReportSession(Path(temporary), [], "prefix-test")
+                session.child_output(f"{name} step3 cache hit: cached artifacts", "grt_step3")
+                self.assertEqual(session.cached_stages_by_unit["grt_step3"], {"step3"})
+
     def test_report_previews_preserve_exact_counts_and_do_not_mutate_audit(self):
         rows = [{"evidence_id": str(index), "detail": "audit-" + "x" * 2048} for index in range(1001)]
         facts = {"summary": {"event_count": len(rows)},
@@ -342,7 +349,7 @@ class ServerReportTests(unittest.TestCase):
 
 
 def make_grt_report_fixture(root: Path) -> tuple[Path, dict]:
-    """Actual GRT implementations with deterministic external-tool fixtures."""
+    """Actual LGZ implementations with deterministic external-tool fixtures."""
     from server.tests.test_grt_repair_stages import GrtRepairStagesTests
     from server.tests.test_grt_telomere_finalize import GrtTelomereFinalizeTests
     from server.tests.test_grt_evidence_package import GrtEvidencePackageTests

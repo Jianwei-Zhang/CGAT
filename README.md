@@ -6,6 +6,8 @@
 
 **English** | [中文](README_zh.md)
 
+The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
+
 [![CGAT Docs](https://img.shields.io/badge/Docs_%26_Direct_Downloads-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/)
 [![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.15-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
 
@@ -19,7 +21,7 @@
 
 | Component | Platform | Role | Documentation |
 | --- | --- | --- | --- |
-| **GPM2.0 Server** | Linux | Aligns multiple *de novo* assemblies to a reference genome, assigns chromosomes, runs automated GRT repair, and packages results (`Full` / `Light` archives + self-contained `report.html`). | [GPM2.0 Guide](GPM2.0/README.md) · [Server Manual](GPM2.0/server/README.md) |
+| **GPM2.0 Server** | Linux | Aligns multiple *de novo* assemblies to a reference genome, assigns chromosomes, runs automated LGZ repair, and packages results (`Full` / `Light` archives + self-contained `report.html`). | [GPM2.0 Guide](GPM2.0/README.md) · [Server Manual](GPM2.0/server/README.md) |
 | **GPM2.0 Desktop** | Windows / macOS | Imports Server delivery archives for chromosome-level source **Preview**, **Assembly** & **Subview** alignment inspection, **Final Path** editing, `DEGAP-JOBS` generation, and multi-format export. | [GPM2.0 Guide](GPM2.0/README.md#desktop-app) · [Online Docs](https://riceome.hzau.edu.cn/cgat/guide/getting-started) |
 | **DEGAP2.0** | Linux | Resolves remaining assembly gaps, links contigs, and extends chromosome ends toward telomeres using HiFi and/or ONT long reads. | [DEGAP2.0 Guide](DEGAP2.0/README.md) · [Online Docs](https://riceome.hzau.edu.cn/cgat/guide/degap) |
 
@@ -49,7 +51,7 @@ SERVER="$HOME/bin/GPM_Server"
 # Activate the environment printed by the installer (e.g. micromamba / mamba / conda)
 micromamba activate cgat-server
 
-# Run alignment, GRT repair, reporting, and delivery packaging
+# Run alignment, LGZ repair, reporting, and delivery packaging
 bash "$SERVER/run.sh" \
   --ref /path/to/reference.fa \
   --ds /path/to/primary_assembly.fa \

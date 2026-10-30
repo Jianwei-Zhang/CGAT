@@ -553,7 +553,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     });
   });
 
-  // The GRT switch only changes overlay layers. Patch them in place so the plot
+  // The LGZ switch only changes overlay layers. Patch them in place so the plot
   // keeps its scroll/zoom instead of being rebuilt from scratch.
   const patchGrtResultControlScope = (target, scope) => {
     if (

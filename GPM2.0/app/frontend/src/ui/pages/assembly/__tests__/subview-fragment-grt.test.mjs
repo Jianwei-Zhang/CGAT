@@ -18,7 +18,7 @@ const entry = (member) => { const placed = { ...member, x: member.xBp, width: me
 const interval = (id, start = 1, end = 100) => ({ assemblyCtgId: id, assemblySourceStart: 1, assemblySourceEnd: 100,
   sourceStart: start, sourceEnd: end, datasetName: `ds${id}`, contigName: `ctg${id}`, orientation: "+", segmentId: `s${id}`, pathOrder: id });
 
-for (const flipped of [false, true]) test(`GRT anchors resolve the unique surviving fragment at each source position, flipped=${flipped}`, () => {
+for (const flipped of [false, true]) test(`LGZ anchors resolve the unique surviving fragment at each source position, flipped=${flipped}`, () => {
   const before = normalize([parent(10, { flipped }), parent(20, { lane: "bottom" })]);
   const split = splitLocalMember(before, "assembly:10", 50);
   const entries = split.composition.members.map(entry);
@@ -33,7 +33,7 @@ for (const flipped of [false, true]) test(`GRT anchors resolve the unique surviv
   assert.equal(buildSubviewGrtAnchorScene({ chrName: "Chr1", plan, entries: [...entries, entry(duplicate)] }).markup, "", "overlapping presentations are ambiguous, not arbitrarily selected");
 });
 
-test("read-only GRT adoption overlays are clipped to surviving source bases, including native rebind lineage", () => {
+test("read-only LGZ adoption overlays are clipped to surviving source bases, including native rebind lineage", () => {
   const before = normalize([parent(), parent(20, { lane: "bottom" })]);
   const split = splitLocalMember(before, "assembly:10", 50);
   const removed = deleteLocalMember(split.composition, split.members[0].entityKey);
@@ -53,7 +53,7 @@ test("read-only GRT adoption overlays are clipped to surviving source bases, inc
   assert.equal(reboundEntry.matchesSourceInterval(interval(999)), false);
 });
 
-for (const orientation of ["+", "-"]) test(`GRT display evidence clips both endpoints with one parameter across a deleted interval, orient=${orientation}`, () => {
+for (const orientation of ["+", "-"]) test(`LGZ display evidence clips both endpoints with one parameter across a deleted interval, orient=${orientation}`, () => {
   const before = normalize([parent(), parent(20, { lane: "bottom" })]);
   const isolated = isolateLocalMemberInterval(before, "assembly:10", 41, 60);
   const removed = deleteLocalMember(isolated.composition, isolated.member.entityKey);

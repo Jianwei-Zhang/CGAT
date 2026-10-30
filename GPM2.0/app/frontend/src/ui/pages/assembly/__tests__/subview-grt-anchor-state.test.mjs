@@ -89,7 +89,7 @@ function descriptor(reference, { sameLane = false } = {}) {
   };
 }
 
-test("GRT references come from the immutable baseline only when present in the scene", () => {
+test("LGZ references come from the immutable baseline only when present in the scene", () => {
   const entry = baseline("gap");
   entry.displayEvidence = [{ evidenceId: "must-not-be-an-anchor" }];
   const assembly = assemblyWithBaseline(entry);
@@ -163,7 +163,7 @@ test("scene projection resolves exact IDs and applies base orientation plus loca
   assert.equal(unresolved.markup, "");
 });
 
-test("cross-lane GRT objects copy once into persistent assembly-space user anchors", () => {
+test("cross-lane LGZ objects copy once into persistent assembly-space user anchors", () => {
   const entry = baseline();
   const assembly = assemblyWithBaseline(entry);
   const raw = referenceIdentity(entry);

@@ -1,4 +1,4 @@
-"""Shared GRT domain, I/O, path, alignment, replay, and checkpoint services."""
+"""Shared LGZ domain, I/O, path, alignment, replay, and checkpoint services."""
 
 from .common import *
 from .stage_schema import *

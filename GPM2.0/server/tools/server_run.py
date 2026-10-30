@@ -89,7 +89,7 @@ def update_fill_limit(root: Path, limit: str) -> None:
         runtime_name = "grt_step23.py"
     runtime = root / ".prepare_lib/tools" / runtime_name
     if not script.is_file() or not runtime.is_file():
-        raise RunnerError("This workspace has no staged GRT Step3 runtime; update its Server runtime before changing the limit.")
+        raise RunnerError("This workspace has no staged LGZ Step3 runtime; update its Server runtime before changing the limit.")
     if "--max-fill" not in runtime.read_text(encoding="utf-8"):
         raise RunnerError("This workspace runtime predates --max-fill; update its Server runtime before changing the limit.")
     lines = script.read_text(encoding="utf-8").splitlines()

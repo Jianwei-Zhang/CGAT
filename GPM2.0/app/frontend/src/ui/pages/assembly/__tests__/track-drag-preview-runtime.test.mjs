@@ -192,7 +192,7 @@ test("previewTrackContigDrag limits duplicate phased bands by phased item id", (
   assert.equal(draggedBandNode.getAttribute("points"), "0,0 1,0 10,1 0,1");
 });
 
-test("previewTrackContigDrag shifts only the dragged GRT junction endpoint and restores it", () => {
+test("previewTrackContigDrag shifts only the dragged LGZ junction endpoint and restores it", () => {
   const draggedGroup = createNode({
     "data-track-contig-id": "22",
     "data-track-role": "primary",
@@ -250,7 +250,7 @@ test("previewTrackContigDrag shifts only the dragged GRT junction endpoint and r
   assert.equal(visibleLine.getAttribute("data-drag-preview-original-x1"), null);
 });
 
-test("previewTrackContigDrag translates a same-ctg GRT junction arc", () => {
+test("previewTrackContigDrag translates a same-ctg LGZ junction arc", () => {
   const draggedGroup = createNode({
     "data-track-contig-id": "22",
     "data-track-role": "primary",
@@ -286,7 +286,7 @@ test("previewTrackContigDrag translates a same-ctg GRT junction arc", () => {
   assert.equal(junctionNode.getAttribute("transform"), null);
 });
 
-test("previewTrackContigDrag shifts both GRT evidence edges when their ctg moves", () => {
+test("previewTrackContigDrag shifts both LGZ evidence edges when their ctg moves", () => {
   const draggedGroup = createNode({
     "data-track-contig-id": "22",
     "data-track-role": "support",
@@ -415,7 +415,7 @@ test("composition drag moves and clears its entity-keyed sticky label", () => {
   }
 });
 
-test("previewSubviewTrackContigDrag shifts the matching GRT junction endpoint", () => {
+test("previewSubviewTrackContigDrag shifts the matching LGZ junction endpoint", () => {
   const groupNode = createNode({
     "data-subview-track-slot": "top",
     "data-subview-track-role": "support",
@@ -454,7 +454,7 @@ test("previewSubviewTrackContigDrag shifts the matching GRT junction endpoint", 
   assert.equal(visibleLine.getAttribute("x2"), "25");
 });
 
-test("previewSubviewTrackContigDrag shifts and restores the matching GRT evidence edge", () => {
+test("previewSubviewTrackContigDrag shifts and restores the matching LGZ evidence edge", () => {
   const groupNode = createNode({
     "data-subview-track-slot": "top",
     "data-subview-track-role": "support",

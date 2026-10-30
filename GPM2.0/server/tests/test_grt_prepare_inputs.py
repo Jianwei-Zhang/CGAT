@@ -619,7 +619,7 @@ printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
             )
             self.assertEqual(migrated.returncode, 0, migrated.stderr)
             self.assertIn("Removed legacy external CRAQ input links", migrated.stdout)
-            self.assertIn("GRT prepare inputs are current", migrated.stdout)
+            self.assertIn("LGZ prepare inputs are current", migrated.stdout)
             self.assertFalse(legacy_link.exists())
             migrated_checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
             self.assertNotIn(legacy_relpath, migrated_checkpoint["output_hashes"])

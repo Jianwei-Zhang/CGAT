@@ -446,7 +446,7 @@ test("listProjectInitializerOptions preserves partitioned package metadata from 
   }
 });
 
-test("initializeProject sends the phased capability to the locked GRT command", async () => {
+test("initializeProject sends the phased capability to the locked LGZ command", async () => {
   const previousWindow = globalThis.window;
   const calls = [];
   try {
@@ -495,7 +495,7 @@ test("initializeProject sends the phased capability to the locked GRT command", 
   }
 });
 
-test("GRT project view routes only the lean project-view command", async () => {
+test("LGZ project view routes only the lean project-view command", async () => {
   const previousWindow = globalThis.window;
   const calls = [];
   try {
@@ -521,7 +521,7 @@ test("GRT project view routes only the lean project-view command", async () => {
   }
 });
 
-test("GRT project view uses the dev bridge without trace endpoints", async () => {
+test("LGZ project view uses the dev bridge without trace endpoints", async () => {
   const previousWindow = globalThis.window;
   const previousFetch = globalThis.fetch;
   const calls = [];

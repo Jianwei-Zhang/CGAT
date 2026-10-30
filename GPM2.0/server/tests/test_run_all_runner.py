@@ -492,7 +492,7 @@ def write_status(selected):
 
 first = server / "grt/checkpoints/step1_round1.json"
 if first.is_file():
-    print("GRT step1_round1 cache hit: fixture", flush=True)
+    print("LGZ step1_round1 cache hit: fixture", flush=True)
 else:
     write_stage("step1_round1")
 write_status(("step1_round1",))
@@ -527,7 +527,7 @@ write_status(stages)
             allow.touch()
             resumed = self.run_runner(server)
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertIn("[CHILD] [grt_step1] GRT step1_round1 cache hit", resumed.stdout)
+            self.assertIn("[CHILD] [grt_step1] LGZ step1_round1 cache hit", resumed.stdout)
             self.assertNotIn("[CACHE_HIT] [grt_step1]", resumed.stdout)
             self.assertEqual(
                 hashlib.sha256(first_checkpoint.read_bytes()).hexdigest(), first_hash
@@ -630,9 +630,9 @@ write_status(stages)
                 [
                     (
                         "grt_step1",
-                        "echo 'GRT step1_round1 cache hit: fixture'\n"
-                        "echo 'GRT step1_filter cache hit: fixture'\n"
-                        "echo 'GRT step1_round2 cache hit: fixture'",
+                        "echo 'LGZ step1_round1 cache hit: fixture'\n"
+                        "echo 'LGZ step1_filter cache hit: fixture'\n"
+                        "echo 'LGZ step1_round2 cache hit: fixture'",
                     )
                 ],
             )
@@ -705,12 +705,12 @@ write_status(stages)
             record = json.loads((server / "report/steps/001.json").read_text())
             self.assertEqual(record["execution"], "cache_reused")
             self.assertIn("CACHE_HIT", [item["event"] for item in record["history"]])
-            self.assertIn("GRT step1_round1 cache hit: fixture", record["output_tail"])
+            self.assertIn("LGZ step1_round1 cache hit: fixture", record["output_tail"])
 
             (server / "commands/grt_step1.sh").write_text(
                 "#!/usr/bin/env bash\nset -euo pipefail\n"
-                "echo 'GRT step1_round1 cache hit: fixture'\n"
-                "echo 'GRT step1_filter complete: recomputed'\n",
+                "echo 'LGZ step1_round1 cache hit: fixture'\n"
+                "echo 'LGZ step1_filter complete: recomputed'\n",
                 encoding="utf-8",
             )
             partial = self.run_runner(server)

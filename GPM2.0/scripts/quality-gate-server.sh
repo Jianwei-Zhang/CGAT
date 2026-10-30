@@ -60,10 +60,10 @@ done
 
 if [[ "${GPM_SKIP_GRT_SERVER_APP_E2E:-0}" == "1" ]]; then
   printf '%s\n' \
-    'SKIP: GRT server-to-app E2E was explicitly disabled with GPM_SKIP_GRT_SERVER_APP_E2E=1.' \
+    'SKIP: LGZ server-to-app E2E was explicitly disabled with GPM_SKIP_GRT_SERVER_APP_E2E=1.' \
     'This local run is incomplete; CI and the canonical server gate do not set this override.'
 else
-  run_group "GRT server-to-app E2E" bash tests/gpm_server/grt_server_to_app_e2e.sh
+  run_group "LGZ server-to-app E2E" bash tests/gpm_server/grt_server_to_app_e2e.sh
 fi
 
 printf 'GPM2.0 server quality gate passed.\n'

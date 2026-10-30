@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Run the two canonical AssembleFill rounds against one frozen GRT donor set."""
+"""Run the two canonical AssembleFill rounds against one frozen LGZ donor set."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def run_external_contig_identity_stage(
     fingerprint = json_hash(fingerprint_payload)
     cached = checkpoint_result(server_dir, stage, fingerprint)
     if cached is not None:
-        print(f"GRT {stage} cache hit: {fingerprint}")
+        print(f"LGZ {stage} cache hit: {fingerprint}")
         return cached, True
     invalidate_step1_from(server_dir, stage)
 
@@ -257,7 +257,7 @@ def run_external_contig_identity_stage(
             f"{artifact_relpath}/result.json",
             output_relpaths,
         )
-        print(f"GRT {stage} complete: external-contig compatibility identity")
+        print(f"LGZ {stage} complete: external-contig compatibility identity")
         return result, False
     except BaseException:
         q_output_temporary.unlink(missing_ok=True)
@@ -325,7 +325,7 @@ def run_round_stage(
     fingerprint = json_hash(fingerprint_payload)
     cached = checkpoint_result(server_dir, stage, fingerprint)
     if cached is not None:
-        print(f"GRT {stage} cache hit: {fingerprint}")
+        print(f"LGZ {stage} cache hit: {fingerprint}")
         return cached, True
 
     invalidate_step1_from(server_dir, stage)
@@ -385,7 +385,7 @@ def run_round_stage(
                 threads,
             )
             print(
-                f"GRT {stage} chromosome {chromosome}: "
+                f"LGZ {stage} chromosome {chromosome}: "
                 f"{'cache hit' if cache_hit else 'computed'}"
             )
             chromosome_artifact = temporary / "by_chr" / chromosome_key
@@ -551,7 +551,7 @@ def run_round_stage(
             output_relpaths,
         )
         print(
-            f"GRT {stage} complete: gaps={len(gaps)}, candidates={len(candidates)}, "
+            f"LGZ {stage} complete: gaps={len(gaps)}, candidates={len(candidates)}, "
             f"accepted={len(accepted_intervals)}"
         )
         return result, False
@@ -591,7 +591,7 @@ def run_filter_stage(
     fingerprint = json_hash(fingerprint_payload)
     cached = checkpoint_result(server_dir, stage, fingerprint)
     if cached is not None:
-        print(f"GRT {stage} cache hit: {fingerprint}")
+        print(f"LGZ {stage} cache hit: {fingerprint}")
         return cached, True
     invalidate_step1_from(server_dir, stage)
     artifact_relpath = "grt/evidence/step1/filter"
@@ -668,7 +668,7 @@ def run_filter_stage(
             output_relpaths,
         )
         removed = sum(len(event["edit"]["removed_intervals"]) for event in events if event["status"] == "accepted")
-        print(f"GRT step1_filter complete: removed_components={removed}")
+        print(f"LGZ step1_filter complete: removed_components={removed}")
         return result, False
     except BaseException:
         if temporary.exists():
@@ -875,7 +875,7 @@ def execute(args: argparse.Namespace) -> None:
     if donor_set["donor_set_id"] != round1["donor_set_id"] or donor_set["donor_set_id"] != round2["donor_set_id"]:
         fail("Step1 rounds do not reference the same frozen donor set")
     print(
-        f"GRT Step1 complete: run={run_id}, donor_set={donor_set['donor_set_id']}, "
+        f"LGZ Step1 complete: run={run_id}, donor_set={donor_set['donor_set_id']}, "
         f"q1_sha256={sha256_file(server_dir / 'grt/q/q1.fa')}"
     )
 

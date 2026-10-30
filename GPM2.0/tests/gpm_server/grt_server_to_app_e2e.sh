@@ -198,7 +198,7 @@ assert_contains "${full_zip_view}" '"display_evidence":[]'
 legacy_final_path_view="$("${backend_exe}" get-grt-project-view "${legacy_final_path_workspace}" 1)"
 assert_contains "${legacy_final_path_view}" '"final_path_schema_version":"1"'
 if [[ "${legacy_final_path_view}" == *'"grt_display_available":true'* ]]; then
-  echo "legacy Final Path schema unexpectedly enabled GRT display" >&2
+  echo "legacy Final Path schema unexpectedly enabled LGZ display" >&2
   exit 1
 fi
 
@@ -237,7 +237,7 @@ assert_contains "${evidence_trace}" '"evidence_id":"ev-display-donor1"'
 assert_contains "${evidence_trace}" '"stage":"display_pairwise"'
 
 if "${backend_exe}" get-grt-project-view "${workspace}" 999 >/dev/null 2>&1; then
-  echo "missing project unexpectedly returned a GRT project view" >&2
+  echo "missing project unexpectedly returned a LGZ project view" >&2
   exit 1
 fi
 
@@ -348,4 +348,4 @@ node --test \
   app/frontend/src/ui/pages/assembly/__tests__/grt-result-state.test.mjs \
   app/frontend/src/ui/pages/assembly/__tests__/grt-visualization.test.mjs >/dev/null
 
-echo "GRT Server-to-App E2E passed"
+echo "LGZ Server-to-App E2E passed"

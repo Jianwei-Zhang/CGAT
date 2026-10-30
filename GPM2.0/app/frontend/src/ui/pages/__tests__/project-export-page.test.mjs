@@ -427,7 +427,7 @@ test("late project export work cannot redraw a different active route", () => {
   assert.equal(host.innerHTML, "assembly stays mounted");
 });
 
-test("project export loading canonicalizes persisted GRT overallLen from the project view", async () => {
+test("project export loading canonicalizes persisted LGZ overallLen from the project view", async () => {
   let state = createState({
     projectExport: {
       ...createState().projectExport,

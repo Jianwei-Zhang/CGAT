@@ -17,16 +17,16 @@ _COLORS = {"START": "36", "PROGRESS": "36", "RUNNING": "36", "RESUME": "36",
            "DONE": "32", "SUCCESS": "32", "WARN": "33", "WARNING": "33", "STALE": "33",
            "ERROR": "31", "FAILED": "31", "INTERRUPTED": "31"}
 _IMPORTANT = re.compile(r"\b(?:warn(?:ing)?|error|failed|fatal|exception|traceback)\b", re.I)
-_METRICS = re.compile(r"^GRT \S+(?: \S+)? (?:artifact|execution) metrics:")
-_DONE = re.compile(r"^GRT (step[23]) MUMmer (\S+): (computed|cache hit)$")
-_EXECUTION = re.compile(r"^GRT (step[23]) execution: .*\bchromosomes=(\d+)\b")
-_CACHE = re.compile(r"^(GRT \S+ cache hit:) .+$")
+_METRICS = re.compile(r"^(?:LGZ|GRT) \S+(?: \S+)? (?:artifact|execution) metrics:")
+_DONE = re.compile(r"^(?:LGZ|GRT) (step[23]) MUMmer (\S+): (computed|cache hit)$")
+_EXECUTION = re.compile(r"^(?:LGZ|GRT) (step[23]) execution: .*\bchromosomes=(\d+)\b")
+_CACHE = re.compile(r"^((?:LGZ|GRT) \S+ cache hit:) .+$")
 _PARTITION = re.compile(
-    r"^GRT step[23] (?:MUMmer|screen) \S+ \d+/\d+: "
+    r"^(?:LGZ|GRT) step[23] (?:MUMmer|screen) \S+ \d+/\d+: "
     r"(?:START|(?:SUCCESS|CACHE_HIT) \([\d.]+s\))$"
 )
 _PARTITION_CONFIG = re.compile(
-    r"^GRT step[23] MUMmer \S+: \d+/\d+ partitions, "
+    r"^(?:LGZ|GRT) step[23] MUMmer \S+: \d+/\d+ partitions, "
     r"workers=\d+, nucmer_threads=\d+, thread_budget=\d+$"
 )
 
@@ -195,9 +195,11 @@ class ProgressDisplay:
             text = _CACHE.sub(r"\1 reused", text)
             # Stage already appears in the prefix, but preserve distinct substage names.
             if unit.startswith("grt_"):
-                prefix = "GRT " + unit[4:] + " "
-                if text.startswith(prefix):
-                    text = text[len(prefix):]
+                for name in ("LGZ", "GRT"):
+                    prefix = name + " " + unit[4:] + " "
+                    if text.startswith(prefix):
+                        text = text[len(prefix):]
+                        break
             if text:
                 self._line("INFO", unit, text)
 

@@ -83,7 +83,7 @@ function buildRawView() {
   };
 }
 
-test("normalizes the lean App GRT projection without trace payloads", () => {
+test("normalizes the lean App LGZ projection without trace payloads", () => {
   const view = normalizeGrtProjectView(buildRawView());
   const patch = view.baselineFinalPathByChr.Chr01.segments[1];
 
@@ -113,7 +113,7 @@ test("normalizes the lean App GRT projection without trace payloads", () => {
   }]);
 });
 
-test("uses one authoritative source length for repeated and N-split GRT slices", () => {
+test("uses one authoritative source length for repeated and N-split LGZ slices", () => {
   const raw = buildRawView();
   raw.final_path_by_chr.Chr01.segments = [
     {
@@ -193,14 +193,14 @@ test("rejects missing or too-small authoritative source lengths", () => {
   delete missing.final_path_by_chr.Chr01.segments[1].source_length;
   assert.throws(
     () => normalizeGrtProjectView(missing),
-    /Invalid GRT source_length for Chr01:seg-patch: missing/,
+    /Invalid LGZ source_length for Chr01:seg-patch: missing/,
   );
 
   const tooSmall = buildRawView();
   tooSmall.final_path_by_chr.Chr01.segments[1].source_length = 3;
   assert.throws(
     () => normalizeGrtProjectView(tooSmall),
-    /Invalid GRT source_length for Chr01:seg-patch: 3/,
+    /Invalid LGZ source_length for Chr01:seg-patch: 3/,
   );
 });
 
@@ -251,7 +251,7 @@ test("schema 2 keeps App-owned display mappings separate from the editable path"
   assert.equal(editableSegment.assemblySourceEnd, undefined);
 });
 
-test("schema 3 normalizes project-mapped local GRT evidence", () => {
+test("schema 3 normalizes project-mapped local LGZ evidence", () => {
   const raw = buildRawView();
   raw.recipe.final_path_schema_version = "3";
   raw.final_path_by_chr.Chr01.grt_display_available = true;

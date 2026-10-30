@@ -6,6 +6,8 @@
 
 [English](README.md) | **中文**
 
+自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
+
 [![CGAT Docs](https://img.shields.io/badge/在线文档与直连下载-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/zh/)
 [![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.15-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
 
@@ -19,7 +21,7 @@
 
 | 组件 | 运行平台 | 核心职责 | 文档入口 |
 | --- | --- | --- | --- |
-| **GPM2.0 服务端** | Linux | 将多套 *de novo* 组装与参考基因组比对，完成染色体分配、GRT 自动修复与证据打包，输出 `Full` / `Light` 交付包与自包含 `report.html` 报告。 | [GPM2.0 指南](GPM2.0/README_zh.md) · [服务端手册](GPM2.0/server/README_zh.md) |
+| **GPM2.0 服务端** | Linux | 将多套 *de novo* 组装与参考基因组比对，完成染色体分配、LGZ 自动修复与证据打包，输出 `Full` / `Light` 交付包与自包含 `report.html` 报告。 | [GPM2.0 指南](GPM2.0/README_zh.md) · [服务端手册](GPM2.0/server/README_zh.md) |
 | **GPM2.0 桌面端** | Windows / macOS | 导入服务端交付包，提供染色体级 **Preview** 来源总览、**Assembly** 主视图与 **Subview** 局部比对、**Final Path** 编辑、`DEGAP-JOBS` 任务导出及多格式结果导出。 | [GPM2.0 指南](GPM2.0/README_zh.md#桌面端-app) · [在线文档](https://riceome.hzau.edu.cn/cgat/zh/guide/getting-started) |
 | **DEGAP2.0** | Linux | 利用 HiFi 和/或 ONT 长读段进行局部缺口补洞（GapFiller）、contig 连接（CtgLinker）与染色体端粒延伸（TelSeeker）。 | [DEGAP2.0 指南](DEGAP2.0/README.md) · [在线文档](https://riceome.hzau.edu.cn/cgat/zh/guide/degap) |
 
@@ -49,7 +51,7 @@ SERVER="$HOME/bin/GPM_Server"
 # 按安装程序提示激活环境（micromamba / mamba / conda）
 micromamba activate cgat-server
 
-# 运行比对、GRT 修复、报告生成与归档打包
+# 运行比对、LGZ 修复、报告生成与归档打包
 bash "$SERVER/run.sh" \
   --ref /path/to/reference.fa \
   --ds /path/to/primary_assembly.fa \

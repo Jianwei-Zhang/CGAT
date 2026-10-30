@@ -1419,7 +1419,7 @@ def run_step4(
     fingerprint = json_hash(fingerprint_payload)
     cached = checkpoint_result(server_dir, "step4_telomere", fingerprint)
     if cached is not None:
-        print(f"GRT step4_telomere cache hit: {fingerprint}")
+        print(f"LGZ step4_telomere cache hit: {fingerprint}")
         return cached, True
     invalidate_step4(server_dir)
     artifact_relpath = "grt/evidence/step4_telomere"
@@ -1470,7 +1470,7 @@ def run_step4(
                     should_align,
                 )
                 print(
-                    f"GRT Step4 MUMmer {chromosome}:{terminal}: "
+                    f"LGZ Step4 MUMmer {chromosome}:{terminal}: "
                     f"{'cache hit' if cache_hit else 'computed'}"
                 )
                 destination = temporary / "mummer" / "by_terminal" / str(identity["terminal_key"])
@@ -1543,7 +1543,7 @@ def run_step4(
                 threads,
             )
             print(
-                f"GRT Step4 minimap2 {candidate['candidate_id']}: "
+                f"LGZ Step4 minimap2 {candidate['candidate_id']}: "
                 f"{'cache hit' if cache_hit else 'computed'}"
             )
             destination = temporary / "minimap" / "by_candidate" / str(identity["candidate_key"])
@@ -1815,7 +1815,7 @@ def run_step4(
             output_relpaths,
         )
         print(
-            "GRT step4_telomere complete: "
+            "LGZ step4_telomere complete: "
             f"recovered={sum(row['outcome'] == 'accepted' for row in candidates)}, "
             f"unresolved={sum(row['final_status'] == 'unresolved' for row in terminal_rows)}"
         )
@@ -1905,7 +1905,7 @@ def build_final_path(
                 ]
                 if len(matches) > 1:
                     fail(
-                        "one q4 source segment matches multiple accepted GRT events: "
+                        "one q4 source segment matches multiple accepted LGZ events: "
                         f"{chromosome}:{segment['dataset_name']}:{segment['contig_name']}"
                     )
                 event = matches[0] if matches else None
@@ -1919,7 +1919,7 @@ def build_final_path(
                         (":grt_promoted", ":cross_chr_grt_usage")
                     ):
                         fail(
-                            "GRT-derived q4 source segment lacks one exact accepted event: "
+                            "LGZ-derived q4 source segment lacks one exact accepted event: "
                             f"{chromosome}:{segment['dataset_name']}:{segment['contig_name']}"
                         )
                     segment_id = stable_id(
@@ -2383,7 +2383,7 @@ def execute(args: argparse.Namespace) -> None:
         server_dir, result, sources, tools, minimap
     )
     print(
-        f"GRT q4 finalized: run={run_id}, Dtel={donor_set['donor_set_id']}, "
+        f"LGZ q4 finalized: run={run_id}, Dtel={donor_set['donor_set_id']}, "
         f"chromosomes={len(final_path['chromosomes'])}, "
         f"q4_sha256={sha256_file(server_dir / 'grt/q/q4.fa')}"
     )

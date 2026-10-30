@@ -1,4 +1,4 @@
-"""GRT Step2 candidate generation, structural fallback and Q2 publication."""
+"""LGZ Step2 candidate generation, structural fallback and Q2 publication."""
 
 from __future__ import annotations
 
@@ -613,7 +613,7 @@ def build_step2_candidates(
 
 
 def step2_strategy(gap_count: int, patch_candidate_count: int, accepted_patch_count: int) -> str:
-    """Return the GRT controller branch for one chromosome."""
+    """Return the LGZ controller branch for one chromosome."""
     if gap_count == 0:
         return "no_gaps"
     if patch_candidate_count == 0:
@@ -703,7 +703,7 @@ def run_step2(
     fingerprint = json_hash(fingerprint_payload)
     cached = checkpoint_result(server_dir, stage, fingerprint)
     if cached is not None:
-        print(f"GRT step2 cache hit: {fingerprint}")
+        print(f"LGZ step2 cache hit: {fingerprint}")
         return cached, True
     invalidate_step23_from(server_dir, stage)
     artifact_relpath = "grt/evidence/step2"
@@ -761,7 +761,7 @@ def run_step2(
                 minimap,
                 threads,
             )
-            print(f"GRT step2 validation {chromosome}: {'cache hit' if cache_hit else 'computed'}")
+            print(f"LGZ step2 validation {chromosome}: {'cache hit' if cache_hit else 'computed'}")
             destination = temporary / "validation" / "by_chr" / chromosome_key
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(cache_dir, destination)
@@ -1120,7 +1120,7 @@ def run_step2(
             output_relpaths,
         )
         print(
-            f"GRT step2 complete: gaps={len(gaps)}, candidates={len(candidates)}, "
+            f"LGZ step2 complete: gaps={len(gaps)}, candidates={len(candidates)}, "
             f"accepted={len(accepted_intervals)}"
         )
         return result, False
@@ -1146,7 +1146,7 @@ def build_step2_fallback_candidates(
 ) -> list[dict[str, object]]:
     """Turn CorrectRefill structural evidence into an auditable Step2 retry.
 
-    The original GRT controller runs a fixer and then re-runs the patcher.  In
+    The original LGZ controller runs a fixer and then re-runs the patcher.  In
     Server mode only an executable Type1 replacement may reuse its explicit
     donor interval as that retry.  Type4/Type5 overlap evidence belongs to the
     Step3 structural-correction path, while conflicting Type2/Type3/Type6
@@ -1541,7 +1541,7 @@ def execute_step2(args: argparse.Namespace) -> dict[str, object]:
     if step2["target_sha256"] != donor_set["fasta_sha256"]:
         fail("Step2 donor FASTA hash drifted from frozen D0")
     print(
-        f"GRT Step2 complete: run={context['run_id']}, "
+        f"LGZ Step2 complete: run={context['run_id']}, "
         f"donor_set={donor_set['donor_set_id']}, "
         f"q2_sha256={sha256_file(context['server_dir'] / 'grt/q/q2.fa')}"
     )

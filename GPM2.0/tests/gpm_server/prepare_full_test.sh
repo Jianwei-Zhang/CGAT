@@ -165,7 +165,7 @@ assert_package_metadata() {
           $(columns["grt_precompute_enabled"]) != "true" ||
           $(columns["recipe_locked"]) != "true" ||
           $(columns["final_path_schema_version"]) != "1") {
-        print "package.tsv missing locked GRT v1 identity" > "/dev/stderr"
+        print "package.tsv missing locked LGZ v1 identity" > "/dev/stderr"
         exit 1
       }
       if ($(columns["package_mode"]) != expected_mode) {
@@ -998,11 +998,11 @@ EOF
 
   if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/package_full_zip.sh" \
       >"${TMP_DIR}/premature-package.out" 2>"${TMP_DIR}/premature-package.err"; then
-    echo "expected packaging before GRT finalization to fail" >&2
+    echo "expected packaging before LGZ finalization to fail" >&2
     exit 1
   fi
   grep -q "MISSING_REQUIRED_FILE" "${TMP_DIR}/premature-package.err" || {
-    echo "expected package preflight to report the incomplete GRT contract" >&2
+    echo "expected package preflight to report the incomplete LGZ contract" >&2
     cat "${TMP_DIR}/premature-package.err" >&2
     exit 1
   }

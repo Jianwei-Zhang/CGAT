@@ -3,7 +3,7 @@
 
 The Server workdir is the audit/validation boundary.  This tool deliberately
 projects only the files consumed by the App importer and chromosome views.
-Raw GRT FASTA, aligner evidence, cache, checkpoint, and Server tooling files
+Raw LGZ FASTA, aligner evidence, cache, checkpoint, and Server tooling files
 never cross that boundary; accepted alignments are reduced to compact display
 evidence in the Final Path document.
 """

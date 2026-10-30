@@ -6,7 +6,7 @@ pub fn load_grt_evidence(project_db_path: &Path, evidence_id: &str) -> Result<Va
         "grt_evidence",
         "evidence_id",
         evidence_id,
-        "GRT evidence",
+        "LGZ evidence",
     )
 }
 
@@ -20,20 +20,20 @@ pub fn verify_persisted_grt_final_path(project_db_path: &Path) -> Result<GrtFina
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .optional()
-        .context("failed to load persisted GRT Final Path verification inputs")?
-        .ok_or_else(|| anyhow!("precomputed GRT Final Path is not available"))?;
+        .context("failed to load persisted LGZ Final Path verification inputs")?
+        .ok_or_else(|| anyhow!("precomputed LGZ Final Path is not available"))?;
     let final_path: Value = serde_json::from_str(&final_path_json)
-        .context("persisted GRT Final Path JSON is invalid")?;
+        .context("persisted LGZ Final Path JSON is invalid")?;
     let chromosomes = final_path["chromosomes"]
         .as_array()
-        .ok_or_else(|| anyhow!("persisted GRT Final Path chromosomes are invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ Final Path chromosomes are invalid"))?;
     let mut fasta_cache = HashMap::<String, BTreeMap<String, String>>::new();
     let mut rebuilt_records = BTreeMap::<String, String>::new();
     let mut segment_count = 0_usize;
     for chromosome in chromosomes {
         let object = chromosome
             .as_object()
-            .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path chromosome is invalid"))?;
         let chr_name = json_nonempty_str(object, "chr", "persisted Final Path chromosome")?;
         let segments = object["segments"]
             .as_array()
@@ -130,11 +130,11 @@ pub fn load_grt_source_card_trace(
         "grt_source_card",
         "source_card_key",
         source_card_key,
-        "GRT source card",
+        "LGZ source card",
     )?;
     let card = source_card
         .as_object()
-        .ok_or_else(|| anyhow!("persisted GRT source card JSON is invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ source card JSON is invalid"))?;
     let event_ids = stored_string_list(card, "accepted_event_ids_json")?;
     let segment_ids = stored_string_list(card, "final_path_segment_ids_json")?;
     let ref_ids = stored_string_list(card, "ref_evidence_ids_json")?;
@@ -216,11 +216,11 @@ pub fn load_grt_event_trace(project_db_path: &Path, event_id: &str) -> Result<Gr
         "event_id",
         event_id,
         "event_json",
-        "GRT event",
+        "LGZ event",
     )?;
     let object = event
         .as_object()
-        .ok_or_else(|| anyhow!("persisted GRT event JSON is invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ event JSON is invalid"))?;
     let evidence_ids = object
         .get("evidence_ids")
         .map(|value| json_value_string_list(value, "event evidence_ids"))
@@ -260,7 +260,7 @@ pub fn load_grt_event_trace(project_db_path: &Path, event_id: &str) -> Result<Gr
                 "segment_id",
                 &segment_id,
                 "segment_json",
-                "GRT Final Path segment",
+                "LGZ Final Path segment",
             )?)
         },
         source_card: if source_card_key.is_empty() {
@@ -271,7 +271,7 @@ pub fn load_grt_event_trace(project_db_path: &Path, event_id: &str) -> Result<Gr
                 "grt_source_card",
                 "source_card_key",
                 &source_card_key,
-                "GRT source card",
+                "LGZ source card",
             )?)
         },
     })
@@ -334,7 +334,7 @@ pub(super) fn load_matching_json(
         .collect::<std::result::Result<Vec<_>, _>>()?;
     values
         .into_iter()
-        .map(|json| serde_json::from_str(&json).context("persisted GRT row JSON is invalid"))
+        .map(|json| serde_json::from_str(&json).context("persisted LGZ row JSON is invalid"))
         .filter_map(|result| match result {
             Ok(value) if predicate(&value) => Some(Ok(value)),
             Ok(_) => None,
@@ -346,7 +346,7 @@ pub(super) fn stored_string_list(object: &Map<String, Value>, key: &str) -> Resu
     let encoded = object
         .get(key)
         .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("persisted GRT source card lacks {key}"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ source card lacks {key}"))?;
     serde_json::from_str(encoded)
-        .with_context(|| format!("persisted GRT source card {key} is invalid"))
+        .with_context(|| format!("persisted LGZ source card {key} is invalid"))
 }

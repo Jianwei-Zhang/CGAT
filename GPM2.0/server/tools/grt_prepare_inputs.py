@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Build the locked GRT recipe, q0, ordinary donor set, and telomere donor set."""
+"""Build the locked LGZ recipe, q0, ordinary donor set, and telomere donor set."""
 
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ def migrate_legacy_qc_symlinks(
             row["checkpoint_sha256"] = sha256_file(checkpoint_path)
     write_tsv(status_path, GRT_STAGE_STATUS_FIELDS, stage_rows)
     print(
-        "Removed legacy external CRAQ input links from the GRT checkpoint: "
+        "Removed legacy external CRAQ input links from the LGZ checkpoint: "
         + ", ".join(path.relative_to(server_dir).as_posix() for path in removed)
     )
     return checkpoint
@@ -570,7 +570,7 @@ def assignment_preset(options: dict[str, str]) -> str:
 
 
 def commit_prepared_outputs(stage_grt: Path, stage_metadata: Path, server_dir: Path) -> None:
-    """Replace GRT outputs as one rollback-safe filesystem transaction."""
+    """Replace LGZ outputs as one rollback-safe filesystem transaction."""
     target_grt = server_dir / "grt"
     target_metadata = server_dir / "metadata"
     backup_root = stage_grt.parent / "previous"
@@ -649,7 +649,7 @@ def prepare(args: argparse.Namespace) -> None:
             f"final_path={package['final_path_schema_version']}"
         )
     if package["grt_precompute_enabled"] != "true" or package["recipe_locked"] != "true":
-        fail("package must enable locked GRT precompute")
+        fail("package must enable locked LGZ precompute")
 
     datasets = read_tsv(
         metadata_dir / "datasets.tsv",
@@ -731,7 +731,7 @@ def prepare(args: argparse.Namespace) -> None:
         fail("--reads-qc full requires at least one --reads input")
     if package["reads_qc_enabled"] != str(reads_qc_enabled).lower():
         fail(
-            "package.tsv reads_qc_enabled disagrees with generated GRT prepare command: "
+            "package.tsv reads_qc_enabled disagrees with generated LGZ prepare command: "
             f"package={package['reads_qc_enabled']}, command={str(reads_qc_enabled).lower()}"
         )
     tools: dict[str, dict[str, str]] = {}
@@ -844,7 +844,7 @@ def prepare(args: argparse.Namespace) -> None:
                 and sha256_file(server_dir / relpath) == expected_hash
                 for relpath, expected_hash in output_hashes.items()
             ):
-                print(f"GRT prepare inputs are current: {checkpoint_path}")
+                print(f"LGZ prepare inputs are current: {checkpoint_path}")
                 return
         except (OSError, ValueError, TypeError, SystemExit):
             pass
@@ -1438,7 +1438,7 @@ def prepare(args: argparse.Namespace) -> None:
 
         commit_prepared_outputs(stage_grt, stage_metadata, server_dir)
         print(
-            f"Prepared GRT q0/D0/Dtel: recipe={recipe_id}, "
+            f"Prepared LGZ q0/D0/Dtel: recipe={recipe_id}, "
             f"q_chromosomes={len(q_records)}, D0={len(ordinary_members)}, Dtel={len(telomere_members)}"
         )
     finally:

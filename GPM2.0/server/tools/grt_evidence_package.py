@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Publish GRT-used source cards, display PAF evidence, and package integrity."""
+"""Publish LGZ-used source cards, display PAF evidence, and package integrity."""
 
 from __future__ import annotations
 

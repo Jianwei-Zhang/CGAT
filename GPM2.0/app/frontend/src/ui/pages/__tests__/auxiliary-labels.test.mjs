@@ -20,7 +20,7 @@ test("auxiliary terminology changes presentation while preserving support i18n k
     assert.doesNotMatch(text, /\bSupport\b|\bsupport (?:datasets?|tracks?|ds ctg)\b/);
   }
   // "support" remains a verb when it does not denote the data role.
-  assert.match(assembly.page.phasedTrackGrtNoticeMessage, /support GRT/);
+  assert.match(assembly.page.phasedTrackGrtNoticeMessage, /support LGZ/);
   assert.equal(getMessages("zh", "assembly").trackControls.supportDataset, "辅助数据集");
 });
 

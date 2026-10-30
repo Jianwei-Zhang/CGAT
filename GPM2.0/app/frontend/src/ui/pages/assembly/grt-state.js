@@ -103,7 +103,7 @@ function normalizeGrtSegment(segment, index, chrName) {
   );
   if (!sourceLength || start > sourceLength || end > sourceLength) {
     throw new TypeError(
-      `Invalid GRT source_length for ${chrName}:${segmentId}: ${String(sourceLength || "missing")}`,
+      `Invalid LGZ source_length for ${chrName}:${segmentId}: ${String(sourceLength || "missing")}`,
     );
   }
   const orientation = normalizeString(sourceLocator.orientation || source.orientation) === "-" ? "-" : "+";

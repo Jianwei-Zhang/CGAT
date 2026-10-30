@@ -340,5 +340,5 @@ def cached_chromosome_alignment(
             # Separate attempts in one process must never overwrite earlier evidence.
             failed_dir = Path(tempfile.mkdtemp(prefix=f"{stage}-{chromosome_key}-", dir=failed_root))
             os.replace(temporary, failed_dir)
-            print(f"[grt] Failed alignment evidence retained: {failed_dir}", file=sys.stderr)
+            print(f"[lgz] Failed alignment evidence retained: {failed_dir}", file=sys.stderr)
         raise

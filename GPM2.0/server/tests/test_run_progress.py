@@ -11,16 +11,44 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 from run_progress import ProgressDisplay, colorize, plain, use_color
 from view_run_log import tail
 import test_run_all_runner as fixtures
+from types import SimpleNamespace
+from run_all_runner import GRT_CACHE_MARKERS, Runner
 
 
 class ProgressTests(unittest.TestCase):
+    def test_runner_normalizes_legacy_cache_markers_without_changing_raw_logs(self):
+        for name in ("GRT", "LGZ"):
+            with self.subTest(name=name):
+                runner = Runner.__new__(Runner)
+                runner.minimap2_failure_hints = {}
+                runner.log_handle = io.StringIO()
+                runner.report = None
+                runner.progress = Mock()
+                runner.run_id = "legacy-prefix"
+                runner.child_cache_markers = set()
+                line = f"{name} step3 cache hit: cached artifacts"
+                runner._child_line(SimpleNamespace(unit_id="grt_step3"), line)
+                self.assertEqual(runner.child_cache_markers, set(GRT_CACHE_MARKERS["grt_step3"]))
+                self.assertIn(line, runner.log_handle.getvalue())
+
+    def test_legacy_and_current_algorithm_prefixes_share_progress_parsing(self):
+        for name in ("GRT", "LGZ"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                stream = io.StringIO()
+                with ProgressDisplay(Path(temp) / "progress.log", {}, stream=stream) as view:
+                    view.child("grt_step3", f"{name} step3 execution: profile=optimized chromosomes=1")
+                    view.child("grt_step3", f"{name} step3 MUMmer Chr01: cache hit")
+                    view.child("grt_step3", f"{name} step3 Chr01 artifact metrics: seconds=1")
+                self.assertIn("1/1 chromosomes · computed=0 cached=1", stream.getvalue())
+                self.assertNotIn("artifact metrics", stream.getvalue())
+
     def display(self, root, **kwargs):
         return ProgressDisplay(root / "progress.log", {"grt_step3": "07/28"}, **kwargs)
 
@@ -30,18 +58,18 @@ class ProgressTests(unittest.TestCase):
             stream = io.StringIO()
             with self.display(Path(temp), stream=stream, clock=lambda: clock[0]) as view:
                 view.event("START", "grt_step3", "attempt=2 command=run.sh")
-                view.child("grt_step3", "GRT step3 execution: profile=optimized shared_workers=32 chromosomes=3")
-                view.child("grt_step3", "GRT step3 MUMmer Chr12: computed")
-                view.child("grt_step3", "GRT step3 MUMmer Chr02: cache hit")
-                view.child("grt_step3", "GRT step3 MUMmer Chr02: cache hit")
-                metric = "GRT step3 Chr12 artifact metrics: copy_seconds=0.046 post_copy_parse_seconds=0.000 parse_reused=True"
+                view.child("grt_step3", "LGZ step3 execution: profile=optimized shared_workers=32 chromosomes=3")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr12: computed")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr02: cache hit")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr02: cache hit")
+                metric = "LGZ step3 Chr12 artifact metrics: copy_seconds=0.046 post_copy_parse_seconds=0.000 parse_reused=True"
                 view.child("grt_step3", metric)
-                view.child("grt_step3", "GRT step3 MUMmer Chr12 1/2: START")
-                view.child("grt_step3", "GRT step3 screen Chr12 1/2: SUCCESS (0.03s)")
-                view.child("grt_step3", "GRT step3 MUMmer Chr12: 2/2 partitions, workers=2, nucmer_threads=1, thread_budget=32")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr12 1/2: START")
+                view.child("grt_step3", "LGZ step3 screen Chr12 1/2: SUCCESS (0.03s)")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr12: 2/2 partitions, workers=2, nucmer_threads=1, thread_budget=32")
                 self.assertNotIn("Chr12 1/2", stream.getvalue())
                 self.assertNotIn("nucmer_threads", stream.getvalue())
-                view.child("grt_step3", "GRT step3 MUMmer Chr12 1/2: FAILED bad coords")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr12 1/2: FAILED bad coords")
                 self.assertIn("FAILED bad coords", stream.getvalue())
                 self.assertNotIn("artifact metrics", stream.getvalue())
                 self.assertEqual(stream.getvalue().count("[PROGRESS]"), 1)
@@ -52,7 +80,7 @@ class ProgressTests(unittest.TestCase):
                 view.child("grt_step3", "Traceback (most recent call last):")
                 view.child("grt_step3", "  file.py, line 12")
                 view.child("grt_step3", "RuntimeError: bad <source>")
-                view.child("grt_step3", "GRT step3 MUMmer Chr15: computed")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr15: computed")
                 view.event("FAILED", "grt_step3", "exit_code=1 detail=logs/run_all.log")
                 output = stream.getvalue()
                 self.assertIn("3/3 chromosomes · computed=2 cached=1", output)
@@ -61,7 +89,7 @@ class ProgressTests(unittest.TestCase):
                 self.assertIn("file.py, line 12", output)
                 self.assertIn("exit_code=1 detail=logs/run_all.log", output)
                 self.assertNotIn("[CHILD]", output)
-                self.assertNotIn("GRT step3 execution", output)
+                self.assertNotIn("LGZ step3 execution", output)
 
     def test_heartbeat_partial_flush_stop_and_midnight(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -70,8 +98,8 @@ class ProgressTests(unittest.TestCase):
             stream = io.StringIO()
             with self.display(Path(temp), stream=stream, clock=lambda: clock[0], now=lambda: now[0]) as view:
                 view.event("START", "grt_step3", "attempt=1")
-                view.child("grt_step3", "GRT step3 MUMmer Chr1: computed")
-                view.child("grt_step3", "GRT step3 MUMmer Chr2: computed")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr1: computed")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr2: computed")
                 # Flush a partial count on failure, not a fabricated completed total.
                 view.event("FAILED", "grt_step3", "exit_code=2")
                 self.assertIn("2 chromosomes", stream.getvalue())
@@ -117,8 +145,8 @@ class ProgressTests(unittest.TestCase):
             with self.display(Path(temp), stream=stream, heartbeat=.01) as view:
                 view.event("START", "grt_step3", "attempt=1")
                 view.event("START", "other", "attempt=1")
-                view.child("grt_step3", "GRT step3 MUMmer Chr1: computed")
-                view.child("other", "GRT step3 MUMmer Chr1: cache hit")
+                view.child("grt_step3", "LGZ step3 MUMmer Chr1: computed")
+                view.child("other", "LGZ step3 MUMmer Chr1: cache hit")
                 view.event("SUCCESS", "other", "elapsed=0.01s")
                 for _ in range(150):
                     if "[RUNNING] [grt_step3]" in stream.getvalue():
@@ -136,7 +164,7 @@ class ProgressTests(unittest.TestCase):
             stream = io.StringIO()
             with self.display(Path(temp), stream=stream) as view:
                 view.event("SKIP_VALID", "grt_step3", "elapsed=0.000s checkpoint=long/path")
-                view.child("grt_step3", "GRT step3 cache hit: " + "a" * 64)
+                view.child("grt_step3", "LGZ step3 cache hit: " + "a" * 64)
                 view.event("CACHE_HIT", "grt_step3", "elapsed=1.223s full checkpoint details")
                 view.event("SUCCESS", "grt_step3", "elapsed=1.223s")
             self.assertIn("[CACHED]", stream.getvalue())
@@ -191,8 +219,8 @@ class ReportCompatibilityTests(unittest.TestCase):
                 for style in ("compact", "detailed"):
                     parent = root / style
                     parent.mkdir()
-                    metric = "GRT step3 Chr12 artifact metrics: copy_seconds=0.046 post_copy_parse_seconds=0.000 parse_reused=True"
-                    script = f"echo '{metric}'\necho 'GRT step3 cache hit: fixture'\nprintf '\\033[31mWARNING: <source> & detail\\033[0m\\n'\necho 'diagnostic continuation'\nexit {code}"
+                    metric = "LGZ step3 Chr12 artifact metrics: copy_seconds=0.046 post_copy_parse_seconds=0.000 parse_reused=True"
+                    script = f"echo '{metric}'\necho 'LGZ step3 cache hit: fixture'\nprintf '\\033[31mWARNING: <source> & detail\\033[0m\\n'\necho 'diagnostic continuation'\nexit {code}"
                     server = fixtures.RunAllRunnerTests().make_workspace(parent, [("example", script)])
                     result = subprocess.run([sys.executable, str(fixtures.RUNNER), "--server-dir", str(server), "--log-style", style, "--color", "always"], capture_output=True, text=True)
                     self.assertEqual(result.returncode, code, result.stdout + result.stderr)
@@ -206,7 +234,7 @@ class ReportCompatibilityTests(unittest.TestCase):
                     manifest = json.loads((server / "report/manifest.json").read_text())
                     record = json.loads((server / "report" / manifest["steps"][0]).read_text())
                     self.assertIn(metric, record["output_tail"])
-                    self.assertIn("GRT step3 cache hit: fixture", record["output_tail"])
+                    self.assertIn("LGZ step3 cache hit: fixture", record["output_tail"])
                     self.assertEqual(record["status"], "success" if code == 0 else "failed")
                     self.assertNotIn("\x1b", json.dumps(record, ensure_ascii=False))
                     html = (server / "report/report.html").read_text()

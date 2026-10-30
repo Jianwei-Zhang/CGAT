@@ -1,4 +1,4 @@
-"""GRT Step3 classification, correction, refill and Q3 publication."""
+"""LGZ Step3 classification, correction, refill and Q3 publication."""
 
 from __future__ import annotations
 
@@ -215,7 +215,7 @@ def run_refill_alignment(
             alignment_runner=batch,
         )
         print(
-            f"GRT step3 refill {round_name} {chromosome}: "
+            f"LGZ step3 refill {round_name} {chromosome}: "
             f"{'cache hit' if cache_hit else 'computed'}"
         )
         destination = temporary / "refill" / round_name / "by_chr" / chromosome_key
@@ -864,7 +864,7 @@ def run_step3(
     fingerprint = json_hash(fingerprint_payload)
     cached = checkpoint_result(server_dir, stage, fingerprint)
     if cached is not None:
-        print(f"GRT step3 cache hit: {fingerprint}")
+        print(f"LGZ step3 cache hit: {fingerprint}")
         return cached, True
     invalidate_step23_from(server_dir, stage)
     artifact_relpath = "grt/evidence/step3"
@@ -1410,7 +1410,7 @@ def run_step3(
             output_relpaths,
         )
         print(
-            f"GRT step3 complete: gaps={len(gaps)}, corrections="
+            f"LGZ step3 complete: gaps={len(gaps)}, corrections="
             f"{sum(row['outcome'] == 'accepted' for row in correction_candidates)}, "
             f"refills={sum(row['outcome'] == 'accepted' for row in [*refill_candidates, *round2_candidates])}"
         )
@@ -1899,7 +1899,7 @@ def execute_step3(args: argparse.Namespace) -> dict[str, object]:
     if step2["target_sha256"] != donor_set["fasta_sha256"] or step3["target_sha256"] != donor_set["fasta_sha256"]:
         fail("Step2/3 donor FASTA hash drifted from frozen D0")
     print(
-        f"GRT Step3 complete: run={context['run_id']}, donor_set={donor_set['donor_set_id']}, "
+        f"LGZ Step3 complete: run={context['run_id']}, donor_set={donor_set['donor_set_id']}, "
         f"q3_sha256={sha256_file(server_dir / 'grt/q/q3.fa')}"
     )
     return step3

@@ -2,6 +2,8 @@
 
 **中文** | [English](README.md)
 
+自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
+
 ## 快速开始
 
 在 Linux 服务端依次执行以下命令：从 [Release v2.0.15](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.15) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
@@ -140,7 +142,7 @@ bash ~/bin/GPM_Server/update.sh
 完成一次性接入，不直接覆盖旧目录。官网可独立完成检查；若镜像滞后，不会把已安装的
 较新版本/构建降级。网络或校验失败不会被当作“已经最新”。
 
-### 独立 GRT 阶段控制与执行配置
+### 独立 LGZ 阶段控制与执行配置
 
 新工作区生成独立的 `run_grt_step2.sh` 与 `run_grt_step3.sh` 阶段脚本，分别记录调度状态和 checkpoint。先运行 Step2，再运行 Step3；Step3 启动前会校验兼容的 Step2 结果。两个阶段共用覆盖修复引擎与公共模块的内容指纹：当修复代码更新时，阶段结果会自动从 Step2 重新生成，而输入与参数一致的 MUMmer 原始比对缓存仍可安全复用。
 
@@ -255,7 +257,7 @@ tail -F ./gpm_server/logs/progress.log
 `MINIMAP2_CIGAR_ASSERTION` 表示检测到了 `mm_update_extra`/`mm_fix_cigar` 的区间长度
 断言。请保留 `command.sh`/`command.txt`/`command.json`、`stderr.log`、
 `tool_version.txt`、部分输出和 Slurm 资源记录。失败任务不会被当成成功继续下游；
-GRT 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之前的失败证据。
+LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之前的失败证据。
 
 不要通过删除 `-c`、过滤超长查询或静默更改组装预设来绕过失败。对 minimap2 2.31
 的 270 Mb 合成序列测试中，已测试的调参不能解决该单操作长度问题；`--max-qlen`

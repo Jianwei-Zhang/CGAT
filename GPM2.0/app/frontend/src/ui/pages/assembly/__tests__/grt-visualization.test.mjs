@@ -175,7 +175,7 @@ function createState() {
   };
 }
 
-test("renders passive GRT placement status and a current-path baseline reset", () => {
+test("renders passive LGZ placement status and a current-path baseline reset", () => {
   const html = renderAssemblyPage(createState());
 
   assert.doesNotMatch(html, /data-grt-trace-panel="true"/);
@@ -184,14 +184,14 @@ test("renders passive GRT placement status and a current-path baseline reset", (
   assert.doesNotMatch(html, /data-grt-locate-/);
   assert.match(html, /grt_promoted/);
   assert.match(html, /Reference status: no_hit/);
-  assert.match(html, /Anchor source: GRT Final Path/);
+  assert.match(html, /Anchor source: LGZ Final Path/);
   assert.match(html, /class="grt-status-badge is-grt_promoted"/);
   assert.doesNotMatch(html, /class="grt-status-badge is-grt_promoted"[^>]*role="button"/);
   assert.match(html, /data-final-path-restore-grt-baseline="Chr01"/);
   assert.doesNotMatch(html, /Program error/);
 });
 
-test("does not render persistent trace controls from GRT metadata", () => {
+test("does not render persistent trace controls from LGZ metadata", () => {
   const state = createState();
   state.assembly.grtProjectView.sourceCards = [];
   const html = renderAssemblyPage(state);
@@ -201,7 +201,7 @@ test("does not render persistent trace controls from GRT metadata", () => {
   assert.doesNotMatch(html, /object-attempt/);
 });
 
-test("schema 2 renders independent GRT result switches and exact main-track overlays", () => {
+test("schema 2 renders independent LGZ result switches and exact main-track overlays", () => {
   const state = createState();
   const baseline = state.assembly.grtProjectView.baselineFinalPathByChr.Chr01;
   state.assembly.grtProjectView.recipe.finalPathSchemaVersion = "2";
@@ -230,7 +230,7 @@ test("schema 2 renders independent GRT result switches and exact main-track over
 
   assert.match(html, /data-grt-result-toggle="main" checked/);
   assert.match(html, /data-grt-result-toggle="subview"/);
-  assert.match(html, /aria-label="Show the path and alignment evidence precomputed by the GRT algorithm"/);
+  assert.match(html, /aria-label="Show the path and alignment evidence precomputed by the Linking Inter-assembly Units for Genome Zipping algorithm"/);
   assert.match(html, />Precomputed result<\/span>/);
   assert.match(html, /data-grt-result-layer="resultPath" data-grt-result-layer-scope="main" checked/);
   assert.match(html, /data-grt-result-layer="alignmentEvidence" data-grt-result-layer-scope="subview" checked/);
@@ -252,7 +252,7 @@ test("schema 2 renders independent GRT result switches and exact main-track over
   assert.doesNotMatch(html, /data-grt-result-toggle="subview" checked/);
 });
 
-test("schema 2 keeps GRT overlay containers in the DOM while the switches are off", () => {
+test("schema 2 keeps LGZ overlay containers in the DOM while the switches are off", () => {
   const state = createState();
   const baseline = state.assembly.grtProjectView.baselineFinalPathByChr.Chr01;
   state.assembly.grtProjectView.recipe.finalPathSchemaVersion = "2";
@@ -292,7 +292,7 @@ test("schema 2 keeps GRT overlay containers in the DOM while the switches are of
   assert.match(shown, /class="grt-result-mask"/);
 });
 
-test("legacy schema 1 keeps both GRT result switches hidden", () => {
+test("legacy schema 1 keeps both LGZ result switches hidden", () => {
   const html = renderAssemblyPage(createState());
 
   assert.doesNotMatch(html, /data-grt-result-toggle=/);
@@ -300,7 +300,7 @@ test("legacy schema 1 keeps both GRT result switches hidden", () => {
 });
 
 
-test("GRT evidence and result hover proxies use the same styled alignment tooltip payload", () => {
+test("LGZ evidence and result hover proxies use the same styled alignment tooltip payload", () => {
   const state = createState();
   state.assembly.grtProjectView.recipe.finalPathSchemaVersion = "2";
   const baseline = state.assembly.grtProjectView.baselineFinalPathByChr.Chr01;
@@ -310,6 +310,6 @@ test("GRT evidence and result hover proxies use the same styled alignment toolti
   const html = renderAssemblyPage(state);
   const proxies = [...html.matchAll(/<(?:polygon|rect|path|line) class="(?:grt-result-hover-proxy|grt-display-evidence-band)[^>]*>/g)];
   assert.ok(proxies.length > 0);
-  for (const [proxy] of proxies) assert.match(proxy, /data-subview-band-tooltip="/);
+  for (const [proxy] of proxies) assert.match(proxy, /data-subview-band-tooltip="Linking Inter-assembly Units for Genome Zipping/);
   assert.doesNotMatch(html, /class="(?:grt-result-hover-proxy|grt-display-evidence-band)[^>]*><title>/);
 });

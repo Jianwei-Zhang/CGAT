@@ -84,7 +84,7 @@ test("keeps main and Subview layer selections independent and defaults legacy st
   assert.equal(subviewPathOff.Chr01.subview, true);
 });
 
-test("only exposes display schemas, unphased, semantically unchanged GRT results", () => {
+test("only exposes display schemas, unphased, semantically unchanged LGZ results", () => {
   const baseline = entry([sourceSegment("a", 1, 1000)]);
   const assembly = {
     selectedChrName: "Chr01",
@@ -282,7 +282,8 @@ test("renders cross-lane links as lines, same-ctg links as arcs, and gap labels 
   assert.match(crossScene.junctionMarkup, /data-grt-result-junction-left-entry-key="top"/);
   assert.match(crossScene.junctionMarkup, /data-grt-result-junction-right-entry-key="bottom"/);
   assert.match(crossScene.junctionMarkup, /data-grt-result-junction-line="1"/);
-  assert.match(crossScene.junctionMarkup, /GRT gap · 300 bp/);
+  assert.match(crossScene.junctionMarkup, /data-subview-band-tooltip="Linking Inter-assembly Units for Genome Zipping gap · 300 bp"/);
+  assert.match(crossScene.junctionMarkup, /<text[^>]*>LGZ gap · 300 bp<\/text>/);
 
   const sameCtgPlan = buildGrtResultPlan(entry([
     sourceSegment("a", 1, 1000),

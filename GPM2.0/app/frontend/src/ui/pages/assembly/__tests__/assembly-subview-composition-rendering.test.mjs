@@ -166,7 +166,7 @@ test("saved members become unavailable only after candidate loading has complete
   assert.doesNotMatch(loadingHtml, /class="track-ctg-group[^"]* is-unavailable"/);
 });
 
-test("composition canvas keeps baseline GRT anchors when result display is off and Final Path diverges", () => {
+test("composition canvas keeps baseline LGZ anchors when result display is off and Final Path diverges", () => {
   const candidates = buildSubviewCompositionCandidates({
     primaryDatasetId: 1,
     allChrCtgs: [

@@ -39,7 +39,7 @@
 | HTML `title` 和图形节点 `<title>` | 由运行环境决定，App 未定义统一尺寸/换行规则 | 由运行环境决定 | 由运行环境决定 | 原生行为，App 不控制延迟；不填一个未经实测的统一毫秒值 |
 | Final Path Contig | 最小宽 180px，最大 `min(460px, 100vw - 16px)`；内边距 6px 8px；圆角 5px；按换行文本展示，长词可断行 | `--font-body`，默认 14px；行高 1.4；未单独指定字重 | 浅色为半透明淡黄色 `rgba(255,252,244,.96)`，文字 `#2f2415`；深色使用琥珀主题变量；1px 边框，阴影 `0 4px 12px rgba(0,0,0,.12)` | pointerover 即时，无等待计时器；随鼠标移动；离开、按下、滚动、键盘事件等隐藏 |
 | 主数据成员卡片 | 与 Final Path 共用上述样式 | 同上 | 同上，非按成员角色分别上整块底色 | 同一即时 runtime，0ms 等待 |
-| 主/局部比对带、GRT evidence/result | 同样继承最小宽 180px、最大宽 460px、内边距 6px 8px、圆角 5px、行高 1.4；分隔文本转换为多行 | `--font-body`，默认 14px | 按对象分为主数据蓝、辅助棕、未知中性、GRT 绿、MUMmer 紫、Minimap2 青绿；使用同一层几何但多种底色 | coordinator 默认等待 500ms；显示后随鼠标移动；离开、滚动、按下、右键、键盘事件等隐藏 |
+| 主/局部比对带、LGZ evidence/result | 同样继承最小宽 180px、最大宽 460px、内边距 6px 8px、圆角 5px、行高 1.4；分隔文本转换为多行 | `--font-body`，默认 14px | 按对象分为主数据蓝、辅助棕、未知中性、LGZ 绿、MUMmer 紫、Minimap2 青绿；使用同一层几何但多种底色 | coordinator 默认等待 500ms；显示后随鼠标移动；离开、滚动、按下、右键、键盘事件等隐藏 |
 | 设置页 `?` 帮助 | `width: min(26rem, 100%)`，默认根字号下上限 364px、实际受包含块影响；内边距 10px 12px；圆角 6px；行高 1.65；按钮下方 6px，部分条目上置 | `--font-caption`，默认约 12px；字重 400 | 浅色淡蓝 `#f3f7fc`、文字 `#53677f`、边框 `#d6e0ec`；深色跟随主题；阴影 `0 4px 16px #18355214` | CSS hover/focus-within 即显，无进入延迟；点击 `?` 还可切换展开状态，和普通 hover-only Tooltip 不完全相同 |
 
 共享底座 `.subview-band-tooltip` 还保留 absolute、z-index 4、最大宽 360px、`white-space: pre` 等基础定义及页面占位节点；上表三个活跃的图形/成员 Tooltip 通过扩展类覆盖为 fixed、z-index 45、最大宽 460px、`pre-wrap`。不能把占位节点一概算作另一套已独立运行的 Tooltip。
@@ -48,7 +48,7 @@
 
 - App 字体栈是 `system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif`。当前自绘提示继承此体系，不是单独打包的跨平台统一字体。
 - Final Path 信息已有明确语义：名称、采用片段长度、来源 Contig 总长（可得时）、来源区间、方向。两种长度不可为了统一样式而混成一个“长度”。
-- 成员提示含名称、长度、来源区间、派生来源、局部信息和部分 GRT 状态；它通过多行纯文本展示，不是真正的标题/字段两列布局。
+- 成员提示含名称、长度、来源区间、派生来源、局部信息和部分 LGZ 状态；它通过多行纯文本展示，不是真正的标题/字段两列布局。
 - 比对带 runtime 把 ` | ` 和 ` · ` 替换为换行。不同来源的文案结构和行数不一致，布局还没有共享结构化模型。
 - 图形/成员提示有 `max-height` 和 `overflow: hidden`；长内容存在被裁切的设计风险，需要在后续规范中处理，不能把现有最大宽当成已保证内容完整。
 
@@ -64,7 +64,7 @@
 | `ui/pages/assembly/immediate-tooltip-runtime.js` | Final Path 和成员提示的即时事件委托、定位及部分清理 |
 | `ui/pages/assembly/final-path-tooltip-runtime.js` | Final Path 适配入口 |
 | `ui/pages/assembly/scope-popover-runtime.js` | 成员卡片提示绑定 |
-| `ui/pages/assembly/alignment-tooltip-runtime.js` | 主/局部比对带及 GRT 提示入口、角色分类和定位 |
+| `ui/pages/assembly/alignment-tooltip-runtime.js` | 主/局部比对带及 LGZ 提示入口、角色分类和定位 |
 | `ui/pages/assembly-page.js:2804–2885` | 500ms 提示协调器 |
 | `ui/pages/assembly/render-subview.js:94` | `SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS = 500` |
 | `ui/shell/app-settings-panel.js` | 设置页帮助内容、ARIA 关系和点击展开状态 |
@@ -91,7 +91,7 @@
 | Overview / Project Preview / 导出页 | 来源 Contig、采用区间覆盖、参考区间、Final Path、数据集长名称、下载按钮、GAP 图形；`project-preview-page.js`、`project-export-page.js`、`project-preview-image-export.js` |
 | Assembly 主视图 | 部分 Contig/成员/标记、来源 gap/split、端粒/N 区间、工具按钮；`render-tracks.js`、`main-anchor-fragments.js`、`source-fragment-layout.js`、`n-region-markers.js` |
 | Assembly 局部视图 | Contig、composition/source 片段、anchor 列表、帮助/历史按钮、拆分候选；`render-subview*.js`、`anchor-contig-split-dialog.js`、`manual-contig-split.js` |
-| Final Path / DEGAP / GRT | Final Path 非 Contig 场景和统计条、DEGAP 名称/按钮、GRT 操作提示；`final-path-card.js`、`degap-card.js`、`grt-result-controls.js` |
+| Final Path / DEGAP / LGZ | Final Path 非 Contig 场景和统计条、DEGAP 名称/按钮、LGZ 操作提示；`final-path-card.js`、`degap-card.js`、`grt-result-controls.js` |
 | 导航条 / 动态业务入口 | 模式按钮、视窗范围、span 数值、辅助数据集选择器；`view-navigation-ui.js`、`view-navigation-runtime.js`、`support-dataset-picker-runtime.js` |
 
 ### 3.3 不能仅靠替换 title 的原因
@@ -117,7 +117,7 @@ D1 的配色规则、D2 的单一规格、D3 的即时触发/定位/关闭/长�
 - 用户明确要求：“根据对象的颜色决定悬浮框的颜色”，不仅匹配色系，也匹配对象的颜色深浅。
 - 对有明确颜色的对象，Tooltip 背景以当前被悬浮对象的实际显示颜色为依据，而不是只按对象类别分配一套固定底色；无明确对象色的普通控件、路径等使用统一规范的默认配色。
 - 比对示例：两种比对色分别对应各自色系；同一色系内的浅色比对块配浅色提示、深色比对块配深色提示，跟随该块当前显示的色阶。不能仅将所有主数据比对统一为一种蓝、所有辅助比对统一为一种棕。
-- Contig、成员卡片、参考对象、GRT 等其他有明确对象颜色的场景也遵循同一原则；统一的是颜色来源规则，不是把所有提示染成同一种颜色。
+- Contig、成员卡片、参考对象、LGZ 等其他有明确对象颜色的场景也遵循同一原则；统一的是颜色来源规则，不是把所有提示染成同一种颜色。
 - 对象若通过透明度/混色表现深浅，匹配目标是实际可见颜色；不能仅复制同一 alpha 值却因提示下层背景不同而产生另一种深浅。具体取色/合成方式待实现时核查。
 - 只调整 Tooltip，不反过来改变对象颜色、identity 色阶、角色或生物学含义。
 - 文字/边框需保证在对应背景上可读；允许的颜色调整也属于统一规则，不给有色对象额外引入一套字体或布局。不把默认配色强行套到有明确颜色的对象上。
@@ -162,7 +162,7 @@ D1 的配色规则、D2 的单一规格、D3 的即时触发/定位/关闭/长�
 
 ### D3. 即时显示、定位、关闭及长内容交互（已确认）
 
-- 所有 App 自有 Tooltip 显示延迟统一为 0ms，不保留普通提示 300ms、比对/GRT 500ms 或其他非零等待；不增加淡入/淡出等待。
+- 所有 App 自有 Tooltip 显示延迟统一为 0ms，不保留普通提示 300ms、比对/LGZ 500ms 或其他非零等待；不增加淡入/淡出等待。
 - 鼠标首次进入有效对象时，在指针右下方偏移 14px 显示；显示后位置稳定，不追随鼠标，切换对象时重新定位。
 - 自动翻转、避让；距离窗口边缘至少 8px，不遮住当前指针位置。
 - 控件获得键盘焦点时即时显示，相对控件定位；Esc 关闭，不抢焦点，关闭后不因同一次 focus/move 立即重弹。
@@ -193,7 +193,7 @@ D1 的配色规则、D2 的单一规格、D3 的即时触发/定位/关闭/长�
 | D1：有对象色时匹配实际颜色及深浅，无对象色时使用统一默认配色 | 已确认；所有对象强制中性底色的建议已撤回 |
 | D1：浅/深主题默认色值、有色背景上的深浅文字及同色系 1px 边框 | 已确认；背景不因文字可读性而擅自变色 |
 | D2：单一规格的字体、字号、排版、尺寸、间距、圆角及阴影 | 已确认；约 13px、行高 1.5、最大宽 480px、内边距 6×8px、圆角 6px、边框 1px；两种密度建议已撤回 |
-| D3：所有 Tooltip 显示延迟统一 0ms | 已确认；300ms 普通提示建议已撤回；比对/GRT 的 500ms 等待待实现移除 |
+| D3：所有 Tooltip 显示延迟统一 0ms | 已确认；300ms 普通提示建议已撤回；比对/LGZ 的 500ms 等待待实现移除 |
 | D3：稳定定位、边缘避让、键盘/移入/选择文字、长内容滚动及即时清理 | 已确认；14px 指针偏移、8px 窗口边距；不改业务菜单/面板关闭规则 |
 | D4：共享 runtime、分层挂载与分批迁移 | 按已确认规范实施，保留数据/导出/业务交互边界 |
 | App 实现 | 用户已授权；源码及 Windows 自动化门槛已完成，原生平台验收见第 7 节 |
@@ -211,9 +211,9 @@ D1 的配色规则、D2 的单一规格、D3 的即时触发/定位/关闭/长�
 
 ### 7.1 已落地的源码范围
 
-- `app/frontend/src/ui/app-tooltip-runtime.js`：全 App 单一事件委托 owner；普通控件、Final Path、成员及比对/GRT 共用一个激活提示。原生 dialog 内部挂载，切回页面时迁回 body，不依赖跨 top-layer 的 z-index。
+- `app/frontend/src/ui/app-tooltip-runtime.js`：全 App 单一事件委托 owner；普通控件、Final Path、成员及比对/LGZ 共用一个激活提示。原生 dialog 内部挂载，切回页面时迁回 body，不依赖跨 top-layer 的 z-index。
 - `app/frontend/src/styles/tooltips.css`：统一字体、尺寸、行高、内边距、圆角、阴影、换行与可滚动内容；无触发等待和淡入/淡出动画。
-- `app/frontend/src/ui/tooltip-colors.js`：对象实际 fill/background/stroke 及深浅；透明证据与祖先表面合成，GRT 结果进一步叠加实际 SVG 遮罩和源 ctg 底色；Canvas 命中代理读取实际 paint 变量，ctg 透明片段命中区关联其源图形。中性普通控件使用默认配色，有明确对象色时覆盖。
+- `app/frontend/src/ui/tooltip-colors.js`：对象实际 fill/background/stroke 及深浅；透明证据与祖先表面合成，LGZ 结果进一步叠加实际 SVG 遮罩和源 ctg 底色；Canvas 命中代理读取实际 paint 变量，ctg 透明片段命中区关联其源图形。中性普通控件使用默认配色，有明确对象色时覆盖。
 - 普通控件及动态更新来源显式迁移到 `data-app-tooltip`；SVG 交互对象改用 `desc[data-app-tooltip-source]`，保留完整文本和可访问名称，不用全页 title 删除观察器掩盖遗漏。
 - 旧 Final Path/成员/比对绑定入口改为共享 owner 的薄适配器；移除原比对 dwell 配置、旧页面占位节点和角色固定底色 CSS，不改其他业务菜单的计时器。
 - 按确认方案稳定定位、翻转/避让和窗口边距；跨间隙用几何关联区域而非关闭计时器；支持移入选择文字、内部滚动、键盘 focus/Esc、外部操作关闭及失效 owner 清理。
@@ -225,7 +225,7 @@ D1 的配色规则、D2 的单一规格、D3 的即时触发/定位/关闭/长�
 ### 7.2 验证证据
 
 - 新增共享 Tooltip 的行为、颜色、生命周期、原生来源迁移及导出隔离定向测试；同步更新原生 title / 500ms 旧契约的渲染断言和 DOM 测试桩，不删减数据/几何/来源校验。
-- Windows Node 全量前端测试：2214/2214 通过，0 失败、0 跳过；其中新增共享 Tooltip 的 39 个定向案例覆盖即时触发、嵌套命中、固定定位、跨间隙、选择/内部滚动、键盘、disabled、dialog、缓存/路由、ctg/Canvas 色阶/透明合成、GRT 遮罩启用/关闭及不同源色、默认配色、导出隔离，以及长路径换行后的内容收宽、滚动条占位、分数像素、重新测量和边缘定位；新增案例进一步覆盖真实自然宽度的小数精度、数值/单位不拆行、复制文本完整性及安全文案刷新。
+- Windows Node 全量前端测试：2214/2214 通过，0 失败、0 跳过；其中新增共享 Tooltip 的 39 个定向案例覆盖即时触发、嵌套命中、固定定位、跨间隙、选择/内部滚动、键盘、disabled、dialog、缓存/路由、ctg/Canvas 色阶/透明合成、LGZ 遮罩启用/关闭及不同源色、默认配色、导出隔离，以及长路径换行后的内容收宽、滚动条占位、分数像素、重新测量和边缘定位；新增案例进一步覆盖真实自然宽度的小数精度、数值/单位不拆行、复制文本完整性及安全文案刷新。
 - Windows Node / npm.cmd 生产构建：通过，2031 modules transformed；主 JS chunk 大于 500kB 的提示保留，非构建失败。本次生成的 `dist/` 已删除。
 - `git diff --check`、新增模块与变更 JS 的 Windows Node 语法检查：通过；最终暂存区检查随提交执行。
 - 首轮实现及 7.4 未启动浏览器；后续因用户再次提供 ctg/比对块留白截图，执行 7.5 所述 Windows 最小页面浏览器排版复现。该证据不替代完整原生 App 交互验收；本次不构建/发布安装包，不改变版本号。

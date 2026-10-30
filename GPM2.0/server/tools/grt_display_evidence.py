@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Project accepted GRT local alignments into App display coordinates.
+"""Project accepted LGZ local alignments into App display coordinates.
 
 The Server audit package keeps synthetic q/flank records and donor-member
 coordinates.  This module converts only the exact MUMmer/PAF rows selected by
 accepted Final Path operations into original dataset/contig coordinates.  The
-desktop App therefore never needs to parse internal GRT record identities.
+desktop App therefore never needs to parse internal LGZ record identities.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def _read_events(path: Path) -> dict[str, dict]:
         event = json.loads(raw)
         event_id = str(event.get("event_id", "")).strip()
         if not event_id or event_id in events:
-            raise ValueError(f"invalid or duplicate GRT event at {path}:{line_number}")
+            raise ValueError(f"invalid or duplicate LGZ event at {path}:{line_number}")
         events[event_id] = event
     return events
 
@@ -79,7 +79,7 @@ def _member_source_endpoint(
         raise ValueError("donor member has an invalid interval/orientation")
     member_length = member_end - member_start + 1
     if local_start <= 0 or local_end < local_start or local_end > member_length:
-        raise ValueError("selected GRT alignment exceeds its donor member")
+        raise ValueError("selected LGZ alignment exceeds its donor member")
     if orientation == "+":
         source_start = member_start + local_start - 1
         source_end = member_start + local_end - 1
@@ -270,7 +270,7 @@ def _mummer_alignments_for_event(
         raise ValueError(f"Final Path event {supporting_event.get('event_id')} lacks an accepted candidate")
     member = members.get(str(candidate.get("member_id", "")))
     if member is None:
-        raise ValueError(f"GRT candidate {candidate.get('candidate_id')} references an unknown donor member")
+        raise ValueError(f"LGZ candidate {candidate.get('candidate_id')} references an unknown donor member")
     profile = _evidence_profile(
         supporting_event,
         registry,
@@ -278,7 +278,7 @@ def _mummer_alignments_for_event(
         candidate,
     )
     if profile is None:
-        raise ValueError(f"GRT candidate {candidate.get('candidate_id')} lacks linked MUMmer evidence")
+        raise ValueError(f"LGZ candidate {candidate.get('candidate_id')} lacks linked MUMmer evidence")
     preset = str(profile.get("preset", ""))
     q_version = str(profile.get("q_version", "")) or ("q1" if stage == "step2" else "q2")
     chromosome = str(candidate.get("chr", ""))
@@ -293,11 +293,11 @@ def _mummer_alignments_for_event(
         row = alignments_by_stage.get(stage, {}).get((chromosome, line_number))
         if row is None:
             raise ValueError(
-                f"GRT candidate {candidate.get('candidate_id')} references missing MUMmer line {line_number}"
+                f"LGZ candidate {candidate.get('candidate_id')} references missing MUMmer line {line_number}"
             )
         if str(row.get("member_id", "")) != str(candidate.get("member_id", "")):
             raise ValueError(
-                f"GRT candidate {candidate.get('candidate_id')} MUMmer line uses another donor member"
+                f"LGZ candidate {candidate.get('candidate_id')} MUMmer line uses another donor member"
             )
         alignment_orientation = str(row.get("orientation", ""))
         if alignment_orientation not in {"+", "-"}:
@@ -335,7 +335,7 @@ def _mummer_alignments_for_event(
 
 def _parse_paf_line(path: Path, line_number: int) -> dict[str, object]:
     if not path.is_file():
-        raise ValueError(f"selected GRT local PAF is missing: {path}")
+        raise ValueError(f"selected LGZ local PAF is missing: {path}")
     selected = None
     with path.open(encoding="utf-8") as handle:
         for current, raw in enumerate(handle, 1):
@@ -343,7 +343,7 @@ def _parse_paf_line(path: Path, line_number: int) -> dict[str, object]:
                 selected = raw.rstrip("\n").split("\t")
                 break
     if selected is None or len(selected) < 12:
-        raise ValueError(f"selected GRT local PAF line is invalid: {path}:{line_number}")
+        raise ValueError(f"selected LGZ local PAF line is invalid: {path}:{line_number}")
     return {
         "query_name": selected[0],
         "query_length": int(selected[1]),
@@ -490,7 +490,7 @@ def _local_alignments_for_event(
         raise ValueError(f"Final Path event {final_event.get('event_id')} lacks an accepted refill candidate")
     member = members.get(str(candidate.get("member_id", "")))
     if member is None:
-        raise ValueError(f"GRT refill {candidate.get('candidate_id')} references an unknown donor member")
+        raise ValueError(f"LGZ refill {candidate.get('candidate_id')} references an unknown donor member")
     profile = _evidence_profile(
         supporting_event,
         registry,
@@ -498,7 +498,7 @@ def _local_alignments_for_event(
         candidate,
     )
     if profile is None:
-        raise ValueError(f"GRT refill {candidate.get('candidate_id')} lacks accepted local evidence")
+        raise ValueError(f"LGZ refill {candidate.get('candidate_id')} lacks accepted local evidence")
     projection = _flank_projection(source_root, profile, projection_cache)
     if historical and projection is None:
         raise ValueError("retained refill lacks immutable flank projection; rerun run_all.sh to regenerate Step3 evidence")
@@ -514,24 +514,24 @@ def _local_alignments_for_event(
         paf = _parse_paf_line(paf_path, line_number)
         strand = str(paf["strand"])
         if strand not in {"+", "-"}:
-            raise ValueError("selected GRT local PAF has an invalid strand")
+            raise ValueError("selected LGZ local PAF has an invalid strand")
         query_name = str(paf["query_name"])
         expected_name = f"flank__{candidate.get('object_id', '')}__{'L' if side == 'left' else 'R'}"
         if query_name != expected_name:
             raise ValueError(
-                f"GRT refill {candidate.get('candidate_id')} {field} does not reference the {side} flank"
+                f"LGZ refill {candidate.get('candidate_id')} {field} does not reference the {side} flank"
             )
         if str(paf["target_name"]) != str(member.get("fasta_record_name", "")):
             raise ValueError(
-                f"GRT refill {candidate.get('candidate_id')} {field} uses another donor member"
+                f"LGZ refill {candidate.get('candidate_id')} {field} uses another donor member"
             )
         aligned_span = int(paf["query_end0"]) - int(paf["query_start0"])
         block_length = int(paf["block_length"])
         matches = int(paf["matches"])
         if aligned_span <= 0 or block_length <= 0 or matches < 0 or matches > block_length:
-            raise ValueError("selected GRT local PAF has invalid alignment lengths")
+            raise ValueError("selected LGZ local PAF has invalid alignment lengths")
         if not (0 <= int(paf["query_start0"]) < int(paf["query_end0"]) <= int(paf["query_length"])):
-            raise ValueError("selected GRT local PAF exceeds its query")
+            raise ValueError("selected LGZ local PAF exceeds its query")
         if projection is None:
             target = _adjacent_source_endpoint(
                 segments, segment_index, side, aligned_span, strand,
@@ -690,7 +690,7 @@ def _candidates_by_event(path: Path) -> dict[str, dict[str, str]]:
             result[event_id] = row
         elif row.get("outcome") == "accepted":
             if previous.get("outcome") == "accepted":
-                raise ValueError(f"GRT event {event_id} has multiple accepted candidates in {path}")
+                raise ValueError(f"LGZ event {event_id} has multiple accepted candidates in {path}")
             result[event_id] = row
     return result
 

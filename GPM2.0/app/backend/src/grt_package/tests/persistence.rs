@@ -98,7 +98,7 @@ fn initializes_locked_recipe_and_materializes_used_unplaced_source_card() {
     let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
 
     let initialized = initialize_grt_project(&outcome.project_db_path, "locked-project")
-        .expect("initialize locked GRT project");
+        .expect("initialize locked LGZ project");
     assert_eq!(initialized.primary_dataset_id, 1);
     assert_eq!(initialized.support_dataset_ids, vec![2]);
     assert_eq!(initialized.project_dataset_count, 2);
@@ -379,7 +379,7 @@ fn initializes_locked_recipe_with_requested_phased_assembly_capability() {
         "phased-locked-project",
         true,
     )
-    .expect("initialize phased locked GRT project");
+    .expect("initialize phased locked LGZ project");
     assert!(initialized.phased_assembly_enabled);
 
     let conn = open_workspace_db(&outcome.project_db_path).unwrap();

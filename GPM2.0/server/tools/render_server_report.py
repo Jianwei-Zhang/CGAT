@@ -221,7 +221,7 @@ def stage_io_html(record: dict) -> str:
         output_body = '<strong>染色体级证据</strong><span>路径片段、事件与来源坐标</span>'
     elif stage_id == "finalize_evidence":
         summary = facts.get("summary", {})
-        output_body = (f'<strong>可追溯 GRT 结果</strong><span>{esc(display(summary.get("events")))} 个事件 · '
+        output_body = (f'<strong>可追溯 LGZ 结果</strong><span>{esc(display(summary.get("events")))} 个事件 · '
                        f'{esc(display(summary.get("evidence")))} 条证据</span>')
     elif outputs:
         output_body = (f'<strong>{esc(outputs[0].get("file", "交付文件"))}</strong>'
@@ -249,7 +249,7 @@ def pipeline_map_html(records: list[dict], input_facts: dict, final: dict) -> st
         ("02", "参考比对", f"{len(refs)} 个比对任务", "生成覆盖与定位证据"),
         ("03", "染色体归属", f"{display(assigned)} 条 contig", "按覆盖、方向和锚点排序"),
         ("04", "构建 q0 与供体", f"{compact_number(q0.get('length_bp'))}", f"{display(q0.get('gap_count'))} 个初始 Gap"),
-        ("05", "GRT 修复", "q0 → q1 → q2 → q3 → q4", "填补、结构修正与端粒处理"),
+        ("05", "LGZ 修复", "q0 → q1 → q2 → q3 → q4", "填补、结构修正与端粒处理"),
         ("06", "最终结果", f"{compact_number(q4.get('length_bp'))}", f"{display(q4.get('sequence_count'))} 条染色体 · {display(q4.get('gap_count'))} 个 Gap"),
         ("07", "证据与交付", f"{display(final.get('process_summary', {}).get('event_count'))} 个事件", "HTML、JSON 与 Server ZIP"),
     ]
@@ -284,7 +284,7 @@ def grt_flow_html(grt: list[dict], final: dict) -> str:
                      f'<small>{esc(display(summary.get("event_count")))} 事件 · {esc(display(status.get("accepted", 0)))} 接受</small></div>')
         if index < len(order) - 1:
             nodes.append('<div class="grt-arrow" aria-hidden="true">→</div>')
-    return '<div class="grt-flow" id="grt-flow">' + "".join(nodes) + '</div>' if nodes else '<p class="note">GRT 序列版本尚不可用。</p>'
+    return '<div class="grt-flow" id="grt-flow">' + "".join(nodes) + '</div>' if nodes else '<p class="note">LGZ 序列版本尚不可用。</p>'
 
 
 def outcome_summary_html(final: dict) -> str:
@@ -408,7 +408,7 @@ def final_path_visual_html(final: dict) -> str:
     return (f'<div class="source-summary"><div><h3>最终序列来源贡献</h3><div class="source-bar">{"".join(contribution_parts)}</div>'
             f'<div class="legend">{contribution_legend}</div></div></div>'
             '<div class="legend path-legend"><span><i class="legend-dot source"></i>主路径来源</span>'
-            f'<span><i class="legend-dot patch"></i>GRT 补丁 / 替换</span><span><i class="legend-dot gap"></i>仍保留的 Gap</span>{annotation_legend}</div>'
+            f'<span><i class="legend-dot patch"></i>LGZ 补丁 / 替换</span><span><i class="legend-dot gap"></i>仍保留的 Gap</span>{annotation_legend}</div>'
             f'<div class="path-map" id="grt-final-path">{"".join(tracks)}</div>'
             '<p class="note">每行是一条最终染色体，色块和标记按最终坐标缩放。点击染色体查看片段来源与标记数量，悬停查看坐标。</p>')
 
@@ -580,7 +580,7 @@ def render(root: Path) -> Path:
         if record["stage_id"] == "grt_prepare":
             versions.update(record.get("facts", {}).get("sequence_versions", {}))
     versions.update(final.get("sequence_versions", {}))
-    body += stats_table("初始构建与 GRT 处理对比", versions) + notes(final.get("notes", [])) + '</details>'
+    body += stats_table("初始构建与 LGZ 处理对比", versions) + notes(final.get("notes", [])) + '</details>'
     body += '<details class="block secondary-results"><summary>查看事件与最终路径审计明细</summary>'
     body += data_table("event_reconciliation", final.get("event_reconciliation", []))
     remaining = [e for e in final.get("events", []) if e.get("status") in {"unresolved", "rejected"}]
@@ -590,7 +590,7 @@ def render(root: Path) -> Path:
     body += data_table("各染色体最终统计", (final.get("sequence_versions", {}).get("q4") or {}).get("sequences", []))
     body += '</details></section>'
     body += ('<section id="workflow" class="technical-section"><details class="section-disclosure"><summary>分析流程与任务概览</summary>'
-             '<p class="workflow-copy">从原始 FASTA 开始，依次经过参考比对、染色体归属、q0 与供体构建、GRT 修复和证据固化。</p>'
+             '<p class="workflow-copy">从原始 FASTA 开始，依次经过参考比对、染色体归属、q0 与供体构建、LGZ 修复和证据固化。</p>'
              + pipeline_map_html(records, input_facts, final))
     body += '<div id="overview">' + key_values({"开始": manifest.get("started_at"), "结束": manifest.get("ended_at"),
               "完成阶段": f'{sum(r.get("status")=="success" for r in records)} / {len(records)}',

@@ -317,7 +317,7 @@ test("resolveSubviewAnchorEdgeContextTarget collects active original edges from 
     "data-subview-anchor-bottom-length-bp": "900",
     "data-subview-anchor-top-name": "ctg_top",
     "data-subview-anchor-bottom-name": "ctg_bottom",
-    "data-subview-anchor-top-source-label": "GRT · primary",
+    "data-subview-anchor-top-source-label": "LGZ · primary",
     "data-subview-anchor-bottom-source-label": "User track",
     "data-subview-anchor-top-source-role": "primary",
     "data-subview-anchor-bottom-source-role": "support",

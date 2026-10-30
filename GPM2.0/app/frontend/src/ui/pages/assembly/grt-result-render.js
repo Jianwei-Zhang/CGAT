@@ -1,3 +1,4 @@
+import { LGZ_FULL_NAME } from "../../algorithm-names.js";
 import { projectGrtSourcePositionToRect } from "./grt-result-state.js";
 
 function normalizePositiveInteger(value) {
@@ -33,7 +34,7 @@ function renderIntervalOverlay(interval, entry, escapeHtml) {
   const rangeList = (interval.occurrences || [interval])
     .map((occurrence) => `${occurrence.sourceStart}-${occurrence.sourceEnd} (${occurrence.orientation})`)
     .join("; ");
-  const title = `GRT result · ${interval.datasetName}:${interval.contigName} · ${rangeList}`;
+  const title = `${LGZ_FULL_NAME} result · ${interval.datasetName}:${interval.contigName} · ${rangeList}`;
   const countMarkup = count > 1
     ? `<text class="grt-result-repeat-count" x="${(x + width / 2).toFixed(2)}" y="${(entry.y - 3).toFixed(2)}" text-anchor="middle">×${count}</text>`
     : "";
@@ -70,15 +71,16 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
   const sameEntry = left.entry === right.entry;
   const leftCenterY = left.entry.y + left.entry.height / 2;
   const rightCenterY = right.entry.y + right.entry.height / 2;
+  const gapCaption = `${gapLabel} · ${junction.gapSizeBp} bp`;
   const title = junction.kind === "gap"
-    ? `${gapLabel} · ${junction.gapSizeBp} bp`
-    : `GRT result · ${junction.left.datasetName}:${junction.left.contigName} → ${junction.right.datasetName}:${junction.right.contigName}`;
+    ? `${gapLabel.replace(/\bLGZ\b/g, LGZ_FULL_NAME)} · ${junction.gapSizeBp} bp`
+    : `${LGZ_FULL_NAME} result · ${junction.left.datasetName}:${junction.left.contigName} → ${junction.right.datasetName}:${junction.right.contigName}`;
   const cssClass = junction.kind === "gap" ? " is-gap" : "";
   if (sameEntry) {
     const controlY = Math.max(3, left.entry.y - 24);
     const path = `M ${left.x.toFixed(2)} ${leftCenterY.toFixed(2)} Q ${((left.x + right.x) / 2).toFixed(2)} ${controlY.toFixed(2)} ${right.x.toFixed(2)} ${rightCenterY.toFixed(2)}`;
     const label = junction.kind === "gap"
-      ? `<text class="grt-result-gap-label" x="${((left.x + right.x) / 2).toFixed(2)}" y="${Math.max(10, controlY - 2).toFixed(2)}" text-anchor="middle">${escapeHtml(title)}</text>`
+      ? `<text class="grt-result-gap-label" x="${((left.x + right.x) / 2).toFixed(2)}" y="${Math.max(10, controlY - 2).toFixed(2)}" text-anchor="middle">${escapeHtml(gapCaption)}</text>`
       : "";
     return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}" ${endpointAttrs}>
       <path class="grt-result-junction${cssClass}" d="${path}" pointer-events="none" />
@@ -90,7 +92,7 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
   const y1 = fromTop ? left.entry.y + left.entry.height : left.entry.y;
   const y2 = fromTop ? right.entry.y : right.entry.y + right.entry.height;
   const label = junction.kind === "gap"
-    ? `<text class="grt-result-gap-label" data-grt-result-junction-label="1" x="${((left.x + right.x) / 2).toFixed(2)}" y="${((y1 + y2) / 2 - 4).toFixed(2)}" text-anchor="middle">${escapeHtml(title)}</text>`
+    ? `<text class="grt-result-gap-label" data-grt-result-junction-label="1" x="${((left.x + right.x) / 2).toFixed(2)}" y="${((y1 + y2) / 2 - 4).toFixed(2)}" text-anchor="middle">${escapeHtml(gapCaption)}</text>`
     : "";
   return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}" ${endpointAttrs}>
     <line class="grt-result-junction${cssClass}" data-grt-result-junction-line="1" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" pointer-events="none" />
@@ -128,7 +130,7 @@ function renderDisplayEvidence(evidence, entries, escapeHtml) {
   const associationText = association === "supporting_precursor"
     ? " · structural precursor"
     : "";
-  const title = `GRT local evidence · ${tool === "mummer" ? "MUMmer" : "minimap2"} · ${roleLabel} · identity ${identityText}${associationText}${evidence.projectionApproximate ? " · approximate projection" : ""}`;
+  const title = `${LGZ_FULL_NAME} local evidence · ${tool === "mummer" ? "MUMmer" : "minimap2"} · ${roleLabel} · identity ${identityText}${associationText}${evidence.projectionApproximate ? " · approximate projection" : ""}`;
   const points = [
     `${sourceFirst.x.toFixed(2)},${sourceY.toFixed(2)}`,
     `${sourceSecond.x.toFixed(2)},${sourceY.toFixed(2)}`,
@@ -151,7 +153,7 @@ export function buildGrtResultScene({
   maskVisibleCtgs = false,
   layers = {},
   escapeHtml = escapeFallback,
-  gapLabel = "GRT gap",
+  gapLabel = "LGZ gap",
 } = {}) {
   const allEntries = Array.isArray(entries) ? entries : [];
   const resultPathVisible = layers?.resultPath !== false;
@@ -199,7 +201,7 @@ export function buildGrtResultScene({
 }
 
 // Keep one stable container per overlay in the DOM, whether the precomputed
-// result is shown or hidden. Toggling the GRT switch then patches these layers
+// result is shown or hidden. Toggling the LGZ switch then patches these layers
 // in place instead of rebuilding the panel (which drops the current scroll).
 export function renderGrtResultOverlayGroup({
   entryKey = "",

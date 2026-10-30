@@ -2,13 +2,15 @@
 
 **中文** | [English](README.md)
 
+自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
+
 GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流程中，用于导入、浏览、轻量编辑和 Final Path 导出。
 
 ## 项目架构
 
 | 组件 | 运行平台 | 核心职责 |
 | --- | --- | --- |
-| **GPM2.0 服务端** | Linux | 执行参考比对、染色体分配、GRT 自动修复与报告生成，产出 Full 与 Light 交付包。 |
+| **GPM2.0 服务端** | Linux | 执行参考比对、染色体分配、LGZ 自动修复与报告生成，产出 Full 与 Light 交付包。 |
 | **GPM2.0 桌面端** | Windows / macOS | 导入交付包，提供染色体 **Preview** 来源总览、**Assembly** 与 **Subview** 共线性检查、**Final Path** 编辑、`DEGAP-JOBS` 导出与结果导出。 |
 
 `win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 安装包可通过 [官方文档站直连下载](https://riceome.hzau.edu.cn/cgat/zh/downloads) 或 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases) 获取。开发和发布检查见[质量门禁](QUALITY_zh.md)。
@@ -63,7 +65,7 @@ bash "$SERVER/install.sh" --check
 | 用途 | 安装或要求的命令 |
 | --- | --- |
 | 核心流程 | `python3`、`samtools`、`zip`、`gzip` |
-| GRT Final Path | `minimap2`、`nucmer`、`delta-filter`、`show-coords` |
+| LGZ Final Path | `minimap2`、`nucmer`、`delta-filter`、`show-coords` |
 | 可选 reads 质控 | `meryl`、`merqury.sh`；仅传入 `--reads` 时使用 |
 
 执行 `run.sh` 时保持该环境已激活。
@@ -103,7 +105,7 @@ bash "$SERVER/run.sh" \
 
 `--ref` 和 `--ds` 均支持 `<名称> <fasta>` 与仅传 `<fasta>` 两种写法。省略名称时，会从 FASTA 文件名自动推导：不区分大小写地移除 `.gz` 及一个 `.fa`、`.fasta` 或 `.fna` 后缀；名称中除字母、数字、点、下划线和连字符以外的连续字符会替换为 `_`。例如 `/data/primary assembly.fa.gz` 会得到名称 `primary_assembly`；需要其他名称时仍可使用原有显式写法。
 
-准备工作目录时，第一个 `--ds` 作为主组装（primary dataset），其余 `--ds` 作为辅助组装（auxiliary datasets）；这些角色用于本次 GRT 计算并保持不变。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。生成的 `add_dataset.sh` 同样支持名称可省略的 `--ds` 写法。
+准备工作目录时，第一个 `--ds` 作为主组装（primary dataset），其余 `--ds` 作为辅助组装（auxiliary datasets）；这些角色用于本次 LGZ 计算并保持不变。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。生成的 `add_dataset.sh` 同样支持名称可省略的 `--ds` 写法。
 
 #### 通用参数
 
@@ -130,7 +132,7 @@ bash "$SERVER/run.sh" \
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` 或 `asm5`；默认 `asm10` |
 
-GPM Server 固定使用 Minimap2。BLASTN 与 Winnowmap 的全基因组运行无法满足当前流程的时间和内存要求，因此不再提供这两个引擎。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
+GPM Server 固定使用 Minimap2。BLASTN 与 Winnowmap 的全基因组运行无法满足当前流程的时间和内存要求，因此不再提供这两个引擎。LGZ 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
 
 ### 3. 恢复与监控
 
@@ -147,7 +149,7 @@ bash "$SERVER/run.sh" -o ./gpm_server
 
 默认使用 pigz 多线程压缩为 `tar.gz`；`--archive-format zip` 可保留 ZIP 格式，App 支持两者。
 
-这两个压缩包是仅有的最终交付文件，不再单独生成报告 ZIP。可直接打开服务端工作目录或任一解压后交付包中的 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。GRT 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
+这两个压缩包是仅有的最终交付文件，不再单独生成报告 ZIP。可直接打开服务端工作目录或任一解压后交付包中的 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。LGZ 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
 
 为避免校验值引用包含自身的压缩包，报告记录嵌入 `report/` 之前的 App 数据载荷校验值。两个最终压缩包完成后，`run_all.sh` 会明确打印其路径、大小、SHA-256、用途和本地报告路径；同一摘要也写入 `logs/run_all.log`。
 
@@ -189,7 +191,7 @@ bash ./gpm_server/add_dataset.sh \
   -o ./gpm_server/add_ds4_name.zip
 ```
 
-新数据集会合并进服务端工作目录，但不参与已经完成的 GRT 计算，也不会改写预计算的 Final Path；其 contig 仍可在 App 中手工编辑。
+新数据集会合并进服务端工作目录，但不参与已经完成的 LGZ 计算，也不会改写预计算的 Final Path；其 contig 仍可在 App 中手工编辑。
 
 初次 `run_all.sh` 已自动生成两种交付包。仅在后续执行 `add_dataset.sh`、`add_ctg.sh` 等操作后按需重新打包：
 
@@ -212,7 +214,7 @@ macOS App 使用 ad-hoc 签名，未经 Apple 公证。请先将 `GPM2.0.app` �
 xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 ```
 
-交付包保留 GRT 计算时确定的主组装与辅助组装角色，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。
+交付包保留 LGZ 计算时确定的主组装与辅助组装角色，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。
 
 ### 桌面端核心工作流
 

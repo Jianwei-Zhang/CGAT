@@ -28,8 +28,8 @@ pub fn load_grt_locked_recipe(project_db_path: &Path) -> Result<GrtLockedRecipe>
         },
     )
     .optional()
-    .context("failed to query locked GRT recipe")?
-    .ok_or_else(|| anyhow!("GRT package recipe is not available"))
+    .context("failed to query locked LGZ recipe")?
+    .ok_or_else(|| anyhow!("LGZ package recipe is not available"))
     .and_then(|row| {
         Ok(GrtLockedRecipe {
             workflow: row.0,
@@ -38,7 +38,7 @@ pub fn load_grt_locked_recipe(project_db_path: &Path) -> Result<GrtLockedRecipe>
             recipe_id: row.3,
             primary_dataset: row.4,
             support_datasets: serde_json::from_str(&row.5)
-                .context("persisted GRT support dataset JSON is invalid")?,
+                .context("persisted LGZ support dataset JSON is invalid")?,
             reads_qc_enabled: row.6,
             donor_set_id: row.7,
             tel_donor_set_id: row.8,
@@ -59,9 +59,9 @@ pub fn load_grt_final_path(project_db_path: &Path) -> Result<Value> {
             |row| row.get(0),
         )
         .optional()
-        .context("failed to query precomputed GRT Final Path")?
-        .ok_or_else(|| anyhow!("precomputed GRT Final Path is not available"))?;
-    serde_json::from_str(&json).context("persisted GRT Final Path JSON is invalid")
+        .context("failed to query precomputed LGZ Final Path")?
+        .ok_or_else(|| anyhow!("precomputed LGZ Final Path is not available"))?;
+    serde_json::from_str(&json).context("persisted LGZ Final Path JSON is invalid")
 }
 
 pub fn load_grt_final_path_by_chr(project_db_path: &Path) -> Result<BTreeMap<String, Value>> {
@@ -83,8 +83,8 @@ pub fn load_grt_final_path_by_chr_for_project(
             |row| row.get(0),
         )
         .optional()
-        .context("failed to query GRT Final Path schema version")?
-        .ok_or_else(|| anyhow!("GRT package recipe is not available"))?;
+        .context("failed to query LGZ Final Path schema version")?
+        .ok_or_else(|| anyhow!("LGZ package recipe is not available"))?;
     let placements = if is_display_app_final_path_schema(&final_path_schema_version) {
         Some(load_grt_assembly_source_placements(&conn, project_id)?)
     } else {
@@ -100,7 +100,7 @@ fn load_grt_final_path_by_chr_with_connection(
 ) -> Result<BTreeMap<String, Value>> {
     let mut stmt = conn
         .prepare("SELECT chr, chromosome_json FROM grt_final_path_chr ORDER BY chr")
-        .context("failed to prepare precomputed GRT Final Path chromosome query")?;
+        .context("failed to prepare precomputed LGZ Final Path chromosome query")?;
     let rows = stmt
         .query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -109,7 +109,7 @@ fn load_grt_final_path_by_chr_with_connection(
     rows.into_iter()
         .map(|(chr_name, json)| {
             let chromosome: Value = serde_json::from_str(&json)
-                .context("persisted GRT Final Path chromosome JSON is invalid")?;
+                .context("persisted LGZ Final Path chromosome JSON is invalid")?;
             let projected =
                 project_grt_final_path_chromosome(chromosome, &chr_name, source_lengths)?;
             let projected = if let Some(placements) = placements {
@@ -203,32 +203,32 @@ fn project_grt_display_evidence_item(
 ) -> Result<bool> {
     let evidence = evidence
         .as_object_mut()
-        .ok_or_else(|| anyhow!("persisted GRT display evidence JSON is invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ display evidence JSON is invalid"))?;
     for endpoint_name in ["source", "target"] {
         let endpoint = evidence
             .get_mut(endpoint_name)
             .and_then(Value::as_object_mut)
-            .ok_or_else(|| anyhow!("persisted GRT display evidence endpoint is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ display evidence endpoint is invalid"))?;
         let dataset_name = endpoint
             .get("dataset")
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
-            .ok_or_else(|| anyhow!("persisted GRT display evidence dataset is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ display evidence dataset is invalid"))?;
         let contig_name = endpoint
             .get("contig")
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
-            .ok_or_else(|| anyhow!("persisted GRT display evidence contig is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ display evidence contig is invalid"))?;
         let start = endpoint
             .get("start")
             .and_then(Value::as_i64)
             .filter(|value| *value > 0)
-            .ok_or_else(|| anyhow!("persisted GRT display evidence start is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ display evidence start is invalid"))?;
         let end = endpoint
             .get("end")
             .and_then(Value::as_i64)
             .filter(|value| *value >= start)
-            .ok_or_else(|| anyhow!("persisted GRT display evidence end is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ display evidence end is invalid"))?;
         let candidates = placements
             .get(&(
                 dataset_name.to_string(),
@@ -336,7 +336,7 @@ fn load_grt_assembly_source_placements(
                AND s.hidden = 0
              ORDER BY d.name, ss.seq_name, c.assigned_chr_name, c.id",
         )
-        .context("failed to prepare GRT assembly source placement query")?;
+        .context("failed to prepare LGZ assembly source placement query")?;
     let rows = stmt
         .query_map(params![project_id], |row| {
             Ok((
@@ -357,7 +357,7 @@ fn load_grt_assembly_source_placements(
             || placement.source_start <= 0
             || placement.source_end < placement.source_start
         {
-            bail!("invalid GRT assembly placement for {dataset_name}:{contig_name}:{chr_name}");
+            bail!("invalid LGZ assembly placement for {dataset_name}:{contig_name}:{chr_name}");
         }
         placements
             .entry((dataset_name, contig_name, chr_name))
@@ -374,39 +374,39 @@ fn project_grt_display_placements(
 ) -> Result<Value> {
     let object = chromosome
         .as_object_mut()
-        .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome JSON is invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ Final Path chromosome JSON is invalid"))?;
     let segments = object
         .get_mut("segments")
         .and_then(Value::as_array_mut)
-        .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome segments are invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ Final Path chromosome segments are invalid"))?;
     let mut display_available = true;
     for segment in segments.iter_mut() {
         let segment_object = segment
             .as_object_mut()
-            .ok_or_else(|| anyhow!("persisted GRT Final Path segment JSON is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path segment JSON is invalid"))?;
         if segment_object.get("kind").and_then(Value::as_str) == Some("gap") {
             continue;
         }
         let source = segment_object
             .get("source")
             .and_then(Value::as_object)
-            .ok_or_else(|| anyhow!("persisted GRT Final Path segment source is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path segment source is invalid"))?;
         let dataset_name = source
             .get("dataset")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow!("persisted GRT Final Path source dataset is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path source dataset is invalid"))?;
         let contig_name = source
             .get("contig")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow!("persisted GRT Final Path source contig is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path source contig is invalid"))?;
         let start = source
             .get("start")
             .and_then(Value::as_i64)
-            .ok_or_else(|| anyhow!("persisted GRT Final Path source start is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path source start is invalid"))?;
         let end = source
             .get("end")
             .and_then(Value::as_i64)
-            .ok_or_else(|| anyhow!("persisted GRT Final Path source end is invalid"))?;
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path source end is invalid"))?;
         let candidates = placements
             .get(&(
                 dataset_name.to_string(),
@@ -503,16 +503,16 @@ pub(super) fn project_grt_final_path_chromosome(
 ) -> Result<Value> {
     let object = chromosome
         .as_object_mut()
-        .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome JSON is invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ Final Path chromosome JSON is invalid"))?;
     let segments = object
         .get_mut("segments")
         .and_then(Value::as_array_mut)
-        .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome segments are invalid"))?;
+        .ok_or_else(|| anyhow!("persisted LGZ Final Path chromosome segments are invalid"))?;
     for (index, segment) in segments.iter_mut().enumerate() {
         let segment_object = segment
             .as_object_mut()
-            .ok_or_else(|| anyhow!("persisted GRT Final Path segment JSON is invalid"))?;
-        let label = format!("persisted GRT Final Path {chr_name} segment {}", index + 1);
+            .ok_or_else(|| anyhow!("persisted LGZ Final Path segment JSON is invalid"))?;
+        let label = format!("persisted LGZ Final Path {chr_name} segment {}", index + 1);
         let kind = segment_object
             .get("kind")
             .and_then(Value::as_str)
@@ -577,7 +577,7 @@ pub fn load_grt_object_attempts(project_db_path: &Path) -> Result<Vec<Value>> {
              FROM grt_object_attempt
              ORDER BY chr, object_kind, object_id, stage, attempt_id",
         )
-        .context("failed to prepare GRT object attempt query")?;
+        .context("failed to prepare LGZ object attempt query")?;
     let rows = stmt
         .query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -586,10 +586,10 @@ pub fn load_grt_object_attempts(project_db_path: &Path) -> Result<Vec<Value>> {
     rows.into_iter()
         .map(|(object_kind, json)| {
             let mut value: Value = serde_json::from_str(&json)
-                .context("persisted GRT object attempt JSON is invalid")?;
+                .context("persisted LGZ object attempt JSON is invalid")?;
             value
                 .as_object_mut()
-                .ok_or_else(|| anyhow!("persisted GRT object attempt must be an object"))?
+                .ok_or_else(|| anyhow!("persisted LGZ object attempt must be an object"))?
                 .insert("object_kind".to_string(), Value::String(object_kind));
             Ok(value)
         })
@@ -611,7 +611,7 @@ pub fn load_grt_source_card_statuses(project_db_path: &Path) -> Result<Vec<GrtSo
         .map(|value| {
             let object = value
                 .as_object()
-                .ok_or_else(|| anyhow!("persisted GRT source card JSON is invalid"))?;
+                .ok_or_else(|| anyhow!("persisted LGZ source card JSON is invalid"))?;
             Ok(GrtSourceCardStatus {
                 source_card_key: object
                     .get("source_card_key")
@@ -685,13 +685,13 @@ pub fn load_persisted_grt_final_path_verification(
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .optional()
-        .context("failed to load persisted GRT Final Path verification summary")?
-        .ok_or_else(|| anyhow!("precomputed GRT Final Path is not available"))?;
+        .context("failed to load persisted LGZ Final Path verification summary")?
+        .ok_or_else(|| anyhow!("precomputed LGZ Final Path is not available"))?;
     Ok(GrtFinalPathVerification {
         chromosome_count: usize::try_from(chromosome_count)
-            .context("persisted GRT chromosome count is invalid")?,
+            .context("persisted LGZ chromosome count is invalid")?,
         segment_count: usize::try_from(segment_count)
-            .context("persisted GRT segment count is invalid")?,
+            .context("persisted LGZ segment count is invalid")?,
         q4_artifact_sha256,
     })
 }

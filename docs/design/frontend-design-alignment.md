@@ -53,7 +53,7 @@
 | `ui/pages/project-preview-state.js`、`ui/pages/project-preview-page.js` | Preview 按采用片段和方向投影；重叠采用片段可占多车道；Gap 标签另占空间 |
 | `ui/pages/assembly/contig-colors.js` | Main/Local、Final Path、项目导出已有共享 role 调色入口；须同步 CSS token 和无 DOM 导出 fallback |
 | `ui/pages/assembly/main-view-history-state.js`、`ui/pages/assembly/subview-history-state.js`、`ui/pages/assembly/final-path-runtime.js` | 主视图、Subview 历史与 Final Path 持久化不是统一事务栈 |
-| `ui/pages/assembly/dom-patch-runtime.js`、`ui/shell/assembly-session-cache.js` | GRT 原位 patch 与路由 DOM 缓存必须保留等价行为；不能随意重建滚动容器 |
+| `ui/pages/assembly/dom-patch-runtime.js`、`ui/shell/assembly-session-cache.js` | LGZ 原位 patch 与路由 DOM 缓存必须保留等价行为；不能随意重建滚动容器 |
 | `ui/pages/project-export-page.js`、`ui/pages/assembly/final-path-export-runtime.js` | 含 Ref 的统计/日志禁用规则仍有效；现有 all 为多文件输出，不是 ZIP，也不包含 SVG |
 
 ### 0.3 前端工程师落地调优决策（Engineering Refinements）
@@ -65,7 +65,7 @@
    - **工程选择器保持原生零延迟**：解除 `#session-workspace-select` 硬编码 `96px` 的局促限制，扩展为自适应宽度（`min(220px, 26vw)`）并优化文本截断与边框质感，保留原生 `<select>` 极速切换与键盘可访问性，不增加冗余浮层。
    - **守护外层方正、内层圆角的架构契约**：维持外层工作台 `.panel` 直角（`border-radius: 0`）贴合视口边界、内层全部卡片共享 `--card-radius: 6px` 的架构不变式（与 `stylesheet-architecture.test.mjs` 严格对齐）。
 2. **保留已校准的低饱和科研轨道配色（Calibrated Bio-Palette）**：
-   - 主组装（`#d2dfef` / `#6d85a1` / `#243a54`）、辅助组装（`#e7dec4` / `#8a7551` / `#5c492a`）与参考基因组（`#cfcfcf` / `#8e8e8e` / `#4f4f4f`）已在 `de32158` 与 `028bf8a` 中完成跨视图及无头导出对齐。低饱和度底色能避免长时间阅片视觉疲劳，并确保端粒、着丝粒、GRT 弧线与标签文字清晰可读。本轮**保留该套轨道语义色**，重点升级外围工作台、按钮、表单、表格与浮层的现代 Slate 质感。
+   - 主组装（`#d2dfef` / `#6d85a1` / `#243a54`）、辅助组装（`#e7dec4` / `#8a7551` / `#5c492a`）与参考基因组（`#cfcfcf` / `#8e8e8e` / `#4f4f4f`）已在 `de32158` 与 `028bf8a` 中完成跨视图及无头导出对齐。低饱和度底色能避免长时间阅片视觉疲劳，并确保端粒、着丝粒、LGZ 弧线与标签文字清晰可读。本轮**保留该套轨道语义色**，重点升级外围工作台、按钮、表单、表格与浮层的现代 Slate 质感。
 3. **统一全局 Design Tokens 与控件质感（Cohesive Slate Tokens）**：
    - 在 `base.css` 中建立统一的背景表面（`--surface-app`、`--surface-panel`、`--surface-subtle`、`--surface-elevated`）、边框（`--border-subtle`、`--border-default`、`--border-strong`）、阴影与焦点环 token；
    - 彻底淘汰 `shared-components.css`、`shell.css`、`assembly.css`、`final-path.css` 等模块中的旧式灰色线性渐变（`linear-gradient(#fbfbfb, #dfdfdf)`），仅保留信息语义渐变（导入进度动画、Gap 斜纹等）。
@@ -199,7 +199,7 @@
     *   *对齐规范*：重构成**三段式标准专业画布工具条（Standard Canvas Topbar）**：
         *   *左区*：数据源下拉、单倍型切换；
         *   *中区*：现有平移/缩放/刻度操作、带作用域标识的历史控制；新增手势与快捷键须单独接入，不提前显示未实现的模式；
-        *   *右区*：图层显示过滤 Popover（统一收纳端粒、着丝粒、共线性色带、GRT 预测开关，避免平铺过多复选框）。
+        *   *右区*：图层显示过滤 Popover（统一收纳端粒、着丝粒、共线性色带、LGZ 预测开关，避免平铺过多复选框）。
 *   **对象 2：左侧吸附标签列 (`.assembly-track-label-column`) 与画布对齐**
     *   *现状*：滚动时偶见 1px 视差，文本垂直中心线与 SVG 轨道中心微有偏移。
     *   *对齐规范*：采用严密 CSS Grid 约束，共享行高和轨道中心线，按文字实际度量居中，不把文字 baseline 直接等同于矩形中心；在缩放、字体和 DPI 变化时重新验证。
@@ -368,11 +368,11 @@
 
 ### 6.1 数据与交互基线
 
-至少覆盖无项目/空库、正常/失效工程、ZIP/目录/拖放导入、普通/多单倍型/含 Ref 路径、重叠采用片段、切分/反向/跨染色体片段、显式 Gap/内部 N、GRT 有结果/无结果、长路径/长名称和大工程。
+至少覆盖无项目/空库、正常/失效工程、ZIP/目录/拖放导入、普通/多单倍型/含 Ref 路径、重叠采用片段、切分/反向/跨染色体片段、显式 Gap/内部 N、LGZ 有结果/无结果、长路径/长名称和大工程。
 
 - 对同一工程副本比较坐标、方向、来源 ID、Final Path 每段及每染色体长度/序列摘要、FASTA 内容、TSV 字段/记录与日志语义。时间戳/输出目录等非确定字段单列，不用宽泛归一化掩盖数据变化。
 - PNG 等视觉产物允许因设计改变而变化，但必须另验标签、图例、标记与几何；不能以图片 hash 不同推断科研数据不同。
-- 验证非零横向位置下切换 GRT、Tab、路由、语言、字号与窗口尺寸；同尺寸切换应保留像素偏移，变尺寸时保留 bp 视口/选区，且不把恢复事件写成用户操作。
+- 验证非零横向位置下切换 LGZ、Tab、路由、语言、字号与窗口尺寸；同尺寸切换应保留像素偏移，变尺寸时保留 bp 视口/选区，且不把恢复事件写成用户操作。
 - 导入取消后仍禁止冲突操作直到清理完成；失败历史不能阻断新导入；复制、重命名、保存失败要保留可恢复信息。
 
 ### 6.2 验证层级与环境

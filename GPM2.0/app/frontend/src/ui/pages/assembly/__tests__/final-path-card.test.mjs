@@ -55,8 +55,8 @@ function createI18n() {
       finalPathLogOtherChrTitle: "重复主组装 Contig 使用情况",
       finalPathLogNoRows: "暂无记录",
       finalPathRestoreGrtBaseline: "↺ 预计算路径",
-      finalPathRestoreGrtBaselineHint: "恢复为 GRT 算法生成的预计算路径",
-      finalPathRestoreGrtBaselineCurrent: "当前已是 GRT 算法生成的预计算路径",
+      finalPathRestoreGrtBaselineHint: "恢复为 Linking Inter-assembly Units for Genome Zipping 算法生成的预计算路径",
+      finalPathRestoreGrtBaselineCurrent: "当前已是 Linking Inter-assembly Units for Genome Zipping 算法生成的预计算路径",
     },
     trackControls: {
       minTickUnitKb: "最小刻度单位(kb)",
@@ -365,7 +365,7 @@ function createEntry() {
   };
 }
 
-test("renderFinalPathCard exposes GRT baseline restore only for the current single path", () => {
+test("renderFinalPathCard exposes LGZ baseline restore only for the current single path", () => {
   const deps = createDeps();
   const i18n = createI18n();
   const base = {
@@ -387,14 +387,14 @@ test("renderFinalPathCard exposes GRT baseline restore only for the current sing
   );
   assert.match(availableHtml, /data-final-path-restore-grt-baseline="Chr01"/);
   assert.match(availableHtml, /↺ 预计算路径/);
-  assert.match(availableHtml, /data-app-tooltip="恢复为 GRT 算法生成的预计算路径"/);
+  assert.match(availableHtml, /data-app-tooltip="恢复为 Linking Inter-assembly Units for Genome Zipping 算法生成的预计算路径"/);
 
   const currentHtml = renderFinalPathCard(
     { ...base, grtBaselineRestore: { available: true, targetChrName: "Chr01", current: true } },
     { ...deps, i18n },
   );
   assert.match(currentHtml, /data-final-path-restore-grt-baseline="Chr01"[^>]*disabled/);
-  assert.match(currentHtml, /data-app-tooltip="当前已是 GRT 算法生成的预计算路径"/);
+  assert.match(currentHtml, /data-app-tooltip="当前已是 Linking Inter-assembly Units for Genome Zipping 算法生成的预计算路径"/);
 
   const allHtml = renderFinalPathCard(
     {

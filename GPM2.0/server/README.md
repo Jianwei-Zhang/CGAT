@@ -2,6 +2,8 @@
 
 [中文](README_zh.md) | **English**
 
+The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
+
 ## Quick start
 
 On your Linux server, download the GPM Server tools (source package) from [Release v2.0.15](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.15), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
@@ -155,7 +157,7 @@ not an overwrite/reinstall. Docs can work without GitHub; a stale mirror cannot
 downgrade a newer installed version/build. Network or integrity failure never
 means “already latest”.
 
-### Independent GRT stage controls and execution profiles
+### Independent LGZ stage controls and execution profiles
 
 New workspaces generate separate `run_grt_step2.sh` and `run_grt_step3.sh` stage scripts with independent scheduler status and checkpoints. Run Step2 before Step3; Step3 validates that a compatible Step2 result is present before starting. Both stages share a content fingerprint covering the repair engines and shared modules—when any repair code changes, stage outputs are invalidated and regenerated from Step2 while compatible raw MUMmer alignment caches remain reusable.
 
@@ -288,7 +290,7 @@ parameters nor replaces the actual per-command logs or FASTA validation.
 `MINIMAP2_CIGAR_ASSERTION` identifies an observed `mm_update_extra`/`mm_fix_cigar`
 span assertion. Preserve `command.sh`/`command.txt`/`command.json`, `stderr.log`,
 `tool_version.txt`, partial outputs and Slurm accounting. Failed work remains
-failed, downstream work does not proceed, and separate GRT failed attempts are
+failed, downstream work does not proceed, and separate LGZ failed attempts are
 retained under `grt/failed/` rather than overwriting an earlier attempt.
 
 Do not remove `-c`, filter out long queries, or silently change assembly presets

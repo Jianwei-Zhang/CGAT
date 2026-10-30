@@ -109,7 +109,7 @@ test("floating-menu timers retain the browser global receiver", () => {
 });
 
 
-test("GRT result layer popup shares the 400ms delay, cancels on return, and keeps inner checkbox moves open", () => {
+test("LGZ result layer popup shares the 400ms delay, cancels on return, and keeps inner checkbox moves open", () => {
   const f = fixture(true);
   f.root.open = true;
   f.fire("pointerout", f.input, { relatedTarget: f.button }); assert.equal(f.timers.size, 0);

@@ -289,10 +289,10 @@ test("Canvas proxies match the exact per-band identity shade in both themes, not
   }
 });
 
-test("transparent GRT proxies inherit their painted sibling, including composited opacity", () => {
+test("transparent LGZ proxies inherit their painted sibling, including composited opacity", () => {
   const h = tooltipFixture(), group = h.create("g", {}, {}, true);
   const paint = h.create("rect", { class: "grt-result-interval" }, { fill: "rgba(47, 158, 68, .72)" }, true);
-  const proxy = h.create("rect", { class: "grt-result-hover-proxy", "data-subview-band-tooltip": "GRT" }, { fill: "transparent" }, true);
+  const proxy = h.create("rect", { class: "grt-result-hover-proxy", "data-subview-band-tooltip": "LGZ" }, { fill: "transparent" }, true);
   group.append(paint, proxy); h.fire("pointerover", proxy);
   assert.equal(h.panel.style.background, "rgb(105, 185, 120)");
   assert.equal(h.panel.style.color, "rgb(30, 41, 59)");
@@ -427,14 +427,14 @@ test("nested targets select the innermost object and SVG sibling labels retain t
 });
 
 
-test("GRT interval shades composite the actual SVG mask and source ctg, not just the page background", () => {
+test("LGZ interval shades composite the actual SVG mask and source ctg, not just the page background", () => {
   for (const masked of [false, true]) for (const sourceFill of [[210, 223, 239, 1], [90, 110, 130, 1]]) {
     const h = tooltipFixture(), sourceGroup = h.create("g", {}, {}, true);
     const source = h.create("rect", { class: "track-ctg" }, { fill: `rgb(${sourceFill.slice(0, 3).join(", ")})` }, true);
     const overlay = h.create("g", { class: "grt-result-overlay" }, {}, true);
     const intervalGroup = h.create("g", { class: "grt-result-interval-group" }, {}, true);
     const interval = h.create("rect", { class: "grt-result-interval" }, { fill: "rgba(47, 158, 68, .72)" }, true);
-    const proxy = h.create("rect", { class: "grt-result-hover-proxy", "data-subview-band-tooltip": "GRT" }, { fill: "transparent" }, true);
+    const proxy = h.create("rect", { class: "grt-result-hover-proxy", "data-subview-band-tooltip": "LGZ" }, { fill: "transparent" }, true);
     sourceGroup.append(source, overlay); overlay.append(intervalGroup); intervalGroup.append(interval, proxy);
     if (masked) {
       const mask = h.create("rect", { class: "grt-result-mask" }, { fill: "rgba(224, 229, 225, .76)" }, true);

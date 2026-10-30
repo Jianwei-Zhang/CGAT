@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Run traceable GRT Step2 against the frozen Q1 and D0 inputs."""
+"""Run traceable LGZ Step2 against the frozen Q1 and D0 inputs."""
 
 from __future__ import annotations
 

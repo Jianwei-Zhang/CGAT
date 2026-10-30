@@ -20,7 +20,7 @@ When the bound Server is this revision or newer within the same compatibility
 contract, a fresh workspace uses the following defaults without extra user
 flags:
 
-- optimized GRT execution profile;
+- optimized LGZ execution profile;
 - Step2 full MUMmer search and Step3 gap-screen;
 - content/tool/preset-validated refill batching and compatible `.mmi` reuse;
 - query-skew-aware, bounded task admission for profiled chromosome-local

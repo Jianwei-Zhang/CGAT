@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Hash-validated outer checkpoints for non-GRT Server execution units."""
+"""Hash-validated outer checkpoints for non-LGZ Server execution units."""
 
 from __future__ import annotations
 
@@ -147,18 +147,18 @@ class OuterCheckpointManager:
     def validate_grt_unit(self, unit_id: str) -> tuple[bool, str]:
         stages = GRT_STAGE_MAP.get(unit_id)
         if stages is None:
-            return True, "no GRT checkpoint validation required"
+            return True, "no LGZ checkpoint validation required"
         status_rows = self._read_tsv("metadata/grt_stage_status.tsv")
         for stage in stages:
             checkpoint_path = self.server_dir / f"grt/checkpoints/{stage}.json"
             if not checkpoint_path.is_file():
-                return False, f"GRT checkpoint is missing: {checkpoint_path}"
+                return False, f"LGZ checkpoint is missing: {checkpoint_path}"
             try:
                 checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-                return False, f"GRT checkpoint cannot be read: {checkpoint_path}: {exc}"
+                return False, f"LGZ checkpoint cannot be read: {checkpoint_path}: {exc}"
             if not isinstance(checkpoint, dict):
-                return False, f"GRT checkpoint is not an object: {checkpoint_path}"
+                return False, f"LGZ checkpoint is not an object: {checkpoint_path}"
             if (
                 checkpoint.get("workflow") != GRT_WORKFLOW
                 or checkpoint.get("stage") != stage
@@ -166,40 +166,40 @@ class OuterCheckpointManager:
                 or not isinstance(checkpoint.get("input_fingerprint"), str)
                 or not checkpoint.get("input_fingerprint")
             ):
-                return False, f"GRT checkpoint identity/status is invalid: {checkpoint_path}"
+                return False, f"LGZ checkpoint identity/status is invalid: {checkpoint_path}"
             output_hashes = checkpoint.get("output_hashes")
             if not isinstance(output_hashes, dict) or not output_hashes:
-                return False, f"GRT checkpoint output manifest is invalid: {checkpoint_path}"
+                return False, f"LGZ checkpoint output manifest is invalid: {checkpoint_path}"
             for relpath, expected_hash in output_hashes.items():
                 if not isinstance(relpath, str) or not isinstance(expected_hash, str):
-                    return False, f"GRT checkpoint output entry is invalid: {checkpoint_path}"
+                    return False, f"LGZ checkpoint output entry is invalid: {checkpoint_path}"
                 try:
                     output_path = self._server_artifact(relpath)
                 except OrchestrationContractError as exc:
                     return False, str(exc)
                 if not output_path.is_file():
-                    return False, f"GRT checkpoint output is missing: {output_path}"
+                    return False, f"LGZ checkpoint output is missing: {output_path}"
                 if sha256_file(output_path) != expected_hash:
-                    return False, f"GRT checkpoint output hash changed: {output_path}"
+                    return False, f"LGZ checkpoint output hash changed: {output_path}"
             required_directories = checkpoint.get("required_directories", [])
             if not isinstance(required_directories, list):
-                return False, f"GRT checkpoint directory manifest is invalid: {checkpoint_path}"
+                return False, f"LGZ checkpoint directory manifest is invalid: {checkpoint_path}"
             for relpath in required_directories:
                 try:
                     directory = self._server_artifact(relpath) if isinstance(relpath, str) else None
                 except OrchestrationContractError as exc:
                     return False, str(exc)
                 if directory is None or not directory.is_dir():
-                    return False, f"GRT checkpoint directory is missing: {directory}"
+                    return False, f"LGZ checkpoint directory is missing: {directory}"
             matching_rows = [row for row in status_rows if row.get("stage") == stage]
             if len(matching_rows) != 1 or matching_rows[0].get("status") != "success":
-                return False, f"GRT stage status is incomplete: {stage}"
+                return False, f"LGZ stage status is incomplete: {stage}"
             row = matching_rows[0]
             if row.get("checkpoint_relpath") != f"grt/checkpoints/{stage}.json":
-                return False, f"GRT stage checkpoint path is invalid: {stage}"
+                return False, f"LGZ stage checkpoint path is invalid: {stage}"
             if row.get("checkpoint_sha256") != sha256_file(checkpoint_path):
-                return False, f"GRT stage checkpoint hash changed: {stage}"
-        return True, f"GRT checkpoints valid: {', '.join(stages)}"
+                return False, f"LGZ stage checkpoint hash changed: {stage}"
+        return True, f"LGZ checkpoints valid: {', '.join(stages)}"
 
     def validate_evidence(self) -> tuple[bool, str]:
         required = [
@@ -228,13 +228,13 @@ class OuterCheckpointManager:
     def _server_artifact(self, relpath: str) -> Path:
         path = Path(relpath)
         if not relpath or path.is_absolute() or ".." in path.parts or "\\" in relpath:
-            raise OrchestrationContractError(f"invalid GRT artifact path: {relpath!r}")
+            raise OrchestrationContractError(f"invalid LGZ artifact path: {relpath!r}")
         resolved = (self.server_dir / path).resolve()
         try:
             resolved.relative_to(self.server_dir)
         except ValueError as exc:
             raise OrchestrationContractError(
-                f"GRT artifact escapes the Server workspace: {relpath!r}"
+                f"LGZ artifact escapes the Server workspace: {relpath!r}"
             ) from exc
         return resolved
 

@@ -161,7 +161,7 @@ def donor_fragment_rows(
 ) -> list[dict[str, object]]:
     """Index D0 sequence fragments without changing the frozen donor FASTA.
 
-    GRT treats long N-runs as fragment boundaries.  The fragment table is an
+    LGZ treats long N-runs as fragment boundaries.  The fragment table is an
     index only: all repair candidates still point to the original D0 member,
     source coordinates and donor-set hash.
     """

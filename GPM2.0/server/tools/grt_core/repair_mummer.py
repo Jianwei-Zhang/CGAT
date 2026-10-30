@@ -11,7 +11,7 @@ MUMMER_LOG_NAMES = [
     for suffix in ("command.txt", "stdout.log", "stderr.log")
 ]
 def grt_mummer_parameters(threads: int) -> dict[str, object]:
-    """Return the effective MUMmer contract used by upstream GRT.
+    """Return the effective MUMmer contract used by upstream LGZ.
 
     Upstream's observed ``delta-filter -i -r -l 10000`` invocation consumes
     ``-r`` as the value of ``-i`` and therefore does not apply reference-best
@@ -34,7 +34,7 @@ def grt_mummer_parameters(threads: int) -> dict[str, object]:
 def partition_mummer_targets(
     records: dict[str, str],
 ) -> list[list[tuple[str, str]]]:
-    """Mirror upstream GRT's target partitions before alignment filtering.
+    """Mirror upstream LGZ's target partitions before alignment filtering.
 
     Upstream aligns every >=1 Mb record independently and packs smaller
     records into <=10 Mb chunks.  It then retains every alignment of at least
@@ -488,7 +488,7 @@ def cached_mummer_partition(
             parse_mummer_coords(cache_dir / "result.coords", stage, chromosome,
                                 query_length, members_by_record, donor_lengths)
             elapsed = time.monotonic() - started
-            print(f"GRT {stage} MUMmer {chromosome} {index}/{total}: CACHE_HIT ({elapsed:.2f}s)", flush=True)
+            print(f"LGZ {stage} MUMmer {chromosome} {index}/{total}: CACHE_HIT ({elapsed:.2f}s)", flush=True)
             return cache_dir, True, elapsed
         work = temporary / label
         work.mkdir()
@@ -512,7 +512,7 @@ def cached_mummer_partition(
                               str(payload["parameters"]["delta_filter"]["min_alignment"]), str(delta)], filtered),
             ("show_coords", [tools["show-coords"]["resolved"], "-r", "-l", str(filtered)], coords),
         ]
-        print(f"GRT {stage} MUMmer {chromosome} {index}/{total}: START", flush=True)
+        print(f"LGZ {stage} MUMmer {chromosome} {index}/{total}: START", flush=True)
         header_only_delta = False
         for tool_name, command, output in commands:
             logs = [work / f"{tool_name}.{suffix}" for suffix in ("command.txt", "stdout.log", "stderr.log")]
@@ -544,7 +544,7 @@ def cached_mummer_partition(
         if cache_dir.exists():
             shutil.rmtree(cache_dir)
         os.replace(work, cache_dir)
-        print(f"GRT {stage} MUMmer {chromosome} {index}/{total}: SUCCESS ({elapsed:.2f}s)", flush=True)
+        print(f"LGZ {stage} MUMmer {chromosome} {index}/{total}: SUCCESS ({elapsed:.2f}s)", flush=True)
         return cache_dir, False, elapsed
 
 
@@ -591,7 +591,7 @@ def cached_mummer_screen_partition(
             )
             elapsed = time.monotonic() - started
             print(
-                f"GRT {stage} screen {chromosome} {index}/{total}: CACHE_HIT ({elapsed:.2f}s)",
+                f"LGZ {stage} screen {chromosome} {index}/{total}: CACHE_HIT ({elapsed:.2f}s)",
                 flush=True,
             )
             return cache_dir, True, elapsed, rows
@@ -640,7 +640,7 @@ def cached_mummer_screen_partition(
                 coords,
             ),
         ]
-        print(f"GRT {stage} screen {chromosome} {index}/{total}: START", flush=True)
+        print(f"LGZ {stage} screen {chromosome} {index}/{total}: START", flush=True)
         header_only_delta = False
         for tool_name, command, output in commands:
             logs = [
@@ -684,7 +684,7 @@ def cached_mummer_screen_partition(
             shutil.rmtree(cache_dir)
         os.replace(work, cache_dir)
         print(
-            f"GRT {stage} screen {chromosome} {index}/{total}: SUCCESS ({elapsed:.2f}s)",
+            f"LGZ {stage} screen {chromosome} {index}/{total}: SUCCESS ({elapsed:.2f}s)",
             flush=True,
         )
         return cache_dir, False, elapsed, rows
@@ -720,7 +720,7 @@ def screen_mummer_partitions(
         sum(len(sequence) for _name, sequence in query_records),
     )
     print(
-        f"GRT {stage} screen {chromosome}: {len(target_partitions)} partitions, "
+        f"LGZ {stage} screen {chromosome}: {len(target_partitions)} partitions, "
         f"windows={len(query_records)}, workers={workers}",
         flush=True,
     )
@@ -782,7 +782,7 @@ def screen_mummer_partitions(
         for index in range(1, len(target_partitions) + 1)
     ]
     print(
-        f"GRT {stage} screen {chromosome}: selected={len(selected)}/{len(target_partitions)}",
+        f"LGZ {stage} screen {chromosome}: selected={len(selected)}/{len(target_partitions)}",
         flush=True,
     )
     shutil.rmtree(screen_root)
@@ -1000,7 +1000,7 @@ def cached_mummer_chromosome(
                 ],
                 len(q_sequence),
             )
-            print(f"GRT {stage} MUMmer {chromosome}: {len(selected_partitions)}/"
+            print(f"LGZ {stage} MUMmer {chromosome}: {len(selected_partitions)}/"
                   f"{len(target_partitions)} partitions, "
                   f"workers={workers}, nucmer_threads=1, thread_budget={threads}", flush=True)
             cancel_event = execution.cancel_event if execution is not None else Event()
@@ -1172,10 +1172,10 @@ def collect_mummer(
                 server_dir, chromosome, records[chromosome], target_partitions, tools, execution
             ):
                 chromosome_scope = "full"
-                print(f"GRT step3 MUMmer {chromosome}: Q2 unchanged from Q1; "
+                print(f"LGZ step3 MUMmer {chromosome}: Q2 unchanged from Q1; "
                       "all full-query partition caches validated", flush=True)
             else:
-                print(f"GRT step3 MUMmer {chromosome}: Q2 unchanged from Q1 but "
+                print(f"LGZ step3 MUMmer {chromosome}: Q2 unchanged from Q1 but "
                       "full-query cache is incomplete; using gap-screen", flush=True)
         parsed = [] if optimized else None
         cache_dir, cache_hit, chromosome_key = cached_mummer_chromosome(
@@ -1183,7 +1183,7 @@ def collect_mummer(
             chromosome_rows, active_set, members_by_record, donor_lengths, tools,
             threads, should_align, target_kind, chromosome_scope, execution, parsed,
         )
-        print(f"GRT {stage} MUMmer {chromosome}: {'cache hit' if cache_hit else 'computed'}")
+        print(f"LGZ {stage} MUMmer {chromosome}: {'cache hit' if cache_hit else 'computed'}")
         destination = temporary / "mummer" / "by_chr" / chromosome_key
         destination.parent.mkdir(parents=True, exist_ok=True)
         copy_started = time.monotonic()
@@ -1194,7 +1194,7 @@ def collect_mummer(
             destination / "result.coords", stage, chromosome,
             len(records[chromosome]), members_by_record, donor_lengths,
         )
-        print(f"GRT {stage} {chromosome} artifact metrics: copy_seconds={copy_seconds:.3f} "
+        print(f"LGZ {stage} {chromosome} artifact metrics: copy_seconds={copy_seconds:.3f} "
               f"post_copy_parse_seconds={time.monotonic() - parse_started:.3f} "
               f"parse_reused={parsed is not None}", flush=True)
         identity = {
@@ -1222,7 +1222,7 @@ def collect_mummer(
             [sum(len(seq) for _name, seq in part) for part in target_partitions] * len(chromosome_order),
             max(len(records[chromosome]) for chromosome in chromosome_order),
         )
-        print(f"GRT {stage} execution: profile=optimized shared_workers={workers} "
+        print(f"LGZ {stage} execution: profile=optimized shared_workers={workers} "
               f"chromosomes={len(chromosome_order)} order=largest-target-first", flush=True)
         cancel_event = Event()
         # Separate coordinators never execute nucmer. Only this shared pool does;
@@ -1253,7 +1253,7 @@ def collect_mummer(
         alignments.extend(chromosome_alignments)
         identities[chromosome] = identity
         tasks.append(task)
-    print(f"GRT {stage} execution metrics: profile={execution_profile} "
+    print(f"LGZ {stage} execution metrics: profile={execution_profile} "
           f"input_seconds={input_seconds:.3f} collection_seconds={time.monotonic() - started:.3f}", flush=True)
     write_tsv(
         temporary / "mummer" / "chromosome_tasks.tsv",

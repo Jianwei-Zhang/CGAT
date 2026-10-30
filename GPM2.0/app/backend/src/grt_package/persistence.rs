@@ -37,7 +37,7 @@ pub(crate) fn persist_grt_package(
             serde_json::to_string(&package.final_path)?,
         ],
     )
-    .context("failed to persist locked GRT package recipe")?;
+    .context("failed to persist locked LGZ package recipe")?;
 
     persist_row_table(
         tx,
@@ -103,7 +103,7 @@ pub(crate) fn persist_grt_package(
                 serde_json::to_string(row)?,
             ],
         )
-        .context("failed to persist GRT gap/terminal object attempt")?;
+        .context("failed to persist LGZ gap/terminal object attempt")?;
     }
     persist_row_table(
         tx,
@@ -131,7 +131,7 @@ pub(crate) fn persist_grt_package(
                 object.get("final_path_segment_id").and_then(Value::as_str).unwrap_or(""),
                 serde_json::to_string(event)?,
             ],
-        ).context("failed to persist GRT event")?;
+        ).context("failed to persist LGZ event")?;
     }
     let chromosomes = package.final_path["chromosomes"].as_array().unwrap();
     for chromosome in chromosomes {
@@ -140,7 +140,7 @@ pub(crate) fn persist_grt_package(
         tx.execute(
             "INSERT INTO grt_final_path_chr (chr, q4_length, q4_sha256, chromosome_json) VALUES (?1, ?2, ?3, ?4)",
             params![chr_name, json_positive_i64(object, "q4_length", chr_name)?, json_str(object, "q4_sha256", chr_name)?, serde_json::to_string(chromosome)?],
-        ).context("failed to persist GRT Final Path chromosome")?;
+        ).context("failed to persist LGZ Final Path chromosome")?;
         for (offset, segment) in object["segments"].as_array().unwrap().iter().enumerate() {
             let segment_object = segment.as_object().unwrap();
             tx.execute(
@@ -151,7 +151,7 @@ pub(crate) fn persist_grt_package(
                     json_str(segment_object, "kind", "segment")?, segment_object.get("event_id").and_then(Value::as_str),
                     serde_json::to_string(segment)?,
                 ],
-            ).context("failed to persist GRT Final Path segment")?;
+            ).context("failed to persist LGZ Final Path segment")?;
         }
     }
     Ok(())

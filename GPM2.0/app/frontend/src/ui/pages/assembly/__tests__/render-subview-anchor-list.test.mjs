@@ -14,15 +14,15 @@ const labels = {
   userEmpty: "No user anchors",
   grtEmpty: "No precomputed anchors",
   manualType: "Offset {direction} {offset}",
-  grtCopyType: "Copied from GRT",
-  grtLinkType: "GRT link",
-  grtGapType: "GRT gap {size} bp",
+  grtCopyType: "Copied from LGZ",
+  grtLinkType: "LGZ link",
+  grtGapType: "LGZ gap {size} bp",
   left: "left",
   right: "right",
   contig: "contig",
   sourcePrimary: "Primary",
   sourceSupport: "Auxiliary",
-  sourceGrt: "GRT",
+  sourceGrt: "LGZ",
   sourceWithName: "{role} ({name})",
   sourceUnavailable: "Unavailable",
   coordinateUnavailable: "?",
@@ -35,7 +35,7 @@ const labels = {
   deleteObject: "Delete",
 };
 
-test("anchor list separates user and read-only GRT objects and disables same-lane copy", () => {
+test("anchor list separates user and read-only LGZ objects and disables same-lane copy", () => {
   const html = renderSubviewAnchorList([
     {
       objectId: "manual:user",
@@ -70,7 +70,7 @@ test("anchor list separates user and read-only GRT objects and disables same-lan
   assert.doesNotMatch(html, /data-subview-anchor-check="grt:origin"/);
   assert.doesNotMatch(html, /data-subview-anchor-delete="grt:origin"/);
   assert.match(html, /data-subview-anchor-copy-grt="origin"[\s\S]*disabled/);
-  assert.match(html, /GRT gap 250 bp/);
+  assert.match(html, /LGZ gap 250 bp/);
   assert.match(html, /class="subview-anchor-object-name">A01</);
   assert.match(html, /class="subview-anchor-object-name" data-app-tooltip="Read only">P01</);
   assert.match(html, /Delete \(1\)/);

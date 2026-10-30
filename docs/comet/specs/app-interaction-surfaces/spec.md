@@ -30,7 +30,7 @@ Complete target behavior for the confirmed GPM application interaction and infor
 ## Application terminology and casing
 
 - Audit both application locales: major headings use English Title Case, minor headings/field labels use sentence case, and system-provided option values use Title Case.
-- Buttons and action/context-menu entries use sentence case while standard proper names, GRT/FASTA and bp/Mb retain their canonical forms.
+- Buttons and action/context-menu entries use sentence case while standard proper names, LGZ/FASTA and bp/Mb retain their canonical forms.
 - Remove redundant ds from Contig-length labels, expand ctg/len, and use Auxiliary contig length (bp)/辅助组装 Contig 长度 (bp), Auxiliary dataset/辅助数据集, and Primary Dataset Members/主数据集成员 in their approved contexts.
 - User project/dataset names, Contig identifiers and chromosome suffixes, paths, internal keys/enums and serialized data are not recased or renamed by the terminology audit. Main View primary/auxiliary track labels use [主] {name}/[辅] {name} in Chinese and [P] {name}/[A] {name} in English (Primary/Auxiliary), with full role/name tooltips and accessible labels; unselected auxiliary rows remain explicit and non-selectable. Reference, phased and mirror labels and track interaction identities remain unchanged.
 

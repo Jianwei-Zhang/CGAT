@@ -33,8 +33,8 @@ function confirmation(state, request, impact) {
   const counts = [impact?.finalPathReferenceCount, impact?.degapReferenceCount, impact?.phasedItemCount, impact?.exportRecordCount]
     .map((value) => Math.max(0, Number(value) || 0));
   return en
-    ? `${action === "delete" ? "Delete" : "Split"} source interval ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()} and synchronize ${targets.length} real Main View entity/entities?\nFinal Path references: ${counts[0]}; GRT/DeGap references: ${counts[1]}; phased items: ${counts[2]}; export records: ${counts[3]}.\nAlready-adopted DNA remains an immutable source interval in Final Path; it is not silently deleted. Main and Local Views each record one undo step. Local undo restores only the local presentation.`
-    : `确认${action === "delete" ? "删除" : "分割"}源区间 ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()}，并同步修改 ${targets.length} 个主视图真实实体吗？\nFinal Path 引用：${counts[0]}；GRT/DeGap 引用：${counts[1]}；单倍型条目：${counts[2]}；导出记录：${counts[3]}。\n已加入 Final Path 的 DNA 保留为不可变源区间，不会被静默删除。主视图与局部视图各记录一次回溯；局部撤销只恢复局部展示。`;
+    ? `${action === "delete" ? "Delete" : "Split"} source interval ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()} and synchronize ${targets.length} real Main View entity/entities?\nFinal Path references: ${counts[0]}; LGZ/DeGap references: ${counts[1]}; phased items: ${counts[2]}; export records: ${counts[3]}.\nAlready-adopted DNA remains an immutable source interval in Final Path; it is not silently deleted. Main and Local Views each record one undo step. Local undo restores only the local presentation.`
+    : `确认${action === "delete" ? "删除" : "分割"}源区间 ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()}，并同步修改 ${targets.length} 个主视图真实实体吗？\nFinal Path 引用：${counts[0]}；LGZ/DeGap 引用：${counts[1]}；单倍型条目：${counts[2]}；导出记录：${counts[3]}。\n已加入 Final Path 的 DNA 保留为不可变源区间，不会被静默删除。主视图与局部视图各记录一次回溯；局部撤销只恢复局部展示。`;
 }
 
 export function createSubviewFragmentSyncRuntime(deps) {

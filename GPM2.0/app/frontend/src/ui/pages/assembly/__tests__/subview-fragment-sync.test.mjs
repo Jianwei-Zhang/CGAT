@@ -246,7 +246,7 @@ test("legacy evidence and manual anchors preserve source points and canonical en
   const manual = projected.manualAnchors[0];
   const endpoint = [manual.endpointA, manual.endpointB].find((e) => e.contigId === 30);
   assert.equal(endpoint.endpointKey, memberAnchorEndpointKey(member));
-  assert.equal(endpoint.cutBp, 500, "assembly-space GRT/manual coordinates must not be flipped twice");
+  assert.equal(endpoint.cutBp, 500, "assembly-space LGZ/manual coordinates must not be flipped twice");
   assert.equal(projected.activeAnchors[0].descriptor.top.endpointKey, memberAnchorEndpointKey(member));
 });
 

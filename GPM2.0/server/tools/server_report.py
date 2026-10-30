@@ -24,9 +24,9 @@ from render_server_report import project_report_facts, render
 
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
-    "grt_prepare": "质量评估、q0 与供体构建", "grt_step1": "GRT Step1",
-    "grt_step2": "GRT Step2", "grt_step3": "GRT Step3",
-    "grt_step23": "GRT Step2 / Step3",
+    "grt_prepare": "质量评估、q0 与供体构建", "grt_step1": "LGZ Step1",
+    "grt_step2": "LGZ Step2", "grt_step3": "LGZ Step3",
+    "grt_step23": "LGZ Step2 / Step3",
     "grt_telomere_finalize": "端粒处理与最终路径",
     "finalize_evidence": "证据整理与结果校验", "package_full": "完整包交付",
     "package_light": "Light 轻量包交付", "step1_round1": "Step1 · 第一阶段",
@@ -71,7 +71,7 @@ def record_grt_result(root: Path, result: dict) -> None:
     report = root / "report"
     manifest = read_json(report / "manifest.json", {})
     if manifest.get("run_id") != run_id:
-        raise ValueError("report invocation does not match the running GRT stage")
+        raise ValueError("report invocation does not match the running LGZ stage")
     path = report / "steps" / ("grt-" + result["stage"] + ".json")
     if path.exists():
         return  # First publication is immutable, including during republishing.
@@ -170,7 +170,7 @@ class ReportSession:
         unit_id = unit_id or self.current_unit_id
         self.output_tails.setdefault(unit_id, deque(maxlen=80)).append(line[:4000])
         parts = line.split()
-        if len(parts) >= 4 and parts[0] == "GRT" and parts[2:4] == ["cache", "hit:"]:
+        if len(parts) >= 4 and parts[0] in {"LGZ", "GRT"} and parts[2:4] == ["cache", "hit:"]:
             self.cached_stages_by_unit.setdefault(unit_id, set()).add(parts[1])
 
     def refresh(self):

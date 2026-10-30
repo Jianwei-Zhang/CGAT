@@ -38,7 +38,7 @@ export function resolveTooltipColors(node, { getStyle, dark = false } = {}) {
     : { background: "#ffffff", color: "#1e293b", borderColor: "#cbd5e1" };
   if (!node) return defaultColors;
   let paint = node;
-  // The transparent GRT target is separate from the actual painted interval/line.
+  // The transparent LGZ target is separate from the actual painted interval/line.
   if (node.matches?.(".grt-result-hover-proxy")) {
     paint = node.parentElement?.querySelector?.(".grt-result-interval, .grt-result-junction") || node;
   } else if (node.matches?.(".subview-fragment-hit-zone, .main-anchor-fragment-hit-zone")) {
@@ -84,7 +84,7 @@ export function resolveTooltipColors(node, { getStyle, dark = false } = {}) {
   for (let current = paint; current; current = current.parentElement) {
     const currentStyle = read(current) || {};
     if (current !== paint) {
-      // GRT result intervals are painted over an optional mask and the source
+      // LGZ result intervals are painted over an optional mask and the source
       // ctg, not directly over the page. These sibling SVG paints are not CSS
       // backgroundColor, so resolve them explicitly in their stacking order.
       if (paint.matches?.(".grt-result-interval") && String(current.tagName).toLowerCase() === "g") {

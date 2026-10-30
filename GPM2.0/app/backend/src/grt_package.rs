@@ -1,4 +1,4 @@
-//! GRT v2 package facade.
+//! LGZ v2 package facade.
 //!
 //! Validation is pure and completes before the importer opens or mutates a
 //! workspace database. A validated in-memory contract is then persisted by the

@@ -221,7 +221,7 @@ test("bindings create phased track from the main track toolbar", async () => {
   assert.equal(createCalls, 1);
 });
 
-test("bindings dispatch current Final Path GRT baseline restore", async () => {
+test("bindings dispatch current Final Path LGZ baseline restore", async () => {
   const listeners = new Map();
   const restoreTarget = {
     dataset: { finalPathRestoreGrtBaseline: "Chr01" },
@@ -252,7 +252,7 @@ test("bindings dispatch current Final Path GRT baseline restore", async () => {
   assert.deepEqual(calls, [{ targetChrName: "Chr01" }]);
 });
 
-test("GRT result bindings toggle only the selected main-view scope", () => {
+test("LGZ result bindings toggle only the selected main-view scope", () => {
   const listeners = new Map();
   const layerListeners = new Map();
   const toggle = {
@@ -341,7 +341,7 @@ test("GRT result bindings toggle only the selected main-view scope", () => {
   assert.equal(rerenders, 2);
 });
 
-test("Subview GRT result binding shows each empty-result toast for exactly three seconds", () => {
+test("Subview LGZ result binding shows each empty-result toast for exactly three seconds", () => {
   const listeners = new Map();
   const toggle = {
     checked: true,
@@ -473,7 +473,7 @@ function createGrtSwitchHarness(scope = "subview") {
   return { host, listeners, layerListeners, state, store: createStore(state) };
 }
 
-test("GRT result switches patch overlay layers in place instead of rebuilding the view", () => {
+test("LGZ result switches patch overlay layers in place instead of rebuilding the view", () => {
   const harness = createGrtSwitchHarness("subview");
   const patchedScopes = [];
   let rerenders = 0;
@@ -494,12 +494,12 @@ test("GRT result switches patch overlay layers in place instead of rebuilding th
   harness.listeners.get("change")?.();
   harness.layerListeners.get("change")?.();
 
-  // Toggling only repaints the GRT layers, so the plot keeps its scroll state.
+  // Toggling only repaints the LGZ layers, so the plot keeps its scroll state.
   assert.deepEqual(patchedScopes, ["subview", "subview"]);
   assert.equal(rerenders, 0);
 });
 
-test("GRT result switches fall back to a rerender when overlay patching cannot apply", () => {
+test("LGZ result switches fall back to a rerender when overlay patching cannot apply", () => {
   const harness = createGrtSwitchHarness("subview");
   const patchedScopes = [];
   let rerenders = 0;

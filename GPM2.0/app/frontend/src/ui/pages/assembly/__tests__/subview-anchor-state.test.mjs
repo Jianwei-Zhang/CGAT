@@ -154,7 +154,7 @@ test("createOffsetSubviewManualAnchor shifts both endpoints and rejects out-of-r
     bottomLengthBp: 500,
     topName: "ctg_top",
     bottomName: "ctg_bottom",
-    topSourceLabel: "GRT · primary",
+    topSourceLabel: "LGZ · primary",
     bottomSourceLabel: "User track",
     topSourceRole: "primary",
     bottomSourceRole: "support",
@@ -197,7 +197,7 @@ test("createOffsetSubviewManualAnchor shifts both endpoints and rejects out-of-r
   assert.equal(rejected.reason, "out-of-range");
 });
 
-test("assembly-space manual anchors preserve their GRT origin and convert local flip once", () => {
+test("assembly-space manual anchors preserve their LGZ origin and convert local flip once", () => {
   const [anchor] = normalizeSubviewManualAnchors([{
     manualAnchorId: "grt-copy:one",
     coordinateSpace: "assembly",

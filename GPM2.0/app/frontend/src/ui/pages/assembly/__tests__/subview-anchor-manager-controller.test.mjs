@@ -7,13 +7,13 @@ const labels = {
   anchorManager: {
     search: "Search", searchPlaceholder: "name or source", deleteSelected: "Delete ({count})",
     empty: "No anchors", noMatches: "No matches", leftEdge: "Left edge", rightEdge: "Right edge",
-    userGroup: "User anchors", grtGroup: "GRT anchors", userEmpty: "No user anchors",
-    grtEmpty: "No GRT anchors", grtCopyType: "Copied from GRT", grtLinkType: "GRT link",
-    grtGapType: "GRT gap {size} bp", grtEndpointUnavailable: "Unavailable",
-    grtSameLane: "Same lane", grtReadOnly: "Read only", copy: "Copy", copyGrt: "Copy GRT",
+    userGroup: "User anchors", grtGroup: "LGZ anchors", userEmpty: "No user anchors",
+    grtEmpty: "No LGZ anchors", grtCopyType: "Copied from LGZ", grtLinkType: "LGZ link",
+    grtGapType: "LGZ gap {size} bp", grtEndpointUnavailable: "Unavailable",
+    grtSameLane: "Same lane", grtReadOnly: "Read only", copy: "Copy", copyGrt: "Copy LGZ",
     manualType: "Manual {direction} {offset} bp", left: "left", right: "right", contig: "ctg",
     sourcePrimary: "Primary", sourceSupport: "Auxiliary", sourceMirror: "Mirror",
-    sourceRef: "Reference", sourcePhased: "Phased", sourceGrt: "GRT",
+    sourceRef: "Reference", sourcePhased: "Phased", sourceGrt: "LGZ",
     sourceWithName: "{role} ({name})",
     sourceUnavailable: "Source unavailable", coordinateUnavailable: "?",
     endpointDetailsUnavailable: "Details unavailable", evidenceUnavailable: "Evidence unavailable",
@@ -168,9 +168,9 @@ test("search input and Enter location are handled without changing the saved sel
   const f = fixture();
   let syncCount = 0;
   const search = target({ subviewAnchorSearch: "1" });
-  search.value = "GRT";
+  search.value = "LGZ";
   f.controller.onInput({ target: search }, { sync: () => { syncCount += 1; } });
-  assert.equal(f.session.subviewAnchorToolsState.query, "GRT");
+  assert.equal(f.session.subviewAnchorToolsState.query, "LGZ");
   assert.equal(syncCount, 1);
 
   const row = target({ subviewAnchorListRow: f.objectId });
@@ -183,7 +183,7 @@ test("search input and Enter location are handled without changing the saved sel
 });
 
 
-test("anchor manager hides GRT baseline anchors absent from the current scene", () => {
+test("anchor manager hides LGZ baseline anchors absent from the current scene", () => {
   const controller = createSubviewAnchorManagerController({ session: {} });
   const host = { querySelectorAll: () => [] };
   const state = {
@@ -221,6 +221,6 @@ test("anchor manager hides GRT baseline anchors absent from the current scene", 
   });
 
   assert.match(html, /No anchors/);
-  assert.doesNotMatch(html, /GRT link/);
+  assert.doesNotMatch(html, /LGZ link/);
   assert.doesNotMatch(html, /data-subview-anchor-copy-grt/);
 });

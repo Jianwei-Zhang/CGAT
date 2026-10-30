@@ -1824,7 +1824,7 @@ test("import progress renders only the most recent 60 log entries", () => {
   }
 });
 
-test("import progress uses phase metadata and labels GRT validation instead of archive-entry completion", () => {
+test("import progress uses phase metadata and labels LGZ validation instead of archive-entry completion", () => {
   const previousWindow = globalThis.window;
   try {
     globalThis.window = {
@@ -1859,8 +1859,8 @@ test("import progress uses phase metadata and labels GRT validation instead of a
           },
           {
             stageCode: "validate_grt_contract_start",
-            detail: "starting full GRT package validation",
-            label: "validate_grt_contract_start：starting full GRT package validation",
+            detail: "starting full LGZ package validation",
+            label: "validate_grt_contract_start：starting full LGZ package validation",
             phaseIndex: 4,
             phaseTotal: 7,
             progressIndex: 673,

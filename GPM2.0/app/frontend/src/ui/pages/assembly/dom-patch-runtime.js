@@ -138,7 +138,7 @@ export function createAssemblyDomPatchController({
     }
   }
 
-  // Toggling the GRT result switch must not rebuild the whole view: the visual
+  // Toggling the LGZ result switch must not rebuild the whole view: the visual
   // layers are patched in place so the plot keeps its scroll and zoom state.
   function patchGrtResultOverlaysDom(host, store, scope) {
     const normalizedScope = scope === "main" ? "main" : "subview";

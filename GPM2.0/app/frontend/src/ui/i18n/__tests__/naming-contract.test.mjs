@@ -33,7 +33,7 @@ for (const domain of ["assembly", "importer", "workspace", "shell", "projectPrev
 test("major titles, minor labels, actions and real system options have distinct English roles", () => {
   const assembly = getMessages("en", "assembly"), workspace = getMessages("en", "workspace");
   assert.equal(assembly.page.primaryAlignmentViewTitle, "Main View");
-  assert.equal(assembly.page.phasedTrackGrtNoticeTitle, "GRT Results Are Temporarily Unavailable");
+  assert.equal(assembly.page.phasedTrackGrtNoticeTitle, "LGZ Results Are Temporarily Unavailable");
   assert.equal(assembly.page.membersCardTitle, "Primary Dataset Members");
   assert.equal(assembly.trackControls.supportDatasetLengthRulesTitle, "Auxiliary Contig Length Rules");
   assert.equal(assembly.trackControls.supportDatasetLengthBp, "Auxiliary contig length (bp)");

@@ -1490,7 +1490,7 @@ test("loadAssemblyView hydrates persisted mirrored ctgs from project assembly vi
   ]);
 });
 
-test("loadAssemblyView canonicalizes persisted GRT overallLen and backfills origin ids", async () => {
+test("loadAssemblyView canonicalizes persisted LGZ overallLen and backfills origin ids", async () => {
   const host = {};
   let state = {
     session: {

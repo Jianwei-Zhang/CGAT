@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""CLI-compatible facade for the modular GRT v2 contract validator."""
+"""CLI-compatible facade for the modular LGZ v2 contract validator."""
 
 import argparse
 import json
@@ -13,7 +13,7 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_contract in reposito
     from .grt_core.contract import ContractError, DEFAULT_SCHEMA_PATH, validate_contract
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Validate a GPM GRT precomputed package contract")
+    parser = argparse.ArgumentParser(description="Validate a GPM LGZ precomputed package contract")
     parser.add_argument("--bundle", required=True, type=Path, help="Path to the gpm_server bundle root")
     parser.add_argument("--schema", type=Path, default=DEFAULT_SCHEMA_PATH)
     args = parser.parse_args(argv)

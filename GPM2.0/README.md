@@ -2,13 +2,15 @@
 
 **English** | [中文](README_zh.md)
 
+The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
+
 GPM2.0 combines reference-anchored results from multiple de novo assemblies in one workflow for import, inspection, lightweight editing, and Final Path export.
 
 ## Architecture
 
 | Component | Platform | Role |
 | --- | --- | --- |
-| **GPM2.0 Server** | Linux | Runs reference alignment, chromosome assignment, GRT automated repair, and HTML reporting, then builds Full and Light delivery archives. |
+| **GPM2.0 Server** | Linux | Runs reference alignment, chromosome assignment, LGZ automated repair, and HTML reporting, then builds Full and Light delivery archives. |
 | **GPM2.0 Desktop** | Windows / macOS | Imports a delivery archive and provides chromosome **Preview**, **Assembly** & **Subview** collinearity inspection, **Final Path** editing, `DEGAP-JOBS` generation, and export. |
 
 Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are available on [CGAT Downloads](https://riceome.hzau.edu.cn/cgat/downloads) (direct mirror) and [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases). Development and release checks are documented in [Quality gates](QUALITY.md).
@@ -63,7 +65,7 @@ Re-running `install.sh` validates the managed environment and updates it only wh
 | Purpose | Commands installed or required |
 | --- | --- |
 | Core workflow | `python3`, `samtools`, `zip`, `gzip` |
-| GRT Final Path | `minimap2`, `nucmer`, `delta-filter`, `show-coords` |
+| LGZ Final Path | `minimap2`, `nucmer`, `delta-filter`, `show-coords` |
 | Optional reads QC | `meryl`, `merqury.sh`; used only when `--reads` is supplied |
 
 Keep this environment active for `run.sh`.
@@ -104,7 +106,7 @@ bash "$SERVER/run.sh" \
 
 `--ref` and `--ds` accept either `<name> <fasta>` or just `<fasta>`. When the name is omitted, it is inferred from the FASTA filename: `.gz` and one `.fa`, `.fasta`, or `.fna` suffix are removed case-insensitively, and runs outside letters, numbers, dot, underscore, and hyphen are replaced with `_`. For example, `/data/primary assembly.fa.gz` becomes `primary_assembly`. Use the explicit form whenever a different name is required.
 
-When preparing the workspace, the first `--ds` becomes the primary dataset and the remaining entries become auxiliary datasets; these roles remain fixed throughout GRT processing. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted. The generated `add_dataset.sh` supports the same optional-name `--ds` forms.
+When preparing the workspace, the first `--ds` becomes the primary dataset and the remaining entries become auxiliary datasets; these roles remain fixed throughout LGZ processing. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted. The generated `add_dataset.sh` supports the same optional-name `--ds` forms.
 
 #### Common options
 
@@ -131,7 +133,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` or `asm5`; default `asm10` |
 
-GPM Server always uses Minimap2. BLASTN and Winnowmap are not available because whole-genome runs could not meet the workflow's runtime and memory requirements. GRT processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
+GPM Server always uses Minimap2. BLASTN and Winnowmap are not available because whole-genome runs could not meet the workflow's runtime and memory requirements. LGZ processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
 
 ### 3. Resume and monitor
 
@@ -148,7 +150,7 @@ The runner executes the generated plan serially, stops at the first error, valid
 
 The default is parallel `tar.gz` compression with pigz. Use `--archive-format zip` for ZIP; the App accepts both formats.
 
-These two archives are the only final delivery files. A separate report ZIP is not created. Open `gpm_server/report/report.html` in the Server workspace or inside either extracted delivery package. Recording starts during input preparation; `run_all.sh` updates the report at stage boundaries, including failures, interruptions, and unexecuted stages. First-published GRT events are preserved separately from their reconciled final state, and cache reuse is explicit. Previous reports are archived under the workspace's `.report_history/` directory.
+These two archives are the only final delivery files. A separate report ZIP is not created. Open `gpm_server/report/report.html` in the Server workspace or inside either extracted delivery package. Recording starts during input preparation; `run_all.sh` updates the report at stage boundaries, including failures, interruptions, and unexecuted stages. First-published LGZ events are preserved separately from their reconciled final state, and cache reuse is explicit. Previous reports are archived under the workspace's `.report_history/` directory.
 
 To avoid a checksum referring to the archive that contains it, the report records the App payload checksum before `report/` is embedded. After both final archives are complete, `run_all.sh` prints their final paths, sizes, SHA-256 values, intended uses, and the local report path; the same summary is written to `logs/run_all.log`.
 
@@ -191,7 +193,7 @@ bash ./gpm_server/add_dataset.sh \
   -o ./gpm_server/add_ds4_name.zip
 ```
 
-The new dataset is merged into the server workspace but is not included in the completed GRT processing and does not rewrite the precomputed Final Path. Its contigs remain available for manual editing in the App.
+The new dataset is merged into the server workspace but is not included in the completed LGZ processing and does not rewrite the precomputed Final Path. Its contigs remain available for manual editing in the App.
 
 The initial `run_all.sh` already builds both delivery archives. Re-run the standalone packagers only after later changes such as `add_dataset.sh` or `add_ctg.sh`:
 
@@ -214,7 +216,7 @@ The macOS app is ad-hoc signed and is not Apple-notarized. Drag `GPM2.0.app` to 
 xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 ```
 
-The package preserves the primary and auxiliary dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
+The package preserves the primary and auxiliary dataset roles established during LGZ processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
 
 ### Core desktop workflow
 

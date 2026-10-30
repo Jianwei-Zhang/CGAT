@@ -172,7 +172,7 @@ test("appendTrackContigToFinalPath appends after existing segments instead of ov
   assert.equal(store.getState().assembly.finalPathByChr.Chr01.segments[1].assemblyCtgId, 9);
 });
 
-test("a semantic Final Path edit clears both current-chromosome GRT result switches", async () => {
+test("a semantic Final Path edit clears both current-chromosome LGZ result switches", async () => {
   const baselineEntry = {
     mode: "segments",
     chrName: "Chr01",
@@ -228,7 +228,7 @@ test("a semantic Final Path edit clears both current-chromosome GRT result switc
   assert.equal(grtConsumerRerenders, 1);
 });
 
-test("a Final Path edit does not refresh GRT consumers while availability stays false", async () => {
+test("a Final Path edit does not refresh LGZ consumers while availability stays false", async () => {
   const store = createStore({
     finalPathByChr: {
       Chr01: {

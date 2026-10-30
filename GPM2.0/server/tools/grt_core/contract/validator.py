@@ -824,7 +824,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             sequence = sources[source_key][start - 1 : end]
             rebuilt.append(sequence if orientation == "+" else reverse_complement(sequence))
             if kind in {"patch", "correction", "telomere"} and not event_id:
-                fail("BROKEN_REFERENCE", f"GRT segment {segment_id} lacks accepted event")
+                fail("BROKEN_REFERENCE", f"LGZ segment {segment_id} lacks accepted event")
         if "".join(rebuilt) != q4_sequence:
             fail("FINAL_PATH_MISMATCH", f"Final Path segments do not reconstruct q4 chromosome {chr_name}")
     if chromosome_names != set(q4_records):
@@ -1144,7 +1144,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         if status in {"other_chr_only", "no_hit"} and anchor_sources != {"grt_final_path"}:
             fail(
                 "BROKEN_REFERENCE",
-                f"used contig {source_card_key} requires an explicit GRT-derived target anchor",
+                f"used contig {source_card_key} requires an explicit LGZ-derived target anchor",
             )
 
     for event_id, event in events.items():
@@ -1187,7 +1187,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             not in {"assignment", "display_pairwise"}
             for evidence_id in event["evidence_ids"]
         ):
-            fail("BROKEN_REFERENCE", f"accepted event {event_id} lacks GRT-stage evidence")
+            fail("BROKEN_REFERENCE", f"accepted event {event_id} lacks LGZ-stage evidence")
 
     expected_card_events = defaultdict(set)
     expected_card_segments = defaultdict(set)

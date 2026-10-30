@@ -83,9 +83,9 @@ Behavior:
   - Supports repeatable --tel <motif> <min_repeat> to mark telomere-like tandem repeats
   - Supports --cen <reference_centromere_fasta> to mark complete reference centromere regions
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
-  - The first --ds is the locked GRT primary dataset; later initial --ds inputs are support datasets
+  - The first --ds is the locked LGZ primary dataset; later initial --ds inputs are support datasets
   - --max-fill sets the Step3 optimized refill length limit in bp, default: 1000000
-  - GRT defaults: optimized execution, full Step2, anchor-safe gap-screen Step3
+  - LGZ defaults: optimized execution, full Step2, anchor-safe gap-screen Step3
   - --grt-execution-profile baseline restores legacy scheduling and per-chromosome refill
   - --grt-step3-mummer-scope full restores the complete Step3 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
@@ -110,7 +110,7 @@ Behavior:
   - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2 -> GRT Step3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full archive -> light archive
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ Step3 -> LGZ telomere/q4 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
   - Prints all generated staged commands to the terminal for manual copy/paste
@@ -260,7 +260,7 @@ validate_mummer4_capabilities() {
   local delta_filter_path="$2"
   local show_coords_path="$3"
   local nucmer_guidance="Install a current MUMmer4 build with nucmer --batch and -t/--threads support."
-  local utility_guidance="Install a complete MUMmer4 build whose delta-filter and show-coords utilities support the GRT recipe."
+  local utility_guidance="Install a complete MUMmer4 build whose delta-filter and show-coords utilities support the LGZ recipe."
 
   require_mummer_help_option \
     "$nucmer_path" --help '^[[:space:]]*--batch([=[:space:]]|$)' --batch \
@@ -312,7 +312,7 @@ write_prepare_lib() {
 
   [[ -d "$lib_src" ]] || die "Missing server library directory: $lib_src"
   [[ -d "$tools_src" ]] || die "Missing server tools directory: $tools_src"
-  [[ -d "$tools_src/grt_core" ]] || die "Missing GRT core package: $tools_src/grt_core"
+  [[ -d "$tools_src/grt_core" ]] || die "Missing LGZ core package: $tools_src/grt_core"
   [[ -f "$tools_src/grt_app_package.py" ]] || die "Missing App delivery package builder: $tools_src/grt_app_package.py"
   [[ -d "$contracts_src" ]] || die "Missing server contracts directory: $contracts_src"
   rm -rf "$lib_dst"
@@ -1188,7 +1188,7 @@ echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
 echo "     - This automatically creates both the full and light delivery archives"
 echo "  2. Or execute the staged commands printed above one by one, including the final two package commands"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2, GRT Step3, GRT telomere/q4 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, LGZ q0/D0/Dtel, LGZ Step1, LGZ Step2, LGZ Step3, LGZ telomere/q4 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi

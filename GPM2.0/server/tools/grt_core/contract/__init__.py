@@ -1,4 +1,4 @@
-"""GRT v2 schema, table, artifact, cross-reference, and Final Path validation."""
+"""LGZ v2 schema, table, artifact, cross-reference, and Final Path validation."""
 
 from .errors import ContractError
 from .schema import DEFAULT_SCHEMA_PATH

@@ -29,7 +29,7 @@ bash scripts/quality-gate-server.sh
 The Windows gate checks tracked LF line endings, all frontend tests, the
 frontend production build, and formatting, strict Clippy, and tests for both
 Rust crates. The Linux gate checks tracked LF line endings, shell syntax, all
-server Python tests, the focused server shell tests, and the GRT server-to-app
+server Python tests, the focused server shell tests, and the LGZ server-to-app
 end-to-end contract.
 
 The complete Windows gate requires `python`, Node.js/npm, Rust, `rustfmt`, and
@@ -39,7 +39,7 @@ The focused shell tests provide their own fake bioinformatics commands; the
 real alignment toolchain is not required for quality verification.
 
 When working in WSL, where Rust verification is intentionally delegated to the
-Windows host, the server-only checks can be run without the Rust-backed GRT E2E:
+Windows host, the server-only checks can be run without the Rust-backed LGZ E2E:
 
 ```bash
 GPM_SKIP_GRT_SERVER_APP_E2E=1 bash scripts/quality-gate-server.sh

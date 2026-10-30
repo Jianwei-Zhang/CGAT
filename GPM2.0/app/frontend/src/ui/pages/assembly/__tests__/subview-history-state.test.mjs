@@ -132,7 +132,7 @@ test("composition history v2 uses one chromosome key and accepts empty lanes", (
     { bpPerPx: 100, leftBp: 250, topPx: 3 });
 });
 
-test("composition history v2 preserves GRT copy origin through rollback and redo", () => {
+test("composition history v2 preserves LGZ copy origin through rollback and redo", () => {
   const legacy = buildAssembly();
   const anchor = {
     manualAnchorId: "grt-copy:origin",

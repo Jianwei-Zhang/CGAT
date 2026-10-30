@@ -1,6 +1,6 @@
 import { memberSourceInterval, sourceCoordinateToMember } from "./subview-fragment-model.js";
 
-// Optional projection interface consumed by the shared GRT renderers. Matching
+// Optional projection interface consumed by the shared LGZ renderers. Matching
 // uses real source lineage, not display labels or an arbitrary same-source copy.
 export function localGrtProjection(member) {
   const range = memberSourceInterval(member);
@@ -33,7 +33,7 @@ export function localGrtProjection(member) {
   };
 }
 
-// Clip paired GRT display evidence with one shared alignment parameter. A band
+// Clip paired LGZ display evidence with one shared alignment parameter. A band
 // must not span a deleted interval or attach its two ends to different objects.
 export function projectLocalGrtEvidence(plan, entries) {
   if (!plan || !(plan.displayEvidence || []).length) return plan;
@@ -57,7 +57,7 @@ export function projectLocalGrtEvidence(plan, entries) {
       }
       if (high < low) continue;
       const clip = (interval, first, last, entry) => {
-        // GRT source coordinates are inclusive integer bases; inward rounding
+        // LGZ source coordinates are inclusive integer bases; inward rounding
         // must not fabricate a base at an unavailable edge.
         const p = first + (last - first) * low, q = first + (last - first) * high;
         const start = Math.ceil(Math.min(p, q) - 1e-7), end = Math.floor(Math.max(p, q) + 1e-7);

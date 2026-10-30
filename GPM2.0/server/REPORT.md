@@ -38,7 +38,7 @@ reporting behavior. Progress counts are alignment progress, not biological QC re
 | `manifest.json` | Invocation identity, ordered execution-unit records, start/end time, status and report errors. |
 | `inputs.json` | Original argv and source identities; actual normalized input statistics and parameters at run start. Changed preparation facts are preserved separately. |
 | `steps/NNN.json` | One execution unit: runtime, execution/cache status, commands, event history, recent output and collected facts. |
-| `steps/grt-<stage>.json` | Immutable first publication of each completed GRT substage, including its original events, sequence versions and evidence tables. |
+| `steps/grt-<stage>.json` | Immutable first publication of each completed LGZ substage, including its original events, sequence versions and evidence tables. |
 | `final_snapshot.json` | Final path and reconciled events, collected only after successful validation in this invocation. |
 | `final_summary.json` | Original event status versus final status, final-path segment associations, sequence statistics and source contribution. |
 | `statistics/` | Report-local sequence statistics cached by file identity, without sequence payloads. |
@@ -48,7 +48,7 @@ reporting behavior. Progress counts are alignment progress, not biological QC re
 Previous complete or partial directories are moved to `.report_history/` before
 each new invocation. Preparation provenance is also stored in
 `metadata/report_inputs.json` for the generated runner. Runtime stage records use
-the runner's invocation ID; existing GRT recipe/content IDs retain their own
+the runner's invocation ID; existing LGZ recipe/content IDs retain their own
 meaning inside the copied results. Renderers reject mixed invocation IDs,
 unsupported schema versions and manifest paths outside the report directory.
 
@@ -63,7 +63,7 @@ and a browser suffice; no third-party renderer packages are required.
 - Runtime success means that a command and its terminal validation completed.
   It does not mean every biological problem was repaired. Cache reuse is an
   execution property and does not add another biological contribution.
-- GRT events are recorded on first publication before downstream reconciliation.
+- LGZ events are recorded on first publication before downstream reconciliation.
   Re-publishing an earlier result does not overwrite that snapshot. A failed
   Step3 can therefore retain a completed Step2 record. A failed invocation never
   adopts an old q4 merely because its file still exists.
@@ -77,7 +77,7 @@ and a browser suffice; no third-party renderer packages are required.
   Explicit connector segments are counted from q0/q4 source mappings; they are
   not subtracted from maximal N-run counts because adjacent runs may merge.
 - Input-to-q0 comparisons describe assignment/order/initial construction;
-  q0-to-q4 comparisons describe GRT processing. N50 increases alone do not prove
+  q0-to-q4 comparisons describe LGZ processing. N50 increases alone do not prove
   quality improvement. QV/CRAQ currently describe measured input contigs, not a
   newly measured final assembly.
 - Original paths, sizes and mtimes describe submitted files. SHA-256 is computed
@@ -99,7 +99,7 @@ and a browser suffice; no third-party renderer packages are required.
 
 ## Validation
 
-`server/tests/test_server_report.py` exercises real GRT Python stages with
+`server/tests/test_server_report.py` exercises real LGZ Python stages with
 deterministic external-tool fixtures, cache reuse, partial failures, old-result
 isolation, immutable events, portable regeneration, gap boundaries, PAF union
 coverage and HTML escaping. Existing runner tests cover execution and signal

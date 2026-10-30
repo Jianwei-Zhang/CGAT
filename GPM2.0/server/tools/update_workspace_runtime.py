@@ -126,7 +126,7 @@ def validate_targets(workspace: Path, tools_root: Path, source: Path, *,
 
 
 def check_direct_processes(workspace: Path, tools_root: Path) -> None:
-    # Runner's lock protects normal runs. Also catch standalone generated GRT
+    # Runner's lock protects normal runs. Also catch standalone generated LGZ
     # scripts, which can bypass run_all.sh. Other-host work must be stopped by
     # the operator; a foreign-host runner lock is never stolen.
     proc = Path("/proc")

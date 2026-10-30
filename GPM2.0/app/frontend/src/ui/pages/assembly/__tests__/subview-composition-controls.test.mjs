@@ -110,7 +110,7 @@ test("composition emits non-negative ruler metadata and ignores legacy manual ti
   assert.equal(html.match(/data-subview-ruler-tick-bp="([^"]+)"/)[1], autoTick[1]);
 });
 
-test("composition GRT switch and both layer selections control the shared result scene", () => {
+test("composition LGZ switch and both layer selections control the shared result scene", () => {
   const state = controlState();
   const baseline = {
     mode: "segments", chrName: "Chr01", grtDisplayAvailable: true,
@@ -136,7 +136,7 @@ test("composition GRT switch and both layer selections control the shared result
         assert.equal(/data-grt-result-junction="link"/.test(html), enabled && resultPath);
         assert.equal(/data-grt-display-evidence="grt-evidence"/.test(html), enabled && alignmentEvidence);
         assert.match(html, /data-subview-anchor-kind="grt"/, "baseline anchor references remain independent");
-        assert.match(html, /data-grt-result-entry-key="assembly:1"/, "drag preview can identify GRT endpoints");
+        assert.match(html, /data-grt-result-entry-key="assembly:1"/, "drag preview can identify LGZ endpoints");
       }
     }
   }

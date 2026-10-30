@@ -64,7 +64,7 @@ where
     recorder.set_phase(2, EXTRACTED_IMPORT_PHASE_TOTAL);
     recorder.record(
         "validate_grt_contract_start",
-        "starting delivery GRT contract validation".to_string(),
+        "starting delivery LGZ contract validation".to_string(),
     );
     let grt_package = validate_grt_delivery_package_with_progress_and_cancel(
         &resolved.bundle_root,
@@ -73,7 +73,7 @@ where
     )?;
     recorder.record(
         "validate_grt_contract",
-        "delivery GRT contract validated".to_string(),
+        "delivery LGZ contract validated".to_string(),
     );
     recorder.set_phase(3, EXTRACTED_IMPORT_PHASE_TOTAL);
     let project_db_path = initialize_workspace_layout(&resolved.workspace_root)?;
@@ -282,7 +282,7 @@ where
     recorder.set_phase(4, ZIP_IMPORT_PHASE_TOTAL);
     recorder.record(
         "validate_grt_contract_start",
-        "starting delivery GRT contract validation".to_string(),
+        "starting delivery LGZ contract validation".to_string(),
     );
     let grt_package = match validate_grt_delivery_package_with_progress_and_cancel(
         workspace_root,
@@ -297,7 +297,7 @@ where
     };
     recorder.record(
         "validate_grt_contract",
-        "delivery GRT contract validated".to_string(),
+        "delivery LGZ contract validated".to_string(),
     );
 
     recorder.set_phase(5, ZIP_IMPORT_PHASE_TOTAL);
@@ -356,7 +356,7 @@ pub(super) fn remove_failed_zip_workspace(
 ) -> Result<()> {
     fs::remove_dir_all(workspace_root).with_context(|| {
         format!(
-            "failed to remove rejected GRT workspace {} after: {import_error:#}",
+            "failed to remove rejected LGZ workspace {} after: {import_error:#}",
             workspace_root.display()
         )
     })

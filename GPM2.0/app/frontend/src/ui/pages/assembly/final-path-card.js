@@ -1,3 +1,4 @@
+import { LGZ_FULL_NAME } from "../../algorithm-names.js";
 import { buildFinalPathTooltip } from "./final-path-presentation.js";
 import { createContigColorResolver } from "./contig-colors.js";
 import { FINAL_PATH_SEGMENT_MIN_WIDTH_PX, resolveFinalPathVisualLayouts } from "./final-path-visual-layout.js";
@@ -1658,7 +1659,7 @@ export function renderFinalPathCard(
   const restoreGrtBaselineDisabled = grtBaselineRestore?.current === true;
   const restoreGrtBaselineHint = restoreGrtBaselineDisabled
     ? (labels.finalPathRestoreGrtBaselineCurrent || "Already using the precomputed path")
-    : (labels.finalPathRestoreGrtBaselineHint || "Restore the path precomputed by the GRT algorithm");
+    : (labels.finalPathRestoreGrtBaselineHint || `Restore the path precomputed by ${LGZ_FULL_NAME}`);
   const restoreAction = canRestoreGrtBaseline
     ? `<button
         type="button"

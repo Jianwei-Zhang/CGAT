@@ -23,7 +23,7 @@ function sceneNode({ kind = "evidence", objectId, topX = 100, bottomX = 140 } = 
     "data-subview-anchor-top-cut-bp": "120",
     "data-subview-anchor-top-length-bp": "1000",
     "data-subview-anchor-top-name": "ctg_alpha",
-    "data-subview-anchor-top-source-label": "GRT · primary",
+    "data-subview-anchor-top-source-label": "LGZ · primary",
     "data-subview-anchor-top-source-role": "primary",
     "data-subview-anchor-top-source-kind": "mother",
     "data-subview-anchor-top-source-name": "hifiasm",
@@ -75,8 +75,8 @@ function fixture() {
         hitKey: "hit:missing",
         edge: "right",
         descriptor: {
-          top: { endpointKey: "old-top", contigId: 7, cutBp: 70, name: "old_top", sourceLabel: "GRT" },
-          bottom: { endpointKey: "old-bottom", contigId: 8, cutBp: 80, name: "old_bottom", sourceLabel: "GRT" },
+          top: { endpointKey: "old-top", contigId: 7, cutBp: 70, name: "old_top", sourceLabel: "LGZ" },
+          bottom: { endpointKey: "old-bottom", contigId: 8, cutBp: 80, name: "old_bottom", sourceLabel: "LGZ" },
         },
       },
     ],
@@ -84,7 +84,7 @@ function fixture() {
       manualAnchorId: "manual-1",
       direction: "right",
       offsetBp: 50,
-      endpointA: { endpointKey: "top-1", contigId: 1, cutBp: 120, name: "ctg_alpha", sourceLabel: "GRT · primary" },
+      endpointA: { endpointKey: "top-1", contigId: 1, cutBp: 120, name: "ctg_alpha", sourceLabel: "LGZ · primary" },
       endpointB: { endpointKey: "bottom-2", contigId: 2, cutBp: 240, name: "ctg_beta", sourceLabel: "User track" },
     }],
   };
@@ -101,7 +101,7 @@ test("anchor objects merge saved identity with current scene details and keep un
     top: {
       endpointKey: "top-1", contigId: 1, cutBp: 120, lengthBp: 1000,
       name: "ctg_alpha", sourceRole: "primary", sourceKind: "mother",
-      sourceName: "hifiasm", sourceLabel: "GRT · primary",
+      sourceName: "hifiasm", sourceLabel: "LGZ · primary",
     },
     bottom: {
       endpointKey: "bottom-2", contigId: 2, cutBp: 240, lengthBp: 900,

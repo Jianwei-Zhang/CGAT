@@ -49,7 +49,7 @@ An explicitly selected `--archive-format zip` does not need `pigz`.
 With `--reads`, also verify `meryl`, `merqury.sh`, Merqury's `MERQURY` environment,
 read-file integrity, and memory budget. `--reads-qc full` additionally needs `craq`.
 Do not silently omit user-provided reads when dependencies fail. Without reads,
-reads-based QC is skipped; this does not skip the entire GRT workflow.
+reads-based QC is skipped; this does not skip the entire LGZ workflow.
 
 Confirm input files are readable/nonempty and really FASTA (or FASTQ for reads),
 with nonempty sequence records and unique IDs within each FASTA. Check compressed

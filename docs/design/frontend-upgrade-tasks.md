@@ -47,7 +47,7 @@
 - [x] 完成；依赖：V02；风险：中。
 - **交付**：统一浮层外观与层级；整理普通/任务/危险确认三类行为；Toast 避开画布中心并沿用原位更新；帮助可点击/键盘打开。
 - **入口**：`ui/shell/app-dialog.js`、`styles/overlays.css`、`ui/pages/floating-menu-runtime.js`、`A/context-menu*.js`、`A/dom-patch-runtime.js`。
-- **验收**：普通框 Esc、焦点约束/恢复、菜单键盘导航；任务框关闭/取消/清理分离，不能解除 busy 锁或误提交；GRT Toast 出现/消失不重建滚动容器。补焦点与取消状态用例。
+- **验收**：普通框 Esc、焦点约束/恢复、菜单键盘导航；任务框关闭/取消/清理分离，不能解除 busy 锁或误提交；LGZ Toast 出现/消失不重建滚动容器。补焦点与取消状态用例。
 
 #### V04 — 生物语义色与屏幕/导出一致性
 - [x] 完成；依赖：V01；风险：高。
@@ -95,15 +95,15 @@
 
 #### A02 — 轨道几何、标记与图层边界
 - [x] 完成；依赖：A01、V04；风险：高。
-- **交付**：统一标签列/轨道行高、Canvas/SVG 尺寸与缩放，改善命中区和标记辨识度；维持实际区间与 GRT 稳定 overlay 节点。
+- **交付**：统一标签列/轨道行高、Canvas/SVG 尺寸与缩放，改善命中区和标记辨识度；维持实际区间与 LGZ 稳定 overlay 节点。
 - **入口**：`A/render-tracks.js`、`A/viewport-runtime.js`、`A/dom-patch-runtime.js`、`A/grt-result-render.js`、轨道几何工具与样式。
-- **验收**：`A/__tests__/grt-visualization.test.mjs`、`track-viewport.test.mjs`、`view-navigation-runtime.test.mjs`；端粒/着丝粒反向与裁剪坐标不变，不吸附到端点；GRT 有/无结果及 Toast 在非零滚动位置切换都不跳回原点；不同 DPI 下图层和命中区域一致。
+- **验收**：`A/__tests__/grt-visualization.test.mjs`、`track-viewport.test.mjs`、`view-navigation-runtime.test.mjs`；端粒/着丝粒反向与裁剪坐标不变，不吸附到端点；LGZ 有/无结果及 Toast 在非零滚动位置切换都不跳回原点；不同 DPI 下图层和命中区域一致。
 
 #### A03 — Subview 模式、工具与局部历史
 - [x] 完成；依赖：A02、V03；风险：高。
-- **交付**：双 Contig、track-pair、composition 明确入口/状态；候选、锚点、规则、GRT/DEGAP 工具与帮助统一外观，保留所有现有业务入口；不实现跨域统一撤销。
+- **交付**：双 Contig、track-pair、composition 明确入口/状态；候选、锚点、规则、LGZ/DEGAP 工具与帮助统一外观，保留所有现有业务入口；不实现跨域统一撤销。
 - **入口**：`A/render-subview*.js`、`A/subview-tools-*.js`、`A/subview-history-state.js`、`styles/subview.css`、`degap.css`。
-- **验收**：`A/__tests__/subview-contract.test.mjs`、`subview-history-state.test.mjs`、`subview-tools-runtime.test.mjs`、`subview-composition-*.test.mjs` 与 GRT 用例；模式切换不丢来源/候选/选区，历史只影响所属上下文；自动任务/错误/取消入口仍可达。
+- **验收**：`A/__tests__/subview-contract.test.mjs`、`subview-history-state.test.mjs`、`subview-tools-runtime.test.mjs`、`subview-composition-*.test.mjs` 与 LGZ 用例；模式切换不丢来源/候选/选区，历史只影响所属上下文；自动任务/错误/取消入口仍可达。
 
 #### A04 — Final Path 图形、表格与编辑反馈
 - [x] 完成；依赖：A03、V02；风险：高。
@@ -186,7 +186,7 @@
 | 空库、失效历史、新项目、重命名 | 状态隔离、默认值、失败恢复、IME | 主次动作、长名称、键盘可达 | P01/P02 |
 | ZIP/目录/拖放、追加、复制、取消 | 同路分类、避重、busy/清理、重试 | 进度关闭及时、宿主拖放/文件选择 | P02 |
 | Preview 多车道、多路径、Gap、反向/切分 | 坐标/来源/长度不变、lane 高度、缓存 | 标签/方向/图例、进入正确染色体 | P03 |
-| Main/Subview 三种模式、GRT 有/无结果 | overlay patch、非零 scroll、候选与历史 | 图层/标签对齐、选区/拖动不跳转 | A01–A03 |
+| Main/Subview 三种模式、LGZ 有/无结果 | overlay patch、非零 scroll、候选与历史 | 图层/标签对齐、选区/拖动不跳转 | A01–A03 |
 | Final Path 编辑、重排、Gap、含 Ref 导出 | 持久化/失败恢复、数据摘要、禁用规则 | 拖动放置、输入、取消与产物可理解 | A04/P04 |
 | Studio Tab、固定对照、折叠、分隔条 | 节点/输入/视口保留、无重复监听 | 主局部与路径对照、焦点不丢失 | W01–W03 |
 | 跨项目/路由、语言、字号、窗口变化 | 缓存隔离、视口恢复、i18n | 中英文、12–18 字号、1280×720/1920×1080 | S01/Q01 |

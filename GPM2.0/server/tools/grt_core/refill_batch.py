@@ -169,7 +169,7 @@ class RefillBatchAlignment:
                 self.rows.append((query, line))
         self.artifact_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(self.cache_dir, self.artifact_dir)
-        print(f"GRT {self.stage}: same-target batch queries={len(names)} "
+        print(f"LGZ {self.stage}: same-target batch queries={len(names)} "
               f"index_cache_hit={self.provenance['index_cache_hit']}", flush=True)
 
     def __call__(self, query_fasta: Path, paf_path: Path, stage_dir: Path):

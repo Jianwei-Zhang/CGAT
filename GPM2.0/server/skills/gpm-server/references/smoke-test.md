@@ -2,7 +2,7 @@
 
 Use only when the user asks to test operation rather than scientific results.
 No real datasets, downloads, reads QC, telomere/centromere claims, or desktop UI
-acceptance are needed. This baseline exercises real alignment/GRT/report/packaging
+acceptance are needed. This baseline exercises real alignment/LGZ/report/packaging
 on two small chromosomes and two assemblies; it is not a benchmark.
 
 ## Prepare the test

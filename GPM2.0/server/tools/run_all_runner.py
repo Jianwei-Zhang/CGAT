@@ -46,16 +46,16 @@ STATUS_FIELDS = [
     "detail_log_relpath",
 ]
 GRT_CACHE_MARKERS = {
-    "grt_prepare": ("GRT prepare inputs are current:",),
+    "grt_prepare": ("LGZ prepare inputs are current:",),
     "grt_step1": (
-        "GRT step1_round1 cache hit:",
-        "GRT step1_filter cache hit:",
-        "GRT step1_round2 cache hit:",
+        "LGZ step1_round1 cache hit:",
+        "LGZ step1_filter cache hit:",
+        "LGZ step1_round2 cache hit:",
     ),
-    "grt_step2": ("GRT step2 cache hit:",),
-    "grt_step3": ("GRT step3 cache hit:",),
-    "grt_step23": ("GRT step2 cache hit:", "GRT step3 cache hit:"),
-    "grt_telomere_finalize": ("GRT step4_telomere cache hit:",),
+    "grt_step2": ("LGZ step2 cache hit:",),
+    "grt_step3": ("LGZ step3 cache hit:",),
+    "grt_step23": ("LGZ step2 cache hit:", "LGZ step3 cache hit:"),
+    "grt_telomere_finalize": ("LGZ step4_telomere cache hit:",),
 }
 
 
@@ -353,8 +353,10 @@ class Runner:
         assert self.log_handle is not None
         if self.report is not None:
             self.report.child_output(line, unit.unit_id)
+        # Old embedded workspace tools can still emit the former public name.
+        cache_line = "LGZ " + line[4:] if line.startswith("GRT ") else line
         for marker in GRT_CACHE_MARKERS.get(unit.unit_id, ()):
-            if line.startswith(marker):
+            if cache_line.startswith(marker):
                 self.child_cache_markers.add(marker)
         rendered = f"{timestamp()} [run={self.run_id}] [CHILD] [{unit.unit_id}] {line}"
         self.progress.raw(rendered)

@@ -8,7 +8,7 @@ import {
   resolveCurrentFinalPathChrName,
 } from "../final-path-state.js";
 
-test("canonicalizes persisted GRT overall lengths without changing source slices", () => {
+test("canonicalizes persisted LGZ overall lengths without changing source slices", () => {
   const authoritative = {
     Chr01: {
       mode: "segments",
@@ -76,7 +76,7 @@ test("canonicalizes persisted GRT overall lengths without changing source slices
   assert.equal(canonical.Chr01.q4Sha256, "q4-sha");
 });
 
-test("rejects persisted GRT slices beyond the authoritative source length", () => {
+test("rejects persisted LGZ slices beyond the authoritative source length", () => {
   const entry = {
     mode: "segments",
     chrName: "Chr01",

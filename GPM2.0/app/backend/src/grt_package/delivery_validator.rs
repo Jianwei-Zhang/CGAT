@@ -1,7 +1,7 @@
 use super::*;
 
 /// Validate the delivery contract selected by metadata/package.tsv. Server
-/// workdirs keep using the exhaustive GRT closure validator; App delivery
+/// workdirs keep using the exhaustive LGZ closure validator; App delivery
 /// archives use the projected contract and therefore do not need Server-only
 /// q-stage, donor, evidence, cache, or checkpoint artifacts.
 pub(crate) fn validate_grt_delivery_package_with_progress_and_cancel<P, C>(
@@ -137,7 +137,7 @@ where
     {
         return grt_err(
             "INVALID_VALUE",
-            "App package must retain a precomputed and locked GRT result",
+            "App package must retain a precomputed and locked LGZ result",
         );
     }
     if field(package, "sequence_layout")? != "partitioned"

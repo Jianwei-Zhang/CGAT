@@ -17,7 +17,7 @@ pub fn initialize_grt_project_with_options(
     let options = list_initializer_options_with_connection(&conn)?;
     if options.references.len() != 1 {
         bail!(
-            "GRT locked recipe requires exactly one imported reference, found {}",
+            "LGZ locked recipe requires exactly one imported reference, found {}",
             options.references.len()
         );
     }
@@ -32,7 +32,7 @@ pub fn initialize_grt_project_with_options(
         .copied()
         .ok_or_else(|| {
             anyhow!(
-                "GRT locked primary dataset '{}' is not present in the workspace catalog",
+                "LGZ locked primary dataset '{}' is not present in the workspace catalog",
                 recipe.primary_dataset
             )
         })?;
@@ -43,7 +43,7 @@ pub fn initialize_grt_project_with_options(
             .map(|name| {
                 dataset_id_by_name.get(name.as_str()).copied().ok_or_else(|| {
                 anyhow!(
-                    "GRT locked support dataset '{}' is not present in the workspace catalog",
+                    "LGZ locked support dataset '{}' is not present in the workspace catalog",
                     name
                 )
             })
@@ -60,7 +60,7 @@ pub fn initialize_grt_project_with_options(
             auto_check_new_seq: false,
             phased_assembly_enabled: Some(phased_assembly_enabled),
             chr_assignment_min_coverage_percent: None,
-            description: Some(format!("locked GRT recipe {}", recipe.recipe_id)),
+            description: Some(format!("locked LGZ recipe {}", recipe.recipe_id)),
         },
     )?;
     let project_id = initialized.project_id;
@@ -76,7 +76,7 @@ pub fn initialize_grt_project_with_options(
         Ok(value) => value,
         Err(error) => {
             delete_project_with_connection(&mut conn, project_id).with_context(|| {
-                format!("failed to clean up incomplete locked GRT project after: {error:#}")
+                format!("failed to clean up incomplete locked LGZ project after: {error:#}")
             })?;
             return Err(error);
         }
@@ -109,7 +109,7 @@ pub(super) fn materialize_grt_source_cards_with_connection(
     )?;
     let tx = conn
         .transaction()
-        .context("failed to start GRT source-card materialization transaction")?;
+        .context("failed to start LGZ source-card materialization transaction")?;
     let created_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -127,27 +127,27 @@ pub(super) fn materialize_grt_source_cards_with_connection(
     for card in source_cards {
         let object = card
             .as_object()
-            .ok_or_else(|| anyhow!("persisted GRT source card must be an object"))?;
-        let placement_mode = json_nonempty_str(object, "placement_mode", "GRT source card")?;
+            .ok_or_else(|| anyhow!("persisted LGZ source card must be an object"))?;
+        let placement_mode = json_nonempty_str(object, "placement_mode", "LGZ source card")?;
         if placement_mode != "grt_promoted" && placement_mode != "cross_chr_grt_usage" {
             continue;
         }
-        let source_card_key = json_nonempty_str(object, "source_card_key", "GRT source card")?;
-        let dataset_name = json_nonempty_str(object, "dataset_name", "GRT source card")?;
-        let contig_name = json_nonempty_str(object, "contig_name", "GRT source card")?;
-        let target_chr = json_nonempty_str(object, "target_chr", "GRT source card")?;
+        let source_card_key = json_nonempty_str(object, "source_card_key", "LGZ source card")?;
+        let dataset_name = json_nonempty_str(object, "dataset_name", "LGZ source card")?;
+        let contig_name = json_nonempty_str(object, "contig_name", "LGZ source card")?;
+        let target_chr = json_nonempty_str(object, "target_chr", "LGZ source card")?;
         let anchor_start = parse_positive_i64(
-            json_nonempty_str(object, "anchor_start", "GRT source card")?,
-            "GRT source card.anchor_start",
+            json_nonempty_str(object, "anchor_start", "LGZ source card")?,
+            "LGZ source card.anchor_start",
         )?;
         let orient = orientation(
-            json_nonempty_str(object, "orientation", "GRT source card")?,
-            "GRT source card orientation",
+            json_nonempty_str(object, "orientation", "LGZ source card")?,
+            "LGZ source card orientation",
         )?;
         let original_assignment =
-            json_nonempty_str(object, "original_assignment", "GRT source card")?;
+            json_nonempty_str(object, "original_assignment", "LGZ source card")?;
         let ref_alignment_status =
-            json_nonempty_str(object, "ref_alignment_status", "GRT source card")?;
+            json_nonempty_str(object, "ref_alignment_status", "LGZ source card")?;
         let (source_seq_id, source_length): (i64, i64) = tx
             .query_row(
                 "SELECT ss.id, ss.length
@@ -160,7 +160,7 @@ pub(super) fn materialize_grt_source_cards_with_connection(
             )
             .with_context(|| {
                 format!(
-                    "failed to resolve GRT source card {source_card_key} to a project source sequence"
+                    "failed to resolve LGZ source card {source_card_key} to a project source sequence"
                 )
             })?;
         let already_visible: Option<(i64, String, Option<i64>, String)> = tx
@@ -177,14 +177,14 @@ pub(super) fn materialize_grt_source_cards_with_connection(
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .optional()
-            .context("failed to check existing GRT source-card placement")?;
+            .context("failed to check existing LGZ source-card placement")?;
         if placement_mode == "normal" {
             let Some((_, existing_orient, existing_anchor, _)) = already_visible else {
-                bail!("normal GRT source card {source_card_key} is absent from the main view");
+                bail!("normal LGZ source card {source_card_key} is absent from the main view");
             };
             if existing_orient != orient || existing_anchor != Some(anchor_start) {
                 bail!(
-                    "normal GRT source card {source_card_key} disagrees with the main-view source orientation or anchor"
+                    "normal LGZ source card {source_card_key} disagrees with the main-view source orientation or anchor"
                 );
             }
             continue;
@@ -195,7 +195,7 @@ pub(super) fn materialize_grt_source_cards_with_connection(
                 || existing_mode != placement_mode
             {
                 bail!(
-                    "GRT source card {source_card_key} conflicts with an existing main-view placement"
+                    "LGZ source card {source_card_key} conflicts with an existing main-view placement"
                 );
             }
             continue;
@@ -216,7 +216,7 @@ pub(super) fn materialize_grt_source_cards_with_connection(
                     format!("grt_source_card_key={source_card_key}")
                 ],
             )
-            .with_context(|| format!("failed to materialize GRT source card {source_card_key}"))?;
+            .with_context(|| format!("failed to materialize LGZ source card {source_card_key}"))?;
             tx.last_insert_rowid()
         };
         let chr_order: i64 = tx
@@ -227,7 +227,7 @@ pub(super) fn materialize_grt_source_cards_with_connection(
                 params![project_id, target_chr],
                 |row| row.get(0),
             )
-            .context("failed to allocate GRT source-card chromosome order")?;
+            .context("failed to allocate LGZ source-card chromosome order")?;
         let preferred_name = format!("{contig_name}@{target_chr}");
         let name_exists: bool = tx.query_row(
             "SELECT EXISTS(SELECT 1 FROM assembly_ctg WHERE project_id = ?1 AND name = ?2)",
@@ -259,7 +259,7 @@ pub(super) fn materialize_grt_source_cards_with_connection(
                 )
             ],
         )
-        .with_context(|| format!("failed to place GRT source card {source_card_key}"))?;
+        .with_context(|| format!("failed to place LGZ source card {source_card_key}"))?;
     }
     crate::source_fragments::split_new_source_instances(&tx, project_id, after_seq_id)?;
     let after: i64 = tx.query_row(
@@ -268,7 +268,7 @@ pub(super) fn materialize_grt_source_cards_with_connection(
         |r| r.get(0),
     )?;
     tx.commit()
-        .context("failed to commit GRT source-card materialization")?;
+        .context("failed to commit LGZ source-card materialization")?;
     Ok((after - before).max(0) as usize)
 }
 
@@ -294,7 +294,7 @@ pub(super) fn verify_project_assignment_orientation_projection(
              WHERE pd.project_id = ?1
              ORDER BY d.id, ss.id, rc.id",
         )
-        .context("failed to prepare GRT assignment projection verification")?;
+        .context("failed to prepare LGZ assignment projection verification")?;
     let baselines = baseline_stmt
         .query_map(params![project_id], |row| {
             Ok((
@@ -319,7 +319,7 @@ pub(super) fn verify_project_assignment_orientation_projection(
                AND s.source_seq_id = ?2
                AND c.assigned_chr_name = ?3",
         )
-        .context("failed to prepare projected GRT assignment query")?;
+        .context("failed to prepare projected LGZ assignment query")?;
     for (
         source_seq_id,
         dataset_name,

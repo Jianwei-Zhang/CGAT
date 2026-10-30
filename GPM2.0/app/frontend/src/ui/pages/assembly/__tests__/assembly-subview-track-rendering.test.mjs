@@ -70,7 +70,7 @@ test("subview panel renders unified toolbar with parameter labels after entering
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
 });
 
-test("schema 3 renders local GRT evidence in contig-pair and track-pair Subviews", () => {
+test("schema 3 renders local LGZ evidence in contig-pair and track-pair Subviews", () => {
   const supportSegment = {
     segmentId: "support-segment",
     type: "ctg",

@@ -10,11 +10,11 @@ def _step3_alignment_features(
     left: dict[str, object],
     right: dict[str, object] | None,
 ) -> dict[str, object]:
-    """Return the alignment feature vector used by GRT's gap analyzer.
+    """Return the alignment feature vector used by LGZ's gap analyzer.
 
     MUMmer rows are already normalized to 1-based closed coordinates by
     :func:`parse_mummer_coords`.  Keeping this adapter on those rows avoids
-    importing the standalone GRT package (which would lose GPM provenance).
+    importing the standalone LGZ package (which would lose GPM provenance).
     """
     if right is None:
         return {
@@ -80,7 +80,7 @@ def _step3_alignment_features(
 
 
 def _step3_classify_features(features: dict[str, object]) -> tuple[str, str, list[str], float]:
-    """Classify one anchor pair using GRT Type1--Type6 precedence."""
+    """Classify one anchor pair using LGZ Type1--Type6 precedence."""
     if features.get("crossing_alignment"):
         return "type1", "crossing_alignment", ["crossing_alignment"], 0.90
 
@@ -516,7 +516,7 @@ def build_correction_candidates(
 ) -> list[dict[str, object]]:
     """Build Server-native Type1--Type6 CorrectRefill candidates.
 
-    The standalone GRT analyzer operates on implicit files.  This adapter uses
+    The standalone LGZ analyzer operates on implicit files.  This adapter uses
     the already parsed, hash-bound MUMmer rows so source cards and donor-set
     coordinates remain owned by GPM.
     """

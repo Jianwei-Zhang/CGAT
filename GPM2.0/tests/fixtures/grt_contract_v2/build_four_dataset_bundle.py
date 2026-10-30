@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a tiny, importable 1-primary/3-support GRT bundle (synthetic, not biological).
+"""Build a tiny, importable 1-primary/3-support LGZ bundle (synthetic, not biological).
 
 The extra supports intentionally have no chromosome assignments: project roles
 and the Assembly dataset menu must not drop datasets without chromosome hits.

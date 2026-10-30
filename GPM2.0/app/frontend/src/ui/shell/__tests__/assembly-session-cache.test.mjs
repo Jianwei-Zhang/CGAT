@@ -106,7 +106,7 @@ test("assembly DOM cache preserves node identity across route detach and restore
   assert.equal(host.dataset.route, "assembly");
 });
 
-test("GRT result switches and transient toast do not survive a project-session restore", () => {
+test("LGZ result switches and transient toast do not survive a project-session restore", () => {
   clearAssemblySessionCache();
   rememberAssemblyState(createState({
     projectId: 7,

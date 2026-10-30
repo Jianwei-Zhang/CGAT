@@ -20,7 +20,7 @@ where
     }
     on_progress(
         "validate_grt_required_files",
-        "checking required GRT package files",
+        "checking required LGZ package files",
     );
     for relpath in REQUIRED_FILES {
         required_bundle_file(bundle_root, relpath, relpath)?;
@@ -28,7 +28,7 @@ where
 
     on_progress(
         "validate_grt_metadata_tables",
-        "parsing GRT metadata tables",
+        "parsing LGZ metadata tables",
     );
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in TABLE_SPECS {
@@ -55,7 +55,7 @@ where
     {
         return grt_err(
             "INVALID_VALUE",
-            "GRT precompute and locked recipe must both be true",
+            "LGZ precompute and locked recipe must both be true",
         );
     }
     if field(package, "sequence_layout")? != "partitioned"
@@ -66,7 +66,7 @@ where
     {
         return grt_err(
             "INVALID_VALUE",
-            "GRT package requires partitioned, preassigned chromosome data",
+            "LGZ package requires partitioned, preassigned chromosome data",
         );
     }
     let threshold = parse_f64(
@@ -210,7 +210,7 @@ where
             .insert(chromosome.to_string());
     }
 
-    on_progress("validate_grt_recipe", "validating the locked GRT recipe");
+    on_progress("validate_grt_recipe", "validating the locked LGZ recipe");
     let recipe = one_row(&tables, "metadata/grt_recipe.tsv")?;
     let primary_dataset = nonempty(recipe, "primary_dataset", "recipe primary dataset")?;
     if !dataset_names.contains(primary_dataset) {
@@ -268,7 +268,7 @@ where
             );
         }
         if !role_keys.insert(key) {
-            return grt_err("DUPLICATE_ID", "duplicate GRT contig role");
+            return grt_err("DUPLICATE_ID", "duplicate LGZ contig role");
         }
         for name in ["q_eligible", "donor_eligible", "tel_donor_eligible"] {
             parse_bool(field(row, name)?, &format!("contig role {name}"))?;
@@ -891,7 +891,7 @@ where
     for event in &events {
         let object = event
             .as_object()
-            .ok_or_else(|| grt_anyhow("INVALID_JSON", "GRT event must be an object"))?;
+            .ok_or_else(|| grt_anyhow("INVALID_JSON", "LGZ event must be an object"))?;
         for field_name in [
             "run_id",
             "event_id",
@@ -1259,7 +1259,7 @@ where
             } else if matches!(kind, "patch" | "correction" | "telomere") {
                 return grt_err(
                     "BROKEN_REFERENCE",
-                    format!("GRT segment {segment_id} lacks accepted event"),
+                    format!("LGZ segment {segment_id} lacks accepted event"),
                 );
             }
             rebuilt.push_str(&orient_sequence(

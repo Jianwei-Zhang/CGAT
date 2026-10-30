@@ -27,7 +27,7 @@ bash scripts/quality-gate-server.sh
 
 Windows 门禁检查已跟踪文本文件的 LF 行尾、全部前端测试、前端生产构建，以及两个
 Rust crate 的格式、严格 Clippy 和测试。Linux 门禁检查 LF 行尾、shell 语法、全部
-服务端 Python 测试、专项 shell 测试和 GRT server-to-app 端到端契约。
+服务端 Python 测试、专项 shell 测试和 LGZ server-to-app 端到端契约。
 
 完整 Windows 门禁需要 `python`、Node.js/npm、Rust、`rustfmt` 和 `clippy`；执行前先
 在前端目录运行 `npm ci`。完整 Linux 门禁需要 `python3`、Bash、Node.js、Rust 和

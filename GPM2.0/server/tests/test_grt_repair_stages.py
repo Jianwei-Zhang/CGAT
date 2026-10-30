@@ -1899,13 +1899,13 @@ else:
             self.assertEqual(first.returncode, 0, first.stderr)
             changed = self.run_repair_stages(server, tools, env, refill_max_length=2_000_000)
             self.assertEqual(changed.returncode, 0, changed.stderr)
-            self.assertIn("GRT step2 cache hit:", changed.stdout)
-            self.assertNotIn("GRT step3 cache hit:", changed.stdout)
+            self.assertIn("LGZ step2 cache hit:", changed.stdout)
+            self.assertNotIn("LGZ step3 cache hit:", changed.stdout)
             checkpoint = json.loads((server / "grt/checkpoints/step3.json").read_text())
             self.assertEqual(checkpoint["fingerprint_payload"]["refill_parameters"]["max_fill_length"], 2_000_000)
             repeated = self.run_repair_stages(server, tools, env, refill_max_length=2_000_000)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
-            self.assertIn("GRT step3 cache hit:", repeated.stdout)
+            self.assertIn("LGZ step3 cache hit:", repeated.stdout)
 
     def test_engine_identity_covers_both_stages_helpers_and_entry_scripts(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
@@ -1967,7 +1967,7 @@ else:
             )
             changed = self.run_repair_stages(server, tools, env, step2_tool=runtime / "grt_step2.py", step3_tool=runtime / "grt_step3.py")
             self.assertEqual(changed.returncode, 0, changed.stderr)
-            self.assertIn("GRT step2 complete", changed.stdout)
+            self.assertIn("LGZ step2 complete", changed.stdout)
             # Recompute repair decisions after engine changes, retaining
             # independently fingerprinted numerical alignments.
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
@@ -2162,7 +2162,7 @@ else:
                 handle.write("# injected output hash mismatch\n")
             output_invalidated = self.run_repair_stages(server, tools, env)
             self.assertEqual(output_invalidated.returncode, 0, output_invalidated.stderr)
-            self.assertIn("GRT step2 complete", output_invalidated.stdout)
+            self.assertIn("LGZ step2 complete", output_invalidated.stdout)
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q2.fa"), q2_hash)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)

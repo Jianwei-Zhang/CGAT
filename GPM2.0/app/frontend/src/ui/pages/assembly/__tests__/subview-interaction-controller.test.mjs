@@ -19,7 +19,7 @@ function anchorNode() {
     "data-subview-anchor-top-contig-id": "1",
     "data-subview-anchor-top-cut-bp": "100",
     "data-subview-anchor-top-name": "ctg_top",
-    "data-subview-anchor-top-source-label": "GRT · primary",
+    "data-subview-anchor-top-source-label": "LGZ · primary",
     "data-subview-anchor-top-source-role": "primary",
     "data-subview-anchor-top-source-kind": "mother",
     "data-subview-anchor-top-source-name": "hifiasm",
@@ -86,7 +86,7 @@ test("legacy anchor descriptor enrichment persists without adding a history oper
   assert.equal(persisted, 1);
 });
 
-test("copying a GRT object creates one undoable user anchor and reuses it on duplicate copy", async () => {
+test("copying a LGZ object creates one undoable user anchor and reuses it on duplicate copy", async () => {
   const baseline = {
     mode: "segments",
     chrName: "Chr01",

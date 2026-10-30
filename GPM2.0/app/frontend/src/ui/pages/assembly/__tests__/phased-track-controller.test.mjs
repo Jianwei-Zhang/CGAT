@@ -63,7 +63,7 @@ function createController({ tracksAfter, createError = null, notices }) {
   });
 }
 
-test("first successful phased track creation explains how to restore GRT results", async () => {
+test("first successful phased track creation explains how to restore LGZ results", async () => {
   const notices = [];
   const controller = createController({
     tracksAfter: [createTrack(1, "A")],
@@ -73,13 +73,13 @@ test("first successful phased track creation explains how to restore GRT results
   await controller.createPhasedChrTrack({}, createStore());
 
   assert.deepEqual(notices, [{
-    title: "GRT 结果暂不可用",
-    message: "分型轨道暂不支持显示 GRT 预计算结果。关闭所有分型轨道后，即可恢复 GRT 结果。",
+    title: "LGZ 结果暂不可用",
+    message: "分型轨道暂不支持显示 LGZ 预计算结果。关闭所有分型轨道后，即可恢复 LGZ 结果。",
     confirmLabel: "我知道了",
   }]);
 });
 
-test("adding another phased track does not repeat the GRT notice", async () => {
+test("adding another phased track does not repeat the LGZ notice", async () => {
   const notices = [];
   const existingTrack = createTrack(1, "A");
   const controller = createController({
@@ -92,7 +92,7 @@ test("adding another phased track does not repeat the GRT notice", async () => {
   assert.deepEqual(notices, []);
 });
 
-test("failed phased track creation does not show the GRT notice", async () => {
+test("failed phased track creation does not show the LGZ notice", async () => {
   const notices = [];
   const controller = createController({
     tracksAfter: [],

@@ -431,7 +431,7 @@ test("loadProjectAssemblyViewState defaults membersCardCollapsed to true", async
   assert.equal(result.membersCardCollapsed, true);
 });
 
-test("project view round-trip preserves GRT anchor origin and assembly coordinates", async () => {
+test("project view round-trip preserves LGZ anchor origin and assembly coordinates", async () => {
   let payload;
   const result = await persistProjectAssemblyViewState({
     workspaceRoot: "/tmp/ws",
