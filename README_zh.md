@@ -9,7 +9,7 @@
 自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
 
 [![CGAT Docs](https://img.shields.io/badge/在线文档与直连下载-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/zh/)
-[![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.15-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
+[![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.16-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
 
 **CGAT（Complete Genome Assembly Toolkit）** 是面向染色体级基因组组装、多组装共线性复核与长读段定点精修的一体化工具集。它将 Linux 服务端的高通量比对与自动修复（**GPM2.0 服务端**）、Windows / macOS 桌面端的交互式证据检查与路径编辑（**GPM2.0 桌面端**），以及基于 HiFi / ONT 长读段的缺口补洞与端粒延伸（**DEGAP2.0**）紧密衔接在一起。
 
@@ -39,11 +39,11 @@ SERVER="$HOME/bin/GPM_Server"
 (
   set -euo pipefail
   mkdir -p "$(dirname "$SERVER")" && mkdir "$SERVER" && cd "$SERVER"
-  archive=GPM_Server_2.0.15_source.tar.gz
+  archive=GPM_Server_2.0.16_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.15/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.16/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.15/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.16/$archive"
   tar -xzf "$archive" --strip-components=1
   bash ./install.sh
 )
