@@ -38,12 +38,13 @@ class ServerAlignmentTests(unittest.TestCase):
         self.args = argparse.Namespace(server_dir=self.workspace,run_dir=self.run,target=self.target,query=self.query,
                                        result="result.paf",preset="asm10",threads=3)
 
-    def native(self,options,*,prepared_workspace,admit_output):
+    def native(self,options,*,prepared_workspace,admit_output,resume_identity):
         self.assertEqual(prepared_workspace,self.workspace)
         self.assertEqual(options.threads,3)
         self.assertEqual(options.memory_gib,0)
         self.assertEqual(options.native_state_bundle,self.runtime/"native"/sa.nst.build.host_platform())
         self.assertFalse(admit_output)
+        self.assertEqual(resume_identity["runtime_sha256"],sa.validate_runtime(self.runtime)["sha256"])
         options.out.mkdir()
         data = b"opaque complete native PAF bytes\n"
         (options.out/"reference.candidate.experimental.paf").write_bytes(data)

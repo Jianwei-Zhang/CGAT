@@ -70,6 +70,7 @@ class FastaStore:
         before = fingerprint(self.source)
         self.records: dict[str, dict] = {}
         raw_hash = hashlib.sha256()
+        normalized_hash = hashlib.sha256()
         current = None
         offset = 0
         at_start = True
@@ -100,6 +101,7 @@ class FastaStore:
                 if sequence.translate(None, ALPHABET):
                     raise ExperimentError("non-IUPAC DNA or whitespace within sequence")
                 out.write(sequence)
+                normalized_hash.update(sequence)
                 offset += len(sequence)
                 current["length"] += len(sequence)
                 if current["length"] > INT32_MAX:
@@ -109,6 +111,7 @@ class FastaStore:
         if fingerprint(self.source) != before:
             raise ExperimentError("FASTA changed during scan")
         self.identity = {"source": str(self.source), **before, "sha256": raw_hash.hexdigest()}
+        self.normalized_sha256 = normalized_hash.hexdigest()
         self.spool = spool.resolve()
         self.spool_identity = fingerprint(self.spool)
         self.handle = self.spool.open("rb")

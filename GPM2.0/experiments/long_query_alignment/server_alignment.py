@@ -22,10 +22,12 @@ import stat
 import subprocess
 import sys
 import tempfile
+import uuid
 
 import selective_reference_alignment as sr
 import proactive_reference_alignment as pa
 import proactive_publication as pub
+import proactive_resume as pr
 import native_chain_state as nst
 import native_first as nf
 import recovery_publication as rp
@@ -33,7 +35,7 @@ import windowed_alignment as wa
 
 MANIFEST = "branch-runtime.json"
 RUNTIME_FILES = (
-    "proactive_reference_plan.py","proactive_reference_alignment.py","proactive_publication.py",
+    "proactive_reference_plan.py","proactive_reference_alignment.py","proactive_publication.py","proactive_resume.py",
     "server_alignment.py","selective_reference_alignment.py","guided_alignment.py","windowed_alignment.py",
     "native_first.py","native_evaluation.py","native_chain_state.py","build_native_chain_state.py","recovery_publication.py",
     "native_recovery.py","native_selection.py","post_dp_selection.py","whole_query_scores.py",
@@ -181,9 +183,11 @@ def run_reference(args,*,runtime_root=None):
     runtime = validate_runtime(runtime_root)
     output = run_dir/args.result
     with task_lock(run_dir),cancellation_scope():
-        attempt = Path(tempfile.mkdtemp(prefix=".long-cigar-attempt-",dir=run_dir))
+        resume_identity = pr.adapter_key(args, runtime)
+        attempt, attempt_reused = pr.select_attempt(run_dir, resume_identity)
+        pr.archive_partial(attempt / "server-alignment.json")
         report = {"schema":1,"status":"running","production_ready":False,"customer_validated":False,
-                  "runtime":runtime,"attempt":str(attempt),"result_published":False,
+                  "runtime":runtime,"attempt":str(attempt),"result_published":False,"attempt_reused":attempt_reused,
                   "minimap2_modified":False,"automatic_parameter_retry":False,
                   "scope":"initial_reference_asm10_only","customer_configuration_required":False}
         wa.write_json(attempt/"server-alignment.json",report)
@@ -192,12 +196,14 @@ def run_reference(args,*,runtime_root=None):
                 raise wa.ExperimentError("existing result is not a regular file; preserving it without mapping")
             if output.is_file():
                 previous = attempt/"prior-result.paf"
+                if previous.exists():
+                    previous = attempt/("prior-result-" + uuid.uuid4().hex + ".paf")
                 output.rename(previous)
                 report["previous_result"] = {"path":str(previous),"sha256":wa.sha256(previous),"restored_automatically":False}
             options = argparse.Namespace(target=args.target,query=args.query,out=attempt/"selective",
                 minimap2="minimap2",threads=args.threads,timeout=21600,memory_gib=0,
                 native_state_bundle=runtime_root/"native"/nst.build.host_platform())
-            result = pa.experiment(options,prepared_workspace=workspace,admit_output=False)
+            result = pa.experiment(options,prepared_workspace=workspace,admit_output=False,resume_identity=resume_identity)
             report["candidate_receipt_sha256"] = wa.sha256(options.out/"proactive-candidate.json")
             source,digest = publication_source(result,attempt,runtime=runtime,runtime_root=runtime_root)
             if validate_runtime(runtime_root)!=runtime:
@@ -219,7 +225,12 @@ def run_reference(args,*,runtime_root=None):
                     if (current["sha256"]!=admission["helper_sha256"]
                             or current["manifest_sha256"]!=admission["helper_manifest_sha256"]):
                         raise wa.ExperimentError("native companion changed before atomic result publication")
-            report["publication"] = publish_atomic(source,digest,output,attempt,check_unchanged=unchanged)
+            publication_attempt = attempt
+            if any((attempt / name).exists() for name in ("publication.pending.paf", "publication.complete.paf")):
+                publication_attempt = Path(tempfile.mkdtemp(prefix=".publication-", dir=attempt))
+            report["publication_evidence"] = str(publication_attempt)
+            report["publication"] = publish_atomic(source,digest,output,publication_attempt,check_unchanged=unchanged)
+            report["cache_reused"] = result.get("cache_reused", {})
             report.update(status="proactive_complete_published" if proactive else "native_complete_published",
                           result_published=True,proactive_routing=proactive,recovered_query_part_cells=result.get("recovered_query_part_cells",0),
                           recovered_output_admission=runtime["recovered_output_admission"],

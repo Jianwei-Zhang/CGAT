@@ -19,8 +19,10 @@ import subprocess
 import guided_alignment as ga
 import native_chain_state as nst
 import native_first as nf
+import recovery_publication as rp
 import proactive_reference_plan as pp
 import proactive_publication as pub
+import proactive_resume as pr
 import selective_reference_alignment as sr
 import windowed_alignment as wa
 
@@ -81,11 +83,11 @@ def add_empty_cell(merger, root, result, name, part):
     return pair
 
 
-def experiment(args, *, prepared_workspace=None, admit_output=True):
+def experiment(args, *, prepared_workspace=None, admit_output=True, resume_identity=None):
     args = argparse.Namespace(**vars(args))
     args.target, args.query = args.target.resolve(), args.query.resolve()
     root = args.out.resolve()
-    if root.exists() or args.out.is_symlink() or not root.parent.is_dir():
+    if (root.exists() and (resume_identity is None or not (root / pr.STATE).is_file())) or args.out.is_symlink() or not root.parent.is_dir():
         raise wa.ExperimentError("fresh private proactive output directory required")
     pp.check_prepared_scope(root, prepared_workspace)
     if args.target.resolve() == args.query.resolve():
@@ -96,19 +98,24 @@ def experiment(args, *, prepared_workspace=None, admit_output=True):
     if not executable:
         raise wa.ExperimentError("minimap2 unavailable")
     mm = str(Path(executable).resolve())
-    root.mkdir(mode=0o700)
+    root.mkdir(mode=0o700, exist_ok=resume_identity is not None)
+    cache = pr.Checkpoint(root, resume_identity)
     report = {"schema": 1, "status": "running", "production_ready": False, "result_published": False,
               "routing_mode": "proactive_query_length", "partial_PAF_reused": False,
               "whole_input_failure_trial": False, "bisection": False, "singleton_assertion_replay": False,
-              "parts": [], "publication_admission": "closed_pending_proactive_contract"}
+              "parts": [], "publication_admission": "closed_pending_proactive_contract", "cache_reused": cache.reused}
     try:
         catalog = pp.scan_query(args.query)
         plan = pp.make_plan(catalog)
-        groups = pp.materialize(catalog, plan, root / "inputs", prepared_workspace=prepared_workspace)
+        cache.bind("query", query_identity(catalog))
+        cache.bind("policy", {"target": str(args.target), "threads": args.threads,
+                              "window": plan["window_policy"], "threshold": plan["risk_threshold"]})
+        tool = nf.source_identity(Path(mm))
+        cache.bind("tool", tool)
+        groups = cache.groups(catalog, plan, prepared_workspace=prepared_workspace)
         wa.write_json(root / "query-catalog.json", {"source": catalog.source,
             "source_sha256": catalog.source_sha256, "records": [pp.asdict(r) for r in catalog.records]})
         wa.write_json(root / "routing-plan.json", plan)
-        tool = nf.source_identity(Path(mm))
         report.update(query=query_identity(catalog), plan=plan, groups=groups, tool={"path": mm, **tool})
         native_args = argparse.Namespace(**vars(args))
         if prepared_workspace is not None:
@@ -116,7 +123,13 @@ def experiment(args, *, prepared_workspace=None, admit_output=True):
         # Normal-only: no reference normalization, MMI preprocessing or companion.
         if not plan["long_queries"]:
             reference = nf.source_identity(args.target.resolve())
-            native = nf.attempt(mm, args.target.resolve(), args.query.resolve(), root / "ordinary-native", native_args)
+            cache.bind("reference", reference)
+            native = cache.ordinary(mm, args.target, args.query)
+            if native is None:
+                pr.archive_partial(root / "ordinary-native")
+                native = nf.attempt(mm, args.target, args.query, root / "ordinary-native", native_args)
+                if native["status"] == "native_success":
+                    cache.save_ordinary()
             if native["status"] != "native_success":
                 raise wa.ExperimentError("ordinary native mapping failed; no automatic failure recovery")
             catalog.require_unchanged()
@@ -131,22 +144,54 @@ def experiment(args, *, prepared_workspace=None, admit_output=True):
             raise wa.ExperimentError("long-query original-state recovery requires minimap2 2.31-r1302")
         bundle = nst.validate_bundle(getattr(args, "native_state_bundle", None))
         report["helper"] = bundle
-        target = wa.FastaStore(args.target, root / "target.bases")
+        cache.bind("helper", {k: bundle[k] for k in ("sha256", "manifest_sha256", "platform")})
+        target = cache.store(args.target, root / "target.bases", "target-store")
         try:
             report["reference"] = target.identity
-            index = sr.build_default_index(mm, target, root, args, tool["sha256"], reuse_single_part=True)
+            cache.bind("reference", target.identity)
+            index = cache.index(target, tool["sha256"])
+            if index is None:
+                for name in ("target.default.mmi", "index-parts", "index-base.json", "index-context.json",
+                             "default-index.command.json", "default-index.execution.json", "default-index.stdout", "default-index.stderr"):
+                    pr.archive_partial(root / name)
+                index = sr.build_default_index(mm, target, root, args, tool["sha256"], reuse_single_part=True)
+                cache.save_index(index)
             queries = {r.name: {"length": r.length} for r in catalog.records}
+            pr.archive_partial(root / "cells")
             merger = nf.CellMerger(root / "cells", queries, target.records, index["parts"])
             ordinary = next((g for g in groups["groups"] if g["route"] == "native"), None)
             if ordinary is not None:
-                native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", native_args)
+                native = cache.ordinary(mm, root / "target.default.mmi", ordinary["path"])
+                if native is None:
+                    pr.archive_partial(root / "ordinary-native")
+                    native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", native_args)
+                    if native["status"] == "native_success":
+                        cache.save_ordinary()
                 if native["status"] != "native_success":
                     raise wa.ExperimentError("ordinary group failed; no bisection or failed PAF reuse")
                 merger.add_native(native, ordinary["queries"])
                 mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(index["parts"]))
                 report.update(ordinary_native=native, threshold_source={"kind": "ordinary_original_index_mapping", "mid_occ": mid})
             else:
-                mid, report["threshold_source"] = first_part_threshold(mm, index["parts"][0], root, args)
+                saved = cache.get("threshold")
+                if saved is not None:
+                    directory = root / "first-part-metadata"
+                    command = [mm, "-x", "asm10", "-t", str(args.threads), "-o", str(directory / "empty.paf"),
+                               index["parts"][0]["path"], str(directory / "empty.fa")]
+                    execution = pub.completed_command(directory, "metadata", root, command)
+                    if (saved["execution"] != execution or saved["part_sha256"] != index["parts"][0]["sha256"]
+                            or wa.sha256(directory / "metadata.stderr") != saved["stderr_sha256"]
+                            or any(rp.regular_under(directory / name, root).stat().st_size != 0 for name in ("empty.fa", "empty.paf"))):
+                        raise wa.ExperimentError("cached first-part threshold evidence changed")
+                    mid = sr.read_shared_mid_occ(directory / "metadata.stderr", 1)
+                    if mid != saved["mid_occ"]:
+                        raise wa.ExperimentError("cached threshold changed")
+                    report["threshold_source"] = saved
+                    cache.reused["threshold_metadata"] += 1
+                else:
+                    pr.archive_partial(root / "first-part-metadata")
+                    mid, report["threshold_source"] = first_part_threshold(mm, index["parts"][0], root, args)
+                    cache.mark("threshold", report["threshold_source"])
             for part in index["parts"]:
                 part["mid_occ"] = mid
             wa.write_json(root / "index-context.json", index)
@@ -157,12 +202,38 @@ def experiment(args, *, prepared_workspace=None, admit_output=True):
                 name = group["queries"][0]
                 number = next(r.ordinal for r in catalog.records if r.name == name)
                 directory = root / f"long-{number:08d}"
-                directory.mkdir()
-                query = wa.FastaStore(Path(group["path"]), directory / "query.bases")
+                directory.mkdir(exist_ok=cache.enabled)
+                query = None
                 try:
-                    if query.identity["sha256"] != group["sha256"] or list(query.records) != [name]:
-                        raise wa.ExperimentError("long query differs from original routed record")
                     for part in index["parts"]:
+                        cell = cache.cell(name, part["part_index"])
+                        cell_dir = directory / f"part-{part['part_index']:04d}"
+                        validator = lambda raw: sr.validate_row(raw, queries, target.records, {name}, "risk")
+                        if cell is not None:
+                            if (cell.get("query") != name or cell.get("part_index") != part["part_index"]
+                                    or cell.get("directory") != str(cell_dir)
+                                    or wa.sha256(rp.regular_under(cell_dir / "guidance.json", root)) != cell["guidance_sha256"]):
+                                raise wa.ExperimentError("cached long-query cell identity changed")
+                            if cell["status"] == "no_candidates_in_original_part":
+                                pub.check_empty(cell, part, group, report, root)
+                                add_empty_cell(merger, cell_dir, pr.read_json(cell_dir / "guidance.json"), name, part)
+                            else:
+                                proof = rp.check_leaf(cell["publication"], cell_dir, part, report, bundle, sr.validate_row,
+                                                      eligibility="proactive_query_length")
+                                pair = proof["paired_paths"]
+                                if pair != cell["pair"]:
+                                    raise wa.ExperimentError("cached long-query pair changed")
+                                merger.add_recovered(pair["public_path"], pair["public_sha256"], name, part["part_index"],
+                                    validator, native_evaluated={"path": pair["path"], "sha256": pair["sha256"]})
+                            cache.reused["long_cells"] += 1
+                            report["parts"].append(cell)
+                            wa.write_json(root / "proactive-candidate.json", report)
+                            continue
+                        if query is None:
+                            query = cache.store(Path(group["path"]), directory / "query.bases", f"query-store:{number}")
+                            if query.identity["sha256"] != group["sha256"] or list(query.records) != [name]:
+                                raise wa.ExperimentError("long query differs from original routed record")
+                        pr.archive_partial(cell_dir)
                         options = argparse.Namespace(target=args.target, query=Path(group["path"]),
                             out=directory / f"part-{part['part_index']:04d}", minimap2=mm, preset="asm10",
                             core_bases=plan["window_policy"]["core_bases"], context_bases=plan["window_policy"]["context_bases"],
@@ -186,14 +257,18 @@ def experiment(args, *, prepared_workspace=None, admit_output=True):
                         report["parts"].append({"query": name, "part_index": part["part_index"],
                             "status": result["status"], "directory": str(options.out), "pair": pair,
                             "guidance_sha256": wa.sha256(options.out / "guidance.json"), "publication": publication})
+                        cache.save_cell(report["parts"][-1])
                         wa.write_json(root / "proactive-candidate.json", report)
                 finally:
-                    query.close()
+                    if query is not None:
+                        query.close()
             catalog.require_unchanged()
             if not target.unchanged() or not nf.identity_unchanged(Path(mm), tool):
                 raise wa.ExperimentError("original source/tool changed before assembly")
             output = root / "reference.candidate.experimental.paf"
             private = root / "reference.native-evaluated.experimental.paf"
+            pr.archive_partial(output)
+            pr.archive_partial(private)
             report["combination"] = merger.finish(output)
             report["native_evaluation_combination"] = merger.finish(private, native_evaluated=True)
             report.update(status="proactive_candidate_complete", output_path=str(output), output_sha256=wa.sha256(output),
