@@ -107,11 +107,12 @@ bash "$SKILL/scripts/update.sh"
 # Equivalent for a registered skill: bash "$SERVER/update.sh"
 ```
 
-No `--check` or `--yes`: it always checks first, reports already up to date when
-all scoped files match, or lists the plan and asks `[y/N]`. `Y/y` confirms;
-`N/n`, Enter, EOF, or no interactive terminal cancels. Let the user answer; do not
-pipe `yes` or manufacture consent. Normal run/resume tasks do not require network
-checks. Updates align tools, registered skill copies and the current project's
+No `--check` or `--yes`: it checks first, reports already up to date when all
+scoped files match, otherwise backs up and updates without a Y/N prompt (including
+closed stdin). New run/resume launchers check before analysis, then exec fresh code.
+An unavailable check before writes can use an integrity-verified installed runtime;
+a failed write or rollback stops startup. Development packages skip auto-updates.
+Updates align tools, registered skill copies and the current project's
 `.prepare_lib/`, preserving `local/`, bindings, logs, results, caches, generated
 scripts and the environment. Stop all affected jobs, including other nodes;
 updates neither start analysis nor reinstall dependencies. A source/version error

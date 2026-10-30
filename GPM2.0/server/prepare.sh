@@ -1043,6 +1043,14 @@ mkdir -p "$RUN_ALL_STATE_DIR"
   printf 'set -euo pipefail\n'
   printf '\n'
   printf 'server_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"\n'
+  printf 'tools_dir=""\n'
+  printf 'if [[ -f "${server_dir}/.prepare_lib/server-tools.path" ]]; then\n'
+  printf '  IFS= read -r tools_dir < "${server_dir}/.prepare_lib/server-tools.path" || true\n'
+  printf 'fi\n'
+  printf 'if [[ -n "$tools_dir" && -f "$tools_dir/update.sh" ]]; then\n'
+  printf '  exec bash "$tools_dir/update.sh" --launch-workspace "$server_dir" "$@"\n'
+  printf 'fi\n'
+  printf 'printf "[UPDATE] Original installation unavailable; using the prepared runtime.\\n" >&2\n'
   printf 'exec python3 "${server_dir}/.prepare_lib/tools/run_all_runner.py" --server-dir "$server_dir" "$@"\n'
 } > "$RUN_ALL"
 printf 'unit_id\tcommand_relpath\tdetail_log_relpath\n' > "$RUN_ALL_PLAN"

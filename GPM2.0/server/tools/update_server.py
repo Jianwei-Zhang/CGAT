@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive, backed-up release update; never run analysis or install dependencies."""
+"""Noninteractive, backed-up release update; optional pre-run exec handoff."""
 from __future__ import annotations
 
 from contextlib import ExitStack
@@ -25,22 +25,6 @@ import update_workspace_runtime as core
 SKILL_PREFIX = "skills/gpm-server/"
 
 
-def confirm(prompt):
-    if not sys.stdin.isatty():
-        print("No interactive terminal; update cancelled. No installation was changed.")
-        return False
-    while True:
-        try:
-            answer = input(prompt + " [y/N]: ").strip()
-        except EOFError:
-            return False
-        if answer in ("y", "Y"):
-            return True
-        if answer in ("", "n", "N"):
-            return False
-        print("Please enter Y/y or N/n.")
-
-
 def project_at(cwd):
     for directory in (cwd, *cwd.parents):
         if (directory / ".prepare_lib").exists() or (directory / "run_all.sh").exists():
@@ -49,7 +33,7 @@ def project_at(cwd):
 
 
 def runtime_file(name):
-    return (name.startswith("lib/") or
+    return (name.startswith("lib/") or name.startswith("tools/long_cigar_recovery/") or
             (name.startswith("contracts/") and name.endswith(".json")) or
             (name.startswith("tools/") and name.endswith(".py") and
              (len(Path(name).parts) == 2 or name.startswith("tools/grt_core/"))))
@@ -125,7 +109,7 @@ def prepare(source, tools, workspace, release):
             if not Path(recorded).is_absolute() or paths.checked(recorded) != tools:
                 raise ValueError("Project tools binding conflicts with the invoked installation: " + recorded)
         else:
-            print("Legacy project has no saved tools path; confirmation will bind it to: " + str(tools))
+            print("Legacy project has no saved tools path; the backed-up update will bind it to: " + str(tools))
     skills = skill_targets(tools)
     roots = {"tools": tools}
     targets = [("tools", source_files, previous.get("files", {}), "")]
@@ -248,7 +232,7 @@ def apply(plan):
             if path.exists() != item["existed"] or (path.exists() and (
                     core.digest(path.read_bytes()) != item["sha256"] or
                     stat.S_IMODE(path.stat().st_mode) != item["mode"])):
-                raise ValueError("Target changed after confirmation; check again: " + str(path))
+                raise ValueError("Target changed after planning; check again: " + str(path))
         home = (workspace or tools) / ".run_all"
         backup = Path(tempfile.mkdtemp(prefix="server-update-", dir=home))
         journal = {**plan, "files": [{k: v for k, v in item.items() if k != "data"} for item in changes], "status": "applying"}
@@ -304,16 +288,27 @@ def rollback(backup):
         core.write_atomic(backup / "journal.json", (json.dumps(journal, indent=2) + "\n").encode())
 
 
-def run(tools):
+def run(tools, *, startup=False, workspace=None):
     tools = paths.validate_tools(tools)
-    workspace = project_at(Path.cwd())
+    if not startup:
+        workspace = project_at(Path.cwd())
     print("Server tools: " + str(tools))
     print("Current project: " + (str(workspace) if workspace else "none (other projects will not be scanned)"))
     print("Checking CGAT docs first, GitHub Release on failure (tools and skill share one verified source)...")
-    release = downloads.discover()
     with tempfile.TemporaryDirectory(prefix="gpm-server-update-") as tmp:
-        source = downloads.extract(release, Path(tmp))
-        plan = prepare(source, tools, workspace, release)
+        # Only pre-mutation failures may fall back during startup. apply() and
+        # its rollback stay outside this catch: uncertain updates MUST stop.
+        try:
+            release = downloads.discover()
+            source = downloads.extract(release, Path(tmp))
+            plan = prepare(source, tools, workspace, release)
+            if startup and plan["unknown_baselines"]:
+                raise ValueError("legacy files have no recorded baseline; use update.sh explicitly for a backed-up adoption")
+        except (OSError, ValueError, RuntimeError, KeyError, TypeError, tarfile.TarError) as exc:
+            if not startup:
+                raise
+            print("[UPDATE] Check unavailable; keeping the verified installed runtime: " + str(exc), file=sys.stderr)
+            return 0
         if not plan["files"]:
             print("Already up to date / 当前已是最新版本，无需更新: " + release["tag"])
             return 0
@@ -323,20 +318,69 @@ def run(tools):
             if count:
                 print(f"  {root}: {count} file changes")
         if plan["unknown_baselines"]:
-            print("Legacy files have no recorded baseline; custom edits cannot be distinguished. Review these before accepting:")
+            print("Legacy files have no recorded baseline; preserving originals in the update backup:")
             print("\n".join("  " + p for p in plan["unknown_baselines"]))
         ensure_idle(tools, workspace)
         print("Preserves skill local/, bindings, inputs, results, logs, caches and environment. Does not run analysis.")
-        print("Stop ALL affected jobs, including jobs on other nodes, before confirming.")
-        if not confirm("Update / 是否更新？"):
-            print("Cancelled; no installation was changed.")
-            return 0
-        # Temporary payload and target snapshots are pinned before confirmation.
+        print("Applying the code-only update without a Y/N prompt. All affected jobs must be stopped.")
+        # Source payload and every target precondition are pinned before writes.
         backup = apply(plan)
         print("Updated successfully. Backup: " + str(backup))
         print("Rollback: python3 " + shlex.quote(str(tools / "tools/update_server.py")) + " --rollback " + shlex.quote(str(backup)))
         print("No analysis was started. Start a fresh agent session to reload the skill.")
     return 0
+
+
+def verify_installed(tools, workspace):
+    """Never continue offline with a corrupted official source/runtime."""
+    info = metadata(tools)
+    core.verified_source(tools, info["git_revision"])
+    if workspace is not None:
+        runtime = workspace / ".prepare_lib"
+        old = metadata(runtime)
+        if not isinstance(old.get("files"), dict) or not old["files"]:
+            raise ValueError("Prepared runtime has no integrity baseline; update.sh must adopt it before automatic startup")
+        for name, record in old["files"].items():
+            if runtime_file(name):
+                path = core.regular_path(runtime, name)
+                if not path.is_file() or core.digest(path.read_bytes()) != record.get("sha256"):
+                    raise ValueError("Prepared runtime integrity check failed: " + name)
+
+
+def launch(tools, mode, argv):
+    """Exec chain removes launcher parents; no PID exemptions or loaded-old-code reuse."""
+    tools = paths.validate_tools(tools)
+    if mode == "--launch-run":
+        from server_run import parse_options
+        help_only = any(flag in argv for flag in ("--help", "-h"))
+        options = {} if help_only else parse_options(argv, Path.cwd())
+        candidate = Path(options.get("--out", [[str(Path.cwd() / "gpm_server")]])[-1][0])
+        workspace = paths.checked(candidate) if (candidate / ".prepare_lib").is_dir() else None
+        command = [sys.executable, "-B", str(tools / "tools/server_run.py"), *argv]
+    elif mode == "--launch-workspace":
+        if not argv:
+            raise ValueError("Missing prepared workspace for internal launch")
+        workspace = paths.checked(argv[0])
+        if not (workspace / ".prepare_lib").is_dir():
+            raise ValueError("Not a prepared Server workspace")
+        binding = core.regular_path(workspace / ".prepare_lib", "server-tools.path")
+        if not binding.is_file() or paths.checked(binding.read_text().strip()) != tools:
+            raise ValueError("Prepared workspace belongs to a different Server installation")
+        help_only = any(flag in argv[1:] for flag in ("--help", "-h"))
+        command = [sys.executable, "-B", str(workspace / ".prepare_lib/tools/run_all_runner.py"),
+                   "--server-dir", str(workspace), *argv[1:]]
+    else:
+        raise ValueError("Unknown internal launch mode")
+    info = metadata(tools)
+    if not help_only and info.get("release") and info.get("official_release") is not False:
+        verify_installed(tools, workspace)
+        run(tools, startup=True, workspace=workspace)
+    elif not help_only:
+        print("[UPDATE] Development/legacy source without an official release manifest: automatic update skipped.", flush=True)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # Reload all code from disk after an update; never run previously imported Runner.
+    os.execv(sys.executable, command)
 
 
 def main():
@@ -345,6 +389,8 @@ def main():
         if len(sys.argv) == 3 and sys.argv[1] == "--rollback":
             rollback(Path(sys.argv[2]))
             return 0
+        if len(sys.argv) >= 3 and sys.argv[2] in ("--launch-run", "--launch-workspace"):
+            return launch(paths.checked(sys.argv[1]), sys.argv[2], sys.argv[3:])
         if len(sys.argv) != 2:
             raise ValueError("Use bash /actual/Server/update.sh (no arguments)")
         return run(paths.checked(sys.argv[1]))

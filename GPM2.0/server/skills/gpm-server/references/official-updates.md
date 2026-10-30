@@ -55,23 +55,26 @@ The nearest ancestor with project markers is validated; other projects are not
 scanned. Legacy projects inside a separate, unmanaged subdirectory of tools are
 supported; projects overlapping managed code directories are refused. New workspaces record `.prepare_lib/server-tools.path` and `SOURCE.json`.
 A conflicting binding stops the update; a legacy missing binding is shown in the
-plan and recorded only after confirmation. Legacy merged-Step2/3 plans are not
-migrated. All prepared `lib/`, Python tools/core and JSON contracts are aligned;
+plan and recorded only during the backed-up update. Legacy merged-Step2/3 plans are not
+migrated. All prepared `lib/`, Python tools/core, long-CIGAR runtime/companion and JSON contracts are aligned;
 generated scripts, inputs, caches, outputs and logs are not rewritten.
 
-No arguments. A matching installation is reported without asking; otherwise the
-plan asks `[y/N]`. Only `Y/y` proceeds. Blank/negative/EOF/noninteractive input leaves
-installations untouched. Do not automate an affirmative answer for the user.
-Temporary verified downloads may be created for checking, then discarded.
+No user arguments are required. A matching installation is reported; otherwise the
+plan is backed up and applied without Y/N interaction, including with closed stdin.
+Temporary verified downloads are discarded after checking. New run.sh/run_all.sh
+launchers invoke this check before analysis, then exec fresh code; they do not
+retain a pre-update imported Runner. Git/development and help-only calls skip it.
+A pre-write check failure may continue with the integrity-verified installed code;
+write/rollback failures stop startup. No process-inspection exemptions are added.
 
 The updater preserves both bundled and registered skills' entire `local/` trees
 and saved tools bindings. Manifest-known custom edits cause a stop; legacy files
-without a baseline are explicitly listed for review before approval. Manifest-owned
+without a baseline are listed and backed up by an explicit update. Automatic startup will not replace unknown-baseline files. Manifest-owned
 retired files are removed only when their original hash still matches; unlisted
 user files remain. Dependency-spec changes stop the code-only update for separate
 environment/compatibility review. Updates never resume scientific computation.
 
-Stop affected jobs on **all nodes** before confirming. Locks and local Linux process
+Stop affected jobs on **all nodes** before updating. Locks and local Linux process
 inspection protect normal runs; they cannot detect every remote standalone process
 or prevent a new independent command from starting after inspection. No lock stealing.
 A write/verification failure attempts all-root rollback. Each successful update keeps
@@ -96,7 +99,7 @@ Use an explicit new staging path outside agent discovery; check/stage use the sa
 docs-first bundle source and never activate it. Inspect the staged report, manifest
 and impact. After user approval to use the verified updater, run from the target
 project: `python3 /a/new/staging-directory/GPM_Server/tools/update_server.py
-/actual/old/GPM_Server`. It checks again and asks `[y/N]` before changing anything.
+/actual/old/GPM_Server`. It checks again, backs up originals and updates without prompting.
 After this one-time adoption, use the single `update.sh` entrypoint. The staged skill
 is not an installed/active skill. Keep staging out of agent discovery roots.
 

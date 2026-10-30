@@ -5,14 +5,11 @@ import hashlib
 import io
 import json
 import os
-import pty
-import select
 import sys
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-import time
 import unittest
 from unittest import mock
 
@@ -175,7 +172,7 @@ class CoordinatedUpdateTests(unittest.TestCase):
         update.apply(plan)
         self.assertFalse(self.plan()["files"])
 
-    def test_legacy_project_records_binding_after_confirmation_only(self):
+    def test_legacy_project_records_binding_after_planning_only(self):
         binding = self.work / ".prepare_lib/server-tools.path"
         binding.unlink()
         plan = self.plan()
@@ -217,10 +214,10 @@ class CoordinatedUpdateTests(unittest.TestCase):
         self.assertTrue(failed)
         self.assertEqual([self.snapshot(root) for root in (self.tools, self.work, self.skill)], before)
 
-    def test_changed_after_confirmation_refused(self):
+    def test_changed_after_planning_refused(self):
         plan = self.plan()
         (self.tools / "tools/grt_step2.py").write_text("concurrent write")
-        with self.assertRaisesRegex(ValueError, "after confirmation"):
+        with self.assertRaisesRegex(ValueError, "after planning"):
             update.apply(plan)
 
     def test_active_process_guard_prevents_any_write(self):
@@ -257,17 +254,18 @@ class CoordinatedUpdateTests(unittest.TestCase):
     def test_no_update_does_not_prompt_or_modify_installation(self):
         update.apply(self.plan())
         before = self.snapshot(self.tools)
-        with mock.patch.object(downloads, "discover", return_value=self.release), mock.patch.object(downloads, "extract", return_value=self.source), mock.patch.object(update, "project_at", return_value=self.work), mock.patch.object(update, "confirm") as confirm, redirect_stdout(io.StringIO()) as output:
+        with mock.patch.object(downloads, "discover", return_value=self.release), mock.patch.object(downloads, "extract", return_value=self.source), mock.patch.object(update, "project_at", return_value=self.work), mock.patch("builtins.input", side_effect=AssertionError("must not prompt")) as confirm, redirect_stdout(io.StringIO()) as output:
             self.assertEqual(update.run(self.tools), 0)
             confirm.assert_not_called()
             self.assertIn("Already up to date", output.getvalue())
         self.assertEqual(self.snapshot(self.tools), before)
 
-    def test_decline_does_not_modify_any_installation(self):
-        before = [self.snapshot(root) for root in (self.tools, self.work, self.skill)]
-        with mock.patch.object(downloads, "discover", return_value=self.release), mock.patch.object(downloads, "extract", return_value=self.source), mock.patch.object(update, "project_at", return_value=self.work), mock.patch.object(update, "confirm", return_value=False):
+    def test_noninteractive_update_applies_without_prompt_and_preserves_data(self):
+        with mock.patch.object(downloads, "discover", return_value=self.release), mock.patch.object(downloads, "extract", return_value=self.source), mock.patch.object(update, "project_at", return_value=self.work), mock.patch("builtins.input", side_effect=AssertionError("must not prompt")), mock.patch("sys.stdin.isatty", return_value=False):
             self.assertEqual(update.run(self.tools), 0)
-        self.assertEqual([self.snapshot(root) for root in (self.tools, self.work, self.skill)], before)
+        self.assertFalse(self.plan()["files"])
+        self.assertEqual((self.work / "result.fasta").read_text(), "preserve\n")
+        self.assertEqual(len(list((self.work / ".run_all").glob("server-update-*/journal.json"))), 1)
 
     def test_manifest_retired_files_removed_and_restored(self):
         (self.source / "README.md").unlink()
@@ -351,7 +349,7 @@ class CoordinatedUpdateTests(unittest.TestCase):
             before = file.read_bytes()
             plan = self.plan()
             file.write_bytes(before + b"changed\n")
-            with self.subTest(file=file), self.assertRaisesRegex(ValueError, "after confirmation"):
+            with self.subTest(file=file), self.assertRaisesRegex(ValueError, "after planning"):
                 update.apply(plan)
             file.write_bytes(before)
 
@@ -374,8 +372,7 @@ class CoordinatedUpdateTests(unittest.TestCase):
         paths.bind(self.skill, self.tools)
         self.assertFalse(record.exists())
 
-    def test_real_terminal_confirmation_updates_all_roots(self):
-        master, slave = pty.openpty()
+    def test_real_closed_stdin_updates_all_roots(self):
         harness = (
             "import sys; from pathlib import Path; "
             f"sys.path.insert(0,{str(update.ROOT / 'tools')!r}); "
@@ -384,49 +381,105 @@ class CoordinatedUpdateTests(unittest.TestCase):
             f"u.downloads.extract=lambda release,tmp: Path({str(self.source)!r}); "
             f"sys.exit(u.run(Path({str(self.tools)!r})))"
         )
-        child = subprocess.Popen([sys.executable, "-B", "-c", harness], cwd=self.work / "logs",
-                                 stdin=slave, stdout=slave, stderr=slave)
-        os.close(slave)
-        output = b""
-        try:
-            deadline = time.monotonic() + 20
-            answered = False
-            while time.monotonic() < deadline:
-                if select.select([master], [], [], .1)[0]:
-                    try:
-                        chunk = os.read(master, 65536)
-                    except OSError:
-                        break
-                    output += chunk
-                    if b"[y/N]:" in output and not answered:
-                        os.write(master, b"Y\n")
-                        answered = True
-                elif child.poll() is not None:
-                    break
-            self.assertEqual(child.wait(timeout=3), 0, output.decode(errors="replace"))
-            self.assertTrue(answered, output.decode(errors="replace"))
-            self.assertIn(b"Updated successfully", output)
-            self.assertFalse(self.plan()["files"])
-            self.assertEqual((self.work / "result.fasta").read_text(), "preserve\n")
-        finally:
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=5)
-            os.close(master)
+        child = subprocess.run([sys.executable, "-B", "-c", harness], cwd=self.work / "logs",
+                               stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20)
+        self.assertEqual(child.returncode, 0, child.stdout + child.stderr)
+        self.assertNotIn("[y/N]", child.stdout)
+        self.assertIn("Updated successfully", child.stdout)
+        self.assertFalse(self.plan()["files"])
+        self.assertEqual((self.work / "result.fasta").read_text(), "preserve\n")
 
+    def test_real_startup_updates_and_executes_new_runner_without_pid_exemptions(self):
+        (self.tools / "tools/server_run.py").write_text("raise RuntimeError('OLD RUNNER MUST NOT EXECUTE')\n")
+        info = json.loads((self.tools / "SOURCE.json").read_text())
+        info["files"]["tools/server_run.py"]["sha256"] = update.core.digest((self.tools / "tools/server_run.py").read_bytes())
+        (self.tools / "SOURCE.json").write_text(json.dumps(info))
+        (self.source / "tools/server_run.py").write_text("import sys; print('FRESH RUNNER', repr(sys.argv[1:]))\n")
+        self.make_manifest(self.source, "b" * 40, "2026-10-26T00:00:00+00:00")
+        harness = (
+            "import sys; from pathlib import Path; "
+            f"sys.path.insert(0,{str(update.ROOT / 'tools')!r}); "
+            "import update_server as u; "
+            f"u.downloads.discover=lambda: {self.release!r}; "
+            f"u.downloads.extract=lambda release,tmp: Path({str(self.source)!r}); "
+            f"u.launch(Path({str(self.tools)!r}), '--launch-run', ['-o', {str(self.work)!r}])"
+        )
+        child = subprocess.run([sys.executable, "-B", "-c", harness], cwd=self.work / "logs",
+                               stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20)
+        self.assertEqual(child.returncode, 0, child.stdout + child.stderr)
+        self.assertIn("Updated successfully", child.stdout)
+        self.assertIn("FRESH RUNNER", child.stdout)
+        self.assertNotIn("OLD RUNNER", child.stdout + child.stderr)
+        self.assertFalse(self.plan()["files"])
+
+    def test_nested_alignment_runtime_and_companion_update_and_rollback(self):
+        names = ("tools/long_cigar_recovery/server_alignment.py", "tools/long_cigar_recovery/branch-runtime.json",
+                 "tools/long_cigar_recovery/native/linux-x86_64/native-chain-state", "tools/long_cigar_recovery/native/linux-x86_64/MINIMAP2_LICENSE.txt")
+        for name in names:
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"new runtime")
+        self.make_manifest(self.source, "b" * 40, "2026-10-26T00:00:00+00:00")
+        backup = update.apply(self.plan())
+        for root in (self.tools, self.work / ".prepare_lib"):
+            for name in names:
+                self.assertEqual((root / name).read_bytes(), b"new runtime")
+        update.rollback(backup)
+        self.assertTrue(all(not (root / name).exists() for root in (self.tools, self.work / ".prepare_lib") for name in names))
+
+    def test_startup_failure_before_mutation_keeps_installed_code(self):
+        before = [self.snapshot(root) for root in (self.tools, self.work)]
+        with mock.patch.object(downloads, "discover", side_effect=OSError("offline")), mock.patch.object(update, "apply") as apply:
+            self.assertEqual(update.run(self.tools, startup=True, workspace=self.work), 0)
+            apply.assert_not_called()
+        self.assertEqual([self.snapshot(root) for root in (self.tools, self.work)], before)
+
+    def test_startup_never_swallows_apply_or_rollback_failure(self):
+        with mock.patch.object(downloads, "discover", return_value=self.release), mock.patch.object(downloads, "extract", return_value=self.source), mock.patch.object(update, "apply", side_effect=OSError("write failed")):
+            with self.assertRaisesRegex(OSError, "write failed"):
+                update.run(self.tools, startup=True, workspace=self.work)
+
+    def test_launch_verifies_then_updates_then_execs_fresh_code(self):
+        calls = []
+        with mock.patch.object(update, "verify_installed", side_effect=lambda *a: calls.append("verify")), mock.patch.object(update, "run", side_effect=lambda *a, **kw: calls.append(("update", kw))), mock.patch.object(update.os, "execv", side_effect=lambda *a: calls.append(("exec", a))):
+            update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
+        self.assertEqual(calls[0], "verify")
+        self.assertEqual(calls[1], ("update", {"startup": True, "workspace": self.work}))
+        self.assertEqual(calls[2][1][1][2:], [str(self.tools / "tools/server_run.py"), "-o", str(self.work)])
+
+    def test_workspace_launch_preserves_runner_arguments_and_rejects_foreign_binding(self):
+        with mock.patch.object(update, "verify_installed"), mock.patch.object(update, "run") as run, mock.patch.object(update.os, "execv") as exe:
+            update.launch(self.tools, "--launch-workspace", [str(self.work), "--from", "step2"])
+            self.assertEqual(exe.call_args.args[1][2:], [str(self.work / ".prepare_lib/tools/run_all_runner.py"), "--server-dir", str(self.work), "--from", "step2"])
+            run.assert_called_once_with(self.tools, startup=True, workspace=self.work)
+            (self.work / ".prepare_lib/server-tools.path").write_text(str(self.source)+"\n")
+            with self.assertRaisesRegex(ValueError, "different Server"):
+                update.launch(self.tools, "--launch-workspace", [str(self.work)])
+
+    def test_help_and_development_launch_do_not_contact_network(self):
+        for mode, argv in (("--launch-run", ["--help"]), ("--launch-workspace", [str(self.work), "--help"])):
+            with mock.patch.object(update, "run") as run, mock.patch.object(update.os, "execv"):
+                update.launch(self.tools, mode, argv)
+                run.assert_not_called()
+        (self.tools / "SOURCE.json").write_text('{"official_release": false}')
+        with mock.patch.object(update, "run") as run, mock.patch.object(update.os, "execv"):
+            update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
+            run.assert_not_called()
+
+    def test_verify_installed_detects_modified_tools_and_runtime(self):
+        update.verify_installed(self.tools, self.work)
+        runtime = self.work / ".prepare_lib/tools/grt_step2.py"
+        before = runtime.read_bytes()
+        runtime.write_bytes(b"changed")
+        with self.assertRaisesRegex(ValueError, "runtime integrity"):
+            update.verify_installed(self.tools, self.work)
+        runtime.write_bytes(before)
+        (self.tools / "tools/server_run.py").write_bytes(b"changed")
+        with self.assertRaisesRegex(ValueError, "source integrity"):
+            update.verify_installed(self.tools, self.work)
 
 
 class InteractionTests(unittest.TestCase):
-    def test_y_n_empty_invalid_and_noninteractive(self):
-        for answer, expected in (("y", True), ("Y", True), ("n", False), ("N", False), ("", False)):
-            with self.subTest(answer=answer), mock.patch("sys.stdin.isatty", return_value=True), mock.patch("builtins.input", return_value=answer):
-                self.assertEqual(update.confirm("Update?"), expected)
-        with mock.patch("sys.stdin.isatty", return_value=True), mock.patch("builtins.input", side_effect=["yes", "?", "Y"]):
-            self.assertTrue(update.confirm("Update?"))
-        with mock.patch("sys.stdin.isatty", return_value=False), mock.patch("builtins.input") as read:
-            self.assertFalse(update.confirm("Update?"))
-            read.assert_not_called()
-
     def test_public_update_rejects_flags_before_network(self):
         for script in (update.ROOT / "update.sh", update.ROOT / "skills/gpm-server/scripts/update.sh"):
             for flag in ("--check", "--yes"):

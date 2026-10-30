@@ -137,18 +137,17 @@ Size, SHA-256 and the source file manifest are verified. Tools and skill come fr
 one release bundle; refreshed same-version assets are detected too.
 
 - All scoped files match: reports already up to date.
-- New files or an outdated runtime: lists changes and asks `[y/N]`.
-- `Y/y` proceeds; `N/n`, Enter, EOF or no interactive terminal cancels. No `--check`/`--yes` flags.
+- New files or an outdated runtime: lists changes, backs up originals, and updates without a Y/N prompt.
+- Works with closed stdin and batch jobs. No `--check`/`--yes` flags are needed.
 - Preserves the whole skill `local/`, valid bindings, inputs, results, logs, caches,
   generated scripts and dependency environment.
 - Separately installed skills registered with `server_tools_path.sh --set` are
   updated too; agent configuration is not scanned.
 
-Stop all affected jobs, including other nodes, before confirming. Active jobs,
+Stop all affected jobs, including other nodes, before updating. Active jobs,
 conflicting paths, known custom edits, dependency-spec changes and unsupported
 legacy plans stop the update; it never reinstalls dependencies or reruns analysis.
-Legacy files without a baseline are listed for review because customizations
-cannot be distinguished automatically. Backups live under the project's
+An explicit update lists legacy files without a baseline and backs them up before replacement; known modified official files remain protected. Backups live under the project's
 `.run_all/server-update-*`, or under tools when no project is selected. Failed
 writes attempt rollback; a successful update prints an advanced rollback command.
 Reload the agent session after a skill update. For older tools without `update.sh`,
@@ -174,7 +173,7 @@ To fall back to the unscreened baseline profile when preparing a **new** workspa
 --grt-execution-profile baseline --grt-step3-mummer-scope full
 ```
 
-Existing workspace scripts and embedded runtimes are not modified automatically; run `update.sh` inside a stopped project workspace when you want to synchronize its `.prepare_lib/` runtime.
+New `run.sh` and generated `run_all.sh` launchers check for a code-only update before analysis and before acquiring the run lock. They reload code after updating, without user configuration. If the check fails before any mutation, an integrity-verified installed runtime can still run offline; a write/rollback failure stops startup. Git/development packages and help-only calls do not contact the update service. Old generated launchers must first be aligned through an explicit `update.sh` invocation; arbitrary generated scripts are not overwritten.
 
 For a Step2 `missing its output gap interval` failure, update both tools and the affected workspace runtime before resuming. Structural edits now register absorbed GAPs on both sides; partial or ambiguous origin mappings fail explicitly. Preserve logs, results, and raw-alignment caches; dependency reinstallation is not required.
 
