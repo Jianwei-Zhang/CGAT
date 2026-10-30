@@ -1,0 +1,176 @@
+# App 悬浮提示统一：现状清单与讨论草案
+
+日期：2026-10-30
+
+状态：现状已做源码核查；设计参数待逐项确认；尚未修改 App 实现。
+
+## 1. 请求、分支与边界
+
+### 用户已明确的目标
+
+- 梳理整个 App 的悬浮提示，包括大小、字体、排版、背景颜色、触发延迟等。
+- App 内悬浮提示由 App 自行触发和绘制，不再依赖系统/WebView 原生提示，以减少 Windows/macOS 体验差异。
+- 先讨论、记录确认结果，再在主分支逐项实现。
+- 不影响 `fix/minimap2-long-cigar-recovery`。
+
+### 本次核查的 Git 状态
+
+- 用户所说的主分支在本仓库实际名为 `master`，本地及远程没有 `main`；不擅自新建、重命名或更改默认分支。
+- 已从干净的修复分支切换到 `master`。核查时主分支与远程均为 `988ca4e907da2fd31cf9d5c1c19eeaf696582b10`。
+- 修复分支核查基线为 `326c82f8a0bf0a22864fd66cb3d2695bb023415c`；切换前该分支与远程一致。
+- 两分支的 `GPM2.0/app` 和 `GPM2.0/docs` 在核查时没有差异；本任务不合并、重置、提交或推送修复分支。
+- Comet 只读恢复探针返回无活跃 Native change；本草案不挂靠历史 change。
+
+### 明确区分
+
+- “统一 Tooltip”不等于重做下拉菜单、右键菜单、成员面板、染色体选择器、确认弹窗或系统文件选择器。
+- 成员面板/染色体选择器已有移出关联区域后 400ms 收起的规则，是交互浮层规则，不是 Tooltip 的触发延迟。
+- 只替换 App 运行页面的原生悬浮来源；不批量删除独立 SVG 导出中的 `<title>`、图形可访问名称或其他元数据。
+- 本文的建议参数不是已获批准的要求；后续简短确认只作用于当次明确提出的讨论项。
+
+## 2. 当前机制与样式
+
+以下为源码现状，不代表已在 Windows/macOS 原生窗口逐项实测。默认界面字号是 14px，用户可在 App 设置中调整。
+
+### 2.1 样式、尺寸和触发对照
+
+| 类别 | 当前尺寸和排版 | 字体 | 背景、边框和阴影 | 触发与关闭 |
+| --- | --- | --- | --- | --- |
+| HTML `title` 和图形节点 `<title>` | 由运行环境决定，App 未定义统一尺寸/换行规则 | 由运行环境决定 | 由运行环境决定 | 原生行为，App 不控制延迟；不填一个未经实测的统一毫秒值 |
+| Final Path Contig | 最小宽 180px，最大 `min(460px, 100vw - 16px)`；内边距 6px 8px；圆角 5px；按换行文本展示，长词可断行 | `--font-body`，默认 14px；行高 1.4；未单独指定字重 | 浅色为半透明淡黄色 `rgba(255,252,244,.96)`，文字 `#2f2415`；深色使用琥珀主题变量；1px 边框，阴影 `0 4px 12px rgba(0,0,0,.12)` | pointerover 即时，无等待计时器；随鼠标移动；离开、按下、滚动、键盘事件等隐藏 |
+| 主数据成员卡片 | 与 Final Path 共用上述样式 | 同上 | 同上，非按成员角色分别上整块底色 | 同一即时 runtime，0ms 等待 |
+| 主/局部比对带、GRT evidence/result | 同样继承最小宽 180px、最大宽 460px、内边距 6px 8px、圆角 5px、行高 1.4；分隔文本转换为多行 | `--font-body`，默认 14px | 按对象分为主数据蓝、辅助棕、未知中性、GRT 绿、MUMmer 紫、Minimap2 青绿；使用同一层几何但多种底色 | coordinator 默认等待 500ms；显示后随鼠标移动；离开、滚动、按下、右键、键盘事件等隐藏 |
+| 设置页 `?` 帮助 | `width: min(26rem, 100%)`，默认根字号下上限 364px、实际受包含块影响；内边距 10px 12px；圆角 6px；行高 1.65；按钮下方 6px，部分条目上置 | `--font-caption`，默认约 12px；字重 400 | 浅色淡蓝 `#f3f7fc`、文字 `#53677f`、边框 `#d6e0ec`；深色跟随主题；阴影 `0 4px 16px #18355214` | CSS hover/focus-within 即显，无进入延迟；点击 `?` 还可切换展开状态，和普通 hover-only Tooltip 不完全相同 |
+
+共享底座 `.subview-band-tooltip` 还保留 absolute、z-index 4、最大宽 360px、`white-space: pre` 等基础定义及页面占位节点；上表三个活跃的图形/成员 Tooltip 通过扩展类覆盖为 fixed、z-index 45、最大宽 460px、`pre-wrap`。不能把占位节点一概算作另一套已独立运行的 Tooltip。
+
+### 2.2 文字与布局现状
+
+- App 字体栈是 `system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif`。当前自绘提示继承此体系，不是单独打包的跨平台统一字体。
+- Final Path 信息已有明确语义：名称、采用片段长度、来源 Contig 总长（可得时）、来源区间、方向。两种长度不可为了统一样式而混成一个“长度”。
+- 成员提示含名称、长度、来源区间、派生来源、局部信息和部分 GRT 状态；它通过多行纯文本展示，不是真正的标题/字段两列布局。
+- 比对带 runtime 把 ` | ` 和 ` · ` 替换为换行。不同来源的文案结构和行数不一致，布局还没有共享结构化模型。
+- 图形/成员提示有 `max-height` 和 `overflow: hidden`；长内容存在被裁切的设计风险，需要在后续规范中处理，不能把现有最大宽当成已保证内容完整。
+
+### 2.3 当前实现入口
+
+路径以 `GPM2.0/app/frontend/src/` 为基准。
+
+| 入口 | 用途 |
+| --- | --- |
+| `styles/base.css`、`styles/theme.css` | 字体层级、界面字号、浅/深主题和角色颜色变量 |
+| `styles/subview.css:1021–1089` | 图形/Final Path/成员 Tooltip 的共享底座、扩展几何和角色色 |
+| `styles/settings.css:27–31` | 设置页帮助按钮及 Tooltip 独立样式 |
+| `ui/pages/assembly/immediate-tooltip-runtime.js` | Final Path 和成员提示的即时事件委托、定位及部分清理 |
+| `ui/pages/assembly/final-path-tooltip-runtime.js` | Final Path 适配入口 |
+| `ui/pages/assembly/scope-popover-runtime.js` | 成员卡片提示绑定 |
+| `ui/pages/assembly/alignment-tooltip-runtime.js` | 主/局部比对带及 GRT 提示入口、角色分类和定位 |
+| `ui/pages/assembly-page.js:2804–2885` | 500ms 提示协调器 |
+| `ui/pages/assembly/render-subview.js:94` | `SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS = 500` |
+| `ui/shell/app-settings-panel.js` | 设置页帮助内容、ARIA 关系和点击展开状态 |
+
+## 3. 原生提示的迁移面
+
+### 3.1 静态检索口径
+
+在 `frontend/src` 的非测试 JS/HTML/CSS 中按原始文本检索，发现：
+
+- HTML `title="…"` / `title='…'` 形式：105 处。
+- SVG `<title>` 起始标签：20 处。
+- 动态 `.title = …` 或 `setAttribute("title", …)`：12 处。
+
+这些是代码文本出现次数，不是 AST 审计、运行时提示个数或必须删除的数量。同一模板可能生成多个对象；也包含导出 SVG 等需保留或另行处理的场景，不能用相加结果宣称有多少个“缺陷”。
+
+### 3.2 页面和公共入口
+
+| 迁移面 | 已见场景及重点文件 |
+| --- | --- |
+| App shell / 导航 | 主题按钮、无项目时的导航原因、工作区完整名称；`app-shell.js`、`main.js`、`router.js` |
+| 公共自绘下拉 | `shell-select-runtime.js` 给触发器和每个选项动态赋 `title`；仅改页面模板不够 |
+| 项目、工作区、导入 | 路径、图标按钮、历史校验/清理、复制、删除、浏览目录；`projects-view.js`、`workspace-page.js`、`project-catalog-view.js`、`importer-page.js` |
+| Overview / Project Preview / 导出页 | 来源 Contig、采用区间覆盖、参考区间、Final Path、数据集长名称、下载按钮、GAP 图形；`project-preview-page.js`、`project-export-page.js`、`project-preview-image-export.js` |
+| Assembly 主视图 | 部分 Contig/成员/标记、来源 gap/split、端粒/N 区间、工具按钮；`render-tracks.js`、`main-anchor-fragments.js`、`source-fragment-layout.js`、`n-region-markers.js` |
+| Assembly 局部视图 | Contig、composition/source 片段、anchor 列表、帮助/历史按钮、拆分候选；`render-subview*.js`、`anchor-contig-split-dialog.js`、`manual-contig-split.js` |
+| Final Path / DEGAP / GRT | Final Path 非 Contig 场景和统计条、DEGAP 名称/按钮、GRT 操作提示；`final-path-card.js`、`degap-card.js`、`grt-result-controls.js` |
+| 导航条 / 动态业务入口 | 模式按钮、视窗范围、span 数值、辅助数据集选择器；`view-navigation-ui.js`、`view-navigation-runtime.js`、`support-dataset-picker-runtime.js` |
+
+### 3.3 不能仅靠替换 title 的原因
+
+- 动态代码会重新写入原生 `title`，必须同时迁移更新来源。
+- `ui/i18n/presentation-patch.js` 对可更新属性有白名单；新增统一 Tooltip 属性需要接入原位语言切换，不能出现按钮已换语言、提示仍是旧语言。
+- 禁用按钮/导航入口的“为什么不可用”也要有可靠提示命中区；不能为此把禁用业务操作重新启用。
+- 当前即时 runtime 与比对 runtime 是不同 owner，尚没有全 App 单一激活提示的统一协调。后续需要处理嵌套命中和旧提示替换。
+- 设置页属于原生 `<dialog>` 场景，提示需留在正确的 top-layer/对话框所属层；不能假定往 body 放一个极高 z-index 就能盖过所有对话框。
+- 页面切换、Assembly DOM 缓存、项目/染色体切换和原位 patch 都是生命周期边界；应取消计时器、隐藏旧提示、清理失效 ARIA 关联，不重建业务视图。
+- `snapshotWithoutFinalPathSelection()` 已在导出克隆中恢复 Final Path `<title>`。此“App 内自绘、独立 SVG 保留信息”的契约必须保留。
+
+## 4. 待讨论的统一方案
+
+以下都是建议，不视为用户已确认。
+
+### D1. 外观体系：建议中性底色，角色色降为语义标识
+
+- 所有 Tooltip 使用同一外壳、字体层级、圆角、边框和阴影；浅/深主题分别从 App 变量取色。
+- 建议背景 `--surface-elevated`：现有浅色 `#ffffff`，深色 `#223044`；文字 `--text-primary`：浅色 `#1e293b`，深色 `#e5edf7`；边框 `--border-default`：浅色 `#cbd5e1`，深色 `#42546a`。
+- 普通操作提示不按页面变成黄框/蓝框；业务角色或证据来源可保留小色标/边线，不依赖整块蓝、棕、绿、紫背景。
+- 只调整 Tooltip，不改图内主/辅助/参考角色色、identity 色阶或生物学含义。
+- 是否保留比对提示的整块角色底色，需用户明确选择；此项先讨论。
+
+### D2. 大小、字体和信息排版
+
+| 参数 | 建议值/规则 |
+| --- | --- |
+| 字体 | 复用 App 字体栈；不单独引入字体包。逻辑样式一致，不承诺两平台字体栅格化像素完全相同 |
+| 正文字号 | 统一 `--font-small`（0.929rem，默认约 13px），跟随界面字号，不跟随图内字号 |
+| 标题 | 与正文同字号，字重 600；短操作提示不强制增加标题行 |
+| 正文 | 字重 400，行高 1.5；自然换行，长路径/ID 必要时断行，不省略关键完整值 |
+| 两种内容密度 | 短提示按内容宽度，最大 320px、内边距 6px 8px；详情最大 480px、内边距 8px 10px |
+| 最小宽度 | 不再把所有短提示强制撑到 180px |
+| 圆角/边框 | 统一 6px / 1px |
+| 阴影 | 统一复用 App 小阴影 token，不每个业务自行定义 |
+| 字段结构 | 详情按“名称/标题 → 标签和值”排列；数值加单位，区间和方向含义不变；长值允许换行 |
+| 窗口约束 | 两种密度都受可视区域边距约束；长内容不得静默裁掉关键字段，超长说明是否升级可固定展开的说明面板需讨论 |
+
+这里的“两种密度”是同一个组件的内容规格，不是再造两套互不兼容的 Tooltip。
+
+### D3. 延迟、定位和关闭
+
+- 建议普通按钮、名称补全、短操作提示默认 300ms；快速经过工具栏时不连续闪现。
+- 图形数据探查（Contig、Final Path、比对带/GRT）与成员详情建议保留/采用即时提示。Final Path 当前 0ms 已有历史确认，不擅自改为统一慢延迟。
+- 上述建议意味着比对/GRT 将从 500ms 调整为即时，属于待确认行为变更，而不是现状。
+- 键盘 focus 可即时显示，Escape 关闭；离开 focus 后清理 ARIA 描述关系。
+- 按钮提示相对触发器锚定；图形数据提示相对指针偏移，建议沿用 14px 偏移及至少 8px 窗口边距，并做翻转/避让。
+- 离开、滚动、拖动、右键、路由切换、窗口失焦和对象失效时取消等待并清理；拖动中不弹出，hover 不改变选择或视口。
+- 长文案是否允许鼠标移入提示、选择文字，以及相应关闭宽限期，需单独确认；不要直接套用业务菜单的 400ms。
+- 设置页 `?` 既有点击展开语义应显式保留或升级为同外观的只读说明 Popover，不能在统一时悄悄取消。
+
+### D4. 技术边界与迁移策略
+
+- 建议统一 App Tooltip runtime + 样式 token；按普通控件、图形数据、设置说明提供适配器，而不是各页复制定位与计时器。
+- 同一时刻只保留一个激活 Tooltip；嵌套子对象优先，移动时不同时弹出父/子或原生/自绘两层。
+- 普通内容安全地当作文本；字段模型用 DOM 安全构造，不把路径、Contig 名或错误信息当 HTML 执行。
+- 显式迁移 App 自有 `title` 来源及动态更新，保留 `aria-label`/`aria-describedby` 等语义；不靠一段无差别删全页 title 的观察器掩盖遗漏。
+- 普通控件覆盖 pointer 与 keyboard，纯图形不为每个非交互形状强塞 tab 停靠点。
+- 对话框/弹出层按所属 surface 挂载；覆盖标题、关闭按钮、表单内容、原生顶层 dialog 的可见性与焦点边界。
+- 先统一 runtime 和已自绘的几类，再迁移 shell/项目/Overview，随后完成 Assembly/SVG 和动态 title 的清点。
+- 不改变数据来源、Contig/区间语义、Preview 的完整源对象与采用覆盖、选择/拖动/右键/缓存和导出结果。
+
+## 5. 确认记录
+
+| 项目 | 状态 |
+| --- | --- |
+| 全 App 自有悬浮提示改为 App 自绘；先讨论后实现；不改修复分支 | 用户已提出的目标 |
+| 主分支实际为 `master`，不创建 `main` | 已核查并说明；若用户要求字面上的新 `main` 分支，需另行明确 |
+| D1：中性底色还是保留整块角色底色 | 待确认，下一讨论项 |
+| D2：字号、两种密度、字段布局 | 待确认 |
+| D3：普通提示 300ms / 数据提示即时、关闭及长文案交互 | 待确认 |
+| D4：共享 runtime、分层挂载与分批迁移 | 技术建议，待结合确认方案落实 |
+| 开始修改 App 实现 | 尚未授权推进具体方案；本轮仅写现状和草案 |
+
+## 6. 后续验证与本轮证据
+
+- 本轮：只读核查源码、Git 分支/远程状态和 Comet 恢复状态；仅新增本文，不修改 App 源码。
+- 本轮：文档检查使用 Git diff/空白检查及所列源码路径核查；不需要为纯文档改动运行前端构建，也未启动浏览器或桌面窗口。
+- 实施后：先做计时器、单 owner、嵌套命中、disabled、focus/Escape、语言切换、路由/缓存清理、对话框层级和导出隔离的定向测试。
+- 前端测试/构建按项目规则使用 Windows `node.exe` / `npm.cmd`；构建生成的 `dist/` 验证后移除。
+- 最后分别记录 Windows/macOS 原生 App 的显示、边缘定位、字体缩放、浅/深主题、拖动、滚动、弹窗和关闭行为；源码/自动化测试通过不等于两平台原生验收完成。
