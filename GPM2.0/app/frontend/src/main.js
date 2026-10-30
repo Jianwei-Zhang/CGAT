@@ -1,3 +1,5 @@
+import { bindAppTooltips, hideAppTooltips } from "./ui/app-tooltip-runtime.js";
+import "./styles/tooltips.css";
 import { releaseProjectOverviewPreview, releaseProjectPathOverview } from "./ui/pages/project-export-page.js";
 import { retagAssemblyDomLocale } from "./ui/shell/assembly-session-cache.js";
 import { patchLocaleMarkup } from "./ui/i18n/presentation-patch.js";
@@ -288,6 +290,7 @@ subscribeAppTheme(() => {
   window.dispatchEvent(new Event("gpm-next:route-refresh"));
 });
 app.innerHTML = renderAppShell(store.getState());
+bindAppTooltips(app);
 bindSettings(app, store);
 bindGlobalLanguageSwitch(app, store);
 bindGlobalSessionSwitchers(app, store);
@@ -337,8 +340,8 @@ function syncSessionHeader(state) {
     const needsProject = ["projectPreview", "assembly", "projectExport"].includes(button.dataset.route);
     button.disabled = (needsProject && (!state.session.workspacePath || !state.session.projectId))
       || projectEntryBusy(state);
-    button.title = needsProject && !state.session.projectId
-      ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "";
+    button.setAttribute("data-app-tooltip", needsProject && !state.session.projectId
+      ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "");
   });
   if (workspaceSelect) {
     const workspaceItems = buildWorkspaceSwitchItems({
@@ -349,7 +352,7 @@ function syncSessionHeader(state) {
     replaceSelectOptions(workspaceSelect, workspaceItems);
     const selectedName = workspaceSelect.selectedOptions[0]?.textContent || labels.workspacePlaceholder;
     const presentation = workspaceSelectPresentation(selectedName);
-    workspaceSelect.title = presentation.title;
+    workspaceSelect.setAttribute("data-app-tooltip", presentation.title);
     workspaceSelect.style.setProperty("--workspace-select-width", presentation.width);
     workspaceSelect.disabled = projectEntryBusy(state) || (workspaceItems.length === 1 && !workspaceItems[0]?.value);
     syncShellSelect(workspaceSelect);
@@ -438,6 +441,7 @@ function bindGlobalLanguageSwitch(root, storeRef) {
   const select = root.querySelector("#app-language-select");
   select?.addEventListener("change", () => {
     const value = select.value === "en" ? "en" : "zh";
+    hideAppTooltips(root);
     const previous = storeRef.getState();
     const next = relocalizeAppState(previous, value);
     storeRef.setState(next);

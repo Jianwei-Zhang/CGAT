@@ -1,66 +1,11 @@
-import { bindImmediateTooltips } from "../immediate-tooltip-runtime.js";
-import { rememberAssemblyDom, restoreAssemblyDom, clearAssemblySessionCache } from "../../../shell/assembly-session-cache.js";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { tooltipFixture } from "../../../__tests__/tooltip-fixture.mjs";
 import { bindFinalPathTooltips } from "../final-path-tooltip-runtime.js";
+import { bindImmediateTooltips, hideImmediateTooltips } from "../immediate-tooltip-runtime.js";
 import { buildFinalPathTooltip, resolveFinalPathSourceRange } from "../final-path-presentation.js";
-
-function fixture() {
-  const events = new Map(); let panel;
-  const host = { isConnected: true, children: [], closest() { return this; },
-    contains(node) { return this.children.includes(node); }, append(node) { this.children.push(node); },
-    addEventListener(type, callback) { const list = events.get(type) || []; list.push(callback); events.set(type, list); },
-    ownerDocument: { defaultView: { innerWidth: 900, innerHeight: 600 }, createElement() {
-      const classes = new Set(["is-hidden"]);
-      panel = { style: {}, attrs: {}, offsetWidth: 240, offsetHeight: 100,
-        classList: { add: v => classes.add(v), remove: v => classes.delete(v), contains: v => classes.has(v) },
-        setAttribute(k, v) { this.attrs[k] = v; } }; return panel;
-    } },
-  };
-  const fire = (type, target, extra = {}) => events.get(type)?.forEach(fn => fn({ target, clientX: 899, clientY: 599, ...extra }));
-  const group = text => { const g = { isConnected: true, getAttribute: () => text,
-    closest: () => g, contains: node => node === g || node?.parent === g }; return g; };
-  bindFinalPathTooltips(host);
-  return { host, events, fire, group, panel: () => panel };
-}
-
-test("Final Path tooltip is synchronous with no dwell timer and accepts escaped plain text", () => {
-  const h = fixture(), group = h.group("<full name>\nAdopted length: 5,000 bp");
-  h.fire("pointerover", group);
-  assert.equal(h.panel().attrs["aria-hidden"], "false");
-  assert.equal(h.panel().textContent, "<full name>\nAdopted length: 5,000 bp");
-  assert.equal(h.panel().style.left, "652px");
-  assert.equal(h.panel().style.top, "492px");
-  assert.equal(h.host.children.length, 1);
-});
-
-test("bar and label share one hover group without hiding, reset on scroll/interaction", () => {
-  const h = fixture(), group = h.group("fragment");
-  const label = { parent: group, closest: () => group };
-  h.fire("pointerover", group);
-  h.fire("pointerout", group, { relatedTarget: label });
-  assert.equal(h.panel().attrs["aria-hidden"], "false");
-  h.fire("pointermove", label, { clientX: 20, clientY: 30 });
-  assert.equal(h.panel().style.left, "34px");
-  for (const type of ["scroll", "pointerdown", "contextmenu", "keydown"]) {
-    h.fire(type, label); assert.equal(h.panel().attrs["aria-hidden"], "true");
-    h.fire("pointerover", group);
-  }
-  h.fire("pointerout", label, { relatedTarget: null });
-  assert.equal(h.panel().attrs["aria-hidden"], "true");
-});
-
-test("delegation tolerates markup patches, disconnected fragments and repeated bindings", () => {
-  const h = fixture(); bindFinalPathTooltips(h.host);
-  assert.equal(h.events.get("pointerover").length, 1);
-  const old = h.group("old"); old.isConnected = false;
-  h.fire("pointerover", old); assert.equal(h.panel().attrs["aria-hidden"], "true");
-  const next = h.group("new"); h.host.children = [];
-  h.fire("pointerover", next);
-  assert.ok(h.host.contains(h.panel()));
-  assert.equal(h.panel().textContent, "new");
-});
+import { rememberAssemblyDom, restoreAssemblyDom, clearAssemblySessionCache } from "../../../shell/assembly-session-cache.js";
 
 const segment = { type: "ctg", assemblyCtgId: 1, datasetName: "Data", ctgName: "ctg1",
   overallLen: 10000, start: 5001, end: 10000 };
@@ -92,63 +37,39 @@ test("reference tooltip uses source chromosome coordinates, GAP/draft do not inv
 });
 
 
-test("rebind after a fragment-local patch hides a stale tooltip without rebuilding its owner", () => {
-  const h = fixture(), node = h.group("old fragment");
-  h.fire("pointerover", node); assert.equal(h.panel().attrs["aria-hidden"], "false");
-  node.isConnected = false; bindFinalPathTooltips(h.host);
-  assert.equal(h.panel().attrs["aria-hidden"], "true");
+
+test("Final Path and member adapters share the App owner and cannot show two panels", () => {
+  const h = tooltipFixture(); bindFinalPathTooltips(h.host);
+  bindImmediateTooltips(h.host, { attribute: "data-member-tooltip", className: "member-card-tooltip" });
+  const first = h.create("g", { "data-final-path-tooltip": "fragment" }, {}, true);
+  const member = h.create("button", { "data-member-tooltip": "member" });
+  h.fire("pointerover", first); assert.equal(h.panel.textContent, "fragment");
+  h.fire("pointerover", member); assert.equal(h.panel.textContent, "member");
+  assert.equal(first.getAttribute("aria-describedby"), null);
+  assert.equal(h.doc.body.querySelectorAll(".app-tooltip").length, 1);
   assert.equal(h.events.get("pointerover").length, 1);
+  hideImmediateTooltips(h.host); assert.equal(h.panel.getAttribute("aria-hidden"), "true");
 });
 
-
-test("dragging across fragments keeps tooltip hidden; release restores ordinary hover", () => {
-  const h = fixture(), first = h.group("first"), second = h.group("second");
-  h.fire("pointerover", first); h.fire("pointerdown", first, { buttons: 1 });
-  assert.equal(h.panel().attrs["aria-hidden"], "true");
-  h.fire("pointerover", second, { buttons: 1 }); h.fire("pointermove", second, { buttons: 1 });
-  assert.equal(h.panel().attrs["aria-hidden"], "true");
-  h.fire("pointerup", second, { buttons: 0 });
-  assert.equal(h.panel().attrs["aria-hidden"], "false"); assert.equal(h.panel().textContent, "second");
-  h.fire("pointercancel", second); assert.equal(h.panel().attrs["aria-hidden"], "true");
+test("Assembly DOM cache never captures/resurrects the document tooltip or replaces its owner", () => {
+  clearAssemblySessionCache();
+  const h = tooltipFixture(), member = h.create("button", { "data-member-tooltip": "member details" });
+  h.host.append(member);
+  const state = { locale: "en", session: { workspacePath: "D:/cache-hover", projectId: 1 } };
+  h.fire("pointerover", member); assert.equal(h.panel.getAttribute("aria-hidden"), "false");
+  assert.equal(rememberAssemblyDom(h.host, state), true);
+  assert.equal(h.panel.getAttribute("aria-hidden"), "true");
+  assert.equal(h.host.contains(h.panel), false);
+  h.host.replaceChildren(); assert.equal(restoreAssemblyDom(h.host, state), true);
+  bindFinalPathTooltips(h.host); bindImmediateTooltips(h.host);
+  assert.equal(h.events.get("pointerover").length, 1);
+  assert.equal(h.panel.getAttribute("aria-hidden"), "true");
+  h.fire("pointerover", member); assert.equal(h.panel.getAttribute("aria-hidden"), "false");
+  clearAssemblySessionCache();
 });
 
-
-test("Final Path bar and label are hit-testable as one group without changing other views", () => {
+test("Final Path label and bar retain shared hit testing without changing other views", () => {
   const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
   assert.match(css, /\.assembly-final-path-svg \[data-final-path-tooltip\] > \.track-ctg-label\s*\{\s*pointer-events: all;/);
   assert.match(css, /\.track-ctg-label\s*\{[^}]*pointer-events: none;/);
-});
-
-
-test("Assembly cache capture and restoration hide both controlled hover kinds without replacing owners", () => {
-  clearAssemblySessionCache();
-  const h = fixture();
-  const finalPanel = h.panel();
-  bindImmediateTooltips(h.host, { attribute: "data-member-tooltip", className: "member-tooltip" });
-  const memberPanel = h.panel();
-  h.host.dataset = {};
-  Object.defineProperty(h.host, "childNodes", { get() { return this.children; } });
-  h.host.replaceChildren = function (...nodes) { this.children = nodes; };
-  const state = { locale: "en", session: { workspacePath: "D:/cache-hover", projectId: 1 } };
-  const member = h.group("member details");
-  h.fire("pointerover", member);
-  assert.equal(finalPanel.attrs["aria-hidden"], "false");
-  assert.equal(memberPanel.attrs["aria-hidden"], "false");
-  const handlers = h.events.get("pointerover").length;
-  assert.equal(rememberAssemblyDom(h.host, state), true);
-  assert.equal(finalPanel.attrs["aria-hidden"], "true");
-  assert.equal(memberPanel.attrs["aria-hidden"], "true");
-  h.host.replaceChildren({ id: "overview" });
-  assert.equal(restoreAssemblyDom(h.host, state), true);
-  bindFinalPathTooltips(h.host);
-  bindImmediateTooltips(h.host, { attribute: "data-member-tooltip", className: "member-tooltip" });
-  assert.equal(h.events.get("pointerover").length, handlers);
-  assert.equal(memberPanel.attrs["aria-hidden"], "true");
-  h.fire("pointerover", member);
-  assert.equal(memberPanel.attrs["aria-hidden"], "false", "a new pointer hover still works");
-  // Even if the live root has another tooltip visible at restoration, hide it.
-  assert.equal(restoreAssemblyDom(h.host, state), true);
-  assert.equal(finalPanel.attrs["aria-hidden"], "true");
-  assert.equal(memberPanel.attrs["aria-hidden"], "true");
-  clearAssemblySessionCache();
 });

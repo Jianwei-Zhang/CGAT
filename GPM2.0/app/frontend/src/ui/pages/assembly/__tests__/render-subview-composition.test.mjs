@@ -61,7 +61,7 @@ test("composition manager renders both lane counts and the focused member", () =
   assert.match(html, /Top \(1\)/);
   assert.match(html, /Bottom \(2\)/);
   assert.match(html, /data-subview-composition-member="assembly:3"[\s\S]*aria-pressed="true"/);
-  assert.match(html, /data-subview-composition-member="assembly:3"[\s\S]*title="ctg3 \(-\)"[\s\S]*<strong>ctg3 \(-\)<\/strong>/);
+  assert.match(html, /data-subview-composition-member="assembly:3"[\s\S]*data-app-tooltip="ctg3 \(-\)"[\s\S]*<strong>ctg3 \(-\)<\/strong>/);
   assert.doesNotMatch(html, /ctg3 \(\+\) \(-\)/);
   assert.match(html, /data-subview-composition-add="top"/);
   assert.match(html, /data-subview-composition-add="bottom"/);
@@ -94,7 +94,7 @@ test("composition picker makes a cross-lane add explicit and supports checked ba
   }, helpers);
 
   assert.match(html, /Move from bottom/);
-  assert.match(html, /<strong title="ctg1 \(\+\)">ctg1 \(\+\)<\/strong>/);
+  assert.match(html, /<strong data-app-tooltip="ctg1 \(\+\)">ctg1 \(\+\)<\/strong>/);
   assert.match(html, /data-subview-composition-candidate="assembly:1\|primary:1:mother:0:0:"[\s\S]*checked/);
   assert.match(html, />Add \(1\)<\/button>/);
 });

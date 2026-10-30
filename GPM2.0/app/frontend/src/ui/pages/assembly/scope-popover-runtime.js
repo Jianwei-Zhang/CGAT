@@ -100,7 +100,7 @@ export function bindAssemblyScopePopovers(host, store, { persistMembers } = {}) 
     const nextScope = JSON.stringify([store.getState().session?.workspacePath, store.getState().session?.projectId]);
     if (scope !== nextScope) { for (const kind of Object.keys(config)) cancel(kind); scope = nextScope; }
     for (const kind of Object.keys(config)) { if (!isOpen(kind)) cancel(kind); paint(kind); }
-    bindImmediateTooltips(host, { attribute: "data-member-tooltip", className: "member-card-tooltip" });
+    bindImmediateTooltips(host);
   };
   const onOutside = event => {
     if (host.isConnected === false) return destroy();

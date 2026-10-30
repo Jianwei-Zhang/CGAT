@@ -1013,7 +1013,7 @@ test("subview 2-contig keeps ref bars and labels on the ref gray palette", () =>
     }),
   );
 
-  assert.match(html, /<div class="assembly-track-label-row is-ref"[^>]*title="ref_Chr01:1-5000 \(\+\)"[^>]*>ref_Chr01:1-5000 \(\+\)<\/div>/);
+  assert.match(html, /<div class="assembly-track-label-row is-ref"[^>]*data-app-tooltip="ref_Chr01:1-5000 \(\+\)"[^>]*>ref_Chr01:1-5000 \(\+\)<\/div>/);
   assert.match(html, /data-subview-track-slot="top"[\s\S]*class="track-ctg subview-track-ctg is-ref"/);
   assert.match(html, /<text class="track-ctg-label[^"]*is-ref[^"]*"[^>]*data-subview-label-slot="top"/);
   const subviewSvg = html.match(/<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<\/svg>/)?.[0] || "";
@@ -1122,8 +1122,8 @@ test("subview 2-contig hides labels that do not fit inside bars and keeps hover 
 
   assert.equal(html.includes(`data-subview-label-contig-id="2">${mainLabel} (+)</text>`), false);
   assert.equal(html.includes(`data-subview-label-contig-id="30">${supportLabel} (+)</text>`), false);
-  assert.match(html, new RegExp(`<title>${mainLabel} \\|`));
-  assert.match(html, new RegExp(`<title>${supportLabel} \\|`));
+  assert.match(html, new RegExp(`<desc data-app-tooltip-source>${mainLabel} \\|`));
+  assert.match(html, new RegExp(`<desc data-app-tooltip-source>${supportLabel} \\|`));
 });
 
 test("subview 2-contig renders anchor fragments for ref members using ref-side hits", () => {
@@ -1456,8 +1456,8 @@ test("subview track-pair hides labels that do not fit inside bars and keeps hove
     html,
     /data-subview-label-slot="top"[^>]*>support-very-long-trackpair-label \(\+\)<\/text>/,
   );
-  assert.match(html, /<title>primary-very-long-trackpair-label \|/);
-  assert.match(html, /<title>support-very-long-trackpair-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>primary-very-long-trackpair-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>support-very-long-trackpair-label \|/);
 });
 
 test("subview track-pair renders anchor fragments for ref members using ref-side hits", () => {

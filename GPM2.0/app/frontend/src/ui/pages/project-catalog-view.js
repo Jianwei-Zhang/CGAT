@@ -47,7 +47,7 @@ function number(value, state) {
 function length(value, state) {
   if (value == null) return "—";
   const [unit, divisor] = value >= 1e9 ? ["Gb", 1e9] : value >= 1e6 ? ["Mb", 1e6] : value >= 1e3 ? ["kb", 1e3] : ["bp", 1];
-  return `<span title="${number(value, state)} bp">${Number(value / divisor).toLocaleString(state.locale === "en" ? "en-US" : "zh-CN", { maximumFractionDigits: divisor === 1 ? 0 : 2 })} ${unit}</span>`;
+  return `<span data-app-tooltip="${number(value, state)} bp">${Number(value / divisor).toLocaleString(state.locale === "en" ? "en-US" : "zh-CN", { maximumFractionDigits: divisor === 1 ? 0 : 2 })} ${unit}</span>`;
 }
 
 function renderDetails(row, catalog, state) {
@@ -62,7 +62,7 @@ function renderDetails(row, catalog, state) {
     <form data-catalog-form class="project-dataset-editor">
       <div class="project-dataset-editor-body">
       <div class="project-dataset-field-heading"><label for="catalog-display-name">${l.name}</label>
-        <button type="button" data-catalog-reset class="button ghost" title="${escape(row.originalName)}" ${busy} ${editor.displayName === row.originalName ? "disabled" : ""}>${l.reset}</button></div>
+        <button type="button" data-catalog-reset class="button ghost" data-app-tooltip="${escape(row.originalName)}" ${busy} ${editor.displayName === row.originalName ? "disabled" : ""}>${l.reset}</button></div>
       <input id="catalog-display-name" name="displayName" maxlength="200" required value="${escape(editor.displayName)}" ${busy} />
       <label for="catalog-note">${l.note}</label>
       <textarea id="catalog-note" name="note" rows="3" maxlength="10000" ${busy}>${escape(editor.note)}</textarea>
@@ -94,11 +94,11 @@ function renderTable(rows, title, catalog, state) {
         const stats = row.statistics || {};
         return `<tr data-catalog-object="${escape(key)}">
           <td><span class="project-dataset-role" data-dataset-role="${escape(row.role)}">${l[row.role] || escape(row.role)}</span></td>
-          <th scope="row"><span class="project-dataset-name" title="${escape(row.displayName)}">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
+          <th scope="row"><span class="project-dataset-name" data-app-tooltip="${escape(row.displayName)}">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
           <td class="numeric">${number(stats.sequenceCount, state)}</td><td class="numeric">${length(stats.totalLengthBp, state)}</td>
           <td class="numeric">${length(stats.n50, state)}</td><td class="numeric">${length(stats.n90, state)}</td>
-          <td><button type="button" class="project-dataset-note" data-catalog-edit="${escape(key)}" data-catalog-focus="note" title="${escape(row.note || l.emptyNote)}" ${disabled}>${escape(row.note || l.emptyNote)}</button></td>
-          <td><button type="button" class="button project-icon-button" data-catalog-edit="${escape(key)}" title="${l.edit}" aria-label="${l.edit}: ${escape(row.displayName)}" aria-expanded="${editing}" ${disabled}>${projectIcon("rename")}</button></td>
+          <td><button type="button" class="project-dataset-note" data-catalog-edit="${escape(key)}" data-catalog-focus="note" data-app-tooltip="${escape(row.note || l.emptyNote)}" ${disabled}>${escape(row.note || l.emptyNote)}</button></td>
+          <td><button type="button" class="button project-icon-button" data-catalog-edit="${escape(key)}" data-app-tooltip="${l.edit}" aria-label="${l.edit}: ${escape(row.displayName)}" aria-expanded="${editing}" ${disabled}>${projectIcon("rename")}</button></td>
         </tr>`;
       }).join("") || `<tr><td colspan="8" class="muted">${l.empty}</td></tr>`}</tbody></table></div>
       </div>`;

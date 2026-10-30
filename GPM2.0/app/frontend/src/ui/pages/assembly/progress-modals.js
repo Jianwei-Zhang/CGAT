@@ -231,7 +231,7 @@ export function createAssemblyProgressModalRenderer({
           <span class="pipeline-step-icon">${renderFinalPathExportStepIcon("running")}</span>
         </div>`;
     const closeButton = isTerminal
-      ? `<button type="button" class="button ghost tiny import-progress-close" data-add-ctg-import-close="1" title="${escapeAttr(runtimeI18n.addCtgImportClose || "关闭")}">x</button>`
+      ? `<button type="button" class="button ghost tiny import-progress-close" data-add-ctg-import-close="1" data-app-tooltip="${escapeAttr(runtimeI18n.addCtgImportClose || "关闭")}">x</button>`
       : "";
     const percent = progressMeta.total > 0
       ? Math.max(0, Math.min(100, (progressMeta.current / progressMeta.total) * 100))

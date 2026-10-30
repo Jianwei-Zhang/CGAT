@@ -137,7 +137,7 @@ function renderContextMenuItem(item, path, deps) {
     const disabledAttrs = disabled ? ' disabled aria-disabled="true"' : "";
     return `
       <div class="context-menu-submenu-group${disabled ? " is-disabled" : ""}" data-context-submenu-group="1">
-        <button type="button" class="context-menu-item context-menu-submenu-trigger${disabled ? " is-disabled" : ""}" data-context-submenu-trigger="1" aria-haspopup="menu" aria-expanded="false" title="${title}"${disabledAttrs}>
+        <button type="button" class="context-menu-item context-menu-submenu-trigger${disabled ? " is-disabled" : ""}" data-context-submenu-trigger="1" aria-haspopup="menu" aria-expanded="false" data-app-tooltip="${title}"${disabledAttrs}>
           <span>${label}</span><span class="context-menu-submenu-indicator" aria-hidden="true">›</span>
         </button>
         <div class="context-menu-submenu" data-context-submenu="1" role="menu">
@@ -158,7 +158,7 @@ function renderContextMenuItem(item, path, deps) {
     attrs.push("disabled");
     attrs.push('aria-disabled="true"');
   }
-  attrs.push(`title="${title}"`);
+  attrs.push(`data-app-tooltip="${title}"`);
   return `<button class="context-menu-item${disabled ? " is-disabled" : ""}" ${attrs.join(" ")}>${label}</button>`;
 }
 

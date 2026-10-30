@@ -139,17 +139,17 @@ export function renderWorkspacePage(state) {
         <div class="project-heading">
         ${selectedProject && renameOpen ? `<form class="project-title-row project-rename-form" data-project-rename-form>
           <input id="selected-project-name-input" type="text" aria-label="${messages.cards.projectName}" value="${escapeAttr(editDraft.projectName)}" size="${projectNameInputSize(editDraft.projectName)}" ${busy ? "disabled" : ""} />
-          <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" title="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
-          <button type="button" id="selected-project-rename-cancel" class="button project-icon-button" title="${labels.cancel}" aria-label="${labels.cancel}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
+          <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" data-app-tooltip="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
+          <button type="button" id="selected-project-rename-cancel" class="button project-icon-button" data-app-tooltip="${labels.cancel}" aria-label="${labels.cancel}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
         </form>` : `<div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
-          ${selectedProject ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
+          ${selectedProject ? `<button id="selected-project-rename-button" class="button project-icon-button" data-app-tooltip="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
         </div>`}
         ${selectedProject ? renderProjectHeaderMetadata(initializer, state) : ""}
         </div>
       </div>
       <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
       <div class="project-location-row">
-        <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
+        <p class="project-path project-detail-path" data-app-tooltip="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
         ${selectedProject ? `<p class="project-detail-created">${labels.created}${state.locale === "en" ? ": " : "："}${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}
       </div>
     </div>

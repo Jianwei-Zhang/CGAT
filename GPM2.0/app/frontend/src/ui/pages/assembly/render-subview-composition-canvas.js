@@ -384,7 +384,7 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
         data-subview-fragment-phased-track-id="${member.source?.phasedTrackId || 0}"
         data-subview-fragment-phased-track-item-id="${member.source?.phasedItemId || 0}"
         data-subview-fragment-phased-haplotype-key="${escapeAttr(member.source?.hap || "")}">
-        <title>${escapeHtml(title)}</title></rect>
+        <desc data-app-tooltip-source>${escapeHtml(title)}</desc></rect>
       <rect class="subview-fragment-outline" x="${range.left.toFixed(2)}" y="${y}"
         width="${width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4"
         fill="none" stroke="transparent" stroke-width="2.5" pointer-events="none" />`;
@@ -444,7 +444,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
       data-subview-rect-width="${member.width.toFixed(2)}" data-subview-rect-height="${BAR_HEIGHT}"
       data-subview-world-start-bp="${worldStartBp}">
     <rect class="track-ctg subview-track-ctg${tone}${selected ? " is-multi-selected" : ""}" x="${member.x.toFixed(2)}" y="${y}"
-      width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all"><title>${escapeHtml(title)}</title></rect>
+      width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all"><desc data-app-tooltip-source>${escapeHtml(title)}</desc></rect>
     ${renderGrtResultOverlayGroup({ entryKey: member.entityKey, markup: grtOverlay, escapeAttr })}
     ${renderNRegionMarkersForTrackCtg({
       ctg: candidate?.ctg, rect: member, y, barHeight: BAR_HEIGHT,
@@ -651,7 +651,6 @@ export function renderSubviewCompositionAlignmentCard({
         data-view-navigation-end-bp="${layout.contentEndBp}"
         data-subview-domain-span-bp="${layout.width * layout.bpPerPx}" data-subview-inner-width="${layout.width}"
         data-subview-viewbox-min-x="${layout.viewBoxMinX}" data-subview-window-start-bp="0">
-        <div class="subview-band-tooltip is-hidden" data-subview-band-tooltip-delay-ms="500" aria-hidden="true"></div>
         <svg class="assembly-track-svg subview-track-svg" width="${layout.width}" height="${CONTENT_HEIGHT}"
           viewBox="${layout.viewBoxMinX} 0 ${layout.width} ${CONTENT_HEIGHT}" preserveAspectRatio="xMinYMin meet">
           <line class="track-ruler-line" x1="0" y1="${RULER_Y}" x2="${rulerWidth}" y2="${RULER_Y}" />

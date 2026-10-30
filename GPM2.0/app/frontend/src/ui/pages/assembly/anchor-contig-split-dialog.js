@@ -14,7 +14,7 @@ export function renderAnchorSplitPreview(model, cuts) {
     ${(model.hits || []).map((h) => `<polygon fill="var(--ctg-support-fill,#d8c9a6)" opacity=".5" points="${40+640*(h.refStart-1)/Math.max(1,model.refLength)},40 ${40+640*h.refEnd/Math.max(1,model.refLength)},40 ${x(h.strand === "-" ? h.queryStart-1 : h.queryEnd)},100 ${x(h.strand === "-" ? h.queryEnd : h.queryStart-1)},100"/>`).join("")}
     <rect data-anchor-split-bar x="40" y="100" width="640" height="16" rx="3" fill="var(--ctg-primary-fill,#bbd0e8)"/>
     ${candidates.map((cut) => `<g data-anchor-cut="${cut}" role="button" tabindex="0" aria-pressed="${selected.has(cut)}" aria-label="${cut} bp">
-      <title>${cut} bp</title><line x1="${x(cut)}" x2="${x(cut)}" y1="80" y2="125" stroke="${selected.has(cut)?"red":"#8996a5"}" stroke-width="${selected.has(cut)?3:1}"/>
+      <desc data-app-tooltip-source>${cut} bp</desc><line x1="${x(cut)}" x2="${x(cut)}" y1="80" y2="125" stroke="${selected.has(cut)?"red":"#8996a5"}" stroke-width="${selected.has(cut)?3:1}"/>
       <line x1="${x(cut)}" x2="${x(cut)}" y1="80" y2="125" stroke="transparent" stroke-width="12"/></g>`).join("")}
     <text x="40" y="150">${model.orient === "-" ? model.sourceEnd : model.sourceStart}</text>
     <text x="680" y="150" text-anchor="end">${model.orient === "-" ? model.sourceStart : model.sourceEnd}</text></svg>`;

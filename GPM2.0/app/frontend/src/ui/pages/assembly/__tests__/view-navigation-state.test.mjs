@@ -125,7 +125,7 @@ for (const role of ["primary", "subview"]) {
       assert.match(hand, /role="switch" aria-checked="true"/);
       assert.doesNotMatch(hand, /aria-checked="false"/);
       assert.match(mouse, /role="switch" aria-checked="false"/);
-      assert.match(hand, locale === "zh" ? /title="手形模式：拖动平移，滚轮缩放"/ : /title="Hand mode: drag to pan; wheel to zoom"/);
+      assert.match(hand, locale === "zh" ? /data-app-tooltip="手形模式：拖动平移，滚轮缩放"/ : /data-app-tooltip="Hand mode: drag to pan; wheel to zoom"/);
     });
   }
 }

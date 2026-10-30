@@ -1,0 +1,35 @@
+/* One surface for all App tooltips and the settings click-to-expand note. */
+.app-tooltip,
+.app-tooltip-surface {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 0;
+  max-width: min(480px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  padding: 6px 8px;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 6px;
+  background: var(--surface-elevated, #ffffff);
+  color: var(--text-primary, #1e293b);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  font-size: var(--font-small, .929rem);
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  user-select: text;
+  pointer-events: auto;
+  transition: none;
+  animation: none;
+}
+.app-tooltip {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+}
+.app-tooltip.is-hidden { display: none; }
+.app-tooltip-heading { display: inline; font: inherit; font-weight: 600; }
+.app-tooltip-body { display: inline; }

@@ -387,14 +387,14 @@ test("renderFinalPathCard exposes GRT baseline restore only for the current sing
   );
   assert.match(availableHtml, /data-final-path-restore-grt-baseline="Chr01"/);
   assert.match(availableHtml, /↺ 预计算路径/);
-  assert.match(availableHtml, /title="恢复为 GRT 算法生成的预计算路径"/);
+  assert.match(availableHtml, /data-app-tooltip="恢复为 GRT 算法生成的预计算路径"/);
 
   const currentHtml = renderFinalPathCard(
     { ...base, grtBaselineRestore: { available: true, targetChrName: "Chr01", current: true } },
     { ...deps, i18n },
   );
   assert.match(currentHtml, /data-final-path-restore-grt-baseline="Chr01"[^>]*disabled/);
-  assert.match(currentHtml, /title="当前已是 GRT 算法生成的预计算路径"/);
+  assert.match(currentHtml, /data-app-tooltip="当前已是 GRT 算法生成的预计算路径"/);
 
   const allHtml = renderFinalPathCard(
     {
@@ -697,8 +697,8 @@ test("renderFinalPathCard shows log tab and renders compact log metrics when fin
   assert.match(html, /final-path-log-ratio-segment is-log-hidden/);
   assert.match(html, /final-path-log-swatch is-log-hidden/);
   assert.match(html, /role="img" aria-label="实际追加: 1\/3; 主图已隐藏: 1\/3"/);
-  assert.match(html, /title="实际追加: 1,200\/5,000 bp"/);
-  assert.match(html, /title="主图已隐藏: 900\/5,000 bp"/);
+  assert.match(html, /data-app-tooltip="实际追加: 1,200\/5,000 bp"/);
+  assert.match(html, /data-app-tooltip="主图已隐藏: 900\/5,000 bp"/);
   assert.match(html, /<span class="final-path-log-stat-label">已使用主组装 Contig 数量<\/span>\s*<span class="final-path-log-ratio-bar"[\s\S]*?<\/span>\s*<strong class="final-path-log-stat-value">2\/3<\/strong>/);
   assert.match(html, /已使用主组装 Contig 数量/);
   assert.match(html, /2\/3/);
@@ -874,7 +874,7 @@ test("renderFinalPathCard strips chr suffix from visible ctg names while keeping
   assert.doesNotMatch(graphHtml, />hifiasm_ptg000009l@Chr22 \(\+\)<\/text>/);
   assert.match(
     tableHtml,
-    /data-final-path-cell="ctg"[\s\S]*value="hifiasm_ptg000009l"[\s\S]*title="hifiasm_ptg000009l@Chr22"/,
+    /data-final-path-cell="ctg"[\s\S]*value="hifiasm_ptg000009l"[\s\S]*data-app-tooltip="hifiasm_ptg000009l@Chr22"/,
   );
 });
 

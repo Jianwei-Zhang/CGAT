@@ -68,7 +68,7 @@ export function renderAlignmentIdentityLegend(labels, escapeAttr) {
   // legend follows the active theme without rescaling identity.
   const gradient = (tone) => `linear-gradient(to right, var(--alignment-legend-${tone}-low), var(--alignment-legend-${tone}-high))`;
   const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed, softened 80–100% color scale; ≤80% uses the lightest shade.";
-  return `<div class="alignment-identity-legend" title="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
+  return `<div class="alignment-identity-legend" data-app-tooltip="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
     <span>Identity</span><span>≤80%</span><span class="alignment-identity-scale" aria-hidden="true">
       <i style="background:${gradient("primary")}"></i><i style="background:${gradient("companion")}"></i>
     </span><span>100%</span>

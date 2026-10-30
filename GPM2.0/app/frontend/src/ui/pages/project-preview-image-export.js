@@ -27,7 +27,7 @@ export const previewImageExportIsRunning = store => running.has(store);
 export const previewImageActionRoot = host => host?.closest?.("[data-overview-project]") || host;
 export function renderPreviewImageDownloadButton(state) {
   const label = xml(getMessages(state, "projectPreview").download);
-  return `<button type="button" class="button project-preview-download" data-preview-download title="${label}" aria-label="${label}" disabled>${projectIcon("imageDownload")}</button>`;
+  return `<button type="button" class="button project-preview-download" data-preview-download data-app-tooltip="${label}" aria-label="${label}" disabled>${projectIcon("imageDownload")}</button>`;
 }
 export function syncPreviewImageDownloadButton(host, store) {
   const button = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");

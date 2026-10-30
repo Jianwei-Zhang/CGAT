@@ -28,23 +28,23 @@ const paths = {
 export function renderViewNavigation(role, locale, mode = "mouse") {
   const t = viewNavText(locale), isHand = mode === "hand";
   const icon = (action) => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[action]}</svg>`;
-  const button = (action, title) => `<button type="button" class="view-nav-button" data-view-nav-action="${action}" aria-label="${escape(title)}" title="${escape(title)}">${icon(action)}</button>`;
+  const button = (action, title) => `<button type="button" class="view-nav-button" data-view-nav-action="${action}" aria-label="${escape(title)}" data-app-tooltip="${escape(title)}">${icon(action)}</button>`;
   return `<div class="assembly-view-navigation" data-view-navigation="${role}" role="group" aria-label="${t.group}">
-    <button type="button" class="view-nav-mode-switch" data-view-nav-action="toggle-mode" role="switch" aria-checked="${isHand}" aria-label="${t.mode}" title="${isHand ? t.hand : t.mouse}">
+    <button type="button" class="view-nav-mode-switch" data-view-nav-action="toggle-mode" role="switch" aria-checked="${isHand}" aria-label="${t.mode}" data-app-tooltip="${isHand ? t.hand : t.mouse}">
       <span class="view-nav-mode-thumb" aria-hidden="true"></span>
       <span class="view-nav-mode-icon is-mouse" aria-hidden="true">${icon("mouse")}</span>
       <span class="view-nav-mode-icon is-hand" aria-hidden="true">${icon("hand")}</span>
     </button>
     <div class="view-nav-moves">${button("left", t.left)}${button("right", t.right)}</div>
     <div class="view-nav-range">
-      <div class="view-nav-axis" data-view-nav-axis title="${t.axis}" aria-label="${t.axis}">
+      <div class="view-nav-axis" data-view-nav-axis data-app-tooltip="${t.axis}" aria-label="${t.axis}">
         <div class="view-nav-window" data-view-nav-window tabindex="0" role="slider" aria-label="${t.window}" aria-orientation="horizontal">
           <button type="button" class="view-nav-edge is-left" data-view-nav-edge="left" aria-label="${t.edgeLeft}"></button>
           <button type="button" class="view-nav-edge is-right" data-view-nav-edge="right" aria-label="${t.edgeRight}"></button>
         </div>
         <div class="view-nav-grip" data-view-nav-grip aria-hidden="true" hidden></div>
       </div>
-      <button type="button" class="view-nav-fit" data-view-nav-action="fit" title="${t.fitHint}">${t.fit}</button>
+      <button type="button" class="view-nav-fit" data-view-nav-action="fit" data-app-tooltip="${t.fitHint}">${t.fit}</button>
     </div>
     <span class="view-nav-span">${t.span}${locale === "en" ? ":" : "："}<span data-view-nav-span aria-label="${t.window}">—</span></span>
   </div>`;

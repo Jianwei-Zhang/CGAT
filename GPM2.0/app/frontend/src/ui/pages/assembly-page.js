@@ -299,7 +299,6 @@ import {
   resolveSubviewTrackDragOffsetBp,
   resolveTrackDragOffsetBp,
   roundTrackMetric,
-  SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS,
 } from "./assembly/render-tracks.js";
 import { renderAssemblyPage as renderAssemblyPageShell } from "./assembly/render-shell.js";
 import {
@@ -1583,10 +1582,7 @@ async function moveFinalPathRow(host, store, payload) {
 }
 
 function bindSubviewBandTooltips(host) {
-  bindAlignmentTooltips(host, {
-    createCoordinator: createSubviewBandTooltipCoordinator,
-    timerApi: resolveTimerApi(),
-  });
+  bindAlignmentTooltips(host);
 }
 
 function rerender(host, store) {
@@ -2801,87 +2797,16 @@ function createActionFeedbackDismissCoordinator({
   };
 }
 
-function createSubviewBandTooltipCoordinator({
-  setTimeoutFn,
-  clearTimeoutFn,
-  hoverDelayMs = SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS,
-  onShow,
-  onMove,
-  onHide,
-} = {}) {
-  const timerApi = resolveTimerApi();
-  const scheduleTimeout =
-    typeof setTimeoutFn === "function" ? setTimeoutFn : timerApi.setTimeout.bind(timerApi);
-  const cancelTimeout =
-    typeof clearTimeoutFn === "function" ? clearTimeoutFn : timerApi.clearTimeout.bind(timerApi);
-
-  let activeToken = null;
-  let pendingContext = null;
-  let hoverTimer = null;
-  let visible = false;
-
-  const clearHoverTimer = () => {
-    if (hoverTimer === null) {
-      return;
-    }
-    cancelTimeout(hoverTimer);
-    hoverTimer = null;
-  };
-  const hide = () => {
-    activeToken = null;
-    pendingContext = null;
-    clearHoverTimer();
-    if (!visible) {
-      return;
-    }
-    visible = false;
-    onHide?.();
-  };
-
+// Compatibility coordinator for standalone callers; production tooltips are
+// document-owned. No dwell timer remains, including for legacy band callers.
+function createSubviewBandTooltipCoordinator({ onShow, onMove, onHide } = {}) {
+  let active = null;
+  const hide = () => { if (active) { active = null; onHide?.(); } };
   return {
-    enter(context) {
-      if (!context?.token) {
-        return;
-      }
-      hide();
-      pendingContext = context;
-      hoverTimer = scheduleTimeout(() => {
-        hoverTimer = null;
-        if (!pendingContext?.token) {
-          return;
-        }
-        const resolvedContext = pendingContext;
-        pendingContext = null;
-        activeToken = resolvedContext.token;
-        visible = true;
-        onShow?.(resolvedContext);
-      }, hoverDelayMs);
-    },
-    move(context) {
-      if (!context?.token) {
-        return;
-      }
-      if (pendingContext?.token === context.token) {
-        pendingContext = context;
-        return;
-      }
-      if (visible && activeToken === context.token) {
-        onMove?.(context);
-      }
-    },
-    leave(token) {
-      if (pendingContext?.token === token) {
-        pendingContext = null;
-        clearHoverTimer();
-      }
-      if (visible && activeToken === token) {
-        hide();
-      }
-    },
-    hide,
-    dispose() {
-      hide();
-    },
+    enter(context) { hide(); if (context?.token) { active = context.token; onShow?.(context); } },
+    move(context) { if (active === context?.token) onMove?.(context); },
+    leave(token) { if (active === token) hide(); },
+    hide, dispose: hide,
   };
 }
 

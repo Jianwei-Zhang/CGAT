@@ -650,8 +650,8 @@ function renderFinalPathLogRatioBar({
   const ariaLabel = [appendedTitle, hiddenTitle].filter(Boolean).join("; ");
   return `
     <span class="final-path-log-ratio-bar" role="img" aria-label="${escapeTitle(ariaLabel)}">
-      <span class="final-path-log-ratio-segment is-appended" style="width: ${appendedPct.toFixed(3)}%" title="${escapeTitle(appendedTitle || "")}"></span>
-      <span class="final-path-log-ratio-segment is-log-hidden" style="width: ${hiddenPct.toFixed(3)}%" title="${escapeTitle(hiddenTitle || "")}"></span>
+      <span class="final-path-log-ratio-segment is-appended" style="width: ${appendedPct.toFixed(3)}%" data-app-tooltip="${escapeTitle(appendedTitle || "")}"></span>
+      <span class="final-path-log-ratio-segment is-log-hidden" style="width: ${hiddenPct.toFixed(3)}%" data-app-tooltip="${escapeTitle(hiddenTitle || "")}"></span>
     </span>
   `;
 }
@@ -1165,7 +1165,7 @@ export function renderFinalPathGraph({
               height="${(graphMetrics.barHeight + 2).toFixed(2)}"
               rx="1"
               ry="1"
-            ><title>${escapeHtml(tooltipText)}</title></rect>
+            >${controlledTooltips ? `<desc data-app-tooltip-source>${escapeHtml(tooltipText)}</desc>` : `<title>${escapeHtml(tooltipText)}</title>`}</rect>
             ${labelLayout
               ? `<text class="final-path-gap-label" x="${labelLayout.labelX.toFixed(2)}" y="${(graphMetrics.barY - 4).toFixed(2)}" text-anchor="${labelLayout.labelAnchor}">GAP</text>`
               : ""}
@@ -1247,7 +1247,7 @@ export function renderFinalPathGraph({
     <div class="assembly-final-path-layout assembly-track-layout">
       <div
         class="assembly-final-path-label-spacer assembly-track-label-column"
-        title="${escapeAttr(normalizedAllGraphLabel || "Final Path")}"
+        data-app-tooltip="${escapeAttr(normalizedAllGraphLabel || "Final Path")}"
         style="width:${FINAL_PATH_LABEL_COLUMN_WIDTH_PX}px"
         ${normalizedAllGraphLabel ? `data-final-path-all-graph-label="${escapeAttr(normalizedAllGraphLabel)}"` : ""}
       ><strong>${escapeHtml(normalizedAllGraphLabel || "Final Path")}</strong></div>
@@ -1335,7 +1335,7 @@ function renderFinalPathTable({
           <div class="final-path-sort-card" data-final-path-card-body="${escapeAttr(segmentId)}"${targetChrAttr}>
             <div class="final-path-sort-card-grid">
               <div class="final-path-card-cell final-path-card-drag-cell">
-                <button type="button" class="button ghost tiny final-path-row-drag-handle" data-final-path-row-drag-id="${escapeAttr(segmentId)}"${targetChrAttr} title="drag">↕</button>
+                <button type="button" class="button ghost tiny final-path-row-drag-handle" data-final-path-row-drag-id="${escapeAttr(segmentId)}"${targetChrAttr} data-app-tooltip="drag">↕</button>
               </div>
               <div class="final-path-card-cell">
                 <input
@@ -1344,7 +1344,7 @@ function renderFinalPathTable({
                   data-final-path-segment-id="${escapeAttr(segmentId)}"
                  ${targetChrAttr}
                   value="${escapeAttr(displayName)}"
-                  title="${escapeAttr(fullDisplayName)}"
+                  data-app-tooltip="${escapeAttr(fullDisplayName)}"
                   autocomplete="off"
                   ${isRefSegment ? "disabled" : ""}
                 />
@@ -1532,7 +1532,7 @@ function renderPhasedFinalPathSelector({ escapeAttr, escapeHtml, labels, options
           data-phased-final-path-key="${escapeAttr(option.key)}"
           data-phased-final-path-chr-name="${escapeAttr(option.chrName)}"
           aria-selected="${option.active ? "true" : "false"}"
-          title="${escapeAttr(option.chrName)}"
+          data-app-tooltip="${escapeAttr(option.chrName)}"
         >${escapeHtml(option.label || option.key)}</button>
       `).join("")}
       </div>
@@ -1665,7 +1665,7 @@ export function renderFinalPathCard(
         class="button ghost tiny final-path-restore-grt-baseline"
         data-final-path-restore-grt-baseline="${escapeAttr(singleEntry.chrName)}"
         aria-label="${escapeAttr(restoreGrtBaselineHint)}"
-        title="${escapeAttr(restoreGrtBaselineHint)}"
+        data-app-tooltip="${escapeAttr(restoreGrtBaselineHint)}"
         ${restoreGrtBaselineDisabled ? "disabled" : ""}
       >${escapeHtml(labels.finalPathRestoreGrtBaseline || "↺ Precomputed path")}</button>`
     : "";

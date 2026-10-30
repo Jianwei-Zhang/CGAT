@@ -517,11 +517,11 @@ test("anchor-enabled ctgs expose fragment hit zones instead of only whole-contig
   );
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \(\+\) \| Start: 1 bp \| Length: 500 bp<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<desc data-app-tooltip-source>primary-bottom \(\+\) \| Start: 1 bp \| Length: 500 bp<\/desc>[\s\S]*?<\/rect>/,
   );
   assert.doesNotMatch(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \| Start: 0 bp \| Length: 1000 bp<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<desc data-app-tooltip-source>primary-bottom \| Start: 0 bp \| Length: 1000 bp<\/desc>[\s\S]*?<\/rect>/,
   );
 });
 
@@ -618,7 +618,7 @@ test("subview-ctg phased anchor fragments expose hoverable phased hit zones", ()
   assert.match(html, /data-subview-fragment-phased-track-item-id="9001"/);
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="100"[\s\S]*?<title>support-bottom \(\+\) \| Start: 1 bp \| Length: 100 bp<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="100"[\s\S]*?<desc data-app-tooltip-source>support-bottom \(\+\) \| Start: 1 bp \| Length: 100 bp<\/desc>[\s\S]*?<\/rect>/,
   );
 });
 
@@ -710,7 +710,7 @@ test("subview-track phased anchor fragments expose hoverable phased hit zones", 
   assert.match(html, /data-subview-fragment-phased-track-item-id="9001"/);
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="5000"[\s\S]*?<title>support-bottom \(\+\) \| Start: 1 bp \| Length: 5000 bp<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="5000"[\s\S]*?<desc data-app-tooltip-source>support-bottom \(\+\) \| Start: 1 bp \| Length: 5000 bp<\/desc>[\s\S]*?<\/rect>/,
   );
 });
 

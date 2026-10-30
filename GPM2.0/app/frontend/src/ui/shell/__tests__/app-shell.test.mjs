@@ -91,22 +91,22 @@ test("theme shortcut persists light/dark, preserves other settings, follows sett
     setAppSettings({ theme: "system", fontSize: 18, graphFontSize: 14, historyCapacity: 123 }, { persist: false });
     applyAppTheme({ dataset: {} }, true);
     bindAppThemeToggle(root, { getLocale: () => locale });
-    assert.equal(button.title, "切换浅色模式");
+    assert.equal(button.attrs["data-app-tooltip"], "切换浅色模式");
     button.click();
     assert.equal(saved.theme, "light");
     assert.equal(saved.fontSize, 18);
     assert.equal(saved.graphFontSize, 14);
     assert.equal(saved.historyCapacity, 123);
-    assert.equal(button.title, "切换深色模式");
+    assert.equal(button.attrs["data-app-tooltip"], "切换深色模式");
     assert.equal(button.attrs["aria-pressed"], "false");
     button.click();
     assert.equal(getAppSettings().theme, "dark");
     locale = "en";
     bindAppThemeToggle(root, { getLocale: () => locale });
     assert.equal(listeners.size, 1);
-    assert.equal(button.title, "Switch to light mode");
+    assert.equal(button.attrs["data-app-tooltip"], "Switch to light mode");
     setAppSettings({ ...getAppSettings(), theme: "light" }, { persist: false });
-    assert.equal(button.title, "Switch to dark mode");
+    assert.equal(button.attrs["data-app-tooltip"], "Switch to dark mode");
     button.click();
     assert.equal(saved.theme, "dark");
     // A failed save leaves the applied theme and button state unchanged.
@@ -114,7 +114,7 @@ test("theme shortcut persists light/dark, preserves other settings, follows sett
       value: { setItem() { throw Error("quota"); } } });
     button.click();
     assert.equal(getAppSettings().theme, "dark");
-    assert.equal(button.title, "Switch to light mode");
+    assert.equal(button.attrs["data-app-tooltip"], "Switch to light mode");
   } finally {
     if (storage) Object.defineProperty(globalThis, "localStorage", storage);
     else delete globalThis.localStorage;

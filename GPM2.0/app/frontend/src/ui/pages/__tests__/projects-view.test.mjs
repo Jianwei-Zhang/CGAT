@@ -85,7 +85,7 @@ test("bulk deletion is exposed only after explicit validation completes with cur
   const importer = { historyValidation: { "/rice": { ok: false, message: "Open failed" } } };
   assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
   importer.historyValidatedPaths = ["/rice"];
-  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*title="Delete failed projects"[^>]*aria-label="Delete failed projects"[^>]*>Delete failed<\/button>/);
+  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*data-app-tooltip="Delete failed projects"[^>]*aria-label="Delete failed projects"[^>]*>Delete failed<\/button>/);
   assert.doesNotMatch(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
   importer.historyValidating = true;
   assert.doesNotMatch(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);

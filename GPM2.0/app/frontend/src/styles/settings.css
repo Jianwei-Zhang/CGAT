@@ -26,9 +26,9 @@
 .settings-help { display: inline-flex; flex: 0 0 auto; }
 .settings-help-button { width: 1.3em; min-height: 1.3em; padding: 0; border: 1px solid var(--theme-line, #b8c2ce); border-radius: 50%; background: transparent; color: var(--theme-muted-ink, #7a8898); font-size: var(--font-caption); line-height: 1.15; cursor: help; }
 .settings-help-button:hover, .settings-help-button:focus-visible { border-color: var(--theme-strong-line, #59799e); color: var(--theme-muted-ink, #3f638d); }
-.settings-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; width: min(26rem, 100%); z-index: 5; padding: 10px 12px; border: 1px solid var(--theme-line, #d6e0ec); border-radius: 6px; background: var(--theme-blue-surface, #f3f7fc); box-shadow: 0 4px 16px #18355214; color: var(--theme-muted-ink, #53677f); font-size: var(--font-caption); font-weight: 400; line-height: 1.65; overflow-wrap: anywhere; }
+.settings-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 1000; }
 .settings-tooltip.is-above { top: auto; bottom: calc(100% + 6px); }
-.settings-help:hover .settings-tooltip, .settings-help:focus-within .settings-tooltip, .settings-help.is-open .settings-tooltip { display: block; }
+.settings-help.is-open .settings-tooltip { display: block; }
 .settings-preview { margin-top: 14px; }
 .settings-preview summary { width: fit-content; color: var(--theme-muted-ink, #607895); font-size: var(--font-small); cursor: pointer; }
 .settings-preview summary:hover { color: var(--theme-blue-ink, #284f7c); }

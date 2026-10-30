@@ -19,7 +19,7 @@ function formatEndpoint(endpoint, labels, escapeHtml, escapeAttr) {
   const coordinateValue = endpoint?.cutBp || endpoint?.sourcePosition;
   const coordinate = coordinateValue ? Number(coordinateValue).toLocaleString() : labels.coordinateUnavailable;
   const title = `${name} · ${source} · ${coordinate} bp`;
-  return `<span class="subview-anchor-endpoint" title="${escapeAttr(title)}">
+  return `<span class="subview-anchor-endpoint" data-app-tooltip="${escapeAttr(title)}">
     <strong>${escapeHtml(name)}</strong><span>${escapeHtml(source)}</span><code>${escapeHtml(coordinate)} bp</code>
   </span>`;
 }
@@ -84,21 +84,21 @@ export function renderSubviewAnchorList(objects, ui, labels, { escapeHtml, escap
     const select = object.canDelete
       ? `<input type="checkbox" data-subview-anchor-check="${escapeAttr(object.objectId)}"
           aria-label="${escapeAttr(labels.selectObject)}" ${checked.has(object.objectId) ? "checked" : ""}>`
-      : `<span class="subview-anchor-readonly" title="${escapeAttr(labels.grtReadOnly)}" aria-label="${escapeAttr(labels.grtReadOnly)}">&#128274;</span>`;
+      : `<span class="subview-anchor-readonly" data-app-tooltip="${escapeAttr(labels.grtReadOnly)}" aria-label="${escapeAttr(labels.grtReadOnly)}">&#128274;</span>`;
     const action = object.kind === "grt"
       ? `<button type="button" class="button ghost tiny subview-anchor-copy-grt"
           data-subview-anchor-copy-grt="${escapeAttr(object.originId)}"
-          aria-label="${escapeAttr(labels.copyGrt)}" title="${escapeAttr(reason || labels.copyGrt)}"
+          aria-label="${escapeAttr(labels.copyGrt)}" data-app-tooltip="${escapeAttr(reason || labels.copyGrt)}"
           ${object.canCopy ? "" : "disabled"}>${escapeHtml(labels.copy)}</button>`
       : `<button type="button" class="button ghost tiny subview-anchor-delete"
           data-subview-anchor-delete="${escapeAttr(object.objectId)}"
-          aria-label="${escapeAttr(labels.deleteObject)}" title="${escapeAttr(labels.deleteObject)}">×</button>`;
+          aria-label="${escapeAttr(labels.deleteObject)}" data-app-tooltip="${escapeAttr(labels.deleteObject)}">×</button>`;
     return `<div class="subview-anchor-object${object.kind === "grt" ? " is-readonly" : ""}${focused ? " is-focused" : ""}"
         data-subview-anchor-list-row="${escapeAttr(object.objectId)}" tabindex="0" aria-current="${focused ? "true" : "false"}">
       <div class="subview-anchor-object-identity">
         ${select}
         <span class="subview-anchor-object-name"${object.kind === "grt"
-          ? ` title="${escapeAttr(labels.grtReadOnly)}"` : ""}>${escapeHtml(displayName)}</span>
+          ? ` data-app-tooltip="${escapeAttr(labels.grtReadOnly)}"` : ""}>${escapeHtml(displayName)}</span>
       </div>
       <div class="subview-anchor-object-main">
         ${type ? `<span class="subview-anchor-object-type">${escapeHtml(type)}</span>` : ""}

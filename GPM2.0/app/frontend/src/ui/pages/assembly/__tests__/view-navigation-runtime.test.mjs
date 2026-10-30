@@ -81,6 +81,7 @@ function harness({ resetScrollOnReparent = false } = {}) {
       return nodes.get(key);
     };
     const bar = {
+      attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k]; },
       dataset: { viewNavigation: role, navLocale: "zh" }, isConnected: true,
       querySelector(selector) { return node(selector.match(/\[([^='\]]+)/)[1]); },
       querySelectorAll(selector) {
@@ -511,7 +512,7 @@ for (const role of ["primary", "subview"]) {
         view.scroll.dataset[domainKey] = domain;
         h.bind();
         assert.equal(view.display.textContent, expected);
-        assert.equal(view.display.title, precise);
+        assert.equal(view.display.getAttribute("data-app-tooltip"), precise);
       }
       assert.equal(h.views[otherRole].display.textContent, "500 bp");
       h.root.emit("change", h.event(view.display));
@@ -520,7 +521,7 @@ for (const role of ["primary", "subview"]) {
       view.scroll.dataset[domainKey] = "0";
       h.bind();
       assert.equal(view.display.textContent, "—");
-      assert.equal(view.display.title, "—");
+      assert.equal(view.display.getAttribute("data-app-tooltip"), "—");
       assert.ok(view.action("left").disabled);
     } finally { h.dispose(); }
   });

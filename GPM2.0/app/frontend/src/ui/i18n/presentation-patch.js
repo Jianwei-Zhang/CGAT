@@ -3,7 +3,7 @@
 // subtrees are never written back: open menus, typed values, SVG overlays,
 // scroll positions, selection and the actual focused node stay owned by runtime.
 const localizedAttribute = name => ["title", "aria-label", "aria-description", "placeholder", "alt", "label"].includes(name)
-  || /^data-(?:member|final-path|alignment)-tooltip$/.test(name);
+  || /^data-(?:app|member|final-path|alignment|subview-band)-tooltip$/.test(name);
 
 function sameKind(a, b) { return a?.nodeType === b?.nodeType && a?.nodeName === b?.nodeName; }
 function stableIdentity(node, peer) {

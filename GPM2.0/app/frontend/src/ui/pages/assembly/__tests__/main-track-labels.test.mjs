@@ -29,7 +29,7 @@ for (const locale of ["zh", "en"]) {
       const row = rows.find(row => row.attrs.includes(`data-track-label-role="${role}"`));
       assert.ok(row, `missing ${role} track`);
       assert.equal(row.text, `[${prefix}] ${name}`);
-      assert.ok(row.attrs.includes(`title="${title}"`));
+      assert.ok(row.attrs.includes(`data-app-tooltip="${title}"`));
       assert.ok(row.attrs.includes(`aria-label="${title}"`));
       assert.ok(row.attrs.includes('data-track-label-selectable="1"'));
       assert.ok(row.attrs.includes('data-track-label-source="mother"'));
@@ -40,7 +40,7 @@ for (const locale of ["zh", "en"]) {
     const rows = labelRows(renderAssemblyPage({ ...createState(), locale }));
     const row = rows.find(row => row.attrs.includes('data-track-label-role="primary"'));
     assert.equal(row.text, `[${primary}]`);
-    assert.ok(row.attrs.includes(locale === "zh" ? 'title="主数据集轨道"' : 'title="Primary Dataset Track"'));
+    assert.ok(row.attrs.includes(locale === "zh" ? 'data-app-tooltip="主数据集轨道"' : 'data-app-tooltip="Primary Dataset Track"'));
     assert.ok(!rows.some(row => row.attrs.includes('data-track-label-role="support"')));
   });
 
@@ -49,7 +49,7 @@ for (const locale of ["zh", "en"]) {
     const text = locale === "zh" ? "未选择" : "Not Selected";
     const row = rows.find(row => row.text === `[${auxiliary}] ${text}`);
     assert.ok(row);
-    assert.ok(row.attrs.includes(locale === "zh" ? 'title="辅助数据集轨道（未选择）"' : 'title="Auxiliary Dataset Track (Not Selected)"'));
+    assert.ok(row.attrs.includes(locale === "zh" ? 'data-app-tooltip="辅助数据集轨道（未选择）"' : 'data-app-tooltip="Auxiliary Dataset Track (Not Selected)"'));
     assert.ok(!row.attrs.includes("data-track-label-selectable"));
   });
 

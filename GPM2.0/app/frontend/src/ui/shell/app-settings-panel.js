@@ -31,7 +31,8 @@ export const APP_SETTINGS_COPY = {
 };
 
 function help(id, label, text, above = false) {
-  return `<span class="settings-help"><button type="button" class="settings-help-button" aria-label="${label}" aria-describedby="${id}" aria-expanded="false">?</button><span id="${id}" role="tooltip" class="settings-tooltip${above ? " is-above" : ""}">${text}</span></span>`;
+  const attr = value => String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return `<span class="settings-help"><button type="button" class="settings-help-button" aria-label="${attr(label)}" data-app-tooltip="${attr(text)}" aria-controls="${id}" aria-expanded="false">?</button><span id="${id}" role="note" class="settings-tooltip app-tooltip-surface${above ? " is-above" : ""}">${text}</span></span>`;
 }
 
 export function renderSettingsContent(locale, settings = getAppSettings()) {
@@ -211,6 +212,8 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
       dialog.querySelectorAll(".settings-help-button").forEach(button => {
         const open = button === helpButton && button.getAttribute("aria-expanded") !== "true";
         button.setAttribute("aria-expanded", String(open));
+        if (open) button.setAttribute("aria-describedby", button.getAttribute("aria-controls"));
+        else button.removeAttribute("aria-describedby");
         button.parentElement.classList.toggle("is-open", open);
       });
       if (event.target.closest("[data-settings-close]")) dialog.close();

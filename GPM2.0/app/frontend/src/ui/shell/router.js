@@ -1,3 +1,4 @@
+import { hideAppTooltips } from "../app-tooltip-runtime.js";
 import { renderImporterPage } from "../pages/importer-page.js";
 import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools, syncAssemblyTransientInteractions } from "../pages/assembly-page.js";
 import { bindImporterPage } from "../pages/importer-page.js";
@@ -49,6 +50,7 @@ export function renderCurrentRoute(root, store) {
 }
 
 function renderRoute(root, store) {
+  hideAppTooltips(root);
   let state = store.getState();
   const canonical = normalizeAppRoute(state.activeRoute);
   if (canonical !== state.activeRoute) { store.setState({ activeRoute: canonical }); state = store.getState(); }
@@ -113,7 +115,7 @@ function renderRoute(root, store) {
   root.querySelectorAll(".route-button").forEach((button) => {
     const requiresProject = ["projectPreview", "assembly", "projectExport"].includes(button.dataset.route);
     button.disabled = requiresProject && (!state.session?.workspacePath || !state.session?.projectId);
-    button.title = button.disabled ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "";
+    button.setAttribute("data-app-tooltip", button.disabled ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "");
     const active = button.dataset.route === state.activeRoute;
     button.classList.toggle("is-active", active);
   });

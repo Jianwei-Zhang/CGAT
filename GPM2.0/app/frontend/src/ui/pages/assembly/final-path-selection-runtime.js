@@ -1,3 +1,4 @@
+import { restoreSvgTooltipTitles } from "../../tooltip-export.js";
 import { resolveCurrentFinalPathChrName } from "./final-path-state.js";
 import { collectFinalPathSourceCtgs, resolveFinalPathSourceRange } from "./final-path-presentation.js";
 import { intersectSourceInterval } from "./source-interval-projection.js";
@@ -118,12 +119,6 @@ export function snapshotWithoutFinalPathSelection(svgNode) {
   const clone = svgNode.cloneNode(true);
   for (const node of clone.querySelectorAll(OVERLAY)) node.remove();
   for (const node of clone.querySelectorAll("[data-final-path-selected]")) node.removeAttribute("data-final-path-selected");
-  for (const node of clone.querySelectorAll("[data-final-path-tooltip]")) {
-    // Live groups use a description to avoid a second delayed native popup.
-    // A standalone SVG has no app tooltip owner, so restore its native title.
-    const title = clone.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "title");
-    title.textContent = node.getAttribute("data-final-path-tooltip");
-    node.append(title);
-  }
+  restoreSvgTooltipTitles(clone);
   return String(clone.outerHTML || "");
 }

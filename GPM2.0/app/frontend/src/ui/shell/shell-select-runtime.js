@@ -35,7 +35,7 @@ export function bindShellSelects(root) {
     const sync = () => {
       const values = [...select.options], selected = values.find(option => option.selected) || values[0];
       caption.textContent = selected?.textContent || "";
-      toggle.title = select.title || caption.textContent;
+      toggle.setAttribute("data-app-tooltip", select.getAttribute("data-app-tooltip") || caption.textContent);
       toggle.disabled = select.disabled;
       const width = select.style.getPropertyValue("--workspace-select-width");
       if (width) combo.style.setProperty("--workspace-select-width", width);
@@ -48,7 +48,7 @@ export function bindShellSelects(root) {
           button.type = "button"; button.className = "assembly-track-combo-option";
           button.setAttribute("role", "option"); button.tabIndex = -1;
           button.dataset.shellOptionIndex = String(index);
-          button.textContent = option.textContent; button.title = option.textContent;
+          button.textContent = option.textContent; button.setAttribute("data-app-tooltip", option.textContent);
           button.disabled = option.disabled; return button;
         }));
       }

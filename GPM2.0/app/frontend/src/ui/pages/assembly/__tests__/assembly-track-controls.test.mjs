@@ -358,14 +358,10 @@ test("subview history controls follow Identity as one icon group and disable una
   assert.match(html, /撤销最近一次回退：恢复“翻转 Contig”后的状态/);
 });
 
-test("subview band tooltip keeps each contig interval on its own unwrapped line", () => {
-  const css = readStylesheetTree(
-    new URL("../../../../styles/components.css", import.meta.url),
-    "utf8",
-  );
-
-  assert.match(css, /\.subview-band-tooltip\s*\{[^}]*white-space:\s*pre;/);
-  assert.doesNotMatch(css, /\.subview-band-tooltip\s*\{[^}]*white-space:\s*pre-line;/);
+test("shared tooltip preserves interval line breaks while wrapping long values", () => {
+  const css = readStylesheetTree(new URL("../../../../styles/tooltips.css", import.meta.url), "utf8");
+  assert.match(css, /white-space:\s*pre-wrap;/);
+  assert.match(css, /overflow-wrap:\s*anywhere;/);
 });
 
 test("subview hit bands use their per-hit opaque identity colors", () => {
@@ -496,7 +492,7 @@ test("main primary track label is selectable for track-level context menu action
 
   assert.match(
     html,
-    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*title="主数据集轨道（hifiasm）"[^>]*>\s*<span>\[主\] hifiasm<\/span>/,
+    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*data-app-tooltip="主数据集轨道（hifiasm）"[^>]*>\s*<span>\[主\] hifiasm<\/span>/,
   );
 });
 
@@ -735,8 +731,8 @@ test("main track does not render outside tilted labels for narrow contigs", () =
   );
 
   assert.doesNotMatch(html, /<text class="track-ctg-label[^"]*is-outside/);
-  assert.match(html, /<title>main-very-long-contig-label \|/);
-  assert.match(html, /<title>support-very-long-contig-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>main-very-long-contig-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>support-very-long-contig-label \|/);
 });
 
 test("track contig labels use assembly orient before reference orient", () => {
@@ -839,11 +835,11 @@ test("assembly visible ctg labels strip chr suffix while hover titles keep full 
   assert.match(html, />ptg000009l \(\+\)<\/text>/);
   assert.match(html, />Ctg1617 \(-\)<\/text>/);
   assert.doesNotMatch(html, /<strong>Ctg1617 \(-\) vs ptg000009l \(\+\)<\/strong>/);
-  assert.match(html, /class="subview-candidate-badge" title="ptg000009l@Chr22 \(\+\)"><strong class="subview-candidate-slot">A<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">ptg000009l \(\+\)<\/span><span class="subview-candidate-meta">/);
-  assert.match(html, /class="subview-candidate-badge" title="Ctg1617@Chr22 \(-\)"><strong class="subview-candidate-slot">B<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">Ctg1617 \(-\)<\/span><span class="subview-candidate-meta">/);
+  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="ptg000009l@Chr22 \(\+\)"><strong class="subview-candidate-slot">A<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">ptg000009l \(\+\)<\/span><span class="subview-candidate-meta">/);
+  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="Ctg1617@Chr22 \(-\)"><strong class="subview-candidate-slot">B<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">Ctg1617 \(-\)<\/span><span class="subview-candidate-meta">/);
   assert.match(html, /class="subview-candidate-remove"[^>]*aria-label="移除该候选"[^>]*><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">/);
-  assert.match(html, /<title>ptg000009l@Chr22 \(\+\) \| Start: /);
-  assert.match(html, /<title>Ctg1617@Chr22 \(-\) \| Start: /);
+  assert.match(html, /<desc data-app-tooltip-source>ptg000009l@Chr22 \(\+\) \| Start: /);
+  assert.match(html, /<desc data-app-tooltip-source>Ctg1617@Chr22 \(-\) \| Start: /);
   assert.doesNotMatch(html, />ptg000009l@Chr22 \(\+\)<\/text>/);
   assert.doesNotMatch(html, />Ctg1617@Chr22 \(-\)<\/text>/);
   assert.doesNotMatch(html, /<strong>ptg000009l@Chr22 \(\+\)<\/strong>/);
@@ -888,8 +884,8 @@ test("main track hides labels that do not fit inside bars and keeps hover titles
 
   assert.doesNotMatch(html, />main-very-long-contig-label \(\+\)<\/text>/);
   assert.doesNotMatch(html, />support-very-long-contig-label \(\+\)<\/text>/);
-  assert.match(html, /<title>main-very-long-contig-label \|/);
-  assert.match(html, /<title>support-very-long-contig-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>main-very-long-contig-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>support-very-long-contig-label \|/);
 });
 
 test("main track keeps narrow contig bars visible without outside labels", () => {
@@ -938,8 +934,8 @@ test("main track keeps narrow contig bars visible without outside labels", () =>
   );
   assert.ok(companionRectMatch, "expected a companion-track contig bar");
   assert.doesNotMatch(html, /<text class="track-ctg-label[^"]*is-outside/);
-  assert.match(html, /<title>main-very-long-contig-label \|/);
-  assert.match(html, /<title>support-very-long-contig-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>main-very-long-contig-label \|/);
+  assert.match(html, /<desc data-app-tooltip-source>support-very-long-contig-label \|/);
 });
 
 test("main track hides right-edge overflow labels instead of widening the svg", () => {
@@ -1004,8 +1000,8 @@ test("main track hides right-edge overflow labels instead of widening the svg", 
   assert.ok(svgMatch, "expected rendered assembly track svg");
 
   assert.doesNotMatch(html, /<text class="track-ctg-label[^"]*is-outside/);
-  assert.match(html, /<title>ctg53 \|/);
-  assert.match(html, /<title>ctg497 \|/);
+  assert.match(html, /<desc data-app-tooltip-source>ctg53 \|/);
+  assert.match(html, /<desc data-app-tooltip-source>ctg497 \|/);
 });
 
 test("max-scale main track keeps svg width equal to inner width even with a right-edge overflow label", () => {
@@ -1397,8 +1393,8 @@ test("four dataset Assembly renders all three support options, even without plac
   const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url), "utf8");
   assert.match(css, /\.assembly-track-select-shell\.is-support\s*\{[^}]*overflow:\s*visible;/);
   assert.match(css, /\.assembly-support-dataset-value\s*\{[^}]*display:\s*none;/);
-  assert.match(menu, /data-support-dataset-option="22"[^>]*title="nextdenovo_with_a_very_long_name"/);
-  assert.match(html, /id="assembly-support-dataset-id-toggle"[^>]*title="nextdenovo_with_a_very_long_name"/);
+  assert.match(menu, /data-support-dataset-option="22"[^>]*data-app-tooltip="nextdenovo_with_a_very_long_name"/);
+  assert.match(html, /id="assembly-support-dataset-id-toggle"[^>]*data-app-tooltip="nextdenovo_with_a_very_long_name"/);
   const popupRule = css.match(/\.assembly-track-select-shell\.is-support \.assembly-track-combo-menu\s*\{([^}]*)\}/)?.[1];
   assert.match(popupRule, /grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   assert.doesNotMatch(popupRule, /width:\s*max-content|right:\s*auto/);

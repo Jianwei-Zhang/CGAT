@@ -93,7 +93,6 @@ import { buildGrtResultScene, renderGrtResultOverlayGroup } from "./grt-result-r
 import { renderGrtResultControls } from "./grt-result-controls.js";
 
 export {
-  SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS,
   __testBuildFilteredRefSubviewCtgs,
   __testPairRefSubviewSegmentsWithCache,
 } from "./render-subview.js";
@@ -301,7 +300,7 @@ function createRenderTracksRenderer(deps = {}) {
               height="${Math.max(1, barHeight - 2)}"
               rx="1.5"
               ry="1.5"
-            ><title>${escapeHtml(tooltip)}</title></rect>`;
+            ><desc data-app-tooltip-source>${escapeHtml(tooltip)}</desc></rect>`;
       })
       .filter(Boolean)
       .join("");
@@ -359,7 +358,7 @@ function createRenderTracksRenderer(deps = {}) {
               height="${Math.max(1, barHeight - 2)}"
               rx="1.5"
               ry="1.5"
-            ><title>${escapeHtml(tooltip)}</title></rect>`;
+            ><desc data-app-tooltip-source>${escapeHtml(tooltip)}</desc></rect>`;
       })
       .filter(Boolean)
       .join("");
@@ -457,7 +456,7 @@ function createRenderTracksRenderer(deps = {}) {
           class="assembly-members-icon-action"
           data-restore-all-deleted-ctgs="1"
           aria-label="${escapeAttr(i18n.page.restoreAllDeletedMembers)}"
-          title="${escapeAttr(i18n.page.restoreAllDeletedMembers)}"
+          data-app-tooltip="${escapeAttr(i18n.page.restoreAllDeletedMembers)}"
         >
           ↶
         </button>
@@ -604,10 +603,10 @@ function createRenderTracksRenderer(deps = {}) {
     const membersTitle = i18n.page.membersCardTitle;
     const projectScopeKey = JSON.stringify([state.session?.workspacePath, state.session?.projectId]);
     const memberScopeKey = JSON.stringify([state.session?.workspacePath, state.session?.projectId, assembly.selectedChrName]);
-    const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}" title="${escapeAttr(`${chr.chrName} · ${formatBp(chr.placedBp)}`)}">
+    const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}" data-app-tooltip="${escapeAttr(`${chr.chrName} · ${formatBp(chr.placedBp)}`)}">
       <strong>${escapeHtml(chr.chrName)}</strong><span>${chr.ctgCount} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb</span></button>`).join("");
     return { chromosome: `<div class="chr-picker-inline assembly-main-scope-title" data-main-track-control-title data-assembly-popup="chromosomes" data-assembly-scope-key="${escapeAttr(projectScopeKey)}">
-        <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" title="${escapeAttr(assembly.selectedChrName ? `${i18n.page.selectChromosomeTitle}: ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
+        <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" data-app-tooltip="${escapeAttr(assembly.selectedChrName ? `${i18n.page.selectChromosomeTitle}: ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
           <span class="chr-picker-current">${assembly.selectedChrName ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}` : escapeHtml(i18n.page.selectChromosomeTitle)}</span><span data-popup-chevron aria-hidden="true">${chrOpen ? "▴" : "▾"}</span>
         </button>
         <div id="assembly-chr-picker-panel" class="chr-picker-menu assembly-scope-popover" ${chrOpen ? "" : "hidden"}>${chromosomeOptions || `<div class="muted">${escapeHtml(i18n.page.noChromosomeData)}</div>`}</div>
@@ -616,7 +615,7 @@ function createRenderTracksRenderer(deps = {}) {
           <strong>${escapeHtml(membersTitle)}</strong><span data-popup-chevron aria-hidden="true">${membersOpen ? "▴" : "▾"}</span>
         </button></div>
         <div id="assembly-members-panel-popover" class="assembly-members-popover assembly-scope-popover" role="region" aria-labelledby="assembly-members-popover-title" ${membersOpen ? "" : "hidden"}>
-          <div class="assembly-members-popover-tools"><strong id="assembly-members-popover-title">${escapeHtml(membersTitle)}</strong><button type="button" class="button ghost tiny" data-reset-members-state="1" aria-label="${escapeAttr(i18n.page.resetMembersState)}" title="${escapeAttr(i18n.page.resetMembersState)}">↺ ${escapeHtml(i18n.page.resetMembersStateLabel)}</button></div>
+          <div class="assembly-members-popover-tools"><strong id="assembly-members-popover-title">${escapeHtml(membersTitle)}</strong><button type="button" class="button ghost tiny" data-reset-members-state="1" aria-label="${escapeAttr(i18n.page.resetMembersState)}" data-app-tooltip="${escapeAttr(i18n.page.resetMembersState)}">↺ ${escapeHtml(i18n.page.resetMembersStateLabel)}</button></div>
           <div class="ctg-chip-grid assembly-member-chip-region">${memberChips}</div>
         </div>
       </article>` };
@@ -1150,14 +1149,14 @@ function renderMainViewHistoryControls({ selectedChrName, history, i18n }) {
     });
   return `
     <div class="main-view-history-controls" role="group" aria-label="${escapeAttr(i18n.mainHistory.controlsAria)}">
-      <button type="button" class="main-view-history-button" data-main-history-action="undo" aria-label="${escapeAttr(undoTitle)}" title="${escapeAttr(undoTitle)}" ${undoDisabled ? "disabled" : ""}>
+      <button type="button" class="main-view-history-button" data-main-history-action="undo" aria-label="${escapeAttr(undoTitle)}" data-app-tooltip="${escapeAttr(undoTitle)}" ${undoDisabled ? "disabled" : ""}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 6.3 3.5 12l5.7 5.7M4 12h9.2a6.8 6.8 0 0 1 6.8 6.8" /></svg>
       </button>
-      <button type="button" class="main-view-history-button" data-main-history-action="redo" aria-label="${escapeAttr(redoTitle)}" title="${escapeAttr(redoTitle)}" ${redoDisabled ? "disabled" : ""}>
+      <button type="button" class="main-view-history-button" data-main-history-action="redo" aria-label="${escapeAttr(redoTitle)}" data-app-tooltip="${escapeAttr(redoTitle)}" ${redoDisabled ? "disabled" : ""}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.8 6.3 5.7 5.7-5.7 5.7M20 12h-9.2A6.8 6.8 0 0 0 4 18.8" /></svg>
       </button>
       <span class="main-view-history-separator" aria-hidden="true"></span>
-      <button type="button" class="main-view-history-button is-reset" data-main-history-action="reset" aria-label="${escapeAttr(resetTitle)}" title="${escapeAttr(resetTitle)}" ${resetDisabled ? "disabled" : ""}>
+      <button type="button" class="main-view-history-button is-reset" data-main-history-action="reset" aria-label="${escapeAttr(resetTitle)}" data-app-tooltip="${escapeAttr(resetTitle)}" ${resetDisabled ? "disabled" : ""}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 8.2V3.8m0 4.4H9M5 8a8 8 0 1 1-1 6.2" /></svg>
       </button>
     </div>
@@ -1181,11 +1180,11 @@ function renderSupportDatasetSelect({ options, value, label }) {
   ).join("");
   const menuHtml = options.map(dataset => {
     const active = dataset === selected;
-    return `<button type="button" class="assembly-track-combo-option${active ? " is-active" : ""}" data-support-dataset-option="${dataset.datasetId}" role="option" aria-selected="${active}" tabindex="-1" title="${escapeAttr(dataset.label)}">${escapeHtml(dataset.label)}</button>`;
+    return `<button type="button" class="assembly-track-combo-option${active ? " is-active" : ""}" data-support-dataset-option="${dataset.datasetId}" role="option" aria-selected="${active}" tabindex="-1" data-app-tooltip="${escapeAttr(dataset.label)}">${escapeHtml(dataset.label)}</button>`;
   }).join("");
   return `
     <div class="assembly-track-select-shell assembly-track-combo is-support" data-track-combo-field="supportDatasetId">
-      <button type="button" id="${id}-toggle" class="assembly-track-fixed-select assembly-support-dataset-toggle" data-track-combo-toggle data-support-dataset-label="${escapeAttr(label)}" aria-label="${escapeAttr(`${label}: ${selected.label}`)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu" title="${escapeAttr(selected.label)}">${escapeHtml(selected.label)}</button>
+      <button type="button" id="${id}-toggle" class="assembly-track-fixed-select assembly-support-dataset-toggle" data-track-combo-toggle data-support-dataset-label="${escapeAttr(label)}" aria-label="${escapeAttr(`${label}: ${selected.label}`)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu" data-app-tooltip="${escapeAttr(selected.label)}">${escapeHtml(selected.label)}</button>
       <select id="${id}" class="assembly-support-dataset-value" hidden aria-hidden="true" tabindex="-1">${optionsHtml}</select>
       <span class="assembly-track-control-marker" aria-hidden="true">▾</span>
       <div id="${id}-menu" class="assembly-track-combo-menu is-hidden" role="listbox" aria-label="${escapeAttr(label)}">${menuHtml}</div>
@@ -1215,7 +1214,7 @@ function renderSupportDsCtgLenControl({
           value="${escapeAttr((i18n.trackControls.supportDatasetLengthAdvancedSummary || "Advanced({count})").replace("{count}", String(supportDsCtgLenRules.length)))}"
           readonly
           aria-readonly="true"
-          title="${escapeAttr((i18n.trackControls.supportDatasetLengthAdvancedTitle || "Current chromosome uses {count} region rules").replace("{count}", String(supportDsCtgLenRules.length)))}"
+          data-app-tooltip="${escapeAttr((i18n.trackControls.supportDatasetLengthAdvancedTitle || "Current chromosome uses {count} region rules").replace("{count}", String(supportDsCtgLenRules.length)))}"
         >
       </div>
     `
@@ -1242,7 +1241,7 @@ function renderSupportDsCtgLenLabel(i18n) {
         class="assembly-support-ds-len-settings-button"
         data-support-ds-ctg-len-settings="1"
         aria-label="${escapeAttr(settingsLabel)}"
-        title="${escapeAttr(settingsLabel)}"
+        data-app-tooltip="${escapeAttr(settingsLabel)}"
       >⚙</button>
     </span>
   `;
@@ -1728,7 +1727,7 @@ function renderAssemblyTracks(args) {
             data-ref-member-start-bp="${member.segmentStartBp}"
             data-ref-member-end-bp="${member.segmentEndBp}"
           >
-            <title>${escapeHtml(member.name)} | start=${member.segmentStartBp} | end=${member.segmentEndBp}</title>
+            <desc data-app-tooltip-source>${escapeHtml(member.name)} | start=${member.segmentStartBp} | end=${member.segmentEndBp}</desc>
           </rect>
           <text
             class="track-ctg-label track-reference-member-label is-ref${labelFits ? "" : " is-collision-hidden"}"
@@ -2043,7 +2042,7 @@ function renderAssemblyTracks(args) {
       const trackLabelAttrs = selectableTrackLabel
         ? ` data-track-label-role="${trackLabelRole}" data-track-label-selectable="1" data-track-label-source="${trackLabelSource}" data-track-label-is-mirror="${trackLabelIsMirror}" data-track-label-dataset-id="${trackLabelDatasetId || 0}"${phasedTrackAttrs}`
         : "";
-      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} title="${escapeAttr(layout.label)}" aria-label="${escapeAttr(layout.label)}">
+      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} data-app-tooltip="${escapeAttr(layout.label)}" aria-label="${escapeAttr(layout.label)}">
         <span>${escapeHtml(layout.displayLabel ?? layout.label)}</span>
       </div>`;
     })
@@ -2292,7 +2291,7 @@ function renderAssemblyTracks(args) {
               rx="${TRACK_HEIGHT_SCALE * 2}"
               ry="${TRACK_HEIGHT_SCALE * 2}"
             >
-              <title>${escapeHtml(ctg.name)} | Start: ${ctg.startBp} bp | Length: ${ctg.lengthBp} bp</title>
+              <desc data-app-tooltip-source>${escapeHtml(ctg.name)} | Start: ${ctg.startBp} bp | Length: ${ctg.lengthBp} bp</desc>
             </rect>
             ${["primary", "support"].includes(fragmentRole) ? `<g data-main-anchor-fragments="1">${anchorFragments}</g>` : ""}
             ${renderGrtResultOverlayGroup({
@@ -2458,7 +2457,7 @@ function renderSupportDsCtgLenRulesDialog({ rules = [], chrLength = null, suppor
             class="button ghost tiny assembly-support-ds-len-rules-close"
             data-support-ds-ctg-len-rules-close="1"
             aria-label="${escapeAttr(labels.supportDatasetLengthRulesClose)}"
-            title="${escapeAttr(labels.supportDatasetLengthRulesClose)}"
+            data-app-tooltip="${escapeAttr(labels.supportDatasetLengthRulesClose)}"
           >X</button>
         </div>
         <div class="assembly-support-ds-len-rules-body">

@@ -44,7 +44,7 @@ for (const locale of ["zh", "en"]) test(`member trigger and panel use generic ti
   assert.ok(panel.includes(`aria-labelledby="assembly-members-popover-title"`));
   const tools = panel.match(/<div class="assembly-members-popover-tools">[^]*?<\/div>/)[0];
   assert.ok(tools.includes(`<strong id="assembly-members-popover-title">${title}</strong>`));
-  assert.ok(tools.includes(`aria-label="${full}" title="${full}">↺ ${reset}</button>`));
+  assert.ok(tools.includes(`aria-label="${full}" data-app-tooltip="${full}">↺ ${reset}</button>`));
   assert.ok(tools.indexOf("<strong") < tools.indexOf("data-reset-members-state"));
 });
 

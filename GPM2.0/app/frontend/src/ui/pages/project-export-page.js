@@ -794,8 +794,8 @@ function renderRatioBar({
   const hiddenPct = Math.min(100 - appendedPct, (hiddenValue / denominator) * 100);
   return `
     <span class="final-path-log-ratio-bar" role="img" aria-label="${escapeAttr([appendedTitle, hiddenTitle].filter(Boolean).join("; "))}">
-      <span class="final-path-log-ratio-segment is-appended" style="width: ${appendedPct.toFixed(3)}%" title="${escapeAttr(appendedTitle || "")}"></span>
-      <span class="final-path-log-ratio-segment is-log-hidden" style="width: ${hiddenPct.toFixed(3)}%" title="${escapeAttr(hiddenTitle || "")}"></span>
+      <span class="final-path-log-ratio-segment is-appended" style="width: ${appendedPct.toFixed(3)}%" data-app-tooltip="${escapeAttr(appendedTitle || "")}"></span>
+      <span class="final-path-log-ratio-segment is-log-hidden" style="width: ${hiddenPct.toFixed(3)}%" data-app-tooltip="${escapeAttr(hiddenTitle || "")}"></span>
     </span>
   `;
 }
@@ -830,7 +830,7 @@ function renderAssignmentValue(parts) {
       ${parts.map((part, index) => `
         <span class="project-export-assignment-value-token">
           ${index > 0 ? `<span class="project-export-assignment-value-separator">/</span>` : ""}
-          <span class="project-export-assignment-value-part" title="${escapeAttr(part.title)}">${escapeHtml(part.text)}</span>
+          <span class="project-export-assignment-value-part" data-app-tooltip="${escapeAttr(part.title)}">${escapeHtml(part.text)}</span>
         </span>
       `).join("")}
     </strong>
@@ -846,7 +846,7 @@ function renderAssignmentBar({ label, values, valueParts }) {
         ${values.map((item) => {
           const value = Math.max(0, Number(item.value || 0));
           const width = total > 0 ? (value / total) * 100 : 0;
-          return `<span class="project-export-assignment-segment ${escapeAttr(item.className)}" style="width: ${width.toFixed(3)}%" title="${escapeAttr(item.title)}"></span>`;
+          return `<span class="project-export-assignment-segment ${escapeAttr(item.className)}" style="width: ${width.toFixed(3)}%" data-app-tooltip="${escapeAttr(item.title)}"></span>`;
         }).join("")}
       </span>
       ${renderAssignmentValue(valueParts)}
@@ -1066,7 +1066,7 @@ function renderDetailFilterHeader({ label, filterKey, options, selectedValues, a
           class="project-export-detail-filter${isActive}"
           data-project-export-detail-filter-menu="${escapeAttr(filterKey)}"
         >
-          <summary aria-label="${escapeAttr(filterCaption.replace("{label}", label))}" title="${escapeAttr(filterCaption.replace("{label}", label))}"></summary>
+          <summary aria-label="${escapeAttr(filterCaption.replace("{label}", label))}" data-app-tooltip="${escapeAttr(filterCaption.replace("{label}", label))}"></summary>
           <div class="project-export-detail-filter-menu">
             <label>
               <input
@@ -1371,7 +1371,7 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, resolveColo
           class="project-export-final-path-preview-gap"
           data-final-path-segment="1" data-final-path-kind="gap" data-final-path-length="${segmentLengthBp}"
           style="left: clamp(0px, calc(${endPct.toFixed(4)}% - 4px), calc(100% - 8px));"
-          title="GAP ${formatNumber(segmentLengthBp)} bp"
+          data-app-tooltip="GAP ${formatNumber(segmentLengthBp)} bp"
         ></span>
       `;
     }
@@ -1388,7 +1388,7 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, resolveColo
         class="project-export-final-path-preview-ctg${toneClass}"
         data-final-path-segment="1" data-final-path-kind="ctg" data-final-path-length="${segmentLengthBp}"
         style="left: ${startPct.toFixed(4)}%; width: ${widthPct.toFixed(4)}%;"
-        title="${escapeAttr(title)}"
+        data-app-tooltip="${escapeAttr(title)}"
       >
         <span>${escapeHtml(label)}</span>
       </span>
@@ -1418,7 +1418,7 @@ function renderFinalPathPreviewRows(state, { primaryDatasetName }) {
           data-project-export-jump-parent-chr="${escapeAttr(parentChrName || chrName)}"
           data-project-export-jump-phased-key="${escapeAttr(phasedTrackKey || "")}"
           data-project-export-jump-chr="${escapeAttr(chrName)}"
-          title="${escapeAttr(chrName)}"
+          data-app-tooltip="${escapeAttr(chrName)}"
         >
           <strong class="project-export-final-path-row-label">${escapeHtml(chrName)}</strong>
           <div class="project-export-final-path-row-graph" aria-hidden="true">
@@ -1784,9 +1784,9 @@ function renderProjectOverviewSummary(state) {
       <section data-overview-summary>
       <div class="project-export-head">
         <dl class="project-export-identity">
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd title="${escapeAttr(state.session?.projectName || currentProject.projectName || "-")}">${escapeHtml(state.session?.projectName || currentProject.projectName || "-")}</dd></div>
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd title="${escapeAttr(primaryDatasetName)}">${escapeHtml(primaryDatasetName)}</dd></div>
-          <div class="project-export-identity-item" title="${escapeAttr(`${labels.auxiliaryDatasets}: ${auxiliaryNames}`)}"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt><dd title="${escapeAttr(auxiliaryNames)}">${escapeHtml(auxiliaryNames)}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd data-app-tooltip="${escapeAttr(state.session?.projectName || currentProject.projectName || "-")}">${escapeHtml(state.session?.projectName || currentProject.projectName || "-")}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd data-app-tooltip="${escapeAttr(primaryDatasetName)}">${escapeHtml(primaryDatasetName)}</dd></div>
+          <div class="project-export-identity-item" data-app-tooltip="${escapeAttr(`${labels.auxiliaryDatasets}: ${auxiliaryNames}`)}"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt><dd data-app-tooltip="${escapeAttr(auxiliaryNames)}">${escapeHtml(auxiliaryNames)}</dd></div>
         </dl>
         <div class="project-export-actions">
           ${renderPreviewImageDownloadButton(state)}

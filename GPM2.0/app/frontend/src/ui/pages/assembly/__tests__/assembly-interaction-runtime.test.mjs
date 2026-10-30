@@ -1073,7 +1073,7 @@ test("action feedback toast dismisses 0.5 second after pointer move", () => {
   assert.equal(dismissCount, 1);
 });
 
-test("subview band tooltip coordinator waits 500ms before showing and hides on leave", () => {
+test("subview band tooltip coordinator shows immediately and hides on leave", () => {
   const timerApi = createFakeTimerApi();
   const calls = [];
   const coordinator = __testCreateSubviewBandTooltipCoordinator({
@@ -1096,25 +1096,23 @@ test("subview band tooltip coordinator waits 500ms before showing and hides on l
     text: "support-top: 2,200-3,400 bp",
     point: { x: 100, y: 120 },
   });
-  timerApi.advance(499);
-  assert.deepEqual(calls, []);
+  assert.deepEqual(calls, [["show", "support-top: 2,200-3,400 bp", 100, 120]]);
   coordinator.move({
     token,
     text: "support-top: 2,200-3,400 bp",
     point: { x: 140, y: 160 },
   });
-  timerApi.advance(1);
-  assert.deepEqual(calls, [["show", "support-top: 2,200-3,400 bp", 140, 160]]);
+  assert.deepEqual(calls[1], ["move", "support-top: 2,200-3,400 bp", 140, 160]);
 
   coordinator.move({
     token,
     text: "support-top: 2,200-3,400 bp",
     point: { x: 170, y: 180 },
   });
-  assert.deepEqual(calls[1], ["move", "support-top: 2,200-3,400 bp", 170, 180]);
+  assert.deepEqual(calls[2], ["move", "support-top: 2,200-3,400 bp", 170, 180]);
 
   coordinator.leave(token);
-  assert.deepEqual(calls[2], ["hide"]);
+  assert.deepEqual(calls[3], ["hide"]);
 });
 
 test("track viewport resize coordinator rerenders only when viewport width meaningfully changes", () => {

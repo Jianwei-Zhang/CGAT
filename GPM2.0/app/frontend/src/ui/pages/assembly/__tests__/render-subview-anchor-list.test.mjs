@@ -72,7 +72,7 @@ test("anchor list separates user and read-only GRT objects and disables same-lan
   assert.match(html, /data-subview-anchor-copy-grt="origin"[\s\S]*disabled/);
   assert.match(html, /GRT gap 250 bp/);
   assert.match(html, /class="subview-anchor-object-name">A01</);
-  assert.match(html, /class="subview-anchor-object-name" title="Read only">P01</);
+  assert.match(html, /class="subview-anchor-object-name" data-app-tooltip="Read only">P01</);
   assert.match(html, /Delete \(1\)/);
 
   const filtered = renderSubviewAnchorList([

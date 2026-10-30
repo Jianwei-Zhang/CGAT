@@ -58,7 +58,7 @@ for (const height of [14, 28]) {
       const entries = ctgs.map((ctg, index) => ({ ctg, rect: { x: 10 + index * 60, width: 40 }, y: 25, height }));
       const html = renderSourceGapConnections(entries, text => text);
       assertGapEdges(html, { ...entries[0].rect, y: 25, height }, entries[1].rect);
-      assert.equal((html.match(/<title>Gap: 1 bp N<\/title>/g) || []).length, 2);
+      assert.equal((html.match(/<desc data-app-tooltip-source>Gap: 1 bp N<\/desc>/g) || []).length, 2);
       assert.equal((html.match(/stroke-dasharray="2 2"/g) || []).length, 2);
     });
   }

@@ -41,7 +41,7 @@ test("standalone preview uses a download icon, hides unpositioned lists and keep
   assert.doesNotMatch(output, /project-preview-unpositioned|未定位/);
   assert.doesNotMatch(output, /data-final-path-gap-label|project-preview-gap-label|>Gap<\/span>/);
   assert.match(output, /data-final-path-kind="gap"[^>]*background:var\(--gap-marker-fill, #ffffff\)/);
-  assert.match(output, /title="Gap: 1 bp/);
+  assert.match(output, /data-app-tooltip="Gap: 1 bp/);
   assert.match(output, /data-final-path-kind="gap"[^>]*data-final-path-length="1"/);
   assert.match(output, /data-final-path-kind="gap"[^>]*color:var\(--gap-marker-text, #1b1b1b\)/);
   assert.match(output, /a&lt;ctg&gt;/);
@@ -214,7 +214,7 @@ test("preview shows the full donor with a separate small adopted interval withou
   assert.ok(source.includes(`width:${fullWidth}%`));
   assert.doesNotMatch(source, /data-final-path-aligned-source/);
   assert.match(output, /project-preview-used[^>]*width:0\.07052%/);
-  assert.match(source, /title="donor · 31,678,158 bp · 采用区间: dsA \/ donor: 17,930,989–17,953,329 \(\+\)"/);
+  assert.match(source, /data-app-tooltip="donor\n长度: 31,678,158 bp\n采用区间: dsA \/ donor: 17,930,989–17,953,329 \(\+\)"/);
 });
 
 test("embedded Preview contains cards only and cannot overwrite the surrounding statistics/export owners", async () => {

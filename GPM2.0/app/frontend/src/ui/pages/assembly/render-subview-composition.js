@@ -29,16 +29,16 @@ function renderMember(member, focusedEntityKey, isUnavailable, labels, escapeHtm
       data-subview-composition-member="${escapeAttr(member.entityKey)}"
       data-subview-composition-lane="${member.lane}" tabindex="0" aria-pressed="${focused ? "true" : "false"}">
     <button type="button" class="subview-composition-member-main"
-      data-subview-composition-focus="${escapeAttr(member.entityKey)}" title="${escapeAttr(label)}">
+      data-subview-composition-focus="${escapeAttr(member.entityKey)}" data-app-tooltip="${escapeAttr(label)}">
       <strong>${escapeHtml(label)}</strong>
       <span>${escapeHtml(sourceLabel(member.source, labels))}</span>
       ${isUnavailable ? `<span class="inline-error">${escapeHtml(labels.sourceUnavailable)}</span>` : ""}
       <code>${Math.round(member.xBp).toLocaleString()} bp${member.flipped ? ` · ${escapeHtml(labels.flipped)}` : ""}</code>
     </button>
     <button type="button" class="button ghost tiny" data-subview-composition-move="${escapeAttr(member.entityKey)}"
-      data-subview-composition-target-lane="${opposite}" title="${escapeAttr(labels.moveTo[opposite])}">⇅</button>
+      data-subview-composition-target-lane="${opposite}" data-app-tooltip="${escapeAttr(labels.moveTo[opposite])}">⇅</button>
     <button type="button" class="button ghost tiny danger" data-subview-composition-remove="${escapeAttr(member.entityKey)}"
-      title="${escapeAttr(labels.remove)}">×</button>
+      data-app-tooltip="${escapeAttr(labels.remove)}">×</button>
   </li>`;
 }
 
@@ -103,7 +103,7 @@ function renderPicker(candidates, composition, ui, labels, escapeHtml, escapeAtt
         return `<li><label>
           <input type="checkbox" data-subview-composition-candidate="${escapeAttr(candidate.candidateKey)}"
             ${checked ? "checked" : ""}>
-          <span><strong title="${escapeAttr(label)}">${escapeHtml(label)}</strong>
+          <span><strong data-app-tooltip="${escapeAttr(label)}">${escapeHtml(label)}</strong>
             <small>${escapeHtml(sourceLabel(candidate.source, labels))}${moveNote ? ` · ${escapeHtml(moveNote)}` : ""}</small></span>
         </label></li>`;
       }).join("") || (ui.loading ? "" : `<li class="muted">${escapeHtml(labels.noMatches)}</li>`)}

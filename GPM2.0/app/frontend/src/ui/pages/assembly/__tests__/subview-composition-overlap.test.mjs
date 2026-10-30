@@ -70,7 +70,7 @@ test("composition labels use shared fitting, padding, orientation and canvas bou
   const state = overlapState();
   let groups = memberGroups(state);
   assert.doesNotMatch(groups.find(({ key }) => key === "assembly:3").markup, /<text/);
-  assert.match(groups.find(({ key }) => key === "assembly:3").markup, /<title>tiny@Chr01 \(\+\)/);
+  assert.match(groups.find(({ key }) => key === "assembly:3").markup, /<desc data-app-tooltip-source>tiny@Chr01 \(\+\)/);
   assert.match(groups.find(({ key }) => key === "assembly:1").markup,
     /<text[^>]*x="204.00"[^>]*text-anchor="start"[^>]*>short \(\+\)<\/text>/);
   assert.match(groups.find(({ key }) => key === "assembly:2").markup, /<text[^>]*x="-196.00"/);

@@ -342,7 +342,7 @@ test("assembly main view inserts phased rows after primary and before mirror row
   }));
 
   const trackLabels = Array.from(
-    html.matchAll(/<div class="assembly-track-label-row[^"]*"[^>]*title="([^"]+)"/g),
+    html.matchAll(/<div class="assembly-track-label-row[^"]*"[^>]*data-app-tooltip="([^"]+)"/g),
     (match) => match[1],
   );
   const supportIndex = trackLabels.indexOf("辅助数据集轨道（flye）");
@@ -360,7 +360,7 @@ test("assembly main view inserts phased rows after primary and before mirror row
   assert.match(html, /该分型轨道暂无 Contig/);
 
   const emptyTrackLabelTop = html.match(
-    /<div class="assembly-track-label-row[^"]*is-phased-track[^"]*" style="top:([\d.]+)px"[^>]*title="主分型 Chr01B"/,
+    /<div class="assembly-track-label-row[^"]*is-phased-track[^"]*" style="top:([\d.]+)px"[^>]*data-app-tooltip="主分型 Chr01B"/,
   );
   const emptyTrackMessageY = html.match(
     /<text class="track-row-empty-label" x="12" y="([\d.]+)">该分型轨道暂无 Contig。<\/text>/,
@@ -805,7 +805,7 @@ test("assembly tab appends deleted members into the same members card without in
   assert.match(html, /已删除成员/);
   assert.match(
     html,
-    /<span class="assembly-members-panel-title-inline">\s*<strong>已删除成员<\/strong>\s*<button[^>]*data-restore-all-deleted-ctgs="1"[^>]*aria-label="撤销全部删除"[^>]*title="撤销全部删除"/,
+    /<span class="assembly-members-panel-title-inline">\s*<strong>已删除成员<\/strong>\s*<button[^>]*data-restore-all-deleted-ctgs="1"[^>]*aria-label="撤销全部删除"[^>]*data-app-tooltip="撤销全部删除"/,
   );
   assert.match(html, /ctg-deleted-77/);
   assert.match(html, /65,432 bp/);

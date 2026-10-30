@@ -521,8 +521,8 @@ test("subview track-pair strips chr suffix in labels and keeps full hover titles
 
   assert.match(html, /data-subview-label-slot="top"[^>]*data-subview-label-role="support"[^>]*data-subview-label-contig-id="30"[^>]*>Ctg1617 \(-\)<\/text>/);
   assert.match(html, /data-subview-label-slot="bottom"[^>]*data-subview-label-role="primary"[^>]*data-subview-label-contig-id="2"[^>]*>ptg000009l \(\+\)<\/text>/);
-  assert.match(html, /<title>Ctg1617@Chr22 \(-\) \| Start: /);
-  assert.match(html, /<title>ptg000009l@Chr22 \(\+\) \| Start: /);
+  assert.match(html, /<desc data-app-tooltip-source>Ctg1617@Chr22 \(-\) \| Start: /);
+  assert.match(html, /<desc data-app-tooltip-source>ptg000009l@Chr22 \(\+\) \| Start: /);
   assert.doesNotMatch(html, /data-subview-label-slot="top"[^>]*>Ctg1617@Chr22 \(-\)<\/text>/);
   assert.doesNotMatch(html, /data-subview-label-slot="bottom"[^>]*>ptg000009l@Chr22 \(\+\)<\/text>/);
 });
@@ -561,8 +561,8 @@ test("subview local contig flips only affect subview labels and leave main-view 
 
   assert.match(html, /data-track-role="primary"[^>]*>[\s\S]*?primary-track \(\+\)<\/text>/);
   assert.doesNotMatch(html, /<strong>primary-track \(\+\) vs primary-track \(-\)<\/strong>/);
-  assert.match(html, /class="subview-candidate-badge" title="primary-track \(\+\)"[\s\S]*?class="subview-candidate-slot">A<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(\+\)<\/span>/);
-  assert.match(html, /class="subview-candidate-badge" title="primary-track \(-\)"[\s\S]*?class="subview-candidate-slot">B<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(-\)<\/span>/);
+  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="primary-track \(\+\)"[\s\S]*?class="subview-candidate-slot">A<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(\+\)<\/span>/);
+  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="primary-track \(-\)"[\s\S]*?class="subview-candidate-slot">B<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(-\)<\/span>/);
   assert.match(html, /data-subview-label-slot="top"[^>]*>primary-track \(\+\)<\/text>/);
   assert.match(html, /data-subview-label-slot="bottom"[^>]*>primary-track \(-\)<\/text>/);
 });
@@ -734,8 +734,8 @@ test("subview track-pair mode renders tooltip-enabled overlap bands and draggabl
     }),
   );
 
-  assert.match(html, /class="subview-band-tooltip is-hidden"/);
-  assert.match(html, /data-subview-band-tooltip-delay-ms="500"/);
+  assert.doesNotMatch(html, /class="subview-band-tooltip is-hidden"/);
+  assert.doesNotMatch(html, /data-subview-band-tooltip-delay-ms="[1-9]/);
   assert.match(html, /data-subview-band-tooltip="[^"]*support-top: 2,200-3,400 bp[^"]*primary-bottom: 2,400-3,600 bp/);
   assert.match(html, /class="track-band-canvas-layer"[^>]*data-track-band-canvas-scene-kind="subview-track-pair"/);
   assert.match(html, /<canvas class="track-band-canvas"[^>]*data-track-band-canvas="1"/);

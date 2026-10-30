@@ -20,7 +20,7 @@ export function bindAppThemeToggle(root, { getLocale }) {
   if (!button) return;
   const sync = () => {
     const dark = isDarkTheme(), label = themeToggleLabel(getMessages(getLocale(), "shell"), dark);
-    button.title = label;
+    button.setAttribute("data-app-tooltip", label);
     button.setAttribute("aria-label", label);
     button.setAttribute("aria-pressed", String(dark));
     button.innerHTML = projectIcon(dark ? "sun" : "moon");
@@ -66,7 +66,7 @@ export function renderAppShell(state) {
             ${renderShellSelect("app-language-select", labels.language,
               [{ value: "zh", label: "中文", selected: locale === "zh" }, { value: "en", label: "English", selected: locale === "en" }])}
           </label>
-          <button type="button" class="button app-theme-toggle" data-app-theme-toggle title="${themeLabel}" aria-label="${themeLabel}" aria-pressed="${dark}">${projectIcon(dark ? "sun" : "moon")}</button>
+          <button type="button" class="button app-theme-toggle" data-app-theme-toggle data-app-tooltip="${themeLabel}" aria-label="${themeLabel}" aria-pressed="${dark}">${projectIcon(dark ? "sun" : "moon")}</button>
           <button type="button" class="button app-settings-button" data-app-settings aria-haspopup="dialog">⚙ ${locale === "en" ? "Settings" : "设置"}</button>
         </div>
       </nav>

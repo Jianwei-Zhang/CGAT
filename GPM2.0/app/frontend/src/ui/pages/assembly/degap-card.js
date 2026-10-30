@@ -265,11 +265,11 @@ export function renderDegapJobCard({ chrName, degap }, { escapeAttr, escapeHtml,
   return `
     <section class="degap-jobs-panel degap-job-card${collapsed ? " is-collapsed" : ""}" data-degap-jobs-panel data-degap-job-card data-degap-job-card-chr-name="${escapeAttr(normalizedChrName)}">
       <div class="degap-jobs-head">
-        <button type="button" class="degap-job-card-toggle" data-degap-job-card-toggle data-degap-job-card-chr-name="${escapeAttr(normalizedChrName)}" aria-expanded="${collapsed ? "false" : "true"}" aria-label="${escapeAttr(toggleLabel)}" title="${escapeAttr(toggleLabel)}">
+        <button type="button" class="degap-job-card-toggle" data-degap-job-card-toggle data-degap-job-card-chr-name="${escapeAttr(normalizedChrName)}" aria-expanded="${collapsed ? "false" : "true"}" aria-label="${escapeAttr(toggleLabel)}" data-app-tooltip="${escapeAttr(toggleLabel)}">
           <span class="degap-job-card-indicator" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
           <strong>${escapeHtml(labels.jobsTitle)} (${jobs.length})</strong>
         </button>
-        <button type="button" class="degap-settings-button" data-degap-settings-open aria-label="${escapeAttr(labels.settingsTitle)}" title="${escapeAttr(labels.settingsTitle)}">⚙</button>
+        <button type="button" class="degap-settings-button" data-degap-settings-open aria-label="${escapeAttr(labels.settingsTitle)}" data-app-tooltip="${escapeAttr(labels.settingsTitle)}">⚙</button>
       </div>
       ${collapsed ? "" : `<div class="degap-job-list" data-degap-job-card-body>${renderJobRows({ jobs, degap: runtime, escapeAttr, escapeHtml, labels })}</div>`}
     </section>

@@ -130,9 +130,9 @@ test("main-view history controls stay grouped after Identity and expose independ
   const identityIndex = html.indexOf("assembly-track-identity-pct");
   const historyIndex = html.indexOf("main-view-history-controls");
   assert.ok(identityIndex >= 0 && historyIndex > identityIndex);
-  assert.match(html, /data-main-history-action="undo"[^>]*title="回退：删除 3 个 Contig"/);
+  assert.match(html, /data-main-history-action="undo"[^>]*data-app-tooltip="回退：删除 3 个 Contig"/);
   assert.match(html, /data-main-history-action="redo"[^>]*disabled/);
-  assert.match(html, /data-main-history-action="reset"[^>]*title="重置：撤销 Chr01 当前 4 项可逆编辑"/);
+  assert.match(html, /data-main-history-action="reset"[^>]*data-app-tooltip="重置：撤销 Chr01 当前 4 项可逆编辑"/);
   assert.equal((html.match(/data-main-history-action=/g) || []).length, 3);
   assert.ok((html.match(/is-history-highlighted/g) || []).length >= 2);
 });

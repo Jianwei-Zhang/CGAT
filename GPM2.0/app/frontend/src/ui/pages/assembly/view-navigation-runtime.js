@@ -81,7 +81,7 @@ function createController(root, store, window) {
     const modeSwitch = current.bar.querySelector("[data-view-nav-action='toggle-mode']");
     const checked = String(current.mode === "hand"), title = viewNavText(locale())[current.mode];
     if (modeSwitch.getAttribute("aria-checked") !== checked) modeSwitch.setAttribute("aria-checked", checked);
-    if (modeSwitch.getAttribute("title") !== title) modeSwitch.setAttribute("title", title);
+    if (modeSwitch.getAttribute("data-app-tooltip") !== title) modeSwitch.setAttribute("data-app-tooltip", title);
   }
   function sync(role) {
     const current = controller.roles[role], scroll = scrollFor(role);
@@ -92,7 +92,7 @@ function createController(root, store, window) {
     const spanDisplay = bar.querySelector("[data-view-nav-span]");
     if (!geometry) {
       spanDisplay.textContent = "—";
-      spanDisplay.title = "—";
+      spanDisplay.setAttribute("data-app-tooltip", "—");
       bar.querySelector("[data-view-nav-grip]").hidden = true;
       bar.querySelectorAll("button,input,select").forEach((node) => { node.disabled = true; });
       selection.setAttribute("aria-disabled", "true");
@@ -126,9 +126,9 @@ function createController(root, store, window) {
     const formatted = formatViewSpan(range.span);
     const spanText = `${formatted.value} ${formatted.unit}`;
     spanDisplay.textContent = spanText;
-    spanDisplay.title = `${Math.round(range.span).toLocaleString("en-US")} bp`;
+    spanDisplay.setAttribute("data-app-tooltip", `${Math.round(range.span).toLocaleString("en-US")} bp`);
     const t = viewNavText(locale());
-    bar.title = `${t.group}: ${Math.round(range.start).toLocaleString("en-US")}–${Math.round(range.start + range.span).toLocaleString("en-US")} bp`;
+    bar.setAttribute("data-app-tooltip", `${t.group}: ${Math.round(range.start).toLocaleString("en-US")}–${Math.round(range.start + range.span).toLocaleString("en-US")} bp`);
   }
   function applyRange(role, requested) {
     const geometry = geometryFor(role), scroll = scrollFor(role);

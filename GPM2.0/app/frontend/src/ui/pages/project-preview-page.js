@@ -44,7 +44,7 @@ function partTitle(part, labels) {
 
 function renderHighlight(patch, length, labels) {
   if (!(length > 0) || patch.end <= patch.start) return "";
-  return `<span class="project-preview-used" style="left:${percent(patch.start / length * 100)}%;width:${percent((patch.end - patch.start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" title="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
+  return `<span class="project-preview-used" style="left:${percent(patch.start / length * 100)}%;width:${percent((patch.end - patch.start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" data-app-tooltip="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
 }
 
 function renderContig(item, track, domain, labels) {
@@ -59,9 +59,9 @@ function renderContig(item, track, domain, labels) {
   const visibleLength = visibleEnd - visibleStart;
   const start = domain ? (visibleStart - domain.start) / (domain.end - domain.start) * 100 : 0;
   const width = domain ? visibleLength / (domain.end - domain.start) * 100 : 100;
-  const title = `${item.name} · ${number(item.length)} bp${item.highlights.length
-    ? ` · ${labels.used}: ${item.highlights.map(patch => partTitle(patch.part, labels)).join("; ")}` : ""}`;
-  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" data-preview-source-length="${item.length}" style="left:${percent(start)}%;width:${percent(width)}%;top:2px;background:${contigColorToken(track.role)};border-color:${contigColorToken(track.role, "stroke")};--preview-source-stroke:${contigColorToken(track.role, "stroke")};color:${contigColorToken(track.role, "text")}" title="${html(title)}">
+  const title = [item.name, `${labels.length}: ${number(item.length)} bp`,
+    item.highlights.length ? `${labels.used}: ${item.highlights.map(patch => partTitle(patch.part, labels)).join("; ")}` : ""].filter(Boolean).join("\n");
+  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" data-preview-source-length="${item.length}" style="left:${percent(start)}%;width:${percent(width)}%;top:2px;background:${contigColorToken(track.role)};border-color:${contigColorToken(track.role, "stroke")};--preview-source-stroke:${contigColorToken(track.role, "stroke")};color:${contigColorToken(track.role, "text")}" data-app-tooltip="${html(title)}">
     ${item.highlights.map(patch => renderHighlight({ ...patch, start: Math.max(0, patch.start - clipped), end: Math.min(visibleLength, patch.end - clipped) }, visibleLength, labels)).join("")}
     <span class="project-preview-contig-label" data-preview-source-fit-label="1">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>
   </span>`;
@@ -80,12 +80,12 @@ function renderReference(card, labels) {
     start: reference.reverse ? card.refLength - patch.end : patch.start,
     end: reference.reverse ? card.refLength - patch.start : patch.end }));
   return card.hasReference ? `<div class="project-preview-row"><span class="project-preview-track-label">Ref</span>
-    <span class="project-preview-plot" style="height:18px"><span class="project-preview-reference" style="left:${percent((refStart - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(Math.max(0, refEnd - refStart) / (domain.end - domain.start) * 100)}%" title="${html(`${labels.referenceHint}: ${card.chrName} · ${number(card.refLength)} bp`)}">
+    <span class="project-preview-plot" style="height:18px"><span class="project-preview-reference" style="left:${percent((refStart - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(Math.max(0, refEnd - refStart) / (domain.end - domain.start) * 100)}%" data-app-tooltip="${html(`${labels.referenceHint}: ${card.chrName}\n${labels.length}: ${number(card.refLength)} bp`)}">
       ${refPatches.map(patch => {
         const start = Math.max(refStart, reference.start + patch.start);
         const end = Math.min(refEnd, reference.start + patch.end);
         const length = Math.max(1, refEnd - refStart);
-        return `<span class="project-preview-used" data-preview-reference-highlight-start="${patch.start}" data-preview-reference-highlight-end="${patch.end}" style="left:${percent((start - refStart) / length * 100)}%;width:${percent(Math.max(0, end - start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" title="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
+        return `<span class="project-preview-used" data-preview-reference-highlight-start="${patch.start}" data-preview-reference-highlight-end="${patch.end}" style="left:${percent((start - refStart) / length * 100)}%;width:${percent(Math.max(0, end - start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" data-app-tooltip="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
       }).join("")}
     </span></span></div>` : "";
 }
@@ -93,15 +93,15 @@ function renderReference(card, labels) {
 function renderCard(card, labels) {
   const { domain } = card;
   const ref = renderReference(card, labels);
-  const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" title="${html(track.name || labels.unknown)}"><span class="project-preview-dataset-dot" style="background:${contigColorToken(track.role, "stroke")}"></span>${html(track.name || labels.unknown)}</span>
+  const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" data-app-tooltip="${html(track.name || labels.unknown)}"><span class="project-preview-dataset-dot" style="background:${contigColorToken(track.role, "stroke")}"></span>${html(track.name || labels.unknown)}</span>
     <div class="project-preview-source-plots">
       ${track.positioned.length ? `<span class="project-preview-plot" style="height:20px">${track.positioned.map(item => renderContig(item, track, domain, labels)).join("")}</span>` : ""}
       ${!track.positioned.length ? `<span class="project-preview-empty-track">—</span>` : ""}
 
     </div></div>`).join("");
   const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path">
-    <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" title="${html(path.name)}">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
-      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${path.parts.map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" title="${html(`${partTitle(part, labels)} · ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
+    <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" data-app-tooltip="${html(path.name)}">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
+      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${path.parts.map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
     </div></div>` : `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`).join("");
   const pathSummary = card.paths.filter(path => path.parts.length).map(path => bpLabel(path.length)).join(" / ");
   const summary = [card.hasReference ? `Ref ${bpLabel(card.refLength)}` : "", pathSummary ? `Final Path ${pathSummary}` : ""].filter(Boolean).join(" · ");
@@ -123,9 +123,9 @@ export function renderProjectPreviewPage(state, options = {}) {
     : !preview.loaded || (preview.localSignature !== undefined && !previewStateIsApplicable(state)) ? `<p class="muted" role="status">${html(labels.loading)}</p>`
     : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderCard(card, labels)).join("")}</div>`
     : `<p class="muted">${html(labels.empty)}</p>`;
-  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}">${options.embedded ? "" : `<header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" title="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
-    <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" title="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
-    <button type="button" class="button project-preview-download" data-preview-download title="${html(labels.download)}" aria-label="${html(labels.download)}" ${!key || preview.loading || !preview.loaded || !preview.cards?.length || preview.error || !previewStateIsApplicable(state) ? "disabled" : ""}>${projectIcon("imageDownload")}</button></header>`}
+  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}">${options.embedded ? "" : `<header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" data-app-tooltip="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
+    <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" data-app-tooltip="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
+    <button type="button" class="button project-preview-download" data-preview-download data-app-tooltip="${html(labels.download)}" aria-label="${html(labels.download)}" ${!key || preview.loading || !preview.loaded || !preview.cards?.length || preview.error || !previewStateIsApplicable(state) ? "disabled" : ""}>${projectIcon("imageDownload")}</button></header>`}
     <p class="error-text" data-preview-export-error role="alert" hidden></p>${content}</section>`;
 }
 

@@ -59,7 +59,7 @@ test("composition canvas keeps world positions and exposes evidence cuts from re
   assert.match(html, /data-subview-composition-scene="1"/);
   assert.match(
     html,
-    /class="subview-candidate-badge" title="自由组合 · 上轨 1 \/ 下轨 1"><strong class="subview-candidate-slot">C<\/strong>[\s\S]*?class="subview-candidate-name">组合<\/span><span class="subview-candidate-meta"> · 上1\/下1<\/span>[\s\S]*?data-subview-action="clear-composition"/,
+    /class="subview-candidate-badge" data-app-tooltip="自由组合 · 上轨 1 \/ 下轨 1"><strong class="subview-candidate-slot">C<\/strong>[\s\S]*?class="subview-candidate-name">组合<\/span><span class="subview-candidate-meta"> · 上1\/下1<\/span>[\s\S]*?data-subview-action="clear-composition"/,
   );
   assert.equal((html.match(/data-subview-action="swap-track-order"/g) || []).length, 1);
   assert.match(
@@ -97,9 +97,9 @@ test("composition canvas renders each effective direction once in labels and hov
   });
   const html = renderAssemblyPage(compositionState(composition, candidates));
 
-  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<title>ctg1@Chr01 \(-\) \| Start: 0 bp \| Length: 1000 bp \|/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<desc data-app-tooltip-source>ctg1@Chr01 \(-\) \| Start: 0 bp \| Length: 1000 bp \|/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?>ctg1 \(-\)<\/text>/);
-  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<title>ctg2@Chr01 \(\+\) \| Start: 0 bp \| Length: 1000 bp \|/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<desc data-app-tooltip-source>ctg2@Chr01 \(\+\) \| Start: 0 bp \| Length: 1000 bp \|/);
   assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?>ctg2 \(\+\)<\/text>/);
   assert.doesNotMatch(html, />ctg1@Chr01 \(-\)<\/text>|>ctg2@Chr01 \(\+\)<\/text>/);
   assert.doesNotMatch(html, /ctg1@Chr01 \(\+\) \(-\)|ctg2@Chr01 \(-\) \(\+\)/);

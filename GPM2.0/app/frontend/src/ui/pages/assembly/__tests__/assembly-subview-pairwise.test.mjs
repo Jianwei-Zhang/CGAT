@@ -707,7 +707,7 @@ test("subview track-pair pairwise bands mirror local flips and toggle band direc
   );
 });
 
-test("subview bands expose only top and bottom ctg interval tooltip payload with 500ms hover delay config", () => {
+test("subview bands expose complete intervals for the immediate shared tooltip without a page-owned panel", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -769,8 +769,7 @@ test("subview bands expose only top and bottom ctg interval tooltip payload with
     }),
   );
 
-  assert.match(html, /data-subview-band-tooltip-delay-ms="500"/);
-  assert.match(html, /class="subview-band-tooltip is-hidden"/);
+  assert.doesNotMatch(html, /data-subview-band-tooltip-delay-ms=|class="subview-band-tooltip/);
   assert.match(html, /data-subview-band-tooltip="[^"]*support-top: 2,200-3,400 bp[^"]*primary-bottom: 2,400-3,600 bp/);
   assert.match(html, /class="track-band-canvas-layer"[^>]*data-track-band-canvas-scene-kind="subview-ctg"/);
   assert.match(html, /<canvas class="track-band-canvas"[^>]*data-track-band-canvas="1"/);

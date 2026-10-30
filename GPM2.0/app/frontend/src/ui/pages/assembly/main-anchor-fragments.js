@@ -46,7 +46,7 @@ export function renderMainAnchorFragments({ ctg, rect, y, height, escapeHtml, ..
     return `<rect class="main-anchor-fragment-hit-zone" ${geometry} fill="transparent" pointer-events="all"
       data-main-fragment-start="${fragment.start}" data-main-fragment-end="${fragment.end}"
       data-main-fragment-role="${context.role}">
-      <title>${escapeHtml(`${ctg.name || ctg.assemblyCtgId}: ${fragment.start.toLocaleString()}–${fragment.end.toLocaleString()}`)}</title></rect>
+      <desc data-app-tooltip-source>${escapeHtml(`${ctg.name || ctg.assemblyCtgId}: ${fragment.start.toLocaleString()}–${fragment.end.toLocaleString()}`)}</desc></rect>
       <rect class="main-anchor-fragment-outline" ${geometry} rx="4" ry="4" fill="none" stroke-width="2.5" pointer-events="none" />
       ${index ? `<line class="main-anchor-fragment-separator" data-main-fragment-role="${context.role}"
         x1="${left.toFixed(2)}" x2="${left.toFixed(2)}" y1="${y.toFixed(2)}" y2="${(y + height).toFixed(2)}" pointer-events="none" />` : ""}`;

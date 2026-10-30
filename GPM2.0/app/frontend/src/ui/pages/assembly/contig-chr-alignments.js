@@ -75,10 +75,10 @@ export function openContigChrAlignments(host,{locale="zh",sourceRole="primary",l
     dialog.querySelectorAll("tr[data-chr-index]").forEach(row=>row.setAttribute("aria-selected",String(Number(row.getAttribute("data-chr-index"))===selected)));};
   const renderTable=()=>{
     const items=data?.items||[];
-    el("[data-chr-table]").innerHTML=items.length?`<table><thead><tr><th>${labels.chr}</th><th>${labels.coverage}</th><th title="${labels.identityHint}">${labels.identity}</th><th>${labels.action}</th></tr></thead><tbody>${items.map((item,i)=>{
+    el("[data-chr-table]").innerHTML=items.length?`<table><thead><tr><th>${labels.chr}</th><th>${labels.coverage}</th><th data-app-tooltip="${labels.identityHint}">${labels.identity}</th><th>${labels.action}</th></tr></thead><tbody>${items.map((item,i)=>{
       const action=chrAlignmentAction(item),hint=labels[item.presence]||"";
       const label=overlapChr===item.chrName?labels.confirm:labels[action];
-      return `<tr data-chr-index="${i}" tabindex="0" aria-selected="${i===selected}"><td>${html(item.chrName)}</td><td>${Number(item.coveragePercent).toFixed(1)}%</td><td title="${labels.identityHint}">≈${Number(item.identityPercent).toFixed(1)}%</td>
+      return `<tr data-chr-index="${i}" tabindex="0" aria-selected="${i===selected}"><td>${html(item.chrName)}</td><td>${Number(item.coveragePercent).toFixed(1)}%</td><td data-app-tooltip="${labels.identityHint}">≈${Number(item.identityPercent).toFixed(1)}%</td>
         <td>${hint?`<span class="contig-chr-presence">${hint}</span>`:""}<button type="button" class="button tiny" data-chr-action="${i}">${label}</button></td></tr>`;
     }).join("")}</tbody></table>`:`<p>${labels.empty}</p>`;
     renderPreview();

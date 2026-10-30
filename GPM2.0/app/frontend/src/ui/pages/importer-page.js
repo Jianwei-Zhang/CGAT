@@ -106,7 +106,7 @@ function renderProjectCopyDialog(state, messages) {
     <label for="project-copy-path">${escapeHtml(messages.page.copyPath)}</label>
     <div class="inline-input">
       <input id="project-copy-path" value="${escapeAttr(dialog.targetRoot || "")}" ${loading ? "disabled" : ""} required />
-      <button type="button" id="project-copy-pick-parent" class="button ghost" title="${escapeAttr(messages.buttons.pickCopyParent)}" aria-label="${escapeAttr(messages.buttons.pickCopyParent)}" ${loading ? "disabled" : ""}>${projectIcon("open")}</button>
+      <button type="button" id="project-copy-pick-parent" class="button ghost" data-app-tooltip="${escapeAttr(messages.buttons.pickCopyParent)}" aria-label="${escapeAttr(messages.buttons.pickCopyParent)}" ${loading ? "disabled" : ""}>${projectIcon("open")}</button>
     </div>
     <p class="project-path muted">${escapeHtml(messages.page.copyHint)}</p>
     <p class="error-text" data-project-copy-error role="alert" ${dialog.error ? "" : "hidden"}>${escapeHtml(dialog.error || "")}</p>
@@ -1824,7 +1824,7 @@ function renderImportProgressOverlay(importer, messages) {
           class="button ghost import-progress-close importer-import-progress-close"
           data-import-cancel="1"
           aria-label="${escapeAttr(cancelLabel)}"
-          title="${escapeAttr(cancelLabel)}"
+          data-app-tooltip="${escapeAttr(cancelLabel)}"
           ${isCancelling ? 'disabled aria-disabled="true"' : ""}
         >
           ${cancelIcon}

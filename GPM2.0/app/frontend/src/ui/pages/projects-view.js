@@ -71,7 +71,7 @@ export function syncProjectValidation(host, state, records) {
   if (validate) {
     validate.disabled = view.disabled;
     if (validate.textContent !== view.label) validate.textContent = view.label;
-    validate.setAttribute("title", view.accessibleLabel);
+    validate.setAttribute("data-app-tooltip", view.accessibleLabel);
     validate.setAttribute("aria-label", view.accessibleLabel);
     validate.setAttribute("aria-busy", String(Boolean(state.importer.historyValidating)));
   }
@@ -108,12 +108,12 @@ export function renderProjectImportDialog(state, messages) {
       <label for="${extracted ? "extracted-path-input" : "zip-path-input"}">${extracted ? labels.extracted : labels.zip}</label>
       <div class="inline-input">
         <input id="${extracted ? "extracted-path-input" : "zip-path-input"}" value="${html(source)}" required />
-        <button type="button" id="${extracted ? "pick-extracted-button" : "pick-zip-button"}" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button>
+        <button type="button" id="${extracted ? "pick-extracted-button" : "pick-zip-button"}" class="button ghost" data-app-tooltip="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button>
       </div>
       ${extracted ? `<p class="project-path muted">${messages.page.importExtractedRule}</p>` : `
         <label for="zip-workspace-root-input">${importer.requireNewWorkspace ? labels.newDirectory : messages.page.workspaceDir}</label>
         <div class="inline-input"><input id="zip-workspace-root-input" value="${html(directory)}" ${importer.requireNewWorkspace ? 'aria-describedby="project-workspace-hint"' : ""} required />
-          <button type="button" id="pick-zip-workspace-button" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button></div>
+          <button type="button" id="pick-zip-workspace-button" class="button ghost" data-app-tooltip="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button></div>
         ${importer.requireNewWorkspace ? `<p id="project-workspace-hint" class="project-path muted">${labels.directoryHint}</p>` : ""}`}
       <label for="import-parallelism-select">${labels.importThreads}</label>
       <select id="import-parallelism-select" name="importParallelism" aria-describedby="import-parallelism-hint">${workerOptions}</select>
@@ -145,13 +145,13 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
     const name = (active && state.session?.projectName) || record.projectName || defaultProjectName(record.path);
     const failed = importer.historyValidation?.[record.path]?.ok === false;
     return `<div class="project-recent-row ${active ? "is-active" : ""}${failed ? " has-validation-error" : ""}" data-workspace-history-row-path="${html(record.path)}">
-      <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" title="${html(record.path)}" ${disabled}>
+      <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" data-app-tooltip="${html(record.path)}" ${disabled}>
         <span class="project-recent-name">${projectIcon("folder")}<strong>${html(name)}</strong></span>
       </button>
       <div class="project-row-actions">
-        <button class="button project-icon-button" data-workspace-import-add-package-path="${html(record.path)}" title="${html(messages.buttons.importAddPackage)}" aria-label="${html(messages.buttons.importAddPackage)}" ${disabled}>${projectIcon("addPackage")}</button>
-        <button class="button project-icon-button" data-project-copy="${html(record.path)}" title="${html(messages.buttons.copyProject)}" aria-label="${html(messages.buttons.copyProject)}" ${disabled}>${projectIcon("copy")}</button>
-        <button class="button project-icon-button" data-project-delete-files="${html(record.path)}" title="${labels.delete}" aria-label="${labels.delete}" ${disabled}>${projectIcon("delete")}</button>
+        <button class="button project-icon-button" data-workspace-import-add-package-path="${html(record.path)}" data-app-tooltip="${html(messages.buttons.importAddPackage)}" aria-label="${html(messages.buttons.importAddPackage)}" ${disabled}>${projectIcon("addPackage")}</button>
+        <button class="button project-icon-button" data-project-copy="${html(record.path)}" data-app-tooltip="${html(messages.buttons.copyProject)}" aria-label="${html(messages.buttons.copyProject)}" ${disabled}>${projectIcon("copy")}</button>
+        <button class="button project-icon-button" data-project-delete-files="${html(record.path)}" data-app-tooltip="${labels.delete}" aria-label="${labels.delete}" ${disabled}>${projectIcon("delete")}</button>
       </div>
     </div>`;
   }).join("");
@@ -164,10 +164,10 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   </section>` : `<div class="project-browser">
     <section class="project-recents" aria-labelledby="project-recents-title">
       ${actions}
-      <header class="project-recents-header"><h4 id="project-recents-title" title="${labels.recent}"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
+      <header class="project-recents-header"><h4 id="project-recents-title" data-app-tooltip="${labels.recent}"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
-          <button id="validate-history-button" class="button ghost project-history-action" title="${html(validation.accessibleLabel)}" aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
-          <button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
+          <button id="validate-history-button" class="button ghost project-history-action" data-app-tooltip="${html(validation.accessibleLabel)}" aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
+          <button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
         </div>` : ""}
       </header>
       <div class="project-recent-list">${rows}</div>

@@ -91,7 +91,6 @@ import {
   sortTrackEntriesForRender,
 } from "./track-render-geometry.js";
 
-export const SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS = 500;
 const MAX_SEGMENT_PAIR_CACHE_ENTRIES = 256;
 
 function resolveRefOverlapBpCached(leftSegment, rightSegment) {
@@ -815,7 +814,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         `data-subview-remove-type="candidate" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-contig-id="${selection.contigId}"${phasedRemoveAttrs}`,
         i18n.subview.removeCandidateAria,
       );
-      return `<span class="subview-candidate-badge" title="${escapeAttr(ctgName)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleCtgName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(roleLabel)}</span></span>${removeButton}</span>`;
+      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(ctgName)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleCtgName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(roleLabel)}</span></span>${removeButton}</span>`;
     })
     .join("");
   const trackBadges = trackSelections
@@ -826,7 +825,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         `data-subview-remove-type="track" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-source="${escapeAttr(selection.source || "mother")}" data-subview-remove-dataset-id="${Number(selection.datasetId || 0)}" data-subview-remove-is-mirror="${selection.isMirror ? "1" : "0"}"`,
         i18n.subview.removeTrackCandidateAria,
       );
-      return `<span class="subview-candidate-badge" title="${escapeAttr(trackLabel)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span>${removeButton}</span>`;
+      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(trackLabel)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span>${removeButton}</span>`;
     })
     .join("");
   const composition = String(subview?.summary?.mode || "") === "composition"
@@ -844,7 +843,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
           'data-subview-action="clear-composition"',
           i18n.subview.closeCompositionAria,
         );
-        return `<span class="subview-candidate-badge" title="${escapeAttr(title)}"><strong class="subview-candidate-slot">C</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(i18n.subview.compositionBadgeName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(count)}</span></span>${closeButton}</span>`;
+        return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(title)}"><strong class="subview-candidate-slot">C</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(i18n.subview.compositionBadgeName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(count)}</span></span>${closeButton}</span>`;
       })()
     : "";
   const allBadges = `${candidateBadges}${trackBadges}${compositionBadge}`;
@@ -872,11 +871,11 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         <div class="subview-panel-title-row assembly-track-inline-controls${alignmentCard ? " subview-track-inline-controls" : ""}" data-subview-toolbar data-grt-result-card="subview" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
           ${alignmentCard ? `<details class="subview-panel-help">
-            <summary class="button ghost tiny" aria-label="${escapeAttr(i18n.subview.helpLabel)}" title="${escapeAttr(i18n.subview.guide)}">?</summary>
+            <summary class="button ghost tiny" aria-label="${escapeAttr(i18n.subview.helpLabel)}" data-app-tooltip="${escapeAttr(i18n.subview.guide)}">?</summary>
             <p class="subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
           </details>` : ""}
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
-          ${!alignmentCard ? `<p class="muted subview-empty-guide" title="${escapeAttr(i18n.subview.guide)}">${escapeHtml(i18n.subview.guide)}</p>` : ""}
+          ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}">${escapeHtml(i18n.subview.guide)}</p>` : ""}
           ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history) : ""}
         </div>
       </div>
@@ -905,10 +904,10 @@ function renderSubviewHistoryControls(history, i18n) {
     : i18n.subview.historyRestoreRollbackUnavailableLabel;
   return `
     <div class="subview-history-controls" role="group" aria-label="${escapeAttr(i18n.subview.historyControlsAria)}">
-      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" title="${escapeAttr(rollbackLabel)}" ${resolvedHistory.canRollback ? "" : "disabled"}><svg class="subview-history-icon subview-history-arrow-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M8 5 3 10l5 5"></path><path d="M3 10h14"></path></svg></button>
-      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" title="${escapeAttr(restoreRollbackLabel)}" ${resolvedHistory.canRestoreRollback ? "" : "disabled"}><svg class="subview-history-icon subview-history-arrow-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="m12 5 5 5-5 5"></path><path d="M3 10h14"></path></svg></button>
+      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" data-app-tooltip="${escapeAttr(rollbackLabel)}" ${resolvedHistory.canRollback ? "" : "disabled"}><svg class="subview-history-icon subview-history-arrow-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M8 5 3 10l5 5"></path><path d="M3 10h14"></path></svg></button>
+      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" data-app-tooltip="${escapeAttr(restoreRollbackLabel)}" ${resolvedHistory.canRestoreRollback ? "" : "disabled"}><svg class="subview-history-icon subview-history-arrow-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="m12 5 5 5-5 5"></path><path d="M3 10h14"></path></svg></button>
       <span class="subview-history-separator" aria-hidden="true"></span>
-      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${resolvedHistory.canReset ? "" : "disabled"}><svg class="subview-history-icon subview-history-reset-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M3.5 10a6.5 6.5 0 1 0 1.9-4.6L3.5 7.3"></path><path d="M3.5 3.5v3.8h3.8"></path></svg></button>
+      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" data-app-tooltip="${escapeAttr(i18n.subview.historyResetAria)}" ${resolvedHistory.canReset ? "" : "disabled"}><svg class="subview-history-icon subview-history-reset-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M3.5 10a6.5 6.5 0 1 0 1.9-4.6L3.5 7.3"></path><path d="M3.5 3.5v3.8h3.8"></path></svg></button>
     </div>
   `;
 }
@@ -962,14 +961,14 @@ function renderSubviewTrackOrderToggleButton({ className = "", style = "", swapT
       class="button ghost tiny subview-track-order-toggle${resolvedClassName ? ` ${resolvedClassName}` : ""}"
       data-subview-action="swap-track-order"
       aria-label="${escapeAttr(swapTrackOrderLabel)}"
-      title="${escapeAttr(swapTrackOrderLabel)}"
+      data-app-tooltip="${escapeAttr(swapTrackOrderLabel)}"
       ${resolvedStyle ? `style="${escapeAttr(resolvedStyle)}"` : ""}
     >⇅</button>
   `;
 }
 
 function renderSubviewBadgeRemoveButton(attributes, ariaLabel) {
-  return `<button type="button" class="subview-candidate-remove" ${attributes} aria-label="${escapeAttr(ariaLabel)}" title="${escapeAttr(ariaLabel)}"><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button>`;
+  return `<button type="button" class="subview-candidate-remove" ${attributes} aria-label="${escapeAttr(ariaLabel)}" data-app-tooltip="${escapeAttr(ariaLabel)}"><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button>`;
 }
 
 function buildSubviewActiveAnchorKeySet(activeAnchors) {
@@ -1271,7 +1270,7 @@ function buildSubviewFragmentRects({
                 data-subview-fragment-phased-track-item-id="${Number(phasedTrackItemId || 0)}"
                 data-subview-fragment-phased-haplotype-key="${escapeAttr(phasedHaplotypeKey || "")}"
               >
-                <title>${escapeHtml(hoverTitle)}</title>
+                <desc data-app-tooltip-source>${escapeHtml(hoverTitle)}</desc>
               </rect>
               <rect
                 class="subview-fragment-outline"
@@ -1829,7 +1828,7 @@ function renderSubviewAlignmentCard(
   const loadingOverlay = isPairwiseEvidenceLoading
     ? `<div class="subview-pairwise-loading-overlay" data-subview-pairwise-loading="1">
         <div class="subview-pairwise-loading-panel">
-          <button type="button" class="subview-pairwise-loading-close" data-subview-pairwise-cancel="1" aria-label="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}" title="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}">&times;</button>
+          <button type="button" class="subview-pairwise-loading-close" data-subview-pairwise-cancel="1" aria-label="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}" data-app-tooltip="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}">&times;</button>
           <div class="subview-pairwise-loading-spinner" aria-hidden="true"></div>
           <p class="subview-pairwise-loading-text">${escapeHtml(i18n.subview.loadingPairwiseEvidence)}</p>
         </div>
@@ -1848,13 +1847,13 @@ function renderSubviewAlignmentCard(
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
-          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" title="${escapeAttr(topDisplayCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" data-app-tooltip="${escapeAttr(topDisplayCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
           ${renderSubviewTrackOrderToggleButton({
             className: "is-in-label-column",
             style: `top:${trackOrderButtonTopPx}px`,
             swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
           })}
-          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" title="${escapeAttr(bottomDisplayCtgName)}">${escapeHtml(bottomVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" data-app-tooltip="${escapeAttr(bottomDisplayCtgName)}">${escapeHtml(bottomVisibleCtgName)}</div>
         </div>
         <div
           class="assembly-track-scroll subview-track-scroll"
@@ -1876,11 +1875,6 @@ function renderSubviewAlignmentCard(
               tone: bandTone,
             })),
           })}
-          <div
-            class="subview-band-tooltip is-hidden"
-            data-subview-band-tooltip-delay-ms="${SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS}"
-            aria-hidden="true"
-          ></div>
           <svg class="assembly-track-svg subview-track-svg" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="${svgModel.renderViewBoxMinX} 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
             <line class="track-ruler-line" x1="0" y1="${svgModel.rulerTop}" x2="${svgModel.baseInnerWidth}" y2="${svgModel.rulerTop}" />
             ${renderSubviewVirtualRuler({
@@ -1931,7 +1925,7 @@ function renderSubviewAlignmentCard(
               data-subview-world-start-bp="${svgModel.topWorldStartBp}"
             >
               <rect class="track-ctg subview-track-ctg${topRowClass}" x="${svgModel.topBarX.toFixed(2)}" y="${svgModel.topBarY.toFixed(2)}" width="${svgModel.topBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
-                <title>${escapeHtml(topCtgTitle)}</title>
+                <desc data-app-tooltip-source>${escapeHtml(topCtgTitle)}</desc>
               </rect>
               ${renderGrtResultOverlayGroup({
                 entryKey: "top",
@@ -1995,7 +1989,7 @@ function renderSubviewAlignmentCard(
               data-subview-world-start-bp="${svgModel.bottomWorldStartBp}"
             >
               <rect class="track-ctg subview-track-ctg${bottomRowClass}" x="${svgModel.bottomBarX.toFixed(2)}" y="${svgModel.bottomBarY.toFixed(2)}" width="${svgModel.bottomBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
-                <title>${escapeHtml(bottomCtgTitle)}</title>
+                <desc data-app-tooltip-source>${escapeHtml(bottomCtgTitle)}</desc>
               </rect>
               ${renderGrtResultOverlayGroup({
                 entryKey: "bottom",
@@ -2959,7 +2953,7 @@ function renderSubviewTrackPairAlignmentCard(
   const loadingOverlay = isPairwiseEvidenceLoading
     ? `<div class="subview-pairwise-loading-overlay" data-subview-pairwise-loading="1">
         <div class="subview-pairwise-loading-panel">
-          <button type="button" class="subview-pairwise-loading-close" data-subview-pairwise-cancel="1" aria-label="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}" title="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}">&times;</button>
+          <button type="button" class="subview-pairwise-loading-close" data-subview-pairwise-cancel="1" aria-label="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}" data-app-tooltip="${escapeAttr(i18n.subview.cancelPairwiseLoadingAria)}">&times;</button>
           <div class="subview-pairwise-loading-spinner" aria-hidden="true"></div>
           <p class="subview-pairwise-loading-text">${escapeHtml(i18n.subview.loadingPairwiseEvidence)}</p>
         </div>
@@ -3107,7 +3101,7 @@ function renderSubviewTrackPairAlignmentCard(
                 ry="4"
                 pointer-events="all"
               >
-                <title>${escapeHtml(ctgTitle)}</title>
+                <desc data-app-tooltip-source>${escapeHtml(ctgTitle)}</desc>
               </rect>
               ${renderGrtResultOverlayGroup({
                 entryKey: grtOverlayKey,
@@ -3185,7 +3179,6 @@ function renderSubviewTrackPairAlignmentCard(
               tone: topTrack.role === "support" ? "companion" : "primary",
             })),
           })}
-          <div class="subview-band-tooltip is-hidden" data-subview-band-tooltip-delay-ms="${SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS}" aria-hidden="true"></div>
           <svg class="assembly-track-svg subview-track-svg" width="${renderInnerWidth}" height="${contentBottom}" viewBox="${renderViewBoxMinX} 0 ${renderInnerWidth} ${contentBottom}" preserveAspectRatio="xMinYMin meet">
             <defs>
               <clipPath id="${bandClipId}" clipPathUnits="userSpaceOnUse">

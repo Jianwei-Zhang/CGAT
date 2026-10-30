@@ -43,7 +43,7 @@ export function renderManualSplitPreview(model, labels = copy.zh) {
   ]).filter(({cut}) => cut >= model.sourceStart && cut < model.sourceEnd).map(({cut,ref}) => {
     const x=manualBoundaryX(model,cut), points=`${x},${CTG_Y} ${refX(ref)},${REF_Y+12}`;
     return `<g class="manual-split-edge" data-manual-cut="${cut}" role="button" tabindex="0" aria-label="${escape(`${labels.position} ${bp(cut)} ${labels.after}`)}">
-      <title>${bp(cut)} bp</title><polyline class="manual-split-edge-hit" points="${points}"/>
+      <desc data-app-tooltip-source>${bp(cut)} bp</desc><polyline class="manual-split-edge-hit" points="${points}"/>
       <polyline class="manual-split-edge-focus" points="${points}"/><circle cx="${x}" cy="${CTG_Y}" r="4"/>
     </g>`;
   }).join("");

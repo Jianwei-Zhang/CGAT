@@ -35,7 +35,7 @@ test("crowded reference names are hidden but the full fragment hover title remai
     refTrackMembers: fragments,
   } }));
   assert.equal([...html.matchAll(/track-reference-member-label is-ref is-collision-hidden/g)].length, 2);
-  assert.match(html, /<title>reference-first-long-name \| start=1 \| end=100<\/title>/);
+  assert.match(html, /<desc data-app-tooltip-source>reference-first-long-name \| start=1 \| end=100<\/desc>/);
   assert.match(html, /track-reference-member-label is-ref"/);
 });
 test("legacy bands skip reference gaps and preserve orientation without claiming exact mapping", () => {

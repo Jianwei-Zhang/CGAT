@@ -8,6 +8,7 @@ import { clearAssemblySessionCache } from "../assembly-session-cache.js";
 function createRouteButton(route) {
   return {
     dataset: { route },
+    attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k]; },
     classList: {
       active: false,
       toggle(_className, enabled) {

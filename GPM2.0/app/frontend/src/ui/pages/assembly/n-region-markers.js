@@ -70,7 +70,7 @@ export function renderNRegionMarkersForTrackCtg({
             height="${Math.max(1, barHeight - 2)}"
             rx="1.5"
             ry="1.5"
-          ><title>${escapeHtml(tooltip)}</title></rect>`;
+          ><desc data-app-tooltip-source>${escapeHtml(tooltip)}</desc></rect>`;
     })
     .filter(Boolean)
     .join("");

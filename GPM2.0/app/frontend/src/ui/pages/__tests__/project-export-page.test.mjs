@@ -697,11 +697,11 @@ test("project export assignment values show placed over total instead of placed 
 
   assert.match(
     html,
-    /<div class="project-export-assignment-row">[\s\S]*?>数目<[\s\S]*title="已放置: 1">1<\/span>[\s\S]*title="已放置 \+ 未分配: 4">4<\/span>/,
+    /<div class="project-export-assignment-row">[\s\S]*?>数目<[\s\S]*data-app-tooltip="已放置: 1">1<\/span>[\s\S]*data-app-tooltip="已放置 \+ 未分配: 4">4<\/span>/,
   );
   assert.match(
     html,
-    /<div class="project-export-assignment-row">[\s\S]*?>长度<[\s\S]*title="已放置: 1,000 bp">1,000<\/span>[\s\S]*title="已放置 \+ 未分配: 1,250 bp">1,250<\/span>/,
+    /<div class="project-export-assignment-row">[\s\S]*?>长度<[\s\S]*data-app-tooltip="已放置: 1,000 bp">1,000<\/span>[\s\S]*data-app-tooltip="已放置 \+ 未分配: 1,250 bp">1,250<\/span>/,
   );
   assert.doesNotMatch(html, /title="未分配: 3">3<\/span>/);
   assert.doesNotMatch(html, /title="未分配: 250 bp">250<\/span>/);
@@ -737,7 +737,7 @@ test("project export page counts current main-track hidden primary contigs", () 
   }));
 
   assert.match(html, /role="img" aria-label="实际追加: 1\/2; 主图已隐藏: 1\/2"/);
-  assert.match(html, /title="主图已隐藏: 2,000\/3,000 bp"/);
+  assert.match(html, /data-app-tooltip="主图已隐藏: 2,000\/3,000 bp"/);
   assert.match(html, /已使用主组装 Contig 数量[\s\S]*<strong>2\/2<\/strong>/);
   assert.match(html, /已使用主组装 Contig 长度[\s\S]*<strong>3,000\/3,000<\/strong>/);
 });
@@ -2196,8 +2196,8 @@ for (const locale of ["zh", "en"]) test(`Overview has compact identity groups an
   assert.equal((html.match(/data-preview-download/g) || []).length, 1);
   assert.ok(toolbar.indexOf("data-preview-download") < toolbar.indexOf("data-project-export-toggle"));
   assert.match(toolbar, /<dl class="project-export-identity">/);
-  assert.match(toolbar, /<dd title="p1">p1<\/dd>/);
-  assert.match(toolbar, /<dd title="hifiasm">hifiasm<\/dd>/);
+  assert.match(toolbar, /<dd data-app-tooltip="p1">p1<\/dd>/);
+  assert.match(toolbar, /<dd data-app-tooltip="hifiasm">hifiasm<\/dd>/);
 });
 
 for (const locale of ["zh", "en"]) test(`Overview includes all configured auxiliary names in its single-line identity (${locale})`, () => {
@@ -2209,7 +2209,7 @@ for (const locale of ["zh", "en"]) test(`Overview includes all configured auxili
   const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
   const label = locale === "zh" ? "辅助数据集" : "Auxiliary datasets";
   const names = "Flye_Very_Long_Auxiliary_Name&lt;&amp;&quot;, RagTag_MiXeD, ds-99";
-  assert.ok(toolbar.includes(`<dt>${label}</dt><dd title="${names}">${names.replaceAll("&quot;", '"')}</dd>`));
+  assert.ok(toolbar.includes(`<dt>${label}</dt><dd data-app-tooltip="${names}">${names.replaceAll("&quot;", '"')}</dd>`));
   assert.equal((toolbar.match(/class="project-export-identity-item"/g) || []).length, 3);
   assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>项目" : "<dt>Project") < toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset"));
   assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset") < toolbar.indexOf(`<dt>${label}`));
@@ -2218,8 +2218,8 @@ for (const locale of ["zh", "en"]) test(`Overview includes all configured auxili
 for (const locale of ["zh", "en"]) test(`Overview reports no configured auxiliary datasets honestly (${locale})`, () => {
   const html = renderProjectExportPage(createState({ locale }));
   const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
-  assert.ok(toolbar.includes(locale === "zh" ? '<dt>辅助数据集</dt><dd title="未配置">未配置</dd>'
-    : '<dt>Auxiliary datasets</dt><dd title="Not configured">Not configured</dd>'));
+  assert.ok(toolbar.includes(locale === "zh" ? '<dt>辅助数据集</dt><dd data-app-tooltip="未配置">未配置</dd>'
+    : '<dt>Auxiliary datasets</dt><dd data-app-tooltip="Not configured">Not configured</dd>'));
 });
 
 test("Overview identity never wraps, ellipsizes names and preserves fixed right-side actions", () => {
