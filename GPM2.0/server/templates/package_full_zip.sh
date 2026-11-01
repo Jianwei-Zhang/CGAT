@@ -8,9 +8,9 @@ kind="full"
 archive_helper="${server_dir}/.prepare_lib/tools/delivery_archive.py"
 archive_path="$(python3 "$archive_helper" path --server-dir "$server_dir" --kind "$kind")"
 staging_path="$(python3 "$archive_helper" staging-path --server-dir "$server_dir" --kind "$kind")"
-app_packager="${server_dir}/.prepare_lib/tools/grt_app_package.py"
+app_packager="${server_dir}/.prepare_lib/tools/lgz_app_package.py"
 
-python3 "${server_dir}/.prepare_lib/tools/grt_contract.py" --bundle "$server_dir"
+python3 "${server_dir}/.prepare_lib/tools/lgz_contract.py" --bundle "$server_dir"
 [[ -f "$app_packager" ]] || { echo "Missing App package builder: $app_packager" >&2; exit 1; }
 
 temporary_dir="$(mktemp -d "${parent_dir}/.${bundle_name}.package-${kind}.XXXXXX")"

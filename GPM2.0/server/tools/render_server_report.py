@@ -262,7 +262,7 @@ def pipeline_map_html(records: list[dict], input_facts: dict, final: dict) -> st
     return '<div class="pipeline-map">' + "".join(cards) + '</div>'
 
 
-def grt_flow_html(grt: list[dict], final: dict) -> str:
+def lgz_flow_html(grt: list[dict], final: dict) -> str:
     stats_by_version = {}
     stage_by_output = {}
     for record in grt:
@@ -572,7 +572,7 @@ def render(root: Path) -> Path:
     else:
         body += final_path_visual_html(final)
     body += '<details class="block secondary-results"><summary>查看 q0 → q4 演化和组装统计</summary><h3>q0 → q4 序列演化</h3>'
-    body += grt_flow_html(grt, final)
+    body += lgz_flow_html(grt, final)
     versions = {}
     primary = next((d for d in input_facts.get("datasets", []) if d["role"] == "primary"), {})
     versions["原始主组装"] = primary.get("stats")
@@ -633,6 +633,10 @@ def render(root: Path) -> Path:
         Path(temporary).unlink(missing_ok=True)
     return root / "report.html"
 
+
+
+# Compatibility aliases for existing Python consumers.
+grt_flow_html = lgz_flow_html
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

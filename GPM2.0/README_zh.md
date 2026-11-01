@@ -4,6 +4,8 @@
 
 自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
 
+Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，产物路径、数据协议与持久化阶段 ID 不变。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](docs/lgz-server-implementation.md)。
+
 GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流程中，用于导入、浏览、轻量编辑和 Final Path 导出。
 
 ## 项目架构
@@ -124,8 +126,8 @@ bash "$SERVER/run.sh" \
 | `--cen-min-len <bp>` | `10000` | 着丝粒比对最小长度。 |
 | `--cen-min-identity <百分比>` | `80` | 着丝粒比对最小一致性百分比。 |
 | `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury QV 评估；`--threads` 总预算会分配给各 dataset。 |
-| `--grt-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
-| `--grt-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
+| `--lgz-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
+| `--lgz-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
 | `--max-fill <bp>` | `1000000` | Step3 两轮优化补洞的长度上限；恢复时可修改。 |
 
 #### 比对引擎专属参数

@@ -13,7 +13,7 @@ from typing import Iterable
 
 try:
     from delivery_archive import validate_delivery_staging
-    from grt_contract import ContractError, validate_contract
+    from lgz_contract import ContractError, validate_contract
     from run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
@@ -26,7 +26,7 @@ try:
     )
 except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
     from .delivery_archive import validate_delivery_staging
-    from .grt_contract import ContractError, validate_contract
+    from .lgz_contract import ContractError, validate_contract
     from .run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
@@ -40,8 +40,8 @@ except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
 
 
 WORKFLOW = "gpm_run_outer_v1"
-GRT_WORKFLOW = "gpm_grt_precomputed_v2"
-GRT_STAGE_MAP = {
+LGZ_WORKFLOW = "gpm_grt_precomputed_v2"
+LGZ_STAGE_MAP = {
     "grt_prepare": ("donor_freeze",),
     "grt_step1": ("step1_round1", "step1_filter", "step1_round2"),
     "grt_step2": ("step2",),
@@ -145,7 +145,11 @@ class OuterCheckpointManager:
         return prepared.path
 
     def validate_grt_unit(self, unit_id: str) -> tuple[bool, str]:
-        stages = GRT_STAGE_MAP.get(unit_id)
+        """Compatibility method for existing runner integrations."""
+        return self.validate_lgz_unit(unit_id)
+
+    def validate_lgz_unit(self, unit_id: str) -> tuple[bool, str]:
+        stages = LGZ_STAGE_MAP.get(unit_id)
         if stages is None:
             return True, "no LGZ checkpoint validation required"
         status_rows = self._read_tsv("metadata/grt_stage_status.tsv")
@@ -160,7 +164,7 @@ class OuterCheckpointManager:
             if not isinstance(checkpoint, dict):
                 return False, f"LGZ checkpoint is not an object: {checkpoint_path}"
             if (
-                checkpoint.get("workflow") != GRT_WORKFLOW
+                checkpoint.get("workflow") != LGZ_WORKFLOW
                 or checkpoint.get("stage") != stage
                 or checkpoint.get("status") != "success"
                 or not isinstance(checkpoint.get("input_fingerprint"), str)
@@ -581,3 +585,8 @@ class OuterCheckpointManager:
             if operation.name == "cen_scan":
                 paths.append(self.server_dir / f"cen/chr_{chromosome}/marks.tsv")
         return paths
+
+
+# Compatibility constants; persisted values remain unchanged.
+GRT_WORKFLOW = LGZ_WORKFLOW
+GRT_STAGE_MAP = LGZ_STAGE_MAP

@@ -18,7 +18,7 @@ try:
 except ModuleNotFoundError:
     from .render_server_report import REPORT_PREVIEW_ROWS
 
-GRT_STAGES = {
+LGZ_STAGES = {
     "step1_round1": "grt/evidence/step1/round1",
     "step1_filter": "grt/evidence/step1/filter",
     "step1_round2": "grt/evidence/step1/round2",
@@ -134,7 +134,7 @@ def collect_assignment(root: Path, input_data: dict) -> dict:
                       "未分配表示未通过当前比对过滤和覆盖阈值，不能直接解释为污染序列。"]}
 
 
-def collect_grt_inputs(root: Path) -> dict:
+def collect_lgz_inputs(root: Path) -> dict:
     recipe = read_tsv(root / "metadata/grt_recipe.tsv")
     qc_enabled = bool(recipe and recipe[0].get("reads_qc_enabled") == "true")
     return {"summary": {"reads_qc": "measured" if qc_enabled else "not_enabled"},
@@ -157,9 +157,9 @@ def event_summary(events: list[dict]) -> dict:
             "by_reason": dict(Counter(str(row.get("reason", "unspecified")) for row in events))}
 
 
-def collect_grt_result(root: Path, result: dict) -> dict:
+def collect_lgz_result(root: Path, result: dict) -> dict:
     stage = result["stage"]
-    evidence_dir = GRT_STAGES.get(stage)
+    evidence_dir = LGZ_STAGES.get(stage)
     tables = {}
     if evidence_dir:
         for path in sorted((root / evidence_dir).glob("*.tsv")):
@@ -350,7 +350,7 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
     if unit_id == "assign":
         return collect_assignment(root, input_data)
     if unit_id == "grt_prepare":
-        return collect_grt_inputs(root)
+        return collect_lgz_inputs(root)
     if unit_id.startswith("chr:"):
         relative = f"runs/chr_{unit_id.split(':', 1)[1]}"
         paths = sorted(local_path(root, relative).glob("*/result.paf"))
@@ -387,3 +387,12 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
             ],
         }
     return {"summary": {}, "notes": ["执行情况见本阶段状态；LGZ 子阶段记录单独列出。"]}
+
+
+# Compatibility aliases for existing Python consumers.
+collect_grt_inputs = collect_lgz_inputs
+collect_grt_result = collect_lgz_result
+
+
+# Compatibility constants; persisted values remain unchanged.
+GRT_STAGES = LGZ_STAGES

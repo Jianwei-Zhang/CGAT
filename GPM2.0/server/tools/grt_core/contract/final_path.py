@@ -1,15 +1,7 @@
-def event_is_path_producing(event):
-    return event["action"] in {
-        "fill",
-        "patch",
-        "refill",
-        "extend_telomere",
-    } or (
-        event["action"] == "replace"
-        and event.get("edit", {}).get("replacement_kind") == "source"
-    )
+"""Compatibility forwarding module; the implementation lives under LGZ."""
+try:
+    from lgz_compat import forward_module as _forward_module
+except ModuleNotFoundError:
+    from ...lgz_compat import forward_module as _forward_module
 
-def reverse_complement(sequence):
-    return sequence.translate(
-        str.maketrans("ACGTRYSWKMBDHVN", "TGCAYRSWMKVHDBN")
-    )[::-1]
+_forward_module(__name__, __package__, globals())

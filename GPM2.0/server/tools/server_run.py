@@ -18,6 +18,10 @@ ALIASES = {
     "-o": "--out", "--output": "--out", "-t": "--threads",
     "-s": "--score", "-m": "--max-fill",
     "-sm": "--self-m", "-sn": "--self-n",
+    "--lgz-qc-memory-gb": "--grt-qc-memory-gb",
+    "--lgz-kmer-size": "--grt-kmer-size",
+    "--lgz-execution-profile": "--grt-execution-profile",
+    "--lgz-step3-mummer-scope": "--grt-step3-mummer-scope",
 }
 SINGLE_OPTIONS = {
     "--out", "--threads", "--score", "--archive-format",
@@ -81,16 +85,22 @@ def check_resume_options(requested: dict, saved: dict, identities: dict) -> None
 
 
 def update_fill_limit(root: Path, limit: str) -> None:
-    script = root / "run_grt_step3.sh"
-    runtime_name = "grt_step3.py"
-    if not script.is_file():
-        # Prepared workspaces are immutable recipes; retain their combined entrypoint.
-        script = root / "run_grt_step23.sh"
-        runtime_name = "grt_step23.py"
+    script, runtime_name = next(
+        ((root / filename, module) for filename, module in (
+            ("run_lgz_step3.sh", "lgz_step3.py"),
+            ("run_grt_step3.sh", "grt_step3.py"),
+            ("run_grt_step23.sh", "grt_step23.py"),
+        ) if (root / filename).is_file()),
+        (root / "run_lgz_step3.sh", "lgz_step3.py"),
+    )
     runtime = root / ".prepare_lib/tools" / runtime_name
     if not script.is_file() or not runtime.is_file():
         raise RunnerError("This workspace has no staged LGZ Step3 runtime; update its Server runtime before changing the limit.")
-    if "--max-fill" not in runtime.read_text(encoding="utf-8"):
+    # A legacy script can call the compatibility facade after a code-only update.
+    candidates = [runtime]
+    if runtime_name == "grt_step3.py":
+        candidates.append(runtime.with_name("lgz_step3.py"))
+    if not any(path.is_file() and "--max-fill" in path.read_text(encoding="utf-8") for path in candidates):
         raise RunnerError("This workspace runtime predates --max-fill; update its Server runtime before changing the limit.")
     lines = script.read_text(encoding="utf-8").splitlines()
     for index, line in enumerate(lines):

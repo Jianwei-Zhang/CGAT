@@ -495,13 +495,13 @@ assert_chr_partition_run_all_staging() {
   local expected_tail
   expected_tail="$(cat <<EOF
 assign	assign_chr_groups.sh	logs/run_all.log
-grt_prepare	prepare_grt_inputs.sh	logs/run_all.log
-grt_step1	run_grt_step1.sh	logs/run_all.log
-grt_step2	run_grt_step2.sh	logs/run_all.log
-grt_step3	run_grt_step3.sh	logs/run_all.log
-grt_telomere_finalize	run_grt_telomere_finalize.sh	logs/run_all.log
+grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
+grt_step1	run_lgz_step1.sh	logs/run_all.log
+grt_step2	run_lgz_step2.sh	logs/run_all.log
+grt_step3	run_lgz_step3.sh	logs/run_all.log
+grt_telomere_finalize	run_lgz_telomere_finalize.sh	logs/run_all.log
 chr:${chr_name}	runs/chr_${chr_name}/command.sh	logs/run_all.log
-finalize_evidence	finalize_grt_evidence.sh	logs/run_all.log
+finalize_evidence	finalize_lgz_evidence.sh	logs/run_all.log
 package_full	package_full_zip.sh	logs/run_all.log
 package_light	package_light_zip.sh	logs/run_all.log
 EOF
@@ -637,6 +637,10 @@ test_custom_output_root() {
     --ref ref "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
+    --lgz-execution-profile optimized \
+    --lgz-step3-mummer-scope gap-screen \
+    --lgz-qc-memory-gb 80 \
+    --lgz-kmer-size 21 \
     -o "$output_root" >"$prepare_log"
 
   grep -F 'Both archives contain top-level run01/{metadata,data,runs,report}' "$prepare_log" >/dev/null || {
@@ -666,17 +670,38 @@ test_custom_output_root() {
   assert_file "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_evidence_package.py"
   assert_file "${output_root}/.prepare_lib/contracts/grt_precomputed_v2.json"
-  assert_file "${output_root}/prepare_grt_inputs.sh"
-  assert_file "${output_root}/run_grt_step1.sh"
-  assert_file "${output_root}/run_grt_step2.sh"
-  assert_file "${output_root}/run_grt_step3.sh"
-  assert_file "${output_root}/run_grt_telomere_finalize.sh"
-  assert_file "${output_root}/finalize_grt_evidence.sh"
+  assert_file "${output_root}/prepare_lgz_inputs.sh"
+  assert_file "${output_root}/run_lgz_step1.sh"
+  assert_file "${output_root}/run_lgz_step2.sh"
+  assert_file "${output_root}/run_lgz_step3.sh"
+  assert_file "${output_root}/run_lgz_telomere_finalize.sh"
+  assert_file "${output_root}/finalize_lgz_evidence.sh"
+  for name in prepare_grt_inputs run_grt_step1 run_grt_step2 run_grt_step3 run_grt_telomere_finalize finalize_grt_evidence; do
+    assert_file "${output_root}/${name}.sh"
+    grep -F 'exec bash ' "${output_root}/${name}.sh" >/dev/null
+    bash -n "${output_root}/${name}.sh"
+  done
+  assert_file "${output_root}/.prepare_lib/tools/lgz_compat.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step2_engine.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step3_engine.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_step2.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_step3.py"
+
   assert_file "${output_root}/package_full_zip.sh"
   assert_file "${output_root}/package_light_zip.sh"
   assert_chr_partition_run_all_staging "${output_root}/run_all.sh" "$output_root" "ref"
   assert_package_metadata "${output_root}/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned"
   assert_tsv_has_self_alignment_flag "${output_root}/metadata/datasets.tsv" "true"
+  # Test legacy forwarding with a harmless spy, never by executing real analysis.
+  local alias_dir="${output_root}/alias forwarding"
+  mkdir -p "$alias_dir"
+  cp "${output_root}/run_grt_step3.sh" "${alias_dir}/run_grt_step3.sh"
+  cat > "${alias_dir}/run_lgz_step3.sh" <<'SPY'
+#!/usr/bin/env bash
+printf '%s\n' "$@"
+SPY
+  [[ "$(bash "${alias_dir}/run_grt_step3.sh" one "two words")" == $'one\ntwo words' ]]
+
 }
 
 test_removed_package_mode_flags_are_rejected() {
@@ -1046,13 +1071,13 @@ test_reads_lock_qc_recipe_and_generated_command() {
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_craq ""
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_qc_memory_gb 96
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_kmer_size 31
-  grep -F -- "--reads ${reads_a}" "${output_root}/prepare_grt_inputs.sh" >/dev/null
-  grep -F -- "--reads ${reads_b}" "${output_root}/prepare_grt_inputs.sh" >/dev/null
-  grep -F -- "--memory-gb 96 --kmer-size 31" "${output_root}/prepare_grt_inputs.sh" >/dev/null
+  grep -F -- "--reads ${reads_a}" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
+  grep -F -- "--reads ${reads_b}" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
+  grep -F -- "--memory-gb 96 --kmer-size 31" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
   grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh" \
-    "${output_root}/prepare_grt_inputs.sh" >/dev/null
-  ! grep -F -- "--reads-qc" "${output_root}/prepare_grt_inputs.sh" >/dev/null
-  ! grep -F -- "--craq" "${output_root}/prepare_grt_inputs.sh" >/dev/null
+    "${output_root}/prepare_lgz_inputs.sh" >/dev/null
+  ! grep -F -- "--reads-qc" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
+  ! grep -F -- "--craq" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
 
   local full_output_root="${TMP_DIR}/reads_full_gpm_server"
   PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
@@ -1065,7 +1090,7 @@ test_reads_lock_qc_recipe_and_generated_command() {
   assert_prepare_option "$full_output_root/metadata/prepare_options.tsv" grt_reads_qc_mode full
   assert_prepare_option "$full_output_root/metadata/prepare_options.tsv" grt_craq "${FAKE_BIN}/craq"
   grep -F -- "--reads-qc full --craq ${FAKE_BIN}/craq" \
-    "$full_output_root/prepare_grt_inputs.sh" >/dev/null
+    "$full_output_root/prepare_lgz_inputs.sh" >/dev/null
 }
 
 test_skip_self_omits_chr_local_self_runs() {

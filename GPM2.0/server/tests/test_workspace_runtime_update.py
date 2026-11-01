@@ -334,3 +334,113 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "backup integrity"):
             updater.rollback(backup)
         self.assertEqual(before, (self.snapshot(self.tools), self.snapshot(self.workspace)))
+
+
+class LgzRuntimeMigrationTests(unittest.TestCase):
+    """New source updates old embedded tools without rewriting generated commands."""
+
+    def setUp(self):
+        self.fixture = WorkspaceRuntimeUpdateTests()
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.source, self.tools, self.workspace = self.fixture.source, self.fixture.tools, self.fixture.workspace
+        for name in updater.LGZ_ENTRYPOINTS | {"tools/lgz_core/__init__.py", "tools/lgz_core/contract/schema.py"}:
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(("canonical or compatibility code: " + name).encode())
+            self.fixture.manifest[name] = {"sha256": updater.digest(path.read_bytes()), "mode": 0o644}
+        (self.source / "SOURCE.json").write_text(json.dumps({
+            "git_revision": self.fixture.REVISION, "files": self.fixture.manifest}))
+
+    def test_new_core_and_aliases_install_in_both_roots_and_rollback_removes_added_files(self):
+        before = [self.fixture.snapshot(root) for root in (self.tools, self.workspace)]
+        old_hashes = [updater.engine_hash(root / "tools") for root in (self.tools, self.workspace / ".prepare_lib")]
+        result = self.fixture.update()
+        for relative in updater.LGZ_ENTRYPOINTS | {"tools/lgz_core/__init__.py", "tools/lgz_core/contract/schema.py"}:
+            expected = (self.source / relative).read_bytes()
+            for root in (self.tools, self.workspace / ".prepare_lib"):
+                self.assertEqual((root / relative).read_bytes(), expected)
+        self.assertEqual(updater.engine_hash(self.source / "tools"), updater.engine_hash(self.workspace / ".prepare_lib/tools"))
+        updater.rollback(Path(result["backup"]))
+        self.assertEqual(before, [self.fixture.snapshot(root) for root in (self.tools, self.workspace)])
+        self.assertFalse((self.workspace / ".prepare_lib/tools/lgz_core/__init__.py").exists())
+        self.assertEqual(old_hashes, [updater.engine_hash(root / "tools")
+                                     for root in (self.tools, self.workspace / ".prepare_lib")])
+
+    def test_canonical_source_cannot_hide_new_namespace_by_stripping_manifest_entries(self):
+        metadata = json.loads((self.source / "SOURCE.json").read_text())
+        metadata["files"] = {name: record for name, record in metadata["files"].items()
+                             if not name.startswith("tools/lgz_")}
+        (self.source / "SOURCE.json").write_text(json.dumps(metadata))
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            self.fixture.update()
+
+    def test_missing_canonical_package_initializer_is_rejected(self):
+        metadata = json.loads((self.source / "SOURCE.json").read_text())
+        metadata["files"].pop("tools/lgz_core/__init__.py")
+        (self.source / "tools/lgz_core/__init__.py").unlink()
+        (self.source / "SOURCE.json").write_text(json.dumps(metadata))
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            self.fixture.update()
+
+    def test_active_recovery_receipts_and_python_dependencies_update_and_rollback_with_namespaces(self):
+        payload = {"tools/long_cigar_recovery/resume-base.json": b'{"new":"tool inventory"}\n',
+                   "tools/long_cigar_recovery/branch-runtime.json": b'{"new":"receipt"}\n',
+                   "tools/extra_runtime_dependency.py": b"new Python dependency\n"}
+        for name, data in payload.items():
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            self.fixture.manifest[name] = {"sha256": updater.digest(data), "mode": 0o644}
+            for target in (self.tools, self.workspace / ".prepare_lib"):
+                old = target / name
+                old.parent.mkdir(parents=True, exist_ok=True)
+                old.write_bytes(b"old receipt or dependency")
+        (self.source / "SOURCE.json").write_text(json.dumps({
+            "git_revision": self.fixture.REVISION, "files": self.fixture.manifest}))
+        before = [self.fixture.snapshot(root) for root in (self.tools, self.workspace)]
+        result = self.fixture.update()
+        for name, data in payload.items():
+            for target in (self.tools, self.workspace / ".prepare_lib"):
+                self.assertEqual((target / name).read_bytes(), data)
+        updater.rollback(Path(result["backup"]))
+        self.assertEqual(before, [self.fixture.snapshot(root) for root in (self.tools, self.workspace)])
+
+    def test_unrecognized_recovery_runtime_file_prevents_partial_migration(self):
+        name = "tools/long_cigar_recovery/branch-runtime.json"
+        path = self.source / name
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"new receipt")
+        self.fixture.manifest[name] = {"sha256": updater.digest(path.read_bytes()), "mode": 0o644}
+        (self.source / "SOURCE.json").write_text(json.dumps({
+            "git_revision": self.fixture.REVISION, "files": self.fixture.manifest}))
+        path = self.workspace / ".prepare_lib/tools/long_cigar_recovery/custom.py"
+        path.parent.mkdir(parents=True)
+        path.write_text("custom")
+        before = self.fixture.snapshot(self.workspace)
+        with self.assertRaisesRegex(ValueError, "unexpected recovery runtime"):
+            self.fixture.update()
+        self.assertEqual(self.fixture.snapshot(self.workspace), before)
+
+    def test_unmanifested_canonical_source_module_is_rejected(self):
+        (self.source / "tools/lgz_core/unknown.py").write_text("unknown")
+        with self.assertRaisesRegex(ValueError, "unmanifested"):
+            self.fixture.update()
+
+    def test_unmanifested_canonical_target_module_is_rejected(self):
+        for root in (self.tools, self.workspace / ".prepare_lib"):
+            path = root / "tools/lgz_core/unknown.py"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("unknown")
+            with self.assertRaisesRegex(ValueError, "unexpected old core"):
+                self.fixture.update()
+            path.unlink()
+
+    def test_incomplete_canonical_source_is_rejected_before_writes(self):
+        metadata = json.loads((self.source / "SOURCE.json").read_text())
+        metadata["files"].pop("tools/lgz_step3.py")
+        (self.source / "SOURCE.json").write_text(json.dumps(metadata))
+        before = [self.fixture.snapshot(root) for root in (self.tools, self.workspace)]
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            self.fixture.update()
+        self.assertEqual(before, [self.fixture.snapshot(root) for root in (self.tools, self.workspace)])

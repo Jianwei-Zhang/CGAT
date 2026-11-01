@@ -4,6 +4,8 @@
 
 The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
 
+Server implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; output paths, data schemas and persisted stage IDs are unchanged. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](docs/lgz-server-implementation.md).
+
 GPM2.0 combines reference-anchored results from multiple de novo assemblies in one workflow for import, inspection, lightweight editing, and Final Path export.
 
 ## Architecture
@@ -126,8 +128,8 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--cen-min-len <bp>` | `10000` | Minimum centromere alignment length. |
 | `--cen-min-identity <pct>` | `80` | Minimum centromere alignment identity percentage. |
 | `--reads <fastq>` | Optional, repeatable | Enable shared Meryl data plus per-dataset Merqury QV assessment; the `--threads` budget is distributed across datasets. |
-| `--grt-qc-memory-gb <n>` | `80` | Memory limit for optional reads QC. |
-| `--grt-kmer-size <n>` | `21` | K-mer size for optional reads QC. |
+| `--lgz-qc-memory-gb <n>` | `80` | Memory limit for optional reads QC. |
+| `--lgz-kmer-size <n>` | `21` | K-mer size for optional reads QC. |
 | `--max-fill <bp>` | `1000000` | Length limit for both Step3 optimized refill rounds; can be changed on resume. |
 
 #### Aligner-specific options

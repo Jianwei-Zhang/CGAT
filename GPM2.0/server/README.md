@@ -4,6 +4,8 @@
 
 The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
 
+Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; output paths, data schemas and persisted stage IDs are unchanged. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md).
+
 ## Quick start
 
 On your Linux server, download the GPM Server tools (source package) from [Release v2.0.16](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.16), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
@@ -158,19 +160,19 @@ means “already latest”.
 
 ### Independent LGZ stage controls and execution profiles
 
-New workspaces generate separate `run_grt_step2.sh` and `run_grt_step3.sh` stage scripts with independent scheduler status and checkpoints. Run Step2 before Step3; Step3 validates that a compatible Step2 result is present before starting. Both stages share a content fingerprint covering the repair engines and shared modules—when any repair code changes, stage outputs are invalidated and regenerated from Step2 while compatible raw MUMmer alignment caches remain reusable.
+New workspaces generate separate `run_lgz_step2.sh` and `run_lgz_step3.sh` stage scripts with independent scheduler status and checkpoints. Run Step2 before Step3; Step3 validates that a compatible Step2 result is present before starting. Both stages share a content fingerprint covering the repair engines and shared modules—when any repair code changes, stage outputs are invalidated and regenerated from Step2 while compatible raw MUMmer alignment caches remain reusable.
 
 Newly prepared workflows enable the validated optimization route by default:
 
-- `--grt-execution-profile optimized`: uses a shared CPU/memory-bounded `nucmer` pool, largest-target-first scheduling, verified partition FASTA reuse, exact anchor indexes, and coordinate-parse cache reuse while preserving deterministic output and tie-breaking order.
+- `--lgz-execution-profile optimized`: uses a shared CPU/memory-bounded `nucmer` pool, largest-target-first scheduling, verified partition FASTA reuse, exact anchor indexes, and coordinate-parse cache reuse while preserving deterministic output and tie-breaking order.
 - Step2 always runs at **full scope**.
-- `--grt-step3-mummer-scope gap-screen`: screens donor partitions safely by anchor before running full-chromosome alignment on selected partitions.
+- `--lgz-step3-mummer-scope gap-screen`: screens donor partitions safely by anchor before running full-chromosome alignment on selected partitions.
 - Optimized Step3 refill batches same-round flank queries and reuses content-verified `.mmi` indexes.
 
 To fall back to the unscreened baseline profile when preparing a **new** workspace, pass:
 
 ```bash
---grt-execution-profile baseline --grt-step3-mummer-scope full
+--lgz-execution-profile baseline --lgz-step3-mummer-scope full
 ```
 
 New `run.sh` and generated `run_all.sh` launchers check for a code-only update before analysis and before acquiring the run lock. They reload code after updating, without user configuration. Before a network check, a stopped prepared runtime can also be aligned from the verified local installation, so older updaters that omitted nested modules do not require a second download on an offline compute node. If the check fails before any mutation, an integrity-verified installed runtime can still run offline; a write/rollback failure stops startup. Git/development packages and help-only calls do not contact the update service. An explicit `update.sh` also upgrades byte-recognized old `run_all.sh` launchers with a rollback backup; customized scripts are not overwritten.

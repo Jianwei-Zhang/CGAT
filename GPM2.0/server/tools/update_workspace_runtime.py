@@ -25,6 +25,36 @@ ENTRYPOINTS = {
     "tools/grt_evidence_package.py", "tools/grt_display_evidence.py",
     "tools/run_all_runner.py", "tools/run_progress.py", "tools/view_run_log.py",
 }
+LGZ_ENTRYPOINTS = {
+    "tools/grt_app_package.py",
+    "tools/grt_contract.py",
+    "tools/grt_display_evidence.py",
+    "tools/grt_evidence_package.py",
+    "tools/grt_prepare_inputs.py",
+    "tools/grt_step1.py",
+    "tools/grt_step2.py",
+    "tools/grt_step3.py",
+    "tools/grt_telomere_finalize.py",
+    "tools/lgz_app_package.py",
+    "tools/lgz_compat.py",
+    "tools/lgz_contract.py",
+    "tools/lgz_display_evidence.py",
+    "tools/lgz_evidence_package.py",
+    "tools/lgz_prepare_inputs.py",
+    "tools/lgz_step1.py",
+    "tools/lgz_step2.py",
+    "tools/lgz_step3.py",
+    "tools/lgz_telomere_finalize.py",
+    "tools/render_server_report.py",
+    "tools/run_outer_checkpoints.py",
+    "tools/run_orchestration.py",
+    "tools/server_report.py",
+    "tools/server_report_collect.py",
+    "tools/server_run.py",
+    "tools/update_server.py",
+    "tools/update_workspace_runtime.py",
+}
+
 BINDING = "skills/gpm-server/server-tools.path"
 
 
@@ -64,7 +94,11 @@ def write_atomic(path: Path, data: bytes, mode: int = 0o644) -> None:
 
 
 def engine_hash(tools: Path) -> str:
-    files = sorted((tools / "grt_core").rglob("*.py")) + [tools / "grt_step2.py", tools / "grt_step3.py"]
+    try:
+        from lgz_compat import engine_source_files
+    except ModuleNotFoundError:
+        from .lgz_compat import engine_source_files
+    files = engine_source_files(tools)
     payload = {str(path.relative_to(tools).as_posix()): digest(path.read_bytes()) for path in files}
     return digest(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())
 
@@ -84,15 +118,24 @@ def verified_source(root: Path, revision: str) -> dict[str, dict]:
         if mode not in (0o644, 0o755) or not path.is_file() or digest(path.read_bytes()) != record.get("sha256"):
             raise ValueError(f"source integrity check failed: {relative}")
         manifest[relative] = dict(record)
-    for relative in ENTRYPOINTS | {"run.sh", "prepare.sh", "install.sh", "tools/server_run.py"}:
+    canonical = (any(key.startswith("tools/lgz_") for key in manifest)
+                 or (root / "tools/lgz_core").exists()
+                 or any((root / "tools").glob("lgz_*.py")))
+    required = ENTRYPOINTS | {"run.sh", "prepare.sh", "install.sh", "tools/server_run.py"}
+    if canonical:
+        required |= LGZ_ENTRYPOINTS
+    for relative in required:
         if relative not in manifest:
             raise ValueError(f"source manifest is incomplete: {relative}")
-    expected_core = {key.removeprefix("tools/") for key in manifest
-                     if key.startswith("tools/grt_core/") and key.endswith(".py")}
-    actual_core = {path.relative_to(root / "tools").as_posix()
-                   for path in (root / "tools/grt_core").rglob("*.py")}
-    if not expected_core or expected_core != actual_core:
-        raise ValueError("source core contains missing or unmanifested modules")
+    for name in (("grt_core", "lgz_core") if canonical else ("grt_core",)):
+        if f"tools/{name}/__init__.py" not in manifest:
+            raise ValueError(f"source manifest is incomplete: tools/{name}/__init__.py")
+        expected_core = {key.removeprefix("tools/") for key in manifest
+                         if key.startswith(f"tools/{name}/") and key.endswith(".py")}
+        actual_core = {path.relative_to(root / "tools").as_posix()
+                       for path in (root / "tools" / name).rglob("*.py")}
+        if not expected_core or expected_core != actual_core:
+            raise ValueError(f"source core contains missing or unmanifested modules: {name}")
     manifest["SOURCE.json"] = {"sha256": digest(source.read_bytes()), "mode": 0o644}
     return manifest
 
@@ -135,7 +178,10 @@ def check_direct_processes(workspace: Path, tools_root: Path) -> None:
     prefixes = (str(workspace / ".prepare_lib") + "/", str(tools_root) + "/")
     scripts = {str(workspace / name) for name in
                ("run_all.sh", "run_grt_step2.sh", "run_grt_step3.sh",
-                "run_grt_telomere_finalize.sh", "finalize_grt_evidence.sh")}
+                "run_grt_telomere_finalize.sh", "finalize_grt_evidence.sh",
+                "prepare_grt_inputs.sh", "prepare_lgz_inputs.sh", "run_lgz_step1.sh",
+                "run_lgz_step2.sh", "run_lgz_step3.sh", "run_lgz_telomere_finalize.sh",
+                "finalize_lgz_evidence.sh")}
     for process in proc.iterdir():
         if not process.name.isdigit() or int(process.name) == os.getpid():
             continue
@@ -209,14 +255,26 @@ def update(source: Path, workspace: Path, tools_root: Path, revision: str, *, ap
     manifest = verified_source(source, revision)
     validate_targets(workspace, tools_root, source)
     runtime = workspace / ".prepare_lib"
+    canonical = "tools/lgz_core/__init__.py" in manifest
     selected = {relative: record for relative, record in manifest.items()
-                if relative == "SOURCE.json" or relative in ENTRYPOINTS
-                or relative.startswith("tools/grt_core/")}
+                if relative == "SOURCE.json" or relative in ENTRYPOINTS | LGZ_ENTRYPOINTS
+                or relative.startswith(("tools/grt_core/", "tools/lgz_core/"))
+                or canonical and relative.startswith("tools/") and (
+                    len(PurePosixPath(relative).parts) == 2 and relative.endswith(".py")
+                    or relative.startswith("tools/long_cigar_recovery/"))}
     # Old untracked Python modules would contaminate the content fingerprint.
     for target in (tools_root / "tools", runtime / "tools"):
-        extra = {p.relative_to(target.parent).as_posix() for p in (target / "grt_core").rglob("*.py")} - set(selected)
+        extra = {p.relative_to(target.parent).as_posix()
+                 for name in ("grt_core", "lgz_core")
+                 for p in (target / name).rglob("*.py")} - set(selected)
         if extra:
             raise ValueError(f"unexpected old core modules; inspect before updating: {sorted(extra)}")
+        if canonical and any(name.startswith("tools/long_cigar_recovery/") for name in selected):
+            extra_runtime = {p.relative_to(target.parent).as_posix()
+                             for p in (target / "long_cigar_recovery").rglob("*")
+                             if p.is_file() and "__pycache__" not in p.parts} - set(selected)
+            if extra_runtime:
+                raise ValueError(f"unexpected recovery runtime files; inspect before updating: {sorted(extra_runtime)}")
     plan = []
     preserved = []
     for kind, root, files in (("tools", tools_root, manifest), ("runtime", runtime, selected)):

@@ -70,7 +70,7 @@ fi
 EOF
 chmod +x "${FAKE_BIN}/zip"
 
-cat > "${SERVER_DIR}/.prepare_lib/tools/grt_contract.py" <<'PY'
+cat > "${SERVER_DIR}/.prepare_lib/tools/lgz_contract.py" <<'PY'
 import os
 import sys
 
@@ -79,7 +79,7 @@ if os.environ.get("FAKE_CONTRACT_FAIL") == "true":
 sys.stdout.write('{"valid":true}\n')
 PY
 
-cat > "${SERVER_DIR}/.prepare_lib/tools/grt_app_package.py" <<'PY'
+cat > "${SERVER_DIR}/.prepare_lib/tools/lgz_app_package.py" <<'PY'
 import argparse
 import shutil
 from pathlib import Path

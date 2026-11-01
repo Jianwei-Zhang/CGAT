@@ -1,9 +1,7 @@
-"""Shared LGZ domain, I/O, path, alignment, replay, and checkpoint services."""
+"""Compatibility forwarding module; the implementation lives under LGZ."""
+try:
+    from lgz_compat import forward_module as _forward_module
+except ModuleNotFoundError:
+    from ..lgz_compat import forward_module as _forward_module
 
-from .common import *
-from .stage_schema import *
-from .stage_io import *
-from .stage_alignment import *
-from .stage_replay import *
-from .stage_cache import *
-from .stage_metadata import *
+_forward_module(__name__, __package__, globals())

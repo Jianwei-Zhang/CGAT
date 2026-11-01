@@ -1,6 +1,6 @@
 # LGZ naming contract / LGZ 命名约定
 
-Confirmed on 2026-10-30.
+Confirmed on 2026-10-30. Server implementation naming approved on 2026-11-01; see [the implementation/compatibility contract](lgz-server-implementation.md).
 
 ## English
 
@@ -9,7 +9,7 @@ Confirmed on 2026-10-30.
 - Use the abbreviation in compact labels, headings, notices, trace/source labels, CLI output and explanatory prose after its first definition.
 - Use the full name in App-owned algorithm explanations and hover tooltips, including the result switch, baseline restoration, read-only anchor explanation, result intervals, junctions and alignment evidence.
 - Define the full name at first introduction in the bilingual project/Server READMEs, website overview and glossary.
-- This is a naming change, not an algorithm, schema or project migration. Keep existing `grt_*`/`Grt*` identifiers, CLI flags, database fields, tool filenames, package paths and machine-facing stage IDs compatible. The progress, cache-hit and report readers accept both the previous and current log prefixes.
+- This is a naming change, not an algorithm, schema or project migration. Keep existing `grt_*`/`Grt*` serialized identifiers, database fields, package paths and machine-facing stage IDs compatible. Server implementation names can use LGZ, with old CLI flags, tool filenames, Python symbols and import paths retained through compatibility forwarding. The progress, cache-hit and report readers accept both the previous and current log prefixes.
 - Preserve historical Release Notes, archived changes, benchmark/validation evidence and provenance paths verbatim. They are historical records, not current product labels.
 - The website source under `docs/en`, `docs/zh` and `docs/.vitepress` is intentionally local and Git-ignored. Synchronizing its text does not publish the website or place that source under version control.
 - This source change does not replace published App installers or authorize release-asset replacement or formal-site deployment.
@@ -28,7 +28,7 @@ Confirmed on 2026-10-30.
 - 紧凑标签、标题、通知、追溯来源标签、命令行输出及首次定义后的说明文字使用缩写。
 - App 中算法说明类悬浮提示使用全称，包括结果开关、预计算路径恢复、只读锚点说明、结果区间、连接与比对证据。
 - 中英文项目/服务端 README、文档站概述与术语表在首次介绍时给出全称。
-- 本次仅改名，不改变算法或执行项目迁移；保留既有 `grt_*`/`Grt*` 标识符、命令行选项、数据库字段、工具文件名、交付包路径及机器阶段 ID。进度、缓存命中与报告读取入口同时兼容新旧日志前缀。
+- 本次仅改名，不改变算法或执行项目迁移；保留既有 `grt_*`/`Grt*` 序列化标识符、数据库字段、交付包路径及机器阶段 ID；Server 实现名称使用 LGZ，并通过兼容转发保留旧命令行选项、工具文件名、Python 符号和导入路径。进度、缓存命中与报告读取入口同时兼容新旧日志前缀。
 - 历史发布说明、已归档变更、基准/验证证据与来源路径原样保留，不作为现行产品文案。
 - 文档站 `docs/en`、`docs/zh`、`docs/.vitepress` 源文件按仓库现有规则仅存本地且被 Git 忽略；同步文案不等于上线或纳入版本控制。
 - 本次源码提交不替换已发布 App 安装包，也不授权替换 Release 附件或部署正式站。

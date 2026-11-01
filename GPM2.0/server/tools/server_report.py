@@ -17,7 +17,7 @@ from collections import deque
 from pathlib import Path
 
 from server_report_collect import (
-    capture_final, collect_grt_result, collect_unit, final_summary, inputs,
+    capture_final, collect_lgz_result, collect_unit, final_summary, inputs,
 )
 from server_report_io import SCHEMA, digest, local_path, now, read_json, write_json
 from render_server_report import project_report_facts, render
@@ -62,7 +62,7 @@ def step_record(run_id: str, unit_id: str, **values) -> dict:
             "title": title(unit_id), "recorded_at": now(), **values}
 
 
-def record_grt_result(root: Path, result: dict) -> None:
+def record_lgz_result(root: Path, result: dict) -> None:
     """Called at publication, before later stages can reconcile these events."""
     run_id = os.environ.get("GPM_REPORT_RUN_ID")
     unit_id = os.environ.get("GPM_REPORT_UNIT_ID")
@@ -77,7 +77,7 @@ def record_grt_result(root: Path, result: dict) -> None:
         return  # First publication is immutable, including during republishing.
     write_json(path, step_record(run_id, result["stage"], parent_unit=unit_id,
                                status="success", execution="see_parent_unit",
-                               facts=project_report_facts(collect_grt_result(root, result))))
+                               facts=project_report_facts(collect_lgz_result(root, result))))
 
 
 class ReportSession:
@@ -487,6 +487,10 @@ def main():
             root, [(delivery_path(root, args.kind), delivery_staging_path(root, args.kind))]
         )
 
+
+
+# Compatibility aliases for existing Python consumers.
+record_grt_result = record_lgz_result
 
 if __name__ == "__main__":
     main()

@@ -45,7 +45,7 @@ STATUS_FIELDS = [
     "exit_code",
     "detail_log_relpath",
 ]
-GRT_CACHE_MARKERS = {
+LGZ_CACHE_MARKERS = {
     "grt_prepare": ("LGZ prepare inputs are current:",),
     "grt_step1": (
         "LGZ step1_round1 cache hit:",
@@ -355,7 +355,7 @@ class Runner:
             self.report.child_output(line, unit.unit_id)
         # Old embedded workspace tools can still emit the former public name.
         cache_line = "LGZ " + line[4:] if line.startswith("GRT ") else line
-        for marker in GRT_CACHE_MARKERS.get(unit.unit_id, ()):
+        for marker in LGZ_CACHE_MARKERS.get(unit.unit_id, ()):
             if cache_line.startswith(marker):
                 self.child_cache_markers.add(marker)
         rendered = f"{timestamp()} [run={self.run_id}] [CHILD] [{unit.unit_id}] {line}"
@@ -493,8 +493,8 @@ class Runner:
         return next(row for row in self.status_rows if row["unit_id"] == unit.unit_id)
 
     def _terminal_validation(self, unit_id: str) -> tuple[bool, str]:
-        if unit_id in GRT_CACHE_MARKERS:
-            return self.outer_checkpoints.validate_grt_unit(unit_id)
+        if unit_id in LGZ_CACHE_MARKERS:
+            return self.outer_checkpoints.validate_lgz_unit(unit_id)
         if unit_id == "finalize_evidence":
             return self.outer_checkpoints.validate_evidence()
         if unit_id == "package_full":
@@ -795,7 +795,7 @@ class Runner:
                             f"rerun='bash {self.server_dir / 'run_all.sh'}'",
                         )
                         return 2
-                    cache_markers = GRT_CACHE_MARKERS.get(unit.unit_id, ())
+                    cache_markers = LGZ_CACHE_MARKERS.get(unit.unit_id, ())
                     if cache_markers and self.child_cache_markers == set(cache_markers):
                         self._event("CACHE_HIT", unit, f"elapsed={elapsed:.3f}s {reason}")
                     if prepared is not None:
@@ -899,6 +899,10 @@ def main() -> int:
     finally:
         lock.release()
 
+
+
+# Compatibility constants; persisted values remain unchanged.
+GRT_CACHE_MARKERS = LGZ_CACHE_MARKERS
 
 if __name__ == "__main__":
     raise SystemExit(main())

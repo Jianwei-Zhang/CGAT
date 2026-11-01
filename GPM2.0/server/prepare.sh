@@ -24,19 +24,19 @@ CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT="60"
 CEN_SRC=""
 CEN_MIN_LEN="10000"
 CEN_MIN_IDENTITY="80"
-GRT_MERYL="meryl"
-GRT_MERQURY="merqury.sh"
-GRT_CRAQ=""
-GRT_READS_QC_MODE="standard"
-GRT_MINIMAP2="minimap2"
-GRT_NUCMER="nucmer"
-GRT_DELTA_FILTER="delta-filter"
-GRT_SHOW_COORDS="show-coords"
-GRT_QC_MEMORY_GB="80"
-GRT_KMER_SIZE="21"
-GRT_REFILL_MAX_LENGTH="1000000"
-GRT_EXECUTION_PROFILE="optimized"
-GRT_STEP3_MUMMER_SCOPE="gap-screen"
+LGZ_MERYL="meryl"
+LGZ_MERQURY="merqury.sh"
+LGZ_CRAQ=""
+LGZ_READS_QC_MODE="standard"
+LGZ_MINIMAP2="minimap2"
+LGZ_NUCMER="nucmer"
+LGZ_DELTA_FILTER="delta-filter"
+LGZ_SHOW_COORDS="show-coords"
+LGZ_QC_MEMORY_GB="80"
+LGZ_KMER_SIZE="21"
+LGZ_REFILL_MAX_LENGTH="1000000"
+LGZ_EXECUTION_PROFILE="optimized"
+LGZ_STEP3_MUMMER_SCOPE="gap-screen"
 
 usage() {
   cat <<'EOF'
@@ -55,11 +55,11 @@ Usage:
     [--cen-min-len <min_alignment_bp>] \
     [--cen-min-identity <min_identity_percent>] \
     [--reads <reads_fastq_path> ...] \
-    [--grt-qc-memory-gb <memory_gb>] \
-    [--grt-kmer-size <kmer_size>] \
+    [--lgz-qc-memory-gb <memory_gb>] \
+    [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
-    [--grt-execution-profile optimized|baseline] \
-    [--grt-step3-mummer-scope gap-screen|full] \
+    [--lgz-execution-profile optimized|baseline] \
+    [--lgz-step3-mummer-scope gap-screen|full] \
     [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
 Example:
@@ -85,9 +85,10 @@ Behavior:
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
   - The first --ds is the locked LGZ primary dataset; later initial --ds inputs are support datasets
   - --max-fill sets the Step3 optimized refill length limit in bp, default: 1000000
+  - Legacy --grt-* options remain accepted aliases for --lgz-* options
   - LGZ defaults: optimized execution, full Step2, anchor-safe gap-screen Step3
-  - --grt-execution-profile baseline restores legacy scheduling and per-chromosome refill
-  - --grt-step3-mummer-scope full restores the complete Step3 MUMmer alignment scope
+  - --lgz-execution-profile baseline restores legacy scheduling and per-chromosome refill
+  - --lgz-step3-mummer-scope full restores the complete Step3 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
   - Repeatable --reads enables one shared Meryl database plus parallel Merqury QV for every initial dataset
   - The --threads budget is divided across concurrent reads-QC dataset jobs
@@ -312,8 +313,8 @@ write_prepare_lib() {
 
   [[ -d "$lib_src" ]] || die "Missing server library directory: $lib_src"
   [[ -d "$tools_src" ]] || die "Missing server tools directory: $tools_src"
-  [[ -d "$tools_src/grt_core" ]] || die "Missing LGZ core package: $tools_src/grt_core"
-  [[ -f "$tools_src/grt_app_package.py" ]] || die "Missing App delivery package builder: $tools_src/grt_app_package.py"
+  [[ -d "$tools_src/lgz_core" ]] || die "Missing LGZ core package: $tools_src/lgz_core"
+  [[ -f "$tools_src/lgz_app_package.py" ]] || die "Missing App delivery package builder: $tools_src/lgz_app_package.py"
   [[ -d "$contracts_src" ]] || die "Missing server contracts directory: $contracts_src"
   rm -rf "$lib_dst"
   rm -rf "$tools_dst"
@@ -324,8 +325,9 @@ write_prepare_lib() {
   cp -R "$lib_src" "$lib_dst"
   cp -f "$tools_src"/*.py "$tools_dst"/
   cp -R "$tools_src/grt_core" "$tools_dst/grt_core"
+  cp -R "$tools_src/lgz_core" "$tools_dst/lgz_core"
   cp -R "$tools_src/long_cigar_recovery" "$tools_dst/long_cigar_recovery"
-  find "$tools_dst/grt_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
+  find "$tools_dst/grt_core" "$tools_dst/lgz_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
   cp -f "$contracts_src"/*.json "$contracts_dst"/
   # Record the actual installation, not a guessed default, for later updates.
   printf '%s\n' "$SCRIPT_DIR" > "${work_root}/.prepare_lib/server-tools.path"
@@ -437,16 +439,16 @@ write_prepare_options_metadata() {
     printf 'grt_workflow\t%s\n' "gpm_grt_precomputed_v2"
     printf 'grt_primary_dataset\t%s\n' "${DATASET_NAMES[0]}"
     printf 'grt_reads_qc_enabled\t%s\n' "$reads_qc_enabled"
-    printf 'grt_reads_qc_mode\t%s\n' "$GRT_READS_QC_MODE"
-    printf 'grt_meryl\t%s\n' "$GRT_MERYL"
-    printf 'grt_merqury\t%s\n' "$GRT_MERQURY"
-    printf 'grt_craq\t%s\n' "$GRT_CRAQ"
-    printf 'grt_refill_max_length\t%s\n' "$GRT_REFILL_MAX_LENGTH"
-    printf 'grt_execution_profile\t%s\n' "$GRT_EXECUTION_PROFILE"
+    printf 'grt_reads_qc_mode\t%s\n' "$LGZ_READS_QC_MODE"
+    printf 'grt_meryl\t%s\n' "$LGZ_MERYL"
+    printf 'grt_merqury\t%s\n' "$LGZ_MERQURY"
+    printf 'grt_craq\t%s\n' "$LGZ_CRAQ"
+    printf 'grt_refill_max_length\t%s\n' "$LGZ_REFILL_MAX_LENGTH"
+    printf 'grt_execution_profile\t%s\n' "$LGZ_EXECUTION_PROFILE"
     printf 'grt_step2_mummer_scope\tfull\n'
-    printf 'grt_step3_mummer_scope\t%s\n' "$GRT_STEP3_MUMMER_SCOPE"
-    printf 'grt_qc_memory_gb\t%s\n' "$GRT_QC_MEMORY_GB"
-    printf 'grt_kmer_size\t%s\n' "$GRT_KMER_SIZE"
+    printf 'grt_step3_mummer_scope\t%s\n' "$LGZ_STEP3_MUMMER_SCOPE"
+    printf 'grt_qc_memory_gb\t%s\n' "$LGZ_QC_MEMORY_GB"
+    printf 'grt_kmer_size\t%s\n' "$LGZ_KMER_SIZE"
   } > "$output_path"
 }
 
@@ -524,7 +526,7 @@ write_assignment_script() {
   make_executable_if_supported "$output_path"
 }
 
-write_grt_prepare_script() {
+write_lgz_prepare_script() {
   local output_path="$1"
   local work_root="$2"
   shift 2
@@ -533,15 +535,15 @@ write_grt_prepare_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --memory-gb %s --kmer-size %s --meryl %s --merqury %s' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_prepare_inputs.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_prepare_inputs.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
-      "$(shell_quote "$GRT_QC_MEMORY_GB")" \
-      "$(shell_quote "$GRT_KMER_SIZE")" \
-      "$(shell_quote "$GRT_MERYL")" \
-      "$(shell_quote "$GRT_MERQURY")"
-    if [[ "$GRT_READS_QC_MODE" == "full" ]]; then
-      printf ' --reads-qc full --craq %s' "$(shell_quote "$GRT_CRAQ")"
+      "$(shell_quote "$LGZ_QC_MEMORY_GB")" \
+      "$(shell_quote "$LGZ_KMER_SIZE")" \
+      "$(shell_quote "$LGZ_MERYL")" \
+      "$(shell_quote "$LGZ_MERQURY")"
+    if [[ "$LGZ_READS_QC_MODE" == "full" ]]; then
+      printf ' --reads-qc full --craq %s' "$(shell_quote "$LGZ_CRAQ")"
     fi
     while [[ $# -gt 0 ]]; do
       printf ' --reads %s' "$(shell_quote "$1")"
@@ -552,7 +554,7 @@ write_grt_prepare_script() {
   make_executable_if_supported "$output_path"
 }
 
-write_grt_step1_script() {
+write_lgz_step1_script() {
   local output_path="$1"
   local work_root="$2"
 
@@ -560,15 +562,15 @@ write_grt_step1_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step1.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step1.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
-      "$(shell_quote "$GRT_MINIMAP2")"
+      "$(shell_quote "$LGZ_MINIMAP2")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
 
-write_grt_step2_script() {
+write_lgz_step2_script() {
   local output_path="$1"
   local work_root="$2"
 
@@ -576,19 +578,19 @@ write_grt_step2_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --execution-profile %s --step2-mummer-scope full\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step2.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step2.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
-      "$(shell_quote "$GRT_MINIMAP2")" \
-      "$(shell_quote "$GRT_NUCMER")" \
-      "$(shell_quote "$GRT_DELTA_FILTER")" \
-      "$(shell_quote "$GRT_SHOW_COORDS")" \
-      "$(shell_quote "$GRT_EXECUTION_PROFILE")"
+      "$(shell_quote "$LGZ_MINIMAP2")" \
+      "$(shell_quote "$LGZ_NUCMER")" \
+      "$(shell_quote "$LGZ_DELTA_FILTER")" \
+      "$(shell_quote "$LGZ_SHOW_COORDS")" \
+      "$(shell_quote "$LGZ_EXECUTION_PROFILE")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
 
-write_grt_step3_script() {
+write_lgz_step3_script() {
   local output_path="$1"
   local work_root="$2"
 
@@ -596,21 +598,21 @@ write_grt_step3_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s --execution-profile %s --step3-mummer-scope %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step3.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step3.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
-      "$(shell_quote "$GRT_MINIMAP2")" \
-      "$(shell_quote "$GRT_NUCMER")" \
-      "$(shell_quote "$GRT_DELTA_FILTER")" \
-      "$(shell_quote "$GRT_SHOW_COORDS")" \
-      "$(shell_quote "$GRT_REFILL_MAX_LENGTH")" \
-      "$(shell_quote "$GRT_EXECUTION_PROFILE")" \
-      "$(shell_quote "$GRT_STEP3_MUMMER_SCOPE")"
+      "$(shell_quote "$LGZ_MINIMAP2")" \
+      "$(shell_quote "$LGZ_NUCMER")" \
+      "$(shell_quote "$LGZ_DELTA_FILTER")" \
+      "$(shell_quote "$LGZ_SHOW_COORDS")" \
+      "$(shell_quote "$LGZ_REFILL_MAX_LENGTH")" \
+      "$(shell_quote "$LGZ_EXECUTION_PROFILE")" \
+      "$(shell_quote "$LGZ_STEP3_MUMMER_SCOPE")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
 
-write_grt_telomere_finalize_script() {
+write_lgz_telomere_finalize_script() {
   local output_path="$1"
   local work_root="$2"
 
@@ -618,18 +620,18 @@ write_grt_telomere_finalize_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_telomere_finalize.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_telomere_finalize.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
-      "$(shell_quote "$GRT_MINIMAP2")" \
-      "$(shell_quote "$GRT_NUCMER")" \
-      "$(shell_quote "$GRT_DELTA_FILTER")" \
-      "$(shell_quote "$GRT_SHOW_COORDS")"
+      "$(shell_quote "$LGZ_MINIMAP2")" \
+      "$(shell_quote "$LGZ_NUCMER")" \
+      "$(shell_quote "$LGZ_DELTA_FILTER")" \
+      "$(shell_quote "$LGZ_SHOW_COORDS")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
 
-write_grt_evidence_package_script() {
+write_lgz_evidence_package_script() {
   local output_path="$1"
   local work_root="$2"
 
@@ -637,10 +639,10 @@ write_grt_evidence_package_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_evidence_package.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_evidence_package.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
-      "$(shell_quote "$GRT_MINIMAP2")"
+      "$(shell_quote "$LGZ_MINIMAP2")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
@@ -803,20 +805,20 @@ while [[ $# -gt 0 ]]; do
       SELF_MINIMIZERS="$2"
       shift 2
       ;;
-    --grt-execution-profile)
+    --lgz-execution-profile|--grt-execution-profile)
       [[ $# -ge 2 ]] || die "$1 requires optimized or baseline"
-      case "$2" in optimized|baseline) GRT_EXECUTION_PROFILE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
+      case "$2" in optimized|baseline) LGZ_EXECUTION_PROFILE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
-    --grt-step3-mummer-scope)
+    --lgz-step3-mummer-scope|--grt-step3-mummer-scope)
       [[ $# -ge 2 ]] || die "$1 requires gap-screen or full"
-      case "$2" in gap-screen|full) GRT_STEP3_MUMMER_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
+      case "$2" in gap-screen|full) LGZ_STEP3_MUMMER_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
     --max-fill|-m)
       [[ $# -ge 2 ]] || die "--max-fill requires <bp>"
       [[ "$2" =~ ^[1-9][0-9]*$ ]] || die "Invalid --max-fill '$2'. Use a positive integer."
-      GRT_REFILL_MAX_LENGTH="$2"
+      LGZ_REFILL_MAX_LENGTH="$2"
       shift 2
       ;;
     --threads|-t)
@@ -858,19 +860,19 @@ while [[ $# -gt 0 ]]; do
     --reads-qc)
       [[ $# -ge 2 ]] || die "--reads-qc requires full"
       [[ "$2" == "full" ]] || die "Invalid --reads-qc value '$2'. Use full."
-      GRT_READS_QC_MODE="full"
+      LGZ_READS_QC_MODE="full"
       shift 2
       ;;
-    --grt-qc-memory-gb)
-      [[ $# -ge 2 ]] || die "--grt-qc-memory-gb requires <memory_gb>"
-      validate_positive_integer "--grt-qc-memory-gb" "$2"
-      GRT_QC_MEMORY_GB="$2"
+    --lgz-qc-memory-gb|--grt-qc-memory-gb)
+      [[ $# -ge 2 ]] || die "--lgz-qc-memory-gb requires <memory_gb>"
+      validate_positive_integer "--lgz-qc-memory-gb" "$2"
+      LGZ_QC_MEMORY_GB="$2"
       shift 2
       ;;
-    --grt-kmer-size)
-      [[ $# -ge 2 ]] || die "--grt-kmer-size requires <kmer_size>"
-      validate_positive_integer "--grt-kmer-size" "$2"
-      GRT_KMER_SIZE="$2"
+    --lgz-kmer-size|--grt-kmer-size)
+      [[ $# -ge 2 ]] || die "--lgz-kmer-size requires <kmer_size>"
+      validate_positive_integer "--lgz-kmer-size" "$2"
+      LGZ_KMER_SIZE="$2"
       shift 2
       ;;
     -h|--help)
@@ -885,7 +887,7 @@ done
 
 [[ -n "$REF_NAME" ]] || die "Missing --ref"
 [[ "${#DATASET_NAMES[@]}" -gt 0 ]] || die "At least one --ds is required"
-if [[ "$GRT_READS_QC_MODE" == "full" && "${#READS_SRCS[@]}" -eq 0 ]]; then
+if [[ "$LGZ_READS_QC_MODE" == "full" && "${#READS_SRCS[@]}" -eq 0 ]]; then
   die "--reads-qc full requires at least one --reads input"
 fi
 
@@ -894,18 +896,18 @@ require_cmd zip
 require_cmd gzip
 if [[ "$ARCHIVE_FORMAT" == "tar.gz" ]]; then require_cmd pigz; fi
 require_cmd python3
-GRT_MINIMAP2="$(resolve_required_command minimap2)"
-GRT_NUCMER="$(resolve_required_command nucmer)"
-GRT_DELTA_FILTER="$(resolve_required_command delta-filter)"
-GRT_SHOW_COORDS="$(resolve_required_command show-coords)"
+LGZ_MINIMAP2="$(resolve_required_command minimap2)"
+LGZ_NUCMER="$(resolve_required_command nucmer)"
+LGZ_DELTA_FILTER="$(resolve_required_command delta-filter)"
+LGZ_SHOW_COORDS="$(resolve_required_command show-coords)"
 validate_mummer4_capabilities \
-  "$GRT_NUCMER" "$GRT_DELTA_FILTER" "$GRT_SHOW_COORDS"
+  "$LGZ_NUCMER" "$LGZ_DELTA_FILTER" "$LGZ_SHOW_COORDS"
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  GRT_MERYL="$(resolve_required_command meryl)"
-  GRT_MERQURY="$(resolve_required_command merqury.sh)"
+  LGZ_MERYL="$(resolve_required_command meryl)"
+  LGZ_MERQURY="$(resolve_required_command merqury.sh)"
 fi
-if [[ "$GRT_READS_QC_MODE" == "full" ]]; then
-  GRT_CRAQ="$(resolve_required_command craq)"
+if [[ "$LGZ_READS_QC_MODE" == "full" ]]; then
+  LGZ_CRAQ="$(resolve_required_command craq)"
 fi
 require_cmd minimap2
 
@@ -1085,45 +1087,45 @@ printf 'bash %s\n\n' "${WORK_ROOT}/assign_chr_groups.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  write_grt_prepare_script "${WORK_ROOT}/prepare_grt_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
+  write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
 else
-  write_grt_prepare_script "${WORK_ROOT}/prepare_grt_inputs.sh" "$WORK_ROOT"
+  write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT"
 fi
-append_run_all_unit "grt_prepare" "prepare_grt_inputs.sh" "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_grt_inputs"
+append_run_all_unit "grt_prepare" "prepare_lgz_inputs.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_lgz_inputs"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/prepare_grt_inputs.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/prepare_lgz_inputs.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_grt_step1_script "${WORK_ROOT}/run_grt_step1.sh" "$WORK_ROOT"
-append_run_all_unit "grt_step1" "run_grt_step1.sh" "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step1"
+write_lgz_step1_script "${WORK_ROOT}/run_lgz_step1.sh" "$WORK_ROOT"
+append_run_all_unit "grt_step1" "run_lgz_step1.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step1"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step1.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step1.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_grt_step2_script "${WORK_ROOT}/run_grt_step2.sh" "$WORK_ROOT"
-append_run_all_unit "grt_step2" "run_grt_step2.sh" "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step2"
+write_lgz_step2_script "${WORK_ROOT}/run_lgz_step2.sh" "$WORK_ROOT"
+append_run_all_unit "grt_step2" "run_lgz_step2.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step2"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step2.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step2.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_grt_step3_script "${WORK_ROOT}/run_grt_step3.sh" "$WORK_ROOT"
-append_run_all_unit "grt_step3" "run_grt_step3.sh" "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step3"
+write_lgz_step3_script "${WORK_ROOT}/run_lgz_step3.sh" "$WORK_ROOT"
+append_run_all_unit "grt_step3" "run_lgz_step3.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step3"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step3.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step3.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_grt_telomere_finalize_script "${WORK_ROOT}/run_grt_telomere_finalize.sh" "$WORK_ROOT"
+write_lgz_telomere_finalize_script "${WORK_ROOT}/run_lgz_telomere_finalize.sh" "$WORK_ROOT"
 append_run_all_unit \
   "grt_telomere_finalize" \
-  "run_grt_telomere_finalize.sh" \
+  "run_lgz_telomere_finalize.sh" \
   "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_telomere_finalize"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_telomere_finalize"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_telomere_finalize.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_telomere_finalize.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
@@ -1140,11 +1142,11 @@ for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   COMMAND_INDEX=$((COMMAND_INDEX + 1))
 done
 
-write_grt_evidence_package_script "${WORK_ROOT}/finalize_grt_evidence.sh" "$WORK_ROOT"
-append_run_all_unit "finalize_evidence" "finalize_grt_evidence.sh" "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "finalize_grt_evidence"
+write_lgz_evidence_package_script "${WORK_ROOT}/finalize_lgz_evidence.sh" "$WORK_ROOT"
+append_run_all_unit "finalize_evidence" "finalize_lgz_evidence.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "finalize_lgz_evidence"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/finalize_grt_evidence.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/finalize_lgz_evidence.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 append_run_all_unit "package_full" "package_full_zip.sh" "logs/run_all.log"
@@ -1180,18 +1182,35 @@ if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
 fi
 echo "  - ${WORK_ROOT}/add_dataset.sh"
 echo "  - ${WORK_ROOT}/add_ctg.sh"
-echo "  - ${WORK_ROOT}/prepare_grt_inputs.sh"
-echo "  - ${WORK_ROOT}/run_grt_step1.sh"
-echo "  - ${WORK_ROOT}/run_grt_step2.sh"
-echo "  - ${WORK_ROOT}/run_grt_step3.sh"
-echo "  - ${WORK_ROOT}/run_grt_telomere_finalize.sh"
-echo "  - ${WORK_ROOT}/finalize_grt_evidence.sh"
+echo "  - ${WORK_ROOT}/prepare_lgz_inputs.sh"
+echo "  - ${WORK_ROOT}/run_lgz_step1.sh"
+echo "  - ${WORK_ROOT}/run_lgz_step2.sh"
+echo "  - ${WORK_ROOT}/run_lgz_step3.sh"
+echo "  - ${WORK_ROOT}/run_lgz_telomere_finalize.sh"
+echo "  - ${WORK_ROOT}/finalize_lgz_evidence.sh"
 echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
 echo "  - ${WORK_ROOT}/.prepare_lib/lib"
 echo "  - ${WORK_ROOT}/.prepare_lib/tools"
 echo "  - ${WORK_ROOT}/package_full_zip.sh"
 echo "  - ${WORK_ROOT}/package_light_zip.sh"
 echo
+# Compatibility entry points; the plan itself uses only canonical LGZ scripts.
+for pair in \
+  prepare_grt_inputs:prepare_lgz_inputs \
+  run_grt_step1:run_lgz_step1 \
+  run_grt_step2:run_lgz_step2 \
+  run_grt_step3:run_lgz_step3 \
+  run_grt_telomere_finalize:run_lgz_telomere_finalize \
+  finalize_grt_evidence:finalize_lgz_evidence; do
+  legacy="${pair%%:*}"
+  canonical="${pair#*:}"
+  {
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+    printf 'exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/%s.sh" "$@"\n' "$canonical"
+  } > "${WORK_ROOT}/${legacy}.sh"
+  make_executable_if_supported "${WORK_ROOT}/${legacy}.sh"
+done
+
 echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
 echo "     - This automatically creates both the full and light delivery archives"

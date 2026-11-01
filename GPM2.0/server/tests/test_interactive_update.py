@@ -149,6 +149,30 @@ class CoordinatedUpdateTests(unittest.TestCase):
     def plan(self, workspace=True):
         return update.prepare(self.source, self.tools, self.work if workspace else None, self.release)
 
+    def test_canonical_lgz_modules_and_legacy_aliases_update_and_rollback_together(self):
+        new_paths = update.core.LGZ_ENTRYPOINTS | {"tools/lgz_core/__init__.py", "tools/lgz_core/contract/schema.py"}
+        for name in new_paths:
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(("new implementation or shim: " + name).encode())
+        self.make_manifest(self.source, "b" * 40, "2026-11-01T00:00:00+00:00")
+        before = [self.snapshot(root) for root in (self.tools, self.work, self.skill)]
+        backup = update.apply(self.plan())
+        for name in new_paths:
+            expected = (self.source / name).read_bytes()
+            self.assertEqual((self.tools / name).read_bytes(), expected)
+            self.assertEqual((self.work / ".prepare_lib" / name).read_bytes(), expected)
+        self.assertEqual((self.work / "run_grt_step3.sh").read_bytes(), before[1]["run_grt_step3.sh"][0])
+        update.rollback(backup)
+        self.assertEqual(before, [self.snapshot(root) for root in (self.tools, self.work, self.skill)])
+
+    def test_unrecognized_lgz_runtime_module_prevents_full_update(self):
+        path = self.work / ".prepare_lib/tools/lgz_core/unknown.py"
+        path.parent.mkdir(parents=True)
+        path.write_text("unknown")
+        with self.assertRaisesRegex(ValueError, "Unrecognized old core"):
+            self.plan()
+
     def test_aligns_full_runtime_and_registered_skills_preserves_local_and_rolls_back(self):
         before = [self.snapshot(root) for root in (self.tools, self.work, self.skill)]
         plan = self.plan()

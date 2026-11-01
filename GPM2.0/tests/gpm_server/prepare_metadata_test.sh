@@ -160,7 +160,7 @@ assert_prepare_option "$metadata_path" cen_min_len 10000
 assert_prepare_option "$metadata_path" cen_min_identity 80
 assert_prepare_option "$metadata_path" grt_reads_qc_enabled false
 assert_prepare_option "$metadata_path" grt_reads_qc_mode standard
-! grep -F -- " --reads " "${output_root}/prepare_grt_inputs.sh" >/dev/null || {
+! grep -F -- " --reads " "${output_root}/prepare_lgz_inputs.sh" >/dev/null || {
   echo "no-reads prepare generated an unexpected --reads argument" >&2
   exit 1
 }
@@ -247,13 +247,13 @@ expected_plan="$(cat <<'EOF'
 unit_id	command_relpath	detail_log_relpath
 ref:ds_add	runs/ds_add_vs_ref/command.sh	runs/ds_add_vs_ref/stderr.log
 assign	assign_chr_groups.sh	logs/run_all.log
-grt_prepare	prepare_grt_inputs.sh	logs/run_all.log
-grt_step1	run_grt_step1.sh	logs/run_all.log
-grt_step2	run_grt_step2.sh	logs/run_all.log
-grt_step3	run_grt_step3.sh	logs/run_all.log
-grt_telomere_finalize	run_grt_telomere_finalize.sh	logs/run_all.log
+grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
+grt_step1	run_lgz_step1.sh	logs/run_all.log
+grt_step2	run_lgz_step2.sh	logs/run_all.log
+grt_step3	run_lgz_step3.sh	logs/run_all.log
+grt_telomere_finalize	run_lgz_telomere_finalize.sh	logs/run_all.log
 chr:Chr01	runs/chr_Chr01/command.sh	logs/run_all.log
-finalize_evidence	finalize_grt_evidence.sh	logs/run_all.log
+finalize_evidence	finalize_lgz_evidence.sh	logs/run_all.log
 package_full	package_full_zip.sh	logs/run_all.log
 package_light	package_light_zip.sh	logs/run_all.log
 EOF
@@ -324,9 +324,9 @@ python3 "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py" --help >/de
 python3 "${output_root}/.prepare_lib/tools/grt_evidence_package.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_contract.py" --help >/dev/null
 
-grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >/dev/null
+grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_lgz_step1.sh" >/dev/null
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
-  "${output_root}/run_grt_step2.sh" "${output_root}/run_grt_step3.sh" >/dev/null
+  "${output_root}/run_lgz_step2.sh" "${output_root}/run_lgz_step3.sh" >/dev/null
 
 no_chmod_bin="${TMP_DIR}/no-chmod-bin"
 no_chmod_log="${TMP_DIR}/no-chmod.log"
@@ -414,11 +414,11 @@ assert_prepare_option "$reads_metadata_path" grt_meryl "${FAKE_BIN}/meryl"
 assert_prepare_option "$reads_metadata_path" grt_merqury "${FAKE_BIN}/merqury.sh"
 assert_prepare_option "$reads_metadata_path" grt_craq ""
 grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh" \
-  "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
-! grep -F -- "--reads-qc" "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
-! grep -F -- "--craq" "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
-grep -F -- " --reads ${reads}" "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
-[[ "$(grep -oF -- " --reads " "${reads_output_root}/prepare_grt_inputs.sh" | wc -l)" -eq 1 ]] || {
+  "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+! grep -F -- "--reads-qc" "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+! grep -F -- "--craq" "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+grep -F -- " --reads ${reads}" "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+[[ "$(grep -oF -- " --reads " "${reads_output_root}/prepare_lgz_inputs.sh" | wc -l)" -eq 1 ]] || {
   echo "single-read prepare did not generate exactly one --reads argument" >&2
   exit 1
 }
@@ -437,8 +437,8 @@ assert_prepare_option \
   grt_reads_qc_enabled \
   true
 grep -F -- " --reads ${reads} --reads ${reads_second}" \
-  "${multiple_reads_output_root}/prepare_grt_inputs.sh" >/dev/null
-[[ "$(grep -oF -- " --reads " "${multiple_reads_output_root}/prepare_grt_inputs.sh" | wc -l)" -eq 2 ]] || {
+  "${multiple_reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+[[ "$(grep -oF -- " --reads " "${multiple_reads_output_root}/prepare_lgz_inputs.sh" | wc -l)" -eq 2 ]] || {
   echo "multiple-read prepare did not generate exactly two --reads arguments" >&2
   exit 1
 }
@@ -597,8 +597,8 @@ assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.ts
 assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_execution_profile optimized
 assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_step2_mummer_scope full
 assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_step3_mummer_scope gap-screen
-grep -F -- "--execution-profile optimized --step2-mummer-scope full" "${TMP_DIR}/default-tar-output/run_grt_step2.sh" >/dev/null
-grep -F -- "--execution-profile optimized --step3-mummer-scope gap-screen" "${TMP_DIR}/default-tar-output/run_grt_step3.sh" >/dev/null
+grep -F -- "--execution-profile optimized --step2-mummer-scope full" "${TMP_DIR}/default-tar-output/run_lgz_step2.sh" >/dev/null
+grep -F -- "--execution-profile optimized --step3-mummer-scope gap-screen" "${TMP_DIR}/default-tar-output/run_lgz_step3.sh" >/dev/null
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   --ref refill_ref "$ref" --ds refill_ds "$ds" --max-fill 2000000 \
   --grt-execution-profile baseline --grt-step3-mummer-scope full \
@@ -606,8 +606,8 @@ PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
 assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_refill_max_length 2000000
 assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_execution_profile baseline
 assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_step3_mummer_scope full
-grep -F -- "--execution-profile baseline --step3-mummer-scope full" "${TMP_DIR}/refill-output/run_grt_step3.sh" >/dev/null
-grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/run_grt_step3.sh" >/dev/null
+grep -F -- "--execution-profile baseline --step3-mummer-scope full" "${TMP_DIR}/refill-output/run_lgz_step3.sh" >/dev/null
+grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/run_lgz_step3.sh" >/dev/null
 for invalid_limit in 0 -1 1.5 nope; do
   if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --max-fill "$invalid_limit" >/dev/null 2>&1; then
     echo "expected invalid refill limit to fail: $invalid_limit" >&2

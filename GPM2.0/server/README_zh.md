@@ -4,6 +4,8 @@
 
 自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
 
+Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，产物路径、数据协议与持久化阶段 ID 不变。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md)。
+
 ## 快速开始
 
 在 Linux 服务端依次执行以下命令：从 [Release v2.0.16](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.16) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
@@ -144,19 +146,19 @@ bash ~/bin/GPM_Server/update.sh
 
 ### 独立 LGZ 阶段控制与执行配置
 
-新工作区生成独立的 `run_grt_step2.sh` 与 `run_grt_step3.sh` 阶段脚本，分别记录调度状态和 checkpoint。先运行 Step2，再运行 Step3；Step3 启动前会校验兼容的 Step2 结果。两个阶段共用覆盖修复引擎与公共模块的内容指纹：当修复代码更新时，阶段结果会自动从 Step2 重新生成，而输入与参数一致的 MUMmer 原始比对缓存仍可安全复用。
+新工作区生成独立的 `run_lgz_step2.sh` 与 `run_lgz_step3.sh` 阶段脚本，分别记录调度状态和 checkpoint。先运行 Step2，再运行 Step3；Step3 启动前会校验兼容的 Step2 结果。两个阶段共用覆盖修复引擎与公共模块的内容指纹：当修复代码更新时，阶段结果会自动从 Step2 重新生成，而输入与参数一致的 MUMmer 原始比对缓存仍可安全复用。
 
 新生成的正式工作流默认启用以下优化路线：
 
-- `--grt-execution-profile optimized`：启用跨染色体共享且受 CPU / 内存约束的 `nucmer` 池、大分区优先调度、分区 FASTA 复用、精确锚点索引与坐标解析缓存复用，并保持输出与平局选择顺序确定性。
+- `--lgz-execution-profile optimized`：启用跨染色体共享且受 CPU / 内存约束的 `nucmer` 池、大分区优先调度、分区 FASTA 复用、精确锚点索引与坐标解析缓存复用，并保持输出与平局选择顺序确定性。
 - Step2 始终使用 **full 全量范围**。
-- `--grt-step3-mummer-scope gap-screen`：使用锚点安全筛选，选中的原始供体分区仍与完整染色体比对。
+- `--lgz-step3-mummer-scope gap-screen`：使用锚点安全筛选，选中的原始供体分区仍与完整染色体比对。
 - optimized Step3 refill 会同轮合并侧翼查询，并复用经内容校验的 `.mmi` 索引。
 
 如需在**新建工作区**时回退为无筛选基线配置，可向 `run.sh` 或 `prepare.sh` 传入：
 
 ```bash
---grt-execution-profile baseline --grt-step3-mummer-scope full
+--lgz-execution-profile baseline --lgz-step3-mummer-scope full
 ```
 
 新 `run.sh` 和新生成的 `run_all.sh` 在分析与运行锁之前先检查更新，更新后重新加载代码，不需要用户配置。联网检查前也会从校验通过的本地安装同步已停止的工作区运行库；旧 updater 漏复制嵌套模块时，离线计算节点不必再下载一次。网络或更新检查在写入前失败时，可继续使用通过完整性校验的已安装运行库；写入或回滚失败则停止启动。Git/开发包及仅查看帮助时不联网更新。停止任务后显式执行 `update.sh` 可同步运行库，并备份后升级逐字节识别的旧 `run_all.sh`；自定义脚本不覆盖。

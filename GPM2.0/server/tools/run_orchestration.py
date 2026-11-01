@@ -41,11 +41,11 @@ LOG_EVENTS = (
 )
 
 ASSIGN_UNIT_ID = "assign"
-GRT_PREPARE_UNIT_ID = "grt_prepare"
-GRT_STEP1_UNIT_ID = "grt_step1"
-GRT_STEP2_UNIT_ID = "grt_step2"
-GRT_STEP3_UNIT_ID = "grt_step3"
-GRT_TELOMERE_FINALIZE_UNIT_ID = "grt_telomere_finalize"
+LGZ_PREPARE_UNIT_ID = "grt_prepare"
+LGZ_STEP1_UNIT_ID = "grt_step1"
+LGZ_STEP2_UNIT_ID = "grt_step2"
+LGZ_STEP3_UNIT_ID = "grt_step3"
+LGZ_TELOMERE_FINALIZE_UNIT_ID = "grt_telomere_finalize"
 FINALIZE_EVIDENCE_UNIT_ID = "finalize_evidence"
 PACKAGE_FULL_UNIT_ID = "package_full"
 PACKAGE_LIGHT_UNIT_ID = "package_light"
@@ -133,25 +133,25 @@ def build_unit_plan(
     items.extend(
         [
             UnitPlanItem(ASSIGN_UNIT_ID, reference_ids),
-            UnitPlanItem(GRT_PREPARE_UNIT_ID, (ASSIGN_UNIT_ID,)),
-            UnitPlanItem(GRT_STEP1_UNIT_ID, (GRT_PREPARE_UNIT_ID,)),
-            UnitPlanItem(GRT_STEP2_UNIT_ID, (GRT_STEP1_UNIT_ID,)),
-            UnitPlanItem(GRT_STEP3_UNIT_ID, (GRT_STEP2_UNIT_ID,)),
+            UnitPlanItem(LGZ_PREPARE_UNIT_ID, (ASSIGN_UNIT_ID,)),
+            UnitPlanItem(LGZ_STEP1_UNIT_ID, (LGZ_PREPARE_UNIT_ID,)),
+            UnitPlanItem(LGZ_STEP2_UNIT_ID, (LGZ_STEP1_UNIT_ID,)),
+            UnitPlanItem(LGZ_STEP3_UNIT_ID, (LGZ_STEP2_UNIT_ID,)),
             UnitPlanItem(
-                GRT_TELOMERE_FINALIZE_UNIT_ID,
-                (GRT_STEP3_UNIT_ID,),
+                LGZ_TELOMERE_FINALIZE_UNIT_ID,
+                (LGZ_STEP3_UNIT_ID,),
             ),
         ]
     )
     items.extend(
-        UnitPlanItem(unit_id, (GRT_TELOMERE_FINALIZE_UNIT_ID,))
+        UnitPlanItem(unit_id, (LGZ_TELOMERE_FINALIZE_UNIT_ID,))
         for unit_id in chromosome_ids
     )
     items.extend(
         [
             UnitPlanItem(
                 FINALIZE_EVIDENCE_UNIT_ID,
-                chromosome_ids or (GRT_TELOMERE_FINALIZE_UNIT_ID,),
+                chromosome_ids or (LGZ_TELOMERE_FINALIZE_UNIT_ID,),
             ),
             UnitPlanItem(PACKAGE_FULL_UNIT_ID, (FINALIZE_EVIDENCE_UNIT_ID,)),
             UnitPlanItem(PACKAGE_LIGHT_UNIT_ID, (PACKAGE_FULL_UNIT_ID,)),
@@ -289,3 +289,11 @@ def validate_paf(path: Path, *, require_cigar: bool = False) -> PafSummary:
     except (OSError, UnicodeError) as exc:
         raise OrchestrationContractError(f"cannot read PAF output {path}: {exc}") from exc
     return PafSummary(record_count=record_count)
+
+
+# Compatibility constants; persisted values remain unchanged.
+GRT_PREPARE_UNIT_ID = LGZ_PREPARE_UNIT_ID
+GRT_STEP1_UNIT_ID = LGZ_STEP1_UNIT_ID
+GRT_STEP2_UNIT_ID = LGZ_STEP2_UNIT_ID
+GRT_STEP3_UNIT_ID = LGZ_STEP3_UNIT_ID
+GRT_TELOMERE_FINALIZE_UNIT_ID = LGZ_TELOMERE_FINALIZE_UNIT_ID

@@ -81,6 +81,24 @@ class ServerRunTests(unittest.TestCase):
             server_run.update_fill_limit(root, "2000000")
             self.assertEqual(script.stat().st_mtime_ns, before)
 
+    def test_refill_limit_updates_canonical_or_forwarding_workspace(self):
+        for name in ("lgz", "grt"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                runtime = root / ".prepare_lib/tools"
+                runtime.mkdir(parents=True)
+                (runtime / "lgz_step3.py").write_text("# supports --max-fill\n")
+                if name == "grt":
+                    (runtime / "grt_step3.py").write_text("# compatibility forwarding module\n")
+                script = root / f"run_{name}_step3.sh"
+                script.write_text(f"#!/usr/bin/env bash\npython3 /runtime/{name}_step3.py --server-dir /workspace --max-fill 1000000\n")
+                before = script.read_text()
+                server_run.update_fill_limit(root, "2000000")
+                self.assertEqual(script.read_text(), before.replace("1000000", "2000000"))
+                mtime = script.stat().st_mtime_ns
+                server_run.update_fill_limit(root, "2000000")
+                self.assertEqual(script.stat().st_mtime_ns, mtime)
+
     def test_refill_limit_keeps_legacy_combined_workspace_supported(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
