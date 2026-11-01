@@ -206,3 +206,18 @@ test("dev bridge passes names and multiline notes as a single JSON argument", as
   assert.deepEqual(calls[0], ["list-project-catalog", "D:/one", "1"]);
   assert.deepEqual(JSON.parse(calls[1][2]), request);
 });
+
+
+test("catalog suppresses repeated wrapped names and empty notes but preserves clipped notes and exact lengths", () => {
+  const { state, row } = fixture();
+  row.statistics.totalLengthBp = 1200000;
+  const html = renderProjectCatalog(state);
+  assert.doesNotMatch(html, /class="project-dataset-name"[^>]*data-app-tooltip/);
+  const notes = [...html.matchAll(/<button[^>]*class="project-dataset-note"[^>]*>/g)].map(match => match[0]);
+  assert.equal(notes.length, 2);
+  assert.equal(notes.filter(note => note.includes("data-app-tooltip=")).length, 1);
+  assert.ok(notes.find(note => note.includes("data-app-tooltip=")).includes("data-app-tooltip-overflow"));
+  assert.match(html, /data-app-tooltip="1,200,000 bp">1\.2 Mb/);
+  assert.doesNotMatch(html, /data-app-tooltip="(?:100|60|30) bp"/);
+  assert.match(html, /data-app-tooltip="View details and edit name or note"/);
+});

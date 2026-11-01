@@ -47,7 +47,8 @@ function number(value, state) {
 function length(value, state) {
   if (value == null) return "—";
   const [unit, divisor] = value >= 1e9 ? ["Gb", 1e9] : value >= 1e6 ? ["Mb", 1e6] : value >= 1e3 ? ["kb", 1e3] : ["bp", 1];
-  return `<span data-app-tooltip="${number(value, state)} bp">${Number(value / divisor).toLocaleString(state.locale === "en" ? "en-US" : "zh-CN", { maximumFractionDigits: divisor === 1 ? 0 : 2 })} ${unit}</span>`;
+  const display = `${Number(value / divisor).toLocaleString(state.locale === "en" ? "en-US" : "zh-CN", { maximumFractionDigits: divisor === 1 ? 0 : 2 })} ${unit}`;
+  return divisor === 1 ? display : `<span data-app-tooltip="${number(value, state)} bp">${display}</span>`;
 }
 
 function renderDetails(row, catalog, state) {
@@ -94,10 +95,10 @@ function renderTable(rows, title, catalog, state) {
         const stats = row.statistics || {};
         return `<tr data-catalog-object="${escape(key)}">
           <td><span class="project-dataset-role" data-dataset-role="${escape(row.role)}">${l[row.role] || escape(row.role)}</span></td>
-          <th scope="row"><span class="project-dataset-name" data-app-tooltip="${escape(row.displayName)}">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
+          <th scope="row"><span class="project-dataset-name">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
           <td class="numeric">${number(stats.sequenceCount, state)}</td><td class="numeric">${length(stats.totalLengthBp, state)}</td>
           <td class="numeric">${length(stats.n50, state)}</td><td class="numeric">${length(stats.n90, state)}</td>
-          <td><button type="button" class="project-dataset-note" data-catalog-edit="${escape(key)}" data-catalog-focus="note" data-app-tooltip="${escape(row.note || l.emptyNote)}" ${disabled}>${escape(row.note || l.emptyNote)}</button></td>
+          <td><button type="button" class="project-dataset-note" data-catalog-edit="${escape(key)}" data-catalog-focus="note" ${row.note ? `data-app-tooltip="${escape(row.note)}" data-app-tooltip-overflow` : ""} ${disabled}>${escape(row.note || l.emptyNote)}</button></td>
           <td><button type="button" class="button project-icon-button" data-catalog-edit="${escape(key)}" data-app-tooltip="${l.edit}" aria-label="${l.edit}: ${escape(row.displayName)}" aria-expanded="${editing}" ${disabled}>${projectIcon("rename")}</button></td>
         </tr>`;
       }).join("") || `<tr><td colspan="8" class="muted">${l.empty}</td></tr>`}</tbody></table></div>

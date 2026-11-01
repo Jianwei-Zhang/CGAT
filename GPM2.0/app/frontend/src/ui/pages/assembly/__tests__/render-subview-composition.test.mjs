@@ -94,7 +94,7 @@ test("composition picker makes a cross-lane add explicit and supports checked ba
   }, helpers);
 
   assert.match(html, /Move from bottom/);
-  assert.match(html, /<strong data-app-tooltip="ctg1 \(\+\)">ctg1 \(\+\)<\/strong>/);
+  assert.match(html, /<strong data-app-tooltip="ctg1 \(\+\)" data-app-tooltip-overflow>ctg1 \(\+\)<\/strong>/);
   assert.match(html, /data-subview-composition-candidate="assembly:1\|primary:1:mother:0:0:"[\s\S]*checked/);
   assert.match(html, />Add \(1\)<\/button>/);
 });

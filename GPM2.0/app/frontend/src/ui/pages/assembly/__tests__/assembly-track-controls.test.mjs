@@ -835,8 +835,8 @@ test("assembly visible ctg labels strip chr suffix while hover titles keep full 
   assert.match(html, />ptg000009l \(\+\)<\/text>/);
   assert.match(html, />Ctg1617 \(-\)<\/text>/);
   assert.doesNotMatch(html, /<strong>Ctg1617 \(-\) vs ptg000009l \(\+\)<\/strong>/);
-  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="ptg000009l@Chr22 \(\+\)"><strong class="subview-candidate-slot">A<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">ptg000009l \(\+\)<\/span><span class="subview-candidate-meta">/);
-  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="Ctg1617@Chr22 \(-\)"><strong class="subview-candidate-slot">B<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">Ctg1617 \(-\)<\/span><span class="subview-candidate-meta">/);
+  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="ptg000009l@Chr22 \(\+\)" data-app-tooltip-overflow="\.subview-candidate-name"><strong class="subview-candidate-slot">A<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">ptg000009l \(\+\)<\/span><span class="subview-candidate-meta">/);
+  assert.match(html, /class="subview-candidate-badge" data-app-tooltip="Ctg1617@Chr22 \(-\)" data-app-tooltip-overflow="\.subview-candidate-name"><strong class="subview-candidate-slot">B<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">Ctg1617 \(-\)<\/span><span class="subview-candidate-meta">/);
   assert.match(html, /class="subview-candidate-remove"[^>]*aria-label="移除该候选"[^>]*><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">/);
   assert.match(html, /<desc data-app-tooltip-source>ptg000009l@Chr22 \(\+\) \| Start: /);
   assert.match(html, /<desc data-app-tooltip-source>Ctg1617@Chr22 \(-\) \| Start: /);

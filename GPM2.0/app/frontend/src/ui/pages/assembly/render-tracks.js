@@ -606,7 +606,7 @@ function createRenderTracksRenderer(deps = {}) {
     const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}" data-app-tooltip="${escapeAttr(`${chr.chrName} · ${formatBp(chr.placedBp)}`)}">
       <strong>${escapeHtml(chr.chrName)}</strong><span>${chr.ctgCount} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb</span></button>`).join("");
     return { chromosome: `<div class="chr-picker-inline assembly-main-scope-title" data-main-track-control-title data-assembly-popup="chromosomes" data-assembly-scope-key="${escapeAttr(projectScopeKey)}">
-        <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" data-app-tooltip="${escapeAttr(assembly.selectedChrName ? `${i18n.page.selectChromosomeTitle}: ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
+        <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" data-app-tooltip="${escapeAttr(assembly.selectedChrName ? `${i18n.chrTitle} ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" data-app-tooltip-overflow=".chr-picker-current" aria-label="${escapeAttr(assembly.selectedChrName ? `${i18n.page.selectChromosomeTitle}: ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
           <span class="chr-picker-current">${assembly.selectedChrName ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}` : escapeHtml(i18n.page.selectChromosomeTitle)}</span><span data-popup-chevron aria-hidden="true">${chrOpen ? "▴" : "▾"}</span>
         </button>
         <div id="assembly-chr-picker-panel" class="chr-picker-menu assembly-scope-popover" ${chrOpen ? "" : "hidden"}>${chromosomeOptions || `<div class="muted">${escapeHtml(i18n.page.noChromosomeData)}</div>`}</div>
@@ -1180,11 +1180,11 @@ function renderSupportDatasetSelect({ options, value, label }) {
   ).join("");
   const menuHtml = options.map(dataset => {
     const active = dataset === selected;
-    return `<button type="button" class="assembly-track-combo-option${active ? " is-active" : ""}" data-support-dataset-option="${dataset.datasetId}" role="option" aria-selected="${active}" tabindex="-1" data-app-tooltip="${escapeAttr(dataset.label)}">${escapeHtml(dataset.label)}</button>`;
+    return `<button type="button" class="assembly-track-combo-option${active ? " is-active" : ""}" data-support-dataset-option="${dataset.datasetId}" role="option" aria-selected="${active}" tabindex="-1" data-app-tooltip="${escapeAttr(dataset.label)}" data-app-tooltip-overflow>${escapeHtml(dataset.label)}</button>`;
   }).join("");
   return `
     <div class="assembly-track-select-shell assembly-track-combo is-support" data-track-combo-field="supportDatasetId">
-      <button type="button" id="${id}-toggle" class="assembly-track-fixed-select assembly-support-dataset-toggle" data-track-combo-toggle data-support-dataset-label="${escapeAttr(label)}" aria-label="${escapeAttr(`${label}: ${selected.label}`)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu" data-app-tooltip="${escapeAttr(selected.label)}">${escapeHtml(selected.label)}</button>
+      <button type="button" id="${id}-toggle" class="assembly-track-fixed-select assembly-support-dataset-toggle" data-track-combo-toggle data-support-dataset-label="${escapeAttr(label)}" aria-label="${escapeAttr(`${label}: ${selected.label}`)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu" data-app-tooltip="${escapeAttr(selected.label)}" data-app-tooltip-overflow>${escapeHtml(selected.label)}</button>
       <select id="${id}" class="assembly-support-dataset-value" hidden aria-hidden="true" tabindex="-1">${optionsHtml}</select>
       <span class="assembly-track-control-marker" aria-hidden="true">▾</span>
       <div id="${id}-menu" class="assembly-track-combo-menu is-hidden" role="listbox" aria-label="${escapeAttr(label)}">${menuHtml}</div>
@@ -2042,7 +2042,7 @@ function renderAssemblyTracks(args) {
       const trackLabelAttrs = selectableTrackLabel
         ? ` data-track-label-role="${trackLabelRole}" data-track-label-selectable="1" data-track-label-source="${trackLabelSource}" data-track-label-is-mirror="${trackLabelIsMirror}" data-track-label-dataset-id="${trackLabelDatasetId || 0}"${phasedTrackAttrs}`
         : "";
-      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} data-app-tooltip="${escapeAttr(layout.label)}" aria-label="${escapeAttr(layout.label)}">
+      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} data-app-tooltip="${escapeAttr(layout.label)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(layout.label)}">
         <span>${escapeHtml(layout.displayLabel ?? layout.label)}</span>
       </div>`;
     })

@@ -3,7 +3,7 @@ import { SUBVIEW_TOOLS_ID, SUBVIEW_TOOLS_TABS } from "./subview-tools-state.js";
 export function renderSubviewToolsToggle(labels, { escapeHtml, escapeAttr }) {
   return `<button type="button" class="button ghost tiny subview-tools-toggle"
     data-subview-tools-toggle="1" aria-controls="${SUBVIEW_TOOLS_ID}" aria-expanded="false"
-    data-app-tooltip="${escapeAttr(labels.title)}"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"
+    ><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"
     focusable="false"><rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/>
     <path d="M12 4v12M14 7h1M14 10h1M14 13h1"/></svg>${escapeHtml(labels.toggle)}</button>`;
 }

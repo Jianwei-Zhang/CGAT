@@ -64,7 +64,7 @@ export function renderAppShell(state) {
           <label class="nav-session-field nav-session-field-language" for="app-language-select-toggle">
             <span>${labels.language}</span>
             ${renderShellSelect("app-language-select", labels.language,
-              [{ value: "zh", label: "中文", selected: locale === "zh" }, { value: "en", label: "English", selected: locale === "en" }])}
+              [{ value: "zh", label: "中文", selected: locale === "zh" }, { value: "en", label: "English", selected: locale === "en" }], { nameTooltips: false })}
           </label>
           <button type="button" class="button app-theme-toggle" data-app-theme-toggle data-app-tooltip="${themeLabel}" aria-label="${themeLabel}" aria-pressed="${dark}">${projectIcon(dark ? "sun" : "moon")}</button>
           <button type="button" class="button app-settings-button" data-app-settings aria-haspopup="dialog">⚙ ${locale === "en" ? "Settings" : "设置"}</button>

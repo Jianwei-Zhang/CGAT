@@ -44,7 +44,7 @@ export function renderViewNavigation(role, locale, mode = "mouse") {
         </div>
         <div class="view-nav-grip" data-view-nav-grip aria-hidden="true" hidden></div>
       </div>
-      <button type="button" class="view-nav-fit" data-view-nav-action="fit" data-app-tooltip="${t.fitHint}">${t.fit}</button>
+      <button type="button" class="view-nav-fit" data-view-nav-action="fit">${t.fit}</button>
     </div>
     <span class="view-nav-span">${t.span}${locale === "en" ? ":" : "："}<span data-view-nav-span aria-label="${t.window}">—</span></span>
   </div>`;

@@ -729,3 +729,23 @@ test("right-clicking navigation never opens a selected Contig business menu and 
   assert.equal(menu.innerHTML, "");
   assert.equal(classes.has("is-hidden"), true);
 });
+
+
+test("context menus omit repeated labels but retain unavailable reasons and coordinate details", () => {
+  const escape = value => String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+  const html = renderContextMenuItems([
+    { label: "Flip", run() {} },
+    { label: "Delete", title: "Delete", run() {} },
+    { label: "Split", children: [{ label: "Manual", run() {} }] },
+    { label: "Restore", title: "Source is unavailable", disabled: true },
+    { label: "At anchor", title: "chr01:1,000 → 2,000", run() {} },
+    { label: "Unavailable group", title: 'Missing "source"', disabled: true, children: [{ label: "Child" }] },
+  ], { escapeAttr: escape, escapeHtml: escape });
+  assert.equal((html.match(/data-app-tooltip=/g) || []).length, 3);
+  assert.doesNotMatch(html, /data-app-tooltip="(?:Flip|Delete|Split|Manual|Child)"/);
+  assert.match(html, /data-app-tooltip="Source is unavailable"/);
+  assert.match(html, /data-app-tooltip="chr01:1,000 → 2,000"/);
+  assert.match(html, /data-app-tooltip="Missing &quot;source&quot;"/);
+  assert.match(html, /aria-haspopup="menu"/);
+  assert.match(html, /aria-disabled="true"/);
+});

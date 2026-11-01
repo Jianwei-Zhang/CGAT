@@ -134,7 +134,7 @@ test("project export page renders assignment bars before placed statistics with 
   const pathHtml = renderLoadedPathOverview(createState());
   assert.match(pathHtml, /class="project-export-final-path-list"/);
   assert.match(pathHtml, /class="project-export-final-path-row"[\s\S]*data-project-export-jump-chr="Chr01"/);
-  assert.match(pathHtml, /class="project-export-final-path-row-label">Chr01<\/strong>/);
+  assert.match(pathHtml, /class="project-export-final-path-row-label" data-app-tooltip="Chr01" data-app-tooltip-overflow>Chr01<\/strong>/);
   assert.match(pathHtml, /class="project-export-final-path-preview-track"/);
   assert.match(pathHtml, /class="project-export-final-path-preview-ctg"[\s\S]*?width: 100\.0000%;/);
   assert.match(pathHtml, /class="project-export-final-path-preview-length">1,000 bp<\/span>/);
@@ -2196,8 +2196,8 @@ for (const locale of ["zh", "en"]) test(`Overview has compact identity groups an
   assert.equal((html.match(/data-preview-download/g) || []).length, 1);
   assert.ok(toolbar.indexOf("data-preview-download") < toolbar.indexOf("data-project-export-toggle"));
   assert.match(toolbar, /<dl class="project-export-identity">/);
-  assert.match(toolbar, /<dd data-app-tooltip="p1">p1<\/dd>/);
-  assert.match(toolbar, /<dd data-app-tooltip="hifiasm">hifiasm<\/dd>/);
+  assert.match(toolbar, /<dd data-app-tooltip="p1" data-app-tooltip-overflow>p1<\/dd>/);
+  assert.match(toolbar, /<dd data-app-tooltip="hifiasm" data-app-tooltip-overflow>hifiasm<\/dd>/);
 });
 
 for (const locale of ["zh", "en"]) test(`Overview includes all configured auxiliary names in its single-line identity (${locale})`, () => {
@@ -2209,8 +2209,9 @@ for (const locale of ["zh", "en"]) test(`Overview includes all configured auxili
   const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
   const label = locale === "zh" ? "辅助数据集" : "Auxiliary datasets";
   const names = "Flye_Very_Long_Auxiliary_Name&lt;&amp;&quot;, RagTag_MiXeD, ds-99";
-  assert.ok(toolbar.includes(`<dt>${label}</dt><dd data-app-tooltip="${names}">${names.replaceAll("&quot;", '"')}</dd>`));
+  assert.ok(toolbar.includes(`<dt>${label}</dt><dd data-app-tooltip="${names}" data-app-tooltip-overflow>${names.replaceAll("&quot;", '"')}</dd>`));
   assert.equal((toolbar.match(/class="project-export-identity-item"/g) || []).length, 3);
+  assert.doesNotMatch(toolbar, /class="project-export-identity-item"[^>]*data-app-tooltip/);
   assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>项目" : "<dt>Project") < toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset"));
   assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset") < toolbar.indexOf(`<dt>${label}`));
 });
@@ -2218,8 +2219,8 @@ for (const locale of ["zh", "en"]) test(`Overview includes all configured auxili
 for (const locale of ["zh", "en"]) test(`Overview reports no configured auxiliary datasets honestly (${locale})`, () => {
   const html = renderProjectExportPage(createState({ locale }));
   const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
-  assert.ok(toolbar.includes(locale === "zh" ? '<dt>辅助数据集</dt><dd data-app-tooltip="未配置">未配置</dd>'
-    : '<dt>Auxiliary datasets</dt><dd data-app-tooltip="Not configured">Not configured</dd>'));
+  assert.ok(toolbar.includes(locale === "zh" ? '<dt>辅助数据集</dt><dd data-app-tooltip="未配置" data-app-tooltip-overflow>未配置</dd>'
+    : '<dt>Auxiliary datasets</dt><dd data-app-tooltip="Not configured" data-app-tooltip-overflow>Not configured</dd>'));
 });
 
 test("Overview identity never wraps, ellipsizes names and preserves fixed right-side actions", () => {

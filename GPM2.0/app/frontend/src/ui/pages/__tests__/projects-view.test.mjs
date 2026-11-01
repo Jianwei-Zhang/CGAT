@@ -198,3 +198,27 @@ test("library header is a non-wrapping grid with a shrinkable caption, right-ali
   assert.match(css, /\.projects-page \.project-library-actions \[hidden\][^{]*\{[^}]*display: none/);
   assert.match(css, /#validate-history-button\[aria-busy="true"\]:disabled[^}]*opacity: 1;[^}]*transition: none/);
 });
+
+
+test("recent headings and idle validation have no repeated hints but paths and busy state remain explained", () => {
+  const records = [{ path: "/rice", projectName: "Rice" }];
+  const html = render({ records });
+  assert.doesNotMatch(html, /id="project-recents-title"[^>]*data-app-tooltip/);
+  assert.doesNotMatch(html, /id="validate-history-button"[^>]*data-app-tooltip/);
+  assert.match(html, /class="project-recent-open"[^>]*data-app-tooltip="\/rice"/);
+  const busy = render({ records, importer: { historyValidating: true } });
+  assert.match(busy, /id="validate-history-button"[^>]*data-app-tooltip="Validating…"/);
+});
+
+test("in-place validation clears its transient busy hint without losing the accessible label", () => {
+  const attrs = new Map([["data-app-tooltip", "Validating…"]]);
+  const button = { textContent: "", setAttribute: (key, value) => attrs.set(key, value), removeAttribute: key => attrs.delete(key) };
+  const host = { querySelectorAll: () => [], querySelector: selector => selector === "#validate-history-button" ? button : null };
+  const state = { locale: "en", importer: { historyValidating: true } };
+  syncProjectValidation(host, state, []);
+  assert.equal(attrs.get("data-app-tooltip"), "Validating…");
+  state.importer.historyValidating = false;
+  syncProjectValidation(host, state, []);
+  assert.equal(attrs.has("data-app-tooltip"), false);
+  assert.equal(attrs.get("aria-label"), "Validate projects");
+});

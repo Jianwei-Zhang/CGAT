@@ -814,7 +814,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         `data-subview-remove-type="candidate" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-contig-id="${selection.contigId}"${phasedRemoveAttrs}`,
         i18n.subview.removeCandidateAria,
       );
-      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(ctgName)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleCtgName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(roleLabel)}</span></span>${removeButton}</span>`;
+      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(ctgName)}" data-app-tooltip-overflow=".subview-candidate-name"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleCtgName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(roleLabel)}</span></span>${removeButton}</span>`;
     })
     .join("");
   const trackBadges = trackSelections
@@ -825,7 +825,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         `data-subview-remove-type="track" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-source="${escapeAttr(selection.source || "mother")}" data-subview-remove-dataset-id="${Number(selection.datasetId || 0)}" data-subview-remove-is-mirror="${selection.isMirror ? "1" : "0"}"`,
         i18n.subview.removeTrackCandidateAria,
       );
-      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(trackLabel)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span>${removeButton}</span>`;
+      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(trackLabel)}" data-app-tooltip-overflow=".subview-candidate-name"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span>${removeButton}</span>`;
     })
     .join("");
   const composition = String(subview?.summary?.mode || "") === "composition"
@@ -1847,13 +1847,13 @@ function renderSubviewAlignmentCard(
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
-          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" data-app-tooltip="${escapeAttr(topDisplayCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" data-app-tooltip="${escapeAttr(topDisplayCtgName)}" data-app-tooltip-overflow>${escapeHtml(topVisibleCtgName)}</div>
           ${renderSubviewTrackOrderToggleButton({
             className: "is-in-label-column",
             style: `top:${trackOrderButtonTopPx}px`,
             swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
           })}
-          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" data-app-tooltip="${escapeAttr(bottomDisplayCtgName)}">${escapeHtml(bottomVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" data-app-tooltip="${escapeAttr(bottomDisplayCtgName)}" data-app-tooltip-overflow>${escapeHtml(bottomVisibleCtgName)}</div>
         </div>
         <div
           class="assembly-track-scroll subview-track-scroll"

@@ -71,7 +71,8 @@ export function syncProjectValidation(host, state, records) {
   if (validate) {
     validate.disabled = view.disabled;
     if (validate.textContent !== view.label) validate.textContent = view.label;
-    validate.setAttribute("data-app-tooltip", view.accessibleLabel);
+    if (state.importer.historyValidating) validate.setAttribute("data-app-tooltip", view.accessibleLabel);
+    else validate.removeAttribute("data-app-tooltip");
     validate.setAttribute("aria-label", view.accessibleLabel);
     validate.setAttribute("aria-busy", String(Boolean(state.importer.historyValidating)));
   }
@@ -164,9 +165,9 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   </section>` : `<div class="project-browser">
     <section class="project-recents" aria-labelledby="project-recents-title">
       ${actions}
-      <header class="project-recents-header"><h4 id="project-recents-title" data-app-tooltip="${labels.recent}"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
+      <header class="project-recents-header"><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
-          <button id="validate-history-button" class="button ghost project-history-action" data-app-tooltip="${html(validation.accessibleLabel)}" aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
+          <button id="validate-history-button" class="button ghost project-history-action" ${importer.historyValidating ? `data-app-tooltip="${html(validation.accessibleLabel)}"` : ""} aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
           <button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
         </div>` : ""}
       </header>

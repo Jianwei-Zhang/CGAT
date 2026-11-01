@@ -33,6 +33,7 @@ function createButton() {
     dataset: {},
     disabled: false,
     setAttribute(name, value) { this[name] = value; },
+    removeAttribute(name) { delete this[name]; },
     addEventListener(type, handler) {
       listeners.set(type, handler);
     },

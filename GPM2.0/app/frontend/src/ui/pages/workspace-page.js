@@ -149,7 +149,7 @@ export function renderWorkspacePage(state) {
       </div>
       <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
       <div class="project-location-row">
-        <p class="project-path project-detail-path" data-app-tooltip="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
+        <p class="project-path project-detail-path">${escapeHtml(state.session.workspacePath)}</p>
         ${selectedProject ? `<p class="project-detail-created">${labels.created}${state.locale === "en" ? ": " : "："}${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}
       </div>
     </div>

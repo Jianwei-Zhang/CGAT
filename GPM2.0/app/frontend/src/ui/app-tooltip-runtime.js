@@ -9,10 +9,27 @@ const point = event => ({ x: Number(event.clientX || 0), y: Number(event.clientY
 const rect = node => node?.getBoundingClientRect?.();
 const inside = (p, r) => Boolean(r && p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom);
 
+// Opt in only name-completion targets; never infer this policy for details/icons.
+function needsNameCompletion(node, text) {
+  const selector = node.getAttribute("data-app-tooltip-overflow");
+  if (selector == null) return true;
+  const label = selector ? node.querySelector?.(selector) : node;
+  if (!label) return false;
+  const normalize = value => String(value ?? "").replace(/\s+/g, " ").trim();
+  const visible = label.matches?.("input, textarea") ? label.value : label.textContent;
+  // Presentation may already have shortened the source name before CSS layout.
+  if (normalize(visible) !== normalize(text)) return true;
+  return (label.clientWidth > 0 && label.scrollWidth > label.clientWidth)
+    || (label.clientHeight > 0 && label.scrollHeight > label.clientHeight);
+}
+
 function payload(node) {
   for (const attribute of ATTRIBUTES) {
     const text = node?.getAttribute?.(attribute);
-    if (text) return attribute === "data-subview-band-tooltip" ? text.replaceAll(" | ", "\n").replaceAll(" · ", "\n") : text;
+    if (text) {
+      if (attribute === "data-app-tooltip" && !needsNameCompletion(node, text)) return "";
+      return attribute === "data-subview-band-tooltip" ? text.replaceAll(" | ", "\n").replaceAll(" · ", "\n") : text;
+    }
   }
   const desc = [...(node?.children || [])].find(child => String(child.tagName).toLowerCase() === "desc" && child.hasAttribute?.("data-app-tooltip-source"));
   return String(desc?.textContent || "").replaceAll(" | ", "\n");
@@ -265,7 +282,7 @@ export function bindAppTooltips(root = globalThis.document) {
     if (changed) refresh();
   }) : null;
   observer?.observe(doc.documentElement, { subtree: true, childList: true, characterData: true, attributes: true,
-    attributeFilter: [...ATTRIBUTES, "data-theme", "open", "class", "style"] });
+    attributeFilter: [...ATTRIBUTES, "data-app-tooltip-overflow", "data-theme", "open", "class", "style"] });
   const owner = { panel, hide, refresh, destroy() {
     hide(); observer?.disconnect(); for (const cleanup of cleanups) cleanup(); panel.remove?.(); owners.delete(events);
   } };

@@ -1248,7 +1248,7 @@ export function renderFinalPathGraph({
     <div class="assembly-final-path-layout assembly-track-layout">
       <div
         class="assembly-final-path-label-spacer assembly-track-label-column"
-        data-app-tooltip="${escapeAttr(normalizedAllGraphLabel || "Final Path")}"
+        data-app-tooltip="${escapeAttr(normalizedAllGraphLabel || "Final Path")}" data-app-tooltip-overflow="strong"
         style="width:${FINAL_PATH_LABEL_COLUMN_WIDTH_PX}px"
         ${normalizedAllGraphLabel ? `data-final-path-all-graph-label="${escapeAttr(normalizedAllGraphLabel)}"` : ""}
       ><strong>${escapeHtml(normalizedAllGraphLabel || "Final Path")}</strong></div>
@@ -1345,7 +1345,7 @@ function renderFinalPathTable({
                   data-final-path-segment-id="${escapeAttr(segmentId)}"
                  ${targetChrAttr}
                   value="${escapeAttr(displayName)}"
-                  data-app-tooltip="${escapeAttr(fullDisplayName)}"
+                  data-app-tooltip="${escapeAttr(fullDisplayName)}" data-app-tooltip-overflow
                   autocomplete="off"
                   ${isRefSegment ? "disabled" : ""}
                 />

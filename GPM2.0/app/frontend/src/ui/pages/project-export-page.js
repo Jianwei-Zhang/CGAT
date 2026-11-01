@@ -1418,9 +1418,8 @@ function renderFinalPathPreviewRows(state, { primaryDatasetName }) {
           data-project-export-jump-parent-chr="${escapeAttr(parentChrName || chrName)}"
           data-project-export-jump-phased-key="${escapeAttr(phasedTrackKey || "")}"
           data-project-export-jump-chr="${escapeAttr(chrName)}"
-          data-app-tooltip="${escapeAttr(chrName)}"
         >
-          <strong class="project-export-final-path-row-label">${escapeHtml(chrName)}</strong>
+          <strong class="project-export-final-path-row-label" data-app-tooltip="${escapeAttr(chrName)}" data-app-tooltip-overflow>${escapeHtml(chrName)}</strong>
           <div class="project-export-final-path-row-graph" aria-hidden="true">
             ${renderFinalPathPreviewTrack({
               entry,
@@ -1784,9 +1783,9 @@ function renderProjectOverviewSummary(state) {
       <section data-overview-summary>
       <div class="project-export-head">
         <dl class="project-export-identity">
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd data-app-tooltip="${escapeAttr(state.session?.projectName || currentProject.projectName || "-")}">${escapeHtml(state.session?.projectName || currentProject.projectName || "-")}</dd></div>
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd data-app-tooltip="${escapeAttr(primaryDatasetName)}">${escapeHtml(primaryDatasetName)}</dd></div>
-          <div class="project-export-identity-item" data-app-tooltip="${escapeAttr(`${labels.auxiliaryDatasets}: ${auxiliaryNames}`)}"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt><dd data-app-tooltip="${escapeAttr(auxiliaryNames)}">${escapeHtml(auxiliaryNames)}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd data-app-tooltip="${escapeAttr(state.session?.projectName || currentProject.projectName || "-")}" data-app-tooltip-overflow>${escapeHtml(state.session?.projectName || currentProject.projectName || "-")}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd data-app-tooltip="${escapeAttr(primaryDatasetName)}" data-app-tooltip-overflow>${escapeHtml(primaryDatasetName)}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt><dd data-app-tooltip="${escapeAttr(auxiliaryNames)}" data-app-tooltip-overflow>${escapeHtml(auxiliaryNames)}</dd></div>
         </dl>
         <div class="project-export-actions">
           ${renderPreviewImageDownloadButton(state)}

@@ -5,9 +5,9 @@ const bindings = new WeakMap();
 const escape = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
-export function renderShellSelect(id, label, options, { name = "" } = {}) {
+export function renderShellSelect(id, label, options, { name = "", nameTooltips = true } = {}) {
   const selected = options.find(option => option.selected) || options[0];
-  return `<span class="shell-select" data-shell-select>
+  return `<span class="shell-select" data-shell-select${nameTooltips ? "" : ' data-shell-select-tooltips="none"'}>
     <button type="button" id="${id}-toggle" class="shell-select-toggle" data-shell-select-toggle aria-label="${escape(label)}: ${escape(selected.label)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu"><span data-shell-select-caption>${escape(selected.label)}</span><span class="shell-select-marker" aria-hidden="true">▾</span></button>
     <select id="${id}"${name ? ` name="${escape(name)}"` : ""} hidden aria-hidden="true" tabindex="-1" aria-label="${escape(label)}">${options.map(option => `<option value="${escape(option.value)}" ${option.selected ? "selected" : ""}>${escape(option.label)}</option>`).join("")}</select>
     <span id="${id}-menu" class="assembly-track-combo-menu shell-select-menu is-hidden" role="listbox" aria-label="${escape(label)}" data-shell-select-menu></span>
@@ -35,12 +35,19 @@ export function bindShellSelects(root) {
     const sync = () => {
       const values = [...select.options], selected = values.find(option => option.selected) || values[0];
       caption.textContent = selected?.textContent || "";
-      toggle.setAttribute("data-app-tooltip", select.getAttribute("data-app-tooltip") || caption.textContent);
+      const nameTooltips = combo.getAttribute("data-shell-select-tooltips") !== "none";
+      if (nameTooltips) {
+        toggle.setAttribute("data-app-tooltip", select.getAttribute("data-app-tooltip") || caption.textContent);
+        toggle.setAttribute("data-app-tooltip-overflow", "[data-shell-select-caption]");
+      } else {
+        toggle.removeAttribute("data-app-tooltip");
+        toggle.removeAttribute("data-app-tooltip-overflow");
+      }
       toggle.disabled = select.disabled;
       const width = select.style.getPropertyValue("--workspace-select-width");
       if (width) combo.style.setProperty("--workspace-select-width", width);
       toggle.setAttribute("aria-label", `${select.getAttribute("aria-label")}: ${caption.textContent}`);
-      const nextSignature = JSON.stringify(values.map(option => [option.value, option.textContent, option.disabled]));
+      const nextSignature = JSON.stringify([nameTooltips, values.map(option => [option.value, option.textContent, option.disabled])]);
       if (signature !== nextSignature) {
         close(); signature = nextSignature;
         menu.replaceChildren(...values.map((option, index) => {
@@ -48,7 +55,11 @@ export function bindShellSelects(root) {
           button.type = "button"; button.className = "assembly-track-combo-option";
           button.setAttribute("role", "option"); button.tabIndex = -1;
           button.dataset.shellOptionIndex = String(index);
-          button.textContent = option.textContent; button.setAttribute("data-app-tooltip", option.textContent);
+          button.textContent = option.textContent;
+          if (nameTooltips) {
+            button.setAttribute("data-app-tooltip", option.textContent);
+            button.setAttribute("data-app-tooltip-overflow", "");
+          }
           button.disabled = option.disabled; return button;
         }));
       }

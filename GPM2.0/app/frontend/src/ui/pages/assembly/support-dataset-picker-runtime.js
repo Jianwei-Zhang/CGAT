@@ -15,6 +15,7 @@ export function bindSupportDatasetPicker({ select, setOpen, closeOthers }) {
     const selected = options[activeIndex()];
     toggle.textContent = selected.textContent;
     toggle.setAttribute("data-app-tooltip", selected.textContent);
+    toggle.setAttribute("data-app-tooltip-overflow", "");
     toggle.setAttribute("aria-label", `${toggle.dataset.supportDatasetLabel}: ${selected.textContent}`);
     options.forEach(option => {
       const active = option === selected;

@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { bindShellSelects, syncShellSelect, renderShellSelect } from "../shell-select-runtime.js";
 
-function fixture() {
+function fixture({ nameTooltips = true } = {}) {
   const doc = { activeElement: null, defaultView: { Event }, handlers: new Map() };
   function element() {
     const classes = new Set(), handlers = new Map();
@@ -11,6 +11,7 @@ function fixture() {
       classList: { add: key => classes.add(key), remove: key => classes.delete(key), contains: key => classes.has(key),
         toggle(key, on) { on ? classes.add(key) : classes.delete(key); } },
       setAttribute(key, value) { this.attrs[key] = value; }, getAttribute(key) { return this.attrs[key]; },
+      removeAttribute(key) { delete this.attrs[key]; },
       addEventListener(type, handler) { const list = handlers.get(type) || new Set(); list.add(handler); handlers.set(type, list); },
       removeEventListener(type, handler) { handlers.get(type)?.delete(handler); },
       emit(type, extra = {}) { const event = { type, target: this, preventDefault() {}, ...extra }; for (const handler of [...handlers.get(type) || []]) handler(event); },
@@ -23,6 +24,7 @@ function fixture() {
   }
   Object.assign(doc, element()); doc.createElement = element;
   const select = element(), menu = element(), toggle = element(), caption = element(), combo = element(), root = element();
+  if (!nameTooltips) combo.setAttribute("data-shell-select-tooltips", "none");
   select.options = [{ value: "a", textContent: "Project A", selected: true }, { value: "b", textContent: "Project <B>", selected: false }];
   Object.defineProperty(select, "value", {
     get() { return this.options.find(option => option.selected)?.value || ""; },
@@ -112,4 +114,36 @@ test("shell picker supports named settings fields and explicit idempotent dispos
   assert.equal(h.doc.handlers.get("pointerdown").size, 0);
   assert.equal(h.toggle.handlers.get("click").size, 0);
   assert.equal(h.menu.classList.contains("is-hidden"), true);
+});
+
+
+test("language controls opt out of repeated hints while preserving selection, labels and focus", () => {
+  const html = renderShellSelect("language", "Language", [
+    { value: "zh", label: "中文", selected: true }, { value: "en", label: "English" },
+  ], { nameTooltips: false });
+  assert.match(html, /data-shell-select-tooltips="none"/);
+  assert.doesNotMatch(html, /data-app-tooltip/);
+  const h = fixture({ nameTooltips: false }); let changes = 0;
+  h.select.addEventListener("change", () => changes++);
+  assert.equal(h.toggle.getAttribute("data-app-tooltip"), undefined);
+  for (const option of h.menu.children) assert.equal(option.getAttribute("data-app-tooltip"), undefined);
+  h.toggle.emit("click");
+  h.menu.emit("click", { target: h.menu.children[1] });
+  assert.equal(changes, 1);
+  assert.equal(h.select.value, "b");
+  assert.equal(h.doc.activeElement, h.toggle);
+  assert.equal(h.toggle.getAttribute("aria-label"), "Project: Project <B>");
+  assert.equal(h.toggle.getAttribute("data-app-tooltip"), undefined);
+  assert.equal(h.toggle.getAttribute("data-app-tooltip-overflow"), undefined);
+});
+
+test("project pickers opt in to measured name completion on captions and options after resync", () => {
+  const h = fixture();
+  assert.equal(h.toggle.getAttribute("data-app-tooltip"), "Project A");
+  assert.equal(h.toggle.getAttribute("data-app-tooltip-overflow"), "[data-shell-select-caption]");
+  for (const option of h.menu.children) assert.equal(option.getAttribute("data-app-tooltip-overflow"), "");
+  h.select.options = [{ value: "new", textContent: "New long project", selected: true }];
+  syncShellSelect(h.select);
+  assert.equal(h.toggle.getAttribute("data-app-tooltip"), "New long project");
+  assert.equal(h.menu.children[0].getAttribute("data-app-tooltip-overflow"), "");
 });

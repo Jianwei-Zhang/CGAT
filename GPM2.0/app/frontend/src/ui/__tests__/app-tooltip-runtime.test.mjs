@@ -446,3 +446,99 @@ test("LGZ interval shades composite the actual SVG mask and source ctg, not just
     assert.equal(h.panel.style.background, `rgb(${expected.slice(0, 3).map(Math.round).join(", ")})`);
   }
 });
+
+
+// Explicit geometry exercises the completion policy, not native text layout.
+function completionTarget(h, text = "Project A", selector = "") {
+  const node = target(h, text);
+  node.setAttribute("data-app-tooltip-overflow", selector);
+  node.textContent = text;
+  Object.assign(node, { clientWidth: 100, scrollWidth: 100, clientHeight: 20, scrollHeight: 20 });
+  return node;
+}
+
+test("name-only hints stay hidden for fully visible text under pointer and keyboard focus", () => {
+  const h = tooltipFixture(), node = completionTarget(h);
+  node.setAttribute("aria-label", "Project: Project A");
+  for (const event of ["pointerover", "focusin"]) {
+    h.fire(event, node);
+    assert.equal(hidden(h), true);
+    assert.equal(node.getAttribute("aria-describedby"), null);
+    assert.equal(node.getAttribute("aria-label"), "Project: Project A");
+  }
+});
+
+test("clipped names complete immediately in either dimension without introducing a delay", () => {
+  for (const axis of ["scrollWidth", "scrollHeight"]) for (const event of ["pointerover", "focusin"]) {
+    const h = tooltipFixture(), node = completionTarget(h);
+    node[axis] += 40;
+    h.fire(event, node);
+    assert.equal(hidden(h), false);
+    assert.equal(h.panel.textContent, "Project A");
+  }
+});
+
+test("completion measures the named child, not other labels or icons in its container", () => {
+  const h = tooltipFixture(), node = completionTarget(h, "Project A", ".caption");
+  const caption = h.create("span", { class: "caption" }), icon = h.create("span");
+  caption.textContent = "Project A"; icon.textContent = "▾";
+  Object.assign(caption, { clientWidth: 80, scrollWidth: 80 });
+  node.textContent = ""; node.append(caption, icon);
+  node.scrollWidth = 300;
+  h.fire("pointerover", caption); assert.equal(hidden(h), true);
+  caption.scrollWidth = 160;
+  h.fire("pointerover", caption); assert.equal(hidden(h), false);
+  assert.equal(h.panel.textContent, "Project A");
+});
+
+test("formatted shortened names complete even when their abbreviated label fits", () => {
+  const h = tooltipFixture(), node = completionTarget(h, "source_contig[1001-2000] (+)");
+  node.textContent = "source_contig (+)";
+  h.fire("pointerover", node);
+  assert.equal(hidden(h), false);
+  assert.equal(h.panel.textContent, "source_contig[1001-2000] (+)");
+});
+
+test("input completion reads the visible value instead of an empty textContent", () => {
+  const h = tooltipFixture(), node = h.create("input", {
+    "data-app-tooltip": "source_contig", "data-app-tooltip-overflow": "", "aria-label": "Contig",
+  });
+  node.value = "source_contig";
+  Object.assign(node, { clientWidth: 100, scrollWidth: 100 });
+  h.fire("focusin", node); assert.equal(hidden(h), true);
+  node.scrollWidth = 150;
+  h.fire("focusin", node); assert.equal(hidden(h), false);
+  assert.equal(h.panel.textContent, "source_contig");
+});
+
+test("completion rechecks changed content and geometry instead of caching a clipping decision", () => {
+  const h = tooltipFixture(), node = completionTarget(h);
+  node.scrollWidth = 160;
+  h.fire("pointerover", node); assert.equal(hidden(h), false);
+  node.scrollWidth = 100;
+  h.mutate([{ type: "attributes", target: node, attributeName: "style" }]);
+  assert.equal(hidden(h), true);
+  node.textContent = "New project"; node.setAttribute("data-app-tooltip", "New project");
+  h.fire("pointerover", node); assert.equal(hidden(h), true);
+  node.scrollWidth = 160;
+  h.fire("pointerover", node); assert.equal(h.panel.textContent, "New project");
+  h.windowFire("resize"); assert.equal(hidden(h), true);
+});
+
+test("missing completion children and whitespace-only differences do not generate redundant hints", () => {
+  const h = tooltipFixture(), missing = completionTarget(h, "Project A", ".missing");
+  h.fire("pointerover", missing); assert.equal(hidden(h), true);
+  const node = completionTarget(h); node.textContent = "  Project   A\n";
+  h.fire("pointerover", node); assert.equal(hidden(h), true);
+});
+
+test("ordinary hints and object details are never suppressed by text equality", () => {
+  for (const attribute of ["data-app-tooltip", "data-member-tooltip", "data-final-path-tooltip", "data-subview-band-tooltip"]) {
+    const h = tooltipFixture(), node = h.create("button", { [attribute]: "Explain or inspect" });
+    node.textContent = "Explain or inspect";
+    Object.assign(node, { clientWidth: 200, scrollWidth: 100 });
+    h.fire("pointerover", node);
+    assert.equal(hidden(h), false, attribute);
+    assert.equal(h.panel.textContent, "Explain or inspect");
+  }
+});

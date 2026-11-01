@@ -29,7 +29,7 @@ function renderMember(member, focusedEntityKey, isUnavailable, labels, escapeHtm
       data-subview-composition-member="${escapeAttr(member.entityKey)}"
       data-subview-composition-lane="${member.lane}" tabindex="0" aria-pressed="${focused ? "true" : "false"}">
     <button type="button" class="subview-composition-member-main"
-      data-subview-composition-focus="${escapeAttr(member.entityKey)}" data-app-tooltip="${escapeAttr(label)}">
+      data-subview-composition-focus="${escapeAttr(member.entityKey)}" data-app-tooltip="${escapeAttr(label)}" data-app-tooltip-overflow="strong">
       <strong>${escapeHtml(label)}</strong>
       <span>${escapeHtml(sourceLabel(member.source, labels))}</span>
       ${isUnavailable ? `<span class="inline-error">${escapeHtml(labels.sourceUnavailable)}</span>` : ""}
@@ -103,7 +103,7 @@ function renderPicker(candidates, composition, ui, labels, escapeHtml, escapeAtt
         return `<li><label>
           <input type="checkbox" data-subview-composition-candidate="${escapeAttr(candidate.candidateKey)}"
             ${checked ? "checked" : ""}>
-          <span><strong data-app-tooltip="${escapeAttr(label)}">${escapeHtml(label)}</strong>
+          <span><strong data-app-tooltip="${escapeAttr(label)}" data-app-tooltip-overflow>${escapeHtml(label)}</strong>
             <small>${escapeHtml(sourceLabel(candidate.source, labels))}${moveNote ? ` · ${escapeHtml(moveNote)}` : ""}</small></span>
         </label></li>`;
       }).join("") || (ui.loading ? "" : `<li class="muted">${escapeHtml(labels.noMatches)}</li>`)}
