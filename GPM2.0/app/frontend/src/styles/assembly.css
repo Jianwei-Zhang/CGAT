@@ -2234,17 +2234,18 @@
 
 /* Read-only adopted-source correlation; not an editing/multiselect class. */
 [data-final-path-selected="1"] > .track-ctg {
-  stroke: var(--theme-accent, #e0a23a);
-  stroke-width: 2.5;
+  stroke: var(--final-path-selection-stroke);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
 }
 .final-path-sort-row[data-final-path-selected="1"] {
-  outline: 2px solid var(--theme-accent, #e0a23a);
-  outline-offset: -2px;
+  outline: 1.5px solid var(--final-path-selection-stroke);
+  outline-offset: -1.5px;
 }
 .final-path-source-highlight {
-  fill: rgba(244, 181, 54, 0.35);
-  stroke: #e0a23a;
-  stroke-width: 2;
+  fill: var(--final-path-selection-fill);
+  stroke: var(--final-path-selection-stroke);
+  stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
