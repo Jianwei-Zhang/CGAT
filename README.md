@@ -2,8 +2,6 @@
 
 **English** | [中文](README_zh.md)
 
-The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
-
 [![CGAT Docs](https://img.shields.io/badge/Docs_%26_Direct_Downloads-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/)
 [![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.16-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
 

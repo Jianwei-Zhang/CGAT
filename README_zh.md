@@ -2,8 +2,6 @@
 
 [English](README.md) | **中文**
 
-自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
-
 [![CGAT Docs](https://img.shields.io/badge/在线文档与直连下载-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/zh/)
 [![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.16-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
 
