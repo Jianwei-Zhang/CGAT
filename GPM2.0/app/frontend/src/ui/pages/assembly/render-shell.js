@@ -1,3 +1,4 @@
+import { renderAssemblyDetailStatus } from "./assembly-detail-status.js";
 export function renderAssemblyPage(state, deps) {
   const addCtgImportProgressModal = deps.renderAddCtgImportProgressModal(state);
   const batchDeleteProgressModal = deps.renderBatchDeleteProgressModal(state);
@@ -7,6 +8,7 @@ export function renderAssemblyPage(state, deps) {
 
   return `
     <section class="page">
+      ${renderAssemblyDetailStatus(state)}
       <section class="assembly-tabs">
         <div class="tab-body">${activeTabContent}</div>
       </section>
@@ -139,7 +141,7 @@ function renderActiveAssemblyTab(state, deps) {
           <tr><td>${i18n.projectIdLabel}</td><td>${session.projectId || "-"}</td></tr>
           <tr><td>${i18n.workspaceLabel}</td><td><code>${deps.escapeHtml(session.workspacePath || "-")}</code></td></tr>
           <tr><td>${i18n.currentChrLabel}</td><td>${deps.escapeHtml(assembly.selectedChrName || "-")}</td></tr>
-          <tr><td>${i18n.currentCtgLabel}</td><td>${deps.escapeHtml(assembly.ctgDetail?.name || "-")}</td></tr>
+          <tr><td>${i18n.currentCtgLabel}</td><td>${deps.escapeHtml(assembly.chrCtgs?.find(ctg => ctg.assemblyCtgId === assembly.selectedCtgId)?.name || assembly.ctgDetail?.name || "-")}</td></tr>
         </tbody>
       </table>
     </article>

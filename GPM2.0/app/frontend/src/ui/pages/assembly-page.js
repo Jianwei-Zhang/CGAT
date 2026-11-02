@@ -1,3 +1,5 @@
+import { retryAssemblyCtgDetail, restoreAssemblyLocalEvidence, resumeAssemblyReadyStages } from "./assembly/assembly-ready-stages.js";
+import { bindAssemblyDetailRetry, patchAssemblyDetailStatus } from "./assembly/assembly-detail-status.js";
 import { refreshViewportGeometry } from "./assembly/viewport-geometry-refresh.js";
 import { syncExistingAssemblyViewNavigation } from "./assembly/view-navigation-runtime.js";
 import { destroyImmediateTooltips } from "./assembly/immediate-tooltip-runtime.js";
@@ -42,7 +44,6 @@ import {
   getContigChrAlignments,
   importAddCtgPackage,
   listChrViewCtgs,
-  listCtgEditCandidates,
   listDeletedCtgs,
   listNewSequences,
   listPhasedChrTracks,
@@ -828,6 +829,16 @@ function normalizeTrackFocusMode(rawMode) {
 }
 
 export function bindAssemblyPage(host, store, options = {}) {
+  bindAssemblyDetailRetry(host,
+    () => retryAssemblyCtgDetail(host, store, assemblyDataRuntimeDeps),
+    () => {
+      const state = store.getState();
+      if (state.activeRoute !== "assembly" || state.assembly.loading || !state.assembly.subview?.summary
+        || (state.assembly.subviewRestoring && state.assembly.subviewRestoringSummary === state.assembly.subview.summary)) return;
+      store.setState({ assembly: { ...state.assembly, subviewRestoring: true, subviewRestoringSummary: state.assembly.subview?.summary, subviewRestoreError: "" } });
+      rerenderSubviewPanel(host, store);
+      return restoreAssemblyLocalEvidence(host, store, assemblyDataRuntimeDeps, { afterPaint: true });
+    });
   const result = bindAssemblyPageImpl(
     host,
     store,
@@ -836,6 +847,7 @@ export function bindAssemblyPage(host, store, options = {}) {
   );
   if (!options.scope) {
     scrollAssemblyToBottomIfRequested(host, store);
+    queueMicrotask(() => { void resumeAssemblyReadyStages(host, store, assemblyDataRuntimeDeps); });
   }
   syncAssemblySubviewTools(host, store);
   return result;
@@ -852,6 +864,7 @@ export function disposeAssemblyTransientInteractions(host) {
 }
 
 export function syncAssemblyTransientInteractions(host, store) {
+  queueMicrotask(() => { void resumeAssemblyReadyStages(host, store, assemblyDataRuntimeDeps); });
   syncExistingAssemblyViewNavigation(host);
   bindAssemblyScopePopovers(host, store);
   bindMainTrackToolbarPopups(host);
@@ -1079,14 +1092,19 @@ function createEditorActionRuntimeAdapters(editorRuntimeDeps, impls = {}) {
 const assemblyDataLoaderDeps = {
   getCtgDetail,
   listChrViewCtgs,
-  listCtgEditCandidates,
   listDeletedCtgs,
   normalizeSupportDatasetId,
 };
 
 function patchMemberSelection(host, store, options = {}) {
   const root = host?.closest?.("#route-host") || host;
-  if (!paintMainSelection(root, store.getState(), options)) return;
+  paintMainSelection(root, store.getState(), options);
+  patchAssemblyDetailStatus(root, store.getState());
+  const details = store.getState().assembly;
+  for (const selector of ["#flip-seq-button", "#hide-show-seq-button", "#set-end-type-button"]) {
+    const button = root.querySelector?.(selector);
+    if (button) button.disabled = Boolean(details.ctgDetailLoading || details.ctgDetailError || !details.ctgDetail);
+  }
   if (options.focus) bindTrackScrollSync(root, store, { scope: "main" });
   const doc = root.ownerDocument;
   if (doc?.createElement) {
@@ -1122,6 +1140,7 @@ const assemblyDataRuntimeDeps = {
   loadDeletedCtgsForChr,
   loadSideDataForCtg,
   patchSelection: patchMemberSelection,
+  patchSubview: rerenderSubviewPanel,
   mapAssemblyError,
   normalizeDeletedCtgRecordIds,
   normalizeGrtProjectView,
@@ -2523,6 +2542,7 @@ export function __testResetMeasuredTrackViewportWidths(nextWidths = null) {
 }
 
 function pickSelectedMember(assembly) {
+  if (assembly.ctgDetailLoading || assembly.ctgDetailError) return null;
   const members = assembly.ctgDetail?.members || [];
   if (!members.length) {
     return null;
@@ -2908,7 +2928,7 @@ function buildAssemblyStats(assembly, i18n) {
     (sum, chr) => sum + Number(chr.placedBp || 0),
     0,
   );
-  const selectedCtg = assembly.ctgDetail?.name || "-";
+  const selectedCtg = assembly.chrCtgs?.find(ctg => ctg.assemblyCtgId === assembly.selectedCtgId)?.name || assembly.ctgDetail?.name || "-";
   return [
     { label: i18n.statsLabels.referenceGenomeId, value: displayNullable(assembly.referenceGenomeId || "-") },
     { label: i18n.statsLabels.chrCount, value: String((assembly.chromosomes || []).length) },

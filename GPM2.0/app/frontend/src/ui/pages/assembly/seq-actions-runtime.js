@@ -20,7 +20,12 @@ export function bindSeqActions(host, store, deps) {
   const hideShowSeqButton = queryHost("#hide-show-seq-button");
   const setEndTypeButton = queryHost("#set-end-type-button");
 
+  for (const button of [flipSeqButton, hideShowSeqButton, setEndTypeButton]) {
+    if (button && (store.getState().assembly?.ctgDetailLoading || !store.getState().assembly?.ctgDetail)) button.disabled = true;
+  }
+
   flipSeqButton?.addEventListener("click", async () => {
+    if (store.getState().assembly?.ctgDetailLoading || store.getState().assembly?.ctgDetailError) return;
     const member = deps.pickSelectedMember(store.getState().assembly);
     if (!member) {
       return;
@@ -33,6 +38,7 @@ export function bindSeqActions(host, store, deps) {
   });
 
   hideShowSeqButton?.addEventListener("click", async () => {
+    if (store.getState().assembly?.ctgDetailLoading || store.getState().assembly?.ctgDetailError) return;
     const member = deps.pickSelectedMember(store.getState().assembly);
     if (!member) {
       return;
@@ -45,6 +51,7 @@ export function bindSeqActions(host, store, deps) {
   });
 
   setEndTypeButton?.addEventListener("click", async () => {
+    if (store.getState().assembly?.ctgDetailLoading || store.getState().assembly?.ctgDetailError) return;
     const member = deps.pickSelectedMember(store.getState().assembly);
     const leftSelect = queryHost("#left-end-type-select");
     const rightSelect = queryHost("#right-end-type-select");

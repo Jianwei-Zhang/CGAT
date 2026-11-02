@@ -2,7 +2,7 @@ import { beginAssemblyViewRequest, currentAssemblyViewRequest } from "../assembl
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { backfillFinalPathOriginIds, handleNewSequenceRowAction, loadAssemblyView, selectChromosome, selectCtg } from "../assembly-data-runtime.js";
+import { backfillFinalPathOriginIds, handleNewSequenceRowAction, loadSideDataForCtg, loadAssemblyView, selectChromosome, selectCtg } from "../assembly-data-runtime.js";
 import { normalizeFinalPathByChr } from "../final-path-state.js";
 
 test("handleNewSequenceRowAction ignores removed add-seq-to-ctg action", async () => {
@@ -435,6 +435,7 @@ test("loadAssemblyView accepts object assemblyStatus deps and loads chromosome d
     normalizeTrackSelectionCtgIds(values) {
       return values;
     },
+    patchSelection() {},
     rerender(_host, currentStore) {
       rerenders.push(currentStore.getState().assembly.summary);
     },
@@ -1740,7 +1741,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-test("chromosome reads overlap while ctg details wait only for primary ctgs", async () => {
+test("chromosome reads overlap and details start only after the complete Main barrier", async () => {
   const reads = new Map();
   const start = (name) => {
     const pending = deferred();
@@ -1765,13 +1766,16 @@ test("chromosome reads overlap while ctg details wait only for primary ctgs", as
   assert.equal(harness.store.getState().assembly.error, "");
   reads.get("primary").resolve({ items: [{ assemblyCtgId: 8 }] });
   await new Promise(setImmediate);
-  assert.ok(reads.has("details"));
-  reads.get("details").resolve({ detail: { members: [] }, candidates: {} });
+  assert.equal(reads.has("details"), false, "details cannot compete with required Main reads");
   reads.get("history").resolve({ canUndo: true, undoOperation: { kind: "flip-ctg", targetCount: 1 } });
   reads.get("phased").resolve({ tracks: [{ phasedTrackId: 1, haplotypeKey: "A", items: [{ assemblyCtgId: 8 }] }] });
   reads.get("reference").resolve({ items: [] });
   reads.get("support").resolve([]);
   reads.get("deleted").resolve([]);
+  await new Promise(setImmediate);
+  assert.equal(harness.store.getState().assembly.loading, false, "Main is usable before detail completion");
+  assert.ok(reads.has("details"));
+  reads.get("details").resolve({ detail: { members: [] }, candidates: {} });
   await pending;
   assert.equal(harness.store.getState().assembly.loading, false);
   assert.equal(harness.store.getState().assembly.mainViewHistory.canUndo, true);
@@ -1873,9 +1877,10 @@ test("initial assembly load overlaps project reads and independent chromosome re
   for (const name of ["primary", "reference", "support", "deleted"]) assert.ok(started.has(name), name);
   primary.resolve({ items: [{ assemblyCtgId: 8 }] });
   await new Promise(setImmediate);
-  assert.ok(started.has("details"));
+  assert.equal(started.has("details"), false);
   reference.resolve({ items: [] });
   await pending;
+  assert.ok(started.has("details"));
   assert.equal(harness.store.getState().assembly.loading, false);
   assert.equal(harness.store.getState().assembly.error, "");
   assert.equal(harness.store.getState().assembly.chrCtgs[0].assemblyCtgId, 8);
@@ -2130,7 +2135,7 @@ for (const mode of ["composition", "track-pair", "2-contig"]) for (const mainSpl
       preserveLegacy: true,
       projectHistorical: (historical) => projectRenderedSubviewToComposition(historical, renderAssemblyPage(historical)),
     }) : activateSubviewCompositionHistory(fixture.assembly, { stateOrLocale: fixture }).assembly;
-    const events = [], finalHtml = [];
+    const events = [], mainHtml = [], finalHtml = [];
     let controller;
     const harness = createInitialLoadHarness({
       getCurrentProject: () => ({ primaryDatasetId: 11 }),
@@ -2143,10 +2148,12 @@ for (const mode of ["composition", "track-pair", "2-contig"]) for (const mainSpl
       activateSubviewCompositionHistory,
       buildSubviewCompositionHistoryKey,
       refreshSubviewPairwiseEvidence: (...args) => controller.refreshSubviewPairwiseEvidence(...args),
+      patchSelection() { events.push("detail-patch"); },
+      patchSubview(_host, store) { events.push("local-ready-render"); finalHtml.push(renderAssemblyPage(store.getState())); },
       rerender(_host, store) {
         if (store.getState().assembly.loading) { events.push("loading-render"); return; }
-        events.push("ready-render");
-        finalHtml.push(renderAssemblyPage(store.getState()));
+        events.push("main-ready-render");
+        mainHtml.push(renderAssemblyPage(store.getState()));
       },
     });
     // Simulate a fresh process: only persisted history exists; no runtime hits,
@@ -2172,7 +2179,12 @@ for (const mode of ["composition", "track-pair", "2-contig"]) for (const mainSpl
     await harness.load();
     assert.equal(harness.store.getState().assembly.error, "");
     assert.equal(harness.store.getState().assembly.subview.pairwiseEvidence.status, "loaded");
-    assert.deepEqual(events, ["loading-render", "evidence-fetch", "ready-render"]);
+    assert.equal(events.filter(event => event === "main-ready-render").length, 1);
+    assert.ok(events.indexOf("main-ready-render") < events.indexOf("evidence-fetch"));
+    assert.equal(events.at(-1), "local-ready-render");
+    assert.equal(mainHtml.length, 1);
+    assert.match(mainHtml[0], /data-subview-panel="1" aria-busy="true"/);
+    assert.doesNotMatch(mainHtml[0], /data-subview-hit-key=/, "do not expose stale Local evidence in the early Main paint");
     assert.equal(finalHtml.length, 1);
     assert.match(finalHtml[0], /data-subview-hit-key="[^"]*evidence-1[^"]*"/);
     assert.match(finalHtml[0], /data-band-identity-pct="93\.27"/);
@@ -2244,7 +2256,7 @@ function quietSelectionFixture() {
     normalizeTrackFocusMode: value => value || "center", setPendingTrackAutoFocusMode: mode => calls.push(["focus", mode]),
     patchSelection: (_host, _store, options) => calls.push(["paint", options.focus]),
     rerender: () => { throw Error("quiet selection must not reconstruct the page"); } };
-  return { store, calls, pending, select: id => selectCtg({}, store, id, { quiet: true, focusMode: "start" }, deps) };
+  return { store, calls, pending, deps, select: id => selectCtg({}, store, id, { quiet: true, focusMode: "start" }, deps) };
 }
 
 test("member selection paints immediately without global loading and clears old edit data", async () => {
@@ -2296,4 +2308,94 @@ test("chromosome selection leaves the chooser open during and after loading, but
     assert.equal(f.store.getState().assembly.chrPickerOpen, !closeDuringLoad);
     assert.equal(f.store.getState().assembly.selectedChrName, "Chr02");
   }
+});
+
+
+test("side data no longer prefetches an unused full-project candidate catalog", async () => {
+  const detail = { assemblyCtgId: 8, members: [{ assemblySeqId: 80 }] };
+  const result = await loadSideDataForCtg("D:/fixture", 9, 8, {
+    getCtgDetail: async args => { assert.equal(args.assemblyCtgId, 8); return detail; },
+    listCtgEditCandidates: () => assert.fail("no current UI consumes these candidates"),
+  });
+  assert.equal(result.detail, detail);
+  assert.deepEqual(result.candidates, { moveTargetCtgs: [], addSeqCandidates: [] });
+});
+
+for (const kind of ["initial", "chromosome"]) test(`${kind} Main renders before detail scheduling and survives isolated detail failure`, async () => {
+  const paint = deferred(), detail = deferred(), paints = []; let calls = 0;
+  const f = createInitialLoadHarness({
+    afterMainPaint: () => paint.promise,
+    loadSideDataForCtg: () => { calls++; return detail.promise; },
+    patchSelection() { paints.push("detail-patch"); },
+    rerender(_host, store) { paints.push(store.getState().assembly.loading ? "loading" : "main-ready"); },
+  });
+  const pending = kind === "initial" ? f.load() : f.select("Chr02");
+  await new Promise(setImmediate);
+  assert.equal(f.store.getState().assembly.loading, false);
+  assert.equal(f.store.getState().assembly.ctgDetailLoading, true);
+  assert.equal(f.store.getState().assembly.ctgDetail, null);
+  assert.equal(calls, 0); assert.deepEqual(paints, ["loading", "main-ready"]);
+  paint.resolve(); await new Promise(setImmediate); assert.equal(calls, 1);
+  detail.reject(Error("detail unavailable")); await pending;
+  assert.equal(f.store.getState().assembly.loading, false);
+  assert.equal(f.store.getState().assembly.error, "");
+  assert.equal(f.store.getState().assembly.ctgDetailError, "detail unavailable");
+  assert.deepEqual(paints, ["loading", "main-ready", "detail-patch"]);
+  assert.equal(f.store.getState().assembly.chrCtgs[0].assemblyCtgId, 8);
+});
+
+test("silent editing reload retains the transaction barrier and never paints an intermediate Main/Local state", async () => {
+  const detail = deferred(); let paints = 0;
+  const f = createInitialLoadHarness({ loadSideDataForCtg: () => detail.promise,
+    rerender: () => { paints++; }, afterMainPaint: () => assert.fail("no intermediate transaction paint") });
+  const pending = loadAssemblyView({}, f.store, { renderLoading: false, renderResult: false }, f.deps);
+  await new Promise(setImmediate);
+  assert.notEqual(f.store.getState().assembly.loading, false, "do not publish a ready transaction before details finish");
+  detail.resolve({ detail: { assemblyCtgId: 8, members: [{ assemblySeqId: 80 }] }, candidates: {} });
+  await pending; assert.equal(paints, 0);
+  assert.equal(f.store.getState().assembly.ctgDetail.assemblyCtgId, 8);
+  assert.equal(f.store.getState().assembly.selectedMemberSeqId, 80);
+});
+
+for (const initial of [true, false]) {
+  test(`failed ${initial ? "initial" : "chromosome"} Main read clears obsolete independent spinners`, async () => {
+    const overrides = { listChrViewCtgs: async () => { throw Error("required Main read failed"); } };
+    const harness = initial ? createInitialLoadHarness(overrides) : createChromosomeLoadHarness(overrides);
+    harness.store.setState({ assembly: { ...harness.store.getState().assembly,
+      ctgDetailLoading: true, ctgDetailError: "old detail error", subviewRestoring: true, subviewRestoreError: "old local error" } });
+    if (initial) await harness.load(); else await harness.select("Chr02");
+    const assembly = harness.store.getState().assembly;
+    assert.equal(assembly.loading, false);
+    assert.equal(assembly.error, "required Main read failed");
+    assert.equal(assembly.ctgDetailLoading, false);
+    assert.equal(assembly.ctgDetailError, "");
+    assert.equal(assembly.subviewRestoring, false);
+    assert.equal(assembly.subviewRestoreError, "");
+  });
+}
+
+test("detail completion replaces selection loading summary on success and isolated failure", async () => {
+  const f = quietSelectionFixture();
+  f.store.setState({ locale: "en" });
+  const selecting = f.select(10);
+  f.pending[0].resolve({ detail: { assemblyCtgId: 10, members: [] } });
+  await selecting;
+  assert.equal(f.store.getState().assembly.summary, "Updated contig 10 details.");
+  const failing = f.select(20);
+  f.pending[1].reject(Error("detail unavailable"));
+  await failing;
+  assert.equal(f.store.getState().assembly.summary, "Failed to load contig 20 details.");
+  assert.equal(f.store.getState().assembly.error, "");
+  assert.equal(f.store.getState().assembly.ctgDetailError, "detail unavailable");
+});
+
+test("default contig selection uses the selection patch instead of global loading", async () => {
+  const f = quietSelectionFixture();
+  const selecting = selectCtg({}, f.store, 10, {}, f.deps);
+  assert.equal(f.store.getState().assembly.loading, false);
+  assert.equal(f.store.getState().assembly.ctgDetailLoading, true);
+  f.pending[0].resolve({ detail: { assemblyCtgId: 10, members: [] } });
+  await selecting;
+  assert.equal(f.store.getState().assembly.ctgDetailLoading, false);
+  assert.deepEqual(f.calls.filter(call => Array.isArray(call) && call[0] === "paint"), [["paint", true], ["paint", false]]);
 });

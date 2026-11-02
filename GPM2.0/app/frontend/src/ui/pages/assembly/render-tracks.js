@@ -1,3 +1,4 @@
+import { renderAssemblyLocalRestoreStatus } from "./assembly-detail-status.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { renderMainAnchorFragments } from "./main-anchor-fragments.js";
 import { mainAlignmentKey, mainAlignmentEndpointKey, mainActiveAnchorKeys, renderMainAlignmentAnchors } from "./main-alignment-anchors.js";
@@ -699,6 +700,8 @@ function createRenderTracksRenderer(deps = {}) {
   const subviewPanel = options.includeSubview === false
     ? ""
     : (() => {
+      const restoring = renderAssemblyLocalRestoreStatus(assembly, i18n);
+      if (restoring) return restoring;
       const supportSubviewCtgs = buildSupportSubviewCtgPool({
         supportChrCtgs: supportTrackCtgs,
         supportMirroredCtgs,
@@ -847,6 +850,8 @@ function createRenderTracksRenderer(deps = {}) {
   function renderAssemblySubviewPanel(state) {
     const assembly = state.assembly;
     const i18n = getAssemblyI18n(state);
+    const restoring = renderAssemblyLocalRestoreStatus(assembly, i18n);
+    if (restoring) return restoring;
     const currentProject = getCurrentProject(state);
     const supportDatasetOptions = getSupportDatasetOptions(state, currentProject);
     const supportDatasetId = normalizeSupportDatasetId(assembly.supportDatasetId);

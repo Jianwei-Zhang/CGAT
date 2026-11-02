@@ -1,3 +1,4 @@
+import { currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { memberBackingIds } from "./subview-fragment-model.js";
 import {
   getJunctionInspection as requestJunctionInspection,
@@ -217,6 +218,7 @@ export function createSubviewPairwiseController({
 
   async function loadSubviewPairwiseEvidence(host, store, summary, { rerenderAfter = true } = {}) {
     const startState = store.getState();
+    const viewRequest = currentAssemblyViewRequest(store);
     const params = resolveSubviewPairwiseEvidenceParams(startState, summary);
     if (!params) {
       return;
@@ -226,7 +228,11 @@ export function createSubviewPairwiseController({
         ? await getTrackPairwiseEvidence(params)
         : await getJunctionInspection(params);
       const currentState = store.getState();
-      if (!isCurrentRequest(currentState, params)) {
+      if (!isCurrentRequest(currentState, params)
+        || currentAssemblyViewRequest(store) !== viewRequest
+        || currentState.session?.workspacePath !== startState.session?.workspacePath
+        || currentState.session?.projectId !== startState.session?.projectId
+        || currentState.activeRoute !== startState.activeRoute) {
         return;
       }
       store.setState({
@@ -256,7 +262,11 @@ export function createSubviewPairwiseController({
       if (rerenderAfter) scheduleDeferredSubviewPanelRerender(host, store);
     } catch (error) {
       const currentState = store.getState();
-      if (!isCurrentRequest(currentState, params)) {
+      if (!isCurrentRequest(currentState, params)
+        || currentAssemblyViewRequest(store) !== viewRequest
+        || currentState.session?.workspacePath !== startState.session?.workspacePath
+        || currentState.session?.projectId !== startState.session?.projectId
+        || currentState.activeRoute !== startState.activeRoute) {
         return;
       }
       const currentEvidence = currentState.assembly?.subview?.pairwiseEvidence || null;

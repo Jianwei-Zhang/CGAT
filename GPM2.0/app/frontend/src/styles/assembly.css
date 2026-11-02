@@ -829,6 +829,32 @@
 .assembly-members-panel .ctg-chip-local-badge { color: var(--theme-muted-ink, #666); white-space: nowrap; }
 .assembly-members-panel .chip-group-separator { flex-basis: 100%; width: 100%; margin: 4px 0 2px; }
 
+/* Detail readiness is independent of the track layout. An in-flow notice
+   would move the mounted graph (and change scrollbar width) when it clears. */
+.assembly-detail-status {
+  position: fixed;
+  right: 16px;
+  bottom: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 6px 9px;
+  border: 1px solid var(--theme-line, #d7d7d7);
+  border-radius: 4px;
+  background: var(--theme-translucent-surface, rgba(255, 255, 255, 0.96));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.assembly-detail-status[hidden] {
+  display: none;
+}
+
+.assembly-detail-status button {
+  flex: none;
+}
+
 .assembly-status-toast-wrap {
   position: absolute;
   top: -34px;
