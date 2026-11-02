@@ -4,6 +4,11 @@
 
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads
+except ModuleNotFoundError:  # Imported through server.tools.
+    from .run_resources import execution_threads
+
 import argparse
 import json
 import os
@@ -477,6 +482,8 @@ def run_display_minimap(
         except json.JSONDecodeError:
             cached = False
     if not cached:
+        # Preserve the prepared command in the historical cache identity.
+        command[command.index("-t") + 1] = str(execution_threads(threads))
         (run_dir / "command.txt").write_text(shlex.join(command) + "\n", encoding="utf-8", newline="")
         with (run_dir / "stdout.log").open("w", encoding="utf-8") as stdout_handle, (
             run_dir / "stderr.log"

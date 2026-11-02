@@ -2,7 +2,8 @@
 """Noninteractive, backed-up release update; optional pre-run exec handoff."""
 from __future__ import annotations
 
-from contextlib import ExitStack
+import io
+from contextlib import ExitStack, nullcontext, redirect_stdout
 import datetime as dt
 import json
 import os
@@ -363,17 +364,36 @@ def run(tools, *, startup=False, workspace=None):
     with tempfile.TemporaryDirectory(prefix="gpm-server-update-") as tmp:
         # Only pre-mutation failures may fall back during startup. apply() and
         # its rollback stay outside this catch: uncertain updates MUST stop.
+        diagnostics = io.StringIO()
         try:
-            release = downloads.discover()
-            source = downloads.extract(release, Path(tmp))
-            plan = prepare(source, tools, workspace, release)
-            if startup and plan["unknown_baselines"]:
-                raise ValueError("legacy files have no recorded baseline; use update.sh explicitly for a backed-up adoption")
+            # Automatic startup is quiet; explicit update.sh keeps actionable details.
+            with redirect_stdout(diagnostics) if startup else nullcontext():
+                release = downloads.discover()
+                source = downloads.extract(release, Path(tmp))
+                plan = prepare(source, tools, workspace, release)
+                if startup and plan["unknown_baselines"]:
+                    raise ValueError("legacy files have no recorded baseline; use update.sh explicitly for a backed-up adoption")
         except (OSError, ValueError, RuntimeError, KeyError, TypeError, tarfile.TarError) as exc:
             if not startup:
                 raise
             verify_installed(tools, workspace)
-            print("[UPDATE] Check unavailable; keeping the verified installed runtime: " + str(exc), file=sys.stderr)
+            # Diagnostic logging is best effort and never weakens local integrity gates.
+            try:
+                log_path = core.regular_path(workspace or tools, ".run_all/update-check.log")
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with log_path.open("a", encoding="utf-8") as log:
+                    log.write(dt.datetime.now(dt.timezone.utc).isoformat() + "\n" + diagnostics.getvalue() + type(exc).__name__ + ": " + str(exc) + "\n")
+            except (OSError, ValueError):
+                pass
+            unreachable = (exc.network_only if isinstance(exc, downloads.SourcesUnavailable)
+                           else downloads.network_unreachable(exc))
+            if unreachable:
+                detail = (".prepare_lib matches the verified local installation. Continuing."
+                          if workspace is not None else "Continuing with the verified local installation.")
+                message = "Update sources unreachable; " + detail
+            else:
+                message = "Update check incomplete; continuing with the verified local runtime."
+            print("[UPDATE] " + message, file=sys.stderr)
             return 0
         if not plan["files"]:
             print("Already up to date / 当前已是最新版本，无需更新: " + release["tag"])

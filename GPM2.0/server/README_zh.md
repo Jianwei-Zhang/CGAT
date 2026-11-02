@@ -277,7 +277,9 @@ LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之�
 | `prepare.sh` | 兼容原有的仅准备命令 | 需要单独生成脚本时 |
 | `export_final_path_fasta.sh` | 根据 App 导出的 Final Path TSV 重建 FASTA | 流程后期按需使用，不是安装步骤 |
 
-重复同一条 `run.sh` 命令，或执行 `bash "$SERVER/run.sh" -o ./gpm_server` 即可恢复；已通过校验的结果会复用。生成的 `run_all.sh` 仍可直接执行。
+重复同一条 `run.sh` 命令，或执行 `bash "$SERVER/run.sh" -o ./gpm_server` 即可恢复；已通过校验的结果会复用。生成的 `run_all.sh` 仍可直接执行。旧作业停止后，可用 `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` 调整线程预算，也可修改 `--lgz-qc-memory-gb`。省略资源参数或直接运行 `run_all.sh` 时沿用上次生效值；恢复前需申请相应调度资源，不会在线调整正在运行的作业。资源修改不改变分析设置，也不会仅因此使其他条件仍有效的已完成结果失效。
+
+计算节点无法访问更新源时，启动会校验本机安装，并在无需下载的情况下对齐 `.prepare_lib`。检查失败的详细信息保存在 `.run_all/update-check.log`；离线启动不表示本机已经是线上最新版本。
 
 `--max-fill <bp>` 设置 Step3 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
 

@@ -615,7 +615,7 @@ printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
                 fake_bin / "merqury.sh",
                 "--craq",
                 fake_bin / "craq",
-                env=env,
+                env={**env, "GPM_RUN_THREADS": "64", "GPM_RUN_QC_MEMORY_GB": "120"},
             )
             self.assertEqual(migrated.returncode, 0, migrated.stderr)
             self.assertIn("Removed legacy external CRAQ input links", migrated.stdout)

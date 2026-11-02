@@ -30,11 +30,13 @@ class ServerRunTests(unittest.TestCase):
                 ("last", "exit 7"),
             ])
             env = fixture.configure_reference_inputs(template, template_root, ["ds"])
+            metadata = template / "metadata/prepare_options.tsv"
+            metadata.write_text(metadata.read_text().replace("threads\t12", "threads\t10"))
             (template / "run_all.sh").write_text("# prepared execution entry\n")
             output = root / "result"
             ref = root / "ref.fa"
             ref.write_text(">r\nACGT\n")
-            argv = ["--ref", str(ref), "--ds", str(ref), "-o", str(output)]
+            argv = ["--ref", str(ref), "--ds", str(ref), "-o", str(output), "--threads", "10"]
             def prepare(_script, _args, target):
                 self.assertTrue((target / ".run_all/lock").is_dir())
                 shutil.copytree(template, target, dirs_exist_ok=True)
@@ -47,8 +49,10 @@ class ServerRunTests(unittest.TestCase):
                 self.assertFalse((output / ".run_all/lock").exists())
                 original_metadata = (output / "metadata/prepare_options.tsv").read_bytes()
                 (output / "commands/last.sh").write_text("exit 0\n")
-                self.assertEqual(server_run.execute(argv, root), 0)
+                self.assertEqual(server_run.execute(argv + ["--threads", "64", "--lgz-qc-memory-gb", "120"], root), 0)
                 self.assertEqual(preparation.call_count, 1)
+                launch = json.loads((output / ".run_all/launch.json").read_text())
+                self.assertEqual(launch["options"]["--threads"], [["10"]])
                 self.assertEqual((output / "run-count.txt").read_text(), "run\n")
                 self.assertEqual((output / "metadata/prepare_options.tsv").read_bytes(), original_metadata)
                 self.assertIn("[SKIP_VALID] [ref:ds]", (output / "logs/run_all.log").read_text())

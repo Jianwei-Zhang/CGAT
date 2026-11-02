@@ -21,6 +21,7 @@ from server_report_collect import (
 )
 from server_report_io import SCHEMA, digest, local_path, now, read_json, write_json
 from render_server_report import project_report_facts, render
+from run_resources import read_resources
 
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
@@ -103,7 +104,8 @@ class ReportSession:
         write_json(self.report / "inputs.json", saved)
         self.manifest = {"schema_version": SCHEMA, "run_id": run_id,
                          "started_at": now(), "ended_at": None, "status": "running",
-                         "workspace_name": root.name, "steps": [], "errors": []}
+                         "workspace_name": root.name, "steps": [], "errors": [],
+                         "execution_resources": read_resources(root)}
         self.records = {}
         self.output_tails = {}
         self.cached_stages_by_unit = {}

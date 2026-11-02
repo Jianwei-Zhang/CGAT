@@ -1,10 +1,13 @@
 """Offline end-to-end contracts for the shared installer/update entrypoints."""
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import copy
 import hashlib
 import io
 import json
 import os
+import socket
+import ssl
+import urllib.error
 import sys
 from pathlib import Path
 import shutil
@@ -81,6 +84,19 @@ class DownloadTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     downloads.docs_release()
 
+
+
+    def test_network_classification_preserves_nonnetwork_failures(self):
+        dns = socket.gaierror(-2, "Name or service not known")
+        for failures, network in (([dns, TimeoutError()], True),
+                ([urllib.error.URLError(dns), ConnectionRefusedError()], True),
+                ([dns, ValueError("invalid manifest")], False),
+                ([dns, urllib.error.HTTPError("https://github.com", 503, "unavailable", {}, None)], False),
+                ([ssl.SSLError("certificate verification failed"), dns], False)):
+            with self.subTest(network=network), mock.patch.object(downloads, "docs_release", side_effect=failures[0]), mock.patch.object(downloads, "github_release", side_effect=failures[1]):
+                with self.assertRaises(downloads.SourcesUnavailable) as error:
+                    downloads.discover(log=lambda _: None)
+                self.assertEqual(error.exception.network_only, network)
 
 
 class CoordinatedUpdateTests(unittest.TestCase):
@@ -466,6 +482,38 @@ class CoordinatedUpdateTests(unittest.TestCase):
         self.assertEqual(launcher.stat().st_mode & 0o777, 0o755)
         update.rollback(backup)
         self.assertEqual(launcher.read_bytes(), update.LEGACY_RUN_ALL)
+
+    def test_startup_dns_failure_is_concise_and_keeps_details_in_private_log(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        failure = socket.gaierror(-2, "Name or service not known")
+        with mock.patch.object(downloads, "docs_release", side_effect=failure), mock.patch.object(downloads, "github_release", side_effect=failure), redirect_stdout(stdout), redirect_stderr(stderr):
+            self.assertEqual(update.run(self.tools, startup=True, workspace=self.work), 0)
+        self.assertEqual(stderr.getvalue(), "[UPDATE] Update sources unreachable; .prepare_lib matches the verified local installation. Continuing.\n")
+        for detail in ("Both official sources failed", "Name or service not known", "Source unavailable; falling back"):
+            self.assertNotIn(detail, stdout.getvalue() + stderr.getvalue())
+            self.assertIn(detail, (self.work / ".run_all/update-check.log").read_text())
+
+    def test_nonnetwork_startup_failure_is_not_claimed_to_be_offline(self):
+        stderr = io.StringIO()
+        with mock.patch.object(downloads, "discover", side_effect=ValueError("invalid release manifest")), redirect_stderr(stderr):
+            self.assertEqual(update.run(self.tools, startup=True, workspace=self.work), 0)
+        self.assertEqual(stderr.getvalue(), "[UPDATE] Update check incomplete; continuing with the verified local runtime.\n")
+        self.assertIn("invalid release manifest", (self.work / ".run_all/update-check.log").read_text())
+
+    def test_startup_without_workspace_does_not_claim_runtime_alignment(self):
+        stderr = io.StringIO()
+        with mock.patch.object(downloads, "discover", side_effect=socket.gaierror(-2, "DNS unavailable")), redirect_stderr(stderr):
+            self.assertEqual(update.run(self.tools, startup=True), 0)
+        self.assertIn("Update sources unreachable", stderr.getvalue())
+        self.assertNotIn(".prepare_lib", stderr.getvalue())
+
+    def test_explicit_update_keeps_failure_details_and_does_not_continue(self):
+        output = io.StringIO()
+        failure = socket.gaierror(-2, "Name or service not known")
+        with mock.patch.object(downloads, "docs_release", side_effect=failure), mock.patch.object(downloads, "github_release", side_effect=failure), redirect_stdout(output):
+            with self.assertRaisesRegex(downloads.SourcesUnavailable, "Both official sources failed"):
+                update.run(self.tools)
+        self.assertIn("Name or service not known", output.getvalue())
 
     def test_startup_failure_before_mutation_keeps_installed_code(self):
         before = [self.snapshot(root) for root in (self.tools, self.work)]

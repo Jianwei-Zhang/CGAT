@@ -6,6 +6,11 @@ change. Index identity includes exact target bytes, preset and executable hash.
 """
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads
+except ModuleNotFoundError:  # Imported through server.tools.
+    from ..run_resources import execution_threads
+
 from contextlib import contextmanager
 import json
 import os
@@ -115,7 +120,7 @@ class RefillBatchAlignment:
                     with cache_lock(index_parent / f"{index_key}.lock"):
                         index_hit = valid_cache(index_dir, index_key, ("target.mmi",))
                         index_temporary = None
-                        command = [str(executable), "-x", PRESET, "-t", str(self.threads),
+                        command = [str(executable), "-x", PRESET, "-t", str(execution_threads(self.threads)),
                                    "-c", "-o", str(temporary / "result.paf")]
                         if index_hit:
                             mapping_target = index_dir / "target.mmi"

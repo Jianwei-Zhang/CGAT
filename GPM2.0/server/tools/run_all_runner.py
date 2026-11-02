@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from run_progress import ProgressDisplay, plain
+from run_resources import execution_threads, read_resources, resource_environment
 from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
                                   changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
@@ -315,6 +316,7 @@ class Runner:
         self.child_cache_markers: set[str] = set()
         self.report: ReportSession | None = None
         self.minimap2_failure_hints: dict[str, str] = {}
+        self.child_environment = resource_environment(server_dir)
 
     def _event(self, event: str, unit: PlanUnit | None, message: str) -> None:
         if unit is None:
@@ -475,7 +477,7 @@ class Runner:
             code = run_tasks(
                 tasks, budget, self.active_children, lambda: self.received_signal,
                 start, lambda task, line: self._child_line(by_id[task.unit_id], line), finish,
-                {**os.environ, "GPM_REPORT_RUN_ID": self.run_id},
+                {**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id},
                 dispatch=dispatcher,
             )
         finally:
@@ -591,6 +593,8 @@ class Runner:
                         for row in csv.DictReader(handle, delimiter="\t")
                     }
                 threads = options.get("threads", "unknown")
+                if threads != "unknown":
+                    threads = str(execution_threads(int(threads), root=self.server_dir))
             except (OSError, UnicodeError, csv.Error, KeyError):
                 pass
 
@@ -603,6 +607,9 @@ class Runner:
             self.progress.raw(separator)
             self.progress.header(self.run_id, mode, self.server_dir, threads)
             log_handle.write(separator + "\n")
+            resources = read_resources(self.server_dir)
+            if resources["effective"]:
+                self._event("RESOURCES", None, json.dumps(resources, sort_keys=True))
             if mode == "resume":
                 self._event("RESUME", None, "rechecking the prepared execution plan")
             for unit_id in abandoned:
@@ -733,8 +740,9 @@ class Runner:
                         errors="replace",
                         bufsize=1,
                         start_new_session=True,
-                        env={**os.environ, "GPM_REPORT_RUN_ID": self.run_id,
-                             "GPM_REPORT_UNIT_ID": unit.unit_id},
+                        env={**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id,
+                             "GPM_REPORT_UNIT_ID": unit.unit_id,
+                             **({"GPM_TASK_THREADS": str(threads)} if threads != "unknown" else {})},
                     )
                     self.active_child = child
                     if self.received_signal is not None and child.poll() is None:

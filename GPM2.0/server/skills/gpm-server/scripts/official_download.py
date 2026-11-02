@@ -6,7 +6,11 @@ uses docs first, then GitHub on failure. Archive fallback keeps the same identit
 """
 from __future__ import annotations
 
+import errno
 import hashlib
+import socket
+import ssl
+import urllib.error
 import json
 from pathlib import Path
 import re
@@ -20,6 +24,25 @@ SITE = "https://riceome.hzau.edu.cn/cgat/"
 TIMEOUT = 8
 TOTAL_TIMEOUT = 25
 HOSTS = legacy.HOSTS | {"riceome.hzau.edu.cn"}
+
+
+def network_unreachable(exc):
+    """Do not call HTTP, TLS, malformed metadata, or integrity errors 'offline'."""
+    if isinstance(exc, (urllib.error.HTTPError, ssl.SSLError)):
+        return False
+    if isinstance(exc, urllib.error.URLError):
+        return network_unreachable(exc.reason)
+    return isinstance(exc, (socket.gaierror, ConnectionError, TimeoutError)) or (
+        isinstance(exc, OSError) and exc.errno in {
+            errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ENETDOWN, errno.ECONNREFUSED,
+            errno.ECONNRESET, errno.ECONNABORTED, errno.ETIMEDOUT,
+        })
+
+
+class SourcesUnavailable(ValueError):
+    def __init__(self, message, failures):
+        super().__init__(message)
+        self.network_only = bool(failures) and all(network_unreachable(exc) for exc in failures)
 
 
 def check_url(url):
@@ -96,7 +119,7 @@ def identity(record):
 
 
 def discover(log=print):
-    errors = []
+    errors, failures = [], []
     for name, fetch in (("CGAT docs", docs_release), ("GitHub Release", github_release)):
         try:
             selected = fetch()
@@ -104,13 +127,14 @@ def discover(log=print):
             log("Version source: " + name)
             return {**selected, "urls": urls}
         except (OSError, ValueError, KeyError, TypeError) as exc:
+            failures.append(exc)
             errors.append(f"{name}: {exc}")
             log("Source unavailable; falling back: " + errors[-1])
-    raise ValueError("Both official sources failed; freshness is unknown. " + "; ".join(errors))
+    raise SourcesUnavailable("Both official sources failed; freshness is unknown. " + "; ".join(errors), failures)
 
 
 def download(record, log=print):
-    failures = []
+    failures, causes = [], []
     # Reconstruct official URLs from validated fields rather than trusting a saved plan.
     urls = [SITE + "downloads/{tag}/{asset}".format(**record), record["url"]]
     for url in urls:
@@ -121,9 +145,10 @@ def download(record, log=print):
             log("Verified download: " + url)
             return data
         except (OSError, ValueError) as exc:
+            causes.append(exc)
             failures.append(f"{url}: {exc}")
             log("Download failed; trying the other official source: " + str(exc))
-    raise ValueError("Both archive downloads failed: " + "; ".join(failures))
+    raise SourcesUnavailable("Both archive downloads failed: " + "; ".join(failures), causes)
 
 
 def extract(record, output: Path, log=print):

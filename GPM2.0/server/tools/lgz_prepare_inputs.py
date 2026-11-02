@@ -4,6 +4,11 @@
 
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads, execution_qc_memory
+except ModuleNotFoundError:  # Imported through server.tools.
+    from .run_resources import execution_threads, execution_qc_memory
+
 import argparse
 import csv
 import hashlib
@@ -864,8 +869,8 @@ def prepare(args: argparse.Namespace) -> None:
                 sequences,
                 reads,
                 tools,
-                args.threads,
-                args.memory_gb,
+                execution_threads(args.threads),
+                execution_qc_memory(args.memory_gb),
                 args.kmer_size,
                 reads_qc_full,
                 input_sha256,

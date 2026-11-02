@@ -11,6 +11,11 @@ the entrypoint.
 
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads
+except ModuleNotFoundError:  # Imported through server.tools.
+    from .run_resources import execution_threads
+
 import argparse
 import json
 import os
@@ -394,7 +399,7 @@ def cached_terminal_mummer(
                     str(MUMMER_MIN_MATCH),
                     "--batch=500000000",
                     "-t",
-                    str(threads),
+                    str(execution_threads(threads)),
                     "-p",
                     str(prefix),
                     str(donor_path),
@@ -768,7 +773,7 @@ def cached_candidate_minimap(
                 "-c",
                 "--secondary=no",
                 "-t",
-                str(threads),
+                str(execution_threads(threads)),
                 "-o",
                 str(temporary / "result.paf"),
                 str(temporary / "target.fa"),

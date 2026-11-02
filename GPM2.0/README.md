@@ -167,7 +167,7 @@ python3 /path/to/report/render_report.py
 
 The renderer reads only report-local records and does not rerun alignments or repairs. Reports contain no raw FASTA/reads; unmeasured quality metrics remain unavailable. Gap counts use consecutive runs of at least 100 Ns; explicit connector segments and total N bases are recorded separately. Automatic reporting currently covers `prepare.sh` and `run_all.sh`; standalone incremental or packaging commands do not update an earlier run's report. See [report format and scope](server/REPORT.md).
 
-The first `run.sh` invocation prepares and runs the full workflow automatically. Resume with the same command or just `-o`. The existing `prepare.sh` and generated `run_all.sh` remain compatible. The prepared thread count remains fixed; runtime `--threads`, `--from`, `--until`, and `--stage` overrides are not supported.
+The first `run.sh` invocation prepares and runs the full workflow automatically. Resume with the same command or just `-o`. The existing `prepare.sh` and generated `run_all.sh` remain compatible. After the previous job has stopped, use `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` to change the thread budget; `--lgz-qc-memory-gb` may also be adjusted. Validated completed work is reused, and omitted resource budgets retain their last values. Request matching scheduler resources before resuming; these options do not resize a live job. The generated `run_all.sh` inherits saved budgets but accepts no new resource flags. `--from`, `--until`, and `--stage` overrides remain unsupported.
 
 ```bash
 tail -F ./gpm_server/logs/progress.log

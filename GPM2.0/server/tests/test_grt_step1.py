@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -321,7 +322,8 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
             )
 
             q1_before = prepare_fixture.sha256(server / "grt/q/q1.fa")
-            repeated = self.run_step1(server, minimap, log)
+            with patch.dict(os.environ, {"GPM_RUN_THREADS": "64"}):
+                repeated = self.run_step1(server, minimap, log)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertFalse(log.exists())
             self.assertEqual(repeated.stdout.count("cache hit:"), 3)

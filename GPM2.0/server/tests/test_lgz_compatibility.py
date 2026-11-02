@@ -76,7 +76,7 @@ for prefix in ('', 'server.tools.'):
         self.assertEqual(updater.engine_hash(TOOLS), repair_engine_sha256(TOOLS / "lgz_core"))
         self.assertEqual(updater.engine_hash(TOOLS), repair_engine_sha256(TOOLS / "grt_core"))
         files = {p.relative_to(TOOLS).as_posix() for p in engine_source_files(TOOLS)}
-        for name in ("lgz_core/step2_engine.py", "grt_core/step2_engine.py", "lgz_step3.py", "grt_step3.py", "lgz_compat.py"):
+        for name in ("lgz_core/step2_engine.py", "grt_core/step2_engine.py", "lgz_step3.py", "grt_step3.py", "lgz_compat.py", "run_resources.py"):
             self.assertIn(name, files)
 
     def test_new_cli_flags_preserve_existing_persisted_option_identity(self):

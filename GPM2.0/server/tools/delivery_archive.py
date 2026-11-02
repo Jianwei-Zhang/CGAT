@@ -1,6 +1,11 @@
 """Delivery archive creation and finalized-report attachment."""
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads
+except ModuleNotFoundError:  # Imported through server.tools.
+    from .run_resources import execution_threads
+
 import argparse
 import csv
 import contextlib
@@ -23,7 +28,7 @@ def archive_options(root: Path) -> tuple[str, int]:
     format_name = options.get("archive_format", "zip")
     if format_name not in {"zip", "tar.gz"}:
         raise ValueError(f"unsupported archive format: {format_name}")
-    threads = int(options.get("threads", "1"))
+    threads = execution_threads(int(options.get("threads", "1")), root=root)
     if threads < 1:
         raise ValueError("archive threads must be positive")
     available = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)

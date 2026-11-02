@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads
+except ModuleNotFoundError:  # Imported through server.tools.
+    from ..run_resources import execution_threads
+
 import json
 import os
 import re
@@ -202,7 +207,7 @@ def run_minimap(
         "-x",
         PRESET,
         "-t",
-        str(threads),
+        str(execution_threads(threads)),
         "-c",
         "-o",
         str(paf_path),

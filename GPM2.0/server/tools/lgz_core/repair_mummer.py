@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads
+except ModuleNotFoundError:  # Imported through server.tools.
+    from ..run_resources import execution_threads
+
 from .repair_common import *
 
 
@@ -398,7 +403,7 @@ def mummer_partition_workers(
     # current headroom for Python, other pipeline processes and the OS.
     per_job = max(512 * 1024**2, 32 * max(partition_sizes) + 4 * query_size)
     memory_workers = max(1, int(available * 0.7) // per_job) if available else 1
-    return max(1, min(threads, cpu_count, len(partition_sizes), memory_workers))
+    return max(1, min(execution_threads(threads), cpu_count, len(partition_sizes), memory_workers))
 
 
 
@@ -1002,7 +1007,7 @@ def cached_mummer_chromosome(
             )
             print(f"LGZ {stage} MUMmer {chromosome}: {len(selected_partitions)}/"
                   f"{len(target_partitions)} partitions, "
-                  f"workers={workers}, nucmer_threads=1, thread_budget={threads}", flush=True)
+                  f"workers={workers}, nucmer_threads=1, thread_budget={execution_threads(threads)}", flush=True)
             cancel_event = execution.cancel_event if execution is not None else Event()
             results: dict[int, tuple[Path, bool, float]] = {}
             pool = execution.pool if execution is not None else ThreadPoolExecutor(max_workers=workers)

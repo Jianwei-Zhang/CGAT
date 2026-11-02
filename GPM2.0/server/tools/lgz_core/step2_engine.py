@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+try:
+    from run_resources import execution_threads
+except ModuleNotFoundError:  # Imported through server.tools.
+    from ..run_resources import execution_threads
+
 from .repair_common import *
 from .repair_mummer import (
     collect_mummer,
@@ -185,7 +190,7 @@ def cached_validation_alignment(
                 "-x",
                 MINIMAP_PRESET,
                 "-t",
-                str(threads),
+                str(execution_threads(threads)),
                 "-c",
                 "-r",
                 "100",

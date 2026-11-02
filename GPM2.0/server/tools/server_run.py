@@ -13,6 +13,7 @@ from pathlib import Path
 
 from run_all_runner import Runner, RunnerError, WorkspaceLock, load_plan, new_run_id
 from run_orchestration import OrchestrationContractError, atomic_write_json
+from run_resources import RESOURCE_OPTIONS, update_resources
 
 ALIASES = {
     "-o": "--out", "--output": "--out", "-t": "--threads",
@@ -49,7 +50,7 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
             raise RunnerError(f"{key} requires a value; see run.sh --help")
         if key in PATH_OPTIONS or key == "--out":
             values[-1] = str((cwd / values[-1]).resolve())
-        if key in {"--max-fill", "--self-m", "--self-n"} and not re.fullmatch(r"[1-9][0-9]*", values[0]):
+        if key in {"--max-fill", "--self-m", "--self-n", *RESOURCE_OPTIONS} and not re.fullmatch(r"[1-9][0-9]*", values[0]):
             raise RunnerError(f"{key} must be a positive integer")
         allowed = {"--grt-execution-profile": {"baseline", "optimized"},
                    "--grt-step3-mummer-scope": {"full", "gap-screen"}}
@@ -75,7 +76,7 @@ def input_identities(options: dict) -> dict:
 
 def check_resume_options(requested: dict, saved: dict, identities: dict) -> None:
     for key, value in requested.items():
-        if key in {"--out", "--max-fill"}:
+        if key in {"--out", "--max-fill", *RESOURCE_OPTIONS}:
             continue
         if value != saved.get(key):
             raise RunnerError(f"{key} differs from the prepared workspace. Use a new -o directory for changed inputs/settings.")
@@ -160,6 +161,7 @@ def execute(argv: list[str], server_source: Path) -> int:
         print(result.stdout.replace("server/prepare.sh", "server/run.sh"))
         print("run.sh prepares once and automatically executes the full workflow.\n"
               "Resume: rerun the same command, or bash server/run.sh -o <workspace>.\n"
+              "Resume with a new thread budget: bash server/run.sh -o <workspace> --threads 64\n"
               "Change only the Step3 refill limit: bash server/run.sh -o <workspace> --max-fill 2000000")
         return result.returncode
     options = parse_options(argv, Path.cwd())
@@ -173,7 +175,7 @@ def execute(argv: list[str], server_source: Path) -> int:
         ready = saved.get("prepared", False) if saved else (root / "run_all.sh").is_file()
         if saved:
             check_resume_options(options, saved["options"], saved["inputs"])
-        elif ready and any(key not in {"--out", "--max-fill"} for key in options):
+        elif ready and any(key not in {"--out", "--max-fill", *RESOURCE_OPTIONS} for key in options):
             raise RunnerError("Resume this existing workspace with run.sh -o <workspace>; its original launch settings were not recorded by run.sh.")
         if ready and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):
             sys.path.insert(0, str(server_source / "tools/long_cigar_recovery"))
@@ -200,6 +202,7 @@ def execute(argv: list[str], server_source: Path) -> int:
             load_plan(root)
             saved["prepared"] = True
             atomic_write_json(manifest_path, saved)
+        update_resources(root, options, run_id)
         if "--max-fill" in options:
             limit = options["--max-fill"][-1][0]
             update_fill_limit(root, limit)

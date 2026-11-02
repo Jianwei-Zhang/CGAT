@@ -165,7 +165,7 @@ python3 /path/to/report/render_report.py
 
 生成器只读取报告目录内的记录，不重新计算比对或修复。报告不携带原始 FASTA/reads；未测量的质量指标不显示为零。报告中的 gap 统计指连续至少 100 个 N，显式连接 gap 与 N 碱基总数分别记录。当前自动报告覆盖 `prepare.sh` 和 `run_all.sh`；单独执行增量脚本或打包脚本不会更新此前的运行报告。详见 [报告格式与边界](server/REPORT.md)。
 
-首次 `run.sh` 会自动准备并运行完整流程；恢复时重复原命令，或仅指定 `-o`。原有 `prepare.sh` 和生成的 `run_all.sh` 仍兼容。线程数固定为准备阶段的值；不支持运行时 `--threads`、`--from`、`--until` 或 `--stage` 覆盖。
+首次 `run.sh` 会自动准备并运行完整流程；恢复时重复原命令，或仅指定 `-o`。原有 `prepare.sh` 和生成的 `run_all.sh` 仍兼容。旧作业停止后，可用 `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` 调整线程预算，也可修改 `--lgz-qc-memory-gb`。已完成且校验有效的工作会复用；省略资源参数时沿用上次生效值。恢复前需申请相应调度资源，这些参数不会在线调整正在运行的作业。生成的 `run_all.sh` 会继承已保存的预算，但不新增资源参数入口；仍不支持 `--from`、`--until` 或 `--stage` 覆盖。
 
 ```bash
 tail -F ./gpm_server/logs/progress.log
