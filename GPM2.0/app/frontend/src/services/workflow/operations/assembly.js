@@ -64,9 +64,9 @@ export async function getProjectOverviewSources({ workspaceRoot, projectId }) {
   return callDevBridge("/api/get-project-overview-sources", { workspaceRoot, projectId });
 }
 
-export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false }) {
+export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false, previewScope = null }) {
   if (isTauriRuntime()) {
-    return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId, previewOnly });
+    return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId, previewOnly, previewScope });
   }
   try {
     return await callDevBridge("/api/list-chr-view-ctgs", {

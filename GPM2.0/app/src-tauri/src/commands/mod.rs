@@ -1233,12 +1233,17 @@ mod tests {
             Some("Chr01".to_string()),
             Some(11),
             None,
+            None,
         ))
         .expect("list chr view ctgs");
 
         assert_eq!(
             result["items"][0]["originId"].as_str(),
             Some("utig4-001122l")
+        );
+        assert!(
+            result["items"][0].get("originSourceSeqId").is_none(),
+            "Main endpoint identity contract must not change"
         );
         assert_eq!(result["items"][0]["orient"].as_str(), Some("-"));
         assert_eq!(result["items"][0]["refOrient"].as_str(), Some("+"));
@@ -1249,6 +1254,7 @@ mod tests {
             None,
             None,
             Some(true),
+            None,
         ))
         .expect("list compact preview ctgs");
         assert_eq!(
@@ -1256,6 +1262,36 @@ mod tests {
             Some("utig4-001122l")
         );
         assert_eq!(preview["items"][0]["memberCount"].as_i64(), Some(1));
+        assert!(preview["items"][0]["originSourceSeqId"].as_i64().is_some());
+        let delta = tauri::async_runtime::block_on(list_chr_view_ctgs(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            None,
+            None,
+            Some(true),
+            Some(
+                gpm_next_backend::main_view::preview_delta::PreviewSourceScope {
+                    dirty_chr_names: vec!["Chr01".to_string()],
+                    source_seq_ids: vec![],
+                    dataset_ids: vec![],
+                },
+            ),
+        ))
+        .expect("preview source delta");
+        assert_eq!(delta["items"], preview["items"]);
+        assert!(
+            delta.get("delta").is_none(),
+            "broad scope uses the full authoritative reader without fake delta metadata"
+        );
+        let phased = tauri::async_runtime::block_on(list_phased_chr_tracks(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            "Chr01".to_string(),
+        ))
+        .expect("background phased Preview read");
+        assert_eq!(phased["parentChrName"], "Chr01");
+        assert_eq!(phased["tracks"], json!([]));
+
         for omitted in [
             "chrOrder",
             "placementMode",
@@ -1284,6 +1320,29 @@ mod tests {
         assert_eq!(overview["ctgs"][0]["placementMode"], "manual");
         assert!(overview["ctgs"][0].get("hits").is_none());
         assert_eq!(overview["phasedChrTracksByChr"], json!({}));
+
+        conn.execute_batch("INSERT INTO source_seq(id,dataset_id,seq_name,seq_order,length) VALUES(102,11,'other',2,100);
+            INSERT INTO assembly_seq(id,project_id,source_seq_id,orient,source_start,source_end,created_at) VALUES(202,7,102,'+',1,100,'0');
+            INSERT INTO assembly_ctg(id,project_id,assembly_seq_id,name,assigned_chr_name,chr_order,anchor_start,ref_orient,placement_mode,created_at) VALUES(302,7,202,'unplaced',NULL,NULL,NULL,'+','manual','0');").expect("insert unrelated source for partial delta");
+        let partial = tauri::async_runtime::block_on(list_chr_view_ctgs(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            None,
+            None,
+            Some(true),
+            Some(
+                gpm_next_backend::main_view::preview_delta::PreviewSourceScope {
+                    dirty_chr_names: vec!["Chr01".to_string()],
+                    source_seq_ids: vec![101],
+                    dataset_ids: vec![],
+                },
+            ),
+        ))
+        .expect("partial source delta wire contract");
+        assert_eq!(partial["items"], preview["items"]);
+        assert_eq!(partial["delta"]["encoding"], "preview-source-delta-v1");
+        assert_eq!(partial["delta"]["sourceSeqIds"], json!([101]));
+        assert_eq!(partial["delta"]["orderedCtgIds"], json!([301, 302]));
 
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");

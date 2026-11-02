@@ -24,16 +24,23 @@ pub async fn list_chr_view_ctgs(
     chrName: Option<String>,
     datasetId: Option<i64>,
     previewOnly: Option<bool>,
+    previewScope: Option<gpm_next_backend::main_view::preview_delta::PreviewSourceScope>,
 ) -> CommandResult<Value> {
     run_blocking_command("list_chr_view_ctgs", move || {
         (|| {
             let preview_only = previewOnly.unwrap_or(false);
             let db_path = project_db_path(&workspaceRoot);
-            let items = if preview_only {
+            let delta = if preview_only {
+                previewScope.as_ref().map(|scope| gpm_next_backend::main_view::preview_delta::read_preview_source_delta(&db_path, projectId, scope)).transpose()?
+            } else { None };
+            let (items, delta_metadata) = if let Some(delta) = delta {
+                let metadata = if delta.full {None} else {Some(json!({"encoding":"preview-source-delta-v1", "sourceSeqIds":delta.source_seq_ids, "orderedCtgIds":delta.ordered_ctg_ids}))};
+                (delta.items, metadata)
+            } else { (if preview_only {
                 backend_list_chr_view_ctgs_for_preview(&db_path, projectId)?
             } else {
                 backend_list_chr_view_ctgs(&db_path, projectId, chrName.as_deref(), datasetId)?
-            };
+            }, None) };
             let mapped = items
                 .into_iter()
                 .map(|item| {
@@ -124,6 +131,7 @@ pub async fn list_chr_view_ctgs(
                         "datasetName": item.dataset_name,
                         "sourceFragment": item.source_fragment
                     });
+                    if preview_only { payload["originSourceSeqId"] = json!(item.origin_source_seq_id); }
                     if !preview_only {
                         payload["chrOrder"] = json!(item.chr_order);
                         payload["placementMode"] = json!(item.placement_mode);
@@ -139,7 +147,9 @@ pub async fn list_chr_view_ctgs(
                     payload
                 })
                 .collect::<Vec<_>>();
-            Ok(json!({ "items": mapped }))
+            let mut result = json!({ "items": mapped });
+            if let Some(metadata) = delta_metadata { result["delta"] = metadata; }
+            Ok(result)
         })()
         .map_err(format_error)
     })
@@ -287,29 +297,32 @@ pub async fn list_reference_track_members(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn list_phased_chr_tracks(
+pub async fn list_phased_chr_tracks(
     workspaceRoot: String,
     projectId: i64,
     parentChrName: String,
 ) -> CommandResult<Value> {
-    (|| {
-        let result = backend_list_phased_chr_tracks(
-            &project_db_path(&workspaceRoot),
-            projectId,
-            &parentChrName,
-        )?;
-        let tracks = result
-            .tracks
-            .into_iter()
-            .map(map_phased_track)
-            .collect::<Vec<_>>();
-        Ok(json!({
-            "projectId": result.project_id,
-            "parentChrName": result.parent_chr_name,
-            "tracks": tracks
-        }))
-    })()
-    .map_err(format_error)
+    run_blocking_command("list_phased_chr_tracks", move || {
+        (|| {
+            let result = backend_list_phased_chr_tracks(
+                &project_db_path(&workspaceRoot),
+                projectId,
+                &parentChrName,
+            )?;
+            let tracks = result
+                .tracks
+                .into_iter()
+                .map(map_phased_track)
+                .collect::<Vec<_>>();
+            Ok(json!({
+                "projectId": result.project_id,
+                "parentChrName": result.parent_chr_name,
+                "tracks": tracks
+            }))
+        })()
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]

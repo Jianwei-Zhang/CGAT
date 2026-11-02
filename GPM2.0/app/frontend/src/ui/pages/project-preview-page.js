@@ -1,3 +1,4 @@
+import {planPreviewSourceDelta,mergePreviewSourceDelta} from "./project-preview-source-delta.js";
 import { syncProjectPreviewCards } from "./project-preview-layout.js";
 import { exportProjectPreviewImage, previewImageActionRoot, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { contigColorToken } from "./assembly/contig-colors.js";
@@ -210,10 +211,25 @@ function buildCards(inputs, paths, previous, affected, build) {
     .map(chr => replacements.get(chr.chrName) || old.get(chr.chrName)).filter(Boolean);
 }
 
-async function readPreviewSources(state, args, metadata, deps) {
+async function readPreviewSources(state, args, metadata, deps, deltaBase = null) {
+  let scope=null;
+  try { scope=deltaBase && planPreviewSourceDelta(deltaBase.inputs,deltaBase.payload,metadata.dirtyChrNames); }
+  catch { /* Unknown old input shape: keep the original full-source path. */ }
+  const list=deps.listChrViewCtgs || listChrViewCtgs;
+  const readCtgs=async()=>{
+    const full=()=>list({...args,chrName:null,previewOnly:true});
+    if(!scope)return full();
+    try {
+      const result=await list({...args,chrName:null,previewOnly:true,previewScope:scope});
+      if(!result?.delta && Array.isArray(result?.items))return result; // Older native/DevBridge readers return the full list.
+      const items=mergePreviewSourceDelta(deltaBase.inputs.ctgs,result,scope);
+      if(items)return {items};
+    }catch { /* Optional delta unsupported/failed: retry the authoritative full reader. */ }
+    return full();
+  };
   const [chromosomes, ctgResult, view, rawGrt] = await Promise.all([
     (deps.listProjectChromosomes || listProjectChromosomes)(args),
-    (deps.listChrViewCtgs || listChrViewCtgs)({ ...args, chrName: null, previewOnly: true }),
+    readCtgs(),
     (deps.getProjectAssemblyViewState || getProjectAssemblyViewState)(args),
     (deps.getGrtProjectView || getGrtProjectView)(args),
   ]);
@@ -323,7 +339,8 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
           if (download) download.disabled = true;
           host?.querySelector?.(".project-preview-page")?.setAttribute?.("aria-busy", "true");
           inputs = await readPreviewSources(store.getState(), args,
-            { ...metadata, sourceMetadata: metadata.sourceMetadata || (sameRevision ? previous?.sourceMetadata : null) }, deps);
+            { ...metadata, sourceMetadata: metadata.sourceMetadata || (sameRevision ? previous?.sourceMetadata : null) }, deps,
+            !options.force && sameIdentity && previous?.incrementalSafe ? previous : null);
           if (!isCurrent()) return false;
           const after = metadata.available ? await readMetadata({ identity: metadata.identity, revision: metadata.revision }) : null;
           if (!isCurrent()) return false;

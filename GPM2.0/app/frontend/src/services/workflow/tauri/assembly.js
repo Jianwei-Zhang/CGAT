@@ -5,16 +5,17 @@ async function getProjectOverviewSources({ workspaceRoot, projectId }) {
   return invokeCommand("get_project_overview_sources", { workspaceRoot, projectId });
 }
 
-async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false }) {
+async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false, previewScope = null }) {
   const result = await invokeCommand("list_chr_view_ctgs", {
     workspaceRoot,
     projectId,
     chrName,
     datasetId,
-    ...(previewOnly ? { previewOnly: true } : {}),
+    ...(previewOnly ? { previewOnly: true, ...(previewScope ? { previewScope } : {}) } : {}),
   });
   return {
     items: result.items || [],
+    ...(result.delta ? { delta: result.delta } : {}),
   };
 }
 

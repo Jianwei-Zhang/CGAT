@@ -13,6 +13,7 @@ use crate::reference_segments::{
 pub mod overview;
 #[cfg(test)]
 mod performance_profile;
+pub mod preview_delta;
 pub mod reference_transport;
 mod source_fragment_bulk;
 
@@ -433,6 +434,27 @@ fn list_chr_view_ctgs_with_connection_options(
     dataset_id: Option<i64>,
     include_details: bool,
 ) -> Result<Vec<ChrViewCtgItem>> {
+    list_chr_view_ctgs_with_source_scope(
+        conn,
+        project_id,
+        chr_name,
+        dataset_id,
+        include_details,
+        None,
+    )
+}
+
+fn list_chr_view_ctgs_with_source_scope(
+    conn: &Connection,
+    project_id: i64,
+    chr_name: Option<&str>,
+    dataset_id: Option<i64>,
+    include_details: bool,
+    source_seq_ids: Option<&[i64]>,
+) -> Result<Vec<ChrViewCtgItem>> {
+    if source_seq_ids.is_some_and(|ids| ids.is_empty()) {
+        return Ok(Vec::new());
+    }
     let chr_param = chr_name.map(ToOwned::to_owned);
     let dataset_param = dataset_id;
     let primary_dataset_id: i64 = conn
@@ -502,6 +524,9 @@ fn list_chr_view_ctgs_with_connection_options(
         LEFT JOIN dataset target_d ON target_d.id = dtm.target_dataset_id
         WHERE c.project_id = ?",
     );
+    // Bundled SQLite already requires JSON for persisted view/cache contracts.
+    // Bind one bounded JSON array rather than rescan the project per 400 sources.
+    let source_scope_json = source_seq_ids.map(serde_json::to_string).transpose()?;
     let mut bind_values: Vec<&dyn ToSql> = vec![&project_id];
     if let Some(chr_name) = chr_param.as_ref() {
         sql.push_str(" AND c.assigned_chr_name = ?");
@@ -523,6 +548,10 @@ fn list_chr_view_ctgs_with_connection_options(
             );
             bind_values.push(&primary_dataset_id);
         }
+    }
+    if let Some(scope_json) = source_scope_json.as_ref() {
+        sql.push_str(" AND s.source_seq_id IN (SELECT value FROM json_each(?))");
+        bind_values.push(scope_json);
     }
     sql.push_str(
         "
@@ -551,6 +580,8 @@ fn list_chr_view_ctgs_with_connection_options(
         conn,
         project_id,
         &mut ctgs,
+        // A project-level delta still needs global co-assignment, not one
+        // project scan for every 400 selected sources.
         chr_param.is_some() || dataset_param.is_some(),
     )?;
     source_fragment_bulk::populate_source_fragments(conn, project_id, &mut ctgs)?;
