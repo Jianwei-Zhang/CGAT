@@ -209,6 +209,18 @@ pub struct CommandError {
 
 type CommandResult<T> = std::result::Result<T, CommandError>;
 
+// SQL/JSON work must not occupy the native window's IPC/UI dispatch thread.
+// Each closure retains the existing backend transaction and error contract.
+async fn run_blocking_command<T, F>(name: &'static str, work: F) -> CommandResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> CommandResult<T> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| CommandError::runtime(format!("{name} worker failed: {error}")))?
+}
+
 impl CommandError {
     fn backend(error: anyhow::Error) -> Self {
         let message = format!("{error:#}");
@@ -769,6 +781,51 @@ pub use workspace::*;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn blocking_command_executes_off_dispatch_thread_and_preserves_backend_errors() {
+        let caller = std::thread::current().id();
+        let worker =
+            tauri::async_runtime::block_on(super::run_blocking_command("thread-test", || {
+                Ok(std::thread::current().id())
+            }))
+            .unwrap();
+        assert_ne!(worker, caller);
+        let expected =
+            super::CommandError::backend(anyhow::anyhow!("project_id 42 does not exist"));
+        let actual = tauri::async_runtime::block_on(super::run_blocking_command::<
+            serde_json::Value,
+            _,
+        >("error-test", || {
+            Err(super::CommandError::backend(anyhow::anyhow!(
+                "project_id 42 does not exist"
+            )))
+        }))
+        .unwrap_err();
+        assert_eq!(
+            serde_json::to_value(actual).unwrap(),
+            serde_json::to_value(expected).unwrap()
+        );
+    }
+
+    #[test]
+    fn blocking_worker_panics_become_command_errors_not_window_dispatch_panics() {
+        let error = tauri::async_runtime::block_on(super::run_blocking_command::<
+            serde_json::Value,
+            _,
+        >("panic-test", || {
+            panic!("controlled worker failure");
+        }))
+        .unwrap_err();
+        let value = serde_json::to_value(error).unwrap();
+        assert_eq!(value["code"], "RUNTIME_ERROR");
+        assert!(
+            value["message"]
+                .as_str()
+                .unwrap()
+                .contains("panic-test worker failed")
+        );
+    }
+
     use super::*;
     use gpm_next_backend::db::{init_workspace_schema, open_workspace_db};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -797,8 +854,14 @@ mod tests {
             INSERT INTO dataset(id,name,assembler,fasta_path,fai_path) VALUES(1,'ds','a','ds.fa','ds.fai');
             INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at) VALUES(1,'p',1,1,1,'0');
             INSERT INTO project_assembly_view_state(project_id,updated_at,final_path_by_chr_json) VALUES(1,'0','{}');").expect("seed fixture");
-        let metadata =
-            get_project_preview_cache(workspace.clone(), 1, 2, None, None).expect("cache metadata");
+        let metadata = tauri::async_runtime::block_on(get_project_preview_cache(
+            workspace.clone(),
+            1,
+            2,
+            None,
+            None,
+        ))
+        .expect("cache metadata");
         let request: PutProjectPreviewCacheRequest = serde_json::from_value(json!({
             "workspaceRoot": workspace, "projectId": 1, "modelVersion": 2,
             "expectedIdentity": metadata["identity"], "expectedRevision": metadata["revision"],
@@ -806,11 +869,13 @@ mod tests {
         }))
         .expect("decode camelCase cache request");
         assert_eq!(
-            put_project_preview_cache(request).expect("write snapshot")["stored"],
+            tauri::async_runtime::block_on(put_project_preview_cache(request))
+                .expect("write snapshot")["stored"],
             true
         );
         let reopened =
-            get_project_preview_cache(workspace, 1, 2, None, None).expect("read snapshot");
+            tauri::async_runtime::block_on(get_project_preview_cache(workspace, 1, 2, None, None))
+                .expect("read snapshot");
         assert_eq!(reopened["valid"], true);
         assert_eq!(reopened["snapshot"]["modelVersion"], 2);
         let paths: String = conn
@@ -1162,13 +1227,13 @@ mod tests {
         )
         .expect("insert assembly ctg");
 
-        let result = list_chr_view_ctgs(
+        let result = tauri::async_runtime::block_on(list_chr_view_ctgs(
             workspace_root.to_string_lossy().into_owned(),
             7,
             Some("Chr01".to_string()),
             Some(11),
             None,
-        )
+        ))
         .expect("list chr view ctgs");
 
         assert_eq!(
@@ -1178,13 +1243,13 @@ mod tests {
         assert_eq!(result["items"][0]["orient"].as_str(), Some("-"));
         assert_eq!(result["items"][0]["refOrient"].as_str(), Some("+"));
 
-        let preview = list_chr_view_ctgs(
+        let preview = tauri::async_runtime::block_on(list_chr_view_ctgs(
             workspace_root.to_string_lossy().into_owned(),
             7,
             None,
             None,
             Some(true),
-        )
+        ))
         .expect("list compact preview ctgs");
         assert_eq!(
             preview["items"][0]["originId"].as_str(),
@@ -1205,9 +1270,11 @@ mod tests {
             assert!(preview["items"][0].get(omitted).is_none(), "{omitted}");
         }
 
-        let overview =
-            get_project_overview_sources(workspace_root.to_string_lossy().into_owned(), 7)
-                .expect("get compact overview sources");
+        let overview = tauri::async_runtime::block_on(get_project_overview_sources(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+        ))
+        .expect("get compact overview sources");
         assert_eq!(overview["primaryCtgIds"], json!([301]));
         assert_eq!(
             overview["ctgs"][0]["originId"],

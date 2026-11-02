@@ -491,6 +491,16 @@ fn ensure_runtime_settings_row(conn: &Connection) -> Result<()> {
 }
 
 fn ensure_project_assembly_view_state_row(conn: &Connection, project_id: i64) -> Result<()> {
+    let exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM project_assembly_view_state WHERE project_id=?1)",
+            [project_id],
+            |row| row.get(0),
+        )
+        .context("failed to check project assembly view state row")?;
+    if exists {
+        return Ok(());
+    }
     conn.execute(
         "INSERT OR IGNORE INTO project_assembly_view_state (
             project_id,
@@ -585,6 +595,42 @@ mod tests {
         update_runtime_settings_with_connection,
     };
     use crate::db::init_workspace_schema;
+
+    #[test]
+    fn existing_project_view_is_a_query_only_read() -> Result<()> {
+        let mut conn = Connection::open_in_memory()?;
+        init_workspace_schema(&conn)?;
+        seed_project(&conn, 1)?;
+        let original = get_project_assembly_view_state_with_connection(&mut conn, 1)?;
+        conn.execute_batch("PRAGMA query_only=ON;")?;
+        assert_eq!(
+            get_project_assembly_view_state_with_connection(&mut conn, 1)?,
+            original
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_missing_project_view_retains_normal_initialization_semantics() -> Result<()> {
+        let mut conn = Connection::open_in_memory()?;
+        init_workspace_schema(&conn)?;
+        seed_project(&conn, 1)?;
+        conn.execute_batch("PRAGMA query_only=ON;")?;
+        assert!(get_project_assembly_view_state_with_connection(&mut conn, 1).is_err());
+        conn.execute_batch("PRAGMA query_only=OFF;")?;
+        let state = get_project_assembly_view_state_with_connection(&mut conn, 1)?;
+        assert_eq!(state.project_id, 1);
+        assert_eq!(state.final_path_by_chr_json, "{}");
+        assert_eq!(
+            conn.query_row(
+                "SELECT COUNT(*) FROM project_assembly_view_state WHERE project_id=1",
+                [],
+                |row| row.get::<_, i64>(0)
+            )?,
+            1
+        );
+        Ok(())
+    }
 
     #[test]
     fn runtime_settings_support_defaults_and_update() -> Result<()> {
