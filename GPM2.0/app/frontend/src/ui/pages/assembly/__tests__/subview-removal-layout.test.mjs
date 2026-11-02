@@ -1,7 +1,7 @@
 import { test, assert, createStore, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { createIdentityRenderState } from "./identity-render-fixture.mjs";
 import { createSubviewInteractionController } from "../subview-interaction-controller.js";
-import { createSubviewCompositionController } from "../subview-composition-controller.js";
+import { projectRenderedSubviewToComposition, projectCurrentSubviewToComposition, createSubviewCompositionController } from "../subview-composition-controller.js";
 import { rollbackSubviewHistory, resolveCurrentSubviewHistory } from "../subview-history-state.js";
 import { buildSubviewClearProjection } from "../subview-clear-state.js";
 import { deleteSelectedSubviewTrackPairCtgs } from "../editor-actions-runtime.js";
@@ -35,7 +35,10 @@ function scene(state, scrollLeft = 0) {
 }
 const hostFor = (view) => ({
   querySelector: (selector) => selector === ".subview-track-scroll" ? view.scroll : null,
-  querySelectorAll: () => [],
+  querySelectorAll: (selector) => selector === "[data-subview-track-slot][data-subview-contig-id][data-subview-rect-x]"
+    ? [...view.html.matchAll(/<g\b[^>]*data-subview-contig-id="[^>]*>/g)].map(([tag]) => ({
+      getAttribute: (name) => attr(tag, name) ?? null,
+    })) : [],
 });
 function interaction() {
   return createSubviewInteractionController({
@@ -185,6 +188,123 @@ for (const mode of ["track-pair", "composition"]) {
       assert.equal(undone.changed, true);
       store.setState({ assembly: undone.assembly });
       assert.deepEqual(scene(store.getState(), before.scroll.scrollLeft).marks, before.marks);
+    });
+  }
+}
+
+function compositionController() {
+  return createSubviewCompositionController({
+    session: {}, getMeasuredTrackViewportPx: () => 1200,
+    listChrViewCtgs: async () => ({ items: [] }),
+    persistProjectAssemblyViewStateFromStore: async () => {},
+    rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {},
+    anchorController: { resetScope() {} },
+  });
+}
+
+function assertHorizontalGeometry(before, after, removedKeys) {
+  assert.equal(after.bpPerPx, before.bpPerPx);
+  assert.equal(after.leftBp, before.leftBp);
+  const worldX = (view, mark) => Number(view.scroll.dataset.subviewWindowStartBp)
+    + Number(mark["rect-x"]) * view.bpPerPx;
+  for (const [key, mark] of before.marks) {
+    if (removedKeys.includes(key)) { assert.equal(after.marks.has(key), false); continue; }
+    const next = after.marks.get(key);
+    assert.ok(next, key);
+    assert.ok(Math.abs(worldX(before, mark) - worldX(after, next)) <= before.bpPerPx * 0.02, `${key} display start`);
+    assert.ok(Math.abs(Number(mark["rect-width"]) - Number(next["rect-width"])) <= 0.02, `${key} display width`);
+    assert.equal(next["world-start-bp"], mark["world-start-bp"], `${key} logical start`);
+    assert.equal(next["track-ref-orient"], mark["track-ref-orient"], `${key} orientation`);
+  }
+}
+
+for (const [fullRange, lengthBp] of [[true, 32], [true, 20000], [false, 20000]]) {
+  for (const slot of ["top", "bottom"]) {
+    for (const removedId of [30, 31, 32]) {
+      test(`context deletion converting track-pair to composition preserves display gaps (${slot}, ${removedId}, overview=${fullRange}, length=${lengthBp})`, async () => {
+        const state = trackPairState(lengthBp, fullRange);
+        // Exercise both primary and auxiliary lanes, including middle/edge removals.
+        state.assembly.chrCtgs = state.assembly.supportChrCtgs.map((ctg) => ({ ...ctg,
+          assemblyCtgId: ctg.assemblyCtgId + 10, datasetId: 11,
+        }));
+        const before = scene(state);
+        const id = slot === "top" ? removedId : removedId + 10;
+        const store = createStore(state);
+        const projected = projectCurrentSubviewToComposition(state, hostFor(before));
+        assert.deepEqual(projectRenderedSubviewToComposition(state, before.html), projected,
+          "history migration and live conversion preserve the same display geometry");
+        const controller = compositionController();
+        assert.equal(await controller.removeContextSubviewMember(hostFor(before), store, {
+          assemblyCtgId: id, slot, trackRole: slot === "top" ? "support" : "primary",
+        }), true);
+        const after = scene(store.getState());
+        // Persistence/normalization must retain display geometry independently of source coordinates.
+        store.setState({ assembly: JSON.parse(JSON.stringify(store.getState().assembly)) });
+        assertHorizontalGeometry(after, scene(store.getState()), []);
+        assertHorizontalGeometry(before, after, [`${slot}:${id}`]);
+        // A second deletion must retain the captured display geometry too.
+        const secondId = [30, 31, 32].find((value) => value !== removedId) + (slot === "bottom" ? 10 : 0);
+        assert.equal(await controller.removeContextSubviewMember(hostFor(after), store, {
+          entityKey: `assembly:${secondId}`,
+        }), true);
+        assertHorizontalGeometry(after, scene(store.getState()), [`${slot}:${secondId}`]);
+        const undo = rollbackSubviewHistory(store.getState().assembly);
+        assert.equal(undo.changed, true);
+        store.setState({ assembly: undo.assembly });
+        assertHorizontalGeometry(after, scene(store.getState()), []);
+      });
+    }
+  }
+}
+
+for (const mode of ["2-contig", "track-pair", "composition"]) {
+  for (const locale of ["zh", "en"]) {
+    test(`local track names share main-view ellipsis and overflow-only tooltip markup (${mode}, ${locale})`, () => {
+      const state = createIdentityRenderState(mode);
+      state.locale = locale;
+      const html = scene(state).html;
+      const column = html.match(/<div class="assembly-track-label-column subview-track-label-column"[^>]*>([\s\S]*?)<div\s+class="assembly-track-scroll/)[1];
+      const rows = [...column.matchAll(/<div class="assembly-track-label-row[^>]*>/g)];
+      assert.equal(rows.length, 2);
+      for (const [tag] of rows) {
+        assert.equal(attr(tag, "data-app-tooltip-overflow"), "span");
+        assert.ok(attr(tag, "data-app-tooltip"));
+        assert.equal(attr(tag, "aria-label"), attr(tag, "data-app-tooltip"));
+        assert.ok(column.includes(`${tag}<span>`));
+        assert.doesNotMatch(tag, /\stitle=/);
+      }
+    });
+  }
+}
+
+for (const slot of ["top", "bottom"]) {
+  test(`2-contig context deletion preserves the surviving ${slot} bar`, async () => {
+    const state = createIdentityRenderState("2-contig");
+    state.assembly.subviewTrackDragOffsets = [{ slot: "top", contigId: 30, offsetBp: -2000 }];
+    const before = scene(state);
+    const store = createStore(state);
+    const id = slot === "top" ? 2 : 30;
+    assert.equal(await compositionController().removeContextSubviewMember(hostFor(before), store, {
+      assemblyCtgId: id, slot: slot === "top" ? "bottom" : "top",
+      trackRole: slot === "top" ? "primary" : "support",
+    }), true);
+    assertHorizontalGeometry(before, scene(store.getState()), [`${slot === "top" ? "bottom" : "top"}:${id}`]);
+  });
+  for (const role of ["primary", "support", "ref", "phased"]) {
+    test(`composition removal retains every other bar in ${slot} lane with ${role} source`, async () => {
+      const state = createIdentityRenderState("composition");
+      const base = state.assembly.subview.summary.members[0];
+      state.assembly.subview = applySubviewComposition(state.assembly.subview, {
+        members: [30, 31, 32].map((id, index) => ({ ...base, entityKey: `assembly:${id}`,
+          assemblyCtgId: id, source: { ...base.source, role }, lane: slot,
+          xBp: index * 20000, displayOffsetBp: index * 100, displayScale: 0.9,
+        })),
+      });
+      const before = scene(state), store = createStore(state);
+      assert.equal(await compositionController().removeContextSubviewMember(hostFor(before), store, {
+        entityKey: "assembly:31",
+      }), true);
+      assertHorizontalGeometry(before, scene(store.getState()), [`${slot}:31`]);
     });
   }
 }

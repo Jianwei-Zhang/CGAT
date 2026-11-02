@@ -112,6 +112,10 @@ export function sliceLocalMember(member, sourceStart, sourceEnd) {
   const reverse = memberEffectiveOrientation(member) === "-";
   return { ...member, entityKey: fragmentKey(member, range, sourceStart, sourceEnd),
     localFragment, lengthBp: sourceEnd - sourceStart + 1,
+    ...(member.displayScale || member.displayOffsetBp ? {
+      displayOffsetBp: (member.displayOffsetBp || 0)
+        + (reverse ? range.sourceEnd - sourceEnd : sourceStart - range.sourceStart) * ((member.displayScale || 1) - 1),
+    } : {}),
     xBp: Number(member.xBp || 0) + (reverse ? range.sourceEnd - sourceEnd : sourceStart - range.sourceStart) };
 }
 
@@ -296,6 +300,14 @@ export function mergeLocalMember(composition, entityKey, side) {
   const merged = { ...member, entityKey: fragmentKey(member, a, sourceStart, sourceEnd), localFragment,
     lengthBp: sourceEnd - sourceStart + 1, baseOrientation: memberEffectiveOrientation(member), flipped: false,
     xBp: Math.min(member.xBp, neighbor.xBp), order: Math.min(member.order, neighbor.order) };
+  if (member.displayScale || member.displayOffsetBp || neighbor.displayScale || neighbor.displayOffsetBp) {
+    const start = (entry) => entry.xBp + (entry.displayOffsetBp || 0);
+    const displayStart = Math.min(start(member), start(neighbor));
+    const displayEnd = Math.max(...[member, neighbor].map((entry) =>
+      start(entry) + entry.lengthBp * (entry.displayScale || 1)));
+    merged.displayOffsetBp = displayStart - merged.xBp;
+    merged.displayScale = (displayEnd - displayStart) / merged.lengthBp;
+  }
   return { composition: replaceLocalMembers(composition, [member, neighbor], [merged]), changed: true, member: merged };
 }
 
