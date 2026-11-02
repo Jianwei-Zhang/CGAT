@@ -1,8 +1,4 @@
-<p>
-  <img src="LIMS/docs/images/logo.png" alt="Pangu logo" width="264" height="64">
-</p>
-
-# CGAT — 完整基因组组装工具集
+# <img src="GPM2.0/app/readme-assets/cgat-logo.svg" alt="CGAT 标志" width="40" height="40" align="absmiddle"> CGAT — 完整基因组组装工具集
 
 [English](README.md) | **中文**
 

@@ -1,8 +1,4 @@
-<p>
-  <img src="LIMS/docs/images/logo.png" alt="Pangu logo" width="264" height="64">
-</p>
-
-# CGAT — Complete Genome Assembly Toolkit
+# <img src="GPM2.0/app/readme-assets/cgat-logo.svg" alt="CGAT logo" width="40" height="40" align="absmiddle"> CGAT — Complete Genome Assembly Toolkit
 
 **English** | [中文](README_zh.md)
 
