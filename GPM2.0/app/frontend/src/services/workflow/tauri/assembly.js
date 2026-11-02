@@ -18,14 +18,15 @@ async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, dataset
   };
 }
 
-async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName }) {
+async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName, deferHits = false }) {
   const result = await invokeCommand("list_reference_track_members", {
     workspaceRoot,
     projectId,
     chrName,
     compact: true,
+    ...(deferHits ? { encoding: "reference-hits-v2" } : {}),
   });
-  return decodeReferenceTracks(result);
+  return decodeReferenceTracks(result, { deferHits });
 }
 
 async function listPhasedChrTracksTauri({ workspaceRoot, projectId, parentChrName }) {

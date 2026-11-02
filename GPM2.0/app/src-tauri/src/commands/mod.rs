@@ -1205,10 +1205,14 @@ mod tests {
             assert!(preview["items"][0].get(omitted).is_none(), "{omitted}");
         }
 
-        let overview = get_project_overview_sources(workspace_root.to_string_lossy().into_owned(), 7)
-            .expect("get compact overview sources");
+        let overview =
+            get_project_overview_sources(workspace_root.to_string_lossy().into_owned(), 7)
+                .expect("get compact overview sources");
         assert_eq!(overview["primaryCtgIds"], json!([301]));
-        assert_eq!(overview["ctgs"][0]["originId"], result["items"][0]["originId"]);
+        assert_eq!(
+            overview["ctgs"][0]["originId"],
+            result["items"][0]["originId"]
+        );
         assert_eq!(overview["ctgs"][0]["orient"], result["items"][0]["orient"]);
         assert_eq!(overview["ctgs"][0]["placementMode"], "manual");
         assert!(overview["ctgs"][0].get("hits").is_none());
@@ -1297,6 +1301,7 @@ mod tests {
             7,
             "Chr01".to_string(),
             None,
+            None,
         ))
         .expect("list reference track members");
         let result = serde_json::to_value(result).unwrap();
@@ -1319,6 +1324,7 @@ mod tests {
             7,
             "Chr01".to_string(),
             Some(true),
+            None,
         ))
         .expect("compact reference track members");
         let compact = serde_json::to_value(compact).unwrap();
@@ -1328,6 +1334,24 @@ mod tests {
             compact["items"][1]["hitRows"][0],
             json!([0, 5001, 10000, 5101, 10100, 5000, 5000, 1, 5000])
         );
+
+        let packed = tauri::async_runtime::block_on(list_reference_track_members(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            "Chr01".to_string(),
+            Some(true),
+            Some("reference-hits-v2".to_string()),
+        ))
+        .expect("packed reference track members");
+        let packed = serde_json::to_value(packed).unwrap();
+        assert_eq!(packed["encoding"], "reference-hits-v2");
+        assert_eq!(
+            packed["items"][1]["hitGroups"],
+            compact["items"][1]["hitGroups"]
+        );
+        assert_eq!(packed["items"][1]["hitCount"], 1);
+        assert_eq!(packed["items"][1]["hitData"], "AJJOoJwB2k/onQGQTpBOApBO");
+        assert!(packed["items"][1].get("hits").is_none());
 
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");

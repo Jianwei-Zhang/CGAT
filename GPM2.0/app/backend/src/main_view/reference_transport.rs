@@ -1,4 +1,5 @@
-//! Lossless IPC encoding: share PAF hit attributes across its CIGAR fragments.
+//! Lossless IPC encodings. v1 remains available for older clients.
+pub mod packed;
 use std::collections::HashMap;
 
 use serde::Serialize;

@@ -1,3 +1,4 @@
+import { hasDeferredReferenceHits, readReferenceHits, iterateReferenceHitEntries } from "../../../services/workflow/reference-evidence.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./source-fragment-drag.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
@@ -1001,15 +1002,8 @@ function buildSubviewLocallyFlippedContig(ctg) {
     1,
     normalizePositiveInt(ctg?.lengthBp ?? ctg?.totalLength) ?? 1,
   );
-  const flippedHits = (Array.isArray(ctg?.hits) ? ctg.hits : []).map((hit) => ({
-    ...hit,
-    ...flipSubviewHitRange(hit, totalLength, "ctgStart", "ctgEnd"),
-    ...flipSubviewHitRange(hit, totalLength, "ctg_start", "ctg_end"),
-    ...flipSubviewHitRange(hit, totalLength, "queryStart", "queryEnd"),
-    ...flipSubviewHitRange(hit, totalLength, "query_start", "query_end"),
-    ...flipSubviewHitRange(hit, totalLength, "hitStart", "hitEnd"),
-    ...flipSubviewHitRange(hit, totalLength, "hit_start", "hit_end"),
-  }));
+  const flippedHits = hasDeferredReferenceHits(ctg) ? null
+    : flipRenderableHits(Array.isArray(ctg?.hits) ? ctg.hits : [], totalLength);
   const nextOrient = resolveTrackCtgOrient(ctg) === "-" ? "+" : "-";
   return {
     ...ctg,
@@ -1017,13 +1011,26 @@ function buildSubviewLocallyFlippedContig(ctg) {
     orient: nextOrient,
     refOrient: nextOrient,
     ref_orient: nextOrient,
-    hits: flippedHits,
+    ...(flippedHits ? { hits: flippedHits } : { referenceHitsFlipped: !ctg.referenceHitsFlipped }),
   };
 }
 
 function resolveTrackRenderableHits(ctg) {
   // Main-track hits from list_chr_view_ctgs are already projected into ctg display coordinates.
-  return Array.isArray(ctg?.hits) ? ctg.hits : [];
+  if (!hasDeferredReferenceHits(ctg)) return Array.isArray(ctg?.hits) ? ctg.hits : [];
+  const hits = readReferenceHits(ctg);
+  return ctg.referenceHitsFlipped ? flipRenderableHits(hits, Math.max(1, Number(ctg.lengthBp ?? ctg.totalLength))) : hits;
+}
+
+function flipRenderableHits(hits, totalLength) {
+  return hits.map(hit => ({ ...hit,
+    ...flipSubviewHitRange(hit, totalLength, "ctgStart", "ctgEnd"),
+    ...flipSubviewHitRange(hit, totalLength, "ctg_start", "ctg_end"),
+    ...flipSubviewHitRange(hit, totalLength, "queryStart", "queryEnd"),
+    ...flipSubviewHitRange(hit, totalLength, "query_start", "query_end"),
+    ...flipSubviewHitRange(hit, totalLength, "hitStart", "hitEnd"),
+    ...flipSubviewHitRange(hit, totalLength, "hit_start", "hit_end"),
+  }));
 }
 
 function resolveTrackHitStrand(hit) {
@@ -1513,19 +1520,21 @@ function renderSubviewAlignmentCard(
       .map((entry) => String(entry?.hitKey || "").trim())
       .filter(Boolean),
   );
-  const topHits = collectSubviewRenderableHits(topCtg, {
-    blockLength,
-    minIdentityPct,
-    preserveHitKeys: activeAnchorHitKeys,
-  });
-  const bottomHits = collectSubviewRenderableHits(bottomCtg, {
-    blockLength,
-    minIdentityPct,
-    preserveHitKeys: activeAnchorHitKeys,
-  });
   const usesRefProjection =
     (topSelection.role === "ref" && bottomSelection.role !== "ref")
     || (bottomSelection.role === "ref" && topSelection.role !== "ref");
+  // The reference side is projected from its counterpart below. Its raw hits
+  // never contributed to this graph; do not expand them just to discard them.
+  const topHits = usesRefProjection && topSelection.role === "ref" ? [] : collectSubviewRenderableHits(topCtg, {
+    blockLength,
+    minIdentityPct,
+    preserveHitKeys: activeAnchorHitKeys,
+  });
+  const bottomHits = usesRefProjection && bottomSelection.role === "ref" ? [] : collectSubviewRenderableHits(bottomCtg, {
+    blockLength,
+    minIdentityPct,
+    preserveHitKeys: activeAnchorHitKeys,
+  });
   const pairwiseEvidenceState = resolveSubviewPairwiseEvidence(subview, summary);
   const isPairwiseEvidenceLoading =
     pairwiseEvidenceState.enabled
@@ -3228,59 +3237,68 @@ function renderSubviewTrackPairAlignmentCard(
 }
 
 function collectSubviewRenderableHits(ctg, { blockLength, minIdentityPct, preserveHitKeys = null }) {
-  const hits = Array.isArray(ctg?.hits) ? ctg.hits : [];
   const preserved = preserveHitKeys instanceof Set ? preserveHitKeys : new Set(preserveHitKeys || []);
-  return hits
-    .map((hit, index) => {
-      const hitBlockLength = normalizePositiveInt(hit?.blockLength ?? hit?.block_length) ?? 0;
-      const hitIdentityPct = resolveHitIdentityPct(hit);
-      const refStart = Number(hit?.refStart ?? hit?.ref_start);
-      const refEnd = Number(hit?.refEnd ?? hit?.ref_end);
-      const ctgStart = Number(
-        hit?.ctgStart
-        ?? hit?.ctg_start
-        ?? hit?.queryStart
-        ?? hit?.query_start
-        ?? hit?.hitStart
-        ?? hit?.hit_start,
-      );
-      const ctgEnd = Number(
-        hit?.ctgEnd
-        ?? hit?.ctg_end
-        ?? hit?.queryEnd
-        ?? hit?.query_end
-        ?? hit?.hitEnd
-        ?? hit?.hit_end,
-      );
-      if (
-        (!preserved.has(`hit-${index + 1}`) && hitBlockLength < blockLength) ||
-        (!preserved.has(`hit-${index + 1}`) && hitIdentityPct < minIdentityPct)
-      ) {
-        return null;
-      }
-      if (
-        !Number.isFinite(ctgStart)
-        || !Number.isFinite(ctgEnd)
-        || !Number.isFinite(refStart)
-        || !Number.isFinite(refEnd)
-      ) {
-        return null;
-      }
-      const normalizedRefStart = Math.min(refStart, refEnd);
-      const normalizedRefEnd = Math.max(refStart, refEnd);
-      return {
-        hitKey: `hit-${index + 1}`,
-        identityPct: readHitIdentityPct(hit),
-        alignLength: hitBlockLength,
-        pairKey: String(hit?.pairKey || `hit-${index + 1}`),
-        ctgStart: Math.min(ctgStart, ctgEnd),
-        ctgEnd: Math.max(ctgStart, ctgEnd),
-        refStart: normalizedRefStart,
-        refEnd: normalizedRefEnd,
-        refMid: (normalizedRefStart + normalizedRefEnd) / 2,
-      };
-    })
-    .filter(Boolean);
+  const deferred = hasDeferredReferenceHits(ctg);
+  const entries = iterateReferenceHitEntries(ctg, {
+    // This is the existing display threshold, not an evidence truncation. Keep
+    // original dataset-filtered indices for saved hit-N anchors, including a
+    // preserved anchor below the threshold. All packed bytes remain available.
+    acceptRow: deferred ? (_group, row, index) => row[5] >= blockLength || preserved.has(`hit-${index + 1}`) : null,
+  });
+  const result = [];
+  for (const entry of entries) {
+    const index = entry.index;
+    const hit = deferred && ctg.referenceHitsFlipped
+      ? flipRenderableHits([entry.hit], Math.max(1, Number(ctg.lengthBp ?? ctg.totalLength)))[0] : entry.hit;
+    const hitBlockLength = normalizePositiveInt(hit?.blockLength ?? hit?.block_length) ?? 0;
+    const hitIdentityPct = resolveHitIdentityPct(hit);
+    const refStart = Number(hit?.refStart ?? hit?.ref_start);
+    const refEnd = Number(hit?.refEnd ?? hit?.ref_end);
+    const ctgStart = Number(
+      hit?.ctgStart
+      ?? hit?.ctg_start
+      ?? hit?.queryStart
+      ?? hit?.query_start
+      ?? hit?.hitStart
+      ?? hit?.hit_start,
+    );
+    const ctgEnd = Number(
+      hit?.ctgEnd
+      ?? hit?.ctg_end
+      ?? hit?.queryEnd
+      ?? hit?.query_end
+      ?? hit?.hitEnd
+      ?? hit?.hit_end,
+    );
+    if (
+      (!preserved.has(`hit-${index + 1}`) && hitBlockLength < blockLength) ||
+      (!preserved.has(`hit-${index + 1}`) && hitIdentityPct < minIdentityPct)
+    ) {
+      continue;
+    }
+    if (
+      !Number.isFinite(ctgStart)
+      || !Number.isFinite(ctgEnd)
+      || !Number.isFinite(refStart)
+      || !Number.isFinite(refEnd)
+    ) {
+      continue;
+    }
+    const normalizedRefStart = Math.min(refStart, refEnd);
+    const normalizedRefEnd = Math.max(refStart, refEnd);
+    result.push({
+      hitKey: `hit-${index + 1}`,
+      identityPct: readHitIdentityPct(hit),
+      alignLength: hitBlockLength,
+      pairKey: String(hit?.pairKey || `hit-${index + 1}`),
+      ctgStart: Math.min(ctgStart, ctgEnd),
+      ctgEnd: Math.max(ctgStart, ctgEnd),
+      refStart: normalizedRefStart,
+      refEnd: normalizedRefEnd,
+      refMid: (normalizedRefStart + normalizedRefEnd) / 2,
+    });
+  }
+  return result;
 }
 
 function buildSubviewAlignmentSvgModel(args) {

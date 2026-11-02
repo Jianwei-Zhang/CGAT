@@ -1,3 +1,4 @@
+import { hasDeferredReferenceHits } from "../../../services/workflow/reference-evidence.js";
 import { hydrateAssemblyCtgDetail, restoreAssemblyLocalEvidence } from "./assembly-ready-stages.js";
 import { beginAssemblyViewRequest, currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { reconcileLocalSubviewWithMain } from "./subview-fragment-reconcile.js";
@@ -214,7 +215,7 @@ function normalizeReferenceTrackMembers(items) {
       lengthBp: Math.max(1, Number(item?.lengthBp || item?.totalLength || (segmentEndBp - segmentStartBp + 1))),
       startBp: segmentStartBp,
       endBp: segmentEndBp,
-      hits: Array.isArray(item?.hits) ? item.hits.map((hit) => ({ ...hit })) : [],
+      ...(hasDeferredReferenceHits(item) ? {} : { hits: Array.isArray(item?.hits) ? item.hits.map((hit) => ({ ...hit })) : [] }),
     };
   });
 }
@@ -303,7 +304,7 @@ async function listReferenceTrackMembersOrEmpty(deps, args) {
     return { items: [] };
   }
   try {
-    const result = await deps.listReferenceTrackMembers(args);
+    const result = await deps.listReferenceTrackMembers({ ...args, deferHits: true });
     return {
       items: normalizeReferenceTrackMembers(result?.items),
     };

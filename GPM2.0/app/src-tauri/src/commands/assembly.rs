@@ -184,6 +184,7 @@ pub fn list_deleted_ctgs(
 #[serde(untagged)]
 pub enum ReferenceTrackResponse {
     Compact(gpm_next_backend::main_view::reference_transport::CompactReferenceTracks),
+    Packed(gpm_next_backend::main_view::reference_transport::packed::PackedReferenceTracks),
     Legacy(Value),
 }
 
@@ -194,13 +195,24 @@ pub async fn list_reference_track_members(
     projectId: i64,
     chrName: String,
     compact: Option<bool>,
+    encoding: Option<String>,
 ) -> CommandResult<ReferenceTrackResponse> {
     tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<ReferenceTrackResponse> {
+        if let Some(value) = encoding.as_deref()
+            && value != gpm_next_backend::main_view::reference_transport::packed::ENCODING
+        {
+            anyhow::bail!("unsupported reference evidence encoding: {value}");
+        }
         let items = backend_list_reference_track_members(
             &project_db_path(&workspaceRoot),
             projectId,
             &chrName,
         )?;
+        if encoding.is_some() {
+            return Ok(ReferenceTrackResponse::Packed(
+                gpm_next_backend::main_view::reference_transport::packed::pack_reference_track_members(items),
+            ));
+        }
         if compact.unwrap_or(false) {
             return Ok(ReferenceTrackResponse::Compact(
                 gpm_next_backend::main_view::reference_transport::compact_reference_track_members(
@@ -1012,4 +1024,66 @@ pub async fn get_contig_chr_alignments(
     .await
     .map_err(|err| format!("get_contig_chr_alignments join error: {err}"))?
     .map_err(format_error)
+}
+
+#[cfg(test)]
+mod reference_transport_tests {
+    use super::*;
+
+    #[test]
+    fn reference_response_encodings_remain_untagged_and_backward_compatible() {
+        let old = ReferenceTrackResponse::Compact(
+            gpm_next_backend::main_view::reference_transport::compact_reference_track_members(
+                vec![],
+            ),
+        );
+        let packed = ReferenceTrackResponse::Packed(
+            gpm_next_backend::main_view::reference_transport::packed::pack_reference_track_members(
+                vec![],
+            ),
+        );
+        let legacy = ReferenceTrackResponse::Legacy(json!({"items":[]}));
+        assert_eq!(
+            serde_json::to_value(old).unwrap(),
+            json!({"encoding":"reference-hits-v1","items":[]})
+        );
+        assert_eq!(
+            serde_json::to_value(packed).unwrap(),
+            json!({"encoding":"reference-hits-v2","items":[]})
+        );
+        assert_eq!(serde_json::to_value(legacy).unwrap(), json!({"items":[]}));
+    }
+
+    #[test]
+    fn unsupported_reference_encoding_is_rejected_before_workspace_access() {
+        let root = std::env::temp_dir().join(format!(
+            "gpm-invalid-ref-encoding-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert!(!root.exists());
+        let result = tauri::async_runtime::block_on(list_reference_track_members(
+            root.to_string_lossy().into_owned(),
+            1,
+            "chr1".into(),
+            Some(true),
+            Some("unknown".into()),
+        ));
+        let error = match result {
+            Err(error) => error,
+            Ok(_) => panic!("unknown encoding was accepted"),
+        };
+        assert!(
+            error
+                .message
+                .contains("unsupported reference evidence encoding")
+        );
+        assert!(
+            !root.exists(),
+            "invalid negotiation must not open/migrate/create a workspace"
+        );
+    }
 }
