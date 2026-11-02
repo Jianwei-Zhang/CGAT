@@ -297,14 +297,14 @@ test("repeated binding and refresh retain one delegated click handler and Resize
   } } };
   for (let index = 0; index < 3; index++) bindProjectPreviewPage(value.host, value.store, value.deps);
   await load(value);
-  assert.equal(handlers, 1); assert.equal(observers, 1); assert.equal(observations, 1);
+  assert.equal(handlers, 3, "one click plus two delegated focus listeners"); assert.equal(observers, 1); assert.equal(observations, 1);
   const writes = value.metrics.writes;
   value.host.click({ target: { closest: selector => selector === "[data-preview-refresh]" ? {} : null } });
   await load(value);
   assert.equal(value.metrics.writes, writes + 1);
   bindProjectPreviewPage(value.host, value.store, value.deps);
   await load(value);
-  assert.equal(handlers, 1); assert.equal(observers, 1); assert.equal(observations, 1);
+  assert.equal(handlers, 3, "one click plus two delegated focus listeners"); assert.equal(observers, 1); assert.equal(observations, 1);
 });
 
 test("older native dependency tracking is a miss rather than a falsely valid cache", async () => {

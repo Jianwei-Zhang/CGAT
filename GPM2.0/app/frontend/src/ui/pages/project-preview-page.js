@@ -1,8 +1,8 @@
-import { syncProjectPreviewSources } from "./project-preview-layout.js";
+import { syncProjectPreviewCards } from "./project-preview-layout.js";
 import { exportProjectPreviewImage, previewImageActionRoot, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { contigColorToken } from "./assembly/contig-colors.js";
 import { projectIcon } from "./project-icons.js";
-import { syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
+import { createProjectPreviewViewport } from "./project-preview-viewport.js";
 import { previewSemanticSignature, previewMutationStamp } from "../../services/preview-content-events.js";
 import { getProjectPreviewCache, putProjectPreviewCache } from "../../services/workflow-api.js";
 import { PREVIEW_MODEL_VERSION, previewSession, rememberPreviewEntry, previewLocalSignatures,
@@ -21,11 +21,10 @@ const requests = new WeakMap();
 const BOUND = Symbol("projectPreviewBound");
 const nodeModels = new WeakMap();
 function syncPreviewGeometry(host) {
-  syncFinalPathStripGeometry(host);
-  for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
-    const card = nodeModels.get(node);
-    if (card) syncProjectPreviewSources(node, card);
-  }
+  if (host[BOUND]?.viewport) host[BOUND].viewport.refresh();
+  else syncProjectPreviewCards([...(host.querySelectorAll?.("[data-preview-chr]") || [])]
+    .filter(node => node.dataset.previewMounted !== "false")
+    .map(node => [node, nodeModels.get(node)]).filter(([, card]) => card));
 }
 const isPreviewRoute = state => ["projectExport", "projectPreview"].includes(state.activeRoute);
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
@@ -90,28 +89,48 @@ function renderReference(card, labels) {
     </span></span></div>` : "";
 }
 
-function renderCard(card, labels) {
+export function renderProjectPreviewCard(card, labels, details = true) {
   const { domain } = card;
   const ref = renderReference(card, labels);
   const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" data-app-tooltip="${html(track.name || labels.unknown)}" data-app-tooltip-overflow><span class="project-preview-dataset-dot" style="background:${contigColorToken(track.role, "stroke")}"></span>${html(track.name || labels.unknown)}</span>
     <div class="project-preview-source-plots">
-      ${track.positioned.length ? `<span class="project-preview-plot" style="height:20px">${track.positioned.map(item => renderContig(item, track, domain, labels)).join("")}</span>` : ""}
+      ${track.positioned.length ? `<span class="project-preview-plot" style="height:20px">${details ? track.positioned.map(item => renderContig(item, track, domain, labels)).join("") : ""}</span>` : ""}
       ${!track.positioned.length ? `<span class="project-preview-empty-track">—</span>` : ""}
 
     </div></div>`).join("");
   const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path">
     <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" data-app-tooltip="${html(path.name)}" data-app-tooltip-overflow="small">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
-      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${path.parts.map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
+      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${(details ? path.parts : []).map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
     </div></div>` : `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`).join("");
   const pathSummary = card.paths.filter(path => path.parts.length).map(path => bpLabel(path.length)).join(" / ");
   const summary = [card.hasReference ? `Ref ${bpLabel(card.refLength)}` : "", pathSummary ? `Final Path ${pathSummary}` : ""].filter(Boolean).join(" · ");
-  return `<article class="project-preview-card" data-preview-chr="${html(card.chrName)}" aria-label="${html(card.chrName)}">
+  return `<article class="project-preview-card" data-preview-chr="${html(card.chrName)}" data-preview-mounted="${details}" aria-label="${html(card.chrName)}">
     <button type="button" class="project-preview-card-header" aria-label="${html(`${card.chrName} · ${labels.open}`)}"><span class="project-preview-chr-name">${html(card.chrName)}</span><span class="project-preview-card-summary">${html(summary)}</span><span class="project-preview-open">${html(labels.open)} →</span></button>
     ${axis(labels.compositionAxis, domain.start, domain.end)}
     ${ref}${rows}
     <div class="project-preview-paths">${paths || `<span class="project-preview-empty-track">${html(labels.noPath)}</span>`}</div>
     ${card.unresolvedCount ? `<span class="project-preview-warning">${html(labels.unresolved)} (${card.unresolvedCount})</span>` : ""}
   </article>`;
+}
+
+function mountCardDetails(node, card, labels) {
+  const wrapper = node.ownerDocument.createElement("div");
+  wrapper.innerHTML = renderProjectPreviewCard(card, labels);
+  const selector = ".project-preview-source-plots .project-preview-plot, .project-preview-final-plot";
+  const rendered = [...wrapper.querySelectorAll(selector)];
+  [...node.querySelectorAll(selector)].forEach((plot, index) => {
+    const range = node.ownerDocument.createRange();
+    range.selectNodeContents(rendered[index]);
+    plot.replaceChildren(range.extractContents());
+  });
+  node.dataset.previewMounted = "true";
+}
+
+function unmountCardDetails(node) {
+  for (const plot of node.querySelectorAll(".project-preview-source-plots .project-preview-plot, .project-preview-final-plot")) {
+    plot.replaceChildren();
+  }
+  node.dataset.previewMounted = "false";
 }
 
 export function renderProjectPreviewPage(state, options = {}) {
@@ -121,7 +140,7 @@ export function renderProjectPreviewPage(state, options = {}) {
   const content = !key ? `<p class="muted">${html(labels.noProject)}</p>`
     : preview.error ? `<p class="error-text" role="alert">${html(preview.error)}</p><button type="button" class="button" data-preview-refresh>${html(labels.retry)}</button>`
     : !preview.loaded || (preview.localSignature !== undefined && !previewStateIsApplicable(state)) ? `<p class="muted" role="status">${html(labels.loading)}</p>`
-    : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderCard(card, labels)).join("")}</div>`
+    : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderProjectPreviewCard(card, labels, false)).join("")}</div>`
     : `<p class="muted">${html(labels.empty)}</p>`;
   return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}">${options.embedded ? "" : `<header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" data-app-tooltip="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
     <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" data-app-tooltip="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
@@ -130,6 +149,7 @@ export function renderProjectPreviewPage(state, options = {}) {
 }
 
 function updatePreviewDom(host, state, store) {
+  const focused = host.ownerDocument?.activeElement;
   const preview = state.projectPreview, page = host.querySelector?.(".project-preview-page");
   const container = page?.querySelector?.(".project-preview-cards");
   if (container && preview?.loaded && preview.cards.length && page.dataset.previewProject === preview.key
@@ -139,8 +159,19 @@ function updatePreviewDom(host, state, store) {
       let node = existing.get(card.chrName);
       if (nodeModels.get(node) !== card) {
         const wrapper = host.ownerDocument.createElement("div");
-        wrapper.innerHTML = renderCard(card, getMessages(state, "projectPreview"));
-        node = wrapper.firstElementChild;
+        wrapper.innerHTML = renderProjectPreviewCard(card, getMessages(state, "projectPreview"), false);
+        const replacement = wrapper.firstElementChild;
+        const header = node?.querySelector?.(".project-preview-card-header");
+        if (header) {
+          // Keep the focused button and article when this chromosome's model
+          // changes. Only its non-interactive body/summary need replacement.
+          const nextHeader = replacement.querySelector(".project-preview-card-header");
+          header.innerHTML = nextHeader.innerHTML;
+          header.setAttribute("aria-label", nextHeader.getAttribute("aria-label"));
+          for (const child of [...node.children]) if (child !== header) child.remove();
+          for (const child of [...replacement.children]) if (child !== nextHeader) node.appendChild(child);
+          node.dataset.previewMounted = "false";
+        } else node = replacement;
         nodeModels.set(node, card);
       }
       return node;
@@ -157,6 +188,9 @@ function updatePreviewDom(host, state, store) {
       const card = preview?.cards?.find(card => card.chrName === node.dataset.previewChr);
       if (card) nodeModels.set(node, card);
     }
+  }
+  if (focused && host.contains?.(focused) && host.ownerDocument.activeElement !== focused) {
+    focused.focus?.({ preventScroll: true });
   }
   const currentPage = host.querySelector?.(".project-preview-page");
   currentPage?.setAttribute?.("aria-busy", String(Boolean(preview?.loading)));
@@ -359,8 +393,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
   const binding = host[BOUND] || {};
   if (binding.store && binding.store !== store) { binding.unsubscribe?.(); binding.unsubscribe = null; }
   if (binding.active === false) {
-    binding.resize?.observe?.(host);
-    if (binding.onResize) host.ownerDocument?.defaultView?.addEventListener?.("resize", binding.onResize);
+    binding.viewport?.start();
   }
   binding.deps = binding.store === store ? { ...binding.deps, ...deps } : deps;
   binding.store = store; binding.active = true;
@@ -380,19 +413,20 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
       const refresh = event.target?.closest?.("[data-preview-refresh]");
       if (refresh && host.contains(refresh)) void loadProjectPreviewData(host, binding.store, binding.deps, { force: true });
     });
-    const win = host.ownerDocument?.defaultView;
-    const Observer = win?.ResizeObserver;
-    if (Observer) {
-      binding.resize = new Observer(() => {
-        if (binding.active && isPreviewRoute(binding.store.getState())) syncPreviewGeometry(host);
-      });
-      binding.resize.observe(host);
-    } else {
-      binding.onResize = () => {
-        if (binding.active && isPreviewRoute(binding.store.getState())) syncPreviewGeometry(host);
-      };
-      win?.addEventListener?.("resize", binding.onResize);
-    }
+    binding.viewport = createProjectPreviewViewport(host, {
+      active: () => {
+        const state = binding.store.getState();
+        return binding.active && host.isConnected !== false && isPreviewRoute(state) && previewStateIsApplicable(state)
+          && host.querySelector?.(".project-preview-page")?.dataset.previewProject === previewProjectKey(state);
+      },
+      mount: node => {
+        const card = nodeModels.get(node);
+        if (card) mountCardDetails(node, card, getMessages(binding.store.getState(), "projectPreview"));
+      },
+      unmount: unmountCardDetails,
+      geometry: nodes => syncProjectPreviewCards(nodes.map(node => [node, nodeModels.get(node)]).filter(([, card]) => card)),
+    });
+    binding.viewport.start();
     host[BOUND] = binding;
   }
   if (!binding.unsubscribe && store.subscribe) binding.unsubscribe = store.subscribe(() => {
@@ -420,6 +454,6 @@ export function unbindProjectPreviewPage(host) {
   if (!binding) return;
   binding.active = false;
   binding.unsubscribe?.(); binding.unsubscribe = null;
-  binding.resize?.disconnect?.();
-  host.ownerDocument?.defaultView?.removeEventListener?.("resize", binding.onResize);
+  binding.viewport?.stop();
+  for (const node of host.querySelectorAll?.('[data-preview-mounted="true"]') || []) unmountCardDetails(node);
 }
