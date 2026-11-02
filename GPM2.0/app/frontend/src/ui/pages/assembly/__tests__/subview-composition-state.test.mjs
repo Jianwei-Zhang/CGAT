@@ -9,6 +9,7 @@ import {
   removeSubviewCompositionMembers,
   swapSubviewCompositionLanes,
 } from "../subview-composition-state.js";
+import { splitLocalMember, mergeLocalMember } from "../subview-fragment-model.js";
 import { buildSubviewCompositionLayout } from "../subview-composition-layout.js";
 
 function member(id, lane, xBp, lengthBp = 100) {
@@ -88,3 +89,36 @@ test("layout keeps negative and overlapping world coordinates", () => {
   assert.equal(layout.top[0].width, 40);
   assert.equal(layout.viewBoxMinX, -10);
 });
+
+for (const orient of ["+", "-"]) {
+  test(`inherited display spacing survives split, merge and explicit compact without changing source lengths (${orient})`, () => {
+    const original = normalizeSubviewComposition({ members: [{ ...member(1, "top", 200, 100),
+      displayOffsetBp: 15, displayScale: 0.8, baseOrientation: orient,
+    }] });
+    const layout = (composition) => buildSubviewCompositionLayout(composition, { bpPerPx: 1 });
+    const before = layout(original).members[0];
+    const split = splitLocalMember(original, "assembly:1", 40);
+    assert.equal(split.changed, true);
+    const rects = layout(split.composition).members.sort((a, b) => a.x - b.x);
+    assert.equal(rects[0].x, before.x);
+    assert.equal(rects[0].x + rects[0].width, rects[1].x);
+    assert.equal(rects[1].x + rects[1].width, before.x + before.width);
+    assert.equal(rects.reduce((sum, entry) => sum + entry.lengthBp, 0), 100);
+    for (const [index, side] of [[0, "right"], [1, "left"]]) {
+      const merged = mergeLocalMember(split.composition, rects[index].entityKey, side);
+      assert.equal(merged.changed, true);
+      const result = layout(merged.composition).members[0];
+      assert.equal(result.x, before.x);
+      assert.equal(result.width, before.width);
+      assert.equal(result.xBp, 200);
+      assert.equal(result.lengthBp, 100);
+    }
+    const compacted = compactSubviewCompositionLayout(original);
+    assert.equal(compacted.changed, true);
+    const compactRect = layout(compacted.composition).members[0];
+    assert.equal(compactRect.x, 0);
+    assert.equal(compactRect.width, 100);
+    const added = addSubviewCompositionMembers(original, [member(2, "top", 0)], "top");
+    assert.equal(added.composition.members[1].xBp, before.x + before.width + original.layoutGapBp);
+  });
+}

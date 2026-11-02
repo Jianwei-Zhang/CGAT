@@ -66,12 +66,21 @@ function readCurrentRectPositions(host, fallbackGapBp) {
     ? domainSpanBp / innerWidth
     : Math.max(1, fallbackGapBp / 20);
   const positions = new Map();
+  const displayRects = new Map();
   for (const node of host?.querySelectorAll?.(
     "[data-subview-track-slot][data-subview-contig-id][data-subview-rect-x]",
   ) || []) {
     const slot = String(node.getAttribute("data-subview-track-slot") || "").trim();
     const contigId = normalizeSupportDatasetId(node.getAttribute("data-subview-contig-id"));
-    const x = Number(node.getAttribute("data-subview-rect-x"));
+    const rawX = node.getAttribute("data-subview-rect-x");
+    const x = rawX == null ? NaN : Number(rawX);
+    const width = Number(node.getAttribute("data-subview-rect-width"));
+    if (contigId && Number.isFinite(x) && width > 0) {
+      displayRects.set(`${slot}:${contigId}`, {
+        startBp: (Number.isFinite(windowStartBp) ? windowStartBp : 0) + x * bpPerPx,
+        lengthBp: width * bpPerPx,
+      });
+    }
     const rawWorldStartBp = node.getAttribute("data-subview-world-start-bp");
     const worldStartBp = rawWorldStartBp === null ? Number.NaN : Number(rawWorldStartBp);
     if (contigId && Number.isFinite(worldStartBp)) {
@@ -83,7 +92,7 @@ function readCurrentRectPositions(host, fallbackGapBp) {
       );
     }
   }
-  return { positions, bpPerPx };
+  return { positions, displayRects, bpPerPx };
 }
 
 function sourceFromSelection(selection, ctg) {
@@ -111,6 +120,7 @@ function memberFromCtg(
   lane,
   index,
   positions,
+  displayRects,
   flippedKeys,
   cursorByLane,
   layoutGapBp,
@@ -120,6 +130,7 @@ function memberFromCtg(
   const lengthBp = Math.max(1, Number(ctg?.lengthBp ?? ctg?.totalLength ?? 1));
   const savedPosition = positions.get(`${lane}:${contigId}`);
   const xBp = Number.isFinite(savedPosition) ? savedPosition : cursorByLane[lane];
+  const displayRect = displayRects?.get(`${lane}:${contigId}`);
   cursorByLane[lane] = Math.max(cursorByLane[lane], xBp + lengthBp + layoutGapBp);
   return normalizeSubviewCompositionMember({
     assemblyCtgId: contigId,
@@ -137,6 +148,9 @@ function memberFromCtg(
     baseOrientation: ctg?.orient ?? ctg?.refOrient,
     lane,
     xBp,
+    // Display gaps may shorten or shift bars without changing source coordinates.
+    ...(displayRect ? { displayOffsetBp: displayRect.startBp - xBp,
+      displayScale: displayRect.lengthBp / lengthBp } : {}),
     flipped: flippedKeys.has(`${lane}:${contigId}`),
     order: index,
   }, index);
@@ -165,7 +179,7 @@ export function projectCurrentSubviewToComposition(state, host, renderedMetrics 
     manualAnchors: currentSubview.manualAnchors,
   });
   const pools = buildSubviewTrackPairPoolsFromAssembly(state?.assembly || {});
-  const { positions, bpPerPx } = renderedMetrics || readCurrentRectPositions(host, 20_000);
+  const { positions, displayRects, bpPerPx } = renderedMetrics || readCurrentRectPositions(host, 20_000);
   const layoutGapBp = Math.max(0, 20 * bpPerPx);
   const flippedKeys = new Set((currentSubview.flippedCtgs || [])
     .map((entry) => `${entry.slot}:${entry.contigId}`));
@@ -199,6 +213,7 @@ export function projectCurrentSubviewToComposition(state, host, renderedMetrics 
       entry.lane,
       index,
       positions,
+      displayRects,
       flippedKeys,
       cursorByLane,
       layoutGapBp,
@@ -702,16 +717,27 @@ export function projectRenderedSubviewToComposition(state, markup) {
   const width = Number(attr(scrollTag, "data-subview-inner-width"));
   const bpPerPx = span > 0 && width > 0 ? span / width : 1_000;
   const positions = new Map();
+  const displayRects = new Map();
+  const windowStartBp = Number(attr(scrollTag, "data-subview-window-start-bp")) || 0;
   for (const match of String(markup).matchAll(/<[^>]*data-subview-contig-id="[^>]*>/g)) {
     const tag = match[0], id = Number(attr(tag, "data-subview-contig-id"));
     const slot = attr(tag, "data-subview-track-slot");
     const raw = attr(tag, "data-subview-world-start-bp"), position = raw == null ? NaN : Number(raw);
-    if (id > 0 && ["top", "bottom"].includes(slot) && Number.isFinite(position)) positions.set(`${slot}:${id}`, position);
+    if (id > 0 && ["top", "bottom"].includes(slot)) {
+      if (Number.isFinite(position)) positions.set(`${slot}:${id}`, position);
+      const rawX = attr(tag, "data-subview-rect-x"), x = rawX == null ? NaN : Number(rawX);
+      const rectWidth = Number(attr(tag, "data-subview-rect-width"));
+      if (Number.isFinite(x) && rectWidth > 0) {
+        displayRects.set(`${slot}:${id}`, { startBp: windowStartBp + x * bpPerPx,
+          lengthBp: rectWidth * bpPerPx });
+        if (!Number.isFinite(position)) positions.set(`${slot}:${id}`, windowStartBp + x * bpPerPx);
+      }
+    }
   }
   const decode = (text) => String(text).replace(/&(amp|quot|lt|gt|#39);/g, (_, key) => ({ amp: "&", quot: '"', lt: "<", gt: ">", "#39": "'" })[key]);
   const anchorNodes = [...String(markup).matchAll(/<[^>]*data-subview-anchor-object-id="[^>]*>/g)].map((match) => ({
     getAttribute: (name) => { const raw = match[0].match(new RegExp(`${name}="([^"\\n]*)"`))?.[1]; return raw == null ? null : decode(raw); },
   }));
   const anchorScene = collectSubviewAnchorScene({ querySelectorAll: () => anchorNodes });
-  return projectCurrentSubviewToComposition(state, null, { positions, bpPerPx, anchorScene });
+  return projectCurrentSubviewToComposition(state, null, { positions, displayRects, bpPerPx, anchorScene });
 }

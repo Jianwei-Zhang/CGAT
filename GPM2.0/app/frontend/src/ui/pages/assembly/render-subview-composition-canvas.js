@@ -614,7 +614,7 @@ export function renderSubviewCompositionAlignmentCard({
   const topCount = layout.top.length;
   const bottomCount = layout.bottom.length;
   const rulerEndBp = Math.max(
-    0,
+    0, layout.contentEndBp,
     ...composition.members.map((member) => member.xBp + member.lengthBp),
   );
   const rulerWidth = Math.max(1, rulerEndBp / layout.bpPerPx);
@@ -638,13 +638,13 @@ export function renderSubviewCompositionAlignmentCard({
     <div class="assembly-track-layout subview-track-layout">
       ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-label-column subview-track-label-column" style="width:136px;height:${CONTENT_HEIGHT}px">
-        <div class="assembly-track-label-row" style="top:${TOP_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.top)}</div>
+        <div class="assembly-track-label-row" style="top:${TOP_Y - 4}px" data-app-tooltip="${escapeAttr(i18n.subview.tools.compositionManager.lanes.top)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(i18n.subview.tools.compositionManager.lanes.top)}"><span>${escapeHtml(i18n.subview.tools.compositionManager.lanes.top)}</span></div>
         ${renderTrackOrderToggleButton({
           className: "is-in-label-column",
           style: `top:${trackOrderButtonTopPx}px`,
           swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
         })}
-        <div class="assembly-track-label-row" style="top:${BOTTOM_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.bottom)}</div>
+        <div class="assembly-track-label-row" style="top:${BOTTOM_Y - 4}px" data-app-tooltip="${escapeAttr(i18n.subview.tools.compositionManager.lanes.bottom)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(i18n.subview.tools.compositionManager.lanes.bottom)}"><span>${escapeHtml(i18n.subview.tools.compositionManager.lanes.bottom)}</span></div>
       </div>
       <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview"
         data-view-navigation-start-bp="${layout.contentStartBp}"

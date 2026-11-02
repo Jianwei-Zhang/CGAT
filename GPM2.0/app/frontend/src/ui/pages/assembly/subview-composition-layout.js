@@ -1,6 +1,9 @@
 import { normalizeSubviewComposition } from "./subview-composition-state.js";
 import { normalizePositiveInt, resolveTrackInnerWidthFromScale, resolveTrackPrefs } from "./track-prefs.js";
 
+const displayStart = (member) => member.xBp + (member.displayOffsetBp || 0);
+const displayLength = (member) => member.lengthBp * (member.displayScale || 1);
+
 export function resolveSubviewCompositionScaleViewport(composition, {
   trackPrefs,
   viewportWidthPx = 1_200,
@@ -8,8 +11,8 @@ export function resolveSubviewCompositionScaleViewport(composition, {
   topPx = 0,
 } = {}) {
   const { members } = normalizeSubviewComposition(composition);
-  const windowStart = Math.min(0, ...members.map((member) => member.xBp));
-  const windowEnd = Math.max(0, ...members.map((member) => member.xBp + member.lengthBp));
+  const windowStart = Math.min(0, ...members.map(displayStart));
+  const windowEnd = Math.max(0, ...members.map((member) => displayStart(member) + displayLength(member)));
   const domainSpanBp = Math.max(1, windowEnd - windowStart);
   const viewportWidth = normalizePositiveInt(viewportWidthPx) ?? 1_200;
   const prefs = resolveTrackPrefs(trackPrefs);
@@ -41,9 +44,9 @@ export function buildSubviewCompositionLayout(composition, {
     : 1_200;
   const members = normalized.members.map((member) => ({
     ...member,
-    x: member.xBp / scale,
-    width: Math.max(1, member.lengthBp / scale),
-    bpPerPx: scale,
+    x: displayStart(member) / scale,
+    width: Math.max(1, displayLength(member) / scale),
+    bpPerPx: scale / (member.displayScale || 1),
   }));
   const contentMinX = Math.floor(Math.min(0, ...members.map((member) => member.x)));
   const contentMaxX = Math.ceil(Math.max(0, ...members.map((member) => member.x + member.width)));

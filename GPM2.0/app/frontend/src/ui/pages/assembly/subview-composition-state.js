@@ -109,6 +109,11 @@ export function normalizeSubviewCompositionMember(value, fallbackOrder = 0) {
     ...(["+", "-"].includes(value.backingOrientation) ? { backingOrientation: value.backingOrientation } : {}),
     lane: normalizeSubviewCompositionLane(value.lane),
     xBp: normalizeFiniteNumber(value.xBp, 0),
+    // Optional view-only geometry; old projects retain the default 1:1 projection.
+    ...(Number.isFinite(Number(value.displayOffsetBp)) && Number(value.displayOffsetBp) !== 0
+      ? { displayOffsetBp: Number(value.displayOffsetBp) } : {}),
+    ...(Number.isFinite(Number(value.displayScale)) && Number(value.displayScale) > 0
+      && Number(value.displayScale) !== 1 ? { displayScale: Number(value.displayScale) } : {}),
     flipped: value.flipped === true,
     order: normalizeNonNegativeOrder(value.order, fallbackOrder),
   };
@@ -201,7 +206,8 @@ export function applySubviewComposition(subview, composition, patch = {}) {
 function resolveLaneRight(members, lane, gapBp) {
   const laneMembers = members.filter((member) => member.lane === lane);
   if (!laneMembers.length) return 0;
-  return Math.max(...laneMembers.map((member) => member.xBp + member.lengthBp)) + gapBp;
+  return Math.max(...laneMembers.map((member) => member.xBp + (member.displayOffsetBp || 0)
+    + member.lengthBp * (member.displayScale || 1))) + gapBp;
 }
 
 export function addSubviewCompositionMembers(composition, candidates, lane) {
@@ -324,13 +330,14 @@ export function compactSubviewCompositionLayout(composition) {
         xBp += member.lengthBp + normalized.layoutGapBp;
       });
   }
-  const members = normalized.members.map((member) => ({
-    ...member,
-    xBp: positions.get(member.entityKey) ?? member.xBp,
-  }));
+  const members = normalized.members.map((member) => {
+    const { displayOffsetBp, displayScale, ...logicalMember } = member;
+    return { ...logicalMember, xBp: positions.get(member.entityKey) ?? member.xBp };
+  });
   return {
     composition: { ...normalized, members },
-    changed: members.some((member, index) => member.xBp !== normalized.members[index].xBp),
+    changed: members.some((member, index) => member.xBp !== normalized.members[index].xBp
+      || normalized.members[index].displayOffsetBp || normalized.members[index].displayScale),
   };
 }
 

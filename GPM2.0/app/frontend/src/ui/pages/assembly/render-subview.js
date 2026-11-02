@@ -1671,6 +1671,7 @@ function renderSubviewAlignmentCard(
     barY: svgModel.topBarY,
     barHeight: svgModel.barHeight,
     inlineTextOffsetY: svgModel.textOffsetY,
+    outsideLabelAnchor: "bar-middle",
     hideOutsideLabel: true,
     minVisibleX: svgModel.renderViewBoxMinX,
     maxVisibleX: svgModel.renderViewBoxMinX + svgModel.renderInnerWidth,
@@ -1686,6 +1687,7 @@ function renderSubviewAlignmentCard(
     barY: svgModel.bottomBarY,
     barHeight: svgModel.barHeight,
     inlineTextOffsetY: svgModel.textOffsetY,
+    outsideLabelAnchor: "bar-middle",
     hideOutsideLabel: true,
     minVisibleX: svgModel.renderViewBoxMinX,
     maxVisibleX: svgModel.renderViewBoxMinX + svgModel.renderInnerWidth,
@@ -1847,13 +1849,13 @@ function renderSubviewAlignmentCard(
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
-          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" data-app-tooltip="${escapeAttr(topDisplayCtgName)}" data-app-tooltip-overflow>${escapeHtml(topVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" data-app-tooltip="${escapeAttr(topDisplayCtgName)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(topDisplayCtgName)}"><span>${escapeHtml(topVisibleCtgName)}</span></div>
           ${renderSubviewTrackOrderToggleButton({
             className: "is-in-label-column",
             style: `top:${trackOrderButtonTopPx}px`,
             swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
           })}
-          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" data-app-tooltip="${escapeAttr(bottomDisplayCtgName)}" data-app-tooltip-overflow>${escapeHtml(bottomVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" data-app-tooltip="${escapeAttr(bottomDisplayCtgName)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(bottomDisplayCtgName)}"><span>${escapeHtml(bottomVisibleCtgName)}</span></div>
         </div>
         <div
           class="assembly-track-scroll subview-track-scroll"
@@ -2289,6 +2291,7 @@ function renderSubviewTrackPairAlignmentCard(
         barY,
         barHeight: TRACK_BAR_HEIGHT,
         inlineTextOffsetY: TRACK_TEXT_OFFSET_Y,
+        outsideLabelAnchor: "bar-middle",
         hideOutsideLabel: true,
         minVisibleX: labelVisibleMinX,
         maxVisibleX: labelVisibleMaxX,
@@ -2317,6 +2320,7 @@ function renderSubviewTrackPairAlignmentCard(
         barY,
         barHeight: TRACK_BAR_HEIGHT,
         inlineTextOffsetY: TRACK_TEXT_OFFSET_Y,
+        outsideLabelAnchor: "bar-middle",
         hideOutsideLabel: true,
         minVisibleX: labelVisibleMinX,
         maxVisibleX: labelVisibleMaxX,
@@ -3030,6 +3034,7 @@ function renderSubviewTrackPairAlignmentCard(
           barY: y,
           barHeight: TRACK_BAR_HEIGHT,
           inlineTextOffsetY: TRACK_TEXT_OFFSET_Y,
+          outsideLabelAnchor: "bar-middle",
           hideOutsideLabel: true,
           minVisibleX: labelVisibleMinX,
           maxVisibleX: labelVisibleMaxX,
@@ -3154,13 +3159,13 @@ function renderSubviewTrackPairAlignmentCard(
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
-          <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px">${escapeHtml(topTrackLabel)}</div>
+          <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px" data-app-tooltip="${escapeAttr(topTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(topTrackLabel)}"><span>${escapeHtml(topTrackLabel)}</span></div>
           ${renderSubviewTrackOrderToggleButton({
             className: "is-in-label-column",
             style: `top:${trackOrderButtonTopPx}px`,
             swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
           })}
-          <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px">${escapeHtml(bottomTrackLabel)}</div>
+          <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px" data-app-tooltip="${escapeAttr(bottomTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(bottomTrackLabel)}"><span>${escapeHtml(bottomTrackLabel)}</span></div>
         </div>
         <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-view-navigation-start-bp="${domainStart + renderViewBoxMinX * domainSpanBp / baseInnerWidth}" data-view-navigation-end-bp="${domainStart + (renderViewBoxMinX + renderInnerWidth) * domainSpanBp / baseInnerWidth}" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}">
           ${renderTrackBandCanvasLayer({
