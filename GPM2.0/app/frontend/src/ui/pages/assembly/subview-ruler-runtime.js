@@ -187,6 +187,8 @@ function readRulerOptions(layer, scrollNode) {
 }
 
 function updateSubviewRuler(layer, scrollNode) {
+  // The Full range handle owns a projected, counter-scaled ruler until release.
+  if (scrollNode?.classList?.contains?.("is-full-range-drag-preview")) return;
   if (!layer) {
     return;
   }

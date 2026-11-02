@@ -1021,3 +1021,16 @@
 .subview-anchor-separator[data-main-fragment-role="ref"] {
   stroke: var(--ctg-ref-stroke);
 }
+
+
+/* Full range drag reuses the original SVG; its labels are counter-scaled by
+   the gesture handle, so no clipped-label HTML overlay is needed. */
+.is-full-range-drag-preview .track-sticky-label-layer { display: none; }
+.is-full-range-drag-preview .track-ctg-label.is-sticky-hidden { display: inline; }
+.is-full-range-drag-preview svg :is(rect, line, polygon, polyline, path) { vector-effect: non-scaling-stroke; }
+
+/* Hit targets are already invisible; the gesture owns window pointer events.
+   Exclude them from SVG layout/painting until release, retaining active lines. */
+.is-full-range-drag-preview .subview-anchor-hit-zone,
+.is-full-range-drag-preview .subview-fragment-hit-zone,
+.is-full-range-drag-preview .subview-anchor-line[stroke="transparent"] { display: none; }

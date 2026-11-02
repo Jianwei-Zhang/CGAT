@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  compileTrackDragPreview,
   clearTrackDragPreview,
   clearSubviewTrackDragPreview,
   previewTrackContigDrag,
@@ -836,4 +837,48 @@ test("Subview drag keeps active anchor lines visible and shifts only the dragged
   clearSubviewTrackDragPreview(host);
   assert.equal(line.getAttribute("x1"), "10"); assert.equal(line.getAttribute("x2"), "30");
   assert.equal(hit.getAttribute("x1"), "10"); assert.equal(hit.getAttribute("x2"), "30");
+});
+
+
+for (const subview of [false,true]) test(`compiled ${subview ? "Local" : "Main"} preview keeps endpoint geometry and never re-queries during frames`,()=>{
+  const group=createNode({"data-track-is-mirror":"0","data-subview-track-role":"primary","data-source-gap-drag-key":"a","data-grt-result-entry-key":"entry"});
+  const band=createNode({points:"0,0 10,0 40,50 30,50"});
+  const gap=createNode({x1:"10",x2:"20","data-source-gap-left-key":"a","data-source-gap-right-key":"b"});
+  const junctionLine=createNode({x1:"30",x2:"70"}),junctionLabel=createNode({x:"50"});
+  const junction=createNode({"data-grt-result-junction-left-entry-key":"entry","data-grt-result-junction-right-entry-key":"other"},{
+    "[data-grt-result-junction-line='1']":[junctionLine],"[data-grt-result-junction-label='1']":[junctionLabel]});
+  const evidence=createNode({points:"1,1 2,1 5,3 4,3","data-grt-display-evidence-source-entry-key":"entry"});
+  const host=createHost({
+    '[data-track-contig-id="1"][data-track-role="primary"]':[group],
+    '[data-band-track-role="primary"][data-band-contig-id="1"]':[band],
+    '[data-subview-track-slot="top"][data-subview-contig-id="1"]':[group],
+    '[data-subview-top-contig-id="1"]':[band],
+    '[data-source-gap-left-key]':[gap], '[data-grt-result-junction]':[junction], '[data-grt-display-evidence]':[evidence],
+    "[data-drag-preview-group='1']":[group],"[data-drag-preview-band='1']":[band,evidence],
+    "[data-drag-preview-junction-line='1']":[gap,junctionLine],"[data-drag-preview-junction-label='1']":[junctionLabel],
+  });
+  let queries=0;const query=host.querySelectorAll;host.querySelectorAll=selector=>{queries++;return query(selector);};
+  const payload=subview?{slot:"top",contigId:1}:{trackRole:"primary",assemblyCtgId:1};
+  const plan=compileTrackDragPreview(host,payload,{subview});
+  const compiledQueries=queries;
+  assert.equal(group.getAttribute("transform"),null,"compilation must not move the graph");
+  for(const offset of [15,-100,0,300,15]) plan.apply(offset);
+  assert.equal(queries,compiledQueries);
+  assert.equal(group.getAttribute("transform"),"translate(15.00 0)");
+  assert.equal(band.getAttribute("points"),subview?"15.00,0.00 25.00,0.00 40.00,50.00 30.00,50.00":"0.00,0.00 10.00,0.00 55.00,50.00 45.00,50.00");
+  assert.equal(gap.getAttribute("x1"),"25.00");assert.equal(gap.getAttribute("x2"),"20.00");
+  assert.equal(junctionLine.getAttribute("x1"),"45.00");assert.equal(junctionLine.getAttribute("x2"),"70.00");
+  assert.equal(junctionLabel.getAttribute("x"),"57.50");
+  assert.equal(evidence.getAttribute("points"),"16.00,1.00 17.00,1.00 5.00,3.00 4.00,3.00");
+  plan.clear();assert.equal(group.getAttribute("transform"),null);assert.equal(band.getAttribute("points"),"0,0 10,0 40,50 30,50");
+  assert.equal(gap.getAttribute("x1"),"10");assert.equal(junctionLabel.getAttribute("x"),"50");
+});
+
+
+test("compiled movement composes rather than discards a pre-existing group transform",()=>{
+ const group=createNode({transform:"translate(7 3) rotate(10)"});
+ const host=createHost({'[data-track-contig-id="1"][data-track-role="primary"]':[group],"[data-drag-preview-group='1']":[group]});
+ const plan=compileTrackDragPreview(host,{trackRole:"primary",assemblyCtgId:1});plan.apply(20);
+ assert.equal(group.getAttribute("transform"),"translate(20.00 0) translate(7 3) rotate(10)");
+ plan.clear();assert.equal(group.getAttribute("transform"),"translate(7 3) rotate(10)");
 });
