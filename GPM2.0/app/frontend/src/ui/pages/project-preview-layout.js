@@ -72,6 +72,10 @@ export function syncProjectPreviewCards(entries) {
     const geometry = layoutProjectPreviewCard(card, width);
     const apply = (source, layout) => {
       place(source, layout);
+      // Context labels were always hidden by CSS. Their complete names stay
+      // in the source tooltip/model, so neither labels nor child queries are
+      // needed for the overwhelmingly common unused source body.
+      if (source?.classList?.contains("is-context")) return;
       [...(source?.querySelectorAll(".project-preview-used") || [])].forEach((patch, index) =>
         place(patch, layout.highlights[index], layout.x));
       const label = source?.querySelector("[data-preview-source-fit-label]");

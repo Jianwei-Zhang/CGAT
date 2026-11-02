@@ -62,7 +62,7 @@ function renderContig(item, track, domain, labels) {
     item.highlights.length ? `${labels.used}: ${item.highlights.map(patch => partTitle(patch.part, labels)).join("; ")}` : ""].filter(Boolean).join("\n");
   return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" data-preview-source-length="${item.length}" style="left:${percent(start)}%;width:${percent(width)}%;top:2px;background:${contigColorToken(track.role)};border-color:${contigColorToken(track.role, "stroke")};--preview-source-stroke:${contigColorToken(track.role, "stroke")};color:${contigColorToken(track.role, "text")}" data-app-tooltip="${html(title)}">
     ${item.highlights.map(patch => renderHighlight({ ...patch, start: Math.max(0, patch.start - clipped), end: Math.min(visibleLength, patch.end - clipped) }, visibleLength, labels)).join("")}
-    <span class="project-preview-contig-label" data-preview-source-fit-label="1">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>
+    ${item.highlights.length ? `<span class="project-preview-contig-label" data-preview-source-fit-label="1">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>` : ""}
   </span>`;
 }
 

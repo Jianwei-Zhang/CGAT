@@ -331,3 +331,21 @@ test("unbinding releases heavy cached plot children but leaves chromosome/header
   assert.equal(released, 2); assert.equal(shell.dataset.previewMounted, "false"); assert.equal(shell.header.focusable, true);
   unbindProjectPreviewPage(node); assert.equal(released, 2, "already-empty plots are not retained or reprocessed");
 });
+
+
+test("unused source bodies retain complete tooltips but do not create CSS-hidden label nodes", () => {
+  const value = state();
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
+    datasets: [{ datasetId: 1, name: "dsA" }], project: { primaryDatasetId: 1 },
+    ctgs: [{ assemblyCtgId: 1, datasetId: 1, datasetName: "dsA", name: "adopted", totalLength: 1000, assignedChrName: "Chr1", anchorStart: 0 },
+      { assemblyCtgId: 2, datasetId: 1, datasetName: "dsA", name: "unused<complete-name>", totalLength: 800, assignedChrName: "Chr1", anchorStart: 100 }],
+    finalPathByChr: { Chr1: { segments: [{ ...segment, ctgName: "adopted" }] } } });
+  const before = JSON.stringify(card), output = renderProjectPreviewCard(card, getMessages(value, "projectPreview"));
+  assert.equal((output.match(/data-preview-source-length=/g) || []).length, 2, "both complete bodies remain");
+  assert.equal((output.match(/data-preview-source-fit-label=/g) || []).length, 1, "only the adopted source needs a visible label");
+  const context = output.match(/<span class="project-preview-contig is-context"[\s\S]*?<\/span>/)?.[0];
+  assert.match(context, /data-app-tooltip="unused&lt;complete-name&gt;/);
+  assert.match(context, /data-preview-source-length="800"/);
+  assert.doesNotMatch(context, /project-preview-contig-label/);
+  assert.equal(JSON.stringify(card), before);
+});

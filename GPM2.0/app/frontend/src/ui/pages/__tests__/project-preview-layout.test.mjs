@@ -147,3 +147,18 @@ test("mounted-card geometry batches widths and label measurements and places tin
   assert.ok(parseFloat(first.parts[1].style.width) >= 8);
   assert.equal(first.labels[1].style.visibility, "hidden"); assert.equal(first.labels[0].style.visibility, "");
 });
+
+
+test("unused context sources receive complete geometry without walking hidden label subtrees", () => {
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: "chr1", chrLength: 1000 }], referenceGenomeId: 1,
+    ctgs: [{ assemblyCtgId: 1, datasetName: "ds", name: "unused", totalLength: 600, assignedChrName: "chr1", anchorStart: 100 }],
+    finalPathByChr: { chr1: { segments: [] } } });
+  const source = { style: {}, classList: { contains: name => name === "is-context" },
+    querySelector() { assert.fail("context source has no label to measure"); },
+    querySelectorAll() { assert.fail("context source has no adopted intervals to place"); } };
+  const node = { querySelector: selector => selector === ".project-preview-reference" ? null : { clientWidth: 500 },
+    querySelectorAll: selector => selector === ".project-preview-source-plots" ? [{ querySelectorAll: () => [source] }] : [] };
+  syncProjectPreviewSources(node, card);
+  const expected = layoutProjectPreviewCard(card, 500).tracks[0][0];
+  close(parseFloat(source.style.left), expected.x); close(parseFloat(source.style.width), expected.width);
+});
