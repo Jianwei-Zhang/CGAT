@@ -4,9 +4,21 @@ mod commands;
 mod import_cancel;
 mod project_copy_cancel;
 
+use tauri::Manager;
+
+fn main_window_title(version: &semver::Version) -> String {
+    format!("GPM ({version})")
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_title(&main_window_title(&app.package_info().version))?;
+            }
+            Ok(())
+        })
         .manage(app_update::UpdateState::default())
         .invoke_handler(tauri::generate_handler![
             app_update::app_update_status,
@@ -89,4 +101,29 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");
+}
+
+#[cfg(test)]
+mod window_title_tests {
+    use super::main_window_title;
+
+    #[test]
+    fn title_uses_the_running_package_version() {
+        assert_eq!(
+            main_window_title(&semver::Version::new(2, 0, 16)),
+            "GPM (2.0.16)"
+        );
+        let next = semver::Version::parse("2.1.0-beta.1").unwrap();
+        assert_eq!(main_window_title(&next), "GPM (2.1.0-beta.1)");
+    }
+
+    #[test]
+    fn versioned_window_title_keeps_the_installed_app_name_clean() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config["productName"], "GPM");
+        assert_eq!(config["identifier"], "com.gpm.next");
+        assert_eq!(config["app"]["windows"][0]["label"], "main");
+        assert_eq!(config["app"]["windows"][0]["title"], "GPM");
+    }
 }
