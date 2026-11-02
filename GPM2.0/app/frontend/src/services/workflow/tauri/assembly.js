@@ -18,14 +18,18 @@ async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, dataset
   };
 }
 
-async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName, deferHits = false }) {
-  const result = await invokeCommand("list_reference_track_members", {
-    workspaceRoot,
-    projectId,
-    chrName,
-    compact: true,
-    ...(deferHits ? { encoding: "reference-hits-v2" } : {}),
-  });
+async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName, deferHits = false, geometryOnly = false }) {
+  const args = { workspaceRoot, projectId, chrName, compact: true,
+    ...(geometryOnly ? { encoding: "reference-geometry-v1" } : deferHits ? { encoding: "reference-hits-v2" } : {}),
+  };
+  let result;
+  try { result = await invokeCommand("list_reference_track_members", args); }
+  catch (error) {
+    // Old desktops may not recognize geometry negotiation. Never turn DB or
+    // integrity failures into a fallback empty/ready evidence response.
+    if (!geometryOnly || !String(error?.message || error).includes("unsupported reference evidence encoding: reference-geometry-v1")) throw error;
+    result = await invokeCommand("list_reference_track_members", { ...args, encoding: "reference-hits-v2" });
+  }
   return decodeReferenceTracks(result, { deferHits });
 }
 

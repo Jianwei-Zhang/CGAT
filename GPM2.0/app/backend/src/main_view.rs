@@ -11,7 +11,10 @@ use crate::reference_segments::{
 };
 
 pub mod overview;
+#[cfg(test)]
+mod performance_profile;
 pub mod reference_transport;
+mod source_fragment_bulk;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectChromosomeItem {
@@ -550,9 +553,7 @@ fn list_chr_view_ctgs_with_connection_options(
         &mut ctgs,
         chr_param.is_some() || dataset_param.is_some(),
     )?;
-    for ctg in &mut ctgs {
-        ctg.source_fragment = load_source_fragment(conn, ctg.assembly_ctg_id)?;
-    }
+    source_fragment_bulk::populate_source_fragments(conn, project_id, &mut ctgs)?;
 
     // Preview needs placement and provenance only. Hits, N regions and end marks
     // are Assembly evidence and require several additional queries per contig.
@@ -685,6 +686,12 @@ fn populate_co_assigned_chr_names(
     ctgs: &mut [ChrViewCtgItem],
     restrict_source_ids: bool,
 ) -> Result<()> {
+    if restrict_source_ids && ctgs.len() > 400 {
+        for chunk in ctgs.chunks_mut(400) {
+            populate_co_assigned_chr_names(conn, project_id, chunk, true)?;
+        }
+        return Ok(());
+    }
     let mut source_seq_ids = ctgs
         .iter()
         .filter_map(|ctg| ctg.origin_source_seq_id)
@@ -1697,6 +1704,7 @@ pub fn list_reference_track_members(
         Some(workspace_root),
         project_id,
         chr_name,
+        true,
     )
 }
 
@@ -1714,7 +1722,36 @@ pub fn list_reference_track_members_with_connection(
         workspace_root.as_deref(),
         project_id,
         chr_name,
+        true,
     )
+}
+
+/// Geometry-only reads never query or expand reference alignment evidence.
+pub fn list_reference_track_geometry_with_connection(
+    conn: &Connection,
+    project_id: i64,
+    chr_name: &str,
+) -> Result<Vec<ReferenceTrackMemberItem>> {
+    let root = conn
+        .path()
+        .and_then(|path| Path::new(path).parent())
+        .map(Path::to_path_buf);
+    list_reference_track_members_with_workspace_root(
+        conn,
+        root.as_deref(),
+        project_id,
+        chr_name,
+        false,
+    )
+}
+
+pub fn list_reference_track_geometry(
+    db: &Path,
+    project_id: i64,
+    chr_name: &str,
+) -> Result<Vec<ReferenceTrackMemberItem>> {
+    let conn = open_workspace_db(db)?;
+    list_reference_track_geometry_with_connection(&conn, project_id, chr_name)
 }
 
 fn list_reference_track_members_with_workspace_root(
@@ -1722,6 +1759,7 @@ fn list_reference_track_members_with_workspace_root(
     workspace_root: Option<&Path>,
     project_id: i64,
     chr_name: &str,
+    include_hits: bool,
 ) -> Result<Vec<ReferenceTrackMemberItem>> {
     let normalized_chr_name = chr_name.trim();
     if normalized_chr_name.is_empty() {
@@ -1777,7 +1815,7 @@ fn list_reference_track_members_with_workspace_root(
         })
         .collect::<Vec<_>>();
 
-    if items.is_empty() {
+    if items.is_empty() || !include_hits {
         return Ok(items);
     }
 
@@ -2217,6 +2255,38 @@ mod tests {
 
     use super::*;
     use crate::db::init_workspace_schema;
+
+    #[test]
+    fn reference_geometry_does_not_read_alignment_rows_and_matches_full_metadata() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_workspace_schema(&conn).unwrap();
+        seed_basic_data(&conn);
+        let full = list_reference_track_members_with_connection(&conn, 1, "chr1").unwrap();
+        let geometry = list_reference_track_geometry_with_connection(&conn, 1, "chr1").unwrap();
+        let full_geometry = full
+            .into_iter()
+            .map(|mut item| {
+                item.hits.clear();
+                item
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(geometry, full_geometry);
+        conn.execute_batch("DROP TABLE ref_alignment_hit;").unwrap();
+        assert_eq!(
+            list_reference_track_geometry_with_connection(&conn, 1, "chr1").unwrap(),
+            geometry
+        );
+        assert!(list_reference_track_members_with_connection(&conn, 1, "chr1").is_err());
+        let wire = reference_transport::reference_track_geometry(geometry);
+        assert_eq!(wire["encoding"], reference_transport::GEOMETRY_ENCODING);
+        for item in wire["items"].as_array().unwrap() {
+            for field in ["hits", "hitRows", "hitData", "hitCount", "hitGroups"] {
+                assert!(item.get(field).is_none());
+            }
+        }
+        assert!(list_reference_track_geometry_with_connection(&conn, 1, "missing-chr").is_err());
+        assert!(list_reference_track_geometry_with_connection(&conn, 999, "chr1").is_err());
+    }
 
     #[test]
     fn queries_chr_and_ctg_views() {

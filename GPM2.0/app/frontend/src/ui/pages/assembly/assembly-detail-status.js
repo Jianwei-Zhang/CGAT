@@ -1,3 +1,4 @@
+import { missingSubviewReferenceEvidence } from "./reference-evidence-loading.js";
 import { getMessages } from "../../i18n/index.js";
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -36,6 +37,15 @@ export function patchAssemblyDetailStatus(host, state) {
 
 
 export function renderAssemblyLocalRestoreStatus(assembly, i18n) {
+  const missing = missingSubviewReferenceEvidence(assembly);
+  if (missing.length) {
+    const error = missing.find(member=>member.referenceEvidence?.status === "error")?.referenceEvidence?.error;
+    return `<article class="subview-selection-panel" data-subview-panel="1" aria-busy="${!error}">
+      <h4 class="assembly-view-title">${html(i18n.subview.panelTitle)}</h4>
+      <p role="${error ? "alert" : "status"}" class="${error ? "error-text" : "muted"}">${html(error || i18n.subview.loadingReferenceEvidence)}</p>
+      ${error ? `<button type="button" class="button ghost tiny" data-assembly-subview-retry>${html(i18n.runtime.detailRetry)}</button>` : ""}
+    </article>`;
+  }
   if (!(assembly.subviewRestoring || assembly.subviewRestoreError)
     || assembly.subviewRestoringSummary !== assembly.subview?.summary) return "";
   const failed = Boolean(assembly.subviewRestoreError);

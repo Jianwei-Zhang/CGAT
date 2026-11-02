@@ -4,8 +4,11 @@ const materialized = new WeakMap();
 const decodedBytes = new WeakMap();
 const V1 = "reference-hits-v1", V2 = "reference-hits-v2";
 
+export function referenceHitsUnloaded(member) {
+  return member?.referenceEvidence?.encoding === "reference-hits-unloaded";
+}
 export function hasDeferredReferenceHits(member) {
-  return member?.referenceEvidence?.encoding === V1 || member?.referenceEvidence?.encoding === V2;
+  return referenceHitsUnloaded(member) || member?.referenceEvidence?.encoding === V1 || member?.referenceEvidence?.encoding === V2;
 }
 
 export function deferReferenceMember(member, encoding) {
@@ -66,6 +69,7 @@ function signed(value) {
 export function* iterateReferenceHitEntries(member, {
   datasetId = member?.referenceDatasetId ?? null, acceptRow = null,
 } = {}) {
+  if (referenceHitsUnloaded(member)) throw Error("Reference evidence is not loaded");
   let hitIndex = 0;
   const evidence = member?.referenceEvidence;
   if (!hasDeferredReferenceHits(member)) {
@@ -132,6 +136,7 @@ export function* iterateReferenceHits(member, options) {
 }
 
 export function readReferenceHits(member, { datasetId = member?.referenceDatasetId ?? null } = {}) {
+  if (referenceHitsUnloaded(member)) throw Error("Reference evidence is not loaded");
   if (!hasDeferredReferenceHits(member)) {
     const hits = Array.isArray(member?.hits) ? member.hits : [];
     return datasetId == null ? hits : hits.filter(hit => Number(hit?.datasetId) === datasetId);

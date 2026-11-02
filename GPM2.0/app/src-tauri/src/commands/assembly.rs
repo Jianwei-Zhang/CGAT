@@ -198,6 +198,14 @@ pub async fn list_reference_track_members(
     encoding: Option<String>,
 ) -> CommandResult<ReferenceTrackResponse> {
     tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<ReferenceTrackResponse> {
+        if encoding.as_deref() == Some(gpm_next_backend::main_view::reference_transport::GEOMETRY_ENCODING) {
+            let items = gpm_next_backend::main_view::list_reference_track_geometry(
+                &project_db_path(&workspaceRoot), projectId, &chrName,
+            )?;
+            return Ok(ReferenceTrackResponse::Legacy(
+                gpm_next_backend::main_view::reference_transport::reference_track_geometry(items),
+            ));
+        }
         if let Some(value) = encoding.as_deref()
             && value != gpm_next_backend::main_view::reference_transport::packed::ENCODING
         {

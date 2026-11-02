@@ -82,9 +82,9 @@ export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datas
   return listChrViewCtgsMock({ workspaceRoot, projectId, chrName, datasetId });
 }
 
-export async function listReferenceTrackMembers({ workspaceRoot, projectId, chrName, deferHits = false }) {
+export async function listReferenceTrackMembers({ workspaceRoot, projectId, chrName, deferHits = false, geometryOnly = false }) {
   if (isTauriRuntime()) {
-    return listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName, deferHits });
+    return listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName, deferHits, geometryOnly });
   }
   try {
     return await callDevBridge("/api/list-reference-track-members", {

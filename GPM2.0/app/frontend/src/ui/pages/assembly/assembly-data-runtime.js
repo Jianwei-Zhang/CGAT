@@ -304,7 +304,7 @@ async function listReferenceTrackMembersOrEmpty(deps, args) {
     return { items: [] };
   }
   try {
-    const result = await deps.listReferenceTrackMembers({ ...args, deferHits: true });
+    const result = await deps.listReferenceTrackMembers({ ...args, deferHits: true, geometryOnly: true });
     return {
       items: normalizeReferenceTrackMembers(result?.items),
     };

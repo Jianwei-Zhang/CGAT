@@ -1,6 +1,8 @@
+import { ensureSubviewReferenceEvidence, missingSubviewReferenceEvidence } from "./reference-evidence-loading.js";
 import { currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { memberBackingIds } from "./subview-fragment-model.js";
 import {
+  listReferenceTrackMembers as requestReferenceTrackMembers,
   getJunctionInspection as requestJunctionInspection,
   getTrackPairwiseEvidence as requestTrackPairwiseEvidence,
 } from "../../../services/workflow-api.js";
@@ -31,6 +33,7 @@ export function createSubviewPairwiseController({
   scheduleDeferredSubviewPanelRerender,
   getJunctionInspection = requestJunctionInspection,
   getTrackPairwiseEvidence = requestTrackPairwiseEvidence,
+  listReferenceTrackMembers = requestReferenceTrackMembers,
 }) {
   function issueSubviewPairwiseEvidenceRequestKey(summary, scope = {}) {
     const key = String(scope?.key || buildSubviewPairwiseEvidenceKey(summary, scope));
@@ -313,6 +316,14 @@ export function createSubviewPairwiseController({
   }
 
   async function refreshSubviewPairwiseEvidence(host, store, { rerenderLoading = true, rerenderLoaded = true } = {}) {
+    if (missingSubviewReferenceEvidence(store.getState().assembly).length) {
+      const ready = await ensureSubviewReferenceEvidence(host,store,{
+        load:listReferenceTrackMembers,
+        render:(host,store)=>{ if (rerenderLoaded) rerenderSubviewPanel(host,store); },
+        mapError:(error,state)=>mapAssemblyError({error,stateOrLocale:state}).userMessage,
+      });
+      if (!ready) return false;
+    }
     const state = store.getState();
     const summary = state.assembly?.subview?.summary || null;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(

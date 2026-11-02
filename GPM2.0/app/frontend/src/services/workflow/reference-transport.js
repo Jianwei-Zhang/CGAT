@@ -4,6 +4,11 @@ import { deferReferenceMember, iterateReferenceHits } from "./reference-evidence
 // the same full hit arrays, and both previous desktop encodings remain valid.
 export function decodeReferenceTracks(result, { deferHits = false } = {}) {
   if (!result?.encoding) return { items: result?.items || [] };
+  if (result.encoding === "reference-geometry-v1") {
+    return { items: (result.items || []).map(({ hits, hitGroups, hitRows, hitData, hitCount, ...member }) => ({
+      ...member, referenceEvidence: { encoding: "reference-hits-unloaded" },
+    })) };
+  }
   if (!["reference-hits-v1", "reference-hits-v2"].includes(result.encoding)) {
     throw Error("Unsupported reference evidence encoding");
   }

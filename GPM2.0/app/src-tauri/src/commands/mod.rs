@@ -1335,6 +1335,20 @@ mod tests {
             json!([0, 5001, 10000, 5101, 10100, 5000, 5000, 1, 5000])
         );
 
+        let geometry = tauri::async_runtime::block_on(list_reference_track_members(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            "Chr01".into(),
+            Some(true),
+            Some("reference-geometry-v1".into()),
+        ))
+        .expect("geometry response");
+        let geometry = serde_json::to_value(geometry).unwrap();
+        assert_eq!(geometry["encoding"], "reference-geometry-v1");
+        assert!(geometry["items"][0].get("hits").is_none());
+        assert!(geometry["items"][0].get("hitData").is_none());
+        assert!(geometry["items"][0].get("hitRows").is_none());
+
         let packed = tauri::async_runtime::block_on(list_reference_track_members(
             workspace_root.to_string_lossy().into_owned(),
             7,

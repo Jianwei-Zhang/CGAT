@@ -1,3 +1,4 @@
+import { missingSubviewReferenceEvidence } from "./reference-evidence-loading.js";
 import { currentAssemblyViewRequest } from "./assembly-view-request.js";
 
 // A task started from a resolved Promise still runs before paint. Wait for a
@@ -117,7 +118,9 @@ export function resumeAssemblyReadyStages(host, store, deps) {
     tasks.push(hydrateAssemblyCtgDetail(host, store, deps, { afterPaint: true }));
   }
   const evidence = local.get(store);
-  if (assembly.subviewRestoring && assembly.subviewRestoringSummary === assembly.subview?.summary
+  const rawMissing=missingSubviewReferenceEvidence(assembly);
+  const resumeRaw=rawMissing.some(member=>member.referenceEvidence?.status !== "error");
+  if (((assembly.subviewRestoring && assembly.subviewRestoringSummary === assembly.subview?.summary) || resumeRaw)
     && !(evidence?.active && evidence.current())) {
     // A discarded request must not be mistaken for a still-running controller
     // request merely because its cached evidence has status=loading.

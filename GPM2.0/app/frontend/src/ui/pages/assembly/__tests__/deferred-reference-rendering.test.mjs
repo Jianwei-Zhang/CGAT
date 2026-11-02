@@ -1,3 +1,4 @@
+import {ensureSubviewReferenceEvidence} from "../reference-evidence-loading.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createIdentityRenderState } from "./identity-render-fixture.mjs";
@@ -131,3 +132,20 @@ for (const flip of [false, true]) {
     assert.match(expected, /data-subview-hit-key="[^"]*hit-2/);
   });
 }
+
+
+for (const mode of ["none","primary-pair","ref-primary","primary-ref","track-ref-primary","track-ref-support","composition"]) for (const flip of [false,true]) {
+ test(`geometry-only ${mode} flip=${flip} has identical complete HTML and colors without raw Ref hits`,()=>{
+  const full=decodeReferenceTracks(wire()).items;
+  const geometry=decodeReferenceTracks({encoding:"reference-geometry-v1",items:wire().items},{deferHits:true}).items;
+  assert.equal(renderAssemblyPage(stateWith(geometry,mode,flip)),renderAssemblyPage(stateWith(full,mode,flip)));
+ });
+}
+for (const flip of [false,true])test(`Ref/Ref after explicit raw hydration preserves full HTML and hit-N anchors flip=${flip}`,async()=>{
+ const full=decodeReferenceTracks(wire()).items;
+ const geometry=decodeReferenceTracks({encoding:"reference-geometry-v1",items:wire().items},{deferHits:true}).items;
+ const store=createStore(stateWith(geometry,"ref-ref",flip));
+ assert.match(renderAssemblyPage(store.getState()),/aria-busy="true"/);
+ assert.equal(await ensureSubviewReferenceEvidence(null,store,{load:async()=>decodeReferenceTracks(packReferenceWire(wire()),{deferHits:true}),render(){},mapError:e=>e.message}),true);
+ assert.equal(renderAssemblyPage(store.getState()),renderAssemblyPage(stateWith(full,"ref-ref",flip)));
+});
