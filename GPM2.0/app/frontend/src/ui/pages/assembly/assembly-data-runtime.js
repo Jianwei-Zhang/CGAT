@@ -926,6 +926,16 @@ export async function selectChromosome(host, store, chrName, deps) {
       });
       if (activated?.assembly) store.setState({ assembly: activated.assembly });
     }
+    // Pairwise hits are runtime data keyed by the Local View members. The
+    // cleared subview keeps the previous chromosome's hits, so reconcile them
+    // with the restored target history before the ready render; otherwise the
+    // old "loaded" hits project onto nothing and no band or status is shown.
+    if (typeof deps.refreshSubviewPairwiseEvidence === "function") {
+      await deps.refreshSubviewPairwiseEvidence(host, store, {
+        rerenderLoading: false, rerenderLoaded: false,
+      });
+      if (!isCurrentRequest()) return;
+    }
   } catch (error) {
     if (!isCurrentRequest()) {
       return;

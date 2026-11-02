@@ -2297,3 +2297,62 @@ test("chromosome selection leaves the chooser open during and after loading, but
     assert.equal(f.store.getState().assembly.selectedChrName, "Chr02");
   }
 });
+
+test("chromosome navigation replaces the previous chromosome's composition hits before the ready render", async () => {
+  const { createSubviewPairwiseController } = await import("../subview-pairwise-controller.js");
+  const { buildSubviewPairwiseEvidenceKey } = await import("../subview-pairwise-evidence-state.js");
+  const member = (lane, role, datasetId, assemblyCtgId) => ({
+    entityKey: `assembly:${assemblyCtgId}`, assemblyCtgId, lane, lengthBp: 1000, xBp: 0,
+    label: `ctg${assemblyCtgId}`, source: { role, datasetId, sourceType: "mother" },
+  });
+  const summaryFor = (topId, bottomId) => ({
+    mode: "composition",
+    members: [member("top", "support", 3, topId), member("bottom", "primary", 1, bottomId)],
+  });
+  const previousSummary = summaryFor(3059, 16);
+  const nextSummary = summaryFor(2001, 32);
+  const staleHits = [{ queryAssemblyCtgId: 3059, subjectAssemblyCtgId: 16, alignLength: 20000 }];
+  const nextHits = [{ queryAssemblyCtgId: 2001, subjectAssemblyCtgId: 32, alignLength: 20000 }];
+  const f = waitingNavigationFixture();
+  f.release();
+  const previousKey = buildSubviewPairwiseEvidenceKey(previousSummary);
+  f.store.setState({ assembly: { ...f.store.getState().assembly, selectedChrName: "Chr04",
+    subview: { summary: previousSummary, pairwiseEvidence: {
+      key: previousKey, requestKey: `${previousKey}|req:16`, status: "loaded", hits: staleHits,
+      minAlignmentLength: 10000, minIdentityPct: 0,
+      loadedMinAlignmentLength: 10000, loadedMinIdentityPct: 0, coverage: [],
+    } },
+    subviewHistoryByKey: { "composition:Chr02": {} } } });
+  const events = [];
+  const controller = createSubviewPairwiseController({
+    session: { subviewPairwiseEvidenceRequestSeq: 16 },
+    getTrackPairwiseEvidence: async (params) => {
+      events.push("evidence-fetch");
+      assert.deepEqual(params.bottomAssemblyCtgIds, [32]);
+      return { hits: nextHits, evidenceSource: "fixture", coverage: [{ status: "ready" }] };
+    },
+    rerenderSubviewPanel() { assert.fail("chromosome navigation owns the loading render"); },
+    scheduleDeferredSubviewPanelRerender() { assert.fail("chromosome navigation owns the ready render"); },
+  });
+  const deps = {
+    ...f.deps,
+    buildClearedSubviewState: (assembly) => ({ ...assembly.subview, summary: null }),
+    buildSubviewCompositionHistoryKey: (chrName) => `composition:${chrName}`,
+    activateSubviewCompositionHistory: (assembly) => ({
+      assembly: { ...assembly, subview: { ...assembly.subview, summary: nextSummary } },
+    }),
+    refreshSubviewPairwiseEvidence: (...args) => controller.refreshSubviewPairwiseEvidence(...args),
+    rerender: (_host, store) => {
+      const assembly = store.getState().assembly;
+      if (!assembly.loading) events.push(`ready:${assembly.subview.pairwiseEvidence?.status}`);
+    },
+  };
+
+  await selectChromosome({}, f.store, "Chr02", deps);
+
+  const evidence = f.store.getState().assembly.subview.pairwiseEvidence;
+  assert.equal(evidence.key, buildSubviewPairwiseEvidenceKey(nextSummary));
+  assert.equal(evidence.status, "loaded");
+  assert.deepEqual(evidence.hits, nextHits);
+  assert.deepEqual(events, ["evidence-fetch", "ready:loaded"]);
+});
