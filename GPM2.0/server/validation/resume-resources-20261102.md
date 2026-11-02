@@ -58,6 +58,8 @@ not a new public parameter catalogue.
 This validates local source behavior and fixtures, not a customer-data rerun,
 real scheduler allocation, native scientific 10/64-core equivalence, or desktop
 acceptance. The source commit/push does not itself refresh official Server
-attachments or formally deployed documentation. Those publication steps remain
-subject to the existing release/deployment authorization gates; no public
-assets, live customer workspaces, scheduler jobs or App installers were changed.
+attachments or formally deployed documentation. On 2026-11-02, the user explicitly deferred replacing the current Release
+assets and deploying formal docs: ship these changes together with the next
+version instead of a same-version refresh. Existing release/deployment gates
+still apply at that time. No public assets, live customer workspaces, scheduler
+jobs or App installers were changed.
