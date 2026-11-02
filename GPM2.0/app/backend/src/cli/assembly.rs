@@ -2,6 +2,17 @@ use super::*;
 
 pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
     match command {
+        Commands::GetProjectOverviewSources {
+            workspace_root,
+            project_id,
+        } => {
+            let result = gpm_next_backend::main_view::overview::get_project_overview_sources(
+                &workspace_root.join("project.sqlite"),
+                project_id,
+            )?;
+            println!("{}", serde_json::to_string(&result)?);
+        }
+
         Commands::GetContigChrAlignments {
             workspace_root,
             project_id,

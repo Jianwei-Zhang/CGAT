@@ -44,6 +44,7 @@ pub fn run() {
             commands::list_project_chromosomes,
             commands::list_new_sequences,
             commands::list_chr_view_ctgs,
+            commands::get_project_overview_sources,
             commands::list_reference_track_members,
             commands::list_phased_chr_tracks,
             commands::create_phased_chr_track,

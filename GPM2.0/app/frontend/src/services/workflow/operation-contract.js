@@ -28,6 +28,7 @@ const DEFINITIONS = {
     ["listNewSequences", "bridge"],
   ],
   assembly: [
+    ["getProjectOverviewSources", "bridge"],
     ["listChrViewCtgs", "bridge"],
     ["listReferenceTrackMembers", "bridge"],
     ["listPhasedChrTracks", "bridge"],

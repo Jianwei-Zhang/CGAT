@@ -150,7 +150,8 @@ test("operation factory exposes every registered operation and maps exact CLI co
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 47);
+  assert.equal(Object.keys(handlers).length, 48);
+  assert.equal(typeof handlers.getProjectOverviewSources, "function");
   assert.equal(typeof handlers.listProjectCatalog, "function");
   assert.equal(typeof handlers.updateProjectCatalog, "function");
   const sequences = await handlers.listNewSequences({
@@ -308,4 +309,19 @@ test("cross-chr evidence dev bridge preserves the typed query and result JSON",a
   const args={assemblyCtgId:6,minAlignmentLength:10000,minIdentityPct:90};
   assert.deepEqual(await operations.getContigChrAlignments({workspaceRoot:"D:/workspace",projectId:1,args}),{items:[]});
   assert.deepEqual(calls[0],["get-contig-chr-alignments","D:/workspace","1",JSON.stringify(args)]);
+});
+
+
+test("overview bridge uses one JSON source operation with provenance intact", async () => {
+  const calls = [], sources = { chromosomes: [{ chrName: "Chr1" }], ctgs: [
+    { assemblyCtgId: 3, sourceFragment: { sourceStart: 10 }, derivedTargetDatasetId: 1 },
+  ], primaryCtgIds: [3], phasedChrTracksByChr: {} };
+  const operations = createBackendOperations({ runBackend: async args => {
+    calls.push(args); return { stdout: JSON.stringify(sources) + "\n" };
+  } });
+  assert.deepEqual(await operations.getProjectOverviewSources({ workspaceRoot: "D:/workspace", projectId: 7 }), sources);
+  assert.deepEqual(calls, [["get-project-overview-sources", "D:/workspace", "7"]]);
+  await assert.rejects(operations.getProjectOverviewSources({ projectId: 7 }), /workspaceRoot/);
+  const invalid = createBackendOperations({ runBackend: async () => ({ stdout: "not JSON" }) });
+  await assert.rejects(invalid.getProjectOverviewSources({ workspaceRoot: "D:/workspace", projectId: 7 }), SyntaxError);
 });

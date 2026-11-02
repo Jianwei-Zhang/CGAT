@@ -1205,6 +1205,15 @@ mod tests {
             assert!(preview["items"][0].get(omitted).is_none(), "{omitted}");
         }
 
+        let overview = get_project_overview_sources(workspace_root.to_string_lossy().into_owned(), 7)
+            .expect("get compact overview sources");
+        assert_eq!(overview["primaryCtgIds"], json!([301]));
+        assert_eq!(overview["ctgs"][0]["originId"], result["items"][0]["originId"]);
+        assert_eq!(overview["ctgs"][0]["orient"], result["items"][0]["orient"]);
+        assert_eq!(overview["ctgs"][0]["placementMode"], "manual");
+        assert!(overview["ctgs"][0].get("hits").is_none());
+        assert_eq!(overview["phasedChrTracksByChr"], json!({}));
+
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");
     }

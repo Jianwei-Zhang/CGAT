@@ -14,6 +14,7 @@ import {
   executeMainViewHistoryAction,
   getMainViewHistoryStatus,
   getGrtProjectView,
+  getProjectOverviewSources,
   initializeProject,
   listPhasedChrTracks,
   listProjectInitializerOptions,
@@ -1080,5 +1081,21 @@ test("synchronized local fragment edits keep interval preconditions and one nati
     assert.equal(calls[0].args.request.action, "edit-local-fragment"); assert.deepEqual(calls[0].args.request.args, args);
     globalThis.window.__TAURI__.core.invoke = async () => { throw new Error("LOCAL_FRAGMENT_STALE_SOURCE"); };
     await assert.rejects(runMainViewEditorAction({ workspaceRoot: "D:/workspace", projectId: 1, chrName: "Chr01", action: "edit-local-fragment", args }), /LOCAL_FRAGMENT_STALE_SOURCE/);
+  } finally { globalThis.window = previousWindow; }
+});
+
+
+test("getProjectOverviewSources forwards a single compact desktop operation and preserves backend errors", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [], sources = { chromosomes: [], ctgs: [], primaryCtgIds: [], phasedChrTracksByChr: {} };
+  try {
+    globalThis.window = { __TAURI__: { core: { invoke: async (command, args) => {
+      calls.push({ command, args });
+      if (args.projectId === 8) throw { code: "NOT_FOUND", message: "missing overview project" };
+      return sources;
+    } } } };
+    assert.equal(await getProjectOverviewSources({ workspaceRoot: "D:/workspace", projectId: 7 }), sources);
+    assert.deepEqual(calls, [{ command: "get_project_overview_sources", args: { workspaceRoot: "D:/workspace", projectId: 7 } }]);
+    await assert.rejects(getProjectOverviewSources({ workspaceRoot: "D:/workspace", projectId: 8 }), /missing overview project/);
   } finally { globalThis.window = previousWindow; }
 });

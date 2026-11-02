@@ -66,7 +66,8 @@ test("route registry exposes all dev bridge operations by functional domain", ()
   const routes = createBackendBridgeRoutes(createHandlers());
 
   assert.deepEqual(Object.keys(groups), ["imports", "workspace", "assembly", "audit", "runtime"]);
-  assert.equal(routes.size, 47);
+  assert.equal(routes.size, 48);
+  assert.ok(groups.assembly.includes("/get-project-overview-sources"));
   assert.ok(groups.workspace.includes("/list-project-catalog"));
   assert.ok(groups.workspace.includes("/update-project-catalog"));
   assert.ok(groups.workspace.includes("/copy-project-workspace"));

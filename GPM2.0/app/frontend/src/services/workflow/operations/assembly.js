@@ -58,6 +58,12 @@ export async function getContigChrAlignments(payload) {
   return callDevBridge("/api/contig-chr-alignments",payload);
 }
 
+// No fabricated fallback: a failed real summary must remain a visible error.
+export async function getProjectOverviewSources({ workspaceRoot, projectId }) {
+  if (isTauriRuntime()) return tauri.getProjectOverviewSources({ workspaceRoot, projectId });
+  return callDevBridge("/api/get-project-overview-sources", { workspaceRoot, projectId });
+}
+
 export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false }) {
   if (isTauriRuntime()) {
     return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId, previewOnly });

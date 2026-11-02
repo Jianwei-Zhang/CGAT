@@ -23,6 +23,7 @@ const ROUTE_GROUPS = Object.freeze({
     ["/list-new-sequences", "listNewSequences"],
   ],
   assembly: [
+    ["/get-project-overview-sources", "getProjectOverviewSources"],
     ["/list-chr-view-ctgs", "listChrViewCtgs"],
     ["/list-reference-track-members", "listReferenceTrackMembers"],
     ["/list-phased-chr-tracks", "listPhasedChrTracks"],

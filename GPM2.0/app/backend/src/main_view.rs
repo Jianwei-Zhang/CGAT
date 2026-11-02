@@ -10,6 +10,7 @@ use crate::reference_segments::{
     map_paf_query_interval_to_ref_span, split_paf_hit_by_reference_gaps,
 };
 
+pub mod overview;
 pub mod reference_transport;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -543,7 +544,12 @@ fn list_chr_view_ctgs_with_connection_options(
         return Ok(ctgs);
     }
 
-    populate_co_assigned_chr_names(conn, project_id, &mut ctgs)?;
+    populate_co_assigned_chr_names(
+        conn,
+        project_id,
+        &mut ctgs,
+        chr_param.is_some() || dataset_param.is_some(),
+    )?;
     for ctg in &mut ctgs {
         ctg.source_fragment = load_source_fragment(conn, ctg.assembly_ctg_id)?;
     }
@@ -677,6 +683,7 @@ fn populate_co_assigned_chr_names(
     conn: &Connection,
     project_id: i64,
     ctgs: &mut [ChrViewCtgItem],
+    restrict_source_ids: bool,
 ) -> Result<()> {
     let mut source_seq_ids = ctgs
         .iter()
@@ -688,23 +695,34 @@ fn populate_co_assigned_chr_names(
         return Ok(());
     }
 
-    let placeholders = vec!["?"; source_seq_ids.len()].join(", ");
+    // A project-wide fetch already contains every visible source. Do not bind
+    // all of their IDs again: large batches can exceed SQLite's variable limit.
+    // Scoped Assembly reads keep their existing source restriction.
+    let source_filter = if restrict_source_ids {
+        format!(
+            "AND s.source_seq_id IN ({})",
+            vec!["?"; source_seq_ids.len()].join(", ")
+        )
+    } else {
+        String::new()
+    };
     let sql = format!(
         "SELECT s.source_seq_id, c.assigned_chr_name
          FROM assembly_ctg c
          JOIN assembly_seq s ON s.id = c.assembly_seq_id
          WHERE c.project_id = ?
            AND s.hidden = 0
-           AND s.source_seq_id IN ({})
+           {source_filter}
            AND c.assigned_chr_name IS NOT NULL
            AND c.assigned_chr_name <> ''
          GROUP BY s.source_seq_id, c.assigned_chr_name
-         ORDER BY s.source_seq_id, c.assigned_chr_name",
-        placeholders
+         ORDER BY s.source_seq_id, c.assigned_chr_name"
     );
     let mut bind_values: Vec<&dyn ToSql> = vec![&project_id];
-    for source_seq_id in &source_seq_ids {
-        bind_values.push(source_seq_id);
+    if restrict_source_ids {
+        for source_seq_id in &source_seq_ids {
+            bind_values.push(source_seq_id);
+        }
     }
     let mut stmt = conn
         .prepare(&sql)

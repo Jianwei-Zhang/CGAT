@@ -1,6 +1,10 @@
 import { decodeReferenceTracks } from "../reference-transport.js";
 
 export function createTauriAssemblyOperations({ invokeCommand }) {
+async function getProjectOverviewSources({ workspaceRoot, projectId }) {
+  return invokeCommand("get_project_overview_sources", { workspaceRoot, projectId });
+}
+
 async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false }) {
   const result = await invokeCommand("list_chr_view_ctgs", {
     workspaceRoot,
@@ -274,6 +278,7 @@ async function appendEditAuditLogTauri({ workspaceRoot, projectId, category, act
 }
 
   return {
+    getProjectOverviewSources,
     listChrViewCtgs: listChrViewCtgsTauri,
     listReferenceTrackMembers: listReferenceTrackMembersTauri,
     listPhasedChrTracks: listPhasedChrTracksTauri,

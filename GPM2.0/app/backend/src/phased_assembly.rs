@@ -701,6 +701,26 @@ fn load_track_by_id(
         .ok_or_else(|| anyhow::anyhow!("failed to load created phased track {}", phased_track_id))
 }
 
+// Overview needs the project set, not one empty roundtrip per chromosome.
+pub(crate) fn list_project_phased_chr_tracks_with_connection(
+    conn: &Connection,
+    project_id: i64,
+) -> Result<Vec<PhasedChrTrack>> {
+    validate_project_id(project_id)?;
+    let project = load_project_context(conn, project_id)?;
+    if !project.phased_assembly_enabled {
+        return Ok(Vec::new());
+    }
+    let mut stmt = conn.prepare(
+        "SELECT id FROM phased_chr_track WHERE project_id = ?1
+         ORDER BY parent_chr_name, display_order, id",
+    )?;
+    let ids = stmt
+        .query_map([project_id], |row| row.get::<_, i64>(0))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    load_tracks_by_ids(conn, project_id, &ids)
+}
+
 fn load_tracks_for_chr(
     conn: &Connection,
     project_id: i64,

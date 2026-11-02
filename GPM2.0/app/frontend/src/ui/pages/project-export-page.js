@@ -1,3 +1,4 @@
+import { groupProjectOverviewSources } from "./project-overview-sources.js";
 import { previewMutationStamp } from "../../services/preview-content-events.js";
 import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCurrentProjectExport,
   updateProjectExportJob, syncCurrentProjectExportJob, finishProjectExportJob } from "../../services/project-export-jobs.js";
@@ -13,9 +14,7 @@ import {
   exportProjectFinalPathFasta,
   getGrtProjectView,
   getProjectAssemblyViewState,
-  listChrViewCtgs,
-  listPhasedChrTracks,
-  listProjectChromosomes,
+  getProjectOverviewSources,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../../services/workflow-api.js";
@@ -2117,67 +2116,21 @@ async function loadProjectExportData(host, store, deps = {}, attempt = 0) {
   });
   refreshProjectDataSurface(host, store);
   try {
-    const listChromosomes = deps.listProjectChromosomes || listProjectChromosomes;
-    const listCtgs = deps.listChrViewCtgs || listChrViewCtgs;
-    const listPhasedTracks = deps.listPhasedChrTracks || listPhasedChrTracks;
+    const args = { workspaceRoot: requestedWorkspacePath, projectId: requestedProjectId };
+    const sources = await (deps.getProjectOverviewSources || getProjectOverviewSources)(args);
+    if (!isCurrent()) return false;
+    const { ctgsByChr, primaryCtgsByChr } = groupProjectOverviewSources(sources);
+    const chromosomeResult = { ...sources, items: sources.chromosomes };
     const getViewState = deps.getProjectAssemblyViewState || getProjectAssemblyViewState;
     const getGrtView = deps.getGrtProjectView || getGrtProjectView;
-    const normalizeGrtView = deps.normalizeGrtProjectView || normalizeGrtProjectView;
-    const chromosomeResult = await listChromosomes({
-      workspaceRoot: requestedWorkspacePath,
-      projectId: requestedProjectId,
-    });
-    const viewState = await getViewState({
-      workspaceRoot: requestedWorkspacePath,
-      projectId: requestedProjectId,
-    });
-    const rawGrtProjectView = typeof deps.getGrtProjectView === "function"
-      ? await getGrtView({
-          workspaceRoot: requestedWorkspacePath,
-          projectId: requestedProjectId,
-        })
-      : typeof window === "undefined"
-        ? (store.getState().assembly?.grtProjectView || {})
-        : await getGrtView({
-            workspaceRoot: requestedWorkspacePath,
-            projectId: requestedProjectId,
-          });
-    const grtProjectView = normalizeGrtView(rawGrtProjectView);
-    const primaryDatasetId = normalizeDatasetId(currentProject.primaryDatasetId);
-    const primaryCtgsByChr = {};
-    const ctgsByChr = {};
-    const phasedChrTracksByChr = {};
-    for (const chr of chromosomeResult.items || []) {
-      const chrName = normalizeString(chr?.chrName);
-      if (!chrName) {
-        continue;
-      }
-      const allResult = await listCtgs({
-        workspaceRoot: requestedWorkspacePath,
-        projectId: requestedProjectId,
-        chrName,
-        datasetId: null,
-      });
-      ctgsByChr[chrName] = allResult.items || [];
-      const result = await listCtgs({
-        workspaceRoot: requestedWorkspacePath,
-        projectId: requestedProjectId,
-        chrName,
-        datasetId: primaryDatasetId,
-      });
-      primaryCtgsByChr[chrName] = result.items || [];
-      if (currentProject?.phasedAssemblyEnabled && typeof listPhasedTracks === "function") {
-        const phasedResult = await listPhasedTracks({
-          workspaceRoot: requestedWorkspacePath,
-          projectId: requestedProjectId,
-          parentChrName: chrName,
-        });
-        const tracks = normalizePhasedTrackMap({ [chrName]: phasedResult?.tracks || [] })[chrName] || [];
-        if (tracks.length) {
-          phasedChrTracksByChr[chrName] = tracks;
-        }
-      }
-    }
+    const [viewState, rawGrtProjectView] = await Promise.all([
+      getViewState(args),
+      typeof deps.getGrtProjectView === "function" || typeof window !== "undefined"
+        ? getGrtView(args) : store.getState().assembly?.grtProjectView || {},
+    ]);
+    const grtProjectView = (deps.normalizeGrtProjectView || normalizeGrtProjectView)(rawGrtProjectView);
+    const phasedChrTracksByChr = currentProject?.phasedAssemblyEnabled
+      ? normalizePhasedTrackMap(sources.phasedChrTracksByChr) : {};
     if (!isCurrent()) return false;
     if (mutationStamp !== projectDataMutationStamp(store.getState())) return retryMutation();
     const mergedFinalPathByChr = canonicalizeFinalPathOverallLengths(

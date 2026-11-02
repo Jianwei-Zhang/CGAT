@@ -2,6 +2,16 @@ use super::*;
 
 #[tauri::command]
 #[allow(non_snake_case)]
+pub fn get_project_overview_sources(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
+    gpm_next_backend::main_view::overview::get_project_overview_sources(
+        &project_db_path(&workspaceRoot),
+        projectId,
+    )
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
 pub fn list_chr_view_ctgs(
     workspaceRoot: String,
     projectId: i64,
