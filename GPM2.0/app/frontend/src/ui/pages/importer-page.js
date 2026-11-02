@@ -1,3 +1,4 @@
+import { prepareProjectOverviewSources } from "./project-overview-preparation.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "./floating-menu-runtime.js";
 import { archiveImportForm, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../../services/project-drop-controller.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory, workspacePathIdentity } from "../../services/workspace-history.js";
@@ -1432,6 +1433,7 @@ async function enterWorkspaceAfterImport(store, payload) {
   const projects = options.existingProjects || [];
   let projectPreview = null;
   const previewStages = [];
+  const preparationWarnings = [];
   updateImporterState(store, { importPreparingPreview: true });
   try {
     for (const [index, project] of projects.entries()) {
@@ -1443,6 +1445,7 @@ async function enterWorkspaceAfterImport(store, payload) {
       const previewStageIndex = store.getState().importer.stages.length;
       updateImporterState(store, { summary: stage, stages: [...store.getState().importer.stages, stage] });
       globalThis.window?.dispatchEvent?.(new Event("gpm-next:route-refresh"));
+      const previewStarted = globalThis.performance?.now?.() ?? Date.now();
       const prepared = await prepareProjectPreviewData(store, {
         workspaceRoot: options.workspaceRoot || workspaceRoot, project, datasets: options.datasets,
       }, {}, { shouldContinue });
@@ -1450,6 +1453,7 @@ async function enterWorkspaceAfterImport(store, payload) {
         const stages = [...store.getState().importer.stages];
         stages[previewStageIndex] = i18nT(store.getState(), "importer.runtime.preparePreviewDone", {
           projectName: project.projectName || project.projectId,
+          seconds: (((globalThis.performance?.now?.() ?? Date.now())-previewStarted)/1000).toFixed(2),
         });
         updateImporterState(store, { stages });
       }
@@ -1459,6 +1463,24 @@ async function enterWorkspaceAfterImport(store, payload) {
           projectName: project.projectName || project.projectId,
         }));
       }
+      if (!shouldContinue()) break;
+      const overviewIndex=store.getState().importer.stages.length;
+      const overviewStage=i18nT(store.getState(),"importer.runtime.prepareOverviewStage",{
+        current:index+1,total:projects.length,projectName:project.projectName||project.projectId,
+      });
+      updateImporterState(store,{summary:overviewStage,stages:[...store.getState().importer.stages,overviewStage]});
+      globalThis.window?.dispatchEvent?.(new Event("gpm-next:route-refresh"));
+      const overview=await prepareProjectOverviewSources(store,{
+        workspaceRoot:options.workspaceRoot||workspaceRoot,projectId:project.projectId,
+      },{},{shouldContinue,expectedPreview:prepared});
+      if (!shouldContinue()) break;
+      const stages=[...store.getState().importer.stages];
+      stages[overviewIndex]=i18nT(store.getState(),overview.ready
+        ? "importer.runtime.prepareOverviewDone" : "importer.runtime.prepareOverviewFailed",{
+          projectName:project.projectName||project.projectId,seconds:(overview.elapsedMs/1000).toFixed(2),
+        });
+      updateImporterState(store,{stages});
+      if(!overview.ready)preparationWarnings.push(stages[overviewIndex]);
     }
   } finally {
     if (store.getState().importer.importRunId === runId) updateImporterState(store, { importPreparingPreview: false });
@@ -1480,6 +1502,7 @@ async function enterWorkspaceAfterImport(store, payload) {
     appendStage,
     projectPreview,
     previewStages,
+    preparationWarnings,
   });
 }
 
@@ -1498,6 +1521,7 @@ function applyWorkspaceLoadedState(store, payload) {
     appendStage,
     projectPreview = null,
     previewStages = [],
+    preparationWarnings = [],
   } = payload;
   const current = store.getState();
   const selectedProject = existingProjects.length === 1 ? existingProjects[0] : null;
@@ -1531,7 +1555,7 @@ function applyWorkspaceLoadedState(store, payload) {
       deleteWithFiles: false,
       deleteTargets: [],
       status: importerStatus,
-      summary: [importerSummary, ...previewStages].filter(Boolean).join("\n"),
+      summary: [importerSummary, ...previewStages, ...preparationWarnings].filter(Boolean).join("\n"),
       stages: [...current.importer.stages, ...previewStages, ...(appendStage ? [appendStage] : [])],
     },
     initializer: {

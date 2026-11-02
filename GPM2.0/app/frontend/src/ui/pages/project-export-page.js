@@ -1,3 +1,4 @@
+import { consumePreparedOverviewSources, hasPreparedOverviewSources, validatePreparedOverviewSources } from "./project-overview-preparation.js";
 import { groupProjectOverviewSources } from "./project-overview-sources.js";
 import { previewMutationStamp } from "../../services/preview-content-events.js";
 import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCurrentProjectExport,
@@ -2117,7 +2118,12 @@ async function loadProjectExportData(host, store, deps = {}, attempt = 0) {
   refreshProjectDataSurface(host, store);
   try {
     const args = { workspaceRoot: requestedWorkspacePath, projectId: requestedProjectId };
-    const sources = await (deps.getProjectOverviewSources || getProjectOverviewSources)(args);
+    let preparedSources=null;
+    if(hasPreparedOverviewSources(store,args)){
+      preparedSources=await consumePreparedOverviewSources(store,args);
+      if(!isCurrent())return false;
+    }
+    const sources = preparedSources || await (deps.getProjectOverviewSources || getProjectOverviewSources)(args);
     if (!isCurrent()) return false;
     const { ctgsByChr, primaryCtgsByChr } = groupProjectOverviewSources(sources);
     const chromosomeResult = { ...sources, items: sources.chromosomes };
@@ -2128,6 +2134,10 @@ async function loadProjectExportData(host, store, deps = {}, attempt = 0) {
       typeof deps.getGrtProjectView === "function" || typeof window !== "undefined"
         ? getGrtView(args) : store.getState().assembly?.grtProjectView || {},
     ]);
+    if(preparedSources && !(await validatePreparedOverviewSources(store,args,preparedSources))) {
+      return isCurrent()?retryMutation():false;
+    }
+    if(!isCurrent())return false;
     const grtProjectView = (deps.normalizeGrtProjectView || normalizeGrtProjectView)(rawGrtProjectView);
     const phasedChrTracksByChr = currentProject?.phasedAssemblyEnabled
       ? normalizePhasedTrackMap(sources.phasedChrTracksByChr) : {};

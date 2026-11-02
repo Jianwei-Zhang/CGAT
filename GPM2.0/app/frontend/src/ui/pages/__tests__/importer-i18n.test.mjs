@@ -1403,6 +1403,7 @@ for (const source of ["zip", "extracted"]) {
             return { stored: true };
           }
           if (command === "list_project_chromosomes") return { items: [{ chrName: "Chr1", chrLength: 1000 }] };
+          if (command === "get_project_overview_sources") return {projectId:args.projectId,chromosomes:[],ctgs:[],primaryCtgIds:[],phasedChrTracksByChr:{}};
           if (command === "list_chr_view_ctgs") return { items: [] };
           if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return {};
           assert.equal(command, "open_workspace");
@@ -1442,11 +1443,13 @@ for (const source of ["zip", "extracted"]) {
       await importButton.click();
       assert.deepEqual(calls.map(call => call.command), [`import_${source}`, `import_${source}`, "open_workspace",
         "get_project_preview_cache", "list_project_chromosomes", "list_chr_view_ctgs", "get_project_assembly_view_state",
-        "get_grt_project_view", "get_project_preview_cache", "put_project_preview_cache"]);
+        "get_grt_project_view", "get_project_preview_cache", "put_project_preview_cache", "get_project_preview_cache",
+        "get_project_overview_sources", "get_project_preview_cache"]);
       assert.equal(store.getState().projectPreview.loaded, true);
       assert.equal(previewStateIsApplicable(store.getState()), true);
       assert.equal(snapshot.cards.length, 1);
-      assert.equal(store.getState().importer.stages.at(-2), "项目预览构建完成：New");
+      assert.match(store.getState().importer.stages.at(-3), /^项目预览构建完成：New（[0-9.]+ 秒）$/);
+      assert.match(store.getState().importer.stages.at(-2), /^总览数据准备完成：New（[0-9.]+ 秒）$/);
       assert.equal(store.getState().importer.stages.at(-1), "导入完成");
       assert.equal(store.getState().session.workspacePath, "D:/new");
       assert.equal(store.getState().session.projectId, 2);
@@ -2081,6 +2084,7 @@ test("import progress cancellation starts on pointerdown and closes the dialog i
               memoryValid: false, valid: false, snapshot: null, dirtyChrNames: ["*"],
             });
             if (command === "list_project_chromosomes") return Promise.resolve({ items: [] });
+            if (command === "get_project_overview_sources") return Promise.resolve({projectId:args.projectId,chromosomes:[],ctgs:[],primaryCtgIds:[],phasedChrTracksByChr:{}});
             if (command === "list_chr_view_ctgs") return Promise.resolve({ items: [] });
             if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return Promise.resolve({});
             if (command === "put_project_preview_cache") return Promise.resolve({ stored: true });
@@ -2198,6 +2202,7 @@ test("normal import success wins over a pending cancellation response", async ()
               valid: false, snapshot: null, dirtyChrNames: ["*"],
             });
             if (command === "list_project_chromosomes") return Promise.resolve({ items: [] });
+            if (command === "get_project_overview_sources") return Promise.resolve({projectId:args.projectId,chromosomes:[],ctgs:[],primaryCtgIds:[],phasedChrTracksByChr:{}});
             if (command === "list_chr_view_ctgs") return Promise.resolve({ items: [] });
             if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return Promise.resolve({});
             if (command === "put_project_preview_cache") return Promise.resolve({ stored: true });
@@ -2945,6 +2950,7 @@ test("import preview preparation is fixed, has no skip or cancel control, and ig
           await sourceRead.promise;
           return { items: [{ chrName: "Chr1", chrLength: 1000 }] };
         }
+        if (command === "get_project_overview_sources") return {projectId:args.projectId,chromosomes:[],ctgs:[],primaryCtgIds:[],phasedChrTracksByChr:{}};
         if (command === "list_chr_view_ctgs") return { items: [] };
         if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return {};
         if (command === "put_project_preview_cache") {
@@ -2985,7 +2991,7 @@ test("import preview preparation is fixed, has no skip or cancel control, and ig
   }
 });
 
-for (const behavior of ["read failure", "multiple projects"]) {
+for (const behavior of ["read failure", "multiple projects", "overview failure"]) {
   test(`import preview preparation: ${behavior} does not turn a successful import into a failure`, async () => {
     const previousWindow = globalThis.window, previousDocument = globalThis.document;
     const previousSetTimeout = globalThis.setTimeout, previousClearTimeout = globalThis.clearTimeout;
@@ -3007,6 +3013,10 @@ for (const behavior of ["read failure", "multiple projects"]) {
             if (behavior === "read failure") throw new Error("temporary preview read failure");
             return { items: [{ chrName: "Chr1", chrLength: 1000 }] };
           }
+          if (command === "get_project_overview_sources") {
+            if(behavior === "overview failure")throw new Error("temporary overview read failure");
+            return {projectId:args.projectId,chromosomes:[],ctgs:[],primaryCtgIds:[],phasedChrTracksByChr:{}};
+          }
           if (command === "list_chr_view_ctgs") return { items: [] };
           if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return {};
           if (command === "put_project_preview_cache") {
@@ -3026,12 +3036,19 @@ for (const behavior of ["read failure", "multiple projects"]) {
       assert.equal(store.getState().importer.importPreparingPreview, false);
       assert.equal(store.getState().importer.projectError, "");
       assert.equal(calls.some(call => call.command === "request_import_cancel"), false);
-      assert.equal(saved.size, behavior === "multiple projects" ? 2 : 0);
+      assert.equal(saved.size, behavior === "multiple projects" ? 2 : behavior === "read failure" ? 0 : 1);
       assert.equal(store.getState().importer.stages.at(-1), "导入完成");
       if (behavior === "read failure") assert.match(store.getState().importer.summary, /项目已导入，进入预览时将重试/);
+      if(behavior === "overview failure"){
+        assert.match(store.getState().importer.summary,/项目已导入，打开总览时将重试/);
+        assert.equal(store.getState().importer.stages.filter(stage=>stage.includes("总览数据准备未完成")).length,1);
+      }
       if (behavior === "multiple projects") {
-        assert.equal(store.getState().importer.stages.at(-3), "项目预览构建完成：P1");
-        assert.equal(store.getState().importer.stages.at(-2), "项目预览构建完成：P2");
+        const stages=store.getState().importer.stages;
+        assert.match(stages.at(-5), /^项目预览构建完成：P1（[0-9.]+ 秒）$/);
+        assert.match(stages.at(-4), /^总览数据准备完成：P1（[0-9.]+ 秒）$/);
+        assert.match(stages.at(-3), /^项目预览构建完成：P2（[0-9.]+ 秒）$/);
+        assert.match(stages.at(-2), /^总览数据准备完成：P2（[0-9.]+ 秒）$/);
         assert.equal(store.getState().projectPreview, null, "multiple projects must not select an arbitrary model");
       }
     } finally {
