@@ -122,6 +122,19 @@ test("project library actions share the title row without squeezing button label
   assert.match(importerCss, /\.projects-page \.project-library-actions \[hidden\][^{]*\{[^}]*display:\s*none;/);
 });
 
+test("project row actions release name space while idle without hiding keyboard or touch access", () => {
+  const importerCss = readFileSync(new URL("./importer.css", entryUrl), "utf8");
+  const hoverRules = importerCss.match(/@media \(hover: hover\)\s*\{\s*(\.project-recent-row[^}]+\})\s*(\.project-recent-row[^}]+\})\s*\}/);
+
+  assert.ok(hoverRules, "idle-only hiding must be scoped to hover-capable devices");
+  assert.match(hoverRules[1], /^\.project-recent-row:not\(:hover\):not\(:has\(:focus-visible\)\)\s*\{/);
+  assert.match(hoverRules[1], /grid-template-columns:\s*minmax\(0, 1fr\);/);
+  assert.match(hoverRules[1], /column-gap:\s*0;/);
+  assert.match(hoverRules[2], /^\.project-recent-row:not\(:hover\):not\(:has\(:focus-visible\)\) \.project-row-actions\s*\{\s*display:\s*none;/);
+  assert.match(importerCss, /\.project-row-actions\s*\{[^}]*display:\s*flex;/);
+  assert.match(importerCss, /\.project-recent-name strong\s*\{[^}]*text-overflow:\s*ellipsis;/);
+});
+
 test("importer toast keeps its status horizontal and wraps long workspace paths", () => {
   const overlaysCss = readFileSync(new URL("./overlays.css", entryUrl), "utf8");
   const toastRule = overlaysCss.match(/\.importer-status-toast\s*\{([^}]*)\}/);

@@ -510,6 +510,13 @@
 .projects-page .project-row-actions .project-icon-button { position: relative; z-index: 1; pointer-events: auto; background: transparent; }
 .projects-page .project-row-actions .project-icon-button:hover:not(:disabled) { background: var(--theme-surface-subtle, #e2e8f0); border-color: transparent; color: var(--theme-ink, #0f172a); }
 
+/* Reclaim the action column while idle, including on the selected project.
+   Keep keyboard access and leave actions visible on devices without hover. */
+@media (hover: hover) {
+  .project-recent-row:not(:hover):not(:has(:focus-visible)) { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+  .project-recent-row:not(:hover):not(:has(:focus-visible)) .project-row-actions { display: none; }
+}
+
 .project-current { min-width: 0; align-self: start; padding: 24px 32px 32px; }
 .project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle, #dbe3ec); }
 .project-identity { min-width: 0; }
