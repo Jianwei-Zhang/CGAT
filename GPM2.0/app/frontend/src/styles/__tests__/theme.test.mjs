@@ -185,3 +185,15 @@ test("dark horizontal view navigation distinguishes the window, grid and draggab
   assert.match(css, /var\(--view-nav-grid, #eee\)/);
   assert.match(css, /var\(--view-nav-trough, #fafafa\)/);
 });
+
+
+test("every SVG drag restoration resolves the active theme palette instead of overriding dark paint with light fill",()=>{
+ const subview=readFileSync(new URL("../subview.css",import.meta.url),"utf8");
+ assert.match(themeCss,/\.track-collinearity-band\s*\{[^}]*--alignment-band-paint-fill:\s*var\(--alignment-band-fill/);
+ assert.match(themeCss,/:root\[data-theme="dark"\] \.track-collinearity-band\s*\{[^}]*--alignment-band-paint-fill:\s*var\(--alignment-band-dark-fill/);
+ assert.match(themeCss,/:root\[data-theme="dark"\] \.track-collinearity-band\s*\{[^}]*--alignment-band-paint-stroke:\s*var\(--alignment-band-dark-stroke/);
+ const dragRules=[...subview.matchAll(/([^{}]*is-(?:subview-)?track-drag-preview[^{}]*)\{([^{}]+)\}/g)].filter(([,selector])=>selector.includes("track-collinearity-band"));
+ assert.equal(dragRules.length,4,"Main/Local, primary/companion restoration groups");
+ for(const [,selector,body] of dragRules){assert.match(body,/fill:\s*var\(--alignment-band-paint-fill/);assert.match(body,/stroke:\s*var\(--alignment-band-paint-stroke/);assert.doesNotMatch(body,/opacity|rgba\(/,selector);}
+ assert.match(subview,/is-track-band-canvas-ready[^{}]*track-collinearity-band[^{}]*\{\s*fill:\s*transparent;\s*stroke:\s*transparent;/);
+});

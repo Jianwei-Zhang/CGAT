@@ -148,20 +148,17 @@ textarea { background: var(--surface-panel); color: var(--text-primary); }
    must stay transparent so the Canvas band layer underneath remains visible.
    Never raise specificity on those backgrounds from the theme file. */
 
-/* Identity bands keep their light-export colours in SVG attributes and switch to
-   canvas-matched dark tints only in the mounted app. */
+/* Export attributes keep their light palette. Mounted SVG/drag proxies resolve
+   the active palette through the same properties regardless of rule specificity. */
+.track-collinearity-band {
+  --alignment-band-paint-fill: var(--alignment-band-fill, rgb(222, 224, 227));
+  --alignment-band-paint-stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+}
 :root[data-theme="dark"] .track-collinearity-band {
-  fill: var(--alignment-band-dark-fill, var(--alignment-band-fill, rgb(36, 48, 63)));
-  stroke: var(--alignment-band-dark-stroke, var(--alignment-band-stroke, rgb(52, 68, 88)));
-}
-:root[data-theme="dark"] .track-collinearity-band.is-companion {
-  fill: var(--alignment-band-dark-fill, var(--alignment-band-fill, rgb(36, 48, 63)));
-  stroke: var(--alignment-band-dark-stroke, var(--alignment-band-stroke, rgb(52, 68, 88)));
-}
-:root[data-theme="dark"] .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
-:root[data-theme="dark"] .is-subview-track-drag-preview .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"] {
-  fill: var(--alignment-band-dark-fill, var(--alignment-band-fill, rgb(36, 48, 63)));
-  stroke: var(--alignment-band-dark-stroke, var(--alignment-band-stroke, rgb(52, 68, 88)));
+  --alignment-band-paint-fill: var(--alignment-band-dark-fill, var(--alignment-band-fill, rgb(36, 48, 63)));
+  --alignment-band-paint-stroke: var(--alignment-band-dark-stroke, var(--alignment-band-stroke, rgb(52, 68, 88)));
+  fill: var(--alignment-band-paint-fill);
+  stroke: var(--alignment-band-paint-stroke);
 }
 
 /* Source tags sit inside the bar, so they need ink for the dark role fill. */

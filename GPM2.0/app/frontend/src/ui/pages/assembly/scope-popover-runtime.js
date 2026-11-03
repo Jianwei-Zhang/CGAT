@@ -8,6 +8,38 @@ const config = {
   members: { trigger: "[data-members-card-toggle='1']", panel: "#assembly-members-panel-popover", width: 820 },
 };
 
+// Size every column to the widest actual name/statistics line, not a fixed
+// fraction of a 720px panel. Keep at most three columns and clamp to the viewport.
+export function resolveChromosomePopoverLayout({ contentWidths = [], itemInsets = 18, panelInsets = 14,
+  gap = 6, viewportWidth, maxWidth = 720, maxColumns = 3, count = contentWidths.length }) {
+  const measured = contentWidths.filter(value => Number.isFinite(value) && value > 0);
+  if (!measured.length || !(viewportWidth > 0) || !(count > 0)) return null;
+  const available = Math.max(1, Math.min(maxWidth, viewportWidth - 16));
+  const cell = Math.ceil(Math.max(...measured) + itemInsets + 2); // glyph rounding slack
+  const columns = Math.max(1, Math.min(maxColumns, count,
+    Math.floor((Math.max(1, available - panelInsets) + gap) / (cell + gap))));
+  return { width: Math.min(available, columns * cell + (columns - 1) * gap + panelInsets), columns };
+}
+
+function chromosomePopoverLayout(panel, win) {
+  const doc = panel.ownerDocument;
+  const options = [...(panel.querySelectorAll?.(".chr-picker-option") || [])];
+  if (!options.length || !doc?.createRange || !win?.getComputedStyle) return null;
+  const range = doc.createRange(), widths = [];
+  try {
+    for (const option of options) for (const line of option.querySelectorAll("strong, span")) {
+      range.selectNodeContents(line);
+      widths.push(range.getBoundingClientRect().width);
+    }
+  } finally { range.detach?.(); }
+  const number = (style, keys) => keys.reduce((sum, key) => sum + (Number.parseFloat(style[key]) || 0), 0);
+  const item = win.getComputedStyle(options[0]), container = win.getComputedStyle(panel);
+  return resolveChromosomePopoverLayout({ contentWidths: widths, count: options.length,
+    itemInsets: number(item, ["paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"]),
+    panelInsets: number(container, ["paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"]),
+    gap: Number.parseFloat(container.columnGap) || 0, viewportWidth: win.innerWidth });
+}
+
 // Trim only unused trailing space after the normal width-limited flex layout.
 // Measuring the widest occupied row preserves card widths, order and wrapping;
 // never use the full-width deleted-group separator as an occupied card edge.
@@ -66,9 +98,14 @@ export function bindAssemblyScopePopovers(host, store, { persistMembers } = {}) 
     if (chevron) chevron.textContent = open ? "▴" : "▾";
     if (kind === "members") trigger.closest?.(".assembly-members-panel")?.classList.toggle("is-collapsed", !open);
     if (open) {
-      const placed = placeAnchoredPanel(trigger, panel, { preferredWidth: c.width, matchAnchorWidth: false });
+      const layout = kind === "chromosomes" ? chromosomePopoverLayout(panel, win) : null;
+      if (layout) panel.style.gridTemplateColumns = `repeat(${layout.columns}, minmax(0, 1fr))`;
+      const placed = placeAnchoredPanel(trigger, panel, { preferredWidth: layout?.width || c.width, matchAnchorWidth: false });
       if (kind === "members" && placed) fitMembersPopover(trigger, panel, placed.width);
-    } else clearAnchoredPanelPlacement(panel);
+    } else {
+      clearAnchoredPanelPlacement(panel);
+      if (kind === "chromosomes") panel.style.gridTemplateColumns = "";
+    }
   };
   const setOpen = (kind, open, restoreFocus = false) => {
     cancel(kind);
