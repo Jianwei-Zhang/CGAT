@@ -1762,6 +1762,13 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
   `;
 }
 
+function renderOverviewIdentityBadge(name, role) {
+  const roleAttributes = role === "project"
+    ? 'class="project-dataset-role project-export-project-badge"'
+    : `class="project-dataset-role" data-dataset-role="${role}"`;
+  return `<span ${roleAttributes} data-app-tooltip="${escapeAttr(name)}" data-app-tooltip-overflow>${escapeHtml(name)}</span>`;
+}
+
 function renderProjectOverviewSummary(state) {
   const labels = getLabels(state);
   const currentProject = getCurrentProject(state);
@@ -1774,8 +1781,9 @@ function renderProjectOverviewSummary(state) {
   const primaryDatasetName = model?.primaryDatasetName || getDatasetNameById(state.initializer?.datasets || [], currentProject.primaryDatasetId) || "-";
   const auxiliaryIds = [...new Set((Array.isArray(currentProject.supportDatasetIds) ? currentProject.supportDatasetIds : [])
     .map(normalizeDatasetId).filter(id => id !== null && id !== normalizeDatasetId(currentProject.primaryDatasetId)))];
-  const auxiliaryNames = auxiliaryIds.map(id => getDatasetNameById(state.initializer?.datasets || [], id) || `ds-${id}`)
-    .join(", ") || labels.noAuxiliaryDatasets;
+  const auxiliaryBadges = auxiliaryIds.map(id => renderOverviewIdentityBadge(
+    getDatasetNameById(state.initializer?.datasets || [], id) || `ds-${id}`, "support",
+  )).join(" ");
   const summaryLine = model?.refChrNames.length
     ? `<div class="project-export-summary-line"><span>${escapeHtml(labels.reference)}: <strong>${escapeHtml(model.refChrNames.join(", "))}</strong></span></div>`
     : "";
@@ -1783,9 +1791,9 @@ function renderProjectOverviewSummary(state) {
       <section data-overview-summary>
       <div class="project-export-head">
         <dl class="project-export-identity">
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd data-app-tooltip="${escapeAttr(state.session?.projectName || currentProject.projectName || "-")}" data-app-tooltip-overflow>${escapeHtml(state.session?.projectName || currentProject.projectName || "-")}</dd></div>
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd data-app-tooltip="${escapeAttr(primaryDatasetName)}" data-app-tooltip-overflow>${escapeHtml(primaryDatasetName)}</dd></div>
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt><dd data-app-tooltip="${escapeAttr(auxiliaryNames)}" data-app-tooltip-overflow>${escapeHtml(auxiliaryNames)}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd>${renderOverviewIdentityBadge(state.session?.projectName || currentProject.projectName || "-", "project")}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd>${renderOverviewIdentityBadge(primaryDatasetName, "primary")}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt>${auxiliaryBadges ? `<dd class="project-export-dataset-badges">${auxiliaryBadges}</dd>` : `<dd data-app-tooltip="${escapeAttr(labels.noAuxiliaryDatasets)}" data-app-tooltip-overflow>${escapeHtml(labels.noAuxiliaryDatasets)}</dd>`}</div>
         </dl>
         <div class="project-export-actions">
           ${renderPreviewImageDownloadButton(state)}

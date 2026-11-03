@@ -875,7 +875,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
             <p class="subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
           </details>` : ""}
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
-          ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}">${escapeHtml(i18n.subview.guide)}</p>` : ""}
+          ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}" data-app-tooltip-overflow>${escapeHtml(i18n.subview.guide)}</p>` : ""}
           ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history) : ""}
         </div>
       </div>

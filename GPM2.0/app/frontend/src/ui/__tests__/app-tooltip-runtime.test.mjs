@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { getMessages } from "../i18n/index.js";
 import { tooltipFixture } from "./tooltip-fixture.mjs";
 import { bindAppTooltips, hideAppTooltips, findAppTooltipTarget, tooltipPosition, inTooltipCorridor } from "../app-tooltip-runtime.js";
 import { parseTooltipColor, compositeTooltipColor, resolveTooltipColors } from "../tooltip-colors.js";
@@ -465,6 +466,27 @@ test("name-only hints stay hidden for fully visible text under pointer and keybo
     assert.equal(hidden(h), true);
     assert.equal(node.getAttribute("aria-describedby"), null);
     assert.equal(node.getAttribute("aria-label"), "Project: Project A");
+  }
+});
+
+test("empty Subview guidance only shows its repeated text when clipped and rechecks available width", () => {
+  for (const locale of ["zh", "en"]) {
+    const h = tooltipFixture();
+    const guide = getMessages(locale, "assembly").subview.guide;
+    const node = h.create("p", { class: "muted subview-empty-guide",
+      "data-app-tooltip": guide, "data-app-tooltip-overflow": "" });
+    node.textContent = guide;
+    Object.assign(node, { clientWidth: 1000, scrollWidth: 1000, clientHeight: 30, scrollHeight: 30 });
+    h.fire("pointerover", node);
+    assert.equal(hidden(h), true, "fully visible guidance must not repeat in a Tooltip");
+    node.clientWidth = 300;
+    h.fire("pointerover", node);
+    assert.equal(hidden(h), false, "clipped guidance exposes the complete instructions");
+    assert.equal(h.panel.textContent, guide);
+    node.clientWidth = 1000;
+    h.windowFire("resize");
+    h.fire("pointerover", node);
+    assert.equal(hidden(h), true, "restored width suppresses the duplicate hint again");
   }
 });
 

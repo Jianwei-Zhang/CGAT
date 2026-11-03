@@ -61,7 +61,7 @@ for (const locale of ["zh", "en"]) {
   test(`empty ${locale} view keeps guidance inside the unified toolbar without inactive controls`, () => {
     const html = localMarkup(createState({ locale }));
     const titleRow = html.match(/<div class="subview-panel-title-row[^"]*"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
-    assert.match(titleRow, /<p class="muted subview-empty-guide" data-app-tooltip="[^"]+">[^<]+<\/p>/);
+    assert.match(titleRow, /<p class="muted subview-empty-guide" data-app-tooltip="[^"]+" data-app-tooltip-overflow>[^<]+<\/p>/);
     assert.match(html, /subview-empty-guide[^>]*>[^<]+<\/p>\s*<\/div>\s*<\/div>/);
     assert.doesNotMatch(html, /subview-panel-help|subview-panel-guide/);
     assert.doesNotMatch(html, /subview-track-inline-controls|subview-alignment-card|data-subview-action="history-/);

@@ -91,7 +91,7 @@ test("project export page renders assignment bars before placed statistics with 
   const html = renderProjectExportPage(createState());
 
   assert.doesNotMatch(html, /<h[1-6][^>]*>概览</);
-  assert.match(html, /<dl class="project-export-identity">[\s\S]*<dt>项目<\/dt><dd[^>]*>p1<\/dd>[\s\S]*<dt>主数据集<\/dt><dd[^>]*>hifiasm<\/dd>/);
+  assert.match(html, /<dl class="project-export-identity">[\s\S]*<dt>项目<\/dt><dd><span[^>]*>p1<\/span><\/dd>[\s\S]*<dt>主数据集<\/dt><dd><span[^>]*data-dataset-role="primary"[^>]*>hifiasm<\/span><\/dd>/);
   assert.ok(html.indexOf("data-preview-download") < html.indexOf("data-project-export-toggle"));
   assert.equal((html.match(/data-preview-download/g) || []).length, 1);
   assert.doesNotMatch(html, /project-preview-heading|project-preview-subtitle|project-preview-legend/);
@@ -2196,8 +2196,8 @@ for (const locale of ["zh", "en"]) test(`Overview has compact identity groups an
   assert.equal((html.match(/data-preview-download/g) || []).length, 1);
   assert.ok(toolbar.indexOf("data-preview-download") < toolbar.indexOf("data-project-export-toggle"));
   assert.match(toolbar, /<dl class="project-export-identity">/);
-  assert.match(toolbar, /<dd data-app-tooltip="p1" data-app-tooltip-overflow>p1<\/dd>/);
-  assert.match(toolbar, /<dd data-app-tooltip="hifiasm" data-app-tooltip-overflow>hifiasm<\/dd>/);
+  assert.match(toolbar, /<dd><span class="project-dataset-role project-export-project-badge" data-app-tooltip="p1" data-app-tooltip-overflow>p1<\/span><\/dd>/);
+  assert.match(toolbar, /<dd><span class="project-dataset-role" data-dataset-role="primary" data-app-tooltip="hifiasm" data-app-tooltip-overflow>hifiasm<\/span><\/dd>/);
 });
 
 for (const locale of ["zh", "en"]) test(`Overview includes all configured auxiliary names in its single-line identity (${locale})`, () => {
@@ -2208,8 +2208,10 @@ for (const locale of ["zh", "en"]) test(`Overview includes all configured auxili
   const html = renderProjectExportPage(state);
   const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
   const label = locale === "zh" ? "辅助数据集" : "Auxiliary datasets";
-  const names = "Flye_Very_Long_Auxiliary_Name&lt;&amp;&quot;, RagTag_MiXeD, ds-99";
-  assert.ok(toolbar.includes(`<dt>${label}</dt><dd data-app-tooltip="${names}" data-app-tooltip-overflow>${names.replaceAll("&quot;", '"')}</dd>`));
+  const names = ["Flye_Very_Long_Auxiliary_Name&lt;&amp;&quot;", "RagTag_MiXeD", "ds-99"];
+  const badges = names.map(name => `<span class="project-dataset-role" data-dataset-role="support" data-app-tooltip="${name}" data-app-tooltip-overflow>${name.replaceAll("&quot;", '"')}</span>`).join(" ");
+  assert.ok(toolbar.includes(`<dt>${label}</dt><dd class="project-export-dataset-badges">${badges}</dd>`));
+  assert.equal((toolbar.match(/data-dataset-role="support"/g) || []).length, 3, "one badge per deduplicated auxiliary dataset");
   assert.equal((toolbar.match(/class="project-export-identity-item"/g) || []).length, 3);
   assert.doesNotMatch(toolbar, /class="project-export-identity-item"[^>]*data-app-tooltip/);
   assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>项目" : "<dt>Project") < toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset"));
@@ -2232,7 +2234,20 @@ test("Overview identity never wraps, ellipsizes names and preserves fixed right-
   assert.match(rule(".project-export-head"), /flex-wrap:\s*nowrap[\s\S]*min-width:\s*0/);
   assert.match(rule(".project-export-identity"), /flex:\s*1 1 0[\s\S]*flex-wrap:\s*nowrap[\s\S]*overflow:\s*hidden/);
   assert.match(rule(".project-export-identity dd"), /overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis[\s\S]*white-space:\s*nowrap/);
+  assert.match(rule(".project-export-identity dd > .project-dataset-role"), /max-width:\s*100%[\s\S]*min-width:\s*0[\s\S]*overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis/);
+  assert.match(rule(".project-export-dataset-badges"), /display:\s*flex[\s\S]*gap:\s*4px/);
   assert.match(rule(".project-export-head > .project-export-actions"), /flex:\s*0 0 auto[\s\S]*flex-wrap:\s*nowrap/);
+});
+
+test("Overview badges reuse the Project dataset-type shapes and palettes without misclassifying the project", () => {
+  const html = renderProjectExportPage(createState());
+  const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
+  assert.match(toolbar, /class="project-dataset-role project-export-project-badge"/);
+  assert.doesNotMatch(toolbar, /data-dataset-role="(?:project|reference)"/);
+  assert.match(componentsCss, /\.project-dataset-role\s*\{[^}]*border-radius:\s*999px;/);
+  for (const [role, palette] of [["primary", "primary"], ["support", "companion"]]) {
+    assert.match(componentsCss, new RegExp(`\\.project-dataset-role\\[data-dataset-role="${role}"\\]\\s*\\{[^}]*background: var\\(--ctg-${palette}-fill\\);[^}]*border-color: var\\(--ctg-${palette}-stroke\\);[^}]*color: var\\(--ctg-${palette}-text\\)`));
+  }
 });
 
 test("Overview image download is borderless, Export-height and has enabled hover/active plus keyboard focus feedback", () => {

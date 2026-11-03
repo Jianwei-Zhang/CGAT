@@ -1,4 +1,5 @@
 import { test, assert, createState, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
+import { getMessages } from "../../../i18n/index.js";
 import { applySubviewComposition, removeSubviewCompositionMembers } from "../subview-composition-state.js";
 
 function assertEmptyPanel(state) {
@@ -6,7 +7,7 @@ function assertEmptyPanel(state) {
   assert.match(html, /data-subview-panel="1"/);
   assert.match(html, /<h4 class="assembly-view-title">局部视图<\/h4>/);
   assert.doesNotMatch(html, /subview-panel-help|subview-panel-guide/);
-  assert.match(html, /subview-empty-guide[^>]*>[^<]+<\/p>\s*<\/div>\s*<\/div>/);
+  assert.match(html, /subview-empty-guide" data-app-tooltip="[^"]+" data-app-tooltip-overflow>[^<]+<\/p>\s*<\/div>\s*<\/div>/);
   assert.match(html, /data-subview-tools-toggle/);
   assert.doesNotMatch(html, /subview-alignment-card|subview-track-layout|subview-track-svg|subview-track-min-tick-unit-kb/);
 }
@@ -46,4 +47,13 @@ test("track-pair renders a single populated lane but hides the graph once both l
   state.assembly.chrCtgs = [];
   state.assembly.subview.trackPairHiddenCtgs = [];
   assertEmptyPanel(state);
+});
+
+
+test("empty Subview guidance opts into overflow-only completion in both languages", () => {
+  for (const locale of ["zh", "en"]) {
+    const html = renderAssemblyPage({ ...createState(), locale });
+    const guide = getMessages(locale, "assembly").subview.guide;
+    assert.ok(html.includes(`<p class="muted subview-empty-guide" data-app-tooltip="${guide}" data-app-tooltip-overflow>${guide}</p>`));
+  }
 });
