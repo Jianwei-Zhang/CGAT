@@ -1,0 +1,187 @@
+{
+  "legacy": {
+    "encoding": "reference-hits-v1",
+    "items": [
+      {
+        "sourceKind": "ref_segment",
+        "referenceChrId": 6,
+        "referenceChrName": "chr06",
+        "segmentOrder": 2,
+        "segmentStartBp": 1001,
+        "segmentEndBp": 5000,
+        "name": "ref_chr06",
+        "anchorStart": 1001,
+        "totalLength": 4000,
+        "refOrient": "+",
+        "hitGroups": [
+          [
+            1,
+            2,
+            40,
+            "-",
+            98.44,
+            60
+          ],
+          [
+            2,
+            1,
+            6,
+            "+",
+            99.123456789,
+            0
+          ],
+          [
+            3,
+            3,
+            7,
+            "+",
+            0.0,
+            0
+          ]
+        ],
+        "hitRows": [
+          [
+            0,
+            901,
+            910,
+            1001,
+            1010,
+            9,
+            10,
+            1,
+            10
+          ],
+          [
+            1,
+            2,
+            10,
+            1002,
+            1010,
+            8,
+            9,
+            2,
+            10
+          ],
+          [
+            0,
+            881,
+            900,
+            1011,
+            1030,
+            19,
+            20,
+            11,
+            30
+          ],
+          [
+            2,
+            1099511627776,
+            1099511627876,
+            1099511627976,
+            1099511628076,
+            0,
+            101,
+            201,
+            301
+          ],
+          [
+            0,
+            881,
+            881,
+            1031,
+            1031,
+            1,
+            1,
+            31,
+            31
+          ],
+          [
+            2,
+            1,
+            101,
+            1001,
+            1101,
+            100,
+            101,
+            1,
+            101
+          ]
+        ]
+      },
+      {
+        "sourceKind": "ref_segment",
+        "referenceChrId": 6,
+        "referenceChrName": "chr06",
+        "segmentOrder": 3,
+        "segmentStartBp": 1001,
+        "segmentEndBp": 5000,
+        "name": "ref_chr06",
+        "anchorStart": 1001,
+        "totalLength": 4000,
+        "refOrient": "+",
+        "hitGroups": [],
+        "hitRows": []
+      }
+    ]
+  },
+  "packed": {
+    "encoding": "reference-hits-v2",
+    "items": [
+      {
+        "sourceKind": "ref_segment",
+        "referenceChrId": 6,
+        "referenceChrName": "chr06",
+        "segmentOrder": 2,
+        "segmentStartBp": 1001,
+        "segmentEndBp": 5000,
+        "name": "ref_chr06",
+        "anchorStart": 1001,
+        "totalLength": 4000,
+        "refOrient": "+",
+        "hitGroups": [
+          [
+            1,
+            2,
+            40,
+            "-",
+            98.44,
+            60
+          ],
+          [
+            2,
+            1,
+            6,
+            "+",
+            99.123456789,
+            0
+          ],
+          [
+            3,
+            3,
+            7,
+            "+",
+            0.0,
+            0
+          ]
+        ],
+        "hitCount": 6,
+        "hitData": "AIoOnA7SD+QPEhQCFAEEFNQP5A8QEgQUACcTFCgUFBQoAoCAgICAQMiBgICAQJCDgICAQNiEgICAQADKAZID2gQAACUoAiMlKAIC/f////8//f////8/vfP///8/vfP///8/yAEAjwOPAw=="
+      },
+      {
+        "sourceKind": "ref_segment",
+        "referenceChrId": 6,
+        "referenceChrName": "chr06",
+        "segmentOrder": 3,
+        "segmentStartBp": 1001,
+        "segmentEndBp": 5000,
+        "name": "ref_chr06",
+        "anchorStart": 1001,
+        "totalLength": 4000,
+        "refOrient": "+",
+        "hitGroups": [],
+        "hitCount": 0,
+        "hitData": ""
+      }
+    ]
+  }
+}

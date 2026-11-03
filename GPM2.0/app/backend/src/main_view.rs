@@ -10,7 +10,12 @@ use crate::reference_segments::{
     map_paf_query_interval_to_ref_span, split_paf_hit_by_reference_gaps,
 };
 
+pub mod overview;
+#[cfg(test)]
+mod performance_profile;
+pub mod preview_delta;
 pub mod reference_transport;
+mod source_fragment_bulk;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectChromosomeItem {
@@ -429,6 +434,27 @@ fn list_chr_view_ctgs_with_connection_options(
     dataset_id: Option<i64>,
     include_details: bool,
 ) -> Result<Vec<ChrViewCtgItem>> {
+    list_chr_view_ctgs_with_source_scope(
+        conn,
+        project_id,
+        chr_name,
+        dataset_id,
+        include_details,
+        None,
+    )
+}
+
+fn list_chr_view_ctgs_with_source_scope(
+    conn: &Connection,
+    project_id: i64,
+    chr_name: Option<&str>,
+    dataset_id: Option<i64>,
+    include_details: bool,
+    source_seq_ids: Option<&[i64]>,
+) -> Result<Vec<ChrViewCtgItem>> {
+    if source_seq_ids.is_some_and(|ids| ids.is_empty()) {
+        return Ok(Vec::new());
+    }
     let chr_param = chr_name.map(ToOwned::to_owned);
     let dataset_param = dataset_id;
     let primary_dataset_id: i64 = conn
@@ -498,6 +524,9 @@ fn list_chr_view_ctgs_with_connection_options(
         LEFT JOIN dataset target_d ON target_d.id = dtm.target_dataset_id
         WHERE c.project_id = ?",
     );
+    // Bundled SQLite already requires JSON for persisted view/cache contracts.
+    // Bind one bounded JSON array rather than rescan the project per 400 sources.
+    let source_scope_json = source_seq_ids.map(serde_json::to_string).transpose()?;
     let mut bind_values: Vec<&dyn ToSql> = vec![&project_id];
     if let Some(chr_name) = chr_param.as_ref() {
         sql.push_str(" AND c.assigned_chr_name = ?");
@@ -519,6 +548,10 @@ fn list_chr_view_ctgs_with_connection_options(
             );
             bind_values.push(&primary_dataset_id);
         }
+    }
+    if let Some(scope_json) = source_scope_json.as_ref() {
+        sql.push_str(" AND s.source_seq_id IN (SELECT value FROM json_each(?))");
+        bind_values.push(scope_json);
     }
     sql.push_str(
         "
@@ -543,10 +576,15 @@ fn list_chr_view_ctgs_with_connection_options(
         return Ok(ctgs);
     }
 
-    populate_co_assigned_chr_names(conn, project_id, &mut ctgs)?;
-    for ctg in &mut ctgs {
-        ctg.source_fragment = load_source_fragment(conn, ctg.assembly_ctg_id)?;
-    }
+    populate_co_assigned_chr_names(
+        conn,
+        project_id,
+        &mut ctgs,
+        // A project-level delta still needs global co-assignment, not one
+        // project scan for every 400 selected sources.
+        chr_param.is_some() || dataset_param.is_some(),
+    )?;
+    source_fragment_bulk::populate_source_fragments(conn, project_id, &mut ctgs)?;
 
     // Preview needs placement and provenance only. Hits, N regions and end marks
     // are Assembly evidence and require several additional queries per contig.
@@ -677,7 +715,14 @@ fn populate_co_assigned_chr_names(
     conn: &Connection,
     project_id: i64,
     ctgs: &mut [ChrViewCtgItem],
+    restrict_source_ids: bool,
 ) -> Result<()> {
+    if restrict_source_ids && ctgs.len() > 400 {
+        for chunk in ctgs.chunks_mut(400) {
+            populate_co_assigned_chr_names(conn, project_id, chunk, true)?;
+        }
+        return Ok(());
+    }
     let mut source_seq_ids = ctgs
         .iter()
         .filter_map(|ctg| ctg.origin_source_seq_id)
@@ -688,23 +733,34 @@ fn populate_co_assigned_chr_names(
         return Ok(());
     }
 
-    let placeholders = vec!["?"; source_seq_ids.len()].join(", ");
+    // A project-wide fetch already contains every visible source. Do not bind
+    // all of their IDs again: large batches can exceed SQLite's variable limit.
+    // Scoped Assembly reads keep their existing source restriction.
+    let source_filter = if restrict_source_ids {
+        format!(
+            "AND s.source_seq_id IN ({})",
+            vec!["?"; source_seq_ids.len()].join(", ")
+        )
+    } else {
+        String::new()
+    };
     let sql = format!(
         "SELECT s.source_seq_id, c.assigned_chr_name
          FROM assembly_ctg c
          JOIN assembly_seq s ON s.id = c.assembly_seq_id
          WHERE c.project_id = ?
            AND s.hidden = 0
-           AND s.source_seq_id IN ({})
+           {source_filter}
            AND c.assigned_chr_name IS NOT NULL
            AND c.assigned_chr_name <> ''
          GROUP BY s.source_seq_id, c.assigned_chr_name
-         ORDER BY s.source_seq_id, c.assigned_chr_name",
-        placeholders
+         ORDER BY s.source_seq_id, c.assigned_chr_name"
     );
     let mut bind_values: Vec<&dyn ToSql> = vec![&project_id];
-    for source_seq_id in &source_seq_ids {
-        bind_values.push(source_seq_id);
+    if restrict_source_ids {
+        for source_seq_id in &source_seq_ids {
+            bind_values.push(source_seq_id);
+        }
     }
     let mut stmt = conn
         .prepare(&sql)
@@ -1679,6 +1735,7 @@ pub fn list_reference_track_members(
         Some(workspace_root),
         project_id,
         chr_name,
+        true,
     )
 }
 
@@ -1696,7 +1753,36 @@ pub fn list_reference_track_members_with_connection(
         workspace_root.as_deref(),
         project_id,
         chr_name,
+        true,
     )
+}
+
+/// Geometry-only reads never query or expand reference alignment evidence.
+pub fn list_reference_track_geometry_with_connection(
+    conn: &Connection,
+    project_id: i64,
+    chr_name: &str,
+) -> Result<Vec<ReferenceTrackMemberItem>> {
+    let root = conn
+        .path()
+        .and_then(|path| Path::new(path).parent())
+        .map(Path::to_path_buf);
+    list_reference_track_members_with_workspace_root(
+        conn,
+        root.as_deref(),
+        project_id,
+        chr_name,
+        false,
+    )
+}
+
+pub fn list_reference_track_geometry(
+    db: &Path,
+    project_id: i64,
+    chr_name: &str,
+) -> Result<Vec<ReferenceTrackMemberItem>> {
+    let conn = open_workspace_db(db)?;
+    list_reference_track_geometry_with_connection(&conn, project_id, chr_name)
 }
 
 fn list_reference_track_members_with_workspace_root(
@@ -1704,6 +1790,7 @@ fn list_reference_track_members_with_workspace_root(
     workspace_root: Option<&Path>,
     project_id: i64,
     chr_name: &str,
+    include_hits: bool,
 ) -> Result<Vec<ReferenceTrackMemberItem>> {
     let normalized_chr_name = chr_name.trim();
     if normalized_chr_name.is_empty() {
@@ -1759,7 +1846,7 @@ fn list_reference_track_members_with_workspace_root(
         })
         .collect::<Vec<_>>();
 
-    if items.is_empty() {
+    if items.is_empty() || !include_hits {
         return Ok(items);
     }
 
@@ -2199,6 +2286,38 @@ mod tests {
 
     use super::*;
     use crate::db::init_workspace_schema;
+
+    #[test]
+    fn reference_geometry_does_not_read_alignment_rows_and_matches_full_metadata() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_workspace_schema(&conn).unwrap();
+        seed_basic_data(&conn);
+        let full = list_reference_track_members_with_connection(&conn, 1, "chr1").unwrap();
+        let geometry = list_reference_track_geometry_with_connection(&conn, 1, "chr1").unwrap();
+        let full_geometry = full
+            .into_iter()
+            .map(|mut item| {
+                item.hits.clear();
+                item
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(geometry, full_geometry);
+        conn.execute_batch("DROP TABLE ref_alignment_hit;").unwrap();
+        assert_eq!(
+            list_reference_track_geometry_with_connection(&conn, 1, "chr1").unwrap(),
+            geometry
+        );
+        assert!(list_reference_track_members_with_connection(&conn, 1, "chr1").is_err());
+        let wire = reference_transport::reference_track_geometry(geometry);
+        assert_eq!(wire["encoding"], reference_transport::GEOMETRY_ENCODING);
+        for item in wire["items"].as_array().unwrap() {
+            for field in ["hits", "hitRows", "hitData", "hitCount", "hitGroups"] {
+                assert!(item.get(field).is_none());
+            }
+        }
+        assert!(list_reference_track_geometry_with_connection(&conn, 1, "missing-chr").is_err());
+        assert!(list_reference_track_geometry_with_connection(&conn, 999, "chr1").is_err());
+    }
 
     #[test]
     fn queries_chr_and_ctg_views() {

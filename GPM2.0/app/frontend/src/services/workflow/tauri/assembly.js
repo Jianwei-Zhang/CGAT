@@ -1,27 +1,37 @@
 import { decodeReferenceTracks } from "../reference-transport.js";
 
 export function createTauriAssemblyOperations({ invokeCommand }) {
-async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false }) {
+async function getProjectOverviewSources({ workspaceRoot, projectId }) {
+  return invokeCommand("get_project_overview_sources", { workspaceRoot, projectId });
+}
+
+async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false, previewScope = null }) {
   const result = await invokeCommand("list_chr_view_ctgs", {
     workspaceRoot,
     projectId,
     chrName,
     datasetId,
-    ...(previewOnly ? { previewOnly: true } : {}),
+    ...(previewOnly ? { previewOnly: true, ...(previewScope ? { previewScope } : {}) } : {}),
   });
   return {
     items: result.items || [],
+    ...(result.delta ? { delta: result.delta } : {}),
   };
 }
 
-async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName }) {
-  const result = await invokeCommand("list_reference_track_members", {
-    workspaceRoot,
-    projectId,
-    chrName,
-    compact: true,
-  });
-  return decodeReferenceTracks(result);
+async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName, deferHits = false, geometryOnly = false }) {
+  const args = { workspaceRoot, projectId, chrName, compact: true,
+    ...(geometryOnly ? { encoding: "reference-geometry-v1" } : deferHits ? { encoding: "reference-hits-v2" } : {}),
+  };
+  let result;
+  try { result = await invokeCommand("list_reference_track_members", args); }
+  catch (error) {
+    // Old desktops may not recognize geometry negotiation. Never turn DB or
+    // integrity failures into a fallback empty/ready evidence response.
+    if (!geometryOnly || !String(error?.message || error).includes("unsupported reference evidence encoding: reference-geometry-v1")) throw error;
+    result = await invokeCommand("list_reference_track_members", { ...args, encoding: "reference-hits-v2" });
+  }
+  return decodeReferenceTracks(result, { deferHits });
 }
 
 async function listPhasedChrTracksTauri({ workspaceRoot, projectId, parentChrName }) {
@@ -274,6 +284,7 @@ async function appendEditAuditLogTauri({ workspaceRoot, projectId, category, act
 }
 
   return {
+    getProjectOverviewSources,
     listChrViewCtgs: listChrViewCtgsTauri,
     listReferenceTrackMembers: listReferenceTrackMembersTauri,
     listPhasedChrTracks: listPhasedChrTracksTauri,

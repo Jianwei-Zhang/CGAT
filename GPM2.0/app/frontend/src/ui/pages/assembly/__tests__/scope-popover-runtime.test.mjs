@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bindAssemblyScopePopovers, resolveMembersPopoverWidth } from "../scope-popover-runtime.js";
+import { bindAssemblyScopePopovers, resolveMembersPopoverWidth, resolveChromosomePopoverLayout } from "../scope-popover-runtime.js";
 import { createScopePopoverFixture, withPopoverClock } from "./scope-popover-fixture.mjs";
 
 function fixture() {
@@ -119,4 +119,27 @@ test("member sizing preserves content widths, excludes full-width separators and
   win.innerWidth = 1000; f.owner.refresh(); assert.equal(panel.style.width, "719px");
   assert.equal(panel.scrollTop, 75);
   f.owner.setOpen("members", false); assert.equal(panel.style.width, "");
+});
+
+
+test("chromosome panel fits actual complete labels rather than stretching three options across 720px",()=>{
+  assert.deepEqual(resolveChromosomePopoverLayout({contentWidths:[34,154,30,166,40,152],count:10,viewportWidth:1400}),{width:584,columns:3});
+  assert.deepEqual(resolveChromosomePopoverLayout({contentWidths:[166],count:10,viewportWidth:420}),{width:392,columns:2});
+  assert.deepEqual(resolveChromosomePopoverLayout({contentWidths:[166],count:10,viewportWidth:320}),{width:200,columns:1});
+  assert.deepEqual(resolveChromosomePopoverLayout({contentWidths:[800],count:10,viewportWidth:1000}),{width:720,columns:1});
+  assert.deepEqual(resolveChromosomePopoverLayout({contentWidths:[80],count:1,viewportWidth:1000}),{width:114,columns:1});
+  assert.equal(resolveChromosomePopoverLayout({contentWidths:[],viewportWidth:1000}),null);
+});
+
+test("chromosome sizing measures name/stat lines, keeps option order/scroll, and adapts after resize",()=>{
+  const f=fixture(),panel=f.panels.chromosomes,doc=f.host.ownerDocument,win=doc.defaultView;
+  panel.ownerDocument=doc;let selected=null,detaches=0;
+  doc.createRange=()=>({selectNodeContents(node){selected=node;},getBoundingClientRect:()=>({width:selected.width}),detach(){detaches++;}});
+  const options=Array.from({length:10},(_,i)=>({index:i,querySelectorAll:()=>[{width:30},{width:166-i}]}));
+  panel.querySelectorAll=selector=>selector===".chr-picker-option"?options:[];
+  win.getComputedStyle=node=>node===panel?{paddingLeft:"6px",paddingRight:"6px",borderLeftWidth:"1px",borderRightWidth:"1px",columnGap:"6px"}:{paddingLeft:"8px",paddingRight:"8px",borderLeftWidth:"1px",borderRightWidth:"1px"};
+  f.owner.setOpen("chromosomes",true);assert.equal(panel.style.width,"584px");assert.equal(panel.style.gridTemplateColumns,"repeat(3, minmax(0, 1fr))");
+  win.innerWidth=320;f.owner.refresh();assert.equal(panel.style.width,"200px");assert.equal(panel.style.gridTemplateColumns,"repeat(1, minmax(0, 1fr))");
+  win.innerWidth=1000;f.owner.refresh();assert.equal(panel.style.width,"584px");assert.equal(panel.scrollTop,75);assert.deepEqual(options.map(o=>o.index),Array.from({length:10},(_,i)=>i));assert.ok(detaches>=3);
+  f.owner.setOpen("chromosomes",false);assert.equal(panel.style.gridTemplateColumns,"");assert.equal(panel.style.width,"");
 });

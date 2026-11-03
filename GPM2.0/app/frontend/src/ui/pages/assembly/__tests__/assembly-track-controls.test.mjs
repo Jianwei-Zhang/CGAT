@@ -411,11 +411,11 @@ test("subview hit bands use their per-hit opaque identity colors", () => {
 
   assert.match(
     css,
-    /\.subview-track-svg\s+\.track-collinearity-band\s*\{[^}]*fill:\s*var\(--alignment-band-fill,[^;]+;[^}]*stroke:\s*var\(--alignment-band-stroke,[^;]+;/,
+    /\.subview-track-svg\s+\.track-collinearity-band\s*\{[^}]*fill:\s*var\(--alignment-band-paint-fill,[^;]+;[^}]*stroke:\s*var\(--alignment-band-paint-stroke,[^;]+;/,
   );
   assert.match(
     css,
-    /\.subview-track-svg\s+\.track-collinearity-band\.is-companion\s*\{[^}]*fill:\s*var\(--alignment-band-fill,[^;]+;[^}]*stroke:\s*var\(--alignment-band-stroke,[^;]+;/,
+    /\.subview-track-svg\s+\.track-collinearity-band\.is-companion\s*\{[^}]*fill:\s*var\(--alignment-band-paint-fill,[^;]+;[^}]*stroke:\s*var\(--alignment-band-paint-stroke,[^;]+;/,
   );
 });
 

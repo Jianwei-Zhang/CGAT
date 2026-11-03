@@ -209,6 +209,18 @@ pub struct CommandError {
 
 type CommandResult<T> = std::result::Result<T, CommandError>;
 
+// SQL/JSON work must not occupy the native window's IPC/UI dispatch thread.
+// Each closure retains the existing backend transaction and error contract.
+async fn run_blocking_command<T, F>(name: &'static str, work: F) -> CommandResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> CommandResult<T> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| CommandError::runtime(format!("{name} worker failed: {error}")))?
+}
+
 impl CommandError {
     fn backend(error: anyhow::Error) -> Self {
         let message = format!("{error:#}");
@@ -769,6 +781,51 @@ pub use workspace::*;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn blocking_command_executes_off_dispatch_thread_and_preserves_backend_errors() {
+        let caller = std::thread::current().id();
+        let worker =
+            tauri::async_runtime::block_on(super::run_blocking_command("thread-test", || {
+                Ok(std::thread::current().id())
+            }))
+            .unwrap();
+        assert_ne!(worker, caller);
+        let expected =
+            super::CommandError::backend(anyhow::anyhow!("project_id 42 does not exist"));
+        let actual = tauri::async_runtime::block_on(super::run_blocking_command::<
+            serde_json::Value,
+            _,
+        >("error-test", || {
+            Err(super::CommandError::backend(anyhow::anyhow!(
+                "project_id 42 does not exist"
+            )))
+        }))
+        .unwrap_err();
+        assert_eq!(
+            serde_json::to_value(actual).unwrap(),
+            serde_json::to_value(expected).unwrap()
+        );
+    }
+
+    #[test]
+    fn blocking_worker_panics_become_command_errors_not_window_dispatch_panics() {
+        let error = tauri::async_runtime::block_on(super::run_blocking_command::<
+            serde_json::Value,
+            _,
+        >("panic-test", || {
+            panic!("controlled worker failure");
+        }))
+        .unwrap_err();
+        let value = serde_json::to_value(error).unwrap();
+        assert_eq!(value["code"], "RUNTIME_ERROR");
+        assert!(
+            value["message"]
+                .as_str()
+                .unwrap()
+                .contains("panic-test worker failed")
+        );
+    }
+
     use super::*;
     use gpm_next_backend::db::{init_workspace_schema, open_workspace_db};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -797,8 +854,14 @@ mod tests {
             INSERT INTO dataset(id,name,assembler,fasta_path,fai_path) VALUES(1,'ds','a','ds.fa','ds.fai');
             INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at) VALUES(1,'p',1,1,1,'0');
             INSERT INTO project_assembly_view_state(project_id,updated_at,final_path_by_chr_json) VALUES(1,'0','{}');").expect("seed fixture");
-        let metadata =
-            get_project_preview_cache(workspace.clone(), 1, 2, None, None).expect("cache metadata");
+        let metadata = tauri::async_runtime::block_on(get_project_preview_cache(
+            workspace.clone(),
+            1,
+            2,
+            None,
+            None,
+        ))
+        .expect("cache metadata");
         let request: PutProjectPreviewCacheRequest = serde_json::from_value(json!({
             "workspaceRoot": workspace, "projectId": 1, "modelVersion": 2,
             "expectedIdentity": metadata["identity"], "expectedRevision": metadata["revision"],
@@ -806,11 +869,13 @@ mod tests {
         }))
         .expect("decode camelCase cache request");
         assert_eq!(
-            put_project_preview_cache(request).expect("write snapshot")["stored"],
+            tauri::async_runtime::block_on(put_project_preview_cache(request))
+                .expect("write snapshot")["stored"],
             true
         );
         let reopened =
-            get_project_preview_cache(workspace, 1, 2, None, None).expect("read snapshot");
+            tauri::async_runtime::block_on(get_project_preview_cache(workspace, 1, 2, None, None))
+                .expect("read snapshot");
         assert_eq!(reopened["valid"], true);
         assert_eq!(reopened["snapshot"]["modelVersion"], 2);
         let paths: String = conn
@@ -1162,35 +1227,71 @@ mod tests {
         )
         .expect("insert assembly ctg");
 
-        let result = list_chr_view_ctgs(
+        let result = tauri::async_runtime::block_on(list_chr_view_ctgs(
             workspace_root.to_string_lossy().into_owned(),
             7,
             Some("Chr01".to_string()),
             Some(11),
             None,
-        )
+            None,
+        ))
         .expect("list chr view ctgs");
 
         assert_eq!(
             result["items"][0]["originId"].as_str(),
             Some("utig4-001122l")
         );
+        assert!(
+            result["items"][0].get("originSourceSeqId").is_none(),
+            "Main endpoint identity contract must not change"
+        );
         assert_eq!(result["items"][0]["orient"].as_str(), Some("-"));
         assert_eq!(result["items"][0]["refOrient"].as_str(), Some("+"));
 
-        let preview = list_chr_view_ctgs(
+        let preview = tauri::async_runtime::block_on(list_chr_view_ctgs(
             workspace_root.to_string_lossy().into_owned(),
             7,
             None,
             None,
             Some(true),
-        )
+            None,
+        ))
         .expect("list compact preview ctgs");
         assert_eq!(
             preview["items"][0]["originId"].as_str(),
             Some("utig4-001122l")
         );
         assert_eq!(preview["items"][0]["memberCount"].as_i64(), Some(1));
+        assert!(preview["items"][0]["originSourceSeqId"].as_i64().is_some());
+        let delta = tauri::async_runtime::block_on(list_chr_view_ctgs(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            None,
+            None,
+            Some(true),
+            Some(
+                gpm_next_backend::main_view::preview_delta::PreviewSourceScope {
+                    dirty_chr_names: vec!["Chr01".to_string()],
+                    source_seq_ids: vec![],
+                    dataset_ids: vec![],
+                },
+            ),
+        ))
+        .expect("preview source delta");
+        assert_eq!(delta["items"], preview["items"]);
+        assert!(
+            delta.get("delta").is_none(),
+            "broad scope uses the full authoritative reader without fake delta metadata"
+        );
+        let phased = tauri::async_runtime::block_on(list_phased_chr_tracks(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            "Chr01".to_string(),
+        ))
+        .expect("background phased Preview read");
+        assert_eq!(phased["parentChrName"], "Chr01");
+        assert_eq!(phased["tracks"], json!([]));
+
         for omitted in [
             "chrOrder",
             "placementMode",
@@ -1204,6 +1305,44 @@ mod tests {
         ] {
             assert!(preview["items"][0].get(omitted).is_none(), "{omitted}");
         }
+
+        let overview = tauri::async_runtime::block_on(get_project_overview_sources(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+        ))
+        .expect("get compact overview sources");
+        assert_eq!(overview["primaryCtgIds"], json!([301]));
+        assert_eq!(
+            overview["ctgs"][0]["originId"],
+            result["items"][0]["originId"]
+        );
+        assert_eq!(overview["ctgs"][0]["orient"], result["items"][0]["orient"]);
+        assert_eq!(overview["ctgs"][0]["placementMode"], "manual");
+        assert!(overview["ctgs"][0].get("hits").is_none());
+        assert_eq!(overview["phasedChrTracksByChr"], json!({}));
+
+        conn.execute_batch("INSERT INTO source_seq(id,dataset_id,seq_name,seq_order,length) VALUES(102,11,'other',2,100);
+            INSERT INTO assembly_seq(id,project_id,source_seq_id,orient,source_start,source_end,created_at) VALUES(202,7,102,'+',1,100,'0');
+            INSERT INTO assembly_ctg(id,project_id,assembly_seq_id,name,assigned_chr_name,chr_order,anchor_start,ref_orient,placement_mode,created_at) VALUES(302,7,202,'unplaced',NULL,NULL,NULL,'+','manual','0');").expect("insert unrelated source for partial delta");
+        let partial = tauri::async_runtime::block_on(list_chr_view_ctgs(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            None,
+            None,
+            Some(true),
+            Some(
+                gpm_next_backend::main_view::preview_delta::PreviewSourceScope {
+                    dirty_chr_names: vec!["Chr01".to_string()],
+                    source_seq_ids: vec![101],
+                    dataset_ids: vec![],
+                },
+            ),
+        ))
+        .expect("partial source delta wire contract");
+        assert_eq!(partial["items"], preview["items"]);
+        assert_eq!(partial["delta"]["encoding"], "preview-source-delta-v1");
+        assert_eq!(partial["delta"]["sourceSeqIds"], json!([101]));
+        assert_eq!(partial["delta"]["orderedCtgIds"], json!([301, 302]));
 
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");
@@ -1288,6 +1427,7 @@ mod tests {
             7,
             "Chr01".to_string(),
             None,
+            None,
         ))
         .expect("list reference track members");
         let result = serde_json::to_value(result).unwrap();
@@ -1310,6 +1450,7 @@ mod tests {
             7,
             "Chr01".to_string(),
             Some(true),
+            None,
         ))
         .expect("compact reference track members");
         let compact = serde_json::to_value(compact).unwrap();
@@ -1319,6 +1460,38 @@ mod tests {
             compact["items"][1]["hitRows"][0],
             json!([0, 5001, 10000, 5101, 10100, 5000, 5000, 1, 5000])
         );
+
+        let geometry = tauri::async_runtime::block_on(list_reference_track_members(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            "Chr01".into(),
+            Some(true),
+            Some("reference-geometry-v1".into()),
+        ))
+        .expect("geometry response");
+        let geometry = serde_json::to_value(geometry).unwrap();
+        assert_eq!(geometry["encoding"], "reference-geometry-v1");
+        assert!(geometry["items"][0].get("hits").is_none());
+        assert!(geometry["items"][0].get("hitData").is_none());
+        assert!(geometry["items"][0].get("hitRows").is_none());
+
+        let packed = tauri::async_runtime::block_on(list_reference_track_members(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            "Chr01".to_string(),
+            Some(true),
+            Some("reference-hits-v2".to_string()),
+        ))
+        .expect("packed reference track members");
+        let packed = serde_json::to_value(packed).unwrap();
+        assert_eq!(packed["encoding"], "reference-hits-v2");
+        assert_eq!(
+            packed["items"][1]["hitGroups"],
+            compact["items"][1]["hitGroups"]
+        );
+        assert_eq!(packed["items"][1]["hitCount"], 1);
+        assert_eq!(packed["items"][1]["hitData"], "AJJOoJwB2k/onQGQTpBOApBO");
+        assert!(packed["items"][1].get("hits").is_none());
 
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");

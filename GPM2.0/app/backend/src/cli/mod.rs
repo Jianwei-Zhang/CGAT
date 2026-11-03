@@ -154,6 +154,10 @@ enum Commands {
         workspace_root: PathBuf,
         project_id: i64,
     },
+    GetProjectOverviewSources {
+        workspace_root: PathBuf,
+        project_id: i64,
+    },
     ListChrViewCtgs {
         workspace_root: PathBuf,
         project_id: i64,

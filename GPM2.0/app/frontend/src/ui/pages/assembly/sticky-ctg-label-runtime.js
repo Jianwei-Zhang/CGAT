@@ -194,6 +194,9 @@ function updateStickyLabelNode(labelNode, target, decision, viewportLeft) {
 }
 
 export function syncStickyCtgLabels(scrollEl, options = {}) {
+  // Full range fits the original SVG labels; do not change their visibility or
+  // regenerate clipped-label overlays while the gesture owns the projection.
+  if (scrollEl?.classList?.contains?.("is-full-range-drag-preview")) return;
   const layer = ensureStickyLabelLayer(scrollEl, options);
   if (!layer) {
     return;

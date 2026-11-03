@@ -1,4 +1,5 @@
-//! Lossless IPC encoding: share PAF hit attributes across its CIGAR fragments.
+//! Lossless IPC encodings. v1 remains available for older clients.
+pub mod packed;
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -88,6 +89,19 @@ pub fn compact_reference_track_members(
             })
             .collect(),
     }
+}
+
+pub const GEOMETRY_ENCODING: &str = "reference-geometry-v1";
+
+/// An explicit geometry-only response has no evidence fields, including no
+/// fabricated empty hits array. Old full-reference encodings are unchanged.
+pub fn reference_track_geometry(items: Vec<ReferenceTrackMemberItem>) -> serde_json::Value {
+    serde_json::json!({"encoding":GEOMETRY_ENCODING,"items":items.into_iter().map(|item| serde_json::json!({
+        "sourceKind":item.source_kind,"referenceChrId":item.reference_chr_id,
+        "referenceChrName":item.reference_chr_name,"segmentOrder":item.segment_order,
+        "segmentStartBp":item.segment_start_bp,"segmentEndBp":item.segment_end_bp,
+        "name":item.name,"anchorStart":item.anchor_start,"totalLength":item.total_length,"refOrient":item.ref_orient,
+    })).collect::<Vec<_>>()})
 }
 
 #[cfg(test)]

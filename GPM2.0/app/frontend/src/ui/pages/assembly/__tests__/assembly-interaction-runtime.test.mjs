@@ -2691,6 +2691,7 @@ test("assembly page public binder wires host-level listeners once for the same h
   }
 
   assert.deepEqual(listenerTypes, [
+    "click", // independent details/Local evidence retries, delegated once
     "pointerdown",
     "pointermove",
     "click",

@@ -60,24 +60,46 @@ const place = (node, layout, origin = 0) => {
   node.style.width = `${layout.width}px`;
   node.style.minWidth = "0";
 };
-const fitLabel = label => {
-  if (label?.style) label.style.visibility = Number(label.scrollWidth || 0) > Number(label.clientWidth || 0) ? "hidden" : "";
-};
+// Batch each phase across mounted cards: read widths, write geometry, read
+// label extents, then write visibility. No per-contig read/write layout loop.
+export function syncProjectPreviewCards(entries) {
+  const measured = entries.map(([node, card]) => {
+    const plot = node.querySelector?.(".project-preview-final-plot, .project-preview-plot");
+    return { node, card, width: plot?.clientWidth || 0 };
+  }).filter(item => item.width > 0);
+  const labels = [];
+  for (const { node, card, width } of measured) {
+    const geometry = layoutProjectPreviewCard(card, width);
+    const apply = (source, layout) => {
+      place(source, layout);
+      // Context labels were always hidden by CSS. Their complete names stay
+      // in the source tooltip/model, so neither labels nor child queries are
+      // needed for the overwhelmingly common unused source body.
+      if (source?.classList?.contains("is-context")) return;
+      [...(source?.querySelectorAll(".project-preview-used") || [])].forEach((patch, index) =>
+        place(patch, layout.highlights[index], layout.x));
+      const label = source?.querySelector("[data-preview-source-fit-label]");
+      if (label) labels.push(label);
+    };
+    apply(node.querySelector(".project-preview-reference"), geometry.reference);
+    [...node.querySelectorAll(".project-preview-source-plots")].forEach((track, trackIndex) => {
+      [...track.querySelectorAll(".project-preview-contig")].forEach((source, index) =>
+        apply(source, geometry.tracks[trackIndex][index]));
+    });
+    for (const plot of node.querySelectorAll(".project-preview-final-plot")) {
+      const layouts = geometry.paths.get(plot.dataset.finalPathName);
+      [...plot.querySelectorAll("[data-final-path-segment]")].forEach((part, index) => {
+        place(part, layouts?.[index]);
+        const label = part.querySelector("[data-final-path-fit-label]");
+        if (label) labels.push(label);
+      });
+    }
+  }
+  const visibility = labels.map(label => Number(label.scrollWidth || 0) > Number(label.clientWidth || 0) ? "hidden" : "");
+  labels.forEach((label, index) => { label.style.visibility = visibility[index]; });
+}
 
-// Called after path measurement, on first paint, cached remount and resize.
+// Retained for callers/tests that measure one card in isolation.
 export function syncProjectPreviewSources(node, card) {
-  const plot = node.querySelector?.(".project-preview-final-plot, .project-preview-plot");
-  if (!(plot?.clientWidth > 0)) return;
-  const geometry = layoutProjectPreviewCard(card, plot.clientWidth);
-  const apply = (source, layout) => {
-    place(source, layout);
-    [...(source?.querySelectorAll(".project-preview-used") || [])].forEach((patch, index) =>
-      place(patch, layout.highlights[index], layout.x));
-    fitLabel(source?.querySelector("[data-preview-source-fit-label]"));
-  };
-  apply(node.querySelector(".project-preview-reference"), geometry.reference);
-  [...node.querySelectorAll(".project-preview-source-plots")].forEach((track, trackIndex) => {
-    [...track.querySelectorAll(".project-preview-contig")].forEach((source, index) =>
-      apply(source, geometry.tracks[trackIndex][index]));
-  });
+  syncProjectPreviewCards([[node, card]]);
 }

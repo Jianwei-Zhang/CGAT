@@ -357,23 +357,26 @@ pub fn initialize_project(request: InitializeProjectCommandRequest) -> CommandRe
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
-    (|| {
-        let project_db = project_db_path(&workspaceRoot);
-        let options = backend_list_initializer_options(&project_db)?;
-        if !options
-            .existing_projects
-            .iter()
-            .any(|project| project.id == projectId)
-        {
-            bail!("project_id {projectId} does not exist");
-        }
-        Ok(serde_json::to_value(backend_load_grt_project_view(
-            &project_db,
-            projectId,
-        )?)?)
-    })()
-    .map_err(format_error)
+pub async fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
+    run_blocking_command("get_grt_project_view", move || {
+        (|| {
+            let project_db = project_db_path(&workspaceRoot);
+            let options = backend_list_initializer_options(&project_db)?;
+            if !options
+                .existing_projects
+                .iter()
+                .any(|project| project.id == projectId)
+            {
+                bail!("project_id {projectId} does not exist");
+            }
+            Ok(serde_json::to_value(backend_load_grt_project_view(
+                &project_db,
+                projectId,
+            )?)?)
+        })()
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -659,32 +662,38 @@ pub fn set_project_auto_pipeline_done(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn list_project_chromosomes(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
-    (|| {
-        let chromosomes =
-            backend_list_project_chromosomes(&project_db_path(&workspaceRoot), projectId)?;
-        let items = chromosomes
-            .items
-            .into_iter()
-            .map(|item| {
-                json!({
-                    "chrName": item.chr_name,
-                    "chrOrder": item.chr_order,
-                    "chrLength": item.chr_length,
-                    "ctgCount": item.ctg_count,
-                    "placedBp": item.placed_bp
+pub async fn list_project_chromosomes(
+    workspaceRoot: String,
+    projectId: i64,
+) -> CommandResult<Value> {
+    run_blocking_command("list_project_chromosomes", move || {
+        (|| {
+            let chromosomes =
+                backend_list_project_chromosomes(&project_db_path(&workspaceRoot), projectId)?;
+            let items = chromosomes
+                .items
+                .into_iter()
+                .map(|item| {
+                    json!({
+                        "chrName": item.chr_name,
+                        "chrOrder": item.chr_order,
+                        "chrLength": item.chr_length,
+                        "ctgCount": item.ctg_count,
+                        "placedBp": item.placed_bp
+                    })
                 })
-            })
-            .collect::<Vec<_>>();
-        Ok(json!({
-            "projectId": chromosomes.project_id,
-            "referenceGenomeId": chromosomes.reference_genome_id,
-            "unplacedCtgCount": chromosomes.unplaced_ctg_count,
-            "unplacedBp": chromosomes.unplaced_bp,
-            "items": items
-        }))
-    })()
-    .map_err(format_error)
+                .collect::<Vec<_>>();
+            Ok(json!({
+                "projectId": chromosomes.project_id,
+                "referenceGenomeId": chromosomes.reference_genome_id,
+                "unplacedCtgCount": chromosomes.unplaced_ctg_count,
+                "unplacedBp": chromosomes.unplaced_bp,
+                "items": items
+            }))
+        })()
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]

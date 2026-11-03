@@ -15,14 +15,14 @@
 }
 
 .subview-track-svg .track-collinearity-band {
-  fill: var(--alignment-band-fill, rgb(222, 224, 227));
-  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+  fill: var(--alignment-band-paint-fill, var(--alignment-band-fill, rgb(222, 224, 227)));
+  stroke: var(--alignment-band-paint-stroke, var(--alignment-band-stroke, rgb(194, 198, 204)));
   cursor: crosshair;
 }
 
 .subview-track-svg .track-collinearity-band.is-companion {
-  fill: var(--alignment-band-fill, rgb(222, 224, 227));
-  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+  fill: var(--alignment-band-paint-fill, var(--alignment-band-fill, rgb(222, 224, 227)));
+  stroke: var(--alignment-band-paint-stroke, var(--alignment-band-stroke, rgb(194, 198, 204)));
 }
 
 .subview-track-ctg,
@@ -942,15 +942,15 @@
 .assembly-track-scroll.is-track-drag-preview.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
 .is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
 .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"] {
-  fill: var(--alignment-band-fill, rgb(222, 224, 227));
-  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+  fill: var(--alignment-band-paint-fill, var(--alignment-band-fill, rgb(222, 224, 227)));
+  stroke: var(--alignment-band-paint-stroke, var(--alignment-band-stroke, rgb(194, 198, 204)));
 }
 
 .assembly-track-scroll.is-track-drag-preview.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"] {
-  fill: var(--alignment-band-fill, rgb(222, 224, 227));
-  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+  fill: var(--alignment-band-paint-fill, var(--alignment-band-fill, rgb(222, 224, 227)));
+  stroke: var(--alignment-band-paint-stroke, var(--alignment-band-stroke, rgb(194, 198, 204)));
 }
 
 .is-subview-track-drag-preview [data-track-band-canvas-scene-kind="subview-ctg"],
@@ -960,14 +960,14 @@
 
 .is-subview-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"],
 .is-subview-track-drag-preview .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"] {
-  fill: var(--alignment-band-fill, rgb(222, 224, 227));
-  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+  fill: var(--alignment-band-paint-fill, var(--alignment-band-fill, rgb(222, 224, 227)));
+  stroke: var(--alignment-band-paint-stroke, var(--alignment-band-stroke, rgb(194, 198, 204)));
 }
 
 .is-subview-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-subview-track-drag-preview .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"] {
-  fill: var(--alignment-band-fill, rgb(222, 224, 227));
-  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+  fill: var(--alignment-band-paint-fill, var(--alignment-band-fill, rgb(222, 224, 227)));
+  stroke: var(--alignment-band-paint-stroke, var(--alignment-band-stroke, rgb(194, 198, 204)));
 }
 
 .is-subview-track-drag-preview .subview-anchor-hit-zone,
@@ -1021,3 +1021,16 @@
 .subview-anchor-separator[data-main-fragment-role="ref"] {
   stroke: var(--ctg-ref-stroke);
 }
+
+
+/* Full range drag reuses the original SVG; its labels are counter-scaled by
+   the gesture handle, so no clipped-label HTML overlay is needed. */
+.is-full-range-drag-preview .track-sticky-label-layer { display: none; }
+.is-full-range-drag-preview .track-ctg-label.is-sticky-hidden { display: inline; }
+.is-full-range-drag-preview svg :is(rect, line, polygon, polyline, path) { vector-effect: non-scaling-stroke; }
+
+/* Hit targets are already invisible; the gesture owns window pointer events.
+   Exclude them from SVG layout/painting until release, retaining active lines. */
+.is-full-range-drag-preview .subview-anchor-hit-zone,
+.is-full-range-drag-preview .subview-fragment-hit-zone,
+.is-full-range-drag-preview .subview-anchor-line[stroke="transparent"] { display: none; }

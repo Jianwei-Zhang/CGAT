@@ -39,7 +39,7 @@ export function previewStateIsApplicable(state) {
 }
 
 export function compactPreviewInputs({ chromosomes, ctgs, datasets, project, ...rest }) {
-  const fields = ["assemblyCtgId", "name", "originId", "totalLength", "datasetId", "datasetName",
+  const fields = ["assemblyCtgId", "name", "originId", "originSourceSeqId", "totalLength", "datasetId", "datasetName",
     "assignedChrName", "coAssignedChrNames", "anchorStart", "orient", "refOrient", "sourceFragment", "memberCount"];
   return { ...rest, chromosomes, project: { primaryDatasetId: project.primaryDatasetId,
     supportDatasetIds: project.supportDatasetIds, phasedAssemblyEnabled: project.phasedAssemblyEnabled },

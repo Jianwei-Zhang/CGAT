@@ -176,3 +176,12 @@ for (const locale of ["zh", "en"]) for (const mode of ["loaded", "loading", "emp
     if (mode === "empty") assert.ok(Object.hasOwn(header.children[0].children[0].attrs, "disabled"));
   });
 }
+
+
+test("complete chromosome picker options have no redundant tooltip and retain selection/accessibility data",()=>{
+ const html=renderAssemblyPage(createState({assembly:{chrPickerOpen:true}}));
+ const buttons=[...html.matchAll(/<button\b([^>]*class="chr-picker-option [^"]*"[^>]*)>([\s\S]*?)<\/button>/g)];
+ assert.ok(buttons.length>0);
+ for(const [,attrs,body] of buttons){assert.doesNotMatch(attrs,/data-app-tooltip|\btitle=/);assert.match(attrs,/data-chr-name="[^"]+"/);assert.match(attrs,/aria-pressed="(?:true|false)"/);assert.match(body,/<strong>[^<]+<\/strong><span>\d+ Contigs · [\d,.]+ Mb<\/span>/);}
+ assert.match(html,/id="assembly-chr-picker-toggle"[^>]*data-app-tooltip-overflow=".chr-picker-current"/);
+});

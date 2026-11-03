@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildProjectPreviewModel } from "../project-preview-state.js";
-import { layoutProjectPreviewCard, syncProjectPreviewSources } from "../project-preview-layout.js";
+import { layoutProjectPreviewCard, syncProjectPreviewSources, syncProjectPreviewCards } from "../project-preview-layout.js";
 
 const fixture = () => buildProjectPreviewModel({
   chromosomes: [{ chrName: "chr01", chrLength: 44000000 }], referenceGenomeId: 1,
@@ -70,7 +70,7 @@ test("DOM source bodies and children are remeasured against the same path geomet
   const plot = { clientWidth: 900 };
   const node = {
     querySelector: selector => selector === ".project-preview-reference" ? null : plot,
-    querySelectorAll: () => sources.map(items => ({ querySelectorAll: () => items })),
+    querySelectorAll: selector => selector === ".project-preview-source-plots" ? sources.map(items => ({ querySelectorAll: () => items })) : [],
   };
   for (const width of [900, 1700]) {
     plot.clientWidth = width; syncProjectPreviewSources(node, card);
@@ -114,4 +114,51 @@ test("empty paths keep unadopted context finite without inventing an adopted pla
       assert.equal(body.highlights.length, 0);
     }
   }
+});
+
+
+test("mounted-card geometry batches widths and label measurements and places tiny final parts without changing Assembly", () => {
+  const card = fixture(), log = [];
+  function entry(width) {
+    const labels = [];
+    const makeLabel = overflow => {
+      const label = { get scrollWidth() { log.push("label-read"); return overflow ? 100 : 5; },
+        get clientWidth() { log.push("label-read"); return 10; },
+        style: new Proxy({}, { set(target, key, value) { log.push("label-write"); target[key] = value; return true; } }) };
+      labels.push(label); return label;
+    };
+    const parts = card.paths[0].parts.map((_, i) => ({
+      style: new Proxy({}, { set(target, key, value) { log.push("geometry-write"); target[key] = value; return true; } }),
+      querySelector: () => makeLabel(i === 1),
+    }));
+    const plot = { dataset: { finalPathName: card.paths[0].name },
+      get clientWidth() { log.push("width-read"); return width; }, querySelectorAll: () => parts };
+    const node = { querySelector: selector => selector === ".project-preview-reference" ? null : plot,
+      querySelectorAll: selector => selector === ".project-preview-final-plot" ? [plot] : [] };
+    return { node, parts, labels };
+  }
+  const first = entry(900), second = entry(360);
+  syncProjectPreviewCards([[first.node, card], [second.node, card]]);
+  assert.deepEqual(log.slice(0, 2), ["width-read", "width-read"]);
+  const readIndex = log.indexOf("label-read"), visibilityIndex = log.indexOf("label-write");
+  assert.equal(log.slice(2, readIndex).every(item => item === "geometry-write"), true);
+  assert.equal(log.slice(readIndex, visibilityIndex).every(item => item === "label-read"), true);
+  assert.equal(log.slice(visibilityIndex).every(item => item === "label-write"), true);
+  assert.ok(parseFloat(first.parts[1].style.width) >= 8);
+  assert.equal(first.labels[1].style.visibility, "hidden"); assert.equal(first.labels[0].style.visibility, "");
+});
+
+
+test("unused context sources receive complete geometry without walking hidden label subtrees", () => {
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: "chr1", chrLength: 1000 }], referenceGenomeId: 1,
+    ctgs: [{ assemblyCtgId: 1, datasetName: "ds", name: "unused", totalLength: 600, assignedChrName: "chr1", anchorStart: 100 }],
+    finalPathByChr: { chr1: { segments: [] } } });
+  const source = { style: {}, classList: { contains: name => name === "is-context" },
+    querySelector() { assert.fail("context source has no label to measure"); },
+    querySelectorAll() { assert.fail("context source has no adopted intervals to place"); } };
+  const node = { querySelector: selector => selector === ".project-preview-reference" ? null : { clientWidth: 500 },
+    querySelectorAll: selector => selector === ".project-preview-source-plots" ? [{ querySelectorAll: () => [source] }] : [] };
+  syncProjectPreviewSources(node, card);
+  const expected = layoutProjectPreviewCard(card, 500).tracks[0][0];
+  close(parseFloat(source.style.left), expected.x); close(parseFloat(source.style.width), expected.width);
 });

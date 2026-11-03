@@ -1,3 +1,4 @@
+import { renderAssemblyLocalRestoreStatus } from "./assembly-detail-status.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { renderMainAnchorFragments } from "./main-anchor-fragments.js";
 import { mainAlignmentKey, mainAlignmentEndpointKey, mainActiveAnchorKeys, renderMainAlignmentAnchors } from "./main-alignment-anchors.js";
@@ -603,7 +604,7 @@ function createRenderTracksRenderer(deps = {}) {
     const membersTitle = i18n.page.membersCardTitle;
     const projectScopeKey = JSON.stringify([state.session?.workspacePath, state.session?.projectId]);
     const memberScopeKey = JSON.stringify([state.session?.workspacePath, state.session?.projectId, assembly.selectedChrName]);
-    const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}" data-app-tooltip="${escapeAttr(`${chr.chrName} · ${formatBp(chr.placedBp)}`)}">
+    const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}">
       <strong>${escapeHtml(chr.chrName)}</strong><span>${chr.ctgCount} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb</span></button>`).join("");
     return { chromosome: `<div class="chr-picker-inline assembly-main-scope-title" data-main-track-control-title data-assembly-popup="chromosomes" data-assembly-scope-key="${escapeAttr(projectScopeKey)}">
         <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" data-app-tooltip="${escapeAttr(assembly.selectedChrName ? `${i18n.chrTitle} ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" data-app-tooltip-overflow=".chr-picker-current" aria-label="${escapeAttr(assembly.selectedChrName ? `${i18n.page.selectChromosomeTitle}: ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
@@ -699,6 +700,8 @@ function createRenderTracksRenderer(deps = {}) {
   const subviewPanel = options.includeSubview === false
     ? ""
     : (() => {
+      const restoring = renderAssemblyLocalRestoreStatus(assembly, i18n);
+      if (restoring) return restoring;
       const supportSubviewCtgs = buildSupportSubviewCtgPool({
         supportChrCtgs: supportTrackCtgs,
         supportMirroredCtgs,
@@ -847,6 +850,8 @@ function createRenderTracksRenderer(deps = {}) {
   function renderAssemblySubviewPanel(state) {
     const assembly = state.assembly;
     const i18n = getAssemblyI18n(state);
+    const restoring = renderAssemblyLocalRestoreStatus(assembly, i18n);
+    if (restoring) return restoring;
     const currentProject = getCurrentProject(state);
     const supportDatasetOptions = getSupportDatasetOptions(state, currentProject);
     const supportDatasetId = normalizeSupportDatasetId(assembly.supportDatasetId);

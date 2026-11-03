@@ -1,3 +1,4 @@
+import { hasDeferredReferenceHits } from "../../../services/workflow/reference-evidence.js";
 import { normalizeSubviewTrackPairLayoutViewport } from "./subview-removal-viewport.js";
 import {
   normalizeSupportDatasetId,
@@ -1042,7 +1043,9 @@ export function buildRefSubviewCtgPool(refTrackMembers, { datasetId = null } = {
         startBp: segmentStartBp,
         endBp: segmentEndBp,
         refOrient: String(item?.refOrient || "+") === "-" ? "-" : "+",
-        hits: filterRefTrackHitsByDataset(item?.hits, datasetId),
+        ...(hasDeferredReferenceHits(item)
+          ? { referenceDatasetId: normalizeSupportDatasetId(datasetId) }
+          : { hits: filterRefTrackHitsByDataset(item?.hits, datasetId) }),
         subviewSource: "mother",
       };
     })

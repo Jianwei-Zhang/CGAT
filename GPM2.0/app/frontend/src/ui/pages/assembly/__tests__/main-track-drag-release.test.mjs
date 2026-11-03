@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { bindTrackContigDrag } from "../track-drag-runtime.js";
 
-function fixture(commit, { fullRange = false } = {}) {
+function fixture(commit, { fullRange = false, fast = false, previewError = false } = {}) {
   const host = new EventTarget();
   const window = new EventTarget();
   // Node needs the options form to remove capture listeners like a browser.
@@ -23,6 +23,18 @@ function fixture(commit, { fullRange = false } = {}) {
   const calls = [];
   const store = { getState: () => ({ assembly: { activeTab: "assembly", trackView: { fullRange }, trackDragOffsets: [] } }) };
   bindTrackContigDrag(host, store, {
+    ...(fast ? { createFullRangeDragPreview: (target) => {
+      calls.push({kind:"compile",target});
+      let active=true;
+      return {
+        isCurrent:()=>active && target.isConnected !== false,
+        update:(delta)=>{
+          if (previewError) throw Error("preview error");
+          calls.push({kind:"fast-preview",delta});target.dataset.trackInnerWidth="50";
+        },
+        restore:()=>{active=false;calls.push({kind:"fast-restore",target});target.dataset.trackInnerWidth="100";},
+      };
+    }, onTrackDragPreviewError:(_host,_store,error)=>calls.push({kind:"preview-error",message:error.message}) } : {}),
     clearTrackDragPreview: (target) => calls.push({ kind: "clear", target }),
     commitTrackDragOffset: (_host, _store, offset) => { calls.push({ kind: "commit", offset }); return commit?.(); },
     convertTrackOffsetPxToBp: (value, metrics) => fullRange
@@ -135,4 +147,36 @@ test("cancelling full-range preview restores the authoritative layout without co
     assert.ok(!f.calls.some((call) => call.kind === "commit"));
     assert.ok(f.calls.some((call) => call.kind === "full-clear" && call.options?.cancelled));
   } finally { globalThis.window = originalWindow; }
+});
+
+
+for (const outcome of ["success","no-change","reject"]) test(`fast Full range retains released geometry until async ${outcome}`,async()=>{
+  let settle;
+  const promise=new Promise((resolve,reject)=>{settle=outcome==="reject"?reject:resolve;});
+  const f=fixture(()=>promise,{fullRange:true,fast:true}),original=globalThis.window;globalThis.window=f.window;
+  try {
+    f.fire("pointerdown",20);f.fire("pointermove",40);
+    for(const [id,callback] of [...f.frames]){f.frames.delete(id);callback();}
+    f.fire("pointermove",50);f.fire("pointerup",50);
+    assert.deepEqual(f.calls.filter(c=>c.kind==="fast-preview").map(c=>c.delta),[20,40]);
+    assert.equal(f.calls.find(c=>c.kind==="commit").offset.offsetBp,50);
+    assert.equal(f.calls.filter(c=>c.kind==="compile").length,1);
+    assert.equal(f.calls.some(c=>c.kind==="full-preview"||c.kind==="full-clear"||c.kind==="fast-restore"),false);
+    settle(outcome==="reject"?Error("save failed"):outcome==="success");await Promise.resolve();
+    assert.equal(f.calls.filter(c=>c.kind==="fast-restore").length,1);
+    assert.equal(f.calls.at(-1).target,f.scroll);
+  }finally{globalThis.window=original;}
+});
+for(const action of ["cancel","detach","error"]) test(`fast Full range ${action} cancels without saving`,()=>{
+  const f=fixture(null,{fullRange:true,fast:true,previewError:action==="error"}),original=globalThis.window;globalThis.window=f.window;
+  try{
+    f.fire("pointerdown",20);f.fire("pointermove",40);
+    for(const [id,callback] of [...f.frames]){f.frames.delete(id);callback();}
+    if(action==="detach"){f.scroll.isConnected=false;f.fire("pointermove",50);}
+    else if(action==="cancel") f.fire("pointercancel",40);
+    f.fire("pointerup",50);
+    assert.equal(f.calls.filter(c=>c.kind==="fast-restore").length,1);
+    assert.equal(f.calls.some(c=>c.kind==="commit"||c.kind==="full-preview"),false);
+    if(action==="error")assert.equal(f.calls.find(c=>c.kind==="preview-error").message,"preview error");
+  }finally{globalThis.window=original;}
 });

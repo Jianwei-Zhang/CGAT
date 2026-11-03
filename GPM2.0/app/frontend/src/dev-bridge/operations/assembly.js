@@ -8,6 +8,14 @@ import {
 export function createAssemblyOperations(runtime) {
   const { runBackend } = runtime;
 
+async function getProjectOverviewSources(payload) {
+  const { workspaceRoot, projectId } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  const output = await runBackend(["get-project-overview-sources", workspaceRoot, String(projectId)]);
+  return JSON.parse(output.stdout);
+}
+
 async function listChrViewCtgs(payload) {
   const { workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
@@ -292,6 +300,7 @@ function parsePhasedChrTracks(stdout, fallbackProjectId, fallbackParentChrName) 
 }
 
   return {
+    getProjectOverviewSources,
     listChrViewCtgs,
     listReferenceTrackMembers,
     listPhasedChrTracks,

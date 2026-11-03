@@ -2,9 +2,10 @@ import { beginPreviewContentOperation, finishPreviewContentOperation } from "../
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { getMessages } from "../../i18n/index.js";
 import { createStore } from "../../../state/store.js";
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
-import { loadProjectPreviewData, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage } from "../project-preview-page.js";
+import { loadProjectPreviewData, renderProjectPreviewPage, renderProjectPreviewCard, bindProjectPreviewPage, unbindProjectPreviewPage } from "../project-preview-page.js";
 
 function state() {
   return { locale: "zh", activeRoute: "projectPreview", session: { workspacePath: "/ws", projectId: 1 },
@@ -33,10 +34,10 @@ test("standalone preview uses a download icon, hides unpositioned lists and keep
       assignedChrName: "Chr1", anchorStart: null }],
     finalPathByChr: { Chr1: { segments: [segment, { type: "gap", gapSizeBp: 1 }] } } });
   value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
-  const output = renderProjectPreviewPage(value);
+  const output = renderProjectPreviewCard(value.projectPreview.cards[0], getMessages(value, "projectPreview"));
   assert.match(output, /class="project-preview-card"/);
   assert.doesNotMatch(output, /<button[^>]*class="project-preview-card"/);
-  assert.match(output, /project-preview-download[^>]*aria-label="下载预览图"[^>]*>[\s\S]*?<svg/);
+  assert.match(renderProjectPreviewPage(value), /project-preview-download[^>]*aria-label="下载预览图"[^>]*>[\s\S]*?<svg/);
   assert.doesNotMatch(output, /data-preview-refresh/);
   assert.doesNotMatch(output, /project-preview-unpositioned|未定位/);
   assert.doesNotMatch(output, /data-final-path-gap-label|project-preview-gap-label|>Gap<\/span>/);
@@ -135,7 +136,7 @@ test("source colors follow Assembly roles and adopted interval outlines are card
       { assemblyCtgId: 2, datasetId: 2, datasetName: "dsB", name: "b", totalLength: 1000, assignedChrName: "Chr1", anchorStart: 0 }],
     finalPathByChr: { Chr1: { segments: [segment] } } });
   value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
-  const output = renderProjectPreviewPage(value);
+  const output = renderProjectPreviewCard(value.projectPreview.cards[0], getMessages(value, "projectPreview"));
   assert.match(output, /background:var\(--ctg-primary-fill, #d2dfef\)/);
   assert.match(output, /background:var\(--ctg-companion-fill, #e7dec4\)/);
   assert.match(output, /border-color:var\(--ctg-companion-stroke, #8a7551\)/);
@@ -172,7 +173,7 @@ test("rendered reference carries its adopted-path anchor rather than a fixed zer
       assignedChrName: "Chr1", anchorStart: -500 }],
     finalPathByChr: { Chr1: { segments: [segment] } } });
   value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
-  const output = renderProjectPreviewPage(value);
+  const output = renderProjectPreviewCard(value.projectPreview.cards[0], getMessages(value, "projectPreview"));
   assert.match(output, /class="project-preview-reference"[^>]*style="left:20\.00000%;width:80\.00000%/);
   assert.match(output, /data-final-path-domain="2500"/);
 });
@@ -191,7 +192,7 @@ test("preview source and Final Path strips have identical thickness and centered
     value.projectPreview = { key: previewProjectKey(value), loaded: true,
       cards: buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }],
         finalPathByChr: { Chr1: { segments: [segment, ...gaps] } } }) };
-    const output = renderProjectPreviewPage(value);
+    const output = renderProjectPreviewCard(value.projectPreview.cards[0], getMessages(value, "projectPreview"));
     assert.match(output, /data-final-path-domain="[^"]+" data-preview-linear="1" data-preview-domain-start="[^"]+" style="height:20px"/);
     assert.doesNotMatch(output, /has-gaps|data-final-path-gap-label/);
   }
@@ -205,7 +206,7 @@ test("preview shows the full donor with a separate small adopted interval withou
       referenceGenomeId: 1, ctgs: [{ assemblyCtgId: 1, datasetName: "dsA", name: "donor", totalLength: 31678158 }],
       finalPathByChr: { Chr1: { segments: [{ type: "ctg", start: 17930989, end: 17953329,
         source: { dataset: "dsA", contig: "donor", start: 17930989, end: 17953329, orientation: "+" } }] } } }) };
-  const output = renderProjectPreviewPage(value);
+  const output = renderProjectPreviewCard(value.projectPreview.cards[0], getMessages(value, "projectPreview"));
   const source = output.match(/class="project-preview-contig is-adopted"[^>]+/)[0];
   assert.match(source, /data-preview-source-length="31678158"/);
   const [card] = value.projectPreview.cards;
@@ -294,10 +295,57 @@ test("overlapping sources stay on the same 20px strip and no unpositioned text a
       { assemblyCtgId: 2, name: "short", datasetName: "assembly", totalLength: 100, assignedChrName: "Chr1", anchorStart: 50 },
       { assemblyCtgId: 3, name: "contig_84@chr03", datasetName: "assembly", totalLength: 1000, assignedChrName: "Chr1", anchorStart: null }],
     finalPathByChr: { Chr1: { segments: [] } } }) };
-  const output = renderProjectPreviewPage(value, { embedded: true });
+  const output = renderProjectPreviewCard(value.projectPreview.cards[0], getMessages(value, "projectPreview"));
   assert.equal((output.match(/class="project-preview-source-plots"/g) || []).length, 1);
   assert.match(output, /project-preview-source-plots[\s\S]*style="height:20px"/);
   assert.ok(output.indexOf('data-preview-source-length="9000"') < output.indexOf('data-preview-source-length="100"'));
   assert.doesNotMatch(output, /top:22px|height:40px|未定位|Unpositioned|contig_84@chr03/);
   assert.equal(value.projectPreview.cards[0].tracks[0].unpositioned[0].name, "contig_84@chr03", "provenance remains in the model");
+});
+
+
+for (const count of [1, 10]) test(`${count}-chromosome initial markup keeps every accessible shell but defers heavy source/path nodes`, () => {
+  const value = state();
+  const chromosomes = Array.from({ length: count }, (_, i) => ({ chrName: `Chr${i + 1}`, chrLength: 2000 }));
+  const cards = buildProjectPreviewModel({ chromosomes, referenceGenomeId: 1,
+    ctgs: chromosomes.map((chr, i) => ({ assemblyCtgId: i + 1, datasetName: "dsA", name: `source${i}`,
+      totalLength: 1000, assignedChrName: chr.chrName, anchorStart: 0 })),
+    finalPathByChr: Object.fromEntries(chromosomes.map((chr, i) => [chr.chrName, { segments: [{ ...segment, assemblyCtgId: i + 1 }] }])) });
+  value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
+  const before = JSON.stringify(cards), output = renderProjectPreviewPage(value);
+  assert.equal((output.match(/data-preview-mounted="false"/g) || []).length, count);
+  assert.equal((output.match(/class="project-preview-card-header"/g) || []).length, count);
+  assert.equal((output.match(/project-preview-final-plot/g) || []).length, count);
+  assert.doesNotMatch(output, /class="project-preview-contig |data-final-path-segment=/);
+  assert.equal(JSON.stringify(cards), before, "virtualization cannot mutate or discard scientific metadata");
+});
+
+
+test("unbinding releases heavy cached plot children but leaves chromosome/header shells in place", () => {
+  const store = createStore(state()), node = host(); let released = 0;
+  const shell = { dataset: { previewMounted: "true" }, header: { focusable: true },
+    querySelectorAll: () => [{ replaceChildren() { released++; } }, { replaceChildren() { released++; } }] };
+  node.querySelectorAll = selector => selector === '[data-preview-mounted="true"]' && shell.dataset.previewMounted === "true" ? [shell] : [];
+  bindProjectPreviewPage(node, store, { getProjectPreviewCache: () => new Promise(() => {}) });
+  unbindProjectPreviewPage(node);
+  assert.equal(released, 2); assert.equal(shell.dataset.previewMounted, "false"); assert.equal(shell.header.focusable, true);
+  unbindProjectPreviewPage(node); assert.equal(released, 2, "already-empty plots are not retained or reprocessed");
+});
+
+
+test("unused source bodies retain complete tooltips but do not create CSS-hidden label nodes", () => {
+  const value = state();
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
+    datasets: [{ datasetId: 1, name: "dsA" }], project: { primaryDatasetId: 1 },
+    ctgs: [{ assemblyCtgId: 1, datasetId: 1, datasetName: "dsA", name: "adopted", totalLength: 1000, assignedChrName: "Chr1", anchorStart: 0 },
+      { assemblyCtgId: 2, datasetId: 1, datasetName: "dsA", name: "unused<complete-name>", totalLength: 800, assignedChrName: "Chr1", anchorStart: 100 }],
+    finalPathByChr: { Chr1: { segments: [{ ...segment, ctgName: "adopted" }] } } });
+  const before = JSON.stringify(card), output = renderProjectPreviewCard(card, getMessages(value, "projectPreview"));
+  assert.equal((output.match(/data-preview-source-length=/g) || []).length, 2, "both complete bodies remain");
+  assert.equal((output.match(/data-preview-source-fit-label=/g) || []).length, 1, "only the adopted source needs a visible label");
+  const context = output.match(/<span class="project-preview-contig is-context"[\s\S]*?<\/span>/)?.[0];
+  assert.match(context, /data-app-tooltip="unused&lt;complete-name&gt;/);
+  assert.match(context, /data-preview-source-length="800"/);
+  assert.doesNotMatch(context, /project-preview-contig-label/);
+  assert.equal(JSON.stringify(card), before);
 });

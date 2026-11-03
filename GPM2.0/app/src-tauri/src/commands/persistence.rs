@@ -80,10 +80,11 @@ pub fn update_runtime_settings(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn get_project_assembly_view_state(
+pub async fn get_project_assembly_view_state(
     workspaceRoot: String,
     projectId: i64,
 ) -> CommandResult<Value> {
+    run_blocking_command("get_project_assembly_view_state",move || {
     (|| {
         let state =
             backend_get_project_assembly_view_state(&project_db_path(&workspaceRoot), projectId)?;
@@ -125,6 +126,8 @@ pub fn get_project_assembly_view_state(
         }))
     })()
     .map_err(format_error)
+
+    }).await
 }
 
 #[tauri::command]

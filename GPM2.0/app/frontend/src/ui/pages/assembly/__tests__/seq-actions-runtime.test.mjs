@@ -85,3 +85,18 @@ test("bindSeqActions routes retained flip hide and end-type actions through inje
   ]);
   assert.equal(removeSeqButton.hasListener("click"), false);
 });
+
+for (const detailState of [{ ctgDetailLoading: true }, { ctgDetailError: "failed", ctgDetail: null }]) {
+  test(`pending or failed details disable sequence actions and guard synthetic clicks: ${JSON.stringify(detailState)}`, async () => {
+    const buttons = [createButton(), createButton(), createButton()];
+    const selectors = ["#flip-seq-button", "#hide-show-seq-button", "#set-end-type-button"];
+    const host = { querySelector: selector => buttons[selectors.indexOf(selector)] || null };
+    const store = { getState: () => ({ assembly: detailState }) };
+    bindSeqActions(host, store, {
+      pickSelectedMember: () => assert.fail("must not use a stale member while detail is unavailable"),
+      applyEditorAction: () => assert.fail("must not submit an edit while detail is unavailable"),
+    });
+    assert.ok(buttons.every(button => button.disabled));
+    for (const button of buttons) await button.click();
+  });
+}

@@ -58,9 +58,15 @@ export async function getContigChrAlignments(payload) {
   return callDevBridge("/api/contig-chr-alignments",payload);
 }
 
-export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false }) {
+// No fabricated fallback: a failed real summary must remain a visible error.
+export async function getProjectOverviewSources({ workspaceRoot, projectId }) {
+  if (isTauriRuntime()) return tauri.getProjectOverviewSources({ workspaceRoot, projectId });
+  return callDevBridge("/api/get-project-overview-sources", { workspaceRoot, projectId });
+}
+
+export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false, previewScope = null }) {
   if (isTauriRuntime()) {
-    return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId, previewOnly });
+    return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId, previewOnly, previewScope });
   }
   try {
     return await callDevBridge("/api/list-chr-view-ctgs", {
@@ -76,9 +82,9 @@ export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datas
   return listChrViewCtgsMock({ workspaceRoot, projectId, chrName, datasetId });
 }
 
-export async function listReferenceTrackMembers({ workspaceRoot, projectId, chrName }) {
+export async function listReferenceTrackMembers({ workspaceRoot, projectId, chrName, deferHits = false, geometryOnly = false }) {
   if (isTauriRuntime()) {
-    return listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName });
+    return listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName, deferHits, geometryOnly });
   }
   try {
     return await callDevBridge("/api/list-reference-track-members", {

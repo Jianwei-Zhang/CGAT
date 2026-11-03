@@ -588,3 +588,16 @@ test("sticky ctg label css defines overlay and hidden-label rules", () => {
   assert.match(css, /\.track-sticky-label\s*\{/);
   assert.match(css, /\.track-ctg-label\.is-sticky-hidden\s*\{[\s\S]*display:\s*none;/);
 });
+
+
+test("Full range gesture owns original labels until restored",()=>{
+ const f=createMainTrackRuntimeFixture(),document=createRuntimeDocument();
+ f.scrollEl.classList.add("is-full-range-drag-preview");
+ bindStickyCtgLabels(f.host,{document});
+ assert.equal(f.scrollEl.querySelectorAll(".track-sticky-label").length,0);
+ assert.equal(f.originalLabel.classList.contains("is-sticky-hidden"),false);
+ f.scrollEl.classList.remove("is-full-range-drag-preview");
+ bindStickyCtgLabels(f.host,{document});
+ assert.equal(f.scrollEl.querySelectorAll(".track-sticky-label").length,1);
+ assert.equal(f.originalLabel.classList.contains("is-sticky-hidden"),true);
+});

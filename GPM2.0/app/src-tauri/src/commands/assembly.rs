@@ -2,25 +2,49 @@ use super::*;
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn list_chr_view_ctgs(
+pub async fn get_project_overview_sources(
+    workspaceRoot: String,
+    projectId: i64,
+) -> CommandResult<Value> {
+    run_blocking_command("get_project_overview_sources", move || {
+        gpm_next_backend::main_view::overview::get_project_overview_sources(
+            &project_db_path(&workspaceRoot),
+            projectId,
+        )
+        .map_err(format_error)
+    })
+    .await
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn list_chr_view_ctgs(
     workspaceRoot: String,
     projectId: i64,
     chrName: Option<String>,
     datasetId: Option<i64>,
     previewOnly: Option<bool>,
+    previewScope: Option<gpm_next_backend::main_view::preview_delta::PreviewSourceScope>,
 ) -> CommandResult<Value> {
-    (|| {
-        let preview_only = previewOnly.unwrap_or(false);
-        let db_path = project_db_path(&workspaceRoot);
-        let items = if preview_only {
-            backend_list_chr_view_ctgs_for_preview(&db_path, projectId)?
-        } else {
-            backend_list_chr_view_ctgs(&db_path, projectId, chrName.as_deref(), datasetId)?
-        };
-        let mapped = items
-            .into_iter()
-            .map(|item| {
-                let hits = item
+    run_blocking_command("list_chr_view_ctgs", move || {
+        (|| {
+            let preview_only = previewOnly.unwrap_or(false);
+            let db_path = project_db_path(&workspaceRoot);
+            let delta = if preview_only {
+                previewScope.as_ref().map(|scope| gpm_next_backend::main_view::preview_delta::read_preview_source_delta(&db_path, projectId, scope)).transpose()?
+            } else { None };
+            let (items, delta_metadata) = if let Some(delta) = delta {
+                let metadata = if delta.full {None} else {Some(json!({"encoding":"preview-source-delta-v1", "sourceSeqIds":delta.source_seq_ids, "orderedCtgIds":delta.ordered_ctg_ids}))};
+                (delta.items, metadata)
+            } else { (if preview_only {
+                backend_list_chr_view_ctgs_for_preview(&db_path, projectId)?
+            } else {
+                backend_list_chr_view_ctgs(&db_path, projectId, chrName.as_deref(), datasetId)?
+            }, None) };
+            let mapped = items
+                .into_iter()
+                .map(|item| {
+                    let hits = item
                     .hits
                     .into_iter()
                     .map(|hit| {
@@ -44,86 +68,92 @@ pub fn list_chr_view_ctgs(
                         })
                     })
                     .collect::<Vec<_>>();
-                let n_regions = item
-                    .n_regions
-                    .into_iter()
-                    .map(|region| {
-                        json!({
-                            "startBp": region.start_bp,
-                            "endBp": region.end_bp,
-                            "lengthBp": region.length_bp,
-                            "ctgStart": region.ctg_start,
-                            "ctgEnd": region.ctg_end
+                    let n_regions = item
+                        .n_regions
+                        .into_iter()
+                        .map(|region| {
+                            json!({
+                                "startBp": region.start_bp,
+                                "endBp": region.end_bp,
+                                "lengthBp": region.length_bp,
+                                "ctgStart": region.ctg_start,
+                                "ctgEnd": region.ctg_end
+                            })
                         })
-                    })
-                    .collect::<Vec<_>>();
-                let telomere_marks = item
-                    .telomere_marks
-                    .into_iter()
-                    .map(|mark| {
-                        json!({
-                            "ruleId": mark.rule_id,
-                            "motif": mark.motif,
-                            "minRepeat": mark.min_repeat,
-                            "repeatCount": mark.repeat_count,
-                            "startBp": mark.start_bp,
-                            "endBp": mark.end_bp,
-                            "strand": mark.strand,
-                            "ctgStart": mark.ctg_start,
-                            "ctgEnd": mark.ctg_end
+                        .collect::<Vec<_>>();
+                    let telomere_marks = item
+                        .telomere_marks
+                        .into_iter()
+                        .map(|mark| {
+                            json!({
+                                "ruleId": mark.rule_id,
+                                "motif": mark.motif,
+                                "minRepeat": mark.min_repeat,
+                                "repeatCount": mark.repeat_count,
+                                "startBp": mark.start_bp,
+                                "endBp": mark.end_bp,
+                                "strand": mark.strand,
+                                "ctgStart": mark.ctg_start,
+                                "ctgEnd": mark.ctg_end
+                            })
                         })
-                    })
-                    .collect::<Vec<_>>();
-                let centromere_marks = item
-                    .centromere_marks
-                    .into_iter()
-                    .map(|mark| {
-                        json!({
-                            "cenId": mark.cen_id,
-                            "queryName": mark.query_name,
-                            "startBp": mark.start_bp,
-                            "endBp": mark.end_bp,
-                            "strand": mark.strand,
-                            "alignLength": mark.align_length,
-                            "identity": mark.identity,
-                            "mapq": mark.mapq,
-                            "ctgStart": mark.ctg_start,
-                            "ctgEnd": mark.ctg_end
+                        .collect::<Vec<_>>();
+                    let centromere_marks = item
+                        .centromere_marks
+                        .into_iter()
+                        .map(|mark| {
+                            json!({
+                                "cenId": mark.cen_id,
+                                "queryName": mark.query_name,
+                                "startBp": mark.start_bp,
+                                "endBp": mark.end_bp,
+                                "strand": mark.strand,
+                                "alignLength": mark.align_length,
+                                "identity": mark.identity,
+                                "mapq": mark.mapq,
+                                "ctgStart": mark.ctg_start,
+                                "ctgEnd": mark.ctg_end
+                            })
                         })
-                    })
-                    .collect::<Vec<_>>();
-                let mut payload = json!({
-                    "assemblyCtgId": item.assembly_ctg_id,
-                    "name": item.name,
-                    "originId": item.origin_id,
-                    "coAssignedChrNames": item.co_assigned_chr_names,
-                    "assignedChrName": item.assigned_chr_name,
-                    "anchorStart": item.anchor_start,
-                    "refOrient": item.ref_orient,
-                    "orient": item.orient,
-                    "memberCount": item.member_count,
-                    "totalLength": item.total_length,
-                    "datasetId": item.dataset_id,
-                    "datasetName": item.dataset_name,
-                    "sourceFragment": item.source_fragment
-                });
-                if !preview_only {
-                    payload["chrOrder"] = json!(item.chr_order);
-                    payload["placementMode"] = json!(item.placement_mode);
-                    payload["derivedSource"] = json!(item.derived_source);
-                    payload["derivedTargetDatasetId"] = json!(item.derived_target_dataset_id);
-                    payload["derivedTargetDatasetName"] = json!(item.derived_target_dataset_name);
-                    payload["hits"] = json!(hits);
-                    payload["nRegions"] = json!(n_regions);
-                    payload["telomereMarks"] = json!(telomere_marks);
-                    payload["centromereMarks"] = json!(centromere_marks);
-                }
-                payload
-            })
-            .collect::<Vec<_>>();
-        Ok(json!({ "items": mapped }))
-    })()
-    .map_err(format_error)
+                        .collect::<Vec<_>>();
+                    let mut payload = json!({
+                        "assemblyCtgId": item.assembly_ctg_id,
+                        "name": item.name,
+                        "originId": item.origin_id,
+                        "coAssignedChrNames": item.co_assigned_chr_names,
+                        "assignedChrName": item.assigned_chr_name,
+                        "anchorStart": item.anchor_start,
+                        "refOrient": item.ref_orient,
+                        "orient": item.orient,
+                        "memberCount": item.member_count,
+                        "totalLength": item.total_length,
+                        "datasetId": item.dataset_id,
+                        "datasetName": item.dataset_name,
+                        "sourceFragment": item.source_fragment
+                    });
+                    if preview_only { payload["originSourceSeqId"] = json!(item.origin_source_seq_id); }
+                    if !preview_only {
+                        payload["chrOrder"] = json!(item.chr_order);
+                        payload["placementMode"] = json!(item.placement_mode);
+                        payload["derivedSource"] = json!(item.derived_source);
+                        payload["derivedTargetDatasetId"] = json!(item.derived_target_dataset_id);
+                        payload["derivedTargetDatasetName"] =
+                            json!(item.derived_target_dataset_name);
+                        payload["hits"] = json!(hits);
+                        payload["nRegions"] = json!(n_regions);
+                        payload["telomereMarks"] = json!(telomere_marks);
+                        payload["centromereMarks"] = json!(centromere_marks);
+                    }
+                    payload
+                })
+                .collect::<Vec<_>>();
+            let mut result = json!({ "items": mapped });
+            if let Some(metadata) = delta_metadata { result["delta"] = metadata; }
+            Ok(result)
+        })()
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -174,6 +204,7 @@ pub fn list_deleted_ctgs(
 #[serde(untagged)]
 pub enum ReferenceTrackResponse {
     Compact(gpm_next_backend::main_view::reference_transport::CompactReferenceTracks),
+    Packed(gpm_next_backend::main_view::reference_transport::packed::PackedReferenceTracks),
     Legacy(Value),
 }
 
@@ -184,13 +215,32 @@ pub async fn list_reference_track_members(
     projectId: i64,
     chrName: String,
     compact: Option<bool>,
+    encoding: Option<String>,
 ) -> CommandResult<ReferenceTrackResponse> {
     tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<ReferenceTrackResponse> {
+        if encoding.as_deref() == Some(gpm_next_backend::main_view::reference_transport::GEOMETRY_ENCODING) {
+            let items = gpm_next_backend::main_view::list_reference_track_geometry(
+                &project_db_path(&workspaceRoot), projectId, &chrName,
+            )?;
+            return Ok(ReferenceTrackResponse::Legacy(
+                gpm_next_backend::main_view::reference_transport::reference_track_geometry(items),
+            ));
+        }
+        if let Some(value) = encoding.as_deref()
+            && value != gpm_next_backend::main_view::reference_transport::packed::ENCODING
+        {
+            anyhow::bail!("unsupported reference evidence encoding: {value}");
+        }
         let items = backend_list_reference_track_members(
             &project_db_path(&workspaceRoot),
             projectId,
             &chrName,
         )?;
+        if encoding.is_some() {
+            return Ok(ReferenceTrackResponse::Packed(
+                gpm_next_backend::main_view::reference_transport::packed::pack_reference_track_members(items),
+            ));
+        }
         if compact.unwrap_or(false) {
             return Ok(ReferenceTrackResponse::Compact(
                 gpm_next_backend::main_view::reference_transport::compact_reference_track_members(
@@ -247,29 +297,32 @@ pub async fn list_reference_track_members(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn list_phased_chr_tracks(
+pub async fn list_phased_chr_tracks(
     workspaceRoot: String,
     projectId: i64,
     parentChrName: String,
 ) -> CommandResult<Value> {
-    (|| {
-        let result = backend_list_phased_chr_tracks(
-            &project_db_path(&workspaceRoot),
-            projectId,
-            &parentChrName,
-        )?;
-        let tracks = result
-            .tracks
-            .into_iter()
-            .map(map_phased_track)
-            .collect::<Vec<_>>();
-        Ok(json!({
-            "projectId": result.project_id,
-            "parentChrName": result.parent_chr_name,
-            "tracks": tracks
-        }))
-    })()
-    .map_err(format_error)
+    run_blocking_command("list_phased_chr_tracks", move || {
+        (|| {
+            let result = backend_list_phased_chr_tracks(
+                &project_db_path(&workspaceRoot),
+                projectId,
+                &parentChrName,
+            )?;
+            let tracks = result
+                .tracks
+                .into_iter()
+                .map(map_phased_track)
+                .collect::<Vec<_>>();
+            Ok(json!({
+                "projectId": result.project_id,
+                "parentChrName": result.parent_chr_name,
+                "tracks": tracks
+            }))
+        })()
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -1002,4 +1055,66 @@ pub async fn get_contig_chr_alignments(
     .await
     .map_err(|err| format!("get_contig_chr_alignments join error: {err}"))?
     .map_err(format_error)
+}
+
+#[cfg(test)]
+mod reference_transport_tests {
+    use super::*;
+
+    #[test]
+    fn reference_response_encodings_remain_untagged_and_backward_compatible() {
+        let old = ReferenceTrackResponse::Compact(
+            gpm_next_backend::main_view::reference_transport::compact_reference_track_members(
+                vec![],
+            ),
+        );
+        let packed = ReferenceTrackResponse::Packed(
+            gpm_next_backend::main_view::reference_transport::packed::pack_reference_track_members(
+                vec![],
+            ),
+        );
+        let legacy = ReferenceTrackResponse::Legacy(json!({"items":[]}));
+        assert_eq!(
+            serde_json::to_value(old).unwrap(),
+            json!({"encoding":"reference-hits-v1","items":[]})
+        );
+        assert_eq!(
+            serde_json::to_value(packed).unwrap(),
+            json!({"encoding":"reference-hits-v2","items":[]})
+        );
+        assert_eq!(serde_json::to_value(legacy).unwrap(), json!({"items":[]}));
+    }
+
+    #[test]
+    fn unsupported_reference_encoding_is_rejected_before_workspace_access() {
+        let root = std::env::temp_dir().join(format!(
+            "gpm-invalid-ref-encoding-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert!(!root.exists());
+        let result = tauri::async_runtime::block_on(list_reference_track_members(
+            root.to_string_lossy().into_owned(),
+            1,
+            "chr1".into(),
+            Some(true),
+            Some("unknown".into()),
+        ));
+        let error = match result {
+            Err(error) => error,
+            Ok(_) => panic!("unknown encoding was accepted"),
+        };
+        assert!(
+            error
+                .message
+                .contains("unsupported reference evidence encoding")
+        );
+        assert!(
+            !root.exists(),
+            "invalid negotiation must not open/migrate/create a workspace"
+        );
+    }
 }

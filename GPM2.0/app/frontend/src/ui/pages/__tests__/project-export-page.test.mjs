@@ -11,6 +11,10 @@ import { readStylesheetTree } from "../../../styles/__tests__/style-test-support
 
 const componentsCss = readStylesheetTree(new URL("../../../styles/components.css", import.meta.url));
 
+function overviewSources({ items = [], ...counts } = {}, ctgs = [], primaryCtgIds = [], phasedChrTracksByChr = {}) {
+  return { ...counts, chromosomes: items, ctgs, primaryCtgIds, phasedChrTracksByChr };
+}
+
 function renderLoadedPathOverview(state) {
   return renderProjectPathOverview({ ...state, projectExport: { ...state.projectExport,
     loaded: true, workspacePath: state.session.workspacePath, mutationStamp: previewMutationStamp({ workspaceRoot: state.session.workspacePath, projectId: state.session.projectId }) } });
@@ -357,8 +361,7 @@ test("loadProjectExportData clears previous project results before loading curre
   };
 
   const loading = __test.loadProjectExportData(host, store, {
-    listProjectChromosomes: async () => chromosomePromise,
-    listChrViewCtgs: async () => ({ items: [] }),
+    getProjectOverviewSources: async () => chromosomePromise,
     getProjectAssemblyViewState: async () => ({
       finalPathByChr: {},
       hiddenPrimaryCtgIds: [],
@@ -373,7 +376,7 @@ test("loadProjectExportData clears previous project results before loading curre
   assert.deepEqual(state.projectExport.chromosomes, []);
   assert.deepEqual(state.projectExport.primaryCtgsByChr, {});
 
-  resolveChromosomes({ items: [], unplacedCtgCount: 0, unplacedBp: 0 });
+  resolveChromosomes(overviewSources({ items: [], unplacedCtgCount: 0, unplacedBp: 0 }));
   assert.equal(await loading, true);
 });
 
@@ -399,7 +402,7 @@ test("project export load failure settles with an error and explicit refresh", a
   };
 
   const loaded = await __test.loadProjectExportData(host, store, {
-    listProjectChromosomes: async () => {
+    getProjectOverviewSources: async () => {
       throw new Error("workspace missing project.sqlite");
     },
   });
@@ -455,12 +458,9 @@ test("project export loading canonicalizes persisted LGZ overallLen from the pro
   };
 
   const loaded = await __test.loadProjectExportData(host, store, {
-    listProjectChromosomes: async () => ({
-      items: [{ chrName: "Chr01" }],
-      unplacedCtgCount: 0,
-      unplacedBp: 0,
+    getProjectOverviewSources: async () => overviewSources({
+      items: [{ chrName: "Chr01" }], unplacedCtgCount: 0, unplacedBp: 0,
     }),
-    listChrViewCtgs: async () => ({ items: [] }),
     getProjectAssemblyViewState: async () => ({
       finalPathByChr: {
         Chr01: {
@@ -574,10 +574,7 @@ test("loadProjectExportData ignores late responses after switching projects", as
   };
 
   const loading = __test.loadProjectExportData(host, store, {
-    listProjectChromosomes: async () => chromosomePromise,
-    listChrViewCtgs: async () => ({
-      items: [{ assemblyCtgId: 1, name: "old_project_ctg", totalLength: 100 }],
-    }),
+    getProjectOverviewSources: async () => chromosomePromise,
     getProjectAssemblyViewState: async () => ({
       finalPathByChr: {
         ChrOld: {
@@ -607,7 +604,7 @@ test("loadProjectExportData ignores late responses after switching projects", as
     },
   };
 
-  resolveChromosomes({ items: [{ chrName: "ChrOld" }], unplacedCtgCount: 0, unplacedBp: 0 });
+  resolveChromosomes(overviewSources({ items: [{ chrName: "ChrOld" }], unplacedCtgCount: 0, unplacedBp: 0 }));
 
   assert.equal(await loading, false);
   assert.equal(state.session.projectId, 8);
@@ -1189,22 +1186,15 @@ test("project export loading fetches phased tracks for every parent chromosome",
   };
 
   const loaded = await __test.loadProjectExportData(host, store, {
-    listProjectChromosomes: async () => ({
-      items: [{ chrName: "Chr01" }, { chrName: "Chr02" }],
-      unplacedCtgCount: 0,
-      unplacedBp: 0,
-    }),
-    listChrViewCtgs: async ({ chrName }) => ({
-      items: [{ assemblyCtgId: chrName === "Chr01" ? 1 : 2, name: `${chrName}_ptg`, totalLength: 100 }],
-    }),
-    listPhasedChrTracks: async ({ parentChrName }) => ({
-      tracks: parentChrName === "Chr01"
-        ? [
-          { phasedTrackId: 101, haplotypeKey: "A", label: "Chr01A", displayOrder: 1 },
-          { phasedTrackId: 102, haplotypeKey: "B", label: "Chr01B", displayOrder: 2 },
-        ]
-        : [],
-    }),
+    getProjectOverviewSources: async () => overviewSources({
+      items: [{ chrName: "Chr01" }, { chrName: "Chr02" }], unplacedCtgCount: 0, unplacedBp: 0,
+    }, [
+      { assemblyCtgId: 1, assignedChrName: "Chr01", name: "Chr01_ptg", totalLength: 100 },
+      { assemblyCtgId: 2, assignedChrName: "Chr02", name: "Chr02_ptg", totalLength: 100 },
+    ], [1, 2], { Chr01: [
+      { phasedTrackId: 101, haplotypeKey: "A", label: "Chr01A", displayOrder: 1 },
+      { phasedTrackId: 102, haplotypeKey: "B", label: "Chr01B", displayOrder: 2 },
+    ] }),
     getProjectAssemblyViewState: async () => ({
       finalPathByChr: {
         Chr01: {
@@ -2021,7 +2011,7 @@ function exportHarness(initial = createState()) {
     subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); } };
   return { host, store, get paints() { return paints; }, get subscriptions() { return listeners.size; } };
 }
-const exportDataDeps = paths => ({ listProjectChromosomes: async () => ({ items: [] }),
+const exportDataDeps = paths => ({ getProjectOverviewSources: async () => overviewSources(),
   getProjectAssemblyViewState: async () => ({ finalPathByChr: paths }), getGrtProjectView: async () => ({}) });
 
 test("background export completes its original snapshot without overwriting another project's job, and restores its result on return", async () => {
@@ -2060,12 +2050,12 @@ test("project data generations reject obsolete success/failure after A-B-A, with
   for (const fail of [false, true]) {
     const h = exportHarness(), original = h.store.getState(), firstList = exportDeferred();
     const first = __test.loadProjectExportData(h.host, h.store, { ...exportDataDeps({ Old: { chrName: "Old", segments: [] } }),
-      listProjectChromosomes: () => firstList.promise });
+      getProjectOverviewSources: () => firstList.promise });
     h.store.setState({ session: { workspacePath: "/b", projectId: 8 } });
     h.store.setState({ ...original, projectExport: { projectId: null, loaded: false } });
     const second = __test.loadProjectExportData(h.host, h.store, exportDataDeps({ Fresh: { chrName: "Fresh", mode: "segments", segments: [] } }));
     assert.equal(await second, true); const current = h.store.getState(), paints = h.paints;
-    if (fail) firstList.reject(Error("obsolete failure")); else firstList.resolve({ items: [] });
+    if (fail) firstList.reject(Error("obsolete failure")); else firstList.resolve(overviewSources());
     assert.equal(await first, false); assert.equal(h.store.getState(), current); assert.equal(h.paints, paints);
     assert.equal(current.projectExport.error, ""); assert.equal(current.projectExport.finalPathByChr.Old, undefined);
     assert.ok(current.projectExport.finalPathByChr.Fresh);
@@ -2091,7 +2081,7 @@ test("Project preload invalidates after bootstrap/content mutation and reloads r
   let reads = 0;
   const root = { addEventListener() {}, querySelectorAll: () => [], querySelector: selector => selector === "[data-project-path-overview]"
     ? { dataset: { projectPathOverview: JSON.stringify(["/tmp/ws", 7]) } } : null };
-  bindProjectPathOverview(root, h.store, { ...exportDataDeps(freshOverviewPaths()), listProjectChromosomes: async () => { reads++; return { items: [] }; } });
+  bindProjectPathOverview(root, h.store, { ...exportDataDeps(freshOverviewPaths()), getProjectOverviewSources: async () => { reads++; return overviewSources(); } });
   for (let i = 0; i < 30 && h.store.getState().projectExport.loading; i++) await new Promise(resolve => setImmediate(resolve));
   const data = h.store.getState().projectExport;
   assert.equal(reads, 1); assert.equal(data.loaded, true); assert.equal(data.job, job);
@@ -2116,10 +2106,10 @@ test("data responses spanning a content mutation are discarded and retried befor
   };
   let reads = 0, views = 0;
   const loading = __test.loadProjectExportData(h.host, h.store, { ...exportDataDeps({}),
-    listProjectChromosomes: async () => { reads++; return reads === 1 ? first.promise : { items: [] }; },
+    getProjectOverviewSources: async () => { reads++; return reads === 1 ? first.promise : overviewSources(); },
     getProjectAssemblyViewState: async () => ({ finalPathByChr: ++views === 1 ? { Old: { chrName: "Old", segments: [] } } : freshOverviewPaths() }),
   });
-  mutateProjectData(h.store, "auto_assign_chr"); first.resolve({ items: [] });
+  mutateProjectData(h.store, "auto_assign_chr"); first.resolve(overviewSources());
   assert.equal(await loading, true); assert.equal(reads, 2);
   assert.deepEqual(published, [["Fresh"]]);
   assert.equal(h.store.getState().projectExport.finalPathByChr.Old, undefined);
@@ -2128,7 +2118,7 @@ test("data responses spanning a content mutation are discarded and retried befor
 test("continuous content mutation settles with a bounded retry/error and can be explicitly refreshed", async () => {
   const h = exportHarness(); let reads = 0;
   assert.equal(await __test.loadProjectExportData(h.host, h.store, { ...exportDataDeps(freshOverviewPaths()),
-    listProjectChromosomes: async () => { reads++; mutateProjectData(h.store, "auto_orient_contigs"); return { items: [] }; },
+    getProjectOverviewSources: async () => { reads++; mutateProjectData(h.store, "auto_orient_contigs"); return overviewSources(); },
   }), false);
   assert.equal(reads, 3); assert.equal(h.store.getState().projectExport.loading, false);
   assert.match(h.store.getState().projectExport.error, /项目内容发生变化/);
@@ -2140,7 +2130,7 @@ test("export entry requires the same content freshness as the composite surface,
   const h = exportHarness(); mutateProjectData(h.store, "run_ctg_editor_action");
   let reads = 0; const outputs = [];
   const result = await __test.runProjectExport(h.host, h.store, "tsv", { ...exportDataDeps(freshOverviewPaths()),
-    listProjectChromosomes: async () => { reads++; return { items: [] }; },
+    getProjectOverviewSources: async () => { reads++; return overviewSources(); },
     resolveProjectExportTarget: async () => "/output/fresh.tsv",
     writeFinalPathExportTextFile: async payload => outputs.push(payload.text),
   });
@@ -2256,4 +2246,33 @@ test("Overview image download is borderless, Export-height and has enabled hover
   assert.match(componentsCss, /\.project-export-head \.project-preview-download:hover:not\(:disabled\)\s*\{[^}]*background:[^}]*color:/);
   assert.match(componentsCss, /\.project-export-head \.project-preview-download:active:not\(:disabled\)\s*\{/);
   assert.match(componentsCss, /\.project-export-head \.project-preview-download:focus-visible\s*\{[^}]*outline:\s*2px solid/);
+});
+
+
+test("overview loads one shared summary and never asks for per-chromosome Assembly evidence", async () => {
+  const h = exportHarness();
+  const calls = [];
+  const oldEvidence = () => assert.fail("Overview must not request full Assembly evidence");
+  const sources = overviewSources({ items: Array.from({ length: 10 }, (_, i) => ({ chrName: `Chr${i + 1}` })) }, [
+    { assemblyCtgId: 41, assignedChrName: "Chr1", datasetId: 2, derivedTargetDatasetId: 1, name: "derived", totalLength: 100 },
+  ], [41]);
+  assert.equal(await __test.loadProjectExportData(h.host, h.store, {
+    getProjectOverviewSources: async args => { calls.push(["sources", args]); return sources; },
+    getProjectAssemblyViewState: async args => { calls.push(["view", args]); return { finalPathByChr: {} }; },
+    getGrtProjectView: async args => { calls.push(["baseline", args]); return {}; },
+    listProjectChromosomes: oldEvidence, listChrViewCtgs: oldEvidence, listPhasedChrTracks: oldEvidence,
+  }), true);
+  assert.deepEqual(calls.map(([name]) => name), ["sources", "view", "baseline"]);
+  assert.equal(h.store.getState().projectExport.ctgsByChr.Chr1[0], sources.ctgs[0]);
+  assert.equal(h.store.getState().projectExport.primaryCtgsByChr.Chr1[0], sources.ctgs[0]);
+});
+
+test("invalid summary responses settle with an error rather than exposing empty overview data", async () => {
+  const h = exportHarness();
+  assert.equal(await __test.loadProjectExportData(h.host, h.store, {
+    getProjectOverviewSources: async () => ({ items: [] }),
+  }), false);
+  assert.equal(h.store.getState().projectExport.loaded, false);
+  assert.equal(h.store.getState().projectExport.loading, false);
+  assert.match(h.store.getState().projectExport.error, /Invalid project overview source payload/);
 });

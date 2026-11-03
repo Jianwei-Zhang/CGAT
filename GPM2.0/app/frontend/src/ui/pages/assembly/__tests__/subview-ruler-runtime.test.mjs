@@ -180,3 +180,15 @@ test("very fine manual ticks are sampled across the viewport and labels do not c
   assert.equal(ticks.at(-1).showLabel, true);
   assert.ok(ticks.filter(tick => tick.showLabel).length <= 2);
 });
+
+
+test("scroll callbacks do not overwrite the Full range gesture ruler",()=>{
+ const f=createRulerFixture(),original=globalThis.requestAnimationFrame;
+ let active=false;f.scrollNode.classList={contains:key=>active&&key==="is-full-range-drag-preview"};
+ globalThis.requestAnimationFrame=callback=>{callback();return 1;};
+ try{
+  bindSubviewRulerRuntime(f.host);active=true;f.layer.innerHTML="gesture-owned ruler";
+  f.listeners.get("scroll")();assert.equal(f.layer.innerHTML,"gesture-owned ruler");
+  active=false;bindSubviewRulerRuntime(f.host);assert.notEqual(f.layer.innerHTML,"gesture-owned ruler");
+ }finally{globalThis.requestAnimationFrame=original;}
+});

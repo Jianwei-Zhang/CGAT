@@ -1,3 +1,5 @@
+import { hasDeferredReferenceHits } from "../../../services/workflow/reference-evidence.js";
+import { hydrateAssemblyCtgDetail, restoreAssemblyLocalEvidence } from "./assembly-ready-stages.js";
 import { beginAssemblyViewRequest, currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { reconcileLocalSubviewWithMain } from "./subview-fragment-reconcile.js";
 function normalizeFinalPathViewMode(value) {
@@ -213,7 +215,7 @@ function normalizeReferenceTrackMembers(items) {
       lengthBp: Math.max(1, Number(item?.lengthBp || item?.totalLength || (segmentEndBp - segmentStartBp + 1))),
       startBp: segmentStartBp,
       endBp: segmentEndBp,
-      hits: Array.isArray(item?.hits) ? item.hits.map((hit) => ({ ...hit })) : [],
+      ...(hasDeferredReferenceHits(item) ? {} : { hits: Array.isArray(item?.hits) ? item.hits.map((hit) => ({ ...hit })) : [] }),
     };
   });
 }
@@ -302,7 +304,7 @@ async function listReferenceTrackMembersOrEmpty(deps, args) {
     return { items: [] };
   }
   try {
-    const result = await deps.listReferenceTrackMembers(args);
+    const result = await deps.listReferenceTrackMembers({ ...args, deferHits: true, geometryOnly: true });
     return {
       items: normalizeReferenceTrackMembers(result?.items),
     };
@@ -395,7 +397,8 @@ export async function loadAssemblyView(host, store, options, deps) {
     const current = store.getState();
     return currentAssemblyViewRequest(store) === request
       && current.session.workspacePath === state.session.workspacePath
-      && current.session.projectId === state.session.projectId;
+      && current.session.projectId === state.session.projectId
+      && current.activeRoute === state.activeRoute;
   };
   if (renderLoading) {
     store.setState({
@@ -517,7 +520,7 @@ export async function loadAssemblyView(host, store, options, deps) {
             projectArgs.workspaceRoot, projectArgs.projectId, selectedChrName, primaryDatasetId,
           ))
         : [],
-      primaryPromise.then((result) => isCurrentRequest()
+      primaryPromise.then((result) => !renderResult && isCurrentRequest()
         ? deps.loadSideDataForCtg(projectArgs.workspaceRoot, projectArgs.projectId,
             resolveSelectedCtgId(result.items, state.assembly.selectedCtgId, keepCurrentCtg))
         : createEmptySideData()),
@@ -675,6 +678,9 @@ export async function loadAssemblyView(host, store, options, deps) {
         finalPathTrackScrollState: persistedFinalPathTrackScrollState,
         selectedCtgId,
         ctgDetail: sideData.detail,
+        ctgDetailLoading: renderResult && Boolean(selectedCtgId),
+        ctgDetailError: "",
+        subviewRestoring: false, subviewRestoringSummary: null, subviewRestoreError: "",
         editCandidates: sideData.candidates,
         selectedMemberSeqId,
         subview: {
@@ -696,15 +702,18 @@ export async function loadAssemblyView(host, store, options, deps) {
       if (activated?.assembly) store.setState({ assembly: activated.assembly });
     }
     store.setState({ assembly: reconcileLocalSubviewWithMain(store.getState().assembly) });
-    // Persisted Local View history contains editable geometry, not runtime
-    // pairwise hits. Restore those hits after the history and backing IDs are
-    // hydrated, before the first non-loading render (including dev restarts).
-    // Silent mutation callers refresh after installing their transaction state.
-    if (renderResult && store.getState().assembly.subview?.summary) {
-      await deps.refreshSubviewPairwiseEvidence?.(host, store, {
-        rerenderLoading: false, rerenderLoaded: false,
-      });
+    if (renderResult) {
+      const restoring = Boolean(store.getState().assembly.subview?.summary && deps.refreshSubviewPairwiseEvidence);
+      store.setState({ assembly: { ...store.getState().assembly, subviewRestoring: restoring, subviewRestoringSummary: store.getState().assembly.subview?.summary } });
       if (!isCurrentRequest()) return;
+      // The Main evidence/identity/history barrier is complete. Render it once,
+      // but never expose a persisted Local graph as if runtime hits were ready.
+      deps.rerender(host, store);
+      await Promise.all([
+        hydrateAssemblyCtgDetail(host, store, deps, { afterPaint: true }),
+        restoring ? restoreAssemblyLocalEvidence(host, store, deps, { afterPaint: true }) : null,
+      ]);
+      return;
     }
   } catch (error) {
     if (!isCurrentRequest()) return;
@@ -713,6 +722,8 @@ export async function loadAssemblyView(host, store, options, deps) {
       assembly: {
         ...store.getState().assembly,
         loading: false,
+        ctgDetailLoading: false, ctgDetailError: "",
+        subviewRestoring: false, subviewRestoringSummary: null, subviewRestoreError: "",
         supportChrCtgs: [],
         refTrackMembers: [],
         phasedChrTracks: [],
@@ -760,7 +771,8 @@ export async function selectChromosome(host, store, chrName, deps) {
     return currentAssemblyViewRequest(store) === request
       && current.session.workspacePath === state.session.workspacePath
       && current.session.projectId === state.session.projectId
-      && current.assembly.selectedChrName === chrName;
+      && current.assembly.selectedChrName === chrName
+      && current.activeRoute === state.activeRoute;
   };
   const hiddenPrimaryCtgIdsByChr = normalizeHiddenPrimaryCtgIdsByChr(
     state.assembly.hiddenPrimaryCtgIdsByChr,
@@ -791,7 +803,8 @@ export async function selectChromosome(host, store, chrName, deps) {
       subviewCompositionCandidatesLoaded: false,
       selectedCtgId: null,
       selectedMemberSeqId: null,
-      ctgDetail: null,
+      ctgDetail: null, ctgDetailLoading: false, ctgDetailError: "",
+      subviewRestoring: false, subviewRestoringSummary: null, subviewRestoreError: "",
       editCandidates: createEmptySideData().candidates,
       subview: deps.buildClearedSubviewState(state.assembly),
       summary: tAssembly(state, "runtime.loadChrSummary", { chrName }),
@@ -808,8 +821,8 @@ export async function selectChromosome(host, store, chrName, deps) {
       projectId: state.session.projectId,
       chrName,
     };
-    // These reads are independent. Only phased-track normalization and ctg
-    // details need the primary contigs, so do not serialize every IPC call.
+    // Required chromosome reads are independent. Phased normalization follows
+    // primary loading; selected details now belong to the post-paint stage.
     const primaryPromise = Promise.resolve().then(() => deps.listChrViewCtgs({
       ...args,
       datasetId: primaryDatasetId,
@@ -838,12 +851,7 @@ export async function selectChromosome(host, store, chrName, deps) {
       Promise.resolve().then(() => deps.loadDeletedCtgsForChr(
         args.workspaceRoot, args.projectId, chrName, primaryDatasetId,
       )),
-      primaryPromise.then((result) => isCurrentRequest()
-        ? deps.loadSideDataForCtg(
-            args.workspaceRoot, args.projectId,
-            resolveSelectedCtgId(result.items, null, false),
-          )
-        : createEmptySideData()),
+      createEmptySideData(),
     ]);
     if (!isCurrentRequest()) return;
     const mainViewHistory = normalizeMainViewHistoryStatus(historyResult, { chrName });
@@ -911,7 +919,7 @@ export async function selectChromosome(host, store, chrName, deps) {
         hiddenPrimaryCtgIdsByChr,
         subviewTrackDragOffsets: [],
         selectedCtgId,
-        ctgDetail: sideData.detail,
+        ctgDetail: sideData.detail, ctgDetailLoading: Boolean(selectedCtgId), ctgDetailError: "",
         editCandidates: sideData.candidates,
         selectedMemberSeqId: resolveSelectedMemberSeqId(sideData.detail, null),
         subview: deps.buildClearedSubviewState(state.assembly),
@@ -926,16 +934,16 @@ export async function selectChromosome(host, store, chrName, deps) {
       });
       if (activated?.assembly) store.setState({ assembly: activated.assembly });
     }
-    // Pairwise hits are runtime data keyed by the Local View members. The
-    // cleared subview keeps the previous chromosome's hits, so reconcile them
-    // with the restored target history before the ready render; otherwise the
-    // old "loaded" hits project onto nothing and no band or status is shown.
-    if (typeof deps.refreshSubviewPairwiseEvidence === "function") {
-      await deps.refreshSubviewPairwiseEvidence(host, store, {
-        rerenderLoading: false, rerenderLoaded: false,
-      });
-      if (!isCurrentRequest()) return;
-    }
+    store.setState({ assembly: reconcileLocalSubviewWithMain(store.getState().assembly) });
+    const restoring = Boolean(store.getState().assembly.subview?.summary && deps.refreshSubviewPairwiseEvidence);
+    store.setState({ assembly: { ...store.getState().assembly, subviewRestoring: restoring, subviewRestoringSummary: store.getState().assembly.subview?.summary } });
+    if (!isCurrentRequest()) return;
+    deps.rerender(host, store);
+    await Promise.all([
+      hydrateAssemblyCtgDetail(host, store, deps, { afterPaint: true }),
+      restoring ? restoreAssemblyLocalEvidence(host, store, deps, { afterPaint: true }) : null,
+    ]);
+    return;
   } catch (error) {
     if (!isCurrentRequest()) {
       return;
@@ -945,6 +953,8 @@ export async function selectChromosome(host, store, chrName, deps) {
       assembly: {
         ...store.getState().assembly,
         loading: false,
+        ctgDetailLoading: false, ctgDetailError: "",
+        subviewRestoring: false, subviewRestoringSummary: null, subviewRestoreError: "",
         supportChrCtgs: [],
         refTrackMembers: [],
         phasedChrTracks: [],
@@ -960,8 +970,6 @@ export async function selectChromosome(host, store, chrName, deps) {
   deps.rerender(host, store);
 }
 
-const contigDetailRequests = new WeakMap();
-
 export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) {
   assertDataRuntimeDeps(deps, [
     "loadSideDataForCtg",
@@ -971,26 +979,14 @@ export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) 
     "setPendingTrackAutoFocusMode",
   ]);
   const state = store.getState();
+  if (!Number.isSafeInteger(assemblyCtgId) || assemblyCtgId <= 0) return;
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
   }
   // Member selection is a paint/detail operation, not an Assembly reload. Keep
   // the mounted plots, popovers, focus and viewport while side data is pending.
-  const quiet = options.quiet === true && typeof deps.patchSelection === "function";
+  const quiet = options.quiet !== false && typeof deps.patchSelection === "function";
   if (quiet && state.assembly.loading) return;
-  const request = {};
-  contigDetailRequests.set(store, request);
-  const viewRequest = currentAssemblyViewRequest(store);
-  const isCurrentRequest = () => {
-    const current = store.getState();
-    return contigDetailRequests.get(store) === request
-      && currentAssemblyViewRequest(store) === viewRequest
-      && current.session?.workspacePath === state.session.workspacePath
-      && current.session?.projectId === state.session.projectId
-      && current.activeRoute === state.activeRoute
-      && current.assembly?.selectedChrName === state.assembly.selectedChrName
-      && current.assembly?.selectedCtgId === assemblyCtgId;
-  };
   deps.setPendingTrackAutoFocusMode(
     options?.preserveViewport === true
       ? null
@@ -1007,7 +1003,7 @@ export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) 
       selectedCtgId: assemblyCtgId,
       trackSelectedCtgIds: [],
       selectedDeletedCtgRecordIds: [],
-      ctgDetail: null,
+      ctgDetail: null, ctgDetailLoading: Boolean(assemblyCtgId), ctgDetailError: "",
       editCandidates: createEmptySideData().candidates,
       selectedMemberSeqId: null,
       summary: tAssembly(state, "runtime.loadCtgDetailSummary", { assemblyCtgId }),
@@ -1015,37 +1011,16 @@ export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) 
   });
   refresh(true);
 
-  try {
-    const sideData = await deps.loadSideDataForCtg(
-      state.session.workspacePath,
-      state.session.projectId,
-      assemblyCtgId,
-    );
-    if (!isCurrentRequest()) return;
-    store.setState({
-      assembly: {
-        ...store.getState().assembly,
-        loading: false,
-        ctgDetail: sideData.detail,
-        editCandidates: sideData.candidates,
-        selectedMemberSeqId: resolveSelectedMemberSeqId(sideData.detail, null),
-        summary: tAssembly(store.getState(), "runtime.ctgDetailLoadedSummary", { assemblyCtgId }),
-      },
-    });
-  } catch (error) {
-    if (!isCurrentRequest()) return;
-    const mappedError = deps.mapAssemblyError({ error, stateOrLocale: store.getState() });
-    store.setState({
-      assembly: {
-        ...store.getState().assembly,
-        loading: false,
-        error: mappedError.userMessage,
-        summary: tAssembly(store.getState(), "runtime.ctgDetailLoadFailedSummary", { assemblyCtgId }),
-      },
-    });
-  }
-
-  refresh();
+  await hydrateAssemblyCtgDetail(host, store, {
+    ...deps, patchSelection: () => {
+      const latest = store.getState();
+      store.setState({ assembly: { ...latest.assembly, loading: false,
+        summary: tAssembly(latest, latest.assembly.ctgDetailError
+          ? "runtime.ctgDetailLoadFailedSummary" : "runtime.ctgDetailLoadedSummary", { assemblyCtgId }),
+      } });
+      refresh();
+    },
+  });
 }
 
 export async function runCtgSearch(host, store, rawKeyword, deps) {
@@ -1104,33 +1079,12 @@ export async function runCtgSearch(host, store, rawKeyword, deps) {
 }
 
 export async function loadSideDataForCtg(workspaceRoot, projectId, assemblyCtgId, deps) {
-  assertDataRuntimeDeps(deps, [
-    "getCtgDetail",
-    "listCtgEditCandidates",
-  ]);
-  if (!assemblyCtgId) {
-    return createEmptySideData();
-  }
-
-  const detail = await deps.getCtgDetail({
-    workspaceRoot,
-    projectId,
-    assemblyCtgId,
-  });
-
-  try {
-    const candidates = await deps.listCtgEditCandidates({
-      workspaceRoot,
-      projectId,
-      assemblyCtgId,
-    });
-    return { detail, candidates };
-  } catch {
-    return {
-      detail,
-      candidates: createEmptySideData().candidates,
-    };
-  }
+  assertDataRuntimeDeps(deps, ["getCtgDetail"]);
+  if (!assemblyCtgId) return createEmptySideData();
+  const detail = await deps.getCtgDetail({ workspaceRoot, projectId, assemblyCtgId });
+  // No UI consumes editCandidates. Actual Local composition pickers already
+  // load their own full catalog on opening; do not prefetch every move target.
+  return { detail, candidates: createEmptySideData().candidates };
 }
 
 export async function loadDatasetChrCtgs(workspaceRoot, projectId, chrName, datasetId, deps) {
