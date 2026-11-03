@@ -235,3 +235,49 @@ test("destroy cancels both idle and pending blur callbacks", () => {
   h.registry.get("alignmentLength").destroy(); h.clock.tick(2000);
   assert.deepEqual(h.commits, []); assert.equal(h.registry.size, 0);
 });
+
+
+test("auxiliary length input color follows positive drafts, presets, zero, Escape and invalid restoration", () => {
+  const h = setup({ field: "supportDsCtgLen", initial: 0 });
+  const isRed = () => h.input.attributes["data-track-nonzero"];
+  h.input.focus();
+  assert.equal(isRed(), "false");
+  h.edit("12345");
+  assert.equal(isRed(), "true", "custom positive drafts turn red before idle commit");
+  h.edit("0");
+  assert.equal(isRed(), "false");
+  h.edit("000");
+  assert.equal(isRed(), "false", "zero with leading zeros is still zero");
+  h.edit("500");
+  h.input.emit("keydown", { key: "Escape" });
+  assert.equal(h.input.value, "0");
+  assert.equal(isRed(), "false");
+  h.option.emit("pointerdown");
+  assert.equal(h.input.value, "50000");
+  assert.equal(isRed(), "true");
+  h.edit("");
+  assert.equal(isRed(), "false");
+  h.input.emit("keydown", { key: "Enter" });
+  assert.equal(h.input.value, "50000");
+  assert.equal(isRed(), "true", "invalid submission restores both the value and its color");
+  h.edit("0");
+  h.input.emit("keydown", { key: "Enter" });
+  assert.equal(isRed(), "false");
+  assert.deepEqual(h.commits, [50000, 0]);
+});
+
+test("positive auxiliary length remains highlighted after toolbar refresh; other numeric controls do not opt in", () => {
+  const h = setup({ field: "supportDsCtgLen", initial: 1000 });
+  h.input.focus();
+  assert.equal(h.input.attributes["data-track-nonzero"], "true");
+  h.edit("4321");
+  h.setOnCommit(() => h.replace());
+  h.clock.tick(TRACK_NUMBER_INPUT_IDLE_MS);
+  assert.equal(h.doc.activeElement.value, "4321");
+  assert.equal(h.doc.activeElement.attributes["data-track-nonzero"], "true");
+  for (const field of ["alignmentLength", "minIdentityPct"]) {
+    const other = setup({ field, initial: 10 });
+    other.input.focus(); other.edit("20");
+    assert.equal(other.input.attributes["data-track-nonzero"], undefined);
+  }
+});

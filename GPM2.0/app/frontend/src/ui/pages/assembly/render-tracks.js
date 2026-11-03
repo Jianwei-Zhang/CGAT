@@ -982,7 +982,7 @@ function renderAssemblyTrackControls({
   return `
     <div class="assembly-v1-control-grid">
       <div class="assembly-v1-control-item assembly-v1-control-item-wide">
-        <label>${escapeHtml(i18n.trackControls.supportDataset)}</label>
+        <label data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetHint)}">${escapeHtml(i18n.trackControls.supportDataset)}</label>
         ${
           supportDatasetOptions.length
             ? supportDatasetSelect
@@ -990,16 +990,16 @@ function renderAssemblyTrackControls({
         }
       </div>
       <div class="assembly-v1-control-item">
-        <label>${renderSupportDsCtgLenLabel(i18n)}</label>
+        <label data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetLengthHint)}">${renderSupportDsCtgLenLabel(i18n)}</label>
         ${supportDsCtgLenInput}
       </div>
       ${renderViewTickControl(trackPrefs, i18n, "trackView")}
       <div class="assembly-v1-control-item">
-        <label>${escapeHtml(i18n.trackControls.alignmentLengthBp)}</label>
+        <label data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">${escapeHtml(i18n.trackControls.alignmentLengthBp)}</label>
         ${alignmentInput}
       </div>
       <div class="assembly-v1-control-item">
-        <label>${escapeHtml(i18n.trackControls.identityPct)}</label>
+        <label data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">${escapeHtml(i18n.trackControls.identityPct)}</label>
         ${identityInput}
       </div>
     </div>
@@ -1066,7 +1066,7 @@ function renderAssemblyTrackInlineControls({
           <label><input type="checkbox" data-track-marker-visibility="showCentromeres" ${trackPrefs.showCentromeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.centromereMarkers)}</label>
         </div>
       </div>
-      <label class="assembly-track-inline-field">
+      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetHint)}">
         <span>${escapeHtml(i18n.trackControls.supportDataset)}</span>
         ${
           supportDatasetOptions.length
@@ -1074,16 +1074,16 @@ function renderAssemblyTrackInlineControls({
             : `<span class="muted">${escapeHtml(i18n.trackControls.unconfigured)}</span>`
         }
       </label>
-      <label class="assembly-track-inline-field">
+      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetLengthHint)}">
         ${renderSupportDsCtgLenLabel(i18n)}
         ${supportDsCtgLenInput}
       </label>
       ${renderViewTickControl(trackPrefs, i18n, "trackView")}
-      <label class="assembly-track-inline-field">
+      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">
         <span>${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
         ${alignmentInput}
       </label>
-      <label class="assembly-track-inline-field">
+      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">
         <span>${escapeHtml(i18n.trackControls.identityPct)}</span>
         ${identityInput}
       </label>
@@ -1268,6 +1268,7 @@ function renderTrackNumberInput({ field, id, label, openOptionLabel = "", value,
         pattern="[0-9]*"
         value="${escapeAttr(String(normalized))}"
         autocomplete="off"
+        ${field === "supportDsCtgLen" ? `data-track-nonzero="${normalized > 0}"` : ""}
         aria-controls="${escapeAttr(menuId)}"
         aria-expanded="false"
       >

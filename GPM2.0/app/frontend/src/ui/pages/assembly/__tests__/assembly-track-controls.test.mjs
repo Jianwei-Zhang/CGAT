@@ -9,6 +9,7 @@ import {
   createStore,
   createSupportDsStorageMock,
 } from "./tabs-semantics-harness.mjs";
+import { getMessages } from "../../../i18n/index.js";
 import {
   activateSubviewHistory,
   commitSubviewHistoryOperation,
@@ -38,15 +39,15 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.doesNotMatch(html, /id="assembly-export-chr-ctg-pmolecule-button"/);
   assert.doesNotMatch(html, /id="assembly-export-agp-button"/);
   assert.doesNotMatch(html, /Controls \/ 控件/);
-  assert.match(html, /辅助组装 Contig 长度 \(bp\)/);
+  assert.match(html, /辅助 Contig 长度 \(bp\)/);
   assert.doesNotMatch(html, /刻度间隔 \(kb\)/);
   assert.doesNotMatch(html, /view-display-settings/);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
-  assert.ok(html.indexOf("辅助组装 Contig 长度 ") < html.indexOf("比对长度"));
+  assert.ok(html.indexOf("辅助 Contig 长度 ") < html.indexOf("比对长度"));
   assert.match(html, /比对长度 \(bp\)/);
   assert.match(html, /一致性 \(%\)/);
-  assert.ok(html.indexOf("辅助数据集") < html.indexOf("辅助组装 Contig 长度 "));
+  assert.ok(html.indexOf("辅助数据集") < html.indexOf("辅助 Contig 长度 "));
   assert.ok(html.indexOf("比对长度") < html.indexOf("一致性"));
 
   assert.match(
@@ -59,7 +60,7 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   );
   assert.match(
     html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开辅助组装 Contig 长度 \(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-support-ds-ctg-len-menu">/,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开辅助 Contig 长度 \(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-support-ds-ctg-len-menu">/,
   );
   assert.match(html, /<div id="assembly-track-support-ds-ctg-len-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
   assert.match(html, /data-track-combo-value="0"/);
@@ -104,6 +105,44 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.doesNotMatch(html, /<datalist id="assembly-track-alignment-length-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-identity-pct-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-support-ds-ctg-len-options">/);
+});
+
+test("auxiliary length presets and positive input values use the theme danger color only in this control", () => {
+  for (const value of [0, 1, 1000, 12345]) {
+    const html = renderAssemblyPage(createState({ assembly: { trackView: { supportDsCtgLen: value } } }));
+    const input = html.match(/<input\s+id="assembly-track-support-ds-ctg-len"[^>]*>/)[0];
+    assert.ok(input.includes(`value="${value}"`));
+    assert.ok(input.includes(`data-track-nonzero="${value > 0}"`));
+    for (const id of ["assembly-track-alignment-length", "assembly-track-identity-pct"]) {
+      assert.doesNotMatch(html.match(new RegExp(`<input\\s+id="${id}"[^>]*>`))[0], /data-track-nonzero/);
+    }
+  }
+  const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url), "utf8");
+  assert.match(css, /\.assembly-track-combo\[data-track-combo-field="supportDsCtgLen"\] \.assembly-track-combo-input\[data-track-nonzero="true"\],\s*\.assembly-track-combo\[data-track-combo-field="supportDsCtgLen"\] \.assembly-track-combo-option:not\(\[data-track-combo-value="0"\]\)\s*\{\s*color: var\(--danger, #b91c1c\);/);
+});
+
+test("main and local view parameter hints use shared Tooltips in both languages", () => {
+  for (const locale of ["zh", "en"]) {
+    const labels = getMessages(locale, "assembly").trackControls;
+    const state = createState({ assembly: {
+      subview: {
+        mode: "2-contig",
+        summary: {
+          mode: "2-contig",
+          top: { role: "primary", contigId: 2 },
+          bottom: { role: "primary", contigId: 5 },
+        },
+      },
+    } });
+    const html = renderAssemblyPage({ ...state, locale });
+    for (const key of ["supportDatasetHint", "supportDatasetLengthHint", "alignmentLengthHint", "identityHint"]) {
+      assert.ok(labels[key]?.length > 0, key);
+      const marker = `<label class="assembly-track-inline-field" data-app-tooltip="${labels[key]}">`;
+      assert.equal(html.split(marker).length - 1, key === "alignmentLengthHint" || key === "identityHint" ? 2 : 1, key);
+    }
+    assert.ok(html.includes(`data-app-tooltip="${labels.supportDatasetLengthRulesSettings}"`));
+    assert.doesNotMatch(html, /辅助组装 Contig 长度/);
+  }
 });
 
 test("support ds ctg len rules dialog renders close in header and actions in footer", () => {

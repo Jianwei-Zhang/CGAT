@@ -1130,6 +1130,11 @@
   cursor: pointer;
 }
 
+.assembly-track-combo[data-track-combo-field="supportDsCtgLen"] .assembly-track-combo-input[data-track-nonzero="true"],
+.assembly-track-combo[data-track-combo-field="supportDsCtgLen"] .assembly-track-combo-option:not([data-track-combo-value="0"]) {
+  color: var(--danger, #b91c1c);
+}
+
 .assembly-track-combo-option:first-child {
   border-top: 0;
 }

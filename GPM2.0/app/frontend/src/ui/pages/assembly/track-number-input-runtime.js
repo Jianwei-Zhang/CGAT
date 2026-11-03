@@ -34,7 +34,13 @@ export function bindTrackNumberInput({
     bucket.push(() => target?.removeEventListener?.(type, handler, options));
   };
   const detachDocument = () => { documentListeners.splice(0).forEach(remove => remove()); };
+  const syncThresholdColor = target => {
+    if (field === "supportDsCtgLen") {
+      target.setAttribute?.("data-track-nonzero", String(normalizeTrackPrefInputValue(field, target.value) > 0));
+    }
+  };
   const validate = () => {
+    syncThresholdColor(input);
     const value = normalizeTrackPrefInputValue(field, input.value);
     input.setAttribute?.("aria-invalid", value === null ? "true" : "false");
     return value;
@@ -61,6 +67,7 @@ export function bindTrackNumberInput({
     } : null;
     const target = liveInput();
     target.value = String(value ?? readValue());
+    syncThresholdColor(target);
     target.setAttribute?.("aria-invalid", "false");
     if (value !== null && value !== readValue()) commitValue(value, target);
     // Scoped graph refreshes replace the toolbar too. Keep editing at the caret,

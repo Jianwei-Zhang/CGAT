@@ -57,7 +57,7 @@ test("major titles, minor labels, actions and real system options have distinct 
 test("Chinese controls use the approved full names rather than exposing source-field abbreviations", () => {
   const assembly = getMessages("zh", "assembly");
   assert.equal(assembly.trackControls.supportDataset, "辅助数据集");
-  assert.equal(assembly.trackControls.supportDatasetLengthBp, "辅助组装 Contig 长度 (bp)");
+  assert.equal(assembly.trackControls.supportDatasetLengthBp, "辅助 Contig 长度 (bp)");
   assert.equal(assembly.page.membersCardTitle, "主数据集成员");
   assert.equal(assembly.page.finalPathOverallLenCol, "Contig 长度");
   assert.equal(assembly.page.finalPathOriginIdCol, "来源 ID");
