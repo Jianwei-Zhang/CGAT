@@ -995,7 +995,7 @@ function renderAssemblyTrackControls({
         }
       </div>
       <div class="assembly-v1-control-item">
-        <label data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetLengthHint)}">${renderSupportDsCtgLenLabel(i18n)}</label>
+        <label>${renderSupportDsCtgLenLabel(i18n)}</label>
         ${supportDsCtgLenInput}
       </div>
       ${renderViewTickControl(trackPrefs, i18n, "trackView")}
@@ -1071,25 +1071,25 @@ function renderAssemblyTrackInlineControls({
           <label><input type="checkbox" data-track-marker-visibility="showCentromeres" ${trackPrefs.showCentromeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.centromereMarkers)}</label>
         </div>
       </div>
-      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetHint)}">
-        <span>${escapeHtml(i18n.trackControls.supportDataset)}</span>
+      <label class="assembly-track-inline-field">
+        <span data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetHint)}">${escapeHtml(i18n.trackControls.supportDataset)}</span>
         ${
           supportDatasetOptions.length
             ? supportDatasetSelect
             : `<span class="muted">${escapeHtml(i18n.trackControls.unconfigured)}</span>`
         }
       </label>
-      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetLengthHint)}">
+      <label class="assembly-track-inline-field">
         ${renderSupportDsCtgLenLabel(i18n)}
         ${supportDsCtgLenInput}
       </label>
       ${renderViewTickControl(trackPrefs, i18n, "trackView")}
-      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">
-        <span>${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
+      <label class="assembly-track-inline-field">
+        <span data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
         ${alignmentInput}
       </label>
-      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">
-        <span>${escapeHtml(i18n.trackControls.identityPct)}</span>
+      <label class="assembly-track-inline-field">
+        <span data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">${escapeHtml(i18n.trackControls.identityPct)}</span>
         ${identityInput}
       </label>
       ${mainViewHistoryControls}
@@ -1219,7 +1219,8 @@ function renderSupportDsCtgLenControl({
           value="${escapeAttr((i18n.trackControls.supportDatasetLengthAdvancedSummary || "Advanced({count})").replace("{count}", String(supportDsCtgLenRules.length)))}"
           readonly
           aria-readonly="true"
-          data-app-tooltip="${escapeAttr((i18n.trackControls.supportDatasetLengthAdvancedTitle || "Current chromosome uses {count} region rules").replace("{count}", String(supportDsCtgLenRules.length)))}"
+          aria-label="${escapeAttr(label)}"
+          aria-description="${escapeAttr((i18n.trackControls.supportDatasetLengthAdvancedTitle || "Current chromosome uses {count} region rules").replace("{count}", String(supportDsCtgLenRules.length)))}"
         >
       </div>
     `
@@ -1239,7 +1240,7 @@ function renderSupportDsCtgLenLabel(i18n) {
   const label = i18n.trackControls.supportDatasetLengthBp;
   const settingsLabel = i18n.trackControls.supportDatasetLengthRulesSettings || "Advanced rules";
   return `
-    <span class="assembly-support-ds-len-label">
+    <span class="assembly-support-ds-len-label" data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetLengthHint)}">
       ${escapeHtml(label)}
       <button
         type="button"

@@ -941,12 +941,12 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
   return `
       ${grtResultControls}
       ${renderViewTickControl(trackPrefs, i18n, "subviewTrackView")}
-      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">
-        <span>${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
+      <label class="assembly-track-inline-field">
+        <span data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
         ${alignmentInput}
       </label>
-      <label class="assembly-track-inline-field" data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">
-        <span>${escapeHtml(i18n.trackControls.identityPct)}</span>
+      <label class="assembly-track-inline-field">
+        <span data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">${escapeHtml(i18n.trackControls.identityPct)}</span>
         ${identityInput}
       </label>
       ${renderSubviewHistoryControls(history, i18n)}

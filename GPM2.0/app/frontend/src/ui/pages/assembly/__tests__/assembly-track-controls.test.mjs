@@ -121,7 +121,7 @@ test("auxiliary length presets and positive input values use the theme danger co
   assert.match(css, /\.assembly-track-combo\[data-track-combo-field="supportDsCtgLen"\] \.assembly-track-combo-input\[data-track-nonzero="true"\],\s*\.assembly-track-combo\[data-track-combo-field="supportDsCtgLen"\] \.assembly-track-combo-option:not\(\[data-track-combo-value="0"\]\)\s*\{\s*color: var\(--danger, #b91c1c\);/);
 });
 
-test("main and local view parameter hints use shared Tooltips in both languages", () => {
+test("main and local parameter explanations belong to label text, not input containers, in both languages", () => {
   for (const locale of ["zh", "en"]) {
     const labels = getMessages(locale, "assembly").trackControls;
     const state = createState({ assembly: {
@@ -137,11 +137,39 @@ test("main and local view parameter hints use shared Tooltips in both languages"
     const html = renderAssemblyPage({ ...state, locale });
     for (const key of ["supportDatasetHint", "supportDatasetLengthHint", "alignmentLengthHint", "identityHint"]) {
       assert.ok(labels[key]?.length > 0, key);
-      const marker = `<label class="assembly-track-inline-field" data-app-tooltip="${labels[key]}">`;
+      const marker = key === "supportDatasetLengthHint"
+        ? `<span class="assembly-support-ds-len-label" data-app-tooltip="${labels[key]}">`
+        : `<span data-app-tooltip="${labels[key]}">`;
       assert.equal(html.split(marker).length - 1, key === "alignmentLengthHint" || key === "identityHint" ? 2 : 1, key);
     }
+    assert.doesNotMatch(html, /<label class="assembly-track-inline-field"[^>]*data-app-tooltip/);
+    const inputs = [...html.matchAll(/<input\s+id="(?:assembly|subview)-track-(?:support-ds-ctg-len|alignment-length|identity-pct)"[^>]*>/g)];
+    assert.equal(inputs.length, 5);
+    for (const [input] of inputs) assert.doesNotMatch(input, /data-app-tooltip|\stitle=/);
+    const combos = [...html.matchAll(/<div class="assembly-track-combo"[^>]*>[\s\S]*?<\/div>/g)];
+    assert.equal(combos.length, 5);
+    for (const [combo] of combos) assert.doesNotMatch(combo, /data-app-tooltip|\stitle=/);
     assert.ok(html.includes(`data-app-tooltip="${labels.supportDatasetLengthRulesSettings}"`));
     assert.doesNotMatch(html, /辅助组装 Contig 长度/);
+  }
+});
+
+test("advanced auxiliary length summary is tooltip-free while retaining accessible rule details", () => {
+  for (const locale of ["zh", "en"]) {
+    const labels = getMessages(locale, "assembly").trackControls;
+    const state = createState({ assembly: { supportDsCtgLenRulesByChr: {
+      Chr01: [
+        { startBp: 1, endBp: 5_000_000, supportDsCtgLen: 100000 },
+        { startBp: 5_000_001, endBp: 10_000_000, supportDsCtgLen: 0 },
+      ],
+    } } });
+    const html = renderAssemblyPage({ ...state, locale });
+    const input = html.match(/<input\s+id="assembly-track-support-ds-ctg-len"[^>]*>/)[0];
+    assert.match(input, /readonly/);
+    assert.doesNotMatch(input, /data-app-tooltip|\stitle=/);
+    assert.ok(input.includes(`aria-label="${labels.supportDatasetLengthBp}"`));
+    assert.ok(input.includes(`aria-description="${labels.supportDatasetLengthAdvancedTitle.replace("{count}", "2")}"`));
+    assert.ok(html.includes(`data-app-tooltip="${labels.supportDatasetLengthRulesSettings}"`));
   }
 });
 
