@@ -1,12 +1,14 @@
-"""Library regression cases; execution intentionally deferred to unified review."""
+"""Library input, management, and project-snapshot regression cases."""
 import csv
 import hashlib
+import gzip
 import json
 from pathlib import Path
 import shutil
 import sys
 import tempfile
 from types import SimpleNamespace
+from unittest import mock
 import unittest
 
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
@@ -79,6 +81,25 @@ class AnnotationLibraryTests(unittest.TestCase):
         tel, _ = load_entries(self.server / "local/library", "local", optional=True)
         self.assertEqual(tel, [])
 
+    def test_add_cen_copies_input_and_remove_does_not_change_existing_snapshot(self):
+        original = self.root / "user.fa"
+        original.write_text(">arbitrary_name\nACGTACGT\n")
+        manage(SimpleNamespace(server_root=self.server, command="add-cen", fasta=original, note=""))
+        _, entries = load_entries(self.server / "local/library", "local", optional=True)
+        self.assertEqual(len(entries), 1)
+        entry_id = entries[0]["id"]
+        original.write_text(">changed\nTTTTCCCC\n")
+        manifest = self.prepare()
+        group = next(row for row in manifest["cen"] if row["length"] == 8)
+        self.assertEqual(group["sequence_sha256"], hashlib.sha256(b"ACGTACGT").hexdigest())
+        self.assertEqual(group["entries"][0]["source"], "local")
+        self.assertEqual(group["entries"][0]["note"], "")
+        before = (self.project / "cen/library.fa").read_bytes()
+        manage(SimpleNamespace(server_root=self.server, command="remove", id=entry_id))
+        self.assertFalse((self.server / "local/library/cen" / (entry_id + ".fa")).exists())
+        self.assertEqual((self.project / "cen/library.fa").read_bytes(), before)
+        verify_snapshot(self.project)
+
     def test_edited_or_partial_snapshots_fail_closed(self):
         self.prepare()
         verify_snapshot(self.project)
@@ -88,6 +109,49 @@ class AnnotationLibraryTests(unittest.TestCase):
         (self.project / "metadata/annotation_library_snapshot.json").unlink()
         with self.assertRaisesRegex(ValueError, "incomplete"):
             verify_snapshot(self.project)
+
+    def test_malformed_catalog_never_silently_truncates_note_or_duplicate_columns(self):
+        path = self.server / "local/library/tel.tsv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        malformed = (
+            "id\tmotif\tmin_repeat\tnote\nlocal\tACGT\t5\tnote\tunescaped tab\n",
+            "id\tmotif\tmin_repeat\tnote\tnote\nlocal\tACGT\t5\tfirst\tsecond\n",
+            "id\tmotif\tmin_repeat\tnote\nlocal\tACGT\t5\n",
+        )
+        for text in malformed:
+            with self.subTest(text=text):
+                path.write_text(text)
+                with self.assertRaises(ValueError):
+                    self.prepare()
+
+    def test_source_hash_and_records_use_the_same_read_even_if_file_is_replaced(self):
+        explicit = self.root / "changing.fa"
+        original = b">old_name\nACGTACGT\n"
+        replacement = b">new_name\nTGACTGAC\n"
+        explicit.write_bytes(original)
+        read_bytes = Path.read_bytes
+
+        def read_then_replace(path):
+            data = read_bytes(path)
+            if path == explicit:
+                path.write_bytes(replacement)
+            return data
+
+        with mock.patch.object(Path, "read_bytes", read_then_replace):
+            manifest = self.prepare(cen=str(explicit))
+        group = next(row for row in manifest["cen"] if row["length"] == 8)
+        self.assertEqual(group["entries"][0]["sequence_name"], "old_name")
+        self.assertEqual(group["entries"][0]["sha256"], hashlib.sha256(original).hexdigest())
+        self.assertEqual(group["sequence_sha256"], hashlib.sha256(b"ACGTACGT").hexdigest())
+
+    def test_compressed_input_keeps_raw_source_hash_and_decoded_sequence(self):
+        path = self.root / "input.fa.gz"
+        data = gzip.compress(b">compressed\nacgtacgt\n", mtime=0)
+        path.write_bytes(data)
+        manifest = self.prepare(cen=str(path))
+        group = next(row for row in manifest["cen"] if row["length"] == 8)
+        self.assertEqual(group["entries"][0]["sha256"], hashlib.sha256(data).hexdigest())
+        self.assertEqual(group["sequence_sha256"], hashlib.sha256(b"ACGTACGT").hexdigest())
 
     def test_invalid_local_data_fails_before_replacing_project_inputs(self):
         self.prepare()

@@ -320,6 +320,105 @@ fn imports_optional_telomere_rules_and_marks() {
 }
 
 #[test]
+fn imports_annotation_provenance_from_csv_quoted_tsv_into_both_mark_tables() {
+    let temp = tempdir().unwrap();
+    let root = temp.path().join("gpm_server");
+    create_bundle_root(&root);
+    let evidence = json!([
+        {"source": "official", "id": "official_repeat", "sha256": "a".repeat(64), "note": "paper: \"evidence\""},
+        {"source": "local", "id": "local_repeat", "sha256": "b".repeat(64), "note": ""}
+    ]);
+    let provenance = serde_json::to_string(&evidence).unwrap();
+    fs::create_dir_all(root.join("tel/chr_r")).unwrap();
+    fs::create_dir_all(root.join("cen/chr_r")).unwrap();
+    fs::write(
+        root.join("tel/rules.tsv"),
+        "rule_id\tmotif\tmin_repeat\treverse_complement\ntel1\tAC\t1\ttrue\n",
+    )
+    .unwrap();
+    let mut tel = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_path(root.join("tel/chr_r/ds_a.tsv"))
+        .unwrap();
+    tel.write_record([
+        "rule_id",
+        "dataset_name",
+        "seq_name",
+        "assigned_chr_name",
+        "motif",
+        "min_repeat",
+        "repeat_count",
+        "start_bp",
+        "end_bp",
+        "strand",
+        "provenance",
+    ])
+    .unwrap();
+    tel.write_record([
+        "tel1",
+        "ds_a",
+        "d",
+        "r",
+        "AC",
+        "1",
+        "1",
+        "1",
+        "2",
+        "+",
+        &provenance,
+    ])
+    .unwrap();
+    tel.flush().unwrap();
+    let mut cen = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_path(root.join("cen/chr_r/marks.tsv"))
+        .unwrap();
+    cen.write_record([
+        "cen_id",
+        "chr_name",
+        "query_name",
+        "dataset_name",
+        "ctg_name",
+        "ctg_start",
+        "ctg_end",
+        "strand",
+        "align_length",
+        "identity",
+        "mapq",
+        "provenance",
+    ])
+    .unwrap();
+    cen.write_record([
+        "cen1",
+        "r",
+        "repeat",
+        "ds_a",
+        "d",
+        "1",
+        "2",
+        "+",
+        "2",
+        "100",
+        "0",
+        &provenance,
+    ])
+    .unwrap();
+    cen.flush().unwrap();
+    drop(tel);
+    drop(cen);
+    let (outcome, _) = import_from_extracted_bundle(&root).unwrap();
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    for table in ["source_seq_telomere_mark", "source_seq_centromere_mark"] {
+        let encoded: String = conn
+            .query_row(&format!("SELECT provenance_json FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&encoded).unwrap(), evidence);
+    }
+}
+
+#[test]
 fn imports_optional_centromere_marks() {
     let temp = tempdir().unwrap();
     let bundle_root = temp.path().join("gpm_server");

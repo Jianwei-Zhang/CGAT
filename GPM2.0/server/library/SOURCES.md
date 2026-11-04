@@ -73,4 +73,7 @@ metadata may change later without a sequence-version change.
 This v1 curation verifies sequence identity and attribution, not detection
 sensitivity/specificity. Real-genome MUMmer sensitivity, cross-species false
 positives, runtime/memory, the provisional 200-bp merge gap and App rendering
-remain subject to the user's unified review and tests before publication.
+remain subject to genome-wide/native-window acceptance before corresponding claims.
+Source review, automated regressions and real MUMmer4 synthetic/fragment checks are
+recorded in `../../docs/server-cen-tel-library-review-20261104.md`; they do not
+establish universal sensitivity/specificity or whole-genome performance.

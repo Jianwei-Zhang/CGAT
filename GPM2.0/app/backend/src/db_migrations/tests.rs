@@ -37,6 +37,8 @@ fn version_one_database_adds_project_subview_history_table() -> Result<()> {
          CREATE TABLE dataset (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          CREATE TABLE reference_genome (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          CREATE TABLE pairwise_alignment_hit (id INTEGER PRIMARY KEY);
+         CREATE TABLE source_seq_telomere_mark (id INTEGER PRIMARY KEY);
+         CREATE TABLE source_seq_centromere_mark (id INTEGER PRIMARY KEY);
          PRAGMA user_version = 1;",
     )?;
 
@@ -58,6 +60,8 @@ fn version_two_database_adds_project_main_view_history_table() -> Result<()> {
          CREATE TABLE dataset (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          CREATE TABLE reference_genome (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          CREATE TABLE pairwise_alignment_hit (id INTEGER PRIMARY KEY);
+         CREATE TABLE source_seq_telomere_mark (id INTEGER PRIMARY KEY);
+         CREATE TABLE source_seq_centromere_mark (id INTEGER PRIMARY KEY);
          PRAGMA user_version = 2;",
     )?;
 

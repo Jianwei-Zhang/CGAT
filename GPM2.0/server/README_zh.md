@@ -331,5 +331,5 @@ Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目�
 `metadata/annotation_library_snapshot.json`。续跑只读并校验项目快照，工具/库更新不会让旧项目
 自动使用新库；要采用新库需显式重新 prepare，建议使用新输出目录。完整交付包含注释 FASTA；
 轻量交付仍排除所有 FASTA，只保留来源快照与校验值。配套 App 源码保留来源信息，并将工作区 schema 从 6 迁移到 7；不保证旧版 App
-能打开迁移后的工作区。目前实现待统一 review 与测试，不代表真实基因组或原生 App 验收已通过。
+能打开迁移后的工作区。源码 review 与自动化测试已通过，不代表全基因组生物学或原生窗口验收已通过。
 具体来源与证据边界见 `library/SOURCES.md`。

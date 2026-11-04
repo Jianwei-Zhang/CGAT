@@ -170,8 +170,8 @@ existing project into a new library; explicitly prepare again, preferably into a
 new output directory, to adopt it. Full delivery includes the frozen annotation
 FASTA; Light omits all FASTA and retains the provenance snapshot/hashes. The matching App source retains this
 provenance and migrates workspace schema 6 to 7; older Apps cannot be assumed to
-open a migrated workspace. Implementation is awaiting unified review/tests and is
-not a claim of real-genome or native-App acceptance. See `server/library/SOURCES.md`
+open a migrated workspace. Source review and automated tests have passed; this is
+not a claim of genome-wide biological or native-window acceptance. See `server/library/SOURCES.md`
 for source records and evidence limits.
 
 #### Aligner-specific options

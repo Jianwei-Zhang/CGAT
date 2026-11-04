@@ -318,7 +318,7 @@ function createRenderTracksRenderer(deps = {}) {
       .join("");
   }
 
-  function renderCentromereMarkersForTrackCtg({ ctg, rect, y, barHeight, role, isMirror }) {
+  function renderCentromereMarkersForTrackCtg({ ctg, rect, y, barHeight, role, isMirror, i18n }) {
     if (
       role !== "primary"
       || isMirror
@@ -2273,6 +2273,7 @@ function renderAssemblyTracks(args) {
             isMirror: layout.isMirror,
           });
           const centromereMarkerMarkup = renderCentromereMarkersForTrackCtg({
+            i18n,
             ctg,
             rect,
             y,

@@ -12,6 +12,7 @@ import csv
 import fcntl
 import gzip
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -42,7 +43,6 @@ def atomic_write(path: Path, data: bytes) -> None:
 
 
 def write_tsv(path: Path, fields, rows) -> None:
-    import io
     buffer = io.StringIO(newline="")
     writer = csv.DictWriter(buffer, fieldnames=fields, delimiter="\t", lineterminator="\n", extrasaction="ignore")
     writer.writeheader()
@@ -54,12 +54,15 @@ def read_tsv(path: Path, fields, optional=False) -> list[dict]:
     if not path.exists() and optional:
         return []
     with path.open(encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
-        if not reader.fieldnames or not set(fields).issubset(reader.fieldnames):
-            raise ValueError(f"{path}: expected columns {fields}")
+        reader = csv.DictReader(handle, delimiter="\t", strict=True)
+        if (not reader.fieldnames or len(reader.fieldnames) != len(fields)
+                or set(reader.fieldnames) != set(fields)):
+            raise ValueError(f"{path}: expected exactly one of each column {fields}")
         rows = list(reader)
     seen = set()
     for row in rows:
+        if None in row or any(row.get(field) is None for field in fields):
+            raise ValueError(f"{path}: wrong number of TSV fields; notes cannot contain unescaped tabs")
         entry_id = row.get("id", "")
         if not ID_RE.fullmatch(entry_id) or entry_id in seen:
             raise ValueError(f"{path}: invalid or duplicate id {entry_id!r}")
@@ -82,10 +85,16 @@ def tel_rule(motif, minimum):
     return motif, int(minimum)
 
 
-def fasta_records(path: Path):
-    opener = gzip.open if path.suffix == ".gz" else open
+def fasta_records(path: Path, *, content: bytes | None = None):
+    if content is None:
+        opener = gzip.open if path.suffix == ".gz" else open
+        stream = opener(path, "rt", encoding="utf-8")
+    else:
+        if path.suffix == ".gz":
+            content = gzip.decompress(content)
+        stream = io.StringIO(content.decode("utf-8"))
     name, sequence, seen = None, [], set()
-    with opener(path, "rt", encoding="utf-8") as handle:
+    with stream as handle:
         for raw in handle:
             line = raw.strip()
             if not line:
@@ -140,8 +149,11 @@ def load_entries(root: Path, source: str, *, optional=False):
     cen = []
     for row in read_tsv(root / "cen/cen.tsv", CEN_FIELDS, optional):
         path = root / "cen" / (row["id"] + ".fa")
-        records = list(fasta_records(path))
-        cen.append({**row, "source": source, "sha256": sha256(path.read_bytes()), "records": records})
+        # Hash and parse the same captured bytes, even if another process replaces
+        # the input path between operations. The sequence and its source must agree.
+        content = path.read_bytes()
+        records = list(fasta_records(path, content=content))
+        cen.append({**row, "source": source, "sha256": sha256(content), "records": records})
     return tel, cen
 
 
@@ -165,8 +177,9 @@ def snapshot(server: Path, workspace: Path, explicit_tel, explicit_cen, min_len,
                     "sha256": sha256(f"{motif}\t{minimum}\n".encode())})
     if explicit_cen:
         path = Path(explicit_cen)
+        content = path.read_bytes()
         cen.append({"id": "parameter_cen", "source": "parameter", "note": "",
-                    "sha256": sha256(path.read_bytes()), "records": list(fasta_records(path))})
+                    "sha256": sha256(content), "records": list(fasta_records(path, content=content))})
     tel_groups, cen_groups = {}, {}
     for entry in tel:
         key = entry["sha256"]
