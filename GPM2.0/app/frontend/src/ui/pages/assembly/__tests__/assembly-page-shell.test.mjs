@@ -224,8 +224,12 @@ test("assembly english view renders localized track labels and mirror empty stat
     },
   }));
 
-  assert.match(html, />Primary Dataset Track</);
-  assert.match(html, />flye Mirror Track</);
+  const localStart = html.indexOf('<article class="assembly-track-panel subview-alignment-card"');
+  assert.ok(localStart >= 0);
+  const localHtml = html.slice(localStart);
+  assert.match(localHtml, /data-app-tooltip="Primary Dataset Track"[^>]*aria-label="Primary Dataset Track"><span>\[P\]<\/span>/);
+  assert.match(localHtml, />flye Mirror Track</);
+  assert.doesNotMatch(localHtml, />Primary Dataset Track</);
   assert.doesNotMatch(html, /主数据集轨道|辅助数据集轨道|mirror 轨道/);
 });
 
