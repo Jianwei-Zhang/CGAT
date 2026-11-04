@@ -7,7 +7,7 @@ mod project_copy_cancel;
 use tauri::Manager;
 
 fn main_window_title(version: &semver::Version) -> String {
-    format!("GPM ({version})")
+    format!("Genome Puzzle Master ({version})")
 }
 
 pub fn run() {
@@ -111,11 +111,14 @@ mod window_title_tests {
     #[test]
     fn title_uses_the_running_package_version() {
         assert_eq!(
-            main_window_title(&semver::Version::new(2, 0, 16)),
-            "GPM (2.0.16)"
+            main_window_title(&semver::Version::new(2, 0, 17)),
+            "Genome Puzzle Master (2.0.17)"
         );
         let next = semver::Version::parse("2.1.0-beta.1").unwrap();
-        assert_eq!(main_window_title(&next), "GPM (2.1.0-beta.1)");
+        assert_eq!(
+            main_window_title(&next),
+            "Genome Puzzle Master (2.1.0-beta.1)"
+        );
     }
 
     #[test]
