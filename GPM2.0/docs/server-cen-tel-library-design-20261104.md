@@ -252,3 +252,34 @@ note
 
 统一 review 与测试应覆盖第 11 节全部条目，以及 MUMmer 高频短单体敏感度、200-bp 合并间隔、跨物种误报/漏报、tel 扫描耗时与标记密度、旧项目恢复、App schema 迁移和来源显示。
 正式 Server 源码资产刷新仍需通过 `RELEASING.md` 的质量、备份、发布和公共下载核验门槛；本轮不发布、不升级现有用户安装。
+
+### 12.3 源码实施收尾核对（2026-11-04）
+
+以下核对针对已实现的代码路径，不是第 11 节运行验收的通过记录。
+用户已明确把统一 review 与测试留到后续安排；本次不执行测试、不发布正式资产。
+
+| 要求 | 已核对的源码依据 |
+| --- | --- |
+| 默认官方库 + 本地库，参数仅作追加 | `prepare.sh` 调用 `annotation_library.py snapshot`；`snapshot()` 先读取两层库，再追加本次 tel/cen 参数，没有替换已有条目的分支。 |
+| 本次参数不写回本地库 | `snapshot()` 的输出仅为项目内 `tel/`、`cen/` 和 `metadata/`；管理命令的本地写入与 prepare 分离。 |
+| 管理最简、官方只读、note 可空 | `library.sh` 公开 list/add-tel/add-cen/remove；`manage()` 只向 `local/library/` 写入，拒绝删除官方 ID；note 默认空串并校验为单行文本。 |
+| 去重不丢来源与 note | tel 按规范化 motif + min_repeat 的内容哈希合并；cen 按大写序列内容哈希合并；每组保留全部 entries，标记输出保留 provenance。 |
+| 官方更新不影响本地库或项目依据 | `update_server.prepare()` 拒绝官方 manifest 拥有 `local/`；`runtime_file()` 不将安装库分发为项目 runtime；快照位于项目运行数据目录，不在代码更新目标中。 |
+| 续跑只使用项目快照 | assignment、GRT 输入构建/端粒收尾、cen 扫描接入 `verify_snapshot()`；outer checkpoint 输入包含快照、cen FASTA 和扫描模块；未接入运行时读取安装库的路径。 |
+| cen 不按参考染色体命名或相似度推断归属 | 新快照统一记录 `chr_name=*`，序列名称仅用于追溯；各 chromosome 的任务均使用全部有效条目；新 prepare 不调用旧 `cen_reference_metadata.py` 的染色体绑定校验。 |
+| 短重复合并后再按长度判断 | `cen_scan.parse_coords()` 先过滤单次 identity；`merge_hits()` 按 contig 合并近邻，计算命中覆盖并排除重叠/间隔，再应用 min-len。 |
+| 保留原有 tel 阈值语义并扩展常见范围 | 原有两类 motif 的末端阈值仍为 5，供体仍要求 >=500 bp；TTAGG 是明确新增的默认覆盖，不将其描述为全部结果与旧版一致。 |
+| 新增 dataset 不偷偷采用当前安装库 | `templates/add_dataset.sh` 复制原项目到 stage 并调用其 assignment/runtime，stage 内快照相对路径不变；没有重新调用安装库 snapshot 的步骤。 |
+| 标记来源进入 App 与报告 | TSV provenance 经过兼容旧包的解析，写入标记表、经 main_view 返回，再由标记详情显示；报告收集 cen provenance 与锁定 tel 规则；schema 7 仅新增默认空来源列。 |
+| Light 不夹带本地 FASTA | `lgz_app_package.build()` 仅在 include_fasta 时复制 cen/library.fa，Light 仍保留来源 JSON/校验值，不复制注释 FASTA。 |
+| v1 数据有固定来源 | `library/cen/sources.json` 固定四个 accession.version、坐标、长度与校验值；`library/tel.tsv` 包含三条带引用的规则；来源范围与限制见 SOURCES.md。 |
+
+此外，对照项目依赖锁定版本 MUMmer4 4.0.1 的上游源码，确认当前使用的
+`--maxmatch`、`--nosimplify`、`-l`、`-c`、`-t`、`-p` 均存在；
+`show-coords -THrcl` 的 NUCMER 表格输出顺序与当前 13 列解析一致。
+此核对只确认接口定义，不证明检测灵敏度、误报率或资源用量：
+
+- https://github.com/mummer4/mummer/blob/v4.0.1/src/umd/nucmer_cmdline.yaggo
+- https://github.com/mummer4/mummer/blob/v4.0.1/src/tigr/show-coords.cc
+
+源码实施交接已齐备；真实数据校准、单元/集成测试、Rust 类型编译、App 构建/原生验收及正式发布仍保持待办，不能从上述静态核对推导为已通过。
