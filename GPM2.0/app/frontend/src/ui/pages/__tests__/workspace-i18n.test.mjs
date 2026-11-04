@@ -979,7 +979,7 @@ test("server-owned create-project chr threshold input ignores typing", async () 
   }
 });
 
-test("selected-project table and paths retain accessible section names without visible subtitles", () => {
+test("selected-project table and paths use compact visible divider headings", () => {
   for (const locale of ["zh", "en"]) {
     const value = createState({ locale, session: { projectId: 7, projectName: "Keep_MiXeD" }, initializer: {
       existingProjects: [{ projectId: 7, projectName: "Keep_MiXeD", primaryDatasetId: 1 }], datasets: [{ datasetId: 1, name: "Source" }],
@@ -989,15 +989,18 @@ test("selected-project table and paths retain accessible section names without v
       { segmentId: "part", type: "ctg", assemblyCtgId: 1, datasetName: "Source", ctgName: "MiXeD_ctg", overallLen: 1000, start: 1, end: 1000 },
     ] } } };
     const before = JSON.stringify(value), html = renderWorkspacePage(value);
-    assert.doesNotMatch(html, /<h[1-6][^>]*>(?:项目信息|路径概览|Project Information|Path Overview)/);
-    assert.match(html, locale === "en" ? /class="project-information" aria-label="Project Information"/ : /class="project-information" aria-label="项目信息"/);
-    assert.match(html, locale === "en" ? /class="project-path-overview"[^>]*aria-label="Path Overview"/ : /class="project-path-overview"[^>]*aria-label="路径概览"/);
+    assert.doesNotMatch(html, /项目信息|路径概览|Project Information|Path Overview/);
+    assert.match(html, /id="project-data-catalog" aria-labelledby="project-data-catalog-title"/);
+    assert.match(html, locale === "en" ? /class="project-section-divider"><h3 id="project-data-catalog-title">Datasets<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/ : /class="project-section-divider"><h3 id="project-data-catalog-title">数据集<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/);
+    assert.match(html, /class="project-path-overview"[^>]*aria-labelledby="project-path-overview-title"/);
+    assert.match(html, locale === "en" ? /<h3 id="project-path-overview-title">Chromosome Preview<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/ : /<h3 id="project-path-overview-title">染色体预览<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/);
     assert.ok(html.indexOf('class="project-information"') < html.indexOf('id="project-data-catalog"'));
     assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('class="project-path-overview"'));
     assert.match(html, /data-project-export-jump-chr="Chr01"/); assert.match(html, /Keep_MiXeD/);
     assert.match(html, /MiXeD_ctg/); assert.equal(JSON.stringify(value), before);
     value.projectExport = { ...value.projectExport, workspacePath: "D:/other" };
     const changed = renderWorkspacePage(value); assert.doesNotMatch(changed, /data-project-export-jump-chr/);
+    assert.match(changed, /<h3 id="project-path-overview-title">[^<]+<\/h3><\/header>/);
     assert.match(changed, locale === "en" ? /Loading overview data/ : /正在加载概览数据/);
   }
 });
@@ -1013,6 +1016,14 @@ for (const locale of ["zh", "en"]) test(`creation time appears once to the right
   assert.match(output, new RegExp(`class="project-location-row">[\\s\\S]*class="project-path project-detail-path"[^>]*>[\\s\\S]*class="project-detail-created">${locale === "zh" ? "创建时间：" : "Created: "}`));
   assert.ok(output.indexOf('class="project-detail-created"') < output.indexOf('class="project-information"'));
   assert.doesNotMatch(output, /project-catalog-created/);
+});
+
+test("project section dividers carry labels without a separate heading row", () => {
+  const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
+  assert.match(css, /\.project-detail-overview\s*\{(?:(?!border-bottom)[^}])*padding-bottom: 16px;(?:(?!border-bottom)[^}])*\}/);
+  assert.match(css, /\.project-section-divider\s*\{[^}]*display: flex;[^}]*align-items: center;[^}]*font-size: var\(--font-small\);/);
+  assert.match(css, /\.project-section-divider::after\s*\{[^}]*flex: 1 1 auto;[^}]*height: 1px;[^}]*background: var\(--border-subtle/);
+  assert.match(css, /\.project-section-divider > h3\s*\{[^}]*font-size: inherit;[^}]*font-weight: 600;/);
 });
 
 test("project creation time occupies the full detail width and stays right aligned beside the path", () => {

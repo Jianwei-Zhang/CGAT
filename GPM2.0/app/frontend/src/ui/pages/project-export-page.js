@@ -452,7 +452,7 @@ function getLabels(state) {
   if (state?.locale === "en") {
     return {
       title: "Overview",
-      pathOverviewTitle: "Path Overview",
+      pathOverviewTitle: "Chromosome Preview",
       pathOverviewEmpty: "No Final Path available for this project.",
       contentChanged: "Project content changed while loading. Refresh after the operation finishes.",
       noProject: "Select a project first.",
@@ -514,7 +514,7 @@ function getLabels(state) {
   }
   return {
     title: "概览",
-    pathOverviewTitle: "路径概览",
+    pathOverviewTitle: "染色体预览",
     pathOverviewEmpty: "当前项目暂无可用的 Final Path。",
     contentChanged: "加载期间项目内容发生变化，请在操作结束后刷新。",
     noProject: "请先选择项目。",
@@ -1439,13 +1439,16 @@ export function renderProjectPathOverview(state) {
   const labels = getLabels(state), currentProject = getCurrentProject(state), data = getScopedProjectExportState(state);
   const scope = previewProjectKey(state);
   const fresh = isProjectOverviewDataFresh(state);
+  const rowCount = currentProject && fresh ? getFinalPathPreviewEntries(state).length : 0;
   const rows = currentProject && fresh
     ? renderFinalPathPreviewRows(state, { primaryDatasetName: getDatasetNameById(state.initializer?.datasets || [], currentProject.primaryDatasetId) }) : "";
   const body = !currentProject ? `<p class="muted">${escapeHtml(labels.noProject)}</p>`
     : data.error ? `<p class="error-text" role="alert">${escapeHtml(data.error)}</p><button type="button" class="button ghost tiny" data-project-path-refresh>${escapeHtml(labels.refresh)}</button>`
     : data.loading || !fresh ? `<p class="muted" role="status">${escapeHtml(labels.loading)}</p>`
     : rows || `<p class="muted">${escapeHtml(labels.pathOverviewEmpty)}</p>`;
-  return `<section class="project-path-overview" data-project-path-overview="${escapeAttr(scope)}" aria-label="${escapeAttr(labels.pathOverviewTitle)}">${body}</section>`;
+  const count = rowCount ? `<span class="project-section-count"><span aria-hidden="true">·</span>${escapeHtml(formatNumber(rowCount))}</span>` : "";
+  return `<section class="project-path-overview" data-project-path-overview="${escapeAttr(scope)}" aria-labelledby="project-path-overview-title">
+    <header class="project-section-divider"><h3 id="project-path-overview-title">${escapeHtml(labels.pathOverviewTitle)}</h3>${count}</header>${body}</section>`;
 }
 
 function projectSurfaceRoot(host) {

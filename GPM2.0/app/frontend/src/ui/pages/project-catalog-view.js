@@ -110,7 +110,8 @@ export function renderProjectCatalog(state) {
   const l = labels(state);
   const rows = [...(catalog.data?.references || []), ...(catalog.data?.datasets || [])];
   const selected = rows.find(row => objectKey(row) === catalog.editor?.key);
-  return `<section id="project-data-catalog" aria-label="${l.datasets}" aria-busy="${Boolean(catalog.loading)}">
+  return `<section id="project-data-catalog" aria-labelledby="project-data-catalog-title" aria-busy="${Boolean(catalog.loading)}">
+    <header class="project-section-divider"><h3 id="project-data-catalog-title">${l.datasets}</h3>${catalog.data ? `<span class="project-section-count"><span aria-hidden="true">·</span>${number(rows.length, state)}</span>` : ""}</header>
     ${catalog.data ? renderTable(rows, l.datasets, catalog, state) : `<p role="status" class="muted">${catalog.error ? l.failure : l.loading}</p>`}
     ${catalog.error && !catalog.editor ? `<p class="error-text" role="alert">${escape(catalog.error)}</p>` : ""}
     ${catalog.error && !catalog.editor ? `<button type="button" class="button ghost" data-catalog-retry ${catalog.loading || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : ""}>${l.retry}</button>` : ""}
