@@ -101,7 +101,7 @@ LABELS = {
     "candidates": "候选明细", "rejections": "拒绝原因", "arbitration": "候选仲裁",
     "gap_attempts": "Gap 处理尝试", "terminal_status": "染色体端点状态", "terminal_rows": "端点处理",
     "strategies": "按染色体处理分支", "classification_rows": "结构问题分类",
-    "alignments": "比对任务", "telomeres": "端粒注释", "centromeres": "着丝粒注释",
+    "alignments": "比对任务", "telomeres": "端粒注释", "centromeres": "着丝粒候选区域",
     "used_contigs": "最终使用的 Contig", "evidence": "证据记录", "usage": "供体使用记录",
 }
 METHODS = {
@@ -320,6 +320,17 @@ def outcome_summary_html(final: dict) -> str:
         for title, value, detail, kind in cards) + '</div>'
 
 
+def annotation_evidence_text(raw) -> str:
+    try:
+        entries = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        return ""
+    if not isinstance(entries, list):
+        return ""
+    return "; ".join(": ".join(str(entry.get(k, "")) for k in ("source", "id", "note") if entry.get(k))
+                     for entry in entries if isinstance(entry, dict))
+
+
 def final_path_visual_html(final: dict) -> str:
     chromosomes = final.get("final_path", {}).get("chromosomes", [])
     if not chromosomes:
@@ -337,6 +348,7 @@ def final_path_visual_html(final: dict) -> str:
     annotations = final.get("annotations", {})
     telomere = annotations.get("telomere", {})
     centromere = annotations.get("centromere", {})
+    rules_by_id = {row.get("rule_id"): row for row in telomere.get("rules", [])}
     terminal_by_chr = {}
     for row in telomere.get("terminal_rows", []):
         terminal_by_chr.setdefault(row.get("chr"), {})[row.get("terminal")] = row
@@ -374,6 +386,9 @@ def final_path_visual_html(final: dict) -> str:
                 row = terminal_rows.get(terminal, {})
                 complete = row.get("final_status") in complete_statuses
                 marker_title = f'{chromosome_name} {terminal} · {"端粒完整" if complete else "未检测到完整端粒"}'
+                evidence = "; ".join(annotation_evidence_text(rules_by_id.get(rule_id, {}).get("provenance"))
+                                     for rule_id in row.get("matched_rule_ids", []))
+                marker_title += f" · {evidence}" if evidence else ""
                 markers.append(f'<span class="path-marker telomere {side} {"complete" if complete else "missing"}" title="{esc(marker_title)}"></span>')
         chromosome_centromeres = centromere_by_chr.get(chromosome_name, [])
         if centromere.get("configured"):
@@ -382,8 +397,10 @@ def final_path_visual_html(final: dict) -> str:
                 end = min(total, marker.get("q4_end", total))
                 left = 100 * (start - 1) / total
                 width = max(.45, 100 * max(1, end - start + 1) / total)
-                marker_title = (f'{chromosome_name} 着丝粒 · q4:{display(start)}–{display(end)} · '
+                marker_title = (f'{chromosome_name} 着丝粒候选区域 · q4:{display(start)}–{display(end)} · '
                                 f'{marker.get("dataset_name", "")}:{marker.get("ctg_name", "")}')
+                evidence = annotation_evidence_text(marker.get("provenance"))
+                marker_title += f" · {evidence}" if evidence else ""
                 markers.append(f'<span class="path-marker centromere" style="left:{left:.6f}%;width:{width:.6f}%" title="{esc(marker_title)}"></span>')
         details = "".join(
             f'<li><span class="segment-chip {"gap" if row["kind"] == label("gap") else ("patch" if row["kind"] == label("patch") else "source")}">{esc(row["kind"])}</span>'
@@ -394,7 +411,7 @@ def final_path_visual_html(final: dict) -> str:
             complete_count = sum(row.get("final_status") in complete_statuses for row in terminal_rows.values())
             annotation_bits.append(f"端粒 {complete_count}/2")
         if centromere.get("configured"):
-            annotation_bits.append(f"着丝粒 {len(chromosome_centromeres)} 处")
+            annotation_bits.append(f"着丝粒候选区域 {len(chromosome_centromeres)} 处")
         annotation_html = (f'<div class="chromosome-annotations">{esc(" · ".join(annotation_bits))}</div>'
                            if annotation_bits else "")
         tracks.append(f'<details class="path-row"><summary><b>{esc(chromosome_name)}</b><div class="path-bar">{"".join(pieces)}{"".join(markers)}</div>'
@@ -404,7 +421,7 @@ def final_path_visual_html(final: dict) -> str:
         annotation_legend += ('<span><i class="legend-symbol telomere"></i>端粒完整</span>'
                               '<span><i class="legend-symbol telomere-missing"></i>端粒缺失</span>')
     if centromere.get("configured"):
-        annotation_legend += '<span><i class="legend-symbol centromere"></i>着丝粒</span>'
+        annotation_legend += '<span><i class="legend-symbol centromere"></i>着丝粒候选区域</span>'
     return (f'<div class="source-summary"><div><h3>最终序列来源贡献</h3><div class="source-bar">{"".join(contribution_parts)}</div>'
             f'<div class="legend">{contribution_legend}</div></div></div>'
             '<div class="legend path-legend"><span><i class="legend-dot source"></i>主路径来源</span>'

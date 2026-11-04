@@ -468,6 +468,7 @@ def read_rules(path):
                 "rule_id": rule_id,
                 "motif": motif,
                 "min_repeat": min_repeat,
+                "provenance": row.get("provenance", "[]"),
             }
         )
     return rules
@@ -500,24 +501,10 @@ def reverse_complement(motif):
 
 
 def scan_pattern(sequence, pattern, min_repeat):
-    seq = sequence.upper()
+    import re
     motif = pattern.upper()
-    motif_len = len(motif)
-    if motif_len < 1:
-        return
-    index = 0
-    limit = len(seq) - motif_len
-    while index <= limit:
-        count = 0
-        while seq[index + count * motif_len : index + (count + 1) * motif_len] == motif:
-            count += 1
-        if count >= min_repeat:
-            start_bp = index + 1
-            end_bp = index + count * motif_len
-            yield start_bp, end_bp, count
-            index += count * motif_len
-            continue
-        index += 1
+    for match in re.finditer(f"(?:{re.escape(motif)}){{{min_repeat},}}", sequence.upper()):
+        yield match.start() + 1, match.end(), (match.end() - match.start()) // len(motif)
 
 
 def iter_rule_hits(sequence, rule):
@@ -550,6 +537,7 @@ work_root = Path(sys.argv[1])
 chr_name = sys.argv[2]
 dataset_specs = parse_dataset_specs(sys.argv[3:])
 rules = read_rules(work_root / "tel" / "rules.tsv")
+with_provenance = (work_root / "metadata/annotation_library_snapshot.json").is_file()
 output_dir = work_root / "tel" / f"chr_{chr_name}"
 output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -565,6 +553,8 @@ header = [
     "end_bp",
     "strand",
 ]
+if with_provenance:
+    header.append("provenance")
 
 for dataset_name, fasta_path in dataset_specs:
     output_path = output_dir / f"{dataset_name}.tsv"
@@ -586,7 +576,7 @@ for dataset_name, fasta_path in dataset_specs:
                             start_bp,
                             end_bp,
                             strand,
-                        ]
+                        ] + ([rule["provenance"]] if with_provenance else [])
                     )
 '''
     path.write_text(
@@ -601,160 +591,16 @@ for dataset_name, fasta_path in dataset_specs:
 
 
 def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_dataset_fastas, threads, minimap_preset):
-    cen_reference_path = work_root / "cen" / "reference.tsv"
-    rows = read_tsv_rows(cen_reference_path)
-    cen_row = next((row for row in rows if row.get("chr_name") == chr_name), None)
-    if cen_row is None:
+    rows = read_tsv_rows(work_root / "cen" / "reference.tsv")
+    if not any(row.get("chr_name") in ("*", chr_name) for row in rows):
         return False
-
-    cen_fasta = work_root / cen_row["fasta_relpath"]
-    cen_query_name = cen_row["sequence_name"]
-    cen_chr_fasta = run_dir / f"{chr_name}_centromere.fa"
-    for name, sequence in read_fasta_records(cen_fasta):
-        if name == cen_query_name:
-            write_single_record_fasta(cen_chr_fasta, name, sequence)
-            break
-    else:
-        fail(f"missing centromere sequence {cen_query_name} in {cen_fasta}")
-
-    output_dir = work_root / "cen" / f"chr_{chr_name}"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    dataset_specs = []
-    lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}", ""]
-    for index, (dataset_name, fasta_path) in enumerate(selected_dataset_fastas):
-        result_name = "result.paf" if len(selected_dataset_fastas) == 1 else f"result_{dataset_name}.paf"
-        result_path = run_dir / result_name
-        dataset_specs.append(f"{dataset_name}={result_path}")
-        args = [
-            "minimap2",
-            "-x",
-            minimap_preset,
-            "-t",
-            THREAD_ARGUMENT,
-            "-c",
-            "--cs",
-            "-o",
-            result_name,
-            str(fasta_path),
-            str(cen_chr_fasta),
-        ]
-        command = " ".join(quote_command_arg(part) for part in args)
-        lines.append(f"{command} > stdout_{dataset_name}.log 2> stderr_{dataset_name}.log")
-    args = [
-        str(work_root),
-        chr_name,
-        cen_row["sequence_name"],
-        cen_row["min_len"],
-        cen_row["min_identity"],
-    ]
-    args.extend(dataset_specs)
-    python_invocation = "python3 - " + " ".join(quote_command_arg(part) for part in args) + " <<'PY'"
-    parser = r'''import csv
-import sys
-from pathlib import Path
-
-
-def fail(message):
-    print(message, file=sys.stderr)
-    raise SystemExit(1)
-
-
-def parse_dataset_specs(values):
-    specs = []
-    for value in values:
-        if "=" not in value:
-            fail(f"invalid dataset spec: {value}")
-        dataset_name, paf_path = value.split("=", 1)
-        dataset_name = dataset_name.strip()
-        paf = Path(paf_path)
-        if not dataset_name or not paf.exists():
-            fail(f"invalid dataset spec: {value}")
-        specs.append((dataset_name, paf))
-    return specs
-
-
-def parse_identity(fields):
-    block_length = int(fields[10])
-    if block_length <= 0:
-        return 0.0
-    for tag in fields[12:]:
-        parts = tag.split(":", 2)
-        if len(parts) != 3:
-            continue
-        key, tag_type, value = parts
-        if key in {"dv", "de"} and tag_type == "f":
-            try:
-                divergence = float(value)
-            except ValueError:
-                continue
-            return max(0.0, min(100.0, (1.0 - divergence) * 100.0))
-    matches = int(fields[9])
-    return max(0.0, min(100.0, (matches * 100.0) / block_length))
-
-
-work_root = Path(sys.argv[1])
-chr_name = sys.argv[2]
-query_name = sys.argv[3]
-min_len = int(sys.argv[4])
-min_identity = float(sys.argv[5])
-dataset_specs = parse_dataset_specs(sys.argv[6:])
-output_dir = work_root / "cen" / f"chr_{chr_name}"
-output_dir.mkdir(parents=True, exist_ok=True)
-output_path = output_dir / "marks.tsv"
-
-header = [
-    "cen_id",
-    "chr_name",
-    "query_name",
-    "dataset_name",
-    "ctg_name",
-    "ctg_start",
-    "ctg_end",
-    "strand",
-    "align_length",
-    "identity",
-    "mapq",
-]
-
-with output_path.open("w", encoding="utf-8", newline="") as handle:
-    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-    writer.writerow(header)
-    for dataset_name, paf_path in dataset_specs:
-        with paf_path.open(encoding="utf-8") as paf_handle:
-            for raw_line in paf_handle:
-                line = raw_line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                fields = line.split("\t")
-                if len(fields) < 12:
-                    continue
-                if fields[0] != query_name:
-                    continue
-                strand = fields[4]
-                if strand not in {"+", "-"}:
-                    continue
-                align_length = int(fields[10])
-                identity = parse_identity(fields)
-                if align_length < min_len or identity < min_identity:
-                    continue
-                writer.writerow(
-                    [
-                        "cen",
-                        chr_name,
-                        query_name,
-                        dataset_name,
-                        fields[5],
-                        int(fields[7]) + 1,
-                        int(fields[8]),
-                        strand,
-                        align_length,
-                        f"{identity:.3f}",
-                        fields[11],
-                    ]
-                )
-'''
-    lines.extend(["", python_invocation, parser, "PY"])
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    args = ["python3", str(work_root / ".prepare_lib/tools/cen_scan.py"),
+            "--root", str(work_root), "--chr", chr_name, "--run-dir", str(run_dir),
+            "--threads", THREAD_ARGUMENT]
+    for dataset_name, fasta_path in selected_dataset_fastas:
+        args.extend(["--dataset", f"{dataset_name}={fasta_path}"])
+    command = " ".join(quote_command_arg(part) for part in args)
+    path.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + command + "\n", encoding="utf-8")
     return True
 
 
@@ -788,6 +634,9 @@ except (KeyError, ValueError) as exc:
     fail(f"invalid self-alignment Minimap2 thresholds: {exc}")
 if self_min_chain_score < 1 or self_minimizers < 1:
     fail("self-alignment Minimap2 thresholds must be positive integers")
+from annotation_library import verify_snapshot
+verify_snapshot(work_root)
+
 metadata_dir = work_root / "metadata"
 runs_dir = work_root / "runs"
 package = read_single_tsv_row(metadata_dir / "package.tsv")
@@ -1140,6 +989,7 @@ for chr_name in reference_chr_names:
             minimap_preset,
         ):
             command_paths.append(command_path)
+            task_caps[command_path] = int(threads)
 
     write_generated_command_script(chr_run_dir / "generated_command.sh", command_paths, chr_name)
     manifest_tasks = []

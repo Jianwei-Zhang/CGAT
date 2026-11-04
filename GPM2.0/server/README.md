@@ -340,3 +340,45 @@ with the same `run.sh` command or its `run_all.sh`; only source-checked unfinish
 reference commands are migrated, with a rollback journal. A compatible completed
 reference checkpoint stays intact. Local synthetic validation is not a claim that
 a customer's unavailable whole wheat assembly has been biologically validated.
+
+### Telomere / centromere libraries (source checkout)
+
+This behavior applies to this source checkout and the next approved source
+refresh, not retroactively to older published archives. The workflow automatically
+uses **official library + local library + this run's `--tel` / `--cen` inputs**.
+Explicit flags add to the libraries; they do not replace them or save local entries.
+
+```bash
+bash "$SERVER/library.sh" list                 # official + local, including notes
+bash "$SERVER/library.sh" list cen
+bash "$SERVER/library.sh" add-tel TTTTAGGG 5 --note "Evidence: my publication"
+bash "$SERVER/library.sh" add-cen ./my_repeats.fa --note "Evidence: accession or DOI"
+bash "$SERVER/library.sh" remove <local_id>   # list shows the generated ID
+```
+
+`--note` may be omitted or empty. To edit a local entry, remove it and add it again.
+Official entries cannot be removed/disabled in v1. Official data are under
+`$SERVER/library/`; user data are under `$SERVER/local/library/`, which updates
+never replace. Common tel motifs are TTTAGGG, TTAGGG and TTAGG (both strands).
+The initial cen families are Arabidopsis CEN180, rice CentO, maize CentC and human
+alpha-satellite; these are representative sequences, not universal species coverage.
+
+`--cen` accepts arbitrary FASTA names, including old `<chr>_centromere` names;
+they no longer bind a repeat to one reference chromosome. Every repeat is searched
+against every chromosome's assemblies. The output is a **centromere candidate
+region**, not a confirmed functional centromere or chromosome assignment.
+`--cen-min-identity` filters individual MUMmer hits; `--cen-min-len` filters the
+union of hit-covered bases in merged regions (overlaps counted once, gaps excluded).
+The internal v1 merge gap is provisionally 200 bp, pending real-data acceptance.
+A missing signal is not evidence that the assembly has no centromere.
+
+Prepare freezes sequences, thresholds, all source IDs, SHA-256 and notes into
+`tel/`, `cen/` and `metadata/annotation_library_snapshot.json`. Resume uses only
+those verified project inputs. Updating installed tools/libraries does not opt an
+existing project into a new library; explicitly prepare again, preferably into a
+new output directory, to adopt it. Full delivery includes the frozen annotation
+FASTA; Light omits all FASTA and retains the provenance snapshot/hashes. The matching App source retains this
+provenance and migrates workspace schema 6 to 7; older Apps cannot be assumed to
+open a migrated workspace. Implementation is awaiting unified review/tests and is
+not a claim of real-genome or native-App acceptance. See `library/SOURCES.md`
+for source records and evidence limits.

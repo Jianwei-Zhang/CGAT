@@ -458,8 +458,8 @@ pub(super) fn append_telomere_rows(
         tx.execute(
             "INSERT INTO source_seq_telomere_mark (
                 source_seq_id, rule_id, assigned_chr_name, motif, min_repeat,
-                repeat_count, start_bp, end_bp, strand
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                repeat_count, start_bp, end_bp, strand, provenance_json
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 source_seq_id,
                 mark.rule_id,
@@ -470,6 +470,7 @@ pub(super) fn append_telomere_rows(
                 mark.start_bp,
                 mark.end_bp,
                 mark.strand,
+                mark.provenance_json,
             ],
         )
         .with_context(|| {
@@ -506,8 +507,8 @@ pub(super) fn append_centromere_rows(
         tx.execute(
             "INSERT INTO source_seq_centromere_mark (
                 source_seq_id, cen_id, assigned_chr_name, query_name,
-                start_bp, end_bp, strand, align_length, identity, mapq
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                start_bp, end_bp, strand, align_length, identity, mapq, provenance_json
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 source_seq_id,
                 mark.cen_id,
@@ -519,6 +520,7 @@ pub(super) fn append_centromere_rows(
                 mark.align_length,
                 mark.identity,
                 mark.mapq,
+                mark.provenance_json,
             ],
         )
         .with_context(|| {

@@ -446,10 +446,15 @@ def run_reads_qc(
 
 
 def build_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
+    try:
+        from annotation_library import verify_snapshot
+    except ModuleNotFoundError:  # Imported through server.tools.
+        from .annotation_library import verify_snapshot
+    verify_snapshot(server_dir)
     rules_path = server_dir / "tel" / "rules.tsv"
     rules: list[dict[str, object]] = []
     if rules_path.is_file():
-        rows = read_tsv(rules_path, ["rule_id", "motif", "min_repeat", "reverse_complement"])
+        rows = read_tsv(rules_path)
         for row in rows:
             motif = row["motif"].upper()
             rules.append(
@@ -458,7 +463,8 @@ def build_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
                     "motif": motif,
                     "chromosome_min_repeat": int(row["min_repeat"]),
                     "donor_min_repeat": int(row["min_repeat"]),
-                    "source": "user",
+                    "source": ",".join(sorted({entry["source"] for entry in json.loads(row.get("provenance") or "[]")})) or "user",
+                    "provenance": row.get("provenance") or "[]",
                 }
             )
             if row["reverse_complement"].lower() == "true":
@@ -468,7 +474,8 @@ def build_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
                         "motif": reverse_complement(motif),
                         "chromosome_min_repeat": int(row["min_repeat"]),
                         "donor_min_repeat": int(row["min_repeat"]),
-                        "source": "user_reverse_complement",
+                        "source": ",".join(sorted({entry["source"] for entry in json.loads(row.get("provenance") or "[]")})) or "user_reverse_complement",
+                        "provenance": row.get("provenance") or "[]",
                     }
                 )
     else:
@@ -482,18 +489,19 @@ def build_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
                     "source": "grt_default",
                 }
             )
-    unique: list[dict[str, object]] = []
-    seen: set[tuple[str, int, int]] = set()
+    unique: dict[tuple[str, int, int], dict[str, object]] = {}
     for rule in rules:
-        key = (
-            str(rule["motif"]),
-            int(rule["chromosome_min_repeat"]),
-            int(rule["donor_min_repeat"]),
-        )
-        if key not in seen:
-            seen.add(key)
-            unique.append(rule)
-    return unique
+        key = (str(rule["motif"]), int(rule["chromosome_min_repeat"]), int(rule["donor_min_repeat"]))
+        if key not in unique:
+            unique[key] = rule
+        else:
+            prior = unique[key]
+            entries = {json.dumps(entry, sort_keys=True): entry
+                       for entry in json.loads(prior.get("provenance", "[]")) + json.loads(rule.get("provenance", "[]"))}
+            prior["provenance"] = json.dumps(list(entries.values()), ensure_ascii=False, sort_keys=True)
+            prior["source"] = ",".join(sorted(set(str(prior["source"]).split(",")) | set(str(rule["source"]).split(","))))
+    return list(unique.values())
+
 
 
 def has_telomere_signal(sequence: str, rules: list[dict[str, object]]) -> bool:
@@ -1348,11 +1356,13 @@ def prepare(args: argparse.Namespace) -> None:
                 "donor_min_repeat",
                 "min_telomere_bp",
                 "source",
+                "provenance",
             ],
             [
                 {
                     **rule,
                     "min_telomere_bp": MIN_TELOMERE_BP,
+                    "provenance": rule.get("provenance", "[]"),
                 }
                 for rule in telomere_rules
             ],

@@ -6,3 +6,6 @@
 /official-source.json
 __pycache__/
 *.pyc
+
+# User annotation libraries must never be packaged or committed.
+/local/

@@ -55,7 +55,26 @@ const MIGRATIONS: &[Migration] = &[
         name: "materialize_reference_segments",
         apply: migrate_reference_segments_to_v6,
     },
+    Migration {
+        version: 7,
+        name: "retain_annotation_library_provenance",
+        apply: migrate_annotation_provenance_to_v7,
+    },
 ];
+
+fn migrate_annotation_provenance_to_v7(conn: &Connection) -> Result<()> {
+    for table in ["source_seq_telomere_mark", "source_seq_centromere_mark"] {
+        ensure_column_exists(
+            conn,
+            LegacyColumn {
+                table,
+                name: "provenance_json",
+                definition: "TEXT NOT NULL DEFAULT '[]'",
+            },
+        )?;
+    }
+    Ok(())
+}
 
 fn migrate_pairwise_paths_to_v5(conn: &Connection) -> Result<()> {
     ensure_column_exists(

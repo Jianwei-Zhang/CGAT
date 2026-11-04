@@ -353,7 +353,7 @@ def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, f
 
 # Derived by prepare.sh from the reference FASTA. Delivery keeps it so the App
 # can render reference N gaps without needing the FASTA payload.
-OPTIONAL_METADATA = ("reference_segments.tsv",)
+OPTIONAL_METADATA = ("reference_segments.tsv", "annotation_library_snapshot.json")
 
 def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     source_root = source_root.resolve()
@@ -393,6 +393,8 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         shutil.copy2(result, target)
     copy_annotation_tree(source_root, staging_root, "tel")
     copy_annotation_tree(source_root, staging_root, "cen")
+    if include_fasta and (source_root / "cen/library.fa").is_file():
+        copy_file(source_root, staging_root, "cen/library.fa")
 
     q4_source = source_root / "grt/q/q4.fa"
     if include_fasta:

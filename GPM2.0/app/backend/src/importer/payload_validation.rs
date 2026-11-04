@@ -899,6 +899,7 @@ pub(super) fn read_telomere_mark_rows(bundle_root: &Path) -> Result<Vec<Telomere
                     bail!("invalid tel strand: {}", strand);
                 }
                 Ok(TelomereMarkRow {
+                    provenance_json: read_annotation_provenance(header, cols)?,
                     rule_id: value_by_header(header, cols, "rule_id")?,
                     dataset_name: value_by_header(header, cols, "dataset_name")?,
                     seq_name: value_by_header(header, cols, "seq_name")?,
@@ -955,6 +956,7 @@ pub(super) fn read_centromere_mark_rows(bundle_root: &Path) -> Result<Vec<Centro
                 bail!("invalid cen strand: {}", strand);
             }
             Ok(CentromereMarkRow {
+                provenance_json: read_annotation_provenance(header, cols)?,
                 cen_id: value_by_header(header, cols, "cen_id")?,
                 assigned_chr_name: value_by_header(header, cols, "chr_name")?,
                 query_name: value_by_header(header, cols, "query_name")?,
@@ -982,4 +984,55 @@ pub(super) fn read_centromere_mark_rows(bundle_root: &Path) -> Result<Vec<Centro
         rows.append(&mut file_rows);
     }
     Ok(rows)
+}
+
+fn read_annotation_provenance(header: &[String], cols: &[String]) -> Result<String> {
+    let raw =
+        optional_value_by_header(header, cols, "provenance").unwrap_or_else(|| "[]".to_string());
+    let decoded = if raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2 {
+        raw[1..raw.len() - 1].replace("\"\"", "\"")
+    } else {
+        raw
+    };
+    let value: Vec<serde_json::Value> =
+        serde_json::from_str(&decoded).context("invalid annotation provenance JSON")?;
+    for entry in &value {
+        for key in ["source", "id", "sha256", "note"] {
+            if entry.get(key).and_then(|v| v.as_str()).is_none() {
+                bail!("annotation provenance requires string field {}", key);
+            }
+        }
+        if !matches!(
+            entry["source"].as_str(),
+            Some("official" | "local" | "parameter")
+        ) {
+            bail!("invalid annotation provenance source");
+        }
+    }
+    serde_json::to_string(&value).context("failed to serialize annotation provenance")
+}
+
+#[cfg(test)]
+mod annotation_provenance_tests {
+    use super::*;
+
+    #[test]
+    fn old_packages_default_to_empty_provenance() -> Result<()> {
+        assert_eq!(read_annotation_provenance(&[], &[])?, "[]");
+        Ok(())
+    }
+
+    #[test]
+    fn python_csv_quoted_json_keeps_notes_and_sources() -> Result<()> {
+        let header = vec!["provenance".to_string()];
+        let value = serde_json::json!([{
+            "source": "local", "id": "my_repeat", "sha256": "a".repeat(64),
+            "note": "evidence: \"paper\""
+        }]);
+        let json = serde_json::to_string(&value)?;
+        let quoted = format!("\"{}\"", json.replace('"', "\"\""));
+        let decoded = read_annotation_provenance(&header, &[quoted])?;
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&decoded)?, value);
+        Ok(())
+    }
 }

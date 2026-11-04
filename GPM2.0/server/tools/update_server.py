@@ -87,6 +87,8 @@ def prepare(source, tools, workspace, release):
         raise ValueError("This is a Git checkout, not an installed source package; update it with Git")
     if source == tools or source in tools.parents or tools in source.parents:
         raise ValueError("Source staging and installed tools must be separate non-nested directories")
+    if any(name in ("local", "skills/gpm-server/local") or name.startswith(("local/", "skills/gpm-server/local/")) for name in source_files):
+        raise ValueError("Official source must never own user-local files")
     previous = metadata(tools)
     if previous.get("release"):
         version = lambda tag: tuple(map(int, tag.lstrip("v").split(".")))
@@ -106,7 +108,7 @@ def prepare(source, tools, workspace, release):
         if nested:
             relative = workspace.relative_to(tools).as_posix()
             managed = set(source_files) | set(previous.get("files", {}))
-            if (relative.split("/")[0] in {".run_all", ".git", "skills", "tools", "lib", "contracts", "templates"}
+            if (relative.split("/")[0] in {".run_all", ".git", "skills", "tools", "lib", "contracts", "templates", "library", "local"}
                     or any(name == relative or name.startswith(relative + "/") or relative.startswith(name + "/") for name in managed)):
                 raise ValueError("Nested project overlaps managed Server files")
         core.validate_targets(workspace, tools, source, allow_nested_workspace=nested)

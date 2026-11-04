@@ -301,3 +301,35 @@ LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之�
 保留原输入和失败日志。停止任务后可用原 `run.sh` 命令或 `run_all.sh` 恢复；
 只有来源核验通过的未完成初始参考命令会迁移，并保存回滚日志。兼容且已完成的
 参考检查点保留。本地合成控制通过不代表已验收尚未提供的客户完整小麦数据。
+
+### 端粒 / 着丝粒库（当前源码）
+
+以下行为适用于当前源码及下一次获准的源码包更新，不追溯改变旧版发布包。
+流程自动使用 **官方库 + 用户本地库 + 本次 `--tel` / `--cen` 参数**。
+显式参数是追加，不覆盖库，也不会自动保存为本地条目。
+
+```bash
+bash "$SERVER/library.sh" list                 # 显示官方和本地条目及 note
+bash "$SERVER/library.sh" list cen
+bash "$SERVER/library.sh" add-tel TTTTAGGG 5 --note "依据：我的文献"
+bash "$SERVER/library.sh" add-cen ./my_repeats.fa --note "依据：accession 或 DOI"
+bash "$SERVER/library.sh" remove <local_id>   # 使用 list 中显示的本地 ID
+```
+
+`--note` 可省略或为空。修改条目时先 remove 再 add；v1 不能删除或停用官方条目。
+官方数据位于 `$SERVER/library/`，本地数据位于 `$SERVER/local/library/`；更新不会替换本地部分。
+初始 tel 包括 TTTAGGG、TTAGGG、TTAGG，自动检查双链；初始 cen 包括拟南芥 CEN180、
+水稻 CentO、玉米 CentC 和人类 α-satellite，只是代表序列，不代表覆盖所有物种。
+
+`--cen` FASTA 名称不再要求染色体前缀；旧 `<chr>_centromere` 名称仍可用，但名称不参与归属。
+所有重复序列都搜索各染色体的 assembly。结果为**着丝粒候选区域**，不是功能着丝粒证明，
+也不用于分配染色体。`--cen-min-identity` 过滤单个 MUMmer 命中；`--cen-min-len` 过滤合并后
+命中实际覆盖总长度（重叠只计一次，间隔不算支持）。v1 内部合并间隔暂定 200 bp，待真实数据验收。
+没有命中不等于没有着丝粒。
+
+Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目的 `tel/`、`cen/` 和
+`metadata/annotation_library_snapshot.json`。续跑只读并校验项目快照，工具/库更新不会让旧项目
+自动使用新库；要采用新库需显式重新 prepare，建议使用新输出目录。完整交付包含注释 FASTA；
+轻量交付仍排除所有 FASTA，只保留来源快照与校验值。配套 App 源码保留来源信息，并将工作区 schema 从 6 迁移到 7；不保证旧版 App
+能打开迁移后的工作区。目前实现待统一 review 与测试，不代表真实基因组或原生 App 验收已通过。
+具体来源与证据边界见 `library/SOURCES.md`。

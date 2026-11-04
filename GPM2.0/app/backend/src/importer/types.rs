@@ -278,6 +278,7 @@ pub(super) struct TelomereMarkRow {
     pub(super) start_bp: i64,
     pub(super) end_bp: i64,
     pub(super) strand: String,
+    pub(super) provenance_json: String,
 }
 
 #[derive(Debug, Clone)]
@@ -293,6 +294,7 @@ pub(super) struct CentromereMarkRow {
     pub(super) align_length: i64,
     pub(super) identity: f64,
     pub(super) mapq: i64,
+    pub(super) provenance_json: String,
 }
 
 #[derive(Debug, Clone)]

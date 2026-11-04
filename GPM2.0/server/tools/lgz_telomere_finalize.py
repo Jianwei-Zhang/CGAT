@@ -104,7 +104,12 @@ CANDIDATE_FIELDS = [
 
 
 def load_locked_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
-    rows = read_tsv(server_dir / "metadata/grt_telomere_rules.tsv", RULE_FIELDS)
+    try:
+        from annotation_library import verify_snapshot
+    except ModuleNotFoundError:  # Imported through server.tools.
+        from .annotation_library import verify_snapshot
+    verify_snapshot(server_dir)
+    rows = read_tsv(server_dir / "metadata/grt_telomere_rules.tsv")
     rules: list[dict[str, object]] = []
     seen: set[tuple[str, int, int, int]] = set()
     for row in rows:
@@ -118,6 +123,7 @@ def load_locked_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
             "donor_min_repeat": int(row["donor_min_repeat"]),
             "min_telomere_bp": int(row["min_telomere_bp"]),
             "source": row["source"],
+            "provenance": row.get("provenance", "[]"),
         }
         if min(
             int(rule["chromosome_min_repeat"]),

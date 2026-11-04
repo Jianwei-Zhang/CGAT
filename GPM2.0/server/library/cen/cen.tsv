@@ -1,0 +1,5 @@
+id	note
+cen_arabidopsis_CEN180	Arabidopsis thaliana CEN180/At178; representative 178-bp window of clone 32_At178, not a consensus; sequence and CENH3-associated family evidence: Zhang et al. 2008, DOI:10.1105/tpc.107.057083; ENA:EU359509.1:181-358; candidate-region evidence only
+cen_rice_CentO	Oryza sativa indica CentO/RCS2; representative 155-bp window; sequence: Dong et al. 1998, DOI:10.1073/pnas.95.14.8135; family centromere localization: Cheng et al. 2002, DOI:10.1105/tpc.003079; ENA:AF058902.1:160-314; candidate-region evidence only
+cen_maize_CentC	Zea mays CentC-154b; 154-bp variant (not a 156-bp consensus); sequence and centromere localization: Ananiev et al. 1998, DOI:10.1073/pnas.95.22.13073; CENH3-associated family evidence: Zhong et al. 2002, DOI:10.1105/tpc.006106; ENA:AF078919.1:1-154; candidate-region evidence only
+cen_human_alpha	Homo sapiens alpha-satellite alpha-R1-9; one 171-bp subfamily monomer, not pan-chromosome coverage; sequence: Jorgensen et al. 1986, DOI:10.1016/0022-2836(86)90227-5; family-level CENP-A context: Altemose et al. 2022, DOI:10.1126/science.abl4178; ENA:X13647.1:1-171; candidate-region evidence only

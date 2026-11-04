@@ -595,3 +595,28 @@ fn opening_current_database_preserves_existing_legacy_pairwise_indexes() -> Resu
     assert_eq!(count, 2);
     Ok(())
 }
+
+#[test]
+fn schema_six_adds_optional_annotation_sources_without_losing_data() -> Result<()> {
+    let conn = Connection::open_in_memory()?;
+    create_current_schema(&conn)?;
+    conn.execute_batch(
+        "ALTER TABLE source_seq_telomere_mark DROP COLUMN provenance_json;
+         ALTER TABLE source_seq_centromere_mark DROP COLUMN provenance_json;
+         CREATE TABLE retained_library_migration_probe (note TEXT NOT NULL);
+         INSERT INTO retained_library_migration_probe VALUES ('keep me');",
+    )?;
+    set_user_version(&conn, 6)?;
+    super::migrate_workspace_schema(&conn)?;
+    assert_eq!(user_version(&conn)?, CURRENT_SCHEMA_VERSION);
+    for table in ["source_seq_telomere_mark", "source_seq_centromere_mark"] {
+        assert!(column_exists(&conn, table, "provenance_json")?);
+    }
+    let note: String = conn.query_row(
+        "SELECT note FROM retained_library_migration_probe",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(note, "keep me");
+    Ok(())
+}

@@ -255,6 +255,16 @@ function createRenderTracksRenderer(deps = {}) {
     };
   }
 
+  function annotationProvenanceTooltip(mark) {
+    try {
+      const entries = JSON.parse(mark?.provenanceJson ?? mark?.provenance_json ?? "[]");
+      if (!Array.isArray(entries)) return [];
+      return entries.map((entry) => [entry.source, entry.id, entry.note].filter(Boolean).join(": "));
+    } catch {
+      return [];
+    }
+  }
+
   function renderTelomereMarkersForTrackCtg({ ctg, rect, y, barHeight, role, isMirror }) {
     if (role !== "primary" || isMirror || !Array.isArray(ctg?.telomereMarks) || ctg.telomereMarks.length === 0) {
       return "";
@@ -285,6 +295,7 @@ function createRenderTracksRenderer(deps = {}) {
           repeatCount ? `repeat=${repeatCount}` : "",
           ctgStart && ctgEnd ? `range=${ctgStart}-${ctgEnd}` : "",
           strand ? `strand=${strand}` : "",
+          ...annotationProvenanceTooltip(mark),
         ].filter(Boolean).join("|");
         return `<rect
               class="track-telomere-marker ${resolveTelomereRuleClass(ruleId)}"
@@ -338,11 +349,14 @@ function createRenderTracksRenderer(deps = {}) {
         const strand = String(mark?.strand ?? "");
         const identityValue = Number(mark?.identity);
         const identity = Number.isFinite(identityValue) ? String(identityValue) : String(mark?.identity ?? "");
+        const evidence = annotationProvenanceTooltip(mark);
         const tooltip = [
-          cenId || "cen",
+          i18n.trackControls.centromereMarkers,
+          evidence.length ? "" : queryName || cenId || "cen",
           ctgStart && ctgEnd ? `range=${ctgStart}-${ctgEnd}` : "",
           identity ? `identity=${identity}` : "",
           strand ? `strand=${strand}` : "",
+          ...evidence,
         ].filter(Boolean).join("|");
         return `<rect
               class="track-centromere-marker"

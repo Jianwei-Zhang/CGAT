@@ -1,0 +1,4 @@
+id	motif	min_repeat	note
+tel_plant_TTTAGGG	TTTAGGG	5	Arabidopsis-type telomere, common in land plants, not universal; Richards and Ausubel 1988, DOI:10.1016/0092-8674(88)90494-1; min_repeat=5 is a GPM detection policy, not a literature-derived biological boundary
+tel_vertebrate_TTAGGG	TTAGGG	5	Human/vertebrate-type telomere, also found in other eukaryotes; Moyzis et al. 1988, DOI:10.1073/pnas.85.18.6622; min_repeat=5 is a GPM detection policy
+tel_arthropod_TTAGG	TTAGG	5	Bombyx-type telomere in many insects and other arthropods, not universal (e.g. not Drosophila); Okazaki et al. 1993, DOI:10.1128/MCB.13.3.1424-1432.1993; Sahara et al. 1999, DOI:10.1023/A:1009297729547; min_repeat=5 is a GPM detection policy

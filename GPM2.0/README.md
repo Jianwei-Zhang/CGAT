@@ -123,14 +123,56 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
 | `-t, --threads <n>` | `10` | Total compute-thread budget shared by independent alignment tasks and reads-QC jobs. |
 | `--skip-self` | Off | Skip same-dataset self alignment; same-dataset Subview becomes unavailable. |
-| `--tel <motif> <count>` | Optional, repeatable | Mark exact telomere-like repeats on both strands. Example: `--tel TTAGGG 20`. |
-| `--cen <fasta>` | Optional | Reference centromere FASTA. Record names must end in `_centromere`, such as `Chr01_centromere`. |
-| `--cen-min-len <bp>` | `10000` | Minimum centromere alignment length. |
-| `--cen-min-identity <pct>` | `80` | Minimum centromere alignment identity percentage. |
+| `--tel <motif> <count>` | Additive, repeatable | Add one-run tel rules to the automatic official + local libraries. |
+| `--cen <fasta>` | Additive | Add one-run centromere-related repeats; FASTA names do not bind chromosomes. |
+| `--cen-min-len <bp>` | `10000` | Minimum merged centromere-candidate covered bases (gaps excluded). |
+| `--cen-min-identity <pct>` | `80` | Minimum individual centromere-repeat hit identity percentage. |
 | `--reads <fastq>` | Optional, repeatable | Enable shared Meryl data plus per-dataset Merqury QV assessment; the `--threads` budget is distributed across datasets. |
 | `--lgz-qc-memory-gb <n>` | `80` | Memory limit for optional reads QC. |
 | `--lgz-kmer-size <n>` | `21` | K-mer size for optional reads QC. |
 | `--max-fill <bp>` | `1000000` | Length limit for both Step3 optimized refill rounds; can be changed on resume. |
+
+### Telomere / centromere libraries (source checkout)
+
+This behavior applies to this source checkout and the next approved source
+refresh, not retroactively to older published archives. The workflow automatically
+uses **official library + local library + this run's `--tel` / `--cen` inputs**.
+Explicit flags add to the libraries; they do not replace them or save local entries.
+
+```bash
+bash "$SERVER/library.sh" list                 # official + local, including notes
+bash "$SERVER/library.sh" list cen
+bash "$SERVER/library.sh" add-tel TTTTAGGG 5 --note "Evidence: my publication"
+bash "$SERVER/library.sh" add-cen ./my_repeats.fa --note "Evidence: accession or DOI"
+bash "$SERVER/library.sh" remove <local_id>   # list shows the generated ID
+```
+
+`--note` may be omitted or empty. To edit a local entry, remove it and add it again.
+Official entries cannot be removed/disabled in v1. Official data are under
+`$SERVER/library/`; user data are under `$SERVER/local/library/`, which updates
+never replace. Common tel motifs are TTTAGGG, TTAGGG and TTAGG (both strands).
+The initial cen families are Arabidopsis CEN180, rice CentO, maize CentC and human
+alpha-satellite; these are representative sequences, not universal species coverage.
+
+`--cen` accepts arbitrary FASTA names, including old `<chr>_centromere` names;
+they no longer bind a repeat to one reference chromosome. Every repeat is searched
+against every chromosome's assemblies. The output is a **centromere candidate
+region**, not a confirmed functional centromere or chromosome assignment.
+`--cen-min-identity` filters individual MUMmer hits; `--cen-min-len` filters the
+union of hit-covered bases in merged regions (overlaps counted once, gaps excluded).
+The internal v1 merge gap is provisionally 200 bp, pending real-data acceptance.
+A missing signal is not evidence that the assembly has no centromere.
+
+Prepare freezes sequences, thresholds, all source IDs, SHA-256 and notes into
+`tel/`, `cen/` and `metadata/annotation_library_snapshot.json`. Resume uses only
+those verified project inputs. Updating installed tools/libraries does not opt an
+existing project into a new library; explicitly prepare again, preferably into a
+new output directory, to adopt it. Full delivery includes the frozen annotation
+FASTA; Light omits all FASTA and retains the provenance snapshot/hashes. The matching App source retains this
+provenance and migrates workspace schema 6 to 7; older Apps cannot be assumed to
+open a migrated workspace. Implementation is awaiting unified review/tests and is
+not a claim of real-genome or native-App acceptance. See `server/library/SOURCES.md`
+for source records and evidence limits.
 
 #### Aligner-specific options
 
@@ -138,7 +180,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` or `asm5`; default `asm10` |
 
-GPM Server always uses Minimap2. BLASTN and Winnowmap are not available because whole-genome runs could not meet the workflow's runtime and memory requirements. LGZ processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
+GPM Server uses Minimap2 for genome/pairwise alignment and MUMmer4 for cen-repeat scans. BLASTN and Winnowmap are not available because whole-genome runs could not meet the workflow's runtime and memory requirements. LGZ processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
 
 ### 3. Resume and monitor
 

@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 6;
+pub const CURRENT_SCHEMA_VERSION: i64 = 7;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -403,6 +403,7 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             start_bp INTEGER NOT NULL,
             end_bp INTEGER NOT NULL,
             strand TEXT NOT NULL CHECK(strand IN ('+', '-')),
+            provenance_json TEXT NOT NULL DEFAULT '[]',
             FOREIGN KEY(source_seq_id) REFERENCES source_seq(id) ON DELETE CASCADE,
             FOREIGN KEY(rule_id) REFERENCES telomere_rule(rule_id) ON DELETE CASCADE
         );
@@ -419,6 +420,7 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             align_length INTEGER NOT NULL,
             identity REAL NOT NULL,
             mapq INTEGER NOT NULL,
+            provenance_json TEXT NOT NULL DEFAULT '[]',
             FOREIGN KEY(source_seq_id) REFERENCES source_seq(id) ON DELETE CASCADE
         );
 

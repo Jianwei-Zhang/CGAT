@@ -73,6 +73,7 @@ def inputs(root: Path) -> dict:
     return {"datasets": rows, "parameters": options(root),
             "telomere_rules": table(root, "tel/rules.tsv"),
             "centromere_reference": table(root, "cen/reference.tsv"),
+            "annotation_library_snapshot": read_json(root / "metadata/annotation_library_snapshot.json", {}),
             "package": table(root, "metadata/package.tsv")}
 
 
@@ -291,6 +292,8 @@ def _project_centromere_markers(root: Path, final_path: dict) -> list[dict]:
                         "dataset_name": hit.get("dataset_name"), "ctg_name": hit.get("ctg_name"),
                         "source_start": overlap_start, "source_end": overlap_end,
                         "identity": hit.get("identity"), "align_length": hit.get("align_length"),
+                        "cen_id": hit.get("cen_id"), "query_name": hit.get("query_name"),
+                        "provenance": hit.get("provenance", "[]"),
                     })
             cursor += length
     return projected
@@ -304,6 +307,7 @@ def final_annotations(root: Path, final_path: dict) -> dict:
         "telomere": {
             "configured": telomere_rules.is_file(),
             "terminal_rows": step4.get("terminal_rows", []),
+            "rules": read_tsv(root / "metadata/grt_telomere_rules.tsv"),
         },
         "centromere": {
             "configured": centromere_reference.is_file(),

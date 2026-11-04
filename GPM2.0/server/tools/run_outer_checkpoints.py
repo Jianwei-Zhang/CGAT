@@ -311,6 +311,11 @@ class OuterCheckpointManager:
         self._tool_cache[command] = identity
         return identity
 
+    @staticmethod
+    def _repeat_cen_scan(operation: Path) -> bool:
+        command = operation / "command.sh"
+        return command.is_file() and "/tools/cen_scan.py" in command.read_text(encoding="utf-8")
+
     def _alignment_tools(self) -> list[dict[str, object]]:
         engine = self._read_options()["alignment_engine"]
         if engine != "minimap2":
@@ -387,6 +392,10 @@ class OuterCheckpointManager:
             self.server_dir / ".prepare_lib/tools/self_alignment_batches.py",
             self.server_dir / "tel/rules.tsv",
             self.server_dir / "cen/reference.tsv",
+            self.server_dir / "cen/library.fa",
+            self.server_dir / "metadata/annotation_library_snapshot.json",
+            self.server_dir / ".prepare_lib/tools/cen_scan.py",
+            self.server_dir / ".prepare_lib/tools/annotation_library.py",
         ]:
             if optional.is_file():
                 paths.append(optional)
@@ -454,6 +463,10 @@ class OuterCheckpointManager:
             self.server_dir / ".prepare_lib/tools/self_alignment_batches.py",
             self.server_dir / "tel/rules.tsv",
             self.server_dir / "cen/reference.tsv",
+            self.server_dir / "cen/library.fa",
+            self.server_dir / "metadata/annotation_library_snapshot.json",
+            self.server_dir / ".prepare_lib/tools/cen_scan.py",
+            self.server_dir / ".prepare_lib/tools/annotation_library.py",
         ]:
             if optional.is_file():
                 paths.append(optional)
@@ -461,6 +474,8 @@ class OuterCheckpointManager:
         if centromere_dir.is_dir():
             paths.extend(path for path in centromere_dir.rglob("*") if path.is_file())
         tools = self._alignment_tools()
+        if self._repeat_cen_scan(run_dir / "cen_scan"):
+            tools = [*tools, self._tool_identity("nucmer"), self._tool_identity("show-coords")]
         uses_python = any((run_dir / name).is_dir() for name in ("tel_scan", "cen_scan")) or any(
             child.is_dir() and (child / "restore_self_paf.py").is_file()
             for child in run_dir.iterdir()
@@ -575,6 +590,13 @@ class OuterCheckpointManager:
                         f"telomere scan outputs are missing for chromosome {chromosome}"
                     )
                 paths.extend(tel_outputs)
+                continue
+            if operation.name == "cen_scan" and self._repeat_cen_scan(operation):
+                paths.append(self.server_dir / f"cen/chr_{chromosome}/marks.tsv")
+                coords = sorted(operation.glob("dataset_*.coords.tsv"))
+                if not coords:
+                    raise OrchestrationContractError(f"centromere scan outputs are missing: {operation}")
+                paths.extend(coords)
                 continue
             paf_paths = sorted(operation.glob("result*.paf"))
             if not paf_paths:

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "cen_arabidopsis_CEN180",
+      "accession": "EU359509.1",
+      "start_1based": 181,
+      "end_1based": 358,
+      "source_url": "https://www.ebi.ac.uk/ena/browser/api/embl/EU359509.1",
+      "retrieved_date": "2026-11-04",
+      "source_record_sha256": "81398aa50456680b6199b024ecbfddedf9923af79c8b0ca1faaa0d83f190226a",
+      "source_sequence_md5": "4ed3b1d9f37dae393aa92076dc505f98",
+      "sequence_sha256": "9b110dec9d5bd988a1da23b9ee7f280918fd96573ebed210ac0c13eaf39f38c7",
+      "fasta_sha256": "388c33339e1a5c48bb34400db404182bf9c30e0324376508440391ccbb6d52df",
+      "length": 178,
+      "note": "Arabidopsis thaliana CEN180/At178; representative 178-bp window of clone 32_At178, not a consensus; sequence and CENH3-associated family evidence: Zhang et al. 2008, DOI:10.1105/tpc.107.057083; ENA:EU359509.1:181-358; candidate-region evidence only"
+    },
+    {
+      "id": "cen_rice_CentO",
+      "accession": "AF058902.1",
+      "start_1based": 160,
+      "end_1based": 314,
+      "source_url": "https://www.ebi.ac.uk/ena/browser/api/embl/AF058902.1",
+      "retrieved_date": "2026-11-04",
+      "source_record_sha256": "ddf26dd4e95ed75b3fe51c7214c837e55fd193d9fb61b80e7e9b8f03be328e2e",
+      "source_sequence_md5": "6a0b60272c10e2daf0ac0286418e2d9a",
+      "sequence_sha256": "90999c938d2da93f3de5b63f568e2ef2e7aae50ea029e6adf98d1bccd7af4d5a",
+      "fasta_sha256": "90672e32e6ce72a0955d9e6dd307896c219606c9fe1baec3e2b4a5447d2b02e3",
+      "length": 155,
+      "note": "Oryza sativa indica CentO/RCS2; representative 155-bp window; sequence: Dong et al. 1998, DOI:10.1073/pnas.95.14.8135; family centromere localization: Cheng et al. 2002, DOI:10.1105/tpc.003079; ENA:AF058902.1:160-314; candidate-region evidence only"
+    },
+    {
+      "id": "cen_maize_CentC",
+      "accession": "AF078919.1",
+      "start_1based": 1,
+      "end_1based": 154,
+      "source_url": "https://www.ebi.ac.uk/ena/browser/api/embl/AF078919.1",
+      "retrieved_date": "2026-11-04",
+      "source_record_sha256": "7c98170be8e3ef94a051a7f3c2f4e98b76f60bb58ba92a51717738a4ae9964b4",
+      "source_sequence_md5": "9afa88bb396577f5b50b1d664cdeb88e",
+      "sequence_sha256": "0b9c70d15f14ced277d41e7ae735aea5b6517ce8bc4728a7768f0683d119d63e",
+      "fasta_sha256": "3742a11bf1628a17d1fbb76f5c1d227fe94d563dd89c15338763a90ab6c39550",
+      "length": 154,
+      "note": "Zea mays CentC-154b; 154-bp variant (not a 156-bp consensus); sequence and centromere localization: Ananiev et al. 1998, DOI:10.1073/pnas.95.22.13073; CENH3-associated family evidence: Zhong et al. 2002, DOI:10.1105/tpc.006106; ENA:AF078919.1:1-154; candidate-region evidence only"
+    },
+    {
+      "id": "cen_human_alpha",
+      "accession": "X13647.1",
+      "start_1based": 1,
+      "end_1based": 171,
+      "source_url": "https://www.ebi.ac.uk/ena/browser/api/embl/X13647.1",
+      "retrieved_date": "2026-11-04",
+      "source_record_sha256": "02e7650cd6e7d8fab80c82adebe3deb8165630c8810fdc371f68aacdd2dd3028",
+      "source_sequence_md5": "16db716dc85268a7cd891658c619314c",
+      "sequence_sha256": "740808e255d0a9ada57a6d346bfdf6fefa131f86e769bd627831f7acf72653a3",
+      "fasta_sha256": "6d65f712e28d3a8585a22a83aaa7a4dd19eba922665b39da079ac03e67fa10de",
+      "length": 171,
+      "note": "Homo sapiens alpha-satellite alpha-R1-9; one 171-bp subfamily monomer, not pan-chromosome coverage; sequence: Jorgensen et al. 1986, DOI:10.1016/0022-2836(86)90227-5; family-level CENP-A context: Altemose et al. 2022, DOI:10.1126/science.abl4178; ENA:X13647.1:1-171; candidate-region evidence only"
+    }
+  ]
+}

@@ -33,6 +33,9 @@ case "${grt_tool}:\${1:-}" in
   nucmer:--help)
     printf '%s\n' '     --batch=BASES' ' -t, --threads=NUM'
     ;;
+  show-coords:-THrcl)
+    if [[ -n "\${FAKE_CEN_COORDS:-}" ]]; then cat "\$FAKE_CEN_COORDS"; fi
+    ;;
   delta-filter:-h|show-coords:-h)
     printf '%s\n' '-r    reference-order option' '-l    sequence-length option'
     ;;
@@ -1209,12 +1212,12 @@ PY
     -o "$output_root" >/dev/null
 
   assert_file "${output_root}/tel/rules.tsv"
-  grep -F $'tel1\tTTAGGG\t20\ttrue' "${output_root}/tel/rules.tsv" >/dev/null || {
+  grep -F $'\tTTAGGG\t20\ttrue' "${output_root}/tel/rules.tsv" >/dev/null || {
     echo "expected TTAGGG tel rule" >&2
     cat "${output_root}/tel/rules.tsv" >&2
     exit 1
   }
-  grep -F $'tel2\tTTTAGGG\t10\ttrue' "${output_root}/tel/rules.tsv" >/dev/null || {
+  grep -F $'\tTTTAGGG\t10\ttrue' "${output_root}/tel/rules.tsv" >/dev/null || {
     echo "expected TTTAGGG tel rule" >&2
     cat "${output_root}/tel/rules.tsv" >&2
     exit 1
@@ -1235,12 +1238,12 @@ EOF
 
   PATH="${FAKE_BIN}:$PATH" bash "${output_root}/runs/chr_Chr01/command.sh" >/dev/null
   assert_file "${output_root}/tel/chr_Chr01/ds_a.tsv"
-  grep -F $'tel1\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t3\t122\t+' "${output_root}/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
+  grep -F $'\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t3\t122\t+' "${output_root}/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
     echo "expected forward TTAGGG tel mark" >&2
     cat "${output_root}/tel/chr_Chr01/ds_a.tsv" >&2
     exit 1
   }
-  grep -F $'tel1\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t125\t244\t-' "${output_root}/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
+  grep -F $'\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t125\t244\t-' "${output_root}/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
     echo "expected reverse-complement TTAGGG tel mark" >&2
     cat "${output_root}/tel/chr_Chr01/ds_a.tsv" >&2
     exit 1
@@ -1265,11 +1268,18 @@ test_cen_option_generates_chr_local_cen_marks() {
     -o "$output_root" >/dev/null
 
   assert_file "${output_root}/cen/reference.tsv"
-  grep -F $'cen\tChr01\tChr01_centromere\tdata/centromere/ref_cen_regions.fa\t5\t80' "${output_root}/cen/reference.tsv" >/dev/null || {
-    echo "expected Chr01 cen reference row" >&2
-    cat "${output_root}/cen/reference.tsv" >&2
-    exit 1
-  }
+  local cen_query
+  cen_query="$(python3 - "$output_root" <<'PYCEN'
+import csv, json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+rows = list(csv.DictReader((root / 'cen/reference.tsv').open(), delimiter='\t'))
+assert len(rows) == 5 and all(row['chr_name'] == '*' for row in rows)
+row = next(row for row in rows if any(e['source'] == 'parameter' for e in json.loads(row['provenance'])))
+assert int(row['min_len']) == 5 and float(row['min_identity']) == 80
+print(row['sequence_name'])
+PYCEN
+)"
 
   cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
 tig_cen	40	0	40	+	Chr01	1000	1	41	40	40	60
@@ -1282,21 +1292,17 @@ EOF
     cat "${output_root}/runs/chr_Chr01/generated_command.sh" >&2
     exit 1
   }
-  grep -F 'minimap2 -x asm10 -t "${GPM_TASK_THREADS:-10}" -c --cs -o result.paf' "${output_root}/runs/chr_Chr01/cen_scan/command.sh" >/dev/null || {
-    echo "expected cen scan minimap2 command with cs/cigar output" >&2
-    cat "${output_root}/runs/chr_Chr01/cen_scan/command.sh" >&2
+  grep -F 'cen_scan.py' "${output_root}/runs/chr_Chr01/cen_scan/command.sh" >/dev/null || {
+    echo "expected repeat-aware cen scan command" >&2
     exit 1
   }
-
-  cat > "${output_root}/runs/chr_Chr01/cen_scan/result.paf" <<'EOF'
-Chr01_centromere	20	0	20	+	tig_cen	40	5	25	18	20	60	dv:f:0.0500
-EOF
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/runs/chr_Chr01/cen_scan/command.sh" >/dev/null
-
+  local coords="${TMP_DIR}/cen.coords.tsv"
+  printf '1\t20\t6\t25\t20\t20\t95.0\t20\t40\t100.0\t50.0\t%s\ttig_cen\n' "$cen_query" > "$coords"
+  FAKE_CEN_COORDS="$coords" PATH="${FAKE_BIN}:$PATH" bash "${output_root}/runs/chr_Chr01/cen_scan/command.sh" >/dev/null
   assert_file "${output_root}/cen/chr_Chr01/marks.tsv"
-  grep -F $'cen\tChr01\tChr01_centromere\tds_a\ttig_cen\t6\t25\t+\t20\t95.000\t60' "${output_root}/cen/chr_Chr01/marks.tsv" >/dev/null || {
-    echo "expected accepted cen mark" >&2
-    cat "${output_root}/cen/chr_Chr01/marks.tsv" >&2
+  grep -F "$(printf '%s\tChr01\t%s\tds_a\ttig_cen\t6\t25\t+\t20\t95.000\t0' "$cen_query" "$cen_query")" \
+    "${output_root}/cen/chr_Chr01/marks.tsv" >/dev/null || {
+    echo "expected merged candidate cen mark with real source provenance" >&2
     exit 1
   }
 }
@@ -1318,14 +1324,14 @@ test_cen_rejects_duplicate_chr_headers() {
     echo "expected duplicate cen chr headers to fail" >&2
     exit 1
   fi
-  grep -F 'Duplicate --cen chromosome entry: Chr01' "${TMP_DIR}/cen_dup.err" >/dev/null || {
+  grep -F 'empty or duplicate FASTA name' "${TMP_DIR}/cen_dup.err" >/dev/null || {
     echo "expected duplicate cen chr error" >&2
     cat "${TMP_DIR}/cen_dup.err" >&2
     exit 1
   }
 }
 
-test_cen_rejects_unknown_reference_chr() {
+test_cen_accepts_unbound_sequence_names() {
   local ref="${TMP_DIR}/ref-cen-missing.fa"
   local cen="${TMP_DIR}/ref-cen-missing-regions.fa"
   local ds="${TMP_DIR}/ds-cen-missing.fa"
@@ -1334,19 +1340,20 @@ test_cen_rejects_unknown_reference_chr() {
   write_multi_fasta "$cen" "Chr99_centromere" "AAAAAAAAAA"
   write_multi_fasta "$ds" "tig_cen" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_cen_missing "$ref" \
     --ds ds_a "$ds" \
     --cen "$cen" \
-    -o "$output_root" >/dev/null 2>"${TMP_DIR}/cen_missing.err"; then
-    echo "expected missing cen chr to fail" >&2
-    exit 1
-  fi
-  grep -F 'Unknown --cen chromosome entry: Chr99' "${TMP_DIR}/cen_missing.err" >/dev/null || {
-    echo "expected unknown cen chr error" >&2
-    cat "${TMP_DIR}/cen_missing.err" >&2
-    exit 1
-  }
+    -o "$output_root" >/dev/null
+  python3 - "$output_root" <<'PYCEN'
+import csv, json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+rows = list(csv.DictReader((root / 'cen/reference.tsv').open(), delimiter='\t'))
+assert all(row['chr_name'] == '*' for row in rows)
+assert any(entry.get('sequence_name') == 'Chr99_centromere'
+           for row in rows for entry in json.loads(row['provenance']))
+PYCEN
 }
 
 test_custom_output_root
@@ -1366,7 +1373,7 @@ test_prepare_decompresses_gzip_inputs_to_package_fa
 test_tel_options_generate_chr_local_tel_marks
 test_cen_option_generates_chr_local_cen_marks
 test_cen_rejects_duplicate_chr_headers
-test_cen_rejects_unknown_reference_chr
+test_cen_accepts_unbound_sequence_names
 test_prepare_writes_package_metadata_and_stages_runs
 test_prepare_rejects_reference_without_sequences
 test_assignment_helper_generates_chr_assignments_and_chr_local_runs

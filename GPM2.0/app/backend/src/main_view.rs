@@ -146,6 +146,7 @@ pub struct ChrViewTelomereMarkItem {
     pub strand: String,
     pub ctg_start: i64,
     pub ctg_end: i64,
+    pub provenance_json: String,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -161,6 +162,7 @@ pub struct ChrViewCentromereMarkItem {
     pub mapq: i64,
     pub ctg_start: i64,
     pub ctg_end: i64,
+    pub provenance_json: String,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -844,6 +846,7 @@ struct ChrViewTelomereMarkRow {
     start_bp: i64,
     end_bp: i64,
     strand: String,
+    provenance_json: String,
 }
 
 #[derive(Debug, Clone)]
@@ -856,6 +859,7 @@ struct ChrViewCentromereMarkRow {
     align_length: i64,
     identity: f64,
     mapq: i64,
+    provenance_json: String,
 }
 
 #[derive(Debug, Clone)]
@@ -987,6 +991,7 @@ fn list_chr_view_telomere_marks_with_connection(
             )
         };
         marks.push(ChrViewTelomereMarkItem {
+            provenance_json: row.provenance_json,
             rule_id: row.rule_id,
             motif: row.motif,
             min_repeat: row.min_repeat,
@@ -1034,6 +1039,7 @@ fn list_chr_view_centromere_marks_with_connection(
             )
         };
         marks.push(ChrViewCentromereMarkItem {
+            provenance_json: row.provenance_json,
             cen_id: row.cen_id,
             query_name: row.query_name,
             start_bp: clipped_start,
@@ -1071,7 +1077,8 @@ fn load_chr_view_centromere_mark_rows(
                 cm.strand,
                 cm.align_length,
                 cm.identity,
-                cm.mapq
+                cm.mapq,
+                cm.provenance_json
              FROM assembly_ctg c
              JOIN assembly_seq s ON s.id = c.assembly_seq_id
              JOIN source_seq ss ON ss.id = s.source_seq_id
@@ -1093,6 +1100,7 @@ fn load_chr_view_centromere_mark_rows(
             align_length: row.get(5)?,
             identity: row.get(6)?,
             mapq: row.get(7)?,
+            provenance_json: row.get(8)?,
         })
     })
     .context("failed to query chr view centromere marks")?
@@ -1114,7 +1122,8 @@ fn load_chr_view_telomere_mark_rows(
                 tm.repeat_count,
                 tm.start_bp,
                 tm.end_bp,
-                tm.strand
+                tm.strand,
+                tm.provenance_json
              FROM assembly_ctg c
              JOIN assembly_seq s ON s.id = c.assembly_seq_id
              JOIN source_seq ss ON ss.id = s.source_seq_id
@@ -1135,6 +1144,7 @@ fn load_chr_view_telomere_mark_rows(
             start_bp: row.get(4)?,
             end_bp: row.get(5)?,
             strand: row.get(6)?,
+            provenance_json: row.get(7)?,
         })
     })
     .context("failed to query chr view telomere marks")?

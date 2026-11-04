@@ -202,6 +202,39 @@ class CoordinatedUpdateTests(unittest.TestCase):
         update.rollback(backup)
         self.assertEqual([self.snapshot(root) for root in (self.tools, self.work, self.skill)], before)
 
+    def test_official_library_updates_never_touch_local_or_project_snapshot(self):
+        for root, payload in ((self.tools, b"old official\n"), (self.source, b"new official\n")):
+            file = root / "library/tel.tsv"
+            file.parent.mkdir(parents=True)
+            file.write_bytes(payload)
+            file.chmod(0o644)
+            meta = json.loads((root / "SOURCE.json").read_text())
+            meta["files"]["library/tel.tsv"] = {"sha256": update.core.digest(payload), "mode": 0o644}
+            (root / "SOURCE.json").write_text(json.dumps(meta) + "\n")
+        local = self.tools / "local/library/tel.tsv"
+        local.parent.mkdir(parents=True)
+        local.write_bytes(b"my local note and sequence\n")
+        prepared = {}
+        for relative in ("tel/rules.tsv", "cen/reference.tsv", "cen/library.fa", "metadata/annotation_library_snapshot.json"):
+            path = self.work / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(("frozen input: " + relative).encode())
+            prepared[path] = path.read_bytes()
+        update.apply(self.plan())
+        self.assertEqual((self.tools / "library/tel.tsv").read_bytes(), b"new official\n")
+        self.assertEqual(local.read_bytes(), b"my local note and sequence\n")
+        for path, data in prepared.items():
+            self.assertEqual(path.read_bytes(), data)
+        self.assertFalse((self.work / ".prepare_lib/library").exists())
+
+    def test_official_source_cannot_own_user_local_library_paths(self):
+        path = self.source / "local/library/tel.tsv"
+        path.parent.mkdir(parents=True)
+        path.write_text("must never be installed\n")
+        self.make_manifest(self.source, "b" * 40, "2026-10-26T00:00:00+00:00")
+        with self.assertRaisesRegex(ValueError, "never own user-local"):
+            self.plan()
+
     def test_tool_only_update_leaves_project_unchanged_then_project_only_alignment(self):
         before = self.snapshot(self.work)
         update.apply(self.plan(workspace=False))

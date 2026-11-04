@@ -51,8 +51,8 @@ Usage:
     [--archive-format tar.gz|zip] \
     [--skip-self] \
     [--tel <motif> <min_repeat>] \
-    [--cen <reference_centromere_fasta>] \
-    [--cen-min-len <min_alignment_bp>] \
+    [--cen <centromere_repeat_fasta>] \
+    [--cen-min-len <min_supported_region_bp>] \
     [--cen-min-identity <min_identity_percent>] \
     [--reads <reads_fastq_path> ...] \
     [--lgz-qc-memory-gb <memory_gb>] \
@@ -75,14 +75,16 @@ Behavior:
   - Uses default work root: ./gpm_server under the current working directory
   - Supports -o/--out to choose another work root
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
-  - Uses Minimap2 for all reference and chromosome-local alignments
+  - Uses Minimap2 for reference/pairwise alignments; MUMmer --maxmatch for cen repeats
   - Supports --minimap-preset, default: asm10
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
   - Default delivery: tar.gz compressed with pigz using the thread budget; --archive-format zip keeps ZIP output
-  - Supports repeatable --tel <motif> <min_repeat> to mark telomere-like tandem repeats
-  - Supports --cen <reference_centromere_fasta> to mark complete reference centromere regions
-  - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
+  - Official and user-local tel/cen libraries are enabled automatically and frozen into the project
+  - Repeatable --tel <motif> <min_repeat> adds one-run rules to both libraries
+  - --cen <centromere_repeat_fasta> adds one-run repeats; headers do not bind chromosomes
+  - --cen-min-identity filters hits; --cen-min-len filters merged candidate support (defaults: 80%, 10000 bp)
+  - Manage local entries with library.sh list/add-tel/add-cen/remove; updates leave local/ unchanged
   - The first --ds is the locked LGZ primary dataset; later initial --ds inputs are support datasets
   - --max-fill sets the Step3 optimized refill length limit in bp, default: 1000000
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
@@ -407,12 +409,8 @@ write_prepare_options_metadata() {
   local cen_enabled="false"
   local reads_qc_enabled="false"
 
-  if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
-    tel_enabled="true"
-  fi
-  if [[ -n "$CEN_SRC" ]]; then
-    cen_enabled="true"
-  fi
+  if [[ -s "${WORK_ROOT}/tel/rules.tsv" ]]; then tel_enabled="true"; fi
+  if [[ -s "${WORK_ROOT}/cen/reference.tsv" ]]; then cen_enabled="true"; fi
   if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
     reads_qc_enabled="true"
   fi
@@ -450,32 +448,6 @@ write_prepare_options_metadata() {
     printf 'grt_qc_memory_gb\t%s\n' "$LGZ_QC_MEMORY_GB"
     printf 'grt_kmer_size\t%s\n' "$LGZ_KMER_SIZE"
   } > "$output_path"
-}
-
-write_tel_rules_metadata() {
-  local output_path="$1"
-  shift
-
-  {
-    printf 'rule_id\tmotif\tmin_repeat\treverse_complement\n'
-    local rule_index=1
-    while [[ $# -ge 2 ]]; do
-      printf 'tel%s\t%s\t%s\ttrue\n' "$rule_index" "${1^^}" "$2"
-      rule_index=$((rule_index + 1))
-      shift 2
-    done
-  } > "$output_path"
-}
-
-write_cen_reference_metadata() {
-  local output_path="$1"
-  local cen_fasta="$2"
-  local ref_fai="$3"
-  local fasta_relpath="$4"
-
-  python3 "${SCRIPT_DIR}/tools/cen_reference_metadata.py" \
-    "$output_path" "$cen_fasta" "$ref_fai" "$fasta_relpath" \
-    "$CEN_MIN_LEN" "$CEN_MIN_IDENTITY"
 }
 
 write_ref_command_script() {
@@ -835,13 +807,13 @@ while [[ $# -gt 0 ]]; do
       shift 3
       ;;
     --cen)
-      [[ $# -ge 2 ]] || die "--cen requires <reference_centromere_fasta>"
+      [[ $# -ge 2 ]] || die "--cen requires <centromere_repeat_fasta>"
       [[ -z "$CEN_SRC" ]] || die "--cen may only be provided once"
       CEN_SRC="$2"
       shift 2
       ;;
     --cen-min-len)
-      [[ $# -ge 2 ]] || die "--cen-min-len requires <min_alignment_bp>"
+      [[ $# -ge 2 ]] || die "--cen-min-len requires <min_supported_region_bp>"
       validate_cen_min_len "$2"
       CEN_MIN_LEN="$2"
       shift 2
@@ -970,23 +942,19 @@ finish_prepare_report() {
 }
 trap finish_prepare_report EXIT
 
-if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
-  mkdir -p "${WORK_ROOT}/tel"
-  write_tel_rules_metadata "${WORK_ROOT}/tel/rules.tsv" "${TEL_RULE_ARGS[@]}"
-fi
+# Merge and freeze installation libraries plus this invocation. Neither a later
+# Server update nor a resume reads live installation library contents.
+LIBRARY_ARGS=(--server-root "$SCRIPT_DIR" snapshot --workspace "$WORK_ROOT"
+  --cen-min-len "$CEN_MIN_LEN" --cen-min-identity "$CEN_MIN_IDENTITY")
+for ((i=0; i<${#TEL_RULE_ARGS[@]}; i+=2)); do
+  LIBRARY_ARGS+=(--tel "${TEL_RULE_ARGS[$i]}" "${TEL_RULE_ARGS[$((i+1))]}")
+done
+if [[ -n "$CEN_SRC" ]]; then LIBRARY_ARGS+=(--cen "$CEN_SRC"); fi
+python3 "${SCRIPT_DIR}/tools/annotation_library.py" "${LIBRARY_ARGS[@]}"
 
 REF_DST="${WORK_ROOT}/data/reference/${REF_NAME}.fa"
 materialize_fasta_input "$REF_SRC" "$REF_DST"
 ensure_fai "$REF_DST"
-
-if [[ -n "$CEN_SRC" ]]; then
-  mkdir -p "${WORK_ROOT}/cen" "${WORK_ROOT}/data/centromere"
-  CEN_BASENAME="$(sanitize_fasta_basename "$CEN_SRC")"
-  CEN_DST="${WORK_ROOT}/data/centromere/${CEN_BASENAME}"
-  CEN_REL="data/centromere/${CEN_BASENAME}"
-  materialize_fasta_input "$CEN_SRC" "$CEN_DST"
-  write_cen_reference_metadata "${WORK_ROOT}/cen/reference.tsv" "$CEN_DST" "${REF_DST}.fai" "$CEN_REL"
-fi
 
 {
   printf 'reference_name\tspecies_name\tassembly_label\tfasta_relpath\tfai_relpath\n'
@@ -1177,9 +1145,9 @@ echo "  - ${WORK_ROOT}/metadata/reference_segments.tsv"
 echo "  - ${WORK_ROOT}/metadata/datasets.tsv"
 echo "  - ${WORK_ROOT}/run_all.sh"
 echo "  - ${WORK_ROOT}/.run_all/plan.tsv"
-if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
-  echo "  - ${WORK_ROOT}/tel/rules.tsv"
-fi
+echo "  - ${WORK_ROOT}/tel/rules.tsv"
+echo "  - ${WORK_ROOT}/cen/reference.tsv"
+echo "  - ${WORK_ROOT}/metadata/annotation_library_snapshot.json"
 echo "  - ${WORK_ROOT}/add_dataset.sh"
 echo "  - ${WORK_ROOT}/add_ctg.sh"
 echo "  - ${WORK_ROOT}/prepare_lgz_inputs.sh"

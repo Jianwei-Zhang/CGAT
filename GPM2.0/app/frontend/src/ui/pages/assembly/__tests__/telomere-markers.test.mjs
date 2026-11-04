@@ -226,7 +226,7 @@ test("assembly main track renders centromere markers only on primary ctg bars", 
   assert.match(html, /data-centromere-cen-id="cen"/);
   assert.match(html, /data-centromere-query-name="Chr01_centromere"/);
   assert.match(html, /data-centromere-contig-id="101"/);
-  assert.match(html, /cen\|range=300-620\|identity=96.5\|strand=\+/);
+  assert.match(html, /Chr01_centromere\|range=300-620\|identity=96.5\|strand=\+/);
   assert.doesNotMatch(html, /data-centromere-contig-id="202"/);
 });
 
@@ -240,4 +240,19 @@ test("assembly tracks render n region markers with inspectable width and tab too
   const markerMatch = html.match(/data-n-region-contig-id="101"[\s\S]*?width="([0-9.]+)"/);
   assert.ok(markerMatch, "expected primary n region marker to render");
   assert.ok(Number(markerMatch[1]) >= 6, `expected n marker width >= 6, got ${markerMatch[1]}`);
+});
+
+
+test("annotation markers show all library sources and their evidence notes", () => {
+  const state = createState();
+  const provenanceJson = JSON.stringify([
+    { source: "official", id: "known_repeat", sha256: "a".repeat(64), note: "DOI:evidence" },
+    { source: "local", id: "my_repeat", sha256: "b".repeat(64), note: "my evidence <safe>" },
+  ]);
+  state.assembly.chrCtgs[0].telomereMarks[0].provenanceJson = provenanceJson;
+  state.assembly.chrCtgs[0].centromereMarks[0].provenanceJson = provenanceJson;
+  const html = renderAssemblyPage(state);
+  assert.match(html, /official: known_repeat: DOI:evidence/);
+  assert.match(html, /local: my_repeat: my evidence &lt;safe&gt;/);
+  assert.doesNotMatch(html, /my evidence <safe>/);
 });

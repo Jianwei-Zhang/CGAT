@@ -28,6 +28,20 @@ class GrtAppPackageTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
+    def test_annotation_provenance_is_kept_but_light_never_contains_library_fasta(self) -> None:
+        library = self.source / "cen/library.fa"
+        library.parent.mkdir(parents=True, exist_ok=True)
+        library.write_text(">private_local_repeat\nACGTACGT\n")
+        snapshot = self.source / "metadata/annotation_library_snapshot.json"
+        snapshot.write_text(json.dumps({"schema_version": 1, "tel": [], "cen": [], "files": {}}))
+        for include_fasta in (True, False):
+            staging = self.root / ("with-fasta" if include_fasta else "light")
+            grt_app_package.build(self.source, staging, include_fasta=include_fasta)
+            self.assertEqual((staging / "metadata/annotation_library_snapshot.json").read_bytes(), snapshot.read_bytes())
+            self.assertEqual((staging / "cen/library.fa").exists(), include_fasta)
+            if not include_fasta:
+                self.assertFalse(any(path.suffix.lower() in {".fa", ".fasta"} for path in staging.rglob("*")))
+
     def test_build_emits_display_contract_schema_three(self) -> None:
         staging = self.root / "staging"
         no_fasta_staging = self.root / "staging-no-fasta"

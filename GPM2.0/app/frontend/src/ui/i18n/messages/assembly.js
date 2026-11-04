@@ -231,7 +231,7 @@ export const zh = {
   trackControls: {
     markerDisplay: "标记显示",
     telomereMarkers: "Tel 标记",
-    centromereMarkers: "Cen 标记",
+    centromereMarkers: "着丝粒候选区域",
     approximateReferenceProjection: "区间投影：缺少精确比对映射",
     supportDataset: "辅助数据集",
     supportDatasetHint: "选择辅助轨道使用的数据集，用于与主数据集比较。",
@@ -882,7 +882,7 @@ export const en = {
   trackControls: {
     markerDisplay: "Markers",
     telomereMarkers: "Telomere markers",
-    centromereMarkers: "Centromere markers",
+    centromereMarkers: "Centromere candidate regions",
     approximateReferenceProjection: "Interval projection: exact alignment mapping unavailable",
     supportDataset: "Auxiliary dataset",
     supportDatasetHint: "Select the dataset shown in the auxiliary track for comparison with the primary dataset.",
