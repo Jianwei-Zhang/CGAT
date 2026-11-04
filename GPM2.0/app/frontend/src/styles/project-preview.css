@@ -1,5 +1,6 @@
 /* Owner: project preview. Read-only chromosome provenance cards and aligned source tracks. */
 .project-preview-page { display: grid; gap: 12px; min-width: 0; }
+.project-preview-page > .project-section-divider { margin: 0; }
 .project-preview-heading { position: relative; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .project-preview-heading h2, .project-preview-heading h3 { flex: 0 0 auto; font-family: inherit; font-size: var(--font-heading); font-weight: 700; line-height: 1.45; white-space: nowrap; }
 .project-preview-subtitle { min-width: 0; color: var(--text-muted, #64748b); font-size: var(--font-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
