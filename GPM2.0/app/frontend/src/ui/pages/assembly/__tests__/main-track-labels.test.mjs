@@ -63,3 +63,43 @@ for (const locale of ["zh", "en"]) {
     }
   });
 }
+
+for (const locale of ["zh", "en"]) {
+  for (const swapped of [false, true]) {
+    test(`local comparison track names match Main while keeping full descriptions (${locale}, swapped=${swapped})`, () => {
+      const topTrack = { role: swapped ? "primary" : "support", datasetId: swapped ? 11 : 22 };
+      const bottomTrack = { role: swapped ? "support" : "primary", datasetId: swapped ? 22 : 11 };
+      const html = renderAssemblyPage({ ...createState({
+        initializer: {
+          datasets: [{ datasetId: 11, name: "hifiasm" }, { datasetId: 22, name: "flye" }],
+          existingProjects: [{ projectId: 7, primaryDatasetId: 11, supportDatasetIds: [22] }],
+        },
+        assembly: {
+          supportDatasetId: 22,
+          supportChrCtgs: [{ assemblyCtgId: 30, name: "support-ctg", totalLength: 300, anchorStart: 320 }],
+          subview: {
+            selectedTrackARole: "primary",
+            selectedTrackBRole: "support",
+            summary: { mode: "track-pair", topTrack, bottomTrack },
+          },
+        },
+      }), locale });
+      const mainRows = labelRows(html).filter(row => row.attrs.includes("data-track-label-role="));
+      const localStart = html.indexOf('<article class="assembly-track-panel subview-alignment-card"');
+      assert.ok(localStart >= 0);
+      const localRows = labelRows(html.slice(localStart));
+      assert.equal(localRows.length, 2);
+      for (const [index, track] of [topTrack, bottomTrack].entries()) {
+        const mainRow = mainRows.find(row => row.attrs.includes(`data-track-label-role="${track.role}"`));
+        const localRow = localRows[index];
+        assert.ok(mainRow);
+        assert.equal(localRow.text, mainRow.text);
+        const fullLabel = mainRow.attrs.match(/aria-label="([^"]*)"/)[1];
+        assert.ok(localRow.attrs.includes(`aria-label="${fullLabel}"`));
+        assert.ok(localRow.attrs.includes(`data-app-tooltip="${fullLabel}"`));
+        assert.ok(localRow.attrs.includes('data-app-tooltip-overflow="span"'));
+        assert.ok(html.includes(`<span class="subview-candidate-name">${mainRow.text}</span>`));
+      }
+    });
+  }
+}

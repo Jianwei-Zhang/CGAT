@@ -822,11 +822,12 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     .map((selection, index) => {
       const slot = index === 0 ? "T1" : "T2";
       const trackLabel = resolveSubviewTrackSelectionLabel(selection, supportContext, i18n);
+      const visibleTrackLabel = resolveSubviewTrackSelectionLabel(selection, supportContext, i18n, { compact: true });
       const removeButton = renderSubviewBadgeRemoveButton(
         `data-subview-remove-type="track" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-source="${escapeAttr(selection.source || "mother")}" data-subview-remove-dataset-id="${Number(selection.datasetId || 0)}" data-subview-remove-is-mirror="${selection.isMirror ? "1" : "0"}"`,
         i18n.subview.removeTrackCandidateAria,
       );
-      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(trackLabel)}" data-app-tooltip-overflow=".subview-candidate-name"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span>${removeButton}</span>`;
+      return `<span class="subview-candidate-badge" data-app-tooltip="${escapeAttr(trackLabel)}" data-app-tooltip-overflow=".subview-candidate-name"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleTrackLabel)}</span></span>${removeButton}</span>`;
     })
     .join("");
   const composition = String(subview?.summary?.mode || "") === "composition"
@@ -2181,6 +2182,8 @@ function renderSubviewTrackPairAlignmentCard(
   };
   const topTrackLabel = resolveSubviewTrackSelectionLabel(topTrack, supportContext, i18n);
   const bottomTrackLabel = resolveSubviewTrackSelectionLabel(bottomTrack, supportContext, i18n);
+  const topVisibleTrackLabel = resolveSubviewTrackSelectionLabel(topTrack, supportContext, i18n, { compact: true });
+  const bottomVisibleTrackLabel = resolveSubviewTrackSelectionLabel(bottomTrack, supportContext, i18n, { compact: true });
   const topSourceDescriptor = resolveSubviewAnchorSourceDescriptor(topTrack, null, supportContext);
   const bottomSourceDescriptor = resolveSubviewAnchorSourceDescriptor(bottomTrack, null, supportContext);
   const rowLayouts = [topLayout, bottomLayout].map((layout) => ({
@@ -3168,13 +3171,13 @@ function renderSubviewTrackPairAlignmentCard(
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
-          <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px" data-app-tooltip="${escapeAttr(topTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(topTrackLabel)}"><span>${escapeHtml(topTrackLabel)}</span></div>
+          <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px" data-app-tooltip="${escapeAttr(topTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(topTrackLabel)}"><span>${escapeHtml(topVisibleTrackLabel)}</span></div>
           ${renderSubviewTrackOrderToggleButton({
             className: "is-in-label-column",
             style: `top:${trackOrderButtonTopPx}px`,
             swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
           })}
-          <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px" data-app-tooltip="${escapeAttr(bottomTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(bottomTrackLabel)}"><span>${escapeHtml(bottomTrackLabel)}</span></div>
+          <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px" data-app-tooltip="${escapeAttr(bottomTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(bottomTrackLabel)}"><span>${escapeHtml(bottomVisibleTrackLabel)}</span></div>
         </div>
         <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-view-navigation-start-bp="${domainStart + renderViewBoxMinX * domainSpanBp / baseInnerWidth}" data-view-navigation-end-bp="${domainStart + (renderViewBoxMinX + renderInnerWidth) * domainSpanBp / baseInnerWidth}" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}">
           ${renderTrackBandCanvasLayer({

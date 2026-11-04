@@ -535,7 +535,7 @@ function createRenderTracksRenderer(deps = {}) {
     return selectedSupportName;
   }
 
-  function resolveSubviewTrackSelectionLabel(trackSelection, supportContext, i18n) {
+  function resolveSubviewTrackSelectionLabel(trackSelection, supportContext, i18n, { compact = false } = {}) {
     const normalizedSelection = normalizeSubviewTrackSelectionItem(trackSelection);
     if (!normalizedSelection) {
       return "";
@@ -554,8 +554,8 @@ function createRenderTracksRenderer(deps = {}) {
     if (normalizedSelection.role !== "support") {
       const primaryName = String(supportContext?.primaryDatasetName || "").trim();
       return primaryName
-        ? i18n.trackControls.primaryTrackLabelWithName.replace("{name}", primaryName)
-        : i18n.trackControls.primaryTrackLabel;
+        ? (compact ? i18n.trackControls.primaryTrackLabelCompactWithName : i18n.trackControls.primaryTrackLabelWithName).replace("{name}", primaryName)
+        : (compact ? i18n.trackControls.primaryTrackLabelCompact : i18n.trackControls.primaryTrackLabel);
     }
     const supportName = resolveSupportDatasetLabelById(supportContext, normalizedSelection.datasetId);
     if (normalizedSelection.source === "mirror" || normalizedSelection.isMirror) {
@@ -564,8 +564,8 @@ function createRenderTracksRenderer(deps = {}) {
         : i18n.trackControls.mirrorTrackLabel;
     }
     return supportName
-      ? i18n.trackControls.supportTrackLabelWithName.replace("{name}", supportName)
-      : i18n.trackControls.supportTrackLabel;
+      ? (compact ? i18n.trackControls.supportTrackLabelCompactWithName : i18n.trackControls.supportTrackLabelWithName).replace("{name}", supportName)
+      : (compact ? i18n.trackControls.supportTrackLabelCompact : i18n.trackControls.supportTrackLabel);
   }
 
   function resolveTrackToneClass(role) {
