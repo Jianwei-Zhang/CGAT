@@ -5,7 +5,10 @@ import csv
 from datetime import datetime, timezone
 import json
 import os
-from long_cigar_recovery.minimap_options import batch_size, BATCH_ENV
+if __package__:
+    from .long_cigar_recovery.minimap_options import batch_size, BATCH_ENV
+else:
+    from long_cigar_recovery.minimap_options import batch_size, BATCH_ENV
 from pathlib import Path
 
 try:

@@ -20,6 +20,15 @@ from server.tools.run_outer_checkpoints import OuterCheckpointManager
 
 
 class PublicMinimapOptionsTests(unittest.TestCase):
+    def test_resource_options_package_import_works_without_flat_tools_path(self):
+        env={k:v for k,v in os.environ.items() if k!='PYTHONPATH'}
+        result=subprocess.run([sys.executable,'-B','-c',
+            "from server.tools import run_resources, lgz_prepare_inputs; "
+            "assert run_resources.batch_size('1g') == '1G'; "
+            "assert run_resources.BATCH_ENV == 'GPM_RUN_MINIMAP_BATCH'"],
+            cwd=TOOLS.parents[1],env=env,capture_output=True,text=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def test_short_and_long_aliases_share_typed_values(self):
         a=server_run.parse_options(["-K","500m","-f","0.0100"],Path.cwd())
         b=server_run.parse_options(["--minimap-batch","500M","--minimap-filter","0.01"],Path.cwd())

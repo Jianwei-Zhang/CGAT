@@ -92,7 +92,7 @@
         "tools/run_orchestration.py": "606d294c8c956ada126e7612d9ff6e5733da723e579529529feeb3bb7de4f5db",
         "tools/run_outer_checkpoints.py": "b64b952cdb82601ce22e000280552cbb71f22baa1024cd95856a0f182c61d18a",
         "tools/run_progress.py": "ae80fbfa01a2e6bfcb225f36a083ef15089257e7db0ab70657d373a4c9e3b30e",
-        "tools/run_resources.py": "a36865566406a539da8854e3462472575a2abb7f33eb21f4ed0576b964c30a99",
+        "tools/run_resources.py": "fc9590a94aa576fd860ea696ab4b0fb175b1c87cd2e670a0a2558258d97ae3d0",
         "tools/self_alignment_batches.py": "00abcb215a4121b384d1613708f9b0618183b0bebf309e0a459c6cc1b7332580",
         "tools/server_report.py": "614d52ee71d9acbf4ee29b2a6a10fd9c99c2bd8fc44a0906cac2296b13d3e6ef",
         "tools/server_report_collect.py": "00a76afb07e6fa6b0a349a2304b7aee0d712fad696a068242a95bece16cf0336",

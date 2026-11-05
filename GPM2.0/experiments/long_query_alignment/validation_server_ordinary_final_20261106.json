@@ -1,0 +1,178 @@
+{
+  "CI_at_recording": {
+    "Linux_Server": "failure",
+    "Windows_Light": "success",
+    "failure": "run_resources absolute-only minimap_options import breaks package import from lgz_prepare_inputs",
+    "full_input": false,
+    "head_sha": "291ed83e9281d0b67296fef0d479fc6670f02f51",
+    "local_reproduction_and_narrow_fix": true,
+    "new_CI_required_after_fix": true,
+    "run_id": 42111136866
+  },
+  "buffered_merge_followup": {
+    "frozen_revision": "1e70a5462e810c121446969fe0b490457bc00208",
+    "job_id": "40886121",
+    "mapping_started_by_this_replay": false,
+    "no_FASTA_MMI_reprocessing": true,
+    "process_address_space_limit_GiB": 8,
+    "remote_root": "/share/home/xbzhang26/cgat-reads-debug/native-cell-merge-20261106-aa0bb89",
+    "requested_cpus": 2,
+    "requested_memory_MB": 12000,
+    "runtime_profile_sha256": "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
+    "source_bundle_sha256": "30559739802a1e6f16cdc2b90177a397c4e03427cae0669daca79c9e34f7fbc2",
+    "source_job_completed_before_submission": true,
+    "status_at_recording": "submitted_not_terminal",
+    "uses_actual_immutable_completed_native_receipt": true
+  },
+  "evidence_archive": {
+    "archive_bytes": 259227693,
+    "exported_files": 151,
+    "independent_auditor_sha256": "f941cd43a1575dbab1e98907e4d0e8d88015204e8952f11bc7865f695a8677a8",
+    "local_directory": "/tmp/cgat-server-ordinary-final-evidence-20261106.J5xxkr/evidence",
+    "safe_regular_file_extraction": true,
+    "sha256": "7cc88e21ddffd1c8ee5622ce2fb0f44b16ee18bd594d0003efb8d2efef830a98",
+    "source_and_export_manifest_verified": true
+  },
+  "frozen_benchmark_revision": "92726e0f88d6765cd31154bedbffc318fbc381f6",
+  "frozen_runtime_profile_sha256": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
+  "frozen_runtime_revision": "28d7f6f6219db8a20491bc6b59ac10ad4d7f1c0e",
+  "independent_audit": {
+    "automatic_memory_discovery_exercised": false,
+    "both_cases_audited": true,
+    "cases": {
+      "default-parts": {
+        "FASTA_MMI_not_exported_or_independently_rehashed": true,
+        "common_preparation_seconds_not_credited": 144.999129652977,
+        "full_CGAT_workflow": false,
+        "native_mmi_stage_median_seconds": 117.92754010856152,
+        "original_default_index_policy": true,
+        "paf_rows": [
+          480,
+          480,
+          480,
+          480
+        ],
+        "paf_sha256": "46da2ebf51615911bac2f7793e53cba7478baadc50fbaf4cd1890f68ade7e855",
+        "production_parts_stage_median_seconds": 57.866465870290995,
+        "query_bases": 2560000256,
+        "query_records": 256,
+        "speedup": 2.037925391415795,
+        "status": "independently_reparsed_complete_evidence",
+        "wall_reduction_percent": 50.93049018319182
+      },
+      "real-parts": {
+        "FASTA_MMI_not_exported_or_independently_rehashed": true,
+        "common_preparation_seconds_not_credited": 144.1356460005045,
+        "full_CGAT_workflow": false,
+        "native_mmi_stage_median_seconds": 970.227919191122,
+        "original_default_index_policy": false,
+        "paf_rows": [
+          355275,
+          355275,
+          355275,
+          355275
+        ],
+        "paf_sha256": "3adcb4c3f87bb4d99aa096a7bac239f2a1ab95d0ce50679fdb698deb26d08d4c",
+        "production_parts_stage_median_seconds": 920.8536706864834,
+        "query_bases": 2229820242,
+        "query_records": 4860,
+        "speedup": 1.0536179092035665,
+        "status": "independently_reparsed_complete_evidence",
+        "wall_reduction_percent": 5.088932974202798
+      }
+    },
+    "customer_wheat_acceptance": false,
+    "runtime_profile": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
+    "scheduler": {
+      "allocated_cpus": 64,
+      "allocated_memory_MB": 224000,
+      "automatic_memory_discovery_exercised": false,
+      "explicit_mapper_group_budget_bytes": 206158430208,
+      "job_id": "40886112",
+      "reported_memory_limit_MB": 327680,
+      "requested_memory_MB": 224000
+    },
+    "schema": 1,
+    "scope": "existing_MMI_ordinary_execution_not_full_CGAT_or_pure_ordinary_preprocessing",
+    "source_revision": "92726e0f88d6765cd31154bedbffc318fbc381f6"
+  },
+  "job_exit": "0",
+  "next": [
+    "Independently audit four old/new native-cell merge replays after 40886121 completes",
+    "Finish package-import regression checks and rerun Quality on corrected SHA",
+    "Keep pure-ordinary fresh FASTA preprocessing conditional; distinguish complete preparation cost",
+    "No master merge, Release or App changes in this fork"
+  ],
+  "phase_medians": {
+    "default-parts": {
+      "native-mmi": {
+        "execution_average_cpu_core_equivalents": 10.47292425216293,
+        "execution_stage_seconds": 117.92754010856152,
+        "independent_output_audit_seconds": 0.0066389963030815125,
+        "mapping_with_production_receipts_seconds": 116.67904460057616,
+        "merge_seconds": 1.241856511682272,
+        "native_CPU_to_mapping_wall_per_trial": [
+          9.982954776993989,
+          11.1799250670627
+        ],
+        "native_cpu_seconds": 1230.544
+      },
+      "server-original-parts": {
+        "execution_average_cpu_core_equivalents": 22.929724176647355,
+        "execution_stage_seconds": 57.866465870290995,
+        "independent_output_audit_seconds": 0.006873924285173416,
+        "mapping_with_production_receipts_seconds": 56.80719651281834,
+        "merge_seconds": 1.0523954331874847,
+        "native_CPU_to_mapping_wall_per_trial": [
+          16.685861819552663,
+          29.970414471346267
+        ],
+        "native_cpu_seconds": 1220.014
+      }
+    },
+    "real-parts": {
+      "native-mmi": {
+        "execution_average_cpu_core_equivalents": 32.60013959927129,
+        "execution_stage_seconds": 970.227919191122,
+        "independent_output_audit_seconds": 12.97907566651702,
+        "mapping_with_production_receipts_seconds": 709.7046363838017,
+        "merge_seconds": 247.54420714080334,
+        "native_CPU_to_mapping_wall_per_trial": [
+          43.796683461487056,
+          45.25376035664776
+        ],
+        "native_cpu_seconds": 31591.129
+      },
+      "server-original-parts": {
+        "execution_average_cpu_core_equivalents": 34.55636590296028,
+        "execution_stage_seconds": 920.8536706864834,
+        "independent_output_audit_seconds": 11.107720833271742,
+        "mapping_with_production_receipts_seconds": 635.981210693717,
+        "merge_seconds": 273.76473915949464,
+        "native_CPU_to_mapping_wall_per_trial": [
+          47.228395930071024,
+          52.414367125789106
+        ],
+        "native_cpu_seconds": 31600.103499999997
+      }
+    }
+  },
+  "recorded_at": "2026-11-06T05:34:38.529929+08:00",
+  "remote_job_id": "40886112",
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/ordinary-server-parts-20261106-28d7f6f",
+  "schema_version": 1,
+  "scope_limits": [
+    "Eight trials across two controls, not eight independent datasets",
+    "Default two-part reference is N-padding synthetic; 160 Mb queries copied 16x as intact records with distinct headers",
+    "Real eight-chromosome reference; full nextdenovo query DNA copied 2x as intact records with distinct headers",
+    "Real two-part index uses TEST ONLY 600M layout identical on both routes, not a production -I suggestion",
+    "Existing original-MMI execution only; common index preparation 144-145 seconds not included in benefit",
+    "No OS page cache flush; two forward/reverse repeats with timing variation",
+    "Explicit 192 GiB maintainer group allowance, not successful automatic Donau memory discovery",
+    "FASTA/MMI not exported or independently rehashed locally; protected by frozen job identities/artifact guards",
+    "Not full CGAT workflow time or wheat customer acceptance; no customer successful work remapped",
+    "Does not measure the later aa0bb89 buffered native-cell stream"
+  ],
+  "status": "original_parts_engine_final_control_independently_audited_buffered_merge_replay_submitted",
+  "terminal_scheduler_state": "SUCCEEDED"
+}

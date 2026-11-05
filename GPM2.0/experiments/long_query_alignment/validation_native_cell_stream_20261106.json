@@ -119,6 +119,36 @@
     "Freeze this candidate source and replay only the immutable completed native PAF on SSH 180",
     "Compare complete PAF hashes, original cell matrix and old/new full merge costs; do not rerun mapping for this test"
   ],
+  "package_import_followup": {
+    "exact_head_sha": "291ed83e9281d0b67296fef0d479fc6670f02f51",
+    "failed_CI_run": 42111136866,
+    "failure_reproduced_without_PYTHONPATH": true,
+    "files_sha256": {
+      "GPM2.0/server/tests/test_minimap_options.py": "2fb82ae80a7621b236fbaf5b6376fe38ec8f5bc70c80dd435a8b3b0668ae1706",
+      "GPM2.0/server/tools/long_cigar_recovery/branch-runtime.json": "3a141f885bfcb30fdf41c9e2a2b0991dd291c719c9be33435b8779e31f8a31c9",
+      "GPM2.0/server/tools/long_cigar_recovery/resume-base.json": "ed7f59a8305706846e901be3642e5029be376cd6238a2313f68e3a8429b1634e",
+      "GPM2.0/server/tools/run_resources.py": "fc9590a94aa576fd860ea696ab4b0fb175b1c87cd2e670a0a2558258d97ae3d0"
+    },
+    "fix": "Use explicit relative minimap_options import in package context, absolute import for script context",
+    "generated_changes": "Only package/base provenance regenerated; no mapper, native CellMerger or recovery algorithm change",
+    "local_Server_only_gate": {
+      "excluded": "LGZ server-to-app E2E; must pass formal CI before final acceptance",
+      "log_location": "/tmp/cgat-run-resources-package-20261106.JX6wIP/server-gate.log",
+      "log_sha256": "3c995df15b6e5b7837524223c0435e61973e5584ed643465afa99335a39cf0cb",
+      "passed": true,
+      "python_tests": 458,
+      "shell_test_groups": 8
+    },
+    "native_mapping_and_recovery_source_profile_changed": false,
+    "native_runtime_profile_sha256": "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
+    "passed": true,
+    "recorded_at": "2026-11-06T05:35:14.459687+08:00",
+    "rerun_corrected_SHA_CI_required": true,
+    "skipped": 0,
+    "test_log": "/tmp/cgat-run-resources-package-20261106.JX6wIP/tests.log",
+    "test_log_sha256": "15811ea58f0ff5470519370b80ebea7cca37f47dfa4e9d8e0eda91879858a864",
+    "tests": 26
+  },
   "previous_runtime_profile_sha256": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
   "recorded_at": "2026-11-06T05:08:02.379835+08:00",
   "resume": {
