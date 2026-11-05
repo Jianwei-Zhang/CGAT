@@ -117,6 +117,62 @@ class HarnessTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'source changed'):bench.runtime(root,profile)
 
 
+class MergeReplayAuditTests(unittest.TestCase):
+    """Synthetic auditor metadata controls, not mapper or speed evidence."""
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
+        raw=b'q\t4\t0\t4\t+\tt\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n'
+        digest=hashlib.sha256(raw).hexdigest()
+        self.old={'native_first.py':'a'*64,'proactive_resume.py':'b'*64}
+        self.new={'native_first.py':'c'*64,'proactive_resume.py':'d'*64}
+        self.trial={'paf_sha256':digest,'paf_rows':1,'paf_bytes':len(raw),
+            'combination':{'native_cells':1,'all_cells_completed':True},'native':{'paf_sha256':digest,'status':'native_success'}}
+        for name in ('00-old','00-new','01-new','01-old'):
+            directory=self.root/name;directory.mkdir();files=self.old if name.endswith('old') else self.new
+            profile=hashlib.sha256(json.dumps(files,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            report={'status':'complete_equal','runtime_profile':profile,'runtime_files_sha256':files,
+                'mapping_started':False,'automatic_retry':False,'original_evidence_modified':False,
+                'original_source_data_and_MMI_not_reprocessed':True,'combination':self.trial['combination'],
+                'paf_sha256':digest,'paf_rows':1,'paf_bytes':len(raw),'merge_seconds':10 if name.endswith('old') else 5,
+                'self_cpu_seconds':1,'host':'same-test-node',
+                'timing_scope':'CellMerger_init_add_native_finish_including_internal_validation_not_full_CGAT'}
+            (directory/'replay.json').write_text(json.dumps(report))
+            (directory/'input-native-receipt.json').write_text(json.dumps(self.trial['native']))
+            (directory/'complete.paf').write_bytes(raw)
+
+    def result(self):return audit.check_merge_runs(self.root,self.trial,self.old,self.new)
+
+    def change(self,name,**values):
+        path=self.root/name/'replay.json';report=json.loads(path.read_text());report.update(values);path.write_text(json.dumps(report))
+
+    def test_complete_reverse_replays_compare_full_bytes_and_original_receipt(self):
+        result=self.result();self.assertEqual(result['speedup'],2)
+        self.assertFalse(result['full_CGAT_workflow']);self.assertFalse(result['mapping_started'])
+
+    def test_slower_candidate_is_reported_honestly_not_rejected(self):
+        for name in ('00-new','01-new'):self.change(name,merge_seconds=20)
+        result=self.result();self.assertEqual(result['speedup'],0.5)
+        self.assertFalse(result['candidate_faster_in_this_control']);self.assertLess(result['wall_reduction_percent'],0)
+
+    def test_corrupt_output_is_not_accepted_from_unchanged_receipt(self):
+        (self.root/'00-new/complete.paf').write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError,'PAF bytes'):self.result()
+
+    def test_changed_matrix_foreign_runtime_and_mapper_restart_are_rejected(self):
+        for values in ({'combination':{}},{'runtime_profile':'0'*64},{'mapping_started':True}):
+            with self.subTest(values=values):
+                path=self.root/'00-new/replay.json';before=path.read_bytes();self.change('00-new',**values)
+                with self.assertRaises(ValueError):self.result()
+                path.write_bytes(before)
+
+    def test_cross_node_and_invalid_timing_are_rejected(self):
+        for values in ({'host':'different-node'},{'host':None},{'merge_seconds':float('nan')},{'merge_seconds':True},{'self_cpu_seconds':-1}):
+            with self.subTest(values=values):
+                path=self.root/'00-new/replay.json';before=path.read_bytes();self.change('00-new',**values)
+                with self.assertRaises(ValueError):self.result()
+                path.write_bytes(before)
+
+
 class RealEngineHarnessTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

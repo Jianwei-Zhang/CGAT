@@ -975,3 +975,47 @@ mapping/收据 709.705 s、合并 247.544 s，对照分区为 635.981 s、273.76
 新的 profile aa0bb89 合并候选尚未用这组总时间宣称提速。原始作业完成并独立审计后，
 才提交 2 CPU 的 `40886121`，只读重放同一已完成 native PAF 的旧/新/新/旧 CellMerger；
 不新增任何 mapper。细节和限制见 `validation_server_ordinary_final_20261106.json`。
+
+
+## 新旧合并重放终态与交付边界（2026-11-06，profile aa0bb89）
+
+`40886121` 已为 SUCCEEDED、job.exit=0，同一 ARM-35 节点，2 CPU 分配，按旧/新/新/旧
+四个独立 Python 进程重放实际 native-success PAF。完整包 SHA-256：
+`4fab9004f84de608dc1f93ef1b3e292194987a42c336c682333ca50ebd459dca`。
+
+| 路线 | 两轮合并 / s | 合并中位 / s |
+| --- | --- | ---: |
+| 旧逐行 open/close | 259.326、231.860 | 245.593 |
+| 新相邻 cell 复用一个句柄 | 24.944、23.113 | 24.029 |
+
+合并阶段 wall 减少 90.22%，约 10.22 倍；四份 PAF 均为 355275 行，SHA 与原作业
+真实 native-success 输出完全相同。独立审计同时核验整个 cell 矩阵、逐 query 计数、
+原始 native 收据、旧/新 runtime profile、固定源码与导出清单、同节点反序和时间口径。
+没有新 mapper、FASTA/MMI 处理、跳过数据或输出规范化。进程地址空间上界 8 GiB，
+不是声明测得了 8 GiB 实际占用。未清 OS cache；该结果只证明本控制的合并收益。
+
+**不能把它与另一作业的 5.09% 相乘，也不能说整个 CGAT 快 10 倍。客户 66.47 小时
+是 minimap2 原生进程时间，不包含这个合并阶段；该区间仍主要由 K/原分区调度等改善，
+客户实际收益需原始小麦数据确认。** 纯普通原生直出不经过 CellMerger，不能套用此项收益。
+
+维护者联合审计入口（不是新增用户配置）：
+
+```bash
+python3 audit_server_ordinary_parts.py --root ORIGINAL_EVIDENCE \
+  --expected-profile 19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e \
+  --evidence-checksums evidence.SHA256SUMS --merge-replay-root REPLAY_EVIDENCE \
+  --expected-merge-profile aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01
+```
+
+最新 112 项 ordinary 默认 discovery 检查通过、0 skipped（无需 PYTHONPATH），
+其中 15 项审计工具检查包含慢候选如实报告、矩阵/来源/节点/时间错误及 PAF 损坏拒绝。
+生成运行时 34 文件一致。之前 CI 包导入失败已独立复现、仅修 run_resources 包/脚本导入；
+Quality `42114171755` 在 `25479b7` 为 success，含 Linux Server-to-App E2E 和 Windows
+Light；其 Server 454/skip1、坐标 527/skip12 如实保留，不能当零跳过真实 mapper 验证，
+Windows Full/Tauri 与客户验收也不在该结果内。审计/证据提交后的最终 SHA 另以 GitHub
+Quality 终态为准，避免自引用提交收据；没有 master、Release 或 App 代码变更。
+
+两个已完成作业的专用 scratch 已清理：79688 个生成文件、18151464168 逻辑字节
+（约 16.90 GiB），仅整记录复制、派生 MMI 和 CellMerger 分片。24 份 native/最终 PAF
+保留并重新核验 SHA；原始 FASTA、共享数据、日志、收据、完整证据压缩包均保留。
+重新实验应从只读原输入在新目录生成 scratch，而不是恢复这个已完成维护者基准。

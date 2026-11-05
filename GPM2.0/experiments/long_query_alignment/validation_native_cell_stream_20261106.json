@@ -70,6 +70,18 @@
     "GPM2.0/experiments/long_query_alignment/test_native_first.py": "076217c340c981ccc22da17f4970799eb6988c85885c68a321921eb98b6edf89",
     "GPM2.0/experiments/long_query_alignment/test_validation_metadata.py": "e063d4add0f30ae187e77b1125434ecf0947ebb0dbef6e0478d1de25ba798e45"
   },
+  "independent_large_replay_followup": {
+    "complete_native_PAF_bytes_equal": true,
+    "evidence_record": "validation_server_ordinary_final_20261106.json",
+    "full_CGAT_workflow_speedup_claimed": false,
+    "job_id": "40886121",
+    "mapping_restarted": false,
+    "new_merge_median_seconds": 24.028699282556772,
+    "old_merge_median_seconds": 245.5925914067775,
+    "recorded_at": "2026-11-06T06:00:15.317656+08:00",
+    "runtime_profile_sha256": "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
+    "status": "SUCCEEDED_and_independently_audited"
+  },
   "limits": [
     "Test groups overlap; do not add counts as unique tests",
     "No large-data speedup measured for this buffered-stream code yet",

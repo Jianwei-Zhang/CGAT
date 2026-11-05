@@ -261,12 +261,70 @@ def allocation(root, threads, budget):
         'automatic_memory_discovery_exercised':False}
 
 
+def check_merge_runs(root, trial, old_files, new_files):
+    profiles={mode:hashlib.sha256(json.dumps(files,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        for mode,files in (('old',old_files),('new',new_files))}
+    expected_files={'old':old_files,'new':new_files}
+    samples={'old':[],'new':[]};hosts=set();rows=[]
+    for name in ('00-old','00-new','01-new','01-old'):
+        mode=name.split('-')[1];directory=root/name;report=read(directory/'replay.json')
+        seconds=report['merge_seconds'];cpu=report['self_cpu_seconds']
+        require(report['status']=='complete_equal' and report['runtime_profile']==profiles[mode]
+            and report['runtime_files_sha256']==expected_files[mode], 'replay used foreign runtime or failed')
+        require(report['mapping_started'] is False and report['automatic_retry'] is False
+            and report['original_evidence_modified'] is False
+            and report['original_source_data_and_MMI_not_reprocessed'] is True, 'replay restarted mapping or changed its input')
+        require(report['combination']==trial['combination']
+            and read(directory/'input-native-receipt.json')==trial['native'], 'original native receipt or complete cell matrix changed')
+        require(report['paf_sha256']==trial['paf_sha256']==sha(directory/'complete.paf')
+            and report['paf_rows']==trial['paf_rows'] and report['paf_bytes']==trial['paf_bytes']
+            and (directory/'complete.paf').stat().st_size==trial['paf_bytes'], 'replay changed full native PAF bytes, order or counts')
+        require(type(seconds) in (float,int) and math.isfinite(seconds) and seconds>0
+            and type(cpu) in (float,int) and math.isfinite(cpu) and 0<=cpu<=2*seconds+1, 'invalid replay timing or CPU accounting')
+        require(report['timing_scope']=='CellMerger_init_add_native_finish_including_internal_validation_not_full_CGAT', 'replay excluded production assembly validation')
+        require(isinstance(report['host'],str) and bool(report['host']), 'missing replay host identity')
+        hosts.add(report['host']);samples[mode].append(seconds)
+        rows.append({'trial':name,'merge_seconds':seconds,'self_cpu_seconds':cpu})
+    require(len(hosts)==1 and all(len(v)==2 for v in samples.values()), 'replay used different nodes or incomplete reverse repeats')
+    medians={k:statistics.median(v) for k,v in samples.items()}
+    return {'status':'independently_reparsed_byte_equal_replays', 'host':next(iter(hosts)),
+        'trials':rows,'merge_median_seconds':medians,'speedup':medians['old']/medians['new'],
+        'wall_reduction_percent':100*(1-medians['new']/medians['old']),
+        'candidate_faster_in_this_control':medians['new']<medians['old'],
+        'paf_sha256':trial['paf_sha256'],'paf_rows':trial['paf_rows'],
+        'mapping_started':False,'full_CGAT_workflow':False,
+        'not_a_combined_speedup_with_separate_64_CPU_mapping_control':True}
+
+
+def merge_replay(root, original, expected_profile):
+    source=frozen_source(root,expected_profile);checksum_manifest(root,'evidence.SHA256SUMS')
+    terminal=read(root/'terminal-status.json')
+    require(terminal['state']=='SUCCEEDED' and (root/'job.exit').read_text().strip()=='0', 'merge replay job not successful')
+    require(len(terminal['resource_grants'])==1, 'ambiguous replay resource grant')
+    grant=terminal['resource_grants'][0]
+    require(grant['resReq']['cpu']==grant['resAlloc']['cpu']==2
+        and 8*1024**3<=min(grant[k]['mem'] for k in ('resReq','resAlloc','resLimit'))*1000000, 'replay test allocation differs')
+    trial=read(original/'real-parts/r00-native-mmi/trial.json')
+    runtime='source/GPM2.0/server/tools/long_cigar_recovery/branch-runtime.json'
+    old_files=read(original/runtime)['files_sha256'];new_files=read(root/runtime)['files_sha256']
+    require(set(old_files)==set(new_files)
+        and {k for k in old_files if old_files[k]!=new_files[k]}=={'native_first.py','proactive_resume.py'}, 'unreviewed source change in merge comparison')
+    result=check_merge_runs(root,trial,old_files,new_files)
+    result.update(job_id=terminal['job_id'],source_revision=source['source_git_revision'],
+        runtime_profile=expected_profile,allocated_cpus=2,process_address_space_upper_bound_bytes=8*1024**3)
+    return result
+
+
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root',type=Path,required=True);p.add_argument('--expected-profile',required=True)
     p.add_argument('--case',choices=CASES,action='append',help='Audit only completed cases; default requires both. Does not mark the other case complete.')
     p.add_argument('--evidence-checksums',help='Optional relative checksum manifest for the exported artifacts, in addition to frozen source checksums.')
-    args=p.parse_args(argv);root=args.root.resolve();source=frozen_source(root,args.expected_profile)
+    p.add_argument('--merge-replay-root',type=Path,help='Also audit completed old/new CellMerger replays against the original native result.')
+    p.add_argument('--expected-merge-profile')
+    args=p.parse_args(argv)
+    require(bool(args.merge_replay_root)==bool(args.expected_merge_profile), 'merge replay root and expected profile required together')
+    root=args.root.resolve();source=frozen_source(root,args.expected_profile)
     if args.evidence_checksums:checksum_manifest(root,args.evidence_checksums)
     selected=args.case or list(CASES)
     require(len(set(selected))==len(selected), 'duplicate selected evidence case')
@@ -279,6 +337,9 @@ def main(argv=None):
         'both_cases_audited':set(selected)==set(CASES),
         'scope':'existing_MMI_ordinary_execution_not_full_CGAT_or_pure_ordinary_preprocessing',
         'automatic_memory_discovery_exercised':False,'customer_wheat_acceptance':False}
+    if args.merge_replay_root:
+        require('real-parts' in selected, 'original real-parts evidence must be audited before its replay')
+        result['merge_replay']=merge_replay(args.merge_replay_root.resolve(),root,args.expected_merge_profile)
     print(json.dumps(result,sort_keys=True,indent=2));return 0
 
 

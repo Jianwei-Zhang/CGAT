@@ -9,20 +9,114 @@
     "new_CI_required_after_fix": true,
     "run_id": 42111136866
   },
+  "auditor_sources_sha256": {
+    "GPM2.0/experiments/long_query_alignment/audit_server_ordinary_parts.py": "2e51281e192f4105591f4099573a19e4fd01d00b1dd439d76f33647ccc906476",
+    "GPM2.0/experiments/long_query_alignment/test_benchmark_server_ordinary_parts.py": "ce24a460b40c0088c441d58d5591594333afe3fd6c739329c61910647ae0f002"
+  },
   "buffered_merge_followup": {
+    "evidence_archive_bytes": 130139744,
+    "evidence_archive_sha256": "4fab9004f84de608dc1f93ef1b3e292194987a42c336c682333ca50ebd459dca",
+    "exported_files": 61,
     "frozen_revision": "1e70a5462e810c121446969fe0b490457bc00208",
+    "independent_audit": {
+      "allocated_cpus": 2,
+      "candidate_faster_in_this_control": true,
+      "full_CGAT_workflow": false,
+      "host": "agent-ARM-35",
+      "job_id": "40886121",
+      "mapping_started": false,
+      "merge_median_seconds": {
+        "new": 24.028699282556772,
+        "old": 245.5925914067775
+      },
+      "not_a_combined_speedup_with_separate_64_CPU_mapping_control": true,
+      "paf_rows": 355275,
+      "paf_sha256": "3adcb4c3f87bb4d99aa096a7bac239f2a1ab95d0ce50679fdb698deb26d08d4c",
+      "process_address_space_upper_bound_bytes": 8589934592,
+      "runtime_profile": "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
+      "source_revision": "1e70a5462e810c121446969fe0b490457bc00208",
+      "speedup": 10.220802571076383,
+      "status": "independently_reparsed_byte_equal_replays",
+      "trials": [
+        {
+          "merge_seconds": 259.3256008978933,
+          "self_cpu_seconds": 28.022215999999997,
+          "trial": "00-old"
+        },
+        {
+          "merge_seconds": 24.944076407700777,
+          "self_cpu_seconds": 4.212336,
+          "trial": "00-new"
+        },
+        {
+          "merge_seconds": 23.113322157412767,
+          "self_cpu_seconds": 3.978428,
+          "trial": "01-new"
+        },
+        {
+          "merge_seconds": 231.8595819156617,
+          "self_cpu_seconds": 27.769666,
+          "trial": "01-old"
+        }
+      ],
+      "wall_reduction_percent": 90.21603251754537
+    },
     "job_id": "40886121",
+    "local_evidence_directory": "/tmp/cgat-native-merge-final-evidence-20261106.xnmdmC/evidence",
     "mapping_started_by_this_replay": false,
     "no_FASTA_MMI_reprocessing": true,
-    "process_address_space_limit_GiB": 8,
+    "process_address_space_upper_bound_GiB": 8,
     "remote_root": "/share/home/xbzhang26/cgat-reads-debug/native-cell-merge-20261106-aa0bb89",
     "requested_cpus": 2,
     "requested_memory_MB": 12000,
     "runtime_profile_sha256": "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
     "source_bundle_sha256": "30559739802a1e6f16cdc2b90177a397c4e03427cae0669daca79c9e34f7fbc2",
     "source_job_completed_before_submission": true,
+    "status_at_final_audit": "SUCCEEDED_job_exit_0_independently_audited",
     "status_at_recording": "submitted_not_terminal",
     "uses_actual_immutable_completed_native_receipt": true
+  },
+  "checks_after_independent_replay": [
+    {
+      "PYTHONPATH": "unset",
+      "log_location": "/tmp/cgat-final-ordinary-audit-controls-20261106.r6lf4Z/ordinary.log",
+      "log_sha256": "07d43e74627b33a6b9f37c100d6a557d0aa84030c482a9264e19035a2045b937",
+      "name": "ordinary_default_discovery",
+      "passed": true,
+      "skipped": 0,
+      "tests": 112
+    },
+    {
+      "log_location": "/tmp/cgat-native-merge-independent-auditor-controls-20261106.log",
+      "log_sha256": "507c44f335b7339fcf4fc00fff59160b7e0fd14e0db7713d8ae1087ff4c48e9f",
+      "name": "independent_auditor_controls_including_one_small_actual_mapper_and_replay",
+      "passed": true,
+      "skipped": 0,
+      "tests": 15
+    }
+  ],
+  "cleanup": {
+    "finished_at": "2026-11-06T05:56:48.076185+08:00",
+    "job_states": [
+      {
+        "job_id": "40886112",
+        "state": "SUCCEEDED"
+      },
+      {
+        "job_id": "40886121",
+        "state": "SUCCEEDED"
+      }
+    ],
+    "native_and_final_PAFs_retained_and_SHA256_rechecked": 24,
+    "original_FASTA_and_shared_inputs_removed": false,
+    "production_workspaces_touched": false,
+    "receipt_sha256": "5af225e5168f9ac672d33ec3e7e7b39bc32e15499f21edefb28b154826ed1610",
+    "removed_files": 79688,
+    "removed_logical_bytes": 18151464168,
+    "reproduction": "Regenerate scratch in a fresh experiment directory from the retained read-only original inputs; completed benchmarks are not resumed",
+    "schema": 1,
+    "scope": "Only generated whole-record copies, derived MMIs and completed CellMerger shards in the two owned experiment roots",
+    "source_archives_logs_receipts_and_checksums_retained": true
   },
   "evidence_archive": {
     "archive_bytes": 259227693,
@@ -98,10 +192,9 @@
   },
   "job_exit": "0",
   "next": [
-    "Independently audit four old/new native-cell merge replays after 40886121 completes",
-    "Finish package-import regression checks and rerun Quality on corrected SHA",
-    "Keep pure-ordinary fresh FASTA preprocessing conditional; distinguish complete preparation cost",
-    "No master merge, Release or App changes in this fork"
+    "Require successful Quality on the final pushed branch SHA, using GitHub run state rather than a self-referential committed CI receipt",
+    "Keep branch-only scope: no master merge, release or App changes without a new request",
+    "Actual wheat speed and original failure acceptance remain separate customer/main-conversation work"
   ],
   "phase_medians": {
     "default-parts": {
@@ -157,6 +250,27 @@
       }
     }
   },
+  "post_fix_Quality_reference": {
+    "CI_skips_are_not_counted_as_passing_real_mapper_controls": true,
+    "Linux_Server_gate_and_Server_to_App_E2E": "passed",
+    "Server_Python": {
+      "skipped": 1,
+      "tests": 454
+    },
+    "Windows": "Light passed, not Full/Tauri acceptance",
+    "conclusion": "success",
+    "experimental_coordinate_tests": {
+      "skipped": 12,
+      "tests": 527
+    },
+    "full_input": false,
+    "head_sha": "25479b7cdbb845e488a60d6a3ef9d0908e37aed6",
+    "log_sha256": "ec9e40edddb70e8d5e2144911c5d71e38750b6391893c9c416c72e4c6e941328",
+    "native_pinned_controls_verified_separately": true,
+    "run_id": 42114171755,
+    "status": "completed",
+    "status_sha256": "1bdf1b305cecc79fb3bd92347f84666dc0a11eac12fb558cc47fb39da7f2b58e"
+  },
   "recorded_at": "2026-11-06T05:34:38.529929+08:00",
   "remote_job_id": "40886112",
   "remote_root": "/share/home/xbzhang26/cgat-reads-debug/ordinary-server-parts-20261106-28d7f6f",
@@ -171,8 +285,10 @@
     "Explicit 192 GiB maintainer group allowance, not successful automatic Donau memory discovery",
     "FASTA/MMI not exported or independently rehashed locally; protected by frozen job identities/artifact guards",
     "Not full CGAT workflow time or wheat customer acceptance; no customer successful work remapped",
-    "Does not measure the later aa0bb89 buffered native-cell stream"
+    "The old 64-CPU control and later aa0bb89 merge replay are separate measurements; do not multiply their speedups or claim a combined full-workflow speedup",
+    "Customer 66.47 hours is native minimap2 time; the CellMerger speedup does not directly shorten that interval"
   ],
-  "status": "original_parts_engine_final_control_independently_audited_buffered_merge_replay_submitted",
-  "terminal_scheduler_state": "SUCCEEDED"
+  "status": "all_component_controls_independently_audited_final_branch_SHA_CI_tracked_on_GitHub",
+  "terminal_scheduler_state": "SUCCEEDED",
+  "updated_at": "2026-11-06T06:00:15.317656+08:00"
 }
