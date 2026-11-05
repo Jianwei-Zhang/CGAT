@@ -2266,17 +2266,17 @@
 /* Read-only adopted-source correlation; not an editing/multiselect class. */
 [data-final-path-selected="1"] > .track-ctg {
   stroke: var(--final-path-selection-stroke);
-  stroke-width: 1.5;
+  stroke-width: 3;
   vector-effect: non-scaling-stroke;
 }
 .final-path-sort-row[data-final-path-selected="1"] {
-  outline: 1.5px solid var(--final-path-selection-stroke);
-  outline-offset: -1.5px;
+  outline: 3px solid var(--final-path-selection-stroke);
+  outline-offset: -3px;
 }
 .final-path-source-highlight {
   fill: var(--final-path-selection-fill);
   stroke: var(--final-path-selection-stroke);
-  stroke-width: 1.5;
+  stroke-width: 3;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }

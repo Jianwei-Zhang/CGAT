@@ -24,7 +24,7 @@ function paint(owner) {
   const state = store.getState();
   const visible = !state.activeRoute || state.activeRoute === "assembly";
   let selected = owner.selected;
-  if (owner.scope !== scopeKey(state) || owner.editing !== editingSelectionKey(state)) {
+  if (!visible || owner.scope !== scopeKey(state) || owner.editing !== editingSelectionKey(state)) {
     owner.selected = selected = null;
   }
   owner.scope = scopeKey(state);
@@ -87,27 +87,56 @@ export function bindFinalPathSelection(host, store) {
   }
   owner.host = host;
   if (!host[BOUND]) {
+    const clear = () => {
+      if (!owner.selected) return;
+      owner.selected = null;
+      paint(owner);
+    };
     const select = event => {
-      if (event.type === "pointerdown" && event.button !== 0) return;
+      if (event.type === "pointerover" && (event.pointerType === "touch" || event.buttons)) return;
+      // A click may focus a table input, but must not pin a hover highlight.
+      if (event.type === "focusin" && owner.pointerFocus) return;
       const node = event.target?.closest?.(SEGMENT);
+      if (node && event.relatedTarget?.closest?.(SEGMENT) === node) return;
       const state = store.getState();
       if ((state.activeRoute && state.activeRoute !== "assembly") || state.assembly?.loading) return;
-      if (node) {
-        const chrName = targetChr(node, state), segmentId = node.dataset.finalPathSegmentId;
-        const segment = state.assembly?.finalPathByChr?.[chrName]?.segments?.find(item => item.segmentId === segmentId);
-        if (!segment || segment.type === "gap" || !resolveFinalPathSourceRange(segment, sourceCtgs(state))) return;
-        const phasedTrackId = state.assembly?.phasedChrTracks?.find(track => track.label === chrName)?.phasedTrackId;
-        owner.selected = { chrName, segmentId, phasedTrackId };
-        owner.scope = scopeKey(state); owner.editing = editingSelectionKey(state);
-        paint(owner);
-      } else if (event.type === "pointerdown" && (event.target?.closest?.(
-        "[data-assembly-ctg-id], [data-deleted-ctg-record-id], [data-track-contig-id], [data-track-label-for-contig-id], [data-subview-contig-id], [data-subview-label-contig-id]")
-        || event.target?.closest?.(".assembly-final-path-svg-wrap"))) {
-        owner.selected = null; paint(owner);
+      const chrName = node && targetChr(node, state), segmentId = node?.dataset.finalPathSegmentId;
+      const segment = state.assembly?.finalPathByChr?.[chrName]?.segments?.find(item => item.segmentId === segmentId);
+      if (!segment || segment.type === "gap" || !resolveFinalPathSourceRange(segment, sourceCtgs(state))) {
+        clear();
+        return;
       }
+      const phasedTrackId = state.assembly?.phasedChrTracks?.find(track => track.label === chrName)?.phasedTrackId;
+      owner.trigger = event.type === "pointerover" ? "hover" : "focus";
+      if (owner.selected?.chrName === chrName && owner.selected?.segmentId === segmentId) return;
+      owner.selected = { chrName, segmentId, phasedTrackId };
+      owner.scope = scopeKey(state); owner.editing = editingSelectionKey(state);
+      paint(owner);
     };
-    host.addEventListener("pointerdown", select, true);
+    const leave = event => {
+      const node = event.target?.closest?.(SEGMENT);
+      if (!node || event.relatedTarget?.closest?.(SEGMENT) === node) return;
+      if (event.type === "focusout" && owner.trigger !== "focus") return;
+      const selected = owner.selected;
+      if (selected?.segmentId === node.dataset.finalPathSegmentId
+        && selected.chrName === targetChr(node, store.getState())) clear();
+    };
+    host.addEventListener("pointerover", select);
+    host.addEventListener("pointerout", leave);
+    host.addEventListener("pointerleave", () => { if (owner.trigger === "hover") clear(); });
+    host.addEventListener("pointercancel", clear);
+    host.addEventListener("dragstart", clear);
+    host.addEventListener("pointerdown", event => {
+      owner.pointerFocus = true;
+      if (!event.target?.closest?.(SEGMENT) || event.pointerType === "touch" || owner.trigger === "focus") clear();
+    }, true);
+    host.ownerDocument.addEventListener("keydown", event => {
+      owner.pointerFocus = false;
+      if (event.key === "Escape") clear();
+    }, true);
     host.addEventListener("focusin", select);
+    host.addEventListener("focusout", leave);
+    host.ownerDocument.defaultView?.addEventListener("blur", clear);
     host[BOUND] = true;
   }
   paint(owner);
