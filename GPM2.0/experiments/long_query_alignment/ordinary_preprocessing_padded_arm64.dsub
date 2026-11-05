@@ -1,0 +1,36 @@
+#!/bin/bash
+#DSUB -n cgat_preprocess_defaultparts64
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-preprocess-defaultparts-20261106-b01cdee"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REFERENCE="$ORIGINAL_HOME/cgat-reads-debug/ordinary-original-parts-20261105-3e0c820/fixture/target.fa"
+QUERY="$ORIGINAL_HOME/cgat-reads-debug/ordinary-original-parts-20261105-3e0c820/fixture/queries.fa"
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
+
+# Reuse read-only synthetic >8G padded fixture; original default partitioning, no -I.
+python3 -B benchmark_ordinary_preprocessing.py \
+  --target "$REFERENCE" --query "$QUERY" --out "$ROOT/comparison" --minimap2 "$MM" \
+  --threads 64 --parallel-parts 2 --memory-mib 196608 --timeout 1800 \
+  --batch-bases 1000000000 --repeats 2 --expected-parts 2 \
+  --expected-paf-sha256 30c1fe486c522d97ff2939755bbb2fbbb778a3efaddacc983b1a4c23b00f65b3 \
+  --execute > comparison.log 2>&1
+
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -

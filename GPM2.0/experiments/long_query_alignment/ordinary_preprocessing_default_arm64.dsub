@@ -1,0 +1,37 @@
+#!/bin/bash
+#DSUB -n cgat_preprocess_default64
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-preprocess-default-20261106-b01cdee"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REFERENCE="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/reference/Caryophyllales_ref.fa"
+QUERY="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/datasets/nextdenovo.fa"
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
+
+# Original default single-part policy on full real inputs; do not force splitting.
+python3 -B benchmark_ordinary_preprocessing.py \
+  --target "$REFERENCE" --query "$QUERY" --out "$ROOT/comparison" --minimap2 "$MM" \
+  --threads 64 --parallel-parts 2 --memory-mib 196608 --timeout 1800 \
+  --batch-bases 1000000000 --repeats 2 --expected-parts 1 \
+  --expected-reference-sha256 2113ddbdf357016dd0c0db8d238fd52f8c3b88925f0d7c412fd4d9c5a7327c73 --expected-query-sha256 5917d137fcac6ab809dc938888297601e7d353312140fe308fa626084aa0fe10 \
+  --expected-paf-sha256 c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932 \
+  --execute > comparison.log 2>&1
+
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
