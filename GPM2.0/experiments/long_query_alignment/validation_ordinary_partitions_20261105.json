@@ -1,7 +1,7 @@
 {
   "schema": "cgat.ordinary_original_part_scheduling.v1",
-  "status": "default_policy_control_passed_pending_real_complexity_control",
-  "observed_at": "2026-11-05T22:23:35.369904+08:00",
+  "status": "default_policy_and_real_complexity_controls_passed_production_integration_pending",
+  "observed_at": "2026-11-05T23:24:08.824069+08:00",
   "production_runtime_modified": false,
   "customer_wheat_data": false,
   "local_control": {
@@ -80,10 +80,10 @@
     }
   ],
   "remaining_gates": [
-    "complete real-complexity fixed-index-layout paired comparison on SSH180",
-    "assess concurrent memory and preparation/merge cost, not only CPU utilization",
     "production command-receipt/cache/resource-policy design not implemented",
-    "customer original-default-index performance remains unproven"
+    "reliable existing-job memory budget is not currently passed to formal alignment caller",
+    "no normal-only pre-indexing regression; reuse existing mixed-path index parts",
+    "production downstream integration and customer original-data acceptance remain unproven"
   ],
   "remote_control": {
     "job_id": 40883745,
@@ -202,6 +202,102 @@
       "serial-parts",
       "parallel-parts"
     ],
-    "accepted_runs": 0
+    "accepted_runs": 6,
+    "scheduler_state": "SUCCEEDED",
+    "started_at": "2026-11-05T22:25:13+08:00",
+    "ended_at": "2026-11-05T23:14:27+08:00",
+    "compute_node": "agent-ARM-04",
+    "independent_audit": {
+      "job_id": 40884199,
+      "status": "SUCCEEDED",
+      "default_partition_policy": false,
+      "control_index_bases": 600000000,
+      "all_original_real_input_records_retained": true,
+      "original_serialized_part_order_preserved": true,
+      "all_six_ordered_PAFs_equal": true,
+      "PAF_sha256": "03350ce0ea7fd41cd326d5747b3a05926fcb1630fd2d6cb33a9182198aec659b",
+      "PAF_rows": 177629,
+      "query_records": 2430,
+      "reference_records": 8,
+      "index_sha256": "011abec93abeac721291f1e05feabee03f28dc5c04bae6b4dfa7a08d0bbe83fc",
+      "preparation_wall_seconds": 57.9048228263855,
+      "schedule_and_budget_audit": true,
+      "threshold_handoff_without_probe_audit": true,
+      "summary": [
+        {
+          "mode": "baseline",
+          "mapping_wall_seconds": [
+            493.15936823934317,
+            486.57194136083126
+          ],
+          "mapping_and_merge_wall_seconds": [
+            493.1690707281232,
+            486.57832638174295
+          ],
+          "median_mapping_wall_seconds": 489.8656548000872,
+          "median_cpu_core_equivalents": 32.32199899393339,
+          "cpu_seconds": [
+            15828.02,
+            15837.36
+          ],
+          "sampled_tree_peak_rss_gib": null,
+          "max_sum_individual_peak_rss_gib_upper_bound": null,
+          "individual_process_peak_rss_gib": [
+            35.85744094848633,
+            36.23660659790039
+          ]
+        },
+        {
+          "mode": "serial-parts",
+          "mapping_wall_seconds": [
+            483.2938891276717,
+            488.56667191535234
+          ],
+          "mapping_and_merge_wall_seconds": [
+            488.946676813066,
+            494.6126041710377
+          ],
+          "median_mapping_wall_seconds": 485.93028052151203,
+          "median_cpu_core_equivalents": 32.57381901868592,
+          "cpu_seconds": [
+            15852.72,
+            15803.29
+          ],
+          "sampled_tree_peak_rss_gib": [
+            35.19557189941406,
+            35.45503616333008
+          ],
+          "max_sum_individual_peak_rss_gib_upper_bound": 70.54555130004883,
+          "individual_process_peak_rss_gib": null
+        },
+        {
+          "mode": "parallel-parts",
+          "mapping_wall_seconds": [
+            382.5732681006193,
+            373.55312348902225
+          ],
+          "mapping_and_merge_wall_seconds": [
+            388.596849642694,
+            380.4782875627279
+          ],
+          "median_mapping_wall_seconds": 378.0631957948208,
+          "median_cpu_core_equivalents": 41.683283911226944,
+          "cpu_seconds": [
+            15768.73,
+            15744.9
+          ],
+          "sampled_tree_peak_rss_gib": [
+            40.0425910949707,
+            40.03132629394531
+          ],
+          "max_sum_individual_peak_rss_gib_upper_bound": 42.75553894042969,
+          "individual_process_peak_rss_gib": null
+        }
+      ],
+      "median_mapping_speedup_vs_baseline": 1.2957242605173949,
+      "median_mapping_wall_reduction_percent": 22.82308586236622,
+      "not_customer_original_default_layout_performance": true,
+      "evidence_archive_sha256": "22cad5ba9c87aaabf651fc8944c3c4d6a2243cf4ff44daa73a23db7abff34ed6"
+    }
   }
 }
