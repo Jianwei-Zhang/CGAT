@@ -735,9 +735,24 @@ export function projectRenderedSubviewToComposition(state, markup) {
     }
   }
   const decode = (text) => String(text).replace(/&(amp|quot|lt|gt|#39);/g, (_, key) => ({ amp: "&", quot: '"', lt: "<", gt: ">", "#39": "'" })[key]);
-  const anchorNodes = [...String(markup).matchAll(/<[^>]*data-subview-anchor-object-id="[^>]*>/g)].map((match) => ({
-    getAttribute: (name) => { const raw = match[0].match(new RegExp(`${name}="([^"\\n]*)"`))?.[1]; return raw == null ? null : decode(raw); },
-  }));
+  const readNode = (tag) => ({ getAttribute: (name) => {
+    const raw = tag.match(new RegExp(`${name}="([^"\\n]*)"`))?.[1];
+    return raw == null ? null : decode(raw);
+  } });
+  const anchorNodes = [], metadataStack = [];
+  for (const match of String(markup).matchAll(/<g\b[^>]*>|<\/g>|<[^>]*data-subview-anchor-object-id="[^>]*>/g)) {
+    const tag = match[0];
+    if (tag === "</g>") { metadataStack.pop(); continue; }
+    const node = readNode(tag);
+    if (/^<g\b/.test(tag)) {
+      metadataStack.push(node.getAttribute("data-subview-anchor-metadata") === "1"
+        ? node : metadataStack.at(-1) || null);
+    } else if (node.getAttribute("data-subview-anchor-kind")) {
+      const metadata = metadataStack.at(-1);
+      node.closest = () => metadata;
+      anchorNodes.push(node);
+    }
+  }
   const anchorScene = collectSubviewAnchorScene({ querySelectorAll: () => anchorNodes });
   return projectCurrentSubviewToComposition(state, null, { positions, displayRects, bpPerPx, anchorScene });
 }

@@ -538,14 +538,23 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       }
       if (finished) return;
       finished = true;
-      if (fullRangePreview) fullRangePreview.restore();
-      else deps.clearSubviewTrackDragPreview(runtimeHost);
+      // On a real commit the renderer replaces this graph synchronously. Do not
+      // unhide/reflow its thousands of hit targets just before discarding it.
+      const restoreAfterCommit = fullRangePreview && shouldCommit && dragging
+        && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
+      if (fullRangePreview && !restoreAfterCommit) fullRangePreview.restore();
+      else if (!fullRangePreview) deps.clearSubviewTrackDragPreview(runtimeHost);
       if (fullRangeDrag && !fastFullRange) deps.clearFullRangeSubviewDragPreview(dragHost, store);
       const hasEffectiveMovement = dragging
         && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
       if (shouldCommit && hasEffectiveMovement) {
         deps.setSuppressTrackContigClickUntil?.(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
-        deps.applySubviewTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp));
+        try {
+          deps.applySubviewTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp));
+        } finally {
+          // Also restores a still-mounted graph if a no-op/error prevented replacement.
+          if (restoreAfterCommit) fullRangePreview.restore();
+        }
         if (
           Number.isFinite(pendingPreviewScrollLeft)
           || Number.isFinite(pendingPreviewViewportLeftX)

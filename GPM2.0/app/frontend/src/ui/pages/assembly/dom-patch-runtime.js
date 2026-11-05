@@ -193,6 +193,9 @@ export function createAssemblyDomPatchController({
     }));
     if (replacements.some(({ current, next }) => Boolean(current) !== Boolean(next)
       || (current && typeof current.replaceWith !== "function"))) return null;
+    // Paint while detached: mounting an unready graph first would style/paint
+    // every SVG proxy, then invalidate them all again when Canvas becomes ready.
+    bindBandCanvasRuntime?.(nextPanel, { synchronous: true });
     const currentScroll = livePanel.querySelector(".subview-track-scroll");
     const scrollLeft = Number(currentScroll?.scrollLeft || 0);
     const scrollTop = Number(currentScroll?.scrollTop || 0);

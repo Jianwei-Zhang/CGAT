@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSubviewBandCanvasDragPreview, compileBandDragBitmapRuns } from "../band-canvas-runtime.js";
+import { createSubviewBandCanvasDragPreview, compileBandDragBitmapRuns, bindBandCanvasRuntime } from "../band-canvas-runtime.js";
 import { resolveAlignmentBandStyle, resolveDarkAlignmentBandStyle } from "../alignment-band-style.js";
 
 function fixture({ count = 1, dark = false, contextAvailable = true, clip = false } = {}) {
@@ -194,3 +194,61 @@ test("crossed reverse-strand bands obey the same affine endpoint mapping without
   }
   assert.equal(f.paints.length,1); handle.restore();
 });
+
+function paintedBitmapFixture({ clipRect = null } = {}) {
+  const f = bitmapFixture();
+  const context = f.canvas.getContext();
+  context.drawImage = (...args) => f.calls.push(["drawImage", ...args]);
+  const sceneNode = { textContent: JSON.stringify({ width: 100, height: 80, viewBoxMinX: 0, clipRect,
+    bands: [{ points: f.actions[0].basePoints, identityPct: 80, tone: "primary" }] }) };
+  const layer = { style: {}, ownerDocument: f.scroll.ownerDocument, closest: () => f.scroll,
+    querySelector: selector => selector === "[data-track-band-canvas-scene]" ? sceneNode : f.canvas };
+  const originalQuery = f.scroll.querySelector;
+  f.scroll.querySelector = selector => selector === "[data-track-band-canvas-layer='1']" ? layer : originalQuery(selector);
+  const host = { querySelectorAll: () => [layer] };
+  bindBandCanvasRuntime(host, { synchronous: true });
+  return { ...f, sceneNode, layer, host };
+}
+
+test("drag reuses a complete ready raster, not a second paint of the alignment records", () => {
+  const f = paintedBitmapFixture(), paints = f.paints.length;
+  const handle = f.create(); handle.draw(30, [-50,0,200,80]);
+  assert.equal(f.paints.length, paints);
+  assert.equal(f.calls.filter(call => call[0] === "drawImage").length, 1);
+  assert.equal(f.children[0].getAttribute("data-subview-band-drag-reused"), "1");
+  const matrix = f.canvases[0].style.transform.slice(7,-1).split(",").map(Number);
+  // The source bitmap has a two-pixel full-viewport gutter, not the band bbox.
+  f.actions[0].basePoints.forEach(([x,y], index) => {
+    const actual = matrix[0]*(x+2) + matrix[2]*y + matrix[4];
+    assert.ok(Math.abs(actual - (x+(index<2?30:0)+50)/2) < 1e-9);
+  });
+  handle.restore();
+  assert.equal(f.canvas.width, 104, "original paint surface is neither moved nor destroyed");
+});
+
+for (const reason of ["theme", "scene", "points", "identity", "hit-key", "bitmap-size", "clip", "dpr", "pending"]) {
+  test(`ready raster reuse fails closed for changed ${reason}`, () => {
+    const previousDpr = globalThis.devicePixelRatio;
+    const previousRequest = globalThis.requestAnimationFrame;
+    try {
+      const f = paintedBitmapFixture(reason === "clip" ? { clipRect: { x:20,y:0,width:80,height:80 } } : {});
+      if (reason === "theme") f.scroll.ownerDocument.documentElement.dataset.theme = "dark";
+      if (reason === "scene") f.sceneNode.textContent += " ";
+      if (reason === "points") f.actions[0].basePoints[0][0] = -500;
+      if (reason === "identity") f.bands[0].attrs["data-band-identity-pct"] = "81";
+      if (reason === "hit-key") f.bands[0].attrs["data-subview-hit-key"] = "another-source-hit";
+      if (reason === "bitmap-size") f.canvas.width += 1;
+      if (reason === "dpr") globalThis.devicePixelRatio = 2;
+      if (reason === "pending") {
+        globalThis.requestAnimationFrame = () => 123;
+        f.sceneNode.textContent += " "; bindBandCanvasRuntime(f.host);
+      }
+      const paints = f.paints.length, handle = f.create(); handle.draw(0, [0,0,100,80]);
+      assert.equal(f.calls.filter(call => call[0] === "drawImage").length, 0);
+      assert.equal(f.paints.length, paints+1, "the entire vector evidence is rasterized on fallback");
+      handle.restore();
+    } finally {
+      globalThis.devicePixelRatio = previousDpr; globalThis.requestAnimationFrame = previousRequest;
+    }
+  });
+}

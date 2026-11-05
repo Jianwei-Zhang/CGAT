@@ -52,6 +52,7 @@ function createCanvasLayer({ context = null, sceneOverrides = {} } = {}) {
     },
   };
   const layer = {
+    style: {},
     parentElement: scrollNode,
     querySelector(selector) {
       if (selector === "[data-track-band-canvas='1']") {
@@ -68,7 +69,7 @@ function createCanvasLayer({ context = null, sceneOverrides = {} } = {}) {
       return selector === "[data-track-band-canvas-layer='1']" ? [layer] : [];
     },
   };
-  return { host, scrollNode };
+  return { host, scrollNode, layer, canvas, sceneNode };
 }
 
 function createContextRecorder() {
@@ -241,4 +242,39 @@ test("band canvas keeps svg proxy bands visible when the requested bitmap is too
     globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
     globalThis.devicePixelRatio = originalDevicePixelRatio;
   }
+});
+
+
+test("detached template Canvas is ready synchronously with the live document theme and is not painted twice on bind", () => {
+  const previous = globalThis.document;
+  const context = createContextRecorder(), fills = [];
+  context.fill = function () { fills.push(this.fillStyle); };
+  const f = createCanvasLayer({ context });
+  f.layer.ownerDocument = { documentElement: null };
+  globalThis.document = { documentElement: { dataset: { theme: "dark" } } };
+  try {
+    bindBandCanvasRuntime(f.host, { synchronous: true });
+    assert.equal(f.scrollNode.classList.contains("is-track-band-canvas-ready"), true);
+    assert.deepEqual(fills, [resolveDarkAlignmentBandStyle("primary", null).fill]);
+    assert.equal(f.layer.style.overflow, "hidden");
+    assert.equal(f.canvas.style.transform, "translateX(-2px)");
+    bindBandCanvasRuntime(f.host);
+    assert.equal(fills.length, 1);
+  } finally { globalThis.document = previous; }
+});
+
+test("synchronous detached Canvas failure retains the full SVG fallback", () => {
+  const context = createContextRecorder(); context.fill = () => { throw new Error("lost context"); };
+  const f = createCanvasLayer({ context });
+  assert.doesNotThrow(() => bindBandCanvasRuntime(f.host, { synchronous: true }));
+  assert.equal(f.scrollNode.classList.contains("is-track-band-canvas-ready"), false);
+});
+
+test("unbounded offscreen extents never enlarge the viewport backing bitmap", () => {
+  const context = createContextRecorder();
+  const f = createCanvasLayer({ context, sceneOverrides: { bands: [{ points: [[-900000,20], [10,20], [200,60], [900000,60]] }] } });
+  bindBandCanvasRuntime(f.host, { synchronous: true });
+  assert.equal(f.canvas.style.width, "200px");
+  assert.equal(f.canvas.style.transform, "translateX(0px)");
+  assert.equal(context.calls.filter(call => call[0] === "fill").length, 1);
 });

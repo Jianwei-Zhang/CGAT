@@ -227,8 +227,16 @@ test("Subview panel patch preserves the mounted panel and viewport while replaci
     ownerDocument: { createElement: () => ({ content: fragment, set innerHTML(_value) {} }) },
     querySelector: (selector) => selector === "[data-subview-panel='1']" ? panel : null,
   };
-  const { patchSubviewPanelDom } = createController({ renderAssemblySubviewPanel: () => "<article></article>" });
+  let painted = false;
+  const { patchSubviewPanelDom } = createController({ renderAssemblySubviewPanel: () => "<article></article>",
+    bindBandCanvasRuntime: (node, options) => {
+      assert.equal(node, nextPanel); assert.deepEqual(options, { synchronous: true });
+      assert.notEqual(live.get(".subview-panel-head"), next.get(".subview-panel-head"));
+      painted = true;
+    },
+  });
   const replaced = patchSubviewPanelDom(routeHost, { getState: () => ({ assembly: {} }) });
+  assert.equal(painted, true);
   assert.deepEqual(replaced.map((node) => node.id), ["next-head", "next-card"]);
   assert.equal(routeHost.querySelector("[data-subview-panel='1']"), panel, "panel identity stays mounted");
   assert.equal(nextScroll.scrollLeft, 18817); assert.equal(nextScroll.scrollTop, 73);

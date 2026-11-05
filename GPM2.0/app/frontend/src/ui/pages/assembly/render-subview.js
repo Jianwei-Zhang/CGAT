@@ -1,3 +1,4 @@
+import { renderCompactSubviewAnchors } from "./subview-anchor-metadata.js";
 import { hasDeferredReferenceHits, readReferenceHits, iterateReferenceHitEntries } from "../../../services/workflow/reference-evidence.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./source-fragment-drag.js";
@@ -1299,6 +1300,8 @@ function buildSubviewFragmentRects({
 }
 
 function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBottomY }) {
+  if (anchorEdges?.length >= 256) return renderCompactSubviewAnchors(anchorEdges,
+    { topY, bottomY, hitTopY, hitBottomY }, { escapeAttr, buildObjectId: buildSubviewAnchorObjectId });
   return (Array.isArray(anchorEdges) ? anchorEdges : [])
     .map(
       (edge) => {

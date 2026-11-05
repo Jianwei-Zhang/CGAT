@@ -1,3 +1,4 @@
+import { readSubviewAnchorAttribute } from "./subview-anchor-metadata.js";
 import {
   normalizeSubviewActiveAnchors,
   normalizeSubviewManualAnchors,
@@ -10,22 +11,22 @@ function positiveInt(value) {
 
 function readEndpoint(node, side) {
   const prefix = `data-subview-anchor-${side}-`;
-  const endpointKey = String(node.getAttribute(`${prefix}endpoint-key`) || "").trim();
-  const contigId = positiveInt(node.getAttribute(`${prefix}contig-id`));
-  const cutBp = positiveInt(node.getAttribute(`${prefix}cut-bp`));
+  const endpointKey = String(readSubviewAnchorAttribute(node, `${prefix}endpoint-key`) || "").trim();
+  const contigId = positiveInt(readSubviewAnchorAttribute(node, `${prefix}contig-id`));
+  const cutBp = positiveInt(readSubviewAnchorAttribute(node, `${prefix}cut-bp`));
   if (!endpointKey || !contigId || !cutBp) return null;
-  const lengthBp = positiveInt(node.getAttribute(`${prefix}length-bp`));
-  const name = String(node.getAttribute(`${prefix}name`) || "").trim();
-  const sourceLabel = String(node.getAttribute(`${prefix}source-label`) || "").trim();
-  const sourceRole = String(node.getAttribute(`${prefix}source-role`) || "").trim();
-  const sourceKind = String(node.getAttribute(`${prefix}source-kind`) || "").trim();
-  const sourceName = String(node.getAttribute(`${prefix}source-name`) || "").trim();
-  const baseCutBp = positiveInt(node.getAttribute(`${prefix}base-cut-bp`));
-  const sourcePosition = positiveInt(node.getAttribute(`${prefix}source-position`));
-  const rawSourceCut = node.getAttribute(`${prefix}source-cut-after`);
+  const lengthBp = positiveInt(readSubviewAnchorAttribute(node, `${prefix}length-bp`));
+  const name = String(readSubviewAnchorAttribute(node, `${prefix}name`) || "").trim();
+  const sourceLabel = String(readSubviewAnchorAttribute(node, `${prefix}source-label`) || "").trim();
+  const sourceRole = String(readSubviewAnchorAttribute(node, `${prefix}source-role`) || "").trim();
+  const sourceKind = String(readSubviewAnchorAttribute(node, `${prefix}source-kind`) || "").trim();
+  const sourceName = String(readSubviewAnchorAttribute(node, `${prefix}source-name`) || "").trim();
+  const baseCutBp = positiveInt(readSubviewAnchorAttribute(node, `${prefix}base-cut-bp`));
+  const sourcePosition = positiveInt(readSubviewAnchorAttribute(node, `${prefix}source-position`));
+  const rawSourceCut = readSubviewAnchorAttribute(node, `${prefix}source-cut-after`);
   const sourceCutAfter = rawSourceCut == null || rawSourceCut === "" ? null : Number(rawSourceCut);
-  const lane = String(node.getAttribute(`${prefix}lane`) || "").trim();
-  const baseOrientation = String(node.getAttribute(`${prefix}base-orientation`) || "").trim();
+  const lane = String(readSubviewAnchorAttribute(node, `${prefix}lane`) || "").trim();
+  const baseOrientation = String(readSubviewAnchorAttribute(node, `${prefix}base-orientation`) || "").trim();
   return {
     endpointKey,
     contigId,

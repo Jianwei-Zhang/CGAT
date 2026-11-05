@@ -930,7 +930,10 @@ for (const view of ["main", "pair", "composition"]) {
               previews.push(payload);
               scroll.dataset.trackDomainSpanBp = scroll.dataset.subviewDomainSpanBp = "200";
             };
-            const commit = (_host, _store, payload) => commits.push(payload);
+            const commit = (_host, _store, payload) => {
+              if (!main && fastFullRange) assert.equal(restored, 0, "replace the graph before unhiding obsolete hit targets");
+              commits.push(payload);
+            };
             const offset = (_offsets, _role, id) => id === 12 ? 7 : -4;
             let compiled = 0, restored = 0;
             const fastFactory = (_scroll, payload) => {

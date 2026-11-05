@@ -85,7 +85,7 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
     restore.push(() => value === null ? node.removeAttribute(name) : node.setAttribute(name,value));
   };
   const set = (node,name,value) => { remember(node,name); node.setAttribute(name,String(value)); };
-  const plan = compileTrackDragPreview(scroll,payload,{subview});
+  const plan = compileTrackDragPreview(scroll,payload,{subview, fullRange:true});
   const composition = subview && Boolean(scroll.closest("[data-subview-composition-scene]"));
   const ruler = svg.querySelector("[data-subview-virtual-ruler]");
   const rulerLine = svg.querySelector(".track-ruler-line");
@@ -97,10 +97,21 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
   }
   const oldScrollLeft = scroll.scrollLeft;
   restore.push(() => { scroll.scrollLeft = oldScrollLeft; });
-  scroll.classList.add(PREVIEW_CLASS);
+  let resetScroll = oldScrollLeft !== 0;
+  // Measure the already-laid-out graph before toggling classes on tens of
+  // thousands of proxies. Only sticky-hidden SVG labels need to be revealed
+  // for their own bounds; the HTML label layer is not part of this measurement.
+  for (const text of svg.querySelectorAll("text.track-ctg-label.is-sticky-hidden")) {
+    remember(text, "style");
+    text.style.display = "inline";
+  }
   let geometry;
   try { geometry = captureGeometry(svg,plan,composition); }
-  catch (error) { scroll.classList.remove(PREVIEW_CLASS); throw error; }
+  catch (error) {
+    for (let index=restore.length-1;index>=0;index--) restore[index]();
+    throw error;
+  }
+  scroll.classList.add(PREVIEW_CLASS);
   for (const text of geometry.texts) remember(text.node,"style");
   if (!composition) geometry.edges.push({ position:0,motion:0,offset:0 },{ position:innerWidth,motion:0,offset:0 });
   else geometry.edges.push({ position:0,motion:0,offset:0 });
@@ -138,7 +149,7 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
       set(scroll,`data-${prefix}-viewbox-min-x`,fit.screenMinX);
       set(scroll,"data-view-navigation-start-bp",windowStart+fit.screenMinX*domainSpan/projectedInnerWidth);
       set(scroll,"data-view-navigation-end-bp",windowStart+(fit.screenMinX+viewportWidth)*domainSpan/projectedInnerWidth);
-      scroll.scrollLeft = 0;
+      if (resetScroll) { scroll.scrollLeft = 0; resetScroll = false; }
       if (ruler) {
         const baseEnd = composition ? Math.max(0,...memberEnds.map(edge => edge.position+edge.motion*deltaPx)) : null;
         const options = { ...rulerOptions, innerWidth:composition ? baseEnd*fit.scale : rulerOptions.innerWidth*fit.scale,

@@ -556,7 +556,8 @@
   opacity: 1;
 }
 
-.subview-anchor-line.is-focused {
+.subview-anchor-line.is-focused,
+.subview-anchor-hit-zone.is-focused {
   stroke: var(--theme-purple-line, #7a1fff);
   stroke-width: 6;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95));
@@ -1033,6 +1034,7 @@
 
 /* Hit targets are already invisible; the gesture owns window pointer events.
    Exclude them from SVG layout/painting until release, retaining active lines. */
+.is-full-range-drag-preview [data-subview-anchor-metadata="1"],
 .is-full-range-drag-preview .subview-anchor-hit-zone,
 .is-full-range-drag-preview .subview-fragment-hit-zone,
 .is-full-range-drag-preview .subview-anchor-line[stroke="transparent"] { display: none; }

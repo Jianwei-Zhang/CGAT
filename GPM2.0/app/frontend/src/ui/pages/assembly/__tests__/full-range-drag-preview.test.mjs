@@ -84,3 +84,27 @@ for (const composition of [false, true]) test(`full-range ${composition ? "compo
  assert.equal(attached, false); assert.equal(f.scroll.classList.contains("is-subview-band-canvas-drag-preview"), false);
  assert.deepEqual(f.snapshot(), before);
 });
+
+
+test("full-range start measures before invalidating dense hit layers and avoids zero-scroll layout flushes", () => {
+ const f=fixture(true), before=f.snapshot();
+ let reads=0, writes=0, left=0;
+ for(const item of f.all.filter(item=>["rect","text"].includes(item.localName))) {
+  const original=item.getBBox;
+  item.getBBox=()=>{assert.equal(f.scroll.classList.contains("is-full-range-drag-preview"),false);reads++;return original();};
+ }
+ Object.defineProperty(f.scroll,"scrollLeft",{get:()=>left,set:value=>{writes++;left=value;}});
+ const handle=f.handle();assert.ok(reads>0);
+ for(const delta of [100,-100,0])handle.update(delta);
+ assert.equal(writes,0,"writing scrollLeft=0 after SVG mutations would force a layout even when already zero");
+ handle.restore();assert.deepEqual(f.snapshot(),before);
+});
+
+test("failed geometry capture restores temporarily revealed sticky labels", () => {
+ const f=fixture(true);
+ f.text.setAttribute("style","display:none");
+ f.queryMaps.get(f.svg)["text.track-ctg-label.is-sticky-hidden"]=[f.text];
+ f.text.getBBox=()=>{assert.equal(f.text.style.display,"inline");throw new Error("detached label");};
+ const before=f.snapshot();assert.throws(()=>f.handle(),/detached label/);
+ assert.deepEqual(f.snapshot(),before);assert.equal(f.scroll.classList.contains("is-full-range-drag-preview"),false);
+});

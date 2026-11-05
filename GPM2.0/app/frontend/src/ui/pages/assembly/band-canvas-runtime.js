@@ -106,12 +106,27 @@ function drawTrackBandCanvasLayer(layer, scene) {
   if (!canvas || !scene) {
     return false;
   }
-  const configured = configureCanvas(canvas, scene.width, scene.height);
-  if (!configured) {
-    return false;
+  const viewportLeft = Number(scene.viewBoxMinX || 0);
+  let offsetX = viewportLeft, paintWidth = Number(scene.width);
+  // Keep a bounded gutter in the already-painted backing bitmap. Minimum-pixel
+  // bands can protrude past a full-range viewport even when their bp endpoints
+  // fit; clipping them here would force another complete raster on pointerdown.
+  let minX = viewportLeft, maxX = viewportLeft + paintWidth;
+  for (const band of scene.bands || []) for (const point of band.points || []) {
+    if (!Number.isFinite(point[0])) continue;
+    minX = Math.min(minX, point[0]); maxX = Math.max(maxX, point[0]);
   }
+  const paddedLeft = Math.floor(minX) - 2, paddedWidth = Math.ceil(maxX) + 2 - paddedLeft;
+  const dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
+  if (paddedWidth <= Math.max(paintWidth * 1.25, paintWidth + 16)
+    && canAllocateCanvasBitmap(paddedWidth, scene.height, dpr)) {
+    offsetX = paddedLeft; paintWidth = paddedWidth;
+  }
+  const configured = configureCanvas(canvas, paintWidth, scene.height);
+  if (!configured) return false;
   const { context, width, height } = configured;
-  const offsetX = Number(scene.viewBoxMinX || 0);
+  layer.style.overflow = "hidden";
+  canvas.style.transform = `translateX(${offsetX - viewportLeft}px)`;
 
   if (scene?.clipRect) {
     context.save();
@@ -125,7 +140,8 @@ function drawTrackBandCanvasLayer(layer, scene) {
     context.clip();
   }
 
-  const dark = (layer?.ownerDocument || globalThis.document)?.documentElement?.dataset?.theme === "dark";
+  const dark = (layer?.ownerDocument?.documentElement?.dataset?.theme
+    ?? globalThis.document?.documentElement?.dataset?.theme) === "dark";
   const resolveBandStyle = dark ? resolveDarkAlignmentBandStyle : resolveAlignmentBandStyle;
   sortAlignmentBands(Array.isArray(scene.bands) ? scene.bands : []).forEach((band) => {
     drawPolygon(
@@ -139,10 +155,10 @@ function drawTrackBandCanvasLayer(layer, scene) {
   if (scene?.clipRect) {
     context.restore();
   }
-  return true;
+  return { canvas, left: offsetX, top: 0, width, height };
 }
 
-export function bindBandCanvasRuntime(host) {
+export function bindBandCanvasRuntime(host, { synchronous = false } = {}) {
   const { request, cancel } = resolveAnimationFrameApi();
   const layers = host?.querySelectorAll?.("[data-track-band-canvas-layer='1']") || [];
   layers.forEach((layer) => {
@@ -151,9 +167,12 @@ export function bindBandCanvasRuntime(host) {
     }
     const sceneNode = layer.querySelector?.("[data-track-band-canvas-scene]");
     const sceneText = String(sceneNode?.textContent || "");
-    const activeTheme = (layer?.ownerDocument || globalThis.document)?.documentElement?.dataset?.theme || "light";
+    const activeTheme = layer?.ownerDocument?.documentElement?.dataset?.theme
+      ?? globalThis.document?.documentElement?.dataset?.theme ?? "light";
+    const dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
     const previous = layer[TRACK_BAND_CANVAS_BOUND] || null;
-    if (previous?.sceneText === sceneText && (previous?.theme || "light") === activeTheme) {
+    if (previous?.sceneText === sceneText && (previous?.theme || "light") === activeTheme
+      && previous.dpr === dpr && !(synchronous && previous.frameHandle !== undefined)) {
       return;
     }
     if (previous?.frameHandle !== undefined) {
@@ -162,8 +181,9 @@ export function bindBandCanvasRuntime(host) {
     const trackScroll = layer.closest?.(".assembly-track-scroll") || layer.parentElement || null;
     trackScroll?.classList?.remove?.(TRACK_BAND_CANVAS_READY_CLASS);
     const scene = readTrackBandCanvasScene(layer);
-    const frameHandle = request(() => {
-      const drew = drawTrackBandCanvasLayer(layer, scene);
+    const draw = () => {
+      let drew = false;
+      try { drew = drawTrackBandCanvasLayer(layer, scene); } catch { /* Keep the complete SVG fallback. */ }
       if (drew) {
         trackScroll?.classList?.add?.(TRACK_BAND_CANVAS_READY_CLASS);
       } else {
@@ -174,14 +194,19 @@ export function bindBandCanvasRuntime(host) {
         layer[TRACK_BAND_CANVAS_BOUND] = {
           ...nextState,
           frameHandle: undefined,
+          paintedBounds: drew || null,
+          paintedScene: drew ? scene : null,
+          paintedCanvas: drew ? layer.querySelector("[data-track-band-canvas='1']") : null,
         };
       }
-    });
-    layer[TRACK_BAND_CANVAS_BOUND] = {
-      sceneText,
-      theme: activeTheme,
-      frameHandle,
     };
+    layer[TRACK_BAND_CANVAS_BOUND] = { sceneText, theme: activeTheme, dpr };
+    if (synchronous) draw();
+    else {
+      const pending = layer[TRACK_BAND_CANVAS_BOUND];
+      const frameHandle = request(draw);
+      if (layer[TRACK_BAND_CANVAS_BOUND] === pending) pending.frameHandle = frameHandle;
+    }
   });
 }
 
@@ -211,17 +236,49 @@ export function compileBandDragBitmapRuns(bands, maxRuns = 16) {
   return runs;
 }
 
+// Reuse only a fully painted same-theme scene covering every original vertex
+// and the exact ordered records. Release still renders the authoritative scene.
+function readReusableBandBitmap(scroll, bands) {
+  const layer = scroll.querySelector?.("[data-track-band-canvas-layer='1']");
+  const bound = layer?.[TRACK_BAND_CANVAS_BOUND];
+  const scene = bound?.paintedScene, canvas = bound?.paintedCanvas;
+  const theme = scroll.ownerDocument?.documentElement?.dataset?.theme || "light";
+  if (!scene || !canvas || bound.frameHandle !== undefined || bound.theme !== theme
+    || bound.dpr !== Math.max(1, Number(globalThis.devicePixelRatio || 1))
+    || bound.sceneText !== String(layer.querySelector?.("[data-track-band-canvas-scene]")?.textContent || "")
+    || canvas !== layer.querySelector?.("[data-track-band-canvas='1']")
+    || scene.bands?.length !== bands.length) return null;
+  const { left, width, height } = bound.paintedBounds || {};
+  if (!(width > 0 && height > 0) || canvas.width !== Math.round(width * bound.dpr)
+    || canvas.height !== Math.round(height * bound.dpr)) return null;
+  const clip = scene.clipRect;
+  for (let i = 0; i < bands.length; i++) {
+    const band = bands[i], original = scene.bands[i];
+    if (band.hitKey !== String(original.hitKey || "") || band.identityPct !== original.identityPct
+      || band.tone !== original.tone || original.points?.length !== 4) return null;
+    for (let j = 0; j < 4; j++) {
+      const [x,y] = band.points[j];
+      if (Math.abs(original.points[j][0]-x) > 0.000001 || Math.abs(original.points[j][1]-y) > 0.000001
+        || x < left || x > left+width || y < 0 || y > height
+        || (clip && (x < clip.x || x > clip.x+clip.width || y < clip.y || y > clip.y+clip.height))) return null;
+    }
+  }
+  return { canvas, left, top: 0, width, height };
+}
+
 function createBandDragBitmapPreview(document, scroll, bands, nodes, { width, height, clipY, clipHeight }) {
   const runs = compileBandDragBitmapRuns(bands);
   if (!runs?.length) return null;
   const layer = document.createElement("div");
   if (!layer?.appendChild) return null;
   const dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
+  const reusable = runs.length === 1 ? readReusableBandBitmap(scroll, bands) : null;
   let area = 0;
   for (const run of runs) {
     run.left = Math.floor(run.minX) - 2; run.top = Math.floor(run.minY) - 2;
     run.width = Math.ceil(run.maxX) + 2 - run.left;
     run.height = Math.ceil(run.maxY) + 2 - run.top;
+    if (reusable) Object.assign(run, { left: reusable.left, top: reusable.top, width: reusable.width, height: reusable.height });
     area += Math.ceil(run.width * dpr) * Math.ceil(run.height * dpr);
     if (!canAllocateCanvasBitmap(run.width, run.height, dpr) || area > MAX_CANVAS_BITMAP_AREA) return null;
   }
@@ -235,8 +292,13 @@ function createBandDragBitmapPreview(document, scroll, bands, nodes, { width, he
     const configured = configureCanvas(canvas, run.width, run.height);
     if (!configured) return null;
     const { context } = configured;
-    context.translate(0, -run.top);
-    for (const band of run.bands) drawPolygon(context, band.points, run.left, band.styles);
+    if (reusable) {
+      context.drawImage(reusable.canvas, 0, 0, run.width, run.height);
+      layer.setAttribute("data-subview-band-drag-reused", "1");
+    } else {
+      context.translate(0, -run.top);
+      for (const band of run.bands) drawPolygon(context, band.points, run.left, band.styles);
+    }
     Object.assign(canvas.style, { position: "absolute", left: "0", top: "0", transformOrigin: "0 0", willChange: "transform" });
     layer.appendChild(canvas);
     run.canvas = canvas;
@@ -295,7 +357,7 @@ export function createSubviewBandCanvasDragPreview(scroll, actions, { width, hei
     const identityText = node.getAttribute("data-band-identity-pct");
     const identityPct = identityText === null || identityText === "" ? null : Number(identityText);
     const tone = node.classList.contains("is-companion") ? "companion" : "primary";
-    bands.push({ points, identityPct, styles: resolveStyle(tone, identityPct),
+    bands.push({ points, identityPct, tone, hitKey: String(node.getAttribute("data-subview-hit-key") || ""), styles: resolveStyle(tone, identityPct),
       moving: points.map((_, index) => action?.edgeIndexes.includes(index) ? 1 : 0) });
   }
   const orderedBands = sortAlignmentBands(bands);

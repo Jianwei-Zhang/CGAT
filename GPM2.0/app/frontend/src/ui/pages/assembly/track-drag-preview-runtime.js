@@ -593,7 +593,10 @@ export function previewSubviewTrackContigDrag(host, payload, plan = null) {
         if (!compositionEntityKey && !isLabelInsideGroup(labelNode, groupNode)) applyStickyLabelPreview(labelNode, offsetPx, plan);
       });
     });
-    for (const anchor of host.querySelectorAll?.('[data-subview-anchor-preview="1"]') || []) {
+    const anchorSelector = plan?.fullRange
+      ? '[data-subview-anchor-preview="1"]:not(.subview-anchor-hit-zone):not(.subview-anchor-line[stroke="transparent"])'
+      : '[data-subview-anchor-preview="1"]';
+    for (const anchor of host.querySelectorAll?.(anchorSelector) || []) {
       if (Number(anchor.getAttribute?.(`data-subview-anchor-${slot}-contig-id`)) !== Number(contigId)) continue;
       if (compositionEntityKey && anchor.getAttribute?.(`data-subview-anchor-${slot}-entity-key`) !== compositionEntityKey) continue;
       const offsets = anchorOffsets.get(anchor) || { top: 0, bottom: 0 };
@@ -633,12 +636,13 @@ export function __testShiftPolygonEdge(pointsText, edgeIndexes, offsetPx) {
 
 // Compile only DOM ownership/endpoint relationships, not scientific evidence or
 // persisted positions. A plan belongs to one gesture and one rendered graph.
-export function compileTrackDragPreview(host, payload, { subview = false } = {}) {
+export function compileTrackDragPreview(host, payload, { subview = false, fullRange = false } = {}) {
   const byNode = new Map();
   const actions = [];
   let cachedSkipBandNodes = null, fullRangeActions = null;
   const plan = {
     actions,
+    fullRange,
     add(kind, node, details) {
       if (!node) return;
       const previous = byNode.get(node);
