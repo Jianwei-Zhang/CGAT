@@ -1,0 +1,37 @@
+#!/bin/bash
+#DSUB -n cgat_ordinary_filtering64
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-filtering-20261105-5cacb63"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REFERENCE="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/reference/Caryophyllales_ref.fa"
+QUERY="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/datasets/nextdenovo.fa"
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
+
+# One real full assembly, explicit default vs 0.01; forward/reverse order.
+# This reports lost/changed evidence. It CANNOT approve a production -f policy.
+python3 -B benchmark_ordinary_filtering.py \
+  --target "$REFERENCE" --query "$QUERY" --out "$ROOT/comparison" --minimap2 "$MM" \
+  --threads 64 --memory-mib 65536 --timeout 900 --batch-bases 500000000 \
+  --fractions 0.01 --repeats 2 \
+  --expected-baseline-paf-sha256 c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932 \
+  --execute > comparison.log 2>&1
+
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -

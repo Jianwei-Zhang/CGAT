@@ -1,0 +1,40 @@
+{
+  "schema": "cgat.ordinary_filtering_screening.v1",
+  "status": "local_harness_smoke_passed_pending_real_input_screening",
+  "observed_at": "2026-11-05T21:18:35.341103+08:00",
+  "production_runtime_modified": false,
+  "automatic_trigger_implemented": false,
+  "downstream_scientific_acceptance": false,
+  "customer_wheat_data": false,
+  "local_control": {
+    "completed_runs": 4,
+    "query_records": 16,
+    "source_content_unchanged": true,
+    "paf_sha256": [
+      "5c2d127252044674703610e2e945f9c8cd48d5c23f51a2ad87f7a7927774ce5f",
+      "5c2d127252044674703610e2e945f9c8cd48d5c23f51a2ad87f7a7927774ce5f",
+      "5c2d127252044674703610e2e945f9c8cd48d5c23f51a2ad87f7a7927774ce5f",
+      "5c2d127252044674703610e2e945f9c8cd48d5c23f51a2ad87f7a7927774ce5f"
+    ],
+    "actual_mid_occ": [
+      50,
+      50,
+      50,
+      50
+    ],
+    "note": "all four local conditions clamp to mid_occ 50; same PAF is not evidence of speedup or automatic policy safety"
+  },
+  "planned_real_screening": {
+    "query": "nextdenovo.fa full original 2430 records",
+    "conditions": [
+      "default",
+      "0.01"
+    ],
+    "repetitions": 2,
+    "order": "forward then reverse",
+    "threads": 64,
+    "K": 500000000,
+    "index_policy": "original default",
+    "acceptance": "report all PAF row/score/coverage/pair changes; no production or downstream approval"
+  }
+}
