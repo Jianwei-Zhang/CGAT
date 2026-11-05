@@ -397,7 +397,7 @@ class RealPartitionExecutionTests(unittest.TestCase):
             old=Path(result['output_path']).read_bytes()
             # Budget now unknown still reuses an already-complete group, not
             # fall back by repeating its original whole query group.
-            args.ordinary_group_memory_bytes=None
+            args.ordinary_group_memory_bytes=None;args.threads=2
             with self.controls(),patch.object(pa.subprocess,'check_output',return_value='2.31-r1302\n'),patch.object(opa.subprocess,'Popen',side_effect=AssertionError('no new native mapping process')):
                 again=pa.experiment(args,resume_identity={'scope':'same-test-input'})
             self.assertEqual(again['cache_reused']['ordinary_group'],1)
@@ -428,7 +428,7 @@ class RealPartitionExecutionTests(unittest.TestCase):
                 failed=json.loads((group/opa.RECEIPT).read_text())
                 self.assertEqual([p['part_index'] for p in failed['parts']],[0])
                 previous={p:p.read_bytes() for p in (group/'part-0000').iterdir()}
-                args.ordinary_group_memory_bytes=None;commands=[]
+                args.ordinary_group_memory_bytes=None;args.threads=3;commands=[]
                 def record(command,*a,**kw):
                     output=str(command[command.index('-o')+1]) if '-o' in command else ''
                     if '/ordinary-native/' in output:commands.append(command)
@@ -437,6 +437,7 @@ class RealPartitionExecutionTests(unittest.TestCase):
                     result=pa.experiment(args,resume_identity={'scope':'real-failed-sibling'})
                 self.assertEqual(len(commands),1)
                 self.assertTrue(commands[0][-2].endswith('part-0001.mmi'))
+                self.assertEqual(commands[0][commands[0].index('-t')+1],'3')
                 native=result['ordinary_native'];self.assertEqual(native['reused_part_indices'],[0])
                 self.assertEqual(native['schema'],2)
                 self.assertEqual(result['admission']['status'],'proactive_recovery_admitted')
@@ -492,7 +493,7 @@ class RealPartitionExecutionTests(unittest.TestCase):
             locator['key']['runtime_sha256']='d'*64
             state=pr.read_json(attempt/'selective'/pr.STATE);state['key']=locator['key']
             wa.write_json(service_args.run_dir/pr.LOCATOR,locator);wa.write_json(attempt/'selective'/pr.STATE,state)
-            commands=[]
+            commands=[];service_args.threads=3
             def record(command,*a,**kw):
                 output=str(command[command.index('-o')+1]) if '-o' in command else ''
                 if '/ordinary-native/' in output:commands.append(command)
@@ -501,6 +502,7 @@ class RealPartitionExecutionTests(unittest.TestCase):
                 result=sa.run_reference(service_args,runtime_root=runtime)
             self.assertTrue(result['attempt_reused']);self.assertEqual(result['attempt'],str(attempt))
             self.assertEqual(len(commands),1);self.assertTrue(commands[0][-2].endswith('part-0001.mmi'))
+            self.assertEqual(commands[0][commands[0].index('-t')+1],'3')
             for p,raw in before.items():self.assertEqual(p.read_bytes(),raw)
             candidate=json.loads((attempt/'selective/proactive-candidate.json').read_text())
             self.assertEqual(candidate['ordinary_native']['reused_part_indices'],[0])
@@ -523,7 +525,7 @@ class RealPartitionExecutionTests(unittest.TestCase):
     def test_performance_source_upgrade_retains_completed_native_and_long_cells(self):
         import test_proactive_resume as fixtures
         import server_alignment as sa
-        for source_file in ('pre_partition_runtime.json', 'post_metadata_fix_runtime.json', 'pre_partition_resume_runtime.json'):
+        for source_file in ('pre_partition_runtime.json', 'post_metadata_fix_runtime.json', 'pre_partition_resume_runtime.json', 'pre_resource_grant_runtime.json'):
             with self.subTest(source_file=source_file), tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp);owner=fixtures.RealResumeTests();owner.mm=self.mm;owner.bundle=self.bundle
                 runtime,args=owner.fixture(root)

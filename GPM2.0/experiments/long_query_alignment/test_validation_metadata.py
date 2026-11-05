@@ -196,7 +196,7 @@ class KeyMigrationTests(unittest.TestCase):
     def test_legacy_full_profile_is_frozen_and_matches_the_approved_digest(self):
         digest = hashlib.sha256(json.dumps(LEGACY,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         self.assertEqual(digest, pr._REVIEWED_LEGACY_RUNTIME)
-        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py"})
+        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py"})
 
     def test_reviewed_runtime_and_ctime_transition_retains_old_controls(self):
         self.target.chmod(0o400);self.query.chmod(0o400)

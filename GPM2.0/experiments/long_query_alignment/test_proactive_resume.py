@@ -196,6 +196,30 @@ class RealResumeTests(unittest.TestCase):
             self.assertEqual(report["combination"]["original_cells"],4)
             self.assertEqual(report["combination"]["rows_by_query"]["new_unmapped"],0)
 
+    def test_execution_thread_changes_retain_verified_native_and_recovered_completions(self):
+        for mode in ('ordinary','mixed','all_long','empty_long'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);runtime,args=self.fixture(root,all_long=mode in ('all_long','empty_long'))
+                if mode=='ordinary':args.query.write_bytes(b'>short\n'+b'ACGT'*1000+b'\n')
+                elif mode=='empty_long':args.query.write_bytes(b'>longN\n'+b'N'*90000+b'\n')
+                with self.controls():first=sa.run_reference(args,runtime_root=runtime)
+                attempt=Path(first['attempt']);output=(args.run_dir/'result.paf').read_bytes()
+                candidate=attempt/'selective';old={p:p.read_bytes() for p in candidate.rglob('*.paf')}
+                for threads in (4,2):
+                    args.threads=threads
+                    with self.controls(),patch.object(wa,'run_command',side_effect=AssertionError('resource-only thread change repeated mapping')):
+                        again=sa.run_reference(args,runtime_root=runtime)
+                    self.assertTrue(again['attempt_reused']);self.assertEqual(again['attempt'],str(attempt))
+                    self.assertEqual((args.run_dir/'result.paf').read_bytes(),output)
+                    for p,raw in old.items():self.assertEqual(p.read_bytes(),raw)
+                    state=pr.read_json(candidate/pr.STATE)
+                    self.assertEqual(state['key']['threads'],threads)
+                    self.assertEqual(state['resource_transitions'][-1]['to'],threads)
+                    self.assertTrue(state['resource_transitions'][-1]['completed_payload_checks_still_required'])
+                if mode in ('ordinary','mixed'):
+                    command=pr.read_json(candidate/'ordinary-native/native-attempt.json')['execution']['command']
+                    self.assertEqual(command[command.index('-t')+1],'1')
+
     def test_complete_unmapped_long_cell_is_reused_without_fake_native_status(self):
         with tempfile.TemporaryDirectory(prefix="cgat-proactive-empty-resume-") as tmp:
             root=Path(tmp); runtime,args=self.fixture(root,all_long=True)

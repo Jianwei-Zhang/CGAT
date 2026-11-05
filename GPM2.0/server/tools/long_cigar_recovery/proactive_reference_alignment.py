@@ -202,7 +202,12 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                 saved = cache.get("threshold")
                 if saved is not None:
                     directory = root / "first-part-metadata"
-                    command = [mm, "-x", "asm10", *mo.seed_flags(fraction), "-t", str(args.threads), "-o", str(directory / "empty.paf"),
+                    cached = saved.get("execution", {}).get("command", [])
+                    prefix = [mm, "-x", "asm10", *mo.seed_flags(fraction), "-t"]
+                    old_threads = cached[len(prefix)] if type(cached) is list and len(cached) > len(prefix) else None
+                    rp.require(type(old_threads) is str and old_threads.isascii() and old_threads.isdigit()
+                               and int(old_threads) > 0, "cached metadata command has invalid actual thread grant")
+                    command = [*prefix, old_threads, "-o", str(directory / "empty.paf"),
                                index["parts"][0]["path"], str(directory / "empty.fa")]
                     execution = pub.completed_command(directory, "metadata", root, command)
                     if (saved["execution"] != execution or saved["part_sha256"] != index["parts"][0]["sha256"]

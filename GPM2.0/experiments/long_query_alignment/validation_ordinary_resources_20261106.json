@@ -1,0 +1,337 @@
+{
+  "actual_process_controls": {
+    "concurrent_siblings_fallback_native_and_no_memory_reads": true,
+    "controlled_grant_bytes": 6442450944,
+    "existing_recovery_publication_passed": true,
+    "lowered_risk_limit_and_TEST_ONLY_index_layout_used": true,
+    "mixed_exclusive_known_envelope_two_workers_threads": [
+      2,
+      2
+    ],
+    "mixed_single_original_part_no_memory_reads": true,
+    "mounted_cgroup_metadata_simulated": true,
+    "private_mapper_budget_field_injected": false,
+    "pure_ordinary_original_FASTA_native_no_index_or_memory_probe": true,
+    "real_dispatcher_to_Server_to_parser_to_native_parts": true
+  },
+  "additional_source_sha256": {
+    "GPM2.0/experiments/long_query_alignment/sync_server_runtime.py": "ccd0ad6238ef4c1d70025fa0b8bad8d0e27e6974e367f2df00456f75a17af29b",
+    "GPM2.0/experiments/long_query_alignment/test_data/pre_resource_grant_runtime.json": "e86e3619c53bd21670000fa0cf6e0f32c1677c4ec4a6b4e1699a86d0fc13e8ff",
+    "GPM2.0/experiments/long_query_alignment/test_ordinary_partition_alignment.py": "acd81cf6b5c91427ce5302bff90ac4fe61171f0243a593ee2b2271d2d1c46ea3",
+    "GPM2.0/experiments/long_query_alignment/test_ordinary_resource_grant.py": "addff9ff6e177fa99c80508fa34c17a056f4d6ba4c587c00bc33a86122c3e6f3",
+    "GPM2.0/experiments/long_query_alignment/test_proactive_resume.py": "76561f0b26f9d65fa093b670fb57342e8844eee40f7747c27e6c74a56f6554ca",
+    "GPM2.0/experiments/long_query_alignment/test_validation_metadata.py": "598706f8a986838ac71f0a885e98b6a0e407ccd0c3d9bfb172ce9bfe54869377",
+    "GPM2.0/server/tests/test_alignment_tasks.py": "2c628a9dcd356795b61a3c7e22ce3d110d67b84d988204ccb05109296dd27356",
+    "GPM2.0/server/tools/alignment_tasks.py": "9487c0938dd9e844cc3ccd55102eca3241d219848bce397d19102c3820b36cb5",
+    "GPM2.0/server/tools/run_all_runner.py": "a521a1ac37e4812df050e1cfbc867fef4635d375663f9c4729c17b0abe31d10d"
+  },
+  "branch": "perf/minimap2-ordinary-mapping-20261105",
+  "canonical_runtime_files_sha256": {
+    "MINIMAP2_LICENSE.txt": "439f990fe612f03792ab99de0298d6feace539d8162830c5063c56520760f364",
+    "batch_seed_ownership.py": "2c961770cb9e87bb73396bbc897e5899d9e9477e7019ce39b98e2cdfdfb31bb4",
+    "build_native_chain_state.py": "a1da3b26759007a8185f8818fd8ddbbbc074ae1146221097b59f815d6785fc22",
+    "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
+    "minimap_index_context.py": "ee888f3645288042abb2e16bb4cb1743368bbb81b34aa4cae49405e70c52b5c7",
+    "minimap_options.py": "1b184b47a507a4daf19323d450b6a4f43c401bc0de24ab5c8a30a8950a756322",
+    "native_chain_state.c": "c21e66248334e7012ecf123e6795db82a220ee2b16bf1a1137f9cdbe831dad82",
+    "native_chain_state.py": "9e4f8efe083e3b65a922e7edfed469baf06e2d8bb35f9b109248a82e78e44cea",
+    "native_evaluation.py": "33f6a37fa6a0b6db621630edbfc5aa8ba8c7eaf5e5b87fde483db8edfe50b0b2",
+    "native_first.py": "e87b01370b213096f4cd74f807933b70063c972d2cf189269db253c608531d0c",
+    "native_recovery.py": "9737a9148cd8da8be1f7bc8968180d99cd5f04e666a2ab54ace96e0b9963ae3f",
+    "native_selection.py": "bdb0a0eb9f2c6b5b5c3a1ab01c34e6f2b30f47dc9353ecaefcb9b9665c13b3ce",
+    "ordinary_partition_alignment.py": "898989711849f42880fc83ecd1db4c814f96e6b6ec9916bc2f2d4d69b7200522",
+    "ordinary_resource_grant.py": "b28adc600ba17f0473ee79550aff81fc513a08cee2bf1671fe9eceba8fd410bc",
+    "post_dp_selection.py": "42d39410f760608461509b38fced2b60caea04dacf3bc4f75027398e25495cef",
+    "proactive_publication.py": "3e48b9b84d5abe5653fc2159d5b045c0c7d8f958bdf2eee52447f7ce4a0ad923",
+    "proactive_reference_alignment.py": "04d0ae77708f5388133651333cfa4c843ae77515c191e99527cc10f1fba21c13",
+    "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
+    "proactive_resume.py": "16a7b9965497bd93730764d8ae7d6934511e795475f485c140bcf47d6c8b64e2",
+    "recovery_publication.py": "0f2984f52f598fb7228ebceb6522f567ced39d9c95ea29f3cf73abc91ad40574",
+    "resume_reference.py": "d432453105a2afddda0dd7bb8f0bbcf7e2f52678632ec395e85737d9c5c7b98d",
+    "seam_witness.py": "09e80e89a6662f185ec8a042e8fbb9ae4e24bc611b56d3be8d3c99a14429b249",
+    "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
+    "sequential_split_witness.py": "573ea1231f052c5ff3f748402528561c6f4da6563f8658ef5baa544e1d4c5ad0",
+    "server_alignment.py": "eb51d66d1e4a7def9aa383964eddf4175c3633aa8c9d2b360ed90780e0e00a83",
+    "stream_seed_trace.py": "a480e1c041a398e58ecde1fdab38750e5142091e8beacb9689670e21a35949cd",
+    "trace_memory.py": "c934202e86d3465499b0585f0b6bce09a215d3485f247fa0abdb616036606eac",
+    "whole_query_scores.py": "85acb52b6e56f3c1ce571cd4e0c0fb29cf9dbca0a3c8c2c2d6f1e8f0d04482d7",
+    "windowed_alignment.py": "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e"
+  },
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "-q",
+        "test_ordinary_resource_grant",
+        "test_ordinary_partition_alignment",
+        "test_minimap_options",
+        "test_proactive_resume",
+        "test_proactive_server_integration",
+        "test_server_alignment",
+        "test_validation_metadata",
+        "test_recovery_publication",
+        "test_original_assertion_reuse",
+        "test_branch_server_package"
+      ],
+      "log_location": "/tmp/cgat-ordinary-resource-delivery-controls-20261106.Q5LEnu/canonical.log",
+      "log_sha256": "6031c6a43d9a6af826d9f06aa272e485c6601b5ccf521ffa24a199698c88c3d7",
+      "name": "canonical",
+      "resource_warning_observed": false,
+      "returncode": 0,
+      "skipped": 0,
+      "tests": 159,
+      "wall_seconds": 30.751
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "GPM2.0/experiments/long_query_alignment",
+        "-p",
+        "test_*ordinary*.py",
+        "-q"
+      ],
+      "log_location": "/tmp/cgat-ordinary-resource-delivery-controls-20261106.Q5LEnu/ordinary.log",
+      "log_sha256": "ae2e9b48d223607e3b18f845ffcad030d1ef9babec738872ee6c9c50fb0224b1",
+      "name": "ordinary",
+      "resource_warning_observed": false,
+      "returncode": 0,
+      "skipped": 0,
+      "tests": 97,
+      "wall_seconds": 27.779
+    },
+    {
+      "canonical_full_gate_complete": false,
+      "command": [
+        "bash",
+        "GPM2.0/scripts/quality-gate-server.sh"
+      ],
+      "environment": {
+        "GPM_SKIP_GRT_SERVER_APP_E2E": "1",
+        "PATH_prefix": "/home/xbzhang/micromamba/envs/cgat-server/bin",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "explicitly_excluded": [
+        "LGZ server-to-app E2E"
+      ],
+      "log_location": "/tmp/cgat-ordinary-resource-delivery-controls-20261106.Q5LEnu/server-gate.log",
+      "log_sha256": "872146dace02eb59cd7481ccb807d1caa486b42fdd40295fb5d9fd3de407f2b7",
+      "name": "server_only_gate",
+      "python_skipped": 0,
+      "python_tests": 457,
+      "resource_warning_observed": true,
+      "returncode": 0,
+      "shell_groups": 8
+    }
+  ],
+  "connected_contract": {
+    "ambient_dispatch_context_stripped_for_each_child": true,
+    "boundary_reserve_formula": "max(1 GiB, minimum visible allowance // 10)",
+    "budget_cached_only_within_fresh_native_argument_object": true,
+    "dispatcher_proves_no_active_or_pending_alignment_siblings": true,
+    "fresh_parallel_admission_memory_probe_for_pure_ordinary_single_part_or_insufficient_threads": false,
+    "global_memory_scheduler_or_cross_workspace_reservation_added": false,
+    "host_total_free_ram_used": false,
+    "mapper_controller_reserve_additional": true,
+    "parent_pid_start_command_run_unit_threads_bound": true,
+    "physical_ram_reservation": false,
+    "providers": [
+      "visible_cgroup_v1_ancestor_limit_minus_usage",
+      "visible_cgroup_v2_ancestor_limit_minus_usage",
+      "single_node_single_task_slurm_allocation"
+    ],
+    "qc_ram_used": false,
+    "resolve_at_mapping_boundary_after_existing_index_preparation": true,
+    "scheduler_cli_called_by_runtime": false,
+    "scope": "one_current_CGAT_execution_plan_only",
+    "unknown_unreadable_ambiguous_scope_behavior": "original native path, or serial partial-group resume",
+    "user_configuration_file_or_new_public_memory_option_required": false
+  },
+  "date": "2026-11-06T03:37:34+08:00",
+  "evidence_limits": [
+    "Check groups overlap; do not add counts as unique tests",
+    "No new end-to-end speedup measured for this code",
+    "Visible envelopes can omit hidden outer constraints; external workloads and DP demand are not proven to fit",
+    "The allowance is not a physical/global memory reservation",
+    "Donau cgroup read permission failure intentionally leaves automatic parallelism disabled",
+    "Remote probe ran only the frozen provider and dispatcher, not the full mapping runtime",
+    "App E2E excluded in Server-only gate; existing ResourceWarnings observed",
+    "No new master/Release/App changes, no original customer remapping"
+  ],
+  "minimap2": {
+    "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+    "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+    "version": "2.31-r1302"
+  },
+  "native_companion": {
+    "execution_validated": false,
+    "manifest_path": "/home/xbzhang/.codex/worktrees/e80b/cgat/GPM2.0/server/tools/long_cigar_recovery/native/linux-x86_64/chain-state-helper.json",
+    "manifest_sha256": "6d96f488bb5a553a62bec7737789496be66e1c368b7a8cbdc96f64a6e3c93c31",
+    "path": "/home/xbzhang/.codex/worktrees/e80b/cgat/GPM2.0/server/tools/long_cigar_recovery/native/linux-x86_64/cgat-chain-state",
+    "platform": "linux-x86_64",
+    "production_ready": false,
+    "runtime_abi": {
+      "legacy_2_17_checked": true,
+      "maximum_glibc": "2.14",
+      "needed_libraries": [
+        "libm.so.6",
+        "libpthread.so.0",
+        "libc.so.6"
+      ],
+      "runtime_paths": []
+    },
+    "sha256": "00a0cee279f70d1faf35202b9328217226efcbe261bf0ff7e19b5bf4c783ab2e",
+    "third_party_licenses_sha256": {
+      "ZLIB_LICENSE_AND_HEADER.txt": "818667d6ab6a37fe7469cb06a7f0cb2c2cb2f2c948a03e5accf1a4a74bf3020a"
+    },
+    "upstream_commit": "3c28777e7e2dcc90f825de1b9f17a89cca7d4452"
+  },
+  "parent_revision": "05c94dab247a957e5969133689ebe539537612fd",
+  "remaining": [
+    "Large real-input final-code ordinary-part execution performance and output audit",
+    "Final integrated downstream/merge/release/customer acceptance appropriate to the fork scope"
+  ],
+  "remote_probe": {
+    "architecture": "aarch64",
+    "automatic_memory_budget_enabled": false,
+    "cpu_affinity": 128,
+    "decline_reason": "effective_memory_envelope_unverifiable",
+    "errno13_read_observed": true,
+    "evidence_archive_sha256": "d7b8ba2d8dd2b6e84481c036fb02cd76d7afec95b840ce1d1765a75183de6ed8",
+    "exit_code": 0,
+    "full_probe": {
+      "architecture": "aarch64",
+      "context": {
+        "command": "/share/home/xbzhang26/cgat-reads-debug/ordinary-resource-probe-20261106-c2ffe33/reference/command.sh",
+        "enabled": true,
+        "exclusive": true,
+        "parent_pid": 1956961,
+        "parent_start": "697171116",
+        "reason": "live_parent_excludes_concurrent_CGAT_mapping_siblings",
+        "run_id": "scheduled-resource-probe",
+        "schema": 1,
+        "scope": "exclusive_current_CGAT_alignment_task_only",
+        "threads": 2,
+        "unit_id": "ref:probe"
+      },
+      "cpu_affinity": 128,
+      "grant": {
+        "budget_bytes": null,
+        "enabled": false,
+        "host_ram_used": false,
+        "physical_memory_reservation": false,
+        "provider_notes": [
+          "cgroup_memory_envelope_unavailable_or_ambiguous",
+          "not_a_slurm_allocation"
+        ],
+        "qc_memory_used": false,
+        "reason": "effective_memory_envelope_unverifiable",
+        "scope": "exclusive_current_CGAT_alignment_task_only"
+      },
+      "hostname": "agent-ARM-35",
+      "mapping_started": false,
+      "reads": [
+        {
+          "path": "/proc/1956961/stat",
+          "status": "read"
+        },
+        {
+          "path": "/proc/1956961/stat",
+          "status": "read"
+        },
+        {
+          "path": "/proc/self/cgroup",
+          "status": "read"
+        },
+        {
+          "path": "/proc/self/mountinfo",
+          "status": "read"
+        },
+        {
+          "errno": 13,
+          "path": "/sys/fs/cgroup/memory/batch/container_40886107_rg0_00000000_e01/memory.limit_in_bytes",
+          "status": "PermissionError"
+        }
+      ],
+      "scheduler_environment": {
+        "CCS_JOB_ID": "40886107"
+      },
+      "schema": 1,
+      "scope": "scheduled_read_only_budget_probe_no_alignment"
+    },
+    "host": "agent-ARM-35",
+    "independent_audit_sha256": "4af07ad59b0db94f97254b3943026c8668e6b8411ce1d73066123035210623ae",
+    "job_id": 40886107,
+    "live_dispatch_context_enabled": true,
+    "local_evidence_directory": "/tmp/cgat-resource-probe-20261106.FJ3Vj5",
+    "mapping_started": false,
+    "requested_and_allocated_cpu": 2,
+    "scope": "scheduled read-only environment probe, NOT alignment or performance success",
+    "source_files_match_current": [
+      "ordinary_resource_grant.py",
+      "alignment_tasks.py"
+    ],
+    "state": "SUCCEEDED"
+  },
+  "resource_resume_controls": {
+    "completed_modes": [
+      "ordinary",
+      "mixed",
+      "all_long",
+      "empty_long"
+    ],
+    "completed_thread_changes": [
+      1,
+      4,
+      2
+    ],
+    "no_automatic_retry_or_parameter_change": true,
+    "old_native_commands_and_PAFs_unchanged": true,
+    "only_missing_native_part_started_after_thread_change": true,
+    "partial_real_failed_sibling_and_reviewed_source_transition_thread_changes": [
+      4,
+      3
+    ],
+    "scientific_policy_change_allowed": false,
+    "source_and_cached_native_long_payloads_reverified": true,
+    "typed_actual_old_metadata_probe_threads_verified": true
+  },
+  "runtime_migration": {
+    "frozen_previous_source_matches_parent": true,
+    "previous_source_profile_sha256": "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58",
+    "recovery_kernels_unchanged_required": true,
+    "reviewed_pairs": [
+      [
+        "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
+        "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
+      ],
+      [
+        "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d",
+        "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
+      ],
+      [
+        "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560",
+        "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
+      ],
+      [
+        "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa",
+        "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
+      ],
+      [
+        "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58",
+        "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
+      ]
+    ],
+    "test_limit": "Old source descriptors are simulated around real native controls, not historical customer reexecutions."
+  },
+  "runtime_source_profile_sha256": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
+  "schema": 1,
+  "status": "conditional_production_budget_path_connected_controlled_tests_passed_remote_unknown_budget_declines"
+}

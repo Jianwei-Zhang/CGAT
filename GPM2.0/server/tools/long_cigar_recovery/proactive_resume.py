@@ -30,6 +30,7 @@ _REVIEWED_LEGACY_RUNTIME = "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b555
 _REVIEWED_METADATA_RUNTIME = "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d"
 _REVIEWED_PARAMETER_RUNTIME = "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
 _REVIEWED_PARTITION_RUNTIME = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
+_REVIEWED_PARTITION_RESUME_RUNTIME = "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
 
 
 
@@ -73,8 +74,8 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
     previous = read_json(candidate / "server-alignment.json").get("runtime", {})
     old_files, new_files = previous.get("files_sha256", {}), runtime.get("files_sha256", {})
     if (previous.get("sha256") != old_key["runtime_sha256"]
-            or not old_files or set(new_files) - set(old_files) not in (set(), {"minimap_options.py"},
-                {"ordinary_partition_alignment.py"}, {"minimap_options.py", "ordinary_partition_alignment.py"})
+            or not old_files or not (set(new_files) - set(old_files)) <= {
+                "minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py"}
             or set(old_files) - set(new_files)
             or any(previous.get(k) != runtime.get(k) for k in
                    ("native_companion_sha256", "native_companion_platform", "recovered_output_admission"))):
@@ -84,7 +85,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
         return True
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME}
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME}
                 and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
     if not approved:
         return False
@@ -101,7 +102,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
                "whole_query_scores.py", "minimap_index_context.py")
     if any(old_files.get(name) != new_files.get(name) for name in kernels):
         return False
-    if (profile == _REVIEWED_PARTITION_RUNTIME
+    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))
             and "ordinary" not in stages):
         partial = candidate / "selective" / "ordinary-native" / opa.RECEIPT
@@ -109,7 +110,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
             descriptor = read_json(partial)
             # This exact reviewed source introduced the original-part format.
             # Actual leaf/index/query/command verification is mandatory on reopen.
-            return (descriptor.get("schema") == 1 and descriptor.get("kind") == opa.KIND
+            return (descriptor.get("schema") in (1, 2) and descriptor.get("kind") == opa.KIND
                     and descriptor.get("status") in ("failed_no_retry", "ordinary_parts_success"))
     return (set(stages) == {"groups", "ordinary"} or
             all(n in stages for n in ("groups", "target-store", "index"))
@@ -123,7 +124,8 @@ def _transition_attempt(candidate, locator, previous, key, runtime):
     if "minimap_filter" in key:
         fields.add("minimap_filter")
     if (not isinstance(old_key, dict) or set(old_key) != fields or set(key) != fields
-            or any(old_key[k] != key[k] for k in ("schema", "threads", "preset"))
+            or any(old_key[k] != key[k] for k in ("schema", "preset"))
+            or any(type(k.get("threads")) is not int or k["threads"] < 1 for k in (old_key, key))
             or old_key.get("minimap_filter") != key.get("minimap_filter")
             or any(not _same_identity_except_ctime(old_key[k], key[k]) for k in ("target", "query", "tool"))):
         return False
@@ -147,7 +149,8 @@ def _transition_attempt(candidate, locator, previous, key, runtime):
     state["key"] = key
     state.setdefault("key_transitions", []).append({"previous_key": old_key,
         "verified_original_sources": verified,
-        "reason": "content_verified_ctime_or_reviewed_validation_runtime",
+        "reason": "content_verified_resource_ctime_or_reviewed_validation_runtime",
+        "execution_thread_change": {"from": old_key["threads"], "to": key["threads"]},
         "payload_completion_checks_still_required": True})
     # Retain both old control receipts and roll back both if either write fails.
     state_backup = locator_backup = None
@@ -220,8 +223,16 @@ class Checkpoint:
     def bind(self, name, value):
         if name in self.data["bound"] and self.data["bound"][name] != value:
             old = self.data["bound"][name]
-            # These identities originate in an actual stable source scan/hash.
-            if (name not in ("query", "reference", "tool") or not old.get("sha256")
+            resource_only = (name == "policy" and isinstance(old, dict) and isinstance(value, dict)
+                and all(type(v.get("threads")) is int and v["threads"] > 0 for v in (old, value))
+                and {k:v for k,v in old.items() if k != "threads"}
+                    == {k:v for k,v in value.items() if k != "threads"})
+            # Resource changes never rewrite prior native commands or outputs.
+            # Source identities still require their original stable content proof.
+            if resource_only:
+                self.data.setdefault("resource_transitions", []).append({"name": "execution_threads",
+                    "from": old["threads"], "to": value["threads"], "completed_payload_checks_still_required": True})
+            elif (name not in ("query", "reference", "tool") or not old.get("sha256")
                     or not _same_identity_except_ctime(old, value)):
                 raise wa.ExperimentError("private resume input/tool/policy identity changed: " + name)
         self.data["bound"][name] = value

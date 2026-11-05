@@ -205,6 +205,29 @@ def allocate_threads(caps: list[int], budget: int) -> list[int]:
     return allocations
 
 
+REFERENCE_DISPATCH_ENV = "GPM_REFERENCE_DISPATCH"
+
+
+def dispatch_environment(environment, task, threads, *, exclusive):
+    """Fresh child-local ownership proof, not a user memory/configuration knob.
+
+    Only a reference leaf with no active OR pending mapping siblings may seek
+    an extra original-part allowance. Other tasks keep their existing resource
+    behavior; inherited contexts are always stripped before spawning.
+    """
+    result = {k:v for k,v in environment.items() if k != REFERENCE_DISPATCH_ENV}
+    if task.unit_id.startswith("ref:") and result.get("GPM_REPORT_RUN_ID"):
+        try:
+            start = Path(f"/proc/{os.getpid()}/stat").read_text().rsplit(")",1)[1].split()[19]
+            result[REFERENCE_DISPATCH_ENV] = json.dumps({"schema":1,"parent_pid":os.getpid(),
+                "parent_start":start,"command":str(task.command.resolve()),"threads":threads,
+                "run_id":result["GPM_REPORT_RUN_ID"],"unit_id":task.unit_id,"exclusive":exclusive},
+                sort_keys=True,separators=(",",":"))
+        except (OSError,IndexError,ValueError):
+            pass  # No ownership proof means no new partition parallelism.
+    return result
+
+
 def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_finish, environment, *, dispatch=None):
     """All callbacks run on the caller thread; each command owns a process group."""
     pending = sorted(tasks, key=lambda task: task.priority, reverse=True)
@@ -254,6 +277,7 @@ def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_fini
                         raise ValueError("invalid dispatch grants or CPU budget exceeded")
                     if pending and not active and not grants:
                         raise ValueError("dispatch stalled with no running tasks")
+                exclusive = not active and len(pending) == len(grants) == 1
                 for task, threads in grants:
                     pending.remove(task)
                     on_start(task, threads)
@@ -261,7 +285,7 @@ def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_fini
                         ["bash", str(task.command)], cwd=task.command.parent,
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         start_new_session=True,
-                        env={**environment, "GPM_REPORT_UNIT_ID": task.unit_id,
+                        env={**dispatch_environment(environment, task, threads, exclusive=exclusive), "GPM_REPORT_UNIT_ID": task.unit_id,
                              "GPM_TASK_THREADS": str(threads), "OMP_NUM_THREADS": str(threads),
                              "OPENBLAS_NUM_THREADS": str(threads)},
                     )

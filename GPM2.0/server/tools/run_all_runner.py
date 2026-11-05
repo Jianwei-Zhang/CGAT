@@ -30,7 +30,7 @@ from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
-from alignment_tasks import AdaptiveDispatcher, AlignmentTask, load_tasks, run_tasks
+from alignment_tasks import AdaptiveDispatcher, AlignmentTask, dispatch_environment, load_tasks, run_tasks
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
@@ -740,7 +740,11 @@ class Runner:
                         errors="replace",
                         bufsize=1,
                         start_new_session=True,
-                        env={**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id,
+                        env={**dispatch_environment(
+                                {**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id},
+                                AlignmentTask(unit.unit_id, self.server_dir / unit.command_relpath,
+                                              int(threads) if threads != "unknown" else 1),
+                                int(threads) if threads != "unknown" else 1, exclusive=True),
                              "GPM_REPORT_UNIT_ID": unit.unit_id,
                              **({"GPM_TASK_THREADS": str(threads)} if threads != "unknown" else {})},
                     )

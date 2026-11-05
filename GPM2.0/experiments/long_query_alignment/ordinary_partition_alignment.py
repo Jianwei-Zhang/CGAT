@@ -19,6 +19,7 @@ import subprocess
 import time
 
 import minimap_options as mo
+import ordinary_resource_grant as org
 import native_first as nf
 import trace_memory as tm
 import windowed_alignment as wa
@@ -42,14 +43,16 @@ def _address_caps(args):
 
 
 def plan(args, parts, records):
-    budget = getattr(args, "ordinary_group_memory_bytes", None)
     base = {"enabled": False, "scope": "explicit_per_reference_group_only",
             "node_or_shared_job_memory_used": False, "extra_index_build": False,
-            "extra_threshold_probe_mapping": False, "automatic_retry": False}
+            "extra_threshold_probe_mapping": False, "automatic_retry": False,
+            "resource_grant": getattr(args, "ordinary_resource_grant", None)}
     if len(parts) < 2:
         return {**base, "reason": "single_original_index_part"}
     if type(args.threads) is not int or args.threads < 2:
         return {**base, "reason": "insufficient_assigned_threads"}
+    budget = org.resolve(args)
+    base["resource_grant"] = getattr(args, "ordinary_resource_grant", None)
     if budget is None:
         return {**base, "reason": "exclusive_reference_group_budget_unknown"}
     if type(budget) is not int or budget <= 0:
@@ -427,12 +430,13 @@ def _round_plan(args, parts, records, selected, *, resumed):
     if not resumed:
         return plan(args, parts, records)
     count = len(selected)
-    budget = getattr(args, "ordinary_group_memory_bytes", None)
+    budget = org.resolve(args)
     if type(args.threads) is not int or args.threads < 1 or not 1 <= count <= len(parts):
         raise wa.ExperimentError("invalid pending original-part execution resources")
     base = {"enabled": True, "scope": "explicit_per_reference_group_only",
             "node_or_shared_job_memory_used": False, "extra_index_build": False,
-            "extra_threshold_probe_mapping": False, "automatic_retry": False}
+            "extra_threshold_probe_mapping": False, "automatic_retry": False,
+            "resource_grant": getattr(args, "ordinary_resource_grant", None)}
     if budget is None:
         # An unknown grant never authorizes parallelism. Preserve completed
         # leaves and continue serially, no more concurrent mappers than native.

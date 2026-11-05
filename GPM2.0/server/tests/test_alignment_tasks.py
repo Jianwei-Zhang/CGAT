@@ -92,6 +92,33 @@ update(-threads)
             self.assertEqual(len(lines), 3)
             self.assertFalse(children)
 
+    def test_actual_dispatch_context_excludes_active_and_pending_mapping_siblings(self):
+        canonical=Path(__file__).resolve().parents[2]/'experiments/long_query_alignment'
+        for count,budget,expected in ((1,2,[True]),(2,2,[False,False]),(3,1,[False,False,True])):
+            with self.subTest(count=count,budget=budget),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary);worker=root/'worker.py'
+                worker.write_text('import json,os,sys\nfrom pathlib import Path\n'
+                    +f'sys.path.insert(0,{str(canonical)!r})\n'
+                    +'import ordinary_resource_grant as org\n'
+                    +"print(json.dumps(org.dispatch_context(Path.cwd(),int(os.environ['GPM_TASK_THREADS']))),flush=True)\n")
+                command=root/'command.sh';command.write_text(f'exec "{sys.executable}" "{worker}"\n')
+                tasks=[AlignmentTask('ref:'+str(i),command,1) for i in range(count)]
+                seen={};environment={**os.environ,'GPM_REPORT_RUN_ID':'dispatch-test','GPM_REFERENCE_DISPATCH':'stale-parent-value'}
+                code=run_tasks(tasks,budget,{},lambda:None,lambda *_:None,
+                    lambda task,line:seen.update({task.unit_id:json.loads(line)}),lambda *_:None,environment)
+                self.assertEqual(code,0)
+                self.assertEqual([seen[t.unit_id]['enabled'] for t in tasks],expected)
+
+    def test_nonreference_child_does_not_inherit_a_stale_reference_grant(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);command=root/'command.sh'
+            command.write_text(f"exec '{sys.executable}' -c \"import os;print(os.environ.get('GPM_REFERENCE_DISPATCH','absent'))\"\n")
+            lines=[]
+            code=run_tasks([AlignmentTask('chr:q',command,1)],1,{},lambda:None,lambda *_:None,
+                lambda task,line:lines.append(line),lambda *_:None,
+                {**os.environ,'GPM_REPORT_RUN_ID':'test','GPM_REFERENCE_DISPATCH':'stale'})
+            self.assertEqual(code,0);self.assertEqual(lines,['absent'])
+
     def test_failure_cancels_sibling_and_does_not_start_pending_task(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -31,6 +31,7 @@ import proactive_resume as pr
 import native_chain_state as nst
 import native_first as nf
 import minimap_options as mo
+import ordinary_resource_grant as org
 import recovery_publication as rp
 import windowed_alignment as wa
 
@@ -41,7 +42,7 @@ RUNTIME_FILES = (
     "native_first.py","native_evaluation.py","native_chain_state.py","build_native_chain_state.py","recovery_publication.py",
     "native_recovery.py","native_selection.py","post_dp_selection.py","whole_query_scores.py",
     "batch_seed_ownership.py","stream_seed_trace.py","trace_memory.py","sequential_split_witness.py",
-    "ordinary_partition_alignment.py","minimap_options.py","minimap_index_context.py","seam_witness.py","resume_reference.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
+    "ordinary_partition_alignment.py","ordinary_resource_grant.py","minimap_options.py","minimap_index_context.py","seam_witness.py","resume_reference.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
 )
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -195,7 +196,8 @@ def run_reference(args,*,runtime_root=None):
                   "runtime":runtime,"attempt":str(attempt),"result_published":False,"attempt_reused":attempt_reused,
                   "minimap2_modified":False,"automatic_parameter_retry":False,
                   "scope":"initial_reference_asm10_only","customer_configuration_required":False,
-                  "initial_reference_options":mapping_options}
+                  "initial_reference_options":mapping_options,
+                  "ordinary_resource_context":org.dispatch_context(run_dir,args.threads)}
         wa.write_json(attempt/"server-alignment.json",report)
         try:
             if output.is_symlink() or (output.exists() and not stat.S_ISREG(output.stat().st_mode)):
@@ -208,6 +210,7 @@ def run_reference(args,*,runtime_root=None):
                 report["previous_result"] = {"path":str(previous),"sha256":wa.sha256(previous),"restored_automatically":False}
             options = argparse.Namespace(target=args.target,query=args.query,out=attempt/"selective",
                 minimap2="minimap2",threads=args.threads,timeout=None,memory_gib=0,
+                ordinary_resource_context=report["ordinary_resource_context"],
                 native_state_bundle=runtime_root/"native"/nst.build.host_platform(), **mapping_options)
             result = pa.experiment(options,prepared_workspace=workspace,admit_output=False,resume_identity=resume_identity)
             report["candidate_receipt_sha256"] = wa.sha256(options.out/"proactive-candidate.json")
