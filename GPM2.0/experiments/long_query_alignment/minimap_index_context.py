@@ -13,6 +13,8 @@ import stat
 import struct
 import sys
 
+import windowed_alignment as wa
+
 MAGIC = b"MMI\x02"
 CHUNK = 1024**2
 MAX_PARTS = 10000
@@ -164,12 +166,12 @@ def validate_part_context(context, *, reference_sha256, tool_sha256, preset, tar
         raise IndexContextError("context is not one complete original index part")
     if any(row["name"] not in target_records or target_records[row["name"]]["length"] != row["length"] for row in context["records"]):
         raise IndexContextError("index part has unknown reference records")
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        before = identity(os.fstat(stream.fileno()))
-        for block in iter(lambda:stream.read(CHUNK),b""):
-            digest.update(block)
-        if (before != identity(os.fstat(stream.fileno())) or before != identity(path.stat()) or
-                list(before) != catalog["index_identity"] or digest.hexdigest() != context["sha256"]):
-            raise IndexContextError("index context hash/identity changed")
+    # The same original part is checked by windows, guidance, native state and
+    # admission. Keep structural/context checks, but hash unchanged bytes once.
+    try:
+        digest = wa.verified_sha256(path)
+    except (OSError, wa.ExperimentError) as exc:
+        raise IndexContextError(str(exc)) from exc
+    if list(identity(path.stat())) != catalog["index_identity"] or digest != context["sha256"]:
+        raise IndexContextError("index context hash/identity changed")
     return path

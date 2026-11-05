@@ -92,7 +92,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
     pp.check_prepared_scope(root, prepared_workspace)
     if args.target.resolve() == args.query.resolve():
         raise wa.ExperimentError("initial reference mapping only; self-alignment is unsupported")
-    if args.threads < 1 or args.timeout < 1 or args.memory_gib < 0:
+    if args.threads < 1 or (args.timeout is not None and args.timeout < 1) or args.memory_gib < 0:
         raise wa.ExperimentError("invalid proactive mapping resources")
     executable = shutil.which(args.minimap2)
     if not executable:

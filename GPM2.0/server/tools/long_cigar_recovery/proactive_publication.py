@@ -119,12 +119,12 @@ def admit(report, root, *, bundle):
     group_by_name = {n: g for g in groups["groups"] for n in g["queries"]}
     for group in groups["groups"]:
         path = Path(group["path"])
-        require(path.is_file() and not path.is_symlink() and wa.sha256(path) == group["sha256"],
+        require(path.is_file() and not path.is_symlink() and wa.verified_sha256(path) == group["sha256"],
                 "group FASTA changed after mapping")
     index_path = rp.regular_under(root / "index-context.json", root)
     require(wa.sha256(index_path) == report["index_catalog_sha256"], "original index catalog changed")
     index = json.loads(index_path.read_bytes())
-    require(wa.sha256(rp.regular_under(root / "target.default.mmi", root)) == index["sha256"],
+    require(wa.verified_sha256(rp.regular_under(root / "target.default.mmi", root)) == index["sha256"],
             "ordinary original index changed")
     parts = index["parts"]
     require(len(parts) == report["index_part_count"] and [p["part_index"] for p in parts] == list(range(len(parts))),
@@ -132,7 +132,7 @@ def admit(report, root, *, bundle):
     for part in parts:
         require(part["reference_sha256"] == report["reference"]["sha256"]
                 and part["tool_sha256"] == report["tool"]["sha256"] and part["preset"] == "asm10"
-                and wa.sha256(rp.regular_under(part["path"], root)) == part["sha256"], "original index part changed")
+                and wa.verified_sha256(rp.regular_under(part["path"], root)) == part["sha256"], "original index part changed")
     expected_sources = []
     if ordinary:
         native = rp.verify_attempt(root / "ordinary-native/native-attempt.json", root, "native_success",

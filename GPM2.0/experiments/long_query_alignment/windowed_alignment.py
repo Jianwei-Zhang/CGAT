@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from collections import OrderedDict
 import re
 import resource
 import shutil
@@ -50,6 +51,66 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(CHUNK), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# Per-process only. A digest is reusable only while all stat fields (including
+# ctime) and the device remain unchanged. No persistent "hash passed" flag.
+_VERIFIED_DIGESTS = OrderedDict()
+_MAX_VERIFIED_DIGESTS = 256
+
+
+def _digest_key(path, identity):
+    return (str(Path(path).resolve()), Path(path).stat().st_dev,
+            *(identity[k] for k in ("size", "mtime_ns", "ctime_ns", "inode")))
+
+
+def remember_digest(path, identity, digest):
+    """Seed only from an actual stable scan/normalization, never a receipt."""
+    path = Path(path)
+    if path.is_symlink() or fingerprint(path) != identity:
+        raise ExperimentError("file changed while recording its content digest: " + str(path))
+    key = _digest_key(path, identity)
+    _VERIFIED_DIGESTS[key] = digest
+    _VERIFIED_DIGESTS.move_to_end(key)
+    while len(_VERIFIED_DIGESTS) > _MAX_VERIFIED_DIGESTS:
+        _VERIFIED_DIGESTS.popitem(last=False)
+
+
+def verified_sha256(path):
+    """Hash a stable regular file once per observed metadata version."""
+    path = Path(path)
+    if path.is_symlink() or not path.is_file():
+        raise ExperimentError("content verification requires an unlinked regular file: " + str(path))
+    before = fingerprint(path)
+    key = _digest_key(path, before)
+    digest = _VERIFIED_DIGESTS.get(key)
+    if digest is None:
+        digest = sha256(path)
+        remember_digest(path, before, digest)
+    elif fingerprint(path) != before:
+        raise ExperimentError("file changed during content verification: " + str(path))
+    else:
+        _VERIFIED_DIGESTS.move_to_end(key)
+    return digest
+
+
+def identity_matches(path, identity, *, verify_content=False):
+    """ctime is a revalidation signal, not a content-change verdict.
+
+    Different size/mtime/inode remains a real identity change. A ctime-only
+    change must match the recorded byte digest before any cached data is used.
+    """
+    path = Path(path)
+    if path.is_symlink() or not path.is_file():
+        return False
+    current = fingerprint(path)
+    if any(current[k] != identity.get(k) for k in ("size", "mtime_ns", "inode")):
+        return False
+    if verify_content or current["ctime_ns"] != identity.get("ctime_ns"):
+        expected = identity.get("sha256")
+        return (isinstance(expected, str) and re.fullmatch(r"[0-9a-f]{64}", expected) is not None
+                and verified_sha256(path) == expected)
+    return True
 
 
 def write_json(path: Path, value) -> None:
@@ -115,6 +176,12 @@ class FastaStore:
         self.spool = spool.resolve()
         self.spool_identity = fingerprint(self.spool)
         self.handle = self.spool.open("rb")
+        try:
+            remember_digest(self.source, before, self.identity["sha256"])
+            remember_digest(self.spool, self.spool_identity, self.normalized_sha256)
+        except BaseException:
+            self.handle.close()
+            raise
 
     def fetch(self, name: str, start: int, end: int) -> bytes:
         record = self.records[name]
@@ -130,25 +197,30 @@ class FastaStore:
         self.handle.close()
 
     def check_binding(self, source):
-        """Borrow only a live store for exactly this unchanged source/spool.
-
-        Cheap metadata checks at stage boundaries avoid a new full hash pass.
-        Each stage still performs its existing source SHA verification at exit.
-        """
-        if (Path(source).resolve() != self.source or self.handle.closed
-                or self.spool.is_symlink() or fingerprint(self.spool) != self.spool_identity
-                or os.fstat(self.handle.fileno()).st_ino != self.spool_identity["inode"]
-                or any(fingerprint(self.source)[key] != self.identity[key]
-                       for key in ("size", "mtime_ns", "ctime_ns", "inode"))):
-            raise ExperimentError("shared sequence store changed, closed or belongs to another source")
+        """Borrow the correct live store, rehashing metadata-only changes."""
+        reason = None
+        if Path(source).resolve() != self.source:
+            reason = "belongs to another source"
+        elif self.handle.closed:
+            reason = "handle is closed"
+        elif self.spool.is_symlink():
+            reason = "private spool is linked"
+        elif os.fstat(self.handle.fileno()).st_ino != self.spool_identity["inode"]:
+            reason = "opened private spool identity changed"
+        elif not identity_matches(self.spool, {**self.spool_identity, "sha256": self.normalized_sha256}):
+            reason = "private spool identity or content changed"
+        elif not identity_matches(self.source, self.identity):
+            reason = "source identity or content changed"
+        if reason:
+            raise ExperimentError("shared sequence store " + reason + ": " + str(self.source))
 
     def unchanged(self):
         try:
             self.check_binding(self.source)
+            return (verified_sha256(self.source) == self.identity["sha256"]
+                    and verified_sha256(self.spool) == self.normalized_sha256)
         except (OSError, ExperimentError):
             return False
-        return all(fingerprint(self.source)[key] == self.identity[key]
-                   for key in ("size", "mtime_ns", "ctime_ns", "inode")) and sha256(self.source) == self.identity["sha256"]
 
 
 @contextmanager
@@ -620,7 +692,7 @@ def run_command(command: list[str], directory: Path, name: str, timeout: int, me
 def experiment(args, *, shared_target=None, shared_query=None) -> dict:
     if not args.target.is_file() or not args.query.is_file():
         raise ExperimentError("target/query input missing")
-    if args.threads < 1 or args.timeout < 1 or args.memory_gib < 0:
+    if args.threads < 1 or (args.timeout is not None and args.timeout < 1) or args.memory_gib < 0:
         raise ExperimentError("invalid resource limits")
     make_windows({}, args.core_bases, args.context_bases)  # Validate before writing.
     candidate_policy = getattr(args, "window_candidate_policy", "native_window_selection")
@@ -673,7 +745,7 @@ def experiment(args, *, shared_target=None, shared_query=None) -> dict:
                     tool_sha256=binary_hash,preset=args.preset,target_records=target.records)
             except mic.IndexContextError as exc:
                 raise ExperimentError(str(exc)) from exc
-        index_hash = sha256(index)
+        index_hash = verified_sha256(index)
         mapping_flags = ["-f",str(index_context["mid_occ"])] if index_context is not None else []
         report.update(index_path=str(index),index_sha256=index_hash,
                       index_scope="original_default_part" if index_context is not None else "full_target_single_part",
@@ -708,7 +780,7 @@ def experiment(args, *, shared_target=None, shared_query=None) -> dict:
         if args.require_full_query_coverage and any(row["covered_bases"] != row["length"] for row in summary["queries"].values()):
             raise ExperimentError("full-query-coverage acceptance failed; do not treat partial mappings as complete")
         if (not all(store.unchanged() for store in stores) or sha256(Path(executable)) != binary_hash
-                or sha256(index) != index_hash or sha256(raw) != raw_hash
+                or verified_sha256(index) != index_hash or sha256(raw) != raw_hash
                 or sha256(root/"windows.json") != window_manifest_hash or sha256(root/"windows.fa") != window_fasta_hash
                 or sha256(root/"provenance.jsonl")!=owned_proof_hash or sha256(root/"stitch-provenance.jsonl")!=stitch_proof_hash):
             raise ExperimentError("input, window evidence, index or minimap2 binary changed during experiment")

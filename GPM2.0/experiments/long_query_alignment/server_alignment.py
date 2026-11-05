@@ -78,7 +78,8 @@ def validate_runtime(root):
             "recovered_output_admission":value["recovered_output_admission"],
             "native_companion_sha256":value.get("native_companion_sha256"),
             "native_companion_platform":value.get("native_companion_platform"),
-            "handoff_base_sha256":value.get("handoff_base_sha256"),"production_ready":False}
+            "handoff_base_sha256":value.get("handoff_base_sha256"),
+            "native_resume_source_profiles":value.get("native_resume_source_profiles",[]),"production_ready":False}
 
 
 @contextmanager
@@ -184,7 +185,7 @@ def run_reference(args,*,runtime_root=None):
     output = run_dir/args.result
     with task_lock(run_dir),cancellation_scope():
         resume_identity = pr.adapter_key(args, runtime)
-        attempt, attempt_reused = pr.select_attempt(run_dir, resume_identity)
+        attempt, attempt_reused = pr.select_attempt(run_dir, resume_identity, runtime=runtime)
         pr.archive_partial(attempt / "server-alignment.json")
         report = {"schema":1,"status":"running","production_ready":False,"customer_validated":False,
                   "runtime":runtime,"attempt":str(attempt),"result_published":False,"attempt_reused":attempt_reused,
@@ -201,7 +202,7 @@ def run_reference(args,*,runtime_root=None):
                 output.rename(previous)
                 report["previous_result"] = {"path":str(previous),"sha256":wa.sha256(previous),"restored_automatically":False}
             options = argparse.Namespace(target=args.target,query=args.query,out=attempt/"selective",
-                minimap2="minimap2",threads=args.threads,timeout=21600,memory_gib=0,
+                minimap2="minimap2",threads=args.threads,timeout=None,memory_gib=0,
                 native_state_bundle=runtime_root/"native"/nst.build.host_platform())
             result = pa.experiment(options,prepared_workspace=workspace,admit_output=False,resume_identity=resume_identity)
             report["candidate_receipt_sha256"] = wa.sha256(options.out/"proactive-candidate.json")

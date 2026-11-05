@@ -232,7 +232,7 @@ def recover(stitched,chains,output,*,query,target,context,native_receipt,bundle,
                     fragments = [_fragment(hit,i) for i,hit in hits.items() if _candidate(hit,chain)]
                     plans[chain.row] = {"coarse":_coarse(chain),"fragments":fragments}
             budget = st.TraceBudget(max_bytes=nst.MAX_TRACE_BYTES,max_lines=nst.MAX_TRACE_BYTES//8,
-                                    timeout_seconds=max(120,timeout))
+                                    timeout_seconds=max(120, timeout if timeout is not None else 21600))
             proof = bo.collect(directories[name]/"native-state.stderr",plans,query_name=name,
                 query_length=record["length"],target_lengths={n:r["length"] for n,r in target.records.items()},
                 expected_sha256=query_states[name]["trace"]["sha256"],budget=budget)
