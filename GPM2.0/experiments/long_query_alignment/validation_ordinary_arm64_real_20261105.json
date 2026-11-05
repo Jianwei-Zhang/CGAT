@@ -1,7 +1,7 @@
 {
   "schema": "cgat.ordinary_real_K_screening.v1",
-  "status": "long_contig_single_pair_passed_pending_counterbalance_and_integration",
-  "observed_at": "2026-11-05T21:20:22+08:00",
+  "status": "counterbalanced_real_input_K_comparison_passed_no_production_change",
+  "observed_at": "2026-11-05T22:23:35.346282+08:00",
   "production_runtime_modified": false,
   "customer_wheat_data": false,
   "scope": "ordinary_reference_alignment_only",
@@ -162,7 +162,6 @@
     "customer_wheat_acceptance": false
   },
   "remaining_gates": [
-    "counterbalanced full hifiasm pair with original tool/index/input hashes and exact PAF audit",
     "same-index-part serial/parallel controls with inherited parameters, deterministic output and global CPU/memory budgets",
     "no production default without resource suitability and provenance/cache compatibility review",
     "sensitivity-changing -f experiments remain separate and require downstream scientific acceptance",
@@ -170,7 +169,6 @@
   ],
   "hifiasm_reverse_counterbalance": {
     "job_id": 40883590,
-    "scheduler_state_at_observation": "RUNNING",
     "observed_at": "2026-11-05T21:20:22+08:00",
     "started_at": "2026-11-05T21:00:05+08:00",
     "compute_node": "agent-ARM-04",
@@ -184,6 +182,57 @@
     "memory_limit_mib": 196608,
     "default_index_and_PAF_hashes_must_match_forward_pair": true,
     "accepted_runs_at_observation": 0,
-    "first_K1G_batch_completed_query_records": 25
+    "first_K1G_batch_completed_query_records": 25,
+    "scheduler_state": "SUCCEEDED",
+    "ended_at": "2026-11-05T22:14:01+08:00",
+    "accepted_runs": 2,
+    "all_ordered_pafs_equal": true,
+    "source_content_unchanged": true,
+    "evidence_archive_sha256": "dee5ceebfc82ca2ab5aa199d895d51246f81fc0addc9fe8198045202e4f72918",
+    "summary": [
+      {
+        "batch_bases": 1000000000,
+        "wall_seconds": 1611.22,
+        "cpu_seconds": 11476.08,
+        "peak_rss_kib": 170730856
+      },
+      {
+        "batch_bases": 500000000,
+        "wall_seconds": 2766.03,
+        "cpu_seconds": 11587.53,
+        "peak_rss_kib": 118470292
+      }
+    ]
+  },
+  "hifiasm_counterbalanced_summary": {
+    "job_id": 40883590,
+    "status": "SUCCEEDED",
+    "source_hash_guards_passed": true,
+    "all_four_ordered_PAFs_equal": true,
+    "summary": [
+      {
+        "batch_bases": 500000000,
+        "wall_seconds": [
+          2589.59,
+          2766.03
+        ],
+        "median_wall_seconds": 2677.8100000000004,
+        "median_cpu_core_equivalents": 4.242106401476865,
+        "maximum_peak_rss_gib": 115.67829132080078
+      },
+      {
+        "batch_bases": 1000000000,
+        "wall_seconds": [
+          1555.35,
+          1611.22
+        ],
+        "median_wall_seconds": 1583.2849999999999,
+        "median_cpu_core_equivalents": 7.1503392112567905,
+        "maximum_peak_rss_gib": 164.28720474243164
+      }
+    ],
+    "wall_reduction_percent": 40.87388574992252,
+    "speedup": 1.6913000502120594,
+    "evidence_archive_sha256": "dee5ceebfc82ca2ab5aa199d895d51246f81fc0addc9fe8198045202e4f72918"
   }
 }

@@ -1,7 +1,7 @@
 {
   "schema": "cgat.ordinary_original_part_scheduling.v1",
-  "status": "local_control_passed_pending_remote_default_multipart",
-  "observed_at": "2026-11-05T21:13:26.456273+08:00",
+  "status": "default_policy_control_passed_pending_real_complexity_control",
+  "observed_at": "2026-11-05T22:23:35.369904+08:00",
   "production_runtime_modified": false,
   "customer_wheat_data": false,
   "local_control": {
@@ -80,14 +80,13 @@
     }
   ],
   "remaining_gates": [
-    "default multipart index without -I override on SSH180",
-    "same-node repeated baseline/serial-parts/parallel-parts comparison",
-    "effective threshold inheritance, all ordered PAF bytes and aggregate resource audit",
-    "production command-receipt/cache/resource-policy design not implemented"
+    "complete real-complexity fixed-index-layout paired comparison on SSH180",
+    "assess concurrent memory and preparation/merge cost, not only CPU utilization",
+    "production command-receipt/cache/resource-policy design not implemented",
+    "customer original-default-index performance remains unproven"
   ],
   "remote_control": {
     "job_id": 40883745,
-    "scheduler_state_at_observation": "WAITING",
     "observed_at": "2026-11-05T21:20:22+08:00",
     "dependency": "40883590=ENDED",
     "original_default_index_policy": true,
@@ -100,7 +99,110 @@
       "serial-parts",
       "parallel-parts"
     ],
-    "accepted_runs_at_observation": 0
+    "accepted_runs_at_observation": 0,
+    "scheduler_state": "SUCCEEDED",
+    "started_at": "2026-11-05T22:14:03+08:00",
+    "ended_at": "2026-11-05T22:16:56+08:00",
+    "accepted_runs": 6,
+    "mapped_non_N_query_names": 15,
+    "both_strands_and_indel_CIGAR_audited": true,
+    "independent_audit": {
+      "job_id": 40883745,
+      "status": "SUCCEEDED",
+      "default_partition_policy": true,
+      "synthetic_padded_control": true,
+      "original_serialized_part_order_preserved": true,
+      "all_six_ordered_PAFs_equal": true,
+      "PAF_sha256": "30c1fe486c522d97ff2939755bbb2fbbb778a3efaddacc983b1a4c23b00f65b3",
+      "PAF_rows": 30,
+      "query_records": 16,
+      "reference_records": 82,
+      "preparation_wall_seconds": 32.7174829095602,
+      "schedule_and_budget_audit": true,
+      "threshold_handoff_without_probe_audit": true,
+      "summary": [
+        {
+          "mode": "baseline",
+          "mapping_wall_seconds": [
+            11.758723974227905,
+            11.538848139345646
+          ],
+          "median_mapping_wall_seconds": 11.648786056786776,
+          "cpu_seconds": [
+            74.71,
+            75.27000000000001
+          ],
+          "sampled_tree_peak_rss_kib": [
+            null,
+            null
+          ],
+          "individual_process_peak_rss_kib": [
+            5782848,
+            5772668
+          ]
+        },
+        {
+          "mode": "serial-parts",
+          "mapping_wall_seconds": [
+            12.059321984648705,
+            8.587008751928806
+          ],
+          "median_mapping_wall_seconds": 10.323165368288755,
+          "cpu_seconds": [
+            74.72999999999999,
+            74.63
+          ],
+          "sampled_tree_peak_rss_kib": [
+            5769300,
+            5774596
+          ],
+          "individual_process_peak_rss_kib": [
+            null,
+            null
+          ]
+        },
+        {
+          "mode": "parallel-parts",
+          "mapping_wall_seconds": [
+            7.026119343936443,
+            9.202068075537682
+          ],
+          "median_mapping_wall_seconds": 8.114093709737062,
+          "cpu_seconds": [
+            74.74000000000001,
+            74.87
+          ],
+          "sampled_tree_peak_rss_kib": [
+            7665360,
+            7667936
+          ],
+          "individual_process_peak_rss_kib": [
+            null,
+            null
+          ]
+        }
+      ],
+      "median_mapping_speedup_vs_baseline": 1.435623801436754,
+      "timings_too_short_for_customer_speedup_claim": true,
+      "evidence_archive_sha256": "86771dcbcde61ae368877740c126171017ca6e32d0ab85b6ca5ec5583bb29e11"
+    }
   },
-  "local_evidence_archive_sha256": "25d43c411b97dd8ba45d111b489a0f008430726d1522e921e27c3b62e75db647"
+  "local_evidence_archive_sha256": "25d43c411b97dd8ba45d111b489a0f008430726d1522e921e27c3b62e75db647",
+  "real_complexity_control": {
+    "job_id": 40884199,
+    "dependency": "40883797=ENDED",
+    "submission_confirmed": true,
+    "original_default_index_policy": false,
+    "control_index_bases": 600000000,
+    "same_original_full_reference_and_queries": true,
+    "threads": 64,
+    "memory_mib": 196608,
+    "repetitions": 2,
+    "conditions": [
+      "baseline",
+      "serial-parts",
+      "parallel-parts"
+    ],
+    "accepted_runs": 0
+  }
 }
