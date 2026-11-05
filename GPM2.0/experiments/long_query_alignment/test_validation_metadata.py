@@ -176,6 +176,8 @@ class KeyMigrationTests(unittest.TestCase):
             'recovered_output_admission':sa.pub.POLICY}
         self.runtime = {**self.old_runtime,'sha256':'c'*64,
                         'files_sha256':sa.runtime_files(Path(sa.__file__).parent)}
+        profile = hashlib.sha256(json.dumps(self.runtime['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.runtime['native_resume_source_profiles'] = [[pr._REVIEWED_LEGACY_RUNTIME,profile]]
         self.key = self.make_key(self.old_runtime['sha256'])
         self.attempt, _ = pr.select_attempt(self.run, self.key)
         (self.attempt / 'selective').mkdir()
@@ -217,11 +219,13 @@ class KeyMigrationTests(unittest.TestCase):
         self.assertEqual(pr.read_json(self.run/pr.LOCATOR)['key'],self.key)
 
     def test_unknown_runtime_or_changed_mapping_code_gets_fresh_attempt(self):
-        for field in ('profile','scientific_module','helper','cached_long_cell'):
+        for field in ('profile','scientific_module','future_validation_module','missing_review_policy','helper','cached_long_cell'):
             runtime = {**self.runtime,'files_sha256':dict(self.runtime['files_sha256'])}
             old = {**self.old_runtime,'files_sha256':dict(LEGACY)}
             if field == 'profile':old['files_sha256']['server_alignment.py']='0'*64
             elif field == 'scientific_module':runtime['files_sha256']['native_selection.py']='0'*64
+            elif field == 'future_validation_module':runtime['files_sha256']['server_alignment.py']='0'*64
+            elif field == 'missing_review_policy':runtime.pop('native_resume_source_profiles')
             elif field == 'helper':runtime['native_companion_sha256']='0'*64
             else:self.cache.mark('cell:0:long',{'not_eligible':True})
             wa.write_json(self.attempt/'server-alignment.json',{'runtime':old})
@@ -254,6 +258,10 @@ class RealMetadataResumeTests(unittest.TestCase):
 
     def run_metadata_failure(self,root,*,legacy=False):
         runtime,args = self.fixture(root)
+        manifest = pr.read_json(runtime/sa.MANIFEST)
+        profile = hashlib.sha256(json.dumps(manifest['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        manifest['native_resume_source_profiles'] = [[pr._REVIEWED_LEGACY_RUNTIME,profile]]
+        wa.write_json(runtime/sa.MANIFEST,manifest)
         def fail_before_window(options,*,shared_target,shared_query):
             self.assertIsNone(options.timeout)  # Scheduler, not the diagnostic 6h default.
             args.target.chmod(0o400);args.query.chmod(0o400)

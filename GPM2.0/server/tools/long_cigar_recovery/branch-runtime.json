@@ -6,8 +6,8 @@
     "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
     "proactive_reference_alignment.py": "449a5a1fcc66926aebc173c158b4ce370ffa84d51a8ec925f1ebd2cfe37c6994",
     "proactive_publication.py": "1a6811bd2bad5aabf56f23b01a3f0ea68520088e3a8ce6a1a07f994a601d28fe",
-    "proactive_resume.py": "77f7e300b8e820fa566e6ad3358bc86321cc8f79425472a36cab4450bdf9ffa9",
-    "server_alignment.py": "ff7d61183b7dfdba1f0014eed6cdda7842c720d41de8e86352bcc8dade3e9d55",
+    "proactive_resume.py": "e9c10bd5ac00b1babad738854cdafef8a021fa1f97937177c996c722df8523f9",
+    "server_alignment.py": "2a69b6d460294cbd4661ecc483b37f33aa9b9c1d19325612e417d1993f977c78",
     "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
     "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
     "windowed_alignment.py": "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e",
@@ -36,5 +36,11 @@
   "handoff_base_sha256": "655fdfdc5326c07b3e627c9133555eb7e678e3851dc9cd418c3afe1f0b7ecd70",
   "production_ready": false,
   "customer_configuration_required": false,
-  "generated_from": "GPM2.0/experiments/long_query_alignment; sync_server_runtime.py"
+  "generated_from": "GPM2.0/experiments/long_query_alignment; sync_server_runtime.py",
+  "native_resume_source_profiles": [
+    [
+      "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
+      "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d"
+    ]
+  ]
 }

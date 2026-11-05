@@ -26,10 +26,7 @@ MAX_STATE = 64 * 1024**2
 # Frozen full source profile from the reviewed pre-fix recovery runtime. Only
 # ordinary native completions, never old recovered cells, may cross this fix.
 _REVIEWED_LEGACY_RUNTIME = "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd"
-_VALIDATION_MODULES = frozenset(("windowed_alignment.py", "native_first.py",
-    "proactive_reference_plan.py", "proactive_resume.py", "server_alignment.py",
-    "guided_alignment.py", "proactive_publication.py", "minimap_index_context.py",
-    "proactive_reference_alignment.py", "native_recovery.py"))
+
 
 
 def read_json(path, *, limit=MAX_STATE):
@@ -77,8 +74,9 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
         # Non-mapping package/base metadata changed; payload checks still run.
         return True
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return (profile == _REVIEWED_LEGACY_RUNTIME
-            and all(old_files[n] == new_files[n] for n in old_files if n not in _VALIDATION_MODULES)
+            and [profile, current_profile] in runtime.get("native_resume_source_profiles", [])
             and all(n in state["stages"] for n in ("groups", "target-store", "index", "ordinary"))
             and not any(n.startswith("cell:") for n in state["stages"]))
 

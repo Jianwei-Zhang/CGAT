@@ -32,9 +32,9 @@ customer sequence bytes are unchanged or certify the remaining long-query run.
 
 - The caller holds the existing alignment lock. A compatible key transition
   hashes both original FASTAs against their previously recorded content first.
-- The reviewed legacy source profile is the complete 26-file digest map, not a
+- Both sides of the reviewed migration are pinned complete 26-file digest maps, not a
   version string or user-provided production-ready flag. A changed scientific
-  module/helper, unsupported profile or old recovered cell is not adopted by
+  module/helper, unsupported source-profile pair or old recovered cell is not adopted by
   the legacy compatibility path.
 - Both original control receipts are backed up. If either control update fails,
   both are restored. Input, MMI, completed native PAF and native commands are
