@@ -16,6 +16,7 @@ import uuid
 
 import minimap_index_context as mic
 import native_first as nf
+import ordinary_partition_alignment as opa
 import proactive_reference_plan as pp
 import recovery_publication as rp
 import windowed_alignment as wa
@@ -27,6 +28,7 @@ MAX_STATE = 64 * 1024**2
 # ordinary native completions, never old recovered cells, may cross this fix.
 _REVIEWED_LEGACY_RUNTIME = "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd"
 _REVIEWED_METADATA_RUNTIME = "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d"
+_REVIEWED_PARAMETER_RUNTIME = "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
 
 
 
@@ -70,7 +72,8 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
     previous = read_json(candidate / "server-alignment.json").get("runtime", {})
     old_files, new_files = previous.get("files_sha256", {}), runtime.get("files_sha256", {})
     if (previous.get("sha256") != old_key["runtime_sha256"]
-            or not old_files or set(new_files) - set(old_files) not in (set(), {"minimap_options.py"})
+            or not old_files or set(new_files) - set(old_files) not in (set(), {"minimap_options.py"},
+                {"ordinary_partition_alignment.py"}, {"minimap_options.py", "ordinary_partition_alignment.py"})
             or set(old_files) - set(new_files)
             or any(previous.get(k) != runtime.get(k) for k in
                    ("native_companion_sha256", "native_companion_platform", "recovered_output_admission"))):
@@ -80,12 +83,26 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
         return True
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    return (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME}
-            and [profile, current_profile] in runtime.get("native_resume_source_profiles", [])
-            and all(n in state["stages"] for n in ("groups", "ordinary"))
-            and (("target-store" in state["stages"] and "index" in state["stages"])
-                 or set(state["stages"]) == {"groups", "ordinary"})
-            and not any(n.startswith("cell:") for n in state["stages"]))
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME}
+                and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
+    if not approved:
+        return False
+    stages = state["stages"]
+    if profile == _REVIEWED_LEGACY_RUNTIME:
+        # The pre-metadata-fix runtime never receives recovered-cell admission.
+        return ((set(stages) == {"groups", "ordinary"} or
+                 all(n in stages for n in ("groups", "target-store", "index", "ordinary")))
+                and not any(n.startswith("cell:") for n in stages))
+    # Performance-only adapter changes retain the already-fixed recovery kernels.
+    # Old native/cell payloads are STILL fully verified on reopen/publication.
+    kernels = ("guided_alignment.py", "windowed_alignment.py", "native_chain_state.py",
+               "native_recovery.py", "native_selection.py", "post_dp_selection.py",
+               "whole_query_scores.py", "minimap_index_context.py")
+    if any(old_files.get(name) != new_files.get(name) for name in kernels):
+        return False
+    return (set(stages) == {"groups", "ordinary"} or
+            all(n in stages for n in ("groups", "target-store", "index"))
+            and ("ordinary" in stages or "threshold" in stages))
 
 
 def _transition_attempt(candidate, locator, previous, key, runtime):
@@ -304,19 +321,32 @@ class Checkpoint:
         wa.write_json(self.root / "index-base.json", index)
         self.mark("index", {"sha256": wa.sha256(self.root / "index-base.json")})
 
-    def ordinary(self, mm, target, query, *, fraction=None):
+    def ordinary(self, mm, target, query, *, fraction=None, parts=None, records=None):
         marker = self.get("ordinary")
         if not marker:
             return None
-        receipt = rp.verify_attempt(self.root / "ordinary-native/native-attempt.json", self.root, "native_success",
-            tool=mm, target=target, query=query, fraction=fraction)
-        if wa.sha256(self.root / "ordinary-native/native-attempt.json") != marker["sha256"]:
+        if marker.get("kind") == opa.KIND:
+            if parts is None or records is None:
+                raise wa.ExperimentError("partitioned ordinary completion has no original index/query context")
+            path = self.root / "ordinary-native" / opa.RECEIPT
+            receipt = opa.verify(path.parent, mm, query, parts, records, fraction=fraction)
+        else:
+            if marker.get("kind") is not None:
+                raise wa.ExperimentError("unknown ordinary completion kind")
+            path = self.root / "ordinary-native/native-attempt.json"
+            receipt = rp.verify_attempt(path, self.root, "native_success",
+                tool=mm, target=target, query=query, fraction=fraction)
+        if wa.sha256(path) != marker["sha256"]:
             raise wa.ExperimentError("cached ordinary completion receipt changed")
         self.reused["ordinary_group"] += 1
         return receipt
 
-    def save_ordinary(self):
-        self.mark("ordinary", {"sha256": wa.sha256(self.root / "ordinary-native/native-attempt.json")})
+    def save_ordinary(self, *, partitioned=False):
+        name = opa.RECEIPT if partitioned else "native-attempt.json"
+        marker = {"sha256": wa.sha256(self.root / "ordinary-native" / name)}
+        if partitioned:
+            marker["kind"] = opa.KIND
+        self.mark("ordinary", marker)
 
     def cell(self, name, part_index):
         return self.get("cell:" + str(part_index) + ":" + name)

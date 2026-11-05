@@ -4,10 +4,10 @@
   "scope": "initial_reference_asm10_only",
   "files_sha256": {
     "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
-    "proactive_reference_alignment.py": "c5e40b73866d66d98bd0338ae7e396977f9356732e37291e0cde404b1d8474e6",
-    "proactive_publication.py": "5b4d26cd0d93b8af0243e5275b9e830b60118ab970203a01f672fcd13ab52c6b",
-    "proactive_resume.py": "62edf7a9ddce003408d554390fd95bb6128f7d9d17203bf4e4ac7872e72989b9",
-    "server_alignment.py": "b65aaf67b0412ed76fe07900d0ee35f3a92b9862495297988271088c18002f42",
+    "proactive_reference_alignment.py": "062c1d5bd60e61554f51f71883a84a037a116c48603f3d7390a3401a019db581",
+    "proactive_publication.py": "3e48b9b84d5abe5653fc2159d5b045c0c7d8f958bdf2eee52447f7ce4a0ad923",
+    "proactive_resume.py": "b6eab538439ed67090c7baadd0f7ae766f25af29bf097536b5e6b79cc83573c5",
+    "server_alignment.py": "c4f5265a4b4b8b5633de1e0f41a1862dc0ea4915e023e6d27aa87ff999aacd2a",
     "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
     "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
     "windowed_alignment.py": "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e",
@@ -24,6 +24,7 @@
     "stream_seed_trace.py": "a480e1c041a398e58ecde1fdab38750e5142091e8beacb9689670e21a35949cd",
     "trace_memory.py": "c934202e86d3465499b0585f0b6bce09a215d3485f247fa0abdb616036606eac",
     "sequential_split_witness.py": "573ea1231f052c5ff3f748402528561c6f4da6563f8658ef5baa544e1d4c5ad0",
+    "ordinary_partition_alignment.py": "75b902d4c3a6180344b384ca525bfe7c44c8bf978e469192ec9223caea366f10",
     "minimap_options.py": "1b184b47a507a4daf19323d450b6a4f43c401bc0de24ab5c8a30a8950a756322",
     "minimap_index_context.py": "ee888f3645288042abb2e16bb4cb1743368bbb81b34aa4cae49405e70c52b5c7",
     "seam_witness.py": "09e80e89a6662f185ec8a042e8fbb9ae4e24bc611b56d3be8d3c99a14429b249",
@@ -41,11 +42,15 @@
   "native_resume_source_profiles": [
     [
       "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
-      "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
+      "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
     ],
     [
       "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d",
-      "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
+      "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
+    ],
+    [
+      "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560",
+      "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
     ]
   ]
 }

@@ -20,6 +20,7 @@ import guided_alignment as ga
 import native_chain_state as nst
 import native_first as nf
 import minimap_options as mo
+import ordinary_partition_alignment as opa
 import recovery_publication as rp
 import proactive_reference_plan as pp
 import proactive_publication as pub
@@ -167,17 +168,33 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             merger = nf.CellMerger(root / "cells", queries, target.records, index["parts"])
             ordinary = next((g for g in groups["groups"] if g["route"] == "native"), None)
             if ordinary is not None:
-                native = cache.ordinary(mm, root / "target.default.mmi", ordinary["path"], fraction=fraction)
+                ordinary_records = [{"name": name, "length": queries[name]["length"]} for name in ordinary["queries"]]
+                native = cache.ordinary(mm, root / "target.default.mmi", ordinary["path"], fraction=fraction,
+                    parts=index["parts"], records=ordinary_records)
                 if native is None:
+                    schedule = opa.plan(native_args, index["parts"], ordinary_records)
+                    report["ordinary_schedule_plan"] = schedule
                     pr.archive_partial(root / "ordinary-native")
-                    native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", native_args)
-                    if native["status"] == "native_success":
-                        cache.save_ordinary()
-                if native["status"] != "native_success":
-                    raise wa.ExperimentError("ordinary group failed; no bisection or failed PAF reuse")
-                merger.add_native(native, ordinary["queries"])
-                mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(index["parts"]))
-                report.update(ordinary_native=native, threshold_source={"kind": "ordinary_original_index_mapping", "mid_occ": mid})
+                    if schedule["enabled"]:
+                        native = opa.attempt(mm, index["parts"], Path(ordinary["path"]), root / "ordinary-native",
+                                             native_args, ordinary_records, schedule)
+                        cache.save_ordinary(partitioned=True)
+                    else:
+                        native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", native_args)
+                        if native["status"] == "native_success":
+                            cache.save_ordinary()
+                if native.get("kind") == opa.KIND:
+                    for row in native["parts"]:
+                        merger.add_native(row["native"], ordinary["queries"], part_index=row["part_index"])
+                    mid = native["mid_occ"]
+                    threshold_kind = "ordinary_original_parts_mapping"
+                else:
+                    if native["status"] != "native_success":
+                        raise wa.ExperimentError("ordinary group failed; no bisection or failed PAF reuse")
+                    merger.add_native(native, ordinary["queries"])
+                    mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(index["parts"]))
+                    threshold_kind = "ordinary_original_index_mapping"
+                report.update(ordinary_native=native, threshold_source={"kind": threshold_kind, "mid_occ": mid})
             else:
                 saved = cache.get("threshold")
                 if saved is not None:

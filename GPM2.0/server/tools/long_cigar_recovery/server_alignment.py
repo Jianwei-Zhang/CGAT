@@ -41,7 +41,7 @@ RUNTIME_FILES = (
     "native_first.py","native_evaluation.py","native_chain_state.py","build_native_chain_state.py","recovery_publication.py",
     "native_recovery.py","native_selection.py","post_dp_selection.py","whole_query_scores.py",
     "batch_seed_ownership.py","stream_seed_trace.py","trace_memory.py","sequential_split_witness.py",
-    "minimap_options.py","minimap_index_context.py","seam_witness.py","resume_reference.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
+    "ordinary_partition_alignment.py","minimap_options.py","minimap_index_context.py","seam_witness.py","resume_reference.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
 )
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 

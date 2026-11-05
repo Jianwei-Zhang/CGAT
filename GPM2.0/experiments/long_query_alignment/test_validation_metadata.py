@@ -196,7 +196,7 @@ class KeyMigrationTests(unittest.TestCase):
     def test_legacy_full_profile_is_frozen_and_matches_the_approved_digest(self):
         digest = hashlib.sha256(json.dumps(LEGACY,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         self.assertEqual(digest, pr._REVIEWED_LEGACY_RUNTIME)
-        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py"})
+        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py"})
 
     def test_reviewed_runtime_and_ctime_transition_retains_old_controls(self):
         self.target.chmod(0o400);self.query.chmod(0o400)
@@ -219,6 +219,16 @@ class KeyMigrationTests(unittest.TestCase):
         attempt,reused = pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
         self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
         self.assertIn('ordinary',pr.read_json(attempt/'selective'/pr.STATE)['stages'])
+
+    def test_previous_parameter_runtime_preserves_existing_native_completion(self):
+        files = json.loads(Path(__file__).with_name('test_data').joinpath('pre_partition_runtime.json').read_text())
+        self.assertEqual(hashlib.sha256(json.dumps(files,sort_keys=True,separators=(',',':')).encode()).hexdigest(),pr._REVIEWED_PARAMETER_RUNTIME)
+        previous = {**self.old_runtime,'files_sha256':files}
+        runtime = {**self.runtime,'native_resume_source_profiles':[[pr._REVIEWED_PARAMETER_RUNTIME,
+            hashlib.sha256(json.dumps(self.runtime['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        attempt,reused = pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
 
     def test_pure_ordinary_previous_runtime_retains_native_completion_without_index(self):
         self.cache.data['stages'] = {name:self.cache.data['stages'][name] for name in ('groups','ordinary')}

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import native_first as nf
 import minimap_options as mo
+import ordinary_partition_alignment as opa
 import proactive_reference_plan as pp
 import recovery_publication as rp
 import selective_reference_alignment as sr
@@ -136,12 +137,21 @@ def admit(report, root, *, bundle):
                 and wa.verified_sha256(rp.regular_under(part["path"], root)) == part["sha256"], "original index part changed")
     expected_sources = []
     if ordinary:
-        native = rp.verify_attempt(root / "ordinary-native/native-attempt.json", root, "native_success",
-            tool=report["tool"]["path"], target=root / "target.default.mmi", query=group_by_name[ordinary[0]]["path"], fraction=report.get("minimap_filter"))
+        if report["ordinary_native"].get("kind") == opa.KIND:
+            ordinary_records = [{"name": r["name"], "length": r["length"]} for r in records if r["name"] in ordinary]
+            native = opa.verify(root / "ordinary-native", report["tool"]["path"], group_by_name[ordinary[0]]["path"],
+                                parts, ordinary_records, fraction=report.get("minimap_filter"))
+            mid = native["mid_occ"]
+            for row in native["parts"]:
+                expected_sources.append({"path": row["native"]["path"], "sha256": row["native"]["paf_sha256"],
+                    "route": "native", "queries": ordinary, "parts": [row["part_index"]]})
+        else:
+            native = rp.verify_attempt(root / "ordinary-native/native-attempt.json", root, "native_success",
+                tool=report["tool"]["path"], target=root / "target.default.mmi", query=group_by_name[ordinary[0]]["path"], fraction=report.get("minimap_filter"))
+            mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(parts))
+            expected_sources.append({"path": native["path"], "sha256": native["paf_sha256"], "route": "native",
+                                     "queries": ordinary, "parts": list(range(len(parts)))})
         require(native == report["ordinary_native"], "ordinary native result changed")
-        mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(parts))
-        expected_sources.append({"path": native["path"], "sha256": native["paf_sha256"], "route": "native",
-                                 "queries": ordinary, "parts": list(range(len(parts)))})
     else:
         directory = root / "first-part-metadata"
         execution = report["threshold_source"]["execution"]

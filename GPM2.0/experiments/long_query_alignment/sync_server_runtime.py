@@ -27,6 +27,7 @@ import windowed_alignment as wa
 # a maintainer explicitly reviews a new source-profile pair.
 _METADATA_FIX_SOURCE_PROFILE = "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d"
 _PARAMETER_SOURCE_PROFILE = "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
+_PARTITION_SOURCE_PROFILE = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
 _LEGACY_METADATA_SOURCE_PROFILE = "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd"
 
 
@@ -74,7 +75,9 @@ def expected_files(server, canonical, bundle):
     manifest["native_resume_source_profiles"] = (
         [[_LEGACY_METADATA_SOURCE_PROFILE, profile]] if profile == _METADATA_FIX_SOURCE_PROFILE else
         [[old, profile] for old in (_LEGACY_METADATA_SOURCE_PROFILE, _METADATA_FIX_SOURCE_PROFILE)]
-        if profile == _PARAMETER_SOURCE_PROFILE else [])
+        if profile == _PARAMETER_SOURCE_PROFILE else
+        [[old, profile] for old in (_LEGACY_METADATA_SOURCE_PROFILE, _METADATA_FIX_SOURCE_PROFILE, _PARAMETER_SOURCE_PROFILE)]
+        if profile == _PARTITION_SOURCE_PROFILE else [])
     files[adapter.MANIFEST] = (encoded(manifest), 0o644)
     return files
 
