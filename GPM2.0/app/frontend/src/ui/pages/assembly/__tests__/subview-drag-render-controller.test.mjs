@@ -18,7 +18,8 @@ function fixture() {
     addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; },
   });
   const makeCard = () => {
-    const scroll = node(), card = node();
+    const scroll = node(), layout = node(), card = node();
+    scroll.parentElement = layout; card.layout = layout;
     scroll.querySelector = selector => selector === "[data-subview-band-drag-canvas]" && f.canvas !== false ? node() : null;
     scroll.querySelectorAll = selector => selector === "[data-track-band-proxy='1']" ? Array(1000).fill(null) : [];
     card.scroll = scroll;
@@ -47,6 +48,9 @@ function fixture() {
   f.controller = createSubviewDragRenderController({
     renderer: f.renderer, supported: () => f.supported !== false,
     getWidths: () => ({ subview: f.width }), createCover: node,
+    statusDelayMs: f.statusDelayMs ?? 0,
+    setTimer(callback, delay) { f.timers = [...(f.timers || []), { callback, delay }]; return f.timers.length; },
+    clearTimer(id) { f.clearedTimers = [...(f.clearedTimers || []), id]; },
     yieldTask: async () => { f.yields++; await f.onYield?.(); },
     onBind(_host, _store, card) { f.bound.push(card); return f.onBind?.(); },
     onMounted(_host, _store, card) { f.mounted.push(card); },
@@ -64,16 +68,37 @@ test("release keeps only the plot busy, binds a sparse skeleton and hydrates eve
   const f = fixture(), before = structuredClone(f.state), pending = f.start();
   assert.equal(typeof pending.then, "function"); assert.equal(f.prepared, 1);
   assert.equal(f.original.scroll.attributes["aria-busy"], "true");
-  assert.equal(f.head.children[0].attributes.role, "status");
+  const status = f.original.layout.children[0];
+  assert.equal(status.attributes.role, "status");
+  assert.equal(status.attributes["data-visible"], "1");
+  assert.equal(f.head.children.length, 0, "progress never enters the parameter row");
   assert.deepEqual(f.state, before); assert.equal(f.state.assembly.loading, false);
   assert.equal(f.panel.attributes["data-subview-render-incomplete"], "1");
   f.onBind = () => assert.deepEqual(f.hydrated, []);
   f.reply(); assert.equal(await pending, true);
   assert.deepEqual(f.hydrated, ["a", "b", "c"]); assert.equal(f.bound.length, 1);
   assert.equal(f.mounted[0], f.card); assert.equal(f.closed, 1); assert.equal(f.fallbacks.length, 0);
-  assert.equal(f.head.children.length, 0); assert.equal(f.card.scroll.attributes["aria-busy"], undefined);
+  assert.equal(f.head.children.length, 0); assert.equal(f.card.layout.children.length, 0);
+  assert.equal(f.card.scroll.attributes["aria-busy"], undefined);
   assert.equal(f.card.scroll.children.length, 0); assert.deepEqual(f.state, before);
   assert.equal(f.panel.attributes["data-subview-render-incomplete"], undefined);
+});
+
+test("render progress is delayed, moves with the replacement plot and clears its pending timer", async () => {
+  const f = fixture(); f.statusDelayMs = 350;
+  f.controller = createSubviewDragRenderController({
+    renderer: f.renderer, supported: () => true, getWidths: () => ({ subview: f.width }),
+    createCover: () => ({ ...f.original.layout, children: [] }),
+    statusDelayMs: 350,
+    setTimer(callback, delay) { f.timers = [{ callback, delay }]; return 7; },
+    clearTimer(id) { f.clearedTimers = [id]; }, yieldTask: async () => {},
+    onBind(_host, _store, card) { assert.equal(card.layout.children[0].attributes.role, "status"); },
+  });
+  const pending = f.controller.start(f.host, f.store, f.preview), status = f.original.layout.children[0];
+  assert.equal(f.timers[0].delay, 350); assert.equal(status.attributes["data-visible"], undefined);
+  f.timers[0].callback(); assert.equal(status.attributes["data-visible"], "1");
+  f.reply(); assert.equal(await pending, true);
+  assert.deepEqual(f.clearedTimers, [7]); assert.equal(f.card.layout.children.length, 0);
 });
 
 for (const kind of ["project", "workspace", "chromosome", "route", "tab", "reload", "detached", "panel"]) {

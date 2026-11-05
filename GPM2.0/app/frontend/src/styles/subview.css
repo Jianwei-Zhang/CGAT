@@ -1080,4 +1080,48 @@
 }
 
 /* Progress belongs only to the plot being rebuilt; never cover the App. */
-.subview-render-status { color: var(--text-muted); font-size: 0.85em; margin-left: auto; }
+.subview-render-status {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  max-width: min(260px, calc(100% - 16px));
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--theme-line, var(--border-subtle, #dbe3ec));
+  border-radius: 4px;
+  background: var(--theme-translucent-surface, rgba(255, 255, 255, 0.92));
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.subview-render-status::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: subview-pairwise-spin 0.8s linear infinite;
+}
+
+.subview-render-status[data-visible="1"] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subview-render-status { transition: none; }
+  .subview-render-status::before { animation: none; }
+}

@@ -35,6 +35,9 @@ export function createSubviewDragRenderController({
   yieldTask = yieldSubviewRender,
   getWidths, onBind = () => {}, onMounted = () => {}, onFallback = () => {},
   createCover = createSubviewRenderCover,
+  statusDelayMs = 350,
+  setTimer = globalThis.setTimeout?.bind(globalThis),
+  clearTimer = globalThis.clearTimeout?.bind(globalThis),
 } = {}) {
   let active = null, serial = 0;
   function cancel() {
@@ -52,10 +55,19 @@ export function createSubviewDragRenderController({
       || (!denseBands && (scroll.querySelectorAll?.("[data-track-band-proxy='1']")?.length || 0) < 1000)) return null;
     if (active) cancel();
     const initial = store.getState(), document = panel.ownerDocument;
-    const marker = document.createElement("span");
+    const marker = document.createElement("div");
     marker.className = "subview-render-status"; marker.setAttribute("role", "status");
+    marker.setAttribute("aria-live", "polite");
     marker.textContent = getAssemblyI18n(initial).subview.renderPending;
-    panel.querySelector(".subview-panel-head")?.appendChild(marker);
+    // Keep progress out of the parameter row. The status is absolutely placed
+    // over the non-scrolling plot layout and appears only for a visible wait.
+    const mountMarker = (nextCard, nextViewport) => {
+      (nextViewport?.parentElement || nextCard)?.appendChild?.(marker);
+    };
+    mountMarker(card, scroll);
+    const statusTimer = Number(statusDelayMs) > 0 && typeof setTimer === "function"
+      ? setTimer(() => marker.setAttribute("data-visible", "1"), Number(statusDelayMs))
+      : (marker.setAttribute("data-visible", "1"), null);
     let cover = null, nextScroll = null;
     // A single input shield avoids toggling `inert` on tens of thousands of
     // SVG descendants (which itself causes a whole-subtree style pause).
@@ -68,6 +80,7 @@ export function createSubviewDragRenderController({
     let cleaned = false;
     const job = { id: ++serial, cancelled: false, cleanup() {
       if (cleaned) return; cleaned = true;
+      if (statusTimer !== null && typeof clearTimer === "function") clearTimer(statusTimer);
       marker.remove(); shield.remove(); scroll.removeAttribute("aria-busy");
       cover?.remove();
       if (nextScroll) nextScroll.removeAttribute("aria-busy");
@@ -119,6 +132,7 @@ export function createSubviewDragRenderController({
                 nextScroll.setAttribute("aria-busy", "true");
                 nextScroll.appendChild(cover);
                 card.replaceWith(nextCard); card = nextCard; mounted = true;
+                mountMarker(nextCard, nextScroll);
                 // Navigation wraps/reparents the layout and restores scroll.
                 // Do this while it is sparse, not after 30,000 nodes exist.
                 needsRebind = onBind(host, store, nextCard) === false;
