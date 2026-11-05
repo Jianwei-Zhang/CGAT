@@ -169,7 +169,7 @@
   ],
   "hifiasm_reverse_counterbalance": {
     "job_id": 40883590,
-    "observed_at": "2026-11-05T21:20:22+08:00",
+    "observed_at": "2026-11-05T22:30:03.907663+08:00",
     "started_at": "2026-11-05T21:00:05+08:00",
     "compute_node": "agent-ARM-04",
     "allocated_cpus": 64,
@@ -181,8 +181,6 @@
     "timeout_seconds_per_command": 7200,
     "memory_limit_mib": 196608,
     "default_index_and_PAF_hashes_must_match_forward_pair": true,
-    "accepted_runs_at_observation": 0,
-    "first_K1G_batch_completed_query_records": 25,
     "scheduler_state": "SUCCEEDED",
     "ended_at": "2026-11-05T22:14:01+08:00",
     "accepted_runs": 2,

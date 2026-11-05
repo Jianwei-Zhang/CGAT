@@ -24,6 +24,7 @@ def profile(path):
     if path.stat().st_size > 64 * 1024**2:
         raise ValueError('filtering audit refuses PAF >64 MiB; preserve outputs, no recommendation')
     signatures, pairs, intervals = Counter(), set(), defaultdict(list)
+    geometry, cg_geometry, mapq, primary = Counter(), Counter(), {}, defaultdict(set)
     with path.open('rb') as stream:
         for raw in stream:
             fields = raw.decode('ascii').rstrip('\n').split('\t')
@@ -32,6 +33,15 @@ def profile(path):
             signatures[hashlib.sha256(raw).hexdigest()] += 1
             pairs.add((fields[0], fields[5], fields[4]))
             intervals[fields[0]].append((int(fields[2]), int(fields[3])))
+            cg = [value[5:] for value in fields[12:] if value.startswith('cg:Z:')]
+            if len(cg) != 1:
+                raise ValueError('one native CIGAR required for geometry audit')
+            key = tuple(fields[:9])
+            geometry[key] += 1
+            cg_geometry[(*key, cg[0])] += 1
+            mapq[(*key, cg[0])] = int(fields[11])
+            if any(value in ('tp:A:P', 'tp:A:I') for value in fields[12:]):
+                primary[fields[0]].add((fields[5], fields[4], fields[2], fields[3], fields[7], fields[8], cg[0]))
     coverage = {}
     for name, spans in intervals.items():
         total, end = 0, -1
@@ -39,13 +49,22 @@ def profile(path):
             total += max(0, stop - max(start, end))
             end = max(end, stop)
         coverage[name] = total
-    return {'signatures': signatures, 'pairs': pairs, 'coverage': coverage}
+    return {'signatures': signatures, 'pairs': pairs, 'coverage': coverage,
+            'geometry': geometry, 'cg_geometry': cg_geometry, 'mapq': mapq, 'primary': primary}
 
 
 def differences(baseline, candidate):
     before, after = baseline['coverage'], candidate['coverage']
+    common_keys = set(baseline.get('mapq', {})) & set(candidate.get('mapq', {}))
+    primary_before, primary_after = baseline.get('primary', {}), candidate.get('primary', {})
     return {'removed_full_PAF_rows': sum((baseline['signatures'] - candidate['signatures']).values()),
             'added_full_PAF_rows': sum((candidate['signatures'] - baseline['signatures']).values()),
+            'removed_geometry_rows': sum((baseline.get('geometry', Counter()) - candidate.get('geometry', Counter())).values()),
+            'added_geometry_rows': sum((candidate.get('geometry', Counter()) - baseline.get('geometry', Counter())).values()),
+            'removed_geometry_and_CIGAR_rows': sum((baseline.get('cg_geometry', Counter()) - candidate.get('cg_geometry', Counter())).values()),
+            'added_geometry_and_CIGAR_rows': sum((candidate.get('cg_geometry', Counter()) - baseline.get('cg_geometry', Counter())).values()),
+            'unchanged_geometry_CIGAR_records_with_MAPQ_change': sum(baseline['mapq'][k] != candidate['mapq'][k] for k in common_keys),
+            'queries_with_changed_primary_geometry_or_CIGAR': sum(primary_before.get(q, set()) != primary_after.get(q, set()) for q in set(before) | set(after)),
             'removed_query_target_strand_pairs': len(baseline['pairs'] - candidate['pairs']),
             'added_query_target_strand_pairs': len(candidate['pairs'] - baseline['pairs']),
             'previously_mapped_queries_now_unmapped': sorted(set(before) - set(after)),

@@ -1,7 +1,7 @@
 {
   "schema": "cgat.ordinary_filtering_screening.v1",
-  "status": "local_harness_smoke_passed_pending_real_input_screening",
-  "observed_at": "2026-11-05T21:18:35.341103+08:00",
+  "status": "real_input_screening_completed_results_changed_no_automatic_policy_approval",
+  "observed_at": "2026-11-05T22:30:03.907238+08:00",
   "production_runtime_modified": false,
   "automatic_trigger_implemented": false,
   "downstream_scientific_acceptance": false,
@@ -24,7 +24,8 @@
     ],
     "note": "all four local conditions clamp to mid_occ 50; same PAF is not evidence of speedup or automatic policy safety"
   },
-  "planned_real_screening": {
+  "local_evidence_archive_sha256": "25d43c411b97dd8ba45d111b489a0f008430726d1522e921e27c3b62e75db647",
+  "real_screening": {
     "query": "nextdenovo.fa full original 2430 records",
     "conditions": [
       "default",
@@ -37,10 +38,77 @@
     "index_policy": "original default",
     "acceptance": "report all PAF row/score/coverage/pair changes; no production or downstream approval",
     "job_id": 40883797,
-    "scheduler_state_at_observation": "WAITING",
-    "observed_at": "2026-11-05T21:20:22+08:00",
     "dependency": "40883745=ENDED",
-    "accepted_runs_at_observation": 0
+    "status": "SUCCEEDED",
+    "all_original_query_records_retained": true,
+    "query_records": 2430,
+    "source_content_guards_passed": true,
+    "baseline_matches_previously_accepted_full_output": true,
+    "each_condition_repeat_PAFs_equal": true,
+    "summary": [
+      {
+        "fraction": "default",
+        "wall_seconds": [
+          178.84,
+          179.4
+        ],
+        "median_wall_seconds": 179.12,
+        "mid_occ": 500,
+        "maximum_peak_rss_gib": 34.840087890625,
+        "paf_rows": 4602,
+        "paf_sha256": "c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932"
+      },
+      {
+        "fraction": "0.01",
+        "wall_seconds": [
+          22.27,
+          23.02
+        ],
+        "median_wall_seconds": 22.645,
+        "mid_occ": 50,
+        "maximum_peak_rss_gib": 13.71066665649414,
+        "paf_rows": 4590,
+        "paf_sha256": "0bbaf28d2db13b2c9e0a58617d17ebfee762083ddc5818f99ba4d6da9d8040f3"
+      }
+    ],
+    "independent_differences": {
+      "removed_full_PAF_rows": 4395,
+      "added_full_PAF_rows": 4383,
+      "removed_geometry_rows": 1070,
+      "added_geometry_rows": 1058,
+      "removed_geometry_and_CIGAR_rows": 1140,
+      "added_geometry_and_CIGAR_rows": 1128,
+      "unchanged_geometry_CIGAR_records_with_MAPQ_change": 114,
+      "queries_with_changed_primary_geometry_or_CIGAR": 227,
+      "removed_query_target_strand_pairs": 116,
+      "added_query_target_strand_pairs": 76,
+      "queries_with_reduced_union_coverage": 36,
+      "baseline_query_union_coverage_bases": 1112845137,
+      "candidate_query_union_coverage_bases": 1113612673
+    },
+    "baseline_primary_secondary_types": {
+      "P": 3632,
+      "S": 964,
+      "I": 3,
+      "i": 3
+    },
+    "candidate_primary_secondary_types": {
+      "P": 3770,
+      "S": 815,
+      "I": 3,
+      "i": 2
+    },
+    "speedup": 7.9099138882755575,
+    "automatic_f_policy_approved": false,
+    "downstream_scientific_acceptance": false,
+    "evidence_archive_sha256": "c37b9a1901200c68a5b96757fded3eb634ac0a4e39a5d5eb80a783f94d42a8fc",
+    "started_at": "2026-11-05T22:16:58+08:00",
+    "ended_at": "2026-11-05T22:25:11+08:00",
+    "scheduler_state": "SUCCEEDED",
+    "compute_node": "agent-ARM-04",
+    "allocated_cpus": 64,
+    "new_audit_metrics_recomputed_from_frozen_old_outputs": true,
+    "accepted_screening_runs": 4
   },
-  "local_evidence_archive_sha256": "25d43c411b97dd8ba45d111b489a0f008430726d1522e921e27c3b62e75db647"
+  "production_decision": "Do not automatically select -f from input size: baseline-equivalent behavior is disproven on this real dataset; different output is not proof of biological error."
 }

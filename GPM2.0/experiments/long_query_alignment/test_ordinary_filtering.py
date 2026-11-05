@@ -41,6 +41,7 @@ class FilteringTests(unittest.TestCase):
             self.assertEqual(diff['queries_with_reduced_union_coverage'],0)
             self.assertEqual(diff['removed_full_PAF_rows'],1)
             self.assertEqual(diff['added_full_PAF_rows'],1)
+            self.assertEqual(diff['unchanged_geometry_CIGAR_records_with_MAPQ_change'],1)
             self.assertFalse(diff['downstream_scientific_acceptance'])
 
     def test_lost_alternative_target_detected_without_any_coverage_loss(self):
@@ -54,6 +55,26 @@ class FilteringTests(unittest.TestCase):
             self.assertEqual(diff['removed_query_target_strand_pairs'],1)
             self.assertEqual(diff['removed_full_PAF_rows'],1)
             self.assertFalse(diff['downstream_scientific_acceptance'])
+
+    def test_primary_coordinate_change_not_hidden_by_total_coverage(self):
+        with tempfile.TemporaryDirectory() as d:
+            a,b=Path(d)/'a',Path(d)/'b'
+            a.write_text(self.row().rstrip('\n')+'\ttp:A:P\n')
+            b.write_text(self.row(start=10,end=20).rstrip('\n')+'\ttp:A:P\n')
+            diff=filtering.differences(filtering.profile(a),filtering.profile(b))
+            self.assertEqual(diff['queries_with_reduced_union_coverage'],0)
+            self.assertEqual(diff['queries_with_changed_primary_geometry_or_CIGAR'],1)
+            self.assertEqual(diff['removed_geometry_rows'],1)
+
+    def test_cigar_change_at_same_coordinates_is_distinguished(self):
+        with tempfile.TemporaryDirectory() as d:
+            a,b=Path(d)/'a',Path(d)/'b'
+            first=self.row().rstrip('\n')+'\ttp:A:P\n'
+            a.write_text(first);b.write_text(first.replace('cg:Z:10M','cg:Z:4M1I1D5M'))
+            diff=filtering.differences(filtering.profile(a),filtering.profile(b))
+            self.assertEqual(diff['removed_geometry_rows'],0)
+            self.assertEqual(diff['removed_geometry_and_CIGAR_rows'],1)
+            self.assertEqual(diff['queries_with_changed_primary_geometry_or_CIGAR'],1)
 
     def test_even_identical_profile_does_not_claim_downstream_acceptance(self):
         x={'signatures':Counter(),'pairs':set(),'coverage':{}}
