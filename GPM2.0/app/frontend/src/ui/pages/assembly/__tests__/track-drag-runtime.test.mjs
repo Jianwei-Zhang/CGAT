@@ -993,3 +993,30 @@ for (const view of ["main", "pair", "composition"]) {
     }
   }
 }
+
+
+test("async release persists immediately, detaches pointer listeners and retains the preview until painting completes",async()=>{
+ const previous=globalThis.window,win=createWindowStub();globalThis.window=win;
+ try{
+ const host=createHost(),state={assembly:{activeTab:"assembly",subviewTrackView:{fullRange:true},subviewTrackDragOffsets:[]}},store=createStore(state);
+ const scroll={scrollLeft:0,dataset:{subviewDomainSpanBp:"100",subviewInnerWidth:"100"}};
+ const node={getAttribute:key=>({"data-subview-track-slot":"top","data-subview-contig-id":"12"})[key]??null,closest:()=>scroll};
+ const target={closest:selector=>selector==="[data-subview-contig-id][data-subview-track-slot]"?node:null};
+ let complete,restored=0,persisted=0,committed=0;
+ const pending=new Promise(resolve=>{complete=resolve;});
+ const preview={isCurrent:()=>true,update(){},prepareCommit(){},restore(){restored++;}};
+ bindSubviewTrackContigDrag(host,store,{
+  clearSubviewTrackDragPreview(){},previewSubviewTrackContigDrag(){},resolveSubviewTrackDragOffsetBp:()=>0,
+  resolveActiveTrackScrollElement:()=>scroll,convertTrackOffsetPxToBp:value=>value,roundTrackMetric:value=>value,
+  createFullRangeDragPreview:()=>preview,
+  applySubviewTrackDragOffset(_host,_store,payload,options){assert.equal(options.preview,preview);committed++;return pending;},
+  persistSubviewTrackDragOffsets(){persisted++;},
+ });
+ host.listeners.get("pointerdown")({button:0,clientX:0,target,preventDefault(){}});
+ win.listeners.get("pointermove")({clientX:20});win.flushAnimationFrame();win.listeners.get("pointerup")({clientX:20});
+ assert.equal(committed,1);assert.equal(persisted,1);assert.equal(restored,0);
+ assert.equal(win.listeners.has("pointermove"),false);assert.equal(win.listeners.has("pointerup"),false);
+ assert.notEqual(state.assembly.loading,true);
+ complete(true);await Promise.resolve();assert.equal(restored,1);
+ }finally{globalThis.window=previous;}
+});

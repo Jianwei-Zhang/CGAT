@@ -340,6 +340,7 @@ export const zh = {
   },
   subview: {
     panelTitle: "局部视图",
+    renderPending: "图形更新中，可继续操作其他视图…",
     helpLabel: "局部视图操作说明",
     tools: {
       toggle: "工具",
@@ -991,6 +992,7 @@ export const en = {
   },
   subview: {
     panelTitle: "Local View",
+    renderPending: "Updating plot; other views remain available…",
     helpLabel: "Local View instructions",
     tools: {
       toggle: "Tools",

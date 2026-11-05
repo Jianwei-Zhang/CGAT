@@ -49,22 +49,19 @@ function disableCanvas(canvas) {
   }
   canvas.width = 1;
   canvas.height = 1;
-  canvas.style.width = "0px";
-  canvas.style.height = "0px";
+  if (canvas.style) { canvas.style.width = "0px"; canvas.style.height = "0px"; }
 }
 
-function configureCanvas(canvas, width, height) {
+function configureCanvas(canvas, width, height, dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1))) {
   const safeWidth = Math.max(1, Math.round(Number(width) || 0));
   const safeHeight = Math.max(1, Math.round(Number(height) || 0));
-  const dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
   if (!canAllocateCanvasBitmap(safeWidth, safeHeight, dpr)) {
     disableCanvas(canvas);
     return null;
   }
   canvas.width = Math.max(1, Math.round(safeWidth * dpr));
   canvas.height = Math.max(1, Math.round(safeHeight * dpr));
-  canvas.style.width = `${safeWidth}px`;
-  canvas.style.height = `${safeHeight}px`;
+  if (canvas.style) { canvas.style.width = `${safeWidth}px`; canvas.style.height = `${safeHeight}px`; }
   const context = canvas.getContext("2d");
   if (!context) {
     return null;
@@ -101,11 +98,8 @@ function drawPolygon(context, points, offsetX, styles) {
   context.stroke();
 }
 
-function drawTrackBandCanvasLayer(layer, scene) {
-  const canvas = layer?.querySelector?.("[data-track-band-canvas='1']");
-  if (!canvas || !scene) {
-    return false;
-  }
+export function paintBandCanvasScene(canvas, scene, { theme = "light", dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1)) } = {}) {
+  if (!canvas || !scene) return false;
   const viewportLeft = Number(scene.viewBoxMinX || 0);
   let offsetX = viewportLeft, paintWidth = Number(scene.width);
   // Keep a bounded gutter in the already-painted backing bitmap. Minimum-pixel
@@ -117,16 +111,13 @@ function drawTrackBandCanvasLayer(layer, scene) {
     minX = Math.min(minX, point[0]); maxX = Math.max(maxX, point[0]);
   }
   const paddedLeft = Math.floor(minX) - 2, paddedWidth = Math.ceil(maxX) + 2 - paddedLeft;
-  const dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
   if (paddedWidth <= Math.max(paintWidth * 1.25, paintWidth + 16)
     && canAllocateCanvasBitmap(paddedWidth, scene.height, dpr)) {
     offsetX = paddedLeft; paintWidth = paddedWidth;
   }
-  const configured = configureCanvas(canvas, paintWidth, scene.height);
+  const configured = configureCanvas(canvas, paintWidth, scene.height, dpr);
   if (!configured) return false;
   const { context, width, height } = configured;
-  layer.style.overflow = "hidden";
-  canvas.style.transform = `translateX(${offsetX - viewportLeft}px)`;
 
   if (scene?.clipRect) {
     context.save();
@@ -140,8 +131,7 @@ function drawTrackBandCanvasLayer(layer, scene) {
     context.clip();
   }
 
-  const dark = (layer?.ownerDocument?.documentElement?.dataset?.theme
-    ?? globalThis.document?.documentElement?.dataset?.theme) === "dark";
+  const dark = theme === "dark";
   const resolveBandStyle = dark ? resolveDarkAlignmentBandStyle : resolveAlignmentBandStyle;
   sortAlignmentBands(Array.isArray(scene.bands) ? scene.bands : []).forEach((band) => {
     drawPolygon(
@@ -156,6 +146,44 @@ function drawTrackBandCanvasLayer(layer, scene) {
     context.restore();
   }
   return { canvas, left: offsetX, top: 0, width, height };
+}
+
+function drawTrackBandCanvasLayer(layer, scene) {
+  const canvas = layer?.querySelector?.("[data-track-band-canvas='1']");
+  const theme = layer?.ownerDocument?.documentElement?.dataset?.theme
+    ?? globalThis.document?.documentElement?.dataset?.theme ?? "light";
+  const painted = paintBandCanvasScene(canvas, scene, { theme });
+  if (painted) {
+    layer.style.overflow = "hidden";
+    canvas.style.transform = `translateX(${painted.left - Number(scene.viewBoxMinX || 0)}px)`;
+  }
+  return painted;
+}
+
+// A Worker-prepared bitmap is adopted only for the exact scene/theme/DPR.
+// All SVG hit targets remain authoritative and are hydrated separately.
+export function adoptBandCanvasRaster(layer, raster) {
+  const canvas = layer?.querySelector?.("[data-track-band-canvas='1']");
+  const sceneText = String(layer?.querySelector?.("[data-track-band-canvas-scene]")?.textContent || "");
+  const theme = layer?.ownerDocument?.documentElement?.dataset?.theme
+    ?? globalThis.document?.documentElement?.dataset?.theme ?? "light";
+  const dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
+  if (!canvas || !raster?.bitmap || raster.sceneText !== sceneText || raster.theme !== theme || raster.dpr !== dpr) return false;
+  if (!canAllocateCanvasBitmap(raster.width, raster.height, dpr)
+    || raster.bitmap.width !== Math.round(raster.width * dpr)
+    || raster.bitmap.height !== Math.round(raster.height * dpr)) return false;
+  canvas.width = raster.bitmap.width; canvas.height = raster.bitmap.height;
+  canvas.style.width = `${raster.width}px`; canvas.style.height = `${raster.height}px`;
+  const context = canvas.getContext("2d");
+  if (!context) return false;
+  context.drawImage(raster.bitmap, 0, 0);
+  canvas.style.transform = `translateX(${raster.left - Number(raster.scene.viewBoxMinX || 0)}px)`;
+  layer.style.overflow = "hidden";
+  layer[TRACK_BAND_CANVAS_BOUND] = { sceneText, theme, dpr, frameHandle: undefined,
+    paintedScene: raster.scene, paintedCanvas: canvas,
+    paintedBounds: { canvas, left: raster.left, top: 0, width: raster.width, height: raster.height } };
+  layer.closest?.(".assembly-track-scroll")?.classList.add(TRACK_BAND_CANVAS_READY_CLASS);
+  return true;
 }
 
 export function bindBandCanvasRuntime(host, { synchronous = false } = {}) {

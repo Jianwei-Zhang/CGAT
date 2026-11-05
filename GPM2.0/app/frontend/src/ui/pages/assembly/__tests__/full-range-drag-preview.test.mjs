@@ -108,3 +108,16 @@ test("failed geometry capture restores temporarily revealed sticky labels", () =
  const before=f.snapshot();assert.throws(()=>f.handle(),/detached label/);
  assert.deepEqual(f.snapshot(),before);assert.equal(f.scroll.classList.contains("is-full-range-drag-preview"),false);
 });
+
+
+test("pending render exposes committed world geometry for Main-to-Local edits and restores it on cancellation",()=>{
+ const f=fixture(true),before=f.snapshot();
+ f.queryMaps.get(f.svg)["[data-subview-track-slot][data-subview-contig-id][data-subview-rect-x]"]=[f.group];
+ const handle=f.handle(),fit=handle.update(150);handle.prepareCommit();
+ const width=Number(f.scroll.getAttribute("data-subview-inner-width"));
+ assert.ok(Math.abs(Number(f.group.getAttribute("data-subview-rect-x"))*100/width-170)<1e-8);
+ assert.ok(Math.abs(Number(f.group.getAttribute("data-subview-rect-width"))*100/width-20)<1e-8);
+ assert.equal(Number(f.group.getAttribute("data-subview-world-start-bp")),170);
+ const committed=f.snapshot();handle.prepareCommit();assert.deepEqual(f.snapshot(),committed);
+ handle.restore();assert.deepEqual(f.snapshot(),before);
+});

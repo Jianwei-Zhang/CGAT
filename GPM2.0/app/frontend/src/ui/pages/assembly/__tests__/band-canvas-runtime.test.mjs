@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { bindBandCanvasRuntime } from "../band-canvas-runtime.js";
+import { bindBandCanvasRuntime, paintBandCanvasScene, adoptBandCanvasRaster } from "../band-canvas-runtime.js";
 import { resolveAlignmentBandStyle, resolveDarkAlignmentBandStyle } from "../alignment-band-style.js";
 
 function createClassList() {
@@ -277,4 +277,27 @@ test("unbounded offscreen extents never enlarge the viewport backing bitmap", ()
   assert.equal(f.canvas.style.width, "200px");
   assert.equal(f.canvas.style.transform, "translateX(0px)");
   assert.equal(context.calls.filter(call => call[0] === "fill").length, 1);
+});
+
+
+test("shared painter supports OffscreenCanvas without a DOM/style object",()=>{
+ const context=createContextRecorder(),canvas={getContext:()=>context};
+ const result=paintBandCanvasScene(canvas,{width:100,height:80,viewBoxMinX:0,bands:[{identityPct:90,tone:"primary",points:[[0,20],[10,20],[30,60],[20,60]]}]},{theme:"dark",dpr:2});
+ assert.equal(canvas.width,208);assert.equal(result.left,-2);assert.equal(result.width,104);
+ assert.equal(context.fillStyle,resolveDarkAlignmentBandStyle("primary",90).fill);
+});
+for(const mismatch of [null,"theme","dpr","scene","dimensions"])test(`worker raster adoption validates exact scene and avoids repaint (${mismatch})`,()=>{
+ const previousDpr=globalThis.devicePixelRatio;globalThis.devicePixelRatio=1;
+ try {
+ const context=createContextRecorder();let blits=0;context.drawImage=()=>blits++;
+ const f=createCanvasLayer({context});f.layer.closest=()=>f.scrollNode;
+ const raster={bitmap:{width:204,height:80},width:204,height:80,left:-2,scene:JSON.parse(f.sceneNode.textContent),sceneText:f.sceneNode.textContent,theme:"light",dpr:1};
+ if(mismatch==="theme")raster.theme="dark";
+ if(mismatch==="dpr")raster.dpr=2;
+ if(mismatch==="scene")raster.sceneText+=" ";
+ if(mismatch==="dimensions")raster.bitmap.width++;
+ assert.equal(adoptBandCanvasRaster(f.layer,raster),!mismatch);
+ assert.equal(blits,mismatch?0:1);
+ if(!mismatch){bindBandCanvasRuntime(f.host,{synchronous:true});assert.equal(context.calls.filter(call=>call[0]==="fill").length,0);assert.equal(f.scrollNode.classList.contains("is-track-band-canvas-ready"),true);}
+ }finally{globalThis.devicePixelRatio=previousDpr;}
 });

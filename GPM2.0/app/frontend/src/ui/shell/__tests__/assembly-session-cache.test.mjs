@@ -133,3 +133,20 @@ test("in-place locale changes remove old-locale aliases to the same cached nodes
   rememberAssemblyDom(host, en); assert.equal(restoreAssemblyDom(destination, en), true);
   clearAssemblySessionCache();
 });
+
+test("leaving during background drag rendering discards partial DOM and its earlier cache aliases", () => {
+  clearAssemblySessionCache();
+  const zh = createState({ projectId: 7, locale: "zh" }), en = createState({ projectId: 7, locale: "en" });
+  const host = createHost([{ id: "assembly-root" }]);
+  assert.equal(rememberAssemblyDom(host, zh), true);
+  assert.equal(rememberAssemblyDom(host, en), true);
+  host.querySelector = selector => selector === "[data-subview-render-incomplete]" ? {} : null;
+  assert.equal(rememberAssemblyDom(host, en), false);
+  const destination = createHost([]);
+  assert.equal(restoreAssemblyDom(destination, zh), false);
+  assert.equal(restoreAssemblyDom(destination, en), false);
+  host.querySelector = () => null;
+  assert.equal(rememberAssemblyDom(host, en), true);
+  assert.equal(restoreAssemblyDom(destination, en), true);
+  clearAssemblySessionCache();
+});

@@ -1045,3 +1045,6 @@
 .is-subview-band-canvas-drag-preview [data-track-band-canvas-layer="1"] {
   display: none;
 }
+
+/* Progress belongs only to the plot being rebuilt; never cover the App. */
+.subview-render-status { color: var(--text-muted); font-size: 0.85em; margin-left: auto; }

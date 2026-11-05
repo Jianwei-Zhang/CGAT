@@ -549,11 +549,20 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
       if (shouldCommit && hasEffectiveMovement) {
         deps.setSuppressTrackContigClickUntil?.(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
+        let renderPending = false;
         try {
-          deps.applySubviewTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp));
+          const result = deps.applySubviewTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp),
+            { preview: restoreAfterCommit ? fullRangePreview : null });
+          if (restoreAfterCommit && result && typeof result.then === "function") {
+            renderPending = true;
+            void Promise.resolve(result).then(() => fullRangePreview.restore(), error => {
+              fullRangePreview.restore(); deps.onTrackDragPreviewError?.(dragHost, store, error);
+            });
+          }
         } finally {
-          // Also restores a still-mounted graph if a no-op/error prevented replacement.
-          if (restoreAfterCommit) fullRangePreview.restore();
+          // Keep the final gesture visible while background rendering yields to
+          // other App operations. Position/history and persistence are not delayed.
+          if (restoreAfterCommit && !renderPending) fullRangePreview.restore();
         }
         if (
           Number.isFinite(pendingPreviewScrollLeft)

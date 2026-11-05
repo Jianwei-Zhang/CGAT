@@ -124,7 +124,7 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
     ? createSubviewBandCanvasDragPreview(scroll, plan.actions, { width: viewportWidth, height: viewBox[3] }) : null;
   const first = svg.firstElementChild;
   const children = svg.childElementCount;
-  let restored = false;
+  let restored = false, lastFit = null, lastDeltaPx = 0, preparedForCommit = false;
   return {
     isCurrent: () => !restored && scroll.isConnected !== false && svg.isConnected !== false
       && scroll.contains(svg) && svg.firstElementChild === first && svg.childElementCount === children
@@ -133,6 +133,7 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
       if (restored) return false;
       const deltaPx = Number(deltaBp)*innerWidth/domainSpan;
       const fit = fitFullRangeDragBounds(geometry.edges,deltaPx,viewportWidth);
+      lastFit = fit; lastDeltaPx = deltaPx;
       const canvasReady = bandPreview?.draw(deltaPx, [fit.minX, viewBox[1], fit.width, viewBox[3]]) === true;
       plan.apply(deltaPx, { skipBandNodes: canvasReady ? bandPreview.nodes : null, fullRange: true });
       set(svg,"width",viewportWidth);
@@ -166,6 +167,20 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
         if (ruler.innerHTML !== markup) ruler.innerHTML = markup;
       }
       return { ...fit, deltaPx };
+    },
+    prepareCommit() {
+      if (restored || !subview || !lastFit || preparedForCommit) return;
+      preparedForCommit = true;
+      const motions = new Map(plan.actions.filter(action => action.kind === "group").map(action => [action.node, action.factor || 0]));
+      for (const node of svg.querySelectorAll("[data-subview-track-slot][data-subview-contig-id][data-subview-rect-x]")) {
+        const x = number(node, "data-subview-rect-x"), width = number(node, "data-subview-rect-width");
+        const motion = motions.get(node) || 0;
+        const oldWorldStart = node.getAttribute("data-subview-world-start-bp");
+        const worldStart = oldWorldStart === null ? windowStart + x * domainSpan / innerWidth : Number(oldWorldStart);
+        set(node, "data-subview-rect-x", (x + motion * lastDeltaPx) * lastFit.scale);
+        set(node, "data-subview-rect-width", width * lastFit.scale);
+        set(node, "data-subview-world-start-bp", worldStart + motion * lastDeltaPx * domainSpan / innerWidth);
+      }
     },
     restore() {
       if (restored) return;

@@ -636,6 +636,61 @@ function createRenderTracksRenderer(deps = {}) {
       </article>` };
   }
 
+  function renderMainMemberChips(assembly, i18n) {
+  const selectedDeletedRecordIds = new Set(
+    normalizeDeletedCtgRecordIds(assembly.selectedDeletedCtgRecordIds),
+  );
+  const hiddenPrimaryCtgIdSet = new Set(
+    filterPrimaryTrackSelectionCtgIds(assembly.hiddenPrimaryCtgIds, assembly),
+  );
+  const selectedPrimaryTrackCtgIdSet = new Set(
+    filterPrimaryTrackSelectionCtgIds(assembly.trackSelectedCtgIds, assembly),
+  );
+  const historyHighlightCtgId = normalizeSupportDatasetId(assembly.historyHighlightCtgId);
+  const ctgChips = assembly.chrCtgs.length
+    ? assembly.chrCtgs
+        .map((ctg) => {
+          const active = ctg.assemblyCtgId === assembly.selectedCtgId ? "is-active" : "";
+          const selectedClass = selectedPrimaryTrackCtgIdSet.has(Number(ctg.assemblyCtgId)) ? " is-multi-selected" : "";
+          const hiddenClass = hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId)) ? " is-hidden-contig" : "";
+          const historyHighlightClass = historyHighlightCtgId === Number(ctg.assemblyCtgId)
+            ? " is-history-highlighted"
+            : "";
+          const hiddenTag = hiddenClass
+            ? ` <span class="ctg-chip-hidden-tag">${escapeHtml(i18n.page.deletedHiddenTag)}</span>`
+            : "";
+          const localAnnotation = memberLocalAnnotation(ctg, assembly, i18n);
+          const fullName = resolveTrackCtgDisplayName(ctg, ctg.assemblyCtgId);
+          const visibleName = resolveTrackCtgVisibleName(ctg, ctg.assemblyCtgId);
+          const sourceTagMarkup = renderDerivedSourceHtmlTag(ctg);
+          const grtStatusMarkup = ctg.grtSourceCardKey
+            ? `<span class="grt-status-badge is-${escapeAttr(ctg.grtPlacementMode || "normal")}">${escapeHtml(ctg.grtPlacementMode || "normal")}</span>`
+            : "";
+          const coAssignedChrNames = Array.isArray(ctg.coAssignedChrNames)
+            ? ctg.coAssignedChrNames
+                .map((chrName) => String(chrName || "").trim())
+                .filter(Boolean)
+            : [];
+          const coAssignedTooltip = coAssignedChrNames.length
+            ? i18n.page.coAssignedChrTooltip.replace("{chrNames}", coAssignedChrNames.join(", "))
+            : "";
+          const nameTitle = [fullName, coAssignedTooltip].filter(Boolean).join("\n");
+          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" type="button" data-member-tooltip="${escapeAttr(memberTooltip(ctg, assembly, i18n, nameTitle, hiddenClass ? [i18n.page.deletedHiddenTag] : []))}" aria-label="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}">
+            ${memberChipBody(ctg, visibleName, i18n, { nameClass: coAssignedTooltip ? "is-coassigned" : "",
+              tags: [sourceTagMarkup, grtStatusMarkup, hiddenTag], localAnnotation })}
+          </button>`;
+        })
+        .join("")
+    : `<div class="muted">${escapeHtml(i18n.noContigsInChr)}</div>`;
+  const deletedCtgChips = buildDeletedCtgChips(assembly.deletedCtgs, selectedDeletedRecordIds, i18n);
+  const combinedMemberChips = `${ctgChips}${deletedCtgChips}`;
+  return combinedMemberChips;
+  }
+
+  function renderAssemblyMainMembersPanel(state) {
+    return renderAssemblyScopeControls(state, renderMainMemberChips(state.assembly, getAssemblyI18n(state))).members;
+  }
+
   function renderAssemblyMainTab(state, options = {}) {
   const assembly = state.assembly;
   const session = state.session || {};
@@ -766,53 +821,8 @@ function createRenderTracksRenderer(deps = {}) {
         i18n,
       );
     })();
-  const selectedDeletedRecordIds = new Set(
-    normalizeDeletedCtgRecordIds(assembly.selectedDeletedCtgRecordIds),
-  );
-  const hiddenPrimaryCtgIdSet = new Set(
-    filterPrimaryTrackSelectionCtgIds(assembly.hiddenPrimaryCtgIds, assembly),
-  );
-  const selectedPrimaryTrackCtgIdSet = new Set(
-    filterPrimaryTrackSelectionCtgIds(assembly.trackSelectedCtgIds, assembly),
-  );
+  const combinedMemberChips = renderMainMemberChips(assembly, i18n);
   const historyHighlightCtgId = normalizeSupportDatasetId(assembly.historyHighlightCtgId);
-  const ctgChips = assembly.chrCtgs.length
-    ? assembly.chrCtgs
-        .map((ctg) => {
-          const active = ctg.assemblyCtgId === assembly.selectedCtgId ? "is-active" : "";
-          const selectedClass = selectedPrimaryTrackCtgIdSet.has(Number(ctg.assemblyCtgId)) ? " is-multi-selected" : "";
-          const hiddenClass = hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId)) ? " is-hidden-contig" : "";
-          const historyHighlightClass = historyHighlightCtgId === Number(ctg.assemblyCtgId)
-            ? " is-history-highlighted"
-            : "";
-          const hiddenTag = hiddenClass
-            ? ` <span class="ctg-chip-hidden-tag">${escapeHtml(i18n.page.deletedHiddenTag)}</span>`
-            : "";
-          const localAnnotation = memberLocalAnnotation(ctg, assembly, i18n);
-          const fullName = resolveTrackCtgDisplayName(ctg, ctg.assemblyCtgId);
-          const visibleName = resolveTrackCtgVisibleName(ctg, ctg.assemblyCtgId);
-          const sourceTagMarkup = renderDerivedSourceHtmlTag(ctg);
-          const grtStatusMarkup = ctg.grtSourceCardKey
-            ? `<span class="grt-status-badge is-${escapeAttr(ctg.grtPlacementMode || "normal")}">${escapeHtml(ctg.grtPlacementMode || "normal")}</span>`
-            : "";
-          const coAssignedChrNames = Array.isArray(ctg.coAssignedChrNames)
-            ? ctg.coAssignedChrNames
-                .map((chrName) => String(chrName || "").trim())
-                .filter(Boolean)
-            : [];
-          const coAssignedTooltip = coAssignedChrNames.length
-            ? i18n.page.coAssignedChrTooltip.replace("{chrNames}", coAssignedChrNames.join(", "))
-            : "";
-          const nameTitle = [fullName, coAssignedTooltip].filter(Boolean).join("\n");
-          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" type="button" data-member-tooltip="${escapeAttr(memberTooltip(ctg, assembly, i18n, nameTitle, hiddenClass ? [i18n.page.deletedHiddenTag] : []))}" aria-label="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}">
-            ${memberChipBody(ctg, visibleName, i18n, { nameClass: coAssignedTooltip ? "is-coassigned" : "",
-              tags: [sourceTagMarkup, grtStatusMarkup, hiddenTag], localAnnotation })}
-          </button>`;
-        })
-        .join("")
-    : `<div class="muted">${escapeHtml(i18n.noContigsInChr)}</div>`;
-  const deletedCtgChips = buildDeletedCtgChips(assembly.deletedCtgs, selectedDeletedRecordIds, i18n);
-  const combinedMemberChips = `${ctgChips}${deletedCtgChips}`;
   const finalPathCard = options.includeFinalPath === false
     ? ""
     : renderAssemblyFinalPathCardImpl(state, deps);
@@ -2541,6 +2551,7 @@ function formatRuleMbValue(value) {
 
   return {
     renderAssemblyMainTab,
+    renderAssemblyMainMembersPanel,
     renderAssemblyStatusToast,
     renderAssemblySubviewPanel,
   };
@@ -2883,4 +2894,8 @@ export function resolveSubviewTrackDragOffsetBp(offsets, slot, contigId, scaleCo
     return convertTrackOffsetPxToBp(item.offsetPx, scaleContext);
   }
   return 0;
+}
+
+export function renderAssemblyMainMembersPanel(state, deps = {}) {
+  return createRenderTracksRenderer(deps).renderAssemblyMainMembersPanel(state);
 }

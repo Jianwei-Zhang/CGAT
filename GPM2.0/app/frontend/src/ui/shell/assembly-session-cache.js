@@ -113,6 +113,14 @@ export function rememberAssemblyDom(host, state, options = {}) {
   if (!key || !nodes.length) {
     return false;
   }
+  // A released drag may still be hydrating its complete hit-target SVG.
+  // Never cache that partial DOM (including old aliases to these live nodes).
+  if (host.querySelector?.("[data-subview-render-incomplete]")) {
+    for (const [cachedKey, entry] of assemblyDomCache) {
+      if (cachedKey === key || entry.nodes.some(node => nodes.includes(node))) assemblyDomCache.delete(cachedKey);
+    }
+    return false;
+  }
   return touchEntry(assemblyDomCache, key, { nodes, graphFontSize: getGraphFontSize() }, options.maxEntries);
 }
 

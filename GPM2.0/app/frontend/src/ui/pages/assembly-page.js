@@ -1,3 +1,4 @@
+import { createSubviewDragRenderController } from "./assembly/subview-drag-render-controller.js";
 import { createFullRangeDragPreview } from "./assembly/full-range-drag-preview.js";
 import { retryAssemblyCtgDetail, restoreAssemblyLocalEvidence, resumeAssemblyReadyStages } from "./assembly/assembly-ready-stages.js";
 import { bindAssemblyDetailRetry, patchAssemblyDetailStatus } from "./assembly/assembly-detail-status.js";
@@ -296,6 +297,7 @@ import {
   renderAssemblyFinalPathCard as renderAssemblyFinalPathCardImpl,
   renderAssemblyMainTab as renderAssemblyMainTabImpl,
   renderAssemblyMainTrackSections as renderAssemblyMainTrackSectionsImpl,
+  renderAssemblyMainMembersPanel as renderAssemblyMainMembersPanelImpl,
   renderAssemblyStatusToast as renderAssemblyStatusToastImpl,
   renderAssemblySubviewPanel as renderAssemblySubviewPanelImpl,
   resolveSubviewTrackDragOffsetBp,
@@ -1681,7 +1683,9 @@ function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, m
     return;
   }
   const template = doc.createElement("template");
-  template.innerHTML = renderAssemblyMainTrackSections(store.getState());
+  template.innerHTML = membersOnly
+    ? renderAssemblyMainMembersPanelImpl(store.getState(), renderTracksDeps)
+    : renderAssemblyMainTrackSections(store.getState());
   const nextContent = template.content;
   const selectors = membersOnly ? [".assembly-members-panel"] : preserveTrackGeometry
     ? [".main-view-history-controls"]
@@ -1693,7 +1697,7 @@ function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, m
     if (!preserveTrackGeometry && !membersOnly) rerender(host, store);
     return;
   }
-  patchAssemblyStatusToast(routeHost, nextContent);
+  if (!membersOnly) patchAssemblyStatusToast(routeHost, nextContent);
   replacedNodes.forEach((node) => {
     bindAssemblyPage(node, store, {
       scope: "main",
@@ -1853,7 +1857,37 @@ function refreshFinalPathLogAfterPrimaryHiddenPatch(host, store) {
   return true;
 }
 
+const subviewDragRenderController = createSubviewDragRenderController({
+  getWidths: () => Object.fromEntries(["primary", "subview", "finalPath"].map(role => [role, getMeasuredTrackViewportPx(role)])),
+  onBind(host, store, card) {
+    // Initial viewport normalization may request another render. Keep that
+    // render in the background loop; later user events use the usual path.
+    let binding = true, retry = false;
+    try {
+      bindAssemblyPage(card, store, { scope: "subview", rerender(...args) {
+        if (binding) retry = true;
+        else rerenderSubviewPanel(...args);
+      } });
+    } finally { binding = false; }
+    return !retry;
+  },
+  async onMounted(host, store, card) {
+    // Only the Main member cards changed; never rebuild its alignment graph.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (card.isConnected !== false && host.querySelector(".assembly-members-panel")) refreshMainMembersForSubview(host, store);
+  },
+  onFallback: (host, store) => rerenderSubviewPanel(host, store),
+});
+
+function renderCommittedSubviewDrag(host, store, preview) {
+  const routeHost = resolveCurrentRouteHost(host);
+  const pending = routeHost && subviewDragRenderController.start(routeHost, store, preview);
+  if (pending) return pending;
+  rerenderSubviewPanel(host, store);
+}
+
 function rerenderSubviewPanel(host, store) {
+  subviewDragRenderController.cancel();
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
     rerender(host, store);
@@ -1877,6 +1911,7 @@ function rerenderSubviewPanel(host, store) {
       scope: "subview", rerender: rerenderSubviewPanel,
     });
   }
+  routeHost.querySelector("[data-subview-panel='1']")?.removeAttribute?.("data-subview-render-incomplete");
   if (routeHost.querySelector(".assembly-members-panel")) refreshMainMembersForSubview(routeHost, store);
 }
 
@@ -2079,7 +2114,7 @@ async function rebaseTrackDragOffsetsAfterRestore(
   await persistProjectAssemblyViewStateFromStore(host, store, deps);
 }
 
-function applySubviewTrackDragOffset(host, store, nextOffset) {
+function applySubviewTrackDragOffset(host, store, nextOffset, { preview = null } = {}) {
   const state = store.getState();
   if (String(state.assembly?.subview?.summary?.mode || "") === "composition"
     && String(nextOffset?.compositionEntityKey || "").trim()) {
@@ -2100,8 +2135,7 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
     });
     if (!committedComposition.changed) return;
     store.setState({ assembly: committedComposition.assembly });
-    rerenderSubviewPanel(host, store);
-    return;
+    return renderCommittedSubviewDrag(host, store, preview);
   }
   const normalizedCurrent = normalizeSubviewTrackDragOffsets(state.assembly.subviewTrackDragOffsets);
   const normalizedNext = setSubviewDragGroupOffsets(normalizedCurrent, nextOffset);
@@ -2118,7 +2152,7 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
     return;
   }
   store.setState({ assembly: committed.assembly });
-  rerenderSubviewPanel(host, store);
+  return renderCommittedSubviewDrag(host, store, preview);
 }
 
 async function persistProjectAssemblyViewStateFromStore(
@@ -2402,6 +2436,18 @@ export function __testRenderAssemblyMainTrackSections(state) {
 
 export function __testRenderAssemblyFinalPathCard(state) {
   return renderAssemblyFinalPathCardImpl(state, renderTracksDeps);
+}
+
+export function __testRenderAssemblyMainMembersPanel(state) {
+  return renderAssemblyMainMembersPanelImpl(state, renderTracksDeps);
+}
+
+export function __testRenderAssemblySubviewPanel(state) {
+  return renderAssemblySubviewPanelImpl(state, renderTracksDeps);
+}
+
+export function __testApplySubviewTrackDragOffset(host, store, offset, options) {
+  return applySubviewTrackDragOffset(host, store, offset, options);
 }
 
 export function __testRerenderSubviewPanel(host, store) {
