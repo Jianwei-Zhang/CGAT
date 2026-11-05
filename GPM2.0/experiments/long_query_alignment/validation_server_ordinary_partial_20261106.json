@@ -1,0 +1,113 @@
+{
+  "benchmark_git_revision": "92726e0f88d6765cd31154bedbffc318fbc381f6",
+  "branch": "perf/minimap2-ordinary-mapping-20261105",
+  "completed_case_limits": [
+    "N-padding synthetic reference, not customer wheat",
+    "Original 160000016 query bases copied 16 times as intact records with prefixed names; native baseline uses the same derived input",
+    "Both routes use the same already-built default index and original serialized parts",
+    "Common preparation 144.999 seconds is not included in the measured execution-stage benefit",
+    "Explicit maintainer-only 192 GiB mapper allowance; not evidence automatic Donau memory discovery succeeded",
+    "Two repeats per route with reversed order, no OS page cache flush; sizeable timing variation",
+    "Not a complete CGAT workflow measurement or a customer speedup promise",
+    "FASTA/MMI bytes guarded by frozen job, not downloaded or independently rehashed locally"
+  ],
+  "files_sha256": {
+    "GPM2.0/experiments/long_query_alignment/audit_server_ordinary_parts.py": "f941cd43a1575dbab1e98907e4d0e8d88015204e8952f11bc7865f695a8677a8",
+    "GPM2.0/experiments/long_query_alignment/test_benchmark_server_ordinary_parts.py": "52c5c74596e3c398845c3e6b83f3a84991b1ab38cb7e0fa7a7916063856e241a"
+  },
+  "next": [
+    "Wait for the existing real-parts forward/reverse comparisons; do not restart or modify the frozen job",
+    "Export and independently audit final artifacts when terminal",
+    "Use measured mapping/merge/audit phase costs to select any further ordinary-path optimization",
+    "Do not enable unconditional fresh-index preprocessing on pure ordinary jobs from this result"
+  ],
+  "pinned_upstream_read_only_review": {
+    "checked": [
+      "main.c: shared options retained across original index parts",
+      "options.c: mm_mapopt_update derives mid_occ only when nonpositive; actual first threshold must be inherited",
+      "map.c: fresh zeroed per-file pipeline for each original part; query tie hash depends on name, length and seed",
+      "index.c/splitidx.c: original part index field is consumed for split-prefix temporary filenames, outside approved PAF command"
+    ],
+    "git_revision": "3c28777e7e2dcc90f825de1b9f17a89cca7d4452",
+    "limits": "Source inspection supports the narrow unchanged-byte/flag contract; not universal equivalence proof or customer acceptance",
+    "mapper_patched_built_or_replaced": false,
+    "repository": "lh3/minimap2",
+    "upstream_tar_sha256": "4ccc555359db80f0e1e285efae0be74c79230a2facc9cb480b74277627dd0c20",
+    "version_in_minimap_h": "2.31-r1302"
+  },
+  "recorded_at": "2026-11-06T04:56:03.254158+08:00",
+  "remote_job_id": "40886112",
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/ordinary-server-parts-20261106-28d7f6f",
+  "runtime_profile_sha256": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
+  "runtime_revision": "28d7f6f6219db8a20491bc6b59ac10ad4d7f1c0e",
+  "runtime_source_modified_by_this_audit": false,
+  "schema_version": 1,
+  "snapshot": {
+    "archive_bytes": 379385,
+    "archive_sha256": "cedbd1e7820706c3696e663159c0d87110cb001ce8992419ca8030a2e025c3e6",
+    "independent_audit": {
+      "automatic_memory_discovery_exercised": false,
+      "both_cases_audited": false,
+      "cases": {
+        "default-parts": {
+          "FASTA_MMI_not_exported_or_independently_rehashed": true,
+          "common_preparation_seconds_not_credited": 144.999129652977,
+          "full_CGAT_workflow": false,
+          "native_mmi_stage_median_seconds": 117.92754010856152,
+          "original_default_index_policy": true,
+          "paf_rows": [
+            480,
+            480,
+            480,
+            480
+          ],
+          "paf_sha256": "46da2ebf51615911bac2f7793e53cba7478baadc50fbaf4cd1890f68ade7e855",
+          "production_parts_stage_median_seconds": 57.866465870290995,
+          "query_bases": 2560000256,
+          "query_records": 256,
+          "speedup": 2.037925391415795,
+          "status": "independently_reparsed_complete_evidence",
+          "wall_reduction_percent": 50.93049018319182
+        }
+      },
+      "customer_wheat_acceptance": false,
+      "runtime_profile": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
+      "scheduler": {
+        "allocated_cpus": 64,
+        "allocated_memory_MB": 224000,
+        "automatic_memory_discovery_exercised": false,
+        "explicit_mapper_group_budget_bytes": 206158430208,
+        "job_id": "40886112",
+        "reported_memory_limit_MB": 327680,
+        "requested_memory_MB": 224000
+      },
+      "schema": 1,
+      "scope": "existing_MMI_ordinary_execution_not_full_CGAT_or_pure_ordinary_preprocessing",
+      "source_revision": "92726e0f88d6765cd31154bedbffc318fbc381f6"
+    },
+    "local_directory": "/tmp/cgat-server-ordinary-evidence-20261106.1F5rgZ/snapshot-default",
+    "source_and_export_manifests_verified": true
+  },
+  "status": "default_parts_independently_audited_real_parts_job_still_running_at_recording",
+  "test_limits": [
+    "Groups overlap; do not add as unique tests",
+    "Initial broader invocation lacked PYTHONPATH and the companion environment: 99 tests, 2 skipped, cancellation fixture import failure; corrected invocation above passed 106 with zero skipped",
+    "Source synchronization check uses no flag; unsupported --check rejected before read-only verification was rerun successfully"
+  ],
+  "tests": [
+    {
+      "log_location": "/tmp/cgat-server-ordinary-auditor-controls-20261106-final.log",
+      "log_sha256": "34caca0c6e8b484b60b209aa3fa844d981615cd26d4a40ac91bd06045476b7e9",
+      "passed": true,
+      "skipped": 0,
+      "tests": 9
+    },
+    {
+      "log_location": "/tmp/cgat-server-ordinary-auditor-suite-20261106-configured.log",
+      "log_sha256": "2bc2f83d56d6c92bad350b4dc8d6631574d9807ae605048971f5f99b684d48b9",
+      "passed": true,
+      "skipped": 0,
+      "tests": 106
+    }
+  ]
+}

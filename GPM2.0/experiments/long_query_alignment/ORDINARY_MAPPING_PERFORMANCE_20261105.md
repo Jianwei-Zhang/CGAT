@@ -860,3 +860,52 @@ CPU 忙碌数。当前 180 自动预算探测不可读，因此该性能实验�
 本地 5 项维护者检查通过，包括真实 pinned mapper/安装源码的四次完整字节比较、
 PLAN ONLY、整记录复制与原源不变、源码改变拒绝；ordinary 共 102 项通过，0 skipped。
 此时仅脚本准备完成，没有新增大数据结果或加速结论；随后作业状态与独立审计另记。
+
+
+## 最终 Server 普通组引擎：首项独立审计（2026-11-06，分支内）
+
+冻结基准代码 `92726e0`、生产候选运行时代码 `28d7f6f`，未修改 master、Release 或 App。
+Donau 作业 `40886112` 的默认原生两分区控制已完成，真实数据控制在本节记录时仍 RUNNING；
+**不是整个作业完成，也不是客户小麦验收**。下载压缩包 SHA-256：
+`cedbd1e7820706c3696e663159c0d87110cb001ce8992419ca8030a2e025c3e6`。
+
+此次独立审计器不导入生产模块、不运行 mapper；核验冻结源码及导出清单、原始
+query×part 完成矩阵、实际命令和 native 日志、共享 mid_occ、并发 CPU/地址空间份额、
+全部 PAF 的坐标/方向/MAPQ/CIGAR 消耗、原次序聚合字节和反序重复。下载包没有
+FASTA/MMI，其原字节仅由冻结计算作业前后守卫保护，未宣称本地独立重算过这些大文件。
+
+| 已完成控制 | 原生 MMI 阶段中位 / s | 原分区并行阶段中位 / s | 阶段 wall 减少 |
+| --- | ---: | ---: | ---: |
+| N-padding 合成参考，默认两分区；整条 query 复制为 2.56 Gb 工作量 | 117.928 | 57.866 | 50.93% |
+
+两路线完整 PAF 均为 480 行，SHA-256 为
+`46da2ebf51615911bac2f7793e53cba7478baadc50fbaf4cd1890f68ade7e855`。
+此处包含生产收据、生产 CellMerger 和输出核验，**不包含 144.999 秒共同准备时间**；
+不拿它替代前述纯普通 FASTA 的完整成本对照。输入为 160 Mb 查询的 16 次整记录复制，
+名称加复制前缀，双方用同一派生输入重新建立答案，不能把原查询旧答案直接改名。
+两轮反序的时间有明显波动，不是清理 OS 页缓存后的冷启动实验，不承诺普遍 2 倍收益。
+
+调度器确认分配 64 CPU、224000 MB；报告的有效内存 limit 是 327680 MB，不能把
+请求的 224000 MB 冒充有效硬上限。维护者显式 mapper 组预算是 192 GiB，满足上述
+较保守的分配口径。此前 Donau cgroup 权限不足时的自动准入仍正确禁用；本项不证明
+该环境可以自动探测内存。原生路线请求 64 线程、候选为两个 32 线程 mapper，不代表
+每条路线每时每刻都持续占满 64 核。
+
+只审计已完成快照的维护者命令（默认不传 `--case` 时必须两项都完成）：
+
+```bash
+python3 audit_server_ordinary_parts.py --root EXTRACTED_EVIDENCE \
+  --expected-profile 19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e \
+  --case default-parts --evidence-checksums snapshot-default.SHA256SUMS
+```
+
+返回明确含 `both_cases_audited=false`。本轮 9 项工具检查、106 项 ordinary 相关检查
+通过、0 skipped；组间重叠不相加。补齐 PYTHONPATH 和指定的原版 mapper/companion
+环境后执行完整集合；首次环境不完整的失败及跳过保留在证据说明中。运行时镜像
+只读校验通过、34 文件未变化。详见 `validation_server_ordinary_partial_20261106.json`。
+
+另外只读检查了官方固定源码 `lh3/minimap2@3c28777`（版本 2.31-r1302）：
+`mm_mapopt_update` 保留首次 mid_occ，后续分区必须继承真实整数阈值；每个原分区
+重新初始化 query pipeline；tie hash 包含 query 名称；`mi->index` 的用途限于本命令
+未开启的 split-prefix 临时文件。这支持当前窄范围的原字节/原参数设计，不能替代
+完整 PAF 对照，更不是对所有 minimap2 选项组合的等价性证明。没有修改或重建 mapper。

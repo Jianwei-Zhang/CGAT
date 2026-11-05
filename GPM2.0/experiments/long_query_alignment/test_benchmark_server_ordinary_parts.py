@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 import benchmark_ordinary_existing as existing
+import audit_server_ordinary_parts as audit
 import benchmark_server_ordinary_parts as bench
 
 
@@ -47,6 +48,55 @@ class HarnessTests(unittest.TestCase):
             catalog=existing.catalog(source,ordinary_query=True)
             same,proof=bench.copied_queries(catalog,root/'copy.fa',1)
             self.assertEqual(same,catalog);self.assertFalse((root/'copy.fa').exists());self.assertFalse(proof['derived'])
+
+    def test_independent_paf_audit_rejects_cigar_span_and_foreign_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'result.paf'
+            valid='q\t4\t0\t4\t+\tt\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n'
+            path.write_text(valid)
+            self.assertEqual(audit.paf(path,{'q':4},{'t':4},{'t':0}),1)
+            for bad in (valid.replace('4M','3M'),valid.replace('\tt\t','\tforeign\t'),valid.rstrip('\n')):
+                path.write_text(bad)
+                with self.assertRaises(ValueError):audit.paf(path,{'q':4},{'t':4},{'t':0})
+
+    def test_independent_log_audit_rejects_skipped_query_batches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'native.stderr'
+            path.write_text('[M::main::0.1] loaded/built the index for 1 target sequence(s)\n'
+                '[M::mm_mapopt_update::0.1] mid_occ = 500\n'
+                '[M::worker_pipeline::0.2] mapped 3 sequences\n'
+                '[M::main] Real time: 0.2 sec; CPU: 0.4 sec; Peak RSS: 0.1 GB\n')
+            with self.assertRaisesRegex(ValueError,'batches'):
+                audit.native_log(path,[{'records':[{'name':'t','length':100}]}],[{'length':60}]*3,100)
+
+    def test_independent_checksum_manifest_rejects_corruption_duplicates_and_escape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);payload=root/'payload';payload.write_bytes(b'frozen')
+            line=hashlib.sha256(payload.read_bytes()).hexdigest()+'  payload\n'
+            manifest=root/'SHA256SUMS';manifest.write_text(line)
+            self.assertEqual(audit.checksum_manifest(root,'SHA256SUMS'),{'payload':audit.sha(payload)})
+            for text in (line+line,line.replace('payload','../payload'),''):
+                manifest.write_text(text)
+                with self.assertRaises(ValueError):audit.checksum_manifest(root,'SHA256SUMS')
+            manifest.write_text(line);payload.write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError,'bytes changed'):audit.checksum_manifest(root,'SHA256SUMS')
+            payload.unlink();payload.symlink_to(root/'SHA256SUMS')
+            with self.assertRaises(ValueError):audit.checksum_manifest(root,'SHA256SUMS')
+            with self.assertRaises(ValueError):audit.checksum_manifest(root,'../SHA256SUMS')
+
+    def test_independent_allocation_checks_grants_not_affinity_or_requested_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);path=root/'allocation.json'
+            grant={'resReq':{'cpu':64,'mem':224000},'resAlloc':{'cpu':64,'mem':224000},
+                   'resLimit':{'cpu':0,'mem':327680}}
+            def save():path.write_text(json.dumps([{'jobId':'40886112','resource_grants':[grant]}]))
+            save();result=audit.allocation(root,64,192*1024**3)
+            self.assertEqual(result['reported_memory_limit_MB'],327680)
+            self.assertEqual(result['allocated_memory_MB'],224000)
+            grant['resAlloc']['cpu']=32;save()
+            with self.assertRaisesRegex(ValueError,'CPU differ'):audit.allocation(root,64,192*1024**3)
+            grant['resAlloc']['cpu']=64;grant['resLimit']['mem']=100000;save()
+            with self.assertRaisesRegex(ValueError,'budget'):audit.allocation(root,64,192*1024**3)
 
     def test_runtime_source_corruption_is_rejected_without_importing_or_executing_it(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -88,6 +138,12 @@ class RealEngineHarnessTests(unittest.TestCase):
             self.assertTrue(all(r['combination']['all_cells_completed'] for r in report['runs']))
             self.assertTrue(all(r['private_digest_memo_reset'] for r in report['runs']))
             self.assertFalse(report['automatic_memory_discovery_tested'])
+            independently=audit.case(root/'comparison')
+            self.assertEqual(independently['paf_sha256'],report['runs'][0]['paf_sha256'])
+            self.assertEqual(independently['paf_rows'],[r['paf_rows'] for r in report['runs']])
+            final=Path(report['runs'][0]['output_path']);original=final.read_bytes();final.write_bytes(original+b'corrupt\n')
+            with self.assertRaises(ValueError):audit.case(root/'comparison')
+            final.write_bytes(original)
             # A changed source fails before mapping rather than reusing the old
             # complete experiment, retrying a mapper or inventing a new layout.
             bad=args.copy();bad[bad.index('--out')+1]=str(root/'bad')
