@@ -26,6 +26,8 @@ from pathlib import Path
 import stat
 import tempfile
 
+import windowed_alignment as wa
+
 MAX_OPERATION = (1 << 28) - 1
 MAX_COORDINATE = (1 << 31) - 1
 CHUNK = 1024 * 1024
@@ -95,8 +97,14 @@ class Catalog:
     records: tuple[Record, ...]
 
     def require_unchanged(self):
-        if fingerprint(self.source) != self.identity:
-            raise PlanError("original query changed; discard this plan rather than reuse stale offsets")
+        current = fingerprint(self.source)
+        if current == self.identity:
+            return
+        device, inode, size, mtime_ns, ctime_ns = self.identity
+        expected = dict(inode=inode, size=size, mtime_ns=mtime_ns,
+                        ctime_ns=ctime_ns, sha256=self.source_sha256)
+        if current[0] != device or not wa.identity_matches(self.source, expected):
+            raise PlanError("original query content/identity changed; discard stale offsets")
 
 
 def scan_query(source):

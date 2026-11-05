@@ -74,7 +74,7 @@ class RawFastaCatalog:
         self.identity = {"source":str(self.source),**before,"sha256":digest.hexdigest()}
 
     def unchanged(self):
-        return wa.fingerprint(self.source)=={k:self.identity[k] for k in ("size","mtime_ns","ctime_ns","inode")}
+        return wa.identity_matches(self.source, self.identity)
 
     def copy_group(self,names,destination):
         if (not names or len(set(names))!=len(names) or any(name not in self.records for name in names)
@@ -115,14 +115,14 @@ def source_identity(path):
     if not path.is_file():
         raise wa.ExperimentError("native input/tool must be a regular file")
     before = wa.fingerprint(path)
-    digest = wa.sha256(path)
+    digest = wa.verified_sha256(path)
     if wa.fingerprint(path)!=before:
         raise wa.ExperimentError("source changed while capturing native input identity")
     return {"source":str(path.resolve()),**before,"sha256":digest}
 
 
 def identity_unchanged(path,identity):
-    return wa.fingerprint(Path(path))=={key:identity[key] for key in ("size","mtime_ns","ctime_ns","inode")}
+    return wa.identity_matches(path, identity)
 
 
 def inspect_stderr(path):

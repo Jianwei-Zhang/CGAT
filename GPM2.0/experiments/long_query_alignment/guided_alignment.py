@@ -239,7 +239,7 @@ def experiment(args, *, shared_target=None, shared_query=None):
         if wa.sha256(Path(mm)) != windowed["tool"]["sha256"]:
             raise wa.ExperimentError("minimap2 changed before whole-query pass")
         index = Path(windowed["index_path"])
-        index_hash = wa.sha256(index)
+        index_hash = wa.verified_sha256(index)
         if index_hash != windowed["index_sha256"]:
             raise wa.ExperimentError("index changed between window and whole-query guidance passes")
         chain_path = root / "whole-query.chains.paf"
@@ -253,7 +253,7 @@ def experiment(args, *, shared_target=None, shared_query=None):
                 and original.stat().st_size == 0):
             # Legitimate no-hit original target part. Never use this to hide a
             # chain/window disagreement or assume every query must map here.
-            if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
+            if (not all(s.unchanged() for s in stores) or wa.verified_sha256(index) != index_hash
                     or wa.sha256(Path(mm)) != windowed["tool"]["sha256"]
                     or wa.sha256(original) != windowed["stitched_sha256"] or wa.sha256(chain_path) != chain_hash):
                 raise wa.ExperimentError("input/index/tool changed in no-hit target part")
@@ -290,7 +290,7 @@ def experiment(args, *, shared_target=None, shared_query=None):
             import whole_query_scores as wqs
             report["path_scoring"] = wqs.write_guided_path_scores(
                 pending,root/"guided.path-scores.jsonl",query,target,index_sha256=index_hash)
-        if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
+        if (not all(s.unchanged() for s in stores) or wa.verified_sha256(index) != index_hash
                 or wa.sha256(Path(mm)) != windowed["tool"]["sha256"] or wa.sha256(original) != windowed["stitched_sha256"] or wa.sha256(chain_path) != chain_hash):
             raise wa.ExperimentError("input/index/tool changed during guided recovery")
         final = root / "guided.experimental.paf"

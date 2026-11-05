@@ -7,6 +7,8 @@ partial outputs are archived, not reused or deleted. No in-call mapper retry.
 from __future__ import annotations
 
 import json
+import hashlib
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -21,6 +23,13 @@ import windowed_alignment as wa
 STATE = "proactive-resume-state.json"
 LOCATOR = ".long-cigar-resume.json"
 MAX_STATE = 64 * 1024**2
+# Frozen full source profile from the reviewed pre-fix recovery runtime. Only
+# ordinary native completions, never old recovered cells, may cross this fix.
+_REVIEWED_LEGACY_RUNTIME = "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd"
+_VALIDATION_MODULES = frozenset(("windowed_alignment.py", "native_first.py",
+    "proactive_reference_plan.py", "proactive_resume.py", "server_alignment.py",
+    "guided_alignment.py", "proactive_publication.py", "minimap_index_context.py",
+    "proactive_reference_alignment.py", "native_recovery.py"))
 
 
 def read_json(path, *, limit=MAX_STATE):
@@ -45,8 +54,83 @@ def adapter_key(args, runtime):
             "query": {"path": str(args.query.resolve()), **wa.fingerprint(args.query.resolve())}, "tool": tool}
 
 
-def select_attempt(run_dir, key):
-    """Caller holds task_lock. A locator never authorizes following foreign paths."""
+def _same_identity_except_ctime(left, right):
+    return (isinstance(left, dict) and isinstance(right, dict)
+            and set(left) == set(right) and "ctime_ns" in left
+            and {k:v for k,v in left.items() if k != "ctime_ns"}
+                == {k:v for k,v in right.items() if k != "ctime_ns"})
+
+
+def _compatible_runtime(candidate, old_key, key, runtime, state):
+    if old_key["runtime_sha256"] == key["runtime_sha256"]:
+        return True
+    if runtime is None:
+        return False
+    previous = read_json(candidate / "server-alignment.json").get("runtime", {})
+    old_files, new_files = previous.get("files_sha256", {}), runtime.get("files_sha256", {})
+    if (previous.get("sha256") != old_key["runtime_sha256"]
+            or not old_files or set(old_files) != set(new_files)
+            or any(previous.get(k) != runtime.get(k) for k in
+                   ("native_companion_sha256", "native_companion_platform", "recovered_output_admission"))):
+        return False
+    if old_files == new_files:
+        # Non-mapping package/base metadata changed; payload checks still run.
+        return True
+    profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return (profile == _REVIEWED_LEGACY_RUNTIME
+            and all(old_files[n] == new_files[n] for n in old_files if n not in _VALIDATION_MODULES)
+            and all(n in state["stages"] for n in ("groups", "target-store", "index", "ordinary"))
+            and not any(n.startswith("cell:") for n in state["stages"]))
+
+
+def _transition_attempt(candidate, locator, previous, key, runtime):
+    """Reviewed control migration; never change input/index/PAF bytes or commands."""
+    old_key = previous.get("key")
+    fields = {"schema", "runtime_sha256", "threads", "preset", "target", "query", "tool"}
+    if (not isinstance(old_key, dict) or set(old_key) != fields or set(key) != fields
+            or any(old_key[k] != key[k] for k in ("schema", "threads", "preset"))
+            or any(not _same_identity_except_ctime(old_key[k], key[k]) for k in ("target", "query", "tool"))):
+        return False
+    state_path = candidate / "selective" / STATE
+    state = read_json(state_path)
+    if (state.get("schema") != 1 or state.get("key") != old_key
+            or type(state.get("bound")) is not dict or type(state.get("stages")) is not dict):
+        raise wa.ExperimentError("private resume state/locator disagree; preserving completed data")
+    if not _compatible_runtime(candidate, old_key, key, runtime, state):
+        return False
+    verified = {}
+    for role, bound in (("target", "reference"), ("query", "query")):
+        expected = state["bound"].get(bound, {})
+        path = Path(key[role]["path"])
+        if (expected.get("source") != str(path.resolve())
+                or not wa.identity_matches(path, expected, verify_content=True)):
+            raise wa.ExperimentError("resume refused: original " + role + " content/identity changed; completed data preserved")
+        verified[role] = {"source": str(path), "sha256": expected["sha256"]}
+    if read_json(state_path) != state or read_json(locator) != previous:
+        raise wa.ExperimentError("resume metadata changed during content verification")
+    state["key"] = key
+    state.setdefault("key_transitions", []).append({"previous_key": old_key,
+        "verified_original_sources": verified,
+        "reason": "content_verified_ctime_or_reviewed_validation_runtime",
+        "payload_completion_checks_still_required": True})
+    # Retain both old control receipts and roll back both if either write fails.
+    state_backup = locator_backup = None
+    try:
+        state_backup = archive_partial(state_path)
+        locator_backup = archive_partial(locator)
+        wa.write_json(state_path, state)
+        wa.write_json(locator, {"schema": 1, "key": key, "attempt": str(candidate)})
+    except BaseException:
+        if state_backup is not None:
+            os.replace(state_backup, state_path)
+        if locator_backup is not None:
+            os.replace(locator_backup, locator)
+        raise
+    return True
+
+
+def select_attempt(run_dir, key, *, runtime=None):
+    """Same work only; metadata-only changes require original content proof."""
     run_dir = Path(run_dir).resolve()
     locator = run_dir / LOCATOR
     if locator.is_symlink():
@@ -54,11 +138,12 @@ def select_attempt(run_dir, key):
     if locator.exists():
         value = read_json(locator, limit=1024**2)
         candidate = Path(value.get("attempt", ""))
-        if (value.get("schema") == 1 and value.get("key") == key
+        if (value.get("schema") == 1
                 and candidate.is_absolute() and candidate.parent == run_dir
                 and candidate.name.startswith(".long-cigar-attempt-") and not candidate.is_symlink()
                 and candidate.is_dir() and (candidate / "selective" / STATE).is_file()):
-            return candidate, True
+            if value.get("key") == key or _transition_attempt(candidate, locator, value, key, runtime):
+                return candidate, True
     attempt = Path(tempfile.mkdtemp(prefix=".long-cigar-attempt-", dir=run_dir))
     wa.write_json(locator, {"schema": 1, "key": key, "attempt": str(attempt)})
     return attempt, False
@@ -98,7 +183,11 @@ class Checkpoint:
 
     def bind(self, name, value):
         if name in self.data["bound"] and self.data["bound"][name] != value:
-            raise wa.ExperimentError("private resume input/tool/policy identity changed: " + name)
+            old = self.data["bound"][name]
+            # These identities originate in an actual stable source scan/hash.
+            if (name not in ("query", "reference", "tool") or not old.get("sha256")
+                    or not _same_identity_except_ctime(old, value)):
+                raise wa.ExperimentError("private resume input/tool/policy identity changed: " + name)
         self.data["bound"][name] = value
         self.save()
 
@@ -129,7 +218,7 @@ class Checkpoint:
                         raise wa.ExperimentError("cached original input path/content changed")
                 else:
                     rp.regular_under(source, self.root / "inputs")
-                    if wa.sha256(source) != group["sha256"]:
+                    if wa.verified_sha256(source) != group["sha256"]:
                         raise wa.ExperimentError("cached group bytes changed")
             catalog.require_unchanged()
             self.reused["input_groups"] += 1
@@ -143,11 +232,12 @@ class Checkpoint:
         old = self.get(stage)
         spool = Path(spool)
         if old:
-            if Path(old["source"]["source"]) != Path(source).resolve() or nf.source_identity(Path(source).resolve()) != old["source"]:
+            if (Path(old["source"]["source"]) != Path(source).resolve()
+                    or not wa.identity_matches(source, old["source"], verify_content=True)):
                 raise wa.ExperimentError("cached sequence store source changed")
             rp.regular_under(spool, self.root)
             before = wa.fingerprint(spool)
-            if wa.sha256(spool) != old["sha256"] or wa.fingerprint(spool) != before:
+            if wa.verified_sha256(spool) != old["sha256"] or wa.fingerprint(spool) != before:
                 raise wa.ExperimentError("cached sequence spool changed")
             offset = 0
             records = old["records"]
@@ -190,14 +280,14 @@ class Checkpoint:
         index = read_json(path)
         if (index["reference_sha256"] != target.identity["sha256"] or index["tool_sha256"] != tool_sha256
                 or index["index_policy"] != "original_default_no_I_override"
-                or wa.sha256(rp.regular_under(self.root / "target.default.mmi", self.root)) != index["sha256"]):
+                or wa.verified_sha256(rp.regular_under(self.root / "target.default.mmi", self.root)) != index["sha256"]):
             raise wa.ExperimentError("cached original index source/tool/policy changed")
         raw = mic.read_catalog(self.root / "target.default.mmi", target.records)
         if len(raw["parts"]) != len(index["parts"]):
             raise wa.ExperimentError("cached original index partition count changed")
         for expected, part in zip(raw["parts"], index["parts"]):
             if (any(part[k] != expected[k] for k in ("part_index", "records", "start", "end"))
-                    or wa.sha256(rp.regular_under(part["path"], self.root)) != part["sha256"]):
+                    or wa.verified_sha256(rp.regular_under(part["path"], self.root)) != part["sha256"]):
                 raise wa.ExperimentError("cached original index part changed")
         self.reused["index"] += 1
         return index
