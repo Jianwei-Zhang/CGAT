@@ -1,0 +1,244 @@
+{
+  "schema": 1,
+  "scope": "ordinary_mapping_performance_only",
+  "production_runtime_changed": false,
+  "branch": "perf/minimap2-ordinary-mapping-20261105",
+  "base_revision": "1d5c8d4c0e35481161bbf024f0b10cb84291e94b",
+  "minimap2_version": "2.31-r1302",
+  "synthetic_controls_not_customer_data": true,
+  "customer_speedup_measured": false,
+  "customer_actual_CPU_allocation_verified": false,
+  "runs_total": 52,
+  "controls": [
+    {
+      "case": "small_8_threads",
+      "benchmark_sha256": "e329227b2a831baa4e2073cb2d070f8e0a47e8afe177b8e40847ab8a9b486a1b",
+      "harness_sha256": "d6375325f7cf0a6ef3a6a1d6b5613bf60aede01d1c308e2444fcf74e08f6744b",
+      "mapper_sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+      "host_visible_cpus": 16,
+      "cpu_affinity_count": 16,
+      "threads": 8,
+      "inputs": {
+        "target.fa": {
+          "bytes": 750014,
+          "sha256": "3caa0ee8dcdc0d0d5f9483724e810b6482b8526a382cdf5e5c454ca3faa705de"
+        },
+        "queries.fa": {
+          "bytes": 16001844,
+          "sha256": "a8a78ed610f9a817a8abfced9966c038c1364697aa8867bc825a9d47830421b9"
+        }
+      },
+      "summary": [
+        {
+          "index_kind": "single",
+          "batch_bases": 500000,
+          "median_wall_seconds": 2.09,
+          "maximum_peak_rss_kib": 20872,
+          "median_cpu_core_equivalents": 1.9138755980861246
+        },
+        {
+          "index_kind": "single",
+          "batch_bases": 2000000,
+          "median_wall_seconds": 1.02,
+          "maximum_peak_rss_kib": 57292,
+          "median_cpu_core_equivalents": 6.712871287128713
+        },
+        {
+          "index_kind": "single",
+          "batch_bases": 8000000,
+          "median_wall_seconds": 1.11,
+          "maximum_peak_rss_kib": 68012,
+          "median_cpu_core_equivalents": 6.440366972477064
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 500000,
+          "median_wall_seconds": 2.35,
+          "maximum_peak_rss_kib": 27420,
+          "median_cpu_core_equivalents": 1.8699186991869918
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 2000000,
+          "median_wall_seconds": 1.27,
+          "maximum_peak_rss_kib": 76024,
+          "median_cpu_core_equivalents": 6.0859375
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 8000000,
+          "median_wall_seconds": 1.35,
+          "maximum_peak_rss_kib": 99484,
+          "median_cpu_core_equivalents": 5.768656716417911
+        }
+      ],
+      "all_ordered_PAF_bytes_equal_within_each_index": true,
+      "actual_original_index_part_counts": [
+        1,
+        2
+      ],
+      "source_input_bytes_unchanged": true,
+      "fixture": {
+        "records": 64,
+        "query_bases": 250000,
+        "repeats": 5,
+        "memory_cap_mib_per_child": 6144,
+        "timeout_seconds_per_child": 300,
+        "random_seed": 2311302
+      }
+    },
+    {
+      "case": "larger_8_threads",
+      "benchmark_sha256": "638e3ee51eabe92e19004f89ffa06c18e9cd2f6c1c2b440c875e72a96d27561c",
+      "harness_sha256": "d6375325f7cf0a6ef3a6a1d6b5613bf60aede01d1c308e2444fcf74e08f6744b",
+      "mapper_sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+      "host_visible_cpus": 16,
+      "cpu_affinity_count": 16,
+      "threads": 8,
+      "inputs": {
+        "target.fa": {
+          "bytes": 3000014,
+          "sha256": "65f860790d8bac452e23fd06062c186e683be0aa7e49232e1dfc1365a0681eed"
+        },
+        "queries.fa": {
+          "bytes": 64001844,
+          "sha256": "dc3bf994cc868666492b7e7a250ab1ea5b3c8ba67d6a140469a0ed3519e8821d"
+        }
+      },
+      "summary": [
+        {
+          "index_kind": "single",
+          "batch_bases": 2000000,
+          "median_wall_seconds": 8.28,
+          "maximum_peak_rss_kib": 52688,
+          "median_cpu_core_equivalents": 1.9770808202653802
+        },
+        {
+          "index_kind": "single",
+          "batch_bases": 8000000,
+          "median_wall_seconds": 3.93,
+          "maximum_peak_rss_kib": 158368,
+          "median_cpu_core_equivalents": 6.904255319148937
+        },
+        {
+          "index_kind": "single",
+          "batch_bases": 32000000,
+          "median_wall_seconds": 4.29,
+          "maximum_peak_rss_kib": 208604,
+          "median_cpu_core_equivalents": 6.497524752475248
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 2000000,
+          "median_wall_seconds": 9.43,
+          "maximum_peak_rss_kib": 70000,
+          "median_cpu_core_equivalents": 1.951219512195122
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 8000000,
+          "median_wall_seconds": 4.89,
+          "maximum_peak_rss_kib": 205052,
+          "median_cpu_core_equivalents": 6.640081799591003
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 32000000,
+          "median_wall_seconds": 5.33,
+          "maximum_peak_rss_kib": 346480,
+          "median_cpu_core_equivalents": 6.085106382978724
+        }
+      ],
+      "all_ordered_PAF_bytes_equal_within_each_index": true,
+      "actual_original_index_part_counts": [
+        1,
+        2
+      ],
+      "source_input_bytes_unchanged": true,
+      "fixture": {
+        "records": 64,
+        "query_bases": 1000000,
+        "repeats": 3,
+        "memory_cap_mib_per_child": 6144,
+        "timeout_seconds_per_child": 300,
+        "random_seed": 2311302
+      }
+    },
+    {
+      "case": "larger_1_thread",
+      "benchmark_sha256": "3663baca98026182e2cf4396d5a728d34087091e146d8ee4b67a1e1587bc6f13",
+      "harness_sha256": "d6375325f7cf0a6ef3a6a1d6b5613bf60aede01d1c308e2444fcf74e08f6744b",
+      "mapper_sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+      "host_visible_cpus": 16,
+      "cpu_affinity_count": 16,
+      "threads": 1,
+      "inputs": {
+        "target.fa": {
+          "bytes": 3000014,
+          "sha256": "65f860790d8bac452e23fd06062c186e683be0aa7e49232e1dfc1365a0681eed"
+        },
+        "queries.fa": {
+          "bytes": 64001844,
+          "sha256": "dc3bf994cc868666492b7e7a250ab1ea5b3c8ba67d6a140469a0ed3519e8821d"
+        }
+      },
+      "summary": [
+        {
+          "index_kind": "single",
+          "batch_bases": 2000000,
+          "median_wall_seconds": 17.92,
+          "maximum_peak_rss_kib": 33672,
+          "median_cpu_core_equivalents": 0.8437499999999999
+        },
+        {
+          "index_kind": "single",
+          "batch_bases": 8000000,
+          "median_wall_seconds": 15.42,
+          "maximum_peak_rss_kib": 39868,
+          "median_cpu_core_equivalents": 0.969520103761349
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 2000000,
+          "median_wall_seconds": 20.32,
+          "maximum_peak_rss_kib": 37364,
+          "median_cpu_core_equivalents": 0.7775590551181103
+        },
+        {
+          "index_kind": "multipart",
+          "batch_bases": 8000000,
+          "median_wall_seconds": 17.12,
+          "maximum_peak_rss_kib": 50824,
+          "median_cpu_core_equivalents": 0.9088785046728971
+        }
+      ],
+      "all_ordered_PAF_bytes_equal_within_each_index": true,
+      "actual_original_index_part_counts": [
+        1,
+        2
+      ],
+      "source_input_bytes_unchanged": true,
+      "fixture": {
+        "records": 64,
+        "query_bases": 1000000,
+        "repeats": 1,
+        "memory_cap_mib_per_child": 6144,
+        "timeout_seconds_per_child": 300,
+        "random_seed": 2311302
+      }
+    }
+  ],
+  "independent_content_checks": {
+    "each_case_queries": 64,
+    "expected_N_only_queries_with_no_PAF": 3,
+    "mapped_query_names": 61,
+    "both_strands": true,
+    "indel_CIGARs": true,
+    "all_PAF_bytes_match_across_K_within_same_index": true,
+    "larger_1_thread_8_thread_PAF_bytes_equal_within_each_index": true
+  },
+  "excluded_initial_control": {
+    "reason": "Test fixture originally did not create two index parts; excluded and corrected before accepted runs.",
+    "used_for_speedup_claim": false
+  }
+}
