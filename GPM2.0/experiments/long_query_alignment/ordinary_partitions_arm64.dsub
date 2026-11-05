@@ -1,0 +1,35 @@
+#!/bin/bash
+#DSUB -n cgat_ordinary_original_parts64
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-original-parts-20261105-3e0c820"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
+
+# Private synthetic reference with >8 Gb of N padding and two substantive ends.
+# No customer files used/changed; original minimap2 default -I is NOT overridden.
+python3 -B ordinary_partition_fixture.py --out "$ROOT/fixture" --execute > fixture.log 2>&1
+python3 -B benchmark_ordinary_partitions.py \
+  --target "$ROOT/fixture/target.fa" --query "$ROOT/fixture/queries.fa" \
+  --out "$ROOT/comparison" --minimap2 "$MM" \
+  --threads 64 --parallel-parts 2 --memory-mib 65536 \
+  --timeout 1800 --batch-bases 500000000 --repeats 2 --execute > comparison.log 2>&1
+
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -

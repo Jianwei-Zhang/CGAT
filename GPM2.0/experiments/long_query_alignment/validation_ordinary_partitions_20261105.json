@@ -1,0 +1,88 @@
+{
+  "schema": "cgat.ordinary_original_part_scheduling.v1",
+  "status": "local_control_passed_pending_remote_default_multipart",
+  "observed_at": "2026-11-05T21:13:26.456273+08:00",
+  "production_runtime_modified": false,
+  "customer_wheat_data": false,
+  "local_control": {
+    "original_default_index_policy": false,
+    "control_index_bases": 50000000,
+    "actual_index_parts": 2,
+    "threads": 8,
+    "memory_mib": 8192,
+    "batch_bases": 500000,
+    "completed_runs": 6,
+    "all_ordered_pafs_equal": true,
+    "paf_sha256": "7d36196d90162ad2be569f5092b737204899406478c8abf2dbe710fbbd24d3aa",
+    "paf_rows": 30,
+    "query_records": 16,
+    "extra_threshold_probe_mapping": false,
+    "source_content_unchanged": true,
+    "index_reader_sha256": "f641ec21a997e215cb436ff67213b9dc6a528ccdb633cd8b5d4da97b6277a6e7",
+    "harness_sha256": "4cc38da37f8bda1be0f449214c2bf6457eddc2ae872fc8ae2536ef82c6a69878",
+    "mapper_sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+    "purpose": "bounded correctness smoke; subsecond-to-one-second timings are not customer performance evidence",
+    "runs": [
+      {
+        "repeat": 0,
+        "mode": "baseline",
+        "observed_mapping_wall_seconds": 1.1177381270099431,
+        "mid_occ": 50,
+        "paf_sha256": "7d36196d90162ad2be569f5092b737204899406478c8abf2dbe710fbbd24d3aa"
+      },
+      {
+        "repeat": 0,
+        "mode": "serial-parts",
+        "observed_mapping_wall_seconds": 1.2174868219881319,
+        "mid_occ": 50,
+        "paf_sha256": "7d36196d90162ad2be569f5092b737204899406478c8abf2dbe710fbbd24d3aa"
+      },
+      {
+        "repeat": 0,
+        "mode": "parallel-parts",
+        "observed_mapping_wall_seconds": 0.9155914809671231,
+        "mid_occ": 50,
+        "paf_sha256": "7d36196d90162ad2be569f5092b737204899406478c8abf2dbe710fbbd24d3aa"
+      },
+      {
+        "repeat": 1,
+        "mode": "parallel-parts",
+        "observed_mapping_wall_seconds": 0.9215599420131184,
+        "mid_occ": 50,
+        "paf_sha256": "7d36196d90162ad2be569f5092b737204899406478c8abf2dbe710fbbd24d3aa"
+      },
+      {
+        "repeat": 1,
+        "mode": "serial-parts",
+        "observed_mapping_wall_seconds": 1.3169432369759306,
+        "mid_occ": 50,
+        "paf_sha256": "7d36196d90162ad2be569f5092b737204899406478c8abf2dbe710fbbd24d3aa"
+      },
+      {
+        "repeat": 1,
+        "mode": "baseline",
+        "observed_mapping_wall_seconds": 1.1698358459980227,
+        "mid_occ": 50,
+        "paf_sha256": "7d36196d90162ad2be569f5092b737204899406478c8abf2dbe710fbbd24d3aa"
+      }
+    ]
+  },
+  "excluded_controls": [
+    {
+      "path_label": "cgat-ordinary-partition-smoke-20261105/comparison",
+      "reason": "tiny forced -I still produced one index part; refused before mapping",
+      "accepted_runs": 0
+    },
+    {
+      "path_label": "cgat-ordinary-partition-smoke-20261105/verified-multipart",
+      "reason": "harness edited during development; final content guard rejected the run; not accepted despite matching intermediate PAFs",
+      "accepted_runs": 0
+    }
+  ],
+  "remaining_gates": [
+    "default multipart index without -I override on SSH180",
+    "same-node repeated baseline/serial-parts/parallel-parts comparison",
+    "effective threshold inheritance, all ordered PAF bytes and aggregate resource audit",
+    "production command-receipt/cache/resource-policy design not implemented"
+  ]
+}
