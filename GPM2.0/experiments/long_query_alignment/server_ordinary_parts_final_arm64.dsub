@@ -1,0 +1,55 @@
+#!/bin/bash
+#DSUB -n cgat_final_ordinary64
+#DSUB -R 'cpu=64,mem=224000MB'
+#DSUB -RL 'mem=224000MB'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ROOT="$HOME/cgat-reads-debug/ordinary-server-parts-20261106-28d7f6f"
+MM="$HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REAL="$HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data"
+PAD="$HOME/cgat-reads-debug/ordinary-original-parts-20261105-3e0c820/fixture"
+SOURCE="$ROOT/source/GPM2.0"
+RUNTIME="$SOURCE/server/tools/long_cigar_recovery"
+HARNESS="$SOURCE/experiments/long_query_alignment/benchmark_server_ordinary_parts.py"
+PROFILE=19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e
+MMSHA=03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc
+
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'code=$?; echo "$code" > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+echo "$MMSHA  $MM" | sha256sum -c -
+
+# Existing default two-part N-padding control. Whole queries are copied with
+# unique headers to reach the unchanged production work floor; no query split.
+python3 -B "$HARNESS" --target "$PAD/target.fa" --query "$PAD/queries.fa" \
+  --query-copies 16 --out "$ROOT/default-parts" --runtime-root "$RUNTIME" \
+  --expected-runtime-profile "$PROFILE" --minimap2 "$MM" --expected-mapper-sha256 "$MMSHA" \
+  --threads 64 --memory-mib 196608 --batch-bases 1000000000 --repeats 2 --timeout 1800 \
+  --max-file-gib 8 --expected-parts 2 --min-free-gib 32 \
+  --expected-reference-sha256 9564829f0ab1c382679e3d17871254ba0952d48d21741ecd44c70fe91775d247 \
+  --expected-query-sha256 2302c8c9beb96270147ac819a7a53936272b39b60cf55f3044b514a90e4a8a1b \
+  --execute > default-parts.log 2>&1
+
+# Full real DNA records, copied twice with unique names. TEST ONLY 600M layout
+# is identical on both routes, not a production -I recommendation. The existing
+# MMI preparation is common and is not credited as an execution-stage speedup.
+python3 -B "$HARNESS" --target "$REAL/reference/Caryophyllales_ref.fa" --query "$REAL/datasets/nextdenovo.fa" \
+  --query-copies 2 --control-index-bases 600000000 --out "$ROOT/real-parts" --runtime-root "$RUNTIME" \
+  --expected-runtime-profile "$PROFILE" --minimap2 "$MM" --expected-mapper-sha256 "$MMSHA" \
+  --threads 64 --memory-mib 196608 --batch-bases 1000000000 --repeats 2 --timeout 1800 \
+  --max-file-gib 8 --expected-parts 2 --min-free-gib 32 \
+  --expected-reference-sha256 2113ddbdf357016dd0c0db8d238fd52f8c3b88925f0d7c412fd4d9c5a7327c73 \
+  --expected-query-sha256 5917d137fcac6ab809dc938888297601e7d353312140fe308fa626084aa0fe10 \
+  --execute > real-parts.log 2>&1
+
+sha256sum -c SHA256SUMS
+echo "$MMSHA  $MM" | sha256sum -c -

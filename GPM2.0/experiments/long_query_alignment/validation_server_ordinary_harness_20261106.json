@@ -1,0 +1,49 @@
+{
+  "OS_page_cache_flushed": false,
+  "automatic_memory_discovery_exercised": false,
+  "common_preparation_reported_separately": true,
+  "customer_wheat_result_claimed": false,
+  "date": "2026-11-06T04:09:47+08:00",
+  "full_CGAT_workflow_timing_claimed": false,
+  "harness_tests": {
+    "includes_one_real_pinned_mapper_four_trial_synthetic_control": true,
+    "large_performance_evidence": false,
+    "tests": 5
+  },
+  "kernel_group_peak_memory_claimed": false,
+  "master_or_release_changed": false,
+  "ordinary_tests": {
+    "log_sha256": "3d29cb40ba267c5c3a976cd1366c0fac174d90682f99ea2ba44611ecbb35ad92",
+    "path": "/tmp/cgat-final-engine-harness-20261106.AVmlKz/ordinary.log",
+    "skipped": 0,
+    "tests": 102,
+    "wall_seconds": 28.301
+  },
+  "original_inputs_modified": false,
+  "planned_large_cases": [
+    {
+      "TEST_ONLY_I": null,
+      "query_copies": 16,
+      "reference": "existing_default_original_two_part_N_padding_control"
+    },
+    {
+      "TEST_ONLY_I": 600000000,
+      "query": "all_nextdenovo_DNA_records",
+      "query_copies": 2,
+      "reference": "full_read_only_Caryophyllales_real_reference"
+    }
+  ],
+  "query_splitting_or_dropping": false,
+  "runtime_code_changed_in_this_stage": false,
+  "runtime_profile_sha256": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
+  "runtime_revision": "28d7f6f6219db8a20491bc6b59ac10ad4d7f1c0e",
+  "schema": 1,
+  "scope": "existing_original_MMI_ordinary_execution_with_current_installed_mapper_receipts_CellMerger_and_independent_output_audit",
+  "sensitivity_policy_changed": false,
+  "source_sha256": {
+    "benchmark_server_ordinary_parts.py": "a0a364d5885f0dba62202a31efb3ba7ccfb043c90a58b41eddd2f44fe41e167f",
+    "server_ordinary_parts_final_arm64.dsub": "2f9299725fae6ffe230a4ff97119fa2e19709384b350922bc2c7c9ab62ad5a05",
+    "test_benchmark_server_ordinary_parts.py": "b0ed8f7c31886db5d51ccd49ed5488c1b913241015d020a404f8c1f14123d7a7"
+  },
+  "status": "maintainer_harness_controls_passed_large_runs_not_started_at_recording"
+}

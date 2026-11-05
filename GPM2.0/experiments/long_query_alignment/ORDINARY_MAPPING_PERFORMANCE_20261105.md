@@ -835,3 +835,28 @@ PermissionError/errno 13，且没有 Slurm allocation；因此没有授予额外
 限制，外部竞争与实际 DP 需求仍不能由该元数据证明。未新增失败后的自动重试/参数替换。
 最终集成路径的大数据计时、完整下游与正式合并/发布验收仍待完成；没有新端到端加速比，
 没有修改 master/Release/App，也未声称客户原始数据已验收。
+
+## 最终安装源码的普通组执行阶段对照（2026-11-06，准备）
+
+新增 `benchmark_server_ordinary_parts.py`，默认 PLAN ONLY，实际加载并核验安装镜像的
+精确源码 profile，而不是继续计时早期实验 dispatcher。原生整 MMI 与当前生产
+`ordinary_partition_alignment` 共用同一已建索引/原始 byte-identical parts；两边都走
+生产 `CellMerger`，计入真实映射、收据、合并、完整 PAF/CIGAR/原 query×part 核验成本。
+输入扫描、派生查询及共同索引准备单列，不冒充纯普通预处理收益或全 CGAT 流程时间。
+每轮清空仅进程内的测试 digest memo，不清 OS 页缓存；原次序/反次序各一轮。
+
+为满足未经改动的生产工作量下限，默认两分区 N-padding 控制复制 16 份原始整条 query，
+完整真实 nextdenovo DNA 控制复制两份，仅前缀化 header 名称、保留全序列及相对顺序。
+每份源字节重新验 SHA；不切 query、不抽样丢数据、不利用旧 PAF 重命名充当答案。
+每个派生数据集都重新取得独立原生完整答案。真实控制的 TEST ONLY -I600M 只用于同布局
+比较，不作为生产参数；默认 N-padding 控制不覆盖 -I。
+
+64 mapper 线程、K1G、原过滤、显式维护者组预算 192 GiB；Donau 申请/限制 224000MB，
+同一作业内顺序运行两种控制。普通阶段最多两个 worker，保留真实命令/CPU/RSS 摘要。
+sum(worker peak RSS) 明确不是同时发生的组高水位；64 是 mapper 线程预算，不冒充实测
+CPU 忙碌数。当前 180 自动预算探测不可读，因此该性能实验使用可审计的测试额度，
+不冒充自动内存发现成功。二进制、输入和安装源码均冻结并前后核验。
+
+本地 5 项维护者检查通过，包括真实 pinned mapper/安装源码的四次完整字节比较、
+PLAN ONLY、整记录复制与原源不变、源码改变拒绝；ordinary 共 102 项通过，0 skipped。
+此时仅脚本准备完成，没有新增大数据结果或加速结论；随后作业状态与独立审计另记。
