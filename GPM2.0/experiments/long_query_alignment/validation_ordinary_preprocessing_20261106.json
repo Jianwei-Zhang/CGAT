@@ -1,0 +1,382 @@
+{
+  "cases": {
+    "default": {
+      "architecture": "aarch64",
+      "archive_bytes": 1605208,
+      "archive_sha256": "cd9e44a3e2d588aca4bea056fa91c42dbb3f6b3b20afe56d8cb7a9621edd3c79",
+      "audit": {
+        "actual_index_parts": 1,
+        "auditor_sha256": "b73521e10bb1ab48398e9c59dfeded514cf393d7a9b86502d8c2befeaefe0a11",
+        "complete_trials": 4,
+        "full_FASTA_MMI_not_available_in_download_and_not_independently_rehashed": true,
+        "job_guard_reported_original_inputs_and_serialized_indices_unchanged": true,
+        "job_id": 40885643,
+        "native_stage_median_seconds": 153.61231745034456,
+        "not_OS_cache_cold_measurement": true,
+        "not_complete_CGAT_workflow_time": true,
+        "ordered_paf_sha256": "c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932",
+        "original_default_index_policy": true,
+        "paf_rows_per_trial": [
+          4602,
+          4602,
+          4602,
+          4602
+        ],
+        "prepared_stage_median_seconds": 167.7764677964151,
+        "source_payload_hashes_match": true,
+        "source_revision": "b38c5587cd098a16c5c89255a4a9fe104b27b244",
+        "speedup_including_preparation_and_audit": 0.9155772526856524,
+        "status": "independently_reparsed_complete_evidence",
+        "synthetic_control": false,
+        "wall_reduction_percent": -9.220712623288897,
+        "whole_queries_order_membership_CIGAR_and_CPU_budgets_checked": true
+      },
+      "batch_bases": 1000000000,
+      "common_input_scan_hash_seconds": 24.666862078011036,
+      "explicit_experiment_memory_mib": 196608,
+      "hostname": "agent-ARM-41",
+      "local_evidence_directory": "/mnt/c/Users/bing1/AppData/Local/Temp/cgat-ordinary-remote-20261106/preprocessing-default-evidence",
+      "mapper_sha256": "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc",
+      "scheduler_allocated_cpus": 64,
+      "summary": {
+        "candidate_faster_in_this_control": false,
+        "native-fasta": {
+          "execution_stage_wall_seconds": 153.61231745034456,
+          "mapping_and_merge_wall_seconds": 153.51285406574607,
+          "output_validation_wall_seconds": 0.09931551292538643,
+          "preparation_wall_seconds": 0.0,
+          "trials": 2
+        },
+        "not_OS_cache_cold_measurement": true,
+        "not_complete_CGAT_workflow_time": true,
+        "prepared-index": {
+          "execution_stage_wall_seconds": 167.7764677964151,
+          "mapping_and_merge_wall_seconds": 140.95890628919005,
+          "output_validation_wall_seconds": 5.370466213673353,
+          "preparation_wall_seconds": 21.447058752179146,
+          "trials": 2
+        },
+        "speedup_including_preparation_and_audit": 0.9155772526856524,
+        "wall_reduction_percent": -9.220712623288897
+      },
+      "trials": [
+        {
+          "actual_index_parts": 1,
+          "execution_stage_wall_seconds": 152.71159430593252,
+          "mapping_and_merge_wall_seconds": 152.6105114221573,
+          "mode": "native-fasta",
+          "output_validation_wall_seconds": 0.10094889998435974,
+          "paf_rows": 4602,
+          "paf_sha256": "c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932",
+          "preparation_wall_seconds": 0.0,
+          "repeat": 0
+        },
+        {
+          "actual_index_parts": 1,
+          "execution_stage_wall_seconds": 167.9630902558565,
+          "mapping_and_merge_wall_seconds": 140.80731919407845,
+          "mode": "prepared-index",
+          "output_validation_wall_seconds": 5.674385637044907,
+          "paf_rows": 4602,
+          "paf_sha256": "c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932",
+          "preparation_wall_seconds": 21.48133810609579,
+          "repeat": 0
+        },
+        {
+          "actual_index_parts": 1,
+          "execution_stage_wall_seconds": 167.58984533697367,
+          "mapping_and_merge_wall_seconds": 141.11049338430166,
+          "mode": "prepared-index",
+          "output_validation_wall_seconds": 5.0665467903018,
+          "paf_rows": 4602,
+          "paf_sha256": "c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932",
+          "preparation_wall_seconds": 21.4127793982625,
+          "repeat": 1
+        },
+        {
+          "actual_index_parts": 1,
+          "execution_stage_wall_seconds": 154.5130405947566,
+          "mapping_and_merge_wall_seconds": 154.41519670933485,
+          "mode": "native-fasta",
+          "output_validation_wall_seconds": 0.09768212586641312,
+          "paf_rows": 4602,
+          "paf_sha256": "c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932",
+          "preparation_wall_seconds": 0.0,
+          "repeat": 1
+        }
+      ]
+    },
+    "defaultparts": {
+      "architecture": "aarch64",
+      "archive_bytes": 62314,
+      "archive_sha256": "8614b0226d63dfae37cab1f77bd9d9486ab6029ca338938ebd572ca3c04fba88",
+      "audit": {
+        "actual_index_parts": 2,
+        "auditor_sha256": "b73521e10bb1ab48398e9c59dfeded514cf393d7a9b86502d8c2befeaefe0a11",
+        "complete_trials": 4,
+        "full_FASTA_MMI_not_available_in_download_and_not_independently_rehashed": true,
+        "job_guard_reported_original_inputs_and_serialized_indices_unchanged": true,
+        "job_id": 40885642,
+        "native_stage_median_seconds": 30.721067253500223,
+        "not_OS_cache_cold_measurement": true,
+        "not_complete_CGAT_workflow_time": true,
+        "ordered_paf_sha256": "30c1fe486c522d97ff2939755bbb2fbbb778a3efaddacc983b1a4c23b00f65b3",
+        "original_default_index_policy": true,
+        "paf_rows_per_trial": [
+          30,
+          30,
+          30,
+          30
+        ],
+        "prepared_stage_median_seconds": 47.65158387646079,
+        "source_payload_hashes_match": true,
+        "source_revision": "b38c5587cd098a16c5c89255a4a9fe104b27b244",
+        "speedup_including_preparation_and_audit": 0.6447019123886036,
+        "status": "independently_reparsed_complete_evidence",
+        "synthetic_control": true,
+        "wall_reduction_percent": -55.11044418885409,
+        "whole_queries_order_membership_CIGAR_and_CPU_budgets_checked": true
+      },
+      "batch_bases": 1000000000,
+      "common_input_scan_hash_seconds": 15.118500240147114,
+      "explicit_experiment_memory_mib": 196608,
+      "hostname": "agent-ARM-41",
+      "local_evidence_directory": "/mnt/c/Users/bing1/AppData/Local/Temp/cgat-ordinary-remote-20261106/preprocessing-defaultparts-evidence",
+      "mapper_sha256": "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc",
+      "scheduler_allocated_cpus": 64,
+      "summary": {
+        "candidate_faster_in_this_control": false,
+        "native-fasta": {
+          "execution_stage_wall_seconds": 30.721067253500223,
+          "mapping_and_merge_wall_seconds": 30.719930417835712,
+          "output_validation_wall_seconds": 0.0010275878012180328,
+          "preparation_wall_seconds": 0.0,
+          "trials": 2
+        },
+        "not_OS_cache_cold_measurement": true,
+        "not_complete_CGAT_workflow_time": true,
+        "prepared-index": {
+          "execution_stage_wall_seconds": 47.65158387646079,
+          "mapping_and_merge_wall_seconds": 5.407195832580328,
+          "output_validation_wall_seconds": 9.780073639005423,
+          "preparation_wall_seconds": 32.46426369994879,
+          "trials": 2
+        },
+        "speedup_including_preparation_and_audit": 0.6447019123886036,
+        "wall_reduction_percent": -55.11044418885409
+      },
+      "trials": [
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 29.675343677401543,
+          "mapping_and_merge_wall_seconds": 29.67448429763317,
+          "mode": "native-fasta",
+          "output_validation_wall_seconds": 0.0007411390542984009,
+          "paf_rows": 30,
+          "paf_sha256": "30c1fe486c522d97ff2939755bbb2fbbb778a3efaddacc983b1a4c23b00f65b3",
+          "preparation_wall_seconds": 0.0,
+          "repeat": 0
+        },
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 47.693369157612324,
+          "mapping_and_merge_wall_seconds": 5.130907453596592,
+          "mode": "prepared-index",
+          "output_validation_wall_seconds": 10.196326300501823,
+          "paf_rows": 30,
+          "paf_sha256": "30c1fe486c522d97ff2939755bbb2fbbb778a3efaddacc983b1a4c23b00f65b3",
+          "preparation_wall_seconds": 32.366084069013596,
+          "repeat": 0
+        },
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 47.60979859530926,
+          "mapping_and_merge_wall_seconds": 5.683484211564064,
+          "mode": "prepared-index",
+          "output_validation_wall_seconds": 9.363820977509022,
+          "paf_rows": 30,
+          "paf_sha256": "30c1fe486c522d97ff2939755bbb2fbbb778a3efaddacc983b1a4c23b00f65b3",
+          "preparation_wall_seconds": 32.56244333088398,
+          "repeat": 1
+        },
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 31.766790829598904,
+          "mapping_and_merge_wall_seconds": 31.765376538038254,
+          "mode": "native-fasta",
+          "output_validation_wall_seconds": 0.0013140365481376648,
+          "paf_rows": 30,
+          "paf_sha256": "30c1fe486c522d97ff2939755bbb2fbbb778a3efaddacc983b1a4c23b00f65b3",
+          "preparation_wall_seconds": 0.0,
+          "repeat": 1
+        }
+      ]
+    },
+    "realparts": {
+      "architecture": "aarch64",
+      "archive_bytes": 80727159,
+      "archive_sha256": "09ea3de6fad6ceef2c0baa12c00492c4a06d111b189769e0578daeda07795b3c",
+      "audit": {
+        "actual_index_parts": 2,
+        "auditor_sha256": "b73521e10bb1ab48398e9c59dfeded514cf393d7a9b86502d8c2befeaefe0a11",
+        "complete_trials": 4,
+        "full_FASTA_MMI_not_available_in_download_and_not_independently_rehashed": true,
+        "job_guard_reported_original_inputs_and_serialized_indices_unchanged": true,
+        "job_id": 40885644,
+        "native_stage_median_seconds": 375.4888424798846,
+        "not_OS_cache_cold_measurement": true,
+        "not_complete_CGAT_workflow_time": true,
+        "ordered_paf_sha256": "03350ce0ea7fd41cd326d5747b3a05926fcb1630fd2d6cb33a9182198aec659b",
+        "original_default_index_policy": false,
+        "paf_rows_per_trial": [
+          177629,
+          177629,
+          177629,
+          177629
+        ],
+        "prepared_stage_median_seconds": 338.7462382763624,
+        "source_payload_hashes_match": true,
+        "source_revision": "b38c5587cd098a16c5c89255a4a9fe104b27b244",
+        "speedup_including_preparation_and_audit": 1.1084664567508677,
+        "status": "independently_reparsed_complete_evidence",
+        "synthetic_control": false,
+        "wall_reduction_percent": 9.785271903382997,
+        "whole_queries_order_membership_CIGAR_and_CPU_budgets_checked": true
+      },
+      "batch_bases": 1000000000,
+      "common_input_scan_hash_seconds": 24.593217253684998,
+      "explicit_experiment_memory_mib": 196608,
+      "hostname": "agent-ARM-41",
+      "local_evidence_directory": "/mnt/c/Users/bing1/AppData/Local/Temp/cgat-ordinary-remote-20261106/preprocessing-realparts-evidence",
+      "mapper_sha256": "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc",
+      "scheduler_allocated_cpus": 64,
+      "summary": {
+        "candidate_faster_in_this_control": true,
+        "native-fasta": {
+          "execution_stage_wall_seconds": 375.4888424798846,
+          "mapping_and_merge_wall_seconds": 371.05625243484974,
+          "output_validation_wall_seconds": 4.432396896183491,
+          "preparation_wall_seconds": 0.0,
+          "trials": 2
+        },
+        "not_OS_cache_cold_measurement": true,
+        "not_complete_CGAT_workflow_time": true,
+        "prepared-index": {
+          "execution_stage_wall_seconds": 338.7462382763624,
+          "mapping_and_merge_wall_seconds": 305.81611916422844,
+          "output_validation_wall_seconds": 8.857220895588398,
+          "preparation_wall_seconds": 24.072857797145844,
+          "trials": 2
+        },
+        "speedup_including_preparation_and_audit": 1.1084664567508677,
+        "wall_reduction_percent": 9.785271903382997
+      },
+      "trials": [
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 375.91579100489616,
+          "mapping_and_merge_wall_seconds": 371.3693587332964,
+          "mode": "native-fasta",
+          "output_validation_wall_seconds": 4.5462450459599495,
+          "paf_rows": 177629,
+          "paf_sha256": "03350ce0ea7fd41cd326d5747b3a05926fcb1630fd2d6cb33a9182198aec659b",
+          "preparation_wall_seconds": 0.0,
+          "repeat": 0
+        },
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 338.99184922873974,
+          "mapping_and_merge_wall_seconds": 305.4782499372959,
+          "mode": "prepared-index",
+          "output_validation_wall_seconds": 8.827334359288216,
+          "paf_rows": 177629,
+          "paf_sha256": "03350ce0ea7fd41cd326d5747b3a05926fcb1630fd2d6cb33a9182198aec659b",
+          "preparation_wall_seconds": 24.686221204698086,
+          "repeat": 0
+        },
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 338.5006273239851,
+          "mapping_and_merge_wall_seconds": 306.15398839116096,
+          "mode": "prepared-index",
+          "output_validation_wall_seconds": 8.88710743188858,
+          "paf_rows": 177629,
+          "paf_sha256": "03350ce0ea7fd41cd326d5747b3a05926fcb1630fd2d6cb33a9182198aec659b",
+          "preparation_wall_seconds": 23.4594943895936,
+          "repeat": 1
+        },
+        {
+          "actual_index_parts": 2,
+          "execution_stage_wall_seconds": 375.0618939548731,
+          "mapping_and_merge_wall_seconds": 370.7431461364031,
+          "mode": "native-fasta",
+          "output_validation_wall_seconds": 4.318548746407032,
+          "paf_rows": 177629,
+          "paf_sha256": "03350ce0ea7fd41cd326d5747b3a05926fcb1630fd2d6cb33a9182198aec659b",
+          "preparation_wall_seconds": 0.0,
+          "repeat": 1
+        }
+      ]
+    }
+  },
+  "date": "2026-11-06",
+  "decisions": {
+    "App_or_release_modified": false,
+    "all_ordinary_tasks_unconditionally_preprocessed": false,
+    "all_suite_jobs_terminal_success_no_active_job_wait": true,
+    "complete_customer_workflow_acceptance": false,
+    "customer_66_hour_group_was_already_using_prebuilt_MMI": true,
+    "default_multipart_N_padded_control_is_performance_promise": false,
+    "master_modified": false,
+    "multiple_datasets_shared_index_benefit_directly_measured_in_this_suite": false,
+    "production_parallel_dispatch_integrated": false,
+    "real_fixed_test_layout_parallelism_including_prep_has_positive_control_evidence": true,
+    "single_dataset_default_single_part_prebuild_admitted": false,
+    "test_index_partition_policy_promoted_to_production": false
+  },
+  "experiment_source_revision": "b38c5587cd098a16c5c89255a4a9fe104b27b244",
+  "frozen_tools_archive_sha256": "592f6ae38d4ce3ef1cd4290ef18b9a1ead62f76ba756a711d12b4272e7b997d1",
+  "next_requirements": [
+    "Reuse existing validated indices in mixed tasks; do not rebuild just for scheduling",
+    "Measure shared index preparation amortization for multiple datasets before making a universal shared-cache claim",
+    "Production dispatch needs actual multi-command execution receipts, exact original partitions/thresholds/order, and an authoritative available budget",
+    "Preserve old validated native completions and legacy effective K/f values; never remap customer ordinary completion solely for speed"
+  ],
+  "schema_version": 1,
+  "server_integration_revision": "58806b91cf13ea4c367dfc923e3b8760f7a19dbf",
+  "server_only_followup": {
+    "App_backend_E2E_explicitly_excluded": true,
+    "canonical_followup_tests": 116,
+    "canonical_full_gate_passed_claimed": false,
+    "corrected_test_fixtures": [
+      "archive-helper transitive module closure",
+      "initial asm5 K1G expectation and frozen metadata",
+      "incremental fake mapper consumes K/f values"
+    ],
+    "incremental_new_dataset_inherits_project_filter_and_saved_batch": true,
+    "log_sha256": {
+      "canonical-followup-passed": "831dd49e7a2cc65b32cceadbcd39273c8ca3515e5c99346b7d6ee330640fc797",
+      "initial-missing-runtime-helper": "8bffd0f12fb54555376f9248ca4ea4052e54bc039fba400452529b61b59b5400",
+      "mock-mapper-missing-K-parser": "e4b6add433488666e980fa4bb1f28de908d2db91cd9ab34b394c0600fecc306b",
+      "old-default-command-expectation": "c21538791cda9437a5f5f285c0952d9fec509f369a0b5617d4ea888ee13027a6",
+      "ordinary-followup-passed": "36b8e88886ce577a85c370ae8cdc6eac4c09638099694de53f1b23045ee40e65",
+      "server-only-passed": "091d8c3121e3d973618421e0dfa04f4a40294c22412c04af25b8e4b9a214be57"
+    },
+    "ordinary_experiment_tests": 57,
+    "python_skipped": 0,
+    "python_tests": 455,
+    "scope": "server_only_python_and_shell_checks",
+    "server_only_checks_passed": true,
+    "shell_groups": [
+      "tests/gpm_server/fake_command_control_test.sh",
+      "tests/gpm_server/env_test.sh",
+      "tests/gpm_server/package_templates_test.sh",
+      "tests/gpm_server/prepare_metadata_test.sh",
+      "tests/gpm_server/prepare_full_test.sh",
+      "tests/gpm_server/final_path_test.sh",
+      "tests/gpm_server/add_dataset_test.sh",
+      "tests/gpm_server/add_ctg_test.sh"
+    ]
+  },
+  "status": "all_three_scheduled_controls_completed_and_independently_audited"
+}
