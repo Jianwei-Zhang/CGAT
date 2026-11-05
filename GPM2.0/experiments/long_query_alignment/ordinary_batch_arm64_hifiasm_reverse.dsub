@@ -1,0 +1,44 @@
+#!/bin/bash
+#DSUB -n cgat_ordinary_K64_hifiasm_reverse
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+BASE="$ORIGINAL_HOME/cgat-reads-debug/ordinary-batch-perf-20261105-68a1a94"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-batch-hifiasm-reverse-20261105-fc097fb"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REFERENCE="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/reference/Caryophyllales_ref.fa"
+QUERY="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/datasets/hifiasm.fa"
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+(cd "$BASE" && sha256sum -c SHA256SUMS)
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
+
+# Counterbalance the completed forward pair. Full original records/order,
+# fresh default index, same 192 GiB per-command limit; no automatic retry.
+python3 -B "$BASE/benchmark_ordinary_existing.py" \
+  --target "$REFERENCE" --query "$QUERY" --out "$ROOT/real-hifiasm" \
+  --minimap2 "$MM" --threads 64 \
+  --batch-bases 1000000000 500000000 --repeats 1 \
+  --memory-mib 196608 --timeout 7200 --execute > "$ROOT/real.log" 2>&1
+
+# Compare to independently accepted full forward outputs/index, not partial PAF.
+echo "6346033bc0fd477a9548710dc0634874e2be2fd01ea8a07f93b5a87b4b647e31  real-hifiasm/target.default.mmi" | sha256sum -c -
+for k in 1000000000 500000000; do
+  echo "91b046865cc28f58f657f712a4b2d3a8f2a2565d4f4418d8dc602cacd8804cca  real-hifiasm/r00-K${k}.paf" | sha256sum -c -
+done
+sha256sum -c SHA256SUMS
+(cd "$BASE" && sha256sum -c SHA256SUMS)
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -

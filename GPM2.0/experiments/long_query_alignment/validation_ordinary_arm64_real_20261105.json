@@ -1,7 +1,7 @@
 {
   "schema": "cgat.ordinary_real_K_screening.v1",
-  "status": "incomplete_no_production_recommendation",
-  "observed_at": "2026-11-05T19:19:04+08:00",
+  "status": "long_contig_single_pair_passed_pending_counterbalance_and_integration",
+  "observed_at": "2026-11-05T21:00:00+08:00",
   "production_runtime_modified": false,
   "customer_wheat_data": false,
   "scope": "ordinary_reference_alignment_only",
@@ -112,26 +112,60 @@
   },
   "hifiasm_extended_screening": {
     "job_id": 40876528,
-    "scheduler_state_at_observation": "RUNNING",
-    "dependency": "40874135=ENDED",
-    "threads": 64,
-    "timeout_per_command_seconds": 7200,
-    "memory_limit_mib": 196608,
-    "batch_bases": [
-      500000000,
-      1000000000
+    "scheduler_state": "SUCCEEDED",
+    "started_at": "2026-11-05T19:16:24+08:00",
+    "ended_at": "2026-11-05T20:26:27+08:00",
+    "compute_node": "agent-ARM-04",
+    "allocated_cpus": 64,
+    "comparison": "single_pair_screening_not_counterbalanced",
+    "completed_runs": 2,
+    "query_records": 490,
+    "query_bases": 1256305570,
+    "index_parts": 1,
+    "index_sha256": "6346033bc0fd477a9548710dc0634874e2be2fd01ea8a07f93b5a87b4b647e31",
+    "paf_sha256": "91b046865cc28f58f657f712a4b2d3a8f2a2565d4f4418d8dc602cacd8804cca",
+    "paf_rows": 10531,
+    "mapped_query_names": 490,
+    "strands": [
+      "+",
+      "-"
     ],
-    "repeats": 1,
-    "script": "ordinary_batch_arm64_hifiasm_extended.dsub",
-    "full_original_inputs_preserved": true,
-    "automatic_retry": false,
-    "production_acceptance": false,
-    "started_at": "2026-11-05T19:16:24+08:00"
+    "all_ordered_pafs_equal": true,
+    "independent_coordinate_and_CIGAR_span_audit": true,
+    "original_name_and_length_catalog_audit": true,
+    "input_content_unchanged": true,
+    "sensitivity_flags_changed": false,
+    "production_runtime_modified": false,
+    "memory_limit_mib": 196608,
+    "timeout_seconds_per_command": 7200,
+    "evidence_archive_sha256": "2401fca4eb16351a00cf57d4caca54ab1b560ed205d3bdae228e789c6e19b106",
+    "summary": [
+      {
+        "batch_bases": 500000000,
+        "wall_seconds": 2589.59,
+        "cpu_seconds": 11122.25,
+        "peak_rss_gib": 115.67829132080078,
+        "measured_core_equivalents": 4.294984920392803
+      },
+      {
+        "batch_bases": 1000000000,
+        "wall_seconds": 1555.35,
+        "cpu_seconds": 11164.42,
+        "peak_rss_gib": 164.28720474243164,
+        "measured_core_equivalents": 7.178075674285531
+      }
+    ],
+    "wall_reduction_percent": 39.93836862205987,
+    "speedup": 1.6649564406725177,
+    "peak_rss_increase_percent": 42.02077405070575,
+    "CPU_time_change_percent": 0.37914990222303047,
+    "customer_wheat_acceptance": false
   },
   "remaining_gates": [
-    "complete actual full-input long-contig hifiasm K screening",
-    "audit exact ordered PAF equality and unchanged inputs/index/tool on that screening",
-    "repeat/counterbalance a promising long-contig comparison before production adoption",
-    "a memory-safe production design has not been implemented or enabled by these experiments"
+    "counterbalanced full hifiasm pair with original tool/index/input hashes and exact PAF audit",
+    "same-index-part serial/parallel controls with inherited parameters, deterministic output and global CPU/memory budgets",
+    "no production default without resource suitability and provenance/cache compatibility review",
+    "sensitivity-changing -f experiments remain separate and require downstream scientific acceptance",
+    "customer wheat performance acceptance remains unproven"
   ]
 }
