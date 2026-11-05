@@ -1484,5 +1484,5 @@ test("Local View SVG fallback overrides canvas-ready transparency when the drag 
     assert.ok(rule.includes("fill: var(--alignment-band-paint-fill"));
     assert.ok(rule.includes("stroke: var(--alignment-band-paint-stroke"));
   }
-  assert.match(css, /\.is-subview-band-canvas-drag-preview \.subview-track-svg \.track-collinearity-band\[data-track-band-proxy="1"\],[\s\S]*?visibility: hidden;/);
+  assert.match(css, /\.is-subview-band-canvas-drag-preview \.subview-track-svg \.track-collinearity-band\[data-track-band-proxy="1"\],[\s\S]*?display: none;/);
 });

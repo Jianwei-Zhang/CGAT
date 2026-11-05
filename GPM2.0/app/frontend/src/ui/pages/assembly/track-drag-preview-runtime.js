@@ -636,6 +636,7 @@ export function __testShiftPolygonEdge(pointsText, edgeIndexes, offsetPx) {
 export function compileTrackDragPreview(host, payload, { subview = false } = {}) {
   const byNode = new Map();
   const actions = [];
+  let cachedSkipBandNodes = null, fullRangeActions = null;
   const plan = {
     actions,
     add(kind, node, details) {
@@ -657,9 +658,14 @@ export function compileTrackDragPreview(host, payload, { subview = false } = {})
     apply(offsetPx, { skipBandNodes = null, fullRange = false } = {}) {
       const previewClass = subview ? SUBVIEW_TRACK_PREVIEW_CLASS : MAIN_TRACK_PREVIEW_CLASS;
       if (!host.classList?.contains?.(previewClass)) host.classList?.add?.(previewClass);
-      for (const action of actions) {
+      if (fullRange && (!fullRangeActions || cachedSkipBandNodes !== skipBandNodes)) {
+        cachedSkipBandNodes = skipBandNodes;
+        fullRangeActions = actions.filter(action => !action.hiddenDuringFullRange
+          && !(action.kind === "band" && skipBandNodes?.has(action.node)));
+      }
+      for (const action of fullRange ? fullRangeActions : actions) {
         const { kind, node, factor = 1 } = action;
-        if ((kind === "band" && skipBandNodes?.has(node)) || (fullRange && action.hiddenDuringFullRange)) continue;
+        if (!fullRange && kind === "band" && skipBandNodes?.has(node)) continue;
         if (kind === "group") applyGroupPreview(node, offsetPx * factor);
         else if (kind === "sticky") applyStickyLabelPreview(node, offsetPx * factor);
         else if (kind === "band") applyBandPreview(node, action.edgeIndexes, offsetPx, null, action.basePoints);

@@ -910,3 +910,17 @@ test("Canvas-owned proxies and invisible full-range anchors skip DOM writes, but
   assert.equal(evidence.getAttribute("points"), "20.00,0.00 30.00,0.00 40.00,50.00 30.00,50.00");
   plan.clear(); assert.equal(active.getAttribute("x1"), "1");
 });
+
+
+test("full-range frames reuse the filtered action list and rebuild it when Canvas falls back", () => {
+  const band = createNode({points:"0,0 10,0 40,50 30,50"});
+  const host = createHost({'[data-subview-top-contig-id="1"]':[band]});
+  const plan = compileTrackDragPreview(host,{slot:"top",contigId:1},{subview:true});
+  let lookups = 0;
+  const skipBandNodes = {has(node) { lookups++; return node === band; }};
+  for (let index=0;index<60;index++) plan.apply(index,{skipBandNodes,fullRange:true});
+  assert.equal(lookups,1,"filter ownership once, not once per band per pointer frame");
+  assert.equal(band.getAttribute("points"),"0,0 10,0 40,50 30,50");
+  plan.apply(20,{fullRange:true});
+  assert.equal(band.getAttribute("points"),"20.00,0.00 30.00,0.00 40.00,50.00 30.00,50.00");
+});

@@ -185,6 +185,97 @@ export function bindBandCanvasRuntime(host) {
   });
 }
 
+// Consecutive runs preserve global paint order even when moving and stationary
+// bands interleave. Only parallel endpoint rows with rigid per-edge movement can
+// share an affine bitmap; anything else retains the complete redraw fallback.
+export function compileBandDragBitmapRuns(bands, maxRuns = 16) {
+  const runs = [];
+  for (const band of bands) {
+    const [a, b, c, d] = band.points;
+    const [ma, mb, mc, md] = band.moving;
+    if (a[1] !== b[1] || c[1] !== d[1] || a[1] === c[1] || ma !== mb || mc !== md) return null;
+    const slope = (mc - ma) / (c[1] - a[1]);
+    const intercept = ma - slope * a[1];
+    let run = runs.at(-1);
+    if (!run || run.slope !== slope || run.intercept !== intercept) {
+      if (runs.length >= maxRuns) return null;
+      run = { slope, intercept, bands: [], minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+      runs.push(run);
+    }
+    run.bands.push(band);
+    for (const [x, y] of band.points) {
+      run.minX = Math.min(run.minX, x); run.maxX = Math.max(run.maxX, x);
+      run.minY = Math.min(run.minY, y); run.maxY = Math.max(run.maxY, y);
+    }
+  }
+  return runs;
+}
+
+function createBandDragBitmapPreview(document, scroll, bands, nodes, { width, height, clipY, clipHeight }) {
+  const runs = compileBandDragBitmapRuns(bands);
+  if (!runs?.length) return null;
+  const layer = document.createElement("div");
+  if (!layer?.appendChild) return null;
+  const dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
+  let area = 0;
+  for (const run of runs) {
+    run.left = Math.floor(run.minX) - 2; run.top = Math.floor(run.minY) - 2;
+    run.width = Math.ceil(run.maxX) + 2 - run.left;
+    run.height = Math.ceil(run.maxY) + 2 - run.top;
+    area += Math.ceil(run.width * dpr) * Math.ceil(run.height * dpr);
+    if (!canAllocateCanvasBitmap(run.width, run.height, dpr) || area > MAX_CANVAS_BITMAP_AREA) return null;
+  }
+  layer.className = "track-band-canvas-layer subview-band-drag-canvas";
+  layer.setAttribute("aria-hidden", "true");
+  layer.setAttribute("data-subview-band-drag-canvas", "1");
+  layer.setAttribute("data-subview-band-drag-mode", "bitmap-transform");
+  Object.assign(layer.style, { width: `${width}px`, height: `${height}px`, overflow: "hidden", pointerEvents: "none" });
+  for (const run of runs) {
+    const canvas = document.createElement("canvas");
+    const configured = configureCanvas(canvas, run.width, run.height);
+    if (!configured) return null;
+    const { context } = configured;
+    context.translate(0, -run.top);
+    for (const band of run.bands) drawPolygon(context, band.points, run.left, band.styles);
+    Object.assign(canvas.style, { position: "absolute", left: "0", top: "0", transformOrigin: "0 0", willChange: "transform" });
+    layer.appendChild(canvas);
+    run.canvas = canvas;
+  }
+  let attached = false, restored = false;
+  return {
+    nodes: new Set(nodes),
+    draw(deltaPx, [minX, minY, spanX, spanY]) {
+      if (restored) return false;
+      const sx = width / spanX, sy = height / spanY;
+      for (const run of runs) {
+        // x' = sx * (x + delta * (slope*y + intercept) - minX).
+        // Raster origins are included before projection, never accumulated.
+        const shear = sx * deltaPx * run.slope;
+        const tx = sx * (run.left + deltaPx * (run.slope * run.top + run.intercept) - minX);
+        const ty = sy * (run.top - minY);
+        run.canvas.style.transform = `matrix(${sx},0,${shear},${sy},${tx},${ty})`;
+      }
+      if (clipY !== null) {
+        const top = Math.max(0, (clipY - minY) * sy);
+        const bottom = Math.max(0, height - (clipY + clipHeight - minY) * sy);
+        layer.style.clipPath = `inset(${top}px 0 ${bottom}px 0)`;
+      }
+      if (!attached) {
+        scroll.appendChild(layer);
+        scroll.classList.add("is-subview-band-canvas-drag-preview");
+        attached = true;
+      }
+      return true;
+    },
+    restore() {
+      if (restored) return;
+      restored = true;
+      layer.remove();
+      scroll.classList.remove("is-subview-band-canvas-drag-preview");
+    },
+  };
+}
+
 // Gesture-local paint records: retain every rendered band and its draw order,
 // but never rewrite thousands of SVG proxy points on every pointer frame.
 export function createSubviewBandCanvasDragPreview(scroll, actions, { width, height }) {
@@ -208,6 +299,15 @@ export function createSubviewBandCanvasDragPreview(scroll, actions, { width, hei
       moving: points.map((_, index) => action?.edgeIndexes.includes(index) ? 1 : 0) });
   }
   const orderedBands = sortAlignmentBands(bands);
+  const clip = svg.querySelector("[data-subview-band-clip-rect='1']");
+  const clipY = clip ? Number(clip.getAttribute("y")) : null;
+  const clipHeight = clip ? Number(clip.getAttribute("height")) : 0;
+  try {
+    const bitmap = createBandDragBitmapPreview(document, scroll, orderedBands, nodes, { width, height, clipY, clipHeight });
+    if (bitmap) return bitmap;
+  } catch {
+    // Allocation/context failures must keep the exact complete redraw path.
+  }
   let canvas, configured;
   try {
     canvas = document.createElement("canvas");
@@ -219,9 +319,7 @@ export function createSubviewBandCanvasDragPreview(scroll, actions, { width, hei
   canvas.className = "track-band-canvas-layer subview-band-drag-canvas";
   canvas.setAttribute("aria-hidden", "true");
   canvas.setAttribute("data-subview-band-drag-canvas", "1");
-  const clip = svg.querySelector("[data-subview-band-clip-rect='1']");
-  const clipY = clip ? Number(clip.getAttribute("y")) : 0;
-  const clipHeight = clip ? Number(clip.getAttribute("height")) : 0;
+  canvas.setAttribute("data-subview-band-drag-mode", "redraw");
   const { context } = configured;
   let restored = false;
   let attached = false;
