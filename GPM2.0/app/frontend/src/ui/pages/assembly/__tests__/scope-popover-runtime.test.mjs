@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { bindAssemblyScopePopovers, resolveMembersPopoverWidth, resolveChromosomePopoverLayout } from "../scope-popover-runtime.js";
 import { createScopePopoverFixture, withPopoverClock } from "./scope-popover-fixture.mjs";
+import { MAIN_TRACK_TITLE_LAYOUT_EVENT } from "../main-track-title-layout-runtime.js";
 
 function fixture() {
   const f = createScopePopoverFixture();
@@ -142,4 +143,14 @@ test("chromosome sizing measures name/stat lines, keeps option order/scroll, and
   win.innerWidth=320;f.owner.refresh();assert.equal(panel.style.width,"200px");assert.equal(panel.style.gridTemplateColumns,"repeat(1, minmax(0, 1fr))");
   win.innerWidth=1000;f.owner.refresh();assert.equal(panel.style.width,"584px");assert.equal(panel.scrollTop,75);assert.deepEqual(options.map(o=>o.index),Array.from({length:10},(_,i)=>i));assert.ok(detaches>=3);
   f.owner.setOpen("chromosomes",false);assert.equal(panel.style.gridTemplateColumns,"");assert.equal(panel.style.width,"");
+});
+
+
+test("scope panels re-anchor after title abbreviation without closing, saving or replacing their content", () => {
+  const f = fixture(); f.owner.setOpen("chromosomes", true);
+  f.triggers.chromosomes.getBoundingClientRect = () => ({ left: 40, right: 220, top: 50, bottom: 80, width: 180, height: 30 });
+  const state = f.store.getState(), panel = f.panels.chromosomes;
+  f.emit(MAIN_TRACK_TITLE_LAYOUT_EVENT, f.host);
+  assert.equal(panel.style.left, "40px"); assert.equal(panel.hidden, false);
+  assert.equal(f.store.getState(), state); assert.equal(panel.scrollTop, 75);
 });

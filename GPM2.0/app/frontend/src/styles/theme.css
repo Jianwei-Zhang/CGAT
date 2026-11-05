@@ -110,8 +110,8 @@ textarea { background: var(--surface-panel); color: var(--text-primary); }
   --ctg-ref-fill: #384352;
   --ctg-ref-stroke: #8292a6;
   --ctg-ref-text: #e2e8f0;
-  --final-path-selection-stroke: #93c5fd;
-  --final-path-selection-fill: rgba(147, 197, 253, 0.10);
+  --final-path-selection-stroke: #facc15;
+  --final-path-selection-fill: rgba(250, 204, 21, 0.24);
   --alignment-legend-primary-low: rgb(45, 68, 96);
   --alignment-legend-primary-high: rgb(81, 127, 180);
   --alignment-legend-companion-low: rgb(75, 69, 59);

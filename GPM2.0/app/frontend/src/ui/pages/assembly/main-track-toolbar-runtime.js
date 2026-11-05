@@ -1,3 +1,4 @@
+import { MAIN_TRACK_TITLE_LAYOUT_EVENT } from "./main-track-title-layout-runtime.js";
 import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 
 const BOUND = Symbol("mainTrackToolbarPopupsBound");
@@ -12,6 +13,7 @@ export function bindMainTrackToolbarPopups(host) {
   if (!host?.addEventListener || !host.querySelector?.(TOOLBAR)) return;
   const win = host.ownerDocument?.defaultView || globalThis.window;
   const destroy = () => {
+    host.removeEventListener?.(MAIN_TRACK_TITLE_LAYOUT_EVENT, sync);
     host.removeEventListener?.("scroll", sync, true);
     host.removeEventListener?.("toggle", sync, true);
     win?.removeEventListener?.("resize", sync);
@@ -40,6 +42,7 @@ export function bindMainTrackToolbarPopups(host) {
     }
   };
   const onViewportScroll = event => { if (!host.contains?.(event.target)) sync(); };
+  host.addEventListener(MAIN_TRACK_TITLE_LAYOUT_EVENT, sync);
   host.addEventListener("scroll", sync, true);
   host.addEventListener("toggle", sync, true);
   win?.addEventListener?.("resize", sync);

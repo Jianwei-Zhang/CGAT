@@ -29,7 +29,11 @@ class Element {
 }
 function fixture() {
   const created = [];
-  const doc = { createElementNS: (_namespace, tag) => {
+  const documentEvents = new Map(), windowEvents = new Map();
+  const listen = events => (type, fn) => {
+    const list = events.get(type) || []; list.push(fn); events.set(type, list);
+  };
+  const doc = { addEventListener: listen(documentEvents), defaultView: { addEventListener: listen(windowEvents) }, createElementNS: (_namespace, tag) => {
     const node = new Element(doc); node.tag = tag; created.push(node); return node;
   } };
   const host = new Element(doc, { id: "route-host" });
@@ -54,14 +58,19 @@ function fixture() {
     assembly: { activeTab: "assembly", selectedChrName: "Chr1", trackSelectedCtgIds: [], subview: { trackPairSelectedCtgs: [] },
       finalPathByChr: { Chr1: { mode: "segments", chrName: "Chr1", segments: [segment] } } } });
   bindFinalPathSelection(host, store);
-  const fire = (type, target, extra = {}) => host.events.get(type)?.forEach(fn => fn({ type, target, button: 0, ...extra }));
+  const fire = (type, target, extra = {}) => {
+    for (const events of [documentEvents, host.events]) {
+      events.get(type)?.forEach(fn => fn({ type, target, button: 0, ...extra }));
+    }
+  };
+  const blur = () => windowEvents.get("blur")?.forEach(fn => fn());
   const overlay = node => node.querySelector("[data-final-path-selection-overlay]");
   const patch = value => store.setState({ assembly: { ...store.getState().assembly, ...value } });
-  return { host, graph, row, input, main, local, other, store, fire, overlay, patch, created };
+  return { host, graph, row, input, main, local, other, store, fire, overlay, patch, created, blur };
 }
 
-test("graph/table single selection paints only adopted Main/Local source intersections", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph);
+test("graph/table hover paints only adopted Main/Local source intersections", () => {
+  const f = fixture(); f.fire("pointerover", f.graph);
   assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
   assert.equal(f.row.getAttribute("data-final-path-selected"), "1");
   assert.equal(f.overlay(f.main).getAttribute("x"), "70");
@@ -83,20 +92,20 @@ test("focus selects table row without saving, rerendering, or altering input val
   assert.equal(notifications, 0);
 });
 
-test("same-context route/scroll/zoom retains selection and existing overlay nodes", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph);
-  f.store.setState({ activeRoute: "importer" }); f.store.setState({ activeRoute: "assembly" });
-  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+test("same-context scroll/zoom retains hover and existing overlay nodes", () => {
+  const f = fixture(); f.fire("pointerover", f.graph);
   const overlay = f.overlay(f.main);
   f.patch({ trackView: { zoom: 2 }, trackScrollState: { scrollLeft: 300 } });
   bindFinalPathSelection(f.host, f.store);
   assert.equal(f.overlay(f.main), overlay);
-  assert.equal(f.host.events.get("pointerdown").length, 1);
+  assert.equal(f.host.events.get("pointerover").length, 1);
+  assert.equal(f.host.events.get("pointerout").length, 1);
 });
 
 test("new Main/Local selection clears correlation without changing editing selections", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph); f.fire("pointerdown", f.main);
+  const f = fixture(); f.fire("pointerover", f.graph); f.fire("pointerdown", f.main);
   assert.equal(f.overlay(f.main), null); assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  f.fire("keydown", f.input, { key: "Tab" });
   f.fire("focusin", f.input); f.patch({ subview: { trackPairSelectedCtgs: [{ contigId: 1, trackRole: "primary" }] } });
   assert.equal(f.overlay(f.local), null);
 });
@@ -105,13 +114,13 @@ test("changing chromosome/project/path or deleting the selected segment clears t
   for (const change of [f => f.patch({ selectedChrName: "Chr2" }),
     f => f.store.setState({ session: { workspacePath: "workspace", projectId: 8 } }),
     f => f.patch({ activeFinalPathKey: "A" }), f => f.patch({ finalPathByChr: {} })]) {
-    const f = fixture(); f.fire("pointerdown", f.graph); change(f);
+    const f = fixture(); f.fire("pointerover", f.graph); change(f);
     assert.equal(f.overlay(f.main), null); assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
   }
 });
 
 test("live export selection is removed only from a clone", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph);
+  const f = fixture(); f.fire("pointerover", f.graph);
   const snapshot = snapshotWithoutFinalPathSelection(f.host);
   assert.doesNotMatch(snapshot, /data-final-path-selection-overlay|data-final-path-selected/);
   assert.ok(f.overlay(f.main)); assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
@@ -130,10 +139,11 @@ test("highlight coordinates update only after successful persisted edits, not fo
 });
 
 
-test("path plot background clears only transient correlation, GAP/hover do not select Contigs", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph);
+test("path plot background and GAP hover clear only transient correlation", () => {
+  const f = fixture(); f.fire("pointerover", f.graph);
   const gap = new Element(f.host.ownerDocument, { "data-final-path-segment-id": "gap" }); f.host.append(gap);
-  f.fire("pointerdown", gap); assert.ok(f.overlay(f.main));
+  f.fire("pointerover", gap); assert.equal(f.overlay(f.main), null);
+  f.fire("pointerover", f.graph);
   const plot = new Element(f.host.ownerDocument, { class: "assembly-final-path-svg-wrap" }); f.host.append(plot);
   f.fire("pointerdown", plot); assert.equal(f.overlay(f.main), null);
   assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, []);
@@ -144,7 +154,7 @@ test("deleting a phase clears selection even when another path reuses its label/
     phasedChrTracks: [{ phasedTrackId: 1, label: "Chr1A" }, { phasedTrackId: 2, label: "Chr1B" }],
     finalPathByChr: { Chr1A: f.store.getState().assembly.finalPathByChr.Chr1 } });
   f.graph.setAttribute("data-final-path-target-chr-name", "Chr1A");
-  f.fire("pointerdown", f.graph); assert.ok(f.overlay(f.main));
+  f.fire("pointerover", f.graph); assert.ok(f.overlay(f.main));
   f.patch({ phasedChrTracks: [{ phasedTrackId: 2, label: "Chr1A" }] });
   assert.equal(f.overlay(f.main), null);
 });
@@ -164,7 +174,7 @@ test("All mode distinguishes repeated segment IDs by owning path and selects onl
     finalPathByChr: { Chr1A: entry, Chr1B: entry } });
   f.graph.setAttribute("data-final-path-target-chr-name", "Chr1A");
   f.row.setAttribute("data-final-path-target-chr-name", "Chr1B");
-  f.fire("pointerdown", f.graph);
+  f.fire("pointerover", f.graph);
   assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
   assert.equal(f.row.getAttribute("data-final-path-selected"), null);
   f.fire("focusin", f.input);
@@ -173,7 +183,7 @@ test("All mode distinguishes repeated segment IDs by owning path and selects onl
 });
 
 test("selection survives a fragment-local DOM replacement by painting the new nodes only", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph);
+  const f = fixture(); f.fire("pointerover", f.graph);
   const next = f.main.cloneNode(true); next.querySelector("[data-final-path-selection-overlay]").remove();
   f.main.remove(); f.host.append(next); bindFinalPathSelection(f.host, f.store);
   assert.equal(f.overlay(next).getAttribute("data-source-start"), "5001");
@@ -182,7 +192,7 @@ test("selection survives a fragment-local DOM replacement by painting the new no
 
 
 test("invalidated source coordinates clear selection rather than retaining an obsolete range", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph);
+  const f = fixture(); f.fire("pointerover", f.graph);
   const entry = f.store.getState().assembly.finalPathByChr.Chr1;
   f.patch({ finalPathByChr: { Chr1: { ...entry, segments: [{ ...entry.segments[0], start: 20000 }] } } });
   assert.equal(f.overlay(f.main), null);
@@ -192,7 +202,7 @@ test("invalidated source coordinates clear selection rather than retaining an ob
 
 test("standalone export restores native source titles only in its cloned SVG", () => {
   const f = fixture(); f.graph.setAttribute("data-final-path-tooltip", "full source identity\nAdopted length: 5,000 bp");
-  f.fire("pointerdown", f.graph); snapshotWithoutFinalPathSelection(f.host);
+  f.fire("pointerover", f.graph); snapshotWithoutFinalPathSelection(f.host);
   const title = f.created.find(node => node.tag === "title");
   assert.equal(title.textContent, "full source identity\nAdopted length: 5,000 bp");
   assert.notEqual(title.parent, f.graph);
@@ -201,21 +211,23 @@ test("standalone export restores native source titles only in its cloned SVG", (
 });
 
 
-test("route departure retains the descriptor but never paints or selects non-Assembly previews", () => {
-  const f = fixture(); f.fire("pointerdown", f.graph);
+test("route departure clears hover and never selects non-Assembly previews", () => {
+  const f = fixture(); f.fire("pointerover", f.graph);
   f.store.setState({ activeRoute: "overview" });
   assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
   assert.equal(f.overlay(f.main), null);
-  f.fire("pointerdown", f.graph);
+  f.fire("pointerover", f.graph);
   assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
   f.store.setState({ activeRoute: "assembly" });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  f.fire("pointerover", f.graph);
   assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
 });
 
 
 test("restoring cached project DOM reconciles invalidated transient paint immediately", () => {
   clearAssemblySessionCache();
-  const f = fixture(); f.fire("pointerdown", f.graph);
+  const f = fixture(); f.fire("pointerover", f.graph);
   const projectA = f.store.getState().session;
   assert.ok(rememberAssemblyDom(f.host, f.store.getState()));
   f.host.replaceChildren(); f.store.setState({ activeRoute: "importer" });
@@ -229,14 +241,16 @@ test("restoring cached project DOM reconciles invalidated transient paint immedi
   clearAssemblySessionCache();
 });
 
-test("same-project cached route restoration retains the valid source selection", () => {
+test("same-project cached route restoration does not revive an obsolete hover", () => {
   clearAssemblySessionCache();
-  const f = fixture(); f.fire("pointerdown", f.graph);
+  const f = fixture(); f.fire("pointerover", f.graph);
   rememberAssemblyDom(f.host, f.store.getState()); f.host.replaceChildren();
   f.store.setState({ activeRoute: "importer" }); f.store.setState({ activeRoute: "assembly" });
   assert.ok(restoreAssemblyDom(f.host, f.store.getState()));
   syncAssemblyTransientInteractions(f.host, f.store);
-  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(f.overlay(f.main), null);
+  f.fire("pointerover", f.graph);
   assert.ok(f.overlay(f.main));
   clearAssemblySessionCache();
 });
@@ -251,9 +265,96 @@ test("an already-open off-chromosome Local source uses known candidate provenanc
     sourceFragment: { sourceSeqId: 7, sourceStart: 6001, sourceEnd: 10000, sourceLength: 15000 } } }],
     finalPathByChr: { Chr1: { ...entry, segments: [{ ...entry.segments[0], overallLen: 4000, start: 1001, end: 4000 }] } } });
   const existingSubview = f.store.getState().assembly.subview;
-  f.fire("pointerdown", f.graph);
+  f.fire("pointerover", f.graph);
   assert.equal(f.overlay(f.local).getAttribute("data-source-start"), "7001");
   assert.equal(f.overlay(f.local).getAttribute("data-source-end"), "10000");
   assert.equal(f.store.getState().assembly.subview, existingSubview);
   assert.deepEqual(f.store.getState().assembly.chrCtgs, []);
+});
+
+
+test("leaving graph/table clears all correlation without saving or changing editing selection", () => {
+  for (const target of ["graph", "input"]) {
+    const f = fixture(); let notifications = 0; f.store.subscribe(() => notifications++);
+    f.fire("pointerover", f[target]);
+    assert.ok(f.overlay(f.main));
+    f.fire("pointerout", f[target], { relatedTarget: f.main });
+    assert.equal(f.overlay(f.main), null);
+    assert.equal(f.overlay(f.local), null);
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+    assert.equal(f.row.getAttribute("data-final-path-selected"), null);
+    assert.equal(notifications, 0);
+    assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, []);
+  }
+});
+
+test("moving between children of one segment keeps overlays without repainting", () => {
+  const f = fixture(); f.fire("pointerover", f.row);
+  const overlay = f.overlay(f.main), count = f.created.length;
+  f.fire("pointerout", f.row, { relatedTarget: f.input });
+  f.fire("pointerover", f.input, { relatedTarget: f.row });
+  assert.equal(f.overlay(f.main), overlay);
+  assert.equal(f.created.length, count);
+});
+
+test("pointer leave, cancellation, drag start and Escape remove transient paint", () => {
+  for (const [type, extra] of [["pointerleave", {}], ["pointercancel", {}], ["dragstart", {}], ["keydown", { key: "Escape" }]]) {
+    const f = fixture(); f.fire("pointerover", f.graph); f.fire(type, f.host, extra);
+    assert.equal(f.overlay(f.main), null);
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  }
+});
+
+test("click/touch never activate or pin correlation; keyboard focus remains available", () => {
+  const f = fixture();
+  f.fire("pointerdown", f.graph);
+  assert.equal(f.overlay(f.main), null);
+  f.fire("pointerover", f.input);
+  f.fire("pointerdown", f.input);
+  f.fire("focusin", f.input);
+  f.fire("pointerout", f.input);
+  assert.equal(f.overlay(f.main), null, "mouse focus must not pin hover after leaving");
+  f.fire("pointerover", f.graph, { pointerType: "touch" });
+  f.fire("pointerdown", f.input, { pointerType: "touch" });
+  f.fire("focusin", f.input);
+  assert.equal(f.overlay(f.main), null);
+  f.fire("pointerover", f.graph, { buttons: 1 });
+  assert.equal(f.overlay(f.main), null, "dragging across a segment must not activate hover");
+  f.fire("keydown", f.input, { key: "Tab" });
+  f.fire("focusin", f.input);
+  assert.ok(f.overlay(f.main));
+  f.fire("focusout", f.input);
+  assert.equal(f.overlay(f.main), null);
+});
+
+test("switching between graph/table targets immediately transfers hover", () => {
+  const f = fixture();
+  f.fire("pointerover", f.graph);
+  f.fire("pointerout", f.graph, { relatedTarget: f.input });
+  f.fire("pointerover", f.input, { relatedTarget: f.graph });
+  assert.ok(f.overlay(f.main));
+  f.fire("pointerout", f.input);
+  assert.equal(f.overlay(f.main), null);
+});
+
+
+test("window blur removes hover without reviving it on later state updates", () => {
+  const f = fixture(); f.fire("pointerover", f.graph); f.blur();
+  assert.equal(f.overlay(f.main), null);
+  f.patch({ trackView: { zoom: 3 } });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+});
+
+test("a late leave from another segment cannot clear the current hovered source", () => {
+  const f = fixture(), entry = f.store.getState().assembly.finalPathByChr.Chr1;
+  f.patch({ finalPathByChr: { Chr1: { ...entry, segments: [...entry.segments,
+    { ...entry.segments[0], segmentId: "seg2", start: 6001 }] } } });
+  const second = new Element(f.host.ownerDocument, { "data-final-path-segment-id": "seg2" });
+  f.host.append(second);
+  f.fire("pointerover", f.graph);
+  f.fire("pointerover", second);
+  f.fire("pointerout", f.graph);
+  assert.equal(second.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(f.overlay(f.main).getAttribute("data-source-start"), "6001");
 });

@@ -1,3 +1,4 @@
+import { MAIN_TRACK_TITLE_LAYOUT_EVENT } from "./main-track-title-layout-runtime.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
 import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 import { bindImmediateTooltips } from "./immediate-tooltip-runtime.js";
@@ -155,6 +156,7 @@ export function bindAssemblyScopePopovers(host, store, { persistMembers } = {}) 
   const onViewportScroll = event => { if (!host.contains?.(event.target)) reposition(); };
   const destroy = () => {
     for (const kind of Object.keys(config)) cancel(kind);
+    host.removeEventListener?.(MAIN_TRACK_TITLE_LAYOUT_EVENT, reposition);
     doc?.removeEventListener?.("pointerdown", onOutside, true);
     win?.removeEventListener?.("resize", reposition);
     win?.removeEventListener?.("scroll", onViewportScroll, true);
@@ -187,6 +189,7 @@ export function bindAssemblyScopePopovers(host, store, { persistMembers } = {}) 
       } else schedule(kind);
     }
   });
+  host.addEventListener(MAIN_TRACK_TITLE_LAYOUT_EVENT, reposition);
   host.addEventListener("scroll", reposition, true);
   doc?.addEventListener?.("pointerdown", onOutside, true);
   win?.addEventListener?.("resize", reposition);
