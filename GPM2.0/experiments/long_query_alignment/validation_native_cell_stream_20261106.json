@@ -34,6 +34,31 @@
       "tests": 36
     }
   ],
+  "default_unittest_discovery_followup": {
+    "PYTHONPATH": "unset",
+    "change": "Explicit child cwd is this test source directory; no external PYTHONPATH requirement",
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "GPM2.0/experiments/long_query_alignment",
+      "-p",
+      "test*ordinary*.py",
+      "-q"
+    ],
+    "log_location": "/tmp/cgat-ordinary-default-discovery-20261106.Uw0r2W/ordinary.log",
+    "log_sha256": "dc9f7587d0c55f6d007c09334c137c7f505c0b0be7766bc6fca68db8c48f983e",
+    "passed": true,
+    "reason": "CI discovery does not propagate parent sys.path to the isolated cancellation controller",
+    "recorded_at": "2026-11-06T05:16:05.700566+08:00",
+    "runtime_changed": false,
+    "skipped": 0,
+    "test_source_sha256": "001dce82f6faf4eb09392a411695318b835e79760bed4620bdffbc3e6046c2f6",
+    "tests": 107
+  },
   "files_sha256": {
     "GPM2.0/experiments/long_query_alignment/native_cell_merge_replay_arm64.dsub": "ea6f8a5cbb87b65b5f69fac1dd60531b8fc59fa751b5ddea3ceddb1fa0701ef2",
     "GPM2.0/experiments/long_query_alignment/native_first.py": "10d75556e5c1846117fa46c0956c4325221953b5e11adb8251b1574aad8b98f7",

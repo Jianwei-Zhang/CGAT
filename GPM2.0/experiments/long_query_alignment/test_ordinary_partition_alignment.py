@@ -318,7 +318,11 @@ parts=PARTS
 args=argparse.Namespace(threads=4,timeout=20,minimap_batch='100K',minimap_filter=None,ordinary_group_memory_bytes=8*1024**3)
 opa.attempt(MM,parts,root/'query.fa',root/'group',args,[{'name':'q','length':200000}],opa.plan(args,parts,[{'name':'q','length':200000}]))
 """.replace('ROOT',repr(str(root))).replace('PARTS',repr(parts)).replace('MM',repr(mm))
-            process=subprocess.Popen([os.sys.executable,'-B','-c',code],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            # unittest discovery updates only this process's sys.path. Give the
+            # isolated controller its own source directory, as CI does not set
+            # PYTHONPATH and must still test cancellation rather than an import error.
+            process=subprocess.Popen([os.sys.executable,'-B','-c',code],cwd=Path(__file__).resolve().parent,
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             try:
                 deadline=time.monotonic()+10
                 while not (marker/'part-0000/native.stderr').is_file():
