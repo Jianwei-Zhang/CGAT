@@ -1,0 +1,65 @@
+#!/bin/bash
+#DSUB -n cgat_ordinary_K64
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-batch-perf-20261105-68a1a94"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REFERENCE="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/reference/Caryophyllales_ref.fa"
+QUERY="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/datasets/hifiasm.fa"
+
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+
+python3 - "$MM" <<'PY'
+import json, os, subprocess, sys
+from pathlib import Path
+import benchmark_ordinary_existing as benchmark
+snapshot = benchmark.resource_snapshot()
+snapshot["requested_cpus"] = 64
+snapshot["mapper_sha256"] = benchmark.perf.sha256(sys.argv[1])
+snapshot["mapper_version"] = subprocess.check_output([sys.argv[1], "--version"], text=True).strip()
+assert snapshot["architecture"] == "aarch64"
+assert len(snapshot["affinity"]) >= 64, "64-CPU controlled comparison requires at least 64 allowed CPUs"
+assert snapshot["mapper_version"] == "2.31-r1302"
+assert snapshot["mapper_sha256"] == "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc"
+Path("resources.json").write_text(json.dumps(snapshot, indent=2) + "\n")
+print(json.dumps(snapshot), flush=True)
+PY
+
+# True default 500M K versus larger batches. All queries remain whole and ordinary.
+python3 -B ordinary_batch_performance.py benchmark \
+  --out "$ROOT/synthetic-default-K" --minimap2 "$MM" \
+  --threads 64 --records 64 --query-bases 30000000 \
+  --batch-bases 500000000 1000000000 2000000000 \
+  --repeats 2 --memory-mib 65536 --timeout 900 --execute \
+  > "$ROOT/synthetic.log" 2>&1
+
+# Existing full real assembly: no input edits, skipped records or reordering.
+python3 -B benchmark_ordinary_existing.py \
+  --target "$REFERENCE" --query "$QUERY" --out "$ROOT/real-hifiasm" \
+  --minimap2 "$MM" --threads 64 \
+  --batch-bases 500000000 1000000000 2000000000 \
+  --repeats 2 --memory-mib 196608 --timeout 1800 --execute \
+  > "$ROOT/real.log" 2>&1
+
+sha256sum -c SHA256SUMS
+python3 - "$MM" <<'PY'
+import sys
+import ordinary_batch_performance as benchmark
+assert benchmark.sha256(sys.argv[1]) == "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc"
+print("Completed ordinary-only synthetic and real-input K comparisons; pinned mapper unchanged.")
+PY
