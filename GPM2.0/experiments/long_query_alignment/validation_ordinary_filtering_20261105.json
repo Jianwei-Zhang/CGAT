@@ -35,6 +35,12 @@
     "threads": 64,
     "K": 500000000,
     "index_policy": "original default",
-    "acceptance": "report all PAF row/score/coverage/pair changes; no production or downstream approval"
-  }
+    "acceptance": "report all PAF row/score/coverage/pair changes; no production or downstream approval",
+    "job_id": 40883797,
+    "scheduler_state_at_observation": "WAITING",
+    "observed_at": "2026-11-05T21:20:22+08:00",
+    "dependency": "40883745=ENDED",
+    "accepted_runs_at_observation": 0
+  },
+  "local_evidence_archive_sha256": "25d43c411b97dd8ba45d111b489a0f008430726d1522e921e27c3b62e75db647"
 }

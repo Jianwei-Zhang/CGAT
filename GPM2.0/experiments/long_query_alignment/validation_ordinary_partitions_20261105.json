@@ -84,5 +84,23 @@
     "same-node repeated baseline/serial-parts/parallel-parts comparison",
     "effective threshold inheritance, all ordered PAF bytes and aggregate resource audit",
     "production command-receipt/cache/resource-policy design not implemented"
-  ]
+  ],
+  "remote_control": {
+    "job_id": 40883745,
+    "scheduler_state_at_observation": "WAITING",
+    "observed_at": "2026-11-05T21:20:22+08:00",
+    "dependency": "40883590=ENDED",
+    "original_default_index_policy": true,
+    "synthetic_control_only": true,
+    "threads": 64,
+    "memory_mib": 65536,
+    "repetitions": 2,
+    "conditions": [
+      "baseline",
+      "serial-parts",
+      "parallel-parts"
+    ],
+    "accepted_runs_at_observation": 0
+  },
+  "local_evidence_archive_sha256": "25d43c411b97dd8ba45d111b489a0f008430726d1522e921e27c3b62e75db647"
 }
