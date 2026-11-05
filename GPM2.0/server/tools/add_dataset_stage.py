@@ -6,6 +6,10 @@ import csv
 import shlex
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+from long_cigar_recovery.minimap_options import native_flags, prepared_options
+from run_resources import read_resources
 
 
 def fail(message):
@@ -75,6 +79,13 @@ run_dir = stage_dir / "runs" / f"{dataset_name}_vs_ref"
 command_path = run_dir / "command.sh"
 dataset_fa = stage_dir / f"data/datasets/{dataset_name}.fa"
 lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
-args = ["minimap2", "-c", "-x", minimap_preset, "-t", threads, "-o", "result.paf", str(reference_fa), str(dataset_fa)]
+# A new dataset's reference mapping inherits the project's frozen filtering
+# policy and current execution-only K budget; never change its pair/self flags.
+mapping_options = prepared_options(stage_dir)
+batch_override = read_resources(stage_dir)["effective"].get("minimap_batch")
+if batch_override is not None:
+    mapping_options["minimap_batch"] = batch_override
+args = ["minimap2", "-c", "-x", minimap_preset, *native_flags(SimpleNamespace(**mapping_options)),
+        "-t", threads, "-o", "result.paf", str(reference_fa), str(dataset_fa)]
 lines.append(" ".join(shlex.quote(part) for part in args) + " > stdout.log 2> stderr.log")
 command_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

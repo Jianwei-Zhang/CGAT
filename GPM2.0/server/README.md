@@ -331,6 +331,7 @@ Long aliases are `--minimap-batch` and `--minimap-filter`.
 For a stopped workspace, `bash "$SERVER/run.sh" -o ./gpm_server -K 500M`
 changes the batch size for unfinished work without rerunning valid completed alignments.
 Existing workspaces retain their prepared defaults; changing `-f` requires a new output directory.
+Newly added datasets inherit the prepared filter and saved batch setting.
 
 ### Ultra-long initial-reference alignments
 

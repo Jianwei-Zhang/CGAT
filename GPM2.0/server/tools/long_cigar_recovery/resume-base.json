@@ -7,7 +7,7 @@
         "tools/add_ctg_package.py": "6958736268bf3c8bbffd3b6d27659b4bdf44810cc331b8969824bbe7ee18b324",
         "tools/add_ctg_stage.py": "9c42bd891db3997f8814ecd555794810508d17f7acef85c4fbc2b614f7380f33",
         "tools/add_dataset_package.py": "3ff25f8289ffdf6c092a6081c65d76090c5a09275af59183b3456046b7c034b8",
-        "tools/add_dataset_stage.py": "325bb8b186cc5a6fcb2d3004982797754c7da648b88122f243c21ec79c532c36",
+        "tools/add_dataset_stage.py": "70c723feb2202a8ca0bfd3cf1f398bd9c1e89b22205d745ab611579ead93b89b",
         "tools/alignment_tasks.py": "6f3d53b93cf64cb6d40eb8595841343256fdfcd29e1c654971f421ed7025a5fc",
         "tools/annotation_library.py": "fa45e7dccff75049d5aea0ec626acb5c9e920cb2c7b27437194224700a15dfec",
         "tools/assign_chr_groups.py": "b80dce79100195f98c1a8f69c8afd4e3f0d4751b0cb2f4ff8efddb682ba2a0ae",

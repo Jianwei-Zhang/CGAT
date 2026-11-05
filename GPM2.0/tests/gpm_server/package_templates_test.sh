@@ -107,6 +107,9 @@ PY
 # Keep the archive helper's runtime dependencies alongside it, as prepare.sh does.
 cp "${REPO_ROOT}/server/tools/"{delivery_archive,run_resources,run_orchestration}.py \
   "${SERVER_DIR}/.prepare_lib/tools/"
+mkdir -p "${SERVER_DIR}/.prepare_lib/tools/long_cigar_recovery"
+cp "${REPO_ROOT}/server/tools/long_cigar_recovery/minimap_options.py" \
+  "${SERVER_DIR}/.prepare_lib/tools/long_cigar_recovery/"
 cp "${REPO_ROOT}/server/templates/package_full_zip.sh" "${SERVER_DIR}/package_full_zip.sh"
 cp "${REPO_ROOT}/server/templates/package_light_zip.sh" "${SERVER_DIR}/package_light_zip.sh"
 chmod +x "${SERVER_DIR}/package_full_zip.sh" "${SERVER_DIR}/package_light_zip.sh"

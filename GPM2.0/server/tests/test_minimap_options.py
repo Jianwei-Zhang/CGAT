@@ -96,6 +96,32 @@ write_alignment_command_script "$1/self.sh" "$1" target.fa query.fa true
         self.assertIn("500M",result.stdout)
         self.assertIn("may change alignments",result.stdout)
 
+    def test_incremental_reference_inherits_frozen_filter_and_persisted_k(self):
+        # No user config is introduced: these are the existing prepared metadata
+        # and launcher-owned execution receipt, also used by initial runs.
+        for prepared, override, expected in (
+            ("", None, []),
+            ("minimap_batch\t1G\nminimap_filter\tdefault\n", None, ["-K", "1G"]),
+            ("minimap_batch\t1G\nminimap_filter\t0.01\n", "500M", ["-K", "500M", "-f", "0.01"]),
+        ):
+            with self.subTest(prepared=prepared, override=override), tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);(root/"metadata").mkdir();(root/"runs/new_vs_ref").mkdir(parents=True)
+                options=root/"metadata/prepare_options.tsv"
+                options.write_text("key\tvalue\nthreads\t12\n"+prepared)
+                before=options.read_bytes()
+                (root/"metadata/datasets.tsv").write_text("dataset_name\tassembler\tassembler_version\tfasta_relpath\tfai_relpath\tself_alignment_available\n")
+                (root/"metadata/reference.tsv").write_text("reference_name\tfasta_relpath\nref\tdata/ref.fa\n")
+                (root/"assign_chr_groups.sh").write_text("export GPM_FAST_WORK_ROOT=old\nexport GPM_FAST_MINIMAP_PRESET=asm5\n")
+                if override:
+                    (root/".run_all").mkdir()
+                    (root/".run_all/resources.json").write_text(json.dumps({"schema_version":1,"effective":{"minimap_batch":override},"history":[]}))
+                subprocess.run([sys.executable,str(TOOLS/"add_dataset_stage.py"),str(root),"new","asm5","12","true"],check=True)
+                import shlex
+                command=shlex.split((root/"runs/new_vs_ref/command.sh").read_text().splitlines()[-1].split(" > stdout.log")[0])
+                self.assertEqual(command[:4],["minimap2","-c","-x","asm5"])
+                self.assertEqual(command[4:command.index("-t")],expected)
+                self.assertEqual(options.read_bytes(),before)
+
     def test_reference_fingerprint_contains_f_not_mutable_k(self):
         # Test the real reference recipe without filesystem-heavy hashing.
         manager=object.__new__(OuterCheckpointManager)

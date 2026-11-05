@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
       output="$2"
       shift 2
       ;;
-    -t)
+    -t|-K|-f)
       shift 2
       ;;
     -X)

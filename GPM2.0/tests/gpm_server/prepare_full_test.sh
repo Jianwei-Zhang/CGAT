@@ -250,11 +250,14 @@ test_minimap_options_set_preset_and_threads() {
     --threads 12 \
     -o "$output_root" >/dev/null
 
-  grep -F 'minimap2 -c -x asm5 -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected ds-vs-ref command to emit CIGAR (-c), use asm5 and 12 threads" >&2
+  grep -F 'minimap2 -c -x asm5 -K "${GPM_RUN_MINIMAP_BATCH:-1G}" -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
+    echo "expected ds-vs-ref command to emit CIGAR (-c), use asm5, default K1G and 12 threads" >&2
     cat "${output_root}/runs/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
+
+  grep -Fx $'minimap_batch\t1G' "${output_root}/metadata/prepare_options.tsv" >/dev/null
+  grep -Fx $'minimap_filter\tdefault' "${output_root}/metadata/prepare_options.tsv" >/dev/null
 
   cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
 tig_a1	10	0	6	+	Chr01	6	0	6	6	6	60
