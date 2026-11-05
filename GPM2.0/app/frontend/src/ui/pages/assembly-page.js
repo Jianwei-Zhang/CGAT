@@ -6,6 +6,7 @@ import { syncExistingAssemblyViewNavigation } from "./assembly/view-navigation-r
 import { destroyImmediateTooltips } from "./assembly/immediate-tooltip-runtime.js";
 import { bindAssemblyScopePopovers, destroyAssemblyScopePopovers } from "./assembly/scope-popover-runtime.js";
 import { bindMainTrackToolbarPopups, destroyMainTrackToolbarPopups } from "./assembly/main-track-toolbar-runtime.js";
+import { bindMainTrackTitleLayout, destroyMainTrackTitleLayout } from "./assembly/main-track-title-layout-runtime.js";
 import { paintMainSelection } from "./assembly/main-selection-paint.js";
 import { bindFinalPathSelection } from "./assembly/final-path-selection-runtime.js";
 import { bindFinalPathTooltips, hideFinalPathTooltips } from "./assembly/final-path-tooltip-runtime.js";
@@ -861,6 +862,7 @@ export function disposeAssemblyTransientInteractions(host) {
   disposeTrackViewportResize(host);
   destroyImmediateTooltips(host);
   destroyAssemblyScopePopovers(host);
+  destroyMainTrackTitleLayout(host);
   destroyMainTrackToolbarPopups(host);
 }
 
@@ -868,6 +870,7 @@ export function syncAssemblyTransientInteractions(host, store) {
   queueMicrotask(() => { void resumeAssemblyReadyStages(host, store, assemblyDataRuntimeDeps); });
   syncExistingAssemblyViewNavigation(host);
   bindAssemblyScopePopovers(host, store);
+  bindMainTrackTitleLayout(host);
   bindMainTrackToolbarPopups(host);
   bindFinalPathSelection(host, store);
   bindFinalPathTooltips(host);

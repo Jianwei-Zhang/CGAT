@@ -22,6 +22,12 @@ for (const domain of ["assembly", "importer", "workspace", "shell", "projectPrev
     for (const [key, value] of en) {
       const placeholder = text => (text.match(/\{[^{}]+\}/g) || []).sort();
       assert.deepEqual(placeholder(value), placeholder(zh.get(key)), `${domain}.${key}`);
+      // Approved exception: English Main View may abbreviate only this
+      // responsive title when the full form would make parameters wrap.
+      if (domain === "assembly" && key === "chrTitleCompact") {
+        assert.equal(value, "Chr"); assert.equal(zh.get(key), "染色体");
+        continue;
+      }
       for (const text of [value, zh.get(key)]) {
         assert.doesNotMatch(text.replace(/\{[^{}]*\}/g, ""), /(?<![\w-])(?:ds|ctgs?|len|chr|ref|seq)(?![\w-])/i,
           `${domain}.${key}: ${text}`);
@@ -32,6 +38,7 @@ for (const domain of ["assembly", "importer", "workspace", "shell", "projectPrev
 
 test("major titles, minor labels, actions and real system options have distinct English roles", () => {
   const assembly = getMessages("en", "assembly"), workspace = getMessages("en", "workspace");
+  assert.equal(assembly.chrTitle, "Chromosome", "normal titles retain the full word");
   assert.equal(assembly.page.primaryAlignmentViewTitle, "Main View");
   assert.equal(assembly.page.phasedTrackGrtNoticeTitle, "LGZ Results Are Temporarily Unavailable");
   assert.equal(assembly.page.membersCardTitle, "Primary Dataset Members");

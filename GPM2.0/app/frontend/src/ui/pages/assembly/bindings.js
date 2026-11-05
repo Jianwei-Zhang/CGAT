@@ -29,6 +29,7 @@ import {
 } from "./grt-result-state.js";
 import { assemblyPageSession } from "./page-session.js";
 import { ALIGNMENT_TOOLBAR_SELECTOR, bindMainTrackToolbarPopups } from "./main-track-toolbar-runtime.js";
+import { bindMainTrackTitleLayout } from "./main-track-title-layout-runtime.js";
 import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 import { bindMarkerDisplayMenus } from "./marker-display-menu-runtime.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
@@ -383,6 +384,7 @@ function getCreateEmptyFinalPathRow(deps) {
 
 export function bindAssemblyPage(host, store, deps, options = {}) {
   assertAssemblyBindingDeps(deps);
+  bindMainTrackTitleLayout(host);
   bindMainTrackToolbarPopups(host);
   const requestedScope = String(options?.scope || "all").trim().toLowerCase();
   const bindingScope = ["main", "subview", "final-path"].includes(requestedScope)

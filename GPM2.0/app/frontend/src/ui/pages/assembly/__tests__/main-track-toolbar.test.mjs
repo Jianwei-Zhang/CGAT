@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { renderAssemblyPage, createState, readStylesheetTree } from "./tabs-semantics-harness.mjs";
 import { resolveAnchoredPanelRect, placeAnchoredPanel, clearAnchoredPanelPlacement } from "../anchored-panel-placement.js";
 import { ALIGNMENT_TOOLBAR_SELECTOR, bindMainTrackToolbarPopups } from "../main-track-toolbar-runtime.js";
+import { MAIN_TRACK_TITLE_LAYOUT_EVENT } from "../main-track-title-layout-runtime.js";
 
 // Parse the isolated header, not a mock of its intended hierarchy.
 function parseHeader(html) {
@@ -89,8 +90,8 @@ function popupFixture() {
 
 test("popup tracking is bounded and resizing closed controls never measures/reorders the toolbar", () => {
   const f = popupFixture(); bindMainTrackToolbarPopups(f.host); bindMainTrackToolbarPopups(f.host);
-  assert.equal(f.events.size, 2); assert.equal(f.windows.size, 2);
-  for (let i = 0; i < 30; i++) f.windows.get("resize")();
+  assert.equal(f.events.size, 3); assert.equal(f.windows.size, 2);
+  for (let i = 0; i < 30; i++) { f.windows.get("resize")(); f.events.get(MAIN_TRACK_TITLE_LAYOUT_EVENT)(); }
   assert.equal(f.reads(), 0);
   f.setOpen(true); f.windows.get("resize")();
   assert.equal(f.panel.style.position, "fixed"); assert.equal(f.panel.style.left, "100px");
@@ -184,4 +185,12 @@ test("complete chromosome picker options have no redundant tooltip and retain se
  assert.ok(buttons.length>0);
  for(const [,attrs,body] of buttons){assert.doesNotMatch(attrs,/data-app-tooltip|\btitle=/);assert.match(attrs,/data-chr-name="[^"]+"/);assert.match(attrs,/aria-pressed="(?:true|false)"/);assert.match(body,/<strong>[^<]+<\/strong><span>\d+ Contigs · [\d,.]+ Mb<\/span>/);}
  assert.match(html,/id="assembly-chr-picker-toggle"[^>]*data-app-tooltip-overflow=".chr-picker-current"/);
+});
+
+
+test("an open toolbar menu follows the reclaimed title width without closing or rebinding", () => {
+  const f = popupFixture(); f.setOpen(true); bindMainTrackToolbarPopups(f.host);
+  f.events.get("toggle")(); assert.equal(f.panel.style.left, "100px");
+  f.setLeft(40); f.events.get(MAIN_TRACK_TITLE_LAYOUT_EVENT)();
+  assert.equal(f.panel.style.left, "40px"); assert.equal(f.panel.style.position, "fixed");
 });

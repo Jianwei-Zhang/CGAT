@@ -2698,6 +2698,7 @@ test("assembly page public binder wires host-level listeners once for the same h
     "keydown",
     "pointerover",
     "pointerout",
+    "assembly-main-title-layout", // re-anchor scope popovers after the responsive title changes
     "scroll",
     "pointerdown",
     "pointerdown",

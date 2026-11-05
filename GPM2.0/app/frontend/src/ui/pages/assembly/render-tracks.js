@@ -613,6 +613,11 @@ function createRenderTracksRenderer(deps = {}) {
   function renderAssemblyScopeControls(state, memberChips = "") {
     const assembly = state.assembly, i18n = getAssemblyI18n(state);
     const chromosomes = Array.isArray(assembly.chromosomes) ? assembly.chromosomes : [];
+    const chrTitle = assembly.selectedChrName ? `${i18n.chrTitle} ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle;
+    const compactChrTitle = assembly.selectedChrName && i18n.chrTitleCompact && i18n.chrTitleCompact !== i18n.chrTitle
+      ? `${i18n.chrTitleCompact} ${assembly.selectedChrName}` : null;
+    const chrTitleLayoutAttrs = compactChrTitle
+      ? ` data-main-chr-title-full="${escapeAttr(chrTitle)}" data-main-chr-title-short="${escapeAttr(compactChrTitle)}"` : "";
     const chrOpen = assembly.chrPickerOpen === true;
     const membersOpen = assembly.membersCardCollapsed === false && !assembly.loading;
     const membersTitle = i18n.page.membersCardTitle;
@@ -622,7 +627,7 @@ function createRenderTracksRenderer(deps = {}) {
       <strong>${escapeHtml(chr.chrName)}</strong><span>${chr.ctgCount} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb</span></button>`).join("");
     return { chromosome: `<div class="chr-picker-inline assembly-main-scope-title" data-main-track-control-title data-assembly-popup="chromosomes" data-assembly-scope-key="${escapeAttr(projectScopeKey)}">
         <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" data-app-tooltip="${escapeAttr(assembly.selectedChrName ? `${i18n.chrTitle} ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" data-app-tooltip-overflow=".chr-picker-current" aria-label="${escapeAttr(assembly.selectedChrName ? `${i18n.page.selectChromosomeTitle}: ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
-          <span class="chr-picker-current">${assembly.selectedChrName ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}` : escapeHtml(i18n.page.selectChromosomeTitle)}</span><span data-popup-chevron aria-hidden="true">${chrOpen ? "▴" : "▾"}</span>
+          <span class="chr-picker-current"${chrTitleLayoutAttrs}>${escapeHtml(chrTitle)}</span><span data-popup-chevron aria-hidden="true">${chrOpen ? "▴" : "▾"}</span>
         </button>
         <div id="assembly-chr-picker-panel" class="chr-picker-menu assembly-scope-popover" ${chrOpen ? "" : "hidden"}>${chromosomeOptions || `<div class="muted">${escapeHtml(i18n.page.noChromosomeData)}</div>`}</div>
       </div>`, members: `<article class="assembly-members-panel assembly-members-panel-inline${membersOpen ? "" : " is-collapsed"}" data-assembly-popup="members" data-assembly-scope-key="${escapeAttr(memberScopeKey)}">
