@@ -230,6 +230,23 @@ class KeyMigrationTests(unittest.TestCase):
         attempt,reused = pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
         self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
 
+    def test_reviewed_partition_runtime_preserves_partial_group_for_payload_verification(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_partition_resume_runtime.json').read_text())
+        self.assertEqual(hashlib.sha256(json.dumps(files,sort_keys=True,separators=(',',':')).encode()).hexdigest(),pr._REVIEWED_PARTITION_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files}
+        runtime={**self.runtime,'native_resume_source_profiles':[[pr._REVIEWED_PARTITION_RUNTIME,
+            hashlib.sha256(json.dumps(self.runtime['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        self.cache.data['stages'].pop('ordinary');self.cache.save()
+        path=self.attempt/'selective/ordinary-native'/pr.opa.RECEIPT;path.parent.mkdir()
+        # Selection only: this minimal descriptor is NOT enough to reuse output.
+        wa.write_json(path,{'schema':1,'kind':pr.opa.KIND,'status':'failed_no_retry'})
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        with self.assertRaises(wa.ExperimentError):
+            pr.opa.attempt(str(self.tool),[],self.query,path.parent,
+                __import__('argparse').Namespace(minimap_filter=None),[],{})
+
     def test_pure_ordinary_previous_runtime_retains_native_completion_without_index(self):
         self.cache.data['stages'] = {name:self.cache.data['stages'][name] for name in ('groups','ordinary')}
         self.cache.save()

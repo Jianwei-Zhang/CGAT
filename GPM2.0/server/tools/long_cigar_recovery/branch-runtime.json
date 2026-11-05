@@ -4,9 +4,9 @@
   "scope": "initial_reference_asm10_only",
   "files_sha256": {
     "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
-    "proactive_reference_alignment.py": "062c1d5bd60e61554f51f71883a84a037a116c48603f3d7390a3401a019db581",
+    "proactive_reference_alignment.py": "a8c312df1fc33db8cefbf7876d62550527851ee870e098744e39a3e796a58329",
     "proactive_publication.py": "3e48b9b84d5abe5653fc2159d5b045c0c7d8f958bdf2eee52447f7ce4a0ad923",
-    "proactive_resume.py": "b6eab538439ed67090c7baadd0f7ae766f25af29bf097536b5e6b79cc83573c5",
+    "proactive_resume.py": "91df0d6153cbc837c4b4ee75ff215d0ec48f8d65ac846d3242ca79476efd63b1",
     "server_alignment.py": "c4f5265a4b4b8b5633de1e0f41a1862dc0ea4915e023e6d27aa87ff999aacd2a",
     "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
     "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
@@ -24,7 +24,7 @@
     "stream_seed_trace.py": "a480e1c041a398e58ecde1fdab38750e5142091e8beacb9689670e21a35949cd",
     "trace_memory.py": "c934202e86d3465499b0585f0b6bce09a215d3485f247fa0abdb616036606eac",
     "sequential_split_witness.py": "573ea1231f052c5ff3f748402528561c6f4da6563f8658ef5baa544e1d4c5ad0",
-    "ordinary_partition_alignment.py": "75b902d4c3a6180344b384ca525bfe7c44c8bf978e469192ec9223caea366f10",
+    "ordinary_partition_alignment.py": "c0600f0554997db6287388bd903d0ad5cee82a8bc78e886dc28bd7bf6c0a8218",
     "minimap_options.py": "1b184b47a507a4daf19323d450b6a4f43c401bc0de24ab5c8a30a8950a756322",
     "minimap_index_context.py": "ee888f3645288042abb2e16bb4cb1743368bbb81b34aa4cae49405e70c52b5c7",
     "seam_witness.py": "09e80e89a6662f185ec8a042e8fbb9ae4e24bc611b56d3be8d3c99a14429b249",
@@ -42,15 +42,19 @@
   "native_resume_source_profiles": [
     [
       "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
-      "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
+      "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
     ],
     [
       "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d",
-      "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
+      "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
     ],
     [
       "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560",
-      "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
+      "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
+    ],
+    [
+      "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa",
+      "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
     ]
   ]
 }

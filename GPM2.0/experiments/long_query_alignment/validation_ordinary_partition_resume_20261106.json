@@ -1,0 +1,220 @@
+{
+  "activation": {
+    "node_or_shared_job_memory_assumed_exclusive": false,
+    "pure_ordinary_raw_fasta_path_changed": false,
+    "real_server_partition_parallelism_default_enabled": false,
+    "real_server_supplies_exclusive_group_memory_grant": false,
+    "user_configuration_file_added": false
+  },
+  "additional_source_sha256": {
+    "GPM2.0/experiments/long_query_alignment/sync_server_runtime.py": "dd1bc6034dee4b10ba027f86f3814a7d6a5f99ebc33c48688103f6446072fb2d",
+    "GPM2.0/experiments/long_query_alignment/test_data/pre_partition_resume_runtime.json": "f11b1356ad19f0dbdd4f55b6a6457b291fbbafdb19a29a87efee44d68ae59793",
+    "GPM2.0/experiments/long_query_alignment/test_ordinary_partition_alignment.py": "5295a128b22a9dbb11f09cff1e3ca101f6e1ad424639da69531eee826c52e665",
+    "GPM2.0/experiments/long_query_alignment/test_validation_metadata.py": "e6c790a277fdcb2eae7507dff8201735839d0b5d9f1acdbc5ea9a53270d5cf9c"
+  },
+  "branch": "perf/minimap2-ordinary-mapping-20261105",
+  "canonical_runtime_files_sha256": {
+    "MINIMAP2_LICENSE.txt": "439f990fe612f03792ab99de0298d6feace539d8162830c5063c56520760f364",
+    "batch_seed_ownership.py": "2c961770cb9e87bb73396bbc897e5899d9e9477e7019ce39b98e2cdfdfb31bb4",
+    "build_native_chain_state.py": "a1da3b26759007a8185f8818fd8ddbbbc074ae1146221097b59f815d6785fc22",
+    "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
+    "minimap_index_context.py": "ee888f3645288042abb2e16bb4cb1743368bbb81b34aa4cae49405e70c52b5c7",
+    "minimap_options.py": "1b184b47a507a4daf19323d450b6a4f43c401bc0de24ab5c8a30a8950a756322",
+    "native_chain_state.c": "c21e66248334e7012ecf123e6795db82a220ee2b16bf1a1137f9cdbe831dad82",
+    "native_chain_state.py": "9e4f8efe083e3b65a922e7edfed469baf06e2d8bb35f9b109248a82e78e44cea",
+    "native_evaluation.py": "33f6a37fa6a0b6db621630edbfc5aa8ba8c7eaf5e5b87fde483db8edfe50b0b2",
+    "native_first.py": "e87b01370b213096f4cd74f807933b70063c972d2cf189269db253c608531d0c",
+    "native_recovery.py": "9737a9148cd8da8be1f7bc8968180d99cd5f04e666a2ab54ace96e0b9963ae3f",
+    "native_selection.py": "bdb0a0eb9f2c6b5b5c3a1ab01c34e6f2b30f47dc9353ecaefcb9b9665c13b3ce",
+    "ordinary_partition_alignment.py": "c0600f0554997db6287388bd903d0ad5cee82a8bc78e886dc28bd7bf6c0a8218",
+    "post_dp_selection.py": "42d39410f760608461509b38fced2b60caea04dacf3bc4f75027398e25495cef",
+    "proactive_publication.py": "3e48b9b84d5abe5653fc2159d5b045c0c7d8f958bdf2eee52447f7ce4a0ad923",
+    "proactive_reference_alignment.py": "a8c312df1fc33db8cefbf7876d62550527851ee870e098744e39a3e796a58329",
+    "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
+    "proactive_resume.py": "91df0d6153cbc837c4b4ee75ff215d0ec48f8d65ac846d3242ca79476efd63b1",
+    "recovery_publication.py": "0f2984f52f598fb7228ebceb6522f567ced39d9c95ea29f3cf73abc91ad40574",
+    "resume_reference.py": "d432453105a2afddda0dd7bb8f0bbcf7e2f52678632ec395e85737d9c5c7b98d",
+    "seam_witness.py": "09e80e89a6662f185ec8a042e8fbb9ae4e24bc611b56d3be8d3c99a14429b249",
+    "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
+    "sequential_split_witness.py": "573ea1231f052c5ff3f748402528561c6f4da6563f8658ef5baa544e1d4c5ad0",
+    "server_alignment.py": "c4f5265a4b4b8b5633de1e0f41a1862dc0ea4915e023e6d27aa87ff999aacd2a",
+    "stream_seed_trace.py": "a480e1c041a398e58ecde1fdab38750e5142091e8beacb9689670e21a35949cd",
+    "trace_memory.py": "c934202e86d3465499b0585f0b6bce09a215d3485f247fa0abdb616036606eac",
+    "whole_query_scores.py": "85acb52b6e56f3c1ce571cd4e0c0fb29cf9dbca0a3c8c2c2d6f1e8f0d04482d7",
+    "windowed_alignment.py": "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e"
+  },
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "-q",
+        "test_ordinary_partition_alignment",
+        "test_minimap_options",
+        "test_proactive_resume",
+        "test_proactive_server_integration",
+        "test_server_alignment",
+        "test_validation_metadata",
+        "test_recovery_publication",
+        "test_original_assertion_reuse",
+        "test_branch_server_package"
+      ],
+      "log_location": "/tmp/cgat-ordinary-part-resume-verified-20261106.JsQUIz/canonical.log",
+      "log_sha256": "d0dc44600f7df17e5125077e5a3c259d33018a376414d8358326aa239a577bf3",
+      "name": "canonical",
+      "resource_warning_observed": false,
+      "returncode": 0,
+      "skipped": 0,
+      "tests": 144,
+      "wall_seconds": 27.712
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "GPM2.0/experiments/long_query_alignment",
+        "-p",
+        "test_*ordinary*.py",
+        "-q"
+      ],
+      "log_location": "/tmp/cgat-ordinary-part-resume-verified-20261106.JsQUIz/ordinary.log",
+      "log_sha256": "cd211baf702fbd10d851cd7db504fae492beff61a40c68d14a2a4364c222b3bb",
+      "name": "ordinary",
+      "resource_warning_observed": false,
+      "returncode": 0,
+      "skipped": 0,
+      "tests": 83,
+      "wall_seconds": 25.811
+    },
+    {
+      "canonical_full_gate_complete": false,
+      "command": [
+        "bash",
+        "GPM2.0/scripts/quality-gate-server.sh"
+      ],
+      "environment": {
+        "GPM_SKIP_GRT_SERVER_APP_E2E": "1",
+        "PATH_prefix": "/home/xbzhang/micromamba/envs/cgat-server/bin",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "explicitly_excluded": [
+        "LGZ server-to-app E2E"
+      ],
+      "log_location": "/tmp/cgat-ordinary-part-resume-verified-20261106.JsQUIz/server-gate.log",
+      "log_sha256": "14018f120903daef0bd4624564ef38c554c17509f88566b6e9b559651373e053",
+      "name": "server_only_gate",
+      "python_skipped": 0,
+      "python_tests": 455,
+      "resource_warning_observed": true,
+      "returncode": 0,
+      "shell_groups": 8
+    }
+  ],
+  "date": "2026-11-06T02:38:01+08:00",
+  "evidence_limits": [
+    "Counts overlap and are not additive unique tests",
+    "No new large/remote benchmark in this phase; no new whole-workflow speed claim",
+    "Per-process address-space caps are not physical reservations or proof DP fits",
+    "Controller SIGKILL without terminal receipt is not an auto-takeover claim; uncertain state fails closed",
+    "Server-only gate excludes App E2E and still reports existing ResourceWarnings",
+    "No customer 66.47-hour successful group remapped; no master, Release or App modification"
+  ],
+  "history_contract": {
+    "automatic_parameter_or_mapper_retry": false,
+    "extra_native_aggregate_PAF_copy": false,
+    "fabricated_full_index_command": false,
+    "failed_partial_PAF_consumed": false,
+    "first_round_snapshot": "original-run.json",
+    "maximum_explicit_rounds": 128,
+    "native_success_paths_rewritten": false,
+    "subsequent_rounds": "resume-NNNN/ordinary-parts.json"
+  },
+  "minimap2": {
+    "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+    "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+    "version": "2.31-r1302"
+  },
+  "native_companion": {
+    "execution_validated": false,
+    "manifest_path": "/home/xbzhang/.codex/worktrees/e80b/cgat/GPM2.0/server/tools/long_cigar_recovery/native/linux-x86_64/chain-state-helper.json",
+    "manifest_sha256": "6d96f488bb5a553a62bec7737789496be66e1c368b7a8cbdc96f64a6e3c93c31",
+    "path": "/home/xbzhang/.codex/worktrees/e80b/cgat/GPM2.0/server/tools/long_cigar_recovery/native/linux-x86_64/cgat-chain-state",
+    "platform": "linux-x86_64",
+    "production_ready": false,
+    "runtime_abi": {
+      "legacy_2_17_checked": true,
+      "maximum_glibc": "2.14",
+      "needed_libraries": [
+        "libm.so.6",
+        "libpthread.so.0",
+        "libc.so.6"
+      ],
+      "runtime_paths": []
+    },
+    "sha256": "00a0cee279f70d1faf35202b9328217226efcbe261bf0ff7e19b5bf4c783ab2e",
+    "third_party_licenses_sha256": {
+      "ZLIB_LICENSE_AND_HEADER.txt": "818667d6ab6a37fe7469cb06a7f0cb2c2cb2f2c948a03e5accf1a4a74bf3020a"
+    },
+    "upstream_commit": "3c28777e7e2dcc90f825de1b9f17a89cca7d4452"
+  },
+  "parent_revision": "6eccddc7603bee5e07d738dd8b08b51d9776c65a",
+  "remaining": [
+    "Production per-reference-group exclusive budget and real launcher activation",
+    "Resource-share changes and whole adapter resume identity policy",
+    "Final integrated large real-data performance and complete downstream acceptance",
+    "Canonical full gate and authorized merge/release/customer acceptance"
+  ],
+  "runtime_migration": {
+    "all_reused_payloads_reverified": true,
+    "frozen_previous_source_matches_parent": true,
+    "historical_customer_runtime_reexecuted": false,
+    "previous_source_profile_sha256": "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa",
+    "reviewed_source_pairs": [
+      [
+        "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
+        "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
+      ],
+      [
+        "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d",
+        "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
+      ],
+      [
+        "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560",
+        "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
+      ],
+      [
+        "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa",
+        "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
+      ]
+    ],
+    "test_limitation": "Reviewed old descriptors are simulated around actual native controls. No claim of historical/customer acceptance.",
+    "unchanged_recovery_kernels_required": true
+  },
+  "runtime_source_profile_sha256": "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58",
+  "schema": 1,
+  "status": "branch_per_part_explicit_resume_verified_not_production_parallel_activation",
+  "verified_controls": [
+    "Explicit reentry maps only missing original parts; no in-call retry",
+    "Original successful native files and exact original group receipt bytes retained",
+    "One pending part receives full currently assigned task threads; multiple pending parts use at most two bounded workers",
+    "Unknown group budget resumes serially, never authorizes parallel mapping",
+    "Configured mapper memory limit and inherited finite RLIMIT_AS remain upper bounds",
+    "Insufficient new budget starts no process, keeps old evidence and permits later corrected explicit reentry",
+    "Successful later part retained after first-part failure; new first-part actual threshold must match",
+    "Threshold mismatch, source/index/query/filter/native/schedule corruption rejected",
+    "Repeated explicit failures retain successful original parts and distinct failed-round evidence",
+    "Subset execution round cannot masquerade as a complete original-part group",
+    "Legacy v1 failure missing leaf array reconstructed only from completed events plus verified native receipts",
+    "Whole successful resumed group is reusable without another mapper",
+    "Real pinned minimap2 SIGSTOP/SIGKILL second-child QA: first mapper actually completes and its original native evidence stays unchanged",
+    "Real mixed pipeline default-filter and explicit f0.01: only second original part restarts; ordinary PAF bytes equal same-layout original full-MMI native baseline",
+    "Real mixed resumed output passes existing proactive publication admission; next reentry reuses both long cells and ordinary group with mapper Popen forbidden",
+    "Real partial native results plus simulated reviewed previous source descriptor: Server selects same attempt and publishes after only missing part reruns"
+  ]
+}

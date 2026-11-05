@@ -174,8 +174,11 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                 if native is None:
                     schedule = opa.plan(native_args, index["parts"], ordinary_records)
                     report["ordinary_schedule_plan"] = schedule
-                    pr.archive_partial(root / "ordinary-native")
-                    if schedule["enabled"]:
+                    partial_group = root / "ordinary-native" / opa.RECEIPT
+                    partition_resume = partial_group.exists() or partial_group.is_symlink()
+                    if not partition_resume:
+                        pr.archive_partial(root / "ordinary-native")
+                    if schedule["enabled"] or partition_resume:
                         native = opa.attempt(mm, index["parts"], Path(ordinary["path"]), root / "ordinary-native",
                                              native_args, ordinary_records, schedule)
                         cache.save_ordinary(partitioned=True)

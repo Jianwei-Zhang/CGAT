@@ -41,12 +41,14 @@ class PartitionExecutionTests(unittest.TestCase):
         mm.write_text('''#!/usr/bin/env python3
 import pathlib,subprocess,sys,time
 args=sys.argv[1:];i=int(pathlib.Path(args[-2]).read_text());mode=BEHAVIOR
+retry=pathlib.Path(RETRY_MARKER)
+threshold='600' if pathlib.Path(MID_MARKER).exists() else '500'
 output=pathlib.Path(args[args.index('-o')+1]);output.write_bytes(b'')
 print('[M::main::0.01*1.0] loaded/built the index for 1 target sequence(s)',file=sys.stderr,flush=True)
 if i==0:
-    sys.stderr.write('[M::mm_mapopt_update::0.01*1.0] mid_occ = 5');sys.stderr.flush()
+    sys.stderr.write('[M::mm_mapopt_update::0.01*1.0] mid_occ = '+threshold[0]);sys.stderr.flush()
     time.sleep(0.1)
-    sys.stderr.write('00\\n');sys.stderr.flush()
+    sys.stderr.write(threshold[1:]+'\\n');sys.stderr.flush()
 else:
     assert args[args.index('-f')+1]=='500'
     print('[M::mm_mapopt_update::0.01*1.0] mid_occ = 500',file=sys.stderr,flush=True)
@@ -54,10 +56,13 @@ if mode=='timeout' and i==0:
     subprocess.Popen([sys.executable,'-c',"import time,pathlib;time.sleep(2);pathlib.Path("+repr(str(output.parent.parent/'orphan'))+").touch()"])
     time.sleep(10)
 if mode=='fail' and i==1:sys.exit(7)
+if mode=='fail-second-once' and i==1 and not retry.exists():time.sleep(0.35);sys.exit(7)
+if mode=='fail-first-once' and i==0 and not retry.exists():time.sleep(0.35);sys.exit(7)
+if mode=='fail-many-once' and i>0 and not retry.exists():time.sleep(0.35 if i==1 else 5);sys.exit(7)
 time.sleep(0.2 if i==0 else 0.02)
 print('[M::worker_pipeline::0.25*1.0] mapped 1 sequences',file=sys.stderr,flush=True)
 output.write_text('q\\t200000\\t0\\t10\\t+\\tt'+str(i)+'\\t1000\\t0\\t10\\t10\\t10\\t60\\tcg:Z:10M\\n')
-'''.replace('BEHAVIOR',repr(behavior)))
+'''.replace('BEHAVIOR',repr(behavior)).replace('RETRY_MARKER',repr(str(root/'retry.enabled'))).replace('MID_MARKER',repr(str(root/'different-threshold'))))
         mm.chmod(0o755)
         return str(mm),parts,query,[{'name':'q','length':200000}]
 
@@ -145,6 +150,152 @@ output.write_text('q\\t200000\\t0\\t10\\t+\\tt'+str(i)+'\\t1000\\t0\\t10\\t10\\t
             self.assertEqual(len([e for e in report['events'] if e['event']=='start']),2)
             self.assertFalse((root/'group/native.complete.paf').exists())
             with self.assertRaises(wa.ExperimentError):opa.verify(root/'group',mm,q,parts,records)
+
+    def fail_once(self, root, *, behavior='fail-second-once', count=2):
+        mm,parts,q,records=self.fixture(root,count=count,behavior=behavior);args=self.args()
+        with self.assertRaisesRegex(wa.ExperimentError,'no retry'):
+            opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+        report=json.loads((root/'group'/opa.RECEIPT).read_text())
+        self.assertEqual(report['status'],'failed_no_retry')
+        expected=[1] if behavior=='fail-first-once' else [0] if behavior=='fail-many-once' else [i for i in range(count) if i!=1]
+        self.assertEqual([p['part_index'] for p in report['parts']],expected)
+        return mm,parts,q,records,args,report
+
+    def test_explicit_resume_runs_only_missing_part_with_full_current_threads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root)
+            old_bytes={p:p.read_bytes() for p in (root/'group/part-0000').iterdir()}
+            original=(root/'group'/opa.RECEIPT).read_bytes();(root/'retry.enabled').touch()
+            spawn=opa.subprocess.Popen;commands=[]
+            def run(command,*a,**kw):commands.append(command);return spawn(command,*a,**kw)
+            with patch.object(opa.subprocess,'Popen',side_effect=run):
+                report=opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            self.assertEqual(len(commands),1);self.assertEqual(commands[0][-2],parts[1]['path'])
+            self.assertEqual(commands[0][commands[0].index('-t')+1],'7')
+            self.assertEqual(report['reused_part_indices'],[0]);self.assertEqual(report['schema'],2)
+            self.assertEqual((root/'group/original-run.json').read_bytes(),original)
+            for p,data in old_bytes.items():self.assertEqual(p.read_bytes(),data)
+            self.assertEqual(opa.verify(root/'group',mm,q,parts,records),report)
+            with patch.object(opa.subprocess,'Popen',side_effect=AssertionError('already complete')):
+                self.assertEqual(opa.attempt(mm,parts,q,root/'group',args,records,{}),report)
+
+    def test_explicit_resume_unknown_budget_is_serial_and_preserves_completed_parts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root,count=3)
+            (root/'retry.enabled').touch();args.ordinary_group_memory_bytes=None
+            report=opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            self.assertEqual(report['reused_part_indices'],[0,2])
+            round=json.loads((root/'group/resume-0001'/opa.RECEIPT).read_text())
+            self.assertEqual(round['selected_parts'],[1]);self.assertEqual(round['admission']['scope'],'serial_resume_only')
+            self.assertEqual(round['admission']['slots'],1)
+            self.assertIsNone(round['parts'][0]['memory_bytes'])
+
+    def test_later_part_success_survives_first_part_failure_and_first_is_revalidated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root,behavior='fail-first-once')
+            (root/'retry.enabled').touch()
+            spawn=opa.subprocess.Popen;commands=[]
+            def run(command,*a,**kw):commands.append(command);return spawn(command,*a,**kw)
+            with patch.object(opa.subprocess,'Popen',side_effect=run):
+                report=opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            self.assertEqual([c[-2] for c in commands],[parts[0]['path']])
+            self.assertEqual(report['reused_part_indices'],[1]);self.assertEqual(report['mid_occ'],500)
+            self.assertEqual(opa.verify(root/'group',mm,q,parts,records),report)
+
+    def test_first_part_threshold_change_never_admits_old_completed_later_parts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root,behavior='fail-first-once')
+            (root/'retry.enabled').touch();(root/'different-threshold').touch()
+            with self.assertRaisesRegex(wa.ExperimentError,'threshold differs'):
+                opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            self.assertEqual(json.loads((root/'group'/opa.RECEIPT).read_text())['status'],'failed_no_retry')
+            with self.assertRaises(wa.ExperimentError):opa.verify(root/'group',mm,q,parts,records)
+
+    def test_repeated_failure_keeps_successful_old_parts_without_automatic_retry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root)
+            for n in (1,2):
+                spawn=opa.subprocess.Popen;commands=[]
+                def run(command,*a,**kw):commands.append(command);return spawn(command,*a,**kw)
+                with patch.object(opa.subprocess,'Popen',side_effect=run),self.assertRaisesRegex(wa.ExperimentError,'no retry'):
+                    opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+                self.assertEqual([c[-2] for c in commands],[parts[1]['path']])
+                report=json.loads((root/'group'/opa.RECEIPT).read_text())
+                self.assertEqual(len(report['source_rounds']),n+1)
+                self.assertEqual([p['part_index'] for p in report['parts']],[0])
+            (root/'retry.enabled').touch()
+            self.assertEqual(opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))['status'],'ordinary_parts_success')
+
+    def test_resume_refuses_changed_source_filter_and_completed_native_before_mapping(self):
+        for corruption in ('output','index','query','filter','history'):
+            with self.subTest(corruption=corruption),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root)
+                if corruption=='output':Path(old['parts'][0]['native']['path']).write_text('corrupt')
+                elif corruption=='index':Path(parts[0]['path']).write_text('corrupt')
+                elif corruption=='query':q.write_text('>changed\nACGT\n')
+                elif corruption=='filter':args.minimap_filter='0.01'
+                else:
+                    old['events'][0]['threads']=1000;wa.write_json(root/'group'/opa.RECEIPT,old)
+                with (patch.object(opa.subprocess,'Popen',side_effect=AssertionError('must not map corrupt inputs')),
+                      self.assertRaises(wa.ExperimentError)):
+                    opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+
+    def test_legacy_failed_receipt_reconstructs_only_recorded_verified_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root)
+            old['parts']=[];old.pop('mid_occ');old.pop('selected_parts');old.pop('inherited_mid_occ')
+            wa.write_json(root/'group'/opa.RECEIPT,old);original=(root/'group'/opa.RECEIPT).read_bytes()
+            (root/'retry.enabled').touch()
+            report=opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            self.assertEqual(report['reused_part_indices'],[0])
+            self.assertEqual((root/'group/original-run.json').read_bytes(),original)
+
+    def test_multiple_pending_parts_reuse_completed_first_and_retain_bounded_parallelism(self):
+        for budget,expected_slots in ((8*1024**3,2),(None,1)):
+            with self.subTest(budget=budget),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root,count=4,behavior='fail-many-once')
+                (root/'retry.enabled').touch();args.ordinary_group_memory_bytes=budget
+                report=opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+                self.assertEqual(report['reused_part_indices'],[0])
+                round=json.loads((root/'group/resume-0001'/opa.RECEIPT).read_text())
+                self.assertEqual(round['selected_parts'],[1,2,3])
+                self.assertEqual(round['admission']['slots'],expected_slots)
+                self.assertEqual([e['part_index'] for e in round['events'] if e['event']=='start'],[1,2,3])
+                self.assertEqual(sum(round['admission']['thread_shares']),7)
+                with self.assertRaisesRegex(wa.ExperimentError,'subset execution'):
+                    opa.verify(root/'group/resume-0001',mm,q,parts,records)
+                # The persistent production cache is exercised below by the real
+                # mixed pipeline test; don't rename native receipt-owned paths.
+                self.assertEqual(opa.verify(root/'group',mm,q,parts,records),report)
+
+    def test_insufficient_new_budget_preserves_history_and_can_resume_after_correction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root)
+            args.ordinary_group_memory_bytes=512*1024**2
+            with (patch.object(opa.subprocess,'Popen',side_effect=AssertionError('budget must prevent launch')),
+                  self.assertRaisesRegex(wa.ExperimentError,'exclusive group budget')):
+                opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            self.assertFalse((root/'group/resume-0001').exists())
+            args.ordinary_group_memory_bytes=8*1024**3;(root/'retry.enabled').touch()
+            report=opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            self.assertEqual(report['reused_part_indices'],[0])
+
+    def test_configured_mapper_memory_limit_is_respected_on_fresh_and_serial_resume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records=self.fixture(root,count=2)
+            args=self.args(memory_gib=1)
+            admission=opa.plan(args,parts,records)
+            self.assertEqual(admission['worker_address_space_bytes'],1024**3)
+            report=opa.attempt(mm,parts,q,root/'group',args,records,admission)
+            self.assertTrue(all(p['memory_bytes']==1024**3 for p in report['parts']))
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);mm,parts,q,records,args,old=self.fail_once(root)
+            args.memory_gib=2;args.ordinary_group_memory_bytes=None;(root/'retry.enabled').touch()
+            report=opa.attempt(mm,parts,q,root/'group',args,records,opa.plan(args,parts,records))
+            round=json.loads((root/'group/resume-0001'/opa.RECEIPT).read_text())
+            self.assertIsNone(round['admission']['group_budget_bytes'])
+            self.assertEqual(round['parts'][0]['memory_bytes'],2*1024**3)
+            self.assertEqual(opa.verify(root/'group',mm,q,parts,records),report)
 
     def test_timeout_terminates_mapper_descendants_without_automatic_retry(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -252,6 +403,111 @@ class RealPartitionExecutionTests(unittest.TestCase):
             self.assertEqual(again['cache_reused']['ordinary_group'],1)
             self.assertEqual(Path(again['output_path']).read_bytes(),old)
 
+    def test_real_failed_sibling_resumes_only_missing_part_and_passes_publication(self):
+        for fraction in (None,'0.01'):
+            with self.subTest(fraction=fraction),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);args=self.fixture(root);args.minimap_filter=fraction
+                spawn=opa.subprocess.Popen;first=[]
+                def interrupt_second(command,*a,**kw):
+                    process=spawn(command,*a,**kw)
+                    output=str(command[command.index('-o')+1]) if '-o' in command else ''
+                    if output.endswith('/ordinary-native/part-0000/native.partial.paf'):
+                        first.append(process)
+                    elif output.endswith('/ordinary-native/part-0001/native.partial.paf'):
+                        # QA-only real process failure: stop/kill the second
+                        # original mapper after the first has actually finished.
+                        # No fabricated returncode, receipt or PAF is accepted.
+                        process.send_signal(signal.SIGSTOP)
+                        try:first[0].wait(timeout=60)
+                        finally:process.kill();process.wait(timeout=10)
+                    return process
+                with self.controls(),patch.object(opa.subprocess,'Popen',side_effect=interrupt_second):
+                    with self.assertRaisesRegex(wa.ExperimentError,'no retry'):
+                        pa.experiment(args,resume_identity={'scope':'real-failed-sibling'})
+                group=args.out/'ordinary-native'
+                failed=json.loads((group/opa.RECEIPT).read_text())
+                self.assertEqual([p['part_index'] for p in failed['parts']],[0])
+                previous={p:p.read_bytes() for p in (group/'part-0000').iterdir()}
+                args.ordinary_group_memory_bytes=None;commands=[]
+                def record(command,*a,**kw):
+                    output=str(command[command.index('-o')+1]) if '-o' in command else ''
+                    if '/ordinary-native/' in output:commands.append(command)
+                    return spawn(command,*a,**kw)
+                with self.controls(),patch.object(opa.subprocess,'Popen',side_effect=record):
+                    result=pa.experiment(args,resume_identity={'scope':'real-failed-sibling'})
+                self.assertEqual(len(commands),1)
+                self.assertTrue(commands[0][-2].endswith('part-0001.mmi'))
+                native=result['ordinary_native'];self.assertEqual(native['reused_part_indices'],[0])
+                self.assertEqual(native['schema'],2)
+                self.assertEqual(result['admission']['status'],'proactive_recovery_admitted')
+                for p,data in previous.items():self.assertEqual(p.read_bytes(),data)
+                baseline=nf.attempt(self.mm,args.out/'target.default.mmi',native['query']['path'],root/'independent-QA-baseline',args)
+                self.assertEqual(b''.join(Path(row['native']['path']).read_bytes() for row in native['parts']),Path(baseline['path']).read_bytes())
+                output=Path(result['output_path']).read_bytes()
+                with self.controls(),patch.object(pa.subprocess,'check_output',return_value='2.31-r1302\n'),patch.object(opa.subprocess,'Popen',side_effect=AssertionError('completed mixed result must not remap')):
+                    again=pa.experiment(args,resume_identity={'scope':'real-failed-sibling'})
+                self.assertEqual(again['cache_reused']['ordinary_group'],1)
+                self.assertEqual(again['cache_reused']['long_cells'],2)
+                self.assertEqual(Path(again['output_path']).read_bytes(),output)
+
+    def test_reviewed_source_upgrade_resumes_real_partial_group_without_remapping_first_part(self):
+        import test_proactive_resume as fixtures
+        import server_alignment as sa
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);owner=fixtures.RealResumeTests();owner.mm=self.mm;owner.bundle=self.bundle
+            service=root/'service';service.mkdir();runtime,service_args=owner.fixture(service)
+            data=root/'data';data.mkdir();mapping=self.fixture(data)
+            service_args.target=mapping.target;service_args.query=mapping.query;service_args.threads=4
+            (service_args.server_dir/'metadata/prepare_options.tsv').write_text('key\tvalue\nminimap_batch\t100K\n')
+            files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_partition_resume_runtime.json').read_text())
+            digest=lambda v:__import__('hashlib').sha256(json.dumps(v,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            manifest=json.loads((runtime/sa.MANIFEST).read_text())
+            manifest['native_resume_source_profiles']=[[digest(files),digest(manifest['files_sha256'])]]
+            wa.write_json(runtime/sa.MANIFEST,manifest)
+            execute=pa.experiment;spawn=opa.subprocess.Popen;first=[]
+            def budgeted(options,**kw):
+                options.ordinary_group_memory_bytes=8*1024**3
+                return execute(options,**kw)
+            def interrupt_second(command,*a,**kw):
+                process=spawn(command,*a,**kw)
+                output=str(command[command.index('-o')+1]) if '-o' in command else ''
+                if output.endswith('/ordinary-native/part-0000/native.partial.paf'):first.append(process)
+                elif output.endswith('/ordinary-native/part-0001/native.partial.paf'):
+                    process.send_signal(signal.SIGSTOP)
+                    try:first[0].wait(timeout=60)
+                    finally:process.kill();process.wait(timeout=10)
+                return process
+            environment={'PATH':str(Path(self.mm).parent)+os.pathsep+os.environ['PATH']}
+            with patch.dict(os.environ,environment),self.controls(),patch.object(pa,'experiment',side_effect=budgeted),patch.object(opa.subprocess,'Popen',side_effect=interrupt_second):
+                with self.assertRaisesRegex(wa.ExperimentError,'no retry'):
+                    sa.run_reference(service_args,runtime_root=runtime)
+            locator=pr.read_json(service_args.run_dir/pr.LOCATOR);attempt=Path(locator['attempt'])
+            group=attempt/'selective/ordinary-native';before={p:p.read_bytes() for p in (group/'part-0000').iterdir()}
+            # QA control descriptor simulation only, with actual old source hash
+            # dictionaries and identical native/recovery kernels. Not a replay
+            # of a historical customer runtime.
+            control=pr.read_json(attempt/'server-alignment.json')
+            control['runtime']={**control['runtime'],'sha256':'d'*64,'files_sha256':files}
+            wa.write_json(attempt/'server-alignment.json',control)
+            locator['key']['runtime_sha256']='d'*64
+            state=pr.read_json(attempt/'selective'/pr.STATE);state['key']=locator['key']
+            wa.write_json(service_args.run_dir/pr.LOCATOR,locator);wa.write_json(attempt/'selective'/pr.STATE,state)
+            commands=[]
+            def record(command,*a,**kw):
+                output=str(command[command.index('-o')+1]) if '-o' in command else ''
+                if '/ordinary-native/' in output:commands.append(command)
+                return spawn(command,*a,**kw)
+            with patch.dict(os.environ,environment),self.controls(),patch.object(pa,'experiment',side_effect=budgeted),patch.object(opa.subprocess,'Popen',side_effect=record):
+                result=sa.run_reference(service_args,runtime_root=runtime)
+            self.assertTrue(result['attempt_reused']);self.assertEqual(result['attempt'],str(attempt))
+            self.assertEqual(len(commands),1);self.assertTrue(commands[0][-2].endswith('part-0001.mmi'))
+            for p,raw in before.items():self.assertEqual(p.read_bytes(),raw)
+            candidate=json.loads((attempt/'selective/proactive-candidate.json').read_text())
+            self.assertEqual(candidate['ordinary_native']['reused_part_indices'],[0])
+            self.assertEqual(json.loads((attempt/'recovery-admission.json').read_text())['status'],'proactive_recovery_admitted')
+            self.assertTrue(result['result_published'])
+            self.assertTrue((service_args.run_dir/'result.paf').is_file())
+
     def test_explicit_fast_fraction_first_part_is_inherited_without_conflicting_flags(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);args=self.fixture(root);args.minimap_filter='0.01'
@@ -267,7 +523,7 @@ class RealPartitionExecutionTests(unittest.TestCase):
     def test_performance_source_upgrade_retains_completed_native_and_long_cells(self):
         import test_proactive_resume as fixtures
         import server_alignment as sa
-        for source_file in ('pre_partition_runtime.json', 'post_metadata_fix_runtime.json'):
+        for source_file in ('pre_partition_runtime.json', 'post_metadata_fix_runtime.json', 'pre_partition_resume_runtime.json'):
             with self.subTest(source_file=source_file), tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp);owner=fixtures.RealResumeTests();owner.mm=self.mm;owner.bundle=self.bundle
                 runtime,args=owner.fixture(root)
