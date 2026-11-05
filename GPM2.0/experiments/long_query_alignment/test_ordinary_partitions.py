@@ -112,10 +112,10 @@ output.write_text(str(index))
         p.chmod(0o700)
         return str(p)
 
-    def run_fake(self,root,behavior='normal',timeout=5):
+    def run_fake(self,root,behavior='normal',timeout=5,count=2):
         mm=self.fake_mapper(root,behavior)
         catalog=[]
-        for i in range(2):
+        for i in range(count):
             p=root/f'idx{i}';p.write_text(str(i))
             catalog.append({'part_index':i,'path':str(p)})
         return parts.map_parts(mm,catalog,'q',root,
@@ -132,6 +132,24 @@ output.write_text(str(index))
             self.assertEqual([e['part_index'] for e in r['events'] if e['event']=='complete'],[1,0])
             self.assertEqual([x['command'][-2] for x in r['parts']],[str(root/'idx0'),str(root/'idx1')])
             self.assertEqual(len(r['parts']),2)
+
+    def test_queued_third_part_reuses_free_slot_without_oversubscribing(self):
+        with tempfile.TemporaryDirectory() as d:
+            r=self.run_fake(Path(d),count=3)
+            self.assertEqual(len(r['parts']),3)
+            active={}
+            for event in r['events']:
+                if event['event']=='start':
+                    active[event['part_index']]=event['threads']
+                    self.assertLessEqual(sum(active.values()),4)
+                    if event['part_index']>0:self.assertEqual(event['mid_occ'],500)
+                elif event['event']=='complete':
+                    del active[event['part_index']]
+            self.assertEqual(active,{})
+            starts={e['part_index']:e['after_seconds'] for e in r['events'] if e['event']=='start'}
+            ends={e['part_index']:e['after_seconds'] for e in r['events'] if e['event']=='complete'}
+            self.assertGreaterEqual(starts[2],ends[1])
+            self.assertLess(starts[2],ends[0])
 
     def test_missing_threshold_refuses_to_start_other_parts(self):
         with tempfile.TemporaryDirectory() as d:

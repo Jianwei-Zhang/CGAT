@@ -43,6 +43,18 @@ class FilteringTests(unittest.TestCase):
             self.assertEqual(diff['added_full_PAF_rows'],1)
             self.assertFalse(diff['downstream_scientific_acceptance'])
 
+    def test_lost_alternative_target_detected_without_any_coverage_loss(self):
+        with tempfile.TemporaryDirectory() as d:
+            a,b=Path(d)/'a',Path(d)/'b'
+            a.write_text(self.row(target='first')+self.row(target='alternative'))
+            b.write_text(self.row(target='first'))
+            diff=filtering.differences(filtering.profile(a),filtering.profile(b))
+            self.assertEqual(diff['queries_with_reduced_union_coverage'],0)
+            self.assertEqual(diff['baseline_query_union_coverage_bases'],diff['candidate_query_union_coverage_bases'])
+            self.assertEqual(diff['removed_query_target_strand_pairs'],1)
+            self.assertEqual(diff['removed_full_PAF_rows'],1)
+            self.assertFalse(diff['downstream_scientific_acceptance'])
+
     def test_even_identical_profile_does_not_claim_downstream_acceptance(self):
         x={'signatures':Counter(),'pairs':set(),'coverage':{}}
         self.assertFalse(filtering.differences(x,x)['downstream_scientific_acceptance'])
