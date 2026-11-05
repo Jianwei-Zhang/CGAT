@@ -1,3 +1,5 @@
+import { formatIntegerEnUs } from "./number-format.js";
+
 // One absolute scale for Canvas, SVG, drag previews and serialized SVGs.
 // Missing evidence is not a measured zero; MAPQ is never a fallback.
 // Keep the absolute identity domain; soften paint strength, not opacity, so
@@ -60,7 +62,7 @@ export function alignmentBandSvgAttrs(band, tone = band?.tone) {
 export function alignmentBandTooltipMetrics(hit) {
   const identity = readHitIdentityPct(hit);
   const length = Number(hit?.alignLength ?? hit?.blockLength);
-  return `Identity: ${identity === null ? "Unknown" : `${identity.toFixed(2)}%`} | Alignment length: ${Number.isFinite(length) && length > 0 ? `${Math.round(length).toLocaleString("en-US")} bp` : "Unknown"}`;
+  return `Identity: ${identity === null ? "Unknown" : `${identity.toFixed(2)}%`} | Alignment length: ${Number.isFinite(length) && length > 0 ? `${formatIntegerEnUs(Math.round(length))} bp` : "Unknown"}`;
 }
 
 export function renderAlignmentIdentityLegend(labels, escapeAttr) {

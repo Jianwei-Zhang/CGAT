@@ -2,6 +2,7 @@ import { createSubviewBandCanvasDragPreview } from "./band-canvas-runtime.js";
 import { compileTrackDragPreview } from "./track-drag-preview-runtime.js";
 import { buildVisibleSubviewRulerMarkup } from "./subview-ruler-runtime.js";
 import { resolveTickBpFromScale } from "./track-prefs.js";
+import { dragTargets } from "./source-fragment-drag.js";
 import { compactFullRangeEdges, fitFullRangeDragBounds, fullRangeTextMatrix,
   IDENTITY_MATRIX, inverseMatrix, matrixPoint, multiplyMatrix } from "./full-range-drag-geometry.js";
 
@@ -121,7 +122,11 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
     return { position:number(node,"data-subview-rect-x")+number(node,"data-subview-rect-width"),motion:action?.factor || 0 };
   }) : [];
   const bandPreview = subview
-    ? createSubviewBandCanvasDragPreview(scroll, plan.actions, { width: viewportWidth, height: viewBox[3] }) : null;
+    ? createSubviewBandCanvasDragPreview(scroll, plan.actions, {
+      width: viewportWidth,
+      height: viewBox[3],
+      denseTargets: dragTargets(payload),
+    }) : null;
   const first = svg.firstElementChild;
   const children = svg.childElementCount;
   let restored = false, lastFit = null, lastDeltaPx = 0, preparedForCommit = false;

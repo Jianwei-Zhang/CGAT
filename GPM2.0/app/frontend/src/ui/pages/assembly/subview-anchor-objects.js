@@ -3,6 +3,7 @@ import {
   normalizeSubviewActiveAnchors,
   normalizeSubviewManualAnchors,
 } from "./subview-anchor-state.js";
+import { readDenseAnchorScene } from "./subview-dense-hit-runtime.js";
 
 function positiveInt(value) {
   const number = Number(value);
@@ -54,8 +55,52 @@ export function buildSubviewAnchorObjectId(kind, identity, edge = "") {
     : `${prefix}:${normalizedIdentity}:${String(edge || "left").trim().toLowerCase()}`;
 }
 
+function denseAnchorEndpoint(record, side) {
+  const prefix = `${side}`;
+  const contigId = positiveInt(record?.[`${prefix}ContigId`]);
+  const cutBp = positiveInt(record?.[`${prefix}CutBp`]);
+  const endpointKey = String(record?.[`${prefix}EndpointKey`] || "").trim();
+  if (!contigId || !cutBp || !endpointKey) return null;
+  const value = (name) => record?.[name] ?? "";
+  return {
+    endpointKey,
+    contigId,
+    cutBp,
+    ...(positiveInt(record?.[`${prefix}LengthBp`]) ? { lengthBp: positiveInt(record[`${prefix}LengthBp`]) } : {}),
+    ...(String(value(`${prefix}Name`)).trim() ? { name: String(value(`${prefix}Name`)).trim() } : {}),
+    ...(String(value(`${prefix}SourceLabel`)).trim() ? { sourceLabel: String(value(`${prefix}SourceLabel`)).trim() } : {}),
+    ...(String(value(`${prefix}SourceRole`)).trim() ? { sourceRole: String(value(`${prefix}SourceRole`)).trim() } : {}),
+    ...(String(value(`${prefix}SourceKind`)).trim() ? { sourceKind: String(value(`${prefix}SourceKind`)).trim() } : {}),
+    ...(String(value(`${prefix}SourceName`)).trim() ? { sourceName: String(value(`${prefix}SourceName`)).trim() } : {}),
+  };
+}
+
+function collectDenseAnchorScene(host) {
+  return readDenseAnchorScene(host).map((record) => {
+    const objectId = buildSubviewAnchorObjectId("evidence", record.hitKey, record.edge);
+    const top = denseAnchorEndpoint(record, "top");
+    const bottom = denseAnchorEndpoint(record, "bottom");
+    if (!objectId) return null;
+    const topX = Number(record.topX), bottomX = Number(record.bottomX);
+    return {
+      objectId,
+      kind: "evidence",
+      hitKey: String(record.hitKey || ""),
+      edge: String(record.edge || "").toLowerCase(),
+      grtOriginId: "",
+      descriptor: top && bottom ? { top, bottom } : null,
+      topX: Number.isFinite(topX) ? topX : null,
+      bottomX: Number.isFinite(bottomX) ? bottomX : null,
+      hitTopY: Number(record.hitTopY),
+      hitBottomY: Number(record.hitBottomY),
+      node: null,
+      dense: true,
+    };
+  }).filter(Boolean);
+}
+
 export function collectSubviewAnchorScene(host) {
-  return Array.from(host?.querySelectorAll?.(
+  const rendered = Array.from(host?.querySelectorAll?.(
     "[data-subview-anchor-kind][data-subview-anchor-object-id]",
   ) || []).map((node) => {
     const rawKind = node.getAttribute("data-subview-anchor-kind");
@@ -76,6 +121,7 @@ export function collectSubviewAnchorScene(host) {
       node,
     };
   }).filter(Boolean);
+  return [...rendered, ...collectDenseAnchorScene(host)];
 }
 
 export function findSubviewAnchorDescriptor(host, hitKey, edge) {

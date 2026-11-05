@@ -7,7 +7,12 @@ export function restoreSvgTooltipTitles(clone) {
     title.textContent = text; node.append(title); restored.add(node);
   };
   for (const attribute of ["data-final-path-tooltip", "data-app-tooltip", "data-member-tooltip", "data-subview-band-tooltip"]) {
-    for (const node of clone.querySelectorAll(`[${attribute}]`)) restore(node, node.getAttribute(attribute));
+    for (const node of clone.querySelectorAll(`[${attribute}]`)) {
+      // Dense Local View hit surfaces are transient pointer adapters, not plot
+      // objects; never serialize their current hover payload into an export.
+      if (node.matches?.("[data-subview-dense-hit-surface]")) continue;
+      restore(node, node.getAttribute(attribute));
+    }
   }
   for (const desc of clone.querySelectorAll("desc[data-app-tooltip-source]")) restore(desc.parentElement, desc.textContent);
   return clone;

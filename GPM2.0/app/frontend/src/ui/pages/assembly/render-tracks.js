@@ -67,6 +67,7 @@ import {
   resolveTrackCtgOrient,
   resolveTrackCtgVisibleName,
 } from "./track-label-geometry.js";
+import { formatBpIntervalEnUs } from "./number-format.js";
 import {
   buildEmptyTrackModelLike,
   buildCollinearityBandPoints,
@@ -501,9 +502,7 @@ function createRenderTracksRenderer(deps = {}) {
   }
 
   function formatBpInterval(start, end) {
-    const resolvedStart = Number(start || 0).toLocaleString("en-US");
-    const resolvedEnd = Number(end || 0).toLocaleString("en-US");
-    return `${resolvedStart}-${resolvedEnd} bp`;
+    return formatBpIntervalEnUs(start, end);
   }
 
   function formatRulerTickLabel(value) {

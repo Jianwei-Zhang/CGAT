@@ -343,6 +343,63 @@ test("subview track-pair uses true pairwise paf intervals for ds-ds bands", () =
   );
 });
 
+test("dense track-pair Local View keeps every pairwise band and anchor in compact scenes", () => {
+  const hits = Array.from({ length: 1100 }, (_, index) => ({
+    hitKey: `pair-${index + 1}`,
+    queryAssemblyCtgId: 30,
+    subjectAssemblyCtgId: 2,
+    queryStart: 100 + index * 40,
+    queryEnd: 260 + index * 40,
+    subjectStart: 200 + index * 45,
+    subjectEnd: 380 + index * 45,
+    strand: index % 2 ? "-" : "+",
+    identityPct: 90 + (index % 100) / 10,
+    alignLength: 160,
+    mapq: 60,
+  }));
+  const html = renderAssemblyPage(createState({
+    assembly: {
+      supportDatasetId: 22,
+      supportChrCtgs: [{
+        assemblyCtgId: 30, name: "support-top", assignedChrName: "Chr01", memberCount: 1,
+        totalLength: 100_000, anchorStart: 320,
+        hits: [{ refStart: 5000, refEnd: 6200, ctgStart: 2200, ctgEnd: 3400, blockLength: 1300, mapq: 60 }],
+      }],
+      chrCtgs: [{
+        assemblyCtgId: 2, name: "primary-bottom", assignedChrName: "Chr01", memberCount: 1,
+        totalLength: 100_000, anchorStart: 100,
+        hits: [{ refStart: 5000, refEnd: 6200, ctgStart: 2400, ctgEnd: 3600, blockLength: 1400, mapq: 60 }],
+      }],
+      subviewTrackView: { minTickUnitKb: 1000, maxTickCount: 10, alignmentLength: 100, mapq: 0 },
+      subview: {
+        mode: "track-pair",
+        pairwiseEvidence: { key: "track-pair:support:mother:22:30|primary:2", status: "loaded", hits },
+        summary: {
+          mode: "track-pair",
+          topTrack: { role: "support", source: "mother", datasetId: 22 },
+          bottomTrack: { role: "primary" },
+        },
+      },
+    },
+    initializer: {
+      datasets: [{ datasetId: 11, name: "hifiasm", label: "hifiasm" },
+        { datasetId: 22, name: "flye", label: "flye" }],
+      existingProjects: [{ projectId: 7, primaryDatasetId: 11, supportDatasetIds: [22] }],
+    },
+  }));
+  assert.match(html, /data-subview-band-rendering="dense"/);
+  assert.match(html, /data-subview-dense-hit-surface="1"/);
+  const sceneMatch = html.match(/data-track-band-canvas-scene-kind="subview-track-pair"[\s\S]*?<script type="application\/json" data-track-band-canvas-scene>(.*?)<\/script>/);
+  const anchorMatch = html.match(/<script type="application\/json" data-subview-dense-anchor-scene="1">(.*?)<\/script>/);
+  assert.ok(sceneMatch, "expected dense track-pair scene");
+  assert.ok(anchorMatch, "expected dense track-pair anchors");
+  const scene = JSON.parse(sceneMatch[1]), anchors = JSON.parse(anchorMatch[1]);
+  assert.equal(scene.bands.length, 1100);
+  assert.equal(anchors.length, 2200);
+  assert.ok(scene.bands.every((band) => band.tooltip && band.topContigId === 30 && band.bottomContigId === 2));
+  assert.doesNotMatch(html, /<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<polygon class="track-collinearity-band is-companion"/);
+});
+
 test("subview track-pair pairwise bands mirror phased item orientation", () => {
   const html = renderAssemblyPage(
     createState({
@@ -873,18 +930,37 @@ test("subview low alignment threshold keeps right-side coverage instead of left-
     const svgWidthMatch = svgMarkup.match(/<svg class="assembly-track-svg subview-track-svg" width="([^"]+)"/);
     assert.ok(svgWidthMatch, "expected subview svg width");
     const svgWidth = Number(svgWidthMatch[1]);
-    const polygons = Array.from(
-      svgMarkup.matchAll(/<polygon class="track-collinearity-band is-companion" points="([^"]+)"/g),
-    );
-    assert.ok(polygons.length > 0, "expected subview band polygons");
-    const maxX = Math.max(
-      ...polygons.flatMap((polygon) =>
-        polygon[1].split(/\s+/).map((point) => Number(point.split(",")[0])),
-      ),
-    );
+    let points = [];
+    if (/data-subview-band-rendering="dense"/.test(html)) {
+      const sceneMatch = html.match(/data-track-band-canvas-scene-kind="subview-ctg"[\s\S]*?<script type="application\/json" data-track-band-canvas-scene>(.*?)<\/script>/);
+      assert.ok(sceneMatch, "expected dense subview band scene");
+      points = JSON.parse(sceneMatch[1]).bands.flatMap((band) => band.points);
+    } else {
+      const polygons = Array.from(
+        svgMarkup.matchAll(/<polygon class="track-collinearity-band is-companion" points="([^"]+)"/g),
+      );
+      assert.ok(polygons.length > 0, "expected subview band polygons");
+      points = polygons.flatMap((polygon) =>
+        polygon[1].split(/\s+/).map((point) => point.split(",")),
+      );
+    }
+    assert.ok(points.length > 0, "expected rendered subview band coordinates");
+    const maxX = Math.max(...points.map((point) => Number(point[0])));
     return { maxX, svgWidth };
   };
 
+  assert.match(lowThresholdHtml, /data-subview-band-rendering="dense"/);
+  assert.match(lowThresholdHtml, /data-subview-dense-hit-surface="1"/);
+  assert.doesNotMatch(lowThresholdHtml, /<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<polygon class="track-collinearity-band is-companion"/);
+  const denseSceneMatch = lowThresholdHtml.match(/data-track-band-canvas-scene-kind="subview-ctg"[\s\S]*?<script type="application\/json" data-track-band-canvas-scene>(.*?)<\/script>/);
+  const denseAnchorMatch = lowThresholdHtml.match(/<script type="application\/json" data-subview-dense-anchor-scene="1">(.*?)<\/script>/);
+  assert.ok(denseSceneMatch, "expected dense band sidecar");
+  assert.ok(denseAnchorMatch, "expected dense anchor sidecar");
+  const denseScene = JSON.parse(denseSceneMatch[1]);
+  const denseAnchors = JSON.parse(denseAnchorMatch[1]);
+  assert.equal(denseAnchors.length, denseScene.bands.length * 2);
+  assert.ok(denseScene.bands.every((band) => band.tooltip && band.topContigId && band.bottomContigId));
+  assert.doesNotMatch(lowThresholdHtml, /class="subview-anchor-hit-zone/);
   const lowThresholdRange = extractMaxBandX(lowThresholdHtml);
   const highThresholdRange = extractMaxBandX(highThresholdHtml);
   assert.ok(

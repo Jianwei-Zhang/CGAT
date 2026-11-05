@@ -3,6 +3,7 @@ import {
   resolveDarkAlignmentBandStyle,
   sortAlignmentBands,
 } from "./alignment-band-style.js";
+import { bindSubviewDenseHitRuntime, readDenseBandRecords } from "./subview-dense-hit-runtime.js";
 
 const TRACK_BAND_CANVAS_BOUND = Symbol("trackBandCanvasBound");
 const TRACK_BAND_CANVAS_READY_CLASS = "is-track-band-canvas-ready";
@@ -187,6 +188,7 @@ export function adoptBandCanvasRaster(layer, raster) {
 }
 
 export function bindBandCanvasRuntime(host, { synchronous = false } = {}) {
+  bindSubviewDenseHitRuntime(host);
   const { request, cancel } = resolveAnimationFrameApi();
   const layers = host?.querySelectorAll?.("[data-track-band-canvas-layer='1']") || [];
   layers.forEach((layer) => {
@@ -334,6 +336,7 @@ function createBandDragBitmapPreview(document, scroll, bands, nodes, { width, he
   let attached = false, restored = false;
   return {
     nodes: new Set(nodes),
+    prepareCommit() {},
     draw(deltaPx, [minX, minY, spanX, spanY]) {
       if (restored) return false;
       const sx = width / spanX, sy = height / spanY;
@@ -368,27 +371,53 @@ function createBandDragBitmapPreview(document, scroll, bands, nodes, { width, he
 
 // Gesture-local paint records: retain every rendered band and its draw order,
 // but never rewrite thousands of SVG proxy points on every pointer frame.
-export function createSubviewBandCanvasDragPreview(scroll, actions, { width, height }) {
+export function createSubviewBandCanvasDragPreview(scroll, actions, { width, height, denseTargets = null } = {}) {
   const document = scroll?.ownerDocument;
   const svg = scroll?.querySelector?.("svg.assembly-track-svg");
   const nodes = svg?.querySelectorAll?.("polygon.track-collinearity-band[data-track-band-proxy='1']") || [];
-  if (!nodes.length || !document?.createElement || !scroll?.appendChild) return null;
-  const byNode = new Map(actions.filter((action) => action.kind === "band").map((action) => [action.node, action]));
+  if (!document?.createElement || !scroll?.appendChild) return null;
+  const byNode = new Map((Array.isArray(actions) ? actions : []).filter((action) => action.kind === "band")
+    .map((action) => [action.node, action]));
   const dark = document.documentElement?.dataset?.theme === "dark";
   const resolveStyle = dark ? resolveDarkAlignmentBandStyle : resolveAlignmentBandStyle;
-  const bands = [];
-  for (const node of nodes) {
-    const action = byNode.get(node);
-    const points = action?.basePoints || String(node.getAttribute("points") || "").trim().split(/\s+/)
-      .map((point) => point.split(",").map(Number));
-    if (points.length !== 4 || points.some((point) => point.length !== 2 || !point.every(Number.isFinite))) return null;
-    const identityText = node.getAttribute("data-band-identity-pct");
-    const identityPct = identityText === null || identityText === "" ? null : Number(identityText);
-    const tone = node.classList.contains("is-companion") ? "companion" : "primary";
-    bands.push({ points, identityPct, tone, hitKey: String(node.getAttribute("data-subview-hit-key") || ""), styles: resolveStyle(tone, identityPct),
-      moving: points.map((_, index) => action?.edgeIndexes.includes(index) ? 1 : 0) });
-  }
-  const orderedBands = sortAlignmentBands(bands);
+  let bands = [];
+  if (nodes.length) {
+    for (const node of nodes) {
+      const action = byNode.get(node);
+      const points = action?.basePoints || String(node.getAttribute("points") || "").trim().split(/\s+/)
+        .map((point) => point.split(",").map(Number));
+      if (points.length !== 4 || points.some((point) => point.length !== 2 || !point.every(Number.isFinite))) return null;
+      const identityText = node.getAttribute("data-band-identity-pct");
+      const identityPct = identityText === null || identityText === "" ? null : Number(identityText);
+      const tone = node.classList.contains("is-companion") ? "companion" : "primary";
+      bands.push({ points, identityPct, tone, hitKey: String(node.getAttribute("data-subview-hit-key") || ""), styles: resolveStyle(tone, identityPct),
+        moving: points.map((_, index) => action?.edgeIndexes.includes(index) ? 1 : 0) });
+    }
+  } else if (Array.isArray(denseTargets) && denseTargets.length) {
+    const targets = denseTargets.map((target) => ({
+      slot: String(target?.slot || "").trim(),
+      contigId: Number(target?.contigId || 0),
+    })).filter((target) => target.slot && target.contigId);
+    if (!targets.length) return null;
+    const layer = scroll.querySelector?.("[data-track-band-canvas-layer='1']");
+    const records = layer?.[TRACK_BAND_CANVAS_BOUND]?.paintedScene?.bands;
+    for (const record of Array.isArray(records) ? records : readDenseBandRecords(scroll)) {
+      const points = Array.isArray(record?.points) ? record.points : null;
+      if (!points || points.length !== 4 || points.some((point) => !Array.isArray(point)
+        || point.length !== 2 || !point.every(Number.isFinite))) return null;
+      const moving = [0, 0, 0, 0];
+      for (const target of targets) {
+        if (target.slot === "top" && Number(record.topContigId) === target.contigId) moving[0] = moving[1] = 1;
+        if (target.slot === "bottom" && Number(record.bottomContigId) === target.contigId) moving[2] = moving[3] = 1;
+      }
+      const tone = String(record?.tone || "primary") === "companion" ? "companion" : "primary";
+      const identityPct = record?.identityPct === null || record?.identityPct === undefined || record?.identityPct === ""
+        ? null : Number(record.identityPct);
+      bands.push({ points, identityPct, tone, hitKey: String(record?.hitKey || ""), styles: resolveStyle(tone, identityPct), moving });
+    }
+    if (!bands.some((band) => band.moving.some(Boolean))) return null;
+  } else return null;
+  const orderedBands = nodes.length ? sortAlignmentBands(bands) : bands;
   const clip = svg.querySelector("[data-subview-band-clip-rect='1']");
   const clipY = clip ? Number(clip.getAttribute("y")) : null;
   const clipHeight = clip ? Number(clip.getAttribute("height")) : 0;
@@ -415,6 +444,7 @@ export function createSubviewBandCanvasDragPreview(scroll, actions, { width, hei
   let attached = false;
   return {
     nodes: new Set(nodes),
+    prepareCommit() {},
     draw(deltaPx, viewBox) {
       if (restored) return false;
       const [minX, minY, spanX, spanY] = viewBox;

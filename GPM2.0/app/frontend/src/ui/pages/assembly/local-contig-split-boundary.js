@@ -53,11 +53,21 @@ export function highlightLocalSplitBoundary(host, state, member, cutAfter, ancho
   for (const edge of localAlignmentEdges(state, host, member)) {
     if (anchored ? edge.cutAfter !== cutAfter : edge.scene.kind !== "evidence"
       || edge.sourceBp !== cutAfter && edge.sourceBp !== cutAfter + 1) continue;
-    const source = edge.scene.node, svg = source?.ownerSVGElement;
-    const doc = source?.ownerDocument || host?.ownerDocument;
+    const source = edge.scene.node;
+    const svg = source?.ownerSVGElement || host?.querySelector?.(".subview-track-svg");
+    const doc = source?.ownerDocument || host?.ownerDocument || svg?.ownerDocument;
     if (!svg || !doc?.createElementNS) continue;
+    const coordinates = source
+      ? Object.fromEntries(["x1", "x2", "y1", "y2"].map((attribute) => [attribute, source.getAttribute(attribute)]))
+      : {
+          x1: edge.scene.topX,
+          x2: edge.scene.bottomX,
+          y1: edge.scene.hitTopY,
+          y2: edge.scene.hitBottomY,
+        };
+    if (!Object.values(coordinates).every((value) => Number.isFinite(Number(value)))) continue;
     const line = doc.createElementNS("http://www.w3.org/2000/svg", "line");
-    for (const attribute of ["x1", "x2", "y1", "y2"]) line.setAttribute(attribute, source.getAttribute(attribute));
+    for (const [attribute, value] of Object.entries(coordinates)) line.setAttribute(attribute, String(value));
     line.setAttribute("class", "subview-anchor-line is-focused track-split-preview");
     line.setAttribute("stroke", "red"); line.setAttribute("stroke-width", "3");
     line.setAttribute("pointer-events", "none");

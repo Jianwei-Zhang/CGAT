@@ -918,6 +918,29 @@
   vector-effect: non-scaling-stroke;
 }
 
+.subview-dense-hit-surface {
+  cursor: default;
+}
+
+.is-subview-track-drag-preview .subview-dense-hit-surface {
+  pointer-events: none;
+}
+
+.subview-dense-hover-proxy {
+  fill: none;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.subview-dense-hit-surface.is-menu-active ~ .subview-dense-hover-proxy {
+  stroke: rgba(46, 86, 127, 0.88) !important;
+  stroke-width: 2;
+}
+
+.subview-dense-hit-surface.is-menu-active ~ .subview-dense-hover-proxy.is-companion {
+  stroke: rgba(124, 100, 64, 0.88) !important;
+}
+
 .subview-fragment-hit-zone {
   cursor: pointer;
 }
@@ -957,6 +980,16 @@
 .is-subview-track-drag-preview [data-track-band-canvas-scene-kind="subview-ctg"],
 .is-subview-track-drag-preview [data-track-band-canvas-scene-kind="subview-track-pair"] {
   visibility: hidden;
+}
+
+/* Dense mode keeps the raster visible if a gesture Canvas cannot be allocated. */
+.is-subview-track-drag-preview[data-subview-band-rendering="dense"]:not(.is-subview-band-canvas-drag-preview) [data-track-band-canvas-scene-kind="subview-ctg"],
+.is-subview-track-drag-preview[data-subview-band-rendering="dense"]:not(.is-subview-band-canvas-drag-preview) [data-track-band-canvas-scene-kind="subview-track-pair"] {
+  visibility: visible;
+}
+
+.is-subview-track-drag-preview .subview-dense-hover-proxy {
+  display: none;
 }
 
 .assembly-track-scroll.is-subview-track-drag-preview.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"],

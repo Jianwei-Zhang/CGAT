@@ -46,9 +46,10 @@ export function createSubviewDragRenderController({
     const panel = host?.querySelector?.("[data-subview-panel='1']");
     let card = panel?.querySelector?.(".subview-alignment-card");
     const scroll = card?.querySelector?.(".subview-track-scroll");
+    const denseBands = scroll?.getAttribute?.("data-subview-band-rendering") === "dense";
     if (!preview?.prepareCommit || !supported() || !scroll
       || !scroll.querySelector("[data-subview-band-drag-canvas]")
-      || (scroll.querySelectorAll?.("[data-track-band-proxy='1']")?.length || 0) < 1000) return null;
+      || (!denseBands && (scroll.querySelectorAll?.("[data-track-band-proxy='1']")?.length || 0) < 1000)) return null;
     if (active) cancel();
     const initial = store.getState(), document = panel.ownerDocument;
     const marker = document.createElement("span");

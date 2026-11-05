@@ -28,6 +28,31 @@ function fixture({ count = 1, dark = false, contextAvailable = true, clip = fals
     create: (options = {}) => createSubviewBandCanvasDragPreview(scroll, actions, { width: 100, height: 80, ...options }) };
 }
 
+test("dense scene Canvas moves selected endpoints and retains stationary bands", () => {
+  const f = fixture({ count: 0 });
+  const sceneNode = { textContent: JSON.stringify({ bands: [{
+    hitKey: "h1", tone: "primary", identityPct: 90,
+    points: [[10, 20], [30, 20], [80, 60], [50, 60]],
+    topContigId: 11, bottomContigId: 23,
+  }, {
+    hitKey: "h2", tone: "primary", identityPct: 95,
+    points: [[60, 20], [70, 20], [90, 60], [80, 60]],
+    topContigId: 12, bottomContigId: 24,
+  }] }) };
+  const svg = { querySelectorAll: () => [], querySelector: () => null };
+  f.scroll.querySelector = (selector) => selector === "[data-track-band-canvas-scene]"
+    ? sceneNode : selector === "svg.assembly-track-svg" ? svg : null;
+  const handle = f.create({ denseTargets: [{ slot: "top", contigId: 11 }] });
+  assert.equal(typeof handle.prepareCommit, "function");
+  handle.draw(20, [0, 0, 100, 80]);
+  assert.deepEqual(f.paints.at(-2).points, [[30, 20], [50, 20], [80, 60], [50, 60]]);
+  assert.deepEqual(f.paints.at(-1).points, [[60, 20], [70, 20], [90, 60], [80, 60]],
+    "stationary dense bands remain visible while the base Canvas is hidden");
+  assert.equal(f.children.length, 1);
+  assert.equal(f.classes.has("is-subview-band-canvas-drag-preview"), true);
+  handle.restore();
+});
+
 for (const edgeIndexes of [[0,1], [2,3], [0,1,2,3], []]) {
   test(`Canvas follows exactly the moving endpoints ${edgeIndexes} through outward and inward refits`, () => {
     const f = fixture(); f.actions[0].edgeIndexes = edgeIndexes;

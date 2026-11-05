@@ -8,9 +8,15 @@ import { renderSourceGapConnections, sourceFragmentDragAttrs, renderManualSplitM
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
-  readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
+  readHitIdentityPct, alignmentBandSvgAttrs,
   sortAlignmentBands, renderAlignmentIdentityLegend,
 } from "./alignment-band-style.js";
+import { buildSubviewBandTooltipData, formatSubviewBandTooltipText } from "./subview-band-tooltip.js";
+import {
+  DENSE_SUBVIEW_BAND_THRESHOLD,
+  DENSE_HIT_SURFACE_ATTR,
+  renderSubviewDenseAnchorScene,
+} from "./subview-dense-hit-runtime.js";
 import { buildDualTrackModel } from "./track-layout.js";
 import {
   ALIGNMENT_LENGTH_OPTIONS,
@@ -682,7 +688,6 @@ export function createAssemblySubviewRenderer(deps = {}) {
   const {
     escapeAttr,
     escapeHtml,
-    formatBpInterval,
     getMeasuredTrackViewportPx,
     getSubviewTrackDragPreview = () => null,
     renderTrackNumberInput,
@@ -694,7 +699,6 @@ export function createAssemblySubviewRenderer(deps = {}) {
   if (
     typeof escapeAttr !== "function"
     || typeof escapeHtml !== "function"
-    || typeof formatBpInterval !== "function"
     || typeof getMeasuredTrackViewportPx !== "function"
     || typeof renderTrackNumberInput !== "function"
     || typeof resolveSubviewTrackDragOffsetBp !== "function"
@@ -1387,6 +1391,12 @@ function stringifyTrackBandCanvasScene(scene) {
   return JSON.stringify(scene).replaceAll("</", "<\\/");
 }
 
+function renderSubviewDenseHitSurface({ x, y, width, height }) {
+  const safeHeight = Number(height);
+  if (!(safeHeight > 0) || !(Number(width) > 0)) return "";
+  return `<rect class="subview-dense-hit-surface" ${DENSE_HIT_SURFACE_ATTR}="1" x="${Number(x || 0).toFixed(2)}" y="${Number(y || 0).toFixed(2)}" width="${Number(width || 0).toFixed(2)}" height="${safeHeight.toFixed(2)}" fill="transparent" pointer-events="all" aria-hidden="true" />`;
+}
+
 function renderTrackBandCanvasLayer({
   sceneKind,
   width,
@@ -1415,12 +1425,17 @@ function renderTrackBandCanvasLayer({
         if (points.length < 4) {
           return null;
         }
-        return {
+        const record = {
           hitKey: String(band?.hitKey || ""),
           tone: String(band?.tone || "").trim() || "primary",
           identityPct: readHitIdentityPct(band),
           points,
         };
+        for (const key of ["topContigId", "bottomContigId", "leftActive", "rightActive"]) {
+          if (band?.[key] !== undefined && band?.[key] !== null) record[key] = band[key];
+        }
+        if (band?.tooltip) record.tooltip = band.tooltip;
+        return record;
       })
       .filter(Boolean),
   };
@@ -1780,6 +1795,12 @@ function renderSubviewAlignmentCard(
     },
   });
   const anchorEdges = [...evidenceAnchorEdges, ...manualAnchorEdges];
+  const denseBandRendering = svgModel.collinearityBands.length >= DENSE_SUBVIEW_BAND_THRESHOLD;
+  const renderedAnchorEdges = denseBandRendering
+    ? anchorEdges.filter((edge) => edge.active || edge.manualAnchorId) : anchorEdges;
+  const denseBandEdgeCandidates = anchorEdges.filter((edge) => !edge.active && !edge.manualAnchorId);
+  const denseBandHitY = Math.min(svgModel.topBarY + svgModel.barHeight, svgModel.bottomBarY);
+  const denseBandHitBottomY = Math.max(svgModel.topBarY + svgModel.barHeight, svgModel.bottomBarY);
   const grtResultEntries = [
     {
       key: "top",
@@ -1879,6 +1900,7 @@ function renderSubviewAlignmentCard(
           data-subview-inner-width="${svgModel.baseInnerWidth}"
           data-subview-viewbox-min-x="${svgModel.renderViewBoxMinX}"
           data-subview-window-start-bp="0"
+          ${denseBandRendering ? 'data-subview-band-rendering="dense"' : ""}
         >
           ${renderTrackBandCanvasLayer({
             sceneKind: "subview-ctg",
@@ -1888,8 +1910,11 @@ function renderSubviewAlignmentCard(
             bands: svgModel.collinearityBands.map((band) => ({
               ...band,
               tone: bandTone,
+              leftActive: activeAnchorKeys.has(`${String(band.hitKey || "").trim()}:left`),
+              rightActive: activeAnchorKeys.has(`${String(band.hitKey || "").trim()}:right`),
             })),
           })}
+          ${denseBandRendering ? renderSubviewDenseAnchorScene(denseBandEdgeCandidates) : ""}
           <svg class="assembly-track-svg subview-track-svg" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="${svgModel.renderViewBoxMinX} 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
             <line class="track-ruler-line" x1="0" y1="${svgModel.rulerTop}" x2="${svgModel.baseInnerWidth}" y2="${svgModel.rulerTop}" />
             ${renderSubviewVirtualRuler({
@@ -1905,14 +1930,20 @@ function renderSubviewAlignmentCard(
               tickLabelY: svgModel.tickLabelY,
               edgeLabelPadding: 16,
             })}
-            ${svgModel.collinearityBands
+            ${denseBandRendering ? "" : svgModel.collinearityBands
               .map(
                 (band) => {
                   const hitKey = String(band.hitKey || "");
-                  return `<polygon class="track-collinearity-band${connectorClass}" points="${band.points}" ${alignmentBandSvgAttrs(band, bandTone)} pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${topSelection.contigId}" data-subview-bottom-contig-id="${bottomSelection.contigId}" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" data-subview-hit-key="${escapeAttr(hitKey)}" data-subview-hit-left-active="${activeAnchorKeys.has(`${hitKey}:left`) ? "1" : "0"}" data-subview-hit-right-active="${activeAnchorKeys.has(`${hitKey}:right`) ? "1" : "0"}" />`;
+                  return `<polygon class="track-collinearity-band${connectorClass}" points="${band.points}" ${alignmentBandSvgAttrs(band, bandTone)} pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${topSelection.contigId}" data-subview-bottom-contig-id="${bottomSelection.contigId}" data-subview-band-tooltip="${escapeAttr(formatSubviewBandTooltipText(band.tooltip))}" data-subview-hit-key="${escapeAttr(hitKey)}" data-subview-hit-left-active="${activeAnchorKeys.has(`${hitKey}:left`) ? "1" : "0"}" data-subview-hit-right-active="${activeAnchorKeys.has(`${hitKey}:right`) ? "1" : "0"}" />`;
                 },
               )
               .join("")}
+            ${denseBandRendering ? renderSubviewDenseHitSurface({
+              x: svgModel.renderViewBoxMinX,
+              y: denseBandHitY,
+              width: svgModel.renderInnerWidth,
+              height: denseBandHitBottomY - denseBandHitY,
+            }) : ""}
             ${renderGrtResultOverlayGroup({
               layer: "junction",
               markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
@@ -2047,7 +2078,7 @@ function renderSubviewAlignmentCard(
                   })
                 : ""}
             </g>
-            ${renderSubviewAnchorLines(anchorEdges, {
+            ${renderSubviewAnchorLines(renderedAnchorEdges, {
               topY: svgModel.topBarY,
               bottomY: svgModel.bottomBarY + svgModel.barHeight,
             })}
@@ -2796,7 +2827,7 @@ function renderSubviewTrackPairAlignmentCard(
         bottomContigId: bottomSegment.ctgId,
         leftActive: activeAnchorKeys.has(`${hitKey}:left`),
         rightActive: activeAnchorKeys.has(`${hitKey}:right`),
-        tooltipText: buildSubviewBandTooltipText({
+        tooltip: buildSubviewBandTooltipData({
           isDirectAlignment: Boolean(usesRefProjection || pairwiseTrackSegments),
           topName: topSegment.ctgName,
           bottomName: bottomSegment.ctgName,
@@ -2951,6 +2982,10 @@ function renderSubviewTrackPairAlignmentCard(
     bottomEndpointsByKey: buildManualEndpointMapForLayout(resolvedBottomLayout),
   });
   const allAnchorEdges = [...anchorEdges, ...manualAnchorEdges];
+  const denseBandRendering = collinearityBands.length >= DENSE_SUBVIEW_BAND_THRESHOLD;
+  const renderedAnchorEdges = denseBandRendering
+    ? allAnchorEdges.filter((edge) => edge.active || edge.manualAnchorId) : allAnchorEdges;
+  const denseBandEdgeCandidates = allAnchorEdges.filter((edge) => !edge.active && !edge.manualAnchorId);
   const activeAnchorCutsByContig = buildSubviewActiveAnchorCutsByContig(allAnchorEdges);
   const selectedTrackPairKeySet = new Set(
     normalizeSubviewTrackPairSelectionCtgs(subview?.trackPairSelectedCtgs).map((entry) =>
@@ -3182,7 +3217,7 @@ function renderSubviewTrackPairAlignmentCard(
           })}
           <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px" data-app-tooltip="${escapeAttr(bottomTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(bottomTrackLabel)}"><span>${escapeHtml(bottomVisibleTrackLabel)}</span></div>
         </div>
-        <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-view-navigation-start-bp="${domainStart + renderViewBoxMinX * domainSpanBp / baseInnerWidth}" data-view-navigation-end-bp="${domainStart + (renderViewBoxMinX + renderInnerWidth) * domainSpanBp / baseInnerWidth}" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}">
+        <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-view-navigation-start-bp="${domainStart + renderViewBoxMinX * domainSpanBp / baseInnerWidth}" data-view-navigation-end-bp="${domainStart + (renderViewBoxMinX + renderInnerWidth) * domainSpanBp / baseInnerWidth}" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}" ${denseBandRendering ? 'data-subview-band-rendering="dense"' : ""}>
           ${renderTrackBandCanvasLayer({
             sceneKind: "subview-track-pair",
             width: renderInnerWidth,
@@ -3199,6 +3234,7 @@ function renderSubviewTrackPairAlignmentCard(
               tone: topTrack.role === "support" ? "companion" : "primary",
             })),
           })}
+          ${denseBandRendering ? renderSubviewDenseAnchorScene(denseBandEdgeCandidates) : ""}
           <svg class="assembly-track-svg subview-track-svg" width="${renderInnerWidth}" height="${contentBottom}" viewBox="${renderViewBoxMinX} 0 ${renderInnerWidth} ${contentBottom}" preserveAspectRatio="xMinYMin meet">
             <defs>
               <clipPath id="${bandClipId}" clipPathUnits="userSpaceOnUse">
@@ -3220,13 +3256,19 @@ function renderSubviewTrackPairAlignmentCard(
               edgeLabelPadding: TRACK_EDGE_LABEL_PADDING,
             })}
             <g clip-path="url(#${bandClipId})">
-              ${collinearityBands
+              ${denseBandRendering ? "" : collinearityBands
                 .map(
                   (band) =>
-                  `<polygon class="track-collinearity-band${topRoleClass}" points="${band.points}" ${alignmentBandSvgAttrs(band, topTrack.role === "support" ? "companion" : "primary")} pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${band.topContigId}" data-subview-bottom-contig-id="${band.bottomContigId}" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" data-subview-hit-key="${escapeAttr(band.hitKey)}" data-subview-hit-left-active="${band.leftActive ? "1" : "0"}" data-subview-hit-right-active="${band.rightActive ? "1" : "0"}" />`,
+                  `<polygon class="track-collinearity-band${topRoleClass}" points="${band.points}" ${alignmentBandSvgAttrs(band, topTrack.role === "support" ? "companion" : "primary")} pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${band.topContigId}" data-subview-bottom-contig-id="${band.bottomContigId}" data-subview-band-tooltip="${escapeAttr(formatSubviewBandTooltipText(band.tooltip))}" data-subview-hit-key="${escapeAttr(band.hitKey)}" data-subview-hit-left-active="${band.leftActive ? "1" : "0"}" data-subview-hit-right-active="${band.rightActive ? "1" : "0"}" />`,
                 )
                 .join("")}
             </g>
+            ${denseBandRendering ? renderSubviewDenseHitSurface({
+              x: renderViewBoxMinX,
+              y: bandClipTop,
+              width: renderInnerWidth,
+              height: bandClipHeight,
+            }) : ""}
             ${renderGrtResultOverlayGroup({
               layer: "junction",
               markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
@@ -3235,7 +3277,7 @@ function renderSubviewTrackPairAlignmentCard(
             ${grtAnchorScene.markup}
             ${renderTrackCtgs(resolvedTopLayout, topRoleClass)}
             ${renderTrackCtgs(resolvedBottomLayout, bottomRoleClass)}
-            ${renderSubviewAnchorLines(allAnchorEdges, {
+            ${renderSubviewAnchorLines(renderedAnchorEdges, {
               topY: resolvedTopLayout.laneTop,
               bottomY: resolvedBottomLayout.laneTop + TRACK_BAR_HEIGHT,
             })}
@@ -3499,7 +3541,9 @@ function buildSubviewAlignmentSvgModel(args) {
     return {
       hitKey,
       identityPct: pairingMode === "projection-key" ? readHitIdentityPct(topSegment) : null,
-      tooltipText: buildSubviewBandTooltipText({
+      topContigId: normalizeSupportDatasetId(topCtg?.assemblyCtgId),
+      bottomContigId: normalizeSupportDatasetId(bottomCtg?.assemblyCtgId),
+      tooltip: buildSubviewBandTooltipData({
         isDirectAlignment: pairingMode === "projection-key",
         topName: String(topCtg?.name || ""),
         bottomName: String(bottomCtg?.name || ""),
@@ -3584,18 +3628,6 @@ function buildSubviewAlignmentSvgModel(args) {
     topLengthBp,
     bottomLengthBp,
   };
-}
-
-function buildSubviewBandTooltipText({ topName, bottomName, topSegment, bottomSegment, isDirectAlignment }) {
-  const resolvedTopName = String(topName || "Top");
-  const resolvedBottomName = String(bottomName || "Bottom");
-  return [
-    `${resolvedTopName}: ${formatBpInterval(topSegment?.ctgStart, topSegment?.ctgEnd)}`,
-    `${resolvedBottomName}: ${formatBpInterval(bottomSegment?.ctgStart, bottomSegment?.ctgEnd)}`,
-    isDirectAlignment ? alignmentBandTooltipMetrics(topSegment)
-      : "Identity: Unknown (reference overlap; not a direct alignment)",
-    topSegment?.projectionApproximate || bottomSegment?.projectionApproximate ? "Approximate projection" : "",
-  ].filter(Boolean).join(" | ");
 }
 
 function buildSubviewTrackPairHitKey(topSegment, bottomSegment) {

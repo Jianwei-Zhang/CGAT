@@ -212,9 +212,18 @@ export function bindAppTooltips(root = globalThis.document) {
   const pointer = event => {
     if (contains(panel, event.target)) return;
     if (Number(event.buttons || 0) !== 0) { dragging = true; hide({ suppress: true }); return; }
+    const denseSurface = event.target?.closest?.('[data-subview-dense-hit-surface="1"]');
+    if (denseSurface && !payload(denseSurface)) {
+      if (active) hide();
+      return;
+    }
     const node = findAppTooltipTarget(event.target);
     if (node) {
-      if (active?.node === node) { bridge = point(event); return; }
+      if (active?.node === node) {
+        const text = payload(node);
+        if (text && text !== active.text) { hide(); show(node, event); return; }
+        bridge = point(event); return;
+      }
       if (node !== suppressed) show(node, event);
       return;
     }

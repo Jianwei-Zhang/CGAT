@@ -1,6 +1,7 @@
 import { dragTargets } from "./source-fragment-drag.js";
 import { resolveTrackScrollLeftForViewboxShift } from "./track-viewport.js";
 import { resolveSubviewStickyLabelKey } from "./sticky-ctg-label-runtime.js";
+import { createSubviewBandCanvasDragPreview } from "./band-canvas-runtime.js";
 
 const MAIN_TRACK_PREVIEW_CLASS = "is-track-drag-preview";
 const SUBVIEW_TRACK_PREVIEW_CLASS = "is-subview-track-drag-preview";
@@ -25,6 +26,7 @@ const ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR = "data-drag-preview-original-subview-
 const PREVIEW_ENVELOPE_MIN_X_ATTR = "data-drag-preview-envelope-min-x";
 const PREVIEW_ENVELOPE_MAX_X_ATTR = "data-drag-preview-envelope-max-x";
 const MISSING_ATTRIBUTE_VALUE = "__gpm_missing_attribute__";
+const DENSE_BAND_PREVIEW_KEY = Symbol("denseSubviewBandDragPreview");
 
 function parsePolygonPoints(pointsText) {
   return String(pointsText || "")
@@ -257,6 +259,11 @@ function restorePreviewAttribute(node, originalAttributeName, targetAttributeNam
 }
 
 function restoreSubviewPreviewEnvelope(host) {
+  for (const scrollNode of host?.querySelectorAll?.(".subview-track-scroll") || []) {
+    const dense = scrollNode[DENSE_BAND_PREVIEW_KEY];
+    dense?.preview?.restore?.();
+    delete scrollNode[DENSE_BAND_PREVIEW_KEY];
+  }
   const envelopeNodes = host?.querySelectorAll?.(`[${PREVIEW_ENVELOPE_ATTR}='1']`) || [];
   envelopeNodes.forEach((node) => {
     restorePreviewAttribute(node, ORIGINAL_WIDTH_ATTR, "width");
@@ -279,6 +286,31 @@ function restoreSubviewPreviewEnvelope(host) {
   });
 }
 
+function updateDenseEnvelopeBandPreview(scrollNode, groupNodes, offsetPx, minX, width, height) {
+  if (!scrollNode?.querySelector?.('[data-subview-dense-hit-surface="1"]')) return null;
+  const targets = [...new Map(groupNodes.map((node) => {
+    const slot = String(node?.getAttribute?.("data-subview-track-slot") || "").trim();
+    const contigId = Number(node?.getAttribute?.("data-subview-contig-id") || 0);
+    return [`${slot}:${contigId}`, { slot, contigId }];
+  }).filter(([, target]) => target.slot && target.contigId)).values()];
+  if (!targets.length) return null;
+  const safeWidth = Math.max(1, Number(width) || 0), safeHeight = Math.max(1, Number(height) || 0);
+  let state = scrollNode[DENSE_BAND_PREVIEW_KEY];
+  if (!state || state.width !== safeWidth || state.height !== safeHeight) {
+    state?.preview?.restore?.();
+    const preview = createSubviewBandCanvasDragPreview(scrollNode, [], {
+      width: safeWidth, height: safeHeight, denseTargets: targets,
+    });
+    if (!preview) {
+      delete scrollNode[DENSE_BAND_PREVIEW_KEY];
+      return null;
+    }
+    state = scrollNode[DENSE_BAND_PREVIEW_KEY] = { preview, width: safeWidth, height: safeHeight };
+  }
+  state.preview.draw(Number(offsetPx || 0), [Number(minX || 0), 0, safeWidth, safeHeight]);
+  return state.preview;
+}
+
 function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = null } = {}) {
   const normalizedOffset = Number(offsetPx || 0);
   if (!Number.isFinite(normalizedOffset)) {
@@ -296,7 +328,7 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
     groups.push(groupNode);
     groupsByScroll.set(scrollNode, groups);
   });
-  let previewState;
+  let previewState, denseCommitPreview = null;
   groupsByScroll.forEach((groups, scrollNode) => {
     const canvasLayer = Array.from(
       scrollNode.querySelectorAll?.(
@@ -402,6 +434,10 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
     svgNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
     canvasLayer?.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
     scrollNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
+    const nextDenseCommitPreview = updateDenseEnvelopeBandPreview(
+      scrollNode, groups, normalizedOffset, nextMinX, nextWidth, baseHeight,
+    );
+    if (nextDenseCommitPreview) denseCommitPreview = nextDenseCommitPreview;
 
     const viewportWidth = Math.max(0, Number(scrollNode.clientWidth || 0));
     const currentScrollLeft = Math.max(0, Number(scrollNode.scrollLeft || 0));
@@ -435,6 +471,7 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
       scrollLeft: nextScrollLeft,
       viewboxMinX: nextMinX,
       viewportLeftX: nextMinX + nextScrollLeft,
+      ...(denseCommitPreview ? { denseCommitPreview } : {}),
     };
   });
   return previewState;

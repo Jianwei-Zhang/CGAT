@@ -13,6 +13,7 @@ import {
   locateSubviewAnchorObject,
   normalizeSubviewAnchorToolsUi,
 } from "../subview-anchor-objects.js";
+import { renderSubviewDenseAnchorScene } from "../subview-dense-hit-runtime.js";
 
 function sceneNode({ kind = "evidence", objectId, topX = 100, bottomX = 140 } = {}) {
   const attributes = {
@@ -184,4 +185,33 @@ test("focus is visual only and locate centers the anchor without changing its id
   assert.equal(locateSubviewAnchorObject(f.host, f.manualId), true);
   assert.deepEqual(f.scroll.lastScroll, { left: 400, behavior: "smooth" });
   assert.equal(locateSubviewAnchorObject(f.host, "manual:missing"), false);
+});
+
+test("dense anchor sidecar participates in the same scene contract as rendered lines", () => {
+  const markup = renderSubviewDenseAnchorScene([{
+    hitKey: "hit:dense", edge: "left", topX: 120.5, bottomX: 240.5,
+    hitTopY: 92, hitBottomY: 194, topContigId: 1, bottomContigId: 2,
+    topCutBp: 120, bottomCutBp: 240, topEndpointKey: "top-1", bottomEndpointKey: "bottom-2",
+    topLengthBp: 1000, bottomLengthBp: 900, topName: "ctg_alpha", bottomName: "ctg_beta",
+    topSourceLabel: "LGZ · primary", bottomSourceLabel: "User track",
+    topSourceRole: "primary", bottomSourceRole: "support",
+    topSourceKind: "mother", bottomSourceKind: "mother",
+    topSourceName: "hifiasm", bottomSourceName: "flye",
+  }]);
+  const sceneNode = { textContent: markup.match(/>(.*)<\/script>/s)?.[1] || "[]" };
+  const host = {
+    querySelector: (selector) => selector.includes("data-subview-dense-anchor-scene") ? sceneNode : null,
+    querySelectorAll: () => [],
+  };
+  const scene = collectSubviewAnchorScene(host);
+  assert.equal(scene.length, 1);
+  assert.equal(scene[0].objectId, buildSubviewAnchorObjectId("evidence", "hit:dense", "left"));
+  assert.equal(scene[0].dense, true);
+  assert.equal(scene[0].topX, 120.5);
+  assert.equal(scene[0].bottomX, 240.5);
+  assert.deepEqual(scene[0].descriptor.top, {
+    endpointKey: "top-1", contigId: 1, cutBp: 120, lengthBp: 1000,
+    name: "ctg_alpha", sourceLabel: "LGZ · primary", sourceRole: "primary",
+    sourceKind: "mother", sourceName: "hifiasm",
+  });
 });

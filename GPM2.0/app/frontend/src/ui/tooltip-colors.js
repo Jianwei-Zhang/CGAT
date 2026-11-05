@@ -58,7 +58,7 @@ export function resolveTooltipColors(node, { getStyle, dark = false } = {}) {
   }
   const style = read(paint) || {};
   const isSvg = paint.namespaceURI === "http://www.w3.org/2000/svg";
-  const proxy = paint.matches?.(".track-collinearity-band[data-track-band-proxy]");
+  const proxy = paint.matches?.(".track-collinearity-band[data-track-band-proxy], [data-subview-dense-hit-surface][data-subview-hit-key]");
   let color = isSvg ? (String(paint.tagName).toLowerCase() === "line" ? null : parseTooltipColor(style.fill || paint.getAttribute?.("fill"))) : parseTooltipColor(style.backgroundColor);
   let strength = number(style.fillOpacity);
   if (proxy && (!color || !color[3])) {

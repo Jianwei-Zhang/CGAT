@@ -313,8 +313,12 @@ test("evidence opacity composites against plot surface instead of changing toolt
 test("export clone restores title information while live SVG stays app-owned", () => {
   const h = tooltipFixture(), svg = h.create("svg", {}, {}, true), shape = h.create("rect", {}, {}, true);
   const desc = h.create("desc", { "data-app-tooltip-source": "" }, {}, true); desc.textContent = "full source <name>"; shape.append(desc); svg.append(shape);
+  const surface = h.create("rect", {
+    "data-subview-dense-hit-surface": "1", "data-subview-band-tooltip": "hover-only payload",
+  }, {}, true); svg.append(surface);
   const clone = svg.cloneNode(true); restoreSvgTooltipTitles(clone);
   assert.equal(clone.querySelector("title").textContent, "full source <name>");
+  assert.equal(clone.querySelectorAll("title").length, 1);
   assert.equal(svg.querySelector("title"), null);
   restoreSvgTooltipTitles(clone); assert.equal(clone.querySelectorAll("title").length, 1);
 });

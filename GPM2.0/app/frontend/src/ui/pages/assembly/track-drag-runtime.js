@@ -418,7 +418,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         typeof deps.previewFullRangeSubviewContigDrag === "function"
         && typeof deps.clearFullRangeSubviewDragPreview === "function"));
     const fastFullRange = fullRangeDrag && typeof deps.createFullRangeDragPreview === "function";
-    let fullRangePreview = null;
+    let fullRangePreview = null, densePreviewHandle = null;
     const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || runtimeHost : runtimeHost;
     let lastPointerClientX = startClientX;
     let finished = false;
@@ -464,6 +464,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         ...(targets.length > 1 ? { targets } : {}),
         pointerClientX: pendingPointerClientX,
       });
+      if (previewResult?.denseCommitPreview) densePreviewHandle = previewResult.denseCommitPreview;
       const nextScrollLeft = Number(previewResult?.scrollLeft);
       if (Number.isFinite(nextScrollLeft)) {
         pendingPreviewScrollLeft = Math.max(0, nextScrollLeft);
@@ -538,12 +539,14 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       }
       if (finished) return;
       finished = true;
-      // On a real commit the renderer replaces this graph synchronously. Do not
-      // unhide/reflow its thousands of hit targets just before discarding it.
-      const restoreAfterCommit = fullRangePreview && shouldCommit && dragging
+      // A committed gesture keeps its final band raster until the replacement
+      // graph is ready. This avoids exposing static bands or reflowing the old
+      // graph during the asynchronous render.
+      const commitPreview = fullRangePreview || densePreviewHandle;
+      const restoreAfterCommit = commitPreview && shouldCommit && dragging
         && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
-      if (fullRangePreview && !restoreAfterCommit) fullRangePreview.restore();
-      else if (!fullRangePreview) deps.clearSubviewTrackDragPreview(runtimeHost);
+      if (commitPreview && !restoreAfterCommit) commitPreview.restore();
+      else if (!commitPreview) deps.clearSubviewTrackDragPreview(runtimeHost);
       if (fullRangeDrag && !fastFullRange) deps.clearFullRangeSubviewDragPreview(dragHost, store);
       const hasEffectiveMovement = dragging
         && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
@@ -552,17 +555,17 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         let renderPending = false;
         try {
           const result = deps.applySubviewTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp),
-            { preview: restoreAfterCommit ? fullRangePreview : null });
+            { preview: restoreAfterCommit ? commitPreview : null });
           if (restoreAfterCommit && result && typeof result.then === "function") {
             renderPending = true;
-            void Promise.resolve(result).then(() => fullRangePreview.restore(), error => {
-              fullRangePreview.restore(); deps.onTrackDragPreviewError?.(dragHost, store, error);
+            void Promise.resolve(result).then(() => commitPreview.restore(), error => {
+              commitPreview.restore(); deps.onTrackDragPreviewError?.(dragHost, store, error);
             });
           }
         } finally {
           // Keep the final gesture visible while background rendering yields to
           // other App operations. Position/history and persistence are not delayed.
-          if (restoreAfterCommit && !renderPending) fullRangePreview.restore();
+          if (restoreAfterCommit && !renderPending) commitPreview.restore();
         }
         if (
           Number.isFinite(pendingPreviewScrollLeft)
