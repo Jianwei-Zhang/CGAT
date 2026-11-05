@@ -1,0 +1,37 @@
+#!/bin/bash
+#DSUB -n cgat_ordinary_parts64_real_control
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-real-parts-20261105-c0d729c"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REFERENCE="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/reference/Caryophyllales_ref.fa"
+QUERY="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/datasets/nextdenovo.fa"
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
+
+# Complement, NOT replace, the default-policy padded correctness control.
+# Full real inputs are only 1.2 Gb: explicitly force a TEST-ONLY 600M index
+# layout once, then compare the SAME MMI bytes/parts for all three schedules.
+# These results cannot be compared to the original default-layout PAF/hash.
+python3 -B benchmark_ordinary_partitions.py \
+  --target "$REFERENCE" --query "$QUERY" --out "$ROOT/comparison" --minimap2 "$MM" \
+  --threads 64 --parallel-parts 2 --memory-mib 196608 --timeout 900 \
+  --control-index-bases 600000000 --batch-bases 500000000 --repeats 2 --execute > comparison.log 2>&1
+
+sha256sum -c SHA256SUMS
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
