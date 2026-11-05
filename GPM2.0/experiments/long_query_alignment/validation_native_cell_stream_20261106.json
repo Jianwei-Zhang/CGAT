@@ -1,0 +1,114 @@
+{
+  "changed_mapping_options": false,
+  "changed_recovery_kernels": false,
+  "checks": [
+    {
+      "log_location": "/tmp/cgat-native-stream-controls-20261106.CtkLem/canonical.log",
+      "log_sha256": "f11504fb4a0db230a9e5de3b3c1752c321c7e355c5edbe781811bbe1b822fd29",
+      "passed": true,
+      "skipped": 0,
+      "tests": 188
+    },
+    {
+      "log_location": "/tmp/cgat-native-stream-controls-20261106.CtkLem/ordinary-final.log",
+      "log_sha256": "b490d8044edbbdda9e7236e157d03bc8a93091b860216deed84c135947d86c14",
+      "passed": true,
+      "skipped": 0,
+      "tests": 107
+    },
+    {
+      "explicitly_excluded": "LGZ server-to-app E2E",
+      "full_canonical_gate_passed": false,
+      "log_location": "/tmp/cgat-native-stream-controls-20261106.CtkLem/server-gate.log",
+      "log_sha256": "d45520e22393a514736c99469bad453235cd7da8cbf6d21b6b132cd17883723f",
+      "passed_Server_only_subset": true,
+      "python_tests": 457,
+      "resource_warning_observed": true,
+      "shell_test_groups": 8
+    },
+    {
+      "log_location": "/tmp/cgat-native-merge-replay-final-controls-20261106.log",
+      "log_sha256": "5fad645130e58091076b8fda14ef3cf090080ffa9de4822080f4d50ddc5fa563",
+      "passed": true,
+      "skipped": 0,
+      "tests": 36
+    }
+  ],
+  "files_sha256": {
+    "GPM2.0/experiments/long_query_alignment/native_cell_merge_replay_arm64.dsub": "ea6f8a5cbb87b65b5f69fac1dd60531b8fc59fa751b5ddea3ceddb1fa0701ef2",
+    "GPM2.0/experiments/long_query_alignment/native_first.py": "10d75556e5c1846117fa46c0956c4325221953b5e11adb8251b1574aad8b98f7",
+    "GPM2.0/experiments/long_query_alignment/proactive_resume.py": "36bbb833ac3dfba461c5c07d87548e7a46a3fd6497a01b09051793661694d20b",
+    "GPM2.0/experiments/long_query_alignment/replay_native_cell_merge.py": "0b34d8a115ac255cb7b2fd0faf5ac0b4551f4c3e37dfcff2c85939f5e4d8e9d3",
+    "GPM2.0/experiments/long_query_alignment/sync_server_runtime.py": "e39a8bcc8fcc7fe831e38be7b5790da4d3a393721015d011e4fdf7c94f71bdb8",
+    "GPM2.0/experiments/long_query_alignment/test_benchmark_server_ordinary_parts.py": "96c48954524deb92db4ee5867571a678d51dcaeb5249c5cae2445f7f12a6868f",
+    "GPM2.0/experiments/long_query_alignment/test_data/pre_native_stream_runtime.json": "31400a19ef90015c445862ae29d769c0d196832dbfa2853485a8f15ef0f61ff2",
+    "GPM2.0/experiments/long_query_alignment/test_native_first.py": "076217c340c981ccc22da17f4970799eb6988c85885c68a321921eb98b6edf89",
+    "GPM2.0/experiments/long_query_alignment/test_validation_metadata.py": "e063d4add0f30ae187e77b1125434ecf0947ebb0dbef6e0478d1de25ba798e45"
+  },
+  "limits": [
+    "Test groups overlap; do not add counts as unique tests",
+    "No large-data speedup measured for this buffered-stream code yet",
+    "Single-cell handle tests and one small real-mapper assembly replay are not full CGAT performance acceptance",
+    "Pure ordinary direct native path still bypasses CellMerger; this only improves routes already doing cell assembly",
+    "Original 64-CPU benchmark stays frozen at old profile 19fd54; no source or job restart",
+    "A separate 2-CPU old/new/reverse-order replay is prepared, but must wait for source job.exit=0 to avoid interfering",
+    "No master, Release or App modifications"
+  ],
+  "motivation_partial_real_control": {
+    "all_repeats_complete_at_observation": false,
+    "case": "real-parts",
+    "conclusion": "First repeat does not show a net execution-stage benefit; no extrapolation to customer wheat",
+    "independent_completed_suite_audit": false,
+    "input_index_layout": "TEST_ONLY_600M_same_on_both_routes",
+    "job_id": "40886112",
+    "native": {
+      "audit_seconds": 12.80510638654232,
+      "mapping_receipts_seconds": 721.5467360168695,
+      "merge_seconds": 245.88928051292896,
+      "total_seconds": 980.2411229163408
+    },
+    "original_parts": {
+      "audit_seconds": 13.124733000993729,
+      "mapping_receipts_seconds": 668.9004226773977,
+      "merge_seconds": 308.66175124794245,
+      "total_seconds": 990.6869069263339
+    },
+    "paf_bytes": 96847604,
+    "paf_rows": 355275,
+    "paf_sha256": "3adcb4c3f87bb4d99aa096a7bac239f2a1ab95d0ce50679fdb698deb26d08d4c",
+    "queries": "two whole-record copies of full nextdenovo DNA with unique names",
+    "repeat": 0
+  },
+  "native_stream_change": {
+    "at_most_one_shard_handle": true,
+    "close_on_cell_change_and_all_exit_paths": true,
+    "long_line_chunking_unchanged": true,
+    "native_PAF_row_bytes_unchanged": true,
+    "no_mapper_reexecution": true,
+    "no_new_index_preprocessing": true,
+    "reuse_only_for_adjacent_same_cell_rows": true,
+    "source_and_shard_hash_validation_unchanged": true
+  },
+  "next": [
+    "Finish and independently audit the already-running real-parts benchmark",
+    "Freeze this candidate source and replay only the immutable completed native PAF on SSH 180",
+    "Compare complete PAF hashes, original cell matrix and old/new full merge costs; do not rerun mapping for this test"
+  ],
+  "previous_runtime_profile_sha256": "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
+  "recorded_at": "2026-11-06T05:08:02.379835+08:00",
+  "resume": {
+    "exact_reviewed_full_profile_pair_added": true,
+    "historical_transition_tests_are_controlled_metadata_not_customer_workspace_reexecution": true,
+    "old_complete_native_stages_preserved": true,
+    "partial_part_payloads_still_require_full_verification": true,
+    "pre_metadata_fix_recovered_cells_still_not_admitted": true,
+    "unreviewed_future_native_stream_source_rejected": true
+  },
+  "runtime_profile_sha256": "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
+  "runtime_source_delta": [
+    "proactive_resume.py",
+    "native_first.py"
+  ],
+  "schema_version": 1,
+  "status": "buffered_native_cell_stream_candidate_correctness_controls_passed_large_replay_not_started"
+}

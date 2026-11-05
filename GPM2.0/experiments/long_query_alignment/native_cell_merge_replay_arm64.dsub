@@ -1,0 +1,33 @@
+#!/bin/bash
+#DSUB -n cgat_native_merge
+#DSUB -R 'cpu=2,mem=12000MB'
+#DSUB -RL 'mem=12000MB'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+ROOT="$HOME/cgat-reads-debug/native-cell-merge-20261106-aa0bb89"
+INPUT="$HOME/cgat-reads-debug/ordinary-server-parts-20261106-28d7f6f"
+OLD="$INPUT/source/GPM2.0/server/tools/long_cigar_recovery"
+NEW="$ROOT/source/GPM2.0/server/tools/long_cigar_recovery"
+HARNESS="$ROOT/source/GPM2.0/experiments/long_query_alignment/replay_native_cell_merge.py"
+OLD_PROFILE=19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e
+NEW_PROFILE=aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'code=$?; echo "$code" > "$ROOT/job.exit"' EXIT
+# Never disturb or compete with the still-running source comparison.
+test "$(cat "$INPUT/job.exit")" = 0
+sha256sum -c SHA256SUMS
+for run in 00-old 00-new 01-new 01-old; do
+  runtime="$OLD"; profile="$OLD_PROFILE"
+  if [[ "$run" == *-new ]]; then runtime="$NEW"; profile="$NEW_PROFILE"; fi
+  python3 -B "$HARNESS" --runtime-root "$runtime" --profile "$profile" \
+    --case-root "$INPUT/real-parts" --out "$ROOT/$run" --execute > "$ROOT/$run.log" 2>&1
+done
+sha256sum -c SHA256SUMS

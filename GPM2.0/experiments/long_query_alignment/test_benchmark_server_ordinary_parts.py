@@ -16,6 +16,7 @@ from unittest.mock import patch
 import benchmark_ordinary_existing as existing
 import audit_server_ordinary_parts as audit
 import benchmark_server_ordinary_parts as bench
+import replay_native_cell_merge as replay
 
 
 class HarnessTests(unittest.TestCase):
@@ -28,6 +29,14 @@ class HarnessTests(unittest.TestCase):
                 self.assertEqual(bench.main(args),0)
             self.assertFalse(output.exists());self.assertEqual(list(root.iterdir()),[])
             self.assertFalse(json.loads(stream.getvalue())['mapping_started'])
+
+    def test_merge_replay_plan_needs_no_inputs_and_starts_no_process(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out=Path(tmp)/'not-created'
+            with patch.object(subprocess,'Popen',side_effect=AssertionError('must not execute')),contextlib.redirect_stdout(io.StringIO()) as stream:
+                self.assertEqual(replay.main(['--runtime-root','absent','--profile','absent',
+                    '--case-root','absent','--out',str(out)]),0)
+            self.assertFalse(out.exists());self.assertFalse(json.loads(stream.getvalue())['mapping_started'])
 
     def test_whole_record_copies_preserve_case_wrapping_and_final_newline_boundary(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -141,6 +150,16 @@ class RealEngineHarnessTests(unittest.TestCase):
             independently=audit.case(root/'comparison')
             self.assertEqual(independently['paf_sha256'],report['runs'][0]['paf_sha256'])
             self.assertEqual(independently['paf_rows'],[r['paf_rows'] for r in report['runs']])
+            replay_out=root/'replayed'
+            replay_command=[sys.executable,'-B',str(Path(replay.__file__)),
+                '--runtime-root',str(runtime),'--profile',profile,
+                '--case-root',str(root/'comparison'),'--out',str(replay_out),'--execute']
+            replayed=subprocess.run(replay_command,capture_output=True,text=True,timeout=30)
+            self.assertEqual(replayed.returncode,0,replayed.stderr+replayed.stdout)
+            replay_report=json.loads((replay_out/'replay.json').read_text())
+            self.assertEqual(replay_report['paf_sha256'],report['runs'][0]['paf_sha256'])
+            self.assertFalse(replay_report['mapping_started'])
+            self.assertEqual((replay_out/'complete.paf').read_bytes(),Path(report['runs'][0]['output_path']).read_bytes())
             final=Path(report['runs'][0]['output_path']);original=final.read_bytes();final.write_bytes(original+b'corrupt\n')
             with self.assertRaises(ValueError):audit.case(root/'comparison')
             final.write_bytes(original)

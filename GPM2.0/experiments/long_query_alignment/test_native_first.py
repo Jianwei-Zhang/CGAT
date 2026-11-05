@@ -209,6 +209,35 @@ class NativeFirstTests(unittest.TestCase):
         merger.finish(output)
         self.assertEqual(wa.sha256(output),wa.sha256(source))
 
+    def test_native_stream_reuses_one_adjacent_shard_handle_across_chunked_rows(self):
+        merger=self.merger();original_open=Path.open;handles=[]
+        a=paf();b=paf(name='b');rows=[a,a,b,b,a]
+        # Force multiple chunks per line without interpreting or rewriting tags.
+        rows=[v.rstrip(b'\n')+b'\tzz:Z:'+b'x'*257+b'\n' for v in rows]
+        receipt=self.receipt(self.root/'many.paf',b''.join(rows))
+        def track(path,*args,**kwargs):
+            if args and args[0]=='ab' and path.parent==merger.root:
+                self.assertTrue(all(h.closed for h in handles), 'more than one shard held open')
+                handle=original_open(path,*args,**kwargs);handles.append(handle);return handle
+            return original_open(path,*args,**kwargs)
+        with patch.object(Path,'open',track),patch.object(wa,'CHUNK',64):
+            self.assertEqual(merger.add_native(receipt,['a','b','c']),5)
+        self.assertEqual(len(handles),3);self.assertTrue(all(h.closed for h in handles))
+        output=self.root/'many-complete.paf';merger.finish(output)
+        self.assertEqual(output.read_bytes(),b''.join([rows[0],rows[1],rows[4],rows[2],rows[3]]))
+
+    def test_native_stream_closes_buffered_shard_on_incomplete_next_record(self):
+        merger=self.merger();receipt=self.receipt(self.root/'bad-trailing.paf',paf()+b'a\t8')
+        original_open=Path.open;handles=[]
+        def track(path,*args,**kwargs):
+            value=original_open(path,*args,**kwargs)
+            if args and args[0]=='ab' and path.parent==merger.root:handles.append(value)
+            return value
+        with patch.object(Path,'open',track),self.assertRaises(wa.ExperimentError):
+            merger.add_native(receipt,['a','b','c'])
+        self.assertTrue(handles);self.assertTrue(all(h.closed for h in handles))
+        with self.assertRaises(wa.ExperimentError):merger.finish(self.root/'must-not-publish.paf')
+
     def test_complete_zero_row_native_cells_are_not_missing_cells(self):
         merger = self.merger()
         merger.add_native(self.receipt(self.root/"empty.paf",b""),["a","b","c"])

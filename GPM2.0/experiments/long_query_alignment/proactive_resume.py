@@ -31,6 +31,7 @@ _REVIEWED_METADATA_RUNTIME = "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7
 _REVIEWED_PARAMETER_RUNTIME = "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
 _REVIEWED_PARTITION_RUNTIME = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
 _REVIEWED_PARTITION_RESUME_RUNTIME = "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
+_REVIEWED_RESOURCE_RUNTIME = "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
 
 
 
@@ -85,7 +86,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
         return True
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME}
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME}
                 and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
     if not approved:
         return False
@@ -102,7 +103,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
                "whole_query_scores.py", "minimap_index_context.py")
     if any(old_files.get(name) != new_files.get(name) for name in kernels):
         return False
-    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME}
+    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))
             and "ordinary" not in stages):
         partial = candidate / "selective" / "ordinary-native" / opa.RECEIPT

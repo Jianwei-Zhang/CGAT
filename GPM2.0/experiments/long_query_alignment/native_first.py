@@ -493,30 +493,40 @@ class CellMerger:
         else:
             prefix = bytearray()
             out = None
+            open_key = None
+            record_started = False
             boundary = True
             try:
                 with path.open("rb") as source:
                     while raw := source.readline(wa.CHUNK):
                         digest.update(raw)
                         boundary = raw.endswith(b"\n")
-                        if out is None:
+                        if not record_started:
                             prefix.extend(raw)
                             if prefix.count(b"\t")>=12 or boundary:
                                 key = self._prefix(bytes(prefix),allowed,part_index)
-                                out = self._shard(key).open("ab")
+                                # Native output commonly has many adjacent rows
+                                # for one original cell. Keep only that shard
+                                # open; never open/close a file for every row.
+                                if key != open_key:
+                                    if out is not None:
+                                        out.close()
+                                    out = self._shard(key).open("ab")
+                                    open_key = key
                                 out.write(prefix)
                                 self.shard_digests.setdefault(key,hashlib.sha256()).update(prefix)
                                 prefix.clear(); counts[key] += 1
+                                record_started = True
                             elif len(prefix)>MAX_PREFIX:
                                 raise wa.ExperimentError("native PAF core prefix exceeds source header bounds")
                         else:
                             out.write(raw)
                             self.shard_digests[key].update(raw)
                         if boundary:
-                            if out is None:
+                            if not record_started:
                                 raise wa.ExperimentError("native PAF core prefix is incomplete")
-                            out.close(); out = None
-                if not boundary or prefix or out is not None:
+                            record_started = False
+                if not boundary or prefix or record_started:
                     raise wa.ExperimentError("native PAF has an incomplete trailing record")
             finally:
                 if out is not None:

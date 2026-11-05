@@ -247,6 +247,38 @@ class KeyMigrationTests(unittest.TestCase):
             pr.opa.attempt(str(self.tool),[],self.query,path.parent,
                 __import__('argparse').Namespace(minimap_filter=None),[],{})
 
+    def resource_runtime(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_native_stream_runtime.json').read_text())
+        self.assertEqual(hashlib.sha256(json.dumps(files,sort_keys=True,separators=(',',':')).encode()).hexdigest(),pr._REVIEWED_RESOURCE_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files}
+        runtime={**self.runtime,'native_resume_source_profiles':[[pr._REVIEWED_RESOURCE_RUNTIME,
+            hashlib.sha256(json.dumps(self.runtime['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        return runtime
+
+    def test_reviewed_resource_runtime_keeps_completed_ordinary_stage(self):
+        runtime=self.resource_runtime();before=self.cache.data['stages'].copy()
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
+    def test_reviewed_resource_runtime_keeps_partial_part_receipts_for_full_verification(self):
+        runtime=self.resource_runtime();self.cache.data['stages'].pop('ordinary');self.cache.save()
+        path=self.attempt/'selective/ordinary-native'/pr.opa.RECEIPT;path.parent.mkdir()
+        wa.write_json(path,{'schema':2,'kind':pr.opa.KIND,'status':'failed_no_retry'})
+        before=path.read_bytes()
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt);self.assertEqual(path.read_bytes(),before)
+        with self.assertRaises(wa.ExperimentError):
+            pr.opa.attempt(str(self.tool),[],self.query,path.parent,
+                __import__('argparse').Namespace(minimap_filter=None),[],{})
+
+    def test_resource_runtime_pair_does_not_admit_unreviewed_native_stream_code(self):
+        runtime=self.resource_runtime()
+        runtime['files_sha256']={**runtime['files_sha256'],'native_first.py':'0'*64}
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertFalse(reused);self.assertNotEqual(attempt,self.attempt)
+
     def test_pure_ordinary_previous_runtime_retains_native_completion_without_index(self):
         self.cache.data['stages'] = {name:self.cache.data['stages'][name] for name in ('groups','ordinary')}
         self.cache.save()

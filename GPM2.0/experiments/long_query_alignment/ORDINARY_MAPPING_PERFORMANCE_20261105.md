@@ -909,3 +909,42 @@ python3 audit_server_ordinary_parts.py --root EXTRACTED_EVIDENCE \
 重新初始化 query pipeline；tie hash 包含 query 名称；`mi->index` 的用途限于本命令
 未开启的 split-prefix 临时文件。这支持当前窄范围的原字节/原参数设计，不能替代
 完整 PAF 对照，更不是对所有 minimap2 选项组合的等价性证明。没有修改或重建 mapper。
+
+
+## 真实普通组首轮：合并 I/O 成本与窄范围流式候选（2026-11-06）
+
+冻结作业 `40886112` 的真实数据控制首轮已完成两条路线，反序重复仍在运行时观察到：
+
+| 首轮路线 | mapping＋收据 / s | 生产 CellMerger / s | 独立输出核验 / s | 执行阶段合计 / s |
+| --- | ---: | ---: | ---: | ---: |
+| 原生完整 MMI | 721.547 | 245.889 | 12.805 | 980.241 |
+| 原始两分区并行 | 668.900 | 308.662 | 13.125 | 990.687 |
+
+两份完整 PAF 为 355275 行、96847604 字节、相同 SHA；但此时整个真实控制尚未
+独立审计，**首轮没有总阶段提速，不用合成控制的 2 倍结果覆盖这个事实**。
+`-I600M` 仍是相同布局的实验控制，完整真实 DNA 整记录复制两次并使用新名字，非小麦客户原输入。
+
+检查发现 native PAF 收集对每一行执行一次分片文件 open/close。共享文件系统上的
+245–309 秒是测得的阶段时间，尚不能全部归因于这一个操作。新增窄范围候选：
+相邻 native 行仍属于同一个原始 query×part cell 时，复用该分片文件句柄；切换 cell
+或任何退出路径时关闭，始终最多一个句柄，不增加大缓存。长行仍按 CHUNK 流式读取，
+原生字节、每行核心字段归属验证、输入 SHA、分片 SHA、最终次序和完整矩阵检查不变；
+recovered 分支及比对参数完全不变。纯普通原生直出本来不进入 CellMerger，不受影响。
+
+该候选的源 profile 为
+`aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01`。
+仅 native_first 的缓冲写入和 proactive_resume 的明确旧 profile 准入改变；原版
+minimap2、索引、恢复算法未修改。冻结旧 profile 19fd54 全清单，按精确审阅配对保留
+已完成普通阶段和部分分区收据；真正复用仍核验全部原始 payload，未知后续代码不获准入，
+历史 pre-metadata-fix recovered cell 也不因此放宽。
+
+188 项 native/恢复/收据/打包相关控制、107 项 ordinary 控制、457 项 Server Python
+与 8 组 shell 检查通过，均非独立数量，不能相加；Server/App E2E 显式排除，已有
+ResourceWarning 如实保留。额外 36 项 targeted 检查覆盖一份小型真实 mapper 输出的
+独立合并重放；同 cell 多行、跨 CHUNK、重新访问旧 cell、异常尾行关闭及原字节一致。
+
+大数据新代码的速度**尚未实测**。准备 `native_cell_merge_replay_arm64.dsub` 和
+`replay_native_cell_merge.py`：默认 PLAN ONLY；只有旧源作业 `job.exit=0` 后才执行
+两轮旧/新反序重放。只读复用其已完成 native PAF，**不启动任何 mapper、不重新处理
+FASTA/MMI**。先等待现有 64 核作业结束，避免额外共享文件系统 I/O 干扰本次对照。
+证据与限制见 `validation_native_cell_stream_20261106.json`。
