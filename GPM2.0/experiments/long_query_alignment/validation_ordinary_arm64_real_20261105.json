@@ -1,7 +1,7 @@
 {
   "schema": "cgat.ordinary_real_K_screening.v1",
   "status": "incomplete_no_production_recommendation",
-  "observed_at": "2026-11-05T19:04:32+08:00",
+  "observed_at": "2026-11-05T19:19:04+08:00",
   "production_runtime_modified": false,
   "customer_wheat_data": false,
   "scope": "ordinary_reference_alignment_only",
@@ -36,14 +36,83 @@
     "evidence_archive_sha256": "094387ed64517758c1ce66301d5754defe9809f0e009972dda7798430e535909"
   },
   "nextdenovo_negative_control": {
+    "status": "accepted_full_existing_input_K_comparison_not_customer_wheat_acceptance",
     "job_id": 40874135,
-    "scheduler_state_at_observation": "RUNNING",
-    "completed_runs_at_observation": 1,
-    "entire_comparison_accepted": false
+    "scheduler_state": "SUCCEEDED",
+    "started_at": "2026-11-05T18:59:33+08:00",
+    "ended_at": "2026-11-05T19:16:22+08:00",
+    "compute_node": "agent-ARM-04",
+    "architecture": "aarch64",
+    "allocated_cpus": 64,
+    "query_records": 2430,
+    "query_bases": 1114910121,
+    "query_sha256": "5917d137fcac6ab809dc938888297601e7d353312140fe308fa626084aa0fe10",
+    "reference_sha256": "2113ddbdf357016dd0c0db8d238fd52f8c3b88925f0d7c412fd4d9c5a7327c73",
+    "index_parts": 1,
+    "index_sha256": "6346033bc0fd477a9548710dc0634874e2be2fd01ea8a07f93b5a87b4b647e31",
+    "mapper_sha256": "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc",
+    "completed_runs": 6,
+    "all_ordered_pafs_equal": true,
+    "paf_sha256": "c34790b0dbf906ca4a4d7c14df335660a5a4c32d08d9f0e6f0a1f2f882c3d932",
+    "paf_rows": 4602,
+    "mapped_query_names": 2430,
+    "strands": [
+      "+",
+      "-"
+    ],
+    "independent_coordinate_and_CIGAR_span_audit": true,
+    "input_content_unchanged": true,
+    "sensitivity_flags_changed": false,
+    "production_runtime_modified": false,
+    "evidence_archive_sha256": "bd9bea14b29ee3ceea77105e9cef0b6d1143eee07ad07d8613e91719a97d1a29",
+    "summary": [
+      {
+        "batch_bases": 500000000,
+        "median_wall_seconds": 184.74,
+        "median_cpu_core_equivalents": 32.96733876990129,
+        "maximum_peak_rss_kib": 36058280,
+        "batch_record_counts": [
+          1119,
+          1055,
+          256
+        ],
+        "wall_seconds_by_repeat": [
+          176.63,
+          192.85
+        ]
+      },
+      {
+        "batch_bases": 1000000000,
+        "median_wall_seconds": 147.125,
+        "median_cpu_core_equivalents": 41.660732644991214,
+        "maximum_peak_rss_kib": 40846016,
+        "batch_record_counts": [
+          2174,
+          256
+        ],
+        "wall_seconds_by_repeat": [
+          142.25,
+          152.0
+        ]
+      },
+      {
+        "batch_bases": 2000000000,
+        "median_wall_seconds": 130.365,
+        "median_cpu_core_equivalents": 46.80765528192218,
+        "maximum_peak_rss_kib": 40312084,
+        "batch_record_counts": [
+          2430
+        ],
+        "wall_seconds_by_repeat": [
+          127.34,
+          133.39
+        ]
+      }
+    ]
   },
   "hifiasm_extended_screening": {
     "job_id": 40876528,
-    "scheduler_state_at_observation": "WAITING",
+    "scheduler_state_at_observation": "RUNNING",
     "dependency": "40874135=ENDED",
     "threads": 64,
     "timeout_per_command_seconds": 7200,
@@ -56,12 +125,13 @@
     "script": "ordinary_batch_arm64_hifiasm_extended.dsub",
     "full_original_inputs_preserved": true,
     "automatic_retry": false,
-    "production_acceptance": false
+    "production_acceptance": false,
+    "started_at": "2026-11-05T19:16:24+08:00"
   },
   "remaining_gates": [
-    "complete actual full-input K comparisons",
-    "exact ordered PAF equality and unchanged original inputs/index/tool",
+    "complete actual full-input long-contig hifiasm K screening",
+    "audit exact ordered PAF equality and unchanged inputs/index/tool on that screening",
     "repeat/counterbalance a promising long-contig comparison before production adoption",
-    "memory-safe production design is not enabled by these experiments"
+    "a memory-safe production design has not been implemented or enabled by these experiments"
   ]
 }
