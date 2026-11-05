@@ -1,0 +1,36 @@
+#!/bin/bash
+#DSUB -n cgat_ordinary_K64_hifiasm_extended
+#DSUB -R 'cpu=64'
+#DSUB -q arm
+#DSUB -aa
+#DSUB -o validation_%J.out
+set -euo pipefail
+
+ORIGINAL_HOME="$HOME"
+BASE="$ORIGINAL_HOME/cgat-reads-debug/ordinary-batch-perf-20261105-68a1a94"
+ROOT="$ORIGINAL_HOME/cgat-reads-debug/ordinary-batch-hifiasm-extended-20261105-e22da21"
+MM="$ORIGINAL_HOME/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2"
+REFERENCE="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/reference/Caryophyllales_ref.fa"
+QUERY="$ORIGINAL_HOME/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/datasets/hifiasm.fa"
+source /etc/profile.d/modules.sh
+export MODULEPATH=/share/software/modulefiles:/share/software/HPCKit/latest/modulefiles
+module load arm/python/3.11.11
+mkdir -p "$ROOT/home" "$ROOT/cache" "$ROOT/tmp"
+export HOME="$ROOT/home" XDG_CACHE_HOME="$ROOT/cache" TMPDIR="$ROOT/tmp"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+export OMP_NUM_THREADS=64 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+unset PYTHONPATH PYTHONHOME
+cd "$ROOT"
+trap 'echo $? > "$ROOT/job.exit"' EXIT
+sha256sum -c SHA256SUMS
+(cd "$BASE" && sha256sum -c SHA256SUMS)
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -
+
+# The original full-input 500M baseline exceeded its 1800-second test budget.
+# One bounded full-input screening pair, not an automatic retry or acceptance:
+# no record omission, no 2G memory jump, and no change to production defaults.
+python3 -B "$BASE/benchmark_ordinary_existing.py"   --target "$REFERENCE" --query "$QUERY" --out "$ROOT/real-hifiasm"   --minimap2 "$MM" --threads 64   --batch-bases 500000000 1000000000   --repeats 1 --memory-mib 196608 --timeout 7200 --execute   > "$ROOT/real.log" 2>&1
+
+sha256sum -c SHA256SUMS
+(cd "$BASE" && sha256sum -c SHA256SUMS)
+echo "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc  $MM" | sha256sum -c -

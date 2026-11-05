@@ -1,0 +1,67 @@
+{
+  "schema": "cgat.ordinary_real_K_screening.v1",
+  "status": "incomplete_no_production_recommendation",
+  "observed_at": "2026-11-05T19:04:32+08:00",
+  "production_runtime_modified": false,
+  "customer_wheat_data": false,
+  "scope": "ordinary_reference_alignment_only",
+  "mapper_version": "2.31-r1302",
+  "mapper_sha256": "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc",
+  "reference": {
+    "source": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/reference/Caryophyllales_ref.fa",
+    "sha256": "2113ddbdf357016dd0c0db8d238fd52f8c3b88925f0d7c412fd4d9c5a7327c73",
+    "total_bases": 1214367339
+  },
+  "hifiasm_query": {
+    "source": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/source_snapshot/data/datasets/hifiasm.fa",
+    "sha256": "4a9ca88176d732873847f03ac75dab8413d0a669045de18aaafbae35a8df20d2",
+    "total_bases": 1256305570
+  },
+  "hifiasm_initial_screening": {
+    "job_id": 40873698,
+    "scheduler_state": "FAILED",
+    "accepted_real_runs": 0,
+    "failure_kind": "maintainer_test_timeout_not_minimap2_assertion",
+    "timeout_seconds": 1800,
+    "memory_limit_mib": 196608,
+    "batch_bases": 500000000,
+    "completed_first_batch": {
+      "records": 11,
+      "elapsed_seconds": 1049.503,
+      "cpu_wall_ratio_to_that_point": 4.87
+    },
+    "all_query_records": 490,
+    "partial_paf_not_accepted": true,
+    "partial_paf_sha256": "af0f3a961a2ba47628927404a0830776c44a78870715eaab78a5e95e9956315c",
+    "evidence_archive_sha256": "094387ed64517758c1ce66301d5754defe9809f0e009972dda7798430e535909"
+  },
+  "nextdenovo_negative_control": {
+    "job_id": 40874135,
+    "scheduler_state_at_observation": "RUNNING",
+    "completed_runs_at_observation": 1,
+    "entire_comparison_accepted": false
+  },
+  "hifiasm_extended_screening": {
+    "job_id": 40876528,
+    "scheduler_state_at_observation": "WAITING",
+    "dependency": "40874135=ENDED",
+    "threads": 64,
+    "timeout_per_command_seconds": 7200,
+    "memory_limit_mib": 196608,
+    "batch_bases": [
+      500000000,
+      1000000000
+    ],
+    "repeats": 1,
+    "script": "ordinary_batch_arm64_hifiasm_extended.dsub",
+    "full_original_inputs_preserved": true,
+    "automatic_retry": false,
+    "production_acceptance": false
+  },
+  "remaining_gates": [
+    "complete actual full-input K comparisons",
+    "exact ordered PAF equality and unchanged original inputs/index/tool",
+    "repeat/counterbalance a promising long-contig comparison before production adoption",
+    "memory-safe production design is not enabled by these experiments"
+  ]
+}
