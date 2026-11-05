@@ -37,7 +37,7 @@ function fixture(subview=false,composition=false){
  queryMaps.set(svg,{'rect.track-ctg, rect.track-reference-member, rect.track-reference-bar, text':[bar,text,ref],
   '[data-subview-rect-x][data-subview-rect-width]':[group]});
  const payload=subview?{slot:'top',contigId:1}:{trackRole:'primary',assemblyCtgId:1};
- return {all,scroll,svg,group,band,text,handle:()=>createFullRangeDragPreview(scroll,payload,{subview}),snapshot:()=>all.map(item=>item.snapshot())};
+ return {all,scroll,svg,group,band,text,queryMaps,handle:()=>createFullRangeDragPreview(scroll,payload,{subview}),snapshot:()=>all.map(item=>item.snapshot())};
 }
 for(const view of ['main','pair','composition'])test(`${view} handle keeps live geometry, updates pointer scale, and restores only its own graph`,()=>{
  const f=fixture(view!=='main',view==='composition'),before=f.snapshot(),handle=f.handle();
@@ -56,4 +56,31 @@ test('a resized or replaced graph invalidates the gesture handle',()=>{
 });
 test('missing plot fails before any DOM or store mutation',()=>{
  assert.throws(()=>createFullRangeDragPreview({querySelector:()=>null},{trackRole:'primary',assemblyCtgId:1}),TypeError);
+});
+
+
+for (const composition of [false, true]) test(`full-range ${composition ? "composition" : "track-pair"} paints live Canvas geometry without mutating SVG bands and restores cleanly`, () => {
+ const f = fixture(true, composition), before = f.snapshot(), calls = [];
+ const context = Object.fromEntries(["setTransform", "clearRect", "beginPath", "closePath", "moveTo", "lineTo", "fill", "stroke"]
+  .map(name => [name, (...args) => calls.push([name, ...args])]));
+ let attached = false;
+ const canvas = { style: {}, setAttribute() {}, getContext: () => context, remove() { attached = false; } };
+ f.scroll.ownerDocument = { documentElement: { dataset: { theme: "dark" } }, createElement: () => canvas };
+ f.scroll.appendChild = () => { attached = true; };
+ f.queryMaps.get(f.svg)["polygon.track-collinearity-band[data-track-band-proxy='1']"] = [f.band];
+ const handle = f.handle();
+ for (const delta of [150, -100, 0]) {
+  calls.length = 0;
+  const fit = handle.update(delta);
+  assert.equal(f.band.getAttribute("points"), "20,20 40,20 60,40 50,40");
+  const points = calls.filter(call => ["moveTo", "lineTo"].includes(call[0])).map(call => call.slice(1));
+  const expected = [[20 + delta,20], [40 + delta,20], [60,40], [50,40]].map(([x,y]) => [(x-fit.minX)*fit.scale,y]);
+  points.forEach((point,index) => point.forEach((value,axis) => assert.ok(Math.abs(value-expected[index][axis]) < 1e-9)));
+  assert.equal(f.scroll.classList.contains("is-subview-band-canvas-drag-preview"), true);
+  assert.equal(handle.isCurrent(), true, "the gesture Canvas must not invalidate the graph");
+  assert.equal(attached, true);
+ }
+ handle.restore(); handle.restore();
+ assert.equal(attached, false); assert.equal(f.scroll.classList.contains("is-subview-band-canvas-drag-preview"), false);
+ assert.deepEqual(f.snapshot(), before);
 });

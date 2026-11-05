@@ -1472,3 +1472,17 @@ test("four dataset Assembly renders all three support options, even without plac
 
 
 });
+
+
+test("Local View SVG fallback overrides canvas-ready transparency when the drag class is on the scroll itself", () => {
+  const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url), "utf8");
+  for (const tone of ["", ".is-companion"]) {
+    const selector = `.assembly-track-scroll.is-subview-track-drag-preview.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band${tone}[data-track-band-proxy="1"]`;
+    const index = css.indexOf(selector);
+    assert.ok(index >= 0, `missing self-container fallback: ${selector}`);
+    const rule = css.slice(index, css.indexOf("}", index));
+    assert.ok(rule.includes("fill: var(--alignment-band-paint-fill"));
+    assert.ok(rule.includes("stroke: var(--alignment-band-paint-stroke"));
+  }
+  assert.match(css, /\.is-subview-band-canvas-drag-preview \.subview-track-svg \.track-collinearity-band\[data-track-band-proxy="1"\],[\s\S]*?visibility: hidden;/);
+});

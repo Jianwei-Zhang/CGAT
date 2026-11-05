@@ -184,3 +184,89 @@ export function bindBandCanvasRuntime(host) {
     };
   });
 }
+
+// Gesture-local paint records: retain every rendered band and its draw order,
+// but never rewrite thousands of SVG proxy points on every pointer frame.
+export function createSubviewBandCanvasDragPreview(scroll, actions, { width, height }) {
+  const document = scroll?.ownerDocument;
+  const svg = scroll?.querySelector?.("svg.assembly-track-svg");
+  const nodes = svg?.querySelectorAll?.("polygon.track-collinearity-band[data-track-band-proxy='1']") || [];
+  if (!nodes.length || !document?.createElement || !scroll?.appendChild) return null;
+  const byNode = new Map(actions.filter((action) => action.kind === "band").map((action) => [action.node, action]));
+  const dark = document.documentElement?.dataset?.theme === "dark";
+  const resolveStyle = dark ? resolveDarkAlignmentBandStyle : resolveAlignmentBandStyle;
+  const bands = [];
+  for (const node of nodes) {
+    const action = byNode.get(node);
+    const points = action?.basePoints || String(node.getAttribute("points") || "").trim().split(/\s+/)
+      .map((point) => point.split(",").map(Number));
+    if (points.length !== 4 || points.some((point) => point.length !== 2 || !point.every(Number.isFinite))) return null;
+    const identityText = node.getAttribute("data-band-identity-pct");
+    const identityPct = identityText === null || identityText === "" ? null : Number(identityText);
+    const tone = node.classList.contains("is-companion") ? "companion" : "primary";
+    bands.push({ points, identityPct, styles: resolveStyle(tone, identityPct),
+      moving: points.map((_, index) => action?.edgeIndexes.includes(index) ? 1 : 0) });
+  }
+  const orderedBands = sortAlignmentBands(bands);
+  let canvas, configured;
+  try {
+    canvas = document.createElement("canvas");
+    configured = configureCanvas(canvas, width, height);
+  } catch {
+    return null;
+  }
+  if (!configured) return null;
+  canvas.className = "track-band-canvas-layer subview-band-drag-canvas";
+  canvas.setAttribute("aria-hidden", "true");
+  canvas.setAttribute("data-subview-band-drag-canvas", "1");
+  const clip = svg.querySelector("[data-subview-band-clip-rect='1']");
+  const clipY = clip ? Number(clip.getAttribute("y")) : 0;
+  const clipHeight = clip ? Number(clip.getAttribute("height")) : 0;
+  const { context } = configured;
+  let restored = false;
+  let attached = false;
+  return {
+    nodes: new Set(nodes),
+    draw(deltaPx, viewBox) {
+      if (restored) return false;
+      const [minX, minY, spanX, spanY] = viewBox;
+      const scaleX = width / spanX, scaleY = height / spanY;
+      context.clearRect(0, 0, configured.width, configured.height);
+      if (clip) {
+        context.save();
+        context.beginPath();
+        context.rect(0, (clipY - minY) * scaleY, width, clipHeight * scaleY);
+        context.clip();
+      }
+      for (const band of orderedBands) {
+        context.beginPath();
+        for (let index = 0; index < band.points.length; index++) {
+          const [x, y] = band.points[index];
+          const px = (x + band.moving[index] * deltaPx - minX) * scaleX;
+          const py = (y - minY) * scaleY;
+          if (index === 0) context.moveTo(px, py);
+          else context.lineTo(px, py);
+        }
+        context.closePath();
+        context.fillStyle = band.styles.fill;
+        context.strokeStyle = band.styles.stroke;
+        context.fill();
+        context.stroke();
+      }
+      if (clip) context.restore();
+      // Switch paint surfaces only after the first complete successful draw.
+      if (!attached) {
+        scroll.appendChild(canvas);
+        scroll.classList.add("is-subview-band-canvas-drag-preview");
+        attached = true;
+      }
+      return true;
+    },
+    restore() {
+      if (restored) return;
+      restored = true;
+      canvas.remove();
+      scroll.classList.remove("is-subview-band-canvas-drag-preview");
+    },
+  };
+}

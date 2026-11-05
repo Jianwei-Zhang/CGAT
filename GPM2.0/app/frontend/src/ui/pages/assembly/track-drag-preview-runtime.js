@@ -646,14 +646,20 @@ export function compileTrackDragPreview(host, payload, { subview = false } = {})
         return;
       }
       const action = { kind, node, ...details };
+      action.hiddenDuringFullRange = kind === "line" && (
+        node.classList?.contains("subview-anchor-hit-zone")
+        || (node.classList?.contains("subview-anchor-line") && node.getAttribute?.("stroke") === "transparent")
+      );
       if (kind === "band") action.basePoints = parsePolygonPoints(node.getAttribute?.("points"));
       byNode.set(node, action);
       actions.push(action);
     },
-    apply(offsetPx) {
-      host.classList?.add?.(subview ? SUBVIEW_TRACK_PREVIEW_CLASS : MAIN_TRACK_PREVIEW_CLASS);
+    apply(offsetPx, { skipBandNodes = null, fullRange = false } = {}) {
+      const previewClass = subview ? SUBVIEW_TRACK_PREVIEW_CLASS : MAIN_TRACK_PREVIEW_CLASS;
+      if (!host.classList?.contains?.(previewClass)) host.classList?.add?.(previewClass);
       for (const action of actions) {
         const { kind, node, factor = 1 } = action;
+        if ((kind === "band" && skipBandNodes?.has(node)) || (fullRange && action.hiddenDuringFullRange)) continue;
         if (kind === "group") applyGroupPreview(node, offsetPx * factor);
         else if (kind === "sticky") applyStickyLabelPreview(node, offsetPx * factor);
         else if (kind === "band") applyBandPreview(node, action.edgeIndexes, offsetPx, null, action.basePoints);

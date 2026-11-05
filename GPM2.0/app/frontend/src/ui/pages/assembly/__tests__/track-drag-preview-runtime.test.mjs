@@ -882,3 +882,31 @@ test("compiled movement composes rather than discards a pre-existing group trans
  assert.equal(group.getAttribute("transform"),"translate(20.00 0) translate(7 3) rotate(10)");
  plan.clear();assert.equal(group.getAttribute("transform"),"translate(7 3) rotate(10)");
 });
+
+
+test("Canvas-owned proxies and invisible full-range anchors skip DOM writes, but active anchors and GRT evidence still move", () => {
+  const group = createNode({ "data-subview-track-role": "primary" });
+  const band = createNode({ points: "0,0 10,0 40,50 30,50" });
+  const evidence = createNode({ points: "0,0 10,0 40,50 30,50", "data-grt-display-evidence-source-entry-key": "entry" });
+  group.setAttribute("data-grt-result-entry-key", "entry");
+  const active = createNode({ x1: "1", x2: "2", stroke: "red", "data-subview-anchor-top-contig-id": "1" });
+  const hidden = createNode({ x1: "1", x2: "2", stroke: "transparent", "data-subview-anchor-top-contig-id": "1" });
+  active.classList.add("subview-anchor-line"); hidden.classList.add("subview-anchor-line");
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="1"]': [group],
+    '[data-subview-top-contig-id="1"]': [band],
+    '[data-subview-anchor-preview="1"]': [active, hidden],
+    '[data-grt-display-evidence]': [evidence],
+    "[data-drag-preview-group='1']": [group], "[data-drag-preview-band='1']": [evidence],
+    "[data-drag-preview-junction-line='1']": [active],
+  });
+  const plan = compileTrackDragPreview(host, { slot: "top", contigId: 1 }, { subview: true });
+  let writes = 0;
+  for (const node of [band, hidden]) node.setAttribute = () => { writes++; };
+  plan.apply(20, { skipBandNodes: new Set([band]), fullRange: true });
+  assert.equal(writes, 0);
+  assert.equal(active.getAttribute("x1"), "21.00");
+  assert.equal(hidden.getAttribute("x1"), "1");
+  assert.equal(evidence.getAttribute("points"), "20.00,0.00 30.00,0.00 40.00,50.00 30.00,50.00");
+  plan.clear(); assert.equal(active.getAttribute("x1"), "1");
+});
