@@ -14,6 +14,7 @@ import stat
 import native_chain_state as nst
 import native_evaluation as ne
 import native_first as nf
+import minimap_options as mo
 import windowed_alignment as wa
 
 POLICY = "original-chain-native-selection-v1"
@@ -103,7 +104,7 @@ def bind_native_rows(pair,selection,directory,part,query_length):
         require(not source.read(1),"private native view has extra unselected candidates")
 
 
-def verify_attempt(path,root,status,*,tool,target,query,mid_occ=None):
+def verify_attempt(path,root,status,*,tool,target,query,mid_occ=None,fraction=None):
     require(status in ("native_success","target_assertion"),"not a usable native completion or exact assertion")
     path = regular_under(path,root)
     receipt = read_json(path,root)
@@ -115,11 +116,11 @@ def verify_attempt(path,root,status,*,tool,target,query,mid_occ=None):
             and receipt.get("paf_usable") is (status=="native_success")
             and receipt.get("stderr_sha256")==wa.sha256(path.parent/"native.stderr"),"native completion/abort/log evidence differs")
     command = execution.get("command",[])
-    inherited = ["-f",str(mid_occ)] if mid_occ is not None else []
-    require(type(command) is list and len(command)==10+len(inherited) and command[:4]==[tool,"-c","-x","asm10"]
-            and command[4:4+len(inherited)]==inherited,"native flags/preset/tool changed")
-    rest = command[4+len(inherited):]
-    require(rest[0]=="-t" and str(rest[1]).isdigit() and int(rest[1])>=1 and rest[2:]==[
+    try:
+        rest = mo.command_tail(command,tool,fraction=fraction,mid_occ=mid_occ)
+    except ValueError as exc:
+        raise wa.ExperimentError(str(exc)) from exc
+    require(len(rest)==6 and rest[0]=="-t" and str(rest[1]).isdigit() and int(rest[1])>=1 and rest[2:]==[
         "-o",str(path.parent/"native.partial.paf"),str(target),str(query)],"native input/output command changed")
     require(read_json(path.parent/"native.execution.json",root)==execution
             and read_json(path.parent/"native.command.json",root,expected_type=list)==command,"native command/execution files disagree")

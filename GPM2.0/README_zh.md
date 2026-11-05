@@ -167,6 +167,8 @@ Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目�
 | 引擎 | 参数 | 可选值 / 默认值 |
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` 或 `asm5`；默认 `asm10` |
+| `minimap2` | `-K, --minimap-batch <bases>` | 初始参考比对的 query 批大小：默认 `1G`；内存不足可尝试 `500M`。不是内存上限。 |
+| `minimap2` | `-f, --minimap-filter <fraction>` | 用户显式选择高速过滤，如 `0.01`，可能改变比对结果；省略则保持 preset 过滤。 |
 
 GPM Server 的全基因组/成对比对使用 Minimap2，cen 重复扫描使用 MUMmer4。BLASTN 与 Winnowmap 的全基因组运行无法满足当前流程的时间和内存要求，因此不再提供这两个引擎。LGZ 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
 

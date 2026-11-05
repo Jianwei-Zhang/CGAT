@@ -320,6 +320,18 @@ On compute nodes where update sources are unreachable, startup verifies the loca
 
 See the parent repository's `README.md` for the complete options and desktop workflow.
 
+### Initial-reference mapping speed and memory
+
+New workspaces default to `-K 1G` (query batch size, **not a RAM limit**).
+If memory is insufficient, try `-K 500M`; this does not guarantee the task will fit.
+Use `-f 0.01` explicitly for faster, more aggressive seed filtering, which **may change alignment results**;
+without `-f`, the assembly preset's filtering is unchanged. These options apply only to initial-reference mapping.
+Long aliases are `--minimap-batch` and `--minimap-filter`.
+
+For a stopped workspace, `bash "$SERVER/run.sh" -o ./gpm_server -K 500M`
+changes the batch size for unfinished work without rerunning valid completed alignments.
+Existing workspaces retain their prepared defaults; changing `-f` requires a new output directory.
+
 ### Ultra-long initial-reference alignments
 
 Initial-reference `asm10` mapping inspects query lengths before mapping. Ordinary

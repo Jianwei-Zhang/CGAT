@@ -358,8 +358,12 @@ class OuterCheckpointManager:
         manifest = (self.server_dir / command_relpath).parent / "alignment_tasks.json"
         if manifest.is_file():
             paths.append(manifest)
+        parameters = self._alignment_options()
+        fraction = self._read_options().get("minimap_filter", "default")
+        if fraction != "default":
+            parameters["minimap_filter"] = fraction
         return {
-            "parameters": self._alignment_options(),
+            "parameters": parameters,
             "tools": self._alignment_tools(),
             "inputs": self._identities(paths),
         }

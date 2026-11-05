@@ -19,6 +19,7 @@ import subprocess
 import guided_alignment as ga
 import native_chain_state as nst
 import native_first as nf
+import minimap_options as mo
 import recovery_publication as rp
 import proactive_reference_plan as pp
 import proactive_publication as pub
@@ -46,7 +47,7 @@ def first_part_threshold(mm, part, root, args):
     empty = directory / "empty.fa"
     empty.write_bytes(b"")
     output = directory / "empty.paf"
-    command = [mm, "-x", "asm10", "-t", str(args.threads), "-o", str(output), part["path"], str(empty)]
+    command = [mm, "-x", "asm10", *mo.seed_flags(getattr(args,"minimap_filter",None)), "-t", str(args.threads), "-o", str(output), part["path"], str(empty)]
     execution = wa.run_command(command, directory, "metadata", args.timeout, args.memory_gib)
     if output.read_bytes() or execution.get("returncode") != 0:
         raise wa.ExperimentError("first-part metadata pass was not a successful zero-query pass")
@@ -108,8 +109,13 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
         catalog = pp.scan_query(args.query)
         plan = pp.make_plan(catalog)
         cache.bind("query", query_identity(catalog))
-        cache.bind("policy", {"target": str(args.target), "threads": args.threads,
-                              "window": plan["window_policy"], "threshold": plan["risk_threshold"]})
+        policy = {"target": str(args.target), "threads": args.threads,
+                  "window": plan["window_policy"], "threshold": plan["risk_threshold"]}
+        fraction = getattr(args,"minimap_filter",None)
+        if fraction is not None:
+            policy["minimap_filter"] = mo.seed_fraction(fraction)
+            report["minimap_filter"] = fraction
+        cache.bind("policy", policy)
         tool = nf.source_identity(Path(mm))
         cache.bind("tool", tool)
         groups = cache.groups(catalog, plan, prepared_workspace=prepared_workspace)
@@ -124,7 +130,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
         if not plan["long_queries"]:
             reference = nf.source_identity(args.target.resolve())
             cache.bind("reference", reference)
-            native = cache.ordinary(mm, args.target, args.query)
+            native = cache.ordinary(mm, args.target, args.query, fraction=fraction)
             if native is None:
                 pr.archive_partial(root / "ordinary-native")
                 native = nf.attempt(mm, args.target, args.query, root / "ordinary-native", native_args)
@@ -161,7 +167,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             merger = nf.CellMerger(root / "cells", queries, target.records, index["parts"])
             ordinary = next((g for g in groups["groups"] if g["route"] == "native"), None)
             if ordinary is not None:
-                native = cache.ordinary(mm, root / "target.default.mmi", ordinary["path"])
+                native = cache.ordinary(mm, root / "target.default.mmi", ordinary["path"], fraction=fraction)
                 if native is None:
                     pr.archive_partial(root / "ordinary-native")
                     native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", native_args)
@@ -176,7 +182,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                 saved = cache.get("threshold")
                 if saved is not None:
                     directory = root / "first-part-metadata"
-                    command = [mm, "-x", "asm10", "-t", str(args.threads), "-o", str(directory / "empty.paf"),
+                    command = [mm, "-x", "asm10", *mo.seed_flags(fraction), "-t", str(args.threads), "-o", str(directory / "empty.paf"),
                                index["parts"][0]["path"], str(directory / "empty.fa")]
                     execution = pub.completed_command(directory, "metadata", root, command)
                     if (saved["execution"] != execution or saved["part_sha256"] != index["parts"][0]["sha256"]

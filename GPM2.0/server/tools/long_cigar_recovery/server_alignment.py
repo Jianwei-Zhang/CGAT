@@ -30,6 +30,7 @@ import proactive_publication as pub
 import proactive_resume as pr
 import native_chain_state as nst
 import native_first as nf
+import minimap_options as mo
 import recovery_publication as rp
 import windowed_alignment as wa
 
@@ -40,7 +41,7 @@ RUNTIME_FILES = (
     "native_first.py","native_evaluation.py","native_chain_state.py","build_native_chain_state.py","recovery_publication.py",
     "native_recovery.py","native_selection.py","post_dp_selection.py","whole_query_scores.py",
     "batch_seed_ownership.py","stream_seed_trace.py","trace_memory.py","sequential_split_witness.py",
-    "minimap_index_context.py","seam_witness.py","resume_reference.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
+    "minimap_options.py","minimap_index_context.py","seam_witness.py","resume_reference.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
 )
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -182,6 +183,9 @@ def run_reference(args,*,runtime_root=None):
         raise wa.ExperimentError("branch adapter supports only a prepared initial-reference asm10 run")
     runtime_root = Path(runtime_root).resolve() if runtime_root is not None else Path(__file__).resolve().parent
     runtime = validate_runtime(runtime_root)
+    mapping_options = mo.workspace_options(workspace)
+    # Fraction changes alter scientific policy. K only affects future executions.
+    args.minimap_filter = mapping_options.get("minimap_filter")
     output = run_dir/args.result
     with task_lock(run_dir),cancellation_scope():
         resume_identity = pr.adapter_key(args, runtime)
@@ -190,7 +194,8 @@ def run_reference(args,*,runtime_root=None):
         report = {"schema":1,"status":"running","production_ready":False,"customer_validated":False,
                   "runtime":runtime,"attempt":str(attempt),"result_published":False,"attempt_reused":attempt_reused,
                   "minimap2_modified":False,"automatic_parameter_retry":False,
-                  "scope":"initial_reference_asm10_only","customer_configuration_required":False}
+                  "scope":"initial_reference_asm10_only","customer_configuration_required":False,
+                  "initial_reference_options":mapping_options}
         wa.write_json(attempt/"server-alignment.json",report)
         try:
             if output.is_symlink() or (output.exists() and not stat.S_ISREG(output.stat().st_mode)):
@@ -203,7 +208,7 @@ def run_reference(args,*,runtime_root=None):
                 report["previous_result"] = {"path":str(previous),"sha256":wa.sha256(previous),"restored_automatically":False}
             options = argparse.Namespace(target=args.target,query=args.query,out=attempt/"selective",
                 minimap2="minimap2",threads=args.threads,timeout=None,memory_gib=0,
-                native_state_bundle=runtime_root/"native"/nst.build.host_platform())
+                native_state_bundle=runtime_root/"native"/nst.build.host_platform(), **mapping_options)
             result = pa.experiment(options,prepared_workspace=workspace,admit_output=False,resume_identity=resume_identity)
             report["candidate_receipt_sha256"] = wa.sha256(options.out/"proactive-candidate.json")
             source,digest = publication_source(result,attempt,runtime=runtime,runtime_root=runtime_root)

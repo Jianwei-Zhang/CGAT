@@ -17,6 +17,8 @@ WORK_ROOT="$(pwd)/gpm_server"
 THREADS="10"
 ARCHIVE_FORMAT="tar.gz"
 MINIMAP_PRESET="asm10"
+MINIMAP_BATCH="1G"
+MINIMAP_FILTER="default"
 SELF_MIN_CHAIN_SCORE="200"
 SELF_MINIMIZERS="100"
 SKIP_SELF=false
@@ -47,6 +49,8 @@ Usage:
     [-o|--out <gpm_server_output_dir>] \
     [--score|-s <chr_assignment_min_coverage_percent>] \
     [--minimap-preset asm10|asm5] \
+    [-K|--minimap-batch <bases>] \
+    [-f|--minimap-filter <fraction>] \
     [--threads|-t <thread_budget>] \
     [--archive-format tar.gz|zip] \
     [--skip-self] \
@@ -77,6 +81,8 @@ Behavior:
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
   - Uses Minimap2 for reference/pairwise alignments; MUMmer --maxmatch for cen repeats
   - Supports --minimap-preset, default: asm10
+  - Initial-reference mapping: -K/--minimap-batch defaults to 1G; try 500M if memory is insufficient (not a RAM limit)
+  - Optional -f/--minimap-filter 0.01 enables faster, more aggressive seed filtering; may change alignments; default keeps the preset
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
   - Default delivery: tar.gz compressed with pigz using the thread budget; --archive-format zip keeps ZIP output
@@ -206,6 +212,7 @@ write_alignment_command_script() {
   local self_mode="$5"
   local result_name="${6:-result.paf}"
   local runtime_threads="\"\${GPM_TASK_THREADS:-${THREADS}}\""
+  local initial_reference="${7:-false}"
 
   {
     printf '#!/usr/bin/env bash\n'
@@ -213,6 +220,12 @@ write_alignment_command_script() {
     printf 'cd %s\n' "$(shell_quote "$run_dir")"
     printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
     printf 'minimap2 -c -x %s ' "$(shell_quote "$MINIMAP_PRESET")"
+    if [[ "$initial_reference" == "true" ]]; then
+      printf -- '-K "${GPM_RUN_MINIMAP_BATCH:-%s}" ' "$MINIMAP_BATCH"
+      if [[ "$MINIMAP_FILTER" != "default" ]]; then
+        printf -- '-f %s ' "$(shell_quote "$MINIMAP_FILTER")"
+      fi
+    fi
     if [[ "$self_mode" == "true" ]]; then
       printf -- '-X '
     fi
@@ -423,6 +436,8 @@ write_prepare_options_metadata() {
     printf 'chr_assignment_min_coverage_percent\t%s\n' "$CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT"
     printf 'alignment_engine\t%s\n' "minimap2"
     printf 'minimap_preset\t%s\n' "$MINIMAP_PRESET"
+    printf 'minimap_batch\t%s\n' "$MINIMAP_BATCH"
+    printf 'minimap_filter\t%s\n' "$MINIMAP_FILTER"
     printf 'self_min_chain_score\t%s\n' "$SELF_MIN_CHAIN_SCORE"
     printf 'self_minimizers\t%s\n' "$SELF_MINIMIZERS"
     printf 'threads\t%s\n' "$THREADS"
@@ -455,7 +470,7 @@ write_ref_command_script() {
   local ref_fa="$2"
   local ds_fa="$3"
 
-  write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false
+  write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false result.paf true
   if [[ "$MINIMAP_PRESET" == "asm10" ]]; then
     local runtime_threads="\"\${GPM_TASK_THREADS:-${THREADS}}\""
     {
@@ -763,6 +778,16 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--minimap-preset requires asm10 or asm5"
       validate_minimap_preset "$2"
       MINIMAP_PRESET="$2"
+      shift 2
+      ;;
+    --minimap-batch|-K)
+      [[ $# -ge 2 ]] || die "$1 requires a base count, e.g. 1G or 500M"
+      MINIMAP_BATCH="$(PYTHONPATH="${SCRIPT_DIR}/tools" python3 -c 'import sys; from long_cigar_recovery.minimap_options import batch_size; print(batch_size(sys.argv[1]))' "$2")" || die "Invalid $1 value"
+      shift 2
+      ;;
+    --minimap-filter|-f)
+      [[ $# -ge 2 ]] || die "$1 requires a fraction, e.g. 0.01"
+      MINIMAP_FILTER="$(PYTHONPATH="${SCRIPT_DIR}/tools" python3 -c 'import sys; from long_cigar_recovery.minimap_options import seed_fraction; print(seed_fraction(sys.argv[1]))' "$2")" || die "Invalid $1 value"
       shift 2
       ;;
     --self-m|-sm)

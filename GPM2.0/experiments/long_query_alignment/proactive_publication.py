@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import native_first as nf
+import minimap_options as mo
 import proactive_reference_plan as pp
 import recovery_publication as rp
 import selective_reference_alignment as sr
@@ -136,7 +137,7 @@ def admit(report, root, *, bundle):
     expected_sources = []
     if ordinary:
         native = rp.verify_attempt(root / "ordinary-native/native-attempt.json", root, "native_success",
-            tool=report["tool"]["path"], target=root / "target.default.mmi", query=group_by_name[ordinary[0]]["path"])
+            tool=report["tool"]["path"], target=root / "target.default.mmi", query=group_by_name[ordinary[0]]["path"], fraction=report.get("minimap_filter"))
         require(native == report["ordinary_native"], "ordinary native result changed")
         mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(parts))
         expected_sources.append({"path": native["path"], "sha256": native["paf_sha256"], "route": "native",
@@ -145,9 +146,12 @@ def admit(report, root, *, bundle):
         directory = root / "first-part-metadata"
         execution = report["threshold_source"]["execution"]
         command = execution["command"]
-        require(len(command) == 9 and command[:4] == [report["tool"]["path"], "-x", "asm10", "-t"]
-                and command[4].isdigit() and int(command[4]) > 0
-                and command[5:] == ["-o", str(directory / "empty.paf"), parts[0]["path"], str(directory / "empty.fa")],
+        flags = mo.seed_flags(report.get("minimap_filter"))
+        prefix = [report["tool"]["path"], "-x", "asm10", *flags, "-t"]
+        rest = command[len(prefix):]
+        require(command[:len(prefix)] == prefix and len(rest) == 5
+                and rest[0].isdigit() and int(rest[0]) > 0
+                and rest[1:] == ["-o", str(directory / "empty.paf"), parts[0]["path"], str(directory / "empty.fa")],
                 "all-long threshold was not read from a zero-query first-part pass")
         completed_command(directory, "metadata", root, command)
         require((directory / "empty.fa").stat().st_size == (directory / "empty.paf").stat().st_size == 0,

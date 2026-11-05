@@ -179,6 +179,8 @@ for source records and evidence limits.
 | Aligner | Option | Allowed values / default |
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` or `asm5`; default `asm10` |
+| `minimap2` | `-K, --minimap-batch <bases>` | Initial-reference query batch: default `1G`; try `500M` if memory is insufficient. Not a RAM cap. |
+| `minimap2` | `-f, --minimap-filter <fraction>` | Optional explicit fast filtering, e.g. `0.01`; may change alignments. Omit to keep preset filtering. |
 
 GPM Server uses Minimap2 for genome/pairwise alignment and MUMmer4 for cen-repeat scans. BLASTN and Winnowmap are not available because whole-genome runs could not meet the workflow's runtime and memory requirements. LGZ processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
 

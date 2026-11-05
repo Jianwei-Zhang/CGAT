@@ -26,6 +26,7 @@ MAX_STATE = 64 * 1024**2
 # Frozen full source profile from the reviewed pre-fix recovery runtime. Only
 # ordinary native completions, never old recovered cells, may cross this fix.
 _REVIEWED_LEGACY_RUNTIME = "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd"
+_REVIEWED_METADATA_RUNTIME = "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d"
 
 
 
@@ -46,9 +47,12 @@ def read_json(path, *, limit=MAX_STATE):
 def adapter_key(args, runtime):
     executable = shutil.which("minimap2")
     tool = nf.source_identity(Path(executable).resolve()) if executable else None
-    return {"schema": 1, "runtime_sha256": runtime["sha256"], "threads": args.threads,
+    key = {"schema": 1, "runtime_sha256": runtime["sha256"], "threads": args.threads,
             "preset": args.preset, "target": {"path": str(args.target.resolve()), **wa.fingerprint(args.target.resolve())},
             "query": {"path": str(args.query.resolve()), **wa.fingerprint(args.query.resolve())}, "tool": tool}
+    if getattr(args, "minimap_filter", None) is not None:
+        key["minimap_filter"] = args.minimap_filter
+    return key
 
 
 def _same_identity_except_ctime(left, right):
@@ -66,7 +70,8 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
     previous = read_json(candidate / "server-alignment.json").get("runtime", {})
     old_files, new_files = previous.get("files_sha256", {}), runtime.get("files_sha256", {})
     if (previous.get("sha256") != old_key["runtime_sha256"]
-            or not old_files or set(old_files) != set(new_files)
+            or not old_files or set(new_files) - set(old_files) not in (set(), {"minimap_options.py"})
+            or set(old_files) - set(new_files)
             or any(previous.get(k) != runtime.get(k) for k in
                    ("native_companion_sha256", "native_companion_platform", "recovered_output_admission"))):
         return False
@@ -75,9 +80,11 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
         return True
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    return (profile == _REVIEWED_LEGACY_RUNTIME
+    return (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME}
             and [profile, current_profile] in runtime.get("native_resume_source_profiles", [])
-            and all(n in state["stages"] for n in ("groups", "target-store", "index", "ordinary"))
+            and all(n in state["stages"] for n in ("groups", "ordinary"))
+            and (("target-store" in state["stages"] and "index" in state["stages"])
+                 or set(state["stages"]) == {"groups", "ordinary"})
             and not any(n.startswith("cell:") for n in state["stages"]))
 
 
@@ -85,8 +92,11 @@ def _transition_attempt(candidate, locator, previous, key, runtime):
     """Reviewed control migration; never change input/index/PAF bytes or commands."""
     old_key = previous.get("key")
     fields = {"schema", "runtime_sha256", "threads", "preset", "target", "query", "tool"}
+    if "minimap_filter" in key:
+        fields.add("minimap_filter")
     if (not isinstance(old_key, dict) or set(old_key) != fields or set(key) != fields
             or any(old_key[k] != key[k] for k in ("schema", "threads", "preset"))
+            or old_key.get("minimap_filter") != key.get("minimap_filter")
             or any(not _same_identity_except_ctime(old_key[k], key[k]) for k in ("target", "query", "tool"))):
         return False
     state_path = candidate / "selective" / STATE
@@ -294,12 +304,12 @@ class Checkpoint:
         wa.write_json(self.root / "index-base.json", index)
         self.mark("index", {"sha256": wa.sha256(self.root / "index-base.json")})
 
-    def ordinary(self, mm, target, query):
+    def ordinary(self, mm, target, query, *, fraction=None):
         marker = self.get("ordinary")
         if not marker:
             return None
         receipt = rp.verify_attempt(self.root / "ordinary-native/native-attempt.json", self.root, "native_success",
-            tool=mm, target=target, query=query)
+            tool=mm, target=target, query=query, fraction=fraction)
         if wa.sha256(self.root / "ordinary-native/native-attempt.json") != marker["sha256"]:
             raise wa.ExperimentError("cached ordinary completion receipt changed")
         self.reused["ordinary_group"] += 1

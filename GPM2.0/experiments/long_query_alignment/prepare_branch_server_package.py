@@ -27,7 +27,7 @@ import server_alignment as adapter
 import resume_reference as resume
 import windowed_alignment as wa
 
-REF_ANCHOR = '  write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false\n'
+REF_ANCHOR = '  write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false result.paf true\n'
 COPY_ANCHOR = '  cp -R "$tools_src/grt_core" "$tools_dst/grt_core"\n'
 REF_OVERLAY = r'''  if [[ "$MINIMAP_PRESET" == "asm10" ]]; then
     local runtime_threads="\"\${GPM_TASK_THREADS:-${THREADS}}\""

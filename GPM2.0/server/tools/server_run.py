@@ -14,10 +14,12 @@ from pathlib import Path
 from run_all_runner import Runner, RunnerError, WorkspaceLock, load_plan, new_run_id
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from run_resources import RESOURCE_OPTIONS, update_resources
+from long_cigar_recovery.minimap_options import batch_size, seed_fraction
 
 ALIASES = {
     "-o": "--out", "--output": "--out", "-t": "--threads",
     "-s": "--score", "-m": "--max-fill",
+    "-K": "--minimap-batch", "-f": "--minimap-filter",
     "-sm": "--self-m", "-sn": "--self-n",
     "--lgz-qc-memory-gb": "--grt-qc-memory-gb",
     "--lgz-kmer-size": "--grt-kmer-size",
@@ -26,7 +28,7 @@ ALIASES = {
 }
 SINGLE_OPTIONS = {
     "--out", "--threads", "--score", "--archive-format",
-    "--minimap-preset", "--cen", "--cen-min-len",
+    "--minimap-preset", "--minimap-batch", "--minimap-filter", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
     "--grt-execution-profile", "--grt-step3-mummer-scope",
@@ -50,8 +52,13 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
             raise RunnerError(f"{key} requires a value; see run.sh --help")
         if key in PATH_OPTIONS or key == "--out":
             values[-1] = str((cwd / values[-1]).resolve())
-        if key in {"--max-fill", "--self-m", "--self-n", *RESOURCE_OPTIONS} and not re.fullmatch(r"[1-9][0-9]*", values[0]):
+        if key in ({"--max-fill", "--self-m", "--self-n", *RESOURCE_OPTIONS} - {"--minimap-batch"}) and not re.fullmatch(r"[1-9][0-9]*", values[0]):
             raise RunnerError(f"{key} must be a positive integer")
+        if key in {"--minimap-batch", "--minimap-filter"}:
+            try:
+                values[0] = (batch_size if key == "--minimap-batch" else seed_fraction)(values[0])
+            except ValueError as exc:
+                raise RunnerError(str(exc)) from exc
         allowed = {"--grt-execution-profile": {"baseline", "optimized"},
                    "--grt-step3-mummer-scope": {"full", "gap-screen"}}
         if key in allowed and values[0] not in allowed[key]:

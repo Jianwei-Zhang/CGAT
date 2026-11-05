@@ -4,18 +4,18 @@
   "scope": "initial_reference_asm10_only",
   "files_sha256": {
     "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
-    "proactive_reference_alignment.py": "449a5a1fcc66926aebc173c158b4ce370ffa84d51a8ec925f1ebd2cfe37c6994",
-    "proactive_publication.py": "1a6811bd2bad5aabf56f23b01a3f0ea68520088e3a8ce6a1a07f994a601d28fe",
-    "proactive_resume.py": "e9c10bd5ac00b1babad738854cdafef8a021fa1f97937177c996c722df8523f9",
-    "server_alignment.py": "2a69b6d460294cbd4661ecc483b37f33aa9b9c1d19325612e417d1993f977c78",
+    "proactive_reference_alignment.py": "c5e40b73866d66d98bd0338ae7e396977f9356732e37291e0cde404b1d8474e6",
+    "proactive_publication.py": "5b4d26cd0d93b8af0243e5275b9e830b60118ab970203a01f672fcd13ab52c6b",
+    "proactive_resume.py": "62edf7a9ddce003408d554390fd95bb6128f7d9d17203bf4e4ac7872e72989b9",
+    "server_alignment.py": "b65aaf67b0412ed76fe07900d0ee35f3a92b9862495297988271088c18002f42",
     "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
     "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
     "windowed_alignment.py": "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e",
-    "native_first.py": "4fadc67df0294af3ab5e555a31542b0da4d6627c12bed38879563eb11e49610b",
+    "native_first.py": "e87b01370b213096f4cd74f807933b70063c972d2cf189269db253c608531d0c",
     "native_evaluation.py": "33f6a37fa6a0b6db621630edbfc5aa8ba8c7eaf5e5b87fde483db8edfe50b0b2",
     "native_chain_state.py": "9e4f8efe083e3b65a922e7edfed469baf06e2d8bb35f9b109248a82e78e44cea",
     "build_native_chain_state.py": "a1da3b26759007a8185f8818fd8ddbbbc074ae1146221097b59f815d6785fc22",
-    "recovery_publication.py": "e05721fd8df404d3b6365aa4864ebaea70dba5214ebb020dfdd67210af13a3d0",
+    "recovery_publication.py": "0f2984f52f598fb7228ebceb6522f567ced39d9c95ea29f3cf73abc91ad40574",
     "native_recovery.py": "9737a9148cd8da8be1f7bc8968180d99cd5f04e666a2ab54ace96e0b9963ae3f",
     "native_selection.py": "bdb0a0eb9f2c6b5b5c3a1ab01c34e6f2b30f47dc9353ecaefcb9b9665c13b3ce",
     "post_dp_selection.py": "42d39410f760608461509b38fced2b60caea04dacf3bc4f75027398e25495cef",
@@ -24,6 +24,7 @@
     "stream_seed_trace.py": "a480e1c041a398e58ecde1fdab38750e5142091e8beacb9689670e21a35949cd",
     "trace_memory.py": "c934202e86d3465499b0585f0b6bce09a215d3485f247fa0abdb616036606eac",
     "sequential_split_witness.py": "573ea1231f052c5ff3f748402528561c6f4da6563f8658ef5baa544e1d4c5ad0",
+    "minimap_options.py": "1b184b47a507a4daf19323d450b6a4f43c401bc0de24ab5c8a30a8950a756322",
     "minimap_index_context.py": "ee888f3645288042abb2e16bb4cb1743368bbb81b34aa4cae49405e70c52b5c7",
     "seam_witness.py": "09e80e89a6662f185ec8a042e8fbb9ae4e24bc611b56d3be8d3c99a14429b249",
     "resume_reference.py": "d432453105a2afddda0dd7bb8f0bbcf7e2f52678632ec395e85737d9c5c7b98d",
@@ -33,14 +34,18 @@
   "recovered_output_admission": "proactive-original-chain-native-selection-v1",
   "native_companion_platform": "linux-x86_64",
   "native_companion_sha256": "00a0cee279f70d1faf35202b9328217226efcbe261bf0ff7e19b5bf4c783ab2e",
-  "handoff_base_sha256": "655fdfdc5326c07b3e627c9133555eb7e678e3851dc9cd418c3afe1f0b7ecd70",
+  "handoff_base_sha256": "dcb3ed48a6c2950b9164c7ffb859c28b7131d5c0ee5197ec5557481382618d3b",
   "production_ready": false,
   "customer_configuration_required": false,
   "generated_from": "GPM2.0/experiments/long_query_alignment; sync_server_runtime.py",
   "native_resume_source_profiles": [
     [
       "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
-      "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d"
+      "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
+    ],
+    [
+      "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d",
+      "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560"
     ]
   ]
 }

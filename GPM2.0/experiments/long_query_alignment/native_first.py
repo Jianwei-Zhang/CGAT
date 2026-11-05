@@ -14,6 +14,7 @@ import re
 import signal
 
 import windowed_alignment as wa
+import minimap_options as mo
 
 MAX_MID_OCC_UPDATES = 10000
 MAX_LOG_LINE = 64*1024
@@ -183,7 +184,7 @@ def classify(execution,log):
 def attempt(mm,target,query,root,args,*,mid_occ=None):
     root.mkdir(parents=True,exist_ok=False)
     output = root/"native.partial.paf"
-    flags = ["-f",str(mid_occ)] if mid_occ is not None else []
+    flags = mo.native_flags(args, mid_occ=mid_occ)
     command = [mm,"-c","-x","asm10",*flags,"-t",str(args.threads),"-o",str(output),str(target),str(query)]
     execution = wa.run_command(command,root,"native",args.timeout,args.memory_gib,allow_failure=True)
     log = inspect_stderr(root/"native.stderr")
@@ -242,7 +243,7 @@ def _reuse_original_first_part(mm,part,query,context,args):
         snapshots[name] = {"path":str(path),"identity":before,"sha256":digest}
     receipt,execution = documents["native-attempt.json"],documents["native.execution.json"]
     reference = context.reference
-    expected_command = [mm,"-c","-x","asm10","-t",str(args.threads),"-o",
+    expected_command = [mm,"-c","-x","asm10",*mo.native_flags(args),"-t",str(args.threads),"-o",
                         str(directory/"native.partial.paf"),str(reference.source),str(query.source)]
     parsed = inspect_stderr(paths["native.stderr"])
     if (type(receipt) is not dict or type(execution) is not dict
