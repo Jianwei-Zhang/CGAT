@@ -8,7 +8,7 @@ Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports
 
 ## Quick start
 
-On your Linux server, download the GPM Server tools (source package) from [Release v2.0.17](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.17), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
+On your Linux server, download the GPM Server tools (source package) from [Release v2.0.18](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.18), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
 
 ```bash
 # 1. Download into the tools directory; keep your project working directory
@@ -18,15 +18,15 @@ SERVER="$HOME/bin/GPM_Server"  # Custom paths are supported; do not overwrite an
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.17_source.tar.gz
+  archive=GPM_Server_2.0.18_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.17/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.18/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.17/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.18/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.17/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.18/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.17 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.18 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -354,10 +354,10 @@ reference commands are migrated, with a rollback journal. A compatible completed
 reference checkpoint stays intact. Local synthetic validation is not a claim that
 a customer's unavailable whole wheat assembly has been biologically validated.
 
-### Telomere / centromere libraries (source checkout)
+### Telomere / centromere libraries
 
-This behavior applies to this source checkout and the next approved source
-refresh, not retroactively to older published archives. The workflow automatically
+The v2.0.18 Server package includes the annotation libraries. Older archives are
+not changed retroactively. The workflow automatically
 uses **official library + local library + this run's `--tel` / `--cen` inputs**.
 Explicit flags add to the libraries; they do not replace them or save local entries.
 
@@ -390,7 +390,7 @@ Prepare freezes sequences, thresholds, all source IDs, SHA-256 and notes into
 those verified project inputs. Updating installed tools/libraries does not opt an
 existing project into a new library; explicitly prepare again, preferably into a
 new output directory, to adopt it. Full delivery includes the frozen annotation
-FASTA; Light omits all FASTA and retains the provenance snapshot/hashes. The matching App source retains this
+FASTA; Light omits all FASTA and retains the provenance snapshot/hashes. The v2.0.18 App retains this
 provenance and migrates workspace schema 6 to 7; older Apps cannot be assumed to
 open a migrated workspace. Source review and automated tests have passed; this is
 not a claim of genome-wide biological or native-window acceptance. See `library/SOURCES.md`

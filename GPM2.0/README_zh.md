@@ -23,7 +23,7 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 ### 1. 下载工具并创建环境
 
-在 Linux 服务端执行以下命令，优先从[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)下载 Server 工具包，失败时回退 [Release v2.0.17](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.17)，校验后解压安装：
+在 Linux 服务端执行以下命令，优先从[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)下载 Server 工具包，失败时回退 [Release v2.0.18](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.18)，校验后解压安装：
 
 新安装默认使用 `~/bin/GPM_Server`，已有安装保留原路径。以下子 shell 不会改变当前工作目录，项目结果仍写入当前工作目录。若不使用 AI，可直接按下列命令安装；AI 安装提示词见[Server README](server/README_zh.md#给-ai-agent-的安装提示词)。
 
@@ -34,15 +34,15 @@ SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要�
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.17_source.tar.gz
+  archive=GPM_Server_2.0.18_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.17/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.18/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.17/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.18/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.17/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.18/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.17 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.18 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -130,9 +130,9 @@ bash "$SERVER/run.sh" \
 | `--lgz-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
 | `--max-fill <bp>` | `1000000` | Step3 两轮优化补洞的长度上限；恢复时可修改。 |
 
-### 端粒 / 着丝粒库（当前源码）
+### 端粒 / 着丝粒库
 
-以下行为适用于当前源码及下一次获准的源码包更新，不追溯改变旧版发布包。
+v2.0.18 Server 发布包已包含以下注释库；不追溯改变旧版发布包。
 流程自动使用 **官方库 + 用户本地库 + 本次 `--tel` / `--cen` 参数**。
 显式参数是追加，不覆盖库，也不会自动保存为本地条目。
 
@@ -158,7 +158,7 @@ bash "$SERVER/library.sh" remove <local_id>   # 使用 list 中显示的本地 I
 Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目的 `tel/`、`cen/` 和
 `metadata/annotation_library_snapshot.json`。续跑只读并校验项目快照，工具/库更新不会让旧项目
 自动使用新库；要采用新库需显式重新 prepare，建议使用新输出目录。完整交付包含注释 FASTA；
-轻量交付仍排除所有 FASTA，只保留来源快照与校验值。配套 App 源码保留来源信息，并将工作区 schema 从 6 迁移到 7；不保证旧版 App
+轻量交付仍排除所有 FASTA，只保留来源快照与校验值。v2.0.18 App保留来源信息，并将工作区 schema 从 6 迁移到 7；不保证旧版 App
 能打开迁移后的工作区。源码 review 与自动化测试已通过，不代表全基因组生物学或原生窗口验收已通过。
 具体来源与证据边界见 `server/library/SOURCES.md`。
 
