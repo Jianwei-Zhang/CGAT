@@ -16,20 +16,21 @@
   font-weight: 600;
 }
 
-/* Keep the overview quiet until one result fragment is inspected. The
-   higher-specificity default also suppresses whole-card hover/focus highlights;
-   role fills/1px borders stay intact, including Gap and unused source context. */
+/* Results stay highlighted; adopted source intervals appear together only
+   while their own card is hovered or its header has keyboard focus. Keep role
+   fills, Gap and unused source context intact, with subdued 2px highlights. */
 .project-export-page [data-overview-preview] .project-preview-card .project-preview-used {
   opacity: 0;
   background: var(--preview-selection-fill);
   box-shadow: inset 0 0 0 2px var(--final-path-selection-stroke);
 }
 
-.project-export-page [data-overview-preview] .project-preview-card .project-preview-used[data-preview-highlighted="1"] {
+.project-export-page [data-overview-preview] .project-preview-card:hover .project-preview-used,
+.project-export-page [data-overview-preview] .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-used {
   opacity: 1;
 }
 
-.project-export-page [data-overview-preview] .project-preview-final-part[data-preview-highlighted="1"]:not(.is-gap) {
+.project-export-page [data-overview-preview] .project-preview-final-part:not(.is-gap) {
   outline: 2px solid var(--final-path-selection-stroke);
   outline-offset: -2px;
 }

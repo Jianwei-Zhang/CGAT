@@ -7,8 +7,11 @@ const css = Object.fromEntries(["project-export", "project-preview", "assembly",
 ]));
 const root = ".project-export-page [data-overview-preview]";
 const usedSelector = `${root} .project-preview-card .project-preview-used`;
-const activeUsed = `${usedSelector}[data-preview-highlighted="1"]`;
-const resultSelector = `${root} .project-preview-final-part[data-preview-highlighted="1"]:not(.is-gap)`;
+const activeUsed = [
+  `${root} .project-preview-card:hover .project-preview-used`,
+  `${root} .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-used`,
+];
+const resultSelector = `${root} .project-preview-final-part:not(.is-gap)`;
 
 function rule(file, selector) {
   const matches = [...css[file].matchAll(/([^{}]+)\{([^{}]*)\}/g)]
@@ -17,14 +20,19 @@ function rule(file, selector) {
   return matches.map(([, , body]) => body).join("\n");
 }
 
-test("Overview source highlights stay hidden even when the whole card is hovered or focused", () => {
+test("Overview reveals every adopted source interval in the hovered or keyboard-focused card, not one fragment", () => {
   assert.match(rule("project-export", usedSelector), /opacity:\s*0;/);
-  assert.match(rule("project-export", activeUsed), /opacity:\s*1;/);
-  assert.equal((usedSelector.match(/[.[]/g) || []).length, 4, "match focused-card rule specificity");
+  for (const selector of activeUsed) {
+    assert.match(rule("project-export", selector), /opacity:\s*1;/);
+    assert.ok(css["project-export"].indexOf(selector) > css["project-export"].indexOf(usedSelector));
+  }
   const visibilityRules = [...css["project-export"].matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter(([, selector]) => selector.includes(".project-preview-used"));
-  assert.deepEqual(visibilityRules.map(([, selector]) => selector.trim()), [usedSelector, activeUsed]);
-  assert.ok(css["project-export"].indexOf(activeUsed) > css["project-export"].indexOf(usedSelector));
+    .filter(([, selector]) => selector.includes(".project-preview-used"))
+    .flatMap(([, selectors]) => selectors.split(",").map(selector => selector.trim()));
+  // Card ancestry scopes every adopted patch together, including header and
+  // whitespace hover, without lighting sources in a neighbouring card.
+  assert.deepEqual(visibilityRules, [usedSelector, ...activeUsed]);
+  assert.doesNotMatch(css["project-export"], /data-preview-highlighted|data-preview-part-key/);
 });
 
 test("Overview uses the Assembly warm hue with thinner strokes and lighter theme-aware fill", () => {
@@ -42,7 +50,7 @@ test("Overview uses the Assembly warm hue with thinner strokes and lighter theme
   assert.doesNotMatch(used, /#[\da-f]|rgba?\(/i);
 });
 
-test("Final Path role fills and 1px borders are the default; only an inspected non-Gap result has a warm outline", () => {
+test("every Final Path CTG has a persistent warm outline, retaining role fills and excluding Gaps", () => {
   const result = rule("project-export", resultSelector);
   assert.match(result, /outline:\s*2px solid var\(--final-path-selection-stroke\);/);
   assert.match(result, /outline-offset:\s*-2px;/);
@@ -54,7 +62,7 @@ test("Final Path role fills and 1px borders are the default; only an inspected n
   assert.equal(resultRules[0][1].trim(), resultSelector);
 });
 
-test("inspecting fragments never changes geometry or promotes every card frame", () => {
+test("card-level source feedback never changes geometry or promotes every card frame", () => {
   const used = rule("project-export", usedSelector);
   assert.doesNotMatch(used, /(?:^|;)\s*(?:left|right|top|bottom|width|height|min-width|border|padding|margin|transform|filter|pointer-events):/);
   const frame = rule("project-preview", ".project-preview-card");

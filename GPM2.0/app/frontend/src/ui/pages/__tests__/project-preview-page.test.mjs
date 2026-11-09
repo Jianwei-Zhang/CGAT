@@ -353,31 +353,44 @@ test("unused source bodies retain complete tooltips but do not create CSS-hidden
 });
 
 
-test("embedded fragment paint clears on route/loading changes and unbind, without changing assembly state", async () => {
-  const value = state(); value.activeRoute = "projectExport";
-  const store = createStore(value), node = host();
-  node.hasAttribute = name => name === "data-overview-preview";
-  node.querySelector = selector => selector === ".project-preview-page"
-    ? { dataset: { previewProject: previewProjectKey(store.getState()) } } : null;
-  const attrs = () => ({ values: {}, getAttribute: key => key === "data-preview-part-key" ? '["Chr1",0]' : null,
-    setAttribute(key, value) { this.values[key] = value; }, removeAttribute(key) { delete this.values[key]; } });
-  const result = attrs(), patch = attrs();
-  const card = { querySelectorAll: () => [result, patch] };
-  result.closest = selector => selector === "[data-preview-chr]" ? card
-    : selector === "[data-preview-part-key][data-final-path-kind='ctg']" ? result : null;
-  const options = { ...deps(), getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }) };
-  bindProjectPreviewPage(node, store, options);
-  assert.equal(await loadProjectPreviewData(node, store, options), true);
-  const assembly = JSON.stringify(store.getState().assembly);
-  const hover = () => node.pointerover({ type: "pointerover", target: result });
-  hover(); assert.equal(patch.values["data-preview-highlighted"], "1");
-  store.setState({ activeRoute: "assembly" }); assert.equal(patch.values["data-preview-highlighted"], undefined);
-  store.setState({ activeRoute: "projectExport" }); hover(); assert.equal(patch.values["data-preview-highlighted"], "1");
-  store.setState({ projectPreview: { ...store.getState().projectPreview, loading: true } });
-  assert.equal(patch.values["data-preview-highlighted"], undefined); hover(); assert.equal(patch.values["data-preview-highlighted"], undefined);
-  store.setState({ projectPreview: { ...store.getState().projectPreview, loading: false } }); hover();
-  assert.equal(patch.values["data-preview-highlighted"], "1");
-  unbindProjectPreviewPage(node); assert.equal(patch.values["data-preview-highlighted"], undefined);
-  hover(); assert.equal(patch.values["data-preview-highlighted"], undefined);
-  assert.equal(JSON.stringify(store.getState().assembly), assembly);
+test("card-level feedback retains all adopted intervals and result CTGs without individual fragment focus state", () => {
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: 'Chr"1', chrLength: 2000 }], referenceGenomeId: 1,
+    datasets: [{ datasetId: 1, name: "dsA" }, { datasetId: 2, name: "dsB" }],
+    project: { primaryDatasetId: 1, supportDatasetIds: [2] },
+    ctgs: [{ assemblyCtgId: 1, datasetId: 1, datasetName: "dsA", name: "raw_ctg", totalLength: 1000,
+      assignedChrName: 'Chr"1', anchorStart: 0 },
+      { assemblyCtgId: 2, datasetId: 2, datasetName: "dsB", name: "aux_ctg", totalLength: 1000,
+        assignedChrName: 'Chr"1', anchorStart: 0 },
+      { assemblyCtgId: 3, datasetId: 2, datasetName: "dsB", name: "unused", totalLength: 200,
+        assignedChrName: 'Chr"1', anchorStart: 1200 }],
+    finalPathByChr: { 'Chr"1': { segments: [
+      { ...segment, ctgName: "raw_ctg", start: 1, end: 100 }, { type: "gap", gapSizeBp: 1 },
+      { ...segment, ctgName: "raw_ctg", start: 601, end: 650, orient: "-" },
+      { ...segment, assemblyCtgId: 2, datasetName: "dsB", ctgName: "aux_ctg", start: 101, end: 200 },
+    ] } } });
+  const before = JSON.stringify(card);
+  const output = renderProjectPreviewCard(card, getMessages("en", "projectPreview"));
+  assert.match(output, /data-preview-chr="Chr&quot;1"/);
+  assert.equal((output.match(/class="project-preview-used"/g) || []).length, 3, "include every adopted interval across both datasets");
+  assert.equal((output.match(/data-final-path-kind="ctg"/g) || []).length, 3, "include every result CTG, including reused sources");
+  assert.equal((output.match(/data-final-path-kind="gap"/g) || []).length, 1);
+  assert.equal((output.match(/class="project-preview-contig is-context"/g) || []).length, 1, "unused context is unchanged");
+  assert.equal((output.match(/<button /g) || []).length, 1, "keep the card header as the sole keyboard action");
+  assert.doesNotMatch(output, /data-preview-highlighted|data-preview-part-key|tabindex|role="img"/);
+  assert.equal(JSON.stringify(card), before, "presentation must not change scientific data");
+});
+
+test("reference adoption remains available to card-level feedback without fragment state", () => {
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
+    datasets: [], project: {}, ctgs: [], finalPathByChr: { Chr1: { segments: [
+      { type: "gap", gapSizeBp: 10 }, { type: "ctg", sourceKind: "ref_segment", referenceChrName: "Chr1",
+        start: 501, end: 600, memberStartBp: 1, memberEndBp: 2000, overallLen: 2000 },
+    ] } } });
+  const before = JSON.stringify(card);
+  const output = renderProjectPreviewCard(card, getMessages("en", "projectPreview"));
+  assert.equal((output.match(/class="project-preview-used"/g) || []).length, 1);
+  assert.match(output, /data-preview-reference-highlight-start=/);
+  assert.equal((output.match(/data-final-path-kind="ctg"/g) || []).length, 1);
+  assert.doesNotMatch(output, /data-preview-highlighted|data-preview-part-key|tabindex/);
+  assert.equal(JSON.stringify(card), before);
 });
