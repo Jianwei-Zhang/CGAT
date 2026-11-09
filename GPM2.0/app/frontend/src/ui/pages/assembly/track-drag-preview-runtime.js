@@ -676,7 +676,7 @@ export function __testShiftPolygonEdge(pointsText, edgeIndexes, offsetPx) {
 export function compileTrackDragPreview(host, payload, { subview = false, fullRange = false } = {}) {
   const byNode = new Map();
   const actions = [];
-  let cachedSkipBandNodes = null, fullRangeActions = null;
+  let cachedSkipBandNodes = null, cachedHideInactiveAnchors = false, filteredActions = null;
   const plan = {
     actions,
     fullRange,
@@ -688,7 +688,7 @@ export function compileTrackDragPreview(host, payload, { subview = false, fullRa
         return;
       }
       const action = { kind, node, ...details };
-      action.hiddenDuringFullRange = kind === "line" && (
+      action.hiddenDuringDrag = (kind === "line" || kind === "band") && (
         node.classList?.contains("subview-anchor-hit-zone")
         || (node.classList?.contains("subview-anchor-line") && node.getAttribute?.("stroke") === "transparent")
       );
@@ -696,17 +696,17 @@ export function compileTrackDragPreview(host, payload, { subview = false, fullRa
       byNode.set(node, action);
       actions.push(action);
     },
-    apply(offsetPx, { skipBandNodes = null, fullRange = false } = {}) {
+    apply(offsetPx, { skipBandNodes = null, fullRange = false, hideInactiveAnchors = fullRange } = {}) {
       const previewClass = subview ? SUBVIEW_TRACK_PREVIEW_CLASS : MAIN_TRACK_PREVIEW_CLASS;
       if (!host.classList?.contains?.(previewClass)) host.classList?.add?.(previewClass);
-      if (fullRange && (!fullRangeActions || cachedSkipBandNodes !== skipBandNodes)) {
+      if (!filteredActions || cachedSkipBandNodes !== skipBandNodes || cachedHideInactiveAnchors !== hideInactiveAnchors) {
         cachedSkipBandNodes = skipBandNodes;
-        fullRangeActions = actions.filter(action => !action.hiddenDuringFullRange
+        cachedHideInactiveAnchors = hideInactiveAnchors;
+        filteredActions = actions.filter(action => !(hideInactiveAnchors && action.hiddenDuringDrag)
           && !(action.kind === "band" && skipBandNodes?.has(action.node)));
       }
-      for (const action of fullRange ? fullRangeActions : actions) {
+      for (const action of filteredActions) {
         const { kind, node, factor = 1 } = action;
-        if (!fullRange && kind === "band" && skipBandNodes?.has(node)) continue;
         if (kind === "group") applyGroupPreview(node, offsetPx * factor);
         else if (kind === "sticky") applyStickyLabelPreview(node, offsetPx * factor);
         else if (kind === "band") applyBandPreview(node, action.edgeIndexes, offsetPx, null, action.basePoints);

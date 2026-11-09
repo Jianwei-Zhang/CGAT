@@ -888,8 +888,8 @@ for (const composition of [false, true]) {
 }
 
 for (const view of ["main", "pair", "composition"]) {
-  for (const strategy of ["normal", "legacy-full", "fast-full"]) {
-    const fullRange = strategy !== "normal", fastFullRange = strategy === "fast-full";
+  for (const strategy of ["normal", ...(view === "main" ? ["fast-main"] : []), "legacy-full", "fast-full"]) {
+    const fullRange = strategy.endsWith("full"), fastFullRange = strategy === "fast-full", fastMain = strategy === "fast-main";
     for (const finish of ["release", "cancel", "context-switch"]) {
       for (const leaderId of [12, 13]) {
         test(`explicit-selected ${view} drag strategy=${strategy}, ${finish}, leader=${leaderId}`, async () => {
@@ -943,7 +943,8 @@ for (const view of ["main", "pair", "composition"]) {
                   : { offsetBp:offset(null,null,main ? entry.assemblyCtgId : entry.contigId)+delta }) }));
                 return { ...payload,...moved[0],targets:moved };
               };
-              return { update: delta => fullPreview(null,null,fromDelta(delta)),isCurrent:()=>true,restore:()=>{restored++;} };
+              return { update: delta => fastMain ? preview(null, { ...payload, offsetPx: delta })
+                : fullPreview(null,null,fromDelta(delta)),isCurrent:()=>true,restore:()=>{restored++;} };
             };
             const legacyPreview = (...args) => { assert.equal(fastFullRange,false,"fast path must not rebuild the graph");fullPreview(...args); };
             const deps = {
@@ -953,6 +954,7 @@ for (const view of ["main", "pair", "composition"]) {
               previewTrackContigDrag: preview, previewSubviewTrackContigDrag: preview,
               previewFullRangeTrackContigDrag: legacyPreview, previewFullRangeSubviewContigDrag: legacyPreview,
               ...(fastFullRange ? { createFullRangeDragPreview:fastFactory } : {}),
+              ...(fastMain ? { createMainTrackDragPreview:fastFactory } : {}),
               convertTrackOffsetPxToBp: (value, context) => value * context.domainSpanBp / context.innerWidth,
               resolveActiveTrackScrollElement: () => scroll,
               resolveTrackDragOffsetBp: offset, resolveSubviewTrackDragOffsetBp: offset,
@@ -972,7 +974,7 @@ for (const view of ["main", "pair", "composition"]) {
             if (finish === "context-switch") state = { ...state, assembly: { ...state.assembly, selectedChrName: "Chr02" } };
             win.listeners.get(finish === "cancel" ? "pointercancel" : "pointerup")({ clientX: 22 });
             await Promise.resolve();
-            if (fastFullRange) { assert.equal(compiled,1);assert.equal(restored,1); }
+            if (fastFullRange || fastMain) { assert.equal(compiled,1);assert.equal(restored,1); }
             if (finish !== "release") {
               assert.deepEqual(commits, []);
               assert.equal(persisted, 0);

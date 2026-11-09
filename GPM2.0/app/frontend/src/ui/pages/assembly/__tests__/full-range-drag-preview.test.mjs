@@ -59,8 +59,8 @@ test('missing plot fails before any DOM or store mutation',()=>{
 });
 
 
-for (const composition of [false, true]) test(`full-range ${composition ? "composition" : "track-pair"} paints live Canvas geometry without mutating SVG bands and restores cleanly`, () => {
- const f = fixture(true, composition), before = f.snapshot(), calls = [];
+for (const view of ["main", "track-pair", "composition"]) test(`full-range ${view} paints live Canvas geometry without mutating SVG bands and restores cleanly`, () => {
+ const f = fixture(view !== "main", view === "composition"), before = f.snapshot(), calls = [];
  const context = Object.fromEntries(["setTransform", "clearRect", "beginPath", "closePath", "moveTo", "lineTo", "fill", "stroke"]
   .map(name => [name, (...args) => calls.push([name, ...args])]));
  let attached = false;
@@ -74,7 +74,10 @@ for (const composition of [false, true]) test(`full-range ${composition ? "compo
   const fit = handle.update(delta);
   assert.equal(f.band.getAttribute("points"), "20,20 40,20 60,40 50,40");
   const points = calls.filter(call => ["moveTo", "lineTo"].includes(call[0])).map(call => call.slice(1));
-  const expected = [[20 + delta,20], [40 + delta,20], [60,40], [50,40]].map(([x,y]) => [(x-fit.minX)*fit.scale,y]);
+  const expected = (view === "main"
+   ? [[20,20], [40,20], [60 + delta,40], [50 + delta,40]]
+   : [[20 + delta,20], [40 + delta,20], [60,40], [50,40]])
+   .map(([x,y]) => [(x-fit.minX)*fit.scale,y]);
   points.forEach((point,index) => point.forEach((value,axis) => assert.ok(Math.abs(value-expected[index][axis]) < 1e-9)));
   assert.equal(f.scroll.classList.contains("is-subview-band-canvas-drag-preview"), true);
   assert.equal(handle.isCurrent(), true, "the gesture Canvas must not invalidate the graph");
@@ -120,4 +123,23 @@ test("pending render exposes committed world geometry for Main-to-Local edits an
  assert.equal(Number(f.group.getAttribute("data-subview-world-start-bp")),170);
  const committed=f.snapshot();handle.prepareCommit();assert.deepEqual(f.snapshot(),committed);
  handle.restore();assert.deepEqual(f.snapshot(),before);
+});
+
+for (const subview of [false, true]) test(`full-range ${subview ? "Local" : "Main"} paint failure restores the complete SVG fallback`, () => {
+ const f = fixture(subview), before = f.snapshot();
+ let fail = false, attached = false;
+ const context = Object.fromEntries(["setTransform", "clearRect", "beginPath", "closePath", "moveTo", "lineTo", "stroke"].map(name => [name, () => {}]));
+ context.fill = () => { if (fail) throw Error("lost Canvas"); };
+ const canvas = { style: {}, setAttribute() {}, getContext: () => context, remove() { attached = false; } };
+ f.scroll.ownerDocument = { documentElement: { dataset: {} }, createElement: () => canvas };
+ f.scroll.appendChild = () => { attached = true; };
+ f.queryMaps.get(f.svg)["polygon.track-collinearity-band[data-track-band-proxy='1']"] = [f.band];
+ const handle = f.handle();
+ handle.update(10); assert.equal(attached, true);
+ fail = true; handle.update(25);
+ assert.equal(attached, false);
+ assert.equal(f.scroll.classList.contains("is-subview-band-canvas-drag-preview"), false);
+ assert.equal(f.band.getAttribute("points"), subview ? "45.00,20.00 65.00,20.00 60.00,40.00 50.00,40.00" : "20.00,20.00 40.00,20.00 85.00,40.00 75.00,40.00");
+ handle.restore();
+ assert.deepEqual(f.snapshot(), before);
 });

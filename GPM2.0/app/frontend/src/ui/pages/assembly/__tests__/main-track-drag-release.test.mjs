@@ -23,14 +23,14 @@ function fixture(commit, { fullRange = false, fast = false, previewError = false
   const calls = [];
   const store = { getState: () => ({ assembly: { activeTab: "assembly", trackView: { fullRange }, trackDragOffsets: [] } }) };
   bindTrackContigDrag(host, store, {
-    ...(fast ? { createFullRangeDragPreview: (target) => {
+    ...(fast ? { [fullRange ? "createFullRangeDragPreview" : "createMainTrackDragPreview"]: (target) => {
       calls.push({kind:"compile",target});
       let active=true;
       return {
         isCurrent:()=>active && target.isConnected !== false,
         update:(delta)=>{
           if (previewError) throw Error("preview error");
-          calls.push({kind:"fast-preview",delta});target.dataset.trackInnerWidth="50";
+          calls.push({kind:"fast-preview",delta});if (fullRange) target.dataset.trackInnerWidth="50";
         },
         restore:()=>{active=false;calls.push({kind:"fast-restore",target});target.dataset.trackInnerWidth="100";},
       };
@@ -179,4 +179,48 @@ for(const action of ["cancel","detach","error"]) test(`fast Full range ${action}
     assert.equal(f.calls.some(c=>c.kind==="commit"||c.kind==="full-preview"),false);
     if(action==="error")assert.equal(f.calls.find(c=>c.kind==="preview-error").message,"preview error");
   }finally{globalThis.window=original;}
+});
+
+for (const outcome of ["success", "no-change", "reject"]) test(`fixed-window Main compiles once and retains release geometry until ${outcome}`, async () => {
+  let settle;
+  const pending = new Promise((resolve, reject) => { settle = outcome === "reject" ? reject : resolve; });
+  const f = fixture(() => pending, { fast: true }), original = globalThis.window;
+  globalThis.window = f.window;
+  try {
+    f.fire("pointerdown", 20);
+    for (const x of [40, 50, -10]) {
+      f.fire("pointermove", x);
+      for (const [id, callback] of [...f.frames]) { f.frames.delete(id); callback(); }
+    }
+    f.fire("pointerup", -15);
+    assert.deepEqual(f.calls.filter(c => c.kind === "fast-preview").map(c => c.delta), [20, 30, -30, -35]);
+    assert.equal(f.calls.filter(c => c.kind === "compile").length, 1);
+    assert.equal(f.calls.find(c => c.kind === "commit").offset.offsetBp, -25);
+    assert.equal(f.calls.some(c => ["preview", "clear", "fast-restore"].includes(c.kind)), false);
+    settle(outcome === "reject" ? Error("save failed") : outcome === "success");
+    await Promise.resolve();
+    assert.equal(f.calls.filter(c => c.kind === "fast-restore").length, 1);
+    assert.equal(f.calls.at(-1).target, f.scroll);
+  } finally { globalThis.window = original; }
+});
+
+for (const action of ["cancel", "detach", "error"]) test(`fixed-window Main ${action} restores without saving and allows the next gesture`, async () => {
+  const f = fixture(null, { fast: true, previewError: action === "error" }), original = globalThis.window;
+  globalThis.window = f.window;
+  try {
+    f.fire("pointerdown", 20); f.fire("pointermove", 40);
+    for (const [id, callback] of [...f.frames]) { f.frames.delete(id); callback(); }
+    if (action === "detach") { f.scroll.isConnected = false; f.fire("pointermove", 50); }
+    else if (action === "cancel") f.fire("pointercancel", 40);
+    f.fire("pointerup", 50);
+    assert.equal(f.calls.filter(c => c.kind === "fast-restore").length, 1);
+    assert.equal(f.calls.some(c => c.kind === "commit"), false);
+    f.scroll.isConnected = true;
+    if (action !== "error") {
+      f.fire("pointerdown", 10); f.fire("pointerup", 30);
+      await Promise.resolve();
+      assert.equal(f.calls.filter(c => c.kind === "commit").length, 1);
+      assert.equal(f.calls.filter(c => c.kind === "compile").length, 2);
+    } else assert.equal(f.calls.find(c => c.kind === "preview-error").message, "preview error");
+  } finally { globalThis.window = original; }
 });

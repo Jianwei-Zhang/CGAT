@@ -207,13 +207,15 @@ export function bindTrackContigDrag(host, store, deps) {
         typeof deps.previewFullRangeTrackContigDrag === "function"
         && typeof deps.clearFullRangeTrackDragPreview === "function"));
     const fastFullRange = fullRangeDrag && typeof deps.createFullRangeDragPreview === "function";
-    let fullRangePreview = null;
+    let fullRangePreview = null, mainPreview = null;
+    let mainPreviewAttempted = false;
     const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || host : host;
     let lastPointerClientX = startClientX;
     let cancelled = false;
     const sameContext = () => {
       const next = store.getState();
       return scrollEl.isConnected !== false && (!fullRangePreview || fullRangePreview.isCurrent())
+        && (!mainPreview || mainPreview.isCurrent())
         && !next.assembly?.mainViewHistory?.inFlight && !next.assembly?.loading
         && !next.assembly?.sourceEditingReloadRequired && next.assembly?.activeTab === "assembly"
         && next.activeRoute === state.activeRoute
@@ -240,7 +242,7 @@ export function bindTrackContigDrag(host, store, deps) {
       const offsetPx = deps.roundTrackMetric(
         deltaOffsetBpToPx(pendingOffsetBp - baseOffsetBp, deps, scaleContext),
       );
-      deps.previewTrackContigDrag(scrollEl, {
+      const previewPayload = {
         trackRole,
         assemblyCtgId,
         ...(datasetId ? { datasetId } : {}),
@@ -248,7 +250,18 @@ export function bindTrackContigDrag(host, store, deps) {
         ...(phasedTrackItemId ? { phasedTrackItemId } : {}),
         offsetPx,
         ...(targets.length > 1 ? { targets } : {}),
-      });
+      };
+      try {
+        if (!mainPreviewAttempted) {
+          mainPreviewAttempted = true;
+          mainPreview = deps.createMainTrackDragPreview?.(scrollEl, previewPayload) || null;
+        }
+        if (mainPreview) mainPreview.update(offsetPx);
+        else deps.previewTrackContigDrag(scrollEl, previewPayload);
+      } catch (error) {
+        onPointerCancel();
+        deps.onTrackDragPreviewError?.(dragHost, store, error);
+      }
     });
 
     const updatePendingOffset = (moveEvent) => {
@@ -293,6 +306,7 @@ export function bindTrackContigDrag(host, store, deps) {
     };
     const clearPreview = () => {
       if (fullRangePreview) fullRangePreview.restore();
+      else if (mainPreview) mainPreview.restore();
       else deps.clearTrackDragPreview(scrollEl);
     };
     const onPointerUp = (upEvent) => {

@@ -121,12 +121,16 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
     const action = plan.actions.find(item => item.node === node && item.kind === "group");
     return { position:number(node,"data-subview-rect-x")+number(node,"data-subview-rect-width"),motion:action?.factor || 0 };
   }) : [];
-  const bandPreview = subview
-    ? createSubviewBandCanvasDragPreview(scroll, plan.actions, {
+  let bandPreview = null;
+  try {
+    bandPreview = createSubviewBandCanvasDragPreview(scroll, plan.actions, {
       width: viewportWidth,
       height: viewBox[3],
-      denseTargets: dragTargets(payload),
-    }) : null;
+      denseTargets: subview ? dragTargets(payload) : null,
+    });
+  } catch {
+    // Keep every original SVG band if the optional paint surface is unavailable.
+  }
   const first = svg.firstElementChild;
   const children = svg.childElementCount;
   let restored = false, lastFit = null, lastDeltaPx = 0, preparedForCommit = false;
@@ -139,7 +143,12 @@ export function createFullRangeDragPreview(scroll, payload, { subview = false, p
       const deltaPx = Number(deltaBp)*innerWidth/domainSpan;
       const fit = fitFullRangeDragBounds(geometry.edges,deltaPx,viewportWidth);
       lastFit = fit; lastDeltaPx = deltaPx;
-      const canvasReady = bandPreview?.draw(deltaPx, [fit.minX, viewBox[1], fit.width, viewBox[3]]) === true;
+      let canvasReady = false;
+      try { canvasReady = bandPreview?.draw(deltaPx, [fit.minX, viewBox[1], fit.width, viewBox[3]]) === true; }
+      catch {
+        bandPreview?.restore();
+        bandPreview = null;
+      }
       plan.apply(deltaPx, { skipBandNodes: canvasReady ? bandPreview.nodes : null, fullRange: true });
       set(svg,"width",viewportWidth);
       set(svg,"preserveAspectRatio","none");

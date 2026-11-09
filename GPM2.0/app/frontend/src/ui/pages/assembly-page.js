@@ -1,5 +1,6 @@
 import { createSubviewDragRenderController } from "./assembly/subview-drag-render-controller.js";
 import { createFullRangeDragPreview } from "./assembly/full-range-drag-preview.js";
+import { createMainTrackDragPreview } from "./assembly/main-track-drag-preview.js";
 import { retryAssemblyCtgDetail, restoreAssemblyLocalEvidence, resumeAssemblyReadyStages } from "./assembly/assembly-ready-stages.js";
 import { bindAssemblyDetailRetry, patchAssemblyDetailStatus } from "./assembly/assembly-detail-status.js";
 import { refreshViewportGeometry } from "./assembly/viewport-geometry-refresh.js";
@@ -1302,6 +1303,7 @@ const contextMenuRuntimeDeps = {
 };
 
 const trackDragRuntimeDeps = {
+  createMainTrackDragPreview,
   createFullRangeDragPreview: (scroll, payload, { subview, prefs }) => createFullRangeDragPreview(scroll, payload, { subview, prefs }),
   onTrackDragPreviewError: (host, store, error) => setAssemblyActionFeedback(host, store, {
     actionError: mapAssemblyError({ error, stateOrLocale: store.getState() }).userMessage,
