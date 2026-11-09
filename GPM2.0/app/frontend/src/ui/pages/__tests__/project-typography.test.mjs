@@ -22,14 +22,27 @@ function font(file, selector, size, weight) {
   if (weight) assert.equal(declarations["font-weight"], String(weight), `${selector}: font-weight`);
 }
 
-test("Project and Overview use the same scalable heading tier for identities and section titles", () => {
+test("Project and Overview retain the main heading tier for page and preview section titles", () => {
   font("importer", ".project-title-row", "title", 600);
-  font("project-export", ".project-export-identity dd > .project-export-project-badge", "title", 600);
   font("importer", ".project-current .project-section-divider", "title");
   font("project-export", ".project-export-page .project-section-divider", "title");
   assert.equal(rule("importer", ".project-section-divider > h3")["font-weight"], "600");
+});
+
+test("all Overview nameplates use the same body tier rather than promoting the project badge to a heading", () => {
+  font("project-export", ".project-export-identity dt", "small", 400);
+  font("project-export", ".project-export-identity dd > .project-dataset-role", "body", 500);
+  assert.equal(rule("project-export", ".project-export-identity dd")["font-weight"], "500");
+  const projectBadge = rule("project-export", ".project-export-identity dd > .project-export-project-badge");
+  assert.equal(projectBadge["font-size"], undefined, "the project badge inherits the same size as dataset badges");
+  assert.equal(projectBadge["font-weight"], undefined, "the project badge inherits the same weight as dataset badges");
+  assert.equal(projectBadge.background, "var(--surface-subtle, #f8fafc)", "retain the neutral project palette");
+  assert.equal(rule("importer", ".project-dataset-role")["padding"], "2px 8px", "nameplates retain shared sizing and role colors");
+});
+
+test("Overview summary card titles are compact secondary headings, not page headings", () => {
   for (const selector of [".project-export-panel h4", ".project-export-detail-heading h4"]) {
-    font("project-export", selector, "title", 600);
+    font("project-export", selector, "section", 600);
   }
 });
 
@@ -50,9 +63,11 @@ test("main content, datasets and controls stay below headings in the body tier",
     ".project-export-page [data-overview-preview] .project-preview-open", ".project-export-detail-toggle"]) {
     font("project-export", selector, "body");
   }
-  for (const selector of [".project-export-used-row strong", ".project-export-assignment-value", ".project-export-detail-sort"]) {
-    assert.equal(rule("project-export", selector)["font-weight"], "600");
+  for (const selector of [".project-export-used-row > span", ".project-export-used-row strong",
+    ".project-export-assignment-row > span:first-child", ".project-export-assignment-value"]) {
+    assert.equal(rule("project-export", selector)["font-weight"], "500", "summary labels and values should not compete with headings");
   }
+  assert.equal(rule("project-export", ".project-export-detail-sort")["font-weight"], "600");
 });
 
 test("Overview overrides both shared table and cell sizes without changing Assembly tables", () => {
