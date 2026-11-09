@@ -10,11 +10,16 @@ const BOUND = Symbol("assemblyViewNavigation");
 const COMPACT_WINDOW_PX = 48;
 const MIN_WINDOW_GRIP_PX = 24;
 const viewKeyFor = (role) => role === "primary" ? "trackView" : "subviewTrackView";
+const localViewOwner = node => {
+  const owner = node?.closest?.("[data-local-view-window]");
+  return owner?.dataset?.localViewWindow ? owner : null;
+};
+const navigationRoot = host => localViewOwner(host) || host?.closest?.("#route-host") || host;
 const scrollSelector = (role) => `.assembly-track-scroll[data-track-role='${role}']`;
 
 // One controller per route host: partial main/local replacement must not add gesture owners.
 export function bindAssemblyViewNavigation(host, store, deps = {}) {
-  const root = host?.closest?.("#route-host") || host;
+  const root = navigationRoot(host);
   const document = root?.ownerDocument;
   if (!document?.createElement || !root?.querySelectorAll || !root?.addEventListener) return;
   const window = document.defaultView || globalThis.window;
@@ -25,11 +30,11 @@ export function bindAssemblyViewNavigation(host, store, deps = {}) {
 }
 
 export function syncExistingAssemblyViewNavigation(host) {
-  (host?.closest?.("#route-host") || host)?.[BOUND]?.mount();
+  navigationRoot(host)?.[BOUND]?.mount();
 }
 
 export function unbindAssemblyViewNavigation(host) {
-  const root = host?.closest?.("#route-host") || host;
+  const root = navigationRoot(host);
   root?.[BOUND]?.dispose();
   if (root) delete root[BOUND];
 }
@@ -49,13 +54,17 @@ function createController(root, store, window) {
   const requestFrame = (fn) => window?.requestAnimationFrame?.(fn) ?? setTimeout(fn, 16);
   const cancelFrame = (id) => { if (window?.cancelAnimationFrame) window.cancelAnimationFrame(id); else clearTimeout(id); };
   const locale = () => store.getState()?.locale || store.getState()?.assembly?.locale || "zh";
-  const scrollFor = (role) => root.querySelector(scrollSelector(role));
+  const owns = node => localViewOwner(node) === localViewOwner(root);
+  const scrollFor = (role) => {
+    const scroll = root.querySelector(scrollSelector(role));
+    return owns(scroll) ? scroll : null;
+  };
   const geometryFor = (role) => {
     const scroll = scrollFor(role);
     return readViewNavigationGeometry(scroll, readTrackViewportMetrics(scroll, role));
   };
-  const roleOf = (node) => node?.closest?.("[data-view-navigation]")?.dataset?.viewNavigation
-    || node?.closest?.(".assembly-track-scroll[data-track-role]")?.dataset?.trackRole;
+  const roleOf = (node) => owns(node) ? node?.closest?.("[data-view-navigation]")?.dataset?.viewNavigation
+    || node?.closest?.(".assembly-track-scroll[data-track-role]")?.dataset?.trackRole : null;
   const contextKey = (role) => {
     const state = store.getState(), a = state.assembly || {};
     return `${state.session?.projectId || ""}:${a.selectedChrName || ""}:${role === "primary" ? a.supportDatasetId || "" : JSON.stringify(a.subview?.summary || {})}`;
@@ -294,7 +303,7 @@ function createController(root, store, window) {
   listen(root, "pointerdown", (event) => {
     // Keep focus and drafts on the combobox until a choice is explicitly committed.
     if (event.button === 0 && event.target?.closest?.("[data-view-tick-toggle],[data-view-tick-option]")) { event.preventDefault(); return; }
-    if (event.button !== 0 || controller.gesture || event.target?.closest?.("input,select,textarea,[contenteditable='true']")) return;
+    if (event.defaultPrevented || event.button !== 0 || controller.gesture || event.target?.closest?.("input,select,textarea,[contenteditable='true']")) return;
     const role = roleOf(event.target);
     if (!["primary", "subview"].includes(role)) return;
     const edge = event.target.closest("[data-view-nav-edge]");

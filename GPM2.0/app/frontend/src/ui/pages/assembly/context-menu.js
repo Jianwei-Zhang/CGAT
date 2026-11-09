@@ -1,3 +1,4 @@
+import { readMainFinalPathInterval, buildSubviewFinalPathContext } from "./final-path-contig-context.js";
 import { readSubviewAnchorAttribute } from "./subview-anchor-metadata.js";
 import { mainActiveAnchorKeys, mainAlignmentEndpointKey, findMainAlignment } from "./main-alignment-anchors.js";
 import { localFragmentCopy } from "./subview-fragment-copy.js";
@@ -130,6 +131,7 @@ export function resolveAssemblyCtgContextTarget(target) {
         trackRole,
         isMirror,
         datasetId,
+        ...readMainFinalPathInterval(target),
       };
       if (refOrient) {
         base.refOrient = refOrient;
@@ -332,7 +334,7 @@ export function resolveSubviewFragmentContextTarget(target) {
   const trackRole = normalizeTrackRole(node.getAttribute("data-subview-fragment-role"));
   const start = normalizeSupportDatasetId(node.getAttribute("data-subview-fragment-start"));
   const end = normalizeSupportDatasetId(node.getAttribute("data-subview-fragment-end"));
-  if (!fragmentKey || !assemblyCtgId || !trackRole || !start || !end) {
+  if (!fragmentKey || (!assemblyCtgId && !node.getAttribute("data-subview-fragment-entity-key")) || !trackRole || !start || !end) {
     return null;
   }
   return {
@@ -654,7 +656,7 @@ export function buildAssemblyContextMenuItems({
       ...(targetContext?.start != null ? { start: targetContext.start, end: targetContext.end, fragmentKey: targetContext.fragmentKey,
         ...(targetContext.coordinateSpace ? { coordinateSpace: targetContext.coordinateSpace } : {}) } : {}),
     };
-    const subviewCtgContext = normalizedTrackRole && assemblyCtgId ? {
+    const subviewCtgContext = normalizedTrackRole && (assemblyCtgId || compositionEntityKey) ? {
       assemblyCtgId,
       slot: memberContext.slot,
       trackRole: normalizedTrackRole,
@@ -806,22 +808,7 @@ export function buildAssemblyContextMenuItems({
   }
 
   if (subviewFragmentContext) {
-    const fragmentAppendContext = attachPhasedSubviewIdentity({
-      assemblyCtgId: subviewFragmentContext.assemblyCtgId,
-      slot: subviewFragmentContext.slot,
-      trackRole: subviewFragmentContext.trackRole,
-      datasetId: subviewFragmentContext.datasetId,
-      isMirror: subviewFragmentContext.isMirror === true,
-      refOrient: subviewFragmentContext.refOrient,
-      ...(subviewFragmentContext.compositionEntityKey ? { localFragmentEntityKey: subviewFragmentContext.compositionEntityKey } : {}),
-      start: subviewFragmentContext.start,
-      end: subviewFragmentContext.end,
-      sourceKind: subviewFragmentContext.sourceKind,
-      referenceChrId: subviewFragmentContext.referenceChrId,
-      referenceChrName: subviewFragmentContext.referenceChrName,
-      segmentStartBp: subviewFragmentContext.segmentStartBp,
-      segmentEndBp: subviewFragmentContext.segmentEndBp,
-    }, subviewFragmentContext);
+    const fragmentAppendContext = buildSubviewFinalPathContext(subviewFragmentContext);
     pushAppendTrackContigItems(fragmentAppendContext, { allowAnyPhasedTarget: true });
     addSubviewTrackPairActions(
       {

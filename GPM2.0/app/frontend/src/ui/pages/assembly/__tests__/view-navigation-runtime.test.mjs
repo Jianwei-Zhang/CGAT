@@ -708,3 +708,29 @@ test("navigation menu guard leaves editable controls and unrelated business targ
     }
   } finally { h.dispose(); }
 });
+
+
+test("Main navigation does not claim a floating Local View's hand-mode gesture", () => {
+  const h = harness();
+  try {
+    const local = { dataset: { localViewWindow: "local-test" } };
+    const scroll = h.views.subview.scroll, original = scroll.closest;
+    scroll.closest = selector => selector === "[data-local-view-window]" ? local : original(selector);
+    const toggle = h.views.subview.action("toggle-mode"), oldClosest = toggle.closest;
+    toggle.closest = selector => selector === "[data-local-view-window]" ? local : oldClosest(selector);
+    const before = h.writes;
+    h.root.emit("click", h.event(toggle));
+    h.root.emit("pointerdown", h.event(scroll));
+    assert.equal(h.writes, before);
+    assert.equal(h.win.count("pointermove"), 0);
+  } finally { h.dispose(); }
+});
+
+test("a gesture already claimed by drag-to-Final-Path cannot also start panning", () => {
+  const h = harness();
+  try {
+    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
+    h.root.emit("pointerdown", h.event(h.views.primary.scroll, { defaultPrevented: true }));
+    assert.equal(h.win.count("pointermove"), 0);
+  } finally { h.dispose(); }
+});

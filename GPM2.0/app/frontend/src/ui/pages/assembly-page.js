@@ -1,3 +1,5 @@
+import { createFinalPathAppendPreview } from "./assembly/final-path-append-preview.js";
+import { bindFinalPathAppendDrag } from "./assembly/final-path-append-drag-runtime.js";
 import { bindSubviewWorkspace, getSubviewWorkspaceRuntime } from "./assembly/subview-workspace-runtime.js";
 import { createSubviewDragRenderController } from "./assembly/subview-drag-render-controller.js";
 import { createFullRangeDragPreview } from "./assembly/full-range-drag-preview.js";
@@ -845,6 +847,15 @@ function normalizeTrackFocusMode(rawMode) {
 }
 
 export function bindAssemblyPage(host, store, options = {}) {
+  bindFinalPathAppendDrag(host, store, {
+    labels: state => getAssemblyI18n(state).finalPathDrag,
+    append: appendTrackContigToFinalPath,
+    preview: (doc, state, context, target) => createFinalPathAppendPreview(doc, state, context, target,
+      projected => renderAssemblyFinalPathCardImpl(projected, renderTracksDeps)),
+    onError: (host, store, error) => setAssemblyActionFeedback(host, store, {
+      actionError: mapAssemblyError({ error, stateOrLocale: store.getState() }).userMessage,
+    }),
+  });
   bindAssemblyDetailRetry(host,
     () => retryAssemblyCtgDetail(host, store, assemblyDataRuntimeDeps),
     () => {
@@ -1614,13 +1625,12 @@ async function appendTrackContigToFinalPath(host, store, ctgContext, options = {
       });
     }
   }
-  return appendTrackContigToFinalPathImpl(
-    host,
-    store,
-    ctgContext,
-    createFinalPathMutationRuntimeDeps(),
-    options,
-  );
+  const sourceChrName = store.getState().assembly?.selectedChrName;
+  return runSerializedProjectViewMutation(store, async isCurrent => {
+    if (!isCurrent() || store.isLocalViewAlive?.() === false
+      || store.getState().assembly?.selectedChrName !== sourceChrName) return null;
+    return appendTrackContigToFinalPathImpl(host, store, ctgContext, createFinalPathMutationRuntimeDeps(), options);
+  });
 }
 
 async function appendFinalPathRow(host, store, payload = {}) {
@@ -1782,6 +1792,9 @@ function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, m
 }
 
 function rerenderFinalPathCard(host, store) {
+  if (store.localViewRootStore) {
+    return rerenderFinalPathCard(getSubviewWorkspaceRuntime(store)?.root || host, store.localViewRootStore);
+  }
   cancelDeferredRerender();
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
@@ -2801,8 +2814,9 @@ function appendAuditLog(store, { category, action, detail }) {
 
 function bindAssemblyActionFeedbackDismiss(host, store, options = {}) {
   // Local section replacements share one timer owner with the route host.
-  const binding = ensureAssemblyActionFeedbackDismissBinding(resolveCurrentRouteHost(host) || host, options);
-  binding.store = store;
+  const root = store.localViewRootStore ? getSubviewWorkspaceRuntime(store)?.root : resolveCurrentRouteHost(host);
+  const binding = ensureAssemblyActionFeedbackDismissBinding(root || host, options);
+  binding.store = store.localViewRootStore || store;
   const signature = getAssemblyActionFeedbackSignature(store.getState().assembly);
   binding.coordinator.onFeedbackChange(signature);
 }
@@ -2884,9 +2898,9 @@ function clearAssemblyActionFeedback(host, store, rerenderImpl = rerender, expec
   if (toast?.remove) {
     // Dismissing feedback must not replace a graph with an in-flight preview.
     toast.remove();
-  } else {
-    rerenderImpl(host, store);
   }
+  // No mounted toast means there is nothing to repaint. A second timer must
+  // not redraw the source view after an Add to Final Path shortcut.
 }
 
 function createActionFeedbackDismissCoordinator({

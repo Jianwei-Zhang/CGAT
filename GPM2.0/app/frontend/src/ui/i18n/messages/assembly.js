@@ -339,6 +339,7 @@ export const zh = {
       jobOutRequired: "Job --out 为必填项。",
     },
   },
+  finalPathDrag: { drag: "拖到 Final Path 图或表末尾添加；Esc 取消", drop: "松开添加到 {path} 末尾" },
   subview: {
     panelTitle: "局部视图",
     renderPending: "正在更新局部视图…",
@@ -993,6 +994,7 @@ export const en = {
       jobOutRequired: "Job --out is required.",
     },
   },
+  finalPathDrag: { drag: "Drag to a Final Path graph or table to append; Esc to cancel", drop: "Release to append to {path}" },
   subview: {
     panelTitle: "Local View",
     renderPending: "Updating Local View…",
