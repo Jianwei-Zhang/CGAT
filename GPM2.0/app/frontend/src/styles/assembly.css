@@ -1532,16 +1532,16 @@
   stroke: #7c6440;
 }
 
-.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg {
+.assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg {
   stroke: #2e567f;
   stroke-width: 2;
 }
 
-.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg.is-companion {
+.assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg.is-companion {
   stroke: #7c6440;
 }
 
-.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:hover > .track-reference-member {
+.assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:hover > .track-reference-member {
   stroke: #8e8e8e;
   stroke-width: 2;
 }

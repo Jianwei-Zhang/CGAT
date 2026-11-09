@@ -16,18 +16,22 @@
   font-weight: 600;
 }
 
-/* Overview keeps adopted-source correlation visible without promoting every
-   card to hover/focus. Reuse Assembly's theme-aware Final Path paint only;
-   inset strokes preserve the measured source/segment geometry and role fills. */
-.project-export-page [data-overview-preview] .project-preview-used {
-  opacity: 1;
-  background: var(--final-path-selection-fill);
-  box-shadow: inset 0 0 0 3px var(--final-path-selection-stroke);
+/* Keep the overview quiet until one result fragment is inspected. The
+   higher-specificity default also suppresses whole-card hover/focus highlights;
+   role fills/1px borders stay intact, including Gap and unused source context. */
+.project-export-page [data-overview-preview] .project-preview-card .project-preview-used {
+  opacity: 0;
+  background: var(--preview-selection-fill);
+  box-shadow: inset 0 0 0 2px var(--final-path-selection-stroke);
 }
 
-.project-export-page [data-overview-preview] .project-preview-final-part:not(.is-gap) {
-  outline: 3px solid var(--final-path-selection-stroke);
-  outline-offset: -3px;
+.project-export-page [data-overview-preview] .project-preview-card .project-preview-used[data-preview-highlighted="1"] {
+  opacity: 1;
+}
+
+.project-export-page [data-overview-preview] .project-preview-final-part[data-preview-highlighted="1"]:not(.is-gap) {
+  outline: 2px solid var(--final-path-selection-stroke);
+  outline-offset: -2px;
 }
 
 .project-export-page .button,

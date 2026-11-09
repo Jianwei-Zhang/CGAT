@@ -351,3 +351,33 @@ test("unused source bodies retain complete tooltips but do not create CSS-hidden
   assert.doesNotMatch(context, /project-preview-contig-label/);
   assert.equal(JSON.stringify(card), before);
 });
+
+
+test("embedded fragment paint clears on route/loading changes and unbind, without changing assembly state", async () => {
+  const value = state(); value.activeRoute = "projectExport";
+  const store = createStore(value), node = host();
+  node.hasAttribute = name => name === "data-overview-preview";
+  node.querySelector = selector => selector === ".project-preview-page"
+    ? { dataset: { previewProject: previewProjectKey(store.getState()) } } : null;
+  const attrs = () => ({ values: {}, getAttribute: key => key === "data-preview-part-key" ? '["Chr1",0]' : null,
+    setAttribute(key, value) { this.values[key] = value; }, removeAttribute(key) { delete this.values[key]; } });
+  const result = attrs(), patch = attrs();
+  const card = { querySelectorAll: () => [result, patch] };
+  result.closest = selector => selector === "[data-preview-chr]" ? card
+    : selector === "[data-preview-part-key][data-final-path-kind='ctg']" ? result : null;
+  const options = { ...deps(), getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }) };
+  bindProjectPreviewPage(node, store, options);
+  assert.equal(await loadProjectPreviewData(node, store, options), true);
+  const assembly = JSON.stringify(store.getState().assembly);
+  const hover = () => node.pointerover({ type: "pointerover", target: result });
+  hover(); assert.equal(patch.values["data-preview-highlighted"], "1");
+  store.setState({ activeRoute: "assembly" }); assert.equal(patch.values["data-preview-highlighted"], undefined);
+  store.setState({ activeRoute: "projectExport" }); hover(); assert.equal(patch.values["data-preview-highlighted"], "1");
+  store.setState({ projectPreview: { ...store.getState().projectPreview, loading: true } });
+  assert.equal(patch.values["data-preview-highlighted"], undefined); hover(); assert.equal(patch.values["data-preview-highlighted"], undefined);
+  store.setState({ projectPreview: { ...store.getState().projectPreview, loading: false } }); hover();
+  assert.equal(patch.values["data-preview-highlighted"], "1");
+  unbindProjectPreviewPage(node); assert.equal(patch.values["data-preview-highlighted"], undefined);
+  hover(); assert.equal(patch.values["data-preview-highlighted"], undefined);
+  assert.equal(JSON.stringify(store.getState().assembly), assembly);
+});

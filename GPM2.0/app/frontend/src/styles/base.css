@@ -50,6 +50,7 @@
   /* Read-only Final Path/source correlation, separate from editing selections. */
   --final-path-selection-stroke: #c2410c;
   --final-path-selection-fill: rgba(234, 88, 12, 0.22);
+  --preview-selection-fill: rgba(234, 88, 12, 0.10);
   /* Identity legend endpoints mirror the band paint scale at 80% and 100%. */
   --alignment-legend-primary-low: rgb(227, 232, 240);
   --alignment-legend-primary-high: rgb(148, 169, 197);

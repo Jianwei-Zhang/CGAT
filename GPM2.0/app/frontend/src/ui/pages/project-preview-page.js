@@ -1,3 +1,4 @@
+import { createProjectPreviewHighlight } from "./project-preview-highlight.js";
 import {planPreviewSourceDelta,mergePreviewSourceDelta} from "./project-preview-source-delta.js";
 import { syncProjectPreviewCards } from "./project-preview-layout.js";
 import { formatProjectPreviewBp as bpLabel } from "./project-preview-presentation.js";
@@ -41,9 +42,20 @@ function partTitle(part, labels) {
     : resolveFinalPathSegmentDisplayName(part.segment);
 }
 
+function partKey(part) {
+  return html(JSON.stringify([part.pathName, part.index]));
+}
+
+function partAttributes(part, labels, interactive) {
+  if (part.gap) return "";
+  const description = `${partTitle(part, labels)} · ${labels.length}: ${number(part.length)} bp`;
+  return ` data-preview-part-key="${partKey(part)}"${interactive
+    ? ` tabindex="0" role="img" aria-label="${html(description)}"` : ""}`;
+}
+
 function renderHighlight(patch, length, labels) {
   if (!(length > 0) || patch.end <= patch.start) return "";
-  return `<span class="project-preview-used" style="left:${percent(patch.start / length * 100)}%;width:${percent((patch.end - patch.start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" data-app-tooltip="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
+  return `<span class="project-preview-used" data-preview-part-key="${partKey(patch.part)}" style="left:${percent(patch.start / length * 100)}%;width:${percent((patch.end - patch.start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" data-app-tooltip="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
 }
 
 function renderContig(item, track, domain, labels) {
@@ -84,12 +96,12 @@ function renderReference(card, labels) {
         const start = Math.max(refStart, reference.start + patch.start);
         const end = Math.min(refEnd, reference.start + patch.end);
         const length = Math.max(1, refEnd - refStart);
-        return `<span class="project-preview-used" data-preview-reference-highlight-start="${patch.start}" data-preview-reference-highlight-end="${patch.end}" style="left:${percent((start - refStart) / length * 100)}%;width:${percent(Math.max(0, end - start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" data-app-tooltip="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
+        return `<span class="project-preview-used" data-preview-part-key="${partKey(patch.part)}" data-preview-reference-highlight-start="${patch.start}" data-preview-reference-highlight-end="${patch.end}" style="left:${percent((start - refStart) / length * 100)}%;width:${percent(Math.max(0, end - start) / length * 100)}%;--source-color:${contigColorToken(patch.part.role, "stroke")}" data-app-tooltip="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
       }).join("")}
     </span></span></div>` : "";
 }
 
-export function renderProjectPreviewCard(card, labels, details = true) {
+export function renderProjectPreviewCard(card, labels, details = true, { interactive = false } = {}) {
   const { domain } = card;
   const ref = renderReference(card, labels);
   const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" data-app-tooltip="${html(track.name || labels.unknown)}" data-app-tooltip-overflow><span class="project-preview-dataset-dot" style="background:${contigColorToken(track.role, "stroke")}"></span>${html(track.name || labels.unknown)}</span>
@@ -100,7 +112,7 @@ export function renderProjectPreviewCard(card, labels, details = true) {
     </div></div>`).join("");
   const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path">
     <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" data-app-tooltip="${html(path.name)}" data-app-tooltip-overflow="small">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
-      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${(details ? path.parts : []).map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
+      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${(details ? path.parts : []).map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}"${partAttributes(part, labels, interactive)} style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
     </div></div>` : `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`).join("");
   const pathSummary = card.paths.filter(path => path.parts.length).map(path => bpLabel(path.length)).join(" / ");
   const summary = [card.hasReference ? `Ref ${bpLabel(card.refLength)}` : "", pathSummary ? `Final Path ${pathSummary}` : ""].filter(Boolean).join(" · ");
@@ -113,9 +125,9 @@ export function renderProjectPreviewCard(card, labels, details = true) {
   </article>`;
 }
 
-function mountCardDetails(node, card, labels) {
+function mountCardDetails(node, card, labels, interactive) {
   const wrapper = node.ownerDocument.createElement("div");
-  wrapper.innerHTML = renderProjectPreviewCard(card, labels);
+  wrapper.innerHTML = renderProjectPreviewCard(card, labels, true, { interactive });
   const selector = ".project-preview-source-plots .project-preview-plot, .project-preview-final-plot";
   const rendered = [...wrapper.querySelectorAll(selector)];
   [...node.querySelectorAll(selector)].forEach((plot, index) => {
@@ -140,7 +152,7 @@ export function renderProjectPreviewPage(state, options = {}) {
   const content = !key ? `<p class="muted">${html(labels.noProject)}</p>`
     : preview.error ? `<p class="error-text" role="alert">${html(preview.error)}</p><button type="button" class="button" data-preview-refresh>${html(labels.retry)}</button>`
     : !preview.loaded || (preview.localSignature !== undefined && !previewStateIsApplicable(state)) ? `<p class="muted" role="status">${html(labels.loading)}</p>`
-    : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderProjectPreviewCard(card, labels, false)).join("")}</div>`
+    : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderProjectPreviewCard(card, labels, false, { interactive: options.embedded })).join("")}</div>`
     : `<p class="muted">${html(labels.empty)}</p>`;
   const count = preview.loaded && !preview.error && previewStateIsApplicable(state) && preview.cards?.length
     ? `<span class="project-section-count"><span aria-hidden="true">·</span>${html(preview.cards.length.toLocaleString(state.locale === "en" ? "en-US" : "zh-CN"))}</span>` : "";
@@ -152,6 +164,7 @@ export function renderProjectPreviewPage(state, options = {}) {
 }
 
 function updatePreviewDom(host, state, store) {
+  host[BOUND]?.highlights?.clear();
   const focused = host.ownerDocument?.activeElement;
   const preview = state.projectPreview, page = host.querySelector?.(".project-preview-page");
   const container = page?.querySelector?.(".project-preview-cards");
@@ -162,7 +175,7 @@ function updatePreviewDom(host, state, store) {
       let node = existing.get(card.chrName);
       if (nodeModels.get(node) !== card) {
         const wrapper = host.ownerDocument.createElement("div");
-        wrapper.innerHTML = renderProjectPreviewCard(card, getMessages(state, "projectPreview"), false);
+        wrapper.innerHTML = renderProjectPreviewCard(card, getMessages(state, "projectPreview"), false, { interactive: host.hasAttribute?.("data-overview-preview") });
         const replacement = wrapper.firstElementChild;
         const header = node?.querySelector?.(".project-preview-card-header");
         if (header) {
@@ -410,15 +423,17 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
 
 export function bindProjectPreviewPage(host, store, deps = {}) {
   const binding = host[BOUND] || {};
-  if (binding.store && binding.store !== store) { binding.unsubscribe?.(); binding.unsubscribe = null; }
+  if (binding.store && binding.store !== store) { binding.highlights?.clear(); binding.unsubscribe?.(); binding.unsubscribe = null; }
   if (binding.active === false) {
     binding.viewport?.start();
+    binding.highlights?.start();
   }
   binding.deps = binding.store === store ? { ...binding.deps, ...deps } : deps;
   binding.store = store; binding.active = true;
   if (!host[BOUND]) {
     host.addEventListener("click", event => {
       if (!binding.active || !isPreviewRoute(binding.store.getState())) return;
+      binding.highlights?.clear();
       const download = event.target?.closest?.("[data-preview-download]");
       if (download && host.contains(download)) {
         void exportProjectPreviewImage(host, binding.store, binding.deps);
@@ -440,17 +455,37 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
       },
       mount: node => {
         const card = nodeModels.get(node);
-        if (card) mountCardDetails(node, card, getMessages(binding.store.getState(), "projectPreview"));
+        if (card) mountCardDetails(node, card, getMessages(binding.store.getState(), "projectPreview"), Boolean(binding.highlights));
       },
-      unmount: unmountCardDetails,
+      unmount: node => {
+        binding.highlights?.clear(node);
+        unmountCardDetails(node);
+      },
       geometry: nodes => syncProjectPreviewCards(nodes.map(node => [node, nodeModels.get(node)]).filter(([, card]) => card)),
     });
+    if (host.hasAttribute?.("data-overview-preview")) {
+      binding.highlights = createProjectPreviewHighlight(host, {
+        active: () => {
+          const state = binding.store.getState();
+          return binding.active && host.isConnected !== false && state.activeRoute === "projectExport"
+            && !state.projectPreview?.loading && previewStateIsApplicable(state)
+            && host.querySelector?.(".project-preview-page")?.dataset.previewProject === previewProjectKey(state);
+        },
+      });
+      binding.highlights.start();
+    }
     binding.viewport.start();
     host[BOUND] = binding;
   }
   if (!binding.unsubscribe && store.subscribe) binding.unsubscribe = store.subscribe(() => {
-    if (!binding.active || host.isConnected === false || !isPreviewRoute(binding.store.getState())) return;
+    if (!binding.active || host.isConnected === false || !isPreviewRoute(binding.store.getState())) {
+      binding.highlights?.clear();
+      return;
+    }
     const state = binding.store.getState();
+    if (state.activeRoute !== "projectExport" || state.projectPreview?.loading || !previewStateIsApplicable(state)) {
+      binding.highlights?.clear();
+    }
     syncPreviewImageDownloadButton(host, binding.store);
     if (state.projectPreview?.loaded && !state.projectPreview.loading && !previewStateIsApplicable(state)) {
       void loadProjectPreviewData(host, binding.store, binding.deps);
@@ -473,6 +508,7 @@ export function unbindProjectPreviewPage(host) {
   if (!binding) return;
   binding.active = false;
   binding.unsubscribe?.(); binding.unsubscribe = null;
+  binding.highlights?.stop();
   binding.viewport?.stop();
   for (const node of host.querySelectorAll?.('[data-preview-mounted="true"]') || []) unmountCardDetails(node);
 }

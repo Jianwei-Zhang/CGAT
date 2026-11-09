@@ -41,3 +41,19 @@ test("Main and Local source overlays share the theme-aware warm fill and never c
   assert.match(overlay, /pointer-events:\s*none;/);
   assert.doesNotMatch(overlay, /(?:filter|box-shadow):/);
 });
+
+
+test("generic track hover never overrides the Final Path graph correlation stroke", () => {
+  const generic = [...assemblyCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, selector]) => selector.includes(".assembly-track-svg") && selector.includes(":hover")
+      && (selector.includes(".track-ctg") || selector.includes(".track-reference-member")));
+  assert.equal(generic.length, 3);
+  for (const [, selector] of generic) {
+    assert.match(selector, /:not\(\.assembly-final-path-svg\)/, "the independent Final Path painter must own graph hover");
+    assert.match(selector, /:not\(\.subview-track-svg\)/, "preserve Local View's independent hover painter");
+  }
+  const selected = rule('[data-final-path-selected="1"] > .track-ctg');
+  assert.match(selected, /stroke:\s*var\(--final-path-selection-stroke\);/);
+  assert.match(selected, /stroke-width:\s*3;/);
+  assert.doesNotMatch(selected, /!important/);
+});
