@@ -1,5 +1,6 @@
 import {planPreviewSourceDelta,mergePreviewSourceDelta} from "./project-preview-source-delta.js";
 import { syncProjectPreviewCards } from "./project-preview-layout.js";
+import { formatProjectPreviewBp as bpLabel } from "./project-preview-presentation.js";
 import { exportProjectPreviewImage, previewImageActionRoot, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { contigColorToken } from "./assembly/contig-colors.js";
 import { projectIcon } from "./project-icons.js";
@@ -31,8 +32,6 @@ const isPreviewRoute = state => ["projectExport", "projectPreview"].includes(sta
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const number = value => Number(value).toLocaleString("en-US");
-const bpLabel = value => value >= 1000000 ? `${(value / 1000000).toFixed(3)} Mb`
-  : value >= 1000 ? `${(value / 1000).toFixed(1)} kb` : `${number(value)} bp`;
 const percent = value => Math.max(0, Math.min(100, value)).toFixed(5);
 
 function partTitle(part, labels) {

@@ -1,3 +1,6 @@
+import { readProjectPreviewImageStyle } from "../project-preview-presentation.js";
+import { paginateProjectPreview, renderProjectPreviewPdf } from "../project-preview-pdf-export.js";
+import { PDFDocument, PDFName } from "pdf-lib";
 import { layoutProjectPreviewCard } from "../project-preview-layout.js";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -47,7 +50,7 @@ test("complete image includes all offscreen chromosome cards and complete source
 });
 
 
-test("image refuses loading, stale and empty previews and oversized complete canvases", () => {
+test("image refuses loading, stale and empty previews; only rasterization limits oversized canvases", async () => {
   for (const change of [preview => { preview.loading = true; }, preview => { preview.cards = []; },
     preview => { preview.modelVersion--; }, preview => { preview.error = "bad"; }]) {
     const { state } = fixture(1); change(state.projectPreview);
@@ -55,14 +58,18 @@ test("image refuses loading, stale and empty previews and oversized complete can
   }
   const { state } = fixture(1);
   state.projectPreview.cards = Array.from({ length: 1000 }, () => state.projectPreview.cards[0]);
-  assert.throws(() => buildProjectPreviewSvgSnapshot(state), /过大/);
+  const snapshot = buildProjectPreviewSvgSnapshot(state);
+  assert.ok(snapshot.rasterScale < 1);
+  assert.equal(snapshot.cardBounds.length, 1000);
+  await assert.rejects(renderProjectPreviewPng(snapshot), /过大.*SVG.*PDF/);
 });
 
 test("download uses the native save/binary chain, locks duplicate clicks and does not mutate state", async () => {
   const f = fixture(), before = JSON.stringify(f.state), writes = [];
   let release;
   const pending = exportProjectPreviewImage(f.host, f.store, {
-    pickSaveFilePath: async args => { assert.equal(args.defaultPath, "test_project__preview.png"); return "D:/preview.png"; },
+    pickSaveFilePath: async args => { assert.equal(args.defaultPath, "test_project__preview.svg");
+      assert.deepEqual(args.filters, [{ name: "SVG", extensions: ["svg"] }, { name: "PNG", extensions: ["png"] }, { name: "PDF", extensions: ["pdf"] }]); return "D:/preview.png"; },
     renderProjectPreviewPng: snapshot => { assert.match(snapshot.svgMarkup, />chr12</); return new Promise(resolve => { release = resolve; }); },
     writeFinalPathExportBinaryFile: async args => writes.push(args),
   });
@@ -161,7 +168,7 @@ test("default save and binary transports receive the real native command contrac
   try {
     assert.equal(await exportProjectPreviewImage(f.host, f.store, { renderProjectPreviewPng: async () => "PNG" }), true);
     assert.deepEqual(calls.map(call => call.command), ["pick_save_file_path", "write_final_path_export_binary_file"]);
-    assert.equal(calls[0].args.defaultPath, "test_project__preview.png");
+    assert.equal(calls[0].args.defaultPath, "test_project__preview.svg");
   } finally { globalThis.window = previous; }
 });
 
@@ -192,11 +199,123 @@ test("PNG keeps one row per dataset, retaining source context without an unposit
 
 test("image export shares the on-screen Final Path mapping for adopted outlines", () => {
   const { state } = fixture(1);
-  const geometry = layoutProjectPreviewCard(state.projectPreview.cards[0], 1440 - 176 - 28);
+  const style = readProjectPreviewImageStyle();
+  const bodyLeft = 20 + style.padding + 1, left = bodyLeft + style.labelWidth + style.columnGap;
+  const geometry = layoutProjectPreviewCard(state.projectPreview.cards[0], 1440 - bodyLeft - left);
   const patch = geometry.tracks.flat().flatMap(body => body.highlights)[0];
-  const snapshot = buildProjectPreviewSvgSnapshot(state);
-  const outlines = [...snapshot.svgMarkup.matchAll(/<rect x="([^"]+)" y="[^"]+" width="([^"]+)" height="14" fill="none"/g)];
+  const snapshot = buildProjectPreviewSvgSnapshot(state, { highlightAdopted: true });
+  const outlines = [...snapshot.svgMarkup.matchAll(/<rect x="([^"]+)" y="[^"]+" width="([^"]+)" height="14" fill="none" stroke="[^"]+" stroke-width="2"/g)];
   assert.equal(outlines.length, 1);
-  assert.ok(Math.abs(Number(outlines[0][1]) - (176 + patch.x)) < 1e-7);
-  assert.ok(Math.abs(Number(outlines[0][2]) - patch.width) < 1e-7);
+  assert.ok(Math.abs(Number(outlines[0][1]) - (left + patch.x + 1)) < 1e-7);
+  assert.ok(Math.abs(Number(outlines[0][2]) - Math.max(0, patch.width - 2)) < 1e-7);
+});
+
+
+for (const target of ["D:/预览.svg", "D:/预览.SVG", "D:/folder.with.dot/预览"]) {
+  test(`SVG is UTF-8 and does not rasterize: ${target}`, async () => {
+    const f = fixture(1), writes = [];
+    assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+      pickSaveFilePath: async () => target,
+      renderProjectPreviewPng: () => assert.fail("SVG must not need a canvas"),
+      writeFinalPathExportBinaryFile: async args => writes.push(args),
+    }), true);
+    assert.equal(writes[0].outputPath, target.endsWith("预览") ? `${target}.svg` : target);
+    const svg = Buffer.from(writes[0].bytesBase64, "base64").toString("utf8");
+    assert.match(svg, /^<svg/); assert.match(svg, /来源组合/); assert.match(svg, />chr01</);
+    assert.doesNotMatch(svg, /�/);
+  });
+}
+
+test("PDF dispatch uses the common snapshot and save transport", async () => {
+  const f = fixture(), writes = [];
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+    pickSaveFilePath: async () => "D:/preview.PDF",
+    renderProjectPreviewPdf: async snapshot => { assert.match(snapshot.svgMarkup, />chr12</); return "PDFbytes"; },
+    renderProjectPreviewPng: () => assert.fail("PDF renderer handles its own bounded pages"),
+    writeFinalPathExportBinaryFile: async args => writes.push(args),
+  }), true);
+  assert.equal(writes[0].bytesBase64, "PDFbytes"); assert.equal(writes[0].outputPath, "D:/preview.PDF");
+});
+
+test("unsupported extensions are rejected without writing mislabeled image bytes", async () => {
+  const f = fixture(1);
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+    pickSaveFilePath: async () => "D:/preview.jpg",
+    writeFinalPathExportBinaryFile: () => assert.fail("unsupported format must not be saved"),
+  }), false);
+  assert.match(f.error.textContent, /SVG、PNG 或 PDF/); assert.equal(f.button.disabled, false);
+});
+
+test("export uses the App's resting rounded cards, header, role dots, typography and context-label policy", () => {
+  const f = fixture(1), style = readProjectPreviewImageStyle();
+  const svg = buildProjectPreviewSvgSnapshot(f.state).svgMarkup;
+  assert.match(svg, /rx="6"/); assert.match(svg, /height="16"[^>]*rx="2"/);
+  assert.match(svg, /height="6"[^>]*rx="3"/);
+  assert.ok(svg.includes(`fill="${style.header}"`));
+  assert.match(svg, /<circle[^>]*r="3.5"/); assert.match(svg, /10.0 kb/);
+  assert.match(svg, /font-size="11.004/);
+  assert.doesNotMatch(svg, />primary0(?:<| )/);
+  assert.doesNotMatch(svg, /stroke-width="2"/); // Hover-only highlights are not baked into exports.
+});
+
+test("export resolves live theme/font/radius styles instead of leaking CSS variables", () => {
+  const previous = globalThis.getComputedStyle;
+  const root = {}, nodes = { ".project-preview-card": { borderTopLeftRadius: "9px", paddingLeft: "18px" },
+    ".project-preview-row": { gridTemplateColumns: "120px 900px", columnGap: "12px" },
+    ".project-preview-contig": { borderTopLeftRadius: "4px" } };
+  const variables = { "--surface-panel": "#17212e", "--surface-subtle": "#1d2938", "--text-primary": "#e5edf7" };
+  globalThis.getComputedStyle = node => node === root
+    ? { fontSize: "16px", fontFamily: "Test Font", getPropertyValue: name => variables[name] || "" } : node;
+  try {
+    const style = readProjectPreviewImageStyle({ ownerDocument: { documentElement: root }, querySelector: selector => nodes[selector] });
+    const svg = buildProjectPreviewSvgSnapshot(fixture(1).state, { style }).svgMarkup;
+    assert.match(svg, /fill="#17212e"/); assert.match(svg, /fill="#1d2938"/); assert.match(svg, /fill="#e5edf7"/);
+    assert.match(svg, /rx="9"/); assert.match(svg, /height="16"[^>]*rx="4"/);
+    assert.match(svg, /font-family="Test Font"/); assert.doesNotMatch(svg, /var\(--/);
+  } finally { globalThis.getComputedStyle = previous; }
+});
+
+test("PDF is parseable, paginated at whole-card boundaries and retains every chromosome", async () => {
+  const snapshot = buildProjectPreviewSvgSnapshot(fixture().state), pages = paginateProjectPreview(snapshot);
+  assert.ok(pages.length > 1);
+  for (const card of snapshot.cardBounds) {
+    assert.equal(pages.filter(page => {
+      const top = Number(/viewBox="0 ([^ ]+)/.exec(page.snapshot.svgMarkup)[1]);
+      return card.top >= top && card.bottom <= top + page.snapshot.height;
+    }).length, 1);
+  }
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/aQAAAAASUVORK5CYII=";
+  const rendered = [];
+  const bytes = await renderProjectPreviewPdf(snapshot, async page => { rendered.push(page); return png; });
+  const pdf = await PDFDocument.load(Buffer.from(bytes, "base64"));
+  assert.equal(pdf.getPageCount(), pages.length); assert.equal(rendered.length, pages.length);
+  assert.equal((rendered.map(page => page.svgMarkup).join("").match(/>chr\d+</g) || []).length, snapshot.cardBounds.length);
+  for (const page of pdf.getPages()) {
+    assert.equal(page.getWidth(), 841.89); assert.equal(page.getHeight(), 595.28);
+    assert.equal(page.node.Resources().lookup(PDFName.of("XObject")).keys().length, 1);
+  }
+});
+
+test("PDF pages bypass the full-overview PNG size limit and fit even an unusually tall card", () => {
+  const f = fixture(1);
+  f.state.projectPreview.cards = Array.from({ length: 300 }, () => f.state.projectPreview.cards[0]);
+  const snapshot = buildProjectPreviewSvgSnapshot(f.state);
+  assert.ok(snapshot.rasterScale < 1);
+  const pages = paginateProjectPreview(snapshot);
+  assert.ok(pages.every(page => page.snapshot.rasterScale >= 1));
+  assert.ok(pages.every(page => page.y >= 24 && page.width <= 841.89 - 48));
+  snapshot.cardBounds = [{ top: 0, bottom: 2000 }];
+  const [tall] = paginateProjectPreview(snapshot);
+  assert.ok(tall.height <= 595.28 - 48); assert.ok(tall.width < 841.89 - 48);
+});
+
+for (const stage of ["render", "save"]) test(`PDF ${stage} failure is visible and unlocks the button`, async () => {
+  const f = fixture(1);
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+    pickSaveFilePath: async () => "D:/preview.pdf",
+    renderProjectPreviewPdf: async () => { if (stage === "render") throw new Error("PDF render failed"); return "bytes"; },
+    writeFinalPathExportBinaryFile: async () => { throw new Error("PDF save failed"); },
+  }), false);
+  assert.match(f.error.textContent, new RegExp(`PDF ${stage} failed`));
+  assert.equal(previewImageExportIsRunning(f.store), false); assert.equal(f.button.disabled, false);
 });

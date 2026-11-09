@@ -13,6 +13,7 @@
     "vite": "^7.3.7"
   },
   "dependencies": {
-    "lucide": "^1.43.0"
+    "lucide": "^1.43.0",
+    "pdf-lib": "^1.17.1"
   }
 }
