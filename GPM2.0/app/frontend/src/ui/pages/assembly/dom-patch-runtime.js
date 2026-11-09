@@ -142,7 +142,9 @@ export function createAssemblyDomPatchController({
   // layers are patched in place so the plot keeps its scroll and zoom state.
   function patchGrtResultOverlaysDom(host, store, scope) {
     const normalizedScope = scope === "main" ? "main" : "subview";
-    const routeHost = host?.closest?.("#route-host") || host;
+    const routeHost = store.localViewRootStore
+      ? host?.closest?.("[data-local-view-window]") || host
+      : host?.closest?.("#route-host") || host;
     if (!routeHost?.querySelector) {
       return false;
     }
@@ -156,7 +158,7 @@ export function createAssemblyDomPatchController({
     const nextHtml = normalizedScope === "main"
       ? renderAssemblyMainTrackSections(state)
       : typeof renderAssemblySubviewPanel === "function"
-        ? renderAssemblySubviewPanel(state)
+        ? renderAssemblySubviewPanel(state, store)
         : "";
     const nextRoot = createRenderedContent(routeHost, nextHtml);
     if (!nextRoot) {
@@ -180,10 +182,12 @@ export function createAssemblyDomPatchController({
   // the mounted panel node prevents WebView2 from flashing the whole window and
   // preserves the scroll container until its replacement is ready.
   function patchSubviewPanelDom(host, store) {
-    const routeHost = host?.closest?.("#route-host") || host;
+    const routeHost = store.localViewRootStore
+      ? host?.closest?.("[data-local-view-window]") || host
+      : host?.closest?.("#route-host") || host;
     const livePanel = routeHost?.querySelector?.("[data-subview-panel='1']") || null;
     if (!livePanel || typeof renderAssemblySubviewPanel !== "function") return null;
-    const nextContent = createRenderedContent(routeHost, renderAssemblySubviewPanel(store.getState()));
+    const nextContent = createRenderedContent(routeHost, renderAssemblySubviewPanel(store.getState(), store));
     const nextPanel = nextContent?.querySelector?.("[data-subview-panel='1']") || null;
     if (!nextPanel) return null;
     const selectors = [".subview-panel-head", ".subview-alignment-card"];

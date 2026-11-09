@@ -339,6 +339,7 @@ export const zh = {
       jobOutRequired: "Job --out 为必填项。",
     },
   },
+  finalPathDrag: { drag: "拖到 Final Path 图或表末尾添加；Esc 取消", drop: "松开添加到 {path} 末尾" },
   subview: {
     panelTitle: "局部视图",
     renderPending: "正在更新局部视图…",
@@ -414,6 +415,7 @@ export const zh = {
         flipped: "已翻转",
       },
     },
+    window: { taskbar: "局部比对任务栏", minimize: "最小化", close: "关闭视图", dock: "解除悬浮", float: "悬浮" },
     guide: "Ctrl/Cmd 选择两个 Contig 或两个轨道进行比较；通过「工具」添加 Contig 进入组合模式。",
     removeCandidateAria: "移除该候选",
     removeTrackCandidateAria: "移除该轨道候选",
@@ -992,6 +994,7 @@ export const en = {
       jobOutRequired: "Job --out is required.",
     },
   },
+  finalPathDrag: { drag: "Drag to a Final Path graph or table to append; Esc to cancel", drop: "Release to append to {path}" },
   subview: {
     panelTitle: "Local View",
     renderPending: "Updating Local View…",
@@ -1067,6 +1070,7 @@ export const en = {
         flipped: "Flipped",
       },
     },
+    window: { taskbar: "Local comparison taskbar", minimize: "Minimize", close: "Close view", dock: "Dock", float: "Float" },
     guide: "Select two contigs with Ctrl/Cmd or two track labels to compare; add contigs via Tools to enter custom composition mode.",
     removeCandidateAria: "Remove this candidate",
     removeTrackCandidateAria: "Remove this track candidate",

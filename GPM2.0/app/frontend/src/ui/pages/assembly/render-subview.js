@@ -1,3 +1,4 @@
+import { renderSubviewEmptyGuide } from "./render-subview-workspace.js";
 import { renderCompactSubviewAnchors } from "./subview-anchor-metadata.js";
 import { hasDeferredReferenceHits, readReferenceHits, iterateReferenceHitEntries } from "../../../services/workflow/reference-evidence.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
@@ -770,6 +771,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     }
   }
   const subview = getSubviewStateImpl(assembly);
+  if (!subview.summary) return `<article class="subview-selection-panel" data-subview-panel="1">${renderSubviewEmptyGuide(i18n.subview)}</article>`;
   const candidates = getSubviewSelections(subview);
   const trackSelections = getSubviewTrackSelections(subview);
   const flippedKeySet = buildSubviewFlippedCtgKeySet(subview?.flippedCtgs);
@@ -883,7 +885,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
           </details>` : ""}
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
           ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}" data-app-tooltip-overflow>${escapeHtml(i18n.subview.guide)}</p>` : ""}
-          ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history) : ""}
+          ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history, assembly.subviewWindowRendering) : ""}
         </div>
       </div>
       ${grtResultToast}
@@ -919,7 +921,7 @@ function renderSubviewHistoryControls(history, i18n) {
   `;
 }
 
-function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = null, history = null) {
+function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = null, history = null, windowId = "") {
   const grtResultControls = renderGrtResultControls({
     scope: "subview",
     context: grtResultContext,
@@ -929,7 +931,7 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
   });
   const alignmentInput = renderTrackNumberInput({
     field: "alignmentLength",
-    id: "subview-track-alignment-length",
+    id: `${windowId ? `${windowId}-` : ""}subview-track-alignment-length`,
     label: i18n.trackControls.alignmentLengthBp,
     openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.alignmentLengthBp),
     value: trackPrefs?.alignmentLength,
@@ -937,7 +939,7 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
   });
   const identityInput = renderTrackNumberInput({
     field: "minIdentityPct",
-    id: "subview-track-identity-pct",
+    id: `${windowId ? `${windowId}-` : ""}subview-track-identity-pct`,
     label: i18n.trackControls.identityPct,
     openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.identityPct),
     value: trackPrefs?.minIdentityPct,

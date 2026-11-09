@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildFinalPathAppendPreview,
   addFinalPathContigRelativeToSegment,
   addFinalPathGapRelativeToSegment,
   appendTrackContigToFinalPath,
@@ -1715,3 +1716,90 @@ for (const reversed of [false, true]) {
     assert.deepEqual(store.getState().assembly.chrCtgs, real);
   });
 }
+
+
+for (const role of ["primary", "support", "phased"]) for (const orient of ["+", "-"]) {
+  test(`Main ${role} anchor interval uses source coordinates, orientation ${orient}`, async () => {
+    const store = createStore({ chrCtgs: [{ assemblyCtgId: 9, name: "bounded", totalLength: 1200, orient, datasetId: 11 }] });
+    await appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: role,
+      start: 101, end: 350, coordinateSpace: "source", refOrient: orient }, createDeps());
+    const segment = store.getState().assembly.finalPathByChr.Chr01.segments[0];
+    assert.deepEqual([segment.start, segment.end], orient === "-" ? [350, 101] : [101, 350]);
+    assert.equal(Math.abs(segment.end - segment.start) + 1, 250);
+  });
+}
+
+for (const orient of ["+", "-"]) test(`Main split child source interval rebases to its actual backing contig, ${orient}`, async () => {
+  const store = createStore({ chrCtgs: [{ assemblyCtgId: 9, name: "child", totalLength: 500, orient,
+    sourceFragment: { sourceStart: 1001, sourceEnd: 1500 } }] });
+  await appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: "primary",
+    start: 1101, end: 1250, coordinateSpace: "source" }, createDeps());
+  const segment = store.getState().assembly.finalPathByChr.Chr01.segments[0];
+  assert.deepEqual([segment.start, segment.end], orient === "-" ? [250, 101] : [101, 250]);
+  assert.equal(Math.abs(segment.end - segment.start) + 1, 150);
+});
+
+for (const range of [[null, 200], [0, 200], [1.5, 200], [501, 1500], [1100, 1600], [1250, 1101]]) {
+  test(`invalid explicit source interval ${range} cannot silently append the full contig`, async () => {
+    const store = createStore({ chrCtgs: [{ assemblyCtgId: 9, totalLength: 500,
+      sourceFragment: { sourceStart: 1001, sourceEnd: 1500 } }] });
+    let writes = 0;
+    await appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: "primary",
+      start: range[0], end: range[1], coordinateSpace: "source" }, createDeps({ persistProjectAssemblyViewState() { writes++; } }));
+    assert.equal(writes, 0);
+    assert.deepEqual(store.getState().assembly.finalPathByChr, {});
+  });
+}
+
+for (const baseOrientation of ["+", "-"]) for (const flipped of [false, true]) {
+  test(`composition anchor slice keeps its base range and effective orientation ${baseOrientation}/${flipped}`, async () => {
+    const { normalizeSubviewComposition } = await import("../subview-composition-state.js");
+    const member = normalizeSubviewComposition({ members: [{ assemblyCtgId: 9, lengthBp: 1200,
+      lane: "top", source: { role: "primary", datasetId: 11 }, baseOrientation, flipped }] }).members[0];
+    const store = createStore({ subview: { summary: { mode: "composition", members: [member] } } });
+    await appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: "primary",
+      localFragmentEntityKey: member.entityKey, start: 101, end: 350, coordinateSpace: "base" }, createDeps());
+    const segment = store.getState().assembly.finalPathByChr.Chr01.segments[0];
+    const source = baseOrientation === "-" ? [851, 1100] : [101, 350];
+    const reverse = (baseOrientation === "-") !== flipped;
+    assert.deepEqual([segment.start, segment.end], reverse ? source.reverse() : source);
+    assert.equal(Math.abs(segment.end - segment.start) + 1, 250);
+  });
+}
+
+test("drag target explicitly selects the intended haplotype path, keeping the current path unchanged", async () => {
+  const store = createStore();
+  await appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: "primary", start: 10, end: 20 },
+    createDeps(), { targetChrName: "Chr01B" });
+  assert.equal(store.getState().assembly.finalPathByChr.Chr01, undefined);
+  assert.equal(store.getState().assembly.finalPathByChr.Chr01B.totalLength, 11);
+});
+
+
+test("append preview is pure, matches the committed interval, and never mutates either source view", async () => {
+  const store = createStore({ trackDragOffsets: [{ contigId: 9, offsetBp: 123 }],
+    subviewTrackDragOffsets: [{ contigId: 9, offsetBp: 456 }],
+    subview: { summary: { mode: "2-contig", top: { contigId: 9 } }, flippedCtgs: [{ contigId: 9 }] },
+    trackSelectedCtgIds: [9], subviewCompositionViewport: { leftBp: 18, bpPerPx: 2 } });
+  const before = structuredClone(store.getState());
+  const context = { assemblyCtgId: 9, trackRole: "primary", start: 101, end: 350, coordinateSpace: "source" };
+  const candidate = buildFinalPathAppendPreview(store.getState(), context, { targetChrName: "Chr01" });
+  assert.deepEqual(store.getState(), before, "preview cannot publish a temporary path or alter a source view");
+  assert.equal(candidate.entry.totalLength, 250);
+  await appendTrackContigToFinalPath({}, store, context, createDeps());
+  assert.deepEqual(store.getState().assembly.finalPathByChr.Chr01.segments, candidate.entry.segments);
+  for (const field of ["chrCtgs", "supportChrCtgs", "trackDragOffsets", "subviewTrackDragOffsets",
+    "trackSelectedCtgIds", "subview", "trackView", "trackScrollState", "subviewTrackScrollState", "subviewCompositionViewport"])
+    assert.deepEqual(store.getState().assembly[field], before.assembly[field], field);
+});
+
+
+test("a delayed append persistence response cannot overwrite a newly opened project", async () => {
+  const store = createStore(); let resolve;
+  const pending = appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: "primary" },
+    createDeps({ persistProjectAssemblyViewState: () => new Promise(done => { resolve = done; }),
+      rerender() { assert.fail("old response must not repaint the new project"); } }));
+  store.setState({ session: { projectId: 8, workspacePath: "/other" }, assembly: { selectedChrName: "Chr01", finalPathByChr: {} } });
+  const before = structuredClone(store.getState()); resolve({}); await pending;
+  assert.deepEqual(store.getState(), before);
+});

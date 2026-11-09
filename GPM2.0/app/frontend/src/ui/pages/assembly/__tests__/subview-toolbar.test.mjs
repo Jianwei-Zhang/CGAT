@@ -58,13 +58,13 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
 }
 
 for (const locale of ["zh", "en"]) {
-  test(`empty ${locale} view keeps guidance inside the unified toolbar without inactive controls`, () => {
-    const html = localMarkup(createState({ locale }));
-    const titleRow = html.match(/<div class="subview-panel-title-row[^"]*"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
-    assert.match(titleRow, /<p class="muted subview-empty-guide" data-app-tooltip="[^"]+" data-app-tooltip-overflow>[^<]+<\/p>/);
-    assert.match(html, /subview-empty-guide[^>]*>[^<]+<\/p>\s*<\/div>\s*<\/div>/);
-    assert.doesNotMatch(html, /subview-panel-help|subview-panel-guide/);
-    assert.doesNotMatch(html, /subview-track-inline-controls|subview-alignment-card|data-subview-action="history-/);
+  test(`empty ${locale} view keeps only guidance and its inline Tools entry`, () => {
+    const state = createState(); state.locale = locale;
+    const html = localMarkup(state);
+    assert.match(html, /subview-empty-guide/);
+    assert.match(html, /class="subview-guide-tools" data-subview-tools-toggle/);
+    assert.doesNotMatch(html, /data-subview-toolbar|subview-panel-title-row|assembly-view-title/);
+    assert.doesNotMatch(html, /subview-track-inline-controls|subview-track-alignment-length/);
   });
 }
 

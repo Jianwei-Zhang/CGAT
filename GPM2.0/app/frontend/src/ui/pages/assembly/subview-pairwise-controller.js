@@ -1,3 +1,4 @@
+import { getSubviewWindowStore } from "./subview-workspace-state.js";
 import { ensureSubviewReferenceEvidence, missingSubviewReferenceEvidence } from "./reference-evidence-loading.js";
 import { currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { memberBackingIds } from "./subview-fragment-model.js";
@@ -220,6 +221,7 @@ export function createSubviewPairwiseController({
   }
 
   async function loadSubviewPairwiseEvidence(host, store, summary, { rerenderAfter = true } = {}) {
+    store = getSubviewWindowStore(store);
     const startState = store.getState();
     const viewRequest = currentAssemblyViewRequest(store);
     const params = resolveSubviewPairwiseEvidenceParams(startState, summary);
@@ -316,6 +318,7 @@ export function createSubviewPairwiseController({
   }
 
   async function refreshSubviewPairwiseEvidence(host, store, { rerenderLoading = true, rerenderLoaded = true } = {}) {
+    store = getSubviewWindowStore(store);
     if (missingSubviewReferenceEvidence(store.getState().assembly).length) {
       const ready = await ensureSubviewReferenceEvidence(host,store,{
         load:listReferenceTrackMembers,

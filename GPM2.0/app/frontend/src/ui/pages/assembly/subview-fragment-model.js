@@ -383,7 +383,7 @@ export function resolveLocalFinalPathContexts(members, context) {
   if (reverse) parts.reverse();
   return parts.map(({ part, first, last }) => {
     const a = first - part.sourceStart + 1, b = last - part.sourceStart + 1;
-    return { ...context, localFragmentEntityKey: undefined, assemblyCtgId: part.assemblyCtgId,
+    return { ...context, localFragmentEntityKey: undefined, coordinateSpace: "contig", assemblyCtgId: part.assemblyCtgId,
       // Normal assembly ranges are relative to source orientation, whereas Ref
       // segments use their explicit orient and ascending member coordinates.
       ...(member.source.role === "ref" ? { orient: undefined, refOrient: reverse ? "-" : "+", start: a, end: b }

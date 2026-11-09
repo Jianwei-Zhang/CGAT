@@ -315,6 +315,12 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
   };
 }
 
+function contextMenuFor(host) {
+  const owner = host?.closest?.("[data-local-view-window]");
+  return owner ? owner.querySelector("[data-local-view-context-menu]")
+    : host.querySelector("#assembly-context-menu");
+}
+
 export function bindAssemblyContextMenu(host, store, deps) {
   assertContextMenuRuntimeDeps(deps);
   if (host[ASSEMBLY_CONTEXT_MENU_BOUND]) {
@@ -353,7 +359,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
     cancelDelayedFloatingClose(host, CONTEXT_MENU_CLOSE_TIMER);
     submenuCleanup?.(); submenuCleanup = null;
     clearItemPreview();
-    const menu = host.querySelector("#assembly-context-menu");
+    const menu = contextMenuFor(host);
     clearSubviewFragmentMenuHighlight();
     clearSubviewHitMenuHighlight();
     if (!menu) {
@@ -384,7 +390,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       target = null,
     } = {},
   ) => {
-    const menu = hostNode.querySelector("#assembly-context-menu");
+    const menu = contextMenuFor(hostNode);
     if (!menu) {
       return;
     }
@@ -454,8 +460,8 @@ export function bindAssemblyContextMenu(host, store, deps) {
   }
 
   bindDelegatedDelayedFloatingClose(host, {
-    rootSelector: "#assembly-context-menu", timerKey: CONTEXT_MENU_CLOSE_TIMER, delayMs: 0,
-    close: menu => { if (host.querySelector("#assembly-context-menu") === menu) closeMenu(); },
+    rootSelector: host?.closest?.("[data-local-view-window]") ? "[data-local-view-context-menu]" : "#assembly-context-menu", timerKey: CONTEXT_MENU_CLOSE_TIMER, delayMs: 0,
+    close: menu => { if (contextMenuFor(host) === menu) closeMenu(); },
   });
   host.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
   host.addEventListener("click", () => {
@@ -471,7 +477,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       closeMenu();
       return;
     }
-    const menu = host.querySelector("#assembly-context-menu");
+    const menu = contextMenuFor(host);
     if (!menu) {
       return;
     }

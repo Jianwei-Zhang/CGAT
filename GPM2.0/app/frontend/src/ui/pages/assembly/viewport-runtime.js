@@ -145,7 +145,10 @@ export function createAssemblyViewportController({
 
   function readAssemblyTrackViewportWidths(host) {
     const primaryScroll = host?.querySelector?.(".assembly-track-scroll[data-track-role='primary']") || null;
-    const subviewScroll = host?.querySelector?.(".assembly-track-scroll.subview-track-scroll") || null;
+    const candidateSubviewScroll = host?.querySelector?.(".assembly-track-scroll.subview-track-scroll") || null;
+    const localOwner = candidateSubviewScroll?.closest?.("[data-local-view-window]");
+    const hostOwner = host?.closest?.("[data-local-view-window]");
+    const subviewScroll = localOwner && localOwner !== hostOwner ? null : candidateSubviewScroll;
     const finalPathScroll = host?.matches?.("[data-final-path-graph-viewport], .assembly-final-path-svg-wrap") ? host :
       host?.querySelector?.("[data-final-path-graph-viewport]")
       || host?.querySelector?.(".assembly-final-path-svg-wrap")
@@ -327,7 +330,10 @@ export function createAssemblyViewportController({
     }
     const trackScrollEls = Array.from(
       host?.querySelectorAll?.(".assembly-track-scroll[data-track-role]") || [],
-    );
+    ).filter(element => {
+      const owner = element.closest?.("[data-local-view-window]");
+      return !owner || owner === host?.closest?.("[data-local-view-window]");
+    });
     const subviewTrackScrollEls = trackScrollEls.filter(
       (element) => String(element.dataset.trackRole || "").trim() === "subview",
     );

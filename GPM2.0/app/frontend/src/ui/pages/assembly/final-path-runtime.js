@@ -382,6 +382,11 @@ async function persistCurrentFinalPathByChr(host, store, nextFinalPathByChr, dep
     finalPathViewMode: normalizeFinalPathViewMode(currentState.assembly.finalPathViewMode),
     finalPathByChr: nextFinalPathByChr,
   });
+  const latest = store.getState();
+  if (latest.session?.workspacePath !== currentState.session?.workspacePath
+    || latest.session?.projectId !== currentState.session?.projectId
+    || latest.assembly?.selectedChrName !== currentState.assembly?.selectedChrName
+    || store.isLocalViewAlive?.() === false) return {};
   const normalizedPersistedFinalPathByChr = normalizeFinalPathByChr(
     persisted?.finalPathByChr ?? nextFinalPathByChr,
   );
@@ -622,11 +627,13 @@ function buildTrackContigFinalPathSegment(state, ctgContext, ctg, segmentId) {
     );
     const memberStartBp = normalizePositiveInteger(
       ctgContext?.segmentStart
+      ?? ctgContext?.segmentStartBp
       ?? ctg?.segmentStartBp
       ?? ctg?.anchorStart,
     );
     const memberEndBp = normalizePositiveInteger(
       ctgContext?.segmentEnd
+      ?? ctgContext?.segmentEndBp
       ?? ctg?.segmentEndBp
       ?? (memberStartBp ? memberStartBp + overallLen - 1 : null),
     );
@@ -681,23 +688,25 @@ function buildTrackContigFinalPathSegment(state, ctgContext, ctg, segmentId) {
     && (
       !rangeStart
       || !rangeEnd
-      || rangeStart > overallLen
-      || rangeEnd > overallLen
+      || (ctgContext?.coordinateSpace !== "source" && (rangeStart > overallLen || rangeEnd > overallLen))
     )
   ) {
     return null;
   }
   const resolvedStart = rangeStart || 1;
   const resolvedEnd = rangeEnd || overallLen;
-  const sourceRange = orient === "-"
-    ? {
-        start: overallLen - resolvedStart + 1,
-        end: overallLen - resolvedEnd + 1,
-      }
-    : {
-        start: resolvedStart,
-        end: resolvedEnd,
-      };
+  let sourceRange;
+  if (ctgContext?.coordinateSpace === "source") {
+    const base = normalizePositiveInteger(ctg?.sourceFragment?.sourceStart) || 1;
+    const first = rangeStart - base + 1, last = rangeEnd - base + 1;
+    if (!hasExplicitRange || !Number.isSafeInteger(first) || !Number.isSafeInteger(last)
+      || first < 1 || last < first || last > overallLen) return null;
+    sourceRange = orient === "-" ? { start: last, end: first } : { start: first, end: last };
+  } else {
+    sourceRange = orient === "-"
+      ? { start: overallLen - resolvedStart + 1, end: overallLen - resolvedEnd + 1 }
+      : { start: resolvedStart, end: resolvedEnd };
+  }
   return buildFinalPathCtgSegment({
     segmentId,
     sourceKind: "assembly_ctg",
@@ -711,12 +720,12 @@ function buildTrackContigFinalPathSegment(state, ctgContext, ctg, segmentId) {
   });
 }
 
-export async function appendTrackContigToFinalPath(host, store, ctgContext, deps = {}, options = {}) {
-  const context = getCurrentFinalPathContext(store, options);
-  if (!context) {
-    return null;
-  }
-  const { state, chrName, currentEntry } = context;
+// The preview and committed addition share this pure source-range projection.
+// Constructing a candidate entry never writes store state or persists anything.
+export function buildFinalPathAppendPreview(state, ctgContext, options = {}) {
+  const context = getCurrentFinalPathContext({ getState: () => state }, options);
+  if (!context) return null;
+  const { chrName, currentEntry } = context;
   const appendContexts = ctgContext?.localFragmentEntityKey
     ? resolveLocalFinalPathContexts(state.assembly.subview?.summary?.members || [], ctgContext) : [ctgContext];
   if (!appendContexts?.length) return null;
@@ -728,6 +737,15 @@ export async function appendTrackContigToFinalPath(host, store, ctgContext, deps
     if (!segment) return null;
     nextSegments.push(segment);
   }
+  return { context, nextSegments, entry: updateEntryBySegments(currentEntry, chrName,
+    [...currentEntry.segments, ...nextSegments], state.assembly?.hiddenPrimaryCtgIds || []) };
+}
+
+export async function appendTrackContigToFinalPath(host, store, ctgContext, deps = {}, options = {}) {
+  const preview = buildFinalPathAppendPreview(store.getState(), ctgContext, options);
+  if (!preview) return null;
+  const { context, nextSegments } = preview;
+  const { state, chrName, currentEntry } = context;
   const nextSegment = nextSegments[0];
   return persistCurrentEntrySegments(
     host,

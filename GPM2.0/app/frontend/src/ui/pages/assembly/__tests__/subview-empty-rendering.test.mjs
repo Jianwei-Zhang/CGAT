@@ -5,9 +5,10 @@ import { applySubviewComposition, removeSubviewCompositionMembers } from "../sub
 function assertEmptyPanel(state) {
   const html = renderAssemblyPage(state);
   assert.match(html, /data-subview-panel="1"/);
-  assert.match(html, /<h4 class="assembly-view-title">局部视图<\/h4>/);
+  if (state.assembly.subview?.summary) assert.match(html, /<h4 class="assembly-view-title">局部视图<\/h4>/);
+  else assert.doesNotMatch(html, /<h4 class="assembly-view-title">局部视图<\/h4>/);
   assert.doesNotMatch(html, /subview-panel-help|subview-panel-guide/);
-  assert.match(html, /subview-empty-guide" data-app-tooltip="[^"]+" data-app-tooltip-overflow>[^<]+<\/p>\s*<\/div>\s*<\/div>/);
+  assert.match(html, /subview-empty-guide" data-app-tooltip="[^"]+"\s+data-app-tooltip-overflow>/);
   assert.match(html, /data-subview-tools-toggle/);
   assert.doesNotMatch(html, /subview-alignment-card|subview-track-layout|subview-track-svg|subview-track-min-tick-unit-kb/);
 }
@@ -54,6 +55,10 @@ test("empty Subview guidance opts into overflow-only completion in both language
   for (const locale of ["zh", "en"]) {
     const html = renderAssemblyPage({ ...createState(), locale });
     const guide = getMessages(locale, "assembly").subview.guide;
-    assert.ok(html.includes(`<p class="muted subview-empty-guide" data-app-tooltip="${guide}" data-app-tooltip-overflow>${guide}</p>`));
+    const paragraph = html.match(/<p class="muted subview-empty-guide"[^]*?<\/p>/)[0];
+    assert.ok(paragraph.includes(`data-app-tooltip="${guide}"`));
+    assert.match(paragraph, /data-app-tooltip-overflow/);
+    assert.equal(paragraph.replace(/<[^>]*>/g, ""), guide);
+    assert.match(paragraph, /class="subview-guide-tools"/);
   }
 });

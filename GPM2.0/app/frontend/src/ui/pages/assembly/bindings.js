@@ -520,8 +520,8 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const createPhasedTrackButton = queryHost("[data-create-phased-track='1']");
   const subviewTrackMinTickUnitKbInput = queryHost("#subview-track-min-tick-unit-kb");
   const subviewTrackMaxTickCountInput = queryHost("#subview-track-max-tick-count");
-  const subviewTrackAlignmentLengthInput = queryHost("#subview-track-alignment-length");
-  const subviewTrackIdentityInput = queryHost("#subview-track-identity-pct");
+  const subviewTrackAlignmentLengthInput = queryHost(`#${store.localViewWindowId ? `${store.localViewWindowId}-` : ""}subview-track-alignment-length`);
+  const subviewTrackIdentityInput = queryHost(`#${store.localViewWindowId ? `${store.localViewWindowId}-` : ""}subview-track-identity-pct`);
   const finalPathTrackMinTickUnitKbInput = queryHost("#final-path-track-min-tick-unit-kb");
   const finalPathTrackMaxTickCountInput = queryHost("#final-path-track-max-tick-count");
   const restoreAllDeletedCtgsButton = queryHost("[data-restore-all-deleted-ctgs='1']");
@@ -1461,7 +1461,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     };
     const scope = getScope();
     bindTrackNumberInputRuntime({
-      input: inputElement, field, key: `${viewKey}:${field}`, registry,
+      input: inputElement, field, key: `${store.localViewWindowId || "main"}:${viewKey}:${field}`, registry,
       isCurrentScope: () => registry === assemblyPageSession.trackNumberInputBindings && scope === getScope(),
       readValue: () => resolveTrackPrefValue(resolveTrackPrefs(store.getState().assembly[viewKey]), field),
       commitValue(value, target) {
