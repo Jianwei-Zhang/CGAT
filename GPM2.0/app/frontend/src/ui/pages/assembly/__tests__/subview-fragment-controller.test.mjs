@@ -103,10 +103,10 @@ test("local menu retains scoped deletion and two anchor split scopes, but no und
     subviewHitContext: { hitKey: "evidence-1" },
   });
   assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 Contig", "分割 Contig（仅局部）", "分割 Contig（影响主视图）", "删除当前片段"]);
-  assert.deepEqual(items[5].children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
+  assert.deepEqual(items[5].children.map((item) => item.label), ["仅在当前局部视图", "并同步主视图…"]);
   assert.equal(items[5].children[1].disabled, true);
   assert.equal(items[3].disabled, false); assert.equal(items[4].disabled, true);
-  assert.deepEqual(items[3].children.map((item) => item.label), ["手动分割…", "左侧分割", "右侧分割"]);
+  assert.deepEqual(items[3].children.map((item) => item.label), ["手动…", "在左侧边界", "在右侧边界"]);
   assert.equal(items[3].children[0].disabled, false);
   assert.ok(items[3].children.slice(1).every((item) => item.disabled));
 
@@ -224,11 +224,14 @@ for (const locale of ["zh", "en"]) for (const role of ["primary", "support"]) fo
     assert.ok(items.length > 0);
     assert.equal(items.filter((item) => /分割|split/i.test(item.label)).length, 2);
     const splitMenus = items.filter((item) => /分割|split/i.test(item.label));
+    assert.deepEqual(splitMenus.map(item => item.label), locale === "zh"
+      ? ["分割 Contig（仅局部）", "分割 Contig（影响主视图）"]
+      : ["Split Contig (Local View Only)", "Split Contig (Affect Main View)"]);
     assert.equal(splitMenus[0].disabled, false);
     assert.equal(splitMenus[1].disabled, role !== "primary");
     for (const menu of splitMenus) {
       assert.deepEqual(menu.children.map((item) => item.label), locale === "zh"
-        ? ["手动分割…", "左侧分割", "右侧分割"] : ["Manual split…", "Split left", "Split right"]);
+        ? ["手动…", "在左侧边界", "在右侧边界"] : ["Manually…", "at the Left Boundary", "at the Right Boundary"]);
       assert.ok(menu.children.slice(1).every((item) => item.disabled));
     }
     const deletion = items.at(-1);
@@ -350,7 +353,7 @@ test("local split menus keep three fixed children and dispatch manual/single-sid
   assert.equal(splitMenus.length, 2);
   assert.ok(splitMenus.every((item) => !item.disabled && item.run === undefined));
   for (const menu of splitMenus) {
-    assert.deepEqual(menu.children.map((item) => item.label), ["手动分割…", "左侧分割", "右侧分割"]);
+    assert.deepEqual(menu.children.map((item) => item.label), ["手动…", "在左侧边界", "在右侧边界"]);
     assert.ok(menu.children.every((item) => !item.disabled));
   }
   await splitMenus[0].children[0].run(); await splitMenus[0].children[1].run(); await splitMenus[1].children[2].run();

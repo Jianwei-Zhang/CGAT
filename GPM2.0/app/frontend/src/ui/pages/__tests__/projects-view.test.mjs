@@ -31,7 +31,7 @@ test("recent projects and current detail share the browser layout without duplic
   assert.match(html, /project-recent-name[\s\S]*>Rice<\/strong>/);
   assert.match(html, /project-recent-name[\s\S]*>Other<\/strong>/);
   assert.doesNotMatch(html, /<span class="project-path muted">|project-recent-time|project-open-status|data-project-validation-path/);
-  assert.match(html, />Projects<\/span><span class="project-count">2<\/span>/);
+  assert.match(html, />Projects<\/span><span class="project-count"><span aria-hidden="true">·<\/span>2<\/span>/);
   assert.match(html, /project-recents-header[\s\S]*id="validate-history-button"[\s\S]*project-recent-list/);
   assert.doesNotMatch(html, /data-project-remove|Remove from recent/);
   assert.doesNotMatch(html, /No projects yet|No project open/);
@@ -40,7 +40,7 @@ test("recent projects and current detail share the browser layout without duplic
     html,
     /data-workspace-import-add-package-path="\/rice"[\s\S]*data-project-copy="\/rice"[\s\S]*data-project-delete-files="\/rice"/,
   );
-  assert.match(html, /data-project-copy="\/rice"[^>]*aria-label="Copy project"/);
+  assert.match(html, /data-project-copy="\/rice"[^>]*aria-label="Copy Project"/);
 });
 
 test("recent-only state is distinct from no projects", () => {
@@ -53,7 +53,7 @@ test("recent-only state is distinct from no projects", () => {
 test("active project keeps the sidebar entry actions when its recent record is removed", () => {
   const html = render({ session: { workspacePath: "/rice" }, summaryHtml: "Rice detail" });
   assert.match(html, /class="project-recents"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"/);
-  assert.match(html, /class="project-count">0<\/span>/);
+  assert.match(html, /class="project-count"><span aria-hidden="true">·<\/span>0<\/span>/);
   assert.match(html, /Rice detail/);
   assert.doesNotMatch(html, /No projects yet|project-no-selection|id="validate-history-button"/);
 });
@@ -222,3 +222,16 @@ test("in-place validation clears its transient busy hint without losing the acce
   assert.equal(attrs.has("data-app-tooltip"), false);
   assert.equal(attrs.get("aria-label"), "Validate projects");
 });
+
+for (const locale of ["en", "zh"]) {
+  test(`${locale} project library count uses an accessible middle-dot separator`, () => {
+    const state = { locale, session: {}, importer: {}, initializer: {} };
+    const html = renderProjectsBody(state, {
+      records: [{ path: "/rice", projectName: "my_miXeD_project" }],
+      summaryHtml: "", messages: getMessages(state, "importer"), formatTime: () => "",
+    });
+    const label = locale === "en" ? "Projects" : "项目库";
+    assert.ok(html.includes(`<span class="project-recents-title-label">${label}</span><span class="project-count"><span aria-hidden="true">·</span>1</span>`));
+    assert.ok(html.includes("my_miXeD_project"));
+  });
+}

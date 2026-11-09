@@ -2183,7 +2183,7 @@ for (const locale of ["zh", "en"]) test(`Overview has compact identity groups an
   const html = renderProjectExportPage(createState({ locale }));
   const toolbar = html.slice(0, html.indexOf('data-overview-preview'));
   assert.doesNotMatch(html, /<h[1-6][^>]*>(?:概览|Overview|预览|Preview)<|project-preview-heading|project-preview-subtitle|project-preview-legend/);
-  assert.match(html, locale === "en" ? /data-overview-preview>[\s\S]*<header class="project-section-divider"><h3 id="overview-preview-title">Chromosome Preview<\/h3>/ : /data-overview-preview>[\s\S]*<header class="project-section-divider"><h3 id="overview-preview-title">染色体预览<\/h3>/);
+  assert.match(html, locale === "en" ? /data-overview-preview>[\s\S]*<header class="project-section-divider"><h3 id="overview-preview-title">Pseudomolecule Preview<\/h3>/ : /data-overview-preview>[\s\S]*<header class="project-section-divider"><h3 id="overview-preview-title">假分子预览<\/h3>/);
   assert.equal((html.match(/data-preview-download/g) || []).length, 1);
   assert.ok(toolbar.indexOf("data-preview-download") < toolbar.indexOf("data-project-export-toggle"));
   assert.match(toolbar, /<dl class="project-export-identity">/);

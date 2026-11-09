@@ -921,7 +921,7 @@ test("context menu shows local subview delete action in track-pair mode", () => 
   assert.ok(items.every((item) => item.label !== "移出局部视图"));
   const deletion = items.find((item) => item.label === "删除 Contig");
   assert.ok(deletion);
-  assert.deepEqual(deletion.children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
+  assert.deepEqual(deletion.children.map((item) => item.label), ["仅在当前局部视图", "并同步主视图…"]);
   assert.equal(deletion.children[1].disabled, true, "support objects are not editable Main DS entities");
 });
 

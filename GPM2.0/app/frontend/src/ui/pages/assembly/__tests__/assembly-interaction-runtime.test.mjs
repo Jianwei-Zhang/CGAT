@@ -2732,8 +2732,8 @@ test("Main split submenu always contains manual, left and right boundaries inste
     actions:{canEditTrackCtg:()=>true,splitContigAtAnchor:async(_host,_store,args)=>calls.push(args),
       openManualContigSplit:async(_host,_store,args)=>calls.push({manual:args})}});
   const split=items.find(i=>i.label==="分割 Contig");assert.ok(split);assert.equal(split.disabled,false);
-  assert.equal(split.run,undefined);assert.equal(split.children[0].label,"手动分割…");
-  assert.deepEqual(split.children.map(i=>i.label),["手动分割…","左侧分割","右侧分割"]);assert.equal(split.children.length,3);assert.ok(!items.some(i=>i.label==="手动分割…"));
+  assert.equal(split.run,undefined);assert.equal(split.children[0].label,"手动…");
+  assert.deepEqual(split.children.map(i=>i.label),["手动…","在左侧边界","在右侧边界"]);assert.equal(split.children.length,3);assert.ok(!items.some(i=>i.label==="手动…"));
   await split.children[0].run();assert.deepEqual(calls[0],{manual:{assemblyCtgId:2}});
   for(const item of split.children.slice(1)){assert.equal(typeof item.preview,"function");item.preview()();await item.run();}
   assert.deepEqual(calls.slice(1).map(c=>c.cutAfter),[100,800]);
@@ -2759,10 +2759,10 @@ test("undo-split menu appears below anchor/manual split only for split fragments
     const store = createStore({...createState({assembly: {selectedChrName: "Chr01", trackSelectedCtgIds: [], chrCtgs: ctgs}}), locale});
     const menu = (id, role="primary") => __testBuildAssemblyContextMenuItems({ctgContext: {assemblyCtgId:id, trackRole:role}, memberNode:null, host:{}, store,
       actions:{canEditTrackCtg:()=>true, undoContigSplit:async(_h,_s,args)=>calls.push(args)}});
-    const items = menu(3), splitIndex = items.findIndex((i)=>i.label===(locale==="zh"?"分割 Contig":"Split contig"));
-    assert.equal(items[splitIndex].children[0].label,locale==="zh"?"手动分割…":"Manual split…");
-    const undo = items[splitIndex+1]; assert.equal(undo.label, locale==="zh"?"撤销分割 Contig":"Undo contig split");
-    assert.deepEqual(undo.children.map((i)=>i.label), locale==="zh"?["撤销左侧分割","撤销右侧分割"]:["Undo left split","Undo right split"]);
+    const items = menu(3), splitIndex = items.findIndex((i)=>i.label===(locale==="zh"?"分割 Contig":"Split Contig"));
+    assert.equal(items[splitIndex].children[0].label,locale==="zh"?"手动…":"Manually…");
+    const undo = items[splitIndex+1]; assert.equal(undo.label, locale==="zh"?"撤销分割 Contig":"Undo Contig Split");
+    assert.deepEqual(undo.children.map((i)=>i.label), locale==="zh"?["左侧","右侧"]:["on the Left","on the Right"]);
     assert.ok(undo.children.every((i)=>!i.disabled));
     await undo.children[0].run(); await undo.children[1].run();
     assert.deepEqual(calls.map((c)=>c.neighborCtgId), orient==="+"?[2,4]:[4,2]);
@@ -2801,10 +2801,10 @@ test("main contig menu groups local-view destinations and orders common actions 
       "加入 Final Path","加入局部视图","跨染色体比对…","翻转 Contig","重命名 Contig...",
       "分割 Contig","撤销分割 Contig","隐藏 Contig","删除 Contig",
     ]:[
-      "Add to Final Path","Add to Local View","Cross-chromosome alignments…","Flip contig","Rename contig...",
-      "Split contig","Undo contig split","Hide contig","Delete contig",
+      "Add to Final Path","Add to Local View","Cross-Chromosome Alignments…","Flip Contig","Rename Contig…",
+      "Split Contig","Undo Contig Split","Hide Contig","Delete Contig",
     ]);
-    assert.deepEqual(items[1].children.map(i=>i.label),locale==="zh"?["上轨","下轨"]:["Top track","Bottom track"]);
+    assert.deepEqual(items[1].children.map(i=>i.label),locale==="zh"?["上轨","下轨"]:["Top Track","Bottom Track"]);
     assert.equal(items[1].run,undefined,"parent opens a submenu instead of editing the composition");
     assert.ok(!items.some(i=>/更多 Contig|More Contig/.test(i.label)));
   }

@@ -16,10 +16,10 @@ export function projectLabels(state) {
     directoryHint: "You may edit this path. Existing directories will not be overwritten.",
     legacy: "This directory contains multiple legacy projects. Select one to continue.",
     pending: "Project initialization incomplete", retry: "Retry initialization",
-    delete: "Delete project files",
+    delete: "Delete Project Files",
     selectFirst: "Open a project first", loading: "Opening project...", deleteFailed: "Deletion failed",
-    sourceLocation: "Project location", openLocation: "Open project file location", openLocationFailed: "Unable to open project file location", legacyProjects: "Legacy projects",
-    noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
+    sourceLocation: "Project location", openLocation: "Open Project File Location", openLocationFailed: "Unable to open project file location", legacyProjects: "Legacy projects",
+    noOpen: "No project open", opened: "Open", rename: "Rename Project", saved: "Save name",
     lastOpened: "Last opened", created: "Created",
     importThreads: "Parallel import workers", importThreadsHint: "Shared by archive extraction and PAF parsing during import; SQLite still uses one writer.",
     recommendedThreads: "{number} (Recommended)",
@@ -165,7 +165,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   </section>` : `<div class="project-browser">
     <section class="project-recents" aria-labelledby="project-recents-title">
       ${actions}
-      <header class="project-recents-header"><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
+      <header class="project-recents-header"><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
           <button id="validate-history-button" class="button ghost project-history-action" ${importer.historyValidating ? `data-app-tooltip="${html(validation.accessibleLabel)}"` : ""} aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
           <button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>

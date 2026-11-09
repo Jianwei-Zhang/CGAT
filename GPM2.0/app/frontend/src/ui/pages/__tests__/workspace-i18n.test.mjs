@@ -269,7 +269,7 @@ test("workspace project rows do not expose add-package context menu", () => {
 
   assert.doesNotMatch(html, /data-project-context-menu/);
   assert.doesNotMatch(html, /data-project-import-add-package-id/);
-  assert.doesNotMatch(html, /Import add package/);
+  assert.doesNotMatch(html, /Import Add Package/);
 });
 
 test("legacy directories offer every project without choosing one implicitly", () => {
@@ -993,7 +993,7 @@ test("selected-project table and paths use compact visible divider headings", ()
     assert.match(html, /id="project-data-catalog" aria-labelledby="project-data-catalog-title"/);
     assert.match(html, locale === "en" ? /class="project-section-divider"><h3 id="project-data-catalog-title">Datasets<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/ : /class="project-section-divider"><h3 id="project-data-catalog-title">数据集<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/);
     assert.match(html, /class="project-path-overview"[^>]*aria-labelledby="project-path-overview-title"/);
-    assert.match(html, locale === "en" ? /<h3 id="project-path-overview-title">Chromosome Preview<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/ : /<h3 id="project-path-overview-title">染色体预览<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/);
+    assert.match(html, locale === "en" ? /<h3 id="project-path-overview-title">Pseudomolecule Preview<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/ : /<h3 id="project-path-overview-title">假分子预览<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/);
     assert.ok(html.indexOf('class="project-information"') < html.indexOf('id="project-data-catalog"'));
     assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('class="project-path-overview"'));
     assert.match(html, /data-project-export-jump-chr="Chr01"/); assert.match(html, /Keep_MiXeD/);
@@ -1032,4 +1032,21 @@ test("project creation time occupies the full detail width and stays right align
   assert.match(css, /\.project-detail-created\s*\{[^}]*margin: 0 0 0 auto;[^}]*text-align: right;/);
   const source = readFileSync(new URL("../workspace-page.js", import.meta.url), "utf8");
   assert.ok(source.indexOf('id="initializer-enter-assembly-button"') < source.indexOf('class="project-location-row"'));
+});
+
+
+test("project identity and section titles share a scalable heading tier above content and metadata", () => {
+  const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
+  const previewCss = readFileSync(new URL("../../../styles/project-export.css", import.meta.url), "utf8");
+  const baseCss = readFileSync(new URL("../../../styles/base.css", import.meta.url), "utf8");
+  assert.match(css, /\.project-title-row\s*\{[^}]*font-size: var\(--font-title\);/);
+  assert.match(css, /\.project-current \.project-section-divider\s*\{[^}]*font-size: var\(--font-title\);/);
+  assert.doesNotMatch(css, /\.project-title-row\s*\{[^}]*font-size: var\(--font-hero\)/);
+  assert.match(css, /\.project-dataset-table\s*\{[^}]*font-size: var\(--font-body\);/);
+  assert.match(previewCss, /\.project-export-final-path-row-label\s*\{[^}]*font-size: var\(--font-body\);/);
+  assert.match(css, /\.project-section-count\s*\{[^}]*font-size: var\(--font-small\);/);
+  assert.match(css, /\.project-heading-meta\s*\{[^}]*font-size: var\(--font-small\);/);
+  const tier = name => Number(baseCss.match(new RegExp(`--font-${name}: ([0-9.]+)rem;`))[1]);
+  assert.ok(tier("title") > tier("body"));
+  assert.ok(tier("body") > tier("small"));
 });

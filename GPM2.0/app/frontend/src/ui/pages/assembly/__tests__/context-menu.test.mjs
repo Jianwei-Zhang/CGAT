@@ -1266,8 +1266,8 @@ test("buildAssemblyContextMenuItems exposes final-path graph ctg actions", async
     items.map((item) => item.label),
     ["删除", "翻转", "添加 Gap", "添加 Contig"],
   );
-  assert.deepEqual(items[2].children.map((item) => item.label), ["左侧添加 Gap", "右侧添加 Gap"]);
-  assert.deepEqual(items[3].children.map((item) => item.label), ["左侧添加 Contig", "右侧添加 Contig"]);
+  assert.deepEqual(items[2].children.map((item) => item.label), ["在左侧", "在右侧"]);
+  assert.deepEqual(items[3].children.map((item) => item.label), ["在左侧", "在右侧"]);
 
   await items[2].children[0].run();
   assert.deepEqual(calls.at(-1), {
@@ -1600,9 +1600,9 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
     actions: createContextMenuActionsCapture([]),
   });
 
-  assert.ok(items.some((item) => item.label === "Hide selected contigs (2)"));
-  assert.ok(items.some((item) => item.label === "Show selected contigs (2)"));
-  assert.ok(items.some((item) => item.label === "Delete selected contigs (2)"));
+  assert.ok(items.some((item) => item.label === "Hide Selected Contigs (2)"));
+  assert.ok(items.some((item) => item.label === "Show Selected Contigs (2)"));
+  assert.ok(items.some((item) => item.label === "Delete Selected Contigs (2)"));
 
   const subviewItems = buildAssemblyContextMenuItems({
     subviewTrackPairContext: {
@@ -1627,8 +1627,8 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
     host: {},
     actions: createContextMenuActionsCapture([]),
   });
-  assert.ok(subviewItems.some((item) => item.label === "Move to other track"));
-  assert.ok(subviewItems.some((item) => item.label === "Delete contig"));
+  assert.ok(subviewItems.some((item) => item.label === "Move to Other Track"));
+  assert.ok(subviewItems.some((item) => item.label === "Delete Contig"));
 });
 
 
@@ -1664,3 +1664,27 @@ test("contig rename waits for app input and cancelling does not edit", async () 
     if (value !== null) assert.equal(calls[0].args[2].action, "rename-ctg");
   }
 });
+
+for (const locale of ["en", "zh"]) {
+  test(`${locale} Final Path add menus form phrases without repeating the parent action`, async () => {
+    const calls = [], host = {};
+    const baseStore = createStore();
+    const store = { getState: () => ({ ...baseStore.getState(), locale }) };
+    const items = buildAssemblyContextMenuItems({
+      finalPathSegmentContext: { segmentId: "seg_miXeD", segmentType: "ctg" },
+      store, host, actions: createContextMenuActionsCapture(calls),
+    });
+    assert.deepEqual(items.map(item => item.label), locale === "en"
+      ? ["Delete", "Flip", "Add a Gap", "Add a Contig"]
+      : ["删除", "翻转", "添加 Gap", "添加 Contig"]);
+    for (const [index, action] of [[2, "addFinalPathGapRelativeToSegment"], [3, "addFinalPathContigRelativeToSegment"]]) {
+      const parent = items[index];
+      assert.deepEqual(parent.children.map(item => item.label), locale === "en" ? ["to the Left", "to the Right"] : ["在左侧", "在右侧"]);
+      for (const [side, placement] of [[0, "before"], [1, "after"]]) {
+        assert.equal(parent.children[side].label.includes(parent.label), false);
+        await parent.children[side].run();
+        assert.deepEqual(calls.at(-1), { name: action, args: [host, store, { segmentId: "seg_miXeD", placement }] });
+      }
+    }
+  });
+}

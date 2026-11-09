@@ -703,8 +703,8 @@ export function buildAssemblyContextMenuItems({
         const openSplit = (options) => isCurrentSplit() && contextMenuActions.openLocalContigSplit(host, store,
           memberContext, { synchronize, expectedKey: model.splitKey, ...options });
         items.push({ label: synchronize
-          ? state.locale === "en" ? "Split contig (affect Main View)" : "分割 Contig（影响主视图）"
-          : state.locale === "en" ? "Split contig (Local View only)" : "分割 Contig（仅局部）",
+          ? state.locale === "en" ? "Split Contig (Affect Main View)" : "分割 Contig（影响主视图）"
+          : state.locale === "en" ? "Split Contig (Local View Only)" : "分割 Contig（仅局部）",
           disabled: !available, title: available ? "" : unavailable, children: [
             { label: splitLabels.manual, disabled: !available, title: available ? "" : unavailable,
               run: () => available && openSplit({ mode: "manual" }) },

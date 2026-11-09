@@ -52,7 +52,8 @@ test("catalog uses one table with data type first and reference first, escaping 
   const { state } = fixture();
   const html = renderProjectCatalog(state);
   assert.match(html, /Datasets/);
-  assert.match(html, /Reference Genome/);
+  assert.match(html, /data-dataset-role="reference">Reference<\/span>/);
+  assert.doesNotMatch(html, /Reference Genome/);
   assert.equal((html.match(/<table /g) || []).length, 1);
   assert.doesNotMatch(html, /<h3>|data-catalog-refresh|data-catalog-retry|Refresh datasets|is-primary/);
   assert.match(html, /<colgroup><col span="7"><col class="project-dataset-actions-column"><\/colgroup>/);
@@ -64,6 +65,8 @@ test("catalog uses one table with data type first and reference first, escaping 
   assert.match(html, /30 bp/);
   state.locale = "zh";
   assert.match(renderProjectCatalog(state), /数据类型/);
+  assert.match(renderProjectCatalog(state), /data-dataset-role="reference">参考<\/span>/);
+  assert.doesNotMatch(renderProjectCatalog(state), /参考基因组/);
   assert.doesNotMatch(renderProjectCatalog(state), /<h3>|刷新数据集|is-primary/);
 });
 

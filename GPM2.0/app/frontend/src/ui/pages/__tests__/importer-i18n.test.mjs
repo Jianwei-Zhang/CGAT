@@ -224,7 +224,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.page.deleteWithFiles, "是否同步删除对应文件（此操作不可逆，请谨慎操作）");
   assert.equal(zh.runtime.deleteDoneFailedHistorySummary, "已从项目库删除 {count} 个校验失败项目。");
 
-  assert.equal(en.buttons.importAddPackage, "Import add package");
+  assert.equal(en.buttons.importAddPackage, "Import Add Package");
   assert.equal(en.runtime.importAddPackageSummary, "Importing the dataset add package.");
   assert.equal(en.runtime.incompleteAddPackageWorkspaceSummary, "Open an existing project first.");
   assert.equal(en.runtime.incompleteAddPackageZipSummary, "Select a dataset add-package archive first.");
@@ -1126,7 +1126,7 @@ test("importer workspace history row imports add packages without expanding the 
     bindImporterPage(host, store);
     recentButton.contextmenu({ clientX: 12, clientY: 24 });
     assert.match(renderImporterPage(store.getState()), /data-workspace-history-context-menu="1"/);
-    assert.match(renderImporterPage(store.getState()), /Import add package/);
+    assert.match(renderImporterPage(store.getState()), /Import Add Package/);
 
     bindImporterPage(host, store);
     await importAddPackageButton.click();
@@ -2786,7 +2786,7 @@ test("project library menu groups all project actions with deletion last in both
       assert.equal((html.match(/role="separator"/g) || []).length, 2);
       assert.equal((html.match(/role="menuitem"/g) || []).length, 6);
       assert.match(html, /D:\/项目 &amp; &quot;rice&quot;/);
-      assert.match(html, locale === "zh" ? /打开项目文件所在位置/ : /Open project file location/);
+      assert.match(html, locale === "zh" ? /打开项目文件所在位置/ : /Open Project File Location/);
       assert.match(html, /context-menu-item is-danger[^>]*data-project-delete-files/);
       for (const importer of [{ inFlight: true }, { entryResolving: true }, { copyDialog: { open: true } }]) {
         const busy = renderImporterPage({ ...state, importer: { ...state.importer, ...importer } }).split('role="menu"')[1];

@@ -452,7 +452,7 @@ function getLabels(state) {
   if (state?.locale === "en") {
     return {
       title: "Overview",
-      pathOverviewTitle: "Chromosome Preview",
+      pathOverviewTitle: "Pseudomolecule Preview",
       pathOverviewEmpty: "No Final Path available for this project.",
       contentChanged: "Project content changed while loading. Refresh after the operation finishes.",
       noProject: "Select a project first.",
@@ -514,7 +514,7 @@ function getLabels(state) {
   }
   return {
     title: "概览",
-    pathOverviewTitle: "染色体预览",
+    pathOverviewTitle: "假分子预览",
     pathOverviewEmpty: "当前项目暂无可用的 Final Path。",
     contentChanged: "加载期间项目内容发生变化，请在操作结束后刷新。",
     noProject: "请先选择项目。",

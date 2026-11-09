@@ -231,11 +231,11 @@ test("schema 2 renders independent LGZ result switches and exact main-track over
   assert.match(html, /data-grt-result-toggle="main" checked/);
   assert.match(html, /data-grt-result-toggle="subview"/);
   assert.match(html, /aria-label="Show the path and alignment evidence precomputed by the Linking Inter-assembly Units for Genome Zipping algorithm"/);
-  assert.match(html, />Precomputed result<\/span>/);
+  assert.match(html, />Precomputed Result<\/span>/);
   assert.match(html, /data-grt-result-layer="resultPath" data-grt-result-layer-scope="main" checked/);
   assert.match(html, /data-grt-result-layer="alignmentEvidence" data-grt-result-layer-scope="subview" checked/);
-  assert.match(html, /Precomputed path/);
-  assert.match(html, /Alignment evidence/);
+  assert.match(html, /Precomputed Path/);
+  assert.match(html, /Alignment Evidence/);
   const subviewToggleIndex = html.indexOf('data-grt-result-toggle="subview"');
   assert.ok(subviewToggleIndex >= 0);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);

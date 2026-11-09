@@ -6,7 +6,7 @@ const messages = {
   zh: {
     datasets: "数据集", name: "名称", role: "数据类型", count: "序列数", details: "数据详情", more: "更多信息", close: "关闭",
     total: "总长度", note: "备注", actions: "操作", primary: "主组装", support: "辅助组装", derived: "派生数据", includesDerived: "含派生序列",
-    reference: "参考基因组", edit: "查看详情、编辑名称与备注", emptyNote: "添加备注",
+    reference: "参考", edit: "查看详情、编辑名称与备注", emptyNote: "添加备注",
     reset: "恢复初始名称", location: "本地位置", missing: "序列文件未包含或不可用",
     partial: "部分序列文件可用", open: "打开目录",
     save: "保存", cancel: "取消", loading: "正在读取数据集…", retry: "重试",
@@ -15,7 +15,7 @@ const messages = {
   en: {
     datasets: "Datasets", name: "Name", role: "Data type", count: "Sequences", details: "Dataset Details", more: "More information", close: "Close",
     total: "Total length", note: "Note", actions: "Actions", primary: "Primary", support: "Auxiliary", derived: "Derived", includesDerived: "Includes derived sequences",
-    reference: "Reference Genome", edit: "View details and edit name or note", emptyNote: "Add note",
+    reference: "Reference", edit: "View details and edit name or note", emptyNote: "Add note",
     reset: "Restore initial name", location: "Local location", missing: "Sequence files not included or unavailable",
     partial: "Some sequence files are available", open: "Open folder",
     save: "Save", cancel: "Cancel", loading: "Loading datasets…", retry: "Retry",

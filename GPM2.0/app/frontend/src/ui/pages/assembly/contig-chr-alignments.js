@@ -28,7 +28,7 @@ export const chrAlignmentCopy = {
     existing:"已存在",contained:"已有包含区间",overlap:"区间重叠",hidden:"已隐藏",confirm:"确认添加",overlapConfirm:"目标中已有部分重叠区间。再次点击“确认添加”继续。",
     loading:"正在读取比对…",empty:"当前筛选下没有其他染色体比对。",stale:"当前对象已变化，请重新打开面板。",done:"已添加到目标染色体，原对象保留；可在目标染色体撤销。",
     shown:"已显示已有对象，未创建重复对象；可在目标染色体撤销。",filter:"沿用主视图比对筛选",identityHint:"按原始比对块加权，非截取区间的逐碱基一致性。",failed:"操作失败，请重试。"},
-  en: {title:"Cross-Chromosome Alignments",openAction:"Cross-chromosome alignments…",chr:"Chromosome",coverage:"Coverage",identity:"Identity",action:"Action",add:"Add",locate:"Locate",show:"Show existing",close:"Close",
+  en: {title:"Cross-Chromosome Alignments",openAction:"Cross-Chromosome Alignments…",chr:"Chromosome",coverage:"Coverage",identity:"Identity",action:"Action",add:"Add",locate:"Locate",show:"Show existing",close:"Close",
     existing:"Exists",contained:"Containing interval exists",overlap:"Overlapping interval",hidden:"Hidden",confirm:"Confirm add",overlapConfirm:"An overlapping source interval exists. Click Confirm add to continue.",
     loading:"Loading alignments…",empty:"No other chromosome alignments pass the current filters.",stale:"Contig changed. Reopen the panel.",done:"Added to the target chromosome; original retained. Undo from the target chromosome.",
     shown:"Existing object shown without creating a duplicate. Undo from the target chromosome.",filter:"Using Main View alignment filters",identityHint:"Weighted original-hit identity, not per-base identity of the clipped interval.",failed:"Operation failed. Try again."},

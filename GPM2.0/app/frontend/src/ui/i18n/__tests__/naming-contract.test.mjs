@@ -36,7 +36,7 @@ for (const domain of ["assembly", "importer", "workspace", "shell", "projectPrev
   });
 }
 
-test("major titles, minor labels, actions and real system options have distinct English roles", () => {
+test("titles and menus use Title Case while minor field labels retain sentence case", () => {
   const assembly = getMessages("en", "assembly"), workspace = getMessages("en", "workspace");
   assert.equal(assembly.chrTitle, "Chromosome", "normal titles retain the full word");
   assert.equal(assembly.page.primaryAlignmentViewTitle, "Main View");
@@ -46,8 +46,8 @@ test("major titles, minor labels, actions and real system options have distinct 
   assert.equal(assembly.trackControls.supportDatasetLengthBp, "Auxiliary contig length (bp)");
   assert.equal(assembly.trackControls.supportDataset, "Auxiliary dataset");
   assert.equal(assembly.trackControls.alignmentLengthBp, "Alignment length (bp)");
-  assert.equal(assembly.contextMenu.hideSelectedContigs, "Hide selected contigs ({count})");
-  assert.equal(assembly.contextMenu.addToSubviewTop, "Top track", "submenu destinations execute actions");
+  assert.equal(assembly.contextMenu.hideSelectedContigs, "Hide Selected Contigs ({count})");
+  assert.equal(assembly.contextMenu.addToSubviewTop, "Top Track", "submenu destinations use Title Case");
   assert.equal(assembly.subview.tools.compositionManager.lanes.top, "Top Track", "the actual lane value stays Title Case");
   assert.equal(assembly.trackControls.unconfigured, "Not Configured");
   assert.equal(workspace.buttons.createProject, "Create project");
@@ -58,7 +58,7 @@ test("major titles, minor labels, actions and real system options have distinct 
   assert.equal(projectLabels({ locale: "en" }).extractedOption, "Extracted Directory");
   assert.equal(projectLabels({ locale: "en" }).extracted, "Extracted directory");
   assert.equal(chrAlignmentCopy.en.title, "Cross-Chromosome Alignments");
-  assert.equal(chrAlignmentCopy.en.openAction, "Cross-chromosome alignments…");
+  assert.equal(chrAlignmentCopy.en.openAction, "Cross-Chromosome Alignments…");
 });
 
 test("Chinese controls use the approved full names rather than exposing source-field abbreviations", () => {
