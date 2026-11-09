@@ -528,7 +528,7 @@
 .project-title-row h2 { min-width: 0; margin: 0; font: inherit; overflow-wrap: anywhere; }
 .project-title-row .project-icon-button { margin-top: 1px; }
 .project-location-row { grid-column: 1 / -1; width: 100%; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; min-width: 0; margin-top: 0; }
-.project-detail-path { flex: 1 1 240px; min-width: 0; margin: 0; color: var(--text-muted, #64748b); font-size: var(--font-body); overflow-wrap: anywhere; }
+.project-detail-path { flex: 1 1 240px; min-width: 0; margin: 0; color: var(--text-muted, #64748b); font-size: var(--font-small); overflow-wrap: anywhere; }
 .projects-page .button.project-enter-assembly {
   min-width: 156px;
   min-height: 44px;
@@ -618,7 +618,7 @@
 .project-dataset-table tbody > tr:last-child > * { border-bottom: 0; }
 .project-dataset-table th[scope="row"] { font-weight: 500; }
 .project-dataset-name { display: block; overflow-wrap: anywhere; }
-.project-dataset-table small { display: block; margin-top: 4px; font-size: var(--font-caption); font-weight: 400; }
+.project-dataset-table small { display: block; margin-top: 4px; font-size: var(--font-small); font-weight: 400; }
 .project-dataset-table .numeric { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .project-dataset-role { display: inline-block; padding: 2px 8px; border: 1px solid var(--theme-line, #d5e2ef); border-radius: 999px; background: var(--theme-blue-surface, #f0f6fc); color: var(--theme-ink, #244a73); font-size: var(--font-small); font-weight: 500; white-space: nowrap; }
 .project-dataset-note { display: block; width: 100%; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: none; color: var(--text-muted, #64748b); text-align: left; cursor: pointer; font: inherit; }

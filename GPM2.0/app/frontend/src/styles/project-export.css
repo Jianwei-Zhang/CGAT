@@ -3,6 +3,23 @@
 .project-export-page {
   display: grid;
   gap: 14px;
+  font-size: var(--font-body);
+}
+
+/* Match Project's semantic tiers without changing standalone Preview or Assembly. */
+.project-export-page .project-section-divider {
+  font-size: var(--font-title);
+}
+
+.project-export-page [data-overview-preview] .project-preview-chr-name {
+  font-size: var(--font-section);
+  font-weight: 600;
+}
+
+.project-export-page .button,
+.project-export-page .final-path-export-item,
+.project-export-page [data-overview-preview] .project-preview-open {
+  font-size: var(--font-body);
 }
 
 .project-export-head {
@@ -29,10 +46,10 @@
 .project-export-identity-item { display: flex; align-items: baseline; flex: 0 1 auto; min-width: 0; overflow: hidden; gap: 6px; white-space: nowrap; }
 .project-export-identity dt { flex: 0 0 auto; color: var(--text-muted, #64748b); font-size: var(--font-small); white-space: nowrap; }
 .project-export-identity dd { min-width: 0; margin: 0; color: var(--text-primary, #1e293b); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-export-identity dd > .project-dataset-role { box-sizing: border-box; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.project-export-identity dd > .project-dataset-role { font-size: var(--font-body); box-sizing: border-box; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 .project-export-dataset-badges { display: flex; align-items: center; gap: 4px; }
 .project-export-dataset-badges > .project-dataset-role { flex: 0 1 auto; }
-.project-export-identity .project-export-project-badge { background: var(--surface-subtle, #f8fafc); border-color: var(--border-default, #cbd5e1); color: var(--text-primary, #1e293b); }
+.project-export-identity dd > .project-export-project-badge { font-size: var(--font-title); font-weight: 600; background: var(--surface-subtle, #f8fafc); border-color: var(--border-default, #cbd5e1); color: var(--text-primary, #1e293b); }
 .project-export-head > .project-export-actions { flex: 0 0 auto; flex-wrap: nowrap; max-width: 100%; margin-left: auto; align-items: center; }
 .project-export-head :is(.project-preview-download, .final-path-export-toggle) {
   display: inline-flex;
@@ -75,7 +92,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  font-size: var(--font-body);
+  font-size: var(--font-small);
 }
 
 .project-export-grid {
@@ -97,7 +114,8 @@
 
 .project-export-panel h4 {
   margin: 0;
-  font-size: var(--font-section);
+  font-size: var(--font-title);
+  font-weight: 600;
 }
 
 .project-export-panel-title {
@@ -139,10 +157,11 @@
 }
 
 .project-export-used-row > span {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .project-export-used-row strong {
+  font-weight: 600;
   text-align: left;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -177,7 +196,8 @@
 
 .project-export-detail-heading h4 {
   margin: 0;
-  font-size: var(--font-section);
+  font-size: var(--font-title);
+  font-weight: 600;
 }
 
 .project-export-detail-count {
@@ -196,7 +216,7 @@
   background: transparent;
   color: var(--theme-muted-ink, #52677f);
   font: inherit;
-  font-size: var(--font-small);
+  font-size: var(--font-body);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -269,6 +289,17 @@
   border: 0;
   border-collapse: separate;
   border-spacing: 0;
+}
+
+/* Match the shared Final Path selectors' specificity, including per-cell sizes. */
+.project-export-page .project-export-detail-table,
+.project-export-page .project-export-detail-table th,
+.project-export-page .project-export-detail-table td {
+  font-size: var(--font-body);
+}
+
+.project-export-page .project-export-detail-table th {
+  font-weight: 600;
 }
 
 .project-export-detail-table th,
@@ -396,7 +427,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   text-align: left;
 }
@@ -406,10 +437,11 @@
 }
 
 .project-export-assignment-row > span:first-child {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .project-export-assignment-value {
+  font-weight: 600;
   display: inline-flex;
   flex-wrap: wrap;
   justify-content: flex-start;
@@ -536,6 +568,11 @@
   white-space: nowrap;
 }
 
+.project-current .project-export-final-path-row-label {
+  font-size: var(--font-section);
+  font-weight: 600;
+}
+
 .project-export-final-path-row-graph {
   display: flex;
   align-self: stretch;
@@ -586,7 +623,7 @@
   border-radius: 2px;
   background: var(--ctg-primary-fill);
   color: var(--ctg-primary-text);
-  font-size: var(--font-small);
+  font-size: var(--font-graph-small);
   font-weight: 700;
   line-height: 14px;
   white-space: nowrap;
@@ -635,6 +672,10 @@
   color: var(--theme-ink, #4f4f4f);
   font-size: var(--font-body);
   white-space: nowrap;
+}
+
+.project-current .project-export-final-path-preview-length {
+  font-size: var(--font-small);
 }
 
 [data-overview-summary] { display: grid; gap: 14px; min-width: 0; }

@@ -1043,7 +1043,7 @@ test("project identity and section titles share a scalable heading tier above co
   assert.match(css, /\.project-current \.project-section-divider\s*\{[^}]*font-size: var\(--font-title\);/);
   assert.doesNotMatch(css, /\.project-title-row\s*\{[^}]*font-size: var\(--font-hero\)/);
   assert.match(css, /\.project-dataset-table\s*\{[^}]*font-size: var\(--font-body\);/);
-  assert.match(previewCss, /\.project-export-final-path-row-label\s*\{[^}]*font-size: var\(--font-body\);/);
+  assert.match(previewCss, /\.project-current \.project-export-final-path-row-label\s*\{[^}]*font-size: var\(--font-section\);[^}]*font-weight: 600;/);
   assert.match(css, /\.project-section-count\s*\{[^}]*font-size: var\(--font-small\);/);
   assert.match(css, /\.project-heading-meta\s*\{[^}]*font-size: var\(--font-small\);/);
   const tier = name => Number(baseCss.match(new RegExp(`--font-${name}: ([0-9.]+)rem;`))[1]);
