@@ -8,7 +8,7 @@ export function refreshViewportGeometry(host, store, { resolveRouteHost, renderP
   if (!doc?.createElement || state.assembly?.loading) return;
   const plots = [
     [".assembly-track-unified .assembly-track-layout:not(.subview-track-layout)", "main"],
-    [".subview-track-layout", "subview"],
+    ...(!state.assembly?.subviewWorkspace ? [[".subview-track-layout", "subview"]] : []),
     ["[data-final-path-graph-viewport]", "final-path"],
   ];
   const collect = (parent, selector) => {

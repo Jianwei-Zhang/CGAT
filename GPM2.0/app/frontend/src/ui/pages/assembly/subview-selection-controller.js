@@ -1,3 +1,4 @@
+import { startSubviewWindowDraft } from "./subview-workspace-state.js";
 import { tAssembly } from "./i18n.js";
 import {
   buildSubviewClearProjection,
@@ -114,7 +115,10 @@ export function createSubviewSelectionController({
     if (!shouldReset) {
       return { assembly: state.assembly, cleared: false };
     }
-    const cleared = buildSubviewClearProjection(state.assembly);
+    const draft = startSubviewWindowDraft(state.assembly);
+    const cleared = draft !== state.assembly
+      ? { assembly: draft, changed: false }
+      : buildSubviewClearProjection(state.assembly);
     invalidateSubviewPairwiseEvidence();
     resetSubviewTransientState();
     return {

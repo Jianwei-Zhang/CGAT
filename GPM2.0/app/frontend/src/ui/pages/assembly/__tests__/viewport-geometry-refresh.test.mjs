@@ -65,3 +65,12 @@ test("All-mode resize refreshes every Final Path graph by path identity across s
   }
   assert.deepEqual(bound, ["Chr01A", "Chr01B", "Chr01A", "Chr01B"]);
 });
+
+
+test("Main viewport resize does not steal or replace independently owned Local View graphs", () => {
+  const f = fixture();
+  f.store.setState({ ...f.store.getState(), assembly: { ...f.store.getState().assembly, subviewWorkspace: { windows: [] } } });
+  refreshViewportGeometry(f.root, f.store, f.deps);
+  assert.deepEqual(f.events.filter(event => event[0] === "bind").map(event => event[1]), ["main", "final-path"]);
+  assert.equal(f.events.filter(event => event[0] === "replace" && event[1] === ".subview-track-layout").length, 0);
+});

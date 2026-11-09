@@ -1,3 +1,4 @@
+import { renderSubviewWorkspace } from "./render-subview-workspace.js";
 import { renderAssemblyLocalRestoreStatus } from "./assembly-detail-status.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { renderMainAnchorFragments } from "./main-anchor-fragments.js";
@@ -772,59 +773,7 @@ function createRenderTracksRenderer(deps = {}) {
   });
   const subviewPanel = options.includeSubview === false
     ? ""
-    : (() => {
-      const restoring = renderAssemblyLocalRestoreStatus(assembly, i18n);
-      if (restoring) return restoring;
-      const supportSubviewCtgs = buildSupportSubviewCtgPool({
-        supportChrCtgs: supportTrackCtgs,
-        supportMirroredCtgs,
-        selectedChrName,
-        deletedCtgs: assembly.deletedCtgs,
-        minSupportLengthBp: supportDsCtgLenBp,
-        supportDsCtgLenRules,
-      });
-      const phasedSubviewCtgs = buildPhasedSubviewCtgPool({
-        phasedChrTracks: assembly.phasedChrTracks || [],
-        primaryCtgs: assembly.chrCtgs || [],
-        deletedCtgs: assembly.deletedCtgs,
-      });
-      const refSubviewCtgs = getCachedFilteredRefSubviewCtgs({
-        refTrackMembers: assembly.refTrackMembers || [],
-        subview,
-        supportContext: {
-          primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
-          supportDatasetId,
-          selectedChrName,
-          refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
-          primaryCtgs: assembly.chrCtgs,
-          supportCtgs: supportSubviewCtgs,
-          supportMirrorCtgs: normalizeSupportMirroredCtgs(supportMirroredCtgs),
-          phasedCtgs: phasedSubviewCtgs,
-        },
-      });
-      return renderSubviewSelectionPanel(
-        assembly,
-        {
-          supportDatasetId,
-          supportDatasetOptions,
-          supportDatasetName: selectedSupportDataset?.label || "",
-          primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
-          primaryDatasetName,
-          primaryCtgs: assembly.chrCtgs,
-          supportCtgs: supportSubviewCtgs,
-          supportMirrorCtgs: normalizeSupportMirroredCtgs(supportMirroredCtgs),
-          phasedCtgs: phasedSubviewCtgs,
-          phasedChrTracks: assembly.phasedChrTracks || [],
-          refCtgs: refSubviewCtgs,
-          refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
-          compositionCandidates: assembly.subviewCompositionCandidates || [],
-          compositionCandidatesLoaded: assembly.subviewCompositionCandidatesLoaded === true,
-          compositionViewport: assembly.subviewCompositionViewport || {},
-        },
-        subviewTrackPrefs,
-        i18n,
-      );
-    })();
+    : renderAssemblySubviewPanel(state);
   const combinedMemberChips = renderMainMemberChips(assembly, i18n);
   const historyHighlightCtgId = normalizeSupportDatasetId(assembly.historyHighlightCtgId);
   const finalPathCard = options.includeFinalPath === false
@@ -876,6 +825,10 @@ function createRenderTracksRenderer(deps = {}) {
 }
 
   function renderAssemblySubviewPanel(state) {
+    return renderSubviewWorkspace(state, getAssemblyI18n(state).subview, renderSingleSubviewPanel);
+  }
+
+  function renderSingleSubviewPanel(state) {
     const assembly = state.assembly;
     const i18n = getAssemblyI18n(state);
     const restoring = renderAssemblyLocalRestoreStatus(assembly, i18n);

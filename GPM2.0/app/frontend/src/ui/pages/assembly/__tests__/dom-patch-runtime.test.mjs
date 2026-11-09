@@ -302,3 +302,29 @@ test("chromosome selection retains the project-owned picker scroll while its sel
   createController().replaceRenderedAssemblySection({ querySelector: () => current }, { querySelector: () => next }, "track");
   assert.equal(nextPanel.scrollTop, 280);
 });
+
+
+test("a Local View patch stays inside its owning window instead of the route first panel", () => {
+  const replaced = [];
+  const nextHead = {}, nextCard = {};
+  const currentPanel = { querySelector(selector) {
+    if (selector === ".subview-panel-head" || selector === ".subview-alignment-card")
+      return { replaceWith(node) { replaced.push(node); } };
+    return null;
+  } };
+  const nextPanel = { querySelector(selector) {
+    return selector === ".subview-panel-head" ? nextHead : selector === ".subview-alignment-card" ? nextCard : null;
+  } };
+  const route = { querySelector() { assert.fail("must not patch another window through the route host"); } };
+  const owner = {
+    closest(selector) { return selector === "[data-local-view-window]" ? owner : route; },
+    querySelector: selector => selector === "[data-subview-panel='1']" ? currentPanel : null,
+    ownerDocument: { createElement: () => ({ content: { querySelector: () => nextPanel } }) },
+  };
+  const store = { localViewRootStore: {}, getState: () => ({ assembly: {} }) };
+  const controller = createController({ renderAssemblySubviewPanel(_state, suppliedStore) {
+    assert.equal(suppliedStore, store); return "scoped panel";
+  } });
+  controller.patchSubviewPanelDom(owner, store);
+  assert.deepEqual(replaced, [nextHead, nextCard]);
+});

@@ -1,3 +1,4 @@
+import { bindSubviewWorkspace, getSubviewWorkspaceRuntime } from "./assembly/subview-workspace-runtime.js";
 import { createSubviewDragRenderController } from "./assembly/subview-drag-render-controller.js";
 import { createFullRangeDragPreview } from "./assembly/full-range-drag-preview.js";
 import { createMainTrackDragPreview } from "./assembly/main-track-drag-preview.js";
@@ -414,7 +415,7 @@ const {
   getAssemblyI18n,
   normalizeTrackSelectionCtgIds,
   renderAssemblyMainTrackSections,
-  renderAssemblySubviewPanel: (state) => renderAssemblySubviewPanelImpl(state, renderTracksDeps),
+  renderAssemblySubviewPanel: (state, store) => renderAssemblySubviewPanelImpl(state, localRenderDeps(store)),
 });
 const {
   clearSubviewTrackPairHiddenCtgs,
@@ -641,7 +642,17 @@ function scheduleDeferredRerender(host, store) {
   getDeferredRerenderCoordinator().schedule(host, store);
 }
 
+const windowRerenderCoordinators = new WeakMap();
 function scheduleDeferredSubviewPanelRerender(host, store) {
+  if (store.localViewRootStore) {
+    let coordinator = windowRerenderCoordinators.get(store);
+    if (!coordinator) {
+      coordinator = createDeferredRerenderCoordinator({ rerender: rerenderSubviewPanel, rerenderSubviewPanel });
+      windowRerenderCoordinators.set(store, coordinator);
+    }
+    coordinator.scheduleSubviewPanel(host, store);
+    return;
+  }
   getDeferredRerenderCoordinator().scheduleSubviewPanel(host, store);
 }
 
@@ -844,17 +855,42 @@ export function bindAssemblyPage(host, store, options = {}) {
       rerenderSubviewPanel(host, store);
       return restoreAssemblyLocalEvidence(host, store, assemblyDataRuntimeDeps, { afterPaint: true });
     });
-  const result = bindAssemblyPageImpl(
+  const workspace = !store.localViewRootStore && host.querySelector?.("[data-subview-workspace]");
+  const marker = workspace?.ownerDocument?.createComment?.("local-view-workspace");
+  if (marker) workspace.replaceWith(marker);
+  let result;
+  try { result = bindAssemblyPageImpl(
     host,
     store,
-    createAssemblyPageBindingDeps(options),
+    createAssemblyPageBindingDeps({ ...options, store }),
     { scope: options.scope, deferViewportSync: options.deferViewportSync },
-  );
+  ); } finally { if (marker) marker.replaceWith(workspace); }
   if (!options.scope) {
     scrollAssemblyToBottomIfRequested(host, store);
     queueMicrotask(() => { void resumeAssemblyReadyStages(host, store, assemblyDataRuntimeDeps); });
   }
-  syncAssemblySubviewTools(host, store);
+  if (!store.localViewRootStore) {
+    bindSubviewWorkspace(resolveCurrentRouteHost(host) || host, store, {
+      render: state => renderAssemblySubviewPanelImpl(state, renderTracksDeps),
+      getLabels: state => getAssemblyI18n(state).subview,
+      bindWindow: (node, scoped) => bindAssemblyPage(node, scoped, { scope: "subview", rerender: rerenderSubviewPanel }),
+      syncTools: syncAssemblySubviewTools,
+      closeTools: () => assemblyPageSession.subviewTools?.close?.(),
+      disposeWindow(id) {
+        for (const [key, binding] of assemblyPageSession.trackNumberInputBindings) {
+          if (!key.startsWith(`${id}:`)) continue;
+          binding.destroy();
+          assemblyPageSession.trackNumberInputBindings.delete(key);
+        }
+        if (assemblyPageSession.subviewTools?.store?.localViewWindowId === id) {
+          assemblyPageSession.subviewTools.destroy();
+          assemblyPageSession.subviewTools = null;
+        }
+      },
+      refresh: rerenderSubviewPanel,
+      refreshEvidence: (node, scoped) => refreshSubviewPairwiseEvidence(node, scoped, { rerenderLoading: false }),
+    });
+  }
   return result;
 }
 
@@ -923,6 +959,30 @@ function scrollAssemblyToBottomIfRequested(host, store) {
   requestFrame(() => requestFrame(applyScroll));
 }
 
+const localViewportControllers = new WeakMap();
+function viewportControllerFor(store) {
+  if (!store?.localViewRootStore) return null;
+  let controller = localViewportControllers.get(store);
+  if (!controller) {
+    controller = createAssemblyViewportController({
+      session: { ...assemblyPageSession, measuredTrackViewportPxByRole: { ...assemblyPageSession.measuredTrackViewportPxByRole },
+        lastSubviewViewportKey: "", lastSubviewScrollLeft: 0, pendingSubviewViewportAnchorBp: null,
+        pendingAssemblyScrollStatePersistTimer: null },
+      getPersistDeps: () => projectAssemblyViewStateRuntimeDeps,
+      getTimerApi: () => resolveTimerApi(),
+      persistProjectAssemblyViewStateFromStore: (host, scoped, deps) => persistProjectAssemblyViewStateFromStore(host, scoped, deps),
+      refreshViewportGeometry: (host, scoped) => rerenderSubviewPanel(host, scoped),
+    });
+    localViewportControllers.set(store, controller);
+  }
+  return controller;
+}
+
+function localRenderDeps(store) {
+  const viewport = viewportControllerFor(store);
+  return viewport ? { ...renderTracksDeps, getMeasuredTrackViewportPx: viewport.getMeasuredTrackViewportPx } : renderTracksDeps;
+}
+
 function createAssemblyPageBindingDeps(options = {}) {
   const rerenderImpl = typeof options.rerender === "function" ? options.rerender : rerender;
   const rerenderAssemblyMainTabImpl = typeof options.rerenderAssemblyMainTab === "function"
@@ -972,9 +1032,11 @@ function createAssemblyPageBindingDeps(options = {}) {
     bindSubviewTrackContigDrag: (host, store) => bindSubviewTrackContigDragImpl(host, store, trackDragRuntimeDeps),
     bindTrackBoxSelection: (host, store) => bindTrackBoxSelectionImpl(host, store, trackSelectionRuntimeDeps),
     bindTrackContigDrag: (host, store) => bindTrackContigDragImpl(host, store, trackDragRuntimeDeps),
-    bindTrackScrollSync,
+    bindTrackScrollSync: (host, store, settings) =>
+      (viewportControllerFor(store)?.bindTrackScrollSync || bindTrackScrollSync)(host, store, { ...settings, ...(!store.localViewRootStore ? { preserveMissing: true } : {}) }),
     bindTrackSelectionHotkeys: (host, store) => bindTrackSelectionHotkeysImpl(host, store, trackHotkeyBindingDeps),
-    bindTrackViewportResize,
+    bindTrackViewportResize: (host, store) =>
+      (viewportControllerFor(store)?.bindTrackViewportResize || bindTrackViewportResize)(host, store),
     createPhasedChrTrack,
     handleNewSequenceRowAction,
     handleSubviewCandidateRemoval,
@@ -1004,7 +1066,8 @@ function createAssemblyPageBindingDeps(options = {}) {
     rerenderSubviewPanel,
     patchGrtResultOverlays: (host, store, scope) => patchGrtResultOverlaysDom(host, store, scope),
     refreshSubviewPairwiseEvidence,
-    rememberTrackViewportAnchor,
+    rememberTrackViewportAnchor: (host, key) =>
+      (options.store && viewportControllerFor(options.store)?.rememberTrackViewportAnchor || rememberTrackViewportAnchor)(host, key),
     rerender: rerenderImpl,
     resolveAssemblyConfirmDialog,
     resolveTrackContigClickAction,
@@ -1617,6 +1680,7 @@ function bindSubviewBandTooltips(host) {
 }
 
 function rerender(host, store) {
+  if (store.localViewRootStore) { rerenderSubviewPanel(host, store); return; }
   cancelDeferredRerender();
   const state = store.getState();
   if (state.activeRoute && state.activeRoute !== "assembly") {
@@ -1676,6 +1740,10 @@ const refreshMainMembersForSubview = createMainMemberAnnotationRefresh({
   rerenderMembers: (host, store) => rerenderAssemblyMainTab(host, store, { membersOnly: true }),
 });
 function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, membersOnly = false } = {}) {
+  if (store.localViewRootStore) {
+    const root = getSubviewWorkspaceRuntime(store)?.root;
+    return rerenderAssemblyMainTab(root || host, store.localViewRootStore, { preserveTrackGeometry, membersOnly });
+  }
   cancelDeferredRerender();
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
@@ -1779,6 +1847,8 @@ function isConnectedToDocument(node, doc) {
 }
 
 function resolveCurrentRouteHost(host) {
+  const windowHost = host?.matches?.("[data-local-view-window]") ? host : host?.closest?.("[data-local-view-window]");
+  if (windowHost?.isConnected !== false && windowHost) return windowHost;
   const doc = host?.ownerDocument || globalThis.document;
   const directRouteHost = host?.matches?.("#route-host")
     ? host
@@ -1862,8 +1932,20 @@ function refreshFinalPathLogAfterPrimaryHiddenPatch(host, store) {
   return true;
 }
 
-const subviewDragRenderController = createSubviewDragRenderController({
-  getWidths: () => Object.fromEntries(["primary", "subview", "finalPath"].map(role => [role, getMeasuredTrackViewportPx(role)])),
+const subviewDragRenderControllers = new WeakMap();
+function subviewDragControllerFor(store) {
+  let controller = subviewDragRenderControllers.get(store);
+  if (!controller) {
+    controller = createAssemblySubviewDragController();
+    subviewDragRenderControllers.set(store, controller);
+  }
+  return controller;
+}
+
+function createAssemblySubviewDragController() {
+  return createSubviewDragRenderController({
+  getWidths: (store) => Object.fromEntries(["primary", "subview", "finalPath"].map(role => [role,
+    (viewportControllerFor(store)?.getMeasuredTrackViewportPx || getMeasuredTrackViewportPx)(role)])),
   onBind(host, store, card) {
     // Initial viewport normalization may request another render. Keep that
     // render in the background loop; later user events use the usual path.
@@ -1877,23 +1959,34 @@ const subviewDragRenderController = createSubviewDragRenderController({
     return !retry;
   },
   async onMounted(host, store, card) {
+    if (store.localViewWindowId) getSubviewWorkspaceRuntime(store)?.markRendered(store.localViewWindowId);
     // Only the Main member cards changed; never rebuild its alignment graph.
     await new Promise(resolve => setTimeout(resolve, 0));
     if (card.isConnected !== false && host.querySelector(".assembly-members-panel")) refreshMainMembersForSubview(host, store);
   },
   onFallback: (host, store) => rerenderSubviewPanel(host, store),
-});
+  });
+}
 
 function renderCommittedSubviewDrag(host, store, preview) {
-  const routeHost = resolveCurrentRouteHost(host);
-  const pending = routeHost && subviewDragRenderController.start(routeHost, store, preview);
+  const routeHost = store.localViewRootStore
+    ? getSubviewWorkspaceRuntime(store)?.windowNode(store.localViewWindowId)
+    : resolveCurrentRouteHost(host);
+  const pending = routeHost && subviewDragControllerFor(store).start(routeHost, store, preview);
   if (pending) return pending;
   rerenderSubviewPanel(host, store);
 }
 
 function rerenderSubviewPanel(host, store) {
-  subviewDragRenderController.cancel();
-  const routeHost = resolveCurrentRouteHost(host);
+  subviewDragRenderControllers.get(store)?.cancel();
+  const workspace = getSubviewWorkspaceRuntime(store);
+  if (!store.localViewRootStore && workspace && store.getState().assembly?.subviewWorkspace) {
+    workspace.render();
+    return;
+  }
+  const routeHost = store.localViewRootStore ? workspace?.windowNode(store.localViewWindowId) : resolveCurrentRouteHost(host);
+  if (store.localViewRootStore && !store.getState().assembly?.subview?.summary) { workspace?.render(); return; }
+  if (store.localViewRootStore && (!routeHost || routeHost.hidden)) return;
   if (!routeHost) {
     rerender(host, store);
     return;
@@ -1906,7 +1999,7 @@ function rerenderSubviewPanel(host, store) {
   if (!replacedNodes?.length) {
     const currentPanel = routeHost.querySelector("[data-subview-panel='1']");
     if (!currentPanel) { rerender(host, store); return; }
-    currentPanel.outerHTML = renderAssemblySubviewPanelImpl(store.getState(), renderTracksDeps);
+    currentPanel.outerHTML = renderAssemblySubviewPanelImpl(store.getState(), localRenderDeps(store));
     const nextPanel = routeHost.querySelector("[data-subview-panel='1']");
     if (!nextPanel) { rerender(host, store); return; }
     bindAssemblyPage(nextPanel, store, { scope: "subview", rerender: rerenderSubviewPanel });
@@ -1918,6 +2011,8 @@ function rerenderSubviewPanel(host, store) {
   }
   routeHost.querySelector("[data-subview-panel='1']")?.removeAttribute?.("data-subview-render-incomplete");
   if (routeHost.querySelector(".assembly-members-panel")) refreshMainMembersForSubview(routeHost, store);
+  workspace?.syncChrome();
+  if (store.localViewWindowId) workspace?.markRendered(store.localViewWindowId);
 }
 
 export async function __testLoadNewSequencesTabData(
@@ -2166,11 +2261,11 @@ async function persistProjectAssemblyViewStateFromStore(
   deps = projectAssemblyViewStateRuntimeDeps,
 ) {
   const requestedIdentity = captureProjectViewIdentity(store.getState());
-  if (!requestedIdentity) {
+  if (!requestedIdentity || store.isLocalViewAlive?.() === false) {
     return;
   }
   return assemblyPageSession.projectViewMutationCoordinator.enqueue(async (isCurrent) => {
-    if (!isCurrent() || !matchesProjectViewIdentity(store.getState(), requestedIdentity)) {
+    if (!isCurrent() || store.isLocalViewAlive?.() === false || !matchesProjectViewIdentity(store.getState(), requestedIdentity)) {
       return;
     }
     return persistProjectAssemblyViewStateFromStoreNow(host, store, deps, requestedIdentity);

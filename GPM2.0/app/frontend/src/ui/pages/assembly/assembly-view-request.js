@@ -4,10 +4,10 @@ const requests = new WeakMap();
 
 export function beginAssemblyViewRequest(store) {
   const request = {};
-  requests.set(store, request);
+  requests.set(store.localViewRootStore || store, request);
   return request;
 }
 
 export function currentAssemblyViewRequest(store) {
-  return requests.get(store);
+  return requests.get(store.localViewRootStore || store);
 }

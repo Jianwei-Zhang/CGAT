@@ -1133,3 +1133,35 @@
   .subview-render-status { transition: none; }
   .subview-render-status::before { animation: none; }
 }
+
+/* Local comparisons: the idle row is text-only; open views live in a taskbar. */
+.subview-guide-tools {
+  display: inline; padding: 0; border: 0; background: none; color: inherit;
+  font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+[data-subview-workspace] { position: relative; isolation: isolate; z-index: 20; min-width: 0; }
+.subview-taskbar { position: relative; z-index: 2147483647; width: fit-content; max-width: 100%; display: flex; gap: 6px; padding: 6px 0; overflow-x: auto; min-width: 0; }
+.subview-task { display: flex; flex: 0 0 auto; max-width: 260px; border: 1px solid var(--border-default);
+  border-radius: 5px; overflow: hidden; background: var(--surface-subtle); }
+.subview-task.is-active { border-color: var(--accent); }
+.subview-task.is-minimized { opacity: .65; }
+.subview-task button, .subview-window-header button {
+  border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 5px 8px;
+}
+.subview-task button:hover, .subview-window-header button:hover { background: var(--surface-hover, #8882); }
+.subview-task-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subview-window { min-width: 0; margin-top: 8px; border: 1px solid var(--border-default); border-radius: 7px;
+  background: var(--surface-panel); color: var(--text-primary); overflow: hidden; }
+.subview-window.is-floating { position: fixed; left: var(--local-x, 80px); top: var(--local-y, 100px);
+  width: min(1080px, calc(100vw - 24px)); max-height: calc(100vh - 24px);
+  z-index: var(--local-z, 1); box-shadow: 0 12px 36px #0003; margin: 0; }
+.subview-window[hidden] { display: none; }
+.subview-window-header { display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  border-bottom: 1px solid var(--border-default); background: var(--surface-subtle); user-select: none; }
+.subview-window.is-floating > .subview-window-header { cursor: move; touch-action: none; }
+.subview-window-header strong { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subview-window-content { padding: 10px; overflow: auto; max-height: calc(100vh - 90px); }
+.subview-window .subview-panel-head > .assembly-view-title { display: none; }
+.subview-window button:focus-visible, .subview-task button:focus-visible, .subview-guide-tools:focus-visible {
+  outline: 2px solid var(--accent, #527ee9); outline-offset: -2px;
+}
