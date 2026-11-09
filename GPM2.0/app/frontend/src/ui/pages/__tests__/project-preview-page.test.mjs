@@ -121,7 +121,7 @@ test("late preview requests cannot overwrite a different project or a newer requ
   assert.equal(store.getState().projectPreview.cards.length, 1);
 });
 
-test("source colors follow Assembly roles and adopted interval outlines are card-scoped hover feedback", () => {
+test("standalone source colors follow Assembly roles and adopted outlines remain card-scoped hover feedback", () => {
   const css = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
   assert.match(css, /\.project-preview-used[^}]*background:\s*transparent/);
   assert.match(css, /\.project-preview-card:hover\s+\.project-preview-used/);
