@@ -108,7 +108,7 @@ export function updateSubviewTasks(document, assembly) {
 
 export function restoredSubviewWindows(document, assembly) {
   return (document?.scopes?.[taskScopeKey(assembly)] || []).map((task, index) => ({
-    ...task, number: index + 1, floating: false, opened: false, minimized: false,
+    ...task, number: index + 1, floating: false, opened: false, minimized: false, pinned: true,
     x: 80, y: 100, z: 0,
     snapshot: { ...task.snapshot, subviewRestoring: false,
       subviewRestoringSummary: null, subviewRestoreError: "" },

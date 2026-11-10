@@ -1,5 +1,5 @@
 import { LOCAL_VIEW_RESIZE_EDGES } from "./subview-window-geometry.js";
-import { PictureInPicture2, PanelTopClose } from "lucide";
+import { PictureInPicture2, PanelTopClose, Pin, PinOff } from "lucide";
 const escapeHtml = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const escapeAttr = escapeHtml;
 
@@ -72,11 +72,29 @@ export function renderSubviewDockIcon(floating) {
   return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${nodes.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(" ")}></${tag}>`).join("")}</svg>`;
 }
 
+export function renderSubviewPinIcon(pinned) {
+  const nodes = pinned ? Pin : PinOff;
+  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${nodes.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(" ")}></${tag}>`).join("")}</svg>`;
+}
+
+export function syncSubviewPinButton(node, item, labels) {
+  const button = node?.querySelector?.('[data-local-view-action="pin"]');
+  if (!button) return;
+  const pinned = item.pinned !== false, label = pinned ? labels.window.unpin : labels.window.pin;
+  button.hidden = !item.floating;
+  button.innerHTML = renderSubviewPinIcon(pinned);
+  button.classList.toggle("is-pinned", pinned);
+  button.setAttribute("aria-pressed", String(pinned));
+  button.setAttribute("aria-label", label);
+  button.setAttribute("data-app-tooltip", label);
+}
+
 export function renderSubviewWindowChrome(assembly, labels, end = false) {
   const item = assembly.subviewWorkspace?.windows.find(item => item.id === assembly.subviewWindowRendering);
   if (!item) return "";
   const w = labels.window;
   if (end) return `<div class="subview-window-actions">
+    ${item.floating && assembly.subviewNativeWindows ? `<button type="button" class="subview-window-pin${item.pinned !== false ? " is-pinned" : ""}" data-local-view-action="pin" data-local-view-id="${item.id}" aria-pressed="${item.pinned !== false}" aria-label="${escapeAttr(item.pinned !== false ? w.unpin : w.pin)}" data-app-tooltip="${escapeAttr(item.pinned !== false ? w.unpin : w.pin)}">${renderSubviewPinIcon(item.pinned !== false)}</button>` : ""}
     <button type="button" data-local-view-action="minimize" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.minimize)}" data-app-tooltip="${escapeAttr(w.minimize)}">−</button>
     <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">×</button></div>`;
   const { title, tooltip } = subviewWindowDescription(item, labels, assembly);
@@ -130,12 +148,14 @@ export function renderSubviewWorkspace(state, labels, renderPanel) {
   </section>`;
 }
 
-export function subviewTaskMenuItems(item, labels) {
+export function subviewTaskMenuItems(item, labels, assembly = {}) {
   const w = labels.window;
   const opened = item.opened !== false;
   return [
     { action: "open-docked", label: w.openDocked, group: "open", checked: opened && !item.floating },
     { action: "open-floating", label: w.openFloating, group: "open", checked: opened && item.floating },
+    ...(item.floating && assembly.subviewNativeWindows
+      ? [{ action: "pin", label: w.keepAboveMain, group: "window", role: "menuitemcheckbox", checked: item.pinned !== false, disabled: !opened }] : []),
     { action: "minimize", label: w.minimize, group: "window", disabled: !opened || item.minimized },
     { action: "rename", label: w.rename, group: "metadata" },
     { action: "note", label: w.editNote, group: "metadata" },

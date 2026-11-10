@@ -1236,3 +1236,5 @@
 .subview-window.is-native > .subview-window-content { flex: 1 1 auto; min-height: 0; max-height: 100%; }
 .subview-window.is-native > .subview-window-resize { display: block; position: absolute; z-index: 30; touch-action: none; }
 .subview-window.is-native [data-local-view-drag] { cursor: move; touch-action: none; user-select: none; }
+
+.subview-window-pin.is-pinned { color: var(--accent, #527ee9); box-shadow: inset 0 0 0 1px currentColor; }

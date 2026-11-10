@@ -1626,6 +1626,8 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "gpm_next_backend",
+ "gtk",
+ "objc2",
  "reqwest 0.12.28",
  "rfd",
  "semver",

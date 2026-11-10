@@ -1,6 +1,6 @@
 import { fitNativeSubviewWindow } from "./subview-native-fit.js";
 import { changeSubviewWindow, getSubviewWindowStore } from "./subview-workspace-state.js";
-import { renderSubviewDockIcon, subviewWindowAssembly, subviewWindowDescription } from "./render-subview-workspace.js";
+import { renderSubviewDockIcon, syncSubviewPinButton, subviewWindowAssembly, subviewWindowDescription } from "./render-subview-workspace.js";
 import { LOCAL_VIEW_RESIZE_EDGES, resolveLocalViewWindowGesture } from "./subview-window-geometry.js";
 import { bindAppTooltips } from "../../app-tooltip-runtime.js";
 
@@ -69,11 +69,36 @@ export function createNativeSubviewWindows(root, store, deps) {
     changeSubviewWindow(store, entry.id, "open-docked");
     report(error);
   }
+  async function syncPin(entry) {
+    if (!valid(entry) || !entry.handle || entry.pinPending) return;
+    entry.pinPending = true;
+    try {
+      // Serialize native updates and coalesce rapid pin/unpin clicks. Never
+      // recreate a dense graph, duplicate its store, or steal Main's focus.
+      while (valid(entry) && entry.nativePinned !== (itemFor(entry.id)?.pinned !== false)) {
+        const requested = itemFor(entry.id).pinned !== false;
+        try {
+          await win.__TAURI__.core.invoke("set_local_view_pinned", { label: entry.handle.label, pinned: requested });
+        } catch (error) {
+          if (valid(entry)) {
+            if ((itemFor(entry.id)?.pinned !== false) === requested)
+              changeSubviewWindow(store, entry.id, "pin", { pinned: entry.nativePinned });
+            report(error);
+          }
+          return;
+        }
+        if (!valid(entry)) return;
+        entry.nativePinned = requested;
+      }
+    } finally { entry.pinPending = false; }
+  }
   function chrome(entry, item) {
     if (!entry.node || !valid(entry)) return;
     const state = store.getState(), labels = deps.getLabels(state);
     const description = subviewWindowDescription(item, labels, subviewWindowAssembly(state));
     if (entry.nativeTitle !== description.title) { entry.nativeTitle = description.title; run(entry.handle.setTitle(description.title), entry); }
+    syncSubviewPinButton(entry.node, item, labels);
+    void syncPin(entry);
     entry.node.setAttribute("role", "region");
     entry.node.setAttribute("aria-label", description.title);
     const title = entry.node.querySelector("[data-local-view-title]");
@@ -130,7 +155,7 @@ export function createNativeSubviewWindows(root, store, deps) {
       event.preventDefault(); event.stopPropagation();
       const action = button.dataset.localViewAction;
       if (action === "dock") { changeSubviewWindow(store, id, "open-docked"); void manager.focus(id); }
-      else if (action === "close" || action === "minimize") changeSubviewWindow(store, id, action);
+      else if (action === "close" || action === "minimize" || action === "pin") changeSubviewWindow(store, id, action);
     }, true);
     listen(host, "pointerdown", event => {
       if (!valid(entry)) return;
@@ -221,10 +246,10 @@ export function createNativeSubviewWindows(root, store, deps) {
     } catch (error) {
       changeSubviewWindow(store, item.id, "open-docked"); report(error); return;
     }
-    const entry = { id: item.id, generation, token, cleanups: [], closing: false };
+    const entry = { id: item.id, generation, token, nativePinned: item.pinned !== false, cleanups: [], closing: false };
     entries.set(item.id, entry);
     entry.timeout = setTimeout(() => fail(entry, new Error("Local View window did not finish opening")), 30000);
-    const url = new URL("local-view.html", win.location.href); url.search = new URLSearchParams({ view: item.id, token }).toString();
+    const url = new URL("local-view.html", win.location.href); url.search = new URLSearchParams({ view: item.id, token, pinned: item.pinned === false ? "0" : "1" }).toString();
     try { win.open(url.href, `gpm-${item.id}-${token}`); } catch (error) { fail(entry, error); }
   }
   function sync() {
@@ -280,6 +305,9 @@ export function createNativeSubviewWindows(root, store, deps) {
         changeSubviewWindow(store, id, "activate");
         if (item.floating) {
           if (!entry?.handle || !entry.ready || !valid(entry)) return;
+          // An owned/transient popup is hidden with its minimized owner.
+          if (item.pinned !== false) await mainHandle.unminimize();
+          if (!valid(entry) || request !== focusSequence) return;
           await entry.handle.unminimize();
           if (!valid(entry) || request !== focusSequence) return;
           await entry.handle.show();

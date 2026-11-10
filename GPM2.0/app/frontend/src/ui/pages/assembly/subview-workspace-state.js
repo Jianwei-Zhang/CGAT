@@ -73,7 +73,7 @@ export function reconcileSubviewWorkspace(previous, next) {
     if (!windows.some(item => item.id === activeId)) {
       activeId = globalThis.crypto?.randomUUID ? `local-${globalThis.crypto.randomUUID()}` : `local-${Date.now()}-${workspace.generation}-${nextId++}`;
       assembly = { ...assembly, trackSelectedCtgIds: [] };
-      windows = [...windows, { id: activeId, number: windows.length + 1, snapshot, name: "", note: "", opened: true, floating: true, minimized: false,
+      windows = [...windows, { id: activeId, number: windows.length + 1, snapshot, name: "", note: "", opened: true, floating: true, minimized: false, pinned: true,
         x: 80 + windows.length % 6 * 24, y: 100 + windows.length % 6 * 24, z: Math.max(0, ...windows.map(item => item.z)) + 1 }];
     } else {
       windows = windows.map(item => item.id === activeId ? { ...item, snapshot } : item);
@@ -111,7 +111,11 @@ export function changeSubviewWindow(store, id, action, patch = {}) {
   const workspace = assembly?.subviewWorkspace;
   const target = workspace?.windows.find(item => item.id === id);
   if (!target) return false;
-  if (!["close", "activate", "minimize", "dock", "open-docked", "open-floating", "metadata", "reorder", "position", "native-geometry"].includes(action)) return false;
+  if (!["close", "activate", "minimize", "dock", "open-docked", "open-floating", "metadata", "reorder", "position", "native-geometry", "pin"].includes(action)) return false;
+  if (action === "pin") {
+    if (!target.floating) return false;
+    patch = { pinned: typeof patch.pinned === "boolean" ? patch.pinned : target.pinned === false };
+  }
   if (action === "position") patch = Object.fromEntries(["x", "y", "width", "height"].filter(key => Number.isFinite(patch[key])).map(key => [key, patch[key]]));
   if (action === "native-geometry") {
     const rect = patch.nativeBounds;

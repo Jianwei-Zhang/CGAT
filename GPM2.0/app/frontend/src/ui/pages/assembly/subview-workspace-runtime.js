@@ -2,7 +2,7 @@ import { createNativeSubviewWindows } from "./subview-native-windows.js";
 import { requestAppPrompt } from "../../shell/app-dialog.js";
 import { constrainLocalViewRect, resizeLocalViewRect, resolveLocalViewWindowGesture } from "./subview-window-geometry.js";
 import { changeSubviewWindow, getSubviewWindowStore, installSubviewWorkspace } from "./subview-workspace-state.js";
-import { renderSubviewTaskbar, renderSubviewTaskStatus, subviewTaskMenuItems, renderSubviewDockIcon, subviewWindowDescription, subviewWindowAssembly } from "./render-subview-workspace.js";
+import { renderSubviewTaskbar, renderSubviewTaskStatus, subviewTaskMenuItems, renderSubviewDockIcon, syncSubviewPinButton, subviewWindowDescription, subviewWindowAssembly } from "./render-subview-workspace.js";
 
 const runtimes = new WeakMap();
 
@@ -80,6 +80,7 @@ function createRuntime(root, store, deps) {
         if (item[dimension] > 0) node.style.setProperty(`--local-${dimension}`, `${item[dimension]}px`);
         else node.style.removeProperty(`--local-${dimension}`);
       }
+      syncSubviewPinButton(node, item, labels);
       const description = subviewWindowDescription(item, labels, assembly);
       node.setAttribute("aria-label", description.title);
       const title = node.querySelector("[data-local-view-title]");
@@ -374,7 +375,7 @@ function createRuntime(root, store, deps) {
     menu.dataset.localViewGeneration = String(store.getState().assembly.subviewWorkspace.generation);
     menu.setAttribute("aria-label", subviewWindowDescription(item, deps.getLabels(store.getState())).title);
     let group;
-    for (const entry of subviewTaskMenuItems(item, deps.getLabels(store.getState()))) {
+    for (const entry of subviewTaskMenuItems(item, deps.getLabels(store.getState()), store.getState().assembly)) {
       if (group && group !== entry.group) {
         const separator = doc.createElement("div");
         separator.className = "subview-task-menu-separator"; separator.setAttribute("role", "separator");
@@ -383,7 +384,7 @@ function createRuntime(root, store, deps) {
       group = entry.group;
       const button = doc.createElement("button"); button.type = "button";
       button.className = `context-menu-item${entry.danger ? " is-danger" : ""}`;
-      button.setAttribute("role", entry.checked === undefined ? "menuitem" : "menuitemradio");
+      button.setAttribute("role", entry.role || (entry.checked === undefined ? "menuitem" : "menuitemradio"));
       if (entry.checked !== undefined) button.setAttribute("aria-checked", String(Boolean(entry.checked)));
       button.dataset.localViewAction = entry.action;
       button.dataset.localViewId = id; button.disabled = Boolean(entry.disabled);

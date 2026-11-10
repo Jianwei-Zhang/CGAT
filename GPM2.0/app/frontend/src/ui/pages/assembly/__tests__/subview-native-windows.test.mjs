@@ -29,6 +29,7 @@ test("native mode opens each task once and does not copy project state", () => {
   try {
     assert.equal(f.urls.length, 1); assert.equal(f.urls[0].pathname, "/local-view.html");
     assert.equal(f.urls[0].searchParams.get("view"), f.id);
+    assert.equal(f.urls[0].searchParams.get("pinned"), "1");
     assert.equal(f.store.getState().assembly.subviewNativeWindows, true);
     f.manager.sync(); assert.equal(f.urls.length, 1);
     const assembly = f.store.getState().assembly;
@@ -102,5 +103,17 @@ test("native drag coordinates resolve only a live owner document", async () => {
     f.store.setState({ assembly: { ...f.store.getState().assembly, selectedChrName: "chr2" } });
     resolve({ ...point, label: "main" });
     assert.equal(await delayed, null);
+  } finally { f.manager.destroy(); }
+});
+
+
+test("reopening an unpinned native view preserves its native opening preference", () => {
+  const f = fixture();
+  try {
+    changeSubviewWindow(f.store, f.id, "pin");
+    changeSubviewWindow(f.store, f.id, "open-docked");
+    changeSubviewWindow(f.store, f.id, "open-floating");
+    assert.equal(f.urls.at(-1).searchParams.get("pinned"), "0");
+    assert.equal(f.store.getState().assembly.subviewWorkspace.windows[0].pinned, false);
   } finally { f.manager.destroy(); }
 });

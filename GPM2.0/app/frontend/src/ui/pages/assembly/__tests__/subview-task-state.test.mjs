@@ -5,7 +5,7 @@ import { createState } from "./tabs-semantics-harness.mjs";
 import { installSubviewWorkspace, startSubviewWindowDraft, changeSubviewWindow, getSubviewWindowStore, hydrateSubviewTasks } from "../subview-workspace-state.js";
 import { normalizeSubviewTasks, taskScopeKey } from "../subview-task-state.js";
 import { installSubviewTaskPersistence } from "../subview-task-persistence.js";
-import { renderSubviewTaskbar, subviewTaskMenuItems, subviewWindowDescription } from "../render-subview-workspace.js";
+import { renderSubviewTaskbar, subviewTaskMenuItems, subviewWindowDescription, renderSubviewWindowChrome } from "../render-subview-workspace.js";
 import { getAssemblyI18n } from "../i18n.js";
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 function fixture() {
@@ -239,4 +239,41 @@ test("Main loading cannot resurrect a task closed while the request was in fligh
   store.setState({ assembly: { ...store.getState().assembly, loading: false, subview: stale } });
   assert.equal(windows(store).length, 0);
   assert.equal(store.getState().assembly.subview, null);
+});
+
+
+test("application pin defaults on but never enters the project task document", () => {
+  const store = fixture(), id = enter(store);
+  const saved = structuredClone(document(store)), scoped = getSubviewWindowStore(store, id);
+  const summary = scoped.getState().assembly.subview.summary;
+  assert.equal(windows(store)[0].pinned, true);
+  changeSubviewWindow(store, id, "pin");
+  assert.equal(windows(store)[0].pinned, false);
+  assert.equal(scoped.getState().assembly.subview.summary, summary);
+  assert.deepEqual(document(store), saved);
+  changeSubviewWindow(store, id, "pin");
+  assert.equal(windows(store)[0].pinned, true);
+  assert.deepEqual(document(store), saved);
+  changeSubviewWindow(store, id, "open-docked");
+  assert.equal(changeSubviewWindow(store, id, "pin"), false);
+  changeSubviewWindow(store, id, "open-floating");
+  assert.equal(windows(store)[0].pinned, true);
+});
+
+for (const locale of ["en", "zh"]) test(`native pin chrome and menu agree and disappear when docked (${locale})`, () => {
+  const store = fixture(), id = enter(store);
+  const labels = getAssemblyI18n({ locale }).subview;
+  const assembly = () => ({ ...store.getState().assembly, subviewNativeWindows: true, subviewWindowRendering: id });
+  const menu = () => subviewTaskMenuItems(windows(store)[0], labels, assembly());
+  let chrome = renderSubviewWindowChrome(assembly(), labels, true);
+  assert.match(chrome, /data-local-view-action="pin"[^>]*aria-pressed="true"/);
+  assert.ok(chrome.indexOf('data-local-view-action="pin"') < chrome.indexOf('data-local-view-action="minimize"'));
+  assert.equal(menu().find(item => item.action === "pin").role, "menuitemcheckbox");
+  assert.equal(menu().find(item => item.action === "pin").checked, true);
+  changeSubviewWindow(store, id, "pin");
+  assert.equal(menu().find(item => item.action === "pin").checked, false);
+  assert.match(renderSubviewWindowChrome(assembly(), labels, true), /aria-pressed="false"/);
+  changeSubviewWindow(store, id, "open-docked");
+  assert.ok(!menu().some(item => item.action === "pin"));
+  assert.doesNotMatch(renderSubviewWindowChrome(assembly(), labels, true), /data-local-view-action="pin"/);
 });

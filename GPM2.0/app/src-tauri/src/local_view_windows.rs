@@ -1,6 +1,20 @@
 use tauri::{Emitter, Manager};
 
+fn local_view_pinned(url: &tauri::Url) -> Option<bool> {
+    match url
+        .query_pairs()
+        .find(|(key, _)| key == "pinned")
+        .map(|(_, value)| value.into_owned())
+        .as_deref()
+    {
+        None | Some("1") => Some(true),
+        Some("0") => Some(false),
+        _ => None,
+    }
+}
+
 fn local_view_id(url: &tauri::Url, main: &tauri::Url) -> Option<String> {
+    local_view_pinned(url)?;
     // url::Url gives custom schemes (tauri:// on macOS/Linux) opaque origins.
     // Compare their explicit authority instead of two unequal opaque tokens.
     if url.scheme() != main.scheme()
@@ -73,7 +87,7 @@ pub fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
                 return tauri::webview::NewWindowResponse::Deny;
             }
             let expected = url.clone();
-            let result = tauri::WebviewWindowBuilder::new(
+            let builder = tauri::WebviewWindowBuilder::new(
                 &owner,
                 &label,
                 tauri::WebviewUrl::External("about:blank".parse().expect("blank URL")),
@@ -90,9 +104,21 @@ pub fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
             .maximizable(false)
             .focused(false)
             .visible(false)
-            .disable_drag_drop_handler()
-            .build();
-            match result {
+            .disable_drag_drop_handler();
+            // Keep normal desktop z-order. Ownership is application-local and
+            // does not turn the popup into a client-area-constrained child.
+            let builder = if local_view_pinned(&url) == Some(true) {
+                let Some(main_window) = owner.get_webview_window("main") else {
+                    return tauri::webview::NewWindowResponse::Deny;
+                };
+                match builder.parent(&main_window) {
+                    Ok(builder) => builder,
+                    Err(_) => return tauri::webview::NewWindowResponse::Deny,
+                }
+            } else {
+                builder
+            };
+            match builder.build() {
                 Ok(window) => tauri::webview::NewWindowResponse::Create { window },
                 Err(error) => {
                     eprintln!("Local View window creation failed: {error}");
@@ -247,6 +273,27 @@ pub fn probe_local_view_drag(app: tauri::AppHandle) -> Result<DragProbe, String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_view_pin_defaults_on_and_accepts_only_explicit_boolean_flags() {
+        let url: tauri::Url =
+            "tauri://localhost/local-view.html?view=local-123&token=0123456789abcdef"
+                .parse()
+                .unwrap();
+        assert_eq!(local_view_pinned(&url), Some(true));
+        assert_eq!(
+            local_view_pinned(&format!("{url}&pinned=0").parse().unwrap()),
+            Some(false)
+        );
+        assert_eq!(
+            local_view_pinned(&format!("{url}&pinned=1").parse().unwrap()),
+            Some(true)
+        );
+        assert_eq!(
+            local_view_pinned(&format!("{url}&pinned=global").parse().unwrap()),
+            None
+        );
+    }
+
     #[test]
     fn custom_protocol_local_views_keep_the_same_authority() {
         let main = "tauri://localhost/index.html".parse().unwrap();
