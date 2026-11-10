@@ -29,12 +29,6 @@ export function bindMainTrackToolbarPopups(host) {
       const panel = root.querySelector(".assembly-marker-display-menu");
       if (panel && !panel.hidden) placeAnchoredPanel(root, panel);
     }
-    for (const root of host.querySelectorAll(`${TOOLBAR} .subview-panel-help`)) {
-      const panel = root.querySelector(".subview-panel-guide");
-      if (root.open) placeAnchoredPanel(root.querySelector("summary") || root, panel,
-        { preferredWidth: 360, matchAnchorWidth: false });
-      else clearAnchoredPanelPlacement(panel);
-    }
     for (const root of host.querySelectorAll(`${TOOLBAR} .grt-result-layer-menu`)) {
       const panel = root.querySelector(".grt-result-layer-options");
       if (root.open) placeAnchoredPanel(root.querySelector("summary") || root, panel);

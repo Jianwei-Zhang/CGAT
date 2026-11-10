@@ -884,10 +884,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
         <div class="subview-panel-title-row assembly-track-inline-controls${alignmentCard ? " subview-track-inline-controls" : ""}" data-subview-toolbar data-grt-result-card="subview" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
-          ${alignmentCard ? `<details class="subview-panel-help">
-            <summary class="button ghost tiny" aria-label="${escapeAttr(i18n.subview.helpLabel)}" data-app-tooltip="${escapeAttr(i18n.subview.guide)}">?</summary>
-            <p class="subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
-          </details>` : ""}
+          ${alignmentCard ? `<button type="button" class="button ghost tiny subview-panel-help" aria-label="${escapeAttr(i18n.subview.helpLabel)}" data-app-tooltip="${escapeAttr(i18n.subview.guide)}">?</button>` : ""}
           ${allBadges && !assembly.subviewWindowRendering ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
           ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}" data-app-tooltip-overflow>${escapeHtml(i18n.subview.guide)}</p>` : ""}
           ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history, assembly.subviewWindowRendering) : ""}

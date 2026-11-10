@@ -140,19 +140,13 @@ test("both parameter bars share fixed popup placement and local-only hosts can b
   assert.equal(bindings.match(/comboNode\.closest\?\.\(ALIGNMENT_TOOLBAR_SELECTOR\)/g)?.length, 2);
 });
 
-test("Local View help escapes the same scrollport and clears fixed placement when closed", () => {
-  const f = popupFixture();
-  let open = true;
-  const help = { get open() { return open; }, querySelector: selector => selector === "summary" ? f.anchor : f.panel };
-  f.host.querySelectorAll = selector => selector.endsWith(" .subview-panel-help") ? [help] : [];
+test("tooltip-only Local View help has no disclosure popup placement binding", () => {
+  const f = popupFixture(), queried = [];
+  f.host.querySelectorAll = selector => { queried.push(selector); return []; };
   bindMainTrackToolbarPopups(f.host);
   f.events.get("toggle")();
-  assert.equal(f.panel.style.position, "fixed");
-  assert.equal(f.panel.style.width, "360px");
-  f.setLeft(30); f.events.get("scroll")();
-  assert.equal(f.panel.style.left, "30px");
-  open = false; f.events.get("toggle")();
-  assert.equal(f.panel.style.position, "");
+  assert.ok(queried.length > 0);
+  assert.ok(queried.every(selector => !selector.includes("subview-panel-help")));
 });
 
 for (const locale of ["zh", "en"]) for (const mode of ["loaded", "loading", "empty", "unplaced"]) {

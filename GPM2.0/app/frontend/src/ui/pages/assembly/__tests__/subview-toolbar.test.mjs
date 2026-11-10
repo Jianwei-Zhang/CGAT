@@ -47,10 +47,11 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
       assert.doesNotMatch(scene, /assembly-track-panel-head|subview-track-inline-controls| vs /);
       assert.match(scene, /subview-track-layout/);
       assert.doesNotMatch(html, /subview-empty-guide/);
-      assert.match(toolbar, /<details class="subview-panel-help">/);
-      assert.match(toolbar, /<summary[^>]*data-app-tooltip="[^"]+"[^>]*>\?<\/summary>/);
+      assert.match(toolbar, /<button type="button" class="button ghost tiny subview-panel-help"[^>]*data-app-tooltip="[^"]+"[^>]*>\?<\/button>/);
       assert.ok(toolbar.includes(`aria-label="${locale === "zh" ? "局部视图操作说明" : "Local View instructions"}"`));
-      assert.match(toolbar, /<p class="subview-panel-guide">[^<]+<\/p>\s*<\/details>/);
+      assert.doesNotMatch(toolbar, /<details class="subview-panel-help"|subview-panel-guide/);
+      const help = toolbar.match(/<button[^>]*class="button ghost tiny subview-panel-help"[^>]*>/)?.[0];
+      assert.doesNotMatch(help, /aria-expanded|aria-controls|data-subview-action/);
       if (mode === "composition") assert.match(toolbar, /data-subview-action="clear-composition"/);
       else assert.equal(toolbar.match(/class="subview-candidate-remove"/g)?.length, 2);
     });
@@ -99,11 +100,11 @@ test("both headers pin their titles to the first line while right-aligned parame
   assert.doesNotMatch(css, /width: calc\(50% - 6px\)/);
 });
 
-test("help disclosure floats over the view rather than consuming toolbar height", () => {
-  assert.match(ruleBody(css, ".subview-panel-title-row"), /position:\s*relative/);
-  assert.match(ruleBody(css, ".subview-panel-guide"), /position:\s*absolute/);
-  assert.match(ruleBody(css, ".subview-panel-guide"), /width:\s*min\(360px, calc\(100vw - 64px\)\)/);
-  assert.match(ruleBody(css, ".subview-panel-help > summary:focus-visible"), /outline:\s*2px solid/);
+test("help is a compact tooltip-only control with keyboard focus styling", () => {
+  assert.match(ruleBody(css, ".subview-panel-help"), /width:\s*26px/);
+  assert.match(ruleBody(css, ".subview-panel-help"), /height:\s*26px/);
+  assert.match(ruleBody(css, ".subview-panel-help:focus-visible"), /outline:\s*2px solid/);
+  assert.doesNotMatch(css, /\.subview-panel-guide|\.subview-panel-help > summary/);
 });
 
 test("empty guidance shrinks inline without forcing another toolbar row", () => {

@@ -322,7 +322,7 @@ test("subview toolbar keeps title and candidates compact and wraps whole control
   );
 
   assert.match(css, /\.subview-panel-head\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*align-items:\s*flex-start;/);
-  assert.match(css, /\.subview-panel-guide\s*\{[^}]*position:\s*absolute;/);
+  assert.doesNotMatch(css, /\.subview-panel-guide\s*\{/);
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;/);
   assert.match(css, /\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex:\s*1 1 0;[^}]*justify-content:\s*safe flex-end;[^}]*flex-wrap:\s*wrap;[^}]*overflow-x:\s*auto;/);
   assert.doesNotMatch(css, /@media \(max-width:\s*700px\)[\s\S]*\.subview-track-inline-controls\s*\{/);

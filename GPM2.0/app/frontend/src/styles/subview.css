@@ -60,9 +60,6 @@
 
 .subview-panel-help {
   flex: 0 0 auto;
-}
-
-.subview-panel-help > summary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -70,35 +67,11 @@
   width: 26px;
   height: 26px;
   padding: 0;
-  list-style: none;
-  cursor: pointer;
 }
 
-.subview-panel-help > summary::-webkit-details-marker {
-  display: none;
-}
-
-.subview-panel-help > summary:focus-visible {
+.subview-panel-help:focus-visible {
   outline: 2px solid var(--theme-strong-line, #4f82b5);
   outline-offset: 2px;
-}
-
-.subview-panel-guide {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
-  box-sizing: border-box;
-  width: min(360px, calc(100vw - 64px));
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--theme-line, #b8c2cc);
-  border-radius: var(--card-radius);
-  background: var(--surface-panel, #fff);
-  color: var(--theme-ink, #444);
-  font-size: var(--font-body);
-  line-height: 1.5;
-  box-shadow: 0 4px 12px rgba(34, 48, 61, 0.12);
 }
 
 .subview-empty-guide {
