@@ -1140,15 +1140,15 @@
   font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
 [data-subview-workspace] { position: relative; isolation: isolate; z-index: 20; min-width: 0; }
-.subview-taskbar { position: relative; z-index: 2147483647; width: fit-content; max-width: 100%; display: flex; gap: 6px; padding: 6px 0; overflow-x: auto; min-width: 0; }
-.subview-task { display: flex; flex: 0 0 auto; max-width: 260px; border: 1px solid var(--border-default);
+.subview-taskbar { position: relative; z-index: 0; width: fit-content; max-width: 100%; display: flex; gap: 4px; padding: 2px 0; overflow-x: auto; min-width: 0; }
+.subview-task { display: flex; flex: 0 0 auto; height: 26px; box-sizing: border-box; max-width: 220px; font-size: var(--font-small); border: 1px solid var(--border-default);
   border-radius: 5px; overflow: hidden; background: var(--surface-subtle); }
 .subview-task.is-active { border-color: var(--accent); }
 .subview-task.is-minimized { opacity: .65; }
-.subview-task button, .subview-window-header button {
-  border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 5px 8px;
+.subview-task button, .subview-window-heading button, .subview-window-actions button {
+  border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 0 6px; min-height: 0;
 }
-.subview-task button:hover, .subview-window-header button:hover { background: var(--surface-hover, #8882); }
+.subview-task button:hover, .subview-window-heading button:hover, .subview-window-actions button:hover { background: var(--surface-hover, #8882); }
 .subview-task-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .subview-window { min-width: 0; margin-top: 8px; border: 1px solid var(--border-default); border-radius: 7px;
   background: var(--surface-panel); color: var(--text-primary); overflow: hidden; }
@@ -1156,12 +1156,33 @@
   width: min(1080px, calc(100vw - 24px)); max-height: calc(100vh - 24px);
   z-index: var(--local-z, 1); box-shadow: 0 12px 36px #0003; margin: 0; }
 .subview-window[hidden] { display: none; }
-.subview-window-header { display: flex; align-items: center; gap: 8px; padding: 5px 8px;
-  border-bottom: 1px solid var(--border-default); background: var(--surface-subtle); user-select: none; }
-.subview-window.is-floating > .subview-window-header { cursor: move; touch-action: none; }
-.subview-window-header strong { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.subview-window-content { padding: 10px; overflow: auto; max-height: calc(100vh - 90px); }
+.subview-window .subview-panel-head.subview-window-header {
+  display: flex; align-items: flex-start; gap: 6px; min-height: 34px; box-sizing: border-box;
+  position: sticky; top: 0; z-index: 10;
+  padding: 4px 6px; border-bottom: 1px solid var(--border-default); background: var(--surface-subtle);
+}
+.subview-window-heading { display: flex; align-items: center; flex: 0 1 clamp(70px, 15%, 190px); min-width: 70px; height: 26px; gap: 4px; }
+.subview-window.is-floating .subview-window-heading { cursor: move; touch-action: none; user-select: none; }
+.subview-window-heading strong { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-small); }
+.subview-window-heading button, .subview-window-actions button {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; min-height: 26px; flex: 0 0 26px; padding: 0;
+}
+.subview-window-actions { display: flex; margin-left: auto; flex: 0 0 auto; }
+.subview-window-content { overflow: auto; max-height: calc(100vh - 24px); }
+.subview-window .subview-selection-panel { gap: 4px; }
+.subview-window .subview-alignment-card { margin: 0 6px 6px; }
 .subview-window .subview-panel-head > .assembly-view-title { display: none; }
+.subview-window [data-subview-toolbar] { align-items: center; gap: 4px; overflow: visible; font-size: var(--font-small); }
+.subview-window [data-subview-toolbar] > * { height: 26px; min-height: 26px; }
+.subview-window [data-subview-toolbar] > .subview-candidate-row { flex: 0 1 190px; }
+.subview-window [data-subview-toolbar] :is(.button, .subview-candidate-badge, .grt-result-switch, .grt-result-layer-menu, .grt-result-layer-trigger,
+  .assembly-track-combo, .assembly-track-combo-input, .assembly-track-combo-toggle, .subview-history-controls) {
+  min-height: 26px; height: 26px; box-sizing: border-box; font-size: var(--font-small);
+}
+.subview-window [data-subview-toolbar] .subview-candidate-badge { padding-top: 0; padding-bottom: 0; }
+.subview-window [data-subview-toolbar] .subview-history-controls .button { height: 100%; min-height: 0; }
+/* Keep the window buttons reachable; only parameter groups wrap on narrow views. */
+.subview-window:not(.is-floating) { position: relative; z-index: 0; }
 .subview-window button:focus-visible, .subview-task button:focus-visible, .subview-guide-tools:focus-visible {
   outline: 2px solid var(--accent, #527ee9); outline-offset: -2px;
 }

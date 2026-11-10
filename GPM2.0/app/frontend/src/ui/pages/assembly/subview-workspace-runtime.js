@@ -1,5 +1,5 @@
 import { changeSubviewWindow, getSubviewWindowStore, installSubviewWorkspace } from "./subview-workspace-state.js";
-import { renderSubviewTaskbar } from "./render-subview-workspace.js";
+import { renderSubviewTaskbar, renderSubviewDockIcon, subviewWindowDescription, subviewWindowAssembly } from "./render-subview-workspace.js";
 
 const runtimes = new WeakMap();
 
@@ -48,9 +48,11 @@ function createRuntime(root, store, deps) {
   function syncChrome() {
     const workspace = store.getState().assembly?.subviewWorkspace;
     if (!workspace) return;
-    const labels = deps.getLabels(store.getState());
+    const state = store.getState();
+    const assembly = subviewWindowAssembly(state);
+    const labels = deps.getLabels(state);
     const taskbar = section()?.querySelector(".subview-taskbar");
-    if (taskbar) taskbar.outerHTML = renderSubviewTaskbar(workspace, labels, store.getState().assembly);
+    if (taskbar) taskbar.outerHTML = renderSubviewTaskbar(workspace, labels, assembly);
     for (const item of workspace.windows) {
       const node = windowNode(item.id);
       if (!node) continue;
@@ -60,10 +62,16 @@ function createRuntime(root, store, deps) {
       node.style.setProperty("--local-x", `${item.x}px`);
       node.style.setProperty("--local-y", `${item.y}px`);
       node.style.setProperty("--local-z", String(item.z));
+      const description = subviewWindowDescription(item, labels, assembly);
+      node.setAttribute("aria-label", description.title);
+      const title = node.querySelector("[data-local-view-title]");
+      if (title) { title.textContent = description.title; title.setAttribute("data-app-tooltip", description.tooltip); }
       const toggle = node.querySelector('[data-local-view-action="dock"]');
       if (toggle) {
-        toggle.textContent = item.floating ? labels.window.dock : labels.window.float;
-        toggle.setAttribute("aria-label", toggle.textContent);
+        toggle.innerHTML = renderSubviewDockIcon(item.floating);
+        const action = item.floating ? labels.window.dock : labels.window.float;
+        toggle.setAttribute("aria-label", action);
+        toggle.setAttribute("data-app-tooltip", action);
       }
     }
   }
@@ -120,7 +128,7 @@ function createRuntime(root, store, deps) {
       deps.syncTools(node, getSubviewWindowStore(store, id));
     }
     if (event.button !== 0 || !event.target.closest("[data-local-view-drag]")
-      || event.target.closest("button") || !node.classList.contains("is-floating")) return;
+      || event.target.closest("button,input,select,textarea,a,[contenteditable=true]") || !node.classList.contains("is-floating")) return;
     const rect = node.getBoundingClientRect();
     gesture = { id, node, pointerId: event.pointerId, x: event.clientX, y: event.clientY, rect };
     node.setPointerCapture?.(event.pointerId);

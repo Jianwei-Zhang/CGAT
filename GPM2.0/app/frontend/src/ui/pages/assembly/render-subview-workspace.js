@@ -1,18 +1,84 @@
+import { PictureInPicture2, PanelTopClose } from "lucide";
 const escapeHtml = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const escapeAttr = escapeHtml;
 
-export function subviewWindowTitle(item, labels, assembly = {}) {
+export function subviewWindowAssembly(state) {
+  const project = state.initializer?.existingProjects?.find(item => Number(item.projectId) === Number(state.session?.projectId));
+  return { ...state.assembly, subviewWindowDatasets: state.initializer?.datasets || [],
+    subviewWindowPrimaryDatasetId: project?.primaryDatasetId };
+}
+
+// One identity/description contract for task buttons, window chrome and destinations.
+export function subviewWindowDescription(item, labels, assembly = {}) {
+  const w = labels.window;
   const summary = item.snapshot?.subview?.summary;
-  if (summary?.mode === "composition") return labels.compositionBadgeName;
-  const name = entry => {
-    const pool = entry?.role === "primary" ? assembly.chrCtgs
-      : entry?.role === "support" ? assembly.supportChrCtgs : [];
-    return pool?.find(ctg => Number(ctg.assemblyCtgId) === Number(entry?.contigId))?.name
-      || entry?.label || entry?.name || entry?.contigName
-      || (entry?.contigId ? `Ctg${entry.contigId}` : entry?.role || "");
+  const number = item.number ?? String(item.id).split("-").at(-1);
+  const role = entry => {
+    const value = entry?.role || entry?.source?.role;
+    if (value === "phased") return `${w.phased} ${entry.haplotypeKey || entry.phasedHaplotypeKey || entry.source?.phasedHaplotypeKey || entry.source?.hap || entry.phasedTrackId || ""}`.trim();
+    return w[value] || w.unknown;
   };
-  return [name(summary?.top || summary?.topTrack), name(summary?.bottom || summary?.bottomTrack)]
-    .filter(Boolean).join(" ↔ ") || labels.panelTitle;
+  const dataset = entry => {
+    const value = entry?.role || entry?.source?.role;
+    const id = entry?.datasetId || entry?.source?.datasetId
+      || (value === "primary" || value === "phased" ? assembly.subviewWindowPrimaryDatasetId
+        : value === "support" ? assembly.supportDatasetId : null);
+    return entry?.source?.datasetName || assembly.subviewWindowDatasets?.find(ds => Number(ds.datasetId) === Number(id))?.name
+      || assembly.subviewWindowDatasets?.find(ds => Number(ds.datasetId) === Number(id))?.label || "";
+  };
+  const contig = entry => {
+    const value = entry?.role || entry?.source?.role;
+    const pool = value === "support" ? assembly.supportChrCtgs : value === "ref" ? assembly.refTrackMembers : assembly.chrCtgs;
+    const id = entry?.contigId || entry?.assemblyCtgId;
+    return entry?.label || entry?.name || entry?.contigName
+      || (id && pool?.find(ctg => Number(ctg.assemblyCtgId) === Number(id))?.name)
+      || (id ? `Ctg${id}` : "");
+  };
+  const detail = entry => `[${role(entry)}] ${[dataset(entry), contig(entry)].filter(Boolean).join(" · ") || assembly.selectedChrName || ""}`;
+  let short, lines;
+  if (summary?.mode === "composition") {
+    const members = summary.members || [];
+    const lane = name => members.filter(member => member.lane === name);
+    const describe = name => {
+      const entries = lane(name);
+      return `${entries.length}: ${entries.slice(0, 3).map(detail).join("; ")}${entries.length > 3 ? " …" : ""}`;
+    };
+    short = `${labels.compositionBadgeName} · ${w.top}${lane("top").length} / ${w.bottom}${lane("bottom").length}`;
+    lines = [`${w.top}: ${describe("top")}`, `${w.bottom}: ${describe("bottom")}`];
+  } else {
+    const top = summary?.top || summary?.topTrack;
+    const bottom = summary?.bottom || summary?.bottomTrack;
+    const name = summary?.mode === "track-pair" ? role : entry => contig(entry) || role(entry);
+    short = [name(top), name(bottom)].join(" ↔ ");
+    lines = [`${w.top}: ${detail(top)}`, `${w.bottom}: ${detail(bottom)}`];
+  }
+  return { title: `#${number} ${short}`, tooltip: [
+    `${labels.panelTitle} #${number} · ${summary?.mode === "track-pair" ? w.trackPair : summary?.mode === "composition" ? labels.compositionBadgeName : w.contigPair}`,
+    `${w.chromosome}: ${assembly.selectedChrName || "—"}`, ...lines,
+  ].join("\n") };
+}
+
+export function subviewWindowTitle(item, labels, assembly = {}) {
+  return subviewWindowDescription(item, labels, assembly).title;
+}
+
+export function renderSubviewDockIcon(floating) {
+  const nodes = floating ? PanelTopClose : PictureInPicture2;
+  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${nodes.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(" ")}></${tag}>`).join("")}</svg>`;
+}
+
+export function renderSubviewWindowChrome(assembly, labels, end = false) {
+  const item = assembly.subviewWorkspace?.windows.find(item => item.id === assembly.subviewWindowRendering);
+  if (!item) return "";
+  const w = labels.window;
+  if (end) return `<div class="subview-window-actions">
+    <button type="button" data-local-view-action="minimize" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.minimize)}" data-app-tooltip="${escapeAttr(w.minimize)}">−</button>
+    <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">×</button></div>`;
+  const { title, tooltip } = subviewWindowDescription(item, labels, assembly);
+  const action = item.floating ? w.dock : w.float;
+  return `<div class="subview-window-heading" data-local-view-drag="1">
+    <button type="button" data-local-view-action="dock" data-local-view-id="${item.id}" aria-label="${escapeAttr(action)}" data-app-tooltip="${escapeAttr(action)}">${renderSubviewDockIcon(item.floating)}</button>
+    <strong data-local-view-title tabindex="0" data-app-tooltip="${escapeAttr(tooltip)}">${escapeHtml(title)}</strong></div>`;
 }
 
 export function renderSubviewEmptyGuide(labels) {
@@ -31,7 +97,7 @@ export function renderSubviewTaskbar(workspace, labels, assembly = {}) {
     ${workspace.windows.map(item => `<div class="subview-task${workspace.activeId === item.id ? " is-active" : ""}${item.minimized ? " is-minimized" : ""}" data-subview-task="${item.id}">
       <button type="button" data-local-view-action="activate" data-local-view-id="${item.id}"
         aria-expanded="${!item.minimized}" aria-controls="${item.id}" class="subview-task-name"
-        data-app-tooltip="${escapeAttr(subviewWindowTitle(item, labels, assembly))}" data-app-tooltip-overflow>${escapeHtml(subviewWindowTitle(item, labels, assembly))}</button>
+        data-app-tooltip="${escapeAttr(subviewWindowDescription(item, labels, assembly).tooltip)}">${escapeHtml(subviewWindowTitle(item, labels, assembly))}</button>
       <button type="button" data-local-view-action="minimize" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.minimize)}" data-app-tooltip="${escapeAttr(w.minimize)}">−</button>
       <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">×</button>
     </div>`).join("")}
@@ -39,28 +105,20 @@ export function renderSubviewTaskbar(workspace, labels, assembly = {}) {
 }
 
 export function renderSubviewWorkspace(state, labels, renderPanel) {
-  const assembly = state.assembly;
+  const assembly = subviewWindowAssembly(state);
   const workspace = assembly.subviewWorkspace;
-  if (state.assembly.subviewWindowRendering) return renderPanel(state);
+  if (state.assembly.subviewWindowRendering) return renderPanel({ ...state, assembly });
   // First paint can precede store binding. The binder installs the runtime
   // workspace before attaching interactive controls.
   if (!workspace) return `<section data-subview-workspace="1">${renderPanel(state)}</section>`;
-  const w = labels.window;
   return `<section data-subview-workspace="1">
     ${workspace.windows.length ? renderSubviewTaskbar(workspace, labels, assembly) : renderPanel(state)}
     ${workspace.windows.map(item => `<section id="${item.id}" data-local-view-window="${item.id}"
       class="subview-window${item.floating ? " is-floating" : ""}" ${item.minimized ? "hidden" : ""}
       role="region" aria-label="${escapeAttr(subviewWindowTitle(item, labels, assembly))}"
       style="--local-x:${item.x}px;--local-y:${item.y}px;--local-z:${item.z}">
-      <header class="subview-window-header" data-local-view-drag="1">
-        <button type="button" data-local-view-action="dock" data-local-view-id="${item.id}"
-          aria-label="${escapeAttr(item.floating ? w.dock : w.float)}">${escapeHtml(item.floating ? w.dock : w.float)}</button>
-        <strong>${escapeHtml(subviewWindowTitle(item, labels, assembly))}</strong>
-        <button type="button" data-local-view-action="minimize" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.minimize)}" data-app-tooltip="${escapeAttr(w.minimize)}">−</button>
-        <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">×</button>
-      </header>
       <div data-local-view-context-menu class="context-menu is-hidden"></div>
-      <div class="subview-window-content">${renderPanel({ ...state, assembly: { ...state.assembly,
+      <div class="subview-window-content">${renderPanel({ ...state, assembly: { ...assembly,
         ...item.snapshot, subviewWindowRendering: item.id } })}</div>
     </section>`).join("")}
   </section>`;

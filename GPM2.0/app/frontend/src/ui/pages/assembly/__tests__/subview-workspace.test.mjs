@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../../../../state/store.js";
 import { installSubviewWorkspace, startSubviewWindowDraft, getSubviewWindowStore, changeSubviewWindow } from "../subview-workspace-state.js";
-import { renderSubviewEmptyGuide } from "../render-subview-workspace.js";
+import { subviewWindowDescription, subviewWindowAssembly, renderSubviewEmptyGuide } from "../render-subview-workspace.js";
 import { constrainLocalViewPosition } from "../subview-workspace-runtime.js";
 import { createSubviewPairwiseController } from "../subview-pairwise-controller.js";
 import { createSubviewSelectionController } from "../subview-selection-controller.js";
@@ -178,4 +178,74 @@ test("new comparisons open above windows that have already been raised many time
   const b = enter(store, summary(5, 8));
   const windows = store.getState().assembly.subviewWorkspace.windows;
   assert.ok(windows.find(item => item.id === b).z > windows.find(item => item.id === a).z);
+});
+
+
+test("completed windows clear Main draft and multiselection without losing their own track selections", () => {
+  const store = fixture();
+  const selections = [{ role: "support", datasetId: 12 }, { role: "primary" }];
+  store.setState({ assembly: { ...startSubviewWindowDraft(store.getState().assembly),
+    trackSelectedCtgIds: [2, 5], subview: { mode: "track-pair", selectedTrackSelections: selections } } });
+  assert.deepEqual(store.getState().assembly.subviewWorkspace.pendingSelection.selectedTrackSelections, selections);
+  assert.match(renderAssemblyPage(store.getState()), /class="assembly-track-label-row[^"\n]*is-subview-track-selected/);
+  store.setState({ assembly: { ...store.getState().assembly, subview: { ...store.getState().assembly.subview,
+    summary: { mode: "track-pair", topTrack: selections[0], bottomTrack: selections[1] } } } });
+  const id = store.getState().assembly.subviewWorkspace.activeId;
+  assert.equal(store.getState().assembly.subviewWorkspace.pendingSelection, null);
+  assert.deepEqual(store.getState().assembly.trackSelectedCtgIds, []);
+  assert.deepEqual(getSubviewWindowStore(store, id).getState().assembly.subview.selectedTrackSelections, selections);
+  changeSubviewWindow(store, id, "activate");
+  assert.equal(store.getState().assembly.subviewWorkspace.pendingSelection, null);
+  const html = renderAssemblyPage(store.getState());
+  assert.doesNotMatch(html, /class="assembly-track-label-row[^"\n]*is-subview-track-selected/);
+});
+
+test("titles have stable window numbers, localized roles and full dataset detail", async () => {
+  const { getAssemblyI18n } = await import("../i18n.js");
+  for (const locale of ["zh", "en"]) {
+    const store = fixture();
+    store.setState({ locale, initializer: { datasets: [{ datasetId: 11, name: "primary-full" }, { datasetId: 12, name: "support-full" }],
+      existingProjects: [{ projectId: store.getState().session.projectId, primaryDatasetId: 11 }] } });
+    const a = enter(store, { mode: "track-pair", topTrack: { role: "support", datasetId: 12 }, bottomTrack: { role: "primary" } });
+    const b = enter(store, summary(2, 5));
+    const labels = getAssemblyI18n(store.getState()).subview;
+    const item = store.getState().assembly.subviewWorkspace.windows[0];
+    const description = subviewWindowDescription(item, labels, subviewWindowAssembly(store.getState()));
+    assert.equal(description.title, locale === "zh" ? "#1 辅 ↔ 主" : "#1 A ↔ P");
+    assert.match(description.tooltip, /support-full/); assert.match(description.tooltip, /primary-full/);
+    changeSubviewWindow(store, a, "close");
+    assert.match(subviewWindowDescription(store.getState().assembly.subviewWorkspace.windows[0], labels, store.getState().assembly).title, /^#2 /);
+    assert.equal(store.getState().assembly.subviewWorkspace.windows[0].id, b);
+  }
+});
+
+test("composition labels count logical members and bound detail lists; names are escaped", async () => {
+  const { getAssemblyI18n } = await import("../i18n.js");
+  const store = fixture();
+  const id = enter(store, { mode: "composition", members: Array.from({ length: 5 }, (_, i) => ({
+    label: `<source-${i}>`, lane: i < 4 ? "top" : "bottom", source: { role: "primary" },
+  })) });
+  const labels = getAssemblyI18n(store.getState()).subview;
+  const item = store.getState().assembly.subviewWorkspace.windows[0];
+  const description = subviewWindowDescription(item, labels, store.getState().assembly);
+  assert.equal(description.title, "#1 Custom · Top4 / Bottom1");
+  assert.match(description.tooltip, /source-2/); assert.doesNotMatch(description.tooltip, /source-3/);
+  const { renderSubviewTaskbar } = await import("../render-subview-workspace.js");
+  const html = renderSubviewTaskbar(store.getState().assembly.subviewWorkspace, labels, store.getState().assembly);
+  assert.match(html, /&lt;source-0&gt;/); assert.doesNotMatch(html, /data-app-tooltip-overflow/);
+  assert.match(html, new RegExp(`data-local-view-id="${id}"`));
+});
+
+test("docked and floating windows place chrome and parameters in one header with action-only icons", () => {
+  const store = fixture(); const id = enter(store, summary(2, 5));
+  for (const docked of [false, true]) {
+    if (docked) changeSubviewWindow(store, id, "dock");
+    const html = renderAssemblyPage(store.getState());
+    const head = html.slice(html.indexOf('class="subview-panel-head subview-window-header"'), html.indexOf('<article class="assembly-track-panel subview-alignment-card'));
+    assert.match(head, /data-local-view-action="dock"/);
+    assert.match(head, /data-subview-toolbar/); assert.match(head, /data-local-view-action="close"/);
+    assert.match(head, new RegExp(`aria-label="${docked ? "Float view" : "Dock to main page"}"`));
+    assert.match(head, /data-local-view-action="dock"[^>]*><svg/);
+    assert.doesNotMatch(html, /<header class="subview-window-header"/);
+  }
 });

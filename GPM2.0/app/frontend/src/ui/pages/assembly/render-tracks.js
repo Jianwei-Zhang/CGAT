@@ -736,7 +736,9 @@ function createRenderTracksRenderer(deps = {}) {
     supportDatasetOptions.find((item) => item.datasetId === supportDatasetId) || null;
   const trackPrefs = resolveTrackPrefs(assembly.trackView);
   const subviewTrackPrefs = resolveTrackPrefs(assembly.subviewTrackView || assembly.trackView);
-  const subview = getSubviewStateImpl(assembly);
+  // Completed windows own their selection. Main only displays an unfinished draft.
+  const subview = getSubviewStateImpl(assembly.subviewWorkspace
+    ? { subview: assembly.subviewWorkspace.pendingSelection } : assembly);
   const grtResultContext = resolveGrtResultContext(assembly);
   const grtResultPlan = grtResultContext.available
     ? buildGrtResultPlan(grtResultContext.baselineEntry)

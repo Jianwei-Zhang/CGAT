@@ -464,6 +464,10 @@ const subviewToolsContentController = createSubviewCompositionController({
   persistProjectAssemblyViewStateFromStore: (host, store) =>
     persistProjectAssemblyViewStateFromStore(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
+  rerenderAssemblyMainTab: (host, store) => {
+    const root = store.localViewRootStore || store;
+    rerenderAssemblyMainTab(getSubviewWorkspaceRuntime(root)?.root || host, root);
+  },
   refreshSubviewPairwiseEvidence,
   anchorController: subviewAnchorManagerController,
 });

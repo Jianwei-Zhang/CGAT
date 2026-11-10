@@ -121,3 +121,24 @@ test("Local View title, Tools and inline guide use the same first-row height and
   assert.match(ruleBody(css, ".subview-panel-title-row > .subview-empty-guide"), /line-height:\s*2\.1429rem/);
   assert.match(ruleBody(sharedCss, ":is([data-main-track-toolbar], [data-subview-toolbar]) > *"), /height:\s*2\.1429rem/);
 });
+
+
+test("window taskbar stays below floating windows and has a compact single-row footprint", () => {
+  const taskbar = ruleBody(css, ".subview-taskbar");
+  assert.match(taskbar, /z-index:\s*0/);
+  assert.match(taskbar, /gap:\s*4px/); assert.match(taskbar, /padding:\s*2px 0/);
+  assert.match(taskbar, /overflow-x:\s*auto/);
+  assert.match(ruleBody(css, ".subview-task"), /height:\s*26px/);
+  assert.match(ruleBody(css, ".subview-task"), /max-width:\s*220px/);
+  assert.match(ruleBody(css, ".subview-window:not(.is-floating)"), /z-index:\s*0/);
+  assert.match(ruleBody(css, ".subview-window.is-floating"), /z-index:\s*var\(--local-z, 1\)/);
+});
+
+test("merged window chrome gives controls a compact row without scrolling the whole toolbar", () => {
+  assert.match(ruleBody(css, ".subview-window .subview-panel-head.subview-window-header"), /min-height:\s*34px/);
+  assert.match(ruleBody(css, ".subview-window [data-subview-toolbar]"), /overflow:\s*visible/);
+  assert.match(ruleBody(css, ".subview-window [data-subview-toolbar] > *"), /height:\s*26px/);
+  assert.match(ruleBody(css, ".subview-window-actions"), /flex:\s*0 0 auto/);
+  assert.match(ruleBody(css, ".subview-window-heading strong"), /text-overflow:\s*ellipsis/);
+  assert.match(ruleBody(css, ".subview-window .subview-selection-panel"), /gap:\s*4px/);
+});

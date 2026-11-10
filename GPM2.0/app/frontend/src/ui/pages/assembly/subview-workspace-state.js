@@ -28,7 +28,7 @@ export function startSubviewWindowDraft(assembly) {
 }
 
 export function reconcileSubviewWorkspace(previous, next) {
-  const assembly = next.assembly;
+  let assembly = next.assembly;
   if (!assembly?.subviewWorkspace) return next;
   const scope = subviewWorkspaceScope(next);
   let workspace = assembly.subviewWorkspace;
@@ -50,7 +50,8 @@ export function reconcileSubviewWorkspace(previous, next) {
     const snapshot = captureSubviewWindow(assembly);
     if (!windows.some(item => item.id === activeId)) {
       activeId = `local-${workspace.generation}-${nextId++}`;
-      windows = [...windows, { id: activeId, snapshot, floating: true, minimized: false,
+      assembly = { ...assembly, trackSelectedCtgIds: [] };
+      windows = [...windows, { id: activeId, number: nextId - 1, snapshot, floating: true, minimized: false,
         x: 80 + windows.length % 6 * 24, y: 100 + windows.length % 6 * 24, z: Math.max(0, ...windows.map(item => item.z)) + 1 }];
     } else {
       windows = windows.map(item => item.id === activeId ? { ...item, snapshot } : item);
@@ -60,7 +61,8 @@ export function reconcileSubviewWorkspace(previous, next) {
     activeId = null;
   }
   return { ...next, assembly: { ...assembly,
-    subviewWorkspace: { ...workspace, windows, activeId, nextId } } };
+    subviewWorkspace: { ...workspace, windows, activeId, nextId,
+      pendingSelection: activeId ? null : assembly.subview } } };
 }
 
 export function installSubviewWorkspace(store) {

@@ -2804,7 +2804,8 @@ test("main contig menu groups local-view destinations and orders common actions 
       "Add to Final Path","Add to Local View","Cross-Chromosome Alignments…","Flip Contig","Rename Contig…",
       "Split Contig","Undo Contig Split","Hide Contig","Delete Contig",
     ]);
-    assert.deepEqual(items[1].children.map(i=>i.label),locale==="zh"?["上轨","下轨"]:["Top Track","Bottom Track"]);
+    assert.deepEqual(items[1].children.map(i=>i.label),locale==="zh"?["新建局部比对"]:["New Local View"]);
+    assert.deepEqual(items[1].children[0].children.map(i=>i.label),locale==="zh"?["上轨","下轨"]:["Top Track","Bottom Track"]);
     assert.equal(items[1].run,undefined,"parent opens a submenu instead of editing the composition");
     assert.ok(!items.some(i=>/更多 Contig|More Contig/.test(i.label)));
   }
@@ -2819,7 +2820,7 @@ test("local-view submenu keeps exact primary, auxiliary and phased identities fo
     const items=__testBuildAssemblyContextMenuItems({ctgContext:context,memberNode:null,host:{},store,
       actions:{canEditTrackCtg:()=>true,addContextCtgToComposition:async(_h,_s,target,slot)=>calls.push({target,slot})}});
     const parent=items.find(i=>i.label==="加入局部视图");assert.ok(parent);
-    await parent.children[0].run();await parent.children[1].run();
+    await parent.children[0].children[0].run();await parent.children[0].children[1].run();
     assert.deepEqual(calls,[{target:context,slot:"top"},{target:context,slot:"bottom"}]);
     assert.equal(calls[0].target,context,"do not drop phased item/dataset scope when nesting actions");
   }

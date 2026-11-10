@@ -1,3 +1,4 @@
+import { changeSubviewWindow, getSubviewWindowStore, startSubviewWindowDraft, subviewWorkspaceScope } from "./subview-workspace-state.js";
 import { collectSubviewAnchorScene, buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { memberAnchorEndpointKey } from "./subview-fragment-model.js";
 import { buildSubviewCompositionCandidates } from "./subview-composition-candidates.js";
@@ -325,6 +326,7 @@ export function createSubviewCompositionController({
   listChrViewCtgs,
   persistProjectAssemblyViewStateFromStore,
   rerenderSubviewPanel,
+  rerenderAssemblyMainTab = () => {},
   refreshSubviewPairwiseEvidence,
   anchorController,
 }) {
@@ -446,6 +448,8 @@ export function createSubviewCompositionController({
     });
     if (!result.changed) return false;
     store.setState({ assembly: result.assembly });
+    if ((store.getState().assembly.subviewWorkspace?.windows.length || 0)
+      > (state.assembly.subviewWorkspace?.windows.length || 0)) rerenderAssemblyMainTab(host, store);
     rerenderSubviewPanel(host, store);
     sync?.();
     refreshSubviewPairwiseEvidence(host, store);
@@ -624,38 +628,74 @@ export function createSubviewCompositionController({
     if (context.tab === "composition") void loadCandidates(context.host, context.store, context.sync);
   }
 
-  async function addContextCtgToComposition(host, store, ctgContext, lane) {
+  async function addContextCtgToComposition(host, store, ctgContext, lane, options = {}) {
+    const rootStore = store.localViewRootStore || store;
+    const initial = rootStore.getState();
+    const scope = subviewWorkspaceScope(initial);
+    const explicitTarget = Object.hasOwn(options, "targetWindowId");
+    const generation = options.workspaceGeneration ?? initial.assembly.subviewWorkspace?.generation;
+    const current = () => subviewWorkspaceScope(rootStore.getState()) === scope
+      && rootStore.getState().assembly.subviewWorkspace?.generation === generation
+      && store.isLocalViewAlive?.() !== false;
+    if (explicitTarget && options.targetWindowId) {
+      if (!initial.assembly.subviewWorkspace?.windows.some(item => item.id === options.targetWindowId)) return false;
+      store = getSubviewWindowStore(rootStore, options.targetWindowId);
+      // Geometry must come from the chosen window, never the first graph in Main.
+      const route = host?.closest?.("#route-host") || host;
+      host = route?.querySelector?.(`[data-local-view-window="${options.targetWindowId}"]`) || null;
+    } else if (explicitTarget) store = rootStore;
+    if (!current()) return false;
     const state = store.getState();
     if (!(state.assembly?.subviewCompositionCandidates || []).length) {
       updateUi({ error: "", requestKey: "" });
       await loadCandidates(host, store);
     }
-    const latest = store.getState();
+    if (!current()) return false;
+    let latest = store.getState();
     const assemblyCtgId = normalizeSupportDatasetId(ctgContext?.assemblyCtgId);
     const role = String(ctgContext?.trackRole || "").trim();
     const candidates = latest.assembly?.subviewCompositionCandidates || [];
-    const selectedIds = (Array.isArray(latest.assembly?.trackSelectedCtgIds)
-      ? latest.assembly.trackSelectedCtgIds : [])
+    const selectedIds = (Array.isArray(initial.assembly?.trackSelectedCtgIds)
+      ? initial.assembly.trackSelectedCtgIds : [])
       .map(normalizeSupportDatasetId)
       .filter(Boolean);
     const targetIds = role === "primary" && selectedIds.includes(assemblyCtgId)
       ? Array.from(new Set(selectedIds))
       : [assemblyCtgId].filter(Boolean);
-    const selectedCandidates = targetIds.map((targetId) =>
-      candidates.find((entry) => entry.assemblyCtgId === targetId
-        && (!role || entry.source?.role === role))
-      || candidates.find((entry) => entry.assemblyCtgId === targetId))
-      .filter(Boolean);
+    const selectedCandidates = targetIds.map(targetId => candidates.find(entry => {
+      if (entry.assemblyCtgId !== targetId || (role && entry.source?.role !== role)) return false;
+      const source = entry.source || {};
+      if (ctgContext.datasetId && Number(source.datasetId) !== Number(ctgContext.datasetId)) return false;
+      if (ctgContext.phasedTrackId && Number(source.phasedTrackId) !== Number(ctgContext.phasedTrackId)) return false;
+      if (ctgContext.phasedTrackItemId && Number(source.phasedItemId) !== Number(ctgContext.phasedTrackItemId)) return false;
+      if (ctgContext.phasedHaplotypeKey && source.hap !== ctgContext.phasedHaplotypeKey) return false;
+      if (role === "support" && (source.mirrored === true) !== (ctgContext.isMirror === true)) return false;
+      return true;
+    })).filter(Boolean);
     if (!selectedCandidates.length) return false;
+    if (explicitTarget && !options.targetWindowId) {
+      const draft = startSubviewWindowDraft(latest.assembly);
+      // Starting from Main is explicit: never project the previously active comparison.
+      latest = { ...latest, assembly: { ...draft, subview: null } };
+      host = null;
+    }
     const result = addSubviewCompositionMembers(
       projectCurrentSubviewToComposition(latest, host),
       selectedCandidates,
       lane,
     );
-    return commit(host, store, result.composition, {
+    if (!result.addedCount && !result.movedCount) return false;
+    if (explicitTarget && !options.targetWindowId) store.setState({ assembly: latest.assembly });
+    const committed = commit(host, store, result.composition, {
       kind: "add-members",
       count: result.addedCount + result.movedCount,
     });
+    // commit publishes synchronously before persistence; scope the eventual activation.
+    if (explicitTarget && options.targetWindowId && current()) {
+      changeSubviewWindow(rootStore, options.targetWindowId, "activate");
+      rerenderSubviewPanel(host, rootStore);
+    }
+    return committed;
   }
 
   async function moveContextSubviewMemberToOtherLane(host, store, memberContext) {

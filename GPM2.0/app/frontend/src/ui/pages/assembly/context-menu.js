@@ -1,3 +1,4 @@
+import { subviewWindowTitle } from "./render-subview-workspace.js";
 import { readMainFinalPathInterval, buildSubviewFinalPathContext } from "./final-path-contig-context.js";
 import { readSubviewAnchorAttribute } from "./subview-anchor-metadata.js";
 import { mainActiveAnchorKeys, mainAlignmentEndpointKey, findMainAlignment } from "./main-alignment-anchors.js";
@@ -986,11 +987,20 @@ export function buildAssemblyContextMenuItems({
         items.push({
           label: i18n.contextMenu.addToSubview,
           children: [
+            { id: null, label: i18n.subview.window.newView },
+            ...(state.assembly.subviewWorkspace?.windows || []).map(item => ({
+              id: item.id, label: subviewWindowTitle(item, i18n.subview, state.assembly),
+            })),
+          ].map(target => ({ label: target.label, children: [
             { label: i18n.contextMenu.addToSubviewTop,
-              run: async () => addContextCtgToComposition(host, store, ctgContext, "top") },
+              run: async () => addContextCtgToComposition(host, store, ctgContext, "top", {
+                targetWindowId: target.id, workspaceGeneration: state.assembly.subviewWorkspace?.generation,
+              }) },
             { label: i18n.contextMenu.addToSubviewBottom,
-              run: async () => addContextCtgToComposition(host, store, ctgContext, "bottom") },
-          ],
+              run: async () => addContextCtgToComposition(host, store, ctgContext, "bottom", {
+                targetWindowId: target.id, workspaceGeneration: state.assembly.subviewWorkspace?.generation,
+              }) },
+          ] })),
         });
       }
       if (!isRefTrackContext && typeof contextMenuActions.openContigChrAlignments === "function") {

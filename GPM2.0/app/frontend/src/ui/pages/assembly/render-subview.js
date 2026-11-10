@@ -1,4 +1,4 @@
-import { renderSubviewEmptyGuide } from "./render-subview-workspace.js";
+import { renderSubviewEmptyGuide, renderSubviewWindowChrome } from "./render-subview-workspace.js";
 import { renderCompactSubviewAnchors } from "./subview-anchor-metadata.js";
 import { hasDeferredReferenceHits, readReferenceHits, iterateReferenceHitEntries } from "../../../services/workflow/reference-evidence.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
@@ -875,7 +875,8 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     : "";
   return `
     <article class="subview-selection-panel" data-subview-panel="1">
-      <div class="subview-panel-head">
+      <div class="subview-panel-head${assembly.subviewWindowRendering ? " subview-window-header" : ""}">
+        ${renderSubviewWindowChrome(assembly, i18n.subview)}
         <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
         <div class="subview-panel-title-row assembly-track-inline-controls${alignmentCard ? " subview-track-inline-controls" : ""}" data-subview-toolbar data-grt-result-card="subview" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
@@ -887,6 +888,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
           ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}" data-app-tooltip-overflow>${escapeHtml(i18n.subview.guide)}</p>` : ""}
           ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history, assembly.subviewWindowRendering) : ""}
         </div>
+        ${renderSubviewWindowChrome(assembly, i18n.subview, true)}
       </div>
       ${grtResultToast}
       ${subview.error ? `<p class="error-text">${escapeHtml(subview.error)}</p>` : ""}
