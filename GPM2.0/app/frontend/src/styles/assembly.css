@@ -2251,7 +2251,7 @@
 .contig-chr-dialog [data-chr-error] { color: var(--theme-red-ink, #a22); font-size: .9em; margin: .3rem 0; }
 .contig-chr-dialog [data-chr-status] { color: var(--theme-green-ink, #35724c); font-size: .85em; margin: .3rem 0; }
 
-/* Read-only adopted-source correlation; not an editing/multiselect class. */
+/* Read-only adopted-source correlation (hover or pinned), never editing selection. */
 [data-final-path-selected="1"] > .track-ctg {
   stroke: var(--final-path-selection-stroke);
   stroke-width: 3;
