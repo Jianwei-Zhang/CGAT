@@ -5,7 +5,6 @@ mod import_cancel;
 mod local_view_windows;
 mod project_copy_cancel;
 
-
 fn main_window_title(version: &semver::Version) -> String {
     format!("Genome Puzzle Master ({version})")
 }

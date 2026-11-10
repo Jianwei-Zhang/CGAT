@@ -383,20 +383,34 @@ pub fn clear_edit_audit_logs(workspaceRoot: String, projectId: i64) -> CommandRe
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub async fn get_project_local_view_tasks(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
+pub async fn get_project_local_view_tasks(
+    workspaceRoot: String,
+    projectId: i64,
+) -> CommandResult<Value> {
     run_blocking_command("get_project_local_view_tasks", move || {
         gpm_next_backend::runtime_persistence::get_project_local_view_tasks(
-            &project_db_path(&workspaceRoot), projectId,
-        ).map_err(format_error)
-    }).await
+            &project_db_path(&workspaceRoot),
+            projectId,
+        )
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub async fn set_project_local_view_tasks(workspaceRoot: String, projectId: i64, state: Value) -> CommandResult<()> {
+pub async fn set_project_local_view_tasks(
+    workspaceRoot: String,
+    projectId: i64,
+    state: Value,
+) -> CommandResult<()> {
     run_blocking_command("set_project_local_view_tasks", move || {
         gpm_next_backend::runtime_persistence::set_project_local_view_tasks(
-            &project_db_path(&workspaceRoot), projectId, state,
-        ).map_err(format_error)
-    }).await
+            &project_db_path(&workspaceRoot),
+            projectId,
+            state,
+        )
+        .map_err(format_error)
+    })
+    .await
 }

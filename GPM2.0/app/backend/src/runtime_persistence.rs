@@ -91,10 +91,13 @@ pub fn get_project_local_view_tasks(path: &Path, project_id: i64) -> Result<Valu
 }
 
 fn read_local_view_tasks(conn: &Connection, project_id: i64) -> Result<Value> {
-    let json: Option<String> = conn.query_row(
-        "SELECT state_json FROM project_local_view_tasks WHERE project_id = ?1",
-        params![project_id], |row| row.get(0),
-    ).optional()?;
+    let json: Option<String> = conn
+        .query_row(
+            "SELECT state_json FROM project_local_view_tasks WHERE project_id = ?1",
+            params![project_id],
+            |row| row.get(0),
+        )
+        .optional()?;
     match json {
         Some(json) => serde_json::from_str(&json).context("invalid Local View task document"),
         None => Ok(serde_json::json!({ "version": 1, "scopes": {} })),
@@ -108,7 +111,8 @@ pub fn set_project_local_view_tasks(path: &Path, project_id: i64, state: Value) 
 
 fn write_local_view_tasks(conn: &Connection, project_id: i64, state: Value) -> Result<()> {
     if state.get("version").and_then(Value::as_u64) != Some(1)
-        || !state.get("scopes").is_some_and(Value::is_object) {
+        || !state.get("scopes").is_some_and(Value::is_object)
+    {
         bail!("unsupported Local View task document");
     }
     conn.execute(
@@ -644,9 +648,22 @@ mod tests {
         }});
         super::write_local_view_tasks(&conn, 1, state.clone())?;
         assert_eq!(super::read_local_view_tasks(&conn, 1)?, state);
-        assert_eq!(super::read_local_view_tasks(&conn, 2)?["scopes"], serde_json::json!({}));
-        assert_eq!(get_project_assembly_view_state_with_connection(&mut conn, 1)?, legacy);
-        assert!(super::write_local_view_tasks(&conn, 1, serde_json::json!({"version": 2, "scopes": {}})).is_err());
+        assert_eq!(
+            super::read_local_view_tasks(&conn, 2)?["scopes"],
+            serde_json::json!({})
+        );
+        assert_eq!(
+            get_project_assembly_view_state_with_connection(&mut conn, 1)?,
+            legacy
+        );
+        assert!(
+            super::write_local_view_tasks(
+                &conn,
+                1,
+                serde_json::json!({"version": 2, "scopes": {}})
+            )
+            .is_err()
+        );
         assert_eq!(super::read_local_view_tasks(&conn, 1)?, state);
         conn.execute_batch("PRAGMA query_only=ON;")?;
         assert_eq!(super::read_local_view_tasks(&conn, 1)?, state);

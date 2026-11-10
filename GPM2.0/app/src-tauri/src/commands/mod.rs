@@ -856,10 +856,29 @@ mod tests {
         let state = json!({"version": 1, "scopes": {"[\"chr1\",null]": [
             {"id": "local-stable", "name": "View", "note": "first\nsecond", "snapshot": {}}
         ]}});
-        tauri::async_runtime::block_on(set_project_local_view_tasks(workspace.clone(), 1, state.clone())).unwrap();
-        assert_eq!(tauri::async_runtime::block_on(get_project_local_view_tasks(workspace.clone(), 1)).unwrap(), state);
-        assert!(tauri::async_runtime::block_on(set_project_local_view_tasks(workspace.clone(), 1, json!({"version": 2}))).is_err());
-        assert_eq!(tauri::async_runtime::block_on(get_project_local_view_tasks(workspace, 1)).unwrap(), state);
+        tauri::async_runtime::block_on(set_project_local_view_tasks(
+            workspace.clone(),
+            1,
+            state.clone(),
+        ))
+        .unwrap();
+        assert_eq!(
+            tauri::async_runtime::block_on(get_project_local_view_tasks(workspace.clone(), 1))
+                .unwrap(),
+            state
+        );
+        assert!(
+            tauri::async_runtime::block_on(set_project_local_view_tasks(
+                workspace.clone(),
+                1,
+                json!({"version": 2})
+            ))
+            .is_err()
+        );
+        assert_eq!(
+            tauri::async_runtime::block_on(get_project_local_view_tasks(workspace, 1)).unwrap(),
+            state
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

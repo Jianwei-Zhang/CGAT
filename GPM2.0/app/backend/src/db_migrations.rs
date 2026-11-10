@@ -74,7 +74,8 @@ fn migrate_local_view_tasks_to_v8(conn: &Connection) -> Result<()> {
             state_json TEXT NOT NULL,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );",
-    ).context("failed to create Local View task storage")
+    )
+    .context("failed to create Local View task storage")
 }
 
 fn migrate_annotation_provenance_to_v7(conn: &Connection) -> Result<()> {
