@@ -156,7 +156,7 @@ export function bindTrackContigDrag(host, store, deps) {
   }
 
   host.addEventListener("pointerdown", (event) => {
-    if (trackDragOwner(event.target) !== trackDragOwner(host) || event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
+    if (trackDragOwner(event.target) !== trackDragOwner(host) || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
     const state = store.getState();
@@ -385,7 +385,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
 
   const startDrag = (event) => {
     const runtimeHost = host;
-    if (trackDragOwner(event.target) !== trackDragOwner(host) || event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
+    if (trackDragOwner(event.target) !== trackDragOwner(host) || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
     const state = store.getState();

@@ -16,7 +16,7 @@ test("visible Tools and Full range actions have no paraphrase hints while icon c
     const fit = html.match(/<button[^>]*data-view-nav-action="fit"[^>]*>/)[0];
     assert.doesNotMatch(fit, /data-app-tooltip/);
     assert.match(html, /data-view-nav-action="left"[^>]*data-app-tooltip=/);
-    assert.match(html, /data-view-nav-action="toggle-mode"[^>]*data-app-tooltip=/);
+    assert.doesNotMatch(html, /data-view-nav-action="toggle-mode"/);
   }
 });
 

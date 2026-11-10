@@ -163,24 +163,21 @@ export function bindFinalPathAppendDrag(host, store, deps) {
   function onDown(event) {
     if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || gesture
       || ownerOf(event.target) !== ownerOf(root)) return;
-    const hand = Boolean(event.target?.closest?.("[data-view-interaction-mode='hand']"));
-    // Without transfer support, retain the original hand-mode-only contract.
-    if (!hand && !runtime.deps.dropLocal) return;
     const context = resolveFinalPathDragSource(event.target);
     if (!context) return;
     const state = store.getState();
     if (state.assembly?.loading || state.assembly?.mainViewHistory?.inFlight || state.assembly?.sourceEditingReloadRequired) return;
     gesture = { context, scope: scopeOf(state), source: event.target.closest(SOURCE), originalTarget: event.target,
       owner: ownerOf(event.target), localContext: resolveSubviewFragmentContextTarget(event.target)
-        || resolveSubviewTrackPairContextTarget(event.target), hand, pointerId: event.pointerId,
+        || resolveSubviewTrackPairContextTarget(event.target), pointerId: event.pointerId,
       startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, moved: false,
       point: { document: doc, x: event.clientX, y: event.clientY },
       generation: state.assembly?.subviewWorkspace?.generation,
       main: state.assembly.chrCtgs, support: state.assembly.supportChrCtgs,
       reference: state.assembly.refTrackMembers, summary: state.assembly.subview?.summary };
-    // In mouse mode this is observational until vertical intent is established.
-    // The existing horizontal controller is free to preview normally meanwhile.
-    if (hand) { event.preventDefault(); event.stopImmediatePropagation(); }
+    // Observe until vertical/cross-view intent is established; horizontal
+    // position previews and click selection remain available without a mode switch.
+    root.dataset.viewContigGesture = "pending";
     try { root.setPointerCapture?.(event.pointerId); } catch { /* synthetic pointer */ }
     win.addEventListener("pointermove", onMove, true);
     win.addEventListener("pointerup", onUp, true);
@@ -193,9 +190,10 @@ export function bindFinalPathAppendDrag(host, store, deps) {
     if (!isCurrent()) { cancel(); return; }
     gesture.x = event.clientX; gesture.y = event.clientY;
     const dx = gesture.x - gesture.startX, dy = gesture.y - gesture.startY;
+    if (Math.hypot(dx, dy) >= 4) root.dataset.viewContigGesture = "drag";
     const outside = gesture.x < 0 || gesture.y < 0 || gesture.x >= win.innerWidth || gesture.y >= win.innerHeight;
-    const destination = runtime.deps.dropLocal && targetAt({ document: doc, x: gesture.x, y: gesture.y });
-    if (!gesture.moved && (Math.hypot(dx, dy) < 4 || (!gesture.hand && !outside && !destination
+    const destination = targetAt({ document: doc, x: gesture.x, y: gesture.y });
+    if (!gesture.moved && (Math.hypot(dx, dy) < 4 || (!outside && !destination
       && (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(dx) * 0.6)))) return;
     event.preventDefault(); event.stopImmediatePropagation();
     startTransfer();
@@ -234,6 +232,11 @@ export function bindFinalPathAppendDrag(host, store, deps) {
       }, error => { if (gesture === active) { cancel(); runtime.deps.onError?.(root, store, error); } });
     } else void finish({ document: doc, x: event.clientX, y: event.clientY });
   }
+  function onLostPointerCapture(event) {
+    if (!gesture || event.pointerId !== gesture.pointerId || gesture.finishing) return;
+    runtime.deps.cancelHorizontal?.(root);
+    cancel();
+  }
   function onKey(event) { if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); cancel(); } }
   function onClick(event) {
     if (Date.now() >= suppressClickUntil) return;
@@ -244,8 +247,10 @@ export function bindFinalPathAppendDrag(host, store, deps) {
     clearTarget();
     if (gesture.moved) suppressClickUntil = Date.now() + 300;
     gesture.ghost?.remove();
-    try { root.releasePointerCapture?.(gesture.pointerId); } catch { /* already released */ }
+    const pointerId = gesture.pointerId;
     gesture = null;
+    delete root.dataset.viewContigGesture;
+    try { root.releasePointerCapture?.(pointerId); } catch { /* already released */ }
     if (frame !== null) win.cancelAnimationFrame(frame);
     if (probeTimer !== null) win.clearTimeout(probeTimer);
     frame = probeTimer = null;
@@ -256,9 +261,10 @@ export function bindFinalPathAppendDrag(host, store, deps) {
     win.removeEventListener("blur", cancel);
   }
   function destroy() {
-    cancel(); root.removeEventListener("pointerdown", onDown, true); root.removeEventListener("click", onClick, true);
+    cancel(); root.removeEventListener("lostpointercapture", onLostPointerCapture); root.removeEventListener("pointerdown", onDown, true); root.removeEventListener("click", onClick, true);
     delete root[BOUND];
   }
+  root.addEventListener("lostpointercapture", onLostPointerCapture);
   root.addEventListener("pointerdown", onDown, true);
   root.addEventListener("click", onClick, true);
   return runtime;

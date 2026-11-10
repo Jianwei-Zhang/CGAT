@@ -7,8 +7,8 @@ export function isViewNavigationContextMenuTarget(target) {
 }
 
 export const VIEW_NAV_TEXT = {
-  zh: { group: "查看范围", mode: "手形导航模式（拖动平移、滚轮缩放；关闭时选择和编辑）", mouse: "鼠标模式：选择和编辑，滚轮滚动页面", hand: "手形模式：拖动 Contig 添加到 Final Path，拖动空白平移，滚轮缩放", left: "左移半屏", right: "右移半屏", fit: "全览", fitHint: "显示当前视图的全部范围", span: "窗口", axis: "总览范围；拖动范围框平移，手形模式下滚轮缩放", window: "当前查看窗口", edgeLeft: "调整窗口左边界", edgeRight: "调整窗口右边界", tick: "刻度间隔", tickOptions: "选择刻度间隔", tickInvalid: "请输入 Auto 或有效的正数；单位为 kb。" },
-  en: { group: "Viewing range", mode: "Hand navigation mode (pan and wheel zoom; off: select and edit)", mouse: "Mouse mode: select and edit; wheel scrolls the page", hand: "Hand mode: drag contigs to Final Path; drag blank space to pan; wheel to zoom", left: "Move left half a window", right: "Move right half a window", fit: "Full range", fitHint: "Display the complete viewing range", span: "Window", axis: "Overview range; drag the window to pan, wheel to zoom in hand mode", window: "Current viewing window", edgeLeft: "Resize left window edge", edgeRight: "Resize right window edge", tick: "Tick interval", tickOptions: "Choose tick interval", tickInvalid: "Enter Auto or a positive tick interval in kb." },
+  zh: { group: "查看范围", interaction: "拖动空白平移；Ctrl / ⌘ + 拖动空白框选；横向拖动 Contig 调整位置，拖到目标视图添加；滚轮缩放", left: "左移半屏", right: "右移半屏", fit: "全览", fitHint: "显示当前视图的全部范围", span: "窗口", axis: "总览范围；拖动范围框平移，滚轮缩放", window: "当前查看窗口", edgeLeft: "调整窗口左边界", edgeRight: "调整窗口右边界", tick: "刻度间隔", tickOptions: "选择刻度间隔", tickInvalid: "请输入 Auto 或有效的正数；单位为 kb。" },
+  en: { group: "Viewing range", interaction: "Drag blank space to pan; Ctrl / ⌘ + drag blank space to box-select; drag contigs horizontally to reposition or onto a destination view to add; wheel to zoom", left: "Move left half a window", right: "Move right half a window", fit: "Full range", fitHint: "Display the complete viewing range", span: "Window", axis: "Overview range; drag the window to pan, wheel to zoom", window: "Current viewing window", edgeLeft: "Resize left window edge", edgeRight: "Resize right window edge", tick: "Tick interval", tickOptions: "Choose tick interval", tickInvalid: "Enter Auto or a positive tick interval in kb." },
 };
 export function viewNavText(i18nOrLocale) {
   const locale = typeof i18nOrLocale === "string" ? i18nOrLocale
@@ -21,20 +21,13 @@ export function renderViewTickControl() {
   return "";
 }
 const paths = {
-  mouse: '<path d="M5 3v16l4-4 3 6 3-2-3-6h6Z"/>',
-  hand: '<path d="M8 12V5a1.5 1.5 0 0 1 3 0v6-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v7c0 4-3 6-7 6-2 0-3-1-4-3l-4-5a1.5 1.5 0 0 1 2-2l2 2Z"/>',
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>', right: '<path d="m10 6 6 6-6 6M4 12h12"/>',
 };
-export function renderViewNavigation(role, locale, mode = "mouse") {
-  const t = viewNavText(locale), isHand = mode === "hand";
+export function renderViewNavigation(role, locale) {
+  const t = viewNavText(locale);
   const icon = (action) => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[action]}</svg>`;
   const button = (action, title) => `<button type="button" class="view-nav-button" data-view-nav-action="${action}" aria-label="${escape(title)}" data-app-tooltip="${escape(title)}">${icon(action)}</button>`;
-  return `<div class="assembly-view-navigation" data-view-navigation="${role}" role="group" aria-label="${t.group}">
-    <button type="button" class="view-nav-mode-switch" data-view-nav-action="toggle-mode" role="switch" aria-checked="${isHand}" aria-label="${t.mode}" data-app-tooltip="${isHand ? t.hand : t.mouse}">
-      <span class="view-nav-mode-thumb" aria-hidden="true"></span>
-      <span class="view-nav-mode-icon is-mouse" aria-hidden="true">${icon("mouse")}</span>
-      <span class="view-nav-mode-icon is-hand" aria-hidden="true">${icon("hand")}</span>
-    </button>
+  return `<div class="assembly-view-navigation" data-view-navigation="${role}" role="group" aria-label="${t.group}" aria-description="${escape(t.interaction)}">
     <div class="view-nav-moves">${button("left", t.left)}${button("right", t.right)}</div>
     <div class="view-nav-range">
       <div class="view-nav-axis" data-view-nav-axis data-app-tooltip="${t.axis}" aria-label="${t.axis}">
@@ -52,11 +45,10 @@ export function renderViewNavigation(role, locale, mode = "mouse") {
 
 // Locale is presentation-only: retain the navigation owner, gesture state and
 // focused elements instead of rebuilding its runtime-created sibling toolbar.
-export function localizeViewNavigation(bar, locale, mode = "mouse") {
+export function localizeViewNavigation(bar, locale) {
   const t = viewNavText(locale);
   const attrs = (node, values) => { for (const [key, value] of Object.entries(values)) node?.setAttribute?.(key, value); };
-  attrs(bar, { "aria-label": t.group });
-  attrs(bar.querySelector("[data-view-nav-action='toggle-mode']"), { "aria-label": t.mode, title: mode === "hand" ? t.hand : t.mouse });
+  attrs(bar, { "aria-label": t.group, "aria-description": t.interaction });
   for (const key of ["left", "right"]) attrs(bar.querySelector(`[data-view-nav-action='${key}']`), { "aria-label": t[key], title: t[key] });
   attrs(bar.querySelector("[data-view-nav-axis]"), { title: t.axis, "aria-label": t.axis });
   attrs(bar.querySelector("[data-view-nav-window]"), { "aria-label": t.window });

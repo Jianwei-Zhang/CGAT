@@ -7,40 +7,89 @@ const BOUND = Symbol("finalPathSelectionBound");
 const OWNERS = new WeakMap();
 const SEGMENT = "[data-final-path-segment-id]";
 const OVERLAY = "[data-final-path-selection-overlay]";
+const SURFACE = "[data-final-path-graph-viewport], [data-final-path-card-list], .assembly-final-path-svg-wrap";
+const EDITABLE = 'input, select, textarea, [contenteditable]:not([contenteditable="false"])';
+const CONTROL = `${EDITABLE}, button, a[href], summary`;
+const DRAG_DISTANCE_PX = 4;
 const scopeKey = state => JSON.stringify([state.session?.workspacePath, state.session?.projectId,
   state.assembly?.selectedChrName, state.assembly?.activeFinalPathKeyByChr?.[state.assembly?.selectedChrName]
     || state.assembly?.activeFinalPathKey || ""]);
 const editingSelectionKey = state => JSON.stringify([state.assembly?.selectedCtgId, state.assembly?.trackSelectedCtgIds || [],
   state.assembly?.subview?.trackPairSelectedCtgs || []]);
+const selectionKey = selection => JSON.stringify([selection.chrName, selection.segmentId]);
 const sourceCtgs = state => collectFinalPathSourceCtgs(state.assembly);
+const isVisible = state => !state.activeRoute || state.activeRoute === "assembly";
 
 function targetChr(node, state) {
   return node?.closest?.("[data-final-path-target-chr-name]")?.dataset?.finalPathTargetChrName
     || resolveCurrentFinalPathChrName(state.assembly);
 }
 
+function phaseExists(selection, state) {
+  return !selection.phasedTrackId || state.assembly?.phasedChrTracks?.some(track =>
+    track.phasedTrackId === selection.phasedTrackId && track.label === selection.chrName);
+}
+
+function selectionRange(selection, state, ctgs) {
+  const segment = state.assembly?.finalPathByChr?.[selection.chrName]?.segments
+    ?.find(item => item.segmentId === selection.segmentId && item.type !== "gap");
+  return segment ? resolveFinalPathSourceRange(segment, ctgs) : null;
+}
+
+function selectionFromNode(node, state) {
+  if (!node || !isVisible(state) || state.assembly?.loading) return null;
+  const chrName = targetChr(node, state), segmentId = node.dataset.finalPathSegmentId;
+  const phasedTrackId = state.assembly?.phasedChrTracks?.find(track => track.label === chrName)?.phasedTrackId;
+  const selection = { chrName, segmentId, phasedTrackId };
+  return selectionRange(selection, state, sourceCtgs(state)) ? selection : null;
+}
+
+// Union only overlapping/adjacent inclusive source intervals. Never bridge an
+// unadopted gap between two selected pieces of the same original Contig.
+function sourceIntersections(ranges, projection) {
+  const intersections = ranges.map(range => intersectSourceInterval(range, projection)).filter(Boolean)
+    .sort((a, b) => a.sourceStart - b.sourceStart || a.sourceEnd - b.sourceEnd);
+  const merged = [];
+  for (const intersection of intersections) {
+    const previous = merged.at(-1);
+    if (previous && intersection.sourceStart <= previous.sourceEnd + 1) {
+      previous.sourceEnd = Math.max(previous.sourceEnd, intersection.sourceEnd);
+      previous.startFraction = Math.min(previous.startFraction, intersection.startFraction);
+      previous.endFraction = Math.max(previous.endFraction, intersection.endFraction);
+    } else merged.push({ ...intersection });
+  }
+  return merged;
+}
+
 function paint(owner) {
   const { host, store } = owner;
-  const state = store.getState();
-  const visible = !state.activeRoute || state.activeRoute === "assembly";
-  let selected = owner.selected;
-  if (!visible || owner.scope !== scopeKey(state) || owner.editing !== editingSelectionKey(state)) {
-    owner.selected = selected = null;
+  const state = store.getState(), scope = scopeKey(state), editing = editingSelectionKey(state);
+  if (!isVisible(state) || owner.scope !== scope) {
+    owner.pinned.clear(); owner.transient = null; owner.pointer = null;
+  } else if (owner.editing !== editing) {
+    // Editing selections still end transient correlation, not the user's
+    // independent read-only pinned comparison set.
+    owner.transient = null;
   }
-  owner.scope = scopeKey(state);
-  owner.editing = editingSelectionKey(state);
-  if (selected?.phasedTrackId && !state.assembly?.phasedChrTracks?.some(track =>
-    track.phasedTrackId === selected.phasedTrackId && track.label === selected.chrName)) {
-    owner.selected = selected = null;
+  owner.scope = scope; owner.editing = editing;
+  const selected = new Map(owner.pinned);
+  if (owner.transient) selected.set(selectionKey(owner.transient), owner.transient);
+  const ctgs = selected.size ? sourceCtgs(state) : [];
+  const ranges = [];
+  for (const [key, selection] of selected) {
+    const validPhase = phaseExists(selection, state);
+    const range = validPhase ? selectionRange(selection, state, ctgs) : null;
+    if (range) ranges.push(range);
+    else {
+      selected.delete(key);
+      if (!validPhase || !state.assembly?.loading) {
+        owner.pinned.delete(key);
+        if (owner.transient && selectionKey(owner.transient) === key) owner.transient = null;
+      }
+    }
   }
-  let segment = selected && state.assembly?.finalPathByChr?.[selected.chrName]?.segments
-    ?.find(item => item.segmentId === selected.segmentId && item.type !== "gap");
-  if (selected && !segment && !state.assembly?.loading) owner.selected = selected = null;
-  const range = segment ? resolveFinalPathSourceRange(segment, sourceCtgs(state)) : null;
-  if (selected && !range && !state.assembly?.loading) owner.selected = selected = null;
   for (const node of host.querySelectorAll(SEGMENT)) {
-    const active = visible && selected && node.dataset.finalPathSegmentId === selected.segmentId
-      && targetChr(node, state) === selected.chrName;
+    const active = selected.has(selectionKey({ chrName: targetChr(node, state), segmentId: node.dataset.finalPathSegmentId }));
     if (active) node.setAttribute("data-final-path-selected", "1");
     else node.removeAttribute("data-final-path-selected");
   }
@@ -48,95 +97,139 @@ function paint(owner) {
   for (const node of host.querySelectorAll("[data-source-interval-projection]")) {
     let projection;
     try { projection = JSON.parse(node.dataset.sourceIntervalProjection); } catch { continue; }
-    const intersection = visible ? intersectSourceInterval(range, projection) : null;
-    if (!intersection) continue;
+    const intersections = sourceIntersections(ranges, projection);
+    if (!intersections.length) continue;
     const d = node.dataset;
     const x = Number(d.trackRectX ?? d.subviewRectX), y = Number(d.trackRectY ?? d.subviewRectY);
     const width = Number(d.trackRectWidth ?? d.subviewRectWidth), height = Number(d.trackRectHeight ?? d.subviewRectHeight);
     if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) continue;
-    let overlay = node.querySelector(OVERLAY);
-    if (!overlay) {
-      overlay = node.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "rect");
-      overlay.setAttribute("data-final-path-selection-overlay", "1");
-      overlay.setAttribute("class", "final-path-source-highlight");
-      overlay.setAttribute("pointer-events", "none");
-      node.append(overlay);
+    const overlays = [...node.children].filter(child => child.matches(OVERLAY));
+    for (const [index, intersection] of intersections.entries()) {
+      let overlay = overlays[index];
+      if (!overlay) {
+        overlay = node.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "rect");
+        overlay.setAttribute("data-final-path-selection-overlay", "1");
+        overlay.setAttribute("class", "final-path-source-highlight");
+        overlay.setAttribute("pointer-events", "none");
+        node.append(overlay);
+      }
+      const attrs = { x: x + intersection.startFraction * width, y,
+        width: (intersection.endFraction - intersection.startFraction) * width, height,
+        "data-source-start": intersection.sourceStart, "data-source-end": intersection.sourceEnd };
+      for (const [key, value] of Object.entries(attrs)) {
+        if (overlay.getAttribute(key) !== String(value)) overlay.setAttribute(key, String(value));
+      }
+      retained.add(overlay);
     }
-    const attrs = { x: x + intersection.startFraction * width, y,
-      width: (intersection.endFraction - intersection.startFraction) * width, height,
-      "data-source-start": intersection.sourceStart, "data-source-end": intersection.sourceEnd };
-    for (const [key, value] of Object.entries(attrs)) {
-      if (overlay.getAttribute(key) !== String(value)) overlay.setAttribute(key, String(value));
-    }
-    retained.add(overlay);
   }
   for (const overlay of host.querySelectorAll(OVERLAY)) if (!retained.has(overlay)) overlay.remove();
 }
 
-// A separate in-memory owner avoids expanding deletion/edit selections or
-// persisting correlation into project data. Binding after a local DOM patch
-// reapplies paint without changing focus, viewport, or the mounted graph.
+// Pinned and transient correlation live outside deletion/edit selections and
+// project persistence. Rebinding after a local DOM patch only reapplies paint.
 export function bindFinalPathSelection(host, store) {
   host = host?.closest?.("#route-host") || host;
   if (!host?.querySelectorAll || !host?.addEventListener || !host.ownerDocument?.createElementNS) return;
   let owner = OWNERS.get(store);
   if (!owner) {
-    owner = { store, host, selected: null, scope: scopeKey(store.getState()), editing: editingSelectionKey(store.getState()) };
+    owner = { store, host, pinned: new Map(), transient: null, pointer: null,
+      scope: scopeKey(store.getState()), editing: editingSelectionKey(store.getState()) };
     OWNERS.set(store, owner);
     store.subscribe?.(() => paint(owner));
   }
   owner.host = host;
   if (!host[BOUND]) {
-    const clear = () => {
-      if (!owner.selected) return;
-      owner.selected = null;
+    const clearTransient = () => {
+      if (!owner.transient) return;
+      owner.transient = null;
+      paint(owner);
+    };
+    const clearAll = () => {
+      owner.pinned.clear(); owner.transient = null;
       paint(owner);
     };
     const select = event => {
       if (event.type === "pointerover" && (event.pointerType === "touch" || event.buttons)) return;
-      // A click may focus a table input, but must not pin a hover highlight.
+      // Pointer focus in an editable table field is not a pinned selection.
       if (event.type === "focusin" && owner.pointerFocus) return;
       const node = event.target?.closest?.(SEGMENT);
       if (node && event.relatedTarget?.closest?.(SEGMENT) === node) return;
       const state = store.getState();
-      if ((state.activeRoute && state.activeRoute !== "assembly") || state.assembly?.loading) return;
-      const chrName = node && targetChr(node, state), segmentId = node?.dataset.finalPathSegmentId;
-      const segment = state.assembly?.finalPathByChr?.[chrName]?.segments?.find(item => item.segmentId === segmentId);
-      if (!segment || segment.type === "gap" || !resolveFinalPathSourceRange(segment, sourceCtgs(state))) {
-        clear();
-        return;
-      }
-      const phasedTrackId = state.assembly?.phasedChrTracks?.find(track => track.label === chrName)?.phasedTrackId;
+      if (!isVisible(state) || state.assembly?.loading) return;
+      const selection = selectionFromNode(node, state);
+      if (!selection) { clearTransient(); return; }
       owner.trigger = event.type === "pointerover" ? "hover" : "focus";
-      if (owner.selected?.chrName === chrName && owner.selected?.segmentId === segmentId) return;
-      owner.selected = { chrName, segmentId, phasedTrackId };
-      owner.scope = scopeKey(state); owner.editing = editingSelectionKey(state);
+      if (owner.transient && selectionKey(owner.transient) === selectionKey(selection)) return;
+      owner.transient = selection;
       paint(owner);
     };
     const leave = event => {
       const node = event.target?.closest?.(SEGMENT);
       if (!node || event.relatedTarget?.closest?.(SEGMENT) === node) return;
       if (event.type === "focusout" && owner.trigger !== "focus") return;
-      const selected = owner.selected;
-      if (selected?.segmentId === node.dataset.finalPathSegmentId
-        && selected.chrName === targetChr(node, store.getState())) clear();
+      if (owner.transient?.segmentId === node.dataset.finalPathSegmentId
+        && owner.transient.chrName === targetChr(node, store.getState())) clearTransient();
+    };
+    const cancelPointer = () => {
+      if (owner.pointer) owner.pointer.cancelled = true;
+      clearTransient();
+    };
+    const trackPointer = event => {
+      const pointer = owner.pointer;
+      if (!pointer || (pointer.id !== undefined && event.pointerId !== pointer.id)) return;
+      if (Math.hypot(Number(event.clientX || 0) - pointer.x, Number(event.clientY || 0) - pointer.y) >= DRAG_DISTANCE_PX) pointer.moved = true;
     };
     host.addEventListener("pointerover", select);
     host.addEventListener("pointerout", leave);
-    host.addEventListener("pointerleave", () => { if (owner.trigger === "hover") clear(); });
-    host.addEventListener("pointercancel", clear);
-    host.addEventListener("dragstart", clear);
+    host.addEventListener("pointerleave", () => { if (owner.trigger === "hover") clearTransient(); });
+    host.addEventListener("dragstart", cancelPointer);
     host.addEventListener("pointerdown", event => {
-      owner.pointerFocus = true;
-      if (!event.target?.closest?.(SEGMENT) || event.pointerType === "touch" || owner.trigger === "focus") clear();
+      owner.pointerFocus = true; owner.pointer = null;
+      const node = event.target?.closest?.(SEGMENT);
+      if (!node || event.pointerType === "touch" || owner.trigger === "focus") clearTransient();
+      if (event.button !== 0 || event.defaultPrevented || event.target?.closest?.(CONTROL)) return;
+      const state = store.getState();
+      const selection = selectionFromNode(node, state);
+      const blank = !node && event.target?.closest?.(SURFACE);
+      if (!isVisible(state) || state.assembly?.loading || (!selection && !blank)) return;
+      owner.pointer = { id: event.pointerId, key: selection ? selectionKey(selection) : null,
+        x: Number(event.clientX || 0), y: Number(event.clientY || 0), scope: scopeKey(state),
+        additive: Boolean(event.ctrlKey || event.metaKey), moved: false };
     }, true);
-    host.ownerDocument.addEventListener("keydown", event => {
+    host.addEventListener("click", event => {
+      const pointer = owner.pointer; owner.pointer = null;
+      if (!pointer || pointer.moved || pointer.cancelled || event.button !== 0 || event.defaultPrevented
+        || event.target?.closest?.(CONTROL)) return;
+      const state = store.getState();
+      if (!isVisible(state) || state.assembly?.loading || pointer.scope !== scopeKey(state)) return;
+      const node = event.target?.closest?.(SEGMENT), selection = selectionFromNode(node, state);
+      const key = selection ? selectionKey(selection) : null;
+      if (key !== pointer.key) return;
+      if (!selection) {
+        if (!node && event.target?.closest?.(SURFACE)) clearAll();
+        return;
+      }
+      // A toggle-off must be visible immediately, even while still hovered.
+      owner.transient = null;
+      if (!pointer.additive) owner.pinned.clear();
+      if (pointer.additive && owner.pinned.has(key)) owner.pinned.delete(key);
+      else owner.pinned.set(key, selection);
+      paint(owner);
+    }, true);
+    const document = host.ownerDocument;
+    document.addEventListener("pointermove", trackPointer, true);
+    document.addEventListener("pointerup", trackPointer, true);
+    document.addEventListener("pointercancel", cancelPointer, true);
+    document.addEventListener("keydown", event => {
       owner.pointerFocus = false;
-      if (event.key === "Escape") clear();
+      if (event.key === "Escape" && !event.defaultPrevented && !event.target?.closest?.(EDITABLE)) {
+        if (owner.pointer) owner.pointer.cancelled = true;
+        clearAll();
+      }
     }, true);
     host.addEventListener("focusin", select);
     host.addEventListener("focusout", leave);
-    host.ownerDocument.defaultView?.addEventListener("blur", clear);
+    document.defaultView?.addEventListener("blur", cancelPointer);
     host[BOUND] = true;
   }
   paint(owner);

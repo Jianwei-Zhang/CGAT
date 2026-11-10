@@ -13,8 +13,11 @@ class Element {
   setAttribute(k, v) { this.attrs[k] = String(v); if (k.startsWith("data-")) this.dataset[key(k)] = String(v); }
   getAttribute(k) { return this.attrs[k] ?? null; }
   removeAttribute(k) { delete this.attrs[k]; if (k.startsWith("data-")) delete this.dataset[key(k)]; }
-  matches(selector) { return selector.split(", ").some(s => s === "#route-host" ? this.attrs.id === "route-host"
+  matches(selector) { return selector.split(/,\s*/).some(s => s === "#route-host" ? this.attrs.id === "route-host"
+    : s === '[contenteditable]:not([contenteditable="false"])' ? this.getAttribute("contenteditable") !== null && this.getAttribute("contenteditable") !== "false"
+    : s === "a[href]" ? this.tag === "a" && this.getAttribute("href") !== null
     : s.startsWith(".") ? (this.attrs.class || "").split(" ").includes(s.slice(1))
+    : /^[a-z]+$/.test(s) ? this.tag === s
     : /^\[[^\]]+\]$/.test(s) && this.getAttribute(s.slice(1, -1)) !== null); }
   closest(selector) { return this.matches(selector) ? this : this.parent?.closest(selector) || null; }
   querySelectorAll(selector) { return this.children.flatMap(child => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]); }
@@ -37,9 +40,11 @@ function fixture() {
     const node = new Element(doc); node.tag = tag; created.push(node); return node;
   } };
   const host = new Element(doc, { id: "route-host" });
-  const graph = new Element(doc, { "data-final-path-segment-id": "seg1" }); host.append(graph);
-  const row = new Element(doc, { "data-final-path-segment-id": "seg1" }); host.append(row);
-  const input = new Element(doc); row.append(input);
+  const plot = new Element(doc, { "data-final-path-graph-viewport": "" }); host.append(plot);
+  const list = new Element(doc, { "data-final-path-card-list": "" }); host.append(list);
+  const graph = new Element(doc, { "data-final-path-segment-id": "seg1" }); plot.append(graph);
+  const row = new Element(doc, { "data-final-path-segment-id": "seg1" }); list.append(row);
+  const input = new Element(doc); input.tag = "input"; row.append(input);
   const makeGroup = (range, local = false) => {
     const node = new Element(doc, { "data-source-interval-projection": JSON.stringify(range),
       [local ? "data-subview-contig-id" : "data-track-contig-id"]: "1",
@@ -60,13 +65,16 @@ function fixture() {
   bindFinalPathSelection(host, store);
   const fire = (type, target, extra = {}) => {
     for (const events of [documentEvents, host.events]) {
-      events.get(type)?.forEach(fn => fn({ type, target, button: 0, ...extra }));
+      events.get(type)?.forEach(fn => fn({ type, target, button: 0, pointerId: 1, clientX: 10, clientY: 10, ...extra }));
     }
   };
   const blur = () => windowEvents.get("blur")?.forEach(fn => fn());
   const overlay = node => node.querySelector("[data-final-path-selection-overlay]");
   const patch = value => store.setState({ assembly: { ...store.getState().assembly, ...value } });
-  return { host, graph, row, input, main, local, other, store, fire, overlay, patch, created, blur };
+  const click = (target, extra = {}) => {
+    fire("pointerdown", target, extra); fire("pointerup", target, extra); fire("click", target, extra);
+  };
+  return { host, plot, list, graph, row, input, main, local, other, store, fire, click, overlay, patch, created, blur };
 }
 
 test("graph/table hover paints only adopted Main/Local source intersections", () => {
@@ -305,7 +313,7 @@ test("pointer leave, cancellation, drag start and Escape remove transient paint"
   }
 });
 
-test("click/touch never activate or pin correlation; keyboard focus remains available", () => {
+test("pointerdown/touch/field focus alone never pin correlation; keyboard focus remains available", () => {
   const f = fixture();
   f.fire("pointerdown", f.graph);
   assert.equal(f.overlay(f.main), null);
@@ -357,4 +365,249 @@ test("a late leave from another segment cannot clear the current hovered source"
   assert.equal(second.getAttribute("data-final-path-selected"), "1");
   assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
   assert.equal(f.overlay(f.main).getAttribute("data-source-start"), "6001");
+});
+
+function addSegment(f, overrides) {
+  const entry = f.store.getState().assembly.finalPathByChr.Chr1;
+  const segment = { ...entry.segments[0], segmentId: "seg2", ...overrides };
+  f.patch({ finalPathByChr: { Chr1: { ...entry, segments: [...entry.segments, segment] } } });
+  const graph = new Element(f.host.ownerDocument, { "data-final-path-segment-id": segment.segmentId }); f.plot.append(graph);
+  const row = new Element(f.host.ownerDocument, { "data-final-path-segment-id": segment.segmentId }); f.list.append(row);
+  return { graph, row, segment };
+}
+const sourceRanges = node => node.querySelectorAll("[data-final-path-selection-overlay]")
+  .map(overlay => [Number(overlay.getAttribute("data-source-start")), Number(overlay.getAttribute("data-source-end"))]);
+
+test("ordinary click pins one instance across graph/table without editing or notifying the store", () => {
+  const f = fixture(); let notifications = 0; f.store.subscribe(() => notifications++);
+  const state = f.store.getState();
+  f.click(f.graph); f.fire("pointerout", f.graph); f.fire("pointerleave", f.host);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.row.getAttribute("data-final-path-selected"), "1");
+  assert.ok(f.overlay(f.main)); assert.ok(f.overlay(f.local));
+  assert.equal(f.store.getState(), state); assert.equal(notifications, 0);
+  assert.deepEqual(state.assembly.trackSelectedCtgIds, []);
+  assert.deepEqual(state.assembly.subview.trackPairSelectedCtgs, []);
+});
+
+for (const modifier of ["ctrlKey", "metaKey"]) {
+  test(`${modifier} + click adds/removes instances and key release does not clear them`, () => {
+    const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2", start: 1, end: 2000 });
+    f.click(f.graph); f.click(second.row, { [modifier]: true });
+    f.fire("keyup", f.host, { key: modifier === "ctrlKey" ? "Control" : "Meta" });
+    f.fire("pointerleave", f.host);
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+    assert.equal(second.graph.getAttribute("data-final-path-selected"), "1");
+    assert.ok(f.overlay(f.main)); assert.ok(f.overlay(f.other));
+    f.fire("pointerover", f.graph); f.click(f.graph, { [modifier]: true });
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), null, "toggle off is immediate, not kept by the same hover");
+    assert.equal(f.overlay(f.main), null);
+    assert.equal(second.row.getAttribute("data-final-path-selected"), "1");
+    f.click(second.graph, { [modifier]: true });
+    assert.equal(f.overlay(f.other), null);
+  });
+}
+
+test("ordinary click replaces multiple pins, while hover only temporarily adds to them", () => {
+  const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2", start: 1, end: 2000 });
+  f.click(f.graph); f.fire("pointerover", second.graph);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(second.graph.getAttribute("data-final-path-selected"), "1");
+  f.fire("pointerout", second.graph, { relatedTarget: f.main });
+  assert.equal(second.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  f.click(second.row, { ctrlKey: true });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(second.graph.getAttribute("data-final-path-selected"), "1");
+  f.click(second.row);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(second.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.overlay(f.main), null); assert.ok(f.overlay(f.other));
+});
+
+test("two pieces of one original Contig stay separate, including reversed Local projection", () => {
+  const f = fixture();
+  const second = addSegment(f, { start: 1001, end: 2000 });
+  f.local.setAttribute("data-source-interval-projection", JSON.stringify({ assemblyCtgId: 1, sourceStart: 1, sourceEnd: 10000, orient: "-" }));
+  f.click(f.graph); f.click(second.graph, { ctrlKey: true });
+  assert.deepEqual(sourceRanges(f.main), [[1001, 2000], [5001, 10000]]);
+  assert.deepEqual(sourceRanges(f.local), [[1001, 2000], [5001, 10000]]);
+  const localOverlays = f.local.querySelectorAll("[data-final-path-selection-overlay]");
+  assert.ok(Math.abs(Number(localOverlays[0].getAttribute("x")) - 180) < 1e-9);
+  assert.ok(Math.abs(Number(localOverlays[0].getAttribute("width")) - 20) < 1e-9);
+  assert.ok(Math.abs(Number(localOverlays[1].getAttribute("x")) - 20) < 1e-9);
+  assert.ok(Math.abs(Number(localOverlays[1].getAttribute("width")) - 100) < 1e-9);
+  f.click(second.graph, { ctrlKey: true });
+  assert.deepEqual(sourceRanges(f.main), [[5001, 10000]]);
+  assert.deepEqual(sourceRanges(f.local), [[5001, 10000]]);
+});
+
+for (const [start, end] of [[4001, 7000], [5001, 10000], [1001, 5000]]) {
+  test(`overlapping, repeated and adjacent source intervals merge without duplicate paint: ${start}-${end}`, () => {
+    const f = fixture(), second = addSegment(f, { start, end });
+    f.click(f.graph); f.click(second.graph, { ctrlKey: true });
+    assert.deepEqual(sourceRanges(f.main), [[Math.min(start, 5001), 10000]]);
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+    assert.equal(second.graph.getAttribute("data-final-path-selected"), "1");
+  });
+}
+
+test("All mode pins repeated segment IDs independently by their owning paths", () => {
+  const f = fixture(), entry = f.store.getState().assembly.finalPathByChr.Chr1;
+  f.patch({ isChrPhased: true, activeFinalPathKey: "__all__",
+    phasedChrTracks: [{ phasedTrackId: 1, label: "Chr1A" }, { phasedTrackId: 2, label: "Chr1B" }],
+    finalPathByChr: { Chr1A: entry, Chr1B: entry } });
+  f.graph.setAttribute("data-final-path-target-chr-name", "Chr1A");
+  f.row.setAttribute("data-final-path-target-chr-name", "Chr1B");
+  f.click(f.graph); f.click(f.row, { ctrlKey: true });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.row.getAttribute("data-final-path-selected"), "1");
+  assert.equal(sourceRanges(f.main).length, 1, "the same adopted source does not get a darker duplicate overlay");
+  f.click(f.graph, { ctrlKey: true });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(f.row.getAttribute("data-final-path-selected"), "1");
+});
+
+for (const clear of [f => f.click(f.plot), f => f.click(f.list), f => f.fire("keydown", f.host, { key: "Escape" })]) {
+  test(`Final Path background/Escape clears all pins and transient overlays: ${clear}`, () => {
+    const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2" });
+    f.click(f.graph); f.click(second.graph, { metaKey: true }); f.fire("pointerover", f.graph);
+    clear(f);
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+    assert.equal(second.row.getAttribute("data-final-path-selected"), null);
+    assert.equal(f.overlay(f.main), null); assert.equal(f.overlay(f.other), null);
+  });
+}
+
+test("editing fields, toolbar controls and unrelated blank clicks do not replace or clear pins", () => {
+  const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2" });
+  const before = f.store.getState();
+  const field = new Element(f.host.ownerDocument); field.tag = "input"; field.value = "draft"; second.row.append(field);
+  f.click(f.graph); f.click(field, { ctrlKey: true });
+  f.fire("keydown", field, { key: "Escape" });
+  const button = new Element(f.host.ownerDocument); button.tag = "button"; second.row.append(button);
+  f.click(button); f.click(f.host); f.click(f.main);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(second.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(field.value, "draft"); assert.equal(f.store.getState(), before);
+});
+
+for (const end of ["drag", "cancel", "native-drag", "blur"]) {
+  test(`a ${end} gesture cannot pin the hovered segment or replace existing pins`, () => {
+    const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2" });
+    f.click(f.graph); f.fire("pointerdown", second.graph);
+    if (end === "drag") {
+      f.fire("pointermove", f.host, { clientX: 30 });
+      f.fire("pointermove", f.host, { clientX: 10 });
+    } else if (end === "cancel") f.fire("pointercancel", second.graph);
+    else if (end === "native-drag") f.fire("dragstart", second.graph);
+    else f.blur();
+    f.fire("pointerup", second.graph); f.fire("click", second.graph);
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+    assert.equal(second.graph.getAttribute("data-final-path-selected"), null);
+  });
+}
+
+test("pinned comparisons survive redraw, scroll/zoom and Main/Local editing selection changes", () => {
+  const f = fixture(); f.click(f.graph);
+  const overlay = f.overlay(f.main);
+  f.patch({ trackView: { zoom: 2 }, trackScrollState: { scrollLeft: 300 }, trackSelectedCtgIds: [2],
+    subview: { trackPairSelectedCtgs: [{ contigId: 2, trackRole: "primary" }] } });
+  bindFinalPathSelection(f.host, f.store);
+  assert.equal(f.overlay(f.main), overlay);
+  const next = f.main.cloneNode(true); next.querySelector("[data-final-path-selection-overlay]").remove();
+  f.main.remove(); f.host.append(next); bindFinalPathSelection(f.host, f.store);
+  assert.ok(f.overlay(next)); assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, [2]);
+  assert.equal(f.host.events.get("click").length, 1);
+});
+
+for (const change of [f => f.patch({ selectedChrName: "Chr2" }),
+  f => f.store.setState({ session: { workspacePath: "workspace", projectId: 8 } }),
+  f => f.patch({ activeFinalPathKey: "A" }), f => f.store.setState({ activeRoute: "overview" })]) {
+  test(`context change clears fixed selection: ${change}`, () => {
+    const f = fixture(); f.click(f.graph); change(f);
+    assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+    assert.equal(f.overlay(f.main), null);
+  });
+}
+
+test("deleting/invalidating one pinned segment prunes only that instance", () => {
+  const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2" });
+  f.click(f.graph); f.click(second.graph, { ctrlKey: true });
+  const entry = f.store.getState().assembly.finalPathByChr.Chr1;
+  f.patch({ finalPathByChr: { Chr1: { ...entry, segments: [second.segment] } } });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(second.row.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.overlay(f.main), null); assert.ok(f.overlay(f.other));
+});
+
+test("export strips every pinned/hover overlay from a clone without altering live pins", () => {
+  const f = fixture(), second = addSegment(f, { start: 1001, end: 2000 });
+  f.click(f.graph); f.click(second.graph, { ctrlKey: true });
+  const count = sourceRanges(f.main).length;
+  const snapshot = snapshotWithoutFinalPathSelection(f.host);
+  assert.doesNotMatch(snapshot, /data-final-path-selection-overlay|data-final-path-selected/);
+  assert.equal(sourceRanges(f.main).length, count);
+  f.fire("pointerleave", f.host); assert.equal(sourceRanges(f.main).length, count);
+});
+
+
+test("removing a phase prunes its pins even if another phase reuses the label", () => {
+  const f = fixture(), entry = f.store.getState().assembly.finalPathByChr.Chr1;
+  f.patch({ isChrPhased: true, activeFinalPathKey: "__all__",
+    phasedChrTracks: [{ phasedTrackId: 1, label: "Chr1A" }, { phasedTrackId: 2, label: "Chr1B" }],
+    finalPathByChr: { Chr1A: entry, Chr1B: entry } });
+  f.graph.setAttribute("data-final-path-target-chr-name", "Chr1A");
+  f.row.setAttribute("data-final-path-target-chr-name", "Chr1B");
+  f.click(f.graph); f.click(f.row, { ctrlKey: true });
+  f.patch({ phasedChrTracks: [{ phasedTrackId: 2, label: "Chr1A" }] });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(f.row.getAttribute("data-final-path-selected"), null);
+  assert.equal(f.overlay(f.main), null);
+});
+
+test("loading may temporarily hide an unresolved pin without reviving invalid ranges", () => {
+  const f = fixture(), entry = f.store.getState().assembly.finalPathByChr.Chr1;
+  f.click(f.graph);
+  f.patch({ loading: true, finalPathByChr: {} });
+  assert.equal(f.overlay(f.main), null);
+  f.patch({ loading: false, finalPathByChr: { Chr1: entry } });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.ok(f.overlay(f.main));
+  f.patch({ finalPathByChr: { Chr1: { ...entry, segments: [{ ...entry.segments[0], start: 20000 }] } } });
+  assert.equal(f.overlay(f.main), null);
+  f.patch({ finalPathByChr: { Chr1: entry } });
+  assert.equal(f.overlay(f.main), null, "a proven invalid pin was pruned, not silently restored");
+});
+
+test("keyboard focus previews beside pins and Escape inside a field leaves pins alone", () => {
+  const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2" });
+  const field = new Element(f.host.ownerDocument); field.tag = "input"; second.row.append(field);
+  f.click(f.graph); f.fire("keydown", field, { key: "Tab" }); f.fire("focusin", field);
+  assert.ok(f.overlay(f.main)); assert.ok(f.overlay(f.other));
+  f.fire("keydown", field, { key: "Escape" });
+  assert.ok(f.overlay(f.main));
+  f.fire("focusout", field);
+  assert.ok(f.overlay(f.main)); assert.equal(f.overlay(f.other), null);
+});
+
+test("a click on a different target after pointerdown cannot select or clear the wrong instance", () => {
+  const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2" });
+  f.click(f.graph); f.fire("pointerdown", second.graph); f.fire("click", f.plot);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(second.graph.getAttribute("data-final-path-selected"), null);
+  f.fire("pointerdown", f.plot); f.fire("click", second.graph);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(second.graph.getAttribute("data-final-path-selected"), null);
+});
+
+
+test("Escape on a non-editing button clears pins, but an already-handled Escape does not", () => {
+  const f = fixture();
+  const button = new Element(f.host.ownerDocument); button.tag = "button"; f.host.append(button);
+  f.click(f.graph); f.fire("keydown", button, { key: "Escape", defaultPrevented: true });
+  assert.ok(f.overlay(f.main));
+  f.fire("keydown", button, { key: "Escape" });
+  assert.equal(f.overlay(f.main), null);
 });

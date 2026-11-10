@@ -92,20 +92,20 @@ test("ruler-only preferences do not invalidate main viewport scroll identity", (
 });
 test("localized navigation groups movement and places Full range after its axis and shows only a read-only window", () => {
   const zh = renderViewNavigation("primary", "zh"), en = renderViewNavigation("subview", "en");
-  for (const action of ["toggle-mode", "left", "right", "fit"]) assert.match(zh, new RegExp(`data-view-nav-action="${action}"`));
+  for (const action of ["left", "right", "fit"]) assert.match(zh, new RegExp(`data-view-nav-action="${action}"`));
   assert.match(zh, /左移半屏/); assert.match(en, /Move right half a window/);
   assert.ok(zh.indexOf('data-view-nav-action="left"') < zh.indexOf("data-view-nav-axis"));
   assert.ok(zh.indexOf('data-view-nav-action="right"') < zh.indexOf("data-view-nav-axis"));
   assert.ok(zh.indexOf("data-view-nav-axis") < zh.indexOf('data-view-nav-action="fit"'));
   assert.ok(zh.indexOf('data-view-nav-action="fit"') < zh.indexOf('data-view-nav-span'));
-  assert.equal([...zh.matchAll(/role="switch"/g)].length, 1);
-  assert.match(zh, /role="switch" aria-checked="false"/);
+  assert.doesNotMatch(zh, /toggle-mode|role="switch"|aria-checked|view-nav-mode/);
+  assert.match(zh, /aria-description="[^"\n]*Ctrl \/ ⌘/);
   assert.doesNotMatch(zh, /data-view-nav-action="(?:mouse|hand)"|aria-pressed/);
   assert.match(zh, /窗口/); assert.match(zh, />全览<\/button>/); assert.match(en, /Full range/);
   assert.match(en, /data-view-nav-grip aria-hidden="true" hidden/);
   assert.match(en, /<span data-view-nav-span/); assert.match(en, /role="slider"/);
   assert.doesNotMatch(zh, /<input|<select|data-view-nav-unit|data-view-nav-action="(?:minus|plus)"|跨度|适应全部/);
-  assert.doesNotMatch(zh, /Ctrl|Space|最小刻度|最多可展示数/);
+  assert.doesNotMatch(zh, /Space|最小刻度|最多可展示数/);
 });
 test("tick settings stay hidden in all assembly views and locales, including legacy manual preferences", () => {
   for (const viewKey of ["trackView", "subviewTrackView", "finalPathTrackView"]) {
@@ -119,13 +119,11 @@ test("tick settings stay hidden in all assembly views and locales, including leg
 
 for (const role of ["primary", "subview"]) {
   for (const locale of ["zh", "en"]) {
-    test(`${role} ${locale} replacement navigation renders the selected hand mode immediately`, () => {
-      const hand = renderViewNavigation(role, locale, "hand");
-      const mouse = renderViewNavigation(role, locale);
-      assert.match(hand, /role="switch" aria-checked="true"/);
-      assert.doesNotMatch(hand, /aria-checked="false"/);
-      assert.match(mouse, /role="switch" aria-checked="false"/);
-      assert.match(hand, locale === "zh" ? /data-app-tooltip="手形模式：拖动 Contig 添加到 Final Path，拖动空白平移，滚轮缩放"/ : /data-app-tooltip="Hand mode: drag contigs to Final Path; drag blank space to pan; wheel to zoom"/);
+    test(`${role} ${locale} navigation has no interaction switch and explains modified box selection`, () => {
+      const html = renderViewNavigation(role, locale);
+      assert.doesNotMatch(html, /toggle-mode|role="switch"|aria-checked|view-nav-mode/);
+      assert.match(html, /aria-description="[^"\n]*Ctrl \/ ⌘/);
+      assert.doesNotMatch(html, /手形模式|鼠标模式|hand mode|mouse mode/i);
     });
   }
 }
@@ -135,4 +133,12 @@ test("gesture cursor belongs to the stable capture host and overrides descendant
   assert.match(css, /\[data-view-navigation-gesture="pan"\],\s*\[data-view-navigation-gesture="window"\]\s*\{\s*cursor: grabbing !important;/);
   assert.match(css, /\[data-view-navigation-gesture="left"\],\s*\[data-view-navigation-gesture="right"\]\s*\{\s*cursor: ew-resize !important;/);
   assert.match(css, /\[data-view-navigation-gesture\] \*\s*\{\s*cursor: inherit !important;/);
+});
+
+test("plot cursors are unified without applying a hand cursor to the entire card", () => {
+  const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
+  assert.match(css, /\.assembly-track-scroll:is\(\[data-track-role="primary"\], \[data-track-role="subview"\]\) \{ cursor: grab; touch-action: none; \}/);
+  assert.match(css, /\.assembly-track-scroll\.is-track-box-selecting[\s\S]*?cursor: crosshair;/);
+  assert.doesNotMatch(css, /view-interaction-mode|view-nav-mode/);
+  assert.doesNotMatch(css, /\.assembly-view-card[^{}]*\{[^{}]*cursor:/);
 });

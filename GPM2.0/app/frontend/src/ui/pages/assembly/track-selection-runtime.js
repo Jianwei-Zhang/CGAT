@@ -8,6 +8,7 @@ import {
   resolveTrackPointerContentPoint,
   resolveTrackPointerScrollPoint,
 } from "./track-viewport.js";
+import { VIEW_CONTIG_TARGET, VIEW_CONTROL_TARGET, isViewBoxSelectionEvent } from "./view-interaction.js";
 
 const ASSEMBLY_TRACK_BOX_SELECT_BOUND = Symbol("assemblyTrackBoxSelectBound");
 const REQUIRED_TRACK_SELECTION_DEPS = [
@@ -128,8 +129,8 @@ export function bindTrackBoxSelection(host, store, deps) {
   }
 
   host.addEventListener("pointerdown", (event) => {
-    if (event.defaultPrevented || event.button !== 0
-      || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand") {
+    if (event.defaultPrevented || event.button !== 0 || !isViewBoxSelectionEvent(event)
+      || event.target?.closest?.(VIEW_CONTIG_TARGET) || event.target?.closest?.(VIEW_CONTROL_TARGET)) {
       return;
     }
     const state = store.getState();
@@ -146,15 +147,9 @@ export function bindTrackBoxSelection(host, store, deps) {
     if (!isPrimaryTrack && !isSubviewTrack) {
       return;
     }
-    if (isPrimaryTrack && event.target?.closest?.("[data-track-contig-id][data-track-role]")) {
-      return;
-    }
-    if (isSubviewTrack && event.target?.closest?.("[data-subview-contig-id][data-subview-track-slot]")) {
-      return;
-    }
-
     event.preventDefault();
     const boxEl = ensureTrackSelectionBox(scrollEl);
+    scrollEl.classList.add("is-track-box-selecting");
     const startPoint = resolveTrackPointerContentPoint(event, scrollEl);
     const startBoxPoint = resolveTrackPointerScrollPoint(event, scrollEl);
     let currentPoint = startPoint;
@@ -200,7 +195,9 @@ export function bindTrackBoxSelection(host, store, deps) {
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
       windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
+      windowObject?.removeEventListener?.("blur", onBlur);
       boxEl.classList.add("is-hidden");
+      scrollEl.classList.remove("is-track-box-selecting");
       if (cancelled || !isCurrent()) return;
       if (!dragging) {
         if (isPrimaryTrack) {
@@ -225,11 +222,13 @@ export function bindTrackBoxSelection(host, store, deps) {
       finishSelection();
     };
     const onPointerCancel = () => finishSelection(true);
+    const onBlur = () => finishSelection(true);
 
     const windowObject = getWindowObject(host);
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
     windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);
+    windowObject?.addEventListener?.("blur", onBlur);
   });
 
   host[ASSEMBLY_TRACK_BOX_SELECT_BOUND] = true;
