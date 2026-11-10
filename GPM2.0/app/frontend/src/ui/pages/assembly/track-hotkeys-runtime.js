@@ -80,7 +80,7 @@ export function shouldHandleTrackDeleteHotkey(event, state) {
     return false;
   }
   const target = event?.target;
-  if (target?.closest?.("[data-subview-tools-host]")) {
+  if (target?.closest?.("[data-subview-tools-host], [data-track-members-dialog], dialog, [role='dialog']")) {
     return false;
   }
   const tagName = String(target?.tagName || "").toUpperCase();

@@ -113,13 +113,13 @@ test("production worker renders off-thread and accepts an offset-only follow-up 
   } finally { await worker.terminate(); }
 });
 
-test("member-only refresh preserves full-page member markup without visiting alignment evidence", () => {
+test("legacy member-only refresh retains its markup without visiting alignment evidence", () => {
   const state = createIdentityRenderState();
   state.assembly.membersPanelOpen = true;
   state.assembly.trackSelectedCtgIds = [2];
   const page = renderAssemblyPage(state);
-  const expected = page.match(/<article class="[^"]*assembly-members-panel[\s\S]*?<\/article>/)?.[0];
-  assert.ok(expected);
+  assert.doesNotMatch(page, /data-members-card-toggle/);
+  const expected = __testRenderAssemblyMainMembersPanel(state);
   for (const ctg of [...state.assembly.chrCtgs, ...state.assembly.supportChrCtgs]) {
     Object.defineProperty(ctg, "hits", { get() { throw new Error("must not render the Main alignment graph"); } });
   }

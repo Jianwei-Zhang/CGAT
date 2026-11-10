@@ -72,7 +72,13 @@ export async function runMainViewHistoryControlAction(host, store, action, deps,
     },
   });
   deps.rerender(host, store);
-  const run = async (isCurrent = () => true) => {
+  const run = async (isCoordinatorCurrent = () => true) => {
+    const isCurrent = () => {
+      const current = store.getState();
+      return isCoordinatorCurrent() && current.session?.workspacePath === state.session.workspacePath
+        && current.session?.projectId === state.session.projectId
+        && current.assembly?.selectedChrName === chrName && current.activeRoute === state.activeRoute;
+    };
     if (!isCurrent()) {
       return false;
     }

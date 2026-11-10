@@ -2222,6 +2222,12 @@ test("Overview identity never wraps, ellipsizes names and preserves fixed right-
     assert.ok(start >= 0, `missing ${selector}`);
     return componentsCss.slice(componentsCss.indexOf("{", start), componentsCss.indexOf("}", start));
   };
+  for (const selector of [".project-export-identity", ".project-export-identity-item", ".project-export-identity dd", ".project-export-dataset-badges"]) {
+    assert.match(rule(selector), /display:\s*flex/);
+    assert.match(rule(selector), /align-items:\s*center/);
+    assert.doesNotMatch(rule(selector), /align-items:\s*baseline/);
+  }
+  assert.match(rule(".project-export-identity dd > .project-dataset-role"), /line-height:\s*1\.4/);
   assert.match(rule(".project-export-head"), /flex-wrap:\s*nowrap[\s\S]*min-width:\s*0/);
   assert.match(rule(".project-export-identity"), /flex:\s*1 1 0[\s\S]*flex-wrap:\s*nowrap[\s\S]*overflow:\s*hidden/);
   assert.match(rule(".project-export-identity dd"), /overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis[\s\S]*white-space:\s*nowrap/);

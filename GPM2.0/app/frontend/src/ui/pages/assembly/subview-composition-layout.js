@@ -1,6 +1,10 @@
 import { normalizeSubviewComposition } from "./subview-composition-state.js";
 import { normalizePositiveInt, resolveTrackInnerWidthFromScale, resolveTrackPrefs } from "./track-prefs.js";
 
+// A captured pixel boundary can round-trip through bp as N +/- machine
+// epsilon. Do not floor that numerical noise into an extra viewport pixel.
+const snapPixelBoundary = value => Math.abs(value - Math.round(value)) < 1e-7 ? Math.round(value) : value;
+
 const displayStart = (member) => member.xBp + (member.displayOffsetBp || 0);
 const displayLength = (member) => member.lengthBp * (member.displayScale || 1);
 
@@ -63,8 +67,8 @@ export function buildSubviewCompositionLayout(composition, {
     leftBp: Number.isFinite(Number(leftBp)) ? Number(leftBp) : 0,
     contentStartBp: contentMinX * scale,
     contentEndBp: contentMaxX * scale,
-    viewBoxMinX: Math.floor(minimumX),
-    width: Math.max(fullRange ? 1 : viewportWidth, Math.ceil(maximumX) - Math.floor(minimumX)),
+    viewBoxMinX: Math.floor(snapPixelBoundary(minimumX)),
+    width: Math.max(fullRange ? 1 : viewportWidth, Math.ceil(maximumX) - Math.floor(snapPixelBoundary(minimumX))),
   };
 }
 

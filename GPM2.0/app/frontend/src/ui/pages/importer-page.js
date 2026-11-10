@@ -18,6 +18,7 @@ import { flushAssemblyProjectState } from "./assembly-page.js";
 import { prepareProjectPreviewData } from "./project-preview-preparation.js";
 import { defaultProjectName, projectImportName } from "../../services/project-session.js";
 import { openProjectWorkspace as openWorkspace } from "../../services/project-session.js";
+import { bindProjectSidebarResize } from "./project-sidebar-resize.js";
 import { renderProjectsBody, projectLabels, syncProjectValidation } from "./projects-view.js";
 import { renderWorkspacePage, bindWorkspacePage } from "./workspace-page.js";
 import { switchProjectFromShell, closeProjectSession, buildEmptyAssemblyViewState, buildEmptyProjectExportState } from "../shell/session-switchers.js";
@@ -169,6 +170,7 @@ function formatCopyBytes(value) {
 }
 
 export function bindImporterPage(host, store) {
+  bindProjectSidebarResize(host);
   if (store.getState().initializer) bindWorkspacePage(host, store);
   bindProjectEntryControls(host, store);
   if (store.getState().importer.importDialogOpen && !store.getState().importer.inFlight) {

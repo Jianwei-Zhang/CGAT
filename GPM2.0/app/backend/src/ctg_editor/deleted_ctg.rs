@@ -115,9 +115,13 @@ pub fn list_deleted_ctgs_with_connection(
                 FROM assembly_seq s2
                 JOIN source_seq ss2
                   ON ss2.id = s2.source_seq_id
+                LEFT JOIN derived_ctg_track_member dtm
+                  ON dtm.project_id = d.project_id AND dtm.source_seq_id = ss2.id
+                JOIN project p ON p.id = d.project_id
                 WHERE s2.id = d.assembly_seq_id
                   AND s2.project_id = d.project_id
-                  AND ss2.dataset_id = {dataset_placeholder}
+                  AND (ss2.dataset_id = {dataset_placeholder} OR dtm.target_dataset_id = {dataset_placeholder})
+                  AND ({dataset_placeholder} = p.primary_dataset_id OR ss2.dataset_id != p.primary_dataset_id)
             )"
         ));
     }

@@ -1,3 +1,4 @@
+import { normalizeHiddenSupportCtgs } from "./support-visibility-state.js";
 export const VIEW_SPAN_KB_OPTIONS = Object.freeze([500, 5000]);
 export const TICK_LENGTH_OPTIONS = Object.freeze([10000, 100000]);
 export const MIN_TICK_UNIT_KB_OPTIONS = Object.freeze([250, 500, 750, 1000, 10000, 100000]);
@@ -80,7 +81,9 @@ export function resolveTrackPrefs(trackView) {
     DEFAULT_SUPPORT_DS_CTG_LEN_BP,
   );
 
+  const hiddenSupportCtgs = normalizeHiddenSupportCtgs(trackView?.hiddenSupportCtgs);
   return {
+    ...(hiddenSupportCtgs.length ? { hiddenSupportCtgs } : {}),
     // Full range is sticky until the user explicitly narrows the window.
     ...(trackView?.fullRange === true ? { fullRange: true } : {}),
     // Explicit navigation may fit content that extends beyond the base ruler.

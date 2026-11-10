@@ -1688,3 +1688,26 @@ for (const locale of ["en", "zh"]) {
     }
   });
 }
+
+test("primary and auxiliary mother-track labels share member management, while mirrors/ref/phased do not", async () => {
+  const calls = [];
+  const actions = { ...createContextMenuActionsCapture(calls), openTrackMembers: (...args) => calls.push({ name: "members", args }) };
+  for (const trackRole of ["primary", "support", "ref", "phased"]) {
+    for (const isMirror of [false, true]) {
+      const scope = { trackRole, datasetId: 22, isMirror };
+      const items = buildAssemblyContextMenuItems({ trackLabelContext: scope, store: createStore({ supportDatasetId: 22 }), host: {}, actions });
+      const entry = items.find(item => item.label === "轨道成员");
+      assert.equal(Boolean(entry), !isMirror && ["primary", "support"].includes(trackRole));
+      if (entry) { await entry.run(); assert.equal(calls.at(-1).args[2], scope); }
+    }
+  }
+});
+
+test("support contig delete explicitly names the active dataset rather than using primary selection", async () => {
+  const calls = [], actions = createContextMenuActionsCapture(calls);
+  const items = buildAssemblyContextMenuItems({ ctgContext: { assemblyCtgId: 30, trackRole: "support", datasetId: 22, isMirror: false },
+    store: createStore({ supportDatasetId: 22, trackSelectedCtgIds: [2,8], supportChrCtgs: [{ assemblyCtgId: 30 }] }), host: {}, actions });
+  const entry = items.find(item => item.label === "删除 Contig"); assert.ok(entry); await entry.run();
+  assert.equal(calls.at(-1).name, "deleteSelectedTrackCtgs");
+  assert.deepEqual(calls.at(-1).args[2], [30]); assert.deepEqual(calls.at(-1).args[3], { trackRole: "support", datasetId: 22 });
+});

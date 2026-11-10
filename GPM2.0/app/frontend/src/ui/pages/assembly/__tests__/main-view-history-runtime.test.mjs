@@ -229,3 +229,17 @@ for (const action of ["undo", "redo", "reset"]) {
     assert.deepEqual(calls, ["main", "reload", "evidence", "main", "local", "final-path"]);
   });
 }
+
+test("late undo reply cannot replace the newly selected chromosome's history", async () => {
+  const store = createStore(); let finish; let reloads = 0;
+  const pending = runMainViewHistoryControlAction({}, store, "undo", {
+    executeMainViewHistoryAction: () => new Promise(resolve => { finish = resolve; }),
+    loadAssemblyView: async () => { reloads++; }, rerender() {},
+    mapAssemblyError: ({ error }) => ({ userMessage: String(error) }),
+    runSerializedProjectViewMutation: (_store, task) => task(() => true),
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  const next = { ...store.getState().assembly, selectedChrName: "Chr02", mainViewHistory: { chrName: "Chr02", canUndo: false }, actionError: "" };
+  store.setState({ assembly: next }); finish({ changed: true, status: { chrName: "Chr01", canRedo: true } });
+  assert.equal(await pending, false); assert.equal(reloads, 0); assert.equal(store.getState().assembly, next);
+});

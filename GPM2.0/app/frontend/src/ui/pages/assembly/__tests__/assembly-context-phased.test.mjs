@@ -162,9 +162,9 @@ test("context menu opens for track contig glyphs and legacy ctg nodes", () => {
   assert.match(menuState.innerHTML, /重命名 Contig/);
   assert.match(menuState.innerHTML, /镜像 Contig/);
   assert.doesNotMatch(menuState.innerHTML, /撤销镜像 Contig/);
-  assert.doesNotMatch(menuState.innerHTML, /隐藏 Contig/);
+  assert.match(menuState.innerHTML, /隐藏 Contig/);
   assert.doesNotMatch(menuState.innerHTML, /解除隐藏 Contig/);
-  assert.doesNotMatch(menuState.innerHTML, /删除 Contig/);
+  assert.match(menuState.innerHTML, /删除 Contig/);
   assert.doesNotMatch(menuState.innerHTML, /查看\/编辑成员/);
   assert.doesNotMatch(menuState.innerHTML, /更多 Contig 操作/);
   assert.doesNotMatch(menuState.innerHTML, /移动锚点/);
@@ -879,10 +879,11 @@ test("primary and phased track labels expose single-active hits toggles", async 
     actions,
   });
 
-  assert.equal(primaryItems[0].label, "隐藏比对线");
+  assert.equal(primaryItems[0].label, "轨道成员");
+  assert.equal(primaryItems[1].label, "隐藏比对线");
   assert.equal(phasedItems[0].label, "显示比对线");
 
-  await primaryItems[0].run();
+  await primaryItems[1].run();
   await phasedItems[0].run();
 
   assert.deepEqual(calls, [{ trackKey: "" }, { trackKey: "A" }]);

@@ -1,6 +1,8 @@
+mod chromosome_navigation;
 mod explicit_selection_drag;
 mod local_fragment;
 mod source_fragment_drag;
+mod track_members;
 
 use anyhow::Result;
 use rusqlite::{Connection, params};

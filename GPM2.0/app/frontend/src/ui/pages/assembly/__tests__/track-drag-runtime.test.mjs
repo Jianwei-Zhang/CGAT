@@ -240,7 +240,7 @@ test("bindTrackContigDrag ignores ref-track members", () => {
   }
 });
 
-for (const native of [false, true]) test(`Subview drag owns ${native ? "native peer" : "main"} window listeners and animation frames`, () => {
+for (const native of [false, true]) for (const role of ["primary", "ref"]) test(`Subview ${role} drag owns ${native ? "native peer" : "main"} window listeners and animation frames`, () => {
   const originalWindow = globalThis.window;
   const windowStub = createWindowStub();
   globalThis.window = native ? createWindowStub() : windowStub;
@@ -264,6 +264,8 @@ for (const native of [false, true]) test(`Subview drag owns ${native ? "native p
     const trackNode = {
       getAttribute(name) {
         if (name === "data-subview-track-slot") return "top";
+        if (name === "data-subview-track-role") return role;
+        if (name === "data-track-source-kind") return role === "ref" ? "ref_segment" : "assembly_ctg";
         if (name === "data-subview-contig-id") return "12";
         return null;
       },

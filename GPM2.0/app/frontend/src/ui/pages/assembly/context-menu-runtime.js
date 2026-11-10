@@ -261,6 +261,8 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     ? overrides.confirm
     : requestAppConfirm;
   return {
+    openTrackMembers: resolveAction("openTrackMembers"),
+    setSupportTrackCtgsHidden: resolveAction("setSupportTrackCtgsHidden"),
     addContextCtgToComposition: resolveAction("addContextCtgToComposition") || (() => false),
     enterSubviewFromTrackSelections: resolveAction("enterSubviewFromTrackSelections"),
     enterSubviewFromCandidates: resolveAction("enterSubviewFromCandidates"),

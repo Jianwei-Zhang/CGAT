@@ -1,3 +1,4 @@
+import { __testRenderAssemblyMainMembersPanel as renderLegacyMembers } from "../../assembly-page.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,7 +10,7 @@ for (const locale of ["zh", "en"]) test(`every member type has exactly two rows 
     { assemblyCtgId: 2, name: "long_fragment[5001-10000].2", totalLength: 5000, sourceFragment: { sourceStart: 5001, sourceEnd: 10000, sourceLength: 10000 } },
   ], hiddenPrimaryCtgIds: [2], deletedCtgs: [{ deletedCtgRecordId: 77, assemblyCtgId: 3, name: "deleted-piece", totalLength: 2500,
     sourceRange: { sourceStart: 2501, sourceEnd: 5000 } }] } }), locale };
-  const html = renderAssemblyPage(state), panel = html.match(/<article class="assembly-members-panel[^]*?<\/article>/)[0];
+  const html = renderLegacyMemberFixture(state), panel = html.match(/<article class="assembly-members-panel[^]*?<\/article>/)[0];
   const cards = [...panel.matchAll(/<button\b[^>]*class="ctg-chip[^]*?<\/button>/g)].map(m => m[0]);
   assert.equal(cards.length, 3);
   for (const card of cards) {
@@ -34,7 +35,7 @@ test("member cards use content-fit flex widths and fixed two-row typography, not
 
 for (const locale of ["zh", "en"]) test(`member trigger and panel use generic titles with a compact reset action (${locale})`, () => {
   const name = "ProjectNameThatMustNotAppearInTheMemberTrigger";
-  const html = renderAssemblyPage({ ...createState({ session: { projectName: name }, assembly: { membersCardCollapsed: false } }), locale });
+  const html = renderLegacyMemberFixture({ ...createState({ session: { projectName: name }, assembly: { membersCardCollapsed: false } }), locale });
   const panel = html.match(/<article class="assembly-members-panel[^]*?<\/article>/)[0];
   const title = locale === "zh" ? "主数据集成员" : "Primary Dataset Members";
   const reset = locale === "zh" ? "重置" : "Reset";
@@ -52,3 +53,9 @@ test("member panel heading and compact reset share the leading edge like deleted
   const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
   assert.match(css, /\.assembly-members-popover-tools\s*\{[^}]*align-items: center;[^}]*justify-content: flex-start;[^}]*gap: 6px;[^}]*flex-wrap: wrap;/);
 });
+
+// Legacy primary-card renderer remains a compatibility target for member-only DOM patches.
+// Production no longer puts this panel in the toolbar (covered in track-members.test.mjs).
+function renderLegacyMemberFixture(state) {
+  return renderAssemblyPage(state) + renderLegacyMembers(state);
+}

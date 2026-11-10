@@ -1,3 +1,4 @@
+import { __testRenderAssemblyMainMembersPanel as renderLegacyMembers } from "../../assembly-page.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createIdentityRenderState } from "./identity-render-fixture.mjs";
@@ -12,11 +13,11 @@ const memberPanel = (html) => html.match(/<article class="assembly-members-panel
 test("Main DS chips keep real membership and total lengths while annotating local split/delete/undo", () => {
   const state = createIdentityRenderState("composition"); state.assembly.membersCardCollapsed = false;
   const real = state.assembly.chrCtgs;
-  const before = memberPanel(renderAssemblyPage(state));
+  const before = memberPanel(renderLegacyMemberFixture(state));
   const composition = getSubviewComposition(state.assembly.subview), split = splitLocalMember(composition, "assembly:2", 8000);
   const committed = commitSubviewHistoryOperation(state.assembly, { nextSubview: applySubviewComposition(state.assembly.subview, split.composition), operation: { kind: "split-contig" } });
   state.assembly = committed.assembly;
-  const after = memberPanel(renderAssemblyPage(state));
+  const after = memberPanel(renderLegacyMemberFixture(state));
   assert.equal((before.match(/data-assembly-ctg-id=/g) || []).length, 1);
   assert.equal((after.match(/data-assembly-ctg-id=/g) || []).length, 1);
   assert.match(after, /局部：2 个对象/);
@@ -25,10 +26,10 @@ test("Main DS chips keep real membership and total lengths while annotating loca
   state.assembly = { ...state.assembly, subview: applySubviewComposition(state.assembly.subview, deleted.composition) };
   const detail = describeMainMemberLocalState(real[0], state.assembly);
   assert.equal(detail.retainedBp, 8000); assert.equal(detail.totalBp, 16000);
-  assert.match(memberPanel(renderAssemblyPage(state)), /局部保留 8,000\/16,000 bp/);
+  assert.match(memberPanel(renderLegacyMemberFixture(state)), /局部保留 8,000\/16,000 bp/);
   const allGone = deleteLocalMember(deleted.composition, split.members[1].entityKey);
   state.assembly = { ...state.assembly, subview: applySubviewComposition(state.assembly.subview, allGone.composition) };
-  assert.match(memberPanel(renderAssemblyPage(state)), /仅局部已删除/);
+  assert.match(memberPanel(renderLegacyMemberFixture(state)), /仅局部已删除/);
   state.assembly = rollbackSubviewHistory(committed.assembly).assembly;
   assert.equal(describeMainMemberLocalState(real[0], state.assembly), null);
 });
@@ -40,7 +41,7 @@ test("real source fragments and deleted native entities display actual source ra
     assemblyCtgId: id, totalLength: end - start + 1, sourceFragment: { sourceSeqId: 700, groupKey: "manual-fragment:2", sourceStart: start, sourceEnd: end } }));
   state.assembly.deletedCtgs = [{ deletedCtgRecordId: 91, assemblyCtgId: 702, name: "deleted-piece", totalLength: 2000,
     sourceRange: { sourceSeqId: 700, sourceStart: 4001, sourceEnd: 6000 } }];
-  const html = memberPanel(renderAssemblyPage(state));
+  const html = memberPanel(renderLegacyMemberFixture(state));
   assert.equal((html.match(/data-assembly-ctg-id=/g) || []).length, 2);
   assert.equal((html.match(/data-deleted-ctg-record-id=/g) || []).length, 1);
   assert.match(html, /Source 1–4,000/); assert.match(html, /Source 6,001–16,000/); assert.match(html, /Source 4,001–6,000/);
@@ -90,17 +91,23 @@ test("member card separates short title, real length, current source range and c
   const split = splitLocalMember(getSubviewComposition(state.assembly.subview), "assembly:2", 8000);
   const deleted = deleteLocalMember(split.composition, split.members[0].entityKey);
   state.assembly.subview = applySubviewComposition(state.assembly.subview, deleted.composition);
-  const partial = memberPanel(renderAssemblyPage(state));
+  const partial = memberPanel(renderLegacyMemberFixture(state));
   assert.match(partial, /ctg-chip-heading/);
   assert.match(partial, /ctg-chip-length[^>]*>16,000 bp/);
   assert.match(partial, /data-main-member-local-state="partial"[^>]*>局部部分保留<\/span>/);
   assert.match(partial, /data-member-tooltip="[^"\n]*\nContig 长度: 16,000 bp\n局部保留 8,000\/16,000 bp · 1 个对象/);
   state.assembly.chrCtgs = [{ ...original, name: "Chr01[42739070-59056711].2", totalLength: 12775756,
     sourceFragment: { sourceSeqId: 1, groupKey: "manual-fragment:2", sourceStart: 46280956, sourceEnd: 59056711 } }];
-  const html = memberPanel(renderAssemblyPage(state));
+  const html = memberPanel(renderLegacyMemberFixture(state));
   assert.match(html, /data-member-tooltip="Chr01\[42739070-59056711\]\.2\nContig 长度: 12,775,756 bp/);
   assert.match(html, />Chr01\.2<\/span>/);
   assert.match(html, /data-member-tooltip="[^"]*源 46,280,956–59,056,711/);
   assert.equal((html.match(/data-assembly-ctg-id=/g) || []).length, 1);
   assert.equal(state.assembly.chrCtgs[0].name, "Chr01[42739070-59056711].2", "presentation never renames the source entity");
 });
+
+// Legacy primary-card renderer remains a compatibility target for member-only DOM patches.
+// Production no longer puts this panel in the toolbar (covered in track-members.test.mjs).
+function renderLegacyMemberFixture(state) {
+  return renderAssemblyPage(state) + renderLegacyMembers(state);
+}
