@@ -7,6 +7,7 @@ import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImp
 export function projectLabels(state) {
   return state.locale === "en" ? {
     projectInformation: "Project Information",
+    resizeLibrary: "Resize project library",
     import: "Import", open: "Open", importTitle: "Import Project", recent: "Projects",
     empty: "No projects yet", emptyHint: "Import a delivery bundle or open an existing project directory.",
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
@@ -25,6 +26,7 @@ export function projectLabels(state) {
     recommendedThreads: "{number} (Recommended)",
   } : {
     projectInformation: "项目信息",
+    resizeLibrary: "调整项目库宽度",
     import: "导入", open: "打开", importTitle: "导入项目", recent: "项目库",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
     name: "项目名称（可选）", nameDefault: "使用目录名称", location: "项目目录",
@@ -163,7 +165,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
     <span class="project-empty-symbol">${projectIcon("folder")}</span>
     <h4 id="project-empty-title">${labels.empty}</h4>${actions}
   </section>` : `<div class="project-browser">
-    <section class="project-recents" aria-labelledby="project-recents-title">
+    <section class="project-recents" id="project-recents" aria-labelledby="project-recents-title">
       ${actions}
       <header class="project-recents-header"><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
@@ -173,6 +175,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       </header>
       <div class="project-recent-list">${rows}</div>
     </section>
+    <div class="project-sidebar-splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="project-recents" aria-label="${labels.resizeLibrary}" aria-valuemin="220" aria-valuemax="560" aria-valuenow="280"></div>
     ${summaryHtml || `<section class="project-empty project-no-selection"><span class="project-empty-symbol">${projectIcon("open")}</span><h4>${labels.noOpen}</h4></section>`}
   </div>`}
   ${renderProjectImportDialog(state, messages)}`;

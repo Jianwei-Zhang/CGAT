@@ -484,7 +484,16 @@
 .project-no-selection { min-height: 360px; padding: 40px 16px; gap: 18px; }
 .project-no-selection h4 { font-size: var(--font-title); }
 
-.project-browser { display: grid; flex: 1; grid-template-columns: 280px minmax(0, 1fr); min-height: 440px; }
+.project-browser { --project-sidebar-default: 280px; display: grid; flex: 1; grid-template-columns: var(--project-sidebar-width, var(--project-sidebar-default)) 0 minmax(0, 1fr); min-height: 440px; }
+/* A zero-width grid track keeps the original boundary; the hit area straddles it. */
+.project-sidebar-splitter { position: relative; z-index: 2; width: 10px; margin-left: -5px; cursor: col-resize; touch-action: none; outline: none; }
+.project-sidebar-splitter::after { content: ""; position: absolute; inset: 0 4px; background: transparent; }
+.project-sidebar-splitter:hover::after,
+.project-sidebar-splitter:focus-visible::after,
+.project-browser.is-sidebar-resizing .project-sidebar-splitter::after { background: var(--focus-ring, #4f82b5); }
+.project-sidebar-splitter:focus-visible { outline: 2px solid var(--focus-ring, #4f82b5); outline-offset: -2px; }
+.project-browser.is-sidebar-resizing { cursor: col-resize; user-select: none; }
+.project-browser.is-sidebar-resizing * { cursor: col-resize !important; }
 .project-recents { min-width: 0; padding: 20px; border-right: 1px solid var(--border-subtle, #dbe3ec); background: var(--surface-subtle, #f8fafc); }
 .project-recents .project-entry-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 20px; }
 .project-recents .project-entry-actions .button { min-width: 0; min-height: 40px; padding: 10px; }
@@ -655,7 +664,7 @@
 }
 
 @media (max-width: 1000px) {
-  .project-browser { grid-template-columns: 260px minmax(0, 1fr); }
+  .project-browser { --project-sidebar-default: 260px; }
   .project-recents { padding: 18px; }
   .project-recents .project-entry-actions { gap: 8px; }
   .project-recents .project-entry-actions .button { gap: 6px; padding: 10px 8px; font-size: var(--font-body); }
@@ -665,6 +674,7 @@
 
 @media (max-width: 760px) {
   .project-browser { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 0; }
+  .project-sidebar-splitter { display: none; }
   .project-recents { border-right: 0; border-bottom: 1px solid var(--theme-line, #e6e6e6); }
   .project-recents .project-entry-actions { max-width: 320px; }
   .project-current { padding: 24px 20px 28px; }
