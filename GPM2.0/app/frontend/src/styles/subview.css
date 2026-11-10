@@ -1153,7 +1153,9 @@
 .subview-window { min-width: 0; margin-top: 8px; border: 1px solid var(--border-default); border-radius: 7px;
   background: var(--surface-panel); color: var(--text-primary); overflow: hidden; }
 .subview-window.is-floating { position: fixed; left: var(--local-x, 80px); top: var(--local-y, 100px);
-  width: min(1080px, calc(100vw - 24px)); max-height: calc(100vh - 24px);
+  display: flex; flex-direction: column; box-sizing: border-box;
+  width: var(--local-width, min(1080px, calc(100vw - 24px))); max-width: 100vw;
+  height: var(--local-height, auto); max-height: 100vh;
   z-index: var(--local-z, 1); box-shadow: 0 12px 36px #0003; margin: 0; }
 .subview-window[hidden] { display: none; }
 .subview-window .subview-panel-head.subview-window-header {
@@ -1161,20 +1163,32 @@
   position: sticky; top: 0; z-index: 10;
   padding: 4px 6px; border-bottom: 1px solid var(--border-default); background: var(--surface-subtle);
 }
-.subview-window-heading { display: flex; align-items: center; flex: 0 1 clamp(70px, 15%, 190px); min-width: 70px; height: 26px; gap: 4px; }
-.subview-window.is-floating .subview-window-heading { cursor: move; touch-action: none; user-select: none; }
+.subview-window-heading { display: flex; align-items: center; flex: 0 1 auto; min-width: 70px; max-width: min(220px, 25%); height: 26px; gap: 4px; }
+.subview-window.is-floating [data-local-view-drag] { cursor: move; touch-action: none; user-select: none; }
+.subview-window [data-local-view-drag] :is(label, .assembly-track-inline-field, .subview-history-controls) { cursor: default; }
+.subview-window [data-local-view-drag] :is(input, textarea) { cursor: text; user-select: text; }
 .subview-window-heading strong { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-small); }
 .subview-window-heading button, .subview-window-actions button {
   display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; min-height: 26px; flex: 0 0 26px; padding: 0;
 }
 .subview-window-actions { display: flex; margin-left: auto; flex: 0 0 auto; }
-.subview-window-content { overflow: auto; max-height: calc(100vh - 24px); }
+.subview-window-content { overflow: auto; min-height: 0; max-height: calc(100vh - 24px); }
+.subview-window.is-floating > .subview-window-content { flex: 1 1 auto; max-height: 100%; }
+.subview-window-resize { display: none; }
+.subview-window.is-floating > .subview-window-resize { display: block; position: absolute; z-index: 30; touch-action: none; }
+.subview-window-resize[data-local-view-resize="n"] { left: 10px; right: 10px; top: 0; height: 6px; cursor: ns-resize; }
+.subview-window-resize[data-local-view-resize="s"] { left: 10px; right: 10px; bottom: 0; height: 6px; cursor: ns-resize; }
+.subview-window-resize[data-local-view-resize="e"] { top: 10px; bottom: 10px; right: 0; width: 6px; cursor: ew-resize; }
+.subview-window-resize[data-local-view-resize="w"] { top: 10px; bottom: 10px; left: 0; width: 6px; cursor: ew-resize; }
+.subview-window-resize[data-local-view-resize="ne"] { right: 0; top: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+.subview-window-resize[data-local-view-resize="nw"] { left: 0; top: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+.subview-window-resize[data-local-view-resize="se"] { right: 0; bottom: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+.subview-window-resize[data-local-view-resize="sw"] { left: 0; bottom: 0; width: 10px; height: 10px; cursor: nesw-resize; }
 .subview-window .subview-selection-panel { gap: 4px; }
 .subview-window .subview-alignment-card { margin: 0 6px 6px; }
 .subview-window .subview-panel-head > .assembly-view-title { display: none; }
-.subview-window [data-subview-toolbar] { align-items: center; gap: 4px; overflow: visible; font-size: var(--font-small); }
+.subview-window [data-subview-toolbar] { justify-content: flex-start; align-items: center; gap: 4px; overflow: visible; font-size: var(--font-small); }
 .subview-window [data-subview-toolbar] > * { height: 26px; min-height: 26px; }
-.subview-window [data-subview-toolbar] > .subview-candidate-row { flex: 0 1 190px; }
 .subview-window [data-subview-toolbar] :is(.button, .subview-candidate-badge, .grt-result-switch, .grt-result-layer-menu, .grt-result-layer-trigger,
   .assembly-track-combo, .assembly-track-combo-input, .assembly-track-combo-toggle, .subview-history-controls) {
   min-height: 26px; height: 26px; box-sizing: border-box; font-size: var(--font-small);

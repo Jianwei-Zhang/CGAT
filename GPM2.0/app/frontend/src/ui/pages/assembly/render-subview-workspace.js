@@ -1,3 +1,4 @@
+import { LOCAL_VIEW_RESIZE_EDGES } from "./subview-window-geometry.js";
 import { PictureInPicture2, PanelTopClose } from "lucide";
 const escapeHtml = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const escapeAttr = escapeHtml;
@@ -76,7 +77,7 @@ export function renderSubviewWindowChrome(assembly, labels, end = false) {
     <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">×</button></div>`;
   const { title, tooltip } = subviewWindowDescription(item, labels, assembly);
   const action = item.floating ? w.dock : w.float;
-  return `<div class="subview-window-heading" data-local-view-drag="1">
+  return `<div class="subview-window-heading">
     <button type="button" data-local-view-action="dock" data-local-view-id="${item.id}" aria-label="${escapeAttr(action)}" data-app-tooltip="${escapeAttr(action)}">${renderSubviewDockIcon(item.floating)}</button>
     <strong data-local-view-title tabindex="0" data-app-tooltip="${escapeAttr(tooltip)}">${escapeHtml(title)}</strong></div>`;
 }
@@ -116,10 +117,11 @@ export function renderSubviewWorkspace(state, labels, renderPanel) {
     ${workspace.windows.map(item => `<section id="${item.id}" data-local-view-window="${item.id}"
       class="subview-window${item.floating ? " is-floating" : ""}" ${item.minimized ? "hidden" : ""}
       role="region" aria-label="${escapeAttr(subviewWindowTitle(item, labels, assembly))}"
-      style="--local-x:${item.x}px;--local-y:${item.y}px;--local-z:${item.z}">
+      style="--local-x:${item.x}px;--local-y:${item.y}px;--local-z:${item.z}${item.width > 0 ? `;--local-width:${item.width}px` : ""}${item.height > 0 ? `;--local-height:${item.height}px` : ""}">
       <div data-local-view-context-menu class="context-menu is-hidden"></div>
       <div class="subview-window-content">${renderPanel({ ...state, assembly: { ...assembly,
         ...item.snapshot, subviewWindowRendering: item.id } })}</div>
+      ${LOCAL_VIEW_RESIZE_EDGES.map(edge => `<div class="subview-window-resize" data-local-view-resize="${edge}" aria-hidden="true"></div>`).join("")}
     </section>`).join("")}
   </section>`;
 }

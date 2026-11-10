@@ -1,3 +1,4 @@
+import { constrainLocalViewRect, resizeLocalViewRect, resolveLocalViewWindowGesture } from "./subview-window-geometry.js";
 import { changeSubviewWindow, getSubviewWindowStore, installSubviewWorkspace } from "./subview-workspace-state.js";
 import { renderSubviewTaskbar, renderSubviewDockIcon, subviewWindowDescription, subviewWindowAssembly } from "./render-subview-workspace.js";
 
@@ -41,6 +42,7 @@ function createRuntime(root, store, deps) {
   const matches = (node, scoped) => rendered.get(node)?.every((value, index) => value === capture(scoped)[index]);
   let gesture = null;
   let rendering = false;
+  let destroyed = false;
   const section = () => root.querySelector("[data-subview-workspace]");
   const windowNode = id => [...(section()?.querySelectorAll("[data-local-view-window]") || [])]
     .find(node => node.dataset.localViewWindow === id);
@@ -62,6 +64,10 @@ function createRuntime(root, store, deps) {
       node.style.setProperty("--local-x", `${item.x}px`);
       node.style.setProperty("--local-y", `${item.y}px`);
       node.style.setProperty("--local-z", String(item.z));
+      for (const dimension of ["width", "height"]) {
+        if (item[dimension] > 0) node.style.setProperty(`--local-${dimension}`, `${item[dimension]}px`);
+        else node.style.removeProperty(`--local-${dimension}`);
+      }
       const description = subviewWindowDescription(item, labels, assembly);
       node.setAttribute("aria-label", description.title);
       const title = node.querySelector("[data-local-view-title]");
@@ -76,14 +82,25 @@ function createRuntime(root, store, deps) {
     }
   }
 
+  function fitWindow(item, node) {
+    if (!item?.floating || !node) return;
+    const rect = node.getBoundingClientRect();
+    changeSubviewWindow(store, item.id, "position", item.width > 0
+      ? constrainLocalViewRect({ ...item, width: item.width, height: item.height || rect.height }, win.innerWidth, win.innerHeight)
+      : constrainLocalViewPosition(item.x, item.y, rect.width, rect.height, win.innerWidth, win.innerHeight));
+  }
+
   function activate(id) {
+    const wasMinimized = store.getState().assembly?.subviewWorkspace?.windows.find(item => item.id === id)?.minimized;
     if (!changeSubviewWindow(store, id, "activate")) return;
     syncChrome();
     bind();
     const node = windowNode(id);
     if (node) {
+      fitWindow(store.getState().assembly.subviewWorkspace.windows.find(item => item.id === id), node);
+      syncChrome();
       const scoped = getSubviewWindowStore(store, id);
-      if (!matches(node, scoped)) deps.refresh(node, scoped);
+      if (wasMinimized || !matches(node, scoped)) deps.refresh(node, scoped);
       deps.syncTools(node, scoped);
     }
   }
@@ -94,6 +111,7 @@ function createRuntime(root, store, deps) {
     event.preventDefault();
     const id = button.dataset.localViewId;
     const action = button.dataset.localViewAction;
+    if (gesture && action !== "activate") finishGesture(false);
     if (action === "activate") {
       activate(id);
       windowNode(id)?.querySelector("[data-local-view-action]")?.focus?.({ preventScroll: true });
@@ -115,55 +133,89 @@ function createRuntime(root, store, deps) {
         || section()?.querySelector(".subview-task [data-local-view-action=activate]");
       focus?.focus?.({ preventScroll: true });
     }
-    if (action === "dock") deps.refresh(windowNode(id), getSubviewWindowStore(store, id));
+    if (action === "dock") {
+      fitWindow(store.getState().assembly.subviewWorkspace.windows.find(item => item.id === id), windowNode(id));
+      syncChrome();
+      deps.refresh(windowNode(id), getSubviewWindowStore(store, id));
+    }
   }
 
   function onPointerDown(event) {
-    const node = event.target?.closest?.("[data-local-view-window]");
+    let node = event.target?.closest?.("[data-local-view-window]");
     if (!node || !section()?.contains(node)) return;
     const id = node.dataset.localViewWindow;
-    if (store.getState().assembly.subviewWorkspace.activeId !== id) activate(id);
-    else {
+    const workspace = store.getState().assembly?.subviewWorkspace;
+    if (!workspace?.windows.some(item => item.id === id)) return;
+    const kind = resolveLocalViewWindowGesture(event.target);
+    if (workspace.activeId !== id) {
+      activate(id);
+      node = windowNode(id);
+    } else {
       // Tools owns a single overlay, retargeted on focus rather than duplicated.
       deps.syncTools(node, getSubviewWindowStore(store, id));
     }
-    if (event.button !== 0 || !event.target.closest("[data-local-view-drag]")
-      || event.target.closest("button,input,select,textarea,a,[contenteditable=true]") || !node.classList.contains("is-floating")) return;
+    if (gesture || event.defaultPrevented || event.button !== 0 || !kind || !node?.classList.contains("is-floating")) return;
     const rect = node.getBoundingClientRect();
-    gesture = { id, node, pointerId: event.pointerId, x: event.clientX, y: event.clientY, rect };
-    node.setPointerCapture?.(event.pointerId);
+    gesture = { id, node, kind, pointerId: event.pointerId, x: event.clientX, y: event.clientY, rect };
+    try { node.setPointerCapture?.(event.pointerId); } catch { /* synthetic pointer or removed node */ }
     event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function gestureCurrent() {
+    const item = store.getState().assembly?.subviewWorkspace?.windows.find(item => item.id === gesture?.id);
+    return Boolean(item?.floating && !item.minimized && windowNode(item.id) === gesture.node
+      && root.isConnected !== false && store.getState().activeRoute === "assembly");
   }
 
   function onMove(event) {
     if (!gesture || event.pointerId !== gesture.pointerId) return;
-    const { rect, node } = gesture;
-    const position = constrainLocalViewPosition(rect.left + event.clientX - gesture.x,
-      rect.top + event.clientY - gesture.y, rect.width, rect.height, win.innerWidth, win.innerHeight);
-    node.style.setProperty("--local-x", `${position.x}px`);
-    node.style.setProperty("--local-y", `${position.y}px`);
+    if (!gestureCurrent()) { finishGesture(false); return; }
+    const { rect, node, kind } = gesture;
+    const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
+    const position = kind === "move"
+      ? constrainLocalViewPosition(rect.left + dx, rect.top + dy, rect.width, rect.height, win.innerWidth, win.innerHeight)
+      : resizeLocalViewRect(rect, kind, dx, dy, win.innerWidth, win.innerHeight);
+    for (const [key, value] of Object.entries(position)) node.style.setProperty(`--local-${key}`, `${value}px`);
     gesture.position = position;
+    event.preventDefault();
+  }
+
+  function finishGesture(commit) {
+    if (!gesture) return;
+    const current = gesture;
+    const valid = gestureCurrent();
+    gesture = null;
+    try { current.node.releasePointerCapture?.(current.pointerId); } catch { /* already released */ }
+    if (commit && valid && current.position) {
+      changeSubviewWindow(store, current.id, "position", current.position);
+      // Commit once, then remeasure only this graph. Pointer moves do not rebuild
+      // dense evidence; existing viewport binding preserves its genomic range.
+      if (current.kind !== "move") deps.refresh(current.node, getSubviewWindowStore(store, current.id));
+    }
+    syncChrome();
   }
 
   function onUp(event) {
     if (!gesture || event.pointerId !== gesture.pointerId) return;
-    const current = gesture;
-    gesture = null;
-    current.node.releasePointerCapture?.(event.pointerId);
-    if (current.position) changeSubviewWindow(store, current.id, "position", current.position);
+    finishGesture(true);
+  }
+  function onCancel(event) {
+    if (gesture && (event?.pointerId == null || event.pointerId === gesture.pointerId)) finishGesture(false);
+  }
+  function onKey(event) {
+    if (gesture && event.key === "Escape") { event.preventDefault(); event.stopPropagation(); finishGesture(false); }
   }
 
   function onResize() {
+    if (gesture) finishGesture(false);
     if (root.isConnected === false || store.getState().activeRoute !== "assembly") return;
-    for (const item of store.getState().assembly?.subviewWorkspace?.windows || []) {
-      const node = windowNode(item.id);
-      if (!node || item.minimized) continue;
-      const rect = node.getBoundingClientRect();
-      if (item.floating) changeSubviewWindow(store, item.id, "position", constrainLocalViewPosition(
-        item.x, item.y, rect.width, rect.height, win.innerWidth, win.innerHeight));
-      if (!rendering) deps.refresh(node, getSubviewWindowStore(store, item.id));
-    }
+    const visible = (store.getState().assembly?.subviewWorkspace?.windows || [])
+      .map(item => ({ item, node: windowNode(item.id) })).filter(({ item, node }) => node && !item.minimized);
+    for (const { item, node } of visible) fitWindow(item, node);
+    // Apply all clamped dimensions before measuring/rendering individual graphs.
     syncChrome();
+    if (!rendering) for (const { item, node } of visible) deps.refresh(node, getSubviewWindowStore(store, item.id));
   }
 
   function bind() {
@@ -189,7 +241,7 @@ function createRuntime(root, store, deps) {
   }
 
   function render() {
-    if (rendering) return;
+    if (rendering || destroyed) return;
     const current = section();
     if (!current) return;
     rendering = true;
@@ -222,7 +274,7 @@ function createRuntime(root, store, deps) {
     queued = true;
     queueMicrotask(() => {
       queued = false;
-      if (root.isConnected !== false && store.getState().activeRoute === "assembly") {
+      if (!destroyed && root.isConnected !== false && store.getState().activeRoute === "assembly") {
         render();
         if (evidenceDirty) {
           evidenceDirty = false;
@@ -238,7 +290,10 @@ function createRuntime(root, store, deps) {
   root.addEventListener("focusin", onFocus, true);
   doc.addEventListener("pointermove", onMove);
   doc.addEventListener("pointerup", onUp);
-  doc.addEventListener("pointercancel", onUp);
+  doc.addEventListener("pointercancel", onCancel);
+  root.addEventListener("lostpointercapture", onCancel, true);
+  doc.addEventListener("keydown", onKey, true);
+  win?.addEventListener("blur", onCancel);
   win?.addEventListener("resize", onResize);
   function onFocus(event) {
     const node = event.target?.closest?.("[data-local-view-window]");
@@ -250,6 +305,8 @@ function createRuntime(root, store, deps) {
       const node = windowNode(id);
       if (node) rendered.set(node, capture(getSubviewWindowStore(store, id)));
     }, destroy() {
+    destroyed = true;
+    finishGesture(false);
     unsubscribe?.();
     for (const id of mountedIds) deps.disposeWindow?.(id);
     mountedIds.clear();
@@ -258,7 +315,10 @@ function createRuntime(root, store, deps) {
     root.removeEventListener("focusin", onFocus, true);
     doc.removeEventListener("pointermove", onMove);
     doc.removeEventListener("pointerup", onUp);
-    doc.removeEventListener("pointercancel", onUp);
+    doc.removeEventListener("pointercancel", onCancel);
+    root.removeEventListener("lostpointercapture", onCancel, true);
+    doc.removeEventListener("keydown", onKey, true);
+    win?.removeEventListener("blur", onCancel);
     win?.removeEventListener("resize", onResize);
     gesture = null;
   } };

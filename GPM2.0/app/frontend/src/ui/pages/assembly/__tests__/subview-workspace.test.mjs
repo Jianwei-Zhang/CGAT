@@ -244,8 +244,24 @@ test("docked and floating windows place chrome and parameters in one header with
     const head = html.slice(html.indexOf('class="subview-panel-head subview-window-header"'), html.indexOf('<article class="assembly-track-panel subview-alignment-card'));
     assert.match(head, /data-local-view-action="dock"/);
     assert.match(head, /data-subview-toolbar/); assert.match(head, /data-local-view-action="close"/);
+    assert.match(head, /data-local-view-drag="1"/);
+    assert.doesNotMatch(head, /subview-candidate-row|subview-candidate-badge/);
+    assert.equal((html.match(/data-local-view-resize=/g) || []).length, 8);
     assert.match(head, new RegExp(`aria-label="${docked ? "Float view" : "Dock to main page"}"`));
     assert.match(head, /data-local-view-action="dock"[^>]*><svg/);
     assert.doesNotMatch(html, /<header class="subview-window-header"/);
   }
+});
+
+
+test("resized geometry survives minimize, activation and docking without entering the comparison snapshot", () => {
+  const store = fixture(); const id = enter(store, summary(2, 5));
+  const before = getSubviewWindowStore(store, id).getState().assembly.subview;
+  changeSubviewWindow(store, id, "position", { x: 20, y: 30, width: 820, height: 510 });
+  for (const action of ["minimize", "activate", "dock", "dock"]) changeSubviewWindow(store, id, action);
+  const item = store.getState().assembly.subviewWorkspace.windows[0];
+  assert.equal(item.width, 820); assert.equal(item.height, 510);
+  assert.equal(getSubviewWindowStore(store, id).getState().assembly.subview, before);
+  assert.equal(item.snapshot.width, undefined);
+  assert.match(renderAssemblyPage(store.getState()), /--local-width:820px;--local-height:510px/);
 });

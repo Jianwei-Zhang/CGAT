@@ -142,3 +142,13 @@ test("merged window chrome gives controls a compact row without scrolling the wh
   assert.match(ruleBody(css, ".subview-window-heading strong"), /text-overflow:\s*ellipsis/);
   assert.match(ruleBody(css, ".subview-window .subview-selection-panel"), /gap:\s*4px/);
 });
+
+
+test("window title consumes only its content and leaves the rest for parameter/history peers", () => {
+  assert.match(ruleBody(css, ".subview-window-heading"), /flex:\s*0 1 auto/);
+  assert.doesNotMatch(ruleBody(css, ".subview-window-heading"), /flex:[^;]*clamp/);
+  assert.match(ruleBody(css, ".subview-window [data-subview-toolbar]"), /justify-content:\s*flex-start/);
+  assert.match(ruleBody(css, ".subview-window.is-floating [data-local-view-drag]"), /cursor:\s*move/);
+  assert.match(ruleBody(css, ".subview-window-resize"), /display:\s*none/);
+  assert.match(ruleBody(css, ".subview-window.is-floating > .subview-window-resize"), /display:\s*block/);
+});

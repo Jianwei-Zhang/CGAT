@@ -875,7 +875,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     : "";
   return `
     <article class="subview-selection-panel" data-subview-panel="1">
-      <div class="subview-panel-head${assembly.subviewWindowRendering ? " subview-window-header" : ""}">
+      <div class="subview-panel-head${assembly.subviewWindowRendering ? " subview-window-header" : ""}"${assembly.subviewWindowRendering ? ' data-local-view-drag="1"' : ""}>
         ${renderSubviewWindowChrome(assembly, i18n.subview)}
         <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
         <div class="subview-panel-title-row assembly-track-inline-controls${alignmentCard ? " subview-track-inline-controls" : ""}" data-subview-toolbar data-grt-result-card="subview" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
@@ -884,7 +884,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
             <summary class="button ghost tiny" aria-label="${escapeAttr(i18n.subview.helpLabel)}" data-app-tooltip="${escapeAttr(i18n.subview.guide)}">?</summary>
             <p class="subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
           </details>` : ""}
-          ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
+          ${allBadges && !assembly.subviewWindowRendering ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
           ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}" data-app-tooltip-overflow>${escapeHtml(i18n.subview.guide)}</p>` : ""}
           ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history, assembly.subviewWindowRendering) : ""}
         </div>
