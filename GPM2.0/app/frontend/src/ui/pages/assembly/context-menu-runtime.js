@@ -94,11 +94,11 @@ function positionContextMenuWithinViewport(menu, clientX, clientY) {
     return;
   }
   const viewportWidth =
-    Number(globalThis.window?.innerWidth)
+    Number((menu.ownerDocument?.defaultView || globalThis.window)?.innerWidth)
     || Number(globalThis.document?.documentElement?.clientWidth)
     || 0;
   const viewportHeight =
-    Number(globalThis.window?.innerHeight)
+    Number((menu.ownerDocument?.defaultView || globalThis.window)?.innerHeight)
     || Number(globalThis.document?.documentElement?.clientHeight)
     || 0;
   if (!Number.isFinite(viewportWidth) || viewportWidth <= 0 || !Number.isFinite(viewportHeight) || viewportHeight <= 0) {
@@ -194,10 +194,10 @@ export function positionContextSubmenuWithinViewport(group, submenu) {
   if (!group || !submenu || typeof group.getBoundingClientRect !== "function") {
     return;
   }
-  const viewportWidth = Number(globalThis.window?.innerWidth)
+  const viewportWidth = Number((submenu.ownerDocument?.defaultView || globalThis.window)?.innerWidth)
     || Number(globalThis.document?.documentElement?.clientWidth)
     || 0;
-  const viewportHeight = Number(globalThis.window?.innerHeight)
+  const viewportHeight = Number((submenu.ownerDocument?.defaultView || globalThis.window)?.innerHeight)
     || Number(globalThis.document?.documentElement?.clientHeight)
     || 0;
   if (viewportWidth <= 0 || viewportHeight <= 0) {

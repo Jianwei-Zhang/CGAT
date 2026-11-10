@@ -1,5 +1,6 @@
 import { changeSubviewWindow, getSubviewWindowStore, startSubviewWindowDraft, subviewWorkspaceScope } from "./subview-workspace-state.js";
 import { collectSubviewAnchorScene, buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
+import { sliceLocalMember, memberSourceInterval } from "./subview-fragment-model.js";
 import { memberAnchorEndpointKey } from "./subview-fragment-model.js";
 import { buildSubviewCompositionCandidates } from "./subview-composition-candidates.js";
 import {
@@ -318,6 +319,20 @@ function resolveContextCompositionMember(composition, memberContext) {
     if (phasedItemId && entry.source?.phasedItemId !== phasedItemId) return false;
     return true;
   }) || (candidates.length === 1 ? candidates[0] : null);
+}
+
+// Reuse the source-owned member model for Main anchor slices. A visible slice
+// must not turn into an entire source contig merely because it crosses a window.
+export function projectMainDraggedMember(candidate, context) {
+  const member = ["+", "-"].includes(context.refOrient)
+    ? { ...candidate, backingOrientation: candidate.backingOrientation || candidate.baseOrientation,
+      baseOrientation: context.refOrient, flipped: false } : candidate;
+  if (context.start == null && context.end == null) return member;
+  const start = Number(context.start), end = Number(context.end);
+  const range = memberSourceInterval(member);
+  if (context.coordinateSpace !== "source" || !Number.isSafeInteger(start) || !Number.isSafeInteger(end)
+    || start < range.sourceStart || end > range.sourceEnd || end < start) return null;
+  return start === range.sourceStart && end === range.sourceEnd ? member : sliceLocalMember(member, start, end);
 }
 
 export function createSubviewCompositionController({
@@ -642,7 +657,9 @@ export function createSubviewCompositionController({
       store = getSubviewWindowStore(rootStore, options.targetWindowId);
       // Geometry must come from the chosen window, never the first graph in Main.
       const route = host?.closest?.("#route-host") || host;
-      host = route?.querySelector?.(`[data-local-view-window="${options.targetWindowId}"]`) || null;
+      host = options.targetHost?.dataset?.localViewWindow === options.targetWindowId
+        ? options.targetHost
+        : route?.querySelector?.(`[data-local-view-window="${options.targetWindowId}"]`) || null;
     } else if (explicitTarget) store = rootStore;
     if (!current()) return false;
     const state = store.getState();
@@ -659,10 +676,10 @@ export function createSubviewCompositionController({
       ? initial.assembly.trackSelectedCtgIds : [])
       .map(normalizeSupportDatasetId)
       .filter(Boolean);
-    const targetIds = role === "primary" && selectedIds.includes(assemblyCtgId)
+    const targetIds = !options.draggedOnly && role === "primary" && selectedIds.includes(assemblyCtgId)
       ? Array.from(new Set(selectedIds))
       : [assemblyCtgId].filter(Boolean);
-    const selectedCandidates = targetIds.map(targetId => candidates.find(entry => {
+    let selectedCandidates = targetIds.map(targetId => candidates.find(entry => {
       if (entry.assemblyCtgId !== targetId || (role && entry.source?.role !== role)) return false;
       const source = entry.source || {};
       if (ctgContext.datasetId && Number(source.datasetId) !== Number(ctgContext.datasetId)) return false;
@@ -673,6 +690,10 @@ export function createSubviewCompositionController({
       return true;
     })).filter(Boolean);
     if (!selectedCandidates.length) return false;
+    if (options.draggedOnly) {
+      selectedCandidates = selectedCandidates.map(candidate => projectMainDraggedMember(candidate, ctgContext)).filter(Boolean);
+      if (!selectedCandidates.length) return false;
+    }
     if (explicitTarget && !options.targetWindowId) {
       const draft = startSubviewWindowDraft(latest.assembly);
       // Starting from Main is explicit: never project the previously active comparison.

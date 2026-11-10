@@ -142,8 +142,8 @@ function syncTrackComboMenuPlacement(comboNode) {
   }
   if (comboNode.closest?.(ALIGNMENT_TOOLBAR_SELECTOR) && placeAnchoredPanel(comboNode, menu)) return;
   const viewportHeight =
-    Number(globalThis.window?.innerHeight)
-    || Number(globalThis.document?.documentElement?.clientHeight)
+    Number(comboNode.ownerDocument?.defaultView?.innerHeight || globalThis.window?.innerHeight)
+    || Number(comboNode.ownerDocument?.documentElement?.clientHeight || globalThis.document?.documentElement?.clientHeight)
     || 0;
   if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) {
     return;
@@ -1508,7 +1508,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   bindTrackContigDrag(host, store);
   bindSubviewTrackContigDrag(host, store);
   bindTrackBoxSelection(host, store);
-  if (isFullPageBinding) {
+  if (isFullPageBinding || (store.localViewRootStore && host.matches?.(".subview-window.is-native"))) {
     bindTrackSelectionHotkeys(host, store);
   }
 

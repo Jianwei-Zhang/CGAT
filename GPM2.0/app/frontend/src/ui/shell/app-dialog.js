@@ -33,8 +33,10 @@ function requestDialog(mode, message, options = {}) {
   form.append(title, body);
   let input;
   if (mode === "prompt") {
-    input = doc.createElement("input");
-    input.type = "text";
+    input = doc.createElement(options.multiline ? "textarea" : "input");
+    if (options.multiline) input.rows = 5;
+    else input.type = "text";
+    if (options.maxLength) input.maxLength = options.maxLength;
     input.className = "app-dialog-input";
     input.value = String(options.defaultValue ?? "");
     input.autocomplete = "off";
@@ -89,6 +91,8 @@ function requestDialog(mode, message, options = {}) {
     });
     dialog.addEventListener("close", () => finish(cancelled));
     dialog.showModal();
+    const nativeWindow = doc.defaultView?.__TAURI__?.window?.getCurrentWindow?.();
+    if (nativeWindow) void nativeWindow.unminimize().then(() => nativeWindow.setFocus()).catch(() => {});
     (input || (mode === "notice" ? confirm : cancel)).focus();
     input?.select();
   });

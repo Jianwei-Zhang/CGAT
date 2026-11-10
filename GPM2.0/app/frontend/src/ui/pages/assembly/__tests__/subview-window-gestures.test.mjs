@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../../../../state/store.js";
 import { bindSubviewWorkspace } from "../subview-workspace-runtime.js";
-import { installSubviewWorkspace, changeSubviewWindow } from "../subview-workspace-state.js";
+import { installSubviewWorkspace, startSubviewWindowDraft, changeSubviewWindow } from "../subview-workspace-state.js";
 import { getAssemblyI18n } from "../i18n.js";
 
 function fixture() {
@@ -15,12 +15,12 @@ function fixture() {
   const win = { ...emitter(), innerWidth: 1400, innerHeight: 900 };
   const doc = { ...emitter(), defaultView: win, createElement() { throw new Error("unexpected render"); } };
   const values = new Map(), classes = new Set(["is-floating"]);
-  const node = { ...emitter(), dataset: { localViewWindow: id }, hidden: false,
+  const node = { ...emitter(), ownerDocument: doc, dataset: { localViewWindow: id }, hidden: false,
     classList: { contains: key => classes.has(key), toggle(key, on) { on ? classes.add(key) : classes.delete(key); } },
     style: { setProperty: (key, value) => values.set(key, value), removeProperty: key => values.delete(key) },
     querySelector: () => null, setAttribute() {}, setPointerCapture() {}, releasePointerCapture() {},
     getBoundingClientRect: () => ({ left: 100, top: 100, width: 700, height: 400 }) };
-  const section = { querySelector: () => null, querySelectorAll: () => [node], contains: () => true };
+  const section = { querySelector: () => null, querySelectorAll: selector => selector === "[data-local-view-window]" ? [node] : [], contains: () => true };
   const root = { ...emitter(), ownerDocument: doc, isConnected: true, matches: () => true,
     querySelector: selector => selector === "[data-subview-workspace]" ? section : null };
   let refreshes = 0;
@@ -34,7 +34,7 @@ function fixture() {
   const event = (extra = {}) => ({ pointerId: 1, button: 0, clientX: 300, clientY: 200, preventDefault() {}, stopPropagation() {}, ...extra });
   const down = (edge = null) => root.events.get("pointerdown")(event({ target: target(edge) }));
   const move = () => doc.events.get("pointermove")(event({ clientX: 350, clientY: 225 }));
-  return { store, id, node, root, doc, win, values, runtime, down, move, event, refreshes: () => refreshes,
+  return { store, id, node, section, root, doc, win, values, runtime, down, move, event, refreshes: () => refreshes,
     item: () => store.getState().assembly.subviewWorkspace.windows.find(item => item.id === id) };
 }
 
@@ -87,5 +87,30 @@ test("restoring a resized window into a smaller viewport clamps geometry and ref
   f.root.events.get("click")(f.event({ target: { closest: () => button } }));
   assert.equal(f.item().minimized, false); assert.equal(f.item().width, 600); assert.equal(f.item().height, 350);
   assert.equal(f.item().x, 0); assert.equal(f.item().y, 0); assert.equal(f.refreshes(), 1);
+  f.runtime.destroy();
+});
+
+
+for (const finish of ["commit", "Escape", "click"]) test(`task pointer reorder ${finish} keeps native file-drop support and click behavior`, () => {
+  const f = fixture();
+  f.store.setState({ assembly: { ...startSubviewWindowDraft(f.store.getState().assembly),
+    subview: { summary: { mode: "2-contig", top: { role: "primary", contigId: 3 }, bottom: { role: "primary", contigId: 4 } } } } });
+  const second = f.store.getState().assembly.subviewWorkspace.activeId;
+  let rewrites = 0, captures = 0;
+  const bar = { scrollLeft: 0, getBoundingClientRect: () => ({ left: 0, right: 400 }), set outerHTML(_html) { rewrites++; } };
+  f.section.querySelector = selector => selector === ".subview-taskbar" ? bar : null;
+  const target = { dataset: { subviewTask: second }, classList: { add() {}, remove() {} }, closest: () => target };
+  const task = { dataset: { subviewTask: f.id } };
+  const button = { dataset: { localViewId: f.id, localViewAction: "activate" }, setPointerCapture() { captures++; }, releasePointerCapture() { captures--; },
+    closest: selector => selector === "[data-subview-task]" ? task : selector === "[data-local-view-action=activate]" ? button : null };
+  f.doc.elementFromPoint = () => target;
+  f.root.events.get("pointerdown")(f.event({ target: button, clientX: 40, clientY: 10 }));
+  if (finish !== "click") f.doc.events.get("pointermove")(f.event({ clientX: 180, clientY: 10 }));
+  const before = rewrites;
+  if (finish === "Escape") f.doc.events.get("keydown")(f.event({ key: "Escape" }));
+  else f.doc.events.get("pointerup")(f.event({ clientX: 180, clientY: 10 }));
+  assert.equal(captures, 0);
+  assert.deepEqual(f.store.getState().assembly.subviewWorkspace.windows.map(item => item.id), finish === "commit" ? [second, f.id] : [f.id, second]);
+  if (finish === "click") assert.equal(rewrites, before, "do not replace a clicked button before its click event");
   f.runtime.destroy();
 });

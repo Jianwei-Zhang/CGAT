@@ -8,7 +8,7 @@ function classes() {
   return { add: name => values.add(name), remove: name => values.delete(name), contains: name => values.has(name),
     toggle: (name, value) => value ? values.add(name) : values.delete(name) };
 }
-function fixture({ mode = "hand", view = "graph" } = {}) {
+function fixture({ mode = "hand", view = "graph", transfer = false, nativePoint = null } = {}) {
   const listeners = new Map(), windowListeners = new Map(), added = [], calls = [];
   const win = { innerWidth: 1000, innerHeight: 800,
     addEventListener: (name, fn) => windowListeners.set(name, fn), removeEventListener: name => windowListeners.delete(name),
@@ -36,11 +36,16 @@ function fixture({ mode = "hand", view = "graph" } = {}) {
   let state = { activeRoute: "assembly", session: { workspacePath: "/fixture", projectId: 1 },
     assembly: { activeTab: "assembly", selectedChrName: "Chr01", chrCtgs: [] } };
   const store = { getState: () => state };
-  const deps = { labels: () => ({ drag: "drag", drop: "drop {path}" }), append: (...args) => calls.push(args) };
+  const localCalls = [], cancelled = [];
+  const deps = { labels: () => ({ drag: "drag", drop: "drop {path}", addLane: "add {lane}", moveLane: "move {lane}", top: "top", bottom: "bottom" }),
+    append: (...args) => calls.push(args),
+    ...(transfer ? { dropLocal: (...args) => localCalls.push(args), cancelHorizontal: () => cancelled.push(true) } : {}),
+    ...(nativePoint ? { dragPoint: nativePoint } : {}),
+  };
   const runtime = bindFinalPathAppendDrag(root, store, deps);
   const event = (x, y, patch = {}) => ({ target: source, pointerId: 1, button: 0, clientX: x, clientY: y,
     preventDefault() { this.defaultPrevented = true; }, stopImmediatePropagation() { this.stopped = true; }, ...patch });
-  return { root, store, source, target, surface, runtime, listeners, windowListeners, added, calls, event,
+  return { root, doc, store, source, target, surface, runtime, deps, listeners, windowListeners, added, calls, localCalls, cancelled, event,
     setHit: value => { hit = value; }, setState: value => { state = value; } };
 }
 
@@ -126,4 +131,133 @@ test("joined Local fragments with an entity key need not have one backing contig
     "data-subview-fragment-entity-key": "joined:entity", "data-subview-fragment-coordinate-space": "base" };
   const node = { getAttribute: name => attrs[name] ?? null, closest: selector => selector.includes("data-subview-fragment") ? node : null };
   assert.equal(resolveFinalPathDragSource(node).localFragmentEntityKey, "joined:entity");
+});
+
+
+function localDestination(doc, id = "local-target") {
+  const window = { dataset: { localViewWindow: id }, closest: () => null };
+  const svg = { dataset: { subviewDropTopY: "100", subviewDropBottomY: "250" },
+    getBoundingClientRect: () => ({ top: 0, height: 350 }), getAttribute: () => "350" };
+  const surface = { classList: classes(), querySelector: () => svg,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 500, bottom: 350 }) };
+  const target = { closest: selector => selector === "[data-local-view-window]" ? window
+    : selector === ".subview-track-scroll" ? surface : null };
+  return { target, window, surface, doc };
+}
+
+test("mouse horizontal movement leaves the positional controller in charge", () => {
+  const f = fixture({ mode: "mouse", transfer: true });
+  const down = f.event(100, 100); f.listeners.get("pointerdown")(down);
+  assert.equal(down.defaultPrevented, undefined);
+  f.windowListeners.get("pointermove")(f.event(240, 104));
+  f.windowListeners.get("pointerup")(f.event(240, 104));
+  assert.equal(f.cancelled.length, 0); assert.equal(f.calls.length, 0); assert.equal(f.localCalls.length, 0);
+});
+
+for (const [lane, y] of [["top", 110], ["bottom", 260]]) test(`Main vertical transfer adds to the chosen ${lane} lane without a horizontal commit`, async () => {
+  const f = fixture({ mode: "mouse", transfer: true });
+  const dest = localDestination(f.doc); f.setHit(dest.target);
+  f.listeners.get("pointerdown")(f.event(20, 20));
+  f.windowListeners.get("pointermove")(f.event(22, y));
+  assert.equal(f.cancelled.length, 1);
+  f.windowListeners.get("pointerup")(f.event(22, y));
+  assert.equal(f.localCalls.length, 1); assert.equal(f.calls.length, 0);
+  const payload = f.localCalls[0][2];
+  assert.equal(payload.target.lane, lane); assert.equal(payload.target.id, "local-target");
+  assert.equal(payload.context.start, 201); assert.equal(payload.context.end, 450);
+  assert.equal(payload.sourceWindowId, null);
+});
+
+test("native transfer hit tests the destination document, not captured source client coordinates", async () => {
+  let point;
+  const f = fixture({ transfer: true, nativePoint: async () => point });
+  const destinationDoc = { ...f.doc, elementFromPoint: () => f.target };
+  point = { document: destinationDoc, x: 20, y: 600, pressed: true };
+  f.doc.defaultView.setTimeout = () => 1; f.doc.defaultView.clearTimeout = () => {};
+  f.listeners.get("pointerdown")(f.event(100, 100));
+  f.windowListeners.get("pointermove")(f.event(-800, -900));
+  await Promise.resolve();
+  assert.equal(f.surface.classList.contains("is-final-path-append-target"), true);
+  f.windowListeners.get("pointerup")(f.event(-800, -900));
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(f.calls.length, 1); assert.equal(f.calls[0][3].targetChrName, "Chr01B");
+});
+
+test("native release requires a fresh valid target and cannot append to its last hover", async () => {
+  let point;
+  const f = fixture({ transfer: true, nativePoint: async () => point });
+  f.doc.defaultView.setTimeout = () => 1; f.doc.defaultView.clearTimeout = () => {};
+  f.setHit(f.target); point = { document: f.doc, x: 20, y: 600, pressed: true };
+  f.listeners.get("pointerdown")(f.event(100, 100));
+  f.windowListeners.get("pointermove")(f.event(200, 500)); await Promise.resolve();
+  point = { document: null, pressed: false };
+  f.windowListeners.get("pointerup")(f.event(200, 500));
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(f.calls.length, 0); assert.equal(f.localCalls.length, 0);
+});
+
+test("a delayed native release cannot write into a newly selected project", async () => {
+  let resolve;
+  const f = fixture({ transfer: true, nativePoint: () => new Promise(done => { resolve = done; }) });
+  f.doc.defaultView.setTimeout = () => 1; f.doc.defaultView.clearTimeout = () => {};
+  f.setHit(f.target); f.listeners.get("pointerdown")(f.event(100, 100));
+  f.windowListeners.get("pointermove")(f.event(200, 500));
+  f.windowListeners.get("pointerup")(f.event(200, 500));
+  f.setState({ ...f.store.getState(), session: { projectId: 222 } });
+  resolve({ document: f.doc, x: 200, y: 500, pressed: false });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(f.calls.length, 0); assert.equal(f.localCalls.length, 0);
+});
+
+for (const lane of ["top", "bottom"]) test(`native Main-to-Local transfer resolves the ${lane} lane in its owning document`, async () => {
+  let point;
+  const f = fixture({ transfer: true, nativePoint: async () => point });
+  const dest = localDestination(null);
+  const destinationDoc = { ...f.doc, elementFromPoint: () => dest.target };
+  point = { document: destinationDoc, x: 100, y: lane === "top" ? 110 : 260, pressed: true };
+  f.doc.defaultView.setTimeout = () => 1; f.doc.defaultView.clearTimeout = () => {};
+  f.listeners.get("pointerdown")(f.event(100, 100));
+  f.windowListeners.get("pointermove")(f.event(-800, 400)); await Promise.resolve();
+  f.windowListeners.get("pointerup")(f.event(-800, 400));
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(f.localCalls.length, 1); assert.equal(f.localCalls[0][2].target.lane, lane);
+});
+
+
+function useLocalSource(f, id = "local-source", slot = "top") {
+  const owner = { dataset: { localViewWindow: id } };
+  const attrs = { "data-subview-track-pair-role": "primary", "data-subview-track-pair-contig-id": "9",
+    "data-subview-composition-entity-key": "source-owned:9", "data-subview-track-slot": slot,
+    "data-subview-track-ref-orient": "-", "data-subview-track-pair-dataset-id": "7" };
+  f.root.closest = selector => selector === "[data-local-view-window]" ? owner : null;
+  // The binding root is the owner if bound anew; this existing fixture binds
+  // first and uses root equality only for event ownership checks.
+  f.source.getAttribute = name => attrs[name] ?? null;
+  f.source.closest = selector => selector === "[data-local-view-window]" ? owner
+    : selector.includes("data-view-interaction-mode") ? { dataset: { viewInteractionMode: "hand" } }
+    : selector.includes("data-subview-fragment") && !selector.includes("data-track-contig-id") ? null
+    : selector.includes("data-subview-track-pair") || selector.includes("data-track-contig-id") ? f.source : null;
+}
+
+for (const lane of ["top", "bottom"]) test(`Local ctg transfer into ${lane} ${lane === "top" ? "is a no-op" : "moves its source-owned member"}`, () => {
+  const f = fixture({ transfer: true }); useLocalSource(f);
+  const destination = localDestination(f.doc, "local-source"); f.setHit(destination.target);
+  f.listeners.get("pointerdown")(f.event(20, 20));
+  const y = lane === "top" ? 110 : 260;
+  f.windowListeners.get("pointermove")(f.event(22, y));
+  f.windowListeners.get("pointerup")(f.event(22, y));
+  assert.equal(f.localCalls.length, lane === "top" ? 0 : 1);
+  if (lane === "bottom") {
+    assert.equal(f.localCalls[0][2].sourceWindowId, "local-source");
+    assert.equal(f.localCalls[0][2].localContext.compositionEntityKey, "source-owned:9");
+    assert.equal(f.localCalls[0][2].target.lane, "bottom");
+  }
+});
+test("Local transfers do not silently copy members into a different Local task", () => {
+  const f = fixture({ transfer: true }); useLocalSource(f);
+  f.setHit(localDestination(f.doc, "local-other").target);
+  f.listeners.get("pointerdown")(f.event(20, 20));
+  f.windowListeners.get("pointermove")(f.event(22, 260));
+  f.windowListeners.get("pointerup")(f.event(22, 260));
+  assert.equal(f.localCalls.length, 0); assert.equal(f.calls.length, 0);
 });

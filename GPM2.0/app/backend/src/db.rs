@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 7;
+pub const CURRENT_SCHEMA_VERSION: i64 = 8;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -544,6 +544,12 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             updated_at TEXT NOT NULL,
             note TEXT,
             FOREIGN KEY(project_id) REFERENCES project(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS project_local_view_tasks (
+            project_id INTEGER PRIMARY KEY REFERENCES project(id) ON DELETE CASCADE,
+            state_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS project_subview_history (

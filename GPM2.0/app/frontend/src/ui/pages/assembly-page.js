@@ -1,3 +1,5 @@
+import { getNativeSubviewManager } from "./assembly/subview-native-windows.js";
+import { installSubviewTaskPersistence, flushSubviewTasks, prepareSubviewTasks } from "./assembly/subview-task-persistence.js";
 import { createFinalPathAppendPreview } from "./assembly/final-path-append-preview.js";
 import { bindFinalPathAppendDrag } from "./assembly/final-path-append-drag-runtime.js";
 import { bindSubviewWorkspace, getSubviewWorkspaceRuntime } from "./assembly/subview-workspace-runtime.js";
@@ -136,6 +138,7 @@ import {
 import {
   bindSubviewTrackContigDrag as bindSubviewTrackContigDragImpl,
   bindTrackContigDrag as bindTrackContigDragImpl,
+  cancelTrackContigDrag,
 } from "./assembly/track-drag-runtime.js";
 import {
   bindTrackBoxSelection as bindTrackBoxSelectionImpl,
@@ -854,6 +857,21 @@ export function bindAssemblyPage(host, store, options = {}) {
   bindFinalPathAppendDrag(host, store, {
     labels: state => getAssemblyI18n(state).finalPathDrag,
     append: appendTrackContigToFinalPath,
+    cancelHorizontal: cancelTrackContigDrag,
+    dragPoint: (getNativeSubviewManager(store) || host.ownerDocument?.defaultView?.__GPM_NATIVE_LOCAL_VIEWS__)
+      ? () => getNativeSubviewManager(store)?.dragPoint() : null,
+    dropLocal: async (_root, sourceStore, { target, context, localContext, sourceWindowId, workspaceGeneration }) => {
+      const rootStore = sourceStore.localViewRootStore || sourceStore;
+      if (rootStore.getState().assembly?.subviewWorkspace?.generation !== workspaceGeneration
+        || !target.window.isConnected || target.window.hidden || target.window.inert) return false;
+      if (sourceWindowId) {
+        if (sourceWindowId !== target.id || localContext?.slot === target.lane) return false;
+        return subviewFragmentController.moveLocalFragmentToOtherLane(target.window, sourceStore, localContext);
+      }
+      return addContextCtgToComposition(target.window, rootStore, context, target.lane, {
+        targetWindowId: target.id, workspaceGeneration, targetHost: target.window, draggedOnly: true,
+      });
+    },
     preview: (doc, state, context, target) => createFinalPathAppendPreview(doc, state, context, target,
       projected => renderAssemblyFinalPathCardImpl(projected, renderTracksDeps)),
     onError: (host, store, error) => setAssemblyActionFeedback(host, store, {
@@ -888,6 +906,7 @@ export function bindAssemblyPage(host, store, options = {}) {
     bindSubviewWorkspace(resolveCurrentRouteHost(host) || host, store, {
       render: state => renderAssemblySubviewPanelImpl(state, renderTracksDeps),
       getLabels: state => getAssemblyI18n(state).subview,
+      retryPersistence: () => flushSubviewTasks(store),
       bindWindow: (node, scoped) => bindAssemblyPage(node, scoped, { scope: "subview", rerender: rerenderSubviewPanel }),
       syncTools: syncAssemblySubviewTools,
       closeTools: () => assemblyPageSession.subviewTools?.close?.(),
@@ -904,7 +923,16 @@ export function bindAssemblyPage(host, store, options = {}) {
       },
       refresh: rerenderSubviewPanel,
       refreshEvidence: (node, scoped) => refreshSubviewPairwiseEvidence(node, scoped, { rerenderLoading: false }),
+      restoreEvidence(node, scoped) {
+        const state = scoped.getState();
+        if (!state.assembly.subview?.summary || scoped.isLocalViewAlive?.() === false) return;
+        scoped.setState({ assembly: { ...state.assembly, subviewRestoring: true,
+          subviewRestoringSummary: state.assembly.subview.summary, subviewRestoreError: "" } });
+        rerenderSubviewPanel(node, scoped);
+        return restoreAssemblyLocalEvidence(node, scoped, assemblyDataRuntimeDeps, { afterPaint: true });
+      },
     });
+    installSubviewTaskPersistence(store);
   }
   return result;
 }
@@ -985,6 +1013,7 @@ function viewportControllerFor(store) {
         pendingAssemblyScrollStatePersistTimer: null },
       getPersistDeps: () => projectAssemblyViewStateRuntimeDeps,
       getTimerApi: () => resolveTimerApi(),
+      getWindow: () => getNativeSubviewManager(store)?.node(store.localViewWindowId)?.ownerDocument?.defaultView || globalThis.window,
       persistProjectAssemblyViewStateFromStore: (host, scoped, deps) => persistProjectAssemblyViewStateFromStore(host, scoped, deps),
       refreshViewportGeometry: (host, scoped) => rerenderSubviewPanel(host, scoped),
     });
@@ -1200,6 +1229,7 @@ function patchMemberSelection(host, store, options = {}) {
 }
 
 const assemblyDataRuntimeDeps = {
+  prepareLocalViewTasks: prepareSubviewTasks,
   waitForProjectViewMutations: () => assemblyPageSession.projectViewMutationCoordinator.whenIdle(),
   activateSubviewCompositionHistory,
   refreshSubviewPairwiseEvidence,
@@ -2436,7 +2466,8 @@ async function persistProjectAssemblyViewStateFromStoreNow(
 
 export async function flushAssemblyProjectState(host, store) {
   await assemblyPageSession.projectViewMutationCoordinator.whenIdle();
-  return persistAssemblyProjectStateChecked(host, store);
+  await persistAssemblyProjectStateChecked(host, store);
+  await flushSubviewTasks(store);
 }
 
 async function persistAssemblyProjectStateChecked(host, store) {

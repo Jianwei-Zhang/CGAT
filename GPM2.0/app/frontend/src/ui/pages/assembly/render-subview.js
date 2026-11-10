@@ -1919,7 +1919,7 @@ function renderSubviewAlignmentCard(
             })),
           })}
           ${denseBandRendering ? renderSubviewDenseAnchorScene(denseBandEdgeCandidates) : ""}
-          <svg class="assembly-track-svg subview-track-svg" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="${svgModel.renderViewBoxMinX} 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
+          <svg class="assembly-track-svg subview-track-svg" data-subview-drop-top-y="${svgModel.topBarY}" data-subview-drop-bottom-y="${svgModel.bottomBarY}" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="${svgModel.renderViewBoxMinX} 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
             <line class="track-ruler-line" x1="0" y1="${svgModel.rulerTop}" x2="${svgModel.baseInnerWidth}" y2="${svgModel.rulerTop}" />
             ${renderSubviewVirtualRuler({
               ...resolveSubviewRulerGeometry({
@@ -3239,7 +3239,7 @@ function renderSubviewTrackPairAlignmentCard(
             })),
           })}
           ${denseBandRendering ? renderSubviewDenseAnchorScene(denseBandEdgeCandidates) : ""}
-          <svg class="assembly-track-svg subview-track-svg" width="${renderInnerWidth}" height="${contentBottom}" viewBox="${renderViewBoxMinX} 0 ${renderInnerWidth} ${contentBottom}" preserveAspectRatio="xMinYMin meet">
+          <svg class="assembly-track-svg subview-track-svg" data-subview-drop-top-y="${resolvedTopLayout.laneTop}" data-subview-drop-bottom-y="${resolvedBottomLayout.laneTop}" width="${renderInnerWidth}" height="${contentBottom}" viewBox="${renderViewBoxMinX} 0 ${renderInnerWidth} ${contentBottom}" preserveAspectRatio="xMinYMin meet">
             <defs>
               <clipPath id="${bandClipId}" clipPathUnits="userSpaceOnUse">
                 <rect data-subview-band-clip-rect="1" x="${renderViewBoxMinX.toFixed(2)}" y="${bandClipTop.toFixed(2)}" width="${renderInnerWidth.toFixed(2)}" height="${bandClipHeight.toFixed(2)}" />

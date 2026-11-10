@@ -106,10 +106,10 @@ export function createSubviewDragRenderController({
         while (contextCurrent()) {
           let state = store.getState(), needsRebind = false;
           const settings = getAppSettings(), settingsKey = JSON.stringify(settings), widths = getWidths(store);
-          const theme = document.documentElement.dataset.theme || "light", dpr = Math.max(1, Number(globalThis.devicePixelRatio || 1));
+          const theme = document.documentElement.dataset.theme || "light", dpr = Math.max(1, Number(document.defaultView?.devicePixelRatio || globalThis.devicePixelRatio || 1));
           const current = () => !needsRebind && contextCurrent() && sameSubviewRenderSnapshot(state, store.getState())
             && JSON.stringify(getAppSettings()) === settingsKey && getWidths(store).subview === widths.subview
-            && (document.documentElement.dataset.theme || "light") === theme && Math.max(1, Number(globalThis.devicePixelRatio || 1)) === dpr;
+            && (document.documentElement.dataset.theme || "light") === theme && Math.max(1, Number(document.defaultView?.devicePixelRatio || globalThis.devicePixelRatio || 1)) === dpr;
           const drawing = renderer.render(state, { settings, widths, theme, dpr }, current);
           void drawing.catch(() => {});
           if (!retired) {

@@ -83,6 +83,42 @@ pub struct EditAuditLogItem {
     pub created_at: String,
 }
 
+// Kept separate from legacy active-view persistence: a scoped view save must
+// never replace the complete task list or another view's edits.
+pub fn get_project_local_view_tasks(path: &Path, project_id: i64) -> Result<Value> {
+    let conn = open_workspace_db(path)?;
+    read_local_view_tasks(&conn, project_id)
+}
+
+fn read_local_view_tasks(conn: &Connection, project_id: i64) -> Result<Value> {
+    let json: Option<String> = conn.query_row(
+        "SELECT state_json FROM project_local_view_tasks WHERE project_id = ?1",
+        params![project_id], |row| row.get(0),
+    ).optional()?;
+    match json {
+        Some(json) => serde_json::from_str(&json).context("invalid Local View task document"),
+        None => Ok(serde_json::json!({ "version": 1, "scopes": {} })),
+    }
+}
+
+pub fn set_project_local_view_tasks(path: &Path, project_id: i64, state: Value) -> Result<()> {
+    let conn = open_workspace_db(path)?;
+    write_local_view_tasks(&conn, project_id, state)
+}
+
+fn write_local_view_tasks(conn: &Connection, project_id: i64, state: Value) -> Result<()> {
+    if state.get("version").and_then(Value::as_u64) != Some(1)
+        || !state.get("scopes").is_some_and(Value::is_object) {
+        bail!("unsupported Local View task document");
+    }
+    conn.execute(
+        "INSERT INTO project_local_view_tasks(project_id, state_json) VALUES (?1, ?2)
+         ON CONFLICT(project_id) DO UPDATE SET state_json=excluded.state_json, updated_at=CURRENT_TIMESTAMP",
+        params![project_id, serde_json::to_string(&state)?],
+    )?;
+    Ok(())
+}
+
 pub fn get_runtime_settings(project_db_path: &Path) -> Result<RuntimeSettings> {
     let mut conn = open_workspace_db(project_db_path)?;
     get_runtime_settings_with_connection(&mut conn)
@@ -595,6 +631,27 @@ mod tests {
         update_runtime_settings_with_connection,
     };
     use crate::db::init_workspace_schema;
+
+    #[test]
+    fn local_view_tasks_round_trip_per_project_without_touching_legacy_state() -> Result<()> {
+        let mut conn = Connection::open_in_memory()?;
+        init_workspace_schema(&conn)?;
+        seed_project(&conn, 1)?;
+        seed_project(&conn, 2)?;
+        let legacy = get_project_assembly_view_state_with_connection(&mut conn, 1)?;
+        let state = serde_json::json!({ "version": 1, "scopes": {
+            "[\"chr1\",null]": [{ "id": "local-test", "name": "Compare", "note": "Notes", "snapshot": {} }]
+        }});
+        super::write_local_view_tasks(&conn, 1, state.clone())?;
+        assert_eq!(super::read_local_view_tasks(&conn, 1)?, state);
+        assert_eq!(super::read_local_view_tasks(&conn, 2)?["scopes"], serde_json::json!({}));
+        assert_eq!(get_project_assembly_view_state_with_connection(&mut conn, 1)?, legacy);
+        assert!(super::write_local_view_tasks(&conn, 1, serde_json::json!({"version": 2, "scopes": {}})).is_err());
+        assert_eq!(super::read_local_view_tasks(&conn, 1)?, state);
+        conn.execute_batch("PRAGMA query_only=ON;")?;
+        assert_eq!(super::read_local_view_tasks(&conn, 1)?, state);
+        Ok(())
+    }
 
     #[test]
     fn existing_project_view_is_a_query_only_read() -> Result<()> {

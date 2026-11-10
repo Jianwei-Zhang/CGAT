@@ -1,3 +1,4 @@
+import { taskScopeKey } from "./subview-task-state.js";
 import { hasDeferredReferenceHits } from "../../../services/workflow/reference-evidence.js";
 import { hydrateAssemblyCtgDetail, restoreAssemblyLocalEvidence } from "./assembly-ready-stages.js";
 import { beginAssemblyViewRequest, currentAssemblyViewRequest } from "./assembly-view-request.js";
@@ -693,9 +694,12 @@ export async function loadAssemblyView(host, store, options, deps) {
         }),
       },
     });
+    const tasksReady = await deps.prepareLocalViewTasks?.(store) ?? true;
+    if (!isCurrentRequest()) return;
     const loadedAssembly = store.getState().assembly;
     const compositionKey = deps.buildSubviewCompositionHistoryKey?.(selectedChrName) || "";
-    if (compositionKey && loadedAssembly.subviewHistoryByKey?.[compositionKey]) {
+    if (tasksReady && compositionKey && loadedAssembly.subviewHistoryByKey?.[compositionKey]
+      && !Object.hasOwn(loadedAssembly.localViewTasks?.scopes || {}, taskScopeKey(loadedAssembly))) {
       const activated = deps.activateSubviewCompositionHistory?.(loadedAssembly, {
         stateOrLocale: store.getState(),
       });
@@ -926,9 +930,12 @@ export async function selectChromosome(host, store, chrName, deps) {
         summary: tAssembly(store.getState(), "runtime.chrLoadedSummary", { chrName }),
       },
     });
+    const tasksReady = await deps.prepareLocalViewTasks?.(store) ?? true;
+    if (!isCurrentRequest()) return;
     const loadedAssembly = store.getState().assembly;
     const compositionKey = deps.buildSubviewCompositionHistoryKey?.(chrName) || "";
-    if (compositionKey && loadedAssembly.subviewHistoryByKey?.[compositionKey]) {
+    if (tasksReady && compositionKey && loadedAssembly.subviewHistoryByKey?.[compositionKey]
+      && !Object.hasOwn(loadedAssembly.localViewTasks?.scopes || {}, taskScopeKey(loadedAssembly))) {
       const activated = deps.activateSubviewCompositionHistory?.(loadedAssembly, {
         stateOrLocale: store.getState(),
       });

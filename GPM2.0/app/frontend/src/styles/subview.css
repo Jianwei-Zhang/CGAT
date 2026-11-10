@@ -1214,7 +1214,9 @@
 [data-view-interaction-mode="hand"] [data-subview-track-pair-contig-id],
 [data-view-interaction-mode="hand"] [data-subview-fragment-key] { cursor: grab; }
 
-.is-final-path-append-source, .is-final-path-append-source * { pointer-events: none !important; }
+.contig-drop-lane-preview { position: fixed; z-index: 9999; pointer-events: none;
+  border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border-radius: 3px; box-sizing: border-box; }
 
 .final-path-append-source-copy { display: block; overflow: hidden; opacity: .8; }
 .final-path-append-caption { margin-top: 5px; }
@@ -1227,3 +1229,37 @@
 .final-path-append-preview rect.is-final-path-append-candidate { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 6 3; }
 .final-path-append-preview .final-path-sort-row.is-final-path-append-candidate {
   outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--surface-subtle); }
+
+.subview-window-actions button[hidden] { display: none; }
+.subview-task { cursor: grab; touch-action: none; user-select: none; }
+.subview-task.is-drag-target { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Match the shared context-menu surface, not browser-default button chrome. */
+.subview-task-menu {
+  position: fixed; z-index: 12000; min-width: 168px; max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px); overflow-y: auto; box-sizing: border-box;
+}
+.subview-task-menu .context-menu-item {
+  display: grid; grid-template-columns: 14px 1fr; align-items: center; gap: 6px;
+  width: 100%; min-height: 28px; padding: 4px 8px; text-align: start;
+  font: inherit; font-size: var(--font-small); line-height: 1.4;
+}
+.subview-task-menu .context-menu-item:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px;
+  background: var(--surface-muted, #eef2f6);
+}
+.subview-task-menu-separator { height: 1px; margin: 3px 6px; background: var(--border-default, #cbd5e1); }
+.subview-task-menu .context-menu-item.is-danger:not(:disabled) { color: var(--theme-red-ink, #8f2424); }
+.subview-task-menu .context-menu-item.is-danger:not(:disabled):hover { background: var(--theme-red-surface, #fff5f5); }
+.subview-task-menu-mark { width: 14px; text-align: center; }
+
+
+[data-local-view-task-status]:not([hidden]) { display: flex; align-items: center; gap: 8px; color: var(--text-danger, #b91c1c); font-size: var(--font-small); }
+
+/* Independent OS windows use the same graph and controls, with no nested frame
+   or viewport clamp inherited from the in-page/browser fallback. */
+.local-view-native-page { margin: 0; padding: 0; overflow: hidden; }
+.local-view-native-page #route-host, .local-view-native-page [data-subview-workspace] { height: 100vh; margin: 0; padding: 0; }
+.subview-window.is-native { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; box-sizing: border-box; margin: 0; border-radius: 0; }
+.subview-window.is-native > .subview-window-content { flex: 1 1 auto; min-height: 0; max-height: 100%; }
+.subview-window.is-native > .subview-window-resize { display: block; position: absolute; z-index: 30; touch-action: none; }
+.subview-window.is-native [data-local-view-drag] { cursor: move; touch-action: none; user-select: none; }

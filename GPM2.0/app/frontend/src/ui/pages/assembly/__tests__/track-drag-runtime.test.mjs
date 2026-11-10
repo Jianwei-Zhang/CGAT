@@ -240,13 +240,14 @@ test("bindTrackContigDrag ignores ref-track members", () => {
   }
 });
 
-test("bindSubviewTrackContigDrag previews during move and applies pending subview offset on release", () => {
+for (const native of [false, true]) test(`Subview drag owns ${native ? "native peer" : "main"} window listeners and animation frames`, () => {
   const originalWindow = globalThis.window;
   const windowStub = createWindowStub();
-  globalThis.window = windowStub;
+  globalThis.window = native ? createWindowStub() : windowStub;
 
   try {
     const host = createHost();
+    if (native) host.ownerDocument = { defaultView: windowStub };
     const store = createStore({
       assembly: {
         activeTab: "assembly",
@@ -321,6 +322,7 @@ test("bindSubviewTrackContigDrag previews during move and applies pending subvie
       target,
     });
 
+    if (native) assert.equal(globalThis.window.listeners.size, 0, "peer gesture must not bind Main events");
     windowStub.listeners.get("pointermove")?.({ clientX: 17 });
     windowStub.flushAnimationFrame();
     assert.deepEqual(calls[1], ["preview", {

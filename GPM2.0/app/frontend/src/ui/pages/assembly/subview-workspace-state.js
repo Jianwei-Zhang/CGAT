@@ -1,6 +1,7 @@
+import { taskProjectKey, taskScopeKey, normalizeSubviewTasks, updateSubviewTasks, restoredSubviewWindows, taskText } from "./subview-task-state.js";
 import { reconcileLocalSubviewWithMain } from "./subview-fragment-reconcile.js";
-// Runtime-only window ownership. Project persistence continues to use the existing
-// Local View fields; neither window geometry nor evidence is serialized here.
+// Runtime ownership stays separate from the durable task document. Geometry,
+// focus and evidence never enter project task storage.
 const LOCAL_KEYS = [
   "subview", "subviewTrackView", "subviewTrackDragOffsets", "subviewTrackScrollState",
   "subviewCompositionViewport", "subviewHistoryByKey", "subviewAnchorStateByKey",
@@ -30,10 +31,29 @@ export function startSubviewWindowDraft(assembly) {
 export function reconcileSubviewWorkspace(previous, next) {
   let assembly = next.assembly;
   if (!assembly?.subviewWorkspace) return next;
+  const project = taskProjectKey(next);
+  const projectChanged = assembly.localViewTaskProject !== project;
+  if (projectChanged) assembly = { ...assembly, localViewTaskSaveError: "", subviewNativeError: "" };
+  let document = projectChanged ? normalizeSubviewTasks(null) : assembly.localViewTasks || normalizeSubviewTasks(null);
   const scope = subviewWorkspaceScope(next);
   let workspace = assembly.subviewWorkspace;
-  if (workspace.scope !== scope) {
-    workspace = { scope, generation: ++generation, nextId: 1, activeId: null, windows: [] };
+  if (workspace.scope !== scope || projectChanged || workspace.reloadTasks) {
+    const keepDraft = workspace.reloadTasks && workspace.scope === scope && !projectChanged && !assembly.subview?.summary;
+    const windows = restoredSubviewWindows(document, assembly);
+    workspace = { scope, generation: ++generation, nextId: 1, activeId: null, windows };
+    // A restored task starts unopened; never reuse the previous chromosome's
+    // active summary as a new task in this scope.
+    if (!keepDraft && (previous.assembly?.subviewWorkspace || windows.length)) assembly = { ...assembly, subview: null };
+  }
+  if (!previous.assembly?.loading && assembly.loading) workspace = { ...workspace, loadActiveId: workspace.activeId };
+  if (previous.assembly?.loading && !assembly.loading) {
+    const current = workspace.windows.find(item => item.id === workspace.activeId);
+    // Main loading carries a legacy single-view snapshot captured at request
+    // start. Never apply that stale snapshot to a different/current task, nor
+    // resurrect a task closed while the Main request was in flight.
+    if (current) assembly = { ...assembly, ...current.snapshot };
+    else if (workspace.loadActiveId) assembly = { ...assembly, ...captureSubviewWindow(previous.assembly) };
+    workspace = { ...workspace, loadActiveId: null };
   }
   let windows = workspace.windows;
   if (!assembly.loading && (previous.assembly?.chrCtgs !== assembly.chrCtgs
@@ -47,11 +67,13 @@ export function reconcileSubviewWorkspace(previous, next) {
   let activeId = workspace.activeId;
   let nextId = workspace.nextId;
   if (assembly.subview?.summary && !assembly.loading) {
-    const snapshot = captureSubviewWindow(assembly);
+    let snapshot = captureSubviewWindow(assembly);
+    const oldSnapshot = windows.find(item => item.id === activeId)?.snapshot;
+    if (oldSnapshot && LOCAL_KEYS.every(key => oldSnapshot[key] === snapshot[key])) snapshot = oldSnapshot;
     if (!windows.some(item => item.id === activeId)) {
-      activeId = `local-${workspace.generation}-${nextId++}`;
+      activeId = globalThis.crypto?.randomUUID ? `local-${globalThis.crypto.randomUUID()}` : `local-${Date.now()}-${workspace.generation}-${nextId++}`;
       assembly = { ...assembly, trackSelectedCtgIds: [] };
-      windows = [...windows, { id: activeId, number: nextId - 1, snapshot, floating: true, minimized: false,
+      windows = [...windows, { id: activeId, number: windows.length + 1, snapshot, name: "", note: "", opened: true, floating: true, minimized: false,
         x: 80 + windows.length % 6 * 24, y: 100 + windows.length % 6 * 24, z: Math.max(0, ...windows.map(item => item.z)) + 1 }];
     } else {
       windows = windows.map(item => item.id === activeId ? { ...item, snapshot } : item);
@@ -60,9 +82,11 @@ export function reconcileSubviewWorkspace(previous, next) {
     windows = windows.filter(item => item.id !== activeId);
     activeId = null;
   }
-  return { ...next, assembly: { ...assembly,
-    subviewWorkspace: { ...workspace, windows, activeId, nextId,
-      pendingSelection: activeId ? null : assembly.subview } } };
+  windows = windows.map((item, index) => item.number === index + 1 ? item : { ...item, number: index + 1 });
+  assembly = { ...assembly, subviewWorkspace: { ...workspace, windows, activeId, nextId,
+    pendingSelection: activeId ? null : assembly.subview } };
+  document = updateSubviewTasks(document, assembly);
+  return { ...next, assembly: { ...assembly, localViewTaskProject: project, localViewTasks: document } };
 }
 
 export function installSubviewWorkspace(store) {
@@ -87,6 +111,13 @@ export function changeSubviewWindow(store, id, action, patch = {}) {
   const workspace = assembly?.subviewWorkspace;
   const target = workspace?.windows.find(item => item.id === id);
   if (!target) return false;
+  if (!["close", "activate", "minimize", "dock", "open-docked", "open-floating", "metadata", "reorder", "position", "native-geometry"].includes(action)) return false;
+  if (action === "position") patch = Object.fromEntries(["x", "y", "width", "height"].filter(key => Number.isFinite(patch[key])).map(key => [key, patch[key]]));
+  if (action === "native-geometry") {
+    const rect = patch.nativeBounds;
+    if (!["x", "y", "width", "height"].every(key => Number.isFinite(rect?.[key])) || rect.width <= 0 || rect.height <= 0) return false;
+    patch = { nativeBounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+  }
   let next = assembly;
   let activeId = workspace.activeId;
   let windows = workspace.windows;
@@ -98,13 +129,28 @@ export function changeSubviewWindow(store, id, action, patch = {}) {
         subviewCompositionViewport: {}, subviewTrackScrollState: {} };
     }
   } else {
+    if (action === "metadata") patch = { name: taskText(patch.name ?? target.name, 80), note: taskText(patch.note ?? target.note, 4000) };
+    if (action === "reorder") {
+      const destination = windows.findIndex(item => item.id === patch.beforeId);
+      if (destination < 0 || patch.beforeId === id) return false;
+      windows = windows.filter(item => item.id !== id);
+      windows.splice(destination, 0, target);
+      patch = {};
+    }
+    if (action === "dock" || action === "open-docked" || action === "open-floating") {
+      patch = { floating: action === "dock" ? !target.floating : action === "open-floating", opened: true, minimized: false };
+      action = "activate";
+    }
     if (action === "activate") {
       activeId = id;
       next = { ...assembly, ...target.snapshot };
-      patch = { ...patch, minimized: false, z: Math.max(0, ...windows.map(item => item.z)) + 1 };
+      patch = { ...patch, opened: true, minimized: false, z: Math.max(0, ...windows.map(item => item.z)) + 1 };
     }
     if (action === "minimize") patch = { minimized: true };
-    if (action === "dock") patch = { floating: !target.floating };
+    // Exactly one docked slot. Replacing it leaves the old task unopened.
+    if (action === "activate" && !(patch.floating ?? target.floating)) {
+      windows = windows.map(item => item.id !== id && !item.floating ? { ...item, opened: false } : item);
+    }
     windows = windows.map(item => item.id === id ? { ...item, ...patch } : item);
   }
   store.setState({ assembly: { ...next, subviewWorkspace: { ...workspace, activeId, windows } } });
@@ -159,4 +205,31 @@ export function getSubviewWindowStore(store, id = null) {
   // Do not retain evidence arrays from closed scopes through cached stores.
   for (const oldKey of cache.keys()) if (!oldKey.startsWith(`${owner}:`)) cache.delete(oldKey);
   return scoped;
+}
+
+export function hydrateSubviewTasks(store, saved, baseline) {
+  const state = store.getState(), assembly = state.assembly;
+  if (!saved) throw new Error("Invalid Local View task document");
+  const loaded = normalizeSubviewTasks(saved);
+  const current = assembly.localViewTasks || normalizeSubviewTasks(null);
+  // Merge changes made while loading by stable ID. Newly created tasks must not
+  // erase saved tasks that were not visible yet; only known IDs can be deleted.
+  const scopes = { ...loaded.scopes };
+  for (const [key, tasks] of Object.entries(current.scopes)) {
+    const before = baseline?.scopes?.[key];
+    if (!(key in scopes)) { scopes[key] = tasks; continue; }
+    if (tasks === before) continue;
+    const known = new Set((before || []).map(task => task.id));
+    const live = new Set(tasks.map(task => task.id));
+    const previouslyUnseen = scopes[key].filter(task => !known.has(task.id) && !live.has(task.id));
+    scopes[key] = [...previouslyUnseen, ...tasks];
+  }
+  const scope = taskScopeKey(assembly), document = { version: 1, scopes };
+  const changedWhileLoading = current.scopes[scope] !== baseline?.scopes?.[scope];
+  const keepLive = changedWhileLoading || !(scope in loaded.scopes);
+  const existing = new Map(assembly.subviewWorkspace.windows.map(item => [item.id, item]));
+  const windows = keepLive ? restoredSubviewWindows(document, assembly).map(item => existing.get(item.id) || item)
+    : assembly.subviewWorkspace.windows;
+  store.setState({ assembly: { ...assembly, localViewTasks: document,
+    subviewWorkspace: { ...assembly.subviewWorkspace, windows, reloadTasks: !keepLive } } });
 }

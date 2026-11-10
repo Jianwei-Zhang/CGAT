@@ -651,7 +651,7 @@ export function renderSubviewCompositionAlignmentCard({
         data-view-navigation-end-bp="${layout.contentEndBp}"
         data-subview-domain-span-bp="${layout.width * layout.bpPerPx}" data-subview-inner-width="${layout.width}"
         data-subview-viewbox-min-x="${layout.viewBoxMinX}" data-subview-window-start-bp="0">
-        <svg class="assembly-track-svg subview-track-svg" width="${layout.width}" height="${CONTENT_HEIGHT}"
+        <svg class="assembly-track-svg subview-track-svg" data-subview-drop-top-y="${TOP_Y}" data-subview-drop-bottom-y="${BOTTOM_Y}" width="${layout.width}" height="${CONTENT_HEIGHT}"
           viewBox="${layout.viewBoxMinX} 0 ${layout.width} ${CONTENT_HEIGHT}" preserveAspectRatio="xMinYMin meet">
           <line class="track-ruler-line" x1="0" y1="${RULER_Y}" x2="${rulerWidth}" y2="${RULER_Y}" />
           ${renderSubviewVirtualRuler({

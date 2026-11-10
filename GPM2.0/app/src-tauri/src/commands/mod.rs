@@ -845,6 +845,25 @@ mod tests {
     }
 
     #[test]
+    fn local_view_task_commands_roundtrip_through_native_storage() {
+        let root = create_test_workspace_root();
+        let workspace = root.display().to_string();
+        let conn = open_workspace_db(&project_db_path(&workspace)).unwrap();
+        conn.execute_batch("INSERT INTO reference_genome(id,name,species_name,assembly_label,fasta_path,fai_path) VALUES(1,'ref','s','a','ref.fa','ref.fai');
+            INSERT INTO dataset(id,name,assembler,fasta_path,fai_path) VALUES(1,'ds','a','ds.fa','ds.fai');
+            INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at) VALUES(1,'p',1,1,1,'0');").unwrap();
+        drop(conn);
+        let state = json!({"version": 1, "scopes": {"[\"chr1\",null]": [
+            {"id": "local-stable", "name": "View", "note": "first\nsecond", "snapshot": {}}
+        ]}});
+        tauri::async_runtime::block_on(set_project_local_view_tasks(workspace.clone(), 1, state.clone())).unwrap();
+        assert_eq!(tauri::async_runtime::block_on(get_project_local_view_tasks(workspace.clone(), 1)).unwrap(), state);
+        assert!(tauri::async_runtime::block_on(set_project_local_view_tasks(workspace.clone(), 1, json!({"version": 2}))).is_err());
+        assert_eq!(tauri::async_runtime::block_on(get_project_local_view_tasks(workspace, 1)).unwrap(), state);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn preview_cache_commands_roundtrip_without_changing_assembly_state() {
         let root = create_test_workspace_root();
         let workspace = root.display().to_string();

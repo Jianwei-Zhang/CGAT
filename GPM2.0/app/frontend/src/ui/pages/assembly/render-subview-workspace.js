@@ -53,9 +53,13 @@ export function subviewWindowDescription(item, labels, assembly = {}) {
     short = [name(top), name(bottom)].join(" ↔ ");
     lines = [`${w.top}: ${detail(top)}`, `${w.bottom}: ${detail(bottom)}`];
   }
-  return { title: `#${number} ${short}`, tooltip: [
+  return { title: item.name || `${w.view} ${number}`, tooltip: [
+    ...(item.name ? [item.name] : []),
+    short,
     `${labels.panelTitle} #${number} · ${summary?.mode === "track-pair" ? w.trackPair : summary?.mode === "composition" ? labels.compositionBadgeName : w.contigPair}`,
     `${w.chromosome}: ${assembly.selectedChrName || "—"}`, ...lines,
+    ...(assembly.subviewNativeWindows && item.floating ? [w.nativeDropHint] : []),
+    ...(item.note ? [`${w.note}: ${item.note}`] : []),
   ].join("\n") };
 }
 
@@ -94,12 +98,11 @@ export function renderSubviewEmptyGuide(labels) {
 export function renderSubviewTaskbar(workspace, labels, assembly = {}) {
   if (!workspace?.windows.length) return "";
   const w = labels.window;
-  return `<div class="subview-taskbar" role="toolbar" aria-label="${escapeAttr(w.taskbar)}">
-    ${workspace.windows.map(item => `<div class="subview-task${workspace.activeId === item.id ? " is-active" : ""}${item.minimized ? " is-minimized" : ""}" data-subview-task="${item.id}">
+  return `<div class="subview-taskbar" data-local-view-generation="${workspace.generation}" role="toolbar" aria-label="${escapeAttr(w.taskbar)}">
+    ${workspace.windows.map(item => `<div class="subview-task${workspace.activeId === item.id ? " is-active" : ""}${item.minimized ? " is-minimized" : ""}" data-subview-task="${item.id}" draggable="false">
       <button type="button" data-local-view-action="activate" data-local-view-id="${item.id}"
-        aria-expanded="${!item.minimized}" aria-controls="${item.id}" class="subview-task-name"
+        aria-expanded="${!item.minimized && item.opened !== false}" ${assembly.subviewNativeWindows && item.floating ? "" : `aria-controls="${item.id}"`} class="subview-task-name"
         data-app-tooltip="${escapeAttr(subviewWindowDescription(item, labels, assembly).tooltip)}">${escapeHtml(subviewWindowTitle(item, labels, assembly))}</button>
-      <button type="button" data-local-view-action="minimize" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.minimize)}" data-app-tooltip="${escapeAttr(w.minimize)}">−</button>
       <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">×</button>
     </div>`).join("")}
   </div>`;
@@ -113,9 +116,10 @@ export function renderSubviewWorkspace(state, labels, renderPanel) {
   // workspace before attaching interactive controls.
   if (!workspace) return `<section data-subview-workspace="1">${renderPanel(state)}</section>`;
   return `<section data-subview-workspace="1">
+    ${renderSubviewTaskStatus(assembly, labels)}
     ${workspace.windows.length ? renderSubviewTaskbar(workspace, labels, assembly) : renderPanel(state)}
-    ${workspace.windows.map(item => `<section id="${item.id}" data-local-view-window="${item.id}"
-      class="subview-window${item.floating ? " is-floating" : ""}" ${item.minimized ? "hidden" : ""}
+    ${workspace.windows.filter(item => !(assembly.subviewNativeWindows && item.floating)).map(item => `<section id="${item.id}" data-local-view-window="${item.id}" data-local-view-generation="${workspace.generation}"
+      class="subview-window${item.floating ? " is-floating" : ""}" ${item.minimized || item.opened === false ? "hidden" : ""}
       role="region" aria-label="${escapeAttr(subviewWindowTitle(item, labels, assembly))}"
       style="--local-x:${item.x}px;--local-y:${item.y}px;--local-z:${item.z}${item.width > 0 ? `;--local-width:${item.width}px` : ""}${item.height > 0 ? `;--local-height:${item.height}px` : ""}">
       <div data-local-view-context-menu class="context-menu is-hidden"></div>
@@ -124,4 +128,25 @@ export function renderSubviewWorkspace(state, labels, renderPanel) {
       ${LOCAL_VIEW_RESIZE_EDGES.map(edge => `<div class="subview-window-resize" data-local-view-resize="${edge}" aria-hidden="true"></div>`).join("")}
     </section>`).join("")}
   </section>`;
+}
+
+export function subviewTaskMenuItems(item, labels) {
+  const w = labels.window;
+  const opened = item.opened !== false;
+  return [
+    { action: "open-docked", label: w.openDocked, group: "open", checked: opened && !item.floating },
+    { action: "open-floating", label: w.openFloating, group: "open", checked: opened && item.floating },
+    { action: "minimize", label: w.minimize, group: "window", disabled: !opened || item.minimized },
+    { action: "rename", label: w.rename, group: "metadata" },
+    { action: "note", label: w.editNote, group: "metadata" },
+    { action: "close", label: w.taskClose, group: "close", danger: true },
+  ];
+}
+
+export function renderSubviewTaskStatus(assembly, labels) {
+  const error = assembly.subviewNativeError || assembly.localViewTaskSaveError;
+  return `<div data-local-view-task-status role="status" ${error ? "" : "hidden"}>
+    ${error ? `<span>${escapeHtml(assembly.subviewNativeError ? labels.window.openFailed : labels.window.saveFailed)}: ${escapeHtml(error)}</span>
+      ${assembly.subviewNativeError ? "" : `<button type="button" class="button ghost" data-local-view-action="retry-save">${escapeHtml(labels.window.retrySave)}</button>`}` : ""}
+  </div>`;
 }

@@ -1,3 +1,5 @@
+import { requestAppNotice } from "./ui/shell/app-dialog.js";
+import { bindLocalViewCloseSave } from "./ui/shell/local-view-close-save.js";
 import { bindAppTooltips, hideAppTooltips } from "./ui/app-tooltip-runtime.js";
 import "./styles/tooltips.css";
 import { releaseProjectOverviewPreview, releaseProjectPathOverview } from "./ui/pages/project-export-page.js";
@@ -260,6 +262,12 @@ const store = createStore({
     job: null,
   },
 });
+
+void bindLocalViewCloseSave({
+  windowHandle: window.__GPM_NATIVE_LOCAL_VIEWS__ ? window.__TAURI__?.window?.getCurrentWindow?.() : null,
+  flush: () => flushAssemblyProjectState(document.querySelector("#route-host"), store),
+  onError: error => requestAppNotice(`${store.getState().locale === "en" ? "Local View tasks could not be saved. The window will stay open." : "局部比对任务保存失败，窗口将保持打开。"}\n${error?.message || error}`, { locale: store.getState().locale }),
+}).catch(error => console.error("Local View close-save listener failed", error));
 
 const updater = createAppUpdater({
   invoke: invokeCommand, listen: listenBackendEvent, storage: window.localStorage,

@@ -91,8 +91,13 @@ test("closed non-active windows and scope ABA cannot receive late writes", () =>
   const scopedB = getSubviewWindowStore(store, b);
   for (const selectedChrName of ["Chr02", "Chr01"]) store.setState({ assembly: {
     ...store.getState().assembly, selectedChrName, subview: null } });
+  const restored = store.getState().assembly.subviewWorkspace.windows[0];
+  assert.equal(restored.id, b);
+  assert.equal(restored.opened, false);
   scopedB.setState({ assembly: { ...scopedB.getState().assembly, subview: { summary: summary(1, 2) } } });
-  assert.equal(store.getState().assembly.subviewWorkspace.windows.length, 0);
+  assert.equal(store.getState().assembly.subviewWorkspace.windows.length, 1);
+  assert.equal(store.getState().assembly.subviewWorkspace.windows[0].snapshot.subview.summary.bottom.contigId, 8);
+  assert.equal(scopedB.isLocalViewAlive(), false);
 });
 
 test("late pairwise results update the originating window, not the current comparison", async () => {
@@ -200,7 +205,7 @@ test("completed windows clear Main draft and multiselection without losing their
   assert.doesNotMatch(html, /class="assembly-track-label-row[^"\n]*is-subview-track-selected/);
 });
 
-test("titles have stable window numbers, localized roles and full dataset detail", async () => {
+test("titles use current order numbers and retain full dataset detail in tooltips", async () => {
   const { getAssemblyI18n } = await import("../i18n.js");
   for (const locale of ["zh", "en"]) {
     const store = fixture();
@@ -211,10 +216,10 @@ test("titles have stable window numbers, localized roles and full dataset detail
     const labels = getAssemblyI18n(store.getState()).subview;
     const item = store.getState().assembly.subviewWorkspace.windows[0];
     const description = subviewWindowDescription(item, labels, subviewWindowAssembly(store.getState()));
-    assert.equal(description.title, locale === "zh" ? "#1 辅 ↔ 主" : "#1 A ↔ P");
+    assert.equal(description.title, locale === "zh" ? "视图 1" : "View 1");
     assert.match(description.tooltip, /support-full/); assert.match(description.tooltip, /primary-full/);
     changeSubviewWindow(store, a, "close");
-    assert.match(subviewWindowDescription(store.getState().assembly.subviewWorkspace.windows[0], labels, store.getState().assembly).title, /^#2 /);
+    assert.match(subviewWindowDescription(store.getState().assembly.subviewWorkspace.windows[0], labels, store.getState().assembly).title, / 1$/);
     assert.equal(store.getState().assembly.subviewWorkspace.windows[0].id, b);
   }
 });
@@ -228,7 +233,8 @@ test("composition labels count logical members and bound detail lists; names are
   const labels = getAssemblyI18n(store.getState()).subview;
   const item = store.getState().assembly.subviewWorkspace.windows[0];
   const description = subviewWindowDescription(item, labels, store.getState().assembly);
-  assert.equal(description.title, "#1 Custom · Top4 / Bottom1");
+  assert.equal(description.title, "View 1");
+  assert.match(description.tooltip, /Custom · Top4 \/ Bottom1/);
   assert.match(description.tooltip, /source-2/); assert.doesNotMatch(description.tooltip, /source-3/);
   const { renderSubviewTaskbar } = await import("../render-subview-workspace.js");
   const html = renderSubviewTaskbar(store.getState().assembly.subviewWorkspace, labels, store.getState().assembly);

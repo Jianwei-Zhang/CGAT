@@ -61,8 +61,8 @@ test("menu has new and every existing destination, and closes over the exact win
   const menu = items.find(item => item.label === "加入局部视图");
   assert.equal(menu.children.length, 3);
   assert.equal(menu.children[0].label, "新建局部比对");
-  assert.match(menu.children[1].label, /^#1 /);
-  assert.match(menu.children[2].label, /^#2 /);
+  assert.match(menu.children[1].label, / 1$/);
+  assert.match(menu.children[2].label, / 2$/);
   await menu.children[1].children[1].run();
   assert.equal(calls[0][3], "bottom"); assert.equal(calls[0][4].targetWindowId, a);
 });

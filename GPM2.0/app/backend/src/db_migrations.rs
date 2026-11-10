@@ -60,7 +60,22 @@ const MIGRATIONS: &[Migration] = &[
         name: "retain_annotation_library_provenance",
         apply: migrate_annotation_provenance_to_v7,
     },
+    Migration {
+        version: 8,
+        name: "add_project_local_view_tasks",
+        apply: migrate_local_view_tasks_to_v8,
+    },
 ];
+
+fn migrate_local_view_tasks_to_v8(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS project_local_view_tasks (
+            project_id INTEGER PRIMARY KEY REFERENCES project(id) ON DELETE CASCADE,
+            state_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );",
+    ).context("failed to create Local View task storage")
+}
 
 fn migrate_annotation_provenance_to_v7(conn: &Connection) -> Result<()> {
     for table in ["source_seq_telomere_mark", "source_seq_centromere_mark"] {

@@ -6,6 +6,9 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-destroy",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize"
   ]
 }

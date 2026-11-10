@@ -624,3 +624,17 @@ fn schema_six_adds_optional_annotation_sources_without_losing_data() -> Result<(
     assert_eq!(note, "keep me");
     Ok(())
 }
+
+#[test]
+fn version_seven_database_adds_task_storage_without_rewriting_existing_records() -> Result<()> {
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch("PRAGMA foreign_keys=ON;
+        CREATE TABLE project(id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+        INSERT INTO project VALUES(1, 'Keep');
+        PRAGMA user_version=7;")?;
+    super::migrate_workspace_schema(&conn)?;
+    assert_eq!(user_version(&conn)?, CURRENT_SCHEMA_VERSION);
+    assert!(table_exists(&conn, "project_local_view_tasks")?);
+    assert_eq!(conn.query_row("SELECT name FROM project WHERE id=1", [], |r| r.get::<_, String>(0))?, "Keep");
+    Ok(())
+}

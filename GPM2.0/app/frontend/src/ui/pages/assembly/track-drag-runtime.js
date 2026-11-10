@@ -4,6 +4,13 @@ import { normalizeSupportDatasetId, normalizeTrackRole } from "./selection-state
 const ASSEMBLY_TRACK_CONTIG_DRAG_BOUND = Symbol("assemblyTrackContigDragBound");
 const ASSEMBLY_SUBVIEW_TRACK_CONTIG_DRAG_BOUND = Symbol("assemblySubviewTrackContigDragBound");
 const TRACK_CONTIG_CLICK_SUPPRESS_MS = 250;
+const activeTrackDrags = new WeakMap();
+// A vertical/cross-window transfer must cancel the positional preview before it
+// owns the pointer. It must never also commit a horizontal offset on release.
+export function cancelTrackContigDrag(host) {
+  const win = getWindowObject(host);
+  if (win) activeTrackDrags.get(win)?.();
+}
 
 const REQUIRED_TRACK_DRAG_DEPS = [
   "clearTrackDragPreview",
@@ -52,8 +59,8 @@ function normalizeSubviewTrackSlot(slot) {
   return "";
 }
 
-function getWindowObject() {
-  return globalThis.window;
+function getWindowObject(host) {
+  return host?.ownerDocument?.defaultView || globalThis.window;
 }
 
 function trackDragOwner(node) {
@@ -73,14 +80,14 @@ function hasBoundTrackDragHost(host, bindingKey) {
   return false;
 }
 
-function createFrameScheduler(flush) {
+function createFrameScheduler(host, flush) {
   let frameToken = null;
   return {
     schedule() {
       if (frameToken !== null) {
         return;
       }
-      const windowObject = getWindowObject();
+      const windowObject = getWindowObject(host);
       if (typeof windowObject?.requestAnimationFrame === "function") {
         frameToken = windowObject.requestAnimationFrame(() => {
           frameToken = null;
@@ -97,7 +104,7 @@ function createFrameScheduler(flush) {
       if (frameToken === null) {
         return false;
       }
-      const windowObject = getWindowObject();
+      const windowObject = getWindowObject(host);
       if (typeof windowObject?.cancelAnimationFrame === "function") {
         windowObject.cancelAnimationFrame(frameToken);
       } else {
@@ -111,7 +118,7 @@ function createFrameScheduler(flush) {
       if (frameToken === null) {
         return false;
       }
-      const windowObject = getWindowObject();
+      const windowObject = getWindowObject(host);
       if (typeof windowObject?.cancelAnimationFrame === "function") {
         windowObject.cancelAnimationFrame(frameToken);
       } else {
@@ -231,7 +238,7 @@ export function bindTrackContigDrag(host, store, deps) {
         && next.assembly?.supportDatasetId === state.assembly?.supportDatasetId;
     };
 
-    const scheduler = createFrameScheduler(() => {
+    const scheduler = createFrameScheduler(host, () => {
       if (!sameContext()) { onPointerCancel(); return; }
       if (fullRangeDrag) {
         if (fastFullRange) {
@@ -305,7 +312,8 @@ export function bindTrackContigDrag(host, store, deps) {
 
     const onPointerMove = (moveEvent) => updatePendingOffset(moveEvent);
     const detachListeners = () => {
-      const windowObject = getWindowObject();
+      const windowObject = getWindowObject(host);
+      if (windowObject && activeTrackDrags.get(windowObject) === onPointerCancel) activeTrackDrags.delete(windowObject);
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
       windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
@@ -356,7 +364,8 @@ export function bindTrackContigDrag(host, store, deps) {
       deps.setTrackContigDragActive(false);
     };
 
-    const windowObject = getWindowObject();
+    const windowObject = getWindowObject(host);
+    if (windowObject) activeTrackDrags.set(windowObject, onPointerCancel);
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
     windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);
@@ -459,7 +468,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         && editableIdentity(next.assembly?.subview) === initialIdentity;
     };
 
-    const scheduler = createFrameScheduler(() => {
+    const scheduler = createFrameScheduler(host, () => {
       if (!sameContext()) { finish(false); return; }
       if (fullRangeDrag) {
         if (fastFullRange) {
@@ -548,7 +557,8 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       if (finished) return;
       // An actual edit/context switch must not apply the drag to a new pair.
       if (!sameContext()) shouldCommit = false;
-      const windowObject = getWindowObject();
+      const windowObject = getWindowObject(host);
+      if (windowObject && activeTrackDrags.get(windowObject) === onPointerCancel) activeTrackDrags.delete(windowObject);
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
       windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
@@ -613,7 +623,8 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     };
     const onPointerCancel = () => finish(false);
 
-    const windowObject = getWindowObject();
+    const windowObject = getWindowObject(host);
+    if (windowObject) activeTrackDrags.set(windowObject, onPointerCancel);
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
     windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);

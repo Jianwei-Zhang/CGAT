@@ -2,9 +2,9 @@ mod app_update;
 mod auto_pipeline_cancel;
 mod commands;
 mod import_cancel;
+mod local_view_windows;
 mod project_copy_cancel;
 
-use tauri::Manager;
 
 fn main_window_title(version: &semver::Version) -> String {
     format!("Genome Puzzle Master ({version})")
@@ -14,13 +14,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            if let Some(window) = app.get_webview_window("main") {
-                window.set_title(&main_window_title(&app.package_info().version))?;
-            }
+            local_view_windows::create_main_window(app)?;
             Ok(())
         })
+        .on_window_event(local_view_windows::on_window_event)
         .manage(app_update::UpdateState::default())
         .invoke_handler(tauri::generate_handler![
+            local_view_windows::probe_local_view_drag,
             app_update::app_update_status,
             app_update::app_update_check,
             app_update::app_update_notes,
@@ -87,6 +87,8 @@ pub fn run() {
             commands::get_project_preview_cache,
             commands::put_project_preview_cache,
             commands::get_project_assembly_view_state,
+            commands::get_project_local_view_tasks,
+            commands::set_project_local_view_tasks,
             commands::update_project_assembly_view_state,
             commands::append_edit_audit_log,
             commands::list_edit_audit_logs,

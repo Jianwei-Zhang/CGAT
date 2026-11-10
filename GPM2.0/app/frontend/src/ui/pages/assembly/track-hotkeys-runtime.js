@@ -25,8 +25,8 @@ function assertTrackHotkeyActionDeps(deps) {
   throw new TypeError(`Missing track hotkey action deps: ${missing.join(", ")}`);
 }
 
-function getWindowObject() {
-  return globalThis.window;
+function getWindowObject(host) {
+  return host?.ownerDocument?.defaultView || globalThis.window;
 }
 
 export function bindTrackSelectionHotkeys(host, store, deps) {
@@ -37,7 +37,7 @@ export function bindTrackSelectionHotkeys(host, store, deps) {
   const keydownHandler = (event) => {
     void deps.handleTrackDeleteHotkey(host, store, event);
   };
-  getWindowObject()?.addEventListener?.("keydown", keydownHandler, true);
+  getWindowObject(host)?.addEventListener?.("keydown", keydownHandler, true);
   host[ASSEMBLY_TRACK_HOTKEYS_HANDLER] = keydownHandler;
   host[ASSEMBLY_TRACK_HOTKEYS_BOUND] = true;
 }
@@ -54,6 +54,7 @@ export async function handleTrackDeleteHotkey(host, store, event, deps) {
     await deps.deleteSelectedSubviewTrackPairCtgs(host, store, subviewSelectedEntries);
     return true;
   }
+  if (store.localViewRootStore) return false;
   const primarySelectedIds = filterPrimaryTrackSelectionCtgIds(state.assembly.trackSelectedCtgIds, state.assembly);
   if (!primarySelectedIds.length) {
     return false;

@@ -5,7 +5,7 @@ export const TRACK_NUMBER_INPUT_IDLE_MS = 600;
 export function bindTrackNumberInput({
   input, field, key, registry, isCurrentScope, readValue, commitValue,
   setMenuOpen, closeOtherMenus, isMenuOpen,
-  timerApi = globalThis.window || globalThis,
+  timerApi = input?.ownerDocument?.defaultView || globalThis.window || globalThis,
 }) {
   if (!input) return;
   registry.get(key)?.destroy({ preserveExplicit: !input.readOnly });

@@ -18,12 +18,12 @@ function assertMemberChipSelectionDeps(deps) {
   throw new TypeError(`Missing member chip selection runtime deps: ${missing.join(", ")}`);
 }
 
-function getWindowObject() {
-  return globalThis.window;
+function getWindowObject(host) {
+  return host?.ownerDocument?.defaultView || globalThis.window;
 }
 
-function getDocumentObject() {
-  return globalThis.document;
+function getDocumentObject(node) {
+  return node?.ownerDocument || globalThis.document;
 }
 
 function hasSelectionDragMoved(start, current) {
@@ -53,7 +53,7 @@ function ensureMemberChipSelectionBox(regionEl) {
   if (boxEl) {
     return boxEl;
   }
-  boxEl = getDocumentObject().createElement("div");
+  boxEl = getDocumentObject(regionEl).createElement("div");
   boxEl.className = "member-chip-selection-box is-hidden";
   regionEl.appendChild(boxEl);
   return boxEl;
@@ -180,7 +180,7 @@ export function bindDeletedMemberChipBoxSelection(host, store, deps) {
     };
 
     const finishSelection = (cancelled = false) => {
-      const windowObject = getWindowObject();
+      const windowObject = getWindowObject(host);
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
       windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
@@ -214,7 +214,7 @@ export function bindDeletedMemberChipBoxSelection(host, store, deps) {
     };
 
     const onPointerCancel = () => finishSelection(true);
-    const windowObject = getWindowObject();
+    const windowObject = getWindowObject(host);
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
     windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);

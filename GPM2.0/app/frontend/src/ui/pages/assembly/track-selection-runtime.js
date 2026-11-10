@@ -23,12 +23,12 @@ function assertTrackSelectionDeps(deps) {
   throw new TypeError(`Missing track selection runtime deps: ${missing.join(", ")}`);
 }
 
-function getWindowObject() {
-  return globalThis.window;
+function getWindowObject(host) {
+  return host?.ownerDocument?.defaultView || globalThis.window;
 }
 
-function getDocumentObject() {
-  return globalThis.document;
+function getDocumentObject(node) {
+  return node?.ownerDocument || globalThis.document;
 }
 
 function ensureTrackSelectionBox(scrollEl) {
@@ -36,7 +36,7 @@ function ensureTrackSelectionBox(scrollEl) {
   if (boxEl) {
     return boxEl;
   }
-  boxEl = getDocumentObject().createElement("div");
+  boxEl = getDocumentObject(scrollEl).createElement("div");
   boxEl.className = "track-selection-box is-hidden";
   scrollEl.appendChild(boxEl);
   return boxEl;
@@ -196,7 +196,7 @@ export function bindTrackBoxSelection(host, store, deps) {
     const finishSelection = (cancelled = false) => {
       if (finished) return;
       finished = true;
-      const windowObject = getWindowObject();
+      const windowObject = getWindowObject(host);
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
       windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
@@ -226,7 +226,7 @@ export function bindTrackBoxSelection(host, store, deps) {
     };
     const onPointerCancel = () => finishSelection(true);
 
-    const windowObject = getWindowObject();
+    const windowObject = getWindowObject(host);
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
     windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);

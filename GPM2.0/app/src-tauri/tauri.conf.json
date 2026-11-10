@@ -24,12 +24,14 @@
         "width": 1360,
         "height": 860,
         "resizable": true,
-        "dragDropEnabled": true
+        "dragDropEnabled": true,
+        "create": false
       }
     ],
     "security": {
       "capabilities": [
-        "default"
+        "default",
+        "local-view"
       ]
     }
   },
