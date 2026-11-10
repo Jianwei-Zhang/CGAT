@@ -20,7 +20,7 @@ function parseHeader(html) {
   return root.children[0];
 }
 
-for (const locale of ["zh", "en"]) test(`chromosome replaces the title and members lead the shared toolbar before parameter actions (${locale})`, () => {
+for (const locale of ["zh", "en"]) test(`chromosome replaces the title and member management no longer occupies the toolbar (${locale})`, () => {
   const entry = { chrName: "Chr01", mode: "segments", segments: [], grtDisplayAvailable: true };
   const html = renderAssemblyPage({ ...createState({ initializer: {
     datasets: [{ datasetId: 11, name: "primary" }, { datasetId: 22, name: "A very long auxiliary dataset name" }],
@@ -36,12 +36,12 @@ for (const locale of ["zh", "en"]) test(`chromosome replaces the title and membe
   assert.ok(Object.hasOwn(toolbar.attrs, "data-main-track-toolbar"));
   assert.deepEqual(toolbar.children.map(node => node.attrs["data-assembly-popup"] === "members" ? "members" : node.attrs["data-grt-result-controls"] ? "precomputed"
     : node.attrs["data-create-phased-track"] ? "phase" : node.attrs.class), [
-    "members", "precomputed", "phase", "assembly-marker-display", "assembly-track-inline-field", "assembly-track-inline-field",
+    "precomputed", "phase", "assembly-marker-display", "assembly-track-inline-field", "assembly-track-inline-field",
     "assembly-track-inline-field", "assembly-track-inline-field", "main-view-history-controls",
   ]);
   assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
   assert.equal(html.match(/id="assembly-chr-picker-toggle"/g)?.length, 1);
-  assert.equal(html.match(/data-members-card-toggle="1"/g)?.length, 1);
+  assert.doesNotMatch(html, /data-members-card-toggle="1"/);
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
@@ -164,14 +164,12 @@ for (const locale of ["zh", "en"]) for (const mode of ["loaded", "loading", "emp
     const html = renderAssemblyPage(state), header = parseHeader(html);
     assert.equal(header.children.length, 2);
     assert.equal(header.children[0].attrs["data-assembly-popup"], "chromosomes");
-    assert.equal(header.children[1].children[0].attrs["data-assembly-popup"], "members");
+    assert.ok(header.children[1].children.every(node => node.attrs["data-assembly-popup"] !== "members"));
     assert.equal(html.match(/id="assembly-chr-picker-toggle"/g)?.length, 1);
-    assert.equal(html.match(/data-members-card-toggle="1"/g)?.length, 1);
+    assert.doesNotMatch(html, /data-members-card-toggle="1"/);
     assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
     assert.ok(html.includes(`: ${chrName}"`)); // Full name survives visual ellipsis in the trigger tooltip.
     if (mode === "loading") {
-      const members = header.children[1].children[0];
-      assert.ok(Object.hasOwn(members.children[0].children[0].attrs, "disabled"));
       assert.doesNotMatch(html, /data-track-contig-id=/);
     }
     if (mode === "empty") assert.ok(Object.hasOwn(header.children[0].children[0].attrs, "disabled"));

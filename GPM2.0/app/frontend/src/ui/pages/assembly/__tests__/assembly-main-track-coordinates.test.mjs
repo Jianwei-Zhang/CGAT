@@ -134,7 +134,7 @@ test("main-view history controls stay grouped after Identity and expose independ
   assert.match(html, /data-main-history-action="redo"[^>]*disabled/);
   assert.match(html, /data-main-history-action="reset"[^>]*data-app-tooltip="重置：撤销 Chr01 当前 4 项可逆编辑"/);
   assert.equal((html.match(/data-main-history-action=/g) || []).length, 3);
-  assert.ok((html.match(/is-history-highlighted/g) || []).length >= 2);
+  assert.ok((html.match(/is-history-highlighted/g) || []).length >= 1);
 });
 
 test("full-chr ruler ticks stop at ref_chr end even when ctg extends beyond chr length", () => {

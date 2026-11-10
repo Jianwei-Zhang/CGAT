@@ -2286,3 +2286,18 @@
 .assembly-final-path-svg [data-final-path-tooltip] > .track-ctg-label {
   pointer-events: all;
 }
+
+/* Shared primary/support member management, mounted outside the rerendered track host. */
+.track-members-dialog { width: min(960px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); overflow: auto; }
+.track-members-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.track-members-dialog h2 { font-size: var(--font-section); margin: 0; overflow-wrap: anywhere; }
+.track-members-dialog > input { box-sizing: border-box; width: 100%; margin: 12px 0; }
+.track-members-filters, .track-members-selection, .track-members-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.track-members-filters [aria-pressed="true"] { background: var(--theme-blue-surface, #eff6ff); border-color: var(--theme-line, #7da2c8); }
+.track-members-list { max-height: 50dvh; overflow: auto; border-block: 1px solid var(--border-subtle, #dbe3ec); }
+.track-member-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px 12px; padding: 10px 4px; border-bottom: 1px solid var(--border-subtle, #dbe3ec); }
+.track-member-row label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.track-member-name { overflow-wrap: anywhere; }
+.track-member-row small { grid-column: 1 / -1; color: var(--text-muted, #64748b); overflow-wrap: anywhere; }
+.track-member-row.is-deleted .track-member-name { text-decoration: line-through; }
+.track-members-dialog .app-dialog-actions { flex-wrap: wrap; }

@@ -1,3 +1,5 @@
+import { hiddenSupportCtgIds } from "./support-visibility-state.js";
+import { trackMembersLabels } from "./track-members-dialog.js";
 import { readMainFinalPathInterval, buildSubviewFinalPathContext } from "./final-path-contig-context.js";
 import { readSubviewAnchorAttribute } from "./subview-anchor-metadata.js";
 import { mainActiveAnchorKeys, mainAlignmentEndpointKey, findMainAlignment } from "./main-alignment-anchors.js";
@@ -435,6 +437,11 @@ export function buildAssemblyContextMenuItems({
   const items = [];
   const state = store.getState();
   const i18n = getAssemblyI18n(state);
+  if (trackLabelContext && !trackLabelContext.isMirror && ["primary", "support"].includes(trackLabelContext.trackRole)
+    && typeof contextMenuActions.openTrackMembers === "function") {
+    items.push({ label: trackMembersLabels(state.locale).title, disabled: Boolean(state.assembly.loading),
+      run: () => contextMenuActions.openTrackMembers(host, store, trackLabelContext) });
+  }
   const selectedTrackCtgIds = normalizeTrackSelectionCtgIds(state.assembly.trackSelectedCtgIds);
   const primarySelectedTrackCtgIds = filterPrimaryTrackSelectionCtgIds(
     selectedTrackCtgIds,
@@ -1354,6 +1361,16 @@ export function buildAssemblyContextMenuItems({
             });
           },
         });
+      }
+      if (isSupportTrackCtg && !isMirrorTrackContext && resolvedSupportContextDatasetId === Number(state.assembly.supportDatasetId)) {
+        const scope = { trackRole: "support", datasetId: resolvedSupportContextDatasetId };
+        if (typeof contextMenuActions.setSupportTrackCtgsHidden === "function") {
+          const hidden = hiddenSupportCtgIds(state.assembly, scope.datasetId).has(Number(ctgId));
+          items.push({ label: hidden ? i18n.contextMenu.unhideContig : i18n.contextMenu.hideContig,
+            run: () => contextMenuActions.setSupportTrackCtgsHidden(host, store, scope, [ctgId], !hidden) });
+        }
+        items.push({ label: i18n.contextMenu.deleteContig,
+          run: () => deleteSelectedTrackCtgs(host, store, [ctgId], scope) });
       }
       if (!isSupportTrackCtg) {
         if (!isPhasedCtgContext && typeof contextMenuActions.splitContigAtAnchor === "function"

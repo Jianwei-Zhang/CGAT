@@ -1,3 +1,5 @@
+import { openTrackMembersDialog } from "./assembly/track-members-dialog.js";
+import { setSupportCtgsHidden } from "./assembly/support-visibility-state.js";
 import { createFinalPathAppendPreview } from "./assembly/final-path-append-preview.js";
 import { bindFinalPathAppendDrag } from "./assembly/final-path-append-drag-runtime.js";
 import { bindSubviewWorkspace, getSubviewWorkspaceRuntime } from "./assembly/subview-workspace-runtime.js";
@@ -1318,7 +1320,36 @@ const degapRuntimeDeps = {
     persistProjectAssemblyViewStateFromStore(host, store, projectAssemblyViewStateRuntimeDeps),
 };
 
+async function setTrackMembersHidden(host, store, scope, ids, hidden) {
+  if (scope.trackRole === "primary") return setSelectedPrimaryTrackCtgsHidden(host, store, ids, hidden);
+  const state = store.getState();
+  const assembly = setSupportCtgsHidden(state.assembly, scope.datasetId, ids, hidden);
+  if (assembly === state.assembly) return;
+  store.setState({ assembly });
+  rerenderAssemblyMainTab(host, store);
+  await persistProjectAssemblyViewStateFromStore(host, store);
+}
+
+function deleteTrackMembers(host, store, ids, scope = {}) {
+  return editorActionRuntimeAdapters.deleteSelectedTrackCtgs(host, store, ids, {
+    ...scope, ...(scope.trackRole === "support" ? { reloadView: loadAssemblyView } : {}),
+  });
+}
+
+function openAssemblyTrackMembers(host, store, context) {
+  return openTrackMembersDialog(host, store, context, {
+    listDeletedCtgs,
+    delete: deleteTrackMembers,
+    restore: (host, store, ids) => editorActionRuntimeAdapters.restoreSelectedDeletedCtgs(host, store, ids, { reloadView: loadAssemblyView }),
+    setHidden: setTrackMembersHidden,
+    locate: (host, store, id) => selectCtg(host, store, id, { focusMode: "center" }),
+    focusFilter: host => host.querySelector("#assembly-track-support-ds-ctg-len")?.focus(),
+  });
+}
+
 const contextMenuRuntimeDeps = {
+  openTrackMembers: openAssemblyTrackMembers,
+  setSupportTrackCtgsHidden: setTrackMembersHidden,
   synchronizeLocalFragment,
   resolveLocalFragmentMenu,
   flipLocalFragment: subviewFragmentController.flipLocalFragment,
@@ -1339,7 +1370,7 @@ const contextMenuRuntimeDeps = {
   clearSubviewTrackPairHiddenCtgs,
   deleteFinalPathSegment,
   deleteSelectedSubviewTrackPairCtgs: editorActionRuntimeAdapters.deleteSelectedSubviewTrackPairCtgs,
-  deleteSelectedTrackCtgs: editorActionRuntimeAdapters.deleteSelectedTrackCtgs,
+  deleteSelectedTrackCtgs: deleteTrackMembers,
   runBatchDeleteTrackCtgs: editorActionRuntimeAdapters.runBatchDeleteTrackCtgs,
   enterSubviewFromCandidates,
   enterSubviewFromTrackSelections,

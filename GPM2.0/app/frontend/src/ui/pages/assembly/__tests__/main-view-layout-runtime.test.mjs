@@ -161,3 +161,23 @@ test("main-view layout invalidation reports one error without a duplicate status
   assert.equal(store.getState().assembly.actionStatus, "");
   assert.equal(store.getState().assembly.mainViewHistory.inFlight, false);
 });
+
+for (const phase of ["queued", "mutation", "readback"]) test(`chromosome switch fences an old drag during ${phase} even if the project coordinator is still current`, async () => {
+  const store = createStore(), calls = [];
+  let release;
+  const barrier = () => new Promise(resolve => { release = resolve; });
+  const deps = {
+    runSerializedProjectViewMutation: async (_store, task) => { if (phase === "queued") await barrier(); return task(() => true); },
+    runMainViewLayoutAction: async () => { calls.push("mutate"); if (phase === "mutation") await barrier(); return { changed: true, status: { canUndo: true, chrName: "Chr01" } }; },
+    loadProjectAssemblyViewState: async () => { calls.push("readback"); if (phase === "readback") await barrier(); return { trackDragOffsets: [{ assemblyCtgId: 11, trackRole: "primary", offsetBp: 20 }], supportMirroredCtgs: [] }; },
+    rerender() {}, mapAssemblyError: ({ error }) => ({ userMessage: String(error) }),
+  };
+  const pending = runMainViewLayoutAction({}, store, { action: "drag-ctg", args: { assemblyCtgId: 11, trackRole: "primary", offsetBp: 20 } }, deps);
+  await new Promise(resolve => setImmediate(resolve));
+  const nextAssembly = { ...store.getState().assembly, selectedChrName: "Chr02", mainViewHistory: { chrName: "Chr02", canUndo: false },
+    trackDragOffsets: [{ assemblyCtgId: 22, trackRole: "primary", offsetBp: 90 }], actionError: "", actionStatus: "new chromosome" };
+  store.setState({ assembly: nextAssembly }); release();
+  assert.equal(await pending, false);
+  assert.equal(store.getState().assembly, nextAssembly, "late replies must not replace Chr02 history, offsets or status");
+  assert.deepEqual(calls, phase === "queued" ? [] : phase === "mutation" ? ["mutate"] : ["mutate", "readback"]);
+});

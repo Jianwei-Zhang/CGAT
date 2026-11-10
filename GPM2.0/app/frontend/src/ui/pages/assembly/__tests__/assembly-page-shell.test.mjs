@@ -1,3 +1,4 @@
+import { __testRenderAssemblyMainMembersPanel as renderLegacyMembers } from "../../assembly-page.js";
 import {
   test,
   assert,
@@ -148,7 +149,7 @@ test("assembly tab renders english labels when locale is en", () => {
   assert.doesNotMatch(html, />Tick interval \(kb\)</);
   assert.doesNotMatch(html, /view-display-settings/);
   assert.doesNotMatch(html, />Maximum visible count</);
-  assert.match(html, /Primary Dataset Members/);
+  assert.doesNotMatch(html, /Primary Dataset Members/);
 });
 
 test("assembly page shell does not render an extra outer card frame", () => {
@@ -721,42 +722,14 @@ test("assembly Anchor offset dialog preserves an automatic out-of-range value wi
   assert.match(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
 });
 
-test("assembly tab nests generic members beside the chromosome selector in the main header", () => {
-  const html = renderAssemblyPage(
-    createState({
-      session: {
-        projectName: "project1",
-      },
-      assembly: {
-        selectedChrName: "Chr01",
-      },
-    }),
-  );
-
-  const membersCardIndex = html.indexOf("assembly-members-panel");
-  const mainTrackIndex = html.indexOf("assembly-track-unified");
-  const ctgGridCount = (html.match(/class="[^"]*ctg-chip-grid[^"]*"/g) || []).length;
-
-  assert.match(html, /assembly-members-panel/);
-  assert.doesNotMatch(html, /chr-strip/);
-  assert.match(html, /data-main-view-header[\s\S]*assembly-members-panel-inline is-collapsed/);
-  assert.doesNotMatch(html, /<\/div>\s*<article class="card assembly-members-panel"/);
-  assert.match(html, /主数据集成员/);
-  assert.match(
-    html,
-    /<button[^>]*data-members-card-toggle="1"[^>]*aria-expanded="false"[^>]*>/,
-  );
-  assert.match(html, /id="assembly-members-panel-popover"[^>]*hidden/);
-  assert.match(html, /data-track-focus-mode="start"/);
-  assert.equal(ctgGridCount, 1);
-  assert.ok(membersCardIndex >= 0);
-  assert.ok(mainTrackIndex >= 0);
-  assert.ok(membersCardIndex > mainTrackIndex);
-  assert.ok(html.indexOf('id="assembly-chr-picker-toggle"') < membersCardIndex);
+test("assembly tab keeps the chromosome selector but moves member management out of the toolbar", () => {
+  const html = renderAssemblyPage(createState());
+  assert.match(html, /id="assembly-chr-picker-toggle"/);
+  assert.doesNotMatch(html, /data-members-card-toggle|assembly-members-panel-popover/);
 });
 
 test("assembly tab expands the members card body when membersCardCollapsed is false", () => {
-  const html = renderAssemblyPage(
+  const html = renderLegacyMemberFixture(
     createState({
       session: {
         projectName: "project1",
@@ -785,7 +758,7 @@ test("assembly tab expands the members card body when membersCardCollapsed is fa
 });
 
 test("assembly tab appends deleted members into the same members card without inline restore buttons", () => {
-  const html = renderAssemblyPage(
+  const html = renderLegacyMemberFixture(
     createState({
       session: {
         projectName: "project1",
@@ -1002,7 +975,7 @@ test("reset members button clears hidden primary contigs and restores every dele
 });
 
 test("member cards render multi-selected style for selected primary ctgs", () => {
-  const html = renderAssemblyPage(
+  const html = renderLegacyMemberFixture(
     createState({
       assembly: {
         membersCardCollapsed: false,
@@ -1022,7 +995,7 @@ test("member cards render multi-selected style for selected primary ctgs", () =>
 });
 
 test("member cards mark primary ctgs assigned to other chromosome groups", () => {
-  const html = renderAssemblyPage(
+  const html = renderLegacyMemberFixture(
     createState({
       assembly: {
         membersCardCollapsed: false,
@@ -1136,7 +1109,7 @@ test("single hide refreshes final path log after local hidden patch", async () =
 });
 
 test("member cards normalize duplicated and noisy selected primary ctg ids", () => {
-  const html = renderAssemblyPage(
+  const html = renderLegacyMemberFixture(
     createState({
       assembly: {
         membersCardCollapsed: false,
@@ -1160,7 +1133,7 @@ test("member cards normalize duplicated and noisy selected primary ctg ids", () 
 });
 
 test("hidden primary contig updates card tag and shifts only its own track bar up by 30px", () => {
-  const normalHtml = renderAssemblyPage(
+  const normalHtml = renderLegacyMemberFixture(
     createState({
       session: {
         projectName: "project1",
@@ -1172,7 +1145,7 @@ test("hidden primary contig updates card tag and shifts only its own track bar u
       },
     }),
   );
-  const hiddenHtml = renderAssemblyPage(
+  const hiddenHtml = renderLegacyMemberFixture(
     createState({
       session: {
         projectName: "project1",
@@ -1271,3 +1244,9 @@ test("hidden primary contig does not render its own collinearity hit bands", () 
   assert.equal(countBands(visibleHtml), 2);
   assert.equal(countBands(hiddenHtml), 1);
 });
+
+// Legacy primary-card renderer remains a compatibility target for member-only DOM patches.
+// Production no longer puts this panel in the toolbar (covered in track-members.test.mjs).
+function renderLegacyMemberFixture(state) {
+  return renderAssemblyPage(state) + renderLegacyMembers(state);
+}

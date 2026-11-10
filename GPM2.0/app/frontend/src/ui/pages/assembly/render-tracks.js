@@ -1,3 +1,4 @@
+import { hiddenSupportCtgIds } from "./support-visibility-state.js";
 import { renderSubviewWorkspace } from "./render-subview-workspace.js";
 import { renderAssemblyLocalRestoreStatus } from "./assembly-detail-status.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
@@ -708,7 +709,7 @@ function createRenderTracksRenderer(deps = {}) {
           ${renderAssemblyStatusToast(assembly)}
           <div class="assembly-track-unified assembly-track-panel assembly-track-loading-shell">
             ${renderAssemblyMainViewHeader({ scopeControls, i18n,
-              inlineControls: renderMainTrackToolbar(scopeControls.members, i18n) })}
+              inlineControls: renderMainTrackToolbar("", i18n) })}
           </div>
         </section>
         ${renderAssemblyLoadingCurtain(assembly, i18n)}
@@ -774,7 +775,7 @@ function createRenderTracksRenderer(deps = {}) {
   const subviewPanel = options.includeSubview === false
     ? ""
     : renderAssemblySubviewPanel(state);
-  const combinedMemberChips = renderMainMemberChips(assembly, i18n);
+  const combinedMemberChips = ""; // Members are loaded on demand from the track-label menu.
   const historyHighlightCtgId = normalizeSupportDatasetId(assembly.historyHighlightCtgId);
   const finalPathCard = options.includeFinalPath === false
     ? ""
@@ -1950,12 +1951,15 @@ function renderAssemblyTracks(args) {
   });
 
   const hiddenPrimaryCtgIdSet = new Set(normalizeTrackSelectionCtgIds(hiddenPrimaryCtgIds));
-  const resolveTrackCtgVerticalOffset = (layoutRole, assemblyCtgId) =>
-    layoutRole === "primary" && hiddenPrimaryCtgIdSet.has(Number(assemblyCtgId)) ? -30 : 0;
+  const hiddenSupportIds = hiddenSupportCtgIds({ trackView: trackPrefs, selectedChrName, supportDatasetId });
+  const isTrackCtgHidden = (layout, id) => !layout.isMirror && (
+    layout.role === "primary" ? hiddenPrimaryCtgIdSet.has(Number(id))
+      : layout.role === "support" && hiddenSupportIds.has(Number(id)));
+  const resolveTrackCtgVerticalOffset = (layout, assemblyCtgId) => isTrackCtgHidden(layout, assemblyCtgId) ? -30 : 0;
   const grtResultEntries = rowLayouts
     .filter((layout) => layout.role === "primary" || layout.role === "support" || layout.isMirror)
     .flatMap((layout) => layout.trackModel.ctgs.map((ctg, index) => {
-      if (layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId))) {
+      if (isTrackCtgHidden(layout, ctg.assemblyCtgId)) {
         return null;
       }
       const rect = resolveTrackCtgDisplayRect(layout, ctg, index);
@@ -2046,7 +2050,7 @@ function renderAssemblyTracks(args) {
       }
       return layout.trackModel.ctgs.flatMap((ctg, ctgIndex) => {
         const isHiddenPrimaryCtg =
-          layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId));
+          isTrackCtgHidden(layout, ctg.assemblyCtgId);
         if (isHiddenPrimaryCtg) {
           return [];
         }
@@ -2088,7 +2092,7 @@ function renderAssemblyTracks(args) {
               ctgEndOffset: hitEndOffset,
             });
             const refRect = resolveReferenceTrackHitRect(refStartBp, refEndBp);
-            const ctgVerticalOffset = resolveTrackCtgVerticalOffset(layout.role, ctg.assemblyCtgId);
+            const ctgVerticalOffset = resolveTrackCtgVerticalOffset(layout, ctg.assemblyCtgId);
             const ctgLaneTop = layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT + ctgVerticalOffset;
             const bandPoints = buildCollinearityBandPoints({
               ctgRect,
@@ -2158,7 +2162,7 @@ function renderAssemblyTracks(args) {
     renderMainAlignmentAnchors(band, mainAnchorKeys, escapeAttr)).join("");
 
   const sourceGapConnections = rowLayouts.map((layout) => renderSourceGapConnections(
-    layout.trackModel.ctgs.filter((ctg) => !(layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId))))
+    layout.trackModel.ctgs.filter((ctg) => !(isTrackCtgHidden(layout, ctg.assemblyCtgId)))
       .map((ctg) => ({ ctg, dragKey: `main:${layout.id}:${ctg.assemblyCtgId}:${ctg.phasedTrackItemId || 0}`, rect: resolveTrackCtgDisplayRect(layout, ctg, layout.trackModel.ctgs.indexOf(ctg)),
         y: layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT, height: TRACK_BAR_HEIGHT })), escapeHtml,
   )).join("");
@@ -2175,7 +2179,7 @@ function renderAssemblyTracks(args) {
       const renderEntries = layout.trackModel.ctgs
         .map((ctg, index) => {
           const rect = resolveTrackCtgDisplayRect(layout, ctg, index);
-          const ctgVerticalOffset = resolveTrackCtgVerticalOffset(layout.role, ctg.assemblyCtgId);
+          const ctgVerticalOffset = resolveTrackCtgVerticalOffset(layout, ctg.assemblyCtgId);
           const y = layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT + ctgVerticalOffset;
           const baseLabelText = resolveTrackCtgLabelText(ctg, ctg.assemblyCtgId);
           const grtPlacementMode = String(ctg?.grtPlacementMode || "").trim();
@@ -2348,7 +2352,7 @@ function renderAssemblyTracks(args) {
     selectedChrName,
     mainViewHistory,
     i18n,
-    leadingControls: `${scopeControls.members}${grtResultControls}${createPhasedTrackButton}`,
+    leadingControls: `${grtResultControls}${createPhasedTrackButton}`,
   });
   const grtResultToastMarkup = grtResultToast?.scope === "main"
     && grtResultToast?.chrName === selectedChrName

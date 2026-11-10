@@ -189,7 +189,8 @@ function createStore(initialState) {
       return state;
     },
     setState(nextState) {
-      state = nextState;
+      // Match the real store: partial assembly patches retain the project/session identity.
+      state = { ...state, ...nextState };
     },
   };
 }

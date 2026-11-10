@@ -1,3 +1,4 @@
+import { __testRenderAssemblyMainMembersPanel as renderLegacyMembers } from "../../assembly-page.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -176,7 +177,7 @@ function createState() {
 }
 
 test("renders passive LGZ placement status and a current-path baseline reset", () => {
-  const html = renderAssemblyPage(createState());
+  const html = renderLegacyMemberFixture(createState());
 
   assert.doesNotMatch(html, /data-grt-trace-panel="true"/);
   assert.doesNotMatch(html, /Server precomputed baseline/);
@@ -313,3 +314,9 @@ test("LGZ evidence and result hover proxies use the same styled alignment toolti
   for (const [proxy] of proxies) assert.match(proxy, /data-subview-band-tooltip="Linking Inter-assembly Units for Genome Zipping/);
   assert.doesNotMatch(html, /class="(?:grt-result-hover-proxy|grt-display-evidence-band)[^>]*><title>/);
 });
+
+// Legacy primary-card renderer remains a compatibility target for member-only DOM patches.
+// Production no longer puts this panel in the toolbar (covered in track-members.test.mjs).
+function renderLegacyMemberFixture(state) {
+  return renderAssemblyPage(state) + renderLegacyMembers(state);
+}

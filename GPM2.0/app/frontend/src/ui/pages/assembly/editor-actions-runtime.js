@@ -1,6 +1,6 @@
+import { filterEditableTrackCtgIds } from "./track-members-model.js";
 import { requestAppConfirm } from "../../shell/app-dialog.js";
 import {
-  filterPrimaryTrackSelectionCtgIds,
   normalizeDeletedCtgRecordIds,
 } from "./selection-state.js";
 import {
@@ -19,6 +19,14 @@ import {
   preserveSubviewRemovalViewport,
 } from "./subview-removal-viewport.js";
 import { applySubviewComposition, removeSubviewCompositionMembers } from "./subview-composition-state.js";
+
+function matchesEditorScope(store, state) {
+  const current = store.getState();
+  return current.session?.workspacePath === state.session?.workspacePath
+    && current.session?.projectId === state.session?.projectId
+    && current.assembly?.selectedChrName === state.assembly?.selectedChrName
+    && current.activeRoute === state.activeRoute;
+}
 
 function normalizeBoolean(value) {
   if (value === true || value === "true") {
@@ -54,9 +62,8 @@ function buildBatchFailedSuffix(stateOrLocale, count) {
 
 function resolveBatchDeleteProgressLabel(assembly, assemblyCtgId) {
   const numericId = Number(assemblyCtgId);
-  const ctg = Array.isArray(assembly?.chrCtgs)
-    ? assembly.chrCtgs.find((item) => Number(item?.assemblyCtgId) === numericId)
-    : null;
+  const ctg = [...(assembly?.chrCtgs || []), ...(assembly?.supportChrCtgs || [])]
+    .find((item) => Number(item?.assemblyCtgId) === numericId);
   const name = String(ctg?.name || ctg?.displayName || "").trim();
   return name || `Ctg${numericId}`;
 }
@@ -244,10 +251,16 @@ export async function deleteSelectedTrackCtgs(host, store, selectedIds, deps, ov
     "runBatchDeleteTrackCtgs",
   ]);
   const state = store.getState();
-  const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, state.assembly);
+  const normalized = filterEditableTrackCtgIds(selectedIds, state.assembly, overrides);
   if (!normalized.length || state.assembly?.mainViewHistory?.inFlight === true) {
     return;
   }
+  const isCurrent = () => {
+    const latest = store.getState();
+    return latest.session?.workspacePath === state.session?.workspacePath && latest.session?.projectId === state.session?.projectId
+      && latest.assembly.selectedChrName === state.assembly.selectedChrName
+      && (overrides.trackRole !== "support" || Number(latest.assembly.supportDatasetId) === Number(overrides.datasetId));
+  };
   let impact;
   try {
     impact = await deps.inspectMainViewDelete({
@@ -257,6 +270,7 @@ export async function deleteSelectedTrackCtgs(host, store, selectedIds, deps, ov
       assemblyCtgIds: normalized,
     });
   } catch (error) {
+    if (!isCurrent()) return;
     const latest = store.getState();
     const mapped = deps.mapAssemblyError({ error, stateOrLocale: latest });
     store.setState({
@@ -269,6 +283,7 @@ export async function deleteSelectedTrackCtgs(host, store, selectedIds, deps, ov
     deps.rerender(host, store);
     return;
   }
+  if (!isCurrent()) return;
   const baseConfirmMessage = String(overrides.confirmMessage || "").trim()
     || tAssembly(store.getState(), "runtime.batchDeleteConfirm", { count: normalized.length });
   const impactMessage = tAssembly(store.getState(), "runtime.deleteDependencyImpact", {
@@ -281,6 +296,7 @@ export async function deleteSelectedTrackCtgs(host, store, selectedIds, deps, ov
   if (!(await confirm(`${baseConfirmMessage}\n\n${impactMessage}`, { host, store, confirmationKey: "delete-main-contigs" }))) {
     return;
   }
+  if (!isCurrent()) return;
   await deps.runBatchDeleteTrackCtgs(host, store, normalized, overrides);
 }
 
@@ -376,7 +392,7 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
     "mapAssemblyError",
     "rerender",
   ]);
-  const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, store.getState().assembly);
+  const normalized = filterEditableTrackCtgIds(selectedIds, store.getState().assembly, overrides);
   if (!normalized.length) {
     return { deletedCount: 0, failedCount: 0 };
   }
@@ -388,7 +404,7 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
   if (state.assembly?.mainViewHistory?.inFlight === true) {
     return { deletedCount: 0, failedCount: 0 };
   }
-  const useLocalRefresh = deps.localRefresh === true || overrides.localRefresh === true;
+  const useLocalRefresh = overrides.trackRole !== "support" && (deps.localRefresh === true || overrides.localRefresh === true);
 
   store.setState({
     assembly: {
@@ -432,6 +448,7 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
       chrName: state.assembly.selectedChrName,
       assemblyCtgIds: normalized,
     });
+    if (!matchesEditorScope(store, state)) return { deletedCount: 0, failedCount: 0, stale: true };
     deletedCount = result?.changed === false ? 0 : normalized.length;
     deletedAssemblyCtgIds.push(...(deletedCount ? normalized : []));
     progress = {
@@ -448,6 +465,7 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
       },
     });
   } catch (error) {
+    if (!matchesEditorScope(store, state)) return { deletedCount: 0, failedCount: 0, stale: true };
     failed.push(...normalized.map((assemblyCtgId) => ({ assemblyCtgId, error })));
     progress = {
       ...progress,
@@ -473,6 +491,7 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
   setBatchDeleteProgress(host, store, deps, progress);
 
   const applyFinalFeedback = () => {
+    if (!matchesEditorScope(store, state)) return;
     const latestState = store.getState();
     const firstError = failed[0]?.error || null;
     const mappedError = firstError ? deps.mapAssemblyError({ error: firstError, stateOrLocale: latestState }) : null;
@@ -505,7 +524,7 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
         renderLoading: false,
       });
     } finally {
-      clearBatchDeleteProgress(host, store, deps);
+      if (matchesEditorScope(store, state)) clearBatchDeleteProgress(host, store, deps);
     }
   } else {
     try {
@@ -516,9 +535,9 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
       });
       applyFinalFeedback();
     } finally {
-      clearBatchDeleteProgress(host, store, deps);
+      if (matchesEditorScope(store, state)) clearBatchDeleteProgress(host, store, deps);
     }
-    deps.rerender(host, store);
+    if (matchesEditorScope(store, state)) deps.rerender(host, store);
   }
 
   return {
@@ -595,6 +614,7 @@ export async function runBatchRestoreDeletedCtgs(host, store, selectedRecordIds,
         action: "restore-deleted-ctg",
         args: { deletedCtgRecordId },
       });
+      if (!matchesEditorScope(store, state)) return { restoredCount, failedCount: failed.length, stale: true };
       restoredCount += 1;
       if (useMainHistory) {
         store.setState({
@@ -613,6 +633,7 @@ export async function runBatchRestoreDeletedCtgs(host, store, selectedRecordIds,
         });
       }
     } catch (error) {
+      if (!matchesEditorScope(store, state)) return { restoredCount, failedCount: failed.length, stale: true };
       failed.push({ deletedCtgRecordId, error });
     }
   }
@@ -636,10 +657,12 @@ export async function runBatchRestoreDeletedCtgs(host, store, selectedRecordIds,
     keepCurrentCtg: true,
     renderLoading: !useLocalRefresh,
   });
+  if (!matchesEditorScope(store, state)) return { restoredCount, failedCount: failed.length, stale: true };
   if (typeof deps.rebaseTrackDragOffsetsAfterRestore === "function") {
     await deps.rebaseTrackDragOffsetsAfterRestore(host, store, state.assembly);
   }
 
+  if (!matchesEditorScope(store, state)) return { restoredCount, failedCount: failed.length, stale: true };
   const latestState = store.getState();
   const firstError = failed[0]?.error || null;
   const mappedError = firstError ? deps.mapAssemblyError({ error: firstError, stateOrLocale: latestState }) : null;

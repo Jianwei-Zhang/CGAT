@@ -1,3 +1,4 @@
+import { __testRenderAssemblyMainMembersPanel as renderLegacyMembers } from "../../assembly-page.js";
 import {
   test,
   assert,
@@ -722,7 +723,7 @@ test("add_ctg import progress meter includes frontend stages after backend compl
 });
 
 test("derived ctg source tags render in track labels and primary member cards", () => {
-  const html = renderAssemblyPage(
+  const html = renderLegacyMemberFixture(
     createState({
       initializer: {
         datasets: [{ datasetId: 11, name: "hifiasm", label: "hifiasm" }],
@@ -1214,3 +1215,9 @@ test("Final Path inherits derived primary and companion track tones without perm
   assert.match(html, /class="track-ctg-group is-companion"\s+data-final-path-segment-id="aux"/);
   assert.doesNotMatch(html, /class="track-ctg-group is-active[^"]*"\s+data-final-path-segment-id/);
 });
+
+// Legacy primary-card renderer remains a compatibility target for member-only DOM patches.
+// Production no longer puts this panel in the toolbar (covered in track-members.test.mjs).
+function renderLegacyMemberFixture(state) {
+  return renderAssemblyPage(state) + renderLegacyMembers(state);
+}
