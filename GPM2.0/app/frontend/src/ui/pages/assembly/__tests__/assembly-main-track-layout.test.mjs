@@ -1201,13 +1201,14 @@ test("subview 2-contig renders anchor fragments for ref members using ref-side h
     html,
     /class="subview-anchor-line is-active"[^>]*stroke="red"/,
   );
+  // Ref 1001..2000 faces left: reference 1501..1800 projects to local 201..500.
   assert.match(
     html,
-    /data-subview-fragment-key="9001:1-500"[^>]*data-subview-fragment-role="ref"[^>]*data-subview-fragment-contig-id="9001"[^>]*data-subview-fragment-start="1"[^>]*data-subview-fragment-end="500"[^>]*data-subview-fragment-ref-orient="-"/,
+    /data-subview-fragment-key="9001:1-200"[^>]*data-subview-fragment-role="ref"[^>]*data-subview-fragment-contig-id="9001"[^>]*data-subview-fragment-start="1"[^>]*data-subview-fragment-end="200"[^>]*data-subview-fragment-ref-orient="-"/,
   );
   assert.match(
     html,
-    /data-subview-fragment-key="9001:1-500"[^>]*data-subview-fragment-source-kind="ref_segment"[^>]*data-subview-fragment-reference-chr-name="Chr01"[^>]*data-subview-fragment-segment-start-bp="1001"[^>]*data-subview-fragment-segment-end-bp="2000"/,
+    /data-subview-fragment-key="9001:1-200"[^>]*data-subview-fragment-source-kind="ref_segment"[^>]*data-subview-fragment-reference-chr-name="Chr01"[^>]*data-subview-fragment-segment-start-bp="1001"[^>]*data-subview-fragment-segment-end-bp="2000"/,
   );
 });
 
@@ -1535,13 +1536,14 @@ test("subview track-pair renders anchor fragments for ref members using ref-side
     html,
     new RegExp(`class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-hit-key="${stablePairHitKey}"[^>]*data-subview-anchor-edge="left"`),
   );
+  // Ref 1001..2000 faces left: reference 1501..1800 projects to local 201..500.
   assert.match(
     html,
-    /data-subview-fragment-key="9001:1-500"[^>]*data-subview-fragment-role="ref"[^>]*data-subview-fragment-contig-id="9001"[^>]*data-subview-fragment-start="1"[^>]*data-subview-fragment-end="500"/,
+    /data-subview-fragment-key="9001:1-200"[^>]*data-subview-fragment-role="ref"[^>]*data-subview-fragment-contig-id="9001"[^>]*data-subview-fragment-start="1"[^>]*data-subview-fragment-end="200"/,
   );
   assert.match(
     html,
-    /data-subview-fragment-key="9001:1-500"[^>]*data-subview-fragment-source-kind="ref_segment"[^>]*data-subview-fragment-reference-chr-name="Chr01"/,
+    /data-subview-fragment-key="9001:1-200"[^>]*data-subview-fragment-source-kind="ref_segment"[^>]*data-subview-fragment-reference-chr-name="Chr01"/,
   );
 });
 

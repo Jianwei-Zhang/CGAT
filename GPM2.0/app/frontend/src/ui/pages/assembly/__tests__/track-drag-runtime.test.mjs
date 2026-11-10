@@ -240,7 +240,7 @@ test("bindTrackContigDrag ignores ref-track members", () => {
   }
 });
 
-test("bindSubviewTrackContigDrag previews during move and applies pending subview offset on release", () => {
+for (const role of ["primary", "ref"]) test(`bindSubviewTrackContigDrag previews ${role} during move and applies only the local offset on release`, () => {
   const originalWindow = globalThis.window;
   const windowStub = createWindowStub();
   globalThis.window = windowStub;
@@ -263,6 +263,8 @@ test("bindSubviewTrackContigDrag previews during move and applies pending subvie
     const trackNode = {
       getAttribute(name) {
         if (name === "data-subview-track-slot") return "top";
+        if (name === "data-subview-track-role") return role;
+        if (name === "data-track-source-kind") return role === "ref" ? "ref_segment" : "assembly_ctg";
         if (name === "data-subview-contig-id") return "12";
         return null;
       },

@@ -1,3 +1,4 @@
+import { resolveReferenceHitDisplayReversed } from "./subview-band-orientation.js";
 import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { localGrtProjection, projectLocalGrtEvidence } from "./subview-fragment-grt.js";
 import { memberAnchorEndpointKey, memberBackingIds, memberSourceInterval, projectLocalAlignment, memberCoordinateToSource, projectLocalNRegions } from "./subview-fragment-model.js";
@@ -176,8 +177,19 @@ function buildReferenceBands(layout, candidates, prefs) {
         const overlapStart = Math.max(referenceStart, Math.min(rawRefStart, rawRefEnd));
         const overlapEnd = Math.min(referenceEnd, Math.max(rawRefStart, rawRefEnd));
         if (overlapEnd < overlapStart) continue;
-        const refStart = Math.min(rawRefStart, rawRefEnd) - referenceStart + 1;
-        const refEnd = Math.max(rawRefStart, rawRefEnd) - referenceStart + 1;
+        let refStart = Math.min(rawRefStart, rawRefEnd) - referenceStart + 1;
+        let refEnd = Math.max(rawRefStart, rawRefEnd) - referenceStart + 1;
+        const refBackingReversed = (ref.backingOrientation ?? ref.baseOrientation) === "-";
+        if (refBackingReversed) {
+          const refLength = referenceEnd - referenceStart + 1;
+          [refStart, refEnd] = [refLength - refEnd + 1, refLength - refStart + 1];
+        }
+        // The phased coordinates above were restored to backing space. Compare
+        // raw strand to that same orientation, not to the phased/local flip.
+        const backingCtg = candidate.ctg?.subviewPhasedOrientFlipped
+          ? { ...candidate.ctg, orient: candidate.ctg.subviewBackingOrientation ?? candidate.backingOrientation }
+          : candidate.ctg;
+        const reversed = resolveReferenceHitDisplayReversed(backingCtg, hit) !== refBackingReversed;
         const topStart = topIsRef ? refStart : ctgStart;
         const topEnd = topIsRef ? refEnd : ctgEnd;
         const bottomStart = bottomIsRef ? refStart : ctgStart;
@@ -185,7 +197,7 @@ function buildReferenceBands(layout, candidates, prefs) {
         const projected = projectLocalAlignment(top, bottom,
           topIsRef ? ref.assemblyCtgId : candidate.assemblyCtgId,
           bottomIsRef ? ref.assemblyCtgId : candidate.assemblyCtgId,
-          { topStart, topEnd, bottomStart, bottomEnd, strand: String(hit?.strand || hit?.orient || "+").trim() });
+          { topStart, topEnd, bottomStart, bottomEnd, strand: reversed ? "-" : "+" });
         if (!projected) continue;
         const strand = projected.strand;
         bands.push({

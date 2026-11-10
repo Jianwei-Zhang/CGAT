@@ -1,3 +1,4 @@
+import { resolveReferenceHitDisplayReversed as resolveTrackHitDisplayReversed, resolveSubviewSegmentPairReversed } from "./subview-band-orientation.js";
 import { renderSubviewEmptyGuide } from "./render-subview-workspace.js";
 import { renderCompactSubviewAnchors } from "./subview-anchor-metadata.js";
 import { hasDeferredReferenceHits, readReferenceHits, iterateReferenceHitEntries } from "../../../services/workflow/reference-evidence.js";
@@ -241,8 +242,8 @@ function projectRefIntervalToLocalRange(ctg, refStart, refEnd) {
   const localStart = Math.max(1, Math.min(totalLength, clampedStart - segmentStartBp + 1));
   const localEnd = Math.max(localStart, Math.min(totalLength, clampedEnd - segmentStartBp + 1));
   return {
-    ctgStart: localStart,
-    ctgEnd: localEnd,
+    ctgStart: resolveTrackCtgOrient(ctg) === "-" ? totalLength - localEnd + 1 : localStart,
+    ctgEnd: resolveTrackCtgOrient(ctg) === "-" ? totalLength - localStart + 1 : localEnd,
   };
 }
 
@@ -263,6 +264,7 @@ function buildProjectedRefSubviewHits(refCtg, sourceHits) {
         ...hit,
         hitKey,
         pairKey,
+        referenceReversed: resolveTrackCtgOrient(refCtg) === "-",
         ctgStart: projectedRange.ctgStart,
         ctgEnd: projectedRange.ctgEnd,
       };
@@ -626,6 +628,8 @@ function buildSubviewSegmentSignature(segments) {
       Number(segment?.width || 0),
       readHitIdentityPct(segment) ?? "unknown",
       Number(segment?.alignLength || 0),
+      segment?.referenceReversed ?? "pairwise",
+      segment?.reversed === true,
     ].join(":"))
     .join("|");
 }
@@ -1041,19 +1045,6 @@ function flipRenderableHits(hits, totalLength) {
   }));
 }
 
-function resolveTrackHitStrand(hit) {
-  const strand = String(hit?.strand || "").trim();
-  return strand === "-" || strand === "+" ? strand : "";
-}
-
-function resolveTrackHitDisplayReversed(ctg, hit) {
-  const hitStrand = resolveTrackHitStrand(hit);
-  if (!hitStrand) {
-    return false;
-  }
-  return resolveTrackCtgOrient(ctg) !== hitStrand;
-}
-
 function resolveSubviewRenderableContig(ctg, flippedKeySet, slot) {
   const contigId = normalizeSupportDatasetId(ctg?.assemblyCtgId);
   if (!contigId || !(flippedKeySet instanceof Set)) {
@@ -1466,7 +1457,7 @@ function resolveSubviewSegmentCtgBpByRef(segment, refBp) {
   const safeRefSpan = Math.max(1, refEnd - refStart);
   const clampedRefBp = Math.max(refStart, Math.min(refEnd, Number(refBp || 0)));
   const ratio = (clampedRefBp - refStart) / safeRefSpan;
-  const ctgValue = ctgStart + ratio * (ctgEnd - ctgStart);
+  const ctgValue = ctgStart + (segment.referenceReversed ? 1 - ratio : ratio) * (ctgEnd - ctgStart);
   const normalized = Math.round(ctgValue);
   return normalized > 0 ? normalized : null;
 }
@@ -2262,6 +2253,7 @@ function renderSubviewTrackPairAlignmentCard(
       domainSpanBp,
       innerWidth: baseInnerWidth,
       minGapPx,
+      preserveWidths: true,
     });
     return [layout.id, new Map(layout.layoutCtgs.map((ctg, index) =>
       [ctg, rects[index]]))];
@@ -2442,6 +2434,7 @@ function renderSubviewTrackPairAlignmentCard(
           identityPct: readHitIdentityPct(hit),
           projectionApproximate: Boolean(hit.projectionApproximate),
           alignLength: hit.alignLength,
+          referenceReversed: hit.referenceReversed,
           pairKey: String(hit?.pairKey || hit?.hitKey || ""),
           ctgStart: hit.ctgStart,
           ctgEnd: hit.ctgEnd,
@@ -2731,6 +2724,7 @@ function renderSubviewTrackPairAlignmentCard(
           hitKey: String(segment?.hitKey || ""),
           identityPct: readHitIdentityPct(segment),
           alignLength: segment.alignLength,
+          referenceReversed: resolveTrackCtgOrient(refEntry.ctg) === "-",
           pairKey: String(segment?.pairKey || segment?.hitKey || ""),
           ctgStart: projectedRange.ctgStart,
           ctgEnd: projectedRange.ctgEnd,
@@ -2788,8 +2782,8 @@ function renderSubviewTrackPairAlignmentCard(
     const clampedEnd = Math.max(segmentRefStart, Math.min(segmentRefEnd, Number(overlapEnd || 0)));
     const startRatio = Math.max(0, Math.min(1, (clampedStart - segmentRefStart) / refSpan));
     const endRatio = Math.max(startRatio, Math.min(1, (clampedEnd - segmentRefStart) / refSpan));
-    const projectedLeft = segmentX + startRatio * segmentWidth;
-    const projectedRight = segmentX + endRatio * segmentWidth;
+    const projectedLeft = segmentX + (segment.referenceReversed ? 1 - endRatio : startRatio) * segmentWidth;
+    const projectedRight = segmentX + (segment.referenceReversed ? 1 - startRatio : endRatio) * segmentWidth;
     const x = Math.min(segmentRight, Math.max(segmentX, projectedLeft));
     const right = Math.min(segmentRight, Math.max(x, projectedRight));
     const width = Math.max(0, right - x);
@@ -2817,7 +2811,7 @@ function renderSubviewTrackPairAlignmentCard(
       const topOverlapRect = buildOverlapRectWithinSegment(topSegment, overlapStart, overlapEnd);
       const bottomOverlapRect = buildOverlapRectWithinSegment(bottomSegment, overlapStart, overlapEnd);
       const hitKey = buildSubviewTrackPairHitKey(topSegment, bottomSegment);
-      const reversed = topSegment.reversed === true || bottomSegment.reversed === true;
+      const reversed = resolveSubviewSegmentPairReversed(topSegment, bottomSegment);
       const topLeftX = topOverlapRect.x;
       const topRightX = topOverlapRect.x + topOverlapRect.width;
       const bottomLeftX = bottomOverlapRect.x;
@@ -2862,15 +2856,15 @@ function renderSubviewTrackPairAlignmentCard(
       const topOverlapRect = buildOverlapRectWithinSegment(topSegment, overlapStart, overlapEnd);
       const bottomOverlapRect = buildOverlapRectWithinSegment(bottomSegment, overlapStart, overlapEnd);
       const hitKey = buildSubviewTrackPairHitKey(topSegment, bottomSegment);
-      const reversed = topSegment.reversed === true || bottomSegment.reversed === true;
+      const reversed = resolveSubviewSegmentPairReversed(topSegment, bottomSegment);
       const topLeftX = topOverlapRect.x;
       const topRightX = topOverlapRect.x + topOverlapRect.width;
       const bottomLeftX = bottomOverlapRect.x;
       const bottomRightX = bottomOverlapRect.x + bottomOverlapRect.width;
-      const topLeftCutBp = resolveSubviewSegmentCtgBpByRef(topSegment, overlapStart);
-      const topRightCutBp = resolveSubviewSegmentCtgBpByRef(topSegment, overlapEnd);
-      const bottomLeftCutBp = resolveSubviewSegmentCtgBpByRef(bottomSegment, overlapStart);
-      const bottomRightCutBp = resolveSubviewSegmentCtgBpByRef(bottomSegment, overlapEnd);
+      const topLeftCutBp = resolveSubviewSegmentCtgBpByRef(topSegment, topSegment.referenceReversed ? overlapEnd : overlapStart);
+      const topRightCutBp = resolveSubviewSegmentCtgBpByRef(topSegment, topSegment.referenceReversed ? overlapStart : overlapEnd);
+      const bottomLeftCutBp = resolveSubviewSegmentCtgBpByRef(bottomSegment, bottomSegment.referenceReversed ? overlapEnd : overlapStart);
+      const bottomRightCutBp = resolveSubviewSegmentCtgBpByRef(bottomSegment, bottomSegment.referenceReversed ? overlapStart : overlapEnd);
       return [
         {
           hitKey,
@@ -3345,6 +3339,7 @@ function collectSubviewRenderableHits(ctg, { blockLength, minIdentityPct, preser
       hitKey: `hit-${index + 1}`,
       identityPct: readHitIdentityPct(hit),
       alignLength: hitBlockLength,
+      referenceReversed: resolveTrackHitDisplayReversed(ctg, hit),
       pairKey: String(hit?.pairKey || `hit-${index + 1}`),
       ctgStart: Math.min(ctgStart, ctgEnd),
       ctgEnd: Math.max(ctgStart, ctgEnd),
@@ -3445,6 +3440,7 @@ function buildSubviewAlignmentSvgModel(args) {
         alignLength: hit.alignLength,
         pairKey: String(hit?.pairKey || hit?.hitKey || ""),
         reversed: hit?.reversed === true,
+        referenceReversed: hit.referenceReversed,
         ctgStart: Math.min(Number(hit.ctgStart) || 0, Number(hit.ctgEnd) || 0),
         ctgEnd: Math.max(Number(hit.ctgStart) || 0, Number(hit.ctgEnd) || 0),
         x: Math.min(x1, x2),
@@ -3539,7 +3535,7 @@ function buildSubviewAlignmentSvgModel(args) {
     const bottomStartX = bottomSegment.x;
     const bottomEndX = bottomSegment.x + bottomSegment.width;
     const hitKey = String(topSegment?.hitKey || bottomSegment?.hitKey || "");
-    const reversed = topSegment.reversed === true || bottomSegment.reversed === true;
+    const reversed = resolveSubviewSegmentPairReversed(topSegment, bottomSegment);
     return {
       hitKey,
       identityPct: pairingMode === "projection-key" ? readHitIdentityPct(topSegment) : null,
@@ -3569,7 +3565,7 @@ function buildSubviewAlignmentSvgModel(args) {
   }));
   const anchorEdges = segmentPairs.flatMap(({ topSegment, bottomSegment }, index) => {
     const hitKey = String(topSegment?.hitKey || bottomSegment?.hitKey || `hit-${index + 1}`);
-    const reversed = topSegment.reversed === true || bottomSegment.reversed === true;
+    const reversed = resolveSubviewSegmentPairReversed(topSegment, bottomSegment);
     return [
       {
         hitKey,
