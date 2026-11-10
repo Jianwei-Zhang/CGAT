@@ -261,3 +261,22 @@ test("Local transfers do not silently copy members into a different Local task",
   f.windowListeners.get("pointerup")(f.event(22, 260));
   assert.equal(f.localCalls.length, 0); assert.equal(f.calls.length, 0);
 });
+
+
+test("mouse drag into an actual destination takes over even after mostly horizontal motion", () => {
+  const f = fixture({ mode: "mouse", transfer: true });
+  f.setHit(localDestination(f.doc).target);
+  f.listeners.get("pointerdown")(f.event(20, 20));
+  f.windowListeners.get("pointermove")(f.event(800, 110));
+  f.windowListeners.get("pointerup")(f.event(800, 110));
+  assert.equal(f.cancelled.length, 1); assert.equal(f.localCalls.length, 1);
+});
+test("mouse drag leaving its native client area transfers instead of committing an offset", async () => {
+  const f = fixture({ mode: "mouse", transfer: true, nativePoint: async () => ({ document: null, pressed: true }) });
+  f.doc.defaultView.setTimeout = () => 1; f.doc.defaultView.clearTimeout = () => {};
+  f.listeners.get("pointerdown")(f.event(100, 100));
+  f.windowListeners.get("pointermove")(f.event(1200, 100));
+  assert.equal(f.cancelled.length, 1);
+  f.runtime.cancel(); await Promise.resolve();
+  assert.equal(f.calls.length, 0);
+});

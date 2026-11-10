@@ -86,3 +86,21 @@ test("delayed native destroyed event cannot close a reopened task with the same 
     assert.equal(f.store.getState().assembly.subviewWorkspace.windows.length, 0);
   } finally { f.manager.destroy(); }
 });
+
+
+test("native drag coordinates resolve only a live owner document", async () => {
+  const f = fixture();
+  try {
+    let point = { label: "main", x: 25, y: 80, pressed: true, escape: false };
+    f.win.__TAURI__.core = { invoke: async name => { assert.equal(name, "probe_local_view_drag"); return point; } };
+    assert.equal((await f.manager.dragPoint()).document, f.root.ownerDocument);
+    point = { ...point, label: "local-view-expired--old-token" };
+    assert.equal((await f.manager.dragPoint()).document, null);
+    let resolve;
+    f.win.__TAURI__.core.invoke = () => new Promise(done => { resolve = done; });
+    const delayed = f.manager.dragPoint();
+    f.store.setState({ assembly: { ...f.store.getState().assembly, selectedChrName: "chr2" } });
+    resolve({ ...point, label: "main" });
+    assert.equal(await delayed, null);
+  } finally { f.manager.destroy(); }
+});

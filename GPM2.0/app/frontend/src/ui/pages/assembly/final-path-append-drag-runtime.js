@@ -193,8 +193,10 @@ export function bindFinalPathAppendDrag(host, store, deps) {
     if (!isCurrent()) { cancel(); return; }
     gesture.x = event.clientX; gesture.y = event.clientY;
     const dx = gesture.x - gesture.startX, dy = gesture.y - gesture.startY;
-    if (!gesture.moved && (gesture.hand ? Math.hypot(dx, dy) < 4
-      : Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(dx) * 0.6)) return;
+    const outside = gesture.x < 0 || gesture.y < 0 || gesture.x >= win.innerWidth || gesture.y >= win.innerHeight;
+    const destination = runtime.deps.dropLocal && targetAt({ document: doc, x: gesture.x, y: gesture.y });
+    if (!gesture.moved && (Math.hypot(dx, dy) < 4 || (!gesture.hand && !outside && !destination
+      && (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(dx) * 0.6)))) return;
     event.preventDefault(); event.stopImmediatePropagation();
     startTransfer();
     // Native polling uses physical desktop hit testing. Never overwrite it with
