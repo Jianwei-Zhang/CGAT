@@ -36,12 +36,52 @@ function selectionRange(selection, state, ctgs) {
   return segment ? resolveFinalPathSourceRange(segment, ctgs) : null;
 }
 
-function selectionFromNode(node, state) {
+function selectionFromNode(node, state, ctgs) {
   if (!node || !isVisible(state) || state.assembly?.loading) return null;
   const chrName = targetChr(node, state), segmentId = node.dataset.finalPathSegmentId;
   const phasedTrackId = state.assembly?.phasedChrTracks?.find(track => track.label === chrName)?.phasedTrackId;
   const selection = { chrName, segmentId, phasedTrackId };
-  return selectionRange(selection, state, sourceCtgs(state)) ? selection : null;
+  return selectionRange(selection, state, ctgs || sourceCtgs(state)) ? selection : null;
+}
+
+// A box is only a transient screen-space gesture. Pins remain unchanged until
+// release; cancellation never changes editing selections or the project store.
+function clearBox(owner) {
+  const box = owner.box;
+  owner.box = null;
+  box?.overlay?.remove();
+  delete owner.host.dataset.finalPathBoxSelecting;
+  if (box?.captured) {
+    try { owner.host.releasePointerCapture?.(box.pointerId); } catch { /* replaced host */ }
+  }
+}
+
+function boxRect(box, x, y) {
+  const bounds = box.surface.getBoundingClientRect();
+  const clampX = value => Math.max(bounds.left, Math.min(bounds.right, value));
+  const clampY = value => Math.max(bounds.top, Math.min(bounds.bottom, value));
+  const startX = clampX(box.x), endX = clampX(x), startY = clampY(box.y), endY = clampY(y);
+  return { left: Math.min(startX, endX), right: Math.max(startX, endX),
+    top: Math.min(startY, endY), bottom: Math.max(startY, endY) };
+}
+
+function boxedSelections(box, rect, state) {
+  const selected = new Map(), visuals = new Set(), ctgs = sourceCtgs(state);
+  if (rect.right <= rect.left || rect.bottom <= rect.top) return selected;
+  for (const node of box.surface.querySelectorAll(SEGMENT)) {
+    // Table inputs repeat segment IDs. Hit-test their owning row only; graph
+    // labels must not enlarge a segment's visual hit area.
+    const visual = node.closest(".final-path-sort-row") || node.querySelector(".track-ctg") || node;
+    if (visuals.has(visual)) continue;
+    visuals.add(visual);
+    const bounds = visual.getBoundingClientRect?.();
+    if (!bounds || bounds.right <= bounds.left || bounds.bottom <= bounds.top
+      || bounds.right <= rect.left || bounds.left >= rect.right
+      || bounds.bottom <= rect.top || bounds.top >= rect.bottom) continue;
+    const selection = selectionFromNode(node, state, ctgs);
+    if (selection) selected.set(selectionKey(selection), selection);
+  }
+  return selected;
 }
 
 // Union only overlapping/adjacent inclusive source intervals. Never bridge an
@@ -64,6 +104,11 @@ function sourceIntersections(ranges, projection) {
 function paint(owner) {
   const { host, store } = owner;
   const state = store.getState(), scope = scopeKey(state), editing = editingSelectionKey(state);
+  if (owner.box && (!isVisible(state) || owner.scope !== scope || state.assembly?.loading
+    || owner.box.surface.isConnected === false)) {
+    if (owner.pointer) owner.pointer.cancelled = true;
+    clearBox(owner);
+  }
   if (!isVisible(state) || owner.scope !== scope) {
     owner.pinned.clear(); owner.transient = null; owner.pointer = null;
   } else if (owner.editing !== editing) {
@@ -171,6 +216,7 @@ export function bindFinalPathSelection(host, store) {
         && owner.transient.chrName === targetChr(node, store.getState())) clearTransient();
     };
     const cancelPointer = () => {
+      clearBox(owner);
       if (owner.pointer) owner.pointer.cancelled = true;
       clearTransient();
     };
@@ -178,12 +224,36 @@ export function bindFinalPathSelection(host, store) {
       const pointer = owner.pointer;
       if (!pointer || (pointer.id !== undefined && event.pointerId !== pointer.id)) return;
       if (Math.hypot(Number(event.clientX || 0) - pointer.x, Number(event.clientY || 0) - pointer.y) >= DRAG_DISTANCE_PX) pointer.moved = true;
+      const box = owner.box;
+      if (!box || pointer.cancelled || !pointer.moved) return;
+      const state = store.getState();
+      if (pointer.scope !== scopeKey(state) || !isVisible(state) || state.assembly?.loading
+        || box.surface.isConnected === false || host.isConnected === false) { cancelPointer(); return; }
+      event.preventDefault?.(); event.stopImmediatePropagation?.();
+      const rect = boxRect(box, event.clientX, event.clientY);
+      if (event.type === "pointerup") {
+        for (const [key, selection] of boxedSelections(box, rect, state)) owner.pinned.set(key, selection);
+        clearBox(owner); owner.transient = null; paint(owner);
+        return;
+      }
+      if (!box.overlay) {
+        host.dataset.finalPathBoxSelecting = "1";
+        box.overlay = host.ownerDocument.createElement("div");
+        box.overlay.setAttribute("class", "final-path-selection-box");
+        box.overlay.setAttribute("aria-hidden", "true");
+        host.ownerDocument.body.append(box.overlay);
+        try { host.setPointerCapture?.(pointer.id); box.captured = true; } catch { /* unsupported pointer */ }
+      }
+      Object.assign(box.overlay.style, { left: `${rect.left}px`, top: `${rect.top}px`,
+        width: `${rect.right - rect.left}px`, height: `${rect.bottom - rect.top}px` });
     };
     host.addEventListener("pointerover", select);
     host.addEventListener("pointerout", leave);
     host.addEventListener("pointerleave", () => { if (owner.trigger === "hover") clearTransient(); });
     host.addEventListener("dragstart", cancelPointer);
     host.addEventListener("pointerdown", event => {
+      if (owner.box && owner.pointer?.id !== event.pointerId) return;
+      clearBox(owner);
       owner.pointerFocus = true; owner.pointer = null;
       const node = event.target?.closest?.(SEGMENT);
       if (!node || event.pointerType === "touch" || owner.trigger === "focus") clearTransient();
@@ -195,8 +265,14 @@ export function bindFinalPathSelection(host, store) {
       owner.pointer = { id: event.pointerId, key: selection ? selectionKey(selection) : null,
         x: Number(event.clientX || 0), y: Number(event.clientY || 0), scope: scopeKey(state),
         additive: Boolean(event.ctrlKey || event.metaKey), moved: false };
+      if (blank && owner.pointer.additive && !event.altKey && event.pointerType !== "touch"
+        && typeof blank.getBoundingClientRect === "function") {
+        owner.box = { surface: blank, x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+        event.preventDefault?.(); event.stopImmediatePropagation?.();
+      }
     }, true);
     host.addEventListener("click", event => {
+      clearBox(owner);
       const pointer = owner.pointer; owner.pointer = null;
       if (!pointer || pointer.moved || pointer.cancelled || event.button !== 0 || event.defaultPrevented
         || event.target?.closest?.(CONTROL)) return;
@@ -219,17 +295,29 @@ export function bindFinalPathSelection(host, store) {
     const document = host.ownerDocument;
     document.addEventListener("pointermove", trackPointer, true);
     document.addEventListener("pointerup", trackPointer, true);
-    document.addEventListener("pointercancel", cancelPointer, true);
+    document.addEventListener("pointercancel", event => {
+      if (owner.pointer && event.pointerId !== undefined && owner.pointer.id !== event.pointerId) return;
+      cancelPointer();
+    }, true);
+    document.addEventListener("lostpointercapture", event => {
+      if (owner.box && event.pointerId === owner.box.pointerId) cancelPointer();
+    }, true);
+    // Do not commit a stale screen-space rectangle after a scroll/layout move.
+    document.addEventListener("scroll", () => { if (owner.box) cancelPointer(); }, true);
     document.addEventListener("keydown", event => {
       owner.pointerFocus = false;
+      if (event.key === "Escape" && owner.box) {
+        cancelPointer(); event.preventDefault?.(); event.stopImmediatePropagation?.(); return;
+      }
       if (event.key === "Escape" && !event.defaultPrevented && !event.target?.closest?.(EDITABLE)) {
         if (owner.pointer) owner.pointer.cancelled = true;
-        clearAll();
+        clearBox(owner); clearAll();
       }
     }, true);
     host.addEventListener("focusin", select);
     host.addEventListener("focusout", leave);
     document.defaultView?.addEventListener("blur", cancelPointer);
+    document.defaultView?.addEventListener("resize", () => { if (owner.box) cancelPointer(); });
     host[BOUND] = true;
   }
   paint(owner);

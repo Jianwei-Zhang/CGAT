@@ -2289,3 +2289,11 @@
 .track-member-row small { grid-column: 1 / -1; color: var(--text-muted, #64748b); overflow-wrap: anywhere; }
 .track-member-row.is-deleted .track-member-name { text-decoration: line-through; }
 .track-members-dialog .app-dialog-actions { flex-wrap: wrap; }
+
+/* Ctrl/Command blank-drag correlation; outside SVG/export and editing state. */
+.final-path-selection-box {
+  position: fixed; z-index: 9999; pointer-events: none; box-sizing: border-box;
+  border: 1px solid var(--final-path-selection-stroke);
+  background: var(--final-path-selection-fill);
+}
+[data-final-path-box-selecting="1"], [data-final-path-box-selecting="1"] * { cursor: crosshair !important; }

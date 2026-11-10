@@ -8,7 +8,7 @@ import { rememberAssemblyDom, restoreAssemblyDom, clearAssemblySessionCache } fr
 
 const key = name => name.slice(5).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 class Element {
-  constructor(doc, attrs = {}) { this.ownerDocument = doc; this.attrs = {}; this.dataset = {}; this.children = []; this.events = new Map();
+  constructor(doc, attrs = {}) { this.ownerDocument = doc; this.attrs = {}; this.dataset = {}; this.children = []; this.events = new Map(); this.style = {};
     for (const [k, v] of Object.entries(attrs)) this.setAttribute(k, v); }
   setAttribute(k, v) { this.attrs[k] = String(v); if (k.startsWith("data-")) this.dataset[key(k)] = String(v); }
   getAttribute(k) { return this.attrs[k] ?? null; }
@@ -24,6 +24,7 @@ class Element {
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   append(child) { child.parent = this; this.children.push(child); }
   get childNodes() { return this.children; }
+  getBoundingClientRect() { return this.rect || { left: 0, top: 0, right: 0, bottom: 0 }; }
   replaceChildren(...nodes) { this.children = []; nodes.forEach(node => this.append(node)); }
   remove() { this.parent.children = this.parent.children.filter(child => child !== this); }
   addEventListener(type, fn) { const list = this.events.get(type) || []; list.push(fn); this.events.set(type, list); }
@@ -39,7 +40,8 @@ function fixture() {
   const doc = { addEventListener: listen(documentEvents), defaultView: { addEventListener: listen(windowEvents) }, createElementNS: (_namespace, tag) => {
     const node = new Element(doc); node.tag = tag; created.push(node); return node;
   } };
-  const host = new Element(doc, { id: "route-host" });
+  doc.body = new Element(doc);
+  const host = new Element(doc, { id: "route-host" }); doc.body.append(host);
   const plot = new Element(doc, { "data-final-path-graph-viewport": "" }); host.append(plot);
   const list = new Element(doc, { "data-final-path-card-list": "" }); host.append(list);
   const graph = new Element(doc, { "data-final-path-segment-id": "seg1" }); plot.append(graph);
@@ -610,4 +612,139 @@ test("Escape on a non-editing button clears pins, but an already-handled Escape 
   assert.ok(f.overlay(f.main));
   f.fire("keydown", button, { key: "Escape" });
   assert.equal(f.overlay(f.main), null);
+});
+
+function boxFixture() {
+  const f = fixture(), second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2", start: 1, end: 2000 });
+  const doc = f.host.ownerDocument;
+  doc.createElement = tag => { const node = new Element(doc); node.tag = tag; return node; };
+  f.plot.rect = f.list.rect = { left: 0, top: 0, right: 500, bottom: 200 };
+  f.graph.rect = f.row.rect = { left: 30, top: 40, right: 100, bottom: 60 };
+  second.graph.rect = second.row.rect = { left: 160, top: 40, right: 230, bottom: 60 };
+  const boxes = () => f.host.ownerDocument.body.querySelectorAll(".final-path-selection-box");
+  const box = (surface = f.plot, modifier = "ctrlKey", start = [10, 20], end = [250, 80]) => {
+    f.fire("pointerdown", surface, { [modifier]: true, clientX: start[0], clientY: start[1] });
+    f.fire("pointermove", surface, { clientX: end[0], clientY: end[1] });
+    f.fire("pointerup", surface, { clientX: end[0], clientY: end[1] });
+    f.fire("click", surface, { clientX: end[0], clientY: end[1] });
+  };
+  return { ...f, second, boxes, box };
+}
+
+for (const mode of ["plot", "list"]) for (const modifier of ["ctrlKey", "metaKey"]) {
+  test(`${modifier} blank box in ${mode} adds intersecting instances without editing or persistence`, () => {
+    const f = boxFixture(), state = f.store.getState(); let writes = 0;
+    f.store.subscribe(() => writes++);
+    f.box(f[mode], modifier);
+    for (const node of [f.graph, f.row, f.second.graph, f.second.row]) assert.equal(node.getAttribute("data-final-path-selected"), "1");
+    assert.ok(f.overlay(f.main)); assert.ok(f.overlay(f.other));
+    assert.equal(f.store.getState(), state); assert.equal(writes, 0); assert.equal(f.boxes().length, 0);
+    assert.deepEqual(state.assembly.trackSelectedCtgIds, []);
+    assert.deepEqual(state.assembly.subview.trackPairSelectedCtgs, []);
+  });
+}
+
+test("box preview is screen-space, clipped, reversible and absent from snapshot exports", () => {
+  const f = boxFixture();
+  f.fire("pointerdown", f.plot, { ctrlKey: true, clientX: 250, clientY: 80 });
+  f.fire("pointermove", f.plot, { clientX: -100, clientY: -20 });
+  assert.equal(f.boxes().length, 1);
+  assert.deepEqual(f.boxes()[0].style, { left: "0px", top: "0px", width: "250px", height: "80px" });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null, "preview does not commit pins");
+  assert.doesNotMatch(snapshotWithoutFinalPathSelection(f.host), /final-path-selection-box/);
+  f.fire("pointerup", f.plot, { clientX: -100, clientY: -20 });
+  f.fire("click", f.plot);
+  assert.equal(f.second.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.boxes().length, 0);
+});
+
+test("boxes add rather than toggle existing pins, ignore GAPs and do not include a neighboring surface", () => {
+  const f = boxFixture(), gap = addSegment(f, { type: "gap", segmentId: "gap" });
+  gap.graph.rect = { left: 110, top: 40, right: 130, bottom: 60 };
+  const outside = addSegment(f, { segmentId: "outside" });
+  outside.row.rect = { left: 30, top: 40, right: 100, bottom: 60 };
+  outside.graph.rect = { left: 600, top: 40, right: 700, bottom: 60 };
+  f.click(f.graph);
+  f.box(); f.box();
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.second.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(gap.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(outside.row.getAttribute("data-final-path-selected"), null);
+});
+
+for (const end of ["pointercancel", "blur", "lostpointercapture", "scroll", "loading", "scope", "removed", "Escape"]) {
+  test(`${end} cancels box and cleans its overlay without adding instances`, () => {
+    const f = boxFixture(); f.click(f.graph);
+    f.fire("pointerdown", f.plot, { ctrlKey: true, clientX: 120, clientY: 20 });
+    f.fire("pointermove", f.plot, { clientX: 250, clientY: 80 });
+    assert.equal(f.boxes().length, 1);
+    if (end === "blur") f.blur();
+    else if (end === "loading") f.patch({ loading: true });
+    else if (end === "scope") f.patch({ selectedChrName: "Chr2" });
+    else if (end === "removed") { f.plot.isConnected = false; f.patch({}); }
+    else if (end === "Escape") f.fire("keydown", f.host, { key: "Escape" });
+    else f.fire(end, f.plot);
+    f.fire("pointerup", f.plot, { clientX: 250, clientY: 80 }); f.fire("click", f.plot);
+    assert.equal(f.second.graph.getAttribute("data-final-path-selected"), null);
+    assert.equal(f.boxes().length, 0);
+    assert.equal(f.host.dataset.finalPathBoxSelecting, undefined);
+    if (end !== "scope") assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  });
+}
+
+for (const extra of [{}, { ctrlKey: true, altKey: true }, { ctrlKey: true, button: 2 }, { ctrlKey: true, pointerType: "touch" }]) {
+  test(`unmodified/unsupported blank drag does not start a correlation box: ${JSON.stringify(extra)}`, () => {
+    const f = boxFixture();
+    f.fire("pointerdown", f.plot, { ...extra, clientX: 10, clientY: 20 });
+    f.fire("pointermove", f.plot, { clientX: 250, clientY: 80 });
+    f.fire("pointerup", f.plot, { clientX: 250, clientY: 80 });
+    assert.equal(f.boxes().length, 0); assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  });
+}
+
+test("segment/control-origin drags and another pointer cannot acquire or finish the box", () => {
+  const f = boxFixture();
+  for (const target of [f.graph, f.input]) {
+    f.fire("pointerdown", target, { ctrlKey: true });
+    f.fire("pointermove", f.plot, { clientX: 250, clientY: 80 });
+    assert.equal(f.boxes().length, 0);
+    f.fire("pointerup", f.plot, { clientX: 250, clientY: 80 });
+  }
+  f.fire("pointerdown", f.plot, { ctrlKey: true, clientX: 120, clientY: 20 });
+  f.fire("pointerdown", f.plot, { pointerId: 2, ctrlKey: true, clientX: 10, clientY: 20 });
+  f.fire("pointermove", f.plot, { pointerId: 2, clientX: 250, clientY: 80 });
+  assert.equal(f.boxes().length, 0);
+  f.fire("pointermove", f.plot, { clientX: 250, clientY: 80 });
+  f.fire("pointerup", f.plot, { pointerId: 2, clientX: 250, clientY: 80 });
+  assert.equal(f.boxes().length, 1); assert.equal(f.second.graph.getAttribute("data-final-path-selected"), null);
+  f.fire("pointerup", f.plot, { clientX: 250, clientY: 80 });
+  assert.equal(f.second.graph.getAttribute("data-final-path-selected"), "1");
+});
+
+test("All-mode boxes distinguish equal segment IDs by path and never widen adopted source intervals", () => {
+  const f = boxFixture(), original = f.store.getState().assembly.finalPathByChr.Chr1.segments[0];
+  f.patch({ activeFinalPathKey: "__all__", phasedChrTracks: [{ phasedTrackId: 1, label: "Chr1A" }, { phasedTrackId: 2, label: "Chr1B" }],
+    finalPathByChr: { Chr1A: { segments: [original] }, Chr1B: { segments: [{ ...original, start: 1001, end: 2000 }] } } });
+  for (const node of [f.graph, f.row]) node.setAttribute("data-final-path-target-chr-name", "Chr1A");
+  for (const node of [f.second.graph, f.second.row]) {
+    node.setAttribute("data-final-path-target-chr-name", "Chr1B"); node.setAttribute("data-final-path-segment-id", original.segmentId);
+  }
+  f.box();
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.second.graph.getAttribute("data-final-path-selected"), "1");
+  assert.deepEqual(sourceRanges(f.main), [[1001, 2000], [5001, 10000]]);
+  assert.deepEqual(sourceRanges(f.local), [[5001, 8000]]);
+});
+
+test("Escape from an earlier focused field cancels only the active box, then normal Escape clears pins", () => {
+  const f = boxFixture(); f.click(f.graph);
+  f.fire("pointerdown", f.plot, { ctrlKey: true, clientX: 120, clientY: 20 });
+  f.fire("pointermove", f.plot, { clientX: 250, clientY: 80 });
+  f.fire("keydown", f.input, { key: "Escape" });
+  assert.equal(f.boxes().length, 0);
+  f.fire("pointerup", f.plot, { clientX: 250, clientY: 80 });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  assert.equal(f.second.graph.getAttribute("data-final-path-selected"), null);
+  f.fire("keydown", f.host, { key: "Escape" });
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
 });
