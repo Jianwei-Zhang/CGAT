@@ -56,7 +56,6 @@ export function gestureHarness(mode, { fullRange = false, flipped = false } = {}
         closest(selector) {
           if (selector === "#route-host") return host;
           if (selector.includes("assembly-track-scroll")) return scroll;
-          if (selector.includes("data-view-interaction-mode")) return null;
           if (selector.includes("data-subview-fragment-key")) return kind === "fragment" ? current : null;
           if (selector.includes("data-subview-contig-id")) {
             if (kind === "group") return current;

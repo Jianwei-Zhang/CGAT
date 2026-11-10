@@ -1210,9 +1210,6 @@
   box-shadow: var(--shadow-md); font-size: var(--font-small); }
 .final-path-append-ghost.is-valid { border-color: var(--accent); }
 .is-final-path-append-target { outline: 2px solid var(--accent); outline-offset: -2px; }
-[data-view-interaction-mode="hand"] [data-track-contig-id],
-[data-view-interaction-mode="hand"] [data-subview-track-pair-contig-id],
-[data-view-interaction-mode="hand"] [data-subview-fragment-key] { cursor: grab; }
 
 .contig-drop-lane-preview { position: fixed; z-index: 9999; pointer-events: none;
   border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent);

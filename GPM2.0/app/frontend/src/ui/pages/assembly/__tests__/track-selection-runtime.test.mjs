@@ -69,6 +69,7 @@ test("bindTrackBoxSelection paints in scroll coordinates and hit-tests in shifte
       },
     };
     const scrollEl = {
+      classList: createClassList(),
       scrollLeft: 400,
       scrollTop: 0,
       dataset: { trackViewboxMinX: "-200" },
@@ -110,6 +111,7 @@ test("bindTrackBoxSelection paints in scroll coordinates and hit-tests in shifte
 
     hostListeners.get("pointerdown")?.({
       button: 0,
+      ctrlKey: true,
       clientX: 320,
       clientY: 62,
       preventDefault() {
@@ -126,6 +128,7 @@ test("bindTrackBoxSelection paints in scroll coordinates and hit-tests in shifte
     });
 
     windowStub.listeners.get("pointermove")?.({ clientX: 370, clientY: 82 });
+    assert.equal(scrollEl.classList.has("is-track-box-selecting"), true);
     assert.equal(boxEl.style.left, "620px");
     assert.equal(boxEl.style.top, "12px");
     assert.equal(boxEl.style.width, "50px");
@@ -137,6 +140,7 @@ test("bindTrackBoxSelection paints in scroll coordinates and hit-tests in shifte
       ["primary", [5]],
     ]);
     assert.equal(boxEl.classList.has("is-hidden"), true);
+    assert.equal(scrollEl.classList.has("is-track-box-selecting"), false);
   } finally {
     globalThis.window = originalWindow;
   }
@@ -163,6 +167,7 @@ test("bindTrackBoxSelection collects subview box selections in track-pair mode",
       },
     };
     const scrollEl = {
+      classList: createClassList(),
       scrollLeft: 0,
       scrollTop: 0,
       dataset: { subviewViewboxMinX: "0" },
@@ -204,6 +209,7 @@ test("bindTrackBoxSelection collects subview box selections in track-pair mode",
 
     hostListeners.get("pointerdown")?.({
       button: 0,
+      metaKey: true,
       clientX: 5,
       clientY: 5,
       preventDefault() {
@@ -227,7 +233,19 @@ test("bindTrackBoxSelection collects subview box selections in track-pair mode",
       ["subview", [{ trackRole: "primary", contigId: 12 }]],
     ]);
     assert.equal(boxEl.classList.has("is-hidden"), true);
+    assert.equal(scrollEl.classList.has("is-track-box-selecting"), false);
   } finally {
     globalThis.window = originalWindow;
   }
 });
+
+for (const modifier of [{}, { shiftKey: true }, { altKey: true }, { ctrlKey: true, altKey: true }]) {
+  test(`box selection does not claim unmodified/other-modifier blank drags: ${JSON.stringify(modifier)}`, () => {
+    const listeners = new Map();
+    const host = { addEventListener: (type, fn) => listeners.set(type, fn) };
+    const store = { getState() { assert.fail("non-selection drag must not read or edit selection state"); } };
+    bindTrackBoxSelection(host, store, { updateTrackSelection() {}, updateSubviewTrackPairSelection() {} });
+    listeners.get("pointerdown")({ button: 0, ...modifier,
+      target: { closest: () => null }, preventDefault() { assert.fail("must not claim the drag"); } });
+  });
+}

@@ -2094,24 +2094,6 @@
 }
 .view-nav-moves { display: inline-flex; gap: 3px; flex: 0 0 auto; }
 .view-nav-range { display: flex; align-items: center; gap: 6px; flex: 1 1 240px; min-width: 154px; }
-.view-nav-mode-switch {
-  display: inline-flex; position: relative; align-items: center; flex: 0 0 58px; height: 28px;
-  padding: 2px; border: 1px solid var(--border-default, #cbd5e1); border-radius: 14px; background: var(--theme-surface-subtle, #edf2f7);
-  color: var(--text-muted, #64748b); cursor: pointer;
-}
-.view-nav-mode-thumb {
-  position: absolute; left: 2px; top: 2px; bottom: 2px; width: 25px;
-  border-radius: 12px; background: var(--surface-panel, #fff); box-shadow: 0 1px 3px #20385826;
-  transition: transform 140ms ease;
-}
-.view-nav-mode-icon { display: inline-flex; position: relative; align-items: center; justify-content: center; width: 25px; }
-.view-nav-mode-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.view-nav-mode-switch[aria-checked="false"] .is-mouse { color: var(--theme-blue-ink, #1858a4); }
-.view-nav-mode-switch[aria-checked="true"] { border-color: var(--theme-blue-line, #78a7e8); background: var(--theme-blue-surface, #e6f0ff); }
-.view-nav-mode-switch[aria-checked="true"] .view-nav-mode-thumb { transform: translateX(25px); }
-.view-nav-mode-switch[aria-checked="true"] .is-hand { color: var(--theme-blue-ink, #1858a4); }
-.view-nav-mode-switch:disabled { opacity: .5; cursor: default; }
-@media (prefers-reduced-motion: reduce) { .view-nav-mode-thumb { transition: none; } }
 .view-nav-button, .view-nav-fit {
   display: inline-flex;
   align-items: center;
@@ -2193,10 +2175,16 @@
 .view-tick-control input {
   height: 28px; border: 1px solid var(--border-default, #cbd5e1); border-radius: 4px; padding: 2px 5px; color: inherit; background: var(--surface-panel, #fff); font: inherit;
 }
-.assembly-track-scroll[data-view-interaction-mode="hand"] { cursor: grab; touch-action: none; }
-.assembly-track-scroll[data-view-interaction-mode="hand"] * { cursor: inherit; }
+/* Unified plot interaction; toolbar controls and resize handles keep their cursors. */
+.assembly-track-scroll:is([data-track-role="primary"], [data-track-role="subview"]) { cursor: grab; touch-action: none; }
+.assembly-track-scroll:is([data-track-role="primary"], [data-track-role="subview"]) :is(svg, svg *) { cursor: inherit; }
+.assembly-track-scroll.is-track-box-selecting,
+.assembly-track-scroll.is-track-box-selecting * { cursor: crosshair; }
 .assembly-track-scroll.is-view-panning, .assembly-track-scroll.is-view-panning * { cursor: grabbing; }
-/* Pointer capture targets the route host, not the plot beneath the pointer. */
+/* Pointer capture targets the stable view owner, not the plot beneath it. */
+[data-view-contig-gesture="pending"] { cursor: grab !important; }
+[data-view-contig-gesture="drag"] { cursor: grabbing !important; }
+[data-view-contig-gesture] * { cursor: inherit !important; }
 [data-view-navigation-gesture="pan"],
 [data-view-navigation-gesture="window"] { cursor: grabbing !important; }
 [data-view-navigation-gesture="left"],

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { bindAssemblyViewNavigation, unbindAssemblyViewNavigation } from "../view-navigation-runtime.js";
+import { VIEW_CONTIG_TARGET, VIEW_CONTROL_TARGET } from "../view-interaction.js";
 import { resolveTrackPrefs } from "../track-prefs.js";
 
 class Events {
@@ -85,7 +86,6 @@ function harness({ resetScrollOnReparent = false } = {}) {
       dataset: { viewNavigation: role, navLocale: "zh" }, isConnected: true,
       querySelector(selector) { return node(selector.match(/\[([^='\]]+)/)[1]); },
       querySelectorAll(selector) {
-        if (selector.includes("mouse")) return ["mouse", "hand"].map(action);
         return [...actions.values()];
       },
     };
@@ -111,6 +111,7 @@ function harness({ resetScrollOnReparent = false } = {}) {
       isConnected: true, clientWidth: 1000, scrollWidth: 2000, scrollLeft: 200, scrollTop: 25,
       dataset: { trackRole: role, trackWindowStartBp: "0", trackDomainSpanBp: "1000", trackInnerWidth: "2000", trackViewboxMinX: "0",
         subviewWindowStartBp: "0", subviewDomainSpanBp: "1000", subviewInnerWidth: "2000", subviewViewboxMinX: "0" },
+      attrs: {}, setAttribute(k, v) { this.attrs[k] = v; },
       classList: { values: new Set(), toggle(key, on) { if (on) this.values.add(key); else this.values.delete(key); } },
       getBoundingClientRect: () => ({ left: 0, width: 1000 }),
       closest(selector) {
@@ -157,15 +158,14 @@ function harness({ resetScrollOnReparent = false } = {}) {
   };
 }
 
-test("partial refreshes retain exactly one owner and independent default mouse modes", () => {
+test("partial refreshes retain exactly one navigation owner without interaction mode state", () => {
   const h = harness();
   try {
     for (let i = 0; i < 12; i++) h.bind();
     assert.equal(h.root.count("wheel"), 1); assert.equal(h.root.count("pointerdown"), 1);
     assert.equal(h.win.count("blur"), 0);
-    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
-    assert.equal(h.views.primary.scroll.dataset.viewInteractionMode, "hand");
-    assert.equal(h.views.subview.scroll.dataset.viewInteractionMode, "mouse");
+    assert.equal(h.views.primary.scroll.dataset.viewInteractionMode, undefined);
+    assert.equal(h.views.subview.scroll.dataset.viewInteractionMode, undefined);
   } finally { h.dispose(); }
   assert.equal(h.root.count("wheel"), 0); assert.equal(h.views.primary.scroll.count("scroll"), 0);
 });
@@ -178,7 +178,6 @@ for (const role of ["primary", "subview"]) {
       assert.equal(view.scroll.scrollLeft, 200);
       assert.equal(view.scroll.scrollTop, 25);
       assert.equal(view.selection.getAttribute("aria-valuenow"), "100");
-      h.root.emit("click", h.event(view.action("toggle-mode")));
       const state = h.store.getState();
       // A scoped render produces a fresh, unwrapped layout; scroll sync runs
       // before navigation mounts its card. Reproduce that ordering repeatedly.
@@ -192,7 +191,7 @@ for (const role of ["primary", "subview"]) {
         assert.equal(view.scroll.scrollLeft, left);
         assert.equal(view.scroll.scrollTop, 45);
         assert.equal(view.selection.getAttribute("aria-valuenow"), String(left / 2));
-        assert.equal(view.scroll.dataset.viewInteractionMode, "hand");
+        assert.equal(view.scroll.dataset.viewInteractionMode, undefined);
         assert.equal(h.store.getState(), state, "mounting must not change viewport preferences or edits");
         assert.equal(view.panel.children.length, 1);
       }
@@ -221,41 +220,32 @@ for (const role of ["primary", "subview"]) {
   });
 
   for (const target of ["scroll", "axis"]) {
-    test(`${role} ${target} wheel scrolls the page in mouse mode and zooms only in hand mode`, () => {
+    test(`${role} ${target} wheel zooms immediately without a mode switch`, () => {
       const h = harness();
       try {
         const view = h.views[role];
-        const wheel = () => h.event(view[target], { deltaY: -100 });
-        const mouseWheel = wheel();
-        h.root.emit("wheel", mouseWheel);
-        assert.equal(mouseWheel.defaultPrevented, undefined);
-        assert.equal(h.frames.size, 0); assert.equal(h.writes, 0);
-        h.root.emit("click", h.event(view.action("toggle-mode")));
-        const handWheel = wheel();
-        h.root.emit("wheel", handWheel);
-        assert.equal(handWheel.defaultPrevented, true);
+        const wheel = h.event(view[target], { deltaY: -100 });
+        h.root.emit("wheel", wheel);
+        assert.equal(wheel.defaultPrevented, true);
         assert.equal(h.frames.size, 1);
         h.flush(); assert.equal(h.writes, 1);
         const otherRole = role === "primary" ? "subview" : "primary";
+        const otherKey = otherRole === "primary" ? "trackView" : "subviewTrackView";
+        assert.equal(h.store.getState().assembly[otherKey].visibleSpanBp, 500);
         const otherWheel = h.event(h.views[otherRole][target], { deltaY: -100 });
         h.root.emit("wheel", otherWheel);
-        assert.equal(otherWheel.defaultPrevented, undefined);
-        h.root.emit("click", h.event(view.action("toggle-mode")));
-        const restoredWheel = wheel();
-        h.root.emit("wheel", restoredWheel);
-        assert.equal(restoredWheel.defaultPrevented, undefined);
-        assert.equal(h.frames.size, 0); assert.equal(h.writes, 1);
+        assert.equal(otherWheel.defaultPrevented, true);
+        h.flush(); assert.equal(h.writes, 2);
       } finally { h.dispose(); }
     });
   }
 }
 
-test("hand mode never consumes wheel events outside the plot and overview or horizontal gestures", () => {
+test("unified navigation never consumes wheel events outside the plot and overview or horizontal gestures", () => {
   const h = harness();
   try {
     for (const role of ["primary", "subview"]) {
       const view = h.views[role];
-      h.root.emit("click", h.event(view.action("toggle-mode")));
       for (const target of [view.display, view.action("fit"), { closest: () => null }]) {
         const event = h.event(target, { deltaY: -100 });
         h.root.emit("wheel", event);
@@ -271,60 +261,63 @@ test("hand mode never consumes wheel events outside the plot and overview or hor
   } finally { h.dispose(); }
 });
 
-test("one mode switch toggles mutually exclusive states without changing window/data", () => {
-  const h = harness();
-  try {
-    const mode = h.views.primary.action("toggle-mode");
-    assert.equal(mode["aria-checked"], "false");
-    const before = JSON.stringify(h.store.getState());
-    h.root.emit("click", h.event(mode));
-    assert.equal(mode["aria-checked"], "true");
-    assert.equal(h.views.primary.scroll.dataset.viewInteractionMode, "hand");
-    h.bind();
-    assert.equal(mode["aria-checked"], "true");
-    h.root.emit("pointerdown", h.event(h.views.primary.scroll));
-    assert.equal(h.win.count("pointermove"), 1);
-    h.root.emit("click", h.event(mode));
-    assert.equal(mode["aria-checked"], "false");
-    assert.equal(h.views.primary.scroll.dataset.viewInteractionMode, "mouse");
-    assert.equal(h.win.count("pointermove"), 0);
-    assert.equal(h.views.subview.action("toggle-mode")["aria-checked"], "false");
-    assert.equal(JSON.stringify(h.store.getState()), before);
-    assert.equal(h.writes, 0);
-  } finally { h.dispose(); }
-});
+for (const role of ["primary", "subview"]) {
+  for (const modifier of ["ctrlKey", "metaKey", "altKey"]) {
+    test(`${role} ${modifier} + blank drag is not claimed for panning`, () => {
+      const h = harness();
+      try {
+        const event = h.event(h.views[role].scroll, { [modifier]: true });
+        h.root.emit("pointerdown", event);
+        assert.notEqual(event.defaultPrevented, true);
+        assert.equal(h.root.hasPointerCapture(1), false);
+        assert.equal(h.win.count("pointermove"), 0);
+        assert.equal(h.writes, 0);
+      } finally { h.dispose(); }
+    });
+  }
+  for (const targetSelector of [VIEW_CONTIG_TARGET, VIEW_CONTROL_TARGET]) {
+    test(`${role} Contig/control targets retain their own drag and click actions: ${targetSelector}`, () => {
+      const h = harness();
+      try {
+        const scroll = h.views[role].scroll;
+        const target = { closest: selector => selector === targetSelector ? target : scroll.closest(selector) };
+        for (const modifiers of [{}, { ctrlKey: true }, { metaKey: true }]) {
+          const event = h.event(target, modifiers);
+          h.root.emit("pointerdown", event);
+          assert.notEqual(event.defaultPrevented, true);
+          assert.equal(h.root.hasPointerCapture(1), false);
+          assert.equal(h.win.count("pointermove"), 0);
+        }
+      } finally { h.dispose(); }
+    });
+  }
+}
 
 for (const role of ["primary", "subview"]) {
-  test(`${role} rebuilding navigation starts in the selected mode, not the mouse default`, () => {
+  test(`${role} rebuilding navigation keeps unified gestures without recreating a mode switch`, () => {
     const h = harness();
     try {
       const view = h.views[role];
-      h.root.emit("click", h.event(view.action("toggle-mode")));
       view.bar.remove();
       h.bind();
       const html = h.renderedNavigation.at(-1);
-      assert.match(html, /role="switch" aria-checked="true"/);
-      assert.equal(view.action("toggle-mode")["aria-checked"], "true");
-      assert.equal(view.scroll.dataset.viewInteractionMode, "hand");
-      assert.equal(h.views[role === "primary" ? "subview" : "primary"].scroll.dataset.viewInteractionMode, "mouse");
+      assert.doesNotMatch(html, /toggle-mode|role="switch"|view-nav-mode/);
+      h.root.emit("pointerdown", h.event(view.scroll));
+      assert.equal(h.root.dataset.viewNavigationGesture, "pan");
     } finally { h.dispose(); }
   });
-  test(`${role} hand pan owns the capture cursor without switching modes during movement`, () => {
+  test(`${role} blank pan owns the capture cursor through movement and refreshes`, () => {
     const h = harness();
     try {
-      const view = h.views[role], mode = view.action("toggle-mode");
-      h.root.emit("click", h.event(mode));
-      const modeWrites = mode.attributeWrites.length;
+      const view = h.views[role];
       h.root.emit("pointerdown", h.event(view.scroll));
       assert.equal(h.root.hasPointerCapture(1), true);
       assert.equal(h.root.dataset.viewNavigationGesture, "pan");
       for (const clientX of [190, 170, 220, 180]) {
         h.win.emit("pointermove", h.event(h.root, { clientX }));
         view.scroll.emit("scroll"); h.bind();
-        assert.equal(mode.attributeWrites.length, modeWrites);
         assert.equal(h.root.dataset.viewNavigationGesture, "pan");
-        assert.equal(mode["aria-checked"], "true");
-        assert.equal(view.scroll.dataset.viewInteractionMode, "hand");
+        assert.equal(view.scroll.dataset.viewInteractionMode, undefined);
         assert.equal(view.scroll.classList.values.has("is-view-panning"), true);
       }
       assert.equal(view.scroll.scrollLeft, 220);
@@ -333,8 +326,6 @@ for (const role of ["primary", "subview"]) {
       assert.equal(h.root.hasPointerCapture(1), false);
       assert.equal(h.root.dataset.viewNavigationGesture, undefined);
       assert.equal(view.scroll.classList.values.has("is-view-panning"), false);
-      assert.equal(mode["aria-checked"], "true");
-      assert.equal(mode.attributeWrites.length, modeWrites);
     } finally { h.dispose(); }
   });
   for (const kind of ["window", "left", "right"]) {
@@ -355,7 +346,7 @@ for (const role of ["primary", "subview"]) {
           h.win.emit("pointermove", h.event(h.root, { clientX }));
           h.flush(); h.bind();
           assert.equal(h.root.dataset.viewNavigationGesture, kind);
-          assert.equal(view.scroll.dataset.viewInteractionMode, "mouse");
+          assert.equal(view.scroll.dataset.viewInteractionMode, undefined);
         }
         h.win.emit("pointerup", h.event(h.root, { clientX: 220 }));
         assert.equal(h.root.dataset.viewNavigationGesture, undefined);
@@ -367,7 +358,6 @@ for (const role of ["primary", "subview"]) {
 
 test("wheel is coalesced, excludes controls and becomes inert after unbinding", () => {
   const h = harness();
-  h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
   for (let i = 0; i < 30; i++) h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -1 }));
   assert.equal(h.frames.size, 1); assert.equal(h.writes, 0);
   h.flush(); assert.equal(h.writes, 1); assert.equal(h.renders, 1);
@@ -378,10 +368,9 @@ test("wheel is coalesced, excludes controls and becomes inert after unbinding", 
 });
 
 for (const termination of ["pointerup", "pointercancel", "lostpointercapture", "blur", "replacement", "removal", "unbind"]) {
-  test(`hand pan cleans capture/listeners on ${termination} without store edits`, () => {
+  test(`blank pan cleans capture/listeners on ${termination} without store edits`, () => {
     const h = harness();
     try {
-      h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
       h.root.emit("pointerdown", h.event(h.views.primary.scroll));
       assert.equal(h.win.count("pointermove"), 1); assert.equal(h.win.count("blur"), 1);
       h.win.emit("pointermove", h.event(h.views.primary.scroll, { clientX: 170 }));
@@ -412,7 +401,6 @@ test("focused input replacement does not reenter commit from synchronous blur/ch
 test("persistence is debounced and does not write into a newly selected context", async () => {
   const h = harness();
   try {
-    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
     h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -20 })); h.flush();
     h.store.setState({ ...h.store.getState(), assembly: { ...h.store.getState().assembly, selectedChrName: "Chr2" } });
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -437,7 +425,6 @@ test("overview edge buttons support keyboard resizing without changing data cont
 test("a queued wheel cannot apply an old chromosome window to a newly selected chromosome", () => {
   const h = harness();
   try {
-    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
     h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -100 }));
     const state = h.store.getState();
     h.store.setState({ ...state, assembly: { ...state.assembly, selectedChrName: "Chr2" } });
@@ -480,10 +467,10 @@ test("explicit empty primary content disables navigation without fabricating a w
   const h = harness();
   try {
     h.views.primary.scroll.dataset.viewNavigationContent = "0";
-    for (const action of ["toggle-mode", "left", "right", "fit"]) h.views.primary.action(action);
+    for (const action of ["left", "right", "fit"]) h.views.primary.action(action);
     h.bind();
     assert.equal(h.views.primary.display.textContent, "—");
-    for (const action of ["toggle-mode", "left", "right", "fit"]) assert.equal(h.views.primary.action(action).disabled, true);
+    for (const action of ["left", "right", "fit"]) assert.equal(h.views.primary.action(action).disabled, true);
     assert.equal(h.views.primary.selection.attrs["aria-disabled"], "true");
     assert.equal(h.views.primary.selection.attrs.tabindex, "-1");
     const before = JSON.stringify(h.store.getState());
@@ -551,7 +538,7 @@ for (const role of ["primary", "subview"]) {
       assert.equal(view.grip.style.left, "476px");
     } finally { h.dispose(); }
   });
-  test(`${role} transparent compact target pans instead of resizing in default mouse mode`, () => {
+  test(`${role} transparent compact target pans instead of resizing without a mode switch`, () => {
     const h = harness();
     try {
       const view = h.views[role], key = role === "primary" ? "trackView" : "subviewTrackView";
@@ -563,7 +550,7 @@ for (const role of ["primary", "subview"]) {
       h.win.emit("pointerup", h.event(view.grip, { clientX: 230 }));
       assert.equal(h.store.getState().assembly[key].visibleSpanBp, span);
       assert.ok(view.scroll.scrollLeft > start);
-      assert.equal(view.scroll.dataset.viewInteractionMode, "mouse");
+      assert.equal(view.scroll.dataset.viewInteractionMode, undefined);
       assert.equal(h.win.count("pointermove"), 0);
     } finally { h.dispose(); }
   });
@@ -638,7 +625,6 @@ for (const [role, viewKey] of [["primary", "trackView"], ["subview", "subviewTra
       h.root.emit("click", h.event(h.views[role].action("fit")));
       assert.equal(h.store.getState().assembly[viewKey].fullRange, true);
       assert.equal(h.store.getState().assembly[viewKey].allowSubViewportScale, true);
-      h.root.emit("click", h.event(h.views[role].action("toggle-mode")));
       h.root.emit("wheel", h.event(h.views[role].scroll, { deltaY: -100 }));
       h.flush();
       assert.notEqual(h.store.getState().assembly[viewKey].fullRange, true);
@@ -710,16 +696,13 @@ test("navigation menu guard leaves editable controls and unrelated business targ
 });
 
 
-test("Main navigation does not claim a floating Local View's hand-mode gesture", () => {
+test("Main navigation does not claim a floating Local View's blank pan gesture", () => {
   const h = harness();
   try {
     const local = { dataset: { localViewWindow: "local-test" } };
     const scroll = h.views.subview.scroll, original = scroll.closest;
     scroll.closest = selector => selector === "[data-local-view-window]" ? local : original(selector);
-    const toggle = h.views.subview.action("toggle-mode"), oldClosest = toggle.closest;
-    toggle.closest = selector => selector === "[data-local-view-window]" ? local : oldClosest(selector);
     const before = h.writes;
-    h.root.emit("click", h.event(toggle));
     h.root.emit("pointerdown", h.event(scroll));
     assert.equal(h.writes, before);
     assert.equal(h.win.count("pointermove"), 0);
@@ -729,7 +712,6 @@ test("Main navigation does not claim a floating Local View's hand-mode gesture",
 test("a gesture already claimed by drag-to-Final-Path cannot also start panning", () => {
   const h = harness();
   try {
-    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
     h.root.emit("pointerdown", h.event(h.views.primary.scroll, { defaultPrevented: true }));
     assert.equal(h.win.count("pointermove"), 0);
   } finally { h.dispose(); }

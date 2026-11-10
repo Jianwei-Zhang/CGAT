@@ -3,6 +3,7 @@ import { resolveTrackPrefs } from "./track-prefs.js";
 import { readTrackViewportMetrics } from "./track-viewport.js";
 import { clampViewRange, zoomViewRange, moveViewRange, parseViewSpan, formatViewSpan, readViewNavigationGeometry } from "./view-navigation-state.js";
 import { renderViewNavigation, localizeViewNavigation, viewNavText, isViewNavigationContextMenuTarget } from "./view-navigation-ui.js";
+import { VIEW_CONTIG_TARGET, VIEW_CONTROL_TARGET } from "./view-interaction.js";
 import { assemblyPageSession } from "./page-session.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 
@@ -82,16 +83,6 @@ function createController(root, store, window) {
     }, 160));
   }
 
-  // Mode changes are independent of high-frequency viewport/scroll updates.
-  function syncInteractionMode(role) {
-    const current = controller.roles[role], scroll = scrollFor(role);
-    if (!current?.bar?.isConnected || !scroll) return;
-    if (scroll.dataset.viewInteractionMode !== current.mode) scroll.dataset.viewInteractionMode = current.mode;
-    const modeSwitch = current.bar.querySelector("[data-view-nav-action='toggle-mode']");
-    const checked = String(current.mode === "hand"), title = viewNavText(locale())[current.mode];
-    if (modeSwitch.getAttribute("aria-checked") !== checked) modeSwitch.setAttribute("aria-checked", checked);
-    if (modeSwitch.getAttribute("data-app-tooltip") !== title) modeSwitch.setAttribute("data-app-tooltip", title);
-  }
   function sync(role) {
     const current = controller.roles[role], scroll = scrollFor(role);
     if (!current?.bar?.isConnected || !scroll) return;
@@ -309,7 +300,11 @@ function createController(root, store, window) {
     const edge = event.target.closest("[data-view-nav-edge]");
     const selection = event.target.closest("[data-view-nav-window]") || event.target.closest("[data-view-nav-grip]");
     const plot = event.target.closest(scrollSelector(role));
-    const kind = edge?.dataset.viewNavEdge || (selection ? "window" : plot && controller.roles[role]?.mode === "hand" ? "pan" : null);
+    // Ctrl/Command + blank drag belongs to box selection. Contigs keep their
+    // horizontal move/cross-view transfer, and embedded controls stay native.
+    if (plot && (event.ctrlKey || event.metaKey || event.altKey
+      || event.target.closest(VIEW_CONTIG_TARGET) || event.target.closest(VIEW_CONTROL_TARGET))) return;
+    const kind = edge?.dataset.viewNavEdge || (selection ? "window" : plot ? "pan" : null);
     const geometry = geometryFor(role), scroll = scrollFor(role);
     if (!kind || !geometry || !scroll) return;
     flushPending();
@@ -335,8 +330,6 @@ function createController(root, store, window) {
     const plot = event.target?.closest?.(".assembly-track-scroll[data-track-role]");
     const role = roleOf(event.target), geometry = geometryFor(role);
     if ((!axis && !plot) || !["primary", "subview"].includes(role) || !geometry || controller.gesture) return;
-    // Mouse mode must leave the wheel to page scrolling, including over the overview.
-    if (controller.roles[role]?.mode !== "hand") return;
     if (!Number.isFinite(event.deltaY) || !event.deltaY || Math.abs(event.deltaX || 0) > Math.abs(event.deltaY)) return;
     event.preventDefault(); event.stopPropagation();
     const range = controller.pending?.role === role && controller.pending.key === contextKey(role) ? controller.pending.range : geometry.range;
@@ -366,7 +359,6 @@ function createController(root, store, window) {
     const role = roleOf(button), current = controller.roles[role], action = button.dataset.viewNavAction;
     if (!current) return;
     flushPending();
-    if (action === "toggle-mode") { endGesture(true); current.mode = current.mode === "mouse" ? "hand" : "mouse"; syncInteractionMode(role); sync(role); return; }
     const geometry = geometryFor(role); if (!geometry) return;
     const { range, domain } = geometry;
     if (action === "left" || action === "right") applyRange(role, moveViewRange(range, domain, (action === "left" ? -1 : 1) * range.span / 2));
@@ -459,7 +451,7 @@ function createController(root, store, window) {
       }
       const key = contextKey(role), previous = controller.roles[role];
       if (controller.gesture?.role === role && (previous?.key !== key || (!controller.applyingRange && controller.gesture.scroll !== scroll))) endGesture(true);
-      const current = previous?.key === key ? previous : { key, mode: "mouse" };
+      const current = previous?.key === key ? previous : { key };
       const localeKey = locale();
       // Share a card with the graphic, but never put navigation in its horizontal scroller.
       let card = layout.parentNode;
@@ -480,16 +472,16 @@ function createController(root, store, window) {
       }
       let bar = layout.previousElementSibling;
       if (bar?.dataset?.viewNavigation === role && bar.dataset.navLocale !== localeKey) {
-        localizeViewNavigation(bar, localeKey, current.mode);
+        localizeViewNavigation(bar, localeKey);
         bar.dataset.navLocale = localeKey;
       }
       if (bar?.dataset?.viewNavigation !== role) {
-        const wrapper = root.ownerDocument.createElement("div"); wrapper.innerHTML = renderViewNavigation(role, localeKey, current.mode);
+        const wrapper = root.ownerDocument.createElement("div"); wrapper.innerHTML = renderViewNavigation(role, localeKey);
         bar = wrapper.firstElementChild; bar.dataset.navLocale = localeKey;
         layout.parentNode.insertBefore(bar, layout);
       }
       current.bar = bar; controller.roles[role] = current;
-      syncInteractionMode(role);
+      scroll.setAttribute("aria-description", viewNavText(localeKey).interaction);
       // On wide rows align the overview with the actual plot gutter, including font changes.
       // Narrow rows prioritize a usable axis with Full range attached on its right.
       if (typeof bar.getBoundingClientRect === "function") {
