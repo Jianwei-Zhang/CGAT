@@ -1022,3 +1022,53 @@ test("async release persists immediately, detaches pointer listeners and retains
  complete(true);await Promise.resolve();assert.equal(restored,1);
  }finally{globalThis.window=previous;}
 });
+
+
+for (const fullRange of [false, true]) test(`Local View contig drag owns its handler and preview despite Main binding, fullRange=${fullRange}`, () => {
+  const previousWindow = globalThis.window;
+  const win = createWindowStub(); globalThis.window = win;
+  try {
+    const main = createHost(); main.closest = () => null;
+    const local = createHost(); local.parentElement = main; local.dataset = { localViewWindow: "local-a" };
+    local.closest = selector => selector === "[data-local-view-window]" ? local : null;
+    const partial = createHost(); partial.parentElement = local;
+    partial.closest = local.closest;
+    const another = createHost(); another.parentElement = main; another.dataset = { localViewWindow: "local-b" };
+    another.closest = selector => selector === "[data-local-view-window]" ? another : null;
+    const mainStore = createStore({ assembly: { activeTab: "assembly", subviewTrackDragOffsets: [] } });
+    const localStore = createStore({ assembly: { activeTab: "assembly", subviewTrackView: { fullRange }, subviewTrackDragOffsets: [] } });
+    const commits = [];
+    const scroll = { scrollLeft: 0, dataset: { subviewDomainSpanBp: "100", subviewInnerWidth: "100" },
+      closest: selector => selector === "[data-local-view-window]" ? local : selector === "#route-host" ? main : null };
+    const track = { getAttribute: name => ({ "data-subview-track-slot": "top", "data-subview-contig-id": "12" })[name] ?? null,
+      closest: selector => selector === ".assembly-track-scroll[data-track-role='subview']" ? scroll : null };
+    const target = { closest: selector => selector === "[data-local-view-window]" ? local
+      : selector === "[data-subview-contig-id][data-subview-track-slot]" ? track : null };
+    const deps = {
+      clearSubviewTrackDragPreview() {}, applySubviewTrackDragOffset(host, store, payload) { commits.push({ host, store, payload }); },
+      convertTrackOffsetPxToBp: value => value, previewSubviewTrackContigDrag() {}, resolveActiveTrackScrollElement: () => scroll,
+      previewFullRangeSubviewContigDrag(host) { assert.equal(host, local, "full-range preview stays inside its window"); },
+      clearFullRangeSubviewDragPreview(host) { assert.equal(host, local); },
+      resolveSubviewTrackDragOffsetBp: () => 0, roundTrackMetric: value => value, persistSubviewTrackDragOffsets() {},
+    };
+    bindSubviewTrackContigDrag(main, mainStore, deps);
+    bindSubviewTrackContigDrag(local, localStore, deps);
+    bindSubviewTrackContigDrag(another, mainStore, deps);
+    bindSubviewTrackContigDrag(partial, localStore, deps);
+    assert.equal(typeof local.listeners.get("pointerdown"), "function", "Main must not suppress the Local window binding");
+    assert.equal(typeof another.listeners.get("pointerdown"), "function", "each window owns its drag binding");
+    assert.equal(partial.listeners.has("pointerdown"), false, "partial patches still use the same window owner");
+    const down = () => ({ target, button: 0, clientX: 10, preventDefault() {} });
+    main.listeners.get("pointerdown")(down());
+    assert.equal(win.listeners.size, 0, "Main cannot claim another window's drag");
+    another.listeners.get("pointerdown")(down());
+    assert.equal(win.listeners.size, 0, "a peer window cannot claim this drag");
+    local.listeners.get("pointerdown")(down());
+    win.listeners.get("pointermove")({ clientX: 45 }); win.flushAnimationFrame();
+    win.listeners.get("pointerup")({ clientX: 45 });
+    assert.equal(commits.length, 1);
+    assert.equal(commits[0].host, local); assert.equal(commits[0].store, localStore);
+    assert.equal(commits[0].payload.offsetBp, 35);
+    assert.equal(win.listeners.size, 0);
+  } finally { globalThis.window = previousWindow; }
+});

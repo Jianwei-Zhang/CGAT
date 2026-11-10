@@ -56,11 +56,17 @@ function getWindowObject() {
   return globalThis.window;
 }
 
+function trackDragOwner(node) {
+  const owner = node?.closest?.("[data-local-view-window]");
+  return owner?.dataset?.localViewWindow ? owner : null;
+}
+
 function hasBoundTrackDragHost(host, bindingKey) {
-  // A partial panel replacement still bubbles to the bound route host.
-  // Per-element guards alone would install a second owner for every gesture.
+  // Partial replacements bubble to their owning window, not Main: Local View
+  // deliberately stops propagation at its boundary. Never inherit Main's guard.
+  const owner = trackDragOwner(host);
   let current = host;
-  while (current) {
+  while (current && trackDragOwner(current) === owner) {
     if (current[bindingKey]) return true;
     current = current.parentElement || current.parentNode || null;
   }
@@ -143,7 +149,7 @@ export function bindTrackContigDrag(host, store, deps) {
   }
 
   host.addEventListener("pointerdown", (event) => {
-    if (event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
+    if (trackDragOwner(event.target) !== trackDragOwner(host) || event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
     const state = store.getState();
@@ -370,7 +376,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
 
   const startDrag = (event) => {
     const runtimeHost = host;
-    if (event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
+    if (trackDragOwner(event.target) !== trackDragOwner(host) || event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
     const state = store.getState();
@@ -433,7 +439,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         && typeof deps.clearFullRangeSubviewDragPreview === "function"));
     const fastFullRange = fullRangeDrag && typeof deps.createFullRangeDragPreview === "function";
     let fullRangePreview = null, densePreviewHandle = null;
-    const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || runtimeHost : runtimeHost;
+    const dragHost = trackDragOwner(scrollEl) || (fullRangeDrag ? scrollEl.closest?.("#route-host") || runtimeHost : runtimeHost);
     let lastPointerClientX = startClientX;
     let finished = false;
     // Evidence completion and harmless state normalization replace subview

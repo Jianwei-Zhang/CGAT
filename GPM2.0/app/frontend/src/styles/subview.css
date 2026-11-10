@@ -1184,8 +1184,11 @@
 .subview-window-resize[data-local-view-resize="nw"] { left: 0; top: 0; width: 10px; height: 10px; cursor: nwse-resize; }
 .subview-window-resize[data-local-view-resize="se"] { right: 0; bottom: 0; width: 10px; height: 10px; cursor: nwse-resize; }
 .subview-window-resize[data-local-view-resize="sw"] { left: 0; bottom: 0; width: 10px; height: 10px; cursor: nesw-resize; }
-.subview-window .subview-selection-panel { gap: 4px; }
-.subview-window .subview-alignment-card { margin: 0 6px 6px; }
+.subview-window .subview-selection-panel { gap: 0; }
+.subview-window .subview-alignment-card,
+.subview-window .subview-alignment-card > .assembly-view-card {
+  margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent;
+}
 .subview-window .subview-panel-head > .assembly-view-title { display: none; }
 .subview-window [data-subview-toolbar] { justify-content: flex-start; align-items: center; gap: 4px; overflow: visible; font-size: var(--font-small); }
 .subview-window [data-subview-toolbar] > * { height: 26px; min-height: 26px; }

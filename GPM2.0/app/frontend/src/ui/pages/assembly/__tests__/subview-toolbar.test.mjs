@@ -140,7 +140,7 @@ test("merged window chrome gives controls a compact row without scrolling the wh
   assert.match(ruleBody(css, ".subview-window [data-subview-toolbar] > *"), /height:\s*26px/);
   assert.match(ruleBody(css, ".subview-window-actions"), /flex:\s*0 0 auto/);
   assert.match(ruleBody(css, ".subview-window-heading strong"), /text-overflow:\s*ellipsis/);
-  assert.match(ruleBody(css, ".subview-window .subview-selection-panel"), /gap:\s*4px/);
+  assert.match(ruleBody(css, ".subview-window .subview-selection-panel"), /gap:\s*0/);
 });
 
 
@@ -151,4 +151,11 @@ test("window title consumes only its content and leaves the rest for parameter/h
   assert.match(ruleBody(css, ".subview-window.is-floating [data-local-view-drag]"), /cursor:\s*move/);
   assert.match(ruleBody(css, ".subview-window-resize"), /display:\s*none/);
   assert.match(ruleBody(css, ".subview-window.is-floating > .subview-window-resize"), /display:\s*block/);
+});
+
+
+test("Local window content uses one outer frame without nested card borders or gutters", () => {
+  const selector = ".subview-window .subview-alignment-card,\n.subview-window .subview-alignment-card > .assembly-view-card";
+  assert.match(ruleBody(css, selector), /margin:\s*0[\s\S]*padding:\s*0[\s\S]*border:\s*0[\s\S]*border-radius:\s*0/);
+  assert.match(ruleBody(css, selector), /box-shadow:\s*none/);
 });
