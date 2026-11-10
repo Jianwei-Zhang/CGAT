@@ -190,7 +190,14 @@ export function bindFinalPathAppendDrag(host, store, deps) {
     if (!isCurrent()) { cancel(); return; }
     gesture.x = event.clientX; gesture.y = event.clientY;
     const dx = gesture.x - gesture.startX, dy = gesture.y - gesture.startY;
-    if (Math.hypot(dx, dy) >= 4) root.dataset.viewContigGesture = "drag";
+    if (Math.hypot(dx, dy) >= 4 && root.dataset.viewContigGesture !== "drag") {
+      root.dataset.viewContigGesture = "drag";
+      // Ref bands do not enter the positional controller (which prevents the
+      // native selection default). Clear any residual range only for a real
+      // drag, never for a click, modified selection, or ordinary text copying.
+      const selection = doc.getSelection?.();
+      if (selection && !selection.isCollapsed) selection.removeAllRanges();
+    }
     const outside = gesture.x < 0 || gesture.y < 0 || gesture.x >= win.innerWidth || gesture.y >= win.innerHeight;
     const destination = targetAt({ document: doc, x: gesture.x, y: gesture.y });
     if (!gesture.moved && (Math.hypot(dx, dy) < 4 || (!outside && !destination
@@ -238,6 +245,11 @@ export function bindFinalPathAppendDrag(host, store, deps) {
     cancel();
   }
   function onKey(event) { if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); cancel(); } }
+  function onNativeSelection(event) {
+    // Do not prevent pointerdown: the horizontal editor still needs to observe
+    // it. Cancel only native text selection/HTML dragging during this gesture.
+    if (gesture) event.preventDefault();
+  }
   function onClick(event) {
     if (Date.now() >= suppressClickUntil) return;
     event.preventDefault(); event.stopImmediatePropagation();
@@ -261,9 +273,12 @@ export function bindFinalPathAppendDrag(host, store, deps) {
     win.removeEventListener("blur", cancel);
   }
   function destroy() {
-    cancel(); root.removeEventListener("lostpointercapture", onLostPointerCapture); root.removeEventListener("pointerdown", onDown, true); root.removeEventListener("click", onClick, true);
+    cancel(); root.removeEventListener("selectstart", onNativeSelection, true); root.removeEventListener("dragstart", onNativeSelection, true);
+    root.removeEventListener("lostpointercapture", onLostPointerCapture); root.removeEventListener("pointerdown", onDown, true); root.removeEventListener("click", onClick, true);
     delete root[BOUND];
   }
+  root.addEventListener("selectstart", onNativeSelection, true);
+  root.addEventListener("dragstart", onNativeSelection, true);
   root.addEventListener("lostpointercapture", onLostPointerCapture);
   root.addEventListener("pointerdown", onDown, true);
   root.addEventListener("click", onClick, true);

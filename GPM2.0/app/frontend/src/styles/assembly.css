@@ -2185,6 +2185,12 @@
 [data-view-contig-gesture="pending"] { cursor: grab !important; }
 [data-view-contig-gesture="drag"] { cursor: grabbing !important; }
 [data-view-contig-gesture] * { cursor: inherit !important; }
+/* Only while a recognized graph-source gesture is pending/dragging. Restore
+   ordinary text/tooltip copying when release/cancel removes the attribute. */
+[data-view-contig-gesture], [data-view-contig-gesture] * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
 [data-view-navigation-gesture="pan"],
 [data-view-navigation-gesture="window"] { cursor: grabbing !important; }
 [data-view-navigation-gesture="left"],

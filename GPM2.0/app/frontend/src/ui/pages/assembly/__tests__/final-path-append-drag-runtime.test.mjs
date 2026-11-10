@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { bindFinalPathAppendDrag, resolveFinalPathDragSource, resolveFinalPathDropTarget } from "../final-path-append-drag-runtime.js";
 import { resolveAssemblyCtgContextTarget } from "../context-menu.js";
 
@@ -8,7 +9,7 @@ function classes() {
   return { add: name => values.add(name), remove: name => values.delete(name), contains: name => values.has(name),
     toggle: (name, value) => value ? values.add(name) : values.delete(name) };
 }
-function fixture({ view = "graph", transfer = false, nativePoint = null } = {}) {
+function fixture({ view = "graph", transfer = false, nativePoint = null, reference = false } = {}) {
   const listeners = new Map(), windowListeners = new Map(), added = [], calls = [];
   const win = { innerWidth: 1000, innerHeight: 800,
     addEventListener: (name, fn) => windowListeners.set(name, fn), removeEventListener: name => windowListeners.delete(name),
@@ -22,6 +23,8 @@ function fixture({ view = "graph", transfer = false, nativePoint = null } = {}) 
     setPointerCapture() {}, releasePointerCapture() {} };
   const attrs = { "data-track-contig-id": "9", "data-track-role": "primary", "data-track-ref-orient": "-",
     "data-main-fragment-start": "201", "data-main-fragment-end": "450" };
+  if (reference) Object.assign(attrs, { "data-track-role": "ref", "data-track-source-kind": "ref_segment",
+    "data-track-reference-chr-name": "Chr01", "data-track-segment-start": "1001", "data-track-segment-end": "9000" });
   const source = { isConnected: true, getAttribute: name => attrs[name] ?? null,
     closest(selector) {
       if (selector.includes("data-local-view-window") || selector.includes("data-subview" ) && !selector.includes("data-track-contig-id")) return null;
@@ -303,4 +306,74 @@ test("lost capture clears the Contig cursor and cancels positional preview", () 
   assert.equal(f.windowListeners.size, 0);
   assert.equal(f.cancelled.length, 1);
   f.runtime.destroy();
+});
+
+for (const reference of [false, true]) for (const view of ["graph", "table"]) {
+  test(`${reference ? "Ref band" : "Contig"} drag blocks native text selection and HTML drag, then restores copying (${view})`, () => {
+    const f = fixture({ reference, view }); let cleared = 0;
+    f.doc.getSelection = () => ({ isCollapsed: false, removeAllRanges: () => cleared++ });
+    const ordinary = f.event(10, 10); f.listeners.get("selectstart")(ordinary);
+    assert.notEqual(ordinary.defaultPrevented, true);
+    const down = f.event(100, 100); f.listeners.get("pointerdown")(down);
+    assert.notEqual(down.defaultPrevented, true, "positional controllers still receive pointerdown");
+    for (const type of ["selectstart", "dragstart"]) {
+      const native = f.event(100, 100); f.listeners.get(type)(native);
+      assert.equal(native.defaultPrevented, true);
+    }
+    assert.equal(cleared, 0, "pointerdown must not clear an earlier copied range");
+    f.setHit(f.target); f.windowListeners.get("pointermove")(f.event(150, 400));
+    assert.equal(cleared, 1);
+    f.windowListeners.get("pointermove")(f.event(160, 410));
+    assert.equal(cleared, 1, "clear once, not on each high-frequency move");
+    f.windowListeners.get("pointerup")(f.event(160, 410));
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0][2].trackRole, reference ? "ref" : "primary");
+    if (reference) {
+      assert.equal(f.calls[0][2].sourceKind, "ref_segment");
+      assert.equal(f.calls[0][2].referenceChrName, "Chr01");
+      assert.equal(f.calls[0][2].segmentStart, 1001); assert.equal(f.calls[0][2].segmentEnd, 9000);
+    }
+    assert.equal(f.root.dataset.viewContigGesture, undefined);
+    const after = f.event(10, 10); f.listeners.get("selectstart")(after);
+    assert.notEqual(after.defaultPrevented, true);
+    f.runtime.destroy(); assert.equal(f.listeners.has("selectstart"), false); assert.equal(f.listeners.has("dragstart"), false);
+  });
+}
+
+for (const reason of ["click", "escape", "pointercancel", "blur", "capture", "destroy", "stale"]) {
+  test(`reference text-selection suppression is temporary after ${reason}`, () => {
+    const f = fixture({ reference: true }); let cleared = 0;
+    f.doc.getSelection = () => ({ isCollapsed: false, removeAllRanges: () => cleared++ });
+    f.listeners.get("pointerdown")(f.event(100, 100));
+    if (reason === "click") f.windowListeners.get("pointerup")(f.event(100, 100));
+    else if (reason === "escape") f.windowListeners.get("keydown")(f.event(100, 100, { key: "Escape" }));
+    else if (reason === "capture") f.listeners.get("lostpointercapture")({ pointerId: 1 });
+    else if (reason === "destroy") f.runtime.destroy();
+    else if (reason === "stale") {
+      f.setState({ ...f.store.getState(), session: { projectId: 2 } });
+      f.windowListeners.get("pointermove")(f.event(200, 400));
+    } else f.windowListeners.get(reason)();
+    assert.equal(cleared, 0); assert.equal(f.calls.length, 0);
+    assert.equal(f.root.dataset.viewContigGesture, undefined);
+    assert.equal(f.windowListeners.size, 0);
+    const selection = f.event(0, 0); f.listeners.get("selectstart")?.(selection);
+    assert.notEqual(selection.defaultPrevented, true);
+  });
+}
+
+for (const modifier of ["ctrlKey", "metaKey", "altKey"]) test(`${modifier} and blank/ordinary text never enable native-selection suppression`, () => {
+  for (const blank of [false, true]) {
+    const f = fixture({ reference: true }); let cleared = 0;
+    f.doc.getSelection = () => ({ isCollapsed: false, removeAllRanges: () => cleared++ });
+    f.listeners.get("pointerdown")(f.event(100, 100, blank
+      ? { target: { closest: () => null } } : { [modifier]: true }));
+    const selection = f.event(0, 0); f.listeners.get("selectstart")(selection);
+    assert.notEqual(selection.defaultPrevented, true);
+    assert.equal(cleared, 0); assert.equal(f.root.dataset.viewContigGesture, undefined);
+  }
+});
+
+test("temporary Contig gesture CSS blocks standard/WebKit selection without a permanent page lock", () => {
+  const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
+  assert.match(css, /\[data-view-contig-gesture\], \[data-view-contig-gesture\] \*\s*\{[^}]*user-select: none !important;[^}]*-webkit-user-select: none !important;/);
 });
