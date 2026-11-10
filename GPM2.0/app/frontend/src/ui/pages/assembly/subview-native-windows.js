@@ -1,3 +1,4 @@
+import { fitNativeSubviewWindow } from "./subview-native-fit.js";
 import { changeSubviewWindow, getSubviewWindowStore } from "./subview-workspace-state.js";
 import { renderSubviewDockIcon, subviewWindowAssembly, subviewWindowDescription } from "./render-subview-workspace.js";
 import { LOCAL_VIEW_RESIZE_EDGES, resolveLocalViewWindowGesture } from "./subview-window-geometry.js";
@@ -112,6 +113,14 @@ export function createNativeSubviewWindows(root, store, deps) {
       <div data-local-view-context-menu class="context-menu is-hidden"></div><div class="subview-window-content">${deps.render(entry.scoped.getState())}</div>
       ${LOCAL_VIEW_RESIZE_EDGES.map(edge => `<div class="subview-window-resize" data-local-view-resize="${edge}" aria-hidden="true"></div>`).join("")}</section></section>`;
     entry.node = host.querySelector("[data-local-view-window]");
+    entry.autoSize = !itemFor(id)?.nativeBounds;
+    const fitContent = async () => {
+      entry.fitting = true;
+      try {
+        const fit = await fitNativeSubviewWindow(entry.node, entry.handle, () => valid(entry) && entry.autoSize);
+        if (fit) entry.autoFitSize = fit;
+      } finally { entry.fitting = false; }
+    };
     const listen = (node, type, callback, capture = false) => {
       node.addEventListener(type, callback, capture); entry.cleanups.push(() => node.removeEventListener(type, callback, capture));
     };
@@ -133,6 +142,8 @@ export function createNativeSubviewWindows(root, store, deps) {
       const kind = resolveLocalViewWindowGesture(event.target);
       if (!kind) return;
       event.preventDefault(); event.stopPropagation();
+      // Once the user resizes, late evidence restoration must not refit it.
+      if (kind !== "move") entry.autoSize = false;
       run(kind === "move" ? entry.handle.startDragging() : entry.handle.startResizeDragging(DIRECTIONS[kind]), entry);
     }, true);
     entry.cleanups.push(await entry.handle.onCloseRequested(event => {
@@ -149,8 +160,14 @@ export function createNativeSubviewWindows(root, store, deps) {
       }), entry);
     }));
     let resizeTimer;
-    entry.cleanups.push(await entry.handle.onResized(() => {
+    entry.cleanups.push(await entry.handle.onResized(({ payload }) => {
       if (!valid(entry)) return;
+      // Also recognize OS-level resize/snap, not only our border handles. A
+      // delayed event for our own fit must not be mistaken for user geometry.
+      if (entry.ready && entry.autoSize && !entry.fitting && !itemFor(id)?.minimized
+        && payload?.width > 0 && payload?.height > 0
+        && (payload.width !== entry.autoFitSize?.width || payload.height !== entry.autoFitSize?.height))
+        entry.autoSize = false;
       peer.clearTimeout(resizeTimer);
       // Let the OS resize the surface live; rebuild dense genomic geometry only
       // after resizing settles, not once per native resize event.
@@ -177,6 +194,8 @@ export function createNativeSubviewWindows(root, store, deps) {
     if (bounds) {
       await entry.handle.setPosition(new peer.__TAURI__.dpi.PhysicalPosition(bounds.x, bounds.y));
       await entry.handle.setSize(new peer.__TAURI__.dpi.PhysicalSize(bounds.width, bounds.height));
+    } else {
+      await fitContent();
     }
     if (!valid(entry)) return;
     await entry.handle.show();
@@ -187,7 +206,12 @@ export function createNativeSubviewWindows(root, store, deps) {
     // Opening must honor the latest user focus, not steal it back after a slow
     // child bootstrap or a task switch that happened while the peer was hidden.
     if (!valid(entry)) return;
-    if (!entry.scoped.getState().assembly.subview?.pairwiseEvidence) void (deps.restoreEvidence || deps.refreshEvidence)?.(entry.node, entry.scoped);
+    const restore = deps.restoreEvidence || deps.refreshEvidence;
+    if (restore && !entry.scoped.getState().assembly.subview?.pairwiseEvidence) {
+      run(Promise.resolve(restore(entry.node, entry.scoped))
+        .then(() => valid(entry) && entry.autoSize
+          ? fitContent() : null), entry);
+    }
   }
   function open(item, generation) {
     let token;
