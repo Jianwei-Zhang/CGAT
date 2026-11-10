@@ -20,8 +20,8 @@ function boxMiddle(h, both = false) {
   const bottom = h.scene.groups.find((node) => node.getAttribute("data-subview-track-slot") === "bottom");
   const endY = both ? Number(bottom.getAttribute("data-subview-rect-y")) + 16 : y + 16;
   const blank = { closest: (selector) => selector.includes("assembly-track-scroll") ? h.scene.scroll : null };
-  h.host.emit("pointerdown", h.pointer(blank, x - vx + width * .2, y - 2));
-  h.win.emit("pointermove", h.pointer(blank, x - vx + width * .8, endY));
+  h.host.emit("pointerdown", { ...h.pointer(blank, x - vx + width * .2, y - 2), ctrlKey: true });
+  h.win.emit("pointermove", { ...h.pointer(blank, x - vx + width * .8, endY), ctrlKey: true });
   h.win.emit("pointerup", {});
 }
 function assertIntact(before, after) {

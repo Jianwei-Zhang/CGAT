@@ -2131,7 +2131,7 @@
   touch-action: none;
 }
 .view-nav-axis:hover .view-nav-window { border-color: var(--view-nav-window-hover-border, #808080); background: var(--view-nav-window-hover-fill, #c9c9c9); }
-.view-nav-window:focus-visible, .view-nav-button:focus-visible, .view-nav-fit:focus-visible, .view-nav-mode-switch:focus-visible { outline: 2px solid var(--theme-blue-line, #2563eb); outline-offset: 2px; }
+.view-nav-window:focus-visible, .view-nav-button:focus-visible, .view-nav-fit:focus-visible { outline: 2px solid var(--theme-blue-line, #2563eb); outline-offset: 2px; }
 .view-nav-edge {
   position: absolute;
   top: -5px;

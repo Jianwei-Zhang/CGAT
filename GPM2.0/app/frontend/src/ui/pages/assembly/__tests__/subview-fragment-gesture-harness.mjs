@@ -43,7 +43,8 @@ export function gestureHarness(mode, { fullRange = false, flipped = false } = {}
     assert.ok(scrollTag, "Local View remains rendered");
     const data = attrs(scrollTag), dataset = Object.fromEntries(Object.entries(data).filter(([key]) => key.startsWith("data-")).map(([key, value]) => [key.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase()), value]));
     const box = { style: {}, classList: { add() {}, remove() {} } };
-    const scroll = { dataset, clientWidth: 1200, scrollWidth: 1600, scrollLeft: scene?.scroll.scrollLeft || 0, scrollTop: 0,
+    const classes = new Set();
+    const scroll = { dataset, classList: { add: name => classes.add(name), remove: name => classes.delete(name), contains: name => classes.has(name) }, clientWidth: 1200, scrollWidth: 1600, scrollLeft: scene?.scroll.scrollLeft || 0, scrollTop: 0,
       getBoundingClientRect: () => ({ left: 0, top: 0 }),
       getAttribute: (key) => key === "data-track-role" ? "subview" : data[key] ?? null,
       closest: (selector) => selector === "#route-host" ? host : null,
