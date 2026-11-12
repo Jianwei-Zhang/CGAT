@@ -14,7 +14,7 @@ test("app shell omits the former top card", () => {
   assert.doesNotMatch(html, />装配工作台</);
   assert.match(html, />项目</);
   assert.match(html, />装配</);
-  assert.match(html, />概览</);
+  assert.doesNotMatch(html, />概览</);
 });
 
 test("app shell renders project and language switches inline before settings", () => {
@@ -40,7 +40,7 @@ test("app shell renders english labels when locale is en", () => {
   assert.doesNotMatch(html, /data-route="workspace"/);
   assert.match(html, />Project</);
   assert.match(html, />Assembly</);
-  assert.match(html, />Overview</);
+  assert.doesNotMatch(html, />Overview</);
   assert.doesNotMatch(html, />Records</);
   assert.doesNotMatch(html, />Settings</);
   assert.match(html, />Project</);
@@ -50,13 +50,13 @@ test("app shell renders english labels when locale is en", () => {
 });
 
 
-test("navigation has only Project, Assembly and Overview in the approved order in both languages", () => {
+test("navigation has only Project and Assembly in the approved order in both languages", () => {
   for (const locale of ["zh", "en"]) {
     const html = renderAppShell({ locale });
-    assert.match(html, /data-route="importer"[\s\S]*data-route="assembly"[\s\S]*data-route="projectExport"/);
-    assert.match(html, locale === "zh" ? />概览<\/button>/ : />Overview<\/button>/);
+    assert.match(html, /data-route="importer"[\s\S]*data-route="assembly"/);
+    assert.doesNotMatch(html, /data-route="projectExport"/);
     assert.doesNotMatch(html, /data-route="projectPreview"/);
-    assert.equal((html.match(/class="route-button"/g) || []).length, 3);
+    assert.equal((html.match(/class="route-button"/g) || []).length, 2);
   }
 });
 

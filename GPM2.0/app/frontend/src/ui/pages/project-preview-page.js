@@ -1,5 +1,6 @@
+import { projectPreviewSession, toggleProjectPreviewChromosome } from "./project-preview-session.js";
 import {planPreviewSourceDelta,mergePreviewSourceDelta} from "./project-preview-source-delta.js";
-import { syncProjectPreviewCards } from "./project-preview-layout.js";
+import { projectPreviewDisplayCards, syncProjectPreviewCards } from "./project-preview-layout.js";
 import { formatProjectPreviewBp as bpLabel } from "./project-preview-presentation.js";
 import { exportProjectPreviewImage, previewImageActionRoot, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { contigColorToken } from "./assembly/contig-colors.js";
@@ -28,7 +29,7 @@ function syncPreviewGeometry(host) {
     .filter(node => node.dataset.previewMounted !== "false")
     .map(node => [node, nodeModels.get(node)]).filter(([, card]) => card));
 }
-const isPreviewRoute = state => ["projectExport", "projectPreview"].includes(state.activeRoute);
+const isPreviewRoute = state => ["importer", "projectExport", "projectPreview"].includes(state.activeRoute);
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const number = value => Number(value).toLocaleString("en-US");
@@ -89,7 +90,7 @@ function renderReference(card, labels) {
     </span></span></div>` : "";
 }
 
-export function renderProjectPreviewCard(card, labels, details = true) {
+export function renderProjectPreviewCard(card, labels, details = true, expanded = true) {
   const { domain } = card;
   const ref = renderReference(card, labels);
   const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" data-app-tooltip="${html(track.name || labels.unknown)}" data-app-tooltip-overflow><span class="project-preview-dataset-dot" style="background:${contigColorToken(track.role, "stroke")}"></span>${html(track.name || labels.unknown)}</span>
@@ -98,18 +99,20 @@ export function renderProjectPreviewCard(card, labels, details = true) {
       ${!track.positioned.length ? `<span class="project-preview-empty-track">—</span>` : ""}
 
     </div></div>`).join("");
-  const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path">
+  const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path" data-preview-path="${html(path.name)}">
     <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" data-app-tooltip="${html(path.name)}" data-app-tooltip-overflow="small">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
       <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${(details ? path.parts : []).map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
     </div></div>` : `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`).join("");
   const pathSummary = card.paths.filter(path => path.parts.length).map(path => bpLabel(path.length)).join(" / ");
   const summary = [card.hasReference ? `Ref ${bpLabel(card.refLength)}` : "", pathSummary ? `Final Path ${pathSummary}` : ""].filter(Boolean).join(" · ");
-  return `<article class="project-preview-card" data-preview-chr="${html(card.chrName)}" data-preview-mounted="${details}" aria-label="${html(card.chrName)}">
-    <button type="button" class="project-preview-card-header" aria-label="${html(`${card.chrName} · ${labels.open}`)}"><span class="project-preview-chr-name">${html(card.chrName)}</span><span class="project-preview-card-summary">${html(summary)}</span><span class="project-preview-open">${html(labels.open)} →</span></button>
-    ${axis(labels.compositionAxis, domain.start, domain.end)}
-    ${ref}${rows}
-    <div class="project-preview-paths">${paths || `<span class="project-preview-empty-track">${html(labels.noPath)}</span>`}</div>
-    ${card.unresolvedCount ? `<span class="project-preview-warning">${html(labels.unresolved)} (${card.unresolvedCount})</span>` : ""}
+  return `<article class="project-preview-card" data-preview-chr="${html(card.chrName)}" data-preview-mounted="${details}" data-preview-expanded="${expanded}" aria-label="${html(card.chrName)}">
+    <div class="project-preview-card-heading"><button type="button" class="project-preview-card-header" data-preview-toggle aria-expanded="${expanded}" aria-controls="preview-details-${encodeURIComponent(card.chrName)}" aria-label="${html(card.chrName)}"><span class="project-preview-chevron" aria-hidden="true">${expanded ? "▾" : "▸"}</span><span class="project-preview-chr-name">${html(card.chrName)}</span><span class="project-preview-card-summary">${html(summary)}</span></button><button type="button" class="project-preview-open" data-preview-open aria-label="${html(`${card.chrName} · ${labels.open}`)}">${html(labels.open)} →</button></div>
+    <div class="project-preview-paths">${paths || `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`}</div>
+    <div class="project-preview-details" id="preview-details-${encodeURIComponent(card.chrName)}" ${expanded ? "" : "hidden"}>
+      ${axis(labels.compositionAxis, domain.start, domain.end)}
+      ${ref}${rows}
+      ${card.unresolvedCount ? `<span class="project-preview-warning">${html(labels.unresolved)} (${card.unresolvedCount})</span>` : ""}
+    </div>
   </article>`;
 }
 
@@ -140,12 +143,12 @@ export function renderProjectPreviewPage(state, options = {}) {
   const content = !key ? `<p class="muted">${html(labels.noProject)}</p>`
     : preview.error ? `<p class="error-text" role="alert">${html(preview.error)}</p><button type="button" class="button" data-preview-refresh>${html(labels.retry)}</button>`
     : !preview.loaded || (preview.localSignature !== undefined && !previewStateIsApplicable(state)) ? `<p class="muted" role="status">${html(labels.loading)}</p>`
-    : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderProjectPreviewCard(card, labels, false)).join("")}</div>`
+    : preview.cards?.length ? `<div class="project-preview-cards">${projectPreviewDisplayCards(preview.cards).map(card => renderProjectPreviewCard(card, labels, false, projectPreviewSession(key).expanded.has(card.chrName))).join("")}</div>`
     : `<p class="muted">${html(labels.empty)}</p>`;
   const count = preview.loaded && !preview.error && previewStateIsApplicable(state) && preview.cards?.length
     ? `<span class="project-section-count"><span aria-hidden="true">·</span>${html(preview.cards.length.toLocaleString(state.locale === "en" ? "en-US" : "zh-CN"))}</span>` : "";
   const embeddedHeading = `<header class="project-section-divider"><h3 id="overview-preview-title">${html(labels.sectionTitle)}</h3>${count}</header>`;
-  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}"${options.embedded ? ' aria-labelledby="overview-preview-title"' : ""}>${options.embedded ? embeddedHeading : `<header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" data-app-tooltip="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
+  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}"${options.embedded ? ' aria-labelledby="overview-preview-title"' : ""}>${options.hideHeading ? "" : options.embedded ? embeddedHeading : `<header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" data-app-tooltip="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
     <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" data-app-tooltip="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
     <button type="button" class="button project-preview-download" data-preview-download data-app-tooltip="${html(labels.download)}" aria-label="${html(labels.download)}" ${!key || preview.loading || !preview.loaded || !preview.cards?.length || preview.error || !previewStateIsApplicable(state) ? "disabled" : ""}>${projectIcon("imageDownload")}</button></header>`}
     <p class="error-text" data-preview-export-error role="alert" hidden></p>${content}</section>`;
@@ -158,19 +161,22 @@ function updatePreviewDom(host, state, store) {
   if (container && preview?.loaded && preview.cards.length && page.dataset.previewProject === preview.key
     && page.dataset.previewLocale === state.locale && !preview.error && previewStateIsApplicable(state)) {
     const existing = new Map([...container.querySelectorAll("[data-preview-chr]")].map(node => [node.dataset.previewChr, node]));
-    const nodes = preview.cards.map(card => {
+    const nodes = projectPreviewDisplayCards(preview.cards).map(card => {
       let node = existing.get(card.chrName);
       if (nodeModels.get(node) !== card) {
         const wrapper = host.ownerDocument.createElement("div");
-        wrapper.innerHTML = renderProjectPreviewCard(card, getMessages(state, "projectPreview"), false);
+        wrapper.innerHTML = renderProjectPreviewCard(card, getMessages(state, "projectPreview"), false, projectPreviewSession(preview.key).expanded.has(card.chrName));
         const replacement = wrapper.firstElementChild;
-        const header = node?.querySelector?.(".project-preview-card-header");
+        const header = node?.querySelector?.(".project-preview-card-heading");
         if (header) {
           // Keep the focused button and article when this chromosome's model
           // changes. Only its non-interactive body/summary need replacement.
-          const nextHeader = replacement.querySelector(".project-preview-card-header");
-          header.innerHTML = nextHeader.innerHTML;
-          header.setAttribute("aria-label", nextHeader.getAttribute("aria-label"));
+          const nextHeader = replacement.querySelector(".project-preview-card-heading");
+          const toggle = header.querySelector("[data-preview-toggle]");
+          const nextToggle = nextHeader.querySelector("[data-preview-toggle]");
+          toggle.innerHTML = nextToggle.innerHTML;
+          toggle.setAttribute("aria-expanded", nextToggle.getAttribute("aria-expanded"));
+          node.dataset.previewExpanded = replacement.dataset.previewExpanded;
           for (const child of [...node.children]) if (child !== header) child.remove();
           for (const child of [...replacement.children]) if (child !== nextHeader) node.appendChild(child);
           node.dataset.previewMounted = "false";
@@ -186,9 +192,9 @@ function updatePreviewDom(host, state, store) {
       if (current !== node) container.insertBefore(node, current || null);
     });
   } else {
-    host.innerHTML = renderProjectPreviewPage(state, { embedded: host.hasAttribute?.("data-overview-preview") === true });
+    host.innerHTML = renderProjectPreviewPage(state, { embedded: host.hasAttribute?.("data-overview-preview") === true, hideHeading: host.hasAttribute?.("data-overview-preview") === true });
     for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
-      const card = preview?.cards?.find(card => card.chrName === node.dataset.previewChr);
+      const card = projectPreviewDisplayCards(preview?.cards || []).find(card => card.chrName === node.dataset.previewChr);
       if (card) nodeModels.set(node, card);
     }
   }
@@ -202,6 +208,7 @@ function updatePreviewDom(host, state, store) {
   if (store) syncPreviewImageDownloadButton(host, store);
   syncPreviewGeometry(host);
   markPreviewDom(host, state);
+  restoreProjectPreviewScroll(host);
 }
 
 function buildCards(inputs, paths, previous, affected, build) {
@@ -245,7 +252,7 @@ async function readPreviewSources(state, args, metadata, deps, deltaBase = null)
       while (pending.length) {
         const chr = pending.shift();
         const result = await (deps.listPhasedChrTracks || listPhasedChrTracks)({ ...args, parentChrName: chr.chrName });
-        phasedChrTracksByChr[chr.chrName] = (result.tracks || []).map(track => ({ label: track.label }));
+        phasedChrTracksByChr[chr.chrName] = (result.tracks || []).map(track => ({ label: track.label, haplotypeKey: track.haplotypeKey }));
       }
     }));
   }
@@ -408,6 +415,15 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
   return promise;
 }
 
+export function restoreProjectPreviewScroll(host) {
+  const binding = host[BOUND], owner = binding?.scrollOwner;
+  if (!owner || binding.scrollRestored || binding.store.getState().projectExport?.loading
+    || (binding.deps.isScrollReady && !binding.deps.isScrollReady()) || !host.querySelector?.(".project-preview-cards")) return;
+  const session = projectPreviewSession(binding.key);
+  owner.scrollTop = session.scrollTop; owner.scrollLeft = session.scrollLeft;
+  binding.scrollRestored = true;
+}
+
 export function bindProjectPreviewPage(host, store, deps = {}) {
   const binding = host[BOUND] || {};
   if (binding.store && binding.store !== store) { binding.unsubscribe?.(); binding.unsubscribe = null; }
@@ -416,6 +432,26 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
   }
   binding.deps = binding.store === store ? { ...binding.deps, ...deps } : deps;
   binding.store = store; binding.active = true;
+  binding.key = previewProjectKey(store.getState());
+  if (!binding.scrollOwner) {
+    let owner = host.parentElement;
+    const doc = host.ownerDocument, win = doc?.defaultView;
+    while (owner && !/(auto|scroll)/.test(win?.getComputedStyle?.(owner)?.overflowY || "")) owner = owner.parentElement;
+    // Project currently scrolls at the document level; also support an
+    // embedded/nested scrolling panel without assuming its CSS selector.
+    const scrollTarget = !owner || owner === doc?.scrollingElement || owner === doc?.documentElement ? doc : owner;
+    owner ||= doc?.scrollingElement || doc?.documentElement;
+    if (owner) {
+      binding.scrollOwner = owner;
+      binding.scrollTarget = scrollTarget;
+      binding.onScroll = () => {
+        if (!binding.active || !binding.scrollRestored) return;
+        const session = projectPreviewSession(binding.key);
+        session.scrollTop = owner.scrollTop; session.scrollLeft = owner.scrollLeft;
+      };
+      scrollTarget.addEventListener("scroll", binding.onScroll, { passive: true });
+    }
+  }
   if (!host[BOUND]) {
     host.addEventListener("click", event => {
       if (!binding.active || !isPreviewRoute(binding.store.getState())) return;
@@ -426,7 +462,23 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
       }
       const card = event.target?.closest?.("[data-preview-chr]");
       if (card && host.contains(card)) {
-        requestPreviewChromosome(binding.store, card.dataset.previewChr);
+        const key = previewProjectKey(binding.store.getState());
+        if (event.target.closest?.("[data-preview-open]") ||
+          (card.dataset.previewExpanded === "true" && event.target.closest?.(".project-preview-paths, .project-preview-details"))) {
+          const pathName = event.target.closest?.("[data-final-path-name]")?.dataset.finalPathName
+            || event.target.closest?.("[data-preview-path]")?.dataset.previewPath;
+          const path = nodeModels.get(card)?.paths.find(path => path.name === pathName);
+          requestPreviewChromosome(binding.store, card.dataset.previewChr, path);
+        } else if (event.target.closest?.("[data-preview-toggle], .project-preview-paths")) {
+          const expanded = toggleProjectPreviewChromosome(key, card.dataset.previewChr);
+          card.dataset.previewExpanded = String(expanded);
+          card.querySelector("[data-preview-toggle]")?.setAttribute("aria-expanded", String(expanded));
+          const chevron = card.querySelector(".project-preview-chevron");
+          if (chevron) chevron.textContent = expanded ? "▾" : "▸";
+          const details = card.querySelector(".project-preview-details");
+          if (details) details.hidden = !expanded;
+          binding.viewport?.refresh();
+        }
         return;
       }
       const refresh = event.target?.closest?.("[data-preview-refresh]");
@@ -458,11 +510,12 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
   });
   if (previewStateIsApplicable(store.getState())) {
     for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
-      const card = store.getState().projectPreview.cards.find(card => card.chrName === node.dataset.previewChr);
+      const card = projectPreviewDisplayCards(store.getState().projectPreview.cards).find(card => card.chrName === node.dataset.previewChr);
       if (card && !nodeModels.has(node)) nodeModels.set(node, card);
     }
     markPreviewDom(host, store.getState());
     syncPreviewGeometry(host);
+    restoreProjectPreviewScroll(host);
   }
   syncPreviewImageDownloadButton(host, store);
   void loadProjectPreviewData(host, store, binding.deps);
@@ -471,6 +524,9 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
 export function unbindProjectPreviewPage(host) {
   const binding = host?.[BOUND];
   if (!binding) return;
+  binding.onScroll?.();
+  binding.scrollTarget?.removeEventListener?.("scroll", binding.onScroll);
+  binding.scrollOwner = null; binding.scrollTarget = null; binding.scrollRestored = false;
   binding.active = false;
   binding.unsubscribe?.(); binding.unsubscribe = null;
   binding.viewport?.stop();

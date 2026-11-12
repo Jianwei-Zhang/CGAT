@@ -1,5 +1,26 @@
 import { layoutProjectPreviewPath } from "./assembly/final-path-visual-layout.js";
 
+// Display-only wrappers: the cached scientific model and its local domains stay
+// untouched. Include every card, even when folded or outside the viewport.
+const sharedCards = new WeakMap();
+const displayCardCache = new WeakMap();
+export function projectPreviewDisplayCards(cards = []) {
+  if (sharedCards.has(cards)) return sharedCards.get(cards);
+  const domain = cards.reduce((range, card) => ({
+    start: Math.min(range.start, card.domain.start),
+    end: Math.max(range.end, card.domain.end),
+  }), { start: 0, end: 1 });
+  const result = cards.map(card => {
+    const previous = displayCardCache.get(card);
+    if (previous?.domain.start === domain.start && previous.domain.end === domain.end) return previous;
+    const display = { ...card, domain };
+    displayCardCache.set(card, display);
+    return display;
+  });
+  sharedCards.set(cards, result);
+  return result;
+}
+
 // Presentation only: Final Path owns the visual positions (including its short
 // segment floor). Source metadata and biological coordinates remain untouched.
 export function layoutProjectPreviewCard(card, viewportWidth) {

@@ -1,3 +1,6 @@
+import { renderProjectPreviewCard } from "../../project-preview-page.js";
+import { buildProjectPreviewModel } from "../../project-preview-state.js";
+import { getMessages } from "../../../i18n/index.js";
 import { previewMutationStamp } from "../../../../services/preview-content-events.js";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -10,7 +13,7 @@ import {
 } from "../contig-colors.js";
 import { renderFinalPathGraph } from "../final-path-card.js";
 import { buildViewportScopedSvgMarkup } from "../final-path-export-runtime.js";
-import { __test, renderProjectPathOverview } from "../../project-export-page.js";
+import { __test } from "../../project-export-page.js";
 
 const css = (file) => readFileSync(new URL(`../../../../styles/${file}`, import.meta.url), "utf8");
 const palette = DEFAULT_CONTIG_PALETTE;
@@ -82,11 +85,15 @@ test("Final Path and Project Path Overview render the same stable tone for each 
     projectExport: { projectId: 7, loaded: true, mutationStamp: previewMutationStamp({ workspaceRoot: "/tmp/ws", projectId: 7 }), workspacePath: "/tmp/ws", primaryCtgsByChr: { Chr02: colorContext.primaryCtgs }, finalPathByChr: { Chr02: entry } },
   };
   const before = JSON.stringify(state);
-  const html = renderProjectPathOverview(state);
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr02" }],
+    datasets: state.initializer.datasets, project: state.initializer.existingProjects[0],
+    ctgs: [...colorContext.primaryCtgs.map(ctg => ({ ...ctg, datasetId: 1 })), ...colorContext.supportCtgs.map(ctg => ({ ...ctg, datasetId: 2 }))], finalPathByChr: { Chr02: entry } });
+  const html = renderProjectPreviewCard(card, getMessages("en", "projectPreview"));
   const roles = ["", " is-companion", " is-ref", "", " is-companion", ""];
   assert.deepEqual([...graph.matchAll(/<rect\s+class="(track-ctg[^"]*)"/g)].map(m => m[1]), roles.map(role => `track-ctg${role}`));
   assert.doesNotMatch(graph, /class="track-ctg(?:-group)? is-active/);
-  assert.deepEqual([...html.matchAll(/class="project-export-final-path-preview-ctg([^"]*)"/g)].map(m => m[1]), roles);
+  assert.deepEqual(card.paths[0].parts.map(part => part.role), ["primary", "companion", "ref", "primary", "companion", "primary"]);
+  assert.equal((html.match(/data-final-path-kind="ctg"/g) || []).length, segments.length);
   assert.equal(JSON.stringify(state), before);
   const snapshot = __test.buildProjectFinalPathSvgSnapshot({ entries: [{ chrName: "Chr02", entry, lengthBp: 600 }],
     primaryDatasetName: "hifiasm", projectName: "p1", ctgColorContext: colorContext });

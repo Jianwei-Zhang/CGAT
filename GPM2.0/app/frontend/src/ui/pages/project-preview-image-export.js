@@ -3,7 +3,7 @@ import { writeFinalPathExportBinaryFile } from "../../services/workflow-api.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { formatProjectPreviewBp as bp, readProjectPreviewImageStyle } from "./project-preview-presentation.js";
-import { layoutProjectPreviewCard } from "./project-preview-layout.js";
+import { projectPreviewDisplayCards, layoutProjectPreviewCard } from "./project-preview-layout.js";
 import { resolveFinalPathSegmentDisplayName } from "./assembly/final-path-state.js";
 import { previewProjectKey } from "./project-preview-state.js";
 import { previewStateIsApplicable } from "./project-preview-cache.js";
@@ -36,10 +36,12 @@ export function syncPreviewImageDownloadButton(host, store) {
 // Build from ALL semantic cards, not the mounted/visible viewport. Native SVG
 // primitives avoid screenshot/foreignObject dependencies and resolve all colors.
 export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = readProjectPreviewImageStyle(), palette = style.palette,
-  highlightAdopted = false } = {}) {
+  highlightAdopted = true } = {}) {
   if (!exportable(state)) throw new Error("Preview is not ready");
   const labels = getMessages(state, "projectPreview");
-  width = Math.round(Math.min(2000, Math.max(1000, Number(width) || 1440)));
+  // Keep the measured on-screen plot width, including minimum-pixel parts.
+  // Only require enough room for the label column and a nonempty plot.
+  width = Math.round(Math.max(2 * (style.padding + 21) + style.labelWidth + style.columnGap + 1, Number(width) || 1440));
   const inset = 20, bodyLeft = inset + style.padding + 1;
   const left = bodyLeft + style.labelWidth + style.columnGap, right = width - bodyLeft, plotWidth = right - left;
   const lineHeight = style.labelSize * 1.45, rowHeight = Math.max(20, lineHeight) + 4;
@@ -63,7 +65,7 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = re
   const label = (yy, value, color = style.text, bold = false) => text(bodyLeft, yy + 14,
     ellipsis(value, style.labelWidth, style.labelSize), `fill="${xml(color)}"${bold ? ' font-weight="600"' : ""}`);
   const roleColors = role => palette[role] || palette.companion;
-  for (const [cardIndex, card] of state.projectPreview.cards.entries()) {
+  for (const [cardIndex, card] of projectPreviewDisplayCards(state.projectPreview.cards).entries()) {
     const top = y, clipId = `preview-card-${cardIndex}`;
     const paths = card.paths.filter(path => path.parts.length);
     const summary = [card.hasReference ? `Ref ${bp(card.refLength)}` : "",
@@ -75,11 +77,6 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = re
       text(summaryX, top + 10 + style.fontSize, ellipsis(summary, Math.max(0, right - summaryX), style.labelSize), `fill="${xml(style.muted)}"`)];
     y += headerHeight + 10;
     const geometry = layoutProjectPreviewCard(card, plotWidth);
-    content.push(label(y, labels.compositionAxis, style.axisText),
-      text(left, y + 14, bp(card.domain.start), `fill="${xml(style.axisText)}"`),
-      text(right, y + 14, bp(card.domain.end), `fill="${xml(style.axisText)}" text-anchor="end"`),
-      `<path d="M${left} ${y + 21}H${right}" stroke="${xml(style.line)}"/>`);
-    y += rowHeight;
     const bar = (layout, yy, colors, name = "", height = 16, radius = style.sourceRadius, extra = "") => {
       const sx = left + layout.x, w = layout.width;
       if (!(w > 0)) return;
@@ -90,9 +87,27 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = re
         `fill="${xml(colors.text)}" font-size="${style.graphSize}"`));
     };
     const used = (layout, yy, role, height) => {
-      if (highlightAdopted && layout.width > 0) content.push(rect(left + layout.x + 1, yy + 1,
-        Math.max(0, layout.width - 2), height - 2, "none", xml(roleColors(role).stroke), 'stroke-width="2"'));
+      if (highlightAdopted && layout.width > 0) content.push(rect(left + layout.x - 0.5, yy - 0.5,
+        layout.width + 1, height + 1, "none", xml(style.selectionStroke), 'stroke-width="1" data-preview-adopted-outline="1"'));
     };
+    for (const path of card.paths.length ? card.paths : [{ name: card.chrName, parts: [] }]) {
+      const named = path.name !== card.chrName;
+      content.push(label(y, "Final Path", style.text, true));
+      if (named) content.push(label(y + lineHeight, path.name, style.axisText));
+      if (!path.parts.length) content.push(text(left, y + 14, labels.noPath, `fill="${xml(style.axisText)}"`));
+      const layouts = geometry.paths.get(path.name);
+      path.parts.forEach((part, index) => {
+        const name = part.gap ? "" : `${resolveFinalPathSegmentDisplayName(part.segment)}${(part.source?.orient || part.segment.orient) === "-" ? " (−)" : ""}`;
+        bar(layouts[index], y + 2, part.gap ? style.gap : roleColors(part.role), name, 16, style.finalRadius);
+        if (!part.gap) used(layouts[index], y + 2, part.role, 16);
+      });
+      y += Math.max(rowHeight, (named ? lineHeight * 2 : lineHeight) + 4);
+    }
+    content.push(label(y, labels.compositionAxis, style.axisText),
+      text(left, y + 14, bp(card.domain.start), `fill="${xml(style.axisText)}"`),
+      text(right, y + 14, bp(card.domain.end), `fill="${xml(style.axisText)}" text-anchor="end"`),
+      `<path d="M${left} ${y + 21}H${right}" stroke="${xml(style.line)}"/>`);
+    y += rowHeight;
     if (card.hasReference) {
       content.push(label(y, "Ref"));
       bar(geometry.reference, y + 6, roleColors("ref"), "", 6, style.referenceRadius);
@@ -112,20 +127,6 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = re
       if (!track.positioned.length) content.push(text(left, y + 14, "—", `fill="${xml(style.axisText)}"`));
       y += rowHeight;
     });
-    y += 4;
-    content.push(`<path d="M${bodyLeft} ${y}H${right}" stroke="${xml(style.pathLine)}"/>`); y += 9;
-    for (const path of card.paths) {
-      const named = path.name !== card.chrName;
-      content.push(label(y, "Final Path", style.text, true));
-      if (named) content.push(label(y + lineHeight, path.name, style.axisText));
-      if (!path.parts.length) content.push(text(left, y + 14, labels.noPath, `fill="${xml(style.axisText)}"`));
-      const layouts = geometry.paths.get(path.name);
-      path.parts.forEach((part, index) => {
-        const name = part.gap ? "" : `${resolveFinalPathSegmentDisplayName(part.segment)}${(part.source?.orient || part.segment.orient) === "-" ? " (−)" : ""}`;
-        bar(layouts[index], y + 2, part.gap ? style.gap : roleColors(part.role), name, 16, style.finalRadius);
-      });
-      y += Math.max(rowHeight, (named ? lineHeight * 2 : lineHeight) + 4);
-    }
     if (card.unresolvedCount) { content.push(text(bodyLeft, y + 16, ellipsis(`${labels.unresolved} (${card.unresolvedCount})`, right - bodyLeft, style.labelSize), `fill="${xml(style.warning)}"`)); y += rowHeight; }
     y += 12;
     const cardWidth = width - inset * 2, cardHeight = y - top;
@@ -187,7 +188,8 @@ export async function exportProjectPreviewImage(host, store, deps = {}) {
   const button = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");
   if (button) button.disabled = true;
   try {
-    const snapshot = buildProjectPreviewSvgSnapshot(state, { width: host.querySelector?.(".project-preview-cards")?.clientWidth,
+    const screenWidth = host.querySelector?.(".project-preview-cards")?.clientWidth;
+    const snapshot = buildProjectPreviewSvgSnapshot(state, { width: screenWidth > 0 ? screenWidth + 40 : undefined,
       style: readProjectPreviewImageStyle(host) });
     const fileName = String(projectName(state)).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/[ .]+$/g, "") || "project";
     let targetPath = await (deps.pickSaveFilePath || pickSaveFilePath)({ defaultPath: `${fileName}_preview.svg`,

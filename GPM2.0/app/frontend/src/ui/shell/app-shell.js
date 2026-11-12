@@ -53,7 +53,6 @@ export function renderAppShell(state) {
         <nav class="route-nav">
           <button class="route-button" data-route="importer">${labels.project}</button>
           <button class="route-button" data-route="assembly">${labels.assembly}</button>
-          <button class="route-button" data-route="projectExport">${labels.projectExport}</button>
         </nav>
         <div class="nav-session-controls">
           <label class="nav-session-field" for="session-workspace-select-toggle">

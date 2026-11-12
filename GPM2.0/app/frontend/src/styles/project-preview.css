@@ -77,3 +77,18 @@
   .project-preview-card-header { gap: 8px; }
 }
 .project-preview-heading > .project-preview-download { margin-left: auto; }
+
+/* Final Path is the folded strip and remains first in the expanded card. */
+.project-preview-card-heading { display: flex; align-items: stretch; margin: 0 -16px; background: var(--surface-subtle, #f8fafc); border-radius: var(--card-radius) var(--card-radius) 0 0; }
+.project-preview-card-heading .project-preview-card-header { flex: 1; min-width: 0; width: auto; margin: 0; border-radius: var(--card-radius) 0 0 0; }
+.project-preview-card-heading .project-preview-open { border: 0; background: transparent; padding: 8px 12px; cursor: pointer; font-family: inherit; }
+.project-preview-open:focus-visible { outline: 2px solid var(--preview-card-ring, #4678ad); outline-offset: -3px; }
+.project-preview-card .project-preview-paths { margin-top: 6px; padding-top: 0; border-top: 0; }
+.project-preview-details { margin-top: 8px; }
+.project-preview-details[hidden] { display: none; }
+.project-preview-chevron { flex: 0 0 12px; }
+@media (max-width: 560px) {
+  .project-preview-card-heading { margin: 0 -10px; }
+  .project-preview-card-heading .project-preview-card-header { margin: 0; width: auto; }
+  .project-preview-card-heading .project-preview-open { padding: 8px 6px; }
+}

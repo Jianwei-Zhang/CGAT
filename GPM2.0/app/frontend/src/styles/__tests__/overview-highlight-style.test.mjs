@@ -5,13 +5,13 @@ import { readFileSync } from "node:fs";
 const css = Object.fromEntries(["project-export", "project-preview", "assembly", "base", "theme"].map(name => [
   name, readFileSync(new URL(`../${name}.css`, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, ""),
 ]));
-const root = ".project-export-page [data-overview-preview]";
+const root = "[data-overview-preview]";
 const card = `${root} .project-preview-card`;
 const usedSelector = `${card} .project-preview-used`;
 const resultSelector = `${root} .project-preview-final-part:not(.is-gap)`;
 const activeCard = [
   `${card}:hover`,
-  `${card}:has(.project-preview-card-header:focus-visible)`,
+  `${card}:has(:focus-visible)`,
 ];
 const activeUsed = activeCard.map(selector => `${selector} .project-preview-used`);
 const activeResults = activeCard.map(selector => `${selector} .project-preview-final-part:not(.is-gap)`);
@@ -103,8 +103,8 @@ test("card-level feedback never changes interval geometry or adds fragment glows
   const frame = rule("project-preview", ".project-preview-card");
   assert.match(frame, /border:\s*1px solid var\(--border-subtle/);
   assert.doesNotMatch(frame, /--preview-card-ring|--final-path-selection/);
-  for (const selector of [".project-preview-card:hover", ".project-preview-card:has(.project-preview-card-header:focus-visible)"]) {
-    const body = rule("project-preview", selector);
+  for (const selector of [".project-preview-card:hover", ".project-preview-card:has(:focus-visible)"]) {
+    const body = rule("project-preview", selector.replace(":has(:focus-visible)", ":has(.project-preview-card-header:focus-visible)"));
     assert.match(body, /border-color:\s*var\(--preview-card-ring/);
     assert.match(body, /box-shadow:\s*inset 0 0 0 1px var\(--preview-card-ring[^;]*\),\s*0 2px 8px var\(--preview-card-glow/);
   }
@@ -115,8 +115,8 @@ test("standalone Preview retains its existing whole-card highlights and Overview
   assert.match(used, /opacity:\s*0;/);
   assert.match(used, /background:\s*transparent;/);
   for (const selector of [".project-preview-card:hover .project-preview-used",
-    ".project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-used"]) {
-    assert.match(rule("project-preview", selector), /opacity:\s*1;/);
+    ".project-preview-card:has(:focus-visible) .project-preview-used"]) {
+    assert.match(rule("project-preview", selector.replace(":has(:focus-visible)", ":has(.project-preview-card-header:focus-visible)")), /opacity:\s*1;/);
   }
   const imports = readFileSync(new URL("../components.css", import.meta.url), "utf8");
   assert.ok(imports.indexOf('"./project-export.css"') > imports.indexOf('"./project-preview.css"'));

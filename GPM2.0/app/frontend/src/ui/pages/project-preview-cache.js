@@ -2,7 +2,7 @@ import { previewSemanticSignature, previewMutationStamp } from "../../services/p
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { previewProjectKey, previewSourceRange } from "./project-preview-state.js";
 
-export const PREVIEW_MODEL_VERSION = 8;
+export const PREVIEW_MODEL_VERSION = 9;
 const sessions = new WeakMap();
 const domEntries = new Map();
 const DOM = Symbol("previewDom");
@@ -137,7 +137,7 @@ export function isPreviewSnapshot(snapshot) {
         && typeof card.reference.alignment.pathName === "string" && Number.isInteger(card.reference.alignment.index)
         && finite(card.reference.alignment.offset)))
       && Array.isArray(card.refHighlights) && card.refHighlights.every(patch)
-      && Array.isArray(card.paths) && card.paths.every(path => object(path) && typeof path.name === "string"
+      && Array.isArray(card.paths) && card.paths.every(path => object(path) && typeof path.name === "string" && typeof path.phasedTrackKey === "string"
         && finite(path.length) && path.length >= 0 && Array.isArray(path.parts) && path.parts.every(part))
       && Array.isArray(card.tracks) && card.tracks.every(track => object(track) && typeof track.name === "string"
         && color(track.color) && ["primary", "companion"].includes(track.role) && track.laneCount === 1

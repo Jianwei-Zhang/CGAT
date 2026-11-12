@@ -1,3 +1,6 @@
+import { renderProjectPreviewCard } from "../project-preview-page.js";
+import { projectPreviewDisplayCards, layoutProjectPreviewCard } from "../project-preview-layout.js";
+import { getMessages } from "../../i18n/index.js";
 import { previewMutationStamp, beginPreviewContentOperation, finishPreviewContentOperation } from "../../../services/preview-content-events.js";
 import { currentProjectExportJob } from "../../../services/project-export-jobs.js";
 import test from "node:test";
@@ -15,9 +18,22 @@ function overviewSources({ items = [], ...counts } = {}, ctgs = [], primaryCtgId
   return { ...counts, chromosomes: items, ctgs, primaryCtgIds, phasedChrTracksByChr };
 }
 
+function loadedPreviewState(state) {
+  const finalPathByChr = __test.getProjectExportFinalPathByChr(state);
+  const chromosomes = [...new Set([
+    ...(state.projectExport?.chromosomes?.length ? state.projectExport.chromosomes : state.assembly?.chromosomes || []).map(chr => chr.chrName),
+    ...Object.keys(finalPathByChr),
+  ])].filter(name => !Object.values(state.projectExport?.phasedChrTracksByChr || {}).flat().some(track => track.label === name))
+    .map(chrName => ({ chrName }));
+  const cards = buildProjectPreviewModel({ chromosomes, finalPathByChr, phasedChrTracksByChr: state.projectExport?.phasedChrTracksByChr,
+    datasets: state.initializer?.datasets, project: state.initializer?.existingProjects?.[0] });
+  return { ...state, projectPreview: { key: previewProjectKey(state), loaded: true, cards }, projectExport: { ...state.projectExport,
+    loaded: true, workspacePath: state.session.workspacePath, mutationStamp: previewMutationStamp({ workspaceRoot: state.session.workspacePath, projectId: state.session.projectId }) } };
+}
 function renderLoadedPathOverview(state) {
-  return renderProjectPathOverview({ ...state, projectExport: { ...state.projectExport,
-    loaded: true, workspacePath: state.session.workspacePath, mutationStamp: previewMutationStamp({ workspaceRoot: state.session.workspacePath, projectId: state.session.projectId }) } });
+  const value = loadedPreviewState(state);
+  // Render viewport-mounted bodies directly for markup assertions.
+  return projectPreviewDisplayCards(value.projectPreview.cards).map(card => renderProjectPreviewCard(card, getMessages(value, "projectPreview"), true, false)).join("");
 }
 
 function createState(overrides = {}) {
@@ -95,7 +111,8 @@ test("project export page renders assignment bars before placed statistics with 
   const html = renderProjectExportPage(createState());
 
   assert.doesNotMatch(html, /<h[1-6][^>]*>概览</);
-  assert.match(html, /<dl class="project-export-identity">[\s\S]*<dt>项目<\/dt><dd><span[^>]*>p1<\/span><\/dd>[\s\S]*<dt>主数据集<\/dt><dd><span[^>]*data-dataset-role="primary"[^>]*>hifiasm<\/span><\/dd>/);
+  assert.doesNotMatch(html, /project-export-identity/);
+  assert.match(html, /<h3>装配统计<\/h3>/);
   assert.ok(html.indexOf("data-preview-download") < html.indexOf("data-project-export-toggle"));
   assert.equal((html.match(/data-preview-download/g) || []).length, 1);
   assert.doesNotMatch(html, /project-preview-heading|project-preview-subtitle|project-preview-legend/);
@@ -136,14 +153,13 @@ test("project export page renders assignment bars before placed statistics with 
   assert.doesNotMatch(html, /class="project-export-final-path-list"/);
   assert.match(html, /data-overview-preview[\s\S]*project-preview-page/);
   const pathHtml = renderLoadedPathOverview(createState());
-  assert.match(pathHtml, /class="project-export-final-path-list"/);
-  assert.match(pathHtml, /class="project-export-final-path-row"[\s\S]*data-project-export-jump-chr="Chr01"/);
-  assert.match(pathHtml, /class="project-export-final-path-row-label" data-app-tooltip="Chr01" data-app-tooltip-overflow>Chr01<\/strong>/);
-  assert.match(pathHtml, /class="project-export-final-path-preview-track"/);
-  assert.match(pathHtml, /class="project-export-final-path-preview-ctg"[\s\S]*?width: 100\.0000%;/);
-  assert.match(pathHtml, /class="project-export-final-path-preview-length">1,000 bp<\/span>/);
-  assert.doesNotMatch(pathHtml, /track-ruler-line/);
-  assert.doesNotMatch(pathHtml, /final-path-card-toggle/);
+  assert.doesNotMatch(pathHtml, /project-export-final-path-list/);
+  assert.match(pathHtml, /data-preview-chr="Chr01"/);
+  assert.match(pathHtml, /data-preview-expanded="false"/);
+  assert.equal((pathHtml.match(/data-final-path-name="Chr01"/g) || []).length, 1);
+  assert.match(pathHtml, /data-final-path-kind="ctg"/);
+  assert.match(pathHtml, /data-preview-open/);
+  assert.ok(pathHtml.indexOf("project-preview-paths") < pathHtml.indexOf("project-preview-axis"));
 });
 
 test("project export menu closes after leaving the export root", () => {
@@ -677,7 +693,7 @@ test("project export page hides log action and stats when any final path contain
   assert.match(html, /data-project-export-action="fasta"/);
   assert.match(html, /data-project-export-action="all"/);
   assert.doesNotMatch(html, /data-project-export-action="log"/);
-  assert.match(html, /<div class="project-export-summary-line"><span>参考: <strong>Chr01<\/strong><\/span><\/div>/);
+  assert.doesNotMatch(html, /project-export-summary-line/);
   assert.match(html, /项目统计和日志导出已关闭/);
   assert.doesNotMatch(html, /已使用主组装 Contig 数量/);
 });
@@ -1009,7 +1025,7 @@ test("project export final path rows use natural order before project export chr
   const expectedNames = ["Chr1", "Chr2", "Chr3", "Chr10"];
   assert.deepEqual(entries.map((entry) => entry.chrName), expectedNames);
 
-  const htmlNames = [...renderLoadedPathOverview(state).matchAll(/data-project-export-jump-chr="([^"]+)"/g)]
+  const htmlNames = [...renderLoadedPathOverview(state).matchAll(/data-preview-chr="([^"]+)"/g)]
     .map(([, chrName]) => chrName);
   assert.deepEqual(htmlNames, expectedNames);
 
@@ -1149,7 +1165,7 @@ test("project export final path rows expand phased chromosomes and omit the pare
   assert.equal(model.finalPathChrCount, 3);
   assert.match(
     renderLoadedPathOverview(state),
-    /data-project-export-jump-parent-chr="Chr01"[\s\S]*data-project-export-jump-phased-key="A"[\s\S]*data-project-export-jump-chr="Chr01A"/,
+    /data-preview-chr="Chr01"[\s\S]*data-preview-path="Chr01A"[\s\S]*data-preview-path="Chr01B"/,
   );
 });
 
@@ -1589,15 +1605,15 @@ test("project export final path preview uses the longest chr as the shared scale
       },
     },
   }));
-  const chr02Width = Number(html.match(/data-project-export-jump-chr="Chr02"[\s\S]*?class="project-export-final-path-preview-ctg"[\s\S]*?width: ([0-9.]+)%;/)?.[1] || 0);
-  const chr01Width = Number(html.match(/data-project-export-jump-chr="Chr01"[\s\S]*?class="project-export-final-path-preview-ctg"[\s\S]*?width: ([0-9.]+)%;/)?.[1] || 0);
+  const chr02Width = Number(html.match(/data-preview-chr="Chr02"[\s\S]*?data-final-path-kind="ctg"[\s\S]*?width:([0-9.]+)%;/)?.[1] || 0);
+  const chr01Width = Number(html.match(/data-preview-chr="Chr01"[\s\S]*?data-final-path-kind="ctg"[\s\S]*?width:([0-9.]+)%;/)?.[1] || 0);
 
   assert.ok(chr02Width > 0);
   assert.ok(chr01Width > 0);
   assert.ok(Math.abs(chr02Width - 100) < 0.001);
   assert.ok(Math.abs((chr01Width / chr02Width) - 0.5) < 0.02);
-  assert.match(html, /class="project-export-final-path-preview-length">200 bp<\/span>/);
-  assert.match(html, /class="project-export-final-path-preview-length">100 bp<\/span>/);
+  assert.match(html, /Final Path 200 bp/);
+  assert.match(html, /Final Path 100 bp/);
 });
 
 test("project export final path preview clamps edge gap markers inside the track", () => {
@@ -1629,9 +1645,10 @@ test("project export final path preview clamps edge gap markers inside the track
     },
   }));
 
-  assert.match(html, /class="project-export-final-path-preview-gap"/);
-  assert.match(html, /class="project-export-final-path-preview-ctg is-after-gap"/);
-  assert.match(html, /left: clamp\(0px, calc\([0-9.]+% - 4px\), calc\(100% - 8px\)\);/);
+  assert.match(html, /data-final-path-kind="gap"/);
+  assert.match(html, /data-final-path-kind="ctg"/);
+  const layouts = layoutProjectPreviewCard(loadedPreviewState(createState()).projectPreview.cards[0], 500).paths.values().next().value;
+  assert.ok(layouts.every(part => part.x >= 0 && part.x + part.width <= 500));
   assert.doesNotMatch(html, /project-export-final-path-preview-gap-label|>GAP<\/span>/);
 });
 
@@ -2076,7 +2093,7 @@ const freshOverviewPaths = () => ({ Fresh: { chrName: "Fresh", mode: "segments",
 test("Project preload invalidates after bootstrap/content mutation and reloads rather than retaining a pre-bootstrap empty path", async () => {
   const h = exportHarness();
   h.store.setState({ activeRoute: "importer", projectExport: { ...h.store.getState().projectExport, chromosomes: [], finalPathByChr: {} } });
-  assert.match(renderProjectPathOverview(h.store.getState()), /暂无可用的 Final Path/);
+  assert.match(renderProjectPathOverview(h.store.getState()), /data-overview-preview/);
   const job = { status: "running", marker: "keep existing snapshot job" };
   h.store.setState({ projectExport: { ...h.store.getState().projectExport, job } });
   mutateProjectData(h.store);
@@ -2088,7 +2105,7 @@ test("Project preload invalidates after bootstrap/content mutation and reloads r
   const data = h.store.getState().projectExport;
   assert.equal(reads, 1); assert.equal(data.loaded, true); assert.equal(data.job, job);
   assert.equal(data.mutationStamp, previewMutationStamp({ workspaceRoot: "/tmp/ws", projectId: 7 }));
-  assert.match(renderProjectPathOverview(h.store.getState()), /data-project-export-jump-chr="Fresh"/);
+  assert.match(renderLoadedPathOverview(h.store.getState()), /data-preview-chr="Fresh"/);
   assert.equal(h.subscriptions, 1);
   for (let i = 0; i < 5; i++) h.store.setState({ projectExport: { ...h.store.getState().projectExport, job: { ...job, currentStep: String(i) } } });
   assert.equal(reads, 1, "job progress cannot reload content with an unchanged mutation stamp");
@@ -2181,82 +2198,20 @@ test("Overview toolbar download exports Preview through its own handler without 
   assert.equal(h.store.getState().activeRoute, "projectExport"); assert.equal(h.paints, 0);
 });
 
-for (const locale of ["zh", "en"]) test(`Overview has compact identity groups and exactly one download action before Export (${locale})`, () => {
+for (const locale of ["zh", "en"]) test(`Project integrates statistics and preview without duplicate nameplates (${locale})`, () => {
   const html = renderProjectExportPage(createState({ locale }));
-  const toolbar = html.slice(0, html.indexOf('data-overview-preview'));
-  assert.doesNotMatch(html, /<h[1-6][^>]*>(?:概览|Overview|预览|Preview)<|project-preview-heading|project-preview-subtitle|project-preview-legend/);
-  assert.match(html, locale === "en" ? /data-overview-preview>[\s\S]*<header class="project-section-divider"><h3 id="overview-preview-title">Pseudomolecule Preview<\/h3>/ : /data-overview-preview>[\s\S]*<header class="project-section-divider"><h3 id="overview-preview-title">假分子预览<\/h3>/);
+  assert.doesNotMatch(html, /project-export-identity|project-export-head|project-export-summary-line|project-preview-heading/);
+  assert.match(html, locale === "zh" ? /<h3>装配统计<\/h3>/ : /<h3>Assembly statistics<\/h3>/);
+  assert.match(html, /project-preview-toolbar[\s\S]*data-preview-download[\s\S]*data-project-export-toggle[\s\S]*data-overview-preview/);
   assert.equal((html.match(/data-preview-download/g) || []).length, 1);
-  assert.ok(toolbar.indexOf("data-preview-download") < toolbar.indexOf("data-project-export-toggle"));
-  assert.match(toolbar, /<dl class="project-export-identity">/);
-  assert.match(toolbar, /<dd><span class="project-dataset-role project-export-project-badge" data-app-tooltip="p1" data-app-tooltip-overflow>p1<\/span><\/dd>/);
-  assert.match(toolbar, /<dd><span class="project-dataset-role" data-dataset-role="primary" data-app-tooltip="hifiasm" data-app-tooltip-overflow>hifiasm<\/span><\/dd>/);
 });
 
-for (const locale of ["zh", "en"]) test(`Overview includes all configured auxiliary names in its single-line identity (${locale})`, () => {
-  const state = createState({ locale });
-  const name = 'Flye_Very_Long_Auxiliary_Name<&"';
-  state.initializer.datasets.push({ datasetId: 2, name }, { datasetId: 3, name: "RagTag_MiXeD" });
-  state.initializer.existingProjects[0].supportDatasetIds = [2, 3, 2, 1, -1, "invalid", 99];
-  const html = renderProjectExportPage(state);
-  const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
-  const label = locale === "zh" ? "辅助数据集" : "Auxiliary datasets";
-  const names = ["Flye_Very_Long_Auxiliary_Name&lt;&amp;&quot;", "RagTag_MiXeD", "ds-99"];
-  const badges = names.map(name => `<span class="project-dataset-role" data-dataset-role="support" data-app-tooltip="${name}" data-app-tooltip-overflow>${name.replaceAll("&quot;", '"')}</span>`).join(" ");
-  assert.ok(toolbar.includes(`<dt>${label}</dt><dd class="project-export-dataset-badges">${badges}</dd>`));
-  assert.equal((toolbar.match(/data-dataset-role="support"/g) || []).length, 3, "one badge per deduplicated auxiliary dataset");
-  assert.equal((toolbar.match(/class="project-export-identity-item"/g) || []).length, 3);
-  assert.doesNotMatch(toolbar, /class="project-export-identity-item"[^>]*data-app-tooltip/);
-  assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>项目" : "<dt>Project") < toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset"));
-  assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset") < toolbar.indexOf(`<dt>${label}`));
+test("Project statistics has a compact two-measure surface and stacks on narrow layouts", () => {
+  assert.match(componentsCss, /\.project-assembly-statistics \.project-export-grid[^}]*gap: 0/);
+  assert.match(componentsCss, /@media \(max-width: 900px\)[\s\S]*\.project-assembly-statistics \.project-export-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(componentsCss, /\.project-preview-toolbar \.project-export-actions[^}]*margin-left: auto/);
+  assert.match(componentsCss, /\.project-preview-toolbar \.project-preview-download:focus-visible[^}]*outline: 2px solid/);
 });
-
-for (const locale of ["zh", "en"]) test(`Overview reports no configured auxiliary datasets honestly (${locale})`, () => {
-  const html = renderProjectExportPage(createState({ locale }));
-  const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
-  assert.ok(toolbar.includes(locale === "zh" ? '<dt>辅助数据集</dt><dd data-app-tooltip="未配置" data-app-tooltip-overflow>未配置</dd>'
-    : '<dt>Auxiliary datasets</dt><dd data-app-tooltip="Not configured" data-app-tooltip-overflow>Not configured</dd>'));
-});
-
-test("Overview identity never wraps, ellipsizes names and preserves fixed right-side actions", () => {
-  const rule = selector => {
-    const start = componentsCss.indexOf(`\n${selector} {`);
-    assert.ok(start >= 0, `missing ${selector}`);
-    return componentsCss.slice(componentsCss.indexOf("{", start), componentsCss.indexOf("}", start));
-  };
-  for (const selector of [".project-export-identity", ".project-export-identity-item", ".project-export-identity dd", ".project-export-dataset-badges"]) {
-    assert.match(rule(selector), /display:\s*flex/);
-    assert.match(rule(selector), /align-items:\s*center/);
-    assert.doesNotMatch(rule(selector), /align-items:\s*baseline/);
-  }
-  assert.match(rule(".project-export-identity dd > .project-dataset-role"), /line-height:\s*1\.4/);
-  assert.match(rule(".project-export-head"), /flex-wrap:\s*nowrap[\s\S]*min-width:\s*0/);
-  assert.match(rule(".project-export-identity"), /flex:\s*1 1 0[\s\S]*flex-wrap:\s*nowrap[\s\S]*overflow:\s*hidden/);
-  assert.match(rule(".project-export-identity dd"), /overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis[\s\S]*white-space:\s*nowrap/);
-  assert.match(rule(".project-export-identity dd > .project-dataset-role"), /max-width:\s*100%[\s\S]*min-width:\s*0[\s\S]*overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis/);
-  assert.match(rule(".project-export-dataset-badges"), /display:\s*flex[\s\S]*gap:\s*4px/);
-  assert.match(rule(".project-export-head > .project-export-actions"), /flex:\s*0 0 auto[\s\S]*flex-wrap:\s*nowrap/);
-});
-
-test("Overview badges reuse the Project dataset-type shapes and palettes without misclassifying the project", () => {
-  const html = renderProjectExportPage(createState());
-  const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
-  assert.match(toolbar, /class="project-dataset-role project-export-project-badge"/);
-  assert.doesNotMatch(toolbar, /data-dataset-role="(?:project|reference)"/);
-  assert.match(componentsCss, /\.project-dataset-role\s*\{[^}]*border-radius:\s*999px;/);
-  for (const [role, palette] of [["primary", "primary"], ["support", "companion"]]) {
-    assert.match(componentsCss, new RegExp(`\\.project-dataset-role\\[data-dataset-role="${role}"\\]\\s*\\{[^}]*background: var\\(--ctg-${palette}-fill\\);[^}]*border-color: var\\(--ctg-${palette}-stroke\\);[^}]*color: var\\(--ctg-${palette}-text\\)`));
-  }
-});
-
-test("Overview image download is borderless, Export-height and has enabled hover/active plus keyboard focus feedback", () => {
-  assert.match(componentsCss, /\.project-export-head :is\(\.project-preview-download, \.final-path-export-toggle\)\s*\{[^}]*height:\s*2\.1429rem;[^}]*min-height:\s*2\.1429rem;/);
-  assert.match(componentsCss, /\.project-export-head \.project-preview-download\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/);
-  assert.match(componentsCss, /\.project-export-head \.project-preview-download:hover:not\(:disabled\)\s*\{[^}]*background:[^}]*color:/);
-  assert.match(componentsCss, /\.project-export-head \.project-preview-download:active:not\(:disabled\)\s*\{/);
-  assert.match(componentsCss, /\.project-export-head \.project-preview-download:focus-visible\s*\{[^}]*outline:\s*2px solid/);
-});
-
 
 test("overview loads one shared summary and never asks for per-chromosome Assembly evidence", async () => {
   const h = exportHarness();

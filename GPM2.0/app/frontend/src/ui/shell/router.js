@@ -26,7 +26,7 @@ const routeBinders = {
 
 const RENDERING = Symbol("routeRendering");
 const RENDER_REVISION = Symbol("routeRenderRevision");
-export const normalizeAppRoute = route => ["projectPreview", "overview"].includes(route) ? "projectExport" : route;
+export const normalizeAppRoute = route => ["projectExport", "projectPreview", "overview"].includes(route) ? "importer" : route;
 
 export function registerRoutes(root, store, onRouteChanged) {
   const buttons = root.querySelectorAll(".route-button");

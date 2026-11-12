@@ -234,7 +234,8 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
         }
         parts.push(part);
       }
-      paths.push({ name, length: cursor, parts });
+      const track = (phasedChrTracksByChr[chrName] || []).find(track => text(track.label) === name);
+      paths.push({ name, phasedTrackKey: text(track?.haplotypeKey), length: cursor, parts });
     }
     // Keep complete source bodies independent of the path's short-fragment
     // visual floor. Adopted placements are evidence for choosing ONE origin,
@@ -305,12 +306,15 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
   });
 }
 
-export function requestPreviewChromosome(store, chrName) {
+export function requestPreviewChromosome(store, chrName, path = null) {
   const state = store.getState(), name = text(chrName);
   const key = previewProjectKey(state);
   if (!key || state.projectPreview?.key !== key || !name
     || !state.projectPreview?.chromosomes?.some(chr => text(chr.chrName) === name)) return false;
   store.setState({ activeRoute: "assembly", assembly: { ...state.assembly,
-    activeTab: "assembly", previewRequestedChrName: name, projectExportScrollToBottom: false } });
+    activeTab: "assembly", previewRequestedChrName: name, projectExportScrollToBottom: false,
+    ...(path ? { activePhasedTrackKey: path.phasedTrackKey || "", activeFinalPathKey: path.phasedTrackKey || "",
+      activePhasedTrackKeyByChr: { ...state.assembly?.activePhasedTrackKeyByChr, [name]: path.phasedTrackKey || "" },
+      activeFinalPathKeyByChr: { ...state.assembly?.activeFinalPathKeyByChr, [name]: path.phasedTrackKey || "" } } : {}) } });
   return true;
 }

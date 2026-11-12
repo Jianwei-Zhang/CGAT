@@ -316,7 +316,7 @@ test("router skips cached assembly DOM when project export requests chr jump scr
 });
 
 function overviewRouteHarness(route) {
-  let state = createRoutableState(route);
+  let state = { ...createRoutableState(route), importer: {} };
   state.initializer.datasets = [{ datasetId: 1, name: "Source" }];
   state.initializer.existingProjects = [{ projectId: 7, primaryDatasetId: 1 }];
   state.projectExport = { projectId: 7, workspacePath: "D:/ws", loaded: true, mutationStamp: previewMutationStamp({ workspaceRoot: "D:/ws", projectId: 7 }), chromosomes: [], finalPathByChr: {}, job: null };
@@ -325,14 +325,14 @@ function overviewRouteHarness(route) {
   return { host, root, store, subscribe: fn => subscribers.push(fn) };
 }
 
-test("legacy Preview and Overview aliases resolve to the one composite Overview surface without recursive duplicate rendering", () => {
+test("legacy Preview and Overview aliases resolve to the Project surface without recursive duplicate rendering", () => {
   for (const route of ["projectPreview", "overview", "projectExport"]) {
     const f = overviewRouteHarness(route);
     f.subscribe(() => renderCurrentRoute(f.root, f.store));
     renderCurrentRoute(f.root, f.store);
-    assert.equal(f.store.getState().activeRoute, "projectExport");
+    assert.equal(f.store.getState().activeRoute, "importer");
     assert.equal(f.host.renderCount, 1);
-    assert.match(f.host.innerHTML, /class="page project-export-page" aria-label="Overview"/);
+    assert.match(f.host.innerHTML, /class="page projects-page"/);
     assert.match(f.host.innerHTML, /data-overview-summary[\s\S]*data-overview-preview[\s\S]*class="project-preview-page"/);
     assert.doesNotMatch(f.host.innerHTML, /project-preview-heading|project-preview-subtitle|project-preview-legend|<h2>Overview<\/h2>/);
     assert.doesNotMatch(f.host.innerHTML, /project-export-final-path-list/);
@@ -349,7 +349,7 @@ test("route-button callback renders once with or without the production store su
     if (subscribed) f.subscribe(() => renderCurrentRoute(f.root, f.store));
     registerRoutes(f.root, f.store, () => { callbacks++; renderCurrentRoute(f.root, f.store); });
     clicked();
-    assert.equal(f.store.getState().activeRoute, "projectExport");
+    assert.equal(f.store.getState().activeRoute, "importer");
     assert.equal(f.host.renderCount, 1); assert.equal(callbacks, subscribed ? 0 : 1);
   }
 });

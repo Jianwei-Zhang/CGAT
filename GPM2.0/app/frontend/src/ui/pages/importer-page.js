@@ -1,3 +1,4 @@
+import { releaseProjectPathOverview } from "./project-export-page.js";
 import { prepareProjectOverviewSources } from "./project-overview-preparation.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "./floating-menu-runtime.js";
 import { archiveImportForm, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../../services/project-drop-controller.js";
@@ -2485,6 +2486,7 @@ function rerender(host, store) {
   if (!routeHost) {
     return;
   }
+  releaseProjectPathOverview(routeHost);
   routeHost.innerHTML = renderImporterPage(store.getState());
   bindImporterPage(routeHost, store);
   syncSessionHeader(store);

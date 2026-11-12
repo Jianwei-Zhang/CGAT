@@ -11,7 +11,7 @@
   font-size: var(--font-title);
 }
 
-.project-export-page [data-overview-preview] .project-preview-chr-name {
+[data-overview-preview] .project-preview-chr-name {
   font-size: var(--font-section);
   font-weight: 600;
 }
@@ -19,38 +19,38 @@
 /* Adopted source intervals and non-Gap results share a persistent thin outer
    outline. Only the active card thickens it; keep role fills and text intact,
    without an interior tint or fragment glow. */
-.project-export-page [data-overview-preview] .project-preview-card .project-preview-used {
+[data-overview-preview] .project-preview-card .project-preview-used {
   opacity: 1;
   background: transparent;
   box-shadow: none;
   border-radius: inherit;
 }
 
-.project-export-page [data-overview-preview] .project-preview-card .project-preview-used,
-.project-export-page [data-overview-preview] .project-preview-final-part:not(.is-gap) {
+[data-overview-preview] .project-preview-card .project-preview-used,
+[data-overview-preview] .project-preview-final-part:not(.is-gap) {
   outline: 1px solid var(--final-path-selection-stroke);
   outline-offset: 0;
 }
 
-.project-export-page [data-overview-preview] .project-preview-card:hover .project-preview-used,
-.project-export-page [data-overview-preview] .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-used,
-.project-export-page [data-overview-preview] .project-preview-card:hover .project-preview-final-part:not(.is-gap),
-.project-export-page [data-overview-preview] .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-final-part:not(.is-gap) {
+[data-overview-preview] .project-preview-card:hover .project-preview-used,
+[data-overview-preview] .project-preview-card:has(:focus-visible) .project-preview-used,
+[data-overview-preview] .project-preview-card:hover .project-preview-final-part:not(.is-gap),
+[data-overview-preview] .project-preview-card:has(:focus-visible) .project-preview-final-part:not(.is-gap) {
   outline-width: 2px;
 }
 
 /* Source and path geometry is already clipped to the domain. Let the outer
    rings paint past their containers, including at plot endpoints; labels keep
    their own clipping and unused source context keeps its existing styling. */
-.project-export-page [data-overview-preview] .project-preview-card .project-preview-plot,
-.project-export-page [data-overview-preview] .project-preview-card .project-preview-contig.is-adopted,
-.project-export-page [data-overview-preview] .project-preview-card .project-preview-reference {
+[data-overview-preview] .project-preview-card .project-preview-plot,
+[data-overview-preview] .project-preview-card .project-preview-contig.is-adopted,
+[data-overview-preview] .project-preview-card .project-preview-reference {
   overflow: visible;
 }
 
 .project-export-page .button,
 .project-export-page .final-path-export-item,
-.project-export-page [data-overview-preview] .project-preview-open {
+[data-overview-preview] .project-preview-open {
   font-size: var(--font-body);
 }
 
@@ -83,7 +83,7 @@
 .project-export-dataset-badges > .project-dataset-role { flex: 0 1 auto; }
 .project-export-identity dd > .project-export-project-badge { background: var(--surface-subtle, #f8fafc); border-color: var(--border-default, #cbd5e1); color: var(--text-primary, #1e293b); }
 .project-export-head > .project-export-actions { flex: 0 0 auto; flex-wrap: nowrap; max-width: 100%; margin-left: auto; align-items: center; }
-.project-export-head :is(.project-preview-download, .final-path-export-toggle) {
+.project-preview-toolbar :is(.project-preview-download, .final-path-export-toggle) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -91,7 +91,7 @@
   min-height: 2.1429rem;
   box-sizing: border-box;
 }
-.project-export-head .project-preview-download {
+.project-preview-toolbar .project-preview-download {
   width: 2.1429rem;
   padding: 0;
   border: 0;
@@ -99,15 +99,15 @@
   box-shadow: none;
   color: var(--text-secondary, #334155);
 }
-.project-export-head .project-preview-download:hover:not(:disabled) {
+.project-preview-toolbar .project-preview-download:hover:not(:disabled) {
   background: var(--surface-muted, #eef2f6);
   color: var(--theme-strong-line, #3f6fa3);
 }
-.project-export-head .project-preview-download:active:not(:disabled) {
+.project-preview-toolbar .project-preview-download:active:not(:disabled) {
   background: var(--surface-subtle, #e2e8f0);
   color: var(--text-primary, #1e293b);
 }
-.project-export-head .project-preview-download:focus-visible {
+.project-preview-toolbar .project-preview-download:focus-visible {
   outline: 2px solid var(--focus-ring, #4f82b5);
   outline-offset: 2px;
 }
@@ -712,3 +712,19 @@
 
 [data-overview-summary] { display: grid; gap: 14px; min-width: 0; }
 [data-overview-preview] { min-width: 0; }
+
+/* One compact statistics surface, not two competing cards. */
+.project-integrated-overview { min-width: 0; margin-top: 18px; }
+.project-assembly-statistics { min-width: 0; }
+.project-assembly-statistics .project-export-grid { border: 1px solid var(--border-subtle, #dbe3ec); border-radius: var(--card-radius); background: var(--surface-panel, #fff); gap: 0; }
+.project-assembly-statistics .project-export-panel { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.project-assembly-statistics .project-export-panel + .project-export-panel { border-left: 1px solid var(--border-subtle, #dbe3ec); }
+.project-preview-toolbar { display: flex; align-items: center; gap: 12px; }
+.project-preview-toolbar .project-export-actions { margin-left: auto; }
+@media (max-width: 900px) {
+  .project-assembly-statistics .project-export-grid { grid-template-columns: minmax(0, 1fr); }
+  .project-assembly-statistics .project-export-panel + .project-export-panel { border-left: 0; border-top: 1px solid var(--border-subtle, #dbe3ec); }
+}
+
+.project-preview-toolbar::after { order: 1; }
+.project-preview-toolbar .project-export-actions { order: 2; }

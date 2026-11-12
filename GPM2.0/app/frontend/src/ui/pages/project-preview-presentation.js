@@ -37,6 +37,7 @@ export function readProjectPreviewImageStyle(host) {
     muted: token("--text-muted", "#64748b"),
     axisText: token("--theme-muted-ink", "#89919a"),
     line: token("--theme-line", "#edf0f3"),
+    selectionStroke: token("--final-path-selection-stroke", "#3b82f6"),
     pathLine: token("--theme-line", "#e8edf1"),
     gap: { fill: token("--gap-marker-fill", "#ffffff"), stroke: token("--border-strong", "#94a3b8"), text: token("--gap-marker-text", "#1b1b1b") },
     warning: token("--theme-amber-ink", "#8a612d"),

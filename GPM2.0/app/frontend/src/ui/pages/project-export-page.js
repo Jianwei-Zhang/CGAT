@@ -3,7 +3,7 @@ import { groupProjectOverviewSources } from "./project-overview-sources.js";
 import { previewMutationStamp } from "../../services/preview-content-events.js";
 import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCurrentProjectExport,
   updateProjectExportJob, syncCurrentProjectExportJob, finishProjectExportJob } from "../../services/project-export-jobs.js";
-import { renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage } from "./project-preview-page.js";
+import { renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "./project-preview-page.js";
 import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "./project-preview-cache.js";
 import { exportProjectPreviewImage, renderPreviewImageDownloadButton, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { previewProjectKey } from "./project-preview-state.js";
@@ -43,7 +43,6 @@ import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
 
 const OVERVIEW_PREVIEW_BOUND = Symbol("overviewPreviewBound");
 const PROJECT_DATA_FRESHNESS_BOUND = Symbol("projectDataFreshnessBound");
-const PROJECT_PATH_OVERVIEW_BOUND = Symbol("projectPathOverviewBound");
 const projectDataRequests = new WeakMap();
 const PROJECT_EXPORT_BOUND = Symbol("projectExportBound");
 const PROJECT_EXPORT_MENU_CLOSE_TIMER = "__projectExportMenuCloseTimer";
@@ -154,18 +153,6 @@ function formatNumber(value) {
   return Number.isFinite(numeric) ? Math.trunc(numeric).toLocaleString("en-US") : "0";
 }
 
-function stripFinalPathCtgAssignmentSuffix(name) {
-  const text = normalizeString(name);
-  const atIndex = text.lastIndexOf("@");
-  if (atIndex <= 0 || atIndex >= text.length - 1) {
-    return text;
-  }
-  const suffix = text.slice(atIndex + 1);
-  if (!suffix || /\s/.test(suffix)) {
-    return text;
-  }
-  return text.slice(0, atIndex);
-}
 
 function buildProjectExportOriginIdByCtgId(state) {
   const byId = new Map();
@@ -229,18 +216,6 @@ function enrichProjectFinalPathEntriesForExport(entries, state) {
   });
 }
 
-function resolveFinalPathPreviewCtgLabel(segment) {
-  if (isFinalPathGapSegment(segment) || isFinalPathRefSegment(segment)) {
-    return resolveFinalPathSegmentDisplayName(segment);
-  }
-  const displayName = stripFinalPathCtgAssignmentSuffix(resolveFinalPathSegmentDisplayName(segment));
-  const start = Number(segment?.start);
-  const end = Number(segment?.end);
-  if (!displayName || !Number.isFinite(start) || !Number.isFinite(end)) {
-    return displayName;
-  }
-  return `${displayName} (${start > end ? "-" : "+"})`;
-}
 
 function getProjectContigColorContext(state) {
   const exportState = getScopedProjectExportState(state);
@@ -453,6 +428,7 @@ function getLabels(state) {
     return {
       title: "Overview",
       pathOverviewTitle: "Pseudomolecule Preview",
+      assemblyStatistics: "Assembly statistics",
       pathOverviewEmpty: "No Final Path available for this project.",
       contentChanged: "Project content changed while loading. Refresh after the operation finishes.",
       noProject: "Select a project first.",
@@ -515,6 +491,7 @@ function getLabels(state) {
   return {
     title: "概览",
     pathOverviewTitle: "假分子预览",
+    assemblyStatistics: "装配统计",
     pathOverviewEmpty: "当前项目暂无可用的 Final Path。",
     contentChanged: "加载期间项目内容发生变化，请在操作结束后刷新。",
     noProject: "请先选择项目。",
@@ -1220,7 +1197,7 @@ function renderStats(model, labels, detailTableState = normalizeDetailTableState
     return `<p class="notice warning">${escapeHtml(labels.refDisabled)}</p>`;
   }
   return `
-    <section class="project-export-grid">
+    <section class="project-assembly-statistics"><header class="project-section-divider"><h3>${escapeHtml(labels.assemblyStatistics)}</h3></header><div class="project-export-grid">
       <article class="project-export-panel">
         <div class="project-export-panel-title">
           <h4>${escapeHtml(labels.assignment)}</h4>
@@ -1260,7 +1237,7 @@ function renderStats(model, labels, detailTableState = normalizeDetailTableState
           })}
         </div>
       </article>
-    </section>
+    </div></section>
     ${renderDetailTable(model, labels, detailTableState)}
   `;
 }
@@ -1352,103 +1329,9 @@ function getFinalPathPreviewEntries(state) {
     });
 }
 
-function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, resolveColorRole }) {
-  const segments = Array.isArray(entry?.segments) ? entry.segments : [];
-  const domainBp = Math.max(1, Number(maxLengthBp || 0), Number(lengthBp || 0));
-  let cursorBp = 0;
-  const segmentNodes = segments.map((segment, index) => {
-    const segmentLengthBp = Math.max(0, resolveFinalPathSegmentLengthBp(segment));
-    if (segmentLengthBp <= 0) {
-      return "";
-    }
-    const startPct = Math.max(0, Math.min(100, (cursorBp / domainBp) * 100));
-    const endPct = Math.max(startPct, Math.min(100, ((cursorBp + segmentLengthBp) / domainBp) * 100));
-    const widthPct = Math.max(0, endPct - startPct);
-    cursorBp += segmentLengthBp;
-    if (isFinalPathGapSegment(segment)) {
-      return `
-        <span
-          class="project-export-final-path-preview-gap"
-          data-final-path-segment="1" data-final-path-kind="gap" data-final-path-length="${segmentLengthBp}"
-          style="left: clamp(0px, calc(${endPct.toFixed(4)}% - 4px), calc(100% - 8px));"
-          data-app-tooltip="GAP ${formatNumber(segmentLengthBp)} bp"
-        ></span>
-      `;
-    }
-    if (!isFinalPathCtgSegment(segment)) {
-      return "";
-    }
-    const label = resolveFinalPathPreviewCtgLabel(segment);
-    const colorRole = resolveColorRole(segment);
-    const afterGapClass = index > 0 && isFinalPathGapSegment(segments[index - 1]) ? " is-after-gap" : "";
-    const toneClass = `${colorRole === "ref" ? " is-ref" : colorRole === "companion" ? " is-companion" : ""}${afterGapClass}`;
-    const title = `${resolveFinalPathSegmentDisplayName(segment)} | ${formatNumber(segmentLengthBp)} bp`;
-    return `
-      <span
-        class="project-export-final-path-preview-ctg${toneClass}"
-        data-final-path-segment="1" data-final-path-kind="ctg" data-final-path-length="${segmentLengthBp}"
-        style="left: ${startPct.toFixed(4)}%; width: ${widthPct.toFixed(4)}%;"
-        data-app-tooltip="${escapeAttr(title)}"
-      >
-        <span>${escapeHtml(label)}</span>
-      </span>
-    `;
-  }).join("");
-  return `
-    <div class="project-export-final-path-preview-track" data-final-path-strip="1" data-final-path-domain="${domainBp}" aria-hidden="true">
-      ${segmentNodes}
-    </div>
-  `;
-}
-
-function renderFinalPathPreviewRows(state, { primaryDatasetName }) {
-  const resolveColorRole = createContigColorResolver({ ...getProjectContigColorContext(state), primaryDatasetName });
-  const rows = getFinalPathPreviewEntries(state);
-  if (!rows.length) {
-    return "";
-  }
-  const maxLengthBp = Math.max(1, ...rows.map((row) => Math.max(0, Number(row.lengthBp || 0))));
-  return `
-    <section class="project-export-final-path-list" aria-label="final path">
-      ${rows.map(({ chrName, parentChrName, phasedTrackKey, entry, lengthBp }) => `
-        <div
-          class="project-export-final-path-row"
-          role="button"
-          tabindex="0"
-          data-project-export-jump-parent-chr="${escapeAttr(parentChrName || chrName)}"
-          data-project-export-jump-phased-key="${escapeAttr(phasedTrackKey || "")}"
-          data-project-export-jump-chr="${escapeAttr(chrName)}"
-        >
-          <strong class="project-export-final-path-row-label" data-app-tooltip="${escapeAttr(chrName)}" data-app-tooltip-overflow>${escapeHtml(chrName)}</strong>
-          <div class="project-export-final-path-row-graph" aria-hidden="true">
-            ${renderFinalPathPreviewTrack({
-              entry,
-              lengthBp,
-              maxLengthBp,
-              resolveColorRole,
-            })}
-            <span class="project-export-final-path-preview-length">${escapeHtml(`${formatNumber(lengthBp)} bp`)}</span>
-          </div>
-        </div>
-      `).join("")}
-    </section>
-  `;
-}
 
 export function renderProjectPathOverview(state) {
-  const labels = getLabels(state), currentProject = getCurrentProject(state), data = getScopedProjectExportState(state);
-  const scope = previewProjectKey(state);
-  const fresh = isProjectOverviewDataFresh(state);
-  const rowCount = currentProject && fresh ? getFinalPathPreviewEntries(state).length : 0;
-  const rows = currentProject && fresh
-    ? renderFinalPathPreviewRows(state, { primaryDatasetName: getDatasetNameById(state.initializer?.datasets || [], currentProject.primaryDatasetId) }) : "";
-  const body = !currentProject ? `<p class="muted">${escapeHtml(labels.noProject)}</p>`
-    : data.error ? `<p class="error-text" role="alert">${escapeHtml(data.error)}</p><button type="button" class="button ghost tiny" data-project-path-refresh>${escapeHtml(labels.refresh)}</button>`
-    : data.loading || !fresh ? `<p class="muted" role="status">${escapeHtml(labels.loading)}</p>`
-    : rows || `<p class="muted">${escapeHtml(labels.pathOverviewEmpty)}</p>`;
-  const count = rowCount ? `<span class="project-section-count"><span aria-hidden="true">·</span>${escapeHtml(formatNumber(rowCount))}</span>` : "";
-  return `<section class="project-path-overview" data-project-path-overview="${escapeAttr(scope)}" aria-labelledby="project-path-overview-title">
-    <header class="project-section-divider"><h3 id="project-path-overview-title">${escapeHtml(labels.pathOverviewTitle)}</h3>${count}</header>${body}</section>`;
+  return renderProjectExportPage(state);
 }
 
 function projectSurfaceRoot(host) {
@@ -1459,15 +1342,7 @@ function projectSurfaceRoot(host) {
 function refreshProjectDataSurface(host, store) {
   const root = projectSurfaceRoot(host), state = store.getState();
   if (!root || root.isConnected === false) return;
-  if (state.activeRoute === "importer") {
-    const current = root.querySelector?.("[data-project-path-overview]");
-    if (!current || current.dataset.projectPathOverview !== previewProjectKey(state)) return;
-    const doc = root.ownerDocument;
-    if (!doc?.createElement) return;
-    const template = doc.createElement("template"); template.innerHTML = renderProjectPathOverview(state);
-    current.replaceWith(template.content.firstElementChild);
-    syncProjectExportPreviewLabels(root);
-  } else rerender(root, store);
+  rerender(root, store);
 }
 
 function ensureProjectOverviewData(host, store, deps = {}) {
@@ -1503,43 +1378,11 @@ function releaseProjectDataFreshness(host) {
 export function bindProjectPathOverview(host, store, deps = {}) {
   const root = projectSurfaceRoot(host);
   if (!root?.querySelector?.("[data-project-path-overview]")) return;
-  let binding = root[PROJECT_PATH_OVERVIEW_BOUND];
-  if (!binding) {
-    binding = { store, deps };
-    const handle = async event => {
-      const state = binding.store.getState();
-      if (state.activeRoute !== "importer" || !event.target?.closest?.("[data-project-path-overview]")) return;
-      const row = event.target.closest("[data-project-export-jump-chr]");
-      if (event.type === "keydown") {
-        if (!row || !["Enter", " "].includes(event.key)) return;
-        event.preventDefault();
-      }
-      if (row) jumpToAssemblyChr(binding.store, { parentChrName: row.dataset.projectExportJumpParentChr || "",
-        chrName: row.dataset.projectExportJumpChr || "", activePhasedTrackKey: row.dataset.projectExportJumpPhasedKey || "" });
-      else if (event.target.closest("[data-project-path-refresh]")) await loadProjectExportData(root, binding.store, binding.deps);
-    };
-    binding.onClick = handle; binding.onKeyDown = handle;
-    binding.onResize = () => { if (binding.store.getState().activeRoute === "importer") syncProjectExportPreviewLabels(root); };
-    root.addEventListener("click", handle); root.addEventListener("keydown", handle);
-    const win = root.ownerDocument?.defaultView;
-    if (win?.ResizeObserver) { binding.observer = new win.ResizeObserver(binding.onResize); binding.observer.observe(root); }
-    else win?.addEventListener?.("resize", binding.onResize);
-    root[PROJECT_PATH_OVERVIEW_BOUND] = binding;
-  }
-  binding.store = store; binding.deps = { ...binding.deps, ...deps };
-  bindProjectDataFreshness(root, store, binding.deps);
-  syncProjectExportPreviewLabels(root);
-  ensureProjectOverviewData(root, store, binding.deps);
+  bindProjectExportPage(root, store, deps);
 }
 
 export function releaseProjectPathOverview(host) {
-  releaseProjectDataFreshness(host);
-  const root = host?.closest?.("#route-host") || host, binding = root?.[PROJECT_PATH_OVERVIEW_BOUND];
-  if (!binding) return;
-  binding.observer?.disconnect?.();
-  root.ownerDocument?.defaultView?.removeEventListener?.("resize", binding.onResize);
-  root.removeEventListener?.("click", binding.onClick); root.removeEventListener?.("keydown", binding.onKeyDown);
-  delete root[PROJECT_PATH_OVERVIEW_BOUND];
+  releaseProjectOverviewPreview(host);
 }
 
 function resolveProjectExportJumpTarget(state, target) {
@@ -1765,13 +1608,6 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
   `;
 }
 
-function renderOverviewIdentityBadge(name, role) {
-  const roleAttributes = role === "project"
-    ? 'class="project-dataset-role project-export-project-badge"'
-    : `class="project-dataset-role" data-dataset-role="${role}"`;
-  return `<span ${roleAttributes} data-app-tooltip="${escapeAttr(name)}" data-app-tooltip-overflow>${escapeHtml(name)}</span>`;
-}
-
 function renderProjectOverviewSummary(state) {
   const labels = getLabels(state);
   const currentProject = getCurrentProject(state);
@@ -1781,33 +1617,8 @@ function renderProjectOverviewSummary(state) {
   }
   const fresh = isProjectOverviewDataFresh(state);
   const model = fresh ? buildProjectExportDataModel(state) : null;
-  const primaryDatasetName = model?.primaryDatasetName || getDatasetNameById(state.initializer?.datasets || [], currentProject.primaryDatasetId) || "-";
-  const auxiliaryIds = [...new Set((Array.isArray(currentProject.supportDatasetIds) ? currentProject.supportDatasetIds : [])
-    .map(normalizeDatasetId).filter(id => id !== null && id !== normalizeDatasetId(currentProject.primaryDatasetId)))];
-  const auxiliaryBadges = auxiliaryIds.map(id => renderOverviewIdentityBadge(
-    getDatasetNameById(state.initializer?.datasets || [], id) || `ds-${id}`, "support",
-  )).join(" ");
-  const summaryLine = model?.refChrNames.length
-    ? `<div class="project-export-summary-line"><span>${escapeHtml(labels.reference)}: <strong>${escapeHtml(model.refChrNames.join(", "))}</strong></span></div>`
-    : "";
   return `
       <section data-overview-summary>
-      <div class="project-export-head">
-        <dl class="project-export-identity">
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd>${renderOverviewIdentityBadge(state.session?.projectName || currentProject.projectName || "-", "project")}</dd></div>
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd>${renderOverviewIdentityBadge(primaryDatasetName, "primary")}</dd></div>
-          <div class="project-export-identity-item"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt>${auxiliaryBadges ? `<dd class="project-export-dataset-badges">${auxiliaryBadges}</dd>` : `<dd data-app-tooltip="${escapeAttr(labels.noAuxiliaryDatasets)}" data-app-tooltip-overflow>${escapeHtml(labels.noAuxiliaryDatasets)}</dd>`}</div>
-        </dl>
-        <div class="project-export-actions">
-          ${renderPreviewImageDownloadButton(state)}
-          ${renderProjectExportMenu({
-            labels,
-            canExportFasta: fresh && canProjectExportFasta(state),
-            canExportLog: Boolean(model?.canExportLog),
-            disabled: !fresh,
-          })}
-        </div>
-      </div>
       ${exportState.loading || (!fresh && !exportState.error) ? `<p class="muted">${escapeHtml(labels.loading)}</p>` : ""}
       ${exportState.error ? `
         <div class="project-export-load-error" role="alert">
@@ -1815,19 +1626,27 @@ function renderProjectOverviewSummary(state) {
           <button type="button" class="button ghost tiny" data-project-export-refresh="1">${escapeHtml(labels.refresh)}</button>
         </div>
       ` : ""}
-      ${fresh ? summaryLine : ""}
       ${renderProjectExportJobModal(exportState.job, labels)}
       ${fresh ? renderStats(model, labels, normalizeDetailTableState(state)) : ""}
       </section>
   `;
 }
 
+function renderProjectOverviewActions(state) {
+  const labels = getLabels(state), fresh = isProjectOverviewDataFresh(state);
+  return `<div class="project-export-actions">${renderPreviewImageDownloadButton(state)}${renderProjectExportMenu({
+    labels, canExportFasta: fresh && canProjectExportFasta(state),
+    canExportLog: fresh && buildProjectExportDataModel(state).canExportLog, disabled: !fresh,
+  })}</div>`;
+}
+
 export function renderProjectExportPage(state) {
   const labels = getLabels(state);
-  if (!getCurrentProject(state)) return `<section class="page project-export-page" aria-label="${escapeAttr(labels.title)}"><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
-  return `<section class="page project-export-page" aria-label="${escapeAttr(labels.title)}" data-overview-project="${escapeAttr(previewProjectKey(state))}">
+  if (!getCurrentProject(state)) return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}"><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
+  return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}" data-overview-project="${escapeAttr(previewProjectKey(state))}" data-project-path-overview="${escapeAttr(previewProjectKey(state))}">
     ${renderProjectOverviewSummary(state)}
-    <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true })}</div>
+    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3>${renderProjectOverviewActions(state)}</header>
+    <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true, hideHeading: true })}</div>
   </section>`;
 }
 
@@ -1887,17 +1706,20 @@ export function releaseProjectOverviewPreview(host) {
 
 function mountOverviewPreview(host, store, deps = {}) {
   const previewHost = host?.querySelector?.("[data-overview-preview]");
-  if (!previewHost?.addEventListener || previewHost[OVERVIEW_PREVIEW_BOUND]) return;
+  if (!previewHost?.addEventListener) return;
+  if (previewHost[OVERVIEW_PREVIEW_BOUND]) { restoreProjectPreviewScroll(previewHost); return; }
   previewHost[OVERVIEW_PREVIEW_BOUND] = true;
   restoreProjectPreviewDom(previewHost, store.getState());
-  (deps.bindProjectPreviewPage || bindProjectPreviewPage)(previewHost, store, deps.preview || {});
+  (deps.bindProjectPreviewPage || bindProjectPreviewPage)(previewHost, store, { ...deps.preview,
+    isScrollReady: () => isProjectOverviewDataFresh(store.getState()) || Boolean(getScopedProjectExportState(store.getState()).error),
+  });
 }
 
 function rerender(host, store) {
   host = projectSurfaceRoot(host);
   if (!host || host.isConnected === false) return;
   const state = store.getState();
-  if (state.activeRoute && state.activeRoute !== "projectExport") return;
+  if (state.activeRoute && !["importer", "projectExport"].includes(state.activeRoute)) return;
   const page = host.querySelector?.("[data-overview-project]");
   const summary = page?.querySelector?.("[data-overview-summary]");
   const doc = host.ownerDocument;
@@ -1908,7 +1730,15 @@ function rerender(host, store) {
     template.innerHTML = renderProjectOverviewSummary(state);
     const next = template.content.querySelector("[data-overview-summary]");
     if (next) summary.replaceWith(next);
+    const toolbar = page.querySelector(".project-preview-toolbar .project-export-actions");
+    if (toolbar) {
+      const actions = doc.createElement("template");
+      actions.innerHTML = renderProjectOverviewActions(state);
+      const nextActions = actions.content.querySelector(".project-export-actions");
+      if (nextActions) toolbar.replaceWith(nextActions);
+    }
   } else {
+    if (state.activeRoute === "importer") return;
     releaseProjectOverviewPreview(host);
     host.innerHTML = renderProjectExportPage(state);
   }
@@ -2478,7 +2308,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
     }
   };
   host.addEventListener("click", async (event) => {
-    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
+    if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
     const downloadNode = event.target?.closest?.("[data-preview-download]");
     if (downloadNode) {
       // Standalone Preview handles its own local action; Overview's action is
@@ -2558,7 +2388,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
     close: (exportRoot) => setExportMenuOpen(exportRoot, false),
   });
   host.addEventListener("change", (event) => {
-    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
+    if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
     const filterNode = event.target?.closest?.("[data-project-export-detail-filter]");
     if (!filterNode) {
       return;
@@ -2572,14 +2402,14 @@ export function bindProjectExportPage(host, store, deps = {}) {
     );
   });
   host.addEventListener("pointerover", (event) => {
-    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
+    if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
     const detailsNode = event.target?.closest?.(".project-export-detail-filter");
     if (detailsNode) {
       clearProjectExportDetailFilterCloseTimer(detailsNode);
     }
   });
   host.addEventListener("pointerout", (event) => {
-    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
+    if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
     const detailsNode = event.target?.closest?.(".project-export-detail-filter");
     if (!detailsNode || detailsNode.contains?.(event.relatedTarget)) {
       return;
@@ -2587,7 +2417,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
     scheduleProjectExportDetailFilterClose(detailsNode);
   });
   host.addEventListener("keydown", (event) => {
-    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
+    if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }

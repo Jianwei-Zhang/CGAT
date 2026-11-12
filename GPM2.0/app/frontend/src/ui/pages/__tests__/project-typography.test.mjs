@@ -48,7 +48,7 @@ test("Overview summary card titles are compact secondary headings, not page head
 
 test("pseudomolecule names align at the secondary heading tier without changing standalone Preview", () => {
   font("project-export", ".project-current .project-export-final-path-row-label", "section", 600);
-  font("project-export", ".project-export-page [data-overview-preview] .project-preview-chr-name", "section", 600);
+  font("project-export", "[data-overview-preview] .project-preview-chr-name", "section", 600);
   font("project-preview", ".project-preview-chr-name", "body", 700);
   font("project-preview", ".project-preview-heading h2", "heading", 700);
 });
@@ -60,7 +60,7 @@ test("main content, datasets and controls stay below headings in the body tier",
   font("project-export", ".project-export-used-metrics", "body");
   font("project-export", ".project-export-assignment", "body");
   for (const selector of [".project-export-page .button", ".project-export-page .final-path-export-item",
-    ".project-export-page [data-overview-preview] .project-preview-open", ".project-export-detail-toggle"]) {
+    "[data-overview-preview] .project-preview-open", ".project-export-detail-toggle"]) {
     font("project-export", selector, "body");
   }
   for (const selector of [".project-export-used-row > span", ".project-export-used-row strong",

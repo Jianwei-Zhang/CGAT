@@ -992,15 +992,13 @@ test("selected-project table and paths use compact visible divider headings", ()
     assert.doesNotMatch(html, /项目信息|路径概览|Project Information|Path Overview/);
     assert.match(html, /id="project-data-catalog" aria-labelledby="project-data-catalog-title"/);
     assert.match(html, locale === "en" ? /class="project-section-divider"><h3 id="project-data-catalog-title">Datasets<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/ : /class="project-section-divider"><h3 id="project-data-catalog-title">数据集<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/);
-    assert.match(html, /class="project-path-overview"[^>]*aria-labelledby="project-path-overview-title"/);
-    assert.match(html, locale === "en" ? /<h3 id="project-path-overview-title">Pseudomolecule Preview<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/ : /<h3 id="project-path-overview-title">假分子预览<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span>/);
-    assert.ok(html.indexOf('class="project-information"') < html.indexOf('id="project-data-catalog"'));
-    assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('class="project-path-overview"'));
-    assert.match(html, /data-project-export-jump-chr="Chr01"/); assert.match(html, /Keep_MiXeD/);
-    assert.match(html, /MiXeD_ctg/); assert.equal(JSON.stringify(value), before);
+    assert.match(html, /class="project-export-page project-integrated-overview"/);
+    assert.match(html, locale === "en" ? /<h3 id="overview-preview-title">Pseudomolecule Preview<\/h3>/ : /<h3 id="overview-preview-title">假分子预览<\/h3>/);
+    assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('data-overview-summary'));
+    assert.match(html, /data-overview-preview/); assert.match(html, /Keep_MiXeD/);
+    assert.equal(JSON.stringify(value), before);
     value.projectExport = { ...value.projectExport, workspacePath: "D:/other" };
     const changed = renderWorkspacePage(value); assert.doesNotMatch(changed, /data-project-export-jump-chr/);
-    assert.match(changed, /<h3 id="project-path-overview-title">[^<]+<\/h3><\/header>/);
     assert.match(changed, locale === "en" ? /Loading overview data/ : /正在加载概览数据/);
   }
 });

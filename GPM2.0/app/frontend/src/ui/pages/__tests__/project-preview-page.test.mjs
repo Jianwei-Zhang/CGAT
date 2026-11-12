@@ -226,7 +226,7 @@ test("embedded Preview contains cards only and cannot overwrite the surrounding 
   assert.equal(await loadProjectPreviewData(node, store, { ...deps(), getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }) }), true);
   assert.equal(node.parentElement.summary, summary);
   assert.doesNotMatch(node.innerHTML, /project-preview-heading|project-preview-subtitle|project-preview-legend|data-preview-download/); assert.match(node.innerHTML, /project-preview-card/);
-  assert.match(node.innerHTML, /aria-labelledby="overview-preview-title"><header class="project-section-divider"><h3 id="overview-preview-title">假分子预览<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>1<\/span><\/header>/);
+  assert.match(node.innerHTML, /aria-labelledby="overview-preview-title"/);
   assert.equal(store.getState().projectPreview.loaded, true);
 });
 
@@ -265,7 +265,7 @@ test("mounted Overview Preview refreshes after committed content changes, not on
   store.setState({ assembly: { ...store.getState().assembly, actionStatus: "phase committed" } });
   assert.equal(await loadProjectPreviewData(node, store, options), true);
   assert.equal(metadataReads, 2); assert.doesNotMatch(node.innerHTML, /project-preview-heading|project-preview-subtitle|project-preview-legend|data-preview-download/);
-  assert.match(node.innerHTML, /<h3 id="overview-preview-title">假分子预览<\/h3>/);
+  assert.doesNotMatch(node.innerHTML, /<h3 id="overview-preview-title">/);
   unbindProjectPreviewPage(node); assert.equal(subscriptions, 0);
   const next = beginPreviewContentOperation("delete_phased_chr_track", args);
   finishPreviewContentOperation(next, "delete_phased_chr_track", {}, true);
@@ -375,7 +375,7 @@ test("card-level feedback retains all adopted intervals and result CTGs without 
   assert.equal((output.match(/data-final-path-kind="ctg"/g) || []).length, 3, "include every result CTG, including reused sources");
   assert.equal((output.match(/data-final-path-kind="gap"/g) || []).length, 1);
   assert.equal((output.match(/class="project-preview-contig is-context"/g) || []).length, 1, "unused context is unchanged");
-  assert.equal((output.match(/<button /g) || []).length, 1, "keep the card header as the sole keyboard action");
+  assert.equal((output.match(/<button /g) || []).length, 2, "expansion and Assembly navigation are independent keyboard actions");
   assert.doesNotMatch(output, /data-preview-highlighted|data-preview-part-key|tabindex|role="img"/);
   assert.equal(JSON.stringify(card), before, "presentation must not change scientific data");
 });
