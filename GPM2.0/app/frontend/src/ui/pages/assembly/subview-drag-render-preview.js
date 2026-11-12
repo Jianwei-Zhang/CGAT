@@ -39,6 +39,10 @@ export function createSubviewRenderCover(scroll) {
 
 export function blockSubviewRenderInput(node) {
   for (const type of ["pointerdown", "click", "dblclick", "contextmenu", "wheel", "keydown"]) {
-    node.addEventListener(type, event => { event.preventDefault(); event.stopPropagation(); }, { capture: true, passive: false });
+    node.addEventListener(type, event => {
+      // A render cover blocks graph edits, not ordinary page scrolling.
+      if (type === "wheel" && !event.ctrlKey) return;
+      event.preventDefault(); event.stopPropagation();
+    }, { capture: true, passive: false });
   }
 }

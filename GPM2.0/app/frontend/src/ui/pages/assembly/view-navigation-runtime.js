@@ -325,6 +325,8 @@ function createController(root, store, window) {
     if (event.pointerId === controller.gesture?.pointerId) endGesture(true);
   });
   listen(root, "wheel", (event) => {
+    // Ordinary wheel input belongs to page scrolling, even over a plot or ruler.
+    if (!event.ctrlKey) return;
     if (event.target?.closest?.("input,select,textarea,button,summary,[contenteditable='true']")) return;
     const axis = event.target?.closest?.("[data-view-nav-axis]");
     const plot = event.target?.closest?.(".assembly-track-scroll[data-track-role]");
