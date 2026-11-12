@@ -16,23 +16,36 @@
   font-weight: 600;
 }
 
-/* Results stay highlighted; adopted source intervals appear together only
-   while their own card is hovered or its header has keyboard focus. Keep role
-   fills, Gap and unused source context intact, with subdued 2px highlights. */
+/* Adopted source intervals and non-Gap results share a persistent thin outer
+   outline. Only the active card thickens it; keep role fills and text intact,
+   without an interior tint or fragment glow. */
 .project-export-page [data-overview-preview] .project-preview-card .project-preview-used {
-  opacity: 0;
-  background: var(--preview-selection-fill);
-  box-shadow: inset 0 0 0 2px var(--final-path-selection-stroke);
+  opacity: 1;
+  background: transparent;
+  box-shadow: none;
+  border-radius: inherit;
+}
+
+.project-export-page [data-overview-preview] .project-preview-card .project-preview-used,
+.project-export-page [data-overview-preview] .project-preview-final-part:not(.is-gap) {
+  outline: 1px solid var(--final-path-selection-stroke);
+  outline-offset: 0;
 }
 
 .project-export-page [data-overview-preview] .project-preview-card:hover .project-preview-used,
-.project-export-page [data-overview-preview] .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-used {
-  opacity: 1;
+.project-export-page [data-overview-preview] .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-used,
+.project-export-page [data-overview-preview] .project-preview-card:hover .project-preview-final-part:not(.is-gap),
+.project-export-page [data-overview-preview] .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-final-part:not(.is-gap) {
+  outline-width: 2px;
 }
 
-.project-export-page [data-overview-preview] .project-preview-final-part:not(.is-gap) {
-  outline: 2px solid var(--final-path-selection-stroke);
-  outline-offset: -2px;
+/* Source and path geometry is already clipped to the domain. Let the outer
+   rings paint past their containers, including at plot endpoints; labels keep
+   their own clipping and unused source context keeps its existing styling. */
+.project-export-page [data-overview-preview] .project-preview-card .project-preview-plot,
+.project-export-page [data-overview-preview] .project-preview-card .project-preview-contig.is-adopted,
+.project-export-page [data-overview-preview] .project-preview-card .project-preview-reference {
+  overflow: visible;
 }
 
 .project-export-page .button,
