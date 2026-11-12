@@ -103,7 +103,7 @@ function createContextRecorder() {
   };
 }
 
-test("canvas draws opaque identity fills low-to-high with stable equal-quality ties", () => {
+test("canvas draws translucent identity fills low-to-high with stable equal-quality ties", () => {
   const originalRequest = globalThis.requestAnimationFrame;
   const originalCancel = globalThis.cancelAnimationFrame;
   globalThis.requestAnimationFrame = (callback) => { callback(0); return 1; };
@@ -128,7 +128,7 @@ test("canvas draws opaque identity fills low-to-high with stable equal-quality t
       resolveAlignmentBandStyle("companion", 85).fill,
       resolveAlignmentBandStyle("primary", 100).fill,
     ]);
-    paints.forEach((fill) => assert.ok(fill.startsWith("rgb("), "no alpha blending"));
+    paints.forEach((fill) => assert.match(fill, /^rgba\(\d+, \d+, \d+, 0\.62\)$/, "constant alpha reveals covered bands"));
   } finally {
     globalThis.requestAnimationFrame = originalRequest;
     globalThis.cancelAnimationFrame = originalCancel;

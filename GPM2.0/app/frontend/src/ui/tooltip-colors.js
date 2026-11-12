@@ -1,5 +1,5 @@
 // Resolve painted object colours, not a coarse primary/companion palette.
-// Canvas hit proxies retain their opaque paint in the alignment custom properties.
+// Canvas hit proxies retain their paint (including alpha) in the alignment custom properties.
 export function parseTooltipColor(value) {
   const text = String(value || "").trim().toLowerCase();
   if (!text || ["none", "transparent"].includes(text)) return null;

@@ -91,8 +91,12 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
   const fromTop = leftCenterY <= rightCenterY;
   const y1 = fromTop ? left.entry.y + left.entry.height : left.entry.y;
   const y2 = fromTop ? right.entry.y : right.entry.y + right.entry.height;
+  // Same-lane junctions used to place the caption inside the CTG bar.
+  const labelY = Math.abs(leftCenterY - rightCenterY) < 1
+    ? Math.max(10, Math.min(left.entry.y, right.entry.y) - 8)
+    : (y1 + y2) / 2 - 4;
   const label = junction.kind === "gap"
-    ? `<text class="grt-result-gap-label" data-grt-result-junction-label="1" x="${((left.x + right.x) / 2).toFixed(2)}" y="${((y1 + y2) / 2 - 4).toFixed(2)}" text-anchor="middle">${escapeHtml(gapCaption)}</text>`
+    ? `<text class="grt-result-gap-label" data-grt-result-junction-label="1" x="${((left.x + right.x) / 2).toFixed(2)}" y="${labelY.toFixed(2)}" text-anchor="middle">${escapeHtml(gapCaption)}</text>`
     : "";
   return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}" ${endpointAttrs}>
     <line class="grt-result-junction${cssClass}" data-grt-result-junction-line="1" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" pointer-events="none" />
@@ -172,6 +176,7 @@ export function buildGrtResultScene({
       hasVisibleJunction: false,
       overlaysByKey: new Map(),
       junctionMarkup: "",
+      evidenceMarkup: "",
     };
   }
   const overlaysByKey = new Map();
@@ -191,10 +196,11 @@ export function buildGrtResultScene({
       .map((junction) => renderJunction(junction, visibleEntries, escapeHtml, gapLabel))
       .join("")
     : "";
-  const junctionMarkup = `${evidenceMarkup}${pathJunctionMarkup}`;
+  const junctionMarkup = pathJunctionMarkup;
   return {
     hasVisibleResult: true,
     hasVisibleJunction: Boolean(junctionMarkup),
+    evidenceMarkup,
     overlaysByKey,
     junctionMarkup,
   };

@@ -117,3 +117,20 @@ test("deferred rerender coordinator cancels a pending frame", () => {
   assert.deepEqual(cancelled, [1]);
   assert.equal(rerenderCalls.length, 0);
 });
+
+
+test("hostless full-page and unscoped panel requests remain no-ops", () => {
+  const frames = [], calls = [];
+  const coordinator = createDeferredRerenderCoordinator({
+    requestAnimationFrame: callback => frames.push(callback),
+    rerender: (...args) => calls.push(args),
+    rerenderSubviewPanel: (...args) => calls.push(args),
+  });
+  coordinator.schedule(null, {});
+  frames.shift()(0);
+  coordinator.scheduleSubviewPanel(null, {});
+  frames.shift()(0);
+  coordinator.scheduleSubviewPanel({}, null);
+  frames.shift()(0);
+  assert.deepEqual(calls, []);
+});

@@ -1983,7 +1983,7 @@ function renderAssemblyTracks(args) {
       escapeHtml,
       gapLabel: i18n.grtResult.gapLabel,
     })
-    : { hasVisibleResult: false, overlaysByKey: new Map(), junctionMarkup: "" };
+    : { hasVisibleResult: false, overlaysByKey: new Map(), junctionMarkup: "", evidenceMarkup: "" };
 
   const subviewTrackSelections = getSubviewTrackSelections(subview);
   const isSubviewTrackLabelSelected = (layout, trackLabelRole) => {
@@ -2404,13 +2404,18 @@ function renderAssemblyTracks(args) {
             ${collinearityBands}
             ${mainAlignmentAnchors}
             ${renderGrtResultOverlayGroup({
-              layer: "junction",
-              markup: grtResultContext?.mainEnabled ? grtResultScene.junctionMarkup : "",
+              layer: "evidence",
+              markup: grtResultContext?.mainEnabled ? grtResultScene.evidenceMarkup : "",
               escapeAttr,
             })}
             ${sourceGapConnections}
             ${rowBlocks}
             ${refRow}
+            ${renderGrtResultOverlayGroup({
+              layer: "junction",
+              markup: grtResultContext?.mainEnabled ? grtResultScene.junctionMarkup : "",
+              escapeAttr,
+            })}
           </svg>
         </div>
       </div>

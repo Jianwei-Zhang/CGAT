@@ -113,10 +113,10 @@ textarea { background: var(--surface-panel); color: var(--text-primary); }
   --final-path-selection-stroke: #facc15;
   --final-path-selection-fill: rgba(250, 204, 21, 0.24);
   --preview-selection-fill: rgba(250, 204, 21, 0.12);
-  --alignment-legend-primary-low: rgb(45, 68, 96);
-  --alignment-legend-primary-high: rgb(81, 127, 180);
-  --alignment-legend-companion-low: rgb(75, 69, 59);
-  --alignment-legend-companion-high: rgb(161, 128, 80);
+  --alignment-legend-primary-low: rgba(45, 68, 96, 0.62);
+  --alignment-legend-primary-high: rgba(81, 127, 180, 0.62);
+  --alignment-legend-companion-low: rgba(75, 69, 59, 0.62);
+  --alignment-legend-companion-high: rgba(161, 128, 80, 0.62);
   --preview-card-ring: #8ab6e6;
   --preview-card-glow: rgba(0, 0, 0, 0.45);
 }
@@ -187,4 +187,15 @@ textarea { background: var(--surface-panel); color: var(--text-primary); }
 :root[data-theme="dark"] .manual-split-edge:hover circle,
 :root[data-theme="dark"] .manual-split-edge:focus circle {
   fill: #3c2f5c;
+}
+
+/* Muted precomputed overlays, with readable labels on dark canvases. */
+:root[data-theme="dark"] {
+  --grt-result-mask: rgba(23, 33, 46, 0.25);
+  --grt-result-fill: rgba(130, 157, 139, 0.30);
+  --grt-result-stroke: #829c8a;
+  --grt-mummer-fill: rgba(154, 143, 170, 0.16);
+  --grt-mummer-stroke: rgba(162, 150, 180, 0.55);
+  --grt-minimap-fill: rgba(130, 161, 157, 0.16);
+  --grt-minimap-stroke: rgba(139, 168, 164, 0.55);
 }

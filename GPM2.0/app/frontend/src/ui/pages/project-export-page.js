@@ -1850,22 +1850,10 @@ function jumpToAssemblyChr(store, target) {
     assembly: {
       ...(state.assembly || {}),
       activeTab: "assembly",
-      loading: false,
-      chromosomes: [],
-      selectedChrName: normalizedChrName,
+      // Queue navigation without destroying the live chromosome/session. The
+      // Assembly binder owns cold loading, warm selection and error recovery.
+      previewRequestedChrName: normalizedChrName,
       activePhasedTrackKey: normalizedPhasedKey,
-      chrCtgs: [],
-      refTrackMembers: [],
-      supportChrCtgs: [],
-      deletedCtgs: [],
-      selectedDeletedCtgRecordIds: [],
-      trackSelectedCtgIds: [],
-      hiddenPrimaryCtgIds: [],
-      trackDragOffsets: [],
-      subviewTrackDragOffsets: [],
-      selectedCtgId: null,
-      selectedMemberSeqId: null,
-      ctgDetail: null,
       projectExportScrollToBottom: true,
       ...(normalizedPhasedKey
         ? {

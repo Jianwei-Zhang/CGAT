@@ -43,7 +43,7 @@ test("titles and menus use Title Case while minor field labels retain sentence c
   assert.equal(assembly.page.phasedTrackGrtNoticeTitle, "LGZ Results Are Temporarily Unavailable");
   assert.equal(assembly.page.membersCardTitle, "Primary Dataset Members");
   assert.equal(assembly.trackControls.supportDatasetLengthRulesTitle, "Auxiliary Contig Length Rules");
-  assert.equal(assembly.trackControls.supportDatasetLengthBp, "Auxiliary contig length (bp)");
+  assert.equal(assembly.trackControls.supportDatasetLengthBp, "Auxiliary length (bp)");
   assert.equal(assembly.trackControls.supportDataset, "Auxiliary dataset");
   assert.equal(assembly.trackControls.alignmentLengthBp, "Alignment length (bp)");
   assert.equal(assembly.contextMenu.hideSelectedContigs, "Hide Selected Contigs ({count})");
@@ -64,7 +64,7 @@ test("titles and menus use Title Case while minor field labels retain sentence c
 test("Chinese controls use the approved full names rather than exposing source-field abbreviations", () => {
   const assembly = getMessages("zh", "assembly");
   assert.equal(assembly.trackControls.supportDataset, "辅助数据集");
-  assert.equal(assembly.trackControls.supportDatasetLengthBp, "辅助 Contig 长度 (bp)");
+  assert.equal(assembly.trackControls.supportDatasetLengthBp, "辅助长度 (bp)");
   assert.equal(assembly.page.membersCardTitle, "主数据集成员");
   assert.equal(assembly.page.finalPathOverallLenCol, "Contig 长度");
   assert.equal(assembly.page.finalPathOriginIdCol, "来源 ID");

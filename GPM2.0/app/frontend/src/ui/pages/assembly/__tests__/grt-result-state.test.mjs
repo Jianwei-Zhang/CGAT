@@ -186,11 +186,11 @@ test("renders accepted MUMmer and local minimap2 evidence as distinct passive ba
   });
 
   assert.equal(scene.hasVisibleJunction, true);
-  assert.match(scene.junctionMarkup, /class="grt-display-evidence-band is-mummer is-supporting-precursor"/);
-  assert.match(scene.junctionMarkup, /data-grt-display-evidence="mummer-left"/);
-  assert.match(scene.junctionMarkup, /data-grt-display-evidence-source-entry-key="top"/);
-  assert.match(scene.junctionMarkup, /data-grt-display-evidence-target-entry-key="bottom"/);
-  assert.match(scene.junctionMarkup, /class="grt-display-evidence-band is-minimap2"/);
+  assert.match(scene.evidenceMarkup, /class="grt-display-evidence-band is-mummer is-supporting-precursor"/);
+  assert.match(scene.evidenceMarkup, /data-grt-display-evidence="mummer-left"/);
+  assert.match(scene.evidenceMarkup, /data-grt-display-evidence-source-entry-key="top"/);
+  assert.match(scene.evidenceMarkup, /data-grt-display-evidence-target-entry-key="bottom"/);
+  assert.match(scene.evidenceMarkup, /class="grt-display-evidence-band is-minimap2"/);
   assert.doesNotMatch(scene.junctionMarkup, /MAPQ/);
 
   const pathOnlyScene = buildGrtResultScene({
@@ -201,7 +201,7 @@ test("renders accepted MUMmer and local minimap2 evidence as distinct passive ba
     ],
     layers: { resultPath: true, alignmentEvidence: false },
   });
-  assert.doesNotMatch(pathOnlyScene.junctionMarkup, /data-grt-display-evidence=/);
+  assert.doesNotMatch(pathOnlyScene.evidenceMarkup, /data-grt-display-evidence=/);
   assert.equal(pathOnlyScene.overlaysByKey.size, 2);
 
   const evidenceOnlyScene = buildGrtResultScene({
@@ -212,7 +212,7 @@ test("renders accepted MUMmer and local minimap2 evidence as distinct passive ba
     ],
     layers: { resultPath: false, alignmentEvidence: true },
   });
-  assert.match(evidenceOnlyScene.junctionMarkup, /data-grt-display-evidence=/);
+  assert.match(evidenceOnlyScene.evidenceMarkup, /data-grt-display-evidence=/);
   assert.equal(evidenceOnlyScene.overlaysByKey.size, 0);
 });
 
@@ -284,6 +284,16 @@ test("renders cross-lane links as lines, same-ctg links as arcs, and gap labels 
   assert.match(crossScene.junctionMarkup, /data-grt-result-junction-line="1"/);
   assert.match(crossScene.junctionMarkup, /data-subview-band-tooltip="Linking Inter-assembly Units for Genome Zipping gap · 300 bp"/);
   assert.match(crossScene.junctionMarkup, /<text[^>]*>LGZ gap · 300 bp<\/text>/);
+
+  const sameRowScene = buildGrtResultScene({
+    plan: crossPlan,
+    entries: [
+      { key: "left", ctg: { assemblyCtgId: 11, lengthBp: 10000, orient: "+" }, rect: { x: 0, width: 1000 }, y: 100, height: 14 },
+      { key: "right", ctg: { assemblyCtgId: 22, lengthBp: 10000, orient: "+" }, rect: { x: 1000, width: 1000 }, y: 100, height: 14 },
+    ],
+  });
+  const labelY = Number(sameRowScene.junctionMarkup.match(/<text[^>]* y="([^"]+)"/)[1]);
+  assert.ok(labelY < 100, "same-row Gap caption sits above CTG bars rather than inside them");
 
   const sameCtgPlan = buildGrtResultPlan(entry([
     sourceSegment("a", 1, 1000),

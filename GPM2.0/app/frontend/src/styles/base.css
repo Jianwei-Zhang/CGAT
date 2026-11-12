@@ -52,10 +52,10 @@
   --final-path-selection-fill: rgba(234, 88, 12, 0.22);
   --preview-selection-fill: rgba(234, 88, 12, 0.10);
   /* Identity legend endpoints mirror the band paint scale at 80% and 100%. */
-  --alignment-legend-primary-low: rgb(227, 232, 240);
-  --alignment-legend-primary-high: rgb(148, 169, 197);
-  --alignment-legend-companion-low: rgb(237, 232, 223);
-  --alignment-legend-companion-high: rgb(186, 167, 135);
+  --alignment-legend-primary-low: rgba(227, 232, 240, 0.62);
+  --alignment-legend-primary-high: rgba(148, 169, 197, 0.62);
+  --alignment-legend-companion-low: rgba(237, 232, 223, 0.62);
+  --alignment-legend-companion-high: rgba(186, 167, 135, 0.62);
   /* Preview chromosome cards read as one selectable object on hover/focus. */
   --preview-card-ring: #3f6fa3;
   --preview-card-glow: rgba(63, 111, 163, 0.18);

@@ -473,7 +473,12 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
 function evidenceStatus(evidence, labels, escapeHtml) {
   const status = String(evidence?.status || "");
   if (status === "loading") return `<span class="muted">${escapeHtml(labels.loadingPairwiseEvidence)}</span>`;
-  if (status === "error") return `<span class="error-text">${escapeHtml(evidence.error || labels.compositionEvidenceFailed)}</span>`;
+  if (status === "error") {
+    const message = evidence.error?.userMessage
+      || (typeof evidence.error === "string" ? evidence.error : "")
+      || labels.compositionEvidenceFailed;
+    return `<span class="error-text">${escapeHtml(message)}</span>`;
+  }
   const coverage = Array.isArray(evidence?.coverage) ? evidence.coverage : [];
   if (coverage.some((item) => item.status === "failed")) return `<span class="error-text">${escapeHtml(labels.compositionEvidencePartialFailed)}</span>`;
   if (coverage.some((item) => item.status === "missing")) return `<span class="muted">${escapeHtml(labels.compositionEvidencePartialMissing)}</span>`;
@@ -674,8 +679,8 @@ export function renderSubviewCompositionAlignmentCard({
           })}
           ${bandMarkup}${emptyTop}${emptyBottom}
           ${renderGrtResultOverlayGroup({
-            layer: "junction",
-            markup: grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : "",
+            layer: "evidence",
+            markup: grtResult.context?.subviewEnabled ? grtScene.evidenceMarkup : "",
             escapeAttr,
           })}
           ${memberMarkup}
@@ -683,6 +688,11 @@ export function renderSubviewCompositionAlignmentCard({
           ${renderManualAnchors(layout, composition.manualAnchors, escapeAttr)}
           ${renderManualAnchors(layout, composition.activeAnchors.filter((anchor) => anchor.descriptor).map((anchor) => ({ ...anchor, endpointA: anchor.descriptor.top, endpointB: anchor.descriptor.bottom })), escapeAttr, true)}
           ${grtAnchorScene.markup}
+          ${renderGrtResultOverlayGroup({
+            layer: "junction",
+            markup: grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : "",
+            escapeAttr,
+          })}
         </svg>
       </div>
     </div>

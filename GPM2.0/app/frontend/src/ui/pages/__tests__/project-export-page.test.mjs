@@ -1656,10 +1656,11 @@ test("project export final path row jump switches to assembly chr and requests b
 
   assert.equal(__test.jumpToAssemblyChr(store, "Chr02"), true);
   assert.equal(state.activeRoute, "assembly");
-  assert.equal(state.assembly.selectedChrName, "Chr02");
+  assert.equal(state.assembly.selectedChrName, "Chr01");
+  assert.equal(state.assembly.previewRequestedChrName, "Chr02");
   assert.equal(state.assembly.activeTab, "assembly");
   assert.equal(state.assembly.projectExportScrollToBottom, true);
-  assert.deepEqual(state.assembly.chromosomes, []);
+  assert.deepEqual(state.assembly.chromosomes, [{ chrName: "Chr01" }]);
 });
 
 test("project export final path row jump switches phased rows to the parent chr and active haplotype", () => {
@@ -1774,7 +1775,8 @@ test("project export final path row jump keeps clicked phased chr target instead
     true,
   );
   assert.equal(state.activeRoute, "assembly");
-  assert.equal(state.assembly.selectedChrName, "Chr02");
+  assert.equal(state.assembly.selectedChrName, "Chr01");
+  assert.equal(state.assembly.previewRequestedChrName, "Chr02");
   assert.equal(state.assembly.activePhasedTrackKey, "B");
   assert.equal(state.assembly.activePhasedTrackKeyByChr.Chr02, "B");
   assert.equal(state.assembly.activeFinalPathKey, "B");

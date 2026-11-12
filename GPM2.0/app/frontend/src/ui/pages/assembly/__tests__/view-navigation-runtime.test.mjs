@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { bindAssemblyViewNavigation, unbindAssemblyViewNavigation } from "../view-navigation-runtime.js";
+import { viewNavText } from "../view-navigation-ui.js";
+import { blockSubviewRenderInput } from "../subview-drag-render-preview.js";
 import { VIEW_CONTIG_TARGET, VIEW_CONTROL_TARGET } from "../view-interaction.js";
 import { resolveTrackPrefs } from "../track-prefs.js";
 
@@ -148,7 +150,7 @@ function harness({ resetScrollOnReparent = false } = {}) {
     persistMainTrackViewState() { persists++; },
   };
   const event = (target, extra = {}) => ({ target, button: 0, pointerId: 1, clientX: 200,
-    preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, stopImmediatePropagation() {}, ...extra });
+    preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.propagationStopped = true; }, stopImmediatePropagation() {}, ...extra });
   const bind = () => bindAssemblyViewNavigation(root, store, deps);
   bind();
   return { root, win, frames, views, ticks, store, deps, bind, event, renderedNavigation,
@@ -220,11 +222,11 @@ for (const role of ["primary", "subview"]) {
   });
 
   for (const target of ["scroll", "axis"]) {
-    test(`${role} ${target} wheel zooms immediately without a mode switch`, () => {
+    test(`${role} ${target} Ctrl + wheel zooms without a mode switch`, () => {
       const h = harness();
       try {
         const view = h.views[role];
-        const wheel = h.event(view[target], { deltaY: -100 });
+        const wheel = h.event(view[target], { ctrlKey: true, deltaY: -100 });
         h.root.emit("wheel", wheel);
         assert.equal(wheel.defaultPrevented, true);
         assert.equal(h.frames.size, 1);
@@ -232,7 +234,7 @@ for (const role of ["primary", "subview"]) {
         const otherRole = role === "primary" ? "subview" : "primary";
         const otherKey = otherRole === "primary" ? "trackView" : "subviewTrackView";
         assert.equal(h.store.getState().assembly[otherKey].visibleSpanBp, 500);
-        const otherWheel = h.event(h.views[otherRole][target], { deltaY: -100 });
+        const otherWheel = h.event(h.views[otherRole][target], { ctrlKey: true, deltaY: -100 });
         h.root.emit("wheel", otherWheel);
         assert.equal(otherWheel.defaultPrevented, true);
         h.flush(); assert.equal(h.writes, 2);
@@ -247,12 +249,12 @@ test("unified navigation never consumes wheel events outside the plot and overvi
     for (const role of ["primary", "subview"]) {
       const view = h.views[role];
       for (const target of [view.display, view.action("fit"), { closest: () => null }]) {
-        const event = h.event(target, { deltaY: -100 });
+        const event = h.event(target, { ctrlKey: true, deltaY: -100 });
         h.root.emit("wheel", event);
         assert.equal(event.defaultPrevented, undefined);
       }
       for (const target of [view.scroll, view.axis]) {
-        const event = h.event(target, { deltaY: 10, deltaX: 100 });
+        const event = h.event(target, { ctrlKey: true, deltaY: 10, deltaX: 100 });
         h.root.emit("wheel", event);
         assert.equal(event.defaultPrevented, undefined);
       }
@@ -358,12 +360,12 @@ for (const role of ["primary", "subview"]) {
 
 test("wheel is coalesced, excludes controls and becomes inert after unbinding", () => {
   const h = harness();
-  for (let i = 0; i < 30; i++) h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -1 }));
+  for (let i = 0; i < 30; i++) h.root.emit("wheel", h.event(h.views.primary.scroll, { ctrlKey: true, deltaY: -1 }));
   assert.equal(h.frames.size, 1); assert.equal(h.writes, 0);
   h.flush(); assert.equal(h.writes, 1); assert.equal(h.renders, 1);
-  h.root.emit("wheel", h.event({ closest: () => ({}) }, { deltaY: -100 }));
+  h.root.emit("wheel", h.event({ closest: () => ({}) }, { ctrlKey: true, deltaY: -100 }));
   assert.equal(h.frames.size, 0);
-  h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -10 }));
+  h.root.emit("wheel", h.event(h.views.primary.scroll, { ctrlKey: true, deltaY: -10 }));
   h.dispose(); assert.equal(h.frames.size, 0); assert.equal(h.win.count("pointermove"), 0);
 });
 
@@ -401,7 +403,7 @@ test("focused input replacement does not reenter commit from synchronous blur/ch
 test("persistence is debounced and does not write into a newly selected context", async () => {
   const h = harness();
   try {
-    h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -20 })); h.flush();
+    h.root.emit("wheel", h.event(h.views.primary.scroll, { ctrlKey: true, deltaY: -20 })); h.flush();
     h.store.setState({ ...h.store.getState(), assembly: { ...h.store.getState().assembly, selectedChrName: "Chr2" } });
     await new Promise(resolve => setTimeout(resolve, 200));
     assert.equal(h.persists, 0);
@@ -425,7 +427,7 @@ test("overview edge buttons support keyboard resizing without changing data cont
 test("a queued wheel cannot apply an old chromosome window to a newly selected chromosome", () => {
   const h = harness();
   try {
-    h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -100 }));
+    h.root.emit("wheel", h.event(h.views.primary.scroll, { ctrlKey: true, deltaY: -100 }));
     const state = h.store.getState();
     h.store.setState({ ...state, assembly: { ...state.assembly, selectedChrName: "Chr2" } });
     h.flush();
@@ -474,7 +476,7 @@ test("explicit empty primary content disables navigation without fabricating a w
     assert.equal(h.views.primary.selection.attrs["aria-disabled"], "true");
     assert.equal(h.views.primary.selection.attrs.tabindex, "-1");
     const before = JSON.stringify(h.store.getState());
-    h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -100 })); h.flush();
+    h.root.emit("wheel", h.event(h.views.primary.scroll, { ctrlKey: true, deltaY: -100 })); h.flush();
     h.root.emit("click", h.event(h.views.primary.action("fit")));
     assert.equal(JSON.stringify(h.store.getState()), before);
     assert.equal(h.writes, 0);
@@ -625,7 +627,7 @@ for (const [role, viewKey] of [["primary", "trackView"], ["subview", "subviewTra
       h.root.emit("click", h.event(h.views[role].action("fit")));
       assert.equal(h.store.getState().assembly[viewKey].fullRange, true);
       assert.equal(h.store.getState().assembly[viewKey].allowSubViewportScale, true);
-      h.root.emit("wheel", h.event(h.views[role].scroll, { deltaY: -100 }));
+      h.root.emit("wheel", h.event(h.views[role].scroll, { ctrlKey: true, deltaY: -100 }));
       h.flush();
       assert.notEqual(h.store.getState().assembly[viewKey].fullRange, true);
     } finally { h.dispose(); }
@@ -715,4 +717,67 @@ test("a gesture already claimed by drag-to-Final-Path cannot also start panning"
     h.root.emit("pointerdown", h.event(h.views.primary.scroll, { defaultPrevented: true }));
     assert.equal(h.win.count("pointermove"), 0);
   } finally { h.dispose(); }
+});
+
+
+for (const role of ["primary", "subview"]) {
+  for (const target of ["scroll", "axis"]) {
+    test(`${role} ${target} ordinary wheel remains native page scrolling`, () => {
+      const h = harness();
+      try {
+        const initial = h.store.getState();
+        for (const modifiers of [{}, { ctrlKey: false }, { metaKey: true }, { shiftKey: true }, { altKey: true }]) {
+          for (const deltaY of [-100, 100]) {
+            const event = h.event(h.views[role][target], { deltaY, ...modifiers });
+            h.root.emit("wheel", event);
+            assert.equal(event.defaultPrevented, undefined);
+            assert.equal(event.propagationStopped, undefined);
+          }
+        }
+        assert.equal(h.frames.size, 0);
+        assert.equal(h.writes, 0);
+        assert.equal(h.renders, 0);
+        assert.equal(h.persists, 0);
+        assert.equal(h.store.getState(), initial);
+      } finally { h.dispose(); }
+    });
+  }
+}
+
+test("ordinary wheel cannot add to an already queued Ctrl zoom", () => {
+  const h = harness();
+  try {
+    h.root.emit("wheel", h.event(h.views.primary.scroll, { ctrlKey: true, deltaY: -100 }));
+    const pending = h.frames.size;
+    const event = h.event(h.views.primary.scroll, { ctrlKey: false, deltaY: 1000 });
+    h.root.emit("wheel", event);
+    assert.equal(event.defaultPrevented, undefined);
+    assert.equal(h.frames.size, pending);
+    h.flush();
+    assert.equal(h.writes, 1);
+    assert.ok(h.store.getState().assembly.trackView.visibleSpanBp < 500);
+  } finally { h.dispose(); }
+});
+
+test("Local render covers allow ordinary scrolling but block Ctrl zoom and graph edits", () => {
+  const node = new Events();
+  blockSubviewRenderInput(node);
+  for (const [type, ctrlKey, blocked] of [["wheel", false, false], ["wheel", true, true],
+    ["pointerdown", false, true], ["click", false, true], ["keydown", false, true]]) {
+    const event = { ctrlKey, preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.propagationStopped = true; } };
+    node.emit(type, event);
+    assert.equal(Boolean(event.defaultPrevented), blocked);
+    assert.equal(Boolean(event.propagationStopped), blocked);
+  }
+});
+
+test("navigation help describes Ctrl-only wheel zoom in both languages", () => {
+  for (const locale of ["zh", "en"]) {
+    const labels = viewNavText(locale);
+    for (const key of ["interaction", "axis"]) {
+      assert.match(labels[key], locale === "zh" ? /Ctrl \+ 滚轮缩放/ : /Ctrl \+ wheel to zoom/);
+      assert.match(labels[key], locale === "zh" ? /普通滚轮上下滚动/ : /plain wheel scrolls vertically/);
+    }
+  }
 });

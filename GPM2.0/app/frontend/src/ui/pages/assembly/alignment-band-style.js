@@ -2,8 +2,10 @@ import { formatIntegerEnUs } from "./number-format.js";
 
 // One absolute scale for Canvas, SVG, drag previews and serialized SVGs.
 // Missing evidence is not a measured zero; MAPQ is never a fallback.
-// Keep the absolute identity domain; soften paint strength, not opacity, so
-// overlapping bands never become artificially darker than their identity.
+// Constant fill alpha reveals overlaps; identity remains encoded by the fixed
+// color ramp and opaque outline. Overlap density is not an identity measurement.
+const BAND_FILL_ALPHA = 0.62;
+const translucent = (color) => color.replace("rgb(", "rgba(").replace(")", `, ${BAND_FILL_ALPHA})`);
 const MIN_COLOR_STRENGTH = 0.18;
 const MAX_COLOR_STRENGTH = 0.68;
 const DARK_MIN_COLOR_STRENGTH = 0.3;
@@ -21,18 +23,18 @@ export function readHitIdentityPct(hit) {
 
 export function resolveAlignmentBandStyle(tone, identityPct) {
   const identity = readHitIdentityPct({ identityPct });
-  if (identity === null) return { fill: "rgb(222, 224, 227)", stroke: "rgb(194, 198, 204)" };
+  if (identity === null) return { fill: translucent("rgb(222, 224, 227)"), stroke: "rgb(194, 198, 204)" };
   const base = tone === "companion" ? [154, 126, 78] : [97, 129, 170];
   const strength = MIN_COLOR_STRENGTH + (MAX_COLOR_STRENGTH - MIN_COLOR_STRENGTH)
     * Math.max(0, Math.min(1, (identity - 80) / 20));
   const blend = (amount) => `rgb(${base.map((channel) => Math.round(255 + (channel - 255) * amount)).join(", ")})`;
-  return { fill: blend(strength), stroke: blend(Math.min(1, strength + 0.1)) };
+  return { fill: translucent(blend(strength)), stroke: blend(Math.min(1, strength + 0.1)) };
 }
 
 export function resolveDarkAlignmentBandStyle(tone, identityPct) {
   const identity = readHitIdentityPct({ identityPct });
   // Unknown identity is a neutral slate wash, never a fabricated strength.
-  if (identity === null) return { fill: "rgb(38, 50, 66)", stroke: "rgb(56, 72, 92)" };
+  if (identity === null) return { fill: translucent("rgb(38, 50, 66)"), stroke: "rgb(56, 72, 92)" };
   const canvas = [23, 33, 46];
   const base = tone === "companion" ? [196, 152, 88] : [96, 150, 214];
   const strength = DARK_MIN_COLOR_STRENGTH
@@ -41,7 +43,7 @@ export function resolveDarkAlignmentBandStyle(tone, identityPct) {
   const blend = (amount) => `rgb(${base
     .map((channel, index) => Math.round(canvas[index] + (channel - canvas[index]) * amount))
     .join(", ")})`;
-  return { fill: blend(strength), stroke: blend(Math.min(1, strength + 0.12)) };
+  return { fill: translucent(blend(strength)), stroke: blend(Math.min(1, strength + 0.12)) };
 }
 
 export function sortAlignmentBands(bands) {
@@ -69,7 +71,7 @@ export function renderAlignmentIdentityLegend(labels, escapeAttr) {
   // Endpoint stops come from the same tokens the paint scale resolves, so the
   // legend follows the active theme without rescaling identity.
   const gradient = (tone) => `linear-gradient(to right, var(--alignment-legend-${tone}-low), var(--alignment-legend-${tone}-high))`;
-  const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed, softened 80–100% color scale; ≤80% uses the lightest shade.";
+  const hint = labels?.identityLegendHint || "Fixed, softened 80–100% Identity color scale; ≤80% uses the low endpoint. Transparent fills reveal overlaps; overlapping color is not higher Identity. Hover for the exact value.";
   return `<div class="alignment-identity-legend" data-app-tooltip="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
     <span>Identity</span><span>≤80%</span><span class="alignment-identity-scale" aria-hidden="true">
       <i style="background:${gradient("primary")}"></i><i style="background:${gradient("companion")}"></i>

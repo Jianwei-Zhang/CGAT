@@ -39,15 +39,15 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.doesNotMatch(html, /id="assembly-export-chr-ctg-pmolecule-button"/);
   assert.doesNotMatch(html, /id="assembly-export-agp-button"/);
   assert.doesNotMatch(html, /Controls \/ 控件/);
-  assert.match(html, /辅助 Contig 长度 \(bp\)/);
+  assert.match(html, /辅助长度 \(bp\)/);
   assert.doesNotMatch(html, /刻度间隔 \(kb\)/);
   assert.doesNotMatch(html, /view-display-settings/);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
-  assert.ok(html.indexOf("辅助 Contig 长度 ") < html.indexOf("比对长度"));
+  assert.ok(html.indexOf("辅助长度 ") < html.indexOf("比对长度"));
   assert.match(html, /比对长度 \(bp\)/);
   assert.match(html, /一致性 \(%\)/);
-  assert.ok(html.indexOf("辅助数据集") < html.indexOf("辅助 Contig 长度 "));
+  assert.ok(html.indexOf("辅助数据集") < html.indexOf("辅助长度 "));
   assert.ok(html.indexOf("比对长度") < html.indexOf("一致性"));
 
   assert.match(
@@ -60,7 +60,7 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   );
   assert.match(
     html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开辅助 Contig 长度 \(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-support-ds-ctg-len-menu">/,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开辅助长度 \(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-support-ds-ctg-len-menu">/,
   );
   assert.match(html, /<div id="assembly-track-support-ds-ctg-len-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
   assert.match(html, /data-track-combo-value="0"/);
@@ -1485,4 +1485,10 @@ test("Local View SVG fallback overrides canvas-ready transparency when the drag 
     assert.ok(rule.includes("stroke: var(--alignment-band-paint-stroke"));
   }
   assert.match(css, /\.is-subview-band-canvas-drag-preview \.subview-track-svg \.track-collinearity-band\[data-track-band-proxy="1"\],[\s\S]*?display: none;/);
+});
+
+test("overlapping Main and Local contigs keep opaque outlines and translucent fills", () => {
+  const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url));
+  assert.match(css, /\.assembly-track-svg:not\(\.assembly-final-path-svg\) \.track-ctg,[\s\S]*?fill-opacity: 0\.68;/);
+  assert.doesNotMatch(css, /\.track-ctg\s*\{[^}]*[^-]opacity:/);
 });

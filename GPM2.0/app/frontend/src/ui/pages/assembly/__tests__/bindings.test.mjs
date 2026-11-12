@@ -1,3 +1,4 @@
+import { __test as projectExportTest } from "../../project-export-page.js";
 import { createScopePopoverFixture, withPopoverClock } from "./scope-popover-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -2048,4 +2049,47 @@ test("Anchor offset dialog validates both endpoints while the automatic value is
     },
   ]);
   assert.equal(typeof directionListeners.get("change"), "function");
+});
+
+
+test("homepage chromosome navigation is repeatable without clearing live assembly state", () => {
+  let state = { ...createState(), activeRoute: "importer", assembly: { ...createState().assembly,
+    selectedChrName: "", finalPathByChr: { Chr01: { segments: [{ id: "kept" }] } },
+    trackDragOffsets: [{ contigId: 17, offsetBp: 100 }], subview: { summary: { mode: "composition" } },
+  } };
+  const store = { getState: () => state, setState: patch => { state = { ...state, ...patch }; } };
+  const host = { querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
+  const calls = [];
+  const data = [{ assemblyCtgId: 17 }];
+  const paths = state.assembly.finalPathByChr, offsets = state.assembly.trackDragOffsets;
+  const deps = createBindingDeps({
+    loadAssemblyView(_host, _store, options) {
+      calls.push(["load", state.assembly.selectedChrName, options]);
+      store.setState({ assembly: { ...state.assembly, loading: false, error: "",
+        chromosomes: [{ chrName: "Chr01" }, { chrName: "Chr02" }], chrCtgs: data } });
+    },
+    selectChromosome(_host, _store, chrName) {
+      calls.push(["select", chrName]);
+      store.setState({ assembly: { ...state.assembly, selectedChrName: chrName } });
+    },
+  });
+  for (const chrName of ["Chr01", "Chr01", "Chr02", "Chr02", "Chr01"]) {
+    store.setState({ activeRoute: "importer" });
+    assert.equal(projectExportTest.jumpToAssemblyChr(store, chrName), true);
+    assert.equal(state.assembly.previewRequestedChrName, chrName);
+    assert.equal(state.assembly.finalPathByChr, paths);
+    assert.equal(state.assembly.trackDragOffsets, offsets);
+    bindAssemblyPageImpl(host, store, deps);
+    assert.equal(state.assembly.previewRequestedChrName, "");
+    assert.equal(state.assembly.selectedChrName, chrName);
+    assert.equal(state.assembly.chrCtgs, data);
+    bindAssemblyPageImpl(host, store, deps); // Rebinding must not navigate twice.
+  }
+  assert.deepEqual(calls, [["load", "Chr01", { keepCurrentChr: true, keepCurrentCtg: false }],
+    ["select", "Chr02"], ["select", "Chr01"]]);
+  store.setState({ activeRoute: "importer", assembly: { ...state.assembly, error: "old failure" } });
+  projectExportTest.jumpToAssemblyChr(store, "Chr02");
+  bindAssemblyPageImpl(host, store, deps);
+  assert.equal(state.assembly.error, "");
+  assert.deepEqual(calls.at(-1), ["load", "Chr02", { keepCurrentChr: true, keepCurrentCtg: false }]);
 });
