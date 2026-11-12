@@ -674,8 +674,8 @@ export function renderSubviewCompositionAlignmentCard({
           })}
           ${bandMarkup}${emptyTop}${emptyBottom}
           ${renderGrtResultOverlayGroup({
-            layer: "junction",
-            markup: grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : "",
+            layer: "evidence",
+            markup: grtResult.context?.subviewEnabled ? grtScene.evidenceMarkup : "",
             escapeAttr,
           })}
           ${memberMarkup}
@@ -683,6 +683,11 @@ export function renderSubviewCompositionAlignmentCard({
           ${renderManualAnchors(layout, composition.manualAnchors, escapeAttr)}
           ${renderManualAnchors(layout, composition.activeAnchors.filter((anchor) => anchor.descriptor).map((anchor) => ({ ...anchor, endpointA: anchor.descriptor.top, endpointB: anchor.descriptor.bottom })), escapeAttr, true)}
           ${grtAnchorScene.markup}
+          ${renderGrtResultOverlayGroup({
+            layer: "junction",
+            markup: grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : "",
+            escapeAttr,
+          })}
         </svg>
       </div>
     </div>

@@ -26,6 +26,14 @@ import test_run_all_runner as runner_fixture
 
 
 class ServerReportTests(unittest.TestCase):
+    def test_gap_legend_uses_the_same_hatching_as_path_segments(self):
+        source = (TOOLS / "render_server_report.py").read_text()
+        legend = re.search(r"\.legend-dot\.gap\{([^}]+)\}", source).group(1)
+        segment = re.search(r"\.path-segment\.gap\{([^}]+)\}", source).group(1)
+        background = lambda rule: re.search(r"background:([^;]+)", rule).group(1)
+        self.assertEqual(background(legend), background(segment))
+        self.assertIn("repeating-linear-gradient", background(legend))
+
     def test_legacy_and_current_cache_prefixes_are_reported_identically(self):
         for name in ("GRT", "LGZ"):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:

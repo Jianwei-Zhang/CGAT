@@ -229,6 +229,15 @@ test("schema 2 renders independent LGZ result switches and exact main-track over
 
   const html = renderAssemblyPage(state);
 
+  for (const [, svg] of html.matchAll(/<svg class="assembly-track-svg[^>]*>([\s\S]*?)<\/svg>/g)) {
+    if (!svg.includes('data-grt-result-overlay-layer="junction"')) continue;
+    const evidence = svg.indexOf('data-grt-result-overlay-layer="evidence"');
+    const junction = svg.indexOf('data-grt-result-overlay-layer="junction"');
+    const firstBar = svg.indexOf('data-grt-result-entry-key=');
+    const lastBar = svg.lastIndexOf('data-grt-result-entry-key=');
+    assert.ok(evidence >= 0 && evidence < firstBar, "evidence stays behind contigs");
+    assert.ok(junction > lastBar, "Gap labels and junctions stay above every contig overlay");
+  }
   assert.match(html, /data-grt-result-toggle="main" checked/);
   assert.match(html, /data-grt-result-toggle="subview"/);
   assert.match(html, /aria-label="Show the path and alignment evidence precomputed by the Linking Inter-assembly Units for Genome Zipping algorithm"/);

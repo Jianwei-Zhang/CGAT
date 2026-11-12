@@ -421,18 +421,18 @@
 }
 
 .grt-result-mask {
-  fill: rgba(224, 229, 225, 0.76);
+  fill: var(--grt-result-mask, rgba(224, 229, 225, 0.28));
 }
 
 .grt-result-interval {
-  fill: rgba(47, 158, 68, 0.72);
-  stroke: var(--theme-green-line, #1f7a34);
+  fill: var(--grt-result-fill, rgba(108, 143, 120, 0.38));
+  stroke: var(--grt-result-stroke, #718d79);
   stroke-width: 1;
 }
 
 .grt-result-junction {
   fill: none;
-  stroke: var(--theme-green-line, #2f9e44);
+  stroke: var(--grt-result-stroke, #718d79);
   stroke-width: 2.5;
 }
 
@@ -448,14 +448,14 @@
 }
 
 .grt-display-evidence-band.is-mummer {
-  fill: rgba(122, 86, 168, 0.24);
-  stroke: rgba(91, 57, 137, 0.78);
+  fill: var(--grt-mummer-fill, rgba(134, 122, 151, 0.16));
+  stroke: var(--grt-mummer-stroke, rgba(118, 102, 137, 0.56));
   stroke-width: 1.25;
 }
 
 .grt-display-evidence-band.is-minimap2 {
-  fill: rgba(0, 137, 123, 0.22);
-  stroke: rgba(0, 105, 92, 0.78);
+  fill: var(--grt-minimap-fill, rgba(106, 142, 138, 0.16));
+  stroke: var(--grt-minimap-stroke, rgba(91, 127, 123, 0.56));
   stroke-width: 1.25;
 }
 
@@ -472,7 +472,7 @@
 .grt-result-repeat-count {
   fill: var(--theme-green-ink, #285f37);
   paint-order: stroke;
-  stroke: rgba(255, 255, 255, 0.94);
+  stroke: var(--surface-panel, #fff);
   stroke-width: 3px;
   stroke-linejoin: round;
   font-size: var(--font-graph-label);
@@ -1488,6 +1488,11 @@
 .track-collinearity-band.is-companion {
   fill: var(--alignment-band-fill, rgb(222, 224, 227));
   stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
+}
+
+.assembly-track-svg:not(.assembly-final-path-svg) .track-ctg,
+.assembly-track-svg:not(.assembly-final-path-svg) .track-reference-member {
+  fill-opacity: 0.68;
 }
 
 .track-ctg {

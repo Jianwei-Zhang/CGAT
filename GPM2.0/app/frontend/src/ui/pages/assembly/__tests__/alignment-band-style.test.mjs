@@ -19,12 +19,12 @@ test("missing identity stays unknown, real zero survives, raw match counts remai
   assert.equal(resolveHitIdentityPct({}), 0, "zero threshold still includes unknown hits");
 });
 
-test("fixed continuous opaque scale preserves track hues and clamps only the color floor", () => {
+test("fixed continuous translucent scale preserves track hues and clamps only the color floor", () => {
   for (const tone of ["primary", "companion"]) {
     assert.deepEqual(resolveAlignmentBandStyle(tone, 0), resolveAlignmentBandStyle(tone, 80));
     const fills = [80, 85, 90, 93.27, 95, 100].map((identity) => resolveAlignmentBandStyle(tone, identity).fill);
-    const channels = fills.map((fill) => fill.match(/\d+/g).map(Number));
-    fills.forEach((fill) => assert.match(fill, /^rgb\(\d+, \d+, \d+\)$/));
+    const channels = fills.map((fill) => fill.match(/\d+/g).slice(0, 3).map(Number));
+    fills.forEach((fill) => assert.match(fill, /^rgba\(\d+, \d+, \d+, 0\.62\)$/));
     channels.slice(1).forEach((rgb, index) => rgb.forEach((channel, i) => assert.ok(channel < channels[index][i])));
     assert.notEqual(resolveAlignmentBandStyle(tone, null).fill, fills[0]);
   }
@@ -53,14 +53,14 @@ test("SVG export attributes and exact tooltip distinguish unknown from zero", ()
 });
 
 
-test("100 percent identity uses a softened opaque endpoint with a stronger but restrained outline", () => {
+test("100 percent identity uses a softened translucent endpoint with a stronger but restrained outline", () => {
   for (const [tone,fill,stroke,oldBase] of [
-    ["primary","rgb(148, 169, 197)","rgb(132, 157, 189)",[97,129,170]],
-    ["companion","rgb(186, 167, 135)","rgb(176, 154, 117)",[154,126,78]],
+    ["primary","rgba(148, 169, 197, 0.62)","rgb(132, 157, 189)",[97,129,170]],
+    ["companion","rgba(186, 167, 135, 0.62)","rgb(176, 154, 117)",[154,126,78]],
   ]) {
     const style=resolveAlignmentBandStyle(tone,100);
     assert.deepEqual(style,{fill,stroke});
-    const channels=style.fill.match(/\d+/g).map(Number);
+    const channels=style.fill.match(/\d+/g).slice(0, 3).map(Number);
     const outline=style.stroke.match(/\d+/g).map(Number);
     channels.forEach((channel,i)=>{assert.ok(channel>oldBase[i]);assert.ok(outline[i]<channel);});
     assert.deepEqual(resolveAlignmentBandStyle(tone,110),style);
@@ -81,18 +81,18 @@ test("legend endpoints stay identical to the main/local/export paint scale witho
   assert.doesNotMatch(html,/rgba\(|opacity/);
 });
 
-test("dark band ramp keeps primary and companion hues apart and monotonic without alpha", () => {
+test("dark band ramp keeps primary and companion hues apart and monotonic with constant alpha", () => {
   const levels=[0,80,85,90,95,100];
   const ramp=(tone)=>levels.map((identity)=>resolveDarkAlignmentBandStyle(tone,identity));
   for (const tone of ["primary","companion"]) {
     const styles=ramp(tone);
     styles.forEach(({fill,stroke})=>{
-      assert.match(fill,/^rgb\(\d+, \d+, \d+\)$/);
+      assert.match(fill,/^rgba\(\d+, \d+, \d+, 0\.62\)$/);
       assert.match(stroke,/^rgb\(\d+, \d+, \d+\)$/);
     });
     assert.deepEqual(styles[0],styles[1],"unknown/<=80 share the darkest floor");
     const luminances=styles.slice(1).map(({fill})=>{
-      const [r,g,b]=fill.match(/\d+/g).map(Number);
+      const [r,g,b]=fill.match(/\d+/g).slice(0, 3).map(Number);
       return 0.2126*r+0.7152*g+0.0722*b;
     });
     luminances.slice(1).forEach((value,index)=>assert.ok(value>luminances[index],`${tone} ramp brightens with identity`));
@@ -110,8 +110,8 @@ test("dark band ramp keeps primary and companion hues apart and monotonic withou
   // The mounted dark ramp must stay below the pale light ramp so bars do not glow.
   for (const tone of ["primary","companion"]) {
     for (const identity of [80,100]) {
-      const light=resolveAlignmentBandStyle(tone,identity).fill.match(/\d+/g).map(Number);
-      const dark=resolveDarkAlignmentBandStyle(tone,identity).fill.match(/\d+/g).map(Number);
+      const light=resolveAlignmentBandStyle(tone,identity).fill.match(/\d+/g).slice(0, 3).map(Number);
+      const dark=resolveDarkAlignmentBandStyle(tone,identity).fill.match(/\d+/g).slice(0, 3).map(Number);
       assert.ok(dark.reduce((a,b)=>a+b,0)<light.reduce((a,b)=>a+b,0),
         `${tone} ${identity}% dark fill is deeper than the light fill`);
     }
@@ -125,5 +125,5 @@ test("band svg attributes keep light export paint and carry the dark ramp as var
   assert.ok(attrs.includes(`--alignment-band-fill:${light.fill};`));
   assert.ok(attrs.includes(`--alignment-band-dark-fill:${dark.fill};`));
   assert.ok(attrs.includes(`--alignment-band-dark-stroke:${dark.stroke}`));
-  assert.doesNotMatch(attrs,/rgba\(/);
+  assert.match(attrs,/rgba\(/);
 });

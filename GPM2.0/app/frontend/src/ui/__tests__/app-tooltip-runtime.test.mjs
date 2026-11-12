@@ -284,7 +284,9 @@ test("Canvas proxies match the exact per-band identity shade in both themes, not
       const node = h.create("polygon", { class: "track-collinearity-band", "data-track-band-proxy": "1", "data-subview-band-tooltip": "band" },
         { fill: "rgba(0, 0, 0, 0)", opacity: "0", "--alignment-band-fill": light.fill, "--alignment-band-dark-fill": shade.fill }, true);
       h.fire("pointerover", node); backgrounds.push(h.panel.style.background);
-      assert.equal(h.panel.style.background, dark ? shade.fill : light.fill);
+      const composite = compositeTooltipColor(parseTooltipColor(dark ? shade.fill : light.fill),
+        dark ? [23, 33, 46, 1] : [255, 255, 255, 1]);
+      assert.equal(h.panel.style.background, `rgb(${composite.slice(0, 3).map(Math.round).join(", ")})`);
     }
     assert.equal(new Set(backgrounds).size, 4);
   }

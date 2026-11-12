@@ -1835,7 +1835,7 @@ function renderSubviewAlignmentCard(
       escapeHtml,
       gapLabel: i18n.grtResult.gapLabel,
     })
-    : { hasVisibleResult: false, hasVisibleJunction: false, overlaysByKey: new Map(), junctionMarkup: "" };
+    : { hasVisibleResult: false, hasVisibleJunction: false, overlaysByKey: new Map(), junctionMarkup: "", evidenceMarkup: "" };
   const activeAnchorCutsByContig = buildSubviewActiveAnchorCutsByContig(anchorEdges);
   const topFragments = deriveSubviewContigFragments({
     contig: {
@@ -1937,8 +1937,8 @@ function renderSubviewAlignmentCard(
               height: denseBandHitBottomY - denseBandHitY,
             }) : ""}
             ${renderGrtResultOverlayGroup({
-              layer: "junction",
-              markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
+              layer: "evidence",
+              markup: grtResult.context?.subviewEnabled ? grtResultScene.evidenceMarkup : "",
               escapeAttr,
             })}
             ${grtAnchorScene.markup}
@@ -2080,6 +2080,11 @@ function renderSubviewAlignmentCard(
             ${bottomLabelPlacement?.hidden
               ? ""
               : `<text class="track-ctg-label${bottomRowClass}${bottomLabelPlacement.classSuffix}" x="${bottomLabelPlacement.x.toFixed(2)}" y="${bottomLabelPlacement.y.toFixed(2)}"${bottomLabelPlacement.transformAttr} text-anchor="${bottomLabelPlacement.textAnchor}" data-subview-label-slot="bottom" data-subview-label-role="${escapeAttr(bottomSelection.role)}" data-subview-label-contig-id="${bottomSelection.contigId}">${escapeHtml(bottomLabelText)}</text>`}
+            ${renderGrtResultOverlayGroup({
+              layer: "junction",
+              markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
+              escapeAttr,
+            })}
           </svg>
         </div>
       </div>
@@ -3052,7 +3057,7 @@ function renderSubviewTrackPairAlignmentCard(
       escapeHtml,
       gapLabel: i18n.grtResult.gapLabel,
     })
-    : { hasVisibleResult: false, hasVisibleJunction: false, overlaysByKey: new Map(), junctionMarkup: "" };
+    : { hasVisibleResult: false, hasVisibleJunction: false, overlaysByKey: new Map(), junctionMarkup: "", evidenceMarkup: "" };
   const renderTrackCtgs = (layout, roleClass) => {
     const ctgs = Array.isArray(layout.trackModel?.ctgs) ? layout.trackModel.ctgs : [];
     if (!ctgs.length) {
@@ -3265,8 +3270,8 @@ function renderSubviewTrackPairAlignmentCard(
               height: bandClipHeight,
             }) : ""}
             ${renderGrtResultOverlayGroup({
-              layer: "junction",
-              markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
+              layer: "evidence",
+              markup: grtResult.context?.subviewEnabled ? grtResultScene.evidenceMarkup : "",
               escapeAttr,
             })}
             ${grtAnchorScene.markup}
@@ -3275,6 +3280,11 @@ function renderSubviewTrackPairAlignmentCard(
             ${renderSubviewAnchorLines(renderedAnchorEdges, {
               topY: resolvedTopLayout.laneTop,
               bottomY: resolvedBottomLayout.laneTop + TRACK_BAR_HEIGHT,
+            })}
+            ${renderGrtResultOverlayGroup({
+              layer: "junction",
+              markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
+              escapeAttr,
             })}
           </svg>
         </div>

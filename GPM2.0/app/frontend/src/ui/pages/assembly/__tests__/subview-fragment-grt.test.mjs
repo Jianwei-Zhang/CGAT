@@ -67,5 +67,5 @@ for (const orientation of ["+", "-"]) test(`LGZ display evidence clips both endp
   assert.deepEqual(projected.displayEvidence.map((e) => [e.source.start, e.source.end]), [[1, 40], [61, 100]]);
   assert.deepEqual(projected.displayEvidence.map((e) => [e.target.start, e.target.end]), orientation === "+" ? [[1, 40], [61, 100]] : [[61, 100], [1, 40]]);
   const scene = buildGrtResultScene({ plan: projected, entries });
-  assert.equal((scene.junctionMarkup.match(/<polygon/g) || []).length, 2);
+  assert.equal((scene.evidenceMarkup.match(/<polygon/g) || []).length, 2);
 });
