@@ -86,7 +86,7 @@
         "tools/minimap2_diagnostics.py": "1d2a0f31c3f0f83782c212ea9bc418ba8c6b18707a5a52fe53f3be4e4f7d69fd",
         "tools/promote_server_stage.py": "03fbadff4b9a9325619e4f4c952092a3596a62aada14c5edba659bcd2d9e0e31",
         "tools/reference_segments.py": "d8fb55f01abd6619afe81921db81eccf8911fe4f3b96ba82b9b00753548d0b74",
-        "tools/render_server_report.py": "d1c3f8e823a58271d434933646a0640499454e1a0823c923594464b98324f6a0",
+        "tools/render_server_report.py": "56fa5a16679db4e641d5ab64869b184b56a7652681fc99e1d2a9b671f80ee519",
         "tools/render_template.py": "854efccc70ed4c3fba3ef6d05c1079d599d440923325b83f2575874dc85cd958",
         "tools/run_all_runner.py": "a521a1ac37e4812df050e1cfbc867fef4635d375663f9c4729c17b0abe31d10d",
         "tools/run_orchestration.py": "606d294c8c956ada126e7612d9ff6e5733da723e579529529feeb3bb7de4f5db",
