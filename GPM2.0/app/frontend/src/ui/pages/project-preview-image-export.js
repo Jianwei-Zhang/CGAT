@@ -105,11 +105,6 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = re
       });
       y += Math.max(rowHeight, (named ? lineHeight * 2 : lineHeight) + 4);
     }
-    content.push(label(y, labels.compositionAxis, style.axisText),
-      text(left, y + 14, bp(card.domain.start), `fill="${xml(style.axisText)}"`),
-      text(right, y + 14, bp(card.domain.end), `fill="${xml(style.axisText)}" text-anchor="end"`),
-      `<path d="M${left} ${y + 21}H${right}" stroke="${xml(style.line)}"/>`);
-    y += rowHeight;
     if (card.hasReference) {
       content.push(label(y, "Ref"));
       bar(geometry.reference, y + 6, roleColors("ref"), "", 6, style.referenceRadius);

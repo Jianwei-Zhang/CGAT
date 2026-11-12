@@ -159,7 +159,8 @@ test("project export page renders assignment bars before placed statistics with 
   assert.equal((pathHtml.match(/data-final-path-name="Chr01"/g) || []).length, 1);
   assert.match(pathHtml, /data-final-path-kind="ctg"/);
   assert.match(pathHtml, /data-preview-open/);
-  assert.ok(pathHtml.indexOf("project-preview-paths") < pathHtml.indexOf("project-preview-axis"));
+  assert.ok(pathHtml.indexOf("project-preview-paths") < pathHtml.indexOf("project-preview-details"));
+  assert.doesNotMatch(pathHtml, /project-preview-axis|来源组合|Source composition/);
 });
 
 test("project export menu closes after leaving the export root", () => {

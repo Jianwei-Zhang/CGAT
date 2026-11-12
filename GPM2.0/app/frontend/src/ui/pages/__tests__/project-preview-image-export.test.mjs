@@ -222,7 +222,7 @@ for (const target of ["D:/预览.svg", "D:/预览.SVG", "D:/folder.with.dot/预�
     }), true);
     assert.equal(writes[0].outputPath, target.endsWith("预览") ? `${target}.svg` : target);
     const svg = Buffer.from(writes[0].bytesBase64, "base64").toString("utf8");
-    assert.match(svg, /^<svg/); assert.match(svg, /来源组合/); assert.match(svg, />chr01</);
+    assert.match(svg, /^<svg/); assert.doesNotMatch(svg, /来源组合|Source composition/); assert.match(svg, />chr01</);
     assert.doesNotMatch(svg, /�/);
   });
 }
@@ -319,4 +319,18 @@ for (const stage of ["render", "save"]) test(`PDF ${stage} failure is visible an
   }), false);
   assert.match(f.error.textContent, new RegExp(`PDF ${stage} failed`));
   assert.equal(previewImageExportIsRunning(f.store), false); assert.equal(f.button.disabled, false);
+});
+
+test("export reads the shared label column even when the first card is folded into one plot column", () => {
+  const previous = globalThis.getComputedStyle;
+  const root = {}, card = { paddingLeft: "16px", getPropertyValue: name => name === "--preview-label-width" ? "72px" : "" };
+  const row = { gridTemplateColumns: "1400px", columnGap: "10px" };
+  globalThis.getComputedStyle = node => node === root ? { getPropertyValue: () => "" } : node;
+  try {
+    const style = readProjectPreviewImageStyle({ ownerDocument: { documentElement: root },
+      querySelector: selector => selector === ".project-preview-card" ? card : selector === ".project-preview-row" ? row : null });
+    assert.equal(style.labelWidth, 72);
+    const snapshot = buildProjectPreviewSvgSnapshot(fixture(1).state, { width: 1600, style });
+    assert.equal(snapshot.width, 1600, "folding cannot inflate the export to accommodate a bogus plot-sized label column");
+  } finally { globalThis.getComputedStyle = previous; }
 });

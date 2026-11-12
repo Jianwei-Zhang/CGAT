@@ -6,11 +6,12 @@ const sharedCards = new WeakMap();
 const displayCardCache = new WeakMap();
 export function projectPreviewDisplayCards(cards = []) {
   if (sharedCards.has(cards)) return sharedCards.get(cards);
-  const domain = cards.reduce((range, card) => ({
-    start: Math.min(range.start, card.domain.start),
-    end: Math.max(range.end, card.domain.end),
-  }), { start: 0, end: 1 });
+  // Common bp/pixel scale, but no project-wide leading blank borrowed from
+  // another chromosome's negative overhang. The largest complete local span
+  // includes every Reference/source/path, even offscreen or folded cards.
+  const span = cards.reduce((span, card) => Math.max(span, card.domain.end - card.domain.start), 1);
   const result = cards.map(card => {
+    const domain = { start: card.domain.start, end: card.domain.start + span };
     const previous = displayCardCache.get(card);
     if (previous?.domain.start === domain.start && previous.domain.end === domain.end) return previous;
     const display = { ...card, domain };
@@ -75,6 +76,12 @@ export function layoutProjectPreviewCard(card, viewportWidth) {
     tracks: card.tracks.map(track => track.positioned.map(item => body(item.start, item.length, item.highlights))) };
 }
 
+// Folded previews omit source-only negative-coordinate space, but use the
+// exact expanded layout/width. Translate the origin; never refit the path.
+export function projectPreviewPathOrigin(card, width, expanded = true) {
+  return expanded ? 0 : Math.max(0, -card.domain.start) / Math.max(1, card.domain.end - card.domain.start) * width;
+}
+
 const place = (node, layout, origin = 0) => {
   if (!node || !layout) return;
   node.style.left = `${layout.x - origin}px`;
@@ -91,6 +98,7 @@ export function syncProjectPreviewCards(entries) {
   const labels = [];
   for (const { node, card, width } of measured) {
     const geometry = layoutProjectPreviewCard(card, width);
+    const origin = projectPreviewPathOrigin(card, width, node.dataset?.previewExpanded !== "false");
     const apply = (source, layout) => {
       place(source, layout);
       // Context labels were always hidden by CSS. Their complete names stay
@@ -110,7 +118,7 @@ export function syncProjectPreviewCards(entries) {
     for (const plot of node.querySelectorAll(".project-preview-final-plot")) {
       const layouts = geometry.paths.get(plot.dataset.finalPathName);
       [...plot.querySelectorAll("[data-final-path-segment]")].forEach((part, index) => {
-        place(part, layouts?.[index]);
+        place(part, layouts?.[index], origin);
         const label = part.querySelector("[data-final-path-fit-label]");
         if (label) labels.push(label);
       });

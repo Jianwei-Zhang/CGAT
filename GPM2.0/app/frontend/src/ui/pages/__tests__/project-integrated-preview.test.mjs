@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { createStore } from "../../../state/store.js";
 import { getMessages } from "../../i18n/index.js";
 import { buildProjectPreviewModel, previewProjectKey, requestPreviewChromosome } from "../project-preview-state.js";
-import { projectPreviewDisplayCards, layoutProjectPreviewCard } from "../project-preview-layout.js";
+import { projectPreviewDisplayCards, layoutProjectPreviewCard, projectPreviewPathOrigin, syncProjectPreviewCards } from "../project-preview-layout.js";
 import { projectPreviewSession, toggleProjectPreviewChromosome } from "../project-preview-session.js";
 import { renderProjectPreviewCount, loadProjectPreviewData, renderProjectPreviewCard, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "../project-preview-page.js";
 import { buildProjectPreviewSvgSnapshot } from "../project-preview-image-export.js";
@@ -29,24 +29,30 @@ function fixture() {
   });
 }
 
-test("one project-wide domain includes folded/offscreen paths, Reference and source overhangs without mutating cached cards", () => {
+test("all cards share the complete maximum span but keep local origins without borrowing blank overhangs", () => {
   const cards = fixture(), original = structuredClone(cards), display = projectPreviewDisplayCards(cards);
-  const expected = { start: Math.min(0, ...cards.map(card => card.domain.start)), end: Math.max(1, ...cards.map(card => card.domain.end)) };
-  assert.ok(expected.start < 0); assert.ok(expected.end > 3000, "the longest context source, not just Final Path, sets the scale");
-  for (const card of display) assert.deepEqual(card.domain, expected);
-  assert.equal(projectPreviewDisplayCards(cards), display, "reuse immutable display wrappers for DOM/model reconciliation");
+  const span = Math.max(1, ...cards.map(card => card.domain.end - card.domain.start));
+  assert.ok(span > 3000, "the complete source span, not just Final Path, sets the scale");
+  display.forEach((card, index) => {
+    assert.equal(card.domain.start, cards[index].domain.start);
+    assert.equal(card.domain.end - card.domain.start, span);
+    assert.ok(card.domain.end >= cards[index].domain.end);
+  });
+  assert.equal(display[0].domain.start, 0, "no borrowed leading blank from another chromosome");
+  assert.equal(projectPreviewDisplayCards(cards), display);
   assert.deepEqual(cards, original);
   const updated = cards.map(card => card.chrName === "chr3" ? { ...card, domain: { start: 0, end: 10 } } : card);
-  assert.ok(projectPreviewDisplayCards(updated)[0].domain.end < expected.end, "new content can shrink the scale; no stale domain accumulation");
+  assert.ok(projectPreviewDisplayCards(updated)[0].domain.end < display[0].domain.end);
 });
 
 test("folding only hides detail rows: each phased Final Path appears once and remains above shared source tracks", () => {
   const [card] = projectPreviewDisplayCards(fixture());
   const closed = renderProjectPreviewCard(card, labels, true, false), open = renderProjectPreviewCard(card, labels, true, true);
   const pathBlock = html => html.slice(html.indexOf("<div class=\"project-preview-paths\">"), html.indexOf("<div class=\"project-preview-details\""));
-  assert.equal(pathBlock(open), pathBlock(closed), "opening must neither replace nor resize the authoritative Final Path strips");
+  assert.equal(pathBlock(open).replace(/left:[^;]+;/g, ""), pathBlock(closed).replace(/left:[^;]+;/g, ""), "folding only translates the origin; strips retain their parts and widths");
   for (const name of ["chr1A", "chr1B"]) assert.equal((open.match(new RegExp(`data-final-path-name="${name}"`, "g")) || []).length, 1);
-  assert.ok(open.indexOf("data-final-path-name=\"chr1B\"") < open.indexOf("project-preview-axis"));
+  assert.ok(open.indexOf("data-final-path-name=\"chr1B\"") < open.indexOf("project-preview-details"));
+  assert.doesNotMatch(open, /project-preview-axis|来源组合|Source composition/);
   assert.equal((open.match(/project-preview-source-plots/g) || []).length, card.tracks.length);
   assert.match(closed, /class="project-preview-details"[^>]* hidden/); assert.doesNotMatch(open, /class="project-preview-details"[^>]* hidden/);
   assert.match(closed, /aria-expanded="false"/); assert.match(open, /aria-expanded="true"/);
@@ -105,11 +111,9 @@ test("export contains complete expanded groups in screen order with shared geome
   const style = readProjectPreviewImageStyle(), snapshot = buildProjectPreviewSvgSnapshot(state, { style });
   assert.equal(snapshot.cardBounds.length, 3, "include folded and offscreen cards");
   const first = snapshot.cardBounds[0].svgMarkup;
-  const axisIndex = first.indexOf(`>${labels.compositionAxis.slice(0, 6)}`);
-  assert.ok(axisIndex > 0);
-  assert.ok(first.indexOf(">Final Path<") < axisIndex);
-  assert.ok(first.indexOf(">chr1B<") < axisIndex);
-  assert.ok(axisIndex < first.indexOf(">Ref<"));
+  assert.ok(first.indexOf(">Final Path<") < first.indexOf(">Ref<"));
+  assert.ok(first.indexOf(">chr1B<") < first.indexOf(">Ref<"));
+  assert.ok(!first.includes(labels.compositionAxis));
   assert.ok(snapshot.cardBounds[2].svgMarkup.includes(labels.noPath));
   assert.match(first, /data-preview-adopted-outline="1"/); assert.doesNotMatch(first, /stroke-width="3"/);
   const inset = 20 + style.padding + 1, left = inset + style.labelWidth + style.columnGap;
@@ -255,9 +259,10 @@ test("folded styling uses one name-plus-strip row without changing the shared ho
   const css = readFileSync(new URL("../../../styles/project-export.css", import.meta.url), "utf8");
   const root = '[data-overview-preview] .project-preview-card[data-preview-expanded="false"]';
   const rule = selector => [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, selectors]) => selectors.trim() === selector).map(([, , body]) => body).join("\n");
-  assert.match(rule(root), /grid-template-columns: 108px minmax\(0, 1fr\)/);
+  assert.match(rule(root), /grid-template-columns: var\(--preview-label-width\) minmax\(0, 1fr\)/);
   assert.match(rule(root + ' .project-preview-card-heading'), /grid-column: 1; grid-row: 1/);
   assert.match(rule(root + ' .project-preview-paths'), /grid-column: 2; grid-row: 1/);
+  assert.doesNotMatch(rule(root + ' .project-preview-paths'), /(?:^|;)\s*width:/);
   assert.match(rule(root + ' .project-preview-row'), /grid-template-columns: minmax\(0, 1fr\)/);
   const [card] = projectPreviewDisplayCards(fixture());
   const html = renderProjectPreviewCard(card, labels, true, false);
@@ -277,4 +282,52 @@ test("preview count in the parent toolbar updates when the independent component
     listChrViewCtgs: async () => ({ items: [] }), getGrtProjectView: async () => ({}), getProjectAssemblyViewState: async () => ({}),
   }), true);
   assert.match(count.innerHTML, />2<\/span>/);
+});
+
+test("folded paths remove negative-domain blank space by translation without changing bp scale or widths", () => {
+  const cards = projectPreviewDisplayCards(fixture());
+  const before = structuredClone(cards);
+  for (const card of cards) for (const width of [320, 900, 1800]) {
+    const origin = projectPreviewPathOrigin(card, width, false);
+    assert.equal(origin > 0, card.domain.start < 0, "only real local source overhangs need an origin translation");
+    assert.equal(projectPreviewPathOrigin(card, width, true), 0);
+    const geometry = layoutProjectPreviewCard(card, width);
+    const plots = card.paths.filter(path => path.parts.length).map(path => ({
+      clientWidth: width, dataset: { finalPathName: path.name }, parts: path.parts.map(() => ({ style: {}, querySelector: () => null })),
+      querySelectorAll() { return this.parts; },
+    }));
+    const node = { dataset: { previewExpanded: "false" },
+      querySelector: selector => selector === ".project-preview-final-plot, .project-preview-plot" ? plots[0] : null,
+      querySelectorAll: selector => selector === ".project-preview-final-plot" ? plots : [],
+    };
+    syncProjectPreviewCards([[node, card]]);
+    for (const plot of plots) {
+      const original = geometry.paths.get(plot.dataset.finalPathName);
+      assert.ok(Math.abs(parseFloat(plot.parts[0].style.left)) < 1e-7, "first part starts immediately at the folded plot origin");
+      plot.parts.forEach((part, index) => {
+        assert.ok(Math.abs(parseFloat(part.style.left) - (original[index].x - origin)) < 1e-7);
+        assert.equal(parseFloat(part.style.width), original[index].width);
+      });
+    }
+    node.dataset.previewExpanded = "true";
+    syncProjectPreviewCards([[node, card]]);
+    for (const plot of plots) plot.parts.forEach((part, index) => assert.equal(parseFloat(part.style.left), geometry.paths.get(plot.dataset.finalPathName)[index].x));
+  }
+  assert.deepEqual(cards, before);
+});
+
+test("both states use one compact label column with no compensating right-side reservation", () => {
+  const css = readFileSync(new URL("../../../styles/project-export.css", import.meta.url), "utf8");
+  assert.match(css, /--preview-label-width: 72px/);
+  assert.match(css, /--preview-label-width: 64px/);
+  assert.match(css, /\.project-preview-row \{ grid-template-columns: var\(--preview-label-width\) minmax\(0, 1fr\)/);
+  assert.doesNotMatch(css, /--preview-folded-label-width/);
+});
+
+test("a different chromosome's negative origin cannot create blank space on an unshifted chromosome", () => {
+  const cards = [{ domain: { start: 0, end: 311 } }, { domain: { start: -18, end: 279 } }];
+  const [first, second] = projectPreviewDisplayCards(cards);
+  assert.deepEqual(first.domain, { start: 0, end: 311 });
+  assert.deepEqual(second.domain, { start: -18, end: 293 });
+  assert.equal(first.domain.end - first.domain.start, second.domain.end - second.domain.start);
 });

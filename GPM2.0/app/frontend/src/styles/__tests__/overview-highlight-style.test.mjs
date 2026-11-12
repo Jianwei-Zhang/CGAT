@@ -6,9 +6,9 @@ const css = Object.fromEntries(["project-export", "project-preview", "assembly",
   name, readFileSync(new URL(`../${name}.css`, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, ""),
 ]));
 const root = "[data-overview-preview]";
-const card = `${root} .project-preview-card`;
+const card = `${root} .project-preview-card[data-preview-expanded="true"]`;
 const usedSelector = `${card} .project-preview-used`;
-const resultSelector = `${root} .project-preview-final-part:not(.is-gap)`;
+const resultSelector = `${card} .project-preview-final-part:not(.is-gap)`;
 const activeCard = [
   `${card}:hover`,
   `${card}:has(:focus-visible)`,
@@ -117,4 +117,11 @@ test("standalone Preview retains its existing whole-card highlights and Overview
 
 test("Project reserves the document scrollbar gutter so expanding details cannot change the shared strip width", () => {
   assert.match(rule("project-export", ":root:has(.project-integrated-overview)"), /scrollbar-gutter:\s*stable;/);
+});
+
+test("folded cards have no adopted-interval or Final Path highlight, including hover and focus", () => {
+  for (const [, selectors, body] of css["project-export"].matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!/(?:outline|outline-width):/.test(body) || !/project-preview-(?:used|final-part)/.test(selectors)) continue;
+    for (const selector of selectors.split(",")) assert.ok(selector.includes('[data-preview-expanded="true"]'), selector);
+  }
 });

@@ -17,21 +17,21 @@
 }
 
 /* Persistent feedback stays inside adopted intervals and result bodies. */
-[data-overview-preview] .project-preview-card .project-preview-used {
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-used {
   opacity: 1;
   background: transparent;
   box-shadow: none;
   border-radius: inherit;
 }
-[data-overview-preview] .project-preview-card .project-preview-used,
-[data-overview-preview] .project-preview-final-part:not(.is-gap) {
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-used,
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-final-part:not(.is-gap) {
   outline: 2px solid var(--final-path-selection-stroke);
   outline-offset: -2px;
 }
-[data-overview-preview] .project-preview-card:hover .project-preview-used,
-[data-overview-preview] .project-preview-card:has(:focus-visible) .project-preview-used,
-[data-overview-preview] .project-preview-card:hover .project-preview-final-part:not(.is-gap),
-[data-overview-preview] .project-preview-card:has(:focus-visible) .project-preview-final-part:not(.is-gap) {
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:hover .project-preview-used,
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:has(:focus-visible) .project-preview-used,
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:hover .project-preview-final-part:not(.is-gap),
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:has(:focus-visible) .project-preview-final-part:not(.is-gap) {
   outline-width: 3px;
   outline-offset: -3px;
 }
@@ -723,9 +723,11 @@
 
 .project-integrated-overview .project-export-detail-section[hidden] { display: none; }
 .project-preview-toolbar > [data-preview-count] { display: contents; }
-/* Folded rows use the same label column and plot width as expanded rows. */
+/* One compact label column in both states; no compensating right gutter. */
+[data-overview-preview] .project-preview-card { --preview-label-width: 72px; }
+[data-overview-preview] .project-preview-row { grid-template-columns: var(--preview-label-width) minmax(0, 1fr); }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] {
-  display: grid; grid-template-columns: 108px minmax(0, 1fr); column-gap: 10px; align-items: center; padding-top: 8px; padding-bottom: 8px;
+  display: grid; grid-template-columns: var(--preview-label-width) minmax(0, 1fr); column-gap: 10px; align-items: center; padding-top: 8px; padding-bottom: 8px;
 }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-card-heading {
   grid-column: 1; grid-row: 1; min-width: 0; margin: 0; background: transparent;
@@ -739,7 +741,8 @@
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-final-part { top: 0; height: 100%; }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"]:not([data-preview-path-count="1"]) .project-preview-final-part > span { display: none; }
 @media (max-width: 560px) {
-  [data-overview-preview] .project-preview-card[data-preview-expanded="false"] { grid-template-columns: 80px minmax(0, 1fr); column-gap: 6px; }
+  [data-overview-preview] .project-preview-card { --preview-label-width: 64px; }
+  [data-overview-preview] .project-preview-card[data-preview-expanded="false"] { column-gap: 6px; }
 }
 
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"][data-preview-path-count="1"] .project-preview-final-part { top: 4px; height: 16px; }

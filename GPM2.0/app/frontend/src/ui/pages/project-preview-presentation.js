@@ -27,7 +27,9 @@ export function readProjectPreviewImageStyle(host) {
     referenceRadius: number(reference?.borderTopLeftRadius, 3),
     finalRadius: number(final?.borderTopLeftRadius, 2),
     padding: number(card?.paddingLeft, 16),
-    labelWidth: number(row?.gridTemplateColumns, 108),
+    // A folded row has only one grid column. Read the card's shared label
+    // token rather than mistaking the entire compact plot for the label width.
+    labelWidth: number(card?.getPropertyValue?.("--preview-label-width"), number(row?.gridTemplateColumns, 108)),
     columnGap: number(row?.columnGap, 10),
     panel: token("--surface-panel", "#ffffff"),
     header: token("--surface-subtle", "#f8fafc"),
