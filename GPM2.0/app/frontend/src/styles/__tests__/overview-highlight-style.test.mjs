@@ -29,12 +29,12 @@ function selectorsFor(fragment) {
     .filter(selector => selector.includes(fragment));
 }
 
-test("Overview keeps adopted sources and non-Gap results persistently outlined with the same thin outer stroke", () => {
+test("Overview keeps adopted sources and non-Gap results persistently outlined with the same thicker inner stroke", () => {
   for (const selector of [usedSelector, resultSelector]) {
     const body = rule("project-export", selector);
-    assert.match(body, /outline:\s*1px solid var\(--final-path-selection-stroke\);/);
-    assert.match(body, /outline-offset:\s*0;/);
-    assert.doesNotMatch(body, /outline-offset:\s*-|font-weight:/);
+    assert.match(body, /outline:\s*2px solid var\(--final-path-selection-stroke\);/);
+    assert.match(body, /outline-offset:\s*-2px;/);
+    assert.doesNotMatch(body, /font-weight:/);
   }
   const used = rule("project-export", usedSelector);
   assert.match(used, /opacity:\s*1;/);
@@ -48,7 +48,7 @@ test("hover and keyboard focus thicken every adopted interval and result in only
   for (const [base, selectors] of [[usedSelector, activeUsed], [resultSelector, activeResults]]) {
     for (const selector of selectors) {
       const body = rule("project-export", selector);
-      assert.match(body, /outline-width:\s*2px;/);
+      assert.match(body, /outline-width:\s*3px;/);
       assert.doesNotMatch(body, /(?:opacity|background|fill|box-shadow|filter|font-weight):/);
       assert.ok(css["project-export"].indexOf(selector) > css["project-export"].indexOf(base));
     }
@@ -56,7 +56,7 @@ test("hover and keyboard focus thicken every adopted interval and result in only
   // Header and whitespace hover emphasize all adopted patches in this card;
   // sibling cards keep their thin persistent outlines, with no fragment state.
   assert.deepEqual([...new Set(selectorsFor(".project-preview-used"))], [usedSelector, ...activeUsed]);
-  assert.deepEqual([...new Set(selectorsFor(".project-preview-final-part"))], [resultSelector, ...activeResults]);
+  assert.deepEqual([...new Set(selectorsFor(".project-preview-final-part:not(.is-gap)"))], [resultSelector, ...activeResults]);
   assert.doesNotMatch(css["project-export"], /data-preview-highlighted|data-preview-part-key/);
 });
 
@@ -76,22 +76,15 @@ test("result feedback preserves role fills and Gaps in both persistent and activ
     assert.doesNotMatch(rule("project-export", selector), /(?:^|;)\s*(?:background|color|fill|opacity|filter|transform|border|width|height|font-weight):/);
   }
   assert.match(rule("project-preview", ".project-preview-final-part"), /border:\s*1px solid/);
-  assert.ok(selectorsFor(".project-preview-final-part").every(selector => selector.endsWith(":not(.is-gap)")));
+  assert.ok([resultSelector, ...activeResults].every(selector => selector.endsWith(":not(.is-gap)")));
 });
 
-test("outer source and endpoint outlines are not clipped, while labels and unused context retain their clipping", () => {
-  for (const selector of [
-    `${card} .project-preview-plot`,
-    `${card} .project-preview-contig.is-adopted`,
-    `${card} .project-preview-reference`,
-  ]) {
-    assert.match(rule("project-export", selector), /overflow:\s*visible;/);
-  }
+test("inner source and endpoint outlines fit inside their bounds and retain normal clipping", () => {
+  for (const selector of [usedSelector, resultSelector]) assert.match(rule("project-export", selector), /outline-offset:\s*-2px;/);
   assert.match(rule("project-preview", ".project-preview-contig-label"), /overflow:\s*hidden;/);
   assert.match(rule("project-preview", ".project-preview-final-part > span"), /overflow:\s*hidden;/);
   assert.match(rule("project-preview", ".project-preview-contig"), /overflow:\s*hidden;/);
   assert.match(rule("project-preview", ".project-preview-contig.is-context .project-preview-contig-label"), /visibility:\s*hidden;/);
-  assert.deepEqual(selectorsFor(".project-preview-contig"), [`${card} .project-preview-contig.is-adopted`]);
 });
 
 test("card-level feedback never changes interval geometry or adds fragment glows, and retains the existing card shadow", () => {

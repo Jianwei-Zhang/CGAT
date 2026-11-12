@@ -204,11 +204,11 @@ test("image export shares the on-screen Final Path mapping for adopted outlines"
   const geometry = layoutProjectPreviewCard(state.projectPreview.cards[0], 1440 - bodyLeft - left);
   const patch = geometry.tracks.flat().flatMap(body => body.highlights)[0];
   const snapshot = buildProjectPreviewSvgSnapshot(state, { highlightAdopted: true });
-  const outlines = [...snapshot.svgMarkup.matchAll(/<rect x="([^"]+)" y="[^"]+" width="([^"]+)" height="17" fill="none" stroke="[^"]+" stroke-width="1" data-preview-adopted-outline="1"/g)];
-  assert.ok(outlines.length >= 2, "both result and source intervals retain a thin outline");
-  assert.ok(outlines.some(match => Math.abs(Number(match[1]) - (left + patch.x - 0.5)) < 1e-7
-    && Math.abs(Number(match[2]) - (patch.width + 1)) < 1e-7));
-  assert.doesNotMatch(snapshot.svgMarkup, /stroke-width="2"/);
+  const outlines = [...snapshot.svgMarkup.matchAll(/<rect x="([^"]+)" y="[^"]+" width="([^"]+)" height="14" fill="none" stroke="[^"]+" stroke-width="2" data-preview-adopted-outline="1"/g)];
+  assert.ok(outlines.length >= 2, "both result and source intervals retain a thicker inner outline");
+  assert.ok(outlines.some(match => Math.abs(Number(match[1]) - (left + patch.x + 1)) < 1e-7
+    && Math.abs(Number(match[2]) - (patch.width - 2)) < 1e-7));
+  assert.doesNotMatch(snapshot.svgMarkup, /stroke-width="3"/);
 });
 
 
@@ -256,7 +256,7 @@ test("export uses the App's resting rounded cards, header, role dots, typography
   assert.match(svg, /<circle[^>]*r="3.5"/); assert.match(svg, /10.0 kb/);
   assert.match(svg, /font-size="11.004/);
   assert.doesNotMatch(svg, />primary0(?:<| )/);
-  assert.doesNotMatch(svg, /stroke-width="2"/); // Persistent thin outlines remain; hover/focus thickening is excluded.
+  assert.doesNotMatch(svg, /stroke-width="3"/); // Persistent thin outlines remain; hover/focus thickening is excluded.
 });
 
 test("export resolves live theme/font/radius styles instead of leaking CSS variables", () => {

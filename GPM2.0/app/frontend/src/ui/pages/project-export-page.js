@@ -3,7 +3,7 @@ import { groupProjectOverviewSources } from "./project-overview-sources.js";
 import { previewMutationStamp } from "../../services/preview-content-events.js";
 import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCurrentProjectExport,
   updateProjectExportJob, syncCurrentProjectExportJob, finishProjectExportJob } from "../../services/project-export-jobs.js";
-import { renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "./project-preview-page.js";
+import { renderProjectPreviewCount, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "./project-preview-page.js";
 import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "./project-preview-cache.js";
 import { exportProjectPreviewImage, renderPreviewImageDownloadButton, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { previewProjectKey } from "./project-preview-state.js";
@@ -1137,7 +1137,7 @@ function renderDetailTable(model, labels, detailTableState) {
   const filters = detailTableState.filters || {};
   const sortedRows = sortDetailRows(filterDetailRows(rows, filters), detailTableState.sort);
   return `
-    <section class="project-export-detail-section" aria-labelledby="project-export-detail-title">
+    <section class="project-export-detail-section" hidden aria-labelledby="project-export-detail-title">
       <div class="project-export-detail-titlebar">
         <div class="project-export-detail-heading">
           <h4 id="project-export-detail-title">${escapeHtml(labels.detailTitle)}</h4>
@@ -1645,7 +1645,7 @@ export function renderProjectExportPage(state) {
   if (!getCurrentProject(state)) return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}"><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
   return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}" data-overview-project="${escapeAttr(previewProjectKey(state))}" data-project-path-overview="${escapeAttr(previewProjectKey(state))}">
     ${renderProjectOverviewSummary(state)}
-    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3>${renderProjectOverviewActions(state)}</header>
+    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3><span data-preview-count>${renderProjectPreviewCount(state)}</span>${renderProjectOverviewActions(state)}</header>
     <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true, hideHeading: true })}</div>
   </section>`;
 }

@@ -101,12 +101,12 @@ export function renderProjectPreviewCard(card, labels, details = true, expanded 
     </div></div>`).join("");
   const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path" data-preview-path="${html(path.name)}">
     <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" data-app-tooltip="${html(path.name)}" data-app-tooltip-overflow="small">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
-      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}" data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${(details ? path.parts : []).map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
+      <span class="project-preview-plot project-preview-final-plot" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end - domain.start}"${path.name !== card.chrName ? ` data-app-tooltip="${html(path.name)}"` : ""} data-preview-linear="1" data-preview-domain-start="${domain.start}" style="height:20px">${(details ? path.parts : []).map(part => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent((part.start - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(part.length / (domain.end - domain.start) * 100)}%;background:${part.gap ? "var(--gap-marker-fill, #ffffff)" : contigColorToken(part.role)};border-color:${part.gap ? "var(--border-strong)" : contigColorToken(part.role, "stroke")};color:${part.gap ? "var(--gap-marker-text, #1b1b1b)" : contigColorToken(part.role, "text")}" data-app-tooltip="${html(`${partTitle(part, labels)}\n${labels.length}: ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? "" : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>`).join("")}</span>
     </div></div>` : `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`).join("");
   const pathSummary = card.paths.filter(path => path.parts.length).map(path => bpLabel(path.length)).join(" / ");
   const summary = [card.hasReference ? `Ref ${bpLabel(card.refLength)}` : "", pathSummary ? `Final Path ${pathSummary}` : ""].filter(Boolean).join(" · ");
-  return `<article class="project-preview-card" data-preview-chr="${html(card.chrName)}" data-preview-mounted="${details}" data-preview-expanded="${expanded}" aria-label="${html(card.chrName)}">
-    <div class="project-preview-card-heading"><button type="button" class="project-preview-card-header" data-preview-toggle aria-expanded="${expanded}" aria-controls="preview-details-${encodeURIComponent(card.chrName)}" aria-label="${html(card.chrName)}"><span class="project-preview-chevron" aria-hidden="true">${expanded ? "▾" : "▸"}</span><span class="project-preview-chr-name">${html(card.chrName)}</span><span class="project-preview-card-summary">${html(summary)}</span></button><button type="button" class="project-preview-open" data-preview-open aria-label="${html(`${card.chrName} · ${labels.open}`)}">${html(labels.open)} →</button></div>
+  return `<article class="project-preview-card" data-preview-chr="${html(card.chrName)}" data-preview-mounted="${details}" data-preview-expanded="${expanded}" data-preview-path-count="${Math.max(1, card.paths.length)}" style="--preview-path-count:${Math.max(1, card.paths.length)}" aria-label="${html(card.chrName)}">
+    <div class="project-preview-card-heading"><button type="button" class="project-preview-card-header" data-preview-toggle aria-expanded="${expanded}" aria-controls="preview-details-${encodeURIComponent(card.chrName)}" aria-label="${html(card.chrName)}"><span class="project-preview-chevron" aria-hidden="true">${expanded ? "▾" : "▸"}</span><span class="project-preview-chr-name" data-app-tooltip="${html(card.chrName)}" data-app-tooltip-overflow>${html(card.chrName)}</span><span class="project-preview-card-summary">${html(summary)}</span></button><button type="button" class="project-preview-open" data-preview-open aria-label="${html(`${card.chrName} · ${labels.open}`)}">${html(labels.open)} →</button></div>
     <div class="project-preview-paths">${paths || `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`}</div>
     <div class="project-preview-details" id="preview-details-${encodeURIComponent(card.chrName)}" ${expanded ? "" : "hidden"}>
       ${axis(labels.compositionAxis, domain.start, domain.end)}
@@ -134,6 +134,16 @@ function unmountCardDetails(node) {
     plot.replaceChildren();
   }
   node.dataset.previewMounted = "false";
+}
+
+export function renderProjectPreviewCount(state) {
+  const preview = state.projectPreview;
+  return previewStateIsApplicable(state) && !preview.loading && !preview.error && Array.isArray(preview.cards)
+    ? `<span class="project-section-count"><span aria-hidden="true">·</span>${html(preview.cards.length.toLocaleString(state.locale === "en" ? "en-US" : "zh-CN"))}</span>` : "";
+}
+function syncProjectPreviewCount(host, state) {
+  const target = previewImageActionRoot(host)?.querySelector?.("[data-preview-count]");
+  if (target) target.innerHTML = renderProjectPreviewCount(state);
 }
 
 export function renderProjectPreviewPage(state, options = {}) {
@@ -177,6 +187,8 @@ function updatePreviewDom(host, state, store) {
           toggle.innerHTML = nextToggle.innerHTML;
           toggle.setAttribute("aria-expanded", nextToggle.getAttribute("aria-expanded"));
           node.dataset.previewExpanded = replacement.dataset.previewExpanded;
+          node.dataset.previewPathCount = replacement.dataset.previewPathCount;
+          node.style.setProperty("--preview-path-count", replacement.dataset.previewPathCount);
           for (const child of [...node.children]) if (child !== header) child.remove();
           for (const child of [...replacement.children]) if (child !== nextHeader) node.appendChild(child);
           node.dataset.previewMounted = "false";
@@ -206,6 +218,7 @@ function updatePreviewDom(host, state, store) {
   const refresh = host.querySelector?.("[data-preview-refresh]");
   if (refresh) refresh.disabled = Boolean(preview?.loading);
   if (store) syncPreviewImageDownloadButton(host, store);
+  syncProjectPreviewCount(host, state);
   syncPreviewGeometry(host);
   markPreviewDom(host, state);
   restoreProjectPreviewScroll(host);
@@ -504,6 +517,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
     if (!binding.active || host.isConnected === false || !isPreviewRoute(binding.store.getState())) return;
     const state = binding.store.getState();
     syncPreviewImageDownloadButton(host, binding.store);
+    syncProjectPreviewCount(host, binding.store.getState());
     if (state.projectPreview?.loaded && !state.projectPreview.loading && !previewStateIsApplicable(state)) {
       void loadProjectPreviewData(host, binding.store, binding.deps);
     }
@@ -518,6 +532,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
     restoreProjectPreviewScroll(host);
   }
   syncPreviewImageDownloadButton(host, store);
+  syncProjectPreviewCount(host, store.getState());
   void loadProjectPreviewData(host, store, binding.deps);
 }
 

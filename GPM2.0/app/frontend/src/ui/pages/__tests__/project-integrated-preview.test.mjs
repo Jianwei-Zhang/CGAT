@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { previewMutationStamp } from "../../../services/preview-content-events.js";
 import { PREVIEW_MODEL_VERSION, previewOverrideSignature } from "../project-preview-cache.js";
 import test from "node:test";
@@ -7,7 +8,7 @@ import { getMessages } from "../../i18n/index.js";
 import { buildProjectPreviewModel, previewProjectKey, requestPreviewChromosome } from "../project-preview-state.js";
 import { projectPreviewDisplayCards, layoutProjectPreviewCard } from "../project-preview-layout.js";
 import { projectPreviewSession, toggleProjectPreviewChromosome } from "../project-preview-session.js";
-import { loadProjectPreviewData, renderProjectPreviewCard, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "../project-preview-page.js";
+import { renderProjectPreviewCount, loadProjectPreviewData, renderProjectPreviewCard, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "../project-preview-page.js";
 import { buildProjectPreviewSvgSnapshot } from "../project-preview-image-export.js";
 import { readProjectPreviewImageStyle } from "../project-preview-presentation.js";
 
@@ -96,7 +97,7 @@ test("phased-strip navigation requests the parent and correct path without destr
   assert.equal(next.selectedChrName, "old");
 });
 
-test("export contains complete expanded groups in screen order with shared geometry and thin persistent outlines only", () => {
+test("export contains complete expanded groups in screen order with shared geometry and persistent inner outlines only", () => {
   const cards = fixture(), state = { locale: "en", session: { workspacePath: "/export-integration", projectId: 1 }, projectPreview: { loaded: true, cards } };
   state.projectPreview.key = previewProjectKey(state);
   Object.assign(state.projectPreview, { modelVersion: PREVIEW_MODEL_VERSION, savedPathSignatures: {},
@@ -110,7 +111,7 @@ test("export contains complete expanded groups in screen order with shared geome
   assert.ok(first.indexOf(">chr1B<") < axisIndex);
   assert.ok(axisIndex < first.indexOf(">Ref<"));
   assert.ok(snapshot.cardBounds[2].svgMarkup.includes(labels.noPath));
-  assert.match(first, /data-preview-adopted-outline="1"/); assert.doesNotMatch(first, /stroke-width="2"/);
+  assert.match(first, /data-preview-adopted-outline="1"/); assert.doesNotMatch(first, /stroke-width="3"/);
   const inset = 20 + style.padding + 1, left = inset + style.labelWidth + style.columnGap;
   const plotWidth = snapshot.width - inset - left, display = projectPreviewDisplayCards(cards);
   const geometry = layoutProjectPreviewCard(display[0], plotWidth);
@@ -230,4 +231,50 @@ test("document-scrolling Project restores its own session and waits until the su
   ready = true; restoreProjectPreviewScroll(host); assert.equal(root.scrollTop, 800);
   root.scrollTop = 900; for (const fn of listeners) fn(); assert.equal(session.scrollTop, 900);
   unbindProjectPreviewPage(host); assert.equal(listeners.size, 0);
+});
+
+function readyState(locale = "en") {
+  const state = { locale, session: { workspacePath: "/refined-preview", projectId: 91 }, assembly: { finalPathByChr: {} } };
+  state.projectPreview = { key: previewProjectKey(state), loaded: true, cards: fixture(), modelVersion: PREVIEW_MODEL_VERSION,
+    savedPathSignatures: {}, localSignature: previewOverrideSignature({}, {}),
+    mutationStamp: previewMutationStamp({ workspaceRoot: state.session.workspacePath, projectId: 91 }) };
+  return state;
+}
+test("Project preview heading counts chromosome groups, not phased paths, and suppresses stale/error counts", () => {
+  for (const locale of ["en", "zh"]) {
+    const state = readyState(locale);
+    assert.match(renderProjectPreviewCount(state), /class="project-section-count"><span aria-hidden="true">·<\/span>3<\/span>/);
+    assert.equal(renderProjectPreviewCount({ ...state, projectPreview: { ...state.projectPreview, key: "other-project" } }), "");
+    assert.equal(renderProjectPreviewCount({ ...state, projectPreview: { ...state.projectPreview, loading: true } }), "");
+    assert.match(renderProjectPreviewCount({ ...state, projectPreview: { ...state.projectPreview, cards: [] } }), />0<\/span>/);
+    assert.equal(renderProjectPreviewCount({ ...state, projectPreview: { ...state.projectPreview, error: "failed" } }), "");
+  }
+});
+
+test("folded styling uses one name-plus-strip row without changing the shared horizontal grid or duplicating paths", () => {
+  const css = readFileSync(new URL("../../../styles/project-export.css", import.meta.url), "utf8");
+  const root = '[data-overview-preview] .project-preview-card[data-preview-expanded="false"]';
+  const rule = selector => [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, selectors]) => selectors.trim() === selector).map(([, , body]) => body).join("\n");
+  assert.match(rule(root), /grid-template-columns: 108px minmax\(0, 1fr\)/);
+  assert.match(rule(root + ' .project-preview-card-heading'), /grid-column: 1; grid-row: 1/);
+  assert.match(rule(root + ' .project-preview-paths'), /grid-column: 2; grid-row: 1/);
+  assert.match(rule(root + ' .project-preview-row'), /grid-template-columns: minmax\(0, 1fr\)/);
+  const [card] = projectPreviewDisplayCards(fixture());
+  const html = renderProjectPreviewCard(card, labels, true, false);
+  assert.match(html, /data-preview-path-count="2" style="--preview-path-count:2"/);
+  assert.equal((html.match(/data-final-path-strip="1"/g) || []).length, 2);
+  assert.equal((html.match(/class="project-preview-card-heading"/g) || []).length, 1);
+});
+
+test("preview count in the parent toolbar updates when the independent component loads", async () => {
+  const store = createStore({ activeRoute: "importer", locale: "en", session: { workspacePath: "/count-load-refined", projectId: 81 },
+    assembly: { finalPathByChr: {} }, initializer: { existingProjects: [{ projectId: 81 }], datasets: [] } });
+  const count = { innerHTML: "" }, root = { querySelector: selector => selector === "[data-preview-count]" ? count : null };
+  const host = { innerHTML: "", closest: () => root, querySelectorAll: () => [], querySelector: () => null };
+  assert.equal(await loadProjectPreviewData(host, store, {
+    getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }),
+    listProjectChromosomes: async () => ({ items: [{ chrName: "chr1" }, { chrName: "chr2" }] }),
+    listChrViewCtgs: async () => ({ items: [] }), getGrtProjectView: async () => ({}), getProjectAssemblyViewState: async () => ({}),
+  }), true);
+  assert.match(count.innerHTML, />2<\/span>/);
 });

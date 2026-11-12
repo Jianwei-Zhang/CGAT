@@ -87,8 +87,10 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = re
         `fill="${xml(colors.text)}" font-size="${style.graphSize}"`));
     };
     const used = (layout, yy, role, height) => {
-      if (highlightAdopted && layout.width > 0) content.push(rect(left + layout.x - 0.5, yy - 0.5,
-        layout.width + 1, height + 1, "none", xml(style.selectionStroke), 'stroke-width="1" data-preview-adopted-outline="1"'));
+      if (!highlightAdopted || !(layout.width > 0)) return;
+      const stroke = Math.min(2, layout.width / 2, height / 2);
+      content.push(rect(left + layout.x + stroke / 2, yy + stroke / 2,
+        layout.width - stroke, height - stroke, "none", xml(style.selectionStroke), `stroke-width="${stroke}" data-preview-adopted-outline="1"`));
     };
     for (const path of card.paths.length ? card.paths : [{ name: card.chrName, parts: [] }]) {
       const named = path.name !== card.chrName;

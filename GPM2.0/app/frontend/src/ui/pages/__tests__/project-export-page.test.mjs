@@ -2240,3 +2240,16 @@ test("invalid summary responses settle with an error rather than exposing empty 
   assert.equal(h.store.getState().projectExport.loading, false);
   assert.match(h.store.getState().projectExport.error, /Invalid project overview source payload/);
 });
+
+test("Project details stay hidden as a whole even with saved expansion, without losing filters, data or exports", () => {
+  const state = createState();
+  state.projectExport.finalPathByChr.Chr01.segments.push({
+    type: "ctg", assemblyCtgId: 2, datasetName: "aux", ctgName: "support", originId: "support", start: 1, end: 500, overallLen: 500,
+  });
+  state.projectExport.detailTableCollapsed = false;
+  state.projectExport.detailTableFilters = { chr: ["Chr01"] };
+  const before = JSON.stringify(state), html = renderProjectExportPage(state);
+  assert.match(html, /class="project-export-detail-section" hidden aria-labelledby="project-export-detail-title"/);
+  for (const action of ["log", "tsv", "png", "fasta", "all"]) assert.ok(html.includes(`data-project-export-action="${action}"`));
+  assert.equal(JSON.stringify(state), before);
+});

@@ -16,36 +16,24 @@
   font-weight: 600;
 }
 
-/* Adopted source intervals and non-Gap results share a persistent thin outer
-   outline. Only the active card thickens it; keep role fills and text intact,
-   without an interior tint or fragment glow. */
+/* Persistent feedback stays inside adopted intervals and result bodies. */
 [data-overview-preview] .project-preview-card .project-preview-used {
   opacity: 1;
   background: transparent;
   box-shadow: none;
   border-radius: inherit;
 }
-
 [data-overview-preview] .project-preview-card .project-preview-used,
 [data-overview-preview] .project-preview-final-part:not(.is-gap) {
-  outline: 1px solid var(--final-path-selection-stroke);
-  outline-offset: 0;
+  outline: 2px solid var(--final-path-selection-stroke);
+  outline-offset: -2px;
 }
-
 [data-overview-preview] .project-preview-card:hover .project-preview-used,
 [data-overview-preview] .project-preview-card:has(:focus-visible) .project-preview-used,
 [data-overview-preview] .project-preview-card:hover .project-preview-final-part:not(.is-gap),
 [data-overview-preview] .project-preview-card:has(:focus-visible) .project-preview-final-part:not(.is-gap) {
-  outline-width: 2px;
-}
-
-/* Source and path geometry is already clipped to the domain. Let the outer
-   rings paint past their containers, including at plot endpoints; labels keep
-   their own clipping and unused source context keeps its existing styling. */
-[data-overview-preview] .project-preview-card .project-preview-plot,
-[data-overview-preview] .project-preview-card .project-preview-contig.is-adopted,
-[data-overview-preview] .project-preview-card .project-preview-reference {
-  overflow: visible;
+  outline-width: 3px;
+  outline-offset: -3px;
 }
 
 .project-export-page .button,
@@ -732,3 +720,26 @@
 /* Expanding the first group can introduce the document scrollbar. Reserve its
    gutter on Project so that this cannot shrink or shift every Final Path. */
 :root:has(.project-integrated-overview) { scrollbar-gutter: stable; }
+
+.project-integrated-overview .project-export-detail-section[hidden] { display: none; }
+.project-preview-toolbar > [data-preview-count] { display: contents; }
+/* Folded rows use the same label column and plot width as expanded rows. */
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] {
+  display: grid; grid-template-columns: 108px minmax(0, 1fr); column-gap: 10px; align-items: center; padding-top: 8px; padding-bottom: 8px;
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-card-heading {
+  grid-column: 1; grid-row: 1; min-width: 0; margin: 0; background: transparent;
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-card-header { padding: 0; border: 0; box-shadow: none; background: transparent; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-chr-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] :is(.project-preview-card-summary, .project-preview-open, .project-preview-final-label) { display: none; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-paths { grid-column: 2; grid-row: 1; min-width: 0; margin: 0; gap: 2px; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-row { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-final-plot { height: max(2px, calc((24px - (var(--preview-path-count) - 1) * 2px) / var(--preview-path-count))) !important; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-final-part { top: 0; height: 100%; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"]:not([data-preview-path-count="1"]) .project-preview-final-part > span { display: none; }
+@media (max-width: 560px) {
+  [data-overview-preview] .project-preview-card[data-preview-expanded="false"] { grid-template-columns: 80px minmax(0, 1fr); column-gap: 6px; }
+}
+
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"][data-preview-path-count="1"] .project-preview-final-part { top: 4px; height: 16px; }
