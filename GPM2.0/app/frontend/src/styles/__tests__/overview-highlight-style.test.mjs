@@ -121,3 +121,7 @@ test("standalone Preview retains its existing whole-card highlights and Overview
   const imports = readFileSync(new URL("../components.css", import.meta.url), "utf8");
   assert.ok(imports.indexOf('"./project-export.css"') > imports.indexOf('"./project-preview.css"'));
 });
+
+test("Project reserves the document scrollbar gutter so expanding details cannot change the shared strip width", () => {
+  assert.match(rule("project-export", ":root:has(.project-integrated-overview)"), /scrollbar-gutter:\s*stable;/);
+});

@@ -728,3 +728,7 @@
 
 .project-preview-toolbar::after { order: 1; }
 .project-preview-toolbar .project-export-actions { order: 2; }
+
+/* Expanding the first group can introduce the document scrollbar. Reserve its
+   gutter on Project so that this cannot shrink or shift every Final Path. */
+:root:has(.project-integrated-overview) { scrollbar-gutter: stable; }
