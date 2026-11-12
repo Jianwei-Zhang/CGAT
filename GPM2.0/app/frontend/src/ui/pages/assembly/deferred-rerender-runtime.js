@@ -36,7 +36,14 @@ export function createDeferredRerenderCoordinator(options = {}) {
       pendingHost = null;
       pendingStore = null;
       pendingMode = "";
-      if (!nextHost || !nextStore) {
+      // Main's context menu may start evidence loading before a Local window
+      // has a DOM host. Its scoped store is the durable owner; the panel renderer
+      // resolves the current window node instead of relying on that old host.
+      const scopedSubview = nextMode === "subview-panel"
+        && nextStore?.localViewRootStore && nextStore?.localViewWindowId;
+      if (!nextStore || (!nextHost && !scopedSubview)
+        || nextStore.isLocalViewAlive?.() === false
+        || (scopedSubview && nextStore.getState().activeRoute !== "assembly")) {
         return;
       }
       if (nextMode === "subview-panel") {
