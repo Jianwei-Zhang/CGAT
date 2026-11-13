@@ -18,7 +18,7 @@ impl AddImportRollback {
     ) -> Result<Self> {
         let backup_root = workspace_root.join(CACHE_DIR).join(format!(
             "add_import_rollback_{}",
-            current_unix_millis_string()
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::create_dir_all(&backup_root).with_context(|| {
             format!(

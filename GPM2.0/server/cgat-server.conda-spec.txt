@@ -8,3 +8,13 @@ craq=1.10
 zip
 gzip
 pigz=2.8
+# DEGAP v2 shares this environment; do not create a second degap_env.
+biopython
+pysam
+numpy
+matplotlib-base
+scipy
+hifiasm=0.25.0
+seqkit=2.8.0
+parallel
+ripgrep=15.1.0

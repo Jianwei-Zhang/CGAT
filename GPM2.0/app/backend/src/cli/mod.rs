@@ -79,6 +79,11 @@ enum Commands {
         zip_path: PathBuf,
         workspace_root: PathBuf,
     },
+    ImportDegapResults {
+        zip_path: PathBuf,
+        workspace_root: PathBuf,
+        project_id: i64,
+    },
     ListProjectInitializerOptions {
         workspace_root: PathBuf,
     },

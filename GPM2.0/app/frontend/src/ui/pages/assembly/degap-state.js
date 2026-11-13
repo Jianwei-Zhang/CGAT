@@ -9,6 +9,7 @@ export const DEGAP_SOFTWARE_SETTINGS_STORAGE_KEY = "gpm_next:degap_software_sett
 
 export const DEFAULT_DEGAP_SETTINGS = Object.freeze({
   degapPath: "",
+  degapPathConfigured: false,
   hifiReads: [],
   ontReads: [],
   gpmServerPath: "",
@@ -142,6 +143,7 @@ export function normalizeDegapSettings(value = {}) {
   return {
     ...DEFAULT_DEGAP_SETTINGS,
     degapPath: normalizeString(source.degapPath ?? DEFAULT_DEGAP_SETTINGS.degapPath),
+    degapPathConfigured: source.degapPathConfigured === true,
     hifiReads: normalizeStringList(source.hifiReads ?? DEFAULT_DEGAP_SETTINGS.hifiReads),
     ontReads: normalizeStringList(source.ontReads ?? DEFAULT_DEGAP_SETTINGS.ontReads),
     gpmServerPath: normalizeString(source.gpmServerPath ?? DEFAULT_DEGAP_SETTINGS.gpmServerPath),
@@ -227,6 +229,12 @@ function normalizeDegapJob(value) {
     rightCtg: normalizeString(source.rightCtg),
     outPath: normalizeString(source.outPath),
     baselineOutPath: normalizeString(source.baselineOutPath || source.outPath),
+    importedResults: (Array.isArray(source.importedResults) ? source.importedResults : []).map((item) => ({
+      token: normalizeString(item.token), ctgName: normalizeString(item.ctgName),
+      assemblyCtgId: Number(item.assemblyCtgId) || null,
+      jobId: normalizeString(item.jobId), chrName: normalizeString(item.chrName),
+      targetChr: normalizeString(item.targetChr), targetTrack: normalizeString(item.targetTrack),
+    })).filter((item) => item.token && item.ctgName),
     left: normalizeSeedSegment(source.left),
     right: normalizeSeedSegment(source.right),
     endpointCtg: normalizeString(source.endpointCtg),
@@ -374,7 +382,8 @@ export function resolveDegapJobSettings(job, globalSettings) {
   const resolved = { ...inheritedSettings };
   Object.keys(DEFAULT_DEGAP_SETTINGS).forEach((field) => {
     if (
-      !isDegapSettingValueConfigured(resolved[field])
+      !(field === "degapPath" && resolved.degapPathConfigured)
+      && !isDegapSettingValueConfigured(resolved[field])
       && isDegapSettingValueConfigured(jobSettings[field])
     ) {
       resolved[field] = jobSettings[field];
@@ -393,7 +402,8 @@ export function resolveDegapExportSettings(settings, jobs) {
     const jobSettings = resolveDegapJobSettings(job, resolved);
     Object.keys(DEFAULT_DEGAP_SETTINGS).forEach((field) => {
       if (
-        !isDegapSettingValueConfigured(resolved[field])
+        !(field === "degapPath" && resolved.degapPathConfigured)
+        && !isDegapSettingValueConfigured(resolved[field])
         && isDegapSettingValueConfigured(jobSettings[field])
       ) {
         resolved[field] = jobSettings[field];
@@ -566,9 +576,6 @@ export function findDuplicateDegapJobs(currentJobs, nextJobs) {
 
 export function validateDegapSettings(settings, { requireOutRoot = true, stateOrLocale = "en" } = {}) {
   const normalized = normalizeDegapSettings(settings);
-  if (!normalized.degapPath) {
-    return tAssembly(stateOrLocale, "degap.validation.degapPathRequired");
-  }
   if (!normalized.hifiReads.length && !normalized.ontReads.length) {
     return tAssembly(stateOrLocale, "degap.validation.readsPathRequired");
   }
@@ -659,6 +666,7 @@ export function writeDegapSoftwareSettings(settings, storage = globalThis.localS
   const normalized = normalizeDegapSettings(settings);
   storage?.setItem?.(DEGAP_SOFTWARE_SETTINGS_STORAGE_KEY, JSON.stringify({
     degapPath: normalized.degapPath,
+    degapPathConfigured: normalized.degapPathConfigured,
     thread: normalized.thread,
     kmerFilter: normalized.kmerFilter,
     kmerSize: normalized.kmerSize,

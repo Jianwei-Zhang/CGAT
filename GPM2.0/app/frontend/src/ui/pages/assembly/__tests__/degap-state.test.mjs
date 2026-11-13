@@ -373,3 +373,21 @@ test("validateDegapSettings requires one reads group and server paths", () => {
   assert.match(validateDegapSettings({ ...settings, hifiReads: [], ontReads: [] }), /reads path/);
   assert.deepEqual(buildDegapExportSettings(settings).ontReads, ["/reads/b.fq.gz"]);
 });
+
+
+test("bundled DEGAP does not require a separate installation path", () => {
+  assert.equal(validateDegapSettings({ ...settings, degapPath: "" }), "");
+  assert.equal(buildDegapExportSettings({ ...settings, degapPath: "" }).degapPath, "");
+  assert.notEqual(validateDegapSettings({ ...settings, degapPath: "", hifiReads: [], ontReads: [] }), "");
+  assert.notEqual(validateDegapSettings({ ...settings, degapPath: "", gpmServerPath: "" }), "");
+});
+
+
+test("explicitly clearing a custom runtime selects bundled DEGAP without resurrecting old paths", () => {
+  const [job] = buildDegapJobsForGap({ finalPathEntry, gapSegmentId: "gap-1", sides: ["left"], settings });
+  const bundled = { ...settings, degapPath: "", degapPathConfigured: true };
+  assert.equal(resolveDegapExportSettings(bundled, [job]).degapPath, "");
+  assert.equal(resolveDegapJobSettings(job, bundled).degapPath, "");
+  const overridden = { ...job, settings: { ...job.settings, degapPath: "/custom/other.py" } };
+  assert.equal(resolveDegapJobSettings(overridden, bundled).degapPath, "/custom/other.py");
+});

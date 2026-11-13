@@ -125,3 +125,32 @@ test("add-ctg import forwards target identity and merges successful refresh data
   assert.equal(store.getState().assembly.actionError, "");
   assert.ok(rerenderCalls >= 3);
 });
+
+
+test("DEGAP batch import uses receipt targets and associates only matching jobs", async () => {
+  const initial = createInitialState();
+  initial.assembly.degap = { jobs: [
+    { jobId: "gap", chrName: "Chr02" }, { jobId: "gap", chrName: "Chr03" },
+  ] };
+  initial.assembly.finalPath = { segments: ["unchanged"] };
+  const store = createStore(initial);
+  const calls = [];
+  const controller = createAddCtgImportController({
+    async importAddCtgPackage(payload) {
+      calls.push(payload);
+      return { targetChr: "Chr02", degapResults: [{ jobId: "gap", chrName: "Chr02", token: "abc", ctgName: "candidate" }] };
+    },
+    mapAssemblyError: ({ error }) => ({ userMessage: String(error) }),
+    async pickZipFilePath() { return "D:/degap_results.zip"; },
+    rerender() {},
+    async selectChromosome(_host, _store, name) { assert.equal(name, "Chr02"); },
+  });
+  await controller.importAddCtgIntoTrack({}, store, { degapResults: true });
+  assert.equal(calls[0].expectedTargetChr, "");
+  assert.equal(calls[0].expectedTargetTrack, "");
+  assert.equal(store.getState().assembly.degap.jobs[0].importedResults.length, 1);
+  assert.equal(store.getState().assembly.degap.jobs[1].importedResults.length, 0);
+  assert.deepEqual(store.getState().assembly.finalPath, { segments: ["unchanged"] });
+  assert.equal(calls[0].degapResultsOnly, true);
+  assert.equal(store.getState().assembly.addCtgImportProgress.status, "success");
+});

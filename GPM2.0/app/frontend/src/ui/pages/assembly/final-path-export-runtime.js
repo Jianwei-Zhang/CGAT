@@ -824,6 +824,7 @@ export async function runFinalPathExportStep({
     return {
       outputPath: result?.manifestPath || step.outputPath,
       outputPaths: [
+        ...[result?.runScriptPath, result?.collectScriptPath].filter(Boolean),
         result?.prepareScriptPath,
         ...scripts.map((script) => script?.scriptPath),
         result?.manifestPath,

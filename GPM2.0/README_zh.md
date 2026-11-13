@@ -297,3 +297,5 @@ bash ./gpm_server/export_final_path_fasta.sh \
   --tsv /path/to/project_Chr01_path.tsv \
   -o /path/to/project_Chr01_path.fa
 ```
+
+DEGAP v2 已内置于 Server，与 GPM 共用 `cgat-server` 环境。App 的自定义 DEGAP 路径留空即可。导出任务后在 Server 执行 `bash run_degap_jobs.sh`，再通过“导入 DEGAP 结果”导入 `degap_results.zip`；结果作为候选加入，不改变 Final Path。调度器、旧项目更新和来源校验说明见 Server 指南。

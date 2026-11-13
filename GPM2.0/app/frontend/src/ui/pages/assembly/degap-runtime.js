@@ -144,6 +144,7 @@ function collectSettings(root, selectorName) {
   const readField = (field) => root.querySelector?.(`[${selectorName}="${field}"]`);
   return normalizeDegapSettings({
     degapPath: readField("degapPath")?.value || "",
+    degapPathConfigured: true,
     hifiReads: normalizeStringList(readField("hifiReads")?.value || ""),
     ontReads: normalizeStringList(readField("ontReads")?.value || ""),
     gpmServerPath: readField("gpmServerPath")?.value || "",
@@ -509,6 +510,10 @@ export function bindDegapCard(host, store, deps = {}) {
     return;
   }
   host.addEventListener("click", (event) => {
+    if (event.target?.closest?.("[data-degap-results-import]")) {
+      void deps.importDegapResults?.(host, store);
+      return;
+    }
     const settingsOpen = event.target?.closest?.("[data-degap-settings-open]");
     if (settingsOpen) {
       openDegapSettings(host, store, deps);

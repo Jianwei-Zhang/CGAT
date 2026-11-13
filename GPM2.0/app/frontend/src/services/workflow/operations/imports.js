@@ -111,6 +111,7 @@ export async function importAddCtgPackage({
   zipPath,
   expectedTargetChr = "",
   expectedTargetTrack = "",
+  degapResultsOnly = false,
   onStage,
   runId = "",
   stateOrLocale = "zh",
@@ -122,11 +123,13 @@ export async function importAddCtgPackage({
       zipPath,
       expectedTargetChr,
       expectedTargetTrack,
+      ...(degapResultsOnly ? { degapResultsOnly: true } : {}),
       onStage,
       runId,
       stateOrLocale,
     });
   }
+  if (degapResultsOnly) throw new Error("DEGAP result import requires the desktop App; browser preview cannot import real candidates.");
   return importAddCtgPackageMock({
     workspaceRoot,
     projectId,

@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import Mock, patch
@@ -141,17 +142,23 @@ class ProgressTests(unittest.TestCase):
 
     def test_live_heartbeat_thread_stops_and_parallel_counts_stay_separate(self):
         with tempfile.TemporaryDirectory() as temp:
-            stream = io.StringIO()
+            observed = threading.Event()
+            class ObservedStream(io.StringIO):
+                def write(self, value):
+                    size = super().write(value)
+                    if "[RUNNING] [grt_step3]" in self.getvalue():
+                        observed.set()
+                    return size
+            stream = ObservedStream()
             with self.display(Path(temp), stream=stream, heartbeat=.01) as view:
                 view.event("START", "grt_step3", "attempt=1")
                 view.event("START", "other", "attempt=1")
                 view.child("grt_step3", "LGZ step3 MUMmer Chr1: computed")
                 view.child("other", "LGZ step3 MUMmer Chr1: cache hit")
                 view.event("SUCCESS", "other", "elapsed=0.01s")
-                for _ in range(150):
-                    if "[RUNNING] [grt_step3]" in stream.getvalue():
-                        break
-                    time.sleep(.01)
+                # The real worker polls once per second. Await its actual output
+                # instead of a 1.5-second scheduling window under a loaded full gate.
+                self.assertTrue(observed.wait(5), stream.getvalue())
                 self.assertIn("[RUNNING] [grt_step3]", stream.getvalue())
                 self.assertNotIn("[RUNNING] [other]", stream.getvalue())
                 self.assertIn("computed=1 cached=0", stream.getvalue())

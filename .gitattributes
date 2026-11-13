@@ -10,3 +10,6 @@
 *.pptx binary
 *.docx binary
 *.xlsx binary
+
+# Generated, byte-identical upstream snapshot; preserve upstream whitespace.
+GPM2.0/server/tools/degap_core/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab

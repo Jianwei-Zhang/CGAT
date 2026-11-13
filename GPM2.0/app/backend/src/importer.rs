@@ -40,6 +40,7 @@ mod add_ctg;
 mod add_dataset;
 mod alignment;
 mod catalog_common;
+mod degap_results;
 mod initial;
 mod initial_catalog;
 mod initial_persistence;
@@ -56,6 +57,7 @@ pub use add_dataset::{
     import_add_dataset_package, import_add_dataset_package_with_hooks,
     import_workspace_add_dataset_package, import_workspace_add_dataset_package_with_hooks,
 };
+pub use degap_results::{import_degap_results_with_hooks, is_degap_results_package};
 pub use initial::{
     import_from_extracted_bundle, import_from_extracted_bundle_with_hooks,
     import_from_extracted_bundle_with_options, import_from_extracted_bundle_with_options_and_hooks,

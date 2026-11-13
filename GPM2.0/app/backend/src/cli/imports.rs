@@ -29,6 +29,21 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             print_progress(&progress);
             print_add_dataset_outcome(&outcome);
         }
+        Commands::ImportDegapResults {
+            zip_path,
+            workspace_root,
+            project_id,
+        } => {
+            let (outcomes, progress) = gpm_next_backend::importer::import_degap_results_with_hooks(
+                &zip_path,
+                &workspace_root,
+                project_id,
+                &mut |_| {},
+                &mut || false,
+            )?;
+            print_progress(&progress);
+            println!("{}", serde_json::to_string(&outcomes)?);
+        }
         command => return Ok(Some(command)),
     }
     Ok(None)

@@ -1348,6 +1348,7 @@ const mainViewHistoryRuntimeDeps = {
 
 const degapRuntimeDeps = {
   rerender,
+  importDegapResults: (host, store) => importAddCtgIntoTrack(host, store, { degapResults: true }),
   confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message, context),
   mapAssemblyError,
   persistDegapProjectState: (host, store) =>

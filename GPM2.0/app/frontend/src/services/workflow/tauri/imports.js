@@ -121,6 +121,7 @@ async function importAddCtgPackageTauri({
   zipPath,
   expectedTargetChr = "",
   expectedTargetTrack = "",
+  degapResultsOnly = false,
   onStage,
   runId = "",
   stateOrLocale = "zh",
@@ -132,6 +133,7 @@ async function importAddCtgPackageTauri({
     zipPath,
     expectedTargetChr,
     expectedTargetTrack,
+    ...(degapResultsOnly ? { degapResultsOnly: true } : {}),
     runId,
   }, stateOrLocale));
   return {
@@ -143,6 +145,8 @@ async function importAddCtgPackageTauri({
     datasetId: result.datasetId,
     sourceSeqId: result.sourceSeqId,
     assemblyCtgId: result.assemblyCtgId,
+    degapResults: result.degapResults,
+    degapIncompleteCount: result.degapIncompleteCount,
     ctgName: result.ctgName,
     targetTrack: result.targetTrack,
     targetChr: result.targetChr,
