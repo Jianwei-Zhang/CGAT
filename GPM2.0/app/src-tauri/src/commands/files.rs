@@ -123,6 +123,52 @@ pub fn export_project_final_path_fasta(
 
 #[tauri::command]
 #[allow(non_snake_case)]
+pub fn export_final_path_agp(
+    workspaceRoot: String,
+    projectId: i64,
+    chrName: String,
+    finalPathEntry: Value,
+    outputPath: String,
+) -> CommandResult<Value> {
+    (|| {
+        let summary = backend_export_final_path_agp(
+            &project_db_path(&workspaceRoot),
+            projectId,
+            &ExportFinalPathFastaParams {
+                chr_name: chrName.trim().to_string(),
+                output_path: PathBuf::from(outputPath.trim()),
+                final_path_segments: normalize_final_path_export_segments(&finalPathEntry)?,
+            },
+        )?;
+        Ok(json!({ "outputPath": path_to_string(&summary.output_path) }))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn export_project_final_path_agp(
+    workspaceRoot: String,
+    projectId: i64,
+    finalPathByChr: Value,
+    outputPath: String,
+) -> CommandResult<Value> {
+    (|| {
+        let summary = backend_export_project_final_path_agp(
+            &project_db_path(&workspaceRoot),
+            projectId,
+            &ExportProjectFinalPathFastaParams {
+                output_path: PathBuf::from(outputPath.trim()),
+                records: normalize_project_final_path_fasta_records(&finalPathByChr)?,
+            },
+        )?;
+        Ok(json!({ "outputPath": path_to_string(&summary.output_path) }))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
 pub fn export_degap_jobs(
     workspaceRoot: String,
     projectId: i64,

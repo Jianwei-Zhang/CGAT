@@ -11,6 +11,9 @@ export function createAssemblyProgressModalRenderer({
     if (kind === "tsv") {
       return labels.finalPathExportTsv || "表(.tsv)";
     }
+    if (kind === "agp") {
+      return labels.finalPathExportAgp || "AGP (.agp)";
+    }
     if (kind === "fasta") {
       return labels.finalPathExportFasta || "序列(.fasta)";
     }

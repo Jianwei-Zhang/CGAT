@@ -23,7 +23,9 @@ use gpm_next_backend::degap_jobs::{
 use gpm_next_backend::exporter::{
     ExportFinalPathFastaParams, ExportProjectFinalPathFastaParams, FinalPathExportSegment,
     FinalPathFastaRecord, ListExportRecordsParams,
+    export_final_path_agp as backend_export_final_path_agp,
     export_final_path_fasta as backend_export_final_path_fasta,
+    export_project_final_path_agp as backend_export_project_final_path_agp,
     export_project_final_path_fasta as backend_export_project_final_path_fasta,
     list_export_records as backend_list_export_records,
 };
@@ -842,6 +844,48 @@ mod tests {
         let path = std::env::temp_dir().join(unique);
         fs::create_dir_all(&path).expect("create temp workspace root");
         path
+    }
+
+    #[test]
+    fn agp_export_commands_roundtrip_current_paths_without_fasta() {
+        let root = create_test_workspace_root();
+        let workspace = root.display().to_string();
+        let conn = open_workspace_db(&project_db_path(&workspace)).unwrap();
+        conn.execute_batch("
+            INSERT INTO reference_genome(id,name,species_name,assembly_label,fasta_path,fai_path) VALUES(1,'ref','s','a','missing.fa','missing.fai');
+            INSERT INTO dataset(id,name,assembler,fasta_path,fai_path) VALUES(1,'ds','asm','missing.fa','missing.fai');
+            INSERT INTO source_seq(id,dataset_id,seq_name,seq_order,length) VALUES(1,1,'tig1',1,20);
+            INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at) VALUES(1,'p',1,1,1,'0');
+            INSERT INTO project_dataset(project_id,dataset_id,dataset_role,display_order) VALUES(1,1,'primary',1);
+        ").unwrap();
+        drop(conn);
+        let entry = json!({"chrName":"Chr01A", "segments":[
+            {"type":"ctg", "serverBaseline":true, "source":{"dataset":"ds","contig":"tig1"}, "start":8,"end":3},
+            {"type":"gap", "gapSizeBp":7}
+        ]});
+        let single = root.join("single.agp");
+        let result = export_final_path_agp(
+            workspace.clone(),
+            1,
+            "Chr01A".into(),
+            entry.clone(),
+            single.display().to_string(),
+        )
+        .unwrap();
+        assert_eq!(result["outputPath"], single.display().to_string());
+        let text = fs::read_to_string(&single).unwrap();
+        assert!(text.contains("Chr01A\t1\t6\t1\tW\ttig1\t3\t8\t-"));
+        assert!(text.contains("Chr01A\t7\t13\t2\tN\t7\tcontig\tno\tna"));
+        let project = root.join("project.agp");
+        export_project_final_path_agp(
+            workspace,
+            1,
+            json!({"Chr01A":entry}),
+            project.display().to_string(),
+        )
+        .unwrap();
+        assert_eq!(fs::read_to_string(project).unwrap(), text);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -57,6 +57,8 @@ const DEFINITIONS = {
     ["writeFinalPathExportTextFile", "unavailable"],
     ["writeFinalPathExportBinaryFile", "unavailable"],
     ["exportFinalPathFasta", "unavailable"],
+    ["exportFinalPathAgp", "unavailable"],
+    ["exportProjectFinalPathAgp", "unavailable"],
     ["exportProjectFinalPathFasta", "unavailable"],
     ["exportDegapJobs", "bridge"],
   ],

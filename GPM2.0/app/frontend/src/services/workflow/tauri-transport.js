@@ -80,6 +80,33 @@ export function createTauriTransport({
         stateOrLocale,
       );
     },
+    exportFinalPathAgp({
+      workspaceRoot,
+      projectId,
+      chrName,
+      finalPathEntry,
+      outputPath,
+      stateOrLocale = "zh",
+    }) {
+      return invokeNormalized(
+        "export_final_path_agp",
+        { workspaceRoot, projectId, chrName, finalPathEntry, outputPath },
+        stateOrLocale,
+      );
+    },
+    exportProjectFinalPathAgp({
+      workspaceRoot,
+      projectId,
+      finalPathByChr,
+      outputPath,
+      stateOrLocale = "zh",
+    }) {
+      return invokeNormalized(
+        "export_project_final_path_agp",
+        { workspaceRoot, projectId, finalPathByChr, outputPath },
+        stateOrLocale,
+      );
+    },
     exportDegapJobs({ stateOrLocale = "zh", ...payload }) {
       return invokeNormalized("export_degap_jobs", payload, stateOrLocale);
     },

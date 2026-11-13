@@ -467,6 +467,7 @@ test("renderFinalPathCard respects the requested graph mode when current chr has
   assert.match(html, /data-final-path-export-action="tsv"/);
   assert.match(html, /data-final-path-export-action="fasta"/);
   assert.match(html, /data-final-path-export-action="all"/);
+  assert.match(html, /data-final-path-export-action="agp"/);
   assert.doesNotMatch(html, /data-final-path-view-mode="log"/);
   assert.doesNotMatch(html, /data-final-path-export-action="log"/);
 });
@@ -522,6 +523,7 @@ test("renderFinalPathCard keeps all export while hiding fasta when fasta is unav
   assert.match(html, /data-final-path-export-action="tsv"/);
   assert.doesNotMatch(html, /data-final-path-export-action="fasta"/);
   assert.match(html, /data-final-path-export-action="all"/);
+  assert.match(html, /data-final-path-export-action="agp"/);
 });
 
 test("renderFinalPathCard shows an editable draft row in table mode when current chr has no final path", () => {

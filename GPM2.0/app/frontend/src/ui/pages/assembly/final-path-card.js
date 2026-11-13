@@ -552,6 +552,7 @@ function renderFinalPathExportMenu({
         <button type="button" class="final-path-export-item" data-final-path-export-action="tsv">${escapeHtml(labels.finalPathExportTsv || "表(.tsv)")}</button>
         ${logItem}
         ${fastaItem}
+        <button type="button" class="final-path-export-item" data-final-path-export-action="agp">${escapeHtml(labels.finalPathExportAgp || "AGP (.agp)")}</button>
         <button type="button" class="final-path-export-item" data-final-path-export-action="all">${escapeHtml(labels.finalPathExportAll || "All")}</button>
         ${degapJobsDivider}
         ${degapJobsItem}

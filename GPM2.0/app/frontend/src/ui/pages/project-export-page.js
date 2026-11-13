@@ -13,6 +13,7 @@ import { getGraphFontSize, estimateGraphTextWidth } from "../../services/app-set
 import { pickDirectoryPath, pickSaveFilePath } from "../../services/backend-api.js";
 import {
   exportProjectFinalPathFasta,
+  exportProjectFinalPathAgp,
   getGrtProjectView,
   getProjectAssemblyViewState,
   getProjectOverviewSources,
@@ -445,6 +446,7 @@ function getLabels(state) {
       exportPng: "Graph (.png)",
       exportTsv: "Table (.tsv)",
       exportFasta: "Sequence (.fasta)",
+      exportAgp: "AGP (.agp)",
       exportLog: "Log (.log)",
       exportDialogTitle: "Exporting Final Path",
       exportRunning: "Running: {step}",
@@ -508,6 +510,7 @@ function getLabels(state) {
     exportPng: "图(.png)",
     exportTsv: "表(.tsv)",
     exportFasta: "序列(.fasta)",
+    exportAgp: "AGP (.agp)",
     exportLog: "日志(.log)",
     exportDialogTitle: "正在导出 Final Path",
     exportRunning: "正在执行：{step}",
@@ -1449,6 +1452,9 @@ function resolveProjectExportKindLabel(job, labels) {
   if (kind === "tsv") {
     return labels.exportTsv || "表(.tsv)";
   }
+  if (kind === "agp") {
+    return labels.exportAgp || "AGP (.agp)";
+  }
   if (kind === "fasta") {
     return labels.exportFasta || "序列(.fasta)";
   }
@@ -1602,6 +1608,7 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
         <button type="button" class="final-path-export-item" data-project-export-action="tsv">${escapeHtml(labels.exportTsv)}</button>
         ${logItem}
         ${fastaItem}
+        <button type="button" class="final-path-export-item" data-project-export-action="agp">${escapeHtml(labels.exportAgp)}</button>
         <button type="button" class="final-path-export-item" data-project-export-action="all">${escapeHtml(labels.exportAll)}</button>
       </div>
     </div>
@@ -2065,6 +2072,12 @@ async function resolveProjectExportTarget({ state, kind, baseName, deps = {} }) 
       filters: [{ name: "LOG", extensions: ["log"] }],
     }, state);
   }
+  if (normalizedKind === "agp") {
+    return pickSaveFile({
+      defaultPath: `${baseName}.agp`,
+      filters: [{ name: "AGP", extensions: ["agp"] }],
+    }, state);
+  }
   if (normalizedKind === "fasta") {
     return pickSaveFile({
       defaultPath: `${baseName}.fasta`,
@@ -2101,6 +2114,9 @@ function planProjectExportSteps({
   if (normalizedKind === "log") {
     return canExportLog ? [buildStep("log", "日志(.log)", "log")] : [];
   }
+  if (normalizedKind === "agp") {
+    return [buildStep("agp", "AGP (.agp)", "agp")];
+  }
   if (normalizedKind === "fasta") {
     return canExportFasta ? [buildStep("fasta", "序列(.fasta)", "fasta")] : [];
   }
@@ -2115,6 +2131,7 @@ function planProjectExportSteps({
     if (canExportFasta) {
       steps.push(buildStep("fasta", "序列(.fasta)", "fasta"));
     }
+    steps.push(buildStep("agp", "AGP (.agp)", "agp"));
     return steps;
   }
   return [];
@@ -2229,8 +2246,9 @@ async function runProjectExport(host, store, kind, deps = {}) {
           text: buildProjectExportLogText(model),
           stateOrLocale: state,
         });
-      } else if (step.kind === "fasta") {
-        await exportFasta({
+      } else if (step.kind === "fasta" || step.kind === "agp") {
+        const exportPath = step.kind === "agp" ? (deps.exportProjectFinalPathAgp || exportProjectFinalPathAgp) : exportFasta;
+        await exportPath({
           workspaceRoot: state.session?.workspacePath || "",
           projectId: Number(state.session?.projectId || 0),
           finalPathByChr,

@@ -10,6 +10,8 @@ import {
   deletePhasedChrTrack,
   exportDegapJobs,
   exportFinalPathFasta,
+  exportFinalPathAgp,
+  exportProjectFinalPathAgp,
   exportProjectFinalPathFasta,
   executeMainViewHistoryAction,
   getMainViewHistoryStatus,
@@ -1098,4 +1100,74 @@ test("getProjectOverviewSources forwards a single compact desktop operation and 
     assert.deepEqual(calls, [{ command: "get_project_overview_sources", args: { workspaceRoot: "D:/workspace", projectId: 7 } }]);
     await assert.rejects(getProjectOverviewSources({ workspaceRoot: "D:/workspace", projectId: 8 }), /missing overview project/);
   } finally { globalThis.window = previousWindow; }
+});
+
+test("exportFinalPathAgp routes the current finalPathEntry through the tauri command", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return { outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" };
+          },
+        },
+      },
+    };
+
+    await exportFinalPathAgp({
+      workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+      projectId: 7,
+      chrName: "Chr01",
+      finalPathEntry: { chrName: "Chr01", segments: [] },
+      outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp",
+    });
+  } finally {
+    globalThis.window = previousWindow;
+  }
+
+  assert.equal(calls[0].command, "export_final_path_agp");
+  assert.equal(calls[0].args.workspaceRoot, "D:\\Desktop\\GPM\\ws1");
+  assert.equal(calls[0].args.projectId, 7);
+  assert.equal(calls[0].args.chrName, "Chr01");
+  assert.deepEqual(calls[0].args.finalPathEntry, { chrName: "Chr01", segments: [] });
+  assert.equal(calls[0].args.outputPath, "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp");
+});
+
+test("exportProjectFinalPathAgp routes the merged finalPathByChr through the tauri command", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  const finalPathByChr = {
+    Chr01: { chrName: "Chr01", segments: [] },
+    Chr02: { chrName: "Chr02", segments: [] },
+  };
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return { outputPath: "D:\\Desktop\\GPM\\exports\\project1_project_path.agp" };
+          },
+        },
+      },
+    };
+
+    await exportProjectFinalPathAgp({
+      workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+      projectId: 7,
+      finalPathByChr,
+      outputPath: "D:\\Desktop\\GPM\\exports\\project1_project_path.agp",
+    });
+  } finally {
+    globalThis.window = previousWindow;
+  }
+
+  assert.equal(calls[0].command, "export_project_final_path_agp");
+  assert.equal(calls[0].args.workspaceRoot, "D:\\Desktop\\GPM\\ws1");
+  assert.equal(calls[0].args.projectId, 7);
+  assert.deepEqual(calls[0].args.finalPathByChr, finalPathByChr);
+  assert.equal(calls[0].args.outputPath, "D:\\Desktop\\GPM\\exports\\project1_project_path.agp");
 });

@@ -100,6 +100,8 @@ pub fn run() {
             commands::write_final_path_export_text_file,
             commands::write_final_path_export_binary_file,
             commands::export_final_path_fasta,
+            commands::export_final_path_agp,
+            commands::export_project_final_path_agp,
             commands::export_project_final_path_fasta,
             commands::export_degap_jobs
         ])

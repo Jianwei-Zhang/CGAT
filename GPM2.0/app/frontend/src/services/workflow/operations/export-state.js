@@ -87,6 +87,54 @@ export async function exportProjectFinalPathFasta({
   });
 }
 
+export async function exportFinalPathAgp({
+  workspaceRoot,
+  projectId,
+  chrName,
+  finalPathEntry,
+  outputPath,
+  stateOrLocale = "zh",
+}) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("final path agp export is unavailable in browser preview", {
+      code: "BROWSER_EXPORT_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "export_final_path_agp",
+    });
+  }
+  return tauri.exportFinalPathAgp({
+    workspaceRoot,
+    projectId,
+    chrName,
+    finalPathEntry,
+    outputPath,
+    stateOrLocale,
+  });
+}
+
+export async function exportProjectFinalPathAgp({
+  workspaceRoot,
+  projectId,
+  finalPathByChr,
+  outputPath,
+  stateOrLocale = "zh",
+}) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("project final path agp export is unavailable in browser preview", {
+      code: "BROWSER_EXPORT_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "export_project_final_path_agp",
+    });
+  }
+  return tauri.exportProjectFinalPathAgp({
+    workspaceRoot,
+    projectId,
+    finalPathByChr,
+    outputPath,
+    stateOrLocale,
+  });
+}
+
 export async function exportDegapJobs({
   workspaceRoot,
   projectId,

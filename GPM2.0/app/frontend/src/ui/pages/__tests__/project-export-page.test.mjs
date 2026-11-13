@@ -1470,6 +1470,7 @@ test("project export all writes one merged artifact per export type", async () =
   const textWrites = [];
   const binaryWrites = [];
   const fastaExports = [];
+  const agpExports = [];
 
   const result = await __test.runProjectExport(host, store, "all", {
     getExportTimestamp: () => "20260430205930",
@@ -1481,12 +1482,15 @@ test("project export all writes one merged artifact per export type", async () =
     writeFinalPathExportBinaryFile: async (payload) => {
       binaryWrites.push(payload);
     },
+    exportProjectFinalPathAgp: async (payload) => { agpExports.push(payload); },
     exportProjectFinalPathFasta: async (payload) => {
       fastaExports.push(payload);
     },
   });
 
   assert.equal(result, true);
+  assert.deepEqual(agpExports.map(item => item.outputPath), ["/exports/p1_project_path_20260430205930.agp"]);
+  assert.deepEqual(agpExports[0].finalPathByChr, fastaExports[0].finalPathByChr);
   assert.deepEqual(binaryWrites.map((item) => item.outputPath), ["/exports/p1_project_path_20260430205930.png"]);
   assert.deepEqual(textWrites.map((item) => item.outputPath), [
     "/exports/p1_project_path_20260430205930.tsv",
@@ -2253,4 +2257,87 @@ test("Project details stay hidden as a whole even with saved expansion, without 
   assert.match(html, /class="project-export-detail-section" hidden aria-labelledby="project-export-detail-title"/);
   for (const action of ["log", "tsv", "png", "fasta", "all"]) assert.ok(html.includes(`data-project-export-action="${action}"`));
   assert.equal(JSON.stringify(state), before);
+});
+
+test("project export all sends phased haplotypes to agp and omits phased parent chr", async () => {
+  const baseState = createState();
+  let state = createState({
+    initializer: {
+      ...baseState.initializer,
+      existingProjects: [
+        {
+          projectId: 7,
+          projectName: "p1",
+          primaryDatasetId: 1,
+          supportDatasetIds: [],
+          phasedAssemblyEnabled: true,
+        },
+      ],
+    },
+    projectExport: {
+      ...baseState.projectExport,
+      chromosomes: [{ chrName: "Chr01" }],
+      phasedChrTracksByChr: {
+        Chr01: [
+          { phasedTrackId: 101, haplotypeKey: "A", label: "Chr01A", displayOrder: 1 },
+          { phasedTrackId: 102, haplotypeKey: "B", label: "Chr01B", displayOrder: 2 },
+        ],
+      },
+      finalPathByChr: {
+        Chr01: {
+          chrName: "Chr01",
+          segments: [{ segmentId: "parent", type: "gap", gapSizeBp: 100 }],
+        },
+        Chr01A: {
+          chrName: "Chr01A",
+          segments: [{ segmentId: "hap-a", type: "gap", gapSizeBp: 100 }],
+        },
+        Chr01B: {
+          chrName: "Chr01B",
+          segments: [{ segmentId: "hap-b", type: "gap", gapSizeBp: 200 }],
+        },
+      },
+    },
+  });
+  const host = {
+    innerHTML: "",
+    addEventListener() {},
+    querySelectorAll() {
+      return [];
+    },
+  };
+  const store = {
+    getState() {
+      return state;
+    },
+    setState(nextState) {
+      state = nextState;
+    },
+  };
+  const agpExports = [];
+
+  const result = await __test.runProjectExport(host, store, "agp", {
+    getExportTimestamp: () => "20260430205930",
+    pickSaveFilePath: async () => "/exports/p1_project_path.agp",
+    exportProjectFinalPathAgp: async (payload) => {
+      agpExports.push(payload);
+    },
+  });
+
+  assert.equal(result, true);
+  assert.deepEqual(Object.keys(agpExports[0].finalPathByChr), ["Chr01A", "Chr01B"]);
+});
+
+
+test("project AGP menu and all-export plan remain available without FASTA", async () => {
+  const html = renderProjectExportPage(createState());
+  assert.match(html, /data-project-export-action="agp"/);
+  const steps = __test.planProjectExportSteps({ kind: "all", baseName: "project", targetPath: "/out", canExportFasta: false });
+  assert.ok(steps.some(step => step.kind === "agp" && step.outputPath === "/out/project.agp"));
+  assert.ok(!steps.some(step => step.kind === "fasta"));
+  let options;
+  await __test.resolveProjectExportTarget({ state: {}, kind: "agp", baseName: "project", deps: {
+    pickSaveFilePath: async value => { options = value; return "/out/project.agp"; },
+  } });
+  assert.deepEqual(options, { defaultPath: "project.agp", filters: [{ name: "AGP", extensions: ["agp"] }] });
 });

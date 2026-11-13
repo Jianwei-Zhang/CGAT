@@ -245,6 +245,222 @@ pub fn export_project_final_path_fasta(
     export_project_final_path_fasta_with_connection(&mut conn, project_db_path, project_id, params)
 }
 
+// AGP uses the same current-path payload as FASTA, but only reads metadata.
+// In particular, light workspaces do not need local FASTA/locator payloads.
+pub fn export_final_path_agp(
+    project_db_path: &Path,
+    project_id: i64,
+    params: &ExportFinalPathFastaParams,
+) -> Result<FinalPathExportSummary> {
+    export_project_final_path_agp(
+        project_db_path,
+        project_id,
+        &ExportProjectFinalPathFastaParams {
+            output_path: params.output_path.clone(),
+            records: vec![FinalPathFastaRecord {
+                chr_name: params.chr_name.clone(),
+                final_path_segments: params.final_path_segments.clone(),
+            }],
+        },
+    )
+}
+
+pub fn export_project_final_path_agp(
+    project_db_path: &Path,
+    project_id: i64,
+    params: &ExportProjectFinalPathFastaParams,
+) -> Result<FinalPathExportSummary> {
+    let conn = open_workspace_db(project_db_path)?;
+    let text = build_final_path_agp(&conn, project_id, &params.records)?;
+    if let Some(parent) = params.output_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&params.output_path, text)
+        .with_context(|| format!("failed to write {}", params.output_path.display()))?;
+    Ok(FinalPathExportSummary {
+        output_path: params.output_path.clone(),
+    })
+}
+
+fn validate_agp_id(value: &str) -> Result<()> {
+    if value.is_empty()
+        || value.starts_with('#')
+        || value
+            .chars()
+            .any(|ch| ch.is_whitespace() || ch.is_control())
+    {
+        bail!(
+            "invalid AGP identifier {value:?}: identifiers must be nonempty and contain no whitespace"
+        );
+    }
+    Ok(())
+}
+
+fn validate_agp_range(start: i64, end: i64, length: i64) -> Result<()> {
+    if start <= 0 || end <= 0 || start.max(end) > length {
+        bail!("AGP component range {start}..{end} exceeds length {length}");
+    }
+    Ok(())
+}
+
+fn build_final_path_agp(
+    conn: &Connection,
+    project_id: i64,
+    records: &[FinalPathFastaRecord],
+) -> Result<String> {
+    validate_project_exists(conn, project_id)?;
+    if records.is_empty() {
+        bail!("at least one final-path AGP record is required");
+    }
+    let mut objects = HashSet::new();
+    let mut identities = HashMap::<String, String>::new();
+    let mut lines = vec!["##agp-version 2.1".to_string()];
+    for record in records {
+        let object = record.chr_name.trim();
+        validate_agp_id(object)?;
+        if !objects.insert(object.to_string()) {
+            bail!("duplicate AGP object {object}");
+        }
+        let mut begin = 1_i64;
+        let mut part = 1_i64;
+        for segment in &record.final_path_segments {
+            // Each item is (original component ID, stable source identity, start, end).
+            // Expand assembly contigs to their original source coordinates, matching
+            // build_final_path_ctg_source_sequence (not the displayed ctg orientation).
+            let mut components = Vec::<(String, String, i64, i64)>::new();
+            match segment {
+                FinalPathExportSegment::Gap { gap_size_bp } => {
+                    if *gap_size_bp <= 0 {
+                        bail!("AGP gap length must be positive");
+                    }
+                    let next = begin
+                        .checked_add(*gap_size_bp)
+                        .context("AGP object coordinate overflow")?;
+                    // The path stores an explicit N count, not linkage evidence.
+                    lines.push(format!(
+                        "{object}\t{begin}\t{}\t{part}\tN\t{gap_size_bp}\tcontig\tno\tna",
+                        next - 1
+                    ));
+                    begin = next;
+                    part += 1;
+                }
+                FinalPathExportSegment::Source {
+                    dataset_name,
+                    contig_name,
+                    start,
+                    end,
+                } => {
+                    let (id, length): (i64, i64) = conn.query_row(
+                        "SELECT ss.id, ss.length FROM source_seq ss
+                         JOIN dataset d ON d.id = ss.dataset_id
+                         JOIN project_dataset pd ON pd.dataset_id = d.id
+                         WHERE pd.project_id = ?1 AND d.name = ?2 AND ss.seq_name = ?3",
+                        params![project_id, dataset_name, contig_name],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    ).with_context(|| format!("AGP source {dataset_name}:{contig_name} not found in project {project_id}"))?;
+                    validate_agp_range(*start, *end, length)?;
+                    components.push((contig_name.clone(), format!("source:{id}"), *start, *end));
+                }
+                FinalPathExportSegment::RefSegment {
+                    reference_chr_name,
+                    member_start_bp,
+                    member_end_bp,
+                    start,
+                    end,
+                } => {
+                    let (id, length): (i64, i64) = conn
+                        .query_row(
+                            "SELECT rc.id, rc.length FROM reference_chr rc
+                         JOIN project p ON p.reference_genome_id = rc.reference_genome_id
+                         WHERE p.id = ?1 AND rc.chr_name = ?2",
+                            params![project_id, reference_chr_name.trim()],
+                            |row| Ok((row.get(0)?, row.get(1)?)),
+                        )
+                        .with_context(|| format!("AGP reference {reference_chr_name} not found"))?;
+                    if member_end_bp < member_start_bp {
+                        bail!("invalid AGP reference member range");
+                    }
+                    validate_agp_range(*member_start_bp, *member_end_bp, length)?;
+                    validate_agp_range(*start, *end, member_end_bp - member_start_bp + 1)?;
+                    components.push((
+                        reference_chr_name.trim().to_string(),
+                        format!("reference:{id}"),
+                        member_start_bp + (start - 1),
+                        member_start_bp + (end - 1),
+                    ));
+                }
+                FinalPathExportSegment::Ctg {
+                    assembly_ctg_id,
+                    start,
+                    end,
+                } => {
+                    let ctg = load_ctg_models(conn, project_id, None, Some(*assembly_ctg_id), false)?
+                        .pop().with_context(|| format!("AGP assembly_ctg_id {assembly_ctg_id} not found in project {project_id}"))?;
+                    let mut offset = 0_i64;
+                    for member in ctg.members.iter().filter(|member| !member.hidden) {
+                        let length: i64 = conn.query_row(
+                            "SELECT length FROM source_seq WHERE id = ?1",
+                            params![member.source_seq_id],
+                            |row| row.get(0),
+                        )?;
+                        if member.source_end < member.source_start {
+                            bail!("invalid AGP source member range");
+                        }
+                        validate_agp_range(member.source_start, member.source_end, length)?;
+                        let member_len = member.source_end - member.source_start + 1;
+                        let next = offset
+                            .checked_add(member_len)
+                            .context("AGP contig length overflow")?;
+                        let low = (*start).min(*end).max(offset + 1);
+                        let high = (*start).max(*end).min(next);
+                        if low <= high {
+                            let first = member.source_start + (low - offset - 1);
+                            let last = member.source_start + (high - offset - 1);
+                            components.push((
+                                member.source_seq_name.clone(),
+                                format!("source:{}", member.source_seq_id),
+                                if start <= end { first } else { last },
+                                if start <= end { last } else { first },
+                            ));
+                        }
+                        offset = next;
+                    }
+                    validate_agp_range(*start, *end, offset)?;
+                    if start > end {
+                        components.reverse();
+                    }
+                }
+            }
+            for (name, identity, start, end) in components {
+                validate_agp_id(&name)?;
+                if let Some(previous) = identities.insert(name.clone(), identity.clone())
+                    && previous != identity
+                {
+                    bail!(
+                        "ambiguous AGP component ID {name}: different source sequences share this name; use unique source FASTA identifiers"
+                    );
+                }
+                let low = start.min(end);
+                let high = start.max(end);
+                let next = begin
+                    .checked_add(high - low + 1)
+                    .context("AGP object coordinate overflow")?;
+                let orient = if start <= end { "+" } else { "-" };
+                lines.push(format!(
+                    "{object}\t{begin}\t{}\t{part}\tW\t{name}\t{low}\t{high}\t{orient}",
+                    next - 1
+                ));
+                begin = next;
+                part += 1;
+            }
+        }
+        if part == 1 {
+            bail!("AGP object {object} has no segments");
+        }
+    }
+    Ok(format!("{}\n", lines.join("\n")))
+}
+
 fn export_ctg_fasta_with_connection(
     conn: &mut Connection,
     project_db_path: &Path,
@@ -1937,6 +2153,301 @@ mod tests {
             .iter()
             .map(|(name, sequence)| (name.to_string(), sequence.clone()))
             .collect()
+    }
+
+    fn agp_fixture() -> (tempfile::TempDir, std::path::PathBuf, Connection) {
+        let temp = tempdir().unwrap();
+        let db = temp.path().join("project.sqlite");
+        let conn = super::open_workspace_db(&db).unwrap();
+        conn.execute_batch("
+            INSERT INTO reference_genome(id,name,species_name,assembly_label,fasta_path,fai_path)
+                VALUES(1,'ref','test','v1','missing-reference.fa','missing.fai');
+            INSERT INTO reference_chr(id,reference_genome_id,chr_name,chr_order,length)
+                VALUES(1,1,'refChr',1,100);
+            INSERT INTO dataset(id,name,assembler,fasta_path,fai_path)
+                VALUES(1,'primary','asm','missing-primary.fa','missing.fai'),
+                      (2,'support','asm','missing-support.fa','missing.fai');
+            INSERT INTO source_seq(id,dataset_id,seq_name,seq_order,length)
+                VALUES(1,1,'tigA',1,10),(2,2,'tigB',1,20);
+            INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at)
+                VALUES(1,'test',1,1,1,'0'),(2,'other',1,1,1,'0');
+            INSERT INTO project_dataset(project_id,dataset_id,dataset_role,display_order)
+                VALUES(1,1,'primary',1),(1,2,'support',2),(2,1,'primary',1);
+            INSERT INTO assembly_seq(id,project_id,source_seq_id,orient,source_start,source_end,created_at)
+                VALUES(1,1,1,'-',3,8,'0');
+            INSERT INTO assembly_ctg(id,project_id,assembly_seq_id,name,created_at)
+                VALUES(1,1,1,'renamed-ctg','0');
+        ").unwrap();
+        (temp, db, conn)
+    }
+
+    #[test]
+    fn final_path_agp_preserves_current_ranges_orientation_gaps_and_reference_without_fasta() {
+        let (_temp, db, conn) = agp_fixture();
+        let records = vec![
+            super::FinalPathFastaRecord {
+                chr_name: "Chr01A".into(),
+                final_path_segments: vec![
+                    super::FinalPathExportSegment::Source {
+                        dataset_name: "support".into(),
+                        contig_name: "tigB".into(),
+                        start: 12,
+                        end: 9,
+                    },
+                    super::FinalPathExportSegment::Gap { gap_size_bp: 7 },
+                    super::FinalPathExportSegment::Ctg {
+                        assembly_ctg_id: 1,
+                        start: 5,
+                        end: 2,
+                    },
+                    super::FinalPathExportSegment::RefSegment {
+                        reference_chr_name: "refChr".into(),
+                        member_start_bp: 21,
+                        member_end_bp: 40,
+                        start: 8,
+                        end: 5,
+                    },
+                ],
+            },
+            super::FinalPathFastaRecord {
+                chr_name: "Chr01B".into(),
+                final_path_segments: vec![super::FinalPathExportSegment::Source {
+                    dataset_name: "primary".into(),
+                    contig_name: "tigA".into(),
+                    start: 2,
+                    end: 4,
+                }],
+            },
+        ];
+        let text = super::build_final_path_agp(&conn, 1, &records).unwrap();
+        assert_eq!(
+            text,
+            "##agp-version 2.1\n\
+Chr01A\t1\t4\t1\tW\ttigB\t9\t12\t-\n\
+Chr01A\t5\t11\t2\tN\t7\tcontig\tno\tna\n\
+Chr01A\t12\t15\t3\tW\ttigA\t4\t7\t-\n\
+Chr01A\t16\t19\t4\tW\trefChr\t25\t28\t-\n\
+Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
+        );
+        // Reconstruct each object from AGP and compare to the existing FASTA
+        // assembler using the same path (non-palindromic sources expose flips).
+        let sources = HashMap::from([
+            (1, "ACGTTAGCGA".to_string()),
+            (2, "TACCGAGTTACGGTACCGTA".to_string()),
+        ]);
+        let references = HashMap::from([("refChr".to_string(), "ACGTG".repeat(20))]);
+        let ids = HashMap::from([
+            (("primary".to_string(), "tigA".to_string()), 1),
+            (("support".to_string(), "tigB".to_string()), 2),
+        ]);
+        let ctgs = super::load_ctg_models(&conn, 1, None, None, false)
+            .unwrap()
+            .into_iter()
+            .map(|ctg| (ctg.id, ctg))
+            .collect();
+        for record in &records {
+            let mut reconstructed = String::new();
+            for line in text.lines().skip(1) {
+                let fields = line.split('\t').collect::<Vec<_>>();
+                if fields[0] != record.chr_name {
+                    continue;
+                }
+                if fields[4] == "N" {
+                    reconstructed.push_str(&"N".repeat(fields[5].parse().unwrap()));
+                } else {
+                    let source = match fields[5] {
+                        "tigA" => &sources[&1],
+                        "tigB" => &sources[&2],
+                        "refChr" => &references["refChr"],
+                        _ => panic!("unexpected component"),
+                    };
+                    reconstructed.push_str(
+                        &super::slice_and_orient(
+                            source,
+                            fields[6].parse().unwrap(),
+                            fields[7].parse().unwrap(),
+                            fields[8],
+                        )
+                        .unwrap(),
+                    );
+                }
+            }
+            assert_eq!(
+                reconstructed,
+                super::build_final_path_sequence(
+                    &record.final_path_segments,
+                    &ctgs,
+                    &sources,
+                    &references,
+                    &ids
+                )
+                .unwrap()
+            );
+        }
+        let output_path = db.parent().unwrap().join("exports/nested/project.agp");
+        super::export_project_final_path_agp(
+            &db,
+            1,
+            &super::ExportProjectFinalPathFastaParams {
+                output_path: output_path.clone(),
+                records: records.clone(),
+            },
+        )
+        .unwrap();
+        assert_eq!(fs::read_to_string(output_path).unwrap(), text);
+        let single = db.parent().unwrap().join("single.agp");
+        super::export_final_path_agp(
+            &db,
+            1,
+            &super::ExportFinalPathFastaParams {
+                chr_name: records[0].chr_name.clone(),
+                output_path: single.clone(),
+                final_path_segments: records[0].final_path_segments.clone(),
+            },
+        )
+        .unwrap();
+        assert!(!fs::read_to_string(single).unwrap().contains("Chr01B"));
+        // Same source interval is independent of the display/member orientation.
+        let positive = super::build_final_path_agp(
+            &conn,
+            1,
+            &[super::FinalPathFastaRecord {
+                chr_name: "Chr02".into(),
+                final_path_segments: vec![super::FinalPathExportSegment::Ctg {
+                    assembly_ctg_id: 1,
+                    start: 2,
+                    end: 5,
+                }],
+            }],
+        )
+        .unwrap();
+        assert!(positive.contains("\tW\ttigA\t4\t7\t+"));
+    }
+
+    #[test]
+    fn final_path_agp_rejects_invalid_ranges_identity_collisions_and_foreign_ctgs_before_writing() {
+        let (_temp, db, conn) = agp_fixture();
+        let valid = super::FinalPathExportSegment::Source {
+            dataset_name: "primary".into(),
+            contig_name: "tigA".into(),
+            start: 1,
+            end: 4,
+        };
+        for segment in [
+            super::FinalPathExportSegment::Source {
+                dataset_name: "primary".into(),
+                contig_name: "tigA".into(),
+                start: 0,
+                end: 4,
+            },
+            super::FinalPathExportSegment::Source {
+                dataset_name: "primary".into(),
+                contig_name: "tigA".into(),
+                start: 1,
+                end: 11,
+            },
+            super::FinalPathExportSegment::Source {
+                dataset_name: "missing".into(),
+                contig_name: "tigA".into(),
+                start: 1,
+                end: 4,
+            },
+            super::FinalPathExportSegment::Ctg {
+                assembly_ctg_id: 1,
+                start: 1,
+                end: 7,
+            },
+            super::FinalPathExportSegment::Gap { gap_size_bp: 0 },
+            super::FinalPathExportSegment::Gap { gap_size_bp: -1 },
+            super::FinalPathExportSegment::RefSegment {
+                reference_chr_name: "refChr".into(),
+                member_start_bp: 21,
+                member_end_bp: 40,
+                start: 1,
+                end: 21,
+            },
+        ] {
+            let output_path = db.parent().unwrap().join("keep.agp");
+            fs::write(&output_path, "keep").unwrap();
+            assert!(
+                super::export_final_path_agp(
+                    &db,
+                    1,
+                    &super::ExportFinalPathFastaParams {
+                        chr_name: "Chr01".into(),
+                        output_path: output_path.clone(),
+                        final_path_segments: vec![valid.clone(), segment],
+                    }
+                )
+                .is_err()
+            );
+            assert_eq!(fs::read_to_string(output_path).unwrap(), "keep");
+        }
+        let record = super::FinalPathFastaRecord {
+            chr_name: "Chr01".into(),
+            final_path_segments: vec![valid.clone()],
+        };
+        assert!(super::build_final_path_agp(&conn, 1, &[]).is_err());
+        assert!(super::build_final_path_agp(&conn, 1, &[record.clone(), record.clone()]).is_err());
+        for chr in ["", "bad\tname", "#comment"] {
+            assert!(
+                super::build_final_path_agp(
+                    &conn,
+                    1,
+                    &[super::FinalPathFastaRecord {
+                        chr_name: chr.into(),
+                        ..record.clone()
+                    }]
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            super::build_final_path_agp(
+                &conn,
+                1,
+                &[super::FinalPathFastaRecord {
+                    final_path_segments: vec![],
+                    ..record.clone()
+                }]
+            )
+            .is_err()
+        );
+        assert!(
+            super::build_final_path_agp(
+                &conn,
+                2,
+                &[super::FinalPathFastaRecord {
+                    final_path_segments: vec![super::FinalPathExportSegment::Ctg {
+                        assembly_ctg_id: 1,
+                        start: 1,
+                        end: 4
+                    }],
+                    ..record.clone()
+                }]
+            )
+            .is_err()
+        );
+        conn.execute("UPDATE source_seq SET seq_name = 'tigA' WHERE id = 2", [])
+            .unwrap();
+        let collision = super::FinalPathFastaRecord {
+            final_path_segments: vec![
+                valid,
+                super::FinalPathExportSegment::Source {
+                    dataset_name: "support".into(),
+                    contig_name: "tigA".into(),
+                    start: 1,
+                    end: 4,
+                },
+            ],
+            ..record
+        };
+        assert!(
+            super::build_final_path_agp(&conn, 1, &[collision])
+                .unwrap_err()
+                .to_string()
+                .contains("ambiguous AGP component ID")
+        );
     }
 
     #[test]

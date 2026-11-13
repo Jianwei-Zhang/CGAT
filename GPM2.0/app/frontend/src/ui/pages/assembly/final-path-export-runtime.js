@@ -19,6 +19,7 @@ import { pickDirectoryPath, pickSaveFilePath } from "../../../services/backend-a
 import {
   exportDegapJobs,
   exportFinalPathFasta,
+  exportFinalPathAgp,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../../../services/workflow-api.js";
@@ -511,6 +512,9 @@ export function planFinalPathExportSteps({
   if (normalizedKind === "log") {
     return canExportLog ? [{ kind: "log", label: "日志(.log)", outputPath: targetPath }] : [];
   }
+  if (normalizedKind === "agp") {
+    return [{ kind: "agp", label: "AGP (.agp)", outputPath: targetPath }];
+  }
   if (normalizedKind === "fasta") {
     return [{ kind: "fasta", label: "序列(.fasta)", outputPath: targetPath }];
   }
@@ -532,6 +536,7 @@ export function planFinalPathExportSteps({
         outputPath: joinOutputPath(targetPath, `${baseName}.fasta`),
       });
     }
+    steps.push({ kind: "agp", label: "AGP (.agp)", outputPath: joinOutputPath(targetPath, `${baseName}.agp`) });
     return steps;
   }
   return [];
@@ -726,6 +731,12 @@ export async function resolveFinalPathExportTarget({ state, kind, baseName, deps
       filters: [{ name: "LOG", extensions: ["log"] }],
     }, state);
   }
+  if (normalizedKind === "agp") {
+    return pickSaveFilePathImpl({
+      defaultPath: `${baseName}.agp`,
+      filters: [{ name: "AGP", extensions: ["agp"] }],
+    }, state);
+  }
   if (normalizedKind === "fasta") {
     return pickSaveFilePathImpl({
       defaultPath: `${baseName}.fasta`,
@@ -802,8 +813,9 @@ export async function runFinalPathExportStep({
     });
     return { outputPath: step.outputPath };
   }
-  if (step?.kind === "fasta") {
-    await exportFastaImpl({
+  if (step?.kind === "fasta" || step?.kind === "agp") {
+    const exportPath = step.kind === "agp" ? (deps.exportFinalPathAgp || exportFinalPathAgp) : exportFastaImpl;
+    await exportPath({
       workspaceRoot: state.session?.workspacePath || "",
       projectId: Number(state.session?.projectId || 0),
       chrName: resolveCurrentFinalPathChrName(assembly),
