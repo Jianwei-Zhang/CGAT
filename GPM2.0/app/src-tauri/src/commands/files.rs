@@ -192,6 +192,8 @@ pub fn export_degap_jobs(
             "outputDir": summary.output_dir.to_string_lossy(),
             "manifestPath": summary.manifest_path.to_string_lossy(),
             "prepareScriptPath": summary.prepare_script_path.to_string_lossy(),
+            "runScriptPath": summary.output_dir.join("run_degap_jobs.sh").to_string_lossy(),
+            "collectScriptPath": summary.output_dir.join("collect_degap_results.sh").to_string_lossy(),
             "scripts": summary.scripts.into_iter().map(|script| json!({
                 "jobId": script.job_id,
                 "scriptPath": script.script_path.to_string_lossy(),

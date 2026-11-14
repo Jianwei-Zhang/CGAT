@@ -310,3 +310,5 @@ bash ./gpm_server/export_final_path_fasta.sh \
   --tsv /path/to/project_Chr01_path.tsv \
   -o /path/to/project_Chr01_path.fa
 ```
+
+The current source checkout bundles DEGAP v2 with Server in the shared `cgat-server` environment. This integration is not included in the currently published v2.0.19 packages; release packages and the docs website will be updated with the next release. In App, leave the custom DEGAP path empty. Export jobs, run `bash run_degap_jobs.sh` on Server, then use **Import DEGAP results** to import `degap_results.zip` as candidates without changing Final Path. See the Server guide for scheduler use, updates and provenance checks.

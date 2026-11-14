@@ -341,8 +341,9 @@ write_prepare_lib() {
   cp -f "$tools_src"/*.py "$tools_dst"/
   cp -R "$tools_src/grt_core" "$tools_dst/grt_core"
   cp -R "$tools_src/lgz_core" "$tools_dst/lgz_core"
+  cp -R "$tools_src/degap_core" "$tools_dst/degap_core"
   cp -R "$tools_src/long_cigar_recovery" "$tools_dst/long_cigar_recovery"
-  find "$tools_dst/grt_core" "$tools_dst/lgz_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
+  find "$tools_dst/grt_core" "$tools_dst/lgz_core" "$tools_dst/degap_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
   cp -f "$contracts_src"/*.json "$contracts_dst"/
   # Record the actual installation, not a guessed default, for later updates.
   printf '%s\n' "$SCRIPT_DIR" > "${work_root}/.prepare_lib/server-tools.path"

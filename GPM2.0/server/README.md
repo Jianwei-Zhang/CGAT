@@ -395,3 +395,63 @@ provenance and migrates workspace schema 7 (or earlier) to 8 to store Local View
 open a migrated workspace. Source review and automated tests have passed; this is
 not a claim of genome-wide biological or native-window acceptance. See `library/SOURCES.md`
 for source records and evidence limits.
+
+## DEGAP v2 in the shared Server environment
+
+The current source checkout includes the pinned DEGAP v2 runtime. This integration
+is not included in the currently published v2.0.19 packages; release packages and
+the docs website will be updated with the next release.
+
+A Server package built from this source includes the runtime. `bash server/install.sh`
+(from `GPM2.0/` in a repository checkout), or `bash install.sh` (from an extracted Server package),
+installs GPM and DEGAP dependencies together into **cgat-server**. Do not create a
+second `degap_env`. The installer updates an existing CGAT-managed environment;
+`--check` verifies both external commands and the required Python modules.
+Stop affected jobs before updating an existing environment. For an older Server
+installation, run the new package's installer first, then update installed tools
+and the project's `.prepare_lib`; keep the existing project and its results.
+If the old updater still rejects the changed dependency specification, run the
+**new package's** updater against the old installation from the existing project:
+`python /path/to/new/GPM_Server/tools/update_server.py /path/to/installed/GPM_Server`.
+This uses the new dependency verifier and preserves the installation binding.
+The code-only updater does not install dependencies on your behalf.
+
+In App, leave **Custom DEGAP path** empty to use the project runtime. Keep the
+Server project directory and HiFi/ONT read paths set to their actual remote paths.
+A custom DEGAP installation remains available under the advanced settings.
+
+1. Export **DEGAP-JOBS** from the desired Final Path chromosome. Transfer the
+   **whole export directory**, including `jobs.tsv`, `degap_jobs/*.json`, scripts
+   and `prepare_degap_shared.sh`, to the Server. Keep the original App workspace:
+   its export receipts are required to associate returned candidates safely.
+2. Activate `cgat-server`, enter that directory and run `bash run_degap_jobs.sh`.
+   It prepares shared reads, runs the exported jobs sequentially, then collects
+   completed candidates. For scheduler-submitted jobs, run the shared prepare
+   once, submit the per-job scripts, and finally run `bash collect_degap_results.sh`.
+3. The collector builds alignments, adds derived candidates to Server metadata,
+   keeps rollback backups under `.run_all/degap-publish-*`, and produces
+   `degap_results.zip`. It reuses immutable input FASTA files while staging changed
+   data; it does not copy the complete workspace for every candidate. Do not run
+   other project mutations while collecting. Failed/uncompleted jobs are listed
+   in the package manifest, not represented as successful repairs.
+4. In the original App project, click **Import DEGAP results** on the DEGAP task
+   card and select `degap_results.zip`. Targets are recovered from the export
+   receipts; there is no need to choose a FASTA, chromosome or track manually.
+   Imported contigs remain **candidates**. Review the alignment before adopting
+   them; import does not replace or edit Final Path.
+
+The importer rejects foreign/stale receipts, changed source objects, altered
+package hashes and changed previously imported results. A later collection can
+include earlier imports: unchanged entries are skipped and only new candidates
+are added. A package containing only previously imported tasks is rejected.
+A batch failure or cancellation rolls back new candidates from that batch. Re-export after changing inputs/settings;
+use a fresh output directory when the prior one belongs to different inputs.
+Legacy individually exported jobs can still use a custom DEGAP path, but result
+packaging/automatic association requires a new export with receipts.
+
+Maintainers: `python3 GPM2.0/scripts/sync-degap-runtime.py` regenerates
+`server/tools/degap_core` from the parent repository's pinned `DEGAP2.0` gitlink;
+`--check` verifies the snapshot. Do not edit the generated runtime directly.
+Its `SOURCE.json` records the upstream revision and per-file SHA-256 hashes.
+
+Pinned-runtime limitation: GapFiller requires a maximum round count of at least 1 (or unset); zero-round TelSeeker is supported. The wrapper rejects zero-round GapFiller explicitly instead of silently changing its parameters.

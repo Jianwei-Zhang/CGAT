@@ -346,7 +346,7 @@ test_check_is_read_only_and_detects_stale_spec() {
   : > "${case_dir}/manager.log"
   run_installer_with_args "$case_dir" "$bin_dir" --check > "${case_dir}/check.out"
   grep -F 'GPM Server environment check: READY' "${case_dir}/check.out" >/dev/null
-  grep -F 'Commands:    12/12 verified' "${case_dir}/check.out" >/dev/null
+  grep -F 'Commands:    16/16 verified' "${case_dir}/check.out" >/dev/null
   if grep -E $'\t(create|install|env remove) ' "${case_dir}/manager.log" >/dev/null; then
     echo "--check must not change the environment" >&2
     exit 1

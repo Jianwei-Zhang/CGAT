@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import signal
 import stat
+import subprocess
 import shlex
 import tarfile
 import sys
@@ -40,10 +41,10 @@ def project_at(cwd):
 
 
 def runtime_file(name):
-    return (name.startswith("lib/") or name.startswith("tools/long_cigar_recovery/") or
+    return (name.startswith("lib/") or name.startswith(("tools/long_cigar_recovery/", "tools/degap_core/")) or
             (name.startswith("contracts/") and name.endswith(".json")) or
             (name.startswith("tools/") and name.endswith(".py") and
-             (len(Path(name).parts) == 2 or name.startswith(("tools/grt_core/", "tools/lgz_core/")))))
+             (len(Path(name).parts) == 2 or name.startswith(("tools/grt_core/", "tools/lgz_core/", "tools/degap_core/")))))
 
 
 def metadata(root):
@@ -98,10 +99,20 @@ def prepare(source, tools, workspace, release):
         if (dt.datetime.fromisoformat(previous["built_at"]) > dt.datetime.fromisoformat(source_info["built_at"])
                 and previous.get("git_revision") != source_info["git_revision"]):
             raise ValueError("Available source predates the installation; refusing stale-mirror downgrade")
-    for name in ("cgat-server.conda-spec.txt", "cgat-server.linux-aarch64.conda-spec.txt"):
-        old, new = core.regular_path(tools, name), core.regular_path(source, name)
-        if old.exists() and new.exists() and old.read_bytes() != new.read_bytes():
-            raise ValueError("Dependency specification changed. Review/install a separate compatible environment before this code-only update: " + name)
+    changed_specs = [name for name in ("cgat-server.conda-spec.txt", "cgat-server.linux-aarch64.conda-spec.txt")
+                     if (old := core.regular_path(tools, name)).exists()
+                     and (new := core.regular_path(source, name)).exists()
+                     and old.read_bytes() != new.read_bytes()]
+    if changed_specs:
+        # Never mutate an environment from the code-only updater. The unified
+        # installer must already have updated and verified the same cgat-server.
+        checked = subprocess.run(["bash", str(source / "install.sh"), "--check"],
+                                 capture_output=True, text=True)
+        if checked.returncode:
+            raise ValueError("Dependency specification changed. Run the new Server package's "
+                             "install.sh to update the existing cgat-server environment, then retry "
+                             "this code-only update (no second environment is required).\n"
+                             + checked.stdout + checked.stderr)
     if workspace:
         paths.checked(workspace / ".prepare_lib")
         nested = tools in workspace.parents
@@ -189,8 +200,8 @@ def prepare(source, tools, workspace, release):
             data = (json.dumps({"release": release["tag"], "git_revision": source_info["git_revision"], "files": skill_files}, indent=2) + "\n").encode()
             add(kind, "official-source.json", data, 0o644)
         if kind in ("runtime", "tools"):
-            expected = {n for n in files if n.startswith(("tools/grt_core/", "tools/lgz_core/")) and n.endswith(".py")}
-            actual = {p.relative_to(root).as_posix() for core in ("grt_core", "lgz_core")
+            expected = {n for n in files if n.startswith(("tools/grt_core/", "tools/lgz_core/", "tools/degap_core/")) and n.endswith(".py")}
+            actual = {p.relative_to(root).as_posix() for core in ("grt_core", "lgz_core", "degap_core")
                       for p in (root / "tools" / core).rglob("*.py")}
             if actual - expected - set(old_files):
                 raise ValueError("Unrecognized old core modules; inspect before updating: " + str(sorted(actual - expected - set(old_files))))

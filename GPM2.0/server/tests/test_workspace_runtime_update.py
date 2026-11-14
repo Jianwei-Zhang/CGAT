@@ -28,6 +28,8 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
                         "install.sh": b"new install\n", "tools/server_run.py": b"new runner\n",
                         "tools/grt_core/__init__.py": b"new core\n",
                         "tools/grt_core/sub/module.py": b"new module\n",
+                        "tools/degap_core/bin/DEGAP.py": b"new DEGAP\n",
+                        "tools/degap_core/SOURCE.json": b'{"revision":"pinned"}\n',
                         "skills/gpm-server/server-tools.path": b"../..\n",
                         "README.md": b"new documentation\n"})
         for name, data in payload.items():
@@ -68,6 +70,21 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
 
     def update(self, apply=True):
         return updater.update(self.source, self.workspace, self.tools, self.REVISION, apply=apply)
+
+    def test_degap_is_a_script_tree_and_unmanifested_source_modules_are_rejected(self):
+        self.update(apply=False)  # no synthetic __init__.py is required
+        (self.source / "tools/degap_core/bin/untracked.py").write_text("untracked code")
+        with self.assertRaisesRegex(ValueError, "source DEGAP runtime"):
+            self.update(apply=False)
+
+    def test_degap_code_and_provenance_reach_existing_project_and_rollback(self):
+        before = self.snapshot(self.workspace)
+        result = self.update()
+        for name in ("bin/DEGAP.py", "SOURCE.json"):
+            self.assertEqual((self.workspace / ".prepare_lib/tools/degap_core" / name).read_bytes(),
+                             (self.source / "tools/degap_core" / name).read_bytes())
+        updater.rollback(Path(result["backup"]))
+        self.assertEqual(self.snapshot(self.workspace), before)
 
     def test_engine_fingerprint_matches_production_identity(self):
         from server.tools.grt_core.repair_common import repair_engine_sha256

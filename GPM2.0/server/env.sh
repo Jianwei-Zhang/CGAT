@@ -36,6 +36,10 @@ readonly -a REQUIRED_COMMANDS=(
   zip
   gzip
   pigz
+  hifiasm
+  seqkit
+  parallel
+  rg
 )
 
 die() {
@@ -258,6 +262,7 @@ verify_environment() {
   local report_path="$1"
   local temporary_path="${report_path}.tmp.$$"
   if ! "$ENV_MANAGER" run -n "$ENV_NAME" python -c '
+import importlib
 import shutil
 import sys
 
@@ -269,13 +274,23 @@ for command in sys.argv[1:]:
         missing.append(command)
     else:
         rows.append((command, resolved))
+for module in ("Bio", "pysam", "numpy", "matplotlib", "scipy"):
+    try:
+        loaded = importlib.import_module(module)
+        rows.append(("python:" + module, str(loaded.__file__)))
+    except Exception as error:
+        missing.append("python:" + module + " (" + str(error) + ")")
 if missing:
-    print("missing required commands: " + ", ".join(missing), file=sys.stderr)
+    print("missing required commands/modules: " + ", ".join(missing), file=sys.stderr)
     raise SystemExit(1)
 print("command\tresolved_path")
 for command, resolved in rows:
     print(f"{command}\t{resolved}")
 ' "${REQUIRED_COMMANDS[@]}" > "$temporary_path"; then
+    rm -f "$temporary_path"
+    return 1
+  fi
+  if ! "$ENV_MANAGER" run -n "$ENV_NAME" python "$SCRIPT_DIR/tools/degap.py" --help >/dev/null; then
     rm -f "$temporary_path"
     return 1
   fi
@@ -310,6 +325,7 @@ print_usage_summary() {
   echo "Environment: $ENV_NAME"
   echo "Manager:     $ENV_MANAGER_KIND ($ENV_MANAGER)"
   echo "Commands:    ${#REQUIRED_COMMANDS[@]}/${#REQUIRED_COMMANDS[@]} verified"
+  echo "DEGAP:       bundled runtime; Python modules verified in $ENV_NAME"
   if [[ "$AUTO_INSTALLED_MICROMAMBA" == "true" ]]; then
     echo "Micromamba was installed and initialized for Bash; open a new terminal before activation."
   fi

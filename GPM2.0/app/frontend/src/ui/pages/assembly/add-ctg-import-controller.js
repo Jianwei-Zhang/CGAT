@@ -42,12 +42,14 @@ export function createAddCtgImportController({
 
   async function importAddCtgIntoTrack(host, store, payload = {}) {
     const snapshot = store.getState();
+    if (snapshot.assembly?.addCtgImportProgress?.status === "running") return;
     const workspaceRoot = String(snapshot.session?.workspacePath || "").trim();
     const projectId = Number(snapshot.session?.projectId || 0);
     const selectedChrName = String(snapshot.assembly?.selectedChrName || "").trim();
-    const targetChr = String(payload.targetChr || selectedChrName).trim();
+    const isDegap = payload.degapResults === true;
+    const targetChr = isDegap ? "" : String(payload.targetChr || selectedChrName).trim();
     const targetTrack = String(payload.targetTrack || "").trim();
-    if (!workspaceRoot || !projectId || !targetChr || !targetTrack) {
+    if (!workspaceRoot || !projectId || (!isDegap && (!targetChr || !targetTrack))) {
       store.setState({
         assembly: {
           ...snapshot.assembly,
@@ -83,6 +85,7 @@ export function createAddCtgImportController({
         zipPath,
         expectedTargetChr: targetChr,
         expectedTargetTrack: targetTrack,
+        ...(isDegap ? { degapResultsOnly: true } : {}),
         runId,
         stateOrLocale: snapshot,
         onStage: (stage) => {
@@ -95,14 +98,18 @@ export function createAddCtgImportController({
       if (String(store.getState().assembly?.addCtgImportProgress?.runId || "") !== runId) {
         return;
       }
-      const importedMessage = result?.message
-        || tAssembly(store.getState(), "runtime.addCtgImportDone");
+      const importedMessage = Array.isArray(result?.degapResults) && result.degapResults.length
+        ? tAssembly(store.getState(), Number(result.degapIncompleteCount) > 0 ? "degap.resultsImportedPartial" : "degap.resultsImported",
+          { count: result.degapResults.length, pending: Number(result.degapIncompleteCount) || 0 })
+        : result?.message || tAssembly(store.getState(), "runtime.addCtgImportDone");
       appendAddCtgImportStage(
         host,
         store,
         tAssembly(store.getState(), "runtime.addCtgImportRefreshStage"),
       );
-      await selectChromosome(host, store, targetChr);
+      const degapResults = Array.isArray(result?.degapResults) ? result.degapResults : [];
+      const refreshChr = targetChr || result?.targetChr || selectedChrName;
+      await selectChromosome(host, store, refreshChr);
       const latest = store.getState();
       store.setState({
         ...latest,
@@ -117,6 +124,16 @@ export function createAddCtgImportController({
         },
         assembly: {
           ...latest.assembly,
+          ...(degapResults.length ? { degap: {
+            ...latest.assembly?.degap,
+            jobs: (latest.assembly?.degap?.jobs || []).map((job) => ({
+              ...job,
+              importedResults: [...(job.importedResults || []), ...degapResults.filter(
+                (item) => item.jobId === job.jobId && item.chrName === job.chrName
+                  && !(job.importedResults || []).some((old) => old.token === item.token),
+              )],
+            })),
+          } } : {}),
           addCtgImportProgress: {
             ...(latest.assembly?.addCtgImportProgress || {}),
             open: true,
@@ -124,7 +141,7 @@ export function createAddCtgImportController({
             summary: importedMessage,
             error: "",
           },
-          actionStatus: tAssembly(latest, "runtime.addCtgImportDoneWithName", {
+          actionStatus: degapResults.length ? importedMessage : tAssembly(latest, "runtime.addCtgImportDoneWithName", {
             ctgName: result?.ctgName || "-",
             targetTrack,
           }),

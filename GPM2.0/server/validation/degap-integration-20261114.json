@@ -1,0 +1,112 @@
+{
+  "schema": "gpm.degap.validation.v1",
+  "candidate_bases": 24000,
+  "gap_bases": 4000,
+  "candidate_matches_reference": true,
+  "final_path_unchanged": true,
+  "job_association_persisted": true,
+  "duplicate_rejected_without_mutation": true,
+  "package_sha256": "efd2722d46d3d40c7d70d0107b58aa3744705f06f77dd48943a4480384a7a38b",
+  "backend_sha256": "60bc40cef8e0dcc01dd1a906936c7ee34f10a36aaaec007dba54682432a97e11",
+  "server_files_sha256": {
+    "tools/degap.py": "9e57f82bc85f81ebcf64fd093b9d1155da39e9d00237be4369f40a9d2711f3c0",
+    "tools/degap_results.py": "96c4eacc5910bc4e7dd8cb6f1953a61b6b5e825a40e94c40c749c15723f5bba8",
+    "tools/degap_core/SOURCE.json": "3c8f190222829efa83d494dcd9130e290aa12b14d805de422f84f18c4abf9da2",
+    "cgat-server.conda-spec.txt": "921de245ba058eab96504c1ed232457e058997d70cd04f825d43e49cf5edc885"
+  },
+  "validation_date": "2026-11-14",
+  "branch": "feat/app-degap-integration-20261113",
+  "upstream_degap_revision": "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75",
+  "acceptance_scope": "synthetic data; native Windows backend and Linux x86_64 Server; no browser/native-window/customer acceptance",
+  "dependency_resolution": {
+    "linux-64": {
+      "success": true,
+      "packages": [
+        {
+          "name": "seqkit",
+          "version": "2.8.0",
+          "subdir": "linux-64"
+        },
+        {
+          "name": "python",
+          "version": "3.11.14",
+          "subdir": "linux-64"
+        },
+        {
+          "name": "hifiasm",
+          "version": "0.25.0",
+          "subdir": "linux-64"
+        },
+        {
+          "name": "minimap2",
+          "version": "2.31",
+          "subdir": "linux-64"
+        },
+        {
+          "name": "samtools",
+          "version": "1.23.1",
+          "subdir": "linux-64"
+        },
+        {
+          "name": "pysam",
+          "version": "0.24.1",
+          "subdir": "linux-64"
+        }
+      ]
+    },
+    "linux-aarch64": {
+      "success": true,
+      "packages": [
+        {
+          "name": "seqkit",
+          "version": "2.8.0",
+          "subdir": "linux-aarch64"
+        },
+        {
+          "name": "python",
+          "version": "3.11.14",
+          "subdir": "linux-aarch64"
+        },
+        {
+          "name": "hifiasm",
+          "version": "0.25.0",
+          "subdir": "linux-aarch64"
+        },
+        {
+          "name": "minimap2",
+          "version": "2.31",
+          "subdir": "linux-aarch64"
+        },
+        {
+          "name": "samtools",
+          "version": "1.23.1",
+          "subdir": "linux-aarch64"
+        },
+        {
+          "name": "pysam",
+          "version": "0.24.1",
+          "subdir": "linux-aarch64"
+        }
+      ]
+    }
+  },
+  "arm64_execution_tested": false,
+  "automated_checks": {
+    "frontend": {
+      "passed": 3083,
+      "failed": 0
+    },
+    "backend": {
+      "passed": 342,
+      "failed": 0,
+      "ignored": 6
+    },
+    "update_and_progress_regressions": {
+      "passed": 102,
+      "failed": 0
+    },
+    "windows_frontend_build": true,
+    "windows_backend_clippy": true,
+    "windows_tauri_clippy_and_check": true
+  }
+}

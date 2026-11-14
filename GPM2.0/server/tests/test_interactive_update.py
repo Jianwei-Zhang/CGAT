@@ -378,6 +378,14 @@ class CoordinatedUpdateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unrecognized old core"):
             self.plan()
 
+    def test_dependency_change_uses_verified_shared_environment_without_installing(self):
+        for root in (self.tools, self.source):
+            (root / "cgat-server.conda-spec.txt").write_text("old" if root == self.tools else "new")
+        self.make_manifest(self.source, "b" * 40, "2026-10-26T00:00:00+00:00")
+        with mock.patch.object(update.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "ready", "")) as run:
+            self.plan()
+        run.assert_called_once_with(["bash", str(self.source / "install.sh"), "--check"], capture_output=True, text=True)
+
     def test_corrupt_backup_and_post_update_edit_refuse_rollback(self):
         backup = update.apply(self.plan())
         target = self.tools / "tools/grt_step2.py"

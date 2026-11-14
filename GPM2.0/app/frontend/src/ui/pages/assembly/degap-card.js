@@ -58,10 +58,6 @@ function renderDegapSettingsFields({
       <legend>${escapeHtml(labels.requiredPaths)}</legend>
       <div class="degap-form-grid">
         <label class="degap-form-field is-wide">
-          <span>${escapeHtml(labels.degapPath)}</span>
-          <input type="text" ${fieldAttr}="degapPath" value="${escapeAttr(normalized.degapPath)}" placeholder="/opt/DEGAP/bin/DEGAP.py">
-        </label>
-        <label class="degap-form-field is-wide">
           <span>${escapeHtml(labels.hifiReadsPath)}</span>
           <input type="text" ${fieldAttr}="hifiReads" value="${escapeAttr(renderPathInputValue(normalized.hifiReads))}" placeholder="/server/reads/hifi.fastq.gz">
         </label>
@@ -76,6 +72,14 @@ function renderDegapSettingsFields({
         ${mainOutRootField}
         ${jobOutPathField}
         <p class="helper-hint degap-form-help">${escapeHtml(labels.readsHelp)}</p>
+        <details class="degap-form-field is-wide"${normalized.degapPath ? " open" : ""}>
+          <summary>${escapeHtml(labels.runtimeAdvanced)}</summary>
+          <p class="helper-hint">${escapeHtml(labels.bundledRuntimeHelp)}</p>
+          <label class="degap-form-field">
+            <span>${escapeHtml(labels.degapPath)}</span>
+            <input type="text" ${fieldAttr}="degapPath" value="${escapeAttr(normalized.degapPath)}" placeholder="${escapeAttr(labels.bundledRuntimePlaceholder)}">
+          </label>
+        </details>
       </div>
     </fieldset>
     <fieldset class="degap-param-group">
@@ -209,9 +213,10 @@ function renderJobRows({ jobs, degap, escapeAttr, escapeHtml, labels }) {
         <div class="degap-job-row" data-degap-job-row data-degap-job-id="${escapeAttr(job.jobId)}" data-degap-job-key="${escapeAttr(jobKey)}" data-degap-job-chr-name="${escapeAttr(job.chrName || "")}">
           <button type="button" class="degap-job-remove" data-degap-job-remove data-degap-job-id="${escapeAttr(job.jobId)}" data-degap-job-key="${escapeAttr(jobKey)}" aria-label="${escapeAttr(labels.removeJobAria)}">×</button>
           <span class="degap-job-type-badge${jobBadge.className}">${escapeHtml(jobBadge.label)}</span>
-          <span class="degap-job-label">${escapeHtml(job.label || job.jobId)}</span>
+          <span class="degap-job-label">${escapeHtml(job.label || job.jobId)}${job.importedResults?.length ? ` · ${escapeHtml(labels.candidatesImported)} (${job.importedResults.length})` : ""}</span>
           <button type="button" class="degap-job-expand" data-degap-job-toggle data-degap-job-id="${escapeAttr(job.jobId)}" data-degap-job-key="${escapeAttr(jobKey)}" aria-expanded="${expanded ? "true" : "false"}">${expanded ? "▴" : "▾"}</button>
         </div>
+        ${job.importedResults?.length ? `<p class="helper-hint">${escapeHtml(labels.candidatesImported)}: ${job.importedResults.map((item) => escapeHtml(item.ctgName)).join(", ")}</p>` : ""}
         ${expanded ? renderJobEditor(job, degap, escapeAttr, escapeHtml, labels) : ""}
       </div>
     `;
@@ -269,9 +274,10 @@ export function renderDegapJobCard({ chrName, degap }, { escapeAttr, escapeHtml,
           <span class="degap-job-card-indicator" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
           <strong>${escapeHtml(labels.jobsTitle)} (${jobs.length})</strong>
         </button>
+        <button type="button" class="button ghost tiny" data-degap-results-import>${escapeHtml(labels.importResults)}</button>
         <button type="button" class="degap-settings-button" data-degap-settings-open aria-label="${escapeAttr(labels.settingsTitle)}" data-app-tooltip="${escapeAttr(labels.settingsTitle)}">⚙</button>
       </div>
-      ${collapsed ? "" : `<div class="degap-job-list" data-degap-job-card-body>${renderJobRows({ jobs, degap: runtime, escapeAttr, escapeHtml, labels })}</div>`}
+      ${collapsed ? "" : `<div class="degap-job-list" data-degap-job-card-body>${renderJobRows({ jobs, degap: runtime, escapeAttr, escapeHtml, labels })}<p class="helper-hint">${escapeHtml(labels.executionHelp)}</p></div>`}
     </section>
   `;
 }

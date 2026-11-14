@@ -3,12 +3,13 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow, bail};
-use rusqlite::{Connection, params};
-use serde_json::{Map, Value};
+use rusqlite::{Connection, OptionalExtension, params};
+use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
 
 use crate::db::open_workspace_db;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct DegapJobExportSettings {
     pub degap_path: String,
     pub hifi_reads: Vec<String>,
@@ -432,6 +433,43 @@ fn export_degap_jobs_with_connection(
                 &seqright_path,
             )
         };
+        let receipt =
+            build_degap_receipt(conn, workspace_root, project_id, job, effective_settings)?;
+        let receipt_path = scripts_dir.join(format!("{safe_job_id}.json"));
+        let receipt_bytes = serde_json::to_vec_pretty(&receipt)?;
+        fs::write(&receipt_path, &receipt_bytes)?;
+        let receipt_dir = workspace_root.join("metadata/degap_exports");
+        fs::create_dir_all(&receipt_dir)?;
+        fs::write(
+            receipt_dir.join(format!("{}.json", receipt["token"].as_str().unwrap())),
+            &receipt_bytes,
+        )?;
+        let result_tool = join_server_path(
+            &effective_settings.gpm_server_path,
+            ".prepare_lib/tools/degap_results.py",
+        );
+        let receipt_name = shell_quote(&format!("{safe_job_id}.json"));
+        let begin = format!(
+            "python3 {} begin --recipe \"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)/\"{}\n",
+            shell_quote(&result_tool),
+            receipt_name
+        );
+        let script = script.replacen(
+            "set -euo pipefail\n",
+            &format!("set -euo pipefail\n{begin}"),
+            1,
+        );
+        let seed = begin.replace(" begin --recipe ", " seed --recipe ");
+        let script = script.replacen(
+            "# Step 3: run DEGAP",
+            &format!("{seed}\n# Step 3: run DEGAP"),
+            1,
+        );
+        let script = format!(
+            "{script}\n# Record this run only after DEGAP exits successfully.\npython3 {} record --recipe \"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)/\"{}\n",
+            shell_quote(&result_tool),
+            receipt_name
+        );
         fs::write(&script_path, script)
             .with_context(|| format!("failed to write {}", script_path.display()))?;
         #[cfg(unix)]
@@ -481,6 +519,23 @@ fn export_degap_jobs_with_connection(
 
     fs::write(&manifest_path, format!("{}\n", manifest_rows.join("\n")))
         .with_context(|| format!("failed to write {}", manifest_path.display()))?;
+
+    let result_tool = join_server_path(
+        &params.settings.gpm_server_path,
+        ".prepare_lib/tools/degap_results.py",
+    );
+    for (name, action) in [
+        ("run_degap_jobs.sh", "run"),
+        ("collect_degap_results.sh", "collect"),
+    ] {
+        fs::write(
+            params.output_dir.join(name),
+            format!(
+                "#!/usr/bin/env bash\nset -euo pipefail\nROOT=\"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)\"\nexec python3 {} {action} --jobs \"$ROOT/jobs.tsv\"\n",
+                shell_quote(&result_tool)
+            ),
+        )?;
+    }
 
     Ok(ExportDegapJobsSummary {
         output_dir: params.output_dir.clone(),
@@ -582,9 +637,6 @@ fn validate_project_exists(conn: &Connection, project_id: i64) -> Result<()> {
 }
 
 fn validate_settings(settings: &DegapJobExportSettings) -> Result<()> {
-    if settings.degap_path.trim().is_empty() {
-        bail!("DEGAP PATH is required");
-    }
     if settings.gpm_server_path.trim().is_empty() {
         bail!("GPM_server PATH is required");
     }
@@ -650,6 +702,14 @@ fn validate_seed_segment(job_id: &str, label: &str, segment: &DegapJobSeedSegmen
 }
 
 fn validate_job(job: &DegapJobExportItem, settings: &DegapJobExportSettings) -> Result<()> {
+    if normalize_job_type(&job.job_type) == "gapfiller"
+        && settings.degap_path.trim().is_empty()
+        && settings.maximum_extension_round == Some(0)
+    {
+        bail!(
+            "Bundled GapFiller requires MaximumExtensionRound >= 1, or leave it unset; zero-round TelSeeker is supported"
+        );
+    }
     if job.job_id.trim().is_empty() {
         bail!("job_id is required");
     }
@@ -1191,6 +1251,111 @@ PY
     )
 }
 
+/// Identity of the original source objects, independent of display names alone.
+pub(crate) fn degap_seed_snapshot(
+    conn: &Connection,
+    project_id: i64,
+    ids: &[i64],
+) -> Result<Value> {
+    let mut sources = Vec::new();
+    for id in ids {
+        let source = conn.query_row(
+            "SELECT c.id, c.name, c.assigned_chr_name, s.source_seq_id, s.source_start,
+                    s.source_end, s.orient, s.hidden, ss.seq_name, ss.length, d.name
+             FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id
+             JOIN source_seq ss ON ss.id=s.source_seq_id JOIN dataset d ON d.id=ss.dataset_id
+             WHERE c.project_id=?1 AND c.id=?2",
+            params![project_id, id],
+            |row| {
+                Ok(json!({
+                    "id": row.get::<_, i64>(0)?, "name": row.get::<_, String>(1)?,
+                    "chr": row.get::<_, Option<String>>(2)?, "source_id": row.get::<_, i64>(3)?,
+                    "start": row.get::<_, i64>(4)?, "end": row.get::<_, i64>(5)?,
+                    "orient": row.get::<_, String>(6)?, "hidden": row.get::<_, i64>(7)?,
+                    "sequence": row.get::<_, String>(8)?, "length": row.get::<_, i64>(9)?,
+                    "dataset": row.get::<_, String>(10)?
+                }))
+            },
+        )?;
+        sources.push(source);
+    }
+    Ok(json!(sources))
+}
+
+pub(crate) fn degap_final_path_snapshot(
+    conn: &Connection,
+    project_id: i64,
+    chr: &str,
+) -> Result<Value> {
+    let raw = conn
+        .query_row(
+            "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+            [project_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    let paths: Value = serde_json::from_str(raw.as_deref().unwrap_or("{}"))?;
+    Ok(paths
+        .get(chr)
+        .and_then(|entry| entry.get("segments"))
+        .cloned()
+        .unwrap_or(Value::Null))
+}
+
+fn build_degap_receipt(
+    conn: &Connection,
+    workspace_root: &Path,
+    project_id: i64,
+    job: &DegapJobExportItem,
+    settings: &DegapJobExportSettings,
+) -> Result<Value> {
+    let segments: Vec<_> = [&job.left, &job.right, &job.endpoint]
+        .into_iter()
+        .flatten()
+        .map(|s| json!({"id": s.assembly_ctg_id, "start": s.start, "end": s.end}))
+        .collect();
+    let ids: Vec<_> = segments.iter().map(|s| s["id"].as_i64().unwrap()).collect();
+    let snapshot = degap_seed_snapshot(conn, project_id, &ids)?;
+    let primary: String = conn.query_row(
+        "SELECT d.name FROM project p JOIN dataset d ON d.id=p.primary_dataset_id WHERE p.id=?1",
+        [project_id],
+        |r| r.get(0),
+    )?;
+    let target_track = snapshot[0]["dataset"]
+        .as_str()
+        .filter(|name| *name != "derived_ctg")
+        .unwrap_or(&primary);
+    let target_chr = snapshot[0]["chr"]
+        .as_str()
+        .filter(|name| !name.is_empty())
+        .unwrap_or(&job.chr_name);
+    let mut receipt = json!({"schema": "gpm.degap.export.v1", "project_id": project_id,
+        "job_id": job.job_id, "chr_name": job.chr_name, "job_type": normalize_job_type(&job.job_type),
+        "target_chr": target_chr, "target_track": target_track, "endpoint_end": job.endpoint_end,
+        "server_root": settings.gpm_server_path, "out_path": job.out_path,
+        "segments": segments, "sources": snapshot, "settings": settings,
+        "final_path": degap_final_path_snapshot(conn, project_id, &job.chr_name)?});
+    let mut digest = Sha256::new();
+    digest.update(serde_json::to_vec(&receipt)?);
+    digest.update(workspace_root.as_os_str().to_string_lossy().as_bytes());
+    digest.update(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos()
+            .to_le_bytes(),
+    );
+    receipt["token"] = json!(format!("{:x}", digest.finalize()));
+    Ok(receipt)
+}
+
+fn resolve_degap_entrypoint(settings: &DegapJobExportSettings) -> String {
+    if settings.degap_path.trim().is_empty() {
+        join_server_path(&settings.gpm_server_path, ".prepare_lib/tools/degap.py")
+    } else {
+        settings.degap_path.clone()
+    }
+}
+
 fn build_gapfiller_job_script(
     job: &DegapJobExportItem,
     settings: &DegapJobExportSettings,
@@ -1214,7 +1379,7 @@ fn build_gapfiller_job_script(
         .join("\n");
     let mut command = vec![
         "python".to_string(),
-        shell_quote(&settings.degap_path),
+        shell_quote(&resolve_degap_entrypoint(settings)),
         "--mode".to_string(),
         "gapfiller".to_string(),
         "--seqleft".to_string(),
@@ -1346,7 +1511,7 @@ fn build_telseeker_ctg_job_script(
         .join("\n");
     let mut command = vec![
         "python".to_string(),
-        shell_quote(&settings.degap_path),
+        shell_quote(&resolve_degap_entrypoint(settings)),
         "--mode".to_string(),
         "telseeker_ctg".to_string(),
         "--ctg".to_string(),
@@ -1504,6 +1669,22 @@ mod tests {
             endpoint: None,
             settings: None,
         }
+    }
+
+    #[test]
+    fn bundled_degap_path_is_default_and_custom_paths_remain_supported() -> Result<()> {
+        let mut settings = parse_degap_export_settings(&json!({
+            "gpmServerPath": "/srv/project with spaces",
+            "outRoot": "/srv/out", "hifiReads": ["/reads/hifi.fa"]
+        }))?;
+        validate_settings(&settings)?;
+        assert_eq!(
+            resolve_degap_entrypoint(&settings),
+            "/srv/project with spaces/.prepare_lib/tools/degap.py"
+        );
+        settings.degap_path = "/custom/DEGAP.py".to_string();
+        assert_eq!(resolve_degap_entrypoint(&settings), "/custom/DEGAP.py");
+        Ok(())
     }
 
     #[test]

@@ -136,6 +136,16 @@ def verified_source(root: Path, revision: str) -> dict[str, dict]:
                        for path in (root / "tools" / name).rglob("*.py")}
         if not expected_core or expected_core != actual_core:
             raise ValueError(f"source core contains missing or unmanifested modules: {name}")
+    # DEGAP is an upstream script tree, not an importable *_core package with
+    # __init__.py. Older source packages legitimately predate this runtime.
+    degap = root / "tools/degap_core"
+    expected_degap = {name for name in manifest if name.startswith("tools/degap_core/")}
+    if degap.exists() or expected_degap:
+        actual_degap = {path.relative_to(root).as_posix() for path in degap.rglob("*")
+                        if path.is_file() and "__pycache__" not in path.parts}
+        if (not {"tools/degap_core/bin/DEGAP.py", "tools/degap_core/SOURCE.json"} <= expected_degap
+                or actual_degap != expected_degap):
+            raise ValueError("source DEGAP runtime contains missing or unmanifested files")
     manifest["SOURCE.json"] = {"sha256": digest(source.read_bytes()), "mode": 0o644}
     return manifest
 
@@ -258,14 +268,14 @@ def update(source: Path, workspace: Path, tools_root: Path, revision: str, *, ap
     canonical = "tools/lgz_core/__init__.py" in manifest
     selected = {relative: record for relative, record in manifest.items()
                 if relative == "SOURCE.json" or relative in ENTRYPOINTS | LGZ_ENTRYPOINTS
-                or relative.startswith(("tools/grt_core/", "tools/lgz_core/"))
+                or relative.startswith(("tools/grt_core/", "tools/lgz_core/", "tools/degap_core/"))
                 or canonical and relative.startswith("tools/") and (
                     len(PurePosixPath(relative).parts) == 2 and relative.endswith(".py")
                     or relative.startswith("tools/long_cigar_recovery/"))}
     # Old untracked Python modules would contaminate the content fingerprint.
     for target in (tools_root / "tools", runtime / "tools"):
         extra = {p.relative_to(target.parent).as_posix()
-                 for name in ("grt_core", "lgz_core")
+                 for name in ("grt_core", "lgz_core", "degap_core")
                  for p in (target / name).rglob("*.py")} - set(selected)
         if extra:
             raise ValueError(f"unexpected old core modules; inspect before updating: {sorted(extra)}")

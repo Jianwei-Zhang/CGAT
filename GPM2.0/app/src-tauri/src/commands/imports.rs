@@ -184,7 +184,9 @@ pub async fn import_add_dataset_package(
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
+// Preserve the existing flat invoke payload; the optional DEGAP discriminator
+// must not break older clients that import ordinary add_ctg packages.
+#[allow(non_snake_case, clippy::too_many_arguments)]
 pub async fn import_add_ctg_package(
     app: AppHandle,
     workspaceRoot: String,
@@ -192,6 +194,7 @@ pub async fn import_add_ctg_package(
     zipPath: String,
     expectedTargetChr: Option<String>,
     expectedTargetTrack: Option<String>,
+    degapResultsOnly: Option<bool>,
     runId: Option<String>,
 ) -> CommandResult<Value> {
     let workspace_root = workspaceRoot;
@@ -214,6 +217,53 @@ pub async fn import_add_ctg_package(
                 .as_deref()
                 .is_some_and(import_cancel::is_cancelled)
         };
+        let is_degap = match gpm_next_backend::importer::is_degap_results_package(Path::new(&zip_path)) {
+            Ok(value) => value,
+            Err(error) => {
+                if let Some(run_id) = run_id.as_deref() { let _ = import_cancel::clear_cancel(run_id); }
+                return Err(error);
+            }
+        };
+        if is_degap {
+            let result = gpm_next_backend::importer::import_degap_results_with_hooks(
+                Path::new(&zip_path),
+                Path::new(&workspace_root),
+                projectId,
+                &mut on_progress,
+                &mut should_cancel,
+            );
+            if let Some(run_id) = run_id.as_deref() {
+                let _ = import_cancel::clear_cancel(run_id);
+            }
+            let (outcomes, progress) = result?;
+            let mut response = read_initializer_options(&workspace_root, true)?;
+            if let Some(object) = response.as_object_mut() {
+                object.insert("degapResults".into(), json!(outcomes));
+                object.insert("degapIncompleteCount".into(), outcomes[0]["uncompletedJobCount"].clone());
+                object.insert("targetChr".into(), outcomes[0]["targetChr"].clone());
+                object.insert(
+                    "stages".into(),
+                    json!(
+                        progress
+                            .into_iter()
+                            .map(|s| format_import_stage(&s))
+                            .collect::<Vec<_>>()
+                    ),
+                );
+                object.insert(
+                    "message".into(),
+                    json!(format!(
+                        "Imported {} DEGAP candidates; Final Path is unchanged.",
+                        outcomes.len()
+                    )),
+                );
+            }
+            return Ok(response);
+        }
+        if degapResultsOnly.unwrap_or(false) {
+            if let Some(run_id) = run_id.as_deref() { let _ = import_cancel::clear_cancel(run_id); }
+            anyhow::bail!("Select a DEGAP results package exported with task receipts, not an ordinary contig package");
+        }
         let result = import_add_ctg_package_with_hooks(
             Path::new(&zip_path),
             Path::new(&workspace_root),

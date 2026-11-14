@@ -346,3 +346,47 @@ Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目�
 轻量交付仍排除所有 FASTA，只保留来源快照与校验值。v2.0.19 App 保留来源信息，并将 schema 7 或更早的工作区迁移到 8，以保存 Local View 任务；升级前请备份，不保证旧版 App
 能打开迁移后的工作区。源码 review 与自动化测试已通过，不代表全基因组生物学或原生窗口验收已通过。
 具体来源与证据边界见 `library/SOURCES.md`。
+
+## DEGAP v2 与 Server 共用环境
+
+当前源码已内置固定版本的 DEGAP v2，但已发布的 v2.0.19 安装包及 Server 源码包尚未包含此集成。
+正式包和 docs 网站将随下一次 release 更新。以下操作适用于当前源码或由它构建的新 Server 包。
+
+仓库内运行 `bash server/install.sh`，
+或在解压后的 Server 包内运行 `bash install.sh`，即可把 GPM 和 DEGAP 依赖一起
+安装到 **cgat-server**，无需另建 `degap_env`。安装器可以更新已有的 CGAT 管理环境；
+`--check` 会检查外部命令和 Python 模块。
+更新已有环境前先停止相关任务。旧安装请先运行新包中的安装器，再更新已安装工具和
+项目 `.prepare_lib`，保留原项目及结果，不要删除或重新准备项目。代码更新器不会代替用户安装依赖。
+如果旧更新器仍拒绝依赖规格变化，请在已有项目目录中，用**新包的更新器**更新原安装：
+`python /path/to/new/GPM_Server/tools/update_server.py /path/to/installed/GPM_Server`。
+这样使用新的依赖验证逻辑，保留原安装路径绑定。
+
+App 的“自定义 DEGAP 路径”留空即可使用项目内置工具；Server 项目目录、HiFi/ONT
+reads 路径仍需填写实际远端位置。自定义 DEGAP 路径保留在高级设置中。
+
+1. 在目标 Final Path 染色体中导出 **DEGAP-JOBS**。将**整个导出目录**传到 Server，
+   包括 `jobs.tsv`、`degap_jobs/*.json`、任务脚本及 `prepare_degap_shared.sh`。
+   保留原 App 工作区，回传结果需要其中的导出来源记录。
+2. 激活 `cgat-server`，进入导出目录，运行 `bash run_degap_jobs.sh`。
+   脚本会准备共享 reads、依次运行任务并收集已完成候选。如需通过调度器提交，
+   先运行共享准备脚本，再提交各任务脚本，结束后运行 `bash collect_degap_results.sh`。
+3. 收集器为候选生成比对，追加 Server 候选元数据，生成 `degap_results.zip`，并在
+   `.run_all/degap-publish-*` 保留回滚备份。暂存过程复用只读输入 FASTA，
+   不为每个候选复制完整项目。收集期间不要同时执行其他项目写入操作。
+   未完成或失败任务会记录在结果包清单中，不会被当作成功修复。
+4. 回到原 App 项目，在 DEGAP 任务卡点击“导入 DEGAP 结果”，选择
+   `degap_results.zip`。无需逐个挑选 FASTA、填写染色体或轨道。
+   导入内容是**候选序列**，请检查比对后再决定是否采用；导入不覆盖或修改 Final Path。
+
+导入会拒绝外来或过期来源记录、已变化的源对象、校验不一致的结果包，以及与既有导入记录不一致的结果。
+后续收集包可以包含先前已导入的任务：记录完全一致的旧结果会跳过，只加入新候选；
+仅含已导入任务的包会被拒绝。批量导入失败或取消时，会撤回本批次新导入的候选。修改输入或参数后请重新导出；
+旧输出目录属于其他输入时须使用新目录。旧版单任务脚本仍可使用自定义 DEGAP，
+但自动打包和关联需要重新导出带来源记录的任务。
+
+维护者：`python3 GPM2.0/scripts/sync-degap-runtime.py` 从父仓库固定的
+`DEGAP2.0` 子模块提交生成 `server/tools/degap_core`，`--check` 用于验证。
+不要直接编辑生成目录；其中的 `SOURCE.json` 记录上游提交和逐文件 SHA-256。
+
+当前固定版本限制：GapFiller 最大轮数需至少为 1，或留空；TelSeeker 仍支持 0 轮。内置入口会明确拒绝 0 轮 GapFiller，不会擅自修改参数。
