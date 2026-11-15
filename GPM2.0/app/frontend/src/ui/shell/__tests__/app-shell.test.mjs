@@ -124,3 +124,13 @@ test("theme shortcut persists light/dark, preserves other settings, follows sett
     assert.equal(listeners.size, 0);
   }
 });
+
+
+for (const locale of ["zh", "en"]) test(`${locale} project page initially hides the workspace shortcut while keeping language and settings`, () => {
+  const markup = renderAppShell({ locale, activeRoute: "importer", runtime: {} });
+  assert.match(markup, /data-session-workspace-field hidden/);
+  assert.match(markup, /id="app-language-select"/);
+  assert.match(markup, /data-app-settings/);
+  const assembly = renderAppShell({ locale, activeRoute: "assembly", runtime: {} });
+  assert.doesNotMatch(assembly, /data-session-workspace-field hidden/);
+});

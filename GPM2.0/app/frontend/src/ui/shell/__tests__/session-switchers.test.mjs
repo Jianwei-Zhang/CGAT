@@ -1,3 +1,4 @@
+import { workspaceShortcutVisible, syncWorkspaceShortcutVisibility } from "../session-switchers.js";
 import { workspaceSelectPresentation } from "../session-switchers.js";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -426,4 +427,20 @@ test("workspace selector sizes the selected name, caps long labels, and retains 
   const name = "project-".repeat(100);
   assert.equal(workspaceSelectPresentation(name).width, "32ch");
   assert.equal(workspaceSelectPresentation(name).title, name);
+});
+
+
+test("project route hides only the workspace shortcut and closes its popup; assembly restores it", () => {
+  const classes = new Set(), attrs = new Map();
+  const field = { hidden: false, querySelector: selector => selector === "[data-shell-select-menu]"
+    ? { classList: { add: value => classes.add(value) } } : { setAttribute: (key, value) => attrs.set(key, value) } };
+  const root = { querySelector: selector => selector === "[data-session-workspace-field]" ? field : null };
+  assert.equal(workspaceShortcutVisible({ activeRoute: "importer" }), false);
+  syncWorkspaceShortcutVisibility(root, { activeRoute: "importer" });
+  assert.equal(field.hidden, true);
+  assert.ok(classes.has("is-hidden"));
+  assert.equal(attrs.get("aria-expanded"), "false");
+  syncWorkspaceShortcutVisibility(root, { activeRoute: "assembly" });
+  assert.equal(field.hidden, false);
+  assert.equal(workspaceShortcutVisible({ activeRoute: "assembly" }), true);
 });

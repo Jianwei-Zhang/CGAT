@@ -423,7 +423,7 @@
 
 .project-recents-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -735,11 +735,11 @@
 .project-section-count { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; font-size: var(--font-small); font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* The library is a persistent navigation tree, including before the first import. */
-/* Keep every library operation on one line in both locales, including failed-project cleanup.
-   Very narrow user-resized sidebars scroll the toolbar rather than clipping actions. */
-.project-library-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; overflow-x: auto; padding: 3px; }
+/* Fit operations beside the title using measured label widths; overflow lives in More. */
+.project-library-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; }
+.project-library-toolbar > [data-library-command] { display: inline-flex; flex: 0 0 auto; }
 .project-library-toolbar > .library-toolbar-button { flex: 0 0 28px; }
-.project-library-toolbar > .project-library-actions { flex: 0 0 auto; margin-left: auto; }
+.project-library-toolbar [hidden], [data-library-menu] [hidden] { display: none !important; }
 .library-toolbar-button, .library-row-menu, .library-chevron, .library-folder-name {
   display: inline-flex; align-items: center; justify-content: center; min-width: 0;
   border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; border-radius: 4px;

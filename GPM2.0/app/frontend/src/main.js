@@ -25,6 +25,7 @@ import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
   buildWorkspaceSwitchItems,
   workspaceSelectPresentation,
+  syncWorkspaceShortcutVisibility,
   migrateWorkspaceHistoryToArrivalOrder,
   switchWorkspaceFromShell,
   updateWorkspaceHistory,
@@ -58,6 +59,7 @@ const store = createStore({
     libraryDialog: null,
     libraryMenu: null,
     libraryError: "",
+    libraryOverflowActions: [],
     librarySelectedId: null,
     libraryRevealedPath: "",
     restoringSession: true,
@@ -348,6 +350,7 @@ window.addEventListener("gpm-next:route-refresh", () => {
 });
 
 function syncSessionHeader(state) {
+  syncWorkspaceShortcutVisibility(document, state);
   const workspaceSelect = document.querySelector("#session-workspace-select");
   const labels = getMessages(state, "shell");
   document.querySelectorAll(".route-button").forEach(button => {

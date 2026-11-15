@@ -116,3 +116,6 @@
   background: var(--theme-surface-subtle, #efefef);
 }
 .shell-select-toggle:disabled { cursor: default; opacity: .55; }
+
+/* Route-specific project shortcut visibility must override the flex label rule. */
+.nav-session-field[hidden] { display: none; }

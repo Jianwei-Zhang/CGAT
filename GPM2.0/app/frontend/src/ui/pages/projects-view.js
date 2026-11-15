@@ -154,13 +154,13 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
     <section class="project-recents" id="project-recents" aria-labelledby="project-recents-title">
       ${actions}
       <header class="project-recents-header" data-library-drop-root><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>
-        <div class="project-library-toolbar">
-          <button type="button" class="library-toolbar-button" data-library-create="root" aria-label="${library.create}" data-app-tooltip="${library.create}" ${disabled}>${projectIcon("newPartition")}</button>
+        <div class="project-library-toolbar project-library-actions">
+          <span data-library-command="create"><button type="button" class="library-toolbar-button" data-library-create="root" aria-label="${library.create}" data-app-tooltip="${library.create}" ${disabled}>${projectIcon("newPartition")}</button></span>
+          ${records.length ? `<span data-library-command="validate">
+          <button id="validate-history-button" class="button ghost project-history-action" ${importer.historyValidating ? `data-app-tooltip="${html(validation.accessibleLabel)}"` : ""} aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button></span>
+          <span data-library-command="delete-failed"><button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button></span>
+          ` : ""}
           <button type="button" class="library-toolbar-button" data-library-root-menu aria-label="${library.actions}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
-          ${records.length ? `<div class="project-library-actions">
-          <button id="validate-history-button" class="button ghost project-history-action" ${importer.historyValidating ? `data-app-tooltip="${html(validation.accessibleLabel)}"` : ""} aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
-          <button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
-          </div>` : ""}
         </div>
       </header>
       <div class="project-recent-list">${rows}</div>

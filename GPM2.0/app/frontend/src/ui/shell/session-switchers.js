@@ -383,3 +383,19 @@ export function workspaceSelectPresentation(name) {
   const units = [...title].reduce((width, char) => width + (char.codePointAt(0) > 255 ? 2 : 1), 0);
   return { title, width: `${Math.min(32, Math.max(10, units + 5))}ch` };
 }
+
+
+// The project page already owns the full library; keep the shortcut on other pages.
+export function workspaceShortcutVisible(state) {
+  return state.activeRoute !== "importer";
+}
+
+export function syncWorkspaceShortcutVisibility(root, state) {
+  const field = root.querySelector("[data-session-workspace-field]");
+  if (!field) return;
+  field.hidden = !workspaceShortcutVisible(state);
+  if (field.hidden) {
+    field.querySelector("[data-shell-select-menu]")?.classList.add("is-hidden");
+    field.querySelector("[data-shell-select-toggle]")?.setAttribute("aria-expanded", "false");
+  }
+}

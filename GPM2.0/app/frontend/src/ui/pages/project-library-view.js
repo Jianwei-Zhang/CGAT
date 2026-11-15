@@ -1,3 +1,5 @@
+import { bindLibraryToolbar } from "./project-library-toolbar.js";
+import { getMessages } from "../i18n/index.js";
 import { projectIcon } from "./project-icons.js";
 import { defaultProjectName } from "../../services/project-session.js";
 import { projectEntryBusy } from "../../services/project-drop-controller.js";
@@ -110,9 +112,12 @@ export function renderLibraryMenu(state) {
   const menu = state.importer.libraryMenu;
   if (!menu) return "";
   const labels = libraryLabels(state);
+  const messages = getMessages(state, "importer");
+  const overflow = state.importer.libraryOverflowActions || [];
+  const extra = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}" data-library-overflow-action="${action}" ${overflow.includes(action) ? "" : "hidden"} ${projectEntryBusy(state) || (action !== "create" && state.importer.historyValidating) ? "disabled" : ""}>${label}</button>`;
   const item = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}">${label}</button>`;
   return `<div class="context-menu workspace-history-context-menu" data-library-menu role="menu" aria-label="${labels.actions}" style="left:${Number(menu.x) || 0}px;top:${Number(menu.y) || 0}px">
-    ${menu.root ? `${item("create", labels.create)}${item("collapse", labels.collapse)}${item("expand", labels.expand)}` : `${item("import", labels.importHere)}${menu.id ? `${item("create", labels.child)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("rename", labels.rename)}${item("move-folder", labels.move)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("delete", labels.remove)}` : ""}`}</div>`;
+    ${menu.root ? `${extra("create", labels.create)}${extra("validate", messages.buttons.validateHistory)}${extra("delete-failed", messages.buttons.deleteFailedRecords)}${item("collapse", labels.collapse)}${item("expand", labels.expand)}` : `${item("import", labels.importHere)}${menu.id ? `${item("create", labels.child)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("rename", labels.rename)}${item("move-folder", labels.move)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("delete", labels.remove)}` : ""}`}</div>`;
 }
 
 export function bindProjectLibrary(host, store, { refresh, openImport, openProjectMenu }) {
@@ -159,7 +164,7 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
     event.preventDefault(); event.stopPropagation();
     if (projectEntryBusy(store.getState())) return;
     patch({ libraryMenu: { id, root, x: event.clientX, y: event.clientY }, workspaceContextMenu: null }); refresh();
-    host.querySelector("[data-library-menu] [role=menuitem]")?.focus();
+    host.querySelector("[data-library-menu] [role=menuitem]:not([hidden]):not(:disabled)")?.focus();
   };
   host.querySelector("[data-library-root-menu]")?.addEventListener("click", event => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -208,6 +213,7 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
     host.querySelectorAll(".library-folder-row.is-selected").forEach(row => row.classList.remove("is-selected"));
     button.closest(".library-folder-row").classList.add("is-selected");
     patch({ librarySelectedId: button.dataset.librarySelect });
+    try { toggle(button.dataset.librarySelect); } catch (cause) { error(cause); }
   }));
   host.querySelector(".library-tree")?.addEventListener("keydown", event => {
     if (!event.target.matches("[data-library-select], [data-recent-path]")) return;
@@ -243,13 +249,19 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
     menu.addEventListener("keydown", event => {
       if (event.key === "Escape") { event.preventDefault(); const id = store.getState().importer.libraryMenu?.id || ""; dismiss(); focusRow("data-library-select", id); }
       if (["ArrowDown", "ArrowUp"].includes(event.key)) {
-        event.preventDefault(); const items = [...menu.querySelectorAll("[role=menuitem]")], index = items.indexOf(event.target);
+        event.preventDefault(); const items = [...menu.querySelectorAll("[role=menuitem]:not([hidden]):not(:disabled)")], index = items.indexOf(event.target);
         items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
       }
     });
     menu.querySelectorAll("[data-library-action]").forEach(button => button.addEventListener("click", () => {
       const current = store.getState().importer.libraryMenu; if (!current) return;
       const action = button.dataset.libraryAction;
+      if (button.hidden || button.disabled) return;
+      if (["validate", "delete-failed"].includes(action)) {
+        patch({ libraryMenu: null }); menu.remove();
+        host.querySelector(action === "validate" ? "#validate-history-button" : "#delete-failed-history-button")?.click();
+        return;
+      }
       if (action === "import") { patch({ libraryMenu: null }); openImport(current.id); return; }
       if (["collapse", "expand"].includes(action)) {
         try { const library = readProjectLibrary(); saveProjectLibrary({ ...library, collapsed: action === "collapse" ? ["", ...library.partitions.map(node => node.id)] : [] }); patch({ libraryMenu: null }); refresh(); }
@@ -300,5 +312,8 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
       }
     });
   }
+  bindLibraryToolbar(host, actions => {
+    if (JSON.stringify(actions) !== JSON.stringify(store.getState().importer.libraryOverflowActions || [])) patch({ libraryOverflowActions: actions });
+  });
   bindLibraryPointerDrag(host, { busy: () => projectEntryBusy(store.getState()), move, error, toggle });
 }

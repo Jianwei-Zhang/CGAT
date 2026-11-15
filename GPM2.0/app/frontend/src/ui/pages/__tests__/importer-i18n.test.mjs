@@ -410,7 +410,7 @@ test("importer bulk delete removes only current failed history records", async (
     const store = createStore(state);
 
     const initialHtml = renderImporterPage(store.getState());
-    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button>\s*<button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
+    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button><\/span>\s*<span data-library-command="delete-failed"><button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
     assert.doesNotMatch(initialHtml, /id="delete-failed-history-button"[^>]*hidden/);
 
     bindImporterPage(host, store);

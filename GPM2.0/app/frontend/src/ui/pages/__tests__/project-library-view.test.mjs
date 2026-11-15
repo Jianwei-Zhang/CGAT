@@ -123,3 +123,60 @@ test("tree rows reserve the menu column in both idle and hover states without ch
   assert.match(css, /\.library-tree \.project-recent-row,\s*\.library-tree \.project-recent-row:not\(:hover\):not\(:has\(:focus-visible\)\)\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) 26px;/);
   assert.match(css, /\.library-tree \.library-row-menu\s*\{\s*opacity: 0;/);
 });
+
+
+for (const id of ["", "plants", "rice"]) {
+  test(`clicking partition name toggles persisted expansion without switching the project: ${id || "unpartitioned"}`, () => withStorage(() => {
+    const selected = new Set(), attrs = new Map(), children = { hidden: library.collapsed.includes(id) };
+    const row = { classList: { add: key => selected.add(key), remove: key => selected.delete(key) } };
+    const name = button({ dataset: { librarySelect: id }, closest: () => row });
+    const toggle = { setAttribute: (key, value) => attrs.set(key, value) };
+    const group = { dataset: { libraryGroup: id }, hasAttribute: () => true, setAttribute: (key, value) => attrs.set(key, value),
+      querySelector: key => key === ":scope > [role=group]" ? children : toggle };
+    const initial = state("zh", { libraryRevealedPath: "/active" });
+    initial.session = { workspacePath: "/active", projectId: 1 };
+    const s = store(initial);
+    const h = host({ "[data-library-select]": name, "[data-library-group]": group });
+    bindProjectLibrary(h, s, { refresh() {}, openImport() {}, openProjectMenu() {} });
+    const before = readProjectLibrary().collapsed.includes(id);
+    name.fire("click");
+    assert.equal(readProjectLibrary().collapsed.includes(id), !before);
+    assert.equal(children.hidden, !before);
+    assert.equal(s.getState().session, initial.session);
+    name.fire("click");
+    assert.equal(readProjectLibrary().collapsed.includes(id), before);
+    assert.equal(children.hidden, before);
+  }));
+}
+
+for (const locale of ["en", "zh"]) {
+  test(`${locale} root menu exposes only overflow commands and does not duplicate the visible create button`, () => {
+    const wide = renderLibraryMenu(state(locale, { libraryMenu: { root: true }, libraryOverflowActions: [] }));
+    assert.match(wide, /data-library-overflow-action="create" hidden/);
+    assert.match(wide, /data-library-overflow-action="validate" hidden/);
+    assert.match(wide, /data-library-overflow-action="delete-failed" hidden/);
+    const narrow = renderLibraryMenu(state(locale, { libraryMenu: { root: true }, libraryOverflowActions: ["validate", "delete-failed"] }));
+    assert.match(narrow, /data-library-overflow-action="create" hidden/);
+    assert.doesNotMatch(narrow, /data-library-overflow-action="(?:validate|delete-failed)" hidden/);
+    assert.match(narrow, locale === "en" ? /Validate/ : /校验项目/);
+    assert.match(narrow, locale === "en" ? /Delete failed/ : /删除失败/);
+  });
+}
+
+
+for (const action of ["validate", "delete-failed"]) {
+  test(`overflow ${action} delegates to the existing action and respects disabled state`, () => withStorage(() => {
+    globalThis.window.innerWidth = 800; globalThis.window.innerHeight = 600;
+    let called = 0;
+    const item = button({ dataset: { libraryAction: action }, hidden: false, disabled: false });
+    const menu = button({ style: {}, getBoundingClientRect: () => ({ left: 10, top: 10, width: 150, height: 100 }),
+      querySelectorAll: () => [item], remove() {}, contains: () => true });
+    const original = { click() { called++; } };
+    const s = store(state("en", { libraryMenu: { root: true }, libraryOverflowActions: [action] }));
+    const h = host({ "[data-library-menu]": menu, [action === "validate" ? "#validate-history-button" : "#delete-failed-history-button"]: original });
+    bindProjectLibrary(h, s, { refresh() {}, openImport() {}, openProjectMenu() {} });
+    item.disabled = true; item.fire("click"); assert.equal(called, 0);
+    item.disabled = false; item.fire("click"); assert.equal(called, 1);
+    assert.equal(s.getState().importer.libraryMenu, null);
+  }));
+}
