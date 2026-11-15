@@ -97,7 +97,7 @@ test("assembly status toast stays above desktop controls and returns to flow on 
 });
 
 
-test("project library actions share the title row without squeezing button labels", () => {
+test("project library operations share one toolbar below the title without squeezing labels", () => {
   const importerCss = readFileSync(new URL("./importer.css", entryUrl), "utf8");
   const headerRule = importerCss.match(/\.project-recents-header\s*\{([^}]*)\}/);
   const titleRule = importerCss.match(/\.project-recents-header h4\s*\{([^}]*)\}/);
@@ -106,7 +106,7 @@ test("project library actions share the title row without squeezing button label
 
   assert.ok(headerRule);
   assert.match(headerRule[1], /display:\s*grid;/);
-  assert.match(headerRule[1], /grid-template-columns:\s*minmax\(0, 1fr\) auto;/);
+  assert.match(headerRule[1], /grid-template-columns:\s*minmax\(0, 1fr\);/);
   assert.match(headerRule[1], /align-items:\s*center;/);
   assert.ok(titleRule);
   assert.match(titleRule[1], /min-width:\s*0;/);

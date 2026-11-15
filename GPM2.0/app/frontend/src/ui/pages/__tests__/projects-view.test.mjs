@@ -177,6 +177,10 @@ for (const locale of ["en", "zh"]) {
       assert.match(markup, new RegExp(`id="validate-history-button"[^>]*>${label}</button>`));
       assert.doesNotMatch(markup, /project-history-action-slot/);
       assert.match(markup, /class="project-recents-title-label"/);
+      const toolbar = markup.split('class="project-library-toolbar"')[1]?.split("</header>")[0];
+      assert.ok(toolbar, "all operations belong to the same header toolbar");
+      assert.match(toolbar, /data-library-create="root"[\s\S]*data-library-root-menu[\s\S]*id="validate-history-button"[\s\S]*id="delete-failed-history-button"/);
+      assert.doesNotMatch(markup, /<\/header>[\s\S]*id="validate-history-button"/);
     }
     assert.match(idle, new RegExp(`aria-label="${locale === "en" ? "Validate projects" : "校验项目"}"`));
     assert.match(idle, /id="delete-failed-history-button"[^>]*hidden/);
@@ -186,13 +190,15 @@ for (const locale of ["en", "zh"]) {
   });
 }
 
-test("library header is a non-wrapping grid with a shrinkable caption, right-aligned actions without an invisible slot and stable busy appearance", () => {
+test("library toolbar keeps a single scrollable action row with full labels and stable busy appearance", () => {
   const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
-  assert.match(css, /\.project-recents-header\s*\{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/);
+  assert.match(css, /\.project-recents-header\s*\{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(css, /\.project-recents-title-label[^}]*text-overflow: ellipsis/);
   assert.match(css, /\.project-count[^}]*flex: 0 0 auto/);
   assert.match(css, /\.project-library-actions[^}]*flex-wrap: nowrap/);
   assert.doesNotMatch(css, /project-history-action-slot/);
+  assert.match(css, /\.project-library-toolbar\s*\{[^}]*flex-wrap: nowrap;[^}]*overflow-x: auto;/);
+  assert.match(css, /\.project-library-toolbar > \.project-library-actions\s*\{[^}]*flex: 0 0 auto;/);
   assert.match(css, /\.projects-page \.project-library-actions \[hidden\][^{]*\{[^}]*display: none/);
   assert.match(css, /#validate-history-button\[aria-busy="true"\]:disabled[^}]*opacity: 1;[^}]*transition: none/);
 });

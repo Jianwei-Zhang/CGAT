@@ -157,12 +157,12 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
         <div class="project-library-toolbar">
           <button type="button" class="library-toolbar-button" data-library-create="root" aria-label="${library.create}" data-app-tooltip="${library.create}" ${disabled}>${projectIcon("newPartition")}</button>
           <button type="button" class="library-toolbar-button" data-library-root-menu aria-label="${library.actions}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
-        </div>
-      </header>
-        ${records.length ? `<div class="project-library-actions">
+          ${records.length ? `<div class="project-library-actions">
           <button id="validate-history-button" class="button ghost project-history-action" ${importer.historyValidating ? `data-app-tooltip="${html(validation.accessibleLabel)}"` : ""} aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
           <button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
-        </div>` : ""}
+          </div>` : ""}
+        </div>
+      </header>
       <div class="project-recent-list">${rows}</div>
     </section>
     <div class="project-sidebar-splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="project-recents" aria-label="${labels.resizeLibrary}" aria-valuemin="220" aria-valuemax="560" aria-valuenow="280"></div>
