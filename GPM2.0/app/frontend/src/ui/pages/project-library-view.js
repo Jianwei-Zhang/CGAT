@@ -5,30 +5,32 @@ import { defaultProjectName } from "../../services/project-session.js";
 import { projectEntryBusy } from "../../services/project-drop-controller.js";
 import { readWorkspaceHistory, workspacePathIdentity } from "../../services/workspace-history.js";
 import { readProjectLibrary, saveProjectLibrary, partitionChoices, partitionAncestors, projectPartition,
-  editPartition, deleteEmptyPartition, moveProjectToPartition, revealProjectPartition } from "../../services/project-library.js";
+  editPartition, deletePartition, partitionDeletionImpact, moveProjectToPartition, revealProjectPartition } from "../../services/project-library.js";
 import { bindLibraryPointerDrag } from "./project-library-drag.js";
 
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 export const libraryLabels = state => state.locale === "en" ? {
   unassigned: "Unpartitioned", root: "Library root", target: "Target partition", create: "New partition", child: "New subpartition",
-  name: "Partition name", parent: "Parent partition", rename: "Rename partition", move: "Move to…", remove: "Delete empty partition",
+  name: "Partition name", parent: "Parent partition", rename: "Rename partition", move: "Move to…", remove: "Delete partition",
   importHere: "Import here", cancel: "Cancel", save: "Save", confirmMove: "Move", actions: "Actions", select: "Select a project",
   selectHint: "Open a project from the library, or import a new one.", collapse: "Collapse all", expand: "Expand all",
   importHint: "Leave unpartitioned to import without a category. Project files stay in their original location.",
-  deleteHint: "Only empty partitions can be deleted. Project files are never deleted by this action.",
+  deleteHint: "This partition and all its subpartitions will be deleted. Their projects will move to Unpartitioned; no project files will be deleted.",
+  deleteImpact: "Partitions to delete: {partitions} (including this partition). Projects to move: {projects}.",
   errors: { storage: "Unable to read or save the project library. Existing library data has not been replaced.", name: "Enter a name (1–120 characters).",
     missing: "The project or partition no longer exists. Choose another destination.", cycle: "A partition cannot be moved into itself or a descendant.",
-    duplicate: "A partition with this name already exists here.", notEmpty: "Move the projects and subpartitions elsewhere before deleting this partition." },
+    duplicate: "A partition with this name already exists here." },
 } : {
   unassigned: "未分区", root: "项目库根层级", target: "目标分区", create: "新建分区", child: "新建子分区",
-  name: "分区名称", parent: "上级分区", rename: "重命名分区", move: "移动到…", remove: "删除空分区",
+  name: "分区名称", parent: "上级分区", rename: "重命名分区", move: "移动到…", remove: "删除分区",
   importHere: "导入到此分区", cancel: "取消", save: "保存", confirmMove: "移动", actions: "操作", select: "选择一个项目",
   selectHint: "从左侧项目库打开项目，或导入新项目。", collapse: "全部折叠", expand: "全部展开",
   importHint: "不选择分区时，导入到“未分区”。分区不改变项目文件的存储位置。",
-  deleteHint: "仅可删除空分区；此操作不会删除项目文件。",
+  deleteHint: "删除此分区及其所有子分区，内部项目全部移到“未分区”，不会删除项目文件。",
+  deleteImpact: "将删除 {partitions} 个分区（含当前分区），移动 {projects} 个项目。",
   errors: { storage: "无法读取或保存项目库，未覆盖已有分区数据。", name: "请输入 1–120 个字符的分区名称。",
     missing: "项目或分区已不存在，请重新选择目标位置。", cycle: "不能把分区移动到自身或其子分区中。",
-    duplicate: "此位置已存在同名分区。", notEmpty: "请先移走其中的项目和子分区，再删除此分区。" },
+    duplicate: "此位置已存在同名分区。" },
 };
 
 export function partitionOptions(library, selected, rootLabel, excludeId = "") {
@@ -96,15 +98,16 @@ export function renderLibraryDialog(state) {
   const creating = dialog.kind === "create", editing = creating || dialog.kind === "rename";
   const removing = dialog.kind === "delete";
   const title = creating ? labels.create : dialog.kind === "rename" ? labels.rename : removing ? labels.remove : labels.move;
-  const notEmpty = removing && (library.partitions.some(item => item.parentId === dialog.id) || readWorkspaceHistory().some(item => item.partitionId === dialog.id));
+  const deleteError = removing ? library.error || (!node ? "missing" : "") : "";
+  const impact = removing && !deleteError ? partitionDeletionImpact(library, dialog.id, readWorkspaceHistory()) : null;
   return `<div class="modal-overlay library-dialog-overlay"><form class="modal-dialog library-dialog" role="dialog" aria-modal="true" aria-labelledby="library-dialog-title">
     <h3 id="library-dialog-title">${title}</h3>
     ${editing ? `<label for="library-name">${labels.name}</label><input id="library-name" maxlength="120" required value="${html(dialog.name ?? node?.name ?? "")}" />` : `<p class="library-dialog-subject">${html(node?.name || dialog.projectName || dialog.path || "")}</p>`}
-    ${removing ? `<p>${labels.deleteHint}</p>` : `<label for="library-target">${editing || dialog.kind === "move-folder" ? labels.parent : labels.target}</label>
+    ${removing ? `<p>${labels.deleteHint}</p>${impact ? `<p class="library-delete-impact">${labels.deleteImpact.replace("{partitions}", impact.ids.length).replace("{projects}", impact.projectCount)}</p>` : ""}` : `<label for="library-target">${editing || dialog.kind === "move-folder" ? labels.parent : labels.target}</label>
     <select id="library-target">${partitionOptions(library, dialog.parentId ?? node?.parentId ?? "", dialog.kind === "move-project" ? labels.unassigned : labels.root, dialog.id)}</select>`}
-    ${dialog.error || notEmpty ? `<p class="error-text" role="alert">${html(labels.errors[dialog.error || "notEmpty"] || labels.errors.storage)}</p>` : ""}
+    ${dialog.error || deleteError ? `<p class="error-text" role="alert">${html(labels.errors[dialog.error || deleteError] || labels.errors.storage)}</p>` : ""}
     <footer class="project-dialog-actions"><button type="button" class="button ghost" data-library-dialog-close>${labels.cancel}</button>
-    <button type="submit" class="button project-primary" ${notEmpty ? "disabled" : ""}>${removing ? labels.remove : editing ? labels.save : labels.confirmMove}</button></footer>
+    <button type="submit" class="button project-primary" ${deleteError ? "disabled" : ""}>${removing ? labels.remove : editing ? labels.save : labels.confirmMove}</button></footer>
     </form></div>`;
 }
 
@@ -158,7 +161,7 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
   host.querySelectorAll("[data-project-move-path]").forEach(button => button.addEventListener("click", () => {
     if (projectEntryBusy(store.getState())) return;
     const record = readWorkspaceHistory().find(item => item.path === button.dataset.projectMovePath);
-    openDialog({ kind: "move-project", path: button.dataset.projectMovePath, projectName: record?.projectName || defaultProjectName(button.dataset.projectMovePath), parentId: record?.partitionId || "" });
+    openDialog({ kind: "move-project", path: button.dataset.projectMovePath, projectName: record?.projectName || defaultProjectName(button.dataset.projectMovePath), parentId: record ? projectPartition(readProjectLibrary(), record) : "" });
   }));
   const showMenu = (event, id, root = false) => {
     event.preventDefault(); event.stopPropagation();
@@ -297,15 +300,23 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
         if (current.kind === "move-project") moveProjectToPartition(current.path, parentId);
         else {
           const library = readProjectLibrary();
-          const next = current.kind === "delete" ? deleteEmptyPartition(library, current.id, readWorkspaceHistory())
+          const next = current.kind === "delete" ? deletePartition(library, current.id, readWorkspaceHistory())
             : editPartition(library, { id: current.id, name, parentId });
           saveProjectLibrary(next);
+          if (current.kind === "delete") {
+            const remaining = new Set(next.partitions.map(node => node.id));
+            const importer = store.getState().importer;
+            patch({
+              librarySelectedId: remaining.has(importer.librarySelectedId) ? importer.librarySelectedId : "",
+              importPartitionId: remaining.has(importer.importPartitionId) ? importer.importPartitionId : "",
+            });
+          }
           if (current.forImport) patch({ importPartitionId: next.partitions.at(-1).id });
         }
         const revealError = current.kind !== "delete" ? reveal(parentId) : "";
         patch({ libraryDialog: null, libraryError: revealError }); refresh();
         if (current.forImport) host.querySelector("#import-partition")?.focus();
-        else focusRow("data-library-select", current.kind === "move-project" ? parentId : current.id || "");
+        else focusRow("data-library-select", current.kind === "delete" ? "" : current.kind === "move-project" ? parentId : current.id || "");
       } catch (cause) {
         patch({ libraryDialog: { ...current, name, parentId, error: cause.message || "storage" } }); refresh();
         host.querySelector("#library-name, #library-target, [data-library-dialog-close]")?.focus();

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PROJECT_LIBRARY_KEY, readProjectLibrary, saveProjectLibrary, editPartition, deleteEmptyPartition,
+import { PROJECT_LIBRARY_KEY, readProjectLibrary, saveProjectLibrary, editPartition, deletePartition, partitionDeletionImpact,
   partitionChoices, partitionAncestors, projectPartition, moveProjectToPartition } from "../project-library.js";
 import { WORKSPACE_HISTORY_KEY, readWorkspaceHistory, writeWorkspaceHistory, updateWorkspaceHistory, reconcileWorkspaceHistory } from "../workspace-history.js";
 
@@ -73,14 +73,44 @@ test("names are trimmed, siblings are unique, and names under different parents 
   assert.equal(editPartition(library, { name: "水稻", parentId: animals }).partitions.length, 4);
 });
 
-test("only empty partitions can be deleted; neither descendants nor project records are removed", () => {
-  const { library, plants, rice } = fixture();
-  assert.throws(() => deleteEmptyPartition(library, plants, []), /notEmpty/);
-  const records = [{ path: "/rice", partitionId: rice }];
-  assert.throws(() => deleteEmptyPartition(library, rice, records), /notEmpty/);
-  assert.throws(() => deleteEmptyPartition(library, "", records), /missing/);
-  assert.equal(deleteEmptyPartition(library, rice, []).partitions.length, 2);
-  assert.deepEqual(records, [{ path: "/rice", partitionId: rice }]);
+test("deleting a nonempty partition removes its entire subtree and keeps every project and its metadata", () => {
+  const s = storage(), { library, plants, rice, animals } = fixture();
+  const records = [
+    { path: "/direct", partitionId: plants, note: "keep direct" },
+    { path: "/rice", partitionId: rice, projectName: "mh63", lastUsedAt: 42, note: "keep nested" },
+    { path: "/other", partitionId: animals }, { path: "/unassigned" },
+  ];
+  writeWorkspaceHistory(records, s); saveProjectLibrary({ ...library, collapsed: [plants, rice, animals, ""] }, s);
+  const raw = s.getItem(WORKSPACE_HISTORY_KEY);
+  assert.deepEqual(partitionDeletionImpact(library, plants, records), { ids: [plants, rice], projectCount: 2 });
+  saveProjectLibrary(deletePartition(readProjectLibrary(s), plants, records), s);
+  const next = readProjectLibrary(s);
+  assert.deepEqual(next.partitions, library.partitions.filter(node => node.id === animals));
+  assert.deepEqual(next.collapsed, [animals]);
+  assert.equal(s.getItem(WORKSPACE_HISTORY_KEY), raw, "project inventory is never rewritten by partition deletion");
+  assert.deepEqual(readWorkspaceHistory(s).map(record => projectPartition(next, record)), ["", "", animals, ""]);
+  assert.deepEqual(readWorkspaceHistory(s), records);
+  assert.throws(() => deletePartition(library, "", records), /missing/);
+  assert.throws(() => deletePartition(next, plants, records), /missing/);
+});
+
+test("deleting a leaf or empty partition keeps ancestors, siblings and unrelated collapse state", () => {
+  const { library, plants, rice, animals } = fixture();
+  const next = deletePartition({ ...library, collapsed: [plants, animals, ""] }, rice, []);
+  assert.deepEqual(next.partitions.map(node => node.id), [plants, animals]);
+  assert.deepEqual(next.collapsed, [plants, animals, ""]);
+  assert.deepEqual(partitionDeletionImpact(library, rice), { ids: [rice], projectCount: 0 });
+});
+
+test("a failed partition deletion save leaves all memberships and project records unchanged", () => {
+  const s = storage(), { library, plants, rice } = fixture();
+  saveProjectLibrary(library, s); writeWorkspaceHistory([{ path: "/rice", partitionId: rice }], s);
+  const beforeLibrary = s.getItem(PROJECT_LIBRARY_KEY), beforeHistory = s.getItem(WORKSPACE_HISTORY_KEY);
+  const broken = { getItem: s.getItem, setItem() { throw new Error("quota"); } };
+  assert.throws(() => saveProjectLibrary(deletePartition(library, plants, readWorkspaceHistory(s)), broken), /storage/);
+  assert.equal(s.getItem(PROJECT_LIBRARY_KEY), beforeLibrary);
+  assert.equal(s.getItem(WORKSPACE_HISTORY_KEY), beforeHistory);
+  assert.equal(projectPartition(readProjectLibrary(s), readWorkspaceHistory(s)[0]), rice);
 });
 
 test("corrupt, cyclic, or future-version partition storage cannot be silently overwritten", () => {

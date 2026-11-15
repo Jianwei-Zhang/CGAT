@@ -79,11 +79,32 @@ export function editPartition(library, { id = "", name, parentId = "" }) {
   return { ...library, partitions: current ? library.partitions.map(item => item.id === id ? node : item) : [...library.partitions, node] };
 }
 
-export function deleteEmptyPartition(library, id, records) {
+export function partitionDeletionImpact(library, id, records = []) {
   if (library.error) throw new Error("storage");
-  if (!library.partitions.some(node => node.id === id)) throw new Error("missing");
-  if (library.partitions.some(node => node.parentId === id) || records.some(record => record.partitionId === id)) throw new Error("notEmpty");
-  return { ...library, partitions: library.partitions.filter(node => node.id !== id), collapsed: library.collapsed.filter(value => value !== id) };
+  if (!id || !library.partitions.some(node => node.id === id)) throw new Error("missing");
+  const children = new Map();
+  for (const node of library.partitions) {
+    if (!children.has(node.parentId)) children.set(node.parentId, []);
+    children.get(node.parentId).push(node.id);
+  }
+  const ids = new Set(), pending = [id];
+  while (pending.length) {
+    const current = pending.pop();
+    if (ids.has(current)) continue;
+    ids.add(current);
+    pending.push(...children.get(current) || []);
+  }
+  return { ids: [...ids], projectCount: records.filter(record => ids.has(record.partitionId)).length };
+}
+
+export function deletePartition(library, id, records = []) {
+  const impact = partitionDeletionImpact(library, id, records);
+  const removed = new Set(impact.ids);
+  // Commit just the partition registry. projectPartition() resolves deleted IDs to
+  // unpartitioned, so projects move atomically with this one storage write. Never
+  // rewrite the separate project inventory or risk losing metadata on a partial save.
+  return { ...library, partitions: library.partitions.filter(node => !removed.has(node.id)),
+    collapsed: library.collapsed.filter(value => !removed.has(value) && !(value === "" && impact.projectCount)) };
 }
 
 export function projectPartition(library, record) {

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { renderLibraryTree, renderImportPartition, renderLibraryDialog, renderLibraryMenu, bindProjectLibrary } from "../project-library-view.js";
 import { renderProjectsBody } from "../projects-view.js";
 import { getMessages } from "../../i18n/index.js";
-import { readProjectLibrary, saveProjectLibrary } from "../../../services/project-library.js";
+import { readProjectLibrary, saveProjectLibrary, projectPartition } from "../../../services/project-library.js";
 import { readWorkspaceHistory, writeWorkspaceHistory } from "../../../services/workspace-history.js";
 
 const library = { version: 1, collapsed: ["plants"], partitions: [
@@ -54,12 +54,13 @@ test("names and paths are escaped and full-path import destinations disambiguate
   assert.match(picker, /<option value="">未分区/);
 }));
 
-test("moving a partition excludes itself and descendants; nonempty deletion cannot submit", () => withStorage(() => {
+test("moving a partition excludes descendants; deleting a nonempty partition requires explicit confirmation", () => withStorage(() => {
   const markup = renderLibraryDialog(state("en", { libraryDialog: { kind: "move-folder", id: "plants" } }));
   assert.doesNotMatch(markup, /value="plants"|value="rice"|value="wheat"/);
   assert.match(markup, /value="animals"/);
   const deletion = renderLibraryDialog(state("zh", { libraryDialog: { kind: "delete", id: "plants" } }));
-  assert.match(deletion, /type="submit"[^>]*disabled/);
+  assert.doesNotMatch(deletion, /type="submit"[^>]*disabled/);
+  assert.match(deletion, /将删除 3 个分区（含当前分区），移动 0 个项目/);
   assert.match(deletion, /不会删除项目文件/);
 }));
 
@@ -178,5 +179,50 @@ for (const action of ["validate", "delete-failed"]) {
     item.disabled = true; item.fire("click"); assert.equal(called, 0);
     item.disabled = false; item.fire("click"); assert.equal(called, 1);
     assert.equal(s.getState().importer.libraryMenu, null);
+  }));
+}
+
+
+for (const locale of ["zh", "en"]) {
+  test(`${locale} deletion confirmation counts all nested partitions and projects without deleting project files`, () => withStorage(() => {
+    writeWorkspaceHistory([{ path: "/direct", partitionId: "plants" }, { path: "/nested", partitionId: "rice" }, { path: "/other", partitionId: "animals" }]);
+    const markup = renderLibraryDialog(state(locale, { libraryDialog: { kind: "delete", id: "plants" } }));
+    assert.match(markup, locale === "zh" ? /将删除 3 个分区（含当前分区），移动 2 个项目/ : /Partitions to delete: 3.*Projects to move: 2/);
+    assert.match(markup, locale === "zh" ? /内部项目全部移到“未分区”，不会删除项目文件/ : /projects will move to Unpartitioned; no project files will be deleted/);
+    assert.doesNotMatch(markup, /type="submit"[^>]*disabled/);
+    const missing = renderLibraryDialog(state(locale, { libraryDialog: { kind: "delete", id: "missing" } }));
+    assert.match(missing, /type="submit"[^>]*disabled/);
+  }));
+}
+
+for (const action of ["confirm", "cancel", "storage-failure"]) {
+  test(`nonempty partition deletion ${action} preserves project inventory and the open project`, () => withStorage(() => {
+    const records = [{ path: "/mh63", partitionId: "rice", projectName: "mh63", note: "keep" }, { path: "/other", partitionId: "animals" }];
+    writeWorkspaceHistory(records);
+    const initial = state("zh", { libraryDialog: { kind: "delete", id: "plants" }, libraryRevealedPath: "/mh63",
+      librarySelectedId: "rice", importPartitionId: "rice" });
+    initial.session = { workspacePath: "/mh63", projectId: 1 }; initial.projectPreview = { token: "keep" };
+    const s = store(initial), cancel = button();
+    const dialog = button({ querySelector: key => key === "[data-library-dialog-close]" ? cancel : null, querySelectorAll: () => [cancel] });
+    bindProjectLibrary(host({ ".library-dialog": dialog }), s, { refresh() {}, openImport() {}, openProjectMenu() {} });
+    if (action === "storage-failure") globalThis.window.localStorage.setItem = () => { throw new Error("quota"); };
+    if (action === "cancel") cancel.fire("click"); else dialog.fire("submit");
+    assert.equal(s.getState().session, initial.session);
+    assert.equal(s.getState().projectPreview, initial.projectPreview);
+    assert.deepEqual(readWorkspaceHistory(), records);
+    const next = readProjectLibrary();
+    if (action === "confirm") {
+      assert.deepEqual(next.partitions.map(node => node.id), ["animals"]);
+      assert.equal(projectPartition(next, records[0]), "");
+      assert.equal(projectPartition(next, records[1]), "animals");
+      assert.equal(s.getState().importer.libraryDialog, null);
+      assert.equal(s.getState().importer.importPartitionId, "");
+      assert.equal(s.getState().importer.librarySelectedId, "");
+    } else {
+      assert.deepEqual(next, library);
+      assert.equal(projectPartition(next, records[0]), "rice");
+      if (action === "storage-failure") assert.equal(s.getState().importer.libraryDialog.error, "storage");
+      else assert.equal(s.getState().importer.libraryDialog, null);
+    }
   }));
 }
