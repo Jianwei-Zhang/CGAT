@@ -22,7 +22,8 @@ test("importer page renders english labels when locale is en", () => {
     },
   });
 
-  assert.doesNotMatch(html, />Projects</);
+  assert.match(html, />Projects</);
+  assert.match(html, /New partition/);
   assert.match(html, />Import</);
   assert.match(html, />Open</);
   assert.doesNotMatch(html, />Import project<|>Open project</);

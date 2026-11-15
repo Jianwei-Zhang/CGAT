@@ -1,3 +1,5 @@
+import { saveProjectLibrary } from "../../../services/project-library.js";
+import { readWorkspaceHistory } from "../../../services/workspace-history.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -2046,7 +2048,7 @@ test("import progress uses an indeterminate meter when no reliable total exists"
     assert.doesNotMatch(html, /Current stage/);
     assert.match(html, /data-progress-mode="indeterminate"/);
     assert.match(html, /aria-valuetext="Processing the import\.\.\."/);
-    assert.doesNotMatch(html, /aria-valuenow=/);
+    assert.doesNotMatch(html, /role="progressbar"[^>]*aria-valuenow=/);
     assert.doesNotMatch(html, /Events recorded:/);
   } finally {
     globalThis.window = previousWindow;
@@ -2780,17 +2782,17 @@ test("project library menu groups all project actions with deletion last in both
         workspaceContextMenu: { open: true, workspacePath: 'D:/项目 & "rice"', x: 12, y: 24 } });
       state.locale = locale;
       const html = renderImporterPage(state).split('role="menu"')[1];
-      const actions = [...html.matchAll(/(data-project-(?:open-path|reveal-path|rename-path|copy|delete-files)|data-workspace-import-add-package-path)=/g)].map(match => match[1]);
-      assert.deepEqual(actions, ["data-project-open-path", "data-project-reveal-path", "data-project-rename-path",
+      const actions = [...html.matchAll(/(data-project-(?:open-path|reveal-path|rename-path|move-path|copy|delete-files)|data-workspace-import-add-package-path)=/g)].map(match => match[1]);
+      assert.deepEqual(actions, ["data-project-open-path", "data-project-reveal-path", "data-project-rename-path", "data-project-move-path",
         "data-workspace-import-add-package-path", "data-project-copy", "data-project-delete-files"]);
       assert.equal((html.match(/role="separator"/g) || []).length, 2);
-      assert.equal((html.match(/role="menuitem"/g) || []).length, 6);
+      assert.equal((html.match(/role="menuitem"/g) || []).length, 7);
       assert.match(html, /D:\/项目 &amp; &quot;rice&quot;/);
       assert.match(html, locale === "zh" ? /打开项目文件所在位置/ : /Open Project File Location/);
       assert.match(html, /context-menu-item is-danger[^>]*data-project-delete-files/);
       for (const importer of [{ inFlight: true }, { entryResolving: true }, { copyDialog: { open: true } }]) {
         const busy = renderImporterPage({ ...state, importer: { ...state.importer, ...importer } }).split('role="menu"')[1];
-        assert.equal((busy.match(/role="menuitem"[^>]*disabled/g) || []).length, 6);
+        assert.equal((busy.match(/role="menuitem"[^>]*disabled/g) || []).length, 7);
       }
     }
   } finally { globalThis.window = previousWindow; }
@@ -3000,8 +3002,9 @@ for (const behavior of ["read failure", "multiple projects", "overview failure"]
       globalThis.document = { querySelector: () => null };
       globalThis.setTimeout = () => 1; globalThis.clearTimeout = () => {};
       const projects = (behavior === "multiple projects" ? [1, 2] : [1]).map(projectId => ({ projectId, projectName: `P${projectId}` }));
+      const storage = new Map();
       globalThis.window = {
-        localStorage: { getItem: () => null }, dispatchEvent() {},
+        localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }, dispatchEvent() {},
         __TAURI__: { core: { invoke: async (command, args) => {
           calls.push({ command, args });
           if (command === "import_zip") return { workspaceRoot: `D:/preview-${behavior}`, message: "Imported" };
@@ -3025,16 +3028,20 @@ for (const behavior of ["read failure", "multiple projects", "overview failure"]
           throw new Error(`Unexpected command: ${command}`);
         } } },
       };
+      saveProjectLibrary({ version: 1, partitions: [{ id: "rice", name: "水稻", parentId: "" }], collapsed: [] });
+      const importPartitionId = behavior === "read failure" ? "" : "rice";
       const startButton = createButton();
       const host = createHost({ "#import-zip-start-button": startButton });
       const store = createStore(createImporterScrollState({ inFlight: false, importRunId: null,
-        zipPath: "D:/bundle.zip", workspaceRoot: `D:/preview-${behavior}` }));
+        zipPath: "D:/bundle.zip", importPartitionId, workspaceRoot: `D:/preview-${behavior}` }));
       bindImporterPage(host, store);
       await startButton.click();
       assert.equal(store.getState().session.workspacePath, `D:/preview-${behavior}`);
       assert.equal(store.getState().importer.inFlight, false);
       assert.equal(store.getState().importer.importPreparingPreview, false);
       assert.equal(store.getState().importer.projectError, "");
+      assert.equal(readWorkspaceHistory().find(record => record.path === `D:/preview-${behavior}`).partitionId, importPartitionId);
+      assert.equal(store.getState().importer.libraryError || "", "");
       assert.equal(calls.some(call => call.command === "request_import_cancel"), false);
       assert.equal(saved.size, behavior === "multiple projects" ? 2 : behavior === "read failure" ? 0 : 1);
       assert.equal(store.getState().importer.stages.at(-1), "导入完成");
@@ -3067,4 +3074,26 @@ test("backend import completion is not labeled as whole-workflow completion", ()
   }
   assert.equal(zh.progressStages.complete, "项目数据已导入");
   assert.equal(en.progressStages.complete, "Project data imported");
+});
+
+
+test("library context menus retain the existing detail DOM, draft state and sidebar scroll", () => {
+  const row = createButton();
+  let removed = 0, restored = null;
+  const detail = { draft: "unsaved project detail", remove() { removed++; } };
+  const list = { scrollTop: 120 };
+  const placeholder = { replaceWith(node) { restored = node; } };
+  const h = projectMenuHarness({ "[data-workspace-history-row-path]": row,
+    ".project-current": detail, ".project-recent-list": list,
+    "[data-library-detail-placeholder]": placeholder });
+  try {
+    row.dataset.workspaceHistoryRowPath = h.path;
+    bindImporterPage(h.host, h.store);
+    row.contextmenu({ clientX: 30, clientY: 40 });
+    assert.equal(removed, 1);
+    assert.equal(restored, detail);
+    assert.equal(restored.draft, "unsaved project detail");
+    assert.equal(list.scrollTop, 120);
+    assert.match(h.host.innerHTML, /data-library-detail-placeholder/);
+  } finally { h.restore(); }
 });

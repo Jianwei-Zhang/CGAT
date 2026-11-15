@@ -116,3 +116,19 @@ test("archive form rejects non-archives or missing collision-safe destinations",
     assert.throws(() => archiveImportForm(entry), /new workspace/);
   }
 });
+
+
+test("new native imports do not inherit the previous import partition", async () => {
+  for (const kind of ["archive", "extracted"]) {
+    const h = harness({ inspect: async () => ({ kind, path: "/new", suggestedWorkspace: "/new-project" }) });
+    h.store.setState({ importer: { importPartitionId: "old-partition" } });
+    assert.equal(await h.handle(drop("/new")), true);
+    assert.equal(h.store.getState().importer.importPartitionId, "");
+  }
+});
+
+test("partition management dialogs block external file drops", async () => {
+  const h = harness(); h.store.setState({ importer: { libraryDialog: { kind: "create" } } });
+  assert.equal(await h.handle(drop("/new.zip")), false);
+  assert.equal(h.calls.some(row => row[0] === "inspect"), false);
+});

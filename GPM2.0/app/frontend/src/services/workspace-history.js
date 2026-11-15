@@ -10,6 +10,7 @@ export function workspacePathIdentity(value) {
   return path.replace(/\/+$/, "") || (path.startsWith("/") ? "/" : "");
 }
 
+// This is the durable project library inventory, not a bounded list of recent opens.
 export function deduplicateWorkspaceHistory(records = []) {
   const next = [];
   const indices = new Map();
@@ -28,7 +29,7 @@ export function deduplicateWorkspaceHistory(records = []) {
       next[index] = { ...record, ...next[index] };
     }
   }
-  return next.slice(-20);
+  return next;
 }
 
 export function readWorkspaceHistory(storage = globalThis.window?.localStorage) {
@@ -52,7 +53,7 @@ export function updateWorkspaceHistory(records = [], workspacePath, projectName 
   if (index < 0) next.push({ path, projectName: String(projectName || ""), lastUsedAt });
   else next[index] = { ...next[index], path,
     projectName: String(projectName || next[index].projectName || ""), lastUsedAt };
-  return next.slice(-20);
+  return next;
 }
 
 export function reconcileWorkspaceHistory(workspacePath, aliases = [], storage = globalThis.window?.localStorage) {

@@ -1,3 +1,5 @@
+import { bindProjectLibrary, libraryLabels } from "./project-library-view.js";
+import { moveProjectToPartition, revealProjectPartition } from "../../services/project-library.js";
 import { releaseProjectPathOverview } from "./project-export-page.js";
 import { prepareProjectOverviewSources } from "./project-overview-preparation.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "./floating-menu-runtime.js";
@@ -36,7 +38,7 @@ const IMPORTER_STATUS_TOAST_DISMISS = Symbol("importerStatusToastDismiss");
 const DELETE_SELECTION_MODE_FAILED_HISTORY = "failed-history";
 const DELETE_SELECTION_MODE_PROJECT = "project";
 
-export function renderImporterPage(state) {
+export function renderImporterPage(state, { detailHtml } = {}) {
   const importer = state.importer;
   const messages = getMessages(state, "importer");
   const importProgressOverlay = importer.inFlight && importer.importRunId && importer.importProgressDismissed !== true
@@ -50,7 +52,7 @@ export function renderImporterPage(state) {
   return `
     <section class="page projects-page">
       ${renderProjectsBody(state, { records: recentRecords, messages,
-        summaryHtml: state.session?.workspacePath ? renderWorkspacePage(state) : "" })}
+        summaryHtml: detailHtml ?? (state.session?.workspacePath ? renderWorkspacePage(state) : "") })}
       ${statusToast}
       ${
         importer.deleteConfirmOpen
@@ -170,10 +172,15 @@ function formatCopyBytes(value) {
   return `${amount >= 10 ? amount.toFixed(1) : amount.toFixed(2)} ${unit}`;
 }
 
-export function bindImporterPage(host, store) {
+export function bindImporterPage(host, store, { preserveWorkspaceDetail = false } = {}) {
   bindProjectSidebarResize(host);
-  if (store.getState().initializer) bindWorkspacePage(host, store);
+  if (!preserveWorkspaceDetail && store.getState().initializer) bindWorkspacePage(host, store);
   bindProjectEntryControls(host, store);
+  bindProjectLibrary(host, store, {
+    refresh: () => rerender(host, store, { preserveWorkspaceDetail: true }),
+    openImport: partitionId => openProjectImportDialog(host, store, partitionId),
+    openProjectMenu: (event, path) => openWorkspaceContextMenu(event, path, host, store),
+  });
   if (store.getState().importer.importDialogOpen && !store.getState().importer.inFlight) {
     syncImportProjectName(host, store);
   }
@@ -455,6 +462,27 @@ export function bindImporterPage(host, store) {
   }));
 }
 
+function openProjectImportDialog(host, store, partitionId = "") {
+  updateImporterState(store, {
+    importDialogOpen: true,
+    importPartitionId: partitionId,
+    // A new import must not reuse an opened or failed workspace as its target.
+    // Closing/retrying the current dialog still preserves that dialog's inputs.
+    importSource: "zip",
+    zipPath: "",
+    extractedPath: "",
+    workspaceRoot: "",
+    projectNameInput: "",
+    projectNameEdited: false,
+    requireNewWorkspace: false,
+    projectError: "",
+    pendingProjectPath: "",
+    importParallelism: normalizeImportParserWorkers("auto"),
+  });
+  rerender(host, store);
+  host.querySelector("#zip-path-input, #extracted-path-input")?.focus();
+}
+
 function bindProjectEntryControls(host, store) {
   const busy = () => store.getState().importer.inFlight || store.getState().importer.entryResolving || store.getState().initializer?.autoPipelineRunning || store.getState().initializer?.updating;
   host.querySelectorAll("[data-project-open-path]").forEach(button => button.addEventListener("click", async event => {
@@ -498,23 +526,7 @@ function bindProjectEntryControls(host, store) {
   };
   host.querySelector("#project-import-button")?.addEventListener("click", () => {
     if (busy()) return;
-    updateImporterState(store, {
-      importDialogOpen: true,
-      // A new import must not reuse an opened or failed workspace as its target.
-      // Closing/retrying the current dialog still preserves that dialog's inputs.
-      importSource: "zip",
-      zipPath: "",
-      extractedPath: "",
-      workspaceRoot: "",
-      projectNameInput: "",
-      projectNameEdited: false,
-      requireNewWorkspace: false,
-      projectError: "",
-      pendingProjectPath: "",
-      importParallelism: normalizeImportParserWorkers("auto"),
-    });
-    rerender(host, store);
-    host.querySelector("#zip-path-input, #extracted-path-input")?.focus();
+    openProjectImportDialog(host, store);
   });
   host.querySelector("#project-open-button")?.addEventListener("click", () => openDirectory());
   const closeImport = () => {
@@ -1167,7 +1179,14 @@ export async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = ""
       importerSummary: i18nT(snapshot, "importer.runtime.workspaceLoadedSummary"),
       appendStage: i18nT(snapshot, "importer.runtime.workspaceLoadedStage"),
     });
-    if (!syncProjectSelection(host, store, { replaceDetail: true })) rerender(host, store);
+    if (importer.pendingProjectPath && workspacePathListIncludes([importer.pendingProjectPath], forcedWorkspacePath || importer.openWorkspacePath)) {
+      try { moveProjectToPartition(workspaceRoot, importer.importPartitionId || ""); }
+      catch (error) { updateImporterState(store, { libraryError: error.message || "storage" }); }
+    }
+    let revealChanged = false;
+    try { revealChanged = revealProjectPartition(workspaceRoot); }
+    catch (error) { updateImporterState(store, { libraryError: error.message || "storage" }); }
+    if (revealChanged || !syncProjectSelection(host, store, { replaceDetail: true })) rerender(host, store);
     return true;
   } catch (error) {
     updateImporterState(store, {
@@ -1205,6 +1224,7 @@ function syncProjectSelection(host, store, { openingPath = "", replaceDetail = f
     const active = workspacePathListIncludes([state.session.workspacePath], record.path);
     const opening = record.path === openingPath;
     row.classList.toggle("is-active", active);
+    row.setAttribute("aria-selected", String(active));
     const button = row.querySelector("[data-recent-path]");
     button.disabled = opening;
     button.setAttribute("aria-current", String(active));
@@ -1433,6 +1453,13 @@ async function enterWorkspaceAfterImport(store, payload) {
   updateImporterState(store, { stages: [...store.getState().importer.stages, projectLabels(store.getState()).pending] });
   const options = await openWorkspace({ workspaceRoot, projectName: store.getState().importer.projectNameInput });
   if (store.getState().importer.importRunId !== runId) return;
+  try {
+    appendWorkspaceHistoryRecord(options.workspaceRoot || workspaceRoot, options.existingProjects?.[0]?.projectName);
+    moveProjectToPartition(options.workspaceRoot || workspaceRoot, store.getState().importer.importPartitionId || "");
+    revealProjectPartition(options.workspaceRoot || workspaceRoot);
+  } catch (error) {
+    updateImporterState(store, { libraryError: error.message || "storage" });
+  }
   const projects = options.existingProjects || [];
   let projectPreview = null;
   const previewStages = [];
@@ -1746,7 +1773,7 @@ function closeWorkspaceContextMenu(host, store, workspacePath = "") {
   }
   cancelWorkspaceContextMenuClose(contextMenu.workspacePath || "", store);
   updateImporterState(store, { workspaceContextMenu: null });
-  rerender(host, store);
+  rerender(host, store, { preserveWorkspaceDetail: true });
 }
 
 function openWorkspaceContextMenu(event, path, host, store) {
@@ -1754,12 +1781,12 @@ function openWorkspaceContextMenu(event, path, host, store) {
   const workspacePath = String(path || "").trim();
   if (!workspacePath || projectEntryBusy(store.getState())) return;
   cancelWorkspaceContextMenuClose("", store);
-  updateImporterState(store, { workspaceContextMenu: {
+  updateImporterState(store, { libraryMenu: null, workspaceContextMenu: {
     open: true, workspacePath,
     x: Number.isFinite(Number(event.clientX)) ? Number(event.clientX) : 0,
     y: Number.isFinite(Number(event.clientY)) ? Number(event.clientY) : 0,
   } });
-  rerender(host, store);
+  rerender(host, store, { preserveWorkspaceDetail: true });
   host.querySelector("[data-workspace-history-context-menu='1']")?.querySelector?.('[role="menuitem"]:not(:disabled)')?.focus?.({ preventScroll: true });
 }
 
@@ -1776,6 +1803,7 @@ function renderWorkspaceHistoryContextMenu(contextMenu, messages, state) {
       ${item("data-project-reveal-path", labels.openLocation)}
       <div class="workspace-history-context-menu-separator" role="separator"></div>
       ${item("data-project-rename-path", labels.rename)}
+      ${item("data-project-move-path", libraryLabels(state).move)}
       ${item("data-workspace-import-add-package-path", messages.buttons.importAddPackage)}
       ${item("data-project-copy", messages.buttons.copyProject)}
       <div class="workspace-history-context-menu-separator" role="separator"></div>
@@ -2477,7 +2505,7 @@ function workspaceOperationSafetyIdentity(value) {
   return /^(?:[a-z]:\/|\/\/)/i.test(normalized) ? normalized.toLowerCase() : normalized;
 }
 
-function rerender(host, store) {
+function rerender(host, store, { preserveWorkspaceDetail = false } = {}) {
   if (store.getState().activeRoute !== "importer") {
     syncSessionHeader(store);
     return;
@@ -2486,9 +2514,25 @@ function rerender(host, store) {
   if (!routeHost) {
     return;
   }
-  releaseProjectPathOverview(routeHost);
-  routeHost.innerHTML = renderImporterPage(store.getState());
-  bindImporterPage(routeHost, store);
+  const detail = preserveWorkspaceDetail ? routeHost.querySelector(".project-current") : null;
+  const scrollTop = routeHost.querySelector(".project-recent-list")?.scrollTop || 0;
+  if (detail) {
+    // Keep the actual detail DOM and its bindings/preview alive while editing library metadata.
+    // Rebinding happens before reinsertion, so existing detail handlers are never duplicated.
+    const markup = renderImporterPage(store.getState(), { detailHtml: '<section data-library-detail-placeholder></section>' });
+    detail.remove();
+    routeHost.innerHTML = markup;
+    bindImporterPage(routeHost, store, { preserveWorkspaceDetail: true });
+    routeHost.querySelector("[data-library-detail-placeholder]").replaceWith(detail);
+  } else {
+    releaseProjectPathOverview(routeHost);
+    routeHost.innerHTML = renderImporterPage(store.getState());
+    bindImporterPage(routeHost, store);
+  }
+  if (preserveWorkspaceDetail) {
+    const list = routeHost.querySelector(".project-recent-list");
+    if (list) list.scrollTop = scrollTop;
+  }
   syncSessionHeader(store);
 }
 

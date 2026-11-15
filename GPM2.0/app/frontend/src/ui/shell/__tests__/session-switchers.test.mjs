@@ -124,8 +124,8 @@ test("updateWorkspaceHistory keeps existing projects in place and appends new pr
   ]);
   const full = Array.from({ length: 20 }, (_, index) => ({ path: `/tmp/${index}` }));
   const appended = updateWorkspaceHistory(full, "/tmp/new", "New", 5);
-  assert.equal(appended.length, 20);
-  assert.equal(appended[0].path, "/tmp/1");
+  assert.equal(appended.length, 21);
+  assert.equal(appended[0].path, "/tmp/0");
   assert.equal(appended.at(-1).path, "/tmp/new");
 });
 

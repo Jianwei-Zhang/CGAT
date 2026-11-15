@@ -11,11 +11,12 @@ function render({ session = {}, importer = {}, records = [], summaryHtml = "" } 
   });
 }
 
-test("empty project page places its only entry actions inside the centered empty state", () => {
+test("empty project page retains the library and partition creation before the first import", () => {
   const html = render();
-  assert.match(html, /<section class="project-empty"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"/);
+  assert.match(html, /class="project-browser"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"/);
   assert.equal((html.match(/id="project-import-button"/g) || []).length, 1);
-  assert.doesNotMatch(html, /class="project-browser|class="project-recents/);
+  assert.match(html, /data-library-create="root"/);
+  assert.match(html, /Unpartitioned/);
   assert.doesNotMatch(html, /class="project-page-header"/);
 });
 
@@ -25,7 +26,7 @@ test("recent projects and current detail share the browser layout without duplic
     records: [{ path: "/rice", projectName: "Rice" }, { path: '/other/"<name>', projectName: "Other" }],
     summaryHtml: '<section class="project-current">Rice detail</section>',
   });
-  assert.match(html, /class="project-browser"[\s\S]*class="project-recents"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"[\s\S]*class="project-recents-header"[\s\S]*class="project-current"/);
+  assert.match(html, /class="project-browser"[\s\S]*class="project-recents"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"[\s\S]*class="project-recents-header"[^>]*[\s\S]*class="project-current"/);
   assert.match(html, /data-recent-path="\/rice" aria-current="true"/);
   assert.match(html, /&quot;&lt;name&gt;/);
   assert.match(html, /project-recent-name[\s\S]*>Rice<\/strong>/);
@@ -36,17 +37,14 @@ test("recent projects and current detail share the browser layout without duplic
   assert.doesNotMatch(html, /data-project-remove|Remove from recent/);
   assert.doesNotMatch(html, /No projects yet|No project open/);
   assert.equal((html.match(/id="project-open-button"/g) || []).length, 1);
-  assert.match(
-    html,
-    /data-workspace-import-add-package-path="\/rice"[\s\S]*data-project-copy="\/rice"[\s\S]*data-project-delete-files="\/rice"/,
-  );
-  assert.match(html, /data-project-copy="\/rice"[^>]*aria-label="Copy Project"/);
+  assert.match(html, /data-library-project-menu="\/rice"/);
+  assert.doesNotMatch(html, /class="project-row-actions"/);
 });
 
 test("recent-only state is distinct from no projects", () => {
   const html = render({ records: [{ path: "/rice" }] });
   assert.match(html, /project-no-selection/);
-  assert.match(html, /No project open/);
+  assert.match(html, /Select a project/);
   assert.doesNotMatch(html, /No projects yet/);
 });
 

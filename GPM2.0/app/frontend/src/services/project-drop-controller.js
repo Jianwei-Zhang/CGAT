@@ -49,7 +49,7 @@ export function projectEntryBusy(state, { includeResolving = true } = {}) {
   const importer = state.importer || {};
   const initializer = state.initializer || {};
   return Boolean(importer.inFlight || importer.restoringSession || (includeResolving && importer.entryResolving) || importer.importDialogOpen
-    || importer.copyDialog?.open || importer.deleteConfirmOpen || initializer.loading || initializer.updating
+    || importer.libraryDialog || importer.copyDialog?.open || importer.deleteConfirmOpen || initializer.loading || initializer.updating
     || initializer.autoPipelineRunning || initializer.createModalOpen || initializer.autoPipelineModalOpen);
 }
 
@@ -100,11 +100,11 @@ export function createProjectDropController({ store, inspect, prepareSwitch = as
       resolving(false);
       if (entry.kind === "archive") {
         store.setState({ activeRoute: "importer", importer: {
-          ...store.getState().importer, ...archiveImportForm(entry) } });
+          ...store.getState().importer, ...archiveImportForm(entry), importPartitionId: "" } });
         refresh();
       } else if (entry.kind === "extracted") {
         store.setState({ activeRoute: "importer", importer: { ...store.getState().importer,
-          extractedPath: entry.path, projectNameInput: defaultProjectName(entry.path), projectNameEdited: false, projectError: "", pendingProjectPath: "" } });
+          importPartitionId: "", extractedPath: entry.path, projectNameInput: defaultProjectName(entry.path), projectNameEdited: false, projectError: "", pendingProjectPath: "" } });
         refresh();
         await importExtracted(entry.path);
       } else {

@@ -54,6 +54,12 @@ const store = createStore({
   },
   importer: {
     importDialogOpen: false,
+    importPartitionId: "",
+    libraryDialog: null,
+    libraryMenu: null,
+    libraryError: "",
+    librarySelectedId: null,
+    libraryRevealedPath: "",
     restoringSession: true,
     importSource: "zip",
     projectNameInput: "",

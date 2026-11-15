@@ -733,3 +733,60 @@
 .project-section-divider > h3 { flex: 0 0 auto; margin: 0; color: var(--text-secondary, #475569); font-size: inherit; font-weight: 600; line-height: inherit; white-space: nowrap; }
 .project-current .project-section-divider { font-size: var(--font-title); }
 .project-section-count { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; font-size: var(--font-small); font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The library is a persistent navigation tree, including before the first import. */
+.project-library-toolbar { display: flex; align-items: center; gap: 2px; }
+.library-toolbar-button, .library-row-menu, .library-chevron, .library-folder-name {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 0;
+  border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; border-radius: 4px;
+}
+.library-toolbar-button { width: 28px; height: 28px; color: var(--text-secondary); }
+.library-toolbar-button:hover, .library-row-menu:hover { background: var(--theme-blue-surface, #eff6ff); }
+.project-recents > .project-library-actions { margin: -4px 0 10px; justify-content: flex-end; }
+.project-recent-list { max-height: calc(100dvh - 270px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.library-tree { min-width: 0; padding: 2px 0; }
+.library-tree [hidden] { display: none !important; }
+.library-folder-row, .library-tree .project-recent-row {
+  min-width: 0; min-height: 32px; margin: 1px 0; border: 1px solid transparent;
+  border-radius: 5px; padding: 0 3px 0 calc(3px + var(--library-depth, 0) * 14px);
+  background: transparent; gap: 2px;
+}
+.library-folder-row { display: flex; align-items: center; }
+.library-folder-row:hover, .library-tree .project-recent-row:hover { background: var(--surface-panel, #fff); }
+.library-folder-row.is-selected { outline: 1px solid var(--border-strong, #94a3b8); outline-offset: -1px; }
+.library-folder-name { flex: 1; justify-content: flex-start; gap: 7px; min-height: 30px; padding: 0 2px; text-align: left; }
+.library-folder-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-folder-name .project-icon { flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-muted); }
+.library-chevron { flex: 0 0 18px; width: 18px; height: 26px; padding: 2px; color: var(--text-muted); }
+.library-chevron[aria-expanded="true"] svg { transform: rotate(90deg); }
+.library-chevron.is-empty { visibility: hidden; }
+/* Override the old card layout even while idle: the hidden menu keeps its column. */
+.library-tree .project-recent-row,
+.library-tree .project-recent-row:not(:hover):not(:has(:focus-visible)) { grid-template-columns: minmax(0, 1fr) 26px; column-gap: 2px; }
+.library-tree .project-recent-open { min-height: 30px; padding-left: 22px; }
+.library-tree .project-recent-name { gap: 7px; }
+.library-tree .project-recent-name strong { font-weight: 400; }
+.library-tree .project-recent-open::after { display: none; }
+.library-tree .project-recent-open:focus-visible { outline: 2px solid var(--focus-ring, #4f82b5); outline-offset: -2px; }
+.library-tree .project-recent-row.is-active { background: var(--theme-blue-surface, #eff6ff); box-shadow: inset 2px 0 var(--focus-ring, #4f82b5); }
+.library-tree .project-recent-row.has-validation-error { border-color: var(--theme-red-line, #b91c1c); }
+.library-row-menu { flex: 0 0 26px; width: 26px; height: 26px; padding: 4px; }
+@media (hover: hover) {
+  .library-tree .library-row-menu { opacity: 0; }
+  .library-folder-row:hover .library-row-menu, .library-folder-row:focus-within .library-row-menu,
+  .library-tree .project-recent-row:hover .library-row-menu, .library-tree .project-recent-row:focus-within .library-row-menu { opacity: 1; }
+}
+.library-tree.is-dragging, .library-tree.is-dragging * { cursor: grabbing !important; user-select: none; }
+.library-tree [data-library-select], .library-tree [data-recent-path] { user-select: none; }
+.library-folder-row.is-drop-target, .project-recents-header.is-drop-target { outline: 2px solid var(--focus-ring, #4f82b5); outline-offset: -2px; background: var(--theme-blue-surface, #eff6ff); }
+.library-drag-ghost { position: fixed; z-index: 10000; pointer-events: none; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 7px 12px; border: 1px solid var(--focus-ring, #4f82b5); border-radius: 6px; background: var(--surface-panel, #fff); color: var(--text-primary, #1e293b); box-shadow: 0 4px 14px #0002; }
+.library-picker-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.library-picker-row select { flex: 1; min-width: 0; }
+.library-picker-row button { flex: 0 0 auto; }
+.library-dialog-overlay { z-index: 1001; }
+.library-dialog { padding: 24px; background: var(--surface-panel, #fff); border: 1px solid var(--border-subtle, #dbe3ec); border-radius: var(--card-radius); display: flex; flex-direction: column; gap: 12px; width: min(460px, calc(100vw - 40px)); }
+.library-dialog-subject { overflow-wrap: anywhere; color: var(--text-secondary); }
+.project-no-selection p { max-width: 420px; margin: 0; text-align: center; line-height: 1.7; }
+@media (max-width: 720px) { .project-recent-list { max-height: 40dvh; } }
+
+.library-dialog input, .library-dialog select { min-width: 0; min-height: 38px; width: 100%; }

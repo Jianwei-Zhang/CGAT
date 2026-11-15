@@ -1,5 +1,6 @@
+import { libraryLabels, renderImportPartition, renderLibraryTree, renderLibraryDialog, renderLibraryMenu } from "./project-library-view.js";
 import { projectEntryBusy } from "../../services/project-drop-controller.js";
-import { defaultProjectName, projectImportName } from "../../services/project-session.js";
+import { projectImportName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImportParserWorkers } from "../../services/import-parallelism.js";
@@ -121,6 +122,7 @@ export function renderProjectImportDialog(state, messages) {
       <label for="import-parallelism-select">${labels.importThreads}</label>
       <select id="import-parallelism-select" name="importParallelism" aria-describedby="import-parallelism-hint">${workerOptions}</select>
       <p id="import-parallelism-hint" class="project-path muted">${labels.importThreadsHint}</p>
+      ${renderImportPartition(state)}
       <label for="import-project-name">${labels.name}</label>
       <input id="import-project-name" value="${html(projectImportName(importer, directory))}" placeholder="${html(labels.nameDefault)}" />
       ${importer.projectError ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
@@ -143,40 +145,28 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
     <button id="project-open-button" class="button ghost" ${disabled}>${projectIcon("open")}${labels.open}</button>
   </div>`;
   const validation = projectValidationView(state, records);
-  const rows = records.map((record, index) => {
-    const active = state.session?.workspacePath === record.path;
-    const name = (active && state.session?.projectName) || record.projectName || defaultProjectName(record.path);
-    const failed = importer.historyValidation?.[record.path]?.ok === false;
-    return `<div class="project-recent-row ${active ? "is-active" : ""}${failed ? " has-validation-error" : ""}" data-workspace-history-row-path="${html(record.path)}">
-      <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" data-app-tooltip="${html(record.path)}" ${disabled}>
-        <span class="project-recent-name">${projectIcon("folder")}<strong>${html(name)}</strong></span>
-      </button>
-      <div class="project-row-actions">
-        <button class="button project-icon-button" data-workspace-import-add-package-path="${html(record.path)}" data-app-tooltip="${html(messages.buttons.importAddPackage)}" aria-label="${html(messages.buttons.importAddPackage)}" ${disabled}>${projectIcon("addPackage")}</button>
-        <button class="button project-icon-button" data-project-copy="${html(record.path)}" data-app-tooltip="${html(messages.buttons.copyProject)}" aria-label="${html(messages.buttons.copyProject)}" ${disabled}>${projectIcon("copy")}</button>
-        <button class="button project-icon-button" data-project-delete-files="${html(record.path)}" data-app-tooltip="${labels.delete}" aria-label="${labels.delete}" ${disabled}>${projectIcon("delete")}</button>
-      </div>
-    </div>`;
-  }).join("");
+  const library = libraryLabels(state);
+  const rows = renderLibraryTree(state, records);
   return `${importer.pendingProjectPath ? `<section class="project-pending">
     <strong>${labels.pending}</strong><span class="project-path">${html(importer.pendingProjectPath)}</span>
     <button id="project-retry-button" class="button" ${disabled}>${labels.retry}</button></section>` : ""}
-  ${empty ? `<section class="project-empty" aria-labelledby="project-empty-title">
-    <span class="project-empty-symbol">${projectIcon("folder")}</span>
-    <h4 id="project-empty-title">${labels.empty}</h4>${actions}
-  </section>` : `<div class="project-browser">
+  <div class="project-browser">
     <section class="project-recents" id="project-recents" aria-labelledby="project-recents-title">
       ${actions}
-      <header class="project-recents-header"><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>
+      <header class="project-recents-header" data-library-drop-root><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>
+        <div class="project-library-toolbar">
+          <button type="button" class="library-toolbar-button" data-library-create="root" aria-label="${library.create}" data-app-tooltip="${library.create}" ${disabled}>${projectIcon("newPartition")}</button>
+          <button type="button" class="library-toolbar-button" data-library-root-menu aria-label="${library.actions}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
+        </div>
+      </header>
         ${records.length ? `<div class="project-library-actions">
           <button id="validate-history-button" class="button ghost project-history-action" ${importer.historyValidating ? `data-app-tooltip="${html(validation.accessibleLabel)}"` : ""} aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
           <button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
         </div>` : ""}
-      </header>
       <div class="project-recent-list">${rows}</div>
     </section>
     <div class="project-sidebar-splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="project-recents" aria-label="${labels.resizeLibrary}" aria-valuemin="220" aria-valuemax="560" aria-valuenow="280"></div>
-    ${summaryHtml || `<section class="project-empty project-no-selection"><span class="project-empty-symbol">${projectIcon("open")}</span><h4>${labels.noOpen}</h4></section>`}
-  </div>`}
-  ${renderProjectImportDialog(state, messages)}`;
+    ${summaryHtml || `<section class="project-empty project-no-selection"><span class="project-empty-symbol">${projectIcon(empty ? "folder" : "open")}</span><h4>${empty ? labels.empty : library.select}</h4><p class="muted">${empty ? labels.emptyHint : library.selectHint}</p></section>`}
+  </div>
+  ${renderProjectImportDialog(state, messages)}${renderLibraryMenu(state)}${renderLibraryDialog(state)}`;
 }

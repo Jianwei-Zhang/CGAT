@@ -149,7 +149,7 @@ for (const locale of ["en", "zh"]) test(`splitter sits between library and detai
   assert.match(html, /id="project-recents"[\s\S]*class="project-sidebar-splitter"[\s\S]*class="project-current"/);
   assert.match(html, /role="separator" tabindex="0" aria-orientation="vertical" aria-controls="project-recents"/);
   assert.ok(html.includes(locale === "en" ? "Resize project library" : "调整项目库宽度"));
-  assert.doesNotMatch(render([]), /project-sidebar-splitter/);
+  assert.match(render([]), /project-sidebar-splitter/);
 });
 
 test("splitter CSS keeps a generous hit area on the existing border and hides it in stacked mode", () => {
