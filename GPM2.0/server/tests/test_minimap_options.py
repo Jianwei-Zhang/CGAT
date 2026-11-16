@@ -104,6 +104,8 @@ write_alignment_command_script "$1/self.sh" "$1" target.fa query.fa true
         self.assertIn("defaults to 1G",result.stdout)
         self.assertIn("500M",result.stdout)
         self.assertIn("may change alignments",result.stdout)
+        self.assertIn("bypasses automatic calibration",result.stdout)
+        self.assertIn("bounded internal calibration",result.stdout)
 
     def test_incremental_reference_inherits_frozen_filter_and_persisted_k(self):
         # No user config is introduced: these are the existing prepared metadata

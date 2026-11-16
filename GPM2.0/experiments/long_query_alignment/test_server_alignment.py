@@ -68,6 +68,30 @@ class ServerAlignmentTests(unittest.TestCase):
         self.assertEqual(result["publication"]["sha256"],wa.sha256(self.run/"result.paf"))
         self.assertTrue((Path(result["attempt"])/"publication.complete.paf").is_file())
 
+    def test_policy_receipt_binds_output_without_server_paths(self):
+        result=self.execute()
+        path=self.run/"result.alignment.json";raw=path.read_text();receipt=json.loads(raw)
+        self.assertEqual(receipt["output_sha256"],wa.sha256(self.run/"result.paf"))
+        self.assertEqual(receipt["policy"],"native_complete_unchanged")
+        self.assertNotIn(str(self.root),raw)
+        self.assertFalse(receipt["scientific_accuracy_proven"])
+        self.assertEqual(result["alignment_policy_receipt"]["sha256"],wa.sha256(path))
+
+    def test_policy_failure_preserves_native_bytes_without_public_unpaired_result(self):
+        with patch.object(sa,"write_alignment_policy",side_effect=OSError("controlled policy write failure")):
+            with self.assertRaisesRegex(OSError,"policy write failure"):self.execute()
+        self.assertFalse((self.run/"result.paf").exists())
+        retained=list(self.run.glob(".long-cigar-attempt-*/unpublished-policy-result-*.paf"))
+        self.assertEqual(len(retained),1)
+        self.assertEqual(retained[0].read_bytes(),b"opaque complete native PAF bytes\n")
+
+    def test_linked_policy_receipt_is_not_overwritten(self):
+        external=self.root/"external.json";external.write_text("private")
+        (self.run/"result.alignment.json").symlink_to(external)
+        with patch.object(sa.pa,"experiment",side_effect=AssertionError("unsafe policy path mapped")):
+            with self.assertRaisesRegex(wa.ExperimentError,"result/policy"):self.execute()
+        self.assertEqual(external.read_text(),"private")
+
     def test_source_checked_native_success_stays_opaque_without_recovery_lookup(self):
         self.manifest.update(status="source_checked_recovery_runtime",recovered_output_admission=sa.pub.POLICY,
                              native_companion_sha256="a"*64,native_companion_platform="linux-x86_64")

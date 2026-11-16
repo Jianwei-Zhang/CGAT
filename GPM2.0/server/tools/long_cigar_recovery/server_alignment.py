@@ -34,6 +34,7 @@ import native_first as nf
 import minimap_options as mo
 import ordinary_resource_grant as org
 import adaptive_ordinary_controller as oc
+import adaptive_screening as screening
 import recovery_publication as rp
 import windowed_alignment as wa
 
@@ -199,6 +200,80 @@ def publish_atomic(source,expected_sha256,output,attempt,*,check_unchanged=None)
             "publication":"atomic_no_clobber_from_complete_native_output","native_bytes_preserved":True}
 
 
+
+def alignment_policy_receipt(result, runtime, requested_options, policy, output_sha256):
+    """Compact delivery provenance from already admitted sources, without paths.
+
+    This is not a new admission or biological-accuracy certificate. Native
+    options describe the ACTUAL source command, not later requested resources.
+    """
+    def options(command):
+        if not isinstance(command, list) or command[:1] == []:
+            raise wa.ExperimentError("native source command missing for policy receipt")
+        return {name: command[command.index(flag) + 1] if flag in command else None
+                for name, flag in (("preset", "-x"), ("query_batch", "-K"),
+                                   ("minimizer_filter_argument", "-f"), ("threads", "-t"))}
+    ordinary = result.get("ordinary_adaptive")
+    sources = []
+    if ordinary is not None:
+        for selection in ordinary["composition"]["identity"]["selections"]:
+            source = selection["source"]
+            path = Path(source["directory"]) / "native-attempt.json"
+            if path.is_symlink() or not path.is_file() or path.stat().st_size > pr.MAX_STATE:
+                raise wa.ExperimentError("invalid native source metadata for delivery policy")
+            with path.open("rb") as handle:raw = handle.read(pr.MAX_STATE + 1)
+            if len(raw) > pr.MAX_STATE or hashlib.sha256(raw).hexdigest() != source["receipt_sha256"]:
+                raise wa.ExperimentError("native source changed while recording delivery policy")
+            native = json.loads(raw)
+            sources.append({"queries": selection["queries"], "paf_sha256": source["sha256"],
+                            "receipt_sha256": source["receipt_sha256"], "options": options(native["execution"]["command"])})
+    else:
+        native = result.get("native") or result.get("ordinary_native")
+        if native is not None:
+            rows = native.get("parts", []) if native.get("kind") == pa.opa.KIND else [{"native": native}]
+            for row in rows:
+                leaf = row["native"]
+                sources.append({"queries": result.get("plan", {}).get("native_queries", []),
+                    "part_index": row.get("part_index"), "paf_sha256": leaf["paf_sha256"],
+                    "options": options(leaf["execution"]["command"])})
+    reviewed_names = {r["query"] for r in result.get("native_reviews", [])}
+    for review in result.get("native_reviews", []):
+        native = review["native"]
+        sources.append({"queries": [review["query"]], "paf_sha256": native["paf_sha256"],
+                        "role": "long_query_native_review", "options": options(native["execution"]["command"])})
+    window_sources = [{"query": row["query"], "part_index": row["part_index"],
+        "paf_sha256": row["sha256"], "receipt_sha256": row["receipt_sha256"],
+        "policy": {k: row["identity"][k] for k in ("core_bases", "context_bases", "mid_occ", "preset", "candidate_policy")}}
+        for row in result.get("parts", []) if row.get("kind") == ap.POLICY and row["query"] not in reviewed_names]
+    fallback = (ordinary or {}).get("default_continuation")
+    return {"schema": 1, "status": "complete", "scope": "initial_reference_asm10",
+        "output_sha256": output_sha256, "policy": policy,
+        "chr_assignment_min_coverage_percent": requested_options.get("assignment_coverage", 0.60) * 100,
+        "requested_options": {k: v for k, v in requested_options.items() if k in ("minimap_batch", "minimap_filter")}, "ordinary_selected_filter": (ordinary or {}).get("selected_filter"),
+        "ordinary_default_continuation": ({k: fallback[k] for k in
+            ("ordinal", "reason", "transition_queries", "transition_bases", "future_filter", "whole_assembly_restart")}
+            if fallback else None), "native_sources": sources, "window_sources": window_sources,
+        "long_queries": result.get("plan", {}).get("long_queries", []),
+        "long_native_review_queries": [r["query"] for r in result.get("native_reviews", [])],
+        "approximate_query_part_cells": result.get("approximate_query_part_cells", 0),
+        "input_sha256": {name: result[name]["sha256"] for name in ("query", "reference", "tool")
+                         if result.get(name, {}).get("sha256")},
+        "runtime_source_profile": hashlib.sha256(json.dumps(runtime["files_sha256"], sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+        "scientific_accuracy_proven": False}
+
+
+def write_alignment_policy(path, receipt, output):
+    fd, temporary = tempfile.mkstemp(prefix=".alignment-policy-", dir=path.parent)
+    temporary = Path(temporary)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(json.dumps(receipt, indent=2, ensure_ascii=True) + "\n")
+            handle.flush(); os.fsync(handle.fileno())
+        os.chmod(temporary, stat.S_IMODE(output.stat().st_mode) & 0o666)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():temporary.unlink()
+
 def run_reference(args,*,runtime_root=None):
     workspace,run_dir = args.server_dir.resolve(),args.run_dir.resolve()
     if (not (workspace/".prepare_lib").is_dir() or not (workspace/"metadata").is_dir()
@@ -208,9 +283,12 @@ def run_reference(args,*,runtime_root=None):
     runtime_root = Path(runtime_root).resolve() if runtime_root is not None else Path(__file__).resolve().parent
     runtime = validate_runtime(runtime_root)
     mapping_options = mo.workspace_options(workspace)
+    args.assignment_coverage = screening.prepared_assignment_coverage(workspace)
+    mapping_options.update(screening.assignment_identity(screening.assignment_limits(args.assignment_coverage)))
     # Fraction changes alter scientific policy. K only affects future executions.
     args.minimap_filter = mapping_options.get("minimap_filter")
     output = run_dir/args.result
+    policy_output = output.with_suffix(".alignment.json")
     with task_lock(run_dir),cancellation_scope():
         resume_identity = pr.adapter_key(args, runtime)
         attempt, attempt_reused = pr.select_attempt(run_dir, resume_identity, runtime=runtime)
@@ -223,14 +301,18 @@ def run_reference(args,*,runtime_root=None):
                   "ordinary_resource_context":org.dispatch_context(run_dir,args.threads)}
         wa.write_json(attempt/"server-alignment.json",report)
         try:
-            if output.is_symlink() or (output.exists() and not stat.S_ISREG(output.stat().st_mode)):
-                raise wa.ExperimentError("existing result is not a regular file; preserving it without mapping")
+            if any(path.is_symlink() or (path.exists() and not stat.S_ISREG(path.stat().st_mode))
+                   for path in (output, policy_output)):
+                raise wa.ExperimentError("existing result/policy is not a regular file; preserving it without mapping")
             if output.is_file():
                 previous = attempt/"prior-result.paf"
                 if previous.exists():
                     previous = attempt/("prior-result-" + uuid.uuid4().hex + ".paf")
                 output.rename(previous)
+                if policy_output.exists():policy_output.rename(previous.with_suffix(".alignment.json"))
                 report["previous_result"] = {"path":str(previous),"sha256":wa.sha256(previous),"restored_automatically":False}
+            if policy_output.exists():
+                policy_output.rename(attempt / ("orphan-alignment-policy-" + uuid.uuid4().hex + ".json"))
             options = argparse.Namespace(target=args.target,query=args.query,out=attempt/"selective",
                 minimap2="minimap2",threads=args.threads,timeout=None,memory_gib=0,
                 ordinary_resource_context=report["ordinary_resource_context"],
@@ -238,6 +320,8 @@ def run_reference(args,*,runtime_root=None):
                 adaptive_ordinary=runtime.get("ordinary_output_admission") == oc.POLICY,
                 native_state_bundle=runtime_root/"native"/nst.build.host_platform(), **mapping_options)
             result = pa.experiment(options,prepared_workspace=workspace,admit_output=False,resume_identity=resume_identity)
+            if result.get("assignment_coverage", 0.60) != args.assignment_coverage:
+                raise wa.ExperimentError("candidate assignment threshold differs from the prepared project")
             report["candidate_receipt_sha256"] = wa.sha256(options.out/"proactive-candidate.json")
             source,digest = publication_source(result,attempt,runtime=runtime,runtime_root=runtime_root,
                 **({"ordinary_catalog": getattr(options, "_ordinary_catalog", None)} if result.get("ordinary_adaptive") is not None else {}))
@@ -260,11 +344,24 @@ def run_reference(args,*,runtime_root=None):
                     if (current["sha256"]!=admission["helper_sha256"]
                             or current["manifest_sha256"]!=admission["helper_manifest_sha256"]):
                         raise wa.ExperimentError("native companion changed before atomic result publication")
+            policy_receipt = alignment_policy_receipt(result, runtime, mapping_options,
+                admission.get("policy") if admission else "native_complete_unchanged", digest)
+            if policy_receipt["output_sha256"] != digest:
+                raise wa.ExperimentError("alignment policy does not bind the admitted output")
             publication_attempt = attempt
             if any((attempt / name).exists() for name in ("publication.pending.paf", "publication.complete.paf")):
                 publication_attempt = Path(tempfile.mkdtemp(prefix=".publication-", dir=attempt))
             report["publication_evidence"] = str(publication_attempt)
             report["publication"] = publish_atomic(source,digest,output,publication_attempt,check_unchanged=unchanged)
+            try:
+                write_alignment_policy(policy_output, policy_receipt, output)
+            except BaseException:
+                # Preserve validated bytes privately, but do not leave a public
+                # result without its requested policy companion after failure.
+                retained = publication_attempt / ("unpublished-policy-result-" + uuid.uuid4().hex + ".paf")
+                if output.is_file() and not output.is_symlink():output.rename(retained)
+                raise
+            report["alignment_policy_receipt"] = {"path": str(policy_output), "sha256": wa.sha256(policy_output)}
             report["cache_reused"] = result.get("cache_reused", {})
             report.update(status="proactive_complete_published" if proactive else "native_complete_published",
                           result_published=True,proactive_routing=proactive,recovered_query_part_cells=result.get("recovered_query_part_cells",0),

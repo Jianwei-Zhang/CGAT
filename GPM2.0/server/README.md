@@ -349,6 +349,15 @@ batch/thread/resource settings; calibration/review bounds are not job-wide RAM
 or runtime promises. Automatic choices are local to the current input and do not
 overwrite the prepared filter default.
 
+Assignment checks use the project's actual `--score`, including non-default
+thresholds, rather than assuming 60%. These checks limit observed changes; they
+do not establish biological accuracy or predict the full assembly's speedup.
+Each newly published reference PAF has an output-hash-bound
+`result.alignment.json` companion recording the policy and actual source options.
+Full and no-FASTA delivery packages retain these records in
+`metadata/alignment_provenance.json`, without copying private logs or caches.
+Legacy results without a companion remain supported; no policy is invented for them.
+
 For a stopped workspace, `bash "$SERVER/run.sh" -o ./gpm_server -K 500M`
 changes the batch size for unfinished work without rerunning valid completed alignments.
 Existing workspaces retain their prepared defaults; changing `-f` requires a new output directory.
@@ -419,9 +428,9 @@ for source records and evidence limits.
 
 ## DEGAP v2 in the shared Server environment
 
-The current source checkout includes the pinned DEGAP v2 runtime. This integration
-is not included in the currently published v2.0.19 packages; release packages and
-the docs website will be updated with the next release.
+The refreshed Server source includes the pinned DEGAP v2 runtime. The published
+v2.0.19 App installers are unchanged and do not include the new DEGAP task-card
+workflow described below; that workflow requires a compatible App build.
 
 A Server package built from this source includes the runtime. `bash server/install.sh`
 (from `GPM2.0/` in a repository checkout), or `bash install.sh` (from an extracted Server package),

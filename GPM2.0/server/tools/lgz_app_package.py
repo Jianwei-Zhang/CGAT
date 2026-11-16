@@ -355,6 +355,22 @@ def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, f
 # can render reference N gaps without needing the FASTA payload.
 OPTIONAL_METADATA = ("reference_segments.tsv", "annotation_library_snapshot.json")
 
+
+def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
+    """Keep optional execution policy, bound to the bytes actually delivered."""
+    limit = 64 * 1024 * 1024
+    if sidecar.is_symlink() or not sidecar.is_file() or sidecar.stat().st_size > limit:
+        raise ValueError("invalid/oversized alignment policy receipt")
+    with sidecar.open("rb") as handle:raw = handle.read(limit + 1)
+    if len(raw) > limit:raise ValueError("alignment policy receipt exceeded its size bound")
+    value = json.loads(raw)
+    if (not isinstance(value, dict) or value.get("schema") != 1 or value.get("status") != "complete"
+            or value.get("scope") != "initial_reference_asm10"
+            or not isinstance(value.get("policy"), str) or not value["policy"]
+            or value.get("output_sha256") != sha256_file(staged_paf)):
+        raise ValueError("alignment policy does not bind the delivered complete PAF")
+    return value
+
 def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
@@ -384,13 +400,22 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     project_package_table(source_root / "metadata/package.tsv", staging_root / "metadata/package.tsv", "full" if include_fasta else "no_fasta")
 
     copy_tree_filtered(source_root, staging_root, "data", include_fasta)
-    # Alignment views consume result.paf only.  Query/target FASTA, commands,
-    # logs, and tool caches are Server-only and intentionally omitted.
+    # Keep compact output-bound policy, not private commands/logs/tool caches.
+    # Legacy runs without a policy companion remain readable, not certified.
+    alignment_policies = []
     for result in sorted((source_root / "runs").rglob("result.paf")):
         relpath = result.relative_to(source_root)
         target = staging_root / relpath
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(result, target)
+        sidecar = result.with_suffix(".alignment.json")
+        if sidecar.exists() or sidecar.is_symlink():
+            alignment_policies.append({"result_paf": relpath.as_posix(),
+                                       "policy": delivered_alignment_policy(sidecar, target)})
+    if alignment_policies:
+        (staging_root / "metadata/alignment_provenance.json").write_text(json.dumps(
+            {"schema": 1, "scope": "recorded_initial_reference_alignments_only", "alignments": alignment_policies},
+            indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     copy_annotation_tree(source_root, staging_root, "tel")
     copy_annotation_tree(source_root, staging_root, "cen")
     if include_fasta and (source_root / "cen/library.fa").is_file():

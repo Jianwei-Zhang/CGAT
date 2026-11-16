@@ -321,6 +321,27 @@ class KeyMigrationTests(unittest.TestCase):
         self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
         self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
 
+    def test_reviewed_assignment_policy_upgrade_preserves_controller_only_stages(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_assignment_policy_runtime.json').read_text())
+        digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest(files),pr._REVIEWED_ORDINARY_CONTROLLER_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY}
+        runtime={**self.runtime,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY,
+                 'native_resume_source_profiles':[[pr._REVIEWED_ORDINARY_CONTROLLER_RUNTIME,digest(self.runtime['files_sha256'])]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        self.cache.data['stages'].pop('ordinary'); self.cache.save()
+        before=self.cache.data['stages'].copy()
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
+    def test_assignment_threshold_change_cannot_migrate_an_old_default_policy(self):
+        runtime={**self.runtime,'files_sha256':self.old_runtime['files_sha256']}
+        key={**self.make_key(runtime['sha256']),'assignment_coverage':.80}
+        attempt,reused=pr.select_attempt(self.run,key,runtime=runtime)
+        self.assertFalse(reused);self.assertNotEqual(attempt,self.attempt)
+        self.assertTrue(self.attempt.exists())
+
     def test_package_ordinary_toggle_is_not_metadata_only(self):
         previous={**self.old_runtime,'files_sha256':self.runtime['files_sha256'],'approximate_output_admission':sa.ap.POLICY}
         wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})

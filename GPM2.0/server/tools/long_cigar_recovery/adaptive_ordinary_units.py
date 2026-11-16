@@ -301,7 +301,7 @@ def compose_completed(root, records, index, selections):
 
 
 def review_plan(profile, workload_records, *, previously_reviewed=(), max_records=32,
-                max_base_fraction=.05):
+                max_base_fraction=.05, assignment_coverage=.60):
     """Finite full-record review allowance over the ORIGINAL ordinary workload.
 
     This is a budget reservation plan, not a quality verdict or a runtime
@@ -318,9 +318,10 @@ def review_plan(profile, workload_records, *, previously_reviewed=(), max_record
         raise ValueError("review ledger must name unique original ordinary records")
     if any(q not in lengths or r["length"] != lengths[q] for q, r in profile.items()):
         raise wa.ExperimentError("review profile differs from original workload")
-    if not profile or not pilot.quality.assess_loss(profile, profile)["passed"]:
+    limits = pilot.quality.assignment_limits(assignment_coverage)
+    if not profile or not pilot.quality.assess_loss(profile, profile, limits)["passed"]:
         raise wa.ExperimentError("complete native assignment evidence required")
-    limits = pilot.quality.Limits(); screened_rows = []
+    screened_rows = []
     for name, row in profile.items():
         assigned = pilot.quality.consumer_assignments(row, limits); reasons = []
         if not assigned:
@@ -356,7 +357,7 @@ def review_plan(profile, workload_records, *, previously_reviewed=(), max_record
             "native_baseline_compared": False, "whole_workload_quality_approved": False}
 
 
-def adopt_calibration(root, catalog, query, index, tool):
+def adopt_calibration(root, catalog, query, index, tool, *, assignment_coverage=.60):
     """Revalidate a completed calibration and KEEP its full default pilot data.
 
     The chosen filter applies to future records only. Both policies were already
@@ -367,6 +368,9 @@ def adopt_calibration(root, catalog, query, index, tool):
     catalog.require_unchanged()
     state = pr.read_json(Path(root) / pilot.STATE)
     identity = state["identity"]
+    limits = pilot.quality.assignment_limits(assignment_coverage)
+    if identity.get("assignment_coverage", .60) != limits.assignment_coverage:
+        raise wa.ExperimentError("completed calibration assignment threshold differs from current project")
     records = [{"name": r.name, "length": r.length} for r in catalog.records]
     plan = pilot.plan(identity["plan"]["reference_bases"], records, budget=pilot.Budget(**identity["budget"]))
     if plan != identity["plan"]:raise wa.ExperimentError("calibration does not describe this ordinary workload")
@@ -374,7 +378,7 @@ def adopt_calibration(root, catalog, query, index, tool):
     selected = query["identity"]["records"]
     if any(r["name"] not in full or (r["length"], r["sha256"]) != (full[r["name"]].length, full[r["name"]].sha256) for r in selected):
         raise wa.ExperimentError("pilot record content is not from this workload")
-    args = argparse.Namespace(threads=identity["threads"], memory_gib=identity["memory_gib"], minimap_batch=identity["batch"])
+    args = argparse.Namespace(threads=identity["threads"], memory_gib=identity["memory_gib"], minimap_batch=identity["batch"], assignment_coverage=limits.assignment_coverage)
     decision = pilot.execute(root, plan, query, index, tool, args, readonly=True)
     names = [r["name"] for r in plan["pilot_records"]]
     if [r["name"] for r in selected] != names or decision["status"] != "complete":

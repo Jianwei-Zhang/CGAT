@@ -106,10 +106,12 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
     mm = str(Path(executable).resolve())
     root.mkdir(mode=0o700, exist_ok=resume_identity is not None)
     cache = pr.Checkpoint(root, resume_identity)
+    assignment_limits = oc.pilot.quality.assignment_limits(getattr(args, "assignment_coverage", 0.60))
     report = {"schema": 1, "status": "running", "production_ready": False, "result_published": False,
               "routing_mode": "proactive_query_length", "partial_PAF_reused": False,
               "whole_input_failure_trial": False, "bisection": False, "singleton_assertion_replay": False,
               "parts": [], "publication_admission": "closed_pending_proactive_contract", "cache_reused": cache.reused}
+    report.update(oc.pilot.quality.assignment_identity(assignment_limits))
     try:
         catalog = pp.scan_query(args.query)
         plan = pp.make_plan(catalog)
@@ -120,6 +122,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
         if fraction is not None:
             policy["minimap_filter"] = mo.seed_fraction(fraction)
             report["minimap_filter"] = fraction
+        policy.update(oc.pilot.quality.assignment_identity(assignment_limits))
         cache.bind("policy", policy)
         tool = nf.source_identity(Path(mm))
         cache.bind("tool", tool)
@@ -387,7 +390,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                         wa.write_json(root / "proactive-candidate.json", report)
                     if approximate and any(r.get("kind") == ap.POLICY for r in report["parts"] if r["query"] == name):
                         sources = [(r["path"], r["sha256"]) for r in merger.sources if r["queries"] == [name]]
-                        screened = ap.screen_group(directory, name, queries[name]["length"], sources)
+                        screened = ap.screen_group(directory, name, queries[name]["length"], sources, assignment_coverage=assignment_limits.assignment_coverage)
                         report["projection_screening"].append(screened)
                         wa.write_json(root / "proactive-candidate.json", report)
                         if not screened["approved"]:

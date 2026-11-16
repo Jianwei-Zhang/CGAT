@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import shutil
 import sys
@@ -68,6 +69,41 @@ class GrtAppPackageTests(unittest.TestCase):
         self.assertEqual(final_path["chromosomes"][0]["display_evidence"], [])
         self.assertEqual(no_fasta_final_path, final_path)
         self.assertEqual(no_fasta_manifest["final_path_sha256"], manifest["final_path_sha256"])
+
+    def test_full_and_light_delivery_keep_output_bound_alignment_policy(self):
+        paf=next((self.source/"runs").rglob("result.paf"))
+        receipt={"schema":1,"status":"complete","scope":"initial_reference_asm10",
+                 "policy":"automatic-ordinary-controller-v1","ordinary_selected_filter":"0.005",
+                 "output_sha256":hashlib.sha256(paf.read_bytes()).hexdigest()}
+        paf.with_suffix(".alignment.json").write_text(json.dumps(receipt))
+        for full in (True,False):
+            target=self.root/("full-policy" if full else "light-policy")
+            grt_app_package.build(self.source,target,include_fasta=full)
+            delivered=json.loads((target/"metadata/alignment_provenance.json").read_text())
+            self.assertEqual(delivered["scope"],"recorded_initial_reference_alignments_only")
+            self.assertEqual(delivered["alignments"],[{"result_paf":paf.relative_to(self.source).as_posix(),"policy":receipt}])
+            self.assertEqual((target/paf.relative_to(self.source)).read_bytes(),paf.read_bytes())
+            self.assertFalse(any(path.name=="native-attempt.json" for path in target.rglob("*")))
+
+    def test_stale_or_failed_alignment_policy_refuses_delivery(self):
+        paf=next((self.source/"runs").rglob("result.paf"))
+        for changed in ({"output_sha256":"0"*64},{"status":"failed"}):
+            receipt={"schema":1,"status":"complete","scope":"initial_reference_asm10","policy":"native_complete_unchanged",
+                     "output_sha256":hashlib.sha256(paf.read_bytes()).hexdigest(),**changed}
+            paf.with_suffix(".alignment.json").write_text(json.dumps(receipt))
+            with self.assertRaisesRegex(ValueError,"does not bind"):
+                grt_app_package.build(self.source,self.root/"stale-policy",include_fasta=False)
+
+    def test_linked_alignment_policy_is_not_followed(self):
+        paf=next((self.source/"runs").rglob("result.paf"));external=self.root/"external-policy.json";external.write_text("{}")
+        paf.with_suffix(".alignment.json").symlink_to(external)
+        with self.assertRaisesRegex(ValueError,"invalid/oversized"):
+            grt_app_package.build(self.source,self.root/"linked-policy",include_fasta=False)
+        self.assertEqual(external.read_text(),"{}")
+
+    def test_legacy_delivery_without_policy_remains_compatible(self):
+        target=self.root/"legacy-policy";grt_app_package.build(self.source,target,include_fasta=False)
+        self.assertFalse((target/"metadata/alignment_provenance.json").exists())
 
     def _write_display_evidence_fixture(self):
         root = self.root / "evidence-source"

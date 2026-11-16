@@ -1424,3 +1424,53 @@ but omits Server caches/logs), then close the official Server-only source refres
 and fresh-download checks. Policy currently remains in the Server evidence, but
 must not disappear when automatic sensitivity changes are delivered to a user.
 No full customer assembly or full native-baseline sweep has been launched.
+
+
+### Prepared assignment threshold and delivered policy (2026-11-17)
+
+The quality policy now follows the actual `chr_assignment_min_coverage_percent`
+consumed from `metadata/package.tsv`. Old workspaces without prepare-options
+metadata therefore retain their real threshold. Conflicting package/prepare
+values are rejected, not silently interpreted as 60%. Pilot comparisons, ordinary
+risk selection/default review, window screening and read-only publication all
+receive the same threshold. A targeted 81%-to-79% qualified-support case shows why
+this matters: the change passes the default 60% check but loses an assignment at
+80%, so the completed default source must be retained. No new user switch is needed.
+
+Non-default thresholds are bound into continuation identities. Default 60% keeps
+its previous identity. A real local old-runtime-to-new-runtime test used frozen
+`0e421bd` sources to create a completed mixed ordinary/window result, then reopened
+it with the new sources while forbidding native/index/window execution. It reused
+the same attempt, made zero new mapping/index calls, and retained byte-identical
+PAF output while creating the new policy companion. Source-profile transition:
+`79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69` ->
+`afbe9f6fd32ec4a96bdd8cfd2b7d87b8db562c6d52e908ee8eddce20989a076d`.
+The synthetic mixed PAF SHA-256 was
+`4bd56a132f0a8945bc8f1b0b26451141be065eba9944165dd234af38f468ffcd`.
+
+Newly published results carry `result.alignment.json`, bound to the admitted
+output SHA-256. It records the actual native source options, retained/default
+sources, window policy and prepared assignment score without absolute Server
+paths. Both full and no-FASTA delivery copy these receipts into
+`metadata/alignment_provenance.json`; private caches/logs remain excluded. Legacy
+results without a companion remain exportable, with no invented provenance.
+Stale output hashes, failed receipts and linked companions are refused. This
+closes the delivery-record gap described above; it is not a biological-accuracy
+certificate and does not add an App UI claim.
+
+The full local alignment regression ran 794 tests in 293.929 s, with one optional
+source-oracle skip and all remaining tests passing. ARM prepared-entry job
+`42097606` SUCCEEDED on ARM-41 (05:22:04--05:22:23 CST). All 13 tests passed without
+skips or a native companion, including the non-default 80% mixed-input path and
+zero-remapping resume. Test runner: 13.452 s; driver: 14.426 s. The downloaded
+report's source hashes match the frozen local payload, SHA-256
+`19d98f65d7b65d7430cf8cb41991da89a9a7fb11d1c509e6fc4e88af2cd23812`.
+These are scaled correctness tests with real native commands and synthetic
+calibration timings, NOT a new wheat performance measurement. No full customer
+assembly or full native-baseline sweep was launched.
+
+The earlier Quality CI run `43953226893` failed only the prepare-help wording
+assertion (`may change alignments`); that wording and its automatic-calibration
+explanation now have regression coverage. Final revision CI, official Server-only
+source refresh, fresh public download and formal docs/mirror closure are still
+required; none is implied by these local/ARM checks.

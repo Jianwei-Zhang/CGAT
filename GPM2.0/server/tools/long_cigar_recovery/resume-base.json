@@ -75,7 +75,7 @@
         "tools/grt_step2.py": "633d99951d3c55636add06c0be7d79cf0b74984ea2c0b05925ba9198322127a8",
         "tools/grt_step3.py": "633d99951d3c55636add06c0be7d79cf0b74984ea2c0b05925ba9198322127a8",
         "tools/grt_telomere_finalize.py": "633d99951d3c55636add06c0be7d79cf0b74984ea2c0b05925ba9198322127a8",
-        "tools/lgz_app_package.py": "4e0167e3ff49843421ab2294089c29f41eb36e36a105680683849d0cc5c33581",
+        "tools/lgz_app_package.py": "fc0b1d170e6027d2043e90a7c72b5a2db0648049d1714689045a84e3d2daab23",
         "tools/lgz_compat.py": "dc1adbe77f3743ddec7d3b30fff551715fa6617849abd8710a5913c6e79e2716",
         "tools/lgz_contract.py": "37100a35cd2465db2704a391372a041c8e40e5100497811f7f1db2a01164df21",
         "tools/lgz_core/__init__.py": "b2982d75955db5cf54499ce0404ccfba4db31d6d8903c0d26d12b63ecf8a058e",
@@ -134,7 +134,7 @@
       "reference_launch_checkpoint_recipe_equal": true
     }
   ],
-  "base_prepare_sha256": "c79e0fabc78bfb49fe8177786a1d815071a45944a8a5df21dfb8b67a09aef332",
+  "base_prepare_sha256": "1461bfcca1b3e71299b6d2640848f57ecfce7b826b7902527e42b1f1f27f375f",
   "source_revision": {
     "worktree_source_bound_by_file_hashes": true
   }

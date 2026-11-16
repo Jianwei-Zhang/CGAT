@@ -12,6 +12,9 @@ from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 import math
+import csv
+from pathlib import Path
+import re
 
 POLICY = "adaptive-screening-v4"
 LONG_QUERY_LIMIT = (1 << 28) - 1
@@ -27,6 +30,49 @@ class Limits:
     assignment_coverage: float = 0.60
     assignment_margin: float = 0.10
     maximum_anchor_spread_fraction: float = 0.20
+
+
+def assignment_limits(coverage=0.60):
+    """Use the prepared downstream assignment threshold, not a fixed default."""
+    if type(coverage) not in (int, float) or not math.isfinite(coverage) or not 0 <= coverage <= 1:
+        raise ValueError("assignment coverage must be a finite fraction from 0 to 1")
+    return Limits(assignment_coverage=coverage)
+
+
+def assignment_identity(limits):
+    # Legacy completed default-60% work retains its exact scientific identity.
+    return {} if limits.assignment_coverage == 0.60 else {"assignment_coverage": limits.assignment_coverage}
+
+
+def prepared_assignment_coverage(root):
+    """Read the same package score as assign_chr_groups, including legacy jobs."""
+    def read_rows(name):
+        path = Path(root) / "metadata" / name
+        if not path.exists() and not path.is_symlink():
+            return None
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024**2:
+            raise ValueError("invalid prepared assignment settings: " + name)
+        with path.open(newline="", encoding="utf-8") as stream:
+            return list(csv.DictReader(stream, delimiter="\t"))
+
+    def score(values):
+        if (len(values) != 1 or not isinstance(values[0], str)
+                or not re.fullmatch(r"[0-9]+(?:[.][0-9]+)?", values[0], flags=re.ASCII)
+                or not 0 <= float(values[0]) <= 100):
+            raise ValueError("invalid prepared --score; expected one percentage from 0 to 100")
+        return assignment_limits(float(values[0]) / 100).assignment_coverage
+
+    key = "chr_assignment_min_coverage_percent"
+    package = read_rows("package.tsv")
+    options = read_rows("prepare_options.tsv")
+    option_scores = [r.get("value") for r in options or [] if r.get("key") == key]
+    option_score = score(option_scores) if option_scores else None
+    if package is not None:
+        package_score = score([r.get(key) for r in package])
+        if option_score is not None and package_score != option_score:
+            raise ValueError("prepared assignment threshold differs between package and options")
+        return package_score
+    return .60 if option_score is None else option_score
 
 
 def screening_gate(reference_bases, records, limits=Limits()):

@@ -247,7 +247,8 @@ def execute(root, pilot_plan, query, index, tool, args, *, readonly=False):
             != [(r["name"], r["length"], r["sha256"]) for r in query["identity"]["records"]]):
         raise wa.ExperimentError("pilot complete-record content changed")
     batch = mo.batch_size(getattr(args, "minimap_batch", None) or "1G")
-    identity = {"policy": POLICY, "query_sha256": query["sha256"], "index_sha256": index["sha256"],
+    limits = quality.assignment_limits(getattr(args, "assignment_coverage", 0.60))
+    identity = {**quality.assignment_identity(limits), "policy": POLICY, "query_sha256": query["sha256"], "index_sha256": index["sha256"],
                 "tool_sha256": tool["sha256"], "threads": args.threads, "batch": batch,
                 "memory_gib": args.memory_gib, "budget": asdict(budget), "plan": pilot_plan,
                 "mapping_sources": {Path(m.__file__).name: wa.sha256(Path(m.__file__)) for m in (nf, wa, mo)}}
@@ -354,7 +355,7 @@ def execute(root, pilot_plan, query, index, tool, args, *, readonly=False):
                 entry["reason"] = "candidate_incomplete"; continue
             speed0 = baseline["wall_seconds"] / first["wall_seconds"]
             entry["first_speedup"] = speed0
-            review = quality.plan_completed_record_review(baseline["profile"], first["profile"])
+            review = quality.plan_completed_record_review(baseline["profile"], first["profile"], limits)
             fallback = [r["query"] for r in review["queries"] if r["source"] == "baseline"]
             lengths = quality.record_lengths(records)
             fallback_bases = sum(lengths[q] for q in fallback)

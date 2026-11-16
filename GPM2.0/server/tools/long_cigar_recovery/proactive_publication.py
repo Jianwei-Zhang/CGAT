@@ -159,7 +159,7 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
             controller_root = rp.regular_under(root / "ordinary-adaptive" / oc.STATE, root).parent
             saved = oc.pr.read_json(controller_root / oc.STATE)
             current = oc.execute(controller_root, current_catalog, {**index, "path": str(root / "target.default.mmi")},
-                report["tool"], argparse.Namespace(threads=1, memory_gib=0, minimap_batch="1G"), readonly=True,
+                report["tool"], argparse.Namespace(threads=1, memory_gib=0, minimap_batch="1G", assignment_coverage=report.get("assignment_coverage", 0.60)), readonly=True,
                 unit_bases=saved["identity"]["plan"]["unit_bases"], primary_work=True, unit_seconds=None)
             reported = report["ordinary_adaptive"]
             # Reuse/cumulative-reservation diagnostics naturally differ on
@@ -274,7 +274,7 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
                     "whole-query screening lost its all-part sources")
             length = next(r["length"] for r in records if r["name"] == row["query"])
             profile = screening.coverage_profile(source, [{"name": row["query"], "length": length}])
-            current = screening.screen_candidate_projection(profile)
+            current = screening.screen_candidate_projection(profile, screening.assignment_limits(report.get("assignment_coverage", 0.60)))
             require(profile == row["profile"] and current == row["screening"] and row["approved"] is True
                     and all(r["action"] == "no_obvious_assignment_risk" for r in current["queries"]),
                     "approximate whole-query risk is unresolved")

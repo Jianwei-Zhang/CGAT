@@ -71,6 +71,40 @@ class AutomaticOrdinaryServerTests(unittest.TestCase):
         stack.enter_context(patch.object(oc.pilot,"_verify_case",side_effect=timing))
         return stack
 
+    def test_prepared_score_80_reaches_pilot_review_windows_publication_and_delivery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime,args=self.fixture(Path(directory),mixed=True,weak=True)
+            (args.server_dir/"metadata/prepare_options.tsv").write_text(
+                "key\tvalue\nchr_assignment_min_coverage_percent\t80\n")
+            (args.server_dir/"metadata/package.tsv").write_text("chr_assignment_min_coverage_percent\n80\n")
+            quality=oc.pilot.quality
+            with self.controls(), patch.object(quality,"plan_completed_record_review",wraps=quality.plan_completed_record_review) as pilot_review, \
+                    patch.object(oc.units,"review_plan",wraps=oc.units.review_plan) as unit_review, \
+                    patch.object(quality,"screen_candidate_projection",wraps=quality.screen_candidate_projection) as window_review:
+                result=sa.run_reference(args,runtime_root=runtime)
+            self.assertTrue(result["result_published"])
+            self.assertTrue(pilot_review.call_count)
+            self.assertTrue(unit_review.call_count)
+            self.assertTrue(window_review.call_count)
+            self.assertTrue(all(c.args[2].assignment_coverage == .80 for c in pilot_review.call_args_list))
+            self.assertTrue(all(c.kwargs["assignment_coverage"] == .80 for c in unit_review.call_args_list))
+            self.assertTrue(all(c.args[1].assignment_coverage == .80 for c in window_review.call_args_list))
+            root=Path(result["attempt"])/"selective"
+            candidate=pr.read_json(root/"proactive-candidate.json")
+            self.assertEqual(candidate["assignment_coverage"], .80)
+            self.assertEqual(candidate["ordinary_adaptive"]["identity"]["assignment_coverage"], .80)
+            pilot=pr.read_json(root/"ordinary-adaptive/calibration"/oc.pilot.STATE)
+            self.assertEqual(pilot["identity"]["assignment_coverage"], .80)
+            receipt=pr.read_json(args.run_dir/"result.alignment.json")
+            self.assertEqual(receipt["chr_assignment_min_coverage_percent"], 80)
+            self.assertEqual({r["query"] for r in receipt["window_sources"]}, {"long1", "long2"})
+            self.assertTrue(all(r["policy"]["core_bases"] == 20000 for r in receipt["window_sources"]))
+            self.assertNotIn(directory, json.dumps(receipt))
+            with self.controls(), patch.object(nf,"attempt",side_effect=AssertionError("score resume remapped")), \
+                    patch.object(wa,"run_command",side_effect=AssertionError("score resume remapped windows")):
+                resumed=sa.run_reference(args,runtime_root=runtime)
+            self.assertTrue(resumed["result_published"])
+
     def test_prepared_ordinary_entry_filters_reviews_publishes_and_resumes_without_mapper(self):
         with tempfile.TemporaryDirectory() as directory:
             runtime,args=self.fixture(Path(directory),weak=True)
@@ -87,11 +121,21 @@ class AutomaticOrdinaryServerTests(unittest.TestCase):
             self.assertEqual(report["combination"]["rows_by_query"]["q35"],0)
             self.assertFalse((root/"ordinary-native").exists())
             output=(args.run_dir/"result.paf").read_bytes()
+            policy_path=args.run_dir/"result.alignment.json";policy_before=policy_path.read_bytes()
+            policy=json.loads(policy_before)
+            self.assertEqual(policy["output_sha256"],wa.sha256(args.run_dir/"result.paf"))
+            self.assertEqual(policy["ordinary_selected_filter"],"0.005")
+            selections=policy["native_sources"]
+            self.assertEqual(len([q for source in selections for q in source["queries"]]),40)
+            self.assertEqual(next(source for source in selections if "q35" in source["queries"])["options"]["minimizer_filter_argument"],None)
+            self.assertNotIn(str(Path(directory)),policy_path.read_text())
             args.threads=2
             with self.controls(),patch.object(wa,"run_command",side_effect=AssertionError("complete automatic work remapped")):
                 resumed=sa.run_reference(args,runtime_root=runtime)
             self.assertTrue(resumed["attempt_reused"])
             self.assertEqual((args.run_dir/"result.paf").read_bytes(),output)
+            self.assertEqual(Path(resumed["previous_result"]["path"]).with_suffix(".alignment.json").read_bytes(),policy_before)
+            self.assertTrue(all(source["options"]["threads"]=="1" for source in json.loads(policy_path.read_text())["native_sources"]))
 
     def test_mixed_ordinary_and_long_routes_keep_complete_matrix_and_default_threshold(self):
         with tempfile.TemporaryDirectory() as directory:

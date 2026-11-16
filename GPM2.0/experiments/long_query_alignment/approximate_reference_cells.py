@@ -251,7 +251,7 @@ def run(root, query, target, tool, part, args):
     return verify(root, expected, tool, part)
 
 
-def screen_group(root, name, length, sources):
+def screen_group(root, name, length, sources, *, assignment_coverage=0.60):
     """Combine ALL original parts of one query before checking assignment risk."""
     import adaptive_screening as policy
     root = Path(root)
@@ -277,7 +277,7 @@ def screen_group(root, name, length, sources):
         previous = {"sources": expected, "sha256": wa.sha256(path)}
         wa.write_json(marker, previous)
     profile = policy.coverage_profile(path, [{"name": name, "length": length}])
-    result = policy.screen_candidate_projection(profile)
+    result = policy.screen_candidate_projection(profile, policy.assignment_limits(assignment_coverage))
     return {"query": name, "path": str(path), **previous, "profile": profile,
             "screening": result, "approved": all(r["action"] == "no_obvious_assignment_risk" for r in result["queries"]),
             "native_baseline_compared": False, "native_confidence_reconstructed": False}

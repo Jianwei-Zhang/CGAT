@@ -46,6 +46,20 @@ class ControllerTests(unittest.TestCase):
         cat, index, tool, args, budget = inputs
         return controller.execute(target, cat, index, tool, args, budget=budget, unit_bases=450000, **kwargs)
 
+    def test_changed_assignment_threshold_refuses_before_mapping_in_both_directions(self):
+        for initial, changed in ((.60,.80), (.80,.60)):
+            with self.subTest(initial=initial), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory); inputs=self.fixture(root); target=root/"controller"
+                inputs[3].assignment_coverage=initial
+                result=self.execute(target,inputs)
+                self.assertEqual(result["identity"].get("assignment_coverage",.60),initial)
+                snapshot=(target/controller.STATE).read_bytes()
+                inputs[3].assignment_coverage=changed
+                with patch.object(nf,"attempt",side_effect=AssertionError("policy change remapped")):
+                    with self.assertRaisesRegex(wa.ExperimentError,"policy changed before calibration"):
+                        self.execute(target,inputs)
+                self.assertEqual((target/controller.STATE).read_bytes(),snapshot)
+
     def test_small_workload_and_explicit_user_filter_never_start_calibration(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); inputs=self.fixture(root); cat,index,tool,args,budget=inputs

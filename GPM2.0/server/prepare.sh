@@ -82,7 +82,7 @@ Behavior:
   - Uses Minimap2 for reference/pairwise alignments; MUMmer --maxmatch for cen repeats
   - Supports --minimap-preset, default: asm10
   - Initial-reference mapping: -K/--minimap-batch defaults to 1G; try 500M if memory is insufficient (not a RAM limit)
-  - Explicit -f/--minimap-filter 0.01 preserves the chosen filter and bypasses automatic calibration; alignments may change
+  - Explicit -f/--minimap-filter 0.01 preserves the chosen filter and bypasses automatic calibration; may change alignments
   - Without -f, eligible large initial-reference asm10 tasks use bounded internal calibration; other inputs keep preset filtering
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget

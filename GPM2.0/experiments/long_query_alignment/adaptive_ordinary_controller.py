@@ -44,6 +44,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
         raise ValueError("positive ordinary unit timeout required outside primary work")
     budget = automatic_budget() if budget is None else budget
     budget.checked(); catalog.require_unchanged()
+    limits = pilot.quality.assignment_limits(getattr(args, "assignment_coverage", .60))
     def progress(message):
         if not readonly and getattr(args, "report_progress", False):
             print("CGAT automatic ordinary: " + message, file=sys.stderr, flush=True)
@@ -72,14 +73,15 @@ def execute(root, catalog, index, tool, args, *, budget=None,
     bindings = [{"ordinal": number, "root": str(Path(binding["root"]).resolve()),
                  "query_path": binding["query"]["path"], "query_sha256": binding["query"]["sha256"]}
                 for number, binding in sorted(completed_units.items())]
-    admission = {"source_sha256": catalog.source_sha256, "index_sha256": index["sha256"],
+    admission = {**pilot.quality.assignment_identity(limits), "source_sha256": catalog.source_sha256, "index_sha256": index["sha256"],
                  "tool_sha256": tool["sha256"], "budget": asdict(budget),
                  "calibration_root": str(calibration_root.resolve()), "completed_unit_bindings": bindings}
     # Reject a changed continuation BEFORE any new calibration command, even
     # when an external completed-pilot/unit binding was accidentally omitted.
     if (root / STATE).exists():
         previous = pr.read_json(root / STATE).get("identity", {})
-        if (any(previous.get(k) != v for k, v in admission.items())
+        if (previous.get("assignment_coverage", .60) != limits.assignment_coverage
+                or any(previous.get(k) != v for k, v in admission.items())
                 or previous.get("plan", {}).get("unit_bases") != unit_bases
                 or external and previous.get("pilot_query_sha256") != calibration_query["sha256"]):
             raise wa.ExperimentError("ordinary controller source/policy changed before calibration")
@@ -99,7 +101,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
             return {"status": "calibration_incomplete", "decision": decision, "output_published": False}
     if pr.read_json(calibration_root / pilot.STATE)["identity"]["plan"] != plan:
         raise wa.ExperimentError("calibration plan/budget differs from controller admission")
-    adopted = units.adopt_calibration(calibration_root, catalog, calibration_query, index, tool)
+    adopted = units.adopt_calibration(calibration_root, catalog, calibration_query, index, tool, assignment_coverage=limits.assignment_coverage)
     if adopted["decision"].get("input_binding") != [{"path": calibration_query["path"], "sha256": calibration_query["sha256"]},
             {"path": index["path"], "sha256": index["sha256"]}, {"path": tool["path"], "sha256": tool["sha256"]}]:
         raise wa.ExperimentError("calibration source binding changed")
@@ -175,7 +177,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
             state["completed_units"].append({"ordinal": unit["ordinal"], "default": True}); save(); continue
         review = units.review_plan(result["source"]["profile"], work["ordinary_records"],
             previously_reviewed=list(state["reviews"]), max_records=budget.review_records,
-            max_base_fraction=budget.review_fraction)
+            max_base_fraction=budget.review_fraction, assignment_coverage=limits.assignment_coverage)
         budget_stop = ("cumulative_review_count_or_bases_exceeded"
                        if review["action"] == "stop_filtered_continuation" else None)
         # Never add a native baseline block to filtered blocks for one query.
@@ -219,7 +221,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
                     timeout=previous["timeout_seconds"], retry_incomplete=False, readonly=readonly)
                 if previous["status"] == "complete" and previous["charged_seconds"] < baseline["source"]["wall_seconds"]:
                     raise wa.ExperimentError("completed default review cost was understated")
-                loss = pilot.quality.assess_loss(baseline["source"]["profile"], {name: result["source"]["profile"][name]})
+                loss = pilot.quality.assess_loss(baseline["source"]["profile"], {name: result["source"]["profile"][name]}, limits)
                 if previous["status"] != "complete" and not baseline["reused"]:
                     previous["charged_seconds"] = max(time.monotonic() - started, baseline["source"]["wall_seconds"])
                 previous.update(status="complete", source_sha256=baseline["source"]["sha256"],

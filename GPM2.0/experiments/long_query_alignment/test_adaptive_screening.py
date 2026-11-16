@@ -25,6 +25,52 @@ def measurement(outcome="completed", wall=100, mid=500):
 
 
 class AdaptiveScreeningTests(unittest.TestCase):
+    def test_actual_assignment_threshold_detects_loss_default_60_misses(self):
+        before, after = row(), row()
+        before["assignment_candidates"]["chr1"]["covered"] = 81
+        after["assignment_candidates"]["chr1"]["covered"] = 79
+        self.assertTrue(policy.assess_loss({"q": before}, {"q": after})["passed"])
+        limits = policy.assignment_limits(.80)
+        loss = policy.assess_loss({"q": before}, {"q": after}, limits)
+        self.assertIn("downstream_assignment_removed", loss["reasons"])
+        review = policy.plan_completed_record_review({"q": before}, {"q": after}, limits)
+        self.assertEqual(review["queries"][0]["source"], "baseline")
+
+    def test_actual_downstream_package_score_is_used_for_legacy_project(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); (root/"metadata").mkdir()
+            package=root/"metadata/package.tsv"
+            package.write_text("chr_assignment_min_coverage_percent\n80\n")
+            self.assertEqual(policy.prepared_assignment_coverage(root), .80)
+            options=root/"metadata/prepare_options.tsv"
+            options.write_text("key\tvalue\nminimap_batch\t1G\n")
+            self.assertEqual(policy.prepared_assignment_coverage(root), .80)
+            options.write_text("key\tvalue\nchr_assignment_min_coverage_percent\t60\n")
+            with self.assertRaisesRegex(ValueError,"differs between"):
+                policy.prepared_assignment_coverage(root)
+            options.unlink()
+            for invalid in ("chr_assignment_min_coverage_percent\n80\n60\n", "wrong\n80\n"):
+                package.write_text(invalid)
+                with self.assertRaises(ValueError):policy.prepared_assignment_coverage(root)
+
+    def test_prepared_score_matches_prepare_percentage_contract_and_legacy_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(policy.prepared_assignment_coverage(root), .60)
+            (root / "metadata").mkdir()
+            path = root / "metadata/prepare_options.tsv"
+            for value, expected in (("0", 0), ("60.00", .60), ("80", .80), ("99.5", .995), ("100", 1)):
+                path.write_text("key\tvalue\nchr_assignment_min_coverage_percent\t" + value + "\n")
+                self.assertEqual(policy.prepared_assignment_coverage(root), expected)
+            for value in ("-1", "101", "nan", "inf", "0.8e2", "", "80\nchr_assignment_min_coverage_percent\t60"):
+                path.write_text("key\tvalue\nchr_assignment_min_coverage_percent\t" + value + "\n")
+                with self.assertRaises(ValueError):policy.prepared_assignment_coverage(root)
+            path.unlink(); path.symlink_to(root / "missing")
+            with self.assertRaises(ValueError):policy.prepared_assignment_coverage(root)
+        self.assertEqual(policy.assignment_identity(policy.assignment_limits()), {})
+        for value in (True, "0.8", -1, 1.1, float("nan"), float("inf")):
+            with self.assertRaises(ValueError):policy.assignment_limits(value)
+
     def test_size_only_requests_pilot_not_lower_sensitivity(self):
         r = policy.screening_gate(14_467_938_249, [{"name": "q", "length": 289_508_469}])
         self.assertEqual(r["action"], "bounded_pilot")
