@@ -276,6 +276,9 @@ def build_ref_evidence(
             key=lambda hit: (
                 -int(hit["block_length"]),
                 -int(hit["matches"]),
+                # PAF 255 means unavailable, not greater confidence than 60
+                # (or a known zero). Preserve the raw field and geometry.
+                int(hit["mapq"]) == 255,
                 -int(hit["mapq"]),
                 int(hit["target_start"]),
                 int(hit["line_number"]),

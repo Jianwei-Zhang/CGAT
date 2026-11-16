@@ -117,6 +117,40 @@ class GrtEvidencePackageTests(unittest.TestCase):
                         else "reference_paf",
                     )
 
+    def test_unknown_paf_mapq_never_wins_a_confidence_tie(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = prepare_fixture.GrtPrepareInputsTests(
+                "test_no_reads_builds_traceable_q0_and_frozen_global_donors"
+            ).make_server(root)
+            dataset = next(row for row in prepare_fixture.read_tsv(server / "metadata/datasets.tsv")
+                           if row["dataset_name"] == "support")
+            reference = prepare_fixture.read_tsv(server / "metadata/reference.tsv")[0]
+            paf_path = server / "runs/support_vs_ref/result.paf"
+            card = {"dataset_name": "support", "contig_name": "s_assigned", "target_chr": "Chr01",
+                    "original_assignment": "assigned", "orientation": "+",
+                    "source_card_key": "support:s_assigned:Chr01:normal", "grt_anchor": 777}
+
+            def hit(start, mapq, length=1500):
+                return (f"s_assigned\t1500\t0\t{length}\t+\tChr01\t5000\t{start}\t{start+length}"
+                        f"\t{length}\t{length}\t{mapq}\n")
+
+            cases = []
+            for known in (0, 60):
+                for reverse in (False, True):
+                    rows = [hit(100, 255), hit(3000, known)]
+                    cases.append((f"known-{known}-reverse-{reverse}", "".join(rows[::-1] if reverse else rows), 3001))
+            # Unknown confidence does not discard the alignment or override
+            # the existing block-length/match priority and coordinate ties.
+            cases += [("both-unknown", hit(3000, 255) + hit(100, 255), 101),
+                      ("longer-unknown", hit(100, 255) + hit(3000, 60, 1499), 101)]
+            for name, text, expected_anchor in cases:
+                with self.subTest(name=name):
+                    paf_path.write_text(text, encoding="utf-8")
+                    _, _, anchor = build_ref_evidence(server, card, "T" * 1500, dataset, reference)
+                    self.assertEqual(anchor, expected_anchor)
+                    self.assertEqual(paf_path.read_text(encoding="utf-8"), text)
+
     def write_executable(self, path: Path, source: str) -> Path:
         path.write_text(source, encoding="utf-8", newline="")
         path.chmod(0o755)
