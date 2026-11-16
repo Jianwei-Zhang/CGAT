@@ -132,8 +132,9 @@
 .assembly-navigation-label { flex: 0 0 auto; white-space: nowrap; color: var(--text-secondary); }
 .assembly-navigation .shell-select { flex: 0 1 auto; width: auto; max-width: var(--assembly-picker-max); }
 .assembly-navigation .shell-select-toggle { width: max-content; min-width: min(var(--assembly-picker-min), 100%); max-width: 100%; height: 32px; }
-.assembly-navigation .shell-select-menu { width: max-content; min-width: min(260px, calc(100vw - 32px)); max-width: min(520px, calc(100vw - 32px)); max-height: min(420px, 65dvh); overflow-y: auto; z-index: 100; }
-.assembly-navigation-project .shell-select-menu { min-width: min(340px, calc(100vw - 32px)); }
+/* Size the popup from its longest option, not a fixed minimum by picker type.
+   The trigger is the floor; long paths/names wrap at the viewport-aware cap. */
+.assembly-navigation .shell-select-menu { box-sizing: border-box; width: max-content; min-width: 100%; max-width: min(520px, calc(100vw - 32px)); max-height: min(420px, 65dvh); overflow-y: auto; z-index: 100; }
 .assembly-navigation-chr .shell-select-menu { left: auto; right: 0; }
 .assembly-navigation .assembly-track-combo-option { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; white-space: normal; overflow-wrap: anywhere; }
 .shell-select-option-description { font-size: var(--font-small); color: var(--text-muted); font-weight: 400; }

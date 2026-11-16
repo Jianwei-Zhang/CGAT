@@ -189,3 +189,44 @@ test("bounded shell menus stay in a narrow viewport, track scroll and clear fixe
   h.combo.emit("keydown", { key: "Escape" });
   assert.equal(h.menu.style.position, ""); assert.equal(h.menu.style.width, "");
 });
+
+
+test("assembly popup CSS sizes all three scopes by content, with only the trigger as a width floor", () => {
+  const css = readFileSync(new URL("../../../styles/shell.css", import.meta.url), "utf8");
+  const rules = [...css.replace(/\/\*[^]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+  const popupRules = rules.filter(([, selectors]) => selectors.includes("assembly-navigation") && selectors.includes(".shell-select-menu"));
+  const sizing = popupRules.find(([, selectors]) => selectors.trim() === ".assembly-navigation .shell-select-menu");
+  assert.ok(sizing);
+  assert.match(sizing[2], /box-sizing: border-box/);
+  assert.match(sizing[2], /width: max-content/);
+  assert.match(sizing[2], /min-width: 100%/);
+  assert.match(sizing[2], /max-width: min\(520px, calc\(100vw - 32px\)\)/);
+  assert.match(sizing[2], /overflow-y: auto/);
+  for (const [, , declarations] of popupRules) {
+    assert.doesNotMatch(declarations, /min-width:.*(?:260|340)px/);
+  }
+  assert.equal(popupRules.filter(([, , declarations]) => /min-width:/.test(declarations)).length, 1,
+    "project and chromosome popups must not reintroduce oversized minimum widths");
+});
+
+for (const [scope, contentWidth] of [["partition", 130], ["project", 290], ["chr", 175]]) {
+  test(`${scope} bounded popup preserves compact content width and remeasures after closing`, () => {
+    const h = fixture({ bounded: true });
+    Object.assign(h.doc.defaultView, { innerWidth: 1200, innerHeight: 800 });
+    h.toggle.getBoundingClientRect = () => ({ left: 800, right: 880, top: 40, bottom: 72 });
+    let naturalWidth = contentWidth;
+    h.menu.getBoundingClientRect = () => ({ width: parseFloat(h.menu.style.width) || naturalWidth, height: 180 });
+    h.menu.scrollHeight = 180;
+    h.toggle.emit("click");
+    assert.equal(h.menu.style.width, `${contentWidth}px`, "positioning must not inflate a compact CSS measurement");
+    assert.equal(h.menu.style.left, "800px");
+    h.combo.emit("keydown", { key: "Escape" });
+    naturalWidth = 400;
+    h.toggle.emit("click");
+    assert.equal(h.menu.style.width, "400px", "new/translated longer options can expand the popup");
+    h.combo.emit("keydown", { key: "Escape" });
+    naturalWidth = contentWidth;
+    h.toggle.emit("click");
+    assert.equal(h.menu.style.width, `${contentWidth}px`, "shorter content must not retain the previous width");
+  });
+}
