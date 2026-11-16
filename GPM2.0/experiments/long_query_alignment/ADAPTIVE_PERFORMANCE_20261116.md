@@ -1061,13 +1061,13 @@ Current quality profiles are recomputed from completed PAFs rather than trusted
 from a stale decision cache. No synthetic full-native receipt is manufactured
 for the selected composite.
 
-Validation: 21 targeted controls pass, including actual pinned-tool completion,
+Validation: 22 targeted controls pass, including actual pinned-tool completion,
 zero-remapping resume, cancellation, source mutation, incomplete native timeout,
 hard-kill receipt recovery and complete no-hit accounting. Two decision/composition
 controls use explicitly SYNTHETIC times/profiles over actual PAFs; they are not
 performance measurements. Final related discovery passed 731 tests in 177.768 s with one
 unavailable native-source oracle skipped. The input-copy path avoids rebuilding
-the selected-name set for every catalogue record; all 21 focused tests also pass
+the selected-name set for every catalogue record; all 22 focused tests also pass
 on this final source.
 
 Still required: real automatic calibration result; bounded future ordinary units
@@ -1105,4 +1105,10 @@ in postprocessing. Those mapper times are not full-task completion or speedup.
 Frozen ordinary producer module SHA-256:
 `7326be58c9333981d99755a93dc084def58a93b6d485d7f1488212cf10daee41`.
 Final local verifier/executor SHA-256:
-`fc6ae2ff48b287d6a7e097553b1746df08a0ab7459b87e7018e23682de564d57`.
+`fac14e97cdbfe419e07c75f83f4b6743e2687919581712787b18e10ae195cd12`.
+
+A final checkpoint boundary control additionally verifies that preflight and
+validation time is sealed BEFORE starting a native child. A hard kill cannot
+erase that already-spent cost before the reserved child slice is charged on
+resume. This adds one focused test after the 731-test complete discovery; it
+changes no mapper arguments or successful source bytes.

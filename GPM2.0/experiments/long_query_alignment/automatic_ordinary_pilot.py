@@ -299,7 +299,11 @@ def execute(root, pilot_plan, query, index, tool, args):
         if options.timeout <= 0:return None
         directory = root / label
         row = {"status": "started", "directory": str(directory), "fraction": fraction, "reserved_seconds": options.timeout + 5}
-        state["cases"][label] = row; save()
+        state["cases"][label] = row
+        # Seal preflight/verification time before starting the child, too. A
+        # hard kill must not erase the cost already spent in this invocation.
+        state["spent_seconds"] = spent_before + time.monotonic() - invocation
+        save()
         try:
             native = nf.attempt(tool["path"], Path(index["path"]), Path(query["path"]), directory, options)
             if native["execution"].get("interrupted") == "KeyboardInterrupt":

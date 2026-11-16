@@ -283,3 +283,17 @@ class ActualNativeTests(unittest.TestCase):
             self.assertEqual(result["reason"], "baseline_uninformative_no_filter_trials")
             selected = pilot.materialize_selection(out, result, inputs[0]["pilot_records"])
             self.assertTrue(all(row["complete_no_hit"] for row in selected["queries"]))
+
+    def test_preflight_time_is_sealed_before_a_child_can_be_hard_killed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); inputs = self.fixture(root); out = root / "calibration"
+            observed = []
+            def before_child(*args, **kwargs):
+                ledger = json.loads((out / pilot.STATE).read_text())
+                observed.append(ledger["spent_seconds"])
+                self.assertEqual(ledger["cases"]["baseline-0"]["status"], "started")
+                raise KeyboardInterrupt("controlled boundary before child execution")
+            with patch.object(nf, "attempt", side_effect=before_child):
+                with self.assertRaises(KeyboardInterrupt):pilot.execute(out, *inputs)
+            self.assertEqual(len(observed), 1)
+            self.assertGreater(observed[0], 0)
