@@ -62,31 +62,26 @@ function fixture({ enabled = true } = {}) {
   };
 }
 
-test("enabled updater first checks at exactly three seconds after initialization", async () => {
+test("enabled updater checks immediately once after initialization, with no delayed or periodic checks", async () => {
   const f = fixture();
   await f.initialize();
-  f.advance(2999);
-  assert.deepEqual(f.checks, []);
-  f.advance(1);
-  assert.deepEqual(f.checks, [3000]);
+  assert.deepEqual(f.checks, [0]);
+  f.advance(3000);
+  assert.deepEqual(f.checks, [0], "no three-second check should remain");
   f.advance(7000);
-  assert.deepEqual(f.checks, [3000], "the obsolete ten-second timer must not remain");
-  assert.deepEqual(f.scheduled, [
-    { delay: 3000, repeat: false },
-    { delay: 6 * 60 * 60 * 1000, repeat: true },
-    { delay: 30000, repeat: true },
-  ]);
+  assert.deepEqual(f.checks, [0], "no older ten-second check should remain");
+  assert.deepEqual(f.scheduled, [{ delay: 30000, repeat: true }]);
 });
 
-test("startup timers wait for initialization rather than application bootstrap", async () => {
+test("startup check waits only for initialization, not an additional timer", async () => {
   const f = fixture();
   f.advance(10000);
   assert.deepEqual(f.scheduled, []);
-  await f.initialize();
-  f.advance(2999);
   assert.deepEqual(f.checks, []);
-  f.advance(1);
-  assert.deepEqual(f.checks, [13000]);
+  await f.initialize();
+  assert.deepEqual(f.checks, [10000]);
+  f.advance(3000);
+  assert.deepEqual(f.checks, [10000]);
 });
 
 test("disabled updater schedules neither startup nor recurring work", async () => {
@@ -98,15 +93,15 @@ test("disabled updater schedules neither startup nor recurring work", async () =
   assert.deepEqual(f.notices, []);
 });
 
-test("startup change preserves six-hour checks and thirty-second offer retries", async () => {
+test("thirty-second offer retries do not perform another update check, even after six hours", async () => {
   const f = fixture();
   await f.initialize();
   f.advance(29999);
   assert.deepEqual(f.notices, []);
   f.advance(1);
   assert.deepEqual(f.notices, [30000]);
-  f.advance(6 * 60 * 60 * 1000 - 30000);
-  assert.deepEqual(f.checks, [3000, 21600000]);
-  assert.equal(f.notices.length, 720);
-  assert.equal(f.notices.at(-1), 21600000);
+  f.advance(12 * 60 * 60 * 1000 - 30000);
+  assert.deepEqual(f.checks, [0]);
+  assert.equal(f.notices.length, 1440);
+  assert.equal(f.notices.at(-1), 43200000);
 });

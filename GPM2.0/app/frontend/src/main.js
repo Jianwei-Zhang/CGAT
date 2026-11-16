@@ -291,8 +291,8 @@ const updater = createAppUpdater({
 });
 void updater.initialize().then(() => {
   if (!updater.getState().enabled) return;
-  setTimeout(() => void updater.check(), 3_000);
-  setInterval(() => void updater.check(), 6 * 60 * 60 * 1000);
+  // One automatic check per launch; notification retries reuse its result.
+  void updater.check();
   setInterval(() => updater.notify(), 30_000);
 });
 
