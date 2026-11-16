@@ -793,3 +793,9 @@
 @media (max-width: 720px) { .project-recent-list { max-height: 40dvh; } }
 
 .library-dialog input, .library-dialog select { min-width: 0; min-height: 38px; width: 100%; }
+
+/* Library menus size to their visible icon/label pairs, not the project-menu minimum. */
+.workspace-history-context-menu[data-library-menu] { width: max-content; min-width: 0; }
+[data-library-menu] .context-menu-item { display: flex; align-items: center; gap: 8px; }
+[data-library-menu] .context-menu-item > .project-icon { width: 16px; height: 16px; flex: 0 0 16px; }
+[data-library-menu] .context-menu-item > span { min-width: 0; overflow-wrap: anywhere; }

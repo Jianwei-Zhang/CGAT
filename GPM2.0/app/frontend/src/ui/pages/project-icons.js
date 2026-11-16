@@ -1,6 +1,6 @@
-import { ArrowRight, ChevronRight, FileBox, FolderPlus, MoreHorizontal, Check, Copy, Folder, FolderOpen, FolderInput, ImageDown, PackagePlus, Pencil, RefreshCw, Sun, Moon, Trash2, X } from "lucide";
+import { ArrowRight, ShieldCheck, ChevronsDownUp, ChevronsUpDown, ChevronRight, FileBox, FolderPlus, MoreHorizontal, Check, Copy, Folder, FolderOpen, FolderInput, ImageDown, PackagePlus, Pencil, RefreshCw, Sun, Moon, Trash2, X } from "lucide";
 
-const icons = { chevron: ChevronRight, project: FileBox, newPartition: FolderPlus, more: MoreHorizontal, arrow: ArrowRight, check: Check, copy: Copy, folder: Folder, open: FolderOpen, import: FolderInput, addPackage: PackagePlus, delete: Trash2, rename: Pencil, close: X, refresh: RefreshCw, imageDownload: ImageDown, sun: Sun, moon: Moon };
+const icons = { validate: ShieldCheck, collapse: ChevronsDownUp, expand: ChevronsUpDown, chevron: ChevronRight, project: FileBox, newPartition: FolderPlus, more: MoreHorizontal, arrow: ArrowRight, check: Check, copy: Copy, folder: Folder, open: FolderOpen, import: FolderInput, addPackage: PackagePlus, delete: Trash2, rename: Pencil, close: X, refresh: RefreshCw, imageDownload: ImageDown, sun: Sun, moon: Moon };
 
 // Lucide's static icon nodes also render in the DOM-free page tests.
 export function projectIcon(name) {

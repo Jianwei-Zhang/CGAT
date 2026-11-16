@@ -59,7 +59,6 @@ function projectValidationView(state, records) {
   return {
     failed,
     disabled: Boolean(importer.inFlight || importer.historyValidating || state.initializer?.autoPipelineRunning),
-    label: messages.buttons.validateHistory,
     accessibleLabel: importer.historyValidating ? messages.buttons.validatingProjects : messages.buttons.validateHistoryLabel,
   };
 }
@@ -73,9 +72,7 @@ export function syncProjectValidation(host, state, records) {
   const validate = host.querySelector("#validate-history-button");
   if (validate) {
     validate.disabled = view.disabled;
-    if (validate.textContent !== view.label) validate.textContent = view.label;
-    if (state.importer.historyValidating) validate.setAttribute("data-app-tooltip", view.accessibleLabel);
-    else validate.removeAttribute("data-app-tooltip");
+    validate.setAttribute("data-app-tooltip", view.accessibleLabel);
     validate.setAttribute("aria-label", view.accessibleLabel);
     validate.setAttribute("aria-busy", String(Boolean(state.importer.historyValidating)));
   }
@@ -157,7 +154,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
         <div class="project-library-toolbar project-library-actions">
           <span data-library-command="create"><button type="button" class="library-toolbar-button" data-library-create="root" aria-label="${library.create}" data-app-tooltip="${library.create}" ${disabled}>${projectIcon("newPartition")}</button></span>
           ${records.length ? `<span data-library-command="validate">
-          <button id="validate-history-button" class="button ghost project-history-action" ${importer.historyValidating ? `data-app-tooltip="${html(validation.accessibleLabel)}"` : ""} aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button></span>
+          <button id="validate-history-button" class="library-toolbar-button" data-app-tooltip="${html(validation.accessibleLabel)}" aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${projectIcon("validate")}</button></span>
           <span data-library-command="delete-failed"><button id="delete-failed-history-button" class="button ghost project-history-action" data-app-tooltip="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button></span>
           ` : ""}
           <button type="button" class="library-toolbar-button" data-library-root-menu aria-label="${library.actions}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>

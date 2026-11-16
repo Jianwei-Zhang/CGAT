@@ -163,18 +163,20 @@ test("validation sync updates existing rows and clears recovered or removed fail
 });
 
 for (const locale of ["en", "zh"]) {
-  test(`${locale} library actions keep their text and hide failed actions without a reserved slot across idle, busy and failed states`, () => {
+  test(`${locale} library validation stays icon-only and failed actions remain conditional across idle, busy and failed states`, () => {
     const records = [{ path: "/rice" }], state = { locale, importer: {}, initializer: {} };
     const messages = getMessages(state, "importer");
     const renderState = () => renderProjectsBody(state, { records, messages, summaryHtml: "" });
-    const label = locale === "en" ? "Validate" : "校验项目";
     const idle = renderState();
     state.importer.historyValidating = true;
     const busy = renderState();
     state.importer = { historyValidatedPaths: ["/rice"], historyValidation: { "/rice": { ok: false } } };
     const failed = renderState();
     for (const markup of [idle, busy, failed]) {
-      assert.match(markup, new RegExp(`id="validate-history-button"[^>]*>${label}</button>`));
+      const button = markup.match(/<button id="validate-history-button"[^>]*>[\s\S]*?<\/button>/)?.[0];
+      assert.match(button, /class="library-toolbar-button"/);
+      assert.match(button, /<svg[^>]*aria-hidden="true"/);
+      assert.doesNotMatch(button, />Validate<|>校验项目</);
       assert.doesNotMatch(markup, /project-history-action-slot/);
       assert.match(markup, /class="project-recents-title-label"/);
       const toolbar = markup.split('class="project-library-toolbar project-library-actions"')[1]?.split("</header>")[0];
@@ -205,26 +207,27 @@ test("library toolbar shares its title row with measured overflow and stable bus
 });
 
 
-test("recent headings and idle validation have no repeated hints but paths and busy state remain explained", () => {
+test("headings stay tooltip-free while validation icons explain idle and busy actions", () => {
   const records = [{ path: "/rice", projectName: "Rice" }];
   const html = render({ records });
   assert.doesNotMatch(html, /id="project-recents-title"[^>]*data-app-tooltip/);
-  assert.doesNotMatch(html, /id="validate-history-button"[^>]*data-app-tooltip/);
+  assert.match(html, /id="validate-history-button"[^>]*data-app-tooltip="Validate projects"/);
   assert.match(html, /class="project-recent-open"[^>]*data-app-tooltip="\/rice"/);
   const busy = render({ records, importer: { historyValidating: true } });
   assert.match(busy, /id="validate-history-button"[^>]*data-app-tooltip="Validating…"/);
 });
 
-test("in-place validation clears its transient busy hint without losing the accessible label", () => {
+test("in-place validation preserves the icon and restores its idle explanation", () => {
   const attrs = new Map([["data-app-tooltip", "Validating…"]]);
-  const button = { textContent: "", setAttribute: (key, value) => attrs.set(key, value), removeAttribute: key => attrs.delete(key) };
+  const button = { innerHTML: "<svg>validation icon</svg>", get textContent() { return ""; }, set textContent(_) { assert.fail("must not replace the validation icon"); }, setAttribute: (key, value) => attrs.set(key, value), removeAttribute: key => attrs.delete(key) };
   const host = { querySelectorAll: () => [], querySelector: selector => selector === "#validate-history-button" ? button : null };
   const state = { locale: "en", importer: { historyValidating: true } };
   syncProjectValidation(host, state, []);
   assert.equal(attrs.get("data-app-tooltip"), "Validating…");
   state.importer.historyValidating = false;
   syncProjectValidation(host, state, []);
-  assert.equal(attrs.has("data-app-tooltip"), false);
+  assert.equal(attrs.get("data-app-tooltip"), "Validate projects");
+  assert.equal(button.innerHTML, "<svg>validation icon</svg>");
   assert.equal(attrs.get("aria-label"), "Validate projects");
 });
 

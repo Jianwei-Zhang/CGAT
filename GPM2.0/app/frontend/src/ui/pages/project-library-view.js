@@ -117,8 +117,11 @@ export function renderLibraryMenu(state) {
   const labels = libraryLabels(state);
   const messages = getMessages(state, "importer");
   const overflow = state.importer.libraryOverflowActions || [];
-  const extra = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}" data-library-overflow-action="${action}" ${overflow.includes(action) ? "" : "hidden"} ${projectEntryBusy(state) || (action !== "create" && state.importer.historyValidating) ? "disabled" : ""}>${label}</button>`;
-  const item = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}">${label}</button>`;
+  const icons = { create: "newPartition", validate: "validate", "delete-failed": "delete", collapse: "collapse", expand: "expand",
+    import: "import", rename: "rename", "move-folder": "arrow", delete: "delete" };
+  const content = (action, label) => `${projectIcon(icons[action])}<span>${html(label)}</span>`;
+  const extra = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}" data-library-overflow-action="${action}" ${overflow.includes(action) ? "" : "hidden"} ${projectEntryBusy(state) || (action !== "create" && state.importer.historyValidating) ? "disabled" : ""}>${content(action, label)}</button>`;
+  const item = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}">${content(action, label)}</button>`;
   return `<div class="context-menu workspace-history-context-menu" data-library-menu role="menu" aria-label="${labels.actions}" style="left:${Number(menu.x) || 0}px;top:${Number(menu.y) || 0}px">
     ${menu.root ? `${extra("create", labels.create)}${extra("validate", messages.buttons.validateHistory)}${extra("delete-failed", messages.buttons.deleteFailedRecords)}${item("collapse", labels.collapse)}${item("expand", labels.expand)}` : `${item("import", labels.importHere)}${menu.id ? `${item("create", labels.child)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("rename", labels.rename)}${item("move-folder", labels.move)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("delete", labels.remove)}` : ""}`}</div>`;
 }

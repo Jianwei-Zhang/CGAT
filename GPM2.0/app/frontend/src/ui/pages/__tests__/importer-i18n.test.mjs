@@ -410,7 +410,7 @@ test("importer bulk delete removes only current failed history records", async (
     const store = createStore(state);
 
     const initialHtml = renderImporterPage(store.getState());
-    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button><\/span>\s*<span data-library-command="delete-failed"><button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
+    assert.match(initialHtml, /id="validate-history-button"[^>]*><svg[\s\S]*?<\/svg><\/button><\/span>\s*<span data-library-command="delete-failed"><button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
     assert.doesNotMatch(initialHtml, /id="delete-failed-history-button"[^>]*hidden/);
 
     bindImporterPage(host, store);
@@ -700,6 +700,7 @@ test("project validation updates in place and preserves the rename draft across 
       } } },
     };
     const validate = Object.assign(createButton(), {
+      textContent: "", innerHTML: "<svg>validation icon</svg>",
       setAttribute(name, value) { this[name] = value; },
     });
     const remove = Object.assign(createButton(), { hidden: true });
@@ -729,7 +730,8 @@ test("project validation updates in place and preserves the rename draft across 
     assert.equal(store.getState().importer.inFlight, false);
     assert.equal(store.getState().importer.deleteConfirmOpen, false);
     assert.equal(validate.disabled, true);
-    assert.equal(validate.textContent, "校验项目");
+    assert.equal(validate.textContent, "");
+    assert.equal(validate.innerHTML, "<svg>validation icon</svg>");
     assert.equal(remove.hidden, true);
     timers[0]();
     assert.equal(toast.removed, true);
@@ -739,7 +741,8 @@ test("project validation updates in place and preserves the rename draft across 
     await pending;
     assert.equal(store.getState().importer.historyValidating, false);
     assert.equal(validate.disabled, false);
-    assert.equal(validate.textContent, "校验项目");
+    assert.equal(validate.textContent, "");
+    assert.equal(validate.innerHTML, "<svg>validation icon</svg>");
     assert.equal(remove.hidden, false);
     assert.equal(remove.disabled, false);
     assert.match(page.toastHtml, /importer-status-toast.*[\s\S]*校验完成：通过 1 个，失败 2 个。/);

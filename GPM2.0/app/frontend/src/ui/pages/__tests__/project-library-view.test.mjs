@@ -1,3 +1,4 @@
+import { projectIcon } from "../project-icons.js";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -226,3 +227,30 @@ for (const action of ["confirm", "cancel", "storage-failure"]) {
     }
   }));
 }
+
+
+for (const locale of ["zh", "en"]) {
+  test(`${locale} every library menu action starts with its matching decorative icon and keeps readable text`, () => {
+    const expected = { create: "newPartition", validate: "validate", "delete-failed": "delete", collapse: "collapse", expand: "expand",
+      import: "import", rename: "rename", "move-folder": "arrow", delete: "delete" };
+    for (const menu of [{ root: true }, { id: "plants" }, { id: "" }]) {
+      const markup = renderLibraryMenu(state(locale, { libraryMenu: menu, libraryOverflowActions: ["create", "validate", "delete-failed"] }));
+      const items = [...markup.matchAll(/<button[^>]*data-library-action="([^"]+)"[^>]*>([\s\S]*?)<\/button>/g)];
+      assert.ok(items.length);
+      for (const [, action, content] of items) {
+        assert.ok(content.startsWith(projectIcon(expected[action])), `${action} has the matching icon first`);
+        assert.match(content, /<svg[^>]*aria-hidden="true"[^>]*focusable="false"/);
+        assert.match(content, /<span>[^<]+<\/span>$/);
+      }
+    }
+  });
+}
+
+test("library menus use visible content width without changing the project context menu minimum", () => {
+  const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
+  assert.match(css, /\.workspace-history-context-menu\[data-library-menu\]\s*\{[^}]*width: max-content;[^}]*min-width: 0;/);
+  assert.match(css, /\[data-library-menu\] \.context-menu-item\s*\{[^}]*display: flex;[^}]*gap: 8px;/);
+  assert.match(css, /\[data-library-menu\] \[hidden\][^{]*\{[^}]*display: none !important/);
+  const overlays = readFileSync(new URL("../../../styles/overlays.css", import.meta.url), "utf8");
+  assert.match(overlays, /\.workspace-history-context-menu\s*\{[^}]*min-width: min\(224px,[^}]*max-width: calc\(100vw - 16px\)/);
+});
