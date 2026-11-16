@@ -697,3 +697,165 @@ native-source oracle was not configured with an unmodified source checkout.
 Pinned-tool/companion resume controls ran, rather than being skipped. This is
 controlled regression evidence, not customer or release acceptance. Official
 published Server/App artifacts were not changed.
+
+
+### Complete 289.5-Mb projection, without repeating either mapper (22:43 audit)
+
+Postprocessing continuation `41901666` SUCCEEDED on ARM-38,
+22:14:38–22:40:34, with 1 CPU / 4 GiB and a 2,700-s process budget. It admitted
+the two SUCCESSFUL mapper substages independently (exit 0, exact native commands,
+all 58 windows, original index part hashes, regenerated window FASTA equality,
+source identities and complete PAF geometry), not the failed parent as a whole.
+It reused the already completed part-0 output and reconstructed part 1 from its
+complete raw PAF. The previous partial stitched PAF was NEVER consumed. The
+reference sequence store was reopened with fresh content checks; no mapper ran.
+
+Measured continuation stages:
+
+| Stage | Wall seconds | CPU seconds |
+| --- | ---: | ---: |
+| Source/substage admission | 113.552 | not separately recorded |
+| Part-1 raw checks + ownership | 710.962 | 59.472 |
+| Part-1 stitching + checks | 677.576 | 38.708 |
+| Entire continuation, including final checks | 1553.684 | not separately recorded |
+
+These are **postprocessing continuation timings**, not a cold complete invocation
+or a paired speedup over the original KN9204 six-day task. Original mapping on
+this IWGSC reference had already completed in 244.515 + 323.159 s. Shared-file I/O
+still dominates postprocessing; simply requesting more CPU cores will not remove
+that measured bottleneck.
+
+Final report: `full-postprocess-continuation-v1/continuation.json`.
+Final PAF: `full-postprocess-continuation-v1/reference.approximate.experimental.paf`.
+SHA-256: `e188be167d498a14467bca393a1712a1070d3d11b513da1b86f00a907e1ecce6`.
+It contains 29,324 rows, original query ID/length 289,508,469, unknown MAPQ255,
+and no inherited AS/ms/s1/s2/cm/tp tags. Both original reference parts are present.
+Independent downloaded-output geometry/hash/profile checks passed.
+
+Union query coverage is 287,355,731 bp (**99.2564% of input length**, NOT retention
+against a complete native baseline). Current assignment is 3D, positive strand,
+anchor 115,382,288, with 285,133,649 qualified supporting bases (98.489%).
+Candidate-only screening finds no obvious assignment risk; no complete full-query
+native accuracy baseline exists. Whole-query native confidence was not restored.
+
+As an additional cheap check, the UNMODIFIED assignment compiler's actual AST
+region (candidate aggregation and assignment generation, with its real interval
+union/weighted-median functions) was executed over the downloaded PAF. Sequence
+objects supplied only lengths because that region reads no bases. It reproduced
+the same 3D/positive/anchor/support result. This is actual consumer-core evidence,
+NOT execution of the full FASTA-partitioning/prepared-workspace pipeline.
+Consumer source SHA-256:
+`b80dce79100195f98c1a8f69c8afd4e3f0d4751b0cb2f4ff8efddb682ba2a0ae`.
+Downloaded evidence and audits:
+`/tmp/cgat-jm19-complete-results-7s_ky9qh/`.
+
+### Automatic bounded native-source selection now produces a complete pilot PAF
+
+`adaptive_complete_sources.py` implements the next executable boundary:
+
+- Trigger evaluation uses the FULL workload catalogue, not the small pilot's
+  longest record. The 19,960,671-bp pilot record alone would incorrectly appear
+  below the provisional 20-Mb shape threshold; the full wheat workload contains
+  the 289.5-Mb record. A size trigger still requests calibration, not sensitivity
+  reduction by itself.
+- Prefer the weaker filter only when BOTH complete repeated measurements meet
+  the existing 2x candidate speed floor, repeated outputs agree, and complete
+  record fallback passes the measured loss/assignment/direction checks.
+- Bound fallback to 32 records AND 5% of pilot query bases. This is an internal
+  provisional calibration budget, not a user-facing knob or a proof of future
+  review cost. If the budget or speed condition fails, select complete default
+  native output instead. A timeout speed lower bound cannot authorize selection.
+- Materialize exactly ONE verified full source per query, preserving within-query
+  row order, all selected chromosomes/strands and native row bytes. Never append
+  baseline rows to candidate rows for the same query. Explicitly record complete
+  no-hit queries, source row numbers, per-record hashes and the selected policy.
+- Recheck actual pilot/reference input bytes and record-level sequence digests
+  against the original workload. Nested subset extraction is valid when content
+  matches; an intermediate catalogue's different metadata link is not a veto.
+- An available completed second baseline may be used when the first timed out;
+  the timed-out PAF is not read. Source mutation, receipt read/hash races, unknown
+  sources and failed output checks cannot publish a final experimental PAF.
+
+Initial frozen job `41906610` completed the ordinary selection, then refused the
+micro subset because it had been extracted from the ordinary subset rather than
+directly from the full catalogue. This exposed an unnecessary direct-parent
+metadata restriction, not bad sequence data. That restriction was replaced with
+fresh complete-record sequence membership checks (with negative content-change
+controls), while preserving the first job's output and all original artifacts.
+
+Corrected job `41908564` SUCCEEDED on ARM-35, 22:40:08–22:40:31, using 1 CPU /
+2 GiB and a 600-s process budget. It executed NO mapper and completed in 18.935 s:
+
+| Completed pilot | Internal choice | Actual selected sources | Rows |
+| --- | --- | --- | ---: |
+| Four ordinary records, 33.46 Mb | f=0.01 | first three filtered; weak short record entirely default | 7308 |
+| Two-record micro control, 3.49 Mb | default | both complete default records | 721 |
+
+The weaker f=0.005 did not meet the paired speed floor on the ordinary pilot;
+the micro pilot had no sufficient candidate speedup. These choices were computed
+internally, not passed as filter arguments. The resulting PAFs passed output and
+baseline-relative quality checks. Source fallback is already completed in these
+controls; **hybrid runtime speedup and future review overhead are NOT measured**.
+Full original workload data is NOT claimed revalidated by this bounded finalizer.
+
+Ordinary selected output SHA-256:
+`c6ffd43d617713c26f9ae159072936ce2f5747747ef0a9154afafde3e3fcf0f5`.
+Micro/default output SHA-256:
+`e5c02c176e70dcfd3b3e58926d3ddb61b67af68ccadcf0d2c8bab5abbc98b8f3`.
+The actual assignment compiler core retained all three ordinary chromosome/
+orientation assignments; anchor changes were +272 / -49 / 0 bp. Qualified
+assignment support changed even where total union coverage improved: approximately
++0.635 / -0.801 / -0.605 percentage points of the respective query lengths.
+Thus this is not a zero-loss or unchanged-support claim.
+
+The auditor is now `adaptive-screening-v3`: it explicitly reports qualified
+support deltas and also applies the existing 2% per-query loss cap to a retained
+assignment's supporting bases. Unqualified short hits can no longer conceal a
+large support loss while leaving the raw union and chromosome name unchanged.
+A negative control preserves 100% raw union and the same chromosome but drops
+qualified support from 100% to 70%; it is rejected and selects the complete
+baseline. The existing global 0.5% budget still refers to raw positive query
+coverage losses, not a sum of potentially overlapping multi-chromosome supports.
+Selection identities include the quality-policy version.
+
+### Remaining production closure (not replaced by the successful controls)
+
+The new source selector is not yet the default Server executor. Remaining work:
+
+1. Pre-execution workload routing and pilot-cost amortization: do not spend a
+   multi-condition pilot on a small job merely because one record is long.
+   Separate packed-CIGAR correctness routing from ordinary throughput calibration;
+   honor existing explicit run settings without making users choose the trigger.
+2. Execute bounded ordinary units and limited review, measuring COMPLETE hybrid
+   cost. Preserve already completed compatible ordinary/exact-recovery work.
+3. Write successful mapping-substage receipts with output hashes BEFORE expensive
+   postprocessing, then resume only missing units. Cancellation/resources and
+   failed partial-output exclusion must cover the new path, not only the old one.
+4. Admit complete all-part approximate projections via a distinct publication
+   contract with unknown confidence; do not smuggle them through the existing
+   native-confidence reconstruction verifier. Preserve full original identities,
+   per-query/per-cell policy provenance and honest unresolved-risk handling.
+5. Validate the actual automatic prepared-workspace path and downstream outputs
+   on bounded representative cases before full customer-scale execution/release.
+
+No full assembly parameter sweep or new full assembly mapping was launched.
+
+
+Final v3 source-selection replay `41912289` SUCCEEDED on ARM-40,
+22:54:44–22:55:03, in 16.385 s. Both internal choices and both final PAF hashes
+were unchanged from v2; the ordinary receipt now exposes qualified-support
+changes of +63,593 / -159,811 / -18,078 bp. All are inside the declared per-query
+support budget. The micro result reports no support change. No mapper executed.
+Payload `automatic-source-tools-v3` SHA-256:
+`926a7a07612f424081b3049fdba227bc6f77831fe7cea695dcd43b11159320e1`.
+Reports: `automatic-complete-sources-v3/automatic-selection.json` and each
+case's `selected-sources.json`. This payload contains the final selector/auditor
+sources, including repeat-1 baseline fallback and receipt-snapshot checks.
+
+Validation: 19 new source-selector/publication tests, two new qualified-support
+controls, and the complete related adaptive/audit/catalogue/extraction group:
+**96 passed, zero skips**, including pinned-minimap2 projection controls.
+A broader discovery before the two final v3 policy controls passed 688 tests
+with one explicitly unavailable native-source oracle skipped. Generated Server
+runtime sources remain synchronized and unchanged by this experimental selector.
+Production admission/default execution and release closure remain outstanding.

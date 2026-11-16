@@ -84,6 +84,25 @@ class AdaptiveScreeningTests(unittest.TestCase):
         loss = policy.assess_loss({"q": before}, {"q": after})
         self.assertEqual(loss["downstream_anchor_shifts"][0]["delta_bp"], 10)
 
+    def test_unqualified_hits_cannot_hide_large_downstream_support_loss(self):
+        before, after = row(1000, length=1000), row(1000, length=1000)
+        after["assignment_candidates"]["chr1"]["covered"] = 700
+        loss = policy.assess_loss({"q": before}, {"q": after})
+        self.assertEqual(loss["positive_loss_fraction"], 0)
+        self.assertFalse(loss["passed"])
+        self.assertIn("downstream_qualified_support_loss", loss["reasons"])
+        self.assertEqual(loss["downstream_support_changes"][0]["delta_bp"], -300)
+        review = policy.plan_completed_record_review({"q": before}, {"q": after})
+        self.assertEqual(review["queries"][0]["source"], "baseline")
+
+    def test_small_qualified_support_change_is_visible_without_zero_loss_claim(self):
+        before, after = row(1000, length=1000), row(1000, length=1000)
+        after["assignment_candidates"]["chr1"]["covered"] = 990
+        loss = policy.assess_loss({"q": before}, {"q": after})
+        self.assertTrue(loss["passed"])
+        self.assertEqual(loss["downstream_support_changes"][0]["fraction_of_query_length"], -.01)
+        self.assertEqual(loss["downstream_support_loss_limit_fraction_of_query"], .02)
+
     def test_strand_flip_not_hidden_by_same_target_and_coverage(self):
         loss = policy.assess_loss({"q": row()}, {"q": row(strand="-")})
         self.assertIn("strand_flip", loss["reasons"])

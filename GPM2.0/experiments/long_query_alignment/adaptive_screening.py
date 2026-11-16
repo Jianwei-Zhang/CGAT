@@ -12,7 +12,7 @@ import hashlib
 import json
 import math
 
-POLICY = "adaptive-screening-v2"
+POLICY = "adaptive-screening-v3"
 LONG_QUERY_LIMIT = (1 << 28) - 1
 
 
@@ -160,6 +160,7 @@ def assess_loss(before, after, limits=Limits(), *, require_consumer=True):
     strand_flips, strand_lost, strand_hidden, strand_missing = [], [], [], []
     consumer_removed, consumer_added, consumer_flips, consumer_missing, anchors = [], [], [], [], []
     consumer_extra = []
+    support_changes, support_losses = [], []
     for q, a in before.items():
         b = after[q]
         if a["length"] != b["length"]:
@@ -214,6 +215,13 @@ def assess_loss(before, after, limits=Limits(), *, require_consumer=True):
                 old_row, new_row = old_assignments[target], new_assignments[target]
                 if old_row["orientation"] != new_row["orientation"]:
                     consumer_flips.append({"query": q, "target": target})
+                support_delta = new_row["covered"] - old_row["covered"]
+                if support_delta:
+                    support = {"query": q, "target": target, "delta_bp": support_delta,
+                               "fraction_of_query_length": support_delta / a["length"]}
+                    support_changes.append(support)
+                    if -support_delta / a["length"] > limits.per_query_loss_fraction:
+                        support_losses.append(support)
                 delta = new_row["anchor_start"] - old_row["anchor_start"]
                 if delta:
                     anchors.append({"query": q, "target": target, "delta_bp": delta,
@@ -230,7 +238,8 @@ def assess_loss(before, after, limits=Limits(), *, require_consumer=True):
                         ("strand_flip", strand_flips), ("strand_assignment_lost", strand_lost),
                         ("strand_ambiguity_hidden", strand_hidden), ("strand_evidence_missing", strand_missing),
                         ("downstream_assignment_removed", consumer_removed), ("downstream_extra_assignment", consumer_extra),
-                        ("downstream_orientation_changed", consumer_flips), ("downstream_evidence_missing", consumer_missing)):
+                        ("downstream_orientation_changed", consumer_flips), ("downstream_evidence_missing", consumer_missing),
+                        ("downstream_qualified_support_loss", support_losses)):
         if items:
             reasons.append(name)
     return {"passed": not reasons, "reasons": reasons, "coverage_losses": losses,
@@ -242,6 +251,8 @@ def assess_loss(before, after, limits=Limits(), *, require_consumer=True):
             "queries_missing_strand_evidence": strand_missing,
             "downstream_assignments_removed": consumer_removed, "downstream_assignments_added": consumer_added,
             "downstream_orientation_changes": consumer_flips, "downstream_anchor_shifts": anchors,
+            "downstream_support_changes": support_changes,
+            "downstream_support_loss_limit_fraction_of_query": limits.per_query_loss_fraction,
             "queries_missing_downstream_evidence": consumer_missing,
             "downstream_projection_required": require_consumer,
             "scientific_accuracy_proven": False}
