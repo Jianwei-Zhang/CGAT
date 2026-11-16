@@ -1,5 +1,6 @@
-"""Internal adaptive-policy calibration; not a production default yet.
+"""Internal adaptive metrics and large-reference projection risk screening.
 
+Ordinary sensitivity calibration is not a production default yet.
 Size selects a bounded pilot, never a sensitivity change. A candidate is eligible
 only from completed, comparable measurements and per-query loss checks. Limits
 are provisional experimental acceptance budgets, not biological accuracy claims.
@@ -12,7 +13,7 @@ import hashlib
 import json
 import math
 
-POLICY = "adaptive-screening-v3"
+POLICY = "adaptive-screening-v4"
 LONG_QUERY_LIMIT = (1 << 28) - 1
 
 
@@ -25,6 +26,7 @@ class Limits:
     per_query_loss_fraction: float = 0.02
     assignment_coverage: float = 0.60
     assignment_margin: float = 0.10
+    maximum_anchor_spread_fraction: float = 0.20
 
 
 def screening_gate(reference_bases, records, limits=Limits()):
@@ -75,7 +77,7 @@ def coverage_profile(path, records):
     lengths = record_lengths(records)
     spans, targets = defaultdict(list), defaultdict(lambda: defaultdict(list))
     target_strands = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    qualified = defaultdict(lambda: defaultdict(lambda: {"spans": [], "anchors": [], "weights": {"+": 0, "-": 0}}))
+    qualified = defaultdict(lambda: defaultdict(lambda: {"spans": [], "anchors": [], "anchors_by_strand": {"+": [], "-": []}, "weights": {"+": 0, "-": 0}}))
     with path.open() as stream:
         for line in stream:
             f = line.rstrip("\n").split("\t")
@@ -96,13 +98,15 @@ def coverage_profile(path, records):
                 bucket["spans"].append((start, end))
                 anchor = int(f[7]) - start + 1 if f[4] == "+" else int(f[7]) + 1 - lengths[f[0]] + end
                 bucket["anchors"].append((anchor, block))
+                bucket["anchors_by_strand"][f[4]].append((anchor, block))
                 bucket["weights"][f[4]] += block
     return {q: {"length": n, "covered": union_length(spans[q]),
                 "targets": {t: union_length(s) for t, s in sorted(targets[q].items())},
                 "target_strands": {t: {strand: union_length(s) for strand, s in sorted(by_strand.items())}
                                    for t, by_strand in sorted(target_strands[q].items())},
                 "assignment_candidates": {t: {"covered": union_length(b["spans"]),
-                    "strand_weights": b["weights"], "anchor_start": weighted_anchor(b["anchors"])}
+                    "strand_weights": b["weights"], "anchor_start": weighted_anchor(b["anchors"]),
+                    "anchor_spans": {strand: weighted_anchor_span(values) for strand, values in b["anchors_by_strand"].items() if values}}
                     for t, b in sorted(qualified[q].items())}}
             for q, n in lengths.items()}
 
@@ -115,6 +119,19 @@ def weighted_anchor(values):
         if cumulative >= threshold:
             return position
     raise ValueError("positive anchor weights required")
+
+
+def weighted_anchor_span(values):
+    """10th/90th block-weighted anchor quantiles; not a native chain proof."""
+    total = sum(w for _, w in values)
+    if total <= 0:raise ValueError("positive anchor weights required")
+    low = high = None; cumulative = 0
+    for position, weight in sorted(values):
+        cumulative += weight
+        if low is None and cumulative * 10 >= total:low = position
+        if cumulative * 10 >= total * 9:
+            high = position; break
+    return [low, high]
 
 
 def consumer_assignments(row, limits):
@@ -285,7 +302,20 @@ def screen_candidate_projection(profile, limits=Limits()):
             if abs(weights["+"] - weights["-"]) / sum(weights.values()) < limits.assignment_margin:
                 reasons.append("orientation_ambiguous")
                 break
+        anchor_spreads = {}
+        for target, assignment_row in assigned.items():
+            candidate = row["assignment_candidates"][target]
+            span = candidate.get("anchor_spans", {}).get(assignment_row["orientation"])
+            if (not isinstance(span, list) or len(span) != 2
+                    or any(type(n) is not int for n in span) or span[0] > span[1]):
+                if "anchor_coherence_evidence_missing" not in reasons:reasons.append("anchor_coherence_evidence_missing")
+                continue
+            spread = (span[1] - span[0]) / row["length"]
+            anchor_spreads[target] = spread
+            if spread > limits.maximum_anchor_spread_fraction and "non_collinear_target_support" not in reasons:
+                reasons.append("non_collinear_target_support")
         queries.append({"query": name, "coverage_fraction": covered,
+                        "dominant_anchor_spread_fractions": anchor_spreads,
                         "assigned_targets": sorted(assigned), "reasons": reasons,
                         "action": "bounded_review" if reasons else "no_obvious_assignment_risk"})
     return {"policy": POLICY, "queries": queries, "baseline_comparison_performed": False,

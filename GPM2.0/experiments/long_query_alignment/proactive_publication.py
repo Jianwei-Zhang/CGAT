@@ -90,17 +90,22 @@ def check_empty(row, part, group, report, root):
 
 
 def admit(report, root, *, bundle):
+    import approximate_reference_cells as ap
     root = Path(root).resolve()
+    approximate = report.get("routing_mode") == "adaptive_large_reference"
     require(report.get("status") == "proactive_candidate_complete"
-            and report.get("routing_mode") == "proactive_query_length"
+            and report.get("routing_mode") in ("proactive_query_length", "adaptive_large_reference")
             and report.get("original_inputs_unchanged") is True
             and report.get("native_row_bytes_preserved") is True
             and report.get("partial_PAF_reused") is False
             and all(report.get(k) is False for k in ("whole_input_failure_trial", "bisection", "singleton_assertion_replay")),
             "not a completed proactive alignment")
-    require((bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is True
-            and report["helper"]["sha256"] == bundle["sha256"]
-            and report["helper"]["manifest_sha256"] == bundle["manifest_sha256"], "proactive helper identity differs")
+    if not approximate or bundle is not None:
+        require(bundle is not None and (bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is True
+                and report["helper"]["sha256"] == bundle["sha256"]
+                and report["helper"]["manifest_sha256"] == bundle["manifest_sha256"], "proactive helper identity differs")
+    if approximate:
+        require(report.get("approximate_policy") == ap.POLICY, "approximate publication policy differs")
     plan = rp.read_json(root / "routing-plan.json", root)
     catalog = rp.read_json(root / "query-catalog.json", root, max_bytes=64*1024**2)
     groups = rp.read_json(root / "inputs/groups.json", root, max_bytes=64*1024**2)
@@ -135,6 +140,9 @@ def admit(report, root, *, bundle):
         require(part["reference_sha256"] == report["reference"]["sha256"]
                 and part["tool_sha256"] == report["tool"]["sha256"] and part["preset"] == "asm10"
                 and wa.verified_sha256(rp.regular_under(part["path"], root)) == part["sha256"], "original index part changed")
+    if approximate:
+        require(sum(r["length"] for p in parts for r in p["records"]) >= ap.MIN_REFERENCE_BASES,
+                "approximate route not eligible for this reference size")
     expected_sources = []
     if ordinary:
         if report["ordinary_native"].get("kind") == opa.KIND:
@@ -173,15 +181,47 @@ def admit(report, root, *, bundle):
     expected_cells = [(n, p["part_index"]) for n in long_names for p in parts]
     require([(r["query"], r["part_index"]) for r in rows] == expected_cells,
             "long-query original-part cells omitted/duplicated/reordered")
-    proofs, empty = [], 0
+    reviews = {}
+    if approximate:
+        import argparse
+        for review in report.get("native_reviews", []):
+            name = review["query"]
+            require(name in long_names and name not in reviews, "native reviews omit/duplicate query identity")
+            directory = rp.regular_under(Path(review["directory"]) / "quality-review.json", root).parent
+            verified = ap.verify_review(directory, group_by_name[name], {**index, "path": str(root / "target.default.mmi")},
+                report["tool"], argparse.Namespace(minimap_filter=report.get("minimap_filter")))
+            require(review == verified, "native quality review completion changed")
+            reviews[name] = review
+    proofs, empty, projected, inserted_reviews = [], 0, [], set()
     for row in rows:
-        rp.regular_under(Path(row["directory"]) / "guidance.json", root)
         part = parts[row["part_index"]]
+        if row["query"] in reviews:
+            name = row["query"]
+            if name not in inserted_reviews:
+                native = reviews[name]["native"]
+                expected_sources.append({"path": native["path"], "sha256": native["paf_sha256"], "route": "native",
+                                         "queries": [name], "parts": list(range(len(parts)))})
+                inserted_reviews.add(name)
+            continue
+        if row.get("kind") == ap.POLICY:
+            require(approximate, "approximate cell cannot enter native-confidence recovery admission")
+            directory = rp.regular_under(Path(row["directory"]) / ap.MANIFEST, root).parent
+            group = group_by_name[row["query"]]
+            length = next(r["length"] for r in records if r["name"] == row["query"])
+            expected = ap.identity(row["query"], length, group["sha256"], report["reference"]["sha256"], report["tool"], part)
+            proof = ap.verify(directory, expected, report["tool"], part)
+            require(proof == row, "approximate cell completion receipt changed")
+            projected.append(row)
+            expected_sources.append({"path": row["path"], "sha256": row["sha256"], "route": "approximate",
+                                     "queries": [row["query"]], "parts": [part["part_index"]]})
+            continue
+        rp.regular_under(Path(row["directory"]) / "guidance.json", root)
         if row["status"] == "no_candidates_in_original_part":
             expected_sources.append(check_empty(row, part, group_by_name[row["query"]], report, root))
             empty += 1
         else:
             require(row["status"] == "validated_experimental_guidance", "long cell did not finish")
+            require(bundle is not None, "legacy recovered cell requires its original native companion proof")
             recovery = row["publication"]
             proof = rp.check_leaf(recovery, Path(row["directory"]), part, report, bundle, sr.validate_row,
                                   eligibility="proactive_query_length")
@@ -190,8 +230,38 @@ def admit(report, root, *, bundle):
                     "recovered cell lost proactive eligibility")
             proofs.append(proof)
             pair = proof["paired_paths"]
-            expected_sources.append({"path": pair["public_path"], "sha256": pair["public_sha256"],
-                                     "route": "recovered", "queries": [row["query"]], "parts": [row["part_index"]]})
+            expected_sources.append({"path": pair["path"] if approximate else pair["public_path"],
+                                     "sha256": pair["sha256"] if approximate else pair["public_sha256"],
+                                     "route": "legacy_recovered" if approximate else "recovered",
+                                     "queries": [row["query"]], "parts": [row["part_index"]]})
+    if approximate:
+        import adaptive_screening as screening
+        projected_names = [n for n in long_names if any(r["query"] == n for r in projected)]
+        reviewed = report.get("projection_screening", [])
+        require([r["query"] for r in reviewed] == projected_names, "whole-query projection screening omitted/reordered queries")
+        for row in reviewed:
+            source = rp.regular_under(row["path"], root)
+            expected = [{"path": r["path"], "sha256": r["sha256"]} for r in expected_sources if r["queries"] == [row["query"]]]
+            require(row["sources"] == expected and wa.verified_sha256(source) == row["sha256"],
+                    "whole-query screening lost its all-part sources")
+            length = next(r["length"] for r in records if r["name"] == row["query"])
+            profile = screening.coverage_profile(source, [{"name": row["query"], "length": length}])
+            current = screening.screen_candidate_projection(profile)
+            require(profile == row["profile"] and current == row["screening"] and row["approved"] is True
+                    and all(r["action"] == "no_obvious_assignment_risk" for r in current["queries"]),
+                    "approximate whole-query risk is unresolved")
+        assembly = report["combination"]
+        require(assembly["all_cells_completed"] is True and assembly["original_cells"] == len(names)*len(parts)
+                and assembly["native_cells"] == (len(ordinary)+len(reviews))*len(parts) and assembly["sources"] == expected_sources
+                and report.get("approximate_query_part_cells") == len(projected),
+                "approximate assembly omitted/duplicated original cells")
+        output = rp.regular_under(report["output_path"], root)
+        require(wa.verified_sha256(output) == report["output_sha256"], "complete approximate candidate changed")
+        return {"schema": 1, "policy": ap.POLICY, "status": "complete_approximate_reference_admitted",
+                "path": str(output), "sha256": report["output_sha256"], "original_cells": len(names)*len(parts),
+                "approximate_cells": len(projected), "legacy_recovered_cells": len(proofs), "native_reviewed_queries": sorted(reviews),
+                "native_confidence_reconstructed": False, "whole_query_dp_equivalence_certified": False,
+                "result_published": False}
     for key in ("combination", "native_evaluation_combination"):
         assembly = report[key]
         require(assembly["all_cells_completed"] is True and assembly["original_cells"] == len(names)*len(parts)

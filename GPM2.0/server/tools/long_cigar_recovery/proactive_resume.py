@@ -32,6 +32,8 @@ _REVIEWED_PARAMETER_RUNTIME = "c83a96b95826d2d58055ac551456124e9acbc0d0331287a63
 _REVIEWED_PARTITION_RUNTIME = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
 _REVIEWED_PARTITION_RESUME_RUNTIME = "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
 _REVIEWED_RESOURCE_RUNTIME = "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
+_REVIEWED_AUTOMATIC_WINDOW_RUNTIME = "4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab"
+_REVIEWED_BUFFERED_RUNTIME = "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
 _REVIEWED_NATIVE_STREAM_RUNTIME = "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01"
 _REVIEWED_SCALAR_WINDOW_SOURCE = "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e"
 _REVIEWED_BUFFERED_WINDOW_SOURCE = "000713110a82508585e820f470e92d70e4f3c326674cb8254ed6279c51a49caa"
@@ -79,17 +81,19 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
     old_files, new_files = previous.get("files_sha256", {}), runtime.get("files_sha256", {})
     if (previous.get("sha256") != old_key["runtime_sha256"]
             or not old_files or not (set(new_files) - set(old_files)) <= {
-                "minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py"}
+                "minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py",
+                "approximate_reference_cells.py", "adaptive_screening.py"}
             or set(old_files) - set(new_files)
             or any(previous.get(k) != runtime.get(k) for k in
                    ("native_companion_sha256", "native_companion_platform", "recovered_output_admission"))):
         return False
     if old_files == new_files:
-        # Non-mapping package/base metadata changed; payload checks still run.
-        return True
+        # Enabling/disabling approximation changes scientific policy, not just
+        # package/base metadata. Source-changing migrations use reviewed pairs.
+        return previous.get("approximate_output_admission") == runtime.get("approximate_output_admission")
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME}
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME}
                 and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
     if not approved:
         return False
@@ -114,7 +118,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
            and not (name == "windowed_alignment.py" and buffered_equivalent)
            for name in kernels):
         return False
-    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME}
+    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))
             and "ordinary" not in stages):
         partial = candidate / "selective" / "ordinary-native" / opa.RECEIPT

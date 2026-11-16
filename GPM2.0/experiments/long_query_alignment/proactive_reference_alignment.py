@@ -15,7 +15,9 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import time
 
+import approximate_reference_cells as ap
 import guided_alignment as ga
 import native_chain_state as nst
 import native_first as nf
@@ -149,12 +151,24 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             return report
         if subprocess.check_output([mm, "--version"], text=True, timeout=5).strip() != "2.31-r1302":
             raise wa.ExperimentError("long-query original-state recovery requires minimap2 2.31-r1302")
-        bundle = nst.validate_bundle(getattr(args, "native_state_bundle", None))
-        report["helper"] = bundle
-        cache.bind("helper", {k: bundle[k] for k in ("sha256", "manifest_sha256", "platform")})
+        bundle = None
+        def require_bundle():
+            nonlocal bundle
+            if bundle is None:
+                bundle = nst.validate_bundle(getattr(args, "native_state_bundle", None))
+                report["helper"] = bundle
+                cache.bind("helper", {k: bundle[k] for k in ("sha256", "manifest_sha256", "platform")})
+            return bundle
         target = cache.store(args.target, root / "target.bases", "target-store")
         try:
             report["reference"] = target.identity
+            approximate = ap.eligible(target, enabled=prepared_workspace is not None
+                and getattr(args, "approximate_initial_reference", False))
+            if approximate:
+                report.update(routing_mode="adaptive_large_reference", approximate_policy=ap.POLICY,
+                              projection_screening=[], native_reviews=[], discarded_projection_screening=[], native_confidence_reconstructed=False)
+            else:
+                require_bundle()
             cache.bind("reference", target.identity)
             index = cache.index(target, tool["sha256"])
             if index is None:
@@ -229,17 +243,45 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             report.update(index_catalog_sha256=wa.sha256(root / "index-context.json"), index_part_count=len(index["parts"]))
             # Query outer loop: each long record gets ONE store, shared across
             # all original index parts, windows and whole-query guidance.
+            review_remaining = ap.TOTAL_REVIEW_SECONDS
+            review_index = {**index, "path": str(root / "target.default.mmi")}
             for group in (g for g in groups["groups"] if g["route"] == "long_query"):
                 name = group["queries"][0]
                 number = next(r.ordinal for r in catalog.records if r.name == name)
                 directory = root / f"long-{number:08d}"
                 directory.mkdir(exist_ok=cache.enabled)
+                if approximate and (directory / "quality-review.json").exists():
+                    review_state = pr.read_json(directory / "quality-review.json")
+                    if review_state.get("status") == "complete":
+                        reviewed = ap.verify_review(directory, group, review_index, report["tool"], args)
+                        report["native_reviews"].append(reviewed)
+                        merger.add_native(reviewed["native"], [name])
+                        report["parts"].extend({"query": name, "part_index": p["part_index"],
+                            "kind": "reviewed_native", "status": "complete_native_review"} for p in index["parts"])
+                        continue
                 query = None
                 try:
                     for part in index["parts"]:
                         cell = cache.cell(name, part["part_index"])
                         cell_dir = directory / f"part-{part['part_index']:04d}"
                         validator = lambda raw: sr.validate_row(raw, queries, target.records, {name}, "risk")
+                        if approximate and (cell is None or cell.get("kind") == ap.POLICY):
+                            if query is None:
+                                query = cache.store(Path(group["path"]), directory / "query.bases", f"query-store:{number}")
+                                if query.identity["sha256"] != group["sha256"] or list(query.records) != [name]:
+                                    raise wa.ExperimentError("approximate query differs from original complete record")
+                            if cell is None:
+                                # Failed old all-chain cells remain evidence, not
+                                # complete native-window sources.
+                                if cell_dir.exists() and not (cell_dir / ap.MANIFEST).exists():
+                                    pr.archive_partial(cell_dir)
+                            row = ap.run(cell_dir, query, target, report["tool"], part, args)
+                            merger._add(Path(row["path"]), row["sha256"], [name], "approximate",
+                                part_index=part["part_index"], validator=lambda raw: ap.validate_row(raw, name, queries[name]["length"], part))
+                            if cell is not None:cache.reused["long_cells"] += 1
+                            cache.save_cell(row); report["parts"].append(row)
+                            wa.write_json(root / "proactive-candidate.json", report)
+                            continue
                         if cell is not None:
                             if (cell.get("query") != name or cell.get("part_index") != part["part_index"]
                                     or cell.get("directory") != str(cell_dir)
@@ -249,13 +291,18 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                                 pub.check_empty(cell, part, group, report, root)
                                 add_empty_cell(merger, cell_dir, pr.read_json(cell_dir / "guidance.json"), name, part)
                             else:
+                                require_bundle()
                                 proof = rp.check_leaf(cell["publication"], cell_dir, part, report, bundle, sr.validate_row,
                                                       eligibility="proactive_query_length")
                                 pair = proof["paired_paths"]
                                 if pair != cell["pair"]:
                                     raise wa.ExperimentError("cached long-query pair changed")
-                                merger.add_recovered(pair["public_path"], pair["public_sha256"], name, part["part_index"],
-                                    validator, native_evaluated={"path": pair["path"], "sha256": pair["sha256"]})
+                                if approximate:
+                                    merger._add(Path(pair["path"]), pair["sha256"], [name], "legacy_recovered",
+                                        part_index=part["part_index"], validator=lambda raw: sr.validate_row(raw, queries, target.records, {name}, "native"))
+                                else:
+                                    merger.add_recovered(pair["public_path"], pair["public_sha256"], name, part["part_index"],
+                                        validator, native_evaluated={"path": pair["path"], "sha256": pair["sha256"]})
                             cache.reused["long_cells"] += 1
                             report["parts"].append(cell)
                             wa.write_json(root / "proactive-candidate.json", report)
@@ -290,9 +337,40 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                             "guidance_sha256": wa.sha256(options.out / "guidance.json"), "publication": publication})
                         cache.save_cell(report["parts"][-1])
                         wa.write_json(root / "proactive-candidate.json", report)
+                    if approximate and any(r.get("kind") == ap.POLICY for r in report["parts"] if r["query"] == name):
+                        sources = [(r["path"], r["sha256"]) for r in merger.sources if r["queries"] == [name]]
+                        screened = ap.screen_group(directory, name, queries[name]["length"], sources)
+                        report["projection_screening"].append(screened)
+                        wa.write_json(root / "proactive-candidate.json", report)
+                        if not screened["approved"]:
+                            started_review = time.monotonic()
+                            reviewed = ap.native_review(directory, group, review_index, report["tool"], args, seconds=review_remaining)
+                            review_remaining -= time.monotonic() - started_review
+                            report["native_reviews"].append(reviewed)
+                            report["discarded_projection_screening"].append(report["projection_screening"].pop())
                 finally:
                     if query is not None:
                         query.close()
+            if approximate and report["native_reviews"]:
+                # Replace every cell of a reviewed query, not append competing
+                # baseline rows to its candidate. Preserve original source order.
+                reviews = {r["query"]: r for r in report["native_reviews"]}
+                sources = list(merger.sources)
+                pr.archive_partial(root / "reviewed-cells")
+                selected = nf.CellMerger(root / "reviewed-cells", queries, target.records, index["parts"])
+                inserted = set()
+                for source in sources:
+                    reviewed_names = set(source["queries"]) & reviews.keys()
+                    if reviewed_names:
+                        if len(source["queries"]) != 1:
+                            raise wa.ExperimentError("quality review cannot replace part of an opaque ordinary group")
+                        name = source["queries"][0]
+                        if name not in inserted:
+                            selected.add_native(reviews[name]["native"], [name]); inserted.add(name)
+                        continue
+                    part_index = source["parts"][0] if len(source["parts"]) == 1 else None
+                    selected._add(Path(source["path"]), source["sha256"], source["queries"], source["route"], part_index=part_index)
+                merger = selected
             catalog.require_unchanged()
             if not target.unchanged() or not nf.identity_unchanged(Path(mm), tool):
                 raise wa.ExperimentError("original source/tool changed before assembly")
@@ -301,14 +379,16 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             pr.archive_partial(output)
             pr.archive_partial(private)
             report["combination"] = merger.finish(output)
-            report["native_evaluation_combination"] = merger.finish(private, native_evaluated=True)
+            if not approximate:
+                report["native_evaluation_combination"] = merger.finish(private, native_evaluated=True)
             report.update(status="proactive_candidate_complete", output_path=str(output), output_sha256=wa.sha256(output),
-                private_path=str(private), private_sha256=wa.sha256(private), original_inputs_unchanged=True,
-                native_row_bytes_preserved=True, recovered_query_part_cells=report["combination"]["recovered_cells"])
+                private_path=None if approximate else str(private), private_sha256=None if approximate else wa.sha256(private), original_inputs_unchanged=True,
+                native_row_bytes_preserved=True, recovered_query_part_cells=report["combination"]["recovered_cells"],
+                approximate_query_part_cells=sum(r.get("kind") == ap.POLICY and r["query"] not in {x["query"] for x in report.get("native_reviews", [])} for r in report["parts"]))
             if admit_output:
                 report["admission"] = pub.admit(report, root, bundle=bundle)
-                current_bundle = nst.validate_bundle(Path(bundle["manifest_path"]).parent)
-                if any(current_bundle[k] != bundle[k] for k in ("sha256", "manifest_sha256", "platform")):
+                current_bundle = nst.validate_bundle(Path(bundle["manifest_path"]).parent) if bundle is not None else None
+                if bundle is not None and any(current_bundle[k] != bundle[k] for k in ("sha256", "manifest_sha256", "platform")):
                     raise wa.ExperimentError("native companion changed during proactive execution")
             catalog.require_unchanged()
             if not target.unchanged() or not nf.identity_unchanged(Path(mm), tool):

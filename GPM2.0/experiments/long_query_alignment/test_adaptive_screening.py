@@ -17,7 +17,7 @@ def row(covered=100, targets=None, length=100, strand="+"):
     return {"length": length, "covered": covered, "targets": targets,
             "target_strands": {t: {strand: n} for t, n in targets.items()},
             "assignment_candidates": {t: {"covered": n, "strand_weights": {"+": n if strand == "+" else 0,
-                "-": n if strand == "-" else 0}, "anchor_start": 1} for t, n in targets.items()}}
+                "-": n if strand == "-" else 0}, "anchor_start": 1, "anchor_spans": {"+": [1,1], "-": [1,1]}} for t, n in targets.items()}}
 
 
 def measurement(outcome="completed", wall=100, mid=500):
@@ -244,6 +244,34 @@ class CandidateProjectionScreenTests(unittest.TestCase):
         result = policy.screen_candidate_projection({"q": row(100, {"a":50,"b":50})})
         self.assertEqual(result["queries"][0]["reasons"], ["covered_but_unassigned"])
         self.assertEqual(result["queries"][0]["action"], "bounded_review")
+
+    def test_same_target_incoherent_anchors_request_review(self):
+        candidate = row()
+        candidate["assignment_candidates"]["chr1"]["anchor_spans"]["+"] = [1, 22]
+        result = policy.screen_candidate_projection({"q": candidate})["queries"][0]
+        self.assertEqual(result["reasons"], ["non_collinear_target_support"])
+        self.assertEqual(result["dominant_anchor_spread_fractions"], {"chr1": .21})
+
+    def test_anchor_spread_boundary_and_minority_orientation(self):
+        candidate = row()
+        candidate["assignment_candidates"]["chr1"]["anchor_spans"] = {"+": [1, 21], "-": [-100, 100]}
+        result = policy.screen_candidate_projection({"q": candidate})["queries"][0]
+        self.assertEqual(result["reasons"], [])
+        self.assertEqual(result["dominant_anchor_spread_fractions"], {"chr1": .20})
+
+    def test_missing_or_invalid_anchor_evidence_is_not_silent_approval(self):
+        for span in (None, [], [2, 1], [1., 2], [True, 2]):
+            with self.subTest(span=span):
+                candidate = row()
+                candidate["assignment_candidates"]["chr1"]["anchor_spans"] = {"+": span}
+                result = policy.screen_candidate_projection({"q": candidate})["queries"][0]
+                self.assertIn("anchor_coherence_evidence_missing", result["reasons"])
+                self.assertEqual(result["action"], "bounded_review")
+
+    def test_weighted_anchor_quantiles_ignore_small_outlier_weight(self):
+        self.assertEqual(policy.weighted_anchor_span([(-1000, 1), (10, 89), (20, 9), (1000, 1)]), [10, 10])
+        self.assertEqual(policy.weighted_anchor_span([(20, 50), (10, 50)]), [10, 20])
+        with self.assertRaises(ValueError):policy.weighted_anchor_span([])
 
     def test_no_obvious_risk_is_never_a_quality_approval(self):
         result = policy.screen_candidate_projection({"q": row()})

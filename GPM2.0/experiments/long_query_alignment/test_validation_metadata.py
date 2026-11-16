@@ -196,7 +196,7 @@ class KeyMigrationTests(unittest.TestCase):
     def test_legacy_full_profile_is_frozen_and_matches_the_approved_digest(self):
         digest = hashlib.sha256(json.dumps(LEGACY,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         self.assertEqual(digest, pr._REVIEWED_LEGACY_RUNTIME)
-        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py"})
+        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py", "approximate_reference_cells.py", "adaptive_screening.py"})
 
     def test_reviewed_runtime_and_ctime_transition_retains_old_controls(self):
         self.target.chmod(0o400);self.query.chmod(0o400)
@@ -276,6 +276,41 @@ class KeyMigrationTests(unittest.TestCase):
     def test_resource_runtime_pair_does_not_admit_unreviewed_native_stream_code(self):
         runtime=self.resource_runtime()
         runtime['files_sha256']={**runtime['files_sha256'],'native_first.py':'0'*64}
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertFalse(reused);self.assertNotEqual(attempt,self.attempt)
+
+    def test_reviewed_automatic_route_retains_buffered_native_and_recovered_work(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_automatic_window_runtime.json').read_text())
+        digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest(files),pr._REVIEWED_BUFFERED_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files}
+        runtime={**self.runtime,'approximate_output_admission':sa.ap.POLICY,
+                 'native_resume_source_profiles':[[pr._REVIEWED_BUFFERED_RUNTIME,digest(self.runtime['files_sha256'])]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        self.cache.mark('cell:0:long',{'test_only':'legacy payload still needs verification'})
+        before=self.cache.data['stages'].copy()
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
+    def test_reviewed_projection_screen_upgrade_preserves_completed_cells(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_projection_coherence_runtime.json').read_text())
+        digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest(files),pr._REVIEWED_AUTOMATIC_WINDOW_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files,'approximate_output_admission':sa.ap.POLICY}
+        runtime={**self.runtime,'approximate_output_admission':sa.ap.POLICY,
+                 'native_resume_source_profiles':[[pr._REVIEWED_AUTOMATIC_WINDOW_RUNTIME,digest(self.runtime['files_sha256'])]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        self.cache.mark('cell:0:long',{'test_only':'source cell still needs complete payload revalidation'})
+        before=self.cache.data['stages'].copy()
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
+    def test_package_approximation_toggle_is_not_metadata_only(self):
+        previous={**self.old_runtime,'files_sha256':self.runtime['files_sha256']}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        runtime={**self.runtime,'approximate_output_admission':sa.ap.POLICY}
         attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
         self.assertFalse(reused);self.assertNotEqual(attempt,self.attempt)
 

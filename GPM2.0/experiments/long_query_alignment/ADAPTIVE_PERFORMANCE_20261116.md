@@ -859,3 +859,131 @@ A broader discovery before the two final v3 policy controls passed 688 tests
 with one explicitly unavailable native-source oracle skipped. Generated Server
 runtime sources remain synchronized and unchanged by this experimental selector.
 Production admission/default execution and release closure remain outstanding.
+
+
+## Automatic Server long-record integration (2026-11-17)
+
+The generated Server source now contains the separate
+`bounded_native_window_projection_v1` admission contract. This is source-tree
+integration, not a published release or complete wheat acceptance. Ordinary
+filter calibration remains experimental and is not silently enabled by this work.
+
+### Internal trigger and finite work
+
+- Only the prepared initial-reference `asm10` path opts in through its packaged
+  runtime contract. No customer size decision or new CLI option is required.
+- Preserve ordinary native mapping. The approximate branch applies to records
+  already routed as over the packed-operation limit (268,435,455 bp), when the
+  normalized reference is at least 5 Gb. A 20-Mb ordinary record alone does not
+  trigger this long-record branch. Smaller-reference exact recovery is unchanged.
+- Use 5-Mb owned cores with 100-kb context, ordinary native window candidate
+  selection, and each ORIGINAL serialized index part's inherited occurrence
+  threshold. This does not substitute `-P` enumeration, a target subset, or a new
+  global f=0.01 default. Every original query/part cell, including empty cells,
+  must complete before a full-record projection can be admitted.
+- Per-cell mapper budget: 900 s; full cell invocation: 2700 s; raw PAF ceiling:
+  64 MiB; mapper address-space ceiling: 36 GiB, or a lower explicit limit.
+  Completed raw mapping and ownership stages are sealed before later work.
+  A later interruption reuses those stages rather than repeating the mapper.
+- Screen ALL parts of a query together. Low support, ambiguous assignments or
+  orientation, near-threshold support, and dispersed same-target anchors request
+  one complete-query native review, capped at 600 s each / 1200 s aggregate per
+  invocation. A failed review is not retried automatically and its partial output
+  is never published. A completed review REPLACES all candidate cells of that
+  query; baseline and candidate rows are not concatenated for the same query.
+- Projected rows have MAPQ 255 and no fabricated AS/ms/s1/s2/cm/tp values. The
+  separate geometry/base-check contract cannot be relabeled as native-confidence
+  recovery. No native C-API helper is needed for fresh approximate cells. Legacy
+  completed exact cells retain their existing native-evaluated output and proof.
+
+### Anchor-coherence screen and measured cases
+
+`adaptive-screening-v4` adds block-weighted 10th/90th anchor positions for each
+orientation. For each assigned target, the dominant orientation's span divided
+by the full query length must not exceed 0.20; missing evidence requests review.
+This is a provisional risk screen, NOT a proof of native global-candidate recall.
+Minority-orientation rearrangements do not alone trigger this dispersion rule.
+
+Two actual pinned-minimap2 controls expose failures that union coverage misses:
+(1) many separate local competitors preserve 100% union but lose the global
+chromosome assignment; (2) local repeats on ONE target preserve 100% union and
+one orientation but yield incoherent placements. Both automatically trigger the
+bounded native review and publish its complete bytes instead of the projection.
+The positive, reverse-strand, multipart/empty-part, input mutation, failed review,
+cancellation, closed-native-contract and zero-remapping resume controls also pass.
+The focused suite has 13 actual-tool Server tests and 52 policy/runner tests.
+
+Re-auditing the completed 289,508,469-bp wheat projection (same final PAF SHA-256
+`e188be167d498a14467bca393a1712a1070d3d11b513da1b86f00a907e1ecce6`)
+under v4 gives target 3D, query union 0.9925641623 and dominant anchor span
+fraction 0.0067711871. It has no newly detected assignment risk. There is still
+NO complete native baseline for that record, so this is not an accuracy estimate
+or a customer end-to-end speedup claim.
+
+### Prepared entry and source-upgrade continuity
+
+An isolated real `prepare.sh` workspace executed its generated `command.sh`
+(only fixture routing thresholds scaled down), then the actual generated
+`assign_chr_groups.sh`. The outputs assign the 4-kb short record and two 90-kb
+forward/reverse records correctly, including assignment FASTA partitioning.
+This is not validation of the entire downstream LGZ/final archive workflow.
+
+Real separate-process source migration executed the old buffered runtime
+`dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db`,
+interrupted after one exact long cell, and then ran the new source. It retained
+ordinary output, index, sequence stores and the completed exact cell unchanged,
+executing exactly ONE mapper for the missing approximate cell. A subsequent
+process ran zero mapper/index/guidance commands and preserved the final PAF.
+
+A further real upgrade from the initial automatic-window source profile
+`4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab` to
+`88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89`
+recomputed the v4 screening, executed ZERO external commands, and preserved the
+published bytes. The reviewed migration pairs are exact file profiles, not a
+blanket module whitelist. The v4 quality screen is not bypassed by an older
+cached screening decision.
+
+Still open: ordinary automatic pilot execution/amortization and measured complete
+hybrid cost; real large-reference execution through this Server entry with normal
+thresholds; downstream customer-scale validation; published Server release closure.
+
+
+ARM Server-entry smoke `41981280` SUCCEEDED on agent-ARM-06 on November 17,
+01:02:16–01:02:22 CST, requesting 1 CPU (5-GiB queue limit). The actual adapter
+plus zero-remapping resume took 2.236 s on the small fixture. All 31 runtime file
+hashes match the reviewed `88e14005...` profile. The fresh ARM route required NO
+native C-API companion: its package explicitly kept the old confidence-recovery
+contract closed while enabling the separate approximate geometry contract.
+The run used the same pinned ARM minimap2 2.31-r1302 as the wheat experiments,
+SHA-256 `03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc`;
+the installed module version differs and was not substituted in this control.
+Output SHA-256: `f2adf1c9b13e21c13c7dcaf38490988f14cf1cc792786cd2cf7b51e56b72baa1`.
+Scripts, payload checksums and receipt are preserved under
+`server-automatic-smoke-v4/` in the existing remote experiment root. The fixture
+uses reduced routing/window thresholds, so this proves ARM entry/resume execution,
+NOT real large-reference workload completion or a speedup measurement.
+
+The complete long-query discovery at this source profile passed **710 tests** in
+179.456 s, with one explicitly unavailable native-source oracle skipped. Pinned
+minimap2 and the audited portable x86 companion were present, so the actual-tool
+Server and native-bridge controls ran. An earlier full run observed one transient
+native trace query-end mismatch; the unchanged check passed in an isolated repeat
+and subsequent complete discoveries. Its cause is not established. Failure-tail
+diagnostics were added to preserve future evidence, not to waive that check.
+
+
+Real-size adapter job `41996964` was submitted and confirmed RUNNING on
+agent-ARM-20 at 01:10 CST (start 01:09:04, November 17). It uses the complete
+14.55-Gb IWGSC reference and ONLY the original 289.5-Mb query, with NO routing or
+window threshold overrides. Its 8-CPU allocation is needed for the 36-GiB mapper
+address-space ceiling within the ARM queue's 5-GiB/core limit; total shell budget
+is 7500 s. No full-assembly run or parameter sweep is involved.
+
+The harness imports only verified reference preprocessing: fresh source/spool,
+whole-index and original-part hashes; original index build command/receipt;
+current MMI record/extents validation. It hardlinks these read-only contents into
+a fresh private attempt and records `preprocessing-adoption.json`. It does NOT
+import/relabel old mapping receipts or claim that a new index build executed.
+Mapping, ownership, stitching, admission and zero-mapper resume are exercised by
+the actual new Server adapter. This job is NOT yet a completed result at this
+checkpoint. Artifacts: `server-full-long-v4/` under the existing remote root.

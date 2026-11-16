@@ -3,15 +3,17 @@
   "status": "source_checked_recovery_runtime",
   "scope": "initial_reference_asm10_only",
   "files_sha256": {
+    "approximate_reference_cells.py": "b40686f9de5b58f9dec69407cbabfb5588c0463ae606e5fc166f6e7ac4dea99b",
+    "adaptive_screening.py": "d832a1d45ffd8e449fb850969f5e7d659b9b029ad00905af6a98c3b865334322",
     "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
-    "proactive_reference_alignment.py": "04d0ae77708f5388133651333cfa4c843ae77515c191e99527cc10f1fba21c13",
-    "proactive_publication.py": "3e48b9b84d5abe5653fc2159d5b045c0c7d8f958bdf2eee52447f7ce4a0ad923",
-    "proactive_resume.py": "65a282013ebd7251ab48aec4f3751aafeabeedec4d3c162ba6290faeec0c7b12",
-    "server_alignment.py": "eb51d66d1e4a7def9aa383964eddf4175c3633aa8c9d2b360ed90780e0e00a83",
+    "proactive_reference_alignment.py": "26e08085c48e923233f32a24717892f98269adb888c3416227fc9d325d6bae6e",
+    "proactive_publication.py": "be9fe2dd9fc11ffbccdbd8906d76271ba498c6e07e0ce000de08e6156f57e0e6",
+    "proactive_resume.py": "686e5e44981e86e49182362a77b62d6bb9c1f98865afe4b27bbd0a2c916bb278",
+    "server_alignment.py": "07a21f26976d4866e7953c1e703841dc56082abedec4627d8742f33bdedf2755",
     "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
     "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
     "windowed_alignment.py": "000713110a82508585e820f470e92d70e4f3c326674cb8254ed6279c51a49caa",
-    "native_first.py": "10d75556e5c1846117fa46c0956c4325221953b5e11adb8251b1574aad8b98f7",
+    "native_first.py": "9ff3abb822ab8494acdf6b1f4f9c9d23a79b24f4aa7ca429cc51443f6f948e4b",
     "native_evaluation.py": "33f6a37fa6a0b6db621630edbfc5aa8ba8c7eaf5e5b87fde483db8edfe50b0b2",
     "native_chain_state.py": "9e4f8efe083e3b65a922e7edfed469baf06e2d8bb35f9b109248a82e78e44cea",
     "build_native_chain_state.py": "a1da3b26759007a8185f8818fd8ddbbbc074ae1146221097b59f815d6785fc22",
@@ -39,35 +41,44 @@
   "handoff_base_sha256": "8005638709b5273327512ac249225a249b8e661cb73f035dd4b10fa7d4d09480",
   "production_ready": false,
   "customer_configuration_required": false,
+  "approximate_output_admission": "bounded_native_window_projection_v1",
   "generated_from": "GPM2.0/experiments/long_query_alignment; sync_server_runtime.py",
   "native_resume_source_profiles": [
     [
       "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
-      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
     ],
     [
       "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d",
-      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
     ],
     [
       "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560",
-      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
     ],
     [
       "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa",
-      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
     ],
     [
       "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58",
-      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
     ],
     [
       "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
-      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
     ],
     [
       "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
-      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+    ],
+    [
+      "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db",
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+    ],
+    [
+      "4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab",
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
     ]
   ]
 }

@@ -95,7 +95,17 @@ class NativeChainStateIntegrationTests(unittest.TestCase):
                         core_bases=50000,context_bases=4000,guide_slack=1000,threads=2,timeout=120,memory_gib=0,
                         require_full_query_coverage=False,index_context=context,allow_empty_index_part=False,
                         window_candidate_policy="all_chains_pool",recover_path_scores=True,native_state_bundle=Path(self.bundle))
-                    report = ga.experiment(args)
+                    try:
+                        report = ga.experiment(args)
+                    except Exception as exc:
+                        # Keep the failing protocol tail in the test error before
+                        # TemporaryDirectory cleanup. Do not waive trace checks.
+                        tails = []
+                        for trace in root.rglob("native-state.stderr"):
+                            with trace.open("rb") as stream:
+                                stream.seek(max(0, trace.stat().st_size - 4096))
+                                tails.append(str(trace.relative_to(root)) + "\n" + stream.read(4096).decode("ascii", errors="replace"))
+                        raise AssertionError("native bridge failed; preserved trace tails: " + repr(tails)) from exc
                     evaluated = Path(report["native_recovery"]["native_evaluated_paf"])
                     self.assertEqual(ne.comparison_signature(evaluated),ne.comparison_signature(baseline))
                     self.assertTrue(report["native_recovery"]["selection"]["native_decisions_applied"])

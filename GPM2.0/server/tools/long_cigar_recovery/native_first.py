@@ -186,7 +186,8 @@ def attempt(mm,target,query,root,args,*,mid_occ=None):
     output = root/"native.partial.paf"
     flags = mo.native_flags(args, mid_occ=mid_occ)
     command = [mm,"-c","-x","asm10",*flags,"-t",str(args.threads),"-o",str(output),str(target),str(query)]
-    execution = wa.run_command(command,root,"native",args.timeout,args.memory_gib,allow_failure=True)
+    execution = wa.run_command(command,root,"native",args.timeout,args.memory_gib,allow_failure=True,
+        **({"max_file_bytes": args.max_output_bytes} if getattr(args, "max_output_bytes", None) is not None else {}))
     log = inspect_stderr(root/"native.stderr")
     status = classify(execution,log)
     if status=="native_success":
