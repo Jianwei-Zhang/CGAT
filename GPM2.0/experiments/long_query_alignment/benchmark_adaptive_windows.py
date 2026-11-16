@@ -59,6 +59,7 @@ def extract_span(path, start, end):
 def owned_coverage(path, windows, start, end):
     by_name = {w["name"]: w for w in windows}
     spans, targets = [], defaultdict(list)
+    strands = defaultdict(lambda: defaultdict(list))
     with path.open() as stream:
         for line in stream:
             f = line.rstrip("\n").split("\t")
@@ -67,8 +68,11 @@ def owned_coverage(path, windows, start, end):
             b = min(w["core_end"], w["query_start"] + int(f[3]))
             if a < b:
                 spans.append((a-start, b-start)); targets[f[5]].append((a-start, b-start))
+                strands[f[5]][f[4]].append((a-start, b-start))
     return {"probe": {"length": end-start, "covered": policy.union_length(spans),
-                      "targets": {t: policy.union_length(s) for t, s in targets.items()}}}
+                      "targets": {t: policy.union_length(s) for t, s in targets.items()},
+                      "target_strands": {t: {strand: policy.union_length(s) for strand, s in values.items()}
+                                         for t, values in strands.items()}}}
 
 
 def execute(args):
@@ -156,7 +160,7 @@ def execute(args):
             comparison={"core_bases":run["core_bases"],"production_approved":False}
             if baseline["outcome"]==run["outcome"]=="completed":
                 comparison.update(mapping_speedup=baseline["wall_seconds"]/run["wall_seconds"],
-                    coverage_risks=policy.assess_loss(profiles[50_000_000],profiles[run["core_bases"]]))
+                    coverage_risks=policy.assess_loss(profiles[50_000_000],profiles[run["core_bases"]],require_consumer=False))
             elif baseline["outcome"]=="timeout" and run["outcome"]=="completed":
                 comparison.update(mapping_speedup_lower_bound=min(baseline["wall_seconds"],baseline["wall_budget_seconds"])/run["wall_seconds"],quality_baseline_available=False)
             r["comparisons"].append(comparison)

@@ -221,3 +221,105 @@ Window-probe ARM smoke job `41778683` uses a generated 6 Mb query with a complet
 synthetic reference, exercising actual 1/1/2-window maps under 50/10/5 Mb cores.
 It is separate from the customer workload and cannot prove wheat speedup. Local
 adaptive/subset/catalogue/window suite currently has 47 passing tests, no skips.
+
+### Policy v2: actual assignment-consumer risk and offline re-audit
+
+The diagnostic's single-best-target heuristic is NOT the Server assignment
+contract. `server/tools/assign_chr_groups.py` retains **every** chromosome reaching
+60% coverage (the current fixture threshold), using only blocks >=1000 bp or >=25%
+of the query. Orientation uses summed qualifying block lengths, with ties choosing
+`+`; anchor placement is a weighted median. Consequently, deleting overlapping
+negative-strand hits can flip downstream orientation while per-strand union
+coverage remains identical. Policy v2 now records these actual projections and
+flags removed assignments, newly added assignments for already assigned queries,
+and changed downstream orientations. Anchor shifts are reported quantitatively;
+no unmeasured universal anchor-distance accuracy threshold is asserted.
+
+`test_adaptive_assignment_contract.py` executes the real Server interval/median
+helpers and PAF-to-assignment loops on tiny controlled fixtures, without launching
+the full assignment script. It cross-checks multi-chromosome retention, short-hit
+qualification, the 60% boundary, block-weighted direction changes and anchors.
+Coverage gained by previously weak/unassigned queries is not mislabeled as hidden
+ambiguity. These are eligibility/review gates for further tests, not biological
+accuracy guarantees.
+
+`audit_adaptive_pilot.py` rechecks terminal pilot PAF hashes and geometry under the
+current policy without invoking a mapper or rewriting the original report. Old
+frozen job payloads remain unchanged. Old v1 candidate eligibility must be
+re-audited before promotion; incomplete/partial PAF is never used as a baseline.
+The auditor does not claim to revalidate the present-day source FASTA files.
+
+Window smoke `41778683` SUCCEEDED on `agent-ARM-33` (34 s job wall). The three
+window mapping calls took approximately 3.43 / 3.43 / 3.38 s and all retained the
+same 6 Mb core coverage. This is a harness success and **not a demonstrated
+performance improvement**. Its six completed filtering-control PAFs and report
+were downloaded with SHA-256 checks and successfully re-audited with policy v2;
+no filtering strategy was selected because effective thresholds were unchanged.
+Local adaptive tests: 68 passed, no skips.
+
+A separate cheap-probe calibration job `41813859` was submitted: two COMPLETE
+ordinary records (`ptg000321l`, `ptg001708l`, total 3,487,782 bp), full unchanged
+IWGSC reference, 8 CPUs / 32 GiB requested memory, 32 GiB address-space cap, and
+1,800 s total index/mapping budget. Input extraction reuses the verified 33.46 Mb
+subset rather than rescanning the whole hifiasm gzip. This evaluates future
+preflight cost and does **not** replace the original larger pilot `41767856` or
+the required full long-query validation. A separate index build in this calibration
+must be counted as experiment overhead; no shared-index or end-to-end speedup is
+claimed. Both pilot jobs remain authoritative handles to inspect, not reasons to
+submit duplicate work while the ARM queue is busy.
+
+At 19:09 the authoritative scheduler showed micro pilot `41813859` RUNNING on
+`agent-ARM-20` (started 19:06:44); its 49 packaged unit/regression tests passed.
+The larger `41767856` remained PENDING. These are not yet performance results:
+the benchmark first scans and verifies the full reference before starting its
+bounded mapping/index clock. Do not interpret the absence of an early mapping
+receipt as a stalled or missing job and do not resubmit either handle.
+
+### First real wheat micro-pilot results and next bounded long-window probe
+
+Job `41813859` SUCCEEDED on ARM-20 at 19:20:48 on 2026-11-16 (started
+19:06:44). The full default index built in 197.53 s; peak index RSS was about
+26.08 GB. The two complete query records total 3,487,782 bp. All six mapping
+calls completed against both original IWGSC index parts; same-policy PAF hashes
+were repeatable across the forward/reverse run order.
+
+| Filtering | First map (s) | Reverse-order repeat (s) | Effective mid_occ |
+| --- | ---: | ---: | ---: |
+| default | 75.70 | 74.99 | 500 |
+| `-f 0.005` | 51.91 | 50.91 | 73 |
+| `-f 0.01` | 48.75 | 52.11 | 50 |
+
+Paired mapping speedups are only 1.44–1.55x, below the experimental 2x gate.
+`ptg001708l` loses 20,005 / 23,706 covered bases (4.00% / 4.74% of its length),
+although the other record gains coverage. Positive loss must not be cancelled
+out by gains elsewhere: the corresponding positive-loss fractions of total
+query bases are 0.5736% / 0.6797%. Neither candidate passes current experimental
+loss limits. No projected downstream assignment, orientation or anchor change
+was detected in these two records; that is not full scientific acceptance.
+The report and all six PAFs were downloaded and their recorded hashes checked;
+current-policy offline re-audit also selects no candidate. Do not loosen limits
+merely to label this experiment successful.
+
+The 14m04s scheduler duration includes full-source verification, indexing,
+six maps and tests. It is NOT an acceptable universal preflight overhead for
+small ordinary jobs. Future automatic admission must use original input shape
+and measured task cost, reuse verified existing indexes, and avoid applying
+expensive probes indiscriminately. This micro result does not establish the
+behavior of the 289.5 Mb record or resolve the original long-window bottleneck.
+
+Real-window diagnostic job `41824802` was submitted at 19:24 on ARM, with
+8 CPUs / 40 GiB requested memory and a 36 GiB child address-space cap. It reuses
+the completed micro pilot index, checks its SHA-256, and copies the original
+serialized index partitions without repartitioning or rebuilding. It compares
+50 / 10 / 5 Mb cores over the SAME first 50 Mb span of `ptg000049l`, against
+original index part 0, with unchanged default filtering and `-P`. Each mapping
+has a 600 s cap; the mapping/threshold budget is 2,000 s, excluding preparation.
+Memory failure remains a resource result, not permission to reduce sensitivity.
+
+Frozen payload: `real-window-tools-v2`, SHA-256
+`55bafc8b4b0ccc074d76e8e8e369c1203319b66c78b2ec8575fd3d20d93818b5`.
+Output: `real-window-default-part0-v2/windows.json` under the same private root.
+This is ONE original reference part and ONE query span, not whole-query recovery
+or end-to-end acceptance. The larger ordinary job `41767856` remained PENDING
+at 19:23 and was not duplicated or cancelled. No production automatic sensitivity
+policy has been enabled by these experimental changes.

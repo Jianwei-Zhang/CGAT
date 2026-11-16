@@ -12,7 +12,7 @@ import hashlib
 import json
 import math
 
-POLICY = "adaptive-screening-v1"
+POLICY = "adaptive-screening-v2"
 LONG_QUERY_LIMIT = (1 << 28) - 1
 
 
@@ -74,19 +74,62 @@ def coverage_profile(path, records):
         raise ValueError("audit PAF exceeds 64 MiB; no automatic recommendation")
     lengths = record_lengths(records)
     spans, targets = defaultdict(list), defaultdict(lambda: defaultdict(list))
+    target_strands = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    qualified = defaultdict(lambda: defaultdict(lambda: {"spans": [], "anchors": [], "weights": {"+": 0, "-": 0}}))
     with path.open() as stream:
         for line in stream:
             f = line.rstrip("\n").split("\t")
             if len(f) < 12 or f[0] not in lengths or int(f[1]) != lengths[f[0]]:
                 raise ValueError("PAF query identity mismatch")
             start, end = int(f[2]), int(f[3])
-            if not 0 <= start < end <= lengths[f[0]]:
+            if f[4] not in ("+", "-") or not 0 <= start < end <= lengths[f[0]]:
                 raise ValueError("PAF query range invalid")
             spans[f[0]].append((start, end))
             targets[f[0]][f[5]].append((start, end))
+            target_strands[f[0]][f[5]][f[4]].append((start, end))
+            block = int(f[10])
+            # Match assign_chr_groups.py: small hits must cover >=25% of the
+            # query; otherwise the block must be >=1000 bp. Every qualifying
+            # chromosome can be assigned, not just the best-scoring target.
+            if block >= 1000 or block * 4 >= lengths[f[0]]:
+                bucket = qualified[f[0]][f[5]]
+                bucket["spans"].append((start, end))
+                anchor = int(f[7]) - start + 1 if f[4] == "+" else int(f[7]) + 1 - lengths[f[0]] + end
+                bucket["anchors"].append((anchor, block))
+                bucket["weights"][f[4]] += block
     return {q: {"length": n, "covered": union_length(spans[q]),
-                "targets": {t: union_length(s) for t, s in sorted(targets[q].items())}}
+                "targets": {t: union_length(s) for t, s in sorted(targets[q].items())},
+                "target_strands": {t: {strand: union_length(s) for strand, s in sorted(by_strand.items())}
+                                   for t, by_strand in sorted(target_strands[q].items())},
+                "assignment_candidates": {t: {"covered": union_length(b["spans"]),
+                    "strand_weights": b["weights"], "anchor_start": weighted_anchor(b["anchors"])}
+                    for t, b in sorted(qualified[q].items())}}
             for q, n in lengths.items()}
+
+
+def weighted_anchor(values):
+    threshold = sum(w for _, w in values) // 2 + 1
+    cumulative = 0
+    for position, weight in sorted(values):
+        cumulative += weight
+        if cumulative >= threshold:
+            return position
+    raise ValueError("positive anchor weights required")
+
+
+def consumer_assignments(row, limits):
+    """Projection of current assign_chr_groups.py, including multiple targets."""
+    result = {}
+    for target, candidate in row["assignment_candidates"].items():
+        covered, weights = candidate["covered"], candidate["strand_weights"]
+        if (type(covered) is not int or not 0 < covered <= row["length"]
+                or set(weights) != {"+", "-"} or any(type(v) is not int or v < 0 for v in weights.values())
+                or sum(weights.values()) <= 0 or type(candidate["anchor_start"]) is not int):
+            raise ValueError("invalid downstream assignment evidence")
+        if covered / row["length"] >= limits.assignment_coverage:
+            result[target] = {"orientation": "-" if weights["-"] > weights["+"] else "+",
+                              "anchor_start": candidate["anchor_start"], "covered": covered}
+    return result
 
 
 def assignment(row, limits):
@@ -100,10 +143,23 @@ def assignment(row, limits):
     return ranked[0][0]
 
 
-def assess_loss(before, after, limits=Limits()):
+def ambiguous_assignment(row, limits):
+    ranked = sorted(row["targets"].values(), reverse=True)
+    return (len(ranked) > 1 and ranked[0] / row["length"] >= limits.assignment_coverage
+            and (ranked[0] - ranked[1]) / row["length"] < limits.assignment_margin)
+
+
+def strand_assignment(row, target, limits):
+    return assignment({"length": row["length"], "targets": row["target_strands"].get(target, {})}, limits)
+
+
+def assess_loss(before, after, limits=Limits(), *, require_consumer=True):
     if not before or before.keys() != after.keys():
         raise ValueError("complete identical query sets required")
     losses, flips, lost_assignment, lost_queries, false_certainty = [], [], [], [], []
+    strand_flips, strand_lost, strand_hidden, strand_missing = [], [], [], []
+    consumer_removed, consumer_added, consumer_flips, consumer_missing, anchors = [], [], [], [], []
+    consumer_extra = []
     for q, a in before.items():
         b = after[q]
         if a["length"] != b["length"]:
@@ -113,6 +169,14 @@ def assess_loss(before, after, limits=Limits()):
                     or type(row["covered"]) is not int or not 0 <= row["covered"] <= row["length"]
                     or any(type(v) is not int or not 0 < v <= row["covered"] for v in row["targets"].values())):
                 raise ValueError("invalid coverage evidence")
+            if "target_strands" in row:
+                if set(row["target_strands"]) != set(row["targets"]):
+                    raise ValueError("incomplete target/strand evidence")
+                for target, values in row["target_strands"].items():
+                    if (not values or not set(values) <= {"+", "-"}
+                            or any(type(v) is not int or not 0 < v <= row["targets"][target] for v in values.values())
+                            or sum(values.values()) < row["targets"][target]):
+                        raise ValueError("invalid target/strand coverage")
         loss = max(0, a["covered"] - b["covered"])
         if loss:
             losses.append({"query": q, "bases": loss, "fraction": loss / a["length"]})
@@ -124,8 +188,36 @@ def assess_loss(before, after, limits=Limits()):
         if old and not new:
             lost_assignment.append(q)
         # Pruning an alternative must not masquerade as increased confidence.
-        if not old and new and len(a["targets"]) > 1:
+        if not old and new and ambiguous_assignment(a, limits):
             false_certainty.append(q)
+        if "target_strands" not in a or "target_strands" not in b:
+            strand_missing.append(q)
+        elif old and old == new:
+            old_strand, new_strand = strand_assignment(a, old, limits), strand_assignment(b, new, limits)
+            if old_strand and new_strand and old_strand != new_strand:
+                strand_flips.append(q)
+            elif old_strand and not new_strand:
+                strand_lost.append(q)
+            elif not old_strand and new_strand and len(a["target_strands"][old]) > 1:
+                strand_hidden.append(q)
+        if "assignment_candidates" not in a or "assignment_candidates" not in b:
+            if require_consumer:
+                consumer_missing.append(q)
+        else:
+            old_assignments, new_assignments = consumer_assignments(a, limits), consumer_assignments(b, limits)
+            consumer_removed.extend({"query": q, "target": t} for t in sorted(old_assignments.keys() - new_assignments.keys()))
+            added = [{"query": q, "target": t} for t in sorted(new_assignments.keys() - old_assignments.keys())]
+            consumer_added.extend(added)
+            if old_assignments:
+                consumer_extra.extend(added)
+            for target in sorted(old_assignments.keys() & new_assignments.keys()):
+                old_row, new_row = old_assignments[target], new_assignments[target]
+                if old_row["orientation"] != new_row["orientation"]:
+                    consumer_flips.append({"query": q, "target": target})
+                delta = new_row["anchor_start"] - old_row["anchor_start"]
+                if delta:
+                    anchors.append({"query": q, "target": target, "delta_bp": delta,
+                                    "fraction_of_query_length": abs(delta) / a["length"]})
     total = sum(r["length"] for r in before.values())
     positive_loss = sum(r["bases"] for r in losses)
     reasons = []
@@ -134,13 +226,24 @@ def assess_loss(before, after, limits=Limits()):
     if any(r["fraction"] > limits.per_query_loss_fraction for r in losses):
         reasons.append("per_query_coverage_loss")
     for name, items in (("assignment_flip", flips), ("assignment_lost", lost_assignment),
-                        ("mapped_query_lost", lost_queries), ("ambiguity_hidden", false_certainty)):
+                        ("mapped_query_lost", lost_queries), ("ambiguity_hidden", false_certainty),
+                        ("strand_flip", strand_flips), ("strand_assignment_lost", strand_lost),
+                        ("strand_ambiguity_hidden", strand_hidden), ("strand_evidence_missing", strand_missing),
+                        ("downstream_assignment_removed", consumer_removed), ("downstream_extra_assignment", consumer_extra),
+                        ("downstream_orientation_changed", consumer_flips), ("downstream_evidence_missing", consumer_missing)):
         if items:
             reasons.append(name)
     return {"passed": not reasons, "reasons": reasons, "coverage_losses": losses,
             "positive_loss_fraction": positive_loss / total, "assignment_flips": flips,
             "lost_assignments": lost_assignment, "lost_queries": lost_queries,
             "newly_confident_ambiguous_queries": false_certainty,
+            "strand_flips": strand_flips, "lost_strand_assignments": strand_lost,
+            "newly_confident_strand_ambiguous_queries": strand_hidden,
+            "queries_missing_strand_evidence": strand_missing,
+            "downstream_assignments_removed": consumer_removed, "downstream_assignments_added": consumer_added,
+            "downstream_orientation_changes": consumer_flips, "downstream_anchor_shifts": anchors,
+            "queries_missing_downstream_evidence": consumer_missing,
+            "downstream_projection_required": require_consumer,
             "scientific_accuracy_proven": False}
 
 

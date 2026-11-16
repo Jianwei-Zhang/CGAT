@@ -12,8 +12,12 @@ import adaptive_screening as policy
 import benchmark_adaptive_screening as bench
 
 
-def row(covered=100, targets=None, length=100):
-    return {"length": length, "covered": covered, "targets": {"chr1": covered} if targets is None else targets}
+def row(covered=100, targets=None, length=100, strand="+"):
+    targets = {"chr1": covered} if targets is None else targets
+    return {"length": length, "covered": covered, "targets": targets,
+            "target_strands": {t: {strand: n} for t, n in targets.items()},
+            "assignment_candidates": {t: {"covered": n, "strand_weights": {"+": n if strand == "+" else 0,
+                "-": n if strand == "-" else 0}, "anchor_start": 1} for t, n in targets.items()}}
 
 
 def measurement(outcome="completed", wall=100, mid=500):
@@ -59,6 +63,58 @@ class AdaptiveScreeningTests(unittest.TestCase):
     def test_chromosome_flip_not_hidden_by_equal_coverage(self):
         loss = policy.assess_loss({"q": row()}, {"q": row(targets={"chr2": 100})})
         self.assertIn("assignment_flip", loss["reasons"])
+
+    def test_multiple_downstream_assignments_are_not_reduced_to_winner(self):
+        before = row(targets={"chr1": 100, "chr2": 65})
+        loss = policy.assess_loss({"q": before}, {"q": row()})
+        self.assertIn("downstream_assignment_removed", loss["reasons"])
+        self.assertEqual(loss["downstream_assignments_removed"], [{"query": "q", "target": "chr2"}])
+
+    def test_block_weight_orientation_flip_is_not_hidden_by_unchanged_unions(self):
+        before, after = row(), row()
+        before["target_strands"] = after["target_strands"] = {"chr1": {"+": 100, "-": 60}}
+        before["assignment_candidates"]["chr1"]["strand_weights"] = {"+": 100, "-": 120}
+        after["assignment_candidates"]["chr1"]["strand_weights"] = {"+": 100, "-": 60}
+        loss = policy.assess_loss({"q": before}, {"q": after})
+        self.assertIn("downstream_orientation_changed", loss["reasons"])
+
+    def test_anchor_shift_is_reported_without_inventing_an_accuracy_threshold(self):
+        before, after = row(), row()
+        after["assignment_candidates"]["chr1"]["anchor_start"] = 11
+        loss = policy.assess_loss({"q": before}, {"q": after})
+        self.assertEqual(loss["downstream_anchor_shifts"][0]["delta_bp"], 10)
+
+    def test_strand_flip_not_hidden_by_same_target_and_coverage(self):
+        loss = policy.assess_loss({"q": row()}, {"q": row(strand="-")})
+        self.assertIn("strand_flip", loss["reasons"])
+        self.assertEqual(loss["strand_flips"], ["q"])
+
+    def test_strand_ambiguity_cannot_be_hidden_by_filtering(self):
+        before = row()
+        before["target_strands"] = {"chr1": {"+": 100, "-": 95}}
+        loss = policy.assess_loss({"q": before}, {"q": row()})
+        self.assertIn("strand_ambiguity_hidden", loss["reasons"])
+
+    def test_losing_majority_direction_is_explicit(self):
+        after = row()
+        after["target_strands"] = {"chr1": {"+": 55, "-": 45}}
+        loss = policy.assess_loss({"q": row()}, {"q": after})
+        self.assertIn("strand_assignment_lost", loss["reasons"])
+
+    def test_legacy_directionless_profile_needs_reaudit(self):
+        old = row(); del old["target_strands"]
+        self.assertIn("strand_evidence_missing", policy.assess_loss({"q": old}, {"q": row()})["reasons"])
+
+    def test_malformed_strand_coverages_are_rejected(self):
+        for values in ({"chr1": {"?": 100}}, {"chr1": {"+": 110}}, {"chr2": {"+": 100}}, {"chr1": {"+": 50}}):
+            bad = row(); bad["target_strands"] = values
+            with self.assertRaises(ValueError):
+                policy.assess_loss({"q": row()}, {"q": bad})
+
+    def test_improved_low_coverage_is_not_hidden_target_ambiguity(self):
+        before = row(50, {"chr1": 30, "chr2": 20})
+        loss = policy.assess_loss({"q": before}, {"q": row()})
+        self.assertTrue(loss["passed"], loss)
 
     def test_removed_competitor_cannot_look_more_certain(self):
         loss = policy.assess_loss({"q": row(targets={"chr1": 100, "chr2": 95})}, {"q": row()})
