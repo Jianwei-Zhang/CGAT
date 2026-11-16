@@ -218,5 +218,62 @@ class BoundedRunnerTests(unittest.TestCase):
             self.assertEqual(r["outcome"], "launch_failure")
 
 
+
+class CompletedRecordReviewTests(unittest.TestCase):
+    def test_only_lossy_short_record_returns_to_completed_baseline(self):
+        before = {"main": row(950, length=1000), "short": row(40, length=500)}
+        after = {"main": row(960, length=1000), "short": row(20, length=500)}
+        saved = json.dumps([before, after], sort_keys=True)
+        result = policy.plan_completed_record_review(before, after)
+        self.assertEqual([(r["query"], r["source"]) for r in result["queries"]],
+                         [("main", "candidate"), ("short", "baseline")])
+        self.assertTrue(result["reviewed_loss"]["passed"])
+        self.assertFalse(result["speedup_measured"])
+        self.assertFalse(result["production_approved"])
+        self.assertFalse(result["per_query_sources_combined"])
+        self.assertEqual(result["new_mapping_commands"], 0)
+        self.assertEqual(json.dumps([before, after], sort_keys=True), saved)
+
+    def test_global_budget_is_not_incorrectly_applied_per_record(self):
+        before = {"q": row(10000, length=10000), "large": row(100000, length=100000)}
+        after = {"q": row(9900, length=10000), "large": before["large"]}
+        result = policy.plan_completed_record_review(before, after)
+        self.assertEqual(result["selection"], "candidate")
+        self.assertTrue(result["reviewed_loss"]["passed"])
+
+    def test_global_review_ties_keep_original_record_order(self):
+        before = {"z": row(1000, length=1000), "a": row(1000, length=1000)}
+        after = {q: row(990, length=1000) for q in before}
+        result = policy.plan_completed_record_review(before, after)
+        self.assertEqual([r["source"] for r in result["queries"]], ["baseline", "candidate"])
+        self.assertEqual(result["queries"][0]["reasons"], ["global_positive_coverage_loss"])
+        self.assertEqual(result["reviewed_loss"]["positive_loss_fraction"], .005)
+
+    def test_gain_cannot_pay_for_loss_elsewhere(self):
+        before = {"q": row(1000, length=1000), "gain": row(500, length=1000)}
+        after = {"q": row(980, length=1000), "gain": row(1000, length=1000)}
+        result = policy.plan_completed_record_review(before, after)
+        self.assertEqual([r["source"] for r in result["queries"]], ["baseline", "candidate"])
+
+    def test_orientation_change_returns_complete_query_to_baseline(self):
+        result = policy.plan_completed_record_review({"q": row()}, {"q": row(strand="-")})
+        self.assertEqual(result["selection"], "baseline")
+        self.assertIn("downstream_orientation_changed", result["queries"][0]["reasons"])
+
+    def test_missing_baseline_evidence_cannot_authorize_a_review(self):
+        original = row(); del original["assignment_candidates"]
+        result = policy.plan_completed_record_review({"q": original}, {"q": row()})
+        self.assertEqual(result["status"], "baseline_evidence_incomplete")
+        self.assertEqual(result["queries"], [])
+
+    def test_unmapped_baseline_does_not_prove_quality(self):
+        result = policy.plan_completed_record_review({"q": row(0, targets={})}, {"q": row()})
+        self.assertEqual(result["status"], "baseline_evidence_incomplete")
+
+    def test_incomplete_query_matrix_refused(self):
+        with self.assertRaises(ValueError):
+            policy.plan_completed_record_review({"q": row()}, {"other": row()})
+
+
 if __name__ == "__main__":
     unittest.main()

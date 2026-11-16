@@ -323,3 +323,114 @@ This is ONE original reference part and ONE query span, not whole-query recovery
 or end-to-end acceptance. The larger ordinary job `41767856` remained PENDING
 at 19:23 and was not duplicated or cancelled. No production automatic sensitivity
 policy has been enabled by these experimental changes.
+
+### Complete-record native feasibility, and verified runtime insertion points
+
+A second, distinct long-query hypothesis is now being tested: exceeding the
+packed-operation length route is NOT evidence that this particular record must
+fail native alignment against IWGSC. Job `41827114` was submitted at 19:30,
+using the complete original `ptg000049l` (289,508,469 bp) and the already verified
+22-record, two-part index. It runs default / f0.005 / f0.01 once each, fixed K1G,
+8 threads, 600 s per invocation and 1,850 s total mapping budget. Request: ARM,
+8 CPUs / 40 GiB; child virtual-address cap: 36 GiB. Preparation/hash time is
+outside the mapping budget. It is not a whole-assembly CGAT run.
+
+Frozen one-off experiment: `native-long-tools-v1/probe.py`; payload SHA-256
+`fcfb0eba20d831361d4152ab09eb53d3039d51516be24c8ab1470bba4dfe6189`.
+Report: `complete-long-native-v1/native-probe.json`. The script reuses reviewed
+bounded-child execution, exact-assertion classification, PAF/CIGAR validation,
+and assignment projection. Success requires complete traversal of BOTH original
+index parts (12 + 10 target records), the full query in each, and unchanged index,
+query, mapper and helper hashes. Partial/failed PAF is never usable. Source FASTA
+is not re-read: the actual reused MMI content is verified against the completed
+pilot receipt. A resource failure does not authorize a production filter change.
+No repeated-pair validation or scientific/production approval is claimed here.
+
+Current source inspection identifies the insertion points and constraints:
+
+- `server_alignment.run_reference` obtains prepared explicit options and the
+  live dispatcher resource context before calling `proactive_reference_alignment`.
+  An explicit user filter must remain authoritative, not be silently escalated.
+- `proactive_reference_alignment.experiment` currently binds one GLOBAL filter
+  and window policy to the checkpoint. Ordinary-only inputs go straight to native
+  mapping without reference normalization, index preprocessing or a companion.
+  A universal eager-reference scan/probe here would regress the ordinary path.
+- Mixed inputs build one original index, then complete the entire ordinary group
+  BEFORE any long-query cells. Therefore a performance gate placed only inside
+  the long-cell loop is too late to prevent the observed 66.94-hour ordinary cost.
+- `proactive_publication.admit` currently requires the length-based native/long
+  split, one inherited seed threshold, uniform window policy and an exact cell
+  matrix. Adaptive native successes, per-record filters or different window sizes
+  cannot be smuggled through the existing receipt by relabeling them. Their actual
+  execution identities and admission rules must be extended together.
+- Resume currently binds the global window policy. Merely changing the default
+  core size would reject otherwise compatible completed ordinary work. The future
+  migration must preserve completed native records and explicitly account for old
+  completed long cells; no cache deletion or rerun of the whole dataset.
+
+The micro-pilot logs also explain why its end-to-end speed ratio is not a direct
+measure of alignment-kernel improvement. In the first run, sums of wall intervals
+from each part's `mm_idx_stat` completion to its `mapped 2 sequences` event are
+39.406 s (default), 15.750 s (f0.005), and 14.744 s (f0.01). These are observed
+pipeline intervals, NOT per-query time or a function-level CPU profile. The rest
+of each invocation includes index loading/setup/cleanup. Report the measured total
+1.44–1.55x speedup, not the ~2.5x interval ratio as a customer/end-to-end result.
+This supports amortizing setup and gating the cost of calibration, not enabling
+a blanket filter after a short-record microbenchmark.
+
+### Local-review feasibility from completed real PAFs (no extra mapper runs)
+
+The micro loss needs its biological context reported accurately. Under default
+mapping `ptg001708l` has 40,757 covered bases out of 500,479 (8.1436%) and no
+qualifying chromosome assignment. Filtering reduces this to 20,752 / 17,051 bp.
+The 2,987,303-bp `ptg000321l` has 2,851,437 covered bp under default and gains
+coverage under both candidates. All three policies assign it to 1B, minus strand,
+anchor 657330534. This does NOT prove the lost short-record hits are spurious;
+it shows why a single aggregate loss percentage is not a sufficient decision.
+
+An offline complete-record substitution was constructed for each candidate:
+retain candidate rows for `ptg000321l`, retain default rows for `ptg001708l`,
+and retain exactly ONE policy for each complete query across BOTH original index
+parts. No fast/default rows were stacked for the same record, so duplicate hits
+cannot artificially change coverage or block-weighted direction. Rows preserve
+selected-source bytes within each original-part/query cell, ordered by original
+index-part then original query order. Every selected source PAF hash was checked.
+
+Both composite diagnostic PAFs pass native geometry/CIGAR checks and the current
+coverage/assignment comparison against the default baseline. f0.005 composite:
+885 rows; f0.01 composite: 901 rows. Reports and PAFs are stored privately at
+`offline-record-review-v1/`, with `REVIEW_SHA256SUMS` verified after upload.
+These are diagnostic artifacts only, never a published CGAT result. No mapper
+was executed, source FASTA was not revalidated, and no hybrid runtime/speedup has
+been measured. The result supports reusing a COMPLETED baseline for local review
+instead of rerunning or rejecting every safe record; it does not justify a
+production threshold, universal filter, or unbounded fallback computation.
+
+A further runtime trap identified in source: prepared-workspace ordinary calls
+explicitly set `native_args.timeout=None` to preserve old native behavior. A new
+internal preflight budget must therefore be independent and explicitly enforced;
+passing a timeout into the existing adapter alone would not bound ordinary work.
+
+The review choice is now automated in `plan_completed_record_review`, invoked by
+`audit_adaptive_pilot` only with completed, hash-verified, repeatable paired PAFs.
+It first resolves per-record coverage/assignment/strand risks, then enforces the
+positive-loss budget over the whole set without incorrectly imposing that global
+limit on each record. If additional replacement is needed, greatest lost bases
+are restored first with original-record-order tie breaking. This is a quality
+ordering over already completed artifacts, not a remapping-time prediction.
+Each query has exactly one selected source and its reason; source PAF digests are
+bound into the report. Missing, failed, partial or nonrepeatable pairs cannot seed
+this plan. A wholly unmapped baseline cannot establish its quality.
+
+The automated plan reproduces the real offline result for BOTH fractions:
+`ptg000321l -> candidate`, `ptg001708l -> baseline`, with no additional mapping.
+It does not alter the pure-filter recommendation (still null), does not publish
+a mixed-policy CGAT output, and does not claim a hybrid speedup. Production cache,
+admission and execution integration remain outstanding. Local adaptive suite:
+79 tests passed, including 11 added review-plan and paired-source regressions.
+
+Scheduler update at 19:46: original larger ordinary pilot `41767856` is now
+RUNNING on `agent-ARM-23`, started 19:45:16, with the previously adjusted
+16-CPU / 64-GiB grant. The real-window job remains PENDING; its explicit scheduler
+reason is insufficient available CPUs on a node, not a failed dependency or
+mapping failure. Existing job handles remain in use; none was duplicated.

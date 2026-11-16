@@ -79,6 +79,33 @@ class PilotReauditTests(unittest.TestCase):
         result = audit.audit(self.report)
         self.assertIsNone(result["selected_for_next_experiment"])
         self.assertEqual(len(result["paf_sha256"]), 2)
+        self.assertEqual(result["completed_record_review_plans"], [])
+
+
+    def test_local_review_plan_binds_completed_sources_without_promoting_filter(self):
+        self.fixture(reverse=True)
+        with patch("subprocess.Popen", side_effect=AssertionError("must not map")):
+            result = audit.audit(self.report)
+        self.assertIsNone(result["selected_for_next_experiment"])
+        plan = result["completed_record_review_plans"][0]
+        self.assertEqual(plan["selection"], "baseline")
+        self.assertTrue(plan["completed_source_hashes_verified"])
+        self.assertFalse(plan["speedup_measured"])
+        self.assertNotEqual(plan["baseline_paf_sha256"], plan["candidate_paf_sha256"])
+
+    def test_review_requires_completed_repeat_pair(self):
+        self.fixture(repeats=1)
+        self.assertEqual(audit.audit(self.report)["completed_record_review_plans"], [])
+
+    def test_nonrepeatable_rejected_candidate_cannot_seed_local_review(self):
+        report = self.fixture(reverse=True)
+        path = self.root / "r1-f0.005.paf"
+        path.write_text(self.row)
+        report["runs"][-1]["paf_sha256"] = hashlib.sha256(self.row.encode()).hexdigest()
+        self.report.write_text(json.dumps(report))
+        result = audit.audit(self.report)
+        self.assertIsNone(result["selected_for_next_experiment"])
+        self.assertEqual(result["completed_record_review_plans"], [])
 
 
 if __name__ == "__main__":unittest.main()

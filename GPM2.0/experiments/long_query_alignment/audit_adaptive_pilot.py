@@ -68,13 +68,26 @@ def audit(path):
                 if runs[0, condition]["paf_sha256"] != runs[1, condition]["paf_sha256"]:
                     raise ValueError("same-policy paired outputs differ")
             eligible.append(fraction)
+    reviews = []
+    for fraction in ("0.005", "0.01"):
+        keys = [(rep, value) for rep in (0, 1) for value in ("default", fraction)]
+        if not all(key in profiles for key in keys):
+            continue  # Partial/timed-out/missing baselines cannot seed review.
+        if any(runs[0, value]["paf_sha256"] != runs[1, value]["paf_sha256"]
+               for value in ("default", fraction)):
+            continue
+        review = policy.plan_completed_record_review(profiles[0, "default"], profiles[0, fraction])
+        reviews.append({"fraction": fraction, **review, "completed_source_hashes_verified": True,
+                        "baseline_paf_sha256": runs[0, "default"]["paf_sha256"],
+                        "candidate_paf_sha256": runs[0, fraction]["paf_sha256"]})
     if path.read_bytes() != raw:
         raise ValueError("pilot report changed during audit")
     return {"status": "audited_completed_artifacts", "policy": policy.POLICY,
             "original_policy": original.get("policy"), "original_report_sha256": hashlib.sha256(raw).hexdigest(),
             "auditor_sha256": perf.sha256(__file__), "policy_sha256": perf.sha256(policy.__file__),
             "paf_validator_sha256": perf.sha256(parts.__file__), "paf_sha256": paf_hashes,
-            "comparisons": comparisons, "eligible_for_expanded_validation": eligible,
+            "comparisons": comparisons, "completed_record_review_plans": reviews,
+            "eligible_for_expanded_validation": eligible,
             "selected_for_next_experiment": eligible[0] if eligible else None,
             "mapper_executed": False, "source_fasta_revalidated": False, "production_approved": False}
 

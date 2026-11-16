@@ -7,7 +7,7 @@ are provisional experimental acceptance budgets, not biological accuracy claims.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 import math
@@ -245,6 +245,52 @@ def assess_loss(before, after, limits=Limits(), *, require_consumer=True):
             "queries_missing_downstream_evidence": consumer_missing,
             "downstream_projection_required": require_consumer,
             "scientific_accuracy_proven": False}
+
+
+def plan_completed_record_review(before, after, limits=Limits()):
+    """Select ONE complete source per query from already verified paired PAFs.
+
+    No new mapping, partial-output reuse, cost extrapolation or production
+    admission. Caller must verify completed source artifacts before using this
+    profile-only plan. Baseline rows replace candidate rows, never supplement
+    them: duplicate blocks would alter downstream strand/anchor weights.
+    """
+    unchanged = assess_loss(before, before, limits)
+    original = assess_loss(before, after, limits)
+    if not unchanged["passed"] or not any(row["covered"] for row in before.values()):
+        return {"status": "baseline_evidence_incomplete", "production_approved": False,
+                "speedup_measured": False, "requires_verified_completed_sources": True,
+                "original_loss": original, "queries": []}
+    decisions = {}
+    # The global loss budget applies to the complete set, not as an additional
+    # tighter per-record limit.
+    per_record = replace(limits, global_loss_fraction=1.0)
+    for name in before:
+        risk = assess_loss({name: before[name]}, {name: after[name]}, per_record)
+        decisions[name] = {"query": name, "source": "candidate" if risk["passed"] else "baseline",
+                           "reasons": risk["reasons"]}
+    remaining = [(max(0, before[q]["covered"] - after[q]["covered"]), i, q)
+                 for i, q in enumerate(before) if decisions[q]["source"] == "candidate"]
+    total_loss = sum(loss for loss, _, _ in remaining)
+    total_bases = sum(row["length"] for row in before.values())
+    # Preserve the greatest amount of lost evidence first. This is a quality
+    # ordering over COMPLETED artifacts, never an estimate of remapping cost.
+    for loss, _, name in sorted(remaining, key=lambda row: (-row[0], row[1])):
+        if total_loss / total_bases <= limits.global_loss_fraction:
+            break
+        decisions[name].update(source="baseline", reasons=["global_positive_coverage_loss"])
+        total_loss -= loss
+    combined = {q: before[q] if decisions[q]["source"] == "baseline" else after[q] for q in before}
+    checked = assess_loss(before, combined, limits)
+    if not checked["passed"]:
+        raise ValueError("complete-record review did not resolve measured quality risks")
+    sources = {row["source"] for row in decisions.values()}
+    return {"status": "completed_record_review_planned", "production_approved": False,
+            "speedup_measured": False, "requires_verified_completed_sources": True,
+            "selection": "mixed" if len(sources) > 1 else next(iter(sources)),
+            "queries": list(decisions.values()), "original_loss": original,
+            "reviewed_loss": checked, "new_mapping_commands": 0,
+            "partial_PAF_reused": False, "per_query_sources_combined": False}
 
 
 def compare(baseline, candidate, before=None, after=None, limits=Limits()):
