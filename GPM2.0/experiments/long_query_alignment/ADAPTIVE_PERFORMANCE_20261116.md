@@ -57,6 +57,12 @@ local review, mixed-policy publication and migration remain required work.
   followed by reverse order. Same-policy repetitions must have identical PAFs.
 - `test_adaptive_screening.py`: trigger separation, hidden losses/ambiguity,
   timeouts, cancellation of subprocess descendants, and evidence requirements.
+- `catalog_adaptive_inputs.py`: read-only streaming plain/gzip FASTA inventory;
+  validates gzip to EOF, counts records/lengths/N bases, and records per-sequence
+  and decompressed-file SHA-256 without loading whole chromosomes in memory.
+  Run it on allocated compute resources, after transfer integrity verification.
+  Six local tests cover gzip/plain parity, truncation, long unwrapped lines,
+  invalid/duplicate records, no-final-newline inputs and output overwrite refusal.
 
 The internal gate's 5 Gb reference / 20 Mb longest-record boundaries are explicit
 **provisional experiment values**, not validated runtime defaults. The experiment
