@@ -987,3 +987,122 @@ import/relabel old mapping receipts or claim that a new index build executed.
 Mapping, ownership, stitching, admission and zero-mapper resume are exercised by
 the actual new Server adapter. This job is NOT yet a completed result at this
 checkpoint. Artifacts: `server-full-long-v4/` under the existing remote root.
+
+
+## Ordinary automatic pilot executor (2026-11-17, subsequent work)
+
+Server integration commit `dd9f25da2045aef3e577be7e143ca4cc6e3bb6df` passed
+quality run `43915822136` (Windows app and Linux server). The separate local
+Server gate passed 472 Python tests with one skip and all eight shell tests;
+its explicit LGZ-to-App E2E opt-out was NOT treated as full acceptance. CI ran
+the canonical gate without that local opt-out.
+
+`automatic_ordinary_pilot.py` now performs the actual finite native calibration
+that the older completed-source selector did not execute. It is not yet wired
+into the default ordinary Server mapping path. This distinction matters: a
+successful pilot is not permission to launch or accept a whole assembly.
+
+### Trigger and cost control
+
+- Keep packed-operation-limit routing separate: ordinary records exclude those
+  above 268,435,455 bp. An explicit filter is honored, not replaced by calibration.
+- The ordinary experiment requires an actual reference >=5 Gb, >=1 Gb of ordinary
+  queries, and at least one ordinary record >=20 Mb. These are internal defaults.
+- Choose the base-weighted median complete ordinary record, then short/mid-size
+  sentinels near 0.5 / 3 / 20 Mb, all in original source order. Total pilot cap:
+  128 Mb. Do not replace an oversized dominant representative with a convenient
+  tiny record, or slice it into synthetic windows to satisfy the cap.
+- Require ordinary workload bases >=64 times pilot bases. This is a conservative
+  size-amortization gate, NOT a forecast of runtime or proof of representativeness.
+- At most six native cases; 1200-s per mapper invocation and 4800-s cumulative
+  calibration budget, with actual verification/cleanup costs accounted in the
+  ledger. Child PAF cap is 64 MiB; address-space ceiling is 36 GiB or a lower
+  explicit limit. Original full-index mapping and first-part threshold semantics
+  are preserved; no extra index build or reference-subset mapping is introduced.
+- Try the weaker filter first. A first completed case that misses the 2x floor
+  or exceeds the complete-record loss/review budget does not get another repeat.
+  A promising case must have two completed speed comparisons and byte-repeatable
+  outputs before selection. A slow/timed-out case cannot become a speed proof.
+  Once the weaker candidate passes, do not execute the stronger candidate.
+
+Actual hifiasm size distribution confirms why a tiny-only pilot is inadequate:
+ordinary records above 20 Mb account for 9,971,444,644 bp; total ordinary sequence
+is 14,296,624,798 bp. The automatic selection from the full audited catalogue is:
+
+| Complete query | Bases |
+| --- | ---: |
+| ptg000045l (base-weighted representative) | 42,677,883 |
+| ptg000159l | 19,960,671 |
+| ptg000321l | 2,987,303 |
+| ptg001708l | 500,479 |
+| Total | 66,126,336 |
+
+This is 0.4625% of ordinary query bases (216.2x workload/pilot ratio), not an
+assertion that all contig lengths will have the same speed or loss characteristics.
+
+### Preserve useful work and never mix partial sources
+
+Complete native cases retain their original command, completion/traversal proof,
+PAF hash and measured time. Resumption revalidates these receipts rather than
+rerunning the mapper. An interrupted/failed case is not automatically retried;
+a hard-killed unsealed case conservatively consumes its reserved budget. If the
+native receipt actually completed before the interruption, resume can validate
+it without executing another mapper. A corrupt completion is rejected, not
+silently remapped or promoted from a partial PAF.
+
+Input materialization retains original whole-record bytes, including headers,
+case, wrapping and order. Plain FASTA units use verified catalogue byte extents;
+gzip extraction verifies the complete decoded source. Completed units are reused.
+
+Selection writes exactly one whole source per original pilot record, including
+explicit complete no-hit records, with source hashes and per-query row hashes.
+Default and candidate rows are never appended together for the same query.
+Current quality profiles are recomputed from completed PAFs rather than trusted
+from a stale decision cache. No synthetic full-native receipt is manufactured
+for the selected composite.
+
+Validation: 21 targeted controls pass, including actual pinned-tool completion,
+zero-remapping resume, cancellation, source mutation, incomplete native timeout,
+hard-kill receipt recovery and complete no-hit accounting. Two decision/composition
+controls use explicitly SYNTHETIC times/profiles over actual PAFs; they are not
+performance measurements. Final related discovery passed 731 tests in 177.768 s with one
+unavailable native-source oracle skipped. The input-copy path avoids rebuilding
+the selected-name set for every catalogue record; all 21 focused tests also pass
+on this final source.
+
+Still required: real automatic calibration result; bounded future ordinary units
+and finite review of those units; measured complete hybrid cost; default Server
+integration/admission with existing completed ordinary work preserved. No pilot
+result here is claimed to prove whole-customer scientific acceptance.
+
+
+Additional final controls require the complete query count WITHIN EACH original
+index part: an equal grand total cannot hide a missing second part. An entirely
+uninformative completed baseline now retains its no-hit sources without spending
+any filter trials. These checks do not change mapper inputs or reinterpret failed
+PAF bodies as evidence.
+
+Real automatic ordinary calibration job `42029896` started on agent-ARM-33 at
+01:35:18 CST, November 17. At 01:40 it was confirmed RUNNING in native calibration;
+input/index verification and complete-record extraction took 106.697 s. It uses
+8 CPUs for the 36-GiB mapper ceiling (40-GiB queue limit), with a 7500-s outer
+budget, and the automatically chosen four-record 66.13-Mb pilot. The original
+hifiasm gzip content and completed catalogue are checked, not just their mtimes.
+No full assembly mapping or index rebuild is executed. Artifacts are under
+`ordinary-automatic-executor-v1/` in the same remote experiment root.
+
+The live producer was frozen before the final stricter per-part traversal and
+uninformative-baseline checks above. Do not modify its sources while it runs.
+Its completed receipts must ALSO pass the final verifier before accepting the
+calibration evidence; this is a read-only/reuse audit, not a reason to rerun the
+mapper. The final mapper recipe and input/parameter identities are unchanged.
+
+At the same 01:40 observation, real Server long-record job `41996964` was still
+RUNNING: original part 0 was completely base-checked and stitched; both original
+parts had completed native window mapping (246.342 / 323.488 s). Part 1 was still
+in postprocessing. Those mapper times are not full-task completion or speedup.
+
+Frozen ordinary producer module SHA-256:
+`7326be58c9333981d99755a93dc084def58a93b6d485d7f1488212cf10daee41`.
+Final local verifier/executor SHA-256:
+`fc6ae2ff48b287d6a7e097553b1746df08a0ab7459b87e7018e23682de564d57`.
