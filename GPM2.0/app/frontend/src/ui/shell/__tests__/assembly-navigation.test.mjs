@@ -69,7 +69,41 @@ test("whole-group wrapping is independent of long names and preserves minimum us
   assert.match(css, /\.app-nav\.is-assembly-nav-stacked > \.assembly-navigation[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 2/);
   assert.match(css, /\.assembly-navigation\[hidden\][^}]*display: none/);
   assert.match(css, /\.app-nav\.has-assembly-navigation > \.route-nav[^}]*justify-self: start/);
-  assert.match(css, /\.assembly-navigation \.shell-select-toggle[^}]*max-width: none/);
+  assert.match(css, /\.assembly-navigation \.shell-select-toggle[^}]*width: max-content;[^}]*min-width: min\(var\(--assembly-picker-min\), 100%\);[^}]*max-width: 100%/);
+  assert.match(css, /\.assembly-navigation \{[^}]*max-width: 100%;[^}]*width: max-content;[^}]*justify-self: end/);
+  for (const [kind, minimum, maximum] of [["partition", 7, 18], ["project", 18, 34], ["chr", 7, 14]]) {
+    assert.ok(css.includes(`.assembly-navigation-${kind} { --assembly-picker-min: ${minimum}ch; --assembly-picker-max: ${maximum}ch; }`));
+  }
+  assert.doesNotMatch(css, /max-width: 940px|justify-self: center/);
+  assert.equal(assemblyNavigationShouldStack({ ...widths, width: 1000, pickerMinWidths: [140, 320, 140] }), true);
+  assert.equal(assemblyNavigationShouldStack({ ...widths, width: 1000 }), false);
+});
+
+test("measured wrapping follows container width, translated labels and font-sized picker minima", () => {
+  const classes = new Set(), events = new Map();
+  const buttons = ["min(70px, 100%)", "min(160px, 100%)", "min(70px, 100%)"].map(minWidth => ({ minWidth }));
+  const labelNodes = [50, 40, 25].map(scrollWidth => ({ scrollWidth }));
+  const navigation = { querySelector: () => null, querySelectorAll: selector => selector === ".assembly-navigation-label" ? labelNodes : buttons };
+  const nav = { clientWidth: 1000, getBoundingClientRect() {},
+    classList: { toggle(name, value) { value ? classes.add(name) : classes.delete(name); } },
+    querySelector: selector => ({ getBoundingClientRect: () => ({ width: selector === ".route-nav" ? 150 : 250 }) }) };
+  const view = { getComputedStyle: node => node === nav ? { paddingLeft: "10px", paddingRight: "10px" } : node,
+    addEventListener: (name, callback) => events.set(name, callback), removeEventListener: name => events.delete(name) };
+  const root = { ownerDocument: { defaultView: view }, querySelector: selector => selector === ".app-nav" ? nav : navigation };
+  const store = { getState: () => state() };
+  const dispose = bindAssemblyNavigation(root, store, {});
+  try {
+    assert.equal(classes.has("is-assembly-nav-stacked"), false);
+    nav.clientWidth = 800; events.get("resize")();
+    assert.equal(classes.has("is-assembly-nav-stacked"), true);
+    nav.clientWidth = 1000; buttons.forEach(button => { button.minWidth = "min(250px, 100%)"; });
+    events.get("resize")(); assert.equal(classes.has("is-assembly-nav-stacked"), true);
+    nav.clientWidth = 1600; events.get("resize")();
+    assert.equal(classes.has("is-assembly-nav-stacked"), false);
+    labelNodes.forEach(label => { label.scrollWidth = 400; }); events.get("resize")();
+    assert.equal(classes.has("is-assembly-nav-stacked"), true);
+  } finally { dispose(); }
+  assert.equal(events.size, 0);
 });
 
 async function fixture(fn, overrides = {}) {

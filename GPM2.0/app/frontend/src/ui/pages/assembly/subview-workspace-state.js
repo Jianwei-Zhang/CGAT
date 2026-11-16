@@ -73,7 +73,10 @@ export function reconcileSubviewWorkspace(previous, next) {
     if (!windows.some(item => item.id === activeId)) {
       activeId = globalThis.crypto?.randomUUID ? `local-${globalThis.crypto.randomUUID()}` : `local-${Date.now()}-${workspace.generation}-${nextId++}`;
       assembly = { ...assembly, trackSelectedCtgIds: [] };
-      windows = [...windows, { id: activeId, number: windows.length + 1, snapshot, name: "", note: "", opened: true, floating: true, minimized: false, pinned: true,
+      // New comparisons use the single docked slot. Retain previous tasks and
+      // explicitly floated windows; only the previous docked task becomes unopened.
+      windows = windows.map(item => !item.floating ? { ...item, opened: false } : item);
+      windows = [...windows, { id: activeId, number: windows.length + 1, snapshot, name: "", note: "", opened: true, floating: false, minimized: false, pinned: true,
         x: 80 + windows.length % 6 * 24, y: 100 + windows.length % 6 * 24, z: Math.max(0, ...windows.map(item => item.z)) + 1 }];
     } else {
       windows = windows.map(item => item.id === activeId ? { ...item, snapshot } : item);

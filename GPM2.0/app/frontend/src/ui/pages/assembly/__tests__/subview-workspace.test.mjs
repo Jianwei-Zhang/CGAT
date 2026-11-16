@@ -35,6 +35,29 @@ test("idle Local View is guidance only, with the inline Tools entry in both lang
   }
 });
 
+test("new Local Views default to the single docked slot without deleting tasks or moving existing floats", () => {
+  const store = fixture(), first = enter(store, summary(2, 5));
+  const firstSnapshot = getSubviewWindowStore(store, first).getState().assembly.subview;
+  const second = enter(store, summary(5, 8));
+  let windows = store.getState().assembly.subviewWorkspace.windows;
+  assert.equal(windows.length, 2);
+  assert.equal(windows.find(item => item.id === first).opened, false);
+  assert.equal(windows.find(item => item.id === first).snapshot.subview, firstSnapshot);
+  assert.deepEqual(windows.filter(item => item.opened && !item.floating).map(item => item.id), [second]);
+  changeSubviewWindow(store, first, "open-floating");
+  const floated = store.getState().assembly.subviewWorkspace.windows.find(item => item.id === first);
+  const third = enter(store, summary(8, 9));
+  windows = store.getState().assembly.subviewWorkspace.windows;
+  assert.equal(windows.find(item => item.id === first), floated, "manual floating state and geometry remain untouched");
+  assert.equal(windows.find(item => item.id === second).opened, false);
+  assert.deepEqual(windows.filter(item => item.opened && !item.floating).map(item => item.id), [third]);
+  changeSubviewWindow(store, second, "activate");
+  windows = store.getState().assembly.subviewWorkspace.windows;
+  assert.deepEqual(windows.filter(item => item.opened && !item.floating).map(item => item.id), [second]);
+  assert.equal(windows.find(item => item.id === first).floating, true);
+  assert.equal(windows.length, 3);
+});
+
 test("windows retain independent edits, history and viewport while sharing live Main data", () => {
   const store = fixture();
   const a = enter(store, summary(2, 5));
@@ -66,6 +89,7 @@ test("minimize and dock preserve the comparison; close drops only the window", (
   const main = store.getState().assembly.chrCtgs;
   const history = { persisted: { past: ["keep"] } };
   scoped.setState({ assembly: { ...scoped.getState().assembly, subviewHistoryByKey: history } });
+  changeSubviewWindow(store, a, "open-floating");
   changeSubviewWindow(store, a, "minimize");
   assert.equal(store.getState().assembly.subviewWorkspace.windows[0].minimized, true);
   changeSubviewWindow(store, a, "dock");
@@ -139,6 +163,7 @@ test("quick entry starts a new task instead of clearing the first comparison", (
 
 test("workspace markup contains a task and independent window controls for every comparison", () => {
   const store = fixture(); const a = enter(store, summary(2, 5)); enter(store, summary(5, 8));
+  changeSubviewWindow(store, a, "open-floating");
   changeSubviewWindow(store, a, "minimize");
   const html = renderAssemblyPage(store.getState());
   assert.equal((html.match(/data-subview-task=/g) || []).length, 2);
@@ -245,7 +270,7 @@ test("composition labels count logical members and bound detail lists; names are
 test("docked and floating windows place chrome and parameters in one header with action-only icons", () => {
   const store = fixture(); const id = enter(store, summary(2, 5));
   for (const docked of [false, true]) {
-    if (docked) changeSubviewWindow(store, id, "dock");
+    changeSubviewWindow(store, id, docked ? "open-docked" : "open-floating");
     const html = renderAssemblyPage(store.getState());
     const head = html.slice(html.indexOf('class="subview-panel-head subview-window-header"'), html.indexOf('<article class="assembly-track-panel subview-alignment-card'));
     assert.match(head, /data-local-view-action="dock"/);

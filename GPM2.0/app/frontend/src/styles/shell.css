@@ -123,24 +123,28 @@
 /* Assembly scope navigation stays together; global utilities never compete with long names. */
 .app-nav.has-assembly-navigation { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 12px; align-items: center; }
 .app-nav.has-assembly-navigation > .route-nav { justify-self: start; }
-.assembly-navigation { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr) minmax(0, .85fr); align-items: center; gap: 12px; min-width: 0; max-width: 940px; width: 100%; justify-self: center; }
+.assembly-navigation { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; width: max-content; justify-self: end; }
+.assembly-navigation-partition { --assembly-picker-min: 7ch; --assembly-picker-max: 18ch; }
+.assembly-navigation-project { --assembly-picker-min: 18ch; --assembly-picker-max: 34ch; }
+.assembly-navigation-chr { --assembly-picker-min: 7ch; --assembly-picker-max: 14ch; }
 .assembly-navigation[hidden] { display: none; }
-.assembly-navigation-field { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--font-small); }
+.assembly-navigation-field { display: flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: 0; font-size: var(--font-small); }
 .assembly-navigation-label { flex: 0 0 auto; white-space: nowrap; color: var(--text-secondary); }
-.assembly-navigation .shell-select { flex: 1 1 auto; width: 0; }
-.assembly-navigation .shell-select-toggle { width: 100%; max-width: none; height: 32px; }
+.assembly-navigation .shell-select { flex: 0 1 auto; width: auto; max-width: var(--assembly-picker-max); }
+.assembly-navigation .shell-select-toggle { width: max-content; min-width: min(var(--assembly-picker-min), 100%); max-width: 100%; height: 32px; }
 .assembly-navigation .shell-select-menu { width: max-content; min-width: min(260px, calc(100vw - 32px)); max-width: min(520px, calc(100vw - 32px)); max-height: min(420px, 65dvh); overflow-y: auto; z-index: 100; }
 .assembly-navigation-project .shell-select-menu { min-width: min(340px, calc(100vw - 32px)); }
 .assembly-navigation-chr .shell-select-menu { left: auto; right: 0; }
 .assembly-navigation .assembly-track-combo-option { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; white-space: normal; overflow-wrap: anywhere; }
 .shell-select-option-description { font-size: var(--font-small); color: var(--text-muted); font-weight: 400; }
 .app-nav.is-assembly-nav-stacked { grid-template-columns: minmax(0, 1fr) max-content; }
-.app-nav.is-assembly-nav-stacked > .assembly-navigation { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+.app-nav.is-assembly-nav-stacked > .assembly-navigation { grid-column: 1 / -1; grid-row: 2; }
 .app-nav.has-assembly-navigation > .nav-session-controls { flex-wrap: nowrap; }
 .app-nav.is-assembly-nav-stacked > .nav-session-controls { grid-column: 2; grid-row: 1; }
 @media (max-width: 600px) {
-  .assembly-navigation { gap: 6px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); }
+  .assembly-navigation { display: grid; width: 100%; gap: 6px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, .8fr); }
   .assembly-navigation-field { flex-direction: column; align-items: stretch; gap: 3px; }
-  .assembly-navigation .shell-select { width: 100%; }
+  .assembly-navigation .shell-select { width: 100%; max-width: none; }
+  .assembly-navigation .shell-select-toggle { width: 100%; min-width: 0; }
   .assembly-navigation-label { font-size: var(--font-small); }
 }

@@ -44,12 +44,15 @@ for (const locale of ["zh", "en"]) test(`main toolbar contains parameters only a
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
-test("CSS right-aligns whole parameter groups with safe extreme-width scrolling, without a resize classifier", () => {
+test("CSS left-aligns Main controls with functional spacing and whole-field wrapping; Local View retains its layout", () => {
   const css = readStylesheetTree(new URL("../../../../styles/assembly.css", import.meta.url));
   assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\],\s*\.subview-panel-head\s*\{[^}]*flex-wrap: nowrap;[^}]*align-items: flex-start;[^}]*justify-content: flex-start;/);
   assert.match(css, /:is\(\.assembly-track-panel-head\[data-main-view-header\], \.subview-panel-head\) > \.assembly-view-title\s*\{[^}]*flex: none;[^}]*white-space: nowrap;/);
   assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*justify-content: flex-end;[^}]*justify-content: safe flex-end;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
   assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex: 1 1 0;[^}]*width: auto;[^}]*min-width: 0;/);
+  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*justify-content: flex-start;[^}]*column-gap: 12px;[^}]*row-gap: 8px;/);
+  assert.match(css, /\[data-main-track-toolbar\] > \.assembly-marker-display[^}]*margin-inline-end: 8px/);
+  assert.match(css, /\[data-main-track-toolbar\] > \.main-view-history-controls[^}]*margin-inline-start: 8px/);
   assert.match(css, /:is\(\[data-main-track-toolbar\], \[data-subview-toolbar\]\) > \*\s*\{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/);
   assert.match(css, /\.assembly-main-scope-title\s*\{[^}]*flex: 0 1 auto;[^}]*min-width: 0;[^}]*max-width: min\(36ch, 50%\);/);
   assert.match(css, /\.assembly-members-panel-inline\s*\{[^}]*margin-inline-end: auto;/);

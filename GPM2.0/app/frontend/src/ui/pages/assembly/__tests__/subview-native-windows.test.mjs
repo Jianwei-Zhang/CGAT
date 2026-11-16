@@ -4,11 +4,12 @@ import { createStore } from "../../../../state/store.js";
 import { createNativeSubviewWindows } from "../subview-native-windows.js";
 import { installSubviewWorkspace, changeSubviewWindow, startSubviewWindowDraft } from "../subview-workspace-state.js";
 import { getAssemblyI18n } from "../i18n.js";
-function fixture({ failOpen = false } = {}) {
+function fixture({ failOpen = false, floating = true } = {}) {
   const store = createStore({ activeRoute: "assembly", locale: "en", session: { projectId: 1, workspacePath: "fixture" }, assembly: {
     selectedChrName: "chr1", subview: { summary: { mode: "2-contig", top: { role: "primary", contigId: 1 }, bottom: { role: "primary", contigId: 2 } } },
   } });
   installSubviewWorkspace(store);
+  if (floating) changeSubviewWindow(store, store.getState().assembly.subviewWorkspace.activeId, "open-floating");
   let serial = 0, destroyedListener;
   const urls = [], calls = [], main = { unminimize: async () => { calls.push("restore-main"); }, setFocus: async () => { calls.push("focus-main"); } };
   const win = { __GPM_NATIVE_LOCAL_VIEWS__: true, location: { href: "http://tauri.localhost/", origin: "http://tauri.localhost" },
@@ -24,6 +25,18 @@ function fixture({ failOpen = false } = {}) {
   return { store, win, root, manager, urls, calls, notifyDestroyed: payload => destroyedListener({ payload }), id: store.getState().assembly.subviewWorkspace.activeId };
 }
 
+test("native mode keeps a new Local View docked until the user explicitly floats it", () => {
+  const f = fixture({ floating: false });
+  try {
+    assert.equal(f.urls.length, 0);
+    assert.equal(f.store.getState().assembly.subviewWorkspace.windows[0].floating, false);
+    f.manager.sync(); assert.equal(f.urls.length, 0);
+    changeSubviewWindow(f.store, f.id, "open-floating");
+    assert.equal(f.urls.length, 1);
+    assert.equal(f.urls[0].searchParams.get("view"), f.id);
+  } finally { f.manager.destroy(); }
+});
+
 test("native mode opens each task once and does not copy project state", () => {
   const f = fixture();
   try {
@@ -34,6 +47,8 @@ test("native mode opens each task once and does not copy project state", () => {
     f.manager.sync(); assert.equal(f.urls.length, 1);
     const assembly = f.store.getState().assembly;
     f.store.setState({ assembly: { ...startSubviewWindowDraft(assembly), subview: assembly.subview } });
+    assert.equal(f.urls.length, 1, "creating a docked task must not open a native popup");
+    changeSubviewWindow(f.store, f.store.getState().assembly.subviewWorkspace.activeId, "open-floating");
     assert.equal(f.urls.length, 2);
   } finally { f.manager.destroy(); }
 });

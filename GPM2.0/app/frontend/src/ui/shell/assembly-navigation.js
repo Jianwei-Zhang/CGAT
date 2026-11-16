@@ -63,9 +63,9 @@ export function renderAssemblyNavigation(state) {
   </div>`;
 }
 
-export function assemblyNavigationShouldStack({ width, routesWidth, toolsWidth, labelWidths = [] }) {
-  // Budget useful minimum name widths, not current project-name lengths.
-  return width < routesWidth + toolsWidth + labelWidths.reduce((sum, value) => sum + value, 0) + 110 + 180 + 90 + 60;
+export function assemblyNavigationShouldStack({ width, routesWidth, toolsWidth, labelWidths = [], pickerMinWidths = [70, 160, 70] }) {
+  // Minimum trigger widths come from the rendered font, not selected-name lengths.
+  return width < routesWidth + toolsWidth + [...labelWidths, ...pickerMinWidths].reduce((sum, value) => sum + value, 0) + 66;
 }
 
 const bindings = new WeakMap();
@@ -156,11 +156,19 @@ export function bindAssemblyNavigation(root, store, { flush, switchWorkspace, se
   const nav = root.querySelector(".app-nav");
   const layout = () => {
     if (!nav?.getBoundingClientRect || !assemblyNavigationVisible(store.getState())) return;
-    const width = nav.clientWidth - 20;
+    const style = view?.getComputedStyle?.(nav);
+    const width = nav.clientWidth - (parseFloat(style?.paddingLeft) || 10) - (parseFloat(style?.paddingRight) || 10);
     const routesWidth = nav.querySelector(".route-nav")?.getBoundingClientRect().width || 0;
     const toolsWidth = nav.querySelector(".nav-session-controls")?.getBoundingClientRect().width || 0;
     const labelWidths = [...navigation.querySelectorAll(".assembly-navigation-label")].map(label => label.scrollWidth);
-    nav.classList.toggle("is-assembly-nav-stacked", assemblyNavigationShouldStack({ width, routesWidth, toolsWidth, labelWidths }));
+    const fallbackWidths = [70, 160, 70];
+    const pickerMinWidths = [...navigation.querySelectorAll("[data-shell-select-toggle]")].map((button, index) => {
+      // Computed ch lengths are pixels; min(..., 100%) still retains its wrapper.
+      const minimum = view?.getComputedStyle?.(button)?.minWidth || "";
+      return parseFloat(minimum.replace(/^min\(\s*/, "")) || fallbackWidths[index];
+    });
+    nav.classList.toggle("is-assembly-nav-stacked", assemblyNavigationShouldStack({ width, routesWidth, toolsWidth, labelWidths,
+      ...(pickerMinWidths.length === 3 ? { pickerMinWidths } : {}) }));
   };
   let observer;
   if (view?.ResizeObserver && nav) { observer = new view.ResizeObserver(layout); observer.observe(nav); }

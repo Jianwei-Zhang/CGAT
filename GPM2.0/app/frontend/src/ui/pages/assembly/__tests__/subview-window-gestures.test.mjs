@@ -11,6 +11,7 @@ function fixture() {
   const store = createStore({ activeRoute: "assembly", locale: "en", assembly: { selectedChrName: "Chr01",
     subview: { summary: { mode: "2-contig", top: { role: "primary", contigId: 1 }, bottom: { role: "primary", contigId: 2 } } } } });
   installSubviewWorkspace(store); const id = store.getState().assembly.subviewWorkspace.activeId;
+  changeSubviewWindow(store, id, "open-floating");
   changeSubviewWindow(store, id, "position", { x: 100, y: 100, width: 700, height: 400 });
   const win = { ...emitter(), innerWidth: 1400, innerHeight: 900 };
   const doc = { ...emitter(), defaultView: win, createElement() { throw new Error("unexpected render"); } };

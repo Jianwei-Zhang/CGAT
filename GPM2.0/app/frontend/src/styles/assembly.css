@@ -304,6 +304,17 @@
   overflow-x: auto;
 }
 
+/* Main has no title competing for this row. Keep intrinsic field widths and
+   stable reading order; flex wraps complete label/input units as space changes.
+   Extra space marks action / parameter / history boundaries, never stretches inputs. */
+.assembly-track-inline-controls[data-main-track-toolbar] {
+  justify-content: flex-start;
+  column-gap: 12px;
+  row-gap: 8px;
+}
+[data-main-track-toolbar] > .assembly-marker-display { margin-inline-end: 8px; }
+[data-main-track-toolbar] > .main-view-history-controls { margin-inline-start: 8px; }
+
 :is([data-main-track-toolbar], [data-subview-toolbar]) > * {
   flex: 0 0 auto;
   box-sizing: border-box;

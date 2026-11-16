@@ -36,6 +36,7 @@ test("task order and current numbering change without changing stable IDs or sco
 
 test("single docked slot replaces views without deleting tasks or changing floating peers", () => {
   const store = fixture(); const a = enter(store), b = enter(store), c = enter(store);
+  changeSubviewWindow(store, b, "open-floating");
   changeSubviewWindow(store, a, "open-docked");
   changeSubviewWindow(store, c, "open-docked");
   assert.equal(windows(store).find(item => item.id === a).opened, false);
@@ -206,7 +207,7 @@ test("menu labels and grouping are concise and consistent in both languages", ()
     assert.deepEqual(menu.map(item => item.label), locale === "zh"
       ? ["停靠打开", "悬浮打开", "最小化", "重命名", "编辑备注", "关闭"]
       : ["Open docked", "Open floating", "Minimize", "Rename", "Edit notes", "Close"]);
-    assert.equal(menu[0].checked, false); assert.equal(menu[1].checked, true);
+    assert.equal(menu[0].checked, true); assert.equal(menu[1].checked, false);
     assert.equal(menu.at(-1).danger, true);
   }
 });
@@ -244,6 +245,7 @@ test("Main loading cannot resurrect a task closed while the request was in fligh
 
 test("application pin defaults on but never enters the project task document", () => {
   const store = fixture(), id = enter(store);
+  changeSubviewWindow(store, id, "open-floating");
   const saved = structuredClone(document(store)), scoped = getSubviewWindowStore(store, id);
   const summary = scoped.getState().assembly.subview.summary;
   assert.equal(windows(store)[0].pinned, true);
@@ -262,6 +264,7 @@ test("application pin defaults on but never enters the project task document", (
 
 for (const locale of ["en", "zh"]) test(`native pin chrome and menu agree and disappear when docked (${locale})`, () => {
   const store = fixture(), id = enter(store);
+  changeSubviewWindow(store, id, "open-floating");
   const labels = getAssemblyI18n({ locale }).subview;
   const assembly = () => ({ ...store.getState().assembly, subviewNativeWindows: true, subviewWindowRendering: id });
   const menu = () => subviewTaskMenuItems(windows(store)[0], labels, assembly());
