@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import unittest
 
@@ -6,6 +7,30 @@ import benchmark_adaptive_windows as windows
 
 
 class WindowProbeTests(unittest.TestCase):
+    def test_existing_probe_defaults_remain_all_chain_three_core_sizes(self):
+        self.assertEqual(windows.probe_policy(SimpleNamespace()),
+                         ("all_chains_pool", (50000000, 10000000, 5000000)))
+
+    def test_single_core_comparison_avoids_unnecessary_size_sweep(self):
+        self.assertEqual(windows.probe_policy(SimpleNamespace(core_bases=5000000,
+            candidate_policy="native_window_selection")), ("native_window_selection", (5000000,)))
+
+    def test_candidate_selection_changes_only_the_pool_flag(self):
+        args = ("mm", "original.mmi", "same-windows.fa", "out.paf", 8, 500)
+        full = windows.mapping_command(*args, "all_chains_pool")
+        selected = windows.mapping_command(*args, "native_window_selection")
+        self.assertEqual([v for v in full if v != "-P"], selected)
+        self.assertIn("--eqx", selected)
+        self.assertEqual(selected[selected.index("-f")+1], "500")
+        self.assertNotIn("-N", selected)
+
+    def test_unreviewed_candidate_and_core_options_are_rejected(self):
+        for args in (SimpleNamespace(candidate_policy="arbitrary"), SimpleNamespace(core_bases=1),
+                     SimpleNamespace(core_bases=True)):
+            with self.assertRaises(ValueError): windows.probe_policy(args)
+        with self.assertRaises(ValueError):
+            windows.mapping_command("mm", "part", "query", "out", 8, 500, "arbitrary")
+
     def test_core_ownership_same_span_without_gaps_or_duplicate_cores(self):
         length,start,end=289508469,100000000,150000000
         for core in (50000000,10000000,5000000):

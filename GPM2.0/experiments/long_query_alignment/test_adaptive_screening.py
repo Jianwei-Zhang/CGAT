@@ -219,6 +219,39 @@ class BoundedRunnerTests(unittest.TestCase):
 
 
 
+
+class CandidateProjectionScreenTests(unittest.TestCase):
+    def test_full_union_coverage_without_chromosome_support_requests_review(self):
+        result = policy.screen_candidate_projection({"q": row(100, {"a":50,"b":50})})
+        self.assertEqual(result["queries"][0]["reasons"], ["covered_but_unassigned"])
+        self.assertEqual(result["queries"][0]["action"], "bounded_review")
+
+    def test_no_obvious_risk_is_never_a_quality_approval(self):
+        result = policy.screen_candidate_projection({"q": row()})
+        self.assertEqual(result["queries"][0]["action"], "no_obvious_assignment_risk")
+        self.assertFalse(result["production_approved"])
+        self.assertFalse(result["baseline_comparison_performed"])
+        self.assertFalse(result["scientific_accuracy_proven"])
+
+    def test_multiple_assignments_are_retained_not_reduced_to_one(self):
+        result = policy.screen_candidate_projection({"q": row(100, {"a":100,"b":90})})
+        self.assertEqual(result["queries"][0]["assigned_targets"], ["a","b"])
+        self.assertIn("multiple_chromosome_assignments", result["queries"][0]["reasons"])
+
+    def test_near_threshold_and_mixed_orientation_are_review_signals(self):
+        uncertain = row(65)
+        uncertain["target_strands"] = {"chr1": {"+":34,"-":31}}
+        uncertain["assignment_candidates"]["chr1"]["strand_weights"] = {"+":34,"-":31}
+        result = policy.screen_candidate_projection({"q": uncertain})
+        self.assertEqual(result["queries"][0]["reasons"], ["near_assignment_threshold","orientation_ambiguous"])
+
+    def test_unmapped_and_missing_evidence_are_not_confused(self):
+        result = policy.screen_candidate_projection({"q": row(0, targets={})})
+        self.assertEqual(result["queries"][0]["reasons"], ["low_reference_support"])
+        missing = row(); del missing["assignment_candidates"]
+        with self.assertRaises(ValueError):policy.screen_candidate_projection({"q": missing})
+
+
 class CompletedRecordReviewTests(unittest.TestCase):
     def test_only_lossy_short_record_returns_to_completed_baseline(self):
         before = {"main": row(950, length=1000), "short": row(40, length=500)}

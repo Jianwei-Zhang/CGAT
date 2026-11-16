@@ -24,6 +24,28 @@ import minimap_index_context as mic
 import ordinary_batch_performance as perf
 
 
+CORE_SIZES = (50_000_000, 10_000_000, 5_000_000)
+
+
+def probe_policy(args):
+    """Explicit maintainer experiment knobs, never customer runtime choices."""
+    candidate = getattr(args, "candidate_policy", "all_chains_pool")
+    core = getattr(args, "core_bases", None)
+    if candidate not in ("all_chains_pool", "native_window_selection"):
+        raise ValueError("unsupported window candidate policy")
+    if core is not None and (type(core) is not int or core not in CORE_SIZES):
+        raise ValueError("unsupported controlled core size")
+    return candidate, CORE_SIZES if core is None else (core,)
+
+
+def mapping_command(mm, part, fasta, output, threads, mid, candidate):
+    if candidate not in ("all_chains_pool", "native_window_selection"):
+        raise ValueError("unsupported window candidate policy")
+    pool = ["-P"] if candidate == "all_chains_pool" else []
+    return [mm, "-c", "--eqx", "-x", "asm10", "-f", str(mid), *pool,
+            "-t", str(threads), "-o", str(output), str(part), str(fasta)]
+
+
 def window_plan(length, start, end, core, context=100_000):
     if not 0 <= start < end <= length or not 0 <= context < core:
         raise ValueError("invalid probe span/window")
@@ -77,6 +99,7 @@ def owned_coverage(path, windows, start, end):
 
 def execute(args):
     started = time.monotonic()
+    candidate_policy, core_sizes = probe_policy(args)
     receipt = json.loads(args.index_receipt.read_text())
     query_receipt = json.loads(args.query_subset.read_text())
     if not receipt.get("input_content_unchanged") or receipt["index"]["outcome"] != "completed":
@@ -99,7 +122,7 @@ def execute(args):
     target_records = {r["name"]: {"length": r["length"]} for r in receipt["sources"]["reference"]["records"]}
     length = query["records"][0]["length"]
     end = args.start + args.span_bases
-    plans = {size: window_plan(length, args.start, end, size) for size in (50_000_000,10_000_000,5_000_000)}
+    plans = {size: window_plan(length, args.start, end, size) for size in core_sizes}
     left = min(w["query_start"] for plan in plans.values() for w in plan)
     right = max(w["query_end"] for plan in plans.values() for w in plan)
     sequence = extract_span(Path(query["source"]), left, right)
@@ -107,6 +130,7 @@ def execute(args):
     r = {"status":"running", "scope":"window_mapping_only_not_whole_query_recovery",
          "production_approved":False,"final_confidence_restored":False,"query":query,
          "original_span":{"start":args.start,"end":end},"fraction":args.fraction,
+         "window_candidate_policy":candidate_policy,"tested_core_sizes":list(core_sizes),
          "runs":[],"comparisons":[],"index_receipt_sha256":perf.sha256(args.index_receipt)}
     guarded={"harness":__file__, **{m.__name__:m.__file__ for m in (policy,runner,existing,parts,mic,perf,mic.wa)}}
     r["code_sha256"]={name:perf.sha256(path) for name,path in guarded.items()}
@@ -136,8 +160,7 @@ def execute(args):
                 for w in windows:
                     stream.write((">"+w["name"]+"\n").encode())
                     stream.write(sequence[w["query_start"]-left:w["query_end"]-left]);stream.write(b"\n")
-            command=[mm,"-c","--eqx","-x","asm10","-f",str(mid),"-P","-t",str(args.threads),
-                     "-o",str(out),part["path"],str(fasta)]
+            command=mapping_command(mm,part["path"],fasta,out,args.threads,mid,candidate_policy)
             run=runner.run_bounded(command,root,stem,min(args.case_seconds,remaining),args.memory_mib)
             run.update(core_bases=core,windows=windows,window_fasta_sha256=perf.sha256(fasta))
             r["runs"].append(run)
@@ -160,7 +183,7 @@ def execute(args):
             comparison={"core_bases":run["core_bases"],"production_approved":False}
             if baseline["outcome"]==run["outcome"]=="completed":
                 comparison.update(mapping_speedup=baseline["wall_seconds"]/run["wall_seconds"],
-                    coverage_risks=policy.assess_loss(profiles[50_000_000],profiles[run["core_bases"]],require_consumer=False))
+                    coverage_risks=policy.assess_loss(profiles[baseline["core_bases"]],profiles[run["core_bases"]],require_consumer=False))
             elif baseline["outcome"]=="timeout" and run["outcome"]=="completed":
                 comparison.update(mapping_speedup_lower_bound=min(baseline["wall_seconds"],baseline["wall_budget_seconds"])/run["wall_seconds"],quality_baseline_available=False)
             r["comparisons"].append(comparison)
@@ -186,6 +209,8 @@ def main(argv=None):
     p.add_argument("--start",type=int,default=0)
     p.add_argument("--span-bases",type=int,default=50_000_000)
     p.add_argument("--fraction",choices=["default","0.005","0.01"],default="default")
+    p.add_argument("--candidate-policy",choices=["all_chains_pool","native_window_selection"],default="all_chains_pool")
+    p.add_argument("--core-bases",type=int,choices=CORE_SIZES)
     p.add_argument("--threads",type=int,default=16)
     p.add_argument("--memory-mib",type=int,default=131072)
     p.add_argument("--case-seconds",type=int,default=600)
@@ -196,7 +221,8 @@ def main(argv=None):
             and 256<=a.memory_mib<=524288 and 1<=a.case_seconds<=1200 and a.case_seconds<=a.total_seconds<=7200):
         p.error("bounded span and resources required")
     if not a.execute:
-        print(json.dumps({"execute":False,"span_bases":a.span_bases,"cores":[50_000_000,10_000_000,5_000_000]}));return
+        candidate,cores=probe_policy(a)
+        print(json.dumps({"execute":False,"span_bases":a.span_bases,"cores":list(cores),"candidate_policy":candidate}));return
     def interrupted(number,frame):raise KeyboardInterrupt(f"cancelled by signal {number}")
     previous={s:signal.getsignal(s) for s in (signal.SIGTERM,signal.SIGHUP)}
     try:

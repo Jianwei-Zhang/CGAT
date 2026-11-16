@@ -247,6 +247,40 @@ def assess_loss(before, after, limits=Limits(), *, require_consumer=True):
             "scientific_accuracy_proven": False}
 
 
+def screen_candidate_projection(profile, limits=Limits()):
+    """Request bounded review from full-record evidence, without a baseline.
+
+    Absence of a risk is NOT proof that window selection retained all global
+    competitors. Never turn union coverage alone into a quality approval.
+    Multiple valid chromosome assignments remain represented, not collapsed.
+    """
+    if not assess_loss(profile, profile, limits)["passed"]:
+        raise ValueError("complete assignment/strand evidence required for projection screening")
+    queries = []
+    for name, row in profile.items():
+        assigned = consumer_assignments(row, limits)
+        covered = row["covered"] / row["length"]
+        reasons = []
+        if not assigned:
+            reasons.append("covered_but_unassigned" if covered >= limits.assignment_coverage
+                           else "low_reference_support")
+        if len(assigned) > 1:
+            reasons.append("multiple_chromosome_assignments")
+        if any(value["covered"] / row["length"] < limits.assignment_coverage + limits.assignment_margin
+               for value in assigned.values()):
+            reasons.append("near_assignment_threshold")
+        for target in assigned:
+            weights = row["assignment_candidates"][target]["strand_weights"]
+            if abs(weights["+"] - weights["-"]) / sum(weights.values()) < limits.assignment_margin:
+                reasons.append("orientation_ambiguous")
+                break
+        queries.append({"query": name, "coverage_fraction": covered,
+                        "assigned_targets": sorted(assigned), "reasons": reasons,
+                        "action": "bounded_review" if reasons else "no_obvious_assignment_risk"})
+    return {"policy": POLICY, "queries": queries, "baseline_comparison_performed": False,
+            "production_approved": False, "scientific_accuracy_proven": False}
+
+
 def plan_completed_record_review(before, after, limits=Limits()):
     """Select ONE complete source per query from already verified paired PAFs.
 

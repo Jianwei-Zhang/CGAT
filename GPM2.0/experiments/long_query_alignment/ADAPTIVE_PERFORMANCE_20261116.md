@@ -434,3 +434,166 @@ RUNNING on `agent-ARM-23`, started 19:45:16, with the previously adjusted
 16-CPU / 64-GiB grant. The real-window job remains PENDING; its explicit scheduler
 reason is insufficient available CPUs on a node, not a failed dependency or
 mapping failure. Existing job handles remain in use; none was duplicated.
+
+### Completed larger ordinary pilot, full-native feasibility and window policy control
+
+The 33,455,812-bp ordinary pilot `41767856` SUCCEEDED on ARM-23, 19:45:16–20:12:06.
+Every condition completed against both original IWGSC parts and same-policy PAFs
+were repeatable. All six PAF hashes were checked after download and the frozen
+v1 receipt was re-audited under the CURRENT assignment-aware policy.
+
+| Ordinary filtering | Forward-order map (s) | Reverse-order map (s) | Paired speedups |
+| --- | ---: | ---: | ---: |
+| default | 294.94 | 292.69 | baseline |
+| f0.005 | 147.83 | 155.84 | 2.00x / 1.88x |
+| f0.01 | 138.10 | 139.41 | 2.14x / 2.10x |
+
+The same short `ptg001708l` is the only record with net union-coverage loss.
+The automatic completed-record review chooses its default result and the candidate
+result for the other three records. This removes measured net coverage loss and
+retains chromosome assignments/directions. Anchor changes are +272 bp on 6D for
+`ptg000126l` and -49 bp on 7D for `ptg000159l`, under both filters; these are actual
+reported differences, not an asserted universal accuracy tolerance. A hybrid runtime
+has not been measured, and filtering alone remains insufficient for the long record.
+
+Complete-record native diagnostic `41827114` SUCCEEDED as a DIAGNOSTIC at 20:10:02,
+not as an alignment. Default aborted after 29.69 s with `[morecore] insufficient
+memory`, return 134, under the 36-GiB virtual-address cap (peak RSS ~15.19 GiB).
+This is allocation-failure evidence, not the targeted CIGAR assertion and not proof
+that physical RAM demand equals the address-space limit. Both f0.005 and f0.01 hit
+600-s caps. f0.01 logged completion of the first original index part, but the whole
+invocation did not complete: NO partial PAF from any of these runs is usable.
+
+All-chain window job `41824802` completed its DIAGNOSTIC at 20:18:16: ALL three
+50/10/5-Mb-core invocations hit their 600-s cap. The aggregate scheduler evidence
+shows 8,182 s user CPU plus 94 s system CPU over 1,912 s job wall, so this was not
+merely idle queue time. It is not a function-level profile or per-window CPU timing.
+
+A one-factor candidate-policy control, `41839608`, SUCCEEDED on ARM-21 at 20:02:27.
+It keeps the same first 50-Mb query span, 5-Mb cores, 100-kb context, original part 0,
+default mid_occ=500, mapper, 8 threads and 36-GiB address cap, but uses normal native
+window candidate selection instead of `-P` all-chain retention. Its mapping completed
+in 73.1467 s, CPU 299.18 s, peak RSS 24,558,588 KiB. All 10 windows completed;
+546 raw rows cover 49,175,135 / 50,000,000 owned bases (98.35027%), on 3D, plus strand.
+
+The paired reports were downloaded and checked: exact same window FASTA SHA-256
+`a9e65fa51d3f00cdfd9bc19177a951798f06309eda0894049bbfa83d46b9b475`, original-part SHA-256
+`8abbf954284f2ce3ec9fbc14007eb0ad1c261aab6a8fe4085fb5c23dea676c6a`, window boundaries,
+query source, index receipt and all command options except `-P` (output/input file
+locations differ). The observed budget ratio is >8.20x. This is ONE paired experiment
+on different ARM nodes, not a repeated full-workflow speedup. The timed-out baseline
+cannot establish a quality-loss rate; 98.35% is coverage of INPUT, not retention of
+baseline alignments. No full native confidence or customer acceptance is inferred.
+
+Frozen control payload `window-selection-tools-v1` SHA-256:
+`b5e238cba0021db9359323ea55d99d0006e7fbb0a648612df37b148d3c363900`.
+Verified comparison and ordinary re-audit: `completed-pilot-audit-v1/`.
+The benchmark now supports a single controlled core size and candidate policy;
+default behavior remains the original all-chain 50/10/5-Mb sweep. These are
+maintainer experiment controls, NOT user-facing performance decisions.
+
+### Complete approximate route: explicit scope, not fabricated native confidence
+
+The user's approved sensitivity/speed trade permits a separate approximate
+initial-reference route. It is NOT legitimate to call a fast window result the
+old confidence-preserving recovery result. This alternative must complete ALL
+windows of every original query across ALL original reference parts, base-check
+CIGARs, clip overlapping context, restore full-record coordinates and lengths,
+and audit actual downstream assignments. It deliberately does not reconstruct
+whole-query chain state, native ranking or MAPQ. The existing exact-recovery
+contract is not weakened or relabeled; if used, its companion/recovery gates still
+apply. Full long-record and downstream acceptance remain mandatory either way.
+
+The existing `windowed_alignment` native-selection route already emits unknown
+MAPQ 255 and strips non-transferable native score/primary tags after coordinate
+projection. Source inspection found an actual downstream issue: reference-evidence
+anchor selection ranked 255 numerically above known MAPQ. A narrow correction now
+ranks unknown below known values only AFTER the existing block-length/match keys,
+without changing raw PAF or deleting hits. Its regression first failed on all
+four known-0/known-60/order variants, then all six evidence-package tests passed.
+The source fix is `3409eb2`; no release artifact or deployed customer tool was
+replaced. The upstream minimap2 manual defines 255 as missing quality and `-P` as
+retaining chains without primary selection. Normal small/native paths are unchanged.
+
+Complete 289,508,469-bp projection job `41847059` was submitted at 20:15:
+16 CPUs / 64 GiB physical limit, 48-GiB mapper address cap, 900 s per original part,
+and a 2,700-s process-wide alarm including preparation and base checks. It reuses
+both existing part files, verifies that their concatenated bytes hash to the
+original full MMI, and does NOT rebuild or copy the 22-GB index. It uses default
+filtering and 5-Mb native-selected windows, checks against original bases, and
+combines outputs only after BOTH parts succeed. This path does not require running
+an x86 helper on ARM; it executes no native-chain-state companion at all.
+
+Payload `full-projection-tools-v1` SHA-256:
+`5145b45cbc08313aeab9a5d650c6f1db0beee7dc8850916186ad105f3d2b37ee`.
+Report: `full-window-projection-default-v1/projection.json`. It was still PENDING
+at 20:21; no result or full-record speedup is claimed.
+
+A separate quality control `41853392` was submitted at 20:29: apply the same
+complete base-checked projection to the already verified FOUR ordinary records,
+then compare to their completed default native PAF (no baseline remapping). It uses
+8 CPUs / 40 GiB, 36-GiB mapper cap, 600 s per part and a 1,800-s process-wide alarm.
+Every original part and every generated window must be logged complete. This
+control provides an attainable complete native quality baseline; it does not
+substitute for the full 289.5-Mb validation. Fresh normalization/base-check costs
+must be counted separately from mapper-only timings, especially for small jobs.
+
+Payload `ordinary-projection-tools-v1` SHA-256:
+`c7d64935bb7e1660ad4ad7449e8c6777215e3dc932447f91ea191a32003feafb`.
+Report: `ordinary-window-projection-default-v1/projection.json`.
+Production automatic admission, finite escalation/review, resume/mixed-policy
+publication and release closure are STILL NOT COMPLETE. No full assembly parameter
+search has been launched.
+
+### Full ordinary projection outcome, hidden ambiguity control, and overhead profiling
+
+Job `41853392` SUCCEEDED on ARM-26 (20:30:38–20:42:40). Source/index hashes and
+both completed part/window traversals were verified after downloading its report,
+final PAF, leaf reports, mapping logs and manifests. Preparation took 363.50 s;
+part processing took 264.24 / 91.79 s, while actual mapper calls took only
+59.562 / 46.065 s. Total measured script wall was 720.77 s. Therefore it is NOT
+a demonstrated faster replacement for the ~293–295 s ordinary native maps:
+normalization/index validation/base checks can erase the mapper-only benefit.
+Different threads/nodes and setup scope also prevent a clean paired speed claim.
+
+All four projected records passed current baseline-relative coverage, assignment
+and strand checks: no net query coverage loss or changed chromosome/direction.
+Anchor shifts were -424 bp on 6D (`ptg000126l`) and -49 bp on 7D (`ptg000159l`).
+All output MAPQs are unknown, not reconstructed. Candidate-only screening flags
+only the weak/unassigned short contig for bounded review; absence of a risk is
+explicitly NOT scientific approval. Local evidence directory:
+`/tmp/cgat-jm19-ordinary-projection-result-ojhbtuqs/`.
+
+Two new REAL minimap2 2.31 controls run the complete base-check/projection route,
+including explicit original multipart layouts, forward/reverse coordinates,
+full-length query identity and removal of non-transferable confidence tags.
+The ambiguity fixture has one near-perfect global placement plus 64 perfect local
+competitors per window (asm10's actual secondary limit is 50). Native mapping
+assigns the full record to `global`; window-native selection has 100% union
+coverage but NO chromosome assignment. The audit rejects this via
+`assignment_lost` / `downstream_assignment_removed` and selects the completed
+baseline. This is direct evidence that coverage alone cannot approve the new route.
+
+`screen_candidate_projection` now automatically flags covered-but-unassigned,
+low-support, multiple-target, near-threshold and direction-ambiguous results for
+bounded review. It requires full-record assignment/strand evidence, preserves
+multiple assignments, and never claims a clean-looking candidate is proven safe.
+Current adaptive suite: 90 passed, no skips, with the pinned local mapper enabled.
+No production runtime threshold was enabled by these screening additions.
+
+A 1-CPU/4-GiB postprocessing-only profile reuses the completed ordinary part-0 PAF;
+mapper calls are explicitly forbidden. It measures index catalogue/hash, original
+sequence-store preparation, context validation, then cProfile of base-check,
+ownership and stitching, requiring byte-identical reconstructed PAFs. Initial job
+`41871765` was stopped after a detected launcher filename collision (`profile.py`
+shadowed Python's standard `profile` module); scheduler confirmed FAILED at
+21:14:20 after termination. No baseline mapping was repeated. Corrected job
+`41872603` uses `replay_postprocess.py`, a separate immutable payload/output root,
+and an 1,800-s process alarm. Import isolation was checked before submission.
+
+Corrected payload `postprocess-profile-tools-v2` SHA-256:
+`c558f0e7eefe9e3d8aa7e95fe7e9dac8b20df21988ab93e1c7f72952a1190057`.
+Report: `postprocess-profile-v2/profile.json`. Completed normalized stores are
+checkpointed for later compute-only replay if profiling supports an optimization.
+The full long-record job `41847059` remains a separate live scheduler handle;
+it was PENDING at 21:13. Do not replace it merely because observations expire.
