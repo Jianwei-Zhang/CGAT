@@ -4,12 +4,15 @@
   "scope": "initial_reference_asm10_only",
   "files_sha256": {
     "approximate_reference_cells.py": "b40686f9de5b58f9dec69407cbabfb5588c0463ae606e5fc166f6e7ac4dea99b",
-    "adaptive_screening.py": "d832a1d45ffd8e449fb850969f5e7d659b9b029ad00905af6a98c3b865334322",
+    "adaptive_screening.py": "1654adc41e2f9bbeda2075597dc2370351f2fd4dcc17c4807a32d1b9c907a3c9",
+    "adaptive_ordinary_controller.py": "11df75f048694f05192ce572c68a4ab397c21e61864752910494e8c9ca655029",
+    "adaptive_ordinary_units.py": "2788ef595bf95d2ea7fe3d96e6399561f35fbc7ccf0315043c1b057bbcd32ca3",
+    "automatic_ordinary_pilot.py": "098197890a0bf792b3ea339aa768dfc4190695b1bb463b896c6aac37cf35e7ab",
     "proactive_reference_plan.py": "da00c834919b1cf5e354645ebbf8fcf58ea2de6bfb9f31f9af0c2f9846b608bf",
-    "proactive_reference_alignment.py": "26e08085c48e923233f32a24717892f98269adb888c3416227fc9d325d6bae6e",
-    "proactive_publication.py": "be9fe2dd9fc11ffbccdbd8906d76271ba498c6e07e0ce000de08e6156f57e0e6",
-    "proactive_resume.py": "686e5e44981e86e49182362a77b62d6bb9c1f98865afe4b27bbd0a2c916bb278",
-    "server_alignment.py": "07a21f26976d4866e7953c1e703841dc56082abedec4627d8742f33bdedf2755",
+    "proactive_reference_alignment.py": "4864a1429c54318355bfe27b070c452adbd337dd99a09a4b76b384bb33739bdd",
+    "proactive_publication.py": "cad9b527813c51abbe44f5246612c19a53ea805bdb7937b07f2422094765d233",
+    "proactive_resume.py": "f2037b2aafba8de8295ae46884ce1a397165cee5fe8d9cc725558f56a3483c0c",
+    "server_alignment.py": "343fed09aef14f20d7c6765b0b2b3954d0d8d2ccc58ff65f59e7194672b44916",
     "selective_reference_alignment.py": "fcd60155fbb5d6d826e60815f8484c70fb26e73b26f4a096cde9a080785e4f91",
     "guided_alignment.py": "a5b0832555cd306093e840559765e9790b72fd940c389ea787227cd210802acf",
     "windowed_alignment.py": "000713110a82508585e820f470e92d70e4f3c326674cb8254ed6279c51a49caa",
@@ -38,47 +41,52 @@
   "recovered_output_admission": "proactive-original-chain-native-selection-v1",
   "native_companion_platform": "linux-x86_64",
   "native_companion_sha256": "00a0cee279f70d1faf35202b9328217226efcbe261bf0ff7e19b5bf4c783ab2e",
-  "handoff_base_sha256": "8005638709b5273327512ac249225a249b8e661cb73f035dd4b10fa7d4d09480",
+  "handoff_base_sha256": "0746e7d8d50c61dfb03f6b97149e98d19c47c5f3b89e7a04faa5b8de231dc0a2",
   "production_ready": false,
   "customer_configuration_required": false,
   "approximate_output_admission": "bounded_native_window_projection_v1",
+  "ordinary_output_admission": "automatic-ordinary-controller-v1",
   "generated_from": "GPM2.0/experiments/long_query_alignment; sync_server_runtime.py",
   "native_resume_source_profiles": [
     [
       "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "c9d6e29d620ecd80d48ebd496d811569961a7e6f9a495646d7f46b8584ea686d",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "c83a96b95826d2d58055ac551456124e9acbc0d0331287a633f28f3902e3d560",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ],
     [
       "4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab",
-      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
+    ],
+    [
+      "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89",
+      "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
     ]
   ]
 }

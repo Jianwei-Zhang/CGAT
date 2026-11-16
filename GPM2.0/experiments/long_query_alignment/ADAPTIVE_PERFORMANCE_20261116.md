@@ -1345,3 +1345,82 @@ optional source-oracle skip, all remaining tests passed. Controller commit
 `caf5aec` passed Linux Server and Windows App CI (`43936902269`). The running
 review uses frozen copies of these same controller/unit sources; subsequent
 documentation edits do not alter that payload.
+
+
+### Real reviewed prefix and default Server entry (2026-11-17)
+
+Review job `42070699` SUCCEEDED on ARM-23 (03:17:02--03:31:24 CST).
+It started exactly two new DEFAULT native commands, for the two automatically
+flagged full records, and no new calibration, unit remapping or remaining-input
+mapping. It wrote zero remaining-assembly input units. The original completed
+pilot/unit ledgers remained byte-identical, and its second resource-change
+invocation made zero new mapper calls.
+
+The review driver took 857.604 s, including 162.451 s of full-catalogue preparation.
+The two review entries charge 360.263 s and 197.331 s respectively (extraction,
+mapping and verification, not mapper-only speed measurements). This extra work
+is a real cost; it must not be omitted from a speed claim. The reviewed prefix
+was freshly downloaded and verified: 5,187,846 bytes, SHA-256
+`dc6a20e528766785ee87994df4df84ed2efd17b6c8e3ce5d7a05bb454807c844`.
+
+Both default-relative filtered checks pass without removed chromosome/orientation
+assignments, qualified-support losses or anchor shifts. Raw union coverage is
+NOT identical: ptg000001l is 0.788500 under default versus 0.844115 under f=0.005;
+ptg000002l is 0.799069 versus 0.849071. The additional filtered coverage (707,516
+and 265,300 bp) is not proof of greater biological accuracy. As planned, the two
+already-paid COMPLETE default sources were retained; ptg000003l keeps its complete
+filtered source. No candidate/default blocks are mixed inside a query, and no
+whole-workload native-equivalence claim is made.
+
+The ordinary controller is now connected to the actual prepared Server adapter:
+
+- The package explicitly admits `automatic-ordinary-controller-v1`. Both pure
+  ordinary large workloads and mixed ordinary/ultralong inputs can use it.
+  Small references/queries and explicit user filters retain their existing paths.
+- Publication revalidates the completed controller READ-ONLY: it cannot fill a
+  missing pilot/input/review/composition or start a mapper. Source identity,
+  selected complete PAFs and scientific policy are compared, not incidental
+  first-invocation reuse/reservation counters.
+- Review count/base/time exhaustion now ends filtering rather than the user's
+  task. At most one default transition handles unresolved records in the current
+  unit; remaining units use default exactly once as primary work. Complete prior
+  sources remain selected. Actual failed/corrupt native work still fails closed;
+  a failed review is not silently retried under another name.
+- Production units retain the prepared native batch width (normally 1G), threads
+  and primary-work resource semantics. The 128-Mb/36-GiB/2400-s experimental
+  settings are NOT imposed on every production unit: that would reduce native
+  concurrency and could introduce artificial failures. Calibration and limited
+  review remain separately bounded. Completed units keep their original actual
+  resource receipts when future execution settings change.
+- Complete older native groups, orphaned native-success children and existing
+  original-index-part checkpoints take their verified reuse/resume paths before
+  any new calibration. The reviewed 31-file window runtime profile is explicitly
+  migratable; arbitrary policy toggles or changed scientific kernels are not.
+- Logs announce actual calibration cases, chosen policy, unit progress and the
+  switch back to default. English/Chinese READMEs explain the internal trigger;
+  no user classification/configuration option was added.
+
+Generated runtime: 34 canonical source files / 39 packaged files, source profile
+`79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69`.
+The prior 781-test run exposed an outdated frozen-legacy inventory assertion when
+three runtime modules were added. The frozen old hashes were NOT changed; the
+explicit added-module set and reviewed migration coverage were updated.
+The final full regression ran 784 tests in 265.397 s: one optional source-oracle
+skip, all remaining tests passed.
+
+ARM prepared-entry job `42080337` SUCCEEDED on ARM-35, 04:05:29--04:05:49 CST.
+All 12 entry/publication/resume tests passed (12.951-s test runner, 14.287-s driver),
+without a native companion. The downloaded report and frozen source hashes were
+checked. These tests use the real pinned ARM mapper with SCALED input thresholds
+and SYNTHETIC calibration timings to cover policy branches; they are not another
+wheat speed benchmark. Payload SHA-256:
+`2a30d50808f2fb6a79dd0d2452bfdae5de9335e9b571ae35447f0f0b1dd686b6`.
+The 34-source profile matches the current canonical runtime; the later prepare
+help-text edit changes package metadata only, not this tested source profile.
+
+Remaining release gates: retain a compact output-bound alignment-policy receipt
+in delivered App packages (the current packager intentionally copies result.paf
+but omits Server caches/logs), then close the official Server-only source refresh
+and fresh-download checks. Policy currently remains in the Server evidence, but
+must not disappear when automatic sensitivity changes are delivered to a user.
+No full customer assembly or full native-baseline sweep has been launched.

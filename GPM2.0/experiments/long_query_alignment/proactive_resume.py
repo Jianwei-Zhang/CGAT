@@ -33,6 +33,7 @@ _REVIEWED_PARTITION_RUNTIME = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f2
 _REVIEWED_PARTITION_RESUME_RUNTIME = "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
 _REVIEWED_RESOURCE_RUNTIME = "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
 _REVIEWED_AUTOMATIC_WINDOW_RUNTIME = "4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab"
+_REVIEWED_WINDOW_SUBSTAGE_RUNTIME = "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
 _REVIEWED_BUFFERED_RUNTIME = "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
 _REVIEWED_NATIVE_STREAM_RUNTIME = "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01"
 _REVIEWED_SCALAR_WINDOW_SOURCE = "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e"
@@ -82,7 +83,8 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
     if (previous.get("sha256") != old_key["runtime_sha256"]
             or not old_files or not (set(new_files) - set(old_files)) <= {
                 "minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py",
-                "approximate_reference_cells.py", "adaptive_screening.py"}
+                "approximate_reference_cells.py", "adaptive_screening.py",
+                "adaptive_ordinary_controller.py", "adaptive_ordinary_units.py", "automatic_ordinary_pilot.py"}
             or set(old_files) - set(new_files)
             or any(previous.get(k) != runtime.get(k) for k in
                    ("native_companion_sha256", "native_companion_platform", "recovered_output_admission"))):
@@ -90,10 +92,11 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
     if old_files == new_files:
         # Enabling/disabling approximation changes scientific policy, not just
         # package/base metadata. Source-changing migrations use reviewed pairs.
-        return previous.get("approximate_output_admission") == runtime.get("approximate_output_admission")
+        return (previous.get("approximate_output_admission") == runtime.get("approximate_output_admission")
+                and previous.get("ordinary_output_admission") == runtime.get("ordinary_output_admission"))
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME}
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME}
                 and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
     if not approved:
         return False
@@ -118,7 +121,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
            and not (name == "windowed_alignment.py" and buffered_equivalent)
            for name in kernels):
         return False
-    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME}
+    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))
             and "ordinary" not in stages):
         partial = candidate / "selective" / "ordinary-native" / opa.RECEIPT
@@ -362,7 +365,17 @@ class Checkpoint:
     def ordinary(self, mm, target, query, *, fraction=None, parts=None, records=None):
         marker = self.get("ordinary")
         if not marker:
-            return None
+            # A completed native child can outlive a controller kill before the
+            # group checkpoint is sealed. Verify the actual receipt, never the
+            # existence of a PAF or a stale running flag, before adopting it.
+            path = self.root / "ordinary-native/native-attempt.json"
+            if not path.exists():return None
+            raw = read_json(path)
+            if raw.get("status") != "native_success":return None
+            receipt = rp.verify_attempt(path, self.root, "native_success", tool=mm, target=target,
+                                        query=query, fraction=fraction)
+            self.save_ordinary(); self.reused["ordinary_group"] += 1
+            return receipt
         if marker.get("kind") == opa.KIND:
             if parts is None or records is None:
                 raise wa.ExperimentError("partitioned ordinary completion has no original index/query context")

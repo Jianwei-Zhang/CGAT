@@ -33,6 +33,7 @@ _RESOURCE_GRANT_SOURCE_PROFILE = "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f
 _NATIVE_STREAM_SOURCE_PROFILE = "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01"
 _REVIEWED_INITIAL_WINDOW_PROFILE = "4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab"
 _AUTOMATIC_WINDOW_SOURCE_PROFILE = "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
+_AUTOMATIC_ORDINARY_SOURCE_PROFILE = "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
 _BUFFERED_STATISTICS_SOURCE_PROFILE = "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
 _LEGACY_METADATA_SOURCE_PROFILE = "85a120a387487e29a71b4e74d8b2ea100b0c2f4cfcf146c6b5558919473cdecd"
 
@@ -77,6 +78,7 @@ def expected_files(server, canonical, bundle):
                 "handoff_base_sha256": hashlib.sha256(files[resume.BASE][0]).hexdigest(),
                 "production_ready": False, "customer_configuration_required": False,
                 "approximate_output_admission": adapter.ap.POLICY,
+                "ordinary_output_admission": adapter.oc.POLICY,
                 "generated_from": "GPM2.0/experiments/long_query_alignment; sync_server_runtime.py"}
     profile = hashlib.sha256(json.dumps(hashes,sort_keys=True,separators=(",",":")).encode()).hexdigest()
     manifest["native_resume_source_profiles"] = (
@@ -102,7 +104,12 @@ def expected_files(server, canonical, bundle):
         [[old, profile] for old in (_LEGACY_METADATA_SOURCE_PROFILE, _METADATA_FIX_SOURCE_PROFILE,
                                     _PARAMETER_SOURCE_PROFILE, _PARTITION_SOURCE_PROFILE, _PARTITION_RESUME_SOURCE_PROFILE,
                                     _RESOURCE_GRANT_SOURCE_PROFILE, _NATIVE_STREAM_SOURCE_PROFILE, _BUFFERED_STATISTICS_SOURCE_PROFILE, _REVIEWED_INITIAL_WINDOW_PROFILE)]
-        if profile == _AUTOMATIC_WINDOW_SOURCE_PROFILE else [])
+        if profile == _AUTOMATIC_WINDOW_SOURCE_PROFILE else
+        [[old, profile] for old in (_LEGACY_METADATA_SOURCE_PROFILE, _METADATA_FIX_SOURCE_PROFILE,
+                                    _PARAMETER_SOURCE_PROFILE, _PARTITION_SOURCE_PROFILE, _PARTITION_RESUME_SOURCE_PROFILE,
+                                    _RESOURCE_GRANT_SOURCE_PROFILE, _NATIVE_STREAM_SOURCE_PROFILE, _BUFFERED_STATISTICS_SOURCE_PROFILE,
+                                    _REVIEWED_INITIAL_WINDOW_PROFILE, _AUTOMATIC_WINDOW_SOURCE_PROFILE)]
+        if profile == _AUTOMATIC_ORDINARY_SOURCE_PROFILE else [])
     files[adapter.MANIFEST] = (encoded(manifest), 0o644)
     return files
 

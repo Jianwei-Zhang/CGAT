@@ -133,7 +133,7 @@ def materialize_units(catalog, plan, root, *, ordinals=None):
     return [completed[u["ordinal"]] for u in selected_units]
 
 
-def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomplete=True, readonly=False):
+def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomplete=True, readonly=False, primary_work=False):
     """One native command, or verified reuse. No inner retry/parameter loop.
 
     A new explicit invocation may retry an interrupted ordinary work unit; a
@@ -141,7 +141,9 @@ def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomp
     Callers disable retry_incomplete for limited quality-review commands.
     """
     if (type(args.threads) is not int or args.threads < 1 or type(args.memory_gib) is not int or args.memory_gib < 0
-            or type(timeout) is not int or timeout < 1):raise ValueError("invalid native unit resources")
+            or type(primary_work) is not bool
+            or not (primary_work and timeout is None) and (type(timeout) is not int or timeout < 1)):
+        raise ValueError("invalid native unit resources")
     root = Path(root)
     if root.is_symlink() or root.parent.is_symlink():raise wa.ExperimentError("linked ordinary unit root")
     root = root.resolve()
@@ -206,8 +208,8 @@ def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomp
     options = argparse.Namespace(**vars(args))
     options.timeout = timeout; options.minimap_filter = unit["fraction"]
     options.minimap_batch = mo.batch_size(getattr(args, "minimap_batch", None) or "1G")
-    options.memory_gib = min(36, args.memory_gib) if args.memory_gib else 36
-    options.max_output_bytes = 64 * 1024**2
+    options.memory_gib = args.memory_gib if primary_work else min(36, args.memory_gib) if args.memory_gib else 36
+    options.max_output_bytes = None if primary_work else 64 * 1024**2
     state.update(status="running", attempts=state["attempts"] + 1,
         resources={"threads": args.threads, "batch": options.minimap_batch,
                    "memory_gib": options.memory_gib, "output_bytes": options.max_output_bytes, "timeout_seconds": timeout})

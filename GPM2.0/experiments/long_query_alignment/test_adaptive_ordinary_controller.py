@@ -92,17 +92,22 @@ class ControllerTests(unittest.TestCase):
                 resumed=self.execute(target,inputs)
             self.assertEqual(resumed["composition"],result["composition"])
 
-    def test_review_allowance_is_cumulative_and_no_partial_result_is_published(self):
+    def test_review_allowance_switches_remaining_work_to_default_without_global_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); inputs=self.fixture(root,filtered=True,weak=(5,15)); target=root/"controller"
             result=self.execute(target,inputs)
-            self.assertEqual(result["status"],"stopped_without_publication")
-            self.assertEqual(result["reason"],"cumulative_review_count_or_bases_exceeded")
+            self.assertEqual(result["status"],"complete_bounded_policy_candidate")
+            fallback=result["default_continuation"]
+            self.assertEqual(fallback["reason"],"cumulative_review_count_or_bases_exceeded")
+            self.assertEqual(fallback["transition_queries"],["q15"])
+            self.assertFalse(fallback["whole_assembly_restart"])
             self.assertEqual(list(result["reviews"]),["q05"])
-            self.assertFalse((target/"composition/ordinary.selected.paf").exists())
-            with patch.object(nf,"attempt",side_effect=AssertionError("stopped prefix remapped")):
-                resumed=self.execute(target,inputs)
-            self.assertEqual(resumed["status"],"stopped_without_publication")
+            self.assertTrue((target/"composition/ordinary.selected.paf").exists())
+            self.assertIsNone(pr.read_json(target/"units/unit-000003/unit.json")["identity"]["fraction"])
+            with patch.object(nf,"attempt",side_effect=AssertionError("completed fallback remapped")):
+                resumed=self.execute(target,inputs,readonly=True)
+            self.assertEqual(resumed["default_continuation"],fallback)
+            self.assertEqual(resumed["composition"],result["composition"])
 
     def test_cancelled_review_has_no_automatic_retry_or_partial_composition(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -202,12 +207,13 @@ class ControllerTests(unittest.TestCase):
             inputs[-1]=replace(inputs[-1],total_seconds=20,review_fraction=.5)
             target=root/"controller"
             result=self.execute(target,inputs)
-            self.assertEqual(result["reason"],"review_wall_budget_exhausted")
+            self.assertEqual(result["default_continuation"]["reason"],"review_wall_budget_exhausted")
             self.assertEqual(list(result["reviews"]),["q04","q05"])
             self.assertEqual(sum(r["charged_seconds"] for r in result["reviews"].values()),20)
             with patch.object(nf,"attempt",side_effect=AssertionError("review time budget reset")):
                 resumed=self.execute(target,inputs)
-            self.assertEqual(resumed["reason"],"review_wall_budget_exhausted")
+            self.assertEqual(resumed["default_continuation"],result["default_continuation"])
+            self.assertEqual(resumed["default_continuation"]["transition_queries"],["q06"])
 
     def test_query_identifier_is_not_used_as_a_filesystem_path(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -220,3 +226,46 @@ class ControllerTests(unittest.TestCase):
             self.assertEqual(review.parent,root/"controller/reviews")
             self.assertEqual(len(review.name),64)
             self.assertFalse((root/"escape").exists())
+
+    def test_publication_reverification_is_readonly_and_never_maps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);inputs=self.fixture(root,filtered=True,weak=(15,));target=root/"controller"
+            first=self.execute(target,inputs)
+            files={p:(p.read_bytes(),p.stat().st_mtime_ns) for p in target.rglob("*.json")}
+            with patch.object(nf,"attempt",side_effect=AssertionError("publication audit mapped")):
+                result=self.execute(target,inputs,readonly=True)
+            self.assertEqual(result["composition"],first["composition"])
+            self.assertEqual({p:(p.read_bytes(),p.stat().st_mtime_ns) for p in files},files)
+
+    def test_readonly_audit_rejects_a_bounded_prefix_and_missing_completed_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);inputs=self.fixture(root);target=root/"controller"
+            self.execute(target,inputs,unit_limit=1)
+            with self.assertRaisesRegex(wa.ExperimentError,"completed full ordinary controller"):
+                self.execute(target,inputs,readonly=True)
+            self.execute(target,inputs)
+            marker=target/"inputs/unit-000002.fa.json";marker.rename(marker.with_suffix(".retained"))
+            with patch.object(nf,"attempt",side_effect=AssertionError("audit filled missing input")):
+                with self.assertRaisesRegex(wa.ExperimentError,"completed ordinary input required"):
+                    self.execute(target,inputs,readonly=True)
+            self.assertFalse(marker.exists())
+
+    def test_readonly_audit_does_not_reconstruct_missing_composition(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);inputs=self.fixture(root);target=root/"controller"
+            self.execute(target,inputs)
+            marker=target/"composition/composition.json";marker.rename(marker.with_suffix(".retained"))
+            with patch.object(nf,"attempt",side_effect=AssertionError("audit mapped")):
+                with self.assertRaisesRegex(wa.ExperimentError,"complete composition missing"):
+                    self.execute(target,inputs,readonly=True)
+            self.assertFalse(marker.exists())
+
+    def test_completed_review_cost_cannot_be_reset_in_cached_ledger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);inputs=self.fixture(root,filtered=True,weak=(15,));target=root/"controller"
+            self.execute(target,inputs)
+            state=pr.read_json(target/controller.STATE);state["reviews"]["q15"]["charged_seconds"]=.001
+            wa.write_json(target/controller.STATE,state)
+            with patch.object(nf,"attempt",side_effect=AssertionError("cost audit mapped")):
+                with self.assertRaisesRegex(wa.ExperimentError,"cost was understated"):
+                    self.execute(target,inputs,readonly=True)

@@ -2,7 +2,8 @@
 """Direct length routing with original index context; private candidates only.
 
 No whole-input trial, failure-driven bisection, singleton assertion replay or
-parameter retries. The standalone CLI remains PLAN ONLY by default; the internal
+whole-input parameter sweeps. Ordinary calibration has its own finite pilot.
+The standalone CLI remains PLAN ONLY by default; the internal
 Server adapter owns prepared-workspace permission and atomic publication. This
 module only produces candidates and optional private-source admission. Durable
 group resume remains a separate integration gate.
@@ -18,6 +19,7 @@ import subprocess
 import time
 
 import approximate_reference_cells as ap
+import adaptive_ordinary_controller as oc
 import guided_alignment as ga
 import native_chain_state as nst
 import native_first as nf
@@ -129,8 +131,13 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
         native_args = argparse.Namespace(**vars(args))
         if prepared_workspace is not None:
             native_args.timeout = None  # Preserve the original Server native command's unlimited wall time.
-        # Normal-only: no reference normalization, MMI preprocessing or companion.
-        if not plan["long_queries"]:
+        ordinary_budget = oc.automatic_budget()
+        ordinary_probe = oc.pilot.plan(ordinary_budget.reference_bases,
+            [{"name": r.name, "length": r.length} for r in catalog.records],
+            explicit_filter=fraction, budget=ordinary_budget)
+        ordinary_requested = (prepared_workspace is not None and getattr(args, "adaptive_ordinary", False)
+                              and ordinary_probe["enabled"])
+        def normal_native():
             reference = nf.source_identity(args.target.resolve())
             cache.bind("reference", reference)
             native = cache.ordinary(mm, args.target, args.query, fraction=fraction)
@@ -149,6 +156,12 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                 native_row_bytes_preserved=True, original_inputs_unchanged=True, recovered_query_part_cells=0,
                 companion_required=False, native_confidence_unchanged=True)
             return report
+        # Keep the ordinary small-input fast path and already completed legacy
+        # whole-input data. Enabling an optimization must not discard that data.
+        native_child = root / "ordinary-native/native-attempt.json"
+        complete_native_child = native_child.exists() and pr.read_json(native_child).get("status") == "native_success"
+        if not plan["long_queries"] and (not ordinary_requested or cache.get("ordinary") is not None or complete_native_child):
+            return normal_native()
         if subprocess.check_output([mm, "--version"], text=True, timeout=5).strip() != "2.31-r1302":
             raise wa.ExperimentError("long-query original-state recovery requires minimap2 2.31-r1302")
         bundle = None
@@ -161,12 +174,22 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             return bundle
         target = cache.store(args.target, root / "target.bases", "target-store")
         try:
+            ordinary_plan = oc.pilot.plan(sum(r["length"] for r in target.records.values()),
+                [{"name": r.name, "length": r.length} for r in catalog.records],
+                explicit_filter=fraction, budget=ordinary_budget)
+            ordinary_enabled = ordinary_requested and ordinary_plan["enabled"]
+            if not plan["long_queries"] and not ordinary_enabled:
+                return normal_native()
             report["reference"] = target.identity
             approximate = ap.eligible(target, enabled=prepared_workspace is not None
                 and getattr(args, "approximate_initial_reference", False))
+            ordinary_only = not plan["long_queries"] and ordinary_enabled
+            approximate = approximate or ordinary_only
+            ordinary_enabled = ordinary_enabled and approximate
             if approximate:
-                report.update(routing_mode="adaptive_large_reference", approximate_policy=ap.POLICY,
-                              projection_screening=[], native_reviews=[], discarded_projection_screening=[], native_confidence_reconstructed=False)
+                report.update(routing_mode="adaptive_large_ordinary" if ordinary_only else "adaptive_large_reference",
+                              approximate_policy=ap.POLICY, projection_screening=[], native_reviews=[],
+                              discarded_projection_screening=[], native_confidence_reconstructed=False)
             else:
                 require_bundle()
             cache.bind("reference", target.identity)
@@ -185,7 +208,29 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                 ordinary_records = [{"name": name, "length": queries[name]["length"]} for name in ordinary["queries"]]
                 native = cache.ordinary(mm, root / "target.default.mmi", ordinary["path"], fraction=fraction,
                     parts=index["parts"], records=ordinary_records)
-                if native is None:
+                adaptive = None
+                partial_group = root / "ordinary-native" / opa.RECEIPT
+                partition_resume = partial_group.exists() or partial_group.is_symlink()
+                if native is None and ordinary_enabled and not partition_resume:
+                    controller_root = root / "ordinary-adaptive"
+                    # Keep the original native query-batch width/thread budget;
+                    # 128-Mb experiment units must not serialize production work.
+                    text = mo.batch_size(getattr(native_args, "minimap_batch", None) or "1G")
+                    unit_bases = int(text[:-1]) * {"K": 1000, "M": 1000000, "G": 1000000000}[text[-1]] if text[-1] in "KMG" else int(text)
+                    if (controller_root / oc.STATE).exists():
+                        unit_bases = pr.read_json(controller_root / oc.STATE)["identity"]["plan"]["unit_bases"]
+                    native_args.report_progress = True
+                    adaptive = oc.execute(controller_root, catalog,
+                        {**index, "path": str(root / "target.default.mmi")}, {"path": mm, **tool}, native_args,
+                        unit_bases=unit_bases, unit_seconds=native_args.timeout, primary_work=True)
+                    if adaptive["status"] != "complete_bounded_policy_candidate":
+                        raise wa.ExperimentError("bounded ordinary continuation incomplete: " + adaptive["status"])
+                    report["ordinary_adaptive"] = adaptive
+                    composed = adaptive["composition"]
+                    merger._add(Path(composed["path"]), composed["sha256"], ordinary["queries"], "native", part_index=None)
+                    mid = sr.read_shared_mid_occ(root / "ordinary-adaptive/calibration/baseline-0/native.stderr", len(index["parts"]))
+                    report["threshold_source"] = {"kind": "completed_default_ordinary_pilot", "mid_occ": mid}
+                if native is None and adaptive is None:
                     schedule = opa.plan(native_args, index["parts"], ordinary_records)
                     report["ordinary_schedule_plan"] = schedule
                     partial_group = root / "ordinary-native" / opa.RECEIPT
@@ -200,7 +245,9 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                         native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", native_args)
                         if native["status"] == "native_success":
                             cache.save_ordinary()
-                if native.get("kind") == opa.KIND:
+                if adaptive is not None:
+                    pass  # Complete selected native sources were already added above.
+                elif native.get("kind") == opa.KIND:
                     for row in native["parts"]:
                         merger.add_native(row["native"], ordinary["queries"], part_index=row["part_index"])
                     mid = native["mid_occ"]
@@ -211,7 +258,8 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                     merger.add_native(native, ordinary["queries"])
                     mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(index["parts"]))
                     threshold_kind = "ordinary_original_index_mapping"
-                report.update(ordinary_native=native, threshold_source={"kind": threshold_kind, "mid_occ": mid})
+                if adaptive is None:
+                    report.update(ordinary_native=native, threshold_source={"kind": threshold_kind, "mid_occ": mid})
             else:
                 saved = cache.get("threshold")
                 if saved is not None:
@@ -386,13 +434,18 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                 native_row_bytes_preserved=True, recovered_query_part_cells=report["combination"]["recovered_cells"],
                 approximate_query_part_cells=sum(r.get("kind") == ap.POLICY and r["query"] not in {x["query"] for x in report.get("native_reviews", [])} for r in report["parts"]))
             if admit_output:
-                report["admission"] = pub.admit(report, root, bundle=bundle)
+                report["admission"] = pub.admit(report, root, bundle=bundle,
+                    **({"ordinary_catalog": catalog} if report.get("ordinary_adaptive") is not None else {}))
                 current_bundle = nst.validate_bundle(Path(bundle["manifest_path"]).parent) if bundle is not None else None
                 if bundle is not None and any(current_bundle[k] != bundle[k] for k in ("sha256", "manifest_sha256", "platform")):
                     raise wa.ExperimentError("native companion changed during proactive execution")
             catalog.require_unchanged()
             if not target.unchanged() or not nf.identity_unchanged(Path(mm), tool):
                 raise wa.ExperimentError("source/tool changed during proactive admission")
+            if report.get("ordinary_adaptive") is not None:
+                # Ephemeral scanner output, not a trusted-on-disk hash flag.
+                # The adapter reuses it to avoid decoding the full input again.
+                args._ordinary_catalog = catalog
             report["publication_admission"] = ("private_source_checked_not_published" if admit_output
                                                  else "awaiting_adapter_proactive_admission")
         finally:

@@ -212,6 +212,19 @@ class ActualUnitTests(unittest.TestCase):
                 with self.assertRaisesRegex(wa.ExperimentError,"private resume metadata"):
                     units.run_unit(target,*inputs,timeout=30,readonly=True)
 
+    def test_primary_work_preserves_native_resource_semantics_without_relaxing_trials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);unit,query,index,tool,args=self.fixture(root)
+            args.memory_gib=0
+            with self.assertRaises(ValueError):units.run_unit(root/"trial",unit,query,index,tool,args,timeout=None)
+            result=units.run_unit(root/"primary",unit,query,index,tool,args,timeout=None,primary_work=True)
+            self.assertEqual(result["resources"]["memory_gib"],0)
+            self.assertIsNone(result["resources"]["timeout_seconds"])
+            self.assertIsNone(result["resources"]["output_bytes"])
+            with patch.object(nf,"attempt",side_effect=AssertionError("completed primary unit remapped")):
+                resumed=units.run_unit(root/"primary",unit,query,index,tool,args,timeout=30,readonly=True)
+            self.assertEqual(resumed["source"],result["source"])
+
 
 class ReviewAllowanceTests(unittest.TestCase):
     def profile(self, name, length, covered):

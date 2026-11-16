@@ -33,12 +33,14 @@ import native_chain_state as nst
 import native_first as nf
 import minimap_options as mo
 import ordinary_resource_grant as org
+import adaptive_ordinary_controller as oc
 import recovery_publication as rp
 import windowed_alignment as wa
 
 MANIFEST = "branch-runtime.json"
 RUNTIME_FILES = (
     "approximate_reference_cells.py","adaptive_screening.py",
+    "adaptive_ordinary_controller.py","adaptive_ordinary_units.py","automatic_ordinary_pilot.py",
     "proactive_reference_plan.py","proactive_reference_alignment.py","proactive_publication.py","proactive_resume.py",
     "server_alignment.py","selective_reference_alignment.py","guided_alignment.py","windowed_alignment.py",
     "native_first.py","native_evaluation.py","native_chain_state.py","build_native_chain_state.py","recovery_publication.py",
@@ -81,6 +83,7 @@ def validate_runtime(root):
     return {"path":str(path),"sha256":hashlib.sha256(raw).hexdigest(),"files_sha256":value["files_sha256"],
             "recovered_output_admission":value["recovered_output_admission"],
             "approximate_output_admission":value.get("approximate_output_admission"),
+            "ordinary_output_admission":value.get("ordinary_output_admission"),
             "native_companion_sha256":value.get("native_companion_sha256"),
             "native_companion_platform":value.get("native_companion_platform"),
             "handoff_base_sha256":value.get("handoff_base_sha256"),
@@ -121,20 +124,24 @@ def cancellation_scope():
             signal.signal(number,handler)
 
 
-def publication_source(report,attempt,*,runtime=None,runtime_root=None):
+def publication_source(report,attempt,*,runtime=None,runtime_root=None,ordinary_catalog=None):
     if (report.get("status")!="proactive_candidate_complete"
             or report.get("original_inputs_unchanged") is not True
             or report.get("partial_PAF_reused") is not False):
         raise wa.ExperimentError("proactive result lacks complete unchanged-input evidence")
-    if report.get("routing_mode") == "adaptive_large_reference":
-        if not runtime or runtime.get("approximate_output_admission") != ap.POLICY:
+    if report.get("ordinary_adaptive") is not None:
+        if not runtime or runtime.get("ordinary_output_admission") != oc.POLICY:
+            raise wa.ExperimentError("automatic ordinary publication is not enabled by this package")
+    if report.get("routing_mode") in ("adaptive_large_reference", "adaptive_large_ordinary"):
+        if report.get("routing_mode") == "adaptive_large_reference" and (not runtime or runtime.get("approximate_output_admission") != ap.POLICY):
             raise wa.ExperimentError("approximate initial-reference publication is not enabled by this package")
         bundle = None
         if report.get("helper") is not None:
             bundle = nst.validate_bundle(Path(runtime_root)/"native"/nst.build.host_platform())
             if bundle["sha256"] != runtime.get("native_companion_sha256"):
                 raise wa.ExperimentError("legacy recovered confidence companion differs")
-        admitted = pub.admit(report, attempt/"selective", bundle=bundle)
+        admitted = pub.admit(report, attempt/"selective", bundle=bundle,
+            **({"ordinary_catalog": ordinary_catalog} if report.get("ordinary_adaptive") is not None else {}))
         if bundle is not None:
             admitted.update(helper_sha256=bundle["sha256"], helper_manifest_sha256=bundle["manifest_sha256"])
         wa.write_json(attempt/"recovery-admission.json", admitted)
@@ -228,10 +235,12 @@ def run_reference(args,*,runtime_root=None):
                 minimap2="minimap2",threads=args.threads,timeout=None,memory_gib=0,
                 ordinary_resource_context=report["ordinary_resource_context"],
                 approximate_initial_reference=runtime.get("approximate_output_admission") == ap.POLICY,
+                adaptive_ordinary=runtime.get("ordinary_output_admission") == oc.POLICY,
                 native_state_bundle=runtime_root/"native"/nst.build.host_platform(), **mapping_options)
             result = pa.experiment(options,prepared_workspace=workspace,admit_output=False,resume_identity=resume_identity)
             report["candidate_receipt_sha256"] = wa.sha256(options.out/"proactive-candidate.json")
-            source,digest = publication_source(result,attempt,runtime=runtime,runtime_root=runtime_root)
+            source,digest = publication_source(result,attempt,runtime=runtime,runtime_root=runtime_root,
+                **({"ordinary_catalog": getattr(options, "_ordinary_catalog", None)} if result.get("ordinary_adaptive") is not None else {}))
             if validate_runtime(runtime_root)!=runtime:
                 raise wa.ExperimentError("branch runtime changed while mapping")
             recovered = result.get("recovered_query_part_cells",0)>0
@@ -263,6 +272,9 @@ def run_reference(args,*,runtime_root=None):
                           recovered_native_confidence_published=recovered and result.get("routing_mode") != "adaptive_large_reference",
                           approximate_query_part_cells=result.get("approximate_query_part_cells", 0),
                           initial_reference_policy=admission.get("policy") if admission else "native_complete_unchanged",
+                          ordinary_adaptive_policy=oc.POLICY if result.get("ordinary_adaptive") is not None else None,
+                          ordinary_selected_filter=(result.get("ordinary_adaptive") or {}).get("selected_filter"),
+                          ordinary_default_continuation=(result.get("ordinary_adaptive") or {}).get("default_continuation"),
                           whole_query_dp_equivalence_certified=False,AS_reconstructed=False)
         except BaseException as exc:
             report.update(status="refused_or_failed",error=f"{type(exc).__name__}: {exc}")

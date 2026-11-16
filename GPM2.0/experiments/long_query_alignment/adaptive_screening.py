@@ -1,6 +1,6 @@
 """Internal adaptive metrics and large-reference projection risk screening.
 
-Ordinary sensitivity calibration is not a production default yet.
+The package-bound initial-reference adapter may enable bounded ordinary calibration.
 Size selects a bounded pilot, never a sensitivity change. A candidate is eligible
 only from completed, comparable measurements and per-query loss checks. Limits
 are provisional experimental acceptance budgets, not biological accuracy claims.

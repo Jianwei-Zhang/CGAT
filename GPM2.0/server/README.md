@@ -325,8 +325,29 @@ See the parent repository's `README.md` for the complete options and desktop wor
 New workspaces default to `-K 1G` (query batch size, **not a RAM limit**).
 If memory is insufficient, try `-K 500M`; this does not guarantee the task will fit.
 Use `-f 0.01` explicitly for faster, more aggressive seed filtering, which **may change alignment results**;
-without `-f`, the assembly preset's filtering is unchanged. These options apply only to initial-reference mapping.
+an explicit `-f` is preserved and bypasses automatic filter calibration. These options apply only to initial-reference mapping.
 Long aliases are `--minimap-batch` and `--minimap-filter`.
+
+Without `-f`, ordinary inputs normally keep preset filtering. For initial-reference
+`asm10` tasks with a reference of at least 5 Gb, at least 1 Gb of ordinary queries,
+and at least one ordinary contig of 20 Mb, Server may automatically calibrate a
+small set of **complete contigs**. The pilot must fit within 128 Mb and the full
+ordinary workload must contain at least 64 times its bases; size alone does not
+change sensitivity. Calibration is bounded (at most six native cases, 20 minutes
+per case and 80 minutes in total) and tries the weaker `0.005` filter first. A
+candidate is used only after repeatable speed and assignment/coverage checks.
+Small inputs and explicit user filters do not enter this path.
+
+This is an internal decision: no manual classification, FASTA splitting or new
+configuration is needed. Startup calibration and subsequent work units are
+reported in the log. The completed default pilot is retained. Flagged contigs get
+limited full-record default review; if its allowance is exhausted, remaining
+unresolved/current and future work returns to default filtering **without
+restarting the whole assembly or discarding completed sources**. Actual failed or
+corrupt native work is not silently accepted. Primary mapping retains its normal
+batch/thread/resource settings; calibration/review bounds are not job-wide RAM
+or runtime promises. Automatic choices are local to the current input and do not
+overwrite the prepared filter default.
 
 For a stopped workspace, `bash "$SERVER/run.sh" -o ./gpm_server -K 500M`
 changes the batch size for unfinished work without rerunning valid completed alignments.

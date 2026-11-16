@@ -134,7 +134,7 @@
       "reference_launch_checkpoint_recipe_equal": true
     }
   ],
-  "base_prepare_sha256": "3fd8ba8231ae6deda5134a0fe9e1c516842e23b4960d8b45c640d5f53c76e781",
+  "base_prepare_sha256": "c79e0fabc78bfb49fe8177786a1d815071a45944a8a5df21dfb8b67a09aef332",
   "source_revision": {
     "worktree_source_bound_by_file_hashes": true
   }

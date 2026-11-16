@@ -7,11 +7,13 @@ particular cause. Admission returns a private checked source, never publishes it
 from __future__ import annotations
 
 import json
+import argparse
 from pathlib import Path
 
 import native_first as nf
 import minimap_options as mo
 import ordinary_partition_alignment as opa
+import adaptive_ordinary_controller as oc
 import proactive_reference_plan as pp
 import recovery_publication as rp
 import selective_reference_alignment as sr
@@ -89,12 +91,13 @@ def check_empty(row, part, group, report, root):
             "route": "no_candidates", "queries": [row["query"]], "parts": [part["part_index"]]}
 
 
-def admit(report, root, *, bundle):
+def admit(report, root, *, bundle, ordinary_catalog=None):
     import approximate_reference_cells as ap
     root = Path(root).resolve()
-    approximate = report.get("routing_mode") == "adaptive_large_reference"
+    ordinary_only = report.get("routing_mode") == "adaptive_large_ordinary"
+    approximate = report.get("routing_mode") == "adaptive_large_reference" or ordinary_only
     require(report.get("status") == "proactive_candidate_complete"
-            and report.get("routing_mode") in ("proactive_query_length", "adaptive_large_reference")
+            and report.get("routing_mode") in ("proactive_query_length", "adaptive_large_reference", "adaptive_large_ordinary")
             and report.get("original_inputs_unchanged") is True
             and report.get("native_row_bytes_preserved") is True
             and report.get("partial_PAF_reused") is False
@@ -118,7 +121,7 @@ def admit(report, root, *, bundle):
     ordinary = [r["name"] for r in records if r["length"] <= pp.MAX_OPERATION]
     long_names = [r["name"] for r in records if r["length"] > pp.MAX_OPERATION]
     require(names and len(names) == len(set(names)) and long_names == plan["long_queries"]
-            and ordinary == plan["native_queries"] and bool(long_names), "proactive query routing changed")
+            and ordinary == plan["native_queries"] and (bool(long_names) or ordinary_only and bool(ordinary)), "proactive query routing changed")
     require(groups["all_original_records_accounted"] is True and groups["original_sequence_order"] == names,
             "group materialization omitted original queries")
     expected_groups = ([ordinary] if ordinary else []) + [[n] for n in long_names]
@@ -140,12 +143,36 @@ def admit(report, root, *, bundle):
         require(part["reference_sha256"] == report["reference"]["sha256"]
                 and part["tool_sha256"] == report["tool"]["sha256"] and part["preset"] == "asm10"
                 and wa.verified_sha256(rp.regular_under(part["path"], root)) == part["sha256"], "original index part changed")
-    if approximate:
+    if approximate and not ordinary_only:
         require(sum(r["length"] for p in parts for r in p["records"]) >= ap.MIN_REFERENCE_BASES,
                 "approximate route not eligible for this reference size")
     expected_sources = []
     if ordinary:
-        if report["ordinary_native"].get("kind") == opa.KIND:
+        if report.get("ordinary_adaptive") is not None:
+            require(report.get("minimap_filter") is None, "explicit filter cannot be replaced by automatic policy")
+            current_catalog = ordinary_catalog if ordinary_catalog is not None else pp.scan_query(catalog["source"])
+            current_catalog.require_unchanged()
+            require(current_catalog.source == catalog["source"]
+                    and current_catalog.source_sha256 == catalog["source_sha256"]
+                    and [pp.asdict(r) for r in current_catalog.records] == records,
+                    "ordinary full-record source catalog changed")
+            controller_root = rp.regular_under(root / "ordinary-adaptive" / oc.STATE, root).parent
+            saved = oc.pr.read_json(controller_root / oc.STATE)
+            current = oc.execute(controller_root, current_catalog, {**index, "path": str(root / "target.default.mmi")},
+                report["tool"], argparse.Namespace(threads=1, memory_gib=0, minimap_batch="1G"), readonly=True,
+                unit_bases=saved["identity"]["plan"]["unit_bases"], primary_work=True, unit_seconds=None)
+            reported = report["ordinary_adaptive"]
+            # Reuse/cumulative-reservation diagnostics naturally differ on
+            # revalidation. Bind actual sources and scientific policy, not those
+            # incidental first-invocation counters.
+            require(current["status"] == "complete_bounded_policy_candidate"
+                    and all(current[k] == reported.get(k) for k in ("identity", "composition", "reviews", "selected_filter", "default_continuation")),
+                    "automatic ordinary complete sources or decision changed")
+            composed = current["composition"]
+            expected_sources.append({"path": composed["path"], "sha256": composed["sha256"], "route": "native",
+                                     "queries": ordinary, "parts": list(range(len(parts)))})
+            mid = sr.read_shared_mid_occ(controller_root / "calibration/baseline-0/native.stderr", len(parts))
+        elif report["ordinary_native"].get("kind") == opa.KIND:
             ordinary_records = [{"name": r["name"], "length": r["length"]} for r in records if r["name"] in ordinary]
             native = opa.verify(root / "ordinary-native", report["tool"]["path"], group_by_name[ordinary[0]]["path"],
                                 parts, ordinary_records, fraction=report.get("minimap_filter"))
@@ -159,7 +186,9 @@ def admit(report, root, *, bundle):
             mid = sr.read_shared_mid_occ(root / "ordinary-native/native.stderr", len(parts))
             expected_sources.append({"path": native["path"], "sha256": native["paf_sha256"], "route": "native",
                                      "queries": ordinary, "parts": list(range(len(parts)))})
-        require(native == report["ordinary_native"], "ordinary native result changed")
+        if report.get("ordinary_adaptive") is None:
+            require(not ordinary_only, "ordinary-only adaptive route lacks verified controller")
+            require(native == report["ordinary_native"], "ordinary native result changed")
     else:
         directory = root / "first-part-metadata"
         execution = report["threshold_source"]["execution"]
@@ -183,7 +212,6 @@ def admit(report, root, *, bundle):
             "long-query original-part cells omitted/duplicated/reordered")
     reviews = {}
     if approximate:
-        import argparse
         for review in report.get("native_reviews", []):
             name = review["query"]
             require(name in long_names and name not in reviews, "native reviews omit/duplicate query identity")
@@ -257,7 +285,9 @@ def admit(report, root, *, bundle):
                 "approximate assembly omitted/duplicated original cells")
         output = rp.regular_under(report["output_path"], root)
         require(wa.verified_sha256(output) == report["output_sha256"], "complete approximate candidate changed")
-        return {"schema": 1, "policy": ap.POLICY, "status": "complete_approximate_reference_admitted",
+        return {"schema": 1, "policy": oc.POLICY if ordinary_only else ap.POLICY,
+                "ordinary_policy": oc.POLICY if report.get("ordinary_adaptive") is not None else None,
+                "status": "complete_approximate_reference_admitted",
                 "path": str(output), "sha256": report["output_sha256"], "original_cells": len(names)*len(parts),
                 "approximate_cells": len(projected), "legacy_recovered_cells": len(proofs), "native_reviewed_queries": sorted(reviews),
                 "native_confidence_reconstructed": False, "whole_query_dp_equivalence_certified": False,

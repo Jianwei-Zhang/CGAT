@@ -15,6 +15,7 @@ import math
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
 
 import adaptive_screening as quality
@@ -195,7 +196,7 @@ def _verify_case(root, row, query, index, tool, records, fraction, options):
     _complete_traversal((directory / "native.stderr").read_text(),
                         [len(p["records"]) for p in index["parts"]], len(records))
     path = Path(receipt["path"])
-    if path.stat().st_size > options.max_output_bytes:
+    if options.max_output_bytes is not None and path.stat().st_size > options.max_output_bytes:
         raise wa.ExperimentError("pilot output exceeded its finite audit budget")
     queries = {r["name"]: {"length": r["length"]} for r in records}
     targets = {r["name"]: {"length": r["length"]} for p in index["parts"] for r in p["records"]}
@@ -312,7 +313,11 @@ def execute(root, pilot_plan, query, index, tool, args, *, readonly=False):
         state["spent_seconds"] = spent_before + time.monotonic() - invocation
         save()
         try:
+            if getattr(args, "report_progress", False):
+                print(f"CGAT ordinary calibration: {label}, {len(records)} complete records, budget {options.timeout:.1f}s", file=sys.stderr, flush=True)
             native = nf.attempt(tool["path"], Path(index["path"]), Path(query["path"]), directory, options)
+            if getattr(args, "report_progress", False):
+                print(f"CGAT ordinary calibration: {label} {native['status']}", file=sys.stderr, flush=True)
             if native["execution"].get("interrupted") == "KeyboardInterrupt":
                 raise KeyboardInterrupt("ordinary calibration cancelled")
             if native["status"] != "native_success":
