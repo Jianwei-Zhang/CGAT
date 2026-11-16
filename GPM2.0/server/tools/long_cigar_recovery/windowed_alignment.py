@@ -385,40 +385,77 @@ def clip_to_core(hit: Hit, window: Window) -> Hit | None:
     return replace(hit, qs=qs, qe=qe, ts=first_t, te=last_t, ops=ops, matches=0, block=0, mapq=255)
 
 
-def checked_statistics(hit: Hit, query: FastaStore, target: FastaStore) -> tuple[int, int, int]:
-    """Check =/X against original bases and recompute stats, excluding ambiguity.
+MAX_BUFFER_BYTES = 1024 * 1024
 
-    Mapping quality, chaining scores and primary/secondary labels CANNOT be
-    inherited after windowing. Those are deliberately absent/unknown in output.
+
+class _Cursor:
+    def __init__(self, store, name, start, end, reverse, capacity):
+        self.store, self.name = store, name
+        self.start, self.end, self.reverse = start, end, reverse
+        self.capacity = capacity
+        self.loaded = self.consumed = self.position = 0
+        self.buffer = b""
+
+    def take(self, size):
+        if size < 0 or size > self.end - self.start - self.consumed:
+            raise ExperimentError("CIGAR consumes beyond its declared sequence span")
+        end = self.position + size
+        if end <= len(self.buffer):
+            result = self.buffer[self.position:end]
+            self.position = end
+            self.consumed += size
+            return result
+        remaining, pieces = size, []
+        while remaining:
+            if self.position == len(self.buffer):
+                count = min(self.capacity, self.end - self.start - self.loaded)
+                lo = self.end - self.loaded - count if self.reverse else self.start + self.loaded
+                block = self.store.fetch(self.name, lo, lo + count)
+                if len(block) != count:
+                    raise ExperimentError("truncated sequence during base verification")
+                block = block.translate(NT)
+                self.buffer = block.translate(RC)[::-1] if self.reverse else block
+                self.loaded += count
+                self.position = 0
+            count = min(remaining, len(self.buffer) - self.position)
+            pieces.append(self.buffer[self.position:self.position + count])
+            self.position += count
+            remaining -= count
+        self.consumed += size
+        return pieces[0] if len(pieces) == 1 else b"".join(pieces)
+
+
+def checked_statistics(hit: Hit, query: FastaStore, target: FastaStore, *, buffer_bytes=MAX_BUFFER_BYTES) -> tuple[int, int, int]:
+    """Validate every =/X base and recount ambiguity using bounded sequential reads.
+
+    Reverse alignments consume an oriented in-memory slab rather than repeatedly
+    seeking backwards for each tiny CIGAR operation. This changes I/O only:
+    coordinates, nucleotide normalization, statistics and confidence policy stay
+    unchanged. No source buffer survives this one alignment check.
     """
-    q, t = 0, hit.ts
+    if type(buffer_bytes) is not int or not 1 <= buffer_bytes <= MAX_BUFFER_BYTES:
+        raise ExperimentError("bounded positive base-check buffer required")
+    q = _Cursor(query, hit.query, hit.qs, hit.qe, hit.strand == "-", buffer_bytes)
+    t = _Cursor(target, hit.target, hit.ts, hit.te, False, buffer_bytes)
     matches = block = ambiguous = 0
     for size, op in hit.ops:
-        for offset in range(0, size, CHUNK):
-            n = min(CHUNK, size - offset)
-            qb = tb = b""
-            if op in Q_OPS:
-                if hit.strand == "+":
-                    qb = query.fetch(hit.query, hit.qs + q + offset, hit.qs + q + offset + n).translate(NT)
-                else:
-                    qb = query.fetch(hit.query, hit.qe - q - offset - n, hit.qe - q - offset).translate(NT).translate(RC)[::-1]
-            if op in T_OPS:
-                tb = target.fetch(hit.target, t + offset, t + offset + n).translate(NT)
+        for offset in range(0, size, buffer_bytes):
+            n = min(buffer_bytes, size - offset)
+            qb = q.take(n) if op in Q_OPS else b""
+            tb = t.take(n) if op in T_OPS else b""
             if op == "=":
                 if qb != tb:
                     raise ExperimentError("= operation disagrees with original input bases")
                 amb = qb.count(b"N")
                 matches += n - amb
             elif op == "X":
-                if any(a == b for a, b in zip(qb, tb)):
+                if (qb == tb if n == 1 else any(a == b for a, b in zip(qb, tb))):
                     raise ExperimentError("X operation disagrees with original input bases")
-                amb = qb.count(b"N") + tb.count(b"N")  # Both N would violate X.
+                amb = qb.count(b"N") + tb.count(b"N")
             else:
                 amb = (qb if op == "I" else tb).count(b"N")
             ambiguous += amb
             block += n - amb
-        q += size if op in Q_OPS else 0
-        t += size if op in T_OPS else 0
     return matches, block, ambiguous
 
 

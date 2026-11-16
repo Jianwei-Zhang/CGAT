@@ -32,6 +32,9 @@ _REVIEWED_PARAMETER_RUNTIME = "c83a96b95826d2d58055ac551456124e9acbc0d0331287a63
 _REVIEWED_PARTITION_RUNTIME = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f269f3f32ef9c90fa"
 _REVIEWED_PARTITION_RESUME_RUNTIME = "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
 _REVIEWED_RESOURCE_RUNTIME = "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
+_REVIEWED_NATIVE_STREAM_RUNTIME = "aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01"
+_REVIEWED_SCALAR_WINDOW_SOURCE = "f2194b39ee759fb6692a3239a1239ef6c110ac6231c844c25dec04050709972e"
+_REVIEWED_BUFFERED_WINDOW_SOURCE = "000713110a82508585e820f470e92d70e4f3c326674cb8254ed6279c51a49caa"
 
 
 
@@ -86,7 +89,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
         return True
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME}
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME}
                 and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
     if not approved:
         return False
@@ -96,14 +99,22 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
         return ((set(stages) == {"groups", "ordinary"} or
                  all(n in stages for n in ("groups", "target-store", "index", "ordinary")))
                 and not any(n.startswith("cell:") for n in stages))
-    # Performance-only adapter changes retain the already-fixed recovery kernels.
-    # Old native/cell payloads are STILL fully verified on reopen/publication.
+    # Recovery kernels must match, except for the exact byte-equivalent
+    # base-check transition below. Old payloads are still fully verified.
     kernels = ("guided_alignment.py", "windowed_alignment.py", "native_chain_state.py",
                "native_recovery.py", "native_selection.py", "post_dp_selection.py",
                "whole_query_scores.py", "minimap_index_context.py")
-    if any(old_files.get(name) != new_files.get(name) for name in kernels):
+    # This exact source pair changes only base-check I/O, not the checked
+    # nucleotides, CIGAR geometry or output bytes. Do not waive future kernel
+    # changes: the complete runtime pair above AND this source pair are required.
+    buffered_equivalent = (
+        old_files.get("windowed_alignment.py") == _REVIEWED_SCALAR_WINDOW_SOURCE
+        and new_files.get("windowed_alignment.py") == _REVIEWED_BUFFERED_WINDOW_SOURCE)
+    if any(old_files.get(name) != new_files.get(name)
+           and not (name == "windowed_alignment.py" and buffered_equivalent)
+           for name in kernels):
         return False
-    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME}
+    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))
             and "ordinary" not in stages):
         partial = candidate / "selective" / "ordinary-native" / opa.RECEIPT

@@ -279,6 +279,59 @@ class KeyMigrationTests(unittest.TestCase):
         attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
         self.assertFalse(reused);self.assertNotEqual(attempt,self.attempt)
 
+    def native_stream_runtime(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_buffered_statistics_runtime.json').read_text())
+        digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest(files),pr._REVIEWED_NATIVE_STREAM_RUNTIME)
+        self.assertEqual(files['windowed_alignment.py'],pr._REVIEWED_SCALAR_WINDOW_SOURCE)
+        self.assertEqual(self.runtime['files_sha256']['windowed_alignment.py'],pr._REVIEWED_BUFFERED_WINDOW_SOURCE)
+        previous={**self.old_runtime,'files_sha256':files}
+        runtime={**self.runtime,'native_resume_source_profiles':[[pr._REVIEWED_NATIVE_STREAM_RUNTIME,digest(self.runtime['files_sha256'])]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        return runtime
+
+    def test_reviewed_buffered_checker_keeps_completed_ordinary_and_index(self):
+        runtime=self.native_stream_runtime();before=self.cache.data['stages'].copy()
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
+    def test_reviewed_scalar_long_cell_is_retained_for_payload_revalidation(self):
+        runtime=self.native_stream_runtime()
+        # Selector eligibility is not payload admission: later readers still
+        # verify the actual cell receipt, source hashes and complete PAF.
+        self.cache.mark('cell:0:long',{'test_only':'must still be revalidated'})
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages']['cell:0:long'],
+                         {'test_only':'must still be revalidated'})
+
+    def test_reviewed_buffered_checker_keeps_partial_part_receipts_without_blessing_them(self):
+        runtime=self.native_stream_runtime();self.cache.data['stages'].pop('ordinary');self.cache.save()
+        path=self.attempt/'selective/ordinary-native'/pr.opa.RECEIPT;path.parent.mkdir()
+        wa.write_json(path,{'schema':2,'kind':pr.opa.KIND,'status':'failed_no_retry'})
+        before=path.read_bytes()
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(path.read_bytes(),before)
+        with self.assertRaises(wa.ExperimentError):
+            pr.opa.attempt(str(self.tool),[],self.query,path.parent,argparse.Namespace(minimap_filter=None),[],{})
+
+    def test_future_buffered_checker_is_not_admitted_by_a_forged_profile_pair(self):
+        runtime=self.native_stream_runtime()
+        runtime['files_sha256']={**runtime['files_sha256'],'windowed_alignment.py':'0'*64}
+        profile=hashlib.sha256(json.dumps(runtime['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        runtime['native_resume_source_profiles']=[[pr._REVIEWED_NATIVE_STREAM_RUNTIME,profile]]
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertFalse(reused);self.assertNotEqual(attempt,self.attempt)
+
+    def test_buffered_transition_does_not_waive_other_recovery_kernels(self):
+        runtime=self.native_stream_runtime()
+        runtime['files_sha256']={**runtime['files_sha256'],'native_recovery.py':'0'*64}
+        profile=hashlib.sha256(json.dumps(runtime['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        runtime['native_resume_source_profiles']=[[pr._REVIEWED_NATIVE_STREAM_RUNTIME,profile]]
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertFalse(reused);self.assertNotEqual(attempt,self.attempt)
+
     def test_pure_ordinary_previous_runtime_retains_native_completion_without_index(self):
         self.cache.data['stages'] = {name:self.cache.data['stages'][name] for name in ('groups','ordinary')}
         self.cache.save()

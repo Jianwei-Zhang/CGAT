@@ -597,3 +597,103 @@ Report: `postprocess-profile-v2/profile.json`. Completed normalized stores are
 checkpointed for later compute-only replay if profiling supports an optimization.
 The full long-record job `41847059` remains a separate live scheduler handle;
 it was PENDING at 21:13. Do not replace it merely because observations expire.
+
+
+### Exact base-check I/O optimization and real old-runtime resume (22:10 update)
+
+The corrected profile `41872603` SUCCEEDED on ARM-12, 21:14:47–21:24:32.
+It reconstructed the completed ordinary part-0 owned and stitched PAFs byte for
+byte without executing a mapper. Fresh reference normalization took 288.33 s;
+recovery/stitching took 145.31 / 109.43 s under cProfile. There were 5,655,910
+`BufferedReader.read` calls, consuming 223.36 s of profiler-attributed own time.
+This identifies a concrete small-read problem, especially on reverse CIGAR
+traversal; it does not justify removing any nucleotide checks.
+
+`windowed_alignment.checked_statistics` now uses at most 1-MiB sequential slabs
+per sequence cursor, normalizes/orients each slab once, and still checks EVERY
+`=` and `X` and recounts ambiguity in `= / X / I / D`. No CIGAR, coordinate,
+placement selection or confidence policy changes. The implementation is embedded
+in the existing runtime file: no additional production module dependency.
+The independent scalar oracle was retained in tests, with 600 randomized
+both-strand/indel/IUPAC cases across five buffer capacities, invalid-base and
+truncated-store controls, and a logical operation above 2^28 with bounded reads.
+
+Unprofiled paired replay `41885245` SUCCEEDED on ARM-20,
+21:38:32–21:53:31 (1 CPU / 4 GiB). It reused source stores only after fresh
+source/spool checks and processed exactly the same completed ordinary part-0
+raw PAF in order scalar / buffered / buffered / scalar:
+
+| Implementation | Wall seconds | CPU seconds |
+| --- | ---: | ---: |
+| Scalar first | 249.624 | 54.246 |
+| Buffered first | 204.778 | 8.498 |
+| Buffered second | 172.575 | 8.687 |
+| Scalar second | 235.135 | 52.234 |
+
+Paired wall improvements are **1.219x / 1.363x**, NOT a whole-pipeline speedup.
+Both owned and stitched outputs are byte-identical in all four runs. Shared-file
+I/O still dominates wall time; the larger CPU reduction is not a wall-time claim.
+Preparation with validated reusable stores was 31.58 s and is reported separately.
+
+- Report: `buffered-postprocess-replay-v1/replay.json` under the same ARM root.
+- Immutable payload SHA-256:
+  `28f616592d153f75d57c3620b928c2f7cceb34fc281314748a009954862a31f5`.
+- Owned PAF SHA-256:
+  `8027c260c61fd46f33ec7b58c8a11fbea45a474dca5f0aae7a631ad612c0f5d1`.
+- Stitched PAF SHA-256:
+  `5a119f2bc31501958b1857ef2ec7cd1e1a886efcdd6fac8cdea30b08865c199e`.
+- Embedded canonical cursor/function ASTs match the frozen ARM prototype after
+  removing type annotations/docstring (the experiment used a standalone helper).
+
+Resume admission is deliberately narrow: the reviewed full-runtime profile pair
+AND the exact old/new `windowed_alignment.py` hashes must match. Other recovery
+kernel changes are still rejected. Eligible old payloads must still pass their
+normal content/output integrity checks; migration does not bless receipts alone.
+
+A real three-process local lifecycle used the pinned minimap2 2.31 and native
+companion, not just relabeled new-source artifacts. All 29 old runtime files
+were read from commit `7b2a302`, profile
+`aa0bb89f9812cd64ad2d02c8e835369b8ba39eba0f021f90bea8390e70149b01`.
+The OLD code completed ordinary mapping, the index, source stores and one long
+cell, then an injected interruption stopped the second cell. Only runtime sources
+and the reviewed manifest pair were updated. A NEW process using profile
+`dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db`
+ran only the missing long cell; old index/store/ordinary PAF/first-cell PAF kept
+both SHA-256 and nanosecond mtime. A third process did ZERO mapper/index calls,
+reused both cells and reproduced identical final PAF bytes. Evidence:
+`/tmp/cgat-buffered-real-migration-halqt841/{old,new,again}.json`.
+The five new metadata migration controls also passed (33 metadata tests total).
+
+### Complete long-record budget outcome; do not discard completed mapping
+
+The earlier 16-CPU pending job `41847059` was verified unstarted with no output
+root, cancelled and confirmed terminal before replacement. Its scripts and
+scheduler receipts remain preserved; this was resource replanning, not a timeout
+retry. Replacement `41876085` requested 8 CPUs / 40 GiB on ARM, retaining the
+36-GiB mapper cap, 5-Mb windows, default filter, both original index parts and a
+2,700-s process-wide budget. It ran on ARM-25, 21:23:44–22:08:48, and correctly
+terminated FAILED at the total wall budget. Frozen payload SHA-256:
+`7aed4d3b25520847ed76fa80cac056726d69e520ace04163fda879bb9c225405`.
+
+Both original-part mapper calls actually completed with exit 0 and all 58
+windows: 244.515 s / 323.159 s. Part 0 completed base checks/stitching in 332.38 s,
+with 285,474,364 / 289,508,469 bases covered (coverage, NOT baseline retention).
+Part 1 mapping finished at 21:40:39; its scalar base-check/ownership stage finished
+at 22:03:14, then stitching was interrupted. The experiment uses the OLD scalar
+verifier; live payloads were not mutated. Fresh preparation cost 343.78 s.
+
+There is NO complete two-part final result and NO accepted long-record speedup.
+A later postprocessing-only continuation may admit the SUCCESSFUL mapping
+substage after explicit command/tool/index/window/input/traversal/integrity checks;
+it must not read the partial stitched PAF or treat the failed parent as success.
+No full assembly rerun or new filter sweep is warranted by this timeout.
+Automatic production routing, bounded review/escalation, mixed-policy provenance,
+per-unit resume and end-to-end acceptance remain unfinished.
+
+Canonical/runtime synchronization completed (34 files checked; only the two
+runtime sources and their manifests changed). Full alignment experiment discovery
+completed **669 tests in 179.73 s, OK, one explicit skip**: the separate post-DP
+native-source oracle was not configured with an unmodified source checkout.
+Pinned-tool/companion resume controls ran, rather than being skipped. This is
+controlled regression evidence, not customer or release acceptance. Official
+published Server/App artifacts were not changed.
