@@ -297,3 +297,20 @@ class ActualNativeTests(unittest.TestCase):
                 with self.assertRaises(KeyboardInterrupt):pilot.execute(out, *inputs)
             self.assertEqual(len(observed), 1)
             self.assertGreater(observed[0], 0)
+
+    def test_readonly_calibration_audit_neither_maps_nor_updates_ledger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); inputs = self.fixture(root); out = root / "calibration"
+            original = pilot.execute(out, *inputs)
+            ledger = out / pilot.STATE; before = (ledger.read_bytes(), ledger.stat().st_mtime_ns)
+            with patch.object(nf, "attempt", side_effect=AssertionError("read-only audit mapped")):
+                audited = pilot.execute(out, *inputs, readonly=True)
+            self.assertEqual(audited, original)
+            self.assertEqual((ledger.read_bytes(), ledger.stat().st_mtime_ns), before)
+
+    def test_readonly_calibration_cannot_start_unfinished_work(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); inputs = self.fixture(root); out = root / "calibration"
+            with self.assertRaisesRegex(wa.ExperimentError, "completed calibration root"):
+                pilot.execute(out, *inputs, readonly=True)
+            self.assertFalse(out.exists())

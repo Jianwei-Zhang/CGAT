@@ -209,7 +209,7 @@ def _verify_case(root, row, query, index, tool, records, fraction, options):
             "profile": quality.coverage_profile(path, records)}
 
 
-def execute(root, pilot_plan, query, index, tool, args):
+def execute(root, pilot_plan, query, index, tool, args, *, readonly=False):
     """Run at most six complete-native cases with a cumulative resume-safe budget.
 
     baseline0 / candidate0 / candidate1 / baseline1 allow early rejection of an
@@ -232,7 +232,9 @@ def execute(root, pilot_plan, query, index, tool, args):
         raise wa.ExperimentError("ordinary pilot plan changed")
     root = Path(root)
     if root.is_symlink() or root.parent.is_symlink():raise wa.ExperimentError("linked ordinary pilot root")
-    root = root.resolve(); root.mkdir(parents=True, exist_ok=True)
+    root = root.resolve()
+    if readonly and not root.is_dir():raise wa.ExperimentError("completed calibration root required")
+    if not readonly:root.mkdir(parents=True, exist_ok=True)
     parsed = mic.read_catalog(index["path"])
     if ([p["records"] for p in parsed["parts"]] != [p["records"] for p in index["parts"]]
             or sum(r["length"] for p in parsed["parts"] for r in p["records"]) != pilot_plan["reference_bases"]):
@@ -250,6 +252,9 @@ def execute(root, pilot_plan, query, index, tool, args):
                 "mapping_sources": {Path(m.__file__).name: wa.sha256(Path(m.__file__)) for m in (nf, wa, mo)}}
     state_path = root / STATE
     state = pr.read_json(state_path) if state_path.exists() else {"schema": 1, "identity": identity, "cases": {}, "spent_seconds": 0.0}
+    snapshot = state_path.read_bytes() if readonly and state_path.is_file() else None
+    if readonly and (snapshot is None or state.get("status") != "complete"):
+        raise wa.ExperimentError("calibration is not sealed complete; no read-only adoption")
     if state.get("schema") != 1 or state.get("identity") != identity:
         raise wa.ExperimentError("ordinary pilot source/recipe changed")
     if (type(state.get("spent_seconds")) not in (int, float) or not math.isfinite(state["spent_seconds"])
@@ -267,7 +272,8 @@ def execute(root, pilot_plan, query, index, tool, args):
     def guard():
         for path, digest in ((query["path"], query["sha256"]), (index["path"], index["sha256"]), (tool["path"], tool["sha256"])):
             if wa.verified_sha256(Path(path)) != digest:raise wa.ExperimentError("ordinary pilot source content changed")
-    def save():wa.write_json(state_path, state)
+    def save():
+        if not readonly:wa.write_json(state_path, state)
     guard()
     # A hard-killed case has no reliable end timestamp. Reserve its entire
     # admitted slice on resume rather than silently resetting the total budget.
@@ -297,6 +303,7 @@ def execute(root, pilot_plan, query, index, tool, args):
             old.update(status="complete", **checked); save()
             return checked
         if options.timeout <= 0:return None
+        if readonly:raise wa.ExperimentError("read-only calibration needs an unexecuted native case")
         directory = root / label
         row = {"status": "started", "directory": str(directory), "fraction": fraction, "reserved_seconds": options.timeout + 5}
         state["cases"][label] = row
@@ -374,6 +381,8 @@ def execute(root, pilot_plan, query, index, tool, args):
         state["spent_seconds"] = spent_before + time.monotonic() - invocation
         state["status"] = result["status"]
         state["decision"] = result if result["status"] == "complete" else None
+        if readonly and state_path.read_bytes() != snapshot:
+            raise wa.ExperimentError("calibration receipt changed during read-only verification")
         save()
 
 

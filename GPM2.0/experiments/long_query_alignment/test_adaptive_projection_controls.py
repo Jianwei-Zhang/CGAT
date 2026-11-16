@@ -74,7 +74,13 @@ class ApproximateProjectionControls(unittest.TestCase):
                         result = wa.experiment(args,shared_target=target,shared_query=query)
                         self.assertEqual(result["status"],"validated_experimental_candidate")
                         self.assertFalse(result["production_ready"])
-                        parsed = perf.parse_log((args.out/"map.stderr").read_text())
+                        log = (args.out/"map.stderr").read_text()
+                        try:
+                            parsed = perf.parse_log(log)
+                        except ValueError as exc:
+                            # Preserve the actual failure before fixture cleanup;
+                            # do not waive native completion or traversal checks.
+                            raise AssertionError("native projection log invalid; tail=" + repr(log[-8192:])) from exc
                         self.assertEqual(sum(b["records"] for p in parsed["parts"] for b in p["batches"]),
                                          len(wa.make_windows(query.records,core,1000)))
                         out.write((args.out/"stitched.experimental.paf").read_bytes())

@@ -1112,3 +1112,140 @@ validation time is sealed BEFORE starting a native child. A hard kill cannot
 erase that already-spent cost before the reserved child slice is charged on
 resume. This adds one focused test after the 731-test complete discovery; it
 changes no mapper arguments or successful source bytes.
+
+
+## Real automatic Server long-record completion (2026-11-17)
+
+Job `41996964` SUCCEEDED on ARM-20, 01:09:04–01:58:44 CST. It executed the actual
+Server adapter with the FULL 14,547,261,565-bp IWGSC reference and the complete
+289,508,469-bp ptg000049l query. No routing/window threshold override, native C-API
+companion, whole-assembly run, or new reference index build was involved.
+
+- Verified preprocessing adoption: 534.773 s. This includes fresh checks of the
+  existing reference store and original index files, not a claimed new build.
+- First adapter result, excluding adoption: 2368.206 s (39.470 min).
+- First result including adoption: 2902.979 s (48.383 min).
+- Same-source resume: 74.929 s, ZERO mapper/index commands, both complete cells
+  and their sequence stores / original threshold metadata reused.
+- Total harness elapsed including that explicit resume check: 2977.914 s
+  (49.632 min), not a whole-customer pipeline runtime.
+
+The adapter published exactly the previously base-audited PAF bytes:
+`e188be167d498a14467bca393a1712a1070d3d11b513da1b86f00a907e1ecce6`.
+The current remote result was downloaded and freshly hashed locally, not merely
+inferred from a success JSON. All 31 runtime source hashes match the reviewed
+`88e14005...` profile. The separate approximate contract was recorded; native
+confidence reconstruction remained false. Complete query union is 99.2564%,
+assignment 3D, dominant anchor spread fraction 0.00677119. These values remain
+coverage/placement observations, NOT accuracy or native-equivalence estimates.
+The uploaded IWGSC reference still differs from the original KN9204 incident;
+there is no six-day-versus-49-minute speedup claim.
+
+## Completed ordinary calibration and subsequent unit primitives
+
+Job `42029896` SUCCEEDED on ARM-33, 01:35:18–02:18:04 CST. The internal policy
+selected the WEAKER f=0.005 and therefore did NOT execute f=0.01. It used the
+four complete automatically selected records (66,126,336 bp), not a manually
+chosen sequence slice or a reference subset.
+
+| Actual complete native case | Wall seconds |
+| --- | ---: |
+| Default baseline 0 | 885.965 |
+| f=0.005 repeat 0 | 331.777 |
+| f=0.005 repeat 1 | 342.192 |
+| Default baseline 1 | 869.416 |
+
+The two paired mapper ratios are 2.67036x / 2.54073x. Preparation/extraction cost
+106.697 s; the COMPLETE calibration plus source selection and zero-remapping
+resume cost 2563.445 s (42.724 min). Those four pilot executions are real startup
+cost, not omitted from an invented whole-workload speedup.
+
+The weakest short record lost 20,005 covered bases (3.9972%) under f=0.005, so the
+selector retained its COMPLETE default source. The other three use the filtered
+source. This is one source per query, not concatenated candidate/default hits.
+Selected PAF SHA-256:
+`1e528e748b7dd3439d0360ae9b378daac40dcc5e4a5b90022dfe4bc50f586fee`.
+Qualified support differences remain visible: +536,794 bp for ptg000045l / 4A,
+-36,218 bp for ptg000159l / 7D and +4,205 bp for ptg000321l / 1B; the 7D anchor
+shift is -49 bp. No query/chr/orientation assignment was lost in the paired
+pilot. This is still not a genome-wide accuracy guarantee.
+
+A fresh, single-CPU read-only audit (`42054284`) was submitted after the producer
+terminated. It uses the final per-part traversal verifier and reconstructs the
+selected-source composition in original part/query order, requiring exactly the
+same multiset of native rows and unchanged original producer receipts. Donau confirms SUCCEEDED on ARM-20 (2026-11-17 02:19:56--02:21:42 CST).
+The audit itself took 102.091 s and passed without running a mapper. Its frozen
+source hashes match the locally uploaded payload, and its original producer
+ledger stayed byte-identical. A fresh download of the reordered selected PAF is
+3,439,358 bytes with SHA-256
+`8ab4453b0420d2948313d5fa9587df38cb79de81c4cf918d3516f99a442b5cb4`.
+The hash differs from the producer selection because order is restored; the
+audit requires the SAME multiset of native rows, and baseline-relative loss
+checks pass. This is not additional calibration or whole-workload acceptance.
+
+`adaptive_ordinary_units.py` adds the actual continuation primitives:
+
+- Whole-record units target 128 Mb and at most 4096 records. An indivisible
+  ordinary record may exceed that target; it is never silently split or omitted.
+  Already completed pilot records are excluded from future units.
+- Cohorts retain original within-cohort order. Plain FASTA uses catalogue byte
+  extents; gzip is decoded at most ONCE to materialize all missing unit inputs,
+  with at most two simultaneous output handles. It is not decompressed once per
+  unit. Existing complete inputs are verified/reused rather than copied again.
+- Native command completion is sealed BEFORE post-map verification. A cancelled
+  verification resumes from the completed native receipt without remapping.
+  Corrupt completed data refuses publication instead of triggering recomputation.
+- New threads/K/memory requests do not invalidate completed native units; their
+  original execution resources and native row bytes remain attached to them.
+  Incomplete ordinary units can retry on a subsequent explicit invocation;
+  bounded quality-review calls can forbid automatic retry. Attempt costs/history
+  are retained instead of overwritten with only the last successful runtime.
+- Composition requires disjoint, exhaustive complete-query ownership and the
+  full original part/query matrix, including no-hit cells. It restores original
+  part/query order and emits a separate source-composition contract, never a
+  fabricated one-command native-success receipt or a quality approval.
+
+Ordinary full-query review is deliberately distinct from approximate-window
+review. The real 42.68-Mb native baseline itself has broad 4A anchors, while its
+paired filtered result retains the chromosome, orientation and anchor. A window-
+local coherence veto must not force that COMPLETE native-query result to rerun.
+Ordinary risk screening retains low/absent support, orientation ambiguity and
+both sides of the assignment threshold; it preserves multiple valid assignments.
+The stricter window coherence rule is unchanged on the approximate-window path.
+Review count/base reservations are cumulative over the original ordinary workload;
+exceeding them stops filtered continuation rather than blessing unresolved data.
+
+Still open: execute and validate bounded future units, actually perform limited
+review/fallback on those units, integrate the complete ordinary controller into
+the default prepared Server path, and measure complete hybrid cost. These new
+primitives do not by themselves claim whole-assembly or downstream acceptance.
+
+
+### Whole-unit checkpoint (2026-11-17)
+
+Completed calibration adoption validates original full-record content, including
+nested extracted catalogues, then retains the ALREADY PAID complete DEFAULT
+pilot data for production continuation. The automatically chosen filter applies
+to future units only; throwing away a complete default pilot source cannot save
+any additional mapping time. Read-only adoption and completed unit audits must
+not create a mapping command or rewrite the original ledger. Resource changes
+are allowed only for future work and do not invalidate complete native units.
+
+Bounded real continuation job `42066647` was submitted and observed RUNNING on
+ARM-07 at 02:56:29 CST. It selects original-order unit zero, not a convenient
+hand-picked record: ptg000001l (12,721,647 bp), ptg000002l (5,305,754 bp), and
+ptg000003l (85,437,144 bp), totaling 103,464,545 bp. It uses f=0.005, the full
+original IWGSC index, 8 requested CPUs, a 36-GiB address-space limit, and a
+2400-second native command bound (3600-second outer job bound). It does NOT
+map the remaining assembly. Frozen payload SHA-256:
+`9f565fc49a4161a576affd087eb44695ffe91063ba41ad850dd7c05cf3b74ff0`.
+At submission checkpoint no completed timing, quality review or final acceptance
+is claimed. Its driver checks resource-change resume without new mapping.
+
+Local validation: 752 tests passed (one optional source-oracle test skipped),
+237.051 s. The preceding 750-test run exposed an intermittent existing native
+projection log parsing error; five isolated reruns and the final full suite
+passed. The exact cause is NOT established. The control now retains the real
+stderr tail in assertion diagnostics, without relaxing any completion checks.
+The generated Server runtime has not changed in this checkpoint: these ordinary
+primitives are not yet the default production controller or a published release.
