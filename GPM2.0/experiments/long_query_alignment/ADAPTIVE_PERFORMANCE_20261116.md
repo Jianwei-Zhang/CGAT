@@ -1249,3 +1249,52 @@ passed. The exact cause is NOT established. The control now retains the real
 stderr tail in assertion diagnostics, without relaxing any completion checks.
 The generated Server runtime has not changed in this checkpoint: these ordinary
 primitives are not yet the default production controller or a published release.
+
+
+### Automatic ordinary controller (2026-11-17, experimental integration layer)
+
+`adaptive_ordinary_controller.py` now connects internal size admission, finite
+calibration, whole-record unit execution, limited native-default review and
+complete-source composition. It is not yet called by the production Server
+adapter; that hook and its publication contract remain an explicit next gate.
+
+- Ordinary inputs below the admission thresholds and an explicitly supplied
+  filter do not start calibration. Size alone never changes sensitivity.
+- A completed external calibration and completed externally executed units can
+  be adopted read-only by original complete-record content. Omitting/changing
+  their bindings on resume is rejected BEFORE a new calibration command.
+- Default-cohort units do not undergo filtered-result review. Each screened
+  filtered query needing review gets ONE complete-record default run against
+  the full original index. Once paid, that COMPLETE default source is retained
+  regardless of whether the relative-loss report would also permit the filtered
+  source; the two sources are never combined within a query.
+- Review reservations are cumulative: at most the configured count/base fraction
+  (defaults 32 records / 5% of the original ordinary bases), plus a separate
+  finite review-time allowance. Reservation metadata is saved before launching
+  work. Interrupted unsealed reviews are not automatically repeated; a genuinely
+  completed native review survives cancellation before controller sealing.
+- Exhausted allowances stop continuation WITHOUT publishing a partial result or
+  launching an unrestricted whole-assembly baseline. This is a deliberate bounded
+  experimental stop, not a complete production fallback policy yet.
+- Complete-source composition happens only after every original ordinary query
+  and index part is covered, including explicit complete no-hit records. Long
+  queries remain owned by the separate long-record route.
+- Resource changes reuse completed pilot/unit/review data. Original receipts are
+  verified, not rewritten. Query identifiers are not used as filesystem paths.
+
+Twelve focused tests use REAL pinned native commands on a small synthetic
+fixture, with explicitly synthetic completed timing values only to exercise the
+filter-selection branch deterministically. They verify complete/no-hit/default
+ownership, cumulative count/base/time stopping, cancellation, read-only external
+adoption, source binding checks before mapping, resource-only resume and bounded
+prefix continuation. These fixtures are NOT performance measurements and NOT
+customer scientific acceptance. The first real 103.46-Mb unit remains a separate
+frozen job; the new controller is not injected into that running process.
+
+
+Validation at this checkpoint: 764 tests completed in 239.879 seconds with one
+optional source-oracle skip. After the final state-report cleanup, all 12
+controller tests passed again in 10.580 seconds. The previously pushed primitive
+commit `a23e6a7` also passed both Linux Server and Windows App Quality CI
+(`43934576378`). No published Server package/runtime has been replaced by this
+experimental controller.
