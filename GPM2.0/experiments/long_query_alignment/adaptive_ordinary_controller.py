@@ -121,17 +121,23 @@ def execute(root, catalog, index, tool, args, *, budget=pilot.Budget(),
     state.update(status="running", output_published=False, whole_workload_quality_approved=False,
                  pilot_default_preserved=True, selected_filter=adopted["future_filter"], completed_units=[])
     save()
-    inputs = units.materialize_units(catalog, work, root / "inputs")
+    active = [u["ordinal"] for u in work["units"] if unit_limit is None or u["ordinal"] < unit_limit]
+    pending = [number for number in active if number not in completed_units]
+    inputs = dict(zip(pending, units.materialize_units(catalog, work, root / "inputs", ordinals=pending)))
+    original = {r.name: r for r in catalog.records}
     selections = list(adopted["selections"])
-    for unit, query in zip(work["units"], inputs):
+    for unit in work["units"]:
         if unit_limit is not None and unit["ordinal"] >= unit_limit:
             state.update(status="bounded_checkpoint", reason="internal_unit_limit"); save(); return state
         binding = completed_units.get(unit["ordinal"])
         directory = root / "units" / ("unit-%06d" % unit["ordinal"])
         if binding is not None:
-            if binding["query"]["sha256"] != query["sha256"]:
+            query = binding["query"]
+            wanted = [(r["name"], original[r["name"]].length, original[r["name"]].sha256) for r in unit["records"]]
+            if [(r["name"], r["length"], r["sha256"]) for r in query["identity"]["records"]] != wanted:
                 raise wa.ExperimentError("external completed unit differs from original complete records")
-            directory, query = Path(binding["root"]), binding["query"]
+            directory = Path(binding["root"])
+        else:query = inputs[unit["ordinal"]]
         result = units.run_unit(directory, unit, query, index, tool, args,
                                 timeout=unit_seconds, readonly=binding is not None)
         names = [r["name"] for r in unit["records"]]

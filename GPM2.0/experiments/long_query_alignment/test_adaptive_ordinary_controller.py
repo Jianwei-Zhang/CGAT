@@ -124,6 +124,7 @@ class ControllerTests(unittest.TestCase):
             first=self.execute(target,inputs,unit_limit=1)
             self.assertEqual(first["status"],"bounded_checkpoint")
             self.assertFalse((target/"composition").exists())
+            self.assertEqual(len(list((target/"inputs").glob("*.fa"))),1)
             with patch.object(nf,"attempt",wraps=nf.attempt) as calls:
                 final=self.execute(target,inputs)
             self.assertEqual(calls.call_count,3)
@@ -170,6 +171,11 @@ class ControllerTests(unittest.TestCase):
             markers=[old/"calibration"/pilot.STATE,old/"units/unit-000000/unit.json"]
             saved=[(p.read_bytes(),p.stat().st_mtime_ns) for p in markers]
             bindings={0:{"root":old/"units/unit-000000","query":unit_query}}
+            with patch.object(nf,"attempt",side_effect=AssertionError("external completed prefix remapped")):
+                prefix=self.execute(target,inputs,calibration_root=old/"calibration",calibration_query=query,
+                                    completed_units=bindings,unit_limit=1)
+            self.assertEqual(prefix["status"],"bounded_checkpoint")
+            self.assertFalse((target/"inputs").exists())
             with patch.object(nf,"attempt",wraps=nf.attempt) as calls:
                 result=self.execute(target,inputs,calibration_root=old/"calibration",calibration_query=query,
                                     completed_units=bindings)

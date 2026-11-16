@@ -62,6 +62,19 @@ class UnitPlanTests(unittest.TestCase):
                 units.materialize_units(catalog,plan,root/"units")
             self.assertFalse((root/"units").exists())
 
+    def test_bounded_input_materialization_does_not_copy_unrequested_units(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/"input.fa.gz";source.write_bytes(gzip.compress(b">a\nAAAA\n>b\nCCCC\n>c\nTTTT\n"))
+            catalog=pp.scan_query(source)
+            plan=units.plan_units([{"name":r.name,"length":r.length} for r in catalog.records],[],"default",unit_bases=4)
+            first=units.materialize_units(catalog,plan,root/"units",ordinals=[0])
+            self.assertEqual(len(first),1);self.assertEqual(len(list((root/"units").glob("*.fa"))),1)
+            with patch.object(pp,"decoded_input",side_effect=AssertionError("empty/completed selection decoded gzip")):
+                self.assertEqual(units.materialize_units(catalog,plan,root/"absent",ordinals=[]),[])
+                self.assertEqual(units.materialize_units(catalog,plan,root/"units",ordinals=[0]),first)
+            self.assertFalse((root/"absent").exists())
+            with self.assertRaises(ValueError):units.materialize_units(catalog,plan,root/"units",ordinals=[2,0])
+
 
 class ActualUnitTests(unittest.TestCase):
     @classmethod

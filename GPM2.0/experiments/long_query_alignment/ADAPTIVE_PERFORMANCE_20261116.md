@@ -1298,3 +1298,50 @@ controller tests passed again in 10.580 seconds. The previously pushed primitive
 commit `a23e6a7` also passed both Linux Server and Windows App Quality CI
 (`43934576378`). No published Server package/runtime has been replaced by this
 experimental controller.
+
+
+### Real first unit completed; bounded review dispatched (2026-11-17)
+
+Donau job `42066647` SUCCEEDED on ARM-07, 02:56:29--03:09:53 CST.
+Its complete 103,464,545-bp native command took 680.648 s by the execution
+receipt (mapper stderr: 680.082 s, 778.303 CPU s, 16.023-GB peak RSS).
+Preparation was 73.845 s; complete driver execution including source verification
+and a zero-mapping resource-change resume was 800.520 s. No native/reference
+index rebuild occurred. A fresh download of the complete native PAF is
+5,557,642 bytes, SHA-256
+`4fc55648fb7a3779fb96e2a62c30a7a78d83baf53b40776d694e21bfe0b04baa`.
+Its frozen sources also match the submitted payload. This result is NOT a paired
+speedup measurement: the pilot's default records differ from this unit.
+
+The native-query screen flagged ptg000001l (12,721,647 bp; coverage 0.844115,
+no qualifying chromosome assignment) and ptg000002l (5,305,754 bp; coverage
+0.849071, assigned 4A) for threshold/assignment review. ptg000003l (85,437,144 bp;
+coverage 0.996296, assigned 1D) did not trigger the current risk rules. The latter
+is NOT an assertion of baseline equivalence or biological correctness.
+
+Job `42070699` was submitted and observed RUNNING on ARM-23 at 03:17:02 CST.
+It executes the actual new controller on ONLY the already completed original
+unit zero, adopting the completed calibration and original unit read-only.
+Only the two automatically flagged COMPLETE records (18,027,401 bp total) may
+start new native commands, using the full original index and DEFAULT sensitivity.
+The harness rejects any new calibration, whole-unit remapping, repeated review,
+stronger filter or remaining-assembly command. It has 8 requested CPUs, a 36-GiB
+address-space cap, at most 1200 s per review and a 3600-s outer bound. Frozen
+payload SHA-256:
+`9779cd69c639315fb0a4b2bc126e72b5bf4cdbe877e1a5054a80c19485f310bf`.
+At this checkpoint the review result is still pending.
+
+The controller now materializes ONLY pending original unit ordinals within its
+internal bounded prefix. Already completed external inputs are accepted by their
+full record content and verified native receipt, without recopying them. With
+only an adopted unit zero and unit_limit=1, it writes ZERO other assembly input
+units. For genuinely missing gzip-derived units, one full decoding pass produces
+all selected inputs; the full original plan is still checked and ordinary query
+membership is never silently changed. Targeted unit/controller checks: 31 passed.
+
+
+Final local prefix-materialization regression: 765 tests in 232.194 s, one
+optional source-oracle skip, all remaining tests passed. Controller commit
+`caf5aec` passed Linux Server and Windows App CI (`43936902269`). The running
+review uses frozen copies of these same controller/unit sources; subsequent
+documentation edits do not alter that payload.

@@ -56,21 +56,27 @@ def plan_units(records, pilot_names, selected_filter, *, default_below=0,
             "selected_filter": selected_filter, "records_split": False}
 
 
-def materialize_units(catalog, plan, root):
+def materialize_units(catalog, plan, root, *, ordinals=None):
     """Plain FASTA uses byte extents; gzip is streamed at most ONCE for all units."""
     records = [{"name": r.name, "length": r.length} for r in catalog.records]
     expected = plan_units(records, plan["pilot_names"], plan["selected_filter"],
         default_below=plan["default_below"], unit_bases=plan["unit_bases"], max_records=plan["max_records"])
     if plan != expected:raise wa.ExperimentError("ordinary unit plan changed")
-    catalog.require_unchanged(); root = Path(root)
+    if ordinals is None:ordinals = [u["ordinal"] for u in plan["units"]]
+    if (not isinstance(ordinals, list) or any(type(n) is not int or not 0 <= n < len(plan["units"]) for n in ordinals)
+            or ordinals != sorted(set(ordinals))):raise ValueError("unique original unit ordinals required")
+    selected_units = [plan["units"][n] for n in ordinals]
+    catalog.require_unchanged()
+    if not selected_units:return []
+    root = Path(root)
     if root.is_symlink() or root.parent.is_symlink():raise wa.ExperimentError("linked unit input directory")
     root = root.resolve(); root.mkdir(parents=True, exist_ok=True)
     if catalog.encoding == "plain":
         return [pilot.materialize(catalog, [r["name"] for r in u["records"]], root / ("unit-%06d.fa" % u["ordinal"]))
-                for u in plan["units"]]
+                for u in selected_units]
     by_name = {r.name: r for r in catalog.records}
     missing, completed = {}, {}
-    for unit in plan["units"]:
+    for unit in selected_units:
         number = unit["ordinal"]; path = root / ("unit-%06d.fa" % number)
         marker = path.with_suffix(".fa.json")
         identity = {"source_sha256": catalog.source_sha256,
@@ -88,8 +94,8 @@ def materialize_units(catalog, plan, root):
                                "digest": hashlib.sha256(), "bytes": 0}
     if not missing:
         catalog.require_unchanged()
-        return [completed[u["ordinal"]] for u in plan["units"]]
-    owners = {r["name"]: u["ordinal"] for u in plan["units"] for r in u["records"]}
+        return [completed[u["ordinal"]] for u in selected_units]
+    owners = {r["name"]: u["ordinal"] for u in selected_units for r in u["records"]}
     active = {}
     try:
         with pp.decoded_input(catalog.source) as (stream, hashed, encoding):
@@ -124,7 +130,7 @@ def materialize_units(catalog, plan, root):
         result = {"identity": state["identity"], "path": str(state["path"]),
                   "sha256": state["digest"].hexdigest(), "copied_bytes": state["bytes"], "complete_original_records": True}
         wa.write_json(state["path"].with_suffix(".fa.json"), result); completed[number] = result
-    return [completed[u["ordinal"]] for u in plan["units"]]
+    return [completed[u["ordinal"]] for u in selected_units]
 
 
 def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomplete=True, readonly=False):
