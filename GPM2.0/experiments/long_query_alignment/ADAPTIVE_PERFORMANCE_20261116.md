@@ -148,4 +148,14 @@ not truncated accepted evidence. Whole input files are never modified.
   `Triticum_aestivum.IWGSC.dna.toplevel.fa.gz`, **not the KN9204 reference from the
   six-day incident**. New strategy comparisons must use the same uploaded reference
   for both arms and must not be reported as replay of the original KN9204 run.
-  Transfer/integrity and real-data calibration are separate, pending evidence.
+  Transfer completed at 2026-11-16 17:59:35 +08:00. All three destination
+  SHA-256 values match the source inventory; source metadata remained unchanged.
+  Verified input root on 180:
+  `~/cgat-reads-debug/jm19-adaptive-20261116/inputs/wheat3contigs/`.
+  `TRANSFER_VERIFIED.json` in the parent experiment root records the content
+  verification; that root is owner-only. SHA verification does not by itself prove
+  gzip/FASTA validity or that this is the original KN9204 incident input.
+- Read-only gzip/FASTA catalogue jobs submitted on ARM (2 CPUs each; 1800 s cap):
+  hifiasm `41741137`, flye `41741141`, reference `41741147`. Submission is not
+  completion. Record counts/content matching and real-data calibration remain
+  pending. No full CGAT or full reference alignment has been started.
