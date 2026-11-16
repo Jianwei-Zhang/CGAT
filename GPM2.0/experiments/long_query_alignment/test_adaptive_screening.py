@@ -85,6 +85,11 @@ class AdaptiveScreeningTests(unittest.TestCase):
         self.assertFalse(r["eligible"])
         self.assertEqual(r["reason"], "baseline_quality_unavailable")
 
+    def test_timeout_cleanup_is_not_counted_as_speedup(self):
+        baseline = {**measurement("timeout", wall=603), "wall_budget_seconds": 600}
+        r = policy.compare(baseline, measurement(wall=100, mid=50))
+        self.assertEqual(r["speedup_lower_bound"], 6)
+
     def test_failed_candidate_never_selected(self):
         for status in ("timeout", "tool_failure", "audit_failure", "cancelled"):
             self.assertFalse(policy.compare(measurement(), measurement(status, wall=1, mid=50))["eligible"])

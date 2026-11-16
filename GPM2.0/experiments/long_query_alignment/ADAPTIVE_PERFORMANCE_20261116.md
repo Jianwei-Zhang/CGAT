@@ -159,3 +159,65 @@ not truncated accepted evidence. Whole input files are never modified.
   hifiasm `41741137`, flye `41741141`, reference `41741147`. Submission is not
   completion. Record counts/content matching and real-data calibration remain
   pending. No full CGAT or full reference alignment has been started.
+
+## Real-input catalogue and bounded pilot — 2026-11-16
+
+All three catalogue jobs succeeded. Hifiasm has 2,377 records / 14,586,133,267 bp;
+Flye has 35,890 records / 17,119,989,222 bp. Both **decompressed-file SHA-256s
+exactly match the original JM19 incident report**, not merely sequence counts.
+IWGSC has 22 records / 14,547,261,565 bp and is a different reference from KN9204.
+
+`prepare_adaptive_subset.py` preserves original record bytes/order and reads the
+source to EOF, verifying the complete decompressed-file digest plus selected
+record hashes before publishing a new FASTA. Cross-node stat fields are audit
+metadata, not content identity: shared filesystem device numbers differed (50 on
+the catalogue node, 59 on the login node). Initial preparation jobs `41753592` /
+`41753594` failed before writing data because the first helper compared those
+numbers across nodes. Frozen v1 logs remain; v2 uses content validation and still
+rejects changes during a read. Eleven local tests cover these contracts.
+
+Successful preparations:
+- Full original IWGSC reference: `41756953`, `derived/reference-v1/`.
+- Four COMPLETE ordinary contigs: `41765306`, `derived/ordinary-v2/`.
+  Source order: `ptg000126l` (10,007,359 bp), `ptg000159l` (19,960,671 bp),
+  `ptg000321l` (2,987,303 bp), `ptg001708l` (500,479 bp). Total 33,455,812 bp.
+  These are length-stratified controls, not yet demonstrated hotspot selections.
+- Complete 289,508,469-bp `ptg000049l`: `41765309`, `derived/long-v2/`.
+
+Ordinary filtering pilot `41767856` was submitted with successful-preparation
+job dependencies. It uses the **full** IWGSC reference, fixed K1G and 16 mapping
+threads in each arm, 32 allocated CPUs for the 128 GiB address-space cap under
+Donau's memory-per-core rules, and default / f0.005 / f0.01 in both orders. The
+index/mapping budget is 2,400 s total, 600 s per command. Catalogue and integrity
+I/O overhead is outside that deadline and must not be hidden in throughput claims.
+This is not a full assembly alignment or production policy enablement.
+
+`benchmark_adaptive_windows.py` adds the second diagnostic: identical original
+query span, 50/10/5 Mb cores with contextual overlaps, and one **whole original
+reference index part**, copied byte-for-byte from the pilot index. It inherits a
+measured fixed seed threshold for every size and preserves all-chain pooling to
+isolate window-size effects. Coverage is counted only inside each disjoint core;
+context overlap cannot inflate it. Six local tests cover ownership, edges, raw
+base extraction and flank-only hits. A timed-out baseline gives only a wall-budget
+lower bound, excluding cancellation cleanup time. Mapping coverage is NOT final
+whole-query chain/CIGAR/confidence or biological acceptance; full recovery remains
+an explicit later gate. Frozen ordinary-pilot v1 uses the preceding auditor version;
+its timeout lower-bound timing must be interpreted with that cleanup caveat.
+
+### Queue/resource adjustment and window smoke
+
+At 18:29 the scheduler explicitly reported that `41767856` lacked a node with
+32 available CPUs, with both preparation dependencies already satisfied. At
+18:34, while still PENDING, the SAME job was modified (not cancelled/requeued):
+`reqCPU=16`, `reqMem=65536 MB`, `limitMem=65536 MB`. Mapper commands still request
+16 threads, with the unchanged 128 GiB **virtual address-space** cap; the scheduler
+physical-memory limit is now 64 GiB. All paired comparisons will share that same
+allocation. Resource failures remain failures, never automatic sensitivity changes.
+The frozen script's original 32-CPU header is superseded by the scheduler receipt
+and `ordinary-pilot-{memory-limit,resource}-adjustment.log`; do not infer allocation
+from the script alone.
+
+Window-probe ARM smoke job `41778683` uses a generated 6 Mb query with a complete
+synthetic reference, exercising actual 1/1/2-window maps under 50/10/5 Mb cores.
+It is separate from the customer workload and cannot prove wheat speedup. Local
+adaptive/subset/catalogue/window suite currently has 47 passing tests, no skips.

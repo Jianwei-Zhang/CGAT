@@ -152,7 +152,7 @@ def compare(baseline, candidate, before=None, after=None, limits=Limits()):
     if baseline["outcome"] != "completed":
         # A timed-out baseline gives a speed lower bound, NOT a quality baseline.
         if baseline["outcome"] == "timeout" and candidate["wall_seconds"] > 0:
-            result["speedup_lower_bound"] = baseline["wall_seconds"] / candidate["wall_seconds"]
+            result["speedup_lower_bound"] = min(baseline["wall_seconds"], baseline.get("wall_budget_seconds", baseline["wall_seconds"])) / candidate["wall_seconds"]
         return {**result, "reason": "baseline_quality_unavailable"}
     for r in (baseline, candidate):
         if not math.isfinite(r["wall_seconds"]) or r["wall_seconds"] <= 0:
