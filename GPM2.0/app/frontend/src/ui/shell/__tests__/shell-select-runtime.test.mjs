@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { bindShellSelects, syncShellSelect, renderShellSelect } from "../shell-select-runtime.js";
 
-function fixture({ nameTooltips = true } = {}) {
+function fixture({ nameTooltips = true, bounded = false } = {}) {
   const doc = { activeElement: null, defaultView: { Event }, handlers: new Map() };
   function element() {
     const classes = new Set(), handlers = new Map();
@@ -24,6 +24,7 @@ function fixture({ nameTooltips = true } = {}) {
   }
   Object.assign(doc, element()); doc.createElement = element;
   const select = element(), menu = element(), toggle = element(), caption = element(), combo = element(), root = element();
+  if (bounded) combo.setAttribute("data-shell-select-bounded", "true");
   if (!nameTooltips) combo.setAttribute("data-shell-select-tooltips", "none");
   select.options = [{ value: "a", textContent: "Project A", selected: true }, { value: "b", textContent: "Project <B>", selected: false }];
   Object.defineProperty(select, "value", {
@@ -146,4 +147,45 @@ test("project pickers opt in to measured name completion on captions and options
   syncShellSelect(h.select);
   assert.equal(h.toggle.getAttribute("data-app-tooltip"), "New long project");
   assert.equal(h.menu.children[0].getAttribute("data-app-tooltip-overflow"), "");
+});
+
+
+test("rich shell choices separate compact captions from full paths and chromosome metadata", () => {
+  const h = fixture();
+  h.select.options = [{ value: "rice", textContent: "Plants / Rice", selected: true, dataset: { caption: "Rice", description: "4 Contigs · 2.50 Mb" } },
+    { value: "", textContent: "No projects", disabled: true }];
+  h.select.setAttribute("data-app-tooltip", "Plants / Rice");
+  syncShellSelect(h.select);
+  assert.equal(h.caption.textContent, "Rice");
+  assert.equal(h.toggle.attrs["data-app-tooltip"], "Plants / Rice");
+  assert.deepEqual(h.menu.children[0].children.map(node => node.textContent), ["Plants / Rice", "4 Contigs · 2.50 Mb"]);
+  assert.equal(h.menu.children[0].attrs["data-app-tooltip-overflow"], ".shell-select-option-name");
+  assert.equal(h.menu.children[1].disabled, true);
+  h.toggle.emit("click"); h.menu.emit("click", { target: h.menu.children[1] });
+  assert.equal(h.select.value, "rice");
+  h.select.options[0].dataset.description = "5 Contigs · 3.00 Mb";
+  syncShellSelect(h.select);
+  assert.equal(h.menu.children[0].children[1].textContent, "5 Contigs · 3.00 Mb");
+  const markup = renderShellSelect("rich", "Chr", [{ value: "a", label: '<chr"1>', caption: "Chr1", selected: true, description: '<detail"x>' },
+    { value: "", label: "Empty", disabled: true }], { bounded: true });
+  assert.match(markup, /data-shell-select-bounded="true"/);
+  assert.match(markup, /data-caption="Chr1"/);
+  assert.match(markup, /data-description="&lt;detail&quot;x&gt;"/);
+  assert.match(markup, /<option value=""[^>]*disabled/);
+});
+
+test("bounded shell menus stay in a narrow viewport, track scroll and clear fixed placement on close", () => {
+  const h = fixture({ bounded: true });
+  Object.assign(h.doc.defaultView, { innerWidth: 320, innerHeight: 480 });
+  let top = 40;
+  h.toggle.getBoundingClientRect = () => ({ left: 280, right: 310, top, bottom: top + 32 });
+  h.menu.getBoundingClientRect = () => ({ width: parseFloat(h.menu.style.width) || 400, height: 700 });
+  h.menu.scrollHeight = 700;
+  h.toggle.emit("click");
+  assert.equal(h.menu.style.position, "fixed");
+  assert.equal(h.menu.style.left, "8px"); assert.equal(h.menu.style.width, "304px");
+  assert.ok(parseFloat(h.menu.style.maxHeight) <= 312);
+  top = 80; h.doc.emit("scroll"); assert.equal(h.menu.style.top, "116px");
+  h.combo.emit("keydown", { key: "Escape" });
+  assert.equal(h.menu.style.position, ""); assert.equal(h.menu.style.width, "");
 });

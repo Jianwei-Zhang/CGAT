@@ -17,7 +17,7 @@ test("app shell omits the former top card", () => {
   assert.doesNotMatch(html, />概览</);
 });
 
-test("app shell renders project and language switches inline before settings", () => {
+test("app shell renders scope navigation before separate language and settings controls", () => {
   const html = renderAppShell({
     runtime: { mode: "Tauri Runtime" },
     locale: "zh",
@@ -26,7 +26,7 @@ test("app shell renders project and language switches inline before settings", (
   assert.match(html, /id="app-language-select"/);
   assert.match(
     html,
-    /<div class="nav-session-controls">[\s\S]*class="nav-session-field"[\s\S]*id="session-workspace-select"[\s\S]*class="nav-session-field nav-session-field-language"[\s\S]*id="app-language-select"[\s\S]*data-app-settings/,
+    /data-assembly-navigation[\s\S]*id="assembly-partition-select"[\s\S]*id="session-workspace-select"[\s\S]*id="assembly-chromosome-select"[\s\S]*class="nav-session-controls"[\s\S]*id="app-language-select"[\s\S]*data-app-settings/,
   );
 });
 
@@ -128,9 +128,10 @@ test("theme shortcut persists light/dark, preserves other settings, follows sett
 
 for (const locale of ["zh", "en"]) test(`${locale} project page initially hides the workspace shortcut while keeping language and settings`, () => {
   const markup = renderAppShell({ locale, activeRoute: "importer", runtime: {} });
-  assert.match(markup, /data-session-workspace-field hidden/);
+  assert.match(markup, /data-assembly-navigation hidden/);
+  assert.doesNotMatch(markup, /data-session-workspace-field/);
   assert.match(markup, /id="app-language-select"/);
   assert.match(markup, /data-app-settings/);
   const assembly = renderAppShell({ locale, activeRoute: "assembly", runtime: {} });
-  assert.doesNotMatch(assembly, /data-session-workspace-field hidden/);
+  assert.doesNotMatch(assembly, /data-assembly-navigation hidden|data-session-workspace-field/);
 });

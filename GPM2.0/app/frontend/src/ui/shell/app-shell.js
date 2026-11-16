@@ -1,4 +1,4 @@
-import { workspaceShortcutVisible } from "./session-switchers.js";
+import { renderAssemblyNavigation } from "./assembly-navigation.js";
 import { renderShellSelect } from "./shell-select-runtime.js";
 import { getMessages } from "../i18n/index.js";
 import { getAppliedAppTheme, getAppSettings, resolveAppTheme, setAppSettings, subscribeAppTheme } from "../../services/app-settings.js";
@@ -55,12 +55,8 @@ export function renderAppShell(state) {
           <button class="route-button" data-route="importer">${labels.project}</button>
           <button class="route-button" data-route="assembly">${labels.assembly}</button>
         </nav>
+        ${renderAssemblyNavigation(state)}
         <div class="nav-session-controls">
-          <label class="nav-session-field" data-session-workspace-field ${workspaceShortcutVisible(state) ? "" : "hidden"} for="session-workspace-select-toggle">
-            <span>${labels.workspace}</span>
-            ${renderShellSelect("session-workspace-select", labels.workspace,
-              [{ value: "", label: labels.workspacePlaceholder, selected: true }])}
-          </label>
           <label class="nav-session-field nav-session-field-language" for="app-language-select-toggle">
             <span>${labels.language}</span>
             ${renderShellSelect("app-language-select", labels.language,

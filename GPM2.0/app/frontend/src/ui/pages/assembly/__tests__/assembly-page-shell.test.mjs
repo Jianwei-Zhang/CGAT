@@ -140,7 +140,7 @@ test("assembly tab renders english labels when locale is en", () => {
   assert.doesNotMatch(html, /data-tab="stats"/);
   assert.doesNotMatch(html, /data-tab="check-new-sequences"/);
   assert.doesNotMatch(html, /data-tab="about"/);
-  assert.match(html, /Chromosome Chr01/);
+  assert.doesNotMatch(html, /id="assembly-chr-picker-toggle"/);
   assert.doesNotMatch(html, />Download</);
   assert.doesNotMatch(html, />Main View</);
   assert.match(html, /data-main-view-header[^>]*aria-label="Main View"/);
@@ -278,7 +278,8 @@ test("local refresh renderers exclude unrelated assembly regions", () => {
   const finalPathHtml = __testRenderAssemblyFinalPathCard(state);
 
   assert.doesNotMatch(mainHtml, /chr-strip/);
-  assert.match(mainHtml, /data-main-view-header[\s\S]*id="assembly-chr-picker-toggle"/);
+  assert.match(mainHtml, /data-main-view-header/);
+  assert.doesNotMatch(mainHtml, /id="assembly-chr-picker-toggle"/);
   assert.match(mainHtml, /assembly-track-unified/);
   assert.doesNotMatch(mainHtml, /data-subview-panel="1"/);
   assert.doesNotMatch(mainHtml, /class="card final-path-card"/);
@@ -722,9 +723,9 @@ test("assembly Anchor offset dialog preserves an automatic out-of-range value wi
   assert.match(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
 });
 
-test("assembly tab keeps the chromosome selector but moves member management out of the toolbar", () => {
+test("assembly tab leaves chromosome navigation in the shell and member management out of the toolbar", () => {
   const html = renderAssemblyPage(createState());
-  assert.match(html, /id="assembly-chr-picker-toggle"/);
+  assert.doesNotMatch(html, /id="assembly-chr-picker-toggle"/);
   assert.doesNotMatch(html, /data-members-card-toggle|assembly-members-panel-popover/);
 });
 

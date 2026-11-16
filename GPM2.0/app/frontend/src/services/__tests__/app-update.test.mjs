@@ -82,7 +82,7 @@ test("unconfigured builds and browser preview do not attempt network checks", as
 });
 test("work guard covers imports, exports, mutations and native commands", () => {
   for (const state of [{ importer: { inFlight: true } }, { initializer: { autoPipelineRunning: true } },
-    { assembly: { mainViewHistory: { inFlight: true } } }, { projectExport: { loading: true } }]) assert.equal(updateWorkBusy(state), true);
+    { assembly: { mainViewHistory: { inFlight: true } } }, { assemblyNavigation: { busy: true } }, { projectExport: { loading: true } }]) assert.equal(updateWorkBusy(state), true);
   assert.equal(updateWorkBusy({}, 1), true); assert.equal(updateWorkBusy({}), false);
 });
 

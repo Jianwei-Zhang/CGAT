@@ -1,3 +1,4 @@
+import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "../pages/assembly/anchored-panel-placement.js";
 import { bindDelayedFloatingClose, cancelDelayedFloatingClose } from "../pages/floating-menu-runtime.js";
 
 const SYNC = Symbol("shellSelectSync");
@@ -5,11 +6,11 @@ const bindings = new WeakMap();
 const escape = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
-export function renderShellSelect(id, label, options, { name = "", nameTooltips = true } = {}) {
+export function renderShellSelect(id, label, options, { name = "", nameTooltips = true, bounded = false } = {}) {
   const selected = options.find(option => option.selected) || options[0];
-  return `<span class="shell-select" data-shell-select${nameTooltips ? "" : ' data-shell-select-tooltips="none"'}>
-    <button type="button" id="${id}-toggle" class="shell-select-toggle" data-shell-select-toggle aria-label="${escape(label)}: ${escape(selected.label)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu"><span data-shell-select-caption>${escape(selected.label)}</span><span class="shell-select-marker" aria-hidden="true">▾</span></button>
-    <select id="${id}"${name ? ` name="${escape(name)}"` : ""} hidden aria-hidden="true" tabindex="-1" aria-label="${escape(label)}">${options.map(option => `<option value="${escape(option.value)}" ${option.selected ? "selected" : ""}>${escape(option.label)}</option>`).join("")}</select>
+  return `<span class="shell-select" data-shell-select${bounded ? ' data-shell-select-bounded="true"' : ""}${nameTooltips ? "" : ' data-shell-select-tooltips="none"'}>
+    <button type="button" id="${id}-toggle" class="shell-select-toggle" data-shell-select-toggle aria-label="${escape(label)}: ${escape(selected.label)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu"><span data-shell-select-caption>${escape(selected.caption ?? selected.label)}</span><span class="shell-select-marker" aria-hidden="true">▾</span></button>
+    <select id="${id}"${name ? ` name="${escape(name)}"` : ""} hidden aria-hidden="true" tabindex="-1" aria-label="${escape(label)}">${options.map(option => `<option value="${escape(option.value)}" ${option.selected ? "selected" : ""}${option.disabled ? " disabled" : ""}${option.caption != null ? ` data-caption="${escape(option.caption)}"` : ""}${option.description ? ` data-description="${escape(option.description)}"` : ""}>${escape(option.label)}</option>`).join("")}</select>
     <span id="${id}-menu" class="assembly-track-combo-menu shell-select-menu is-hidden" role="listbox" aria-label="${escape(label)}" data-shell-select-menu></span>
   </span>`;
 }
@@ -23,18 +24,25 @@ export function bindShellSelects(root) {
     const select = combo.querySelector("select"), toggle = combo.querySelector("[data-shell-select-toggle]");
     const menu = combo.querySelector("[data-shell-select-menu]"), caption = combo.querySelector("[data-shell-select-caption]");
     const timerKey = Symbol("shellSelectClose");
-    const listen = (node, type, handler) => {
-      node.addEventListener(type, handler); cleanups.push(() => node.removeEventListener(type, handler));
+    const bounded = combo.getAttribute("data-shell-select-bounded") === "true";
+    const place = () => {
+      if (!bounded || menu.classList.contains("is-hidden")) return;
+      const rect = placeAnchoredPanel(toggle, menu, { matchAnchorWidth: false });
+      if (rect) menu.style.maxHeight = `${Math.min(rect.maxHeight, 420, (root.ownerDocument.defaultView?.innerHeight || 640) * .65)}px`;
+    };
+    const listen = (node, type, handler, options) => {
+      node.addEventListener(type, handler, options); cleanups.push(() => node.removeEventListener(type, handler, options));
     };
     const close = () => {
       cancelDelayedFloatingClose(combo, timerKey);
       menu.classList.add("is-hidden"); toggle.setAttribute("aria-expanded", "false");
+      if (bounded) clearAnchoredPanelPlacement(menu);
     };
     const options = () => [...menu.children];
     let signature = "";
     const sync = () => {
       const values = [...select.options], selected = values.find(option => option.selected) || values[0];
-      caption.textContent = selected?.textContent || "";
+      caption.textContent = selected?.dataset?.caption ?? selected?.textContent ?? "";
       const nameTooltips = combo.getAttribute("data-shell-select-tooltips") !== "none";
       if (nameTooltips) {
         toggle.setAttribute("data-app-tooltip", select.getAttribute("data-app-tooltip") || caption.textContent);
@@ -47,7 +55,7 @@ export function bindShellSelects(root) {
       const width = select.style.getPropertyValue("--workspace-select-width");
       if (width) combo.style.setProperty("--workspace-select-width", width);
       toggle.setAttribute("aria-label", `${select.getAttribute("aria-label")}: ${caption.textContent}`);
-      const nextSignature = JSON.stringify([nameTooltips, values.map(option => [option.value, option.textContent, option.disabled])]);
+      const nextSignature = JSON.stringify([nameTooltips, values.map(option => [option.value, option.textContent, option.disabled, option.dataset?.caption, option.dataset?.description])]);
       if (signature !== nextSignature) {
         close(); signature = nextSignature;
         menu.replaceChildren(...values.map((option, index) => {
@@ -55,10 +63,14 @@ export function bindShellSelects(root) {
           button.type = "button"; button.className = "assembly-track-combo-option";
           button.setAttribute("role", "option"); button.tabIndex = -1;
           button.dataset.shellOptionIndex = String(index);
-          button.textContent = option.textContent;
+          if (option.dataset?.description) {
+            const name = select.ownerDocument.createElement("span"); name.className = "shell-select-option-name"; name.textContent = option.textContent;
+            const detail = select.ownerDocument.createElement("span"); detail.className = "shell-select-option-description"; detail.textContent = option.dataset.description;
+            button.replaceChildren(name, detail);
+          } else button.textContent = option.textContent;
           if (nameTooltips) {
             button.setAttribute("data-app-tooltip", option.textContent);
-            button.setAttribute("data-app-tooltip-overflow", "");
+            button.setAttribute("data-app-tooltip-overflow", option.dataset?.description ? ".shell-select-option-name" : "");
           }
           button.disabled = option.disabled; return button;
         }));
@@ -77,6 +89,7 @@ export function bindShellSelects(root) {
       });
       cancelDelayedFloatingClose(combo, timerKey);
       menu.classList.remove("is-hidden"); toggle.setAttribute("aria-expanded", "true");
+      place();
       const available = options().filter(option => !option.disabled);
       (edge === "first" ? available[0] : edge === "last" ? available.at(-1)
         : available.find(option => option.getAttribute("aria-selected") === "true") || available[0])?.focus();
@@ -105,6 +118,10 @@ export function bindShellSelects(root) {
     const outside = event => { if (!combo.contains(event.target)) close(); };
     listen(root.ownerDocument, "pointerdown", outside);
     cleanups.push(bindDelayedFloatingClose(combo, close, { timerKey }));
+    if (bounded) {
+      if (root.ownerDocument.defaultView?.addEventListener) listen(root.ownerDocument.defaultView, "resize", place);
+      listen(root.ownerDocument, "scroll", place, true);
+    }
     listen(select, "change", sync);
     select[SYNC] = sync; cleanups.push(() => { close(); delete select[SYNC]; }); sync();
   }

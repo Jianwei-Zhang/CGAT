@@ -1590,6 +1590,10 @@ function resolveAppendToPathFocusPatch(assembly, activePhasedTrackKey) {
   };
 }
 
+export async function selectAssemblyChromosome(host, store, chrName) {
+  return selectChromosome(host, store, chrName);
+}
+
 async function selectChromosome(host, store, chrName) {
   return selectChromosomeImpl(host, store, chrName, assemblyDataRuntimeDeps);
 }

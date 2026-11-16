@@ -1,3 +1,4 @@
+import { renderAssemblyNavigation, buildAssemblyNavigationModel } from "../../../shell/assembly-navigation.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -20,7 +21,7 @@ function parseHeader(html) {
   return root.children[0];
 }
 
-for (const locale of ["zh", "en"]) test(`chromosome replaces the title and member management no longer occupies the toolbar (${locale})`, () => {
+for (const locale of ["zh", "en"]) test(`main toolbar contains parameters only after chromosome navigation moves to the shell (${locale})`, () => {
   const entry = { chrName: "Chr01", mode: "segments", segments: [], grtDisplayAvailable: true };
   const html = renderAssemblyPage({ ...createState({ initializer: {
     datasets: [{ datasetId: 11, name: "primary" }, { datasetId: 22, name: "A very long auxiliary dataset name" }],
@@ -29,10 +30,8 @@ for (const locale of ["zh", "en"]) test(`chromosome replaces the title and membe
     grtProjectView: { recipe: { finalPathSchemaVersion: "2" }, baselineFinalPathByChr: { Chr01: entry } } } }), locale });
   const header = parseHeader(html);
   assert.equal(header.children[0].name, "div");
-  assert.equal(header.children[0].attrs["data-assembly-popup"], "chromosomes");
-  assert.ok(Object.hasOwn(header.children[0].attrs, "data-main-track-control-title"));
-  const toolbar = header.children[1];
-  assert.equal(header.children.length, 2);
+  const toolbar = header.children[0];
+  assert.equal(header.children.length, 1);
   assert.ok(Object.hasOwn(toolbar.attrs, "data-main-track-toolbar"));
   assert.deepEqual(toolbar.children.map(node => node.attrs["data-assembly-popup"] === "members" ? "members" : node.attrs["data-grt-result-controls"] ? "precomputed"
     : node.attrs["data-create-phased-track"] ? "phase" : node.attrs.class), [
@@ -40,7 +39,7 @@ for (const locale of ["zh", "en"]) test(`chromosome replaces the title and membe
     "assembly-track-inline-field", "assembly-track-inline-field", "main-view-history-controls",
   ]);
   assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
-  assert.equal(html.match(/id="assembly-chr-picker-toggle"/g)?.length, 1);
+  assert.doesNotMatch(html, /id="assembly-chr-picker-toggle"/);
   assert.doesNotMatch(html, /data-members-card-toggle="1"/);
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
@@ -150,39 +149,32 @@ test("tooltip-only Local View help has no disclosure popup placement binding", (
 });
 
 for (const locale of ["zh", "en"]) for (const mode of ["loaded", "loading", "empty", "unplaced"]) {
-  test(`scope controls occur once inside the main header for ${mode} (${locale})`, () => {
+  test(`scope controls occur only in the shell for ${mode} (${locale})`, () => {
     const chrName = mode === "unplaced" ? "unplaced" : "Chromosome_with_a_very_long_name.1";
     const state = { ...createState({ assembly: { selectedChrName: chrName,
       loading: mode === "loading", chromosomes: mode === "empty" ? [] : [{ chrName, chrLength: 10000, ctgCount: 0, placedBp: 0 }],
     } }), locale };
     const html = renderAssemblyPage(state), header = parseHeader(html);
-    assert.equal(header.children.length, 2);
-    assert.equal(header.children[0].attrs["data-assembly-popup"], "chromosomes");
-    assert.ok(header.children[1].children.every(node => node.attrs["data-assembly-popup"] !== "members"));
-    assert.equal(html.match(/id="assembly-chr-picker-toggle"/g)?.length, 1);
+    assert.equal(header.children.length, 1);
+    assert.ok(header.children[0].children.every(node => node.attrs["data-assembly-popup"] !== "members"));
+    assert.doesNotMatch(html, /id="assembly-chr-picker-toggle"/);
     assert.doesNotMatch(html, /data-members-card-toggle="1"/);
     assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
-    assert.ok(html.includes(`: ${chrName}"`)); // Full name survives visual ellipsis in the trigger tooltip.
+    const navigation = renderAssemblyNavigation(state);
+    assert.equal(navigation.match(/id="assembly-chromosome-select"/g)?.length, 1);
+    assert.ok(mode === "empty" || navigation.includes(chrName));
     if (mode === "loading") {
       assert.doesNotMatch(html, /data-track-contig-id=/);
     }
-    if (mode === "empty") assert.ok(Object.hasOwn(header.children[0].children[0].attrs, "disabled"));
+    if (mode === "empty") assert.equal(buildAssemblyNavigationModel(state).chromosomes[0].disabled, true);
   });
 }
 
 
-test("complete chromosome picker options have no redundant tooltip and retain selection/accessibility data",()=>{
- const html=renderAssemblyPage(createState({assembly:{chrPickerOpen:true}}));
- const buttons=[...html.matchAll(/<button\b([^>]*class="chr-picker-option [^"]*"[^>]*)>([\s\S]*?)<\/button>/g)];
- assert.ok(buttons.length>0);
- for(const [,attrs,body] of buttons){assert.doesNotMatch(attrs,/data-app-tooltip|\btitle=/);assert.match(attrs,/data-chr-name="[^"]+"/);assert.match(attrs,/aria-pressed="(?:true|false)"/);assert.match(body,/<strong>[^<]+<\/strong><span>\d+ Contigs · [\d,.]+ Mb<\/span>/);}
- assert.match(html,/id="assembly-chr-picker-toggle"[^>]*data-app-tooltip-overflow=".chr-picker-current"/);
-});
-
-
-test("an open toolbar menu follows the reclaimed title width without closing or rebinding", () => {
-  const f = popupFixture(); f.setOpen(true); bindMainTrackToolbarPopups(f.host);
-  f.events.get("toggle")(); assert.equal(f.panel.style.left, "100px");
-  f.setLeft(40); f.events.get(MAIN_TRACK_TITLE_LAYOUT_EVENT)();
-  assert.equal(f.panel.style.left, "40px"); assert.equal(f.panel.style.position, "fixed");
+test("shell chromosome choices preserve names, counts, lengths and selected state", () => {
+  const state = createState({ assembly: { chrPickerOpen: true } });
+  const model = buildAssemblyNavigationModel(state);
+  assert.ok(model.chromosomes.some(item => item.selected));
+  for (const option of model.chromosomes.filter(item => !item.disabled)) assert.match(option.description, /\d+ Contigs · [\d,.]+ Mb/);
+  assert.doesNotMatch(renderAssemblyPage(state), /id="assembly-chr-picker-toggle"/);
 });

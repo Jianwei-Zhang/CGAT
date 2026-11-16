@@ -1,3 +1,4 @@
+import { bindAssemblyNavigation, syncAssemblyNavigation } from "./ui/shell/assembly-navigation.js";
 import { requestAppNotice } from "./ui/shell/app-dialog.js";
 import { bindLocalViewCloseSave } from "./ui/shell/local-view-close-save.js";
 import { bindAppTooltips, hideAppTooltips } from "./ui/app-tooltip-runtime.js";
@@ -18,14 +19,11 @@ import { applyAppTypography, initializeAppTheme, subscribeAppTheme } from "./ser
 import { bindAppSettings } from "./ui/shell/app-settings-panel.js";
 import "./styles/settings.css";
 import { createStore } from "./state/store.js";
-import { flushAssemblyProjectState } from "./ui/pages/assembly-page.js";
+import { flushAssemblyProjectState, selectAssemblyChromosome } from "./ui/pages/assembly-page.js";
 import { openProjectWorkspace as openWorkspace } from "./services/project-session.js";
 import { bindAppThemeToggle, renderAppShell } from "./ui/shell/app-shell.js";
 import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
-  buildWorkspaceSwitchItems,
-  workspaceSelectPresentation,
-  syncWorkspaceShortcutVisibility,
   migrateWorkspaceHistoryToArrivalOrder,
   switchWorkspaceFromShell,
   updateWorkspaceHistory,
@@ -43,6 +41,7 @@ const app = document.getElementById("app");
 const initialLocale = readPreferredLocale();
 const store = createStore({
   activeRoute: "importer",
+  assemblyNavigation: { partitionId: null, workspacePath: "", busy: false },
   locale: initialLocale,
   runtime: {
     ready: true,
@@ -350,9 +349,7 @@ window.addEventListener("gpm-next:route-refresh", () => {
 });
 
 function syncSessionHeader(state) {
-  syncWorkspaceShortcutVisibility(document, state);
-  const workspaceSelect = document.querySelector("#session-workspace-select");
-  const labels = getMessages(state, "shell");
+  syncAssemblyNavigation(app, state);
   document.querySelectorAll(".route-button").forEach(button => {
     const needsProject = ["projectPreview", "assembly", "projectExport"].includes(button.dataset.route);
     button.disabled = (needsProject && (!state.session.workspacePath || !state.session.projectId))
@@ -360,20 +357,6 @@ function syncSessionHeader(state) {
     button.setAttribute("data-app-tooltip", needsProject && !state.session.projectId
       ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "");
   });
-  if (workspaceSelect) {
-    const workspaceItems = buildWorkspaceSwitchItems({
-      state,
-      historyRecords: readWorkspaceHistory(),
-      labels,
-    });
-    replaceSelectOptions(workspaceSelect, workspaceItems);
-    const selectedName = workspaceSelect.selectedOptions[0]?.textContent || labels.workspacePlaceholder;
-    const presentation = workspaceSelectPresentation(selectedName);
-    workspaceSelect.setAttribute("data-app-tooltip", presentation.title);
-    workspaceSelect.style.setProperty("--workspace-select-width", presentation.width);
-    workspaceSelect.disabled = projectEntryBusy(state) || (workspaceItems.length === 1 && !workspaceItems[0]?.value);
-    syncShellSelect(workspaceSelect);
-  }
 }
 
 function persistLastWorkspace(state) {
@@ -489,43 +472,13 @@ function bindGlobalLanguageSwitch(root, storeRef) {
 }
 
 function bindGlobalSessionSwitchers(root, storeRef) {
-  const workspaceSelect = root.querySelector("#session-workspace-select");
-
-  workspaceSelect?.addEventListener("change", async () => {
-    if (projectEntryBusy(storeRef.getState())) return;
-    const nextWorkspacePath = normalizeWorkspacePath(workspaceSelect.value);
-    const currentWorkspacePath = normalizeWorkspacePath(storeRef.getState().session.workspacePath);
-    if (!nextWorkspacePath || nextWorkspacePath === currentWorkspacePath) {
-      syncSessionHeader(storeRef.getState());
-      return;
-    }
-    try {
-      const before = storeRef.getState();
-      storeRef.setState({ importer: { ...before.importer, inFlight: true, projectError: "" } });
-      await flushAssemblyProjectState(document.querySelector("#route-host"), storeRef);
-      await switchWorkspaceFromShell(storeRef, nextWorkspacePath, { openWorkspace });
-      window.dispatchEvent(new Event("gpm-next:route-refresh"));
-    } catch (error) {
-      const current = storeRef.getState();
-      storeRef.setState({
-        importer: {
-          ...current.importer,
-          inFlight: false,
-          importRunId: null,
-          importCancelling: false,
-          importCancelError: "",
-          projectError: String(error?.message || error),
-          pendingProjectPath: error.pendingProjectPath || "",
-          status: t(current, "importer.runtime.openFailedStatus"),
-          summary: String(error?.message || error || ""),
-        },
-        activeRoute: "importer",
-      });
-      window.dispatchEvent(new Event("gpm-next:route-refresh"));
-    }
-    syncSessionHeader(storeRef.getState());
+  bindAssemblyNavigation(root, storeRef, {
+    flush: () => flushAssemblyProjectState(root.querySelector("#route-host"), storeRef),
+    switchWorkspace: path => switchWorkspaceFromShell(storeRef, path, { openWorkspace }),
+    selectChromosome: name => selectAssemblyChromosome(root.querySelector("#route-host"), storeRef, name),
+    refresh: () => window.dispatchEvent(new Event("gpm-next:route-refresh")),
+    notice: message => requestAppNotice(message, { store: storeRef }),
   });
-
 }
 
 async function restoreLastWorkspace(storeRef) {
@@ -657,30 +610,6 @@ function appendWorkspaceHistory(workspacePath, projectName = "") {
   writeWorkspaceHistory(updateWorkspaceHistory(readWorkspaceHistory(), path, projectName));
 }
 
-function replaceSelectOptions(select, items) {
-  const nextOptions = items
-    .map(
-      (item) =>
-        `<option value="${escapeAttr(item.value)}" ${item.selected ? "selected" : ""}>${escapeHtml(
-          item.label,
-        )}</option>`,
-    )
-    .join("");
-  if (select.innerHTML !== nextOptions) {
-    select.innerHTML = nextOptions;
-  }
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-function escapeAttr(value) {
-  return escapeHtml(value).replaceAll('"', "&quot;");
-}
 
 function bindSettings(root, storeRef) {
   bindShellSelects(root);

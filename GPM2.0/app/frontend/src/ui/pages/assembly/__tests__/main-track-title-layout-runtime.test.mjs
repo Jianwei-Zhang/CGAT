@@ -1,3 +1,4 @@
+import { renderAssemblyNavigation } from "../../../shell/assembly-navigation.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -21,29 +22,18 @@ test("full-title budget includes all groups/gaps/insets, not current row count o
   }
 });
 
-for (const locale of ["en", "zh"]) test(`only English has an abbreviated title; full identity/accessibility/tooltip survive (${locale})`, () => {
+for (const locale of ["en", "zh"]) test(`chromosome identity moves to the shell with escaped full name (${locale})`, () => {
   const chrName = 'BSWB<&".1';
-  const state = { ...createState({ assembly: { selectedChrName: chrName } }), locale };
-  const html = renderAssemblyPage(state);
-  const button = html.match(/<button id="assembly-chr-picker-toggle"[^>]+>/)[0];
-  assert.match(button, /aria-label="[^"<>]*: BSWB&lt;&amp;&quot;\.1"/);
-  assert.match(button, /data-app-tooltip-overflow="\.chr-picker-current"/);
-  if (locale === "en") {
-    assert.match(html, /data-main-chr-title-full="Chromosome BSWB&lt;&amp;&quot;\.1"/);
-    assert.match(html, /data-main-chr-title-short="Chr BSWB&lt;&amp;&quot;\.1"/);
-    assert.match(html, /class="chr-picker-current"[^>]*>Chromosome BSWB&lt;&amp;"\.1<\/span>/);
-    assert.match(button, /data-app-tooltip="Chromosome BSWB&lt;&amp;&quot;\.1"/);
-    assert.equal(html.match(/data-main-chr-title-short=/g)?.length, 1);
-  } else {
-    assert.doesNotMatch(html, /data-main-chr-title-(?:full|short)/);
-    assert.match(html, /class="chr-picker-current">染色体 BSWB&lt;&amp;"\.1<\/span>/);
-  }
+  const state = { ...createState({ assembly: { selectedChrName: chrName, chromosomes: [{ chrName, ctgCount: 2, placedBp: 1000000 }] } }), locale };
+  const html = renderAssemblyNavigation(state);
+  assert.match(html, /aria-label="Chr: BSWB&lt;&amp;&quot;\.1"/);
+  assert.match(html, /data-description="2 Contigs · 1.00 Mb"/);
+  assert.doesNotMatch(renderAssemblyPage(state), /id="assembly-chr-picker-toggle"|data-main-chr-title-/);
 });
 
-test("empty English selection retains the full Choose chromosome prompt without abbreviation", () => {
-  const html = renderAssemblyPage({ ...createState({ assembly: { selectedChrName: "" } }), locale: "en" });
-  assert.match(html, /class="chr-picker-current">Choose chromosome<\/span>/);
-  assert.doesNotMatch(html, /data-main-chr-title-(?:full|short)/);
+test("empty shell chromosome selection keeps an explicit prompt", () => {
+  const html = renderAssemblyNavigation({ ...createState({ assembly: { selectedChrName: "", chromosomes: [] } }), locale: "en" });
+  assert.match(html, /Choose chromosome/);
 });
 
 function fixture({ english = true, observer = true } = {}) {

@@ -22,7 +22,7 @@ test("visible Tools and Full range actions have no paraphrase hints while icon c
 
 test("approved name renderers explicitly opt in rather than globally suppressing ordinary hints", () => {
   const expectations = [
-    ["pages/assembly/render-tracks.js", /data-app-tooltip-overflow="\.chr-picker-current"/],
+    ["shell/shell-select-runtime.js", /toggle\.setAttribute\("data-app-tooltip-overflow", "\[data-shell-select-caption\]"\)/],
     ["pages/assembly/render-tracks.js", /data-app-tooltip-overflow="span"/],
     ["pages/assembly/render-tracks.js", /data-app-tooltip="\$\{escapeAttr\(dataset.label\)\}" data-app-tooltip-overflow/],
     ["pages/assembly/render-subview.js", /data-app-tooltip-overflow="\.subview-candidate-name"/],

@@ -48,7 +48,7 @@ export const projectDropCopy = {
 export function projectEntryBusy(state, { includeResolving = true } = {}) {
   const importer = state.importer || {};
   const initializer = state.initializer || {};
-  return Boolean(importer.inFlight || importer.restoringSession || (includeResolving && importer.entryResolving) || importer.importDialogOpen
+  return Boolean(state.assemblyNavigation?.busy || importer.inFlight || importer.restoringSession || (includeResolving && importer.entryResolving) || importer.importDialogOpen
     || importer.libraryDialog || importer.copyDialog?.open || importer.deleteConfirmOpen || initializer.loading || initializer.updating
     || initializer.autoPipelineRunning || initializer.createModalOpen || initializer.autoPipelineModalOpen);
 }

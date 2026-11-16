@@ -86,7 +86,7 @@ export function createAppUpdater({ invoke, listen = async () => () => {}, storag
 
 export function updateWorkBusy(state = {}, pendingCommands = 0) {
   const i = state.importer || {}, init = state.initializer || {}, a = state.assembly || {};
-  return Boolean(hasRunningProjectExports() || pendingCommands || i.inFlight || i.restoringSession || i.entryResolving
+  return Boolean(state.assemblyNavigation?.busy || hasRunningProjectExports() || pendingCommands || i.inFlight || i.restoringSession || i.entryResolving
     || i.copyDialog?.inFlight || init.loading || init.creating || init.updating || init.autoPipelineRunning
     || a.loading || a.bootstrapping || a.mainViewHistory?.inFlight || state.projectExport?.loading
     || state.projectExport?.job?.status === "running");
