@@ -14,7 +14,8 @@ from typing import Iterable
 
 from .common import canonical_json, executable_identity, read_fasta, sha256_file, stable_id, write_fasta
 from .q0_alignments import read_paf
-from .q0_catalog import CATALOG_SCHEMA, CandidateCatalog, add_pairwise_candidates, build_catalog, supplemental_groups
+from .q0_catalog import (CATALOG_SCHEMA, CandidateCatalog, DISCOVERY_REFERENCE_IDENTITY, DISCOVERY_REFERENCE_MAPQ,
+                         add_pairwise_candidates, build_catalog, partial_source_request, supplemental_groups)
 from .q0_sources import Q0EvidenceError, SourceKey
 try:
     from run_outer_checkpoints import OuterCheckpointManager
@@ -26,8 +27,11 @@ except ModuleNotFoundError:
 SCHEMA = "lgz_q0_evidence_v1"
 MANIFEST = "metadata/grt_q0_evidence.json"
 MAPPING_OUTPUT_FILES = ("query.fa", "target.fa", "result.paf", "command.json")
-POLICY = {"version": 1, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
+POLICY = {"version": 2, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
           "supplement": "out_of_group_split_and_missing_ref_neighbors",
+          "partial_source_discovery_min_uncovered_bp": 100,
+          "partial_source_reference_identity": DISCOVERY_REFERENCE_IDENTITY,
+          "partial_source_reference_mapq": DISCOVERY_REFERENCE_MAPQ,
           "supplement_flags": ["-D", "-P", "--dual=yes", "--no-long-join"]}
 
 
@@ -327,6 +331,14 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         if not added:
             break
         remaining, anchors = catalog.unplaced(), sorted(added)
+    request = partial_source_request(catalog, minimum_uncovered_bp=POLICY["partial_source_discovery_min_uncovered_bp"])
+    if request:
+        task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
+                           skip_self=options.get("skip_self") == "true")
+        tasks.append(task)
+        hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
+                        target_lengths={key: catalog.parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"])
+        add_pairwise_candidates(catalog, hits, set(task["query_ids"]), set(task["target_ids"]), include_placed=True)
     for request in supplemental_groups(catalog, assignments, known_pairs):
         tasks.append(_supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
                                  skip_self=options.get("skip_self") == "true"))

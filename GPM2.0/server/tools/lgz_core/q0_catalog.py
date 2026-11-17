@@ -12,6 +12,8 @@ from .q0_alignments import PafAlignment, read_paf
 from .q0_sources import Interval, Q0EvidenceError, SourceKey, SourceSegment, merged_intervals, split_source
 
 CATALOG_SCHEMA = "lgz_q0_candidates_v1"
+DISCOVERY_REFERENCE_IDENTITY = 0.90
+DISCOVERY_REFERENCE_MAPQ = 20
 
 
 def interval_rows(intervals: Iterable[Interval]) -> list[list[int]]:
@@ -105,9 +107,13 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                                           block.target.start + block.query.end - overlap.start)
                     identity = (part.segment_id, hit.target_name, hit.strand)
                     row = accumulated.setdefault(identity, {"query": [], "target": [],
-                                                             "evidence": set(), "mapq": []})
+                                                             "evidence": set(), "mapq": [], "discovery_query": []})
                     row["query"].append(overlap)
                     row["target"].append(target)
+                    if (block.operation != "X" and hit.mapping_quality is not None
+                            and hit.mapping_quality >= DISCOVERY_REFERENCE_MAPQ
+                            and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
+                        row["discovery_query"].append(overlap)
                     row["evidence"].add(hit.evidence_id)
                     if hit.mapping_quality is not None:
                         row["mapq"].append(hit.mapping_quality)
@@ -122,6 +128,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             "placement_kind": "reference", "origin_group": (
                 "main" if (part.source.dataset, part.source.contig, chromosome) in grouped else "expanded"),
             "query_intervals": interval_rows(row["query"]),
+            "discovery_query_intervals": interval_rows(row["discovery_query"]),
             "reference_intervals": interval_rows(row["target"]),
             "reference_evidence_ids": sorted(row["evidence"]), "pairwise_evidence_ids": [],
             "anchor_candidate_ids": [], "maximum_available_mapq": max(row["mapq"], default=None),
@@ -132,7 +139,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
 
 
 def add_pairwise_candidates(catalog: CandidateCatalog, hits: Iterable[PafAlignment],
-                            query_ids: set[str], target_ids: set[str]) -> set[str]:
+                            query_ids: set[str], target_ids: set[str], *, include_placed: bool = False) -> set[str]:
     """Discover candidate chr relations; never fabricate direct ref alignments.
 
     Only previously unplaced segments are expanded in a round. Candidate links
@@ -147,7 +154,7 @@ def add_pairwise_candidates(catalog: CandidateCatalog, hits: Iterable[PafAlignme
     for hit in hits:
         if hit.query_name not in query_ids or hit.target_name not in target_ids:
             raise Q0EvidenceError("supplementary PAF references an undeclared segment")
-        if hit.query_name == hit.target_name or hit.query_name in before:
+        if hit.query_name == hit.target_name or (hit.query_name in before and not include_placed):
             continue
         query = catalog.parts[hit.query_name]
         query_intervals = [Interval(query.interval.start + block.query.start,
@@ -225,3 +232,24 @@ def supplemental_groups(catalog: CandidateCatalog, assignments: Iterable[dict[st
             tasks.append({"kind": "candidate_chr", "chromosome": chromosome,
                           "query_ids": sorted(queries), "target_ids": sorted(segment_ids)})
     return tasks
+
+
+def partial_source_request(catalog: CandidateCatalog, *, minimum_uncovered_bp: int = 100) -> dict | None:
+    """Request evidence for poorly covered pieces of an already grouped source.
+
+    Whole source segments remain mapper context. This is a targeted subset of
+    queries against the anchored set, not unconditional genome all-versus-all.
+    The coarse coverage screen never authorizes placement or clipping.
+    """
+    from .q0_sources import subtract_intervals
+    coverage = defaultdict(list)
+    for candidate in catalog.payload["candidates"]:
+        if candidate["placement_kind"] == "reference":
+            coverage[candidate["segment_id"]].extend(Interval(*i) for i in candidate["discovery_query_intervals"])
+    queries = [key for key, intervals in sorted(coverage.items())
+               if any(i.length >= minimum_uncovered_bp for i in subtract_intervals(catalog.parts[key].interval, intervals))]
+    anchors = sorted({row["segment_id"] for row in catalog.payload["candidates"]})
+    if queries and len(anchors) > 1:
+        return {"kind": "partial_source_discovery", "query_ids": queries, "target_ids": anchors,
+                "minimum_uncovered_bp": minimum_uncovered_bp}
+    return None

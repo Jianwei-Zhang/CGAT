@@ -9,7 +9,7 @@ import unittest
 from server.tools.lgz_core.common import reverse_complement
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_paths import (
-    PairLink, PathGraph, PathPolicy, Placement, pair_blocks, reconstruct, search_paths,
+    PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor, pair_blocks, reconstruct, search_paths,
 )
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey, split_source
 
@@ -17,7 +17,8 @@ from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKe
 def placement(name, start, end, *, dataset=None, offset=0, orientation="+", chromosome="chr1"):
     interval = Interval(offset, offset + end - start)
     return Placement(name, name, SourceKey(dataset or name, name), interval, orientation, chromosome,
-                     (Interval(start, end),), (interval,), ("ref-" + name,))
+                     (Interval(start, end),), (interval,), ("ref-" + name,),
+                     (ReferenceAnchor(interval, Interval(start, end), "ref-" + name),))
 
 
 def link(left, right, left_range, right_range, *, number=1, cigar=None, matches=None,
@@ -49,7 +50,8 @@ def bridge_fixture(reverse=False, original_gap=False):
         index = split_source(source, sequence)
         a = replace(a, source=source, segment_id=index.segments[0].segment_id)
         b = replace(b, source=source, segment_id=index.segments[1].segment_id,
-                    interval=index.segments[1].interval, anchor_intervals=(index.segments[1].interval,))
+                    interval=index.segments[1].interval, anchor_intervals=(index.segments[1].interval,),
+                    reference_blocks=(ReferenceAnchor(index.segments[1].interval, Interval(2600, 5000), "ref-b"),))
         sequences = {source: sequence, c.source: sequences[c.source]}
         original = index.adjacencies
     links = (link(a, c, (1800, 2200), (0, 400), number=1),
@@ -107,8 +109,10 @@ class Q0PathKernelTests(unittest.TestCase):
     def test_reverse_original_connection_reverses_endpoints_not_gap_provenance(self):
         truth, nodes, links, sequences, original = bridge_fixture(original_gap=True)
         a, b = nodes[:2]
-        a = replace(a, orientation="-", reference_intervals=(Interval(3000, 5200),))
-        b = replace(b, orientation="-", reference_intervals=(Interval(0, 2400),))
+        a = replace(a, orientation="-", reference_intervals=(Interval(3000, 5200),),
+                    reference_blocks=(ReferenceAnchor(a.interval, Interval(3000, 5200), "ref-a"),))
+        b = replace(b, orientation="-", reference_intervals=(Interval(0, 2400),),
+                    reference_blocks=(ReferenceAnchor(b.interval, Interval(0, 2400), "ref-b"),))
         result = search_paths(PathGraph([a, b], [], original))
         self.assertEqual(result.path.nodes, ("b", "a"))
         self.assertEqual(result.path.joins[0].gap_interval, original[0].gap_interval)
@@ -137,7 +141,8 @@ class Q0PathKernelTests(unittest.TestCase):
 
     def test_ref_uncovered_source_tails_are_not_silently_trimmed(self):
         a = placement("long", 0, 2400)
-        a = replace(a, reference_intervals=(Interval(0, 2000),), anchor_intervals=(Interval(200, 2200),))
+        a = replace(a, reference_intervals=(Interval(0, 2000),), anchor_intervals=(Interval(200, 2200),),
+                    reference_blocks=(ReferenceAnchor(Interval(200, 2200), Interval(0, 2000), "ref-a"),))
         result = search_paths(PathGraph([a], []))
         self.assertEqual(result.path.slices[0].interval, Interval(0, 2400))
 
@@ -217,6 +222,7 @@ class Q0PathKernelTests(unittest.TestCase):
         # Each pair separately looks unique, but together they map two loci of
         # a to the same b/c coordinate. Discard the conflicting equivalences.
         a, b, c = placement("a", 0, 1000), placement("b", 0, 200), placement("c", 0, 200)
+        a, b, c = [replace(p, reference_intervals=(), reference_blocks=(), localization_kind="pairwise") for p in (a, b, c)]
         links = [link(a, b, (0, 200), (0, 200), number=1),
                  link(a, c, (600, 800), (0, 200), number=2),
                  link(b, c, (0, 200), (0, 200), number=3)]
@@ -234,6 +240,9 @@ class Q0PathKernelTests(unittest.TestCase):
         a, b = placement("a", 0, 1000), placement("b", 590, 1600)
         # b has ten additional bases between the two matching runs. Choose
         # either exact paired cut, not an ambiguous insertion boundary.
+        b = replace(b, reference_intervals=(Interval(600, 1600),),
+                    reference_blocks=(ReferenceAnchor(Interval(0, 200), Interval(600, 800), "ref-b"),
+                                      ReferenceAnchor(Interval(210, 1010), Interval(800, 1600), "ref-b")))
         evidence = link(a, b, (600, 1000), (0, 410), cigar="200M10D200M")
         graph = PathGraph([a, b], [evidence])
         joins = graph.joins("a", "b")
@@ -300,6 +309,37 @@ class Q0PathKernelTests(unittest.TestCase):
         empty = search_paths(PathGraph([], []))
         self.assertIsNone(empty.path)
         self.assertIn("no_admitted_placements", empty.diagnostics["stop_reasons"])
+
+    def test_competing_mapping_outside_selected_fragment_still_blocks_a_cut(self):
+        a = placement("a", 0, 1000)
+        whole_b = placement("b", 600, 1800)
+        b = replace(whole_b, interval=Interval(0, 400), anchor_intervals=(Interval(0, 400),),
+                    reference_intervals=(Interval(600, 1000),),
+                    reference_blocks=(ReferenceAnchor(Interval(0, 400), Interval(600, 1000), "ref-b"),))
+        good = link(a, whole_b, (600, 1000), (0, 400), number=1)
+        alternative = link(a, whole_b, (600, 1000), (700, 1100), number=2)
+        self.assertFalse(PathGraph([a, b], [good, alternative]).joins("a", "b"))
+
+    def test_soft_original_neighbor_cannot_form_an_independent_seed(self):
+        p = placement("a", 0, 1000)
+        soft = replace(p, reference_intervals=(), reference_blocks=(), anchor_intervals=(),
+                       seed_eligible=False, localization_kind="input_adjacency")
+        self.assertIsNone(search_paths(PathGraph([soft], [])).path)
+
+    def test_simple_independent_coverage_is_not_lost_to_quadratic_seed_proposals(self):
+        nodes = [placement(f"n{i:03}", i * 200, i * 200 + 100) for i in range(80)]
+        result = search_paths(PathGraph(nodes, [], policy=PathPolicy(maximum_evaluations=500)))
+        self.assertEqual(len(result.path.nodes), 80)
+        self.assertEqual(result.path.score[0], 8000)
+        self.assertLessEqual(result.diagnostics["evaluations"], 500)
+
+    def test_provenance_id_order_cannot_choose_a_different_source(self):
+        a, b = placement("a", 0, 1000), placement("b", 0, 1000)
+        evidence = link(a, b, (0, 1000), (0, 1000))
+        before = search_paths(PathGraph([a, b], [evidence]))
+        after = search_paths(PathGraph([replace(a, placement_id="zzz"), replace(b, placement_id="aaa")], [evidence]))
+        self.assertEqual(before.path.slices[0].source, after.path.slices[0].source)
+        self.assertEqual(before.path.slices[0].interval, after.path.slices[0].interval)
 
     def test_invalid_policies_and_unlocalized_placements_fail(self):
         for kwargs in ({"beam_width": 0}, {"minimum_anchor_bp": -1}, {"minimum_pair_identity": 2}):

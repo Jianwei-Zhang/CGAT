@@ -8,6 +8,7 @@ consensus bases, and never treats an N count as a measured physical distance.
 """
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from itertools import product
@@ -21,7 +22,7 @@ from .q0_sources import Interval, OriginalAdjacency, Q0EvidenceError, SourceKey,
 
 @dataclass(frozen=True)
 class PathPolicy:
-    version: int = 1
+    version: int = 2
     minimum_pair_identity: float = 0.95
     minimum_anchor_bp: int = 100
     unknown_join_n: int = 100
@@ -30,15 +31,27 @@ class PathPolicy:
     maximum_rounds: int = 32
     maximum_replaced_nodes: int = 3
     maximum_edge_variants: int = 4
+    maximum_seed_positions: int = 8
     maximum_coverage_boundaries: int = 200000
 
     def __post_init__(self):
         if not 0 < self.minimum_pair_identity <= 1:
             raise Q0EvidenceError("q0 pair identity must be in (0, 1]")
         for name in ("version", "minimum_anchor_bp", "unknown_join_n", "beam_width",
-                     "maximum_evaluations", "maximum_rounds", "maximum_replaced_nodes", "maximum_edge_variants", "maximum_coverage_boundaries"):
+                     "maximum_evaluations", "maximum_rounds", "maximum_replaced_nodes", "maximum_edge_variants", "maximum_seed_positions", "maximum_coverage_boundaries"):
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
                 raise Q0EvidenceError(f"q0 path policy requires positive integer {name}")
+
+
+@dataclass(frozen=True)
+class ReferenceAnchor:
+    source: Interval
+    reference: Interval
+    evidence_id: str
+
+    def __post_init__(self):
+        if self.source.length != self.reference.length or not self.evidence_id:
+            raise Q0EvidenceError("reference anchor must be an actual equal-length paired block")
 
 
 @dataclass(frozen=True)
@@ -52,12 +65,21 @@ class Placement:
     reference_intervals: tuple[Interval, ...]
     anchor_intervals: tuple[Interval, ...]
     evidence_ids: tuple[str, ...]
+    reference_blocks: tuple[ReferenceAnchor, ...] = ()
+    seed_eligible: bool = True
+    localization_kind: str = "reference"
 
     def __post_init__(self):
         if not self.placement_id or not self.segment_id or not self.chromosome or self.orientation not in {"+", "-"}:
             raise Q0EvidenceError("invalid q0 placement identity/orientation")
-        if not self.evidence_ids or not self.anchor_intervals:
+        if not self.evidence_ids or (self.seed_eligible and not self.anchor_intervals):
             raise Q0EvidenceError("q0 placement needs localization evidence and supported source anchors")
+        if not self.seed_eligible and self.localization_kind != "input_adjacency":
+            raise Q0EvidenceError("only original-adjacency placements may lack independent anchors")
+        if merged_intervals(self.reference_intervals) != merged_intervals(a.reference for a in self.reference_blocks):
+            raise Q0EvidenceError("reference footprint must come from actual paired blocks")
+        if any(not self.interval.contains(a.source) for a in self.reference_blocks):
+            raise Q0EvidenceError("reference block escapes q0 placement")
         if any(not self.interval.contains(interval) for interval in self.anchor_intervals):
             raise Q0EvidenceError("q0 anchor escapes source placement")
 
@@ -137,6 +159,84 @@ def pair_blocks(link: PairLink, left: Placement, right: Placement) -> tuple[Bloc
                     Interval(overlap.end - (clipped.end - mapped.start), overlap.end - (clipped.start - mapped.start)))
             result.add(Block(left.local(back), right.local(clipped)))
     return tuple(sorted(result))
+
+
+def reference_consistent(block: Block, left: Placement, right: Placement) -> bool:
+    """Compare corresponding paired bases, never reference bounding hulls."""
+    for a in left.reference_blocks:
+        local_a = left.local(a.source)
+        clipped = block.clip_left(local_a)
+        if clipped is None:
+            continue
+        for b in right.reference_blocks:
+            local_b = right.local(b.source)
+            overlap = clipped.right.intersection(local_b)
+            if overlap is None:
+                continue
+            left_position = clipped.left.start + overlap.start - clipped.right.start
+            if a.reference.start + left_position - local_a.start != b.reference.start + overlap.start - local_b.start:
+                return False
+    return True
+
+
+def _source_pairs(link: PairLink, left: SourceKey, right: SourceKey):
+    for q, t in link.source_blocks():
+        if (link.query_source, link.target_source) == (left, right):
+            yield q, t
+        if (link.target_source, link.query_source) == (left, right):
+            yield t, q
+
+
+def qualify_pair_blocks(left: Placement, right: Placement, links: Iterable[PairLink], policy: PathPolicy,
+                        *, require_supported: bool = True) -> tuple[tuple[Block, str], ...]:
+    """Retain coordinate-unique blocks; all observed loci compete, even outside
+    the proposed fragments, with opposite orientation, or inconsistent with ref.
+    require_supported=False only proposes anchors to the admission layer; it is
+    not an authorization to edit or to bypass that layer's sequence checks.
+    """
+    links = tuple(link for link in links if link.hit.matches / link.hit.block_length >= policy.minimum_pair_identity)
+    result = []
+    for link in links:
+        blocks = pair_blocks(link, left, right)
+        if not blocks or any(not reference_consistent(block, left, right) for block in blocks):
+            continue
+        supported = []
+        for block in blocks:
+            if not require_supported:
+                supported.append(block.left)
+                continue
+            for a in left.anchor_intervals:
+                clipped = block.clip_left(left.local(a))
+                if clipped:
+                    for b in right.anchor_intervals:
+                        overlap = clipped.right.intersection(right.local(b))
+                        if overlap:
+                            start = clipped.left.start + overlap.start - clipped.right.start
+                            supported.append(Interval(start, start + overlap.length))
+        if _size(supported) < policy.minimum_anchor_bp:
+            continue
+        for block in blocks:
+            left_global, right_global = left.source_interval(block.left), right.source_interval(block.right)
+            reverse = left.orientation != right.orientation
+            conflicts = False
+            for alternative in links:
+                for a, b in _source_pairs(alternative, left.source, right.source):
+                    qa, qb = left_global.intersection(a), right_global.intersection(b)
+                    if max(qa.length if qa else 0, qb.length if qb else 0) < policy.minimum_anchor_bp:
+                        continue
+                    opposite = (alternative.hit.strand == "-") != reverse
+                    # For matching orientations, a single boundary identifies
+                    # the affine paired-base map over each ungapped run.
+                    same_map = (right_global.end + left_global.start == b.end + a.start if reverse else
+                                right_global.start - left_global.start == b.start - a.start)
+                    if opposite or not same_map:
+                        conflicts = True
+                        break
+                if conflicts:
+                    break
+            if not conflicts:
+                result.append((block, link.hit.evidence_id))
+    return tuple(sorted(set(result), key=lambda item: (item[0], item[1])))
 
 
 @dataclass(frozen=True)
@@ -232,8 +332,6 @@ class PathGraph:
                 continue  # Distinct loci in one source are not redundant copies.
             for left in by_source[a]:
                 for right in by_source[b]:
-                    if not self.colocated(left, right):
-                        continue
                     for block, evidence_id in self.homologous_blocks(left, right):
                         relations.append(Equivalence(left.source, left.source_interval(block.left),
                                                      right.source, right.source_interval(block.right),
@@ -248,62 +346,10 @@ class PathGraph:
     def homologous_blocks(self, left: Placement, right: Placement) -> tuple[tuple[Block, str], ...]:
         key = (left.placement_id, right.placement_id)
         if key not in self._blocks:
-            items = []
-            for link in self.links[tuple(sorted((left.source, right.source)))]:
-                if link.hit.evidence_id in self.ambiguous_equivalence_ids:
-                    continue
-                blocks = pair_blocks(link, left, right)
-                supported = []
-                for block in blocks:
-                    for anchor in left.anchor_intervals:
-                        clipped = block.clip_left(left.local(anchor))
-                        if clipped is None:
-                            continue
-                        for other in right.anchor_intervals:
-                            overlap = clipped.right.intersection(right.local(other))
-                            if overlap:
-                                start = clipped.left.start + overlap.start - clipped.right.start
-                                supported.append(Interval(start, start + overlap.length))
-                if _size(supported) >= self.policy.minimum_anchor_bp:
-                    items.extend((block, link.hit.evidence_id) for block in blocks)
-            # Competing mappings to different positions invalidate positional
-            # equivalence; reciprocal/duplicate observations are not votes.
-            valid = []
-            for block, evidence_id in items:
-                conflicts = any(
-                    (block.right.start - block.left.start != other.right.start - other.left.start)
-                    and max(_overlap_size((block.left,), (other.left,)),
-                            _overlap_size((block.right,), (other.right,))) >= self.policy.minimum_anchor_bp
-                    for other, _ in items)
-                # An inverted alternative at the same source locus is also
-                # a competing placement, even though it cannot be an edge in
-                # this oriented graph. Do not hide it by filtering strands.
-                if not conflicts:
-                    for alternative in self.links[tuple(sorted((left.source, right.source)))]:
-                        if (alternative.hit.strand == "+") == (left.orientation == right.orientation):
-                            continue
-                        for q, t in alternative.source_blocks():
-                            assignments = []
-                            if (alternative.query_source, alternative.target_source) == (left.source, right.source):
-                                assignments.append((q, t))
-                            if (alternative.target_source, alternative.query_source) == (left.source, right.source):
-                                assignments.append((t, q))
-                            if any(max(_overlap_size((left.source_interval(block.left),), (a,)),
-                                       _overlap_size((right.source_interval(block.right),), (b,)))
-                                   >= self.policy.minimum_anchor_bp for a, b in assignments):
-                                conflicts = True
-                                break
-                        if conflicts:
-                            break
-                if not conflicts:
-                    valid.append((block, evidence_id))
-            self._blocks[key] = tuple(sorted(set(valid), key=lambda item: (item[0], item[1])))
+            links = [link for link in self.links[tuple(sorted((left.source, right.source)))]
+                     if link.hit.evidence_id not in self.ambiguous_equivalence_ids]
+            self._blocks[key] = qualify_pair_blocks(left, right, links, self.policy)
         return self._blocks[key]
-
-    @staticmethod
-    def colocated(left: Placement, right: Placement) -> bool:
-        return (not left.reference_intervals or not right.reference_intervals
-                or _overlap_size(left.reference_intervals, right.reference_intervals) > 0)
 
     def joins(self, left_id: str, right_id: str) -> tuple[Join, ...]:
         key = (left_id, right_id)
@@ -316,7 +362,7 @@ class PathGraph:
             return ()
         # Only supported paired-base coordinates can authorize an overlap cut.
         blocks = self.homologous_blocks(left, right)
-        if blocks and self.colocated(left, right):
+        if blocks:
             for block, evidence_id in blocks:
                 # One actual chain must reach both ends. Its interior indels
                 # are allowed; the chosen cut itself must be inside a supported
@@ -398,7 +444,8 @@ class PathGraph:
                     original.gap_interval if original else None)
 
     def materialize(self, nodes: tuple[str, ...], joins: tuple[Join, ...]) -> Path | None:
-        if not nodes or len(joins) != len(nodes) - 1 or len(set(nodes)) != len(nodes):
+        if (not nodes or len(joins) != len(nodes) - 1 or len(set(nodes)) != len(nodes)
+                or not any(self.placements[node].seed_eligible for node in nodes)):
             return None
         for left_id, right_id, join in zip(nodes, nodes[1:], joins):
             if join not in self.joins(left_id, right_id):
@@ -425,9 +472,16 @@ class PathGraph:
                  -sum(j.n_bp > 0 for j in joins), -switches, -len(slices), max(s.interval.length for s in slices))
         return Path(self.chromosome, nodes, joins, tuple(slices), score, missing)
 
-    @staticmethod
-    def rank(path: Path):
-        return tuple(-value for value in path.score), path.nodes, tuple(j.join_id for j in path.joins)
+    def source_rank(self, node: str):
+        p = self.placements[node]
+        return (p.source.dataset, p.source.contig, p.interval.start, p.interval.end, p.orientation, p.chromosome)
+
+    def rank(self, path: Path):
+        # Provenance IDs include PAF record identity and can change with row
+        # ordering. They must not choose the source or clipping geometry.
+        return (tuple(-value for value in path.score), tuple(self.source_rank(node) for node in path.nodes),
+                tuple((j.kind, j.left_end, j.right_start, j.n_bp) for j in path.joins),
+                path.nodes, tuple(j.join_id for j in path.joins))
 
 
 def search_paths(graph: PathGraph) -> SearchResult:
@@ -438,7 +492,7 @@ def search_paths(graph: PathGraph) -> SearchResult:
     A reference hull alone never discharges another source's contribution.
     """
     policy = graph.policy
-    ordered = sorted(graph.placements, key=lambda key: (-graph.placements[key].interval.length, key))
+    ordered = sorted(graph.placements, key=lambda key: (-graph.placements[key].interval.length, graph.source_rank(key), key))
     evaluations, seen, decisions = 0, set(), []
     stopped = set()
 
@@ -467,24 +521,47 @@ def search_paths(graph: PathGraph) -> SearchResult:
                 paths.append(path)
         return paths
 
-    if not ordered:
+    seeds = [node for node in ordered if graph.placements[node].seed_eligible]
+    if not seeds:
         return SearchResult(None, (), [], {"policy": asdict(policy), "evaluations": 0,
                                           "stop_reasons": ["no_admitted_placements"], "global_optimality_claimed": False})
-    # Reserve most of the budget for competitive replacement, rather than
-    # consuming it all in an irreversible longest-first pass.
-    seed_quota = max(1, policy.maximum_evaluations // 4)
-    seed = evaluate((ordered[0],))[0]
+    seed = evaluate((seeds[0],))[0]
     observed = {seed.path_id: seed}
-    for node in ordered[1:]:
-        choices = [path for index in range(len(seed.nodes) + 1)
-                   for path in evaluate(seed.nodes[:index] + (node,) + seed.nodes[index:], quota=seed_quota)]
+    seed_position_pruning = []
+
+    def seed_positions(node):
+        candidate = graph.placements[node]
+        positions = set()
+        referenced = [(min(i.start for i in graph.placements[key].reference_intervals), index)
+                      for index, key in enumerate(seed.nodes) if graph.placements[key].reference_intervals]
+        if candidate.reference_intervals and referenced:
+            referenced.sort()
+            pivot = bisect_left([start for start, _ in referenced], min(i.start for i in candidate.reference_intervals))
+            insertion = referenced[pivot][1] if pivot < len(referenced) else len(seed.nodes)
+            positions.update(i for i in (insertion - 1, insertion, insertion + 1) if 0 <= i <= len(seed.nodes))
+        # Pairwise-only and original-N neighbors use actual incident evidence,
+        # not invented ref coordinates. These are proposals; joins still prove
+        # the cuts and connectivity before a path can be accepted.
+        for index, key in enumerate(seed.nodes):
+            neighbor = graph.placements[key]
+            if (graph.links.get(tuple(sorted((candidate.source, neighbor.source))))
+                    or candidate.source == neighbor.source):
+                positions.update((index, index + 1))
+        ordered_positions = sorted(positions)
+        if len(ordered_positions) > policy.maximum_seed_positions:
+            seed_position_pruning.append({"placement_id": node, "omitted": len(ordered_positions) - policy.maximum_seed_positions})
+        return ordered_positions[:policy.maximum_seed_positions]
+
+    for node in (node for node in ordered if node != seeds[0]):
+        choices = [path for index in seed_positions(node)
+                   for path in evaluate(seed.nodes[:index] + (node,) + seed.nodes[index:])]
         if choices:
             best = min([seed, *choices], key=graph.rank)
             observed.update((p.path_id, p) for p in choices)
             if best.score > seed.score:
                 decisions.append(_decision("length_first_add", seed, best, node))
                 seed = best
-        if evaluations >= seed_quota:
+        if "maximum_evaluations" in stopped:
             break
     initial = seed
     # Alternative single-source starts can displace the initial long source.
@@ -559,6 +636,7 @@ def search_paths(graph: PathGraph) -> SearchResult:
                         {"policy": asdict(policy), "evaluations": evaluations, "rounds": rounds,
                          "initial_path_id": initial.path_id, "initial_score": list(initial.score),
                          "stop_reasons": sorted(stopped), "edge_pruning": graph.edge_pruning, "beam_pruning": beam_pruning,
+                         "seed_position_pruning": seed_position_pruning,
                          "ambiguous_equivalence_ids": sorted(graph.ambiguous_equivalence_ids),
                          "coverage_atoms": len(graph.coverage.atoms), "unique_required_bp": graph.coverage.total_bp,
                          "global_optimality_claimed": False})
