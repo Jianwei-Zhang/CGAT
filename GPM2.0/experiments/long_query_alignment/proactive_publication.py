@@ -18,6 +18,7 @@ import proactive_reference_plan as pp
 import recovery_publication as rp
 import selective_reference_alignment as sr
 import windowed_alignment as wa
+import ordinary_tool_transition as ott
 
 POLICY = "proactive-original-chain-native-selection-v1"
 require = rp.require
@@ -96,6 +97,14 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
     root = Path(root).resolve()
     ordinary_only = report.get("routing_mode") == "adaptive_large_ordinary"
     approximate = report.get("routing_mode") == "adaptive_large_reference" or ordinary_only
+    execution_tool = None
+    if report.get("execution_tool_transition") is not None:
+        transition = ott.verify_transition(report["execution_tool_transition"])
+        require(approximate and report.get("ordinary_adaptive") is not None
+                and report["tool"]["path"] == transition["origin"]["path"]
+                and report["tool"]["sha256"] == transition["origin"]["sha256"],
+                "execution tool transition differs from historical ordinary source")
+        execution_tool = transition["execution"]
     require(report.get("status") == "proactive_candidate_complete"
             and report.get("routing_mode") in ("proactive_query_length", "adaptive_large_reference", "adaptive_large_ordinary")
             and report.get("original_inputs_unchanged") is True
@@ -162,7 +171,7 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
             saved = oc.pr.read_json(controller_root / oc.STATE, fields={"identity"})
             current = oc.execute(controller_root, current_catalog, {**index, "path": str(root / "target.default.mmi")},
                 report["tool"], argparse.Namespace(threads=1, memory_gib=0, minimap_batch="1G", assignment_coverage=report.get("assignment_coverage", 0.60)), readonly=True,
-                unit_bases=saved["identity"]["plan"]["unit_bases"], primary_work=True, unit_seconds=None)
+                unit_bases=saved["identity"]["plan"]["unit_bases"], primary_work=True, unit_seconds=None, execution_tool=execution_tool)
             reported = report["ordinary_adaptive"]
             # Reuse/cumulative-reservation diagnostics naturally differ on
             # revalidation. Bind actual sources and scientific policy, not those
@@ -212,6 +221,7 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
     expected_cells = [(n, p["part_index"]) for n in long_names for p in parts]
     require([(r["query"], r["part_index"]) for r in rows] == expected_cells,
             "long-query original-part cells omitted/duplicated/reordered")
+    long_tool = execution_tool if execution_tool is not None else report["tool"]
     reviews = {}
     if approximate:
         for review in report.get("native_reviews", []):
@@ -219,7 +229,7 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
             require(name in long_names and name not in reviews, "native reviews omit/duplicate query identity")
             directory = rp.regular_under(Path(review["directory"]) / "quality-review.json", root).parent
             verified = ap.verify_review(directory, group_by_name[name], {**index, "path": str(root / "target.default.mmi")},
-                report["tool"], argparse.Namespace(minimap_filter=report.get("minimap_filter")))
+                long_tool, argparse.Namespace(minimap_filter=report.get("minimap_filter")))
             require(review == verified, "native quality review completion changed")
             reviews[name] = review
     proofs, empty, projected, inserted_reviews = [], 0, [], set()
@@ -238,13 +248,14 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
             directory = rp.regular_under(Path(row["directory"]) / ap.MANIFEST, root).parent
             group = group_by_name[row["query"]]
             length = next(r["length"] for r in records if r["name"] == row["query"])
-            expected = ap.identity(row["query"], length, group["sha256"], report["reference"]["sha256"], report["tool"], part)
-            proof = ap.verify(directory, expected, report["tool"], part)
+            expected = ap.identity(row["query"], length, group["sha256"], report["reference"]["sha256"], long_tool, part)
+            proof = ap.verify(directory, expected, long_tool, part)
             require(proof == row, "approximate cell completion receipt changed")
             projected.append(row)
             expected_sources.append({"path": row["path"], "sha256": row["sha256"], "route": "approximate",
                                      "queries": [row["query"]], "parts": [part["part_index"]]})
             continue
+        require(execution_tool is None, "cross-tool long query lacks a native-window execution proof")
         rp.regular_under(Path(row["directory"]) / "guidance.json", root)
         if row["status"] == "no_candidates_in_original_part":
             expected_sources.append(check_empty(row, part, group_by_name[row["query"]], report, root))

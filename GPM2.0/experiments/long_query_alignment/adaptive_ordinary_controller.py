@@ -19,6 +19,7 @@ import automatic_ordinary_pilot as pilot
 import proactive_reference_plan as pp
 import proactive_resume as pr
 import windowed_alignment as wa
+import ordinary_tool_transition as ott
 
 POLICY = "automatic-ordinary-controller-v1"
 STATE = "ordinary-controller.json"
@@ -31,7 +32,7 @@ def automatic_budget():
 
 def execute(root, catalog, index, tool, args, *, budget=None,
             calibration_root=None, calibration_query=None, unit_bases=128_000_000,
-            unit_limit=None, unit_seconds=2400, completed_units=None, readonly=False, primary_work=False):
+            unit_limit=None, unit_seconds=2400, completed_units=None, readonly=False, primary_work=False, execution_tool=None):
     """Run the admitted internal policy without a whole-input parameter sweep.
 
     unit_limit is an internal bounded-development checkpoint, not a user choice.
@@ -65,8 +66,13 @@ def execute(root, catalog, index, tool, args, *, budget=None,
     else:root.mkdir(parents=True, exist_ok=True)
     if (calibration_root is None) != (calibration_query is None):
         raise ValueError("calibration root and complete query must be supplied together")
+    tool_transition = ott.transition_record(tool, execution_tool) if execution_tool is not None else None
     external = calibration_root is not None
     calibration_root = Path(calibration_root) if external else root / "calibration"
+    if tool_transition is not None:
+        if (not (root / STATE).is_file()
+                or pr.read_json(calibration_root / pilot.STATE, fields={"status"}).get("status") != "complete"):
+            raise wa.ExperimentError("cross-tool continuation requires an existing controller and sealed calibration")
     completed_units = {} if completed_units is None else completed_units
     if not isinstance(completed_units, dict) or any(type(k) is not int or k < 0 for k in completed_units):
         raise ValueError("completed unit bindings require original plan ordinals")
@@ -96,7 +102,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
             identity = pr.read_json(calibration_root / pilot.STATE)["identity"]
             options.threads = identity["threads"]; options.memory_gib = identity["memory_gib"]
             options.minimap_batch = identity["batch"]
-        decision = pilot.execute(calibration_root, plan, calibration_query, index, tool, options, readonly=readonly)
+        decision = pilot.execute(calibration_root, plan, calibration_query, index, tool, options, readonly=readonly or tool_transition is not None)
         if decision["status"] != "complete":
             return {"status": "calibration_incomplete", "decision": decision, "output_published": False}
     if pr.read_json(calibration_root / pilot.STATE)["identity"]["plan"] != plan:
@@ -126,6 +132,15 @@ def execute(root, catalog, index, tool, args, *, budget=None,
     state = pr.read_json(marker) if marker.exists() else {"schema": 1, "identity": identity, "reviews": {}}
     if state.get("schema") != 1 or state.get("identity") != identity or not isinstance(state.get("reviews"), dict):
         raise wa.ExperimentError("ordinary controller source/policy changed")
+    previous_transition = state.get("execution_tool_transition")
+    if previous_transition is not None and previous_transition != tool_transition:
+        raise wa.ExperimentError("ordinary execution tool transition omitted or changed")
+    if tool_transition is not None:
+        if readonly and previous_transition is None:
+            # Auditing old completed results does not mutate their controller.
+            pass
+        else:
+            state["execution_tool_transition"] = tool_transition
     ordinary_names = {r["name"] for r in work["ordinary_records"]}
     if not set(state["reviews"]) <= ordinary_names - set(adopted["pilot_names"]):
         raise wa.ExperimentError("ordinary review ledger contains an unrelated query")
@@ -169,7 +184,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
         execution_unit = {**unit, "fraction": None} if state["default_continuation"] is not None else unit
         progress(f"unit {unit['ordinal'] + 1}/{len(work['units'])}, {unit['bases']} bp, filter {execution_unit['fraction'] or 'default'}")
         result = units.run_unit(directory, execution_unit, query, index, tool, args,
-                                timeout=unit_seconds, readonly=readonly or binding is not None, primary_work=primary_work)
+                                timeout=unit_seconds, readonly=readonly or binding is not None, primary_work=primary_work, execution_tool=execution_tool)
         progress("unit complete (verified cached output)" if result["reused"] else f"unit complete; native mapping {result['source']['wall_seconds']:.1f}s")
         names = [r["name"] for r in unit["records"]]
         if execution_unit["fraction"] is None:
@@ -218,7 +233,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
                 review_query = pilot.materialize(unit_catalog, [name], review_input)
                 review_unit = {"records": [{"name": name, "length": lengths[name]}], "fraction": None}
                 baseline = units.run_unit(destination, review_unit, review_query, index, tool, args,
-                    timeout=previous["timeout_seconds"], retry_incomplete=False, readonly=readonly)
+                    timeout=previous["timeout_seconds"], retry_incomplete=False, readonly=readonly, execution_tool=execution_tool)
                 if previous["status"] == "complete" and previous["charged_seconds"] < baseline["source"]["wall_seconds"]:
                     raise wa.ExperimentError("completed default review cost was understated")
                 loss = pilot.quality.assess_loss(baseline["source"]["profile"], {name: result["source"]["profile"][name]}, limits)
@@ -249,7 +264,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
             default_query = pilot.materialize(current_catalog, unresolved, transition_input)
             default_unit = {"records": [{"name": n, "length": lengths[n]} for n in unresolved], "fraction": None}
             default = units.run_unit(transition, default_unit, default_query, index, tool, args,
-                                     timeout=unit_seconds, readonly=readonly, primary_work=primary_work)
+                                     timeout=unit_seconds, readonly=readonly, primary_work=primary_work, execution_tool=execution_tool)
             selections.append({"queries": unresolved, "source": default["source"]})
             state["default_continuation"] = {"ordinal": unit["ordinal"], "reason": budget_stop,
                 "transition_queries": unresolved, "transition_source_sha256": default["source"]["sha256"],

@@ -19,6 +19,7 @@ import minimap_options as mo
 import proactive_reference_plan as pp
 import proactive_resume as pr
 import windowed_alignment as wa
+import ordinary_tool_transition as ott
 
 POLICY = "adaptive-ordinary-whole-units-v1"
 
@@ -133,7 +134,7 @@ def materialize_units(catalog, plan, root, *, ordinals=None):
     return [completed[u["ordinal"]] for u in selected_units]
 
 
-def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomplete=True, readonly=False, primary_work=False):
+def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomplete=True, readonly=False, primary_work=False, execution_tool=None):
     """One native command, or verified reuse. No inner retry/parameter loop.
 
     A new explicit invocation may retry an interrupted ordinary work unit; a
@@ -155,6 +156,35 @@ def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomp
                 "index_sha256": index["sha256"], "tool_sha256": tool["sha256"], "fraction": unit["fraction"], "preset": "asm10"}
     marker = root / "unit.json"
     state = pr.read_json(marker) if marker.exists() else {"schema": 1, "identity": identity, "attempts": 0}
+    execution_transition = None
+    if execution_tool is not None:
+        execution_transition = ott.transition_record(tool, execution_tool)
+        next_identity = {**identity, "tool_sha256": execution_tool["sha256"]}
+        previous_identity = state.get("identity")
+        if state.get("schema") != 1 or previous_identity not in (identity, next_identity):
+            raise wa.ExperimentError("ordinary unit source/filter identity changed before tool transition")
+        native_receipt = root / "native/native-attempt.json"
+        completed = (state.get("status") in ("complete", "native_complete_pending_validation")
+            or native_receipt.exists() and pr.read_json(native_receipt).get("status") == "native_success")
+        if marker.exists() and previous_identity == next_identity and state.get("execution_tool_transition") != execution_transition:
+            raise wa.ExperimentError("ordinary unit execution provenance changed")
+        if previous_identity == next_identity or not completed:
+            if previous_identity != next_identity and marker.exists():
+                if readonly or not retry_incomplete or not primary_work:
+                    raise wa.ExperimentError("incomplete historical unit cannot be retried in this context")
+                # Validate actual full inputs before archiving an incomplete unit.
+                for path, digest in ((query["path"], query["sha256"]), (index["path"], index["sha256"])):
+                    if wa.verified_sha256(Path(path)) != digest:
+                        raise wa.ExperimentError("ordinary unit source changed before tool transition")
+                archived = pr.archive_partial(root)
+                root.mkdir()
+                state = {"schema": 1, "identity": next_identity, "attempts": 0,
+                         "previous_execution": {"directory": str(archived), "identity": previous_identity}}
+            elif not marker.exists():
+                state = {"schema": 1, "identity": next_identity, "attempts": 0}
+            tool, identity = execution_tool, next_identity
+        if not readonly:
+            state["execution_tool_transition"] = execution_transition
     snapshot = marker.read_bytes() if readonly and marker.is_file() else None
     if readonly and (snapshot is None or state.get("status") != "complete"):
         raise wa.ExperimentError("ordinary unit not sealed complete")
@@ -171,7 +201,10 @@ def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomp
     actual_index = pilot.mic.read_catalog(index["path"])
     if [p["records"] for p in actual_index["parts"]] != [p["records"] for p in index["parts"]]:
         raise wa.ExperimentError("ordinary unit original index membership differs")
-    if subprocess.check_output([tool["path"], "--version"], text=True, timeout=5).strip() != "2.31-r1302":
+    sealed_native = root / "native/native-attempt.json"
+    historical = (readonly or state.get("status") in ("complete", "native_complete_pending_validation")
+        or sealed_native.exists() and pr.read_json(sealed_native).get("status") == "native_success")
+    if ott.checked_version(tool, historical=historical) != "2.31-r1302":
         raise wa.ExperimentError("ordinary unit requires pinned minimap2 2.31-r1302")
     child = root / "native"
     def verify():
@@ -202,6 +235,8 @@ def run_unit(root, unit, query, index, tool, args, *, timeout=1800, retry_incomp
         return {"identity": identity, "source": checked, "reused": True, "resources": state["resources"]}
     if state.get("status") in ("running", "failed") and not retry_incomplete:
         raise wa.ExperimentError("bounded native review did not complete; no automatic retry")
+    if execution_transition is not None and tool["sha256"] != execution_transition["execution"]["sha256"]:
+        raise wa.ExperimentError("historical native completion could not be validated; refusing remapping")
     archived = pr.archive_partial(child)
     if archived is not None and state.get("attempt_history"):
         state["attempt_history"][-1]["archived_child"] = str(archived)

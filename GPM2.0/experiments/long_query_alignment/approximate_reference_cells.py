@@ -155,7 +155,16 @@ def verify(root, expected, tool, part):
             "identity": expected, "rows": rows, "native_confidence_reconstructed": False}
 
 
-def run(root, query, target, tool, part, args):
+def run(root, query, target, tool, part, args, *, tool_transition=None):
+    index_tool_sha256 = tool["sha256"]
+    if tool_transition is not None:
+        import ordinary_tool_transition as ott
+        checked = ott.verify_transition(tool_transition)
+        if (tool["path"] != checked["execution"]["path"]
+                or tool["sha256"] != checked["execution"]["sha256"]):
+            raise wa.ExperimentError("native-window execution tool differs from reviewed transition")
+        # Validate the original builder, not a forged new builder on old bytes.
+        index_tool_sha256 = checked["origin"]["sha256"]
     root = Path(root)
     if root.is_symlink() or root.parent.is_symlink():
         raise wa.ExperimentError("linked approximate cell directory")
@@ -175,7 +184,7 @@ def run(root, query, target, tool, part, args):
     try:
         with deadline(CELL_SECONDS):
             mic.validate_part_context(part, reference_sha256=target.identity["sha256"],
-                tool_sha256=tool["sha256"], preset="asm10", target_records=target.records)
+                tool_sha256=index_tool_sha256, preset="asm10", target_records=target.records)
             if "raw" in state:
                 windows = _raw_proof(root, state, expected, tool, part); reused["mapping"] = True
             else:

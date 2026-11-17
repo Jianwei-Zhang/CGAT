@@ -31,6 +31,7 @@ import proactive_publication as pub
 import proactive_resume as pr
 import selective_reference_alignment as sr
 import windowed_alignment as wa
+import ordinary_tool_transition as ott
 
 
 def query_identity(catalog):
@@ -124,6 +125,17 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             report["minimap_filter"] = fraction
         policy.update(oc.pilot.quality.assignment_identity(assignment_limits))
         cache.bind("policy", policy)
+        execution_tool = None
+        transition = cache.data.get("execution_tool_transition")
+        if transition is not None:
+            checked = ott.verify_transition(transition)
+            if mm != checked["execution"]["path"]:
+                raise wa.ExperimentError("cross-tool execution binary path differs from transition")
+            execution_tool = {"path": mm, **nf.source_identity(Path(mm))}
+            if execution_tool["sha256"] != checked["execution"]["sha256"]:
+                raise wa.ExperimentError("cross-tool execution binary changed")
+            mm = checked["origin"]["path"]
+            report["execution_tool_transition"] = checked
         tool = nf.source_identity(Path(mm))
         cache.bind("tool", tool)
         groups = cache.groups(catalog, plan, prepared_workspace=prepared_workspace)
@@ -141,6 +153,8 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
         ordinary_requested = (prepared_workspace is not None and getattr(args, "adaptive_ordinary", False)
                               and ordinary_probe["enabled"])
         def normal_native():
+            if execution_tool is not None:
+                raise wa.ExperimentError("cross-tool continuation cannot restart a whole native mapping")
             reference = nf.source_identity(args.target.resolve())
             cache.bind("reference", reference)
             native = cache.ordinary(mm, args.target, args.query, fraction=fraction)
@@ -165,7 +179,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
         complete_native_child = native_child.exists() and pr.read_json(native_child).get("status") == "native_success"
         if not plan["long_queries"] and (not ordinary_requested or cache.get("ordinary") is not None or complete_native_child):
             return normal_native()
-        if subprocess.check_output([mm, "--version"], text=True, timeout=5).strip() != "2.31-r1302":
+        if subprocess.check_output([execution_tool["path"] if execution_tool else mm, "--version"], text=True, timeout=5).strip() != "2.31-r1302":
             raise wa.ExperimentError("long-query original-state recovery requires minimap2 2.31-r1302")
         bundle = None
         def require_bundle():
@@ -189,6 +203,8 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             ordinary_only = not plan["long_queries"] and ordinary_enabled
             approximate = approximate or ordinary_only
             ordinary_enabled = ordinary_enabled and approximate
+            if execution_tool is not None and not approximate:
+                raise wa.ExperimentError("cross-tool continuation requires automatic large-reference admission")
             if approximate:
                 report.update(routing_mode="adaptive_large_ordinary" if ordinary_only else "adaptive_large_reference",
                               approximate_policy=ap.POLICY, projection_screening=[], native_reviews=[],
@@ -198,6 +214,8 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             cache.bind("reference", target.identity)
             index = cache.index(target, tool["sha256"])
             if index is None:
+                if execution_tool is not None:
+                    raise wa.ExperimentError("cross-tool continuation cannot replace its historical index")
                 for name in ("target.default.mmi", "index-parts", "index-base.json", "index-context.json",
                              "default-index.command.json", "default-index.execution.json", "default-index.stdout", "default-index.stderr"):
                     pr.archive_partial(root / name)
@@ -225,7 +243,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                     native_args.report_progress = True
                     adaptive = oc.execute(controller_root, catalog,
                         {**index, "path": str(root / "target.default.mmi")}, {"path": mm, **tool}, native_args,
-                        unit_bases=unit_bases, unit_seconds=native_args.timeout, primary_work=True)
+                        unit_bases=unit_bases, unit_seconds=native_args.timeout, primary_work=True, execution_tool=execution_tool)
                     if adaptive["status"] != "complete_bounded_policy_candidate":
                         raise wa.ExperimentError("bounded ordinary continuation incomplete: " + adaptive["status"])
                     report["ordinary_adaptive"] = adaptive
@@ -294,6 +312,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             report.update(index_catalog_sha256=wa.sha256(root / "index-context.json"), index_part_count=len(index["parts"]))
             # Query outer loop: each long record gets ONE store, shared across
             # all original index parts, windows and whole-query guidance.
+            long_tool = execution_tool if execution_tool is not None else report["tool"]
             review_remaining = ap.TOTAL_REVIEW_SECONDS
             review_index = {**index, "path": str(root / "target.default.mmi")}
             for group in (g for g in groups["groups"] if g["route"] == "long_query"):
@@ -304,7 +323,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                 if approximate and (directory / "quality-review.json").exists():
                     review_state = pr.read_json(directory / "quality-review.json")
                     if review_state.get("status") == "complete":
-                        reviewed = ap.verify_review(directory, group, review_index, report["tool"], args)
+                        reviewed = ap.verify_review(directory, group, review_index, long_tool, args)
                         report["native_reviews"].append(reviewed)
                         merger.add_native(reviewed["native"], [name])
                         report["parts"].extend({"query": name, "part_index": p["part_index"],
@@ -326,13 +345,16 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                                 # complete native-window sources.
                                 if cell_dir.exists() and not (cell_dir / ap.MANIFEST).exists():
                                     pr.archive_partial(cell_dir)
-                            row = ap.run(cell_dir, query, target, report["tool"], part, args)
+                            row = ap.run(cell_dir, query, target, long_tool, part, args,
+                                **({"tool_transition": report["execution_tool_transition"]} if execution_tool is not None else {}))
                             merger._add(Path(row["path"]), row["sha256"], [name], "approximate",
                                 part_index=part["part_index"], validator=lambda raw: ap.validate_row(raw, name, queries[name]["length"], part))
                             if cell is not None:cache.reused["long_cells"] += 1
                             cache.save_cell(row); report["parts"].append(row)
                             wa.write_json(root / "proactive-candidate.json", report)
                             continue
+                        if execution_tool is not None:
+                            raise wa.ExperimentError("cross-tool continuation cannot adopt a legacy recovered long cell")
                         if cell is not None:
                             if (cell.get("query") != name or cell.get("part_index") != part["part_index"]
                                     or cell.get("directory") != str(cell_dir)
@@ -395,7 +417,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                         wa.write_json(root / "proactive-candidate.json", report)
                         if not screened["approved"]:
                             started_review = time.monotonic()
-                            reviewed = ap.native_review(directory, group, review_index, report["tool"], args, seconds=review_remaining)
+                            reviewed = ap.native_review(directory, group, review_index, long_tool, args, seconds=review_remaining)
                             review_remaining -= time.monotonic() - started_review
                             report["native_reviews"].append(reviewed)
                             report["discarded_projection_screening"].append(report["projection_screening"].pop())
@@ -445,6 +467,8 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             catalog.require_unchanged()
             if not target.unchanged() or not nf.identity_unchanged(Path(mm), tool):
                 raise wa.ExperimentError("source/tool changed during proactive admission")
+            if execution_tool is not None:
+                ott.verify_transition(report["execution_tool_transition"])
             if report.get("ordinary_adaptive") is not None:
                 # Ephemeral scanner output, not a trusted-on-disk hash flag.
                 # The adapter reuses it to avoid decoding the full input again.

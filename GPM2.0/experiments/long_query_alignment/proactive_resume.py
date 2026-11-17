@@ -22,6 +22,7 @@ import ordinary_partition_alignment as opa
 import proactive_reference_plan as pp
 import recovery_publication as rp
 import windowed_alignment as wa
+import ordinary_tool_transition as ott
 
 STATE = "proactive-resume-state.json"
 LOCATOR = ".long-cigar-resume.json"
@@ -34,6 +35,7 @@ _REVIEWED_PARTITION_RUNTIME = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f2
 _REVIEWED_PARTITION_RESUME_RUNTIME = "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
 _REVIEWED_RESOURCE_RUNTIME = "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
 _REVIEWED_AUTOMATIC_WINDOW_RUNTIME = "4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab"
+_REVIEWED_STREAM_METADATA_RUNTIME = "ab5f17ccf5cc2b1509ca61a6f94715303f44ea1cfb0fd8ad411d7f4370c047a6"
 _REVIEWED_DISK_PROFILE_RUNTIME = "b61402b11101780c865f9b26654a7a5c104f696c90d3fabb82e53760495a2961"
 _REVIEWED_ASSIGNMENT_POLICY_RUNTIME = "afbe9f6fd32ec4a96bdd8cfd2b7d87b8db562c6d52e908ee8eddce20989a076d"
 _REVIEWED_ORDINARY_CONTROLLER_RUNTIME = "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
@@ -71,7 +73,7 @@ def _same_identity_except_ctime(left, right):
                 == {k:v for k,v in right.items() if k != "ctime_ns"})
 
 
-def _compatible_runtime(candidate, old_key, key, runtime, state):
+def _compatible_runtime(candidate, old_key, key, runtime, state, *, cross_tool=False):
     if old_key["runtime_sha256"] == key["runtime_sha256"]:
         return True
     if runtime is None:
@@ -82,10 +84,11 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
             or not old_files or not (set(new_files) - set(old_files)) <= {
                 "minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py",
                 "approximate_reference_cells.py", "adaptive_screening.py",
-                "adaptive_ordinary_controller.py", "adaptive_ordinary_units.py", "automatic_ordinary_pilot.py", "metadata_json.py"}
+                "adaptive_ordinary_controller.py", "adaptive_ordinary_units.py", "automatic_ordinary_pilot.py", "metadata_json.py", "ordinary_tool_transition.py"}
             or set(old_files) - set(new_files)
             or any(previous.get(k) != runtime.get(k) for k in
-                   ("native_companion_sha256", "native_companion_platform", "recovered_output_admission"))):
+                   ( ("recovered_output_admission",) if cross_tool else
+                    ("native_companion_sha256", "native_companion_platform", "recovered_output_admission")))):
         return False
     if old_files == new_files:
         # Enabling/disabling approximation changes scientific policy, not just
@@ -94,7 +97,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
                 and previous.get("ordinary_output_admission") == runtime.get("ordinary_output_admission"))
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME, _REVIEWED_DISK_PROFILE_RUNTIME}
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME, _REVIEWED_DISK_PROFILE_RUNTIME, _REVIEWED_STREAM_METADATA_RUNTIME}
                 and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
     if not approved:
         return False
@@ -119,13 +122,13 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
            and not (name == "windowed_alignment.py" and buffered_equivalent)
            for name in kernels):
         return False
-    if (profile in {_REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME, _REVIEWED_DISK_PROFILE_RUNTIME}
+    if (profile in {_REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME, _REVIEWED_DISK_PROFILE_RUNTIME, _REVIEWED_STREAM_METADATA_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))):
         # The ordinary controller keeps its own finite pilot/unit ledger, not
         # an "ordinary" native-group checkpoint. Reopen it; every source and
         # policy decision is still revalidated before reuse or publication.
         return True
-    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME, _REVIEWED_DISK_PROFILE_RUNTIME}
+    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME, _REVIEWED_DISK_PROFILE_RUNTIME, _REVIEWED_STREAM_METADATA_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))
             and "ordinary" not in stages):
         partial = candidate / "selective" / "ordinary-native" / opa.RECEIPT
@@ -153,14 +156,31 @@ def _transition_attempt(candidate, locator, previous, key, runtime):
             or any(type(k.get("threads")) is not int or k["threads"] < 1 for k in (old_key, key))
             or old_key.get("minimap_filter") != key.get("minimap_filter")
             or old_key.get("assignment_coverage", .60) != key.get("assignment_coverage", .60)
-            or any(not _same_identity_except_ctime(old_key[k], key[k]) for k in ("target", "query", "tool"))):
+            or any(not _same_identity_except_ctime(old_key[k], key[k]) for k in ("target", "query"))):
         return False
     state_path = candidate / "selective" / STATE
     state = read_json(state_path)
     if (state.get("schema") != 1 or state.get("key") != old_key
             or type(state.get("bound")) is not dict or type(state.get("stages")) is not dict):
         raise wa.ExperimentError("private resume state/locator disagree; preserving completed data")
-    if not _compatible_runtime(candidate, old_key, key, runtime, state):
+    tool_transition = None
+    if not _same_identity_except_ctime(old_key["tool"], key["tool"]):
+        # Unknown tool changes must not silently discard paid work via a fresh
+        # attempt. This migration is only for sealed-pilot ordinary controllers.
+        tool_transition = ott.transition_record(old_key["tool"], key["tool"])
+        selective = candidate / "selective"
+        routing = read_json(selective / "routing-plan.json", fields={"long_queries"})
+        calibration = read_json(selective / "ordinary-adaptive/calibration/ordinary-pilot.json", fields={"status"})
+        if (not isinstance(routing.get("long_queries"), list) or calibration.get("status") != "complete"
+                or not (selective / "ordinary-adaptive/ordinary-controller.json").is_file()
+                or not all(n in state["stages"] for n in ("groups", "target-store", "index"))
+                or any(n.startswith("cell:") or n.startswith("query-store:") for n in state["stages"])
+                or any(selective.glob("long-*"))
+                or not _same_identity_except_ctime(state["bound"].get("tool"), old_key["tool"])):
+            raise wa.ExperimentError("cross-tool resume requires a sealed ordinary calibration and no previously started long-query work")
+    if not _compatible_runtime(candidate, old_key, key, runtime, state, cross_tool=tool_transition is not None):
+        if tool_transition is not None:
+            raise wa.ExperimentError("cross-tool runtime pair is not reviewed; preserving completed work without restart")
         return False
     verified = {}
     for role, bound in (("target", "reference"), ("query", "query")):
@@ -172,6 +192,8 @@ def _transition_attempt(candidate, locator, previous, key, runtime):
         verified[role] = {"source": str(path), "sha256": expected["sha256"]}
     if read_json(state_path) != state or read_json(locator) != previous:
         raise wa.ExperimentError("resume metadata changed during content verification")
+    if tool_transition is not None:
+        state["execution_tool_transition"] = tool_transition
     state["key"] = key
     state.setdefault("key_transitions", []).append({"previous_key": old_key,
         "verified_original_sources": verified,

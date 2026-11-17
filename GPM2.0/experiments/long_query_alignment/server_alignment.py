@@ -37,10 +37,11 @@ import adaptive_ordinary_controller as oc
 import adaptive_screening as screening
 import recovery_publication as rp
 import windowed_alignment as wa
+import ordinary_tool_transition as ott
 
 MANIFEST = "branch-runtime.json"
 RUNTIME_FILES = (
-    "approximate_reference_cells.py","adaptive_screening.py","metadata_json.py",
+    "approximate_reference_cells.py","adaptive_screening.py","metadata_json.py","ordinary_tool_transition.py",
     "adaptive_ordinary_controller.py","adaptive_ordinary_units.py","automatic_ordinary_pilot.py",
     "proactive_reference_plan.py","proactive_reference_alignment.py","proactive_publication.py","proactive_resume.py",
     "server_alignment.py","selective_reference_alignment.py","guided_alignment.py","windowed_alignment.py",
@@ -214,6 +215,8 @@ def alignment_policy_receipt(result, runtime, requested_options, policy, output_
                 for name, flag in (("preset", "-x"), ("query_batch", "-K"),
                                    ("minimizer_filter_argument", "-f"), ("threads", "-t"))}
     ordinary = result.get("ordinary_adaptive")
+    transition = (ott.verify_transition(result["execution_tool_transition"])
+                  if result.get("execution_tool_transition") is not None else None)
     sources = []
     if ordinary is not None:
         for selection in ordinary["composition"]["identity"]["selections"]:
@@ -225,6 +228,12 @@ def alignment_policy_receipt(result, runtime, requested_options, policy, output_
                 raise wa.ExperimentError("native source changed while recording delivery policy: " + str(exc)) from exc
             sources.append({"queries": selection["queries"], "paf_sha256": source["sha256"],
                             "receipt_sha256": source["receipt_sha256"], "options": options(native["execution"]["command"])})
+            if transition is not None:
+                binaries = {transition[role]["path"]: transition[role]["sha256"] for role in ("origin", "execution")}
+                executable = native["execution"]["command"][0]
+                if executable not in binaries:
+                    raise wa.ExperimentError("native delivery source uses an unbound execution tool")
+                sources[-1]["tool_sha256"] = binaries[executable]
     else:
         native = result.get("native") or result.get("ordinary_native")
         if native is not None:
@@ -243,6 +252,12 @@ def alignment_policy_receipt(result, runtime, requested_options, policy, output_
         "paf_sha256": row["sha256"], "receipt_sha256": row["receipt_sha256"],
         "policy": {k: row["identity"][k] for k in ("core_bases", "context_bases", "mid_occ", "preset", "candidate_policy")}}
         for row in result.get("parts", []) if row.get("kind") == ap.POLICY and row["query"] not in reviewed_names]
+    if transition is not None:
+        for source in sources:
+            if source.get("role") == "long_query_native_review":
+                source["tool_sha256"] = transition["execution"]["sha256"]
+        for source in window_sources:
+            source["tool_sha256"] = transition["execution"]["sha256"]
     fallback = (ordinary or {}).get("default_continuation")
     return {"schema": 1, "status": "complete", "scope": "initial_reference_asm10",
         "output_sha256": output_sha256, "policy": policy,
@@ -254,6 +269,8 @@ def alignment_policy_receipt(result, runtime, requested_options, policy, output_
         "long_queries": result.get("plan", {}).get("long_queries", []),
         "long_native_review_queries": [r["query"] for r in result.get("native_reviews", [])],
         "approximate_query_part_cells": result.get("approximate_query_part_cells", 0),
+        **({"execution_tool_transition": {role: {k: transition[role][k] for k in ("sha256", "architecture", "version")}
+                                           for role in ("origin", "execution")}} if transition is not None else {}),
         "input_sha256": {name: result[name]["sha256"] for name in ("query", "reference", "tool")
                          if result.get(name, {}).get("sha256")},
         "runtime_source_profile": hashlib.sha256(json.dumps(runtime["files_sha256"], sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
@@ -329,6 +346,8 @@ def run_reference(args,*,runtime_root=None):
             proactive = result.get("routing_mode")!="native_complete_unchanged"
             admission = json.loads((attempt/"recovery-admission.json").read_text()) if proactive else None
             def unchanged():
+                if result.get("execution_tool_transition") is not None:
+                    ott.verify_transition(result["execution_tool_transition"])
                 if all(name in result for name in ("reference","query","tool")):
                     for name in ("reference","query","tool"):
                         identity = result[name]

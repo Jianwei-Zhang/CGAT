@@ -8,7 +8,7 @@ an environment smoke test. Preserve completed PAFs and their original commands.
 Do not run two writers against the same workspace. If ARM has already started,
 the authorization to cancel a queued job does not authorize stopping that run.
 
-## Implemented in this step
+## Reviewed binary evidence
 
 `ordinary_tool_transition.py` verifies the exact reviewed minimap2 2.31-r1302
 binary pair. It checks real file content, ELF architecture, source/path agreement
@@ -17,16 +17,44 @@ without executing a foreign instruction set. It cannot validate PAFs or migrate
 any checkpoint. Unknown builds are not admitted merely by version string.
 Receipts cannot extend the inventory or disable payload revalidation.
 
-The helper is not yet wired into the Server adapter/controller/publication path
-or included in the generated runtime. No published Server artifact, existing
-runtime, workspace checkpoint or scientific output is changed by this step.
+The helper is now wired through adapter identity migration, ordinary controller,
+unit execution, long-query native-window execution and final publication. The
+original index and completed commands retain their original ARM builder/executor
+identity. Incomplete old unit directories are archived, not rewritten or deleted;
+future commands bind the x86 executable. Delivery policy records identify the
+actual executable per native/window source without leaking filesystem paths.
+
+This transition requires a completed ordinary calibration. Previously started
+long-query work is not migrated: the current wheat long record has not started,
+so its native-window mapping/review can run on x86 against the unchanged original
+index. Existing calibration timing remains historical evidence, not a claim of
+x86 speedup or a new cross-architecture benchmark. Quality checks, review budgets,
+default fallback and complete input/output validation remain in force.
+
+Generated sources are synchronized, but this change has NOT yet been published
+or installed into the live wheat workspace. No full x86 continuation has yet
+been submitted. ARM job 42396961 remains pending as of 03:20 CST.
 
 ## Verification
 
 - 14 focused unittest cases pass, including content mutation, ELF mismatch,
   foreign/same/reverse pairs, unknown binaries, version failure/timeout, forged
   receipts, boolean/integer schema confusion and symlink substitution.
-- Generated Server runtime synchronization: 40 files verified, zero changes.
+- Generated Server runtime synchronization: 41 files verified, zero drift.
+- Seven additional real-native regressions cover immutable completed units,
+  interrupted-unit archival, completed-child recovery, corruption refusal,
+  mixed-tool controller resume, existing default fallback, prepared-adapter
+  publication/repeated resume with new long-query native-window work, forged
+  provenance, previously started long work and unreviewed runtime refusal.
+- Server Python tests: 476 tests, one skip, all others passed. An initial invocation
+  from repository root had import errors; the actual gate working directory is
+  GPM2.0. The corrected run passed. An unrelated process-state race in that first
+  run was not patched (Linux reported X/dead rather than the expected Z/zombie).
+- Final mixed-long-query alignment suite: 838 tests, one optional native-source
+  oracle skipped, all others passed (218 seconds). The additional negative
+  previously-started-long-work assertion also passed in the targeted suite.
+  This includes real native tests using pinned minimap2 and the portable helper;
+  it is controlled regression evidence, not full customer acceptance.
 - Donau x86 smoke job `42402478` succeeded on `agent-X86-26`, 2026-11-18
   02:30:14--02:30:17 CST. Pinned binary, synthetic 20kb mapping and selected
   published-runtime imports passed. This was not a wheat continuation test.
@@ -52,18 +80,36 @@ Operational scripts/receipts are in
 and the corresponding remote `~/cgat-reads-debug/jm19-x86-readiness-20261118/`.
 These are evidence records, not new user-facing configuration.
 
+## Customer read-only replay
+
+- First x86 audit 42406872 failed because the verification harness used the
+  initial filter for Flye units after its valid recorded default fallback.
+  The existing unit identity check correctly rejected that mismatch.
+- Second audit 42408144 correctly revealed a real scope gap: hifiasm contains
+  the unstarted long query ptg000049l. An ordinary-only transition would not
+  complete this workload. The implementation now covers new long-query native
+  windows and native quality reviews while retaining original index provenance.
+- Neither audit launched a mapper or wrote the scientific workspace. Their
+  failure logs are preserved. They are not successful customer acceptance.
+- Third audit 42410157 uses source profile
+  `5a6f6ae44f11b533ad2541dc77a5aabe7c0d9c170b19d6de990d90563b68ca6f`.
+  It is running on agent-X86-26, starting 2026-11-18 03:19:11 CST. It validates
+  hifiasm completed units, then the complete Flye publication path, checks all
+  26 native PAF and unit-marker hashes before/after, and prohibits original
+  workspace writes and all external processes except the new mapper's version
+  probe. A running audit is not a passed audit or a full scientific continuation.
+
 ## Remaining acceptance gates
 
-1. Integrate historical/active tool separation through adapter, ordinary
-   controller, unit receipts and final publication without mutating old tool
-   claims, using exact reviewed runtime transitions.
-2. Verify all 26 completed native units on x86 without remapping, and reject
-   changed inputs, index, tool, native commands and PAFs.
-3. Permit the unfinished unit and future units to use the x86 executable while
-   retaining per-unit execution provenance and existing policy/quality checks.
-4. Cover old/new/mixed completed work, interruption, repeated resume, publication
-   and concurrent-owner rejection with targeted regressions and real-data proof.
-5. Validate and publish the integrated runtime, update the installed/workspace
-   runtime under safe ownership, then start one authoritative full continuation.
-6. Confirm genuine continuation before canceling the still-pending ARM job.
-7. Monitor until every workflow stage and final delivery are verified complete.
+1. Finish the exact final-runtime regression/CI gates and real-data read-only
+   proof. All 26 completed units must validate with zero mapper calls.
+2. Publish the verified runtime and update installed/workspace tools under safe
+   ownership. Preserve backups and verify exact installed/runtime file hashes.
+3. Start one authoritative x86 full continuation, never two concurrent writers.
+   The current workspace lock treats an owner on another host as active; do not
+   clear it based on a local PID check. Preserve the queued ARM fallback until
+   real x86 continuation succeeds; coordinate ownership before updating code.
+4. Confirm genuine continuation, including old-result reuse and new execution,
+   before canceling the still-pending ARM job. Recheck scheduler state first;
+   stopping an already-running ARM computation is not covered by that instruction.
+5. Monitor until every workflow stage and final delivery are verified complete.

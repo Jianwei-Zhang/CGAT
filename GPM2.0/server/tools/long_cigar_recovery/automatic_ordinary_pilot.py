@@ -27,6 +27,7 @@ import proactive_resume as pr
 import recovery_publication as publication
 import selective_reference_alignment as sr
 import windowed_alignment as wa
+import ordinary_tool_transition as ott
 
 POLICY = "automatic-ordinary-pilot-v1"
 STATE = "ordinary-pilot.json"
@@ -240,7 +241,7 @@ def execute(root, pilot_plan, query, index, tool, args, *, readonly=False):
     if ([p["records"] for p in parsed["parts"]] != [p["records"] for p in index["parts"]]
             or sum(r["length"] for p in parsed["parts"] for r in p["records"]) != pilot_plan["reference_bases"]):
         raise wa.ExperimentError("pilot reference is not the complete declared index")
-    if subprocess.check_output([tool["path"], "--version"], text=True, timeout=5).strip() != "2.31-r1302":
+    if ott.checked_version(tool, historical=readonly) != "2.31-r1302":
         raise wa.ExperimentError("ordinary pilot requires pinned minimap2 2.31-r1302")
     actual = pp.scan_query(query["path"])
     if (actual.source_sha256 != query["sha256"] or [(r.name, r.length, r.sha256) for r in actual.records]

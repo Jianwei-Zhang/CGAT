@@ -87,3 +87,10 @@ def verify_transition(record):
     if checked != record:
         raise wa.ExperimentError("tool transition receipt differs from actual binaries")
     return checked
+
+
+def checked_version(tool, *, historical=False):
+    """Keep ordinary version checks; only reviewed historical artifacts avoid exec."""
+    if historical and tool.get("sha256") in _REVIEWED:
+        return historical_version(tool)
+    return subprocess.check_output([tool["path"], "--version"], text=True, timeout=5).strip()
