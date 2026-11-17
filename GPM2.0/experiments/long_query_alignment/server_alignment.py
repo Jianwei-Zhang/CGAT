@@ -40,7 +40,7 @@ import windowed_alignment as wa
 
 MANIFEST = "branch-runtime.json"
 RUNTIME_FILES = (
-    "approximate_reference_cells.py","adaptive_screening.py",
+    "approximate_reference_cells.py","adaptive_screening.py","metadata_json.py",
     "adaptive_ordinary_controller.py","adaptive_ordinary_units.py","automatic_ordinary_pilot.py",
     "proactive_reference_plan.py","proactive_reference_alignment.py","proactive_publication.py","proactive_resume.py",
     "server_alignment.py","selective_reference_alignment.py","guided_alignment.py","windowed_alignment.py",
@@ -219,12 +219,10 @@ def alignment_policy_receipt(result, runtime, requested_options, policy, output_
         for selection in ordinary["composition"]["identity"]["selections"]:
             source = selection["source"]
             path = Path(source["directory"]) / "native-attempt.json"
-            if path.is_symlink() or not path.is_file() or path.stat().st_size > pr.MAX_STATE:
-                raise wa.ExperimentError("invalid native source metadata for delivery policy")
-            with path.open("rb") as handle:raw = handle.read(pr.MAX_STATE + 1)
-            if len(raw) > pr.MAX_STATE or hashlib.sha256(raw).hexdigest() != source["receipt_sha256"]:
-                raise wa.ExperimentError("native source changed while recording delivery policy")
-            native = json.loads(raw)
+            try:
+                native = pr.metadata.load(path, fields={"execution"}, expected_sha256=source["receipt_sha256"])
+            except pr.metadata.MetadataError as exc:
+                raise wa.ExperimentError("native source changed while recording delivery policy: " + str(exc)) from exc
             sources.append({"queries": selection["queries"], "paf_sha256": source["sha256"],
                             "receipt_sha256": source["receipt_sha256"], "options": options(native["execution"]["command"])})
     else:

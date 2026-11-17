@@ -58,10 +58,10 @@ def execute(root, catalog, index, tool, args, *, budget=None,
     root = root.resolve()
     snapshot = None
     if readonly:
-        saved = pr.read_json(root / STATE)
+        saved = pr.read_json(root / STATE, fields={"status"})
         if saved.get("status") != "complete_bounded_policy_candidate" or unit_limit is not None:
             raise wa.ExperimentError("completed full ordinary controller required for read-only verification")
-        snapshot = (root / STATE).read_bytes()
+        snapshot = wa.sha256(root / STATE)
     else:root.mkdir(parents=True, exist_ok=True)
     if (calibration_root is None) != (calibration_query is None):
         raise ValueError("calibration root and complete query must be supplied together")
@@ -79,7 +79,7 @@ def execute(root, catalog, index, tool, args, *, budget=None,
     # Reject a changed continuation BEFORE any new calibration command, even
     # when an external completed-pilot/unit binding was accidentally omitted.
     if (root / STATE).exists():
-        previous = pr.read_json(root / STATE).get("identity", {})
+        previous = pr.read_json(root / STATE, fields={"identity"}).get("identity", {})
         if (previous.get("assignment_coverage", .60) != limits.assignment_coverage
                 or any(previous.get(k) != v for k, v in admission.items())
                 or previous.get("plan", {}).get("unit_bases") != unit_bases
@@ -269,6 +269,6 @@ def execute(root, catalog, index, tool, args, *, budget=None,
                  complete_default_pilot_preserved=True, scientific_accuracy_proven=False,
                  baseline_compared_queries=list(state["reviews"]),
                  coverage="all_original_ordinary_records_and_index_parts", output_published=False)
-    if readonly and marker.read_bytes() != snapshot:
+    if readonly and wa.sha256(marker) != snapshot:
         raise wa.ExperimentError("ordinary controller changed during read-only verification")
     save(); return state

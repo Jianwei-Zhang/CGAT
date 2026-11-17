@@ -196,7 +196,7 @@ class KeyMigrationTests(unittest.TestCase):
     def test_legacy_full_profile_is_frozen_and_matches_the_approved_digest(self):
         digest = hashlib.sha256(json.dumps(LEGACY,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         self.assertEqual(digest, pr._REVIEWED_LEGACY_RUNTIME)
-        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py", "approximate_reference_cells.py", "adaptive_screening.py", "adaptive_ordinary_controller.py", "adaptive_ordinary_units.py", "automatic_ordinary_pilot.py"})
+        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py", "approximate_reference_cells.py", "adaptive_screening.py", "adaptive_ordinary_controller.py", "adaptive_ordinary_units.py", "automatic_ordinary_pilot.py", "metadata_json.py"})
 
     def test_reviewed_runtime_and_ctime_transition_retains_old_controls(self):
         self.target.chmod(0o400);self.query.chmod(0o400)
@@ -353,6 +353,26 @@ class KeyMigrationTests(unittest.TestCase):
         attempt,reused=pr.select_attempt(self.run,key,runtime=runtime)
         self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
         self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
+    def test_stream_metadata_upgrade_reuses_published_wheat_controller(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_stream_metadata_runtime.json').read_text())
+        digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest(files),pr._REVIEWED_DISK_PROFILE_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY}
+        runtime={**self.runtime,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY,
+                 'native_resume_source_profiles':[[pr._REVIEWED_DISK_PROFILE_RUNTIME,digest(self.runtime['files_sha256'])]]}
+        self.key['assignment_coverage']=.80
+        self.cache.data['key']=self.key
+        locator=pr.read_json(self.run/pr.LOCATOR);locator['key']=self.key
+        wa.write_json(self.run/pr.LOCATOR,locator)
+        self.cache.data['stages'].pop('ordinary');self.cache.save()
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        before=self.cache.data['stages'].copy()
+        key={**self.make_key(runtime['sha256']),'assignment_coverage':.80}
+        attempt,reused=pr.select_attempt(self.run,key,runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
 
     def test_assignment_threshold_change_cannot_migrate_an_old_default_policy(self):
         runtime={**self.runtime,'files_sha256':self.old_runtime['files_sha256']}

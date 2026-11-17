@@ -109,9 +109,11 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
                 and report["helper"]["manifest_sha256"] == bundle["manifest_sha256"], "proactive helper identity differs")
     if approximate:
         require(report.get("approximate_policy") == ap.POLICY, "approximate publication policy differs")
-    plan = rp.read_json(root / "routing-plan.json", root)
-    catalog = rp.read_json(root / "query-catalog.json", root, max_bytes=64*1024**2)
-    groups = rp.read_json(root / "inputs/groups.json", root, max_bytes=64*1024**2)
+    plan = report["plan"]
+    rp.compare_json(root / "routing-plan.json", root, plan)
+    catalog = rp.read_json(root / "query-catalog.json", root)
+    groups = report["groups"]
+    rp.compare_json(root / "inputs/groups.json", root, groups)
     require(plan == report["plan"] and groups == report["groups"]
             and catalog["source_sha256"] == plan["source_sha256"] == report["query"]["sha256"]
             and plan["risk_threshold"] == pp.MAX_OPERATION == rp.PROACTIVE_QUERY_LIMIT,
@@ -157,7 +159,7 @@ def admit(report, root, *, bundle, ordinary_catalog=None):
                     and [pp.asdict(r) for r in current_catalog.records] == records,
                     "ordinary full-record source catalog changed")
             controller_root = rp.regular_under(root / "ordinary-adaptive" / oc.STATE, root).parent
-            saved = oc.pr.read_json(controller_root / oc.STATE)
+            saved = oc.pr.read_json(controller_root / oc.STATE, fields={"identity"})
             current = oc.execute(controller_root, current_catalog, {**index, "path": str(root / "target.default.mmi")},
                 report["tool"], argparse.Namespace(threads=1, memory_gib=0, minimap_batch="1G", assignment_coverage=report.get("assignment_coverage", 0.60)), readonly=True,
                 unit_bases=saved["identity"]["plan"]["unit_bases"], primary_work=True, unit_seconds=None)

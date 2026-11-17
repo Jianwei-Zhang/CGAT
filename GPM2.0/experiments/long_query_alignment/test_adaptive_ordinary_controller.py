@@ -212,7 +212,7 @@ class ControllerTests(unittest.TestCase):
             state=pr.read_json(target/controller.STATE);state["reviews"]["q15"]["timeout_seconds"]=float("inf")
             wa.write_json(target/controller.STATE,state)
             with patch.object(nf,"attempt",side_effect=AssertionError("invalid budget mapped")):
-                with self.assertRaisesRegex(wa.ExperimentError,"finite ordinary review ledger"):
+                with self.assertRaisesRegex(wa.ExperimentError,"finite ordinary review ledger|non-finite JSON number"):
                     self.execute(target,inputs)
 
     def test_review_time_allowance_is_not_reset_on_resume(self):

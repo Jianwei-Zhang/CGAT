@@ -71,6 +71,34 @@ class AutomaticOrdinaryServerTests(unittest.TestCase):
         stack.enter_context(patch.object(oc.pilot,"_verify_case",side_effect=timing))
         return stack
 
+    def test_oversized_publication_failure_reuses_native_units_without_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime,args=self.fixture(Path(directory),weak=True)
+            captured={}
+            def old_size_veto(report, root, **kwargs):
+                captured.update(report=report, root=root, kwargs=kwargs)
+                # Valid metadata beyond both old file gates, not changed scientific data.
+                with (root / "routing-plan.json").open("a") as stream:
+                    for _ in range(65):stream.write(" " * 1024**2)
+                rp.read_json(root / "routing-plan.json", root, max_bytes=1024**2)
+                raise AssertionError("legacy size veto did not fire")
+            with self.controls(), patch.object(pub,"admit",side_effect=old_size_veto):
+                with self.assertRaisesRegex(wa.ExperimentError,"oversized"):
+                    sa.run_reference(args,runtime_root=runtime)
+            self.assertFalse((args.run_dir/"result.paf").exists())
+            attempt=Path(pr.read_json(args.run_dir/pr.LOCATOR)["attempt"])
+            receipts={p:wa.sha256(p) for p in attempt.rglob("native.complete.paf")}
+            self.assertTrue(receipts)
+            with self.controls(), patch.object(nf,"attempt",side_effect=AssertionError("completed source remapped")), \
+                    patch.object(wa,"run_command",side_effect=AssertionError("completed index rebuilt")):
+                admission=pub.admit(captured["report"],captured["root"],**captured["kwargs"])
+                self.assertEqual(admission["status"],"complete_approximate_reference_admitted")
+                resumed=sa.run_reference(args,runtime_root=runtime)
+            self.assertTrue(resumed["result_published"])
+            self.assertEqual(Path(resumed["attempt"]),attempt)
+            self.assertEqual({p:wa.sha256(p) for p in receipts},receipts)
+            self.assertEqual(wa.sha256(args.run_dir/"result.paf"),captured["report"]["output_sha256"])
+
     def test_failed_disk_audit_preserves_completed_mapping_for_later_resume(self):
         with tempfile.TemporaryDirectory() as directory:
             runtime,args=self.fixture(Path(directory),weak=True)

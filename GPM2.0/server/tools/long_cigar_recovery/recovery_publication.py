@@ -7,6 +7,7 @@ published. This contract does not assert arbitrary whole-query DP/AS equality.
 from __future__ import annotations
 
 import json
+import metadata_json as metadata
 import re
 from pathlib import Path
 import stat
@@ -19,7 +20,6 @@ import windowed_alignment as wa
 
 POLICY = "original-chain-native-selection-v1"
 PROOF = "publication-proof.json"
-MAX_PROOF_BYTES = 1024*1024
 PROACTIVE_QUERY_LIMIT = (1 << 28) - 1
 
 
@@ -36,15 +36,19 @@ def regular_under(path,root):
     return resolved
 
 
-def read_json(path,root,*,max_bytes=MAX_PROOF_BYTES,expected_type=dict):
+def read_json(path,root,*,max_bytes=None,expected_type=dict):
     path = regular_under(path,root)
-    with path.open("rb") as source:
-        raw = source.read(max_bytes+1)
-    require(len(raw)<=max_bytes,"oversized publication metadata")
-    value = json.loads(raw)
-    require(type(value) is expected_type,"publication metadata has the wrong container type")
-    return value
+    try:
+        return metadata.load(path, expected_type=expected_type, limit=max_bytes)
+    except metadata.MetadataError as exc:
+        raise wa.ExperimentError("recovery publication refused: " + str(exc)) from exc
 
+
+def compare_json(path, root, expected):
+    try:
+        metadata.compare(regular_under(path, root), expected)
+    except metadata.MetadataError as exc:
+        raise wa.ExperimentError("recovery publication refused: " + str(exc)) from exc
 
 
 def protocol_line(lines):
