@@ -28,8 +28,11 @@ import track_member_order as ordering
 
 
 def digest(path):
+    value = hashlib.sha256()
     with Path(path).open("rb") as handle:
-        return hashlib.file_digest(handle, "sha256").hexdigest()
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            value.update(block)
+    return value.hexdigest()
 
 
 def atomic_json(path, value):

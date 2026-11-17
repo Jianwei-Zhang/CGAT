@@ -30,6 +30,13 @@ class DegapResultsTests(unittest.TestCase):
         for name in ("seqleft.fa", "seqright.fa", "endpoint.ctg.fa"):
             (self.out / name).write_text(">endpoint\nACGT\n")
 
+    def test_digest_does_not_require_python311_file_digest(self):
+        path=self.root/"bytes.bin";payload=bytes(range(256))*8193;path.write_bytes(payload)
+        expected=results.hashlib.sha256(payload).hexdigest()
+        with mock.patch.object(results.hashlib,"file_digest",side_effect=AssertionError("Python 3.11 API used"),create=True):
+            self.assertEqual(results.digest(path),expected)
+            path.write_bytes(b"");self.assertEqual(results.digest(path),results.hashlib.sha256(b"").hexdigest())
+
     def test_gap_candidate_snapshot_and_stale_run_rejected(self):
         results.begin(self.recipe)
         final = self.out / "job.final.fa"

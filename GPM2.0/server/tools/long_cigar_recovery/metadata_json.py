@@ -50,8 +50,12 @@ def _source(path, limit=None, expected_sha256=None):
             _require(type(limit) is int and limit >= 0, "invalid explicit metadata budget")
             _require(opened.st_size <= limit, "oversized fixed-schema metadata")
         if expected_sha256 is not None:
-            digest = hashlib.file_digest(stream.buffer, "sha256").hexdigest()
-            _require(digest == expected_sha256, "metadata digest differs")
+            # hashlib.file_digest is Python 3.11+. Keep the same exact-byte
+            # binding on supported Python 3.10 cluster environments as well.
+            digest = hashlib.sha256()
+            while block := stream.buffer.read(CHUNK):
+                digest.update(block)
+            _require(digest.hexdigest() == expected_sha256, "metadata digest differs")
             stream.seek(0)
         yield stream
         _require(_identity(opened) == _identity(os.fstat(stream.fileno()))

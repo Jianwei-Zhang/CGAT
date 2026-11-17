@@ -123,6 +123,15 @@ class MetadataJsonTests(unittest.TestCase):
         outside.write_text('{}'); self.addCleanup(outside.unlink)
         with self.assertRaises(wa.ExperimentError):rp.read_json(outside, self.root)
 
+    def test_expected_digest_without_python311_file_digest(self):
+        self.write({"execution":{"command":["minimap2","-c"]},"unicode":"小麦"})
+        expected=hashlib.sha256(self.path.read_bytes()).hexdigest()
+        with patch.object(hashlib,"file_digest",side_effect=AssertionError("Python 3.11 API used"),create=True),patch.object(mj,"CHUNK",7):
+            self.assertEqual(mj.load(self.path,fields={"execution"},expected_sha256=expected),
+                             {"execution":{"command":["minimap2","-c"]}})
+            with self.assertRaisesRegex(mj.MetadataError,"digest differs"):
+                mj.load(self.path,expected_sha256="0"*64)
+
     def test_source_digest_is_bound_to_selected_fields(self):
         self.write({"execution": {"command": ["minimap2"]}, "unselected": [1, 2]})
         digest=hashlib.sha256(self.path.read_bytes()).hexdigest()

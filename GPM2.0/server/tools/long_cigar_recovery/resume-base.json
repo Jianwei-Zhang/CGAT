@@ -39,7 +39,7 @@
         "tools/degap_core/bin/TelSeekerTargets.py": "953c048ebc81f0de39744f20c4a0b067cb3bf6ceebd1131a3aff232b6dd54d21",
         "tools/degap_core/bin/TelSeekerVisualizer.py": "a6170710355b8fed476798ce115fc10bae42e62cf7247049520562af104717a8",
         "tools/degap_core/bin/selectRawReads.py": "22a174b574d44772c20269798c6bdfc3641de13db482ffa81f371a8d3e0e59b4",
-        "tools/degap_results.py": "96c4eacc5910bc4e7dd8cb6f1953a61b6b5e825a40e94c40c749c15723f5bba8",
+        "tools/degap_results.py": "3b7096f63c62d22667f9be1c4dd93083bb3825eb88b2013fab0fdf5b9d7d2867",
         "tools/delivery_archive.py": "0135adf20f2934ecb8ec5bcffbea77e401d5b5ae38e703c4c168e62ad086048b",
         "tools/grt_app_package.py": "633d99951d3c55636add06c0be7d79cf0b74984ea2c0b05925ba9198322127a8",
         "tools/grt_contract.py": "633d99951d3c55636add06c0be7d79cf0b74984ea2c0b05925ba9198322127a8",
