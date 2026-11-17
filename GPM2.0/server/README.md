@@ -8,7 +8,7 @@ Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports
 
 ## Quick start
 
-On your Linux server, download the GPM Server tools (source package) from [Release v2.0.19](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.19), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
+On your Linux server, download the GPM Server tools (source package) from [Release v2.0.20](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.20), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
 
 ```bash
 # 1. Download into the tools directory; keep your project working directory
@@ -18,15 +18,15 @@ SERVER="$HOME/bin/GPM_Server"  # Custom paths are supported; do not overwrite an
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.19_source.tar.gz
+  archive=GPM_Server_2.0.20_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.19/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.20/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.19/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.20/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.19/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.20/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.19 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.20 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -377,11 +377,13 @@ confidence evidence. The whole batch is not deliberately run until it crashes,
 and ordinary queries are not split. No FASTA splitting or user configuration is
 needed. The installed minimap2 executable is never patched or replaced.
 
-Long-query reconstruction currently requires minimap2 `2.31-r1302` and the bundled
-Linux x86_64 companion (glibc 2.17-compatible). Ordinary mapping does not require
-the companion. Unsupported or ambiguous reconstruction fails explicitly without
-publishing partial output or inventing MAPQ. Same-task verified completed groups
-can be reused on the next run; input/tool/runtime changes invalidate reuse.
+Long-query handling requires minimap2 `2.31-r1302`. Eligible large references use
+bounded native-window projection, with whole-record checks and limited risk review;
+this route supports Linux ARM64 without the x86 companion. The legacy confidence
+reconstruction route still requires the bundled Linux x86_64 companion (glibc 2.17).
+Ordinary mapping does not require that companion. Unsupported recovery fails explicitly
+without publishing partial output or inventing MAPQ. Resume reuses only verified
+completed groups and explicitly reviewed runtime migrations.
 
 Keep original inputs and failed-job evidence. Resume a stopped supported workspace
 with the same `run.sh` command or its `run_all.sh`; only source-checked unfinished
@@ -391,7 +393,7 @@ a customer's unavailable whole wheat assembly has been biologically validated.
 
 ### Telomere / centromere libraries
 
-The v2.0.19 Server package includes the annotation libraries. Older archives are
+The v2.0.20 Server package includes the annotation libraries. Older archives are
 not changed retroactively. The workflow automatically
 uses **official library + local library + this run's `--tel` / `--cen` inputs**.
 Explicit flags add to the libraries; they do not replace them or save local entries.
@@ -425,17 +427,16 @@ Prepare freezes sequences, thresholds, all source IDs, SHA-256 and notes into
 those verified project inputs. Updating installed tools/libraries does not opt an
 existing project into a new library; explicitly prepare again, preferably into a
 new output directory, to adopt it. Full delivery includes the frozen annotation
-FASTA; Light omits all FASTA and retains the provenance snapshot/hashes. The v2.0.19 App retains this
+FASTA; Light omits all FASTA and retains the provenance snapshot/hashes. The v2.0.20 App retains this
 provenance and migrates workspace schema 7 (or earlier) to 8 to store Local View tasks; back up workspaces before upgrading. Older Apps cannot be assumed to
 open a migrated workspace. Source review and automated tests have passed; this is
 not a claim of genome-wide biological or native-window acceptance. See `library/SOURCES.md`
 for source records and evidence limits.
 
-## DEGAP v2 in the shared Server environment
+## DEGAP2.0 in the shared Server environment
 
-The refreshed Server source includes the pinned DEGAP v2 runtime. The published
-v2.0.19 App installers are unchanged and do not include the new DEGAP task-card
-workflow described below; that workflow requires a compatible App build.
+GPM v2.0.20 includes the pinned DEGAP2.0 Server runtime and the matching App
+task-card workflow described below. Update both Server and App to use this workflow.
 
 A Server package built from this source includes the runtime. `bash server/install.sh`
 (from `GPM2.0/` in a repository checkout), or `bash install.sh` (from an extracted Server package),

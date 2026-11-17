@@ -8,7 +8,7 @@ Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、�
 
 ## 快速开始
 
-在 Linux 服务端依次执行以下命令：从 [Release v2.0.19](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.19) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
+在 Linux 服务端依次执行以下命令：从 [Release v2.0.20](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.20) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
 
 ```bash
 # 1. 下载并解压到工具目录，不改变当前项目目录
@@ -18,15 +18,15 @@ SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要�
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.19_source.tar.gz
+  archive=GPM_Server_2.0.20_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.19/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.20/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.19/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.20/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.19/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.20/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.19 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.20 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -332,10 +332,11 @@ Server 可自动选取少量**完整 contig**进行校准。校准数据不得�
 不先让整批数据崩溃，不切割普通记录，不要求用户手工拆 FASTA 或编写配置，
 也不修改或替换安装的 minimap2 可执行文件。
 
-长序列恢复目前要求 minimap2 `2.31-r1302` 和包内 Linux x86_64 辅助程序
-（兼容 glibc 2.17）；普通比对不需要该辅助程序。不支持或有歧义的恢复会明确失败，
-不会发布部分结果或伪造 MAPQ。同任务已完成且证据校验通过的分组可在下次启动复用；
-输入、工具或运行库变化会使复用失效。
+长序列处理要求 minimap2 `2.31-r1302`。满足条件的大参考采用有界原生分窗投影，
+进行整条记录检查和有限风险复核；该路径支持 Linux ARM64，不需要 x86 辅助程序。
+旧的置信度恢复路径仍要求包内 Linux x86_64 辅助程序（兼容 glibc 2.17），
+普通比对不需要该辅助程序。不支持的恢复会明确失败，不发布部分结果或伪造 MAPQ。
+续跑仅复用校验有效的已完成分组及明确审核过的运行库迁移。
 
 保留原输入和失败日志。停止任务后可用原 `run.sh` 命令或 `run_all.sh` 恢复；
 只有来源核验通过的未完成初始参考命令会迁移，并保存回滚日志。兼容且已完成的
@@ -343,7 +344,7 @@ Server 可自动选取少量**完整 contig**进行校准。校准数据不得�
 
 ### 端粒 / 着丝粒库
 
-v2.0.19 Server 发布包已包含以下注释库；不追溯改变旧版发布包。
+v2.0.20 Server 发布包已包含以下注释库；不追溯改变旧版发布包。
 流程自动使用 **官方库 + 用户本地库 + 本次 `--tel` / `--cen` 参数**。
 显式参数是追加，不覆盖库，也不会自动保存为本地条目。
 
@@ -369,14 +370,14 @@ bash "$SERVER/library.sh" remove <local_id>   # 使用 list 中显示的本地 I
 Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目的 `tel/`、`cen/` 和
 `metadata/annotation_library_snapshot.json`。续跑只读并校验项目快照，工具/库更新不会让旧项目
 自动使用新库；要采用新库需显式重新 prepare，建议使用新输出目录。完整交付包含注释 FASTA；
-轻量交付仍排除所有 FASTA，只保留来源快照与校验值。v2.0.19 App 保留来源信息，并将 schema 7 或更早的工作区迁移到 8，以保存 Local View 任务；升级前请备份，不保证旧版 App
+轻量交付仍排除所有 FASTA，只保留来源快照与校验值。v2.0.20 App 保留来源信息，并将 schema 7 或更早的工作区迁移到 8，以保存 Local View 任务；升级前请备份，不保证旧版 App
 能打开迁移后的工作区。源码 review 与自动化测试已通过，不代表全基因组生物学或原生窗口验收已通过。
 具体来源与证据边界见 `library/SOURCES.md`。
 
-## DEGAP v2 与 Server 共用环境
+## DEGAP2.0 与 Server 共用环境
 
-本次更新的 Server 源码包附带固定版本的 DEGAP v2。已发布的 v2.0.19 App 安装包保持不变，
-尚不包含下文的新 DEGAP 任务卡工作流；该工作流需要兼容的 App 构建。
+GPM v2.0.20 附带固定版本的 DEGAP2.0 Server 运行时，以及下文配套的 App 任务卡工作流。
+请同时更新 Server 和 App 后使用。
 
 仓库内运行 `bash server/install.sh`，
 或在解压后的 Server 包内运行 `bash install.sh`，即可把 GPM 和 DEGAP 依赖一起
