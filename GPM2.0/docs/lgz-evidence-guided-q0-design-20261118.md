@@ -241,8 +241,8 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 
 | 阶段 | 状态 | 证据 |
 | --- | --- | --- |
-| D0 | 文档已完成结构/决策覆盖校验，作为首个独立提交 | 本文；Q1–Q14、A01–A20 均已登记；Git 历史记录提交 |
-| I1 | 未开始 | — |
+| D0 | 已提交并推送 | `a634df9`；Q1–Q14、A01–A20、13 个章节及 LF 格式检查通过 |
+| I1 | 基础模块与定向回归已完成；尚未接入运行入口 | `q0_sources.py`、`q0_alignments.py`；新增 25 项测试，联合回归 44 项通过；运行库清单校验通过 |
 | I2 | 未开始 | — |
 | I3 | 未开始 | — |
 | I4 | 未开始 | — |
@@ -250,3 +250,31 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 | I6 | 未开始 | — |
 
 尚无新算法真实样本收益结论；尚未执行发布或客户工作区迁移。
+
+
+### 13.1 I1：来源与比对证据基础
+
+新增文件：
+
+- `server/tools/lgz_core/q0_sources.py`：严格半开区间及既有闭区间转换、覆盖并集与剩余来源区间、长 N 分段、原组装连接索引、稳定来源身份。
+- `server/tools/lgz_core/q0_alignments.py`：PAF/CIGAR 验证、完整 ref 命中保留、双向及反向链坐标投影、indel 边界歧义、真实 paired-base 覆盖和 target skip 统计。
+- `server/tests/test_q0_evidence.py`：25 项测试；投影另以独立的逐碱基网格路径 oracle 检查随机小 CIGAR 的全部子区间和两种方向。
+- `server/tools/grt_core/q0_sources.py`、`q0_alignments.py`：沿用现有模块别名转发约定，仅指向同一份 LGZ 实现，不是保留旧构建策略。
+
+运行库清单通过维护工具生成，未手工改写哈希，未更新任何正式 Release 或客户工作区。
+
+在仓库的 `GPM2.0` 目录运行：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest \
+  server.tests.test_q0_evidence \
+  server.tests.test_grt_prepare_inputs \
+  server.tests.test_lgz_compatibility -v
+# 44 tests, OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  experiments/long_query_alignment/sync_server_runtime.py
+# status=verified, changed=[]
+```
+
+证据边界：这是 I1 基础模块验证，不是 A01–A20 全部通过。尚未前置调度、替换旧 q0 入口、实现路径引擎或完成 donor/App 适配。投影结果的 `exact` 仅表示裁剪坐标准确，不代表命中唯一、碱基一致、桥接成立或允许结构编辑。
