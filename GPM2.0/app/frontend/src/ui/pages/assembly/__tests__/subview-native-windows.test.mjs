@@ -132,3 +132,21 @@ test("reopening an unpinned native view preserves its native opening preference"
     assert.equal(f.store.getState().assembly.subviewWorkspace.windows[0].pinned, false);
   } finally { f.manager.destroy(); }
 });
+
+
+test("a WebKit popup inheriting Main's identity is rejected before attaching native handlers", async () => {
+  const f = fixture();
+  let destroyed = 0;
+  try {
+    const token = f.urls[0].searchParams.get("token");
+    const peer = { opener: f.win, location: f.win.location,
+      __TAURI__: { window: { getCurrentWindow: () => ({ label: "main", destroy: () => destroyed++ }) } } };
+    await assert.rejects(f.win.__gpmLocalViews.connect(f.id, token, peer), /identity mismatch/);
+    f.win.__gpmLocalViews.fail(f.id, token, "Local View native window identity mismatch");
+    await Promise.resolve();
+    const task = f.store.getState().assembly.subviewWorkspace.windows[0];
+    assert.equal(task.floating, false);
+    assert.equal(task.snapshot.subview.summary.bottom.contigId, 2);
+    assert.equal(destroyed, 0);
+  } finally { f.manager.destroy(); }
+});

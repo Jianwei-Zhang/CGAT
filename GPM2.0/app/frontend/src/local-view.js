@@ -1,3 +1,4 @@
+import { destroyNativeSubviewPeer } from "./ui/pages/assembly/subview-native-identity.js";
 import "./styles/base.css";
 import "./styles/theme.css";
 import "./styles/layout.css";
@@ -16,6 +17,6 @@ try {
   } finally {
     // The owner reports the error and restores the dock. Never leave an orphan
     // borderless error window when an opening raced with close/project switch.
-    await window.__TAURI__?.window?.getCurrentWindow?.().destroy().catch(() => {});
+    await destroyNativeSubviewPeer(window, params.get("view"), params.get("token")).catch(() => {});
   }
 }

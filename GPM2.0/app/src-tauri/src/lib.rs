@@ -1,3 +1,5 @@
+#[cfg(any(target_os = "macos", test))]
+mod app_menu;
 mod app_update;
 mod auto_pipeline_cancel;
 mod commands;
@@ -14,6 +16,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app_menu::install(app)?;
             local_view_windows::create_main_window(app)?;
             Ok(())
         })

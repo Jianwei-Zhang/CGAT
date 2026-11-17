@@ -1,3 +1,4 @@
+import { getNativeSubviewHandle } from "./subview-native-identity.js";
 import { fitNativeSubviewWindow } from "./subview-native-fit.js";
 import { changeSubviewWindow, getSubviewWindowStore } from "./subview-workspace-state.js";
 import { renderSubviewDockIcon, syncSubviewPinButton, subviewWindowAssembly, subviewWindowDescription } from "./render-subview-workspace.js";
@@ -123,8 +124,9 @@ export function createNativeSubviewWindows(root, store, deps) {
     const entry = entries.get(id);
     if (!entry || entry.token !== token || !valid(entry) || entry.win
       || peer.opener !== win || peer.location.origin !== win.location.origin) throw new Error("Local View owner expired");
+    const handle = getNativeSubviewHandle(peer, id, token);
     entry.win = peer;
-    entry.handle = peer.__TAURI__.window.getCurrentWindow();
+    entry.handle = handle;
     // OS destruction is asynchronous. Keep a capture-phase gate until it really
     // completes, so a closing/docked/stale peer cannot edit a new project via
     // old DOM handlers while the authoritative store has already moved on.

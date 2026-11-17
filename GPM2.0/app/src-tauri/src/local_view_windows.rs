@@ -86,6 +86,24 @@ pub fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
             if owner.get_webview_window(&label).is_some() {
                 return tauri::webview::NewWindowResponse::Deny;
             }
+            // WKWebView's popup configuration inherits Main's user content
+            // controller. Wry skips popup initialization/IPC when that controller
+            // is shared, leaving the popup with Main's Tauri window identity.
+            // Keep WebKit's required configuration (and opener/process pool),
+            // but give each popup its own scripts and IPC message handler.
+            // Safety: WebKit invokes on_new_window on AppKit's main thread;
+            // the configuration retains the newly created controller.
+            #[cfg(target_os = "macos")]
+            unsafe {
+                let Some(class) = objc2::runtime::AnyClass::get(c"WKUserContentController") else {
+                    eprintln!("Local View user content controller unavailable");
+                    return tauri::webview::NewWindowResponse::Deny;
+                };
+                let controller: objc2::rc::Retained<objc2::runtime::AnyObject> =
+                    objc2::msg_send![class, new];
+                let configuration = &*features.opener().target_configuration;
+                let _: () = objc2::msg_send![configuration, setUserContentController: &*controller];
+            }
             let expected = url.clone();
             let builder = tauri::WebviewWindowBuilder::new(
                 &owner,

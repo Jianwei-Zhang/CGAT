@@ -31,3 +31,49 @@ test("browser mode needs no native close listener and Tauri main can finish its 
   assert.deepEqual(capability.windows, ["main"]);
   assert.ok(capability.permissions.includes("core:window:allow-destroy"));
 });
+
+
+for (const discard of [false, true]) test(`failed save ${discard ? "can close only after explicit discard" : "keeps open when discard is cancelled"}`, async () => {
+  let handler, resolve, prompts = 0, prevented = 0, finished = false;
+  const error = new Error("failed to open workspace db: unable to open database file");
+  await bindLocalViewCloseSave({ windowHandle: { onCloseRequested(callback) { handler = callback; } },
+    flush: async () => { throw error; },
+    confirmDiscard: received => {
+      assert.equal(received, error); prompts++;
+      return new Promise(r => { resolve = r; });
+    } });
+  const event = { preventDefault() { prevented++; } };
+  const first = handler(event).then(() => { finished = true; });
+  const second = handler(event);
+  while (!resolve) await Promise.resolve();
+  assert.equal(prompts, 1); assert.equal(finished, false);
+  resolve(discard); await Promise.all([first, second]);
+  assert.equal(prevented, discard ? 0 : 2);
+});
+
+test("failed or non-boolean discard decisions never close an unsaved project", async () => {
+  for (const decision of [async () => { throw new Error("dialog unavailable"); }, async () => undefined, async () => "yes"]) {
+    let handler, prevented = 0;
+    await bindLocalViewCloseSave({ windowHandle: { onCloseRequested(callback) { handler = callback; } },
+      flush: async () => { throw new Error("disk full"); }, confirmDiscard: decision });
+    await handler({ preventDefault() { prevented++; } });
+    assert.equal(prevented, 1);
+  }
+});
+
+test("cancelled discard permits saving normally after the project is restored", async () => {
+  let handler, missing = true, prompts = 0, prevented = 0;
+  await bindLocalViewCloseSave({ windowHandle: { onCloseRequested(callback) { handler = callback; } },
+    flush: async () => { if (missing) throw new Error("missing project"); },
+    confirmDiscard: async () => { prompts++; return false; } });
+  const event = { preventDefault() { prevented++; } };
+  await handler(event); missing = false; await handler(event);
+  assert.equal(prompts, 1); assert.equal(prevented, 1);
+});
+
+test("successful persistence never asks to discard", async () => {
+  let handler;
+  await bindLocalViewCloseSave({ windowHandle: { onCloseRequested(callback) { handler = callback; } },
+    flush: async () => {}, confirmDiscard: () => assert.fail("unexpected discard dialog") });
+  await handler({ preventDefault() { assert.fail("saved window should close"); } });
+});

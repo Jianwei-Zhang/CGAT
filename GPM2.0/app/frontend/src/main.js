@@ -1,5 +1,5 @@
 import { bindAssemblyNavigation, syncAssemblyNavigation } from "./ui/shell/assembly-navigation.js";
-import { requestAppNotice } from "./ui/shell/app-dialog.js";
+import { requestAppConfirm, requestAppNotice } from "./ui/shell/app-dialog.js";
 import { bindLocalViewCloseSave } from "./ui/shell/local-view-close-save.js";
 import { bindAppTooltips, hideAppTooltips } from "./ui/app-tooltip-runtime.js";
 import "./styles/tooltips.css";
@@ -273,7 +273,17 @@ const store = createStore({
 void bindLocalViewCloseSave({
   windowHandle: window.__GPM_NATIVE_LOCAL_VIEWS__ ? window.__TAURI__?.window?.getCurrentWindow?.() : null,
   flush: () => flushAssemblyProjectState(document.querySelector("#route-host"), store),
-  onError: error => requestAppNotice(`${store.getState().locale === "en" ? "Local View tasks could not be saved. The window will stay open." : "局部比对任务保存失败，窗口将保持打开。"}\n${error?.message || error}`, { locale: store.getState().locale }),
+  confirmDiscard: error => {
+    const locale = store.getState().locale, en = locale === "en";
+    return requestAppConfirm(`${en
+      ? "Local View tasks could not be saved. If the project folder was moved or deleted, restore it to its original location and retry. Close without saving? Unsaved Local View changes will be lost."
+      : "局部比对任务保存失败。如果项目文件夹已被移动或删除，可恢复到原路径后重试。是否不保存并关闭？尚未保存的局部视图更改将丢失。"}\n\n${error?.message || error}`, {
+      locale,
+      title: en ? "Close without saving?" : "不保存并关闭？",
+      confirmLabel: en ? "Close without saving" : "不保存并关闭",
+      cancelLabel: en ? "Keep open" : "保持打开",
+    });
+  },
 }).catch(error => console.error("Local View close-save listener failed", error));
 
 const updater = createAppUpdater({
