@@ -120,9 +120,9 @@ Behavior:
   - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ Step3 -> LGZ telomere/q4 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ Step3 -> LGZ telomere/q4 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
-  - --skip-self conflicts with multiple same-dataset q0 candidates in a chr group; assignment stops with an error
+  - --skip-self conflicts with multiple same-dataset q0 candidates; assignment/evidence preparation stops with an error
   - Prints all generated staged commands to the terminal for manual copy/paste
 EOF
 }
@@ -512,6 +512,18 @@ write_assignment_script() {
     --shell-var GPM_FAST_MINIMAP_PRESET "$MINIMAP_PRESET" \
     --shell-var GPM_FAST_SELF_MIN_CHAIN_SCORE "$SELF_MIN_CHAIN_SCORE" \
     --shell-var GPM_FAST_SELF_MINIMIZERS "$SELF_MINIMIZERS"
+  make_executable_if_supported "$output_path"
+}
+
+write_q0_evidence_script() {
+  local output_path="$1"
+  local work_root="$2"
+  {
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+    printf 'exec python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_prepare_evidence.py")" \
+      "$(shell_quote "$work_root")" "$(shell_quote "$THREADS")" "$(shell_quote "$LGZ_MINIMAP2")"
+  } > "$output_path"
   make_executable_if_supported "$output_path"
 }
 
@@ -1068,7 +1080,7 @@ mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 [[ "${#REFERENCE_CHR_NAMES[@]}" -gt 0 ]] \
   || die "Reference FASTA contains no sequence records: $REF_DST"
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 9 + 2 * ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 10 + 2 * ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -1102,6 +1114,13 @@ for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   printf 'bash %s\n\n' "${run_chr_dir}/q0_command.sh"
   COMMAND_INDEX=$((COMMAND_INDEX + 1))
 done
+
+write_q0_evidence_script "${WORK_ROOT}/prepare_q0_evidence.sh" "$WORK_ROOT"
+append_run_all_unit "q0_evidence" "prepare_q0_evidence.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_q0_evidence"
+printf 'cd %s\n' "$WORK_ROOT"
+printf 'bash %s\n\n' "${WORK_ROOT}/prepare_q0_evidence.sh"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
   write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"

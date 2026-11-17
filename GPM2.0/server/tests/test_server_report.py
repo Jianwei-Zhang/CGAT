@@ -368,6 +368,8 @@ def make_grt_report_fixture(root: Path) -> tuple[Path, dict]:
     server = tel.make_server(root)
     step_tools, tel_tools = step.make_tools(root), tel.make_tools(root)
     evidence.write_existing_main_view_results(server)
+    from server.tests.q0_test_support import seed_q0_evidence
+    seed_q0_evidence(server)
     minimap = evidence.make_minimap(root)
     runtime = server / ".prepare_lib/tools"
     shutil.copytree(TOOLS, runtime, ignore=shutil.ignore_patterns("__pycache__"))

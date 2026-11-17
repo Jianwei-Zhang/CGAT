@@ -604,6 +604,22 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
     return True
 
 
+def generated_operation_dirs(chr_run_dir, work_root):
+    """Only generated commands authorize retirement; unrelated directories stay."""
+    result = set()
+    for name in (MANIFEST, Q0_MANIFEST):
+        manifest = chr_run_dir / name
+        if not manifest.is_file():
+            continue
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        for row in payload["tasks"]:
+            command = (work_root / row["command"]).resolve()
+            relative = command.relative_to(chr_run_dir.resolve())
+            if len(relative.parts) >= 2:
+                result.add(chr_run_dir / relative.parts[0])
+    return result
+
+
 def write_generated_command_script(path, command_paths, chr_name):
     if not command_paths:
         body = (
@@ -898,14 +914,7 @@ for chr_name in reference_chr_names:
     datasets_dir.mkdir(parents=True, exist_ok=True)
     for stale_fasta in datasets_dir.glob("*.fa"):
         stale_fasta.unlink()
-    for child in chr_run_dir.iterdir():
-        if child.name in {"datasets", "command.sh", "generated_command.sh",
-                          "q0_command.sh", "q0_generated_command.sh"}:
-            continue
-        if child.is_dir():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
+    previous_operations = generated_operation_dirs(chr_run_dir, work_root)
 
     selected_dataset_fastas = []
     for dataset_name in dataset_order:
@@ -970,6 +979,30 @@ for chr_name in reference_chr_names:
             task_profiles[command_path] = (total * left_fasta.stat().st_size, largest_fraction)
 
     q0_command_paths = list(command_paths)
+    alignment_inputs = []
+    for dataset_name, fasta in selected_dataset_fastas:
+        run = chr_run_dir / f"{dataset_name}_vs_self"
+        if run / "command.sh" in q0_command_paths:
+            alignment_inputs.append({
+                "kind": "self", "query_dataset": dataset_name, "target_dataset": dataset_name,
+                "query_fasta": fasta.relative_to(work_root).as_posix(),
+                "target_fasta": fasta.relative_to(work_root).as_posix(),
+                "run_dir": run.relative_to(work_root).as_posix(),
+                "paf": (run / "result.paf").relative_to(work_root).as_posix(),
+            })
+    for index, (left_name, left_fasta) in enumerate(selected_dataset_fastas):
+        for right_name, right_fasta in selected_dataset_fastas[index + 1:]:
+            run = chr_run_dir / f"{left_name}_vs_{right_name}"
+            alignment_inputs.append({
+                "kind": "cross", "query_dataset": right_name, "target_dataset": left_name,
+                "query_fasta": right_fasta.relative_to(work_root).as_posix(),
+                "target_fasta": left_fasta.relative_to(work_root).as_posix(),
+                "run_dir": run.relative_to(work_root).as_posix(),
+                "paf": (run / "result.paf").relative_to(work_root).as_posix(),
+            })
+    (chr_run_dir / "q0_alignment_inputs.json").write_text(
+        json.dumps({"version": 1, "chromosome": chr_name, "alignments": alignment_inputs},
+                   indent=2, sort_keys=True) + "\n", encoding="utf-8")
     command_paths = []
 
     tel_rules_path = work_root / "tel" / "rules.tsv"
@@ -1018,3 +1051,14 @@ for chr_name in reference_chr_names:
                 row += task_profiles[command]
             manifest_tasks.append(row)
         write_manifest(chr_run_dir / manifest_name, work_root, manifest_tasks)
+
+    # Same-path raw results and self batch caches survive regeneration. Their
+    # content-bound checkpoints decide reuse. Retire only previously generated
+    # operations no longer in the plan, outside the App's runs/ discovery tree.
+    active_operations = {command.parent for command in q0_command_paths + command_paths}
+    for operation in sorted(previous_operations - active_operations):
+        if operation.is_dir() and operation.name not in {"datasets", "add_ctg"}:
+            import uuid
+            retired = work_root / ".run_all" / "retired_chr_operations" / chr_name
+            retired.mkdir(parents=True, exist_ok=True)
+            operation.rename(retired / f"{operation.name}.{uuid.uuid4().hex}")

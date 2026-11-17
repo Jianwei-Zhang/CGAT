@@ -91,6 +91,8 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
             handle.write(
                 "s_tel_assigned\t20000\t0\t20000\t+\tChr01\t60000\t0\t20000\t20000\t20000\t60\n"
             )
+        from server.tests.q0_test_support import seed_q0_evidence
+        seed_q0_evidence(server)
         completed = subprocess.run(
             [sys.executable, str(PREPARE_TOOL), "--server-dir", str(server)],
             check=False,

@@ -231,6 +231,7 @@ class GrtPrepareInputsTests(unittest.TestCase):
             ["key", "value"],
             [
                 {"key": "alignment_engine", "value": "minimap2"},
+                {"key": "threads", "value": "10"},
                 {"key": "minimap_preset", "value": "asm10"},
                 {"key": "chr_assignment_min_coverage_percent", "value": "60"},
             ],
@@ -325,6 +326,8 @@ class GrtPrepareInputsTests(unittest.TestCase):
         return server
 
     def run_tool(self, server, *extra, env=None):
+        from server.tests.q0_test_support import seed_q0_evidence
+        seed_q0_evidence(server)
         return subprocess.run(
             [sys.executable, str(TOOL), "--server-dir", str(server), *map(str, extra)],
             check=False,

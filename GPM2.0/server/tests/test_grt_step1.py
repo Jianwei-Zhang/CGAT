@@ -166,6 +166,8 @@ class GrtStep1Tests(unittest.TestCase):
             "s_assigned\t50000\t0\t50000\t+\tChr01\t60000\t0\t50000\t50000\t50000\t60\n",
             encoding="utf-8",
         )
+        from server.tests.q0_test_support import seed_q0_evidence
+        seed_q0_evidence(server)
         completed = subprocess.run(
             [sys.executable, str(PREPARE_TOOL), "--server-dir", str(server)],
             check=False,

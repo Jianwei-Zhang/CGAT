@@ -353,6 +353,14 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                 "outputs": [{"file": relative, "sha256": digest(root / relative) if stats["available"] else None}]}
     if unit_id == "assign":
         return collect_assignment(root, input_data)
+    if unit_id == "q0_evidence":
+        manifest = read_json(root / "metadata/grt_q0_evidence.json", {})
+        relative = manifest.get("catalog")
+        catalog = read_json(local_path(root, relative), {}) if relative else {}
+        return {"summary": {"candidate_count": len(catalog.get("candidates", [])),
+                             "unplaced_segment_count": len(catalog.get("unplaced_segment_ids", [])),
+                             "supplementary_task_count": len(catalog.get("supplementary_alignments", []))},
+                "notes": ["候选发现不等于路径接受；q0 尚未在此阶段构建。"]}
     if unit_id == "grt_prepare":
         return collect_lgz_inputs(root)
     if unit_id.startswith(("chr:", "q0_chr:")):

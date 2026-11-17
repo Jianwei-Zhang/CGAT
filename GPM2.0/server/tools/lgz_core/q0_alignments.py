@@ -110,7 +110,7 @@ def parse_paf_line(line: str, *, artifact: str, line_number: int) -> PafAlignmen
 
 
 def read_paf(path: Path, *, query_lengths: Mapping[str, int],
-             target_lengths: Mapping[str, int]) -> Iterator[PafAlignment]:
+             target_lengths: Mapping[str, int], artifact: str | None = None) -> Iterator[PafAlignment]:
     """Stream validated records; callers separately require task-success evidence.
 
     An empty stream alone does NOT prove a successful no-hit alignment task.
@@ -121,7 +121,7 @@ def read_paf(path: Path, *, query_lengths: Mapping[str, int],
             for number, line in enumerate(handle, 1):
                 if not line.strip() or line.startswith("#"):
                     continue
-                hit = parse_paf_line(line, artifact=path.as_posix(), line_number=number)
+                hit = parse_paf_line(line, artifact=artifact if artifact is not None else path.as_posix(), line_number=number)
                 if (query_lengths.get(hit.query_name) != hit.query_length
                         or target_lengths.get(hit.target_name) != hit.target_length):
                     raise Q0EvidenceError(f"{path}:{number}: PAF names/lengths differ from inputs")

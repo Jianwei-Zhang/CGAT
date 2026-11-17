@@ -25,6 +25,7 @@ from run_resources import read_resources
 
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
+    "q0_evidence": "q0 候选与补充比对证据",
     "grt_prepare": "质量评估、q0 与供体构建", "grt_step1": "LGZ Step1",
     "grt_step2": "LGZ Step2", "grt_step3": "LGZ Step3",
     "grt_step23": "LGZ Step2 / Step3",

@@ -309,6 +309,37 @@ PYBATCH
     cat "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >&2
     exit 1
   }
+  # Completed raw evidence and self caches survive identical assignment regeneration.
+  PATH="${FAKE_BIN}:$PATH" python3 - "$output_root" <<'PYCACHE'
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / ".prepare_lib/tools"))
+from run_outer_checkpoints import OuterCheckpointManager
+run = root / "runs/chr_Chr01"
+for name in ("ds_a_vs_self", "ds_a_vs_ds_b"):
+    (run / name / "result.paf").write_text("")
+(run / "ds_a_vs_self/cache-marker").write_text("preserve")
+manager = OuterCheckpointManager(root)
+manager.commit(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+PYCACHE
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  PATH="${FAKE_BIN}:$PATH" python3 - "$output_root" <<'PYCACHE'
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / ".prepare_lib/tools"))
+from run_outer_checkpoints import OuterCheckpointManager
+manager = OuterCheckpointManager(root)
+valid, reason = manager.validate(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+assert valid, reason
+assert (root / "runs/chr_Chr01/ds_a_vs_self/cache-marker").read_text() == "preserve"
+PYCACHE
+  # Removing an operation retires its data outside active runs/, rather than deleting it.
+  : > "${output_root}/runs/ds_b_vs_ref/result.paf"
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  [[ ! -d "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b" ]] || exit 1
+  find "${output_root}/.run_all/retired_chr_operations/Chr01" -path '*/ds_a_vs_ds_b.*/result.paf' | grep -q .
 }
 
 test_self_alignment_restores_unique_cross_contig_pairs() {
@@ -485,8 +516,8 @@ assert_chr_partition_run_all_staging() {
     exit 1
   }
   mapfile -t command_lines < <(tail -n +2 "$plan")
-  [[ "${#command_lines[@]}" -eq 13 ]] || {
-    echo "expected 13 staged plan units, got ${#command_lines[@]}" >&2
+  [[ "${#command_lines[@]}" -eq 14 ]] || {
+    echo "expected 14 staged plan units, got ${#command_lines[@]}" >&2
     if [[ "${#command_lines[@]}" -gt 0 ]]; then
       printf '%s\n' "${command_lines[@]}" >&2
     fi
@@ -507,6 +538,7 @@ assert_chr_partition_run_all_staging() {
   expected_tail="$(cat <<EOF
 assign	assign_chr_groups.sh	logs/run_all.log
 q0_chr:${chr_name}	runs/chr_${chr_name}/q0_command.sh	logs/run_all.log
+q0_evidence	prepare_q0_evidence.sh	logs/run_all.log
 grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
 grt_step1	run_lgz_step1.sh	logs/run_all.log
 grt_step2	run_lgz_step2.sh	logs/run_all.log

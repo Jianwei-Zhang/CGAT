@@ -242,8 +242,8 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 | 阶段 | 状态 | 证据 |
 | --- | --- | --- |
 | D0 | 已提交并推送 | `a634df9`；Q1–Q14、A01–A20、13 个章节及 LF 格式检查通过 |
-| I1 | 基础模块与定向回归已完成；尚未接入运行入口 | `q0_sources.py`、`q0_alignments.py`；新增 25 项测试，联合回归 44 项通过；运行库清单校验通过 |
-| I2 | 部分完成：组内比对前置、分阶段 checkpoint 与复用；扩展候选/补比对和总证据清单尚未接入 | 见 13.2；13 项新增调度测试；最终合并回归 138 项通过；两套准备脚本测试通过 |
+| I1 | 基础模块与定向回归已完成，已由 I2 证据阶段使用 | `q0_sources.py`、`q0_alignments.py`；新增 25 项测试，联合回归 44 项通过；运行库清单校验通过 |
+| I2 | 已接入并验证：前置比对、扩展候选、按需补比对、必需证据清单及缓存保留 | 见 13.2–13.3；最终联合回归 230 项通过（含来源方向回归）；两套准备脚本测试通过 |
 | I3 | 未开始 | — |
 | I4 | 未开始 | — |
 | I5 | 未开始 | — |
@@ -277,7 +277,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 # status=verified, changed=[]
 ```
 
-证据边界：这是 I1 基础模块验证，不是 A01–A20 全部通过。尚未前置调度、替换旧 q0 入口、实现路径引擎或完成 donor/App 适配。投影结果的 `exact` 仅表示裁剪坐标准确，不代表命中唯一、碱基一致、桥接成立或允许结构编辑。
+证据边界：本节记录 I1 提交时的基础模块验证，不是 A01–A20 全部通过。后续调度和必需证据入口见 13.2–13.3；路径选择引擎及 donor/App 适配仍由 I3–I5 完成。投影结果的 `exact` 仅表示裁剪坐标准确，不代表命中唯一、碱基一致、桥接成立或允许结构编辑。
 
 
 ### 13.2 I2a：前置组内比对并拆分扫描依赖
@@ -325,10 +325,61 @@ PYTHONDONTWRITEBYTECODE=1 bash tests/gpm_server/prepare_metadata_test.sh
 PYTHONDONTWRITEBYTECODE=1 bash tests/gpm_server/prepare_full_test.sh
 ```
 
-I2 仍有未完成工作：
+I2a 提交时的剩余工作（已在 13.3 接入）：
 
 - 主候选/扩展候选发现、内部 N 分段后的区段级关系，以及按需求生成跨组/未分组补比对。
 - 把组内与补比对的成功状态、query/target 来源、参数及实际 PAF 汇总为 q0 的必需证据清单，并纳入 q0 输入指纹；独立调用新 q0 入口也必须校验该清单。
 - 分组重新生成时保留输入与参数仍匹配的原始比对缓存，不能依赖当前分组脚本清理目录的旧行为满足此要求。
 
-当前 `lgz_prepare_inputs.py` 的路径选择尚未切换，不能把本阶段的调度通过当作新 q0 或 Final Path 已验收。后续按 I2 剩余项、I3–I6 继续，不增加旧策略开关。
+I2a 提交时 `lgz_prepare_inputs.py` 的路径选择尚未切换；调度通过不代表新 q0 或 Final Path 已验收。后续按 13.3、I3–I6 继续，不增加旧策略开关。
+
+
+### 13.3 I2b：扩展候选、补比对和必需证据清单
+
+当前实际计划：
+
+```text
+ref:* -> assign -> q0_chr:* -> q0_evidence -> grt_prepare -> LGZ 后续阶段 -> chr:* -> finalize_evidence -> archives
+```
+
+新增/接入接口：
+
+| 接口 | 用途 |
+| --- | --- |
+| `runs/chr_<chr>/q0_alignment_inputs.json` | 明确声明每个原始 PAF 的 query/target dataset、输入 FASTA、方向和运行目录；不从 ds 顺序推测 |
+| `server/tools/lgz_core/q0_catalog.py` | 跨 ds 来源区段、原 N 连接、完整 ref 命中候选及 pairwise 派生候选 |
+| `server/tools/lgz_core/q0_preparation.py` | 校验已完成的组内任务、发现并执行补比对、缓存和清单发布/读取 |
+| `prepare_q0_evidence.sh` / `lgz_prepare_evidence.py` | 独立于 q0 路径选择的必需准备阶段 |
+| `grt/evidence/q0_prepare/catalog-*.json` | 来源、区段、原连接、候选、比对引用和未放置范围的内容寻址快照 |
+| `metadata/grt_q0_evidence.json` | 版本化成功清单，绑定策略、构建器、输入、catalog 和补比对产物的 SHA-256 |
+
+候选与任务范围：
+
+1. 从所有 ds 的完整 ref PAF 建立区段候选，保留竞争 chr 和方向。只统计 CIGAR 配对块的区间并集，不把跨删除的包围跨度当作有效覆盖。
+2. 初始无 ref 候选的区段对已有锚定区段做发现比对；新发现区段成为下一轮锚点，直到无新增区段。每个有效轮次至少增加一个区段，因此轮数受区段总数限制。
+3. 每轮对尚未放置区段建立候选；保留该轮观测到的多个 chr/方向，不用投票强选。派生候选记录锚定候选 ID 和实际 pairwise 证据，不伪造直接 ref 坐标或 assignment。
+4. 原分组之外的候选、同一来源长 N 分段后的区段，以及 ref 重叠/邻近但原始 PAF 没有观察到来源对命中的关系，触发 chr 内补比对。后者避免高阈值 self 比对漏掉短末端后，将“任务完成”误认为“连接证据足够”。
+5. 已有实际来源对命中的普通组内关系继续复用其 PAF；不是再次做全基因组全量两两比对。ref 邻近只授权请求比对，不授权连接或裁剪。
+
+补比对使用版本化策略中的 `-D -P --dual=yes --no-long-join`，并保留 `-c` 和选定 assembly preset：避免 query 本身在 target 集合中时的对角匹配压住部分重叠，同时避免名称字典序过滤有向 query 子集。该模式保留链而不依赖 primary MAPQ 排名；后续选择必须根据实际竞争命中和锚点判断，不把此类 MAPQ 当作独立质量证明。
+
+缓存、失败和事务：
+
+- 原始补比对缓存只绑定 mapper、实际 query/target 区段内容、preset 和比对参数；候选构建器更新或发现轮次变化不会无理由重跑同一原始比对。缓存读取仍核对产物内容和 CIGAR 几何。
+- 成功空 PAF 是有效结果；缺失成功记录、缺失必需来源对、损坏 PAF、补比对失败或输入在执行中变化均终止，不发布新的成功清单。
+- 显式 `--skip-self` 同样约束补比对：如果新发现或分段候选需要同 ds 非自身关系，直接报错，不静默绕过该参数。
+- 清单校验同时检查输入指纹、catalog schema、原始比对依赖、补比对任务 ID/回执和完整产物闭包，不能删去某个条目后仅靠其余文件哈希通过；准备期间构建器代码变化也不发布成功清单。
+- `load_verified_evidence` 没有旧策略 fallback。`lgz_prepare_inputs.py` 必须先通过该检查；清单及其产物进入 q0 输入指纹，准备器版本升至 4。
+- q0/donor 原子发布会保留前一阶段的证据目录和清单（优先硬链接，必要时复制），并在发布前再次检查证据，不能因整体替换 `grt/` 而删除前置证据。
+- 相同分组重新生成时保留原始 PAF 和 self batch 缓存，由内容 checkpoint 判定复用。已不在生成计划中的旧操作移动到 `.run_all/retired_chr_operations/`，既保留数据，又避免 App 将其误发现为当前运行。无关目录不按猜测清理。
+
+最终验证：
+
+- 最终联合回归 **230 项通过**（333.730 秒），覆盖候选/补比对、清单依赖闭包、skip-self、调度/断点、原 q0 准备、Step1、Step2/3、端粒收尾、证据包、报告、命名兼容、运行库更新及来源卡片方向。
+- `prepare_metadata_test.sh` 和 `prepare_full_test.sh` 通过；包含相同分组重新生成后的 checkpoint 复用、缓存保留及不再使用的操作归档。
+- 使用本机 **minimap2 2.26-r1175** 的受控随机序列测试通过：query 同时出现在 target 中、且两种名称顺序下，仍能发现另一来源的部分重叠。它是证据发现测试，不是物种数据或最终组装质量验收。
+- 运行库清单由维护脚本重新生成并验证，不手改哈希；没有修改正式 Release 或客户工作区。
+
+复跑：在 13.2 的 Python 测试列表中增加 `server.tests.test_q0_preparation`、`server.tests.test_grt_prepare_inputs`、`server.tests.test_grt_step1`、`server.tests.test_grt_repair_stages`、`server.tests.test_grt_telomere_finalize`、`server.tests.test_source_card_orientation`，得到本次 230 项联合回归（相同工作目录和 `PYTHONPATH`）。
+
+完成边界：**证据准备和强制入口已完成，q0 的路径选择仍是待替换部分。** 本阶段没有引入新旧构建策略开关，也没有宣称 q0/Final Path 已改善。I3 将真正使用 catalog 和原始比对选择、替换路径；I4–I5 仍须完成区间级 donor/后续 LGZ 及 Server/App 的选择证据适配。运行期清单引用的 checkpoint/工具上下文也不能被直接当作已完成的便携 App 交付契约。

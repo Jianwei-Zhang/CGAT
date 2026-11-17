@@ -41,6 +41,7 @@ LOG_EVENTS = (
 )
 
 ASSIGN_UNIT_ID = "assign"
+Q0_EVIDENCE_UNIT_ID = "q0_evidence"
 LGZ_PREPARE_UNIT_ID = "grt_prepare"
 LGZ_STEP1_UNIT_ID = "grt_step1"
 LGZ_STEP2_UNIT_ID = "grt_step2"
@@ -139,7 +140,8 @@ def build_unit_plan(
         [
             UnitPlanItem(ASSIGN_UNIT_ID, reference_ids),
             *(UnitPlanItem(unit_id, (ASSIGN_UNIT_ID,)) for unit_id in q0_chromosome_ids),
-            UnitPlanItem(LGZ_PREPARE_UNIT_ID, q0_chromosome_ids),
+            UnitPlanItem(Q0_EVIDENCE_UNIT_ID, q0_chromosome_ids),
+            UnitPlanItem(LGZ_PREPARE_UNIT_ID, (Q0_EVIDENCE_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP1_UNIT_ID, (LGZ_PREPARE_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP2_UNIT_ID, (LGZ_STEP1_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP3_UNIT_ID, (LGZ_STEP2_UNIT_ID,)),

@@ -239,8 +239,8 @@ plan_path="${output_root}/.run_all/plan.tsv"
   exit 1
 }
 grep -F $'unit_id\tcommand_relpath\tdetail_log_relpath' "$plan_path" >/dev/null
-[[ "$(tail -n +2 "$plan_path" | wc -l)" -eq 12 ]] || {
-  echo "expected 12 units in generated run_all plan" >&2
+[[ "$(tail -n +2 "$plan_path" | wc -l)" -eq 13 ]] || {
+  echo "expected 13 units in generated run_all plan" >&2
   exit 1
 }
 expected_plan="$(cat <<'EOF'
@@ -248,6 +248,7 @@ unit_id	command_relpath	detail_log_relpath
 ref:ds_add	runs/ds_add_vs_ref/command.sh	runs/ds_add_vs_ref/stderr.log
 assign	assign_chr_groups.sh	logs/run_all.log
 q0_chr:Chr01	runs/chr_Chr01/q0_command.sh	logs/run_all.log
+q0_evidence	prepare_q0_evidence.sh	logs/run_all.log
 grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
 grt_step1	run_lgz_step1.sh	logs/run_all.log
 grt_step2	run_lgz_step2.sh	logs/run_all.log

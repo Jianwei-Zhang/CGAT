@@ -27,8 +27,12 @@ from typing import Callable, Iterable
 
 try:
     from lgz_core.common import *
+    from lgz_core.q0_preparation import MANIFEST as Q0_EVIDENCE_MANIFEST, load_verified_evidence
+    from lgz_core.q0_sources import Q0EvidenceError
 except ModuleNotFoundError:  # Imported as server.tools.grt_prepare_inputs.
     from .lgz_core.common import *
+    from .lgz_core.q0_preparation import MANIFEST as Q0_EVIDENCE_MANIFEST, load_verified_evidence
+    from .lgz_core.q0_sources import Q0EvidenceError
 
 
 def parse_merqury_qv(path: Path) -> dict[str, float]:
@@ -775,7 +779,14 @@ def prepare(args: argparse.Namespace) -> None:
             known_chromosomes,
         )
 
+    try:
+        q0_evidence = load_verified_evidence(server_dir)
+    except Q0EvidenceError as exc:
+        fail(f"q0 evidence is not ready; run prepare_q0_evidence.sh first: {exc}")
+
     input_files = [
+        server_dir / Q0_EVIDENCE_MANIFEST,
+        *[server_dir / row["path"] for row in q0_evidence["outputs"]],
         metadata_dir / "package.tsv",
         metadata_dir / "datasets.tsv",
         metadata_dir / "reference.tsv",
@@ -804,7 +815,7 @@ def prepare(args: argparse.Namespace) -> None:
         input_identity.append({"path": label, "sha256": digest})
     fingerprint_payload = {
         "workflow": WORKFLOW,
-        "builder_version": 3,
+        "builder_version": 4,
         "inputs": input_identity,
         "reads_qc_enabled": reads_qc_enabled,
         "reads_qc_mode": args.reads_qc,
@@ -867,6 +878,11 @@ def prepare(args: argparse.Namespace) -> None:
         stage_grt = stage_root / "grt"
         stage_metadata = stage_root / "metadata"
         stage_metadata.mkdir(parents=True)
+        # Evidence preparation is an earlier stage. Preserve its content-bound
+        # artifacts when the q0/donor transaction replaces the grt/ tree.
+        shutil.copytree(server_dir / "grt/evidence/q0_prepare", stage_grt / "evidence/q0_prepare",
+                        copy_function=link_or_copy_file, symlinks=True)
+        shutil.copy2(server_dir / Q0_EVIDENCE_MANIFEST, stage_metadata / Path(Q0_EVIDENCE_MANIFEST).name)
         qv_scores: dict[tuple[str, str], float] = {}
         craq_scores: dict[tuple[str, str], float] = {}
         if reads_qc_enabled:
@@ -1451,6 +1467,8 @@ def prepare(args: argparse.Namespace) -> None:
             ],
         )
 
+        if q0_evidence != load_verified_evidence(server_dir):
+            fail("q0 evidence changed while building q0/donors")
         commit_prepared_outputs(stage_grt, stage_metadata, server_dir)
         print(
             f"Prepared LGZ q0/D0/Dtel: recipe={recipe_id}, "

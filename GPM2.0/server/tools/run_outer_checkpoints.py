@@ -442,7 +442,18 @@ class OuterCheckpointManager:
         # New workspaces have separate q0 alignment and later annotation units.
         split = (run_dir / "q0_command.sh").is_file()
         operations = []
+        declared = None
+        descriptor = run_dir / "q0_alignment_inputs.json"
+        if descriptor.is_file():
+            if alignment_only:
+                rows = json.loads(descriptor.read_text(encoding="utf-8"))["alignments"]
+                declared = {Path(row["run_dir"]).name for row in rows}
+            else:
+                rows = json.loads((run_dir / "alignment_tasks.json").read_text(encoding="utf-8"))["tasks"]
+                declared = {Path(row["command"]).parent.name for row in rows}
         for child in sorted(run_dir.iterdir()):
+            if declared is not None and child.name not in declared:
+                continue
             if not child.is_dir() or child.name in {"datasets", "add_ctg"}:
                 continue
             scan = child.name in {"tel_scan", "cen_scan"}
@@ -467,6 +478,9 @@ class OuterCheckpointManager:
         manifest = run_dir / ("q0_alignment_tasks.json" if alignment_only else "alignment_tasks.json")
         if alignment_only or split or manifest.is_file():
             paths.append(manifest)
+        descriptor = run_dir / "q0_alignment_inputs.json"
+        if alignment_only and descriptor.is_file():
+            paths.append(descriptor)
         datasets_dir = run_dir / "datasets"
         if datasets_dir.is_dir():
             paths.extend(path for path in datasets_dir.rglob("*") if path.is_file())
@@ -578,9 +592,15 @@ class OuterCheckpointManager:
             datasets_dir = run_dir / "datasets"
             if datasets_dir.is_dir():
                 paths.extend(path for path in datasets_dir.rglob("*") if path.is_file())
-            for child in run_dir.iterdir():
-                if not child.is_dir() or child.name in {"datasets", "add_ctg"}:
-                    continue
+            descriptor = run_dir / "q0_alignment_inputs.json"
+            if descriptor.is_file():
+                paths.append(descriptor)
+                operation_dirs = sorted(set(self._chromosome_operations(run_dir, alignment_only=True)
+                                            + self._chromosome_operations(run_dir)))
+            else:
+                operation_dirs = [child for child in run_dir.iterdir()
+                                  if child.is_dir() and child.name not in {"datasets", "add_ctg"}]
+            for child in operation_dirs:
                 command = child / "command.sh"
                 if command.is_file():
                     paths.append(command)

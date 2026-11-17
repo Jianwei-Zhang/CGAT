@@ -32,6 +32,7 @@ class RunOrchestrationContractTests(unittest.TestCase):
                 "assign",
                 "q0_chr:Chr01",
                 "q0_chr:Chr02",
+                "q0_evidence",
                 "grt_prepare",
                 "grt_step1",
                 "grt_step2",
@@ -48,7 +49,8 @@ class RunOrchestrationContractTests(unittest.TestCase):
         by_id = {item.unit_id: item for item in plan}
         self.assertEqual(by_id["q0_chr:Chr01"].dependencies, ("assign",))
         self.assertEqual(by_id["q0_chr:Chr02"].dependencies, ("assign",))
-        self.assertEqual(by_id["grt_prepare"].dependencies, ("q0_chr:Chr01", "q0_chr:Chr02"))
+        self.assertEqual(by_id["q0_evidence"].dependencies, ("q0_chr:Chr01", "q0_chr:Chr02"))
+        self.assertEqual(by_id["grt_prepare"].dependencies, ("q0_evidence",))
         self.assertEqual(by_id["chr:Chr01"].dependencies, ("grt_telomere_finalize",))
         self.assertEqual(by_id["finalize_evidence"].dependencies, ("chr:Chr01", "chr:Chr02"))
 

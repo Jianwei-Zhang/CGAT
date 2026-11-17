@@ -1503,6 +1503,8 @@ Path(prefix + '.delta').write_text(
                 ("s_tel_short", "TTTAGGG" * 80),
             ],
         )
+        from server.tests.q0_test_support import seed_q0_evidence
+        seed_q0_evidence(server)
         completed = subprocess.run(
             [sys.executable, str(PREPARE_TOOL), "--server-dir", str(server)],
             check=False,
