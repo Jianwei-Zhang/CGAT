@@ -291,9 +291,14 @@ command = Path(batch["directory"]) / "command.sh"
 assert str(command) in (run / "command.sh").read_text()
 assert "self_alignment_batches.py" in command.read_text()
 assert str(manifest_path) in command.read_text()
-tasks = json.loads((run.parent / "alignment_tasks.json").read_text())["tasks"]
+tasks = json.loads((run.parent / "q0_alignment_tasks.json").read_text())["tasks"]
 self_task = next(row for row in tasks if root / row["command"] == command)
 assert self_task["max_threads"] == 2  # Two query records, within the 12-thread budget.
+late = json.loads((run.parent / "alignment_tasks.json").read_text())["tasks"]
+assert all("_vs_" not in row["command"] for row in late)
+assert "tel_scan" not in (run.parent / "q0_generated_command.sh").read_text()
+assert "cen_scan" not in (run.parent / "q0_generated_command.sh").read_text()
+assert "_vs_" not in (run.parent / "generated_command.sh").read_text()
 PYBATCH
   [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
     echo "expected the one-contig ds_b track not to schedule a self run" >&2
@@ -480,8 +485,8 @@ assert_chr_partition_run_all_staging() {
     exit 1
   }
   mapfile -t command_lines < <(tail -n +2 "$plan")
-  [[ "${#command_lines[@]}" -eq 12 ]] || {
-    echo "expected 12 staged plan units, got ${#command_lines[@]}" >&2
+  [[ "${#command_lines[@]}" -eq 13 ]] || {
+    echo "expected 13 staged plan units, got ${#command_lines[@]}" >&2
     if [[ "${#command_lines[@]}" -gt 0 ]]; then
       printf '%s\n' "${command_lines[@]}" >&2
     fi
@@ -501,6 +506,7 @@ assert_chr_partition_run_all_staging() {
   local expected_tail
   expected_tail="$(cat <<EOF
 assign	assign_chr_groups.sh	logs/run_all.log
+q0_chr:${chr_name}	runs/chr_${chr_name}/q0_command.sh	logs/run_all.log
 grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
 grt_step1	run_lgz_step1.sh	logs/run_all.log
 grt_step2	run_lgz_step2.sh	logs/run_all.log
@@ -1136,10 +1142,17 @@ EOF
     echo "expected --skip-self to suppress chr-local ds_b_vs_self" >&2
     exit 1
   }
-  ! grep -q '_vs_self' "${output_root}/runs/chr_Chr01/generated_command.sh" || {
+  ! grep -q '_vs_self' "${output_root}/runs/chr_Chr01/q0_generated_command.sh" || {
     echo "expected generated chr command not to contain self runs when --skip-self is set" >&2
     exit 1
   }
+  printf '>tig_second\nAAAAAAAAAA\n' >> "${output_root}/data/datasets/ds_a.fa"
+  printf 'tig_second\t10\t0\t6\t+\tChr01\t30\t4\t10\t6\t6\t60\n' >> "${output_root}/runs/ds_a_vs_ref/result.paf"
+  if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >"${TMP_DIR}/skip-conflict.log" 2>&1; then
+    echo "expected --skip-self to reject multiple same-dataset q0 candidates" >&2
+    exit 1
+  fi
+  grep -F -- '--skip-self conflicts with multiple candidate contigs' "${TMP_DIR}/skip-conflict.log" >/dev/null
 }
 
 test_prepare_writes_reference_segments_metadata() {

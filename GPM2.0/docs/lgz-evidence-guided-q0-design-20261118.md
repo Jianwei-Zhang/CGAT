@@ -243,7 +243,7 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 | --- | --- | --- |
 | D0 | 已提交并推送 | `a634df9`；Q1–Q14、A01–A20、13 个章节及 LF 格式检查通过 |
 | I1 | 基础模块与定向回归已完成；尚未接入运行入口 | `q0_sources.py`、`q0_alignments.py`；新增 25 项测试，联合回归 44 项通过；运行库清单校验通过 |
-| I2 | 未开始 | — |
+| I2 | 部分完成：组内比对前置、分阶段 checkpoint 与复用；扩展候选/补比对和总证据清单尚未接入 | 见 13.2；13 项新增调度测试；最终合并回归 138 项通过；两套准备脚本测试通过 |
 | I3 | 未开始 | — |
 | I4 | 未开始 | — |
 | I5 | 未开始 | — |
@@ -278,3 +278,57 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 ```
 
 证据边界：这是 I1 基础模块验证，不是 A01–A20 全部通过。尚未前置调度、替换旧 q0 入口、实现路径引擎或完成 donor/App 适配。投影结果的 `exact` 仅表示裁剪坐标准确，不代表命中唯一、碱基一致、桥接成立或允许结构编辑。
+
+
+### 13.2 I2a：前置组内比对并拆分扫描依赖
+
+实际生成的计划已变为：
+
+```text
+ref:* -> assign -> q0_chr:* -> grt_prepare -> LGZ 后续阶段 -> chr:* -> finalize_evidence -> archives
+```
+
+- `q0_chr:<chr>` 使用 `q0_command.sh` / `q0_generated_command.sh` / `q0_alignment_tasks.json` 执行 self/cross 比对。
+- 后面的 `chr:<chr>` 及原 `command.sh` / `generated_command.sh` / `alignment_tasks.json` 执行扫描；原始 PAF 路径不变。
+- q0 染色体任务沿用现有 CPU 预算调度器；全部成功并通过 PAF/CIGAR/内容校验后才继续下一阶段。
+- 两个阶段分别记录 checkpoint，不要求早期比对提前拥有未来扫描输出；扫描脚本变化不会单独使早期比对失效。
+- 手动复制执行 `q0_command.sh` 由同一工具在运行前捕获输入，成功后记录同一种 checkpoint。手动和并行执行都会在提交前重新核对输入；运行期间来源或参数变化时拒绝发布成功记录。空比对、无比对任务、缺失结果分别处理。
+- 缺失 q0 任务清单报错，不回退使用扫描清单。
+- 跨 ds 比对方向按 dataset 名称稳定排列；`existing_display_evidence` 使用实际 PAF 路径判断 query/target，不能再按 `--ds` 顺序猜测角色。读取既有反向目录不等于保留旧 q0 构建算法。
+- 当现有组中有多个同 ds 候选而显式要求 `--skip-self` 时，在分组输出写入前报告冲突；只有一个候选时不强制生成无意义的 self 任务。
+- Server 报告区分 q0 候选比对与后续扫描，不重复计入同一 PAF。
+
+验证：
+
+1. `prepare_metadata_test.sh`、`prepare_full_test.sh` 均通过，包括新顺序、拆分清单、self batch 及 skip-self 冲突。
+2. 最终代码冻结后，以下合并 Python 回归 **138 项通过**，其中新增调度测试 13 项。此前的分批回归也通过；最终以合并结果为准。
+3. `sync_server_runtime.py --write` 重新生成清单；只读校验 `status=verified, changed=[]`。Python 语法、shell 语法、LF 和 Git whitespace 检查通过。
+
+以下是最终合并回归及准备脚本复跑命令（在 `GPM2.0` 中执行）；这是受影响范围的定向验证，不宣称已完成整体质量 gate：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests:. python3 -m unittest \
+  server.tests.test_q0_scheduling \
+  server.tests.test_run_orchestration \
+  server.tests.test_run_outer_checkpoints \
+  server.tests.test_run_all_runner \
+  server.tests.test_alignment_tasks \
+  server.tests.test_self_alignment_batches \
+  server.tests.test_self_alignment_parameters \
+  server.tests.test_server_report \
+  server.tests.test_q0_evidence \
+  server.tests.test_grt_evidence_package \
+  server.tests.test_lgz_compatibility \
+  server.tests.test_workspace_runtime_update -v
+
+PYTHONDONTWRITEBYTECODE=1 bash tests/gpm_server/prepare_metadata_test.sh
+PYTHONDONTWRITEBYTECODE=1 bash tests/gpm_server/prepare_full_test.sh
+```
+
+I2 仍有未完成工作：
+
+- 主候选/扩展候选发现、内部 N 分段后的区段级关系，以及按需求生成跨组/未分组补比对。
+- 把组内与补比对的成功状态、query/target 来源、参数及实际 PAF 汇总为 q0 的必需证据清单，并纳入 q0 输入指纹；独立调用新 q0 入口也必须校验该清单。
+- 分组重新生成时保留输入与参数仍匹配的原始比对缓存，不能依赖当前分组脚本清理目录的旧行为满足此要求。
+
+当前 `lgz_prepare_inputs.py` 的路径选择尚未切换，不能把本阶段的调度通过当作新 q0 或 Final Path 已验收。后续按 I2 剩余项、I3–I6 继续，不增加旧策略开关。

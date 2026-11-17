@@ -40,6 +40,8 @@ TITLES = {
 def title(unit_id: str) -> str:
     if unit_id.startswith("ref:"):
         return "参考比对 · " + unit_id[4:]
+    if unit_id.startswith("q0_chr:"):
+        return "q0 候选比对 · " + unit_id.split(":", 1)[1]
     if unit_id.startswith("chr:"):
         return "染色体比对与注释 · " + unit_id[4:]
     return TITLES.get(unit_id, unit_id)

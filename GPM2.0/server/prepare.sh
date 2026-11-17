@@ -104,7 +104,7 @@ Behavior:
   - With --reads, also discovers meryl and merqury.sh from PATH
   - With no --reads, only reads-based QC is skipped; q0 and frozen D0/Dtel are still prepared
   - Generates staged chromosome-partitioned run commands
-  - Supports --skip-self to omit dataset vs self alignments
+  - --skip-self is allowed only when no chr group requires same-dataset candidate alignments
   - Accepts plain FASTA inputs such as .fa/.fasta/.fna
   - Accepts gzip-compressed FASTA inputs such as .fa.gz/.fasta.gz/.fna.gz
   - Normalizes all inputs into package-local .fa files under data/
@@ -120,9 +120,9 @@ Behavior:
   - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ Step3 -> LGZ telomere/q4 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ Step3 -> LGZ telomere/q4 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
-  - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
+  - --skip-self conflicts with multiple same-dataset q0 candidates in a chr group; assignment stops with an error
   - Prints all generated staged commands to the terminal for manual copy/paste
 EOF
 }
@@ -652,6 +652,17 @@ generated_command="./generated_command.sh"
 bash "\${generated_command}"
 EOF
   make_executable_if_supported "${run_dir}/command.sh"
+  cat > "${run_dir}/q0_command.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd $(shell_quote "$run_dir")
+[[ -f ./q0_generated_command.sh ]] || {
+  echo "missing q0 chr-local command for ${chr_name}; run assign_chr_groups.sh first" >&2
+  exit 1
+}
+exec python3 $(shell_quote "${WORK_ROOT}/.prepare_lib/tools/run_outer_checkpoints.py") --server-dir $(shell_quote "$WORK_ROOT") --run-q0-chr $(shell_quote "$chr_name")
+EOF
+  make_executable_if_supported "${run_dir}/q0_command.sh"
 }
 
 write_self_command_script() {
@@ -1057,7 +1068,7 @@ mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 [[ "${#REFERENCE_CHR_NAMES[@]}" -gt 0 ]] \
   || die "Reference FASTA contains no sequence records: $REF_DST"
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 9 + ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 9 + 2 * ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -1080,6 +1091,17 @@ printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "assign_chr_groups"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/assign_chr_groups.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
+for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
+  run_chr_dir="${WORK_ROOT}/runs/chr_${chr_name}"
+  mkdir -p "$run_chr_dir"
+  write_chr_placeholder_script "$run_chr_dir" "$chr_name"
+  append_run_all_unit "q0_chr:${chr_name}" "runs/chr_${chr_name}/q0_command.sh" "logs/run_all.log"
+  printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "q0_alignments_${chr_name}"
+  printf 'cd %s\n' "$run_chr_dir"
+  printf 'bash %s\n\n' "${run_chr_dir}/q0_command.sh"
+  COMMAND_INDEX=$((COMMAND_INDEX + 1))
+done
 
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
   write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
@@ -1125,8 +1147,6 @@ COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   run_chr_dir="${WORK_ROOT}/runs/chr_${chr_name}"
-  mkdir -p "$run_chr_dir"
-  write_chr_placeholder_script "$run_chr_dir" "$chr_name"
   append_run_all_unit \
     "chr:${chr_name}" \
     "runs/chr_${chr_name}/command.sh" \

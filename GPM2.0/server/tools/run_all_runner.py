@@ -647,7 +647,7 @@ class Runner:
                         )
                         return 128 + self.received_signal
                     kind = unit.unit_id.split(":", 1)[0]
-                    if kind in {"ref", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
+                    if kind in {"ref", "q0_chr", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
                         group = []
                         for candidate in self.units[unit_index:]:
                             if candidate.unit_id.split(":", 1)[0] != kind or load_tasks(self.server_dir, candidate.unit_id, candidate.command_relpath) is None:

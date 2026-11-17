@@ -76,6 +76,9 @@ class OuterCheckpointManager:
         elif unit_id == "assign":
             kind = "assignment"
             inputs = self._assignment_inputs(command_relpath)
+        elif unit_id.startswith("q0_chr:") and unit_id.count(":") == 1:
+            kind = "q0_chromosome_alignments"
+            inputs = self._chromosome_inputs(unit_id.split(":", 1)[1], command_relpath, alignment_only=True)
         elif unit_id.startswith("chr:") and unit_id.count(":") == 1:
             kind = "chromosome_local"
             inputs = self._chromosome_inputs(unit_id.removeprefix("chr:"), command_relpath)
@@ -90,6 +93,8 @@ class OuterCheckpointManager:
             "alignment_geometry_version": 2,
             **inputs,
         }
+        if kind == "q0_chromosome_alignments":
+            input_payload["command_relpath"] = command_relpath
         digest = fingerprint(unit_id)
         slug = "".join(character if character.isalnum() else "-" for character in unit_id)
         checkpoint_path = self.checkpoint_dir / f"{slug[:48]}.{digest[:16]}.json"
@@ -130,6 +135,13 @@ class OuterCheckpointManager:
 
     def commit(self, prepared: PreparedOuterCheckpoint) -> Path:
         outputs = self._output_identities(prepared)
+        if prepared.kind == "q0_chromosome_alignments":
+            # Bind outputs to the inputs captured BEFORE execution, including
+            # manual runs. A new manager also refreshes tool/option identities.
+            current = OuterCheckpointManager(self.server_dir).prepare(
+                prepared.unit_id, str(prepared.input_payload["command_relpath"]))
+            if current is None or current.input_fingerprint != prepared.input_fingerprint:
+                raise OrchestrationContractError("q0 alignment inputs changed during execution")
         checkpoint = {
             "workflow": WORKFLOW,
             "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
@@ -424,24 +436,42 @@ class OuterCheckpointManager:
             "inputs": self._identities(paths),
         }
 
-    def _chromosome_inputs(self, chromosome: str, command_relpath: str) -> dict[str, object]:
+    @staticmethod
+    def _chromosome_operations(run_dir: Path, *, alignment_only: bool = False) -> list[Path]:
+        # Old prepared chr commands retain their all-in-one checkpoint shape.
+        # New workspaces have separate q0 alignment and later annotation units.
+        split = (run_dir / "q0_command.sh").is_file()
+        operations = []
+        for child in sorted(run_dir.iterdir()):
+            if not child.is_dir() or child.name in {"datasets", "add_ctg"}:
+                continue
+            scan = child.name in {"tel_scan", "cen_scan"}
+            if alignment_only and scan:
+                continue
+            if not alignment_only and split and not scan:
+                continue
+            operations.append(child)
+        return operations
+
+    def _chromosome_inputs(self, chromosome: str, command_relpath: str,
+                           *, alignment_only: bool = False) -> dict[str, object]:
         run_dir = self.server_dir / f"runs/chr_{chromosome}"
+        split = (run_dir / "q0_command.sh").is_file()
         paths = [
             self.server_dir / command_relpath,
-            run_dir / "generated_command.sh",
+            run_dir / ("q0_generated_command.sh" if alignment_only else "generated_command.sh"),
             self.server_dir / "metadata/prepare_options.tsv",
             self.server_dir / "metadata/chr_assignments.tsv",
             self.server_dir / "metadata/track_member_orders.tsv",
         ]
-        datasets_dir = run_dir / "datasets"
-        manifest = run_dir / "alignment_tasks.json"
-        if manifest.is_file():
+        manifest = run_dir / ("q0_alignment_tasks.json" if alignment_only else "alignment_tasks.json")
+        if alignment_only or split or manifest.is_file():
             paths.append(manifest)
+        datasets_dir = run_dir / "datasets"
         if datasets_dir.is_dir():
             paths.extend(path for path in datasets_dir.rglob("*") if path.is_file())
-        for child in run_dir.iterdir():
-            if not child.is_dir() or child.name in {"datasets", "add_ctg"}:
-                continue
+        operations = self._chromosome_operations(run_dir, alignment_only=alignment_only)
+        for child in operations:
             command = child / "command.sh"
             if command.is_file():
                 paths.append(command)
@@ -455,50 +485,39 @@ class OuterCheckpointManager:
                     for path in child.glob(pattern)
                     if path.is_file()
                 )
-
             for support_name in ("self_name_map.tsv", "restore_self_paf.py"):
-
                 support_path = child / support_name
-
                 if support_path.is_file():
-
                     paths.append(support_path)
-        for optional in [
-            self.server_dir / ".prepare_lib/tools/self_alignment_batches.py",
-            self.server_dir / "tel/rules.tsv",
-            self.server_dir / "cen/reference.tsv",
-            self.server_dir / "cen/library.fa",
-            self.server_dir / "metadata/annotation_library_snapshot.json",
-            self.server_dir / ".prepare_lib/tools/cen_scan.py",
-            self.server_dir / ".prepare_lib/tools/annotation_library.py",
-        ]:
-            if optional.is_file():
-                paths.append(optional)
-        centromere_dir = self.server_dir / "data/centromere"
-        if centromere_dir.is_dir():
-            paths.extend(path for path in centromere_dir.rglob("*") if path.is_file())
-        tools = self._alignment_tools()
-        if self._repeat_cen_scan(run_dir / "cen_scan"):
-            tools = [*tools, self._tool_identity("nucmer"), self._tool_identity("show-coords")]
-        uses_python = any((run_dir / name).is_dir() for name in ("tel_scan", "cen_scan")) or any(
-            child.is_dir() and (child / "restore_self_paf.py").is_file()
-            for child in run_dir.iterdir()
-        )
+        optional_names = [".prepare_lib/tools/self_alignment_batches.py"] if alignment_only else [
+            ".prepare_lib/tools/self_alignment_batches.py",
+            "tel/rules.tsv", "cen/reference.tsv", "cen/library.fa",
+            "metadata/annotation_library_snapshot.json",
+            ".prepare_lib/tools/cen_scan.py", ".prepare_lib/tools/annotation_library.py",
+        ]
+        for name in optional_names:
+            path = self.server_dir / name
+            if path.is_file():
+                paths.append(path)
+        if not alignment_only:
+            centromere_dir = self.server_dir / "data/centromere"
+            if centromere_dir.is_dir():
+                paths.extend(path for path in centromere_dir.rglob("*") if path.is_file())
+        has_alignment = any(child.name not in {"tel_scan", "cen_scan"} for child in operations)
+        cen_scan = next((child for child in operations if child.name == "cen_scan"), None)
+        repeat_scan = cen_scan is not None and self._repeat_cen_scan(cen_scan)
+        tools = self._alignment_tools() if has_alignment or (cen_scan and not repeat_scan) else []
+        if repeat_scan:
+            tools.extend([self._tool_identity("nucmer"), self._tool_identity("show-coords")])
+        uses_python = any(child.name in {"tel_scan", "cen_scan"}
+                          or (child / "restore_self_paf.py").is_file() for child in operations)
         if uses_python:
-            tools = [*tools, self._tool_identity("python3")]
+            tools.append(self._tool_identity("python3"))
         return {
-            "parameters": self._selected_options(
-                [
-                    "alignment_engine",
-                    "threads",
-                    "minimap_preset",
-                    "skip_self",
-                    "tel_enabled",
-                    "cen_enabled",
-                    "cen_min_len",
-                    "cen_min_identity",
-                ]
-            ),
+            "parameters": self._selected_options([
+                "alignment_engine", "threads", "minimap_preset", "skip_self",
+                "tel_enabled", "cen_enabled", "cen_min_len", "cen_min_identity",
+            ]),
             "tools": tools,
             "inputs": self._identities(paths),
         }
@@ -514,6 +533,9 @@ class OuterCheckpointManager:
             ]
         elif prepared.kind == "assignment":
             paths = self._assignment_output_paths()
+        elif prepared.kind == "q0_chromosome_alignments":
+            chromosome = prepared.unit_id.split(":", 1)[1]
+            paths = self._chromosome_output_paths(chromosome, alignment_only=True)
         elif prepared.kind == "chromosome_local":
             chromosome = prepared.unit_id.removeprefix("chr:")
             paths = self._chromosome_output_paths(chromosome)
@@ -550,6 +572,9 @@ class OuterCheckpointManager:
             manifest = run_dir / "alignment_tasks.json"
             if manifest.is_file():
                 paths.append(manifest)
+            if (run_dir / "q0_command.sh").is_file():
+                paths.extend(run_dir / name for name in (
+                    "q0_command.sh", "q0_generated_command.sh", "q0_alignment_tasks.json"))
             datasets_dir = run_dir / "datasets"
             if datasets_dir.is_dir():
                 paths.extend(path for path in datasets_dir.rglob("*") if path.is_file())
@@ -578,14 +603,10 @@ class OuterCheckpointManager:
         except (OSError, UnicodeError, csv.Error) as exc:
             raise OrchestrationContractError(f"cannot read {path}: {exc}") from exc
 
-    def _chromosome_output_paths(self, chromosome: str) -> list[Path]:
+    def _chromosome_output_paths(self, chromosome: str, *, alignment_only: bool = False) -> list[Path]:
         run_dir = self.server_dir / f"runs/chr_{chromosome}"
         paths: list[Path] = []
-        operation_dirs = [
-            child
-            for child in run_dir.iterdir()
-            if child.is_dir() and child.name not in {"datasets", "add_ctg"}
-        ]
+        operation_dirs = self._chromosome_operations(run_dir, alignment_only=alignment_only)
         for operation in operation_dirs:
             if operation.name == "tel_scan":
                 tel_outputs = sorted((self.server_dir / f"tel/chr_{chromosome}").glob("*.tsv"))
@@ -616,3 +637,38 @@ class OuterCheckpointManager:
 # Compatibility constants; persisted values remain unchanged.
 GRT_WORKFLOW = LGZ_WORKFLOW
 GRT_STAGE_MAP = LGZ_STAGE_MAP
+
+
+def main() -> None:
+    """Run a manual q0 chromosome command against a pre-execution input snapshot.
+
+    The adaptive runner commits the same checkpoint after all leaf tasks succeed.
+    This entrypoint keeps prepare.sh's printed per-stage commands equivalent.
+    """
+    import argparse
+    import subprocess
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("--server-dir", required=True, type=Path)
+    parser.add_argument("--run-q0-chr", required=True)
+    args = parser.parse_args()
+    # Match the ordinary plan's name restrictions before constructing a path.
+    try:
+        from run_orchestration import q0_chromosome_unit_id
+    except ModuleNotFoundError:
+        from .run_orchestration import q0_chromosome_unit_id
+    try:
+        unit = q0_chromosome_unit_id(args.run_q0_chr)
+        manager = OuterCheckpointManager(args.server_dir)
+        prepared = manager.prepare(unit, f"runs/chr_{args.run_q0_chr}/q0_command.sh")
+        assert prepared is not None
+        run_dir = manager.server_dir / f"runs/chr_{args.run_q0_chr}"
+        result = subprocess.run(["bash", str(run_dir / "q0_generated_command.sh")], cwd=run_dir)
+        if result.returncode:
+            raise SystemExit(result.returncode if result.returncode > 0 else 128 - result.returncode)
+        manager.commit(prepared)
+    except (OSError, ValueError, OrchestrationContractError) as exc:
+        parser.exit(1, f"q0 alignment checkpoint failed: {exc}\n")
+
+
+if __name__ == "__main__":
+    main()

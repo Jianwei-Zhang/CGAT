@@ -355,11 +355,16 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
         return collect_assignment(root, input_data)
     if unit_id == "grt_prepare":
         return collect_lgz_inputs(root)
-    if unit_id.startswith("chr:"):
+    if unit_id.startswith(("chr:", "q0_chr:")):
         relative = f"runs/chr_{unit_id.split(':', 1)[1]}"
         paths = sorted(local_path(root, relative).glob("*/result.paf"))
+        q0_phase = unit_id.startswith("q0_chr:")
+        split_phases = (local_path(root, relative) / "q0_alignment_tasks.json").is_file()
+        if q0_phase or split_phases:
+            paths = [path for path in paths
+                     if (path.parent.name not in {"tel_scan", "cen_scan"}) == q0_phase]
         annotation_tables = {}
-        for kind in ("tel", "cen"):
+        for kind in (() if q0_phase else ("tel", "cen")):
             directory = local_path(root, f"{kind}/chr_{unit_id.split(':', 1)[1]}")
             for path in sorted(directory.glob("*.tsv")):
                 annotation_tables[f"{kind} · {path.stem}"] = table(root, path.relative_to(root).as_posix())

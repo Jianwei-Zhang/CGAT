@@ -16,6 +16,7 @@ from pathlib import Path
 
 
 MANIFEST = "alignment_tasks.json"
+Q0_MANIFEST = "q0_alignment_tasks.json"
 
 
 @dataclass(frozen=True)
@@ -152,8 +153,11 @@ def write_manifest(
 
 
 def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | None:
-    manifest = (root / command).parent / MANIFEST
+    q0_phase = unit_id.startswith("q0_chr:")
+    manifest = (root / command).parent / (Q0_MANIFEST if q0_phase else MANIFEST)
     if not manifest.is_file():
+        if q0_phase:
+            raise ValueError(f"required q0 alignment task manifest is missing: {manifest}")
         return None  # Older prepared workspaces retain their sequential contract.
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("version") not in {1, 2, 3}:

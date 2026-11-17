@@ -84,6 +84,10 @@ def chromosome_unit_id(chromosome: str) -> str:
     return f"chr:{validate_name(chromosome, 'chromosome name')}"
 
 
+def q0_chromosome_unit_id(chromosome: str) -> str:
+    return f"q0_chr:{validate_name(chromosome, 'chromosome name')}"
+
+
 def chromosome_self_unit_id(chromosome: str, dataset_name: str) -> str:
     return (
         f"{chromosome_unit_id(chromosome)}:self:"
@@ -129,11 +133,13 @@ def build_unit_plan(
 
     reference_ids = tuple(reference_unit_id(name) for name in datasets)
     chromosome_ids = tuple(chromosome_unit_id(name) for name in chromosomes)
+    q0_chromosome_ids = tuple(q0_chromosome_unit_id(name) for name in chromosomes)
     items = [UnitPlanItem(unit_id, ()) for unit_id in reference_ids]
     items.extend(
         [
             UnitPlanItem(ASSIGN_UNIT_ID, reference_ids),
-            UnitPlanItem(LGZ_PREPARE_UNIT_ID, (ASSIGN_UNIT_ID,)),
+            *(UnitPlanItem(unit_id, (ASSIGN_UNIT_ID,)) for unit_id in q0_chromosome_ids),
+            UnitPlanItem(LGZ_PREPARE_UNIT_ID, q0_chromosome_ids),
             UnitPlanItem(LGZ_STEP1_UNIT_ID, (LGZ_PREPARE_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP2_UNIT_ID, (LGZ_STEP1_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP3_UNIT_ID, (LGZ_STEP2_UNIT_ID,)),

@@ -17,7 +17,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from alignment_tasks import MANIFEST, query_profile, query_threads, write_manifest
+from alignment_tasks import MANIFEST, Q0_MANIFEST, query_profile, query_threads, write_manifest
 
 
 THREAD_ARGUMENT = object()
@@ -770,6 +770,13 @@ for dataset_name in dataset_order:
             )
             selected_by_chr_dataset.setdefault(chr_name, {}).setdefault(dataset_name, set()).add(seq_name)
 
+if skip_self:
+    for chromosome, group in selected_by_chr_dataset.items():
+        for dataset_name, members in group.items():
+            if len(members) > 1:
+                fail(f"q0 requires within-dataset alignment for {dataset_name}:{chromosome}; "
+                     "--skip-self conflicts with multiple candidate contigs")
+
 chr_assignments_path = metadata_dir / "chr_assignments.tsv"
 with chr_assignments_path.open("w", encoding="utf-8", newline="") as handle:
     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
@@ -892,7 +899,8 @@ for chr_name in reference_chr_names:
     for stale_fasta in datasets_dir.glob("*.fa"):
         stale_fasta.unlink()
     for child in chr_run_dir.iterdir():
-        if child.name in {"datasets", "command.sh", "generated_command.sh"}:
+        if child.name in {"datasets", "command.sh", "generated_command.sh",
+                          "q0_command.sh", "q0_generated_command.sh"}:
             continue
         if child.is_dir():
             shutil.rmtree(child)
@@ -911,6 +919,7 @@ for chr_name in reference_chr_names:
         write_selected_fasta(output_fasta, ordered_records, selected_names)
         selected_dataset_fastas.append((dataset_name, output_fasta))
 
+    selected_dataset_fastas.sort(key=lambda item: item[0])
     command_paths = []
     task_caps = {}
     task_priorities = {}
@@ -960,6 +969,9 @@ for chr_name in reference_chr_names:
             total, largest_fraction = query_profile(right_fasta)
             task_profiles[command_path] = (total * left_fasta.stat().st_size, largest_fraction)
 
+    q0_command_paths = list(command_paths)
+    command_paths = []
+
     tel_rules_path = work_root / "tel" / "rules.tsv"
     if tel_rules_path.exists() and selected_dataset_fastas:
         run_dir = chr_run_dir / "tel_scan"
@@ -991,18 +1003,18 @@ for chr_name in reference_chr_names:
             command_paths.append(command_path)
             task_caps[command_path] = int(threads)
 
-    write_generated_command_script(chr_run_dir / "generated_command.sh", command_paths, chr_name)
-    manifest_tasks = []
-    for command in command_paths:
-        if command in expanded_tasks:
-            manifest_tasks.extend(expanded_tasks[command])
-            continue
-        row = (
-            command,
-            task_caps.get(command, 1),
-            task_priorities.get(command, 0),
-        )
-        if command in task_profiles:
-            row += task_profiles[command]
-        manifest_tasks.append(row)
-    write_manifest(chr_run_dir / MANIFEST, work_root, manifest_tasks)
+    for script_name, manifest_name, phase_commands in (
+        ("q0_generated_command.sh", Q0_MANIFEST, q0_command_paths),
+        ("generated_command.sh", MANIFEST, command_paths),
+    ):
+        write_generated_command_script(chr_run_dir / script_name, phase_commands, chr_name)
+        manifest_tasks = []
+        for command in phase_commands:
+            if command in expanded_tasks:
+                manifest_tasks.extend(expanded_tasks[command])
+                continue
+            row = (command, task_caps.get(command, 1), task_priorities.get(command, 0))
+            if command in task_profiles:
+                row += task_profiles[command]
+            manifest_tasks.append(row)
+        write_manifest(chr_run_dir / manifest_name, work_root, manifest_tasks)

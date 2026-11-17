@@ -369,8 +369,7 @@ def existing_display_evidence(
         fail(f"source card dataset is absent: {source_dataset}")
     chr_run = server_dir / f"runs/chr_{chr_name}"
     results: list[dict[str, object]] = []
-    source_index = names.index(source_dataset)
-    for other_index, other_dataset in enumerate(names):
+    for other_dataset in sorted(names):
         source_fasta = chr_run / f"datasets/{source_dataset}.fa"
         other_fasta = chr_run / f"datasets/{other_dataset}.fa"
         if not source_fasta.is_file() or not other_fasta.is_file():
@@ -379,14 +378,18 @@ def existing_display_evidence(
             run_dir = chr_run / f"{source_dataset}_vs_self"
             left_fasta = right_fasta = source_fasta
             source_role = "both"
-        elif source_index < other_index:
-            run_dir = chr_run / f"{source_dataset}_vs_{other_dataset}"
-            left_fasta, right_fasta = source_fasta, other_fasta
-            source_role = "target"
         else:
-            run_dir = chr_run / f"{other_dataset}_vs_{source_dataset}"
-            left_fasta, right_fasta = other_fasta, source_fasta
-            source_role = "query"
+            # New q0 runs canonicalize pair direction independently of --ds
+            # order. Also accept the actual reverse path in existing bundles.
+            left_name, right_name = sorted((source_dataset, other_dataset))
+            run_dir = chr_run / f"{left_name}_vs_{right_name}"
+            reverse_dir = chr_run / f"{right_name}_vs_{left_name}"
+            if not (run_dir / "result.paf").is_file() and (reverse_dir / "result.paf").is_file():
+                left_name, right_name = right_name, left_name
+                run_dir = reverse_dir
+            left_fasta = chr_run / f"datasets/{left_name}.fa"
+            right_fasta = chr_run / f"datasets/{right_name}.fa"
+            source_role = "target" if source_dataset == left_name else "query"
         paf_path = run_dir / "result.paf"
         if not paf_path.is_file():
             continue
