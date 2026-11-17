@@ -61,6 +61,7 @@
         "tools/grt_core/q0_coverage.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_paths.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_preparation.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
+        "tools/grt_core/q0_publication.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_sources.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/refill_batch.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/repair_common.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
@@ -104,6 +105,7 @@
         "tools/lgz_core/q0_coverage.py": "1b9928c97cccf71a531d321e859aa07ac79109f7ac9494ff58bc69f9b46317b7",
         "tools/lgz_core/q0_paths.py": "9739dc115e6b0468ce46aac0f583cb23c8bbcd0e88aa09d71cad6814f87dbec9",
         "tools/lgz_core/q0_preparation.py": "a150ed4a8d1d276c26c8a9a89146a4b770a6307a5099ca999a1d0310482e7629",
+        "tools/lgz_core/q0_publication.py": "dc5cb7fcd5f3c10167f114e9281bd653fa174a4ba89c768b0a2f991f6dd8b556",
         "tools/lgz_core/q0_sources.py": "8f26d53ead816a66438f8489a3565bb617558893adcc6f5600581ab1b28c2bad",
         "tools/lgz_core/refill_batch.py": "f6fdeed9ae286d7bab06ff25649e5e78283cd8776871e9ae86766c58f93f9bce",
         "tools/lgz_core/repair_common.py": "2e756f863292416bd007324e5e2429ca3725dfc20f95c88344d87d009377114f",
@@ -121,8 +123,8 @@
         "tools/lgz_display_evidence.py": "ebdaa11fea3b1cca0d94927409b03df078b571f19acfff963410b2b073a394a7",
         "tools/lgz_evidence_package.py": "b7ded7416d7b3179b6c54448fca9b01d61187d2420175f4df7afdb27914d9bf7",
         "tools/lgz_prepare_evidence.py": "abac6a1c7fdc478d0b006b8691805fc54b4fc5cd3f2d8cc956d58fd4e1f3a56f",
-        "tools/lgz_prepare_inputs.py": "a495080fdb624a7db8d13c6136a823d18f566eed237f885d69076f3d5af2bb29",
-        "tools/lgz_step1.py": "304fc080444679324e7bab24143a237e3e960a2b4b41fe3f38e41dc0a6793660",
+        "tools/lgz_prepare_inputs.py": "b29fe2d3e70a38f0ed6c20c8bed1b9cd4d7652c01ed55d12bd671b29513297c2",
+        "tools/lgz_step1.py": "e6cf72c3aa5be1686161a272aac6a74c5e84a3e9b5d95c94e3644737030496d2",
         "tools/lgz_step2.py": "170595080cb4622a66ede97ff6f8f6d0382ba7c08cceb719a379fdd2d3c47dd5",
         "tools/lgz_step3.py": "8b42e133ceb2246ef03ed2313827499c9db9291b5beb32df73071d57d17acf98",
         "tools/lgz_telomere_finalize.py": "88faf3fcf633b7f6ef282cef7c44e01620ca18f4e2c7fd430366c76b031185e8",
@@ -150,7 +152,7 @@
       "reference_launch_checkpoint_recipe_equal": true
     }
   ],
-  "base_prepare_sha256": "7397bd55387836abddaa6f1b7df057c7acf2e490f21f0e0040f0a8460de7020d",
+  "base_prepare_sha256": "f0af6febc032205948a593824e4fc0ac5847eb5c21da0704e538ab824b4d5bc6",
   "source_revision": {
     "worktree_source_bound_by_file_hashes": true
   }

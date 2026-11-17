@@ -244,8 +244,8 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 | D0 | 已提交并推送 | `a634df9`；Q1–Q14、A01–A20、13 个章节及 LF 格式检查通过 |
 | I1 | 基础模块与定向回归已完成，已由 I2 证据阶段使用 | `q0_sources.py`、`q0_alignments.py`；新增 25 项测试，联合回归 44 项通过；运行库清单校验通过 |
 | I2 | 已接入并验证：前置比对、扩展候选、按需补比对、必需证据清单及缓存保留 | 见 13.2–13.3；最终联合回归 230 项通过（含来源方向回归）；两套准备脚本测试通过 |
-| I3 | 进行中：路径内核、真实证据准入和构建结果已实现；主准备事务尚未切换 | 见 13.4–13.5；不是完整新 q0 已交付 |
-| I4 | 未开始 | — |
+| I3 | 主入口已切换，q0 与 donor 冻结已共同发布，q0→q1 定向验证通过 | 见 13.4–13.6；完整 LGZ/交付尚未完成 |
+| I4 | 已冻结可新增区间与完整 donor 上下文；Step2/3、端粒收尾的使用仲裁尚待适配 | 见 13.6；不能仅修改版本判断放行 |
 | I5 | 未开始 | — |
 | I6 | 未开始 | — |
 
@@ -464,4 +464,53 @@ ref:* -> assign -> q0_chr:* -> q0_evidence -> grt_prepare -> LGZ 后续阶段 ->
 - 另一个实际 minimap2 测试没有预先提供跨组 pair PAF，由 `partial_source_discovery` 找到已归组来源的另一 chr 尾部关系，随后得到预期局部来源结果。
 - 最终 **165 项联合定向回归通过**（100.233 秒），包含准入/路径/坐标、I2 证据准备、既有主准备入口、命名兼容及运行库更新；运行库清单校验为 `verified, changed=[]`。以上均不是物种样本/客户数据质量收益或 App 导入验收。
 
-**仍未完成的切换：** `lgz_prepare_inputs.py` 尚未使用本构建结果。下一步必须在同一事务中替换旧 first-ds 路径构建、冻结区间级 donor/占用范围，并更新来源证据校验；不能把新选择证据伪装成旧 assignment，也不能只写一份新 FASTA 绕过 donor 和来源契约。I4–I6 与完整 Server/App 交付仍需继续。
+**I3b 提交时尚未完成的切换（已在 13.6 接入主准备事务）：** 当时 `lgz_prepare_inputs.py` 尚未使用本构建结果，下一步必须在同一事务中替换旧 first-ds 路径构建、冻结区间级 donor/占用范围，并更新来源证据校验；不能把新选择证据伪装成旧 assignment，也不能只写一份新 FASTA 绕过 donor 和来源契约。I4–I6 与完整 Server/App 交付仍需继续。
+
+
+### 13.6 I3c / I4 冻结基础：主入口切换与共同发布
+
+`lgz_prepare_inputs.py` 已删除原 first-ds 候选选择、ref 包围范围去冗余、按原轨道成员顺序串接整条 contig 的实现。它现在在完成实际 reads QC（如启用）之后，直接调用 `build_q0`，将其结果与 D0/Dtel、来源映射及证据一起准备、验证、发布。没有旧算法分支或策略开关。
+
+保留的 `primary_dataset` / `support_datasets_json` 是项目元数据，不决定 q0 候选资格或排序。donor 同分决胜也使用稳定原始来源身份，不再使用 `--ds` 行号。原 `chr_assignments.tsv` 不被改写；区段方向使用实际选择证据，不强行套用整条 contig 的旧显示方向。
+
+新增发布契约：
+
+| 产物 | 语义 |
+| --- | --- |
+| `metadata/package.tsv` 的 `schema_version=3` | 新 q0/donor 语义的显式版本门槛；workflow 机器标识和 Server Final Path JSON 版本不顺带改名 |
+| `metadata/grt_q0_selection.json` | `lgz_q0_selection_artifact_v1`，包装实际构建决策及所引用原始比对/原 N catalog 的文件哈希 |
+| `metadata/grt_q0_freeze.json` | `lgz_q0_donor_freeze_v1`，绑定选择结果、q0 来源行、q0 证据行、原始来源、来源占用、允许新增区间和完整 donor 成员 |
+| `grt_evidence_registry.tsv` 中 `q0_construction / q0_path_selection` | 明确表示 q0 选择证据，引用版本化选择产物；不伪装成 `assignment` 或直接 ref PAF |
+| `server/tools/lgz_core/q0_publication.py` | 发布序列化、source/card 映射、donor 可用区间计算和准备事务验证；不是完整 q4/App 交付校验器 |
+
+坐标与资格：
+
+- JSON 中的 source/occupied/available/member-available 区间为 **0-based half-open**；现有 q-segment 和 donor-member TSV 的来源区间仍为 **1-based inclusive**，只在明确边界转换。
+- 每个 donor 成员 FASTA 仍是完整正向原始 contig，保留比对锚点上下文；其可新增区间单独冻结。已进入 q0 的源区间以及长 N 区间不能因为成员 FASTA 完整就被视为可再次新增。
+- 部分进入 q0 的来源，只要仍满足原序列有效性、reads QC、长度等 donor 条件且存在未占用的可用区间，就可以留在 D0；不再按整个 contig 因“用于 q0”排除。
+- Dtel 的上下文资格与实际新增授权分开。没有可新增区间的成员不能仅凭端粒信号再次追加已占用来源；后续使用仲裁见 I4 待办。
+- donor-set ID 同时绑定成员和其允许区间。相同完整 FASTA 在不同 q0 占用状态下不能冒用同一冻结授权。
+- “来源尚未选入 q0”不等于自动具有 donor 资格；序列/QC 拒绝仍有效。未测 reads QC 仍明确标记 `not_run`，不伪造分值。另修正实际输入 `+inf` QV 被转成零值的问题，避免错误作为低质量淘汰。
+
+事务与缓存：
+
+- q0 FASTA、source TSV、选择/冻结 JSON、证据 registry、D0/Dtel 与 checkpoint 在同一原有回滚事务中发布。
+- 发布前验证序列可以由原始来源逐段重建、来源区间不重复、原 N 间隔确实存在、完整 donor FASTA/manifest 与来源一致、可用区间正好来自未占用的非长 N 来源区间。
+- 新 fingerprint 升至 builder version 5，并绑定选择器、发布器及实际主准备脚本身份。旧 q0 缓存不能冒充新结果；原始映射缓存仍按已有独立规则复用。
+- 缺失/损坏必需证据、序列化不一致或发布失败均不安装新结果；旧可用产物保留。输入确实改变并成功重建时，旧的下游生成结果不残留。
+
+当前可运行范围与明确门槛：
+
+- 生成脚本现在产生 package schema 3；新主准备入口只构建这一版本，不自动迁移客户 schema-2 项目。
+- Step1 已适配版本 3 的冻结校验和 q0 选择证据保留，并验证 q0、q0r1、q0f、q1 的序列/来源重放。已有版本 2 的输出读取兼容不等于保留旧 q0 构建器。
+- **Step2/3、端粒收尾、完整 Server 契约、App 导入尚未适配版本 3。** 已实测：新 q0→q1 成功后，现有 Step2 在修改任何 q0/q1/冻结文件之前拒绝版本 3；不会套用旧 donor-reuse 规则继续输出。这是功能分支的实施中状态，不是整条 `run_all.sh` 已完成验收。
+- 下一步必须修改实际候选使用仲裁（包括 `repair_common.arbitrate` 的旧允许复用行为）、当前路径占用/替换释放、跨阶段账本及 primary-only 限制，再放行版本 3。不能只改 `SCHEMA_VERSION` 常量。
+- 仍使用旧准备过程构造 schema-2 输入的下游测试夹具，需要改为明确的冻结测试输入或新版场景；不得为了这些夹具恢复旧构建算法。完整交付/报告和旧包可读性继续由 I5 覆盖。
+
+验证：
+
+- **177 项定向回归通过**（125.867 秒）：主入口、选择/冻结、真实证据、来源区间、reads QC/缓存、发布回滚、Step1 重放、命名兼容和运行库更新。
+- `prepare_metadata_test.sh`、`prepare_full_test.sh` 均通过，包含新生成 package schema 3。
+- 主入口测试证明：第一个 ds 只有 2,200 bp 的情况下，实际写出的 q0 是来自 a/c/b 的 5,000 bp 桥接序列；交换 ds 元数据顺序不改变 q0 或来源选择。
+- 检查了部分来源保留完整 donor 上下文、准确剩余区间、原 N 来源占用、反向切片、未分组来源不被伪造为原 assignment、损坏输入保留旧结果，以及发布前重建失败的回滚。
+- 运行库清单仍由维护脚本生成；没有更新正式 Release、客户工作区或 master。尚未通过完整 Step1→q4/Final Path、App 导入或真实样本质量验收。

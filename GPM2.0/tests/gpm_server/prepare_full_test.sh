@@ -164,7 +164,7 @@ assert_package_metadata() {
         exit 1
       }
       if ($(columns["workflow"]) != "gpm_grt_precomputed_v2" ||
-          $(columns["schema_version"]) != "2" ||
+          $(columns["schema_version"]) != "3" ||
           $(columns["grt_precompute_enabled"]) != "true" ||
           $(columns["recipe_locked"]) != "true" ||
           $(columns["final_path_schema_version"]) != "1") {

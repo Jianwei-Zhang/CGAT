@@ -744,11 +744,17 @@ def execute(args: argparse.Namespace) -> None:
     package = read_single(server_dir / "metadata/package.tsv")
     if (
         package.get("workflow") != WORKFLOW
-        or package.get("schema_version") != SCHEMA_VERSION
+        or package.get("schema_version") not in {"2", "3"}
         or package.get("grt_precompute_enabled") != "true"
         or package.get("recipe_locked") != "true"
     ):
         fail("unsupported package workflow/schema; Step1 has no legacy fallback")
+    if package["schema_version"] == "3":
+        try:
+            from lgz_core.q0_publication import validate_prepared_q0
+        except ModuleNotFoundError:
+            from .lgz_core.q0_publication import validate_prepared_q0
+        validate_prepared_q0(server_dir)
     recipe = read_single(
         server_dir / "metadata/grt_recipe.tsv",
         [
@@ -767,7 +773,8 @@ def execute(args: argparse.Namespace) -> None:
     all_q_rows = read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS)
     base_q_rows = [row for row in all_q_rows if row["q_version"] == "q0"]
     all_evidence_rows = read_tsv(server_dir / "metadata/grt_evidence_registry.tsv", EVIDENCE_FIELDS)
-    base_evidence_rows = [row for row in all_evidence_rows if row["stage"] == "assignment"]
+    base_stage = "q0_construction" if package["schema_version"] == "3" else "assignment"
+    base_evidence_rows = [row for row in all_evidence_rows if row["stage"] == base_stage]
     base_tool_rows = read_tsv(server_dir / "metadata/grt_tool_versions.tsv", TOOL_FIELDS)
     minimap = executable_identity(args.minimap2)
     assignments: dict[tuple[str, str], set[str]] = defaultdict(set)

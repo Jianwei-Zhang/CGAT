@@ -92,7 +92,7 @@ Behavior:
   - --cen <centromere_repeat_fasta> adds one-run repeats; headers do not bind chromosomes
   - --cen-min-identity filters hits; --cen-min-len filters merged candidate support (defaults: 80%, 10000 bp)
   - Manage local entries with library.sh list/add-tel/add-cen/remove; updates leave local/ unchanged
-  - The first --ds is the locked LGZ primary dataset; later initial --ds inputs are support datasets
+  - The first --ds remains project-primary metadata; q0 is selected across all initial datasets using alignment evidence
   - --max-fill sets the Step3 optimized refill length limit in bp, default: 1000000
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
   - LGZ defaults: optimized execution, full Step2, anchor-safe gap-screen Step3
@@ -399,7 +399,7 @@ write_package_metadata() {
     printf 'workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n'
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "gpm_grt_precomputed_v2" \
-      "2" \
+      "3" \
       "$package_mode" \
       "$sequence_layout" \
       "$preassigned_chr" \

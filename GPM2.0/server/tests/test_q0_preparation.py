@@ -282,19 +282,27 @@ def fasta(path):
         self.assertEqual((self.server / MANIFEST).read_bytes(), before)
 
     def test_q0_entry_rejects_absent_evidence_instead_of_old_strategy_fallback(self):
-        (self.server / MANIFEST).unlink()
-        completed = subprocess.run([sys.executable, str(fixture.TOOL), "--server-dir", str(self.server)],
+        from server.tests.test_q0_admission import bridge_fixture
+        from server.tests.test_q0_publication import complete_workspace
+        evidence_fixture, _ = bridge_fixture()
+        server = complete_workspace(evidence_fixture, self.root / "schema3")
+        (server / MANIFEST).unlink()
+        completed = subprocess.run([sys.executable, str(fixture.TOOL), "--server-dir", str(server)],
                                    text=True, capture_output=True)
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("q0 evidence is not ready", completed.stderr)
-        self.assertFalse((self.server / "grt/q/q0.fa").exists())
+        self.assertFalse((server / "grt/q/q0.fa").exists())
 
     def test_q0_transaction_preserves_the_prepared_evidence(self):
-        before = load_verified_evidence(self.server)
-        completed = subprocess.run([sys.executable, str(fixture.TOOL), "--server-dir", str(self.server)],
+        from server.tests.test_q0_admission import bridge_fixture
+        from server.tests.test_q0_publication import complete_workspace
+        evidence_fixture, _ = bridge_fixture()
+        server = complete_workspace(evidence_fixture, self.root / "schema3")
+        before = load_verified_evidence(server)
+        completed = subprocess.run([sys.executable, str(fixture.TOOL), "--server-dir", str(server)],
                                    text=True, capture_output=True)
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(load_verified_evidence(self.server), before)
+        self.assertEqual(load_verified_evidence(server), before)
 
     def test_skip_self_is_not_ignored_by_supplementary_comparisons(self):
         from server.tools.lgz_core.q0_catalog import CandidateCatalog
