@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .repair_common import *
+from .source_intervals import SourceAuthorization, attach_authorizations
 from .refill_batch import RefillBatchAlignment
 from .repair_mummer import (
     collect_mummer,
@@ -172,6 +173,9 @@ def run_refill_alignment(
     parameters = {
         "preset": MINIMAP_PRESET,
         "cigar": True,
+        # Fully occupied contexts must not hide another source's usable chain.
+        # Source authorization, not primary/secondary designation, decides reuse.
+        "keep_all_chains": True,
         "threads": threads,
         "flank_length": PATCH_FLANK,
         "min_gap_length": NORMALIZED_GAP_LENGTH,
@@ -797,8 +801,11 @@ def run_step3(
     refill_max_length: int = REFILL_MAX_LENGTH,
     mummer_scope: str = DEFAULT_MUMMER_SCOPE,
     execution_profile: str = DEFAULT_EXECUTION_PROFILE,
+    source_authorization=None,
 ) -> tuple[dict[str, object], bool]:
     stage = "step3"
+    authorization = source_authorization or SourceAuthorization.load(server_dir, sources)
+    authorization.validate_paths(input_paths)
     if refill_max_length < 1:
         fail("max-fill must be a positive integer")
     if repair_mode not in REPAIR_MODES:
@@ -813,6 +820,7 @@ def run_step3(
         "engine_version": ENGINE_VERSION,
         "engine_sha256": ENGINE_SHA256,
         "stage": stage,
+        "source_authorization": authorization.fingerprint,
         "q_version": "q2",
         "q_source_sha256": q_input_sha256,
         "q_segments_sha256": json_hash(input_q_rows),
@@ -852,6 +860,7 @@ def run_step3(
         },
         "refill_parameters": {
             "preset": MINIMAP_PRESET,
+            "keep_all_chains": True,
             "min_alignment": REFILL_MIN_ALIGNMENT,
             "min_identity": REFILL_MIN_IDENTITY,
             "max_fill_length": refill_max_length,
@@ -920,7 +929,12 @@ def run_step3(
         )
         ineligible = [row for row in correction_candidates if not row.get("eligible", True)]
         eligible = [row for row in correction_candidates if row.get("eligible", True)]
-        correction_candidates = [*arbitrate(eligible, consumed), *ineligible]
+        for candidate in correction_candidates:
+            candidate["interval_edit_kind"] = "remove"
+        correction_candidates = [*arbitrate(
+            eligible, consumed,
+            source_guard=authorization.frame(input_paths, donor_set["donor_set_id"], "q2"),
+        ), *ineligible]
         correction_usage = correction_usage_rows(run_id, donor_set["donor_set_id"], correction_candidates)
         correction_evidence: list[dict[str, object]] = []
         for candidate in correction_candidates:
@@ -980,6 +994,7 @@ def run_step3(
             correction_candidates,
             sources,
         )
+        authorization.validate_paths(corrected_paths)
         write_fasta(
             temporary / "corrected.fa",
             [(chromosome, corrected_records[chromosome]) for chromosome in chromosome_order],
@@ -1014,6 +1029,7 @@ def run_step3(
         refill_candidates = arbitrate(
             refill_candidates,
             [*consumed, *accepted_correction_intervals],
+            source_guard=authorization.frame(corrected_paths, donor_set["donor_set_id"], "q2_corrected"),
         )
         refill_evidence = stage_evidence_rows(
             "step3",
@@ -1062,6 +1078,7 @@ def run_step3(
             sources,
             action="refill",
         )
+        authorization.validate_paths(round1_paths)
         for row in refill_usage:
             row["donor_set_id"] = donor_set["donor_set_id"]
         refill_by_origin_round1 = finalize_refill_origins(
@@ -1078,6 +1095,7 @@ def run_step3(
             q_input_version="q2",
             q_output_version="q3",
         )
+        authorization.validate_paths(filter_paths_result)
         mark_refills_removed_by_filter(
             refill_events,
             filter_events,
@@ -1137,6 +1155,7 @@ def run_step3(
         round2_candidates = arbitrate(
             round2_candidates,
             [*consumed, *accepted_correction_intervals, *round1_consumed],
+            source_guard=authorization.frame(filter_paths_result, donor_set["donor_set_id"], "q2_corrected_filtered"),
         )
         round2_evidence = stage_evidence_rows(
             "step3",
@@ -1189,6 +1208,7 @@ def run_step3(
             sources,
             action="refill",
         )
+        authorization.validate_paths(output_paths)
         for row in round2_usage:
             row["donor_set_id"] = donor_set["donor_set_id"]
         refill_by_origin_round2 = finalize_refill_origins(
@@ -1340,6 +1360,7 @@ def run_step3(
             [*refill_rejections, *round2_rejections],
         )
         write_tsv(temporary / "q_segments.tsv", Q_SEGMENT_FIELDS, q_rows)
+        attach_authorizations(evidence_rows, [*correction_candidates, *refill_candidates, *round2_candidates])
         write_tsv(temporary / "evidence.tsv", EVIDENCE_FIELDS, evidence_rows)
         write_tsv(temporary / "usage.tsv", USAGE_FIELDS, usage_rows)
         write_tsv(temporary / "gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
@@ -1888,6 +1909,7 @@ def execute_step3(args: argparse.Namespace) -> dict[str, object]:
         refill_max_length=args.refill_max_length,
         mummer_scope=args.step3_mummer_scope,
         execution_profile=getattr(args, "execution_profile", DEFAULT_EXECUTION_PROFILE),
+        source_authorization=context["source_authorization"],
     )
     reconcile_step2_events_with_step3(step2, step3)
     publish_repair_metadata(

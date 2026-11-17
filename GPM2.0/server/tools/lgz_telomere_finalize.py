@@ -28,10 +28,14 @@ from pathlib import Path
 try:
     from lgz_core import *
     from lgz_core.common import *
+    from lgz_core.source_intervals import SourceAuthorization, attach_authorizations
+    from lgz_core.q0_publication import validate_prepared_q0
     from lgz_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
 except ModuleNotFoundError:  # Imported as server.tools.grt_telomere_finalize.
     from .lgz_core import *
     from .lgz_core.common import *
+    from .lgz_core.source_intervals import SourceAuthorization, attach_authorizations
+    from .lgz_core.q0_publication import validate_prepared_q0
     from .lgz_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
 
 
@@ -929,6 +933,8 @@ def candidate_rank_key(candidate: dict[str, object]) -> tuple[object, ...]:
 def arbitrate_terminal_candidates(
     chromosome_order: list[str],
     candidates: list[dict[str, object]],
+    *,
+    source_guard=None,
 ) -> list[dict[str, object]]:
     grouped: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
     for candidate in candidates:
@@ -982,6 +988,12 @@ def arbitrate_terminal_candidates(
                     if left_cut > right_cut:
                         candidate["outcome"] = "conflicted"
                         candidate["reason"] = f"terminal_edits_overlap:{other['candidate_id']}"
+                        continue
+                if source_guard is not None:
+                    rejection = source_guard.try_accept(candidate)
+                    if rejection:
+                        candidate["outcome"] = "conflicted"
+                        candidate["reason"] = rejection
                         continue
                 candidate["outcome"] = "accepted"
                 candidate["reason"] = "accepted_by_terminal_rank_and_global_interval_arbitration"
@@ -1396,12 +1408,17 @@ def run_step4(
     tools: dict[str, dict[str, str]],
     minimap: dict[str, str],
     threads: int,
+    source_authorization=None,
 ) -> tuple[dict[str, object], bool]:
+    authorization = source_authorization or SourceAuthorization.load(server_dir, sources)
+    authorization.validate_paths(input_paths)
     q3_sha256 = sha256_file(server_dir / "grt/q/q3.fa")
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
         "stage": "step4_telomere",
+        "source_authorization": authorization.fingerprint,
+        "engine_sha256": sha256_file(Path(__file__)),
         "q_version": "q3",
         "q3_sha256": q3_sha256,
         "q_segments_sha256": json_hash(q3_rows),
@@ -1586,7 +1603,10 @@ def run_step4(
                 len(input_records[str(candidate["chr"])]),
             )
 
-        arbitrate_terminal_candidates(chromosome_order, candidates)
+        arbitrate_terminal_candidates(
+            chromosome_order, candidates,
+            source_guard=authorization.frame(input_paths, donor_set["donor_set_id"], "q3"),
+        )
         output_paths, output_records, placements = apply_telomere_candidates(
             chromosome_order,
             input_paths,
@@ -1595,6 +1615,7 @@ def run_step4(
             assignments,
             sources,
         )
+        authorization.validate_paths(output_paths)
         write_fasta(
             q4_temporary,
             [(chromosome, output_records[chromosome]) for chromosome in chromosome_order],
@@ -1783,6 +1804,7 @@ def run_step4(
             ],
         )
         write_tsv(temporary / "q_segments.tsv", Q_SEGMENT_FIELDS, q_rows)
+        attach_authorizations(evidence_rows, candidates)
         write_tsv(temporary / "evidence.tsv", EVIDENCE_FIELDS, evidence_rows)
         write_tsv(temporary / "usage.tsv", USAGE_FIELDS, usage_rows)
         write_tsv(temporary / "gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
@@ -2323,7 +2345,7 @@ def execute(args: argparse.Namespace) -> None:
     package = read_single(server_dir / "metadata/package.tsv")
     if (
         package.get("workflow") != WORKFLOW
-        or package.get("schema_version") != SCHEMA_VERSION
+        or package.get("schema_version") not in {SCHEMA_VERSION, "3"}
         or package.get("grt_precompute_enabled") != "true"
         or package.get("recipe_locked") != "true"
     ):
@@ -2344,7 +2366,9 @@ def execute(args: argparse.Namespace) -> None:
     donor_set, donor_members, _donor_freeze = verify_telomere_donor_freeze(
         server_dir, recipe
     )
+    frozen_q0 = validate_prepared_q0(server_dir) if package["schema_version"] == "3" else None
     sources = source_catalog(server_dir)
+    authorization = SourceAuthorization.load(server_dir, sources, frozen=frozen_q0)
     assignments = assignment_map(server_dir)
     q_rows = read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS)
     q3_rows = [row for row in q_rows if row["q_version"] == "q3"]
@@ -2389,6 +2413,7 @@ def execute(args: argparse.Namespace) -> None:
         tools,
         minimap,
         args.threads,
+        source_authorization=authorization,
     )
     final_path = publish_metadata_and_finalize(
         server_dir, result, sources, tools, minimap

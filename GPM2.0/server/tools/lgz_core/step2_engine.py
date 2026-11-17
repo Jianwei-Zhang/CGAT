@@ -8,6 +8,7 @@ except ModuleNotFoundError:  # Imported through server.tools.
     from ..run_resources import execution_threads
 
 from .repair_common import *
+from .source_intervals import SourceAuthorization, attach_authorizations
 from .repair_mummer import (
     collect_mummer,
     lgz_mummer_parameters,
@@ -659,8 +660,11 @@ def run_step2(
     repair_mode: str = DEFAULT_REPAIR_MODE,
     mummer_scope: str = DEFAULT_MUMMER_SCOPE,
     execution_profile: str = DEFAULT_EXECUTION_PROFILE,
+    source_authorization=None,
 ) -> tuple[dict[str, object], bool]:
     stage = "step2"
+    authorization = source_authorization or SourceAuthorization.load(server_dir, sources)
+    authorization.validate_paths(input_paths)
     if repair_mode not in REPAIR_MODES:
         fail(f"unsupported Step2 repair mode: {repair_mode}")
     if mummer_scope not in MUMMER_SCOPES:
@@ -673,6 +677,7 @@ def run_step2(
         "engine_version": ENGINE_VERSION,
         "engine_sha256": ENGINE_SHA256,
         "stage": stage,
+        "source_authorization": authorization.fingerprint,
         "q_version": "q1",
         "q_source_sha256": q_input_sha256,
         "q_segments_sha256": json_hash(input_q_rows),
@@ -789,7 +794,11 @@ def run_step2(
         validate_step2_candidates(candidates, validation_rows, members_by_record, rejections)
         reject_candidates_spanning_other_gaps(candidates, gaps, rejections)
         annotate_candidate_fragments(candidates, donor_members, fragment_rows)
-        patch_candidates = arbitrate(candidates, consumed)
+        arbitration_pool = {id(row) for row in candidates if row.get("outcome") == "candidate"}
+        patch_candidates = arbitrate(
+            candidates, consumed,
+            source_guard=authorization.frame(input_paths, donor_set["donor_set_id"], "q1"),
+        )
         validated_patch_counts = {
             chromosome: sum(
                 1 for row in patch_candidates
@@ -860,6 +869,26 @@ def run_step2(
                 }
             )
         candidates = [*patch_candidates, *fallback_candidates]
+        # A chromosome-wide fallback can discard previously accepted patches.
+        # Rebuild reservations from only edits that can actually be applied.
+        for row in candidates:
+            row.pop("source_interval_authorization", None)
+        for row in patch_candidates:
+            if id(row) in arbitration_pool and str(row["chr"]) not in fallback_chromosomes:
+                row["outcome"] = "candidate"
+        for row in fallback_candidates:
+            row["interval_edit_kind"] = "remove"
+            if row.get("outcome") == "accepted":
+                row["outcome"] = "candidate"
+        candidates = arbitrate(
+            candidates, [],
+            source_guard=authorization.frame(input_paths, donor_set["donor_set_id"], "q1"),
+        )
+        for strategy_row in strategy_rows:
+            strategy_row["accepted_patch_count"] = sum(
+                row.get("outcome") == "accepted" and row["chr"] == strategy_row["chr"]
+                for row in patch_candidates
+            )
         fallback_by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
         for row in fallback_candidates:
             fallback_by_chr[str(row["chr"])].append(row)
@@ -1016,6 +1045,7 @@ def run_step2(
             fallback_candidates,
             sources,
         )
+        authorization.validate_paths(output_paths)
         write_fasta(
             q_output_temporary,
             [
@@ -1068,6 +1098,7 @@ def run_step2(
         write_tsv(temporary / "candidates.tsv", CANDIDATE_FIELDS, candidate_table_rows(candidates))
         write_tsv(temporary / "rejections.tsv", REJECTION_FIELDS, rejections)
         write_tsv(temporary / "q_segments.tsv", Q_SEGMENT_FIELDS, q_rows)
+        attach_authorizations(evidence_rows, candidates)
         write_tsv(temporary / "evidence.tsv", EVIDENCE_FIELDS, evidence_rows)
         write_tsv(temporary / "usage.tsv", USAGE_FIELDS, usage_rows)
         write_tsv(temporary / "gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
@@ -1536,6 +1567,7 @@ def execute_step2(args: argparse.Namespace) -> dict[str, object]:
         args.repair_mode,
         getattr(args, "step2_mummer_scope", DEFAULT_MUMMER_SCOPE),
         getattr(args, "execution_profile", DEFAULT_EXECUTION_PROFILE),
+        source_authorization=context["source_authorization"],
     )
     publish_repair_metadata(
         context["server_dir"], [step2], context["tools"], context["minimap"]

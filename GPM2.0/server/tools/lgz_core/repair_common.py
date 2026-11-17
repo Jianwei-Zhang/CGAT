@@ -242,6 +242,8 @@ def reference_overlap_score(candidate: dict[str, object]) -> int:
 def arbitrate(
     candidates: list[dict[str, object]],
     consumed: list[dict[str, object]],
+    *,
+    source_guard=None,
 ) -> list[dict[str, object]]:
     valid = [row for row in candidates if row.get("outcome") == "candidate"]
     ordered = sorted(
@@ -266,7 +268,8 @@ def arbitrate(
             str(row["candidate_id"]),
         ),
     )
-    occupied_sources = [dict(row) for row in consumed]
+    # Historical usage is audit data, not the current occupancy ledger.
+    occupied_sources = [dict(row) for row in consumed] if source_guard is None else []
     occupied_targets: list[dict[str, object]] = []
     accepted_objects: set[str] = set()
     for candidate in ordered:
@@ -331,6 +334,12 @@ def arbitrate(
             candidate["outcome"] = "conflicted"
             candidate["reason"] = f"target_interval_overlaps:{target_collision['candidate_id']}"
             continue
+        if source_guard is not None:
+            rejection = source_guard.try_accept(candidate)
+            if rejection:
+                candidate["outcome"] = "conflicted"
+                candidate["reason"] = rejection
+                continue
         candidate["outcome"] = "accepted"
         candidate["reason"] = (
             f"accepted_with_donor_reuse_of:{source_collision.get('candidate_id', '')}"
@@ -341,7 +350,7 @@ def arbitrate(
             candidate["donor_reuse"] = True
             candidate["donor_reuse_of"] = source_collision.get("candidate_id", "")
         accepted_objects.add(object_id)
-        if source_consumable:
+        if source_consumable and source_guard is None:
             occupied_sources.append(candidate)
         occupied_targets.append(candidate)
     return sorted(

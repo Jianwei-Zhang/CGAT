@@ -22,7 +22,7 @@ PACKAGE_SCHEMA_VERSION = "3"
 SELECTION = "metadata/grt_q0_selection.json"
 FREEZE = "metadata/grt_q0_freeze.json"
 SELECTION_SCHEMA = "lgz_q0_selection_artifact_v1"
-FREEZE_SCHEMA = "lgz_q0_donor_freeze_v1"
+FREEZE_SCHEMA = "lgz_q0_donor_freeze_v2"
 
 
 def publication_identity():
@@ -137,7 +137,8 @@ def freeze_manifest(stage_root, construction, sequences, datasets, donor_sets, m
     source_rows = [{"source": asdict(SourceKey(*key)), "length": len(sequence),
                     "sequence_sha256": sha256_bytes(sequence.encode("ascii")),
                     "occupied": [asdict(i) for i in occupied.get(SourceKey(*key), ())],
-                    "available": [asdict(i) for i in available[key]]}
+                    "available": [asdict(i) for i in available[key]],
+                    "informative_intervals": [asdict(i) for i in available_intervals({key: sequence}, {})[key]]}
                    for key, sequence in sorted(sequences.items())]
     member_rows = []
     for member in members:
@@ -243,6 +244,9 @@ def validate_prepared_q0(root: Path, *, source_root: Path | None = None, expecte
         raise Q0EvidenceError("q0 cannot be reconstructed from selected original sources")
     available = available_intervals(sources, actual_occupied)
     for source, row in by_source.items():
+        key = (source.dataset, source.contig)
+        if row.get("informative_intervals") != [asdict(i) for i in available_intervals({key: sources[key]}, {})[key]]:
+            raise Q0EvidenceError("frozen informative source intervals differ from original sequence")
         if row["occupied"] != [asdict(i) for i in merged_intervals(actual_occupied[source])] or row["available"] != [asdict(i) for i in available[(source.dataset, source.contig)]]:
             raise Q0EvidenceError("q0 donor availability differs from actual source occupancy")
     member_map = {(row["donor_set_id"], row["member_id"]): row for row in read_tsv(resolve("metadata/grt_donor_members.tsv"), DONOR_MEMBER_FIELDS)}

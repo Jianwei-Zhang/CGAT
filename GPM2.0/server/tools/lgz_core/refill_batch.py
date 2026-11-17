@@ -90,7 +90,7 @@ class RefillBatchAlignment:
         payload = {"schema_version": 2, "stage": self.stage, "tool": tool,
                    "target_sha256": self.donor_set["fasta_sha256"],
                    "query_sha256": sha256_bytes(query_payload),
-                   "mapping": {"preset": PRESET, "cigar": True, "threads": self.threads}}
+                   "mapping": {"preset": PRESET, "cigar": True, "keep_all_chains": True, "threads": self.threads}}
         key = json_hash(payload)
         parent = self.server_dir / f"grt/cache/step23/raw_refill_batch/v1/{self.stage}"
         parent.mkdir(parents=True, exist_ok=True)
@@ -121,7 +121,7 @@ class RefillBatchAlignment:
                         index_hit = valid_cache(index_dir, index_key, ("target.mmi",))
                         index_temporary = None
                         command = [str(executable), "-x", PRESET, "-t", str(execution_threads(self.threads)),
-                                   "-c", "-o", str(temporary / "result.paf")]
+                                   "-c", "-P", "-o", str(temporary / "result.paf")]
                         if index_hit:
                             mapping_target = index_dir / "target.mmi"
                         else:

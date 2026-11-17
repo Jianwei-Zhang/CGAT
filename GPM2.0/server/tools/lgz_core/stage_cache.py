@@ -201,6 +201,8 @@ def run_minimap(
     flank_fasta: Path,
     paf_path: Path,
     stage_dir: Path,
+    *,
+    keep_all_chains: bool = False,
 ) -> None:
     command = [
         executable,
@@ -209,6 +211,7 @@ def run_minimap(
         "-t",
         str(execution_threads(threads)),
         "-c",
+        *(["-P"] if keep_all_chains else []),
         "-o",
         str(paf_path),
         str(donor_fasta),
@@ -303,6 +306,7 @@ def cached_chromosome_alignment(
                 flank_path,
                 paf_path,
                 temporary,
+                keep_all_chains=bool(parameters.get("keep_all_chains", False)),
             )
         else:
             paf_path.write_bytes(b"")

@@ -395,8 +395,15 @@ class GrtPrepareInputsTests(unittest.TestCase):
             for name, dataset, start, end in (("p_cover", "primary", 0, 1800),
                                                ("p_redundant", "primary", 2000, 3100),
                                                ("s_assigned", "support", 3500, 5000)):
-                source = fixture.source(name, genome[start:end], dataset=dataset)
-                fixture.ref(source, (0, end-start), (start, end))
+                sequence = genome[start:end]
+                aligned_length = end - start
+                if name == "p_redundant":
+                    # A real terminal repeat must not bypass failed read QC
+                    # when freezing the otherwise eligible Dtel context.
+                    sequence = sequence[:-560] + "TTTAGGG" * 80
+                    aligned_length -= 560
+                source = fixture.source(name, sequence, dataset=dataset)
+                fixture.ref(source, (0, aligned_length), (start, start + aligned_length))
             server = complete_workspace(fixture, root)
             package = read_tsv(server / "metadata/package.tsv")
             package[0]["reads_qc_enabled"] = "true"
@@ -539,6 +546,10 @@ printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
             quality_by_contig = {row["contig_name"]: row for row in quality}
             self.assertEqual(quality_by_contig["p_redundant"]["qv"], "20.000000")
             self.assertEqual(quality_by_contig["p_redundant"]["reads_qc_pass"], "false")
+            roles = {row["contig_name"]: row for row in read_tsv(server / "metadata/grt_contig_roles.tsv")}
+            self.assertEqual(roles["p_redundant"]["tel_donor_eligible"], "false")
+            self.assertEqual(roles["p_redundant"]["tel_rejection_reason"], "failed_reads_qc")
+            self.assertNotIn("p_redundant", {row["contig_name"] for row in read_tsv(server / "metadata/grt_donor_members.tsv")})
             self.assertTrue(
                 all(
                     row["qv"] == "35.000000"

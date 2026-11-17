@@ -898,8 +898,6 @@ def prepare(args: argparse.Namespace) -> None:
                 donor_rejection = "length_lt_1000"
             elif not qc_pass[key]:
                 donor_rejection = "failed_reads_qc"
-            elif not available[key]:
-                donor_rejection = "no_unoccupied_source_interval"
             else:
                 donor_rejection = ""
             donor_eligible = not donor_rejection
@@ -908,6 +906,8 @@ def prepare(args: argparse.Namespace) -> None:
 
             if not valid_sequence[key]:
                 tel_rejection = "invalid_sequence"
+            elif not qc_pass[key]:
+                tel_rejection = "failed_reads_qc"
             elif not tel_signal[key]:
                 tel_rejection = "no_reliable_telomere_repeat"
             else:

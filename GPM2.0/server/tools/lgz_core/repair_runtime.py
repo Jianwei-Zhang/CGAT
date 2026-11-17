@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from .repair_common import *
+from .source_intervals import SourceAuthorization
+from .q0_publication import validate_prepared_q0
 
 
 def publish_repair_metadata(
@@ -143,7 +145,7 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
     package = read_single(server_dir / "metadata/package.tsv")
     if (
         package.get("workflow") != WORKFLOW
-        or package.get("schema_version") != SCHEMA_VERSION
+        or package.get("schema_version") not in {SCHEMA_VERSION, "3"}
         or package.get("grt_precompute_enabled") != "true"
         or package.get("recipe_locked") != "true"
     ):
@@ -162,13 +164,16 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
         ],
     )
     donor_set, donor_members, _donor_freeze = verify_donor_freeze(server_dir, recipe)
+    frozen_q0 = validate_prepared_q0(server_dir) if package["schema_version"] == "3" else None
     sources = source_catalog(server_dir)
+    authorization = SourceAuthorization.load(server_dir, sources, frozen=frozen_q0)
     assignments = assignment_map(server_dir)
     all_q_rows = read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS)
     q1_rows = [row for row in all_q_rows if row["q_version"] == "q1"]
     if not q1_rows or not (server_dir / "grt/q/q1.fa").is_file():
         fail("Step2 requires a completed q1/Step1 mapping")
     chromosome_order, q1_paths, q1_records = load_q_paths(server_dir, "q1", q1_rows, sources)
+    authorization.validate_paths(q1_paths)
     tools = {
         "nucmer": executable_identity(args.nucmer),
         "delta-filter": executable_identity(args.delta_filter),
@@ -203,6 +208,7 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
         "donor_set": donor_set,
         "donor_members": donor_members,
         "sources": sources,
+        "source_authorization": authorization,
         "assignments": assignments,
         "q1_rows": q1_rows,
         "chromosome_order": chromosome_order,

@@ -3,13 +3,14 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from server.tools.grt_core.common import sha256_file
 from server.tools.grt_core.refill_batch import RefillBatchAlignment
-from server.tools.grt_core.stage_cache import cached_chromosome_alignment, fasta_bytes
+from server.tools.grt_core.stage_cache import cached_chromosome_alignment, fasta_bytes, run_minimap
 
 
 class RefillBatchTests(unittest.TestCase):
@@ -74,6 +75,7 @@ Path(args[args.index('-o')+1]).write_text('\n'.join(rows)+'\n')
         self.assertTrue(all("cg:Z:100M" in row for row in first + second))
         self.assertIn("tp:A:S", first[1])
         self.assertIn("-d", self.calls()[0])
+        self.assertIn("-P", self.calls()[0])
         self.assertTrue((self.root / "artifact-round1/provenance.json").is_file())
         second_round = self.provider("round2")
         self.emit(second_round, "round2-chr1", ["chr1__L", "chr1__R"])
@@ -89,7 +91,7 @@ Path(args[args.index('-o')+1]).write_text('\n'.join(rows)+'\n')
         self.assertEqual(len(self.calls()), 1)
 
     def test_existing_chromosome_cache_does_not_trigger_a_batch(self):
-        parameters = {"preset": "asm5", "cigar": True, "threads": 2}
+        parameters = {"preset": "asm5", "cigar": True, "keep_all_chains": True, "threads": 2}
         for number in (1, 2):
             batch = self.provider(f"cache-attempt-{number}")
             path, hit, _key = cached_chromosome_alignment(
@@ -102,6 +104,18 @@ Path(args[args.index('-o')+1]).write_text('\n'.join(rows)+'\n')
             if hit:
                 self.assertIsNone(batch.rows)
         self.assertEqual(len(self.calls()), 1)
+
+    def test_baseline_refill_requests_same_all_chain_policy_as_batch(self):
+        query_dir = self.root / "baseline"
+        query_dir.mkdir()
+        query = query_dir / "query.fa"
+        query.write_bytes(fasta_bytes(self.records))
+        run_minimap(str(self.tool), 2, self.root / "donor.fa", query,
+                    query_dir / "result.paf", query_dir, keep_all_chains=True)
+        self.assertIn("-P", self.calls()[0])
+        self.emit(self.provider("equivalent"), "equivalent-output", [name for name, _sequence in self.records])
+        self.assertIn("-P", self.calls()[1])
+        self.assertEqual((query_dir / "result.paf").read_bytes(), (self.root / "equivalent-output/result.paf").read_bytes())
 
     def test_corrupt_index_is_rebuilt_for_a_new_batch(self):
         self.emit(self.provider("first"), "first-output", ["chr1__L"])
@@ -124,6 +138,37 @@ Path(args[args.index('-o')+1]).write_text('\n'.join(rows)+'\n')
         with self.assertRaises(SystemExit):
             self.emit(self.provider("duplicate", self.records + self.records[:1]), "duplicate-output", ["chr1__L"])
         self.assertEqual(self.calls(), [])
+
+
+@unittest.skipUnless(shutil.which("minimap2"), "real minimap2 is not installed")
+class RealRefillContextTests(unittest.TestCase):
+    def test_all_chains_retain_more_than_five_competing_full_source_contexts(self):
+        from server.tests.test_q0_admission import dna
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            left, right = dna(2000, 813), dna(2000, 814)
+            records = [("left", left), ("right", right)]
+            donors = [(f"donor{n}", left + dna(500, n + 50) + right) for n in range(8)]
+            target = root / "donor.fa"
+            target.write_bytes(fasta_bytes(donors))
+            donor = {"donor_set_id": "D0", "fasta_relpath": "donor.fa", "fasta_sha256": sha256_file(target)}
+            executable = shutil.which("minimap2")
+            minimap = {"resolved": executable, "version": subprocess.check_output([executable, "--version"], text=True).strip()}
+            query_map = {name: ({"object_id": "gap", "chr": "chr1"}, side) for name, side in (("left", "L"), ("right", "R"))}
+            query = root / "queries.fa"
+            query.write_bytes(fasta_bytes(records))
+            run_minimap(executable, 1, target, query, root / "baseline.paf", root, keep_all_chains=True)
+            batch = RefillBatchAlignment(root, "step3_refill_round1", donor, minimap, 1, records,
+                                         query_map, {name: len(seq) for name, seq in donors}, root / "artifact")
+            output = root / "output"
+            output.mkdir()
+            batch(query, output / "result.paf", output)
+            baseline = (root / "baseline.paf").read_text().splitlines()
+            batched = (output / "result.paf").read_text().splitlines()
+            self.assertEqual(sorted(baseline), sorted(batched))
+            for query_name in ("left", "right"):
+                self.assertEqual({line.split("\t")[5] for line in baseline if line.split("\t")[0] == query_name},
+                                 {name for name, _sequence in donors})
 
 
 if __name__ == "__main__":
