@@ -15,9 +15,13 @@ import math
 import csv
 from pathlib import Path
 import re
+import sqlite3
+import tempfile
+from itertools import groupby
 
 POLICY = "adaptive-screening-v4"
 LONG_QUERY_LIMIT = (1 << 28) - 1
+IN_MEMORY_PROFILE_BYTES = 64 * 1024**2
 
 
 @dataclass(frozen=True)
@@ -112,40 +116,75 @@ def union_length(spans):
     return total
 
 
-def coverage_profile(path, records):
-    """Read only a separately validated PAF; retain competing target coverage.
+def _profile_fields(path):
+    """Read mandatory PAF columns without retaining potentially huge CIGAR tags.
 
-    Reject oversized audit inputs rather than silently truncate them. MAPQ is
-    not used as a stand-alone confidence signal for multipart reference mapping.
+    The caller has already verified the complete native PAF, including its tags.
+    Profiling still traverses every row; this is not a sampled audit.
     """
-    if path.stat().st_size > 64 * 1024**2:
-        raise ValueError("audit PAF exceeds 64 MiB; no automatic recommendation")
+    with path.open("rb") as stream:
+        prefix = bytearray(); tabs = 0; complete = False
+        while chunk := stream.readline(64 * 1024):
+            if not complete:
+                offset = 0
+                while tabs < 12:
+                    at = chunk.find(b"\t", offset)
+                    if at < 0:
+                        break
+                    tabs += 1; offset = at + 1
+                if tabs == 12:
+                    prefix.extend(chunk[:offset - 1]); complete = True
+                else:
+                    prefix.extend(chunk)
+            if chunk.endswith(b"\n"):
+                fields = prefix.rstrip(b"\r\n").decode("utf-8").split("\t")
+                if len(fields) != 12:
+                    raise ValueError("PAF requires twelve mandatory columns")
+                yield fields
+                prefix = bytearray(); tabs = 0; complete = False
+        if prefix or complete:
+            fields = prefix.rstrip(b"\r\n").decode("utf-8").split("\t")
+            if len(fields) != 12:
+                raise ValueError("PAF requires twelve mandatory columns")
+            yield fields
+
+
+def _profile_rows(path, lengths):
+    for f in _profile_fields(path):
+        if f[0] not in lengths or int(f[1]) != lengths[f[0]]:
+            raise ValueError("PAF query identity mismatch")
+        start, end = int(f[2]), int(f[3])
+        if f[4] not in ("+", "-") or not 0 <= start < end <= lengths[f[0]]:
+            raise ValueError("PAF query range invalid")
+        block = int(f[10])
+        qualified = block >= 1000 or block * 4 >= lengths[f[0]]
+        anchor = (int(f[7]) - start + 1 if f[4] == "+" else int(f[7]) + 1 - lengths[f[0]] + end) if qualified else 0
+        yield f[0], f[5], f[4], start, end, block, anchor, qualified
+
+
+def coverage_profile(path, records):
+    """Exact full-source metrics, spilling large PAF audits to temporary disk.
+
+    The 64-MiB threshold selects the storage strategy, not output admission.
+    Finite pilot/review mapping budgets remain enforced by their own callers.
+    """
     lengths = record_lengths(records)
+    if path.stat().st_size > IN_MEMORY_PROFILE_BYTES:
+        return _coverage_profile_disk(path, lengths)
     spans, targets = defaultdict(list), defaultdict(lambda: defaultdict(list))
     target_strands = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     qualified = defaultdict(lambda: defaultdict(lambda: {"spans": [], "anchors": [], "anchors_by_strand": {"+": [], "-": []}, "weights": {"+": 0, "-": 0}}))
-    with path.open() as stream:
-        for line in stream:
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12 or f[0] not in lengths or int(f[1]) != lengths[f[0]]:
-                raise ValueError("PAF query identity mismatch")
-            start, end = int(f[2]), int(f[3])
-            if f[4] not in ("+", "-") or not 0 <= start < end <= lengths[f[0]]:
-                raise ValueError("PAF query range invalid")
-            spans[f[0]].append((start, end))
-            targets[f[0]][f[5]].append((start, end))
-            target_strands[f[0]][f[5]][f[4]].append((start, end))
-            block = int(f[10])
-            # Match assign_chr_groups.py: small hits must cover >=25% of the
-            # query; otherwise the block must be >=1000 bp. Every qualifying
-            # chromosome can be assigned, not just the best-scoring target.
-            if block >= 1000 or block * 4 >= lengths[f[0]]:
-                bucket = qualified[f[0]][f[5]]
-                bucket["spans"].append((start, end))
-                anchor = int(f[7]) - start + 1 if f[4] == "+" else int(f[7]) + 1 - lengths[f[0]] + end
-                bucket["anchors"].append((anchor, block))
-                bucket["anchors_by_strand"][f[4]].append((anchor, block))
-                bucket["weights"][f[4]] += block
+    for q, t, strand, start, end, block, anchor, qualifies in _profile_rows(path, lengths):
+        spans[q].append((start, end))
+        targets[q][t].append((start, end))
+        target_strands[q][t][strand].append((start, end))
+        # Match assign_chr_groups.py, including all qualifying targets.
+        if qualifies:
+            bucket = qualified[q][t]
+            bucket["spans"].append((start, end))
+            bucket["anchors"].append((anchor, block))
+            bucket["anchors_by_strand"][strand].append((anchor, block))
+            bucket["weights"][strand] += block
     return {q: {"length": n, "covered": union_length(spans[q]),
                 "targets": {t: union_length(s) for t, s in sorted(targets[q].items())},
                 "target_strands": {t: {strand: union_length(s) for strand, s in sorted(by_strand.items())}
@@ -155,6 +194,80 @@ def coverage_profile(path, records):
                     "anchor_spans": {strand: weighted_anchor_span(values) for strand, values in b["anchors_by_strand"].items() if values}}
                     for t, b in sorted(qualified[q].items())}}
             for q, n in lengths.items()}
+
+
+def _coverage_profile_disk(path, lengths):
+    """Disk-backed sorting; Python retains groups/targets, never all hit rows.
+
+    This disposable database is not a cache or an admission receipt. It is kept
+    outside the source directory, removed on normal/error exit, and never read
+    by another invocation. No persistent SQLite tuning or project mutation.
+    """
+    names = list(lengths); numbers = {name: i for i, name in enumerate(names)}
+    result = {q: {"length": n, "covered": 0, "targets": {}, "target_strands": {},
+                  "assignment_candidates": {}} for q, n in lengths.items()}
+    def row(q):return result[names[q]]
+    with tempfile.TemporaryDirectory(prefix="cgat-profile-") as scratch:
+        db = sqlite3.connect(str(Path(scratch) / "hits.sqlite"))
+        try:
+            db.execute("PRAGMA journal_mode=OFF")  # Disposable derived data only.
+            db.execute("PRAGMA synchronous=OFF")
+            db.execute("PRAGMA temp_store=FILE")
+            db.execute("PRAGMA cache_size=-4096")
+            db.execute("PRAGMA mmap_size=0")
+            db.execute("CREATE TABLE hits(q INTEGER,t TEXT,strand TEXT,start INTEGER,end INTEGER,block INTEGER,anchor INTEGER,qualified INTEGER)")
+            db.executemany("INSERT INTO hits VALUES(?,?,?,?,?,?,?,?)",
+                ((numbers[q], t, strand, start, end, block, anchor, qualifies)
+                 for q, t, strand, start, end, block, anchor, qualifies in _profile_rows(path, lengths)))
+            db.commit()
+
+            def unions(keys, where=""):
+                columns = ",".join(keys)
+                cursor = db.execute("SELECT " + columns + ",start,end FROM hits " + where + " ORDER BY " + columns + ",start,end")
+                for key, hits in groupby(cursor, lambda v: v[:-2]):
+                    total = right = 0
+                    for *_, start, end in hits:
+                        total += max(0, end - max(start, right)); right = max(right, end)
+                    yield key, total
+
+            for (q,), covered in unions(("q",)):
+                row(q)["covered"] = covered
+            for (q, t), covered in unions(("q", "t")):
+                row(q)["targets"][t] = covered
+            for (q, t, strand), covered in unions(("q", "t", "strand")):
+                row(q)["target_strands"].setdefault(t, {})[strand] = covered
+            for (q, t), covered in unions(("q", "t"), "WHERE qualified=1"):
+                row(q)["assignment_candidates"][t] = {"covered": covered, "strand_weights": {"+": 0, "-": 0},
+                                                       "anchor_start": None, "anchor_spans": {}}
+            cursor = db.execute("SELECT q,t,strand,block FROM hits WHERE qualified=1 ORDER BY q,t,strand")
+            for (q, t, strand), hits in groupby(cursor, lambda v: v[:3]):
+                row(q)["assignment_candidates"][t]["strand_weights"][strand] = sum(v[3] for v in hits)
+            cursor = db.execute("SELECT q,t,anchor,block FROM hits WHERE qualified=1 ORDER BY q,t,anchor,block")
+            for (q, t), hits in groupby(cursor, lambda v: v[:2]):
+                candidate = row(q)["assignment_candidates"][t]
+                threshold = sum(candidate["strand_weights"].values()) // 2 + 1
+                cumulative = 0
+                for _, _, anchor, weight in hits:
+                    cumulative += weight
+                    if cumulative >= threshold:
+                        candidate["anchor_start"] = anchor; break
+                if candidate["anchor_start"] is None:
+                    raise ValueError("positive anchor weights required")
+            cursor = db.execute("SELECT q,t,strand,anchor,block FROM hits WHERE qualified=1 ORDER BY q,t,strand,anchor,block")
+            for (q, t, strand), hits in groupby(cursor, lambda v: v[:3]):
+                candidate = row(q)["assignment_candidates"][t]
+                total = candidate["strand_weights"][strand]
+                if total <= 0:raise ValueError("positive anchor weights required")
+                low = high = None; cumulative = 0
+                for _, _, _, anchor, weight in hits:
+                    cumulative += weight
+                    if low is None and cumulative * 10 >= total:low = anchor
+                    if cumulative * 10 >= total * 9:
+                        high = anchor; break
+                candidate["anchor_spans"][strand] = [low, high]
+            return result
+        finally:
+            db.close()
 
 
 def weighted_anchor(values):

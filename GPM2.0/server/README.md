@@ -358,6 +358,11 @@ Full and no-FASTA delivery packages retain these records in
 `metadata/alignment_provenance.json`, without copying private logs or caches.
 Legacy results without a companion remain supported; no policy is invented for them.
 
+Large PAF audits use exact disk-backed statistics rather than a blanket 64-MiB
+result limit. Provide sufficient temporary space; an audit error preserves
+completed native work for a later resume. Pilot/review execution budgets remain
+finite, and no rows are sampled away to make an audit fit.
+
 For a stopped workspace, `bash "$SERVER/run.sh" -o ./gpm_server -K 500M`
 changes the batch size for unfinished work without rerunning valid completed alignments.
 Existing workspaces retain their prepared defaults; changing `-f` requires a new output directory.

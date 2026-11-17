@@ -71,6 +71,43 @@ class AutomaticOrdinaryServerTests(unittest.TestCase):
         stack.enter_context(patch.object(oc.pilot,"_verify_case",side_effect=timing))
         return stack
 
+    def test_failed_disk_audit_preserves_completed_mapping_for_later_resume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime,args=self.fixture(Path(directory),weak=True)
+            with self.controls():first=sa.run_reference(args,runtime_root=runtime)
+            before=(args.run_dir/"result.paf").read_bytes()
+            quality=oc.pilot.quality
+            with self.controls(), patch.object(quality,"IN_MEMORY_PROFILE_BYTES",0), \
+                    patch.object(quality,"_coverage_profile_disk",side_effect=quality.sqlite3.OperationalError("disk full")), \
+                    patch.object(nf,"attempt",side_effect=AssertionError("failed audit remapped")):
+                with self.assertRaisesRegex(quality.sqlite3.OperationalError,"disk full"):
+                    sa.run_reference(args,runtime_root=runtime)
+            self.assertFalse((args.run_dir/"result.paf").exists())
+            self.assertEqual((Path(first["attempt"])/"prior-result.paf").read_bytes(),before)
+            with self.controls(), patch.object(quality,"IN_MEMORY_PROFILE_BYTES",0), \
+                    patch.object(nf,"attempt",side_effect=AssertionError("disk recovery remapped")):
+                resumed=sa.run_reference(args,runtime_root=runtime)
+            self.assertTrue(resumed["result_published"])
+            self.assertEqual(resumed["attempt"],first["attempt"])
+            self.assertEqual((args.run_dir/"result.paf").read_bytes(),before)
+
+    def test_exact_disk_audit_keeps_native_outputs_and_readonly_resume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime,args=self.fixture(Path(directory),mixed=True,weak=True)
+            with self.controls():first=sa.run_reference(args,runtime_root=runtime)
+            before=(args.run_dir/"result.paf").read_bytes()
+            quality=oc.pilot.quality
+            with self.controls(), patch.object(quality,"IN_MEMORY_PROFILE_BYTES",0), \
+                    patch.object(quality,"_coverage_profile_disk",wraps=quality._coverage_profile_disk) as spill, \
+                    patch.object(nf,"attempt",side_effect=AssertionError("disk audit remapped native")), \
+                    patch.object(wa,"run_command",side_effect=AssertionError("disk audit rebuilt index/windows")):
+                resumed=sa.run_reference(args,runtime_root=runtime)
+            self.assertGreater(spill.call_count,0)
+            self.assertEqual(resumed["attempt"],first["attempt"])
+            self.assertTrue(resumed["result_published"])
+            self.assertEqual((args.run_dir/"result.paf").read_bytes(),before)
+            self.assertEqual(resumed["ordinary_selected_filter"],first["ordinary_selected_filter"])
+
     def test_prepared_score_80_reaches_pilot_review_windows_publication_and_delivery(self):
         with tempfile.TemporaryDirectory() as directory:
             runtime,args=self.fixture(Path(directory),mixed=True,weak=True)

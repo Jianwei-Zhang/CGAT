@@ -335,6 +335,25 @@ class KeyMigrationTests(unittest.TestCase):
         self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
         self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
 
+    def test_disk_audit_upgrade_preserves_nondefault_controller_identity(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_disk_profile_runtime.json').read_text())
+        digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest(files),pr._REVIEWED_ASSIGNMENT_POLICY_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY}
+        runtime={**self.runtime,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY,
+                 'native_resume_source_profiles':[[pr._REVIEWED_ASSIGNMENT_POLICY_RUNTIME,digest(self.runtime['files_sha256'])]]}
+        self.key['assignment_coverage']=.80
+        self.cache.data['key']=self.key
+        locator=pr.read_json(self.run/pr.LOCATOR);locator['key']=self.key
+        wa.write_json(self.run/pr.LOCATOR,locator)
+        self.cache.data['stages'].pop('ordinary');self.cache.save()
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        before=self.cache.data['stages'].copy()
+        key={**self.make_key(runtime['sha256']),'assignment_coverage':.80}
+        attempt,reused=pr.select_attempt(self.run,key,runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertEqual(pr.read_json(attempt/'selective'/pr.STATE)['stages'],before)
+
     def test_assignment_threshold_change_cannot_migrate_an_old_default_policy(self):
         runtime={**self.runtime,'files_sha256':self.old_runtime['files_sha256']}
         key={**self.make_key(runtime['sha256']),'assignment_coverage':.80}

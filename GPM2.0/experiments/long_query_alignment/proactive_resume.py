@@ -34,6 +34,7 @@ _REVIEWED_PARTITION_RUNTIME = "322b55b8b3dc0b0e019bd467c515551a97c77ed7a94e120f2
 _REVIEWED_PARTITION_RESUME_RUNTIME = "9e67482b65ae03e09ea84f83e87d956d677b6f5ca777e981446d5e3fb6cf7f58"
 _REVIEWED_RESOURCE_RUNTIME = "19fd54d556005a7fc854fa98c61d0fb74a49e0e0e9496f68fea814248bf0563e"
 _REVIEWED_AUTOMATIC_WINDOW_RUNTIME = "4d9244c3be38d5df7796d2917b73738859ab502b367a1c70fcf939b1d610bfab"
+_REVIEWED_ASSIGNMENT_POLICY_RUNTIME = "afbe9f6fd32ec4a96bdd8cfd2b7d87b8db562c6d52e908ee8eddce20989a076d"
 _REVIEWED_ORDINARY_CONTROLLER_RUNTIME = "79a55837358822ba3769efa69b81a7364109e26c6668cc15685b85cb66feae69"
 _REVIEWED_WINDOW_SUBSTAGE_RUNTIME = "88e14005c9a1786dc257662106552cb6c20b898e0a943bd3b5088d1ed6e9ba89"
 _REVIEWED_BUFFERED_RUNTIME = "dccfca050f54e57cc769559ae227dfd2863d532ea55b64f08557a7e6c38a18db"
@@ -99,7 +100,7 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
                 and previous.get("ordinary_output_admission") == runtime.get("ordinary_output_admission"))
     profile = hashlib.sha256(json.dumps(old_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     current_profile = hashlib.sha256(json.dumps(new_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME}
+    approved = (profile in {_REVIEWED_LEGACY_RUNTIME, _REVIEWED_METADATA_RUNTIME, _REVIEWED_PARAMETER_RUNTIME, _REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME}
                 and [profile, current_profile] in runtime.get("native_resume_source_profiles", []))
     if not approved:
         return False
@@ -124,13 +125,13 @@ def _compatible_runtime(candidate, old_key, key, runtime, state):
            and not (name == "windowed_alignment.py" and buffered_equivalent)
            for name in kernels):
         return False
-    if (profile == _REVIEWED_ORDINARY_CONTROLLER_RUNTIME
+    if (profile in {_REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))):
         # The ordinary controller keeps its own finite pilot/unit ledger, not
         # an "ordinary" native-group checkpoint. Reopen it; every source and
         # policy decision is still revalidated before reuse or publication.
         return True
-    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME}
+    if (profile in {_REVIEWED_PARTITION_RUNTIME, _REVIEWED_PARTITION_RESUME_RUNTIME, _REVIEWED_RESOURCE_RUNTIME, _REVIEWED_NATIVE_STREAM_RUNTIME, _REVIEWED_BUFFERED_RUNTIME, _REVIEWED_AUTOMATIC_WINDOW_RUNTIME, _REVIEWED_WINDOW_SUBSTAGE_RUNTIME, _REVIEWED_ORDINARY_CONTROLLER_RUNTIME, _REVIEWED_ASSIGNMENT_POLICY_RUNTIME}
             and all(n in stages for n in ("groups", "target-store", "index"))
             and "ordinary" not in stages):
         partial = candidate / "selective" / "ordinary-native" / opa.RECEIPT

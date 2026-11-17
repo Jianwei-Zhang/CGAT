@@ -1474,3 +1474,54 @@ assertion (`may change alignments`); that wording and its automatic-calibration
 explanation now have regression coverage. Final revision CI, official Server-only
 source refresh, fresh public download and formal docs/mirror closure are still
 required; none is implied by these local/ARM checks.
+
+
+### Exact large-PAF audit without a primary-output size veto (2026-11-17)
+
+A final large-unit call-path review found that `primary_work` removed the native
+output cap but still called a profiler that rejected every PAF over 64 MiB. This
+could reject successfully completed ordinary mapping at production batch sizes.
+The fix does NOT raise a pilot budget, sample rows, accept an unchecked filtered
+source, or send the whole workload back to default. Small audits keep the exact
+in-memory calculation; large audits stream the mandatory columns and use a
+private disposable SQLite database for full interval unions, chromosome/strand
+support, block-weighted anchor medians and 10th/90th quantiles. Large optional
+CIGAR/tag text is not buffered as an entire row by this profiler. The separate
+native geometry/tag/source verification and finite pilot/review caps remain.
+
+A frozen pre-change oracle agrees exactly with both implementations on randomized
+multitarget/multistrand overlaps, duplicate anchors, unqualified hits, no-hit
+records, non-default assignment thresholds and chunk-boundary input. Scratch is
+removed on normal/error exit without touching unrelated files. An injected disk
+failure prevents publication, preserves completed work, and a subsequent successful
+audit resumes without new native commands. No memory/RSS guarantee for the full
+pipeline is inferred from these profile-only checks.
+
+The synthetic scale input contains 1,018,680 rows / 75,501,166 bytes, SHA-256
+`00e03bd3721079e3d1a269ddb7f95d5e1da3916eb27d5c00d052d0c29eccfa6a`.
+Every row was included. Exact expected statistics account for all repeated block
+weights; profile SHA-256 is
+`af814786050cc2a9fd6bba38174f4a9318441755c3daecfe8e9007997fa587a7`.
+Local audit: 13.366 s, process peak RSS 28,908 KiB. ARM audit: 21.771 s, process
+peak RSS 25,352 KiB. These are audit scalability measurements, not mapping speedups.
+
+The previously downloaded genuine wheat prefix, reviewed prefix and 289.5-Mb
+long-query result were re-audited read-only. Each source SHA was rechecked; all
+three disk profiles equal the old in-memory profiles exactly. No new mapper
+command was run. Local audit times were 0.245 s, 0.233 s and 0.343 s respectively.
+
+A real upgrade control generated a mixed-input result with frozen `aeaad58`
+sources and `--score 80`, then reopened it with the new runtime and forced disk
+profiling. It kept the same attempt and byte-identical PAF with zero new native,
+index or window calls. Reviewed source transition:
+`afbe9f6fd32ec4a96bdd8cfd2b7d87b8db562c6d52e908ee8eddce20989a076d` ->
+`b61402b11101780c865f9b26654a7a5c104f696c90d3fabb82e53760495a2961`.
+
+Full local regression: 802 tests in 292.033 s, one optional source-oracle skip,
+all others passed. ARM job `42147128` SUCCEEDED on ARM-11,
+09:12:42--09:13:28 CST: all 20 prepared-entry/profile tests passed in 19.414 s,
+then the million-row scale audit passed. Frozen payload SHA-256:
+`6c6b938f1ca748f87ce3e5bbdce41e0db4262282c7d6bb5deb55e019d0a87ef2`.
+The preceding commit `aeaad58` passed Quality CI `43960780894`, including the
+canonical Linux Server gate; this does not substitute for the new revision's CI.
+Official source-asset and formal docs/mirror closure remain pending.
