@@ -248,3 +248,11 @@ output-bound q0 routing provenance attachment plus the retained Server audit;
 do not relabel q0 routing as the initial-reference policy schema. Main log:
 `logs/resume_routed_42710779.out`; cutover backups and scheduler evidence are in
 `routing-resume-staged-20261119/cutover-20261119-0555/`.
+
+
+At 06:09:58 the activation receipt `resume-verified.json` confirmed both
+references, assignment and all **17 native cross leaves** were validated and
+reused. The first real routed leaf, **5D**, started at 06:08:28. Its baseline
+and 0.005 window-calibration mappings had begun; no complete routed 5D result
+or whole-workflow success was claimed. Startup-to-first-new-leaf took 10m18s,
+including content verification, not alignment time or a controlled speedup.

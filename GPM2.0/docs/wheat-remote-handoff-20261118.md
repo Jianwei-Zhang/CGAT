@@ -253,3 +253,19 @@
 - 本次登录节点控制脚本最初误用了系统 Python 3.6，因 `subprocess(text=...)`
   不支持而在任何停止操作前退出；加载已确认的 x86 environment 后执行成功。
   后续控制脚本同样先 source 该环境，不修改系统 Python。
+
+
+### 06:10 补充：初始阶段与 17 个 native cross 已确认复用
+
+- 当前 run 的两个 ref 已分别于 06:00:51 / 06:02:26 SKIP_VALID；assign 于
+  **06:07:09** SKIP_VALID。**17 个** native cross 都出现 CROSS_LEAF_REUSED
+  和 exit_code=0 的 TASK_END，包含刚完成的 6A；没有重跑这些比对。
+- **06:08:28** 首个实际 routed leaf 为 **5D cross**，日志明确记录
+  `ROUTE_EXECUTION_OVERRIDE`，执行 `routing-resume-staged-20261119/route-5D.sh`。
+  由作业启动到该叶子执行为 **10 分 18 秒**，包含本次内容校验，不是比对耗时；
+  不把跨节点/不同缓存状态的耗时差直接说成缓存优化倍率。
+- 06:09:58 检查时，5D stdout 已先后记录 baseline 与 `-f 0.005` 的窗口校准启动，
+  stderr 为空。尚未完成整条 5D，不能提前声称其近似分支最终通过或已经提速。
+- 复用验收存于 `routing-resume-staged-20261119/resume-verified.json`，包含当前
+  run ID、三个 SKIP_VALID 原始事件、17 个原参叶子列表及实际执行替换事件。
+  路由的详细阶段在对应 leaf 的 `stdout.log`，不能只看顶层 checksum 日志。
