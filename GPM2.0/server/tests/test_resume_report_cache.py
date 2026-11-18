@@ -143,6 +143,21 @@ class ResumeReportCacheTests(unittest.TestCase):
             self.assertEqual(collect.sequence_stats(self.root, self.fasta)['sha256'], identity['sha256'])
         self.assertEqual(reads.call_count, 1)
 
+    def test_checkpoint_sweep_keeps_hashes_after_hundreds_of_batch_files(self):
+        # A chromosome-batched workspace exceeds the historical 256-entry memo.
+        # Each phase must still stat every file, but unchanged bytes need one read.
+        paths = [self.fasta]
+        for i in range(600):
+            path = self.root / f'batch-{i:04d}.sh'
+            path.write_text(f'echo {i}\n')
+            paths.append(path)
+        with patch.object(contract, '_sha256_read', wraps=contract._sha256_read) as reads:
+            first = [contract.file_identity(path) for path in paths]
+            second = [contract.file_identity(path) for path in paths]
+        self.assertEqual(first, second)
+        self.assertEqual(reads.call_count, len(paths))
+        self.assertLessEqual(len(contract._SHA256_CACHE), contract._SHA256_CACHE_LIMIT)
+
     def test_replacement_inode_and_bounded_hash_memo(self):
         first = contract.sha256_file(self.fasta)
         st = self.fasta.stat()
@@ -159,6 +174,9 @@ class ResumeReportCacheTests(unittest.TestCase):
                 p.write_text(str(i))
                 contract.sha256_file(p)
             self.assertLessEqual(len(contract._SHA256_CACHE), 3)
+            with patch.object(contract, '_sha256_read', wraps=contract._sha256_read) as reads:
+                self.assertEqual(contract.sha256_file(self.root / '0'), hashlib.sha256(b'0').hexdigest())
+            self.assertEqual(reads.call_count, 1)  # Evicted entries retain the full-read fallback.
 
     def test_shared_hash_memo_is_safe_for_concurrent_readers(self):
         from concurrent.futures import ThreadPoolExecutor

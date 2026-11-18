@@ -179,7 +179,11 @@ def fingerprint(value: object) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
-_SHA256_CACHE_LIMIT = 256
+# Keep metadata-only digests across chromosome/batch checkpoint sweeps; a
+# 256-entry LRU evicts large inputs before the next phase can reuse their hash.
+# Still bounded and process-local: every hit rechecks the full stat signature,
+# and a changed/evicted entry falls back to a stable complete byte read.
+_SHA256_CACHE_LIMIT = 8192
 _SHA256_CACHE = OrderedDict()
 _SHA256_CACHE_LOCK = threading.RLock()
 
