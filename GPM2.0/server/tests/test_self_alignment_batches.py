@@ -28,6 +28,66 @@ def load_generator():
 
 
 class SelfAlignmentBatchTests(unittest.TestCase):
+    def make_merge_fixture(self, root, *, complete=True):
+        import self_alignment_batches as batches
+        rows = []
+        for i in range(3):
+            directory = root / f"batch-{i}"
+            directory.mkdir()
+            for name in batches.OUTPUTS:
+                (directory / name).write_text(f"{name}-{i}\n")
+            key = f"key-{i}"
+            if complete or i < 2:
+                batches.publish(directory, key, batches.OUTPUTS)
+            rows.append({"directory": str(directory), "key": key})
+        manifest = {"output": str(root / "result.paf"), "batches": rows}
+        path = root / "manifest.json"
+        batches.atomic_json(path, manifest)
+        return path, manifest
+
+    def test_incomplete_merge_does_not_rehash_completed_prefix(self):
+        import self_alignment_batches as batches
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path, manifest = self.make_merge_fixture(root, complete=False)
+            with patch.object(batches, "valid_outputs", wraps=batches.valid_outputs) as validate:
+                self.assertFalse(batches.merge_if_complete(path, manifest))
+                validate.assert_not_called()
+            self.assertFalse((root / "result.paf").exists())
+            self.assertFalse((root / "self_batch_result.json").exists())
+
+    def test_complete_merge_still_validates_every_batch_in_manifest_order(self):
+        import self_alignment_batches as batches
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path, manifest = self.make_merge_fixture(root)
+            with patch.object(batches, "valid_outputs", wraps=batches.valid_outputs) as validate:
+                self.assertTrue(batches.merge_if_complete(path, manifest))
+                self.assertEqual(validate.call_count, 3)
+            self.assertEqual((root / "result.paf").read_text(),
+                             "result.paf-0\nresult.paf-1\nresult.paf-2\n")
+            self.assertTrue((root / "self_batch_result.json").is_file())
+
+    def test_completion_markers_do_not_admit_corrupt_outputs(self):
+        import self_alignment_batches as batches
+        for name in batches.OUTPUTS:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                path, manifest = self.make_merge_fixture(root)
+                (root / "batch-1" / name).write_text("corrupt\n")
+                self.assertFalse(batches.merge_if_complete(path, manifest))
+                self.assertFalse((root / "result.paf").exists())
+                self.assertFalse((root / "self_batch_result.json").exists())
+
+    def test_malformed_completion_marker_does_not_admit_merge(self):
+        import self_alignment_batches as batches
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path, manifest = self.make_merge_fixture(root)
+            (root / "batch-1/complete.json").write_text("not-json")
+            self.assertFalse(batches.merge_if_complete(path, manifest))
+            self.assertFalse((root / "result.paf").exists())
+
     def test_assertion_preserves_failed_batch_and_never_publishes_success(self):
         import self_alignment_batches as batches
         namespace = load_generator()

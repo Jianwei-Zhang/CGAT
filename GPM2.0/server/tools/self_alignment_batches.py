@@ -175,9 +175,15 @@ def merge_if_complete(manifest_path: Path, manifest: dict) -> bool:
                 return True
         except (OSError, ValueError, KeyError, TypeError):
             pass
+        # An incomplete set cannot be merged. Check small completion markers
+        # first instead of hashing every completed prefix after each batch.
+        # Marker presence is not acceptance: the full output checks below still
+        # run before publication, under the same merge lock.
+        directories = [Path(batch["directory"]) for batch in manifest["batches"]]
+        if any(not (directory / "complete.json").is_file() for directory in directories):
+            return False
         sources = []
-        for batch in manifest["batches"]:
-            directory = Path(batch["directory"])
+        for batch, directory in zip(manifest["batches"], directories):
             if not valid_outputs(directory, batch["key"], OUTPUTS):
                 return False
             sources.append(directory / "result.paf")

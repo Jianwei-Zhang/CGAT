@@ -145,7 +145,7 @@
         "tools/run_outer_checkpoints.py": "e066d7950f99b35822512c3840ae2a9e0683eede275f30f29747879b32be0035",
         "tools/run_progress.py": "ae80fbfa01a2e6bfcb225f36a083ef15089257e7db0ab70657d373a4c9e3b30e",
         "tools/run_resources.py": "fc9590a94aa576fd860ea696ab4b0fb175b1c87cd2e670a0a2558258d97ae3d0",
-        "tools/self_alignment_batches.py": "00abcb215a4121b384d1613708f9b0618183b0bebf309e0a459c6cc1b7332580",
+        "tools/self_alignment_batches.py": "8768cac7ba99f0f0a39794b0acaa05ea1f01335f4903973cb394cf15ef78eb5d",
         "tools/server_report.py": "ca61bf87d1a2cbd73c7e5d0f21b02c536df13a062e150c29deea29d1b0140ead",
         "tools/server_report_collect.py": "4a2c430e0a712063efb497d64b196a7d382694a7bb5fd7fb2886da69f66ef492",
         "tools/server_report_io.py": "0887d970ece7a5017bd626f3519bb525a7e12e0e76318407069a8964ff37db72",
