@@ -18,6 +18,14 @@ try:
 except ModuleNotFoundError:
     from .render_server_report import REPORT_PREVIEW_ROWS
 
+try:
+    from run_orchestration import file_signature, fingerprint
+except ModuleNotFoundError:
+    from .run_orchestration import file_signature, fingerprint
+
+_LEGACY_STATISTICS_ALGORITHM = "fasta-length-n50-n-gap100-v1"
+STATISTICS_ALGORITHM = _LEGACY_STATISTICS_ALGORITHM
+
 LGZ_STAGES = {
     "step1_round1": "grt/evidence/step1/round1",
     "step1_filter": "grt/evidence/step1/filter",
@@ -28,16 +36,84 @@ LGZ_STAGES = {
 }
 
 
+def _read_statistics_cache(path: Path):
+    if path.is_symlink():
+        return None
+    try:
+        return read_json(path)
+    except (OSError, ValueError):
+        return None  # Derived cache corruption is a miss, not valid evidence.
+
+
+def _statistics_match(value, sha256: str) -> bool:
+    keys = ("length_bp", "n_bp", "gap_count", "gap_bp")
+    if (not isinstance(value, dict) or value.get("sha256") != sha256
+            or value.get("gap_definition") != "maximal consecutive N/n runs of at least 100 bp"
+            or not isinstance(value.get("sequences"), list)
+            or any(type(value.get(k)) is not int or value[k] < 0 for k in (*keys, "sequence_count", "n50_bp"))
+            or value["sequence_count"] != len(value["sequences"])):
+        return False
+    rows = value["sequences"]
+    for row in rows:
+        if (not isinstance(row, dict) or not isinstance(row.get("sequence"), str)
+                or any(type(row.get(k)) is not int or row[k] < 0 for k in keys)
+                or not row["gap_count"] * 100 <= row["gap_bp"] <= row["n_bp"] <= row["length_bp"]):
+            return False
+    if any(value[k] != sum(row[k] for row in rows) for k in keys):
+        return False
+    cumulative = n50 = 0
+    for length in sorted((row["length_bp"] for row in rows), reverse=True):
+        cumulative += length
+        if cumulative * 2 >= value["length_bp"]:
+            n50 = length
+            break
+    return value["n50_bp"] == n50
+
+
 def sequence_stats(root: Path, path: Path) -> dict | None:
     if not path.is_file():
         return None
-    stat = path.stat()
-    key = hashlib.sha256(f"{path.relative_to(root)}:{stat.st_size}:{stat.st_mtime_ns}:{stat.st_ctime_ns}".encode()).hexdigest()
-    cached = root / "report/statistics" / f"{key}.json"
-    value = read_json(cached)
+    before = file_signature(path)
+    relative = path.relative_to(root).as_posix()
+    # This always establishes actual content in the current process, even when
+    # persistent metadata agrees. It can reuse an earlier checkpoint hash read.
+    current_sha = digest(path)
+    key = hashlib.sha256(relative.encode()).hexdigest()
+    cache = root / ".run_all/report-statistics" / f"{key}.json"
+    if cache.parent.is_symlink() or not cache.parent.resolve().is_relative_to(root.resolve()):
+        raise ValueError("report statistics cache escapes its workspace")
+    saved = _read_statistics_cache(cache)
+    source = {"path": relative, "sha256": current_sha}
+    value = None
+    if (isinstance(saved, dict) and saved.get("schema") == 1
+            and saved.get("algorithm") == STATISTICS_ALGORITHM
+            and saved.get("source") == source
+            and _statistics_match(saved.get("stats"), current_sha)
+            and saved.get("stats_sha256") == fingerprint(saved["stats"])):
+        value = saved["stats"]
+    if value is None and saved is None and STATISTICS_ALGORITHM == _LEGACY_STATISTICS_ALGORITHM:
+        # Adopt only the previous known statistics contract and verify its
+        # content binding. Archived reports stay immutable. This avoids one
+        # last full re-scan when first installing the persistent-cache fix.
+        st = path.stat()
+        legacy_key = hashlib.sha256(f"{path.relative_to(root)}:{st.st_size}:{st.st_mtime_ns}:{st.st_ctime_ns}".encode()).hexdigest()
+        candidates = [root / "report/statistics" / f"{legacy_key}.json"]
+        candidates += sorted((root / ".report_history").glob(f"*/statistics/{legacy_key}.json"), reverse=True)[:8]
+        for candidate in candidates:
+            if not candidate.resolve().is_relative_to(root.resolve()):
+                continue
+            old = _read_statistics_cache(candidate)
+            if _statistics_match(old, current_sha):
+                value = old
+                break
     if value is None:
         value = fasta_stats(path)
-        write_json(cached, value)
+    if file_signature(path) != before or not _statistics_match(value, current_sha):
+        raise ValueError(f"FASTA changed during report statistics: {path}")
+    record = {"schema": 1, "algorithm": STATISTICS_ALGORITHM, "source": source,
+              "stats_sha256": fingerprint(value), "stats": value}
+    if saved != record:
+        write_json(cache, record)
     return value
 
 

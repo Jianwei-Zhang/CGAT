@@ -8,6 +8,9 @@ import hashlib
 import json
 import os
 import re
+import stat
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -168,23 +171,69 @@ def fingerprint(value: object) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
-def sha256_file(path: Path) -> str:
+_SHA256_CACHE_LIMIT = 256
+_SHA256_CACHE = OrderedDict()
+_SHA256_CACHE_LOCK = threading.RLock()
+
+
+def _stat_signature(resolved: Path, value: os.stat_result) -> tuple:
+    return (str(resolved), value.st_dev, value.st_ino, value.st_size,
+            value.st_mtime_ns, value.st_ctime_ns)
+
+
+def file_signature(path: Path) -> tuple:
+    try:
+        resolved = Path(path).resolve(strict=True)
+        value = resolved.stat()
+    except FileNotFoundError as exc:
+        raise OrchestrationContractError(f"required file is missing: {path}") from exc
+    if not stat.S_ISREG(value.st_mode):
+        raise OrchestrationContractError(f"required regular file is missing: {path}")
+    return _stat_signature(resolved, value)
+
+
+def _sha256_read(signature: tuple) -> str:
+    """Only an actual stable byte read may populate the process-local memo."""
+    path = Path(signature[0])
     digest = hashlib.sha256()
     with path.open("rb") as handle:
+        if _stat_signature(path, os.fstat(handle.fileno())) != signature:
+            raise OrchestrationContractError(f"file changed before hashing: {path}")
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
+        if _stat_signature(path, os.fstat(handle.fileno())) != signature:
+            raise OrchestrationContractError(f"file changed during hashing: {path}")
     return digest.hexdigest()
 
 
+def sha256_file(path: Path) -> str:
+    signature = file_signature(path)
+    with _SHA256_CACHE_LOCK:
+        cached = _SHA256_CACHE.get(signature)
+        if cached is not None:
+            _SHA256_CACHE.move_to_end(signature)
+    if cached is not None:
+        if file_signature(path) != signature:
+            raise OrchestrationContractError(f"file changed during hash reuse: {path}")
+        return cached
+    digest = _sha256_read(signature)
+    if file_signature(path) != signature:
+        raise OrchestrationContractError(f"file changed while hashing: {path}")
+    with _SHA256_CACHE_LOCK:
+        _SHA256_CACHE[signature] = digest
+        _SHA256_CACHE.move_to_end(signature)
+        while len(_SHA256_CACHE) > _SHA256_CACHE_LIMIT:
+            _SHA256_CACHE.popitem(last=False)
+    return digest
+
+
 def file_identity(path: Path, *, relative_to: Path | None = None) -> dict[str, object]:
-    if not path.is_file():
-        raise OrchestrationContractError(f"required file is missing: {path}")
+    signature = file_signature(path)
     label = path.relative_to(relative_to).as_posix() if relative_to is not None else str(path)
-    return {
-        "path": label,
-        "size": path.stat().st_size,
-        "sha256": sha256_file(path),
-    }
+    digest = sha256_file(path)
+    if file_signature(path) != signature:
+        raise OrchestrationContractError(f"file identity changed while hashing: {path}")
+    return {"path": label, "size": signature[3], "sha256": digest}
 
 
 def atomic_write_json(path: Path, value: Mapping[str, object]) -> None:

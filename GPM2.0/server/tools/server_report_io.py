@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import os
 import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    from run_orchestration import sha256_file
+except ModuleNotFoundError:
+    from .run_orchestration import sha256_file
 
 SCHEMA = "cgat_server_report_v1"
 
@@ -50,11 +54,9 @@ def read_events(path: Path) -> list[dict]:
 
 
 def digest(path: Path) -> str:
-    value = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            value.update(chunk)
-    return value.hexdigest()
+    # Share actual reads with outer checkpoints in this process; never seed a
+    # content digest from a persisted report/cache receipt.
+    return sha256_file(path)
 
 
 def local_path(root: Path, relative: str) -> Path:
