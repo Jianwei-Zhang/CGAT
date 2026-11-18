@@ -20,12 +20,13 @@ const COPY = {
 const escape = value => String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
 export function renderToolbarGroup(kind, content, i18n, { local = false } = {}) {
-  if (!content.trim()) return "";
+  const fields = (Array.isArray(content) ? content : [content]).map(field => field.trim()).filter(Boolean);
+  if (!fields.length) return "";
   const locale = /[\u4e00-\u9fff]/.test(i18n.trackControls.identityPct) ? "zh" : "en";
   const key = local ? `local${kind[0].toUpperCase()}${kind.slice(1)}` : kind;
   const [label, hint] = COPY[locale][key];
-  return `<div class="assembly-toolbar-group" data-toolbar-group="${kind}" role="group" aria-label="${label}">
-    <span class="assembly-toolbar-group-label" tabindex="0" data-app-tooltip="${escape(hint)}" aria-description="${escape(hint)}">${label}</span>
-    <div class="assembly-toolbar-group-content" data-toolbar-group-content>${content}</div>
-  </div>`;
+  const caption = `<span class="assembly-toolbar-group-label" tabindex="0" data-app-tooltip="${escape(hint)}" aria-description="${escape(hint)}">${label}</span>`;
+  // Keep the caption with its first field, not with the entire group.
+  const first = `<div class="assembly-toolbar-group-start">${caption}${fields[0]}</div>`;
+  return `<div class="assembly-toolbar-group" data-toolbar-group="${kind}" role="group" aria-label="${label}"><div class="assembly-toolbar-group-content" data-toolbar-group-content>${[first, ...fields.slice(1)].join(" ")}</div></div>`;
 }

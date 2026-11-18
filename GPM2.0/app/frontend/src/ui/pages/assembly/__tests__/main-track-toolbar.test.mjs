@@ -35,21 +35,23 @@ for (const locale of ["zh", "en"]) test(`main toolbar contains parameters only a
   assert.ok(Object.hasOwn(toolbar.attrs, "data-main-track-toolbar"));
   assert.deepEqual(toolbar.children.map(node => node.attrs["data-toolbar-group"]), ["display", "filter", "edit"]);
   const contents = toolbar.children.map(group => group.children.find(node => Object.hasOwn(node.attrs, "data-toolbar-group-content")));
-  assert.ok(contents[0].children.some(node => node.attrs["data-grt-result-controls"] === "main"));
-  assert.ok(contents[2].children.some(node => node.attrs["data-create-phased-track"]));
-  assert.ok(contents[2].children.some(node => node.attrs.class === "main-view-history-controls"));
+  assert.ok(contents[0].children.flatMap(node => node.attrs.class === "assembly-toolbar-group-start" ? node.children : [node]).some(node => node.attrs["data-grt-result-controls"] === "main"));
+  assert.ok(contents[2].children.flatMap(node => node.attrs.class === "assembly-toolbar-group-start" ? node.children : [node]).some(node => node.attrs["data-create-phased-track"]));
+  assert.ok(contents[2].children.flatMap(node => node.attrs.class === "assembly-toolbar-group-start" ? node.children : [node]).some(node => node.attrs.class === "main-view-history-controls"));
   assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
   assert.doesNotMatch(html, /id="assembly-chr-picker-toggle"/);
   assert.doesNotMatch(html, /data-members-card-toggle="1"/);
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
-test("CSS wraps Main and Local control groups with separated inline captions", () => {
+test("CSS flows Main and Local fields through bounded, breakable groups", () => {
   const css = readStylesheetTree(new URL("../../../../styles/assembly.css", import.meta.url));
   assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\],\s*\.subview-panel-head\s*\{[^}]*flex-wrap: nowrap;[^}]*align-items: flex-start;[^}]*justify-content: flex-start;/);
   assert.match(css, /:is\(\.assembly-track-panel-head\[data-main-view-header\], \.subview-panel-head\) > \.assembly-view-title\s*\{[^}]*flex: none;[^}]*white-space: nowrap;/);
   const grouped = readFileSync(new URL("../../../../styles/assembly-toolbar.css", import.meta.url), "utf8");
-  assert.match(grouped, /justify-content: space-between;[\s\S]*flex-wrap: wrap;[\s\S]*gap: 8px;/);
+  assert.match(grouped, /display: block;[\s\S]*container-type: inline-size;/);
+  assert.match(grouped, /box-decoration-break: clone;/);
+  assert.match(grouped, /clamp\(8px, 1\.5cqw, 24px\)/);
   assert.match(grouped, /--toolbar-group-size: 32px;/);
   assert.match(grouped, /--toolbar-control-size: 26px;/);
   assert.match(grouped, /\.assembly-toolbar-group,[\s\S]*border: 1px solid var\(--border-subtle/);
@@ -93,7 +95,7 @@ function popupFixture() {
 
 test("popup tracking is bounded and resizing closed controls never measures/reorders the toolbar", () => {
   const f = popupFixture(); bindMainTrackToolbarPopups(f.host); bindMainTrackToolbarPopups(f.host);
-  assert.equal(f.events.size, 3); assert.equal(f.windows.size, 2);
+  assert.equal(f.events.size, 5); assert.equal(f.windows.size, 2);
   for (let i = 0; i < 30; i++) { f.windows.get("resize")(); f.events.get(MAIN_TRACK_TITLE_LAYOUT_EVENT)(); }
   assert.equal(f.reads(), 0);
   f.setOpen(true); f.windows.get("resize")();

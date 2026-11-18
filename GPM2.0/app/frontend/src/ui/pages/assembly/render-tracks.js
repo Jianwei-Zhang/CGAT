@@ -1034,15 +1034,14 @@ function renderAssemblyTrackInlineControls({
     history: mainViewHistory,
     i18n,
   });
-  const displayControls = `
-      ${leadingControls}
+  const displayControls = [leadingControls, `
       <div class="assembly-marker-display">
         <button type="button" class="button ghost tiny" data-marker-display-toggle aria-expanded="false" aria-controls="assembly-marker-display-menu">${escapeHtml(i18n.trackControls.markerDisplay)}</button>
         <div id="assembly-marker-display-menu" class="assembly-marker-display-menu" role="group" aria-label="${escapeAttr(i18n.trackControls.markerDisplay)}" hidden>
           <label><input type="checkbox" data-track-marker-visibility="showTelomeres" ${trackPrefs.showTelomeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.telomereMarkers)}</label>
           <label><input type="checkbox" data-track-marker-visibility="showCentromeres" ${trackPrefs.showCentromeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.centromereMarkers)}</label>
         </div>
-      </div>
+      </div>`, `
       <label class="assembly-track-inline-field">
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetHint)}">${escapeHtml(i18n.trackControls.supportDataset)}</span>
         ${
@@ -1050,27 +1049,24 @@ function renderAssemblyTrackInlineControls({
             ? supportDatasetSelect
             : `<span class="muted">${escapeHtml(i18n.trackControls.unconfigured)}</span>`
         }
-      </label>
-  `;
-  const filterControls = `
+      </label>`];
+  const filterControls = [`
       <label class="assembly-track-inline-field">
         ${renderSupportDsCtgLenLabel(i18n)}
         ${supportDsCtgLenInput}
-      </label>
-      ${renderViewTickControl(trackPrefs, i18n, "trackView")}
+      </label>`, renderViewTickControl(trackPrefs, i18n, "trackView"), `
       <label class="assembly-track-inline-field">
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
         ${alignmentInput}
-      </label>
+      </label>`, `
       <label class="assembly-track-inline-field">
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">${escapeHtml(i18n.trackControls.identityPct)}</span>
         ${identityInput}
-      </label>
-  `;
+      </label>`];
   return renderMainTrackToolbar(
     renderToolbarGroup("display", displayControls, i18n)
       + renderToolbarGroup("filter", filterControls, i18n)
-      + renderToolbarGroup("edit", `${editingControls}${mainViewHistoryControls}`, i18n),
+      + renderToolbarGroup("edit", [editingControls, mainViewHistoryControls], i18n),
     i18n,
   );
 }

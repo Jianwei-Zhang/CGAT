@@ -953,17 +953,15 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
     options: IDENTITY_PCT_OPTIONS,
     allowZero: true,
   });
-  const filters = `
-      ${renderViewTickControl(trackPrefs, i18n, "subviewTrackView")}
+  const filters = [renderViewTickControl(trackPrefs, i18n, "subviewTrackView"), `
       <label class="assembly-track-inline-field">
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
         ${alignmentInput}
-      </label>
+      </label>`, `
       <label class="assembly-track-inline-field">
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">${escapeHtml(i18n.trackControls.identityPct)}</span>
         ${identityInput}
-      </label>
-  `;
+      </label>`];
   return renderToolbarGroup("display", grtResultControls, i18n, { local: true })
     + renderToolbarGroup("filter", filters, i18n, { local: true })
     + renderToolbarGroup("edit", renderSubviewHistoryControls(history, i18n), i18n, { local: true });

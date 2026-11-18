@@ -1,3 +1,4 @@
+import { syncToolbarControlWidth } from "./toolbar-control-sizing.js";
 import { bindAssemblyScopePopovers } from "./scope-popover-runtime.js";
 import { bindFinalPathSelection } from "./final-path-selection-runtime.js";
 import { bindFinalPathTooltips } from "./final-path-tooltip-runtime.js";
@@ -140,7 +141,7 @@ function syncTrackComboMenuPlacement(comboNode) {
   if (!menu || typeof menu.getBoundingClientRect !== "function") {
     return;
   }
-  if (comboNode.closest?.(ALIGNMENT_TOOLBAR_SELECTOR) && placeAnchoredPanel(comboNode, menu)) return;
+  if (comboNode.closest?.(ALIGNMENT_TOOLBAR_SELECTOR) && placeAnchoredPanel(comboNode, menu, { matchAnchorWidth: false })) return;
   const viewportHeight =
     Number(comboNode.ownerDocument?.defaultView?.innerHeight || globalThis.window?.innerHeight)
     || Number(comboNode.ownerDocument?.documentElement?.clientHeight || globalThis.document?.documentElement?.clientHeight)
@@ -263,6 +264,7 @@ function captureScrollableRegionState(host, selector) {
 }
 
 function syncTrackComboSelection(comboNode, selectedValue) {
+  syncToolbarControlWidth(comboNode);
   if (!comboNode) {
     return;
   }

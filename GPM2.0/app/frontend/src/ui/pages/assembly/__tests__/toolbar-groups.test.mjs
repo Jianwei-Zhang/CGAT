@@ -14,35 +14,44 @@ function ruleBody(selector) {
   return rule[2];
 }
 
-test("Main and Local toolbars wrap visible groups and distribute spare row width between them", () => {
+test("toolbar spacing responds to container width but is bounded instead of filling the row", () => {
   const selector = ".assembly-track-inline-controls[data-main-track-toolbar],\n"
     + ".assembly-track-inline-controls[data-subview-toolbar],\n"
     + ".subview-window .assembly-track-inline-controls[data-subview-toolbar]";
   const toolbar = ruleBody(selector);
-  assert.match(toolbar, /flex-wrap:\s*wrap;/);
-  assert.match(toolbar, /justify-content:\s*space-between;/);
-  assert.match(toolbar, /gap:\s*8px;/);
-  assert.doesNotMatch(toolbar, /column-gap:\s*20px;/);
+  assert.match(toolbar, /display:\s*block;/);
+  assert.match(toolbar, /container-type:\s*inline-size;/);
   assert.match(toolbar, /overflow:\s*visible;/);
-  assert.doesNotMatch(toolbar, /nowrap|overflow-x:\s*auto/);
+  assert.doesNotMatch(toolbar, /space-between|overflow-x:\s*auto/);
+  assert.match(ruleBody(".assembly-toolbar-group + .assembly-toolbar-group"), /clamp\(8px, 1\.5cqw, 24px\)/);
   assert.doesNotMatch(css, /data-toolbar-compact|data-toolbar-group-open/);
 });
 
-test("oversized groups grow vertically and wrap complete fields without changing compact styling", () => {
+test("logical groups fragment between complete controls while retaining their borders", () => {
   const group = ruleBody(".assembly-toolbar-group,\n.subview-window [data-subview-toolbar] > .assembly-toolbar-group");
-  assert.match(group, /flex:\s*0 1 auto;/);
-  assert.match(group, /min-width:\s*0;/);
-  assert.match(group, /max-width:\s*100%;/);
-  assert.match(group, /height:\s*auto;/);
-  assert.match(group, /min-height:\s*var\(--toolbar-group-size, 32px\);/);
+  assert.match(group, /display:\s*inline;/);
+  assert.match(group, /box-decoration-break:\s*clone;/);
   assert.match(group, /border:\s*1px solid var\(--border-subtle/);
-  const content = ruleBody(".assembly-toolbar-group-content");
-  assert.match(content, /flex:\s*0 1 auto;/);
-  assert.match(content, /flex-wrap:\s*wrap;/);
-  assert.match(content, /gap:\s*6px;/);
-  assert.match(ruleBody(".assembly-toolbar-group-content > *"), /flex:\s*0 0 auto;/);
+  assert.match(ruleBody(".assembly-toolbar-group-content"), /display:\s*contents;/);
+  assert.match(ruleBody(".assembly-toolbar-group-label,\n.assembly-toolbar-group-content > *"), /display:\s*inline-flex;/);
   assert.match(css, /--toolbar-control-size: 26px;/);
   assert.match(ruleBody(".subview-window .assembly-track-inline-controls[data-subview-toolbar]"), /--toolbar-control-size: 24px;/);
+  const html = renderToolbarGroup("filter", ["", '<label id="first">first</label>', '<label id="second">second</label>'], getMessages("en", "assembly"));
+  assert.match(html, /class="assembly-toolbar-group-start">[\s\S]*?class="assembly-toolbar-group-label"[\s\S]*?<label id="first">first<\/label><\/div> <label id="second">second<\/label>/);
+  assert.equal(renderToolbarGroup("filter", ["", " "], getMessages("en", "assembly")), "");
+});
+
+test("toolbar inputs and preset menus have separate content-based width limits", () => {
+  const prefix = ":is([data-main-track-toolbar], [data-subview-toolbar])";
+  const combo = ruleBody(`${prefix} .assembly-toolbar-group .assembly-track-inline-field .assembly-track-combo`);
+  assert.match(combo, /width:\s*var\(--toolbar-combo-width, 64px\)/);
+  assert.match(combo, /min-width:\s*44px;/);
+  assert.match(combo, /max-width:\s*140px;/);
+  assert.match(ruleBody(`${prefix} .assembly-toolbar-group .assembly-track-inline-field .assembly-track-combo.is-support`), /max-width:\s*180px;/);
+  const menu = ruleBody(`${prefix} .assembly-track-combo-menu`);
+  assert.match(menu, /right:\s*auto;/);
+  assert.match(menu, /width:\s*max-content;/);
+  assert.match(menu, /max-width:\s*min\(240px, calc\(100vw - 16px\)\);/);
 });
 test("bilingual group captions explain purpose without adding headings or input tooltips", () => {
   for (const locale of ["zh", "en"]) {

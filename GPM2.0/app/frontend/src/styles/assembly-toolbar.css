@@ -1,18 +1,16 @@
 /* Owner: assembly Main / Local toolbar geometry. Group captions are subordinate micro-tags inside bordered group pills. */
+/* Inline formatting lets one logical group continue on the next line. */
 .assembly-track-inline-controls[data-main-track-toolbar],
 .assembly-track-inline-controls[data-subview-toolbar],
 .subview-window .assembly-track-inline-controls[data-subview-toolbar] {
   --toolbar-group-size: 32px;
   --toolbar-control-size: 26px;
-  display: flex;
+  display: block;
   flex: 1 1 0;
   min-width: 0;
-  align-items: center;
-  /* Distribute spare row width between groups, never stretch the controls. */
-  justify-content: space-between;
-  flex-wrap: wrap;
-  /* Minimum clearance only; space-between supplies the dynamic extra gap. */
-  gap: 8px;
+  container-type: inline-size;
+  line-height: calc(var(--toolbar-group-size) + 10px);
+  text-align: start;
   overflow: visible;
   padding: 2px 0;
 }
@@ -22,19 +20,20 @@
 }
 .assembly-toolbar-group,
 .subview-window [data-subview-toolbar] > .assembly-toolbar-group {
-  display: inline-flex;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  align-items: center;
-  gap: 6px;
+  display: inline;
   height: auto;
-  min-height: var(--toolbar-group-size, 32px);
-  padding: 2px 4px;
+  min-height: 0;
+  padding: 7px 4px;
   border: 1px solid var(--border-subtle, #dbe3ec);
   border-radius: calc(var(--control-radius, 5px) + 2px);
   background: var(--surface-subtle, #f8fafc);
   box-sizing: border-box;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.assembly-toolbar-group + .assembly-toolbar-group {
+  margin-inline-start: clamp(8px, 1.5vw, 24px);
+  margin-inline-start: clamp(8px, 1.5cqw, 24px);
 }
 .assembly-toolbar-group-label {
   display: inline-flex;
@@ -62,17 +61,18 @@
   outline: 2px solid var(--accent, #527ee9);
   outline-offset: -2px;
 }
-/* Keep each group together when it fits. Oversized groups wrap whole controls
-   inside their border instead of hiding fields or squeezing their inputs. */
-.assembly-toolbar-group-content {
+/* The content wrapper contributes no box. Only each complete field/button is
+   atomic, so the group can start in the space left on the current row. */
+.assembly-toolbar-group-content { display: contents; }
+.assembly-toolbar-group-label,
+.assembly-toolbar-group-content > * {
   display: inline-flex;
-  align-items: center;
-  flex: 0 1 auto;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 6px;
+  vertical-align: middle;
+  line-height: normal;
 }
-.assembly-toolbar-group-content > * { flex: 0 0 auto; }
+.assembly-toolbar-group-content > * { margin-inline: 2px; }
+.assembly-toolbar-group-label { line-height: 1; }
+.assembly-toolbar-group-start { align-items: center; gap: 6px; }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(
   .button, .grt-result-controls, .grt-result-switch, .grt-result-layer-menu, .grt-result-layer-trigger,
   .assembly-track-inline-field, .assembly-track-select-shell, .assembly-track-combo, .assembly-support-ds-len-settings-button,
@@ -151,9 +151,28 @@
 .assembly-toolbar-group .grt-result-layer-trigger { width: var(--toolbar-control-size); min-width: var(--toolbar-control-size); }
 .assembly-toolbar-group .grt-result-switch { border-radius: var(--control-radius, 5px) 0 0 var(--control-radius, 5px); }
 .assembly-toolbar-group .grt-result-layer-trigger { border-radius: 0 var(--control-radius, 5px) var(--control-radius, 5px) 0; }
-.assembly-toolbar-group .assembly-track-inline-field [data-track-combo-field="minIdentityPct"] { width: 70px; min-width: 70px; }
-.assembly-toolbar-group .assembly-track-inline-field [data-track-combo-field="alignmentLength"] { width: 88px; min-width: 88px; }
-.assembly-toolbar-group .assembly-track-inline-field .assembly-track-select-shell.is-support { width: 104px; min-width: 104px; }
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-track-inline-field .assembly-track-combo {
+  width: var(--toolbar-combo-width, 64px);
+  min-width: 44px;
+  max-width: 140px;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-track-inline-field .assembly-track-combo.is-support {
+  max-width: 180px;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-track-combo.is-readonly-summary .assembly-track-combo-input { padding-right: 8px; }
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-track-combo-menu {
+  right: auto;
+  width: max-content;
+  min-width: 32px;
+  max-width: min(240px, calc(100vw - 16px));
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-track-combo-option {
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .subview-header-tools { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 4px; }
 .subview-panel-head > .assembly-view-title,
 .subview-header-tools .button,
