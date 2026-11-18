@@ -39,8 +39,11 @@ where
     let final_version = final_q_version(field(&package_table.rows[0], "schema_version")?);
     let final_relpath = format!("grt/q/{final_version}.fa");
     let stages = read_tsv(
-        bundle_root, "metadata/grt_stage_status.tsv", STAGE_STATUS_HEADER,
-        if current { 5 } else { 8 }, Some(if current { 5 } else { 8 }),
+        bundle_root,
+        "metadata/grt_stage_status.tsv",
+        STAGE_STATUS_HEADER,
+        if current { 5 } else { 8 },
+        Some(if current { 5 } else { 8 }),
     )?;
     let transitions = expected_stage_transitions(&stages, current)?;
     let q_versions = if transitions.len() == Q0_DIRECT_STAGE_TRANSITIONS.len() {
@@ -50,7 +53,10 @@ where
     };
     for relpath in REQUIRED_FILES {
         if relpath.starts_with("grt/q/")
-            && !q_versions.iter().any(|version| *relpath == format!("grt/q/{version}.fa")) {
+            && !q_versions
+                .iter()
+                .any(|version| *relpath == format!("grt/q/{version}.fa"))
+        {
             continue;
         }
         required_bundle_file(bundle_root, package_table_path(relpath, current), relpath)?;
@@ -68,7 +74,13 @@ where
         };
         tables.insert(
             *relpath,
-            read_tsv(bundle_root, package_table_path(relpath, current), header, minimum, *maximum)?,
+            read_tsv(
+                bundle_root,
+                package_table_path(relpath, current),
+                header,
+                minimum,
+                *maximum,
+            )?,
         );
     }
 
@@ -693,7 +705,7 @@ where
                 &[
                     "assignment",
                     "step1",
-                "step1_round1",
+                    "step1_round1",
                     "step1_round2",
                     "step2",
                     "step3",
@@ -1328,7 +1340,12 @@ where
             );
         }
     }
-    if final_chr_names != q_records[final_version].keys().cloned().collect::<HashSet<_>>() {
+    if final_chr_names
+        != q_records[final_version]
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>()
+    {
         return grt_err(
             "FINAL_PATH_MISMATCH",
             "Final Path chromosome set differs from q4 FASTA",

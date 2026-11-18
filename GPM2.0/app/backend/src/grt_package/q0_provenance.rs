@@ -246,7 +246,8 @@ pub(super) fn validate_q0(
     let freeze: Freeze = decode(root, FREEZE)?;
     let selection: Selection = decode(root, SELECTION)?;
     if freeze.schema != "lgz_q0_donor_freeze_v2"
-        || freeze.package_schema_version != field(one_row(tables, "metadata/package.tsv")?, "schema_version")?
+        || freeze.package_schema_version
+            != field(one_row(tables, "metadata/package.tsv")?, "schema_version")?
         || selection.schema != "lgz_q0_selection_artifact_v1"
         || freeze.selection != SELECTION
     {
@@ -627,7 +628,10 @@ impl Q0Proof {
             let segments = chromosome["segments"]
                 .as_array()
                 .ok_or_else(|| grt_anyhow("INVALID_JSON", "Final Path segments"))?;
-            let final_version = final_q_version(field(one_row(tables, "metadata/package.tsv")?, "schema_version")?);
+            let final_version = final_q_version(field(
+                one_row(tables, "metadata/package.tsv")?,
+                "schema_version",
+            )?);
             let mut q4 = rows
                 .iter()
                 .filter(|row| row["q_version"] == final_version && row["chr"] == chr)

@@ -277,7 +277,9 @@ fn later_project_dataset_does_not_join_the_locked_q0_input_set() {
 fn accepts_direct_q0_pipeline_without_identity_artifacts() {
     let temp = materialize_named("frozen_direct_server.json");
     let package = validate_grt_package(temp.path()).unwrap();
-    let stages = &table(&package.tables, "metadata/grt_stage_status.tsv").unwrap().rows;
+    let stages = &table(&package.tables, "metadata/grt_stage_status.tsv")
+        .unwrap()
+        .rows;
     assert_eq!(stages.len(), 5);
     assert_eq!(stages[1]["stage"], "step1");
     assert_eq!(stages[1]["q_input_version"], "q0");
@@ -290,7 +292,9 @@ fn accepts_direct_q0_pipeline_without_identity_artifacts() {
         fs::read(legacy.path().join("grt/q/q4.fa")).unwrap(),
     );
     let path = temp.path().join("metadata/grt_stage_status.tsv");
-    let text = fs::read_to_string(&path).unwrap().replace("step1\tq0\t", "step1\tq1\t");
+    let text = fs::read_to_string(&path)
+        .unwrap()
+        .replace("step1\tq0\t", "step1\tq1\t");
     fs::write(path, text).unwrap();
     let error = validate_grt_package(temp.path()).unwrap_err().to_string();
     assert!(error.contains("stage transition"), "{error}");

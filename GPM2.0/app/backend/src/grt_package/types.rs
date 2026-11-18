@@ -12,12 +12,18 @@ pub(super) fn is_q0_package_schema(value: &str) -> bool {
     matches!(value, GRT_Q0_SCHEMA_VERSION | GRT_CURRENT_SCHEMA_VERSION)
 }
 pub(super) fn final_q_version(value: &str) -> &'static str {
-    if value == GRT_CURRENT_SCHEMA_VERSION { "q3" } else { "q4" }
+    if value == GRT_CURRENT_SCHEMA_VERSION {
+        "q3"
+    } else {
+        "q4"
+    }
 }
 pub(super) fn package_table_path<'a>(path: &'a str, current: bool) -> &'a str {
     match (current, path) {
         (true, "metadata/grt_step2_strategies.tsv") => "metadata/grt_step1_strategies.tsv",
-        (true, "metadata/grt_step3_classifications.tsv") => "metadata/grt_step2_classifications.tsv",
+        (true, "metadata/grt_step3_classifications.tsv") => {
+            "metadata/grt_step2_classifications.tsv"
+        }
         _ => path,
     }
 }

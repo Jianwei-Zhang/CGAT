@@ -237,7 +237,12 @@ where
         );
     }
     let q4_relpath = json_str(manifest_object, "q4_relpath", "App manifest")?;
-    if q4_relpath != format!("grt/q/{}.fa", final_q_version(field(package, "schema_version")?)) {
+    if q4_relpath
+        != format!(
+            "grt/q/{}.fa",
+            final_q_version(field(package, "schema_version")?)
+        )
+    {
         return grt_err(
             "INVALID_PATH",
             "App manifest final path must match the package schema",

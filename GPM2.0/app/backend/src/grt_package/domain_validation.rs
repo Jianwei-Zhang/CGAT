@@ -380,7 +380,8 @@ where
     if json_str(object, "workflow", "App Final Path")? != GRT_APP_WORKFLOW
         || json_str(object, "schema_version", "App Final Path")? != expected_schema_version
         || !is_supported_app_final_path_schema(expected_schema_version)
-        || json_str(object, "q4_relpath", "App Final Path")? != json_str(manifest, "q4_relpath", "App manifest")?
+        || json_str(object, "q4_relpath", "App Final Path")?
+            != json_str(manifest, "q4_relpath", "App manifest")?
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
@@ -710,8 +711,12 @@ pub(super) fn expected_stage_transitions(
     for (row, (stage, input, output)) in table.rows.iter().zip(transitions.iter()) {
         if field(row, "stage")? != *stage
             || field(row, "q_input_version")? != *input
-            || field(row, "q_output_version")? != *output {
-            return grt_err("BROKEN_REFERENCE", format!("stage transition must be {stage}:{input}->{output}"));
+            || field(row, "q_output_version")? != *output
+        {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("stage transition must be {stage}:{input}->{output}"),
+            );
         }
     }
     Ok(transitions)
