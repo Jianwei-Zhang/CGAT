@@ -9,12 +9,6 @@ const root = "[data-overview-preview]";
 const card = `${root} .project-preview-card[data-preview-expanded="true"]`;
 const usedSelector = `${card} .project-preview-used`;
 const resultSelector = `${card} .project-preview-final-part:not(.is-gap)`;
-const activeCard = [
-  `${card}:hover`,
-  `${card}:has(:focus-visible)`,
-];
-const activeUsed = activeCard.map(selector => `${selector} .project-preview-used`);
-const activeResults = activeCard.map(selector => `${selector} .project-preview-final-part:not(.is-gap)`);
 
 function rule(file, selector) {
   const matches = [...css[file].matchAll(/([^{}]+)\{([^{}]*)\}/g)]
@@ -44,20 +38,31 @@ test("Overview keeps adopted sources and non-Gap results persistently outlined w
   assert.doesNotMatch(used, /--preview-selection-fill|inset/);
 });
 
-test("hover and keyboard focus thicken every adopted interval and result in only the current card", () => {
-  for (const [base, selectors] of [[usedSelector, activeUsed], [resultSelector, activeResults]]) {
-    for (const selector of selectors) {
-      const body = rule("project-export", selector);
-      assert.match(body, /outline-width:\s*3px;/);
-      assert.doesNotMatch(body, /(?:opacity|background|fill|box-shadow|filter|font-weight):/);
-      assert.ok(css["project-export"].indexOf(selector) > css["project-export"].indexOf(base));
-    }
-  }
-  // Header and whitespace hover emphasize all adopted patches in this card;
-  // sibling cards keep their thin persistent outlines, with no fragment state.
-  assert.deepEqual([...new Set(selectorsFor(".project-preview-used"))], [usedSelector, ...activeUsed]);
-  assert.deepEqual([...new Set(selectorsFor(".project-preview-final-part:not(.is-gap)"))], [resultSelector, ...activeResults]);
+test("expanded card hover and focus never thicken adopted intervals or results", () => {
+  assert.deepEqual([...new Set(selectorsFor(".project-preview-used"))], [usedSelector]);
+  assert.deepEqual([...new Set(selectorsFor(".project-preview-final-part:not(.is-gap)"))], [resultSelector]);
   assert.doesNotMatch(css["project-export"], /data-preview-highlighted|data-preview-part-key/);
+});
+
+test("expanded Overview cards suppress the shared card ring and keep feedback local", () => {
+  const frame = rule("project-export", card);
+  assert.match(frame, /border-color:\s*var\(--border-subtle/);
+  assert.match(frame, /box-shadow:\s*var\(--shadow-xs\);/);
+  const header = rule("project-export", `${card} .project-preview-card-header`);
+  assert.match(header, /border-bottom-color:\s*var\(--border-subtle/);
+  assert.match(header, /box-shadow:\s*none;/);
+  assert.match(header, /background:\s*var\(--surface-subtle/);
+  assert.match(rule("project-export", `${card} .project-preview-card-header:hover`), /background:\s*var\(--theme-blue-surface/);
+  assert.match(rule("project-export", `${card} .project-preview-open`), /color:\s*var\(--theme-blue-ink/);
+  assert.match(rule("project-export", `${card} .project-preview-open:hover`), /background:\s*var\(--theme-blue-surface/);
+  for (const control of [".project-preview-card-header", ".project-preview-open"]) {
+    assert.match(rule("project-preview", `${control}:focus-visible`), /outline:\s*2px solid/);
+  }
+  // Overrides must not remove the actual control's keyboard focus indicator.
+  for (const selector of selectorsFor('[data-preview-expanded="true"]')) {
+    if (selector.includes("project-preview-used") || selector.includes("project-preview-final-part")) continue;
+    assert.doesNotMatch(rule("project-export", selector), /(?:outline|outline-width):/);
+  }
 });
 
 test("Overview retains the shared warm highlight hue in both themes without tinting source interiors", () => {
@@ -66,17 +71,17 @@ test("Overview retains the shared warm highlight hue in both themes without tint
   for (const [file, selector] of [["base", ":root"], ["theme", ':root[data-theme="dark"]']]) {
     assert.match(rule(file, selector), /--final-path-selection-stroke:\s*#[\da-f]+;/i);
   }
-  for (const selector of [usedSelector, resultSelector, ...activeUsed, ...activeResults]) {
+  for (const selector of [usedSelector, resultSelector]) {
     assert.doesNotMatch(rule("project-export", selector), /#[\da-f]|rgba?\(/i);
   }
 });
 
 test("result feedback preserves role fills and Gaps in both persistent and active states", () => {
-  for (const selector of [resultSelector, ...activeResults]) {
+  for (const selector of [resultSelector]) {
     assert.doesNotMatch(rule("project-export", selector), /(?:^|;)\s*(?:background|color|fill|opacity|filter|transform|border|width|height|font-weight):/);
   }
   assert.match(rule("project-preview", ".project-preview-final-part"), /border:\s*1px solid/);
-  assert.ok([resultSelector, ...activeResults].every(selector => selector.endsWith(":not(.is-gap)")));
+  assert.ok([resultSelector].every(selector => selector.endsWith(":not(.is-gap)")));
 });
 
 test("inner source and endpoint outlines fit inside their bounds and retain normal clipping", () => {
@@ -88,7 +93,7 @@ test("inner source and endpoint outlines fit inside their bounds and retain norm
 });
 
 test("card-level feedback never changes interval geometry or adds fragment glows, and retains the existing card shadow", () => {
-  for (const selector of [usedSelector, resultSelector, ...activeUsed, ...activeResults]) {
+  for (const selector of [usedSelector, resultSelector]) {
     const body = rule("project-export", selector);
     assert.doesNotMatch(body, /(?:^|;)\s*(?:left|right|top|bottom|width|height|min-width|border|padding|margin|transform|filter|pointer-events|font-weight):/);
     assert.doesNotMatch(body.replace(/box-shadow:\s*none;/g, ""), /box-shadow:/);

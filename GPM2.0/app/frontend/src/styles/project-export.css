@@ -28,12 +28,26 @@
   outline: 2px solid var(--final-path-selection-stroke);
   outline-offset: -2px;
 }
-[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:hover .project-preview-used,
-[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:has(:focus-visible) .project-preview-used,
-[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:hover .project-preview-final-part:not(.is-gap),
-[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:has(:focus-visible) .project-preview-final-part:not(.is-gap) {
-  outline-width: 3px;
-  outline-offset: -3px;
+/* Expanded cards emphasize content, not the whole clickable surface.
+   Keep the shared folded-card ring and the controls' keyboard focus outlines. */
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] {
+  border-color: var(--border-subtle, #dbe3ec);
+  box-shadow: var(--shadow-xs);
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-card-header {
+  border-bottom-color: var(--border-subtle, #dbe3ec);
+  box-shadow: none;
+  background: var(--surface-subtle, #f8fafc);
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-card-header:hover {
+  background: var(--theme-blue-surface, #f1f6fc);
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-open {
+  color: var(--theme-blue-ink, #2b5784);
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-open:hover {
+  color: var(--preview-card-ring, #2b5784);
+  background: var(--theme-blue-surface, #f1f6fc);
 }
 
 .project-export-page .button,
