@@ -185,3 +185,47 @@ This remains three-window calibration, not whole-record accuracy verification
 or a router speedup measurement. No full long-query remapping or main-workspace
 adoption occurred. `real-calibration.json`, `final-job.json` and
 `wheat-router-v2.sha256` retain the result and frozen-source bindings.
+
+
+## Explicit resume adapter staged, not activated (05:40 +08)
+
+`routing_resume_support.py`, `resume_with_cross_router.py` and
+`stage_routing_commands.py` prepare isolated execution overrides for pending
+1D/4D/5D/6D cross leaves. They do **not** rewrite any live workspace command,
+helper or task manifest. Current 6A and the 16 completed native cross leaves
+are excluded. Initial references, assignment and self mappings keep their
+existing execution paths.
+
+The adapter substitutes an isolated script at dispatch, but maps callbacks
+back to the original task. Logs explicitly identify both commands. Both the
+leaf input identity and q0 outer input fingerprint include the executed
+script, frozen dependency hashes and policy. Successful routed leaves also
+require a matching final routing receipt and PAF hash; they cannot be reused
+as ordinary native leaves. Before any routed leaf completes, its former logs
+and existing outputs are copied into isolated attempt evidence.
+
+The frozen outer checkpoint `commit()` constructs a literal base manager.
+A naive subclass would therefore fail its final q0 input check. The adapter
+preserves that check: it reconstructs a fresh native preparation, adds the
+same explicit override, compares against the pre-execution fingerprint and
+then atomically writes the success checkpoint. No guard is removed and no
+native checkpoint is temporarily published for a routed result.
+
+- Local incident suite: **62/62** passed. Frozen-runtime validation job
+  **42706833**: **15/15** binding/dispatch/checkpoint tests passed, including
+  actual scheduler subprocess dispatch, changed scientific inputs, changed
+  receipts, original-key rejection and preservation of ordinary task keys.
+- Remote stage: `routing-resume-staged-20261119/`; plan SHA-256
+  `3bf29f170bf27276f19c767b296a0bc082fa86a8ff27c7152d22f10937e2fc00`.
+  Shell syntax and all staged source/plan hashes were checked. The entry
+  `resume.dsub` has been prepared but **not submitted**.
+- This test is not a successful production cutover. First recheck main job
+  state, 6A completion, plan exclusions and resources. Do not interrupt 6A
+  merely to install this adapter; do not start another analysis concurrently.
+- The future entry sets the verified process-local hash cache limit to 8192;
+  it does not seed hashes from stored receipts or modify frozen runtime files.
+- Rollback before activation is simply to retain the current native entry.
+  After routed results exist, reverting to native parameters requires archiving
+  the affected routed markers/results and recomputing those selected leaves;
+  never relabel approximate outputs as native. Completed native leaves remain
+  separate and must be preserved.

@@ -190,3 +190,30 @@
   当前 q0 输入身份已冻结，不能在运行中替换 helper/command/manifest。
 - 已保存 `long-query-router-validation-v2-20261119/final-job.json` 和
   `real-calibration.json`。两个主作业在 **05:22:08** 仍均 RUNNING。
+
+
+## 2026-11-19 05:40 +08：续跑适配已隔离验证，尚未切换主作业
+
+- 当前作业仍为旧版 `42523432` / 新版 `42646893`；新版仍在 6A cross，
+  16 个原参 cross 已完成。05:40:45 采样新版约 2 核、74600 MiB，未出现失败；
+  旧版 Step 2 约 15.5 核。不要因线程数下降或暂时零 PAF 自动取消长序列任务。
+- 只为尚未完成的 **1D、4D、5D、6D cross** 准备了显式执行替换：
+  `routing-resume-staged-20261119/routing-plan.json`。6A、Un、所有 self 和初始
+  ref 均不在替换范围内。该判定的长度画像只用于选候选；真正运行仍完整读源
+  并按内部策略校准，不能把 self manifest 的重命名长度图冒当真实 cross 输入证明。
+- 不再计划重写 workspace command 或迁移 assignment 输出。入口在调度时替换
+  执行脚本，同时把实际脚本/代码/策略绑定到叶子与 q0 外层检查点。原有命令、
+  helper、manifest 未修改，当前主进程未重启。
+- 验证 `42706833` 已 SUCCEEDED（05:37:52），远端 15/15；本地事故套件 62/62。
+  特别覆盖 q0 收尾重新捕获输入指纹、拒绝将 routed 结果当 native 缓存以及真实
+  subprocess 调度的回调身份。证据：`validation-final-job.json`、
+  `validation_42706833.out`、`staged.sha256`、`wheat-routing-support.sha256`。
+- 已准备 **未提交** `routing-resume-staged-20261119/resume.dsub`，沿用 32 CPU /
+  327680 MiB 申请，实际原有全局线程预算不变。新入口在进程内将实际读取得到的
+  SHA memo 上限调为 8192，不修改 frozen runtime、不灌入回执摘要。
+- 后续安全切换：优先等 6A 完整成功标记；再次核实计划中的四个 leaf 是否已有
+  原参完成记录，若有就从新计划中排除，不要替换已完成结果。新入口会拒绝这种
+  过期计划。检查当前作业停止和 workspace lock 后才提交，随后确认两个 ref、
+  assign 及全部已完成 cross 的有效复用。**不要直接执行普通 run_all.sh。**
+- 入口支持文件存入仓库 `docs/incident-tools/wheat-20261119/`，仍是事故适配，
+  不代表 master 默认生产运行路径已启用。真实新旧整套任务均未完成。
