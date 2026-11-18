@@ -2,22 +2,47 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { renderToolbarGroup } from "../toolbar-groups.js";
-import { resolveCompactToolbarGroups } from "../toolbar-groups-runtime.js";
 import { renderTrackIdentity } from "../track-identity.js";
 import { getMessages } from "../../../i18n/index.js";
 import { renderAssemblyPage, createState } from "./tabs-semantics-harness.mjs";
 
-const metrics = [
-  { kind: "display", width: 400, compactWidth: 60 },
-  { kind: "filter", width: 500, compactWidth: 60 },
-  { kind: "edit", width: 200, compactWidth: 50 },
-];
-test("toolbar groups stay inline when they fit, then compact editing before filters", () => {
-  assert.deepEqual(resolveCompactToolbarGroups(1116, metrics), []);
-  assert.deepEqual(resolveCompactToolbarGroups(1000, metrics), ["edit"]);
-  assert.deepEqual(resolveCompactToolbarGroups(700, metrics), ["edit", "filter"]);
-  assert.deepEqual(resolveCompactToolbarGroups(250, metrics), ["edit", "filter", "display"]);
-  assert.deepEqual(resolveCompactToolbarGroups(0, []), []);
+const css = readFileSync(new URL("../../../../styles/assembly-toolbar.css", import.meta.url), "utf8");
+function ruleBody(selector) {
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g);
+  const rule = [...rules].find(match => match[1].trim() === selector);
+  assert.ok(rule, `missing toolbar rule: ${selector}`);
+  return rule[2];
+}
+
+test("Main and Local toolbars wrap visible groups and distribute spare row width between them", () => {
+  const selector = ".assembly-track-inline-controls[data-main-track-toolbar],\n"
+    + ".assembly-track-inline-controls[data-subview-toolbar],\n"
+    + ".subview-window .assembly-track-inline-controls[data-subview-toolbar]";
+  const toolbar = ruleBody(selector);
+  assert.match(toolbar, /flex-wrap:\s*wrap;/);
+  assert.match(toolbar, /justify-content:\s*space-between;/);
+  assert.match(toolbar, /gap:\s*8px;/);
+  assert.doesNotMatch(toolbar, /column-gap:\s*20px;/);
+  assert.match(toolbar, /overflow:\s*visible;/);
+  assert.doesNotMatch(toolbar, /nowrap|overflow-x:\s*auto/);
+  assert.doesNotMatch(css, /data-toolbar-compact|data-toolbar-group-open/);
+});
+
+test("oversized groups grow vertically and wrap complete fields without changing compact styling", () => {
+  const group = ruleBody(".assembly-toolbar-group,\n.subview-window [data-subview-toolbar] > .assembly-toolbar-group");
+  assert.match(group, /flex:\s*0 1 auto;/);
+  assert.match(group, /min-width:\s*0;/);
+  assert.match(group, /max-width:\s*100%;/);
+  assert.match(group, /height:\s*auto;/);
+  assert.match(group, /min-height:\s*var\(--toolbar-group-size, 32px\);/);
+  assert.match(group, /border:\s*1px solid var\(--border-subtle/);
+  const content = ruleBody(".assembly-toolbar-group-content");
+  assert.match(content, /flex:\s*0 1 auto;/);
+  assert.match(content, /flex-wrap:\s*wrap;/);
+  assert.match(content, /gap:\s*6px;/);
+  assert.match(ruleBody(".assembly-toolbar-group-content > *"), /flex:\s*0 0 auto;/);
+  assert.match(css, /--toolbar-control-size: 26px;/);
+  assert.match(ruleBody(".subview-window .assembly-track-inline-controls[data-subview-toolbar]"), /--toolbar-control-size: 24px;/);
 });
 test("bilingual group captions explain purpose without adding headings or input tooltips", () => {
   for (const locale of ["zh", "en"]) {
@@ -25,7 +50,9 @@ test("bilingual group captions explain purpose without adding headings or input 
     for (const kind of ["display", "filter", "edit"]) {
       const html = renderToolbarGroup(kind, '<input value="5">', i18n);
       assert.match(html, new RegExp(`data-toolbar-group="${kind}"`));
-      assert.match(html, /data-toolbar-group-toggle aria-expanded="true" data-app-tooltip=/);
+      assert.match(html, /<span class="assembly-toolbar-group-label" tabindex="0" data-app-tooltip=/);
+      assert.match(html, /aria-description=/);
+      assert.doesNotMatch(html, /<button|aria-expanded|toolbar-group-toggle|toolbar-group-chevron/);
       assert.match(html, /<input value="5">/);
       assert.doesNotMatch(html, /<h[1-6]/);
       const local = renderToolbarGroup(kind, '<input value="5">', i18n, { local: true });

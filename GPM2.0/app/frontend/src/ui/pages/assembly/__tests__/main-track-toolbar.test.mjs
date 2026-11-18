@@ -44,22 +44,23 @@ for (const locale of ["zh", "en"]) test(`main toolbar contains parameters only a
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
-test("CSS aligns Main and Local controls in one row with inline group captions", () => {
+test("CSS wraps Main and Local control groups with separated inline captions", () => {
   const css = readStylesheetTree(new URL("../../../../styles/assembly.css", import.meta.url));
   assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\],\s*\.subview-panel-head\s*\{[^}]*flex-wrap: nowrap;[^}]*align-items: flex-start;[^}]*justify-content: flex-start;/);
   assert.match(css, /:is\(\.assembly-track-panel-head\[data-main-view-header\], \.subview-panel-head\) > \.assembly-view-title\s*\{[^}]*flex: none;[^}]*white-space: nowrap;/);
   const grouped = readFileSync(new URL("../../../../styles/assembly-toolbar.css", import.meta.url), "utf8");
-  assert.match(grouped, /flex-wrap: nowrap;/);
-  assert.match(grouped, /--toolbar-control-size: 32px;/);
-  assert.match(grouped, /\.assembly-toolbar-group \+ \.assembly-toolbar-group\s*\{[^}]*border-inline-start:/);
-  assert.match(grouped, /\.assembly-toolbar-group-label\s*\{[^}]*font-size: 12px;[^}]*font-weight: 400;/);
-  assert.match(grouped, /\[data-toolbar-compact\] > \.assembly-toolbar-group-content \{ display: none; \}/);
+  assert.match(grouped, /justify-content: space-between;[\s\S]*flex-wrap: wrap;[\s\S]*gap: 8px;/);
+  assert.match(grouped, /--toolbar-group-size: 32px;/);
+  assert.match(grouped, /--toolbar-control-size: 26px;/);
+  assert.match(grouped, /\.assembly-toolbar-group,[\s\S]*border: 1px solid var\(--border-subtle/);
+  assert.match(grouped, /\.assembly-toolbar-group-label\s*\{[^}]*font-size: 11px;[^}]*font-weight: 500;/);
+  assert.doesNotMatch(grouped, /data-toolbar-compact|data-toolbar-group-open/);
   assert.match(css, /\.assembly-main-scope-title\s*\{[^}]*flex: 0 1 auto;[^}]*min-width: 0;[^}]*max-width: min\(36ch, 50%\);/);
   assert.match(css, /\.assembly-members-panel-inline\s*\{[^}]*margin-inline-end: auto;/);
   assert.doesNotMatch(css, /data-main-track-control-layout|assembly-track-panel-quick-actions/);
   assert.equal(existsSync(new URL("../main-track-control-layout-runtime.js", import.meta.url)), false);
   const runtime = readFileSync(new URL("../main-track-toolbar-runtime.js", import.meta.url), "utf8");
-  assert.doesNotMatch(runtime, /ResizeObserver|getComputedStyle|setState|appendChild|replaceWith/);
+  assert.doesNotMatch(runtime, /ResizeObserver|getComputedStyle|setState|appendChild|replaceWith|bindToolbarGroups|toolbar-groups-runtime/);
 });
 
 test("popup rectangles clamp to narrow viewports and open above a low toolbar", () => {

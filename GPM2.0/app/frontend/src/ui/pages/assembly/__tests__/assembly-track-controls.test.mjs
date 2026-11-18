@@ -315,7 +315,7 @@ test("track tick label css does not force middle anchor", () => {
   assert.doesNotMatch(css, /\.track-tick-label\s*\{[^}]*text-anchor:\s*middle;/);
 });
 
-test("subview toolbar keeps title and candidates compact and groups controls without wrapping", () => {
+test("subview toolbar keeps title and candidates compact while control groups wrap with fluid spacing", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
@@ -324,7 +324,7 @@ test("subview toolbar keeps title and candidates compact and groups controls wit
   assert.match(css, /\.subview-panel-head\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*align-items:\s*flex-start;/);
   assert.doesNotMatch(css, /\.subview-panel-guide\s*\{/);
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;/);
-  assert.match(css, /\.subview-window \.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex:\s*1 1 0;[^}]*justify-content:\s*flex-start;[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto;/);
+  assert.match(css, /\.subview-window \.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex:\s*1 1 0;[^}]*justify-content:\s*space-between;[^}]*flex-wrap:\s*wrap;[^}]*overflow:\s*visible;/);
   assert.doesNotMatch(css, /@media \(max-width:\s*700px\)[\s\S]*\.subview-track-inline-controls\s*\{/);
   assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*2\.1429rem;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid var\(--theme-line,\s*#b8c2cc\);[^}]*border-radius:\s*4px;/);
   assert.match(css, /\.subview-candidate-slot\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);

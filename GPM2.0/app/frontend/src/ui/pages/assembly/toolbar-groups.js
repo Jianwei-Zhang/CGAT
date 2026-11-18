@@ -25,7 +25,7 @@ export function renderToolbarGroup(kind, content, i18n, { local = false } = {}) 
   const key = local ? `local${kind[0].toUpperCase()}${kind.slice(1)}` : kind;
   const [label, hint] = COPY[locale][key];
   return `<div class="assembly-toolbar-group" data-toolbar-group="${kind}" role="group" aria-label="${label}">
-    <button type="button" class="assembly-toolbar-group-label" data-toolbar-group-toggle aria-expanded="true" data-app-tooltip="${escape(hint)}" aria-label="${escape(`${label}: ${hint}`)}">${label}<span class="assembly-toolbar-group-chevron" aria-hidden="true">▾</span></button>
+    <span class="assembly-toolbar-group-label" tabindex="0" data-app-tooltip="${escape(hint)}" aria-description="${escape(hint)}">${label}</span>
     <div class="assembly-toolbar-group-content" data-toolbar-group-content>${content}</div>
   </div>`;
 }

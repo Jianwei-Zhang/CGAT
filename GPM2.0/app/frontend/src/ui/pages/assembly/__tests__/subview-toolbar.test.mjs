@@ -87,14 +87,14 @@ for (const evidence of [
   });
 }
 
-test("both headers keep titles reachable while compact control groups remain on one line", () => {
+test("both headers keep titles reachable while visible control groups wrap with fluid spacing", () => {
   assert.match(ruleBody(sharedCss, headerSelector), /flex-wrap:\s*nowrap[\s\S]*align-items:\s*flex-start/);
   assert.match(ruleBody(css, ".subview-panel-title-row > .subview-candidate-row"), /flex:\s*0 1 240px[\s\S]*min-width:\s*0/);
   assert.match(ruleBody(css, ".subview-candidate-row"), /min-width:\s*0[\s\S]*flex-wrap:\s*nowrap/);
   assert.match(ruleBody(css, ".subview-candidate-badge"), /flex:\s*0 1 auto[\s\S]*min-width:\s*0/);
   assert.match(ruleBody(css, ".subview-candidate-name"), /text-overflow:\s*ellipsis/);
   assert.match(ruleBody(css, ".subview-candidate-remove"), /flex:\s*0 0 26px/);
-  assert.match(ruleBody(groupCss, toolbarSelector), /flex:\s*1 1 0[\s\S]*min-width:\s*0[\s\S]*justify-content:\s*flex-start[\s\S]*flex-wrap:\s*nowrap[\s\S]*overflow-x:\s*auto/);
+  assert.match(ruleBody(groupCss, toolbarSelector), /flex:\s*1 1 0[\s\S]*min-width:\s*0[\s\S]*justify-content:\s*space-between[\s\S]*flex-wrap:\s*wrap[\s\S]*overflow:\s*visible/);
   assert.match(ruleBody(css, ".subview-track-inline-controls .assembly-track-inline-field"), /flex:\s*0 0 auto/);
   assert.doesNotMatch(css, /@media \(max-width: 700px\)|\.subview-track-inline-controls\s*\{/);
   assert.doesNotMatch(css, /@media \(max-width: 520px\)/);
@@ -121,7 +121,9 @@ test("Local View title, Tools and inline guide use the same first-row height and
   const title = ruleBody(css, ".subview-panel-head > .assembly-view-title");
   assert.match(title, /display:\s*flex[\s\S]*align-items:\s*center[\s\S]*min-height:\s*2\.1429rem/);
   assert.match(ruleBody(css, ".subview-panel-title-row > .subview-empty-guide"), /line-height:\s*2\.1429rem/);
-  assert.match(groupCss, /--toolbar-control-size: 32px;/);
+  assert.match(groupCss, /--toolbar-group-size: 32px;/);
+  assert.match(groupCss, /--toolbar-control-size: 26px;/);
+  assert.match(groupCss, /min-height: var\(--toolbar-group-size, 32px\);/);
   assert.match(groupCss, /height: var\(--toolbar-control-size\);/);
   assert.match(groupCss, /\.subview-header-tools \.button,[\s\S]*height: 32px; min-height: 32px;/);
 });
