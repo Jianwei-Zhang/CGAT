@@ -256,3 +256,44 @@ reused. The first real routed leaf, **5D**, started at 06:08:28. Its baseline
 and 0.005 window-calibration mappings had begun; no complete routed 5D result
 or whole-workflow success was claimed. Startup-to-first-new-leaf took 10m18s,
 including content verification, not alignment time or a controlled speedup.
+
+
+## Portable q0 routing audit attachment
+
+`export_routing_provenance.py` prepares a separate
+`comparison-audit/q0-routing-provenance.json` only after every leaf in the
+fixed routing plan has a matching successful marker. It verifies current
+PAF/log/receipt bytes, execution bindings, whole-record source selection,
+record inventory and effective filters. Source FASTA hashes are explicitly
+reported **as recorded in completed checkpoints**, not falsely described as
+rehashed by this exporter. Raw attempt paths and private diagnostic strings
+are omitted. A full-coverage fallback is reported as ordinary mapping rather
+than as approximate simply because a candidate was attempted.
+
+This schema is not initial-reference policy, does not cover self alignments,
+and sets `certifies_whole_workflow=false`. It must accompany final comparison
+delivery; it is not evidence that the whole wheat workflow has finished.
+Publication is idempotent for identical evidence and refuses to overwrite a
+different existing audit.
+
+- Local incident suite **71/71** passed; frozen-runtime job **42715067** passed
+  **9/9** exporter tests. Its real-workspace gate also correctly refused an
+  incomplete four-leaf scope without publishing an audit.
+- Frozen exporter/test copies and receipts are under
+  `routing-audit-validation-20261119/`. They do not replace any source used by
+  the active main job.
+- After all planned routed leaves have committed, run on a **compute node**
+  with the existing x86 environment (not directly on the login node):
+
+```bash
+cd "$HOME/cgat-reads-debug/jm19-compare-614589f-20261118/routing-audit-validation-20261119"
+sha256sum -c wheat-audit-code.sha256
+python3 -B export_routing_provenance.py --root "$HOME/cgat-reads-debug/jm19-compare-614589f-20261118"
+```
+
+At 06:27 the full audit had not been produced. In active 5D mapping, the two
+complete long-record candidate mappings (105593624 and 154141050 bp) had
+succeeded as one group: minimap2 reported 245.858 s and 14.069 GB peak RSS.
+The other 639 records were still using ordinary options. These are group-only
+measurements, excluding calibration and ordinary mapping; there is no complete
+original-parameter 5D baseline for claiming a speedup multiplier.
