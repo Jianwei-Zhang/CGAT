@@ -56,18 +56,32 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     for relpath in schema["required_files"]:
         bundle_path(bundle_root, relpath, relpath)
 
-    tables = {
-        relpath: read_tsv(bundle_root, relpath, table_spec)
-        for relpath, table_spec in schema["tables"].items()
-    }
+    package_rows = read_tsv(bundle_root, "metadata/package.tsv", schema["tables"]["metadata/package.tsv"])
+    package = package_rows[0]
+    extension = schema.get("package_schema_extensions", {}).get(package["schema_version"])
+    if (package["workflow"] != schema["workflow"]
+            or (package["schema_version"] != schema["schema_version"] and extension is None)):
+        fail("UNSUPPORTED_SCHEMA", f"unsupported workflow/schema: {package['workflow']}/{package['schema_version']}")
+    table_overrides = extension.get("tables", {}) if extension else {}
+    tables = {"metadata/package.tsv": package_rows}
+    tables.update({
+        relpath: read_tsv(bundle_root, relpath, {**table_spec, **table_overrides.get(relpath, {})})
+        for relpath, table_spec in schema["tables"].items() if relpath != "metadata/package.tsv"
+    })
     enums = schema["enums"]
 
-    package = tables["metadata/package.tsv"][0]
-    if package["workflow"] != schema["workflow"] or package["schema_version"] != schema["schema_version"]:
-        fail(
-            "UNSUPPORTED_SCHEMA",
-            f"expected workflow={schema['workflow']} schema_version={schema['schema_version']}",
-        )
+    q0_freeze = None
+    if extension is not None:
+        for relative in extension["required_files"]:
+            bundle_path(bundle_root, relative, relative)
+        enums = {**enums, **{name: [*enums[name], *extension[name]]
+                            for name in ("evidence_stage", "coordinate_system")}}
+        from ..q0_publication import validate_prepared_q0
+        from ..q0_sources import Q0EvidenceError
+        try:
+            q0_freeze = validate_prepared_q0(bundle_root)
+        except (Q0EvidenceError, KeyError, TypeError, ValueError, OSError, SystemExit) as exc:
+            fail("INVALID_Q0_SELECTION", f"invalid evidence-guided q0 freeze: {exc}")
     if package["final_path_schema_version"] != schema["final_path_schema_version"]:
         fail("UNSUPPORTED_SCHEMA", "unsupported final_path_schema_version")
     if not parse_bool(package["grt_precompute_enabled"], "package.grt_precompute_enabled"):
@@ -227,19 +241,25 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 fail("INVALID_VALUE", f"q segment {segment_id} has invalid orientation")
             if not row["source_card_key"]:
                 fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source_card_key")
+            if extension is not None:
+                targets = assignment_chromosomes[source_key]
+                mode = "normal" if chr_name in targets else ("cross_chr_grt_usage" if targets else "grt_promoted")
+                if row["source_card_key"] != f"{source_key[0]}:{source_key[1]}:{chr_name}:{mode}":
+                    fail("BROKEN_REFERENCE", f"q segment {segment_id} has a non-canonical source card key")
             if q_version == "q0":
-                if chr_name not in assignment_chromosomes[source_key]:
-                    fail("BROKEN_REFERENCE", f"q0 segment {segment_id} source is not assigned to {chr_name}")
-                baseline = assignment_baselines[(*source_key, chr_name)]
-                if row["orientation"] != baseline["source_orientation"]:
-                    fail(
-                        "BROKEN_REFERENCE",
-                        f"q0 segment {segment_id} orientation disagrees with chr_assignments.tsv",
-                    )
-                if row["source_card_key"] != (
-                    f"{source_key[0]}:{source_key[1]}:{chr_name}:normal"
-                ):
-                    fail("BROKEN_REFERENCE", f"q0 segment {segment_id} has a non-canonical source card key")
+                if extension is None:
+                    if chr_name not in assignment_chromosomes[source_key]:
+                        fail("BROKEN_REFERENCE", f"q0 segment {segment_id} source is not assigned to {chr_name}")
+                    baseline = assignment_baselines[(*source_key, chr_name)]
+                    if row["orientation"] != baseline["source_orientation"]:
+                        fail(
+                            "BROKEN_REFERENCE",
+                            f"q0 segment {segment_id} orientation disagrees with chr_assignments.tsv",
+                        )
+                    if row["source_card_key"] != (
+                        f"{source_key[0]}:{source_key[1]}:{chr_name}:normal"
+                    ):
+                        fail("BROKEN_REFERENCE", f"q0 segment {segment_id} has a non-canonical source card key")
                 q0_segment_sources[segment_id] = (
                     source_key,
                     chr_name,
@@ -277,6 +297,17 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     q0_segment_records = {chr_name for q_version, chr_name in q_segments_by_record if q_version == "q0"}
     if q0_segment_records != set(q0_records):
         fail("BROKEN_REFERENCE", "q0 segment mapping does not cover every q0 record")
+
+    if extension is not None:
+        from ..source_intervals import SourceAuthorization
+        from ..stage_io import load_q_paths
+        try:
+            authorization = SourceAuthorization.load(bundle_root, sources, frozen=q0_freeze)
+            for version in ("q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"):
+                _, paths, _ = load_q_paths(bundle_root, version, tables["metadata/grt_q_segments.tsv"], sources)
+                authorization.validate_paths(paths)
+        except (Q0EvidenceError, KeyError, TypeError, ValueError, OSError, SystemExit) as exc:
+            fail("INVALID_SOURCE_PATH", f"invalid live source mapping: {exc}")
 
     donor_sets = unique_index(tables["metadata/grt_donor_sets.tsv"], "donor_set_id", "metadata/grt_donor_sets.tsv")
     donor_kinds = Counter()
@@ -468,6 +499,15 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             evidence_source_end = parse_int(
                 row["source_end"], f"evidence {evidence_id}.source_end", 1
             )
+            if extension is not None:
+                if (row["stage"] != "q0_construction" or row["evidence_type"] != extension["q0_evidence_type"]
+                        or row["status"] != "accepted"
+                        or (row["source_dataset"], row["source_contig"]) != source_key
+                        or row["target_chr"] != chr_name
+                        or evidence_source_start != source_start or evidence_source_end != source_end
+                        or row["raw_artifact_relpath"] != "metadata/grt_q0_selection.json"):
+                    fail("BROKEN_REFERENCE", f"q0 segment {segment_id} is not backed by its frozen source selection")
+                continue
             if (
                 row["stage"] != "assignment"
                 or row["status"] not in {"accepted", "background"}
@@ -758,6 +798,18 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     segment_event = {}
     segments_by_id = {}
     chromosome_names = set()
+    root_card_segments = defaultdict(set)
+    q4_source_rows = defaultdict(list)
+    if extension is not None:
+        for row in q_segment_rows:
+            if row["q_version"] == "q4":
+                q4_source_rows[row["chr"]].append(row)
+        for rows in q4_source_rows.values():
+            rows.sort(key=lambda row: int(row["q_start"]))
+    q0_lineage = None
+    if extension is not None:
+        from ..q0_lineage import Q0Lineage, display_peer_keys
+        q0_lineage = Q0Lineage(q_segment_rows)
     for chromosome in chromosomes:
         if not isinstance(chromosome, dict):
             fail("INVALID_JSON", "final path chromosome must be an object")
@@ -774,8 +826,10 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         segments = chromosome.get("segments")
         if not isinstance(segments, list) or not segments:
             fail("INVALID_JSON", f"final path {chr_name}.segments must be a non-empty array")
+        if extension is not None and len(segments) != len(q4_source_rows[chr_name]):
+            fail("FINAL_PATH_MISMATCH", f"Final Path {chr_name} differs from q4 source mapping")
         rebuilt = []
-        for segment in segments:
+        for segment_index, segment in enumerate(segments):
             if not isinstance(segment, dict):
                 fail("INVALID_JSON", f"final path {chr_name} segment must be an object")
             segment_id = segment.get("segment_id")
@@ -793,6 +847,18 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             for evidence_id in evidence_ids:
                 if evidence_id not in evidence:
                     fail("BROKEN_REFERENCE", f"segment {segment_id} references unknown evidence {evidence_id}")
+            if extension is not None:
+                qrow = q4_source_rows[chr_name][segment_index]
+                expected_source = None if qrow["segment_kind"] == "gap" else {
+                    "dataset": qrow["dataset_name"], "contig": qrow["contig_name"],
+                    "start": int(qrow["source_start"]), "end": int(qrow["source_end"]),
+                    "orientation": qrow["orientation"],
+                }
+                if (segment.get("source") != expected_source
+                        or (kind == "gap") != (expected_source is None)
+                        or length != int(qrow["q_end"]) - int(qrow["q_start"]) + 1
+                        or evidence_ids != json.loads(qrow["evidence_ids_json"])):
+                    fail("FINAL_PATH_MISMATCH", f"Final Path segment {segment_id} differs from q4 source mapping")
             event_id = segment.get("event_id")
             if event_id:
                 if event_id not in events:
@@ -821,6 +887,13 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 fail("INVALID_VALUE", f"segment {segment_id} has invalid source orientation")
             if segment["orientation"] != orientation:
                 fail("INVALID_VALUE", f"segment {segment_id} orientation differs from source")
+            if q0_lineage is not None and not event_id:
+                if not q0_lineage.covers(chr_name, source, evidence_ids):
+                    fail("BROKEN_REFERENCE", f"source segment {segment_id} lacks frozen q0 provenance")
+                targets = assignment_chromosomes[source_key]
+                mode = "normal" if chr_name in targets else ("cross_chr_grt_usage" if targets else "grt_promoted")
+                card_key = f"{source_key[0]}:{source_key[1]}:{chr_name}:{mode}"
+                root_card_segments[card_key].add(segment_id)
             sequence = sources[source_key][start - 1 : end]
             rebuilt.append(sequence if orientation == "+" else reverse_complement(sequence))
             if kind in {"patch", "correction", "telomere"} and not event_id:
@@ -962,7 +1035,10 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         ):
             if len(values) != len(set(values)):
                 fail("DUPLICATE_ID", f"used contig {source_card_key} duplicates {label} links")
-        if not ref_ids or not event_ids or not final_segment_ids or not pairwise_ids:
+        pairwise_required = (extension is None or bool(display_peer_keys(
+            row, assignment_chromosomes, used_contigs.values())))
+        if (not ref_ids or not final_segment_ids or (pairwise_required and not pairwise_ids)
+                or (not event_ids and not root_card_segments.get(source_card_key))):
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} has an incomplete trace chain")
         card_event_ids[source_card_key] = set(event_ids)
         card_segment_ids[source_card_key] = set(final_segment_ids)
@@ -1011,7 +1087,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} lacks display-pairwise role metadata")
         pairwise_provenance = {parameters.get("provenance") for parameters in pairwise_parameters}
         if row["placement_mode"] == "normal":
-            if pairwise_provenance != {"existing_main_view"}:
+            if pairwise_ids and pairwise_provenance != {"existing_main_view"}:
                 fail("BROKEN_REFERENCE", f"normal used contig {source_card_key} must reuse main-view PAF")
             expected_prefix = f"runs/chr_{row['target_chr']}/"
             if any(
@@ -1043,7 +1119,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                         f"normal pairwise evidence {evidence_id} omits the full source contig",
                     )
         else:
-            if pairwise_provenance != {"grt_supplement"}:
+            if pairwise_ids and pairwise_provenance != {"grt_supplement"}:
                 fail("BROKEN_REFERENCE", f"promoted/cross used contig {source_card_key} requires supplemental PAF")
             for evidence_id in pairwise_ids:
                 pairwise = evidence[evidence_id]
@@ -1199,8 +1275,10 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         ):
             expected_card_events[event["source_card_key"]].add(event_id)
             expected_card_segments[event["source_card_key"]].add(event["final_path_segment_id"])
-    if set(used_contigs) != set(expected_card_events):
-        fail("BROKEN_REFERENCE", "used-contig cards do not exactly match accepted path sources")
+    for source_card_key, retained_segments in root_card_segments.items():
+        expected_card_segments[source_card_key].update(retained_segments)
+    if set(used_contigs) != set(expected_card_segments):
+        fail("BROKEN_REFERENCE", "used-contig cards do not exactly match retained path sources")
     for source_card_key in used_contigs:
         if (
             card_event_ids[source_card_key] != expected_card_events[source_card_key]
@@ -1261,7 +1339,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
 
     return {
         "workflow": schema["workflow"],
-        "schema_version": schema["schema_version"],
+        "schema_version": package["schema_version"],
         "datasets": len(dataset_names),
         "sources": len(sources),
         "donor_sets": len(donor_sets),

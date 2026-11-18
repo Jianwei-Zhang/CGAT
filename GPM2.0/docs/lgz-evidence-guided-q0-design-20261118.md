@@ -625,3 +625,38 @@ I3c 提交时的可运行范围与门槛（后续接入进度见 13.7）：
 
 
 最终代码回归：279 项定向测试通过（250.727 秒），包括本节 16 项结构证据单元测试、6 项真实工具流水线测试（含正反向、序列副本及 baseline/optimized 子场景），以及此前 q0、冻结/授权、filter/refill、准备、兼容、运行库与独立结构事件回归。另单独运行 34 项不依赖旧准备夹具的 repair 底层回归，全部通过（0.170 秒）。运行库维护脚本同步后只读验证通过：39 个受管产物无漂移，工具源文件哈希表明确包含新增 canonical 模块与 GRT 别名。旧全流程夹具迁移和 I5/I6 不计为通过。
+
+
+### 13.9 I5 交付契约：保留的 q0 来源不是修补事件（Server 阶段）
+
+旧交付链条有一个与新 q0 不相容的假设：`grt_promoted` / `cross_chr_grt_usage` 来源只能由后续 accepted repair event 引入。新 q0 已可直接选择这类来源；沿用旧检查会在 Final Path 发布时拒绝它，而只移除检查又会丢掉来源证明。
+
+本阶段采用两种明确的来源证明，不伪造事件或 assignment：
+
+- 后续修补新增片段仍须关联真实的 accepted path-producing event，并保留原有的双向链接校验。
+- 没有关联修补事件的最终 source 片段，必须被冻结 q0 中同 chr、同 ds/contig、同方向的原始 source 区间完整覆盖，且携带对应 q0 选择证据。裁剪后的子区间允许保留；同名来源、区间外部分、其他 chr、错误方向或仅有区间外框不能替代证明。
+- Final Path 的逐段 source、长度和 evidence 还必须与 q4 TSV 一致；q0→q4 各个版本的原始 source 区间均检查全局不重复。
+- `grt_used_contigs.tsv` 同时收集最终保留的 q0 来源和真实修补来源。q0-only 卡片的 `accepted_event_ids_json` 合法为空，但必须精确反向关联实际保留的 Final Path segments。已经被删除且不再出现的 q0 来源不生成“仍在使用”的卡片。
+- 同一张 full-contig display card 可以包含不同方向的片段。normal card 保持原始 assignment 的显示方向；promoted card 使用第一个实际保留片段的方向。二者都不改写片段自身的方向。
+
+#### 版本边界
+
+在现有 `grt_precomputed_v2.json` 中定义显式 package-schema-3 extension，而不是放松旧 schema-2 的规则。新扩展要求 `grt_q0_selection.json` / `grt_q0_freeze.json`，并增加 `q0_construction`、`q0_path_selection` 和 source 坐标声明。验证冻结文件、q0 选择、原始来源和比对文件的内容身份；不以当前安装代码的 SHA 取代历史包的来源事实。
+
+schema-3 的粗分组 assignment 表可以为空，但表本身及其正确 header 仍然必需。是否有可用 q0 由完整比对和选择证明决定，不能为了通过导入而制造 assignment。schema-2 仍保持原来的非空限制。
+
+#### 没有比对对象，不等于缺少比对结果
+
+新增 q0-only 卡片后，单来源染色体也可能需要 used-source 记录。这时不生成假的 self PAF：
+
+- normal card 的已有主视图比对对象来自该 chr 的原始 assignment 成员；promoted card 的补充比对对象还包含该 chr 实际保留的 promoted 来源。
+- 只有 schema-3 且这个实际比较域内没有另一个来源时，pairwise evidence 列表才可为空。
+- 有比较对象却缺少 pairwise 证据，仍然报错。空 PAF（实际完成比对但无命中）和空 evidence 列表（根本没有比较对象）不混为一谈。
+- ref 证据、原始 full-source 序列及最终来源追溯仍然必须存在。
+
+`test_q0_delivery.py` 覆盖 q0-only normal/promoted、粗分组方向与选中片段方向不同、单来源/空粗分组、真实修补与保留 q0 共用一张卡、已删除根来源不产生卡片，以及错误根证据、错误卡键和丢失 pairwise 反向链接。另验证包目录迁移后仍可读取，以及真实端粒新增与保留 q0 来源具有各自的证据链。流水线仍使用明确的受控 pre-q0 比对 fixture，加上真实 Step1→q4 工具执行；不作为真实样本效果或性能验收。
+
+**完成边界：本节仅是 I5 的 Server 交付实现。Rust/App schema-3 校验、导入/持久化、报告及完整验收仍未完成；当前 App 不应仅放开版本号就接受新包。I5/I6 不因此标记完成，Release、客户工作区和 master 均不在本阶段操作范围内。**
+
+
+本节最终验证：90 项定向回归通过（432.278 秒，包含新增交付测试以及 q0 publication、live source、真实结构流水线、schema-2 contract、LGZ 兼容和 workspace runtime update）；随后新增的真实端粒交付测试单独通过（1 项，7.575 秒）。后者验证 q0-only backbone 卡片没有修补事件，而实际 tel 来源卡片具有真实 accepted event 和补充比对证据。共覆盖 91 个不同测试方法，不把子场景或重复运行重复计数。运行库只读验证通过：39 个受管产物无漂移，`production_ready=false`，未修改正式 Release。

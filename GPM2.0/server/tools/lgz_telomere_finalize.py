@@ -1898,6 +1898,7 @@ def build_final_path(
     q4_paths: dict[str, list[dict[str, object]]],
     q4_records: dict[str, str],
     events: list[dict[str, object]],
+    q0_lineage=None,
 ) -> dict[str, object]:
     path_events = [
         event
@@ -1949,7 +1950,15 @@ def build_final_path(
                     event_id: str | None = str(event["event_id"])
                     matched_event_ids.add(event_id)
                 else:
-                    if str(segment["source_card_key"]).endswith(
+                    if q0_lineage is not None:
+                        if not q0_lineage.covers(chromosome, {
+                            "dataset": segment["dataset_name"], "contig": segment["contig_name"],
+                            "start": segment["source_start"], "end": segment["source_end"],
+                            "orientation": segment["orientation"],
+                        }, segment["evidence_ids"]):
+                            fail("q4 source without accepted event lacks frozen q0 provenance: "
+                                 f"{chromosome}:{segment['dataset_name']}:{segment['contig_name']}")
+                    elif str(segment["source_card_key"]).endswith(
                         (":grt_promoted", ":cross_chr_grt_usage")
                     ):
                         fail(
@@ -2300,7 +2309,14 @@ def publish_metadata_and_finalize(
         evidence_rows,
         usage_rows,
     )
-    final_path = build_final_path(chromosome_order, q4_paths, q4_records, events)
+    q0_lineage = None
+    if read_single(server_dir / "metadata/package.tsv")["schema_version"] == "3":
+        try:
+            from lgz_core.q0_lineage import Q0Lineage
+        except ModuleNotFoundError:
+            from .lgz_core.q0_lineage import Q0Lineage
+        q0_lineage = Q0Lineage(q_rows)
+    final_path = build_final_path(chromosome_order, q4_paths, q4_records, events, q0_lineage)
     verify_final_path(final_path, q4_records, sources)
 
     atomic_write_tsv(metadata / "grt_q_segments.tsv", Q_SEGMENT_FIELDS, q_rows)

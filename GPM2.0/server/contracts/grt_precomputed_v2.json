@@ -2,6 +2,17 @@
   "workflow": "gpm_grt_precomputed_v2",
   "schema_version": "2",
   "final_path_schema_version": "1",
+  "package_schema_extensions": {
+    "3": {
+      "tables": {"metadata/chr_assignments.tsv": {"min_rows": 0}},
+      "required_files": ["metadata/grt_q0_selection.json", "metadata/grt_q0_freeze.json"],
+      "evidence_stage": ["q0_construction"],
+      "coordinate_system": ["source_0_based_half_open"],
+      "q0_evidence_type": "q0_path_selection",
+      "q0_selection_schema": "lgz_q0_selection_artifact_v1",
+      "q0_freeze_schema": "lgz_q0_donor_freeze_v2"
+    }
+  },
   "hash_semantics": {
     "artifact": "sha256 of exact file bytes",
     "sequence": "sha256 of uppercase sequence bytes without FASTA header or whitespace"
