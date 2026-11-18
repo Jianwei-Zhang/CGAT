@@ -935,22 +935,9 @@ pub(super) fn validate_source_cards(
         let expected_event_ids = events
             .iter()
             .filter_map(|(event_id, event)| {
-                let action = event.get("action").and_then(Value::as_str).unwrap_or("");
                 (event.get("status").and_then(Value::as_str) == Some("accepted")
                     && event.get("source_card_key").and_then(Value::as_str) == Some(card)
-                    && (if q0_roots.is_some() {
-                        event_is_path_producing(event)
-                    } else {
-                        matches!(
-                            action,
-                            "fill"
-                                | "patch"
-                                | "replace"
-                                | "correct_boundary"
-                                | "refill"
-                                | "extend_telomere"
-                        )
-                    }))
+                    && event_is_path_producing(event))
                 .then(|| event_id.clone())
             })
             .collect::<HashSet<_>>();
@@ -1087,25 +1074,27 @@ pub(super) fn validate_source_cards(
             }
         }
     }
-    if let Some(roots) = q0_roots {
-        let mut expected = roots.keys().cloned().collect::<HashSet<_>>();
-        for event in events.values().filter(|event| {
-            event.get("status").and_then(Value::as_str) == Some("accepted")
-                && event.get("source").is_some_and(|source| !source.is_null())
-                && event_is_path_producing(event)
-        }) {
-            let card = event
-                .get("source_card_key")
-                .and_then(Value::as_str)
-                .ok_or_else(|| grt_anyhow("BROKEN_REFERENCE", "path event lacks source card"))?;
-            expected.insert(card.to_string());
-        }
-        if card_ids != expected {
-            return grt_err(
-                "BROKEN_REFERENCE",
-                "used cards do not exactly cover retained path sources",
-            );
-        }
+    // Both generations require all actual source-producing events. Package 3
+    // additionally has retained q0 roots; guidance-only donors are neither.
+    let mut expected = q0_roots
+        .map(|roots| roots.keys().cloned().collect::<HashSet<_>>())
+        .unwrap_or_default();
+    for event in events.values().filter(|event| {
+        event.get("status").and_then(Value::as_str) == Some("accepted")
+            && event.get("source").is_some_and(|source| !source.is_null())
+            && event_is_path_producing(event)
+    }) {
+        let card = event
+            .get("source_card_key")
+            .and_then(Value::as_str)
+            .ok_or_else(|| grt_anyhow("BROKEN_REFERENCE", "path event lacks source card"))?;
+        expected.insert(card.to_string());
+    }
+    if card_ids != expected {
+        return grt_err(
+            "BROKEN_REFERENCE",
+            "used cards do not exactly cover retained path sources",
+        );
     }
     Ok(())
 }

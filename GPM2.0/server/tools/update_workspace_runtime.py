@@ -52,6 +52,7 @@ LGZ_ENTRYPOINTS = {
     "tools/run_orchestration.py",
     "tools/server_report.py",
     "tools/server_report_collect.py",
+    "tools/server_report_q0.py",
     "tools/server_run.py",
     "tools/update_server.py",
     "tools/update_workspace_runtime.py",

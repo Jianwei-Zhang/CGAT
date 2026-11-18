@@ -18,6 +18,11 @@ try:
 except ModuleNotFoundError:
     from .render_server_report import REPORT_PREVIEW_ROWS
 
+try:
+    from server_report_q0 import MODE as Q0_MODE, collect_q0_decisions, is_evidence_guided
+except ModuleNotFoundError:
+    from .server_report_q0 import MODE as Q0_MODE, collect_q0_decisions, is_evidence_guided
+
 LGZ_STAGES = {
     "step1_round1": "grt/evidence/step1/round1",
     "step1_filter": "grt/evidence/step1/filter",
@@ -64,13 +69,15 @@ def inputs(root: Path) -> dict:
     datasets = read_tsv(root / "metadata/datasets.tsv")
     reference = read_tsv(root / "metadata/reference.tsv")
     rows = []
+    modern_q0 = is_evidence_guided(root)
     for index, entry in enumerate([*reference, *datasets]):
         is_reference = "reference_name" in entry
-        role = "reference" if is_reference else ("primary" if index == len(reference) else "support")
+        role = "reference" if is_reference else ("assembly_candidate" if modern_q0 else ("primary" if index == len(reference) else "support"))
         path = local_path(root, entry["fasta_relpath"])
         rows.append({"name": entry.get("reference_name", entry.get("dataset_name")),
                      "role": role, "file": entry["fasta_relpath"], "stats": sequence_stats(root, path)})
-    return {"datasets": rows, "parameters": options(root),
+    return {"datasets": rows, "q0_mode": Q0_MODE if modern_q0 else "legacy_primary",
+            "parameters": options(root),
             "telomere_rules": table(root, "tel/rules.tsv"),
             "centromere_reference": table(root, "cen/reference.tsv"),
             "annotation_library_snapshot": read_json(root / "metadata/annotation_library_snapshot.json", {}),
@@ -138,7 +145,9 @@ def collect_assignment(root: Path, input_data: dict) -> dict:
 def collect_lgz_inputs(root: Path) -> dict:
     recipe = read_tsv(root / "metadata/grt_recipe.tsv")
     qc_enabled = bool(recipe and recipe[0].get("reads_qc_enabled") == "true")
+    q0_decisions = collect_q0_decisions(root)
     return {"summary": {"reads_qc": "measured" if qc_enabled else "not_enabled"},
+            "q0_construction": q0_decisions,
             "parameters": read_json(root / "grt/checkpoints/donor_freeze.json", {}).get("fingerprint_payload"),
             "sequence_versions": {"q0": sequence_stats(root, root / "grt/q/q0.fa")},
             "tables": {name: table(root, f"metadata/{filename}.tsv") for name, filename in {
@@ -202,7 +211,24 @@ def final_summary(root: Path, report_root: Path) -> dict:
             "final_reason": last.get("reason") if last else "final_state_not_available",
             "final_path_segment_ids": segments.get(event_id, []),
             "final_event": last})
-    q0 = sequence_stats(root, root / "grt/q/q0.fa")
+    # New q0 is a stage publication, not whatever an old workspace currently
+    # contains after a failed prepare or a later file mutation.
+    modern_q0 = (is_evidence_guided(root) or bool(final.get("q0_construction"))
+                 or read_json(report_root / "inputs.json", {}).get("facts", {}).get("q0_mode") == Q0_MODE)
+    final["q0_mode"] = Q0_MODE if modern_q0 else "legacy_primary"
+    if modern_q0:
+        q0 = final.get("sequence_versions", {}).get("q0")
+        if q0 is None:
+            for relative in manifest.get("steps", []):
+                record = read_json(local_path(report_root, relative), {})
+                if record.get("stage_id") == "grt_prepare" and record.get("status") == "success":
+                    if record.get("run_id") != manifest["run_id"] or record.get("schema_version") != SCHEMA:
+                        raise ValueError("q0 snapshot belongs to another invocation or schema")
+                    facts = record.get("facts", {})
+                    q0 = facts.get("sequence_versions", {}).get("q0")
+                    final["q0_construction"] = facts.get("q0_construction")
+    else:
+        q0 = sequence_stats(root, root / "grt/q/q0.fa")
     if q0:
         final.setdefault("sequence_versions", {})["q0"] = q0
     q4 = final.get("sequence_versions", {}).get("q4") or {}
@@ -227,6 +253,9 @@ def final_summary(root: Path, report_root: Path) -> dict:
         "total_length_bp": q4.get("length_bp") if q4 else None,
         "chromosome_count": q4.get("sequence_count") if q4 else None,
         "starting_gap_count": q0_gap_count,
+        "gap_count_change": (q4_gap_count - q0_gap_count
+                             if q0_gap_count is not None and q4_gap_count is not None else None),
+        "closed_gap_count_semantics": "legacy_net_reduction_not_verified_gap_closure",
         "closed_gap_count": (max(0, q0_gap_count - q4_gap_count)
                              if q0_gap_count is not None and q4_gap_count is not None else None),
         "remaining_gap_count": q4_gap_count,
@@ -234,6 +263,7 @@ def final_summary(root: Path, report_root: Path) -> dict:
         "telomere_ends_total": expected_ends or None,
         "telomeres_complete": telomeres_complete if terminal_rows else None,
         "t2t_status": t2t_status,
+        "t2t_scope": "emitted_sequences_only",
         "centromere_marker_count": len(centromere_markers),
         "centromere_chromosome_count": len({row.get("chr") for row in centromere_markers}),
     }
@@ -242,7 +272,10 @@ def final_summary(root: Path, report_root: Path) -> dict:
     final["final_event_summary"] = event_summary(final.get("events", [])) if final else None
     final["notes"] = ["过程中的接受数不可相加作为最终修复数；最终状态以最终路径及协调后的事件为准。",
                       "gap 定义为连续至少 100 个 N；N 碱基数单独统计。",
-                      "原始主组装 → q0 表示初始构建；q0 → q4 表示 LGZ 处理。N50 增加本身不证明质量改善。"]
+                      ("多组装候选 → q0 表示证据驱动的初始构建；q0 → q4 表示 LGZ 处理。"
+                       if modern_q0 else "原始主组装 → q0 表示初始构建；q0 → q4 表示 LGZ 处理。") + "N50 增加本身不证明质量改善。",
+                      "Gap 数净减少可能来自冗余连接删除、裁剪或序列替换，不等于真实缺失序列的闭合数量。",
+                      "T2T 结构条件只针对本次已输出序列；不证明参考的所有染色体均已构建或无生物学缺失。"]
     return final
 
 
@@ -332,7 +365,9 @@ def capture_final(root: Path) -> dict:
             contribution[row.get("dataset_name", "unknown")] += int(row["q_end"]) - int(row["q_start"]) + 1
     return {"available": bool(final_path), "final_path": final_path,
             "events": read_events(root / "metadata/grt_events.jsonl"),
-            "sequence_versions": {"q4": sequence_stats(root, root / "grt/q/q4.fa")},
+            "sequence_versions": {"q0": sequence_stats(root, root / "grt/q/q0.fa"),
+                                  "q4": sequence_stats(root, root / "grt/q/q4.fa")},
+            "q0_construction": collect_q0_decisions(root),
             "source_contribution_bp": dict(contribution),
             "explicit_connector_segments": dict(connectors),
             "annotations": final_annotations(root, final_path)}

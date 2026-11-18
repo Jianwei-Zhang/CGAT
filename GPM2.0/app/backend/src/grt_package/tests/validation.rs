@@ -864,3 +864,59 @@ fn q4_hash_batches_preserve_short_long_lines_and_chromosome_boundaries() {
         assert_eq!(summaries[&name].sha256, sha256_bytes(sequence.as_bytes()));
     }
 }
+
+#[test]
+fn historical_source_free_edits_and_structural_guidance_do_not_require_source_segments() {
+    let cases_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/grt_contract_v2/non_path_events.json");
+    let data: Value = serde_json::from_slice(&fs::read(cases_path).unwrap()).unwrap();
+    for case in data["cases"].as_array().unwrap() {
+        let temp = tempdir().unwrap();
+        copy_tree(&fixture_root(), temp.path());
+        let path = temp.path().join("metadata/grt_events.jsonl");
+        let mut events = fs::read_to_string(&path).unwrap();
+        events.push_str(&serde_json::to_string(&case["event"]).unwrap());
+        events.push('\n');
+        fs::write(&path, events).unwrap();
+        if let Some(usage) = case.get("usage") {
+            let path = temp.path().join("metadata/grt_donor_usage.tsv");
+            let mut text = fs::read_to_string(&path).unwrap();
+            let values = text
+                .lines()
+                .next()
+                .unwrap()
+                .split('\t')
+                .map(|field| usage[field].as_str().unwrap().to_string())
+                .collect::<Vec<_>>();
+            text.push_str(&(values.join("\t") + "\n"));
+            fs::write(path, text).unwrap();
+        }
+        validate_grt_package(temp.path())
+            .unwrap_or_else(|error| panic!("{}: {error}", case["name"]));
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(temp.path()).unwrap();
+        let trace = load_grt_event_trace(
+            &outcome.project_db_path,
+            case["event"]["event_id"].as_str().unwrap(),
+        )
+        .unwrap();
+        assert!(trace.final_path_segment.is_none());
+        assert!(trace.source_card.is_none());
+        assert_eq!(
+            trace.donor_usage.len(),
+            usize::from(case.get("usage").is_some())
+        );
+        if case["name"] == "gap_replacement" {
+            let mut source_edit = case["event"].clone();
+            source_edit["edit"]["replacement_kind"] = Value::String("source".to_string());
+            let events = fs::read_to_string(&path).unwrap();
+            let lines = events.lines().collect::<Vec<_>>();
+            let updated = lines[..lines.len() - 1].join("\n")
+                + "\n"
+                + &serde_json::to_string(&source_edit).unwrap()
+                + "\n";
+            fs::write(&path, updated).unwrap();
+            let error = validate_grt_package(temp.path()).unwrap_err().to_string();
+            assert!(error.contains("lacks Final Path segment"), "{error}");
+        }
+    }
+}

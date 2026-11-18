@@ -1311,25 +1311,11 @@ where
 
     for (event_id, event) in &event_index {
         let status = event.get("status").and_then(Value::as_str).unwrap_or("");
-        let action = event.get("action").and_then(Value::as_str).unwrap_or("");
         let segment_id = event
             .get("final_path_segment_id")
             .and_then(Value::as_str)
             .unwrap_or("");
-        let path_producing = status == "accepted"
-            && (if q0_v3 {
-                event_is_path_producing(event)
-            } else {
-                matches!(
-                    action,
-                    "fill"
-                        | "patch"
-                        | "replace"
-                        | "correct_boundary"
-                        | "refill"
-                        | "extend_telomere"
-                )
-            });
+        let path_producing = status == "accepted" && event_is_path_producing(event);
         if q0_v3 && path_producing && event.get("source").is_none_or(|source| !source.is_object()) {
             return grt_err(
                 "BROKEN_REFERENCE",

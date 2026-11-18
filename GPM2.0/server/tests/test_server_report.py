@@ -350,34 +350,37 @@ class ServerReportTests(unittest.TestCase):
             html = (report / "report.html").read_text()
             self.assertLess(html.index('id="summary"'), html.index('id="results"'))
             self.assertLess(html.index('id="results"'), html.index('id="workflow"'))
-            self.assertIn("关闭 Gap", html)
+            self.assertIn("Gap 数净变化", html)
             self.assertIn("已达到", html)
             self.assertIn('path-marker telomere left complete', html)
             self.assertIn('path-marker centromere', html)
 
 
 def make_grt_report_fixture(root: Path) -> tuple[Path, dict]:
-    """Actual LGZ implementations with deterministic external-tool fixtures."""
-    from server.tests.test_grt_repair_stages import GrtRepairStagesTests
-    from server.tests.test_grt_telomere_finalize import GrtTelomereFinalizeTests
-    from server.tests.test_grt_evidence_package import GrtEvidencePackageTests
+    """Current q0 plus real stage tools; pre-q0 PAF geometry is controlled.
 
-    tel = GrtTelomereFinalizeTests()
-    step = GrtRepairStagesTests()
-    evidence = GrtEvidencePackageTests()
-    server = tel.make_server(root)
-    step_tools, tel_tools = step.make_tools(root), tel.make_tools(root)
-    evidence.write_existing_main_view_results(server)
-    from server.tests.q0_test_support import seed_q0_evidence
-    seed_q0_evidence(server)
-    minimap = evidence.make_minimap(root)
+    This no longer calls the removed schema-2 q0 producer. The terminal donor
+    gives a real accepted source event for report reconciliation and replay.
+    """
+    from server.tests.test_q0_admission import EvidenceFixture, dna
+    from server.tests.test_q0_publication import complete_workspace
+    from server.tests.test_source_structural_pipeline import RealSourceStructuralPipelineTests
+
+    RealSourceStructuralPipelineTests.setUpClass()
+    fixture = EvidenceFixture({"chr1": 60000})
+    backbone = dna(50000, 601)
+    source = fixture.source("primary", backbone)
+    fixture.ref(source, (0, len(backbone)), (0, len(backbone)))
+    fixture.source("tel", backbone[-30000:] + "TTTAGGG" * 80)
+    server = complete_workspace(fixture, root)
+    step_tools = {name.replace("-", "_"): Path(path) for name, path in RealSourceStructuralPipelineTests.tools.items()}
+    step_tools["minimap2"] = Path(shutil.which("minimap2"))
+    tel_tools = step_tools
+    minimap = step_tools["minimap2"]
     runtime = server / ".prepare_lib/tools"
     shutil.copytree(TOOLS, runtime, ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(PROJECT / "server/contracts", server / ".prepare_lib/contracts")
     environment = os.environ.copy()
-    for key in ("FAKE_GRT_MINIMAP_LOG", "FAKE_GRT_MUMMER_LOG", "FAKE_TEL_MUMMER_LOG",
-                "FAKE_TEL_MINIMAP_LOG", "FAKE_DISPLAY_MINIMAP_LOG"):
-        environment[key] = str(root / (key + ".log"))
     commands = []
     for unit, tool, external in [
         ("grt_prepare", "grt_prepare_inputs.py", {}),
@@ -418,6 +421,8 @@ class GrtReportIntegrationTests(unittest.TestCase):
             self.assertEqual(stage1["facts"]["result"]["q_input_sha256"], stage1["facts"]["result"]["q_output_sha256"])
             final = read_json(report / "final_summary.json")
             self.assertTrue(final["available"])
+            self.assertEqual(final["q0_construction"]["summary"]["selected_datasets"], 1)
+            self.assertEqual(final["q0_construction"]["summary"]["qc"], "not_measured")
             actual = fasta_stats(server / "grt/q/q4.fa")
             self.assertEqual(final["sequence_versions"]["q4"], actual)
             self.assertIn("q4", final["explicit_connector_segments"])

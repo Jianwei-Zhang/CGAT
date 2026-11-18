@@ -244,10 +244,10 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 | D0 | 已提交并推送 | `a634df9`；Q1–Q14、A01–A20、13 个章节及 LF 格式检查通过 |
 | I1 | 基础模块与定向回归已完成，已由 I2 证据阶段使用 | `q0_sources.py`、`q0_alignments.py`；新增 25 项测试，联合回归 44 项通过；运行库清单校验通过 |
 | I2 | 已接入并验证：前置比对、扩展候选、按需补比对、必需证据清单及缓存保留 | 见 13.2–13.3；最终联合回归 230 项通过（含来源方向回归）；两套准备脚本测试通过 |
-| I3 | 主入口已切换，q0 与 donor 冻结已共同发布，q0→q1 定向验证通过 | 见 13.4–13.6；完整 LGZ/交付尚未完成 |
+| I3 | 主入口已切换，跨 ds q0 与 donor 冻结已共同发布 | 见 13.4–13.6；后续 q0→q4 与交付定向验证见 13.8–13.11 |
 | I4 | 区间授权、跨 ds overlap、原 N 软连接及真实工具受控编辑闭环已实现并验证 | 见 13.7–13.8；完整交付与大数据/生物学验收仍属 I5/I6 |
-| I5 | 未开始 | — |
-| I6 | 未开始 | — |
+| I5 | 契约、导入与报告已接通并通过定向验证 | 见 13.9–13.11；完整质量 gate 与效果/规模收口留在 I6 |
+| I6 | 进行中：已有矩阵定向证据，完整 gate 与旧流程夹具迁移待收口 | A01–A20 需逐项审计，不能将局部通过当作完整验收 |
 
 尚无新算法真实样本收益结论；尚未执行发布或客户工作区迁移。
 
@@ -692,3 +692,41 @@ schema-3 的粗分组 assignment 表可以为空，但表本身及其正确 head
 后续验收还要补齐历史 schema-2 的 source-free boundary/correction 等事件在两端的分类一致性，不能把当前旧包基线通过当成所有历史边界都已覆盖；并继续报告输出、旧流程夹具迁移和 I6 的真实比对/规模测试，包括完整 Server 包的哈希与 FASTA 校验成本。
 
 补充的 fail-fast 边界：未选中的 chr 必须有明确的 `path: null` 决定；缺少 `path` 字段不是默认跳过。accepted 的 DNA 新增事件也必须有 source 证明，不能把 source-free 事件改名为 fill 来绕过根来源校验。这两类反例已纳入回归。
+
+
+### 13.11 I5 历史事件一致性与 q0 决策报告
+
+#### 结构指导不等于新增来源序列
+
+使用同一份 schema-2 契约输入复现了两端差异：Python 接受 `replacement_kind=gap` 的事件及其 `structural_evidence` donor usage，Rust 却报 `accepted path-producing event ... lacks Final Path segment`。原因是 Rust 把所有 `replace` / `correct_boundary` 都当成了 DNA 新增。
+
+现在两端使用相同的 path-producing 定义：fill、patch、refill、端粒新增，以及明确 `replacement_kind=source` 的 replace。filter、纯 boundary 调整、gap-only replacement 不凭空生成 Final Path 片段或来源卡；其中的 donor 可以只是结构指导。`tests/fixtures/grt_contract_v2/non_path_events.json` 是双方共用的契约案例，不是修复效果数据。原生测试还实际导入、持久化并回读这些事件，验证其 Final Path / source-card 链接为空，而指导用途仍保留。
+
+这不是放松来源检查：真正的 source replacement 仍必须关联最终片段；删去已接受来源的 used-source 卡仍须被两端拒绝。schema-2 和 schema-3 的 used-card 集合均须准确对应真实来源事件，schema-3 再加入保留的 q0 根来源。
+
+#### 报告的事实与边界
+
+新模块 `server_report_q0.py` 在成功发布边界读取正式选择产物，检查 selection SHA、q0 FASTA SHA 与 q0 rows 的冻结身份，然后生成有界摘要：
+
+- 各 chr 的状态和实际来源 ds / bp / 原始 contig 数 / 来源片段数；`partial_path` 不称为完整染色体，`not_constructed` 在摘要区单独警告。
+- 分开显示输入原有 N 连接、新增未知连接和最终保留的 overlap。真实输入 `137 N` 与未知连接的 `100 N` 不混同，参考上未覆盖的 1,000 bp 也不被解释成插入了 1,000 个 N。
+- 显示参考未被选中锚点覆盖的范围、候选来源未被路径表示的范围，以及未选来源区间和候选准入记录。未选部分包含冗余/QC 排除等原因，不自动等于生物学缺失或 donor 可用范围。
+- 搜索轮数、评估次数、停止原因、剪枝记录数、策略限制和操作数可查；过程中的 bridge 操作数不当作最终修补次数，也不声称全局最优。
+- 大表保留准确总数、产物路径和内容哈希，只预览前 200 行；完整决策和原始证据仍留在 Server 正式产物中。离线 HTML 仍只读自己的报告快照，不回读工作区。
+
+schema-3 输入统一显示为候选组装，统计比较不再只取第一个 ds 当作 q0 基线。`primary_dataset` 仍是项目元数据。报告里的 `q0_mode` 只是历史/当前产物的解释标记，不是新旧 q0 构建策略开关；新包缺 selection/freeze 时不会回退到旧构建或旧说明。
+
+“关闭 Gap”改为 **Gap 数净变化（q4 − q0）**，增加时保留正号，不再被 `max(0, ...)` 隐藏。旧 `closed_gap_count` JSON 字段保留作兼容净减少量，并明确标记它不是真实缺失序列闭合数；新展示使用 `gap_count_change`。T2T 展示限定为已输出序列的结构条件，不等于完整基因组或独立生物学正确性验收。
+
+schema-3 报告的 q0 统计来自本次成功 prepare 的快照，或成功 finalization 同时捕获的 q0/q4 快照。prepare 失败时，磁盘上残留的旧 q0 不会被当成本次构建；后续失败时可以展示本次已成功的 q0，但不能拿旧 q4 作结果。不同 run/schema 的成功快照拒绝混入。
+
+#### 验证范围
+
+报告集成夹具已从“调用旧 schema-2 q0 producer”迁移到当前 q0：受控 pre-q0 PAF 几何，加上真实 MUMmer4/minimap2 的 Step1→q4→evidence CLI。末端 donor 产生真实 accepted 来源事件，保留了首次发布、缓存复用、事件与最终来源协调、后续失败隔离这些原有断言。测试通过 `GPM_TEST_MUMMER_BIN` 指定 MUMmer4；缺少真实工具时会明确 skip，本轮运行提供了工具并实际执行，不能把其他环境的 skip 算作通过。
+
+另有 Windows Node 数据契约回归读取同一份 schema-3 App 快照。测试按原生 read model 的方式从 FAI 提供完整 source_length，不从片段 end 猜长度；确认反向 q0-only promoted 来源无需修补 trace，也无需新增前端策略或放松来源长度检查。没有前端生产代码改动、浏览器或安装包验收。
+
+新报告 helper 已纳入工作区 runtime 的必需文件清单，并通过生成脚本更新内容身份。I5 的这些定向证据不替代 I6 的完整 Server/E2E gate、旧流程夹具迁移及获授权真实样本与规模性能验证。
+
+
+本节验证：98 项 Python 定向回归通过（366.390 秒，包含真实工具报告集成、10 项 q0 报告验证、运行库与 runner 回归）；增加“缺少已使用来源卡”的共享反例后，12 项契约测试再次通过（181.927 秒，不重复计入不同测试总数）。Windows 原生 LGZ 契约/导入组分别 47 和 56 项通过；两项 opt-in 性能探针保持 ignored，不作为性能结论。Windows Node 的 LGZ 状态/显示数据回归 16 项通过。生成脚本同步并只读核验通过：39 个受管产物无漂移。
