@@ -518,7 +518,18 @@ def has_telomere_signal(sequence: str, rules: list[dict[str, object]]) -> bool:
     for rule in rules:
         motif = str(rule["motif"])
         minimum = int(rule["donor_min_repeat"])
-        for match in re.finditer(f"(?:{re.escape(motif)}){{{minimum},}}", sequence):
+        pattern = re.compile(f"(?:{re.escape(motif)}){{{minimum},}}")
+        if motif and minimum >= 0 and MIN_TELOMERE_BP > 0:
+            required = max(minimum, (MIN_TELOMERE_BP + len(motif) - 1) // len(motif))
+            required_bp = required * len(motif)
+            if required_bp > len(sequence):
+                continue
+            # Negative long contigs need only a fast literal search. Bound the
+            # allocation for custom rules; retain the regex for positive cases
+            # because overlapping motifs can affect its non-overlapping matches.
+            if required_bp <= 4096 and motif * required not in sequence:
+                continue
+        for match in pattern.finditer(sequence):
             if match.end() - match.start() >= MIN_TELOMERE_BP:
                 return True
     return False
