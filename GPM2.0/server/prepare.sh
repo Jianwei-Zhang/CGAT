@@ -30,6 +30,7 @@ LGZ_MERYL="meryl"
 LGZ_MERQURY="merqury.sh"
 LGZ_CRAQ=""
 LGZ_READS_QC_MODE="standard"
+DEGAP_READS_TYPE=""
 LGZ_MINIMAP2="minimap2"
 LGZ_NUCMER="nucmer"
 LGZ_DELTA_FILTER="delta-filter"
@@ -58,7 +59,7 @@ Usage:
     [--cen <centromere_repeat_fasta>] \
     [--cen-min-len <min_supported_region_bp>] \
     [--cen-min-identity <min_identity_percent>] \
-    [--reads <reads_fastq_path> ...] \
+    [--reads <reads_fastq_path> ... --reads-type hifi|ont] \
     [--lgz-qc-memory-gb <memory_gb>] \
     [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
@@ -93,6 +94,8 @@ Behavior:
   - --cen-min-identity filters hits; --cen-min-len filters merged candidate support (defaults: 80%, 10000 bp)
   - Manage local entries with library.sh list/add-tel/add-cen/remove; updates leave local/ unchanged
   - The first --ds remains project-primary metadata; q0 is selected across all initial datasets using alignment evidence
+  - --reads enables post-LGZ DEGAP gap filling only; --reads-type hifi|ont is required
+  - Reads do not filter q0 or rank LGZ donors in new workspaces; original LGZ outputs stay unchanged
   - --max-fill sets the Step2 optimized refill length limit in bp, default: 1000000
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
   - LGZ defaults: optimized execution, full Step1, anchor-safe gap-screen Step2
@@ -391,9 +394,6 @@ write_package_metadata() {
   local self_alignment_scope="$5"
   local cross_alignment_scope="$6"
   local reads_qc_enabled="false"
-  if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-    reads_qc_enabled="true"
-  fi
 
   {
     printf 'workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n'
@@ -426,9 +426,6 @@ write_prepare_options_metadata() {
 
   if [[ -s "${WORK_ROOT}/tel/rules.tsv" ]]; then tel_enabled="true"; fi
   if [[ -s "${WORK_ROOT}/cen/reference.tsv" ]]; then cen_enabled="true"; fi
-  if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-    reads_qc_enabled="true"
-  fi
 
   {
     printf 'key\tvalue\n'
@@ -453,6 +450,8 @@ write_prepare_options_metadata() {
     printf 'cen_min_identity\t%s\n' "$CEN_MIN_IDENTITY"
     printf 'grt_workflow\t%s\n' "gpm_grt_precomputed_v2"
     printf 'grt_primary_dataset\t%s\n' "${DATASET_NAMES[0]}"
+    printf 'reads_purpose\tpost_lgz_degap_v1\n'
+    printf 'degap_reads_type\t%s\n' "$DEGAP_READS_TYPE"
     printf 'grt_reads_qc_enabled\t%s\n' "$reads_qc_enabled"
     printf 'grt_reads_qc_mode\t%s\n' "$LGZ_READS_QC_MODE"
     printf 'grt_meryl\t%s\n' "$LGZ_MERYL"
@@ -863,6 +862,12 @@ while [[ $# -gt 0 ]]; do
       READS_SRCS+=("$2")
       shift 2
       ;;
+    --reads-type)
+      [[ $# -ge 2 ]] || die "--reads-type requires hifi or ont"
+      [[ "$2" == "hifi" || "$2" == "ont" ]] || die "--reads-type requires hifi or ont"
+      DEGAP_READS_TYPE="$2"
+      shift 2
+      ;;
     --reads-qc)
       [[ $# -ge 2 ]] || die "--reads-qc requires full"
       [[ "$2" == "full" ]] || die "Invalid --reads-qc value '$2'. Use full."
@@ -893,8 +898,13 @@ done
 
 [[ -n "$REF_NAME" ]] || die "Missing --ref"
 [[ "${#DATASET_NAMES[@]}" -gt 0 ]] || die "At least one --ds is required"
-if [[ "$LGZ_READS_QC_MODE" == "full" && "${#READS_SRCS[@]}" -eq 0 ]]; then
-  die "--reads-qc full requires at least one --reads input"
+if [[ "$LGZ_READS_QC_MODE" == "full" ]]; then
+  die "--reads-qc is legacy-only; new workspaces use --reads with --reads-type for post-LGZ DEGAP"
+fi
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+  [[ -n "$DEGAP_READS_TYPE" ]] || die "--reads requires --reads-type hifi|ont for post-LGZ DEGAP"
+else
+  [[ -z "$DEGAP_READS_TYPE" ]] || die "--reads-type requires --reads"
 fi
 
 require_cmd samtools
@@ -908,14 +918,10 @@ LGZ_DELTA_FILTER="$(resolve_required_command delta-filter)"
 LGZ_SHOW_COORDS="$(resolve_required_command show-coords)"
 validate_mummer4_capabilities \
   "$LGZ_NUCMER" "$LGZ_DELTA_FILTER" "$LGZ_SHOW_COORDS"
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  LGZ_MERYL="$(resolve_required_command meryl)"
-  LGZ_MERQURY="$(resolve_required_command merqury.sh)"
-fi
-if [[ "$LGZ_READS_QC_MODE" == "full" ]]; then
-  LGZ_CRAQ="$(resolve_required_command craq)"
-fi
 require_cmd minimap2
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+  python3 "${SCRIPT_DIR}/tools/post_lgz_degap.py" --check-environment --server-dir "$WORK_ROOT" --reads "${READS_SRCS[@]}"
+fi
 
 validate_name "$REF_NAME"
 ensure_readable_file "$REF_SRC"
@@ -1001,6 +1007,15 @@ ensure_fai "$REF_DST"
 } > "${WORK_ROOT}/metadata/reference.tsv"
 
 write_reference_segments_metadata "$REF_DST" "${WORK_ROOT}/metadata/reference_segments.tsv"
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+  python3 - "${WORK_ROOT}/metadata/degap_inputs.json" "$DEGAP_READS_TYPE" "${READS_SRCS[@]}" <<'PYREADS'
+import json, sys
+from pathlib import Path
+Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "purpose": "post_lgz_degap_v1",
+    "reads_type": sys.argv[2], "reads": sys.argv[3:]}, indent=2) + "\n")
+PYREADS
+fi
+
 
 package_mode="fast"
 sequence_layout="partitioned"
@@ -1065,6 +1080,7 @@ mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
   || die "Reference FASTA contains no sequence records: $REF_DST"
 
 TOTAL_COMMANDS=$(( DATASET_COUNT + 9 + 2 * ${#REFERENCE_CHR_NAMES[@]} ))
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then TOTAL_COMMANDS=$((TOTAL_COMMANDS + 1)); fi
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -1106,11 +1122,7 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/prepare_q0_evidence.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
-else
-  write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT"
-fi
+write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT"
 append_run_all_unit "grt_prepare" "prepare_lgz_inputs.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_lgz_inputs"
 printf 'cd %s\n' "$WORK_ROOT"
@@ -1140,6 +1152,19 @@ printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step3"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step3.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+  {
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+    printf 'python3 %s --server-dir %s --threads %s\n' \
+      "$(shell_quote "${WORK_ROOT}/.prepare_lib/tools/post_lgz_degap.py")" \
+      "$(shell_quote "$WORK_ROOT")" "$(shell_quote "$THREADS")"
+  } > "${WORK_ROOT}/run_post_lgz_degap.sh"
+  make_executable_if_supported "${WORK_ROOT}/run_post_lgz_degap.sh"
+  append_run_all_unit "degap_gapfill" "run_post_lgz_degap.sh" "logs/run_all.log"
+  printf '[%s/%s] post_lgz_degap\nbash %s\n\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "${WORK_ROOT}/run_post_lgz_degap.sh"
+  COMMAND_INDEX=$((COMMAND_INDEX + 1))
+fi
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   run_chr_dir="${WORK_ROOT}/runs/chr_${chr_name}"

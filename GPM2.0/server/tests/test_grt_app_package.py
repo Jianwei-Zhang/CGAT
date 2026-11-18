@@ -29,6 +29,33 @@ class GrtAppPackageTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
+    def test_post_lgz_gapfill_delivery_is_separate_and_content_bound(self):
+        import post_lgz_degap as gapfill
+        config = self.source / "metadata/degap_inputs.json"
+        config.write_text('{"reads":["/private/reads.fq"]}')
+        output = self.source / gapfill.OUTPUT
+        output.parent.mkdir(parents=True)
+        output.write_text(">chr1\nACGT\n")
+        report = {"schema_version": 1, "input_signature": "test-input", "output_fasta": gapfill.OUTPUT,
+                  "output_sha256": gapfill.digest(output), "lgz_unchanged": True,
+                  "accepted_count": 1, "decisions": []}
+        gapfill.atomic_json(self.source / gapfill.REPORT, report)
+        gapfill.atomic_json(self.source / gapfill.CHECKPOINT, {"schema_version": 1,
+            "signature": "test-input", "artifacts": {gapfill.OUTPUT: gapfill.digest(output),
+                gapfill.REPORT: gapfill.digest(self.source / gapfill.REPORT)}})
+        for full in (True, False):
+            target = self.root / ("full-degap" if full else "light-degap")
+            grt_app_package.build(self.source, target, include_fasta=full)
+            delivered = json.loads((target / gapfill.REPORT).read_text())
+            self.assertEqual(delivered["fasta_available"], full)
+            self.assertEqual((target / gapfill.OUTPUT).exists(), full)
+            self.assertFalse((target / "metadata/degap_inputs.json").exists())
+            self.assertFalse((target / "degap").exists())
+            self.assertNotIn("/private", (target / gapfill.REPORT).read_text())
+        output.write_text(">stale\nT\n")
+        with self.assertRaisesRegex(ValueError, "artifact changed"):
+            grt_app_package.build(self.source, self.root / "invalid-degap", include_fasta=True)
+
     def test_annotation_provenance_is_kept_but_light_never_contains_library_fasta(self) -> None:
         library = self.source / "cen/library.fa"
         library.parent.mkdir(parents=True, exist_ok=True)

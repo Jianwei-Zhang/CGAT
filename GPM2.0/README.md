@@ -68,7 +68,8 @@ Re-running `install.sh` validates the managed environment and updates it only wh
 | --- | --- |
 | Core workflow | `python3`, `samtools`, `zip`, `gzip` |
 | LGZ Final Path | `minimap2`, `nucmer`, `delta-filter`, `show-coords` |
-| Optional reads QC | `meryl`, `merqury.sh`; used only when `--reads` is supplied |
+| Optional post-LGZ gap filling | Bundled DEGAP and its shared Server environment; enable with `--reads` + `--reads-type` |
+| Legacy workspace reads QC | Saved QC recipes still use `meryl`, `merqury.sh` (and CRAQ for full QC) |
 
 Keep this environment active for `run.sh`.
 
@@ -121,15 +122,16 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--ds [<name>] <fasta>` | Required, repeatable | Initial assembly dataset; omit the name to infer it from the filename. The first is primary; the rest are auxiliary datasets. |
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
-| `-t, --threads <n>` | `10` | Total compute-thread budget shared by independent alignment tasks and reads-QC jobs. |
+| `-t, --threads <n>` | `10` | Total compute-thread budget for alignment tasks and optional post-LGZ DEGAP; legacy QC also follows this budget. |
 | `--skip-self` | Off | Skip same-dataset self alignment; same-dataset Subview becomes unavailable. |
 | `--tel <motif> <count>` | Additive, repeatable | Add one-run tel rules to the automatic official + local libraries. |
 | `--cen <fasta>` | Additive | Add one-run centromere-related repeats; FASTA names do not bind chromosomes. |
 | `--cen-min-len <bp>` | `10000` | Minimum merged centromere-candidate covered bases (gaps excluded). |
 | `--cen-min-identity <pct>` | `80` | Minimum individual centromere-repeat hit identity percentage. |
-| `--reads <fastq>` | Optional, repeatable | Enable shared Meryl data plus per-dataset Merqury QV assessment; the `--threads` budget is distributed across datasets. |
-| `--lgz-qc-memory-gb <n>` | `80` | Memory limit for optional reads QC. |
-| `--lgz-kmer-size <n>` | `21` | K-mer size for optional reads QC. |
+| `--reads <fastq>` | Optional, repeatable | New tasks: enable post-LGZ internal gap filling, not pre-LGZ QC. Preserve LGZ and write a separate FASTA. |
+| `--reads-type hifi/ont` | Required with reads | Explicit read technology; all repeated `--reads` files use this type. |
+| `--lgz-qc-memory-gb <n>` | `80` | Memory limit for legacy workspace reads QC. |
+| `--lgz-kmer-size <n>` | `21` | Legacy reads-QC k-mer size; not used by new DEGAP tasks. |
 | `--max-fill <bp>` | `1000000` | Length limit for both Step2 optimized refill rounds; can be changed on resume. |
 
 ### Telomere / centromere libraries

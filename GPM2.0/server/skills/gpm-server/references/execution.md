@@ -46,10 +46,18 @@ An executable's presence or version label alone is insufficient. Default `tar.gz
 needs `pigz`; the current preparation also checks `zip` even for tar delivery.
 An explicitly selected `--archive-format zip` does not need `pigz`.
 
-With `--reads`, also verify `meryl`, `merqury.sh`, Merqury's `MERQURY` environment,
-read-file integrity, and memory budget. `--reads-qc full` additionally needs `craq`.
-Do not silently omit user-provided reads when dependencies fail. Without reads,
-reads-based QC is skipped; this does not skip the entire LGZ workflow.
+For new preparations, `--reads` requires `--reads-type hifi|ont` and enables
+post-LGZ DEGAP internal gap filling, not q0 QC or reads-based donor ranking.
+Check the shared DEGAP environment with `install.sh --check`; validate reads and
+scheduler memory. Do not silently drop supplied reads when dependencies fail.
+The extra FASTA is `data/degap/post_lgz.fa`; LGZ and App Final Path stay unchanged.
+Native merged/ambiguous candidates are not automatically admitted; consult
+`metadata/degap_gapfill.json`. No telomere extension is performed.
+
+For existing workspaces, preserve the saved meaning of reads and the saved plan.
+Legacy QC requires `meryl`, `merqury.sh`, Merqury's `MERQURY` environment, plus
+`craq` for saved full-QC recipes. Do not retrofit `--reads-type` or DEGAP on resume.
+Without reads, neither QC nor the new automatic DEGAP stage runs.
 
 Confirm input files are readable/nonempty and really FASTA (or FASTQ for reads),
 with nonempty sequence records and unique IDs within each FASTA. Check compressed

@@ -55,6 +55,10 @@ def project_report_record(record: dict) -> dict:
 
 
 LABELS = {
+    "degap_gapfill": "LGZ 后 DEGAP 补洞", "gap_count": "原始 gap 数",
+    "accepted_count": "已接纳 gap 数", "unfilled_count": "保留 gap 数",
+    "reads_type": "Reads 类型", "lgz_unchanged": "保留原始 LGZ",
+    "gap_decisions": "逐 gap 接纳记录",
     "success": "完成", "failed": "失败", "interrupted": "中断", "pending": "未执行",
     "running": "运行中", "prepared": "输入已准备，等待运行", "preparing": "准备中",
     "computed": "本次执行", "cache_reused": "复用已验证缓存", "not_started": "尚未开始",
@@ -128,7 +132,8 @@ LABELS = {
 METHODS = {
     "prepare": "记录原始文件身份、数据角色与规范化后的 FASTA 统计。",
     "assign": "依据经过过滤的参考比对及覆盖率阈值分配染色体，记录方向与排列顺序。",
-    "grt_prepare": "构建 q0，锁定普通供体与端粒供体；提供 reads 时执行输入质量评估。",
+    "degap_gapfill": "LGZ 完成后使用 reads 补剩余内部 gap，保留原始 LGZ 结果；不延伸端粒。",
+    "grt_prepare": "构建 q0，锁定普通供体与端粒供体；旧工作区按保存的配方保留 reads 质量评估。",
     "step1": "生成并验证补丁候选，按染色体选择补丁或结构修正分支，生成 q1。",
     "step2": "处理结构问题、重叠与后续优化填补，记录过滤和未解决的问题，生成 q2。",
     "step3": "检查染色体两端、验证端粒供体并记录处理结果，生成 q3 / Final Path。",

@@ -357,7 +357,7 @@ def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, f
 
 # Derived by prepare.sh from the reference FASTA. Delivery keeps it so the App
 # can render reference N gaps without needing the FASTA payload.
-OPTIONAL_METADATA = ("reference_segments.tsv", "annotation_library_snapshot.json")
+OPTIONAL_METADATA = ("reference_segments.tsv", "annotation_library_snapshot.json", "degap_gapfill.json")
 
 
 def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
@@ -392,6 +392,11 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         shutil.rmtree(staging_root)
     staging_root.mkdir(parents=True)
 
+    if (source_root / "metadata/degap_inputs.json").is_file():
+        from post_lgz_degap import validate_result
+        valid, reason = validate_result(source_root)
+        if not valid:
+            raise ValueError(reason)
     source_lengths = validate_source_locators(source_root)
     display_source_cards = load_display_source_cards(source_root)
     for filename in REQUIRED_METADATA:
@@ -404,6 +409,11 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     for filename in OPTIONAL_METADATA:
         if (source_root / "metadata" / filename).is_file():
             copy_file(source_root, staging_root, f"metadata/{filename}")
+            if filename == "degap_gapfill.json":
+                report_path = staging_root / "metadata" / filename
+                report = json.loads(report_path.read_text())
+                report["fasta_available"] = include_fasta
+                report_path.write_text(json.dumps(report, indent=2) + "\n")
     final_path, q4_lengths = project_final_path(
         source_root,
         source_root / "metadata/grt_final_path.json",

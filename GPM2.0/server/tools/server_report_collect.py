@@ -482,6 +482,21 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                              "unplaced_segment_count": len(catalog.get("unplaced_segment_ids", [])),
                              "supplementary_task_count": len(catalog.get("supplementary_alignments", []))},
                 "notes": ["候选发现不等于路径接受；q0 尚未在此阶段构建。"]}
+    if unit_id == "degap_gapfill":
+        checkpoint = read_json(root / "degap/checkpoint.json", {})
+        report = read_json(root / "metadata/degap_gapfill.json", {})
+        artifacts = checkpoint.get("artifacts")
+        if (not isinstance(artifacts, dict)
+                or checkpoint.get("signature") != report.get("input_signature")
+                or artifacts.get("metadata/degap_gapfill.json") !=
+                (digest(root / "metadata/degap_gapfill.json") if report else None)
+                or not artifacts):
+            return {"summary": {"available": False}, "notes": ["DEGAP 本次运行尚无已提交结果；不展示旧结果。"]}
+        return {"summary": {key: report.get(key) for key in
+                ("gap_count", "accepted_count", "unfilled_count", "reads_type", "lgz_unchanged")},
+                "tables": {"gap_decisions": {"available": bool(report), "rows": report.get("decisions", [])}},
+                "outputs": [{"file": report.get("output_fasta"), "sha256": report.get("output_sha256")}],
+                "notes": ["仅补剩余内部 gap；独立输出，不修改 LGZ / App Final Path。双侧序列检查不等于独立生物学验证。"]}
     if unit_id == "grt_prepare":
         return collect_lgz_inputs(root)
     if unit_id.startswith(("chr:", "q0_chr:")):

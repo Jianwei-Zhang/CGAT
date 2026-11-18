@@ -10,6 +10,16 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 FAKE_BIN="${TMP_DIR}/bin"
 mkdir -p "$FAKE_BIN"
+REAL_PYTHON="$(command -v python3)"
+cat > "${FAKE_BIN}/python3" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == */post_lgz_degap.py && "\${2:-}" == --check-environment ]]; then
+  exit 0  # Environment checker has separate unit coverage; this is a fake-tool plan test.
+fi
+exec "$REAL_PYTHON" "\$@"
+EOF
+chmod +x "${FAKE_BIN}/python3"
+
 
 cat > "${FAKE_BIN}/samtools" <<'EOF'
 #!/usr/bin/env bash
@@ -825,8 +835,9 @@ test_grt_tool_discovery_fails_fast_for_missing_commands() {
     local output_dir="$1"
     local missing_command="$2"
     mkdir -p "$output_dir"
+    ln -s "${FAKE_BIN}/python3" "${output_dir}/python3"
     local command_name
-    for command_name in bash dirname gzip python3; do
+    for command_name in bash dirname gzip; do
       ln -s "$(command -v "$command_name")" "${output_dir}/${command_name}"
     done
     for command_name in \
@@ -860,22 +871,22 @@ test_grt_tool_discovery_fails_fast_for_missing_commands() {
   PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" --archive-format zip \
     --ref ref_standard_without_craq "$ref" \
     --ds ds_standard_without_craq "$ds" \
-    --reads "$reads" \
+    --reads "$reads" --reads-type hifi \
     -o "${TMP_DIR}/standard-without-craq-output" \
     >/dev/null
   if PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" --archive-format zip \
     --ref ref_missing_grt_qc "$ref" \
     --ds ds_missing_grt_qc "$ds" \
-    --reads "$reads" \
+    --reads "$reads" --reads-type hifi \
     --reads-qc full \
     -o "${TMP_DIR}/missing-craq-output" \
     >/dev/null 2>"${TMP_DIR}/missing-craq.err"; then
-    echo "expected missing craq with reads to fail" >&2
+    echo "expected new reads QC preparation to fail" >&2
     exit 1
   fi
-  grep -F 'Required command not found in PATH: craq' \
+  grep -F 'legacy-only' \
     "${TMP_DIR}/missing-craq.err" >/dev/null || {
-    echo "expected missing craq preflight error" >&2
+    echo "expected legacy QC rejection" >&2
     cat "${TMP_DIR}/missing-craq.err" >&2
     exit 1
   }
@@ -1079,7 +1090,7 @@ EOF
   }
 }
 
-test_reads_lock_qc_recipe_and_generated_command() {
+test_reads_enable_post_lgz_degap_without_qc() {
   local ref="${TMP_DIR}/ref-grt-reads.fa"
   local ds_a="${TMP_DIR}/ds-grt-reads-a.fa"
   local ds_b="${TMP_DIR}/ds-grt-reads-b.fa"
@@ -1093,47 +1104,23 @@ test_reads_lock_qc_recipe_and_generated_command() {
   printf 'reads-b\n' > "$reads_b"
 
   PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
-    --ref ref_grt_reads "$ref" \
-    --ds ds_a "$ds_a" \
-    --ds ds_b "$ds_b" \
-    --reads "$reads_a" \
-    --reads "$reads_b" \
-    --grt-qc-memory-gb 96 \
-    --grt-kmer-size 31 \
-    -o "$output_root" >/dev/null
-
+    --ref ref_grt_reads "$ref" --ds ds_a "$ds_a" --ds ds_b "$ds_b" \
+    --reads "$reads_a" --reads "$reads_b" --reads-type ont -o "$output_root" >/dev/null
   awk -F '\t' '
     NR == 1 { for (i = 1; i <= NF; i++) column[$i] = i; next }
-    NR == 2 { exit ($(column["reads_qc_enabled"]) == "true" ? 0 : 1) }
+    NR == 2 { exit ($(column["reads_qc_enabled"]) == "false" ? 0 : 1) }
   ' "${output_root}/metadata/package.tsv"
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_primary_dataset ds_a
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_reads_qc_enabled true
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_reads_qc_mode standard
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_meryl "${FAKE_BIN}/meryl"
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_merqury "${FAKE_BIN}/merqury.sh"
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_craq ""
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_qc_memory_gb 96
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_kmer_size 31
-  grep -F -- "--reads ${reads_a}" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
-  grep -F -- "--reads ${reads_b}" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
-  grep -F -- "--memory-gb 96 --kmer-size 31" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
-  grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh" \
-    "${output_root}/prepare_lgz_inputs.sh" >/dev/null
-  ! grep -F -- "--reads-qc" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
-  ! grep -F -- "--craq" "${output_root}/prepare_lgz_inputs.sh" >/dev/null
+  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_reads_qc_enabled false
+  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" degap_reads_type ont
+  ! grep -F -- " --reads " "${output_root}/prepare_lgz_inputs.sh" >/dev/null
+  grep -F 'degap_gapfill' "${output_root}/.run_all/plan.tsv" >/dev/null
+  python3 - "${output_root}/metadata/degap_inputs.json" "$reads_a" "$reads_b" <<'PYREADS'
+import json, sys
+value = json.load(open(sys.argv[1]))
+assert value["reads"] == sys.argv[2:]
+assert value["reads_type"] == "ont"
+PYREADS
 
-  local full_output_root="${TMP_DIR}/reads_full_gpm_server"
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
-    --ref ref_grt_reads_full "$ref" \
-    --ds ds_a "$ds_a" \
-    --ds ds_b "$ds_b" \
-    --reads "$reads_a" \
-    --reads-qc full \
-    -o "$full_output_root" >/dev/null
-  assert_prepare_option "$full_output_root/metadata/prepare_options.tsv" grt_reads_qc_mode full
-  assert_prepare_option "$full_output_root/metadata/prepare_options.tsv" grt_craq "${FAKE_BIN}/craq"
-  grep -F -- "--reads-qc full --craq ${FAKE_BIN}/craq" \
-    "$full_output_root/prepare_lgz_inputs.sh" >/dev/null
 }
 
 test_skip_self_omits_chr_local_self_runs() {
@@ -1424,7 +1411,7 @@ test_cen_accepts_unbound_sequence_names
 test_prepare_writes_package_metadata_and_stages_runs
 test_prepare_rejects_reference_without_sequences
 test_assignment_helper_generates_chr_assignments_and_chr_local_runs
-test_reads_lock_qc_recipe_and_generated_command
+test_reads_enable_post_lgz_degap_without_qc
 test_skip_self_omits_chr_local_self_runs
 
 echo "prepare_full_test.sh: ok"

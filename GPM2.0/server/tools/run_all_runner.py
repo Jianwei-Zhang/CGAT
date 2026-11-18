@@ -54,6 +54,7 @@ LGZ_CACHE_MARKERS = {
     "grt_step3": ("LGZ step3 cache hit:",),
 }
 
+STAGE_CACHE_MARKERS = {**LGZ_CACHE_MARKERS, "degap_gapfill": ("DEGAP gapfill cache hit:",)}
 
 class RunnerError(RuntimeError):
     """Raised for an invalid plan, lock, or execution state."""
@@ -352,7 +353,7 @@ class Runner:
             self.report.child_output(line, unit.unit_id)
         # Old embedded workspace tools can still emit the former public name.
         cache_line = "LGZ " + line[4:] if line.startswith("GRT ") else line
-        for marker in LGZ_CACHE_MARKERS.get(unit.unit_id, ()):
+        for marker in STAGE_CACHE_MARKERS.get(unit.unit_id, ()):
             if cache_line.startswith(marker):
                 self.child_cache_markers.add(marker)
         rendered = f"{timestamp()} [run={self.run_id}] [CHILD] [{unit.unit_id}] {line}"
@@ -490,6 +491,9 @@ class Runner:
         return next(row for row in self.status_rows if row["unit_id"] == unit.unit_id)
 
     def _terminal_validation(self, unit_id: str) -> tuple[bool, str]:
+        if unit_id == "degap_gapfill":
+            from post_lgz_degap import validate_result
+            return validate_result(self.server_dir)
         if unit_id in LGZ_CACHE_MARKERS:
             return self.outer_checkpoints.validate_lgz_unit(unit_id)
         if unit_id == "finalize_evidence":
@@ -802,7 +806,7 @@ class Runner:
                             f"rerun='bash {self.server_dir / 'run_all.sh'}'",
                         )
                         return 2
-                    cache_markers = LGZ_CACHE_MARKERS.get(unit.unit_id, ())
+                    cache_markers = STAGE_CACHE_MARKERS.get(unit.unit_id, ())
                     if cache_markers and self.child_cache_markers == set(cache_markers):
                         self._event("CACHE_HIT", unit, f"elapsed={elapsed:.3f}s {reason}")
                     if prepared is not None:

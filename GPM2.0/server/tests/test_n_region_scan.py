@@ -2,7 +2,6 @@
 import ast
 import itertools
 import random
-import re
 import unittest
 from pathlib import Path
 
@@ -15,8 +14,10 @@ def load_scanner(name):
     tree = ast.parse((TOOLS / name).read_text(encoding="utf-8"))
     function = next(node for node in tree.body
                     if isinstance(node, ast.FunctionDef) and node.name == "iter_n_regions")
-    namespace = {"re": re}
-    exec(compile(ast.Module(body=[function], type_ignores=[]), name, "exec"), namespace)
+    imports = [node for node in tree.body if isinstance(node, ast.Import)
+               and any(alias.name == "re" for alias in node.names)]
+    namespace = {}
+    exec(compile(ast.Module(body=[*imports, function], type_ignores=[]), name, "exec"), namespace)
     return namespace["iter_n_regions"]
 
 

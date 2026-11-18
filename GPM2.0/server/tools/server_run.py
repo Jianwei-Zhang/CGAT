@@ -29,7 +29,7 @@ ALIASES = {
 SINGLE_OPTIONS = {
     "--out", "--threads", "--score", "--archive-format",
     "--minimap-preset", "--minimap-batch", "--minimap-filter", "--cen", "--cen-min-len",
-    "--cen-min-identity", "--reads", "--reads-qc", "--grt-qc-memory-gb",
+    "--cen-min-identity", "--reads", "--reads-type", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
     "--grt-execution-profile", "--grt-step2-mummer-scope",
 }
@@ -59,7 +59,7 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
                 values[0] = (batch_size if key == "--minimap-batch" else seed_fraction)(values[0])
             except ValueError as exc:
                 raise RunnerError(str(exc)) from exc
-        allowed = {"--grt-execution-profile": {"baseline", "optimized"},
+        allowed = {"--reads-type": {"hifi", "ont"}, "--grt-execution-profile": {"baseline", "optimized"},
                    "--grt-step2-mummer-scope": {"full", "gap-screen"}}
         if key in allowed and values[0] not in allowed[key]:
             raise RunnerError(f"Invalid {key}: {values[0]}")

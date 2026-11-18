@@ -508,3 +508,37 @@ Maintainers: `python3 GPM2.0/scripts/sync-degap-runtime.py` regenerates
 Its `SOURCE.json` records the upstream revision and per-file SHA-256 hashes.
 
 Pinned-runtime limitation: GapFiller requires a maximum round count of at least 1 (or unset); zero-round TelSeeker is supported. The wrapper rejects zero-round GapFiller explicitly instead of silently changing its parameters.
+
+### Automatic post-LGZ gap filling
+
+For **new workspaces**, add `--reads /path/to/reads.fastq.gz --reads-type hifi`
+(or `ont`). Repeat `--reads` for multiple files of the same type. The type is
+required, not inferred. Preparation checks DEGAP executables and Python imports
+before reference mapping. Activate the shared Server environment first; the
+pinned native job writer requires workspace/runtime/reads paths without spaces or
+shell metacharacters. These reads no longer trigger Meryl/Merqury/CRAQ, q0
+quality exclusion, or reads-based donor ranking. `--reads-qc full` is rejected
+for new preparations. Existing workspaces retain their saved legacy QC recipe
+when resumed; updating code does not insert a new stage into an old plan.
+
+After LGZ Step3, the bundled DEGAP AutoGapfiller runs with one gap worker within
+the thread budget. Only remaining **internal N gaps** are eligible; no telomere
+extension. Original `grt/q/q3.fa` and App Final Path remain unchanged. The separate
+`data/degap/post_lgz.fa` contains accepted bridges plus all untouched LGZ bases.
+`metadata/degap_gapfill.json` records every gap decision in original LGZ coordinates.
+Full deliveries include both; light deliveries keep the decision report only.
+The App still displays its original LGZ Final Path, not this additional FASTA.
+
+An engine success is not automatically accepted: a proposal must identify an
+original maximal N run, retain both non-N flanks exactly (case-insensitive), and
+supply a positive-length A/C/G/T bridge. Partial, ambiguous, overlapping-flank
+changes and terminal gaps remain unchanged with a reason recorded. These checks
+are conservative structural checks, **not independent biological validation**;
+valid overlap-only joins may therefore remain unaccepted. The native engine skips
+gaps shorter than 20 bp and merges nearby gaps; this first integration does not
+automatically admit merged replacements that span existing non-N sequence. Reads, LGZ inputs,
+bundled code and output content bind the completed-stage cache. Failed native
+attempts remain under `degap/attempts/` for diagnosis; a retry starts a fresh
+native attempt rather than trusting incomplete results. No-gap tasks skip native
+execution. The native engine still has its own whole-genome memory/I/O costs;
+this integration does not claim a wheat runtime speedup.

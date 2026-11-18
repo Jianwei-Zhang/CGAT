@@ -432,3 +432,31 @@ reads 路径仍需填写实际远端位置。自定义 DEGAP 路径保留在高�
 不要直接编辑生成目录；其中的 `SOURCE.json` 记录上游提交和逐文件 SHA-256。
 
 当前固定版本限制：GapFiller 最大轮数需至少为 1，或留空；TelSeeker 仍支持 0 轮。内置入口会明确拒绝 0 轮 GapFiller，不会擅自修改参数。
+
+### LGZ 后自动补 gap
+
+**新工作区**添加 `--reads /path/to/reads.fastq.gz --reads-type hifi`
+（或 `ont`）。同一类型的多个文件可重复传 `--reads`，类型必须明确指定，不自动猜测。
+准备阶段会在参考比对前检查 DEGAP 命令及 Python 依赖；需先激活共享 Server 环境。
+当前原生任务脚本要求工作区、运行库及 reads 路径不含空格或 shell 特殊字符。
+这些 reads 不再触发 Meryl/Merqury/CRAQ、q0 质量淘汰或按 reads 质量排序供体。
+新建任务不再接受 `--reads-qc full`；旧工作区续跑仍使用保存的 QC 配方，
+更新代码不会给旧执行计划插入 DEGAP 阶段。
+
+LGZ Step3 完成后，内置 DEGAP AutoGapfiller 在总线程预算内单任务补洞。
+第一版只处理剩余的**内部 N gap**，不做端粒延伸。原始 `grt/q/q3.fa`
+和 App Final Path 保持不变；独立的 `data/degap/post_lgz.fa` 保存接纳后的桥接序列
+及所有未改动的 LGZ 碱基，`metadata/degap_gapfill.json` 按原 LGZ 坐标记录每处决定。
+完整包包含该 FASTA 和记录；轻量包仅包含记录。App 显示的仍是原始 LGZ Final Path，
+不会自动切换为这份额外 FASTA。
+
+DEGAP 成功退出不等于补洞成功：候选必须对应原始完整 N 区间、完整保留两侧非 N
+序列（忽略大小写），并提供正长度的 A/C/G/T 桥接。部分结果、歧义序列、修改两侧
+序列的重叠连接和末端 gap 均保留原样并记录原因。这是保守的结构检查，
+**不等于独立生物学验证**；有效但仅靠重叠直接连接的候选也可能不被自动接纳。
+原生工具跳过不足 20 bp 的 gap，并会合并邻近 gap；第一版不自动接纳跨越已有非 N
+序列的合并替换，逐 gap 记录保留原因。
+完成缓存绑定 reads、LGZ 输入、内置代码与输出内容；失败的原生运行保留在
+`degap/attempts/` 供排查，重试启动新的原生运行，不直接复用未验证的部分结果。
+无 gap 时跳过原生执行。原生工具仍有整基因组内存和 I/O 开销，本次接入不代表
+已经取得小麦全流程加速。

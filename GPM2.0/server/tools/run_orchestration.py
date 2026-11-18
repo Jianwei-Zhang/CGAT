@@ -125,7 +125,7 @@ def _unique_names(values: Iterable[str], label: str) -> tuple[str, ...]:
 
 
 def build_unit_plan(
-    dataset_names: Iterable[str], chromosome_names: Iterable[str]
+    dataset_names: Iterable[str], chromosome_names: Iterable[str], *, degap_enabled: bool = False
 ) -> tuple[UnitPlanItem, ...]:
     datasets = _unique_names(dataset_names, "dataset name")
     chromosomes = _unique_names(chromosome_names, "chromosome name")
@@ -152,8 +152,10 @@ def build_unit_plan(
             ),
         ]
     )
+    if degap_enabled:
+        items.append(UnitPlanItem("degap_gapfill", (LGZ_STEP3_UNIT_ID,)))
     items.extend(
-        UnitPlanItem(unit_id, (LGZ_STEP3_UNIT_ID,))
+        UnitPlanItem(unit_id, ("degap_gapfill" if degap_enabled else LGZ_STEP3_UNIT_ID,))
         for unit_id in chromosome_ids
     )
     items.extend(

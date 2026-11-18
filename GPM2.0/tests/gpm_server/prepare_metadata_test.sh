@@ -14,6 +14,16 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 FAKE_BIN="${TMP_DIR}/bin"
 mkdir -p "$FAKE_BIN"
+REAL_PYTHON="$(command -v python3)"
+cat > "${FAKE_BIN}/python3" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == */post_lgz_degap.py && "\${2:-}" == --check-environment ]]; then
+  exit 0  # Environment checker has separate unit coverage; this is a fake-tool plan test.
+fi
+exec "$REAL_PYTHON" "\$@"
+EOF
+chmod +x "${FAKE_BIN}/python3"
+
 
 cat > "${FAKE_BIN}/samtools" <<'EOF'
 #!/usr/bin/env bash
@@ -100,8 +110,9 @@ make_restricted_path() {
   local output_dir="$1"
   local missing_command="$2"
   mkdir -p "$output_dir"
+  ln -s "${FAKE_BIN}/python3" "${output_dir}/python3"
   local command_name
-  for command_name in awk basename bash cat chmod cp dirname find gzip mkdir python3 rm sed; do
+  for command_name in awk basename bash cat chmod cp dirname find gzip mkdir rm sed; do
     ln -s "$(command -v "$command_name")" "${output_dir}/${command_name}"
   done
   for command_name in \
@@ -406,43 +417,51 @@ printf 'reads\n' > "$reads"
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_reads_qc "$ref" \
   --ds ds_reads_qc "$ds" \
-  --reads "$reads" \
+  --reads "$reads" --reads-type hifi \
   -o "$reads_output_root" >/dev/null
 reads_metadata_path="${reads_output_root}/metadata/prepare_options.tsv"
-assert_prepare_option "$reads_metadata_path" grt_reads_qc_enabled true
-assert_prepare_option "$reads_metadata_path" grt_reads_qc_mode standard
-assert_prepare_option "$reads_metadata_path" grt_meryl "${FAKE_BIN}/meryl"
-assert_prepare_option "$reads_metadata_path" grt_merqury "${FAKE_BIN}/merqury.sh"
-assert_prepare_option "$reads_metadata_path" grt_craq ""
-grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh" \
-  "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
-! grep -F -- "--reads-qc" "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
-! grep -F -- "--craq" "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
-grep -F -- " --reads ${reads}" "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
-[[ "$(grep -oF -- " --reads " "${reads_output_root}/prepare_lgz_inputs.sh" | wc -l)" -eq 1 ]] || {
-  echo "single-read prepare did not generate exactly one --reads argument" >&2
-  exit 1
-}
+assert_prepare_option "$reads_metadata_path" grt_reads_qc_enabled false
+assert_prepare_option "$reads_metadata_path" reads_purpose post_lgz_degap_v1
+assert_prepare_option "$reads_metadata_path" degap_reads_type hifi
+! grep -F -- " --reads " "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+python3 - "$reads_output_root" "$reads" <<'PYREADS'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+config = json.loads((root / "metadata/degap_inputs.json").read_text())
+assert config["reads"] == [sys.argv[2]]
+assert config["reads_type"] == "hifi"
+units = [line.split("\t")[0] for line in (root / ".run_all/plan.tsv").read_text().splitlines()[1:]]
+assert units.index("grt_step3") < units.index("degap_gapfill") < units.index("finalize_evidence")
+assert (root / ".prepare_lib/tools/post_lgz_degap.py").is_file()
+PYREADS
 
+for invalid_args in "missing" "invalid" "orphan"; do
+  args=(--ref ref_invalid "$ref" --ds ds_invalid "$ds")
+  case "$invalid_args" in
+    missing) args+=(--reads "$reads");;
+    invalid) args+=(--reads "$reads" --reads-type guess);;
+    orphan) args+=(--reads-type hifi);;
+  esac
+  if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" "${args[@]}" -o "${TMP_DIR}/invalid-${invalid_args}" > /dev/null 2>&1; then
+    echo "expected invalid reads arguments to fail: $invalid_args" >&2; exit 1
+  fi
+done
 reads_second="${TMP_DIR}/reads-second.fastq"
 multiple_reads_output_root="${TMP_DIR}/multiple-reads-gpm-server"
 printf 'reads-second\n' > "$reads_second"
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_multiple_reads_qc "$ref" \
   --ds ds_multiple_reads_qc "$ds" \
-  --reads "$reads" \
+  --reads "$reads" --reads-type hifi \
   --reads "$reads_second" \
   -o "$multiple_reads_output_root" >/dev/null
-assert_prepare_option \
-  "${multiple_reads_output_root}/metadata/prepare_options.tsv" \
-  grt_reads_qc_enabled \
-  true
-grep -F -- " --reads ${reads} --reads ${reads_second}" \
-  "${multiple_reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
-[[ "$(grep -oF -- " --reads " "${multiple_reads_output_root}/prepare_lgz_inputs.sh" | wc -l)" -eq 2 ]] || {
-  echo "multiple-read prepare did not generate exactly two --reads arguments" >&2
-  exit 1
-}
+assert_prepare_option "${multiple_reads_output_root}/metadata/prepare_options.tsv" grt_reads_qc_enabled false
+! grep -F -- " --reads " "${multiple_reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+python3 - "${multiple_reads_output_root}/metadata/degap_inputs.json" "$reads" "$reads_second" <<'PYREADS'
+import json, sys
+assert json.load(open(sys.argv[1]))["reads"] == sys.argv[2:]
+PYREADS
 
 for missing_command in minimap2 nucmer delta-filter show-coords; do
   restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
@@ -537,20 +556,11 @@ for missing_command in meryl merqury.sh; do
   restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
   error_path="${TMP_DIR}/missing-${missing_command}.err"
   make_restricted_path "$restricted_bin" "$missing_command"
-  if PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
-    --ref ref_missing_grt_qc "$ref" \
-    --ds ds_missing_grt_qc "$ds" \
-    --reads "$reads" \
-    -o "${TMP_DIR}/missing-${missing_command}-output" \
-    >/dev/null 2>"$error_path"; then
-    echo "expected missing ${missing_command} with reads to fail" >&2
-    exit 1
-  fi
-  grep -F "Required command not found in PATH: ${missing_command}" "$error_path" >/dev/null || {
-    echo "expected missing-command error for ${missing_command}" >&2
-    cat "$error_path" >&2
-    exit 1
-  }
+  PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
+    --ref ref_missing_grt_qc "$ref" --ds ds_missing_grt_qc "$ds" \
+    --reads "$reads" --reads-type ont \
+    -o "${TMP_DIR}/missing-${missing_command}-output" >/dev/null
+
 done
 
 missing_craq_bin="${TMP_DIR}/missing-craq-bin"
@@ -558,20 +568,20 @@ make_restricted_path "$missing_craq_bin" craq
 PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_standard_without_craq "$ref" \
   --ds ds_standard_without_craq "$ds" \
-  --reads "$reads" \
+  --reads "$reads" --reads-type hifi \
   -o "${TMP_DIR}/standard-without-craq-output" \
   >/dev/null
 if PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_full_missing_craq "$ref" \
   --ds ds_full_missing_craq "$ds" \
-  --reads "$reads" \
+  --reads "$reads" --reads-type hifi \
   --reads-qc full \
   -o "${TMP_DIR}/full-missing-craq-output" \
   >/dev/null 2>"${TMP_DIR}/full-missing-craq.err"; then
-  echo "expected --reads-qc full to require craq" >&2
+  echo "expected new preparations to reject legacy --reads-qc full" >&2
   exit 1
 fi
-grep -F 'Required command not found in PATH: craq' \
+grep -F 'legacy-only' \
   "${TMP_DIR}/full-missing-craq.err" >/dev/null
 
 grep -q $'^Chr01\t20\t' "${output_root}/data/reference/ref_add_options.fa.fai" || {

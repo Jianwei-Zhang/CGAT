@@ -68,7 +68,8 @@ bash "$SERVER/install.sh" --check
 | --- | --- |
 | 核心流程 | `python3`、`samtools`、`zip`、`gzip` |
 | LGZ Final Path | `minimap2`、`nucmer`、`delta-filter`、`show-coords` |
-| 可选 reads 质控 | `meryl`、`merqury.sh`；仅传入 `--reads` 时使用 |
+| 可选 LGZ 后补洞 | 内置 DEGAP，使用共享 Server 环境；通过 `--reads` + `--reads-type` 启用 |
+| 旧工作区 reads 质控 | 保存的 QC 配方仍使用 `meryl`、`merqury.sh`，完整 QC 还需 CRAQ |
 
 执行 `run.sh` 时保持该环境已激活。
 
@@ -119,15 +120,16 @@ bash "$SERVER/run.sh" \
 | `--ds [<名称>] <fasta>` | 必填，可重复 | 初次输入的组装数据集；省略名称时从文件名自动推导。第一个为主组装，其余为辅助组装。 |
 | `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
-| `-t, --threads <数量>` | `10` | 总计算线程预算，在独立比对任务及 reads QC 任务之间分配。 |
+| `-t, --threads <数量>` | `10` | 比对及可选 LGZ 后 DEGAP 的总计算线程预算；旧工作区 QC 也遵守此预算。 |
 | `--skip-self` | 关闭 | 跳过同 dataset 自比对；同 dataset Subview 将不可用。 |
 | `--tel <motif> <次数>` | 可追加，可重复 | 在自动启用的官方库 + 本地库之外，追加本次端粒规则。 |
 | `--cen <fasta>` | 可追加 | 追加本次着丝粒相关重复序列；FASTA 名称不绑定染色体。 |
 | `--cen-min-len <bp>` | `10000` | 合并后着丝粒候选区域的最小命中覆盖长度，不计间隔。 |
 | `--cen-min-identity <百分比>` | `80` | 单个着丝粒重复命中的最小一致性百分比。 |
-| `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury QV 评估；`--threads` 总预算会分配给各 dataset。 |
-| `--lgz-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
-| `--lgz-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
+| `--reads <fastq>` | 可选，可重复 | 新任务启用 LGZ 后内部 gap 修补，不再前置 QC；保留 LGZ，另存修补 FASTA。 |
+| `--reads-type hifi/ont` | 传 reads 时必填 | 明确测序类型；多次 `--reads` 必须属于同一类型。 |
+| `--lgz-qc-memory-gb <数量>` | `80` | 旧工作区 reads 质控的内存上限。 |
+| `--lgz-kmer-size <数量>` | `21` | 旧 reads QC 的 k-mer 大小；新 DEGAP 任务不使用。 |
 | `--max-fill <bp>` | `1000000` | Step2 两轮优化补洞的长度上限；恢复时可修改。 |
 
 ### 端粒 / 着丝粒库
