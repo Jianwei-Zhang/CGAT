@@ -417,7 +417,7 @@ printf 'reads\n' > "$reads"
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_reads_qc "$ref" \
   --ds ds_reads_qc "$ds" \
-  --reads "$reads" --reads-type hifi \
+  --hifi "$reads" \
   -o "$reads_output_root" >/dev/null
 reads_metadata_path="${reads_output_root}/metadata/prepare_options.tsv"
 assert_prepare_option "$reads_metadata_path" grt_reads_qc_enabled false
@@ -429,19 +429,22 @@ import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
 config = json.loads((root / "metadata/degap_inputs.json").read_text())
-assert config["reads"] == [sys.argv[2]]
-assert config["reads_type"] == "hifi"
+assert config["schema_version"] == 2
+assert config["hifi"] == [sys.argv[2]]
+assert config["ont"] == []
 units = [line.split("\t")[0] for line in (root / ".run_all/plan.tsv").read_text().splitlines()[1:]]
 assert units.index("grt_step3") < units.index("degap_gapfill") < units.index("finalize_evidence")
 assert (root / ".prepare_lib/tools/post_lgz_degap.py").is_file()
 PYREADS
 
-for invalid_args in "missing" "invalid" "orphan"; do
+for invalid_args in "missing" "invalid" "orphan" "empty-hifi" "empty-ont"; do
   args=(--ref ref_invalid "$ref" --ds ds_invalid "$ds")
   case "$invalid_args" in
     missing) args+=(--reads "$reads");;
     invalid) args+=(--reads "$reads" --reads-type guess);;
     orphan) args+=(--reads-type hifi);;
+    empty-hifi) args+=(--hifi);;
+    empty-ont) args+=(--ont --hifi "$reads");;
   esac
   if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" "${args[@]}" -o "${TMP_DIR}/invalid-${invalid_args}" > /dev/null 2>&1; then
     echo "expected invalid reads arguments to fail: $invalid_args" >&2; exit 1
@@ -453,15 +456,27 @@ printf 'reads-second\n' > "$reads_second"
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_multiple_reads_qc "$ref" \
   --ds ds_multiple_reads_qc "$ds" \
-  --reads "$reads" --reads-type hifi \
-  --reads "$reads_second" \
+  --hifi "$reads" \
+  --hifi "$reads_second" \
   -o "$multiple_reads_output_root" >/dev/null
 assert_prepare_option "${multiple_reads_output_root}/metadata/prepare_options.tsv" grt_reads_qc_enabled false
 ! grep -F -- " --reads " "${multiple_reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
 python3 - "${multiple_reads_output_root}/metadata/degap_inputs.json" "$reads" "$reads_second" <<'PYREADS'
 import json, sys
-assert json.load(open(sys.argv[1]))["reads"] == sys.argv[2:]
+assert json.load(open(sys.argv[1]))["hifi"] == sys.argv[2:]
 PYREADS
+
+mixed_output_root="${TMP_DIR}/mixed-reads-gpm-server"
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
+  --ref ref_mixed "$ref" --ds ds_mixed "$ds" --hifi "$reads" --ont "$reads_second" \
+  -o "$mixed_output_root" >/dev/null
+assert_prepare_option "${mixed_output_root}/metadata/prepare_options.tsv" degap_reads_type mixed
+python3 - "${mixed_output_root}/metadata/degap_inputs.json" "$reads" "$reads_second" <<'PYREADS'
+import json, sys
+value = json.load(open(sys.argv[1]))
+assert value["hifi"] == [sys.argv[2]] and value["ont"] == [sys.argv[3]]
+PYREADS
+! "$PREPARE_BASH" "$SCRIPT" --help | grep -F 'shared Meryl database' >/dev/null
 
 for missing_command in minimap2 nucmer delta-filter show-coords; do
   restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
@@ -558,7 +573,7 @@ for missing_command in meryl merqury.sh; do
   make_restricted_path "$restricted_bin" "$missing_command"
   PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
     --ref ref_missing_grt_qc "$ref" --ds ds_missing_grt_qc "$ds" \
-    --reads "$reads" --reads-type ont \
+    --ont "$reads" \
     -o "${TMP_DIR}/missing-${missing_command}-output" >/dev/null
 
 done
@@ -568,13 +583,13 @@ make_restricted_path "$missing_craq_bin" craq
 PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_standard_without_craq "$ref" \
   --ds ds_standard_without_craq "$ds" \
-  --reads "$reads" --reads-type hifi \
+  --hifi "$reads" \
   -o "${TMP_DIR}/standard-without-craq-output" \
   >/dev/null
 if PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_full_missing_craq "$ref" \
   --ds ds_full_missing_craq "$ds" \
-  --reads "$reads" --reads-type hifi \
+  --hifi "$reads" \
   --reads-qc full \
   -o "${TMP_DIR}/full-missing-craq-output" \
   >/dev/null 2>"${TMP_DIR}/full-missing-craq.err"; then

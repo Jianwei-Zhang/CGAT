@@ -418,17 +418,24 @@ def prepare_start(root: Path, argv: list[str]):
     run_id = "prepare-" + uuid.uuid4().hex
     sources = []
     for index, value in enumerate(argv):
-        if value in {"--ref", "--ds"} and index + 2 < len(argv):
-            name, original = argv[index + 1:index + 3]
+        if value in {"--hifi", "--ont"}:
+            originals = []
+            for candidate in argv[index + 1:]:
+                if candidate.startswith("-"):
+                    break
+                originals.append((value[2:], candidate))
+        elif value in {"--ref", "--ds"} and index + 2 < len(argv):
+            originals = [tuple(argv[index + 1:index + 3])]
         elif value in {"--reads", "--cen"} and index + 1 < len(argv):
-            name, original = value[2:], argv[index + 1]
+            originals = [(value[2:], argv[index + 1])]
         else:
             continue
-        path = Path(original).resolve()
-        sources.append({"option": value, "name": name, "original_path": str(path),
-                        "size_bytes": path.stat().st_size if path.is_file() else None,
-                        "mtime_ns": path.stat().st_mtime_ns if path.is_file() else None,
-                        "sha256": None, "identity_note": "原始文件记录路径、大小和修改时间；规范化 FASTA 另记 SHA-256。"})
+        for name, original in originals:
+            path = Path(original).resolve()
+            sources.append({"option": value, "name": name, "original_path": str(path),
+                            "size_bytes": path.stat().st_size if path.is_file() else None,
+                            "mtime_ns": path.stat().st_mtime_ns if path.is_file() else None,
+                            "sha256": None, "identity_note": "原始文件记录路径、大小和修改时间；规范化 FASTA 另记 SHA-256。"})
     data = {"schema_version": SCHEMA, "run_id": run_id, "started_at": now(),
             "status": "running", "argv": argv, "sources": sources, "facts": {}}
     write_json(report / "inputs.json", data)

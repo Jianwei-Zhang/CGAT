@@ -59,7 +59,8 @@ Usage:
     [--cen <centromere_repeat_fasta>] \
     [--cen-min-len <min_supported_region_bp>] \
     [--cen-min-identity <min_identity_percent>] \
-    [--reads <reads_fastq_path> ... --reads-type hifi|ont] \
+    [--hifi <reads_file> ...] \
+    [--ont <reads_file> ...] \
     [--lgz-qc-memory-gb <memory_gb>] \
     [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
@@ -94,7 +95,7 @@ Behavior:
   - --cen-min-identity filters hits; --cen-min-len filters merged candidate support (defaults: 80%, 10000 bp)
   - Manage local entries with library.sh list/add-tel/add-cen/remove; updates leave local/ unchanged
   - The first --ds remains project-primary metadata; q0 is selected across all initial datasets using alignment evidence
-  - --reads enables post-LGZ DEGAP gap filling only; --reads-type hifi|ont is required
+  - --hifi and/or --ont enable post-LGZ DEGAP gap filling only; each accepts multiple files and can repeat
   - Reads do not filter q0 or rank LGZ donors in new workspaces; original LGZ outputs stay unchanged
   - --max-fill sets the Step2 optimized refill length limit in bp, default: 1000000
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
@@ -102,10 +103,8 @@ Behavior:
   - --lgz-execution-profile baseline restores legacy scheduling and per-chromosome refill
   - --lgz-step2-mummer-scope full restores the complete Step2 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
-  - Repeatable --reads enables one shared Meryl database plus parallel Merqury QV for every initial dataset
-  - The --threads budget is divided across concurrent reads-QC dataset jobs
-  - With --reads, also discovers meryl and merqury.sh from PATH
-  - With no --reads, only reads-based QC is skipped; q0 and frozen D0/Dtel are still prepared
+  - No reads: skip DEGAP; q0 and frozen D0/Dtel are still prepared
+  - --reads, --reads-type and --reads-qc are legacy resume options, not accepted for new preparation
   - Generates staged chromosome-partitioned run commands
   - --skip-self is allowed only when no chr group requires same-dataset candidate alignments
   - Accepts plain FASTA inputs such as .fa/.fasta/.fna
@@ -733,6 +732,8 @@ declare -a DATASET_NAMES=()
 declare -a DATASET_SRCS=()
 declare -a TEL_RULE_ARGS=()
 declare -a READS_SRCS=()
+declare -a HIFI_SRCS=()
+declare -a ONT_SRCS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -857,22 +858,17 @@ while [[ $# -gt 0 ]]; do
       CEN_MIN_IDENTITY="$2"
       shift 2
       ;;
-    --reads)
-      [[ $# -ge 2 ]] || die "--reads requires <reads_fastq_path>"
-      READS_SRCS+=("$2")
-      shift 2
+    --hifi|--ont)
+      reads_option="$1"
+      shift
+      [[ $# -gt 0 && "$1" != -* ]] || die "$reads_option requires at least one reads file"
+      while [[ $# -gt 0 && "$1" != -* ]]; do
+        if [[ "$reads_option" == "--hifi" ]]; then HIFI_SRCS+=("$1"); else ONT_SRCS+=("$1"); fi
+        shift
+      done
       ;;
-    --reads-type)
-      [[ $# -ge 2 ]] || die "--reads-type requires hifi or ont"
-      [[ "$2" == "hifi" || "$2" == "ont" ]] || die "--reads-type requires hifi or ont"
-      DEGAP_READS_TYPE="$2"
-      shift 2
-      ;;
-    --reads-qc)
-      [[ $# -ge 2 ]] || die "--reads-qc requires full"
-      [[ "$2" == "full" ]] || die "Invalid --reads-qc value '$2'. Use full."
-      LGZ_READS_QC_MODE="full"
-      shift 2
+    --reads|--reads-type|--reads-qc)
+      die "$1 is legacy-only; new workspaces use --hifi and/or --ont for post-LGZ DEGAP; resume old workspaces with run.sh"
       ;;
     --lgz-qc-memory-gb|--grt-qc-memory-gb)
       [[ $# -ge 2 ]] || die "--lgz-qc-memory-gb requires <memory_gb>"
@@ -898,13 +894,13 @@ done
 
 [[ -n "$REF_NAME" ]] || die "Missing --ref"
 [[ "${#DATASET_NAMES[@]}" -gt 0 ]] || die "At least one --ds is required"
-if [[ "$LGZ_READS_QC_MODE" == "full" ]]; then
-  die "--reads-qc is legacy-only; new workspaces use --reads with --reads-type for post-LGZ DEGAP"
-fi
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  [[ -n "$DEGAP_READS_TYPE" ]] || die "--reads requires --reads-type hifi|ont for post-LGZ DEGAP"
-else
-  [[ -z "$DEGAP_READS_TYPE" ]] || die "--reads-type requires --reads"
+READS_SRCS=("${HIFI_SRCS[@]}" "${ONT_SRCS[@]}")
+if [[ "${#HIFI_SRCS[@]}" -gt 0 && "${#ONT_SRCS[@]}" -gt 0 ]]; then
+  DEGAP_READS_TYPE="mixed"
+elif [[ "${#HIFI_SRCS[@]}" -gt 0 ]]; then
+  DEGAP_READS_TYPE="hifi"
+elif [[ "${#ONT_SRCS[@]}" -gt 0 ]]; then
+  DEGAP_READS_TYPE="ont"
 fi
 
 require_cmd samtools
@@ -920,7 +916,10 @@ validate_mummer4_capabilities \
   "$LGZ_NUCMER" "$LGZ_DELTA_FILTER" "$LGZ_SHOW_COORDS"
 require_cmd minimap2
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  python3 "${SCRIPT_DIR}/tools/post_lgz_degap.py" --check-environment --server-dir "$WORK_ROOT" --reads "${READS_SRCS[@]}"
+  DEGAP_CHECK_ARGS=(--check-environment --server-dir "$WORK_ROOT")
+  if [[ "${#HIFI_SRCS[@]}" -gt 0 ]]; then DEGAP_CHECK_ARGS+=(--hifi "${HIFI_SRCS[@]}"); fi
+  if [[ "${#ONT_SRCS[@]}" -gt 0 ]]; then DEGAP_CHECK_ARGS+=(--ont "${ONT_SRCS[@]}"); fi
+  python3 "${SCRIPT_DIR}/tools/post_lgz_degap.py" "${DEGAP_CHECK_ARGS[@]}"
 fi
 
 validate_name "$REF_NAME"
@@ -1008,11 +1007,12 @@ ensure_fai "$REF_DST"
 
 write_reference_segments_metadata "$REF_DST" "${WORK_ROOT}/metadata/reference_segments.tsv"
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  python3 - "${WORK_ROOT}/metadata/degap_inputs.json" "$DEGAP_READS_TYPE" "${READS_SRCS[@]}" <<'PYREADS'
+  python3 - "${WORK_ROOT}/metadata/degap_inputs.json" "${#HIFI_SRCS[@]}" "${READS_SRCS[@]}" <<'PYREADS'
 import json, sys
 from pathlib import Path
-Path(sys.argv[1]).write_text(json.dumps({"schema_version": 1, "purpose": "post_lgz_degap_v1",
-    "reads_type": sys.argv[2], "reads": sys.argv[3:]}, indent=2) + "\n")
+count = int(sys.argv[2])
+Path(sys.argv[1]).write_text(json.dumps({"schema_version": 2, "purpose": "post_lgz_degap_v1",
+    "hifi": sys.argv[3:3 + count], "ont": sys.argv[3 + count:]}, indent=2) + "\n")
 PYREADS
 fi
 

@@ -78,17 +78,34 @@ def stat_key(path: Path) -> tuple:
     return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
 
 
+def read_groups(config: dict) -> dict[str, list[str]]:
+    """Read native typed inputs; retain the explicitly marked first-version recipe."""
+    error = "invalid post-LGZ reads contract; do not reinterpret legacy reads QC"
+    if config.get("purpose") != PURPOSE:
+        raise ValueError(error)
+    if config.get("schema_version") == 1 and config.get("reads_type") in {"hifi", "ont"}:
+        groups = {"hifi": [], "ont": [], config["reads_type"]: config.get("reads")}
+    elif config.get("schema_version") == 2 and not ({"reads", "reads_type"} & config.keys()):
+        groups = {kind: config.get(kind) for kind in ("hifi", "ont")}
+    else:
+        raise ValueError(error)
+    if (any(not isinstance(paths, list) or any(not isinstance(path, str) or not Path(path).is_absolute()
+                                             for path in paths) for paths in groups.values())
+            or not any(groups.values())):
+        raise ValueError(error)
+    if {Path(p).resolve() for p in groups["hifi"]} & {Path(p).resolve() for p in groups["ont"]}:
+        raise ValueError("the same reads file cannot be both --hifi and --ont")
+    return groups
+
+
 def input_binding(root: Path, engine: Path) -> tuple[str, dict[Path, tuple]]:
     config = load_json(root / "metadata/degap_inputs.json")
-    if (config.get("schema_version") != 1 or config.get("purpose") != PURPOSE
-            or config.get("reads_type") not in {"hifi", "ont"}
-            or not isinstance(config.get("reads"), list) or not config["reads"]
-            or any(not isinstance(p, str) or not Path(p).is_absolute() for p in config["reads"])):
-        raise ValueError("invalid post-LGZ reads contract; do not reinterpret legacy reads QC")
-    check_native_paths(root, config["reads"])
+    groups = read_groups(config)
+    reads = groups["hifi"] + groups["ont"]
+    check_native_paths(root, reads)
     paths = [root / "metadata/degap_inputs.json", root / "grt/q/q3.fa",
              root / "metadata/grt_final_path.json", Path(__file__).resolve()]
-    paths += [Path(p) for p in config["reads"]]
+    paths += [Path(p) for p in reads]
     tool_paths = {name: shutil.which(name) for name in NATIVE_COMMANDS}
     paths += [Path(path).resolve() for path in tool_paths.values() if path]
     # Bind actual pinned code, not just the revision claimed by SOURCE.json.
@@ -264,13 +281,17 @@ def run(root: Path, threads: int) -> dict:
     genome = IndexedFasta(root / "grt/q/q3.fa", attempt / "input.fa")
     gaps = list(genome.gaps())
     config = load_json(root / "metadata/degap_inputs.json")
+    groups = read_groups(config)
+    reads_type = "mixed" if all(groups.values()) else next(kind for kind, paths in groups.items() if paths)
     rows = []
     # No-gap tasks do not preprocess reads or launch the native engine.
     if any(start > 0 and end < genome.records[name][0] and end - start >= 20
            for name, start, end in gaps):
         command = [sys.executable, str(engine), "--genome", str(root / "grt/q/q3.fa"),
-                   "--output", str(attempt / "native"), "--work", "1", "--thread", str(threads),
-                   "--" + config["reads_type"], *config["reads"]]
+                   "--output", str(attempt / "native"), "--work", "1", "--thread", str(threads)]
+        for kind, paths in groups.items():
+            if paths:
+                command.extend(["--" + kind, *paths])
         atomic_json(attempt / "invocation.json", {"input_signature": signature, "command": command})
         # Failed attempts are retained for diagnosis, never adopted or overwritten.
         subprocess.run(command, check=True)
@@ -335,7 +356,7 @@ def run(root: Path, threads: int) -> dict:
         raise ValueError("inputs changed while DEGAP was running; result not published")
     report = {"schema_version": 1, "purpose": PURPOSE, "input_signature": signature,
               "coordinates": "0-based half-open in original LGZ q3", "lgz_unchanged": True,
-              "reads_type": config["reads_type"], "gap_count": len(gaps),
+              "reads_type": reads_type, "gap_count": len(gaps),
               "accepted_count": len(accepted), "unfilled_count": len(gaps) - len(accepted),
               "output_fasta": OUTPUT, "output_sha256": digest(temporary), "decisions": decisions,
               "acceptance": "exact non-N flanks and positive ACGT bridge; not independent biological validation"}
@@ -354,13 +375,17 @@ def main() -> None:
     parser.add_argument("--server-dir", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=10)
     parser.add_argument("--check-environment", action="store_true")
-    parser.add_argument("--reads", nargs="+", default=[])
+    parser.add_argument("--hifi", nargs="+", action="extend", default=[])
+    parser.add_argument("--ont", nargs="+", action="extend", default=[])
     args = parser.parse_args()
     if args.threads < 1:
         parser.error("--threads must be positive")
     try:
         if args.check_environment:
-            check_environment(args.server_dir, args.reads)
+            groups = read_groups({"schema_version": 2, "purpose": PURPOSE,
+                "hifi": [str(Path(p).resolve()) for p in args.hifi],
+                "ont": [str(Path(p).resolve()) for p in args.ont]})
+            check_environment(args.server_dir, groups["hifi"] + groups["ont"])
         else:
             run(args.server_dir, execution_threads(args.threads))
     except (OSError, ValueError, subprocess.CalledProcessError) as error:

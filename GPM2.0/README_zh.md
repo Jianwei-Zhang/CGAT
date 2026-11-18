@@ -68,7 +68,7 @@ bash "$SERVER/install.sh" --check
 | --- | --- |
 | 核心流程 | `python3`、`samtools`、`zip`、`gzip` |
 | LGZ Final Path | `minimap2`、`nucmer`、`delta-filter`、`show-coords` |
-| 可选 LGZ 后补洞 | 内置 DEGAP，使用共享 Server 环境；通过 `--reads` + `--reads-type` 启用 |
+| 可选 LGZ 后补洞 | 内置 DEGAP，使用共享 Server 环境；通过 `--hifi` 和/或 `--ont` 启用 |
 | 旧工作区 reads 质控 | 保存的 QC 配方仍使用 `meryl`、`merqury.sh`，完整 QC 还需 CRAQ |
 
 执行 `run.sh` 时保持该环境已激活。
@@ -126,8 +126,8 @@ bash "$SERVER/run.sh" \
 | `--cen <fasta>` | 可追加 | 追加本次着丝粒相关重复序列；FASTA 名称不绑定染色体。 |
 | `--cen-min-len <bp>` | `10000` | 合并后着丝粒候选区域的最小命中覆盖长度，不计间隔。 |
 | `--cen-min-identity <百分比>` | `80` | 单个着丝粒重复命中的最小一致性百分比。 |
-| `--reads <fastq>` | 可选，可重复 | 新任务启用 LGZ 后内部 gap 修补，不再前置 QC；保留 LGZ，另存修补 FASTA。 |
-| `--reads-type hifi/ont` | 传 reads 时必填 | 明确测序类型；多次 `--reads` 必须属于同一类型。 |
+| `--hifi <文件...>` | 可选，可重复 | HiFi reads，用于 LGZ 后内部 gap 修补，不再前置 QC；保留 LGZ，另存修补 FASTA。 |
+| `--ont <文件...>` | 可选，可重复 | ONT reads；可以单独使用，也可与 `--hifi` 同时提供。 |
 | `--lgz-qc-memory-gb <数量>` | `80` | 旧工作区 reads 质控的内存上限。 |
 | `--lgz-kmer-size <数量>` | `21` | 旧 reads QC 的 k-mer 大小；新 DEGAP 任务不使用。 |
 | `--max-fill <bp>` | `1000000` | Step2 两轮优化补洞的长度上限；恢复时可修改。 |

@@ -511,15 +511,24 @@ Pinned-runtime limitation: GapFiller requires a maximum round count of at least 
 
 ### Automatic post-LGZ gap filling
 
-For **new workspaces**, add `--reads /path/to/reads.fastq.gz --reads-type hifi`
-(or `ont`). Repeat `--reads` for multiple files of the same type. The type is
-required, not inferred. Preparation checks DEGAP executables and Python imports
+For **new workspaces**, use `--hifi /path/to/hifi.fastq.gz` and/or
+`--ont /path/to/ont.fastq.gz`, matching the native DEGAP interface. Each flag accepts
+multiple files and can be repeated; supplying both enables mixed HiFi/ONT input.
+The same file cannot be assigned to both technologies. For example:
+
+```bash
+bash "$SERVER/run.sh" --ref ref.fa --ds assembly.fa \
+  --hifi hifi_1.fastq.gz hifi_2.fastq.gz --ont ont.fastq.gz -o new_workspace
+```
+
+Preparation checks DEGAP executables and Python imports
 before reference mapping. Activate the shared Server environment first; the
 pinned native job writer requires workspace/runtime/reads paths without spaces or
 shell metacharacters. These reads no longer trigger Meryl/Merqury/CRAQ, q0
-quality exclusion, or reads-based donor ranking. `--reads-qc full` is rejected
-for new preparations. Existing workspaces retain their saved legacy QC recipe
-when resumed; updating code does not insert a new stage into an old plan.
+quality exclusion, or reads-based donor ranking. `--reads`, `--reads-type`, and
+`--reads-qc` are rejected for new preparations. Existing workspaces retain their
+saved QC or earlier post-LGZ recipe when resumed; do not rename saved arguments.
+Updating code does not insert a new stage into an old plan.
 
 After LGZ Step3, the bundled DEGAP AutoGapfiller runs with one gap worker within
 the thread budget. Only remaining **internal N gaps** are eligible; no telomere

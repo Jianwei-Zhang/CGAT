@@ -68,7 +68,7 @@ Re-running `install.sh` validates the managed environment and updates it only wh
 | --- | --- |
 | Core workflow | `python3`, `samtools`, `zip`, `gzip` |
 | LGZ Final Path | `minimap2`, `nucmer`, `delta-filter`, `show-coords` |
-| Optional post-LGZ gap filling | Bundled DEGAP and its shared Server environment; enable with `--reads` + `--reads-type` |
+| Optional post-LGZ gap filling | Bundled DEGAP and its shared Server environment; enable with `--hifi` and/or `--ont` |
 | Legacy workspace reads QC | Saved QC recipes still use `meryl`, `merqury.sh` (and CRAQ for full QC) |
 
 Keep this environment active for `run.sh`.
@@ -128,8 +128,8 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--cen <fasta>` | Additive | Add one-run centromere-related repeats; FASTA names do not bind chromosomes. |
 | `--cen-min-len <bp>` | `10000` | Minimum merged centromere-candidate covered bases (gaps excluded). |
 | `--cen-min-identity <pct>` | `80` | Minimum individual centromere-repeat hit identity percentage. |
-| `--reads <fastq>` | Optional, repeatable | New tasks: enable post-LGZ internal gap filling, not pre-LGZ QC. Preserve LGZ and write a separate FASTA. |
-| `--reads-type hifi/ont` | Required with reads | Explicit read technology; all repeated `--reads` files use this type. |
+| `--hifi <files...>` | Optional, repeatable | HiFi reads for post-LGZ internal gap filling, not pre-LGZ QC. Preserve LGZ and write a separate FASTA. |
+| `--ont <files...>` | Optional, repeatable | ONT reads for the same stage; use alone or together with `--hifi`. |
 | `--lgz-qc-memory-gb <n>` | `80` | Memory limit for legacy workspace reads QC. |
 | `--lgz-kmer-size <n>` | `21` | Legacy reads-QC k-mer size; not used by new DEGAP tasks. |
 | `--max-fill <bp>` | `1000000` | Length limit for both Step2 optimized refill rounds; can be changed on resume. |

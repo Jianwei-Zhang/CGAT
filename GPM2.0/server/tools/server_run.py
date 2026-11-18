@@ -33,7 +33,8 @@ SINGLE_OPTIONS = {
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
     "--grt-execution-profile", "--grt-step2-mummer-scope",
 }
-PATH_OPTIONS = {"--ref", "--ds", "--reads", "--cen"}
+TYPED_READ_OPTIONS = {"--hifi", "--ont"}
+PATH_OPTIONS = {"--ref", "--ds", "--reads", "--cen"} | TYPED_READ_OPTIONS
 
 
 def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
@@ -42,7 +43,13 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
     while index < len(argv):
         key = ALIASES.get(argv[index], argv[index])
         count = 0 if key == "--skip-self" else 2 if key == "--tel" else 1
-        if key in {"--ref", "--ds"}:
+        if key in TYPED_READ_OPTIONS:
+            count = 0
+            while index + count + 1 < len(argv) and not argv[index + count + 1].startswith("-"):
+                count += 1
+            if not count:
+                raise RunnerError(f"{key} requires at least one reads file")
+        elif key in {"--ref", "--ds"}:
             if index + 2 < len(argv) and not argv[index + 2].startswith("-"):
                 count = 2
         elif key not in SINGLE_OPTIONS and key not in {"--skip-self", "--tel"}:
@@ -50,7 +57,9 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
         values = argv[index + 1:index + count + 1]
         if len(values) != count or any(value.startswith("--") for value in values):
             raise RunnerError(f"{key} requires a value; see run.sh --help")
-        if key in PATH_OPTIONS or key == "--out":
+        if key in TYPED_READ_OPTIONS:
+            values = [str((cwd / value).resolve()) for value in values]
+        elif key in PATH_OPTIONS or key == "--out":
             values[-1] = str((cwd / values[-1]).resolve())
         if key in ({"--max-fill", "--self-m", "--self-n", *RESOURCE_OPTIONS} - {"--minimap-batch"}) and not re.fullmatch(r"[1-9][0-9]*", values[0]):
             raise RunnerError(f"{key} must be a positive integer")
@@ -63,7 +72,10 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
                    "--grt-step2-mummer-scope": {"full", "gap-screen"}}
         if key in allowed and values[0] not in allowed[key]:
             raise RunnerError(f"Invalid {key}: {values[0]}")
-        if key in {"--ds", "--reads", "--tel"}:
+        if key in TYPED_READ_OPTIONS:
+            # Canonicalize grouped and repeated flags identically for resume.
+            options.setdefault(key, []).extend([value] for value in values)
+        elif key in {"--ds", "--reads", "--tel"}:
             options.setdefault(key, []).append(values)
         else:
             options[key] = [values]

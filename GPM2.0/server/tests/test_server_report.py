@@ -202,6 +202,19 @@ class ServerReportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "escapes"):
                 render(report)
 
+    def test_preparation_records_all_typed_reads_and_legacy_reads(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = [root / name for name in ("h1.fq", "h2.fq", "h3.fq", "ont.fq", "legacy.fq")]
+            for i, path in enumerate(paths):
+                path.write_text("A" * (i + 1))
+            prepare_start(root, ["--hifi", str(paths[0]), str(paths[1]), "--hifi", str(paths[2]),
+                                 "--ont", str(paths[3]), "--reads", str(paths[4]), "--threads", "4"])
+            sources = read_json(root / "metadata/report_inputs.json")["sources"]
+            self.assertEqual([row["original_path"] for row in sources], [str(path) for path in paths])
+            self.assertEqual([row["option"] for row in sources], ["--hifi"] * 3 + ["--ont", "--reads"])
+            self.assertEqual([row["size_bytes"] for row in sources], [1, 2, 3, 4, 5])
+
     def test_preparation_failure_invalidates_old_input_snapshot(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

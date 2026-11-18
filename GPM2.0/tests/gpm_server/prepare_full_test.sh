@@ -871,13 +871,13 @@ test_grt_tool_discovery_fails_fast_for_missing_commands() {
   PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" --archive-format zip \
     --ref ref_standard_without_craq "$ref" \
     --ds ds_standard_without_craq "$ds" \
-    --reads "$reads" --reads-type hifi \
+    --hifi "$reads" \
     -o "${TMP_DIR}/standard-without-craq-output" \
     >/dev/null
   if PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" --archive-format zip \
     --ref ref_missing_grt_qc "$ref" \
     --ds ds_missing_grt_qc "$ds" \
-    --reads "$reads" --reads-type hifi \
+    --hifi "$reads" \
     --reads-qc full \
     -o "${TMP_DIR}/missing-craq-output" \
     >/dev/null 2>"${TMP_DIR}/missing-craq.err"; then
@@ -1105,7 +1105,7 @@ test_reads_enable_post_lgz_degap_without_qc() {
 
   PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_grt_reads "$ref" --ds ds_a "$ds_a" --ds ds_b "$ds_b" \
-    --reads "$reads_a" --reads "$reads_b" --reads-type ont -o "$output_root" >/dev/null
+    --ont "$reads_a" "$reads_b" -o "$output_root" >/dev/null
   awk -F '\t' '
     NR == 1 { for (i = 1; i <= NF; i++) column[$i] = i; next }
     NR == 2 { exit ($(column["reads_qc_enabled"]) == "false" ? 0 : 1) }
@@ -1117,8 +1117,9 @@ test_reads_enable_post_lgz_degap_without_qc() {
   python3 - "${output_root}/metadata/degap_inputs.json" "$reads_a" "$reads_b" <<'PYREADS'
 import json, sys
 value = json.load(open(sys.argv[1]))
-assert value["reads"] == sys.argv[2:]
-assert value["reads_type"] == "ont"
+assert value["schema_version"] == 2
+assert value["ont"] == sys.argv[2:]
+assert value["hifi"] == []
 PYREADS
 
 }

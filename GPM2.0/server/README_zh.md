@@ -435,12 +435,20 @@ reads 路径仍需填写实际远端位置。自定义 DEGAP 路径保留在高�
 
 ### LGZ 后自动补 gap
 
-**新工作区**添加 `--reads /path/to/reads.fastq.gz --reads-type hifi`
-（或 `ont`）。同一类型的多个文件可重复传 `--reads`，类型必须明确指定，不自动猜测。
+**新工作区**直接使用 `--hifi /path/to/hifi.fastq.gz` 和/或
+`--ont /path/to/ont.fastq.gz`，与 DEGAP 原生接口一致。每个参数可接多个文件，
+也可重复指定；同时提供两者就是 HiFi/ONT 混合输入。同一文件不能同时标成两种类型。
+
+```bash
+bash "$SERVER/run.sh" --ref ref.fa --ds assembly.fa \
+  --hifi hifi_1.fastq.gz hifi_2.fastq.gz --ont ont.fastq.gz -o new_workspace
+```
+
 准备阶段会在参考比对前检查 DEGAP 命令及 Python 依赖；需先激活共享 Server 环境。
 当前原生任务脚本要求工作区、运行库及 reads 路径不含空格或 shell 特殊字符。
 这些 reads 不再触发 Meryl/Merqury/CRAQ、q0 质量淘汰或按 reads 质量排序供体。
-新建任务不再接受 `--reads-qc full`；旧工作区续跑仍使用保存的 QC 配方，
+新建任务不再接受 `--reads`、`--reads-type` 或 `--reads-qc`。
+旧工作区续跑仍使用保存的 QC 或上一版 LGZ 后补洞配方，不需要改名已有参数；
 更新代码不会给旧执行计划插入 DEGAP 阶段。
 
 LGZ Step3 完成后，内置 DEGAP AutoGapfiller 在总线程预算内单任务补洞。

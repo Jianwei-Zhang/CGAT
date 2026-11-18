@@ -26,8 +26,8 @@ class PostLgzTests(unittest.TestCase):
         (self.root / "grt/q").mkdir(parents=True)
         self.reads = self.root / "reads_file.fq"
         self.reads.write_text("@r\nACGT\n+\nIIII\n")
-        self.config = {"schema_version": 1, "purpose": gapfill.PURPOSE,
-                       "reads_type": "hifi", "reads": [str(self.reads)]}
+        self.config = {"schema_version": 2, "purpose": gapfill.PURPOSE,
+                       "hifi": [str(self.reads)], "ont": []}
         gapfill.atomic_json(self.root / "metadata/degap_inputs.json", self.config)
         (self.root / "metadata/grt_final_path.json").write_text(json.dumps({"unchanged": True}))
         self.original = "AAA" + "N" * 20 + "CCC"
@@ -96,13 +96,50 @@ class PostLgzTests(unittest.TestCase):
 
     def test_ont_type_and_final_path_invalidate_cache(self):
         self.run_stage()
-        self.config["reads_type"] = "ont"
+        self.config["ont"] = self.config.pop("hifi")
+        self.config["hifi"] = []
         gapfill.atomic_json(self.root / "metadata/degap_inputs.json", self.config)
         self.run_stage()
         self.assertIn("--ont", self.native_calls[-1])
         (self.root / "metadata/grt_final_path.json").write_text("{}")
         self.run_stage()
         self.assertEqual(len(self.native_calls), 3)
+
+    def test_mixed_native_arguments_and_legacy_recipe_resume(self):
+        ont = self.root / "ont.fq"
+        ont.write_text("ONT reads")
+        hifi2 = self.root / "hifi2.fq"
+        hifi2.write_text("second HiFi file")
+        self.config["hifi"].append(str(hifi2))
+        self.config["ont"] = [str(ont)]
+        gapfill.atomic_json(self.root / "metadata/degap_inputs.json", self.config)
+        report = self.run_stage()
+        command = self.native_calls[-1]
+        self.assertEqual(command[command.index("--hifi") + 1:command.index("--ont")], [str(self.reads), str(hifi2)])
+        self.assertEqual(command[command.index("--ont") + 1:], [str(ont)])
+        self.assertEqual(report["reads_type"], "mixed")
+        self.run_stage()
+        self.assertEqual(len(self.native_calls), 1)
+        ont.write_text("changed ONT reads")
+        self.run_stage()
+        self.assertEqual(len(self.native_calls), 2)
+        # Last implementation used schema 1: preserve its explicit meaning.
+        legacy = {"schema_version": 1, "purpose": gapfill.PURPOSE, "reads_type": "hifi", "reads": [str(self.reads)]}
+        gapfill.atomic_json(self.root / "metadata/degap_inputs.json", legacy)
+        self.assertEqual(self.run_stage()["reads_type"], "hifi")
+        self.assertNotIn("--ont", self.native_calls[-1])
+        self.assertEqual(gapfill.load_json(self.root / "metadata/degap_inputs.json"), legacy)
+
+    def test_ambiguous_or_empty_typed_inputs_rejected(self):
+        for config in (
+            {**self.config, "ont": [str(self.reads)]},
+            {**self.config, "hifi": [], "ont": []},
+            {**self.config, "hifi": "not-a-list"},
+            {**self.config, "hifi": ["relative.fq"]},
+            {**self.config, "reads": [str(self.reads)]},
+        ):
+            with self.subTest(config=config), self.assertRaises(ValueError):
+                gapfill.read_groups(config)
 
     def test_candidate_rejections_preserve_gap(self):
         def change_sequence(sequence):
@@ -224,13 +261,34 @@ class PostLgzPlanTests(unittest.TestCase):
         self.assertEqual(mapping["chr:chr1"], ("degap_gapfill",))
 
     def test_typed_reads_and_legacy_resume_parser(self):
-        for kind in ("hifi", "ont"):
-            options = server_run.parse_options(["--reads", "reads.fq", "--reads-type", kind], Path.cwd())
-            self.assertEqual(options["--reads-type"], [[kind]])
-        # Old saved options still parse without a new mandatory argument.
-        server_run.parse_options(["--reads", "reads.fq", "--reads-qc", "full"], Path.cwd())
-        with self.assertRaises(server_run.RunnerError):
-            server_run.parse_options(["--reads-type", "guess"], Path.cwd())
+        cwd = Path.cwd()
+        grouped = server_run.parse_options(["--hifi", "a.fq", "b.fq", "--ont", "o.fq", "-t", "4"], cwd)
+        repeated = server_run.parse_options(["--hifi", "a.fq", "--hifi", "b.fq", "--ont", "o.fq", "-t", "4"], cwd)
+        self.assertEqual(grouped, repeated)
+        self.assertEqual(grouped["--hifi"], [[str(cwd / "a.fq")], [str(cwd / "b.fq")]])
+        for args in (["--hifi"], ["--ont", "--hifi", "a.fq"]):
+            with self.assertRaises(server_run.RunnerError):
+                server_run.parse_options(args, cwd)
+        # Both historical launch formats remain parseable, not rewritten on resume.
+        server_run.parse_options(["--reads", "reads.fq", "--reads-qc", "full"], cwd)
+        server_run.parse_options(["--reads", "reads.fq", "--reads-type", "ont"], cwd)
+
+    def test_all_read_files_and_technology_are_locked_on_resume(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ("a.fq", "b.fq", "o.fq"):
+                (root / name).write_text("reads")
+            saved = server_run.parse_options(["--hifi", "a.fq", "b.fq", "--ont", "o.fq"], root)
+            identities = server_run.input_identities(saved)
+            self.assertEqual(len(identities), 3)
+            equivalent = server_run.parse_options(["--hifi", "a.fq", "--hifi", "b.fq", "--ont", "o.fq"], root)
+            server_run.check_resume_options(equivalent, saved, identities)
+            changed_type = server_run.parse_options(["--ont", "a.fq", "b.fq", "o.fq"], root)
+            with self.assertRaisesRegex(server_run.RunnerError, "differs"):
+                server_run.check_resume_options(changed_type, saved, identities)
+            (root / "b.fq").write_text("changed second reads file")
+            with self.assertRaisesRegex(server_run.RunnerError, "Input changed"):
+                server_run.check_resume_options(equivalent, saved, identities)
 
 
 if __name__ == "__main__":
