@@ -3,6 +3,7 @@
 import argparse
 import csv
 import hashlib
+import re
 import shlex
 import sys
 from datetime import datetime, timezone
@@ -130,15 +131,10 @@ def fasta_has_record(path, name):
 
 
 def iter_n_regions(sequence):
-    index = 0
-    while index < len(sequence):
-        if sequence[index] not in {"N", "n"}:
-            index += 1
-            continue
-        start = index
-        while index < len(sequence) and sequence[index] in {"N", "n"}:
-            index += 1
-        yield start + 1, index, index - start
+    # Scan in the regex engine rather than one Python iteration per base.
+    # Keep every mixed-case N run and the existing 1-based inclusive coordinates.
+    for match in re.finditer(r"[Nn]+", sequence):
+        yield match.start() + 1, match.end(), match.end() - match.start()
 
 
 def merged_interval_coverage(intervals):

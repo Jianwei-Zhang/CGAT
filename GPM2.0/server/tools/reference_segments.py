@@ -138,14 +138,18 @@ def scan_fasta(input_path, output_handle, chunk_size=DEFAULT_CHUNK_SIZE):
                     at_line_start = False
                     continue
 
-                newline = chunk.find(b"\n", offset)
-                if newline < 0:
+                # Wrapped FASTA can contain hundreds of millions of lines.
+                # Consume sequence blocks, stopping only at a real record header;
+                # consume_sequence removes whitespace and carries N runs across
+                # both line and chunk boundaries without changing coordinates.
+                next_header = chunk.find(b"\n>", offset)
+                if next_header < 0:
                     scanner.consume_sequence(chunk[offset:])
+                    at_line_start = chunk.endswith(b"\n")
                     offset = len(chunk)
-                    at_line_start = False
                     continue
-                scanner.consume_sequence(chunk[offset:newline])
-                offset = newline + 1
+                scanner.consume_sequence(chunk[offset:next_header + 1])
+                offset = next_header + 1
                 at_line_start = True
 
     if header_buffer is not None:

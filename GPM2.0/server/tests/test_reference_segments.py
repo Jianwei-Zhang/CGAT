@@ -1,4 +1,7 @@
 import importlib.util
+import random
+import re
+from unittest import mock
 import tempfile
 import unittest
 from pathlib import Path
@@ -74,6 +77,56 @@ class ReferenceSegmentsTests(unittest.TestCase):
                 ).encode("ascii")
             ),
         )
+
+    def test_wrapping_and_chunk_boundaries_match_whole_record_oracle(self):
+        rng = random.Random(20261118)
+        records = [("first", "Nn" * 50 + "ACGT" + "n" * 99),
+                   ("middle", "A" + "N" * 100 + "T" + "n" * 101),
+                   ("all_n", "Nn" * 80), ("empty", ""),
+                   ("random", "".join(rng.choices("ACGTNn", k=500))),
+                   ("literal_gt", "A>CN"), ("last", "AC" + "N" * 100)]
+        expected = REFERENCE_SEGMENTS.HEADER
+        for name, sequence in records:
+            start, order = 1, 0
+            for match in re.finditer(r"[Nn]{100,}", sequence):
+                if match.start() >= start:
+                    order += 1
+                    expected += f"{name}\t{order}\t{start}\t{match.start()}\n"
+                start = match.end() + 1
+            if start <= len(sequence):
+                order += 1
+                expected += f"{name}\t{order}\t{start}\t{len(sequence)}\n"
+            if sequence and not order:
+                expected += f"{name}\t0\t0\t0\n"
+        for width in (1, 7, 60, 1000):
+            # Keep a literal '>' inside a sequence line rather than at line start.
+            parts = []
+            for name, sequence in records:
+                parts.append(f">{name} description\r\n".encode())
+                if name == "literal_gt":
+                    parts.append(sequence.encode() + b"\r\n")
+                else:
+                    parts.extend(sequence[i:i + width].encode() + b" \t\r\n"
+                                 for i in range(0, len(sequence), width))
+            fasta = b"".join(parts).rstrip(b"\n")
+            for chunk_size in (1, 2, 3, 7, 59, 60, 61, 101, 4096):
+                with self.subTest(width=width, chunk_size=chunk_size):
+                    self.assertEqual(self.scan(fasta, chunk_size), expected.encode())
+
+    def test_sequence_consumption_is_bounded_by_chunks_not_lines(self):
+        fasta = b">chr\n" + b"A\n" * 100000
+        sizes = []
+        original = REFERENCE_SEGMENTS.ReferenceSegmentScanner.consume_sequence
+
+        def record(scanner, block):
+            sizes.append(len(block))
+            return original(scanner, block)
+
+        with mock.patch.object(REFERENCE_SEGMENTS.ReferenceSegmentScanner, "consume_sequence", record):
+            result = self.scan(fasta, chunk_size=4096)
+        self.assertIn(b"chr\t1\t1\t100000\n", result)
+        self.assertLessEqual(len(sizes), len(fasta) // 4096 + 2)
+        self.assertLessEqual(max(sizes), 4096)
 
     def test_preserves_existing_output_when_sequence_precedes_header(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
