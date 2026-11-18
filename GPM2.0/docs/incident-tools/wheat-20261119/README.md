@@ -70,3 +70,26 @@ mapping pilots to self-alignment (`-X`, custom chain/minimizer thresholds),
 all chromosomes, or initial reference mapping. Do not adopt a candidate PAF
 as if it were produced by the original command: any future use needs an explicit
 algorithm/parameter provenance transition and checkpoint-safe adoption.
+
+
+### Full-context 3D follow-up (candidate only)
+
+`full_3d_seed_pilot.py` runs one full 3D cross mapping with `-f 0.005`, three
+threads and an 1800-second command timeout. It uses the original FASTAs, not
+sampled windows, and retains input/tool/output hashes. Job `42681096` was
+submitted to `agent-X86-46` with 8 CPU / 81920 MiB; inspect its live state.
+
+There is no duplicate baseline submission: the baseline is the already-running
+3D leaf of main job `42646893`. The script compares only after that leaf has a
+successful checkpoint whose command, input, tool and output identities match.
+A PAF file existing (even valid/nonempty) without its leaf checkpoint is not
+sufficient. If the baseline is still pending, the candidate is preserved with
+status `candidate_complete_native_comparison_pending`, not adopted or declared
+equivalent. A later scheduled invocation with `--compare-only` validates the
+stored artifacts and performs only comparison; it must not rerun alignment.
+This follow-up does not modify either analysis workspace or approve a global
+approximation policy. Native and candidate run on different x86 nodes, so any
+later timing comparison must disclose that boundary.
+
+Four focused tests exercise refusal of changed inputs/corrupt candidates,
+ignore an uncommitted baseline PAF, and verify comparison without replacement.
