@@ -185,7 +185,9 @@ class GrtPrepareInputsTests(unittest.TestCase):
             [
                 {
                     "workflow": "gpm_grt_precomputed_v2",
-                    "schema_version": "2",
+                    # This fixture invokes the current producer; schema 2 is
+                    # supported only by frozen historical delivery fixtures.
+                    "schema_version": "3",
                     "package_mode": "fast",
                     "sequence_layout": "partitioned",
                     "preassigned_chr": "true",

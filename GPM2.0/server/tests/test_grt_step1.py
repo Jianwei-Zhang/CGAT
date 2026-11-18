@@ -67,16 +67,20 @@ class GrtStep1Tests(unittest.TestCase):
         )
         server = helper.make_server(root)
         metadata = server / "metadata"
+        from server.tests.test_q0_admission import dna
+        # Controlled stage fixture, not a measured alignment result. Give q0
+        # three distinct anchored pieces and two unknown joins; unanchored
+        # donors remain available for later-stage evidence, not a first-ds bias.
         primary_records = [
-            ("p_cover", "A" * 12_000),
-            ("p_redundant", "C" * 11_000),
-            ("p_partial", "G" * 12_000),
-            ("p_third", "T" * 12_000),
-            ("p_reverse", "A" * 6_000 + "C" * 6_000),
+            ("p_cover", dna(12_000, 801)),
+            ("p_redundant", dna(11_000, 802)),
+            ("p_partial", dna(12_000, 803)),
+            ("p_third", dna(12_000, 804)),
+            ("p_reverse", dna(12_000, 805)),
         ]
         support_records = [
-            ("s_assigned", ("ACGT" * 12_500)),
-            ("s_unplaced", "AC" * 6_500),
+            ("s_assigned", dna(50_000, 806)),
+            ("s_unplaced", dna(13_000, 807)),
             ("s_tel_short", "TTTAGGG" * 80),
         ]
         prepare_fixture.write_fasta(
@@ -153,7 +157,6 @@ class GrtStep1Tests(unittest.TestCase):
             "\n".join(
                 [
                     "p_cover\t12000\t0\t12000\t+\tChr01\t60000\t0\t12000\t12000\t12000\t60",
-                    "p_redundant\t11000\t0\t11000\t+\tChr01\t60000\t100\t11100\t11000\t11000\t60",
                     "p_partial\t12000\t0\t12000\t+\tChr01\t60000\t20000\t32000\t12000\t12000\t60",
                     "p_third\t12000\t0\t12000\t+\tChr01\t60000\t40000\t52000\t12000\t12000\t60",
                     "p_reverse\t12000\t0\t12000\t-\tChr02\t60000\t99\t12099\t12000\t12000\t60",
@@ -163,7 +166,7 @@ class GrtStep1Tests(unittest.TestCase):
             encoding="utf-8",
         )
         (server / "runs/support_vs_ref/result.paf").write_text(
-            "s_assigned\t50000\t0\t50000\t+\tChr01\t60000\t0\t50000\t50000\t50000\t60\n",
+            "",
             encoding="utf-8",
         )
         from server.tests.q0_test_support import seed_q0_evidence

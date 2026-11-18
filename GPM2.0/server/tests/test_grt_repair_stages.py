@@ -1499,11 +1499,12 @@ Path(prefix + '.delta').write_text(
             "test_external_contig_stage1_is_auditable_identity_and_resumes"
         ).make_server(root)
         support_path = server / "data/datasets/support.fa"
+        from server.tests.test_q0_admission import dna
         prepare_fixture.write_fasta(
             support_path,
             [
-                ("s_assigned", "ACGT" * 12_500),
-                ("s_unplaced", "ACGT" * 12_500),
+                ("s_assigned", dna(50_000, 806)),
+                ("s_unplaced", dna(50_000, 807)),
                 ("s_tel_short", "TTTAGGG" * 80),
             ],
         )
