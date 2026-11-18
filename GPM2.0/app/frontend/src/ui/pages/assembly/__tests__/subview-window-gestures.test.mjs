@@ -115,3 +115,17 @@ for (const finish of ["commit", "Escape", "click"]) test(`task pointer reorder $
   if (finish === "click") assert.equal(rewrites, before, "do not replace a clicked button before its click event");
   f.runtime.destroy();
 });
+
+
+test("route restoration refreshes only stale local DOM and leaves unchanged windows untouched", () => {
+  const f = fixture();
+  f.runtime.resume(); assert.equal(f.refreshes(), 0);
+  f.store.setState({ activeRoute: "importer" });
+  const a = f.store.getState().assembly;
+  f.store.setState({ assembly: { ...a, subview: { ...a.subview, pairwiseEvidence: { status: "loaded", hits: [] } } } });
+  f.runtime.resume(); assert.equal(f.refreshes(), 0);
+  f.store.setState({ activeRoute: "assembly" });
+  f.runtime.resume(); assert.equal(f.refreshes(), 1);
+  f.runtime.markRendered(f.id); f.runtime.resume(); assert.equal(f.refreshes(), 1);
+  f.runtime.destroy();
+});

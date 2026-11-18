@@ -26,7 +26,7 @@ test("initial navigation reflects current partition, parent filters include desc
   assert.equal(model(state(ALL_PARTITIONS)).projects.length, 4);
   const unassigned = model(state(""));
   assert.equal(unassigned.projects.find(item => item.selected).value, "/rice");
-  assert.match(unassigned.projects[0].description, /当前项目/);
+  assert.match(unassigned.projects[0].description, /当前组装/);
   assert.ok(unassigned.projects.some(item => item.value === "/legacy"));
   assert.equal(model().partitions.find(item => item.value === "rice").label, "植物 / 水稻");
   assert.equal(model().partitions.find(item => item.value === "rice").caption, "水稻");
@@ -37,7 +37,7 @@ for (const locale of ["zh", "en"]) {
     const s = state("empty", locale), before = structuredClone(s);
     const view = model(s);
     assert.equal(view.projects.find(item => item.selected).value, "/rice");
-    assert.match(view.projects[0].description, locale === "zh" ? /不在所选分区内/ : /outside this filter/);
+    assert.match(view.projects[0].description, locale === "zh" ? /不在所选项目内/ : /outside this project/);
     assert.ok(view.projects.some(item => item.disabled && !item.value));
     assert.deepEqual(s, before);
     const chr = view.chromosomes.find(item => item.selected);
@@ -139,8 +139,8 @@ test("partition selection changes only filter state and keeps project/assembly r
   const before = h.store.getState(); await h.partition.change("maize");
   assert.equal(h.store.getState().session, before.session); assert.equal(h.store.getState().assembly, before.assembly);
   assert.equal(h.store.getState().assemblyNavigation.partitionId, "maize");
-  assert.deepEqual(h.calls, []); assert.match(h.project.innerHTML, /B73/); assert.match(h.project.innerHTML, /当前项目/);
-  await h.partition.change("empty"); assert.match(h.project.innerHTML, /此分区暂无项目/);
+  assert.deepEqual(h.calls, []); assert.match(h.project.innerHTML, /B73/); assert.match(h.project.innerHTML, /当前组装/);
+  await h.partition.change("empty"); assert.match(h.project.innerHTML, /此项目暂无组装/);
 }));
 
 test("workspace selection flushes once, remains in assembly, updates filter only after successful switch", () => fixture(async h => {

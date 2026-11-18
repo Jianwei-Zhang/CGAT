@@ -70,11 +70,11 @@ test("durable task round trip includes logical edits and notes but excludes evid
   assert.equal(restored.getState().assembly.subview.summary.bottom.contigId, 5);
 });
 
-test("different chromosome and support scopes restore unopened tasks; project changes cannot inherit them", () => {
+test("different chromosome and support scopes restore their own runtime tasks; project changes cannot inherit them", () => {
   const store = fixture(), a = enter(store);
   const original = store.getState().assembly.selectedChrName;
   for (const selectedChrName of ["other", original]) store.setState({ assembly: { ...store.getState().assembly, selectedChrName } });
-  assert.equal(windows(store)[0].id, a); assert.equal(windows(store)[0].opened, false);
+  assert.equal(windows(store)[0].id, a); assert.equal(windows(store)[0].opened, true);
   const support = store.getState().assembly.supportDatasetId;
   for (const supportDatasetId of [987, support]) store.setState({ assembly: { ...store.getState().assembly, supportDatasetId } });
   assert.equal(windows(store)[0].id, a);

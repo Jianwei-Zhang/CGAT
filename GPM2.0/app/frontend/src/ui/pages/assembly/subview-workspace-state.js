@@ -28,22 +28,47 @@ export function startSubviewWindowDraft(assembly) {
     subviewTrackScrollState: { viewportKey: "", scrollLeft: 0 } };
 }
 
-export function reconcileSubviewWorkspace(previous, next) {
+export function reconcileSubviewWorkspace(previous, next, { runtimeScopes } = {}) {
   let assembly = next.assembly;
   if (!assembly?.subviewWorkspace) return next;
   const project = taskProjectKey(next);
   const projectChanged = assembly.localViewTaskProject !== project;
   if (projectChanged) assembly = { ...assembly, localViewTaskSaveError: "", subviewNativeError: "" };
+  if (projectChanged) runtimeScopes?.clear();
+  const previousWorkspace = previous.assembly?.subviewWorkspace;
+  if (!projectChanged && runtimeScopes && previousWorkspace && previousWorkspace.scope !== subviewWorkspaceScope(next)) {
+    // Keep window placement/focus for in-session Chr round trips. Large derived
+    // pairwise arrays are deliberately not retained; they reload behind fences.
+    runtimeScopes.set(previousWorkspace.scope, { ...previousWorkspace,
+      windows: previousWorkspace.windows.map(item => ({ ...item, snapshot: { ...item.snapshot,
+        subview: item.snapshot.subview ? { ...item.snapshot.subview, pairwiseEvidence: null } : null,
+        subviewRestoring: false, subviewRestoringSummary: null, subviewRestoreError: "",
+      } })),
+    });
+  }
   let document = projectChanged ? normalizeSubviewTasks(null) : assembly.localViewTasks || normalizeSubviewTasks(null);
   const scope = subviewWorkspaceScope(next);
   let workspace = assembly.subviewWorkspace;
   if (workspace.scope !== scope || projectChanged || workspace.reloadTasks) {
     const keepDraft = workspace.reloadTasks && workspace.scope === scope && !projectChanged && !assembly.subview?.summary;
-    const windows = restoredSubviewWindows(document, assembly);
-    workspace = { scope, generation: ++generation, nextId: 1, activeId: null, windows };
-    // A restored task starts unopened; never reuse the previous chromosome's
-    // active summary as a new task in this scope.
-    if (!keepDraft && (previous.assembly?.subviewWorkspace || windows.length)) assembly = { ...assembly, subview: null };
+    const cached = !projectChanged && !workspace.reloadTasks ? runtimeScopes?.get(scope) : null;
+    const windows = restoredSubviewWindows(document, assembly).map(item => {
+      const remembered = cached?.windows.find(window => window.id === item.id);
+      if (!remembered) return item;
+      // The task document remains authoritative for object membership/history.
+      // Restore transient window geometry and selection, not stale evidence.
+      return { ...remembered, name: item.name, note: item.note, snapshot: { ...item.snapshot,
+        subview: { ...item.snapshot.subview, trackPairSelectedCtgs: remembered.snapshot.subview?.trackPairSelectedCtgs || [] },
+      } };
+    });
+    const activeId = windows.some(item => item.id === cached?.activeId) ? cached.activeId : null;
+    workspace = { scope, generation: ++generation, nextId: cached?.nextId || 1, activeId, windows };
+    // Cold tasks start unopened. In-session returns restore only this scope's
+    // own active task, never the previous chromosome's summary.
+    if (!keepDraft && (previous.assembly?.subviewWorkspace || windows.length)) {
+      const active = windows.find(item => item.id === activeId);
+      assembly = { ...assembly, ...(active?.snapshot || { subview: null }) };
+    }
   }
   if (!previous.assembly?.loading && assembly.loading) workspace = { ...workspace, loadActiveId: workspace.activeId };
   if (previous.assembly?.loading && !assembly.loading) {
@@ -96,7 +121,8 @@ export function installSubviewWorkspace(store) {
   if (store.localViewRootStore || !store.addStateTransform) return false;
   if (!installed.has(store)) {
     installed.add(store);
-    store.addStateTransform(reconcileSubviewWorkspace);
+    const runtimeScopes = new Map();
+    store.addStateTransform((previous, next) => reconcileSubviewWorkspace(previous, next, { runtimeScopes }));
   }
   const state = store.getState();
   if (state.assembly?.subviewWorkspace) return false;

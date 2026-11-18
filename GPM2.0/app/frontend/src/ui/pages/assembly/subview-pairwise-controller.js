@@ -36,6 +36,8 @@ export function createSubviewPairwiseController({
   getTrackPairwiseEvidence = requestTrackPairwiseEvidence,
   listReferenceTrackMembers = requestReferenceTrackMembers,
 }) {
+  const pendingRequests = new WeakMap();
+
   function issueSubviewPairwiseEvidenceRequestKey(summary, scope = {}) {
     const key = String(scope?.key || buildSubviewPairwiseEvidenceKey(summary, scope));
     if (!key) {
@@ -228,12 +230,14 @@ export function createSubviewPairwiseController({
     if (!params) {
       return;
     }
+    const request = { key: params.requestKey, viewRequest, startState };
+    pendingRequests.set(store, request);
     try {
       const report = params.mode === "track-pair" || params.mode === "composition"
         ? await getTrackPairwiseEvidence(params)
         : await getJunctionInspection(params);
       const currentState = store.getState();
-      if (!isCurrentRequest(currentState, params)
+      if (store.isLocalViewAlive?.() === false || !isCurrentRequest(currentState, params)
         || currentAssemblyViewRequest(store) !== viewRequest
         || currentState.session?.workspacePath !== startState.session?.workspacePath
         || currentState.session?.projectId !== startState.session?.projectId
@@ -267,7 +271,7 @@ export function createSubviewPairwiseController({
       if (rerenderAfter) scheduleDeferredSubviewPanelRerender(host, store);
     } catch (error) {
       const currentState = store.getState();
-      if (!isCurrentRequest(currentState, params)
+      if (store.isLocalViewAlive?.() === false || !isCurrentRequest(currentState, params)
         || currentAssemblyViewRequest(store) !== viewRequest
         || currentState.session?.workspacePath !== startState.session?.workspacePath
         || currentState.session?.projectId !== startState.session?.projectId
@@ -314,6 +318,8 @@ export function createSubviewPairwiseController({
         },
       });
       if (rerenderAfter) scheduleDeferredSubviewPanelRerender(host, store);
+    } finally {
+      if (pendingRequests.get(store) === request) pendingRequests.delete(store);
     }
   }
 
@@ -329,10 +335,21 @@ export function createSubviewPairwiseController({
     }
     const state = store.getState();
     const summary = state.assembly?.subview?.summary || null;
+    const previousEvidence = state.assembly?.subview?.pairwiseEvidence;
+    const pending = pendingRequests.get(store);
+    const inFlight = pending && pending.key === previousEvidence?.requestKey
+      && pending.viewRequest === currentAssemblyViewRequest(store)
+      && pending.startState.activeRoute === state.activeRoute
+      && pending.startState.session?.workspacePath === state.session?.workspacePath
+      && pending.startState.session?.projectId === state.session?.projectId;
+    // A response discarded while off-route leaves status=loading behind. Only
+    // a live request may keep that state; otherwise issue a fresh fenced query.
+    const reusableEvidence = previousEvidence?.status === "loading" && !inFlight
+      ? { ...previousEvidence, status: "idle", requestKey: "" } : previousEvidence;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
       summary,
       state.assembly?.subviewTrackView || state.assembly?.trackView,
-      state.assembly?.subview?.pairwiseEvidence,
+      reusableEvidence,
       state,
     );
     if (!pairwiseEvidence) {

@@ -7,6 +7,7 @@
 @import "./workspace.css";
 @import "./assembly.css";
 @import "./subview.css";
+@import "./assembly-toolbar.css";
 @import "./final-path.css";
 @import "./degap.css";
 @import "./project-export.css";

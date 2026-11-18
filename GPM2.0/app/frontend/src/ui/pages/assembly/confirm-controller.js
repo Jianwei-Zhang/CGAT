@@ -11,6 +11,19 @@ export function resolveAnchorOffsetErrorKey(reason) {
   }
   return "runtime.subviewAnchorOffsetInvalid";
 }
+// Dialogs are transient page UI, not a Local View graph or a saved project field.
+export function cancelAssemblyConfirmDialog(store) {
+  store = store?.localViewRootStore || store;
+  const state = store?.getState?.();
+  const dialog = state?.assembly?.confirmDialog;
+  if (!dialog) return false;
+  const resolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(dialog.id);
+  assemblyPageSession.pendingAssemblyConfirmResolvers.delete(dialog.id);
+  store.setState({ assembly: { ...state.assembly, confirmDialog: null } });
+  resolve?.(dialog.mode === "anchor-offset" ? null : dialog.mode === "prompt" ? "" : false);
+  return true;
+}
+
 export function createAssemblyConfirmController(deps = {}) {
   const {
     createOffsetSubviewManualAnchor,
@@ -189,7 +202,7 @@ function requestAssemblyConfirm(host, store, message, options = {}) {
         },
       },
     });
-    rerender(host, store);
+    rerenderDialog(host, store);
   });
 }
 
@@ -252,11 +265,13 @@ function requestAssemblyPrompt(host, store, message, defaultValue = "") {
         },
       },
     });
-    rerender(host, store);
+    rerenderDialog(host, store);
   });
 }
 
 function requestAssemblyAnchorOffsetPrompt(host, store, options = {}) {
+  if (store?.isLocalViewAlive?.() === false
+    || (store?.getState?.().activeRoute && store.getState().activeRoute !== "assembly")) return Promise.resolve(null);
   const normalizedOptions = options && typeof options === "object" && !Array.isArray(options)
     ? options
     : { defaultValue: options };
@@ -301,7 +316,7 @@ function requestAssemblyAnchorOffsetPrompt(host, store, options = {}) {
         },
       },
     });
-    rerender(host, store);
+    rerenderDialog(host, store);
   });
 }
 
@@ -316,17 +331,9 @@ function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value, skipC
   const rawMode = String(state.assembly?.confirmDialog?.mode || "").trim();
   const mode = ["prompt", "anchor-offset", "notice"].includes(rawMode) ? rawMode : "confirm";
   assemblyPageSession.pendingAssemblyConfirmResolvers.delete(dialogId);
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      confirmDialog: null,
-    },
-  });
-  if (mode === "notice") {
-    rerenderDialog(host, store);
-  } else {
-    rerender(host, store);
-  }
+  const dialogStore = store.localViewRootStore || store;
+  dialogStore.setState({ assembly: { ...dialogStore.getState().assembly, confirmDialog: null } });
+  rerenderDialog(host, dialogStore);
   if (resolve) {
     if (mode === "anchor-offset") {
       resolve(confirmed && value && typeof value === "object" ? value : null);

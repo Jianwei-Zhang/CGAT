@@ -5,7 +5,7 @@ import { getAppSettings } from "../../../services/app-settings.js";
 import { getAssemblyI18n } from "./i18n.js";
 import { resolveCurrentSubviewHistory, formatSubviewHistoryActionLabel } from "./subview-history-state.js";
 
-const ignoredAssemblyKeys = new Set(["actionStatus", "actionError", "trackScrollState", "subviewTrackScrollState", "finalPathTrackScrollState"]);
+const ignoredAssemblyKeys = new Set(["actionStatus", "actionError", "confirmDialog", "trackScrollState", "subviewTrackScrollState", "finalPathTrackScrollState"]);
 export function sameSubviewRenderSnapshot(left, right) {
   if (left.locale !== right.locale || left.initializer !== right.initializer) return false;
   if (left.assembly === right.assembly) return true;

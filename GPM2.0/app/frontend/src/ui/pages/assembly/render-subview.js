@@ -1,3 +1,5 @@
+import { renderToolbarGroup } from "./toolbar-groups.js";
+import { renderTrackIdentity } from "./track-identity.js";
 import { resolveReferenceHitDisplayReversed as resolveTrackHitDisplayReversed, resolveSubviewSegmentPairReversed } from "./subview-band-orientation.js";
 import { renderSubviewEmptyGuide, renderSubviewWindowChrome } from "./render-subview-workspace.js";
 import { renderCompactSubviewAnchors } from "./subview-anchor-metadata.js";
@@ -882,15 +884,17 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
       <div class="subview-panel-head${assembly.subviewWindowRendering ? " subview-window-header" : ""}"${assembly.subviewWindowRendering ? ' data-local-view-drag="1"' : ""}>
         ${renderSubviewWindowChrome(assembly, i18n.subview)}
         <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
-        <div class="subview-panel-title-row assembly-track-inline-controls${alignmentCard ? " subview-track-inline-controls" : ""}" data-subview-toolbar data-grt-result-card="subview" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
+        <div class="subview-header-tools">
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
           ${alignmentCard ? `<button type="button" class="button ghost tiny subview-panel-help" aria-label="${escapeAttr(i18n.subview.helpLabel)}" data-app-tooltip="${escapeAttr(i18n.subview.guide)}">?</button>` : ""}
-          ${allBadges && !assembly.subviewWindowRendering ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
+        </div>
+        <div class="subview-panel-title-row assembly-track-inline-controls${alignmentCard ? " subview-track-inline-controls" : ""}" data-subview-toolbar data-grt-result-card="subview" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
           ${!alignmentCard ? `<p class="muted subview-empty-guide" data-app-tooltip="${escapeAttr(i18n.subview.guide)}" data-app-tooltip-overflow>${escapeHtml(i18n.subview.guide)}</p>` : ""}
           ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history, assembly.subviewWindowRendering) : ""}
         </div>
         ${renderSubviewWindowChrome(assembly, i18n.subview, true)}
       </div>
+      ${allBadges && !assembly.subviewWindowRendering ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
       ${grtResultToast}
       ${subview.error ? `<p class="error-text">${escapeHtml(subview.error)}</p>` : ""}
       ${alignmentCard}
@@ -949,8 +953,7 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
     options: IDENTITY_PCT_OPTIONS,
     allowZero: true,
   });
-  return `
-      ${grtResultControls}
+  const filters = `
       ${renderViewTickControl(trackPrefs, i18n, "subviewTrackView")}
       <label class="assembly-track-inline-field">
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
@@ -960,8 +963,10 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">${escapeHtml(i18n.trackControls.identityPct)}</span>
         ${identityInput}
       </label>
-      ${renderSubviewHistoryControls(history, i18n)}
   `;
+  return renderToolbarGroup("display", grtResultControls, i18n, { local: true })
+    + renderToolbarGroup("filter", filters, i18n, { local: true })
+    + renderToolbarGroup("edit", renderSubviewHistoryControls(history, i18n), i18n, { local: true });
 }
 
 function renderSubviewTrackOrderToggleButton({ className = "", style = "", swapTrackOrderLabel = "" } = {}) {
@@ -3209,13 +3214,13 @@ function renderSubviewTrackPairAlignmentCard(
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
-          <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px" data-app-tooltip="${escapeAttr(topTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(topTrackLabel)}"><span>${escapeHtml(topVisibleTrackLabel)}</span></div>
+          <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px" data-app-tooltip="${escapeAttr(topTrackLabel)}" data-app-tooltip-overflow=".assembly-track-label-name" aria-label="${escapeAttr(topTrack.role === "ref" ? `${topTrackLabel} [R]` : topTrackLabel)}">${renderTrackIdentity(topVisibleTrackLabel, topTrack.role)}</div>
           ${renderSubviewTrackOrderToggleButton({
             className: "is-in-label-column",
             style: `top:${trackOrderButtonTopPx}px`,
             swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
           })}
-          <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px" data-app-tooltip="${escapeAttr(bottomTrackLabel)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(bottomTrackLabel)}"><span>${escapeHtml(bottomVisibleTrackLabel)}</span></div>
+          <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px" data-app-tooltip="${escapeAttr(bottomTrackLabel)}" data-app-tooltip-overflow=".assembly-track-label-name" aria-label="${escapeAttr(bottomTrack.role === "ref" ? `${bottomTrackLabel} [R]` : bottomTrackLabel)}">${renderTrackIdentity(bottomVisibleTrackLabel, bottomTrack.role)}</div>
         </div>
         <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-view-navigation-start-bp="${domainStart + renderViewBoxMinX * domainSpanBp / baseInnerWidth}" data-view-navigation-end-bp="${domainStart + (renderViewBoxMinX + renderInnerWidth) * domainSpanBp / baseInnerWidth}" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}" ${denseBandRendering ? 'data-subview-band-rendering="dense"' : ""}>
           ${renderTrackBandCanvasLayer({

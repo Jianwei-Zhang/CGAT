@@ -44,11 +44,11 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.doesNotMatch(html, /view-display-settings/);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
-  assert.ok(html.indexOf("辅助长度 ") < html.indexOf("比对长度"));
+  assert.ok(html.indexOf("辅助长度 ") < html.indexOf("比对长度 (bp)"));
   assert.match(html, /比对长度 \(bp\)/);
   assert.match(html, /一致性 \(%\)/);
   assert.ok(html.indexOf("辅助数据集") < html.indexOf("辅助长度 "));
-  assert.ok(html.indexOf("比对长度") < html.indexOf("一致性"));
+  assert.ok(html.indexOf("比对长度 (bp)") < html.indexOf("一致性 (%)"));
 
   assert.match(
     html,
@@ -315,7 +315,7 @@ test("track tick label css does not force middle anchor", () => {
   assert.doesNotMatch(css, /\.track-tick-label\s*\{[^}]*text-anchor:\s*middle;/);
 });
 
-test("subview toolbar keeps title and candidates compact and wraps whole controls on narrow screens", () => {
+test("subview toolbar keeps title and candidates compact and groups controls without wrapping", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
@@ -324,7 +324,7 @@ test("subview toolbar keeps title and candidates compact and wraps whole control
   assert.match(css, /\.subview-panel-head\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*align-items:\s*flex-start;/);
   assert.doesNotMatch(css, /\.subview-panel-guide\s*\{/);
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;/);
-  assert.match(css, /\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex:\s*1 1 0;[^}]*justify-content:\s*safe flex-end;[^}]*flex-wrap:\s*wrap;[^}]*overflow-x:\s*auto;/);
+  assert.match(css, /\.subview-window \.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex:\s*1 1 0;[^}]*justify-content:\s*flex-start;[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto;/);
   assert.doesNotMatch(css, /@media \(max-width:\s*700px\)[\s\S]*\.subview-track-inline-controls\s*\{/);
   assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*2\.1429rem;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid var\(--theme-line,\s*#b8c2cc\);[^}]*border-radius:\s*4px;/);
   assert.match(css, /\.subview-candidate-slot\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
@@ -559,7 +559,7 @@ test("main primary track label is selectable for track-level context menu action
 
   assert.match(
     html,
-    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*data-app-tooltip="主数据集轨道（hifiasm）"[^>]*>\s*<span>\[主\] hifiasm<\/span>/,
+    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*data-app-tooltip="主数据集轨道（hifiasm）"[^>]*>\s*<span class="assembly-track-label-name">hifiasm<\/span><span class="assembly-track-role-marker" aria-hidden="true">\[P\]<\/span>/,
   );
 });
 

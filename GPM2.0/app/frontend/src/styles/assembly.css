@@ -288,45 +288,7 @@
   padding: 0 8px;
 }
 
-/* All parameter/action groups are peers. A whole field wraps as one unit.
-   Only a field wider than the toolbar creates an internal horizontal scroll. */
-.assembly-track-inline-controls[data-main-track-toolbar],
-.assembly-track-inline-controls[data-subview-toolbar] {
-  flex: 1 1 0;
-  width: auto;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  justify-content: flex-end;
-  /* An over-wide group must overflow toward the reachable scroll end. */
-  justify-content: safe flex-end;
-  flex-wrap: wrap;
-  overflow-x: auto;
-}
-
-/* Main has no title competing for this row. Keep intrinsic field widths and
-   stable reading order; flex wraps complete label/input units as space changes.
-   Extra space marks action / parameter / history boundaries, never stretches inputs. */
-.assembly-track-inline-controls[data-main-track-toolbar] {
-  justify-content: flex-start;
-  column-gap: 12px;
-  row-gap: 8px;
-}
-[data-main-track-toolbar] > .assembly-marker-display { margin-inline-end: 8px; }
-[data-main-track-toolbar] > .main-view-history-controls { margin-inline-start: 8px; }
-
-:is([data-main-track-toolbar], [data-subview-toolbar]) > * {
-  flex: 0 0 auto;
-  box-sizing: border-box;
-  height: 2.1429rem;
-  min-height: 2.1429rem;
-  white-space: nowrap;
-}
-
-[data-main-track-toolbar] > [data-create-phased-track] {
-  height: 2.1429rem;
-}
-
+/* Grouped Main/Local control geometry is owned by assembly-toolbar.css. */
 .assembly-marker-display > [data-marker-display-toggle] {
   height: 2.1429rem;
   min-height: 2.1429rem;

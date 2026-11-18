@@ -70,7 +70,7 @@ function createState(overrides = {}) {
       editSupportDatasetIds: [],
       editChrAssignmentMinCoveragePercentInput: "60",
       editPhasedAssemblyEnabledInput: false,
-      summary: "Fill in the project information and create a project.",
+      summary: "Fill in the assembly information and create an assembly.",
       ...initializerOverrides,
     },
     assembly: {
@@ -243,7 +243,7 @@ function createRouteHost(nodeMap = {}) {
 test("project summary leads directly with the selected project", () => {
   const html = renderWorkspacePage(createState());
   assert.match(html, />Enter Assembly</);
-  assert.doesNotMatch(html, /Current project|Close project|project-close-button|Create Project|Existing Projects|Project Initialization/);
+  assert.doesNotMatch(html, /Current project|Close project|project-close-button|Create Project|Existing Assemblies|Assembly Initialization/);
 });
 
 test("legacy creation state cannot expose a phased capability switch", () => {

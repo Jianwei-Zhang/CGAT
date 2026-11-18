@@ -24,7 +24,7 @@ test("empty library keeps the hierarchy, fixed default bucket and right-side imp
   assert.match(markup, /class="project-browser"/);
   assert.match(markup, /data-library-group="plants"/);
   assert.match(markup, /data-library-group="rice"/);
-  assert.match(markup, /尚未添加项目/);
+  assert.match(markup, /尚未添加组装/);
   assert.match(markup, /data-library-create="root"/);
   assert.equal((markup.match(/data-library-group=""/g) || []).length, 1);
   assert.doesNotMatch(markup, /data-library-drag-folder=""/);
@@ -52,7 +52,7 @@ test("names and paths are escaped and full-path import destinations disambiguate
   assert.match(markup, /data-app-tooltip-overflow="span"/);
   const picker = renderImportPartition(state("zh", { importPartitionId: "rice" }));
   assert.match(picker, /value="rice" selected>植物 \/ 水稻/);
-  assert.match(picker, /<option value="">未分区/);
+  assert.match(picker, /<option value="">未分配/);
 }));
 
 test("moving a partition excludes descendants; deleting a nonempty partition requires explicit confirmation", () => withStorage(() => {
@@ -61,8 +61,8 @@ test("moving a partition excludes descendants; deleting a nonempty partition req
   assert.match(markup, /value="animals"/);
   const deletion = renderLibraryDialog(state("zh", { libraryDialog: { kind: "delete", id: "plants" } }));
   assert.doesNotMatch(deletion, /type="submit"[^>]*disabled/);
-  assert.match(deletion, /将删除 3 个分区（含当前分区），移动 0 个项目/);
-  assert.match(deletion, /不会删除项目文件/);
+  assert.match(deletion, /将删除 3 个项目（含当前项目），移动 0 个组装/);
+  assert.match(deletion, /不会删除组装文件/);
 }));
 
 test("unpartitioned is a fixed system entry with import but no rename, child or delete menu", () => {
@@ -91,14 +91,14 @@ test("import selector and inline creation preserve the import draft and preselec
   bindProjectLibrary(h, s, callbacks);
   input.fire("change", { target: input }); create.fire("click");
   assert.deepEqual(s.getState().importer.libraryDialog, { kind: "create", parentId: "rice", forImport: true });
-  const name = button({ value: "新分区" }), target = button({ value: "rice" }), cancel = button();
+  const name = button({ value: "新项目" }), target = button({ value: "rice" }), cancel = button();
   const dialog = button({ querySelector: key => ({ "#library-name": name, "#library-target": target, "[data-library-dialog-close]": cancel }[key]), querySelectorAll: () => [name, target, cancel] });
   const overlay = { setAttribute() {} };
   bindProjectLibrary(host({ ".library-dialog": dialog, "[data-project-import-overlay]": overlay }), s, callbacks);
   assert.equal(overlay.inert, true);
   dialog.fire("submit");
   const created = readProjectLibrary().partitions.at(-1);
-  assert.equal(created.name, "新分区"); assert.equal(created.parentId, "rice");
+  assert.equal(created.name, "新项目"); assert.equal(created.parentId, "rice");
   assert.equal(s.getState().importer.importPartitionId, created.id);
   assert.equal(s.getState().importer.zipPath, "/bundle.zip");
   assert.equal(s.getState().importer.projectNameInput, "draft");
@@ -160,7 +160,7 @@ for (const locale of ["en", "zh"]) {
     const narrow = renderLibraryMenu(state(locale, { libraryMenu: { root: true }, libraryOverflowActions: ["validate", "delete-failed"] }));
     assert.match(narrow, /data-library-overflow-action="create" hidden/);
     assert.doesNotMatch(narrow, /data-library-overflow-action="(?:validate|delete-failed)" hidden/);
-    assert.match(narrow, locale === "en" ? /Validate/ : /校验项目/);
+    assert.match(narrow, locale === "en" ? /Validate/ : /校验组装/);
     assert.match(narrow, locale === "en" ? /Delete failed/ : /删除失败/);
   });
 }
@@ -188,8 +188,8 @@ for (const locale of ["zh", "en"]) {
   test(`${locale} deletion confirmation counts all nested partitions and projects without deleting project files`, () => withStorage(() => {
     writeWorkspaceHistory([{ path: "/direct", partitionId: "plants" }, { path: "/nested", partitionId: "rice" }, { path: "/other", partitionId: "animals" }]);
     const markup = renderLibraryDialog(state(locale, { libraryDialog: { kind: "delete", id: "plants" } }));
-    assert.match(markup, locale === "zh" ? /将删除 3 个分区（含当前分区），移动 2 个项目/ : /Partitions to delete: 3.*Projects to move: 2/);
-    assert.match(markup, locale === "zh" ? /内部项目全部移到“未分区”，不会删除项目文件/ : /projects will move to Unpartitioned; no project files will be deleted/);
+    assert.match(markup, locale === "zh" ? /将删除 3 个项目（含当前项目），移动 2 个组装/ : /Projects to delete: 3.*Assemblies to move: 2/);
+    assert.match(markup, locale === "zh" ? /内部组装全部移到“未分配”，不会删除组装文件/ : /assemblies will move to Unassigned; no assembly files will be deleted/);
     assert.doesNotMatch(markup, /type="submit"[^>]*disabled/);
     const missing = renderLibraryDialog(state(locale, { libraryDialog: { kind: "delete", id: "missing" } }));
     assert.match(missing, /type="submit"[^>]*disabled/);

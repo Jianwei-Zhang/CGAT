@@ -951,6 +951,7 @@ export function disposeAssemblyTransientInteractions(host) {
 }
 
 export function syncAssemblyTransientInteractions(host, store) {
+  getSubviewWorkspaceRuntime(store)?.resume();
   queueMicrotask(() => { void resumeAssemblyReadyStages(host, store, assemblyDataRuntimeDeps); });
   syncExistingAssemblyViewNavigation(host);
   bindAssemblyScopePopovers(host, store);
@@ -1787,7 +1788,13 @@ function refreshAssemblyViewportGeometry(host, store) {
 }
 
 function rerenderAssemblyConfirmModal(host, store) {
-  const routeHost = resolveCurrentRouteHost(host);
+  if (store.getState().activeRoute && store.getState().activeRoute !== "assembly") return;
+  if (store.isLocalViewAlive?.() === false) return;
+  // resolveCurrentRouteHost intentionally prefers the Local window for graph
+  // edits. A page modal must instead escape that window and its clipping/stack.
+  const doc = host?.ownerDocument || getSubviewWorkspaceRuntime(store)?.root?.ownerDocument || globalThis.document;
+  const routeHost = host?.matches?.("#route-host") ? host
+    : host?.closest?.("#route-host") || doc?.querySelector?.("#route-host") || resolveCurrentRouteHost(host);
   if (!routeHost) {
     return;
   }
@@ -1797,7 +1804,6 @@ function rerenderAssemblyConfirmModal(host, store) {
     currentOverlay?.remove?.();
     return;
   }
-  const doc = routeHost.ownerDocument || host?.ownerDocument || globalThis.document;
   if (!doc?.createElement) {
     rerender(host, store);
     return;

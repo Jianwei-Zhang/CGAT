@@ -1,3 +1,4 @@
+import { cancelAssemblyConfirmDialog } from "../pages/assembly/confirm-controller.js";
 import { hideAppTooltips } from "../app-tooltip-runtime.js";
 import { renderImporterPage } from "../pages/importer-page.js";
 import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools, syncAssemblyTransientInteractions } from "../pages/assembly-page.js";
@@ -69,6 +70,11 @@ function renderRoute(root, store) {
   const previousAssemblyDomCacheKey = String(host?.dataset?.assemblyDomCacheKey || "");
   if (["projectExport", "projectPreview"].includes(previousRoute)) releaseProjectOverviewPreview(host);
   if (previousRoute === "assembly") {
+    if (state.activeRoute !== "assembly") {
+      cancelAssemblyConfirmDialog(store);
+      host.querySelector?.("[data-assembly-confirm-overlay='true']")?.remove?.();
+      state = store.getState();
+    }
     rememberAssemblyDom(host, state);
   }
   const renderer = routeRenderers[state.activeRoute];

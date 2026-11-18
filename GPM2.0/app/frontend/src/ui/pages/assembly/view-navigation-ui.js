@@ -7,8 +7,8 @@ export function isViewNavigationContextMenuTarget(target) {
 }
 
 export const VIEW_NAV_TEXT = {
-  zh: { group: "查看范围", interaction: "拖动空白平移；Ctrl / ⌘ + 拖动空白框选；横向拖动 Contig 调整位置，拖到目标视图添加；Ctrl + 滚轮缩放，普通滚轮上下滚动", left: "左移半屏", right: "右移半屏", fit: "全览", fitHint: "显示当前视图的全部范围", span: "窗口", axis: "总览范围；拖动范围框平移，Ctrl + 滚轮缩放，普通滚轮上下滚动", window: "当前查看窗口", edgeLeft: "调整窗口左边界", edgeRight: "调整窗口右边界", tick: "刻度间隔", tickOptions: "选择刻度间隔", tickInvalid: "请输入 Auto 或有效的正数；单位为 kb。" },
-  en: { group: "Viewing range", interaction: "Drag blank space to pan; Ctrl / ⌘ + drag blank space to box-select; drag contigs horizontally to reposition or onto a destination view to add; Ctrl + wheel to zoom; plain wheel scrolls vertically", left: "Move left half a window", right: "Move right half a window", fit: "Full range", fitHint: "Display the complete viewing range", span: "Window", axis: "Overview range; drag the window to pan, Ctrl + wheel to zoom; plain wheel scrolls vertically", window: "Current viewing window", edgeLeft: "Resize left window edge", edgeRight: "Resize right window edge", tick: "Tick interval", tickOptions: "Choose tick interval", tickInvalid: "Enter Auto or a positive tick interval in kb." },
+  zh: { label: "视野", hint: "平移、缩放或查看完整范围，不修改组装内容", group: "查看范围", interaction: "拖动空白平移；Ctrl / ⌘ + 拖动空白框选；横向拖动 Contig 调整位置，拖到目标视图添加；Ctrl + 滚轮缩放，普通滚轮上下滚动", left: "左移半屏", right: "右移半屏", fit: "全览", fitHint: "显示当前视图的全部范围", span: "窗口", axis: "总览范围；拖动范围框平移，Ctrl + 滚轮缩放，普通滚轮上下滚动", window: "当前查看窗口", edgeLeft: "调整窗口左边界", edgeRight: "调整窗口右边界", tick: "刻度间隔", tickOptions: "选择刻度间隔", tickInvalid: "请输入 Auto 或有效的正数；单位为 kb。" },
+  en: { label: "View", hint: "Pan, zoom or fit the viewing range without changing assembly content", group: "Viewing range", interaction: "Drag blank space to pan; Ctrl / ⌘ + drag blank space to box-select; drag contigs horizontally to reposition or onto a destination view to add; Ctrl + wheel to zoom; plain wheel scrolls vertically", left: "Move left half a window", right: "Move right half a window", fit: "Full range", fitHint: "Display the complete viewing range", span: "Window", axis: "Overview range; drag the window to pan, Ctrl + wheel to zoom; plain wheel scrolls vertically", window: "Current viewing window", edgeLeft: "Resize left window edge", edgeRight: "Resize right window edge", tick: "Tick interval", tickOptions: "Choose tick interval", tickInvalid: "Enter Auto or a positive tick interval in kb." },
 };
 export function viewNavText(i18nOrLocale) {
   const locale = typeof i18nOrLocale === "string" ? i18nOrLocale
@@ -28,6 +28,7 @@ export function renderViewNavigation(role, locale) {
   const icon = (action) => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[action]}</svg>`;
   const button = (action, title) => `<button type="button" class="view-nav-button" data-view-nav-action="${action}" aria-label="${escape(title)}" data-app-tooltip="${escape(title)}">${icon(action)}</button>`;
   return `<div class="assembly-view-navigation" data-view-navigation="${role}" role="group" aria-label="${t.group}" aria-description="${escape(t.interaction)}">
+    <span class="assembly-toolbar-group-label view-nav-group-label" data-view-nav-group-label tabindex="0" data-app-tooltip="${t.hint}">${t.label}</span>
     <div class="view-nav-moves">${button("left", t.left)}${button("right", t.right)}</div>
     <div class="view-nav-range">
       <div class="view-nav-axis" data-view-nav-axis data-app-tooltip="${t.axis}" aria-label="${t.axis}">
@@ -49,6 +50,8 @@ export function localizeViewNavigation(bar, locale) {
   const t = viewNavText(locale);
   const attrs = (node, values) => { for (const [key, value] of Object.entries(values)) node?.setAttribute?.(key, value); };
   attrs(bar, { "aria-label": t.group, "aria-description": t.interaction });
+  const label = bar.querySelector("[data-view-nav-group-label]");
+  if (label) { label.textContent = t.label; attrs(label, { "data-app-tooltip": t.hint }); }
   for (const key of ["left", "right"]) attrs(bar.querySelector(`[data-view-nav-action='${key}']`), { "aria-label": t[key], title: t[key] });
   attrs(bar.querySelector("[data-view-nav-axis]"), { title: t.axis, "aria-label": t.axis });
   attrs(bar.querySelector("[data-view-nav-window]"), { "aria-label": t.window });

@@ -13,14 +13,14 @@ function renderTracks(locale, { primaryName = "hifiasm", supportName = "flye", s
 }
 
 function labelRows(html) {
-  return [...html.matchAll(/<div class="assembly-track-label-row[^"]*"([^>]+)>\s*<span>([^<]*)<\/span>/g)]
-    .map(([, attrs, text]) => ({ attrs, text }));
+  return [...html.matchAll(/<div class="assembly-track-label-row[^"]*"([^>]+)>\s*<span class="assembly-track-label-name">([^<]*)<\/span>(?:<span class="assembly-track-role-marker" aria-hidden="true">([^<]*)<\/span>)?/g)]
+    .map(([, attrs, name, marker]) => ({ attrs, text: [name, marker].filter(Boolean).join(" ") }));
 }
 
 for (const locale of ["zh", "en"]) {
-  const primary = locale === "zh" ? "主" : "P";
-  const auxiliary = locale === "zh" ? "辅" : "A";
-  test(`main track names use compact role prefixes with full accessible labels (${locale})`, () => {
+  const primary = "P";
+  const auxiliary = "A";
+  test(`main track names use compact role suffixes with full accessible labels (${locale})`, () => {
     const rows = labelRows(renderTracks(locale));
     for (const [role, prefix, name, title] of [
       ["primary", primary, "hifiasm", locale === "zh" ? "主数据集轨道（hifiasm）" : "Primary Dataset Track (hifiasm)"],
@@ -28,7 +28,7 @@ for (const locale of ["zh", "en"]) {
     ]) {
       const row = rows.find(row => row.attrs.includes(`data-track-label-role="${role}"`));
       assert.ok(row, `missing ${role} track`);
-      assert.equal(row.text, `[${prefix}] ${name}`);
+      assert.equal(row.text, `${name} [${prefix}]`);
       assert.ok(row.attrs.includes(`data-app-tooltip="${title}"`));
       assert.ok(row.attrs.includes(`aria-label="${title}"`));
       assert.ok(row.attrs.includes('data-track-label-selectable="1"'));
@@ -36,7 +36,7 @@ for (const locale of ["zh", "en"]) {
     }
   });
 
-  test(`unnamed primary track keeps its role prefix without fabricating a dataset name (${locale})`, () => {
+  test(`unnamed primary track keeps its role suffix without fabricating a dataset name (${locale})`, () => {
     const rows = labelRows(renderAssemblyPage({ ...createState(), locale }));
     const row = rows.find(row => row.attrs.includes('data-track-label-role="primary"'));
     assert.equal(row.text, `[${primary}]`);
@@ -47,7 +47,7 @@ for (const locale of ["zh", "en"]) {
   test(`unselected auxiliary track stays concise, explicit and non-selectable (${locale})`, () => {
     const rows = labelRows(renderTracks(locale, { selected: false }));
     const text = locale === "zh" ? "未选择" : "Not Selected";
-    const row = rows.find(row => row.text === `[${auxiliary}] ${text}`);
+    const row = rows.find(row => row.text === `${text} [${auxiliary}]`);
     assert.ok(row);
     assert.ok(row.attrs.includes(locale === "zh" ? 'data-app-tooltip="辅助数据集轨道（未选择）"' : 'data-app-tooltip="Auxiliary Dataset Track (Not Selected)"'));
     assert.ok(!row.attrs.includes("data-track-label-selectable"));
@@ -58,7 +58,7 @@ for (const locale of ["zh", "en"]) {
     const rows = labelRows(renderTracks(locale, { primaryName: name, supportName: name }));
     for (const [role, prefix] of [["primary", primary], ["support", auxiliary]]) {
       const row = rows.find(row => row.attrs.includes(`data-track-label-role="${role}"`));
-      assert.equal(row.text, `[${prefix}] HiFiasm_Chromosome_V1_very_long_name&lt;&amp;"`);
+      assert.equal(row.text, `HiFiasm_Chromosome_V1_very_long_name&lt;&amp;&quot; [${prefix}]`);
       assert.ok(row.attrs.includes('HiFiasm_Chromosome_V1_very_long_name&lt;&amp;&quot;'));
     }
   });
@@ -97,7 +97,7 @@ for (const locale of ["zh", "en"]) {
         const fullLabel = mainRow.attrs.match(/aria-label="([^"]*)"/)[1];
         assert.ok(localRow.attrs.includes(`aria-label="${fullLabel}"`));
         assert.ok(localRow.attrs.includes(`data-app-tooltip="${fullLabel}"`));
-        assert.ok(localRow.attrs.includes('data-app-tooltip-overflow="span"'));
+        assert.ok(localRow.attrs.includes('data-app-tooltip-overflow=".assembly-track-label-name"'));
         assert.ok(html.includes(`<span class="subview-candidate-name">${mainRow.text}</span>`));
       }
     });

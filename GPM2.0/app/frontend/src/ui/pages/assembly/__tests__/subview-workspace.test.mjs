@@ -117,7 +117,7 @@ test("closed non-active windows and scope ABA cannot receive late writes", () =>
     ...store.getState().assembly, selectedChrName, subview: null } });
   const restored = store.getState().assembly.subviewWorkspace.windows[0];
   assert.equal(restored.id, b);
-  assert.equal(restored.opened, false);
+  assert.equal(restored.opened, true);
   scopedB.setState({ assembly: { ...scopedB.getState().assembly, subview: { summary: summary(1, 2) } } });
   assert.equal(store.getState().assembly.subviewWorkspace.windows.length, 1);
   assert.equal(store.getState().assembly.subviewWorkspace.windows[0].snapshot.subview.summary.bottom.contigId, 8);

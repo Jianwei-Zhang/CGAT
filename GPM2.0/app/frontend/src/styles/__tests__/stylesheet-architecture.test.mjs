@@ -14,6 +14,7 @@ const expectedImports = [
   "./workspace.css",
   "./assembly.css",
   "./subview.css",
+  "./assembly-toolbar.css",
   "./final-path.css",
   "./degap.css",
   "./project-export.css",

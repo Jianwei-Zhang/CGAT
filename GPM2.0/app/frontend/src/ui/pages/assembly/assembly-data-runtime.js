@@ -1,3 +1,5 @@
+import { rememberChromosomeView, restoreChromosomeView } from "./chromosome-view-state.js";
+import { cancelAssemblyConfirmDialog } from "./confirm-controller.js";
 import { taskScopeKey } from "./subview-task-state.js";
 import { hasDeferredReferenceHits } from "../../../services/workflow/reference-evidence.js";
 import { hydrateAssemblyCtgDetail, restoreAssemblyLocalEvidence } from "./assembly-ready-stages.js";
@@ -759,6 +761,8 @@ export async function selectChromosome(host, store, chrName, deps) {
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
   }
+  cancelAssemblyConfirmDialog(store);
+  state = store.getState();
   const request = beginAssemblyViewRequest(store);
   if (typeof deps.waitForProjectViewMutations === "function") {
     await deps.waitForProjectViewMutations();
@@ -770,6 +774,8 @@ export async function selectChromosome(host, store, chrName, deps) {
     // navigation waited. Never spread the older pre-barrier assembly snapshot.
     state = latest;
   }
+  rememberChromosomeView(store, state);
+  const previousView = restoreChromosomeView(store, chrName, state);
   const isCurrentRequest = () => {
     const current = store.getState();
     return currentAssemblyViewRequest(store) === request
@@ -785,6 +791,9 @@ export async function selectChromosome(host, store, chrName, deps) {
   store.setState({
     assembly: {
       ...state.assembly,
+      ...(previousView?.trackView ? { trackView: previousView.trackView } : {}),
+      ...(previousView?.trackScrollState ? { trackScrollState: previousView.trackScrollState } : {}),
+      ...(previousView?.finalPathTrackScrollState ? { finalPathTrackScrollState: previousView.finalPathTrackScrollState } : {}),
       loading: true,
       error: "",
       chrPickerOpen: state.assembly.chrPickerOpen === true,
@@ -888,7 +897,7 @@ export async function selectChromosome(host, store, chrName, deps) {
       annotatedPrimaryCtgs,
       annotatedSupportCtgs,
     );
-    const selectedCtgId = resolveSelectedCtgId(annotatedPrimaryCtgs, null, false);
+    const selectedCtgId = resolveSelectedCtgId(annotatedPrimaryCtgs, previousView?.selectedCtgId ?? null, true);
     const filterPrimaryHiddenIds = typeof deps.filterPrimaryTrackSelectionCtgIds === "function"
       ? deps.filterPrimaryTrackSelectionCtgIds
       : (values) => values;
@@ -917,15 +926,18 @@ export async function selectChromosome(host, store, chrName, deps) {
         supportChrCtgs: annotatedSupportCtgs,
         finalPathByChr: hydratedFinalPathByChr,
         deletedCtgs,
-        selectedDeletedCtgRecordIds: [],
-        trackSelectedCtgIds: [],
+        selectedDeletedCtgRecordIds: (previousView?.selectedDeletedCtgRecordIds || []).filter(id =>
+          deletedCtgs.some(ctg => Number(ctg.deletedCtgRecordId) === Number(id))),
+        trackSelectedCtgIds: filterPrimaryHiddenIds(previousView?.trackSelectedCtgIds || [], {
+          ...store.getState().assembly, chrCtgs: annotatedPrimaryCtgs, mainViewHistory,
+        }),
         hiddenPrimaryCtgIds: filteredHiddenPrimaryCtgIds,
         hiddenPrimaryCtgIdsByChr,
         subviewTrackDragOffsets: [],
         selectedCtgId,
         ctgDetail: sideData.detail, ctgDetailLoading: Boolean(selectedCtgId), ctgDetailError: "",
         editCandidates: sideData.candidates,
-        selectedMemberSeqId: resolveSelectedMemberSeqId(sideData.detail, null),
+        selectedMemberSeqId: previousView?.selectedMemberSeqId ?? resolveSelectedMemberSeqId(sideData.detail, null),
         subview: deps.buildClearedSubviewState(state.assembly),
         summary: tAssembly(store.getState(), "runtime.chrLoadedSummary", { chrName }),
       },

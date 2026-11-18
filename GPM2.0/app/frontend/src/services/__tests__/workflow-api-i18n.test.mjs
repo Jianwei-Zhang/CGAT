@@ -17,9 +17,9 @@ test("workflow-api mock import stages and summaries use english copy when locale
     });
 
     assert.deepEqual(zipStages, [
-      "Validate archive path and project parameters",
+      "Validate archive path and assembly parameters",
       "Extract the bundle and inspect the gpm_server delivery structure",
-      "Create the project and generate project.sqlite",
+      "Create the assembly and generate project.sqlite",
     ]);
     assert.equal(
       zipResult.message,
@@ -35,7 +35,7 @@ test("workflow-api mock import stages and summaries use english copy when locale
 
     assert.deepEqual(extractedStages, [
       "Validate the extracted bundle structure",
-      "Locate gpm_server and use it as the project root",
+      "Locate gpm_server and use it as the assembly root",
     ]);
     assert.equal(
       extractedResult.message,

@@ -190,7 +190,7 @@ export function createAssemblyDomPatchController({
     const nextContent = createRenderedContent(routeHost, renderAssemblySubviewPanel(store.getState(), store));
     const nextPanel = nextContent?.querySelector?.("[data-subview-panel='1']") || null;
     if (!nextPanel) return null;
-    const selectors = [".subview-panel-head", ".subview-alignment-card"];
+    const selectors = [".subview-panel-head", ":scope > .subview-candidate-row", ".subview-alignment-card"];
     const replacements = selectors.map((selector) => ({
       current: livePanel.querySelector(selector),
       next: nextPanel.querySelector(selector),

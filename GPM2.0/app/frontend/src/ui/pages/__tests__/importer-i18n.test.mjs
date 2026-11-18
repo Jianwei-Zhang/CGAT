@@ -193,7 +193,7 @@ function createImporterScrollState(overrides = {}) {
 test("importer add-package labels and errors are translated in Chinese and English", () => {
   assert.equal(zh.buttons.importAddPackage, "导入追加包");
   assert.equal(zh.runtime.importAddPackageSummary, "正在导入数据集追加包。");
-  assert.equal(zh.runtime.incompleteAddPackageWorkspaceSummary, "请先加载已有项目。");
+  assert.equal(zh.runtime.incompleteAddPackageWorkspaceSummary, "请先加载已有组装。");
   assert.equal(zh.runtime.incompleteAddPackageZipSummary, "请先选择数据集追加压缩包。");
   assert.equal(zh.runtime.importAddPackageDoneStage, "数据集追加包导入完成并刷新候选项");
   assert.equal("skipPreviewPreparation" in zh.buttons, false);
@@ -212,23 +212,23 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与参考基因组的 FAI 长度");
   assert.equal(zh.progressStages.validate_grt_app_fastas, "检查 App 来源 FASTA 文件");
   assert.equal(zh.progressStages.validate_grt_app_final_path, "校验 Final Path 与 q4 序列摘要");
-  assert.equal(zh.progressStages.normalize_workspace_layout_start, "整理项目目录");
-  assert.equal(zh.progressStages.normalize_workspace_layout_entry, "整理项目目录：{detail}");
+  assert.equal(zh.progressStages.normalize_workspace_layout_start, "整理组装目录");
+  assert.equal(zh.progressStages.normalize_workspace_layout_entry, "整理组装目录：{detail}");
   assert.equal(zh.progressStages.resolve_bundle_root_start, "定位交付包根目录");
   assert.equal(zh.progressStages.resolve_bundle_root, "交付包根目录已定位");
   assert.equal(zh.progressStages.index_pairwise_paf_commit, "保存 pairwise 索引事务");
   assert.equal(zh.progressStages.extract_native_archive, "使用系统解压器展开交付包");
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
   assert.equal(zh.runtime.importPhaseProgressEntries, "阶段 {current}/{total} · 已展开 {entries} 个条目");
-  assert.equal(zh.buttons.validateHistory, "校验项目");
+  assert.equal(zh.buttons.validateHistory, "校验组装");
   assert.equal(zh.buttons.deleteFailedRecords, "删除失败");
-  assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败项目");
+  assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败组装");
   assert.equal(zh.page.deleteWithFiles, "是否同步删除对应文件（此操作不可逆，请谨慎操作）");
-  assert.equal(zh.runtime.deleteDoneFailedHistorySummary, "已从项目库删除 {count} 个校验失败项目。");
+  assert.equal(zh.runtime.deleteDoneFailedHistorySummary, "已从项目库删除 {count} 个校验失败组装。");
 
   assert.equal(en.buttons.importAddPackage, "Import Add Package");
   assert.equal(en.runtime.importAddPackageSummary, "Importing the dataset add package.");
-  assert.equal(en.runtime.incompleteAddPackageWorkspaceSummary, "Open an existing project first.");
+  assert.equal(en.runtime.incompleteAddPackageWorkspaceSummary, "Open an existing assembly first.");
   assert.equal(en.runtime.incompleteAddPackageZipSummary, "Select a dataset add-package archive first.");
   assert.equal(en.runtime.importAddPackageDoneStage, "Dataset add package imported and options refreshed");
   assert.equal(en.runtime.addPackageHint, "(added {datasetName})");
@@ -245,8 +245,8 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.progressStages.validate_grt_app_fai, "Validate source and reference FAI lengths");
   assert.equal(en.progressStages.validate_grt_app_fastas, "Check App source FASTA files");
   assert.equal(en.progressStages.validate_grt_app_final_path, "Validate Final Path and q4 sequence digests");
-  assert.equal(en.progressStages.normalize_workspace_layout_start, "Normalize project layout");
-  assert.equal(en.progressStages.normalize_workspace_layout_entry, "Normalize project layout: {detail}");
+  assert.equal(en.progressStages.normalize_workspace_layout_start, "Normalize assembly layout");
+  assert.equal(en.progressStages.normalize_workspace_layout_entry, "Normalize assembly layout: {detail}");
   assert.equal(en.progressStages.resolve_bundle_root_start, "Resolve delivery bundle root");
   assert.equal(en.progressStages.resolve_bundle_root, "Delivery bundle root resolved");
   assert.equal(en.progressStages.index_pairwise_paf_start, "Prepare pairwise bulk indexing");
@@ -257,11 +257,11 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
   assert.equal(en.runtime.importPhaseProgressEntries, "Phase {current}/{total} · {entries} entries extracted");
   assert.equal(en.buttons.validateHistory, "Validate");
-  assert.equal(en.buttons.validateHistoryLabel, "Validate projects");
+  assert.equal(en.buttons.validateHistoryLabel, "Validate assemblies");
   assert.equal(en.buttons.deleteFailedRecords, "Delete failed");
-  assert.equal(en.page.deleteFailedConfirmTitle, "Delete Failed Projects");
+  assert.equal(en.page.deleteFailedConfirmTitle, "Delete Failed Assemblies");
   assert.equal(en.page.deleteWithFiles, "Also delete files on disk (irreversible).");
-  assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Removed {count} projects that failed validation from the library.");
+  assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Removed {count} assemblies that failed validation from the library.");
 });
 
 test("project copy action opens an editable dialog with backend defaults", async () => {
@@ -421,7 +421,7 @@ test("importer bulk delete removes only current failed history records", async (
     assert.deepEqual(store.getState().importer.deleteTargets, ["D:/ws-failed-b", "D:/ws-failed-a"]);
 
     const confirmHtml = renderImporterPage(store.getState());
-    assert.match(confirmHtml, /删除失败项目/);
+    assert.match(confirmHtml, /删除失败组装/);
     assert.match(confirmHtml, /D:\/ws-failed-a/);
     assert.match(confirmHtml, /D:\/ws-failed-b/);
     assert.match(confirmHtml, /id="delete-with-files-checkbox" type="checkbox"/);
@@ -460,7 +460,7 @@ test("importer bulk delete removes only current failed history records", async (
       projectName: "active-project",
       projectId: 42,
     });
-    assert.equal(store.getState().importer.summary, "已从项目库删除 2 个校验失败项目。");
+    assert.equal(store.getState().importer.summary, "已从项目库删除 2 个校验失败组装。");
     assert.equal(store.getState().importer.deleteSelectionMode, "");
     assert.equal(deleteRequestCount, 0);
   } finally {
@@ -1006,7 +1006,7 @@ test("importer does not render loaded-project add-package actions", () => {
 
   assert.doesNotMatch(html, /draft-assembly/);
   assert.doesNotMatch(html, /data-import-add-package-project-id="42"/);
-  assert.doesNotMatch(html, /<h4>Loaded Projects<\/h4>/);
+  assert.doesNotMatch(html, /<h4>Loaded Assemblies<\/h4>/);
 });
 
 test("importer workspace history row imports add packages without expanding the compact project card", async () => {
@@ -1402,7 +1402,7 @@ for (const source of ["zip", "extracted"]) {
           if (command === "put_project_preview_cache") {
             assert.equal(store.getState().importer.inFlight, true, "import must wait for persistence");
             assert.equal(store.getState().importer.importPreparingPreview, true);
-            assert.match(store.getState().importer.stages.at(-1), /正在构建项目预览（1\/1）：New/);
+            assert.match(store.getState().importer.stages.at(-1), /正在构建组装预览（1\/1）：New/);
             assert.notEqual(store.getState().importer.status, "导入完成");
             snapshot = args.request.payload;
             return { stored: true };
@@ -1453,7 +1453,7 @@ for (const source of ["zip", "extracted"]) {
       assert.equal(store.getState().projectPreview.loaded, true);
       assert.equal(previewStateIsApplicable(store.getState()), true);
       assert.equal(snapshot.cards.length, 1);
-      assert.match(store.getState().importer.stages.at(-3), /^项目预览构建完成：New（[0-9.]+ 秒）$/);
+      assert.match(store.getState().importer.stages.at(-3), /^组装预览构建完成：New（[0-9.]+ 秒）$/);
       assert.match(store.getState().importer.stages.at(-2), /^总览数据准备完成：New（[0-9.]+ 秒）$/);
       assert.equal(store.getState().importer.stages.at(-1), "导入完成");
       assert.equal(store.getState().session.workspacePath, "D:/new");
@@ -1535,7 +1535,7 @@ test("importer english missing-parameter feedback stays translated after binding
 
     const nextImporter = store.getState().importer;
     assert.equal(nextImporter.status, "Incomplete parameters");
-    assert.equal(nextImporter.summary, "Fill in both the archive path and project directory.");
+    assert.equal(nextImporter.summary, "Fill in both the archive path and assembly directory.");
     assert.equal(timers.at(-1)?.delay, 1000);
     timers.at(-1).callback();
     assert.equal(store.getState().importer.status, "");
@@ -1889,7 +1889,7 @@ test("import progress uses phase metadata and labels LGZ validation instead of a
       },
     });
 
-    assert.match(html, /整理项目目录/);
+    assert.match(html, /整理组装目录/);
     assert.match(html, /校验参考基因组\/数据集 FASTA 与 FAI/);
     assert.match(html, /阶段 4\/7/);
     assert.doesNotMatch(html, /673\/674/);
@@ -2791,7 +2791,7 @@ test("project library menu groups all project actions with deletion last in both
       assert.equal((html.match(/role="separator"/g) || []).length, 2);
       assert.equal((html.match(/role="menuitem"/g) || []).length, 7);
       assert.match(html, /D:\/项目 &amp; &quot;rice&quot;/);
-      assert.match(html, locale === "zh" ? /打开项目文件所在位置/ : /Open Project File Location/);
+      assert.match(html, locale === "zh" ? /打开组装文件所在位置/ : /Open Assembly File Location/);
       assert.match(html, /context-menu-item is-danger[^>]*data-project-delete-files/);
       for (const importer of [{ inFlight: true }, { entryResolving: true }, { copyDialog: { open: true } }]) {
         const busy = renderImporterPage({ ...state, importer: { ...state.importer, ...importer } }).split('role="menu"')[1];
@@ -2832,7 +2832,7 @@ test("project location opens the clicked directory without opening or switching 
     assert.equal(h.store.getState().session.workspacePath, "");
     fail = true;
     await button.click();
-    assert.equal(h.store.getState().importer.status, "无法打开项目文件所在位置");
+    assert.equal(h.store.getState().importer.status, "无法打开组装文件所在位置");
     assert.equal(h.store.getState().importer.summary, "Directory no longer exists");
     h.store.setState({ importer: { ...h.store.getState().importer, entryResolving: true } });
     await button.click();
@@ -3048,16 +3048,16 @@ for (const behavior of ["read failure", "multiple projects", "overview failure"]
       assert.equal(calls.some(call => call.command === "request_import_cancel"), false);
       assert.equal(saved.size, behavior === "multiple projects" ? 2 : behavior === "read failure" ? 0 : 1);
       assert.equal(store.getState().importer.stages.at(-1), "导入完成");
-      if (behavior === "read failure") assert.match(store.getState().importer.summary, /项目已导入，进入预览时将重试/);
+      if (behavior === "read failure") assert.match(store.getState().importer.summary, /组装已导入，进入预览时将重试/);
       if(behavior === "overview failure"){
-        assert.match(store.getState().importer.summary,/项目已导入，打开总览时将重试/);
+        assert.match(store.getState().importer.summary,/组装已导入，打开总览时将重试/);
         assert.equal(store.getState().importer.stages.filter(stage=>stage.includes("总览数据准备未完成")).length,1);
       }
       if (behavior === "multiple projects") {
         const stages=store.getState().importer.stages;
-        assert.match(stages.at(-5), /^项目预览构建完成：P1（[0-9.]+ 秒）$/);
+        assert.match(stages.at(-5), /^组装预览构建完成：P1（[0-9.]+ 秒）$/);
         assert.match(stages.at(-4), /^总览数据准备完成：P1（[0-9.]+ 秒）$/);
-        assert.match(stages.at(-3), /^项目预览构建完成：P2（[0-9.]+ 秒）$/);
+        assert.match(stages.at(-3), /^组装预览构建完成：P2（[0-9.]+ 秒）$/);
         assert.match(stages.at(-2), /^总览数据准备完成：P2（[0-9.]+ 秒）$/);
         assert.equal(store.getState().projectPreview, null, "multiple projects must not select an arbitrary model");
       }
@@ -3075,8 +3075,8 @@ test("backend import completion is not labeled as whole-workflow completion", ()
     assert.equal(messages.runtime.importZipDoneStage, messages.runtime.importDoneStatus);
     assert.equal(messages.runtime.importExtractedDoneStage, messages.runtime.importDoneStatus);
   }
-  assert.equal(zh.progressStages.complete, "项目数据已导入");
-  assert.equal(en.progressStages.complete, "Project data imported");
+  assert.equal(zh.progressStages.complete, "组装数据已导入");
+  assert.equal(en.progressStages.complete, "Assembly data imported");
 });
 
 

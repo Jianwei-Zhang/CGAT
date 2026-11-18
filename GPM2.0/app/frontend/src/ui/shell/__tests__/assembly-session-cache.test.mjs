@@ -150,3 +150,21 @@ test("leaving during background drag rendering discards partial DOM and its earl
   assert.equal(restoreAssemblyDom(destination, en), true);
   clearAssemblySessionCache();
 });
+
+
+test("cached Assembly preserves page/plot scroll but rejects changed Chr or object ownership", () => {
+  clearAssemblySessionCache();
+  const state = createState({ assembly: { selectedChrName: "Chr1", chrCtgs: [{ assemblyCtgId: 1 }],
+    supportDatasetId: 2, selectedCtgId: 1, trackView: { visibleSpanBp: 600 } } });
+  const plot = { scrollLeft: 180, scrollTop: 25 }, page = { scrollLeft: 0, scrollTop: 320 };
+  const host = { ...createHost([{ id: "mounted-chr1" }]), ownerDocument: { scrollingElement: page },
+    querySelectorAll: () => [plot] };
+  rememberAssemblyDom(host, state);
+  host.replaceChildren({ id: "project-page" }); plot.scrollLeft = 0; page.scrollTop = 0;
+  assert.equal(restoreAssemblyDom(host, state), true);
+  assert.equal(plot.scrollLeft, 180); assert.equal(page.scrollTop, 320);
+  assert.equal(restoreAssemblyDom(host, { ...state, assembly: { ...state.assembly, selectedChrName: "Chr2" } }), false);
+  assert.equal(restoreAssemblyDom(host, { ...state, assembly: { ...state.assembly, chrCtgs: [{ assemblyCtgId: 2 }] } }), false);
+  assert.equal(restoreAssemblyDom(host, { ...state, assembly: { ...state.assembly, subview: { pairwiseEvidence: { status: "loaded" } } } }), true,
+    "Local-only completion is reconciled per window, not by discarding Main DOM");
+});

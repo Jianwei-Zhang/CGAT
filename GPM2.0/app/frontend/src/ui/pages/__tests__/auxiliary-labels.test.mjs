@@ -37,7 +37,7 @@ for (const locale of ["en", "zh"]) {
       });
       assert.match(html, new RegExp(`id="project-import-button"[^>]*>[\\s\\S]*?>${labels.import}<`));
       assert.match(html, new RegExp(`id="project-open-button"[^>]*>[\\s\\S]*?>${labels.open}<`));
-      assert.doesNotMatch(html, />Import Project<|>Open project<|>导入项目<|>打开项目</);
+      assert.doesNotMatch(html, />Import Assembly<|>Open assembly<|>导入项目<|>打开项目</);
     });
   }
 }
@@ -57,6 +57,6 @@ test("compact entry buttons do not shorten the import dialog title", () => {
   for (const locale of ["en", "zh"]) {
     const state = { locale, importer: { importDialogOpen: true } };
     const html = renderProjectImportDialog(state, getMessages(state, "importer"));
-    assert.match(html, new RegExp(`id="project-import-title">${locale === "en" ? "Import Project" : "导入项目"}<`));
+    assert.match(html, new RegExp(`id="project-import-title">${locale === "en" ? "Import Assembly" : "导入组装"}<`));
   }
 });

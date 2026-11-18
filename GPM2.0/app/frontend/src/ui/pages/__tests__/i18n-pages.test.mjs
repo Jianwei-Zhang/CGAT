@@ -23,11 +23,11 @@ test("importer page renders english labels when locale is en", () => {
   });
 
   assert.match(html, />Projects</);
-  assert.match(html, /New partition/);
+  assert.match(html, /New project/);
   assert.match(html, />Import</);
   assert.match(html, />Open</);
-  assert.doesNotMatch(html, />Import project<|>Open project</);
-  assert.match(html, />No projects yet</);
+  assert.doesNotMatch(html, />Import project<|>Open assembly</);
+  assert.match(html, />No assemblies yet</);
 });
 
 test("workspace page renders english labels when locale is en", () => {
@@ -59,7 +59,7 @@ test("workspace page renders english labels when locale is en", () => {
       editSupportDatasetIds: [],
       editChrAssignmentMinCoveragePercentInput: "60",
       optionsError: "",
-      summary: "Fill in the project information and create a project.",
+      summary: "Fill in the assembly information and create an assembly.",
     },
     assembly: {
       loading: false,

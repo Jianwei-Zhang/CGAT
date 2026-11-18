@@ -16,7 +16,7 @@ test("empty project page retains the library and partition creation before the f
   assert.match(html, /class="project-browser"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"/);
   assert.equal((html.match(/id="project-import-button"/g) || []).length, 1);
   assert.match(html, /data-library-create="root"/);
-  assert.match(html, /Unpartitioned/);
+  assert.match(html, /Unassigned/);
   assert.doesNotMatch(html, /class="project-page-header"/);
 });
 
@@ -44,7 +44,7 @@ test("recent projects and current detail share the browser layout without duplic
 test("recent-only state is distinct from no projects", () => {
   const html = render({ records: [{ path: "/rice" }] });
   assert.match(html, /project-no-selection/);
-  assert.match(html, /Select a project/);
+  assert.match(html, /Select an assembly/);
   assert.doesNotMatch(html, /No projects yet/);
 });
 
@@ -83,7 +83,7 @@ test("bulk deletion is exposed only after explicit validation completes with cur
   const importer = { historyValidation: { "/rice": { ok: false, message: "Open failed" } } };
   assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
   importer.historyValidatedPaths = ["/rice"];
-  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*data-app-tooltip="Delete failed projects"[^>]*aria-label="Delete failed projects"[^>]*>Delete failed<\/button>/);
+  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*data-app-tooltip="Delete failed assemblies"[^>]*aria-label="Delete failed assemblies"[^>]*>Delete failed<\/button>/);
   assert.doesNotMatch(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
   importer.historyValidating = true;
   assert.doesNotMatch(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
@@ -176,7 +176,7 @@ for (const locale of ["en", "zh"]) {
       const button = markup.match(/<button id="validate-history-button"[^>]*>[\s\S]*?<\/button>/)?.[0];
       assert.match(button, /class="library-toolbar-button"/);
       assert.match(button, /<svg[^>]*aria-hidden="true"/);
-      assert.doesNotMatch(button, />Validate<|>校验项目</);
+      assert.doesNotMatch(button, />Validate<|>校验组装</);
       assert.doesNotMatch(markup, /project-history-action-slot/);
       assert.match(markup, /class="project-recents-title-label"/);
       const toolbar = markup.split('class="project-library-toolbar project-library-actions"')[1]?.split("</header>")[0];
@@ -184,7 +184,7 @@ for (const locale of ["en", "zh"]) {
       assert.match(toolbar, /data-library-create="root"[\s\S]*id="validate-history-button"[\s\S]*id="delete-failed-history-button"[\s\S]*data-library-root-menu/);
       assert.doesNotMatch(markup, /<\/header>[\s\S]*id="validate-history-button"/);
     }
-    assert.match(idle, new RegExp(`aria-label="${locale === "en" ? "Validate projects" : "校验项目"}"`));
+    assert.match(idle, new RegExp(`aria-label="${locale === "en" ? "Validate assemblies" : "校验组装"}"`));
     assert.match(idle, /id="delete-failed-history-button"[^>]*hidden/);
     assert.match(busy, /id="delete-failed-history-button"[^>]*hidden/);
     assert.match(busy, /aria-busy="true" disabled/);
@@ -211,7 +211,7 @@ test("headings stay tooltip-free while validation icons explain idle and busy ac
   const records = [{ path: "/rice", projectName: "Rice" }];
   const html = render({ records });
   assert.doesNotMatch(html, /id="project-recents-title"[^>]*data-app-tooltip/);
-  assert.match(html, /id="validate-history-button"[^>]*data-app-tooltip="Validate projects"/);
+  assert.match(html, /id="validate-history-button"[^>]*data-app-tooltip="Validate assemblies"/);
   assert.match(html, /class="project-recent-open"[^>]*data-app-tooltip="\/rice"/);
   const busy = render({ records, importer: { historyValidating: true } });
   assert.match(busy, /id="validate-history-button"[^>]*data-app-tooltip="Validating…"/);
@@ -226,9 +226,9 @@ test("in-place validation preserves the icon and restores its idle explanation",
   assert.equal(attrs.get("data-app-tooltip"), "Validating…");
   state.importer.historyValidating = false;
   syncProjectValidation(host, state, []);
-  assert.equal(attrs.get("data-app-tooltip"), "Validate projects");
+  assert.equal(attrs.get("data-app-tooltip"), "Validate assemblies");
   assert.equal(button.innerHTML, "<svg>validation icon</svg>");
-  assert.equal(attrs.get("aria-label"), "Validate projects");
+  assert.equal(attrs.get("aria-label"), "Validate assemblies");
 });
 
 for (const locale of ["en", "zh"]) {
