@@ -125,7 +125,48 @@ in queries below 100 Mb, arguing against indiscriminate whole-group filtering.
 
 A next design to evaluate is whole-record routing: approximate only eligible
 very long queries and keep the ordinary path for others, preserving record
-order, all query records and per-record provenance. This is **not implemented
-or deployed**, has not demonstrated a 12x speedup, and is not validated for the
+order, all query records and per-record provenance. An isolated prototype is
+now archived below, but it is **not deployed** and has not demonstrated a 12x
+speedup or been validated for the
 self-alignment path. The already completed native 3D result should be reused,
 not replaced merely to install an optimization. No candidate has been adopted.
+
+
+## Whole-record routing prototype (2026-11-19, not deployed)
+
+`long_query_cross_router.py` routes only eligible complete queries, never final
+window fragments. Internal defaults require a query >=100 Mb and target
+100 Mb–1 Gb. Three 5 Mb windows calibrate filters 0.005 then 0.001, requiring
+at least 1,000 baseline grid positions, <=0.2% position disagreement and
+<=0.1% primary coverage loss; these samples do not establish whole-query
+accuracy. Failed calibration retains ordinary options. Full candidate primary
+coverage below 90% falls back to an ordinary whole-record mapping. Ordinary
+records retain their original names, bytes and options. Self alignments are
+outside this prototype's scope.
+
+Private mapping caches bind actual input/tool bytes, preset/filter, complete
+traversal, CIGAR-valid outputs and successful exit. Probe evidence cannot be
+used as a whole-record mapping. The final receipt also binds the preset,
+policy and implementation dependencies; changing only resource threads is
+not an analysis change. Cancellation does not leave a detached mapper. Any
+future main-workspace adoption still requires explicit command/checkpoint
+migration and preserving completed native leaves; uploading this file is not
+an installation into the main job.
+
+- Initial frozen-runtime validation: job `42701257`, 21/21 tests passed with
+  Python 3.10.12 / minimap2 2.31-r1302 on x86.
+- Review then found and fixed a missing final-receipt preset binding. Added
+  preset-change, dependency-change and multi-index ordinary-fallback tests.
+- Local incident suite: 47/47 passed; revised remote router suite: 24/24
+  passed at the start of job `42703218`.
+- `calibrate_whole_record_router.py` is a separate real-3D validation driver.
+  It verifies the completed native leaf, compares three bounded ordinary
+  whole records against that result, then calibrates eligible long records
+  without remapping those full long records. All products remain outside
+  the main analysis workspace. Job `42703218` was running this validation
+  at the 05:20 snapshot. The three ordinary-record outputs were subsequently
+  verified byte-identical to their completed native counterparts; long-record
+  calibration is still running. No main-workspace adoption is claimed.
+- Remote evidence: `long-query-router-validation-20261119/` and
+  `long-query-router-validation-v2-20261119/`, each retaining its source hashes,
+  launch script, logs and submission record.
