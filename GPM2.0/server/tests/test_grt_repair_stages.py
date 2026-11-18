@@ -184,6 +184,7 @@ class GrtRepairStagesTests(unittest.TestCase):
     def test_mummer_filter_retains_upstream_repeat_hits(self):
         parameters = grt_mummer_parameters(8)
         self.assertFalse(parameters["delta_filter"]["reference_best"])
+        self.assertEqual(parameters["nucmer"]["anchor_mode"], "maxmatch")
         self.assertEqual(parameters["delta_filter"]["min_alignment"], 10_000)
 
     def test_logged_command_failure_surfaces_stderr_tail(self):
@@ -1142,7 +1143,10 @@ Path(prefix + '.delta').write_text(
             "trim_left": 0,
             "trim_right": 10_287,
             "fill_length": 100,
+            "source_dataset": "guide", "source_contig": "bridge", "source_start": 1,
+            "source_end": len(left_oriented) + 3000, "orientation": "+",
         }
+        sources[("guide", "bridge")] = left_oriented + right_oriented[19542:]
 
         promote_direct_primary_overlap_merges(
             [gap],
@@ -1198,7 +1202,7 @@ Path(prefix + '.delta').write_text(
         )
         self.assertEqual(replayed, output_records)
 
-    def test_step3_direct_overlap_trims_left_only_without_flush_match(self):
+    def test_step3_direct_overlap_preserves_nonflush_left_tail(self):
         rng = random.Random(7)
         overlap = "".join(rng.choice("ACGT") for _ in range(1_000))
         left = "".join(rng.choice("ACGT") for _ in range(500)) + overlap + "TTT"
@@ -1233,8 +1237,8 @@ Path(prefix + '.delta').write_text(
             max_overlap=2_000,
             max_left_trim=5,
         )
-        self.assertEqual(candidate["trim_left"], 3)
-        self.assertEqual(candidate["trim_right"], 1_000)
+        self.assertEqual(candidate["outcome"], "rejected")
+        self.assertIn("nonflush_overlap_would_discard_left_tail", candidate["reason"])
 
     def test_step3_direct_overlap_event_uses_valid_junction_anchor(self):
         gap = {
@@ -1308,7 +1312,7 @@ Path(prefix + '.delta').write_text(
         self.assertFalse(event["junction"]["support_sequence_inserted"])
         self.assertEqual(attempts[0]["status"], "accepted")
 
-    def test_step3_direct_overlap_rejects_unsafe_or_non_primary_cases(self):
+    def test_step3_direct_overlap_rejects_missing_flanks_or_unsafe_cases(self):
         rng = random.Random(11)
         overlap = "".join(rng.choice("ACGT") for _ in range(1_000))
         suffix = "".join(rng.choice("ACGT") for _ in range(200))
@@ -1333,7 +1337,7 @@ Path(prefix + '.delta').write_text(
                 500,
             ),
             (
-                "non_primary_neighbors",
+                "no_left_outer_flank",
                 "support",
                 overlap,
                 overlap + suffix,

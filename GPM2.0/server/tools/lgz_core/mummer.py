@@ -24,6 +24,9 @@ def mummer_parameters(
 ) -> dict[str, object]:
     return {
         "nucmer": {
+            # Full original-source contexts can be identical across donors.
+            # Reference-unique seeds would silently erase all such evidence.
+            "anchor_mode": "maxmatch",
             "min_cluster": min_cluster,
             "min_match": min_match,
             "batch": 500_000_000,

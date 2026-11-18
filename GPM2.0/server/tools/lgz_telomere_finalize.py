@@ -403,6 +403,7 @@ def cached_terminal_mummer(
             run_logged(
                 [
                     tools["nucmer"]["resolved"],
+                    "--maxmatch",
                     "-c",
                     str(MUMMER_MIN_CLUSTER),
                     "-l",
@@ -1665,7 +1666,7 @@ def run_step4(
                         tools[name]["version"]
                         for name in ("nucmer", "delta-filter", "show-coords")
                     ),
-                    preset="nucmer-c1000-l100;delta-filter-r-l10000;show-coords-r-l",
+                    preset="nucmer-maxmatch-c1000-l100;delta-filter-r-l10000;show-coords-r-l",
                     parameters={
                         **mummer_parameters(threads),
                         "terminal": row["terminal"],
@@ -1701,7 +1702,7 @@ def run_step4(
                         tools[name]["version"]
                         for name in ("nucmer", "delta-filter", "show-coords")
                     ),
-                    preset="nucmer-c1000-l100;delta-filter-r-l10000;show-coords-r-l",
+                    preset="nucmer-maxmatch-c1000-l100;delta-filter-r-l10000;show-coords-r-l",
                     parameters={
                         **mummer_parameters(threads),
                         "candidate_min_identity": CANDIDATE_MIN_IDENTITY,

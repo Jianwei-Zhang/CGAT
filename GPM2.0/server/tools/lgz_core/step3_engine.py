@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .repair_common import *
 from .source_intervals import SourceAuthorization, attach_authorizations
+from .structural_support import OverlapSupport, ReferenceSupport, POLICY as SOURCE_SUPPORT_POLICY
 from .refill_batch import RefillBatchAlignment
 from .repair_mummer import (
     collect_mummer,
@@ -17,7 +18,7 @@ from .repair_structural import (
     apply_corrections,
     build_correction_candidates,
     correction_usage_rows,
-    promote_direct_primary_overlap_merges,
+    promote_direct_source_overlap_merges,
 )
 
 
@@ -517,6 +518,7 @@ def build_correction_events(
                         "orientation": candidate["primary_right_orientation"],
                     },
                     "support_sequence_inserted": False,
+                    "source_overlap_support": candidate.get("source_overlap_support"),
                 }
             elif candidate.get("junction_policy") == DOMINATED_COMPONENT_POLICY:
                 event["junction"] = {
@@ -848,11 +850,11 @@ def run_step3(
             "any_reference_overlap_is_type5": True,
             "large_edit_bp": CORRECTION_LARGE_EDIT_BP,
             "max_overlap_edit_ratio": CORRECTION_MAX_OVERLAP_EDIT_RATIO,
-            "primary_dataset": primary_dataset,
-            "direct_primary_overlap": {
+            "source_structural_support": SOURCE_SUPPORT_POLICY,
+            "direct_source_overlap": {
                 "minimum_bp": PRIMARY_OVERLAP_MIN_BP,
                 "maximum_bp": PRIMARY_OVERLAP_MAX_BP,
-                "maximum_left_trim": PRIMARY_OVERLAP_MAX_LEFT_TRIM,
+                "maximum_left_trim": 0,
                 "policy": PRIMARY_OVERLAP_POLICY,
                 "matching": "exact_oriented_suffix_prefix",
                 "support_sequence_inserted": False,
@@ -866,6 +868,7 @@ def run_step3(
             "max_fill_length": refill_max_length,
             "rounds": 2,
             "post_round1_filter_min_component_length": MIN_COMPONENT_LENGTH,
+            "q0_filter_protection": "frozen_source_intersections_v1" if authorization.q0_intervals else "no_selection_proof",
             "post_round1_filter_connector_length": FILTER_CONNECTOR_LENGTH,
         },
         "consumed_intervals_sha256": json_hash(consumed),
@@ -915,13 +918,14 @@ def run_step3(
             repair_mode=repair_mode,
             structural_target="ordinary_donor",
             use_index=execution_profile == "optimized",
+            input_paths=input_paths, sources=sources, input_records=input_records,
         )
-        promote_direct_primary_overlap_merges(
+        promote_direct_source_overlap_merges(
             gaps,
             correction_candidates,
             input_paths,
             sources,
-            primary_dataset,
+            support=OverlapSupport(sources, ReferenceSupport(authorization.reference_placements, authority=authorization.fingerprint)),
         )
         reject_candidates_spanning_other_gaps(correction_candidates, gaps)
         annotate_candidate_fragments(
@@ -957,10 +961,12 @@ def run_step3(
                     candidate=candidate,
                     tool="nucmer/delta-filter/show-coords",
                     tool_version=" | ".join(tools[name]["version"] for name in ("nucmer", "delta-filter", "show-coords")),
-                    preset="nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l",
+                    preset="nucmer-maxmatch-c1000-l100;delta-filter-l10000;show-coords-r-l",
                     parameters={
                         **lgz_mummer_parameters(threads),
                         **fingerprint_payload["correction_parameters"],
+                        "source_structural_support": candidate.get("source_structural_support"),
+                        "source_overlap_support": candidate.get("source_overlap_support"),
                         "classification": {
                             "error_type": candidate.get("error_type", "unknown"),
                             "error_subtype": candidate.get("error_subtype", "unspecified"),
@@ -1094,6 +1100,8 @@ def run_step3(
             stage="step3",
             q_input_version="q2",
             q_output_version="q3",
+            protected_intervals=authorization.protected_query_intervals(round1_paths),
+            protection_identity=authorization.fingerprint if authorization.q0_intervals else "",
         )
         authorization.validate_paths(filter_paths_result)
         mark_refills_removed_by_filter(

@@ -396,12 +396,16 @@ def filter_paths(
     input_paths: dict[str, list[dict[str, object]]],
     input_records: dict[str, str],
     sources: dict[tuple[str, str], str],
+    *, protected_intervals=None,
 ) -> tuple[dict[str, list[dict[str, object]]], dict[str, str], list[dict[str, object]]]:
     output_paths: dict[str, list[dict[str, object]]] = {}
     output_records: dict[str, str] = {}
     prototypes: list[dict[str, object]] = []
     for chromosome in chromosome_order:
         sequence = input_records[chromosome]
+        protected = sorted((protected_intervals or {}).get(chromosome, ()))
+        if any(not 0 <= start < end <= len(sequence) for start, end in protected):
+            fail("q0 filter protection exceeds the current chromosome")
         gaps = list(re.finditer(r"N{100,}", sequence))
         if not gaps:
             output_paths[chromosome] = [dict(segment) for segment in input_paths[chromosome]]
@@ -424,8 +428,16 @@ def filter_paths(
             cursor = gap.end()
         if cursor < len(sequence):
             components.append((cursor, len(sequence)))
-        kept0 = [interval for interval in components if interval[1] - interval[0] >= MIN_COMPONENT_LENGTH]
-        removed0 = [interval for interval in components if interval[1] - interval[0] < MIN_COMPONENT_LENGTH]
+        protected0, protection_cursor = set(), 0
+        for interval in components:
+            while protection_cursor < len(protected) and protected[protection_cursor][1] <= interval[0]:
+                protection_cursor += 1
+            if protection_cursor < len(protected) and protected[protection_cursor][0] < interval[1]:
+                protected0.add(interval)
+        kept0 = [interval for interval in components if interval[1] - interval[0] >= MIN_COMPONENT_LENGTH or interval in protected0]
+        removed0 = [interval for interval in components if interval[1] - interval[0] < MIN_COMPONENT_LENGTH and interval not in protected0]
+        protected_short = [[start + 1, end] for start, end in components
+                           if (start, end) in protected0 and end - start < MIN_COMPONENT_LENGTH]
         if not kept0:
             output_paths[chromosome] = [dict(segment) for segment in input_paths[chromosome]]
             output_records[chromosome] = sequence
@@ -446,12 +458,31 @@ def filter_paths(
                 {
                     "chr": chromosome,
                     "status": "unresolved",
-                    "reason": "no_component_lt_100000",
+                    "reason": "q0_supported_short_components_retained" if protected_short else "no_component_lt_100000",
+                    "protected_q0_components": protected_short,
                     "kept": [[start + 1, end] for start, end in kept0],
                     "removed": [],
                 }
             )
             continue
+        # Keep original gaps between adjacent retained components. Only a
+        # removed component warrants collapsing its surrounding separation;
+        # an edit elsewhere must not silently normalize an unrelated 137-N
+        # input adjacency to a fresh 100-N gap. Grouped retained intervals also
+        # make this exact behavior replayable with the existing event format.
+        kept_groups = []
+        removed_set = set(removed0)
+        adjacent = False
+        for start, end in components:
+            if (start, end) in removed_set:
+                adjacent = False
+                continue
+            if adjacent:
+                kept_groups[-1] = (kept_groups[-1][0], end)
+            else:
+                kept_groups.append((start, end))
+            adjacent = True
+        kept0 = kept_groups
         filtered_path: list[dict[str, object]] = []
         for index, (start, end) in enumerate(kept0):
             if index:
@@ -490,6 +521,7 @@ def filter_paths(
                 "reason": f"removed_{len(removed0)}_isolated_components_lt_100000",
                 "kept": [[start + 1, end] for start, end in kept0],
                 "removed": [[start + 1, end] for start, end in removed0],
+                "protected_q0_components": protected_short,
             }
         )
     return output_paths, output_records, prototypes
@@ -506,12 +538,15 @@ def apply_filter(
     stage: str = "step1_filter",
     q_input_version: str = "q0r1",
     q_output_version: str = "q0f",
+    protected_intervals=None,
+    protection_identity="",
 ) -> tuple[dict[str, list[dict[str, object]]], dict[str, str], list[dict[str, object]]]:
     output_paths, output_records, prototypes = filter_paths(
         chromosome_order,
         input_paths,
         input_records,
         sources,
+        protected_intervals=protected_intervals,
     )
     q_output_bytes = bytearray()
     for chromosome in chromosome_order:
@@ -560,6 +595,10 @@ def apply_filter(
                     "removed_intervals": prototype["removed"],
                     "min_component_length": MIN_COMPONENT_LENGTH,
                     "connector_length": FILTER_CONNECTOR_LENGTH,
+                    **({"q0_protection": {
+                        "authorization_id": protection_identity,
+                        "retained_components": prototype.get("protected_q0_components", []),
+                    }} if protection_identity else {}),
                 },
             }
         )

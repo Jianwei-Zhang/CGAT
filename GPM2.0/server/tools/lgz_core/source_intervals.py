@@ -71,7 +71,9 @@ def source_spans(paths):
 
 
 class SourceAuthorization:
-    def __init__(self, source_lengths, members, informative, *, fingerprint, chromosomes=None):
+    def __init__(self, source_lengths, members, informative, *, fingerprint, chromosomes=None, reference_placements=(), q0_intervals=None):
+        self.q0_intervals = q0_intervals or {}
+        self.reference_placements = reference_placements
         self.source_lengths = source_lengths
         self.members = members
         self.informative = informative
@@ -84,6 +86,8 @@ class SourceAuthorization:
         members = read_tsv(root / "metadata/grt_donor_members.tsv")
         source_lengths = {SourceKey(*key): len(sequence) for key, sequence in sources.items()}
         member_map = {}
+        reference_placements = ()
+        q0_intervals = {}
         for row in members:
             key = (row["donor_set_id"], row["member_id"])
             source = SourceKey(row["dataset_name"], row["contig_name"])
@@ -98,7 +102,10 @@ class SourceAuthorization:
                 raise Q0EvidenceError("unsupported donor freeze; rerun prepare_lgz_inputs.sh")
             informative = {SourceKey(**row["source"]): tuple(Interval(**i) for i in row["informative_intervals"])
                            for row in frozen["sources"]}
+            q0_intervals = {SourceKey(**row["source"]): tuple(Interval(**i) for i in row["occupied"])
+                            for row in frozen["sources"]}
             selection = json.loads((root / frozen["selection"]).read_text())["construction"]
+            reference_placements = selection["placements"]
             chromosomes = {chr_name for chr_name, search in selection["searches"].items() if search["path"] is not None}
             fingerprint = stable_id(POLICY_VERSION, [sha256_file(root / FREEZE), sorted(chromosomes)])
         elif package["schema_version"] == "2":
@@ -115,7 +122,8 @@ class SourceAuthorization:
             fingerprint = stable_id(POLICY_VERSION, [members, [(asdict(k), [asdict(i) for i in v]) for k, v in sorted(informative.items())]])
         else:
             raise Q0EvidenceError("unsupported source interval authorization package")
-        return cls(source_lengths, member_map, informative, fingerprint=fingerprint, chromosomes=chromosomes)
+        return cls(source_lengths, member_map, informative, fingerprint=fingerprint, chromosomes=chromosomes,
+                   reference_placements=reference_placements, q0_intervals=q0_intervals)
 
     def validate_paths(self, paths):
         spans, lengths = source_spans(paths)
@@ -125,6 +133,26 @@ class SourceAuthorization:
             if span.source not in self.source_lengths or span.interval.end > self.source_lengths[span.source]:
                 raise Q0EvidenceError("live path source exceeds original sequence")
         return spans, lengths
+
+    def protected_query_intervals(self, paths):
+        """Project retained evidence-guided q0 DNA into the CURRENT query.
+
+        This prevents a length-only filter from undoing an accepted q0 source
+        choice. It does not veto source-aware structural corrections or protect
+        every newly donated interval of the same original contig.
+        """
+        spans, lengths = self.validate_paths(paths)
+        protected = defaultdict(list)
+        for span in spans:
+            for original in self.q0_intervals.get(span.source, ()):
+                shared = span.interval.intersection(original)
+                if shared is None:
+                    continue
+                offset = (shared.start - span.interval.start if span.orientation == "+"
+                          else span.interval.end - shared.end)
+                protected[span.chromosome].append(Interval(span.query.start + offset, span.query.start + offset + shared.length))
+        return {chromosome: [(i.start, i.end) for i in merged_intervals(protected[chromosome])]
+                for chromosome in lengths}
 
     def frame(self, paths, donor_set_id, working_version):
         return EditFrame(self, paths, donor_set_id, working_version)

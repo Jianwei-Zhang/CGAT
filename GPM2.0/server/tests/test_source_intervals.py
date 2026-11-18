@@ -25,7 +25,8 @@ def segment(source=A, start=0, end=100, orientation="+"):
 
 
 def gap(length=100):
-    return {"segment_kind": "gap", "length": length}
+    return {"segment_kind": "gap", "length": length, "dataset_name": "", "contig_name": "",
+            "source_start": None, "source_end": None, "orientation": "", "source_card_key": "", "evidence_ids": []}
 
 
 def authorization(*, informative=None, chromosomes=None):
@@ -182,6 +183,28 @@ class SourceIntervalTests(unittest.TestCase):
             self.assertTrue(parameters["existing"])
             self.assertEqual(parameters["source_interval_authorization"]["status"], "accepted")
         self.assertNotIn("source_interval_authorization", json.loads(evidence[-1]["parameters_json"]))
+
+    def test_q0_protection_projects_reverse_intervals_not_whole_contigs(self):
+        self.auth.q0_intervals = {A: (Interval(0, 100),)}
+        paths = {"chr1": [segment(A, 50, 150, "-"), gap(), segment(A, 200, 300)]}
+        self.assertEqual(self.auth.protected_query_intervals(paths), {"chr1": [(50, 100)]})
+
+    def test_filter_keeps_q0_component_but_not_new_interval_of_same_contig(self):
+        from server.tests.test_q0_admission import dna
+        from server.tools.lgz_core.stage_io import path_sequence
+        from server.tools.lgz_core.stage_replay import apply_filter
+        sources = {(A.dataset, A.contig): dna(130000, 811), (B.dataset, B.contig): dna(2000, 812)}
+        auth = SourceAuthorization({A: 130000, B: 2000}, {},
+                                   {A: (Interval(0, 130000),), B: (Interval(0, 2000),)},
+                                   fingerprint="controlled-q0", q0_intervals={A: (Interval(0, 130000),), B: (Interval(0, 1000),)})
+        paths = {"chr1": [segment(A, 0, 130000), gap(137), segment(B, 0, 1200), gap(100), segment(B, 1200, 2000)]}
+        records = {"chr1": path_sequence(paths["chr1"], sources)}
+        _, filtered, events = apply_filter("run", ["chr1"], paths, records, "input", sources,
+            protected_intervals=auth.protected_query_intervals(paths), protection_identity=auth.fingerprint)
+        self.assertEqual(filtered["chr1"], sources[(A.dataset, A.contig)] + "N" * 137 + sources[(B.dataset, B.contig)][:1200])
+        self.assertEqual(events[0]["edit"]["removed_intervals"], [[131438, 132237]])
+        self.assertEqual(events[0]["edit"]["q0_protection"]["retained_components"], [[130138, 131337]])
+        self.assertEqual(events[0]["edit"]["kept_intervals"], [[1, 131337]])
 
     def test_small_random_edits_match_per_base_live_occupancy_oracle(self):
         rng = random.Random(32)

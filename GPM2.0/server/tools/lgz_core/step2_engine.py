@@ -9,6 +9,7 @@ except ModuleNotFoundError:  # Imported through server.tools.
 
 from .repair_common import *
 from .source_intervals import SourceAuthorization, attach_authorizations
+from .structural_support import OverlapSupport, ReferenceSupport, POLICY as SOURCE_SUPPORT_POLICY
 from .repair_mummer import (
     collect_mummer,
     lgz_mummer_parameters,
@@ -20,6 +21,7 @@ from .repair_runtime import (
 from .repair_structural import (
     apply_corrections,
     build_correction_candidates,
+    promote_direct_source_overlap_merges,
 )
 
 
@@ -701,6 +703,7 @@ def run_step2(
         },
         "fallback_parameters": {
             "repair_mode": repair_mode,
+            "source_structural_support": SOURCE_SUPPORT_POLICY,
             "controller": "server_native_correctrefill_source_retry",
             "strategies": [
                 "no_patch_fixer",
@@ -809,6 +812,7 @@ def run_step2(
         strategy_rows: list[dict[str, object]] = []
         fallback_candidates: list[dict[str, object]] = []
         fallback_chromosomes: set[str] = set()
+        overlap_support = OverlapSupport(sources, ReferenceSupport(authorization.reference_placements, authority=authorization.fingerprint))
         for chromosome in chromosome_order:
             chromosome_gaps = sorted(
                 (gap for gap in gaps if str(gap["chr"]) == chromosome),
@@ -846,6 +850,8 @@ def run_step2(
                         members_by_record,
                         repair_mode=repair_mode,
                         use_index=execution_profile == "optimized",
+                        input_paths=input_paths, sources=sources, input_records=input_records,
+                        overlap_support=overlap_support,
                     )
                 )
             accepted_count = sum(
@@ -932,7 +938,7 @@ def run_step2(
                     candidate=candidate,
                     tool="nucmer/delta-filter/show-coords",
                     tool_version=" | ".join(tools[name]["version"] for name in ("nucmer", "delta-filter", "show-coords")),
-                    preset="nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l",
+                    preset="nucmer-maxmatch-c1000-l100;delta-filter-l10000;show-coords-r-l",
                     parameters=lgz_mummer_parameters(threads),
                     raw_relpath=mummer_identity["coords_relpath"],
                     raw_sha256=mummer_identity["coords_sha256"],
@@ -970,6 +976,8 @@ def run_step2(
                             "repair_mode": repair_mode,
                             "fallback_strategy": candidate.get("fallback_strategy", ""),
                             "parent_candidate_id": candidate.get("fallback_parent_candidate_id", ""),
+                            "source_structural_support": candidate.get("source_structural_support"),
+                            "source_overlap_support": candidate.get("source_overlap_support"),
                         },
                         raw_relpath=mummer_identity["coords_relpath"],
                         raw_sha256=mummer_identity["coords_sha256"],
@@ -1157,7 +1165,8 @@ def run_step2(
         )
         print(
             f"LGZ step2 complete: gaps={len(gaps)}, candidates={len(candidates)}, "
-            f"accepted={len(accepted_intervals)}"
+            f"accepted={sum(row['outcome'] == 'accepted' for row in candidates)}, "
+            f"donor_additions={len(accepted_intervals)}"
         )
         return result, False
     except BaseException:
@@ -1257,7 +1266,7 @@ def build_step2_structural_fallback_candidates(
     alignments: list[dict[str, object]],
     members_by_record: dict[str, dict[str, str]],
     repair_mode: str = DEFAULT_REPAIR_MODE,
-    *, use_index: bool = False,
+    *, use_index: bool = False, input_paths=None, sources=None, input_records=None, overlap_support=None,
 ) -> list[dict[str, object]]:
     """Build the upstream PatchRepair fixer branch without inserting D0 bases."""
     candidates = build_correction_candidates(
@@ -1267,7 +1276,10 @@ def build_step2_structural_fallback_candidates(
         repair_mode=repair_mode,
         structural_target="ordinary_donor",
         use_index=use_index,
+        input_paths=input_paths, sources=sources, input_records=input_records,
     )
+    if input_paths is not None and sources is not None:
+        promote_direct_source_overlap_merges(gaps, candidates, input_paths, sources, support=overlap_support)
     for candidate in candidates:
         candidate.update(
             {

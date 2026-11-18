@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .repair_common import *
+from .structural_support import OverlapSupport, self_context_lines, equivalent_sequence_context
 
 
 def _step3_alignment_features(
@@ -223,10 +224,9 @@ def _longest_exact_suffix_prefix(
 
 
 
-def _adjacent_primary_segments(
+def _adjacent_source_segments(
     path: list[dict[str, object]],
     gap: dict[str, object],
-    primary_dataset: str,
 ) -> tuple[dict[str, object], dict[str, object]] | None:
     """Resolve the exact source-gap-source triplet around one q gap."""
     gap_start0 = int(gap["start0"])
@@ -250,132 +250,77 @@ def _adjacent_primary_segments(
         cursor = segment_end
     if not exact_gap or left is None or right is None:
         return None
-    if (
-        str(left["dataset_name"]) != primary_dataset
-        or str(right["dataset_name"]) != primary_dataset
-        or str(left["contig_name"]) == str(right["contig_name"])
-    ):
+    if ((left["dataset_name"], left["contig_name"]) == (right["dataset_name"], right["contig_name"])
+            and intervals_overlap(int(left["source_start"]), int(left["source_end"]), int(right["source_start"]), int(right["source_end"]))):
         return None
     return left, right
 
 
 
-def promote_direct_primary_overlap_merges(
-    gaps: list[dict[str, object]],
-    candidates: list[dict[str, object]],
-    input_paths: dict[str, list[dict[str, object]]],
-    sources: dict[tuple[str, str], str],
-    primary_dataset: str,
-    *,
-    min_overlap: int = PRIMARY_OVERLAP_MIN_BP,
-    max_overlap: int = PRIMARY_OVERLAP_MAX_BP,
-    max_left_trim: int = PRIMARY_OVERLAP_MAX_LEFT_TRIM,
-) -> None:
-    """Promote safe Type5 gaps to primary-only direct overlap deletions.
+def promote_direct_source_overlap_merges(
+    gaps, candidates, input_paths, sources, *, support=None,
+    min_overlap=PRIMARY_OVERLAP_MIN_BP, max_overlap=PRIMARY_OVERLAP_MAX_BP,
+    max_left_trim=PRIMARY_OVERLAP_MAX_LEFT_TRIM,
+):
+    """Merge exact terminal overlaps only with source-aware junction evidence.
 
-    A flush suffix-prefix match always wins.  Trimming a short unsupported
-    left tail is considered only when no flush overlap reaches ``min_overlap``.
+    Dataset order is irrelevant. A nonflush match cannot erase a left tail;
+    repetition, incompatible ref loci or an unsupported bridge cannot be
+    converted back into a generic Type5 deletion by this same candidate.
     """
+    support = support or OverlapSupport(sources)
     gaps_by_key = {(str(row["chr"]), str(row["object_id"])): row for row in gaps}
-    overlap_by_gap: dict[tuple[str, str], dict[str, object] | None] = {}
+    geometry = {}
     for candidate in candidates:
         if candidate.get("outcome") != "candidate" or candidate.get("error_type") != "type5":
             continue
         key = (str(candidate["chr"]), str(candidate["object_id"]))
-        if key not in overlap_by_gap:
-            gap = gaps_by_key[key]
-            adjacent = _adjacent_primary_segments(
-                input_paths[str(candidate["chr"])], gap, primary_dataset
-            )
-            resolution: dict[str, object] | None = None
+        gap = gaps_by_key[key]
+        if key not in geometry:
+            adjacent = _adjacent_source_segments(input_paths[key[0]], gap)
+            geometry[key] = None
             if adjacent is not None:
                 left, right = adjacent
-                left_length = int(left["length"])
-                right_length = int(right["length"])
-                left_sequence = path_sequence(
-                    slice_path(
-                        [left],
-                        max(0, left_length - max_overlap - max_left_trim),
-                        left_length,
-                    ),
-                    sources,
-                )
-                right_sequence = path_sequence(
-                    slice_path([right], 0, min(right_length, max_overlap)),
-                    sources,
-                )
-                maximum_trim = min(max_left_trim, max(0, left_length - 1))
-                overlaps = _exact_suffix_prefix_by_left_trim(
-                    left_sequence,
-                    right_sequence,
-                    max_overlap,
-                    maximum_trim,
-                )
-                selected: tuple[int, int] | None = None
-                if overlaps[0] >= right_length:
-                    # Do not manufacture a one-base right remainder by shifting
-                    # the left boundary when the flush overlap consumes it all.
-                    selected = None
-                elif min_overlap <= overlaps[0]:
-                    selected = (0, overlaps[0])
-                else:
-                    shifted = [
-                        (overlap, -left_trim, left_trim)
-                        for left_trim, overlap in enumerate(overlaps[1:], start=1)
-                        if min_overlap <= overlap < right_length
-                    ]
-                    if shifted:
-                        overlap, _negative_trim, left_trim = max(shifted)
-                        selected = (left_trim, overlap)
-                if selected is not None:
-                    left_trim, right_trim = selected
-                    resolution = {
-                        "left": left,
-                        "right": right,
-                        "left_trim": left_trim,
-                        "right_trim": right_trim,
-                    }
-            overlap_by_gap[key] = resolution
-
-        resolution = overlap_by_gap[key]
-        if resolution is None:
+                left_sequence = path_sequence(slice_path([left], max(0, int(left["length"]) - max_overlap - max_left_trim), int(left["length"])), sources)
+                right_sequence = path_sequence(slice_path([right], 0, min(int(right["length"]), max_overlap)), sources)
+                lengths = _exact_suffix_prefix_by_left_trim(left_sequence, right_sequence, max_overlap,
+                                                            min(max_left_trim, max(0, int(left["length"]) - 1)))
+                geometry[key] = (left, right, lengths)
+        if geometry[key] is None:
             continue
-        gap = gaps_by_key[key]
-        left = resolution["left"]
-        right = resolution["right"]
-        left_trim = int(resolution["left_trim"])
-        right_trim = int(resolution["right_trim"])
-        feature_names = list(candidate.get("error_features", []))
-        feature_names.extend(
-            [
-                f"direct_primary_overlap_{right_trim}",
-                f"junction_policy_{PRIMARY_OVERLAP_POLICY}",
-                f"left_trim_{left_trim}",
-                f"right_trim_{right_trim}",
-            ]
-        )
+        left, right, lengths = geometry[key]
+        overlap = lengths[0]
+        if overlap < min_overlap:
+            if not any(length >= min_overlap for length in lengths[1:]):
+                continue
+            proof = {"status": "rejected", "reason": "nonflush_overlap_would_discard_left_tail"}
+        elif overlap >= int(left["length"]) or overlap >= int(right["length"]):
+            proof = {"status": "rejected", "reason": "overlap_consumes_a_source_component"}
+        else:
+            proof = support.prove(left, right, overlap, candidate)
+        candidate["source_overlap_support"] = proof
+        if proof["status"] != "supported":
+            reason = "source_overlap_not_proven:" + proof["reason"]
+            candidate.update(outcome="rejected", eligible=False, validation_passed=False, reason=reason, repair_reason=reason)
+            continue
+        features = sorted(set([*candidate.get("error_features", []), f"direct_source_overlap_{overlap}",
+                               f"junction_policy_{PRIMARY_OVERLAP_POLICY}", "left_trim_0", f"right_trim_{overlap}"]))
         candidate.update(
-            {
-                "input_start": int(gap["start0"]) + 1 - left_trim,
-                "input_end": int(gap["end0"]) + right_trim,
-                "trim_left": left_trim,
-                "trim_right": right_trim,
-                "fill_length": 0,
-                "reason": "direct_primary_overlap_keep_left_trim_right",
-                "classification_reason": "direct_primary_overlap_keep_left_trim_right",
-                "error_features": sorted(set(feature_names)),
-                "error_features_json": canonical_json(sorted(set(feature_names))),
-                "direct_primary_overlap": True,
-                "direct_overlap_bp": right_trim,
-                "junction_policy": PRIMARY_OVERLAP_POLICY,
-                "primary_left_dataset": left["dataset_name"],
-                "primary_left_contig": left["contig_name"],
-                "primary_left_orientation": left["orientation"],
-                "primary_right_dataset": right["dataset_name"],
-                "primary_right_contig": right["contig_name"],
-                "primary_right_orientation": right["orientation"],
-            }
+            input_start=int(gap["start0"]) + 1, input_end=int(gap["end0"]) + overlap,
+            trim_left=0, trim_right=overlap, fill_length=0,
+            reason="direct_source_overlap_keep_left_trim_right", classification_reason="direct_source_overlap_keep_left_trim_right",
+            error_features=features, error_features_json=canonical_json(features), direct_source_overlap=True,
+            direct_overlap_bp=overlap, junction_policy=PRIMARY_OVERLAP_POLICY,
+            # Retain legacy record keys for event readers; never use them as
+            # an eligibility restriction or a first-dataset preference.
+            primary_left_dataset=left["dataset_name"], primary_left_contig=left["contig_name"], primary_left_orientation=left["orientation"],
+            primary_right_dataset=right["dataset_name"], primary_right_contig=right["contig_name"], primary_right_orientation=right["orientation"],
         )
+
+
+def promote_direct_primary_overlap_merges(gaps, candidates, input_paths, sources, primary_dataset, **kwargs):
+    """Historical import signature forwarding to the same source-aware policy."""
+    return promote_direct_source_overlap_merges(gaps, candidates, input_paths, sources, **kwargs)
 
 
 
@@ -513,6 +458,9 @@ def build_correction_candidates(
     *,
     structural_target: str = "ordinary_donor",
     use_index: bool = False,
+    input_paths=None,
+    sources=None,
+    input_records=None,
 ) -> list[dict[str, object]]:
     """Build Server-native Type1--Type6 CorrectRefill candidates.
 
@@ -522,6 +470,8 @@ def build_correction_candidates(
     """
     if repair_mode not in REPAIR_MODES:
         fail(f"unsupported Step3 repair mode: {repair_mode}")
+    self_lines = self_context_lines(alignments, input_paths, members_by_record, identity_only=False) if input_paths is not None else set()
+    context_cache = {}
     by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
     for alignment in alignments:
         by_chr[str(alignment["chr"])].append(alignment)
@@ -538,11 +488,20 @@ def build_correction_candidates(
         ]
         prototypes: list[tuple[dict[str, object], dict[str, object] | None]] = []
         if crossing:
-            prototypes.append((sorted(
-                crossing,
-                key=lambda row: (-float(row["identity"]), -int(row["query_aligned"]), int(row["line_number"])),
-            )[0], None))
-        else:
+            prototypes.extend((row, None) for row in sorted(
+                crossing, key=lambda row: (-float(row["identity"]), -int(row["query_aligned"]), int(row["line_number"]))))
+        def context_only(row):
+            if (chromosome, int(row["line_number"])) in self_lines:
+                return True
+            if sources is None or input_records is None:
+                return False
+            member = members_by_record[str(row["ref_record"])]
+            source_start, source_end = member_source_interval(member, int(row["ref_min"]), int(row["ref_max"]))
+            return equivalent_sequence_context(row, None, member, source_start, source_end,
+                                               input_records, sources, context_cache)
+        if not crossing or all(context_only(row) for row in crossing):
+            # Neither a self hit nor its renamed sequence-equivalent copy may
+            # hide the two anchors of a genuinely different bridge.
             prototypes.extend(_step3_anchor_pairs(gap_pos, chromosome_alignments, coordinate_index))
         for left, right in prototypes:
             features = _step3_alignment_features(gap_pos, left, right)
@@ -574,6 +533,12 @@ def build_correction_candidates(
             if not anchor_pair_executable:
                 eligible = False
                 repair_reason = "anchor_pair_source_or_orientation_conflict"
+            guide_lines = [int(left["line_number"])] + ([] if right is None else [int(right["line_number"])])
+            self_only = all((chromosome, line) in self_lines for line in guide_lines)
+            if self_only:
+                eligible = False
+                repair_reason = "self_context_is_not_independent_structural_evidence"
+                feature_names = [*feature_names, "self_context_only"]
             ref_start = int(left["ref_min"])
             ref_end = int(left["ref_max"])
             if right is not None and str(left["ref_record"]) == str(right["ref_record"]):
@@ -581,6 +546,14 @@ def build_correction_candidates(
                 ref_end = max(ref_end, int(right["ref_max"]))
             member = members_by_record[str(left["ref_record"])]
             source_start, source_end = member_source_interval(member, ref_start, ref_end)
+            equivalent = None
+            if eligible and not self_only and sources is not None and input_records is not None:
+                equivalent = equivalent_sequence_context(left, right, member, source_start, source_end,
+                                                          input_records, sources, context_cache)
+                if equivalent:
+                    eligible = False
+                    repair_reason = "guide_confirms_existing_sequence_context"
+                    feature_names = [*feature_names, "equivalent_sequence_context"]
             payload = {
                 "stage": "step3",
                 "object_id": gap["object_id"],
@@ -594,6 +567,7 @@ def build_correction_candidates(
                 "input_end": end,
                 "error_type": error_type,
                 "error_subtype": subtype,
+                "orientation": left["orientation"],
                 "repair_mode": repair_mode,
             }
             action = str(payload["action"])
@@ -643,6 +617,8 @@ def build_correction_candidates(
                     "repair_reason": repair_reason,
                     "eligible": eligible,
                     "structural_target": structural_target,
+                    "source_structural_support": {"self_context_only": self_only,
+                        "equivalent_sequence_context": equivalent, "alignment_lines": guide_lines},
                     # Structural correction uses the alignment only as
                     # evidence; it inserts a normalized gap, not donor bases.
                     "source_consumable": False,
@@ -650,8 +626,10 @@ def build_correction_candidates(
                     "final_path_segment_id": "",
                 }
             )
-    return candidates
-
+    unique = {}
+    for candidate in candidates:
+        unique.setdefault(candidate["candidate_id"], candidate)
+    return list(unique.values())
 
 
 def reject_ambiguous_reference_anchors(

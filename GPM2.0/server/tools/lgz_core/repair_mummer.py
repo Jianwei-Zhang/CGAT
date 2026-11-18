@@ -509,7 +509,7 @@ def cached_mummer_partition(
         coords = work / "result.coords"
         nucmer_parameters = payload["parameters"]["nucmer"]
         commands = [
-            ("nucmer", [tools["nucmer"]["resolved"], "-c", str(nucmer_parameters["min_cluster"]),
+            ("nucmer", [tools["nucmer"]["resolved"], "--maxmatch", "-c", str(nucmer_parameters["min_cluster"]),
                         "-l", str(nucmer_parameters["min_match"]),
                         f"--batch={nucmer_parameters['batch']}", "-t", str(nucmer_parameters["threads"]),
                         "-p", str(work / "result"), str(target_path), str(temporary / "query.fa")], None),
@@ -615,6 +615,7 @@ def cached_mummer_screen_partition(
                 "nucmer",
                 [
                     tools["nucmer"]["resolved"],
+                    "--maxmatch",
                     "-c",
                     str(parameters["nucmer"]["min_cluster"]),
                     "-l",
