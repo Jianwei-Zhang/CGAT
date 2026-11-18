@@ -200,5 +200,15 @@
       "old": "grt/checkpoints/donor_freeze.json\tca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
       "new": "grt/checkpoints/donor_freeze.json\t0000000000000000000000000000000000000000000000000000000000000000"
     }
+  },
+  {
+    "name": "missing_used_source_card",
+    "expected_code": "BROKEN_REFERENCE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_used_contigs.tsv",
+      "old": "support:donor1:Chr01:grt_promoted\tsupport\tdonor1\tunplaced\tChr01\tgrt_promoted\tno_hit\t5\t+\t[\"ev-ref-donor1\"]\t[\"evt-step1-round1\"]\t[\"seg-patch-1\"]\t[\"ev-display-donor1\"]\n",
+      "new": ""
+    }
   }
 ]

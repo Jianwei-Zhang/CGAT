@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   normalizeGrtProjectView,
@@ -298,4 +299,50 @@ test("schema 3 normalizes project-mapped local LGZ evidence", () => {
   assert.equal(evidence.source.assemblyCtgId, 202);
   assert.equal(evidence.target.assemblyCtgId, 101);
   assert.equal(evidence.mapq, 60);
+});
+
+
+test("schema-3 q0-only promoted sources retain exact coordinates without repair traces", () => {
+  const fixture = JSON.parse(readFileSync(new URL(
+    "../../../../../../../tests/fixtures/grt_contract_v3/frozen_app_full.json", import.meta.url,
+  ), "utf8"));
+  const row = (name) => {
+    const [header, values] = fixture.files[name].trimEnd().split("\n").map((line) => line.split("\t"));
+    assert.equal(header.length, values.length);
+    return Object.fromEntries(header.map((key, index) => [key, values[index]]));
+  };
+  const packageRow = row("metadata/package.tsv");
+  const recipe = row("metadata/grt_recipe.tsv");
+  const path = JSON.parse(fixture.files["metadata/grt_final_path.json"]);
+  assert.equal(path.chromosomes[0].segments[0].kind, "source");
+  assert.equal(row("metadata/grt_used_contigs.tsv").accepted_event_ids_json, "[]");
+  // The native read model supplies the full source length from the FAI; the
+  // archive's Final Path is not itself an App API view. Never infer it from end.
+  const dataset = row("metadata/datasets.tsv");
+  const lengths = new Map(fixture.files[dataset.fai_relpath].trimEnd().split("\n").map((line) => {
+    const [contig, length] = line.split("\t");
+    return [`${dataset.dataset_name}:${contig}`, Number(length)];
+  }));
+  for (const chromosome of path.chromosomes) {
+    for (const segment of chromosome.segments) {
+      if (!segment.source) continue;
+      segment.source_length = lengths.get(`${segment.source.dataset}:${segment.source.contig}`);
+      assert.ok(segment.source_length > 0);
+    }
+  }
+  const view = normalizeGrtProjectView({
+    recipe: { ...packageRow, ...recipe, support_datasets: JSON.parse(recipe.support_datasets_json) },
+    final_path_by_chr: Object.fromEntries(path.chromosomes.map((chromosome) => [chromosome.chr, chromosome])),
+    source_cards: [row("metadata/grt_used_contigs.tsv")],
+  });
+  assert.equal(view.recipe.schemaVersion, "3");
+  assert.equal(view.recipe.finalPathSchemaVersion, "3");
+  const source = view.baselineFinalPathByChr.chr1.segments[0];
+  assert.equal(source.type, "ctg");
+  assert.equal(source.orient, "-");
+  assert.equal(source.start, 2000);
+  assert.equal(source.end, 1);
+  assert.equal(source.eventId, undefined);
+  assert.equal(view.sourceCards[0].placementMode, "grt_promoted");
+  assert.equal(view.sourceCards[0].contigName, "only");
 });

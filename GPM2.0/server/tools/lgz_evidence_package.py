@@ -28,7 +28,7 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_evidence_package.
     from .lgz_core.common import *
 
 
-ENGINE_VERSION = 2
+ENGINE_VERSION = 3
 DISPLAY_PRESET = "asm5"
 USED_CONTIG_FIELDS = [
     "source_card_key",
@@ -115,6 +115,7 @@ def accepted_source_cards(
     assignments: dict[tuple[str, str], set[str]],
     segment_anchors: dict[str, tuple[str, int]],
     assignment_baselines: dict[tuple[str, str, str], tuple[str, int]],
+    *, final_path=None, q0_lineage=None,
 ) -> list[dict[str, object]]:
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     for event in events:
@@ -138,9 +139,30 @@ def accepted_source_cards(
             fail(f"accepted event {event.get('event_id')} lacks its Final Path segment")
         if source.get("orientation") not in {"+", "-"}:
             fail(f"accepted event {event.get('event_id')} has invalid source orientation")
-        event["_placement_mode"] = placement_mode
-        event["_path_anchor"] = segment_anchors[segment_id][1]
-        grouped[expected_key].append(event)
+        grouped[expected_key].append({**event, "_placement_mode": placement_mode,
+                                      "_path_anchor": segment_anchors[segment_id][1]})
+
+    if q0_lineage is not None:
+        for chromosome in final_path["chromosomes"]:
+            for segment in chromosome["segments"]:
+                if segment["kind"] == "gap" or segment.get("event_id"):
+                    continue
+                source = segment["source"]
+                if not q0_lineage.covers(chromosome["chr"], source, segment["evidence_ids"]):
+                    fail(f"Final Path source {segment['segment_id']} lacks frozen q0 provenance")
+                original, mode, card_key = source_assignment(assignments, {
+                    "source_dataset": source["dataset"], "source_contig": source["contig"],
+                    "chr": chromosome["chr"],
+                })
+                # A display placement is not a repair event. Keep its event link
+                # empty and link the actual retained segment back to frozen q0.
+                grouped[card_key].append({
+                    "source": {**source, "original_assignment": original},
+                    "chr": chromosome["chr"], "event_id": None,
+                    "final_path_segment_id": segment["segment_id"],
+                    "_placement_mode": mode,
+                    "_path_anchor": segment_anchors[segment["segment_id"]][1],
+                })
 
     cards: list[dict[str, object]] = []
     for card_key in sorted(grouped):
@@ -184,7 +206,7 @@ def accepted_source_cards(
                 "target_chr": str(prototype["chr"]),
                 "placement_mode": str(prototype["_placement_mode"]),
                 "orientation": display_orientation,
-                "event_ids": [str(event["event_id"]) for event in card_events],
+                "event_ids": [str(event["event_id"]) for event in card_events if event["event_id"]],
                 "segment_ids": [str(event["final_path_segment_id"]) for event in card_events],
                 "grt_anchor": min(int(event["_path_anchor"]) for event in card_events),
             }
@@ -369,8 +391,7 @@ def existing_display_evidence(
         fail(f"source card dataset is absent: {source_dataset}")
     chr_run = server_dir / f"runs/chr_{chr_name}"
     results: list[dict[str, object]] = []
-    source_index = names.index(source_dataset)
-    for other_index, other_dataset in enumerate(names):
+    for other_dataset in sorted(names):
         source_fasta = chr_run / f"datasets/{source_dataset}.fa"
         other_fasta = chr_run / f"datasets/{other_dataset}.fa"
         if not source_fasta.is_file() or not other_fasta.is_file():
@@ -379,14 +400,18 @@ def existing_display_evidence(
             run_dir = chr_run / f"{source_dataset}_vs_self"
             left_fasta = right_fasta = source_fasta
             source_role = "both"
-        elif source_index < other_index:
-            run_dir = chr_run / f"{source_dataset}_vs_{other_dataset}"
-            left_fasta, right_fasta = source_fasta, other_fasta
-            source_role = "target"
         else:
-            run_dir = chr_run / f"{other_dataset}_vs_{source_dataset}"
-            left_fasta, right_fasta = other_fasta, source_fasta
-            source_role = "query"
+            # New q0 runs canonicalize pair direction independently of --ds
+            # order. Also accept the actual reverse path in existing bundles.
+            left_name, right_name = sorted((source_dataset, other_dataset))
+            run_dir = chr_run / f"{left_name}_vs_{right_name}"
+            reverse_dir = chr_run / f"{right_name}_vs_{left_name}"
+            if not (run_dir / "result.paf").is_file() and (reverse_dir / "result.paf").is_file():
+                left_name, right_name = right_name, left_name
+                run_dir = reverse_dir
+            left_fasta = chr_run / f"datasets/{left_name}.fa"
+            right_fasta = chr_run / f"datasets/{right_name}.fa"
+            source_role = "target" if source_dataset == left_name else "query"
         paf_path = run_dir / "result.paf"
         if not paf_path.is_file():
             continue
@@ -628,11 +653,18 @@ def execute(args: argparse.Namespace) -> None:
     package = read_single(server_dir / "metadata/package.tsv")
     if (
         package.get("workflow") != WORKFLOW
-        or package.get("schema_version") != SCHEMA_VERSION
+        or package.get("schema_version") not in {SCHEMA_VERSION, "3", "4"}
         or package.get("grt_precompute_enabled") != "true"
         or package.get("recipe_locked") != "true"
     ):
         fail("unsupported package workflow/schema; evidence packaging has no legacy fallback")
+
+    if package["schema_version"] in {"3", "4"}:
+        try:
+            from lgz_core.q0_publication import validate_prepared_q0
+        except ModuleNotFoundError:
+            from .lgz_core.q0_publication import validate_prepared_q0
+        validate_prepared_q0(server_dir)
 
     dataset_rows = read_tsv(server_dir / "metadata/datasets.tsv", DATASET_FIELDS)
     datasets = {row["dataset_name"]: row for row in dataset_rows}
@@ -668,8 +700,16 @@ def execute(args: argparse.Namespace) -> None:
     final_path = json.loads(
         (server_dir / "metadata/grt_final_path.json").read_text(encoding="utf-8")
     )
+    q0_lineage = None
+    if package["schema_version"] in {"3", "4"}:
+        try:
+            from lgz_core.q0_lineage import Q0Lineage, display_peer_keys
+        except ModuleNotFoundError:
+            from .lgz_core.q0_lineage import Q0Lineage, display_peer_keys
+        q0_lineage = Q0Lineage(read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS))
     cards = accepted_source_cards(
-        events, assignments, final_segment_anchors(final_path), assignment_baselines
+        events, assignments, final_segment_anchors(final_path), assignment_baselines,
+        final_path=final_path, q0_lineage=q0_lineage,
     )
     visible = visible_members(cards, assignment_rows, sources)
     cleanup_stale_display_dirs(server_dir, cards)
@@ -725,7 +765,7 @@ def execute(args: argparse.Namespace) -> None:
                 minimap,
                 args.threads,
             )
-        if not pairwise_rows:
+        if not pairwise_rows and (q0_lineage is None or display_peer_keys(card, assignments, cards)):
             fail(
                 f"used source {card['source_card_key']} has no display-pairwise target; "
                 "the main-view alignment set is incomplete"

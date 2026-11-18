@@ -211,7 +211,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.progressStages.validate_grt_app_required_files, "检查 App 交付包必需文件");
   assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与参考基因组的 FAI 长度");
   assert.equal(zh.progressStages.validate_grt_app_fastas, "检查 App 来源 FASTA 文件");
-  assert.equal(zh.progressStages.validate_grt_app_final_path, "校验 Final Path 与 q4 序列摘要");
+  assert.equal(zh.progressStages.validate_grt_app_final_path, "校验 Final Path 与最终序列摘要");
   assert.equal(zh.progressStages.normalize_workspace_layout_start, "整理项目目录");
   assert.equal(zh.progressStages.normalize_workspace_layout_entry, "整理项目目录：{detail}");
   assert.equal(zh.progressStages.resolve_bundle_root_start, "定位交付包根目录");
@@ -244,7 +244,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.progressStages.validate_grt_app_required_files, "Check required App delivery files");
   assert.equal(en.progressStages.validate_grt_app_fai, "Validate source and reference FAI lengths");
   assert.equal(en.progressStages.validate_grt_app_fastas, "Check App source FASTA files");
-  assert.equal(en.progressStages.validate_grt_app_final_path, "Validate Final Path and q4 sequence digests");
+  assert.equal(en.progressStages.validate_grt_app_final_path, "Validate Final Path and final sequence digests");
   assert.equal(en.progressStages.normalize_workspace_layout_start, "Normalize project layout");
   assert.equal(en.progressStages.normalize_workspace_layout_entry, "Normalize project layout: {detail}");
   assert.equal(en.progressStages.resolve_bundle_root_start, "Resolve delivery bundle root");

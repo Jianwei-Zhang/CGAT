@@ -40,7 +40,7 @@ def semantic_result(result):
 
 def compare_stage(engine, stage, baseline_dir, optimized_dir, baseline, optimized):
     checks = [comparison(f"{stage}:result", semantic_result(baseline), semantic_result(optimized))]
-    q = "q2" if stage == "step2" else "q3"
+    q = "q1" if stage == "step1" else "q2"
     checks.append(comparison(f"{q}:file_sha256", engine.sha256_file(baseline_dir / f"grt/q/{q}.fa"),
                              engine.sha256_file(optimized_dir / f"grt/q/{q}.fa")))
     left = baseline_dir / "grt/evidence" / stage
@@ -61,14 +61,14 @@ def run_stage(engine, server, args, profile, previous=None):
                     threads=args.threads, repair_mode=engine.DEFAULT_REPAIR_MODE)
     context = args.context_factory(engine, cli) if args.context_factory else engine.execution_context(cli)
     if previous is None:
-        return context, engine.run_step2(
-            server, context["run_id"], context["chromosome_order"], context["q1_paths"], context["q1_records"],
-            context["q1_rows"], context["donor_set"], context["donor_members"], context["assignments"],
+        return context, engine.run_step1(
+            server, context["run_id"], context["chromosome_order"], context["q0_paths"], context["q0_records"],
+            context["q0_rows"], context["donor_set"], context["donor_members"], context["assignments"],
             context["sources"], context["initial_consumed"], context["tools"], context["minimap"],
             args.threads, mummer_scope=args.scope, execution_profile=profile,
         )
-    _, paths, records = engine.load_q_paths(server, "q2", previous["q_rows"], context["sources"])
-    return context, engine.run_step3(
+    _, paths, records = engine.load_q_paths(server, "q1", previous["q_rows"], context["sources"])
+    return context, engine.run_step2(
         server, context["run_id"], context["chromosome_order"], paths, records, previous["q_rows"],
         context["donor_set"], context["donor_members"], context["assignments"], context["sources"],
         context["recipe"]["primary_dataset"], [*context["initial_consumed"], *previous["accepted_intervals"]],
@@ -96,10 +96,10 @@ def main():
     if args.baseline == args.optimized:
         parser.error("workspaces must be independent")
     sys.path.insert(0, str(args.tools_dir.resolve()))
-    from grt_core import repair_common, repair_runtime, step2_engine, step3_engine
+    from grt_core import repair_common, repair_runtime, step1_engine, step2_engine
     engine = SimpleNamespace(**{
         name: value
-        for module in (repair_common, repair_runtime, step2_engine, step3_engine)
+        for module in (repair_common, repair_runtime, step1_engine, step2_engine)
         for name, value in vars(module).items() if not name.startswith("_")
     })
     args.context_factory = None
@@ -109,10 +109,10 @@ def main():
         spec.loader.exec_module(adapter)
         args.context_factory = adapter.snapshot_context
     results, times, checks = {}, {}, []
-    for stage in ("step2", "step3"):
+    for stage in ("step1", "step2"):
         for profile, server in (("baseline", args.baseline), ("optimized", args.optimized)):
             started = time.monotonic()
-            previous = results[profile] if stage == "step3" else None
+            previous = results[profile] if stage == "step2" else None
             _, (result, cache_hit) = run_stage(engine, server, args, profile, previous)
             results[profile] = result
             times[f"{profile}:{stage}"] = {"seconds": time.monotonic() - started, "stage_cache_hit": cache_hit}

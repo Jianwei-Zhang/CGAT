@@ -52,9 +52,9 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
             path = self.workspace / ".prepare_lib" / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"old runtime " + name.encode())
-        for name in ("run_all.sh", "run_grt_step2.sh", "run_grt_step3.sh"):
+        for name in ("run_all.sh", "run_grt_step1.sh", "run_grt_step2.sh", "run_grt_step3.sh"):
             (self.workspace / name).write_bytes(b"generated command; do not execute")
-        for name, data in {"metadata/package.tsv": b"workflow\tschema_version\ngpm_grt_precomputed_v2\t2\n",
+        for name, data in {"metadata/package.tsv": b"workflow\tschema_version\ngpm_grt_precomputed_v2\t4\n",
                            "data/input.fa": b">input\nACGT\n", "grt/q/q3.fa": b">q3\nACGT\n",
                            "grt/cache/raw/result.coords": b"original alignment",
                            "grt/checkpoints/step3.json": b"original checkpoint",
@@ -90,6 +90,14 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         from server.tools.grt_core.repair_common import repair_engine_sha256
         tools = Path(updater.__file__).resolve().parent
         self.assertEqual(updater.engine_hash(tools), repair_engine_sha256(tools / "grt_core"))
+
+    def test_legacy_numbering_is_rejected_before_runtime_mutation(self):
+        package = self.workspace / "metadata/package.tsv"
+        package.write_text(package.read_text().replace("\t4\n", "\t3\n"))
+        before = tuple(self.snapshot(root) for root in (self.workspace, self.tools))
+        with self.assertRaisesRegex(ValueError, "requires workspace schema 4"):
+            self.update()
+        self.assertEqual(tuple(self.snapshot(root) for root in (self.workspace, self.tools)), before)
 
     def test_dry_run_is_read_only(self):
         before = tuple(self.snapshot(p) for p in (self.source, self.tools, self.workspace))

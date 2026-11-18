@@ -48,15 +48,10 @@ STATUS_FIELDS = [
 ]
 LGZ_CACHE_MARKERS = {
     "grt_prepare": ("LGZ prepare inputs are current:",),
-    "grt_step1": (
-        "LGZ step1_round1 cache hit:",
-        "LGZ step1_filter cache hit:",
-        "LGZ step1_round2 cache hit:",
-    ),
+    "grt_step1": ("LGZ step1 cache hit:",),
     "grt_step2": ("LGZ step2 cache hit:",),
+    "grt_step12": ("LGZ step1 cache hit:", "LGZ step2 cache hit:"),
     "grt_step3": ("LGZ step3 cache hit:",),
-    "grt_step23": ("LGZ step2 cache hit:", "LGZ step3 cache hit:"),
-    "grt_telomere_finalize": ("LGZ step4_telomere cache hit:",),
 }
 
 
@@ -647,7 +642,7 @@ class Runner:
                         )
                         return 128 + self.received_signal
                     kind = unit.unit_id.split(":", 1)[0]
-                    if kind in {"ref", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
+                    if kind in {"ref", "q0_chr", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
                         group = []
                         for candidate in self.units[unit_index:]:
                             if candidate.unit_id.split(":", 1)[0] != kind or load_tasks(self.server_dir, candidate.unit_id, candidate.command_relpath) is None:

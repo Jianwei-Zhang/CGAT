@@ -68,6 +68,16 @@ class GrtPrepareInputsTests(unittest.TestCase):
         self.assertIn("probe stdout", message)
         self.assertLess(message.count("old-output"), 25)
 
+    def test_positive_infinite_qv_is_not_converted_to_failed_zero_quality(self):
+        import math
+        from server.tools.lgz_prepare_inputs import parse_merqury_qv
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "quality.qv"
+            path.write_text("contig 0 1000 +inf\n")
+            value = parse_merqury_qv(path)["contig"]
+            self.assertTrue(math.isinf(value))
+            self.assertGreater(value, 30)
+
     def test_reads_qc_thread_plan_caps_and_distributes_total_budget(self):
         with mock.patch.object(
             os, "sched_getaffinity", return_value=set(range(12)), create=True
@@ -175,7 +185,9 @@ class GrtPrepareInputsTests(unittest.TestCase):
             [
                 {
                     "workflow": "gpm_grt_precomputed_v2",
-                    "schema_version": "2",
+                    # This fixture invokes the current producer; schema 2 is
+                    # supported only by frozen historical delivery fixtures.
+                    "schema_version": "4",
                     "package_mode": "fast",
                     "sequence_layout": "partitioned",
                     "preassigned_chr": "true",
@@ -231,6 +243,7 @@ class GrtPrepareInputsTests(unittest.TestCase):
             ["key", "value"],
             [
                 {"key": "alignment_engine", "value": "minimap2"},
+                {"key": "threads", "value": "10"},
                 {"key": "minimap_preset", "value": "asm10"},
                 {"key": "chr_assignment_min_coverage_percent", "value": "60"},
             ],
@@ -325,6 +338,8 @@ class GrtPrepareInputsTests(unittest.TestCase):
         return server
 
     def run_tool(self, server, *extra, env=None):
+        from server.tests.q0_test_support import seed_q0_evidence
+        seed_q0_evidence(server)
         return subprocess.run(
             [sys.executable, str(TOOL), "--server-dir", str(server), *map(str, extra)],
             check=False,
@@ -334,109 +349,67 @@ class GrtPrepareInputsTests(unittest.TestCase):
         )
 
     def test_no_reads_builds_traceable_q0_and_frozen_global_donors(self):
+        from server.tests.test_q0_admission import bridge_fixture
+        from server.tests.test_q0_publication import complete_workspace
+        from server.tools.lgz_core.q0_publication import validate_prepared_q0
         with tempfile.TemporaryDirectory() as temporary_dir:
-            server = self.make_server(Path(temporary_dir))
+            fixture, truth = bridge_fixture()
+            server = complete_workspace(fixture, Path(temporary_dir))
             completed = self.run_tool(server)
             self.assertEqual(completed.returncode, 0, completed.stderr)
-
-            q0 = (server / "grt/q/q0.fa").read_text(encoding="utf-8")
-            self.assertEqual(
-                sha256(server / "grt/q/q0.fa"),
-                "e736adbe311565c992046974c889ea48fe9a94605595b9223e84f64d9ee0220e",
-            )
-            self.assertIn("A" * 80, q0)
-            self.assertIn("N" * 80, q0)
-            self.assertIn("G" * 80, q0)
-            self.assertIn("G" * 80 + "\n", q0)  # reverse-complemented p_reverse starts with G
-
-            q_rows = read_tsv(server / "metadata/grt_q_segments.tsv")
-            self.assertEqual([row["segment_kind"] for row in q_rows if row["chr"] == "Chr01"], ["source", "gap", "source"])
-            gap = next(row for row in q_rows if row["segment_kind"] == "gap")
-            self.assertEqual(int(gap["q_end"]) - int(gap["q_start"]) + 1, 100)
-            reverse = next(row for row in q_rows if row["contig_name"] == "p_reverse")
-            self.assertEqual(reverse["orientation"], "-")
-            evidence = read_tsv(server / "metadata/grt_evidence_registry.tsv")
-            self.assertTrue(all(row["tool_version"] == "minimap2 fixture 1" for row in evidence))
-
-            roles = {(row["dataset_name"], row["contig_name"]): row for row in read_tsv(server / "metadata/grt_contig_roles.tsv")}
-            self.assertEqual(roles[("primary", "p_redundant")]["q_eligible"], "false")
-            self.assertTrue(roles[("primary", "p_redundant")]["q_rejection_reason"].startswith("ref_footprint_covered_by:"))
-            self.assertEqual(roles[("support", "s_unplaced")]["donor_eligible"], "true")
-            self.assertEqual(roles[("support", "s_tel_short")]["tel_donor_eligible"], "true")
-
-            recipe = read_tsv(server / "metadata/grt_recipe.tsv")[0]
-            ordinary = [
-                row
-                for row in read_tsv(server / "metadata/grt_donor_members.tsv")
-                if row["donor_set_id"] == recipe["donor_set_id"]
-            ]
-            self.assertEqual(
-                [(row["dataset_name"], row["contig_name"]) for row in ordinary],
-                [("support", "s_assigned"), ("support", "s_unplaced"), ("primary", "p_redundant")],
-            )
-            self.assertNotIn("p_cover", {row["contig_name"] for row in ordinary})
-            fragments = read_tsv(server / "metadata/grt_donor_fragments.tsv")
-            self.assertEqual(
-                {row["member_id"] for row in fragments},
-                {row["member_id"] for row in ordinary},
-            )
-
-            ordinary_set = next(
-                row
-                for row in read_tsv(server / "metadata/grt_donor_sets.tsv")
-                if row["donor_set_id"] == recipe["donor_set_id"]
-            )
-            self.assertEqual(
-                sha256(server / ordinary_set["fasta_relpath"]),
-                "a15c5b2a58c751b60c77ddb332db7c5036574bbc8697e224dbbe1e5ad58f1f63",
-            )
-            tracked = [
-                server / "grt/q/q0.fa",
-                server / ordinary_set["fasta_relpath"],
-                server / "metadata/grt_donor_sets.tsv",
-                server / "metadata/grt_donor_fragments.tsv",
-                server / "metadata/grt_q_segments.tsv",
-            ]
-            before = {path: sha256(path) for path in tracked}
+            from server.tools.lgz_core.common import read_fasta
+            self.assertEqual(dict(read_fasta(server / "grt/q/q0.fa")), {"chr1": truth})
+            frozen = validate_prepared_q0(server)
+            self.assertEqual(frozen["package_schema_version"], "4")
+            roles = {row["contig_name"]: row for row in read_tsv(server / "metadata/grt_contig_roles.tsv")}
+            self.assertEqual(roles["a"]["donor_eligible"], "true")
+            self.assertTrue(all(row["stage"] == "q0_construction" for row in read_tsv(server / "metadata/grt_evidence_registry.tsv")))
+            before = sha256(server / "grt/q/q0.fa")
             repeated = self.run_tool(server)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertIn("are current", repeated.stdout)
-            self.assertEqual(before, {path: sha256(path) for path in tracked})
+            self.assertEqual(sha256(server / "grt/q/q0.fa"), before)
 
-            stale_stage = server / "grt/stages/old/result.txt"
-            stale_stage.parent.mkdir(parents=True)
-            stale_stage.write_text("stale\n", encoding="utf-8")
-            stale_metadata = server / "metadata/grt_events.jsonl"
-            stale_metadata.write_text("{}\n", encoding="utf-8")
-            with (server / "runs/primary_vs_ref/result.paf").open(
-                "a", encoding="utf-8", newline=""
-            ) as handle:
-                handle.write("# input hash changed\n")
-            rebuilt = self.run_tool(server)
-            self.assertEqual(rebuilt.returncode, 0, rebuilt.stderr)
-            self.assertNotIn("are current", rebuilt.stdout)
-            self.assertFalse(stale_stage.exists())
-            self.assertFalse(stale_metadata.exists())
-
-    def test_q0_consumes_assignment_orientation_without_recomputing_paf_strand(self):
+    def test_q0_uses_interval_alignment_orientation_not_whole_assignment(self):
+        from server.tests.test_q0_admission import bridge_fixture
+        from server.tests.test_q0_publication import complete_workspace
         with tempfile.TemporaryDirectory() as temporary_dir:
-            server = self.make_server(Path(temporary_dir))
-            assignments_path = server / "metadata/chr_assignments.tsv"
-            assignments = read_tsv(assignments_path)
-            reverse = next(row for row in assignments if row["seq_name"] == "p_reverse")
-            reverse["source_orientation"] = "+"
-            write_tsv(assignments_path, list(assignments[0]), assignments)
-
+            fixture, truth = bridge_fixture(reverse=True)
+            server = complete_workspace(fixture, Path(temporary_dir))
+            path = server / "metadata/chr_assignments.tsv"
+            assignments = read_tsv(path)
+            next(row for row in assignments if row["seq_name"] == "c")["source_orientation"] = "+"
+            write_tsv(path, list(assignments[0]), assignments)
+            original = path.read_bytes()
             completed = self.run_tool(server)
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            q_rows = read_tsv(server / "metadata/grt_q_segments.tsv")
-            reverse_q0 = next(row for row in q_rows if row["contig_name"] == "p_reverse")
-            self.assertEqual(reverse_q0["orientation"], "+")
+            row = next(row for row in read_tsv(server / "metadata/grt_q_segments.tsv") if row["contig_name"] == "c")
+            self.assertEqual(row["orientation"], "-")
+            self.assertEqual(path.read_bytes(), original)
 
     def test_reads_default_skips_craq_and_full_mode_runs_it(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
-            server = self.make_server(root, reads_qc_enabled=True)
+            from server.tests.test_q0_admission import EvidenceFixture, dna
+            from server.tests.test_q0_publication import complete_workspace
+            fixture = EvidenceFixture()
+            genome = dna(5000)
+            for name, dataset, start, end in (("p_cover", "primary", 0, 1800),
+                                               ("p_redundant", "primary", 2000, 3100),
+                                               ("s_assigned", "support", 3500, 5000)):
+                sequence = genome[start:end]
+                aligned_length = end - start
+                if name == "p_redundant":
+                    # A real terminal repeat must not bypass failed read QC
+                    # when freezing the otherwise eligible Dtel context.
+                    sequence = sequence[:-560] + "TTTAGGG" * 80
+                    aligned_length -= 560
+                source = fixture.source(name, sequence, dataset=dataset)
+                fixture.ref(source, (0, aligned_length), (start, start + aligned_length))
+            server = complete_workspace(fixture, root)
+            package = read_tsv(server / "metadata/package.tsv")
+            package[0]["reads_qc_enabled"] = "true"
+            write_tsv(server / "metadata/package.tsv", list(package[0]), package)
             reads = root / "reads.fastq"
             reads.write_text("@r1\nACGT\n+\n!!!!\n", encoding="utf-8")
             fake_bin = root / "bin"
@@ -575,6 +548,10 @@ printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
             quality_by_contig = {row["contig_name"]: row for row in quality}
             self.assertEqual(quality_by_contig["p_redundant"]["qv"], "20.000000")
             self.assertEqual(quality_by_contig["p_redundant"]["reads_qc_pass"], "false")
+            roles = {row["contig_name"]: row for row in read_tsv(server / "metadata/grt_contig_roles.tsv")}
+            self.assertEqual(roles["p_redundant"]["tel_donor_eligible"], "false")
+            self.assertEqual(roles["p_redundant"]["tel_rejection_reason"], "failed_reads_qc")
+            self.assertNotIn("p_redundant", {row["contig_name"] for row in read_tsv(server / "metadata/grt_donor_members.tsv")})
             self.assertTrue(
                 all(
                     row["qv"] == "35.000000"

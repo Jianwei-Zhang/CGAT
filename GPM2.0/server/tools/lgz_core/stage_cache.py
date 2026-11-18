@@ -104,46 +104,9 @@ def commit_stage_directory(temporary: Path, destination: Path) -> None:
         shutil.rmtree(destination)
     os.replace(temporary, destination)
 
-def invalidate_step1_from(server_dir: Path, stage: str) -> None:
-    order = ["step1_round1", "step1_filter", "step1_round2"]
-    q_outputs = {
-        "step1_round1": "q0r1",
-        "step1_filter": "q0f",
-        "step1_round2": "q1",
-    }
-    artifact_paths = {
-        "step1_round1": server_dir / "grt/evidence/step1/round1",
-        "step1_filter": server_dir / "grt/evidence/step1/filter",
-        "step1_round2": server_dir / "grt/evidence/step1/round2",
-    }
-    start = order.index(stage)
-    for invalid_stage in order[start:]:
-        checkpoint = server_dir / f"grt/checkpoints/{invalid_stage}.json"
-        checkpoint.unlink(missing_ok=True)
-        q_path = server_dir / f"grt/q/{q_outputs[invalid_stage]}.fa"
-        q_path.unlink(missing_ok=True)
-        artifact = artifact_paths[invalid_stage]
-        if artifact.is_dir():
-            shutil.rmtree(artifact)
-    for downstream_stage, q_output in (
-        ("step2", "q2"),
-        ("step3", "q3"),
-        ("step4_telomere", "q4"),
-        ("finalize", ""),
-    ):
-        (server_dir / f"grt/checkpoints/{downstream_stage}.json").unlink(missing_ok=True)
-        if q_output:
-            (server_dir / f"grt/q/{q_output}.fa").unlink(missing_ok=True)
-    for downstream_artifact in ("step2", "step3", "step4_telomere"):
-        path = server_dir / f"grt/evidence/{downstream_artifact}"
-        if path.is_dir():
-            shutil.rmtree(path)
-    (server_dir / "metadata/grt_final_path.json").unlink(missing_ok=True)
-
-
-def invalidate_step23_from(server_dir: Path, stage: str) -> None:
-    order = ["step2", "step3"]
-    outputs = {"step2": "q2", "step3": "q3"}
+def invalidate_step12_from(server_dir: Path, stage: str) -> None:
+    order = ["step1", "step2"]
+    outputs = {"step1": "q1", "step2": "q2"}
     start = order.index(stage)
     for invalid_stage in order[start:]:
         (server_dir / f"grt/checkpoints/{invalid_stage}.json").unlink(missing_ok=True)
@@ -151,15 +114,15 @@ def invalidate_step23_from(server_dir: Path, stage: str) -> None:
         artifact = server_dir / f"grt/evidence/{invalid_stage}"
         if artifact.is_dir():
             shutil.rmtree(artifact)
-    invalidate_step4(server_dir)
+    invalidate_step3(server_dir)
 
 
-def invalidate_step4(server_dir: Path) -> None:
-    for stage in ("step4_telomere", "finalize"):
+def invalidate_step3(server_dir: Path) -> None:
+    for stage in ("step3", "finalize"):
         (server_dir / f"grt/checkpoints/{stage}.json").unlink(missing_ok=True)
-    (server_dir / "grt/q/q4.fa").unlink(missing_ok=True)
+    (server_dir / "grt/q/q3.fa").unlink(missing_ok=True)
     (server_dir / "metadata/grt_final_path.json").unlink(missing_ok=True)
-    artifact = server_dir / "grt/evidence/step4_telomere"
+    artifact = server_dir / "grt/evidence/step3"
     if artifact.is_dir():
         shutil.rmtree(artifact)
 
@@ -201,6 +164,8 @@ def run_minimap(
     flank_fasta: Path,
     paf_path: Path,
     stage_dir: Path,
+    *,
+    keep_all_chains: bool = False,
 ) -> None:
     command = [
         executable,
@@ -209,6 +174,7 @@ def run_minimap(
         "-t",
         str(execution_threads(threads)),
         "-c",
+        *(["-P"] if keep_all_chains else []),
         "-o",
         str(paf_path),
         str(donor_fasta),
@@ -303,6 +269,7 @@ def cached_chromosome_alignment(
                 flank_path,
                 paf_path,
                 temporary,
+                keep_all_chains=bool(parameters.get("keep_all_chains", False)),
             )
         else:
             paf_path.write_bytes(b"")

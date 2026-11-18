@@ -280,7 +280,7 @@ def _mummer_alignments_for_event(
     if profile is None:
         raise ValueError(f"LGZ candidate {candidate.get('candidate_id')} lacks linked MUMmer evidence")
     preset = str(profile.get("preset", ""))
-    q_version = str(profile.get("q_version", "")) or ("q1" if stage == "step2" else "q2")
+    q_version = str(profile.get("q_version", "")) or str(supporting_event["q_before"]["version"])
     chromosome = str(candidate.get("chr", ""))
     line_roles = [
         (_positive_int(candidate.get("left_line"), "MUMmer left_line"), "left_anchor"),
@@ -716,17 +716,20 @@ def build_display_evidence(
     for row in _read_tsv(source_root / "metadata/grt_q_segments.tsv"):
         q_rows[(row.get("q_version", ""), row.get("chr", ""))].append(row)
 
+    package = _read_tsv(source_root / "metadata/package.tsv")[0]
+    current = package["schema_version"] == "4"
+    patch_stage, correction_stage = ("step1", "step2") if current else ("step2", "step3")
     candidates_by_stage: dict[str, dict[str, dict[str, str]]] = {}
     for stage, relpath in (
-        ("step2", "grt/evidence/step2/candidates.tsv"),
-        ("step3", "grt/evidence/step3/correction_candidates.tsv"),
+        (patch_stage, f"grt/evidence/{patch_stage}/candidates.tsv"),
+        (correction_stage, f"grt/evidence/{correction_stage}/correction_candidates.tsv"),
     ):
         candidates_by_stage[stage] = _candidates_by_event(source_root / relpath)
     refill_candidates = _candidates_by_event(
-        source_root / "grt/evidence/step3/refill_candidates.tsv"
+        source_root / f"grt/evidence/{correction_stage}/refill_candidates.tsv"
     )
     alignments_by_stage: dict[str, dict[tuple[str, int], dict[str, str]]] = {}
-    for stage in ("step2", "step3"):
+    for stage in (patch_stage, correction_stage):
         alignments_by_stage[stage] = {
             (row.get("chr", ""), int(row["line_number"])): row
             for row in _read_tsv(source_root / f"grt/evidence/{stage}/mummer/alignments.tsv")
@@ -770,7 +773,7 @@ def build_display_evidence(
                     supporting_events.append(supporting)
                     supporting_ids.add(supporting_id)
             for supporting_event in supporting_events:
-                if str(supporting_event.get("stage", "")) in {"step2", "step3"}:
+                if str(supporting_event.get("stage", "")) in {patch_stage, correction_stage}:
                     projected.extend(
                         _mummer_alignments_for_event(
                             final_event=final_event,
@@ -784,7 +787,7 @@ def build_display_evidence(
                         )
                     )
             for local_event in [final_event, *retained_ancestors]:
-                if local_event.get("stage") == "step3" and local_event.get("action") == "refill":
+                if local_event.get("stage") == correction_stage and local_event.get("action") == "refill":
                     projected.extend(
                         _local_alignments_for_event(
                             source_root=source_root,

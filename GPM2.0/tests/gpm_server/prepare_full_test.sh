@@ -164,7 +164,7 @@ assert_package_metadata() {
         exit 1
       }
       if ($(columns["workflow"]) != "gpm_grt_precomputed_v2" ||
-          $(columns["schema_version"]) != "2" ||
+          $(columns["schema_version"]) != "4" ||
           $(columns["grt_precompute_enabled"]) != "true" ||
           $(columns["recipe_locked"]) != "true" ||
           $(columns["final_path_schema_version"]) != "1") {
@@ -291,9 +291,14 @@ command = Path(batch["directory"]) / "command.sh"
 assert str(command) in (run / "command.sh").read_text()
 assert "self_alignment_batches.py" in command.read_text()
 assert str(manifest_path) in command.read_text()
-tasks = json.loads((run.parent / "alignment_tasks.json").read_text())["tasks"]
+tasks = json.loads((run.parent / "q0_alignment_tasks.json").read_text())["tasks"]
 self_task = next(row for row in tasks if root / row["command"] == command)
 assert self_task["max_threads"] == 2  # Two query records, within the 12-thread budget.
+late = json.loads((run.parent / "alignment_tasks.json").read_text())["tasks"]
+assert all("_vs_" not in row["command"] for row in late)
+assert "tel_scan" not in (run.parent / "q0_generated_command.sh").read_text()
+assert "cen_scan" not in (run.parent / "q0_generated_command.sh").read_text()
+assert "_vs_" not in (run.parent / "generated_command.sh").read_text()
 PYBATCH
   [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
     echo "expected the one-contig ds_b track not to schedule a self run" >&2
@@ -304,6 +309,37 @@ PYBATCH
     cat "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >&2
     exit 1
   }
+  # Completed raw evidence and self caches survive identical assignment regeneration.
+  PATH="${FAKE_BIN}:$PATH" python3 - "$output_root" <<'PYCACHE'
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / ".prepare_lib/tools"))
+from run_outer_checkpoints import OuterCheckpointManager
+run = root / "runs/chr_Chr01"
+for name in ("ds_a_vs_self", "ds_a_vs_ds_b"):
+    (run / name / "result.paf").write_text("")
+(run / "ds_a_vs_self/cache-marker").write_text("preserve")
+manager = OuterCheckpointManager(root)
+manager.commit(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+PYCACHE
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  PATH="${FAKE_BIN}:$PATH" python3 - "$output_root" <<'PYCACHE'
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / ".prepare_lib/tools"))
+from run_outer_checkpoints import OuterCheckpointManager
+manager = OuterCheckpointManager(root)
+valid, reason = manager.validate(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+assert valid, reason
+assert (root / "runs/chr_Chr01/ds_a_vs_self/cache-marker").read_text() == "preserve"
+PYCACHE
+  # Removing an operation retires its data outside active runs/, rather than deleting it.
+  : > "${output_root}/runs/ds_b_vs_ref/result.paf"
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  [[ ! -d "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b" ]] || exit 1
+  find "${output_root}/.run_all/retired_chr_operations/Chr01" -path '*/ds_a_vs_ds_b.*/result.paf' | grep -q .
 }
 
 test_self_alignment_restores_unique_cross_contig_pairs() {
@@ -480,8 +516,8 @@ assert_chr_partition_run_all_staging() {
     exit 1
   }
   mapfile -t command_lines < <(tail -n +2 "$plan")
-  [[ "${#command_lines[@]}" -eq 12 ]] || {
-    echo "expected 12 staged plan units, got ${#command_lines[@]}" >&2
+  [[ "${#command_lines[@]}" -eq 13 ]] || {
+    echo "expected 13 staged plan units, got ${#command_lines[@]}" >&2
     if [[ "${#command_lines[@]}" -gt 0 ]]; then
       printf '%s\n' "${command_lines[@]}" >&2
     fi
@@ -501,11 +537,12 @@ assert_chr_partition_run_all_staging() {
   local expected_tail
   expected_tail="$(cat <<EOF
 assign	assign_chr_groups.sh	logs/run_all.log
+q0_chr:${chr_name}	runs/chr_${chr_name}/q0_command.sh	logs/run_all.log
+q0_evidence	prepare_q0_evidence.sh	logs/run_all.log
 grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
 grt_step1	run_lgz_step1.sh	logs/run_all.log
 grt_step2	run_lgz_step2.sh	logs/run_all.log
 grt_step3	run_lgz_step3.sh	logs/run_all.log
-grt_telomere_finalize	run_lgz_telomere_finalize.sh	logs/run_all.log
 chr:${chr_name}	runs/chr_${chr_name}/command.sh	logs/run_all.log
 finalize_evidence	finalize_lgz_evidence.sh	logs/run_all.log
 package_full	package_full_zip.sh	logs/run_all.log
@@ -644,7 +681,7 @@ test_custom_output_root() {
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
     --lgz-execution-profile optimized \
-    --lgz-step3-mummer-scope gap-screen \
+    --lgz-step2-mummer-scope gap-screen \
     --lgz-qc-memory-gb 80 \
     --lgz-kmer-size 21 \
     -o "$output_root" >"$prepare_log"
@@ -668,30 +705,30 @@ test_custom_output_root() {
   assert_file "${output_root}/.prepare_lib/tools/add_dataset_package.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
-  [[ ! -e "${output_root}/.prepare_lib/tools/grt_step23.py" ]]
+  [[ ! -e "${output_root}/.prepare_lib/tools/grt_step12.py" ]]
+  assert_file "${output_root}/.prepare_lib/tools/grt_core/step1_engine.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_core/step2_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_core/step3_engine.py"
+  assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step2.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step3.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_evidence_package.py"
   assert_file "${output_root}/.prepare_lib/contracts/grt_precomputed_v2.json"
   assert_file "${output_root}/prepare_lgz_inputs.sh"
+  [[ -f "${output_root}/run_lgz_step1.sh" ]]
   assert_file "${output_root}/run_lgz_step1.sh"
   assert_file "${output_root}/run_lgz_step2.sh"
   assert_file "${output_root}/run_lgz_step3.sh"
-  assert_file "${output_root}/run_lgz_telomere_finalize.sh"
   assert_file "${output_root}/finalize_lgz_evidence.sh"
-  for name in prepare_grt_inputs run_grt_step1 run_grt_step2 run_grt_step3 run_grt_telomere_finalize finalize_grt_evidence; do
+  for name in prepare_grt_inputs run_grt_step1 run_grt_step2 run_grt_step3 finalize_grt_evidence; do
     assert_file "${output_root}/${name}.sh"
     grep -F 'exec bash ' "${output_root}/${name}.sh" >/dev/null
     bash -n "${output_root}/${name}.sh"
   done
   assert_file "${output_root}/.prepare_lib/tools/lgz_compat.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step1_engine.py"
   assert_file "${output_root}/.prepare_lib/tools/lgz_core/step2_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step3_engine.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_step1.py"
   assert_file "${output_root}/.prepare_lib/tools/lgz_step2.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_step3.py"
 
   assert_file "${output_root}/package_full_zip.sh"
   assert_file "${output_root}/package_light_zip.sh"
@@ -701,12 +738,12 @@ test_custom_output_root() {
   # Test legacy forwarding with a harmless spy, never by executing real analysis.
   local alias_dir="${output_root}/alias forwarding"
   mkdir -p "$alias_dir"
-  cp "${output_root}/run_grt_step3.sh" "${alias_dir}/run_grt_step3.sh"
-  cat > "${alias_dir}/run_lgz_step3.sh" <<'SPY'
+  cp "${output_root}/run_grt_step2.sh" "${alias_dir}/run_grt_step2.sh"
+  cat > "${alias_dir}/run_lgz_step2.sh" <<'SPY'
 #!/usr/bin/env bash
 printf '%s\n' "$@"
 SPY
-  [[ "$(bash "${alias_dir}/run_grt_step3.sh" one "two words")" == $'one\ntwo words' ]]
+  [[ "$(bash "${alias_dir}/run_grt_step2.sh" one "two words")" == $'one\ntwo words' ]]
 
 }
 
@@ -1136,10 +1173,17 @@ EOF
     echo "expected --skip-self to suppress chr-local ds_b_vs_self" >&2
     exit 1
   }
-  ! grep -q '_vs_self' "${output_root}/runs/chr_Chr01/generated_command.sh" || {
+  ! grep -q '_vs_self' "${output_root}/runs/chr_Chr01/q0_generated_command.sh" || {
     echo "expected generated chr command not to contain self runs when --skip-self is set" >&2
     exit 1
   }
+  printf '>tig_second\nAAAAAAAAAA\n' >> "${output_root}/data/datasets/ds_a.fa"
+  printf 'tig_second\t10\t0\t6\t+\tChr01\t30\t4\t10\t6\t6\t60\n' >> "${output_root}/runs/ds_a_vs_ref/result.paf"
+  if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >"${TMP_DIR}/skip-conflict.log" 2>&1; then
+    echo "expected --skip-self to reject multiple same-dataset q0 candidates" >&2
+    exit 1
+  fi
+  grep -F -- '--skip-self conflicts with multiple candidate contigs' "${TMP_DIR}/skip-conflict.log" >/dev/null
 }
 
 test_prepare_writes_reference_segments_metadata() {

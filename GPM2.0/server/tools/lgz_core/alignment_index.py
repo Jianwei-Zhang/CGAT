@@ -39,7 +39,7 @@ class AlignmentCoordinateIndex:
                 [self.rows[i] for i in sorted(i for _, i in right)])
 
 
-class Step2MemberIndex:
+class Step1MemberIndex:
     """Return exactly the original stable top-two left/right anchors."""
 
     def __init__(self, rows: list[dict[str, object]]):

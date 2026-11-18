@@ -22,6 +22,8 @@ from lgz_display_evidence import build_display_evidence
 
 APP_WORKFLOW = "gpm_grt_app_precomputed_v2"
 APP_SCHEMA_VERSION = "2"
+Q0_APP_SCHEMA_VERSION = "3"
+CURRENT_APP_SCHEMA_VERSION = "4"
 SERVER_FINAL_PATH_SCHEMA_VERSION = "1"
 FINAL_PATH_SCHEMA_VERSION = "3"
 FASTA_SUFFIXES = {".fa", ".fasta"}
@@ -101,14 +103,17 @@ def copy_annotation_tree(source_root: Path, staging_root: Path, directory: str) 
         shutil.copy2(source, target)
 
 
-def project_package_table(source: Path, target: Path, package_mode: str) -> None:
+def project_package_table(source: Path, target: Path, package_mode: str) -> str:
     with source.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle, delimiter="\t"))
         if len(rows) != 1:
             raise ValueError("metadata/package.tsv must contain exactly one row")
         fieldnames = list(rows[0])
+    source_schema = rows[0].get("schema_version")
+    if rows[0].get("workflow") != "gpm_grt_precomputed_v2" or source_schema not in {APP_SCHEMA_VERSION, Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}:
+        raise ValueError("unsupported Server package schema for App projection")
     rows[0]["workflow"] = APP_WORKFLOW
-    rows[0]["schema_version"] = APP_SCHEMA_VERSION
+    rows[0]["schema_version"] = source_schema
     rows[0]["package_mode"] = package_mode
     rows[0]["grt_precompute_enabled"] = "true"
     rows[0]["recipe_locked"] = "true"
@@ -118,6 +123,7 @@ def project_package_table(source: Path, target: Path, package_mode: str) -> None
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         writer.writerow(rows[0])
+    return source_schema
 
 
 def project_recipe(source: Path, target: Path) -> None:
@@ -132,7 +138,6 @@ def project_recipe(source: Path, target: Path) -> None:
     # those Server artifacts part of the delivery contract.
     for key in ("donor_set_id", "tel_donor_set_id", "q0_relpath"):
         rows[0][key] = ""
-    rows[0]["final_q_relpath"] = "grt/q/q4.fa"
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
@@ -294,7 +299,6 @@ def project_final_path(
     )
     payload["workflow"] = APP_WORKFLOW
     payload["schema_version"] = FINAL_PATH_SCHEMA_VERSION
-    payload["q4_relpath"] = "grt/q/q4.fa"
     for chromosome in payload["chromosomes"]:
         chromosome["display_evidence"] = display_evidence_by_chr.get(
             str(chromosome.get("chr", "")),
@@ -334,13 +338,13 @@ def validate_source_locators(source_root: Path) -> dict[tuple[str, str], int]:
     return lengths
 
 
-def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, final_path: dict, q4_artifact_sha256: str, q4_lengths: dict[str, int]) -> None:
+def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, final_path: dict, q4_artifact_sha256: str, q4_lengths: dict[str, int], *, schema_version: str = APP_SCHEMA_VERSION) -> None:
     manifest = {
         "workflow": APP_WORKFLOW,
-        "schema_version": APP_SCHEMA_VERSION,
+        "schema_version": schema_version,
         "package_kind": "full" if include_fasta else "no_fasta",
         "fasta_available": include_fasta,
-        "q4_relpath": "grt/q/q4.fa",
+        "q4_relpath": final_path["q4_relpath"],
         "q4_artifact_sha256": q4_artifact_sha256,
         "q4_length_bp": sum(q4_lengths.values()),
         "q4_chromosome_lengths": q4_lengths,
@@ -374,6 +378,16 @@ def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
 def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
+    with (source_root / "metadata/package.tsv").open(newline="", encoding="utf-8") as handle:
+        package_rows = list(csv.DictReader(handle, delimiter="\t"))
+    if (len(package_rows) != 1 or package_rows[0].get("workflow") != "gpm_grt_precomputed_v2"
+            or package_rows[0].get("schema_version") not in {APP_SCHEMA_VERSION, Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}):
+        raise ValueError("unsupported Server package schema for App projection")
+    if package_rows[0]["schema_version"] in {Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}:
+        # The projected App contract is intentionally smaller; verify the full
+        # frozen Server proof before omitting Server-only audit artifacts.
+        from lgz_contract import validate_contract
+        validate_contract(source_root)
     if staging_root.exists():
         shutil.rmtree(staging_root)
     staging_root.mkdir(parents=True)
@@ -397,7 +411,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         source_lengths,
         display_source_cards,
     )
-    project_package_table(source_root / "metadata/package.tsv", staging_root / "metadata/package.tsv", "full" if include_fasta else "no_fasta")
+    app_schema = project_package_table(source_root / "metadata/package.tsv", staging_root / "metadata/package.tsv", "full" if include_fasta else "no_fasta")
 
     copy_tree_filtered(source_root, staging_root, "data", include_fasta)
     # Keep compact output-bound policy, not private commands/logs/tool caches.
@@ -421,15 +435,16 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     if include_fasta and (source_root / "cen/library.fa").is_file():
         copy_file(source_root, staging_root, "cen/library.fa")
 
-    q4_source = source_root / "grt/q/q4.fa"
+    final_relpath = final_path["q4_relpath"]
+    q4_source = source_root / final_relpath
     if include_fasta:
-        copy_file(source_root, staging_root, "grt/q/q4.fa")
-        if (source_root / "grt/q/q4.fa.fai").is_file():
-            copy_file(source_root, staging_root, "grt/q/q4.fa.fai")
+        copy_file(source_root, staging_root, final_relpath)
+        if (source_root / (final_relpath + ".fai")).is_file():
+            copy_file(source_root, staging_root, final_relpath + ".fai")
         q4_hash = sha256_file(q4_source)
     else:
         q4_hash = sha256_file(q4_source)
-    write_manifest(staging_root, "full" if include_fasta else "no_fasta", include_fasta, final_path, q4_hash, q4_lengths)
+    write_manifest(staging_root, "full" if include_fasta else "no_fasta", include_fasta, final_path, q4_hash, q4_lengths, schema_version=app_schema)
 
 
 def main() -> int:

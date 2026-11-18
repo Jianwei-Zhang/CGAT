@@ -44,11 +44,11 @@ LOG_EVENTS = (
 )
 
 ASSIGN_UNIT_ID = "assign"
+Q0_EVIDENCE_UNIT_ID = "q0_evidence"
 LGZ_PREPARE_UNIT_ID = "grt_prepare"
 LGZ_STEP1_UNIT_ID = "grt_step1"
 LGZ_STEP2_UNIT_ID = "grt_step2"
 LGZ_STEP3_UNIT_ID = "grt_step3"
-LGZ_TELOMERE_FINALIZE_UNIT_ID = "grt_telomere_finalize"
 FINALIZE_EVIDENCE_UNIT_ID = "finalize_evidence"
 PACKAGE_FULL_UNIT_ID = "package_full"
 PACKAGE_LIGHT_UNIT_ID = "package_light"
@@ -85,6 +85,10 @@ def reference_unit_id(dataset_name: str) -> str:
 
 def chromosome_unit_id(chromosome: str) -> str:
     return f"chr:{validate_name(chromosome, 'chromosome name')}"
+
+
+def q0_chromosome_unit_id(chromosome: str) -> str:
+    return f"q0_chr:{validate_name(chromosome, 'chromosome name')}"
 
 
 def chromosome_self_unit_id(chromosome: str, dataset_name: str) -> str:
@@ -132,29 +136,31 @@ def build_unit_plan(
 
     reference_ids = tuple(reference_unit_id(name) for name in datasets)
     chromosome_ids = tuple(chromosome_unit_id(name) for name in chromosomes)
+    q0_chromosome_ids = tuple(q0_chromosome_unit_id(name) for name in chromosomes)
     items = [UnitPlanItem(unit_id, ()) for unit_id in reference_ids]
     items.extend(
         [
             UnitPlanItem(ASSIGN_UNIT_ID, reference_ids),
-            UnitPlanItem(LGZ_PREPARE_UNIT_ID, (ASSIGN_UNIT_ID,)),
+            *(UnitPlanItem(unit_id, (ASSIGN_UNIT_ID,)) for unit_id in q0_chromosome_ids),
+            UnitPlanItem(Q0_EVIDENCE_UNIT_ID, q0_chromosome_ids),
+            UnitPlanItem(LGZ_PREPARE_UNIT_ID, (Q0_EVIDENCE_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP1_UNIT_ID, (LGZ_PREPARE_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP2_UNIT_ID, (LGZ_STEP1_UNIT_ID,)),
-            UnitPlanItem(LGZ_STEP3_UNIT_ID, (LGZ_STEP2_UNIT_ID,)),
             UnitPlanItem(
-                LGZ_TELOMERE_FINALIZE_UNIT_ID,
-                (LGZ_STEP3_UNIT_ID,),
+                LGZ_STEP3_UNIT_ID,
+                (LGZ_STEP2_UNIT_ID,),
             ),
         ]
     )
     items.extend(
-        UnitPlanItem(unit_id, (LGZ_TELOMERE_FINALIZE_UNIT_ID,))
+        UnitPlanItem(unit_id, (LGZ_STEP3_UNIT_ID,))
         for unit_id in chromosome_ids
     )
     items.extend(
         [
             UnitPlanItem(
                 FINALIZE_EVIDENCE_UNIT_ID,
-                chromosome_ids or (LGZ_TELOMERE_FINALIZE_UNIT_ID,),
+                chromosome_ids or (LGZ_STEP3_UNIT_ID,),
             ),
             UnitPlanItem(PACKAGE_FULL_UNIT_ID, (FINALIZE_EVIDENCE_UNIT_ID,)),
             UnitPlanItem(PACKAGE_LIGHT_UNIT_ID, (PACKAGE_FULL_UNIT_ID,)),
@@ -345,4 +351,3 @@ GRT_PREPARE_UNIT_ID = LGZ_PREPARE_UNIT_ID
 GRT_STEP1_UNIT_ID = LGZ_STEP1_UNIT_ID
 GRT_STEP2_UNIT_ID = LGZ_STEP2_UNIT_ID
 GRT_STEP3_UNIT_ID = LGZ_STEP3_UNIT_ID
-GRT_TELOMERE_FINALIZE_UNIT_ID = LGZ_TELOMERE_FINALIZE_UNIT_ID

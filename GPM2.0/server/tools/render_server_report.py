@@ -62,6 +62,27 @@ LABELS = {
     "unresolved": "未解决", "superseded": "已被替换", "not_finalized": "尚未最终确认",
     "not_enabled": "未启用", "measured": "已测量", "enabled": "已启用",
     "reference": "参考序列", "primary": "主组装", "support": "辅助组装",
+    "assembly_candidate": "候选组装", "not_measured": "未测量",
+    "partial_path": "可用路径（完整性未确认）", "not_constructed": "未构建",
+    "input_assembly_gap": "输入原有 N 连接", "reference_unknown": "新增未知连接",
+    "sequence_overlap": "序列证据支持的 overlap",
+    "q0_unused_source_intervals": "未选区间（包括冗余或未通过筛选的来源）",
+    "q0_candidate_admission": "候选准入过程记录", "unplaced_component_count": "未准入的逻辑区段数",
+    "ambiguous_interval_count": "歧义区间数", "evidence_count": "证据记录数",
+    "q0_chromosomes": "各 chr 的构建范围", "q0_source_composition": "各 chr 的来源构成",
+    "q0_retained_joins": "q0 最终保留的连接", "q0_reference_unrepresented": "参考未被选中锚点覆盖的范围",
+    "q0_source_unrepresented": "候选来源未被路径表示的范围", "q0_search": "有界搜索记录（不是修补计数）",
+    "selected_chromosomes": "已有路径的 chr 数", "not_constructed_chromosomes": "未构建的 chr 数",
+    "selected_datasets": "实际采用的 ds 数", "selected_source_bp": "来源片段长度 / bp",
+    "source_bp_by_dataset": "各 ds 来源片段 / bp", "source_bp": "来源片段 / bp",
+    "source_piece_count": "来源片段数", "source_contig_count": "原始 contig 数",
+    "input_gap_joins": "原有 N 连接数", "input_gap_n_bp": "原有连接 N / bp",
+    "unknown_joins": "新增未知连接数", "unknown_join_n_bp": "新增未知连接 N / bp",
+    "sequence_overlap_joins": "最终保留的 overlap 连接数", "qc": "输入质量评估状态",
+    "reference_unrepresented_bp": "参考未被选中锚点覆盖 / bp",
+    "search_operation_counts": "搜索过程操作数", "global_optimality_claimed": "是否声称全局最优",
+    "pruning_record_counts": "剪枝记录数（按类型）",
+    "evaluations": "候选评估次数", "rounds": "搜索轮数", "stop_reasons": "停止原因",
     "sequence_count": "序列数", "length_bp": "总长度 / bp", "n_bp": "N 碱基数",
     "gap_count": "Gap 数（连续 N ≥100 bp）", "gap_bp": "Gap 长度 / bp", "n50_bp": "N50 / bp",
     "alignment_count": "比对记录数", "aligned_query_count": "有比对的 contig 数",
@@ -108,13 +129,9 @@ METHODS = {
     "prepare": "记录原始文件身份、数据角色与规范化后的 FASTA 统计。",
     "assign": "依据经过过滤的参考比对及覆盖率阈值分配染色体，记录方向与排列顺序。",
     "grt_prepare": "构建 q0，锁定普通供体与端粒供体；提供 reads 时执行输入质量评估。",
-    "step1_round1": "记录外部 contig 模式的第一阶段及其实际序列变化。",
-    "step1_filter": "记录过滤阶段；延期处理会保留原因。",
-    "step1_round2": "记录第二阶段及通往 q1 的序列变化。",
-    "step2": "生成并验证补丁候选，按染色体选择补丁或结构修正分支，生成 q2。",
-    "step3": "处理结构问题、重叠与后续优化填补，记录过滤和未解决的问题，生成 q3。",
-    "step4_telomere": "检查染色体两端、验证端粒供体并记录处理结果，生成 q4。",
-    "finalize_evidence": "整理最终路径使用的 contig 和比对证据，执行结果契约校验。",
+    "step1": "生成并验证补丁候选，按染色体选择补丁或结构修正分支，生成 q1。",
+    "step2": "处理结构问题、重叠与后续优化填补，记录过滤和未解决的问题，生成 q2。",
+    "step3": "检查染色体两端、验证端粒供体并记录处理结果，生成 q3 / Final Path。",
 }
 
 
@@ -194,11 +211,13 @@ def stage_io_html(record: dict) -> str:
     elif stage_id == "assign":
         input_body = '<strong>参考比对 PAF</strong><span>全部数据集的过滤后比对</span>'
     elif stage_id == "grt_prepare":
-        input_body = '<strong>归属与排列结果</strong><span>主组装、辅助组装及可选 QC 数据</span>'
+        input_body = ('<strong>多组装候选与完整比对证据</strong><span>全部 ds 的参考/ctg 比对及可选 QC 数据</span>'
+                      if facts.get("q0_construction") else
+                      '<strong>归属与排列结果</strong><span>主组装、辅助组装及可选 QC 数据</span>')
     elif stage_id.startswith("chr:"):
-        input_body = f'<strong>q4 · {esc(stage_id.split(":", 1)[1])}</strong><span>最终染色体与路径证据</span>'
+        input_body = f'<strong>Final Path · {esc(stage_id.split(":", 1)[1])}</strong><span>最终染色体与路径证据</span>'
     elif stage_id == "finalize_evidence":
-        input_body = '<strong>q4 + Final Path</strong><span>阶段事件、供体使用和比对证据</span>'
+        input_body = '<strong>Final Path</strong><span>阶段事件、供体使用和比对证据</span>'
     elif stage_id.startswith("package_"):
         input_body = '<strong>已验证工作目录</strong><span>结果、元数据和交付脚本</span>'
     else:
@@ -242,15 +261,16 @@ def pipeline_map_html(records: list[dict], input_facts: dict, final: dict) -> st
     assignment = next((row for row in records if row.get("stage_id") == "assign"), {})
     grt_prepare = next((row for row in records if row.get("stage_id") == "grt_prepare"), {})
     q0 = grt_prepare.get("facts", {}).get("sequence_versions", {}).get("q0", {})
-    q4 = final.get("sequence_versions", {}).get("q4", {})
+    q4 = final.get("sequence_versions", {}).get(final.get("final_q_version", "q4"), {})
     assigned = assignment.get("facts", {}).get("summary", {}).get("assigned_unique_contigs")
     stages = [
-        ("01", "原始输入", f"{len(datasets)} 组 FASTA", "参考、主组装与辅助组装"),
+        ("01", "原始输入", f"{len(datasets)} 组 FASTA",
+         "参考与多组装候选" if input_facts.get("q0_mode") == "evidence_guided_multi_source" else "参考、主组装与辅助组装"),
         ("02", "参考比对", f"{len(refs)} 个比对任务", "生成覆盖与定位证据"),
         ("03", "染色体归属", f"{display(assigned)} 条 contig", "按覆盖、方向和锚点排序"),
         ("04", "构建 q0 与供体", f"{compact_number(q0.get('length_bp'))}", f"{display(q0.get('gap_count'))} 个初始 Gap"),
-        ("05", "LGZ 修复", "q0 → q1 → q2 → q3 → q4", "填补、结构修正与端粒处理"),
-        ("06", "最终结果", f"{compact_number(q4.get('length_bp'))}", f"{display(q4.get('sequence_count'))} 条染色体 · {display(q4.get('gap_count'))} 个 Gap"),
+        ("05", "LGZ 修复", ("q0 → q1 → q2 → q3" if final.get("final_q_version") == "q3" else "q0 → q1 → q2 → q3 → q4"), "填补、结构修正与端粒处理"),
+        ("06", "最终结果", f"{compact_number(q4.get('length_bp'))}", f"{display(q4.get('sequence_count'))} 条输出序列 · {display(q4.get('gap_count'))} 个 Gap"),
         ("07", "证据与交付", f"{display(final.get('process_summary', {}).get('event_count'))} 个事件", "HTML、JSON 与 Server ZIP"),
     ]
     cards = []
@@ -293,10 +313,10 @@ def outcome_summary_html(final: dict) -> str:
     t2t_text = {"achieved": "已达到", "not_achieved": "尚未达到",
                 "unknown": "待评估", "unavailable": "暂无结果"}.get(t2t_status, "待评估")
     t2t_detail = {
-        "achieved": "最终序列无 N/Gap，且所有染色体两端均检测到端粒信号",
+        "achieved": "已输出序列无 N/Gap，且两端均检测到端粒信号；不等于全基因组完整性验收",
         "not_achieved": "仍有 N/Gap，或至少一个染色体末端缺少端粒信号",
         "unknown": "端粒末端记录不完整，暂不能判断",
-        "unavailable": "最终 q4 尚未生成",
+        "unavailable": "最终路径 尚未生成",
     }.get(t2t_status, "")
     complete = summary.get("telomere_ends_complete")
     total = summary.get("telomere_ends_total")
@@ -305,15 +325,20 @@ def outcome_summary_html(final: dict) -> str:
                         else ("完整端点 / 应有端点" if total else "等待最终端粒检测结果"))
     chromosome_count = summary.get("chromosome_count")
     starting_gaps = summary.get("starting_gap_count")
+    remaining_gaps = summary.get("remaining_gap_count")
+    gap_change = summary.get("gap_count_change")
+    if gap_change is None and starting_gaps is not None and remaining_gaps is not None:
+        gap_change = remaining_gaps - starting_gaps
+    gap_text = f"{gap_change:+,}" if isinstance(gap_change, int) and gap_change != 0 else display(gap_change)
     cards = [
         ("总长度", compact_number(summary.get("total_length_bp")),
          f'{display(chromosome_count)} 条最终序列' if chromosome_count is not None else "最终序列尚未生成", "length"),
-        ("关闭 Gap", display(summary.get("closed_gap_count")),
-         f'处理前 {display(starting_gaps)} 个' if starting_gaps is not None else "处理前状态未测量", "closed"),
+        ("Gap 数净变化", gap_text,
+         "Final Path − q0；减少不等于真实缺失序列闭合", "remaining" if isinstance(gap_change, int) and gap_change > 0 else "closed"),
         ("剩余 Gap", display(summary.get("remaining_gap_count")),
          "连续 N ≥ 100 bp", "remaining"),
         ("端粒完整性", telomere_value, telomere_detail, "telomere"),
-        ("T2T 水平", t2t_text, t2t_detail, f"t2t {t2t_status}"),
+        ("T2T 结构条件", t2t_text, t2t_detail, f"t2t {t2t_status}"),
     ]
     return '<div class="outcome-grid">' + "".join(
         f'<article class="outcome-card {esc(kind)}"><span>{esc(title)}</span><strong>{esc(value)}</strong><small>{esc(detail)}</small></article>'
@@ -397,7 +422,7 @@ def final_path_visual_html(final: dict) -> str:
                 end = min(total, marker.get("q4_end", total))
                 left = 100 * (start - 1) / total
                 width = max(.45, 100 * max(1, end - start + 1) / total)
-                marker_title = (f'{chromosome_name} 着丝粒候选区域 · q4:{display(start)}–{display(end)} · '
+                marker_title = (f'{chromosome_name} 着丝粒候选区域 · Final Path:{display(start)}–{display(end)} · '
                                 f'{marker.get("dataset_name", "")}:{marker.get("ctg_name", "")}')
                 evidence = annotation_evidence_text(marker.get("provenance"))
                 marker_title += f" · {evidence}" if evidence else ""
@@ -456,7 +481,7 @@ details>summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}details{ma
 
 JS = r"""
 const data=JSON.parse(document.getElementById('report-data').textContent);
-const labels=data.labels, enums=new Set(['status','action','reason','outcome','role','process_status','process_reason','final_status','final_reason','reads_qc','self_alignment']), fmt=(v,key)=>v===null||v===undefined||v===''?'未记录 / 未测量':typeof v==='object'?JSON.stringify(v,null,2):(enums.has(key)?labels[String(v)]||String(v):String(v));
+const labels=data.labels, enums=new Set(['status','action','reason','outcome','role','process_status','process_reason','final_status','final_reason','reads_qc','self_alignment','kind','qc']), fmt=(v,key)=>v===null||v===undefined||v===''?'未记录 / 未测量':typeof v==='object'?JSON.stringify(v,null,2):(enums.has(key)?labels[String(v)]||String(v):String(v));
 const save=(value,name)=>{const a=document.createElement('a');const u=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json;charset=utf-8'}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 document.getElementById('download').onclick=()=>save({...data.payload,tables:data.tables},'server-report.json');
 for(const box of document.querySelectorAll('[data-table]')){
@@ -485,7 +510,7 @@ def render(root: Path) -> Path:
         raise ValueError("mixed invocation or schema in report input record")
     records = [project_report_record(load(root, relative)) for relative in manifest["steps"]]
     grt = [project_report_record(load(root, p.relative_to(root).as_posix())) for p in sorted((root / "steps").glob("grt-*.json"))]
-    stage_order = ["step1_round1", "step1_filter", "step1_round2", "step2", "step3", "step4_telomere"]
+    stage_order = ["step1", "step2", "step3"]
     grt.sort(key=lambda row: stage_order.index(row["stage_id"]) if row["stage_id"] in stage_order else len(stage_order))
     for record in [*records, *grt]:
         if record.get("run_id") != manifest["run_id"] or record.get("schema_version") != SCHEMA:
@@ -539,6 +564,19 @@ def render(root: Path) -> Path:
                 (f'<div class="bar"><i style="width:{100*row[key]/max_length:.2f}%"></i></div>' if key == "length_bp" else '') +
                 '</td>' for key in columns) + '</tr>' for row in rows) + '</tbody></table></div>'
 
+    def q0_summary_html(value):
+        if not value:
+            return '<p class="note">本次运行尚无成功发布的 q0 构建摘要。</p>'
+        summary = dict(value["summary"])
+        summary["qc"] = label(summary.get("qc"))
+        body = '<h3>多组装候选 → q0</h3>' + key_values(summary)
+        body += notes(value.get("notes", []))
+        body += key_values({"搜索限制": value.get("policy", {})})
+        for name, table in value.get("tables", {}).items():
+            body += data_table(name, table.get("rows", []), table.get("available", False), table)
+        body += notes([f"决策来源：{value.get('source')} · SHA-256 {value.get('source_sha256')}"])
+        return body
+
     def stage_html(record, element_id):
         facts = record.get("facts", {})
         runtime = record.get("runtime", {})
@@ -577,22 +615,38 @@ def render(root: Path) -> Path:
             '<a href="#summary">结果摘要</a><a href="#results">染色体组成</a><a href="#delivery">交付文件</a>'
             '<a href="#workflow">分析与审计</a></nav></header><main>')
     input_facts = input_record.get("facts", {})
+    q0_construction = final.get("q0_construction")
+    if not q0_construction:
+        q0_construction = next((record.get("facts", {}).get("q0_construction") for record in records
+                                if record.get("stage_id") == "grt_prepare" and record.get("status") == "success"), None)
+    modern_q0 = (bool(q0_construction) or input_facts.get("q0_mode") == "evidence_guided_multi_source"
+                 or final.get("q0_mode") == "evidence_guided_multi_source")
     body += ('<section id="summary" class="summary-panel"><div class="summary-heading"><div><h2>本次处理结果</h2>'
-             '<p>优先展示 Gap、端粒、T2T 完整性和最终组装规模。</p></div>'
+             '<p>优先展示 Gap、端粒、输出序列的结构条件和最终组装规模。</p></div>'
              f'<span class="badge {esc(state)}">{esc(label(state))}</span></div>' + outcome_summary_html(final))
+    if q0_construction and q0_construction.get("summary", {}).get("not_constructed_chromosomes", 0):
+        count = q0_construction["summary"]["not_constructed_chromosomes"]
+        body += (f'<p class="warn">q0 中有 {esc(display(count))} 个参考 chr 未构建；'
+                 '输出序列的结构条件不能代表完整基因组。<a href="#q0-construction">查看 q0 构建范围</a></p>')
     body += notes(manifest.get("errors", []))
     if state != "success":
         body += '<p class="warn">任务尚未全部完成；未测量的指标不会被解释为成功结果。</p>'
     body += '</section><section id="results"><h2>染色体组成与标记</h2>'
     if not final.get("available"):
-        body += '<p class="warn">本次运行尚无经过确认的最终 q4 / Final Path。</p>'
+        body += '<p class="warn">本次运行尚无经过确认的最终路径 / Final Path。</p>'
     else:
         body += final_path_visual_html(final)
-    body += '<details class="block secondary-results"><summary>查看 q0 → q4 演化和组装统计</summary><h3>q0 → q4 序列演化</h3>'
+    if modern_q0:
+        body += '<div class="block" id="q0-construction"><h2>q0 构建与未解决范围</h2>' + q0_summary_html(q0_construction) + '</div>'
+    body += '<details class="block secondary-results"><summary>查看 q0 → Final Path 演化和组装统计</summary><h3>q0 → Final Path 序列演化</h3>'
     body += lgz_flow_html(grt, final)
     versions = {}
-    primary = next((d for d in input_facts.get("datasets", []) if d["role"] == "primary"), {})
-    versions["原始主组装"] = primary.get("stats")
+    if modern_q0:
+        candidates = {f"输入 {row['name']}": row.get("stats") for row in input_facts.get("datasets", []) if row["role"] != "reference"}
+        body += stats_table("各组装输入（可重叠，不能相加作为 q0 基线）", candidates)
+    else:
+        primary = next((d for d in input_facts.get("datasets", []) if d["role"] == "primary"), {})
+        versions["原始主组装"] = primary.get("stats")
     for record in records:
         if record["stage_id"] == "grt_prepare":
             versions.update(record.get("facts", {}).get("sequence_versions", {}))
@@ -601,10 +655,10 @@ def render(root: Path) -> Path:
     body += '<details class="block secondary-results"><summary>查看事件与最终路径审计明细</summary>'
     body += data_table("event_reconciliation", final.get("event_reconciliation", []))
     remaining = [e for e in final.get("events", []) if e.get("status") in {"unresolved", "rejected"}]
-    body += '<p class="note">历史未接受事件可能已由后续阶段解决；最终剩余 gap 以 q4 的序列统计为准。</p>'
+    body += '<p class="note">历史未接受事件可能已由后续阶段解决；最终剩余 gap 以最终路径的序列统计为准。</p>'
     body += data_table("历史未接受事件与原因", remaining)
     body += data_table("最终染色体路径", final.get("final_path", {}).get("chromosomes", []))
-    body += data_table("各染色体最终统计", (final.get("sequence_versions", {}).get("q4") or {}).get("sequences", []))
+    body += data_table("各染色体最终统计", (final.get("sequence_versions", {}).get(final.get("final_q_version", "q4")) or {}).get("sequences", []))
     body += '</details></section>'
     body += ('<section id="workflow" class="technical-section"><details class="section-disclosure"><summary>分析流程与任务概览</summary>'
              '<p class="workflow-copy">从原始 FASTA 开始，依次经过参考比对、染色体归属、q0 与供体构建、LGZ 修复和证据固化。</p>'

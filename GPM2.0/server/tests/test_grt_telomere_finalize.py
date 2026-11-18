@@ -11,13 +11,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
 from server.tests import test_grt_prepare_inputs as prepare_fixture
-from server.tests import test_grt_repair_stages as step23_fixture
+from server.tests import test_grt_repair_stages as step12_fixture
 from server.tools.grt_prepare_inputs import read_fasta
-from server.tools.grt_telomere_finalize import verify_final_path
+from server.tools.grt_step3 import verify_final_path
 
 
 PREPARE_TOOL = REPO_ROOT / "server/tools/grt_prepare_inputs.py"
-FINALIZE_TOOL = REPO_ROOT / "server/tools/grt_telomere_finalize.py"
+FINALIZE_TOOL = REPO_ROOT / "server/tools/grt_step3.py"
 
 
 class GrtTelomereFinalizeTests(unittest.TestCase):
@@ -26,9 +26,9 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
         path.chmod(0o755)
         return path
 
-    def make_server(self, root: Path):
-        helper = step23_fixture.GrtRepairStagesTests(
-            "test_fixed_d0_step2_step3_interval_usage_replay_and_resume"
+    def make_server(self, root: Path, *, assignment_variant="normal"):
+        helper = step12_fixture.GrtRepairStagesTests(
+            "test_fixed_d0_step1_step2_interval_usage_replay_and_resume"
         )
         server = helper.make_server(root)
         support_path = server / "data/datasets/support.fa"
@@ -70,6 +70,16 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
                 "anchor_start": 1,
             }
         )
+        # Install metadata variants before the current q0 freeze. Finalized
+        # schema-3 evidence must not be edited to manufacture an assignment.
+        assigned = assignments[-1]
+        if assignment_variant == "signed":
+            assigned["anchor_start"] = "-205687"
+            assignments.append({**assigned, "assigned_chr_name": "Chr02", "anchor_start": "-172703"})
+        elif assignment_variant == "cross_chr":
+            assigned["assigned_chr_name"] = "Chr02"
+        elif assignment_variant != "normal":
+            raise ValueError(assignment_variant)
         prepare_fixture.write_tsv(
             server / "metadata/chr_assignments.tsv",
             [
@@ -91,6 +101,12 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
             handle.write(
                 "s_tel_assigned\t20000\t0\t20000\t+\tChr01\t60000\t0\t20000\t20000\t20000\t60\n"
             )
+        if assignment_variant == "signed":
+            with (server / "runs/support_vs_ref/result.paf").open("a", encoding="utf-8") as handle:
+                handle.write("s_tel_assigned\t20000\t1000\t20000\t+\tChr02\t60000\t100\t19100"
+                             "\t19000\t19000\t60\tcg:Z:19000M\n")
+        from server.tests.q0_test_support import seed_q0_evidence
+        seed_q0_evidence(server)
         completed = subprocess.run(
             [sys.executable, str(PREPARE_TOOL), "--server-dir", str(server)],
             check=False,
@@ -98,14 +114,12 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        step23_tools = helper.make_tools(root)
+        step12_tools = helper.make_tools(root)
         env = os.environ.copy()
-        env["FAKE_GRT_MINIMAP_LOG"] = str(root / "step23_minimap.log")
-        env["FAKE_GRT_MUMMER_LOG"] = str(root / "step23_mummer.log")
-        step1 = helper.run_step1(server, step23_tools, env)
-        self.assertEqual(step1.returncode, 0, step1.stderr)
-        step23 = helper.run_repair_stages(server, step23_tools, env)
-        self.assertEqual(step23.returncode, 0, step23.stderr)
+        env["FAKE_GRT_MINIMAP_LOG"] = str(root / "step12_minimap.log")
+        env["FAKE_GRT_MUMMER_LOG"] = str(root / "step12_mummer.log")
+        step12 = helper.run_repair_stages(server, step12_tools, env)
+        self.assertEqual(step12.returncode, 0, step12.stderr)
         return server
 
     def make_tools(self, root: Path):
@@ -292,7 +306,7 @@ print(
             minimap_log = root / "tel_minimap.log"
             env["FAKE_TEL_MUMMER_LOG"] = str(mummer_log)
             env["FAKE_TEL_MINIMAP_LOG"] = str(minimap_log)
-            q3 = dict(read_fasta(server / "grt/q/q3.fa"))
+            q2 = dict(read_fasta(server / "grt/q/q2.fa"))
 
             completed = self.run_finalize(server, tools, env)
             self.assertEqual(completed.returncode, 0, completed.stderr)
@@ -301,19 +315,16 @@ print(
                 [row["stage"] for row in stages],
                 [
                     "donor_freeze",
-                    "step1_round1",
-                    "step1_filter",
-                    "step1_round2",
+                    "step1",
                     "step2",
                     "step3",
-                    "step4_telomere",
                     "finalize",
                 ],
             )
-            q4 = dict(read_fasta(server / "grt/q/q4.fa"))
-            self.assertEqual(len(q4["Chr01"]), len(q3["Chr01"]) + 10_000)
-            self.assertTrue(q4["Chr01"].startswith("TTTAGGG" * 100))
-            self.assertTrue(q4["Chr01"].endswith("CCCTAAA" * 100))
+            q3 = dict(read_fasta(server / "grt/q/q3.fa"))
+            self.assertEqual(len(q3["Chr01"]), len(q2["Chr01"]) + 10_000)
+            self.assertTrue(q3["Chr01"].startswith("TTTAGGG" * 100))
+            self.assertTrue(q3["Chr01"].endswith("CCCTAAA" * 100))
 
             events = [
                 json.loads(line)
@@ -322,7 +333,7 @@ print(
                 ).splitlines()
                 if line.strip()
             ]
-            tel_events = [row for row in events if row["stage"] == "step4_telomere"]
+            tel_events = [row for row in events if row["stage"] == "step3"]
             accepted = [row for row in tel_events if row["status"] == "accepted"]
             unresolved = [row for row in tel_events if row["status"] == "unresolved"]
             self.assertEqual(len(accepted), 2)
@@ -335,7 +346,7 @@ print(
             superseded_patch = next(
                 row
                 for row in events
-                if row["stage"] == "step2" and row["status"] == "superseded"
+                if row["stage"] == "step1" and row["status"] == "superseded"
             )
             replacing_tel = next(
                 row
@@ -348,7 +359,7 @@ print(
             )
 
             terminal_rows = prepare_fixture.read_tsv(
-                server / "grt/evidence/step4_telomere/terminal_status.tsv"
+                server / "grt/evidence/step3/terminal_status.tsv"
             )
             self.assertEqual(
                 sum(row["final_status"] == "recovered" for row in terminal_rows), 2
@@ -371,11 +382,11 @@ print(
                 for row in prepare_fixture.read_tsv(server / "metadata/datasets.tsv")
                 for name, sequence in read_fasta(server / row["fasta_relpath"])
             }
-            verify_final_path(final_path, q4, sources)
+            verify_final_path(final_path, q3, sources)
             evidence = prepare_fixture.read_tsv(
                 server / "metadata/grt_evidence_registry.tsv"
             )
-            tel_evidence = [row for row in evidence if row["stage"] == "step4_telomere"]
+            tel_evidence = [row for row in evidence if row["stage"] == "step3"]
             self.assertTrue(
                 any(row["evidence_type"] == "mummer_telomere_anchor" for row in tel_evidence)
             )
@@ -393,12 +404,12 @@ print(
 
             mummer_calls = mummer_log.read_text(encoding="utf-8").splitlines()
             minimap_calls = minimap_log.read_text(encoding="utf-8").splitlines()
-            q4_hash = prepare_fixture.sha256(server / "grt/q/q4.fa")
+            q3_hash = prepare_fixture.sha256(server / "grt/q/q3.fa")
             repeated = self.run_finalize(server, tools, env)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), mummer_calls)
             self.assertEqual(minimap_log.read_text(encoding="utf-8").splitlines(), minimap_calls)
-            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q4.fa"), q4_hash)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
 
             path_file = server / "metadata/grt_final_path.json"
             path_file.write_text("{}\n", encoding="utf-8", newline="")
@@ -406,15 +417,15 @@ print(
             self.assertEqual(repaired.returncode, 0, repaired.stderr)
             self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), mummer_calls)
             verify_final_path(
-                json.loads(path_file.read_text(encoding="utf-8")), q4, sources
+                json.loads(path_file.read_text(encoding="utf-8")), q3, sources
             )
 
             broken = copy.deepcopy(final_path)
             broken["chromosomes"][0]["q4_length"] += 1
             with self.assertRaisesRegex(SystemExit, "does not exactly reconstruct"):
-                verify_final_path(broken, q4, sources)
+                verify_final_path(broken, q3, sources)
 
-    def test_interrupted_step4_recovers_to_fresh_run_checksums(self):
+    def test_interrupted_step3_recovers_to_fresh_run_checksums(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
 
@@ -440,13 +451,13 @@ print(
             resumed_env = os.environ.copy()
             resumed_env["FAKE_TEL_MUMMER_LOG"] = str(root / "resumed_tel_mummer.log")
             resumed_env["FAKE_TEL_MINIMAP_LOG"] = str(root / "resumed_tel_minimap.log")
-            partial_evidence = resumed_server / "grt/evidence/step4_telomere"
+            partial_evidence = resumed_server / "grt/evidence/step3"
             partial_evidence.mkdir(parents=True, exist_ok=True)
             (partial_evidence / "partial.txt").write_text(
                 "interrupted\n",
                 encoding="utf-8",
             )
-            (resumed_server / "grt/q/q4.fa").write_text(
+            (resumed_server / "grt/q/q3.fa").write_text(
                 ">Chr01\nPARTIAL\n",
                 encoding="utf-8",
                 newline="",
@@ -461,7 +472,7 @@ print(
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
             self.assertFalse((partial_evidence / "partial.txt").exists())
 
-            for q_version in ("q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"):
+            for q_version in ("q0", "q1", "q2", "q3"):
                 self.assertEqual(
                     prepare_fixture.sha256(fresh_server / f"grt/q/{q_version}.fa"),
                     prepare_fixture.sha256(resumed_server / f"grt/q/{q_version}.fa"),

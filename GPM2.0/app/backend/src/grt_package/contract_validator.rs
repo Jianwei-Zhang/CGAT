@@ -22,30 +22,64 @@ where
         "validate_grt_required_files",
         "checking required LGZ package files",
     );
-    for relpath in REQUIRED_FILES {
-        required_bundle_file(bundle_root, relpath, relpath)?;
-    }
 
     on_progress(
         "validate_grt_metadata_tables",
         "parsing LGZ metadata tables",
     );
+    let package_table = read_tsv(
+        bundle_root,
+        "metadata/package.tsv",
+        PACKAGE_HEADER,
+        1,
+        Some(1),
+    )?;
+    let q0_v3 = is_q0_package_schema(field(&package_table.rows[0], "schema_version")?);
+    let current = field(&package_table.rows[0], "schema_version")? == GRT_CURRENT_SCHEMA_VERSION;
+    let final_version = final_q_version(field(&package_table.rows[0], "schema_version")?);
+    let final_relpath = format!("grt/q/{final_version}.fa");
+    let stages = read_tsv(
+        bundle_root, "metadata/grt_stage_status.tsv", STAGE_STATUS_HEADER,
+        if current { 5 } else { 8 }, Some(if current { 5 } else { 8 }),
+    )?;
+    let transitions = expected_stage_transitions(&stages, current)?;
+    let q_versions = if transitions.len() == Q0_DIRECT_STAGE_TRANSITIONS.len() {
+        Q0_DIRECT_VERSIONS
+    } else {
+        LEGACY_Q_VERSIONS
+    };
+    for relpath in REQUIRED_FILES {
+        if relpath.starts_with("grt/q/")
+            && !q_versions.iter().any(|version| *relpath == format!("grt/q/{version}.fa")) {
+            continue;
+        }
+        required_bundle_file(bundle_root, package_table_path(relpath, current), relpath)?;
+    }
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in TABLE_SPECS {
+        if *relpath == "metadata/grt_stage_status.tsv" {
+            tables.insert(*relpath, stages.clone());
+            continue;
+        }
+        let minimum = if q0_v3 && *relpath == "metadata/chr_assignments.tsv" {
+            0
+        } else {
+            *minimum
+        };
         tables.insert(
             *relpath,
-            read_tsv(bundle_root, relpath, header, *minimum, *maximum)?,
+            read_tsv(bundle_root, package_table_path(relpath, current), header, minimum, *maximum)?,
         );
     }
 
     let package = one_row(&tables, "metadata/package.tsv")?;
     if field(package, "workflow")? != GRT_WORKFLOW
-        || field(package, "schema_version")? != GRT_SCHEMA_VERSION
+        || (!q0_v3 && field(package, "schema_version")? != GRT_SCHEMA_VERSION)
         || field(package, "final_path_schema_version")? != GRT_FINAL_PATH_SCHEMA_VERSION
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_precomputed_v2 schema 2 / Final Path schema 1",
+            "expected gpm_grt_precomputed_v2 schema 2, 3 or 4 / Final Path schema 1",
         );
     }
     if !parse_bool(
@@ -245,11 +279,11 @@ where
         );
     }
     if field(recipe, "q0_relpath")? != "grt/q/q0.fa"
-        || field(recipe, "final_q_relpath")? != "grt/q/q4.fa"
+        || field(recipe, "final_q_relpath")? != final_relpath
     {
         return grt_err(
             "INVALID_VALUE",
-            "recipe q paths must identify q0.fa and q4.fa",
+            "recipe q paths must match the package schema",
         );
     }
 
@@ -288,11 +322,11 @@ where
 
     on_progress(
         "validate_grt_q_artifacts",
-        "validating q0-q4 artifacts and segment reconstruction",
+        "validating path-version artifacts and segment reconstruction",
     );
     let mut q_records = HashMap::<String, BTreeMap<String, String>>::new();
     let mut q_artifact_hashes = HashMap::<String, String>::new();
-    for q_version in ["q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"] {
+    for q_version in q_versions {
         let relpath = format!("grt/q/{q_version}.fa");
         let path = required_bundle_file(bundle_root, &relpath, &relpath)?;
         q_artifact_hashes.insert(q_version.to_string(), sha256_file(&path)?);
@@ -383,7 +417,7 @@ where
                         format!("q segment {segment_id} lacks source card/evidence"),
                     );
                 }
-                if q_version == "q0" {
+                if q_version == "q0" && !q0_v3 {
                     if !assignments
                         .get(&key)
                         .is_some_and(|chrs| chrs.contains(chr_name))
@@ -653,20 +687,23 @@ where
         if evidence.insert(id.to_string(), row).is_some() {
             return grt_err("DUPLICATE_ID", format!("duplicate evidence_id={id}"));
         }
-        enum_value(
-            field(row, "stage")?,
-            &[
-                "assignment",
+        if !(q0_v3 && field(row, "stage")? == "q0_construction") {
+            enum_value(
+                field(row, "stage")?,
+                &[
+                    "assignment",
+                    "step1",
                 "step1_round1",
-                "step1_round2",
-                "step2",
-                "step3",
-                "step4_telomere",
-                "candidate_validation",
-                "display_pairwise",
-            ],
-            &format!("evidence {id}.stage"),
-        )?;
+                    "step1_round2",
+                    "step2",
+                    "step3",
+                    "step4_telomere",
+                    "candidate_validation",
+                    "display_pairwise",
+                ],
+                &format!("evidence {id}.stage"),
+            )?;
+        }
         enum_value(
             field(row, "status")?,
             &[
@@ -679,15 +716,17 @@ where
             ],
             &format!("evidence {id}.status"),
         )?;
-        enum_value(
-            field(row, "coordinate_system")?,
-            &[
-                "paf_0_based_half_open",
-                "mummer_1_based_closed",
-                "app_1_based_closed",
-            ],
-            &format!("evidence {id}.coordinate_system"),
-        )?;
+        if !(q0_v3 && field(row, "coordinate_system")? == "source_0_based_half_open") {
+            enum_value(
+                field(row, "coordinate_system")?,
+                &[
+                    "paf_0_based_half_open",
+                    "mummer_1_based_closed",
+                    "app_1_based_closed",
+                ],
+                &format!("evidence {id}.coordinate_system"),
+            )?;
+        }
         enum_value(
             field(row, "projection_status")?,
             &["native", "projected"],
@@ -818,6 +857,18 @@ where
         }
     }
 
+    let q0_proof = if q0_v3 {
+        Some(q0_provenance::validate_q0(
+            bundle_root,
+            &tables,
+            &sources,
+            &assignments,
+            q_versions,
+        )?)
+    } else {
+        None
+    };
+
     let usage_table = table(&tables, "metadata/grt_donor_usage.tsv")?;
     let mut usage = HashMap::<String, &TsvRow>::new();
     for row in &usage_table.rows {
@@ -851,6 +902,7 @@ where
         enum_value(
             field(row, "stage")?,
             &[
+                "step1",
                 "step1_round1",
                 "step1_filter",
                 "step1_round2",
@@ -923,6 +975,7 @@ where
         enum_value(
             json_str(object, "stage", id)?,
             &[
+                "step1",
                 "step1_round1",
                 "step1_filter",
                 "step1_round2",
@@ -1070,6 +1123,7 @@ where
         table(&tables, "metadata/grt_stage_status.tsv")?,
         &q_artifact_hashes,
         &donor_sets,
+        transitions,
     )?;
     validate_tool_versions(table(&tables, "metadata/grt_tool_versions.tsv")?)?;
 
@@ -1114,7 +1168,7 @@ where
                 format!("duplicate Final Path chromosome {chr_name}"),
             );
         }
-        let expected_q4 = q_records["q4"].get(chr_name).ok_or_else(|| {
+        let expected_q4 = q_records[final_version].get(chr_name).ok_or_else(|| {
             grt_anyhow(
                 "BROKEN_REFERENCE",
                 format!("Final Path references unknown q4 chromosome {chr_name}"),
@@ -1274,7 +1328,7 @@ where
             );
         }
     }
-    if final_chr_names != q_records["q4"].keys().cloned().collect::<HashSet<_>>() {
+    if final_chr_names != q_records[final_version].keys().cloned().collect::<HashSet<_>>() {
         return grt_err(
             "FINAL_PATH_MISMATCH",
             "Final Path chromosome set differs from q4 FASTA",
@@ -1283,16 +1337,17 @@ where
 
     for (event_id, event) in &event_index {
         let status = event.get("status").and_then(Value::as_str).unwrap_or("");
-        let action = event.get("action").and_then(Value::as_str).unwrap_or("");
         let segment_id = event
             .get("final_path_segment_id")
             .and_then(Value::as_str)
             .unwrap_or("");
-        let path_producing = status == "accepted"
-            && matches!(
-                action,
-                "fill" | "patch" | "replace" | "correct_boundary" | "refill" | "extend_telomere"
+        let path_producing = status == "accepted" && event_is_path_producing(event);
+        if q0_v3 && path_producing && event.get("source").is_none_or(|source| !source.is_object()) {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("accepted path-producing event {event_id} requires source provenance"),
             );
+        }
         if path_producing && segment_id.is_empty() {
             return grt_err(
                 "BROKEN_REFERENCE",
@@ -1328,6 +1383,10 @@ where
         "validate_grt_trace_integrity",
         "validating source-card trace integrity",
     );
+    let q0_root_cards = q0_proof
+        .as_ref()
+        .map(|proof| proof.final_roots(&tables, &final_path, &assignments))
+        .transpose()?;
     validate_source_cards(
         table(&tables, "metadata/grt_used_contigs.tsv")?,
         &sources,
@@ -1335,6 +1394,7 @@ where
         &evidence,
         &event_index,
         &final_segments,
+        q0_root_cards.as_ref(),
     )?;
     validate_gap_attempts(
         table(&tables, "metadata/grt_gap_attempts.tsv")?,
@@ -1346,6 +1406,6 @@ where
         events,
         final_path,
         q0_artifact_sha256: q_artifact_hashes.remove("q0").unwrap(),
-        q4_artifact_sha256: q_artifact_hashes.remove("q4").unwrap(),
+        q4_artifact_sha256: q_artifact_hashes.remove(final_version).unwrap(),
     })
 }

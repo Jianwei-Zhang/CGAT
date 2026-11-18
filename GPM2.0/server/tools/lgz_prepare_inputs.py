@@ -27,8 +27,18 @@ from typing import Callable, Iterable
 
 try:
     from lgz_core.common import *
+    from lgz_core.q0_preparation import MANIFEST as Q0_EVIDENCE_MANIFEST, load_verified_evidence
+    from lgz_core.q0_sources import Q0EvidenceError, SourceKey
+    from lgz_core.q0_admission import build_q0
+    from lgz_core.q0_publication import (PACKAGE_SCHEMA_VERSION, publication_identity, source_occupancy,
+        available_intervals, stage_selection, freeze_manifest, validate_prepared_q0)
 except ModuleNotFoundError:  # Imported as server.tools.grt_prepare_inputs.
     from .lgz_core.common import *
+    from .lgz_core.q0_preparation import MANIFEST as Q0_EVIDENCE_MANIFEST, load_verified_evidence
+    from .lgz_core.q0_sources import Q0EvidenceError, SourceKey
+    from .lgz_core.q0_admission import build_q0
+    from .lgz_core.q0_publication import (PACKAGE_SCHEMA_VERSION, publication_identity, source_occupancy,
+        available_intervals, stage_selection, freeze_manifest, validate_prepared_q0)
 
 
 def parse_merqury_qv(path: Path) -> dict[str, float]:
@@ -41,7 +51,7 @@ def parse_merqury_qv(path: Path) -> dict[str, float]:
             fields = line.split()
             if len(fields) < 4:
                 fail(f"invalid Merqury QV row at {path}:{line_number}")
-            value = 0.0 if fields[3] == "+inf" else float(fields[3])
+            value = float(fields[3])
             if fields[0] in scores:
                 fail(f"duplicate Merqury contig score in {path}: {fields[0]}")
             scores[fields[0]] = value
@@ -514,61 +524,12 @@ def has_telomere_signal(sequence: str, rules: list[dict[str, object]]) -> bool:
     return False
 
 
-def parse_assignment_paf(
-    path: Path,
-    known_contigs: set[str],
-    known_chromosomes: set[str],
-) -> list[dict[str, object]]:
-    hits: list[dict[str, object]] = []
-    with path.open(encoding="utf-8") as handle:
-        for line_number, raw_line in enumerate(handle, start=1):
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
-            fields = line.split("\t")
-            if len(fields) < 12:
-                fail(f"invalid PAF row at {path}:{line_number}")
-            try:
-                query_length = int(fields[1])
-                query_start = int(fields[2]) + 1
-                query_end = int(fields[3])
-                target_start = int(fields[7]) + 1
-                target_end = int(fields[8])
-                matches = int(fields[9])
-                block_length = int(fields[10])
-                mapq = int(fields[11])
-            except ValueError as exc:
-                fail(f"invalid numeric PAF field at {path}:{line_number}: {exc}")
-            if fields[0] not in known_contigs or fields[5] not in known_chromosomes:
-                continue
-            if fields[4] not in {"+", "-"} or query_start < 1 or query_end < query_start:
-                fail(f"invalid PAF coordinates/strand at {path}:{line_number}")
-            if block_length < 1_000 and (block_length * 100.0) / max(query_length, 1) < 25.0:
-                continue
-            hits.append(
-                {
-                    "query": fields[0],
-                    "query_length": query_length,
-                    "query_start": query_start,
-                    "query_end": query_end,
-                    "strand": fields[4],
-                    "target": fields[5],
-                    "target_start": target_start,
-                    "target_end": target_end,
-                    "matches": matches,
-                    "block_length": block_length,
-                    "mapq": mapq,
-                }
-            )
-    return hits
-
-
 def quality_rank(
     key: tuple[str, str],
     sequence: str,
     qv_scores: dict[tuple[str, str], float],
     craq_scores: dict[tuple[str, str], float],
-    source_rank: dict[tuple[str, str], tuple[int, int]],
+    source_rank: dict[tuple[str, str], tuple[str, str]],
     reads_qc_enabled: bool,
 ) -> tuple[object, ...]:
     n_fraction = sequence.count("N") / max(len(sequence), 1)
@@ -576,10 +537,6 @@ def quality_rank(
     if reads_qc_enabled:
         return (-qv_scores[key], -craq_scores.get(key, 0.0), n_fraction, -len(sequence), *stable)
     return (-len(sequence), n_fraction, *stable)
-
-
-def assignment_preset(options: dict[str, str]) -> str:
-    return options.get("minimap_preset", "asm10")
 
 
 def commit_prepared_outputs(stage_grt: Path, stage_metadata: Path, server_dir: Path) -> None:
@@ -653,7 +610,7 @@ def prepare(args: argparse.Namespace) -> None:
     package = package_rows[0]
     if (
         package["workflow"] != WORKFLOW
-        or package["schema_version"] != SCHEMA_VERSION
+        or package["schema_version"] != PACKAGE_SCHEMA_VERSION
         or package["final_path_schema_version"] != FINAL_PATH_SCHEMA_VERSION
     ):
         fail(
@@ -702,7 +659,7 @@ def prepare(args: argparse.Namespace) -> None:
     primary_dataset = dataset_order[0]
     support_datasets = dataset_order[1:]
     sequences: dict[tuple[str, str], str] = {}
-    source_rank: dict[tuple[str, str], tuple[int, int]] = {}
+    source_rank: dict[tuple[str, str], tuple[str, str]] = {}
     dataset_hashes: dict[str, str] = {}
     for dataset_index, dataset in enumerate(datasets):
         fasta_path = server_dir / dataset["fasta_relpath"]
@@ -712,7 +669,7 @@ def prepare(args: argparse.Namespace) -> None:
             if key in sequences:
                 fail(f"duplicate source identity: {key[0]}:{key[1]}")
             sequences[key] = sequence
-            source_rank[key] = (dataset_index, contig_index)
+            source_rank[key] = key
 
     locator_keys: set[tuple[str, str]] = set()
     locator_fasta_cache: dict[str, dict[str, str]] = {}
@@ -756,7 +713,6 @@ def prepare(args: argparse.Namespace) -> None:
         if reads_qc_full:
             tools["craq"] = executable_identity(args.craq)
 
-    paf_rows: dict[str, list[dict[str, object]]] = {}
     paf_paths: dict[str, Path] = {}
     alignment_versions: dict[str, str] = {}
     for dataset in datasets:
@@ -769,13 +725,16 @@ def prepare(args: argparse.Namespace) -> None:
             fail(f"global ds-vs-ref tool version is missing: {version_path}")
         paf_paths[dataset_name] = paf_path
         alignment_versions[dataset_name] = version_path.read_text(encoding="utf-8").strip().splitlines()[0]
-        paf_rows[dataset_name] = parse_assignment_paf(
-            paf_path,
-            {contig for dataset_key, contig in sequences if dataset_key == dataset_name},
-            known_chromosomes,
-        )
+
+
+    try:
+        q0_evidence = load_verified_evidence(server_dir)
+    except Q0EvidenceError as exc:
+        fail(f"q0 evidence is not ready; run prepare_q0_evidence.sh first: {exc}")
 
     input_files = [
+        server_dir / Q0_EVIDENCE_MANIFEST,
+        *[server_dir / row["path"] for row in q0_evidence["outputs"]],
         metadata_dir / "package.tsv",
         metadata_dir / "datasets.tsv",
         metadata_dir / "reference.tsv",
@@ -804,7 +763,8 @@ def prepare(args: argparse.Namespace) -> None:
         input_identity.append({"path": label, "sha256": digest})
     fingerprint_payload = {
         "workflow": WORKFLOW,
-        "builder_version": 3,
+        "builder_version": 5,
+        "q0_publication_identity": publication_identity(),
         "inputs": input_identity,
         "reads_qc_enabled": reads_qc_enabled,
         "reads_qc_mode": args.reads_qc,
@@ -867,6 +827,11 @@ def prepare(args: argparse.Namespace) -> None:
         stage_grt = stage_root / "grt"
         stage_metadata = stage_root / "metadata"
         stage_metadata.mkdir(parents=True)
+        # Evidence preparation is an earlier stage. Preserve its content-bound
+        # artifacts when the q0/donor transaction replaces the grt/ tree.
+        shutil.copytree(server_dir / "grt/evidence/q0_prepare", stage_grt / "evidence/q0_prepare",
+                        copy_function=link_or_copy_file, symlinks=True)
+        shutil.copy2(server_dir / Q0_EVIDENCE_MANIFEST, stage_metadata / Path(Q0_EVIDENCE_MANIFEST).name)
         qv_scores: dict[tuple[str, str], float] = {}
         craq_scores: dict[tuple[str, str], float] = {}
         if reads_qc_enabled:
@@ -885,36 +850,6 @@ def prepare(args: argparse.Namespace) -> None:
             )
 
         telomere_rules = build_telomere_rules(server_dir)
-        assignment_by_key: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
-        for row in assignments:
-            if row["source_orientation"] not in {"+", "-"}:
-                fail(
-                    "chr assignment has invalid source_orientation: "
-                    f"{row['dataset_name']}:{row['seq_name']}:{row['assigned_chr_name']}"
-                )
-            if row["orientation_source"] != "ref_alignment":
-                fail(
-                    "chr assignment has unsupported orientation_source: "
-                    f"{row['dataset_name']}:{row['seq_name']}:{row['assigned_chr_name']}"
-                )
-            key = (row["dataset_name"], row["seq_name"])
-            if key in sequences:
-                assignment_by_key[key].append(row)
-        order_by_key: dict[tuple[str, str, str, str], int] = {}
-        for row in member_orders:
-            order_key = (
-                row["target_track"],
-                row["target_chr"],
-                row["member_dataset"],
-                row["member_ctg"],
-            )
-            if order_key in order_by_key:
-                fail(f"duplicate track member order: {order_key}")
-            order_value = int(row["member_order"])
-            if order_value < 1:
-                fail(f"invalid track member order for {order_key}: {order_value}")
-            order_by_key[order_key] = order_value
-
         qc_pass: dict[tuple[str, str], bool] = {}
         valid_sequence: dict[tuple[str, str], bool] = {}
         tel_signal: dict[tuple[str, str], bool] = {}
@@ -927,211 +862,19 @@ def prepare(args: argparse.Namespace) -> None:
             )
             tel_signal[key] = valid_sequence[key] and has_telomere_signal(sequence, telomere_rules)
 
-        primary_assignments: dict[tuple[str, str], dict[str, str]] = {}
-        primary_hits: dict[tuple[str, str], list[dict[str, object]]] = {}
-        chromosome_index = {name: index for index, name in enumerate(chromosome_order)}
-        for key, rows in assignment_by_key.items():
-            if key[0] != primary_dataset:
-                continue
-            selected = min(
-                rows,
-                key=lambda row: (
-                    -int(row["support_bp"]),
-                    -float(row["support_percent"]),
-                    chromosome_index.get(row["assigned_chr_name"], len(chromosome_index)),
-                ),
-            )
-            primary_assignments[key] = selected
-            hits = [
-                hit
-                for hit in paf_rows[primary_dataset]
-                if hit["query"] == key[1] and hit["target"] == selected["assigned_chr_name"]
-            ]
-            if not hits:
-                fail(f"selected primary assignment has no qualified PAF evidence: {key[0]}:{key[1]}")
-            primary_hits[key] = hits
-
-        candidate_by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
-        for key, assignment in primary_assignments.items():
-            sequence = sequences[key]
-            if not valid_sequence[key] or not qc_pass[key]:
-                continue
-            hits = primary_hits[key]
-            footprint = merged_intervals(
-                (int(hit["target_start"]), int(hit["target_end"])) for hit in hits
-            )
-            candidate_by_chr[assignment["assigned_chr_name"]].append(
-                {
-                    "key": key,
-                    "sequence": sequence,
-                    "assignment": assignment,
-                    "hits": hits,
-                    "footprint": footprint,
-                    "orientation": assignment["source_orientation"],
-                    "quality_rank": quality_rank(
-                        key, sequence, qv_scores, craq_scores, source_rank, reads_qc_enabled
-                    ),
-                }
-            )
-
-        retained_keys: set[tuple[str, str]] = set()
-        redundant_reason: dict[tuple[str, str], str] = {}
-        for chromosome, candidates in candidate_by_chr.items():
-            for candidate in candidates:
-                key = candidate["key"]
-                assert isinstance(key, tuple)
-                redundant_to: tuple[str, str] | None = None
-                for other in candidates:
-                    if other is candidate or not intervals_cover(other["footprint"], candidate["footprint"]):
-                        continue
-                    mutually_covered = intervals_cover(candidate["footprint"], other["footprint"])
-                    if mutually_covered and not other["quality_rank"] < candidate["quality_rank"]:
-                        continue
-                    other_key = other["key"]
-                    assert isinstance(other_key, tuple)
-                    if redundant_to is None or source_rank[other_key] < source_rank[redundant_to]:
-                        redundant_to = other_key
-                if redundant_to is None:
-                    retained_keys.add(key)
-                else:
-                    redundant_reason[key] = f"ref_footprint_covered_by:{redundant_to[0]}:{redundant_to[1]}"
-
-        assignment_engine = options.get("alignment_engine", "minimap2")
-        ref_hash = sha256_file(reference_fasta)
-        q_rows: list[dict[str, object]] = []
-        evidence_rows: list[dict[str, object]] = []
-        q_records: list[tuple[str, str]] = []
-        q_used_keys: set[tuple[str, str]] = set()
-        for chromosome in chromosome_order:
-            candidates = [
-                candidate
-                for candidate in candidate_by_chr.get(chromosome, [])
-                if candidate["key"] in retained_keys
-            ]
-            for candidate in candidates:
-                member_order_key = (
-                    primary_dataset,
-                    chromosome,
-                    primary_dataset,
-                    candidate["key"][1],
-                )
-                if member_order_key not in order_by_key:
-                    fail(f"q0 source has no authoritative track member order: {member_order_key}")
-            candidates.sort(
-                key=lambda candidate: (
-                    order_by_key[
-                        (primary_dataset, chromosome, primary_dataset, candidate["key"][1])
-                    ],
-                    int(candidate["assignment"]["anchor_start"]),
-                    source_rank[candidate["key"]],
-                )
-            )
-            if not candidates:
-                continue
-            q_parts: list[str] = []
-            q_position = 1
-            for index, candidate in enumerate(candidates, start=1):
-                key = candidate["key"]
-                assert isinstance(key, tuple)
-                if index > 1:
-                    gap_id = stable_id("q0-gap", [chromosome, index - 1, index], 16)
-                    q_rows.append(
-                        {
-                            "q_version": "q0",
-                            "chr": chromosome,
-                            "segment_id": gap_id,
-                            "segment_kind": "gap",
-                            "q_start": q_position,
-                            "q_end": q_position + Q_GAP_LENGTH - 1,
-                            "dataset_name": "",
-                            "contig_name": "",
-                            "source_start": "",
-                            "source_end": "",
-                            "orientation": "",
-                            "source_card_key": "",
-                            "evidence_ids_json": "[]",
-                        }
-                    )
-                    q_parts.append("N" * Q_GAP_LENGTH)
-                    q_position += Q_GAP_LENGTH
-                sequence = str(candidate["sequence"])
-                orientation = str(candidate["orientation"])
-                oriented = sequence if orientation == "+" else reverse_complement(sequence)
-                evidence_id = stable_id("ev-assignment", [*key, chromosome], 20)
-                segment_id = stable_id("q0-source", [*key, chromosome], 20)
-                source_card_key = f"{key[0]}:{key[1]}:{chromosome}:normal"
-                q_rows.append(
-                    {
-                        "q_version": "q0",
-                        "chr": chromosome,
-                        "segment_id": segment_id,
-                        "segment_kind": "source",
-                        "q_start": q_position,
-                        "q_end": q_position + len(sequence) - 1,
-                        "dataset_name": key[0],
-                        "contig_name": key[1],
-                        "source_start": 1,
-                        "source_end": len(sequence),
-                        "orientation": orientation,
-                        "source_card_key": source_card_key,
-                        "evidence_ids_json": canonical_json([evidence_id]),
-                    }
-                )
-                q_parts.append(oriented)
-                q_position += len(sequence)
-                q_used_keys.add(key)
-                hits = candidate["hits"]
-                target_intervals = merged_intervals(
-                    (int(hit["target_start"]), int(hit["target_end"])) for hit in hits
-                )
-                dataset_fasta_rel = next(
-                    row["fasta_relpath"] for row in datasets if row["dataset_name"] == key[0]
-                )
-                paf_rel = paf_paths[key[0]].relative_to(server_dir).as_posix()
-                evidence_rows.append(
-                    {
-                        "evidence_id": evidence_id,
-                        "stage": "assignment",
-                        "evidence_type": "ref_alignment",
-                        "status": "background",
-                        "q_version": "",
-                        "q_source_sha256": "",
-                        "query_artifact_relpath": dataset_fasta_rel,
-                        "query_sha256": dataset_hashes[key[0]],
-                        "donor_set_id": "",
-                        "target_artifact_relpath": reference["fasta_relpath"],
-                        "target_sha256": ref_hash,
-                        "source_dataset": key[0],
-                        "source_contig": key[1],
-                        "source_start": 1,
-                        "source_end": len(sequence),
-                        "orientation": orientation,
-                        "target_chr": chromosome,
-                        "target_start": min(start for start, _end in target_intervals),
-                        "target_end": max(end for _start, end in target_intervals),
-                        "tool": assignment_engine,
-                        "tool_version": alignment_versions[key[0]],
-                        "preset": assignment_preset(options),
-                        "parameters_json": canonical_json(
-                            {
-                                "alignment_engine": assignment_engine,
-                                "chr_assignment_min_coverage_percent": options.get("chr_assignment_min_coverage_percent", "60"),
-                                "minimap_preset": options.get("minimap_preset", "asm10"),
-                                "source": "existing_global_ds_vs_ref_paf",
-                                "threads": options.get("threads", "10"),
-                            }
-                        ),
-                        "raw_artifact_relpath": paf_rel,
-                        "raw_artifact_sha256": sha256_file(paf_paths[key[0]]),
-                        "coordinate_system": "paf_0_based_half_open",
-                        "projection_status": "projected",
-                    }
-                )
-            q_records.append((chromosome, "".join(q_parts)))
-        if not q_records:
-            fail("primary dataset produced no q-eligible chromosome records")
+        try:
+            construction = build_q0(server_dir, quality_pass=(
+                {SourceKey(*key): passed for key, passed in qc_pass.items()} if reads_qc_enabled else None))
+        except Q0EvidenceError as exc:
+            fail(f"q0 selection failed: {exc}")
+        q_records = list(construction.records.items())
         q0_path = stage_grt / "q" / "q0.fa"
         write_fasta(q0_path, q_records)
+        q_rows, evidence_rows = stage_selection(server_dir, stage_root, construction, datasets, assignments)
+        occupied = source_occupancy(construction)
+        available = available_intervals(sequences, occupied)
+        q_used_keys = {(source.dataset, source.contig) for source, intervals in occupied.items() if intervals}
+        assignment_engine = options.get("alignment_engine", "minimap2")
 
         role_rows: list[dict[str, object]] = []
         quality_rows: list[dict[str, object]] = []
@@ -1139,18 +882,12 @@ def prepare(args: argparse.Namespace) -> None:
         telomere_keys: list[tuple[str, str]] = []
         for key in sorted(sequences, key=lambda value: source_rank[value]):
             sequence = sequences[key]
-            if key[0] != primary_dataset:
-                q_rejection = "not_primary_dataset"
-            elif not valid_sequence[key]:
+            if not valid_sequence[key]:
                 q_rejection = "invalid_sequence"
             elif not qc_pass[key]:
                 q_rejection = "failed_reads_qc"
-            elif key not in primary_assignments:
-                q_rejection = "unassigned"
-            elif key in redundant_reason:
-                q_rejection = redundant_reason[key]
-            elif key not in retained_keys:
-                q_rejection = "not_selected"
+            elif key not in q_used_keys:
+                q_rejection = "not_selected_by_evidence_guided_q0"
             else:
                 q_rejection = ""
             q_eligible = key in q_used_keys
@@ -1161,8 +898,6 @@ def prepare(args: argparse.Namespace) -> None:
                 donor_rejection = "length_lt_1000"
             elif not qc_pass[key]:
                 donor_rejection = "failed_reads_qc"
-            elif key in q_used_keys:
-                donor_rejection = "same_source_interval_used_by_q0"
             else:
                 donor_rejection = ""
             donor_eligible = not donor_rejection
@@ -1171,6 +906,8 @@ def prepare(args: argparse.Namespace) -> None:
 
             if not valid_sequence[key]:
                 tel_rejection = "invalid_sequence"
+            elif not qc_pass[key]:
+                tel_rejection = "failed_reads_qc"
             elif not tel_signal[key]:
                 tel_rejection = "no_reliable_telomere_repeat"
             else:
@@ -1222,7 +959,8 @@ def prepare(args: argparse.Namespace) -> None:
                 for key in keys
             ]
             prefix = "d0" if kind == "ordinary" else "dtel"
-            donor_set_id = stable_id(prefix, {"kind": kind, "members": identity})
+            donor_set_id = stable_id(prefix, {"kind": kind, "members": identity,
+                "available_source_intervals": [[key[0], key[1], [[i.start, i.end] for i in available[key]]] for key in keys]})
             member_rows: list[dict[str, object]] = []
             fasta_records: list[tuple[str, str]] = []
             for entry, key in zip(identity, keys):
@@ -1279,6 +1017,7 @@ def prepare(args: argparse.Namespace) -> None:
                 "donor_set_id": ordinary_set["donor_set_id"],
                 "tel_donor_set_id": telomere_set["donor_set_id"],
                 "q0_sha256": q0_hash,
+                "q0_selection_sha256": sha256_file(stage_metadata / "grt_q0_selection.json"),
             },
         )
 
@@ -1304,7 +1043,7 @@ def prepare(args: argparse.Namespace) -> None:
                     "donor_set_id": ordinary_set["donor_set_id"],
                     "tel_donor_set_id": telomere_set["donor_set_id"],
                     "q0_relpath": "grt/q/q0.fa",
-                    "final_q_relpath": "grt/q/q4.fa",
+                    "final_q_relpath": "grt/q/q3.fa",
                 }
             ],
         )
@@ -1370,7 +1109,7 @@ def prepare(args: argparse.Namespace) -> None:
         tool_rows = [
             {
                 "tool": "grt_prepare_inputs",
-                "version": "2",
+                "version": "3",
                 "executable": ".prepare_lib/tools/lgz_prepare_inputs.py",
             },
             {
@@ -1388,6 +1127,14 @@ def prepare(args: argparse.Namespace) -> None:
             ["tool", "version", "executable"],
             tool_rows,
         )
+        freeze_manifest(stage_root, construction, sequences, datasets, donor_sets, donor_members, available, evidence_rows)
+        try:
+            validate_prepared_q0(stage_root, source_root=server_dir, expected=construction)
+        except Q0EvidenceError as exc:
+            fail(f"q0/donor freeze validation failed: {exc}")
+        if publication_identity() != fingerprint_payload["q0_publication_identity"]:
+            fail("q0 publication implementation changed during preparation")
+
         mutable_stage_metadata = {
             "grt_q_segments.tsv",
             "grt_evidence_registry.tsv",
@@ -1451,6 +1198,8 @@ def prepare(args: argparse.Namespace) -> None:
             ],
         )
 
+        if q0_evidence != load_verified_evidence(server_dir):
+            fail("q0 evidence changed while building q0/donors")
         commit_prepared_outputs(stage_grt, stage_metadata, server_dir)
         print(
             f"Prepared LGZ q0/D0/Dtel: recipe={recipe_id}, "

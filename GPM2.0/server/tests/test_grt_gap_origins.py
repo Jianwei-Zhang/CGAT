@@ -1,6 +1,6 @@
 import unittest
 
-from server.tools.grt_core import step3_engine as engine
+from server.tools.grt_core import step2_engine as engine
 
 
 class GapOriginTests(unittest.TestCase):
@@ -19,7 +19,7 @@ class GapOriginTests(unittest.TestCase):
         }
 
     def trace_through_filter(self, sequence, path, sources):
-        original = engine.gap_objects("chr01", "q2", sequence)
+        original = engine.gap_objects("chr01", "q1", sequence)
         paths, records, _, origins = engine.apply_corrections(
             ["chr01"], {"chr01": path}, {"chr01": sequence}, original, [], sources
         )
@@ -28,7 +28,7 @@ class GapOriginTests(unittest.TestCase):
         engine.annotate_gap_path_origins(paths, corrected)
         self.assertEqual(engine.path_sequence(paths["chr01"], sources), sequence)
         paths, records, _, _, _ = engine.apply_round(
-            "run", "step3", "q2", "q3", ["chr01"], paths, records,
+            "run", "step2", "q1", "q2", ["chr01"], paths, records,
             corrected, [], {}, "input-sha", sources, action="refill",
         )
         paths, records, _ = engine.filter_paths(["chr01"], paths, records, sources)
@@ -83,8 +83,8 @@ class GapOriginTests(unittest.TestCase):
 
     def test_missing_gap_origin_still_fails(self):
         sequence = "A" * 10 + "N" * 100 + "G" * 10
-        gaps = engine.gap_objects("chr01", "q2", sequence)
-        with self.assertRaisesRegex(SystemExit, "cannot map filtered Step3 gap"):
+        gaps = engine.gap_objects("chr01", "q1", sequence)
+        with self.assertRaisesRegex(SystemExit, "cannot map filtered Step2 gap"):
             engine.attach_gap_origins_from_paths(
                 {"chr01": [self.source_segment(sequence)]}, gaps, gaps
             )

@@ -24,14 +24,14 @@ ALIASES = {
     "--lgz-qc-memory-gb": "--grt-qc-memory-gb",
     "--lgz-kmer-size": "--grt-kmer-size",
     "--lgz-execution-profile": "--grt-execution-profile",
-    "--lgz-step3-mummer-scope": "--grt-step3-mummer-scope",
+    "--lgz-step2-mummer-scope": "--grt-step2-mummer-scope",
 }
 SINGLE_OPTIONS = {
     "--out", "--threads", "--score", "--archive-format",
     "--minimap-preset", "--minimap-batch", "--minimap-filter", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
-    "--grt-execution-profile", "--grt-step3-mummer-scope",
+    "--grt-execution-profile", "--grt-step2-mummer-scope",
 }
 PATH_OPTIONS = {"--ref", "--ds", "--reads", "--cen"}
 
@@ -60,7 +60,7 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
             except ValueError as exc:
                 raise RunnerError(str(exc)) from exc
         allowed = {"--grt-execution-profile": {"baseline", "optimized"},
-                   "--grt-step3-mummer-scope": {"full", "gap-screen"}}
+                   "--grt-step2-mummer-scope": {"full", "gap-screen"}}
         if key in allowed and values[0] not in allowed[key]:
             raise RunnerError(f"Invalid {key}: {values[0]}")
         if key in {"--ds", "--reads", "--tel"}:
@@ -95,19 +95,19 @@ def check_resume_options(requested: dict, saved: dict, identities: dict) -> None
 def update_fill_limit(root: Path, limit: str) -> None:
     script, runtime_name = next(
         ((root / filename, module) for filename, module in (
-            ("run_lgz_step3.sh", "lgz_step3.py"),
-            ("run_grt_step3.sh", "grt_step3.py"),
-            ("run_grt_step23.sh", "grt_step23.py"),
+            ("run_lgz_step2.sh", "lgz_step2.py"),
+            ("run_grt_step2.sh", "grt_step2.py"),
+            ("run_grt_step12.sh", "grt_step12.py"),
         ) if (root / filename).is_file()),
-        (root / "run_lgz_step3.sh", "lgz_step3.py"),
+        (root / "run_lgz_step2.sh", "lgz_step2.py"),
     )
     runtime = root / ".prepare_lib/tools" / runtime_name
     if not script.is_file() or not runtime.is_file():
-        raise RunnerError("This workspace has no staged LGZ Step3 runtime; update its Server runtime before changing the limit.")
+        raise RunnerError("This workspace has no staged LGZ Step2 runtime; update its Server runtime before changing the limit.")
     # A legacy script can call the compatibility facade after a code-only update.
     candidates = [runtime]
-    if runtime_name == "grt_step3.py":
-        candidates.append(runtime.with_name("lgz_step3.py"))
+    if runtime_name == "grt_step2.py":
+        candidates.append(runtime.with_name("lgz_step2.py"))
     if not any(path.is_file() and "--max-fill" in path.read_text(encoding="utf-8") for path in candidates):
         raise RunnerError("This workspace runtime predates --max-fill; update its Server runtime before changing the limit.")
     lines = script.read_text(encoding="utf-8").splitlines()
@@ -130,7 +130,7 @@ def update_fill_limit(root: Path, limit: str) -> None:
         temporary.chmod(script.stat().st_mode)
         os.replace(temporary, script)
         return
-    raise RunnerError(f"Cannot locate Step3 command in {script}")
+    raise RunnerError(f"Cannot locate Step2 command in {script}")
 
 
 def prepare_workspace(script: Path, argv: list[str], root: Path) -> int:
@@ -169,7 +169,7 @@ def execute(argv: list[str], server_source: Path) -> int:
         print("run.sh prepares once and automatically executes the full workflow.\n"
               "Resume: rerun the same command, or bash server/run.sh -o <workspace>.\n"
               "Resume with a new thread budget: bash server/run.sh -o <workspace> --threads 64\n"
-              "Change only the Step3 refill limit: bash server/run.sh -o <workspace> --max-fill 2000000")
+              "Change only the Step2 refill limit: bash server/run.sh -o <workspace> --max-fill 2000000")
         return result.returncode
     options = parse_options(argv, Path.cwd())
     root = Path(options.get("--out", [[str(Path.cwd() / "gpm_server")]])[-1][0])

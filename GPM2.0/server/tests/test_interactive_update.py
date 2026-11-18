@@ -118,10 +118,10 @@ class CoordinatedUpdateTests(unittest.TestCase):
             file.chmod(0o755 if name.endswith(".sh") else 0o644)
         self.make_manifest(self.tools, "a" * 40, "2026-10-25T00:00:00+00:00")
         self.work.mkdir()
-        for name in ("run_all.sh", "run_grt_step2.sh", "run_grt_step3.sh"):
+        for name in ("run_all.sh", "run_grt_step1.sh", "run_grt_step2.sh", "run_grt_step3.sh"):
             (self.work / name).write_text("keep generated script\n")
         (self.work / "metadata").mkdir()
-        (self.work / "metadata/package.tsv").write_text("workflow\tschema_version\ngpm_grt_precomputed_v2\t2\n")
+        (self.work / "metadata/package.tsv").write_text("workflow\tschema_version\ngpm_grt_precomputed_v2\t4\n")
         for name in data:
             if update.runtime_file(name):
                 target = self.work / ".prepare_lib" / name

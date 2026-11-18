@@ -5,12 +5,12 @@ import unittest
 from server.tests import test_step2_structural_events as fixtures
 from server.tools.grt_core.repair_common import PRIMARY_OVERLAP_POLICY
 from server.tools.grt_core.repair_structural import apply_corrections
-from server.tools.grt_core.step2_engine import (
+from server.tools.grt_core.step1_engine import (
     arbitrate_structural_candidates,
-    build_step2_structural_events,
+    build_step1_structural_events,
 )
-from server.tools.grt_core.step3_engine import (
-    reconcile_step2_events_with_step3,
+from server.tools.grt_core.step2_engine import (
+    reconcile_step1_events_with_step2,
     reject_candidates_spanning_other_gaps,
 )
 from server.tools.grt_core.stage_io import q_rows_for_paths
@@ -19,7 +19,7 @@ from server.tools.grt_core.stage_io import q_rows_for_paths
 class StructuralCoverageTests(unittest.TestCase):
     @staticmethod
     def fixture(policy=None, *, forward=False):
-        sources, paths, records, gaps, candidate = fixtures.Step2StructuralEventsTests.fixture(policy)
+        sources, paths, records, gaps, candidate = fixtures.Step1StructuralEventsTests.fixture(policy)
         if forward:
             sources[("primary", "tail")] = "G" * 20
             paths["Chr01"].extend([
@@ -47,7 +47,7 @@ class StructuralCoverageTests(unittest.TestCase):
                     rows = arbitrate_structural_candidates([rejected, candidate], list(reversed(gaps)))
                     self.assertEqual(candidate["covered_object_ids"], ["gap-2", "gap-1"] + (["gap-3"] if forward else []))
                     self.assertEqual(rejected["outcome"], "rejected")
-                    events, _, output_paths, _ = fixtures.Step2StructuralEventsTests().build_events(fixture)
+                    events, _, output_paths, _ = fixtures.Step1StructuralEventsTests().build_events(fixture)
                     by_object = {row["object_id"]: row for row in events}
                     primary = by_object["gap-2"]
                     self.assertEqual(primary["status"], "accepted")
@@ -59,25 +59,25 @@ class StructuralCoverageTests(unittest.TestCase):
                         self.assertEqual(absorbed["superseded_by_event_id"], primary["event_id"])
                         self.assertIn(absorbed["event_id"], primary["superseded_event_ids"])
                         self.assertEqual(absorbed["q_after"], primary["q_after"])
-                    q2_rows = q_rows_for_paths("q2", ["Chr01"], output_paths)
-                    q2_hash = primary["q_after"]["sha256"]
-                    # Real Step3 explicitly projects each unresolved q2 GAP
-                    # onto q3; an empty event list is not a valid normal-gap run.
-                    step3_events = [{
-                        "event_id": "step3-gap", "chr": row["chr"],
+                    q1_rows = q_rows_for_paths("q1", ["Chr01"], output_paths)
+                    q1_hash = primary["q_after"]["sha256"]
+                    # Real Step2 explicitly projects each unresolved q1 GAP
+                    # onto q2; an empty event list is not a valid normal-gap run.
+                    step2_events = [{
+                        "event_id": "step2-gap", "chr": row["chr"],
                         "status": "unresolved", "action": "correct_boundary",
-                        "q_before": {"version": "q2", "sha256": q2_hash,
+                        "q_before": {"version": "q1", "sha256": q1_hash,
                                      "start": row["q_start"], "end": row["q_end"]},
-                        "q_after": {"version": "q3", "sha256": "q3-hash",
+                        "q_after": {"version": "q2", "sha256": "q2-hash",
                                     "start": row["q_start"], "end": row["q_end"]},
                         "q_after_projection": "surviving_origin_gap",
-                    } for row in q2_rows if row["segment_kind"] == "gap"]
-                    reconcile_step2_events_with_step3(
-                        {"events": events, "q_rows": q2_rows,
+                    } for row in q1_rows if row["segment_kind"] == "gap"]
+                    reconcile_step1_events_with_step2(
+                        {"events": events, "q_rows": q1_rows,
                          "usage_rows": [], "evidence_rows": []},
-                        {"events": step3_events, "q_rows": q_rows_for_paths("q3", ["Chr01"], output_paths),
-                         "q_input_version": "q2", "q_input_sha256": q2_hash,
-                         "q_output_version": "q3", "q_output_sha256": "q3-hash"},
+                        {"events": step2_events, "q_rows": q_rows_for_paths("q2", ["Chr01"], output_paths),
+                         "q_input_version": "q1", "q_input_sha256": q1_hash,
+                         "q_output_version": "q2", "q_output_sha256": "q2-hash"},
                     )
                     self.assertEqual(primary["status"], "accepted")
                     self.assertEqual(len(rows), 2)
@@ -145,7 +145,7 @@ class StructuralCoverageTests(unittest.TestCase):
         origin = next(iter(origins.values()))
         self.assertEqual(origin["object_id"], "gap-2")
         self.assertEqual(origin["coalesced_object_ids"], ["gap-1"])
-        events, _ = build_step2_structural_events("run", "q1", "q2", gaps, [candidate], prototypes, origins)
+        events, _ = build_step1_structural_events("run", "q1", "q1", gaps, [candidate], prototypes, origins)
         self.assertEqual([r["status"] for r in events], ["superseded", "accepted"])
 
     def test_apply_rejects_partial_gap_edit_even_if_declared(self):
@@ -157,9 +157,9 @@ class StructuralCoverageTests(unittest.TestCase):
     def test_following_gap_shift_uses_emitted_replacement_not_fill_hint(self):
         for policy in (None, PRIMARY_OVERLAP_POLICY):
             with self.subTest(policy=policy):
-                fixture = fixtures.Step2StructuralEventsTests.fixture(policy)
+                fixture = fixtures.Step1StructuralEventsTests.fixture(policy)
                 fixture[-1]["fill_length"] = 37
-                events, _, _, _ = fixtures.Step2StructuralEventsTests().build_events(fixture)
+                events, _, _, _ = fixtures.Step1StructuralEventsTests().build_events(fixture)
                 expected = (151, 250) if policy is None else (51, 150)
                 self.assertEqual((events[1]["q_after"]["start"], events[1]["q_after"]["end"]), expected)
 
@@ -168,16 +168,16 @@ class StructuralCoverageTests(unittest.TestCase):
         origins = {("Chr01", 40, 140): {"object_id": "gap-1"},
                    ("Chr01", 150, 250): {"object_id": "gap-1"}}
         with self.assertRaisesRegex(SystemExit, "ambiguous.*gap.*origin"):
-            build_step2_structural_events("run", "q1", "q2", [gap], [], [], origins)
+            build_step1_structural_events("run", "q1", "q1", [gap], [], [], origins)
 
     def test_event_serializer_rejects_duplicate_accepted_owners(self):
         sources, paths, records, gaps, candidate = self.fixture()
         candidate.update(outcome="accepted", covered_object_ids=["gap-2", "gap-1"])
         other = {**candidate, "candidate_id": "duplicate-owner"}
         with self.assertRaisesRegex(SystemExit, "multiple.*accepted.*gap"):
-            build_step2_structural_events("run", "q1", "q2", gaps, [candidate, other], [], {})
+            build_step1_structural_events("run", "q1", "q1", gaps, [candidate, other], [], {})
 
-    def test_step3_already_rejects_forward_backward_and_partial_multigap_edits(self):
+    def test_step2_already_rejects_forward_backward_and_partial_multigap_edits(self):
         for start, end in ((41, 260), (91, 260)):
             with self.subTest(start=start, end=end):
                 _, _, _, gaps, candidate = self.fixture()

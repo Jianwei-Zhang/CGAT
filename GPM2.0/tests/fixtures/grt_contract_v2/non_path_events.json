@@ -1,0 +1,125 @@
+{
+  "description": "Contract-only linkage cases, not measured biological repairs. Accepted filters and gap-only/boundary corrections do not insert source DNA, even when a donor provided structural guidance.",
+  "cases": [
+    {
+      "name": "filter",
+      "event": {
+        "run_id": "run-test",
+        "event_id": "evt-step1-filter",
+        "stage": "step1_filter",
+        "chr": "Chr01",
+        "object_id": "component-filter-1",
+        "action": "filter_component",
+        "status": "accepted",
+        "reason": "removed_isolated_component",
+        "q_before": {
+          "version": "q0r1",
+          "start": 1,
+          "end": 8,
+          "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481"
+        },
+        "q_after": {
+          "version": "q0f",
+          "start": 1,
+          "end": 8,
+          "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481"
+        },
+        "source": null,
+        "evidence_ids": [],
+        "usage_ids": [],
+        "source_card_key": "",
+        "final_path_segment_id": ""
+      }
+    },
+    {
+      "name": "gap_replacement",
+      "event": {
+        "run_id": "run-test",
+        "event_id": "evt-step3-correction",
+        "stage": "step3",
+        "chr": "Chr01",
+        "object_id": "gap-step3-1",
+        "action": "replace",
+        "status": "accepted",
+        "reason": "crossing_alignment_error_region",
+        "q_before": {
+          "version": "q2",
+          "start": 1,
+          "end": 4,
+          "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481"
+        },
+        "q_after": {
+          "version": "q3",
+          "start": 1,
+          "end": 4,
+          "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481"
+        },
+        "source": {
+          "dataset": "support",
+          "contig": "donor1",
+          "start": 1,
+          "end": 4,
+          "orientation": "+",
+          "original_assignment": "unplaced"
+        },
+        "evidence_ids": [],
+        "usage_ids": [
+          "use-step3-correction"
+        ],
+        "source_card_key": "",
+        "final_path_segment_id": "",
+        "edit": {
+          "operation": "replace_interval",
+          "replacement_kind": "gap"
+        }
+      },
+      "usage": {
+        "usage_id": "use-step3-correction",
+        "donor_set_id": "d0-test",
+        "member_id": "d0-donor1-1-4",
+        "source_dataset": "support",
+        "source_contig": "donor1",
+        "source_start": "1",
+        "source_end": "4",
+        "stage": "step3",
+        "status": "accepted",
+        "event_id": "evt-step3-correction",
+        "final_path_segment_id": "",
+        "reason": "structural_evidence"
+      }
+    },
+    {
+      "name": "boundary_only",
+      "event": {
+        "run_id": "run-test",
+        "event_id": "evt-boundary-only",
+        "stage": "step3",
+        "chr": "Chr01",
+        "object_id": "gap-step3-1",
+        "action": "correct_boundary",
+        "status": "accepted",
+        "reason": "crossing_alignment_error_region",
+        "q_before": {
+          "version": "q2",
+          "start": 1,
+          "end": 4,
+          "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481"
+        },
+        "q_after": {
+          "version": "q3",
+          "start": 1,
+          "end": 4,
+          "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481"
+        },
+        "source": null,
+        "evidence_ids": [],
+        "usage_ids": [],
+        "source_card_key": "",
+        "final_path_segment_id": "",
+        "edit": {
+          "operation": "normalize_gap"
+        }
+      }
+    }
+  ]
+}

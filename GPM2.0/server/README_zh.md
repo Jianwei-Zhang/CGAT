@@ -102,7 +102,7 @@ bash "$SERVER/install.sh" --manager conda
 `run.sh -t 32` 设置总计算线程预算；新准备的工作区会在独立比对任务之间
 自动分配线程并行执行。
 
-### Step3 来源追踪修复后的断点恢复
+### 历史工作区来源追踪修复（旧阶段编号）
 
 当连续 N 位于原始 contig 内部，或跨越多个路径片段时，旧版可能报错
 `cannot map filtered Step3 gap back to q2`。Step3 现在会在过滤过程中
@@ -146,19 +146,34 @@ bash ~/bin/GPM_Server/update.sh
 
 ### 独立 LGZ 阶段控制与执行配置
 
-新工作区生成独立的 `run_lgz_step2.sh` 与 `run_lgz_step3.sh` 阶段脚本，分别记录调度状态和 checkpoint。先运行 Step2，再运行 Step3；Step3 启动前会校验兼容的 Step2 结果。两个阶段共用覆盖修复引擎与公共模块的内容指纹：当修复代码更新时，阶段结果会自动从 Step2 重新生成，而输入与参数一致的 MUMmer 原始比对缓存仍可安全复用。
+新工作区使用 **package schema 4**，执行步骤和实际产物连续编号：
+
+| 阶段 | 脚本 | 输出 |
+| --- | --- | --- |
+| 证据驱动初始路径 | `prepare_lgz_inputs.sh` | q0 |
+| 补丁验证与处理分支 | `run_lgz_step1.sh` | q1 |
+| 结构修正与优化补洞 | `run_lgz_step2.sh` | q2 |
+| 端粒恢复与最终路径 | `run_lgz_step3.sh` | q3 |
+
+通常由 `run_all.sh` 按顺序执行。各实际步骤有独立检查点，不再产生 q0r1/q0f
+等原样复制版本。Step2 启动前验证 Step1 结果；修复代码变化会使决策缓存失效，
+内容与参数一致的原始 MUMmer 比对缓存仍可复用。
+
+历史 schema 2/3 包继续按原编号读取，但不原地重编号或迁移为本流程。
+使用新策略时准备新的 schema-4 工作目录并保留旧结果；上面的历史恢复说明
+适用于与历史工作区匹配的运行库，不代表编号迁移。
 
 新生成的正式工作流默认启用以下优化路线：
 
 - `--lgz-execution-profile optimized`：启用跨染色体共享且受 CPU / 内存约束的 `nucmer` 池、大分区优先调度、分区 FASTA 复用、精确锚点索引与坐标解析缓存复用，并保持输出与平局选择顺序确定性。
-- Step2 始终使用 **full 全量范围**。
-- `--lgz-step3-mummer-scope gap-screen`：使用锚点安全筛选，选中的原始供体分区仍与完整染色体比对。
-- optimized Step3 refill 会同轮合并侧翼查询，并复用经内容校验的 `.mmi` 索引。
+- Step1 默认使用 **full 全量范围**。
+- `--lgz-step2-mummer-scope gap-screen`：使用锚点安全筛选，选中的原始供体分区仍与完整染色体比对。
+- optimized Step2 refill 会同轮合并侧翼查询，并复用经内容校验的 `.mmi` 索引。
 
 如需在**新建工作区**时回退为无筛选基线配置，可向 `run.sh` 或 `prepare.sh` 传入：
 
 ```bash
---lgz-execution-profile baseline --lgz-step3-mummer-scope full
+--lgz-execution-profile baseline --lgz-step2-mummer-scope full
 ```
 
 新 `run.sh` 和新生成的 `run_all.sh` 在分析与运行锁之前先检查更新，更新后重新加载代码，不需要用户配置。联网检查前也会从校验通过的本地安装同步已停止的工作区运行库；旧 updater 漏复制嵌套模块时，离线计算节点不必再下载一次。网络或更新检查在写入前失败时，可继续使用通过完整性校验的已安装运行库；写入或回滚失败则停止启动。Git/开发包及仅查看帮助时不联网更新。停止任务后显式执行 `update.sh` 可同步运行库，并备份后升级逐字节识别的旧 `run_all.sh`；自定义脚本不覆盖。
@@ -281,7 +296,7 @@ LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之�
 
 计算节点无法访问更新源时，启动会校验本机安装，并在无需下载的情况下对齐 `.prepare_lib`。检查失败的详细信息保存在 `.run_all/update-check.log`；离线启动不表示本机已经是线上最新版本。
 
-`--max-fill <bp>` 设置 Step3 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
+`--max-fill <bp>` 设置 Step2 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
 
 
 完整参数和客户端说明见仓库上一级的 `README_zh.md`。

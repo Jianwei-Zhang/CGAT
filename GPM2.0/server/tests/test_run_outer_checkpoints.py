@@ -252,7 +252,7 @@ class OuterCheckpointTests(unittest.TestCase):
             server, _fake_bin = self.make_server(Path(temporary))
             rows = [
                 self.write_grt_stage(server, stage)
-                for stage in ("step1_round1", "step1_filter", "step1_round2")
+                for stage in ("step1", "step2")
             ]
             fields = list(rows[0])
             write(
@@ -262,13 +262,13 @@ class OuterCheckpointTests(unittest.TestCase):
                 + "".join("\t".join(row[field] for field in fields) + "\n" for row in rows),
             )
             manager = OuterCheckpointManager(server)
-            valid, reason = manager.validate_grt_unit("grt_step1")
+            valid, reason = manager.validate_grt_unit("grt_step12")
             self.assertTrue(valid, reason)
 
-            (server / "grt/evidence/step1_filter/result.txt").write_text(
+            (server / "grt/evidence/step2/result.txt").write_text(
                 "corrupt\n", encoding="utf-8"
             )
-            valid, reason = manager.validate_grt_unit("grt_step1")
+            valid, reason = manager.validate_grt_unit("grt_step12")
             self.assertFalse(valid)
             self.assertIn("output hash changed", reason)
 
@@ -284,7 +284,7 @@ class OuterCheckpointTests(unittest.TestCase):
             write(server / "metadata/grt_contract_summary.json", json.dumps(summary) + "\n")
             write(server / "metadata/grt_used_contigs.tsv", "source_card_key\n")
             write(server / "metadata/grt_final_path.json", "{}\n")
-            write(server / "grt/q/q4.fa", ">Chr1\nA\n")
+            write(server / "grt/q/q3.fa", ">Chr1\nA\n")
             manager = OuterCheckpointManager(server)
             with mock.patch(
                 "server.tools.run_outer_checkpoints.validate_contract",

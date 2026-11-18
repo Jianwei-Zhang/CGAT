@@ -25,8 +25,13 @@ except ModuleNotFoundError:
 
 _LEGACY_STATISTICS_ALGORITHM = "fasta-length-n50-n-gap100-v1"
 STATISTICS_ALGORITHM = _LEGACY_STATISTICS_ALGORITHM
+try:
+    from server_report_q0 import MODE as Q0_MODE, collect_q0_decisions, is_evidence_guided
+except ModuleNotFoundError:
+    from .server_report_q0 import MODE as Q0_MODE, collect_q0_decisions, is_evidence_guided
 
 LGZ_STAGES = {
+    "step1": "grt/evidence/step1",
     "step1_round1": "grt/evidence/step1/round1",
     "step1_filter": "grt/evidence/step1/filter",
     "step1_round2": "grt/evidence/step1/round2",
@@ -140,17 +145,22 @@ def inputs(root: Path) -> dict:
     datasets = read_tsv(root / "metadata/datasets.tsv")
     reference = read_tsv(root / "metadata/reference.tsv")
     rows = []
+    modern_q0 = is_evidence_guided(root)
     for index, entry in enumerate([*reference, *datasets]):
         is_reference = "reference_name" in entry
-        role = "reference" if is_reference else ("primary" if index == len(reference) else "support")
+        role = "reference" if is_reference else ("assembly_candidate" if modern_q0 else ("primary" if index == len(reference) else "support"))
         path = local_path(root, entry["fasta_relpath"])
         rows.append({"name": entry.get("reference_name", entry.get("dataset_name")),
                      "role": role, "file": entry["fasta_relpath"], "stats": sequence_stats(root, path)})
-    return {"datasets": rows, "parameters": options(root),
+    package = table(root, "metadata/package.tsv")
+    current = any(row.get("schema_version") == "4" for row in package["rows"])
+    return {"datasets": rows, "q0_mode": Q0_MODE if modern_q0 else "legacy_primary",
+            "final_q_version": "q3" if current else "q4",
+            "parameters": options(root),
             "telomere_rules": table(root, "tel/rules.tsv"),
             "centromere_reference": table(root, "cen/reference.tsv"),
             "annotation_library_snapshot": read_json(root / "metadata/annotation_library_snapshot.json", {}),
-            "package": table(root, "metadata/package.tsv")}
+            "package": package}
 
 
 def paf_summary(path: Path) -> dict:
@@ -214,7 +224,9 @@ def collect_assignment(root: Path, input_data: dict) -> dict:
 def collect_lgz_inputs(root: Path) -> dict:
     recipe = read_tsv(root / "metadata/grt_recipe.tsv")
     qc_enabled = bool(recipe and recipe[0].get("reads_qc_enabled") == "true")
+    q0_decisions = collect_q0_decisions(root)
     return {"summary": {"reads_qc": "measured" if qc_enabled else "not_enabled"},
+            "q0_construction": q0_decisions,
             "parameters": read_json(root / "grt/checkpoints/donor_freeze.json", {}).get("fingerprint_payload"),
             "sequence_versions": {"q0": sequence_stats(root, root / "grt/q/q0.fa")},
             "tables": {name: table(root, f"metadata/{filename}.tsv") for name, filename in {
@@ -278,10 +290,30 @@ def final_summary(root: Path, report_root: Path) -> dict:
             "final_reason": last.get("reason") if last else "final_state_not_available",
             "final_path_segment_ids": segments.get(event_id, []),
             "final_event": last})
-    q0 = sequence_stats(root, root / "grt/q/q0.fa")
+    # New q0 is a stage publication, not whatever an old workspace currently
+    # contains after a failed prepare or a later file mutation.
+    modern_q0 = (is_evidence_guided(root) or bool(final.get("q0_construction"))
+                 or read_json(report_root / "inputs.json", {}).get("facts", {}).get("q0_mode") == Q0_MODE)
+    final["q0_mode"] = Q0_MODE if modern_q0 else "legacy_primary"
+    if modern_q0:
+        q0 = final.get("sequence_versions", {}).get("q0")
+        if q0 is None:
+            for relative in manifest.get("steps", []):
+                record = read_json(local_path(report_root, relative), {})
+                if record.get("stage_id") == "grt_prepare" and record.get("status") == "success":
+                    if record.get("run_id") != manifest["run_id"] or record.get("schema_version") != SCHEMA:
+                        raise ValueError("q0 snapshot belongs to another invocation or schema")
+                    facts = record.get("facts", {})
+                    q0 = facts.get("sequence_versions", {}).get("q0")
+                    final["q0_construction"] = facts.get("q0_construction")
+    else:
+        q0 = sequence_stats(root, root / "grt/q/q0.fa")
     if q0:
         final.setdefault("sequence_versions", {})["q0"] = q0
-    q4 = final.get("sequence_versions", {}).get("q4") or {}
+    input_facts = read_json(report_root / "inputs.json", {}).get("facts", {})
+    final_version = final.get("final_q_version", input_facts.get("final_q_version", "q4"))
+    final["final_q_version"] = final_version
+    q4 = final.get("sequence_versions", {}).get(final_version) or {}
     terminal_rows = final.get("annotations", {}).get("telomere", {}).get("terminal_rows", [])
     complete_statuses = {"already_present", "recovered"}
     complete_ends = sum(row.get("final_status") in complete_statuses for row in terminal_rows)
@@ -303,6 +335,9 @@ def final_summary(root: Path, report_root: Path) -> dict:
         "total_length_bp": q4.get("length_bp") if q4 else None,
         "chromosome_count": q4.get("sequence_count") if q4 else None,
         "starting_gap_count": q0_gap_count,
+        "gap_count_change": (q4_gap_count - q0_gap_count
+                             if q0_gap_count is not None and q4_gap_count is not None else None),
+        "closed_gap_count_semantics": "legacy_net_reduction_not_verified_gap_closure",
         "closed_gap_count": (max(0, q0_gap_count - q4_gap_count)
                              if q0_gap_count is not None and q4_gap_count is not None else None),
         "remaining_gap_count": q4_gap_count,
@@ -310,6 +345,7 @@ def final_summary(root: Path, report_root: Path) -> dict:
         "telomere_ends_total": expected_ends or None,
         "telomeres_complete": telomeres_complete if terminal_rows else None,
         "t2t_status": t2t_status,
+        "t2t_scope": "emitted_sequences_only",
         "centromere_marker_count": len(centromere_markers),
         "centromere_chromosome_count": len({row.get("chr") for row in centromere_markers}),
     }
@@ -318,7 +354,10 @@ def final_summary(root: Path, report_root: Path) -> dict:
     final["final_event_summary"] = event_summary(final.get("events", [])) if final else None
     final["notes"] = ["过程中的接受数不可相加作为最终修复数；最终状态以最终路径及协调后的事件为准。",
                       "gap 定义为连续至少 100 个 N；N 碱基数单独统计。",
-                      "原始主组装 → q0 表示初始构建；q0 → q4 表示 LGZ 处理。N50 增加本身不证明质量改善。"]
+                      ("多组装候选 → q0 表示证据驱动的初始构建；q0 → Final Path 表示 LGZ 处理。"
+                       if modern_q0 else "原始主组装 → q0 表示初始构建；q0 → Final Path 表示 LGZ 处理。") + "N50 增加本身不证明质量改善。",
+                      "Gap 数净减少可能来自冗余连接删除、裁剪或序列替换，不等于真实缺失序列的闭合数量。",
+                      "T2T 结构条件只针对本次已输出序列；不证明参考的所有染色体均已构建或无生物学缺失。"]
     return final
 
 
@@ -376,7 +415,9 @@ def _project_centromere_markers(root: Path, final_path: dict) -> list[dict]:
 
 
 def final_annotations(root: Path, final_path: dict) -> dict:
-    step4 = read_json(root / "grt/evidence/step4_telomere/result.json", {})
+    package = read_tsv(root / "metadata/package.tsv")
+    terminal_stage = "step3" if package and package[0].get("schema_version") == "4" else "step4_telomere"
+    step4 = read_json(root / f"grt/evidence/{terminal_stage}/result.json", {})
     telomere_rules = root / "tel/rules.tsv"
     centromere_reference = root / "cen/reference.tsv"
     return {
@@ -394,21 +435,25 @@ def final_annotations(root: Path, final_path: dict) -> dict:
 
 def capture_final(root: Path) -> dict:
     final_path = read_json(root / "metadata/grt_final_path.json", {})
+    package = read_tsv(root / "metadata/package.tsv")
+    final_version = "q3" if package and package[0].get("schema_version") == "4" else "q4"
     q_rows = read_tsv(root / "metadata/grt_q_segments.tsv")
     contribution = Counter()
     connectors = Counter()
-    for version in {row["q_version"] for row in q_rows} & {"q0", "q4"}:
+    for version in {row["q_version"] for row in q_rows} & {"q0", final_version}:
         connectors[version] = 0
     for row in q_rows:
-        if row.get("q_version") not in {"q0", "q4"}:
+        if row.get("q_version") not in {"q0", final_version}:
             continue
         if row.get("segment_kind") == "gap":
             connectors[row["q_version"]] += 1
-        elif row.get("q_version") == "q4":
+        elif row.get("q_version") == final_version:
             contribution[row.get("dataset_name", "unknown")] += int(row["q_end"]) - int(row["q_start"]) + 1
-    return {"available": bool(final_path), "final_path": final_path,
+    return {"available": bool(final_path), "final_path": final_path, "final_q_version": final_version,
             "events": read_events(root / "metadata/grt_events.jsonl"),
-            "sequence_versions": {"q4": sequence_stats(root, root / "grt/q/q4.fa")},
+            "sequence_versions": {"q0": sequence_stats(root, root / "grt/q/q0.fa"),
+                                  final_version: sequence_stats(root, root / f"grt/q/{final_version}.fa")},
+            "q0_construction": collect_q0_decisions(root),
             "source_contribution_bp": dict(contribution),
             "explicit_connector_segments": dict(connectors),
             "annotations": final_annotations(root, final_path)}
@@ -429,13 +474,26 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                 "outputs": [{"file": relative, "sha256": digest(root / relative) if stats["available"] else None}]}
     if unit_id == "assign":
         return collect_assignment(root, input_data)
+    if unit_id == "q0_evidence":
+        manifest = read_json(root / "metadata/grt_q0_evidence.json", {})
+        relative = manifest.get("catalog")
+        catalog = read_json(local_path(root, relative), {}) if relative else {}
+        return {"summary": {"candidate_count": len(catalog.get("candidates", [])),
+                             "unplaced_segment_count": len(catalog.get("unplaced_segment_ids", [])),
+                             "supplementary_task_count": len(catalog.get("supplementary_alignments", []))},
+                "notes": ["候选发现不等于路径接受；q0 尚未在此阶段构建。"]}
     if unit_id == "grt_prepare":
         return collect_lgz_inputs(root)
-    if unit_id.startswith("chr:"):
+    if unit_id.startswith(("chr:", "q0_chr:")):
         relative = f"runs/chr_{unit_id.split(':', 1)[1]}"
         paths = sorted(local_path(root, relative).glob("*/result.paf"))
+        q0_phase = unit_id.startswith("q0_chr:")
+        split_phases = (local_path(root, relative) / "q0_alignment_tasks.json").is_file()
+        if q0_phase or split_phases:
+            paths = [path for path in paths
+                     if (path.parent.name not in {"tel_scan", "cen_scan"}) == q0_phase]
         annotation_tables = {}
-        for kind in ("tel", "cen"):
+        for kind in (() if q0_phase else ("tel", "cen")):
             directory = local_path(root, f"{kind}/chr_{unit_id.split(':', 1)[1]}")
             for path in sorted(directory.glob("*.tsv")):
                 annotation_tables[f"{kind} · {path.stem}"] = table(root, path.relative_to(root).as_posix())

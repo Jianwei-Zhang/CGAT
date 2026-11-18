@@ -347,7 +347,7 @@ def apply_round(
                 "replacement_sequence_sha256": sha256_bytes(str(candidate["fill_sequence"]).encode("ascii")),
                 # Exact immutable-source slices removed from the working path.
                 # Unlike public q_before, these remain meaningful after the
-                # corrected/filtered query has shifted relative to q2.
+                # corrected/filtered query has shifted relative to q1.
                 "replaced_source_segments": prototype["replaced_source_segments"],
             }
             event["fragment_id"] = candidate.get("fragment_id", "")
@@ -396,12 +396,16 @@ def filter_paths(
     input_paths: dict[str, list[dict[str, object]]],
     input_records: dict[str, str],
     sources: dict[tuple[str, str], str],
+    *, protected_intervals=None,
 ) -> tuple[dict[str, list[dict[str, object]]], dict[str, str], list[dict[str, object]]]:
     output_paths: dict[str, list[dict[str, object]]] = {}
     output_records: dict[str, str] = {}
     prototypes: list[dict[str, object]] = []
     for chromosome in chromosome_order:
         sequence = input_records[chromosome]
+        protected = sorted((protected_intervals or {}).get(chromosome, ()))
+        if any(not 0 <= start < end <= len(sequence) for start, end in protected):
+            fail("q0 filter protection exceeds the current chromosome")
         gaps = list(re.finditer(r"N{100,}", sequence))
         if not gaps:
             output_paths[chromosome] = [dict(segment) for segment in input_paths[chromosome]]
@@ -424,8 +428,16 @@ def filter_paths(
             cursor = gap.end()
         if cursor < len(sequence):
             components.append((cursor, len(sequence)))
-        kept0 = [interval for interval in components if interval[1] - interval[0] >= MIN_COMPONENT_LENGTH]
-        removed0 = [interval for interval in components if interval[1] - interval[0] < MIN_COMPONENT_LENGTH]
+        protected0, protection_cursor = set(), 0
+        for interval in components:
+            while protection_cursor < len(protected) and protected[protection_cursor][1] <= interval[0]:
+                protection_cursor += 1
+            if protection_cursor < len(protected) and protected[protection_cursor][0] < interval[1]:
+                protected0.add(interval)
+        kept0 = [interval for interval in components if interval[1] - interval[0] >= MIN_COMPONENT_LENGTH or interval in protected0]
+        removed0 = [interval for interval in components if interval[1] - interval[0] < MIN_COMPONENT_LENGTH and interval not in protected0]
+        protected_short = [[start + 1, end] for start, end in components
+                           if (start, end) in protected0 and end - start < MIN_COMPONENT_LENGTH]
         if not kept0:
             output_paths[chromosome] = [dict(segment) for segment in input_paths[chromosome]]
             output_records[chromosome] = sequence
@@ -446,12 +458,31 @@ def filter_paths(
                 {
                     "chr": chromosome,
                     "status": "unresolved",
-                    "reason": "no_component_lt_100000",
+                    "reason": "q0_supported_short_components_retained" if protected_short else "no_component_lt_100000",
+                    "protected_q0_components": protected_short,
                     "kept": [[start + 1, end] for start, end in kept0],
                     "removed": [],
                 }
             )
             continue
+        # Keep original gaps between adjacent retained components. Only a
+        # removed component warrants collapsing its surrounding separation;
+        # an edit elsewhere must not silently normalize an unrelated 137-N
+        # input adjacency to a fresh 100-N gap. Grouped retained intervals also
+        # make this exact behavior replayable with the existing event format.
+        kept_groups = []
+        removed_set = set(removed0)
+        adjacent = False
+        for start, end in components:
+            if (start, end) in removed_set:
+                adjacent = False
+                continue
+            if adjacent:
+                kept_groups[-1] = (kept_groups[-1][0], end)
+            else:
+                kept_groups.append((start, end))
+            adjacent = True
+        kept0 = kept_groups
         filtered_path: list[dict[str, object]] = []
         for index, (start, end) in enumerate(kept0):
             if index:
@@ -490,6 +521,7 @@ def filter_paths(
                 "reason": f"removed_{len(removed0)}_isolated_components_lt_100000",
                 "kept": [[start + 1, end] for start, end in kept0],
                 "removed": [[start + 1, end] for start, end in removed0],
+                "protected_q0_components": protected_short,
             }
         )
     return output_paths, output_records, prototypes
@@ -503,15 +535,18 @@ def apply_filter(
     q_input_sha256: str,
     sources: dict[tuple[str, str], str],
     *,
-    stage: str = "step1_filter",
-    q_input_version: str = "q0r1",
-    q_output_version: str = "q0f",
+    stage: str = "step2",
+    q_input_version: str = "q1",
+    q_output_version: str = "q2",
+    protected_intervals=None,
+    protection_identity="",
 ) -> tuple[dict[str, list[dict[str, object]]], dict[str, str], list[dict[str, object]]]:
     output_paths, output_records, prototypes = filter_paths(
         chromosome_order,
         input_paths,
         input_records,
         sources,
+        protected_intervals=protected_intervals,
     )
     q_output_bytes = bytearray()
     for chromosome in chromosome_order:
@@ -560,81 +595,16 @@ def apply_filter(
                     "removed_intervals": prototype["removed"],
                     "min_component_length": MIN_COMPONENT_LENGTH,
                     "connector_length": FILTER_CONNECTOR_LENGTH,
+                    **({"q0_protection": {
+                        "authorization_id": protection_identity,
+                        "retained_components": prototype.get("protected_q0_components", []),
+                    }} if protection_identity else {}),
                 },
             }
         )
     if replay_filter_records(input_records, events) != output_records:
         fail(f"{stage} filter events do not deterministically reconstruct {q_output_version}")
     return output_paths, output_records, events
-
-def reconcile_filtered_round1_events(
-    round1: dict[str, object],
-    filter_result: dict[str, object],
-) -> None:
-    removed_by_chr: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
-    for filter_event in filter_result["events"]:
-        if filter_event["status"] != "accepted":
-            continue
-        for start, end in filter_event["edit"]["removed_intervals"]:
-            removed_by_chr[str(filter_event["chr"])].append(
-                (int(start), int(end), str(filter_event["event_id"]))
-            )
-    evidence_to_filter: dict[str, str] = {}
-    for row in round1["q_rows"]:
-        chromosome = str(row["chr"])
-        for removed_start, removed_end, filter_event_id in removed_by_chr.get(chromosome, []):
-            if not intervals_overlap(
-                int(row["q_start"]),
-                int(row["q_end"]),
-                removed_start,
-                removed_end,
-            ):
-                continue
-            for evidence_id in json.loads(str(row["evidence_ids_json"])):
-                evidence_to_filter[str(evidence_id)] = filter_event_id
-    superseded_events: dict[str, str] = {}
-    for event in round1["events"]:
-        if event["status"] != "accepted":
-            continue
-        filter_event_id = next(
-            (
-                evidence_to_filter[str(evidence_id)]
-                for evidence_id in event["evidence_ids"]
-                if str(evidence_id) in evidence_to_filter
-            ),
-            None,
-        )
-        if filter_event_id is None:
-            continue
-        event["status"] = "superseded"
-        event["reason"] = "accepted_then_removed_by_step1_filter"
-        event["superseded_by_event_id"] = filter_event_id
-        event["final_path_segment_id"] = ""
-        superseded_events[str(event["event_id"])] = filter_event_id
-    if not superseded_events:
-        return
-    for row in round1["evidence_rows"]:
-        if row["status"] == "accepted" and any(
-            row["evidence_id"] in event["evidence_ids"]
-            for event in round1["events"]
-            if event["event_id"] in superseded_events
-        ):
-            row["status"] = "superseded"
-    for row in round1["usage_rows"]:
-        if row["event_id"] not in superseded_events:
-            continue
-        if row["status"] == "consumed":
-            row["status"] = "superseded"
-        row["final_path_segment_id"] = ""
-        row["reason"] = "accepted_then_removed_by_step1_filter"
-    for filter_event in filter_result["events"]:
-        event_ids = sorted(
-            event_id
-            for event_id, filter_event_id in superseded_events.items()
-            if filter_event_id == filter_event["event_id"]
-        )
-        if event_ids:
-            filter_event["superseded_event_ids"] = event_ids
 
 def candidate_public_row(candidate: dict[str, object]) -> dict[str, object]:
     row = {field: candidate.get(field, "") for field in CANDIDATE_FIELDS}

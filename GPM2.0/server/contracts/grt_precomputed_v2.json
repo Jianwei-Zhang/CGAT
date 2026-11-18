@@ -2,6 +2,79 @@
   "workflow": "gpm_grt_precomputed_v2",
   "schema_version": "2",
   "final_path_schema_version": "1",
+  "package_schema_extensions": {
+    "3": {
+      "tables": {
+        "metadata/chr_assignments.tsv": {
+          "min_rows": 0
+        }
+      },
+      "required_files": [
+        "metadata/grt_q0_selection.json",
+        "metadata/grt_q0_freeze.json"
+      ],
+      "evidence_stage": [
+        "q0_construction"
+      ],
+      "coordinate_system": [
+        "source_0_based_half_open"
+      ],
+      "q0_evidence_type": "q0_path_selection",
+      "q0_selection_schema": "lgz_q0_selection_artifact_v1",
+      "q0_freeze_schema": "lgz_q0_donor_freeze_v2"
+    },
+    "4": {
+      "tables": {
+        "metadata/chr_assignments.tsv": {
+          "min_rows": 0
+        }
+      },
+      "required_files": [
+        "metadata/grt_q0_selection.json",
+        "metadata/grt_q0_freeze.json"
+      ],
+      "evidence_stage": [
+        "q0_construction"
+      ],
+      "coordinate_system": [
+        "source_0_based_half_open"
+      ],
+      "q0_evidence_type": "q0_path_selection",
+      "q0_selection_schema": "lgz_q0_selection_artifact_v1",
+      "q0_freeze_schema": "lgz_q0_donor_freeze_v2",
+      "stage_transitions": [
+        [
+          "donor_freeze",
+          "q0",
+          "q0"
+        ],
+        [
+          "step1",
+          "q0",
+          "q1"
+        ],
+        [
+          "step2",
+          "q1",
+          "q2"
+        ],
+        [
+          "step3",
+          "q2",
+          "q3"
+        ],
+        [
+          "finalize",
+          "q3",
+          "q3"
+        ]
+      ],
+      "table_paths": {
+        "metadata/grt_step2_strategies.tsv": "metadata/grt_step1_strategies.tsv",
+        "metadata/grt_step3_classifications.tsv": "metadata/grt_step2_classifications.tsv"
+      }
+    }
+  },
   "hash_semantics": {
     "artifact": "sha256 of exact file bytes",
     "sequence": "sha256 of uppercase sequence bytes without FASTA header or whitespace"

@@ -3,7 +3,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fixture_root="${repo_root}/tests/fixtures/grt_contract_v2/valid/gpm_server"
-task_tmp_dir="$(mktemp -d /tmp/gpm2-grt-server-app-e2e.XXXXXX)"
+task_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/gpm2-grt-server-app-e2e.XXXXXX")"
+node_exe="${GPM_GRT_E2E_NODE:-node}"
 task_cargo_target="${GPM_GRT_E2E_CARGO_TARGET_DIR:-/tmp/gpm2-grt-e2e-cargo-target}"
 
 cleanup() {
@@ -26,10 +27,20 @@ python3 server/tools/grt_contract.py \
   --bundle "${fixture_root}" \
   --schema server/contracts/grt_precomputed_v2.json >/dev/null
 
-CARGO_TARGET_DIR="${task_cargo_target}" cargo build \
-  --locked \
-  --manifest-path app/backend/Cargo.toml >/dev/null
-backend_exe="${task_cargo_target}/debug/gpm_next_backend"
+# CI builds the current checkout. A Windows-host validation may explicitly
+# supply its freshly built executable (or a path-converting launcher); never
+# build a Linux backend against the shared Windows checkout for that workflow.
+backend_exe="${GPM_GRT_E2E_BACKEND_EXE:-}"
+if [[ -z "$backend_exe" ]]; then
+  CARGO_TARGET_DIR="${task_cargo_target}" cargo build \
+    --locked \
+    --manifest-path app/backend/Cargo.toml >/dev/null
+  backend_exe="${task_cargo_target}/debug/gpm_next_backend"
+fi
+if [[ ! -x "$backend_exe" ]]; then
+  echo "backend executable unavailable: $backend_exe" >&2
+  exit 1
+fi
 
 app_full_stage="${task_tmp_dir}/app-full/gpm_server"
 app_light_stage="${task_tmp_dir}/app-light/gpm_server"
@@ -177,9 +188,9 @@ if [[ -e "${task_tmp_dir}/zip-v1/project.sqlite" ]]; then
   echo "rejected v1 App package left project.sqlite behind" >&2
   exit 1
 fi
-full_zip_options="$(${backend_exe} list-project-initializer-options "${full_zip_workspace}")"
-light_zip_options="$(${backend_exe} list-project-initializer-options "${light_zip_workspace}")"
-legacy_no_fasta_zip_options="$(${backend_exe} list-project-initializer-options "${legacy_no_fasta_zip_workspace}")"
+full_zip_options="$("${backend_exe}" list-project-initializer-options "${full_zip_workspace}")"
+light_zip_options="$("${backend_exe}" list-project-initializer-options "${light_zip_workspace}")"
+legacy_no_fasta_zip_options="$("${backend_exe}" list-project-initializer-options "${legacy_no_fasta_zip_workspace}")"
 assert_contains "${full_zip_options}" 'fasta_available=true'
 assert_contains "${light_zip_options}" 'fasta_available=false'
 assert_contains "${legacy_no_fasta_zip_options}" 'fasta_available=false'
@@ -240,6 +251,95 @@ if "${backend_exe}" get-grt-project-view "${workspace}" 999 >/dev/null 2>&1; the
   echo "missing project unexpectedly returned a LGZ project view" >&2
   exit 1
 fi
+
+# Current q0 generation: validate portable frozen Server outputs, export both
+# App delivery modes, then exercise the actual archive/CLI/persisted read model.
+# These controlled fixtures are not measured biological assembly results.
+python3 - "${task_tmp_dir}/q0-v3" <<'PYQ0'
+import json
+from pathlib import Path
+import sys
+from server.tests.q0_delivery_fixture import materialize
+from server.tools.lgz_core.contract.validator import validate_contract
+for name, fixture in (("reverse", "frozen_server.json"), ("bridge", "frozen_bridge_server.json"), ("direct", "frozen_direct_server.json")):
+    root = Path(sys.argv[1]) / name / "gpm_server"
+    materialize(json.loads((Path("tests/fixtures/grt_contract_v3") / fixture).read_text()), root)
+    assert validate_contract(root)["schema_version"] == ("4" if name == "direct" else "3")
+PYQ0
+for fixture in reverse bridge direct; do
+  q0_source="${task_tmp_dir}/q0-v3/${fixture}/gpm_server"
+  for kind in server full light; do
+    printf 'q0 E2E: %s / %s\n' "$fixture" "$kind"
+    q0_stage="${task_tmp_dir}/q0-stage-${fixture}-${kind}/gpm_server"
+    q0_workspace="${task_tmp_dir}/q0-import-${fixture}-${kind}"
+    if [[ "$kind" == server ]]; then
+      mkdir -p "$(dirname "$q0_stage")"
+      cp -a "$q0_source" "$q0_stage"
+    else
+      fasta_flag=--include-fasta
+      if [[ "$kind" == light ]]; then fasta_flag=--no-fasta; fi
+      python3 server/tools/grt_app_package.py \
+        --source "$q0_source" --staging "$q0_stage" "$fasta_flag" >/dev/null
+    fi
+    (cd "$(dirname "$q0_stage")" && zip -qr "${task_tmp_dir}/q0-${fixture}-${kind}.zip" gpm_server)
+    "${backend_exe}" import-zip "${task_tmp_dir}/q0-${fixture}-${kind}.zip" "$q0_workspace" >/dev/null
+    "${backend_exe}" initialize-project "$q0_workspace" "q0-${fixture}-${kind}" >/dev/null
+    "${backend_exe}" get-grt-project-view "$q0_workspace" 1 > "${task_tmp_dir}/q0-view.json"
+    python3 - "$q0_source" "$q0_stage" "${task_tmp_dir}/q0-view.json" "$kind" <<'PYQ0VIEW'
+import csv
+import json
+from pathlib import Path
+import sys
+source, stage, view_file = map(Path, sys.argv[1:4])
+kind = sys.argv[4]
+view = json.loads(view_file.read_text().removeprefix("json="))
+assert view["recipe"]["schema_version"] in {"3", "4"}
+expected = json.loads((stage / "metadata/grt_final_path.json").read_text())
+assert set(view["final_path_by_chr"]) == {c["chr"] for c in expected["chromosomes"]}
+for chromosome in expected["chromosomes"]:
+    actual = view["final_path_by_chr"][chromosome["chr"]]
+    if kind != "server":
+        assert actual["grt_display_available"] is True
+    assert actual["q4_length"] == chromosome["q4_length"]
+    # The display model adds source_length and intentionally removes trace
+    # links. Compare geometry here; source-card traces below retain provenance.
+    def preserves(original, value):
+        if isinstance(original, dict):
+            return all(key in value and preserves(item, value[key]) for key, item in original.items())
+        if isinstance(original, list):
+            return len(original) == len(value) and all(preserves(a, b) for a, b in zip(original, value))
+        return original == value
+    trace_fields = {"event_id", "eventId", "evidence_ids", "evidenceIds", "source_card_key", "sourceCardKey"}
+    projected = [{k: v for k, v in segment.items() if k not in trace_fields}
+                 for segment in chromosome["segments"]]
+    assert preserves(projected, actual["segments"]), chromosome["chr"]
+with (source / "metadata/grt_used_contigs.tsv").open(newline="") as handle:
+    cards = list(csv.DictReader(handle, delimiter="\t"))
+assert cards and all(json.loads(c["accepted_event_ids_json"]) == [] for c in cards)
+assert {c["source_card_key"] for c in view["source_cards"]} == {c["source_card_key"] for c in cards}
+(view_file.parent / "q0-card.txt").write_text(cards[0]["source_card_key"])
+PYQ0VIEW
+    "${backend_exe}" get-grt-source-card-trace "$q0_workspace" 1 "$(cat "${task_tmp_dir}/q0-card.txt")" \
+      > "${task_tmp_dir}/q0-trace.json"
+    python3 - "${task_tmp_dir}/q0-trace.json" "$kind" <<'PYQ0TRACE'
+import json
+from pathlib import Path
+import sys
+trace = json.loads(Path(sys.argv[1]).read_text().removeprefix("json="))
+assert trace["accepted_events"] == []
+if sys.argv[2] == "server":
+    assert trace["final_path_segments"]
+    assert {s["segment_id"] for s in trace["final_path_segments"]} == set(
+        json.loads(trace["source_card"]["final_path_segment_ids_json"]))
+    assert all(s["evidence_ids"] for s in trace["final_path_segments"])
+else:
+    # App projection intentionally omits Server history/trace tables; its
+    # source geometry and cards were checked through the project view above.
+    assert trace["final_path_segments"] == []
+    assert trace["ref_evidence"] == [] and trace["pairwise_evidence"] == []
+PYQ0TRACE
+  done
+done
 
 # One source card may display in one direction while its Final Path uses both.
 # Exercise the unchanged Rust importer for Server, full App and light App data.
@@ -341,7 +441,7 @@ if [[ -e "${legacy_workspace}/project.sqlite" ]]; then
   exit 1
 fi
 
-node --test \
+"${node_exe}" --test \
   app/frontend/src/services/__tests__/workflow-api.test.mjs \
   app/frontend/src/ui/pages/__tests__/workspace-i18n.test.mjs \
   app/frontend/src/ui/pages/assembly/__tests__/grt-state.test.mjs \

@@ -148,10 +148,16 @@ PYZIP
 chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/zip" \
   "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords"
 
-repeat_base() {
-  local base="$1"
-  local count="$2"
-  awk -v base="$base" -v count="$count" 'BEGIN { for (i = 0; i < count; i += 1) printf "%s", base; printf "\n" }'
+fixture_sequence() {
+  # Controlled, matching prefixes of one non-repetitive reference. This tests
+  # add/import orchestration, not acceptance of low-complexity q0 anchors.
+  python3 - "$1" "${2:-0}" <<'PYSEQ'
+import random
+import sys
+length, offset = map(int, sys.argv[1:])
+rng = random.Random(831)
+print("".join(rng.choice("ACGT") for _ in range(length + offset))[offset:])
+PYSEQ
 }
 
 write_fasta() {
@@ -185,9 +191,9 @@ ds4="${TMP_DIR}/ds4.fa"
 output_root="${TMP_DIR}/gpm_server"
 export GPM_TEST_MINIMAP_LOG="${TMP_DIR}/minimap2.log"
 
-write_fasta "$ref" "Chr01" "$(repeat_base A 1500)"
-write_fasta "$ds1" "ds1_ctg" "$(repeat_base A 1200)"
-write_fasta "$ds4" "ds4_ctg" "$(repeat_base A 400)NNNN$(repeat_base A 796)"
+write_fasta "$ref" "Chr01" "$(fixture_sequence 1500)"
+write_fasta "$ds1" "ds1_ctg" "$(fixture_sequence 1200)"
+write_fasta "$ds4" "ds4_ctg" "$(fixture_sequence 400)NNNN$(fixture_sequence 796 404)"
 
 PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
   --ref ref_add_script "$ref" \
@@ -237,9 +243,9 @@ grep -Fq '[SKIP_VALID] [assign]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [chr:Chr01]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_prepare]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step1]' "${TMP_DIR}/resume.out"
+grep -Fq '[CACHE_HIT] [grt_step1]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step2]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step3]' "${TMP_DIR}/resume.out"
-grep -Fq '[CACHE_HIT] [grt_telomere_finalize]' "${TMP_DIR}/resume.out"
 awk -F '\t' '
   $1 == "ref:ds1" || $1 == "assign" || $1 == "chr:Chr01" {
     if ($4 != "success" || $5 != "1") exit 1
@@ -252,7 +258,13 @@ awk -F '\t' 'BEGIN { OFS = "\t" } $1 == "chr_assignment_min_coverage_percent" { 
   "${output_root}/metadata/prepare_options.tsv" > "${output_root}/metadata/prepare_options.tsv.tmp"
 mv "${output_root}/metadata/prepare_options.tsv.tmp" "${output_root}/metadata/prepare_options.tsv"
 
+# Adding display data must not rewrite the original q0/final sequence or
+# retroactively enlist the dataset in its locked recipe and donor freeze.
+frozen_before="$(sha256sum "${output_root}/metadata/grt_q0_freeze.json" \
+  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q3.fa")"
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_dataset.sh" --ds "$ds4" >/dev/null
+[[ "$frozen_before" == "$(sha256sum "${output_root}/metadata/grt_q0_freeze.json" \
+  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q3.fa")" ]]
 
 test -f "${output_root}/add_ds4.zip"
 grep -q '^gpm_grt_precomputed_v2' "${output_root}/metadata/package.tsv"

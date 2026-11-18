@@ -13,7 +13,7 @@ from server.tests import test_grt_telomere_finalize as telomere_fixture
 from server.tools.grt_contract import ContractError, validate_contract
 from server.tools.grt_evidence_package import build_ref_evidence
 from server.tools.grt_prepare_inputs import read_fasta
-from server.tools.grt_step1 import source_assignment
+from server.tools.lgz_core import source_assignment
 
 
 TOOL = REPO_ROOT / "server/tools/grt_evidence_package.py"
@@ -156,11 +156,11 @@ class GrtEvidencePackageTests(unittest.TestCase):
         path.chmod(0o755)
         return path
 
-    def make_finalized_server(self, root: Path) -> Path:
+    def make_finalized_server(self, root: Path, *, assignment_variant="normal") -> Path:
         helper = telomere_fixture.GrtTelomereFinalizeTests(
             "test_assigned_and_unplaced_recovery_unresolved_and_exact_resume"
         )
-        server = helper.make_server(root)
+        server = helper.make_server(root, assignment_variant=assignment_variant)
         tools = helper.make_tools(root)
         env = os.environ.copy()
         env["FAKE_TEL_MUMMER_LOG"] = str(root / "package_tel_mummer.log")
@@ -338,31 +338,7 @@ with open(output, 'w', encoding='utf-8', newline='') as handle:
     def test_normal_used_card_reuses_signed_target_assignment_anchor(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
-            server = self.make_finalized_server(root)
-            assignments_path = server / "metadata/chr_assignments.tsv"
-            assignments = prepare_fixture.read_tsv(assignments_path)
-            chr01 = next(
-                row
-                for row in assignments
-                if row["dataset_name"] == "support"
-                and row["seq_name"] == "s_tel_assigned"
-                and row["assigned_chr_name"] == "Chr01"
-            )
-            chr01["anchor_start"] = "-205687"
-            chr02 = dict(chr01)
-            chr02["assigned_chr_name"] = "Chr02"
-            chr02["anchor_start"] = "-172703"
-            assignments.append(chr02)
-            prepare_fixture.write_tsv(
-                assignments_path, list(assignments[0]), assignments
-            )
-            with (server / "runs/support_vs_ref/result.paf").open(
-                "a", encoding="utf-8", newline=""
-            ) as handle:
-                handle.write(
-                    "s_tel_assigned\t20000\t1000\t20000\t+\tChr02\t60000\t100\t19100"
-                    "\t19000\t19000\t60\n"
-                )
+            server = self.make_finalized_server(root, assignment_variant="signed")
             self.write_existing_main_view_results(server)
             minimap = self.make_minimap(root)
             env = os.environ.copy()
@@ -387,42 +363,8 @@ with open(output, 'w', encoding='utf-8', newline='') as handle:
     def test_cross_chr_source_is_linked_without_moving_original_card(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
-            server = self.make_finalized_server(root)
+            server = self.make_finalized_server(root, assignment_variant="cross_chr")
             assignments_path = server / "metadata/chr_assignments.tsv"
-            assignments = prepare_fixture.read_tsv(assignments_path)
-            for row in assignments:
-                if row["dataset_name"] == "support" and row["seq_name"] == "s_tel_assigned":
-                    row["assigned_chr_name"] = "Chr02"
-            prepare_fixture.write_tsv(assignments_path, list(assignments[0]), assignments)
-
-            events_path = server / "metadata/grt_events.jsonl"
-            events = [
-                json.loads(line)
-                for line in events_path.read_text(encoding="utf-8").splitlines()
-                if line
-            ]
-            changed = False
-            for event in events:
-                source = event.get("source")
-                if (
-                    event["status"] == "accepted"
-                    and isinstance(source, dict)
-                    and source["contig"] == "s_tel_assigned"
-                ):
-                    source["original_assignment"] = "cross_chr"
-                    event["source_card_key"] = (
-                        "support:s_tel_assigned:Chr01:cross_chr_grt_usage"
-                    )
-                    changed = True
-            self.assertTrue(changed)
-            events_path.write_text(
-                "".join(
-                    json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n"
-                    for row in events
-                ),
-                encoding="utf-8",
-                newline="",
-            )
             self.write_existing_main_view_results(server)
             minimap = self.make_minimap(root)
             env = os.environ.copy()
