@@ -65,3 +65,42 @@ export function selectedSourceRanges(surfaces, rootStore) {
   }
   return ranges;
 }
+
+
+// Escape dismisses the editing selection as well as read-only correlation.
+// Patch only transient selection fields, including inactive Local snapshots;
+// never rebuild plots, clear comparison membership, or persist an edit.
+export function clearSourceEditingSelections(surfaces, store) {
+  const assembly = store.getState().assembly || {};
+  const clearLocal = subview => subview?.trackPairSelectedCtgs?.length
+    ? { ...subview, trackPairSelectedCtgs: [] } : subview;
+  const subview = clearLocal(assembly.subview);
+  let workspace = assembly.subviewWorkspace;
+  if (workspace) {
+    let changed = false;
+    const windows = workspace.windows.map(item => {
+      const local = clearLocal(item.snapshot?.subview);
+      if (local === item.snapshot?.subview) return item;
+      changed = true;
+      return { ...item, snapshot: { ...item.snapshot, subview: local } };
+    });
+    if (changed) workspace = { ...workspace, windows };
+  }
+  if (assembly.selectedCtgId || assembly.trackSelectedCtgIds?.length || assembly.selectedDeletedCtgRecordIds?.length
+    || subview !== assembly.subview || workspace !== assembly.subviewWorkspace) {
+    store.setState({ assembly: { ...assembly, selectedCtgId: null, trackSelectedCtgIds: [], selectedDeletedCtgRecordIds: [],
+      ...(subview !== assembly.subview ? { subview } : {}),
+      ...(workspace !== assembly.subviewWorkspace ? { subviewWorkspace: workspace } : {}) } });
+  }
+  const clearPaint = node => {
+    node.classList?.remove("is-active", "is-multi-selected");
+    if (node.getAttribute("aria-pressed") !== null) node.setAttribute("aria-pressed", "false");
+  };
+  for (const host of surfaces.keys()) {
+    for (const node of host.querySelectorAll('[data-track-contig-id], [data-subview-contig-id], .assembly-member-chip-region [data-assembly-ctg-id], [data-deleted-ctg-record-id]')) {
+      clearPaint(node);
+      for (const child of node.querySelectorAll(".track-ctg, .track-ctg-label")) clearPaint(child);
+    }
+    for (const label of host.querySelectorAll(".track-sticky-label")) clearPaint(label);
+  }
+}

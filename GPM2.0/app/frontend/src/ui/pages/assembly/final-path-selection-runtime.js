@@ -1,7 +1,7 @@
 import { restoreSvgTooltipTitles } from "../../tooltip-export.js";
 import { resolveCurrentFinalPathChrName } from "./final-path-state.js";
 import { collectFinalPathSourceCtgs, resolveFinalPathSourceRange } from "./final-path-presentation.js";
-import { SOURCE, readSourceProjection, correlationSourceRange, selectedSourceRanges } from "./source-correlation.js";
+import { SOURCE, readSourceProjection, correlationSourceRange, selectedSourceRanges, clearSourceEditingSelections } from "./source-correlation.js";
 import { intersectSourceInterval } from "./source-interval-projection.js";
 
 const BOUND = Symbol("finalPathSelectionBound");
@@ -475,9 +475,14 @@ export function bindFinalPathSelection(host, store) {
       if (event.key === "Escape" && owner.box) {
         cancelPointer(); event.preventDefault?.(); event.stopImmediatePropagation?.(); return;
       }
-      if (event.key === "Escape" && !event.defaultPrevented && !event.target?.closest?.(EDITABLE)) {
+      if (event.key === "Escape" && !event.defaultPrevented
+        && !event.target?.closest?.(`${EDITABLE}, dialog, [role="dialog"], [data-subview-tools-host], [data-track-members-dialog]`)) {
         if (owner.pointer) owner.pointer.cancelled = true;
         clearBox(owner); clearAll();
+        const state = store.getState();
+        if (isVisible(state) && (!state.assembly?.activeTab || state.assembly.activeTab === "assembly")) {
+          clearSourceEditingSelections(owner.surfaces, store);
+        }
       }
     }, true);
     listen(host, "focusin", select);

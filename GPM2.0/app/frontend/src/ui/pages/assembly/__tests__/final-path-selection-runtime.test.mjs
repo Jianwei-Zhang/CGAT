@@ -28,6 +28,10 @@ class Element {
   replaceChildren(...nodes) { this.children = []; nodes.forEach(node => this.append(node)); }
   remove() { this.parent.children = this.parent.children.filter(child => child !== this); }
   addEventListener(type, fn) { const list = this.events.get(type) || []; list.push(fn); this.events.set(type, list); }
+  get classList() { return {
+    remove: (...tokens) => this.setAttribute("class", (this.getAttribute("class") || "").split(/\s+/).filter(token => !tokens.includes(token)).join(" ")),
+    contains: token => (this.getAttribute("class") || "").split(/\s+/).includes(token),
+  }; }
   removeEventListener(type, fn) { this.events.set(type, (this.events.get(type) || []).filter(item => item !== fn)); }
   cloneNode() { const clone = new Element(this.ownerDocument, this.attrs); this.children.forEach(child => clone.append(child.cloneNode(true))); return clone; }
   get outerHTML() { return `<g ${Object.entries(this.attrs).map(([k,v]) => `${k}="${v}"`).join(" ")}>${this.children.map(c => c.outerHTML).join("")}</g>`; }
@@ -990,8 +994,8 @@ for (const clear of ["blank-main", "blank-local", "blank-result", "escape"]) {
     assert.equal(f.overlay(f.graph), null);
     f.patch({ trackView: { zoom: 2 } }); bindFinalPathSelection(f.host, f.store);
     assert.equal(f.overlay(f.graph), null); assert.equal(f.overlay(f.local), null);
-    assert.equal(f.store.getState().assembly.selectedCtgId, 1);
-    assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, [1]);
+    assert.equal(f.store.getState().assembly.selectedCtgId, clear === "escape" ? null : 1);
+    assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, clear === "escape" ? [] : [1]);
   });
 }
 
@@ -1063,7 +1067,60 @@ test("a new unchanged Ctrl box can re-enable a previously dismissed edit selecti
   const blank = new Element(f.host.ownerDocument, { class: "assembly-track-scroll" }); f.host.append(blank);
   f.patch({ trackSelectedCtgIds: [1] }); f.fire("keydown", f.host, { key: "Escape" });
   assert.equal(f.overlay(f.graph), null);
-  // The existing edit-box controller may skip setState when the set is equal.
+  // A new box selection is still allowed after Escape clears the old one.
+  f.patch({ trackSelectedCtgIds: [1] });
   f.fire("pointerdown", blank, { ctrlKey: true }); f.fire("pointerup", blank, { ctrlKey: true }); f.fire("click", blank, { ctrlKey: true });
   assert.ok(f.overlay(f.graph));
+});
+
+
+test("Escape clears blue Main/Local edit paint and state, including inactive Local snapshots", () => {
+  const f = fixture(); resultBar(f); const peer = peerView(f);
+  const summary = { mode: "composition", members: [{ assemblyCtgId: 1 }] };
+  const snapshot = { subview: { summary, trackPairSelectedCtgs: [{ contigId: 1, trackRole: "primary" }] }, subviewTrackView: { zoom: 2 } };
+  const path = f.store.getState().assembly.finalPathByChr;
+  const offsets = [{ assemblyCtgId: 1, offsetBp: 40 }];
+  f.patch({ selectedCtgId: 1, trackSelectedCtgIds: [1], selectedDeletedCtgRecordIds: [3], trackDragOffsets: offsets,
+    subview: snapshot.subview, subviewWorkspace: { generation: 1, activeId: "a", windows: [
+      { id: "a", opened: true, snapshot }, { id: "b", opened: false, snapshot },
+    ] } });
+  const groups = [f.main, f.local, peer.local];
+  for (const node of groups) {
+    node.setAttribute("class", "track-ctg-group is-active is-multi-selected");
+    const bar = new Element(node.ownerDocument, { class: "track-ctg is-active is-multi-selected" }); node.append(bar);
+  }
+  peer.fire("keydown", peer.host, { key: "Escape" });
+  const assembly = f.store.getState().assembly;
+  assert.equal(assembly.selectedCtgId, null);
+  assert.deepEqual(assembly.trackSelectedCtgIds, []);
+  assert.deepEqual(assembly.selectedDeletedCtgRecordIds, []);
+  assert.deepEqual(assembly.subview.trackPairSelectedCtgs, []);
+  for (const item of assembly.subviewWorkspace.windows) {
+    assert.deepEqual(item.snapshot.subview.trackPairSelectedCtgs, []);
+    assert.equal(item.snapshot.subview.summary, summary);
+    assert.equal(item.snapshot.subviewTrackView, snapshot.subviewTrackView);
+  }
+  for (const node of groups) {
+    assert.equal(node.classList.contains("is-multi-selected"), false);
+    assert.equal(node.classList.contains("is-active"), false);
+    assert.equal(node.querySelector(".track-ctg").classList.contains("is-multi-selected"), false);
+  }
+  assert.equal(assembly.finalPathByChr, path); assert.equal(assembly.trackDragOffsets, offsets);
+  assert.equal(f.overlay(f.main), null); assert.equal(f.overlay(f.graph), null);
+  f.patch({ trackView: { zoom: 3 } });
+  assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, []);
+  peer.close();
+});
+
+test("Escape inside an editable field or dialog and outside Assembly leaves edit selections alone", () => {
+  for (const mode of ["input", "dialog", "route", "tab", "handled"]) {
+    const f = fixture(); f.patch({ selectedCtgId: 1, trackSelectedCtgIds: [1] });
+    const dialog = new Element(f.host.ownerDocument); dialog.tag = "dialog"; f.host.append(dialog);
+    if (mode === "route") f.store.setState({ activeRoute: "importer" });
+    if (mode === "tab") f.patch({ activeTab: "check-new-sequences" });
+    f.fire("keydown", mode === "input" ? f.input : mode === "dialog" ? dialog : f.host,
+      { key: "Escape", defaultPrevented: mode === "handled" });
+    assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, [1]);
+    assert.equal(f.store.getState().assembly.selectedCtgId, 1);
+  }
 });
