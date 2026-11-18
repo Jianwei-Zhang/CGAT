@@ -217,3 +217,39 @@
   assign 及全部已完成 cross 的有效复用。**不要直接执行普通 run_all.sh。**
 - 入口支持文件存入仓库 `docs/incident-tools/wheat-20261119/`，仍是事故适配，
   不代表 master 默认生产运行路径已启用。真实新旧整套任务均未完成。
+
+
+## 2026-11-19 06:02 +08：已切换，新主作业 42710779
+
+**当前新版主作业是 `42710779`，不是 `42646893`。** 旧版对照仍是 `42523432`。
+
+- 6A 原参 cross 在 **05:55:39** 成功，已完成原参 cross 增至 **17 个**。
+  对完成标记的 status、command、run_id、PAF/日志实际大小和 SHA-256 做了有界
+  复核。随后只对新版旧作业 `42646893` 发出 `dkill`，其 FAILED 是**受控终止**，
+  不是新增 OOM 或算法失败。刚启动的 5D 只有未完成输出，未作为成功缓存接纳。
+- 旧作业终态已核实；workspace lock 已自行释放，**没有手动删锁或清理缓存**。
+  备份：`routing-resume-staged-20261119/cutover-20261119-0555/`，含 17 个原参
+  叶子标记、原外层检查点、6A 完整证明、停止前/后调度信息及 dkill 返回记录。
+- **42710779** 于 **05:58:10** 在 `agent-X86-06` RUNNING，申请 32 CPU /
+  327680 MiB，实际全局预算 16。入口 `routing-resume-staged-20261119/resume.dsub`；
+  日志 **`logs/resume_routed_42710779.out`**；run ID
+  `20261118T215811Z-1612976-2eca2eb1`。提交记录位于同目录的
+  `submission-intent.json`、`submission-result.json`、`submitted-job.json`，勿重复提交。
+- 启动清单全部通过，入口记录了实际执行替换和进程 SHA memo 上限 **8192**。
+  **06:00:51、06:02:26 两个 ref 均已 SKIP_VALID**，没有重跑初始参考比对。
+  本节时点 assign 和 17 个 cross 的本次复用尚待日志确认，不能提前宣称验收完毕。
+- 新的只读采样日志：`~/cgat-reads-debug/logs/wheat-live-20261119-055915.jsonl`。
+  持久只读 watcher 已切到 42710779，PID **1577626**（cli-X86-01，已核实进程存活），
+  `watch-comparison-status.json` 已报告新 job RUNNING。它只记录状态，不自动修复。
+- `run_all` 原生 PREFLIGHT 日志中的 `parameters unchanged` 仅描述它自身的普通
+  runtime 风险快照，不能用于宣称这次所有 cross 参数不变；实际替换以
+  `EXPLICIT_ROUTING_RESUME`、`ROUTE_EXECUTION_OVERRIDE`、叶子/外层身份及最终
+  `routing-receipt.json` 为准。
+- **最终交付还需附带 q0 路由审计说明/结果证明。** 已核实 frozen App packager
+  仅投影 `recorded_initial_reference_alignments_only` 的 alignment policy，
+  不会自动带出 `routing-receipt.json`。不要把 q0 回执伪装成参考比对的 policy，
+  也不要把仅有 App 包视为已交付这次现场近似策略的完整审计信息。保留工作区审计，
+  全流程完成时生成与输出 SHA 绑定的独立 q0 provenance 附件并随比较结果交付。
+- 本次登录节点控制脚本最初误用了系统 Python 3.6，因 `subprocess(text=...)`
+  不支持而在任何停止操作前退出；加载已确认的 x86 environment 后执行成功。
+  后续控制脚本同样先 source 该环境，不修改系统 Python。

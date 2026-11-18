@@ -229,3 +229,22 @@ native checkpoint is temporarily published for a routed result.
   the affected routed markers/results and recomputing those selected leaves;
   never relabel approximate outputs as native. Completed native leaves remain
   separate and must be preserved.
+
+
+### Controlled activation, 2026-11-19 05:58 +08
+
+After native 6A committed at 05:55:39 (17 complete native cross leaves), only
+new-run job `42646893` was intentionally terminated. Its lock released normally;
+no cache/lock deletion or native result substitution occurred. Job **42710779**
+started on `agent-X86-06` through the staged entry, with the same 32 CPU/320 GiB
+reservation and original 16-thread global budget. Two initial references were
+subsequently verified and skipped. At the 06:02 snapshot, assignment/leaf reuse
+verification and first routed execution were still pending. Submission alone
+is not evidence that approximation has been used or the workflow has passed.
+
+The frozen App packager exports only initial-reference policy companions, not
+these q0 receipts. Final comparison delivery must therefore include a separate,
+output-bound q0 routing provenance attachment plus the retained Server audit;
+do not relabel q0 routing as the initial-reference policy schema. Main log:
+`logs/resume_routed_42710779.out`; cutover backups and scheduler evidence are in
+`routing-resume-staged-20261119/cutover-20261119-0555/`.
