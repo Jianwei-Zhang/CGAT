@@ -54,6 +54,8 @@ test("navigation has only Project and Assembly in the approved order in both lan
   for (const locale of ["zh", "en"]) {
     const html = renderAppShell({ locale });
     assert.match(html, /data-route="importer"[\s\S]*data-route="assembly"/);
+    assert.ok(html.includes(`data-route="importer">${locale === "en" ? "Project" : "项目"}</button>`));
+    assert.ok(html.includes(`data-route="assembly">${locale === "en" ? "Assembly" : "装配"}</button>`));
     assert.doesNotMatch(html, /data-route="projectExport"/);
     assert.doesNotMatch(html, /data-route="projectPreview"/);
     assert.equal((html.match(/class="route-button"/g) || []).length, 2);

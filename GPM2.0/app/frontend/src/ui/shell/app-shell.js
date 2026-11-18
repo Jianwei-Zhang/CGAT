@@ -52,7 +52,7 @@ export function renderAppShell(state) {
     <div class="desktop-shell">
       <nav class="panel app-nav">
         <nav class="route-nav">
-          <button class="route-button" data-route="importer">${labels.project}</button>
+          <button class="route-button" data-route="importer">${labels.workspaceRoute}</button>
           <button class="route-button" data-route="assembly">${labels.assembly}</button>
         </nav>
         ${renderAssemblyNavigation(state)}

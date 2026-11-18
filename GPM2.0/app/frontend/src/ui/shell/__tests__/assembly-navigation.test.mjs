@@ -193,3 +193,14 @@ test("rendered navigation escapes user names, has one switch per scope and is ab
   for (const id of ["assembly-partition-select", "session-workspace-select", "assembly-chromosome-select"]) assert.equal((markup.match(new RegExp(`id="${id}"`, "g")) || []).length, 1);
   assert.match(renderAssemblyNavigation({ ...s, activeRoute: "importer" }), /data-assembly-navigation hidden/);
 }));
+
+
+test("all-assemblies option has bilingual copy without changing its filter value", () => {
+  for (const locale of ["zh", "en"]) {
+    const view = model(state(ALL_PARTITIONS, locale));
+    const all = view.partitions.find(item => item.value === ALL_PARTITIONS);
+    assert.equal(all.label, locale === "en" ? "Assemblies" : "全部组装");
+    assert.equal(all.selected, true);
+    assert.equal(view.projects.length, records.length);
+  }
+});
