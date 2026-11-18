@@ -7,7 +7,7 @@ import { renderShellSelect, syncShellSelect } from "./shell-select-runtime.js";
 export const ALL_PARTITIONS = "__all__";
 export const assemblyNavigationVisible = state => state.activeRoute === "assembly";
 const labels = state => state.locale === "en" ? {
-  partition: "Project", project: "Assembly", chr: "Chr", all: "Assemblies", unassigned: "Unassigned",
+  partition: "Project", project: "Assembly", chr: "Chr", all: "All assemblies", unassigned: "Unassigned",
   empty: "No assemblies in this project", chooseProject: "Choose assembly", chooseChr: "Choose chromosome", current: "Current assembly · outside this project",
   switchFailed: "Unable to switch. The current assembly has been kept.",
 } : {
