@@ -1,3 +1,5 @@
+import { renderToolbarGroup } from "./toolbar-groups.js";
+import { renderTrackIdentity } from "./track-identity.js";
 import { hiddenSupportCtgIds } from "./support-visibility-state.js";
 import { renderSubviewWorkspace } from "./render-subview-workspace.js";
 import { renderAssemblyLocalRestoreStatus } from "./assembly-detail-status.js";
@@ -990,6 +992,7 @@ function renderAssemblyTrackInlineControls({
   mainViewHistory,
   i18n,
   leadingControls = "",
+  editingControls = "",
 }) {
   const supportDatasetSelect = supportDatasetOptions.length
     ? renderSupportDatasetSelect({
@@ -1031,7 +1034,7 @@ function renderAssemblyTrackInlineControls({
     history: mainViewHistory,
     i18n,
   });
-  return renderMainTrackToolbar(`
+  const displayControls = `
       ${leadingControls}
       <div class="assembly-marker-display">
         <button type="button" class="button ghost tiny" data-marker-display-toggle aria-expanded="false" aria-controls="assembly-marker-display-menu">${escapeHtml(i18n.trackControls.markerDisplay)}</button>
@@ -1048,6 +1051,8 @@ function renderAssemblyTrackInlineControls({
             : `<span class="muted">${escapeHtml(i18n.trackControls.unconfigured)}</span>`
         }
       </label>
+  `;
+  const filterControls = `
       <label class="assembly-track-inline-field">
         ${renderSupportDsCtgLenLabel(i18n)}
         ${supportDsCtgLenInput}
@@ -1061,8 +1066,13 @@ function renderAssemblyTrackInlineControls({
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.identityHint)}">${escapeHtml(i18n.trackControls.identityPct)}</span>
         ${identityInput}
       </label>
-      ${mainViewHistoryControls}
-  `, i18n);
+  `;
+  return renderMainTrackToolbar(
+    renderToolbarGroup("display", displayControls, i18n)
+      + renderToolbarGroup("filter", filterControls, i18n)
+      + renderToolbarGroup("edit", `${editingControls}${mainViewHistoryControls}`, i18n),
+    i18n,
+  );
 }
 
 function renderMainTrackToolbar(content, i18n) {
@@ -2020,8 +2030,8 @@ function renderAssemblyTracks(args) {
       const trackLabelAttrs = selectableTrackLabel
         ? ` data-track-label-role="${trackLabelRole}" data-track-label-selectable="1" data-track-label-source="${trackLabelSource}" data-track-label-is-mirror="${trackLabelIsMirror}" data-track-label-dataset-id="${trackLabelDatasetId || 0}"${phasedTrackAttrs}`
         : "";
-      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} data-app-tooltip="${escapeAttr(layout.label)}" data-app-tooltip-overflow="span" aria-label="${escapeAttr(layout.label)}">
-        <span>${escapeHtml(layout.displayLabel ?? layout.label)}</span>
+      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} data-app-tooltip="${escapeAttr(layout.label)}" data-app-tooltip-overflow=".assembly-track-label-name" aria-label="${escapeAttr(layout.id === "ref" ? `${layout.label} [R]` : layout.label)}">
+        ${renderTrackIdentity(layout.displayLabel ?? layout.label, layout.id === "ref" ? "ref" : layout.role)}
       </div>`;
     })
     .join("");
@@ -2338,7 +2348,8 @@ function renderAssemblyTracks(args) {
     selectedChrName,
     mainViewHistory,
     i18n,
-    leadingControls: `${grtResultControls}${createPhasedTrackButton}`,
+    leadingControls: grtResultControls,
+    editingControls: createPhasedTrackButton,
   });
   const grtResultToastMarkup = grtResultToast?.scope === "main"
     && grtResultToast?.chrName === selectedChrName

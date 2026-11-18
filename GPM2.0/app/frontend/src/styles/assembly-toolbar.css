@@ -1,0 +1,143 @@
+/* Owner: assembly Main / Local toolbar geometry. Group captions are inline, not headings. */
+.assembly-track-inline-controls[data-main-track-toolbar],
+.assembly-track-inline-controls[data-subview-toolbar],
+.subview-window .assembly-track-inline-controls[data-subview-toolbar] {
+  --toolbar-control-size: 32px;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0;
+}
+.assembly-toolbar-group,
+.subview-window [data-subview-toolbar] > .assembly-toolbar-group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  height: var(--toolbar-control-size);
+  min-height: var(--toolbar-control-size);
+  box-sizing: border-box;
+}
+.assembly-toolbar-group + .assembly-toolbar-group {
+  border-inline-start: 1px solid var(--border-subtle, #dbe3ec);
+  padding-inline-start: 10px;
+}
+.assembly-toolbar-group-label {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 3px;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--control-radius, 5px);
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: help;
+}
+.assembly-toolbar-group-label:focus-visible {
+  outline: 2px solid var(--accent, #527ee9);
+  outline-offset: -2px;
+}
+.assembly-toolbar-group-chevron { display: none; }
+.assembly-toolbar-group-content {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(
+  .button, .grt-result-controls, .grt-result-switch, .grt-result-layer-menu, .grt-result-layer-trigger,
+  .assembly-track-inline-field, .assembly-track-select-shell, .assembly-track-combo, .assembly-support-ds-len-settings-button,
+  .main-view-history-controls, .subview-history-controls) {
+  box-sizing: border-box;
+  height: var(--toolbar-control-size);
+  min-height: var(--toolbar-control-size);
+  font-size: var(--font-small);
+  font-weight: 400;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.assembly-track-combo-input, .assembly-track-fixed-select) {
+  box-sizing: border-box;
+  height: calc(var(--toolbar-control-size) - 2px);
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: var(--font-small);
+  font-weight: 400;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-track-combo-toggle {
+  height: calc(var(--toolbar-control-size) - 2px);
+  min-height: 0;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-controls, .subview-history-controls) button {
+  height: 100%;
+  min-height: 0;
+  width: 32px;
+  min-width: 32px;
+  border-radius: 0;
+}
+.assembly-toolbar-group .assembly-support-ds-len-settings-button,
+.assembly-toolbar-group .grt-result-layer-trigger { width: 32px; min-width: 32px; }
+.assembly-toolbar-group .grt-result-switch { border-radius: var(--control-radius, 5px) 0 0 var(--control-radius, 5px); }
+.assembly-toolbar-group .grt-result-layer-trigger { border-radius: 0 var(--control-radius, 5px) var(--control-radius, 5px) 0; }
+.assembly-toolbar-group .assembly-track-inline-field [data-track-combo-field="minIdentityPct"] { width: 70px; min-width: 70px; }
+.assembly-toolbar-group .assembly-track-inline-field [data-track-combo-field="alignmentLength"] { width: 88px; min-width: 88px; }
+.assembly-toolbar-group .assembly-track-inline-field .assembly-track-select-shell.is-support { width: 104px; min-width: 104px; }
+/* Collapsing never duplicates or reparents a control, preserving event ownership. */
+.assembly-toolbar-group[data-toolbar-compact] > .assembly-toolbar-group-label { cursor: pointer; }
+.assembly-toolbar-group[data-toolbar-compact] > .assembly-toolbar-group-label:hover { background: var(--surface-subtle, #f8fafc); }
+.assembly-toolbar-group[data-toolbar-compact] .assembly-toolbar-group-chevron { display: inline; }
+.assembly-toolbar-group[data-toolbar-compact] > .assembly-toolbar-group-content { display: none; }
+.assembly-toolbar-group[data-toolbar-compact][data-toolbar-group-open] > .assembly-toolbar-group-content {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  position: fixed;
+  z-index: 80;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: 10px;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px);
+  background: var(--surface-panel, #fff);
+  box-shadow: 0 4px 16px #0002;
+  white-space: normal;
+}
+.assembly-toolbar-group[data-toolbar-compact] .assembly-track-inline-field { justify-content: space-between; }
+.subview-header-tools { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 4px; }
+.subview-panel-head > .assembly-view-title,
+.subview-header-tools .button,
+.subview-window .subview-window-heading,
+.subview-window .subview-window-heading button,
+.subview-window .subview-window-actions button { height: 32px; min-height: 32px; }
+.subview-window .subview-window-actions button { width: 32px; flex-basis: 32px; }
+.subview-panel-head, .subview-window .subview-panel-head.subview-window-header { align-items: center; }
+.assembly-view-navigation { flex-wrap: nowrap; }
+.assembly-view-navigation .view-nav-group-label { flex: 0 0 auto; }
+.assembly-view-navigation :is(.view-nav-button, .view-nav-fit) { height: 32px; min-height: 32px; }
+.assembly-view-navigation .view-nav-range { flex: 1 1 240px; min-width: 100px; }
+/* Only the name shrinks. Roles remain visible at the right edge in both views. */
+.assembly-track-label-row > .assembly-track-label-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.assembly-track-label-row > .assembly-track-role-marker {
+  flex: 0 0 auto;
+  max-width: none;
+  overflow: visible;
+  margin-inline-start: 4px;
+  white-space: nowrap;
+}

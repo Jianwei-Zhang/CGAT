@@ -874,7 +874,7 @@ test("mirror track label is selectable and support mother selection does not aut
   );
   assert.match(
     selectedHtml,
-    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*>\s*<span>\[辅\] flye<\/span>/,
+    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*>\s*<span class="assembly-track-label-name">flye<\/span><span class="assembly-track-role-marker" aria-hidden="true">\[A\]<\/span>/,
   );
   assert.doesNotMatch(
     selectedHtml,
@@ -933,7 +933,7 @@ test("subview support track selection highlights only the matching dataset/sourc
 
   assert.match(
     html,
-    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*data-track-label-source="mother"[^>]*data-track-label-dataset-id="22"[^>]*>\s*<span>\[辅\] flye<\/span>/,
+    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*data-track-label-source="mother"[^>]*data-track-label-dataset-id="22"[^>]*>\s*<span class="assembly-track-label-name">flye<\/span><span class="assembly-track-role-marker" aria-hidden="true">\[A\]<\/span>/,
   );
   assert.doesNotMatch(
     html,
@@ -1399,7 +1399,7 @@ test("subview track-pair keeps ref track bars and labels on the ref gray palette
     }),
   );
 
-  assert.match(html, /<div class="assembly-track-label-row is-ref"[^>]*><span>ref_chr1<\/span><\/div>/);
+  assert.match(html, /<div class="assembly-track-label-row is-ref"[^>]*><span class="assembly-track-label-name">ref_chr1<\/span><span class="assembly-track-role-marker" aria-hidden="true">\[R\]<\/span><\/div>/);
   assert.match(html, /data-subview-track-slot="top"[\s\S]*class="track-ctg subview-track-ctg is-ref"/);
   assert.match(html, /<text class="track-ctg-label[^"]*is-ref[^"]*"[^>]*data-subview-label-slot="top"/);
 });

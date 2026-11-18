@@ -7,13 +7,13 @@ import { renderShellSelect, syncShellSelect } from "./shell-select-runtime.js";
 export const ALL_PARTITIONS = "__all__";
 export const assemblyNavigationVisible = state => state.activeRoute === "assembly";
 const labels = state => state.locale === "en" ? {
-  partition: "Partition", project: "Project", chr: "Chr", all: "All projects", unassigned: "Unpartitioned",
-  empty: "No projects in this partition", chooseProject: "Choose project", chooseChr: "Choose chromosome", current: "Current project · outside this filter",
-  switchFailed: "Unable to switch. The current project has been kept.",
+  partition: "Project", project: "Assembly", chr: "Chr", all: "All projects", unassigned: "Unassigned",
+  empty: "No assemblies in this project", chooseProject: "Choose assembly", chooseChr: "Choose chromosome", current: "Current assembly · outside this project",
+  switchFailed: "Unable to switch. The current assembly has been kept.",
 } : {
-  partition: "分区", project: "项目", chr: "Chr", all: "全部项目", unassigned: "未分区",
-  empty: "此分区暂无项目", chooseProject: "选择项目", chooseChr: "选择染色体", current: "当前项目 · 不在所选分区内",
-  switchFailed: "切换失败，已保留当前项目。",
+  partition: "项目", project: "组装", chr: "Chr", all: "全部项目", unassigned: "未分配",
+  empty: "此项目暂无组装", chooseProject: "选择组装", chooseChr: "选择染色体", current: "当前组装 · 不在所选项目内",
+  switchFailed: "切换失败，已保留当前组装。",
 };
 const escape = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const samePath = (a, b) => workspacePathIdentity(a) === workspacePathIdentity(b);

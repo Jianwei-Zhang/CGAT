@@ -695,7 +695,7 @@ test("project export page hides log action and stats when any final path contain
   assert.match(html, /data-project-export-action="all"/);
   assert.doesNotMatch(html, /data-project-export-action="log"/);
   assert.doesNotMatch(html, /project-export-summary-line/);
-  assert.match(html, /项目统计和日志导出已关闭/);
+  assert.match(html, /组装统计和日志导出已关闭/);
   assert.doesNotMatch(html, /已使用主组装 Contig 数量/);
 });
 
@@ -1979,7 +1979,7 @@ test("detail card defaults collapsed and remembers expansion while preserving it
   };
   const store = { getState: () => state, setState(next) { state = next; } };
   bindProjectExportPage(host, store);
-  assert.match(host.innerHTML, /id="project-export-detail-title">项目明细/);
+  assert.match(host.innerHTML, /id="project-export-detail-title">组装明细/);
   assert.match(host.innerHTML, /aria-expanded="false"[\s\S]*?展开/);
   assert.match(host.innerHTML, /id="project-export-detail-body"[^>]* hidden/);
   const click = async () => {
@@ -2145,7 +2145,7 @@ test("continuous content mutation settles with a bounded retry/error and can be 
     getProjectOverviewSources: async () => { reads++; mutateProjectData(h.store, "auto_orient_contigs"); return overviewSources(); },
   }), false);
   assert.equal(reads, 3); assert.equal(h.store.getState().projectExport.loading, false);
-  assert.match(h.store.getState().projectExport.error, /项目内容发生变化/);
+  assert.match(h.store.getState().projectExport.error, /组装内容发生变化/);
   assert.equal(await __test.loadProjectExportData(h.host, h.store, exportDataDeps(freshOverviewPaths())), true);
   assert.equal(h.store.getState().projectExport.error, "");
 });

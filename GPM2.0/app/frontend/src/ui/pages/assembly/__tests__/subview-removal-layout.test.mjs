@@ -267,10 +267,10 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
       const rows = [...column.matchAll(/<div class="assembly-track-label-row[^>]*>/g)];
       assert.equal(rows.length, 2);
       for (const [tag] of rows) {
-        assert.equal(attr(tag, "data-app-tooltip-overflow"), "span");
+        assert.equal(attr(tag, "data-app-tooltip-overflow"), mode === "track-pair" ? ".assembly-track-label-name" : "span");
         assert.ok(attr(tag, "data-app-tooltip"));
         assert.equal(attr(tag, "aria-label"), attr(tag, "data-app-tooltip"));
-        assert.ok(column.includes(`${tag}<span>`));
+        assert.ok(column.includes(`${tag}<span${mode === "track-pair" ? ' class="assembly-track-label-name"' : ""}>`));
         assert.doesNotMatch(tag, /\stitle=/);
       }
     });

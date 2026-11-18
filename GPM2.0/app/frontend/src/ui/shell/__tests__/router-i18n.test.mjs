@@ -212,7 +212,7 @@ test("router restores cached assembly DOM when returning to the same project", (
       return state;
     },
     setState(nextState) {
-      state = nextState;
+      state = { ...state, ...nextState };
     },
   };
   const routeHost = createRouteHost();
@@ -222,11 +222,11 @@ test("router restores cached assembly DOM when returning to the same project", (
     renderCurrentRoute(root, store);
     const firstAssemblyNode = routeHost.childNodes[0];
 
-    state = createRoutableState("workspace");
+    state = { ...state, activeRoute: "workspace" };
     renderCurrentRoute(root, store);
     assert.notEqual(routeHost.childNodes[0], firstAssemblyNode);
 
-    state = createRoutableState("assembly");
+    state = { ...state, activeRoute: "assembly" };
     renderCurrentRoute(root, store);
 
     assert.equal(routeHost.childNodes[0], firstAssemblyNode);

@@ -26,6 +26,7 @@ export function bindSubviewWorkspace(host, store, deps) {
   }
   if (installSubviewWorkspace(store) || usedNative !== Boolean(store.getState().assembly?.subviewNativeWindows)) runtime.render();
   else runtime.bind();
+  runtime.resume();
   return runtime;
 }
 
@@ -311,6 +312,22 @@ function createRuntime(root, store, deps) {
     syncChrome();
   }
 
+  function resume() {
+    const state = store.getState();
+    if (destroyed || state.activeRoute !== "assembly" || state.assembly?.loading) return;
+    for (const item of state.assembly?.subviewWorkspace?.windows || []) {
+      if (item.opened === false || item.minimized) continue;
+      const node = windowNode(item.id);
+      if (!node || node.isConnected === false) continue;
+      const scoped = getSubviewWindowStore(store, item.id);
+      // Cached DOM may still contain a loading scrim even though its scoped
+      // evidence completed off-screen. Refresh only that stale window.
+      if (!matches(node, scoped) || node.querySelector?.("[data-subview-render-incomplete]")) deps.refresh(node, scoped);
+      const evidence = scoped.getState().assembly?.subview?.pairwiseEvidence;
+      if (!evidence || evidence.status === "loading") void deps.refreshEvidence?.(node, scoped);
+    }
+  }
+
   function render() {
     if (rendering || destroyed) return;
     const current = section();
@@ -471,7 +488,7 @@ function createRuntime(root, store, deps) {
     if (node && store.getState().assembly?.subviewWorkspace?.activeId !== node.dataset.localViewWindow)
       activate(node.dataset.localViewWindow);
   }
-  return { root, render, bind, syncChrome, windowNode,
+  return { root, render, bind, resume, syncChrome, windowNode,
     markRendered(id) {
       const node = windowNode(id);
       if (node) rendered.set(node, capture(getSubviewWindowStore(store, id)));

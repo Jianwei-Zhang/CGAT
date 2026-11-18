@@ -159,6 +159,18 @@ export function createSubviewInteractionController({
   }
 
   async function copySubviewAnchorWithOffset(host, store, sourceEdge) {
+    const initial = store.getState();
+    const initialSummary = initial.assembly?.subview?.summary;
+    const owner = JSON.stringify([initial.session?.workspacePath, initial.session?.projectId,
+      initial.assembly?.selectedChrName, buildSubviewAnchorStateKey(initialSummary)]);
+    const currentOwner = () => {
+      const state = store.getState();
+      return store.isLocalViewAlive?.() !== false
+        && (!state.activeRoute || state.activeRoute === "assembly")
+        && state.assembly?.subview?.summary === initialSummary
+        && JSON.stringify([state.session?.workspacePath, state.session?.projectId,
+          state.assembly?.selectedChrName, buildSubviewAnchorStateKey(state.assembly?.subview?.summary)]) === owner;
+    };
     const suggestion = deriveSubviewAnchorOffsetSuggestion(
       sourceEdge,
       sourceEdge?.activeOriginalEdges,
@@ -168,7 +180,7 @@ export function createSubviewInteractionController({
       defaultValue: suggestion.ok ? suggestion.offsetBp : "",
       sourceEdge,
     });
-    if (!promptResult) {
+    if (!promptResult || !currentOwner()) {
       return;
     }
     const direction = String(promptResult.direction || "").trim();

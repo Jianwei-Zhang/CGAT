@@ -50,7 +50,7 @@ test("titles and menus use Title Case while minor field labels retain sentence c
   assert.equal(assembly.contextMenu.addToSubviewTop, "Top Track", "submenu destinations use Title Case");
   assert.equal(assembly.subview.tools.compositionManager.lanes.top, "Top Track", "the actual lane value stays Title Case");
   assert.equal(assembly.trackControls.unconfigured, "Not Configured");
-  assert.equal(workspace.buttons.createProject, "Create project");
+  assert.equal(workspace.buttons.createProject, "Create assembly");
   assert.equal(workspace.cards.primaryDataset, "Primary dataset");
   assert.equal(APP_SETTINGS_COPY.en.title, "App Settings");
   assert.equal(APP_SETTINGS_COPY.en.system, "Follow System");
@@ -73,7 +73,7 @@ test("Chinese controls use the approved full names rather than exposing source-f
 
 test("user identifiers and names remain verbatim inside the recased system copy", () => {
   const projectName = "my_ds.ctg_LEN_miXeD", chrName = "NC_141021.1", dataset = "ds ctg MiXeD Dataset";
-  assert.equal(t("en", "workspace.cards.selectedProject", { projectName }), `Selected Project: ${projectName}`);
+  assert.equal(t("en", "workspace.cards.selectedProject", { projectName }), `Selected Assembly: ${projectName}`);
   assert.equal(t("en", "assembly.trackControls.supportTrackLabelWithName", { name: dataset }), `Auxiliary Dataset Track (${dataset})`);
   const state = createState({ locale: "en", session: { projectName }, assembly: {
     selectedChrName: chrName, chromosomes: [{ chrName, chrOrder: 1, ctgCount: 1, placedBp: 100 }],

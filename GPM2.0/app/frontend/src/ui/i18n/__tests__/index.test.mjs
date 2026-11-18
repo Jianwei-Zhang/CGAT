@@ -21,8 +21,8 @@ test("getLocale resolves locale from state or raw locale input", () => {
 test("getMessages returns the domain catalog for zh and en", () => {
   assert.equal(getMessages({ locale: "zh" }, "shell").title, "装配工作台");
   assert.equal(getMessages({ locale: "en" }, "shell").title, "Assembly Workbench");
-  assert.equal(getMessages({ locale: "zh" }, "shell").workspace, "项目");
-  assert.equal(getMessages({ locale: "en" }, "shell").workspace, "Project");
+  assert.equal(getMessages({ locale: "zh" }, "shell").workspace, "组装");
+  assert.equal(getMessages({ locale: "en" }, "shell").workspace, "Assembly");
 });
 
 test("t resolves nested keys for zh and en", () => {
@@ -33,11 +33,11 @@ test("t resolves nested keys for zh and en", () => {
 test("t interpolates named variables", () => {
   assert.equal(
     t("en", "workspace.cards.selectedProject", { projectName: "demo" }),
-    "Selected Project: demo",
+    "Selected Assembly: demo",
   );
   assert.equal(
     t("zh", "workspace.cards.selectedProject", { projectName: "demo" }),
-    "已选择项目：demo",
+    "已选择组装：demo",
   );
 });
 

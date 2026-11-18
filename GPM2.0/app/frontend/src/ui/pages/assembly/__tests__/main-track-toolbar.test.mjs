@@ -33,27 +33,27 @@ for (const locale of ["zh", "en"]) test(`main toolbar contains parameters only a
   const toolbar = header.children[0];
   assert.equal(header.children.length, 1);
   assert.ok(Object.hasOwn(toolbar.attrs, "data-main-track-toolbar"));
-  assert.deepEqual(toolbar.children.map(node => node.attrs["data-assembly-popup"] === "members" ? "members" : node.attrs["data-grt-result-controls"] ? "precomputed"
-    : node.attrs["data-create-phased-track"] ? "phase" : node.attrs.class), [
-    "precomputed", "phase", "assembly-marker-display", "assembly-track-inline-field", "assembly-track-inline-field",
-    "assembly-track-inline-field", "assembly-track-inline-field", "main-view-history-controls",
-  ]);
+  assert.deepEqual(toolbar.children.map(node => node.attrs["data-toolbar-group"]), ["display", "filter", "edit"]);
+  const contents = toolbar.children.map(group => group.children.find(node => Object.hasOwn(node.attrs, "data-toolbar-group-content")));
+  assert.ok(contents[0].children.some(node => node.attrs["data-grt-result-controls"] === "main"));
+  assert.ok(contents[2].children.some(node => node.attrs["data-create-phased-track"]));
+  assert.ok(contents[2].children.some(node => node.attrs.class === "main-view-history-controls"));
   assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
   assert.doesNotMatch(html, /id="assembly-chr-picker-toggle"/);
   assert.doesNotMatch(html, /data-members-card-toggle="1"/);
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
-test("CSS left-aligns Main controls with functional spacing and whole-field wrapping; Local View retains its layout", () => {
+test("CSS aligns Main and Local controls in one row with inline group captions", () => {
   const css = readStylesheetTree(new URL("../../../../styles/assembly.css", import.meta.url));
   assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\],\s*\.subview-panel-head\s*\{[^}]*flex-wrap: nowrap;[^}]*align-items: flex-start;[^}]*justify-content: flex-start;/);
   assert.match(css, /:is\(\.assembly-track-panel-head\[data-main-view-header\], \.subview-panel-head\) > \.assembly-view-title\s*\{[^}]*flex: none;[^}]*white-space: nowrap;/);
-  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*justify-content: flex-end;[^}]*justify-content: safe flex-end;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
-  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex: 1 1 0;[^}]*width: auto;[^}]*min-width: 0;/);
-  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*justify-content: flex-start;[^}]*column-gap: 12px;[^}]*row-gap: 8px;/);
-  assert.match(css, /\[data-main-track-toolbar\] > \.assembly-marker-display[^}]*margin-inline-end: 8px/);
-  assert.match(css, /\[data-main-track-toolbar\] > \.main-view-history-controls[^}]*margin-inline-start: 8px/);
-  assert.match(css, /:is\(\[data-main-track-toolbar\], \[data-subview-toolbar\]\) > \*\s*\{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/);
+  const grouped = readFileSync(new URL("../../../../styles/assembly-toolbar.css", import.meta.url), "utf8");
+  assert.match(grouped, /flex-wrap: nowrap;/);
+  assert.match(grouped, /--toolbar-control-size: 32px;/);
+  assert.match(grouped, /\.assembly-toolbar-group \+ \.assembly-toolbar-group\s*\{[^}]*border-inline-start:/);
+  assert.match(grouped, /\.assembly-toolbar-group-label\s*\{[^}]*font-size: 12px;[^}]*font-weight: 400;/);
+  assert.match(grouped, /\[data-toolbar-compact\] > \.assembly-toolbar-group-content \{ display: none; \}/);
   assert.match(css, /\.assembly-main-scope-title\s*\{[^}]*flex: 0 1 auto;[^}]*min-width: 0;[^}]*max-width: min\(36ch, 50%\);/);
   assert.match(css, /\.assembly-members-panel-inline\s*\{[^}]*margin-inline-end: auto;/);
   assert.doesNotMatch(css, /data-main-track-control-layout|assembly-track-panel-quick-actions/);
@@ -137,7 +137,7 @@ test("both parameter bars share fixed popup placement and local-only hosts can b
   f.setOpen(true);
   f.events.get("scroll")();
   assert.equal(f.panel.style.position, "fixed");
-  assert.ok(queried.every(selector => selector.startsWith(`${ALIGNMENT_TOOLBAR_SELECTOR} `)));
+  assert.ok(queried.every(selector => selector === "[data-toolbar-group]" || selector.startsWith(`${ALIGNMENT_TOOLBAR_SELECTOR} `)));
   const bindings = readFileSync(new URL("../bindings.js", import.meta.url), "utf8");
   assert.equal(bindings.match(/comboNode\.closest\?\.\(ALIGNMENT_TOOLBAR_SELECTOR\)/g)?.length, 2);
 });

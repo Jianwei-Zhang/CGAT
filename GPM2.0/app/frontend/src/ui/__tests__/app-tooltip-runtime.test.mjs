@@ -194,7 +194,7 @@ test("keyboard focus is immediate, preserves existing descriptions and Escape do
 });
 
 test("disabled buttons keep their explanation without changing disabled state or requiring a click", () => {
-  const h = tooltipFixture(), node = target(h, "Open a project first"); node.setAttribute("disabled", "");
+  const h = tooltipFixture(), node = target(h, "Open an assembly first"); node.setAttribute("disabled", "");
   h.fire("pointermove", node); assert.equal(hidden(h), false);
   assert.equal(node.hasAttribute("disabled"), true);
 });

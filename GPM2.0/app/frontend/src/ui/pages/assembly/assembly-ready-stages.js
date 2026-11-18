@@ -22,7 +22,8 @@ function scopeGuard(store, state, request, table = details) {
   const view = currentAssemblyViewRequest(store);
   return () => {
     const next = store.getState();
-    return table.get(store) === request && currentAssemblyViewRequest(store) === view
+    return store.isLocalViewAlive?.() !== false
+      && table.get(store) === request && currentAssemblyViewRequest(store) === view
       && next.session?.workspacePath === state.session?.workspacePath
       && next.session?.projectId === state.session?.projectId
       && next.activeRoute === state.activeRoute
@@ -122,14 +123,8 @@ export function resumeAssemblyReadyStages(host, store, deps) {
   const resumeRaw=rawMissing.some(member=>member.referenceEvidence?.status !== "error");
   if (((assembly.subviewRestoring && assembly.subviewRestoringSummary === assembly.subview?.summary) || resumeRaw)
     && !(evidence?.active && evidence.current())) {
-    // A discarded request must not be mistaken for a still-running controller
-    // request merely because its cached evidence has status=loading.
-    if (assembly.subview?.pairwiseEvidence?.status === "loading") {
-      const latest = store.getState().assembly;
-      store.setState({ assembly: { ...latest, subview: { ...latest.subview,
-        pairwiseEvidence: { ...latest.subview.pairwiseEvidence, status: "idle", requestKey: "" },
-      } } });
-    }
+    // Pairwise controller owns live-request detection. Do not clear a loading
+    // key here: a scoped window may already have resumed that same query.
     tasks.push(restoreAssemblyLocalEvidence(host, store, deps, { afterPaint: true }));
   }
   return Promise.all(tasks);

@@ -106,6 +106,22 @@ export function invalidateAssemblyDomCache(state) {
   }
 }
 
+function assemblyDomIdentity(state) {
+  const a = state?.assembly || {};
+  return [a.selectedChrName, a.supportDatasetId, a.loading, a.sourceEditingReloadRequired,
+    a.chrCtgs, a.supportChrCtgs, a.refTrackMembers, a.phasedChrTracks, a.deletedCtgs,
+    a.trackView, a.trackDragOffsets, a.selectedCtgId, a.trackSelectedCtgIds,
+    a.hiddenPrimaryCtgIds, a.finalPathByChr, a.finalPathViewMode]
+    .map(value => Array.isArray(value) && value.length === 0 ? null : value);
+}
+
+function captureAssemblyScroll(host) {
+  const nodes = [...(host?.querySelectorAll?.(".assembly-track-scroll, .subview-window-content") || [])];
+  const page = host?.ownerDocument?.scrollingElement;
+  if (page) nodes.push(page);
+  return nodes.map(node => ({ node, left: Number(node.scrollLeft) || 0, top: Number(node.scrollTop) || 0 }));
+}
+
 export function rememberAssemblyDom(host, state, options = {}) {
   hideImmediateTooltips(host);
   const key = String(host?.dataset?.assemblyDomCacheKey || buildAssemblyDomCacheKey(state));
@@ -121,7 +137,8 @@ export function rememberAssemblyDom(host, state, options = {}) {
     }
     return false;
   }
-  return touchEntry(assemblyDomCache, key, { nodes, graphFontSize: getGraphFontSize() }, options.maxEntries);
+  return touchEntry(assemblyDomCache, key, { nodes, graphFontSize: getGraphFontSize(),
+    identity: assemblyDomIdentity(state), scroll: captureAssemblyScroll(host) }, options.maxEntries);
 }
 
 export function restoreAssemblyDom(host, state) {
@@ -130,8 +147,15 @@ export function restoreAssemblyDom(host, state) {
   if (!host || cached?.graphFontSize !== getGraphFontSize() || !cached?.nodes?.length || typeof host.replaceChildren !== "function") {
     return false;
   }
+  // Do not expose cached Chr/object DOM when an off-route mutation changed its
+  // owner. A full render from current state is the authoritative fallback.
+  const identity = assemblyDomIdentity(state);
+  if (!cached.identity?.every((value, index) => value === identity[index])) return false;
   hideImmediateTooltips(host);
   host.replaceChildren(...cached.nodes);
+  for (const { node, left, top } of cached.scroll || []) {
+    node.scrollLeft = left; node.scrollTop = top;
+  }
   if (host.dataset) {
     host.dataset.route = "assembly";
     host.dataset.assemblyDomCacheKey = key;

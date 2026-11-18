@@ -1,3 +1,4 @@
+import { bindToolbarGroups } from "./toolbar-groups-runtime.js";
 import { MAIN_TRACK_TITLE_LAYOUT_EVENT } from "./main-track-title-layout-runtime.js";
 import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 
@@ -9,10 +10,12 @@ const TOOLBAR = ALIGNMENT_TOOLBAR_SELECTOR;
 // placement follows resize/scroll; wrapping and reading order remain CSS-owned.
 export function bindMainTrackToolbarPopups(host) {
   host = host?.closest?.("#route-host") || host;
-  if (host?.[BOUND]) { host[BOUND].sync(); return; }
+  if (host?.[BOUND]) { bindToolbarGroups(host); host[BOUND].sync(); return; }
   if (!host?.addEventListener || !host.querySelector?.(TOOLBAR)) return;
+  const destroyGroups = bindToolbarGroups(host);
   const win = host.ownerDocument?.defaultView || globalThis.window;
   const destroy = () => {
+    destroyGroups();
     host.removeEventListener?.(MAIN_TRACK_TITLE_LAYOUT_EVENT, sync);
     host.removeEventListener?.("scroll", sync, true);
     host.removeEventListener?.("toggle", sync, true);
