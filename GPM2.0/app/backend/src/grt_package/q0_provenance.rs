@@ -301,9 +301,23 @@ pub(super) fn validate_q0(
     for (path, hash) in &selection.artifact_hashes {
         validate_artifact(root, path, hash, "q0 raw evidence")?;
     }
+    // Later add-dataset operations extend the project, not this locked q0
+    // input set. The recipe itself is a hash-bound frozen artifact above.
+    let recipe = one_row(tables, "metadata/grt_recipe.tsv")?;
+    let mut initial_datasets = json_string_list(
+        field(recipe, "support_datasets_json")?,
+        "recipe.support_datasets_json",
+    )?
+    .into_iter()
+    .collect::<HashSet<_>>();
+    initial_datasets.insert(field(recipe, "primary_dataset")?.to_string());
     let expected_fastas = table(tables, "metadata/datasets.tsv")?
         .rows
         .iter()
+        .filter(|row| {
+            row.get("dataset_name")
+                .is_some_and(|name| initial_datasets.contains(name))
+        })
         .map(|row| {
             Ok((
                 field(row, "dataset_name")?.to_string(),
@@ -311,8 +325,10 @@ pub(super) fn validate_q0(
             ))
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
-    if freeze.source_fastas != expected_fastas {
-        return invalid("q0 source FASTA inventory differs from dataset registry");
+    if expected_fastas.keys().cloned().collect::<HashSet<_>>() != initial_datasets
+        || freeze.source_fastas != expected_fastas
+    {
+        return invalid("q0 source FASTA inventory differs from locked recipe datasets");
     }
 
     let q_rows = &table(tables, "metadata/grt_q_segments.tsv")?.rows;
@@ -464,7 +480,11 @@ pub(super) fn validate_q0(
             );
         }
     }
-    if frozen_sources.len() != sources.len() || !occupied.is_empty() {
+    let initial_sources = sources
+        .keys()
+        .filter(|(dataset, _)| initial_datasets.contains(dataset))
+        .collect::<HashSet<_>>();
+    if frozen_sources.keys().collect::<HashSet<_>>() != initial_sources || !occupied.is_empty() {
         return invalid("q0 freeze does not cover original sources");
     }
     let members = &table(tables, "metadata/grt_donor_members.tsv")?.rows;

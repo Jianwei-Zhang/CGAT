@@ -26,7 +26,7 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
         path.chmod(0o755)
         return path
 
-    def make_server(self, root: Path):
+    def make_server(self, root: Path, *, assignment_variant="normal"):
         helper = step23_fixture.GrtRepairStagesTests(
             "test_fixed_d0_step2_step3_interval_usage_replay_and_resume"
         )
@@ -70,6 +70,16 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
                 "anchor_start": 1,
             }
         )
+        # Install metadata variants before the current q0 freeze. Finalized
+        # schema-3 evidence must not be edited to manufacture an assignment.
+        assigned = assignments[-1]
+        if assignment_variant == "signed":
+            assigned["anchor_start"] = "-205687"
+            assignments.append({**assigned, "assigned_chr_name": "Chr02", "anchor_start": "-172703"})
+        elif assignment_variant == "cross_chr":
+            assigned["assigned_chr_name"] = "Chr02"
+        elif assignment_variant != "normal":
+            raise ValueError(assignment_variant)
         prepare_fixture.write_tsv(
             server / "metadata/chr_assignments.tsv",
             [
@@ -91,6 +101,10 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
             handle.write(
                 "s_tel_assigned\t20000\t0\t20000\t+\tChr01\t60000\t0\t20000\t20000\t20000\t60\n"
             )
+        if assignment_variant == "signed":
+            with (server / "runs/support_vs_ref/result.paf").open("a", encoding="utf-8") as handle:
+                handle.write("s_tel_assigned\t20000\t1000\t20000\t+\tChr02\t60000\t100\t19100"
+                             "\t19000\t19000\t60\tcg:Z:19000M\n")
         from server.tests.q0_test_support import seed_q0_evidence
         seed_q0_evidence(server)
         completed = subprocess.run(

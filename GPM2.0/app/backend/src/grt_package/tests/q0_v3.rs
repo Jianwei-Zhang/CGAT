@@ -239,3 +239,36 @@ fn source_free_event_cannot_be_forged_into_an_accepted_source_edit() {
     let error = validate_grt_package(temp.path()).unwrap_err().to_string();
     assert!(error.contains("requires source provenance"), "{error}");
 }
+
+#[test]
+fn later_project_dataset_does_not_join_the_locked_q0_input_set() {
+    let temp = materialize();
+    let fixture: Value = serde_json::from_slice(
+        &fs::read(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/grt_contract_v3/post_freeze_dataset.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let freeze_path = temp.path().join("metadata/grt_q0_freeze.json");
+    let before = fs::read(&freeze_path).unwrap();
+    for (name, text) in fixture["append"].as_object().unwrap() {
+        let path = temp.path().join(name);
+        let content = fs::read_to_string(&path).unwrap() + text.as_str().unwrap();
+        fs::write(path, content).unwrap();
+    }
+    for (name, text) in fixture["files"].as_object().unwrap() {
+        fs::write(temp.path().join(name), text.as_str().unwrap()).unwrap();
+    }
+    validate_grt_package(temp.path()).unwrap();
+    assert_eq!(fs::read(&freeze_path).unwrap(), before);
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(temp.path()).unwrap();
+    let recipe = load_grt_locked_recipe(&outcome.project_db_path).unwrap();
+    assert_eq!(recipe.primary_dataset, "only");
+    edit_json(temp.path(), "metadata/grt_q0_freeze.json", |data| {
+        data["source_fastas"]["later"] = Value::String("data/datasets/later.fa".to_string());
+    });
+    let error = validate_grt_package(temp.path()).unwrap_err().to_string();
+    assert!(error.contains("locked recipe datasets"), "{error}");
+}

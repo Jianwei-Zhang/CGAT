@@ -12,8 +12,7 @@ from unittest import mock
 
 from server.tests import test_run_all_runner as runner_fixtures
 from server.tests import test_run_outer_checkpoints as checkpoint_fixtures
-from server.tools.run_outer_checkpoints import OuterCheckpointManager
-from server.tools.run_orchestration import OrchestrationContractError
+from server.tools.run_outer_checkpoints import OuterCheckpointManager, OrchestrationContractError
 from server.tools.alignment_tasks import load_tasks
 from server.tools import lgz_evidence_package
 
@@ -278,7 +277,7 @@ class Q0SchedulingTests(unittest.TestCase):
                 valid, reason = manager.validate(prepared)
                 self.assertTrue(valid, reason)
                 (run_dir / "ds_vs_self/result.paf").unlink()
-                with self.assertRaises(OrchestrationContractError):
+                with self.assertRaisesRegex(OrchestrationContractError, "alignment output is missing"):
                     manager.commit(prepared)
 
 

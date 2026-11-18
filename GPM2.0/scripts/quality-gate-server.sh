@@ -23,8 +23,8 @@ require_cmd bash
 require_cmd python3
 
 if [[ "${GPM_SKIP_GRT_SERVER_APP_E2E:-0}" != "1" ]]; then
-  require_cmd cargo
-  require_cmd node
+  if [[ -z "${GPM_GRT_E2E_BACKEND_EXE:-}" ]]; then require_cmd cargo; fi
+  require_cmd "${GPM_GRT_E2E_NODE:-node}"
   require_cmd zip
 fi
 

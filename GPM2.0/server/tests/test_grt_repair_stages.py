@@ -1836,7 +1836,12 @@ else:
     def test_optimized_cold_step2_step3_keep_candidates_rejections_and_decisions(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
-            servers = {profile: self.make_server(root / profile) for profile in ("baseline", "optimized")}
+            # Compare execution profiles on the same frozen q0/input identity,
+            # not on two independently prepared runs with different evidence IDs.
+            seed = self.make_server(root / "input")
+            servers = {profile: root / profile / "gpm_server" for profile in ("baseline", "optimized")}
+            for server in servers.values():
+                shutil.copytree(seed, server)
             tools = self.make_tools(root)
             env = os.environ.copy()
             env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")

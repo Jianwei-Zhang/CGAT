@@ -193,9 +193,14 @@ def validate_prepared_q0(root: Path, *, source_root: Path | None = None, expecte
     required_artifacts.update(row[field] for row in donor_sets for field in ("fasta_relpath", "manifest_relpath"))
     if set(frozen["artifacts"]) != required_artifacts:
         raise Q0EvidenceError("incomplete frozen artifact inventory")
-    expected_fastas = {row["dataset_name"]: row["fasta_relpath"] for row in read_tsv(resolve("metadata/datasets.tsv"))}
-    if frozen["source_fastas"] != expected_fastas:
-        raise Q0EvidenceError("q0 source FASTA inventory differs from dataset registry")
+    # Added project datasets are not retroactive inputs to the locked q0 run.
+    # The frozen recipe hash below prevents silently changing that input set.
+    recipe = read_tsv(resolve("metadata/grt_recipe.tsv"))[0]
+    initial_datasets = {recipe["primary_dataset"], *json.loads(recipe["support_datasets_json"])}
+    expected_fastas = {row["dataset_name"]: row["fasta_relpath"] for row in read_tsv(resolve("metadata/datasets.tsv"))
+                       if row["dataset_name"] in initial_datasets}
+    if set(expected_fastas) != initial_datasets or frozen["source_fastas"] != expected_fastas:
+        raise Q0EvidenceError("q0 source FASTA inventory differs from locked recipe datasets")
     for relative, digest in frozen["artifacts"].items():
         if sha256_file(resolve(relative)) != digest:
             raise Q0EvidenceError(f"q0 frozen artifact changed: {relative}")

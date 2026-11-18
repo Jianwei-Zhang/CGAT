@@ -171,10 +171,16 @@ PYZIP
 chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/zip" \
   "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords"
 
-repeat_base() {
-  local base="$1"
-  local count="$2"
-  awk -v base="$base" -v count="$count" 'BEGIN { for (i = 0; i < count; i += 1) printf "%s", base; printf "\n" }'
+fixture_sequence() {
+  # Controlled, matching prefixes of one non-repetitive reference. This tests
+  # add/import orchestration, not acceptance of low-complexity q0 anchors.
+  python3 - "$1" "${2:-0}" <<'PYSEQ'
+import random
+import sys
+length, offset = map(int, sys.argv[1:])
+rng = random.Random(831)
+print("".join(rng.choice("ACGT") for _ in range(length + offset))[offset:])
+PYSEQ
 }
 
 write_fasta() {
@@ -200,10 +206,10 @@ final_fa="${TMP_DIR}/gap.final.fa"
 output_root="${TMP_DIR}/gpm_server"
 export GPM_TEST_MINIMAP_LOG="${TMP_DIR}/minimap2.log"
 
-write_fasta "$ref" "Chr01" "$(repeat_base A 2000)"
-write_fasta "$ds1" "ds1_ctg" "$(repeat_base A 1200)"
-write_fasta "$ds2" "ds2_ctg" "$(repeat_base A 1000)"
-write_fasta "$final_fa" "old_gap_name" "$(repeat_base A 400)NNNNNNNNNN$(repeat_base A 590)"
+write_fasta "$ref" "Chr01" "$(fixture_sequence 2000)"
+write_fasta "$ds1" "ds1_ctg" "$(fixture_sequence 1200)"
+write_fasta "$ds2" "ds2_ctg" "$(fixture_sequence 1000)"
+write_fasta "$final_fa" "old_gap_name" "$(fixture_sequence 400)NNNNNNNNNN$(fixture_sequence 590 410)"
 
 PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
   --ref ref_add_ctg "$ref" \

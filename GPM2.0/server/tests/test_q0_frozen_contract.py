@@ -33,6 +33,20 @@ class FrozenQ0ContractTests(unittest.TestCase):
         self.assertEqual(summary["schema_version"], "3")
         validate_prepared_q0(self.root)
 
+    def test_later_dataset_is_not_added_to_locked_q0_or_donors(self):
+        fixture = json.loads((FIXTURE.parent / "post_freeze_dataset.json").read_text())
+        frozen_bytes = (self.root / FREEZE).read_bytes()
+        for relative, text in fixture["append"].items():
+            path = self.root / relative
+            path.write_text(path.read_text() + text)
+        materialize(fixture, self.root)
+        self.assertEqual(validate_contract(self.root)["datasets"], 2)
+        self.assertEqual((self.root / FREEZE).read_bytes(), frozen_bytes)
+        # Project addition is legal; silently enlisting it in the old q0 is not.
+        self.edit_json(FREEZE, lambda value: value["source_fastas"].update(later="data/datasets/later.fa"))
+        with self.assertRaisesRegex(Q0EvidenceError, "locked recipe datasets"):
+            validate_prepared_q0(self.root)
+
     def test_missing_frozen_artifact_binding_is_not_an_optional_check(self):
         self.edit_json(FREEZE, lambda data: data["artifacts"].pop("metadata/grt_contig_quality.tsv"))
         with self.assertRaisesRegex(Q0EvidenceError, "incomplete frozen artifact inventory"):

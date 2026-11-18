@@ -109,7 +109,7 @@
         "tools/lgz_core/q0_lineage.py": "a1716c065f97e0e1ff4537dff351b28fdb371cd71c21912373d9fd4d04afd0ee",
         "tools/lgz_core/q0_paths.py": "9739dc115e6b0468ce46aac0f583cb23c8bbcd0e88aa09d71cad6814f87dbec9",
         "tools/lgz_core/q0_preparation.py": "a150ed4a8d1d276c26c8a9a89146a4b770a6307a5099ca999a1d0310482e7629",
-        "tools/lgz_core/q0_publication.py": "636618884f7e1f886e2ad9a10aa6433bab2055bdcf67eb6b79dab6c3a999877e",
+        "tools/lgz_core/q0_publication.py": "8443d8bd3be7064b286772730555371ca580069812e13a48e3a4c06edfb7f018",
         "tools/lgz_core/q0_sources.py": "8f26d53ead816a66438f8489a3565bb617558893adcc6f5600581ab1b28c2bad",
         "tools/lgz_core/refill_batch.py": "037711f0e60d18b6be87f6859d521de7b6f8a48b432c803edae062460f4b2592",
         "tools/lgz_core/repair_common.py": "3c27b7f8599fd99cfb7a4e7f80a8ffdae1c3457d9a80b5d5ac7beec1e3ee34ca",

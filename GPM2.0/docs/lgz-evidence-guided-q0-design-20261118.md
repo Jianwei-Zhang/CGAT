@@ -1,7 +1,7 @@
 # LGZ：基于比对证据的跨组装 q0 构建
 
 - 决策日期：2026-11-18。
-- 状态：设计已通过逐轮讨论确认；本文先于实现固定，实施进度见第 13 节。
+- 状态：设计先行固定，分支实现及本地受影响范围验收已完成；收口方式和证据边界见 13.14。
 - 基线：`deba82f15fa096bf5aaf16c968c98f9e3ca830ac`。
 - 实施分支：`feat/lgz-evidence-guided-q0-20261118`。
 - 范围：替换 q0 构建及其必要的证据准备、donor/LGZ、Server 包、App 导入和报告适配。
@@ -10,7 +10,7 @@
 
 ## 1. 要解决的问题
 
-当前 q0 的候选只来自第一个 `--ds`。它已经使用 ref 确定分组、方向、顺序和部分去冗余，但没有在所有组装之间选择骨架。部分重叠、错误短片段和内部未知连接可能被保留，整条记录串联又会引入新的 N 间隔。后续 LGZ 因而可能面对原本不应出现的路径和 gap。
+改造前，q0 的候选只来自第一个 `--ds`。它已经使用 ref 确定分组、方向、顺序和部分去冗余，但没有在所有组装之间选择骨架。部分重叠、错误短片段和内部未知连接可能被保留，整条记录串联又会引入新的 N 间隔。后续 LGZ 因而可能面对原本不应出现的路径和 gap。
 
 新目标不是“换一个主 ds”，也不是“最大限度贴近 ref”，而是：
 
@@ -196,30 +196,32 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 
 ## 11. 验收矩阵
 
-| ID | 场景 | 必须证明 |
-| --- | --- | --- |
-| A01 | ds 输入顺序置换 | q0 序列和来源选择不变；日志、运行 ID 不要求字节一致 |
-| A02 | 低质量/冗余短候选 | 不凭分组顺序制造新连接，拒绝原因可追踪 |
-| A03 | 短候选含可信独有序列 | 不为减少 gap 丢弃贡献 |
-| A04 | c3 双侧跨越 c1/c2 | 精确替换、外侧保留、无重复来源/序列，反向案例覆盖 |
-| A05 | c3 仅重复锚点或顺序错误 | 不授权桥接或裁剪 |
-| A06 | 内部 N >= 100 | 分段、原连接、原 N 数和坐标准确；首尾 N、全 N、短 N 均覆盖 |
-| A07 | 跨 chr 重复末端 | 不误裁剪、不错误改归属 |
-| A08 | 可定位错误连接 | 有证据的区段处理、未决状态与精确来源 |
-| A09 | 未分组可靠局部候选 | 可以被发现和采用，不篡改整条来源分组 |
-| A10 | 部分 contig 进入 q0 | 剩余可用区间保留，已用区间作锚点不再次新增 |
-| A11 | 必需比对失败/损坏 | 终止、诊断存在、旧可用产物不受损、不降级 |
-| A12 | 成功空比对 | 与失败区分，不虚构边或证据 |
-| A13 | chr 部分/全部缺失 | 部分可用、未构建明确；全局无 q0 时失败 |
-| A14 | 缓存和事务 | 相同内容复用，策略/证据变化失效，安装失败恢复 |
-| A15 | Step1 到 q4/Final Path | 序列重建、来源坐标、使用账本、事件证据一致 |
-| A16 | Server 到 App | full/light 包必需内容齐备；Rust 校验、导入和持久化通过 |
-| A17 | 决策报告 | 原有/新增间隔区别正确，未测质量和未解决区域不隐藏 |
-| A18 | 有界搜索 | 竞争方案可替换初始贪心路径，限制及剪枝有记录 |
-| A19 | 无 reads | 可正常构建，不伪造 QC；有 reads 时使用实际已有证据 |
-| A20 | 来源合法性 | 禁止来源区间重复、超界、假 evidence 和错误坐标转换 |
+| ID | 场景 | 必须证明 | 受控验证入口 |
+| --- | --- | --- | --- |
+| A01 | ds 输入顺序置换 | q0 序列和来源选择不变；日志、运行 ID 不要求字节一致 | `test_q0_publication.test_reordering_dataset_metadata_preserves_q0_source_choices` |
+| A02 | 低质量/冗余短候选 | 不凭分组顺序制造新连接，拒绝原因可追踪 | `test_q0_paths.test_redundant_short_fragment_does_not_create_a_gap`；`test_q0_admission` 的 QC 排除案例 |
+| A03 | 短候选含可信独有序列 | 不为减少 gap 丢弃贡献 | `test_q0_admission.test_short_unique_ref_candidate_is_admitted_without_contig_length_filter` |
+| A04 | c3 双侧跨越 c1/c2 | 精确替换、外侧保留、无重复来源/序列，反向案例覆盖 | `test_q0_admission` 的原始证据桥接/反向桥接；`test_q0_paths` 的外侧保留 |
+| A05 | c3 仅重复锚点或顺序错误 | 不授权桥接或裁剪 | `test_q0_paths` 的重复锚点、竞争位点、错误顺序和方向反例 |
+| A06 | 内部 N >= 100 | 分段、原连接、原 N 数和坐标准确；首尾 N、全 N、短 N 均覆盖 | `test_q0_evidence` 的 N 边界/首尾/全 N；`test_q0_publication` 的原 N 冻结 |
+| A07 | 跨 chr 重复末端 | 不误裁剪、不错误改归属 | `test_q0_admission.test_cross_chr_repeat_tail_is_kept_but_not_used_as_a_unique_anchor` |
+| A08 | 可定位错误连接 | 有证据的区段处理、未决状态与精确来源 | `test_q0_admission` 的精确跨 chr 局部选择、无独立支持不拆分和连续性保护 |
+| A09 | 未分组可靠局部候选 | 可以被发现和采用，不篡改整条来源分组 | `test_q0_preparation` 的候选发现；`test_q0_publication.test_expanded_source_is_not_forged_into_an_original_assignment` |
+| A10 | 部分 contig 进入 q0 | 剩余可用区间保留，已用区间作锚点不再次新增 | `test_q0_publication` 的完整 donor 上下文；`test_source_intervals` 的占用、释放和跨 chr 复用拒绝 |
+| A11 | 必需比对失败/损坏 | 终止、诊断存在、旧可用产物不受损、不降级 | `test_q0_scheduling` 的失败屏障；`test_q0_publication` 的损坏证据保持旧产物 |
+| A12 | 成功空比对 | 与失败区分，不虚构边或证据 | `test_q0_evidence` / `test_q0_preparation` / `test_q0_scheduling` 的成功空结果 |
+| A13 | chr 部分/全部缺失 | 部分可用、未构建明确；全局无 q0 时失败 | `test_q0_admission` 的全 N/无根候选；`test_q0_report` 的未构建 chr |
+| A14 | 缓存和事务 | 相同内容复用，策略/证据变化失效，安装失败恢复 | `test_q0_preparation` 的内容身份；`test_q0_publication` 的缓存和发布失败 |
+| A15 | Step1 到 q4/Final Path | 序列重建、来源坐标、使用账本、事件证据一致 | `test_source_structural_pipeline`、`test_source_intervals`、`test_q0_delivery` |
+| A16 | Server 到 App | full/light 包必需内容齐备；Rust 校验、导入和持久化通过 | `test_q0_frozen_contract`、Rust `grt_package::tests::q0_v3`、`grt_server_to_app_e2e.sh` |
+| A17 | 决策报告 | 原有/新增间隔区别正确，未测质量和未解决区域不隐藏 | `test_q0_report`、`test_server_report` |
+| A18 | 有界搜索 | 竞争方案可替换初始贪心路径，限制及剪枝有记录 | `test_q0_paths` 的后到候选替换、预算耗尽/剪枝记录和非二次初始提案 |
+| A19 | 无 reads | 可正常构建，不伪造 QC；有 reads 时使用实际已有证据 | `test_grt_prepare_inputs` 的无 reads/QC 输出读取及失败恢复；`test_q0_publication` 的未测状态 |
+| A20 | 来源合法性 | 禁止来源区间重复、超界、假 evidence 和错误坐标转换 | `test_q0_evidence` 的坐标 oracle；`test_source_intervals`、`test_q0_frozen_contract` 和 Rust 反例 |
 
-验证集中在实现稳定之后进行，不把上述矩阵解释为每次局部修改都要重跑的清单。开发期间以调用链、diff、语法和具体疑点的最小复现为主；不持续扩展旧夹具、不重复运行大范围回归。进入最终验证阶段后，先统一整理受影响夹具，再按依赖运行 Python、Server shell 和 Server→App 必要检查；失败后只重跑相关组，最后对稳定代码做一次受影响范围的完整收口。App Rust 测试在 Windows host 运行；若涉及前端，只使用 Windows Node/npm。无需为纯数据契约变化启动浏览器。
+表内 Python 入口均位于 `server/tests/`，Rust 入口位于 `app/backend/`，shell 入口位于 `tests/gpm_server/`。这些是已有场景的定位，不要求每次修改重复运行；最终结果以第 13 节收口记录为准。
+
+验证集中在实现稳定之后进行，不把上述矩阵解释为每次局部修改都要重跑的清单。开发期间以调用链、diff、语法和具体疑点的最小复现为主；不持续扩展旧夹具、不重复运行大范围回归。进入最终验证阶段后，先统一整理受影响夹具，再按依赖运行 Python、Server shell 和 Server→App 必要检查；失败后只重跑相关组，最后对稳定代码做一次受影响范围的完整收口；若后续只修测试夹具，复用未受影响组的已有结果，不为得到一次全绿日志重跑全部检查。App Rust 测试在 Windows host 运行；若涉及前端，只使用 Windows Node/npm。无需为纯数据契约变化启动浏览器。
 
 真实样本与旧基线比较在输入获授权且可用后进行，记录输入哈希、参数、版本和范围；不能拿合成测试通过代替真实数据的效果结论。也不能把基于同一 ref 的评分提升当作独立正确性证明。
 
@@ -245,9 +247,9 @@ q0 仍输出到现有 `grt/q/q0.fa`，最终版本链和可复用来源字段尽
 | I1 | 基础模块与定向回归已完成，已由 I2 证据阶段使用 | `q0_sources.py`、`q0_alignments.py`；新增 25 项测试，联合回归 44 项通过；运行库清单校验通过 |
 | I2 | 已接入并验证：前置比对、扩展候选、按需补比对、必需证据清单及缓存保留 | 见 13.2–13.3；最终联合回归 230 项通过（含来源方向回归）；两套准备脚本测试通过 |
 | I3 | 主入口已切换，跨 ds q0 与 donor 冻结已共同发布 | 见 13.4–13.6；后续 q0→q4 与交付定向验证见 13.8–13.11 |
-| I4 | 区间授权、跨 ds overlap、原 N 软连接及真实工具受控编辑闭环已实现并验证 | 见 13.7–13.8；完整交付与大数据/生物学验收仍属 I5/I6 |
-| I5 | 契约、导入与报告已接通并通过定向验证 | 见 13.9–13.11；完整质量 gate 与效果/规模收口留在 I6 |
-| I6 | 进行中：主链已接通；按用户要求改为集中收口验证，当前不重复启动回归 | 已有首轮全量结果及明确的夹具待办；见 13.12，不将局部通过当作完整验收 |
+| I4 | 区间授权、跨 ds overlap、原 N 软连接及真实工具受控编辑闭环已实现并验证 | 见 13.7–13.8、13.14；不据此宣称真实样本收益或大规模性能 |
+| I5 | 契约、Server/App 导入与报告已接通并验证 | 见 13.9–13.11、13.14；历史读取与当前构建明确分开 |
+| I6 | 本地受影响范围已分组收口，未为日志全绿重复整套测试 | A01–A20 对应入口见第 11 节；结果与保留的 skip/ignored 见 13.14 |
 
 尚无新算法真实样本收益结论；尚未执行发布或客户工作区迁移。
 
@@ -752,15 +754,47 @@ schema-3 报告的 q0 统计来自本次成功 prepare 的快照，或成功 fin
 
 #### 已有验证结果和待办集中登记
 
-调整节奏前启动的首轮 Python discovery 已结束：692 项，738.303 秒，12 个 failure、1 个 error、1 个 skip，故完整 gate **尚未通过**。12 个 failure 均在旧流程夹具以 schema-2 调用当前 producer 时发生，不能据此认定 q0 路径选择错误，也不能恢复旧策略来消除这些失败。另一个 error 是调度夹具未提供其声明的已完成 chr 比对文件；应补齐夹具，而不是允许生产流程忽略必需产物。
+调整节奏前启动的首轮 Python discovery 已结束：692 项，738.303 秒，12 个 failure、1 个 error、1 个 skip，故完整 gate **尚未通过**。12 个 failure 均在旧流程夹具以 schema-2 调用当前 producer 时发生，不能据此认定 q0 路径选择错误，也不能恢复旧策略来消除这些失败。另一个 error 经逐行复核是测试异常类的导入身份不一致：用例先成功发布 checkpoint，再主动删除比对产物，生产代码按预期报错；完整 discovery 中顶层与包路径加载了不同的异常类，导致断言没有捕获。修正为从被测 checkpoint 模块导入其实际使用的异常类，并继续断言缺失比对的报错，不放松生产检查。
 
 已有的准备/Step1/Step2–3 夹具调整改用 schema-3、可区分的受控序列和明确的 pre-q0 比对范围，保留后续实际来源插入、阶段结果、缓存和恢复断言。用户调整节奏前已启动的 Step1 组与固定 donor Step2–3 案例共 6 项结束并通过（43.550 秒）；本节只接收既有结果，没有重跑。该受控夹具不作为实际物种组装效果证据，其他依赖它的组留待集中验证。
 
 最终验证只处理以下已知事项，不泛化扩张：
 
-1. 统一收完旧 producer 调用夹具、调度成功产物夹具，以及 add-dataset/add-ctg 的受控序列输入；保留原有功能断言，不通过降低生产准入标准过关。
+1. 统一收完旧 producer 调用夹具、调度异常类型导入，以及 add-dataset/add-ctg 的受控序列输入；保留原有功能断言，不通过降低生产准入标准过关。
 2. 收完现有 Server→App E2E 草稿：分别验证 Server 和 App 的 read-model 语义，不能要求 Server 的旧 Final Path 表示拥有 App 专用展示字段；Windows host 构建/执行路径不允许偷偷跳过导入或前端检查。
 3. 在代码和夹具稳定后执行一次受影响范围的完整验证，再审阅最终分支 diff、提交和推送。保留 schema-2 读取案例，当前构建只走新 q0。
 4. 真实样本比较和规模性能只在有获授权输入、明确范围时单独安排；没有这类证据不阻止讨论实现状态，但不得宣称生物学收益或大规模性能达标。
 
 已运行的 LF、版本指南、runtime 身份、shell 语法以及六组基础 Server shell 检查通过；add-dataset 组因旧低复杂度输入不能形成可信 q0 而停止，后续 add-ctg 未执行。Server→App E2E 的新增断言仍待收口。这些记录用于下一次集中验证定位，不构成完整 gate 通过或本任务完成声明。当前不发布、不修改客户工作区、不合并 master。
+
+
+### 13.13 集中收口中的实际修正
+
+- **冻结输入与后来添加的项目 ds 分离**：add-dataset 的实际 shell 流程暴露了 schema-3 校验错误。项目 registry 可增加用于展示/比较的 ds，而已经完成的 q0 仍只属于原来锁定的 recipe。Python 与 Rust 现在要求 freeze 精确覆盖该 recipe 的初始 ds 和原 ctg，不再错误要求覆盖后来加入的所有 ds。recipe 本身的冻结哈希、初始来源的序列/坐标、donor 资格和 raw evidence 仍严格核验；不得把后来 ds 塞入旧 freeze。没有添加迁移、重算或放宽缺失证据的分支。新增 ds 会增加来源卡的可见比较对象，因此 add-dataset 在 staging 中刷新展示证据后再 promotion；原 q0、q4、recipe 和 donor freeze 保持字节不变，新增比对不能伪装为旧 q0 的选择依据。
+- **测试输入在冻结前准备**：签名 anchor / 跨 chr 来源夹具改在 q0 准备前设置原始分组，再让真实阶段逻辑生成事件和来源卡；不在 finalize 后修改分组或伪造 accepted 事件。
+- **执行模式公平比较**：baseline/optimized 使用同一份已冻结 q0 的独立副本，检查 source、事件、候选、拒绝及序列结果仍逐项一致；不再把两次独立准备的运行身份差异误报为算法差异，也不通过删除断言掩盖差异。
+- **展示与追踪接口分工**：E2E 的 geometry 断言遵循 read model：Server 的旧 Final Path 表示不必拥有 App 展示字段，展示段主动去掉 event/evidence/card 链接；Server 的来源追踪通过 source-card trace 接口检查；App full/light 按现有交付契约不携带 Server 历史 trace，不能要求它返回这些链接。两类项目视图中的源区间、方向、N 连接和真实来源卡仍需一致，不为测试改动生产 read model。
+
+这一阶段不再重复运行整套 discovery。首轮未受改动影响的结果保留；本轮集中运行受影响的 104 项 Python 用例，103 项先通过；修正唯一失败的执行模式夹具后，与冻结/发布契约合并补跑的 23 项全部通过（134.615 秒），未重复整组 104 项。Windows 原生契约组 48 项通过，1 项 opt-in 性能探针 ignored；当前源码的 CLI 已重新构建。add-ctg 和修正后的 add-dataset shell 均通过，后者还核对原 q0/q4/recipe/freeze 的字节身份不变。最后的 Server→App E2E 分段收口结果见 13.14；不将这次分组验收描述成一次完整 gate 命令从头到尾全绿。
+
+
+### 13.14 分支实现收口
+
+D0 → I1–I6 的代码与文档范围已完成。第 11 节保留了 A01–A20 与实际验证入口的对应关系；本节采用用户确认的“集中验证、失败只补影响组”方式，不重复全部检查来生成一份全绿日志。
+
+| 范围 | 收口证据 |
+| --- | --- |
+| Python 全体及失败收口 | 首轮 discovery 的 692 项结果保留；12 个 failure / 1 个 error 已在受影响组中逐项解决。集中 104 项中先通过 103 项；唯一剩余的执行模式用例与冻结/发布组共 23 项补跑全部通过。未改动的组复用此前结果，新增 post-freeze dataset 案例覆盖实际打包缺陷 |
+| Windows 原生契约 | 当前源码编译后 `cargo test --lib grt_package:: -- --quiet`：48 passed、1 ignored；包括新增项目 ds、冻结不变、禁止追加入旧 q0，以及实际导入。此前 importer 组 56 passed、1 ignored 的未受影响结果保留 |
+| Server shell | 八个既有组均已有通过结果：fake_command_control、env、package_templates、prepare_metadata、prepare_full、final_path，以及最后收口的 add_dataset、add_ctg |
+| Server → App | 既有 archive/full/light/legacy 拒绝等前段检查已通过。只补跑当前脚本从 `Current q0 generation` 起的原样后段：反向与跨 ds/N 桥接两份 fixture，各自 Server/full/light 三种交付，项目初始化、持久化视图、适用的来源追踪、混合方向、保留来源、旧协议拒绝及末尾 Windows Node 检查，退出码 0。不是声称整个 shell gate 被再次从头执行 |
+| 产物与格式 | 运行库生成器同步并只读核验：39 个受管产物无漂移；已执行 shell 语法与差异空白检查，未生成前端 dist、安装器或发布资产 |
+
+E2E 中跨 N 的冻结 Server fixture 补齐了由其原始 FASTA 得到的 N 区间表：`n_scaffold:1701–1837`、137 bp。该表是 App 导出所需的来源元数据，不更改任何冻结选择、输入序列或 q0/q4；不是给缺失比对补造证据。
+
+保留的验证边界：
+
+- 首轮 Python 的 1 个环境 skip 和 Rust 的 opt-in 性能 ignored 不计为通过；没有新增浏览器或桌面窗口验收。
+- 有真实 minimap2/MUMmer4 参与的受控序列用例，但没有本任务获授权的实际物种样本对照或大规模性能结论。不得把更少 N、更高 N50 或受控测试通过当成真实 Final Path 改善的证明。
+- 新 q0 构建直接替换第一 ds 策略，不提供旧策略开关；历史包读取仍保留。后加项目 ds 不会被追认为原 q0 或 donor 的输入。
+- 本地分组验证不冒称当前提交的远端 CI 结果。交付仅限功能分支提交/推送，不合并 master，不发布 Release，不更新客户工作区。
