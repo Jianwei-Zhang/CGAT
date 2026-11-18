@@ -5,9 +5,10 @@ import { readFileSync } from "node:fs";
 const readCss = name => readFileSync(new URL(`../${name}.css`, import.meta.url), "utf8");
 const assemblyCss = readCss("assembly");
 const rule = selector => {
-  const start = assemblyCss.indexOf(`${selector} {`);
-  assert.notEqual(start, -1, selector);
-  return assemblyCss.slice(start + selector.length + 2, assemblyCss.indexOf("}", start));
+  const body = [...assemblyCss.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .find(([, selectors]) => selectors.split(",").some(value => value.trim() === selector))?.[2];
+  assert.ok(body, selector);
+  return body;
 };
 
 test("Final Path correlation has dedicated high-contrast warm tokens in both themes", () => {
@@ -44,7 +45,7 @@ test("Main and Local source overlays share the theme-aware warm fill and never c
 
 
 test("generic track hover never overrides the Final Path graph correlation stroke", () => {
-  const generic = [...assemblyCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  const generic = [...assemblyCss.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, selector]) => selector.includes(".assembly-track-svg") && selector.includes(":hover")
       && (selector.includes(".track-ctg") || selector.includes(".track-reference-member")));
   assert.equal(generic.length, 3);

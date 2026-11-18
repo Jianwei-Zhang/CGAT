@@ -123,7 +123,7 @@
 /* Assembly scope navigation stays together; global utilities never compete with long names. */
 .app-nav.has-assembly-navigation { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 12px; align-items: center; }
 .app-nav.has-assembly-navigation > .route-nav { justify-self: start; }
-.assembly-navigation { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; width: max-content; justify-self: end; }
+.assembly-navigation { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; width: max-content; justify-self: start; }
 .assembly-navigation-partition { --assembly-picker-min: 7ch; --assembly-picker-max: 18ch; }
 .assembly-navigation-project { --assembly-picker-min: 18ch; --assembly-picker-max: 34ch; }
 .assembly-navigation-chr { --assembly-picker-min: 7ch; --assembly-picker-max: 14ch; }

@@ -70,7 +70,7 @@ test("whole-group wrapping is independent of long names and preserves minimum us
   assert.match(css, /\.assembly-navigation\[hidden\][^}]*display: none/);
   assert.match(css, /\.app-nav\.has-assembly-navigation > \.route-nav[^}]*justify-self: start/);
   assert.match(css, /\.assembly-navigation \.shell-select-toggle[^}]*width: max-content;[^}]*min-width: min\(var\(--assembly-picker-min\), 100%\);[^}]*max-width: 100%/);
-  assert.match(css, /\.assembly-navigation \{[^}]*max-width: 100%;[^}]*width: max-content;[^}]*justify-self: end/);
+  assert.match(css, /\.assembly-navigation \{[^}]*max-width: 100%;[^}]*width: max-content;[^}]*justify-self: start/);
   for (const [kind, minimum, maximum] of [["partition", 7, 18], ["project", 18, 34], ["chr", 7, 14]]) {
     assert.ok(css.includes(`.assembly-navigation-${kind} { --assembly-picker-min: ${minimum}ch; --assembly-picker-max: ${maximum}ch; }`));
   }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../../../../state/store.js";
-import { bindFinalPathSelection, snapshotWithoutFinalPathSelection } from "../final-path-selection-runtime.js";
+import { bindFinalPathSelection, unbindFinalPathSelection, snapshotWithoutFinalPathSelection } from "../final-path-selection-runtime.js";
 import { updateFinalPathRow } from "../final-path-runtime.js";
 import { syncAssemblyTransientInteractions } from "../../assembly-page.js";
 import { rememberAssemblyDom, restoreAssemblyDom, clearAssemblySessionCache } from "../../../shell/assembly-session-cache.js";
@@ -28,6 +28,7 @@ class Element {
   replaceChildren(...nodes) { this.children = []; nodes.forEach(node => this.append(node)); }
   remove() { this.parent.children = this.parent.children.filter(child => child !== this); }
   addEventListener(type, fn) { const list = this.events.get(type) || []; list.push(fn); this.events.set(type, list); }
+  removeEventListener(type, fn) { this.events.set(type, (this.events.get(type) || []).filter(item => item !== fn)); }
   cloneNode() { const clone = new Element(this.ownerDocument, this.attrs); this.children.forEach(child => clone.append(child.cloneNode(true))); return clone; }
   get outerHTML() { return `<g ${Object.entries(this.attrs).map(([k,v]) => `${k}="${v}"`).join(" ")}>${this.children.map(c => c.outerHTML).join("")}</g>`; }
 }
@@ -40,6 +41,8 @@ function fixture() {
   const doc = { addEventListener: listen(documentEvents), defaultView: { addEventListener: listen(windowEvents) }, createElementNS: (_namespace, tag) => {
     const node = new Element(doc); node.tag = tag; created.push(node); return node;
   } };
+  doc.removeEventListener = (type, fn) => documentEvents.set(type, (documentEvents.get(type) || []).filter(item => item !== fn));
+  doc.defaultView.removeEventListener = (type, fn) => windowEvents.set(type, (windowEvents.get(type) || []).filter(item => item !== fn));
   doc.body = new Element(doc);
   const host = new Element(doc, { id: "route-host" }); doc.body.append(host);
   const plot = new Element(doc, { "data-final-path-graph-viewport": "" }); host.append(plot);
@@ -112,12 +115,14 @@ test("same-context scroll/zoom retains hover and existing overlay nodes", () => 
   assert.equal(f.host.events.get("pointerout").length, 1);
 });
 
-test("new Main/Local selection clears correlation without changing editing selections", () => {
+test("new Local editing selection replaces transient Final Path correlation with reverse correlation", () => {
   const f = fixture(); f.fire("pointerover", f.graph); f.fire("pointerdown", f.main);
   assert.equal(f.overlay(f.main), null); assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
   f.fire("keydown", f.input, { key: "Tab" });
   f.fire("focusin", f.input); f.patch({ subview: { trackPairSelectedCtgs: [{ contigId: 1, trackRole: "primary" }] } });
-  assert.equal(f.overlay(f.local), null);
+  assert.equal(f.overlay(f.local).getAttribute("data-source-start"), "4001");
+  assert.equal(f.graph.getAttribute("data-final-path-correlated"), "1");
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
 });
 
 test("changing chromosome/project/path or deleting the selected segment clears transient paint", () => {
@@ -488,7 +493,7 @@ test("editing fields, toolbar controls and unrelated blank clicks do not replace
   f.click(f.graph); f.click(field, { ctrlKey: true });
   f.fire("keydown", field, { key: "Escape" });
   const button = new Element(f.host.ownerDocument); button.tag = "button"; second.row.append(button);
-  f.click(button); f.click(f.host); f.click(f.main);
+  f.click(button); f.click(f.host);
   assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
   assert.equal(second.graph.getAttribute("data-final-path-selected"), null);
   assert.equal(field.value, "draft"); assert.equal(f.store.getState(), before);
@@ -747,4 +752,318 @@ test("Escape from an earlier focused field cancels only the active box, then nor
   assert.equal(f.second.graph.getAttribute("data-final-path-selected"), null);
   f.fire("keydown", f.host, { key: "Escape" });
   assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+});
+
+
+function resultBar(f) {
+  const bar = new Element(f.host.ownerDocument, { class: "track-ctg", x: "10", y: "20", width: "100", height: "14" });
+  f.graph.append(bar);
+  return bar;
+}
+
+function peerView(f) {
+  const peer = fixture();
+  unbindFinalPathSelection(peer.host, peer.store);
+  peer.host.replaceChildren(peer.local);
+  let localSelection = [];
+  let alive = true;
+  const scoped = { localViewRootStore: f.store, isLocalViewAlive: () => alive,
+    getState: () => ({ ...f.store.getState(), assembly: { ...f.store.getState().assembly,
+      subview: { trackPairSelectedCtgs: localSelection } } }) };
+  bindFinalPathSelection(peer.host, scoped);
+  return { ...peer, scoped, setSelection(entries) { localSelection = entries; f.patch({}); },
+    close() { alive = false; unbindFinalPathSelection(peer.host, scoped); } };
+}
+
+test("Main hover correlates matching Local ranges and adopted results without store writes", () => {
+  const f = fixture(); resultBar(f);
+  const before = structuredClone(f.store.getState()); let notifications = 0;
+  f.store.subscribe(() => notifications++);
+  f.fire("pointerover", f.main);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), null);
+  assert.equal(f.graph.getAttribute("data-final-path-correlated"), "1");
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "100");
+  assert.equal(f.overlay(f.local).getAttribute("data-source-start"), "4001");
+  assert.equal(f.overlay(f.other), null);
+  assert.deepEqual(f.store.getState(), before); assert.equal(notifications, 0);
+  f.fire("pointerout", f.main);
+  assert.equal(f.overlay(f.graph), null); assert.equal(f.overlay(f.local), null);
+});
+
+test("Local hover highlights only the overlap within each Final Path instance", () => {
+  const f = fixture(); resultBar(f);
+  f.fire("pointerover", f.local);
+  assert.equal(f.overlay(f.graph).getAttribute("data-source-start"), "5001");
+  assert.equal(f.overlay(f.graph).getAttribute("data-source-end"), "8000");
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+  assert.equal(f.overlay(f.main).getAttribute("data-source-start"), "4001");
+  assert.equal(f.overlay(f.main).getAttribute("data-source-end"), "8000");
+  assert.equal(f.row.getAttribute("data-final-path-correlated"), "1");
+  f.fire("pointerout", f.local);
+  assert.equal(f.row.getAttribute("data-final-path-correlated"), null);
+});
+
+test("opposite Final Path orientation reverses the partial result overlay", () => {
+  const f = fixture(); resultBar(f);
+  const path = structuredClone(f.store.getState().assembly.finalPathByChr);
+  Object.assign(path.Chr1.segments[0], { start: 10000, end: 5001 });
+  f.patch({ finalPathByChr: path }); f.fire("pointerover", f.local);
+  assert.equal(f.overlay(f.graph).getAttribute("x"), "50");
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+});
+
+test("a Local source outside adopted coordinates cannot light the result", () => {
+  const f = fixture(); resultBar(f);
+  f.local.setAttribute("data-source-interval-projection", JSON.stringify({ assemblyCtgId: 1, sourceStart: 1, sourceEnd: 2000 }));
+  f.fire("pointerover", f.local);
+  assert.equal(f.graph.getAttribute("data-final-path-correlated"), null);
+  assert.equal(f.overlay(f.graph), null);
+  assert.equal(f.overlay(f.main).getAttribute("data-source-end"), "2000");
+});
+
+test("selected Main and Local sources maintain reverse correlation after hover leaves", () => {
+  const f = fixture(); resultBar(f);
+  f.patch({ trackSelectedCtgIds: [1] });
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "100");
+  f.fire("pointerover", f.other); f.fire("pointerout", f.other);
+  assert.ok(f.overlay(f.graph));
+  f.patch({ trackSelectedCtgIds: [], subview: { trackPairSelectedCtgs: [{ contigId: 1, trackRole: "primary" }] } });
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+  f.patch({ subview: { trackPairSelectedCtgs: [] } });
+  assert.equal(f.overlay(f.graph), null);
+});
+
+test("multiple native documents share Final Path hover, pins, and reverse source hover", () => {
+  const f = fixture(); resultBar(f);
+  const a = peerView(f), b = peerView(f);
+  f.fire("pointerover", f.graph);
+  assert.equal(a.overlay(a.local).getAttribute("data-source-start"), "5001");
+  assert.equal(b.overlay(b.local).getAttribute("data-source-end"), "8000");
+  f.click(f.graph); f.blur();
+  assert.ok(a.overlay(a.local));
+  f.fire("keydown", f.host, { key: "Escape" });
+  assert.equal(a.overlay(a.local), null);
+  a.fire("pointerover", a.local);
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+  assert.equal(b.overlay(b.local).getAttribute("data-source-start"), "4001");
+  // A delayed leave from Main must not erase the peer's newer hover.
+  f.fire("pointerleave", f.host);
+  assert.ok(f.overlay(f.graph));
+  a.fire("pointerout", a.local);
+  assert.equal(f.overlay(f.graph), null);
+  a.close(); b.close();
+});
+
+test("native selections and rerenders repaint without taking ownership from Main", () => {
+  const f = fixture(); resultBar(f); const peer = peerView(f);
+  peer.setSelection([{ contigId: 1, trackRole: "primary" }]);
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+  const next = peer.local.cloneNode(true); peer.local.remove(); peer.host.append(next);
+  bindFinalPathSelection(peer.host, peer.scoped);
+  assert.ok(f.overlay(next));
+  f.fire("pointerover", f.graph);
+  assert.equal(f.graph.getAttribute("data-final-path-selected"), "1");
+  peer.close(); f.fire("pointerout", f.graph);
+  assert.equal(f.overlay(f.graph), null);
+  assert.equal(peer.host.events.get("pointerover").length, 0);
+});
+
+test("Local viewport clipping applies source orientation before reverse matching", () => {
+  const f = fixture(); resultBar(f);
+  const viewport = new Element(f.host.ownerDocument, { class: "subview-track-scroll" });
+  viewport.rect = { left: 100, right: 200, top: 0, bottom: 100 };
+  f.local.remove(); f.host.append(viewport); viewport.append(f.local);
+  const bar = new Element(f.host.ownerDocument, { class: "track-ctg" });
+  bar.rect = { left: 0, right: 200, top: 0, bottom: 14 }; f.local.append(bar);
+  // Right half of a reverse 4001..8000 source corresponds to 4001..6000.
+  f.fire("pointerover", f.local);
+  assert.equal(f.overlay(f.graph).getAttribute("data-source-start"), "5001");
+  assert.equal(f.overlay(f.graph).getAttribute("data-source-end"), "6000");
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "20");
+  viewport.rect = { left: 150, right: 200, top: 0, bottom: 100 };
+  f.fire("scroll", viewport);
+  assert.equal(f.overlay(f.graph), null);
+});
+
+test("export strips reverse-correlation paint from a clone only", () => {
+  const f = fixture(); resultBar(f); f.fire("pointerover", f.local);
+  assert.doesNotMatch(snapshotWithoutFinalPathSelection(f.host), /data-final-path-correlated|data-final-path-selection-overlay/);
+  assert.ok(f.overlay(f.graph));
+});
+
+
+test("source sequence identity prevents cross-dataset name collisions during reverse hover", () => {
+  const f = fixture(); resultBar(f);
+  f.patch({ chrCtgs: [{ assemblyCtgId: 1, originSourceSeqId: 7 }] });
+  f.local.setAttribute("data-source-interval-projection", JSON.stringify({ assemblyCtgId: 1,
+    sourceSeqId: 8, sourceStart: 4001, sourceEnd: 8000, datasetName: "Data", contigName: "ctg1" }));
+  f.fire("pointerover", f.local);
+  assert.equal(f.overlay(f.graph), null);
+});
+
+test("merged Local provenance can reverse-match a constituent Final Path contig", () => {
+  const f = fixture(); resultBar(f);
+  f.local.setAttribute("data-source-interval-projection", JSON.stringify({ sourceStart: 4001, sourceEnd: 8000,
+    parts: [{ assemblyCtgId: 1 }], orient: "+" }));
+  f.fire("pointerover", f.local);
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+});
+
+test("all paths keep reverse correlations scoped by identity and source overlap", () => {
+  const f = fixture(); resultBar(f);
+  const second = f.graph.cloneNode(true); second.setAttribute("data-final-path-target-chr-name", "Chr2"); f.plot.append(second);
+  const base = f.store.getState().assembly.finalPathByChr.Chr1;
+  f.patch({ finalPathByChr: { Chr1: base, Chr2: { ...base, segments: [{ ...base.segments[0], start: 1, end: 2000 }] } } });
+  f.fire("pointerover", f.local);
+  assert.ok(f.overlay(f.graph)); assert.equal(f.overlay(second), null);
+});
+
+test("inactive open Local windows supply split provenance, closed windows do not", () => {
+  const f = fixture(); resultBar(f);
+  const entry = f.store.getState().assembly.finalPathByChr.Chr1;
+  f.patch({ finalPathByChr: { Chr1: { ...entry, segments: [{ ...entry.segments[0], overallLen: 4000, start: 1001, end: 4000 }] } },
+    subviewWorkspace: { windows: [{ id: "peer", opened: true, snapshot: { subview: { summary: { mode: "composition", members: [
+      { assemblyCtgId: 1, sourceFragment: { sourceSeqId: 7, sourceStart: 6001, sourceEnd: 10000 } },
+    ] } } } }] } });
+  f.fire("pointerover", f.graph);
+  assert.equal(f.overlay(f.local).getAttribute("data-source-start"), "7001");
+});
+
+test("leaving Assembly or switching scope clears reverse correlation in every document", () => {
+  for (const change of [f => f.store.setState({ activeRoute: "importer" }),
+    f => f.patch({ selectedChrName: "Chr2" }), f => f.store.setState({ session: { projectId: 8, workspacePath: "other" } })]) {
+    const f = fixture(); resultBar(f); const peer = peerView(f);
+    peer.fire("pointerover", peer.local); assert.ok(f.overlay(f.graph));
+    change(f);
+    assert.equal(f.overlay(f.graph), null); assert.equal(f.overlay(f.main), null);
+    assert.equal(peer.overlay(peer.local), null); peer.close();
+  }
+});
+
+
+for (const source of ["main", "local"]) {
+  test(`${source} plain click pins a source independently and a second click cancels immediately`, () => {
+    const f = fixture(); resultBar(f); const before = structuredClone(f.store.getState());
+    f.fire("pointerover", f[source]); f.click(f[source]); f.fire("pointerout", f[source]);
+    assert.ok(f.overlay(f.graph)); assert.ok(f.overlay(f.main)); assert.ok(f.overlay(f.local));
+    f.blur(); assert.ok(f.overlay(f.graph));
+    f.fire("pointerover", f[source]); f.click(f[source]);
+    assert.equal(f.overlay(f.graph), null); assert.equal(f.overlay(f.local), null);
+    assert.deepEqual(f.store.getState(), before);
+  });
+}
+
+test("Shift-click adds and toggles source pins without borrowing Ctrl comparisons", () => {
+  const f = fixture(); resultBar(f); const second = addSegment(f, { assemblyCtgId: 2, ctgName: "ctg2" });
+  f.click(f.main); f.click(f.other, { shiftKey: true });
+  assert.equal(f.graph.getAttribute("data-final-path-correlated"), "1");
+  assert.equal(second.graph.getAttribute("data-final-path-correlated"), "1");
+  f.click(f.other, { shiftKey: true });
+  assert.equal(second.graph.getAttribute("data-final-path-correlated"), null);
+  assert.ok(f.overlay(f.graph));
+  f.click(f.other);
+  assert.equal(f.graph.getAttribute("data-final-path-correlated"), null);
+  assert.equal(second.graph.getAttribute("data-final-path-correlated"), "1");
+});
+
+for (const modifier of ["ctrlKey", "metaKey", "altKey"]) {
+  test(`${modifier} source clicks stay with the existing gesture owner`, () => {
+    const f = fixture(); resultBar(f);
+    f.click(f.main, { [modifier]: true }); f.fire("pointerout", f.main);
+    assert.equal(f.overlay(f.graph), null);
+    f.click(f.local); f.click(f.main, { [modifier]: true });
+    assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+  });
+}
+
+for (const clear of ["blank-main", "blank-local", "blank-result", "escape"]) {
+  test(`${clear} clears source pins and does not resurrect unchanged edit-box selections`, () => {
+    const f = fixture(); resultBar(f);
+    f.patch({ selectedCtgId: 1, trackSelectedCtgIds: [1], subview: { trackPairSelectedCtgs: [{ contigId: 1, trackRole: "primary" }] } });
+    f.click(f.local);
+    if (clear === "escape") f.fire("keydown", f.host, { key: "Escape" });
+    else if (clear === "blank-result") f.click(f.plot);
+    else {
+      const blank = new Element(f.host.ownerDocument, { class: "assembly-track-scroll", "data-track-role": clear === "blank-local" ? "subview" : "primary" });
+      f.host.append(blank); f.click(blank);
+    }
+    assert.equal(f.overlay(f.graph), null);
+    f.patch({ trackView: { zoom: 2 } }); bindFinalPathSelection(f.host, f.store);
+    assert.equal(f.overlay(f.graph), null); assert.equal(f.overlay(f.local), null);
+    assert.equal(f.store.getState().assembly.selectedCtgId, 1);
+    assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, [1]);
+  });
+}
+
+test("canceling a source pin also masks an old matching editing selection", () => {
+  const f = fixture(); resultBar(f); f.patch({ trackSelectedCtgIds: [1] });
+  f.click(f.main); f.click(f.main); f.patch({});
+  assert.equal(f.overlay(f.graph), null);
+  f.fire("pointerover", f.local); assert.ok(f.overlay(f.graph));
+  f.fire("pointerout", f.local); assert.equal(f.overlay(f.graph), null);
+  f.patch({ trackSelectedCtgIds: [] }); f.patch({ trackSelectedCtgIds: [1] });
+  assert.ok(f.overlay(f.graph));
+});
+
+test("a stale navigation focus alone never becomes persistent source correlation", () => {
+  const f = fixture(); resultBar(f); f.patch({ selectedCtgId: 1 });
+  assert.equal(f.overlay(f.graph), null);
+  f.fire("pointerover", f.main); f.fire("pointerout", f.main);
+  assert.equal(f.overlay(f.graph), null);
+});
+
+for (const end of ["drag", "cancel", "blur", "scope"]) {
+  test(`source ${end} cannot accidentally pin on the resulting click`, () => {
+    const f = fixture(); resultBar(f); f.fire("pointerdown", f.main);
+    if (end === "drag") f.fire("pointermove", f.main, { clientX: 13 });
+    if (end === "cancel") f.fire("pointercancel", f.main);
+    if (end === "blur") f.blur();
+    if (end === "scope") f.patch({ selectedChrName: "Chr2" });
+    f.fire("pointerup", f.main); f.fire("click", f.main);
+    assert.equal(f.overlay(f.graph), null);
+  });
+}
+
+test("source pins survive same-context rerender but not the originating native window closing", () => {
+  const f = fixture(); resultBar(f); const peer = peerView(f);
+  peer.click(peer.local); peer.fire("pointerout", peer.local);
+  const next = peer.local.cloneNode(true); peer.local.remove(); peer.host.append(next);
+  bindFinalPathSelection(peer.host, peer.scoped);
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+  peer.fire("keydown", peer.host, { key: "Escape" });
+  assert.equal(f.overlay(f.graph), null);
+  peer.click(next); assert.ok(f.overlay(f.graph));
+  peer.close(); assert.equal(f.overlay(f.graph), null);
+});
+
+test("starting an existing Ctrl blank-box gesture neither consumes the event nor creates a pin", () => {
+  const f = fixture(); resultBar(f);
+  const blank = new Element(f.host.ownerDocument, { class: "assembly-track-scroll", "data-track-role": "primary" });
+  f.host.append(blank); let consumed = false;
+  f.fire("pointerdown", blank, { ctrlKey: true, preventDefault() { consumed = true; }, stopImmediatePropagation() { consumed = true; } });
+  assert.equal(consumed, false);
+  f.patch({ trackSelectedCtgIds: [1] });
+  f.fire("pointerup", blank, { ctrlKey: true }); f.fire("click", blank, { ctrlKey: true });
+  assert.ok(f.overlay(f.graph));
+  f.patch({ trackSelectedCtgIds: [] }); assert.equal(f.overlay(f.graph), null);
+});
+
+
+test("late Main blur cannot cancel a newer native Local source click or blank cancel", () => {
+  const f = fixture(); resultBar(f); const peer = peerView(f);
+  peer.fire("pointerdown", peer.local); f.blur(); peer.fire("pointerup", peer.local); peer.fire("click", peer.local);
+  assert.equal(f.overlay(f.graph).getAttribute("width"), "60");
+  const blank = new Element(peer.host.ownerDocument, { class: "assembly-track-scroll" }); peer.host.append(blank);
+  peer.fire("pointerdown", blank); f.blur(); peer.fire("pointerup", blank); peer.fire("click", blank);
+  assert.equal(f.overlay(f.graph), null); peer.close();
+});
+
+test("a new unchanged Ctrl box can re-enable a previously dismissed edit selection", () => {
+  const f = fixture(); resultBar(f);
+  const blank = new Element(f.host.ownerDocument, { class: "assembly-track-scroll" }); f.host.append(blank);
+  f.patch({ trackSelectedCtgIds: [1] }); f.fire("keydown", f.host, { key: "Escape" });
+  assert.equal(f.overlay(f.graph), null);
+  // The existing edit-box controller may skip setState when the set is equal.
+  f.fire("pointerdown", blank, { ctrlKey: true }); f.fire("pointerup", blank, { ctrlKey: true }); f.fire("click", blank, { ctrlKey: true });
+  assert.ok(f.overlay(f.graph));
 });

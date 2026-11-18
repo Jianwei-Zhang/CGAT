@@ -2241,7 +2241,8 @@
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
 }
-.final-path-sort-row[data-final-path-selected="1"] {
+.final-path-sort-row[data-final-path-selected="1"],
+.final-path-sort-row[data-final-path-correlated="1"] {
   outline: 3px solid var(--final-path-selection-stroke);
   outline-offset: -3px;
 }

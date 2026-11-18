@@ -39,7 +39,8 @@ export function intersectSourceInterval(selected, target) {
     if (selected.sourceSeqId !== target.sourceSeqId) return null;
   } else {
     const direct = selected.assemblyCtgId && (selected.assemblyCtgId === target.assemblyCtgId
-      || target.parts?.some(part => part.assemblyCtgId === selected.assemblyCtgId));
+      || target.parts?.some(part => part.assemblyCtgId === selected.assemblyCtgId))
+      || (target.assemblyCtgId && selected.parts?.some(part => part.assemblyCtgId === target.assemblyCtgId));
     const original = selected.originalCoordinates && selected.datasetName && selected.contigName
       && selected.datasetName === target.datasetName && selected.contigName === target.contigName;
     if (!direct && !original) return null;

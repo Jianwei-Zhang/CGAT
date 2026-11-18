@@ -1,3 +1,4 @@
+import { unbindFinalPathSelection } from "./final-path-selection-runtime.js";
 import { getNativeSubviewHandle } from "./subview-native-identity.js";
 import { fitNativeSubviewWindow } from "./subview-native-fit.js";
 import { changeSubviewWindow, getSubviewWindowStore } from "./subview-workspace-state.js";
@@ -210,6 +211,7 @@ export function createNativeSubviewWindows(root, store, deps) {
     entry.cleanups.push(() => peer.clearTimeout(resizeTimer));
     if (!valid(entry)) { run(entry.handle.destroy()); return; }
     deps.bindWindow(entry.node, entry.scoped);
+    entry.cleanups.push(() => unbindFinalPathSelection(host, entry.scoped));
     deps.onNativeMount?.(entry.node, entry.scoped);
     entry.tooltips = bindAppTooltips(doc);
     chrome(entry, itemFor(id));
