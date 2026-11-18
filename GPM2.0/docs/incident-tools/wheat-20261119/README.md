@@ -297,3 +297,47 @@ succeeded as one group: minimap2 reported 245.858 s and 14.069 GB peak RSS.
 The other 639 records were still using ordinary options. These are group-only
 measurements, excluding calibration and ordinary mapping; there is no complete
 original-parameter 5D baseline for claiming a speedup multiplier.
+
+
+## First complete routed leaves and a medium-record counterexample
+
+5D cross committed at **06:36:16**, 27m48s after its routed start. Independent
+compute job **42720570** verified its final PAF, receipt, complete record
+inventory and saved group outputs. It contains all 641 processed queries:
+2 approximate records and 639 ordinary records. Native tool times were
+245.858 s for the two long records and 1242.760 s for the ordinary group; these
+exclude calibration and wrapper work. The final PAF is 1,023,183 bytes, SHA-256
+`0559de26a82882cdebbb287adaabc53bf66a27220463db0efbaf65fd3c7bae13`.
+
+`inspect_routed_leaf_and_length_strata.py` also reused existing complete 3D
+PAFs rather than rerunning them. At a 10 kb grid, baseline positions without
+candidate target/strand/position support within 100 bp were:
+
+| Original query length | All primary baseline positions | Baseline MAPQ=60 positions |
+|---|---:|---:|
+| <20 Mb | 51/4925 | 7/4751 |
+| 20–50 Mb | 94/9363 | 65/9331 |
+| 50–100 Mb | 11/19585 | 9/19560 |
+| >=100 Mb | 38/28899 | 18/28875 |
+
+The favorable 3D 50–100 Mb aggregate does **not** justify a blanket threshold
+reduction. The diagnostic ran only one additional complete 5D ordinary record,
+`ptg000056l` (51,086,554 bp), at filter 0.005, reusing its already completed
+native baseline. Candidate time was 126.046 s / 5.143 GB reported peak RSS.
+Coverage increased, but baseline-position support was lost at 153/5052 sampled
+positions (10 kb grid) and 1543/50532 (1 kb grid), about 3% in both cases.
+Extra candidate placements also exceeded the current limits. This is baseline
+agreement, **not a measured biological error rate**. Native per-record time is
+unknown, so the 639-record group time cannot be used as its speedup denominator.
+
+The candidate did not pass the current full-context quality limits and was not
+adopted. The 50 Mb automatic *window-selection gate* was not exercised; do not
+claim it has passed or failed from this experiment alone. The main 100 Mb
+policy and completed native results remain unchanged. Evidence:
+`routing-first-leaf-qc-20261119/{first-leaf-qc.json,length-strata.json,medium-record-study.json,final-job.json}`.
+The frozen script SHA was checked after job success.
+
+4D cross subsequently committed at **07:09:47**, taking 33m31s, with one
+approximate record and five ordinary records. The main job advanced directly
+to 1D, without restart. There are now **19 complete cross leaves** (17 native,
+2 routed), not 19 complete outer q0 stages or a completed wheat workflow.
