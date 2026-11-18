@@ -170,3 +170,18 @@ an installation into the main job.
 - Remote evidence: `long-query-router-validation-20261119/` and
   `long-query-router-validation-v2-20261119/`, each retaining its source hashes,
   launch script, logs and submission record.
+
+
+### Real-data calibration result, 05:21:28 +08
+
+Job `42703218` subsequently **SUCCEEDED**. Three complete ordinary records
+(263657, 502552 and 187423 bp) produced byte-identical PAF to the matching
+records in the completed native 3D leaf. The only >=100 Mb query,
+`ptg000049l` (289508469 bp), admitted filter 0.005 using the unchanged internal
+policy: all 1498 baseline sampled window positions had exactly matching
+candidate target/strand/position support. One additional candidate position
+was absent from the baseline sampling; this is not a claim of identical PAF.
+This remains three-window calibration, not whole-record accuracy verification
+or a router speedup measurement. No full long-query remapping or main-workspace
+adoption occurred. `real-calibration.json`, `final-job.json` and
+`wheat-router-v2.sha256` retain the result and frozen-source bindings.
