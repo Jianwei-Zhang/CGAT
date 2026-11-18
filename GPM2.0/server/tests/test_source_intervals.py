@@ -13,7 +13,7 @@ import unittest
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey
 from server.tools.lgz_core.source_intervals import SourceAuthorization, attach_authorizations, source_spans
 from server.tools.lgz_core.repair_common import arbitrate
-from server.tools.lgz_telomere_finalize import arbitrate_terminal_candidates
+from server.tools.lgz_step3 import arbitrate_terminal_candidates
 
 A, B = SourceKey("a", "same_name"), SourceKey("b", "same_name")
 
@@ -302,17 +302,16 @@ class SourceAuthorizationStageTests(unittest.TestCase):
                               "prefix = sys.argv[sys.argv.index('-p')+1]\n"
                               "Path(prefix+'.delta').write_text('reference query\\nNUCMER\\n')\n")
             nucmer.chmod(0o755)
-            for script in ("lgz_step1.py", "lgz_step2.py", "lgz_step3.py", "lgz_telomere_finalize.py"):
+            for script in ("lgz_step1.py", "lgz_step2.py", "lgz_step3.py"):
                 command = [sys.executable, str(PROJECT / "server/tools" / script), "--server-dir", str(root), "--threads", "1"]
-                if script != "lgz_step1.py":
-                    command += ["--nucmer", str(nucmer)]
+                command += ["--nucmer", str(nucmer)]
                 result = subprocess.run(command, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, f"{script}: {result.stdout}\n{result.stderr}")
-            records = dict(read_fasta(root / "grt/q/q4.fa"))
+            records = dict(read_fasta(root / "grt/q/q3.fa"))
             self.assertEqual(records, {"chr1": left + fill + right, "chr2": left2 + "N" * 100 + right2})
             sources = source_catalog(root)
             auth = SourceAuthorization.load(root, sources)
-            _, paths, _ = load_q_paths(root, "q4", read_tsv(root / "metadata/grt_q_segments.tsv"), sources)
+            _, paths, _ = load_q_paths(root, "q3", read_tsv(root / "metadata/grt_q_segments.tsv"), sources)
             auth.validate_paths(paths)
             authorizations = [json.loads(row["parameters_json"]).get("source_interval_authorization")
                               for row in read_tsv(root / "metadata/grt_evidence_registry.tsv")]
@@ -320,7 +319,7 @@ class SourceAuthorizationStageTests(unittest.TestCase):
             self.assertTrue(any(row["status"] == "accepted" and row["target_chr"] == "chr1" for row in decisions))
             self.assertTrue(any(row.get("reason") == "donor_interval_still_present_in_live_path" and row["target_chr"] == "chr2" for row in decisions))
 
-    def test_schema3_no_edit_path_reaches_q4_and_corrupt_freeze_fails_before_mutation(self):
+    def test_schema3_no_edit_path_reaches_q3_and_corrupt_freeze_fails_before_mutation(self):
         from server.tests.test_q0_admission import bridge_fixture
         from server.tests.test_q0_publication import complete_workspace, run_prepare, PROJECT
         from server.tools.lgz_core.common import read_fasta, read_tsv
@@ -330,14 +329,14 @@ class SourceAuthorizationStageTests(unittest.TestCase):
             root = complete_workspace(fixture, Path(directory))
             prepared = run_prepare(root)
             self.assertEqual(prepared.returncode, 0, prepared.stderr)
-            commands = ("lgz_step1.py", "lgz_step2.py", "lgz_step3.py", "lgz_telomere_finalize.py")
+            commands = ("lgz_step1.py", "lgz_step2.py", "lgz_step3.py")
             def run(script):
                 return subprocess.run([sys.executable, str(PROJECT / "server/tools" / script),
                                        "--server-dir", str(root), "--threads", "1"], capture_output=True, text=True)
             for script in commands:
                 result = run(script)
                 self.assertEqual(result.returncode, 0, f"{script}: {result.stdout}\n{result.stderr}")
-            for version in ("q0", "q1", "q2", "q3", "q4"):
+            for version in ("q0", "q1", "q2", "q3"):
                 self.assertEqual(dict(read_fasta(root / f"grt/q/{version}.fa")), {"chr1": truth})
             evidence = read_tsv(root / "metadata/grt_evidence_registry.tsv")
             self.assertTrue(any(row["stage"] == "q0_construction" for row in evidence))
@@ -346,7 +345,7 @@ class SourceAuthorizationStageTests(unittest.TestCase):
             frozen = json.loads((root / FREEZE).read_text())
             frozen["sources"][0]["informative_intervals"] = []
             (root / FREEZE).write_text(json.dumps(frozen))
-            result = run("lgz_step2.py")
+            result = run("lgz_step1.py")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("informative source intervals differ", result.stderr)
             self.assertEqual({relative: (root / relative).read_bytes() for relative in snapshots}, snapshots)

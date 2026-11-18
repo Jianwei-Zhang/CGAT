@@ -73,11 +73,11 @@ class ServerRunTests(unittest.TestCase):
     def test_refill_limit_updates_command_without_repreparing(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            runtime = root / ".prepare_lib/tools/grt_step3.py"
+            runtime = root / ".prepare_lib/tools/grt_step2.py"
             runtime.parent.mkdir(parents=True)
             runtime.write_text('# supports --max-fill\n')
-            script = root / "run_grt_step3.sh"
-            script.write_text("#!/usr/bin/env bash\nset -euo pipefail\npython3 '/path with spaces/grt_step3.py' --server-dir '/workspace with spaces' --max-fill 1000000\n")
+            script = root / "run_grt_step2.sh"
+            script.write_text("#!/usr/bin/env bash\nset -euo pipefail\npython3 '/path with spaces/grt_step2.py' --server-dir '/workspace with spaces' --max-fill 1000000\n")
             server_run.update_fill_limit(root, "2000000")
             self.assertIn("--max-fill 2000000", script.read_text())
             self.assertIn("'/workspace with spaces'", script.read_text())
@@ -91,11 +91,11 @@ class ServerRunTests(unittest.TestCase):
                 root = Path(temporary)
                 runtime = root / ".prepare_lib/tools"
                 runtime.mkdir(parents=True)
-                (runtime / "lgz_step3.py").write_text("# supports --max-fill\n")
+                (runtime / "lgz_step2.py").write_text("# supports --max-fill\n")
                 if name == "grt":
-                    (runtime / "grt_step3.py").write_text("# compatibility forwarding module\n")
-                script = root / f"run_{name}_step3.sh"
-                script.write_text(f"#!/usr/bin/env bash\npython3 /runtime/{name}_step3.py --server-dir /workspace --max-fill 1000000\n")
+                    (runtime / "grt_step2.py").write_text("# compatibility forwarding module\n")
+                script = root / f"run_{name}_step2.sh"
+                script.write_text(f"#!/usr/bin/env bash\npython3 /runtime/{name}_step2.py --server-dir /workspace --max-fill 1000000\n")
                 before = script.read_text()
                 server_run.update_fill_limit(root, "2000000")
                 self.assertEqual(script.read_text(), before.replace("1000000", "2000000"))
@@ -106,15 +106,15 @@ class ServerRunTests(unittest.TestCase):
     def test_refill_limit_keeps_legacy_combined_workspace_supported(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            runtime = root / ".prepare_lib/tools/grt_step23.py"
+            runtime = root / ".prepare_lib/tools/grt_step12.py"
             runtime.parent.mkdir(parents=True)
             runtime.write_text('# supports --max-fill\n')
-            script = root / "run_grt_step23.sh"
-            script.write_text("#!/usr/bin/env bash\npython3 /runtime/grt_step23.py --server-dir /workspace\n")
+            script = root / "run_grt_step12.sh"
+            script.write_text("#!/usr/bin/env bash\npython3 /runtime/grt_step12.py --server-dir /workspace\n")
             server_run.update_fill_limit(root, "2000000")
-            self.assertIn("grt_step23.py", script.read_text())
+            self.assertIn("grt_step12.py", script.read_text())
             self.assertIn("--max-fill 2000000", script.read_text())
-            self.assertFalse((root / "run_grt_step3.sh").exists())
+            self.assertFalse((root / "run_grt_step2.sh").exists())
 
     def test_large_refill_limit_preserves_other_candidate_checks(self):
         gap = {"object_id": "gap", "chr": "chr06", "start0": 10000, "end0": 10100}
@@ -124,7 +124,7 @@ class ServerRunTests(unittest.TestCase):
         right = {**left, "side": "R", "line_number": 2, "tstart": 1510000, "tend": 1520000}
         member = {"member_id": "member", "dataset_name": "assembly", "contig_name": "contig_40",
                   "orientation": "+", "source_start": "1", "source_end": "1520000"}
-        args = ("step3", [left, right], [gap], {"donor": member}, {"donor": "A" * 1520000})
+        args = ("step2", [left, right], [gap], {"donor": member}, {"donor": "A" * 1520000})
         candidates, rejected = build_candidates(*args)
         self.assertFalse(candidates)
         self.assertEqual(rejected[0]["reason"], "fill_length_gt_1000000")

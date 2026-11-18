@@ -10,7 +10,7 @@ from server.tools.lgz_core.q0_sources import SourceKey
 from server.tools.lgz_core.repair_structural import (
     apply_corrections, build_correction_candidates, promote_direct_source_overlap_merges,
 )
-from server.tools.lgz_core.step2_engine import build_step2_structural_fallback_candidates
+from server.tools.lgz_core.step1_engine import build_step1_structural_fallback_candidates
 from server.tools.lgz_core.structural_support import OverlapSupport, ReferenceSupport, self_context_lines
 
 
@@ -160,10 +160,10 @@ class SourceOverlapTests(unittest.TestCase):
         self.assertEqual(first["source_overlap_support"]["status"], "supported")
         self.assertEqual(second["outcome"], "rejected")
 
-    def test_step2_structural_fallback_uses_same_cross_dataset_proof(self):
+    def test_step1_structural_fallback_uses_same_cross_dataset_proof(self):
         sources, paths, origin, _, parts = fixture()
         rows = [row(1, 1, 14000, 1, 14000), row(2, 14101, 29100, 2001, 17000)]
-        candidates = build_step2_structural_fallback_candidates([origin], rows, {"guide": member(size=17000)},
+        candidates = build_step1_structural_fallback_candidates([origin], rows, {"guide": member(size=17000)},
                                                               input_paths=paths, sources=sources)
         accepted = [candidate for candidate in candidates if candidate["outcome"] == "accepted"]
         self.assertEqual(len(accepted), 1)
@@ -185,7 +185,7 @@ class SelfContextTests(unittest.TestCase):
             candidates = build_correction_candidates(origins, rows, members, input_paths=paths)
             self.assertTrue(candidates)
             self.assertTrue(all(c["outcome"] == "rejected" and "self_context" in c["reason"] for c in candidates))
-            fallback = build_step2_structural_fallback_candidates(origins, rows, members, input_paths=paths)
+            fallback = build_step1_structural_fallback_candidates(origins, rows, members, input_paths=paths)
             self.assertTrue(all(c["outcome"] == "rejected" for c in fallback))
 
     def test_self_crossing_cannot_hide_an_independent_guides_flanks(self):

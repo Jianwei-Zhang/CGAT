@@ -48,15 +48,10 @@ STATUS_FIELDS = [
 ]
 LGZ_CACHE_MARKERS = {
     "grt_prepare": ("LGZ prepare inputs are current:",),
-    "grt_step1": (
-        "LGZ step1_round1 cache hit:",
-        "LGZ step1_filter cache hit:",
-        "LGZ step1_round2 cache hit:",
-    ),
+    "grt_step1": ("LGZ step1 cache hit:",),
     "grt_step2": ("LGZ step2 cache hit:",),
+    "grt_step12": ("LGZ step1 cache hit:", "LGZ step2 cache hit:"),
     "grt_step3": ("LGZ step3 cache hit:",),
-    "grt_step23": ("LGZ step2 cache hit:", "LGZ step3 cache hit:"),
-    "grt_telomere_finalize": ("LGZ step4_telomere cache hit:",),
 }
 
 

@@ -24,13 +24,19 @@ def freeze_delivery_fixture(root, output, provenance):
     schema = json.loads((Path(__file__).parents[1] / "contracts/grt_precomputed_v2.json").read_text())
     freeze = json.loads((root / "metadata/grt_q0_freeze.json").read_text())
     selection = json.loads((root / "metadata/grt_q0_selection.json").read_text())
+    package_schema = read_tsv(root / "metadata/package.tsv")[0]["schema_version"]
+    table_paths = schema.get("package_schema_extensions", {}).get(package_schema, {}).get("table_paths", {})
     paths = (set(schema["required_files"]) | set(schema["tables"]) | set(freeze["artifacts"])
              | set(selection["artifact_hashes"]) | {"metadata/grt_q0_freeze.json"})
+    paths = {table_paths.get(name, name) for name in paths}
     paths.update("metadata/" + name for name in ("track_member_orders.tsv", "reference_chr_locator.tsv", "source_seq_n_regions.tsv")
                  if (root / "metadata" / name).is_file())
-    paths.update(f"grt/q/{version}.fa" for version in ("q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"))
+    versions = {row[key] for row in read_tsv(root / "metadata/grt_stage_status.tsv")
+                for key in ("q_input_version", "q_output_version")}
+    paths = {name for name in paths if not name.startswith("grt/q/") or Path(name).stem in versions}
+    paths.update(f"grt/q/{version}.fa" for version in versions)
     for table in schema["tables"]:
-        for row in read_tsv(root / table):
+        for row in read_tsv(root / table_paths.get(table, table)):
             paths.update(value for field, value in row.items() if field.endswith("_relpath") and value)
     data = {"fixture_schema": "lgz_frozen_delivery_fixture_v1", "provenance": provenance,
             "files": {name: (root / name).read_text(encoding="utf-8") for name in sorted(paths)}}

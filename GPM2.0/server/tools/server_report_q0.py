@@ -22,7 +22,7 @@ MODE = "evidence_guided_multi_source"
 
 def is_evidence_guided(root: Path) -> bool:
     rows = read_tsv(root / "metadata/package.tsv")
-    return bool(rows and rows[0].get("schema_version") == "3")
+    return bool(rows and rows[0].get("schema_version") in {"3", "4"})
 
 
 def bounded_table(rows):

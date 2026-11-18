@@ -21,7 +21,7 @@ from threading import Event, Lock
 
 from . import *
 from .common import *
-from .alignment_index import AlignmentCoordinateIndex, Step2MemberIndex
+from .alignment_index import AlignmentCoordinateIndex, Step1MemberIndex
 from .mummer import (
     command_identity, is_header_only_mummer_delta, mummer_parameters,
     parse_mummer_coords, run_logged, write_skipped_command_logs,
@@ -31,7 +31,7 @@ from .mummer import (
 def repair_engine_sha256(core_root: Path | None = None) -> str:
     """Hash the complete staged engine, independent of its installation path.
 
-    Step2 and Step3 intentionally share one identity: changing either stage or
+    Step1 and Step2 intentionally share one identity: changing either stage or
     a shared helper invalidates stage decisions, never independent raw alignments.
     Entry scripts are included so changing their CLI contract is also detected.
     """
@@ -47,7 +47,7 @@ def repair_engine_sha256(core_root: Path | None = None) -> str:
         for path in files
     }).encode("utf-8"))
 
-ENGINE_VERSION = 14
+ENGINE_VERSION = 15
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -77,7 +77,7 @@ REPAIR_MODES = {"conservative", "aggressive"}
 DEFAULT_REPAIR_MODE = "aggressive"
 MUMMER_SCOPES = {"full", "gap-screen"}
 DEFAULT_MUMMER_SCOPE = "full"
-DEFAULT_STEP3_MUMMER_SCOPE = "gap-screen"
+DEFAULT_STEP2_MUMMER_SCOPE = "gap-screen"
 EXECUTION_PROFILES = {"baseline", "optimized"}
 DEFAULT_EXECUTION_PROFILE = "optimized"
 ENGINE_SHA256 = repair_engine_sha256()

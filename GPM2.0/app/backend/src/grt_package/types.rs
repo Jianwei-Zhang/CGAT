@@ -6,6 +6,21 @@ pub const GRT_SCHEMA_VERSION: &str = "2";
 // Package generation with evidence-guided q0. Independent of Final Path's
 // display/local-evidence schema numbers below; legacy package 2 stays readable.
 pub const GRT_Q0_SCHEMA_VERSION: &str = "3";
+pub const GRT_CURRENT_SCHEMA_VERSION: &str = "4";
+
+pub(super) fn is_q0_package_schema(value: &str) -> bool {
+    matches!(value, GRT_Q0_SCHEMA_VERSION | GRT_CURRENT_SCHEMA_VERSION)
+}
+pub(super) fn final_q_version(value: &str) -> &'static str {
+    if value == GRT_CURRENT_SCHEMA_VERSION { "q3" } else { "q4" }
+}
+pub(super) fn package_table_path<'a>(path: &'a str, current: bool) -> &'a str {
+    match (current, path) {
+        (true, "metadata/grt_step2_strategies.tsv") => "metadata/grt_step1_strategies.tsv",
+        (true, "metadata/grt_step3_classifications.tsv") => "metadata/grt_step2_classifications.tsv",
+        _ => path,
+    }
+}
 pub const GRT_FINAL_PATH_SCHEMA_VERSION: &str = "1";
 pub const GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION: &str = "2";
 pub const GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION: &str = "3";
@@ -480,3 +495,14 @@ pub(super) const STAGE_TRANSITIONS: &[(&str, &str, &str)] = &[
     ("step4_telomere", "q3", "q4"),
     ("finalize", "q4", "q4"),
 ];
+
+// Schema 4 renumbers the actual stages and artifacts, not just UI labels.
+pub(super) const Q0_DIRECT_STAGE_TRANSITIONS: &[(&str, &str, &str)] = &[
+    ("donor_freeze", "q0", "q0"),
+    ("step1", "q0", "q1"),
+    ("step2", "q1", "q2"),
+    ("step3", "q2", "q3"),
+    ("finalize", "q3", "q3"),
+];
+pub(super) const Q0_DIRECT_VERSIONS: &[&str] = &["q0", "q1", "q2", "q3"];
+pub(super) const LEGACY_Q_VERSIONS: &[&str] = &["q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"];

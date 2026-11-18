@@ -261,12 +261,12 @@ from pathlib import Path
 import sys
 from server.tests.q0_delivery_fixture import materialize
 from server.tools.lgz_core.contract.validator import validate_contract
-for name, fixture in (("reverse", "frozen_server.json"), ("bridge", "frozen_bridge_server.json")):
+for name, fixture in (("reverse", "frozen_server.json"), ("bridge", "frozen_bridge_server.json"), ("direct", "frozen_direct_server.json")):
     root = Path(sys.argv[1]) / name / "gpm_server"
     materialize(json.loads((Path("tests/fixtures/grt_contract_v3") / fixture).read_text()), root)
-    assert validate_contract(root)["schema_version"] == "3"
+    assert validate_contract(root)["schema_version"] == ("4" if name == "direct" else "3")
 PYQ0
-for fixture in reverse bridge; do
+for fixture in reverse bridge direct; do
   q0_source="${task_tmp_dir}/q0-v3/${fixture}/gpm_server"
   for kind in server full light; do
     printf 'q0 E2E: %s / %s\n' "$fixture" "$kind"
@@ -293,7 +293,7 @@ import sys
 source, stage, view_file = map(Path, sys.argv[1:4])
 kind = sys.argv[4]
 view = json.loads(view_file.read_text().removeprefix("json="))
-assert view["recipe"]["schema_version"] == "3"
+assert view["recipe"]["schema_version"] in {"3", "4"}
 expected = json.loads((stage / "metadata/grt_final_path.json").read_text())
 assert set(view["final_path_by_chr"]) == {c["chr"] for c in expected["chromosomes"]}
 for chromosome in expected["chromosomes"]:

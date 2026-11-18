@@ -81,7 +81,7 @@ for prefix in ('', 'server.tools.'):
 
     def test_new_cli_flags_preserve_existing_persisted_option_identity(self):
         from server.tools.server_run import parse_options
-        pairs = {"execution-profile": "optimized", "step3-mummer-scope": "full",
+        pairs = {"execution-profile": "optimized", "step2-mummer-scope": "full",
                  "qc-memory-gb": "64", "kmer-size": "21"}
         for option, value in pairs.items():
             self.assertEqual(parse_options(["--lgz-" + option, value], PROJECT),

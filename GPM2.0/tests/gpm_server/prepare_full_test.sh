@@ -164,7 +164,7 @@ assert_package_metadata() {
         exit 1
       }
       if ($(columns["workflow"]) != "gpm_grt_precomputed_v2" ||
-          $(columns["schema_version"]) != "3" ||
+          $(columns["schema_version"]) != "4" ||
           $(columns["grt_precompute_enabled"]) != "true" ||
           $(columns["recipe_locked"]) != "true" ||
           $(columns["final_path_schema_version"]) != "1") {
@@ -516,8 +516,8 @@ assert_chr_partition_run_all_staging() {
     exit 1
   }
   mapfile -t command_lines < <(tail -n +2 "$plan")
-  [[ "${#command_lines[@]}" -eq 14 ]] || {
-    echo "expected 14 staged plan units, got ${#command_lines[@]}" >&2
+  [[ "${#command_lines[@]}" -eq 13 ]] || {
+    echo "expected 13 staged plan units, got ${#command_lines[@]}" >&2
     if [[ "${#command_lines[@]}" -gt 0 ]]; then
       printf '%s\n' "${command_lines[@]}" >&2
     fi
@@ -543,7 +543,6 @@ grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
 grt_step1	run_lgz_step1.sh	logs/run_all.log
 grt_step2	run_lgz_step2.sh	logs/run_all.log
 grt_step3	run_lgz_step3.sh	logs/run_all.log
-grt_telomere_finalize	run_lgz_telomere_finalize.sh	logs/run_all.log
 chr:${chr_name}	runs/chr_${chr_name}/command.sh	logs/run_all.log
 finalize_evidence	finalize_lgz_evidence.sh	logs/run_all.log
 package_full	package_full_zip.sh	logs/run_all.log
@@ -682,7 +681,7 @@ test_custom_output_root() {
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
     --lgz-execution-profile optimized \
-    --lgz-step3-mummer-scope gap-screen \
+    --lgz-step2-mummer-scope gap-screen \
     --lgz-qc-memory-gb 80 \
     --lgz-kmer-size 21 \
     -o "$output_root" >"$prepare_log"
@@ -706,30 +705,30 @@ test_custom_output_root() {
   assert_file "${output_root}/.prepare_lib/tools/add_dataset_package.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
-  [[ ! -e "${output_root}/.prepare_lib/tools/grt_step23.py" ]]
+  [[ ! -e "${output_root}/.prepare_lib/tools/grt_step12.py" ]]
+  assert_file "${output_root}/.prepare_lib/tools/grt_core/step1_engine.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_core/step2_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_core/step3_engine.py"
+  assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step2.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step3.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_evidence_package.py"
   assert_file "${output_root}/.prepare_lib/contracts/grt_precomputed_v2.json"
   assert_file "${output_root}/prepare_lgz_inputs.sh"
+  [[ -f "${output_root}/run_lgz_step1.sh" ]]
   assert_file "${output_root}/run_lgz_step1.sh"
   assert_file "${output_root}/run_lgz_step2.sh"
   assert_file "${output_root}/run_lgz_step3.sh"
-  assert_file "${output_root}/run_lgz_telomere_finalize.sh"
   assert_file "${output_root}/finalize_lgz_evidence.sh"
-  for name in prepare_grt_inputs run_grt_step1 run_grt_step2 run_grt_step3 run_grt_telomere_finalize finalize_grt_evidence; do
+  for name in prepare_grt_inputs run_grt_step1 run_grt_step2 run_grt_step3 finalize_grt_evidence; do
     assert_file "${output_root}/${name}.sh"
     grep -F 'exec bash ' "${output_root}/${name}.sh" >/dev/null
     bash -n "${output_root}/${name}.sh"
   done
   assert_file "${output_root}/.prepare_lib/tools/lgz_compat.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step1_engine.py"
   assert_file "${output_root}/.prepare_lib/tools/lgz_core/step2_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step3_engine.py"
+  assert_file "${output_root}/.prepare_lib/tools/lgz_step1.py"
   assert_file "${output_root}/.prepare_lib/tools/lgz_step2.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_step3.py"
 
   assert_file "${output_root}/package_full_zip.sh"
   assert_file "${output_root}/package_light_zip.sh"
@@ -739,12 +738,12 @@ test_custom_output_root() {
   # Test legacy forwarding with a harmless spy, never by executing real analysis.
   local alias_dir="${output_root}/alias forwarding"
   mkdir -p "$alias_dir"
-  cp "${output_root}/run_grt_step3.sh" "${alias_dir}/run_grt_step3.sh"
-  cat > "${alias_dir}/run_lgz_step3.sh" <<'SPY'
+  cp "${output_root}/run_grt_step2.sh" "${alias_dir}/run_grt_step2.sh"
+  cat > "${alias_dir}/run_lgz_step2.sh" <<'SPY'
 #!/usr/bin/env bash
 printf '%s\n' "$@"
 SPY
-  [[ "$(bash "${alias_dir}/run_grt_step3.sh" one "two words")" == $'one\ntwo words' ]]
+  [[ "$(bash "${alias_dir}/run_grt_step2.sh" one "two words")" == $'one\ntwo words' ]]
 
 }
 

@@ -38,7 +38,7 @@ LGZ_QC_MEMORY_GB="80"
 LGZ_KMER_SIZE="21"
 LGZ_REFILL_MAX_LENGTH="1000000"
 LGZ_EXECUTION_PROFILE="optimized"
-LGZ_STEP3_MUMMER_SCOPE="gap-screen"
+LGZ_STEP2_MUMMER_SCOPE="gap-screen"
 
 usage() {
   cat <<'EOF'
@@ -63,7 +63,7 @@ Usage:
     [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
     [--lgz-execution-profile optimized|baseline] \
-    [--lgz-step3-mummer-scope gap-screen|full] \
+    [--lgz-step2-mummer-scope gap-screen|full] \
     [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
 Example:
@@ -93,11 +93,11 @@ Behavior:
   - --cen-min-identity filters hits; --cen-min-len filters merged candidate support (defaults: 80%, 10000 bp)
   - Manage local entries with library.sh list/add-tel/add-cen/remove; updates leave local/ unchanged
   - The first --ds remains project-primary metadata; q0 is selected across all initial datasets using alignment evidence
-  - --max-fill sets the Step3 optimized refill length limit in bp, default: 1000000
+  - --max-fill sets the Step2 optimized refill length limit in bp, default: 1000000
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
-  - LGZ defaults: optimized execution, full Step2, anchor-safe gap-screen Step3
+  - LGZ defaults: optimized execution, full Step1, anchor-safe gap-screen Step2
   - --lgz-execution-profile baseline restores legacy scheduling and per-chromosome refill
-  - --lgz-step3-mummer-scope full restores the complete Step3 MUMmer alignment scope
+  - --lgz-step2-mummer-scope full restores the complete Step2 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
   - Repeatable --reads enables one shared Meryl database plus parallel Merqury QV for every initial dataset
   - The --threads budget is divided across concurrent reads-QC dataset jobs
@@ -120,7 +120,7 @@ Behavior:
   - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ Step3 -> LGZ telomere/q4 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step1 -> LGZ Step2 -> LGZ telomere/q3 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
   - --skip-self conflicts with multiple same-dataset q0 candidates; assignment/evidence preparation stops with an error
   - Prints all generated staged commands to the terminal for manual copy/paste
@@ -399,7 +399,7 @@ write_package_metadata() {
     printf 'workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n'
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "gpm_grt_precomputed_v2" \
-      "3" \
+      "4" \
       "$package_mode" \
       "$sequence_layout" \
       "$preassigned_chr" \
@@ -460,8 +460,8 @@ write_prepare_options_metadata() {
     printf 'grt_craq\t%s\n' "$LGZ_CRAQ"
     printf 'grt_refill_max_length\t%s\n' "$LGZ_REFILL_MAX_LENGTH"
     printf 'grt_execution_profile\t%s\n' "$LGZ_EXECUTION_PROFILE"
-    printf 'grt_step2_mummer_scope\tfull\n'
-    printf 'grt_step3_mummer_scope\t%s\n' "$LGZ_STEP3_MUMMER_SCOPE"
+    printf 'grt_step1_mummer_scope\tfull\n'
+    printf 'grt_step2_mummer_scope\t%s\n' "$LGZ_STEP2_MUMMER_SCOPE"
     printf 'grt_qc_memory_gb\t%s\n' "$LGZ_QC_MEMORY_GB"
     printf 'grt_kmer_size\t%s\n' "$LGZ_KMER_SIZE"
   } > "$output_path"
@@ -562,24 +562,8 @@ write_lgz_step1_script() {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --execution-profile %s --step1-mummer-scope full\n' \
       "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step1.py")" \
-      "$(shell_quote "$work_root")" \
-      "$(shell_quote "$THREADS")" \
-      "$(shell_quote "$LGZ_MINIMAP2")"
-  } > "$output_path"
-  make_executable_if_supported "$output_path"
-}
-
-write_lgz_step2_script() {
-  local output_path="$1"
-  local work_root="$2"
-
-  {
-    printf '#!/usr/bin/env bash\n'
-    printf 'set -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --execution-profile %s --step2-mummer-scope full\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step2.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -591,15 +575,15 @@ write_lgz_step2_script() {
   make_executable_if_supported "$output_path"
 }
 
-write_lgz_step3_script() {
+write_lgz_step2_script() {
   local output_path="$1"
   local work_root="$2"
 
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s --execution-profile %s --step3-mummer-scope %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step3.py")" \
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s --execution-profile %s --step2-mummer-scope %s\n' \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step2.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -608,12 +592,12 @@ write_lgz_step3_script() {
       "$(shell_quote "$LGZ_SHOW_COORDS")" \
       "$(shell_quote "$LGZ_REFILL_MAX_LENGTH")" \
       "$(shell_quote "$LGZ_EXECUTION_PROFILE")" \
-      "$(shell_quote "$LGZ_STEP3_MUMMER_SCOPE")"
+      "$(shell_quote "$LGZ_STEP2_MUMMER_SCOPE")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
 
-write_lgz_telomere_finalize_script() {
+write_lgz_step3_script() {
   local output_path="$1"
   local work_root="$2"
 
@@ -621,7 +605,7 @@ write_lgz_telomere_finalize_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_telomere_finalize.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step3.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -832,9 +816,9 @@ while [[ $# -gt 0 ]]; do
       case "$2" in optimized|baseline) LGZ_EXECUTION_PROFILE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
-    --lgz-step3-mummer-scope|--grt-step3-mummer-scope)
+    --lgz-step2-mummer-scope|--grt-step2-mummer-scope)
       [[ $# -ge 2 ]] || die "$1 requires gap-screen or full"
-      case "$2" in gap-screen|full) LGZ_STEP3_MUMMER_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
+      case "$2" in gap-screen|full) LGZ_STEP2_MUMMER_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
     --max-fill|-m)
@@ -1080,7 +1064,7 @@ mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 [[ "${#REFERENCE_CHR_NAMES[@]}" -gt 0 ]] \
   || die "Reference FASTA contains no sequence records: $REF_DST"
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 10 + 2 * ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 9 + 2 * ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -1148,20 +1132,13 @@ printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step2.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 write_lgz_step3_script "${WORK_ROOT}/run_lgz_step3.sh" "$WORK_ROOT"
-append_run_all_unit "grt_step3" "run_lgz_step3.sh" "logs/run_all.log"
+append_run_all_unit \
+  "grt_step3" \
+  "run_lgz_step3.sh" \
+  "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step3"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step3.sh"
-COMMAND_INDEX=$((COMMAND_INDEX + 1))
-
-write_lgz_telomere_finalize_script "${WORK_ROOT}/run_lgz_telomere_finalize.sh" "$WORK_ROOT"
-append_run_all_unit \
-  "grt_telomere_finalize" \
-  "run_lgz_telomere_finalize.sh" \
-  "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_telomere_finalize"
-printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_telomere_finalize.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
@@ -1220,7 +1197,6 @@ echo "  - ${WORK_ROOT}/prepare_lgz_inputs.sh"
 echo "  - ${WORK_ROOT}/run_lgz_step1.sh"
 echo "  - ${WORK_ROOT}/run_lgz_step2.sh"
 echo "  - ${WORK_ROOT}/run_lgz_step3.sh"
-echo "  - ${WORK_ROOT}/run_lgz_telomere_finalize.sh"
 echo "  - ${WORK_ROOT}/finalize_lgz_evidence.sh"
 echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
 echo "  - ${WORK_ROOT}/.prepare_lib/lib"
@@ -1234,7 +1210,6 @@ for pair in \
   run_grt_step1:run_lgz_step1 \
   run_grt_step2:run_lgz_step2 \
   run_grt_step3:run_lgz_step3 \
-  run_grt_telomere_finalize:run_lgz_telomere_finalize \
   finalize_grt_evidence:finalize_lgz_evidence; do
   legacy="${pair%%:*}"
   canonical="${pair#*:}"
@@ -1249,7 +1224,7 @@ echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
 echo "     - This automatically creates both the full and light delivery archives"
 echo "  2. Or execute the staged commands printed above one by one, including the final two package commands"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, LGZ q0/D0/Dtel, LGZ Step1, LGZ Step2, LGZ Step3, LGZ telomere/q4 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, LGZ q0/D0/Dtel, LGZ Step1, LGZ Step1, LGZ Step2, LGZ telomere/q3 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi

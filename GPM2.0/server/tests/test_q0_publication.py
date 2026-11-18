@@ -28,7 +28,7 @@ def complete_workspace(fixture, directory, *, unassign=()):
     root = fixture.workspace(directory)
     def write(name, rows):
         write_tsv(root / name, SCHEMA["tables"][name]["header"], rows)
-    write("metadata/package.tsv", [{"workflow": "gpm_grt_precomputed_v2", "schema_version": "3",
+    write("metadata/package.tsv", [{"workflow": "gpm_grt_precomputed_v2", "schema_version": "4",
         "package_mode": "fast", "sequence_layout": "partitioned", "preassigned_chr": "true",
         "self_alignment_scope": "chr_partition", "cross_alignment_scope": "chr_partition",
         "chr_assignment_min_coverage_percent": "60", "grt_precompute_enabled": "true", "recipe_locked": "true",
@@ -214,18 +214,25 @@ class Q0PublicationTests(unittest.TestCase):
                 producer.prepare(args)
         self.assertEqual({name: (root / name).read_bytes() for name in before}, before)
 
-    def test_step1_replays_new_q0_and_preserves_its_selection_evidence(self):
+    def test_direct_repair_context_preserves_q0_selection_evidence(self):
         fixture, truth = bridge_fixture()
         root = complete_workspace(fixture, self.directory)
         completed = run_prepare(root)
         self.assertEqual(completed.returncode, 0, completed.stderr)
         frozen_before = (root / FREEZE).read_bytes()
         evidence_before = read_tsv(root / "metadata/grt_evidence_registry.tsv")
-        completed = subprocess.run([sys.executable, str(PROJECT / "server/tools/lgz_step1.py"),
-                                    "--server-dir", str(root), "--threads", "1"], capture_output=True, text=True)
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        for version in ("q0r1", "q0f", "q1"):
-            self.assertEqual(dict(read_fasta(root / f"grt/q/{version}.fa")), {"chr1": truth})
+        from server.tools.lgz_core.repair_runtime import execution_context
+        import argparse
+        args = argparse.Namespace(server_dir=root, nucmer="nucmer", delta_filter="delta-filter",
+                                  show_coords="show-coords", minimap2="minimap2")
+        # Only external executable identity is controlled here; q0 loading and
+        # frozen-source authorization use the production path.
+        with mock.patch("server.tools.lgz_core.repair_runtime.executable_identity",
+                        side_effect=lambda name: {"resolved": name, "version": "fixture", "sha256": "0" * 64}):
+            context = execution_context(args)
+        self.assertEqual(context["q0_records"], {"chr1": truth})
+        self.assertEqual(context["initial_consumed"], [])
+        self.assertFalse((root / "grt/q/q1.fa").exists())
         after = [r for r in read_tsv(root / "metadata/grt_evidence_registry.tsv") if r["stage"] == "q0_construction"]
         self.assertEqual(after, evidence_before)
         self.assertEqual((root / FREEZE).read_bytes(), frozen_before)

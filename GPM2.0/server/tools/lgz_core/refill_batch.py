@@ -92,7 +92,7 @@ class RefillBatchAlignment:
                    "query_sha256": sha256_bytes(query_payload),
                    "mapping": {"preset": PRESET, "cigar": True, "keep_all_chains": True, "threads": self.threads}}
         key = json_hash(payload)
-        parent = self.server_dir / f"grt/cache/step23/raw_refill_batch/v1/{self.stage}"
+        parent = self.server_dir / f"grt/cache/step12/raw_refill_batch/v1/{self.stage}"
         parent.mkdir(parents=True, exist_ok=True)
         destination = parent / key
         outputs = ("flanks.fa", "result.paf", "command.txt", "stdout.log", "stderr.log", "provenance.json")
@@ -181,8 +181,8 @@ class RefillBatchAlignment:
         if self.rows is None:
             self._prepare()
         # Select from the original PAF stream, not query-grouped rows. With a
-        # multi-part minimap2 index the original order is part1(q1,q2), then
-        # part2(q1,q2); regrouping by query would silently alter line/tie order.
+        # multi-part minimap2 index the original order is part1(q1,q1), then
+        # part2(q1,q1); regrouping by query would silently alter line/tie order.
         names = [line[1:].split()[0] for line in query_fasta.read_text().splitlines()
                  if line.startswith(">")]
         selected = set(names)

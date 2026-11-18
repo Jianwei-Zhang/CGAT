@@ -1,4 +1,4 @@
-"""Regression coverage for Step2 events after gap-preserving and gapless edits."""
+"""Regression coverage for Step1 events after gap-preserving and gapless edits."""
 
 import hashlib
 import unittest
@@ -9,11 +9,11 @@ from server.tools.grt_core.repair_common import (
 )
 from server.tools.grt_core.repair_structural import apply_corrections
 from server.tools.grt_core.stage_io import q_rows_for_paths
-from server.tools.grt_core.step2_engine import build_step2_structural_events
-from server.tools.grt_core.step3_engine import reconcile_step2_events_with_step3, replay_step3
+from server.tools.grt_core.step1_engine import build_step1_structural_events
+from server.tools.grt_core.step2_engine import reconcile_step1_events_with_step2, replay_step2
 
 
-class Step2StructuralEventsTests(unittest.TestCase):
+class Step1StructuralEventsTests(unittest.TestCase):
     @staticmethod
     def fixture(policy=PRIMARY_OVERLAP_POLICY, *, coalesced=False):
         sources = {("primary", "left"): "A" * 40,
@@ -55,20 +55,20 @@ class Step2StructuralEventsTests(unittest.TestCase):
         output_paths, output_records, prototypes, origins = apply_corrections(
             ["Chr01"], paths, records, gaps, [candidate], sources,
         )
-        q1_hash = hashlib.sha256(records["Chr01"].encode("ascii")).hexdigest()
-        q2_hash = hashlib.sha256(output_records["Chr01"].encode("ascii")).hexdigest()
-        events, attempts = build_step2_structural_events(
-            "run-test", q1_hash, q2_hash, gaps, [candidate], prototypes, origins,
+        q0_hash = hashlib.sha256(records["Chr01"].encode("ascii")).hexdigest()
+        q1_hash = hashlib.sha256(output_records["Chr01"].encode("ascii")).hexdigest()
+        events, attempts = build_step1_structural_events(
+            "run-test", q0_hash, q1_hash, gaps, [candidate], prototypes, origins,
         )
         for event in events:
             after = event["q_after"]
-            self.assertEqual(after["version"], "q2")
-            self.assertEqual(after["sha256"], q2_hash)
+            self.assertEqual(after["version"], "q1")
+            self.assertEqual(after["sha256"], q1_hash)
             self.assertGreaterEqual(after["start"], 1)
             self.assertLessEqual(after["start"], after["end"])
             self.assertLessEqual(after["end"], len(output_records["Chr01"]))
         edits = [event for event in events if event["status"] == "accepted"]
-        self.assertEqual(replay_step3(records, edits, [], sources), output_records)
+        self.assertEqual(replay_step2(records, edits, [], sources), output_records)
         return events, attempts, output_paths, output_records
 
     def test_gapless_junction_uses_prototype_and_preserves_following_gap(self):
@@ -100,11 +100,11 @@ class Step2StructuralEventsTests(unittest.TestCase):
                 self.assertEqual([row["status"] for row in attempts], ["accepted", "superseded"])
                 self.assertEqual(records["Chr01"], "A" * 40 + "T" * 30)
                 self.assertFalse(any(segment["segment_kind"] == "gap" for segment in paths["Chr01"]))
+                q1_rows = q_rows_for_paths("q1", ["Chr01"], paths)
                 q2_rows = q_rows_for_paths("q2", ["Chr01"], paths)
-                q3_rows = q_rows_for_paths("q3", ["Chr01"], paths)
-                reconcile_step2_events_with_step3(
-                    {"events": events, "q_rows": q2_rows, "usage_rows": [], "evidence_rows": []},
-                    {"events": [], "q_rows": q3_rows},
+                reconcile_step1_events_with_step2(
+                    {"events": events, "q_rows": q1_rows, "usage_rows": [], "evidence_rows": []},
+                    {"events": [], "q_rows": q2_rows},
                 )
                 self.assertEqual(primary["status"], "accepted")
 
@@ -149,21 +149,21 @@ class Step2StructuralEventsTests(unittest.TestCase):
 
     def test_missing_unresolved_origin_fails_explicitly(self):
         gap = {"chr": "Chr01", "object_id": "missing-gap", "start0": 40, "end0": 140}
-        with self.assertRaisesRegex(SystemExit, "Step2.*output.*missing-gap"):
-            build_step2_structural_events("run-test", "q1", "q2", [gap], [], [], {})
+        with self.assertRaisesRegex(SystemExit, "Step1.*output.*missing-gap"):
+            build_step1_structural_events("run-test", "q0", "q1", [gap], [], [], {})
 
     def test_missing_accepted_prototype_fails_explicitly(self):
         _, _, _, gaps, candidate = self.fixture()
-        with self.assertRaisesRegex(SystemExit, "Step2.*prototype.*correction-1"):
-            build_step2_structural_events("run-test", "q1", "q2", gaps[:1], [candidate], [], {})
+        with self.assertRaisesRegex(SystemExit, "Step1.*prototype.*correction-1"):
+            build_step1_structural_events("run-test", "q0", "q1", gaps[:1], [candidate], [], {})
 
     def test_missing_normalized_gap_origin_is_not_replaced_by_prototype(self):
         sources, paths, records, gaps, candidate = self.fixture(None)
         _, _, prototypes, _ = apply_corrections(
             ["Chr01"], paths, records, gaps, [candidate], sources,
         )
-        with self.assertRaisesRegex(SystemExit, "Step2.*output.*gap-1"):
-            build_step2_structural_events("run-test", "q1", "q2", gaps[:1], [candidate], prototypes, {})
+        with self.assertRaisesRegex(SystemExit, "Step1.*output.*gap-1"):
+            build_step1_structural_events("run-test", "q0", "q1", gaps[:1], [candidate], prototypes, {})
 
     def test_gapless_deletion_cannot_remove_entire_chromosome(self):
         sources, paths, records, gaps, candidate = self.fixture()
@@ -178,8 +178,8 @@ class Step2StructuralEventsTests(unittest.TestCase):
             ["Chr01"], paths, records, gaps, [candidate], sources,
         )
         prototypes[0]["replacement_length"] = 100
-        with self.assertRaisesRegex(SystemExit, "Step2.*gapless.*correction-1"):
-            build_step2_structural_events("run-test", "q1", "q2", gaps, [candidate], prototypes, origins)
+        with self.assertRaisesRegex(SystemExit, "Step1.*gapless.*correction-1"):
+            build_step1_structural_events("run-test", "q0", "q1", gaps, [candidate], prototypes, origins)
 
 
 if __name__ == "__main__":

@@ -130,7 +130,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--reads <fastq>` | Optional, repeatable | Enable shared Meryl data plus per-dataset Merqury QV assessment; the `--threads` budget is distributed across datasets. |
 | `--lgz-qc-memory-gb <n>` | `80` | Memory limit for optional reads QC. |
 | `--lgz-kmer-size <n>` | `21` | K-mer size for optional reads QC. |
-| `--max-fill <bp>` | `1000000` | Length limit for both Step3 optimized refill rounds; can be changed on resume. |
+| `--max-fill <bp>` | `1000000` | Length limit for both Step2 optimized refill rounds; can be changed on resume. |
 
 ### Telomere / centromere libraries
 
@@ -194,7 +194,7 @@ The runner executes the generated plan serially, stops at the first error, valid
 
 | Archive | Contents and use |
 | --- | --- |
-| `gpm_server.tar.gz` | Full App package with source/reference FASTA, authoritative q4 FASTA, and the complete `report/` directory. Supports client-side FASTA export. |
+| `gpm_server.tar.gz` | Full App package with source/reference FASTA, authoritative final q3 FASTA, and the complete `report/` directory. Supports client-side FASTA export. |
 | `gpm_server.light.tar.gz` | Light App package with FASTA omitted; retains `.fai`, metadata, Final Path, source-card state, PAF views, and the complete `report/` directory. Supports import, inspection, and PNG/TSV export. |
 
 The default is parallel `tar.gz` compression with pigz. Use `--archive-format zip` for ZIP; the App accepts both formats.

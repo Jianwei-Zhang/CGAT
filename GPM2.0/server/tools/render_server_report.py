@@ -129,13 +129,9 @@ METHODS = {
     "prepare": "记录原始文件身份、数据角色与规范化后的 FASTA 统计。",
     "assign": "依据经过过滤的参考比对及覆盖率阈值分配染色体，记录方向与排列顺序。",
     "grt_prepare": "构建 q0，锁定普通供体与端粒供体；提供 reads 时执行输入质量评估。",
-    "step1_round1": "记录外部 contig 模式的第一阶段及其实际序列变化。",
-    "step1_filter": "记录过滤阶段；延期处理会保留原因。",
-    "step1_round2": "记录第二阶段及通往 q1 的序列变化。",
-    "step2": "生成并验证补丁候选，按染色体选择补丁或结构修正分支，生成 q2。",
-    "step3": "处理结构问题、重叠与后续优化填补，记录过滤和未解决的问题，生成 q3。",
-    "step4_telomere": "检查染色体两端、验证端粒供体并记录处理结果，生成 q4。",
-    "finalize_evidence": "整理最终路径使用的 contig 和比对证据，执行结果契约校验。",
+    "step1": "生成并验证补丁候选，按染色体选择补丁或结构修正分支，生成 q1。",
+    "step2": "处理结构问题、重叠与后续优化填补，记录过滤和未解决的问题，生成 q2。",
+    "step3": "检查染色体两端、验证端粒供体并记录处理结果，生成 q3 / Final Path。",
 }
 
 
@@ -219,9 +215,9 @@ def stage_io_html(record: dict) -> str:
                       if facts.get("q0_construction") else
                       '<strong>归属与排列结果</strong><span>主组装、辅助组装及可选 QC 数据</span>')
     elif stage_id.startswith("chr:"):
-        input_body = f'<strong>q4 · {esc(stage_id.split(":", 1)[1])}</strong><span>最终染色体与路径证据</span>'
+        input_body = f'<strong>Final Path · {esc(stage_id.split(":", 1)[1])}</strong><span>最终染色体与路径证据</span>'
     elif stage_id == "finalize_evidence":
-        input_body = '<strong>q4 + Final Path</strong><span>阶段事件、供体使用和比对证据</span>'
+        input_body = '<strong>Final Path</strong><span>阶段事件、供体使用和比对证据</span>'
     elif stage_id.startswith("package_"):
         input_body = '<strong>已验证工作目录</strong><span>结果、元数据和交付脚本</span>'
     else:
@@ -265,7 +261,7 @@ def pipeline_map_html(records: list[dict], input_facts: dict, final: dict) -> st
     assignment = next((row for row in records if row.get("stage_id") == "assign"), {})
     grt_prepare = next((row for row in records if row.get("stage_id") == "grt_prepare"), {})
     q0 = grt_prepare.get("facts", {}).get("sequence_versions", {}).get("q0", {})
-    q4 = final.get("sequence_versions", {}).get("q4", {})
+    q4 = final.get("sequence_versions", {}).get(final.get("final_q_version", "q4"), {})
     assigned = assignment.get("facts", {}).get("summary", {}).get("assigned_unique_contigs")
     stages = [
         ("01", "原始输入", f"{len(datasets)} 组 FASTA",
@@ -273,7 +269,7 @@ def pipeline_map_html(records: list[dict], input_facts: dict, final: dict) -> st
         ("02", "参考比对", f"{len(refs)} 个比对任务", "生成覆盖与定位证据"),
         ("03", "染色体归属", f"{display(assigned)} 条 contig", "按覆盖、方向和锚点排序"),
         ("04", "构建 q0 与供体", f"{compact_number(q0.get('length_bp'))}", f"{display(q0.get('gap_count'))} 个初始 Gap"),
-        ("05", "LGZ 修复", "q0 → q1 → q2 → q3 → q4", "填补、结构修正与端粒处理"),
+        ("05", "LGZ 修复", ("q0 → q1 → q2 → q3" if final.get("final_q_version") == "q3" else "q0 → q1 → q2 → q3 → q4"), "填补、结构修正与端粒处理"),
         ("06", "最终结果", f"{compact_number(q4.get('length_bp'))}", f"{display(q4.get('sequence_count'))} 条输出序列 · {display(q4.get('gap_count'))} 个 Gap"),
         ("07", "证据与交付", f"{display(final.get('process_summary', {}).get('event_count'))} 个事件", "HTML、JSON 与 Server ZIP"),
     ]
@@ -320,7 +316,7 @@ def outcome_summary_html(final: dict) -> str:
         "achieved": "已输出序列无 N/Gap，且两端均检测到端粒信号；不等于全基因组完整性验收",
         "not_achieved": "仍有 N/Gap，或至少一个染色体末端缺少端粒信号",
         "unknown": "端粒末端记录不完整，暂不能判断",
-        "unavailable": "最终 q4 尚未生成",
+        "unavailable": "最终路径 尚未生成",
     }.get(t2t_status, "")
     complete = summary.get("telomere_ends_complete")
     total = summary.get("telomere_ends_total")
@@ -338,7 +334,7 @@ def outcome_summary_html(final: dict) -> str:
         ("总长度", compact_number(summary.get("total_length_bp")),
          f'{display(chromosome_count)} 条最终序列' if chromosome_count is not None else "最终序列尚未生成", "length"),
         ("Gap 数净变化", gap_text,
-         "q4 − q0；减少不等于真实缺失序列闭合", "remaining" if isinstance(gap_change, int) and gap_change > 0 else "closed"),
+         "Final Path − q0；减少不等于真实缺失序列闭合", "remaining" if isinstance(gap_change, int) and gap_change > 0 else "closed"),
         ("剩余 Gap", display(summary.get("remaining_gap_count")),
          "连续 N ≥ 100 bp", "remaining"),
         ("端粒完整性", telomere_value, telomere_detail, "telomere"),
@@ -426,7 +422,7 @@ def final_path_visual_html(final: dict) -> str:
                 end = min(total, marker.get("q4_end", total))
                 left = 100 * (start - 1) / total
                 width = max(.45, 100 * max(1, end - start + 1) / total)
-                marker_title = (f'{chromosome_name} 着丝粒候选区域 · q4:{display(start)}–{display(end)} · '
+                marker_title = (f'{chromosome_name} 着丝粒候选区域 · Final Path:{display(start)}–{display(end)} · '
                                 f'{marker.get("dataset_name", "")}:{marker.get("ctg_name", "")}')
                 evidence = annotation_evidence_text(marker.get("provenance"))
                 marker_title += f" · {evidence}" if evidence else ""
@@ -514,7 +510,7 @@ def render(root: Path) -> Path:
         raise ValueError("mixed invocation or schema in report input record")
     records = [project_report_record(load(root, relative)) for relative in manifest["steps"]]
     grt = [project_report_record(load(root, p.relative_to(root).as_posix())) for p in sorted((root / "steps").glob("grt-*.json"))]
-    stage_order = ["step1_round1", "step1_filter", "step1_round2", "step2", "step3", "step4_telomere"]
+    stage_order = ["step1", "step2", "step3"]
     grt.sort(key=lambda row: stage_order.index(row["stage_id"]) if row["stage_id"] in stage_order else len(stage_order))
     for record in [*records, *grt]:
         if record.get("run_id") != manifest["run_id"] or record.get("schema_version") != SCHEMA:
@@ -637,12 +633,12 @@ def render(root: Path) -> Path:
         body += '<p class="warn">任务尚未全部完成；未测量的指标不会被解释为成功结果。</p>'
     body += '</section><section id="results"><h2>染色体组成与标记</h2>'
     if not final.get("available"):
-        body += '<p class="warn">本次运行尚无经过确认的最终 q4 / Final Path。</p>'
+        body += '<p class="warn">本次运行尚无经过确认的最终路径 / Final Path。</p>'
     else:
         body += final_path_visual_html(final)
     if modern_q0:
         body += '<div class="block" id="q0-construction"><h2>q0 构建与未解决范围</h2>' + q0_summary_html(q0_construction) + '</div>'
-    body += '<details class="block secondary-results"><summary>查看 q0 → q4 演化和组装统计</summary><h3>q0 → q4 序列演化</h3>'
+    body += '<details class="block secondary-results"><summary>查看 q0 → Final Path 演化和组装统计</summary><h3>q0 → Final Path 序列演化</h3>'
     body += lgz_flow_html(grt, final)
     versions = {}
     if modern_q0:
@@ -659,10 +655,10 @@ def render(root: Path) -> Path:
     body += '<details class="block secondary-results"><summary>查看事件与最终路径审计明细</summary>'
     body += data_table("event_reconciliation", final.get("event_reconciliation", []))
     remaining = [e for e in final.get("events", []) if e.get("status") in {"unresolved", "rejected"}]
-    body += '<p class="note">历史未接受事件可能已由后续阶段解决；最终剩余 gap 以 q4 的序列统计为准。</p>'
+    body += '<p class="note">历史未接受事件可能已由后续阶段解决；最终剩余 gap 以最终路径的序列统计为准。</p>'
     body += data_table("历史未接受事件与原因", remaining)
     body += data_table("最终染色体路径", final.get("final_path", {}).get("chromosomes", []))
-    body += data_table("各染色体最终统计", (final.get("sequence_versions", {}).get("q4") or {}).get("sequences", []))
+    body += data_table("各染色体最终统计", (final.get("sequence_versions", {}).get(final.get("final_q_version", "q4")) or {}).get("sequences", []))
     body += '</details></section>'
     body += ('<section id="workflow" class="technical-section"><details class="section-disclosure"><summary>分析流程与任务概览</summary>'
              '<p class="workflow-copy">从原始 FASTA 开始，依次经过参考比对、染色体归属、q0 与供体构建、LGZ 修复和证据固化。</p>'

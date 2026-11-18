@@ -107,7 +107,7 @@ tails so the underlying error remains available after temporary QC cleanup.
 `run.sh -t 32` sets the total compute-thread budget. Newly prepared workspaces
 automatically share it across independent alignment tasks.
 
-### Resuming a workspace after Step3 provenance fixes
+### Historical workspace provenance fixes (old stage numbering)
 
 The error `cannot map filtered Step3 gap back to q2` can occur when a run of
 `N` bases lies inside a source contig or spans multiple path segments. Step3 now
@@ -160,19 +160,36 @@ means “already latest”.
 
 ### Independent LGZ stage controls and execution profiles
 
-New workspaces generate separate `run_lgz_step2.sh` and `run_lgz_step3.sh` stage scripts with independent scheduler status and checkpoints. Run Step2 before Step3; Step3 validates that a compatible Step2 result is present before starting. Both stages share a content fingerprint covering the repair engines and shared modules—when any repair code changes, stage outputs are invalidated and regenerated from Step2 while compatible raw MUMmer alignment caches remain reusable.
+New workspaces use **package schema 4** and continuous stage/output numbering:
+
+| Stage | Script | Output |
+| --- | --- | --- |
+| Evidence-guided initial path | `prepare_lgz_inputs.sh` | q0 |
+| Patch validation and repair branches | `run_lgz_step1.sh` | q1 |
+| Structural correction and optimized refill | `run_lgz_step2.sh` | q2 |
+| Telomere recovery and Final Path | `run_lgz_step3.sh` | q3 |
+
+Run these in order, normally through `run_all.sh`. Each real stage has its own
+checkpoint; the removed identity stages produce no q0r1/q0f files. Step2 verifies
+its Step1 dependency before starting. Repair code changes invalidate decisions,
+while content-compatible raw MUMmer alignment caches remain reusable.
+
+Historical schema-2/3 packages remain readable with their original numbering.
+They are not relabeled or migrated in place to this execution chain: prepare a
+new schema-4 workspace and keep the old results. The historical recovery notes
+above refer to their original matching runtime, not to a numbering migration.
 
 Newly prepared workflows enable the validated optimization route by default:
 
 - `--lgz-execution-profile optimized`: uses a shared CPU/memory-bounded `nucmer` pool, largest-target-first scheduling, verified partition FASTA reuse, exact anchor indexes, and coordinate-parse cache reuse while preserving deterministic output and tie-breaking order.
-- Step2 always runs at **full scope**.
-- `--lgz-step3-mummer-scope gap-screen`: screens donor partitions safely by anchor before running full-chromosome alignment on selected partitions.
-- Optimized Step3 refill batches same-round flank queries and reuses content-verified `.mmi` indexes.
+- Step1 runs at **full scope** by default.
+- `--lgz-step2-mummer-scope gap-screen`: screens donor partitions safely by anchor before running full-chromosome alignment on selected partitions.
+- Optimized Step2 refill batches same-round flank queries and reuses content-verified `.mmi` indexes.
 
 To fall back to the unscreened baseline profile when preparing a **new** workspace, pass:
 
 ```bash
---lgz-execution-profile baseline --lgz-step3-mummer-scope full
+--lgz-execution-profile baseline --lgz-step2-mummer-scope full
 ```
 
 New `run.sh` and generated `run_all.sh` launchers check for a code-only update before analysis and before acquiring the run lock. They reload code after updating, without user configuration. Before a network check, a stopped prepared runtime can also be aligned from the verified local installation, so older updaters that omitted nested modules do not require a second download on an offline compute node. If the check fails before any mutation, an integrity-verified installed runtime can still run offline; a write/rollback failure stops startup. Git/development packages and help-only calls do not contact the update service. An explicit `update.sh` also upgrades byte-recognized old `run_all.sh` launchers with a rollback backup; customized scripts are not overwritten.
@@ -315,7 +332,7 @@ Rerun the same `run.sh` command, or use `bash "$SERVER/run.sh" -o ./gpm_server` 
 
 On compute nodes where update sources are unreachable, startup verifies the local installation and aligns `.prepare_lib` without downloading. Detailed failed checks are saved in `.run_all/update-check.log`; offline startup does not imply that the local version is the latest.
 
-`--max-fill <bp>` sets the length limit for both Step3 optimized refill rounds (default: `1000000`). Change it with `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.
+`--max-fill <bp>` sets the length limit for both Step2 optimized refill rounds (default: `1000000`). Change it with `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.
 
 
 See the parent repository's `README.md` for the complete options and desktop workflow.

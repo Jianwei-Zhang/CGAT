@@ -36,20 +36,19 @@ class RealSourceStructuralPipelineTests(unittest.TestCase):
             raise unittest.SkipTest("default nucmer is not MUMmer4; set GPM_TEST_MUMMER_BIN")
 
     def run_pipeline(self, root, profile="optimized"):
-        for script in ("lgz_step1.py", "lgz_step2.py", "lgz_step3.py", "lgz_telomere_finalize.py"):
+        for script in ("lgz_step1.py", "lgz_step2.py", "lgz_step3.py"):
             command = [sys.executable, str(PROJECT / "server/tools" / script), "--server-dir", str(root), "--threads", "1"]
-            if script != "lgz_step1.py":
-                for name, executable in self.tools.items():
-                    command += ["--"+name, executable]
-            if script in {"lgz_step2.py", "lgz_step3.py"}:
+            for name, executable in self.tools.items():
+                command += ["--"+name, executable]
+            if script in {"lgz_step1.py", "lgz_step2.py"}:
                 command += ["--execution-profile", profile]
             result = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, f"{script}: {result.stdout}\n{result.stderr}")
         sources = source_catalog(root)
         auth = SourceAuthorization.load(root, sources)
-        _, paths, _ = load_q_paths(root, "q4", read_tsv(root / "metadata/grt_q_segments.tsv"), sources)
+        _, paths, _ = load_q_paths(root, "q3", read_tsv(root / "metadata/grt_q_segments.tsv"), sources)
         auth.validate_paths(paths)
-        return dict(read_fasta(root / "grt/q/q4.fa"))
+        return dict(read_fasta(root / "grt/q/q3.fa"))
 
     def test_original_n_adjacency_survives_self_context_in_both_orientations(self):
         for orientation, duplicate in (("+", False), ("-", False), ("+", True), ("-", True)):
@@ -66,9 +65,9 @@ class RealSourceStructuralPipelineTests(unittest.TestCase):
                 expected = sequence if orientation == "+" else reverse_complement(sequence)
                 self.assertEqual(dict(read_fasta(root / "grt/q/q0.fa")), {"chr1": expected})
                 self.assertEqual(self.run_pipeline(root), {"chr1": expected})
-                for version in ("q1", "q2", "q3"):
+                for version in ("q0", "q1", "q2"):
                     self.assertEqual(dict(read_fasta(root / f"grt/q/{version}.fa")), {"chr1": expected})
-                candidates = read_tsv(root / "grt/evidence/step2/candidates.tsv")
+                candidates = read_tsv(root / "grt/evidence/step1/candidates.tsv")
                 self.assertTrue(any(row["reason"] == "self_context_is_not_independent_structural_evidence" for row in candidates))
                 if duplicate:
                     self.assertTrue(any(row["reason"] == "guide_confirms_existing_sequence_context" for row in candidates))
@@ -90,7 +89,7 @@ class RealSourceStructuralPipelineTests(unittest.TestCase):
             self.assertEqual(prepared.returncode, 0, prepared.stderr)
             self.assertEqual(dict(read_fasta(root / "grt/q/q0.fa")), {"chr1": original})
             self.assertEqual(self.run_pipeline(root), {"chr1": before + common + after})
-            rows = [row for row in read_tsv(root / "metadata/grt_q_segments.tsv") if row["q_version"] == "q4"]
+            rows = [row for row in read_tsv(root / "metadata/grt_q_segments.tsv") if row["q_version"] == "q3"]
             self.assertTrue(all(row["dataset_name"] == "scaffold" for row in rows))
             self.assertEqual([(row["source_start"], row["source_end"]) for row in rows], [("1", "16000"), ("28138", "32137")])
 
@@ -115,7 +114,7 @@ class RealSourceStructuralPipelineTests(unittest.TestCase):
                 proofs = [json.loads(row["parameters_json"]) for row in read_tsv(root / "metadata/grt_evidence_registry.tsv")]
                 self.assertTrue(any(p.get("source_overlap_support", {}).get("status") == "supported"
                                     for p in proofs if p.get("source_overlap_support") is not None))
-                source_rows = [row for row in read_tsv(root / "metadata/grt_q_segments.tsv") if row["q_version"] == "q4"]
+                source_rows = [row for row in read_tsv(root / "metadata/grt_q_segments.tsv") if row["q_version"] == "q3"]
                 right_row = next(row for row in source_rows if row["dataset_name"] == "right")
                 self.assertEqual((right_row["source_start"], right_row["source_end"]), ("12001", "16000"))
                 self.assertNotIn("guide", {row["dataset_name"] for row in source_rows})
@@ -142,8 +141,8 @@ class RealSourceStructuralPipelineTests(unittest.TestCase):
             self.assertEqual(frozen_right["available"], [])
             self.assertEqual(frozen_right["occupied"], [{"start": 0, "end": 16000}])
             self.assertEqual(self.run_pipeline(root), {"chr1": before + common + after, "chr2": x_prefix + common + y_suffix})
-            q4 = [row for row in read_tsv(root / "metadata/grt_q_segments.tsv") if row["q_version"] == "q4"]
-            reused = [row for row in q4 if row["chr"] == "chr2" and row["dataset_name"] == "right"]
+            q3 = [row for row in read_tsv(root / "metadata/grt_q_segments.tsv") if row["q_version"] == "q3"]
+            reused = [row for row in q3 if row["chr"] == "chr2" and row["dataset_name"] == "right"]
             self.assertEqual([(row["source_start"], row["source_end"]) for row in reused], [("2001", "10000")])
             decisions = [json.loads(row["parameters_json"]).get("source_interval_authorization")
                          for row in read_tsv(root / "metadata/grt_evidence_registry.tsv")]
@@ -171,7 +170,7 @@ class RealSourceStructuralPipelineTests(unittest.TestCase):
             self.assertEqual(len(final["chr1"]), len(expected["chr1"]))
             self.assertEqual(final, expected)
             events = [json.loads(line) for line in (root / "metadata/grt_events.jsonl").read_text().splitlines()]
-            retained = [event for event in events if event["stage"] == "step3"
+            retained = [event for event in events if event["stage"] == "step2"
                         and event["reason"] == "q0_supported_short_components_retained"]
             self.assertEqual(len(retained), 1)
             self.assertEqual(retained[0]["edit"]["q0_protection"]["retained_components"], [[130101, 131300]])
@@ -189,7 +188,7 @@ class RealSourceStructuralPipelineTests(unittest.TestCase):
             self.assertEqual(dict(read_fasta(root / "grt/q/q0.fa")), {"chr1": backbone})
             self.assertEqual(self.run_pipeline(root), {"chr1": backbone + terminal})
             terminal_evidence = [row for row in read_tsv(root / "metadata/grt_evidence_registry.tsv")
-                                 if row["stage"] == "step4_telomere" and row["status"] == "accepted"
+                                 if row["stage"] == "step3" and row["status"] == "accepted"
                                  and row["evidence_type"] in {"mummer_telomere_anchor", "minimap2_terminal_overlap_validation"}]
             self.assertTrue(terminal_evidence)
             self.assertTrue(all(json.loads(row["parameters_json"])["source_interval_authorization"]["status"] == "accepted"

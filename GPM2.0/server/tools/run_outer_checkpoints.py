@@ -43,11 +43,10 @@ WORKFLOW = "gpm_run_outer_v1"
 LGZ_WORKFLOW = "gpm_grt_precomputed_v2"
 LGZ_STAGE_MAP = {
     "grt_prepare": ("donor_freeze",),
-    "grt_step1": ("step1_round1", "step1_filter", "step1_round2"),
+    "grt_step1": ("step1",),
     "grt_step2": ("step2",),
-    "grt_step3": ("step3",),
-    "grt_step23": ("step2", "step3"),
-    "grt_telomere_finalize": ("step4_telomere", "finalize"),
+    "grt_step12": ("step1", "step2"),
+    "grt_step3": ("step3", "finalize"),
 }
 
 
@@ -222,7 +221,6 @@ class OuterCheckpointManager:
             self.server_dir / "metadata/grt_contract_summary.json",
             self.server_dir / "metadata/grt_used_contigs.tsv",
             self.server_dir / "metadata/grt_final_path.json",
-            self.server_dir / "grt/q/q4.fa",
         ]
         missing = next((path for path in required if not path.is_file()), None)
         if missing is not None:

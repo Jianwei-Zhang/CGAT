@@ -384,10 +384,9 @@ def make_grt_report_fixture(root: Path) -> tuple[Path, dict]:
     commands = []
     for unit, tool, external in [
         ("grt_prepare", "grt_prepare_inputs.py", {}),
-        ("grt_step1", "grt_step1.py", {"minimap2": step_tools["minimap2"]}),
+        ("grt_step1", "grt_step1.py", step_tools),
         ("grt_step2", "grt_step2.py", step_tools),
-        ("grt_step3", "grt_step3.py", step_tools),
-        ("grt_telomere_finalize", "grt_telomere_finalize.py", tel_tools),
+        ("grt_step3", "grt_step3.py", tel_tools),
         ("finalize_evidence", "grt_evidence_package.py", {"minimap2": minimap}),
     ]:
         argv = [sys.executable, str(runtime / tool), "--server-dir", str(server)]
@@ -415,17 +414,17 @@ class GrtReportIntegrationTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             report = server / "report"
             stage_files = list((report / "steps").glob("grt-*.json"))
-            self.assertEqual(len(stage_files), 6)
-            stage1 = read_json(report / "steps/grt-step1_round1.json")
-            self.assertEqual(stage1["facts"]["parameters"]["execution_mode"], "upstream_external_contigs_stage1_identity")
-            self.assertEqual(stage1["facts"]["result"]["q_input_sha256"], stage1["facts"]["result"]["q_output_sha256"])
+            self.assertEqual({path.stem for path in stage_files}, {"grt-step1", "grt-step2", "grt-step3"})
+            stage1 = read_json(report / "steps/grt-step1.json")
+            self.assertEqual(stage1["facts"]["result"]["q_input_version"], "q0")
+            self.assertEqual(stage1["facts"]["result"]["q_output_version"], "q1")
             final = read_json(report / "final_summary.json")
             self.assertTrue(final["available"])
             self.assertEqual(final["q0_construction"]["summary"]["selected_datasets"], 1)
             self.assertEqual(final["q0_construction"]["summary"]["qc"], "not_measured")
-            actual = fasta_stats(server / "grt/q/q4.fa")
-            self.assertEqual(final["sequence_versions"]["q4"], actual)
-            self.assertIn("q4", final["explicit_connector_segments"])
+            actual = fasta_stats(server / "grt/q/q3.fa")
+            self.assertEqual(final["sequence_versions"][final.get("final_q_version", "q4")], actual)
+            self.assertIn(final["final_q_version"], final["explicit_connector_segments"])
             self.assertIn("primary", final["source_contribution_bp"])
             self.assertTrue(any(row["final_path_segment_ids"] for row in final["event_reconciliation"]))
             html = (report / "report.html").read_text()
@@ -435,21 +434,23 @@ class GrtReportIntegrationTests(unittest.TestCase):
             self.assertIn('id="grt-flow"', html)
             self.assertIn('id="grt-final-path"', html)
             self.assertIn('class="path-segment', html)
-            self.assertLess(html.index('id="grt-step1_round1"'), html.index('id="grt-step1_filter"'))
-            self.assertLess(html.index('id="grt-step1_filter"'), html.index('id="grt-step1_round2"'))
+            self.assertLess(html.index('id="grt-step1"'), html.index('id="grt-step2"'))
+            self.assertLess(html.index('id="grt-step2"'), html.index('id="grt-step3"'))
+            self.assertIn("q0 → q1 → q2 → q3", html)
+            self.assertNotIn("q0 → q1 → q2 → q3 → q4", html)
             self.assertFalse((root / f"{server.name}.report.zip").exists())
             self.assertFalse((root / f"{server.name}.report.html").exists())
             second = helper.run_runner(server, env=environment)
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             records = [read_json(path) for path in (report / "steps").glob("[0-9]*.json")]
             self.assertTrue(any(row["execution"] == "cache_reused" for row in records))
-            self.assertEqual(read_json(report / "steps/grt-step1_round1.json")["execution"], "cache_reused")
+            self.assertEqual(read_json(report / "steps/grt-step1.json")["execution"], "cache_reused")
             (server / "grt_step2.sh").write_text("#!/bin/bash\necho deliberate-failure >&2\nexit 19\n")
             failed = helper.run_runner(server, env=environment)
             self.assertEqual(failed.returncode, 19, failed.stdout + failed.stderr)
-            self.assertTrue((server / "grt/q/q4.fa").is_file())
+            self.assertTrue((server / "grt/q/q3.fa").is_file())
             self.assertFalse(read_json(report / "final_summary.json").get("available", False))
-            self.assertEqual(len(list((report / "steps").glob("grt-*.json"))), 3)
+            self.assertEqual(len(list((report / "steps").glob("grt-*.json"))), 1)
 
 
 if __name__ == "__main__":

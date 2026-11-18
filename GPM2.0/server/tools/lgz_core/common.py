@@ -14,6 +14,13 @@ from typing import Iterable
 WORKFLOW = "gpm_grt_precomputed_v2"
 
 SCHEMA_VERSION = "2"
+CURRENT_PACKAGE_SCHEMA_VERSION = "4"
+Q0_PACKAGE_SCHEMA_VERSIONS = {"3", "4"}
+
+
+def final_q_version(schema_version: str) -> str:
+    return "q3" if schema_version == CURRENT_PACKAGE_SCHEMA_VERSION else "q4"
+
 
 FINAL_PATH_SCHEMA_VERSION = "1"
 

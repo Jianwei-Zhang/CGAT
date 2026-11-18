@@ -653,13 +653,13 @@ def execute(args: argparse.Namespace) -> None:
     package = read_single(server_dir / "metadata/package.tsv")
     if (
         package.get("workflow") != WORKFLOW
-        or package.get("schema_version") not in {SCHEMA_VERSION, "3"}
+        or package.get("schema_version") not in {SCHEMA_VERSION, "3", "4"}
         or package.get("grt_precompute_enabled") != "true"
         or package.get("recipe_locked") != "true"
     ):
         fail("unsupported package workflow/schema; evidence packaging has no legacy fallback")
 
-    if package["schema_version"] == "3":
+    if package["schema_version"] in {"3", "4"}:
         try:
             from lgz_core.q0_publication import validate_prepared_q0
         except ModuleNotFoundError:
@@ -701,7 +701,7 @@ def execute(args: argparse.Namespace) -> None:
         (server_dir / "metadata/grt_final_path.json").read_text(encoding="utf-8")
     )
     q0_lineage = None
-    if package["schema_version"] == "3":
+    if package["schema_version"] in {"3", "4"}:
         try:
             from lgz_core.q0_lineage import Q0Lineage, display_peer_keys
         except ModuleNotFoundError:

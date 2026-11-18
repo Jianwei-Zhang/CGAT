@@ -22,9 +22,6 @@ where
         "validate_grt_required_files",
         "checking required LGZ package files",
     );
-    for relpath in REQUIRED_FILES {
-        required_bundle_file(bundle_root, relpath, relpath)?;
-    }
 
     on_progress(
         "validate_grt_metadata_tables",
@@ -37,9 +34,33 @@ where
         1,
         Some(1),
     )?;
-    let q0_v3 = field(&package_table.rows[0], "schema_version")? == GRT_Q0_SCHEMA_VERSION;
+    let q0_v3 = is_q0_package_schema(field(&package_table.rows[0], "schema_version")?);
+    let current = field(&package_table.rows[0], "schema_version")? == GRT_CURRENT_SCHEMA_VERSION;
+    let final_version = final_q_version(field(&package_table.rows[0], "schema_version")?);
+    let final_relpath = format!("grt/q/{final_version}.fa");
+    let stages = read_tsv(
+        bundle_root, "metadata/grt_stage_status.tsv", STAGE_STATUS_HEADER,
+        if current { 5 } else { 8 }, Some(if current { 5 } else { 8 }),
+    )?;
+    let transitions = expected_stage_transitions(&stages, current)?;
+    let q_versions = if transitions.len() == Q0_DIRECT_STAGE_TRANSITIONS.len() {
+        Q0_DIRECT_VERSIONS
+    } else {
+        LEGACY_Q_VERSIONS
+    };
+    for relpath in REQUIRED_FILES {
+        if relpath.starts_with("grt/q/")
+            && !q_versions.iter().any(|version| *relpath == format!("grt/q/{version}.fa")) {
+            continue;
+        }
+        required_bundle_file(bundle_root, package_table_path(relpath, current), relpath)?;
+    }
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in TABLE_SPECS {
+        if *relpath == "metadata/grt_stage_status.tsv" {
+            tables.insert(*relpath, stages.clone());
+            continue;
+        }
         let minimum = if q0_v3 && *relpath == "metadata/chr_assignments.tsv" {
             0
         } else {
@@ -47,7 +68,7 @@ where
         };
         tables.insert(
             *relpath,
-            read_tsv(bundle_root, relpath, header, minimum, *maximum)?,
+            read_tsv(bundle_root, package_table_path(relpath, current), header, minimum, *maximum)?,
         );
     }
 
@@ -58,7 +79,7 @@ where
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_precomputed_v2 schema 2 or 3 / Final Path schema 1",
+            "expected gpm_grt_precomputed_v2 schema 2, 3 or 4 / Final Path schema 1",
         );
     }
     if !parse_bool(
@@ -258,11 +279,11 @@ where
         );
     }
     if field(recipe, "q0_relpath")? != "grt/q/q0.fa"
-        || field(recipe, "final_q_relpath")? != "grt/q/q4.fa"
+        || field(recipe, "final_q_relpath")? != final_relpath
     {
         return grt_err(
             "INVALID_VALUE",
-            "recipe q paths must identify q0.fa and q4.fa",
+            "recipe q paths must match the package schema",
         );
     }
 
@@ -301,11 +322,11 @@ where
 
     on_progress(
         "validate_grt_q_artifacts",
-        "validating q0-q4 artifacts and segment reconstruction",
+        "validating path-version artifacts and segment reconstruction",
     );
     let mut q_records = HashMap::<String, BTreeMap<String, String>>::new();
     let mut q_artifact_hashes = HashMap::<String, String>::new();
-    for q_version in ["q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"] {
+    for q_version in q_versions {
         let relpath = format!("grt/q/{q_version}.fa");
         let path = required_bundle_file(bundle_root, &relpath, &relpath)?;
         q_artifact_hashes.insert(q_version.to_string(), sha256_file(&path)?);
@@ -671,7 +692,8 @@ where
                 field(row, "stage")?,
                 &[
                     "assignment",
-                    "step1_round1",
+                    "step1",
+                "step1_round1",
                     "step1_round2",
                     "step2",
                     "step3",
@@ -841,6 +863,7 @@ where
             &tables,
             &sources,
             &assignments,
+            q_versions,
         )?)
     } else {
         None
@@ -879,6 +902,7 @@ where
         enum_value(
             field(row, "stage")?,
             &[
+                "step1",
                 "step1_round1",
                 "step1_filter",
                 "step1_round2",
@@ -951,6 +975,7 @@ where
         enum_value(
             json_str(object, "stage", id)?,
             &[
+                "step1",
                 "step1_round1",
                 "step1_filter",
                 "step1_round2",
@@ -1098,6 +1123,7 @@ where
         table(&tables, "metadata/grt_stage_status.tsv")?,
         &q_artifact_hashes,
         &donor_sets,
+        transitions,
     )?;
     validate_tool_versions(table(&tables, "metadata/grt_tool_versions.tsv")?)?;
 
@@ -1142,7 +1168,7 @@ where
                 format!("duplicate Final Path chromosome {chr_name}"),
             );
         }
-        let expected_q4 = q_records["q4"].get(chr_name).ok_or_else(|| {
+        let expected_q4 = q_records[final_version].get(chr_name).ok_or_else(|| {
             grt_anyhow(
                 "BROKEN_REFERENCE",
                 format!("Final Path references unknown q4 chromosome {chr_name}"),
@@ -1302,7 +1328,7 @@ where
             );
         }
     }
-    if final_chr_names != q_records["q4"].keys().cloned().collect::<HashSet<_>>() {
+    if final_chr_names != q_records[final_version].keys().cloned().collect::<HashSet<_>>() {
         return grt_err(
             "FINAL_PATH_MISMATCH",
             "Final Path chromosome set differs from q4 FASTA",
@@ -1380,6 +1406,6 @@ where
         events,
         final_path,
         q0_artifact_sha256: q_artifact_hashes.remove("q0").unwrap(),
-        q4_artifact_sha256: q_artifact_hashes.remove("q4").unwrap(),
+        q4_artifact_sha256: q_artifact_hashes.remove(final_version).unwrap(),
     })
 }

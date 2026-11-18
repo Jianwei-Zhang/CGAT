@@ -13,7 +13,7 @@ from server.tests import test_grt_telomere_finalize as telomere_fixture
 from server.tools.grt_contract import ContractError, validate_contract
 from server.tools.grt_evidence_package import build_ref_evidence
 from server.tools.grt_prepare_inputs import read_fasta
-from server.tools.grt_step1 import source_assignment
+from server.tools.lgz_core import source_assignment
 
 
 TOOL = REPO_ROOT / "server/tools/grt_evidence_package.py"

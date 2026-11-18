@@ -243,9 +243,9 @@ grep -Fq '[SKIP_VALID] [assign]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [chr:Chr01]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_prepare]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step1]' "${TMP_DIR}/resume.out"
+grep -Fq '[CACHE_HIT] [grt_step1]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step2]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step3]' "${TMP_DIR}/resume.out"
-grep -Fq '[CACHE_HIT] [grt_telomere_finalize]' "${TMP_DIR}/resume.out"
 awk -F '\t' '
   $1 == "ref:ds1" || $1 == "assign" || $1 == "chr:Chr01" {
     if ($4 != "success" || $5 != "1") exit 1
@@ -261,10 +261,10 @@ mv "${output_root}/metadata/prepare_options.tsv.tmp" "${output_root}/metadata/pr
 # Adding display data must not rewrite the original q0/final sequence or
 # retroactively enlist the dataset in its locked recipe and donor freeze.
 frozen_before="$(sha256sum "${output_root}/metadata/grt_q0_freeze.json" \
-  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q4.fa")"
+  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q3.fa")"
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_dataset.sh" --ds "$ds4" >/dev/null
 [[ "$frozen_before" == "$(sha256sum "${output_root}/metadata/grt_q0_freeze.json" \
-  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q4.fa")" ]]
+  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q3.fa")" ]]
 
 test -f "${output_root}/add_ds4.zip"
 grep -q '^gpm_grt_precomputed_v2' "${output_root}/metadata/package.tsv"

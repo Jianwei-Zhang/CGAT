@@ -17,37 +17,22 @@ def publish_repair_metadata(
     q_rows = [
         row
         for row in read_tsv(metadata / "grt_q_segments.tsv", Q_SEGMENT_FIELDS)
-        if row["q_version"] not in {"q2", "q3", "q4"}
+        if row["q_version"] == "q0"
     ]
     evidence_rows = [
         row
         for row in read_tsv(metadata / "grt_evidence_registry.tsv", EVIDENCE_FIELDS)
-        if row["stage"] not in {"step2", "step3", "step4_telomere", "candidate_validation"}
+        if row["stage"] in {"assignment", "q0_construction"}
     ]
-    usage_rows = [
-        row
-        for row in read_tsv(metadata / "grt_donor_usage.tsv", USAGE_FIELDS)
-        if row["stage"] not in {"step2", "step3", "step4_telomere"}
-    ]
-    events = [
-        json.loads(line)
-        for line in (metadata / "grt_events.jsonl").read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    events = [
-        row
-        for row in events
-        if row["stage"] not in {"step2", "step3", "step4_telomere"}
-    ]
-    attempts = [
-        row
-        for row in read_tsv(metadata / "grt_gap_attempts.tsv", ATTEMPT_FIELDS)
-        if row["stage"] not in {"step2", "step3", "step4_telomere"}
-    ]
+    # q0 selection is provenance, not a repair event. Publish actual edits only;
+    # there is no preceding identity stage that initializes these output tables.
+    usage_rows = []
+    events = []
+    attempts = []
     stage_rows = [
         row
         for row in read_tsv(metadata / "grt_stage_status.tsv", STAGE_FIELDS)
-        if row["stage"] not in {"step2", "step3", "step4_telomere", "finalize"}
+        if row["stage"] == "donor_freeze"
     ]
     for result in results:
         q_rows.extend(result["q_rows"])
@@ -62,13 +47,13 @@ def publish_repair_metadata(
         if row["tool"]
         not in {
             "grt_step_engine",
+            "grt_step1",
             "grt_step2",
-            "grt_step3",
-            "grt_step23",
-            "step23_nucmer",
-            "step23_delta_filter",
-            "step23_show_coords",
-            "step23_minimap2",
+            "grt_step12",
+            "step12_nucmer",
+            "step12_delta_filter",
+            "step12_show_coords",
+            "step12_minimap2",
         }
     ]
     tool_rows.extend(
@@ -79,32 +64,32 @@ def publish_repair_metadata(
                 "executable": ".prepare_lib/tools/lgz_core/repair_common.py",
             },
             {
+                "tool": "grt_step1",
+                "version": str(ENGINE_VERSION),
+                "executable": ".prepare_lib/tools/lgz_step1.py",
+            },
+            {
                 "tool": "grt_step2",
                 "version": str(ENGINE_VERSION),
                 "executable": ".prepare_lib/tools/lgz_step2.py",
             },
             {
-                "tool": "grt_step3",
-                "version": str(ENGINE_VERSION),
-                "executable": ".prepare_lib/tools/lgz_step3.py",
-            },
-            {
-                "tool": "step23_nucmer",
+                "tool": "step12_nucmer",
                 "version": tools["nucmer"]["version"],
                 "executable": tools["nucmer"]["resolved"],
             },
             {
-                "tool": "step23_delta_filter",
+                "tool": "step12_delta_filter",
                 "version": tools["delta-filter"]["version"],
                 "executable": tools["delta-filter"]["resolved"],
             },
             {
-                "tool": "step23_show_coords",
+                "tool": "step12_show_coords",
                 "version": tools["show-coords"]["version"],
                 "executable": tools["show-coords"]["resolved"],
             },
             {
-                "tool": "step23_minimap2",
+                "tool": "step12_minimap2",
                 "version": minimap["version"],
                 "executable": minimap["resolved"],
             },
@@ -128,12 +113,12 @@ def publish_repair_metadata(
     atomic_write_tsv(metadata / "grt_stage_status.tsv", STAGE_FIELDS, stage_rows)
     atomic_write_tsv(metadata / "grt_tool_versions.tsv", TOOL_FIELDS, tool_rows)
     atomic_write_tsv(
-        metadata / "grt_step2_strategies.tsv",
+        metadata / "grt_step1_strategies.tsv",
         STRATEGY_FIELDS,
         strategy_rows,
     )
     atomic_write_tsv(
-        metadata / "grt_step3_classifications.tsv",
+        metadata / "grt_step2_classifications.tsv",
         CLASSIFICATION_FIELDS,
         classification_rows,
     )
@@ -145,11 +130,11 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
     package = read_single(server_dir / "metadata/package.tsv")
     if (
         package.get("workflow") != WORKFLOW
-        or package.get("schema_version") not in {SCHEMA_VERSION, "3"}
+        or package.get("schema_version") != CURRENT_PACKAGE_SCHEMA_VERSION
         or package.get("grt_precompute_enabled") != "true"
         or package.get("recipe_locked") != "true"
     ):
-        fail("unsupported package workflow/schema; Step2/3 has no legacy fallback")
+        fail("unsupported package workflow/schema; Step1/Step2 has no legacy fallback")
     recipe = read_single(
         server_dir / "metadata/grt_recipe.tsv",
         [
@@ -164,38 +149,30 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
         ],
     )
     donor_set, donor_members, _donor_freeze = verify_donor_freeze(server_dir, recipe)
-    frozen_q0 = validate_prepared_q0(server_dir) if package["schema_version"] == "3" else None
+    frozen_q0 = validate_prepared_q0(server_dir)
     sources = source_catalog(server_dir)
     authorization = SourceAuthorization.load(server_dir, sources, frozen=frozen_q0)
     assignments = assignment_map(server_dir)
     all_q_rows = read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS)
-    q1_rows = [row for row in all_q_rows if row["q_version"] == "q1"]
-    if not q1_rows or not (server_dir / "grt/q/q1.fa").is_file():
-        fail("Step2 requires a completed q1/Step1 mapping")
-    chromosome_order, q1_paths, q1_records = load_q_paths(server_dir, "q1", q1_rows, sources)
-    authorization.validate_paths(q1_paths)
+    q0_rows = [row for row in all_q_rows if row["q_version"] == "q0"]
+    if not q0_rows or not (server_dir / "grt/q/q0.fa").is_file():
+        fail("Step1 requires a prepared q0 mapping")
+    chromosome_order, q0_paths, q0_records = load_q_paths(server_dir, "q0", q0_rows, sources)
+    authorization.validate_paths(q0_paths)
     tools = {
         "nucmer": executable_identity(args.nucmer),
         "delta-filter": executable_identity(args.delta_filter),
         "show-coords": executable_identity(args.show_coords),
     }
     minimap = executable_identity(args.minimap2)
-    existing_usage = read_tsv(server_dir / "metadata/grt_donor_usage.tsv", USAGE_FIELDS)
-    existing_events = [
-        json.loads(line)
-        for line in (server_dir / "metadata/grt_events.jsonl").read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    initial_consumed = consumed_intervals(
-        [row for row in existing_usage if row["stage"].startswith("step1_")],
-        existing_events,
-    )
+    # q0 occupancy is enforced by SourceAuthorization, not synthetic Step1 usage.
+    initial_consumed = []
     run_id = stable_id(
         "grt-run",
         {
             "recipe_id": recipe["recipe_id"],
             "donor_set_id": donor_set["donor_set_id"],
-            "q1_sha256": sha256_file(server_dir / "grt/q/q1.fa"),
+            "q0_sha256": sha256_file(server_dir / "grt/q/q0.fa"),
             "engine_version": ENGINE_VERSION,
             "engine_sha256": ENGINE_SHA256,
             "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
@@ -210,10 +187,10 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
         "sources": sources,
         "source_authorization": authorization,
         "assignments": assignments,
-        "q1_rows": q1_rows,
+        "q0_rows": q0_rows,
         "chromosome_order": chromosome_order,
-        "q1_paths": q1_paths,
-        "q1_records": q1_records,
+        "q0_paths": q0_paths,
+        "q0_records": q0_records,
         "tools": tools,
         "minimap": minimap,
         "initial_consumed": initial_consumed,

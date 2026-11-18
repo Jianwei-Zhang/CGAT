@@ -131,7 +131,7 @@ done < <(find "${stage_dir}/runs" -mindepth 3 -maxdepth 3 -path '*/chr_*/*/comma
 # display evidence in staging before promotion, not q0/donors/repair decisions.
 if [[ -f "${stage_dir}/metadata/grt_final_path.json" ]] && \
    awk -F '\t' 'NR == 1 { for (i=1; i<=NF; i++) if ($i == "schema_version") col=i }
-                 NR == 2 { exit !(col && $col == "3") }' "${stage_dir}/metadata/package.tsv"; then
+                 NR == 2 { exit !(col && ($col == "3" || $col == "4")) }' "${stage_dir}/metadata/package.tsv"; then
   python3 "${stage_dir}/.prepare_lib/tools/lgz_evidence_package.py" \
     --server-dir "$stage_dir" --threads "$threads"
 fi

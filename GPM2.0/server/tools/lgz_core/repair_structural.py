@@ -1,4 +1,4 @@
-"""Shared structural anchor analysis and path edits used by Step2 and Step3."""
+"""Shared structural anchor analysis and path edits used by Step1 and Step2."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from .repair_common import *
 from .structural_support import OverlapSupport, self_context_lines, equivalent_sequence_context
 
 
-def _step3_alignment_features(
+def _step2_alignment_features(
     gap_pos: int,
     left: dict[str, object],
     right: dict[str, object] | None,
@@ -80,7 +80,7 @@ def _step3_alignment_features(
 
 
 
-def _step3_classify_features(features: dict[str, object]) -> tuple[str, str, list[str], float]:
+def _step2_classify_features(features: dict[str, object]) -> tuple[str, str, list[str], float]:
     """Classify one anchor pair using LGZ Type1--Type6 precedence."""
     if features.get("crossing_alignment"):
         return "type1", "crossing_alignment", ["crossing_alignment"], 0.90
@@ -147,7 +147,7 @@ def _step3_classify_features(features: dict[str, object]) -> tuple[str, str, lis
 
 
 
-def _step3_edit_scope_decision(
+def _step2_edit_scope_decision(
     error_type: str,
     features: dict[str, object],
     start: int,
@@ -324,7 +324,7 @@ def promote_direct_primary_overlap_merges(gaps, candidates, input_paths, sources
 
 
 
-def _step3_project_ref_interval(row: dict[str, object], ref_start: int, ref_end: int) -> tuple[int, int]:
+def _step2_project_ref_interval(row: dict[str, object], ref_start: int, ref_end: int) -> tuple[int, int]:
     ref_min, ref_max = int(row["ref_min"]), int(row["ref_max"])
     query_min, query_max = int(row["query_min"]), int(row["query_max"])
     ref_span = max(1, ref_max - ref_min)
@@ -339,7 +339,7 @@ def _step3_project_ref_interval(row: dict[str, object], ref_start: int, ref_end:
 
 
 
-def _step3_replace_region(
+def _step2_replace_region(
     gap_pos: int,
     gap_end: int,
     left: dict[str, object],
@@ -364,7 +364,7 @@ def _step3_replace_region(
         overlap_start = max(int(left["ref_min"]), int(right["ref_min"]))
         overlap_end = min(int(left["ref_max"]), int(right["ref_max"]))
         overlap_row = right
-        query_start, query_end = _step3_project_ref_interval(overlap_row, overlap_start, overlap_end)
+        query_start, query_end = _step2_project_ref_interval(overlap_row, overlap_start, overlap_end)
         if overlap_row["orientation"] == "+":
             return query_start, query_end + CORRECTION_MARGIN, "reference_overlap_with_margin"
         return query_start, query_end + CORRECTION_MARGIN, "reference_overlap_with_margin"
@@ -372,7 +372,7 @@ def _step3_replace_region(
 
 
 
-def _step3_repair_decision(
+def _step2_repair_decision(
     error_type: str,
     confidence_score: float,
     left: dict[str, object],
@@ -382,7 +382,7 @@ def _step3_repair_decision(
     repair_mode: str,
 ) -> tuple[bool, str]:
     if repair_mode not in REPAIR_MODES:
-        fail(f"unsupported Step3 repair mode: {repair_mode}")
+        fail(f"unsupported Step2 repair mode: {repair_mode}")
     if right is None:
         return True, "crossing alignment is an error-region anchor"
     anchor_distance = int(right["query_min"]) - int(left["query_max"])
@@ -398,7 +398,7 @@ def _step3_repair_decision(
 
 
 
-def _step3_anchor_pairs(
+def _step2_anchor_pairs(
     gap_pos: int,
     chromosome_alignments: list[dict[str, object]],
     coordinate_index: AlignmentCoordinateIndex | None = None,
@@ -469,7 +469,7 @@ def build_correction_candidates(
     coordinates remain owned by GPM.
     """
     if repair_mode not in REPAIR_MODES:
-        fail(f"unsupported Step3 repair mode: {repair_mode}")
+        fail(f"unsupported Step2 repair mode: {repair_mode}")
     self_lines = self_context_lines(alignments, input_paths, members_by_record, identity_only=False) if input_paths is not None else set()
     context_cache = {}
     by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -502,11 +502,11 @@ def build_correction_candidates(
         if not crossing or all(context_only(row) for row in crossing):
             # Neither a self hit nor its renamed sequence-equivalent copy may
             # hide the two anchors of a genuinely different bridge.
-            prototypes.extend(_step3_anchor_pairs(gap_pos, chromosome_alignments, coordinate_index))
+            prototypes.extend(_step2_anchor_pairs(gap_pos, chromosome_alignments, coordinate_index))
         for left, right in prototypes:
-            features = _step3_alignment_features(gap_pos, left, right)
-            error_type, subtype, feature_names, confidence_score = _step3_classify_features(features)
-            start, end, reason = _step3_replace_region(
+            features = _step2_alignment_features(gap_pos, left, right)
+            error_type, subtype, feature_names, confidence_score = _step2_classify_features(features)
+            start, end, reason = _step2_replace_region(
                 gap_pos, int(gap["end0"]), left, right, error_type
             )
             # Upstream reasons from the gap midpoint and normalizes the
@@ -517,14 +517,14 @@ def build_correction_candidates(
             query_length = int(left["query_length"])
             start = max(1, min(start, query_length))
             end = max(start, min(end, query_length))
-            eligible, repair_reason = _step3_repair_decision(
+            eligible, repair_reason = _step2_repair_decision(
                 error_type, confidence_score, left, right, start, end, repair_mode
             )
             anchor_pair_executable = right is None or (
                 bool(features["ref_contig_match"])
                 and bool(features["direction_match"])
             )
-            edit_scope_safe, edit_scope_reason = _step3_edit_scope_decision(
+            edit_scope_safe, edit_scope_reason = _step2_edit_scope_decision(
                 error_type, features, start, end
             )
             if not edit_scope_safe:
@@ -555,7 +555,7 @@ def build_correction_candidates(
                     repair_reason = "guide_confirms_existing_sequence_context"
                     feature_names = [*feature_names, "equivalent_sequence_context"]
             payload = {
-                "stage": "step3",
+                "stage": "step2",
                 "object_id": gap["object_id"],
                 "action": "replace" if error_type in {"type1", "type3"} else (
                     "delete" if error_type in {"type4", "type5"} else "correct_boundary"
@@ -573,8 +573,8 @@ def build_correction_candidates(
             action = str(payload["action"])
             candidates.append(
                 {
-                    "candidate_id": stable_id("step3-correction", payload, 24),
-                    "stage": "step3",
+                    "candidate_id": stable_id("step2-correction", payload, 24),
+                    "stage": "step2",
                     "chr": chromosome,
                     "object_id": gap["object_id"],
                     "action": action,
@@ -847,7 +847,7 @@ def build_dominated_terminal_component_candidates(
                     input_start, input_end = int(gap["start0"]) + 1, sequence_length
                     trim_left, trim_right = 0, sequence_length - int(gap["end0"])
                 payload = {
-                    "stage": "step3",
+                    "stage": "step2",
                     "object_id": gap["object_id"],
                     "policy": DOMINATED_COMPONENT_POLICY,
                     "side": side,
@@ -863,8 +863,8 @@ def build_dominated_terminal_component_candidates(
                 ]
                 candidates.append(
                     {
-                        "candidate_id": stable_id("step3-dominated-component", payload, 24),
-                        "stage": "step3",
+                        "candidate_id": stable_id("step2-dominated-component", payload, 24),
+                        "stage": "step2",
                         "chr": chromosome,
                         "object_id": gap["object_id"],
                         "action": "delete",
@@ -924,13 +924,13 @@ def correction_usage_rows(
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for candidate in candidates:
-        event_id = stable_id("event", [run_id, "step3", candidate["object_id"], "correction"], 24)
+        event_id = stable_id("event", [run_id, "step2", candidate["object_id"], "correction"], 24)
         candidate["event_id"] = event_id
         if not candidate.get("source_consumable", True):
             candidate["usage_ids"] = []
             continue
-        candidate_usage_id = stable_id("usage-candidate", ["step3", candidate["candidate_id"]], 22)
-        outcome_usage_id = stable_id("usage-outcome", ["step3", candidate["candidate_id"]], 22)
+        candidate_usage_id = stable_id("usage-candidate", ["step2", candidate["candidate_id"]], 22)
+        outcome_usage_id = stable_id("usage-outcome", ["step2", candidate["candidate_id"]], 22)
         rows.extend(
             [
                 {
@@ -941,7 +941,7 @@ def correction_usage_rows(
                     "source_contig": candidate["source_contig"],
                     "source_start": candidate["source_start"],
                     "source_end": candidate["source_end"],
-                    "stage": "step3",
+                    "stage": "step2",
                     "status": "candidate",
                     "event_id": event_id,
                     "final_path_segment_id": "",
@@ -955,7 +955,7 @@ def correction_usage_rows(
                     "source_contig": candidate["source_contig"],
                     "source_start": candidate["source_start"],
                     "source_end": candidate["source_end"],
-                    "stage": "step3",
+                    "stage": "step2",
                     "status": "accepted" if candidate["outcome"] == "accepted" else candidate["outcome"],
                     "event_id": event_id,
                     "final_path_segment_id": "",
@@ -998,7 +998,7 @@ def apply_corrections(
         cursor = 0
         output_cursor = 0
         result_path: list[dict[str, object]] = []
-        # This writer is shared by Step2 and Step3. Reject incomplete or
+        # This writer is shared by Step1 and Step2. Reject incomplete or
         # ambiguous provenance before creating paths/origins, rather than
         # silently overwriting a repaired GAP with a supposedly untouched one.
         accepted_by_object: dict[str, dict[str, object]] = {}
@@ -1007,9 +1007,9 @@ def apply_corrections(
             start, end = int(candidate["input_start"]), int(candidate["input_end"])
             associated_gap = gaps_by_object.get(primary)
             if associated_gap is None:
-                fail(f"Step3 correction references an unknown q2 gap: {candidate['candidate_id']}")
+                fail(f"Step2 correction references an unknown q1 gap: {candidate['candidate_id']}")
             if start > int(associated_gap["start0"]) + 1 or end < int(associated_gap["end0"]):
-                fail(f"Step3 correction edit does not cover associated q2 gap: {candidate['candidate_id']}")
+                fail(f"Step2 correction edit does not cover associated q1 gap: {candidate['candidate_id']}")
             actual = []
             for gap in chromosome_gaps:
                 if not intervals_overlap(start, end, int(gap["start0"]) + 1, int(gap["end0"])):
@@ -1037,7 +1037,7 @@ def apply_corrections(
             primary = str(candidate["object_id"])
             covered_object_ids = [primary, *[value for value in covered_object_ids if value != primary]]
             if start0 < cursor or end0 < start0 or end0 > len(sequence):
-                fail(f"overlapping or invalid Step3 correction edit: {candidate['candidate_id']}")
+                fail(f"overlapping or invalid Step2 correction edit: {candidate['candidate_id']}")
             result_path.extend(slice_path(path, cursor, start0))
             output_cursor += start0 - cursor
             gapless_junction = candidate.get("junction_policy") in {
@@ -1094,8 +1094,8 @@ def apply_corrections(
                     fail(f"correction output gap origins collide: {key}")
                 gap_origin_by_output[key] = {
                     "object_id": candidate["object_id"],
-                    "q2_start": int(candidate["input_start"]),
-                    "q2_end": int(candidate["input_end"]),
+                    "q1_start": int(candidate["input_start"]),
+                    "q1_end": int(candidate["input_end"]),
                     "correction_candidate_id": candidate["candidate_id"],
                     "coalesced_object_ids": covered_object_ids[1:],
                 }
@@ -1115,8 +1115,8 @@ def apply_corrections(
                 fail(f"correction output gap origins collide: {key}")
             gap_origin_by_output[key] = {
                 "object_id": gap["object_id"],
-                "q2_start": int(gap["start0"]) + 1,
-                "q2_end": int(gap["end0"]),
+                "q1_start": int(gap["start0"]) + 1,
+                "q1_end": int(gap["end0"]),
                 "correction_candidate_id": "",
             }
     return output_paths, output_records, prototypes, gap_origin_by_output

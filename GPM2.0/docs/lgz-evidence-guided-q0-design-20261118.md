@@ -798,3 +798,73 @@ E2E 中跨 N 的冻结 Server fixture 补齐了由其原始 FASTA 得到的 N �
 - 有真实 minimap2/MUMmer4 参与的受控序列用例，但没有本任务获授权的实际物种样本对照或大规模性能结论。不得把更少 N、更高 N50 或受控测试通过当成真实 Final Path 改善的证明。
 - 新 q0 构建直接替换第一 ds 策略，不提供旧策略开关；历史包读取仍保留。后加项目 ds 不会被追认为原 q0 或 donor 的输入。
 - 本地分组验证不冒称当前提交的远端 CI 结果。交付仅限功能分支提交/推送，不合并 master，不发布 Release，不更新客户工作区。
+
+
+## 14. 删除 identity 前置阶段并统一编号（2026-11-18）
+
+本节覆盖前文保留 Step1 的安排。新的执行链与实际文件统一为：
+
+| 阶段 | 输入 → 输出 | 脚本 / 实现 |
+| --- | --- | --- |
+| q0 构建与冻结 | 多 ds 及完整比对证据 → q0 | prepare_lgz_inputs.sh / lgz_prepare_inputs.py |
+| Step1 | q0 → q1 | run_lgz_step1.sh / lgz_step1.py / step1_engine.py |
+| Step2 | q1 → q2 | run_lgz_step2.sh / lgz_step2.py / step2_engine.py |
+| Step3 | q2 → q3 / Final Path | run_lgz_step3.sh / lgz_step3.py |
+| 证据整理与交付 | 不产生新 q 版本 | finalize_lgz_evidence.sh |
+
+新 Step1 是原补丁验证/处理分支，Step2 是原结构修正/优化填补，Step3 是端粒处理。
+初始桥接、选段和局部替换已经前移到 q0 构建；旧 q0r1/q0f/q1 的三次原样复制被删除，
+不是将其恢复为新 Step1。后续实际算法不变，路径修正后的重新补洞仍保留。
+
+### 14.1 真实产物与协议边界
+
+- 新 Server/App 包使用 package schema **4**，实际仅生成 q0.fa、q1.fa、q2.fa、q3.fa。
+- 阶段 ID、证据目录、检查点、工具入口、调度依赖、事件坐标空间和输入指纹一起编号。
+  元数据文件同步为 grt_step1_strategies.tsv 和 grt_step2_classifications.tsv。
+- 新执行器要求 schema 4，不把历史 q1/q2/q3 误当作新版本，也不回退执行旧策略。
+  项目运行库更新器同样在写入前拒绝旧编号工作区，避免只替换代码却误用旧阶段产物。
+- Python/Rust 按 schema 区分阶段链：历史 schema 2/3 的包继续按原含义完整校验和读取。
+- Final Path/数据库既有 `q4_length`、`q4_sha256`、`q4_relpath` 等持久化字段暂不重命名，
+  它们仍表示最终产物；schema 4 的路径值是 **grt/q/q3.fa**，绝不生成 q4 副本。
+  此举避免把执行链优化扩大成数据库和全部 UI 状态模型迁移。界面用“最终序列”表达。
+- descriptive telomere_finalize Python 入口只转发当前 Step3，非另一套执行策略。
+
+### 14.2 必要校验与缓存
+
+进入修正阶段仍验证 q0 冻结输入、来源坐标和当前全局占用；缺失必要信息直接失败。
+原始 q0 占用来自来源授权模型，不依赖虚构的前置阶段 usage/events。
+每个实际编辑阶段保留独立检查点、重放和来源约束；引擎指纹覆盖新的三个入口和实现。
+结构修正后用当前路径对比原始 q0 决定能否复用原始比对，不要求旧版中间产物。
+
+### 14.3 集中验证
+
+实现完成后集中验证：脚本/调度编号、实际 q 产物、来源与事件坐标、断点续跑、
+真实修正后的序列、Server→App Full/Light 投影，以及历史 schema 2/3 包读取。
+受控回归不等同于实际生物学样本改善或大规模性能收益。
+
+
+### 14.4 本轮验证记录
+
+本轮采用集中、分组验证，不将多次结果包装成“一次全量全绿”：
+
+- Python 首轮 308 个相关测试：旧编号断言、历史夹具误用新生成器等产生 35 个 error
+  （包含 subTest）及 1 个 failure。修复后对受影响组和新增的 schema-4 更新边界运行
+  141 个测试，140 通过；剩余报告 HTML 旧阶段名断言修正后，单独运行该真实工具
+  集成用例通过（非 skip）。未重跑无关的全量 Python discovery。
+- Windows Rust：首次 50 个相关用例中 47 通过、2 个组件夹具缺少 manifest 路径、
+  1 个既有 ignored。补齐夹具后定向 4 个 App 校验用例全部通过，关闭两项失败。
+  新 schema-4 Server 与历史 schema-2/3 包均有读取覆盖。
+- freshly built Windows CLI：新 schema-4 Server、App Full、App Light 三类 ZIP
+  均完成实际导入、项目初始化和持久化项目视图读取；最终路径绑定 q3.fa，Light
+  不携带 FASTA，三类均不生成 q4.fa。
+- 受控 reverse-source 输入使用当前 q0 发布器及真实 MUMmer4/minimap2 执行新三步；
+  最终 q3 DNA 与历史冻结样例的 q4 DNA 相同。新快照为
+  `tests/fixtures/grt_contract_v3/frozen_direct_server.json`，不是生物学效果测量。
+- 三组 Shell 回归：prepare metadata、prepare full、add dataset 全部通过。
+- Windows Node：importer-i18n 的 77 个用例通过；未运行前端生产构建或浏览器验证。
+- 历史 retained-source 包冻结于原 b79bcbefd757cc122bc5c661fc8574337af510db
+  已验证的测试构造器，独立保留历史读取及损坏拒绝检查，不保留旧策略执行代码。
+
+原有 Final Path 持久化字段名兼容不等于执行版本仍有 q4；新产物、脚本、事件和
+阶段编号均为 q0→q1→q2→q3 / Step1→Step2→Step3。未发布 Release、未迁移客户
+工作区、未将本分支合并到 master，也未声称实际样本收益或大规模速度提升。

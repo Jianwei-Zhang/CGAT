@@ -76,7 +76,7 @@ where
         1,
         Some(1),
     )?;
-    let q0_v3 = field(&package_table.rows[0], "schema_version")? == GRT_Q0_SCHEMA_VERSION;
+    let q0_v3 = is_q0_package_schema(field(&package_table.rows[0], "schema_version")?);
     let core_specs: &[(&str, &[&str], usize, Option<usize>)] = &[
         ("metadata/package.tsv", PACKAGE_HEADER, 1, Some(1)),
         ("metadata/reference.tsv", REFERENCE_HEADER, 1, Some(1)),
@@ -145,7 +145,7 @@ where
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected App schema 2 (Final Path 1/2/3) or schema 3 (Final Path 3)",
+            "expected App schema 2 (Final Path 1/2/3) or schema 3/4 (Final Path 3)",
         );
     }
     if q0_v3
@@ -237,10 +237,10 @@ where
         );
     }
     let q4_relpath = json_str(manifest_object, "q4_relpath", "App manifest")?;
-    if q4_relpath != "grt/q/q4.fa" {
+    if q4_relpath != format!("grt/q/{}.fa", final_q_version(field(package, "schema_version")?)) {
         return grt_err(
             "INVALID_PATH",
-            "App manifest q4_relpath must be grt/q/q4.fa",
+            "App manifest final path must match the package schema",
         );
     }
     let q4_artifact_sha256 =

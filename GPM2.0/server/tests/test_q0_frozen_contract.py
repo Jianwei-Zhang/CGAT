@@ -33,6 +33,25 @@ class FrozenQ0ContractTests(unittest.TestCase):
         self.assertEqual(summary["schema_version"], "3")
         validate_prepared_q0(self.root)
 
+    def test_direct_q0_pipeline_and_legacy_pipeline_preserve_final_sequence(self):
+        from server.tools.lgz_core.common import read_fasta, read_tsv, write_tsv
+        legacy = dict(read_fasta(self.root / "grt/q/q4.fa"))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            materialize(json.loads((FIXTURE.parent / "frozen_direct_server.json").read_text()), root)
+            self.assertEqual(validate_contract(root)["schema_version"], "4")
+            self.assertEqual(dict(read_fasta(root / "grt/q/q3.fa")), legacy)
+            self.assertEqual(sorted(p.stem for p in (root / "grt/q").glob("*.fa")), ["q0", "q1", "q2", "q3"])
+            stage_file = root / "metadata/grt_stage_status.tsv"
+            stages = read_tsv(stage_file)
+            self.assertEqual([r["stage"] for r in stages], ["donor_freeze", "step1", "step2", "step3", "finalize"])
+            self.assertEqual(stages[1]["q_input_version"], "q0")
+            # A hybrid/incomplete old chain must not be mistaken for a direct run.
+            stages[1]["q_input_version"] = "q1"
+            write_tsv(stage_file, list(stages[0]), stages)
+            with self.assertRaisesRegex(ContractError, "stage transition order"):
+                validate_contract(root)
+
     def test_later_dataset_is_not_added_to_locked_q0_or_donors(self):
         fixture = json.loads((FIXTURE.parent / "post_freeze_dataset.json").read_text())
         frozen_bytes = (self.root / FREEZE).read_bytes()

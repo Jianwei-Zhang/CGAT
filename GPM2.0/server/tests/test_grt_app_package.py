@@ -111,6 +111,7 @@ class GrtAppPackageTests(unittest.TestCase):
         mummer = root / "grt/evidence/step3/mummer"
         refill = root / "grt/evidence/step3/refill/round1"
         metadata.mkdir(parents=True)
+        shutil.copy2(self.source / "metadata/package.tsv", metadata / "package.tsv")
         mummer.mkdir(parents=True)
         refill.mkdir(parents=True)
         (metadata / "grt_events.jsonl").write_text(

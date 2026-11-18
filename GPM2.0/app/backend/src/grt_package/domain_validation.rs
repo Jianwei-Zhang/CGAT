@@ -267,7 +267,7 @@ pub(super) fn validate_app_display_evidence(
         }
         enum_value(
             json_str(item, "stage", evidence_id)?,
-            &["step2", "step3"],
+            &["step1", "step2", "step3"],
             &format!("App display evidence {evidence_id}.stage"),
         )?;
         enum_value(
@@ -380,7 +380,7 @@ where
     if json_str(object, "workflow", "App Final Path")? != GRT_APP_WORKFLOW
         || json_str(object, "schema_version", "App Final Path")? != expected_schema_version
         || !is_supported_app_final_path_schema(expected_schema_version)
-        || json_str(object, "q4_relpath", "App Final Path")? != "grt/q/q4.fa"
+        || json_str(object, "q4_relpath", "App Final Path")? != json_str(manifest, "q4_relpath", "App manifest")?
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
@@ -569,14 +569,15 @@ where
     // reference FAI above; reference-only chromosomes do not invalidate the
     // projected App package.
     let mut q4_records = None;
-    let q4_path = bundle_root.join("grt/q/q4.fa");
+    let final_relpath = json_str(manifest, "q4_relpath", "App manifest")?;
+    let q4_path = bundle_root.join(final_relpath);
     if fasta_available {
         if source_sequences.is_none() {
             // Official App deliveries are closed over Final Path and q4 hashes.
             // Validate the same FASTA grammar and both levels of SHA-256 while
             // retaining only O(chromosomes) summaries, not O(genome) strings.
             let (summaries, observed_hash) = read_fasta_summaries_with_sha256_and_cancel(
-                &required_bundle_file(bundle_root, "grt/q/q4.fa", "App q4 FASTA")?,
+                &required_bundle_file(bundle_root, final_relpath, "App final FASTA")?,
                 "App q4 FASTA",
                 false,
                 should_cancel,
@@ -613,7 +614,7 @@ where
         // Reconstruction callers still need the actual sequences. Parsing and
         // artifact hashing share one pass here too.
         let (records, q4_observed_sha256) = read_fasta_with_sha256_and_cancel(
-            &required_bundle_file(bundle_root, "grt/q/q4.fa", "App q4 FASTA")?,
+            &required_bundle_file(bundle_root, final_relpath, "App final FASTA")?,
             "App q4 FASTA",
             false,
             should_cancel,
@@ -694,13 +695,36 @@ where
     Ok((final_lengths, q4_records))
 }
 
+pub(super) fn expected_stage_transitions(
+    table: &TsvTable,
+    current: bool,
+) -> Result<&'static [(&'static str, &'static str, &'static str)]> {
+    let transitions = if current {
+        Q0_DIRECT_STAGE_TRANSITIONS
+    } else {
+        STAGE_TRANSITIONS
+    };
+    if table.rows.len() != transitions.len() {
+        return grt_err("BROKEN_REFERENCE", "incomplete LGZ stage transition chain");
+    }
+    for (row, (stage, input, output)) in table.rows.iter().zip(transitions.iter()) {
+        if field(row, "stage")? != *stage
+            || field(row, "q_input_version")? != *input
+            || field(row, "q_output_version")? != *output {
+            return grt_err("BROKEN_REFERENCE", format!("stage transition must be {stage}:{input}->{output}"));
+        }
+    }
+    Ok(transitions)
+}
+
 pub(super) fn validate_stage_status(
     bundle_root: &Path,
     table: &TsvTable,
     q_hashes: &HashMap<String, String>,
     donor_sets: &HashMap<String, &TsvRow>,
+    transitions: &[(&str, &str, &str)],
 ) -> Result<()> {
-    for (row, (stage, input, output)) in table.rows.iter().zip(STAGE_TRANSITIONS.iter()) {
+    for (row, (stage, input, output)) in table.rows.iter().zip(transitions.iter()) {
         if field(row, "stage")? != *stage
             || field(row, "q_input_version")? != *input
             || field(row, "q_output_version")? != *output
@@ -1114,6 +1138,7 @@ pub(super) fn validate_gap_attempts(
         enum_value(
             field(row, "stage")?,
             &[
+                "step1",
                 "step1_round1",
                 "step1_filter",
                 "step1_round2",

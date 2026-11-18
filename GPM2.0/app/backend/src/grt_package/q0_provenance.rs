@@ -6,7 +6,6 @@ use serde_json::json;
 
 const SELECTION: &str = "metadata/grt_q0_selection.json";
 const FREEZE: &str = "metadata/grt_q0_freeze.json";
-const VERSIONS: [&str; 7] = ["q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"];
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Source {
@@ -242,11 +241,12 @@ pub(super) fn validate_q0(
     tables: &HashMap<&'static str, TsvTable>,
     sources: &HashMap<(String, String), String>,
     assignments: &HashMap<(String, String), HashSet<String>>,
+    q_versions: &[&str],
 ) -> Result<Q0Proof> {
     let freeze: Freeze = decode(root, FREEZE)?;
     let selection: Selection = decode(root, SELECTION)?;
     if freeze.schema != "lgz_q0_donor_freeze_v2"
-        || freeze.package_schema_version != GRT_Q0_SCHEMA_VERSION
+        || freeze.package_schema_version != field(one_row(tables, "metadata/package.tsv")?, "schema_version")?
         || selection.schema != "lgz_q0_selection_artifact_v1"
         || freeze.selection != SELECTION
     {
@@ -575,7 +575,7 @@ pub(super) fn validate_q0(
         .iter()
         .map(|row| row["chr"].clone())
         .collect::<HashSet<_>>();
-    for version in VERSIONS {
+    for &version in q_versions {
         let mut by_source: HashMap<(String, String), Vec<Span>> = HashMap::new();
         let mut chrs = HashSet::new();
         for row in q_rows.iter().filter(|row| row["q_version"] == version) {
@@ -627,9 +627,10 @@ impl Q0Proof {
             let segments = chromosome["segments"]
                 .as_array()
                 .ok_or_else(|| grt_anyhow("INVALID_JSON", "Final Path segments"))?;
+            let final_version = final_q_version(field(one_row(tables, "metadata/package.tsv")?, "schema_version")?);
             let mut q4 = rows
                 .iter()
-                .filter(|row| row["q_version"] == "q4" && row["chr"] == chr)
+                .filter(|row| row["q_version"] == final_version && row["chr"] == chr)
                 .collect::<Vec<_>>();
             q4.sort_by_key(|row| row["q_start"].parse::<i64>().unwrap_or(0));
             if segments.len() != q4.len() {

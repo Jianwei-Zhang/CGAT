@@ -18,7 +18,7 @@ from .q0_preparation import artifact_path
 from .q0_sources import Interval, Q0EvidenceError, SourceKey, merged_intervals, split_source, subtract_intervals
 from .stage_replay import source_assignment
 
-PACKAGE_SCHEMA_VERSION = "3"
+PACKAGE_SCHEMA_VERSION = "4"
 SELECTION = "metadata/grt_q0_selection.json"
 FREEZE = "metadata/grt_q0_freeze.json"
 SELECTION_SCHEMA = "lgz_q0_selection_artifact_v1"
@@ -181,10 +181,10 @@ def validate_prepared_q0(root: Path, *, source_root: Path | None = None, expecte
             raise Q0EvidenceError(f"invalid q0 publication object: {relative}")
         return value
     package = read_tsv(resolve("metadata/package.tsv"))
-    if len(package) != 1 or package[0]["schema_version"] != PACKAGE_SCHEMA_VERSION:
-        raise Q0EvidenceError("q0 publication requires package schema 3")
+    if len(package) != 1 or package[0]["schema_version"] not in {"3", PACKAGE_SCHEMA_VERSION}:
+        raise Q0EvidenceError("q0 publication requires evidence-guided package schema 3 or 4")
     frozen = load(FREEZE)
-    if frozen.get("schema") != FREEZE_SCHEMA or frozen.get("package_schema_version") != PACKAGE_SCHEMA_VERSION:
+    if frozen.get("schema") != FREEZE_SCHEMA or frozen.get("package_schema_version") != package[0]["schema_version"]:
         raise Q0EvidenceError("unsupported q0 donor freeze schema")
     donor_sets = read_tsv(resolve("metadata/grt_donor_sets.tsv"))
     required_artifacts = {SELECTION, "grt/q/q0.fa", "metadata/grt_recipe.tsv", "metadata/grt_contig_roles.tsv",

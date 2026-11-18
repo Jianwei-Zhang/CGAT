@@ -95,7 +95,7 @@ class SourceAuthorization:
             if key in member_map or source not in source_lengths or domain.end > source_lengths[source]:
                 raise Q0EvidenceError("invalid frozen donor source membership")
             member_map[key] = (source, domain)
-        if package["schema_version"] == "3":
+        if package["schema_version"] in {"3", "4"}:
             if frozen is None:
                 frozen = validate_prepared_q0(root)
             if frozen.get("schema") != FREEZE_SCHEMA:

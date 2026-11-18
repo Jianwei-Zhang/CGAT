@@ -105,7 +105,7 @@ class Q0DeliveryTests(unittest.TestCase):
                 result = subprocess.run(command, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 summary = validate_contract(root)
-                self.assertEqual(summary["schema_version"], "3")
+                self.assertEqual(summary["schema_version"], "4")
                 cards = read_tsv(root / "metadata/grt_used_contigs.tsv")
                 self.assertTrue(cards)
                 self.assertTrue(all(json.loads(card["accepted_event_ids_json"]) == [] for card in cards))
@@ -125,7 +125,7 @@ class Q0DeliveryTests(unittest.TestCase):
                 q_path = root / "metadata/grt_q_segments.tsv"
                 original_q = q_path.read_bytes()
                 qrows = read_tsv(q_path)
-                next(row for row in qrows if row["q_version"] == "q4" and row["segment_kind"] == "source")["source_card_key"] = "forged"
+                next(row for row in qrows if row["q_version"] == "q3" and row["segment_kind"] == "source")["source_card_key"] = "forged"
                 write_tsv(q_path, list(qrows[0]), qrows)
                 with self.assertRaisesRegex(ContractError, "non-canonical source card"):
                     validate_contract(root)

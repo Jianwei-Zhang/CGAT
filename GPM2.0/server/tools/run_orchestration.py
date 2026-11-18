@@ -46,7 +46,6 @@ LGZ_PREPARE_UNIT_ID = "grt_prepare"
 LGZ_STEP1_UNIT_ID = "grt_step1"
 LGZ_STEP2_UNIT_ID = "grt_step2"
 LGZ_STEP3_UNIT_ID = "grt_step3"
-LGZ_TELOMERE_FINALIZE_UNIT_ID = "grt_telomere_finalize"
 FINALIZE_EVIDENCE_UNIT_ID = "finalize_evidence"
 PACKAGE_FULL_UNIT_ID = "package_full"
 PACKAGE_LIGHT_UNIT_ID = "package_light"
@@ -144,22 +143,21 @@ def build_unit_plan(
             UnitPlanItem(LGZ_PREPARE_UNIT_ID, (Q0_EVIDENCE_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP1_UNIT_ID, (LGZ_PREPARE_UNIT_ID,)),
             UnitPlanItem(LGZ_STEP2_UNIT_ID, (LGZ_STEP1_UNIT_ID,)),
-            UnitPlanItem(LGZ_STEP3_UNIT_ID, (LGZ_STEP2_UNIT_ID,)),
             UnitPlanItem(
-                LGZ_TELOMERE_FINALIZE_UNIT_ID,
-                (LGZ_STEP3_UNIT_ID,),
+                LGZ_STEP3_UNIT_ID,
+                (LGZ_STEP2_UNIT_ID,),
             ),
         ]
     )
     items.extend(
-        UnitPlanItem(unit_id, (LGZ_TELOMERE_FINALIZE_UNIT_ID,))
+        UnitPlanItem(unit_id, (LGZ_STEP3_UNIT_ID,))
         for unit_id in chromosome_ids
     )
     items.extend(
         [
             UnitPlanItem(
                 FINALIZE_EVIDENCE_UNIT_ID,
-                chromosome_ids or (LGZ_TELOMERE_FINALIZE_UNIT_ID,),
+                chromosome_ids or (LGZ_STEP3_UNIT_ID,),
             ),
             UnitPlanItem(PACKAGE_FULL_UNIT_ID, (FINALIZE_EVIDENCE_UNIT_ID,)),
             UnitPlanItem(PACKAGE_LIGHT_UNIT_ID, (PACKAGE_FULL_UNIT_ID,)),
@@ -304,4 +302,3 @@ GRT_PREPARE_UNIT_ID = LGZ_PREPARE_UNIT_ID
 GRT_STEP1_UNIT_ID = LGZ_STEP1_UNIT_ID
 GRT_STEP2_UNIT_ID = LGZ_STEP2_UNIT_ID
 GRT_STEP3_UNIT_ID = LGZ_STEP3_UNIT_ID
-GRT_TELOMERE_FINALIZE_UNIT_ID = LGZ_TELOMERE_FINALIZE_UNIT_ID

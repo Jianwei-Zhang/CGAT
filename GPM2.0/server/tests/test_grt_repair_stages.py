@@ -24,7 +24,7 @@ from server.tools.grt_core.repair_common import (
     parse_mummer_coords,
     reject_candidates_spanning_other_gaps,
 )
-from server.tools.grt_core.step2_engine import (
+from server.tools.grt_core.step1_engine import (
     arbitrate_structural_candidates,
 )
 from server.tools.grt_core.repair_mummer import (
@@ -32,154 +32,153 @@ from server.tools.grt_core.repair_mummer import (
     grt_mummer_parameters,
     parse_mummer_screen_coords,
     partition_mummer_targets,
-    step3_mummer_screen_windows,
-    step3_screen_partition_relevant,
+    step2_mummer_screen_windows,
+    step2_screen_partition_relevant,
 )
 from server.tools.grt_core.repair_structural import (
     _longest_exact_suffix_prefix,
-    _step3_classify_features,
-    _step3_edit_scope_decision,
+    _step2_classify_features,
+    _step2_edit_scope_decision,
     apply_corrections,
     build_correction_candidates,
     build_dominated_terminal_component_candidates,
     promote_direct_primary_overlap_merges,
     reject_ambiguous_reference_anchors,
 )
-from server.tools.grt_core.step2_engine import (
-    build_step2_candidates,
-    build_step2_fallback_candidates,
-    step2_strategy,
-    step2_strategy_applied,
+from server.tools.grt_core.step1_engine import (
+    build_step1_candidates,
+    build_step1_fallback_candidates,
+    step1_strategy,
+    step1_strategy_applied,
 )
-from server.tools.grt_core.step3_engine import (
+from server.tools.grt_core.step2_engine import (
     build_correction_events,
     project_interval_after_refills,
-    reconcile_step2_events_with_step3,
-    replay_step3,
+    reconcile_step1_events_with_step2,
+    replay_step2,
 )
 
 
 PREPARE_TOOL = REPO_ROOT / "server/tools/grt_prepare_inputs.py"
 STEP1_TOOL = REPO_ROOT / "server/tools/grt_step1.py"
 STEP2_TOOL = REPO_ROOT / "server/tools/grt_step2.py"
-STEP3_TOOL = REPO_ROOT / "server/tools/grt_step3.py"
 
 
 class GrtRepairStagesTests(unittest.TestCase):
     @staticmethod
     def reconciliation_fixture():
+        q1_hash = "q1-hash"
         q2_hash = "q2-hash"
-        q3_hash = "q3-hash"
-        step2_event = {
-            "event_id": "step2-gap",
+        step1_event = {
+            "event_id": "step1-gap",
             "chr": "Chr01",
             "action": "replace",
             "status": "accepted",
             "reason": "simple_gap",
             "edit": {"replacement_kind": "gap"},
             "q_after": {
-                "version": "q2", "start": 101, "end": 200,
-                "sha256": q2_hash,
+                "version": "q1", "start": 101, "end": 200,
+                "sha256": q1_hash,
             },
         }
-        q2_row = {
-            "chr": "Chr01", "q_version": "q2",
+        q1_row = {
+            "chr": "Chr01", "q_version": "q1",
             "q_start": 101, "q_end": 200, "segment_kind": "gap",
             "evidence_ids_json": "[]",
         }
-        step2 = {
-            "events": [step2_event], "q_rows": [q2_row],
+        step1 = {
+            "events": [step1_event], "q_rows": [q1_row],
             "usage_rows": [], "evidence_rows": [],
         }
-        step3 = {
-            "q_input_version": "q2", "q_input_sha256": q2_hash,
-            "q_output_version": "q3", "q_output_sha256": q3_hash,
+        step2 = {
+            "q_input_version": "q1", "q_input_sha256": q1_hash,
+            "q_output_version": "q2", "q_output_sha256": q2_hash,
             "events": [], "q_rows": [],
         }
-        return step2, step3
+        return step1, step2
 
-    def test_reconcile_keeps_verified_empty_evidence_gap_surviving_in_q3(self):
-        step2, step3 = self.reconciliation_fixture()
-        step3["events"].append(
+    def test_reconcile_keeps_verified_empty_evidence_gap_surviving_in_q2(self):
+        step1, step2 = self.reconciliation_fixture()
+        step2["events"].append(
             {
-                "event_id": "step3-unresolved", "chr": "Chr01",
+                "event_id": "step2-unresolved", "chr": "Chr01",
                 "action": "refill", "status": "unresolved",
                 "q_before": {
-                    "version": "q2", "start": 101, "end": 200,
-                    "sha256": "q2-hash",
+                    "version": "q1", "start": 101, "end": 200,
+                    "sha256": "q1-hash",
                 },
                 "q_after": {
-                    "version": "q3", "start": 121, "end": 220,
-                    "sha256": "q3-hash",
+                    "version": "q2", "start": 121, "end": 220,
+                    "sha256": "q2-hash",
                 },
                 "q_after_projection": "surviving_origin_gap",
             }
         )
-        step3["q_rows"].append(
+        step2["q_rows"].append(
             {
-                "chr": "Chr01", "q_version": "q3",
+                "chr": "Chr01", "q_version": "q2",
                 "q_start": 121, "q_end": 220, "segment_kind": "gap",
                 "evidence_ids_json": "[]",
             }
         )
 
-        reconcile_step2_events_with_step3(step2, step3)
+        reconcile_step1_events_with_step2(step1, step2)
 
-        self.assertEqual(step2["events"][0]["status"], "accepted")
+        self.assertEqual(step1["events"][0]["status"], "accepted")
 
-    def test_reconcile_still_supersedes_gap_with_accepted_step3_replacement(self):
-        step2, step3 = self.reconciliation_fixture()
+    def test_reconcile_still_supersedes_gap_with_accepted_step2_replacement(self):
+        step1, step2 = self.reconciliation_fixture()
         replacement = {
-            "event_id": "step3-refill", "chr": "Chr01",
+            "event_id": "step2-refill", "chr": "Chr01",
             "action": "refill", "status": "accepted",
             "q_before": {
-                "version": "q2", "start": 101, "end": 200,
-                "sha256": "q2-hash",
+                "version": "q1", "start": 101, "end": 200,
+                "sha256": "q1-hash",
             },
             "q_after": {
-                "version": "q3", "start": 101, "end": 250,
-                "sha256": "q3-hash",
+                "version": "q2", "start": 101, "end": 250,
+                "sha256": "q2-hash",
             },
         }
-        step3["events"].append(replacement)
+        step2["events"].append(replacement)
 
-        reconcile_step2_events_with_step3(step2, step3)
+        reconcile_step1_events_with_step2(step1, step2)
 
-        event = step2["events"][0]
+        event = step1["events"][0]
         self.assertEqual(event["status"], "superseded")
-        self.assertEqual(event["superseded_by_event_id"], "step3-refill")
-        self.assertEqual(replacement["superseded_event_ids"], ["step2-gap"])
+        self.assertEqual(event["superseded_by_event_id"], "step2-refill")
+        self.assertEqual(replacement["superseded_event_ids"], ["step1-gap"])
 
     def test_reconcile_still_rejects_unexplained_empty_evidence_gap_loss(self):
-        step2, step3 = self.reconciliation_fixture()
+        step1, step2 = self.reconciliation_fixture()
 
         with self.assertRaisesRegex(
-            SystemExit, "accepted Step2 path segment disappeared in q3"
+            SystemExit, "accepted Step1 path segment disappeared in q2"
         ):
-            reconcile_step2_events_with_step3(step2, step3)
+            reconcile_step1_events_with_step2(step1, step2)
 
-    def test_reconcile_rejects_survival_projection_without_q3_gap(self):
-        step2, step3 = self.reconciliation_fixture()
-        step3["events"].append(
+    def test_reconcile_rejects_survival_projection_without_q2_gap(self):
+        step1, step2 = self.reconciliation_fixture()
+        step2["events"].append(
             {
-                "event_id": "step3-unresolved", "chr": "Chr01",
+                "event_id": "step2-unresolved", "chr": "Chr01",
                 "action": "refill", "status": "unresolved",
                 "q_before": {
-                    "version": "q2", "start": 101, "end": 200,
-                    "sha256": "q2-hash",
+                    "version": "q1", "start": 101, "end": 200,
+                    "sha256": "q1-hash",
                 },
                 "q_after": {
-                    "version": "q3", "start": 121, "end": 220,
-                    "sha256": "q3-hash",
+                    "version": "q2", "start": 121, "end": 220,
+                    "sha256": "q2-hash",
                 },
                 "q_after_projection": "surviving_origin_gap",
             }
         )
 
         with self.assertRaisesRegex(
-            SystemExit, "accepted Step2 path segment disappeared in q3"
+            SystemExit, "accepted Step1 path segment disappeared in q2"
         ):
-            reconcile_step2_events_with_step3(step2, step3)
+            reconcile_step1_events_with_step2(step1, step2)
 
     def test_mummer_filter_retains_upstream_repeat_hits(self):
         parameters = grt_mummer_parameters(8)
@@ -211,15 +210,15 @@ class GrtRepairStagesTests(unittest.TestCase):
             self.assertIn("exit code 7", message)
             self.assertIn("stderr_tail='specific delta failure'", message)
 
-    def test_step2_structural_controller_is_reported_as_fixer_only(self):
-        self.assertEqual(step2_strategy_applied("no_gaps"), "patcher_result")
+    def test_step1_structural_controller_is_reported_as_fixer_only(self):
+        self.assertEqual(step1_strategy_applied("no_gaps"), "patcher_result")
         self.assertEqual(
-            step2_strategy_applied("partial_success_no_fixer"),
+            step1_strategy_applied("partial_success_no_fixer"),
             "patcher_result",
         )
-        self.assertEqual(step2_strategy_applied("no_patch_fixer"), "fixer_only")
+        self.assertEqual(step1_strategy_applied("no_patch_fixer"), "fixer_only")
         self.assertEqual(
-            step2_strategy_applied("full_fixer_reuse_patches"),
+            step1_strategy_applied("full_fixer_reuse_patches"),
             "fixer_only",
         )
 
@@ -242,10 +241,10 @@ class GrtRepairStagesTests(unittest.TestCase):
             ],
         )
 
-    def test_step3_screen_windows_merge_overlapping_gap_ranges(self):
+    def test_step2_screen_windows_merge_overlapping_gap_ranges(self):
         sequence = "A" * 800_000 + "N" * 100 + "A" * 399_900 + "N" * 100 + "A" * 800_000
 
-        records, windows = step3_mummer_screen_windows("Chr01", sequence)
+        records, windows = step2_mummer_screen_windows("Chr01", sequence)
 
         self.assertEqual(len(records), 1)
         name, fragment = records[0]
@@ -272,12 +271,12 @@ class GrtRepairStagesTests(unittest.TestCase):
         self.assertEqual(rows[0]["query_min"], 890_000)
         self.assertEqual(rows[1]["query_max"], 1_110_100)
         self.assertTrue(
-            step3_screen_partition_relevant(
+            step2_screen_partition_relevant(
                 [{"start0": 999_999, "end0": 1_000_099}], rows
             )
         )
         self.assertFalse(
-            step3_screen_partition_relevant(
+            step2_screen_partition_relevant(
                 [{"start0": 1_900_000, "end0": 1_900_099}], rows
             )
         )
@@ -355,7 +354,7 @@ raise SystemExit(91)
 
             cache_dir, cache_hit, _chromosome_key = cached_mummer_chromosome(
                 server,
-                "step2",
+                "step1",
                 "Chr01",
                 "0" * 64,
                 "C" * 20_000,
@@ -382,7 +381,7 @@ raise SystemExit(91)
 
             reused_dir, reused, _chromosome_key = cached_mummer_chromosome(
                 server,
-                "step2",
+                "step1",
                 "Chr01",
                 "0" * 64,
                 "C" * 20_000,
@@ -420,7 +419,7 @@ Path(prefix + '.delta').write_text(
             with self.assertRaises(SystemExit) as raised:
                 cached_mummer_chromosome(
                     server,
-                    "step2",
+                    "step1",
                     "Chr02",
                     "0" * 64,
                     "C" * 20_000,
@@ -435,8 +434,8 @@ Path(prefix + '.delta').write_text(
             failure = str(raised.exception)
             self.assertIn("stderr_tail='unexpected postprocessor'", failure)
             self.assertIn("failed_artifacts=", failure)
-            self.assertIn("/grt/failed/step2-mummer-", failure)
-            self.assertNotIn("/grt/cache/step23/step2/mummer/", failure)
+            self.assertIn("/grt/failed/step1-mummer-", failure)
+            self.assertNotIn("/grt/cache/step12/step1/mummer/", failure)
 
     @staticmethod
     def source_segment(
@@ -483,7 +482,7 @@ Path(prefix + '.delta').write_text(
         )
         for row in golden["step2"]:
             self.assertEqual(
-                step2_strategy(
+                step1_strategy(
                     row["gap_count"],
                     row["patch_candidate_count"],
                     row["accepted_patch_count"],
@@ -491,10 +490,10 @@ Path(prefix + '.delta').write_text(
                 row["strategy"],
             )
         for row in golden["step3"]:
-            error_type, subtype, _features, _score = _step3_classify_features(row["features"])
+            error_type, subtype, _features, _score = _step2_classify_features(row["features"])
             self.assertEqual((error_type, subtype), (row["error_type"], row["subtype"]))
 
-    def test_step23_reuses_same_orientation_donor_on_distinct_targets(self):
+    def test_step12_reuses_same_orientation_donor_on_distinct_targets(self):
         def candidate(candidate_id, object_id, chromosome, orientation):
             return {
                 "candidate_id": candidate_id,
@@ -524,7 +523,7 @@ Path(prefix + '.delta').write_text(
         self.assertEqual([row["outcome"] for row in rows], ["accepted", "accepted"])
         self.assertEqual(next(row for row in rows if row.get("donor_reuse"))["donor_reuse_of"], "c1")
 
-    def test_step2_direct_patch_prefers_nearest_validated_flanks(self):
+    def test_step1_direct_patch_prefers_nearest_validated_flanks(self):
         def candidate(candidate_id, input_end, identity):
             return {
                 "candidate_id": candidate_id,
@@ -557,12 +556,12 @@ Path(prefix + '.delta').write_text(
         )
         self.assertEqual(next(row for row in rows if row["outcome"] == "accepted")["candidate_id"], "near")
 
-    def test_step2_controller_selects_all_three_grt_branches(self):
-        self.assertEqual(step2_strategy(3, 0, 0), "no_patch_fixer")
-        self.assertEqual(step2_strategy(3, 4, 0), "full_fixer_reuse_patches")
-        self.assertEqual(step2_strategy(3, 4, 2), "partial_success_no_fixer")
+    def test_step1_controller_selects_all_three_grt_branches(self):
+        self.assertEqual(step1_strategy(3, 0, 0), "no_patch_fixer")
+        self.assertEqual(step1_strategy(3, 4, 0), "full_fixer_reuse_patches")
+        self.assertEqual(step1_strategy(3, 4, 2), "partial_success_no_fixer")
 
-    def test_step2_structural_fixer_coalesces_overlapping_gap_edits(self):
+    def test_step1_structural_fixer_coalesces_overlapping_gap_edits(self):
         gaps = [
             {"chr": "Chr02", "object_id": "gap-1", "start0": 999, "end0": 1099},
             {"chr": "Chr02", "object_id": "gap-2", "start0": 1499, "end0": 1599},
@@ -622,7 +621,7 @@ Path(prefix + '.delta').write_text(
             "largest-overlap",
         )
 
-    def test_step2_fallback_reuses_explicit_donor_source(self):
+    def test_step1_fallback_reuses_explicit_donor_source(self):
         member = {
             "member_id": "m-d1",
             "dataset_name": "d0",
@@ -648,7 +647,7 @@ Path(prefix + '.delta').write_text(
         }
         gap = {"chr": "Chr01", "object_id": "gap-1", "start0": 999, "end0": 1099}
         sources = {("d0", "d1"): "ACGT" * 500}
-        candidates = build_step2_fallback_candidates(
+        candidates = build_step1_fallback_candidates(
             [gap], [alignment], {"d1": member}, sources
         )
         self.assertEqual(len(candidates), 1)
@@ -657,7 +656,7 @@ Path(prefix + '.delta').write_text(
         self.assertEqual(candidates[0]["fill_sequence"], sources[("d0", "d1")][100:500])
         self.assertEqual(candidates[0]["fallback_strategy"], "correctrefill_source_retry")
 
-    def test_step2_fallback_ignores_mixed_donor_decoy_and_uses_type5(self):
+    def test_step1_fallback_ignores_mixed_donor_decoy_and_uses_type5(self):
         members = {
             "contig_62": {
                 "member_id": "m-contig-62",
@@ -721,12 +720,12 @@ Path(prefix + '.delta').write_text(
         self.assertTrue(type5["eligible"])
         self.assertEqual(type5["outcome"], "candidate")
 
-        fallback = build_step2_fallback_candidates(
+        fallback = build_step1_fallback_candidates(
             [gap], alignments, members, sources={}
         )
         self.assertEqual(fallback, [])
 
-    def test_rejected_negative_step2_anchor_order_emits_increasing_evidence_interval(self):
+    def test_rejected_negative_step1_anchor_order_emits_increasing_evidence_interval(self):
         member = {
             "member_id": "m-d1",
             "dataset_name": "support",
@@ -750,7 +749,7 @@ Path(prefix + '.delta').write_text(
                 "orientation": "-",
             }
 
-        candidates, rejections = build_step2_candidates(
+        candidates, rejections = build_step1_candidates(
             [{"chr": "Chr21", "object_id": "gap-1", "start0": 149, "end0": 250}],
             [
                 alignment(1, 100, 140, 100000, 200000),
@@ -778,13 +777,13 @@ Path(prefix + '.delta').write_text(
         )
 
         evidence = evidence_row(
-            evidence_id="ev-step2-mummer-regression",
-            stage="step2",
+            evidence_id="ev-step1-mummer-regression",
+            stage="step1",
             evidence_type="mummer_gap_anchor_pair",
             status="rejected",
-            q_version="q1",
+            q_version="q0",
             q_source_sha256="0" * 64,
-            query_relpath="grt/q/q1.fa",
+            query_relpath="grt/q/q0.fa",
             query_sha256="1" * 64,
             donor_set_id="donor-1",
             target_relpath="grt/donor/d0.fa",
@@ -794,7 +793,7 @@ Path(prefix + '.delta').write_text(
             tool_version="test",
             preset="test",
             parameters={},
-            raw_relpath="grt/evidence/step2/coords.tsv",
+            raw_relpath="grt/evidence/step1/coords.tsv",
             raw_sha256="3" * 64,
             coordinate_system="mummer_1_based_closed",
         )
@@ -809,7 +808,7 @@ Path(prefix + '.delta').write_text(
         )
         self.assertLessEqual(evidence["source_end"], 1000000)
 
-    def test_valid_negative_step2_anchor_order_keeps_executable_patch_interval(self):
+    def test_valid_negative_step1_anchor_order_keeps_executable_patch_interval(self):
         member = {
             "member_id": "m-d1",
             "dataset_name": "support",
@@ -833,7 +832,7 @@ Path(prefix + '.delta').write_text(
                 "orientation": "-",
             }
 
-        candidates, rejections = build_step2_candidates(
+        candidates, rejections = build_step1_candidates(
             [{"chr": "Chr21", "object_id": "gap-1", "start0": 149, "end0": 250}],
             [
                 alignment(1, 100, 140, 800000, 900000),
@@ -851,7 +850,7 @@ Path(prefix + '.delta').write_text(
         self.assertEqual((candidate["patch_start"], candidate["patch_end"]), (190001, 809999))
         self.assertEqual((candidate["source_start"], candidate["source_end"]), (190001, 809999))
 
-    def test_step3_classifies_realizable_anchor_pairs_with_type5_overlap_override(self):
+    def test_step2_classifies_realizable_anchor_pairs_with_type5_overlap_override(self):
         members = {
             "d1": {
                 "member_id": "m-d1",
@@ -1016,7 +1015,7 @@ Path(prefix + '.delta').write_text(
             [],
         )
 
-    def test_step3_small_reference_overlap_uses_type5_and_covers_origin_gap(self):
+    def test_step2_small_reference_overlap_uses_type5_and_covers_origin_gap(self):
         member = {
             "member_id": "m-d1",
             "dataset_name": "support",
@@ -1062,7 +1061,7 @@ Path(prefix + '.delta').write_text(
         self.assertLessEqual(candidate["input_start"], candidate["target_start"])
         self.assertGreaterEqual(candidate["input_end"], candidate["target_end"])
 
-    def test_step3_real_chr05_overlap_does_not_delete_the_full_shorter_alignment(self):
+    def test_step2_real_chr05_overlap_does_not_delete_the_full_shorter_alignment(self):
         member = {
             "member_id": "m-flye-scaffold-50",
             "dataset_name": "flye",
@@ -1111,7 +1110,7 @@ Path(prefix + '.delta').write_text(
         self.assertEqual(candidate["input_end"], 27338456)
         self.assertLess(candidate["input_end"] - candidate["input_start"] + 1, 20_000)
 
-    def test_step3_direct_primary_overlap_keeps_left_and_trims_right(self):
+    def test_step2_direct_primary_overlap_keeps_left_and_trims_right(self):
         rng = random.Random(20260809)
         overlap = "".join(rng.choice("ACGT") for _ in range(19_542))
         left_oriented = "".join(rng.choice("ACGT") for _ in range(2_000)) + overlap
@@ -1184,7 +1183,7 @@ Path(prefix + '.delta').write_text(
             output_paths["Chr05"][1]["source_end"],
             len(right_oriented) - 19_542,
         )
-        replayed = replay_step3(
+        replayed = replay_step2(
             {"Chr05": input_sequence},
             [
                 {
@@ -1202,7 +1201,7 @@ Path(prefix + '.delta').write_text(
         )
         self.assertEqual(replayed, output_records)
 
-    def test_step3_direct_overlap_preserves_nonflush_left_tail(self):
+    def test_step2_direct_overlap_preserves_nonflush_left_tail(self):
         rng = random.Random(7)
         overlap = "".join(rng.choice("ACGT") for _ in range(1_000))
         left = "".join(rng.choice("ACGT") for _ in range(500)) + overlap + "TTT"
@@ -1240,7 +1239,7 @@ Path(prefix + '.delta').write_text(
         self.assertEqual(candidate["outcome"], "rejected")
         self.assertIn("nonflush_overlap_would_discard_left_tail", candidate["reason"])
 
-    def test_step3_direct_overlap_event_uses_valid_junction_anchor(self):
+    def test_step2_direct_overlap_event_uses_valid_junction_anchor(self):
         gap = {
             "chr": "Chr05",
             "object_id": "gap-direct",
@@ -1312,7 +1311,7 @@ Path(prefix + '.delta').write_text(
         self.assertFalse(event["junction"]["support_sequence_inserted"])
         self.assertEqual(attempts[0]["status"], "accepted")
 
-    def test_step3_direct_overlap_rejects_missing_flanks_or_unsafe_cases(self):
+    def test_step2_direct_overlap_rejects_missing_flanks_or_unsafe_cases(self):
         rng = random.Random(11)
         overlap = "".join(rng.choice("ACGT") for _ in range(1_000))
         suffix = "".join(rng.choice("ACGT") for _ in range(200))
@@ -1391,8 +1390,8 @@ Path(prefix + '.delta').write_text(
         self.assertEqual(_longest_exact_suffix_prefix("aacCGGtt", "GGTTAA", 20), 4)
         self.assertEqual(_longest_exact_suffix_prefix("AACCGGTA", "GGTTAA", 20), 0)
 
-    def test_step3_rejects_large_overlap_edit_without_matching_evidence_scope(self):
-        safe, reason = _step3_edit_scope_decision(
+    def test_step2_rejects_large_overlap_edit_without_matching_evidence_scope(self):
+        safe, reason = _step2_edit_scope_decision(
             "type4",
             {
                 "query_overlap_length": 10_000,
@@ -1404,7 +1403,7 @@ Path(prefix + '.delta').write_text(
         self.assertFalse(safe)
         self.assertEqual(reason, "automatic_edit_exceeds_overlap_evidence")
 
-        safe, reason = _step3_edit_scope_decision(
+        safe, reason = _step2_edit_scope_decision(
             "type5",
             {
                 "query_overlap_length": 0,
@@ -1416,7 +1415,7 @@ Path(prefix + '.delta').write_text(
         self.assertTrue(safe)
         self.assertEqual(reason, "")
 
-        safe, reason = _step3_edit_scope_decision(
+        safe, reason = _step2_edit_scope_decision(
             "type5",
             {
                 "query_overlap_length": 0,
@@ -1449,7 +1448,7 @@ Path(prefix + '.delta').write_text(
             "input_end": 1500,
             "outcome": "accepted",
         }
-        with self.assertRaisesRegex(SystemExit, "does not cover associated q2 gap"):
+        with self.assertRaisesRegex(SystemExit, "does not cover associated q1 gap"):
             apply_corrections(
                 ["Chr01"],
                 {"Chr01": [gap_segment]},
@@ -1496,7 +1495,7 @@ Path(prefix + '.delta').write_text(
 
     def make_server(self, root: Path) -> Path:
         server = step1_fixture.GrtStep1Tests(
-            "test_external_contig_stage1_is_auditable_identity_and_resumes"
+            "test_prepared_q0_has_no_legacy_identity_versions"
         ).make_server(root)
         support_path = server / "data/datasets/support.fa"
         from server.tests.test_q0_admission import dna
@@ -1535,7 +1534,7 @@ import sys
 from pathlib import Path
 
 if '--version' in sys.argv:
-    print('minimap2 fixture step23 1')
+    print('minimap2 fixture step12 1')
     raise SystemExit(0)
 
 def fasta(path):
@@ -1569,13 +1568,13 @@ queries = fasta(query_path)
 lines = []
 stage = 'step1'
 if queries and queries[0][0].startswith('validate__'):
-    stage = 'step2_validation'
-elif 'step3_refill' in query_path:
-    stage = 'step3_refill'
+    stage = 'step1_validation'
+elif 'step2_refill' in query_path:
+    stage = 'step2_refill'
 with open(os.environ['FAKE_GRT_MINIMAP_LOG'], 'a', encoding='utf-8') as handle:
     handle.write(stage + '\n')
 
-if stage == 'step2_validation' and queries:
+if stage == 'step1_validation' and queries:
     target_name, target_sequence = targets[0]
     gap = re.search(r'N{100,}', target_sequence)
     if gap:
@@ -1593,7 +1592,7 @@ if stage == 'step2_validation' and queries:
                     f'{name}\t{qlen}\t0\t{qlen}\t+\t{target_name}\t{len(target_sequence)}'
                     f'\t{start}\t{end}\t{qlen}\t{qlen}\t60\tcg:Z:{qlen}M'
                 )
-elif stage == 'step3_refill' and queries:
+elif stage == 'step2_refill' and queries:
     manifest = Path(target_path).with_suffix('.manifest.tsv')
     with manifest.open(encoding='utf-8', newline='') as handle:
         rows = list(csv.DictReader(handle, delimiter='\t'))
@@ -1622,13 +1621,13 @@ import os
 import sys
 
 if '--version' in sys.argv:
-    print('nucmer fixture step23 1')
+    print('nucmer fixture step12 1')
     raise SystemExit(0)
 args = sys.argv[1:]
 prefix = args[args.index('-p') + 1]
 reference = args[-2]
 query = args[-1]
-stage = 'step3' if '/step3/' in query else 'step2'
+stage = 'step2' if '/step2/' in query else 'step1'
 with open(query, 'rb') as handle:
     query_hash = hashlib.sha256(handle.read()).hexdigest()
 with open(os.environ['FAKE_GRT_MUMMER_LOG'], 'a', encoding='utf-8') as handle:
@@ -1642,7 +1641,7 @@ with open(prefix + '.delta', 'w', encoding='utf-8', newline='') as handle:
             r'''#!/usr/bin/env python3
 import sys
 if '--version' in sys.argv:
-    print('delta-filter fixture step23 1')
+    print('delta-filter fixture step12 1')
     raise SystemExit(0)
 with open(sys.argv[-1], encoding='utf-8') as handle:
     sys.stdout.write(handle.read())
@@ -1657,7 +1656,7 @@ import sys
 from pathlib import Path
 
 if '--version' in sys.argv:
-    print('show-coords fixture step23 1')
+    print('show-coords fixture step12 1')
     raise SystemExit(0)
 
 def fasta(path):
@@ -1704,7 +1703,7 @@ print(f'{reference} {query}')
 print('NUCMER')
 print('[S1] [E1] | [S2] [E2] | [LEN 1] [LEN 2] | [% IDY] | [LEN R] [LEN Q] | [TAGS]')
 print('=' * 80)
-if stage == 'step2':
+if stage == 'step1':
     left_end = gap.start()
     left_start = left_end - 9999
     right_start = gap.end() + 1
@@ -1727,32 +1726,14 @@ else:
             "show_coords": show_coords,
         }
 
-    def run_step1(self, server: Path, tools: dict[str, Path], env: dict[str, str]):
-        return subprocess.run(
-            [
-                sys.executable,
-                str(STEP1_TOOL),
-                "--server-dir",
-                str(server),
-                "--minimap2",
-                str(tools["minimap2"]),
-                "--threads",
-                "2",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
-
     def run_repair_stages(
         self,
         server: Path,
         tools: dict[str, Path],
         env: dict[str, str],
         threads: int = 2,
+        step1_tool: Path = STEP1_TOOL,
         step2_tool: Path = STEP2_TOOL,
-        step3_tool: Path = STEP3_TOOL,
         refill_max_length: int = 1_000_000,
         execution_profile: str = "baseline",
     ):
@@ -1766,13 +1747,13 @@ else:
             "--execution-profile", execution_profile,
         ]
         first = subprocess.run(
-            [sys.executable, str(step2_tool), *common],
+            [sys.executable, str(step1_tool), *common],
             check=False, capture_output=True, text=True, env=env,
         )
         if first.returncode:
             return first
         second = subprocess.run(
-            [sys.executable, str(step3_tool), *common, "--step3-mummer-scope", "full", "--max-fill", str(refill_max_length)],
+            [sys.executable, str(step2_tool), *common, "--step2-mummer-scope", "full", "--max-fill", str(refill_max_length)],
             check=False, capture_output=True, text=True, env=env,
         )
         return subprocess.CompletedProcess(
@@ -1780,7 +1761,7 @@ else:
             first.stdout + second.stdout, first.stderr + second.stderr,
         )
 
-    def run_split_step2_step3(
+    def run_split_step1_step2(
         self,
         server: Path,
         tools: dict[str, Path],
@@ -1795,19 +1776,19 @@ else:
             "--show-coords", str(tools["show_coords"]),
             "--threads", str(threads),
         ]
+        step1 = subprocess.run(
+            [sys.executable, str(STEP1_TOOL), *common],
+            check=False, capture_output=True, text=True, env=env,
+        )
+        if step1.returncode:
+            return step1, None
         step2 = subprocess.run(
             [sys.executable, str(STEP2_TOOL), *common],
             check=False, capture_output=True, text=True, env=env,
         )
-        if step2.returncode:
-            return step2, None
-        step3 = subprocess.run(
-            [sys.executable, str(STEP3_TOOL), *common],
-            check=False, capture_output=True, text=True, env=env,
-        )
-        return step2, step3
+        return step1, step2
 
-    def test_independent_step2_then_step3_leave_stage_specific_checkpoints(self):
+    def test_independent_step1_then_step2_leave_stage_specific_checkpoints(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             server = self.make_server(root)
@@ -1815,25 +1796,27 @@ else:
             env = os.environ.copy()
             env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
             env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
-            first = self.run_step1(server, tools, env)
-            self.assertEqual(first.returncode, 0, first.stderr)
             common = ["--server-dir", str(server), "--threads", "2"]
             for key, value in tools.items():
                 common += ["--" + key.replace("_", "-"), str(value)]
+            step1 = subprocess.run([sys.executable, str(STEP1_TOOL), *common],
+                                   capture_output=True, text=True, env=env)
+            self.assertEqual(step1.returncode, 0, step1.stderr)
+            self.assertTrue((server / "grt/checkpoints/step1.json").is_file())
+            self.assertFalse((server / "grt/checkpoints/step2.json").exists())
+            self.assertEqual(sorted(p.stem for p in (server / "grt/q").glob("*.fa")), ["q0", "q1"])
+            step1_result = json.loads((server / "grt/evidence/step1/result.json").read_text())
+            self.assertEqual(step1_result["q_input_version"], "q0")
+            self.assertEqual(step1_result["q_input_sha256"], prepare_fixture.sha256(server / "grt/q/q0.fa"))
+            q1_hash = prepare_fixture.sha256(server / "grt/q/q1.fa")
             step2 = subprocess.run([sys.executable, str(STEP2_TOOL), *common],
                                    capture_output=True, text=True, env=env)
             self.assertEqual(step2.returncode, 0, step2.stderr)
+            self.assertEqual(q1_hash, prepare_fixture.sha256(server / "grt/q/q1.fa"))
             self.assertTrue((server / "grt/checkpoints/step2.json").is_file())
-            self.assertFalse((server / "grt/checkpoints/step3.json").exists())
-            q2_hash = prepare_fixture.sha256(server / "grt/q/q2.fa")
-            step3 = subprocess.run([sys.executable, str(STEP3_TOOL), *common],
-                                   capture_output=True, text=True, env=env)
-            self.assertEqual(step3.returncode, 0, step3.stderr)
-            self.assertEqual(q2_hash, prepare_fixture.sha256(server / "grt/q/q2.fa"))
-            self.assertTrue((server / "grt/checkpoints/step3.json").is_file())
-            self.assertFalse((REPO_ROOT / "server/tools/grt_step23.py").exists())
+            self.assertFalse((REPO_ROOT / "server/tools/grt_step12.py").exists())
 
-    def test_optimized_cold_step2_step3_keep_candidates_rejections_and_decisions(self):
+    def test_optimized_cold_step1_step2_keep_candidates_rejections_and_decisions(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             # Compare execution profiles on the same frozen q0/input identity,
@@ -1847,14 +1830,12 @@ else:
             env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
             env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
             for profile, server in servers.items():
-                completed = self.run_step1(server, tools, env)
-                self.assertEqual(completed.returncode, 0, completed.stderr)
                 completed = self.run_repair_stages(server, tools, env, execution_profile=profile)
                 self.assertEqual(completed.returncode, 0, completed.stderr)
-            for q in ("q2", "q3"):
+            for q in ("q1", "q2"):
                 self.assertEqual(prepare_fixture.sha256(servers["baseline"] / f"grt/q/{q}.fa"),
                                  prepare_fixture.sha256(servers["optimized"] / f"grt/q/{q}.fa"))
-            for stage in ("step2", "step3"):
+            for stage in ("step1", "step2"):
                 baseline = servers["baseline"] / "grt/evidence" / stage
                 optimized = servers["optimized"] / "grt/evidence" / stage
                 left = json.loads((baseline / "result.json").read_text())
@@ -1871,7 +1852,7 @@ else:
                     if (baseline / name).is_file():
                         self.assertEqual((baseline / name).read_bytes(), (optimized / name).read_bytes(), f"{stage}:{name}")
 
-    def test_split_step3_rejects_missing_or_modified_step2_checkpoint_outputs(self):
+    def test_split_step2_rejects_missing_or_modified_step1_checkpoint_outputs(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             server = self.make_server(root)
@@ -1879,25 +1860,23 @@ else:
             env = os.environ.copy()
             env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
             env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
-            completed = self.run_step1(server, tools, env)
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            step2, step3 = self.run_split_step2_step3(server, tools, env)
+            step1, step2 = self.run_split_step1_step2(server, tools, env)
+            self.assertEqual(step1.returncode, 0, step1.stderr)
             self.assertEqual(step2.returncode, 0, step2.stderr)
-            self.assertEqual(step3.returncode, 0, step3.stderr)
             before = (root / "mummer.log").read_text()
-            checkpoint = server / "grt/checkpoints/step2.json"
+            checkpoint = server / "grt/checkpoints/step1.json"
             from server.tools.grt_core.stage_cache import completed_stage_result
-            completed_stage_result(server, "step2")
-            q2 = server / "grt/q/q2.fa"
-            q2.write_text(q2.read_text() + "\n")
+            completed_stage_result(server, "step1")
+            q1 = server / "grt/q/q1.fa"
+            q1.write_text(q1.read_text() + "\n")
             with self.assertRaisesRegex(SystemExit, "checkpoint output is missing or changed"):
-                completed_stage_result(server, "step2")
+                completed_stage_result(server, "step1")
             checkpoint.unlink()
-            with self.assertRaisesRegex(SystemExit, "cannot load completed step2 result"):
-                completed_stage_result(server, "step2")
+            with self.assertRaisesRegex(SystemExit, "cannot load completed step1 result"):
+                completed_stage_result(server, "step1")
             self.assertEqual((root / "mummer.log").read_text(), before)
 
-    def test_refill_limit_invalidates_step3_but_reuses_step2(self):
+    def test_refill_limit_invalidates_step2_but_reuses_step1(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             server = self.make_server(root)
@@ -1905,19 +1884,17 @@ else:
             env = os.environ.copy()
             env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
             env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
-            step1 = self.run_step1(server, tools, env)
-            self.assertEqual(step1.returncode, 0, step1.stderr)
             first = self.run_repair_stages(server, tools, env)
             self.assertEqual(first.returncode, 0, first.stderr)
             changed = self.run_repair_stages(server, tools, env, refill_max_length=2_000_000)
             self.assertEqual(changed.returncode, 0, changed.stderr)
-            self.assertIn("LGZ step2 cache hit:", changed.stdout)
-            self.assertNotIn("LGZ step3 cache hit:", changed.stdout)
-            checkpoint = json.loads((server / "grt/checkpoints/step3.json").read_text())
+            self.assertIn("LGZ step1 cache hit:", changed.stdout)
+            self.assertNotIn("LGZ step2 cache hit:", changed.stdout)
+            checkpoint = json.loads((server / "grt/checkpoints/step2.json").read_text())
             self.assertEqual(checkpoint["fingerprint_payload"]["refill_parameters"]["max_fill_length"], 2_000_000)
             repeated = self.run_repair_stages(server, tools, env, refill_max_length=2_000_000)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
-            self.assertIn("LGZ step3 cache hit:", repeated.stdout)
+            self.assertIn("LGZ step2 cache hit:", repeated.stdout)
 
     def test_engine_identity_covers_both_stages_helpers_and_entry_scripts(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
@@ -1927,10 +1904,10 @@ else:
             original = repair_engine_sha256(runtime / "grt_core")
             self.assertEqual(original, repair_engine_sha256())
             for relative in (
-                "grt_core/step2_engine.py", "grt_core/step3_engine.py",
+                "grt_core/step1_engine.py", "grt_core/step2_engine.py",
                 "grt_core/repair_mummer.py", "grt_core/alignment_index.py",
                 "grt_core/refill_batch.py", "grt_core/stage_cache.py",
-                "grt_step2.py", "grt_step3.py",
+                "grt_step1.py", "grt_step2.py",
             ):
                 with self.subTest(relative=relative):
                     path = runtime / relative
@@ -1959,16 +1936,14 @@ else:
             runtime = root / "runtime"
             shutil.copytree(REPO_ROOT / "server/tools", runtime,
                             ignore=shutil.ignore_patterns("__pycache__"))
-            runtime_tool = runtime / "grt_core/step2_engine.py"
+            runtime_tool = runtime / "grt_core/step1_engine.py"
 
-            step1 = self.run_step1(server, tools, env)
-            self.assertEqual(step1.returncode, 0, step1.stderr)
-            first = self.run_repair_stages(server, tools, env, step2_tool=runtime / "grt_step2.py", step3_tool=runtime / "grt_step3.py")
+            first = self.run_repair_stages(server, tools, env, step1_tool=runtime / "grt_step1.py", step2_tool=runtime / "grt_step2.py")
             self.assertEqual(first.returncode, 0, first.stderr)
             initial_calls = mummer_log.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(initial_calls), 2)
 
-            repeated = self.run_repair_stages(server, tools, env, step2_tool=runtime / "grt_step2.py", step3_tool=runtime / "grt_step3.py")
+            repeated = self.run_repair_stages(server, tools, env, step1_tool=runtime / "grt_step1.py", step2_tool=runtime / "grt_step2.py")
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), initial_calls)
 
@@ -1977,21 +1952,21 @@ else:
                 encoding="utf-8",
                 newline="",
             )
-            changed = self.run_repair_stages(server, tools, env, step2_tool=runtime / "grt_step2.py", step3_tool=runtime / "grt_step3.py")
+            changed = self.run_repair_stages(server, tools, env, step1_tool=runtime / "grt_step1.py", step2_tool=runtime / "grt_step2.py")
             self.assertEqual(changed.returncode, 0, changed.stderr)
-            self.assertIn("LGZ step2 complete", changed.stdout)
+            self.assertIn("LGZ step1 complete", changed.stdout)
             # Recompute repair decisions after engine changes, retaining
             # independently fingerprinted numerical alignments.
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
             checkpoint = json.loads(
-                (server / "grt/checkpoints/step3.json").read_text(encoding="utf-8")
+                (server / "grt/checkpoints/step2.json").read_text(encoding="utf-8")
             )
             self.assertEqual(
                 checkpoint["fingerprint_payload"]["engine_sha256"],
                 repair_engine_sha256(runtime / "grt_core"),
             )
 
-    def test_fixed_d0_step2_step3_interval_usage_replay_and_resume(self):
+    def test_fixed_d0_step1_step2_interval_usage_replay_and_resume(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             server = self.make_server(root)
@@ -2002,15 +1977,13 @@ else:
             env["FAKE_GRT_MINIMAP_LOG"] = str(minimap_log)
             env["FAKE_GRT_MUMMER_LOG"] = str(mummer_log)
 
-            step1 = self.run_step1(server, tools, env)
-            self.assertEqual(step1.returncode, 0, step1.stderr)
             self.assertFalse(minimap_log.exists())
-            self.assertEqual(len(re.findall(r"N{100,}", dict(read_fasta(server / "grt/q/q1.fa"))["Chr01"])), 2)
+            self.assertEqual(len(re.findall(r"N{100,}", dict(read_fasta(server / "grt/q/q0.fa"))["Chr01"])), 2)
 
             completed = self.run_repair_stages(server, tools, env)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             filter_commands = list(
-                (server / "grt/cache/step23").glob(
+                (server / "grt/cache/step12").glob(
                     "*/mummer/*/*/delta_filter.command.txt"
                 )
             )
@@ -2026,7 +1999,7 @@ else:
                 self.assertNotIn(" -r ", command_text)
             self.assertEqual(
                 [line.split("\t")[0] for line in mummer_log.read_text(encoding="utf-8").splitlines()],
-                ["step2", "step3"],
+                ["step1", "step2"],
             )
             mummer_query_hashes = [
                 line.split("\t")[1]
@@ -2034,11 +2007,11 @@ else:
             ]
             self.assertNotEqual(mummer_query_hashes[0], mummer_query_hashes[1])
             self.assertEqual(
-                minimap_log.read_text(encoding="utf-8").splitlines().count("step2_validation"),
+                minimap_log.read_text(encoding="utf-8").splitlines().count("step1_validation"),
                 1,
             )
             self.assertEqual(
-                minimap_log.read_text(encoding="utf-8").splitlines().count("step3_refill"),
+                minimap_log.read_text(encoding="utf-8").splitlines().count("step2_refill"),
                 1,
             )
 
@@ -2051,19 +2024,19 @@ else:
             stages = prepare_fixture.read_tsv(server / "metadata/grt_stage_status.tsv")
             self.assertEqual(
                 [row["stage"] for row in stages],
-                ["donor_freeze", "step1_round1", "step1_filter", "step1_round2", "step2", "step3"],
+                ["donor_freeze", "step1", "step2"],
             )
             self.assertEqual({row["donor_set_id"] for row in stages}, {recipe["donor_set_id"]})
-            self.assertEqual(stages[-2]["q_input_sha256"], prepare_fixture.sha256(server / "grt/q/q1.fa"))
-            self.assertEqual(stages[-1]["q_input_sha256"], prepare_fixture.sha256(server / "grt/q/q2.fa"))
-            strategies = prepare_fixture.read_tsv(server / "metadata/grt_step2_strategies.tsv")
+            self.assertEqual(stages[-2]["q_input_sha256"], prepare_fixture.sha256(server / "grt/q/q0.fa"))
+            self.assertEqual(stages[-1]["q_input_sha256"], prepare_fixture.sha256(server / "grt/q/q1.fa"))
+            strategies = prepare_fixture.read_tsv(server / "metadata/grt_step1_strategies.tsv")
             self.assertEqual(
                 {row["strategy"] for row in strategies},
                 {"partial_success_no_fixer", "no_gaps"},
             )
             self.assertTrue(all(row["strategy_applied"] == "patcher_result" for row in strategies))
             classifications = prepare_fixture.read_tsv(
-                server / "metadata/grt_step3_classifications.tsv"
+                server / "metadata/grt_step2_classifications.tsv"
             )
             self.assertTrue(classifications)
             self.assertTrue(all(row["repair_mode"] == "aggressive" for row in classifications))
@@ -2078,12 +2051,12 @@ else:
                     "mummer_structural_correction",
                 }
             ]
-            self.assertEqual({row["q_version"] for row in mummer_evidence}, {"q1", "q2"})
+            self.assertEqual({row["q_version"] for row in mummer_evidence}, {"q0", "q1"})
             self.assertEqual(
                 {
                     row["target_sha256"]
                     for row in mummer_evidence
-                    if row["q_version"] == "q1"
+                    if row["q_version"] == "q0"
                 },
                 {donor_hash},
             )
@@ -2091,7 +2064,7 @@ else:
                 {
                     row["target_sha256"]
                     for row in mummer_evidence
-                    if row["q_version"] == "q2"
+                    if row["q_version"] == "q1"
                 },
                 {donor_hash},
             )
@@ -2102,21 +2075,21 @@ else:
                 for line in (server / "metadata/grt_events.jsonl").read_text(encoding="utf-8").splitlines()
             ]
             accepted_patch = next(
-                event for event in events if event["stage"] == "step2" and event["status"] == "accepted"
+                event for event in events if event["stage"] == "step1" and event["status"] == "accepted"
             )
             accepted_refill = next(
                 event
                 for event in events
-                if event["stage"] == "step3" and event["action"] == "refill" and event["status"] == "accepted"
+                if event["stage"] == "step2" and event["action"] == "refill" and event["status"] == "accepted"
             )
             superseded_correction = next(
                 event
                 for event in events
-                if event["stage"] == "step3" and event["action"] == "replace" and event["status"] == "superseded"
+                if event["stage"] == "step2" and event["action"] == "replace" and event["status"] == "superseded"
             )
             self.assertEqual(accepted_patch["source"]["contig"], "s_unplaced")
             self.assertEqual(accepted_refill["source"]["contig"], "s_unplaced")
-            self.assertEqual(accepted_refill["object_id"], accepted_refill["origin_q2_object_id"])
+            self.assertEqual(accepted_refill["object_id"], accepted_refill["origin_q1_object_id"])
             self.assertNotEqual(accepted_refill["corrected_object_id"], accepted_refill["object_id"])
             self.assertEqual(superseded_correction["superseded_by_event_id"], accepted_refill["event_id"])
             self.assertIn(superseded_correction["event_id"], accepted_refill["superseded_event_ids"])
@@ -2158,38 +2131,38 @@ else:
                 )
             )
 
-            q3 = dict(read_fasta(server / "grt/q/q3.fa"))
-            self.assertFalse(re.search(r"N{100,}", q3["Chr01"]))
+            q2 = dict(read_fasta(server / "grt/q/q2.fa"))
+            self.assertFalse(re.search(r"N{100,}", q2["Chr01"]))
+            q1_hash = prepare_fixture.sha256(server / "grt/q/q1.fa")
             q2_hash = prepare_fixture.sha256(server / "grt/q/q2.fa")
-            q3_hash = prepare_fixture.sha256(server / "grt/q/q3.fa")
             mummer_calls = mummer_log.read_text(encoding="utf-8").splitlines()
             minimap_calls = minimap_log.read_text(encoding="utf-8").splitlines()
             repeated = self.run_repair_stages(server, tools, env)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), mummer_calls)
             self.assertEqual(minimap_log.read_text(encoding="utf-8").splitlines(), minimap_calls)
-            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q2.fa"), q2_hash)
 
-            with (server / "grt/q/q2.fa").open("a", encoding="utf-8", newline="") as handle:
+            with (server / "grt/q/q1.fa").open("a", encoding="utf-8", newline="") as handle:
                 handle.write("# injected output hash mismatch\n")
             output_invalidated = self.run_repair_stages(server, tools, env)
             self.assertEqual(output_invalidated.returncode, 0, output_invalidated.stderr)
-            self.assertIn("LGZ step2 complete", output_invalidated.stdout)
+            self.assertIn("LGZ step1 complete", output_invalidated.stdout)
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q1.fa"), q1_hash)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q2.fa"), q2_hash)
-            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
 
             parameter_invalidated = self.run_repair_stages(server, tools, env, threads=3)
             self.assertEqual(parameter_invalidated.returncode, 0, parameter_invalidated.stderr)
             # The scheduling budget does not change nucmer's effective -t 1.
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
-            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q2.fa"), q2_hash)
 
             nucmer_path = tools["nucmer"]
             nucmer_path.write_text(
                 nucmer_path.read_text(encoding="utf-8").replace(
-                    "nucmer fixture step23 1",
-                    "nucmer fixture step23 2",
+                    "nucmer fixture step12 1",
+                    "nucmer fixture step12 2",
                     1,
                 ),
                 encoding="utf-8",
@@ -2198,7 +2171,7 @@ else:
             tool_invalidated = self.run_repair_stages(server, tools, env, threads=3)
             self.assertEqual(tool_invalidated.returncode, 0, tool_invalidated.stderr)
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 4)
-            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q2.fa"), q2_hash)
 
     def test_coords_parser_uses_real_show_coords_columns(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
@@ -2211,7 +2184,7 @@ else:
             )
             rows = parse_mummer_coords(
                 path,
-                "step3",
+                "step2",
                 "Chr01",
                 60000,
                 {
@@ -2228,7 +2201,7 @@ else:
             self.assertEqual(rows[0]["orientation"], "-")
             self.assertEqual((rows[0]["query_min"], rows[0]["query_max"]), (10001, 20000))
 
-    def test_final_q3_projection_accounts_for_earlier_refill_length_change(self):
+    def test_final_q2_projection_accounts_for_earlier_refill_length_change(self):
         refill = {
             "event_id": "refill-1",
             "chr": "Chr01",
@@ -2251,7 +2224,7 @@ else:
         candidates = [
             {
                 "candidate_id": "candidate-1",
-                "stage": "step2",
+                "stage": "step1",
                 "chr": "Chr01",
                 "object_id": "gap-1",
                 "input_start": 100,

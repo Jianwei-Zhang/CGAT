@@ -134,7 +134,7 @@ def prepare_mummer_inputs(
     Workers only read these files. Never hard-link mutable workspace artifacts.
     The numerical raw-cache key remains identical to the baseline key.
     """
-    parent = server_dir / "grt/cache/step23/inputs/v1"
+    parent = server_dir / "grt/cache/step12/inputs/v1"
     parent.mkdir(parents=True, exist_ok=True)
     inputs = {}
     for index, partition in enumerate(partitions, start=1):
@@ -172,18 +172,18 @@ def mummer_screen_windows(
 ) -> tuple[list[tuple[str, str]], dict[str, dict[str, int]]]:
     """Build conservative local queries used only to select full-Q reruns.
 
-    Step2 patch candidates allow anchors up to ``PATCH_MAX_ANCHOR_DISTANCE``
-    apart; Step2 structural fallback and Step3 correction use
+    Step1 patch candidates allow anchors up to ``PATCH_MAX_ANCHOR_DISTANCE``
+    apart; Step1 structural fallback and Step2 correction use
     ``CORRECTION_SEARCH_RANGE`` around the gap midpoint. Add one retained
     alignment length beyond the active range so every >=10 kb alignment with
     a relevant endpoint still has enough sequence to survive
     ``delta-filter -l`` in the screen.
     """
-    if stage == "step2":
-        q_version = "q1"
+    if stage == "step1":
+        q_version = "q0"
         margin = PATCH_MAX_ANCHOR_DISTANCE + MUMMER_MIN_ALIGNMENT
-    elif stage == "step3":
-        q_version = "q2"
+    elif stage == "step2":
+        q_version = "q1"
         margin = CORRECTION_SEARCH_RANGE + MUMMER_MIN_ALIGNMENT
     else:
         fail(f"gap-screen is unsupported for {stage}")
@@ -210,12 +210,12 @@ def mummer_screen_windows(
 
 
 
-def step3_mummer_screen_windows(
+def step2_mummer_screen_windows(
     chromosome: str,
     sequence: str,
 ) -> tuple[list[tuple[str, str]], dict[str, dict[str, int]]]:
-    """Compatibility wrapper for the original Step3-only screen helper."""
-    return mummer_screen_windows(chromosome, "step3", sequence)
+    """Compatibility wrapper for the original Step2-only screen helper."""
+    return mummer_screen_windows(chromosome, "step2", sequence)
 
 
 
@@ -225,7 +225,7 @@ def parse_mummer_screen_coords(
     members_by_record: dict[str, dict[str, str]],
     donor_lengths: dict[str, int],
 ) -> list[dict[str, object]]:
-    """Parse window-query coords and project them into whole-Q2 coordinates."""
+    """Parse window-query coords and project them into whole-Q1 coordinates."""
     rows: list[dict[str, object]] = []
     with path.open(encoding="utf-8") as handle:
         for line_number, raw in enumerate(handle, start=1):
@@ -291,7 +291,7 @@ def parse_mummer_screen_coords(
 
 
 
-def step3_screen_partition_relevant(
+def step2_screen_partition_relevant(
     gaps: list[dict[str, object]],
     rows: list[dict[str, object]],
 ) -> bool:
@@ -315,11 +315,11 @@ def step3_screen_partition_relevant(
 
 
 
-def step2_screen_partition_relevant(
+def step1_screen_partition_relevant(
     gaps: list[dict[str, object]],
     rows: list[dict[str, object]],
 ) -> bool:
-    """Return whether one partition can contribute any Step2 strategy input."""
+    """Return whether one partition can contribute any Step1 strategy input."""
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     for row in rows:
         grouped[str(row["ref_record"])].append(row)
@@ -349,7 +349,7 @@ def step2_screen_partition_relevant(
                 for right in rights
             ):
                 return True
-        if step3_screen_partition_relevant([gap], rows):
+        if step2_screen_partition_relevant([gap], rows):
             return True
     return False
 
@@ -444,7 +444,7 @@ def raw_mummer_cache_identity(
         "parameters": lgz_mummer_parameters(1),
     }
     fingerprint = json_hash(payload)
-    cache_dir = server_dir / "grt/cache/step23/raw_mummer/v1" / fingerprint
+    cache_dir = server_dir / "grt/cache/step12/raw_mummer/v1" / fingerprint
     return target_payload, payload, fingerprint, cache_dir, ["result.coords", *MUMMER_LOG_NAMES]
 
 
@@ -571,7 +571,7 @@ def cached_mummer_screen_partition(
     prepared_input: PreparedMummerInput | None = None,
     execution: MummerExecution | None = None,
 ) -> tuple[Path, bool, float, list[dict[str, object]]]:
-    """Cache a local-window screen used only to select exact full-Q2 reruns."""
+    """Cache a local-window screen used only to select exact full-Q1 reruns."""
     started = time.monotonic()
     label = f"part-{index:04d}"
     target_payload = None if prepared_input is not None else fasta_bytes(partition)
@@ -584,7 +584,7 @@ def cached_mummer_screen_partition(
         "parameters": lgz_mummer_parameters(1),
     }
     fingerprint = json_hash(payload)
-    cache_parent = server_dir / "grt/cache/step23/raw_mummer_screen/v1"
+    cache_parent = server_dir / "grt/cache/step12/raw_mummer_screen/v1"
     cache_dir = cache_parent / fingerprint
     names = ["result.coords", *MUMMER_LOG_NAMES]
     with execution.cache_lock(cache_dir) if execution is not None else nullcontext():
@@ -718,7 +718,7 @@ def screen_mummer_partitions(
     screen_root = temporary / "screen"
     screen_root.mkdir()
     (screen_root / "query.fa").write_bytes(query_payload)
-    q_version = "q1" if stage == "step2" else "q2"
+    q_version = "q0" if stage == "step1" else "q1"
     gaps = gap_objects(chromosome, q_version, q_sequence)
     workers = mummer_partition_workers(
         threads,
@@ -768,9 +768,9 @@ def screen_mummer_partitions(
         if execution is None:
             pool.shutdown(wait=True, cancel_futures=True)
     relevant = (
-        step2_screen_partition_relevant
-        if stage == "step2"
-        else step3_screen_partition_relevant
+        step1_screen_partition_relevant
+        if stage == "step1"
+        else step2_screen_partition_relevant
     )
     selected = {
         index
@@ -796,7 +796,7 @@ def screen_mummer_partitions(
 
 
 
-def screen_step3_mummer_partitions(
+def screen_step2_mummer_partitions(
     server_dir: Path,
     temporary: Path,
     chromosome: str,
@@ -807,11 +807,11 @@ def screen_step3_mummer_partitions(
     tools: dict[str, dict[str, str]],
     threads: int,
 ) -> tuple[set[int], list[dict[str, object]], list[tuple[str, str]]]:
-    """Compatibility wrapper for the original Step3-only screen helper."""
+    """Compatibility wrapper for the original Step2-only screen helper."""
     return screen_mummer_partitions(
         server_dir,
         temporary,
-        "step3",
+        "step2",
         chromosome,
         q_sequence,
         target_partitions,
@@ -843,8 +843,8 @@ def cached_mummer_chromosome(
 ) -> tuple[Path, bool, str]:
     if mummer_scope not in MUMMER_SCOPES:
         fail(f"unsupported MUMmer scope: {mummer_scope}")
-    if mummer_scope == "gap-screen" and stage not in {"step2", "step3"}:
-        fail("gap-screen MUMmer scope is only supported for Step2/Step3")
+    if mummer_scope == "gap-screen" and stage not in {"step1", "step2"}:
+        fail("gap-screen MUMmer scope is only supported for Step1/Step2")
     query_payload = fasta_bytes([(chromosome, q_sequence)])
     parameters = lgz_mummer_parameters(threads)
     target_records = execution.records if execution is not None else dict(
@@ -877,16 +877,16 @@ def cached_mummer_chromosome(
             {
                 "search_range": (
                     PATCH_MAX_ANCHOR_DISTANCE
-                    if stage == "step2"
+                    if stage == "step1"
                     else CORRECTION_SEARCH_RANGE
                 ),
                 "guard_bp": MUMMER_MIN_ALIGNMENT,
                 "selection": (
-                    "step2_patch_or_structural_candidate"
-                    if stage == "step2"
+                    "step1_patch_or_structural_candidate"
+                    if stage == "step1"
                     else "crossing_or_any_window_affecting_anchor"
                 ),
-                "final_alignment": f"selected_partitions_against_full_{'q1' if stage == 'step2' else 'q2'}",
+                "final_alignment": f"selected_partitions_against_full_{'q0' if stage == 'step1' else 'q1'}",
             }
             if mummer_scope == "gap-screen"
             else None
@@ -900,7 +900,7 @@ def cached_mummer_chromosome(
     }
     fingerprint = json_hash(fingerprint_payload)
     chromosome_key = stable_id("chr", chromosome, 16)
-    cache_parent = server_dir / f"grt/cache/step23/{stage}/mummer/{chromosome_key}"
+    cache_parent = server_dir / f"grt/cache/step12/{stage}/mummer/{chromosome_key}"
     cache_dir = cache_parent / fingerprint
     checkpoint_path = cache_dir / "cache.json"
     output_names = [
@@ -1163,9 +1163,9 @@ def collect_mummer(
         fail(f"{target_kind} FASTA records differ from its alignment target manifest")
     donor_lengths = {name: len(sequence) for name, sequence in donor_records.items()}
     target_partitions = partition_mummer_targets(donor_records)
-    q1_records: dict[str, str] = {}
-    if stage == "step3" and mummer_scope == "gap-screen":
-        q1_records = dict(read_fasta(server_dir / "grt/q/q1.fa"))
+    q0_records: dict[str, str] = {}
+    if stage == "step2" and mummer_scope == "gap-screen":
+        q0_records = dict(read_fasta(server_dir / "grt/q/q0.fa"))
     execution = None
     input_seconds = 0.0
 
@@ -1173,15 +1173,15 @@ def collect_mummer(
         chromosome_rows = [row for row in q_rows if row["chr"] == chromosome]
         should_align = bool(donor_records) and bool(gap_objects(chromosome, stage, records[chromosome]))
         chromosome_scope = mummer_scope
-        if chromosome_scope == "gap-screen" and q1_records.get(chromosome) == records[chromosome]:
+        if chromosome_scope == "gap-screen" and q0_records.get(chromosome) == records[chromosome]:
             if complete_raw_mummer_cache(
                 server_dir, chromosome, records[chromosome], target_partitions, tools, execution
             ):
                 chromosome_scope = "full"
-                print(f"LGZ step3 MUMmer {chromosome}: Q2 unchanged from Q1; "
+                print(f"LGZ step2 MUMmer {chromosome}: Q1 unchanged from Q0; "
                       "all full-query partition caches validated", flush=True)
             else:
-                print(f"LGZ step3 MUMmer {chromosome}: Q2 unchanged from Q1 but "
+                print(f"LGZ step2 MUMmer {chromosome}: Q1 unchanged from Q0 but "
                       "full-query cache is incomplete; using gap-screen", flush=True)
         parsed = [] if optimized else None
         cache_dir, cache_hit, chromosome_key = cached_mummer_chromosome(

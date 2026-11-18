@@ -435,9 +435,9 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
             ready = root / "grt.ready"
             allow = root / "grt.continue"
             server = self.make_workspace(
-                root, [("grt_step1", "python3 commands/fake_grt_step1.py")]
+                root, [("grt_step12", "python3 commands/fake_grt_step12.py")]
             )
-            script = server / "commands/fake_grt_step1.py"
+            script = server / "commands/fake_grt_step12.py"
             script.write_text(
                 f'''#!/usr/bin/env python3
 import csv
@@ -449,7 +449,7 @@ from pathlib import Path
 server = Path(__file__).resolve().parents[1]
 ready = Path({str(ready)!r})
 allow = Path({str(allow)!r})
-stages = ("step1_round1", "step1_filter", "step1_round2")
+stages = ("step1", "step2")
 fields = ("stage", "q_input_version", "q_input_sha256", "q_output_version", "q_output_sha256", "donor_set_id", "status", "checkpoint_relpath", "checkpoint_sha256")
 
 def sha(path):
@@ -490,12 +490,12 @@ def write_status(selected):
                 "checkpoint_sha256": sha(checkpoint),
             }})
 
-first = server / "grt/checkpoints/step1_round1.json"
+first = server / "grt/checkpoints/step1.json"
 if first.is_file():
-    print("LGZ step1_round1 cache hit: fixture", flush=True)
+    print("LGZ step1 cache hit: fixture", flush=True)
 else:
-    write_stage("step1_round1")
-write_status(("step1_round1",))
+    write_stage("step1")
+write_status(("step1",))
 ready.touch()
 if not allow.is_file():
     time.sleep(30)
@@ -519,20 +519,20 @@ write_status(stages)
             process.send_signal(signal.SIGTERM)
             _stdout, stderr = process.communicate(timeout=5)
             self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
-            first_checkpoint = server / "grt/checkpoints/step1_round1.json"
+            first_checkpoint = server / "grt/checkpoints/step1.json"
             self.assertTrue(first_checkpoint.is_file())
             first_hash = hashlib.sha256(first_checkpoint.read_bytes()).hexdigest()
-            self.assertFalse((server / "grt/checkpoints/step1_filter.json").exists())
+            self.assertFalse((server / "grt/checkpoints/step2.json").exists())
 
             allow.touch()
             resumed = self.run_runner(server)
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertIn("[CHILD] [grt_step1] LGZ step1_round1 cache hit", resumed.stdout)
-            self.assertNotIn("[CACHE_HIT] [grt_step1]", resumed.stdout)
+            self.assertIn("[CHILD] [grt_step12] LGZ step1 cache hit", resumed.stdout)
+            self.assertNotIn("[CACHE_HIT] [grt_step12]", resumed.stdout)
             self.assertEqual(
                 hashlib.sha256(first_checkpoint.read_bytes()).hexdigest(), first_hash
             )
-            self.assertTrue((server / "grt/checkpoints/step1_filter.json").is_file())
+            self.assertTrue((server / "grt/checkpoints/step2.json").is_file())
             row = read_status(server / "logs/status.tsv")[0]
             self.assertEqual((row["state"], row["attempt"]), ("success", "2"))
 
@@ -629,10 +629,9 @@ write_status(stages)
                 root,
                 [
                     (
-                        "grt_step1",
-                        "echo 'LGZ step1_round1 cache hit: fixture'\n"
-                        "echo 'LGZ step1_filter cache hit: fixture'\n"
-                        "echo 'LGZ step1_round2 cache hit: fixture'",
+                        "grt_step12",
+                        "echo 'LGZ step1 cache hit: fixture'\n"
+                        "echo 'LGZ step2 cache hit: fixture'\n",
                     )
                 ],
             )
@@ -648,7 +647,7 @@ write_status(stages)
                 "checkpoint_sha256",
             ]
             rows = []
-            for stage in ("step1_round1", "step1_filter", "step1_round2"):
+            for stage in ("step1", "step2"):
                 output_relpath = f"grt/evidence/{stage}/result.txt"
                 output = server / output_relpath
                 output.parent.mkdir(parents=True, exist_ok=True)
@@ -696,28 +695,28 @@ write_status(stages)
 
             result = self.run_runner(server)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("[CACHE_HIT] [grt_step1]", result.stdout)
+            self.assertIn("[CACHE_HIT] [grt_step12]", result.stdout)
 
             compact = self.run_runner(server, log_style="compact")
             self.assertEqual(compact.returncode, 0, compact.stderr)
-            self.assertIn("[DONE] [grt_step1] cached", compact.stdout)
+            self.assertIn("[DONE] [grt_step12] cached", compact.stdout)
             self.assertNotIn("[CHILD]", compact.stdout)
             record = json.loads((server / "report/steps/001.json").read_text())
             self.assertEqual(record["execution"], "cache_reused")
             self.assertIn("CACHE_HIT", [item["event"] for item in record["history"]])
-            self.assertIn("LGZ step1_round1 cache hit: fixture", record["output_tail"])
+            self.assertIn("LGZ step1 cache hit: fixture", record["output_tail"])
 
-            (server / "commands/grt_step1.sh").write_text(
+            (server / "commands/grt_step12.sh").write_text(
                 "#!/usr/bin/env bash\nset -euo pipefail\n"
-                "echo 'LGZ step1_round1 cache hit: fixture'\n"
-                "echo 'LGZ step1_filter complete: recomputed'\n",
+                "echo 'LGZ step1 cache hit: fixture'\n"
+                "echo 'LGZ step2 complete: recomputed'\n",
                 encoding="utf-8",
             )
             partial = self.run_runner(server)
             self.assertEqual(partial.returncode, 0, partial.stderr)
-            self.assertNotIn("[CACHE_HIT] [grt_step1]", partial.stdout)
+            self.assertNotIn("[CACHE_HIT] [grt_step12]", partial.stdout)
 
-            (server / "grt/evidence/step1_filter/result.txt").write_text(
+            (server / "grt/evidence/step2/result.txt").write_text(
                 "corrupt\n", encoding="utf-8"
             )
             failed = self.run_runner(server)

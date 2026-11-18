@@ -24,3 +24,17 @@ Additional shared fixtures:
 - `frozen_app_full.json` / `frozen_app_no_fasta.json`: actual schema-3 App projections of `frozen_server.json`. They intentionally omit q0/donor/raw audit artifacts, as required by the minimal App contract. The source/reference locators describe the supplied FASTA records; no assignment, ordering member or repair event is fabricated to populate an otherwise empty table.
 
 The two App snapshots are also compared byte-for-byte with fresh projections by the Python test; Windows Rust validates/imports the same files. The no-FASTA test verifies metadata and source-coordinate integrity, not absent sequence bytes.
+
+
+`frozen_direct_server.json` is the current schema-4 Server fixture. Its controlled
+reverse-source input matches `frozen_server.json`. The current q0 publisher and
+real MUMmer4/minimap2 Step1/Step2/Step3/evidence producers generate q0/q1/q2/q3;
+there are no q0r1/q0f/q4 artifacts. Final q3 DNA equals historical q4 DNA.
+Python and Windows Rust both validate it and reject mixed-version transitions.
+Historical schema-2/3 fixtures remain unchanged. Stable Final Path `q4_*` fields
+refer to the final artifact; schema 4 binds their path value to `grt/q/q3.fa`.
+
+The retained-source historical reader tests use
+`../grt_contract_v2/retained_source_bundle.json`, frozen from the validated
+pre-renumbering builder at b79bcbefd757cc122bc5c661fc8574337af510db. Current
+algorithms no longer manufacture old-numbered stage output for those tests.

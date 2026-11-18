@@ -10,17 +10,15 @@ from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).parents[2]
 from server.tests import test_grt_prepare_inputs as prepare_fixture
-from server.tools.grt_step1 import (
+from server.tools.lgz_core import (
     apply_filter,
     arbitrate_candidates,
     filter_paths,
-    reconcile_filtered_round1_events,
     replay_filter_records,
 )
 
 
 PREPARE_TOOL = REPO_ROOT / "server/tools/grt_prepare_inputs.py"
-STEP1_TOOL = REPO_ROOT / "server/tools/grt_step1.py"
 
 
 class GrtStep1Tests(unittest.TestCase):
@@ -180,178 +178,14 @@ class GrtStep1Tests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         return server
 
-    def make_minimap(self, root: Path) -> tuple[Path, Path]:
-        executable = root / "fake_minimap2.py"
-        log = root / "minimap_calls.log"
-        executable.write_text(
-            """#!/usr/bin/env python3
-import os
-import sys
-
-if '--version' in sys.argv:
-    print('minimap2 fixture step1 1')
-    raise SystemExit(0)
-
-args = sys.argv[1:]
-out = args[args.index('-o') + 1]
-target = args[-2]
-query = args[-1]
-log = os.environ['FAKE_MINIMAP_LOG']
-with open(log, 'a', encoding='utf-8') as handle:
-    handle.write('call\\n')
-with open(log, encoding='utf-8') as handle:
-    call = len(handle.readlines())
-
-def fasta(path):
-    records = []
-    name = None
-    parts = []
-    with open(path, encoding='utf-8') as handle:
-        for raw in handle:
-            line = raw.strip()
-            if line.startswith('>'):
-                if name is not None:
-                    records.append((name, ''.join(parts)))
-                name = line[1:].split()[0]
-                parts = []
-            elif line:
-                parts.append(line)
-    if name is not None:
-        records.append((name, ''.join(parts)))
-    return records
-
-targets = fasta(target)
-queries = fasta(query)
-target_name, target_sequence = targets[0]
-target_length = len(target_sequence)
-lines = []
-if len(queries) > 2:
-    selected = queries[:2]
-    coords = [(0, 10000), (10200, 20200)]
-    for (name, sequence), (start, end) in zip(selected, coords):
-        qlen = len(sequence)
-        lines.append(
-            f'{name}\\t{qlen}\\t0\\t{qlen}\\t+\\t{target_name}\\t{target_length}'
-            f'\\t{start}\\t{end}\\t{qlen}\\t{qlen}\\t60\\tcg:Z:{qlen}M'
-        )
-elif queries:
-    left, right = queries[:2]
-    for name, sequence, start, end, identity, mapq in [
-        (left[0], left[1], 0, 10000, 1.0, 60),
-        (right[0], right[1], 10200, 20200, 1.0, 60),
-        (left[0], left[1], 20000, 30000, 0.9, 50),
-        (right[0], right[1], 30200, 40200, 0.9, 50),
-    ]:
-        qlen = len(sequence)
-        matches = int(qlen * identity)
-        lines.append(
-            f'{name}\\t{qlen}\\t0\\t{qlen}\\t+\\t{target_name}\\t{target_length}'
-            f'\\t{start}\\t{end}\\t{matches}\\t{qlen}\\t{mapq}\\tcg:Z:{qlen}M'
-        )
-with open(out, 'w', encoding='utf-8', newline='') as handle:
-    if lines:
-        handle.write('\\n'.join(lines) + '\\n')
-""",
-            encoding="utf-8",
-            newline="",
-        )
-        executable.chmod(0o755)
-        return executable, log
-
-    def run_step1(self, server: Path, minimap: Path, log: Path):
-        env = os.environ.copy()
-        env["FAKE_MINIMAP_LOG"] = str(log)
-        return subprocess.run(
-            [
-                sys.executable,
-                str(STEP1_TOOL),
-                "--server-dir",
-                str(server),
-                "--minimap2",
-                str(minimap),
-                "--threads",
-                "2",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
-
-    def test_external_contig_stage1_is_auditable_identity_and_resumes(self):
+    def test_prepared_q0_has_no_legacy_identity_versions(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
-            root = Path(temporary_dir)
-            server = self.make_server(root)
-            minimap, log = self.make_minimap(root)
-            completed = self.run_step1(server, minimap, log)
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertFalse(log.exists())
-
-            recipe = prepare_fixture.read_tsv(server / "metadata/grt_recipe.tsv")[0]
-            stages = prepare_fixture.read_tsv(server / "metadata/grt_stage_status.tsv")
+            server = self.make_server(Path(temporary_dir))
+            self.assertEqual(sorted(p.stem for p in (server / "grt/q").glob("*.fa")), ["q0"])
             self.assertEqual(
-                [row["stage"] for row in stages],
-                ["donor_freeze", "step1_round1", "step1_filter", "step1_round2"],
+                [row["stage"] for row in prepare_fixture.read_tsv(server / "metadata/grt_stage_status.tsv")],
+                ["donor_freeze"],
             )
-            self.assertEqual(stages[1]["q_input_version"], "q0")
-            self.assertEqual(stages[1]["q_output_version"], "q0r1")
-            self.assertEqual(stages[3]["q_input_version"], "q0f")
-            self.assertEqual(stages[3]["q_output_version"], "q1")
-            self.assertTrue(all(row["donor_set_id"] == recipe["donor_set_id"] for row in stages))
-            q_hashes = {
-                prepare_fixture.sha256(server / f"grt/q/{version}.fa")
-                for version in ("q0", "q0r1", "q0f", "q1")
-            }
-            self.assertEqual(len(q_hashes), 1)
-            self.assertEqual(
-                prepare_fixture.read_tsv(server / "metadata/grt_donor_usage.tsv"),
-                [],
-            )
-            events = [
-                json.loads(line)
-                for line in (server / "metadata/grt_events.jsonl").read_text(
-                    encoding="utf-8"
-                ).splitlines()
-            ]
-            self.assertTrue(
-                all(event["status"] == "unresolved" for event in events)
-            )
-            self.assertTrue(
-                any(event["reason"] == "upstream_external_contigs_stage1_noop" for event in events)
-            )
-            self.assertTrue(
-                any(
-                    event["reason"] == "deferred_to_post_correction_optimized_fill"
-                    for event in events
-                )
-            )
-
-            q1_before = prepare_fixture.sha256(server / "grt/q/q1.fa")
-            with patch.dict(os.environ, {"GPM_RUN_THREADS": "64"}):
-                repeated = self.run_step1(server, minimap, log)
-            self.assertEqual(repeated.returncode, 0, repeated.stderr)
-            self.assertFalse(log.exists())
-            self.assertEqual(repeated.stdout.count("cache hit:"), 3)
-            self.assertEqual(q1_before, prepare_fixture.sha256(server / "grt/q/q1.fa"))
-
-            donor_resume = subprocess.run(
-                [sys.executable, str(PREPARE_TOOL), "--server-dir", str(server)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(donor_resume.returncode, 0, donor_resume.stderr)
-            self.assertIn("are current", donor_resume.stdout)
-            after_donor_resume = self.run_step1(server, minimap, log)
-            self.assertEqual(after_donor_resume.returncode, 0, after_donor_resume.stderr)
-            self.assertFalse(log.exists())
-            self.assertEqual(q1_before, prepare_fixture.sha256(server / "grt/q/q1.fa"))
-
-            (server / "grt/checkpoints/step1_round2.json").unlink()
-            resumed = self.run_step1(server, minimap, log)
-            self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertFalse(log.exists())
-            self.assertEqual(q1_before, prepare_fixture.sha256(server / "grt/q/q1.fa"))
 
     def test_filter_removes_only_isolated_components_below_threshold(self):
         sources = {
@@ -458,53 +292,6 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
         self.assertEqual(len(output_records["Chr01"]), 200_100)
         self.assertEqual(prototypes[0]["status"], "accepted")
 
-    def test_filter_marks_removed_accepted_donor_trace_as_superseded(self):
-        round1 = {
-            "q_rows": [
-                {
-                    "chr": "Chr01",
-                    "q_start": 101,
-                    "q_end": 300,
-                    "evidence_ids_json": '["ev-fill"]',
-                }
-            ],
-            "events": [
-                {
-                    "event_id": "event-fill",
-                    "status": "accepted",
-                    "reason": "accepted_by_global_interval_arbitration",
-                    "evidence_ids": ["ev-fill"],
-                    "final_path_segment_id": "segment-fill",
-                }
-            ],
-            "evidence_rows": [{"evidence_id": "ev-fill", "status": "accepted"}],
-            "usage_rows": [
-                {
-                    "event_id": "event-fill",
-                    "status": "consumed",
-                    "final_path_segment_id": "segment-fill",
-                    "reason": "accepted_by_global_interval_arbitration",
-                }
-            ],
-        }
-        filter_result = {
-            "events": [
-                {
-                    "event_id": "event-filter",
-                    "chr": "Chr01",
-                    "status": "accepted",
-                    "edit": {"removed_intervals": [[1, 500]]},
-                }
-            ]
-        }
-        reconcile_filtered_round1_events(round1, filter_result)
-        self.assertEqual(round1["events"][0]["status"], "superseded")
-        self.assertEqual(round1["events"][0]["final_path_segment_id"], "")
-        self.assertEqual(round1["evidence_rows"][0]["status"], "superseded")
-        self.assertEqual(round1["usage_rows"][0]["status"], "superseded")
-        self.assertEqual(
-            filter_result["events"][0]["superseded_event_ids"], ["event-fill"]
-        )
 
 
 if __name__ == "__main__":

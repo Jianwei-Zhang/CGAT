@@ -53,22 +53,38 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     except (OSError, json.JSONDecodeError) as exc:
         fail("INVALID_SCHEMA", f"cannot load contract schema: {exc}")
 
-    for relpath in schema["required_files"]:
-        bundle_path(bundle_root, relpath, relpath)
-
     package_rows = read_tsv(bundle_root, "metadata/package.tsv", schema["tables"]["metadata/package.tsv"])
     package = package_rows[0]
     extension = schema.get("package_schema_extensions", {}).get(package["schema_version"])
     if (package["workflow"] != schema["workflow"]
             or (package["schema_version"] != schema["schema_version"] and extension is None)):
         fail("UNSUPPORTED_SCHEMA", f"unsupported workflow/schema: {package['workflow']}/{package['schema_version']}")
-    table_overrides = extension.get("tables", {}) if extension else {}
+    table_overrides = dict(extension.get("tables", {})) if extension else {}
+    current = package["schema_version"] == "4"
+    transitions = extension["stage_transitions"] if current else schema["stage_transitions"]
+    table_paths = extension.get("table_paths", {}) if extension else {}
+    final_version = "q3" if current else "q4"
+    correction_stage = "step2" if current else "step3"
+    terminal_stage = "step3" if current else "step4_telomere"
+    q_versions = list(dict.fromkeys(version for _, before, after in transitions for version in (before, after)))
+    table_overrides["metadata/grt_stage_status.tsv"] = {"min_rows": len(transitions), "max_rows": len(transitions)}
+    for relpath in schema["required_files"]:
+        if relpath.startswith("grt/q/") and Path(relpath).stem not in q_versions:
+            continue
+        bundle_path(bundle_root, table_paths.get(relpath, relpath), relpath)
     tables = {"metadata/package.tsv": package_rows}
     tables.update({
-        relpath: read_tsv(bundle_root, relpath, {**table_spec, **table_overrides.get(relpath, {})})
+        relpath: read_tsv(bundle_root, table_paths.get(relpath, relpath), {**table_spec, **table_overrides.get(relpath, {})})
         for relpath, table_spec in schema["tables"].items() if relpath != "metadata/package.tsv"
     })
-    enums = schema["enums"]
+    observed = [(row["stage"], row["q_input_version"], row["q_output_version"])
+                for row in tables["metadata/grt_stage_status.tsv"]]
+    if observed != [tuple(value) for value in transitions]:
+        fail("INVALID_VALUE", "grt_stage_status.tsv does not match the package schema stage transition order")
+    enums = dict(schema["enums"])
+    if current:
+        enums["event_stage"] = ["step1", "step2", "step3"]
+        enums["evidence_stage"] = [*enums["evidence_stage"], "step1"]
 
     q0_freeze = None
     if extension is not None:
@@ -175,8 +191,8 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         fail("INVALID_VALUE", "recipe and package reads_qc_enabled disagree")
     q0_path = bundle_path(bundle_root, recipe["q0_relpath"], "recipe.q0_relpath")
     q4_path = bundle_path(bundle_root, recipe["final_q_relpath"], "recipe.final_q_relpath")
-    if recipe["q0_relpath"] != "grt/q/q0.fa" or recipe["final_q_relpath"] != "grt/q/q4.fa":
-        fail("INVALID_VALUE", "recipe q paths must identify q0.fa and q4.fa")
+    if recipe["q0_relpath"] != "grt/q/q0.fa" or recipe["final_q_relpath"] != f"grt/q/{final_version}.fa":
+        fail("INVALID_VALUE", "recipe q paths must match the package schema")
 
     role_keys = set()
     for row_number, row in enumerate(tables["metadata/grt_contig_roles.tsv"], start=2):
@@ -205,6 +221,8 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         chr_name = row["chr"]
         segment_id = row["segment_id"]
         segment_kind = row["segment_kind"]
+        if q_version not in q_versions:
+            fail("BROKEN_REFERENCE", f"q segment {segment_id} references unknown q version")
         if not q_version or not chr_name or not segment_id:
             fail("INVALID_VALUE", f"grt_q_segments.tsv:{row_number} has empty identity")
         if segment_kind not in enums["q_segment_kind"]:
@@ -304,7 +322,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         from ..stage_io import load_q_paths
         try:
             authorization = SourceAuthorization.load(bundle_root, sources, frozen=q0_freeze)
-            for version in ("q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"):
+            for version in q_versions:
                 _, paths, _ = load_q_paths(bundle_root, version, tables["metadata/grt_q_segments.tsv"], sources)
                 authorization.validate_paths(paths)
         except (Q0EvidenceError, KeyError, TypeError, ValueError, OSError, SystemExit) as exc:
@@ -748,7 +766,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         if (
             not row["event_id"]
             or row["event_id"] not in events
-            or events[row["event_id"]]["stage"] != "step3"
+            or events[row["event_id"]]["stage"] != correction_stage
         ):
             fail(
                 "BROKEN_REFERENCE",
@@ -809,7 +827,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     q4_source_rows = defaultdict(list)
     if extension is not None:
         for row in q_segment_rows:
-            if row["q_version"] == "q4":
+            if row["q_version"] == final_version:
                 q4_source_rows[row["chr"]].append(row)
         for rows in q4_source_rows.values():
             rows.sort(key=lambda row: int(row["q_start"]))
@@ -1313,10 +1331,6 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("BROKEN_REFERENCE", f"gap attempt {attempt_id} references unknown event")
 
     stage_rows = tables["metadata/grt_stage_status.tsv"]
-    transitions = schema["stage_transitions"]
-    observed = [(row["stage"], row["q_input_version"], row["q_output_version"]) for row in stage_rows]
-    if observed != [tuple(value) for value in transitions]:
-        fail("INVALID_VALUE", "grt_stage_status.tsv does not match the required stage transition order")
     for row in stage_rows:
         stage = row["stage"]
         if row["status"] not in enums["stage_status"]:
@@ -1330,7 +1344,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             validate_sha256(value, f"stage {stage} q {label} SHA-256")
             if cached_sha256_file(path) != value:
                 fail("CHECKSUM_MISMATCH", f"stage {stage} q {label} hash mismatch")
-        if stage == "step4_telomere":
+        if stage == terminal_stage:
             expected_donor = recipe["tel_donor_set_id"]
         elif stage == "finalize":
             expected_donor = ""

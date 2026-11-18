@@ -347,7 +347,7 @@ def apply_round(
                 "replacement_sequence_sha256": sha256_bytes(str(candidate["fill_sequence"]).encode("ascii")),
                 # Exact immutable-source slices removed from the working path.
                 # Unlike public q_before, these remain meaningful after the
-                # corrected/filtered query has shifted relative to q2.
+                # corrected/filtered query has shifted relative to q1.
                 "replaced_source_segments": prototype["replaced_source_segments"],
             }
             event["fragment_id"] = candidate.get("fragment_id", "")
@@ -535,9 +535,9 @@ def apply_filter(
     q_input_sha256: str,
     sources: dict[tuple[str, str], str],
     *,
-    stage: str = "step1_filter",
-    q_input_version: str = "q0r1",
-    q_output_version: str = "q0f",
+    stage: str = "step2",
+    q_input_version: str = "q1",
+    q_output_version: str = "q2",
     protected_intervals=None,
     protection_identity="",
 ) -> tuple[dict[str, list[dict[str, object]]], dict[str, str], list[dict[str, object]]]:
@@ -605,75 +605,6 @@ def apply_filter(
     if replay_filter_records(input_records, events) != output_records:
         fail(f"{stage} filter events do not deterministically reconstruct {q_output_version}")
     return output_paths, output_records, events
-
-def reconcile_filtered_round1_events(
-    round1: dict[str, object],
-    filter_result: dict[str, object],
-) -> None:
-    removed_by_chr: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
-    for filter_event in filter_result["events"]:
-        if filter_event["status"] != "accepted":
-            continue
-        for start, end in filter_event["edit"]["removed_intervals"]:
-            removed_by_chr[str(filter_event["chr"])].append(
-                (int(start), int(end), str(filter_event["event_id"]))
-            )
-    evidence_to_filter: dict[str, str] = {}
-    for row in round1["q_rows"]:
-        chromosome = str(row["chr"])
-        for removed_start, removed_end, filter_event_id in removed_by_chr.get(chromosome, []):
-            if not intervals_overlap(
-                int(row["q_start"]),
-                int(row["q_end"]),
-                removed_start,
-                removed_end,
-            ):
-                continue
-            for evidence_id in json.loads(str(row["evidence_ids_json"])):
-                evidence_to_filter[str(evidence_id)] = filter_event_id
-    superseded_events: dict[str, str] = {}
-    for event in round1["events"]:
-        if event["status"] != "accepted":
-            continue
-        filter_event_id = next(
-            (
-                evidence_to_filter[str(evidence_id)]
-                for evidence_id in event["evidence_ids"]
-                if str(evidence_id) in evidence_to_filter
-            ),
-            None,
-        )
-        if filter_event_id is None:
-            continue
-        event["status"] = "superseded"
-        event["reason"] = "accepted_then_removed_by_step1_filter"
-        event["superseded_by_event_id"] = filter_event_id
-        event["final_path_segment_id"] = ""
-        superseded_events[str(event["event_id"])] = filter_event_id
-    if not superseded_events:
-        return
-    for row in round1["evidence_rows"]:
-        if row["status"] == "accepted" and any(
-            row["evidence_id"] in event["evidence_ids"]
-            for event in round1["events"]
-            if event["event_id"] in superseded_events
-        ):
-            row["status"] = "superseded"
-    for row in round1["usage_rows"]:
-        if row["event_id"] not in superseded_events:
-            continue
-        if row["status"] == "consumed":
-            row["status"] = "superseded"
-        row["final_path_segment_id"] = ""
-        row["reason"] = "accepted_then_removed_by_step1_filter"
-    for filter_event in filter_result["events"]:
-        event_ids = sorted(
-            event_id
-            for event_id, filter_event_id in superseded_events.items()
-            if filter_event_id == filter_event["event_id"]
-        )
-        if event_ids:
-            filter_event["superseded_event_ids"] = event_ids
 
 def candidate_public_row(candidate: dict[str, object]) -> dict[str, object]:
     row = {field: candidate.get(field, "") for field in CANDIDATE_FIELDS}

@@ -69,6 +69,9 @@ use types::{
     SOURCE_LOCATOR_HEADER, SOURCE_N_REGIONS_HEADER, STAGE_TRANSITIONS, TABLE_SPECS,
     TRACK_MEMBER_ORDERS_HEADER, TsvRow, TsvTable, USED_CONTIGS_HEADER,
     is_display_app_final_path_schema, is_supported_app_final_path_schema,
+    GRT_CURRENT_SCHEMA_VERSION, Q0_DIRECT_STAGE_TRANSITIONS, Q0_DIRECT_VERSIONS,
+    LEGACY_Q_VERSIONS, STAGE_STATUS_HEADER, is_q0_package_schema,
+    final_q_version, package_table_path,
 };
 
 #[cfg(test)]

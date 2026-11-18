@@ -39,7 +39,7 @@ def engine_source_files(tools: Path) -> list[Path]:
     files = [path for name in names for path in sorted((tools / name).rglob("*.py"))]
     files += [tools / "grt_step2.py", tools / "grt_step3.py"]
     if "lgz_core" in names:
-        files += [tools / "lgz_step2.py", tools / "lgz_step3.py", tools / "lgz_compat.py"]
+        files += [tools / "grt_step1.py", tools / "lgz_step1.py", tools / "lgz_step2.py", tools / "lgz_step3.py", tools / "lgz_compat.py"]
     if (tools / "run_resources.py").is_file():
         files.append(tools / "run_resources.py")
     return files

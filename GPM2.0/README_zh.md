@@ -128,7 +128,7 @@ bash "$SERVER/run.sh" \
 | `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury QV 评估；`--threads` 总预算会分配给各 dataset。 |
 | `--lgz-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
 | `--lgz-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
-| `--max-fill <bp>` | `1000000` | Step3 两轮优化补洞的长度上限；恢复时可修改。 |
+| `--max-fill <bp>` | `1000000` | Step2 两轮优化补洞的长度上限；恢复时可修改。 |
 
 ### 端粒 / 着丝粒库
 
@@ -182,7 +182,7 @@ bash "$SERVER/run.sh" -o ./gpm_server
 
 | 交付包 | 内容与用途 |
 | --- | --- |
-| `gpm_server.tar.gz` | 完整 App 包，包含 source/reference FASTA、权威 q4 FASTA 和完整 `report/` 目录，可在客户端导出 FASTA。 |
+| `gpm_server.tar.gz` | 完整 App 包，包含 source/reference FASTA、权威最终 q3 FASTA 和完整 `report/` 目录，可在客户端导出 FASTA。 |
 | `gpm_server.light.tar.gz` | Light App 轻量包，不含 FASTA，保留 `.fai`、metadata、Final Path、source-card 状态、PAF 视图和完整 `report/` 目录，可导入、浏览并导出 PNG/TSV。 |
 
 默认使用 pigz 多线程压缩为 `tar.gz`；`--archive-format zip` 可保留 ZIP 格式，App 支持两者。

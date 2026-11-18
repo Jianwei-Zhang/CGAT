@@ -1043,7 +1043,7 @@ def prepare(args: argparse.Namespace) -> None:
                     "donor_set_id": ordinary_set["donor_set_id"],
                     "tel_donor_set_id": telomere_set["donor_set_id"],
                     "q0_relpath": "grt/q/q0.fa",
-                    "final_q_relpath": "grt/q/q4.fa",
+                    "final_q_relpath": "grt/q/q3.fa",
                 }
             ],
         )

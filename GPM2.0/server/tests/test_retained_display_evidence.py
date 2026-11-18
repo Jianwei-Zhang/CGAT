@@ -10,7 +10,7 @@ import unittest
 from server.tests import test_grt_app_package as app_fixture
 from server.tests import test_grt_prepare_inputs as tables
 from server.tools.grt_core.stage_cache import fasta_bytes
-from server.tools.grt_core.step3_engine import write_refill_projection, retain_source_fragments
+from server.tools.grt_core.step2_engine import write_refill_projection
 from server.tools.grt_core.stage_io import q_rows_for_paths
 from server.tools.grt_telomere_finalize import build_final_path
 from server.tests.test_grt_contract import VALID_BUNDLE, SCHEMA_PATH
@@ -19,92 +19,12 @@ from server.tools.grt_display_evidence import build_display_evidence
 
 
 def make_retained_delivery_fixture(directory):
+    # Historical packages are read-only fixtures. Do not rerun the newly
+    # numbered algorithm and relabel its events as an old execution strategy.
+    from server.tests.q0_delivery_fixture import materialize
     root = Path(directory) / "gpm_server"
-    shutil.copytree(VALID_BUNDLE, root)
-    metadata = root / "metadata"
-    parent = json.loads((metadata / "grt_events.jsonl").read_text())
-    old_hash = parent["q_after"]["sha256"]
-    new_fasta = b">Chr01\nAAAACCC\n"
-    new_hash = hashlib.sha256(new_fasta).hexdigest()
-    for version in ("q3", "q4"):
-        (root / f"grt/q/{version}.fa").write_bytes(new_fasta)
-    parent.update(stage="step3", action="refill")
-    parent["q_before"].update(version="q2", start=5, end=8, sha256=old_hash)
-    parent["q_after"].update(version="q2", start=5, end=8)
-    usage = tables.read_tsv(metadata / "grt_donor_usage.tsv")
-    usage[0]["stage"] = "step3"
-    evidence = tables.read_tsv(metadata / "grt_evidence_registry.tsv")
-    primary = {"segment_kind": "source", "length": 4, "dataset_name": "primary",
-               "contig_name": "primary1", "source_start": 1, "source_end": 4,
-               "orientation": "+", "source_card_key": "primary:primary1:Chr01:normal",
-               "evidence_ids": ["ev-ref-primary"]}
-    patch = {**primary, "dataset_name": "support", "contig_name": "donor1",
-             "source_card_key": parent["source_card_key"], "evidence_ids": parent["evidence_ids"]}
-    before = {"Chr01": [primary, patch]}
-    after = {"Chr01": [primary, {**patch, "source_end": 1, "length": 1},
-                        {**patch, "source_start": 3, "length": 2}]}
-    history = {"events": [parent], "usage_rows": usage, "evidence_rows": evidence}
-    correction = {**copy.deepcopy(parent), "event_id": "trim-refill", "action": "delete",
-                  "source": None, "source_card_key": "", "final_path_segment_id": "",
-                  "evidence_ids": [], "usage_ids": [],
-                  "q_before": {"version": "q2", "start": 6, "end": 6, "sha256": old_hash},
-                  "q_after": {"version": "q3", "start": 6, "end": 6, "sha256": new_hash},
-                  "edit": {"operation": "replace_interval", "input_start": 6, "input_end": 6,
-                           "input_coordinate_space": "q2_1_based_closed"}}
-    output = {"events": [correction], "q_rows": q_rows_for_paths("q3", ["Chr01"], after),
-              "usage_rows": [], "q_input_version": "q2", "q_input_sha256": old_hash,
-              "q_output_version": "q3", "q_output_sha256": new_hash}
-    assert retain_source_fragments(parent, q_rows_for_paths("q2", ["Chr01"], before), history, output)
-    children = [event for event in output["events"] if event.get("retained_from_event_id")]
-    events = [parent, *output["events"]]
-    (metadata / "grt_events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
-    tables.write_tsv(metadata / "grt_donor_usage.tsv", list(usage[0]), [*usage, *output["usage_rows"]])
-    stages = tables.read_tsv(metadata / "grt_stage_status.tsv")
-    for row in stages:
-        for side in ("input", "output"):
-            if row[f"q_{side}_version"] in {"q3", "q4"}: row[f"q_{side}_sha256"] = new_hash
-    tables.write_tsv(metadata / "grt_stage_status.tsv", list(stages[0]), stages)
-    cards = tables.read_tsv(metadata / "grt_used_contigs.tsv")
-    cards[0]["accepted_event_ids_json"] = json.dumps([event["event_id"] for event in children])
-    cards[0]["final_path_segment_ids_json"] = json.dumps([event["final_path_segment_id"] for event in children])
-    tables.write_tsv(metadata / "grt_used_contigs.tsv", list(cards[0]), cards)
-    final = build_final_path(["Chr01"], after, {"Chr01": "AAAACCC"}, events)
-    (metadata / "grt_final_path.json").write_text(json.dumps(final))
-
-    artifact = root / "grt/evidence/step3/refill/round1"
-    artifact.mkdir(parents=True)
-    flanks = [("flank__gap-1__L", "AA"), ("flank__gap-1__R", "AA")]
-    (artifact / "flanks.fa").write_bytes(fasta_bytes(flanks))
-    (artifact / "result.paf").write_text(
-        "flank__gap-1__L\t2\t0\t2\t+\td0__support__donor1__1_4\t4\t0\t2\t2\t2\t60\n"
-        "flank__gap-1__R\t2\t0\t2\t+\td0__support__donor1__1_4\t4\t2\t4\t2\t2\t60\n")
-    # Use the actual donor-member record name from the frozen source registry.
-    member = tables.read_tsv(metadata / "grt_donor_members.tsv")[0]
-    paf = artifact / "result.paf"
-    paf.write_text(paf.read_text().replace("d0__support__donor1__1_4", member["fasta_record_name"]))
-    gap = {"chr": "Chr01", "start0": 2, "end0": 4}
-    working = q_rows_for_paths("q2_corrected_round1", ["Chr01"], {"Chr01": [
-        {**primary, "length": 2, "source_end": 2},
-        {"segment_kind": "gap", "length": 2, "dataset_name": "", "contig_name": "",
-         "source_start": None, "source_end": None, "orientation": "", "source_card_key": "", "evidence_ids": []},
-        {**primary, "length": 2, "source_start": 3}]})
-    projection = write_refill_projection(artifact, "Chr01", "AANNAA", working, flanks,
-                                        {name: (gap, name[-1]) for name, _ in flanks})
-    profile = next(row for row in evidence if row["evidence_id"] == parent["evidence_ids"][0])
-    profile.update(stage="step3", evidence_type="corrected_gap_flank_refill",
-                   q_version="q2", q_source_sha256=old_hash,
-                   query_artifact_relpath=(artifact / "flanks.fa").relative_to(root).as_posix(),
-                   query_sha256=hashlib.sha256((artifact / "flanks.fa").read_bytes()).hexdigest(),
-                   raw_artifact_relpath=paf.relative_to(root).as_posix(),
-                   raw_artifact_sha256=hashlib.sha256(paf.read_bytes()).hexdigest(),
-                   parameters_json=json.dumps({"flank_projection_relpath": projection.relative_to(root).as_posix(),
-                                               "flank_projection_sha256": hashlib.sha256(projection.read_bytes()).hexdigest()}))
-    tables.write_tsv(metadata / "grt_evidence_registry.tsv", list(evidence[0]), evidence)
-    fields = ["candidate_id", "event_id", "stage", "chr", "object_id", "member_id",
-              "source_dataset", "source_contig", "outcome", "left_line", "right_line"]
-    candidate = dict(zip(fields, ["refill-original", parent["event_id"], "step3", "Chr01", "gap-1",
-                                 member["member_id"], "support", "donor1", "accepted", "1", "2"]))
-    tables.write_tsv(root / "grt/evidence/step3/refill_candidates.tsv", fields, [candidate])
+    fixture = VALID_BUNDLE.parents[1] / "retained_source_bundle.json"
+    materialize(json.loads(fixture.read_text()), root)
     validate_contract(root, SCHEMA_PATH)
     return root
 

@@ -21,7 +21,7 @@ import uuid
 
 sys.dont_write_bytecode = True
 ENTRYPOINTS = {
-    "tools/grt_step2.py", "tools/grt_step3.py", "tools/grt_telomere_finalize.py",
+    "tools/grt_step1.py", "tools/grt_step2.py", "tools/grt_step3.py", "tools/grt_telomere_finalize.py",
     "tools/grt_evidence_package.py", "tools/grt_display_evidence.py",
     "tools/run_all_runner.py", "tools/run_progress.py", "tools/view_run_log.py",
 }
@@ -167,15 +167,15 @@ def validate_targets(workspace: Path, tools_root: Path, source: Path, *,
     for relative in ("run.sh", "prepare.sh", "install.sh", "tools/server_run.py"):
         if not regular_path(tools_root, relative).is_file():
             raise ValueError(f"not an installed Server tools directory: {tools_root}")
-    for relative in ("run_all.sh", "run_grt_step2.sh", "run_grt_step3.sh",
-                     ".prepare_lib/tools/grt_step2.py", ".prepare_lib/tools/grt_step3.py"):
+    for relative in ("run_all.sh", "run_grt_step1.sh", "run_grt_step2.sh", "run_grt_step3.sh",
+                     ".prepare_lib/tools/grt_step1.py", ".prepare_lib/tools/grt_step2.py", ".prepare_lib/tools/grt_step3.py"):
         if not regular_path(workspace, relative).is_file():
-            raise ValueError(f"workspace lacks independent Step2/Step3 runtime: {relative}")
+            raise ValueError(f"workspace lacks the numbered Step1/Step2/Step3 runtime: {relative}")
     package = regular_path(workspace, "metadata/package.tsv")
     with package.open() as handle:
         rows = list(csv.DictReader(handle, delimiter="\t"))
-    if len(rows) != 1 or rows[0].get("workflow") != "gpm_grt_precomputed_v2" or rows[0].get("schema_version") != "2":
-        raise ValueError("unsupported workspace workflow/schema; no legacy migration is performed")
+    if len(rows) != 1 or rows[0].get("workflow") != "gpm_grt_precomputed_v2" or rows[0].get("schema_version") != "4":
+        raise ValueError("this runtime requires workspace schema 4; historical workspaces are not renumbered or migrated")
     for root in (workspace, tools_root):
         regular_path(root, "tools/grt_core/__init__.py" if root == tools_root
                      else ".prepare_lib/tools/grt_core/__init__.py")
@@ -190,7 +190,7 @@ def check_direct_processes(workspace: Path, tools_root: Path) -> None:
         raise ValueError("runtime updates require Linux process inspection")
     prefixes = (str(workspace / ".prepare_lib") + "/", str(tools_root) + "/")
     scripts = {str(workspace / name) for name in
-               ("run_all.sh", "run_grt_step2.sh", "run_grt_step3.sh",
+               ("run_all.sh", "run_grt_step1.sh", "run_grt_step2.sh", "run_grt_step3.sh",
                 "run_grt_telomere_finalize.sh", "finalize_grt_evidence.sh",
                 "prepare_grt_inputs.sh", "prepare_lgz_inputs.sh", "run_lgz_step1.sh",
                 "run_lgz_step2.sh", "run_lgz_step3.sh", "run_lgz_telomere_finalize.sh",

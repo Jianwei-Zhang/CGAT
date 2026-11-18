@@ -1,7 +1,7 @@
 import random
 import unittest
 
-from server.tools.grt_core.alignment_index import AlignmentCoordinateIndex, Step2MemberIndex
+from server.tools.grt_core.alignment_index import AlignmentCoordinateIndex, Step1MemberIndex
 from server.tools.grt_core import repair_structural as engine
 
 
@@ -15,7 +15,7 @@ class AlignmentIndexTests(unittest.TestCase):
             rows.append({"query_min": start, "query_max": end,
                          "identity": rng.choice([0.90, 0.99, 0.99]),
                          "ref_record": f"donor-{i % 7}", "line_number": i + 1})
-        index, step2 = AlignmentCoordinateIndex(rows), Step2MemberIndex(rows)
+        index, step1 = AlignmentCoordinateIndex(rows), Step1MemberIndex(rows)
         for position in [0, 10, 99990, 100000, 100010, 2000000, 4000000] + [rng.randrange(0, 3000000) for _ in range(100)]:
             with self.subTest(position=position):
                 self.assertEqual(index.crossing(position), [r for r in rows if r["query_min"] <= position <= r["query_max"]])
@@ -29,9 +29,9 @@ class AlignmentIndexTests(unittest.TestCase):
                               key=lambda r: (-r["query_max"], -r["identity"]))[:2]
                 right = sorted((r for r in rows if r["query_min"] >= position - 10),
                                key=lambda r: (r["query_min"], -r["identity"]))[:2]
-                self.assertEqual(step2.anchors(position), (left, right))
-                self.assertEqual(engine._step3_anchor_pairs(position, rows, index),
-                                 engine._step3_anchor_pairs(position, rows))
+                self.assertEqual(step1.anchors(position), (left, right))
+                self.assertEqual(engine._step2_anchor_pairs(position, rows, index),
+                                 engine._step2_anchor_pairs(position, rows))
 
     def test_index_keeps_near_one_sided_anchor_stop_and_boundary_ties(self):
         position = 1000050
@@ -41,9 +41,9 @@ class AlignmentIndexTests(unittest.TestCase):
             {"ref_record": "far-pair", "query_min": position - 160000, "query_max": position - 150000},
             {"ref_record": "far-pair", "query_min": position + 150000, "query_max": position + 160000},
         ]
-        self.assertEqual(engine._step3_anchor_pairs(position, rows, AlignmentCoordinateIndex(rows)), [])
+        self.assertEqual(engine._step2_anchor_pairs(position, rows, AlignmentCoordinateIndex(rows)), [])
         self.assertEqual(AlignmentCoordinateIndex([]).crossing(1), [])
-        self.assertEqual(Step2MemberIndex([]).anchors(1), ([], []))
+        self.assertEqual(Step1MemberIndex([]).anchors(1), ([], []))
 
 
 if __name__ == "__main__":

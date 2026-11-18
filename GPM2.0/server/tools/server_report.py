@@ -25,17 +25,15 @@ from run_resources import read_resources
 
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
-    "q0_evidence": "q0 候选与补充比对证据",
-    "grt_prepare": "质量评估、q0 与供体构建", "grt_step1": "LGZ Step1",
-    "grt_step2": "LGZ Step2", "grt_step3": "LGZ Step3",
-    "grt_step23": "LGZ Step2 / Step3",
-    "grt_telomere_finalize": "端粒处理与最终路径",
+    "q0_evidence": "q0 候选与补充比对证据", "grt_prepare": "质量评估、q0 与供体构建",
+    "grt_step1": "Step1 · 补丁验证与处理分支", "grt_step2": "Step2 · 结构修正与优化填补",
+    "grt_step3": "Step3 · 端粒处理与最终路径", "grt_step12": "Step1 / Step2",
     "finalize_evidence": "证据整理与结果校验", "package_full": "完整包交付",
-    "package_light": "Light 轻量包交付", "step1_round1": "Step1 · 第一阶段",
-    "step1_filter": "Step1 · 过滤阶段", "step1_round2": "Step1 · 第二阶段",
-    "step2": "Step2 · 补丁验证与处理分支", "step3": "Step3 · 结构修正与优化填补",
-    "step4_telomere": "Step4 · 端粒处理",
+    "package_light": "Light 轻量包交付",
+    "step1": "Step1 · 补丁验证与处理分支", "step2": "Step2 · 结构修正与优化填补",
+    "step3": "Step3 · 端粒处理",
 }
+
 
 
 def title(unit_id: str) -> str:
@@ -158,7 +156,7 @@ class ReportSession:
                     cached = self.cached_stages_by_unit.get(unit.unit_id, set())
                     substage["execution"] = "cache_reused" if substage["stage_id"] in cached else "computed"
                     write_json(path, substage)
-            if unit.unit_id == "grt_telomere_finalize":
+            if unit.unit_id == "grt_step3":
                 write_json(self.report / "final_snapshot.json", {
                     "schema_version": SCHEMA, "run_id": self.run_id,
                     **capture_final(self.root)})

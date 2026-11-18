@@ -187,7 +187,7 @@ class GrtPrepareInputsTests(unittest.TestCase):
                     "workflow": "gpm_grt_precomputed_v2",
                     # This fixture invokes the current producer; schema 2 is
                     # supported only by frozen historical delivery fixtures.
-                    "schema_version": "3",
+                    "schema_version": "4",
                     "package_mode": "fast",
                     "sequence_layout": "partitioned",
                     "preassigned_chr": "true",
@@ -360,7 +360,7 @@ class GrtPrepareInputsTests(unittest.TestCase):
             from server.tools.lgz_core.common import read_fasta
             self.assertEqual(dict(read_fasta(server / "grt/q/q0.fa")), {"chr1": truth})
             frozen = validate_prepared_q0(server)
-            self.assertEqual(frozen["package_schema_version"], "3")
+            self.assertEqual(frozen["package_schema_version"], "4")
             roles = {row["contig_name"]: row for row in read_tsv(server / "metadata/grt_contig_roles.tsv")}
             self.assertEqual(roles["a"]["donor_eligible"], "true")
             self.assertTrue(all(row["stage"] == "q0_construction" for row in read_tsv(server / "metadata/grt_evidence_registry.tsv")))

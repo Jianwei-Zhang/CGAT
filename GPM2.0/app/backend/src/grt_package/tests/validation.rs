@@ -156,7 +156,9 @@ fn app_final_path_accepts_reference_subset_and_rejects_unknown_chromosome() {
     let temp = tempdir().unwrap();
     let references = BTreeMap::from([("Chr06".to_string(), 10), ("Chr09".to_string(), 10)]);
     let sources = HashMap::new();
-    let manifest = serde_json::Map::new();
+    let manifest = serde_json::Map::from_iter([(
+        "q4_relpath".to_string(), Value::String("grt/q/q4.fa".to_string()),
+    )]);
     let display_source_cards = HashSet::new();
     let final_path = serde_json::json!({
         "workflow": GRT_APP_WORKFLOW,
@@ -769,10 +771,10 @@ fn app_q4_summary_checks_artifact_chromosome_and_reconstruction_contracts() {
     let references = BTreeMap::from([("Chr06".to_string(), 10)]);
     let sources = HashMap::new();
     let cards = HashSet::new();
-    let manifest = serde_json::Map::from_iter([(
-        "q4_artifact_sha256".to_string(),
-        Value::String(sha256_bytes(text.as_bytes())),
-    )]);
+    let manifest = serde_json::Map::from_iter([
+        ("q4_relpath".to_string(), Value::String("grt/q/q4.fa".to_string())),
+        ("q4_artifact_sha256".to_string(), Value::String(sha256_bytes(text.as_bytes()))),
+    ]);
     let final_path = serde_json::json!({
         "workflow": GRT_APP_WORKFLOW,
         "schema_version": GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION,
