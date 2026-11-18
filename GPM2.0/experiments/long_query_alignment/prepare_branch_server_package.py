@@ -74,14 +74,16 @@ CHECKPOINT_OVERLAY = '        branch_runtime = self.server_dir / ".prepare_lib/t
 
 
 def overlay_checkpoint(text):
-    if ".prepare_lib/tools/long_cigar_recovery" in text:
-        raise wa.ExperimentError("checkpoint source already contains branch runtime bindings")
     if text.count(CHECKPOINT_ANCHOR)!=1:
         raise wa.ExperimentError("reference checkpoint source changed; refusing a guessed runtime binding")
     at = text.index(CHECKPOINT_ANCHOR)
     previous = text.rfind("    def ",0,at)
     if not text[previous:].startswith("    def _reference_inputs("):
         raise wa.ExperimentError("runtime checkpoint hook no longer belongs to initial-reference inputs")
+    end = text.find("    def ", at)
+    reference_body = text[previous:end if end >= 0 else len(text)]
+    if ".prepare_lib/tools/long_cigar_recovery" in reference_body:
+        raise wa.ExperimentError("checkpoint source already contains branch runtime bindings")
     return text.replace(CHECKPOINT_ANCHOR,CHECKPOINT_OVERLAY+CHECKPOINT_ANCHOR)
 
 

@@ -189,6 +189,16 @@ class ReferenceResumeTests(unittest.TestCase):
         self.assertEqual((self.ws/"runs/a_vs_ref/command.sh").read_bytes(),self.original["a"])
         self.assertFalse(list((self.ws/".run_all").glob(rr.PREFIX+"*")))
 
+    def test_reviewed_completed_runtime_migration_is_preserved_not_reclassified(self):
+        (self.ws/"logs/status.tsv").write_text("unit_id\tstate\nref:a\tsuccess\nref:b\tfailed\n")
+        manager = Manager()
+        with patch.object(manager, "migrate_reference_runtime", create=True, return_value=(True, "reviewed fixture")) as migrate, self.helpers():
+            result = rr.handoff(self.ws, self.source, self.run_id, self.units, manager)
+        self.assertEqual(migrate.call_count, 1)
+        self.assertEqual(result["preserved_completed_units"], ["ref:a"])
+        self.assertTrue(result["completed_checkpoint_runtime_migrations"][0]["outputs_unchanged"])
+        self.assertEqual((self.ws/"runs/a_vs_ref/command.sh").read_bytes(), self.original["a"])
+
     def test_wrong_owner_or_active_standalone_process_prevents_any_code_handoff(self):
         with self.helpers(),self.assertRaisesRegex(wa.ExperimentError,"workspace lock"):
             rr.handoff(self.ws,self.source,"not-the-owner",self.units,Manager())

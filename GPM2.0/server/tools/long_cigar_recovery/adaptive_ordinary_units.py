@@ -10,6 +10,8 @@ import argparse
 from dataclasses import asdict
 import hashlib
 import json
+import math
+import signal
 from pathlib import Path
 import time
 import subprocess
@@ -22,6 +24,88 @@ import windowed_alignment as wa
 import ordinary_tool_transition as ott
 
 POLICY = "adaptive-ordinary-whole-units-v1"
+
+
+def review_timeout_proof(root, unit, query, index, tool, timeout, *, execution_tool=None):
+    """Verify an ended bounded review, never admit or reuse its partial PAF.
+
+    This is also used after a stopped job and during read-only publication.
+    All original inputs and failed-attempt bytes are checked before a timeout
+    can select the existing complete-default primary-work fallback.
+    """
+    root = Path(root)
+    receipt_path = root / "native/native-attempt.json"
+    if not receipt_path.exists():
+        return None
+    paths = {name: root / "native" / ("native." + name)
+             for name in ("command.json", "execution.json", "stderr")}
+    paths.update(unit=root / "unit.json", receipt=receipt_path)
+    if (root.is_symlink() or root.parent.is_symlink() or (root / "native").is_symlink()
+            or any(p.is_symlink() or not p.is_file() for p in paths.values())):
+        raise wa.ExperimentError("invalid bounded-review timeout evidence path")
+    before = {name: wa.fingerprint(path) for name, path in paths.items()}
+    receipt = pr.read_json(receipt_path)
+    execution = receipt.get("execution", {})
+    if receipt.get("status") != "other_failure" or execution.get("interrupted") != "TimeoutExpired":
+        return None
+    state = pr.read_json(paths["unit"])
+    resources = state.get("resources", {})
+    seconds = execution.get("seconds")
+    if (type(timeout) is not int or timeout < 1
+            or resources.get("timeout_seconds") != timeout
+            or type(resources.get("timeout_seconds")) is not int
+            or type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < timeout - .001
+            or type(execution.get("returncode")) is not int
+            or execution["returncode"] not in (-signal.SIGTERM, -signal.SIGKILL)
+            or state.get("status") not in ("failed", "running")
+            or receipt.get("paf_usable") is not False or receipt.get("partial_PAF_reused") is not False
+            or receipt.get("target_assertion_observed") is not False
+            or unit.get("fraction") is not None):
+        raise wa.ExperimentError("invalid bounded-review timeout receipt")
+    active_tool = tool
+    if execution_tool is not None:
+        transition = ott.transition_record(tool, execution_tool)
+        if state.get("identity", {}).get("tool_sha256") == execution_tool["sha256"]:
+            if state.get("execution_tool_transition") != transition:
+                raise wa.ExperimentError("bounded-review execution provenance changed")
+            active_tool = execution_tool
+    identity = {"policy": POLICY, "records": unit["records"], "query_sha256": query["sha256"],
+                "index_sha256": index["sha256"], "tool_sha256": active_tool["sha256"],
+                "fraction": None, "preset": "asm10"}
+    if (type(state.get("schema")) is not int or state["schema"] != 1 or state.get("identity") != identity
+            or unit["records"] != [{"name": r["name"], "length": r["length"]}
+                                   for r in query["identity"]["records"]]):
+        raise wa.ExperimentError("bounded-review timeout source identity differs")
+    for value in (query, index, active_tool):
+        if wa.verified_sha256(Path(value["path"])) != value["sha256"]:
+            raise wa.ExperimentError("bounded-review timeout source content differs")
+    if ott.checked_version(active_tool, historical=True) != "2.31-r1302":
+        raise wa.ExperimentError("bounded-review timeout tool version differs")
+    threads = resources.get("threads")
+    if type(threads) is not int or threads < 1:
+        raise wa.ExperimentError("invalid bounded-review recorded threads")
+    options = argparse.Namespace(minimap_batch=mo.batch_size(resources.get("batch")), minimap_filter=None)
+    partial = root / "native/native.partial.paf"
+    command = [active_tool["path"], "-c", "-x", "asm10", *mo.native_flags(options), "-t", str(threads),
+               "-o", str(partial), str(index["path"]), str(query["path"])]
+    if (execution.get("command") != command or pr.metadata.load(paths["command.json"], expected_type=list) != command
+            or pr.read_json(paths["execution.json"]) != execution or receipt.get("path") != str(partial)
+            or (root / "native/native.complete.paf").exists()
+            or receipt.get("stderr_sha256") != wa.verified_sha256(paths["stderr"])
+            or pilot.nf.inspect_stderr(paths["stderr"])["target_assertion_observed"]):
+        raise wa.ExperimentError("bounded-review timeout execution binding differs")
+    if partial.is_symlink() or partial.exists() and not partial.is_file():
+        raise wa.ExperimentError("invalid bounded-review partial output")
+    partial_sha = wa.verified_sha256(partial) if partial.is_file() else None
+    if receipt.get("paf_sha256") != partial_sha:
+        raise wa.ExperimentError("bounded-review partial output changed; it is not reusable")
+    hashes = {name: wa.verified_sha256(path) for name, path in paths.items()}
+    if any(wa.fingerprint(path) != before[name] for name, path in paths.items()):
+        raise wa.ExperimentError("bounded-review timeout evidence changed during validation")
+    return {"kind": "verified-bounded-review-timeout-v1", "identity": identity,
+            "timeout_seconds": timeout, "execution_seconds": seconds,
+            "evidence_sha256": hashes, "partial_paf_sha256": partial_sha,
+            "partial_PAF_reused": False}
 
 
 def plan_units(records, pilot_names, selected_filter, *, default_below=0,

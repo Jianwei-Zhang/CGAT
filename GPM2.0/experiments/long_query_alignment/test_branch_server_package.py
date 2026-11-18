@@ -141,6 +141,15 @@ class BranchServerPackageTests(unittest.TestCase):
             with self.assertRaises(wa.ExperimentError):
                 package.overlay_checkpoint(text)
 
+    def test_completed_checkpoint_migration_path_is_not_an_existing_input_overlay(self):
+        original = (self.source/"tools/run_outer_checkpoints.py").read_text()
+        self.assertIn("def migrate_reference_runtime", original)
+        self.assertIn('prefix = ".prepare_lib/tools/long_cigar_recovery/"', original)
+        patched = package.overlay_checkpoint(original)
+        self.assertEqual(patched.count(package.CHECKPOINT_OVERLAY), 1)
+        with self.assertRaisesRegex(wa.ExperimentError, "already contains"):
+            package.overlay_checkpoint(patched)
+
     def test_existing_workspace_hook_is_inside_the_original_lock_and_does_not_replace_run_sh(self):
         original = (self.source/"tools/server_run.py").read_text()
         patched = package.overlay_server_run(original)

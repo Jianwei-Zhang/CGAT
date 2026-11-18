@@ -7,6 +7,7 @@ from __future__ import annotations
 import csv
 import json
 import shutil
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -127,6 +128,88 @@ class OuterCheckpointManager:
             return True, "checkpoint and outputs are valid"
         except (OSError, UnicodeError, json.JSONDecodeError, OrchestrationContractError) as exc:
             return False, f"checkpoint validation failed: {exc}"
+
+    def migrate_reference_runtime(self, prepared: PreparedOuterCheckpoint, command_relpath: str,
+                                  runtime: dict, *, dry_run: bool = False) -> tuple[bool, str]:
+        """Rebind only an explicitly reviewed code-only completed-reference update.
+
+        Scientific inputs, parameters, tools, native assets and all outputs must
+        still match. Keep the original checkpoint before replacing metadata.
+        The dedicated allowlist is narrower than partial native-cache migration.
+        """
+        if (type(dry_run) is not bool or prepared.kind != "reference_alignment"
+                or not prepared.path.is_file() or prepared.path.is_symlink() or prepared.path.parent.is_symlink()):
+            return False, "not a completed reference checkpoint"
+        prefix = ".prepare_lib/tools/long_cigar_recovery/"
+        try:
+            original_bytes = prepared.path.read_bytes()
+            checkpoint = json.loads(original_bytes)
+            if (not isinstance(checkpoint, dict) or checkpoint.get("workflow") != WORKFLOW
+                    or checkpoint.get("checkpoint_schema_version") != CHECKPOINT_SCHEMA_VERSION
+                    or checkpoint.get("execution_engine_version") != EXECUTION_ENGINE_VERSION
+                    or checkpoint.get("unit_id") != prepared.unit_id or checkpoint.get("kind") != prepared.kind
+                    or checkpoint.get("status") != "success"):
+                return False, "completed checkpoint contract differs"
+            previous = checkpoint.get("input_payload")
+            current = prepared.input_payload
+            if not isinstance(previous, dict) or checkpoint.get("input_fingerprint") != fingerprint(previous):
+                return False, "completed checkpoint input binding differs"
+            if {k:v for k,v in previous.items() if k != "inputs"} != {k:v for k,v in current.items() if k != "inputs"}:
+                return False, "reference parameters or tools changed"
+            old = {row["path"]: row for row in previous["inputs"]}
+            new = {row["path"]: row for row in current["inputs"]}
+            if (len(old) != len(previous["inputs"]) or len(new) != len(current["inputs"])
+                    or set(old) != set(new)):
+                return False, "reference input inventory changed"
+            code = runtime.get("files_sha256", {})
+            if not code or any(prefix + name not in old for name in code):
+                return False, "completed runtime code inventory missing"
+            old_profile = fingerprint({name: old[prefix + name]["sha256"] for name in code})
+            new_profile = fingerprint(code)
+            if [old_profile, new_profile] not in runtime.get("completed_reference_resume_source_profiles", []):
+                return False, "completed reference runtime transition is not reviewed"
+            if any(new[prefix + name]["sha256"] != digest for name, digest in code.items()):
+                return False, "current runtime code differs from its validated manifest"
+            if (new.get(prefix + "branch-runtime.json", {}).get("sha256") != runtime.get("sha256")
+                    or new.get(prefix + "resume-base.json", {}).get("sha256") != runtime.get("handoff_base_sha256")):
+                return False, "current runtime metadata binding differs"
+            mutable = {prefix + name for name in code} | {prefix + "branch-runtime.json", prefix + "resume-base.json"}
+            changed = [name for name in old if old[name] != new[name]]
+            if not changed or any(name not in mutable for name in changed):
+                return False, "non-runtime reference input or native asset changed"
+            outputs = checkpoint.get("outputs")
+            if not isinstance(outputs, list) or self._output_identities(prepared) != outputs:
+                return False, "completed reference outputs changed"
+            refreshed = self.prepare(prepared.unit_id, command_relpath)
+            if (refreshed is None or refreshed.input_fingerprint != prepared.input_fingerprint
+                    or prepared.path.read_bytes() != original_bytes):
+                return False, "reference inputs or checkpoint changed during migration validation"
+            if not isinstance(checkpoint.get("runtime_transitions", []), list):
+                return False, "completed checkpoint transition history is invalid"
+            reason = f"reviewed runtime-only reference transition {old_profile} -> {new_profile}"
+            if dry_run:
+                return True, reason + " (read only)"
+            backup = prepared.path.with_name(prepared.path.name + ".before-runtime-" + uuid.uuid4().hex)
+            with backup.open("xb") as handle:
+                handle.write(original_bytes)
+            updated = dict(checkpoint)
+            updated.update(input_payload=current, input_fingerprint=prepared.input_fingerprint)
+            updated["runtime_transitions"] = [*checkpoint.get("runtime_transitions", []),
+                {"from_source_profile":old_profile, "to_source_profile":new_profile,
+                 "previous_input_fingerprint":checkpoint["input_fingerprint"],
+                 "previous_checkpoint":str(backup.relative_to(self.server_dir)),
+                 "outputs_unchanged":True}]
+            try:
+                atomic_write_json(prepared.path, updated)
+                valid, detail = self.validate(prepared)
+                if not valid:
+                    raise OrchestrationContractError(detail)
+            except BaseException:
+                atomic_write_json(prepared.path, checkpoint)
+                raise
+            return True, reason
+        except (OSError, UnicodeError, ValueError, KeyError, TypeError, OrchestrationContractError) as exc:
+            return False, f"completed reference runtime migration refused: {exc}"
 
     def commit(self, prepared: PreparedOuterCheckpoint) -> Path:
         outputs = self._output_identities(prepared)

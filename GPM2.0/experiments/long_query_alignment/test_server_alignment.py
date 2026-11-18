@@ -58,6 +58,15 @@ class ServerAlignmentTests(unittest.TestCase):
         with patch.object(sa.pa,"experiment",side_effect=side_effect or self.native),redirect_stderr(io.StringIO()):
             return sa.run_reference(self.args,runtime_root=self.runtime)
 
+    def test_completed_reference_migrations_survive_runtime_validation_without_widening(self):
+        self.assertEqual(sa.validate_runtime(self.runtime)["completed_reference_resume_source_profiles"], [])
+        pairs = [["a" * 64, "b" * 64]]
+        self.manifest["completed_reference_resume_source_profiles"] = pairs
+        wa.write_json(self.runtime/sa.MANIFEST, self.manifest)
+        checked = sa.validate_runtime(self.runtime)
+        self.assertEqual(checked["completed_reference_resume_source_profiles"], pairs)
+        self.assertEqual(checked["native_resume_source_profiles"], [])
+
     def test_native_complete_output_publishes_without_rewriting_or_recovery(self):
         result = self.execute()
         self.assertEqual((self.run/"result.paf").read_bytes(),b"opaque complete native PAF bytes\n")

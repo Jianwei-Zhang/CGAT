@@ -89,7 +89,9 @@ def validate_runtime(root):
             "native_companion_sha256":value.get("native_companion_sha256"),
             "native_companion_platform":value.get("native_companion_platform"),
             "handoff_base_sha256":value.get("handoff_base_sha256"),
-            "native_resume_source_profiles":value.get("native_resume_source_profiles",[]),"production_ready":False}
+            "native_resume_source_profiles":value.get("native_resume_source_profiles",[]),
+            "completed_reference_resume_source_profiles":value.get("completed_reference_resume_source_profiles",[]),
+            "production_ready":False}
 
 
 @contextmanager

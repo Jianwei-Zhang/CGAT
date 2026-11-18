@@ -1,8 +1,9 @@
 """Internal, journaled handoff of unfinished initial-reference commands only.
 
 Called by the separate branch package INSIDE the existing run.sh workspace lock.
-Never launches analysis, edits FASTA/results/checkpoints/GRT code, or asks the
-customer to create configuration. Unsupported/custom provenance refuses unchanged.
+Never launches analysis, edits FASTA/results/GRT code, or asks the customer to
+create configuration. The checkpoint owner may rebind an explicitly reviewed
+runtime-only completed-reference update after full input/output checks and backup. Unsupported/custom provenance refuses unchanged.
 Implementation only; no current handoff/package/customer acceptance is claimed.
 """
 from __future__ import annotations
@@ -358,7 +359,15 @@ def handoff(workspace,server_source,run_id,units,manager):
             report["preserved_completed_units"].append(unit.unit_id)
             continue
         if statuses.get(unit.unit_id)=="success":
-            raise wa.ExperimentError("a previously completed reference checkpoint is now incompatible; refusing to reclassify it as the reported failed task")
+            migrate = getattr(manager, "migrate_reference_runtime", None)
+            migrated, migration_reason = (migrate(prepared, unit.command_relpath, checked)
+                                          if callable(migrate) else (False, "checkpoint owner has no reviewed migration"))
+            if migrated:
+                report["preserved_completed_units"].append(unit.unit_id)
+                report.setdefault("completed_checkpoint_runtime_migrations", []).append(
+                    {"unit_id": unit.unit_id, "reason": migration_reason, "outputs_unchanged": True})
+                continue
+            raise wa.ExperimentError("a previously completed reference checkpoint is now incompatible; refusing to reclassify it as the reported failed task: " + migration_reason)
         old,new = render_commands(workspace,path.parent,target,queries[name],options["threads"])
         data = small(path,MAX_COMMAND)
         if data==new:

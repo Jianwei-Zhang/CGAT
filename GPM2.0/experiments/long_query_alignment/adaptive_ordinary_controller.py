@@ -146,14 +146,31 @@ def execute(root, catalog, index, tool, args, *, budget=None,
         raise wa.ExperimentError("ordinary review ledger contains an unrelated query")
     for name, row in state["reviews"].items():
         if (row.get("directory") != str(review_path(name))
-                or row.get("status") not in ("reserved", "complete", "failed")
+                or row.get("status") not in ("reserved", "complete", "failed", "budget_exhausted")
                 or type(row.get("timeout_seconds")) is not int or not 0 < row["timeout_seconds"] <= budget.case_seconds
                 or row["status"] == "reserved" and row.get("charged_seconds") != row["timeout_seconds"] + 5
+                or row["status"] == "budget_exhausted" and not isinstance(row.get("timeout_evidence"), dict)
                 or type(row.get("charged_seconds")) not in (int, float)
                 or not 0 < row["charged_seconds"] < float("inf")):
             raise wa.ExperimentError("invalid finite ordinary review ledger")
     def save():
         if not readonly:wa.write_json(marker, state)
+    def prepare_review_input(query, name, destination):
+        unit_catalog = pp.scan_query(query["path"])
+        review_input = root / "review-inputs" / (destination.name + ".fa")
+        if readonly and not review_input.with_suffix(".fa.json").is_file():
+            raise wa.ExperimentError("complete review input missing during read-only verification")
+        return pilot.materialize(unit_catalog, [name], review_input)
+    def record_timeout(previous, proof):
+        if previous["charged_seconds"] < previous["timeout_seconds"] + 5:
+            raise wa.ExperimentError("bounded-review timeout reservation cost was understated")
+        if previous["status"] == "budget_exhausted" and previous.get("timeout_evidence") != proof:
+            raise wa.ExperimentError("bounded-review timeout proof changed")
+        charged = max(previous["charged_seconds"], proof["execution_seconds"])
+        if readonly and (previous["status"] != "budget_exhausted" or charged != previous["charged_seconds"]):
+            raise wa.ExperimentError("unsealed bounded-review timeout fallback")
+        previous.update(status="budget_exhausted", charged_seconds=charged, timeout_evidence=proof)
+        save()
     def stop(reason):
         state.update(status="stopped_without_publication", reason=reason, output_published=False,
                      whole_workload_quality_approved=False); save(); return state
@@ -199,10 +216,24 @@ def execute(root, catalog, index, tool, args, *, budget=None,
         # Every reviewed query chooses its COMPLETE default source, already paid.
         risks = review["review_queries"]; filtered = [q for q in names if q not in risks]
         if filtered:selections.append({"queries": filtered, "source": result["source"]})
-        unit_review, unresolved = [], []
+        unit_review, unresolved, deferred_reviews = [], [], []
         for name in risks:
             destination = review_path(name)
             previous = state["reviews"].get(name)
+            review_unit = {"records": [{"name": name, "length": lengths[name]}], "fraction": None}
+            review_query = None
+            if previous is not None and previous["status"] in ("failed", "reserved", "budget_exhausted") and primary_work:
+                review_query = prepare_review_input(query, name, destination)
+                proof = units.review_timeout_proof(destination, review_unit, review_query, index, tool,
+                    previous["timeout_seconds"], execution_tool=execution_tool)
+                if proof is not None:
+                    record_timeout(previous, proof)
+                    budget_stop = "review_timeout_budget_exhausted"
+                    unresolved.append(name); deferred_reviews.append(name); continue
+                if previous["status"] == "budget_exhausted":
+                    raise wa.ExperimentError("bounded-review timeout proof missing")
+            if previous is not None and previous["status"] == "budget_exhausted":
+                raise wa.ExperimentError("bounded-review timeout fallback requires primary work")
             if previous is not None and previous["status"] == "failed":return stop("review_failed_no_retry")
             spent = sum(r["charged_seconds"] for r in state["reviews"].values())
             remaining = budget.total_seconds - spent
@@ -226,12 +257,8 @@ def execute(root, catalog, index, tool, args, *, budget=None,
                     return stop("interrupted_review_no_automatic_retry")
             started = time.monotonic()
             try:
-                unit_catalog = pp.scan_query(query["path"])
-                review_input = root / "review-inputs" / (destination.name + ".fa")
-                if readonly and not review_input.with_suffix(".fa.json").is_file():
-                    raise wa.ExperimentError("complete review input missing during read-only verification")
-                review_query = pilot.materialize(unit_catalog, [name], review_input)
-                review_unit = {"records": [{"name": name, "length": lengths[name]}], "fraction": None}
+                if review_query is None:
+                    review_query = prepare_review_input(query, name, destination)
                 baseline = units.run_unit(destination, review_unit, review_query, index, tool, args,
                     timeout=previous["timeout_seconds"], retry_incomplete=False, readonly=readonly, execution_tool=execution_tool)
                 if previous["status"] == "complete" and previous["charged_seconds"] < baseline["source"]["wall_seconds"]:
@@ -249,7 +276,15 @@ def execute(root, catalog, index, tool, args, *, budget=None,
                 previous.update(status="reserved" if recoverable else "failed",
                                 error=type(exc).__name__ + ": " + str(exc))
                 if recoverable:previous["charged_seconds"] = previous["timeout_seconds"] + 5
-                save(); raise
+                save()
+                if primary_work and not readonly and isinstance(exc, wa.ExperimentError) and review_query is not None:
+                    proof = units.review_timeout_proof(destination, review_unit, review_query, index, tool,
+                        previous["timeout_seconds"], execution_tool=execution_tool)
+                    if proof is not None:
+                        record_timeout(previous, proof)
+                        budget_stop = "review_timeout_budget_exhausted"
+                        unresolved.append(name); deferred_reviews.append(name); continue
+                raise
         if unresolved:
             progress(f"review allowance reached; {len(unresolved)} unresolved current records and future work use default; no whole-assembly restart")
             # End the approximation phase, not the user's task. At most ONE
@@ -272,9 +307,11 @@ def execute(root, catalog, index, tool, args, *, budget=None,
                 "transition_bases": sum(lengths[n] for n in unresolved),
                 "future_filter": "default", "complete_prior_sources_preserved": True,
                 "whole_assembly_restart": False}
-        state["completed_units"].append({"ordinal": unit["ordinal"], "default": False,
-                                         "reviewed_queries": unit_review, "screen": review}); save()
-    if set(state["reviews"]) != {q for row in state["completed_units"] for q in row.get("reviewed_queries", [])}:
+        row = {"ordinal": unit["ordinal"], "default": False, "reviewed_queries": unit_review, "screen": review}
+        if deferred_reviews:row["deferred_review_queries"] = deferred_reviews
+        state["completed_units"].append(row); save()
+    if set(state["reviews"]) != {q for row in state["completed_units"]
+                                for q in row.get("reviewed_queries", []) + row.get("deferred_review_queries", [])}:
         raise wa.ExperimentError("ordinary review ledger contains unverified extra records")
     catalog.require_unchanged()
     if readonly and not (root / "composition/composition.json").is_file():
@@ -282,8 +319,10 @@ def execute(root, catalog, index, tool, args, *, budget=None,
     composition = units.compose_completed(root / "composition", work["ordinary_records"], index, selections)
     state.update(status="complete_bounded_policy_candidate", composition=composition,
                  complete_default_pilot_preserved=True, scientific_accuracy_proven=False,
-                 baseline_compared_queries=list(state["reviews"]),
+                 baseline_compared_queries=[q for q, row in state["reviews"].items() if row["status"] == "complete"],
                  coverage="all_original_ordinary_records_and_index_parts", output_published=False)
+    exhausted = [q for q, row in state["reviews"].items() if row["status"] == "budget_exhausted"]
+    if exhausted:state["budget_exhausted_review_queries"] = exhausted
     if readonly and wa.sha256(marker) != snapshot:
         raise wa.ExperimentError("ordinary controller changed during read-only verification")
     save(); return state
