@@ -223,6 +223,21 @@ class KeyMigrationTests(unittest.TestCase):
         self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
         self.assertIn('index',pr.read_json(attempt/'selective'/pr.STATE)['stages'])
 
+    def test_pre_primary_long_runtime_retains_existing_ordinary_controller(self):
+        files=json.loads(Path(__file__).with_name('test_data').joinpath('pre_primary_long_runtime.json').read_text())
+        digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest(files),pr._REVIEWED_REVIEW_TIMEOUT_RUNTIME)
+        previous={**self.old_runtime,'files_sha256':files,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY}
+        runtime={**self.runtime,'approximate_output_admission':sa.ap.POLICY,'ordinary_output_admission':sa.oc.POLICY,
+                 'native_resume_source_profiles':[[pr._REVIEWED_REVIEW_TIMEOUT_RUNTIME,digest(self.runtime['files_sha256'])]]}
+        wa.write_json(self.attempt/'server-alignment.json',{'runtime':previous})
+        state=pr.read_json(self.attempt/'selective'/pr.STATE)
+        state['stages'].pop('ordinary')
+        wa.write_json(self.attempt/'selective'/pr.STATE,state)
+        attempt,reused=pr.select_attempt(self.run,self.make_key(runtime['sha256']),runtime=runtime)
+        self.assertTrue(reused);self.assertEqual(attempt,self.attempt)
+        self.assertIn('index',pr.read_json(attempt/'selective'/pr.STATE)['stages'])
+
     def test_legacy_full_profile_is_frozen_and_matches_the_approved_digest(self):
         digest = hashlib.sha256(json.dumps(LEGACY,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         self.assertEqual(digest, pr._REVIEWED_LEGACY_RUNTIME)

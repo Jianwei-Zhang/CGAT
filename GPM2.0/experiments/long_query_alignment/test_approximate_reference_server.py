@@ -122,6 +122,60 @@ class AutomaticServerTests(old.RealResumeTests):
             self.assertTrue(second["result_published"])
             self.assertEqual((args.run_dir / "result.paf").read_bytes(), final)
 
+    def test_primary_windows_and_required_review_ignore_exploratory_caps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime, args = self.automatic_fixture(Path(directory))
+            screen, command, native = ap.screen_group, wa.run_command, nf.attempt
+            maps, reviews = [], []
+            def request_review(root, name, *a, **kw):
+                result = screen(root, name, *a, **kw)
+                if name == "long1":result["approved"] = False
+                return result
+            def mapped(argv, folder, name, timeout, memory, **kw):
+                if name == "map":maps.append((timeout, memory, kw.get("max_file_bytes")))
+                return command(argv, folder, name, timeout, memory, **kw)
+            def reviewed(mm, target, query, root, options, **kw):
+                if root.name == "native-quality-review":
+                    reviews.append((options.timeout, options.memory_gib, options.max_output_bytes))
+                return native(mm, target, query, root, options, **kw)
+            with self.automatic_controls(), patch.object(ap, "screen_group", side_effect=request_review), \
+                 patch.object(ap, "MAP_SECONDS", 1), patch.object(ap, "MAX_PAF_BYTES", 1), \
+                 patch.object(ap, "REVIEW_SECONDS", 1), patch.object(ap, "TOTAL_REVIEW_SECONDS", 0), \
+                 patch.object(ap, "deadline", side_effect=AssertionError("production used exploratory deadline")), \
+                 patch.object(wa, "run_command", side_effect=mapped), patch.object(nf, "attempt", side_effect=reviewed):
+                result = sa.run_reference(args, runtime_root=runtime)
+            self.assertTrue(result["result_published"])
+            self.assertEqual(maps, [(None, 0, None), (None, 0, None)])
+            self.assertEqual(reviews, [(None, 0, None)])
+            states = list((Path(result["attempt"])/"selective").glob("long-*/part-*/" + ap.MANIFEST))
+            self.assertEqual(len(states), 2)
+            for path in states:
+                resources = json.loads(path.read_text())["last_invocation"]
+                self.assertTrue(resources["primary_work"])
+                self.assertIsNone(resources["cell_budget_seconds"])
+                self.assertIsNone(resources["mapper_output_limit_bytes"])
+
+    def test_experimental_review_stays_bounded_and_primary_respects_explicit_limits(self):
+        from types import SimpleNamespace
+        from contextlib import nullcontext
+        for primary in (False, True):
+            with self.subTest(primary=primary), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory); calls=[]
+                args=SimpleNamespace(timeout=75,memory_gib=48,minimap_filter=None)
+                group={"sha256":"a"*64,"path":str(root/"q.fa"),"queries":["q"]}
+                index={"sha256":"b"*64,"path":str(root/"r.mmi")};tool={"sha256":"c"*64,"path":"fixture-only"}
+                def failed(mm,target,query,destination,options):
+                    calls.append((options.timeout,options.memory_gib,options.max_output_bytes))
+                    return {"status":"other_failure"}
+                with patch.object(nf,"attempt",side_effect=failed), patch.object(ap,"deadline",side_effect=lambda seconds:nullcontext()) as clock:
+                    with self.assertRaisesRegex(wa.ExperimentError,"did not complete"):
+                        ap.native_review(root,group,index,tool,args,seconds=25,primary_work=primary)
+                self.assertEqual(calls, [(75,48,None)] if primary else [(25,36,ap.MAX_PAF_BYTES)])
+                self.assertEqual(clock.call_count, 0 if primary else 1)
+                with patch.object(nf,"attempt",side_effect=AssertionError("failed work retried")):
+                    with self.assertRaisesRegex(wa.ExperimentError,"already failed"):
+                        ap.native_review(root,group,index,tool,args,seconds=25,primary_work=primary)
+
     def test_failed_quality_review_never_publishes_partial_or_retries_it(self):
         with tempfile.TemporaryDirectory() as directory:
             runtime, args = self.automatic_fixture(Path(directory))

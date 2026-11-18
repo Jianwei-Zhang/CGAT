@@ -345,7 +345,7 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                                 # complete native-window sources.
                                 if cell_dir.exists() and not (cell_dir / ap.MANIFEST).exists():
                                     pr.archive_partial(cell_dir)
-                            row = ap.run(cell_dir, query, target, long_tool, part, args,
+                            row = ap.run(cell_dir, query, target, long_tool, part, args, primary_work=prepared_workspace is not None,
                                 **({"tool_transition": report["execution_tool_transition"]} if execution_tool is not None else {}))
                             merger._add(Path(row["path"]), row["sha256"], [name], "approximate",
                                 part_index=part["part_index"], validator=lambda raw: ap.validate_row(raw, name, queries[name]["length"], part))
@@ -417,7 +417,8 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
                         wa.write_json(root / "proactive-candidate.json", report)
                         if not screened["approved"]:
                             started_review = time.monotonic()
-                            reviewed = ap.native_review(directory, group, review_index, long_tool, args, seconds=review_remaining)
+                            reviewed = ap.native_review(directory, group, review_index, long_tool, args, seconds=review_remaining,
+                                primary_work=prepared_workspace is not None)
                             review_remaining -= time.monotonic() - started_review
                             report["native_reviews"].append(reviewed)
                             report["discarded_projection_screening"].append(report["projection_screening"].pop())

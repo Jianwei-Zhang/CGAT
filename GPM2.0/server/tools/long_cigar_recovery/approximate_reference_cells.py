@@ -6,7 +6,7 @@ Successful mapper/ownership substages are sealed BEFORE the next expensive step.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict
 import hashlib
 import json
@@ -155,7 +155,9 @@ def verify(root, expected, tool, part):
             "identity": expected, "rows": rows, "native_confidence_reconstructed": False}
 
 
-def run(root, query, target, tool, part, args, *, tool_transition=None):
+def run(root, query, target, tool, part, args, *, tool_transition=None, primary_work=False):
+    if type(primary_work) is not bool:
+        raise wa.ExperimentError("primary-work selection must be boolean")
     index_tool_sha256 = tool["sha256"]
     if tool_transition is not None:
         import ordinary_tool_transition as ott
@@ -178,11 +180,16 @@ def run(root, query, target, tool, part, args, *, tool_transition=None):
     if state["identity"] != expected:
         raise wa.ExperimentError("existing approximate cell belongs to another input/policy")
     started = time.monotonic(); reused = {"mapping": False, "ownership": False, "stitching": False}
-    cap = min(36, args.memory_gib) if args.memory_gib else 36
+    # Fixed window geometry bounds the algorithm. Exploratory wall/output
+    # limits must not terminate required production mapping or base checks.
+    cap = args.memory_gib if primary_work else (min(36, args.memory_gib) if args.memory_gib else 36)
+    map_seconds = args.timeout if primary_work else (min(MAP_SECONDS, args.timeout) if args.timeout else MAP_SECONDS)
+    cell_seconds = None if primary_work else CELL_SECONDS
+    output_bytes = None if primary_work else MAX_PAF_BYTES
     checker = wa.sha256(Path(wa.__file__))
     def save():wa.write_json(root / MANIFEST, state)
     try:
-        with deadline(CELL_SECONDS):
+        with (nullcontext() if primary_work else deadline(CELL_SECONDS)):
             mic.validate_part_context(part, reference_sha256=target.identity["sha256"],
                 tool_sha256=index_tool_sha256, preset="asm10", target_records=target.records)
             if "raw" in state:
@@ -198,8 +205,7 @@ def run(root, query, target, tool, part, args, *, tool_transition=None):
                 manifest_sha = _hash(root / "windows.json", root)
                 command = [tool["path"], "-c", "--eqx", "-x", "asm10", "-f", str(part["mid_occ"]),
                     "-t", str(args.threads), "-o", str(root / "raw.windows.paf"), part["path"], str(root / "windows.fa")]
-                execution = wa.run_command(command, root, "map", min(MAP_SECONDS, args.timeout) if args.timeout else MAP_SECONDS,
-                    cap, max_file_bytes=MAX_PAF_BYTES)
+                execution = wa.run_command(command, root, "map", map_seconds, cap, max_file_bytes=output_bytes)
                 raw_proof = {"threads": args.threads, "execution": execution,
                     "sha256": _hash(root / "raw.windows.paf", root), "windows_sha256": windows_sha,
                     "manifest_sha256": manifest_sha, "stderr_sha256": _hash(root / "map.stderr", root)}
@@ -254,8 +260,8 @@ def run(root, query, target, tool, part, args, *, tool_transition=None):
         raise
     finally:
         state["last_invocation"] = {"elapsed_seconds": time.monotonic() - started, "reused": reused,
-                                  "cell_budget_seconds": CELL_SECONDS, "mapper_budget_seconds": MAP_SECONDS,
-                                  "mapper_address_space_gib": cap}
+                                  "primary_work": primary_work, "cell_budget_seconds": cell_seconds, "mapper_budget_seconds": map_seconds,
+                                  "mapper_address_space_gib": cap, "mapper_output_limit_bytes": output_bytes}
         save()
     return verify(root, expected, tool, part)
 
@@ -296,8 +302,13 @@ REVIEW_SECONDS = 600
 TOTAL_REVIEW_SECONDS = 1200
 
 
-def native_review(root, group, index, tool, args, *, seconds):
-    """One bounded authoritative whole-record native review, never partial reuse."""
+def native_review(root, group, index, tool, args, *, seconds, primary_work=False):
+    """One complete authoritative source; production work is not a pilot.
+
+    Existing failed receipts still require diagnosis, never an implicit retry.
+    """
+    if type(primary_work) is not bool:
+        raise wa.ExperimentError("primary-work selection must be boolean")
     import argparse
     import native_first as nf
     import recovery_publication as rp
@@ -312,16 +323,19 @@ def native_review(root, group, index, tool, args, *, seconds):
     if state["status"] == "failed":
         raise wa.ExperimentError("bounded native quality review already failed; partial PAF is not publishable")
     if state["status"] != "complete":
-        if seconds <= 0:
+        if not primary_work and seconds <= 0:
             raise wa.ExperimentError("automatic quality review budget exhausted")
         pr.archive_partial(native)
         state["status"] = "running"; wa.write_json(marker, state)
         try:
             options = argparse.Namespace(**vars(args))
-            options.timeout = min(REVIEW_SECONDS, seconds, args.timeout or REVIEW_SECONDS)
-            options.memory_gib = min(36, args.memory_gib) if args.memory_gib else 36
-            options.max_output_bytes = MAX_PAF_BYTES
-            with deadline(options.timeout + 10):
+            options.timeout = args.timeout if primary_work else min(REVIEW_SECONDS, seconds, args.timeout or REVIEW_SECONDS)
+            options.memory_gib = args.memory_gib if primary_work else (min(36, args.memory_gib) if args.memory_gib else 36)
+            options.max_output_bytes = None if primary_work else MAX_PAF_BYTES
+            state["resources"] = {"primary_work": primary_work, "timeout_seconds": options.timeout,
+                "memory_gib": options.memory_gib, "max_output_bytes": options.max_output_bytes}
+            wa.write_json(marker, state)
+            with (nullcontext() if primary_work else deadline(options.timeout + 10)):
                 receipt = nf.attempt(tool["path"], Path(index["path"]), Path(group["path"]), native, options)
             if receipt["status"] != "native_success":
                 raise wa.ExperimentError("bounded native quality review did not complete; approximate candidate retained")
