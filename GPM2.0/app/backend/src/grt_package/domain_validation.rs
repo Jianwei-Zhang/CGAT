@@ -749,6 +749,46 @@ pub(super) fn validate_tool_versions(table: &TsvTable) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn validate_q0_card_assignment(
+    row: &TsvRow,
+    baselines: &HashMap<(String, String, String), (String, i64)>,
+) -> Result<()> {
+    let dataset = field(row, "dataset_name")?;
+    let contig = field(row, "contig_name")?;
+    let target = nonempty(row, "target_chr", "source card chromosome")?;
+    let here =
+        baselines.contains_key(&(dataset.to_string(), contig.to_string(), target.to_string()));
+    let elsewhere = baselines
+        .keys()
+        .any(|(ds, ctg, _)| ds == dataset && ctg == contig);
+    let (original, mode) = if here {
+        ("assigned", "normal")
+    } else if elsewhere {
+        ("cross_chr", "cross_chr_grt_usage")
+    } else {
+        ("unplaced", "grt_promoted")
+    };
+    if field(row, "original_assignment")? != original || field(row, "placement_mode")? != mode {
+        return grt_err(
+            "BROKEN_REFERENCE",
+            "source card disagrees with original chromosome assignment",
+        );
+    }
+    Ok(())
+}
+
+pub(super) fn event_is_path_producing(event: &Value) -> bool {
+    matches!(
+        event.get("action").and_then(Value::as_str),
+        Some("fill" | "patch" | "refill" | "extend_telomere")
+    ) || (event.get("action").and_then(Value::as_str) == Some("replace")
+        && event
+            .get("edit")
+            .and_then(|edit| edit.get("replacement_kind"))
+            .and_then(Value::as_str)
+            == Some("source"))
+}
+
 pub(super) fn validate_source_cards(
     table: &TsvTable,
     sources: &HashMap<(String, String), String>,
@@ -756,6 +796,7 @@ pub(super) fn validate_source_cards(
     evidence: &HashMap<String, &TsvRow>,
     events: &HashMap<String, &Value>,
     segments: &HashMap<String, (&Value, String)>,
+    q0_roots: Option<&HashMap<String, HashSet<String>>>,
 ) -> Result<()> {
     let mut card_ids = HashSet::new();
     for row in &table.rows {
@@ -842,7 +883,28 @@ pub(super) fn validate_source_cards(
             field(row, "pairwise_evidence_ids_json")?,
             &format!("source card {card}.pairwise evidence"),
         )?;
-        if refs.is_empty() || event_ids.is_empty() || segment_ids.is_empty() || pairwise.is_empty()
+        let roots = q0_roots.and_then(|roots| roots.get(card));
+        let target_chr = nonempty(row, "target_chr", "source card chromosome")?;
+        if q0_roots.is_some() {
+            validate_q0_card_assignment(row, assignment_baselines)?;
+            for links in [&refs, &event_ids, &segment_ids, &pairwise] {
+                if links.iter().collect::<HashSet<_>>().len() != links.len() {
+                    return grt_err("DUPLICATE_ID", "source card has duplicate trace links");
+                }
+            }
+        }
+        let has_peer = assignment_baselines.keys().any(|(dataset, contig, chr)| {
+            chr == target_chr && (dataset, contig) != (&key.0, &key.1)
+        }) || (placement != "normal"
+            && table.rows.iter().any(|other| {
+                other.get("target_chr") == row.get("target_chr")
+                    && (other.get("dataset_name"), other.get("contig_name"))
+                        != (Some(&key.0), Some(&key.1))
+            }));
+        if refs.is_empty()
+            || (event_ids.is_empty() && roots.is_none_or(HashSet::is_empty))
+            || segment_ids.is_empty()
+            || (pairwise.is_empty() && (q0_roots.is_none() || has_peer))
         {
             return grt_err(
                 "BROKEN_REFERENCE",
@@ -876,15 +938,19 @@ pub(super) fn validate_source_cards(
                 let action = event.get("action").and_then(Value::as_str).unwrap_or("");
                 (event.get("status").and_then(Value::as_str) == Some("accepted")
                     && event.get("source_card_key").and_then(Value::as_str) == Some(card)
-                    && matches!(
-                        action,
-                        "fill"
-                            | "patch"
-                            | "replace"
-                            | "correct_boundary"
-                            | "refill"
-                            | "extend_telomere"
-                    ))
+                    && (if q0_roots.is_some() {
+                        event_is_path_producing(event)
+                    } else {
+                        matches!(
+                            action,
+                            "fill"
+                                | "patch"
+                                | "replace"
+                                | "correct_boundary"
+                                | "refill"
+                                | "extend_telomere"
+                        )
+                    }))
                 .then(|| event_id.clone())
             })
             .collect::<HashSet<_>>();
@@ -894,7 +960,7 @@ pub(super) fn validate_source_cards(
                 format!("source card {card} accepted-event set is not exact"),
             );
         }
-        let expected_segment_ids = expected_event_ids
+        let mut expected_segment_ids = expected_event_ids
             .iter()
             .filter_map(|event_id| {
                 events[event_id]
@@ -904,6 +970,9 @@ pub(super) fn validate_source_cards(
                     .map(ToString::to_string)
             })
             .collect::<HashSet<_>>();
+        if let Some(roots) = roots {
+            expected_segment_ids.extend(roots.iter().cloned());
+        }
         if segment_ids.iter().cloned().collect::<HashSet<_>>() != expected_segment_ids {
             return grt_err(
                 "BROKEN_REFERENCE",
@@ -986,6 +1055,9 @@ pub(super) fn validate_source_cards(
                     format!("source card {card} segment source differs"),
                 );
             }
+            if roots.is_some_and(|roots| roots.contains(segment_id)) {
+                continue;
+            }
             let event_id = segment
                 .get("event_id")
                 .and_then(Value::as_str)
@@ -1013,6 +1085,26 @@ pub(super) fn validate_source_cards(
                     format!("source card {card} event and segment source intervals differ"),
                 );
             }
+        }
+    }
+    if let Some(roots) = q0_roots {
+        let mut expected = roots.keys().cloned().collect::<HashSet<_>>();
+        for event in events.values().filter(|event| {
+            event.get("status").and_then(Value::as_str) == Some("accepted")
+                && event.get("source").is_some_and(|source| !source.is_null())
+                && event_is_path_producing(event)
+        }) {
+            let card = event
+                .get("source_card_key")
+                .and_then(Value::as_str)
+                .ok_or_else(|| grt_anyhow("BROKEN_REFERENCE", "path event lacks source card"))?;
+            expected.insert(card.to_string());
+        }
+        if card_ids != expected {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                "used cards do not exactly cover retained path sources",
+            );
         }
     }
     Ok(())

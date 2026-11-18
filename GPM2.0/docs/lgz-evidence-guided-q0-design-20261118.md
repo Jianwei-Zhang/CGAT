@@ -660,3 +660,35 @@ schema-3 的粗分组 assignment 表可以为空，但表本身及其正确 head
 
 
 本节最终验证：90 项定向回归通过（432.278 秒，包含新增交付测试以及 q0 publication、live source、真实结构流水线、schema-2 contract、LGZ 兼容和 workspace runtime update）；随后新增的真实端粒交付测试单独通过（1 项，7.575 秒）。后者验证 q0-only backbone 卡片没有修补事件，而实际 tel 来源卡片具有真实 accepted event 和补充比对证据。共覆盖 91 个不同测试方法，不把子场景或重复运行重复计数。运行库只读验证通过：39 个受管产物无漂移，`production_ready=false`，未修改正式 Release。
+
+
+### 13.10 I5 原生校验、导入及精简 App 投影
+
+完整 Server 包和精简 App 包是两个不同边界，不能把版本号放开后混用证明责任：
+
+1. **完整 Server package schema 3**：Rust 校验器读取冻结文件与选择文件，核对必需 artifact 清单及内容哈希、原始 source FASTA 清单、选择结果生成的精确 q0 rows、source 序列身份、原 N 间隔、informative / occupied / available 区间及完整 donor context。q0 根证据和后续真实事件分开追溯；各 q 版本不得重复使用同一原始 source 区间，最终片段还必须与 q4 来源表一致。校验通过后才进入既有导入事务。
+2. **精简 App package schema 3**：Server 投影入口先完整验证 schema-3 源包，再裁剪为 App 所需数据；仍不搬运 q0 / donor / 原始运行证据 / checkpoints。App 端校验包版本、manifest、Final Path、来源范围与显示卡关系，并执行跨 chr、跨方向的原始 source 区间去重。`no_fasta` 只验证其实际携带的索引、坐标和内容身份声明，不声称验证了不存在的序列字节。
+3. 新 App 包保留显式 package version 3；**不是把新 Server 语义伪装成 package version 2**。Final Path 的 local-evidence schema version 3 是另一个已有协议维度，不与 package generation 混淆。旧 Server package 2 及旧 App package 2 的入口保留读取能力，不引入旧 q0 构建策略开关。
+4. 粗 assignment 全空时，schema-3 App 的 assignment / track-order 表可以只有真实 header，但不能缺文件；有 assignment 却没有其排序仍须报错。q0-only promoted 来源由真正的 used-source 卡提供，不通过制造 assignment 或 accepted event 填表。
+5. 原有持久化结构可以存储 q0-only 卡片的空事件列表及实际 Final Path segment 链接，因此没有为此新建数据库表或交互 UI。
+
+原生实现位于 `grt_package/q0_provenance.rs`，与现有 contract / delivery validators、source-card 校验联动。Python 同步补强冻结清单完整性，避免仅核对“清单里剩下的条目”，却容忍删除某个必需 hash 绑定；q0 evidence 的坐标体系、方向、query FASTA 和阶段也必须与实际选择一致。
+
+#### 共用冻结夹具，而不是两套不同的成功示例
+
+`tests/fixtures/grt_contract_v3/` 中的 UTF-8 文件快照由 Python 与 Windows-native Rust 共同读取：
+
+- 单个反向、粗分组未归属的 q0 来源，保留空 assignment、无比较对象、无修补事件这些真实状态。
+- chr1 三个 ds 的反向 bridge，整条 `c` 的 display baseline 为 `+` 而实际选中片段为 `-`；chr2 保留原始 scaffold 的 `137 N` 连接。
+- 同一单来源样本的实际 full / no-FASTA App 投影。Python 将新生成投影与快照逐文件比较，Rust 使用相同快照进行校验、导入和持久化回读。
+
+快照包含当时的代码身份和工具路径，但读取它不要求安装同一份 selector，也不执行其中的历史工具路径。辅助 freezer 先验证源工作区，再验证迁移后的材料化副本；不能通过手工补假 assignment、假事件或改 checksum 把错误夹具“修好”。pre-q0 PAF 几何明确是受控输入，后续流水线使用真实工具，因此这些是契约与导入验收，不是生物学效果验收。
+
+本轮不修改 frontend、不启动浏览器、不发布安装包；需要证明的是原生数据链与可显示的项目来源，而不是重新设计 UI。报告输出、旧全流程夹具迁移、完整真实比对准备/样本效果与规模性能仍需继续验收；I5/I6 和整体目标保持未完成。
+
+
+最终验证：Python 定向回归 **89 项通过**（430.963 秒）；Windows 原生 `cargo test --lib grt_package::` **46 项通过**，`cargo test --lib importer::` **56 项通过**。另有两项 opt-in 性能探针按原配置 ignored，不计为通过，也不作为性能结论。新增 full / no-FASTA App 测试实际完成导入、项目初始化、q0 来源卡材料化和项目 Final Path 显示映射（`grt_display_available=true`）；full 模式还重验了持久化 q4。运行库同步后再次只读验证：39 个受管产物无漂移，未改变正式 Release。
+
+后续验收还要补齐历史 schema-2 的 source-free boundary/correction 等事件在两端的分类一致性，不能把当前旧包基线通过当成所有历史边界都已覆盖；并继续报告输出、旧流程夹具迁移和 I6 的真实比对/规模测试，包括完整 Server 包的哈希与 FASTA 校验成本。
+
+补充的 fail-fast 边界：未选中的 chr 必须有明确的 `path: null` 决定；缺少 `path` 字段不是默认跳过。accepted 的 DNA 新增事件也必须有 source 证明，不能把 source-free 事件改名为 fill 来绕过根来源校验。这两类反例已纳入回归。

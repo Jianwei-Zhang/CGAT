@@ -186,6 +186,16 @@ def validate_prepared_q0(root: Path, *, source_root: Path | None = None, expecte
     frozen = load(FREEZE)
     if frozen.get("schema") != FREEZE_SCHEMA or frozen.get("package_schema_version") != PACKAGE_SCHEMA_VERSION:
         raise Q0EvidenceError("unsupported q0 donor freeze schema")
+    donor_sets = read_tsv(resolve("metadata/grt_donor_sets.tsv"))
+    required_artifacts = {SELECTION, "grt/q/q0.fa", "metadata/grt_recipe.tsv", "metadata/grt_contig_roles.tsv",
+                          "metadata/grt_donor_sets.tsv", "metadata/grt_donor_members.tsv", "metadata/grt_donor_fragments.tsv",
+                          "metadata/grt_contig_quality.tsv", "metadata/grt_telomere_rules.tsv"}
+    required_artifacts.update(row[field] for row in donor_sets for field in ("fasta_relpath", "manifest_relpath"))
+    if set(frozen["artifacts"]) != required_artifacts:
+        raise Q0EvidenceError("incomplete frozen artifact inventory")
+    expected_fastas = {row["dataset_name"]: row["fasta_relpath"] for row in read_tsv(resolve("metadata/datasets.tsv"))}
+    if frozen["source_fastas"] != expected_fastas:
+        raise Q0EvidenceError("q0 source FASTA inventory differs from dataset registry")
     for relative, digest in frozen["artifacts"].items():
         if sha256_file(resolve(relative)) != digest:
             raise Q0EvidenceError(f"q0 frozen artifact changed: {relative}")
@@ -195,6 +205,10 @@ def validate_prepared_q0(root: Path, *, source_root: Path | None = None, expecte
     decisions = envelope["construction"]
     if expected is not None and canonical_json(decisions) != canonical_json(expected.decisions):
         raise Q0EvidenceError("serialized q0 decision differs from the actual selection")
+    raw_evidence = {record.get("artifact") or record.get("catalog") for record in decisions["evidence"].values()}
+    raw_evidence.discard(None)
+    if set(envelope["artifact_hashes"]) != raw_evidence:
+        raise Q0EvidenceError("incomplete q0 raw evidence inventory")
     for relative, digest in envelope["artifact_hashes"].items():
         if sha256_file(resolve(relative)) != digest:
             raise Q0EvidenceError(f"q0 raw alignment evidence changed: {relative}")

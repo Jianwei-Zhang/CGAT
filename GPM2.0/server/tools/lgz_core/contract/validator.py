@@ -265,6 +265,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                     chr_name,
                     source_start,
                     source_end,
+                    row["orientation"],
                 )
             if not evidence_ids:
                 fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source evidence")
@@ -490,7 +491,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     for segment_id, evidence_ids in q_segment_evidence.items():
         if any(evidence_id not in evidence for evidence_id in evidence_ids):
             fail("BROKEN_REFERENCE", f"q segment {segment_id} references unknown evidence")
-    for segment_id, (source_key, chr_name, source_start, source_end) in q0_segment_sources.items():
+    for segment_id, (source_key, chr_name, source_start, source_end, source_orientation) in q0_segment_sources.items():
         for evidence_id in q_segment_evidence[segment_id]:
             row = evidence[evidence_id]
             evidence_source_start = parse_int(
@@ -502,6 +503,10 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             if extension is not None:
                 if (row["stage"] != "q0_construction" or row["evidence_type"] != extension["q0_evidence_type"]
                         or row["status"] != "accepted"
+                        or row["coordinate_system"] != "source_0_based_half_open"
+                        or row["projection_status"] != "projected" or row["q_version"] != "q0"
+                        or row["orientation"] != source_orientation
+                        or row["query_artifact_relpath"] != q0_freeze["source_fastas"][source_key[0]]
                         or (row["source_dataset"], row["source_contig"]) != source_key
                         or row["target_chr"] != chr_name
                         or evidence_source_start != source_start or evidence_source_end != source_end
@@ -714,6 +719,8 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             if event["chr"] not in q_records or int(q_value["end"]) > len(q_records[event["chr"]]):
                 fail("INVALID_COORDINATE", f"event {event_id}.{q_field} exceeds q chromosome")
         source = event["source"]
+        if extension is not None and event["status"] == "accepted" and event_is_path_producing(event) and source is None:
+            fail("BROKEN_REFERENCE", f"accepted path-producing event {event_id} requires source provenance")
         if source is not None:
             expected_source_fields = {
                 "dataset",

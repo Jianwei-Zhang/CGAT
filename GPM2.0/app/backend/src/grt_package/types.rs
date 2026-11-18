@@ -3,6 +3,9 @@ use super::*;
 pub const GRT_WORKFLOW: &str = "gpm_grt_precomputed_v2";
 pub const GRT_APP_WORKFLOW: &str = "gpm_grt_app_precomputed_v2";
 pub const GRT_SCHEMA_VERSION: &str = "2";
+// Package generation with evidence-guided q0. Independent of Final Path's
+// display/local-evidence schema numbers below; legacy package 2 stays readable.
+pub const GRT_Q0_SCHEMA_VERSION: &str = "3";
 pub const GRT_FINAL_PATH_SCHEMA_VERSION: &str = "1";
 pub const GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION: &str = "2";
 pub const GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION: &str = "3";

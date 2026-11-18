@@ -69,6 +69,14 @@ where
         "validate_grt_app_required_files",
         "checking minimal App delivery files",
     );
+    let package_table = read_tsv(
+        bundle_root,
+        "metadata/package.tsv",
+        PACKAGE_HEADER,
+        1,
+        Some(1),
+    )?;
+    let q0_v3 = field(&package_table.rows[0], "schema_version")? == GRT_Q0_SCHEMA_VERSION;
     let core_specs: &[(&str, &[&str], usize, Option<usize>)] = &[
         ("metadata/package.tsv", PACKAGE_HEADER, 1, Some(1)),
         ("metadata/reference.tsv", REFERENCE_HEADER, 1, Some(1)),
@@ -114,20 +122,43 @@ where
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in core_specs {
         check_grt_validation_cancel(should_cancel)?;
+        let minimum = if q0_v3
+            && matches!(
+                *relpath,
+                "metadata/chr_assignments.tsv" | "metadata/track_member_orders.tsv"
+            ) {
+            0
+        } else {
+            *minimum
+        };
         tables.insert(
             *relpath,
-            read_tsv(bundle_root, relpath, header, *minimum, *maximum)?,
+            read_tsv(bundle_root, relpath, header, minimum, *maximum)?,
         );
     }
     let package = one_row(&tables, "metadata/package.tsv")?;
     let final_path_schema_version = field(package, "final_path_schema_version")?;
     if field(package, "workflow")? != GRT_APP_WORKFLOW
-        || field(package, "schema_version")? != GRT_SCHEMA_VERSION
+        || (!q0_v3 && field(package, "schema_version")? != GRT_SCHEMA_VERSION)
         || !is_supported_app_final_path_schema(final_path_schema_version)
+        || (q0_v3 && final_path_schema_version != GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION)
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_app_precomputed_v2 schema 2 / Final Path schema 1, 2, or 3",
+            "expected App schema 2 (Final Path 1/2/3) or schema 3 (Final Path 3)",
+        );
+    }
+    if q0_v3
+        && !table(&tables, "metadata/chr_assignments.tsv")?
+            .rows
+            .is_empty()
+        && table(&tables, "metadata/track_member_orders.tsv")?
+            .rows
+            .is_empty()
+    {
+        return grt_err(
+            "INVALID_TSV",
+            "assigned App sources require track member ordering",
         );
     }
     if !parse_bool(
@@ -181,7 +212,8 @@ where
         )
     })?;
     if json_str(manifest_object, "workflow", "App manifest")? != GRT_APP_WORKFLOW
-        || json_str(manifest_object, "schema_version", "App manifest")? != GRT_SCHEMA_VERSION
+        || json_str(manifest_object, "schema_version", "App manifest")?
+            != field(package, "schema_version")?
         || json_str(manifest_object, "package_kind", "App manifest")? != package_mode
     {
         return grt_err(
@@ -380,6 +412,11 @@ where
         &assignment_baselines,
         &reference_records,
     )?;
+    if q0_v3 {
+        for card in &table(&tables, "metadata/grt_used_contigs.tsv")?.rows {
+            validate_q0_card_assignment(card, &assignment_baselines)?;
+        }
+    }
     let mut display_source_cards = assignment_baselines.keys().cloned().collect::<HashSet<_>>();
     for row in &table(&tables, "metadata/grt_used_contigs.tsv")?.rows {
         check_grt_validation_cancel(should_cancel)?;
@@ -422,6 +459,9 @@ where
         },
         should_cancel,
     )?;
+    if q0_v3 {
+        q0_provenance::validate_final_source_uniqueness(&final_path)?;
+    }
     if let Some(expected_lengths) = manifest_object
         .get("q4_chromosome_lengths")
         .and_then(Value::as_object)

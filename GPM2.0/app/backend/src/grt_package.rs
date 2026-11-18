@@ -29,6 +29,7 @@ mod domain_validation;
 mod initialization;
 mod parsing;
 mod persistence;
+mod q0_provenance;
 mod read_model;
 mod trace_queries;
 mod types;
@@ -52,9 +53,9 @@ pub use trace_queries::{
 pub(crate) use types::ValidatedGrtPackage;
 pub use types::{
     GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION, GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION,
-    GRT_APP_WORKFLOW, GRT_FINAL_PATH_SCHEMA_VERSION, GRT_SCHEMA_VERSION, GRT_WORKFLOW,
-    GrtEventTrace, GrtFinalPathVerification, GrtLockedRecipe, GrtProjectInitializationSummary,
-    GrtProjectView, GrtSourceCardStatus, GrtSourceCardTrace,
+    GRT_APP_WORKFLOW, GRT_FINAL_PATH_SCHEMA_VERSION, GRT_Q0_SCHEMA_VERSION, GRT_SCHEMA_VERSION,
+    GRT_WORKFLOW, GrtEventTrace, GrtFinalPathVerification, GrtLockedRecipe,
+    GrtProjectInitializationSummary, GrtProjectView, GrtSourceCardStatus, GrtSourceCardTrace,
 };
 
 use domain_validation::*;

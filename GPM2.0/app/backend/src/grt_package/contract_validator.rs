@@ -30,22 +30,35 @@ where
         "validate_grt_metadata_tables",
         "parsing LGZ metadata tables",
     );
+    let package_table = read_tsv(
+        bundle_root,
+        "metadata/package.tsv",
+        PACKAGE_HEADER,
+        1,
+        Some(1),
+    )?;
+    let q0_v3 = field(&package_table.rows[0], "schema_version")? == GRT_Q0_SCHEMA_VERSION;
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in TABLE_SPECS {
+        let minimum = if q0_v3 && *relpath == "metadata/chr_assignments.tsv" {
+            0
+        } else {
+            *minimum
+        };
         tables.insert(
             *relpath,
-            read_tsv(bundle_root, relpath, header, *minimum, *maximum)?,
+            read_tsv(bundle_root, relpath, header, minimum, *maximum)?,
         );
     }
 
     let package = one_row(&tables, "metadata/package.tsv")?;
     if field(package, "workflow")? != GRT_WORKFLOW
-        || field(package, "schema_version")? != GRT_SCHEMA_VERSION
+        || (!q0_v3 && field(package, "schema_version")? != GRT_SCHEMA_VERSION)
         || field(package, "final_path_schema_version")? != GRT_FINAL_PATH_SCHEMA_VERSION
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_precomputed_v2 schema 2 / Final Path schema 1",
+            "expected gpm_grt_precomputed_v2 schema 2 or 3 / Final Path schema 1",
         );
     }
     if !parse_bool(
@@ -383,7 +396,7 @@ where
                         format!("q segment {segment_id} lacks source card/evidence"),
                     );
                 }
-                if q_version == "q0" {
+                if q_version == "q0" && !q0_v3 {
                     if !assignments
                         .get(&key)
                         .is_some_and(|chrs| chrs.contains(chr_name))
@@ -653,20 +666,22 @@ where
         if evidence.insert(id.to_string(), row).is_some() {
             return grt_err("DUPLICATE_ID", format!("duplicate evidence_id={id}"));
         }
-        enum_value(
-            field(row, "stage")?,
-            &[
-                "assignment",
-                "step1_round1",
-                "step1_round2",
-                "step2",
-                "step3",
-                "step4_telomere",
-                "candidate_validation",
-                "display_pairwise",
-            ],
-            &format!("evidence {id}.stage"),
-        )?;
+        if !(q0_v3 && field(row, "stage")? == "q0_construction") {
+            enum_value(
+                field(row, "stage")?,
+                &[
+                    "assignment",
+                    "step1_round1",
+                    "step1_round2",
+                    "step2",
+                    "step3",
+                    "step4_telomere",
+                    "candidate_validation",
+                    "display_pairwise",
+                ],
+                &format!("evidence {id}.stage"),
+            )?;
+        }
         enum_value(
             field(row, "status")?,
             &[
@@ -679,15 +694,17 @@ where
             ],
             &format!("evidence {id}.status"),
         )?;
-        enum_value(
-            field(row, "coordinate_system")?,
-            &[
-                "paf_0_based_half_open",
-                "mummer_1_based_closed",
-                "app_1_based_closed",
-            ],
-            &format!("evidence {id}.coordinate_system"),
-        )?;
+        if !(q0_v3 && field(row, "coordinate_system")? == "source_0_based_half_open") {
+            enum_value(
+                field(row, "coordinate_system")?,
+                &[
+                    "paf_0_based_half_open",
+                    "mummer_1_based_closed",
+                    "app_1_based_closed",
+                ],
+                &format!("evidence {id}.coordinate_system"),
+            )?;
+        }
         enum_value(
             field(row, "projection_status")?,
             &["native", "projected"],
@@ -817,6 +834,17 @@ where
             );
         }
     }
+
+    let q0_proof = if q0_v3 {
+        Some(q0_provenance::validate_q0(
+            bundle_root,
+            &tables,
+            &sources,
+            &assignments,
+        )?)
+    } else {
+        None
+    };
 
     let usage_table = table(&tables, "metadata/grt_donor_usage.tsv")?;
     let mut usage = HashMap::<String, &TsvRow>::new();
@@ -1289,10 +1317,25 @@ where
             .and_then(Value::as_str)
             .unwrap_or("");
         let path_producing = status == "accepted"
-            && matches!(
-                action,
-                "fill" | "patch" | "replace" | "correct_boundary" | "refill" | "extend_telomere"
+            && (if q0_v3 {
+                event_is_path_producing(event)
+            } else {
+                matches!(
+                    action,
+                    "fill"
+                        | "patch"
+                        | "replace"
+                        | "correct_boundary"
+                        | "refill"
+                        | "extend_telomere"
+                )
+            });
+        if q0_v3 && path_producing && event.get("source").is_none_or(|source| !source.is_object()) {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("accepted path-producing event {event_id} requires source provenance"),
             );
+        }
         if path_producing && segment_id.is_empty() {
             return grt_err(
                 "BROKEN_REFERENCE",
@@ -1328,6 +1371,10 @@ where
         "validate_grt_trace_integrity",
         "validating source-card trace integrity",
     );
+    let q0_root_cards = q0_proof
+        .as_ref()
+        .map(|proof| proof.final_roots(&tables, &final_path, &assignments))
+        .transpose()?;
     validate_source_cards(
         table(&tables, "metadata/grt_used_contigs.tsv")?,
         &sources,
@@ -1335,6 +1382,7 @@ where
         &evidence,
         &event_index,
         &final_segments,
+        q0_root_cards.as_ref(),
     )?;
     validate_gap_attempts(
         table(&tables, "metadata/grt_gap_attempts.tsv")?,
