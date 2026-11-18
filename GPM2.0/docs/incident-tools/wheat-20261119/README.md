@@ -93,3 +93,39 @@ later timing comparison must disclose that boundary.
 
 Four focused tests exercise refusal of changed inputs/corrupt candidates,
 ignore an uncommitted baseline PAF, and verify comparison without replacement.
+
+
+### Completed full-context measurement and stratification
+
+The full candidate job `42681096` and comparison-only job `42685578` both
+succeeded. Native 3D finished and its verified leaf checkpoint was retained.
+Minimap2 reported **7091.836 s / 125.225 GB** for native, versus
+**583.913 s / 18.254 GB** for the full `-f 0.005` candidate: an observed time
+ratio of 12.15 on these two x86 nodes, not a full-workflow speedup.
+The candidate processed all 113 queries against 988 targets; query coverage
+was 99.686%, versus native 99.625%. All PAF names and lengths were checked
+against the assignment-checkpoint-bound `metadata/chr_assignments.tsv`.
+
+Unlike the fragment pilots, full-context results are not position-equivalent:
+62577/62772 primary grid positions retained an exact position. In particular,
+`stratify_full_3d.py` (job `42686656`, succeeded) found:
+
+| Group | Baseline positions | Exact support | Changed/missing positions |
+|---|---:|---:|---:|
+| Queries >=100 Mb | 28899 | 28861 | 38 |
+| Queries <100 Mb | 33873 | 33716 | 157 |
+| All baseline MAPQ=60 positions | 62517 | 62417 | 100 |
+| >=100 Mb, baseline MAPQ=60 | 28875 | 28857 | 18 |
+
+Quality filtering is applied only to the baseline; a candidate MAPQ decrease
+must not be mistaken for a changed destination. Candidate geometry is always
+compared without that quality filter. These are baseline-agreement measures,
+not ground-truth accuracy. About 80.5% of the sampled position differences were
+in queries below 100 Mb, arguing against indiscriminate whole-group filtering.
+
+A next design to evaluate is whole-record routing: approximate only eligible
+very long queries and keep the ordinary path for others, preserving record
+order, all query records and per-record provenance. This is **not implemented
+or deployed**, has not demonstrated a 12x speedup, and is not validated for the
+self-alignment path. The already completed native 3D result should be reused,
+not replaced merely to install an optimization. No candidate has been adopted.
