@@ -21,6 +21,7 @@ test("toolbar spacing responds to container width but is bounded instead of fill
   const toolbar = ruleBody(selector);
   assert.match(toolbar, /display:\s*flex;/);
   assert.match(toolbar, /flex-wrap:\s*wrap;/);
+  assert.match(toolbar, /justify-content:\s*flex-start;/);
   assert.match(toolbar, /container-type:\s*inline-size;/);
   assert.match(toolbar, /overflow:\s*visible;/);
   assert.doesNotMatch(toolbar, /space-between|overflow-x:\s*auto/);

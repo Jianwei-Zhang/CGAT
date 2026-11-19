@@ -14,6 +14,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
   row-gap: 6px;
   column-gap: clamp(12px, 2.4vw, 36px);
   column-gap: clamp(12px, 2.4cqw, 36px);
