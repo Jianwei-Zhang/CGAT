@@ -1161,15 +1161,20 @@ test("importer workspace history row imports add packages without expanding the 
   }
 });
 
-test("importer workspace history add-package menu auto-hides on leave and closes on click", async () => {
+test("importer workspace history context menu stays open on pointerleave and closes on outside pointerdown or action click", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
-  const previousSetTimeout = globalThis.setTimeout;
-  const previousClearTimeout = globalThis.clearTimeout;
   try {
+    const docListeners = new Map();
     globalThis.document = {
       querySelector() {
         return null;
+      },
+      addEventListener(type, fn) {
+        docListeners.set(type, [...(docListeners.get(type) || []), fn]);
+      },
+      removeEventListener(type, fn) {
+        docListeners.set(type, (docListeners.get(type) || []).filter(item => item !== fn));
       },
     };
     globalThis.window = {
@@ -1178,6 +1183,8 @@ test("importer workspace history add-package menu auto-hides on leave and closes
         return "";
       },
       dispatchEvent() {},
+      addEventListener() {},
+      removeEventListener() {},
       localStorage: {
         getItem() {
           return JSON.stringify([{ path: "D:/ws", lastUsedAt: 1770000000000 }]);
@@ -1186,31 +1193,13 @@ test("importer workspace history add-package menu auto-hides on leave and closes
       },
     };
 
-    const timers = [];
-    globalThis.setTimeout = (callback, delay) => {
-      const timer = { callback, delay, cancelled: false };
-      timers.push(timer);
-      return timer;
-    };
-    globalThis.clearTimeout = (timer) => {
-      if (timer) {
-        timer.cancelled = true;
-      }
-    };
-    const runTimers = () => {
-      for (const timer of timers.splice(0)) {
-        if (!timer.cancelled) {
-          timer.callback();
-        }
-      }
-    };
-
     const recentButton = createButton();
     recentButton.dataset.recentPath = "D:/ws";
     const historyRow = createButton();
     historyRow.dataset.workspaceHistoryRowPath = "D:/ws";
     const menu = createButton();
     menu.dataset.workspaceHistoryContextMenuPath = "D:/ws";
+    menu.contains = node => node === menu;
     const importAddPackageButton = createButton();
     importAddPackageButton.dataset.workspaceImportAddPackagePath = "D:/ws";
     const host = createHost({
@@ -1253,16 +1242,13 @@ test("importer workspace history add-package menu auto-hides on leave and closes
     recentButton.contextmenu({ clientX: 12, clientY: 24 });
     bindImporterPage(host, store);
     historyRow.pointerleave();
-    assert.equal(timers[0]?.delay, 400);
     assert.equal(store.getState().importer.workspaceContextMenu.open, true);
-    runTimers();
+
+    for (const listener of docListeners.get("pointerdown") || []) listener({ target: { closest: () => null } });
     assert.equal(store.getState().importer.workspaceContextMenu, null);
 
     recentButton.contextmenu({ clientX: 12, clientY: 24 });
     bindImporterPage(host, store);
-    historyRow.pointerleave();
-    menu.pointerenter();
-    runTimers();
     assert.equal(store.getState().importer.workspaceContextMenu.open, true);
 
     await importAddPackageButton.click();
@@ -1270,8 +1256,6 @@ test("importer workspace history add-package menu auto-hides on leave and closes
   } finally {
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;
-    globalThis.setTimeout = previousSetTimeout;
-    globalThis.clearTimeout = previousClearTimeout;
   }
 });
 

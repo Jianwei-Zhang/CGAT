@@ -2,7 +2,7 @@ import { projectIcon } from "../project-icons.js";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderLibraryTree, renderImportPartition, renderLibraryDialog, renderLibraryMenu, bindProjectLibrary } from "../project-library-view.js";
+import { renderLibraryTree, renderLibrarySearch, renderImportPartition, renderLibraryDialog, renderLibraryMenu, bindProjectLibrary } from "../project-library-view.js";
 import { renderProjectsBody } from "../projects-view.js";
 import { getMessages } from "../../i18n/index.js";
 import { readProjectLibrary, saveProjectLibrary, projectPartition } from "../../../services/project-library.js";
@@ -254,3 +254,59 @@ test("library menus use visible content width without changing the project conte
   const overlays = readFileSync(new URL("../../../styles/overlays.css", import.meta.url), "utf8");
   assert.match(overlays, /\.workspace-history-context-menu\s*\{[^}]*min-width: min\(224px,[^}]*max-width: calc\(100vw - 16px\)/);
 });
+
+test("folder rows show recursive assembly counts, open/closed folder icons, danger delete menu and search filtering", () => {
+  const records = [{ path: "/z", projectName: "zh97", partitionId: "rice" }, { path: "/m", projectName: "mh63", partitionId: "rice" }, { path: "/old", projectName: "Legacy" }];
+  const markup = renderLibraryTree(state("zh"), records, library);
+  assert.match(markup, /data-library-group="plants"[\s\S]*?<small class="library-folder-count" aria-hidden="true">2<\/small>/);
+  assert.match(markup, /data-library-group="rice"[\s\S]*?<small class="library-folder-count" aria-hidden="true">2<\/small>/);
+  assert.match(markup, /library-icon-closed[\s\S]*library-icon-open/);
+  assert.match(markup, /library-icon-system/);
+  assert.match(markup, /data-library-quick-add="plants"/);
+
+  const folderMenu = renderLibraryMenu(state("zh", { libraryMenu: { id: "plants" } }));
+  assert.match(folderMenu, /context-menu-item is-danger[^>]*data-library-action="delete"/);
+
+  const searchBar = renderLibrarySearch(state("zh", { libraryQuery: "mh63" }), records, library);
+  assert.match(searchBar, /data-library-search value="mh63"/);
+  const filtered = renderLibraryTree(state("zh", { libraryQuery: "mh63" }), records, library);
+  assert.match(filtered, /aria-expanded="true" data-library-group="plants"/);
+  assert.match(filtered, /data-library-group="animals"[^>]*hidden/);
+  assert.match(filtered, /data-library-search-empty hidden/);
+
+  const emptySearch = renderLibraryTree(state("zh", { libraryQuery: "no-such-item" }), records, library);
+  assert.doesNotMatch(emptySearch, /data-library-search-empty hidden/);
+
+  const createDialog = renderLibraryDialog(state("en", { libraryDialog: { kind: "create", parentId: "plants" } }));
+  assert.match(createDialog, /<form[^>]*autocomplete="off"/);
+  assert.match(createDialog, /<input id="library-name"[^>]*autocomplete="off"/);
+
+  const inlineRename = renderLibraryTree(state("zh", { libraryRenamingId: "rice" }), records, library);
+  assert.match(inlineRename, /data-library-inline-rename-form="rice"[^>]*autocomplete="off"/);
+  assert.match(inlineRename, /data-library-inline-rename="rice"[^>]*autocomplete="off"/);
+});
+
+test("inline folder rename commits valid changes, rejects duplicates and cancels cleanly on Escape", () => withStorage(() => {
+  const s = store(state("zh", { libraryRenamingId: "rice" }));
+  const input = button({ value: "籼稻" });
+  const form = button({ dataset: { libraryInlineRenameForm: "rice" }, querySelector: () => input });
+  bindProjectLibrary(host({ "[data-library-inline-rename-form]": form }), s, { refresh() {}, openImport() {}, openProjectMenu() {} });
+  form.fire("submit");
+  assert.equal(readProjectLibrary().partitions.find(node => node.id === "rice").name, "籼稻");
+  assert.equal(s.getState().importer.libraryRenamingId, "");
+
+  s.setState({ importer: { ...s.getState().importer, libraryRenamingId: "rice", libraryRenameError: "" } });
+  const dupInput = button({ value: "小麦" });
+  const dupForm = button({ dataset: { libraryInlineRenameForm: "rice" }, querySelector: () => dupInput });
+  bindProjectLibrary(host({ "[data-library-inline-rename-form]": dupForm }), s, { refresh() {}, openImport() {}, openProjectMenu() {} });
+  dupForm.fire("submit");
+  assert.equal(s.getState().importer.libraryRenameError, "duplicate");
+  assert.equal(readProjectLibrary().partitions.find(node => node.id === "rice").name, "籼稻");
+
+  const escInput = button({ value: "cancelled" });
+  const escForm = button({ dataset: { libraryInlineRenameForm: "rice" }, querySelector: () => escInput });
+  bindProjectLibrary(host({ "[data-library-inline-rename-form]": escForm }), s, { refresh() {}, openImport() {}, openProjectMenu() {} });
+  escInput.fire("keydown", { key: "Escape" });
+  assert.equal(s.getState().importer.libraryRenamingId, "");
+  assert.equal(readProjectLibrary().partitions.find(node => node.id === "rice").name, "籼稻");
+}));

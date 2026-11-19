@@ -2,7 +2,6 @@ import { bindProjectLibrary, libraryLabels } from "./project-library-view.js";
 import { moveProjectToPartition, revealProjectPartition } from "../../services/project-library.js";
 import { releaseProjectPathOverview } from "./project-export-page.js";
 import { prepareProjectOverviewSources } from "./project-overview-preparation.js";
-import { FLOATING_MENU_CLOSE_DELAY_MS } from "./floating-menu-runtime.js";
 import { archiveImportForm, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../../services/project-drop-controller.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory, workspacePathIdentity } from "../../services/workspace-history.js";
 import {
@@ -397,14 +396,6 @@ export function bindImporterPage(host, store, { preserveWorkspaceDetail = false 
     row.addEventListener("contextmenu", event => {
       openWorkspaceContextMenu(event, row.dataset.workspaceHistoryRowPath, host, store);
     });
-    row.addEventListener("pointerenter", () => {
-      const workspacePath = String(row.dataset.workspaceHistoryRowPath || "").trim();
-      cancelWorkspaceContextMenuClose(workspacePath, store);
-    });
-    row.addEventListener("pointerleave", () => {
-      const workspacePath = String(row.dataset.workspaceHistoryRowPath || "").trim();
-      scheduleWorkspaceContextMenuClose(host, store, workspacePath);
-    });
   });
 
   historyDeleteButtons.forEach((button) => {
@@ -417,11 +408,49 @@ export function bindImporterPage(host, store, { preserveWorkspaceDetail = false 
     });
   });
 
+  workspaceMenuCleanups.get(host)?.();
+  workspaceMenuCleanups.delete(host);
   // Measure the expanded menu so all actions remain reachable near window edges.
   const menuBounds = workspaceContextMenu?.getBoundingClientRect?.();
   if (menuBounds) {
-    workspaceContextMenu.style.left = `${Math.max(8, Math.min(menuBounds.left, window.innerWidth - menuBounds.width - 8))}px`;
-    workspaceContextMenu.style.top = `${Math.max(8, Math.min(menuBounds.top, window.innerHeight - menuBounds.height - 8))}px`;
+    const menuState = store.getState().importer?.workspaceContextMenu;
+    const rawLeft = menuState?.alignRight ? menuBounds.left - menuBounds.width : menuBounds.left;
+    let rawTop = menuBounds.top;
+    if (menuState?.anchorTop != null && rawTop + menuBounds.height > window.innerHeight - 8 && menuState.anchorTop - menuBounds.height - 4 >= 8) {
+      rawTop = menuState.anchorTop - menuBounds.height - 4;
+    }
+    workspaceContextMenu.style.left = `${Math.max(8, Math.min(rawLeft, window.innerWidth - menuBounds.width - 8))}px`;
+    workspaceContextMenu.style.top = `${Math.max(8, Math.min(rawTop, window.innerHeight - menuBounds.height - 8))}px`;
+  }
+  if (workspaceContextMenu) {
+    const doc = workspaceContextMenu.ownerDocument || globalThis.document;
+    const view = doc?.defaultView || globalThis.window;
+    const scroller = host.querySelector(".project-recent-list");
+    const dismissMenu = () => {
+      workspaceMenuCleanups.get(host)?.();
+      workspaceMenuCleanups.delete(host);
+      updateImporterState(store, { workspaceContextMenu: null });
+      workspaceContextMenu.remove?.();
+    };
+    const onOutsidePointerDown = event => {
+      if (workspaceContextMenu.contains?.(event.target)) return;
+      if (event.target?.closest?.("[data-library-project-menu]")) return;
+      dismissMenu();
+    };
+    const cleanup = () => {
+      doc?.removeEventListener?.("pointerdown", onOutsidePointerDown, true);
+      view?.removeEventListener?.("blur", dismissMenu);
+      view?.removeEventListener?.("resize", dismissMenu);
+      scroller?.removeEventListener?.("scroll", dismissMenu);
+    };
+    doc?.addEventListener?.("pointerdown", onOutsidePointerDown, true);
+    view?.addEventListener?.("blur", dismissMenu);
+    view?.addEventListener?.("resize", dismissMenu);
+    scroller?.addEventListener?.("scroll", dismissMenu);
+    workspaceMenuCleanups.set(host, cleanup);
+    workspaceContextMenu.addEventListener("focusout", event => {
+      if (event.relatedTarget && !workspaceContextMenu.contains?.(event.relatedTarget)) dismissMenu();
+    });
   }
   workspaceContextMenu?.addEventListener("keydown", event => {
     if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
@@ -441,16 +470,6 @@ export function bindImporterPage(host, store, { preserveWorkspaceDetail = false 
   });
   workspaceContextMenu?.addEventListener("click", (event) => {
     event.stopPropagation?.();
-  });
-  workspaceContextMenu?.addEventListener("pointerenter", () => {
-    cancelWorkspaceContextMenuClose(workspaceContextMenu.dataset.workspaceHistoryContextMenuPath || "", store);
-  });
-  workspaceContextMenu?.addEventListener("pointerleave", () => {
-    scheduleWorkspaceContextMenuClose(
-      host,
-      store,
-      workspaceContextMenu.dataset.workspaceHistoryContextMenuPath || "",
-    );
   });
 
   importAddPackageMenuButtons.forEach((importAddPackageMenuButton) => importAddPackageMenuButton.addEventListener("click", async (event) => {
@@ -1740,30 +1759,7 @@ function normalizeAddPackageHintNames(value) {
     .filter(Boolean);
 }
 
-let workspaceContextMenuCloseTimer = null;
-
-function cancelWorkspaceContextMenuClose(workspacePath = "", store = null) {
-  const currentPath = store?.getState?.().importer?.workspaceContextMenu?.workspacePath || "";
-  if (workspacePath && currentPath && String(workspacePath) !== String(currentPath)) {
-    return;
-  }
-  if (workspaceContextMenuCloseTimer) {
-    clearTimeout(workspaceContextMenuCloseTimer);
-    workspaceContextMenuCloseTimer = null;
-  }
-}
-
-function scheduleWorkspaceContextMenuClose(host, store, workspacePath = "") {
-  const currentPath = store.getState().importer?.workspaceContextMenu?.workspacePath || "";
-  if (!currentPath || (workspacePath && String(workspacePath) !== String(currentPath))) {
-    return;
-  }
-  cancelWorkspaceContextMenuClose(currentPath, store);
-  workspaceContextMenuCloseTimer = setTimeout(() => {
-    workspaceContextMenuCloseTimer = null;
-    closeWorkspaceContextMenu(host, store, currentPath);
-  }, FLOATING_MENU_CLOSE_DELAY_MS);
-}
+const workspaceMenuCleanups = new WeakMap();
 
 function closeWorkspaceContextMenu(host, store, workspacePath = "") {
   const current = store.getState();
@@ -1771,20 +1767,26 @@ function closeWorkspaceContextMenu(host, store, workspacePath = "") {
   if (!contextMenu.open || (workspacePath && String(contextMenu.workspacePath || "") !== String(workspacePath))) {
     return;
   }
-  cancelWorkspaceContextMenuClose(contextMenu.workspacePath || "", store);
+  workspaceMenuCleanups.get(host)?.();
+  workspaceMenuCleanups.delete(host);
   updateImporterState(store, { workspaceContextMenu: null });
-  rerender(host, store, { preserveWorkspaceDetail: true });
+  const existing = host?.querySelector?.("[data-workspace-history-context-menu='1']");
+  if (existing?.remove) existing.remove();
+  else rerender(host, store, { preserveWorkspaceDetail: true });
 }
 
 function openWorkspaceContextMenu(event, path, host, store) {
   event.preventDefault?.();
   const workspacePath = String(path || "").trim();
   if (!workspacePath || projectEntryBusy(store.getState())) return;
-  cancelWorkspaceContextMenuClose("", store);
+  workspaceMenuCleanups.get(host)?.();
+  workspaceMenuCleanups.delete(host);
   updateImporterState(store, { libraryMenu: null, workspaceContextMenu: {
     open: true, workspacePath,
     x: Number.isFinite(Number(event.clientX)) ? Number(event.clientX) : 0,
     y: Number.isFinite(Number(event.clientY)) ? Number(event.clientY) : 0,
+    alignRight: Boolean(event.alignRight),
+    anchorTop: Number.isFinite(Number(event.anchorTop)) ? Number(event.anchorTop) : undefined,
   } });
   rerender(host, store, { preserveWorkspaceDetail: true });
   host.querySelector("[data-workspace-history-context-menu='1']")?.querySelector?.('[role="menuitem"]:not(:disabled)')?.focus?.({ preventScroll: true });
@@ -1796,18 +1798,18 @@ function renderWorkspaceHistoryContextMenu(contextMenu, messages, state) {
   const path = escapeAttr(String(contextMenu.workspacePath || "").trim());
   const labels = projectLabels(state);
   const disabled = projectEntryBusy(state) ? "disabled" : "";
-  const item = (attribute, label, danger = false) => `<button type="button" role="menuitem" class="context-menu-item${danger ? " is-danger" : ""}" ${attribute}="${path}" ${disabled}>${escapeHtml(label)}</button>`;
+  const item = (attribute, icon, label, danger = false) => `<button type="button" role="menuitem" class="context-menu-item${danger ? " is-danger" : ""}" ${attribute}="${path}" ${disabled}>${projectIcon(icon)}<span>${escapeHtml(label)}</span></button>`;
   return `
     <div class="context-menu workspace-history-context-menu" role="menu" aria-label="${escapeAttr(labels.recent)}" data-workspace-history-context-menu="1" data-workspace-history-context-menu-path="${path}" style="left: ${left}px; top: ${top}px;">
-      ${item("data-project-open-path", labels.open)}
-      ${item("data-project-reveal-path", labels.openLocation)}
+      ${item("data-project-open-path", "open", labels.open)}
+      ${item("data-project-reveal-path", "externalLink", labels.openLocation)}
       <div class="workspace-history-context-menu-separator" role="separator"></div>
-      ${item("data-project-rename-path", labels.rename)}
-      ${item("data-project-move-path", libraryLabels(state).move)}
-      ${item("data-workspace-import-add-package-path", messages.buttons.importAddPackage)}
-      ${item("data-project-copy", messages.buttons.copyProject)}
+      ${item("data-project-rename-path", "rename", labels.rename)}
+      ${item("data-project-move-path", "arrow", libraryLabels(state).move)}
+      ${item("data-workspace-import-add-package-path", "addPackage", messages.buttons.importAddPackage)}
+      ${item("data-project-copy", "copy", messages.buttons.copyProject)}
       <div class="workspace-history-context-menu-separator" role="separator"></div>
-      ${item("data-project-delete-files", labels.delete, true)}
+      ${item("data-project-delete-files", "delete", labels.delete, true)}
     </div>
   `;
 }

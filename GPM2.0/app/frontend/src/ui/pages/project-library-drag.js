@@ -1,9 +1,12 @@
 import { readProjectLibrary, partitionAncestors } from "../../services/project-library.js";
+import { projectIcon } from "./project-icons.js";
+
+const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
 export function canDropLibraryItem(library, source, target, root = false) {
   if (library.error || !source || (root && source.kind !== "folder")) return false;
   if (target && !library.partitions.some(node => node.id === target)) return false;
-  if (source.kind === "project") return true;
+  if (source.kind === "project") return source.partitionId === undefined || source.partitionId !== target;
   const node = library.partitions.find(item => item.id === source.id);
   return Boolean(node && (root || target) && node.parentId !== target
     && !partitionAncestors(library, target).some(item => item.id === source.id));
@@ -17,11 +20,23 @@ export function bindLibraryPointerDrag(host, { busy, move, error, toggle }) {
   if (!tree) return;
   const doc = tree.ownerDocument, view = doc.defaultView;
   let drag = null, hoverTimer = null, frame = null, suppressClick = false, observer;
+  const updateGhost = (targetLabel = "") => {
+    if (!drag?.ghost) return;
+    if (typeof drag.ghost.setAttribute !== "function") {
+      drag.ghost.textContent = drag.label;
+      return;
+    }
+    const icon = projectIcon(drag.source.kind === "folder" ? "folder" : "project");
+    const dest = targetLabel ? `<span class="library-drag-ghost-target">→ ${html(targetLabel)}</span>` : "";
+    drag.ghost.classList?.toggle?.("is-valid-drop", Boolean(targetLabel));
+    drag.ghost.innerHTML = `${icon}<span class="library-drag-ghost-label">${html(drag.label)}</span>${dest}`;
+  };
   const clearTarget = () => {
     if (hoverTimer) view.clearTimeout(hoverTimer);
     hoverTimer = null;
-    drag?.target?.classList.remove("is-drop-target");
-    if (drag) { drag.target = null; drag.targetId = null; }
+    drag?.target?.classList?.remove?.("is-drop-target");
+    drag?.group?.classList?.remove?.("is-drop-group");
+    if (drag) { drag.target = null; drag.group = null; drag.targetId = null; updateGhost(""); }
   };
   const finish = commit => {
     if (!drag) return;
@@ -29,7 +44,9 @@ export function bindLibraryPointerDrag(host, { busy, move, error, toggle }) {
     clearTarget(); drag = null;
     if (frame) view.cancelAnimationFrame(frame);
     frame = null; previous.ghost?.remove();
+    previous.row?.classList?.remove?.("is-drag-source");
     tree.classList.remove("is-dragging");
+    tree.classList.remove("is-dragging-folder");
     doc.removeEventListener("keydown", onEscape, true);
     view.removeEventListener("blur", onBlur);
     if (tree.hasPointerCapture?.(previous.pointerId)) tree.releasePointerCapture(previous.pointerId);
@@ -43,16 +60,32 @@ export function bindLibraryPointerDrag(host, { busy, move, error, toggle }) {
   const targetAt = () => {
     if (!drag?.active) return;
     const hit = doc.elementFromPoint(drag.x, drag.y);
-    const target = hit?.closest("[data-library-folder], [data-library-drop-root]");
-    const root = target?.hasAttribute("data-library-drop-root");
-    const id = root ? "" : target?.dataset.libraryFolder;
-    const valid = target && host.contains(target) && canDropLibraryItem(readProjectLibrary(), drag.source, id, root);
+    let target = hit?.closest("[data-library-folder], [data-library-drop-root]");
+    let group = null;
+    if (!target) {
+      const hitGroup = hit?.closest?.("[data-library-group]");
+      if (hitGroup && host.contains(hitGroup)) {
+        const folderRow = hitGroup.querySelector?.(":scope > [data-library-folder]") || hitGroup.querySelector?.("[data-library-folder]");
+        if (folderRow) { target = folderRow; group = hitGroup; }
+      }
+    } else if (!target.hasAttribute?.("data-library-drop-root")) {
+      group = target.closest?.("[data-library-group]") || null;
+    }
+    const root = Boolean(target?.hasAttribute?.("data-library-drop-root"));
+    const id = root ? "" : target?.dataset?.libraryFolder;
+    const valid = Boolean(target && host.contains(target) && canDropLibraryItem(readProjectLibrary(), drag.source, id, root));
     drag.destination = valid ? id : null;
     if (drag.target === (valid ? target : null)) return;
     clearTarget();
     if (valid) {
-      drag.target = target; drag.targetId = id; target.classList.add("is-drop-target");
-      if (!root && target.closest("[data-library-group]")?.getAttribute("aria-expanded") === "false") {
+      drag.target = target; drag.group = root ? null : group; drag.targetId = id;
+      target.classList.add("is-drop-target");
+      if (!root) group?.classList?.add?.("is-drop-group");
+      const targetLabel = root
+        ? (target.dataset?.libraryDropRootLabel || target.querySelector?.(".project-recents-title-label, span")?.textContent || "")
+        : (target.querySelector?.(".library-folder-name span")?.textContent || "");
+      updateGhost(targetLabel);
+      if (!root && group?.getAttribute?.("aria-expanded") === "false") {
         hoverTimer = view.setTimeout(() => {
           if (drag?.target !== target) return;
           try { toggle(id, true); } catch (cause) { finish(false); error(cause); }
@@ -72,11 +105,17 @@ export function bindLibraryPointerDrag(host, { busy, move, error, toggle }) {
   tree.addEventListener("dragstart", event => event.preventDefault());
   tree.addEventListener("pointerdown", event => {
     if (event.button !== 0 || event.isPrimary === false || busy() || event.pointerType === "touch") return;
+    if (event.target?.tagName === "INPUT" || event.target?.tagName === "TEXTAREA") return;
     if (!event.target.closest("[data-recent-path], [data-library-select]")) return;
     const row = event.target.closest("[data-library-drag-project], [data-library-drag-folder]");
     if (!row) return;
+    const isProject = row.hasAttribute("data-library-drag-project");
+    const source = isProject
+      ? { kind: "project", id: row.dataset.libraryDragProject, ...(row.dataset.libraryPartitionId !== undefined ? { partitionId: row.dataset.libraryPartitionId } : {}) }
+      : { kind: "folder", id: row.dataset.libraryDragFolder };
+    const isNestedFolder = source.kind === "folder" && Boolean(readProjectLibrary().partitions.find(item => item.id === source.id)?.parentId);
     drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY,
-      source: row.hasAttribute("data-library-drag-project") ? { kind: "project", id: row.dataset.libraryDragProject } : { kind: "folder", id: row.dataset.libraryDragFolder },
+      row, source, isNestedFolder,
       label: row.querySelector("strong, .library-folder-name span")?.textContent || "", active: false, destination: null };
     doc.addEventListener("keydown", onEscape, true); view.addEventListener("blur", onBlur);
   });
@@ -88,8 +127,12 @@ export function bindLibraryPointerDrag(host, { busy, move, error, toggle }) {
     event.preventDefault();
     if (!drag.active) {
       if (busy()) { finish(false); return; }
-      drag.active = true; tree.setPointerCapture?.(event.pointerId); tree.classList.add("is-dragging");
-      drag.ghost = doc.createElement("div"); drag.ghost.className = "library-drag-ghost"; drag.ghost.textContent = drag.label;
+      drag.active = true; tree.setPointerCapture?.(event.pointerId);
+      drag.row?.classList?.add?.("is-drag-source");
+      tree.classList.add("is-dragging");
+      if (drag.isNestedFolder) tree.classList.add("is-dragging-folder");
+      drag.ghost = doc.createElement("div"); drag.ghost.className = "library-drag-ghost";
+      updateGhost("");
       doc.body.append(drag.ghost); frame = view.requestAnimationFrame(tick);
     }
     drag.ghost.style.left = `${event.clientX + 14}px`; drag.ghost.style.top = `${event.clientY + 12}px`;

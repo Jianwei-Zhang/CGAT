@@ -14,6 +14,8 @@ export const libraryLabels = state => state.locale === "en" ? {
   name: "Project name", parent: "Parent project", rename: "Rename project", move: "Move to…", remove: "Delete project",
   importHere: "Import here", cancel: "Cancel", save: "Save", confirmMove: "Move", actions: "Actions", select: "Select an assembly",
   selectHint: "Open an assembly from the library, or import a new one.", collapse: "Collapse all", expand: "Expand all",
+  searchPlaceholder: "Filter projects or assemblies…", clearSearch: "Clear filter", noMatches: "No matching projects or assemblies",
+  dropToRoot: "Drop here to move to library root",
   importHint: "Leave the project unselected to import into Unassigned. Assembly files stay in their original location.",
   deleteHint: "This project and all its subprojects will be deleted. Their assemblies will move to Unassigned; no assembly files will be deleted.",
   deleteImpact: "Projects to delete: {partitions} (including this project). Assemblies to move: {projects}.",
@@ -25,6 +27,8 @@ export const libraryLabels = state => state.locale === "en" ? {
   name: "项目名称", parent: "上级项目", rename: "重命名项目", move: "移动到…", remove: "删除项目",
   importHere: "导入到此项目", cancel: "取消", save: "保存", confirmMove: "移动", actions: "操作", select: "选择一个组装",
   selectHint: "从左侧项目库打开组装，或导入新组装。", collapse: "全部折叠", expand: "全部展开",
+  searchPlaceholder: "筛选项目或组装…", clearSearch: "清除筛选", noMatches: "没有匹配的项目或组装",
+  dropToRoot: "拖放到此处移至项目库根层级",
   importHint: "不选择项目时，导入到“未分配”。项目不改变组装文件的存储位置。",
   deleteHint: "删除此项目及其所有子项目，内部组装全部移到“未分配”，不会删除组装文件。",
   deleteImpact: "将删除 {partitions} 个项目（含当前项目），移动 {projects} 个组装。",
@@ -32,6 +36,17 @@ export const libraryLabels = state => state.locale === "en" ? {
     missing: "组装或项目已不存在，请重新选择目标位置。", cycle: "不能把项目移动到自身或其子项目中。",
     duplicate: "此位置已存在同名项目。" },
 };
+
+export function renderLibrarySearch(state, records, library = readProjectLibrary()) {
+  const query = String(state.importer?.libraryQuery || "");
+  if (!records.length && !library.partitions.length && !query) return "";
+  const labels = libraryLabels(state);
+  return `<div class="library-search">
+    ${projectIcon("search", "library-search-icon")}
+    <input type="search" class="library-search-input" data-library-search value="${html(query)}" placeholder="${html(labels.searchPlaceholder)}" aria-label="${html(labels.searchPlaceholder)}" autocomplete="off" spellcheck="false" />
+    <button type="button" class="library-search-clear" data-library-search-clear aria-label="${html(labels.clearSearch)}" ${query ? "" : "hidden"}>${projectIcon("close")}</button>
+  </div>`;
+}
 
 export function partitionOptions(library, selected, rootLabel, excludeId = "") {
   return `<option value="">${html(rootLabel)}</option>` + partitionChoices(library, excludeId)
@@ -46,9 +61,14 @@ export function renderImportPartition(state) {
     </div><p id="import-partition-hint" class="project-path muted">${labels.importHint}</p>`;
 }
 
+const menuCleanups = new WeakMap();
+
 export function renderLibraryTree(state, records, library = readProjectLibrary()) {
   const labels = libraryLabels(state), busy = projectEntryBusy(state), disabled = busy ? "disabled" : "";
   const activePath = workspacePathIdentity(state.session?.workspacePath);
+  const query = String(state.importer?.libraryQuery || "").trim().toLowerCase();
+  const renamingId = String(state.importer?.libraryRenamingId || "");
+  const renameError = String(state.importer?.libraryRenameError || "");
   const folders = new Map(), projects = new Map();
   const recordIndices = new Map(records.map((record, index) => [record, index]));
   for (const node of library.partitions) {
@@ -63,31 +83,81 @@ export function renderLibraryTree(state, records, library = readProjectLibrary()
   const projectName = record => (workspacePathIdentity(record.path) === activePath && state.session?.projectName)
     || record.projectName || defaultProjectName(record.path);
   const sortedProjects = id => [...(projects.get(id) || [])].sort((a, b) => projectName(a).localeCompare(projectName(b), state.locale, { numeric: true }));
-  const row = (record, level) => {
-    const active = workspacePathIdentity(record.path) === activePath;
-    const failed = state.importer.historyValidation?.[record.path]?.ok === false;
-    return `<div role="treeitem" aria-level="${level}" aria-selected="${active}" class="project-recent-row ${active ? "is-active" : ""}${failed ? " has-validation-error" : ""}" data-workspace-history-row-path="${html(record.path)}" data-library-drag-project="${html(record.path)}" style="--library-depth:${level - 1}">
-      <button class="project-recent-open" data-recent-index="${recordIndices.get(record)}" data-recent-path="${html(record.path)}" aria-current="${active}" data-app-tooltip="${html(record.path)}" ${disabled}>
-        <span class="project-recent-name">${projectIcon("project")}<strong>${html(projectName(record))}</strong></span>
-      </button><button type="button" class="library-row-menu" data-library-project-menu="${html(record.path)}" aria-label="${html(labels.actions)}: ${html(projectName(record))}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
-    </div>`;
+  const totalCountMemo = new Map();
+  const subtreeCount = (id, system = false) => {
+    const key = system ? "__root__" : id;
+    if (totalCountMemo.has(key)) return totalCountMemo.get(key);
+    let count = (projects.get(id) || []).length;
+    if (!system) {
+      for (const child of folders.get(id) || []) count += subtreeCount(child.id, false);
+    }
+    totalCountMemo.set(key, count);
+    return count;
   };
-  const group = (id, name, level, system = false) => {
+  let anyVisible = false;
+  const row = (record, level, partitionId, forceVisible) => {
+    const active = workspacePathIdentity(record.path) === activePath;
+    const validation = state.importer.historyValidation?.[record.path];
+    const failed = validation?.ok === false;
+    const name = projectName(record);
+    const searchText = `${name}\n${record.path}`;
+    const visible = !query || forceVisible || searchText.toLowerCase().includes(query);
+    if (visible) anyVisible = true;
+    const tooltip = failed && validation?.message ? `${record.path} — ${validation.message}` : record.path;
+    return {
+      visible,
+      markup: `<div role="treeitem" aria-level="${level}" aria-selected="${active}" class="project-recent-row ${active ? "is-active" : ""}${failed ? " has-validation-error" : ""}" data-workspace-history-row-path="${html(record.path)}" data-library-drag-project="${html(record.path)}" data-library-partition-id="${html(partitionId)}" data-library-search-text="${html(searchText)}" style="--library-depth:${level - 1}" ${visible ? "" : "hidden"}>
+      <button class="project-recent-open" data-recent-index="${recordIndices.get(record)}" data-recent-path="${html(record.path)}" aria-current="${active}" data-app-tooltip="${html(tooltip)}" ${disabled}>
+        <span class="project-recent-name">${projectIcon("project")}<strong>${html(name)}</strong></span>
+      </button><button type="button" class="library-row-menu" data-library-project-menu="${html(record.path)}" aria-label="${html(labels.actions)}: ${html(name)}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
+    </div>`,
+    };
+  };
+  const group = (id, name, level, system = false, ancestorMatched = false) => {
     const children = [...(system ? [] : folders.get(id) || [])].sort((a, b) => a.name.localeCompare(b.name, state.locale, { numeric: true }));
     const items = sortedProjects(id);
     const hasChildren = Boolean(children.length || items.length);
-    const expanded = !library.collapsed.includes(id);
-    return `<div role="treeitem" aria-level="${level}" ${hasChildren ? `aria-expanded="${expanded}"` : ""} data-library-group="${html(id)}">
-      <div class="library-folder-row${state.importer.librarySelectedId === id ? " is-selected" : ""}" data-library-folder="${html(id)}" ${system ? "" : `data-library-drag-folder="${html(id)}"`} style="--library-depth:${level - 1}">
+    const totalCount = subtreeCount(id, system);
+    const selfMatch = Boolean(query && name.toLowerCase().includes(query));
+    const childForceVisible = ancestorMatched || (selfMatch && !system);
+    const renderedChildren = children.map(node => group(node.id, node.name, level + 1, false, childForceVisible));
+    const renderedItems = items.map(record => row(record, level + 1, id, childForceVisible));
+    const visible = !query || renderedChildren.some(child => child.visible) || renderedItems.some(item => item.visible)
+      || (selfMatch && (!system || items.length > 0));
+    if (visible) anyVisible = true;
+    const expanded = query ? visible : !library.collapsed.includes(id);
+    const renaming = !system && renamingId === id;
+    const folderIcon = system
+      ? projectIcon("inbox", "library-icon-system")
+      : `${projectIcon("folder", "library-icon-closed")}${projectIcon("open", "library-icon-open")}`;
+    const quickLabel = system ? labels.importHere : labels.child;
+    const rowContent = renaming
+      ? `<form class="library-inline-rename" data-library-inline-rename-form="${html(id)}" autocomplete="off">${projectIcon("folder", "library-icon-closed")}<input type="text" class="library-inline-rename-input" data-library-inline-rename="${html(id)}" value="${html(name)}" maxlength="120" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="${html(labels.rename)}" /></form>`
+      : `<button type="button" class="library-folder-name" data-library-select="${html(id)}" data-app-tooltip="${html(name)}" data-app-tooltip-overflow="span">${folderIcon}<span>${html(name)}</span>${totalCount > 0 ? `<small class="library-folder-count" aria-hidden="true">${totalCount}</small>` : ""}</button>
+        <div class="library-folder-actions">
+          <button type="button" class="library-row-action" data-library-quick-add="${html(id)}" aria-label="${html(quickLabel)}: ${html(name)}" data-app-tooltip="${html(quickLabel)}" ${disabled}>${projectIcon(system ? "import" : "plus")}</button>
+          <button type="button" class="library-row-menu" data-library-folder-menu="${html(id)}" aria-label="${html(labels.actions)}: ${html(name)}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
+        </div>`;
+    return {
+      visible,
+      markup: `<div role="treeitem" aria-level="${level}" ${hasChildren ? `aria-expanded="${expanded}"` : ""} data-library-group="${html(id)}" data-library-group-name="${html(name)}" ${system ? 'data-library-system="1"' : ""} ${visible ? "" : "hidden"}>
+      <div class="library-folder-row${system ? " is-system" : ""}${!hasChildren ? " is-empty" : ""}${renaming ? " is-renaming" : ""}${state.importer.librarySelectedId === id ? " is-selected" : ""}" data-library-folder="${html(id)}" ${system ? "" : `data-library-drag-folder="${html(id)}"`} style="--library-depth:${level - 1}">
         <button type="button" class="library-chevron ${hasChildren ? "" : "is-empty"}" data-library-toggle="${html(id)}" aria-label="${html(name)}" ${hasChildren ? `aria-expanded="${expanded}"` : 'disabled aria-hidden="true" tabindex="-1"'}>${projectIcon("chevron")}</button>
-        <button type="button" class="library-folder-name" data-library-select="${html(id)}" data-app-tooltip="${html(name)}" data-app-tooltip-overflow="span">${projectIcon(system ? "import" : "folder")}<span>${html(name)}</span></button>
-        <button type="button" class="library-row-menu" data-library-folder-menu="${html(id)}" aria-label="${html(labels.actions)}: ${html(name)}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
-      </div><div role="group" ${expanded ? "" : "hidden"}>${children.map(node => group(node.id, node.name, level + 1)).join("")}${items.map(record => row(record, level + 1)).join("")}</div>
-    </div>`;
+        ${rowContent}
+      </div>${renaming && renameError ? `<p class="library-inline-error error-text" role="alert">${html(labels.errors[renameError] || labels.errors.storage)}</p>` : ""}<div style="--library-depth:${level - 1}" role="group" ${expanded ? "" : "hidden"}>${renderedChildren.map(child => child.markup).join("")}${renderedItems.map(item => item.markup).join("")}</div>
+    </div>`,
+    };
   };
+  const rootGroups = [
+    group("", labels.unassigned, 1, true, false),
+    ...(folders.get("") || []).sort((a, b) => a.name.localeCompare(b.name, state.locale, { numeric: true })).map(node => group(node.id, node.name, 1, false, false)),
+  ];
+  const noMatchHidden = !query || anyVisible ? "hidden" : "";
   return `${library.error || state.importer.libraryError ? `<p class="error-text" role="alert">${html(labels.errors[library.error || state.importer.libraryError] || labels.errors.storage)}</p>` : ""}
     <div class="library-tree" role="tree" aria-label="${html(state.locale === "en" ? "Project library" : "项目库")}">
-    ${group("", labels.unassigned, 1, true)}${(folders.get("") || []).sort((a, b) => a.name.localeCompare(b.name, state.locale, { numeric: true })).map(node => group(node.id, node.name, 1)).join("")}</div>`;
+    ${rootGroups.map(entry => entry.markup).join("")}
+    <div class="library-search-empty" data-library-search-empty ${noMatchHidden}><p class="muted">${html(labels.noMatches)}</p><button type="button" class="button ghost" data-library-search-clear>${html(labels.clearSearch)}</button></div>
+    <div class="library-root-dropzone" data-library-drop-root data-library-drop-root-label="${html(labels.root)}" aria-hidden="true">${projectIcon("arrow")}<span>${html(labels.dropToRoot)}</span></div></div>`;
 }
 
 export function renderLibraryDialog(state) {
@@ -100,9 +170,9 @@ export function renderLibraryDialog(state) {
   const title = creating ? labels.create : dialog.kind === "rename" ? labels.rename : removing ? labels.remove : labels.move;
   const deleteError = removing ? library.error || (!node ? "missing" : "") : "";
   const impact = removing && !deleteError ? partitionDeletionImpact(library, dialog.id, readWorkspaceHistory()) : null;
-  return `<div class="modal-overlay library-dialog-overlay"><form class="modal-dialog library-dialog" role="dialog" aria-modal="true" aria-labelledby="library-dialog-title">
+  return `<div class="modal-overlay library-dialog-overlay"><form class="modal-dialog library-dialog" role="dialog" aria-modal="true" aria-labelledby="library-dialog-title" autocomplete="off">
     <h3 id="library-dialog-title">${title}</h3>
-    ${editing ? `<label for="library-name">${labels.name}</label><input id="library-name" maxlength="120" required value="${html(dialog.name ?? node?.name ?? "")}" />` : `<p class="library-dialog-subject">${html(node?.name || dialog.projectName || dialog.path || "")}</p>`}
+    ${editing ? `<label for="library-name">${labels.name}</label><input id="library-name" maxlength="120" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${html(dialog.name ?? node?.name ?? "")}" />` : `<p class="library-dialog-subject">${html(node?.name || dialog.projectName || dialog.path || "")}</p>`}
     ${removing ? `<p>${labels.deleteHint}</p>${impact ? `<p class="library-delete-impact">${labels.deleteImpact.replace("{partitions}", impact.ids.length).replace("{projects}", impact.projectCount)}</p>` : ""}` : `<label for="library-target">${editing || dialog.kind === "move-folder" ? labels.parent : labels.target}</label>
     <select id="library-target">${partitionOptions(library, dialog.parentId ?? node?.parentId ?? "", dialog.kind === "move-project" ? labels.unassigned : labels.root, dialog.id)}</select>`}
     ${dialog.error || deleteError ? `<p class="error-text" role="alert">${html(labels.errors[dialog.error || deleteError] || labels.errors.storage)}</p>` : ""}
@@ -120,19 +190,86 @@ export function renderLibraryMenu(state) {
   const icons = { create: "newPartition", validate: "validate", "delete-failed": "delete", collapse: "collapse", expand: "expand",
     import: "import", rename: "rename", "move-folder": "arrow", delete: "delete" };
   const content = (action, label) => `${projectIcon(icons[action])}<span>${html(label)}</span>`;
-  const extra = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}" data-library-overflow-action="${action}" ${overflow.includes(action) ? "" : "hidden"} ${projectEntryBusy(state) || (action !== "create" && state.importer.historyValidating) ? "disabled" : ""}>${content(action, label)}</button>`;
-  const item = (action, label) => `<button type="button" role="menuitem" class="context-menu-item" data-library-action="${action}">${content(action, label)}</button>`;
+  const extra = (action, label, danger = false) => `<button type="button" role="menuitem" class="context-menu-item${danger ? " is-danger" : ""}" data-library-action="${action}" data-library-overflow-action="${action}" ${overflow.includes(action) ? "" : "hidden"} ${projectEntryBusy(state) || (action !== "create" && state.importer.historyValidating) ? "disabled" : ""}>${content(action, label)}</button>`;
+  const item = (action, label, danger = false) => `<button type="button" role="menuitem" class="context-menu-item${danger ? " is-danger" : ""}" data-library-action="${action}">${content(action, label)}</button>`;
   return `<div class="context-menu workspace-history-context-menu" data-library-menu role="menu" aria-label="${labels.actions}" style="left:${Number(menu.x) || 0}px;top:${Number(menu.y) || 0}px">
-    ${menu.root ? `${extra("create", labels.create)}${extra("validate", messages.buttons.validateHistory)}${extra("delete-failed", messages.buttons.deleteFailedRecords)}${item("collapse", labels.collapse)}${item("expand", labels.expand)}` : `${item("import", labels.importHere)}${menu.id ? `${item("create", labels.child)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("rename", labels.rename)}${item("move-folder", labels.move)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("delete", labels.remove)}` : ""}`}</div>`;
+    ${menu.root ? `${extra("create", labels.create)}${extra("validate", messages.buttons.validateHistory)}${extra("delete-failed", messages.buttons.deleteFailedRecords, true)}${item("collapse", labels.collapse)}${item("expand", labels.expand)}` : `${item("import", labels.importHere)}${menu.id ? `${item("create", labels.child)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("rename", labels.rename)}${item("move-folder", labels.move)}<div role="separator" class="workspace-history-context-menu-separator"></div>${item("delete", labels.remove, true)}` : ""}`}</div>`;
+}
+
+function applyInPlaceLibraryFilter(host, query) {
+  const tree = host.querySelector(".library-tree");
+  if (!tree?.querySelectorAll) return;
+  const q = String(query || "").trim().toLowerCase();
+  const library = readProjectLibrary();
+  const collapsedSet = new Set(library.collapsed || []);
+  const topGroups = [...tree.querySelectorAll(":scope > [data-library-group]")];
+  let anyVisible = false;
+  const walk = (group, ancestorMatched) => {
+    const id = group.dataset.libraryGroup || "";
+    const name = String(group.dataset.libraryGroupName || "");
+    const isSystem = group.dataset.librarySystem === "1";
+    const childrenWrap = group.querySelector(":scope > [role=group]");
+    const childGroups = childrenWrap ? [...childrenWrap.querySelectorAll(":scope > [data-library-group]")] : [];
+    const directRows = childrenWrap ? [...childrenWrap.querySelectorAll(":scope > [data-workspace-history-row-path]")] : [];
+    const hasChildren = Boolean(childGroups.length || directRows.length);
+    if (!q) {
+      group.hidden = false;
+      directRows.forEach(row => { row.hidden = false; });
+      childGroups.forEach(child => walk(child, false));
+      const expanded = !collapsedSet.has(id);
+      if (hasChildren) {
+        group.setAttribute("aria-expanded", String(expanded));
+        if (childrenWrap) childrenWrap.hidden = !expanded;
+        group.querySelector("[data-library-toggle]")?.setAttribute("aria-expanded", String(expanded));
+      }
+      return true;
+    }
+    const selfMatch = name.toLowerCase().includes(q);
+    const forceChildren = ancestorMatched || (selfMatch && !isSystem);
+    let childVisible = false;
+    for (const child of childGroups) {
+      if (walk(child, forceChildren)) childVisible = true;
+    }
+    let rowVisible = false;
+    for (const row of directRows) {
+      const text = String(row.dataset.librarySearchText || "").toLowerCase();
+      const match = forceChildren || text.includes(q);
+      row.hidden = !match;
+      if (match) rowVisible = true;
+    }
+    const visible = childVisible || rowVisible || (selfMatch && (!isSystem || directRows.length > 0));
+    group.hidden = !visible;
+    if (visible && hasChildren) {
+      group.setAttribute("aria-expanded", "true");
+      if (childrenWrap) childrenWrap.hidden = false;
+      group.querySelector("[data-library-toggle]")?.setAttribute("aria-expanded", "true");
+    }
+    return visible;
+  };
+  for (const group of topGroups) {
+    if (walk(group, false)) anyVisible = true;
+  }
+  const emptyNode = tree.querySelector("[data-library-search-empty]");
+  if (emptyNode) emptyNode.hidden = !q || anyVisible;
 }
 
 export function bindProjectLibrary(host, store, { refresh, openImport, openProjectMenu }) {
+  menuCleanups.get(host)?.();
+  menuCleanups.delete(host);
   const patch = value => store.setState({ importer: { ...store.getState().importer, ...value } });
   const error = cause => { patch({ libraryError: cause.message || "storage" }); refresh(); };
   const focusRow = (attribute, value) => [...host.querySelectorAll(`[${attribute}]`)].find(row => row.getAttribute(attribute) === value)?.focus();
   const openDialog = dialog => {
-    patch({ libraryDialog: dialog, libraryMenu: null, workspaceContextMenu: null, libraryError: "" }); refresh();
+    patch({ libraryDialog: dialog, libraryMenu: null, workspaceContextMenu: null, libraryRenamingId: "", libraryRenameError: "", libraryError: "" }); refresh();
     host.querySelector("#library-name, #library-target, [data-library-dialog-close]")?.focus();
+  };
+  const startInlineRename = id => {
+    if (!id || projectEntryBusy(store.getState())) return;
+    patch({ libraryMenu: null, workspaceContextMenu: null, libraryRenamingId: id, libraryRenameError: "" });
+    refresh();
+    const input = host.querySelector("[data-library-inline-rename]");
+    input?.focus();
+    input?.select?.();
   };
   const reveal = id => {
     try {
@@ -156,33 +293,119 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
     openDialog({ kind: "create", parentId: button.dataset.libraryCreate === "import" ? store.getState().importer.importPartitionId || "" : "", forImport: button.dataset.libraryCreate === "import" });
   }));
   host.querySelector("#import-partition")?.addEventListener("change", event => patch({ importPartitionId: event.target.value }));
-  host.querySelectorAll("[data-library-project-menu]").forEach(button => button.addEventListener("click", event => {
-    const rect = button.getBoundingClientRect();
-    openProjectMenu({ preventDefault() {}, clientX: rect.left, clientY: rect.bottom }, button.dataset.libraryProjectMenu);
+  host.querySelectorAll("[data-library-quick-add]").forEach(button => button.addEventListener("click", event => {
     event.stopPropagation();
+    if (projectEntryBusy(store.getState())) return;
+    const id = button.dataset.libraryQuickAdd || "";
+    if (!id) openImport("");
+    else openDialog({ kind: "create", parentId: id });
+  }));
+  const searchInput = host.querySelector("[data-library-search]");
+  const searchClearButtons = host.querySelectorAll("[data-library-search-clear]");
+  const updateSearch = value => {
+    patch({ libraryQuery: value });
+    if (searchInput && searchInput.value !== value) searchInput.value = value;
+    const inlineClear = host.querySelector(".library-search [data-library-search-clear]");
+    if (inlineClear) inlineClear.hidden = !value;
+    applyInPlaceLibraryFilter(host, value);
+  };
+  searchInput?.addEventListener("input", event => updateSearch(event.target.value));
+  searchInput?.addEventListener("keydown", event => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape" && searchInput.value) {
+      event.preventDefault();
+      updateSearch("");
+    } else if (event.key === "Enter") {
+      const first = [...host.querySelectorAll(".library-tree [data-recent-path], .library-tree [data-library-select]")].find(node => !node.closest("[hidden]"));
+      if (first) { event.preventDefault(); first.focus(); }
+    }
+  });
+  searchClearButtons.forEach(button => button.addEventListener("click", () => {
+    updateSearch("");
+    searchInput?.focus();
+  }));
+  host.querySelectorAll("[data-library-project-menu]").forEach(button => button.addEventListener("click", event => {
+    const path = button.dataset.libraryProjectMenu;
+    const current = store.getState().importer.workspaceContextMenu;
+    event.stopPropagation();
+    if (current?.open && current.workspacePath === path && current.alignRight) {
+      patch({ workspaceContextMenu: null });
+      host.querySelector("[data-workspace-history-context-menu='1']")?.remove?.();
+      return;
+    }
+    const rect = button.getBoundingClientRect();
+    openProjectMenu({ preventDefault() {}, clientX: rect.right, clientY: rect.bottom + 4, alignRight: true, anchorTop: rect.top }, path);
   }));
   host.querySelectorAll("[data-project-move-path]").forEach(button => button.addEventListener("click", () => {
     if (projectEntryBusy(store.getState())) return;
     const record = readWorkspaceHistory().find(item => item.path === button.dataset.projectMovePath);
     openDialog({ kind: "move-project", path: button.dataset.projectMovePath, projectName: record?.projectName || defaultProjectName(button.dataset.projectMovePath), parentId: record ? projectPartition(readProjectLibrary(), record) : "" });
   }));
-  const showMenu = (event, id, root = false) => {
+  const showMenu = (event, id, root = false, alignRight = false) => {
     event.preventDefault(); event.stopPropagation();
     if (projectEntryBusy(store.getState())) return;
-    patch({ libraryMenu: { id, root, x: event.clientX, y: event.clientY }, workspaceContextMenu: null }); refresh();
+    const existing = store.getState().importer.libraryMenu;
+    if (alignRight && existing && Boolean(existing.root) === Boolean(root) && (existing.id || "") === (id || "")) {
+      patch({ libraryMenu: null });
+      host.querySelector("[data-library-menu]")?.remove?.();
+      return;
+    }
+    patch({ libraryMenu: { id, root, x: event.clientX, y: event.clientY, alignRight, anchorTop: event.anchorTop }, workspaceContextMenu: null }); refresh();
     host.querySelector("[data-library-menu] [role=menuitem]:not([hidden]):not(:disabled)")?.focus();
   };
   host.querySelector("[data-library-root-menu]")?.addEventListener("click", event => {
     const rect = event.currentTarget.getBoundingClientRect();
-    showMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.bottom }, "", true);
+    showMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.right, clientY: rect.bottom + 4, anchorTop: rect.top }, "", true, true);
   });
   host.querySelectorAll("[data-library-folder]").forEach(row => {
     row.addEventListener("contextmenu", event => showMenu(event, row.dataset.libraryFolder));
     row.querySelector("[data-library-folder-menu]")?.addEventListener("click", event => {
       const rect = event.currentTarget.getBoundingClientRect();
-      showMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.bottom }, row.dataset.libraryFolder);
+      showMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.right, clientY: rect.bottom + 4, anchorTop: rect.top }, row.dataset.libraryFolder, false, true);
     });
   });
+  const renameForm = host.querySelector("[data-library-inline-rename-form]");
+  if (renameForm) {
+    const id = renameForm.dataset.libraryInlineRenameForm;
+    const input = renameForm.querySelector("[data-library-inline-rename]");
+    let settled = false;
+    const cancel = () => {
+      if (settled) return;
+      settled = true;
+      patch({ libraryRenamingId: "", libraryRenameError: "" });
+      refresh();
+      focusRow("data-library-select", id);
+    };
+    const commit = (fromBlur = false) => {
+      if (settled) return;
+      const library = readProjectLibrary();
+      const currentNode = library.partitions.find(node => node.id === id);
+      if (!currentNode) { cancel(); return; }
+      const nextName = String(input?.value || "").trim();
+      if (nextName === currentNode.name || (fromBlur && !nextName)) { cancel(); return; }
+      try {
+        const next = editPartition(library, { id, name: nextName, parentId: currentNode.parentId });
+        saveProjectLibrary(next);
+        settled = true;
+        patch({ libraryRenamingId: "", libraryRenameError: "", libraryError: "" });
+        refresh();
+        focusRow("data-library-select", id);
+      } catch (cause) {
+        if (fromBlur) { cancel(); return; }
+        settled = true;
+        patch({ libraryRenameError: cause.message || "storage" });
+        refresh();
+        const retryInput = host.querySelector("[data-library-inline-rename]");
+        if (retryInput) { retryInput.value = input?.value || ""; retryInput.focus(); retryInput.select?.(); }
+      }
+    };
+    renameForm.addEventListener("submit", event => { event.preventDefault(); commit(false); });
+    input?.addEventListener("keydown", event => {
+      if (event.isComposing || event.keyCode === 229) return;
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancel(); }
+    });
+    input?.addEventListener("blur", () => commit(true));
+  }
   const toggle = (id, expand) => {
     const library = readProjectLibrary();
     const collapsed = new Set(library.collapsed);
@@ -221,6 +444,12 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
     patch({ librarySelectedId: button.dataset.librarySelect });
     try { toggle(button.dataset.librarySelect); } catch (cause) { error(cause); }
   }));
+  host.querySelectorAll("[data-recent-path]").forEach(button => button.addEventListener("click", () => {
+    if (store.getState().importer.librarySelectedId !== null) {
+      host.querySelectorAll(".library-folder-row.is-selected").forEach(row => row.classList.remove("is-selected"));
+      patch({ librarySelectedId: null });
+    }
+  }));
   host.querySelector(".library-tree")?.addEventListener("keydown", event => {
     if (!event.target.matches("[data-library-select], [data-recent-path]")) return;
     const buttons = [...host.querySelectorAll(".library-tree [data-library-select], .library-tree [data-recent-path]")].filter(button => !button.closest("[hidden]"));
@@ -238,6 +467,9 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
         } else if (event.key === "ArrowRight" && group.getAttribute("aria-expanded") === "true") buttons[index + 1]?.focus();
         else toggle(group.dataset.libraryGroup, event.key === "ArrowRight");
       } catch (cause) { error(cause); }
+    } else if (event.key === "F2" && event.target.matches("[data-library-select]") && event.target.dataset.librarySelect) {
+      event.preventDefault();
+      startInlineRename(event.target.dataset.librarySelect);
     } else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
       const rect = event.target.getBoundingClientRect(); event.preventDefault();
       const coordinates = { preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.bottom };
@@ -247,13 +479,46 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
   });
   const menu = host.querySelector("[data-library-menu]");
   if (menu) {
+    const currentMenu = store.getState().importer.libraryMenu;
     const bounds = menu.getBoundingClientRect();
-    menu.style.left = `${Math.max(8, Math.min(bounds.left, window.innerWidth - bounds.width - 8))}px`;
-    menu.style.top = `${Math.max(8, Math.min(bounds.top, window.innerHeight - bounds.height - 8))}px`;
-    const dismiss = () => { patch({ libraryMenu: null }); menu.remove(); };
-    menu.addEventListener("focusout", event => { if (!menu.contains(event.relatedTarget)) dismiss(); });
+    const rawLeft = currentMenu?.alignRight ? bounds.left - bounds.width : bounds.left;
+    let rawTop = bounds.top;
+    if (currentMenu?.anchorTop != null && rawTop + bounds.height > window.innerHeight - 8 && currentMenu.anchorTop - bounds.height - 4 >= 8) {
+      rawTop = currentMenu.anchorTop - bounds.height - 4;
+    }
+    menu.style.left = `${Math.max(8, Math.min(rawLeft, window.innerWidth - bounds.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(rawTop, window.innerHeight - bounds.height - 8))}px`;
+    const doc = menu.ownerDocument || globalThis.document;
+    const view = doc?.defaultView || globalThis.window;
+    const scroller = host.querySelector(".project-recent-list");
+    const cleanup = () => {
+      doc?.removeEventListener?.("pointerdown", onOutsidePointerDown, true);
+      view?.removeEventListener?.("blur", onDismiss);
+      view?.removeEventListener?.("resize", onDismiss);
+      scroller?.removeEventListener?.("scroll", onDismiss);
+      menuCleanups.delete(host);
+    };
+    const dismiss = () => { cleanup(); patch({ libraryMenu: null }); menu.remove(); };
+    const onDismiss = () => dismiss();
+    const onOutsidePointerDown = event => {
+      if (menu.contains(event.target)) return;
+      if (event.target?.closest?.("[data-library-root-menu], [data-library-folder-menu]")) return;
+      dismiss();
+    };
+    doc?.addEventListener?.("pointerdown", onOutsidePointerDown, true);
+    view?.addEventListener?.("blur", onDismiss);
+    view?.addEventListener?.("resize", onDismiss);
+    scroller?.addEventListener?.("scroll", onDismiss);
+    menuCleanups.set(host, cleanup);
+    menu.addEventListener("focusout", event => { if (event.relatedTarget && !menu.contains(event.relatedTarget)) dismiss(); });
     menu.addEventListener("keydown", event => {
-      if (event.key === "Escape") { event.preventDefault(); const id = store.getState().importer.libraryMenu?.id || ""; dismiss(); focusRow("data-library-select", id); }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        const current = store.getState().importer.libraryMenu;
+        dismiss();
+        if (current?.root) host.querySelector("[data-library-root-menu]")?.focus();
+        else focusRow("data-library-select", current?.id || "");
+      }
       if (["ArrowDown", "ArrowUp"].includes(event.key)) {
         event.preventDefault(); const items = [...menu.querySelectorAll("[role=menuitem]:not([hidden]):not(:disabled)")], index = items.indexOf(event.target);
         items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
@@ -263,12 +528,14 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
       const current = store.getState().importer.libraryMenu; if (!current) return;
       const action = button.dataset.libraryAction;
       if (button.hidden || button.disabled) return;
+      cleanup();
       if (["validate", "delete-failed"].includes(action)) {
         patch({ libraryMenu: null }); menu.remove();
         host.querySelector(action === "validate" ? "#validate-history-button" : "#delete-failed-history-button")?.click();
         return;
       }
       if (action === "import") { patch({ libraryMenu: null }); openImport(current.id); return; }
+      if (action === "rename") { startInlineRename(current.id); return; }
       if (["collapse", "expand"].includes(action)) {
         try { const library = readProjectLibrary(); saveProjectLibrary({ ...library, collapsed: action === "collapse" ? ["", ...library.partitions.map(node => node.id)] : [] }); patch({ libraryMenu: null }); refresh(); }
         catch (cause) { error(cause); } return;

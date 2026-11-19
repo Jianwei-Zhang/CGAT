@@ -7,9 +7,12 @@ const library = { version: 1, collapsed: [], partitions: [
   { id: "plants", name: "Plants", parentId: "" }, { id: "rice", name: "Rice", parentId: "plants" },
 ] };
 
-test("drop targets distinguish library root, unpartitioned, projects, and descendant cycles", () => {
+test("drop targets distinguish library root, unpartitioned, projects, same-partition no-ops, and descendant cycles", () => {
   assert.equal(canDropLibraryItem(library, { kind: "project", id: "/a" }, "rice"), true);
+  assert.equal(canDropLibraryItem(library, { kind: "project", id: "/a", partitionId: "rice" }, "rice"), false);
+  assert.equal(canDropLibraryItem(library, { kind: "project", id: "/a", partitionId: "rice" }, "plants"), true);
   assert.equal(canDropLibraryItem(library, { kind: "project", id: "/a" }, ""), true);
+  assert.equal(canDropLibraryItem(library, { kind: "project", id: "/a", partitionId: "" }, ""), false);
   assert.equal(canDropLibraryItem(library, { kind: "project", id: "/a" }, "", true), false);
   assert.equal(canDropLibraryItem(library, { kind: "folder", id: "plants" }, "rice"), false);
   assert.equal(canDropLibraryItem(library, { kind: "folder", id: "plants" }, "plants"), false);
@@ -46,7 +49,13 @@ function harness(fn) {
     const dispose = bindLibraryPointerDrag(host, { busy: () => busy, move: (...args) => moves.push(args), error: cause => errors.push(cause), toggle() {} });
     const start = () => tree.emit("pointerdown", { target });
     const hover = id => { const node = folder(id); hit = { closest: () => node }; return node; };
-    fn({ tree, doc, view, start, hover, moves, errors, ghosts, captures: () => captures, setBusy: value => { busy = value; }, clearHit: () => { hit = null; }, dispose });
+    const hoverGroup = id => {
+      const node = folder(id);
+      const group = emitter({ dataset: { libraryGroup: id }, querySelector: () => node });
+      hit = { closest: selector => selector.includes("data-library-group") ? group : null };
+      return { node, group };
+    };
+    fn({ tree, doc, view, start, hover, hoverGroup, moves, errors, ghosts, captures: () => captures, setBusy: value => { busy = value; }, clearHit: () => { hit = null; }, dispose });
     dispose();
   } finally { globalThis.window = previous; }
 }
@@ -88,4 +97,15 @@ test("busy state prevents drag start and also vetoes a drop started before a blo
   setBusy(true); start(); tree.emit("pointermove", { clientX: 80 }); assert.equal(captures(), 0);
   setBusy(false); start(); hover("rice"); tree.emit("pointermove", { clientX: 80 });
   setBusy(true); tree.emit("pointerup", { clientX: 80 }); assert.equal(moves.length, 0);
+}));
+
+test("dropping anywhere over an expanded folder group resolves its parent folder and highlights the group", () => harness(({ start, hoverGroup, tree, moves }) => {
+  start();
+  const { node, group } = hoverGroup("rice");
+  tree.emit("pointermove", { clientX: 80 });
+  assert.equal(node.classList.contains("is-drop-target"), true);
+  assert.equal(group.classList.contains("is-drop-group"), true);
+  tree.emit("pointerup", { clientX: 80 });
+  assert.deepEqual(moves, [[{ kind: "project", id: "/mh63" }, "rice"]]);
+  assert.equal(group.classList.contains("is-drop-group"), false);
 }));

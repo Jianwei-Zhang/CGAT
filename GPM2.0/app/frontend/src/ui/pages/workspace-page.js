@@ -137,8 +137,8 @@ export function renderWorkspacePage(state) {
     <div class="project-detail-overview">
       <div class="project-identity">
         <div class="project-heading">
-        ${selectedProject && renameOpen ? `<form class="project-title-row project-rename-form" data-project-rename-form>
-          <input id="selected-project-name-input" type="text" aria-label="${messages.cards.projectName}" value="${escapeAttr(editDraft.projectName)}" size="${projectNameInputSize(editDraft.projectName)}" ${busy ? "disabled" : ""} />
+        ${selectedProject && renameOpen ? `<form class="project-title-row project-rename-form" data-project-rename-form autocomplete="off">
+          <input id="selected-project-name-input" type="text" aria-label="${messages.cards.projectName}" value="${escapeAttr(editDraft.projectName)}" size="${projectNameInputSize(editDraft.projectName)}" autocomplete="off" spellcheck="false" ${busy ? "disabled" : ""} />
           <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" data-app-tooltip="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
           <button type="button" id="selected-project-rename-cancel" class="button project-icon-button" data-app-tooltip="${labels.cancel}" aria-label="${labels.cancel}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
         </form>` : `<div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>

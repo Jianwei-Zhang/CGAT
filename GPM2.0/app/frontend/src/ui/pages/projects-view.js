@@ -1,4 +1,4 @@
-import { libraryLabels, renderImportPartition, renderLibraryTree, renderLibraryDialog, renderLibraryMenu } from "./project-library-view.js";
+import { libraryLabels, renderImportPartition, renderLibrarySearch, renderLibraryTree, renderLibraryDialog, renderLibraryMenu } from "./project-library-view.js";
 import { projectEntryBusy } from "../../services/project-drop-controller.js";
 import { projectImportName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
@@ -100,7 +100,7 @@ export function renderProjectImportDialog(state, messages) {
     return `<option value="${value}" ${value === selectedWorkers ? "selected" : ""}>${label}</option>`;
   }).join("");
   return `<div class="modal-overlay" data-project-import-overlay>
-    <form class="modal-dialog project-import-dialog" role="dialog" aria-modal="true" aria-labelledby="project-import-title">
+    <form class="modal-dialog project-import-dialog" role="dialog" aria-modal="true" aria-labelledby="project-import-title" autocomplete="off">
       <h3 id="project-import-title">${labels.importTitle}</h3>
       <fieldset class="project-source-switch"><legend>${labels.source}</legend>
         <label><input type="radio" name="project-source" value="zip" ${extracted ? "" : "checked"} />${labels.zip}</label>
@@ -108,12 +108,12 @@ export function renderProjectImportDialog(state, messages) {
       </fieldset>
       <label for="${extracted ? "extracted-path-input" : "zip-path-input"}">${extracted ? labels.extracted : labels.zip}</label>
       <div class="inline-input">
-        <input id="${extracted ? "extracted-path-input" : "zip-path-input"}" value="${html(source)}" required />
+        <input id="${extracted ? "extracted-path-input" : "zip-path-input"}" value="${html(source)}" autocomplete="off" spellcheck="false" required />
         <button type="button" id="${extracted ? "pick-extracted-button" : "pick-zip-button"}" class="button ghost" data-app-tooltip="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button>
       </div>
       ${extracted ? `<p class="project-path muted">${messages.page.importExtractedRule}</p>` : `
         <label for="zip-workspace-root-input">${importer.requireNewWorkspace ? labels.newDirectory : messages.page.workspaceDir}</label>
-        <div class="inline-input"><input id="zip-workspace-root-input" value="${html(directory)}" ${importer.requireNewWorkspace ? 'aria-describedby="project-workspace-hint"' : ""} required />
+        <div class="inline-input"><input id="zip-workspace-root-input" value="${html(directory)}" ${importer.requireNewWorkspace ? 'aria-describedby="project-workspace-hint"' : ""} autocomplete="off" spellcheck="false" required />
           <button type="button" id="pick-zip-workspace-button" class="button ghost" data-app-tooltip="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button></div>
         ${importer.requireNewWorkspace ? `<p id="project-workspace-hint" class="project-path muted">${labels.directoryHint}</p>` : ""}`}
       <label for="import-parallelism-select">${labels.importThreads}</label>
@@ -121,7 +121,7 @@ export function renderProjectImportDialog(state, messages) {
       <p id="import-parallelism-hint" class="project-path muted">${labels.importThreadsHint}</p>
       ${renderImportPartition(state)}
       <label for="import-project-name">${labels.name}</label>
-      <input id="import-project-name" value="${html(projectImportName(importer, directory))}" placeholder="${html(labels.nameDefault)}" />
+      <input id="import-project-name" value="${html(projectImportName(importer, directory))}" placeholder="${html(labels.nameDefault)}" autocomplete="off" spellcheck="false" />
       ${importer.projectError ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
       <footer class="project-dialog-actions">
         <button type="button" data-project-import-close class="button ghost">${labels.cancel}</button>
@@ -150,7 +150,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   <div class="project-browser">
     <section class="project-recents" id="project-recents" aria-labelledby="project-recents-title">
       ${actions}
-      <header class="project-recents-header" data-library-drop-root><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>
+      <header class="project-recents-header" data-library-drop-root data-library-drop-root-label="${html(library.root)}"><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>
         <div class="project-library-toolbar project-library-actions">
           <span data-library-command="create"><button type="button" class="library-toolbar-button" data-library-create="root" aria-label="${library.create}" data-app-tooltip="${library.create}" ${disabled}>${projectIcon("newPartition")}</button></span>
           ${records.length ? `<span data-library-command="validate">
@@ -160,6 +160,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
           <button type="button" class="library-toolbar-button" data-library-root-menu aria-label="${library.actions}" aria-haspopup="menu" ${disabled}>${projectIcon("more")}</button>
         </div>
       </header>
+      ${renderLibrarySearch(state, records)}
       <div class="project-recent-list">${rows}</div>
     </section>
     <div class="project-sidebar-splitter" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="project-recents" aria-label="${labels.resizeLibrary}" aria-valuemin="220" aria-valuemax="560" aria-valuenow="280"></div>
