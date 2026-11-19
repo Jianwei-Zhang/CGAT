@@ -103,6 +103,31 @@ class SelfEvidenceComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "inconsistent sequence length"):
             self.load(row() + row(qlen=999))
 
+    def test_window_clipping_preserves_forward_and_reverse_coordinates(self):
+        for strand, expected_target in (("+", [(23, 27)]), ("-", [(23, 27)])):
+            p = self.root / "windows.paf"; p.write_text(row(strand=strand))
+            e = compare.read_evidence(p, step=1, query_windows={"q": [(3, 5), (5, 7)]})
+            self.assertEqual(e.query_intervals[("q", "t", strand)], [(3, 7)])
+            self.assertEqual(e.target_intervals[("q", "t", strand)], expected_target)
+            self.assertEqual(len(e.anchors), 4)
+            self.assertEqual(e.anchors[("q", "t", strand, 3)], {23 if strand == "+" else 26})
+
+    def test_empty_or_disjoint_windows_do_not_include_outside_hits(self):
+        p = self.root / "windows.paf"; p.write_text(row())
+        for windows in ({}, {"q": [(10, 20)]}):
+            e = compare.read_evidence(p, step=1, query_windows=windows)
+            self.assertEqual(e.rows, 0); self.assertEqual(e.anchors, {})
+        full = compare.read_evidence(p, step=1)
+        clipped = compare.read_evidence(p, step=1, query_windows={"q": [(0, 10)]})
+        with self.assertRaisesRegex(ValueError, "query windows disagree"):
+            compare.compare_evidence(full, clipped, step=1)
+
+    def test_invalid_query_windows_are_rejected(self):
+        p = self.root / "windows.paf"; p.write_text(row())
+        for interval in ((-1, 2), (4, 4), (0, 1001)):
+            with self.assertRaises(ValueError):
+                compare.read_evidence(p, query_windows={"q": [interval]})
+
     def test_sampling_resolution_cannot_be_mislabelled(self):
         a = self.load(row(), step=10)
         with self.assertRaisesRegex(ValueError, "sampling steps disagree"):

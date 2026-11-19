@@ -15,6 +15,7 @@ import re
 @dataclass
 class Evidence:
     sampling_step: int
+    query_windows: dict | None
     anchors: dict
     query_intervals: dict
     target_intervals: dict
@@ -61,9 +62,14 @@ def one_to_one_support(left, right, tolerance):
     return matched
 
 
-def read_evidence(path, step=1000):
+def read_evidence(path, step=1000, query_windows=None):
     if type(step) is not int or step < 1:
         raise ValueError("positive integer sampling step required")
+    if query_windows is not None:
+        if any(type(lo) is not int or type(hi) is not int or lo < 0 or hi <= lo
+               for intervals in query_windows.values() for lo, hi in intervals):
+            raise ValueError("invalid query window")
+        query_windows = {name: union(intervals) for name, intervals in query_windows.items()}
     anchors = defaultdict(set)
     qi, ti = defaultdict(list), defaultdict(list)
     lengths, kinds = {}, Counter()
@@ -89,25 +95,38 @@ def read_evidence(path, step=1000):
             if not operations or "".join(n + op for n, op in operations) != cigar:
                 raise ValueError("malformed CIGAR in all-hit comparison")
             pair = (qname, tname, strand)
+            windows = [(qs, qe)] if query_windows is None else query_windows.get(qname, ())
+            if any(hi > qlen for _lo, hi in windows):
+                raise ValueError("query window exceeds sequence length")
+            included = query_windows is None
             qdone, target = 0, ts
             for size, op in operations:
                 size = int(size)
                 if op in "M=X":
                     lo, hi = ((qs + qdone, qs + qdone + size) if strand == "+"
                               else (qe - qdone - size, qe - qdone))
-                    qi[pair].append((lo, hi)); ti[pair].append((target, target + size))
-                    for q in range(((lo + step - 1) // step) * step, hi, step):
-                        position = target + (q - lo if strand == "+" else hi - 1 - q)
-                        anchors[(*pair, q)].add(position)
-                        observations += 1
+                    for start, end in windows:
+                        clipped_lo, clipped_hi = max(lo, start), min(hi, end)
+                        if clipped_lo >= clipped_hi:
+                            continue
+                        included = True
+                        qi[pair].append((clipped_lo, clipped_hi))
+                        target_lo = target + (clipped_lo - lo if strand == "+" else hi - clipped_hi)
+                        target_hi = target + (clipped_hi - lo if strand == "+" else hi - clipped_lo)
+                        ti[pair].append((target_lo, target_hi))
+                        for q in range(((clipped_lo + step - 1) // step) * step, clipped_hi, step):
+                            position = target + (q - lo if strand == "+" else hi - 1 - q)
+                            anchors[(*pair, q)].add(position)
+                            observations += 1
                 if op in "MI=X": qdone += size
                 if op in "MDN=X": target += size
             if qdone != qe - qs or target != te:
                 raise ValueError("CIGAR span mismatch")
             kind = [tag[5:] for tag in fields[12:] if tag.startswith("tp:A:")]
-            kinds[kind[0] if len(kind) == 1 else "missing_or_ambiguous"] += 1
-            count += 1
-    return Evidence(step, dict(anchors), {k: union(v) for k, v in qi.items()},
+            if included:
+                kinds[kind[0] if len(kind) == 1 else "missing_or_ambiguous"] += 1
+                count += 1
+    return Evidence(step, query_windows, dict(anchors), {k: union(v) for k, v in qi.items()},
                     {k: union(v) for k, v in ti.items()}, lengths, count, dict(kinds), observations)
 
 
@@ -121,12 +140,15 @@ def inventory(evidence):
 
 
 def compare_evidence(left, right, step=1000, tolerances=(0, 100, 1000)):
+    if left.query_windows != right.query_windows:
+        raise ValueError("query windows disagree")
     if left.sampling_step != step or right.sampling_step != step:
         raise ValueError("sampling steps disagree")
     if any(left.lengths[k] != right.lengths[k] for k in left.lengths.keys() & right.lengths.keys()):
         raise ValueError("baseline/candidate sequence lengths disagree")
     report = {"scope": "all_hits_sampled_positions_and_exact_oriented_pair_aligned_coverage",
-        "query_sampling_step_bases": step, "primary_or_mapq_filter_applied": False,
+        "query_sampling_step_bases": step, "query_windows": left.query_windows,
+        "primary_or_mapq_filter_applied": False,
         "accuracy_claim": "baseline agreement only; sampled positions are not exhaustive",
         "placement_matching": "distinct_positions_one_to_one_within_each_query_target_strand_grid_key",
         "baseline": inventory(left), "candidate": inventory(right), "position_support": {}, "pairs": []}

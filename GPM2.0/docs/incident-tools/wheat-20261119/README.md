@@ -434,3 +434,39 @@ This measured secondary-hit majority confirms why the cross primary-only check
 cannot establish preservation of this self evidence. No baseline agreement or
 speedup ratio is available yet. The complete local incident suite passed
 **114 tests**. All main-job settings and outputs remain unchanged by this work.
+
+### Bounded full-length/name-preserved masked self probe: not admitted
+
+`masked_self_probe.py` retains the entire query length and original name, index,
+self flags and thresholds, but replaces bases outside three fixed windows with
+N. The comparator now supports explicit query windows, clips CIGAR intervals
+on either strand, and refuses comparisons with different window declarations.
+These diagnostic changes are not installed into any active mapper/controller.
+
+The reference side is a bounded native masked-query run; the candidate side is
+the already completed **full-query** candidate restricted to those coordinates.
+Masking changes chaining context. Therefore this is a local screening experiment,
+not a same-input full-context accuracy measurement and not proof that the native
+full-query output contains all masked-query hits. There is no adoption logic.
+
+- Three 5 Mb windows: job `42749029` hit the 300-second mapper timeout (return
+  code 124, 300.088 s). The owned child was killed/waited; main jobs were unaffected.
+  No complete quality result was produced. Evidence: `self-masked-probe-20261119/`.
+- Three 1 Mb windows: job **42766357 SUCCEEDED**, November 19 10:56:04–10:58:50,
+  mapper 152.966 s; all **45** staged tests passed. Evidence:
+  `self-masked-probe-1mb-20261119/native-probe/probe.json` and `final-job.json`.
+- The masked native result has 40,533 distinct 1 kb sampled placements, versus
+  1,770 in the restricted full candidate; 1,754 match within 100 bp. Thus 38,779
+  masked-baseline placements lack candidate support. Pair-query aligned coverage
+  also falls from 8,528,353 to 1,164,722 pair-summed bases, with 7,370,642 baseline
+  pair-bases missing. Significant pairs disappear. These are not unique genome
+  coverage counts or biological error rates.
+- Proposed local limits **failed**; no parameters/results were adopted. The
+  ~95.67% unsupported fraction belongs only to this different-context experiment,
+  not to the pending full-native versus full-candidate comparison. Wait for that
+  native commit (or separately control context) before attributing the difference.
+
+The final local incident suite passed **126 tests**. Original full-self pilot,
+its committed candidate, original all-hit inspector and the live routed reader
+retain their frozen remote copies; do not overwrite those dependency profiles
+with these diagnostic extensions.
