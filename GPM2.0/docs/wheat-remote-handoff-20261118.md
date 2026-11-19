@@ -840,3 +840,83 @@
   失败/超时则不比较临时PAF。它不重跑native mapper。
 - 旧对照42523432仍Step2的4D MUMmer分块，14:00有新的SUCCESS/START；单个分块编号
   不是整体完成百分比。两主监控64397与候选监控90604继续，未重提其他科学作业。
+
+
+## 2026-11-19 14:46：两路资源overlay已受控切换，保留原科学profile
+
+- 单路f0.005继续成功：1A batch0于14:15:29结束，mapper913.671秒、PeakRSS5.909GB；
+  7D batch0于14:26:06结束，PeakRSS5.366GB；4D batch0于**14:42:31**成功结束。
+  现在>=100Mb原21条已有native3D+4个fast共5条完成，剩16条；未包含更短self批次。
+- 增加独立资源层：`self_memory_guard.py`执行前核实原script SHA/打开inode，设置
+  每进程64GiB RLIMIT_AS与CORE0，exec原脚本，子进程继承；不是聚合RSS/cgroup限制。
+  `self_two_lane_admission.py`最多两路f0.005、query<=300Mb/target<=800Mb，
+  每路预留128GiB，不混fast/native。原native-small的1Gb target边界保持，
+  cross/unknown/oversized仍独占。当前job继续32CPU/320GiB，计算预算16。
+- `stage_self_resource_resume.py`保持原profile文件/科学参数/原command/所有batch key
+  和cross依赖，仅生成新guard脚本及资源元数据。至少两条已完整成功f0.005、输出hash与
+  stderr峰值通过核验后才可生成；本次有1A/4A/7D三条。`resume_self_resources.py`明确
+  验证新资源模块、选择该模块后执行原冻结entry，不修改原冻结源码。
+- 本地全事故工具**222项通过**；随后补了保留native1Gb边界的定向回归（该组5项通过）。
+  远端v1 **42828493 SUCCEEDED**（14:28:14–14:28:28）留存不改。v2
+  **42828665 SUCCEEDED**（14:32:47–14:32:54，agent-X86-20），**17项通过**，
+  加真实minimap2合成检验：两进程guard64GiB输出与非guard非空PAF字节一致；故意
+  16MiB限制子例返回-6，stderr`[morecore] insufficient memory`，是预期失败而非主任务OOM。
+- 实际冻结runtime为 `self-two-lane-runtime-v2-20261119/`；v1没有部署。
+  最终资源plan为 `self-two-lane-plan-v2-20261119/self-plan.json`，SHA
+  `348ba78a956e9416e1cbc6c30d0ce962091b08d69bebf81fef0a89ba1b09114d`。
+  它复用origin `self-aggressive-plan-20261119/self-plan.json`（9cd695df...），
+  保留44self组/20选中script的原科学profile；20是配置数，含已完成缓存，不是要重跑20条。
+- 新主任务 **42828863 RUNNING**，14:37:17，**agent-X86-40**，先在
+  `self-two-lane-resume-20261119/`等待handoff。明确等4D TASK_END exit0后才于14:42:34
+  请求停止单路新版42813048；正常锁释放、旧job终态后放行。仅下一条3A刚启动约数秒
+  的未完成工作被中止，4D及此前所有已完成产出保存。旧42523432不修改、不取消。
+- 新entry已打印RESOURCE_ONLY_SELF_RESUME / EXPLICIT_SELF_PROFILE_RESUME，
+  run_id **20261119T064255Z-773649-4017a74e**；14:44:13进入RESUME/PREFLIGHT。
+  **本记录时尚未确认两个实际mapper同时开始，不能只凭max_fast=2声称两路提速已兑现。**
+  新主日志 `logs/resume_self_two_lane_42828863.out`。
+- 旧主监控64397在单路新版预期终止后结束；新主监控 **45573**，脚本
+  `/tmp/cgat-wheat-live-monitor-two-lane.py`，跟踪42523432/42828863。观察两个actual
+  TASK_START、SELF_RESOURCE_GUARD和子mapper实际limits，再记录真实并发/内存。
+- 资源overlay只约束新启动的任务，不把此前缓存结果标记为曾受guard。若需回退并发，
+  不可直接运行原run_all或删profile；保留科学profile和结果，在q0证据未发布的前提下
+  走明确的资源/launcher回退或新overlay。guard失败也不得使用临时PAF。
+
+### 中间档完整试验已结束，不阻塞当前激进路线
+
+- **42802491 SUCCEEDED**，13:08:47–14:17:56；完整f0.002 mapper **4128.961秒**
+  （约68分49秒）。没有重跑完整native基线。独立比较/分层 **42828539 SUCCEEDED**，
+  14:31:02–14:33:30，目录 `self-middle-inspection-20261119/`。
+- 完整>=10kb且identity>=95%诊断层：missing pair-query coverage1714819 /
+  baseline62132537bp（约2.76%），抽样位置缺失2.52%；这是此层与native一致性，
+  **不是整体精度只下降2.8%**。仅identity>=95%的全长短混合层仍缺失156972139 /
+  282441454bp成对query覆盖、抽样位置缺失67.98%。完整结果与局部样本并不完全一致。
+- f0.002比f0.005保留更多长高相似度证据，但本条耗时约69分钟对比f0.005约7分25秒。
+  按用户已进一步放宽内部self精度的授权，主任务继续f0.005；中间结果留作可追溯对照，
+  不以此回退/重跑已完成主任务。监控90604已因该候选成功自然结束，后续无需再等待它。
+
+
+### 2026-11-19 14:59：两路实际生效与下游补比对边界
+
+- 主任务42828863于**14:52:29**同时启动3A hifiasm batch2和1A hifiasm batch2，
+  两条均打印SELF_RESOURCE_GUARD。启动时成功复用21cross+6self共27个leaf。
+  1A batch2于**14:55:05**成功提交，mapper148.002秒（约2分28秒），随后接上5A batch0。
+  >=100Mb原21条此时完成6条、剩15条；这是长self子批次计数，不是染色体或全流程完成度。
+- 同节点只读采样作业**42829367**，目录`self-two-lane-memory-sample-20261119/`。
+  14:58:48采到3A PID783206和5A PID784763的实际minimap2命令，均有`-f 0.005`；
+  两者/proc/limits均为AS soft=hard=68719476736bytes，确认子mapper实际继承保护。
+  当时VmRSS分别5392388/5193868kB（约5.14/4.95GiB），VmSize6465784/6012684kB，Swap0。
+  这只是采样瞬间，不能推出后续所有任务峰值或整棵进程树均受64GiB聚合限制。
+- 新launcher安装收据确认SHA
+  `55e231f1c4880226766f99c87c275a25091f6863d7dfc0cb3a3c48946a4226d8`，
+  prior仍为f7a34cdf...，plan仍为348ba78a...；不是改写旧冻结reader。
+- 当前最终代码本地完整事故工具回归**223项通过，137.433秒**，
+  日志`/tmp/wheat-two-lane-final-tests.log`。未运行发布CI，未update.sh或重装。
+- 下游审计：远端冻结q0_preparation.py与q0_catalog.py和当前仓库SHA相同。
+  `_initial_inputs`的known_pairs记录有实际aligned_blocks的source对，不是所有已计划对。
+  `supplemental_groups`有意针对参考重叠/相邻但无命中、split source、跨组来源补证据；
+  因此激进过滤后的缺失可能增加后续补比对，不能声称整个q0都已套用快速档或绝不补跑。
+  不把所有已计划对冒充为已有命中来粗暴取消该环节。后续若此处成为瓶颈，应先检查
+  实际request/query/target范围和可复用证据，再明确拆分内部self与cross策略；当前仅观察，
+  没有修改科学builder或正在运行的冻结代码。两路AS保护也没有自动覆盖这些补比对。
+- 旧对照42523432仍RUNNING/grt_step2，未修改或取消。32核新作业当前约使用2核：
+  当前保守资源额为并发试行/后续阶段预留，不以该阶段低CPU作为失败；不为缩额立即重启。

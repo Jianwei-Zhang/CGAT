@@ -618,3 +618,39 @@ whole-workflow or biological-accuracy certification.
 comparison path. It rejects unfinished, timed-out, mislabelled or wrong-driver
 candidates and never launches the original mapper. That middle-parameter trial
 no longer blocks the explicitly authorized f0.005 self execution.
+
+
+### Guarded two-lane resource overlay (separate from scientific profiles)
+
+`self_memory_guard.py` verifies a frozen script, opens the verified inode, sets
+Linux per-process RLIMIT_AS to at most 64 GiB, disables core dumps, and executes
+that script through the open descriptor. Descendants inherit the limit; there
+is no added mapper timeout. This is NOT a cgroup or aggregate RSS limit. An
+allocation failure is not accepted as a completed alignment.
+
+`self_two_lane_admission.py` permits at most two whole-query f0.005 processes
+within the <=300 Mb query / <=800 Mb target envelope. Each lane reserves 128 GiB
+for helper/mapper overhead within the existing 320-GiB job. Fast/native pools
+are not mixed; cross, unknown and oversized work remain exclusive. Ordinary
+native-small eligibility retains the previous 1-Gb target envelope, rather than
+accidentally applying the new 800-Mb fast calibration bound to it.
+
+`stage_self_resource_resume.py` copies the original final plan without changing
+any scientific profile, original command, selected batch key or cross dependency.
+It requires at least two distinct completed production f0.005 queries, rechecks
+those output hashes/logged peaks, and emits hash-bound resource wrappers plus a
+new reader launcher outside the workspace. Existing completed results are reused;
+they are NOT retrospectively claimed to have run under the new memory limit.
+
+`resume_self_resources.py` verifies that resource-only transition and selects
+the explicitly bound admission module, then executes the same frozen owning
+entry. It preserves the original lock and reader-installation checks. Do not
+regenerate the science profiles to change concurrency: doing so would invalidate
+already-completed approximate keys. Inspect the dated handoff for the active
+resource plan, job and preserved origin plan.
+
+`probe_guarded_minimap2.py` uses synthetic sequences only. On the actual frozen
+binary it checks two concurrent 64-GiB-guarded processes against a nonempty,
+byte-identical unguarded result; a deliberately tiny 16-MiB subcase must fail
+with an explicit allocator error. This validates enforcement/error behavior,
+not complete wheat throughput or a guarantee against every source of job OOM.
