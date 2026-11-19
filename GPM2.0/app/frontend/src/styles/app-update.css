@@ -3,11 +3,15 @@
 .app-update-notes { max-height: min(36dvh, 320px); overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 1px solid var(--theme-line); border-radius: 6px; background: var(--theme-surface-subtle); color: var(--theme-ink); font-size: var(--font-small); line-height: 1.7; }
 .app-update-dialog #app-update-scope { margin-top: 14px; }
 .app-update-status, .settings-update-status { margin: 10px 0; color: var(--theme-muted-ink); font-size: var(--font-small); overflow-wrap: anywhere; }
+.settings-update-summary { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--theme-line); }
+.settings-update-summary .settings-update-status { margin: 0; }
+.settings-update-summary .settings-hint { margin-top: 4px; }
 .app-update-status.is-error, .settings-update-status.is-error { color: var(--theme-red-ink); }
 .app-update-progress { display: block; width: 100%; height: 8px; accent-color: var(--theme-blue-ink); margin: 12px 0; }
 .app-update-progress[hidden] { display: none; }
 .app-update-mute { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: var(--font-small); color: var(--theme-muted-ink); }
 .app-update-mute input { accent-color: var(--theme-blue-ink); }
-.settings-update-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.settings-update-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .settings-update-actions .button { font-size: var(--font-small); }
+.settings-version-value { justify-self: end; font-family: var(--font-mono); font-size: var(--font-small); font-variant-numeric: tabular-nums; color: var(--theme-ink); padding: 2px 8px; border: 1px solid var(--theme-line); border-radius: 999px; background: var(--theme-surface-subtle); }
 .app-update-dialog button:disabled { opacity: .55; cursor: not-allowed; }

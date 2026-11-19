@@ -1,6 +1,6 @@
 const copy = {
   zh: {
-    title: "应用更新", current: "当前版本", check: "检查更新", last: "上次检查", idle: "通过 CGAT 文档镜像自动检查并下载新版本。",
+    title: "应用更新", desc: "查看桌面 App 当前版本并检查签名更新。", current: "当前版本", check: "检查更新", last: "上次检查", idle: "通过 CGAT 文档镜像自动检查并下载新版本。",
     checking: "正在检查更新…", latest: "当前已是最新版本", available: "发现新版本", downloading: "正在下载更新…",
     ready: "更新已准备就绪", installing: "正在保存项目并安装更新…", unavailable: "此构建尚未启用签名更新。",
     error: "更新失败，请重试。", view: "查看更新", download: "下载更新", install: "安装并重启", later: "稍后",
@@ -14,7 +14,7 @@ const copy = {
     update_install: "安装失败，当前项目未被替换。请重试。", update_unconfigured: "此构建尚未启用签名更新。",
   },
   en: {
-    title: "App updates", current: "Current version", check: "Check for updates", last: "Last checked", idle: "Checks and downloads updates through the CGAT docs mirror.",
+    title: "App Updates", desc: "Check the desktop App version and manage signed updates.", current: "Current version", check: "Check for updates", last: "Last checked", idle: "Checks and downloads updates through the CGAT docs mirror.",
     checking: "Checking for updates…", latest: "You are up to date", available: "New Version Available", downloading: "Downloading update…",
     ready: "Update is ready", installing: "Saving your project and installing…", unavailable: "Signed updates are not enabled in this build.",
     error: "Update failed. Please retry.", view: "View update", download: "Download update", install: "Install and restart", later: "Later",
@@ -42,12 +42,16 @@ export function renderUpdateSettings(locale, state = {}) {
   const c = labels(locale);
   const active = ["checking", "downloading", "installing"].includes(state.phase);
   const details = state.version && !["checking", "installing"].includes(state.phase);
-  return `<h3 id="settings-update-title">${c.title}</h3>
-    <div class="settings-row"><span>${c.current}</span><span data-update-version>${escape(state.currentVersion || "—")}</span></div>
-    <p class="settings-update-status${state.error ? " is-error" : ""}" role="status" aria-live="polite">${escape(updateStatusText(state, locale))}${state.version ? ` · v${escape(state.version)}` : ""}</p>
-    ${state.checkedAt ? `<p class="settings-hint">${c.last}: ${escape(new Date(state.checkedAt).toLocaleString(locale === "en" ? "en-US" : "zh-CN"))}</p>` : ""}
-    <div class="settings-update-actions"><button type="button" class="button ghost" data-update-check ${active || !state.enabled ? "disabled" : ""}>${c.check}</button>
-    ${details ? `<button type="button" class="button" data-update-view>${c.view}</button>` : ""}</div>`;
+  return `<header class="settings-panel-header"><h3 id="settings-update-title">${c.title}</h3><p class="settings-panel-desc">${c.desc}</p></header>
+    <div class="settings-group">
+      <div class="settings-row settings-row-meta"><span class="settings-row-label">${c.current}</span><span class="settings-version-value" data-update-version>${escape(state.currentVersion || "—")}</span></div>
+      <div class="settings-update-summary">
+        <p class="settings-update-status${state.error ? " is-error" : ""}" role="status" aria-live="polite">${escape(updateStatusText(state, locale))}${state.version ? ` · v${escape(state.version)}` : ""}</p>
+        ${state.checkedAt ? `<p class="settings-hint">${c.last}: ${escape(new Date(state.checkedAt).toLocaleString(locale === "en" ? "en-US" : "zh-CN"))}</p>` : ""}
+      </div>
+      <div class="settings-update-actions"><button type="button" class="button ghost" data-update-check ${active || !state.enabled ? "disabled" : ""}>${c.check}</button>
+      ${details ? `<button type="button" class="button primary" data-update-view>${c.view}</button>` : ""}</div>
+    </div>`;
 }
 
 // Native <dialog> and existing app-dialog/button classes retain theme, typography,
