@@ -35,7 +35,7 @@ class ContextControlTests(unittest.TestCase):
                          self.root / "masked-query.fa")
 
     def test_variant_only_changes_seed_filter(self):
-        for fraction in ("0.005", "0.001"):
+        for fraction in ("0.005", "0.002", "0.001"):
             command = control.variant_command(self.probe["native_command"], fraction)
             self.assertEqual(command[-4:-2], ["-f", fraction])
             self.assertEqual(command[:-4] + command[-2:], self.probe["native_command"])

@@ -476,7 +476,7 @@ with these diagnostic extensions.
 
 `self_context_control.py` reuses the completed three-by-1-Mb masked native
 probe, including its full query name/length, index, native flags and hash-bound
-results. It runs only a filtered variant (`-f 0.005` or `0.001`), with a
+results. It runs only a filtered variant (`-f 0.005`, `0.002` or `0.001`), with a
 300-second mapper limit. No duplicate native mapper is launched. For `0.005`
 it also compares the new masked result against the already-completed full
 `0.005` candidate in the same windows, separating seed-filter and context
@@ -492,7 +492,7 @@ pretending that primary-only evidence represents the entire downstream input.
 
 ### Whole-record moderate candidate (not deployed)
 
-`full_self_moderate_candidate.py` runs one isolated `-f 0.001` whole-query
+`full_self_moderate_candidate.py` runs one isolated `-f 0.001` (default) or explicit `-f 0.002` whole-query
 candidate, reusing the earlier f0.005 pilot only as a hash-bound source/index/
 command provenance record. It preserves every original self flag, name,
 length, query base and cached index. The native batch is not rerun. Output
@@ -521,8 +521,9 @@ keys. Tests specifically cover a native batch finishing last and corruption of
 receipts, index proofs, adoption origins and output files.
 
 The producer/cache/merge layer is complemented by the tested controller adapter
-below. There is still no deployed staging plan, owning resume entry, combined
-q0 evidence reader or portable audit exporter. Do not invoke it on the live
+below and by the isolated entry/reader/stager further below. None is deployed
+to the main job. A portable combined audit exporter and controlled cutover
+remain outstanding. Do not invoke it on the live
 workspace or cancel a main job just because these focused tests pass. Its owner
 must hold the usual workspace lock.
 
@@ -549,3 +550,42 @@ Full native-command inventories are verified at initialization/preparation and
 the final fresh-input fence, not rescanned across all operations on every child
 completion. Callback checks are scoped to their affected operation. Scientific
 flags remain unchanged for native-only batches.
+
+
+### Isolated self entry, combined reader and metadata staging (not deployed)
+
+`self_profile_context.py` verifies the original frozen cross plan/runtime and
+composes self/cross checkpoint identities. `resume_with_self_profile.py` requires
+the normal workspace lock and a separately installed, hash-matched reader
+launcher; it never accepts a preview plan for execution.
+`self_profile_evidence_reader.py` binds extra receipts as actual q0 input files,
+not only a descriptive note, and restores its module hooks on failure.
+`stage_self_profile.py` generates a new isolated plan covering every planned
+self operation, excludes already-native-complete batch markers, and preserves
+all original manifest/command files. Final staging still requires a completed
+f0.001 candidate; an f0.002 diagnostic cannot silently satisfy that contract.
+
+`self_profile_admission.py` preserves **exclusive execution for all long/fast,
+cross and unknown work**. A single low observed RSS does not prove other long
+queries safe to overlap. `max_fast=1` cannot be enlarged by the stager; only the
+existing native-small two-process allowance remains. This corrects an earlier
+isolated preview heuristic which allowed four fast queries based on one peak.
+Frozen remote preview directories are not overwritten; neither version has
+been installed in the main workflow. Reservation numbers are not hard mapper
+memory limits.
+
+### Full fast-self evidence audit (no mapping or adoption)
+
+`audit_self_fast_evidence.py` consumes the previously verified complete-native /
+complete-candidate comparison receipt and rechecks the actual PAF/marker hashes.
+It compares the necessary identity threshold from the frozen workspace's actual
+q0 PathPolicy, without dropping secondary or MAPQ-zero alignments. A separate
+>=10kb/high-identity diagnostic is not a q0 admission rule. Both exact pairwise
+coverage and sampled one-to-one placements are reported.
+
+The sampled query-side ambiguity transition counts cases where several native
+maps become one fast map, including opposite strands within the same contig
+pair. This catches a risk that coverage-only comparisons hide; it is not a full
+q0 uniqueness/admission replay. Reference placement, sequence complexity,
+target-side uniqueness and all competing 100bp overlaps remain unevaluated.
+The audit never writes workspace outputs or certifies final biological accuracy.

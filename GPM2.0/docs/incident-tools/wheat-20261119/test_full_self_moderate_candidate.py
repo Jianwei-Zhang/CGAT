@@ -21,6 +21,13 @@ class ModerateCandidateTests(unittest.TestCase):
         self.assertEqual(self.native[-2:], ["/cache/target.mmi", "/whole.fa"])
         self.assertNotIn("-f", self.native)
 
+    def test_explicit_middle_fraction_changes_only_the_named_flag(self):
+        command = moderate.moderate_command(self.manifest, self.batch, self.native, "0.002")
+        self.assertEqual(command[-4:-2], ["-f", "0.002"])
+        self.assertEqual(command[:-4] + command[-2:], self.native)
+        with self.assertRaises(ValueError):
+            moderate.moderate_command(self.manifest, self.batch, self.native, "0.005")
+
     def test_small_or_multirecord_batches_are_not_silently_approximated(self):
         for entries in ([{"name": "q", "length": 99999999}], self.batch["entries"] * 2):
             with self.assertRaises(ValueError):
@@ -38,7 +45,7 @@ class ModerateCandidateTests(unittest.TestCase):
         with patch.object(moderate.sys, "argv", args), patch.object(moderate, "execute") as execute, \
              patch.object(moderate.signal, "signal"), patch.object(moderate.pilot, "execute") as native:
             moderate.main()
-        execute.assert_called_once_with(Path("/work"), Path("/manifest"), 3, Path("/source"), Path("/output"))
+        execute.assert_called_once_with(Path("/work"), Path("/manifest"), 3, Path("/source"), Path("/output"), fraction="0.001")
         native.assert_not_called()
 
 

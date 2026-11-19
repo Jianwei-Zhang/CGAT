@@ -19,7 +19,7 @@ import self_paf_comparison as comparison
 
 
 def variant_command(native, fraction):
-    if fraction not in ("0.005", "0.001") or "-f" in native:
+    if fraction not in ("0.005", "0.002", "0.001") or "-f" in native:
         raise ValueError("expected an unchanged native command and fixed seed variant")
     return native[:-2] + ["-f", fraction] + native[-2:]
 
@@ -157,7 +157,7 @@ def main():
     for name in ("work", "manifest", "candidate-dir", "probe-dir", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--batch-index", type=int, required=True)
-    parser.add_argument("--fraction", choices=("0.005", "0.001"), required=True)
+    parser.add_argument("--fraction", choices=("0.005", "0.002", "0.001"), required=True)
     args = parser.parse_args()
     def stop(signum, _frame):
         raise KeyboardInterrupt("signal " + str(signum))

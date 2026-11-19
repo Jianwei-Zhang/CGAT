@@ -678,3 +678,70 @@
 - 42767640 于 11:56/后续查询仍 RUNNING，未宣告成功；主作业 42523432、
   42710779 和监控 51160 均未停止。监控约 12:27 到时，届时先查原 handle
   再延长观察，不重提科学作业。
+
+
+## 2026-11-19 13:10：完整激进结果分层评估、中间档试验与 OOM 边界
+
+- 主作业仍为旧 **42523432**（Step 2，约 15 核、86 GiB）和新 **42710779**。
+  新版 3D hifiasm batch-00003 于 **12:28:11** 完成，mapper **15126.361 秒**、
+  Peak RSS **21.646 GB**；当前是 4A batch-00001（220255611 bp），12:28:11 开始，
+  13:09 仍约 1 核、30125 MiB。未修改/取消两个主任务，长任务独占仍有效。
+- >=100 Mb 单条 self 批次共 21：1 完成、1 运行、19 尚未开始。这个计数不含更短
+  self 批次；“3–4 天”只是按已完成最慢样本估算的安排余量，不是全流程 ETA。
+- 完整 f=.001 候选 **42767640 FAILED**，11:21:49–12:52:07；返回码124，mapper
+  5400.187 秒，命中独立试验的 90 分钟上限，没有成功输出可采用；不是主任务失败。
+  保留 `self-full-3D-moderate-20261119/candidate/candidate.json` 和 final-job.json。
+- 已完成 f=.005 候选 444.913 秒；与原 native 单次 mapper 比约34倍，但为不同
+  x86 节点且非端到端提速。原全位置比较 **42786027 SUCCEEDED**（12:36:59–12:39:50），
+  目录 `self-native-comparison-20261119/`；没有重跑 native。100bp 容差下缺失
+  原始抽样位置93.0954%，该指标不是生物学错误率。
+- 新的**只读完整 PAF 分层审计 42800465 SUCCEEDED**（13:03:08–13:03:36，
+  agent-X86-14，4CPU/40GiB），目录 `self-fast-evidence-audit-20261119/`，结果
+  `results/audit.json`。使用远端实际 q0 PathPolicy.minimum_pair_identity=.95：
+  - 必要 identity 过滤后 native140711行、fast8658行；缺失抽样位置89.856%，
+    成对 query coverage missing230015952 / baseline282441454 bp。
+  - >=10kb 且 identity>=.95 的诊断层：native8092行、fast3378行；缺失位置57.753%，
+    成对 query coverage missing26944225 / baseline62132537 bp（约43.36%）。
+  - identity 层有8355个抽样的同 contig-pair/query 坐标从多个映射变为单个；其中8116
+    是原候选之一。这不是 q0 已实际误判的证明，但不能将删掉竞争位置称为无损去重复。
+  - 未运行完整 q0 admission：未评估参考定位、序列复杂度、目标侧唯一性和所有100bp
+    冲突重叠。诊断保留 secondary/MAPQ0，不以 primary 标签冒充正确性。
+- 中间档 f=.002 同输入局部试验 **42801481 SUCCEEDED**（13:05:41–13:06:31，
+  agent-X86-14，1CPU/10GiB），`self-middle-control-20261119/f0002/control.json`。
+  复用原153秒的3x1Mb masked native，不重跑原基线；新 mapper39.602秒，约3.86倍。
+  长高相似度层 missing51668 / baseline490574 bp（10.53%），位置缺失12.5%；
+  全位置层缺失71.84%。只能称局部折中，不能外推完整查询或 q0 最终结果。
+- 已提交且 **13:08:47 RUNNING 的完整 f=.002 候选 42802491**，agent-X86-14，
+  4CPU/40GiB（实际 mapper1线程），目录 `self-full-3D-middle-20261119/`。
+  只运行新参数候选，不重跑原始完整比对，不写主工作区。独立上限5400秒；
+  成功后需与现成 native 完整结果比较，不得把局部3.86倍/10.53%当完整结论。
+  f=.002 目前不被固定 f=.001 execution profile 接纳，不能混用已有计划/成功key。
+- 新的 context/resume/reader/stager 六文件已有初步集成验证：**42784275 SUCCEEDED**，
+  12:33:13–12:34:22，**69项通过**，真实冻结工具与实际客户元数据 preview验证成功。
+  `self-profile-preview-20261119/` 覆盖44self组、20近似批次、0候选复用，
+  `preview_only=true`。**只是隔离预览，不是已部署。** installed q0 launcher 仍是原
+  cross-only reader，self 快速参数未进入主任务；联合可移植 audit 和安全切换仍待完成。
+- 用户再次提醒历史 OOM：11月18日160GiB溢出，以及11月19日01:25两个 cross
+  长比对顶满240GiB。不得因当前低RSS恢复长任务并发。已收紧未部署的 admission/stager：
+  即使候选峰值低，fast long也独占，max_fast=1；仅保留已有native-small双进程能力。
+  初版预览/验证目录保持冻结，不用其早先允许4fast的代码替换主任务；新代码需新验证目录。
+- 旧监控59089在12:52捕获候选终态并正常结束。当前两主任务只读监控 **62156**，
+  日志 `logs/wheat-live-20261119-130124.jsonl`，30秒采样、约14:31到时。
+  它不跟踪新候选42802491，需单独查询/监控该明确job；监控到时不是主作业失败。
+- 所有目录相对于 `jm19-compare-614589f-20261118/`，除 logs/wheat-live 在公共debug根。
+  上述终态诊断已各自保存 final-job.json；未运行 update.sh、发布CI、全量重装或 reprepare。
+
+### 13:14 验证补记
+
+- 收紧 long/fast 独占后的本地事故工具 **192项通过**，日志
+  `/tmp/wheat-fast-audit-all-tests.log`。包括新 full-evidence 分层/歧义诊断、f=.002
+  参数隔离，以及“低峰值不能自动开启长任务并发”的回归。
+- **42803719 SUCCEEDED**，13:12:05–13:12:36，agent-X86-40，**70项通过**。
+  新冻结目录 `self-profile-integration-exclusive-20261119/`，final-job.json已保存。
+  实际工作区元数据 preview 为 `self-profile-preview-exclusive-20261119/`，44组、
+  20近似候选、0复用；plan SHA
+  `f8fe00fb5b3888005046354043a6f99222cc1bbf0ea40a3268973d087b477d01`。
+  entry/reader仅validate-only成功，仍未安装launcher/运行q0/接入主任务。
+- f=.002完整候选42802491继续 RUNNING；新增独立只读监控会话 **90604**，
+  `/tmp/cgat-wheat-middle-candidate-monitor.py`，30秒采样，终态才结束并保存final-job.json。
+  主任务监控62156继续，不因候选失败或监控超时重提主任务。

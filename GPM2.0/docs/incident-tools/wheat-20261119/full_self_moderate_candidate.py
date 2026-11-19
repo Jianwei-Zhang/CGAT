@@ -1,6 +1,6 @@
-"""One whole-record f=.001 candidate reusing the validated original self inputs.
+"""One whole-record f=.001 or f=.002 candidate reusing the validated original self inputs.
 
-The already-running native batch is NOT rerun. This candidate may later be
+The original native batch is NOT rerun. This candidate may later be
 adopted only under an explicit approximate execution profile; no native cache
 marker is created. Keep the earlier f=.005 pilot and its verifier immutable.
 """
@@ -18,17 +18,19 @@ TIMEOUT = 5400
 SCOPE = "one_complete_self_query_moderate_candidate_only"
 
 
-def moderate_command(manifest, batch, native):
+def moderate_command(manifest, batch, native, fraction="0.001"):
+    if fraction not in ("0.001", "0.002"):
+        raise ValueError("only bounded moderate diagnostic fractions are supported")
     # Validate every native flag, complete query and cached index using the
     # original frozen contract; then change exactly the fixed seed fraction.
     original = pilot.candidate_command(manifest, batch, native)
     if batch["entries"][0]["length"] < 100_000_000:
         raise ValueError("moderate candidate is restricted to >=100 Mb whole queries")
-    original[-3] = "0.001"
+    original[-3] = fraction
     return original
 
 
-def execute(work, manifest_path, batch_index, source_dir, output):
+def execute(work, manifest_path, batch_index, source_dir, output, *, fraction="0.001"):
     work = work.resolve(strict=True)
     pilot.require_isolated(work, output)
     manifest_path = manifest_path.resolve(strict=True)
@@ -53,7 +55,7 @@ def execute(work, manifest_path, batch_index, source_dir, output):
     helper_path = work / ".prepare_lib/tools/self_alignment_batches.py"
     if str(helper_path) not in expected:
         raise ValueError("original helper is not bound")
-    command = moderate_command(manifest, batch, source["native_command"])
+    command = moderate_command(manifest, batch, source["native_command"], fraction)
     expected.update(pilot.identities([source_path]))
     inspection.checked_files(expected)
     if source_path.read_bytes() != source_bytes:
@@ -74,7 +76,7 @@ def execute(work, manifest_path, batch_index, source_dir, output):
         "native_command": source["native_command"], "command": command,
         "candidate_adopted": False, "analysis_workspace_modified": False,
         "whole_records_preserved": True, "mapping_timeout_seconds": TIMEOUT,
-        "inputs": expected, "seed_fraction": "0.001",
+        "inputs": expected, "seed_fraction": fraction,
         "target_fasta_sha256_basis": "recorded_index_source_identity_not_fresh_target_fasta_read",
         "source_target_sha256": manifest["identities"]["target"],
         "accuracy_boundary": "local calibration is not a full-query agreement or biological accuracy guarantee",
@@ -113,11 +115,12 @@ def main():
     for name in ("work", "manifest", "source-dir", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--batch-index", type=int, required=True)
+    parser.add_argument("--fraction", choices=("0.001", "0.002"), default="0.001")
     args = parser.parse_args()
     def stop(signum, _frame):
         raise KeyboardInterrupt("signal " + str(signum))
     signal.signal(signal.SIGTERM, stop)
-    execute(args.work, args.manifest, args.batch_index, args.source_dir, args.output)
+    execute(args.work, args.manifest, args.batch_index, args.source_dir, args.output, fraction=args.fraction)
 
 
 if __name__ == "__main__":
