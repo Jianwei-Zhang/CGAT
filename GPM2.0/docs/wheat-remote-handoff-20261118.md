@@ -985,3 +985,19 @@
   原监控86968曾因SSH255中断，已检查远端没有对应监控进程、日志停止；这不代表主作业停止。
   其后41219观察旧新版，交接后应自然终止。持续核实候选实际adoption、原40个leaf复用与
   新extension命令/receipt/内存，不要只看外层running unit数。
+
+
+### 2026-11-19 17:09：扩展已实际执行，99Mb候选未重跑
+
+- 新主任务42876793已完成续跑校验，实际日志确认**21 CROSS_LEAF_REUSED +
+  19 SELF_BATCH_REUSED**，原40个已成功leaf全部复用。不是重跑初始参考或旧self。
+- 7A hifiasm batch0于17:05:21进入扩展、17:05:34成功提交；读取真实receipt确认
+  `mapping_rerun=false`，原candidate mapping334.302秒被保留为来源记录，不是本次又跑
+  334秒。新marker key与receipt一致，raw/result/stderr的记录SHA与原candidate一致。
+  schema为incident_self_seed_profile_extended_v1，policy为>=10Mb、f0.005、无mapper时限。
+- 2A hifiasm batch4（约87Mb）17:05:21实际启动新扩展mapper；5D hifiasm batch3
+  （原有>=100Mb快速profile）17:05:35启动。两条command.json均实际含f0.005，日志均
+  打印64GiB AS保护。5D仍调用原two-lane-v2脚本，证明未为了扩展改写旧profile执行来源。
+  17:07作业CPU约199%、RSS7524MiB；两个mapper仍在运行，没有新失败。
+- 代码与指导文档已提交并推送master **4a9b0a4**；远端采用冻结runtime，不读取活动master。
+  新监控22444日志为`logs/wheat-live-20261119-165306.jsonl`。旧42523432仍运行Step2。
