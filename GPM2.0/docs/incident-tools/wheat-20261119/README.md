@@ -470,3 +470,22 @@ The final local incident suite passed **126 tests**. Original full-self pilot,
 its committed candidate, original all-hit inspector and the live routed reader
 retain their frozen remote copies; do not overwrite those dependency profiles
 with these diagnostic extensions.
+
+
+### Same-input self controls and stratified diagnostics
+
+`self_context_control.py` reuses the completed three-by-1-Mb masked native
+probe, including its full query name/length, index, native flags and hash-bound
+results. It runs only a filtered variant (`-f 0.005` or `0.001`), with a
+300-second mapper limit. No duplicate native mapper is launched. For `0.005`
+it also compares the new masked result against the already-completed full
+`0.005` candidate in the same windows, separating seed-filter and context
+effects. It never adopts a result or writes a native checkpoint.
+
+All-hit comparisons remain available. Additional explicit diagnostic strata
+are literal `tp:A:P` rows and rows with alignment block length >=10 kb and
+matching-bases/block-length >=95%; neither stratum certifies correctness.
+Tests cover immutable-source contracts, command changes, separate filters,
+all-hit retention and overwrite refusal. The 2026-11-19 user authorization
+permits accuracy/speed tradeoffs, not silent removal of source provenance or
+pretending that primary-only evidence represents the entire downstream input.
