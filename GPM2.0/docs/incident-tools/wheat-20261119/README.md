@@ -341,3 +341,32 @@ The frozen script SHA was checked after job success.
 approximate record and five ordinary records. The main job advanced directly
 to 1D, without restart. There are now **19 complete cross leaves** (17 native,
 2 routed), not 19 complete outer q0 stages or a completed wheat workflow.
+
+### Four routed leaves complete; separate self-alignment pilot
+
+By 08:15:30 on November 19, 1D and 6D also committed, bringing the observed
+cross total to 21. Independent export job `42737813` succeeded and produced
+`comparison-audit/q0-routing-provenance.json` (20153 bytes, SHA-256
+`b318e68e3d58de4d1cde3fbba528e440d99baba55b27f2626810f0f3fac1820a`).
+It covers only the four routed leaves, not reference or self alignments and
+not whole-workflow completion. Include it separately in the comparison delivery.
+
+`full_self_seed_pilot.py` is a **new, isolated diagnostic**, not a self router.
+It runs the exact complete 289,508,469 bp query from the live 3D self batch,
+with the original cached index, single thread, names and self-specific flags;
+only `-f 0.005` is added. It never builds an index or writes to the analysis
+workspace and never creates a native completion marker. The live original
+batch is the only baseline; no duplicate baseline is launched.
+
+It validates source/tool/index identities, complete traversal, PAFs and source
+stability. Timeout/interruption kills and waits for its child; an existing
+output directory is refused. Mapping has an 1800-second limit. The ten tests
+passed locally and in remote job `42740281`, which was RUNNING at 08:45:41 on
+agent-X86-61 (8 scheduler CPUs/80 GiB for memory, one mapper thread).
+The complete local incident suite passed 81 tests. Evidence and launch receipts
+are under `self-full-3D-pilot-20261119/`; inspect live status before any action.
+
+**No self candidate has been adopted or proven equivalent.** Any future decision
+requires a successfully committed native batch and self-specific all-hit/pair
+and positional checks. Primary-only cross comparisons or cropped-query window
+calibration do not establish preservation of self-alignment evidence.
