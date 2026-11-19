@@ -1,7 +1,8 @@
 """Experimental two-lane f0.005 self admission for an explicitly guarded plan.
 
-Not wired into the running single-lane job. Only bounded, whole-record f0.005
-queries with staged 64-GiB per-process-AS wrappers may overlap. Fast/native
+For newly staged overlays; running frozen plans are never edited in place.
+Only bounded, whole-record f0.005 queries with staged 64-GiB per-process-AS
+wrappers may overlap. Fast/native
 pools are not mixed; cross, unknown, f0.001 and oversized work stay exclusive.
 The 128-GiB lane reservations include helper overhead but are not a cgroup limit.
 """
@@ -53,12 +54,16 @@ class SelfDispatcher(AdaptiveDispatcher):
         if slots<=0 or available<=0:return []
         kinds={self.kind(item['task']) for item in active}
         if 'exclusive' in kinds or len(kinds)>1:return []
-        first=super().__call__(pending,available,budget,active,1)
-        if not first:return []
-        wanted=self.kind(first[0][0])
-        if wanted=='exclusive':return [] if active else first
-        if kinds and wanted not in kinds:return []
-        pool=next(iter(kinds)) if kinds else wanted
+        if kinds:
+            # Fill an existing pool before considering another pool's queue
+            # head. Otherwise a larger incompatible task can leave a lane
+            # idle even though compatible work is ready. No pool mixing.
+            pool=next(iter(kinds))
+        else:
+            first=super().__call__(pending,available,budget,active,1)
+            if not first:return []
+            pool=self.kind(first[0][0])
+            if pool=='exclusive':return first
         allowed=[task for task in pending if self.kind(task)==pool]
         # The two lanes each reserve 128 GiB; keep 32 GiB outside the 288-GiB pool.
         slots=min(slots,POLICY['reservation_pool_gib']//128-len(active))

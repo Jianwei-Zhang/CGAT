@@ -920,3 +920,26 @@
   没有修改科学builder或正在运行的冻结代码。两路AS保护也没有自动覆盖这些补比对。
 - 旧对照42523432仍RUNNING/grt_step2，未修改或取消。32核新作业当前约使用2核：
   当前保守资源额为并发试行/后续阶段预留，不以该阶段低CPU作为失败；不为缩额立即重启。
+
+
+### 2026-11-19 15:25：继续运行，队首阻塞修复仅保存仓库
+
+- 两主任务仍RUNNING。新版两路在14:52:29后持续推进；截至15:24:39已有36个leaf
+  TASK_END成功（含21个复用cross），当前6D hifiasm batch1和1D hifiasm batch4。
+  当前主进程资源快照CPU约198%、RSS4342MiB、历史峰值10654MiB；不是后续峰值保证。
+- 只读清点1342个self批次：原21个>=100Mb单record；另有1321个<100Mb，
+  其中已完成4D flye batch29。其余1320个按最大query分层为：<1Mb 96、1–10Mb 484、
+  10–50Mb 679、50–100Mb 61，总query约26.84Gb。它们尚未自动变成f0.005。
+  已完成20Mb flye批次native只耗4.335秒，但其PAF为空且query排序靠后，不能代表
+  所有短batch。先看实际执行，不从单条快例外推出尾部必快，也不为猜测立即改阈值重启。
+- 旧版当前run只读去重：15:17时1D为2402个distinct SUCCESS；4D为805个SUCCESS，
+  另16个已START未完成，无重复START的partition ID。日志编号大小不是进度计数：
+  repair_mummer.MummerExecution.indices按分区大小安排，后面出现较小编号不是重跑。
+- 定向回归复现资源dispatcher队首阻塞：active fast + 较大pending native + 可用pending
+  fast时原来返回空，反方向同样存在。仓库现改为先从active pool筛选可运行项，不混池、
+  不增加并发/内存上限、不改变无active时的原优先级。新测试先失败后修复通过，admission
+  6项及resource overlay 8项通过。**这项改动尚未部署远端，当前仍冻结v2。**
+  下一次确有必要资源切换时，从原单路scientific origin plan生成新隔离overlay，保留所有
+  原科学profile/key；不要修改v2文件或仅为这个短暂等待重提，避免又付出完整续跑校验。
+- 监控45573仍活跃，远端日志`logs/wheat-live-20261119-144627.jsonl`；有限90分钟监控
+  到期不等于任务退出。现场持续看实际TASK_START/END，不把21个running外层unit当并发数。

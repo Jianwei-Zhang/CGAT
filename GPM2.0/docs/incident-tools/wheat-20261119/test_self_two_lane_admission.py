@@ -36,6 +36,16 @@ class TwoLaneTests(unittest.TestCase):
         self.assertEqual(d([self.native],15,16,[{'task':self.tasks[0]}],16),[])
         self.assertEqual(d(self.tasks,15,16,[{'task':self.native}],16),[])
 
+    def test_active_pool_fills_free_lane_past_other_pool_queue_head(self):
+        d=self.dispatcher()
+        waiting_native=AlignmentTask('native',Path('/native/larger.sh'),1,work=200)
+        # An incompatible queue head must not block ready work in the active
+        # pool. It remains pending; this does not permit mixing the pools.
+        selected=d([waiting_native,self.tasks[1]],15,16,[{'task':self.tasks[0]}],16)
+        self.assertEqual([task for task,_threads in selected],[self.tasks[1]])
+        selected=d([self.tasks[0],self.native],15,16,[{'task':waiting_native}],16)
+        self.assertEqual([task for task,_threads in selected],[self.native])
+
     def test_cross_unknown_and_unmeasured_profiles_stay_exclusive(self):
         d=self.dispatcher()
         for task in (self.cross,AlignmentTask('unknown',Path('/unknown'),1,work=1000)):
