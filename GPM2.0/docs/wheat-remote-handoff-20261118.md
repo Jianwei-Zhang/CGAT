@@ -608,3 +608,32 @@
 - 后续优先检查 42767640 与当前 native batch 的真正完成状态；候选可供后续
   profile 下复用，不是为了“证明速度”再启动一条完整 native。只读主监控仍为
   会话 51160，约 12:27 到时结束；监控结束不代表科学作业结束。
+
+
+## 2026-11-19 11:42：self profile 执行/复用/合并层验证完成，尚未接入主任务
+
+- 新增 `self_seed_profile.py` 与定向测试，原 runtime/helper/manifest/command
+  均未修改。>=100 Mb 单条查询显式 f0.001，profile JSON、原 manifest、代码/
+  helper/contract 依赖都受 SHA 绑定；新 batch key 不冒用 native key。
+- 支持复用已完成的 moderate `candidate.json`：核实完整输入/索引/实际命令、
+  成功状态和全部输出后复制，**不重跑 mapper、不重复恢复名称**。候选来源
+  回执也绑定 profile，修改来源/参数/索引证明/结果或失败退出均不能命中缓存。
+- 不覆盖已有 native/未知 complete.json；若原任务在切换前已经完成，应刷新
+  选择计划保留它。原 manifest/普通批次 key 保持原样。
+- 已验证混合 native/profile 的按原顺序合并，包括**普通 native 批次最后完成**。
+  原 native merger 会拒绝 profile key，故控制器必须在原 finish 回调提交外层
+  检查点之前处理 profile-aware merge。不能只换 batch mapper。
+- 本地全部事故工具 **153 项通过**。远端真实冻结 helper/contract 的合成微型
+  回归：**42768267 SUCCEEDED**，11:40:38–11:40:40，agent-X86-13，
+  **24 项通过**；目录 `self-profile-runtime-validation-v2-20261119/`，有
+  SHA 清单、日志、final-job.json。旧 v1 作业 42768225 也成功，保留不覆盖。
+  这验证执行协议，不是完整科学数据、整个 q0 或工作流验收。
+- 最终 runtime SHA：
+  `7f9edd0b236787e4a1aeea687ad0147020516de63972fdc78edaf2f9f0500eb8`。
+- **仍未完成，不得部署/取消主任务**：自动 profile 计划生成、控制器覆盖与
+  完成回调、cross/self 外层检查点组合、独立 q0 evidence reader、可移植 audit。
+  控制器还应以完整 self operation 为单位复用已完成组，避免续跑时每个缓存
+  batch 都再次完整合并/校验同一组；不能通过放弃结果内容校验省时间。
+- **42767640** 完整 f0.001 候选在 11:41 仍 RUNNING；11:37 左右采样约
+  0.93 核、13070 MiB 内存，未完成。不能称为已采用或承诺整条查询的加速倍率。
+  两个主任务及当前只读监控 51160 均保持不动。

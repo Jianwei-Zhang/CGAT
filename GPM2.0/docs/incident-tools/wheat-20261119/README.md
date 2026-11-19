@@ -502,3 +502,28 @@ limit bounds this single long-query trial; child termination/wait, full
 traversal, PAF/CIGAR geometry, restoration and pre/post source hashes remain
 required. No source or native complete marker is changed. Future adoption
 requires a separately verified explicit self execution profile.
+
+### Explicit self profile execution layer (tested, not connected to main jobs)
+
+`self_seed_profile.py` validates an isolated immutable profile over an unchanged
+assignment-bound native manifest. Only selected single-record queries >=100 Mb
+receive `-f 0.001` and distinct profile-bound batch keys. Ordinary batch keys
+and original manifests stay unchanged. Original tool/index/query/name mapping,
+full traversal and PAF geometry remain checked. A receipt binds the actual
+command, validated index proof, inputs, outputs and any adopted candidate.
+
+A completed whole moderate candidate can be copied after exact source/output
+verification without launching a mapper or restoring names again. Existing
+native/unknown completion markers are preserved and cause a request to refresh
+the plan, not an overwrite. Profile-aware merging accepts mixed native/profile
+batches in original order; the original native merger cannot certify the new
+keys. Tests specifically cover a native batch finishing last and corruption of
+receipts, index proofs, adoption origins and output files.
+
+This is only the producer/cache/merge layer. It does NOT yet supply a staging
+plan, owning controller callbacks, composed cross/self outer-checkpoint binding,
+q0 evidence reader or portable audit exporter. Do not invoke it on the live
+workspace or cancel a main job just because these focused tests pass. Its owner
+must hold the usual workspace lock and merge before the original group finish
+callback; completed groups should be reused as groups to avoid repeatedly
+validating/merging all completed batches during resume.
