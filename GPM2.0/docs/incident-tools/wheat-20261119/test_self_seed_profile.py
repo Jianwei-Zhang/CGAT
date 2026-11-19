@@ -78,6 +78,18 @@ class SelfSeedProfileTests(unittest.TestCase):
         helper.publish(directory, "native-1", runtime.OUTPUTS)
         return text
 
+    def test_aggressive_profile_changes_actual_command_and_receipt_without_trial_timeout(self):
+        old_key = self.profile.manifest['batches'][0]['key']
+        self.spec['policy']['seed_fraction'] = '0.005'
+        self.path.write_text(json.dumps(self.spec)); self.profile = runtime.Profile(self.path)
+        self.assertIsNone(self.profile.policy['mapper_timeout_seconds'])
+        self.assertNotEqual(old_key, self.profile.manifest['batches'][0]['key'])
+        self.run_profile()
+        receipt = json.loads((self.directory / runtime.RECEIPT).read_text())
+        self.assertEqual(receipt['command'][-4:-2], ['-f', '0.005'])
+        self.assertEqual(receipt['policy']['seed_fraction'], '0.005')
+        self.assertTrue(self.profile.validate_batch(0))
+
     def test_keys_change_only_selected_batches(self):
         before = self.source.read_bytes()
         self.assertNotEqual(self.profile.manifest["batches"][0]["key"], "native-0")
@@ -152,7 +164,7 @@ class SelfSeedProfileTests(unittest.TestCase):
     def test_changed_source_and_policy_rejected(self):
         self.source.write_text(self.source.read_text() + " ")
         with self.assertRaisesRegex(ValueError, "dependency changed"): self.profile.verify()
-        spec = copy.deepcopy(self.spec); spec["policy"]["seed_fraction"] = "0.005"
+        spec = copy.deepcopy(self.spec); spec["policy"]["seed_fraction"] = "0.002"
         self.path.write_text(json.dumps(spec))
         with self.assertRaisesRegex(ValueError, "unsupported"): runtime.Profile(self.path)
 

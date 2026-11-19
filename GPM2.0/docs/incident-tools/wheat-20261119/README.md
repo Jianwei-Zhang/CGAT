@@ -503,11 +503,13 @@ traversal, PAF/CIGAR geometry, restoration and pre/post source hashes remain
 required. No source or native complete marker is changed. Future adoption
 requires a separately verified explicit self execution profile.
 
-### Explicit self profile execution layer (tested, not connected to main jobs)
+### Explicit self profile execution layer (incident-only cutover)
 
 `self_seed_profile.py` validates an isolated immutable profile over an unchanged
 q0-input-bound native manifest. Only selected single-record queries >=100 Mb
-receive `-f 0.001` and distinct profile-bound batch keys. Ordinary batch keys
+receive an explicit `-f 0.001` or `-f 0.005` policy and distinct profile-bound batch keys.
+The owning production profile has no diagnostic 90-minute mapper timeout;
+isolated pilot time budgets remain separate. Ordinary batch keys
 and original manifests stay unchanged. Original tool/index/query/name mapping,
 full traversal and PAF geometry remain checked. A receipt binds the actual
 command, validated index proof, inputs, outputs and any adopted candidate.
@@ -521,14 +523,13 @@ keys. Tests specifically cover a native batch finishing last and corruption of
 receipts, index proofs, adoption origins and output files.
 
 The producer/cache/merge layer is complemented by the tested controller adapter
-below and by the isolated entry/reader/stager further below. None is deployed
-to the main job. A portable combined audit exporter and controlled cutover
-remain outstanding. Do not invoke it on the live
+below and by the isolated entry/reader/stager further below. Deployment is always explicit; see the dated handoff for the active job.
+The portable combined audit exporter below must accompany final project delivery. Do not invoke it on the live
 workspace or cancel a main job just because these focused tests pass. Its owner
 must hold the usual workspace lock.
 
 
-### Self dispatch and outer-checkpoint composition (not deployed)
+### Self dispatch and outer-checkpoint composition (immutable plan-bound)
 
 `self_profile_bindings.py` replaces only explicitly selected self commands,
 restores original task identities in callbacks, verifies/reuses cached batches
@@ -552,7 +553,7 @@ completion. Callback checks are scoped to their affected operation. Scientific
 flags remain unchanged for native-only batches.
 
 
-### Isolated self entry, combined reader and metadata staging (not deployed)
+### Isolated self entry, combined reader and metadata staging (explicit installation)
 
 `self_profile_context.py` verifies the original frozen cross plan/runtime and
 composes self/cross checkpoint identities. `resume_with_self_profile.py` requires
@@ -562,16 +563,19 @@ launcher; it never accepts a preview plan for execution.
 not only a descriptive note, and restores its module hooks on failure.
 `stage_self_profile.py` generates a new isolated plan covering every planned
 self operation, excludes already-native-complete batch markers, and preserves
-all original manifest/command files. Final staging still requires a completed
-f0.001 candidate; an f0.002 diagnostic cannot silently satisfy that contract.
+all original manifest/command files. Final staging requires a completed candidate matching its explicit fraction.
+For f0.005 it additionally binds the completed evidence-loss audit; f0.002
+cannot silently satisfy either execution policy. A completed native batch wins
+over candidate adoption. The f0.005 plan does not recopy the 3D candidate over
+its already-complete native baseline.
 
 `self_profile_admission.py` preserves **exclusive execution for all long/fast,
 cross and unknown work**. A single low observed RSS does not prove other long
 queries safe to overlap. `max_fast=1` cannot be enlarged by the stager; only the
 existing native-small two-process allowance remains. This corrects an earlier
 isolated preview heuristic which allowed four fast queries based on one peak.
-Frozen remote preview directories are not overwritten; neither version has
-been installed in the main workflow. Reservation numbers are not hard mapper
+Frozen remote preview directories are not overwritten. The dated handoff
+distinguishes previews from the explicitly installed active profile. Reservation numbers are not hard mapper
 memory limits.
 
 ### Full fast-self evidence audit (no mapping or adoption)
@@ -589,3 +593,28 @@ pair. This catches a risk that coverage-only comparisons hide; it is not a full
 q0 uniqueness/admission replay. Reference placement, sequence complexity,
 target-side uniqueness and all competing 100bp overlaps remain unevaluated.
 The audit never writes workspace outputs or certifies final biological accuracy.
+
+
+### Authorized aggressive self cutover and portable companion
+
+After the user explicitly accepted greater precision loss for within-assembly
+self evidence on 2026-11-19, the incident planner may select f0.005 for unfinished
+single queries >=100 Mb. Reference and between-assembly policies are unchanged.
+`resume_with_self_profile.py --install-reader` requires the real acquired
+workspace lock, an unchanged previous launcher, and absent q0 evidence/reader
+declaration. It preserves the old launcher and SHA receipt outside the workspace,
+atomically replaces only that launcher, and restores it if installation fails.
+It never installs from a preview or steals an active lock.
+
+`self_profile_audit.py` verifies committed merged/self outputs and selected
+batch receipts, composes the existing verified cross audit, and exports a
+portable companion without private absolute paths. Each approximated query,
+actual fraction, result hash and native/executed key is explicit. Run it on a
+compute node after q0 alignments complete, using the final plan and an output
+outside the workspace; deliver it alongside the finished project. This is not
+whole-workflow or biological-accuracy certification.
+
+`inspect_moderate_self_candidate.py` prepares the separate complete f0.001/f0.002
+comparison path. It rejects unfinished, timed-out, mislabelled or wrong-driver
+candidates and never launches the original mapper. That middle-parameter trial
+no longer blocks the explicitly authorized f0.005 self execution.

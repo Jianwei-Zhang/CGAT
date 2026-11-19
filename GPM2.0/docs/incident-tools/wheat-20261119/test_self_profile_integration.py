@@ -15,6 +15,7 @@ import self_profile_evidence_reader as reader_driver
 import routing_q0_evidence_reader as reader_helper
 import routing_resume_support as cross_support
 import stage_self_profile as stager
+import resume_with_self_profile as entry
 from alignment_tasks import AlignmentTask
 from lgz_core import q0_preparation as q0
 import run_orchestration as contract
@@ -196,6 +197,70 @@ class CalibrationTests(unittest.TestCase):
     def test_changed_resource_log_not_used_for_admission(self):
         self.write(); self.stderr.write_text('forged low RSS')
         with self.assertRaisesRegex(ValueError,'resource evidence'): stager.calibration(self.report)
+
+
+    def test_aggressive_calibration_requires_matching_complete_loss_audit(self):
+        self.write(peak=5)
+        data=json.loads(self.report.read_text())
+        native=['minimap2','-c','index','query']
+        data.update(scope='one_complete_self_query_candidate_only',
+            status='candidate_complete_not_compared_not_adopted',native_command=native,
+            command=native[:-2]+['-f','0.005']+native[-2:],driver_sha256=stager.pilot.digest(Path(stager.pilot.__file__)))
+        for key in ('seed_fraction','whole_records_preserved','restoration'):data.pop(key)
+        self.report.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError,'evidence-loss audit'):
+            stager.calibration(self.report,'0.005')
+        audit=self.root/'audit.json'
+        audit.write_text(json.dumps({'status':'full_self_identity_strata_compared_not_adopted',
+            'candidate_adopted':False,'analysis_workspace_modified':False,'checked_source_files':data['outputs']}))
+        self.assertEqual(stager.calibration(self.report,'0.005',audit)[1]['max_fast'],1)
+        audit.write_text('{}')
+        with self.assertRaisesRegex(ValueError,'does not bind'):
+            stager.calibration(self.report,'0.005',audit)
+
+
+class ReaderInstallationTests(unittest.TestCase):
+    def setUp(self):
+        temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup);self.root=Path(temp.name)
+        self.work=self.root/'work';self.work.mkdir();self.stage=self.root/'stage';self.stage.mkdir()
+        self.target=self.work/'prepare_q0_evidence.sh';self.target.write_text('old launcher');self.target.chmod(0o755)
+        self.source=self.stage/'launcher';self.source.write_text('new launcher')
+        self.ctx=SimpleNamespace(work=self.work,path=self.stage/'plan.json',plan_sha='plan',contract=contract,
+            helper=SimpleNamespace(LAUNCHER=self.target.name,RECEIPT='metadata/incident_q0_routing_reader.json'),
+            plan={'preview_only':False,'prior_launcher':stager.record(self.target),
+                  'dependencies':{'launcher':stager.record(self.source)}})
+        self.lock=SimpleNamespace(acquired=True,server_dir=self.work,run_id='run',_existing_owner=lambda:{'run_id':'run'})
+
+    def test_install_backup_receipt_and_repeat_without_replacing_again(self):
+        entry.install_reader(self.ctx,self.lock)
+        self.assertEqual(self.target.read_text(),'new launcher')
+        self.assertEqual((self.stage/'reader-installation/prepare_q0_evidence.sh').read_text(),'old launcher')
+        self.assertEqual(self.target.stat().st_mode&0o777,0o755)
+        before=self.target.stat().st_ino
+        entry.install_reader(self.ctx,self.lock)
+        self.assertEqual(before,self.target.stat().st_ino)
+
+    def test_no_lock_preview_changed_source_or_published_evidence_rejected(self):
+        self.lock.acquired=False
+        with self.assertRaises(ValueError):entry.install_reader(self.ctx,self.lock)
+        self.lock.acquired=True;self.ctx.plan['preview_only']=True
+        with self.assertRaises(ValueError):entry.install_reader(self.ctx,self.lock)
+        self.ctx.plan['preview_only']=False
+        (self.work/'metadata').mkdir();(self.work/'metadata/grt_q0_evidence.json').write_text('{}')
+        with self.assertRaises(ValueError):entry.install_reader(self.ctx,self.lock)
+        self.assertEqual(self.target.read_text(),'old launcher')
+        self.assertFalse((self.stage/'reader-installation').exists())
+
+    def test_receipt_publication_failure_restores_original_launcher(self):
+        with patch.object(contract,'atomic_write_json',side_effect=OSError('fixture failure')):
+            with self.assertRaises(OSError):entry.install_reader(self.ctx,self.lock)
+        self.assertEqual(self.target.read_text(),'old launcher')
+
+    def test_linked_target_or_changed_target_not_overwritten(self):
+        self.target.write_text('unexpected')
+        with self.assertRaises(ValueError):entry.install_reader(self.ctx,self.lock)
+        self.assertEqual(self.target.read_text(),'unexpected')
+
 
 
 class StagingTests(unittest.TestCase):

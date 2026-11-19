@@ -745,3 +745,55 @@
 - f=.002完整候选42802491继续 RUNNING；新增独立只读监控会话 **90604**，
   `/tmp/cgat-wheat-middle-candidate-monitor.py`，30秒采样，终态才结束并保存final-job.json。
   主任务监控62156继续，不因候选失败或监控超时重提主任务。
+
+
+## 2026-11-19 13:38：按用户进一步放宽 self 精度，已受控切换到 f0.005 入口
+
+- 用户最新明确授权：同一 de novo 内部比对用途低于组装间比对，可进一步放开
+  精度下降限制。因此 f0.002 试验不再阻塞 f0.005 self 接入；不是将整个工作流
+  或 reference/cross 一并放宽。已完成3D native继续保留，默认触发仍为单条>=100Mb。
+- 补充规模/内存实测：13:17新版旧进程30134 MiB/327680 MiB（约29.4/320 GiB），
+  3D完成峰值21.646GB；剩余20条超长 query最大263669096bp、target集合最大764542142bp。
+  可独立评估self两路，但现阶段只切换参数，不同时解除长任务独占。
+- runtime支持显式f0.001/f0.005身份，生产mapper不继承试验5400秒上限。f0.005 final
+  staging绑定已完成候选和完整损失审计；不存在伪装native key或采用失败临时输出。
+  新增持正常工作区锁安装reader，保留launcher备份/hash回执，已发布q0证据/旧声明
+  存在则拒绝隐式迁移。增加portable cross/self companion exporter，输出逐query真实
+  参数/输入输出hash/执行key，不泄露私有绝对路径；最终交付必须附带，尚未生成。
+- 本地全事故工具 **206项通过**（`/tmp/wheat-aggressive-all-tests.log`）。远端真实
+  冻结工具验证 **42811986 SUCCEEDED**，13:30:44–13:31:06，agent-X86-07，
+  **88项通过**。源码冻结在 `self-aggressive-runtime-20261119/`；preview成功覆盖
+  44组/20近似批次/0候选复用，entry和reader只读加载均通过。
+- 替代主任务 **42813048 RUNNING**，13:33:32，agent-X86-36，申请32CPU/320GiB，
+  actual mapper并发：long/fast/cross/unknown独占，仅native-small最多2进程。
+  `self-aggressive-resume-20261119/resume.dsub`先检查代码SHA并等待明确handoff，
+  ready.json确认分配到资源后，才停止原新版 **42710779**。后者FAILED是明确dkill
+  的预期终态，不是新bug；正常`.run_all/lock`已释放，未偷锁、未删数据。
+  旧对照 **42523432**保持运行，不停止、不修改。
+- cutover-before.json、stopped-job.json、handoff.json保存在上述resume目录。final plan
+  由新计算节点在旧作业停止后生成，避免误覆盖切换前新完成的native batch。
+  final目录 `self-aggressive-plan-20261119/`，SHA
+  `9cd695dfb4fdcae362483843239d07f80a088b08c7c2a747ac6c2c110817635d`，44组/20选中/0复用。
+- 新entry已经打印EXPLICIT_SELF_PROFILE_RESUME，实际run_id
+  `20261119T053543Z-3535567-b85fd419`。13:37:12进入Runner RESUME/PREFLIGHT，
+  effective threads16（原resource历史保留）。**此记录时尚未核实第一条f0.005
+  mapper真正开始/完成，后续必须补证，不能仅凭提交或入口日志宣称提速已兑现。**
+- 主日志 `logs/resume_self_aggressive_42813048.out`。旧监控62156在13:35按旧新版
+  停止终态正常结束；需要切换主监控到42813048，并识别profile-attempt-*。
+  f0.002候选42802491和其监控90604仍独立，未改变它的运行文件。
+- 一次SSH banner超时后同别名重试成功；未修改路由、认证、proxy或关闭共享master。
+- 所有上文目录相对于 `jm19-compare-614589f-20261118/`。当前生产reader launcher
+  的备份/安装凭据位于final plan的`reader-installation/`。最终q0完成后在计算节点用
+  同冻结runtime的self_profile_audit.py导出companion，与已有cross审计一起保留交付。
+
+### 13:41 安装与参考复用补证
+
+- Reader安装回执已存在，old SHA
+  `21a9dbb0bfad11fdf52a583ad0babb94a8688d256883a25ee52dab6d66f72ff2`，
+  installed SHA `f7a34cdfdd0693ee0a00705c3cd3b1dbe8068ef98f99981cc3403bc132775632`。
+  13:38:12 hifiasm ref、13:39:47 flye ref 均 **SKIP_VALID**，不是重新比对。
+- 主监控已切换为 **64397**，本地脚本`/tmp/cgat-wheat-live-monitor-aggressive.py`，
+  监控42523432/42813048，识别native attempt和profile-attempt。后续先核实新 mapper
+  命令、SELF_BATCH_REUSED/SELF_PROFILE_COMMITTED，再称为实际参数提速。
+- 若已经有profile批次提交，不能恢复旧cross-only reader/旧入口冒充native续跑。
+  应使用同一冻结final plan恢复；改变执行参数/策略需显式迁移，保留所有既有产出。

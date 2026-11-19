@@ -20,7 +20,7 @@ import full_self_seed_pilot as pilot
 
 SCHEMA = "incident_self_seed_profile_v1"
 POLICY = {"scope": "q0_self_single_whole_record", "minimum_query_bases": 100_000_000,
-          "seed_fraction": "0.001", "mapper_timeout_seconds": 5400,
+          "seed_fraction": "0.001", "mapper_timeout_seconds": None,
           "native_flags_unchanged": True}
 OUTPUTS = ("raw.paf", "result.paf", "stderr.log")
 RECEIPT = "self-profile-receipt.json"
@@ -51,10 +51,11 @@ def index_key(manifest):
                      "preset": manifest["preset"], "index_limit": "8G"})
 
 
-def mapping_command(manifest, batch, tool, index):
+def mapping_command(manifest, batch, tool, index, policy=None):
+    policy = POLICY if policy is None else policy
     return [str(tool), "-c", "-x", manifest["preset"], "-X", "--no-hash-name",
             "-m", str(manifest["min_chain_score"]), "-n", str(manifest["minimizers"]),
-            "-t", "1", "-f", POLICY["seed_fraction"], str(index), batch["query"]]
+            "-t", "1", "-f", policy["seed_fraction"], str(index), batch["query"]]
 
 
 class Profile:
@@ -62,7 +63,9 @@ class Profile:
         self.path = Path(path).resolve(strict=True)
         self.sha = pilot.digest(self.path)
         self.spec = json.loads(self.path.read_text())
-        if self.spec.get("schema") != SCHEMA or self.spec.get("policy") != POLICY:
+        self.policy = self.spec.get("policy", {})
+        if (self.spec.get("schema") != SCHEMA or self.policy.get("seed_fraction") not in ("0.001", "0.005")
+                or self.policy != {**POLICY, "seed_fraction": self.policy.get("seed_fraction")}):
             raise ValueError("unsupported self execution profile")
         self.work = Path(self.spec["workspace"]).resolve(strict=True)
         if self.path == self.work or self.work in self.path.parents:
@@ -130,11 +133,11 @@ class Profile:
             marker = json.loads((directory / "complete.json").read_text())
             expected = {"schema": SCHEMA, "profile_sha256": self.sha,
                         "native_key": self.native["batches"][index]["key"], "key": batch["key"],
-                        "batch_index": index, "status": "complete", "policy": POLICY}
+                        "batch_index": index, "status": "complete", "policy": self.policy}
             if any(receipt.get(k) != v for k, v in expected.items()) or receipt.get("outputs") != marker["outputs"]:
                 return False
             tool = Path(receipt["command"][0])
-            if receipt["command"] != mapping_command(self.native, batch, tool, Path(self.native["cache"]) / "target.mmi"):
+            if receipt["command"] != mapping_command(self.native, batch, tool, Path(self.native["cache"]) / "target.mmi", self.policy):
                 return False
             if receipt.get("tool_sha256") != self.native["identities"]["tool"]:
                 return False
@@ -207,7 +210,7 @@ def reuse_candidate(profile, index, command, inputs, attempt):
             or source.get("whole_records_preserved") is not True
             or source.get("mapping", {}).get("returncode") != 0
             or source.get("restoration", {}).get("returncode") != 0
-            or source.get("seed_fraction") != POLICY["seed_fraction"]
+            or source.get("seed_fraction") != profile.policy["seed_fraction"]
             or source.get("native_batch_key") != profile.native["batches"][index]["key"]
             or source.get("command") != command):
         raise ValueError("whole candidate does not match this explicit profile batch")
@@ -254,7 +257,7 @@ def run_batch(profile, index):
             print("SELF_PROFILE_CACHE_HIT", index, flush=True)
             return
         index_path = helper.ensure_index(manifest, tool, Path(manifest["target"]), Path(manifest["cache"]), 1)
-        command = mapping_command(manifest, batch, tool, index_path)
+        command = mapping_command(manifest, batch, tool, index_path, profile.policy)
         inputs = pilot.identities([query, tool, index_path, Path(manifest["name_map"]), Path(manifest["restore"])])
         index_proof = json.loads((Path(manifest["cache"]) / "complete.json").read_text())
         if (index_proof.get("key") != index_key(manifest)
@@ -265,7 +268,7 @@ def run_batch(profile, index):
         helper.atomic_json(attempt / "command.json", command)
         adoption = reuse_candidate(profile, index, command, inputs, attempt)
         mapping = (adoption["mapping"] if adoption is not None else
-                   pilot.run_child(command, attempt / "raw.paf", attempt / "stderr.log", POLICY["mapper_timeout_seconds"]))
+                   pilot.run_child(command, attempt / "raw.paf", attempt / "stderr.log", profile.policy["mapper_timeout_seconds"]))
         if mapping["returncode"]:
             raise ValueError("self profile mapper failed or timed out; attempt preserved")
         pilot.verify_completion(attempt / "stderr.log", 1)
@@ -293,7 +296,7 @@ def run_batch(profile, index):
             os.replace(attempt / name, directory / name)
         receipt = {"schema": SCHEMA, "status": "complete", "profile_sha256": profile.sha,
             "native_key": manifest["batches"][index]["key"], "key": batch["key"], "batch_index": index,
-            "policy": POLICY, "command": command, "inputs": inputs, "mapping": mapping,
+            "policy": profile.policy, "command": command, "inputs": inputs, "mapping": mapping,
             "adoption": adoption, "index_proof": index_proof,
             "tool_sha256": manifest["identities"]["tool"],
             "outputs": {name: pilot.digest(directory / name) for name in OUTPUTS}}

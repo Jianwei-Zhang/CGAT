@@ -20,7 +20,8 @@ HERE = Path(__file__).resolve().parent
 MODULES = {'stager': 'stage_self_profile.py', 'entry': 'resume_with_self_profile.py',
            'reader': 'self_profile_evidence_reader.py', 'context': 'self_profile_context.py',
            'support': 'self_profile_bindings.py', 'runtime': 'self_seed_profile.py',
-           'pilot': 'full_self_seed_pilot.py', 'admission': 'self_profile_admission.py'}
+           'pilot': 'full_self_seed_pilot.py', 'admission': 'self_profile_admission.py',
+           'audit_exporter': 'self_profile_audit.py', 'cross_audit': 'export_routing_provenance.py'}
 
 
 def record(path):
@@ -28,17 +29,36 @@ def record(path):
     return {'path': str(path), 'sha256': pilot.digest(path)}
 
 
-def calibration(candidate):
+def calibration(candidate, fraction="0.001", audit=None):
     candidate = Path(candidate).resolve(strict=True)
     data = json.loads(candidate.read_text())
-    if (data.get('scope') != 'one_complete_self_query_moderate_candidate_only'
-            or data.get('status') != 'moderate_candidate_complete_not_adopted'
-            or data.get('seed_fraction') != '0.001'
-            or data.get('mapping', {}).get('returncode') != 0
-            or data.get('restoration', {}).get('returncode') != 0
-            or data.get('analysis_workspace_modified') is not False
-            or data.get('candidate_adopted') is not False or data.get('whole_records_preserved') is not True):
-        raise ValueError('a completed whole moderate candidate is required, not partial mapping output')
+    if fraction not in ("0.001", "0.005"):
+        raise ValueError('unsupported execution profile fraction')
+    common = (data.get('analysis_workspace_modified') is False and data.get('candidate_adopted') is False
+              and data.get('mapping', {}).get('returncode') == 0)
+    if fraction == "0.001":
+        valid = (data.get('scope') == 'one_complete_self_query_moderate_candidate_only'
+            and data.get('status') == 'moderate_candidate_complete_not_adopted'
+            and data.get('seed_fraction') == fraction and data.get('restoration', {}).get('returncode') == 0
+            and data.get('whole_records_preserved') is True)
+    else:
+        command, native = data.get('command', []), data.get('native_command', [])
+        valid = (data.get('scope') == 'one_complete_self_query_candidate_only'
+            and data.get('status') == 'candidate_complete_not_compared_not_adopted'
+            and len(native) >= 4 and command == native[:-2] + ['-f', fraction] + native[-2:]
+            and data.get('driver_sha256') == pilot.digest(Path(pilot.__file__)))
+        if audit is None:
+            raise ValueError('aggressive profile requires its complete evidence-loss audit')
+        proof = json.loads(Path(audit).read_text())
+        if (proof.get('status') != 'full_self_identity_strata_compared_not_adopted'
+                or proof.get('candidate_adopted') is not False
+                or proof.get('analysis_workspace_modified') is not False
+                or not data.get('outputs')
+                or any(proof.get('checked_source_files', {}).get(path) != value
+                       for path, value in data['outputs'].items())):
+            raise ValueError('aggressive calibration audit does not bind this candidate')
+    if not common or not valid:
+        raise ValueError('a completed whole candidate matching the profile is required, not partial mapping output')
     stderr = candidate.parent / 'stderr.log'
     proof = data['outputs'].get(str(stderr))
     if not proof or pilot.identities([stderr])[str(stderr)] != proof:
@@ -47,13 +67,14 @@ def calibration(candidate):
     peaks = re.findall(r'Peak RSS: ([0-9.]+) GB', stderr.read_text())
     if len(peaks) != 1 or not 0 < float(peaks[0]) < 10000:
         raise ValueError('candidate peak RSS is missing or invalid')
-    peak = float(peaks[0])
-    return data, {'report': record(candidate), 'observed_peak_rss_gb': peak,
-                  'max_fast': 1,
-                  'interpretation': 'observed peak only; long queries remain exclusive, not a memory guarantee'}
+    measured = {'report': record(candidate), 'observed_peak_rss_gb': float(peaks[0]), 'max_fast': 1,
+        'interpretation': 'observed peak only; long queries remain exclusive, not a memory guarantee'}
+    if audit is not None:
+        measured['evidence_loss_audit'] = record(audit)
+    return data, measured
 
 
-def stage(work, cross_plan, reader_helper, output, *, preview, candidate=None):
+def stage(work, cross_plan, reader_helper, output, *, preview, candidate=None, fraction="0.001", audit=None):
     work, cross_plan = work.resolve(strict=True), cross_plan.resolve(strict=True)
     output = output.resolve()
     if output.exists() or output == work or output.is_relative_to(work) or work.is_relative_to(output):
@@ -66,11 +87,16 @@ def stage(work, cross_plan, reader_helper, output, *, preview, candidate=None):
         raise ValueError('cross plan belongs to another workflow')
     source, measured = (None, {'max_fast': 1, 'interpretation': 'preview has no completed full candidate'})
     if candidate is not None:
-        source, measured = calibration(candidate)
+        source, measured = calibration(candidate, fraction, audit)
     elif not preview:
         raise ValueError('final staging requires completed full candidate calibration')
+    if fraction not in ("0.001", "0.005"):
+        raise ValueError("unsupported execution profile fraction")
+    policy = {**POLICY, "seed_fraction": fraction}
     dependencies = {name: record(HERE / filename) for name, filename in MODULES.items()}
     dependencies.update(cross_plan=record(cross_plan), reader_helper=record(reader_helper))
+    if audit is not None:
+        dependencies['calibration_audit'] = record(audit)
     output.mkdir(); (output / 'profiles').mkdir(); (output / 'commands').mkdir()
     plan_path = output / 'self-plan.json'
     launcher = output / 'prepare_q0_evidence.sh'
@@ -101,12 +127,12 @@ def stage(work, cross_plan, reader_helper, output, *, preview, candidate=None):
                     continue
                 if len(batch['entries']) == 1 and batch['entries'][0]['length'] >= POLICY['minimum_query_bases']:
                     selected.append(i)
-                    if (source is not None and source.get('native_batch_key') == batch['key']
+                    if (fraction == "0.001" and source is not None and source.get('native_batch_key') == batch['key']
                             and source.get('native_command', [None])[-1] == batch['query']):
                         adoptions[str(i)] = measured['report']; adoption_count += 1
             label = rel.replace('/', '__')
             profile_path = output / 'profiles' / (label + '.json')
-            profile = {'schema': SCHEMA, 'workspace': str(work), 'policy': POLICY,
+            profile = {'schema': SCHEMA, 'workspace': str(work), 'policy': policy,
                 'native_manifest': record(manifest_path), 'selected_batches': selected, 'adoptions': adoptions,
                 'dependencies': {'runtime': dependencies['runtime'], 'pilot': dependencies['pilot'],
                     'helper': record(work / '.prepare_lib/tools/self_alignment_batches.py'),
@@ -146,8 +172,10 @@ def main():
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--candidate', type=Path)
     parser.add_argument('--preview', action='store_true')
+    parser.add_argument('--fraction', choices=('0.001', '0.005'), default='0.001')
+    parser.add_argument('--audit', type=Path)
     args = parser.parse_args()
-    stage(args.work, args.cross_plan, args.reader_helper, args.output, preview=args.preview, candidate=args.candidate)
+    stage(args.work, args.cross_plan, args.reader_helper, args.output, preview=args.preview, candidate=args.candidate, fraction=args.fraction, audit=args.audit)
 
 
 if __name__ == '__main__':
