@@ -571,3 +571,40 @@
   成原生命令的 complete.json。普通批次和已成功结果不必全部重算。
 - 主作业仍为旧 42523432、新 42710779；本轮无取消、重提或参数热修改。
   监控仍使用会话 51160，重用而不是重启。
+
+
+## 2026-11-19 11:25：完整温和 self 候选已运行，接入约束已核对
+
+- **42767640 RUNNING**，11:21:49 在 **agent-X86-61** 启动，隔离目录
+  `self-full-3D-moderate-20261119/`。申请 4 CPU / 40960 MiB 为内存留余量，
+  实际 mapper 仍 1 线程；固定原 minimap2 2.31-r1302，避免架构/版本混杂。
+- `full_self_moderate_candidate.py` 对原完整 289508469 bp 查询、原缓存索引
+  仅增加 `-f 0.001`；不重跑 native、不修改原输入、不写原 complete.json。
+  实际 stderr 已加载 113 条 target、mid_occ=232（原参数 500），正在计算。
+  mapper 上限 5400 秒；超时仅 kill/wait 自己的子进程，不能当成完整结果。
+- 输出将为 `candidate/candidate.json`，成功状态必须是
+  `moderate_candidate_complete_not_adopted`。它与旧 f0.005 的 `pilot.json`
+  是不同协议，不能直接交给原 inspector 或伪装成 native 成功标记。
+  全遍历日志、PAF/CIGAR、恢复原名、原输入和所有输出 SHA 均需要验证。
+- 远端 **40 项测试通过**；本地事故工具 **139 项通过**。旧 f0.005 driver、
+  冻结 comparator/inspector 及两个主任务均未更换。本轮没有发布 CI。
+- 只读任务清点：>=100 Mb 的 21 个单记录批次分布在 **13 个 self operation**，
+  都属于 JM19_hifiasm，检查时这些批次均无 native 完成标记。该结论只是
+  计划/标记清点；最终接入前必须重新检查，不能覆盖后来已经完成的 native。
+- **接入边界（已核对代码，尚未实现/部署）**：
+  1. 原 assignment 输出身份包含原 self manifest/command，不能直接编辑它们。
+     应使用隔离执行 profile/manifest，明确绑定新 batch key 和实际参数，保留
+     原文件和所有成功跨组装叶子。当前 cross routing plan 的冻结依赖也不能热改。
+  2. 原 helper 的每个 batch 会尝试 native manifest 合并；新 profile key 不匹配
+     时它会返回未合并。故不能只替换长 batch mapper：须在受控 controller 的
+     self 完成回调中、原回调提交染色体检查点前，调用 profile-aware merge。
+     最后完成的可能是普通 native batch，因此回调须覆盖该 operation 的所有批次。
+  3. 外层 q0 commit 会重建字面 OuterCheckpointManager 复核身份；profile
+     适配须与已有 cross binding 组合，保留收尾复核，绑定合并回执/输出。
+     后续独立 q0 evidence reader 和最终可移植 provenance 也须理解相同 profile。
+  4. 现有 MemoryBoundedDispatcher 将隔离目录里的新 command 视为 unknown，
+     因而独占。若调整并发，必须把执行覆盖映射回真实 self 配置并依据新候选实测
+     峰值单独放宽；不能为了 self 把 cross/unknown 的 OOM 保护一并去掉。
+- 后续优先检查 42767640 与当前 native batch 的真正完成状态；候选可供后续
+  profile 下复用，不是为了“证明速度”再启动一条完整 native。只读主监控仍为
+  会话 51160，约 12:27 到时结束；监控结束不代表科学作业结束。

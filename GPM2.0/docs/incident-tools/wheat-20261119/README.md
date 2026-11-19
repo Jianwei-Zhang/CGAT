@@ -489,3 +489,16 @@ Tests cover immutable-source contracts, command changes, separate filters,
 all-hit retention and overwrite refusal. The 2026-11-19 user authorization
 permits accuracy/speed tradeoffs, not silent removal of source provenance or
 pretending that primary-only evidence represents the entire downstream input.
+
+### Whole-record moderate candidate (not deployed)
+
+`full_self_moderate_candidate.py` runs one isolated `-f 0.001` whole-query
+candidate, reusing the earlier f0.005 pilot only as a hash-bound source/index/
+command provenance record. It preserves every original self flag, name,
+length, query base and cached index. The native batch is not rerun. Output
+`candidate.json` has a distinct scope/status and cannot be accepted by the
+original f0.005 verifier or as a native batch marker. A 5400-second mapper
+limit bounds this single long-query trial; child termination/wait, full
+traversal, PAF/CIGAR geometry, restoration and pre/post source hashes remain
+required. No source or native complete marker is changed. Future adoption
+requires a separately verified explicit self execution profile.
