@@ -813,3 +813,30 @@
 - 本轮实现已提交推送master **d80213c** `[skip ci]`。独立UI工作树改动未暂存/提交。
   后续优先检查4A `SELF_PROFILE_COMMITTED`与新完整产出，及下一条自动路由，然后考虑
   在同类实测基础上的两路准入；不能只因为峰值低而改 frozen plan/代码。
+
+## 2026-11-19 14:04：首个主任务激进批次完成，下一条自动接续
+
+- **4A hifiasm batch-00001于13:59:39成功完成**，自13:45:45开始共约13分54秒。
+  mapper回执wall_seconds=820.483，minimap日志Real time820.313秒、CPU815.591秒，
+  **Peak RSS 5.738 GB**。raw.paf12527275字节、restored result.paf11806087字节；
+  成功receipt与complete.json的key/output hashes一致，正式writer完成了内容/CIGAR验证。
+- 实际参数f0.005、query220255611bp、target731737596bp。旧native尝试只跑到约66分钟
+  就因受控切换停止，**没有完整native耗时，不能给这条宣称精确加速倍率**。
+- 新版42813048已于13:59:39自动启动 **1A hifiasm batch-00000，263669096bp**，
+  实际profile-attempt command同为f0.005。全体>=100Mb原21条，现在native3D+fast4A共2条
+  完成，剩19条未完成（包括当前1A）。这不是4A整组或q0阶段已经完成。
+- 新只读进程采样 **42821390 SUCCEEDED**，13:53:02–13:54:04，固定agent-X86-36，
+  1CPU/1GiB。`self-memory-sample-20261119/samples.jsonl`含7次当前用户/目标workspace
+  minimap2采样，PID3542222：VmRSS/VmHWM约6009536–6010636kB，VmSize/VmPeak
+  7117596–7117696kB，Swap0、Threads2。采样不改运行进程；final-job.json已保存。
+  这些是约5.73GiB RSS /6.79GiB虚拟空间，支持进一步评估“两路+明确资源保护”，
+  不是无上限放开并发的依据。目前max_fast仍1，未部署资源限额wrapper或两路调度。
+- 检查了reader/任务组范围：plan与self计划均含22个q0_chr、44个self operation。
+  q0_chr:Un当前pending是尚未开始其首个leaf，不是漏出计划；其他21个unit因缓存leaf
+  回调已标running，并不代表21个mapper并行。Un两组均无近似selection，原生处理不变。
+- f0.002完整候选42802491仍独立运行（90分钟上限约14:39）；不阻塞主任务。
+  已将匹配冻结driver的完整比较+身份分层工具准备到`self-middle-inspection-20261119/`，
+  code.sha256校验通过，**inspect.dsub未提交**；仅在candidate.json真实完整成功后提交，
+  失败/超时则不比较临时PAF。它不重跑native mapper。
+- 旧对照42523432仍Step2的4D MUMmer分块，14:00有新的SUCCESS/START；单个分块编号
+  不是整体完成百分比。两主监控64397与候选监控90604继续，未重提其他科学作业。
