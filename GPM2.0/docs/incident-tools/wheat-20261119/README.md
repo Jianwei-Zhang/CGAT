@@ -399,3 +399,38 @@ query mapping took 444.913 s, with Minimap2 reporting 5.073 GB peak RSS. At 08:5
 the original native batch was still running. There is no completed-baseline
 speedup ratio or self-evidence agreement result yet, and the candidate remains
 unadopted. Its secondary/multi-position hits must be included in future comparison.
+
+### Self-specific all-hit comparator and verified candidate inventory
+
+`self_paf_comparison.py` retains **all** PAF hits, including secondary and zero-MAPQ
+hits. At each query-grid position / target / strand, it matches distinct target
+positions one-to-one; one surviving repeat placement cannot stand in for two
+baseline placements even inside the tolerance. Exact duplicate coordinates are
+coalesced and counted separately. Exact unions of CIGAR-aligned intervals per
+oriented pair additionally expose coverage losses shorter than the sampling grid.
+These pair-summed quantities are not genome-unique coverage. The comparison is
+baseline agreement, not ground-truth accuracy or exhaustive nucleotide agreement.
+
+`inspect_full_self_pilot.py` launches no mapper and never writes native results.
+It verifies the completed candidate's inputs, index, tool/helper, command trace
+and all outputs. Baseline comparison additionally requires the correct native
+batch key, complete output inventory and hashes, normal full traversal, and
+unchanged proof after comparison. A temporary/native PAF without its successful
+marker is never accepted. `--candidate-only` explicitly produces inventory only.
+Normal comparison reports both 1 kb and 10 kb grids; there is no adoption policy.
+
+Remote job **42744063** succeeded on agent-X86-18 at 09:11:04–09:11:12 on
+November 19. It passed **23** comparator/proof tests and validated the actual
+candidate inventory without rerunning alignment. Native completion was still
+absent, so the output is only
+`self-full-3D-comparison-20261119/candidate-inventory.json`:
+
+- 27,451 PAF rows: **24,855 secondary**, 2,596 primary;
+- 80 oriented query/target pairs;
+- 261,140 distinct sampled placements on the 1 kb grid, with 926 duplicate
+  placement observations coalesced.
+
+This measured secondary-hit majority confirms why the cross primary-only check
+cannot establish preservation of this self evidence. No baseline agreement or
+speedup ratio is available yet. The complete local incident suite passed
+**114 tests**. All main-job settings and outputs remain unchanged by this work.
