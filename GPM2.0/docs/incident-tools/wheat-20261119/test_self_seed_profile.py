@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -87,11 +88,27 @@ class SelfSeedProfileTests(unittest.TestCase):
         self.assertNotEqual(other["batches"][0]["key"], self.profile.manifest["batches"][0]["key"])
 
     def test_invalid_selections_rejected(self):
-        for selected in ([1], [0, 0], [-1], [2], [], [False]):
+        for selected in ([1], [0, 0], [-1], [2], [False]):
             with self.subTest(selected=selected), self.assertRaises(ValueError):
                 runtime.effective_manifest(self.native, selected, "profile")
         native = copy.deepcopy(self.native); native["batches"][0]["entries"] *= 2
         with self.assertRaises(ValueError): runtime.effective_manifest(native, [0], "profile")
+
+    def test_native_only_group_retains_original_keys_and_merge_identity(self):
+        self.spec["selected_batches"] = []
+        self.path.write_text(json.dumps(self.spec)); self.profile = runtime.Profile(self.path)
+        self.assertEqual(self.profile.manifest, self.native)
+        for name, text in (("raw.paf", self.raw), ("result.paf", self.restored), ("stderr.log", "native")):
+            (self.directory / name).write_text(text)
+        helper.publish(self.directory, "native-0", runtime.OUTPUTS)
+        self.publish_native_small()
+        self.assertTrue(helper.merge_if_complete(self.source, self.native))
+        before = (self.op / "result.paf").stat()
+        self.assertTrue(self.profile.merge())
+        after = (self.op / "result.paf").stat()
+        self.assertEqual((before.st_ino, before.st_mtime_ns), (after.st_ino, after.st_mtime_ns))
+        self.assertEqual(json.loads((self.op / "self_batch_result.json").read_text())["manifest_sha256"],
+                         runtime.pilot.digest(self.source))
 
     def test_run_restore_and_distinct_receipt(self):
         self.run_profile()
@@ -157,8 +174,12 @@ class SelfSeedProfileTests(unittest.TestCase):
         self.run_profile()
         receipt = self.directory / runtime.RECEIPT; saved = receipt.read_bytes(); receipt.unlink()
         self.assertFalse(self.profile.validate_batch(0)); receipt.write_bytes(saved)
-        (self.directory / "result.paf").write_text("corrupt")
-        self.assertFalse(self.profile.validate_batch(0))
+        output = self.directory / "result.paf"
+        self.assertTrue(self.profile.validate_batch(0))  # Prime the real scoped digest memo.
+        stat = output.stat()
+        output.write_bytes(output.read_bytes().replace(b"ctg1", b"ctg9"))
+        os.utime(output, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        self.assertFalse(self.profile.validate_batch(0))  # Same size/mtime is not acceptance.
 
     def candidate(self):
         directory = self.root / "candidate"; directory.mkdir()

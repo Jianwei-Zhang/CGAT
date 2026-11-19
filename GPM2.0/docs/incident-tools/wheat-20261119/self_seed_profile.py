@@ -32,7 +32,7 @@ def identity(value):
 
 
 def effective_manifest(native, selected, profile_sha):
-    if native.get("version") != 1 or not selected or selected != sorted(set(selected)):
+    if native.get("version") != 1 or not native.get("batches") or selected != sorted(set(selected)):
         raise ValueError("invalid self profile batch selection")
     result = copy.deepcopy(native)
     for index in selected:
@@ -101,7 +101,8 @@ class Profile:
             raise ValueError("wrong PAF contract imported")
 
     def verify(self):
-        if pilot.digest(self.path) != self.sha:
+        digest = self.contract.sha256_file if hasattr(self, "contract") else pilot.digest
+        if digest(self.path) != self.sha:
             raise ValueError("self profile changed")
         if set(self.spec["dependencies"]) != {"runtime", "helper", "contract", "pilot"}:
             raise ValueError("unexpected self profile dependency inventory")
@@ -109,13 +110,18 @@ class Profile:
         if Path(rows["runtime"]["path"]).resolve() != Path(__file__).resolve() or Path(rows["pilot"]["path"]).resolve() != Path(pilot.__file__).resolve():
             raise ValueError("unbound self executor")
         for row in rows.values():
-            if pilot.digest(Path(row["path"])) != row["sha256"]:
+            if digest(Path(row["path"])) != row["sha256"]:
                 raise ValueError("self profile source/dependency changed: " + row["path"])
 
     def validate_batch(self, index):
         batch = self.manifest["batches"][index]
         directory = Path(batch["directory"])
-        if not self.helper.valid_outputs(directory, batch["key"], OUTPUTS):
+        try:
+            marker = json.loads((directory / "complete.json").read_text())
+            if (marker.get("key") != batch["key"] or set(marker.get("outputs", {})) != set(OUTPUTS)
+                    or any(self.contract.sha256_file(directory / name) != marker["outputs"][name] for name in OUTPUTS)):
+                return False
+        except (OSError, ValueError, KeyError, TypeError, self.contract.OrchestrationContractError):
             return False
         if index not in self.selected:
             return True
@@ -164,6 +170,16 @@ class Profile:
         except (OSError, ValueError, KeyError, TypeError, IndexError):
             return False
 
+    @property
+    def merge_manifest_path(self):
+        # A native-only group preserves its original merge identity as well as
+        # all batch keys; do not recopy an already merged native PAF.
+        return self.path if self.selected else self.source
+
+    @property
+    def merge_manifest_sha(self):
+        return self.sha if self.selected else self.spec["native_manifest"]["sha256"]
+
     def merge(self):
         self.verify()
         # Presence gate avoids rehashing a completed prefix after every batch.
@@ -171,7 +187,7 @@ class Profile:
             return False
         if not all(self.validate_batch(i) for i in range(len(self.manifest["batches"]))):
             raise ValueError("self profile batch receipt/output mismatch before merge")
-        merged = self.helper.merge_if_complete(self.path, self.manifest)
+        merged = self.helper.merge_if_complete(self.merge_manifest_path, self.manifest)
         self.verify()
         return merged
 

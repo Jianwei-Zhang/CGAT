@@ -506,7 +506,7 @@ requires a separately verified explicit self execution profile.
 ### Explicit self profile execution layer (tested, not connected to main jobs)
 
 `self_seed_profile.py` validates an isolated immutable profile over an unchanged
-assignment-bound native manifest. Only selected single-record queries >=100 Mb
+q0-input-bound native manifest. Only selected single-record queries >=100 Mb
 receive `-f 0.001` and distinct profile-bound batch keys. Ordinary batch keys
 and original manifests stay unchanged. Original tool/index/query/name mapping,
 full traversal and PAF geometry remain checked. A receipt binds the actual
@@ -520,10 +520,32 @@ batches in original order; the original native merger cannot certify the new
 keys. Tests specifically cover a native batch finishing last and corruption of
 receipts, index proofs, adoption origins and output files.
 
-This is only the producer/cache/merge layer. It does NOT yet supply a staging
-plan, owning controller callbacks, composed cross/self outer-checkpoint binding,
+The producer/cache/merge layer is complemented by the tested controller adapter
+below. There is still no deployed staging plan, owning resume entry, combined
 q0 evidence reader or portable audit exporter. Do not invoke it on the live
 workspace or cancel a main job just because these focused tests pass. Its owner
-must hold the usual workspace lock and merge before the original group finish
-callback; completed groups should be reused as groups to avoid repeatedly
-validating/merging all completed batches during resume.
+must hold the usual workspace lock.
+
+
+### Self dispatch and outer-checkpoint composition (not deployed)
+
+`self_profile_bindings.py` replaces only explicitly selected self commands,
+restores original task identities in callbacks, verifies/reuses cached batches
+without launching the helper or rereading its derived index, and merges once
+per operation before its last successful callback. Ordinary batches can finish
+last; failed/cancelled groups cannot be published as successful. The adapter
+preserves an existing cross-bound checkpoint payload and output identities,
+and reconstructs the fresh composed input before publishing an outer marker.
+
+Native-only operations are supported with an empty selection: all native keys
+and the original native merge identity remain unchanged. A valid merged native
+PAF is not recopied. The eventual planner should include these operations too,
+so resume savings are not restricted to the thirteen operations with long
+queries. Source/tool/target/output digests remain mandatory; process-local hash
+memo entries originate from actual byte reads and recheck inode, size, mtime
+and ctime. A same-size alteration with restored mtime is rejected in tests.
+
+Full native-command inventories are verified at initialization/preparation and
+the final fresh-input fence, not rescanned across all operations on every child
+completion. Callback checks are scoped to their affected operation. Scientific
+flags remain unchanged for native-only batches.

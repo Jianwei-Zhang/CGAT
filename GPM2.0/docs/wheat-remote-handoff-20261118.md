@@ -592,7 +592,9 @@
   都属于 JM19_hifiasm，检查时这些批次均无 native 完成标记。该结论只是
   计划/标记清点；最终接入前必须重新检查，不能覆盖后来已经完成的 native。
 - **接入边界（已核对代码，尚未实现/部署）**：
-  1. 原 assignment 输出身份包含原 self manifest/command，不能直接编辑它们。
+  1. 原 q0 外层输入身份包含 self manifest 和 batch command，不能在运行中直接编辑。
+     assignment 本身绑定 q0 task 清单、顶层 command、FASTA/名称映射等，但实际
+     assign.before.json 输出清单不含 self_batch_manifest.json 或 batches/ 文件。
      应使用隔离执行 profile/manifest，明确绑定新 batch key 和实际参数，保留
      原文件和所有成功跨组装叶子。当前 cross routing plan 的冻结依赖也不能热改。
   2. 原 helper 的每个 batch 会尝试 native manifest 合并；新 profile key 不匹配
@@ -637,3 +639,42 @@
 - **42767640** 完整 f0.001 候选在 11:41 仍 RUNNING；11:37 左右采样约
   0.93 核、13070 MiB 内存，未完成。不能称为已采用或承诺整条查询的加速倍率。
   两个主任务及当前只读监控 51160 均保持不动。
+
+
+## 2026-11-19 12:03：self 调度回调与外层检查点适配已测，入口/reader 尚待接好
+
+- 新增 `self_profile_bindings.py` / 定向测试：替换明确选中的 batch command，
+  回调保持原任务身份；完整缓存先核验原 query/target/tool 与输出，再复用，
+  不启动 native helper 重读派生索引。每组仅在最后成功回调前合并一次，覆盖
+  native 最后完成、profile 最后完成、部分/全部缓存、失败和取消。
+- 外层适配保留已有 cross-bound input/output，提交前通过原 base class
+  重新构造输入再补 self binding；不跳过 q0 最终输入复核。输出附带 profile
+  receipt、batch marker 和合并 marker 的内容身份。
+- native-only group 可用空 selection：普通 key 和原 native merge marker
+  身份都保留，已有合法合并 PAF 不重拷贝。后续计划生成应覆盖全部计划内 self
+  operation（本数据 44 个），而不仅是含超长查询的 13 个，避免普通批次续跑
+  仍重复扫描。正式改变参数的仍只是自动选出的超长批次。
+- 避免新的扫描放大：完整原 batch command 清单在初始化/准备/最终复核检查，
+  不在每次 finish 回调遍历全部 1342 项；回调只查受影响组。Profile 的常规
+  digest 验证复用现有进程级内容摘要缓存；实测 frozen contract 的缓存签名含
+  inode/size/mtime/ctime，缓存只来自真实完整读取。新增同大小、恢复 mtime
+  的篡改回归仍被拒绝。新入口/reader 应使用足够的有界缓存容量，不能持久预灌 SHA。
+- **更正早先绑定描述**：实际 `assign.before.json` 输出中没有
+  self_batch_manifest.json 或 batches/ 文件；它有 44 个 self_name_map 和
+  22 个 q0 task 清单等。self manifest/batch command 由 q0 外层输入绑定。
+  本轮已更正前文，不改变“不得中途热改原输入”的结论。
+- 本地 **165 项通过**；远端 **42768711 SUCCEEDED**，11:57:53–11:57:57，
+  agent-X86-65，**36 项通过**，使用真实冻结 helper/contract 的微型测试。
+  目录 `self-profile-bindings-validation-20261119/` 保留 code.sha256、日志、
+  final-job.json。外层测试覆盖组合协议和 fresh-input guard，但不是完整客户
+  q0 科学验收，也不等于新的 resume 入口和 reader 已在远端运行。
+- 此快照 SHA：self runtime
+  `a820280b32493d93fcceb61e2c45f2c450310cfc039d2f2c7275d1ce112b5b8f`；
+  self bindings
+  `a6386451fe9fb6729bcb62a985c4e1e77379ba5388445941195bcb54e6440c5a`。
+- **下一步真正缺项**：自动计划生成、持锁 resume 入口、cross/self 联合独立
+  q0 evidence reader、可移植 provenance；再验证完整 moderate 候选并选择安全
+  切换点。不要重写冻结 cross plan/dependencies，不要重新跑完整 native 基线。
+- 42767640 于 11:56/后续查询仍 RUNNING，未宣告成功；主作业 42523432、
+  42710779 和监控 51160 均未停止。监控约 12:27 到时，届时先查原 handle
+  再延长观察，不重提科学作业。
