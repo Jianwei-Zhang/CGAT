@@ -23,17 +23,16 @@ test("toolbar spacing responds to container width but is bounded instead of fill
   assert.match(toolbar, /container-type:\s*inline-size;/);
   assert.match(toolbar, /overflow:\s*visible;/);
   assert.doesNotMatch(toolbar, /space-between|overflow-x:\s*auto/);
-  assert.match(ruleBody(".assembly-toolbar-group + .assembly-toolbar-group"), /clamp\(8px, 1\.2cqw, 14px\)/);
-  assert.match(ruleBody(".assembly-toolbar-group + .assembly-toolbar-group::before"), /width:\s*1px;[\s\S]*height:\s*16px;/);
+  assert.match(ruleBody(".assembly-toolbar-group + .assembly-toolbar-group"), /clamp\(12px, 2\.4cqw, 36px\)/);
   assert.doesNotMatch(css, /data-toolbar-compact|data-toolbar-group-open/);
 });
 
-test("logical groups fragment between complete controls as a flat ribbon with hairline dividers and unified 28px controls", () => {
+test("logical groups fragment between complete controls as soft tonal section trays with unified 28px controls", () => {
   const group = ruleBody(".assembly-toolbar-group,\n.subview-window [data-subview-toolbar] > .assembly-toolbar-group");
   assert.match(group, /display:\s*inline;/);
   assert.match(group, /box-decoration-break:\s*clone;/);
   assert.match(group, /border:\s*0;/);
-  assert.match(group, /background:\s*transparent;/);
+  assert.match(group, /background:\s*var\(--surface-subtle/);
   assert.match(ruleBody(".assembly-toolbar-group-content"), /display:\s*contents;/);
   assert.match(ruleBody(".assembly-toolbar-group-label,\n.assembly-toolbar-group-content > *"), /display:\s*inline-flex;/);
   assert.match(css, /--toolbar-control-size: 28px;/);

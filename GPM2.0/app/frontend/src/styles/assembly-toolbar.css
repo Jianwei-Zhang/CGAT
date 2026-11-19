@@ -1,26 +1,26 @@
-/* Owner: assembly Main / Local toolbar geometry. Flat ribbon with hairline dividers and unified 28px controls. */
+/* Owner: assembly Main / Local toolbar geometry. Clean panel ribbon with soft tonal section trays, bounded responsive spacing, and unified 28px controls. */
 /* Inline formatting lets one logical group continue on the next line. */
 .assembly-track-panel-head[data-main-view-header] {
-  padding: 5px 10px;
-  background: var(--surface-subtle, #f8fafc);
+  padding: 6px 10px;
+  background: var(--surface-panel, #fff);
   border-bottom: 1px solid var(--border-subtle, #dbe3ec);
 }
 .assembly-track-inline-controls[data-main-track-toolbar],
 .assembly-track-inline-controls[data-subview-toolbar],
 .subview-window .assembly-track-inline-controls[data-subview-toolbar] {
-  --toolbar-group-size: 32px;
+  --toolbar-group-size: 34px;
   --toolbar-control-size: 28px;
   display: block;
   flex: 1 1 0;
   min-width: 0;
   container-type: inline-size;
-  line-height: calc(var(--toolbar-group-size) + 6px);
+  line-height: calc(var(--toolbar-group-size) + 10px);
   text-align: start;
   overflow: visible;
   padding: 0;
 }
 .subview-window .assembly-track-inline-controls[data-subview-toolbar] {
-  --toolbar-group-size: 32px;
+  --toolbar-group-size: 34px;
   --toolbar-control-size: 28px;
 }
 .assembly-toolbar-group,
@@ -28,41 +28,33 @@
   display: inline;
   height: auto;
   min-height: 0;
-  padding: 0;
+  padding: 8px 6px;
   border: 0;
-  border-radius: 0;
-  background: transparent;
+  border-radius: calc(var(--control-radius, 5px) + 3px);
+  background: var(--surface-subtle, #f8fafc);
+  background: color-mix(in srgb, var(--surface-muted, #eef2f6) 62%, var(--surface-panel, #fff));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-subtle, #dbe3ec) 80%, transparent);
   box-sizing: border-box;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 .assembly-toolbar-group + .assembly-toolbar-group {
-  margin-inline-start: clamp(8px, 1.2vw, 14px);
-  margin-inline-start: clamp(8px, 1.2cqw, 14px);
-}
-.assembly-toolbar-group + .assembly-toolbar-group::before {
-  content: "";
-  display: inline-block;
-  width: 1px;
-  height: 16px;
-  margin-inline-end: clamp(8px, 1.2vw, 14px);
-  margin-inline-end: clamp(8px, 1.2cqw, 14px);
-  background: var(--border-default, #cbd5e1);
-  vertical-align: middle;
+  margin-inline-start: clamp(12px, 2.4vw, 36px);
+  margin-inline-start: clamp(12px, 2.4cqw, 36px);
 }
 .assembly-toolbar-group-label {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
   gap: 3px;
-  height: calc(var(--toolbar-group-size, 32px) - 12px);
+  height: 22px;
   box-sizing: border-box;
-  padding: 0 4px 0 0;
+  padding: 0 7px;
   margin-inline-end: 2px;
   border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-muted, #64748b);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-muted, #eef2f6) 92%, var(--border-subtle, #dbe3ec));
+  color: var(--text-secondary, #475569);
   font: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -74,18 +66,7 @@
 .assembly-toolbar-group-label:focus-visible {
   outline: 2px solid var(--focus-ring, #4f82b5);
   outline-offset: -2px;
-  border-radius: 3px;
-}
-/* Local View windows already have window chrome + hairline dividers; keep group captions screen-reader accessible. */
-.subview-window [data-subview-toolbar] .assembly-toolbar-group-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  border-radius: 4px;
 }
 /* The content wrapper contributes no box. Only each complete field/button is
    atomic, so the group can start in the space left on the current row. */
@@ -263,9 +244,9 @@
   gap: 4px;
 }
 .subview-window .subview-header-tools {
-  padding-inline-end: 8px;
-  margin-inline-end: 2px;
-  border-inline-end: 1px solid var(--border-default, #cbd5e1);
+  padding-inline-end: 10px;
+  margin-inline-end: clamp(6px, 1.2vw, 16px);
+  border-inline-end: 1px solid var(--border-subtle, #dbe3ec);
 }
 .subview-header-tools .button {
   padding: 0 9px;
@@ -318,16 +299,16 @@
   align-items: center;
 }
 .subview-window .subview-panel-head.subview-window-header {
-  padding: 5px 8px;
+  padding: 6px 8px;
   gap: 6px;
-  min-height: 38px;
+  min-height: 40px;
   border-bottom: 1px solid var(--border-subtle, #dbe3ec);
-  background: var(--surface-subtle, #f8fafc);
+  background: var(--surface-panel, #fff);
 }
 .assembly-view-navigation {
   flex-wrap: nowrap;
   padding: 5px 10px;
-  background: var(--surface-panel, #fff);
+  background: var(--surface-subtle, #f8fafc);
   border-top: 0;
   border-bottom: 1px solid var(--border-subtle, #dbe3ec);
 }
