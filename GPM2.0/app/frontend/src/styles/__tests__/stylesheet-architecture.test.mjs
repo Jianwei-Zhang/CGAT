@@ -241,7 +241,7 @@ test("final path card shares the main view subtle surface and keeps table and lo
   const assemblyCss = readFileSync(new URL("./assembly.css", entryUrl), "utf8");
   const finalPathCss = readFileSync(new URL("./final-path.css", entryUrl), "utf8");
 
-  assert.match(assemblyCss, /\.assembly-main-view\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
+  assert.match(assemblyCss, /\.assembly-main-view\.card\s*\{[^}]*border:\s*0;[^}]*padding:\s*0;[^}]*background:\s*transparent;/);
   assert.match(finalPathCss, /\.final-path-card\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
   assert.match(finalPathCss, /\.final-path-card-list-head\s*>\s*:first-child\s*\{[^}]*background:\s*var\(--surface-muted,\s*#eef2f6\);/);
   assert.match(finalPathCss, /\.final-path-card-list-head-card\s*\{[^}]*padding:\s*4px 8px 4px 11px;[^}]*background:\s*var\(--surface-muted,\s*#eef2f6\);/);

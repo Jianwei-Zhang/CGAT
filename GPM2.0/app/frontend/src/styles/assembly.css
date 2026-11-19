@@ -634,9 +634,13 @@
   gap: 8px;
 }
 
-/* Main and local views share one frame; their plot/navigation frames remain. */
+/* Keep only the outer stage panel; avoid a second wrapper card around Main and Local views. */
 .assembly-main-view.card {
-  background: var(--surface-subtle, #f8fafc);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .assembly-main-view > .assembly-track-unified,

@@ -1,48 +1,48 @@
-/* Owner: assembly Main / Local toolbar geometry. Compact panel ribbon with soft tonal section trays, bounded responsive spacing, and unified 26px controls. */
-/* Inline formatting lets one logical group continue on the next line. */
+/* Owner: assembly Main / Local toolbar geometry. Frameless Main header, flex-wrapped tonal section trays that fully enclose 26px controls, and bounded responsive group spacing. */
 .assembly-track-panel-head[data-main-view-header] {
-  margin: -4px -4px -2px;
-  padding: 3px 6px;
-  background: var(--surface-panel, #fff);
-  border-bottom: 1px solid var(--border-subtle, #dbe3ec);
-  border-radius: 5px 5px 0 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 .assembly-track-inline-controls[data-main-track-toolbar],
 .assembly-track-inline-controls[data-subview-toolbar],
 .subview-window .assembly-track-inline-controls[data-subview-toolbar] {
-  --toolbar-group-size: 30px;
+  --toolbar-group-size: 32px;
   --toolbar-control-size: 26px;
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 6px;
+  column-gap: clamp(12px, 2.4vw, 36px);
+  column-gap: clamp(12px, 2.4cqw, 36px);
   flex: 1 1 0;
   min-width: 0;
   container-type: inline-size;
-  line-height: calc(var(--toolbar-group-size) + 4px);
-  text-align: start;
   overflow: visible;
   padding: 0;
 }
 .subview-window .assembly-track-inline-controls[data-subview-toolbar] {
-  --toolbar-group-size: 30px;
+  --toolbar-group-size: 32px;
   --toolbar-control-size: 26px;
 }
 .assembly-toolbar-group,
 .subview-window [data-subview-toolbar] > .assembly-toolbar-group {
-  display: inline;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  max-width: 100%;
   height: auto;
   min-height: 0;
-  padding: 5px 5px;
+  padding: 3px 6px;
   border: 0;
   border-radius: calc(var(--control-radius, 5px) + 2px);
   background: var(--surface-subtle, #f8fafc);
   background: color-mix(in srgb, var(--surface-muted, #eef2f6) 62%, var(--surface-panel, #fff));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-subtle, #dbe3ec) 80%, transparent);
   box-sizing: border-box;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-}
-.assembly-toolbar-group + .assembly-toolbar-group {
-  margin-inline-start: clamp(12px, 2.4vw, 36px);
-  margin-inline-start: clamp(12px, 2.4cqw, 36px);
 }
 .assembly-toolbar-group-label {
   display: inline-flex;
@@ -52,7 +52,7 @@
   height: 20px;
   box-sizing: border-box;
   padding: 0 6px;
-  margin-inline-end: 2px;
+  margin-inline-end: 0;
   border: 0;
   border-radius: 4px;
   background: color-mix(in srgb, var(--surface-muted, #eef2f6) 92%, var(--border-subtle, #dbe3ec));
@@ -70,18 +70,16 @@
   outline-offset: -2px;
   border-radius: 4px;
 }
-/* The content wrapper contributes no box. Only each complete field/button is
-   atomic, so the group can start in the space left on the current row. */
+/* The content wrapper contributes no box; every field/button participates directly in the flex group tray. */
 .assembly-toolbar-group-content { display: contents; }
 .assembly-toolbar-group-label,
 .assembly-toolbar-group-content > * {
   display: inline-flex;
-  vertical-align: middle;
+  align-items: center;
   line-height: normal;
 }
-.assembly-toolbar-group-content > * { margin-inline: 3px; }
 .assembly-toolbar-group-label { line-height: 1; }
-.assembly-toolbar-group-start { align-items: center; gap: 6px; margin-inline-start: 0; }
+.assembly-toolbar-group-start { align-items: center; gap: 6px; }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(
   .button, .grt-result-controls, .grt-result-switch, .grt-result-layer-menu, .grt-result-layer-trigger,
   .assembly-track-inline-field, .assembly-track-select-shell, .assembly-track-combo, .assembly-split-field,
@@ -163,7 +161,7 @@
   color: var(--text-primary, #1e293b);
 }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-switch:has(input:checked),
-:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-controls:has(input:checked) .grt-result-layer-trigger {
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-controls:has([data-grt-result-toggle]:checked) .grt-result-layer-trigger {
   background: var(--theme-green-surface, #f0fdf4);
   border-color: var(--theme-green-line, #86efac);
   color: var(--theme-green-ink, #166534);

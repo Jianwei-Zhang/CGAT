@@ -49,12 +49,13 @@ test("CSS flows Main and Local fields through bounded, breakable groups", () => 
   assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\],\s*\.subview-panel-head\s*\{[^}]*flex-wrap: nowrap;[^}]*align-items: flex-start;[^}]*justify-content: flex-start;/);
   assert.match(css, /:is\(\.assembly-track-panel-head\[data-main-view-header\], \.subview-panel-head\) > \.assembly-view-title\s*\{[^}]*flex: none;[^}]*white-space: nowrap;/);
   const grouped = readFileSync(new URL("../../../../styles/assembly-toolbar.css", import.meta.url), "utf8");
-  assert.match(grouped, /display: block;[\s\S]*container-type: inline-size;/);
-  assert.match(grouped, /box-decoration-break: clone;/);
-  assert.match(grouped, /clamp\(12px, 2\.4cqw, 36px\)/);
-  assert.match(grouped, /--toolbar-group-size: 30px;/);
+  assert.match(grouped, /display: flex;[\s\S]*flex-wrap: wrap;[\s\S]*container-type: inline-size;/);
+  assert.match(grouped, /column-gap: clamp\(12px, 2\.4cqw, 36px\)/);
+  assert.match(grouped, /--toolbar-group-size: 32px;/);
   assert.match(grouped, /--toolbar-control-size: 26px;/);
-  assert.match(grouped, /\.assembly-toolbar-group,[\s\S]*border: 0;[\s\S]*background: var\(--surface-subtle/);
+  assert.match(grouped, /\.assembly-toolbar-group,[\s\S]*display: inline-flex;[\s\S]*border: 0;[\s\S]*background: var\(--surface-subtle/);
+  assert.match(grouped, /\.assembly-track-panel-head\[data-main-view-header\]\s*\{[^}]*background: transparent;[^}]*border: 0;/);
+  assert.match(grouped, /\.grt-result-controls:has\(\[data-grt-result-toggle\]:checked\) \.grt-result-layer-trigger/);
   assert.match(grouped, /\.assembly-toolbar-group-label\s*\{[^}]*font-size: 11px;[^}]*font-weight: 600;/);
   assert.match(grouped, /\.assembly-split-field\s*\{[^}]*display: inline-flex;/);
   assert.doesNotMatch(grouped, /data-toolbar-compact|data-toolbar-group-open/);

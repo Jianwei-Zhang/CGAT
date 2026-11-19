@@ -94,7 +94,7 @@ test("both headers keep titles reachable while fields flow across logical group 
   assert.match(ruleBody(css, ".subview-candidate-badge"), /flex:\s*0 1 auto[\s\S]*min-width:\s*0/);
   assert.match(ruleBody(css, ".subview-candidate-name"), /text-overflow:\s*ellipsis/);
   assert.match(ruleBody(css, ".subview-candidate-remove"), /flex:\s*0 0 26px/);
-  assert.match(ruleBody(groupCss, toolbarSelector), /display:\s*block[\s\S]*flex:\s*1 1 0[\s\S]*min-width:\s*0[\s\S]*container-type:\s*inline-size[\s\S]*overflow:\s*visible/);
+  assert.match(ruleBody(groupCss, toolbarSelector), /display:\s*flex[\s\S]*flex-wrap:\s*wrap[\s\S]*flex:\s*1 1 0[\s\S]*min-width:\s*0[\s\S]*container-type:\s*inline-size[\s\S]*overflow:\s*visible/);
   assert.match(ruleBody(css, ".subview-track-inline-controls .assembly-track-inline-field"), /flex:\s*0 0 auto/);
   assert.doesNotMatch(css, /@media \(max-width: 700px\)|\.subview-track-inline-controls\s*\{/);
   assert.doesNotMatch(css, /@media \(max-width: 520px\)/);
@@ -121,9 +121,9 @@ test("Local View title, Tools and inline guide use the same first-row height and
   const title = ruleBody(css, ".subview-panel-head > .assembly-view-title");
   assert.match(title, /display:\s*flex[\s\S]*align-items:\s*center[\s\S]*min-height:\s*2\.1429rem/);
   assert.match(ruleBody(css, ".subview-panel-title-row > .subview-empty-guide"), /line-height:\s*2\.1429rem/);
-  assert.match(groupCss, /--toolbar-group-size: 30px;/);
+  assert.match(groupCss, /--toolbar-group-size: 32px;/);
   assert.match(groupCss, /--toolbar-control-size: 26px;/);
-  assert.match(groupCss, /line-height: calc\(var\(--toolbar-group-size\) \+ 4px\);/);
+  assert.match(groupCss, /display: inline-flex;[\s\S]*align-items: center;[\s\S]*padding: 3px 6px;/);
   assert.match(groupCss, /height: var\(--toolbar-control-size\);/);
   assert.match(groupCss, /\.subview-header-tools \.button,[\s\S]*height: 26px; min-height: 26px;/);
 });

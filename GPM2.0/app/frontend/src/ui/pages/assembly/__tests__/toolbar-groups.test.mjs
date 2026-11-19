@@ -19,18 +19,20 @@ test("toolbar spacing responds to container width but is bounded instead of fill
     + ".assembly-track-inline-controls[data-subview-toolbar],\n"
     + ".subview-window .assembly-track-inline-controls[data-subview-toolbar]";
   const toolbar = ruleBody(selector);
-  assert.match(toolbar, /display:\s*block;/);
+  assert.match(toolbar, /display:\s*flex;/);
+  assert.match(toolbar, /flex-wrap:\s*wrap;/);
   assert.match(toolbar, /container-type:\s*inline-size;/);
   assert.match(toolbar, /overflow:\s*visible;/);
   assert.doesNotMatch(toolbar, /space-between|overflow-x:\s*auto/);
-  assert.match(ruleBody(".assembly-toolbar-group + .assembly-toolbar-group"), /clamp\(12px, 2\.4cqw, 36px\)/);
+  assert.match(toolbar, /column-gap:\s*clamp\(12px, 2\.4cqw, 36px\)/);
   assert.doesNotMatch(css, /data-toolbar-compact|data-toolbar-group-open/);
 });
 
-test("logical groups fragment between complete controls as soft tonal section trays with unified 26px controls", () => {
+test("logical groups wrap complete controls inside flex-enclosed tonal trays with unified 26px controls", () => {
   const group = ruleBody(".assembly-toolbar-group,\n.subview-window [data-subview-toolbar] > .assembly-toolbar-group");
-  assert.match(group, /display:\s*inline;/);
-  assert.match(group, /box-decoration-break:\s*clone;/);
+  assert.match(group, /display:\s*inline-flex;/);
+  assert.match(group, /flex-wrap:\s*wrap;/);
+  assert.match(group, /align-items:\s*center;/);
   assert.match(group, /border:\s*0;/);
   assert.match(group, /background:\s*var\(--surface-subtle/);
   assert.match(ruleBody(".assembly-toolbar-group-content"), /display:\s*contents;/);
