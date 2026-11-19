@@ -394,3 +394,55 @@
 是否内部自动选择此模式，需根据实际 q0 gap 窗口覆盖和 donor 工作量评估，
 保留完整参数/缓存身份与已有效的全量结果。**当前未修改 prepare_options、
 下游 wrapper、活跃路由依赖或原有检查点。**
+
+## 2026-11-19 08:58：预防下游检查点读取失败，自比对候选成功
+
+### q0 证据读取入口定点修复，无重提
+
+主动检查发现：冻结的 `lgz_core/q0_preparation.py::_initial_inputs()`
+独立创建原生 `OuterCheckpointManager`。四个路由外层检查点含显式
+`incident_execution_overrides`，主控制器已支持写入，但原生下游 reader
+会因输入身份/输出清单不同而拒绝。不是检查点损坏，也不能删除路由字段来绕过。
+
+- `routing_q0_evidence_reader.py` 使用**同一份冻结路由绑定器**，为该子进程
+  提供只读管理器；完整验证原输入/输出，并额外验证路由参数、依赖、PAF 和 receipt。
+  其 `commit()` 明确拒绝写回比对检查点。
+- 原始 q0 科学构建器、policy 和 builder identity 保持不变；实际入口与
+  `metadata/incident_q0_routing_reader.json` 作为额外输入纳入证据清单。
+  原构建器发布前的身份检查还核实路由依赖和入口/声明未变。
+  后续 `lgz_prepare_inputs` / `q0_admission` 仍用未改动的 `load_verified_evidence`。
+- 10 项定向测试复现“原生 reader 拒绝、显式 reader 通过”，并覆盖损坏 PAF、
+  缺失 receipt、依赖变化、只读边界、恢复模块状态及下游对新增输入的完整性验证。
+  **本地全套事故测试 91 项通过**；远端验证作业 **42741013** 于
+  08:56:10–08:56:14 SUCCEEDED，10 项通过，且实际冻结模块/路由计划只读导入通过。
+- **08:57:34** 仅原子替换 `gpm_server/prepare_q0_evidence.sh`。
+  安装前后 `q0_evidence`、`grt_prepare` 都是 pending / attempt 0；
+  新版主作业 `42710779` 仍 RUNNING。没有终止、重提、更新安装包或改动活跃比对依赖。
+- 已核查已保存检查点不引用此入口，当前 q0 对齐输入集合和路由依赖也不包含它；
+  主 Runner 在该阶段开始时读取脚本，报告 START 会重读实际 command text。
+- 原入口 SHA：`a64b66847d3f8ea2b132697064d8e3020a8593e9c5278591149eeda49a303eec`。
+  新入口 SHA：`21a9dbb0bfad11fdf52a583ad0babb94a8688d256883a25ee52dab6d66f72ff2`。
+  reader SHA：`349558353c156c5bd3e7d390f2cbf3ce59ef46e71a0a6842ff5ee4c428b90e90`。
+- 证据及备份：新版根目录 `routing-q0-reader-20261119/` 下的
+  `validation-final-job.json`、`installation-intent.json`、`installation-receipt.json`、
+  `prepare_q0_evidence.original.sh`、`code.sha256`。
+- 回退只适用于该阶段尚未启动时恢复备份；恢复原入口也会恢复其“不识别路由”
+  的行为，不是端到端可用性保证。证据生成后改入口会使其已绑定身份失效，
+  需重新评估，不能悄悄覆盖。
+- **当前只是安装了未来阶段入口，尚未执行真实全量 q0 evidence，更不能称该阶段通过。**
+
+### 完整自比对候选已成功，但原参数基线未完成
+
+作业 **42740281 SUCCEEDED**；`self-full-3D-pilot-20261119/final-job.json`
+及 `candidate/pilot.json` 已保存。完整 289508469 bp 单查询候选：
+
+- mapper wall **444.913 s**；Minimap2 自报 CPU 442.695 s、峰值 **5.073 GB**。
+- raw PAF 9577356 字节，SHA
+  `f771401f07a87b68285451cbd9bf98980072ee84c590091f222a07c13adc040b`。
+- 恢复原名称后的 PAF 9083238 字节，SHA
+  `450269528392fe2e847c44ddd1571a8a830bea0ad73d20492f39c655ba1065b9`。
+- 完整遍历、退出码、PAF、输入/索引稳定性校验已通过；状态为
+  `candidate_complete_not_compared_not_adopted`。
+- **08:58 原参数批次仍无完成标记**；不能计算完整基线加速比或宣布保真。
+  实际候选前几行包含 `tp:A:S` 的多位置命中，说明 primary-only cross 检查
+  不足以评价这个自比对。后续要按所有相关命中/配对及坐标支持比较；不重复跑基线。

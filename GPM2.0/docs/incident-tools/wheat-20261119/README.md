@@ -370,3 +370,32 @@ are under `self-full-3D-pilot-20261119/`; inspect live status before any action.
 requires a successfully committed native batch and self-specific all-hit/pair
 and positional checks. Primary-only cross comparisons or cropped-query window
 calibration do not establish preservation of self-alignment evidence.
+
+### Downstream routed-checkpoint reader (installed, execution pending)
+
+The native `q0_preparation._initial_inputs()` creates a separate native checkpoint
+manager. It would reject the explicit routed identity even though the running
+controller can successfully commit it. `routing_q0_evidence_reader.py` supplies
+a read-only manager using the **same frozen routing support**, retaining normal
+input/output checks plus receipt validation. It cannot commit alignment markers.
+The original scientific builder/policy/identity remain unchanged; the actual
+launcher and a reader declaration become explicit evidence inputs. The existing
+builder pre-publication check also fences routing dependencies and these inputs.
+Unmodified downstream evidence consumers verify the resulting manifest.
+
+Ten targeted tests passed locally and on remote validation job `42741013`,
+including an actual frozen-module/plan import without building real evidence.
+The whole local incident suite passed 91 tests. On November 19 at 08:57:34,
+only the still-pending `prepare_q0_evidence.sh` was atomically replaced; the
+running mappings, plan, frozen helpers and checkpoints were not changed and
+main job `42710779` was not restarted. Backups, hashes and installation receipts
+are in `routing-q0-reader-20261119/`. Real q0 evidence execution remains pending.
+See the handoff before rollback: reverting the launcher restores the original
+reader incompatibility, and changing it after evidence publication invalidates
+the bound inputs of that manifest.
+
+The isolated self candidate job `42740281` has meanwhile **SUCCEEDED**: complete
+query mapping took 444.913 s, with Minimap2 reporting 5.073 GB peak RSS. At 08:58
+the original native batch was still running. There is no completed-baseline
+speedup ratio or self-evidence agreement result yet, and the candidate remains
+unadopted. Its secondary/multi-position hits must be included in future comparison.
