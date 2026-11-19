@@ -797,3 +797,19 @@
   命令、SELF_BATCH_REUSED/SELF_PROFILE_COMMITTED，再称为实际参数提速。
 - 若已经有profile批次提交，不能恢复旧cross-only reader/旧入口冒充native续跑。
   应使用同一冻结final plan恢复；改变执行参数/策略需显式迁移，保留所有既有产出。
+
+### 13:47：已确认主任务真实执行 f0.005，不再只是预览或提交
+
+- 新版42813048于 **13:45:45** 开始4A hifiasm batch-00001。实际
+  `profile-attempt-sukunpr0/command.json`包含`-c -x asm10 -X --no-hash-name -m200 -n100 -t1 -f0.005`，
+  query仍为原完整220255611bp文件，index仍为原731737596bp目标集合；mapper stderr
+  mid_occ从原500变为58。已确认真实运行，不是仅看wrapper参数。
+- **21条CROSS_LEAF_REUSED + 2条SELF_BATCH_REUSED**（3D hifiasm batch3、4D flye batch29），
+  参考两组与assign也均SKIP_VALID，未重跑已完成比对。当前4A原生未完成尝试保持留存，
+  新输出使用独立profile-attempt；未把旧空临时PAF作为结果。
+- 13:46:42新作业约1核、5053MiB，尚非峰值，也尚未有第一条fast批次完成；不能用此
+  早期RSS自动放开并发或宣布完整加速倍数。旧42523432仍Step2、约15核，无本轮修改。
+- 主监控64397日志 `~/cgat-reads-debug/logs/wheat-live-20261119-134040.jsonl`，约15:10到时。
+- 本轮实现已提交推送master **d80213c** `[skip ci]`。独立UI工作树改动未暂存/提交。
+  后续优先检查4A `SELF_PROFILE_COMMITTED`与新完整产出，及下一条自动路由，然后考虑
+  在同类实测基础上的两路准入；不能只因为峰值低而改 frozen plan/代码。
