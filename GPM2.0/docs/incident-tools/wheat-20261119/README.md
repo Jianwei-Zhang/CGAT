@@ -654,3 +654,48 @@ binary it checks two concurrent 64-GiB-guarded processes against a nonempty,
 byte-identical unguarded result; a deliberately tiny 16-MiB subcase must fail
 with an explicit allocator error. This validates enforcement/error behavior,
 not complete wheat throughput or a guarantee against every source of job OOM.
+
+
+## 2026-11-19 sub100 self extension (incident only)
+
+The 100-Mb boundary left a 99-Mb native self query running for over an hour.
+An isolated same-node `-f 0.005` candidate completed its whole query in 334.302s
+(3.835 GB mapper peak), without rerunning the native baseline. This is runtime
+calibration, not a completed native agreement comparison or a biological accuracy
+claim. The user explicitly accepts greater loss for within-assembly self evidence.
+
+- `extended_self_seed_profile.py` is an explicit versioned sibling of the original
+  executor. It selects only unfinished **single-whole-record queries >=10 Mb**,
+  keeps `-c`, self-name ordering and the other native flags, and records `-f 0.005`.
+  Multi-record batches and smaller records remain native; cross/reference mapping
+  does not inherit this precision policy. This is not a shipped global default.
+- `composite_self_profile.py` combines the unchanged primary profile with a disjoint
+  extension. Primary profiles, completed output bytes, original keys and execution
+  scripts are preserved. Per-batch validation uses its actual owning profile;
+  only the future aggregate merge binds the composite. Nested composites are
+  deliberately rejected rather than silently inventing migration semantics.
+- `stage_self_extension.py` verifies the full candidate, source/output identities
+  and the parent plan, stages guards/scripts outside the analysis workspace, and
+  excludes completed native batches. A native completion racing with staging
+  requires restaging; it is never discarded to force the new profile to run.
+- `self_extension_context.py`, `resume_self_extension.py`, and
+  `read_self_extension.py` explicitly bind the factory/dispatcher and execute the
+  original owning entry/reader. They retain the normal lock and checked reader
+  installation/backup gate; no frozen source is edited in place.
+- `self_extension_audit.py` is the companion exporter for the new plan. It keeps
+  **each receipt's actual execution policy/profile SHA**, not the extension policy
+  retroactively applied to primary results. Use this exporter, not the old direct
+  `self_profile_audit.py`, for a composite plan.
+- `run_remote_tests.py` adapts only the cross-router fixture's tools path for a flat
+  remote bundle; it does not change test selection or assertions. The first remote
+  all-suite invocation failed because `../../../server/tools` does not exist in
+  that layout. The explicit-tools rerun passed 237 tests, then verified the actual
+  staged controller and reader. Local final validation passed 239 tests, including
+  two further portable composite-audit regressions.
+
+The deployed plan still uses two lanes with a 64-GiB **per-process virtual address
+space** guard and a 320-GiB scheduler allocation, not an aggregate 64-GiB RSS cap.
+Its 444 added selections are not all of the remaining 1320 batches: eligibility
+also requires exactly one record. Existing completed results are not relabeled as
+having used the extension or its guard. The successful isolated 99-Mb candidate
+is bound for verified adoption; it must not be mapped a third time.

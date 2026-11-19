@@ -943,3 +943,45 @@
   原科学profile/key；不要修改v2文件或仅为这个短暂等待重提，避免又付出完整续跑校验。
 - 监控45573仍活跃，远端日志`logs/wheat-live-20261119-144627.jsonl`；有限90分钟监控
   到期不等于任务退出。现场持续看实际TASK_START/END，不把21个running外层unit当并发数。
+
+
+## 2026-11-19 16:53：sub100内部self扩展已切换，等待实际续跑验证
+
+- 用户再次确认内部self可进一步放宽精度，并要求意外对话中断后继续。远端主任务没有
+  因对话中断停止。新版42828863自15:32:34并行跑7A hifiasm batch0（99097964bp）和
+  2A hifiasm batch4（86825214bp），到切换前仍未完成。两者旧未完成attempt保留。
+- 隔离同节点候选**42854191 SUCCEEDED**，agent-X86-40，16:20:14–16:25:57。
+  `self-sub100-pilot-20261119/candidate/pilot.json` SHA
+  `1e4846102fea15f440fd1b42bf0c4f0c9065bb098432d3de192d49e69dab6e6b`；
+  7A 99Mb整条query、同索引、仅新增f0.005，mapper334.302秒、PeakRSS3.835GB。
+  仍无完整native对照结果，不能给出精确全程倍数或99Mb精度损失率。候选30分钟试验上限
+  没有带入生产映射；candidate在工作区外，没有原生成功标记，准备核验后采纳免重跑。
+- 实现新增extended/composite profile：原profile、已完成primary结果/key/script不变；
+  只扩展未完成的>=10Mb单record内部self。总共新增**444批次**，加原20个配置共464个
+  approximate配置（含已有成功缓存，不是全部待跑）。排除两个已完成native批次，
+  多record与较短批次仍native。初始参考/cross/旧对照均不变；两路/64GiB AS/320GiB不变。
+- 冻结runtime：`self-extension-runtime-20261119/`，68个Python文件归档SHA
+  `0842c4aa119f3be24c29f7bdada8b47b2320401786b9f95790a7de07ba4248de`。
+  **42869397 FAILED**是首次远端测试布局问题：cross fixture假设`../../../server/tools`，
+  并非主任务失败。没有改冻结代码，新增隔离测试适配器绑定真实tools路径。
+  **42874082 SUCCEEDED**，16:46:47–16:47:28，agent-X86-40：237项通过，
+  实际stage/原controller validate-only/combined reader validate-only均通过。
+  日志`self-extension-validation-20261119/`；本地最终239项通过（187.991秒），多出的两项
+  是portable audit按真实owner区分旧/新policy并拒绝损坏receipt，日志
+  `/tmp/wheat-extension-final-tests.log`。没有发布CI、重装或update.sh。
+- 实际新plan：`self-extension-plan-20261119/self-plan.json`，SHA
+  `d9058d48a750a7230adaf125eda29677ccb241b08db62d67284ba829bd5b4434`。
+  parent是two-lane-v2 plan348ba78a...。未来最终companion必须调用本runtime里的
+  **self_extension_audit.py**及这个active plan；旧self_profile_audit直接入口不支持该factory。
+- 新主任务 **42876793 RUNNING**，**agent-X86-29**，32CPU/327680MiB，16:49:35分配资源，
+  16:49:55完成validate-only并等待handoff。16:52:26确认旧新版42828863终态、正常锁释放
+  后放行。旧42523432完全不动。停止42828863是有意切换低效步骤，不是算法失败。
+  交接证据`self-extension-resume-20261119/{ready,cutover-before,stop-command,stopped-job,handoff}.json`。
+- 新entry已进入EXPLICIT_SELF_PROFILE_RESUME，run_id **20261119T085235Z-94158-ebf2d842**；
+  新reader安装收据SHA **33fc5bea2c85b08ae1705ba4054aa0ab91ac13932c65c7b30c8618c369cf0166**，
+  prior为55e231f...；备份/receipt在新plan的`reader-installation/`。此记录时尚未实际启动
+  新mapper，不能凭入口日志宣称扩展提速已经兑现。主日志`logs/resume_self_extension_42876793.out`。
+- 新监控会话 **22444**，脚本`/tmp/cgat-wheat-live-monitor-extension.py`，观察42523432/42876793。
+  原监控86968曾因SSH255中断，已检查远端没有对应监控进程、日志停止；这不代表主作业停止。
+  其后41219观察旧新版，交接后应自然终止。持续核实候选实际adoption、原40个leaf复用与
+  新extension命令/receipt/内存，不要只看外层running unit数。
