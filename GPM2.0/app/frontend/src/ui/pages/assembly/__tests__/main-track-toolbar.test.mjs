@@ -51,11 +51,12 @@ test("CSS flows Main and Local fields through bounded, breakable groups", () => 
   const grouped = readFileSync(new URL("../../../../styles/assembly-toolbar.css", import.meta.url), "utf8");
   assert.match(grouped, /display: block;[\s\S]*container-type: inline-size;/);
   assert.match(grouped, /box-decoration-break: clone;/);
-  assert.match(grouped, /clamp\(8px, 1\.5cqw, 24px\)/);
+  assert.match(grouped, /clamp\(8px, 1\.2cqw, 14px\)/);
   assert.match(grouped, /--toolbar-group-size: 32px;/);
-  assert.match(grouped, /--toolbar-control-size: 26px;/);
-  assert.match(grouped, /\.assembly-toolbar-group,[\s\S]*border: 1px solid var\(--border-subtle/);
-  assert.match(grouped, /\.assembly-toolbar-group-label\s*\{[^}]*font-size: 11px;[^}]*font-weight: 500;/);
+  assert.match(grouped, /--toolbar-control-size: 28px;/);
+  assert.match(grouped, /\.assembly-toolbar-group,[\s\S]*border: 0;/);
+  assert.match(grouped, /\.assembly-toolbar-group-label\s*\{[^}]*font-size: 11px;[^}]*font-weight: 600;/);
+  assert.match(grouped, /\.assembly-split-field\s*\{[^}]*display: inline-flex;/);
   assert.doesNotMatch(grouped, /data-toolbar-compact|data-toolbar-group-open/);
   assert.match(css, /\.assembly-main-scope-title\s*\{[^}]*flex: 0 1 auto;[^}]*min-width: 0;[^}]*max-width: min\(36ch, 50%\);/);
   assert.match(css, /\.assembly-members-panel-inline\s*\{[^}]*margin-inline-end: auto;/);

@@ -1,39 +1,54 @@
-/* Owner: assembly Main / Local toolbar geometry. Group captions are subordinate micro-tags inside bordered group pills. */
+/* Owner: assembly Main / Local toolbar geometry. Flat ribbon with hairline dividers and unified 28px controls. */
 /* Inline formatting lets one logical group continue on the next line. */
+.assembly-track-panel-head[data-main-view-header] {
+  padding: 5px 10px;
+  background: var(--surface-subtle, #f8fafc);
+  border-bottom: 1px solid var(--border-subtle, #dbe3ec);
+}
 .assembly-track-inline-controls[data-main-track-toolbar],
 .assembly-track-inline-controls[data-subview-toolbar],
 .subview-window .assembly-track-inline-controls[data-subview-toolbar] {
   --toolbar-group-size: 32px;
-  --toolbar-control-size: 26px;
+  --toolbar-control-size: 28px;
   display: block;
   flex: 1 1 0;
   min-width: 0;
   container-type: inline-size;
-  line-height: calc(var(--toolbar-group-size) + 10px);
+  line-height: calc(var(--toolbar-group-size) + 6px);
   text-align: start;
   overflow: visible;
-  padding: 2px 0;
+  padding: 0;
 }
 .subview-window .assembly-track-inline-controls[data-subview-toolbar] {
-  --toolbar-group-size: 30px;
-  --toolbar-control-size: 24px;
+  --toolbar-group-size: 32px;
+  --toolbar-control-size: 28px;
 }
 .assembly-toolbar-group,
 .subview-window [data-subview-toolbar] > .assembly-toolbar-group {
   display: inline;
   height: auto;
   min-height: 0;
-  padding: 7px 4px;
-  border: 1px solid var(--border-subtle, #dbe3ec);
-  border-radius: calc(var(--control-radius, 5px) + 2px);
-  background: var(--surface-subtle, #f8fafc);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-sizing: border-box;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 .assembly-toolbar-group + .assembly-toolbar-group {
-  margin-inline-start: clamp(8px, 1.5vw, 24px);
-  margin-inline-start: clamp(8px, 1.5cqw, 24px);
+  margin-inline-start: clamp(8px, 1.2vw, 14px);
+  margin-inline-start: clamp(8px, 1.2cqw, 14px);
+}
+.assembly-toolbar-group + .assembly-toolbar-group::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  margin-inline-end: clamp(8px, 1.2vw, 14px);
+  margin-inline-end: clamp(8px, 1.2cqw, 14px);
+  background: var(--border-default, #cbd5e1);
+  vertical-align: middle;
 }
 .assembly-toolbar-group-label {
   display: inline-flex;
@@ -42,24 +57,35 @@
   gap: 3px;
   height: calc(var(--toolbar-group-size, 32px) - 12px);
   box-sizing: border-box;
-  padding: 0 7px 0 4px;
-  margin-inline-end: 1px;
+  padding: 0 4px 0 0;
+  margin-inline-end: 2px;
   border: 0;
-  border-inline-end: 1px solid var(--border-subtle, #dbe3ec);
   border-radius: 0;
   background: transparent;
   color: var(--text-muted, #64748b);
   font: inherit;
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
   cursor: help;
 }
 .assembly-toolbar-group-label:focus-visible {
-  outline: 2px solid var(--accent, #527ee9);
+  outline: 2px solid var(--focus-ring, #4f82b5);
   outline-offset: -2px;
+  border-radius: 3px;
+}
+/* Local View windows already have window chrome + hairline dividers; keep group captions screen-reader accessible. */
+.subview-window [data-subview-toolbar] .assembly-toolbar-group-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 /* The content wrapper contributes no box. Only each complete field/button is
    atomic, so the group can start in the space left on the current row. */
@@ -70,13 +96,13 @@
   vertical-align: middle;
   line-height: normal;
 }
-.assembly-toolbar-group-content > * { margin-inline: 2px; }
+.assembly-toolbar-group-content > * { margin-inline: 3px; }
 .assembly-toolbar-group-label { line-height: 1; }
-.assembly-toolbar-group-start { align-items: center; gap: 6px; }
+.assembly-toolbar-group-start { align-items: center; gap: 6px; margin-inline-start: 0; }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(
   .button, .grt-result-controls, .grt-result-switch, .grt-result-layer-menu, .grt-result-layer-trigger,
-  .assembly-track-inline-field, .assembly-track-select-shell, .assembly-track-combo, .assembly-support-ds-len-settings-button,
-  .main-view-history-controls, .subview-history-controls) {
+  .assembly-track-inline-field, .assembly-track-select-shell, .assembly-track-combo, .assembly-split-field,
+  .assembly-support-ds-len-settings-button, .main-view-history-controls, .subview-history-controls) {
   box-sizing: border-box;
   height: var(--toolbar-control-size);
   min-height: var(--toolbar-control-size);
@@ -91,6 +117,11 @@
   background: var(--surface-panel, #fff);
   color: var(--text-primary, #1e293b);
   box-shadow: none;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .button {
+  padding: 0 9px;
+  font-weight: 500;
 }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .button:hover:not(:disabled),
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-support-ds-len-settings-button:hover:not(:disabled) {
@@ -99,8 +130,9 @@
   color: var(--text-primary, #1e293b);
 }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .button[aria-expanded="true"] {
-  background: var(--surface-muted, #eef2f6);
-  border-color: var(--accent, #527ee9);
+  background: var(--theme-blue-surface, #eff6ff);
+  border-color: var(--focus-ring, #4f82b5);
+  color: var(--text-primary, #1e293b);
 }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-track-inline-field {
   gap: 5px;
@@ -109,17 +141,46 @@
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-track-inline-field > span {
   font-weight: 500;
 }
+.assembly-split-field {
+  display: inline-flex;
+  align-items: center;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-split-field > .assembly-track-combo {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .assembly-split-field > .assembly-support-ds-len-settings-button {
+  border-inline-start: 0;
+  border-radius: 0 var(--control-radius, 5px) var(--control-radius, 5px) 0;
+  color: var(--text-muted, #64748b);
+}
+.toolbar-settings-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.grt-result-switch, .grt-result-layer-trigger) {
   border-color: var(--border-default, #cbd5e1);
   background: var(--surface-panel, #fff);
   color: var(--text-primary, #1e293b);
-  font-weight: 400;
+  font-weight: 500;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-layer-trigger {
+  color: var(--text-muted, #64748b);
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-switch input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
 }
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-switch:hover,
 :is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-layer-trigger:hover {
   background: var(--surface-muted, #eef2f6);
+  color: var(--text-primary, #1e293b);
 }
-:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-switch:has(input:checked) {
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-switch:has(input:checked),
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group .grt-result-controls:has(input:checked) .grt-result-layer-trigger {
   background: var(--theme-green-surface, #f0fdf4);
   border-color: var(--theme-green-line, #86efac);
   color: var(--theme-green-ink, #166534);
@@ -142,9 +203,31 @@
   min-height: 0;
   width: var(--toolbar-control-size);
   min-width: var(--toolbar-control-size);
+  padding: 0;
+  border: 0;
   border-radius: 0;
+  background: var(--surface-panel, #fff);
+  color: var(--text-secondary, #334155);
 }
-:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-controls, .subview-history-controls) button + button {
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-controls, .subview-history-controls) button:not(:disabled):hover {
+  background: var(--surface-muted, #eef2f6);
+  color: var(--text-primary, #1e293b);
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-controls, .subview-history-controls) button:disabled {
+  background: var(--surface-panel, #fff);
+  color: var(--text-muted, #64748b);
+  opacity: 0.42;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-controls, .subview-history-controls) svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.75;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-separator, .subview-history-separator) {
+  display: none;
+}
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-controls, .subview-history-controls) button + button,
+:is([data-main-track-toolbar], [data-subview-toolbar]) .assembly-toolbar-group :is(.main-view-history-controls, .subview-history-controls) span + button {
   border-inline-start: 1px solid var(--border-subtle, #dbe3ec);
 }
 .assembly-toolbar-group .assembly-support-ds-len-settings-button,
@@ -173,18 +256,79 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.subview-header-tools { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 4px; }
+.subview-header-tools {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+.subview-window .subview-header-tools {
+  padding-inline-end: 8px;
+  margin-inline-end: 2px;
+  border-inline-end: 1px solid var(--border-default, #cbd5e1);
+}
+.subview-header-tools .button {
+  padding: 0 9px;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px);
+  background: var(--surface-panel, #fff);
+  color: var(--text-primary, #1e293b);
+  font-size: var(--font-small);
+  font-weight: 500;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.subview-header-tools .button:hover:not(:disabled) {
+  background: var(--surface-muted, #eef2f6);
+  border-color: var(--border-strong, #94a3b8);
+}
+.subview-header-tools .subview-panel-help {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  color: var(--text-muted, #64748b);
+}
+.subview-header-tools .subview-panel-help:hover:not(:disabled) {
+  color: var(--text-primary, #1e293b);
+}
 .subview-panel-head > .assembly-view-title,
 .subview-header-tools .button,
 .subview-window .subview-window-heading,
 .subview-window .subview-window-heading button,
-.subview-window .subview-window-actions button { height: 32px; min-height: 32px; }
-.subview-window .subview-window-actions button { width: 32px; flex-basis: 32px; }
-.subview-panel-head, .subview-window .subview-panel-head.subview-window-header { align-items: center; }
+.subview-window .subview-window-actions button { height: 28px; min-height: 28px; }
+.subview-window .subview-window-heading button,
+.subview-window .subview-window-actions button {
+  width: 28px;
+  flex-basis: 28px;
+  border-radius: var(--control-radius, 5px);
+  color: var(--text-secondary, #334155);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.subview-window .subview-window-heading button:hover,
+.subview-window .subview-window-actions button:hover {
+  background: var(--surface-muted, #eef2f6);
+  color: var(--text-primary, #1e293b);
+}
+.subview-window .subview-window-actions {
+  gap: 2px;
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--border-default, #cbd5e1);
+}
+.subview-panel-head,
+.subview-window .subview-panel-head.subview-window-header {
+  align-items: center;
+}
+.subview-window .subview-panel-head.subview-window-header {
+  padding: 5px 8px;
+  gap: 6px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-subtle, #f8fafc);
+}
 .assembly-view-navigation {
   flex-wrap: nowrap;
   padding: 5px 10px;
-  border-top: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-panel, #fff);
+  border-top: 0;
   border-bottom: 1px solid var(--border-subtle, #dbe3ec);
 }
 .assembly-view-navigation .view-nav-group-label {

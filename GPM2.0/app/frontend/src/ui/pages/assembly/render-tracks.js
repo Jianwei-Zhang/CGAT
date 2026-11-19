@@ -1053,7 +1053,7 @@ function renderAssemblyTrackInlineControls({
   const filterControls = [`
       <label class="assembly-track-inline-field">
         ${renderSupportDsCtgLenLabel(i18n)}
-        ${supportDsCtgLenInput}
+        <div class="assembly-split-field">${supportDsCtgLenInput}${renderSupportDsCtgLenSettingsButton(i18n)}</div>
       </label>`, renderViewTickControl(trackPrefs, i18n, "trackView"), `
       <label class="assembly-track-inline-field">
         <span data-app-tooltip="${escapeAttr(i18n.trackControls.alignmentLengthHint)}">${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
@@ -1210,21 +1210,22 @@ function renderSupportDsCtgLenControl({
   return inputHtml;
 }
 
+const TOOLBAR_SETTINGS_ICON_SVG = `<svg class="toolbar-settings-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+
 function renderSupportDsCtgLenLabel(i18n) {
   const label = i18n.trackControls.supportDatasetLengthBp;
+  return `<span class="assembly-support-ds-len-label" data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetLengthHint)}">${escapeHtml(label)}</span>`;
+}
+
+function renderSupportDsCtgLenSettingsButton(i18n) {
   const settingsLabel = i18n.trackControls.supportDatasetLengthRulesSettings || "Advanced rules";
-  return `
-    <span class="assembly-support-ds-len-label" data-app-tooltip="${escapeAttr(i18n.trackControls.supportDatasetLengthHint)}">
-      ${escapeHtml(label)}
-      <button
+  return `<button
         type="button"
         class="assembly-support-ds-len-settings-button"
         data-support-ds-ctg-len-settings="1"
         aria-label="${escapeAttr(settingsLabel)}"
         data-app-tooltip="${escapeAttr(settingsLabel)}"
-      >⚙</button>
-    </span>
-  `;
+      >${TOOLBAR_SETTINGS_ICON_SVG}</button>`;
 }
 
 function renderTrackNumberInput({ field, id, label, openOptionLabel = "", value, options, allowZero = false }) {

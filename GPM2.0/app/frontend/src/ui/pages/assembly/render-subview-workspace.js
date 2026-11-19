@@ -1,7 +1,8 @@
 import { LOCAL_VIEW_RESIZE_EDGES } from "./subview-window-geometry.js";
-import { PictureInPicture2, PanelTopClose, Pin, PinOff } from "lucide";
+import { PictureInPicture2, PanelTopClose, Pin, PinOff, Minus, X } from "lucide";
 const escapeHtml = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const escapeAttr = escapeHtml;
+const renderChromeSvg = (nodes, size = 15) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${nodes.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(" ")}></${tag}>`).join("")}</svg>`;
 
 export function subviewWindowAssembly(state) {
   const project = state.initializer?.existingProjects?.find(item => Number(item.projectId) === Number(state.session?.projectId));
@@ -95,8 +96,8 @@ export function renderSubviewWindowChrome(assembly, labels, end = false) {
   const w = labels.window;
   if (end) return `<div class="subview-window-actions">
     ${item.floating && assembly.subviewNativeWindows ? `<button type="button" class="subview-window-pin${item.pinned !== false ? " is-pinned" : ""}" data-local-view-action="pin" data-local-view-id="${item.id}" aria-pressed="${item.pinned !== false}" aria-label="${escapeAttr(item.pinned !== false ? w.unpin : w.pin)}" data-app-tooltip="${escapeAttr(item.pinned !== false ? w.unpin : w.pin)}">${renderSubviewPinIcon(item.pinned !== false)}</button>` : ""}
-    <button type="button" data-local-view-action="minimize" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.minimize)}" data-app-tooltip="${escapeAttr(w.minimize)}">−</button>
-    <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">×</button></div>`;
+    <button type="button" data-local-view-action="minimize" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.minimize)}" data-app-tooltip="${escapeAttr(w.minimize)}">${renderChromeSvg(Minus)}</button>
+    <button type="button" data-local-view-action="close" data-local-view-id="${item.id}" aria-label="${escapeAttr(w.close)}" data-app-tooltip="${escapeAttr(w.close)}">${renderChromeSvg(X)}</button></div>`;
   const { title, tooltip } = subviewWindowDescription(item, labels, assembly);
   const action = item.floating ? w.dock : w.float;
   return `<div class="subview-window-heading">
