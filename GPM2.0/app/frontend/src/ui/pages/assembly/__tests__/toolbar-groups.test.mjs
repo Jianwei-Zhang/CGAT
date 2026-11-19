@@ -27,7 +27,7 @@ test("toolbar spacing responds to container width but is bounded instead of fill
   assert.doesNotMatch(css, /data-toolbar-compact|data-toolbar-group-open/);
 });
 
-test("logical groups fragment between complete controls as soft tonal section trays with unified 28px controls", () => {
+test("logical groups fragment between complete controls as soft tonal section trays with unified 26px controls", () => {
   const group = ruleBody(".assembly-toolbar-group,\n.subview-window [data-subview-toolbar] > .assembly-toolbar-group");
   assert.match(group, /display:\s*inline;/);
   assert.match(group, /box-decoration-break:\s*clone;/);
@@ -35,8 +35,8 @@ test("logical groups fragment between complete controls as soft tonal section tr
   assert.match(group, /background:\s*var\(--surface-subtle/);
   assert.match(ruleBody(".assembly-toolbar-group-content"), /display:\s*contents;/);
   assert.match(ruleBody(".assembly-toolbar-group-label,\n.assembly-toolbar-group-content > *"), /display:\s*inline-flex;/);
-  assert.match(css, /--toolbar-control-size: 28px;/);
-  assert.match(ruleBody(".subview-window .assembly-track-inline-controls[data-subview-toolbar]"), /--toolbar-control-size: 28px;/);
+  assert.match(css, /--toolbar-control-size: 26px;/);
+  assert.match(ruleBody(".subview-window .assembly-track-inline-controls[data-subview-toolbar]"), /--toolbar-control-size: 26px;/);
   const html = renderToolbarGroup("filter", ["", '<label id="first">first</label>', '<label id="second">second</label>'], getMessages("en", "assembly"));
   assert.match(html, /class="assembly-toolbar-group-start">[\s\S]*?class="assembly-toolbar-group-label"[\s\S]*?<label id="first">first<\/label><\/div> <label id="second">second<\/label>/);
   assert.equal(renderToolbarGroup("filter", ["", " "], getMessages("en", "assembly")), "");

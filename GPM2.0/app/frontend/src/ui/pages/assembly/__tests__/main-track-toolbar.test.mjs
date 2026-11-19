@@ -52,8 +52,8 @@ test("CSS flows Main and Local fields through bounded, breakable groups", () => 
   assert.match(grouped, /display: block;[\s\S]*container-type: inline-size;/);
   assert.match(grouped, /box-decoration-break: clone;/);
   assert.match(grouped, /clamp\(12px, 2\.4cqw, 36px\)/);
-  assert.match(grouped, /--toolbar-group-size: 34px;/);
-  assert.match(grouped, /--toolbar-control-size: 28px;/);
+  assert.match(grouped, /--toolbar-group-size: 30px;/);
+  assert.match(grouped, /--toolbar-control-size: 26px;/);
   assert.match(grouped, /\.assembly-toolbar-group,[\s\S]*border: 0;[\s\S]*background: var\(--surface-subtle/);
   assert.match(grouped, /\.assembly-toolbar-group-label\s*\{[^}]*font-size: 11px;[^}]*font-weight: 600;/);
   assert.match(grouped, /\.assembly-split-field\s*\{[^}]*display: inline-flex;/);

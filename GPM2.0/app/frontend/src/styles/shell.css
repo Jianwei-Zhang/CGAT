@@ -120,18 +120,22 @@
 /* Route-specific project shortcut visibility must override the flex label rule. */
 .nav-session-field[hidden] { display: none; }
 
-/* Assembly scope navigation stays together; global utilities never compete with long names. */
+/* Assembly scope navigation stays together as a subordinate breadcrumb rail; global utilities never compete with long names. */
 .app-nav.has-assembly-navigation { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 12px; align-items: center; }
 .app-nav.has-assembly-navigation > .route-nav { justify-self: start; }
-.assembly-navigation { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; width: max-content; justify-self: start; }
+.assembly-navigation { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; width: max-content; justify-self: start; padding: 3px 8px; border: 1px solid var(--border-subtle, #dbe3ec); border-radius: 7px; background: var(--surface-subtle, #f8fafc); }
 .assembly-navigation-partition { --assembly-picker-min: 7ch; --assembly-picker-max: 18ch; }
 .assembly-navigation-project { --assembly-picker-min: 18ch; --assembly-picker-max: 34ch; }
 .assembly-navigation-chr { --assembly-picker-min: 7ch; --assembly-picker-max: 14ch; }
 .assembly-navigation[hidden] { display: none; }
-.assembly-navigation-field { display: flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: 0; font-size: var(--font-small); }
-.assembly-navigation-label { flex: 0 0 auto; white-space: nowrap; color: var(--text-secondary); }
+.assembly-navigation-field { display: flex; flex: 0 1 auto; align-items: center; gap: 4px; min-width: 0; font-size: var(--font-small); }
+.assembly-navigation-field + .assembly-navigation-field::before { content: "/"; color: var(--border-strong, #94a3b8); font-size: var(--font-caption); font-weight: 400; margin-inline-end: 2px; }
+.assembly-navigation-label { flex: 0 0 auto; white-space: nowrap; color: var(--text-muted, #64748b); font-size: var(--font-caption); font-weight: 500; }
 .assembly-navigation .shell-select { flex: 0 1 auto; width: auto; max-width: var(--assembly-picker-max); }
-.assembly-navigation .shell-select-toggle { width: max-content; min-width: min(var(--assembly-picker-min), 100%); max-width: 100%; height: 32px; }
+.assembly-navigation .shell-select-toggle { width: max-content; min-width: min(var(--assembly-picker-min), 100%); max-width: 100%; height: 26px; min-height: 26px; padding: 2px 2px 2px 6px; gap: 4px; border-color: transparent; background: transparent; color: var(--text-primary, #1e293b); font-weight: 500; transition: background-color 120ms ease, border-color 120ms ease; }
+.assembly-navigation .shell-select-toggle:hover:not(:disabled),
+.assembly-navigation .shell-select-toggle[aria-expanded="true"] { background: var(--surface-panel, #fff); border-color: var(--border-default, #cbd5e1); }
+.assembly-navigation .shell-select-marker { flex: 0 0 16px; border-left: 0; background: transparent; color: var(--text-muted, #64748b); font-size: 11px; }
 /* Size the popup from its longest option, not a fixed minimum by picker type.
    The trigger is the floor; long paths/names wrap at the viewport-aware cap. */
 .assembly-navigation .shell-select-menu { box-sizing: border-box; width: max-content; min-width: 100%; max-width: min(520px, calc(100vw - 32px)); max-height: min(420px, 65dvh); overflow-y: auto; z-index: 100; }
@@ -143,9 +147,10 @@
 .app-nav.has-assembly-navigation > .nav-session-controls { flex-wrap: nowrap; }
 .app-nav.is-assembly-nav-stacked > .nav-session-controls { grid-column: 2; grid-row: 1; }
 @media (max-width: 600px) {
-  .assembly-navigation { display: grid; width: 100%; gap: 6px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, .8fr); }
+  .assembly-navigation { display: grid; width: 100%; gap: 6px; padding: 6px 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, .8fr); }
   .assembly-navigation-field { flex-direction: column; align-items: stretch; gap: 3px; }
+  .assembly-navigation-field + .assembly-navigation-field::before { display: none; }
   .assembly-navigation .shell-select { width: 100%; max-width: none; }
-  .assembly-navigation .shell-select-toggle { width: 100%; min-width: 0; }
-  .assembly-navigation-label { font-size: var(--font-small); }
+  .assembly-navigation .shell-select-toggle { width: 100%; min-width: 0; border-color: var(--border-default, #cbd5e1); background: var(--surface-panel, #fff); }
+  .assembly-navigation-label { font-size: var(--font-caption); }
 }

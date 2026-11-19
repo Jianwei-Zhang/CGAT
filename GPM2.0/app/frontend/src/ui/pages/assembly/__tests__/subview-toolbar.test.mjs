@@ -121,11 +121,11 @@ test("Local View title, Tools and inline guide use the same first-row height and
   const title = ruleBody(css, ".subview-panel-head > .assembly-view-title");
   assert.match(title, /display:\s*flex[\s\S]*align-items:\s*center[\s\S]*min-height:\s*2\.1429rem/);
   assert.match(ruleBody(css, ".subview-panel-title-row > .subview-empty-guide"), /line-height:\s*2\.1429rem/);
-  assert.match(groupCss, /--toolbar-group-size: 34px;/);
-  assert.match(groupCss, /--toolbar-control-size: 28px;/);
-  assert.match(groupCss, /line-height: calc\(var\(--toolbar-group-size\) \+ 10px\);/);
+  assert.match(groupCss, /--toolbar-group-size: 30px;/);
+  assert.match(groupCss, /--toolbar-control-size: 26px;/);
+  assert.match(groupCss, /line-height: calc\(var\(--toolbar-group-size\) \+ 4px\);/);
   assert.match(groupCss, /height: var\(--toolbar-control-size\);/);
-  assert.match(groupCss, /\.subview-header-tools \.button,[\s\S]*height: 28px; min-height: 28px;/);
+  assert.match(groupCss, /\.subview-header-tools \.button,[\s\S]*height: 26px; min-height: 26px;/);
 });
 
 
