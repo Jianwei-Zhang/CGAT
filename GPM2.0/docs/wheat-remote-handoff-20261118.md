@@ -1534,3 +1534,21 @@
 - 1B Hifiasm batch41已在15:51:25成功（14:54:19启动、grant1），mapper Real3422.943s、
   CPU3414.746s、PeakRSS2.128GB；mapping/restore exit0、complete marker SHA匹配guard receipt。
   6B Hifiasm batch31仍运行；当前没有新增失败，不以单批安静时长为由重提。
+
+
+#### 16:18只读观察器与SSH生命周期解耦
+
+- session42743亦提前exit143。16:16:56再次独立djob确认两作业RUNNING，登录节点已无原
+  `python3 -u -`观察进程；原日志末次16:16:47。没有把观察退出当作作业失败，也没有重提计算。
+- 为避免SSH断开中止采样，将同一观察脚本原样保存到
+  ~/cgat-reads-debug/wheat-observer-20261120-1618/monitor.py，传输后核验SHA=
+  329074a0550e486dd886d282c11b596e26a25033ba999b9a1d0a8484386153ae。
+  经原environment.sh加载后nohup运行，stdin=/dev/null，stdout/stderr均到该目录console.log。
+  **当前监控不再以本地session为句柄**：observer.pid记录远端PID **2636895**；16:17:51
+  `ps`确认真实python进程、PPID1、命令路径匹配。续接先核实PID/完整命令与日志新鲜度，
+  不凭pid文件判断存活；PID重用、观察退出均不能作为重启计算任务的理由。
+- 全量采样log=~/cgat-reads-debug/logs/wheat-live-20261120-161744.jsonl；每30秒采样，仍为
+  181轮有限窗口，约17:49结束；告警仅打印INSPECT_NOW并结束观察，不会自动取消或修改任务。
+  观察仍只读取调度器、状态、日志和小型完成记录，不在登录节点处理大型FASTA/PAF。
+- 首次16:17:44新版973/1364成功，16路/grant32、CPU3021%、RSS51860MiB；q0_chr:Un也已开始。
+  旧版仍grt_step2、CPU1594%；两者无新增失败。本次只改观察器运行方式，不改科学参数或runtime。
