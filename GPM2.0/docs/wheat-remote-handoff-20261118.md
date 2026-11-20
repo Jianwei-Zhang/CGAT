@@ -1520,3 +1520,17 @@
   核实两作业仍RUNNING后仅续接只读观察器：**session79134**，source仍为
   /tmp/cgat-wheat-live-monitor-fair-compact.py，新日志logs/wheat-live-20261120-153747.jsonl，
   首次15:37:47，预计约17:09到期。优先poll79134，不重复启动观察器；此快照须实时核实。
+
+
+#### 16:00观察通道恢复（非计算任务重启）
+
+- 本地观察session79134在15:58前后exit143，早于计划窗口到期，不能据此认定计算任务失败。
+  15:58:23独立djob核实42949582与42523432均RUNNING、owner和计算子进程仍在。
+  原远端observer PID791947及shell791158短暂仍在，等到15:59:24确认两PID均消失后才续接，
+  未重复运行观察器、未中断计算任务；断开原因尚未确定。
+- 新只读观察session **42743**，脚本仍为/tmp/cgat-wheat-live-monitor-fair-compact.py，
+  log=logs/wheat-live-20261120-155941.jsonl。15:59:41新版951/1364个leaf成功，16路、grant31，
+  CPU2344%、RSS51759MiB；旧版仍grt_step2。新监控预计约17:31到期，优先poll42743。
+- 1B Hifiasm batch41已在15:51:25成功（14:54:19启动、grant1），mapper Real3422.943s、
+  CPU3414.746s、PeakRSS2.128GB；mapping/restore exit0、complete marker SHA匹配guard receipt。
+  6B Hifiasm batch31仍运行；当前没有新增失败，不以单批安静时长为由重提。
