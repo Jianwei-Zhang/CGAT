@@ -1723,3 +1723,29 @@
 - 首样新版42949582在q0_evidence，约1核、RSS47502MiB/限额327680MiB，25个外层单元成功
   （2ref+assign+22q0_chr），1364leaf全部成功；485次本轮guarded native实际执行/receipt完成。
   旧版42523432仍grt_step2，CPU1595%、RSS85357MiB。无新增失败，未改主runtime或重提计算。
+
+
+#### 21:34 q0 reader后续只读诊断（未切换runtime）
+
+- 诊断42965792 SUCCEEDED，21:11:08–21:13:09，目录q0-reader-diagnostic-20261120-2111/。
+  同一reader PID1754951在120.197秒内消耗117.41秒CPU；已推进到7B，先读Flye self PAF，
+  再读Hifiasm self PAF，随后重新读Flye PAF。文件位置复位是不同消费步骤的重读，不能说成
+  单次扫描一直向前，也不直接证明可删除某次语义校验。summary SHA=
+  ef4c2645759a1152ab3f0a03eb0072fe7c7c2c9e42919b75934c6800fd721a74。
+- 21:22起新版RSS由约47GiB降至约33GiB。为区分等待与计算，资源检查确认agent-X86-64仍有
+  16空闲CPU/52100MiB可调度内存、x86 OPEN/ACTIVE后，提交1CPU/1GiB请求的同节点只读诊断
+  42966572；调度器SUCCEEDED，实际七次采样21:31:01–21:33:01。
+  sampler与前次完全相同，SHA仍dd2c564e6ad802b44a5a7dfec9a885b8bb714b635e9399d03c918e5ed4d27915；
+  目录q0-reader-diagnostic-20261120-2130/，dsub SHA=
+  f08126708e16bb3cc8af328eb0dfada72d87ab10067b8558db44ea8a491a32f7。
+  reader同一start_ticks，120.191秒内CPU119.96秒（0.998核），七次均无工作区打开文件句柄。
+  这说明采样期间在CPU计算，不能凭无输出判为I/O卡死；没有Python栈，不能据此指定某个函数。
+  summary SHA=f5c84453a57adb706a75c19bbdad7135e257fe0b4fd926275a4464b52706b125。
+- 仅以checkpoint JSON和文件stat盘点其输入/输出并集：4851个路径、134041746043字节，
+  其中1474个FASTA共121496040434字节、66个PAF共12522376422字节。额外provenance清单
+  1679条共3879386字节。没有在登录节点读取基因组内容；这是清单逻辑体量，不是本轮实际I/O，
+  也不能据此声称这些文件都被无谓重算。后续重复内容身份计算优化仍须保留完整性与变更检测。
+- 21:34两主作业仍RUNNING，新版q0_evidence、旧版grt_step2；新版manifest和补充任务目录
+  尚未出现。observer3067484仍存活且采样新鲜，预计22:26窗口结束。未改冻结runtime、
+  未重提主任务；57f6d8ff仓库性能补丁依旧未部署。诊断final-job.json/samples.jsonl/summary.json
+  均保留在各自目录，不能将诊断SUCCEEDED误当成小麦主任务已成功。
