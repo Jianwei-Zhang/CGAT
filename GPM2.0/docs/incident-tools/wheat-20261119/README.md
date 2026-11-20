@@ -912,3 +912,15 @@ verify the prior resource plan with its authentic verifier, and bind a new owner
 reader and audit consistently. The existing initial stager does not yet implement
 that resource-plan revision protocol. A positive two-case replay alone is not a
 production cutover or proof of overall speedup.
+
+The two-case thread replay `42947499` subsequently **SUCCEEDED** on
+`agent-X86-37`, 13:00:01–13:24:29 CST. Both raw/restored PAF pairs were byte-identical
+with grants reduced from `[8,8]` to `[2,2]`. Mapping execution took 1439.490 seconds,
+total driver time 1455.098 seconds; scheduler peak was 7016 MiB. Sixteen remote
+pilot tests passed before mapping (5.577 seconds). `results/pilot.json` SHA-256:
+`e7f9f9c7ec42cd7f7073fb71c5818288c08197e1d2590ecb9b13baa83d9ff44f`.
+This validates two resource-rebudgeted cases, not every possible thread/input
+combination or a whole-workflow acceleration. Lower per-case CPU naturally takes
+longer; the scheduling candidate concerns queue starvation and overall resource
+allocation. The candidate remains uninstalled pending the explicit receipt-safe
+resource-plan revision and controller/reader/audit validation described above.

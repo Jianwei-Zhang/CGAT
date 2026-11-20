@@ -1362,3 +1362,17 @@
   不能替换那个要求8路的槽位。若未来revision使用fair候选，应另行绑定完整的线程重预算
   验证报告，而不是放松旧8路校验。候选代码单独存为native_fair_admission.py，原默认
   native_resource_admission.py及其测试未修改，避免把未完成试验的策略悄悄当成默认入口。
+
+
+### 2026-11-20 13:24：两例8→2线程完整重放通过，尚未切换fair候选
+
+- 隔离试验42947499 SUCCEEDED，agent-X86-37，13:00:01至13:24:29。2B flye batch1/2
+  原8线程改为各2线程，两个raw.paf/result.paf对均逐字节一致，原科学参数/输入不变。
+  mapping执行1439.490秒，总driver1455.098秒，调度器峰值7016MiB。少线程使单批变慢
+  是预期；这不是“降线程让单批更快”的证据，也不是整体调度加速倍率。
+- 远端16项pilot测试先通过（5.577秒）；final-job.json已保存。完整report SHA为
+  e7f9f9c7ec42cd7f7073fb71c5818288c08197e1d2590ecb9b13baa83d9ff44f，driver仍为
+  6762b6939d15f02fb2b7c8d65d50a132da2baaf4f3a90e2ae5ef66fbcf01de6d。未采纳试验输出。
+- 候选源码/定点测试/调查文档已通过4b038cbd保存推送；当前运行中的42943728仍使用原
+  e06f...dispatcher，没有中断。下一步必须保留现有native specs/guard receipts实现资源
+  计划revision并验证producer/reader/audit后，才考虑新的ready/安全切换；这个机制仍未实现。
