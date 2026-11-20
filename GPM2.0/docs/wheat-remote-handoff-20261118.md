@@ -1813,3 +1813,26 @@
   预计约23:58到期，仍须以实际PID/日志新鲜度核实。/tmp/wheat-detached-observer-poll.py已更新。
   旧版42523432仍grt_step2、约16核，未改动；新版42949582仍q0_evidence。
   仓库57f6d8ff、8f33a52e两个局部性能补丁均未部署到当前冻结任务，未重提主计算。
+
+
+#### 23:08 补充mapper降并发的线程级只读核查
+
+- 新版仍在首项q0-map-8024dde83cbf20e7ffa6d8ee补充比对。22:29–22:44曾约32核，随后
+  CPU逐步降至4核；不能据低于申请核数就重提。23:04节点检查为OK、32CPU空闲、
+  183172MiB可调度内存、仅主任务运行，x86 OPEN/ACTIVE。
+- 同节点只读诊断42970316 SUCCEEDED，23:05:35–23:06:36，1CPU/1GiB请求，目录
+  q0-supplement-thread-diagnostic-20261120-2305/。核对同UID和精确补充query路径后，
+  只读/proc状态、进程/线程CPU及I/O计数，不读序列、不attach、不发信号。
+  sample.py SHA=55b173e021bab6a263d9e3c954693361f188309a9da65f7d1089b4aaa73474cf；
+  dsub SHA=90c5a7af7b61ad2a76b20cfb4f75faf1f5a60d557ad9fc2ba832fc7861945eb8。
+- mapper确认为PID1839627、命令包含原补充任务；4次采样共60.068秒，进程CPU239.74秒
+  （3.991核）。6个TID集合未变，其中4个线程各增加约59.93秒CPU并处于R，另2个没有明显
+  CPU增量。mapper RSS38355176KiB、HWM54741052KiB、VmSwap=0；I/O计数全窗口未变。
+  这排除了“整个mapper都在等磁盘/交换”的解释，符合少数计算线程长尾；没有读取线程局部变量，
+  不能声称已经定位到具体4条query，也不能由此给出完成时间。
+  summary SHA=f7ffcf7b9b75bbb610705d74f7131d8055d11b14ee512dfe1fab7abbd585d9f8。
+  使用进程CPU独立计数；未用幸存线程CPU和冒充进程累计CPU。
+- 23:07主作业RSS约124000MiB/限327680MiB，无失败；补充success.json和q0 manifest仍未生成。
+  未修改或重启主任务/旧版。observer944455仍活跃（预计23:58窗口结束）；所有计算节点
+  只读诊断现已结束，无持续占用诊断作业。本地poll仍每分钟核实，重复输出仅保留首末及状态变化，
+  原远端30秒完整采样不变；已结束的Python栈不再当实时位置显示。
