@@ -1,4 +1,5 @@
 import { unbindFinalPathSelection } from "./final-path-selection-runtime.js";
+import { createNativeSubviewVisibility } from "./subview-native-visibility.js";
 import { getNativeSubviewHandle } from "./subview-native-identity.js";
 import { fitNativeSubviewWindow } from "./subview-native-fit.js";
 import { changeSubviewWindow, getSubviewWindowStore } from "./subview-workspace-state.js";
@@ -116,10 +117,8 @@ export function createNativeSubviewWindows(root, store, deps) {
       const value = root.ownerDocument.documentElement.style.getPropertyValue(name);
       if (value) entry.win.document.documentElement.style.setProperty(name, value);
     }
-    if (entry.minimized !== Boolean(item.minimized)) {
-      entry.minimized = Boolean(item.minimized);
-      run(entry.minimized ? entry.handle.minimize() : entry.handle.unminimize(), entry);
-    }
+    // Geometry and handlers must be ready before revealing a newly opened peer.
+    if (entry.ready) void entry.visibility.sync();
   }
   async function connect(id, token, peer) {
     const entry = entries.get(id);
@@ -128,6 +127,10 @@ export function createNativeSubviewWindows(root, store, deps) {
     const handle = getNativeSubviewHandle(peer, id, token);
     entry.win = peer;
     entry.handle = handle;
+    entry.visibility = createNativeSubviewVisibility({
+      handle, isCurrent: () => valid(entry),
+      isMinimized: () => itemFor(id)?.minimized, onError: report,
+    });
     // OS destruction is asynchronous. Keep a capture-phase gate until it really
     // completes, so a closing/docked/stale peer cannot edit a new project via
     // old DOM handlers while the authoritative store has already moved on.
@@ -179,9 +182,10 @@ export function createNativeSubviewWindows(root, store, deps) {
       if (valid(entry)) changeSubviewWindow(store, id, "close");
     }));
     entry.cleanups.push(await entry.handle.onFocusChanged(({ payload }) => {
-      if (!payload || !entry.ready || !valid(entry) || (focusTarget && focusTarget !== id)) return;
+      if (!payload || !entry.ready || !valid(entry) || itemFor(id)?.minimized
+        || (focusTarget && focusTarget !== id)) return;
       run(entry.handle.isFocused().then(focused => {
-        if (focused && valid(entry) && (!focusTarget || focusTarget === id)) {
+        if (focused && valid(entry) && !itemFor(id)?.minimized && (!focusTarget || focusTarget === id)) {
           changeSubviewWindow(store, id, "activate");
           deps.syncTools(entry.node, entry.scoped);
         }
@@ -202,7 +206,7 @@ export function createNativeSubviewWindows(root, store, deps) {
       resizeTimer = peer.setTimeout(() => {
         resizeTimer = null;
         void entry.handle.isMinimized().then(minimized => {
-          if (!valid(entry)) return;
+          if (!valid(entry) || itemFor(id)?.minimized) return;
           if (minimized) { if (!itemFor(id)?.minimized) changeSubviewWindow(store, id, "minimize"); return; }
           deps.refresh(entry.node, entry.scoped);
         }).catch(error => { if (valid(entry)) report(error); });
@@ -227,11 +231,10 @@ export function createNativeSubviewWindows(root, store, deps) {
       await fitContent();
     }
     if (!valid(entry)) return;
-    await entry.handle.show();
-    if (!valid(entry)) return;
     entry.ready = true;
-    if (itemFor(id).minimized) await entry.handle.minimize();
-    else await manager.focus(store.getState().assembly.subviewWorkspace.activeId);
+    await entry.visibility.sync();
+    if (!valid(entry)) return;
+    if (!itemFor(id).minimized) await manager.focus(store.getState().assembly.subviewWorkspace.activeId);
     // Opening must honor the latest user focus, not steal it back after a slow
     // child bootstrap or a task switch that happened while the peer was hidden.
     if (!valid(entry)) return;
@@ -312,10 +315,9 @@ export function createNativeSubviewWindows(root, store, deps) {
           // An owned/transient popup is hidden with its minimized owner.
           if (item.pinned !== false) await mainHandle.unminimize();
           if (!valid(entry) || request !== focusSequence) return;
-          await entry.handle.unminimize();
-          if (!valid(entry) || request !== focusSequence) return;
-          await entry.handle.show();
-          if (valid(entry) && request === focusSequence) await entry.handle.setFocus();
+          const restored = await entry.visibility.sync(true);
+          if (restored && valid(entry) && request === focusSequence && !itemFor(id)?.minimized)
+            await entry.handle.setFocus();
         } else {
           await mainHandle.unminimize();
           if (request === focusSequence) await mainHandle.setFocus();

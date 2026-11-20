@@ -21,7 +21,7 @@ function fixture({ failOpen = false, floating = true } = {}) {
   };
   const doc = { defaultView: win, documentElement: { dataset: {}, style: { getPropertyValue: () => "" } } };
   const root = { ownerDocument: doc, isConnected: true };
-  const manager = createNativeSubviewWindows(root, store, { getLabels: getAssemblyI18n, disposeWindow() {} });
+  const manager = createNativeSubviewWindows(root, store, { getLabels: state => getAssemblyI18n(state).subview, disposeWindow() {}, render: () => "", bindWindow() {}, syncTools() {}, refresh() {} });
   return { store, win, root, manager, urls, calls, notifyDestroyed: payload => destroyedListener({ payload }), id: store.getState().assembly.subviewWorkspace.activeId };
 }
 
@@ -148,5 +148,66 @@ test("a WebKit popup inheriting Main's identity is rejected before attaching nat
     assert.equal(task.floating, false);
     assert.equal(task.snapshot.subview.summary.bottom.contigId, 2);
     assert.equal(destroyed, 0);
+  } finally { f.manager.destroy(); }
+});
+
+async function connectPeer(f) {
+  changeSubviewWindow(f.store, f.id, "native-geometry", { nativeBounds: { x: 40, y: 40, width: 600, height: 300 } });
+  const calls = [], callbacks = {};
+  const token = f.urls[0].searchParams.get("token");
+  const handle = { label: `local-view-${f.id}--${token}`, isMinimized: async () => false,
+    isFocused: async () => true, outerPosition: async () => ({ x: 40, y: 40 }), innerSize: async () => ({ width: 600, height: 300 }) };
+  for (const name of ["hide", "unminimize", "show", "setFocus", "destroy", "setTitle", "setPosition", "setSize"])
+    handle[name] = async () => { calls.push(name); };
+  for (const name of ["onCloseRequested", "onFocusChanged", "onResized"])
+    handle[name] = async callback => { callbacks[name] = callback; return () => {}; };
+  const node = { querySelector: () => null, setAttribute() {} };
+  const host = { querySelector: () => node, addEventListener() {}, removeEventListener() {} };
+  const doc = { querySelector: () => host, documentElement: { dataset: {}, style: { setProperty() {} } } };
+  const peer = { opener: f.win, location: f.win.location, document: doc, addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout,
+    __TAURI__: { window: { getCurrentWindow: () => handle }, dpi: { PhysicalPosition: class {}, PhysicalSize: class {} } } };
+  doc.defaultView = peer; node.ownerDocument = doc;
+  await f.win.__gpmLocalViews.connect(f.id, token, peer);
+  return { handle, calls, callbacks };
+}
+const settle = () => new Promise(resolve => setImmediate(resolve));
+
+test("connected native popup hides into its task and one activation restores it without recreating content", async () => {
+  const f = fixture();
+  try {
+    const peer = await connectPeer(f); peer.calls.length = 0;
+    changeSubviewWindow(f.store, f.id, "minimize"); await settle();
+    assert.deepEqual(peer.calls, ["hide"]);
+    assert.equal(f.store.getState().assembly.subviewWorkspace.windows[0].minimized, true);
+    await f.manager.focus(f.id);
+    assert.deepEqual(peer.calls, ["hide", "unminimize", "show", "setFocus"]);
+    assert.equal(f.urls.length, 1);
+    assert.equal(f.store.getState().assembly.subviewWorkspace.windows[0].minimized, false);
+    assert.equal(f.store.getState().assembly.subviewWorkspace.windows[0].snapshot.subview.summary.bottom.contigId, 2);
+  } finally { f.manager.destroy(); }
+});
+
+test("a task minimized while bootstrapping is never shown before its restore action", async () => {
+  const f = fixture();
+  try {
+    changeSubviewWindow(f.store, f.id, "minimize");
+    const peer = await connectPeer(f);
+    assert.ok(peer.calls.includes("hide"));
+    assert.ok(!peer.calls.includes("show")); assert.ok(!peer.calls.includes("setFocus"));
+    await f.manager.focus(f.id); assert.equal(peer.calls.at(-1), "setFocus");
+  } finally { f.manager.destroy(); }
+});
+
+test("late native focus notifications cannot reactivate a hidden task", async () => {
+  const f = fixture();
+  try {
+    const peer = await connectPeer(f);
+    let resolve;
+    peer.handle.isFocused = () => new Promise(done => { resolve = done; });
+    peer.callbacks.onFocusChanged({ payload: true });
+    changeSubviewWindow(f.store, f.id, "minimize"); resolve(true); await settle();
+    peer.callbacks.onFocusChanged({ payload: true }); await settle();
+    assert.equal(f.store.getState().assembly.subviewWorkspace.windows[0].minimized, true);
+    assert.equal(peer.calls.at(-1), "hide");
   } finally { f.manager.destroy(); }
 });
