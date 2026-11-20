@@ -1234,3 +1234,48 @@
   八线程批次、CPU空隙填充、内存满额阻止第17路、未知命令独占、禁止混池、旧缓存
   不执行/不冒称保护、回调还原、缺receipt不得完成、新reader验证及篡改拒绝。
   这些是组件测试，不替代后续真实staged controller/reader/audit闭环。
+
+
+### 2026-11-20 11:21：普通池资源层完成实际切换，新版作业改为42943728
+
+- 新增stage_native_resources/native_resource_bootstrap/native_resource_context、
+  resume_native_resources/read_native_resources/native_resource_audit，严格独立验证旧
+  extension来源与新资源差异，不改旧验证器断言、不伪造模块身份、不改科学profile/key。
+  本地新增7项stage/bootstrap测试通过（589.782秒）、6项owner顺序测试通过（0.047秒）、
+  3项audit测试通过（73.766秒）；之前42项native组件及6项fast准入测试仍是已记录基线。
+- 计算节点预检42943568 SUCCEEDED，agent-X86-18，11:11:11至11:12:04，2CPU/20GiB，
+  峰值222MiB。真实plan staging、controller configure、独立reader与audit preflight
+  全部通过；没有用这个小资源作业执行正式流程。计划包括876个eligible native（含已完成
+  可复用者）、464个原fast、2个已完成超范围native，共44 operations/1342 self批次。
+- 新immutable bundle位于比较根目录native-resource-candidate-20261120-1110/，plan为
+  plan/self-plan.json，SHA=cad752a468ec890170d1ad6730a851ccc0b359d8804b1d570c8312ec470b5950。
+  9份实际代码、verify.dsub及code.sha256均已传输校验。44个operation对应任务清单的现场检查确认：
+  22个q0_alignment_tasks.json的max_concurrent均未另设上限，不会再被隐藏两路限制卡住。
+- 正式接替作业42943728，agent-X86-32，11:15:25启动，32CPU/327680MiB；11:15:41
+  ready gate就绪。handoff目录native-resource-handoff-20261120-1115/保存gate/resume.dsub
+  和launch.sha256、submission、ready、切换前原owner、scheduler snapshots及handoff。
+  ready后再次核对资源、原owner PID94158/runID和受保护旧版42523432仍RUNNING。
+- 只dkill新版原作业42876793（不使用force），11:18:29终态FAILED，原因明确为
+  Job was terminated by xbzhang26，是本次有意切换，不是新故障。结束时610个成功leaf；
+  仅4B flye batch1与2B flye batch18尚未完成（此前长7B批次已完成）。它们的临时attempt
+  保留，所有已完成结果保留。调度器子进程列表为空且正常lock消失后才放行，不删锁。
+- gate于11:19:43接受handoff，正式新run=20261120T031955Z-3903530-2bc35443，PID3903530，
+  11:19:55正常持锁。原读取入口备份在plan/reader-installation/，原resource配置备份为
+  plan/resources-before-20261120T031955Z-3903530-2bc35443.json。正常resource API已将
+  effective threads16恢复32，history已记录；只安装新reader launcher，没有运行update.sh、
+  发布CI、整体替换runtime或reprepare。日志logs/resume_native_resource_42943728.out。
+- 原观察器10159在发现被有意终止的42876793后正常退出；INSPECT_NOW是该切换的终态提示，
+  不是需要重启旧作业的原因。新观察器72919使用/tmp/cgat-wheat-live-monitor-native.py，
+  跟踪42523432与42943728，额外记录复用数量、guarded starts/receipts及实际线程预算。
+  首次输出日志路径需从当前session核实；90分钟观察窗口结束不等于主任务结束。
+- 截至11:20:43新owner已进入正常Runner preflight，线程32。还需核实已有结果真正复用、
+  新普通批次实际并发、CPU/内存及首批guard receipts；不能把preflight当q0/整流程完成。
+  最终portable audit要用新native_resource_audit.py而非直接调用旧extension CLI。
+- 新观察器日志已核实为logs/wheat-live-20261120-112048.jsonl，约12:51到期；session72919。
+  11:21:51已看到ref:JM19_hifiasm的SKIP_VALID（原参考结果复用，未重新比对）；11:22:18
+  新任务RUNNING、约单核用于续跑完整性验证，尚未启动普通mapper，不把这个启动阶段
+  误当并发策略失效。后续要确认ref:JM19_flye、assign及self/cross缓存复用和实际并发。
+- 新reader安装receipt已核实：prior_sha=33fc5bea2c85b08ae1705ba4054aa0ab91ac13932c65c7b30c8618c369cf0166，
+  installed_sha=43766e880e7cb4196eb70519d79ffc8918238c30a53245bba2db88d1230f0e33。
+  master另有其他会话的1fe41ab5（v2.0.21发布准备），不因此更新远端冻结runtime；本轮
+  仅提交自己的incident工具/文档，不夹带其他会话的版本或发布改动。

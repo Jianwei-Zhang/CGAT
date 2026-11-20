@@ -701,7 +701,7 @@ having used the extension or its guard. The successful isolated 99-Mb candidate
 is bound for verified adoption; it must not be mapped a third time.
 
 
-## Guarded native concurrency pilot (not deployed)
+## Guarded native concurrency pilot
 
 `native_concurrency_pilot.py` defaults to four completed native self batches
 on an x86 compute node, using the frozen batch helper, mapper, original flags
@@ -738,7 +738,7 @@ All four raw and restored PAF pairs were byte-identical to their native baseline
 The four-lane helper execution took 490.524 seconds (510.588 seconds including
 staging/verification), with a scheduler-observed peak of 27797 MiB. This is a
 controlled replay on a different node from the original results, not a paired
-whole-workflow speedup. The production wheat job still uses its prior dispatcher.
+whole-workflow speedup. That four-lane trial did not change production; the later native resource cutover is recorded below.
 
 ### Split-limit native guard and eight-lane acceptance
 
@@ -765,7 +765,7 @@ code hashes, config, submission, 19 passing guard/pilot tests, results and
 `02794293671a8414f83e9c9ef9c23020620c202ed9571f94d064313e706fe995`.
 No trial output was adopted and neither main job was restarted.
 
-### Candidate dynamic admission and native command bindings (not installed)
+### Dynamic admission and native command bindings
 
 - `native_resource_admission.py` keeps existing fast admission unchanged: at most
   two 128-GiB reservations, no fast/native mixing, and unknown/unguarded work
@@ -782,10 +782,9 @@ No trial output was adopted and neither main job was restarted.
   stay on the original source/output-verified reuse path. New guarded successes
   require a matching resource receipt before the scientific finish callback;
   fresh reader bindings verify the same receipt and output identities.
-- These are tested components, **not a deployable resource plan yet**. Remaining
-  gates are the immutable resource-only transition verifier/stager, honest context
-  bootstrap, owning entry and evidence reader/audit integration, followed by a
-  compute-node validation of the staged controller/reader. Do not pass a changed
+- The explicit transition/context/owner/reader/audit integration and the verified
+  cutover are described below. Passing component tests alone never authorizes
+  editing a frozen running plan or bypassing the resource-ready handoff. Do not pass a changed
   resource policy through the old extension verifier, edit frozen sources, or
   stop a main job merely because these component tests pass. Effective threads
   may be restored from 16 to the allocated 32 only under the normal workspace lock
@@ -795,3 +794,82 @@ Local focused validation after these additions: 42 native guard/pilot/admission/
 bindings tests passed (58.650 seconds), plus six unchanged fast-admission
 regressions. Synthetic fixtures prove execution plumbing, not biological
 equivalence; the eight-case real replay is the separate scientific-output check.
+
+### Explicit resource-plan integration
+
+`stage_native_resources.py` creates a new isolated plan using the unchanged
+scientific operation rows plus `native_scripts`/`native_specs`. It binds the
+original extension plan and the successful eight-lane guard replay. The original
+extension verifier still receives the **original** policy and plan; a separate
+resource-transition verifier permits only resource fields, admission/launcher
+changes and explicitly inventoried new dependencies. Existing scientific module
+paths, profile keys, native commands, fast wrappers and output bytes are retained.
+
+`native_resource_bootstrap.py` selects modules by their real hash-bound paths and
+restores module selection on exit. `native_resource_context.py` loads the genuine
+original context at its original path, then composes `NativeBindings`; neither
+module identity nor the old policy assertions are spoofed. This path is shared by
+`resume_native_resources.py`, `read_native_resources.py` and
+`native_resource_audit.py`.
+
+The owner uses the original normal workspace lock and 55-unit/no-DEGAP comparison
+plan. Reader installation retains the original backup/receipt gate. Effective
+threads are updated through the frozen `run_resources.update_resources`, only
+under the acquired lock and after retaining the previous resource JSON outside
+the workspace. The original controller configuration and Runner remain in use.
+The portable audit retains the scientific audit and adds actual native guard
+receipts with relative output paths; historical native outputs without receipts
+are explicitly not claimed as guarded executions.
+
+Compute-node preflight, with a fresh isolated output directory and the same
+frozen x86 environment as the main comparison:
+
+```bash
+python3 -B stage_native_resources.py --origin-plan ORIGINAL_SELF_PLAN \
+  --calibration EIGHT_LANE_RESULTS/pilot.json --output NEW_PLAN_DIRECTORY
+python3 -B resume_native_resources.py --plan NEW_PLAN_DIRECTORY/self-plan.json --validate-only
+python3 -B read_native_resources.py --plan NEW_PLAN_DIRECTORY/self-plan.json \
+  --server-dir EXISTING_WORKSPACE --validate-reader-only
+python3 -B native_resource_audit.py --plan NEW_PLAN_DIRECTORY/self-plan.json \
+  --work EXISTING_WORKSPACE --validate-only
+```
+
+These commands do not install a reader or execute the scientific workflow. Audit
+preflight does not certify incomplete q0 outputs. Actual cutover still requires a
+verified single-node 32-CPU/320-GiB allocation, an explicit ready/handoff gate,
+termination of **only the newer** original job and its children, and normal lock
+release. Do not use a validation job's smaller resource allocation to run the
+workflow. Preserve the old baseline and both prior launcher/resource backups.
+
+### November 20, 2026 resource cutover
+
+Seven staging/bootstrap transition tests passed (589.782 seconds on the local
+Windows-backed checkout), six owning-order tests passed (0.047 seconds), and
+three portable native-audit tests passed (73.766 seconds). These supplement the
+previous 42 component tests, six fast-admission regressions and real eight-case
+PAF replay. Compute-node preflight `42943568` succeeded on `agent-X86-18` at
+11:12:04 CST after 53 seconds, peak 222 MiB, validating the actual staged plan,
+controller configuration, independent reader and audit imports without installing
+anything. The plan binds 876 eligible native batches, 464 unchanged fast batches,
+and two excluded historical oversized native batches across 44 operations.
+
+The immutable bundle/plan lives under comparison-root
+`native-resource-candidate-20261120-1110/`. Plan SHA-256 is
+`cad752a468ec890170d1ad6730a851ccc0b359d8804b1d570c8312ec470b5950`.
+Handoff artifacts are under `native-resource-handoff-20261120-1115/`.
+Replacement `42943728` became resource-ready on `agent-X86-32` with a verified
+32-CPU / 327680-MiB single-node allocation before stopping the prior newer job.
+Only `42876793` was terminated, at 11:18:29, following 610 successful leaf events;
+its scheduler termination by `xbzhang26`, empty process list and normal lock
+release were verified. Its two unfinished batches retain diagnostic attempts;
+completed outputs were not deleted. Old baseline `42523432` was left running.
+
+The gate accepted the SHA-bound scheduler/ready proofs at 11:19:43. The new owner
+acquired the normal lock at 11:19:55, backed up and installed only the reader
+launcher, and backed up then changed effective threads from 16 to 32 through the
+frozen resource API. Run ID: `20261120T031955Z-3903530-2bc35443`. Launch log:
+`logs/resume_native_resource_42943728.out`. This is a resource-only cutover, not
+whole-q0/workflow completion or an established speedup factor; retain monitoring
+for actual reuse, concurrent mapper execution, memory peaks and guarded success
+receipts. No release CI, `update.sh`, full runtime replacement or reprepare was
+performed for this incident.
