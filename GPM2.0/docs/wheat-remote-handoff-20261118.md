@@ -1634,3 +1634,21 @@
   保留最终完整审计，不能直接修改运行中的冻结依赖或去掉检查点。
 - 当前只读observer仍为PID1022372，目录wheat-observer-20261120-1923/，日志192243.jsonl；
   新旧计算job均未重提，旧对照不变。
+
+
+#### 20:01全部比对leaf与22个q0染色体检查点完成
+
+- 最后一个leaf为3B Hifiasm batch17，19:59:20 TASK_END exit0；最后的q0_chr:3B在
+  **20:00:31 SUCCESS**。**1364/1364个比对leaf、22/22个q0染色体单元（含Un）已成功**。
+  主job42949582继续运行，**20:00:39自动START q0_evidence**，不是全流程完成。
+- 已以当前冻结plan（343f1d...）绑定的22个task manifests重新构建预期command集合，逐项核对
+  本轮成功TASK_END集合完全相等、无缺项/额外项、无未结束leaf。22个status均success，并核对
+  SUCCESS日志所指checkpoint的unit/status与文件摘要，未在登录节点重新hash大型PAF/FASTA。
+  这是metadata-only阶段验收，不替代主控制器内容验证或最终portable audit。
+- 证据native-fair-handoff-20261120-1357/alignment-stage-completed-20261120-2001.json，SHA=
+  ccd4488e011a85c4a6c9a5cbf516c336cfa8d1bb192d7b9604bc3b74d1fd0859。
+  不把876个eligible native的历史缓存追认为全部受新guard实际执行；保持已有来源分层。
+- 下一步重点监控q0_evidence reader的真实性能/身份核验，然后LGZ准备、step1/2/3与最终产物。
+  前述重复PAF格式验证仍只是源码定位的候选精简项，未为此修改冻结runtime或重提。
+  当前远端observer1022372、目录wheat-observer-20261120-1923/、日志192243.jsonl持续运行，
+  约20:54窗口结束后按真实进程/调度状态续接；旧对照42523432仍grt_step2，保持不变。
