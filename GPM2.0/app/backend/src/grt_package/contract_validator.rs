@@ -23,6 +23,15 @@ where
         "checking required LGZ package files",
     );
 
+    // Check schema-independent files before parsing metadata. Incomplete legacy
+    // deliveries must still report the missing LGZ payload at the required-files
+    // phase, while versioned stage tables and q FASTAs are checked below.
+    for relpath in REQUIRED_FILES {
+        if !relpath.starts_with("grt/q/") && package_table_path(relpath, true) == *relpath {
+            required_bundle_file(bundle_root, relpath, relpath)?;
+        }
+    }
+
     on_progress(
         "validate_grt_metadata_tables",
         "parsing LGZ metadata tables",
