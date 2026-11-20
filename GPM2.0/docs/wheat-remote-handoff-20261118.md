@@ -1703,3 +1703,23 @@
   半小时；仅凭局部微基准不足以证明中断重读更划算，因此本轮保存源码修复但不强制重提。
   若后续自然失败/续跑或新增实测表明切换净收益为正，再按绑定plan/正常锁的规则部署；
   不能把master补丁冒称已在当前远端生效。当前observer1022372不变。
+
+
+#### 20:55 q0 reader继续推进、观察窗口续接
+
+- 第二次只读进程诊断**42965098 SUCCEEDED**，20:37:52–20:39:53，agent-X86-64、1CPU/1GiB请求，
+  sampler与42964604逐字节相同，目录q0-reader-diagnostic-20261120-2038/。
+  reader仍PID1754951，同一start_ticks；120.19893秒内CPU119.11秒（0.991核）。
+  读取位置从3D Flye self PAF offset153608192持续到440213504，随后3D Hifiasm self PAF，
+  20:39:53进入4A Hifiasm batch1/query.fa身份检查。与20:11的1B采样相比，明确不是原地等待。
+  summary SHA=50eab7bf6c3744e84dc3c196d4616955e6d7813aefe0148f855ab1c974f54089。
+  这是原冻结reader进展，不是master的57f6d8ff补丁生效；该补丁尚未部署远端。
+- observer1022372完成181轮，末次20:53:08；20:54确认PID已不存在，独立djob确认两作业
+  仍RUNNING，才续接。**当前远端observer PID3067484**，PPID1，目录
+  ~/cgat-reads-debug/wheat-observer-20261120-2055/，源码SHA仍为
+  329074a0550e486dd886d282c11b596e26a25033ba999b9a1d0a8484386153ae。
+  log=logs/wheat-live-20261120-205456.jsonl，首样20:54:56，预计约22:26到期。
+  /tmp/wheat-detached-observer-poll.py已更新目录/日志；仍以实际PID/完整命令和采样新鲜度确认存活。
+- 首样新版42949582在q0_evidence，约1核、RSS47502MiB/限额327680MiB，25个外层单元成功
+  （2ref+assign+22q0_chr），1364leaf全部成功；485次本轮guarded native实际执行/receipt完成。
+  旧版42523432仍grt_step2，CPU1595%、RSS85357MiB。无新增失败，未改主runtime或重提计算。
