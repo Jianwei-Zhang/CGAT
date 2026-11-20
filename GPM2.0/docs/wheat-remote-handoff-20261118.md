@@ -1552,3 +1552,24 @@
   观察仍只读取调度器、状态、日志和小型完成记录，不在登录节点处理大型FASTA/PAF。
 - 首次16:17:44新版973/1364成功，16路/grant32、CPU3021%、RSS51860MiB；q0_chr:Un也已开始。
   旧版仍grt_step2、CPU1594%；两者无新增失败。本次只改观察器运行方式，不改科学参数或runtime。
+
+
+#### 17:25近三小时6B普通批次的进程级诊断
+
+- 对6B Hifiasm batch31不凭日志安静直接取消。先查x86队列OPEN/ACTIVE、agent-X86-64
+  cpuFree16/memSched52100MiB，确认有余量，再提交同节点只读诊断**42956948**，1CPU/1GiB请求，
+  17:20:48–17:21:49 SUCCEEDED。只读当前UID、指定新版workspace及已核实owner1538453的/proc；
+  未读其他用户数据，未重做比对或改变主任务。目录native-long-batch-diagnostic-20261120-1721/。
+- 七次采样跨60.19395秒：目标mapper PID1551781、同一start_ticks及全部采样同一TID集合，
+  CPU增加60.06秒（0.998核），worker为R，VmSwap0；末次RSS1781312KiB（约1.70GiB），
+  HWM2117160KiB（约2.02GiB），AS soft/hard均16GiB。实际grant1。
+  **该窗口是持续计算而非I/O/内存阻塞**；不能外推整个三小时都无停滞，也不证明算法耗时最优。
+- 其他mapper线程会退出或重建，不能直接用两端“存活线程CPU之和”相减冒充进程累计CPU；
+  summary对全七次PID身份/TID集合不稳定的进程置CPU估算null并注明原因，保留原始samples。
+  目标6B满足稳定集合与单调计数条件。summary SHA=
+  e4912e899055af5f6afff9b711262104bd380180a7d251490bf46d4ccb008971。
+- sampler.py（文件名sample.py）SHA=34b76e2345f83edf54d44b06bfbea0b28dfb7677a321b47438bab59eb243607c；
+  sample.dsub SHA=c207c51e063c8160e5f08875d5f4abe1693ac70956826c680d7615399f86e633。
+  code.sha256、submission.txt、final-job.json、samples.jsonl、summary.json均保留；新主任务未重提。
+- 17:23:38新版1057/1364个比对leaf成功，16路、grant31；旧对照仍RUNNING/grt_step2，无新增失败。
+  当前观察仍为远端PID2636895，非本地短时读取session；目录/日志见16:18条目，预计17:49到期。
