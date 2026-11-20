@@ -1135,3 +1135,33 @@
   chromosomes=22、shared_workers=16；5D结束也不代表整个Step2结束。保持旧基线不动。
 - 监控7600已正常到期；当前只读监控28309，日志
   logs/wheat-live-20261120-065819.jsonl，预计08:29左右到期。到期续接观察而非重启主作业。
+
+
+### 2026-11-20 09:49：普通池资源利用率评估，尚未扩并发
+
+- 已重读定点修复规范。持续低CPU不仅是故障观察项；可以评估不改科学参数的资源优化。
+  当前没有部署新资源策略，也不扩大<10Mb/多record批次的降精度范围；旧基线不动。
+- 09:46盘点157个有完整stderr统计的native成功批次，其中155个满足query总量<=20Mb、
+  target<=1Gb；这155个mapper峰值RSS最大7.791GB、中位4.952GB。其余两个较大原参
+  成功批次不混入此范围。待完成native721批全部落在上述规模内，query总量最大
+  19,999,010bp、target最大924,608,183bp。证据
+  logs/wheat-native-resource-samples-20261120-094626.json；不是新增并发的安全证明。
+- 只读同节点诊断42940708已SUCCEEDED（agent-X86-29，09:48:14至09:49:15，1CPU）；
+  目录native-memory-diagnostic-20261120-0948/保存脚本SHA、submission、7次/proc采样、
+  summary.json和final-job.json。仅读取当前UID/目标工作区及已验证主PID94158。
+  两个mapper在约60秒中分别消耗60.02/60.05秒CPU，VmPeak为4.344/4.969GiB，
+  VmHWM为3.804/4.765GiB；主控制器VmHWM0.677GiB，两个helper各不到0.05GiB。
+  当前native的AS limit均为unlimited；快速批次的64GiB guard并不覆盖native。
+- 代码确认当前native也受两路和128GiB/路启发式预留约束；这提供资源优化候选，
+  不能直接把两路改四路或把RSS样本当硬限。下一步应先隔离验证native保护与并发，
+  检查mapper/helper/restore的进程树边界、线程预算、失败不提交、回调映射、复用和
+  reader/audit身份，再决定是否值得切换；优先不改科学profile/key、原命令和已完成输出。
+  新资源策略若需要重提，按原规范在收益与切换成本明确且新资源ready后执行，
+  不为精度讨论机械中断，也不把原参数长期低效视为只能等待失败。
+- 原监控81664的本地句柄因会话中断丢失，先核实远端PID3118685仍活跃，临时只读取
+  其日志；09:48核实该PID退出后才续接。当前监控10159，日志
+  logs/wheat-live-20261120-094852.jsonl，约11:19到期。两个主任务均未重启；09:48
+  新版592个成功leaf，仍在q0。09:18旧5D为1579/2402成功、16活跃。
+- 09:18本次新版运行调度日志审计：590个唯一START、588个唯一成功END、2个活跃，
+  无重复START/成功END和非零END；cross复用21、self复用19。范围仅本run的leaf调度，
+  不代表整个下游不存在重复工作。证据logs/wheat-dispatch-audit-20261120-091759.json。
