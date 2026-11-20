@@ -1836,3 +1836,26 @@
   未修改或重启主任务/旧版。observer944455仍活跃（预计23:58窗口结束）；所有计算节点
   只读诊断现已结束，无持续占用诊断作业。本地poll仍每分钟核实，重复输出仅保留首末及状态变化，
   原远端30秒完整采样不变；已结束的Python栈不再当实时位置显示。
+
+
+#### 23:30 后续补充输入的提前核查提示（仅本地只读poll）
+
+- 23:24起新版补充任务CPU约2核、RSS约122558MiB，仍无success.json/最终manifest，未出现
+  错误；本轮未重启。旧版3D持续新增MUMmer SUCCESS，不能仅用同一grt_step2标签认为它停滞。
+- 核对后续代码partial_source_request：只要已放置segment存在达到100bp的未覆盖区间，
+  请求中仍使用**整段source segment**作为query上下文，并非只比对那100bp。因此后续补充
+  query总量/最长序列可能与当前150段约15MB显著不同；不能沿用本轮低内存给后续任务背书。
+  这只是源码风险识别，当前尚无下一项实际大query，未把推测说成已发生OOM或重复计算。
+- /tmp/wheat-detached-observer-poll.py增加metadata-only提示：未人工核查过的补充query.fa
+  大于100000000字节时输出supplement_large_input_requires_review，并以exit3停止**本地poll**
+  以便立即检查；不停止主任务，不改mapper参数/精度/资源，也不把总FASTA大小当最长contig长度。
+  100MB只是保守排查阈值，不是资源准入/精度自动触发或OOM判定；后续应在计算节点核查
+  真实长度分布、mapper是否已启动及剩余资源，再决定是否需要受控修复。不能为清提示直接
+  kill/restart。明确审查后才可在helper的reviewed_large_tasks记下任务ID；单凭success.json
+  存在不会免除提示。当前第一项15MB不触发，正常退出0已实测。
+- 本地稀疏文件/假proc目录测试5项通过：小输入exit0、大输入exit3、仅有marker仍exit3、
+  显式已核查ID exit0、主作业失败仍优先exit2。只测试只读探针，不触碰远端进程。
+  helper此刻SHA=2820fcc103e496d0fea4178d759b136d09684d1b37532025ff015d7853e0b1d9。原远端30秒observer944455未变；上述提示依赖本地poll运行，
+  不冒称远端已部署自动干预服务。
+- 共享文件系统df显示54%使用、inode约1%使用；quota -s退出1且无输出，故未取得用户级
+  配额信息，不能把共享空间充足等同于已确认账号无配额限制。
