@@ -1,0 +1,49 @@
+{
+  "scope": "synthetic 40 Mb partition-validation kernel only; exact before/after AST blocks; not whole q0 or customer benchmark",
+  "source_sha256": {
+    "before": "a150ed4a8d1d276c26c8a9a89146a4b770a6307a5099ca999a1d0310482e7629",
+    "after": "7b0ad76f7d88e76b502f879d7dea909755b0a04433735bba0730a2819cc99fa7"
+  },
+  "hash_cache": "cleared before every run, filesystem page cache uncontrolled; alternating order",
+  "results": {
+    "before": [
+      {
+        "seconds": 0.38154313003178686,
+        "fasta_parse_calls": 6,
+        "fasta_parse_bytes": 121500048
+      },
+      {
+        "seconds": 0.3586341430200264,
+        "fasta_parse_calls": 6,
+        "fasta_parse_bytes": 121500048
+      },
+      {
+        "seconds": 0.37547820701729506,
+        "fasta_parse_calls": 6,
+        "fasta_parse_bytes": 121500048
+      }
+    ],
+    "after": [
+      {
+        "seconds": 0.14835989801213145,
+        "fasta_parse_calls": 2,
+        "fasta_parse_bytes": 40500016
+      },
+      {
+        "seconds": 0.15480596502311528,
+        "fasta_parse_calls": 2,
+        "fasta_parse_bytes": 40500016
+      },
+      {
+        "seconds": 0.156235639937222,
+        "fasta_parse_calls": 2,
+        "fasta_parse_bytes": 40500016
+      }
+    ]
+  },
+  "median_seconds": {
+    "before": 0.37547820701729506,
+    "after": 0.15480596502311528
+  },
+  "kernel_speedup": 2.425476350095615
+}

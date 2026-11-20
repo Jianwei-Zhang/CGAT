@@ -1678,3 +1678,28 @@
   dd2c564e6ad802b44a5a7dfec9a885b8bb714b635e9399d03c918e5ed4d27915；summary SHA=
   dced28bcd2a2cc288a72ccd8eb95fa23f5200174eea76f94b9a196784dc017f7。
   当前observer1022372不变；本地poll工具现在也显示active单元，避免只重复已完成leaf数量。
+
+
+#### 20:34分组FASTA重复解析的仓库定点修复（尚未部署远端）
+
+- 仅用远端descriptor及文件stat盘点：66个基础PAF共12522376422字节；44个唯一分组FASTA共
+  30374062385字节，但query/target角色合计132次读取，代码逻辑解析量91122187155字节。
+  这些是清单/大小统计，不是在登录节点重新扫描数据，也不把它当成实际I/O计数。
+- 仓库q0_preparation._initial_inputs现在在单次调用/单个染色体的固定sources与group上下文内，
+  按(dataset,path,实际内容SHA)复用已成功的分组序列/成员校验；self两个角色及cross复用同一路径。
+  每次取摘要仍走既有run_orchestration稳定内容哈希memo，校验完整stat签名，失效回退完整字节读取；
+  新内容重新解析，首次解析前后摘要不同则失败，不按存在/非空/mtime单独跳过。输入清单不删项。
+  缓存不跨调用/染色体，不保留整份分组序列，不改变PAF、CIGAR、known_pairs或科学选择参数。
+- 相似路径核对：q0_admission已按dataset一次加载原始序列，不存在该query/target分组重复读取；
+  routing/self reader包装会调用同一个_initial_inputs，无需另复制实现。PAF重复消费问题仍未修复。
+- 5项新增回归覆盖角色复用/跨调用重验、同大小且恢复mtime的内容修改、解析中修改、字节相同
+  的文件替换、不同dataset角色不得误用缓存。test_q0_preparation共28项通过（11.497s），
+  test_q0_admission共28项通过（3.186s），合计56项；仅针对性测试，无整版CI/发布。
+- 40Mb合成分组FASTA的实际前后AST校验代码块微基准：三轮交替顺序、每轮清空内容哈希memo，
+  旧6次解析/121500048字节，新2次/40500016字节；中位0.375478s→0.154806s，局部约2.43倍。
+  报告docs/incident-tools/wheat-20261119/partition-role-reuse-benchmark-20261120.json。
+  **不是整套小麦/q0提速，也不代表总I/O减少同等比例**；新旧仍需内容哈希及其他验证。
+- 当前远端42949582冻结runtime未变，20:33仍q0_evidence、约1核/46GiB、无失败。它已读了约
+  半小时；仅凭局部微基准不足以证明中断重读更划算，因此本轮保存源码修复但不强制重提。
+  若后续自然失败/续跑或新增实测表明切换净收益为正，再按绑定plan/正常锁的规则部署；
+  不能把master补丁冒称已在当前远端生效。当前observer1022372不变。

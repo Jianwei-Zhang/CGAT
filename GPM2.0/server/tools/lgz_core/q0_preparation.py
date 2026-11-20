@@ -19,10 +19,10 @@ from .q0_catalog import (CATALOG_SCHEMA, CandidateCatalog, DISCOVERY_REFERENCE_I
 from .q0_sources import Q0EvidenceError, SourceKey
 try:
     from run_outer_checkpoints import OuterCheckpointManager
-    from run_orchestration import atomic_write_json
+    from run_orchestration import atomic_write_json, sha256_file as _partition_sha256
 except ModuleNotFoundError:
     from ..run_outer_checkpoints import OuterCheckpointManager
-    from ..run_orchestration import atomic_write_json
+    from ..run_orchestration import atomic_write_json, sha256_file as _partition_sha256
 
 SCHEMA = "lgz_q0_evidence_v1"
 MANIFEST = "metadata/grt_q0_evidence.json"
@@ -202,6 +202,10 @@ def _initial_inputs(root: Path):
             for right in dataset_names[i + 1:]:
                 expected.add((left, right))
         actual = set()
+        # A partition can occur as both self roles and again in a cross pair.
+        # Reuse only a successful sequence/group validation of these exact
+        # bytes, within this chromosome and this immutable source context.
+        validated_partitions = {}
         for row in rows:
             left, right = row["target_dataset"], row["query_dataset"]
             pair = (left, right)
@@ -212,9 +216,16 @@ def _initial_inputs(root: Path):
             if row["paf"] != f"runs/chr_{chromosome}/{stem}/result.paf":
                 raise Q0EvidenceError("q0 pair PAF does not match its declared direction")
             for field, dataset in (("query_fasta", right), ("target_fasta", left)):
-                records = dict(read_fasta(artifact_path(root, row[field])))
-                if set(records) != group[dataset] or any(sources[SourceKey(dataset, key)] != seq for key, seq in records.items()):
-                    raise Q0EvidenceError("q0 partition FASTA differs from original sources or grouping")
+                partition = artifact_path(root, row[field])
+                digest = _partition_sha256(partition)
+                validation_key = (dataset, row[field])
+                if validated_partitions.get(validation_key) != digest:
+                    records = dict(read_fasta(partition))
+                    if set(records) != group[dataset] or any(sources[SourceKey(dataset, key)] != seq for key, seq in records.items()):
+                        raise Q0EvidenceError("q0 partition FASTA differs from original sources or grouping")
+                    if _partition_sha256(partition) != digest:
+                        raise Q0EvidenceError("q0 partition FASTA changed during validation")
+                    validated_partitions[validation_key] = digest
                 paths.add(row[field])
             qlengths = {name: len(sources[SourceKey(right, name)]) for name in group[right]}
             tlengths = {name: len(sources[SourceKey(left, name)]) for name in group[left]}

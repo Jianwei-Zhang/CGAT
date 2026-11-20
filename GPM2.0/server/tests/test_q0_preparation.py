@@ -114,6 +114,113 @@ class EvidencePreparationTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         self.minimap = self.root / "q0-fixture-bin/minimap2"
 
+    def seed_assigned_support(self):
+        import csv
+        assignment = self.server / "metadata/chr_assignments.tsv"
+        with assignment.open(newline="") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            fields, rows = reader.fieldnames, list(reader)
+        rows.append({**rows[0], "dataset_name": "support", "seq_name": "s_assigned",
+                     "seq_length_bp": "1500", "assigned_chr_name": "Chr01",
+                     "support_bp": "1500", "support_percent": "100.000", "anchor_start": "3001"})
+        with assignment.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
+            writer.writeheader()
+            writer.writerows(rows)
+        seed_q0_evidence(self.server)
+
+    def test_partition_parsing_is_reused_across_roles_but_not_invocations(self):
+        self.seed_assigned_support()
+        from collections import Counter
+        from server.tools.lgz_core import q0_preparation
+        expected = set()
+        occurrences = 0
+        for descriptor in (self.server / "runs").glob("chr_*/q0_alignment_inputs.json"):
+            for row in json.loads(descriptor.read_text())["alignments"]:
+                for field in ("query_fasta", "target_fasta"):
+                    expected.add((self.server / row[field]).resolve())
+                    occurrences += 1
+        self.assertGreater(occurrences, len(expected))
+        with mock.patch.object(q0_preparation, "read_fasta", wraps=read_fasta) as reads:
+            first = q0_preparation._initial_inputs(self.server)
+            counts = Counter(Path(call.args[0]).resolve() for call in reads.call_args_list)
+            self.assertTrue(all(counts[path] == 1 for path in expected))
+            second = q0_preparation._initial_inputs(self.server)
+            counts = Counter(Path(call.args[0]).resolve() for call in reads.call_args_list)
+            self.assertTrue(all(counts[path] == 2 for path in expected))
+        self.assertEqual(first, second)
+        self.assertTrue({path.relative_to(self.server).as_posix() for path in expected} <= set(first[4]))
+
+    def test_same_size_partition_change_with_restored_mtime_is_not_reused(self):
+        from server.tools.lgz_core import q0_preparation
+        target = (self.server / "runs/chr_Chr01/datasets/primary.fa").resolve()
+        original_hash = q0_preparation._partition_sha256
+        calls = 0
+        def digest(path):
+            nonlocal calls
+            if path == target:
+                calls += 1
+                if calls == 3:  # first validation has completed; the next role must recheck bytes
+                    stat = target.stat()
+                    before = target.read_text()
+                    after = before.replace("\nA", "\nT", 1)
+                    self.assertNotEqual(before, after)
+                    self.assertEqual(len(before), len(after))
+                    target.write_text(after)
+                    os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+            return original_hash(path)
+        with mock.patch.object(q0_preparation, "_partition_sha256", side_effect=digest), \
+             mock.patch.object(q0_preparation, "read_fasta", wraps=read_fasta) as reads:
+            with self.assertRaisesRegex(Q0EvidenceError, "differs from original sources"):
+                q0_preparation._initial_inputs(self.server)
+        self.assertEqual(sum(Path(call.args[0]).resolve() == target for call in reads.call_args_list), 2)
+
+    def test_partition_change_during_parsing_cannot_populate_validation_cache(self):
+        from server.tools.lgz_core import q0_preparation
+        target = (self.server / "runs/chr_Chr01/datasets/primary.fa").resolve()
+        def changing_read(path):
+            yield from read_fasta(path)
+            if Path(path).resolve() == target:
+                target.write_text(target.read_text().replace("\nA", "\nT", 1))
+        with mock.patch.object(q0_preparation, "read_fasta", side_effect=changing_read):
+            with self.assertRaisesRegex(Q0EvidenceError, "changed during validation"):
+                q0_preparation._initial_inputs(self.server)
+
+    def test_byte_identical_partition_replacement_can_reuse_validation(self):
+        from server.tools.lgz_core import q0_preparation
+        target = (self.server / "runs/chr_Chr01/datasets/primary.fa").resolve()
+        original_hash = q0_preparation._partition_sha256
+        calls = 0
+        def digest(path):
+            nonlocal calls
+            if path == target:
+                calls += 1
+                if calls == 3:
+                    replacement = target.with_suffix(".replacement.fa")
+                    replacement.write_bytes(target.read_bytes())
+                    os.replace(replacement, target)
+            return original_hash(path)
+        with mock.patch.object(q0_preparation, "_partition_sha256", side_effect=digest), \
+             mock.patch.object(q0_preparation, "read_fasta", wraps=read_fasta) as reads:
+            q0_preparation._initial_inputs(self.server)
+        self.assertGreaterEqual(calls, 3)
+        self.assertEqual(sum(Path(call.args[0]).resolve() == target for call in reads.call_args_list), 1)
+
+    def test_partition_validation_cache_does_not_cross_dataset_roles(self):
+        self.seed_assigned_support()
+        from server.tools.lgz_core import q0_preparation
+        from server.tools.run_outer_checkpoints import OuterCheckpointManager
+        descriptor = self.server / "runs/chr_Chr01/q0_alignment_inputs.json"
+        value = json.loads(descriptor.read_text())
+        cross = next(row for row in value["alignments"] if row["kind"] == "cross")
+        cross["query_fasta"] = cross["target_fasta"]
+        descriptor.write_text(json.dumps(value))
+        manager = OuterCheckpointManager(self.server)
+        prepared = manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh")
+        manager.commit(prepared)
+        with self.assertRaisesRegex(Q0EvidenceError, "differs from original sources"):
+            q0_preparation._initial_inputs(self.server)
+
     def catalog(self):
         manifest = load_verified_evidence(self.server)
         return json.loads((self.server / manifest["catalog"]).read_text())
