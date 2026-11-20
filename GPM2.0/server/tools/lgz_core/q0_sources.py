@@ -12,6 +12,9 @@ from typing import Iterable
 from .common import DNA_ALPHABET, sha256_bytes, stable_id
 
 
+_INVALID_DNA = re.compile("[^" + re.escape("".join(sorted(DNA_ALPHABET))) + "]")
+
+
 class Q0EvidenceError(ValueError):
     """Required evidence is malformed, rather than a valid negative result."""
 
@@ -141,7 +144,7 @@ def split_source(source: SourceKey, sequence: str, *, min_gap: int = 100) -> Sou
     if type(min_gap) is not int or min_gap < 1:
         raise Q0EvidenceError("minimum N run must be a positive integer")
     sequence = sequence.upper()
-    if not sequence or set(sequence) - DNA_ALPHABET:
+    if not sequence or _INVALID_DNA.search(sequence):
         raise Q0EvidenceError(f"empty or invalid source sequence: {source.dataset}:{source.contig}")
     digest = sha256_bytes(sequence.encode("ascii"))
     gap_intervals = [Interval(m.start(), m.end()) for m in re.finditer(r"N{%d,}" % min_gap, sequence)]
@@ -149,7 +152,10 @@ def split_source(source: SourceKey, sequence: str, *, min_gap: int = 100) -> Sou
     segments: list[SourceSegment] = []
     for interval in segment_intervals:
         fragment = sequence[interval.start:interval.end]
-        fragment_hash = sha256_bytes(fragment.encode("ascii"))
+        # The unsplit segment is exactly the normalized source already hashed.
+        # Retain independent content hashes for every proper subinterval.
+        fragment_hash = (digest if interval.start == 0 and interval.end == len(sequence)
+                         else sha256_bytes(fragment.encode("ascii")))
         identity = [source.dataset, source.contig, interval.start, interval.end, fragment_hash]
         segments.append(SourceSegment(
             stable_id("q0-source-part", identity), source, interval, fragment_hash,

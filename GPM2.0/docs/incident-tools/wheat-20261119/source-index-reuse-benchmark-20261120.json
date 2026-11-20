@@ -1,0 +1,55 @@
+{
+  "scope": "synthetic full split_source function only; not customer wheat or end-to-end speedup",
+  "before_source_sha256": "8f26d53ead816a66438f8489a3565bb617558893adcc6f5600581ab1b28c2bad",
+  "after_source_sha256": "2fd88802d000d57b672420dc9270220f8865b1140dd6048f16c0955f8e497aa0",
+  "random_equivalence_cases": 400,
+  "cases": [
+    {
+      "name": "no_long_n",
+      "bases": 30000000,
+      "segments": 1,
+      "seconds": {
+        "before": [
+          0.37910527701023966,
+          0.37151871307287365,
+          0.36808278306853026
+        ],
+        "after": [
+          0.293783918954432,
+          0.3052064770599827,
+          0.2916079220594838
+        ]
+      },
+      "median_before_seconds": 0.37151871307287365,
+      "median_after_seconds": 0.293783918954432,
+      "local_speedup": 1.2645985334905239,
+      "full_source_index_equal": true
+    },
+    {
+      "name": "internal_long_n",
+      "bases": 30000000,
+      "segments": 300,
+      "seconds": {
+        "before": [
+          0.3070857629645616,
+          0.3060901699354872,
+          0.3338513419730589
+        ],
+        "after": [
+          0.273087295005098,
+          0.27067987993359566,
+          0.2896358799189329
+        ]
+      },
+      "median_before_seconds": 0.3070857629645616,
+      "median_after_seconds": 0.273087295005098,
+      "local_speedup": 1.124496703366698,
+      "full_source_index_equal": true
+    }
+  ],
+  "environment": {
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39"
+  },
+  "method": "Actual old/new split_source function, same dataclass implementations, 3 alternating timing rounds per 30Mb synthetic case, full SourceIndex equality; no customer data and no remote timing."
+}

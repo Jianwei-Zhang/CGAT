@@ -4,8 +4,9 @@ from pathlib import Path
 import random
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from server.tools.lgz_core.common import reverse_complement, sha256_bytes
+from server.tools.lgz_core.common import DNA_ALPHABET, reverse_complement, sha256_bytes
 from server.tools.lgz_core.q0_sources import (
     Interval, Q0EvidenceError, SourceKey, merged_intervals,
     split_source, subtract_intervals,
@@ -123,6 +124,43 @@ class SourceIntervalTests(unittest.TestCase):
     def test_lowercase_matches_existing_reader_semantics(self):
         self.assertEqual(split_source(SourceKey("a", "c"), "acgtnnn", min_gap=3),
                          split_source(SourceKey("a", "c"), "ACGTNNN", min_gap=3))
+
+    def test_source_validation_preserves_normalized_alphabet_membership(self):
+        # Include Unicode upper-case expansions accepted by the existing contract.
+        for character in [chr(i) for i in range(256)] + ["ſ", "K", "中", "\ud800"]:
+            sequence = "AC" + character + "GT"
+            normalized = sequence.upper()
+            with self.subTest(character=repr(character)):
+                if set(normalized) - DNA_ALPHABET:
+                    with self.assertRaises(Q0EvidenceError):
+                        split_source(SourceKey("a", "c"), sequence)
+                else:
+                    self.assertEqual(split_source(SourceKey("a", "c"), sequence),
+                                     split_source(SourceKey("a", "c"), normalized))
+
+    def test_unsplit_source_reuses_only_its_identical_content_digest(self):
+        for sequence in ["acgtryswkmbdhvn", "A" + "N" * 99 + "C", "N" * 99]:
+            with self.subTest(sequence=sequence):
+                with patch("server.tools.lgz_core.q0_sources.sha256_bytes", wraps=sha256_bytes) as digest:
+                    index = split_source(SourceKey("a", "c"), sequence)
+                self.assertEqual(digest.call_count, 1)
+                self.assertEqual(len(index.segments), 1)
+                part = index.segments[0]
+                self.assertEqual(part.sequence_sha256, index.sequence_sha256)
+                self.assertEqual(part.sequence_sha256, sha256_bytes(sequence.upper().encode("ascii")))
+                self.assertEqual(part.n_bp, sequence.upper().count("N"))
+                self.assertEqual((part.left_boundary, part.right_boundary), ("record_start", "record_end"))
+
+    def test_split_fragments_keep_separate_hashes_including_terminal_gaps(self):
+        for sequence in ["A" + "N" * 100 + "CG", "N" * 100 + "ACGT", "ACGT" + "N" * 100, "N" * 100]:
+            with self.subTest(sequence=sequence):
+                with patch("server.tools.lgz_core.q0_sources.sha256_bytes", wraps=sha256_bytes) as digest:
+                    index = split_source(SourceKey("a", "c"), sequence)
+                self.assertEqual(digest.call_count, 1 + len(index.segments))
+                for part in index.segments:
+                    fragment = sequence[part.interval.start:part.interval.end]
+                    self.assertEqual(part.sequence_sha256, sha256_bytes(fragment.encode("ascii")))
+                    self.assertNotEqual(part.sequence_sha256, index.sequence_sha256)
 
     def test_invalid_inputs_fail_not_silently_disappear(self):
         for sequence in ["", "ACGT!", "A C", "A\nC"]:

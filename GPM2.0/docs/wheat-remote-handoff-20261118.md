@@ -1749,3 +1749,38 @@
   尚未出现。observer3067484仍存活且采样新鲜，预计22:26窗口结束。未改冻结runtime、
   未重提主任务；57f6d8ff仓库性能补丁依旧未部署。诊断final-job.json/samples.jsonl/summary.json
   均保留在各自目录，不能将诊断SUCCEEDED误当成小麦主任务已成功。
+
+
+#### 21:47 非暂停式栈采样定位source索引，保存无损局部优化（未部署）
+
+- 同节点只读诊断42966973 SUCCEEDED，21:42:34–21:43:15，目录
+  q0-stack-diagnostic-20261120-2143/；1CPU/1GiB请求，实际峰值14MiB。
+  登录环境module/PATH未找到py-spy，因此仅在独立诊断目录放置官方benfred/py-spy v0.4.1
+  x86_64 wheel内的单文件工具，不安装到主环境、不改变主runtime。wheel对照Release资产
+  SHA=6a80ec05eb8a6883863a367c6a4d4f2d57de68466f7956b6367d4edd5c61bb29；传输后binary SHA=
+  e7c2de2dc54449ec88c086f1859555b4e34e63ccdcf3f8804496f9306cd44de6。
+- 验证同UID、reader命令路径、start_ticks=6258771188后，每20秒一次共3次
+  dump --nonblocking --full-filenames --json。节点原有ptrace_scope=0，未改权限/内核设置，
+  未用locals/native/core、未发暂停/终止信号；3次全部退出0。
+  调用链均为prepare_evidence -> build_catalog -> split_source：一次source SHA计算，
+  两次set(sequence)字符校验。证明已进入source索引，不再只靠RSS下降猜测；仅3次样本，
+  不能用2/3当作准确耗时比例。summary SHA=
+  67150d283d678a17e4718a1bc78cbcba07990e0b9ecca5daf0e78a7aa5b3154a。
+- 仓库split_source定点优化：按同一DNA_ALPHABET生成非法字符regex，保留先upper的规范化
+  与空/非法输入拒绝；完整source已经算过SHA时，仅对恰好覆盖全长的未切分segment复用digest，
+  所有真正子区间仍独立计算。源/segment SHA、ID、坐标、短N计数、长N边界/连接均不改变。
+  q0_catalog、q0_admission、q0_publication、source_intervals共用该函数，无需复制补丁。
+  structural_support的ACGT-only局部复杂度判断是不同语义，不随之改写。
+- 针对性测试：q0_evidence/preparation/admission/paths共119项（15.166s），
+  q0_publication/source_intervals共32项（46.673s），151项全部通过。新增覆盖256字符及Unicode
+  upper语义、未切分源只算一次摘要、内部/终端长N子片段仍分别哈希（含全N）。
+- 实际旧/新函数的400例随机等价核对及两种30Mb合成样本三轮交替微基准均完整SourceIndex相等。
+  未切分样本中位0.371519s→0.293784s（局部1.265倍），300段长N样本0.307086s→0.273087s
+  （局部1.124倍）。报告incident-tools/wheat-20261119/source-index-reuse-benchmark-20261120.json。
+  不代表客户小麦/整套q0提速。远端实读q0_sources SHA仍为旧版
+  8f26d53ead816a66438f8489a3565bb617558893adcc6f5600581ab1b28c2bad，仓库新版SHA=
+  2fd88802d000d57b672420dc9270220f8865b1140dd6048f16c0955f8e497aa0。
+- 当前reader已运行约106分钟；小幅局部收益不足以抵消重读成本，本轮不切断它。
+  此补丁会改变builder源码身份，不能直接拷贝进冻结runtime冒充原计划；后续有必要受控续跑时
+  与57f6d8ff一起按绑定reader/plan及完整复用门禁评估。21:46两主任务仍RUNNING，新版
+  q0_evidence约1核/34GiB，manifest/补充任务尚未出现；observer3067484不变。
