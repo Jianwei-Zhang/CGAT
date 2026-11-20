@@ -703,9 +703,11 @@ is bound for verified adoption; it must not be mapped a third time.
 
 ## Guarded native concurrency pilot (not deployed)
 
-`native_concurrency_pilot.py` replays exactly four completed native self batches
+`native_concurrency_pilot.py` defaults to four completed native self batches
 on an x86 compute node, using the frozen batch helper, mapper, original flags
-and eight threads per batch. Query totals are bounded at 20 Mb and targets at
+and eight threads per batch. An explicitly bound `native_batch_guard.py` adapter
+allows 1–16 lanes with original per-case thread grants (1–8), whose sum must fit
+the configured CPU budget (at most 32). Query totals are bounded at 20 Mb and targets at
 1 Gb. Source manifests, complete markers, original command records, mapper and
 input/index content are verified; fast-profile baselines are rejected.
 
@@ -737,3 +739,59 @@ The four-lane helper execution took 490.524 seconds (510.588 seconds including
 staging/verification), with a scheduler-observed peak of 27797 MiB. This is a
 controlled replay on a different node from the original results, not a paired
 whole-workflow speedup. The production wheat job still uses its prior dispatcher.
+
+### Split-limit native guard and eight-lane acceptance
+
+`native_batch_guard.py` loads the authentic frozen helper and diagnostics. Only
+that helper module's subprocess attribute is wrapped: its synchronous mapper
+child has a 16-GiB soft/hard AS limit, restoration has 2 GiB, and the helper has
+a 2-GiB **soft** / 16-GiB hard limit so its forked mapper can raise the soft limit.
+The helper does not itself raise its soft limit. A lane reserves 18 GiB for the
+helper plus its one child; this is still not a process-group cgroup RSS limit.
+Unexpected child executables/shell invocations are rejected. This adapter changes
+no scientific flags, native keys or source manifests. A successful new mapping
+publishes a create-only resource receipt after the native complete marker; cache
+reuse does not overwrite a historical receipt or claim retroactive protection.
+
+Eight-lane replay `42942852` succeeded on `agent-X86-09`, November 20, 2026,
+10:35:22–10:43:57 CST. It used 22 CPUs / 220 GiB with thread grants
+`8,8,1,1,1,1,1,1`. All eight raw and restored PAF pairs were byte-identical to
+completed native baselines, under the split limits. Execution took 478.493 seconds
+(509.675 seconds including preparation/verification); scheduler peak was
+31044 MiB, approximately 30.3 GiB. This is not a paired whole-workflow speedup.
+Remote `native-eight-lane-pilot-20261120-1033/` under the comparison root retains
+code hashes, config, submission, 19 passing guard/pilot tests, results and
+`final-job.json`. Report SHA-256:
+`02794293671a8414f83e9c9ef9c23020620c202ed9571f94d064313e706fe995`.
+No trial output was adopted and neither main job was restarted.
+
+### Candidate dynamic admission and native command bindings (not installed)
+
+- `native_resource_admission.py` keeps existing fast admission unchanged: at most
+  two 128-GiB reservations, no fast/native mixing, and unknown/unguarded work
+  exclusive. Only the fully verified native wrapper inventory enters the native
+  pool. It retains `AdaptiveDispatcher.desired` thread grants and fills available
+  CPU gaps with compatible pending work rather than blocking behind a larger
+  request. Total grants cannot exceed the effective run budget; 288 GiB / 18 GiB
+  currently permits at most 16 native lanes, with 32 GiB outside the pool.
+- `native_resource_bindings.py` composes with the original scientific bindings,
+  rather than spoofing module identity or changing native manifests. It validates
+  exact eligible inventory, canonical wrappers, specs, keys and frozen tools.
+  Pending eligible tasks get guarded commands; callback task identities are
+  restored before the original merge/commit. Historical completed native batches
+  stay on the original source/output-verified reuse path. New guarded successes
+  require a matching resource receipt before the scientific finish callback;
+  fresh reader bindings verify the same receipt and output identities.
+- These are tested components, **not a deployable resource plan yet**. Remaining
+  gates are the immutable resource-only transition verifier/stager, honest context
+  bootstrap, owning entry and evidence reader/audit integration, followed by a
+  compute-node validation of the staged controller/reader. Do not pass a changed
+  resource policy through the old extension verifier, edit frozen sources, or
+  stop a main job merely because these component tests pass. Effective threads
+  may be restored from 16 to the allocated 32 only under the normal workspace lock
+  during an approved resource-ready cutover. Old baseline remains untouched.
+
+Local focused validation after these additions: 42 native guard/pilot/admission/
+bindings tests passed (58.650 seconds), plus six unchanged fast-admission
+regressions. Synthetic fixtures prove execution plumbing, not biological
+equivalence; the eight-case real replay is the separate scientific-output check.

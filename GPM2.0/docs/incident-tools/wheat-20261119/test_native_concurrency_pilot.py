@@ -103,6 +103,25 @@ class NativePilotTests(unittest.TestCase):
         p.write_text(json.dumps(cmd));self.cases[0]['command']=pilot.record(p);self.save()
         with self.assertRaises(ValueError):self.run_pilot()
 
+    def test_cpu_budget_and_each_grant_are_bounded(self):
+        for budget, grant in ((16,8),(33,8),(32,9),(32,True),(0,1)):
+            self.data['cpu_budget']=budget
+            self.cases[0]['threads']=grant
+            self.save()
+            with self.assertRaises(ValueError): self.run_pilot()
+
+    def test_extra_lanes_require_the_split_limit_adapter(self):
+        self.data['lanes']=8; self.save()
+        with self.assertRaises(ValueError): self.run_pilot()
+        self.data['lanes']=17; self.save()
+        with self.assertRaises(ValueError): self.run_pilot()
+
+    def test_single_record_replay_requires_one_thread_not_eight(self):
+        m=json.loads(Path(self.cases[0]['manifest']['path']).read_text())
+        b=m['batches'][0]; b['entries']=[{'name':'q','length':4}]
+        pilot.check_bounds(m,b,threads=1)
+        with self.assertRaises(ValueError): pilot.check_bounds(m,b,threads=8)
+
     def test_rejects_wrong_native_key(self):
         p=self.work/'0/complete.json'; d=json.loads(p.read_text());d['key']='approximate';p.write_text(json.dumps(d))
         self.cases[0]['complete_sha256']=pilot.digest(p);self.save()

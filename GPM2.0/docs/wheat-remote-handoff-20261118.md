@@ -1198,3 +1198,39 @@
   验证原extension来源与新资源变更各自的身份，不能删除旧约束、伪造__file__或只修writer。
   同时覆盖续跑controller、独立reader、portable audit；主任务已加载/指纹绑定的文件
   不热替换，适当完成边界、资源ready、旧新版停止且锁释放后再安全切换。旧对照不动。
+
+
+### 2026-11-20 10:52：八路原参验证通过，动态普通池组件已实现但未切换
+
+- 上一轮为已验证等待：42942852当时仍RUNNING；本轮确认其SUCCEEDED，10:35:22至
+  10:43:57，agent-X86-09，22CPU/220GiB，线程分配8+8+1+1+1+1+1+1。
+  八批raw.paf/result.paf均与原生基线逐字节一致；执行478.493秒、总509.675秒；
+  调度器峰值31044MiB（约30.3GiB）。不同节点，不据此声称全流程倍数。
+- 远端目录位于比较根目录jm19-compare-614589f-20261118/下的
+  native-eight-lane-pilot-20261120-1033/（不是cgat-reads-debug的直接子目录）。
+  已保留code.sha256、config、submission、19项远端测试（3.046秒）、results及
+  final-job.json。results/pilot.json SHA256为
+  02794293671a8414f83e9c9ef9c23020620c202ed9571f94d064313e706fe995。
+- native_batch_guard.py对真实冻结helper单独装配subprocess适配器：helper软限2GiB、
+  硬限16GiB；同步mapper子进程软硬限16GiB；restore软硬限2GiB。helper本身不提高
+  软限；每路预留18GiB。不是整棵进程树的RSS/cgroup上限。原参/原key不变；已有缓存
+  不补造guard执行证明；新执行才以create-only方式发布native-resource-receipt.json。
+- 新增候选native_resource_admission.py：原fast双路规则不变；native仅接受已验证的
+  wrapper，保持desired线程分配，按CPU余量与288/18=16路内存准入填空；未知/未保护
+  native独占，不混池。native_resource_bindings.py保留原SelfBindings科学层和复用，
+  只替换待运行eligible命令并恢复原任务回调；新成功先验证guard receipt再merge/commit；
+  独立新建reader bindings走同样receipt/output验证。没有修改当前冻结运行文件。
+- **尚未部署、尚未重提**：仍需资源变更stager/verifier、明确的context/entry/reader/
+  portable audit接入和计算节点整体验证。不能伪造__file__或删除原extension约束；先按
+  原验证器验证旧计划，再独立证明新计划只改资源层。plan需新增native_runtime、
+  native_support/native_guard/fast_admission等依赖，operation新增native_specs/scripts。
+  原科学profile、原命令、native key与完成结果保持不变。资源ready、适当完成边界、
+  仅停止新版且确认子进程/锁释放后，才在正常锁内将有效threads16恢复32并续跑。
+- 10:49:09新版42876793仍RUNNING，604个成功leaf，活跃7B flye batch13和2A flye
+  batch1，无失败；旧42523432仍在grt_step2，CPU约1597%、内存86857MiB。
+  监控10159仍活跃，预计11:19结束；观察器结束不代表主任务结束，不因此重启任务。
+- 本地定点验证42项native guard/pilot/admission/bindings测试全部通过（58.650秒），
+  原fast双路准入6项回归通过（0.001秒）；不运行版本CI。测试覆盖16个单核批次、4个
+  八线程批次、CPU空隙填充、内存满额阻止第17路、未知命令独占、禁止混池、旧缓存
+  不执行/不冒称保护、回调还原、缺receipt不得完成、新reader验证及篡改拒绝。
+  这些是组件测试，不替代后续真实staged controller/reader/audit闭环。

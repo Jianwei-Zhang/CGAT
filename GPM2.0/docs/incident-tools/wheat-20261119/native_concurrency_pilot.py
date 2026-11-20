@@ -1,7 +1,8 @@
-"""Compute-node-only four-lane native replay; never adopts outputs into a run.
+"""Compute-node-only bounded native replay; never adopts outputs into a run.
 
-Uses four completed native batches and the frozen helper with unchanged mapping
-flags/threads. All writable manifest paths and index copies are isolated. The
+Uses completed native batches and the frozen helper with unchanged mapping
+flags/threads. Four lanes use the original guard; up to sixteen require the
+explicit native split-limit adapter, within a maximum 32-thread budget. All writable manifest paths and index copies are isolated. The
 32-GiB per-process AS guard covers each helper and its sequential mapper/restore
 child; it is not a cgroup or an aggregate RSS limit. Trial timeout is not a
 production policy. This pilot does not deploy a dispatcher or certify all inputs.
@@ -65,18 +66,19 @@ def verify_outputs(directory, key):
     return marker
 
 
-def expected_command(manifest, batch, tool):
+def expected_command(manifest, batch, tool, threads=THREADS):
     return [str(tool), "-c", "-x", manifest["preset"], "-X", "--no-hash-name",
             "-m", str(manifest["min_chain_score"]), "-n", str(manifest["minimizers"]),
-            "-t", str(THREADS), str(Path(manifest["cache"]) / "target.mmi"), batch["query"]]
+            "-t", str(threads), str(Path(manifest["cache"]) / "target.mmi"), batch["query"]]
 
 
-def check_bounds(manifest, batch):
+def check_bounds(manifest, batch, threads=THREADS):
     if (manifest.get("version") != 1 or not batch["entries"]
             or sum(x["length"] for x in batch["entries"]) > 20_000_000
             or sum(manifest["target_lengths"].values()) > 1_000_000_000
             or any(x["length"] <= 0 for x in batch["entries"])
-            or len(batch["entries"]) < THREADS):
+            or type(threads) is not int or not 1 <= threads <= THREADS
+            or len(batch["entries"]) < threads):
         raise ValueError("outside the bounded eight-thread native replay scope")
 
 
@@ -87,9 +89,19 @@ def execute(config_path, output, timeout):
     output = output.resolve()
     if output == work or work in output.parents or output in work.parents:
         raise ValueError("pilot outputs must be disjoint from the analysis workspace")
-    if len(config["cases"]) != LANES or not 0 < timeout <= 3600:
-        raise ValueError("requires exactly four lanes and a bounded trial timeout")
-    if len({(c["manifest"]["path"], c["batch_index"]) for c in config["cases"]}) != LANES:
+    lanes = config.get("lanes",LANES)
+    adapter_record = config["runtime"].get("native_adapter")
+    if (type(lanes) is not int or not 1 <= lanes <= 16 or len(config["cases"]) != lanes
+            or (not adapter_record and lanes != LANES) or not 0 < timeout <= 3600):
+        raise ValueError("unsupported lane count or trial timeout")
+    cpu_budget = config.get("cpu_budget",32)
+    if type(cpu_budget) is not int or not 1 <= cpu_budget <= 32:
+        raise ValueError("pilot CPU budget must fit the 32-CPU job")
+    grants = [c.get("threads",THREADS) for c in config["cases"]]
+    if (any(type(n) is not int or not 1 <= n <= THREADS for n in grants)
+            or sum(grants) > cpu_budget):
+        raise ValueError("pilot thread grants exceed the CPU budget")
+    if len({(c["manifest"]["path"], c["batch_index"]) for c in config["cases"]}) != lanes:
         raise ValueError("duplicate replay batch")
     for r in config["runtime"].values():
         require(r["path"], r["sha256"])
@@ -111,14 +123,15 @@ def execute(config_path, output, timeout):
             raise ValueError("source manifest is outside the requested workspace")
         require(source, spec["manifest"]["sha256"])
         m = json.loads(source.read_text()); b = m["batches"][spec["batch_index"]]
-        check_bounds(m, b)
+        threads = spec.get("threads",THREADS)
+        check_bounds(m, b, threads)
         baseline = Path(b["directory"])
         if (baseline / "self-profile-receipt.json").exists():
             raise ValueError("fast-profile result is not a native baseline")
         require(baseline / "complete.json", spec["complete_sha256"])
         original = verify_outputs(baseline, b["key"])
         require(spec["command"]["path"], spec["command"]["sha256"])
-        if json.loads(Path(spec["command"]["path"]).read_text()) != expected_command(m, b, tool):
+        if json.loads(Path(spec["command"]["path"]).read_text()) != expected_command(m, b, tool, threads):
             raise ValueError("baseline command differs from the unchanged replay parameters")
         for key in ("target", "name_map", "restore"):
             once(m[key], m["identities"][key])
@@ -142,10 +155,22 @@ def execute(config_path, output, timeout):
         manifest = isolated_manifest(m, spec["batch_index"], case, cache)
         mp = case / "manifest.json"; mp.write_text(json.dumps(manifest))
         command = [sys.executable, "-B", str(helper), "--manifest", str(mp), "--batch-index", "0"]
+        if adapter_record:
+            import native_batch_guard as adapter
+            if Path(adapter.__file__).resolve() != Path(adapter_record["path"]).resolve():
+                raise ValueError("pilot imported an unbound native adapter")
+            native_spec = {"schema":adapter.SCHEMA,"policy":adapter.POLICY,
+                "manifest":record(mp),"batch_index":0,"native_key":b["key"],
+                "runtime":{"adapter":adapter_record,"helper":config["runtime"]["helper"],
+                    "mapper":config["runtime"]["tool"],"diagnostics":config["runtime"]["minimap_diagnostics"],
+                    "restore":record(m["restore"])}}
+            native_path = case / "native-resource.json"
+            native_path.write_text(json.dumps(native_spec,indent=2))
+            command = [sys.executable,"-B",str(adapter_record["path"]),"--spec",str(native_path)]
         script = case / "command.sh"
         script.write_text("#!/bin/bash\nset -euo pipefail\nexec " + shlex.join(command) + "\n")
         prepared.append({"case":case, "source":spec, "baseline":original, "key":b["key"],
-                         "script":record(script), "manifest":record(mp)})
+                         "script":record(script), "manifest":record(mp), "threads":threads})
     env = dict(os.environ, GPM_TASK_THREADS=str(THREADS), OMP_NUM_THREADS=str(THREADS),
                OPENBLAS_NUM_THREADS=str(THREADS), PYTHONDONTWRITEBYTECODE="1", PYTHONPATH=str(helper.parent))
     children, handles = [], []
@@ -156,9 +181,10 @@ def execute(config_path, output, timeout):
             cmd = [sys.executable, "-B", str(guard), "--script", item["script"]["path"],
                    "--sha256", item["script"]["sha256"], "--limit-bytes", str(AS_BYTES)]
             children.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT,
-                                             env=env, start_new_session=True))
-        print(json.dumps({"event":"FOUR_NATIVE_LANES_STARTED", "pids":[p.pid for p in children],
-                          "threads_each":THREADS, "as_bytes_each_process":AS_BYTES}), flush=True)
+                                             env={**env,"GPM_TASK_THREADS":str(item["threads"]),"OMP_NUM_THREADS":str(item["threads"]),
+                                                  "OPENBLAS_NUM_THREADS":str(item["threads"])}, start_new_session=True))
+        print(json.dumps({"event":"GUARDED_NATIVE_LANES_STARTED", "pids":[p.pid for p in children],
+                          "lanes":lanes,"thread_grants":grants, "outer_as_bytes_each_process":AS_BYTES}), flush=True)
         while any(p.poll() is None for p in children):
             if any(p.poll() not in (None, 0) for p in children):
                 raise RuntimeError("native replay failed; inspect retained lane logs")
@@ -197,12 +223,22 @@ def execute(config_path, output, timeout):
                       if line.startswith("SELF_RESOURCE_GUARD ")]
         if len(guard_rows) != 1 or guard_rows[0]["limit_bytes"] != AS_BYTES:
             raise ValueError("missing actual native address-space guard receipt")
-        result.append({"source":item["source"], "identical":same, "outputs":marker["outputs"], "guard":guard_rows[0]})
+        resource_receipt = None
+        if adapter_record:
+            resource_receipt = json.loads((case / "batch" / adapter.RECEIPT).read_text())
+            if (resource_receipt["policy"] != adapter.POLICY or resource_receipt["native_key"] != item["key"]
+                    or resource_receipt["outputs"] != marker["outputs"]
+                    or resource_receipt["thread_grant"] != item["threads"]
+                    or resource_receipt["runtime"]["adapter"] != adapter_record):
+                raise ValueError("native split-limit execution receipt differs")
+        result.append({"source":item["source"], "identical":same, "outputs":marker["outputs"],
+                       "guard":guard_rows[0],"native_resource_receipt":resource_receipt})
     for path, sha in verified: require(path, sha)
     require(config_path, config_record["sha256"])
     for r in config["runtime"].values(): require(r["path"], r["sha256"])
-    report = {"status":"four_native_replays_byte_identical", "scope":"four completed bounded native batches only; not production deployment or whole-run speedup",
-              "config":config_record, "lanes":LANES, "threads_each":THREADS,
+    report = {"status":("guarded_native_replays_byte_identical" if adapter_record else "four_native_replays_byte_identical"), "scope":"completed bounded native batches only; not production deployment or whole-run speedup",
+              "config":config_record, "lanes":lanes, "thread_grants":grants,
+              "native_resource_policy":adapter.POLICY if adapter_record else None,
               "execution_seconds":execution_seconds, "total_seconds":time.monotonic()-started,
               "as_limit_bytes_per_process":AS_BYTES, "main_workspace_modified":False, "cases":result}
     (output / "pilot.json").write_text(json.dumps(report,indent=2)+"\n")
