@@ -1022,3 +1022,23 @@ execution had not yet started in this resume: do not confuse these unchanged
 fast/exclusive tasks with a failed 16-lane native policy, and do not restart
 productive short batches merely to display concurrency. Observe the first actual
 native grants/successes before claiming fair-dispatch runtime acceptance.
+
+
+At 14:21:29 the ordinary native pool actually began. By 14:25 there were ten
+native starts and three verified new native successes. Four starts used fewer
+threads than the original `AdaptiveDispatcher.desired` preference; 1A Flye batch
+32 preferred eight, actually received three, and completed at 14:22:29 with a
+matching three-thread guard receipt and successful 16-GiB mapper / 2-GiB restore
+children. This demonstrates real capped-grant execution, not merely import or
+synthetic admission acceptance. The previously bypassed 1B Flye batch 45 started
+at 14:21:30 and completed at 14:21:55; 2A Flye batch 3 started at 14:21:29 and was
+still active at this snapshot. Seven active lanes held a total of 32 grants;
+at 14:22:43 scheduler CPU was 3054% and RSS 25089 MiB. These are workload-specific
+observations, not a paired whole-workflow speedup estimate.
+
+`first-fair-native-execution.json` in the new handoff directory records the exact
+starts, preferences, actual grants and success-receipt identities. Executed native
+wrapper paths intentionally still point into the previous `...1110/plan/native/`
+directory: retaining those immutable specs/guards is what preserves old receipts.
+The active admission/owner plan is the new `343f1d...` revision, not the old
+backfill dispatcher. Continue monitoring both main jobs and final provenance.

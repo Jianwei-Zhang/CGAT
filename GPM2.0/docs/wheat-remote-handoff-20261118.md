@@ -1480,3 +1480,23 @@
   batch10。这些仍是原科学profile及原fast/独占资源规则，不是新native admission没生效。
   **截至该快照native新启动数仍0**；继续观察普通池进入及实际fair grant/receipt，不能仅因
   现在看到单条快速任务就再次重启，也不能据本次预检/安装声称整体加速已测得。
+
+
+#### 14:25普通池与实际降grant成功确认
+
+- 普通native池14:21:29开始，已完成此前4个剩余fast profile后切入。14:25:02记录10次native
+  实际启动、3个新native成功、4次实际grant低于原desired，其中1例已经成功。它们是当前
+  42949582的新执行，不是把218个旧receipt重新计数。
+- 1A flye batch32原desired8、实际3线程，14:21:55启动、14:22:29成功；新receipt SHA=
+  715e531df38924292f4704e574c04caf8fab7758a99e5335dac9f7afe5d45568，实际grant3，mapping
+  AS16GiB/restore AS2GiB均exit0、complete-marker/output身份一致。该例证明真实capped-grant
+  成功，不是全数据/所有线程组合等价或整体提速倍率证明。
+- 原被绕过的1B flye batch45在14:21:30以8线程开始、14:21:55成功；2A flye batch3在14:21:29
+  以5线程开始，当时尚未结束。6B hifiasm batch31原desired8只拿到1线程亦已开始；1A flye
+  batch29原desired8实际3、batch28原desired7实际5。各路总grant仍不超过32，不为凑32路超售。
+- 14:22:43快照7路活跃、grant合计32、CPU3054%、RSS25089MiB（约24.5GiB）。这是这一批
+  多query任务的实际利用率，不把当前低内存外推给超长任务，也不把7路解释为退回固定小路数。
+- 证据新handoff目录first-fair-native-execution.json。native实际executed路径仍在旧
+  native-resource-candidate-20261120-1110/plan/native/，这是刻意保留spec/guard身份，
+  **不代表用了旧dispatcher**；active plan343f1d...和admission a54c3d...已由新owner验证。
+  继续poll19945；旧对照42523432仍RUNNING，完整q0/LGZ/portable audit尚未完成。
