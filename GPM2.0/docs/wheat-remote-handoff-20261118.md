@@ -1279,3 +1279,38 @@
   installed_sha=43766e880e7cb4196eb70519d79ffc8918238c30a53245bba2db88d1230f0e33。
   master另有其他会话的1fe41ab5（v2.0.21发布准备），不因此更新远端冻结runtime；本轮
   仅提交自己的incident工具/文档，不夹带其他会话的版本或发布改动。
+
+
+### 2026-11-20 11:43：610个既有结果全部复用，真实普通池已跑满32线程
+
+- 新run中ref:JM19_hifiasm于11:21:51、ref:JM19_flye_ABD于11:23:33、assign于11:25:57
+  均为SKIP_VALID。随后21个cross leaf与589个self批次验证后复用，共610个，无初始比对
+  或这些已完成批次的重新计算。11:28:14开始新的计算；不是一直停在校验。
+- 新普通池此前没有启动的原因已现场查清：优先级队首是原策略仍独占的fast批次，target
+  大于800Mb；不是普通池仍被两路限制。11:31:34的inventory-113134.json记录703个待跑
+  eligible native、45个待跑exclusive fast，首个native之前有12个exclusive fast；这里只读
+  manifest/marker清单，不是输出验收。其字段guarded_native表示新池资格，**不代表旧
+  completed native曾用新guard**；实际执行必须看此次日志与native-resource-receipt。
+- first-progress-113321.json记录最初8个新增fast成功，每个16–71秒。没有为了这些持续
+  完成的短任务再次重启。到11:40:00之前共新增17个fast成功，总成功leaf达到627。
+- **11:40:00普通池正式同时启动7路**，线程分配8+4+7+1+3+5+4=32：4B flye batch1、
+  2B flye batch18、4B flye batch0、4A flye batch25、4B flye batch34、1B flye batch36、
+  1B flye batch8。前两条是上次有意切换时尚未完成者，旧attempt保留而不冒充成功。
+- 11:40:53.428443调度器实测CPU3086%（约30.86核），RSS31197MiB（约30.5GiB），
+  当时峰值32109MiB，配额327680MiB；32线程预算实际用起来了，不必硬凑16/32个进程。
+  只读观察器日志中的这一组原始样本已另存handoff目录native-pool-first-active.json。
+  当时guarded starts=7、guarded成功receipt=0，尚需继续核实首批普通输出成功及后续峰值。
+- 旧版42523432继续运行。11:26:04只读统计：1D、4D各2402/2402完成；5D为2021/2402、
+  16活跃。这仅是Step2某个染色体组，不是全部旧任务进度。原baseline未改动。
+- 监控仍为72919，日志logs/wheat-live-20261120-112048.jsonl；任务未因短时低CPU或观察器
+  轮询间隔再重启。规范文档补充了不同资源池、总线程预算和历史复用/新增guard证明的区分。
+- 11:45:44已核实首批**2个正式普通池成功**（不仅是pilot）：1B flye batch36，11:40:00
+  至11:42:16，5线程；4B flye batch34，11:40:00至11:44:51，3线程。两者TASK_END=0，
+  resource receipt与spec、native key、complete marker SHA和输出身份记录一致，mapper
+  16GiB AS/restore 2GiB AS子进程均returncode0。证据native-pool-first-successes.json；
+  登录节点仅核对小receipt/marker/spec与文件stat，没有额外扫描大型PAF，完整内容验收由
+  正式helper/controller完成。helper_maxrss是进程历史高水位，不应误当当前RSS或AS上限。
+- 11:44:54观察到动态扩为10路、线程之和仍32；guarded starts12、guarded成功2、总成功
+  leaf629=610复用+17新增fast+2新增native。CPU2658%（约26.6核），RSS38406MiB、
+  当时峰值41297MiB（约40.3GiB），无OOM/失败。后续根据每批线程需要自动增减路数，
+  不是固定7/10/16路，也不为凑32个进程超卖线程。整流程和整个q0尚未完成，需继续监控。
