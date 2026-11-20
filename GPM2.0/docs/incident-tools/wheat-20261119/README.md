@@ -699,3 +699,41 @@ Its 444 added selections are not all of the remaining 1320 batches: eligibility
 also requires exactly one record. Existing completed results are not relabeled as
 having used the extension or its guard. The successful isolated 99-Mb candidate
 is bound for verified adoption; it must not be mapped a third time.
+
+
+## Guarded native concurrency pilot (not deployed)
+
+`native_concurrency_pilot.py` replays exactly four completed native self batches
+on an x86 compute node, using the frozen batch helper, mapper, original flags
+and eight threads per batch. Query totals are bounded at 20 Mb and targets at
+1 Gb. Source manifests, complete markers, original command records, mapper and
+input/index content are verified; fast-profile baselines are rejected.
+
+Writable batch, merge and index-cache paths are cloned into a fresh isolated
+directory. The main workspace and its completed results are not replaced. Each
+helper and its sequential mapper/restore child inherits a 32-GiB per-process
+address-space limit from `self_memory_guard.py`; this is not an aggregate RSS
+limit. The trial requests 32 CPUs / 320 GiB. Its 1800-second execution budget
+is only a diagnostic deadline, never a production timeout.
+
+Acceptance requires successful native helpers, guard receipts, intact source
+results, and byte-identical raw and restored PAFs for all four cases. The pilot
+does not install a dispatcher, change scientific profiles, adopt outputs, or
+certify whole-wheat speedup. Ten focused tests exercise isolation, native key and
+source validation, parameter identity, failure handling and actual guard
+inheritance with dummy helpers; real mapper acceptance requires the remote trial.
+
+```bash
+python3 -B -m unittest discover -s GPM2.0/docs/incident-tools/wheat-20261119 \
+  -p test_native_concurrency_pilot.py -v
+# Compute node only, with frozen tools selected by the incident environment:
+python3 -B native_concurrency_pilot.py --config config.json \
+  --output isolated-results --timeout 1800
+```
+
+Remote trial `42942033` succeeded on `agent-X86-56` on November 20, 2026.
+All four raw and restored PAF pairs were byte-identical to their native baselines.
+The four-lane helper execution took 490.524 seconds (510.588 seconds including
+staging/verification), with a scheduler-observed peak of 27797 MiB. This is a
+controlled replay on a different node from the original results, not a paired
+whole-workflow speedup. The production wheat job still uses its prior dispatcher.

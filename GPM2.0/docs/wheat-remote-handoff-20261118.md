@@ -1165,3 +1165,36 @@
 - 09:18本次新版运行调度日志审计：590个唯一START、588个唯一成功END、2个活跃，
   无重复START/成功END和非零END；cross复用21、self复用19。范围仅本run的leaf调度，
   不代表整个下游不存在重复工作。证据logs/wheat-dispatch-audit-20261120-091759.json。
+
+
+### 2026-11-20 10:13：四路普通自比对验证通过，用户要求按线程预算扩展
+
+- 用户追问普通任务含义、剩余时间及为何不能更多并发。实际是2套组装（Flye/Hifiasm）
+  ×22分组（21条染色体+Un）=44个self operation，按约20Mb query分成1342个子批次；
+  不是1342套de novo或重复全量比对。10:04:48快速414/464、native161/878，余717个
+  native和50个fast。最近1/2/4/8小时native成功10/18/44/121批；双路普通段粗估
+  50–80小时，非整流程ETA，待调度优化后重新测量。
+- 用户进一步问每路内存、4路是否太少，以及能否与run_all.sh线程数一致。已明确：
+  4路只是验证起点，不是最终固定上限；目标是总线程预算与内存准入共同决定并发，
+  单核批次争取8–16路，不能把路数和每路线程都设为--threads而超售CPU。
+  已核实prepare_options.tsv threads=32，但.run_all/resources.json有效threads=16
+  （2026-11-18资源续跑下调）；调度器当前申请32CPU/320GiB。后续须一起核对有效预算。
+- 隔离试验42942033在agent-X86-56上SUCCEEDED，10:04:26–10:13:02；32CPU/320GiB。
+  目录native-concurrency-pilot-20261120-1002/保存全部代码SHA、config、submission、
+  tests.log、results和final-job.json。四个已完成native基线为2B flye batch1/2、
+  3B flye batch0/1，query总量各约20Mb，target约916/925Mb；使用原冻结helper、
+  原mapper、原参数和每批8线程，写入完全隔离的batch/merge/cache，未采纳试验输出。
+- 每个helper和其顺序启动的mapper/restore子进程继承32GiB RLIMIT_AS；这是单进程
+  地址空间限制，不是整棵进程树/RSS总限。四路执行490.524秒、含准备校验510.588秒；
+  调度器观测峰值27797MiB。四批raw.paf和result.paf均与既有原参结果逐字节一致；
+  单mapper峰值7.309/7.790/7.496/7.435GB。与原任务节点不同，不冒称全流程加速倍率。
+  results/pilot.json SHA256=f6b857fe0762df6cb4579436da494fdcfce3c8fbb6bc548b4341dd031478bc7e。
+- 新增native_concurrency_pilot.py及test_native_concurrency_pilot.py；本地10项测试
+  通过（2.529秒），远端同10项通过（2.100秒），之后才执行真实mapper试验。
+  测试用dummy helper只证明隔离/验证/保护机制，不能替代上述真实PAF结果。
+- **尚未部署新普通池调度或改主任务参数。** 不能只把self_two_lane_admission.py的
+  maximum_processes改成16：当前native无AS保护，且扩展plan verifier明确绑定旧资源
+  策略。需要显式的资源层、guarded native命令映射及原回调还原，保留科学profile/key；
+  验证原extension来源与新资源变更各自的身份，不能删除旧约束、伪造__file__或只修writer。
+  同时覆盖续跑controller、独立reader、portable audit；主任务已加载/指纹绑定的文件
+  不热替换，适当完成边界、资源ready、旧新版停止且锁释放后再安全切换。旧对照不动。
