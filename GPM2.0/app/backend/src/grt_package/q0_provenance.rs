@@ -139,11 +139,11 @@ fn merge(mut spans: Vec<Span>) -> Vec<Span> {
     spans.sort();
     let mut result: Vec<Span> = Vec::new();
     for span in spans {
-        if let Some(last) = result.last_mut() {
-            if last.end >= span.start {
-                last.end = last.end.max(span.end);
-                continue;
-            }
+        if let Some(last) = result.last_mut()
+            && last.end >= span.start
+        {
+            last.end = last.end.max(span.end);
+            continue;
         }
         result.push(span);
     }

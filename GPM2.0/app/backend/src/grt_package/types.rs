@@ -18,7 +18,7 @@ pub(super) fn final_q_version(value: &str) -> &'static str {
         "q4"
     }
 }
-pub(super) fn package_table_path<'a>(path: &'a str, current: bool) -> &'a str {
+pub(super) fn package_table_path(path: &str, current: bool) -> &str {
     match (current, path) {
         (true, "metadata/grt_step2_strategies.tsv") => "metadata/grt_step1_strategies.tsv",
         (true, "metadata/grt_step3_classifications.tsv") => {

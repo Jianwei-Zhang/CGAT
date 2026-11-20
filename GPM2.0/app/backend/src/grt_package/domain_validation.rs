@@ -963,12 +963,12 @@ pub(super) fn validate_source_cards(
         }
         let expected_event_ids = events
             .iter()
-            .filter_map(|(event_id, event)| {
-                (event.get("status").and_then(Value::as_str) == Some("accepted")
+            .filter(|(_, event)| {
+                event.get("status").and_then(Value::as_str) == Some("accepted")
                     && event.get("source_card_key").and_then(Value::as_str) == Some(card)
-                    && event_is_path_producing(event))
-                .then(|| event_id.clone())
+                    && event_is_path_producing(event)
             })
+            .map(|(event_id, _)| event_id.clone())
             .collect::<HashSet<_>>();
         if event_ids.iter().cloned().collect::<HashSet<_>>() != expected_event_ids {
             return grt_err(
