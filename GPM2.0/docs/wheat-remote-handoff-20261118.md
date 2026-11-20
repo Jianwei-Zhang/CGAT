@@ -1500,3 +1500,23 @@
   native-resource-candidate-20261120-1110/plan/native/，这是刻意保留spec/guard身份，
   **不代表用了旧dispatcher**；active plan343f1d...和admission a54c3d...已由新owner验证。
   继续poll19945；旧对照42523432仍RUNNING，完整q0/LGZ/portable audit尚未完成。
+
+
+#### 15:38长批次完成与观察器续接
+
+- 新版42949582在15:37:47仍RUNNING，915个成功leaf，16路活跃、grant合计31，CPU2687%、
+  RSS49376MiB、峰值55713MiB/限额327680MiB；当前比对阶段总1364，剩449（含运行中）。
+  总数按冻结plan的1342个self batches与22个cross leaves计，不是完整工作流的完成比例。
+  其中845个为此前成功复用、4个为本轮新增fast、66个为本轮新增guarded native。
+- 先前安静约一小时的3D Flye batch0已在15:29:08 TASK_END exit0；14:28:52启动，实际grant1。
+  stderr记录276条query、mapper Real3612.017s/CPU3602.668s/PeakRSS2.328GB，说明该批次持续
+  使用所分配的一核，不是挂起。mapping/restore均exit0；小型complete-marker与stderr SHA
+  均匹配guard receipt。raw/result分别42027923/42593451字节；没有在登录节点重hash大型PAF。
+  receipt SHA=ab8e9fce195dc33d0eeea83b4db35f2cd7ce973403421ef80bb754ef65dc2d9d。
+- 6B Hifiasm batch31仍未结束（14:21:30开始、grant1）。其他批次持续成功，不能仅凭它暂时
+  没有PAF输出取消；需继续区分真实停滞和低grant计算长尾，也不能把整体CPU冒充单批次CPU。
+- 旧对照42523432仍RUNNING/grt_step2，CPU1594%、RSS90044MiB；本轮未改动或重提任一任务。
+- 观察器19945已按181轮窗口正常exit0（末次15:37:08）；这是观察器到期，不是计算任务退出。
+  核实两作业仍RUNNING后仅续接只读观察器：**session79134**，source仍为
+  /tmp/cgat-wheat-live-monitor-fair-compact.py，新日志logs/wheat-live-20261120-153747.jsonl，
+  首次15:37:47，预计约17:09到期。优先poll79134，不重复启动观察器；此快照须实时核实。
