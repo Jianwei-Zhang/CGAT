@@ -1419,3 +1419,64 @@
   全q0通过或主任务正在使用fair。下一步先核实时序/在途批次成本和资源，若切换则新建ready/handoff，
   等新32CPU/320GiB资源ready后仅停42943728，确认正常children/lock释放，备份并安装新reader。
   不能复用旧handoff中针对42876793的终态证明。当前还没有提交替代主作业或新handoff gate。
+
+
+### 2026-11-20 14:10：fair调度已安全接管，当前新版42949582
+
+- **当前新版改为42949582**（agent-X86-64，32CPU/327680MiB）；旧对照仍42523432。
+  原新版42943728是有意终止，不再是应持续监控的运行任务，不要重提它或复用其旧handoff。
+- 新作业13:58:20启动，13:58:38资源ready，尚未占分析工作区。新交接目录比较根下
+  native-fair-handoff-20261120-1357/；gate.py SHA=
+  7246cfb9da9e4d3c57f071a2cd1cf90e5a42e5bd1c2c9f8f3cbcd46f312b17f4，resume.dsub SHA=
+  ac6791e7d25a127fac489fc5608f2fb7cd9cad875b2fe919c31ae24cdbed96a1。新gate增加旧子进程
+  PID空、protected_baseline身份、实际硬内存额度检查；12项合成gate测试通过（0.052秒）。
+  仓库native_fair_handoff_gate.py保存原字节，仅是本次交接存档，不是通用可执行入口。
+- 等2D flye batch15、7D flye batch12两条较长在途批次都TASK_END exit0后才切换（14:03:44
+  两者确认完成）。stop_previous.py用新鲜djob/ready、正常owner PID/run_id、reader SHA、
+  原在途成本核验后，仅dkill 42943728，不使用force。停前成功leaf845=610复用+17新fast+
+  218新native；未完成16个，保留attempt目录，不把临时PAF当缓存。估计在途线程预留时间
+  204.45线程分钟，不是实测CPU时间或承诺的墙钟损失。prestop-leaf-snapshot.json保存清单。
+- 42943728于14:05:24终态FAILED，exitCode10003，明确Job was terminated by xbzhang26。
+  随后确认scheduler pids为“-”、正常.run_all/lock不存在；旧42523432仍RUNNING。
+- release_handoff.py重新核对两个作业与protected baseline、ready SHA/新32核320GiB额度，
+  以临时文件fsync+create-only link发布handoff.json，避免gate读到半份JSON。14:06:07
+  handoff accepted；ready SHA=b1c7042345bd5d3bcbba7a4dfdcf0c2121cf3677209ce62bfdbe01b44237990f。
+  old-terminal.json、新new-ready-scheduler.json、baseline-at-handoff.json、stop-request.json、
+  prior-owner.json、post-installation.json等都在新交接目录。stop/release helper的SHA记录在
+  helpers.sha256；没有触碰142、没有改旧对照或删除已完成产出。
+- 新正常owner 14:06:16取得锁：PID1538453，process_start6256597221，
+  run_id=20261120T060616Z-1538453-726e2805。采用预检通过的新plan
+  native-fair-revision-20261120-1350/plan/self-plan.json（343f1d...），admission a54c3d...；
+  不是修改旧e06f...文件。source/archive实现已通过0bfaa532保存到master。
+- reader新SHA=69dc816929da34bfe075f5796cbc23670c052be93147e0dc85e3145672ddffd0；
+  plan/reader-installation/prepare_q0_evidence.sh备份SHA仍43766e880e7cb4196eb70519d79ffc8918238c30a53245bba2db88d1230f0e33。
+  同目录receipt.json绑定run/plan/prior/installed。资源文件在plan/resources-before-
+  20261120T060616Z-1538453-726e2805.json备份后，经冻结resource API保持32线程，前后字节一致。
+- 新log为logs/resume_native_fair_42949582.out。14:07:31 RUN/RESUME，14:08:32 hifiasm参考
+  SKIP_VALID，14:10:07 flye参考SKIP_VALID；**此刻尚未确认全部leaf复用或fair实际新mapper执行**。
+  后续看assign跳过、845个叶子复用、新head任务开始与实际grant/guard receipts，不能仅凭
+  controller预检或换了entry就宣布科学任务完成或整体加速倍率。
+- 观察器26767已因有意终止42943728正常INSPECT_NOW退出，不是新故障。新只读观察器19945，
+  source=/tmp/cgat-wheat-live-monitor-fair-compact.py，log=logs/wheat-live-20261120-140639.jsonl，
+  约15:37到期。新job资源启动早于旧job取消，failed/active阶段归属改按新log的真实RUN id时间
+  过滤，而非仅按djob startTime，避免将旧owner取消记录误报为新失败。先poll19945，勿并行重复
+  启动主观察器。旧对照仍Step2；全q0、后续LGZ、最终portable audit均未完成。
+- 如新owner真失败，先看调度/日志/正常锁；不覆盖冻结源码或重prepare。需要回退时，先停止新
+  owner并确认子进程/正常锁释放，再按原reader备份及旧plan做受控回退；不能在运行中覆盖launcher。
+  旧native specs/guard/support完全相同，新旧实际1..8 grant的receipt仍可核验，不需删除成果。
+
+
+#### 14:20复用与首批执行确认
+
+- 14:14:07 assign也SKIP_VALID。14:17:41统计824个SELF_BATCH_REUSED、21个CROSS_LEAF_REUSED，
+  **845个停前成功leaf全部复用**。14:20:23将prestop-leaf-snapshot.json完整success集合与
+  新log的TASK_END/实际EXECUTION_OVERRIDE逐一比对，全部完成且已完成leaf重执行交集为空。
+- metadata-only审计再次核对218个旧native-resource-receipt与保留spec SHA、native key、
+  runtime/policy/manifest、complete-marker SHA及输出identity一致。不是登录节点重hash大型PAF；
+  PAF内容有效复用由新主控制器的真实验证/跳过路径证明，也不把历史receipt追认为新guard执行。
+  证据新handoff目录first-reuse-audit.json。
+- 此次新做的先是剩余fast profile：2A flye batch4于14:17:18开始、14:18:30成功（72秒），
+  后续5A flye batch20、3A flye batch29也成功，14:20:23共848个成功leaf；当时运行4A flye
+  batch10。这些仍是原科学profile及原fast/独占资源规则，不是新native admission没生效。
+  **截至该快照native新启动数仍0**；继续观察普通池进入及实际fair grant/receipt，不能仅因
+  现在看到单条快速任务就再次重启，也不能据本次预检/安装声称整体加速已测得。

@@ -874,7 +874,7 @@ for actual reuse, concurrent mapper execution, memory peaks and guarded success
 receipts. No release CI, `update.sh`, full runtime replacement or reprepare was
 performed for this incident.
 
-### Native backfill fairness investigation (candidate only, not deployed)
+### Initial native backfill fairness investigation (before the cutover below)
 
 On November 20, 2026, the running native dispatcher was observed bypassing a
 five-thread-preference batch for over an hour while admitting lower-work batches.
@@ -926,7 +926,7 @@ allocation. The candidate remains separate from the running dispatcher; the rece
 revision preflight is recorded below.
 
 
-### Receipt-preserving native revision (isolated preflight, not installed)
+### Receipt-preserving native revision (isolated preflight before installation)
 
 `stage_native_revision.py` adds an explicit first-generation resource-plan
 revision, without changing the default initial stager. It validates the prior
@@ -969,3 +969,56 @@ rewriting specs. Revised plan SHA-256:
 The installed production reader is still SHA-256
 `43766e880e7cb4196eb70519d79ffc8918238c30a53245bba2db88d1230f0e33`;
 main job `42943728` was not stopped, and no candidate launcher was installed.
+
+
+### Fair native cutover, November 20 at 14:06 CST
+
+The source snapshot above was then installed through an explicit resource-ready
+handoff, not a live edit. Replacement job **42949582** started on `agent-X86-64`
+at 13:58:20 with 32 CPUs / 327680 MiB and reached the readiness gate at 13:58:38.
+Two selected longer in-flight batches (2D Flye 15 and 7D Flye 12) were allowed to
+commit before stopping only the previous newer job **42943728**. At the stop
+request it had 845 successful leaves (610 reused, 17 new fast, 218 new native)
+and 16 unfinished leaves. Attempts remain diagnostic and were not accepted as
+complete output. The in-flight reservation-time estimate was 204.45 thread-
+minutes, not measured CPU consumption or a promised wallclock recovery time.
+
+The previous job ended at 14:05:24 with scheduler message `Job was terminated by
+xbzhang26`. Its empty scheduler PID list and normal lock release were verified;
+protected old baseline **42523432** remained running. Fresh SHA-bound scheduler,
+readiness and lock proofs released the new gate at 14:06:07. Handoff records live
+under `native-fair-handoff-20261120-1357/`, separate from the older handoff for
+42876793. `native_fair_handoff_gate.py` archives the exact gate source for this
+incident; it is not a generic runnable submission entry. Twelve synthetic gate
+tests passed, including rejection of live old children, occupied locks, wrong
+jobs/nodes/proofs, altered baseline identity and insufficient CPU/hard memory.
+
+The new owner acquired the normal lock at 14:06:16, run ID
+`20261120T060616Z-1538453-726e2805`, PID 1538453. It backed up and installed only the
+reader launcher under that lock. New reader SHA-256:
+`69dc816929da34bfe075f5796cbc23670c052be93147e0dc85e3145672ddffd0`.
+The backup matches the previous `43766e...` reader exactly. Effective resources
+remain 32 threads; `resources.json` is byte-identical to its saved backup. The
+scientific profiles, native specs/scripts, guard/runtime and completed outputs
+are unchanged. Launch log: `logs/resume_native_fair_42949582.out`.
+
+At 14:10 the Hifiasm and Flye reference stages were both `SKIP_VALID`, not mapping
+replays. This establishes the handoff and reference reuse, not all leaf reuse,
+new fair-dispatch executions or whole-q0/workflow completion. Continue the live
+checks and final scientific/portable evidence audit; do not rerun release CI,
+`update.sh`, prepare or a full installation for this resource-only repair.
+
+
+At 14:20, the resumed controller had reused **824 self batches + 21 cross leaves
+= all 845 previously successful leaves**. Comparing the complete prior-success
+set with current execution overrides found no completed leaf remapped. A separate
+small-file metadata audit accepted all 218 prior native guard receipts against
+the retained specs/runtime, complete-marker hashes and output identities; it did
+not hash large PAFs on the login node or claim a new guard execution. Evidence:
+`native-fair-handoff-20261120-1357/first-reuse-audit.json`.
+Assignment was `SKIP_VALID` at 14:14:07; three remaining fast-profile batches had
+completed by 14:20 while the next fast-profile batch ran. Ordinary native-pool
+execution had not yet started in this resume: do not confuse these unchanged
+fast/exclusive tasks with a failed 16-lane native policy, and do not restart
+productive short batches merely to display concurrency. Observe the first actual
+native grants/successes before claiming fair-dispatch runtime acceptance.
