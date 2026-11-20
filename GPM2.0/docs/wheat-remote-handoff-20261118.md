@@ -1614,3 +1614,23 @@
   log=logs/wheat-live-20261120-192243.jsonl，首样19:22:43，预计约20:54窗口到期。
   /tmp/wheat-detached-observer-poll.py已更新到新观察目录/日志；仍先查真实PID/命令及日志新鲜度。
   本轮未改变主任务runtime、参数、结果，也未重提计算或触碰旧版。
+
+
+#### 19:30普通池结束，切入剩余快速profile
+
+- 19:30:15新版1334/1364个leaf已TASK_END成功；普通受保护876个与历史未保护2个均已完成，
+  剩29个fast self和1个cross。12个q0染色体单元已SUCCESS：1A、1B、1D、2A、2D、3D、4B、
+  4D、5D、6A、6D、7D。完整q0、下游LGZ与最终audit仍未完成。
+- 19:17–19:30存在完成标记已写但等待父控制器merge/commit的回调，低CPU期间上述checkpoint
+  持续提交。19:30:16已真实启动3B Hifiasm batch22的SELF_EXECUTION_OVERRIDE，grant1，
+  SELF_RESOURCE_GUARD AS64GiB；这是原快速profile/原内存规则的阶段切换，不是16路普通池失效。
+  不因当前只有一个fast mapper而无条件解除长任务隔离、增加路数或再次重提。
+- 源码检查发现潜在后续精简点：SelfBindings.finish最后一个batch调用Profile.merge，merge
+  遍历validate_batch；外层SelfBindings.output_identities对selected batches再次validate_batch。
+  selected路径包含validate_paf(require_cigar=True)，哈希memo不等于PAF格式校验memo。
+  这是已定位的重复调用路径，尚未隔离测得其独立耗时，也未部署新缓存或跳过验证。
+  本轮收尾持续推进且已切入新pool，未为该候选优化重启支付校验成本；如后续确认收益足够，
+  需采用内容/文件身份约束的成功验证复用、失败/变化回退，覆盖普通/快参及cross类似路径，
+  保留最终完整审计，不能直接修改运行中的冻结依赖或去掉检查点。
+- 当前只读observer仍为PID1022372，目录wheat-observer-20261120-1923/，日志192243.jsonl；
+  新旧计算job均未重提，旧对照不变。
