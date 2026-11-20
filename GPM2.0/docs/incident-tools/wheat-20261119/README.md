@@ -909,8 +909,8 @@ Check its scheduler state and final report before claiming acceptance.
 successes bind the original native-spec SHA and guard runtime. A future resource
 revision must explicitly preserve those spec/script records and guard identities,
 verify the prior resource plan with its authentic verifier, and bind a new owner,
-reader and audit consistently. The existing initial stager does not yet implement
-that resource-plan revision protocol. A positive two-case replay alone is not a
+reader and audit consistently. The initial stager does not implement
+that resource-plan revision protocol; use the separate revision entry below. A positive two-case replay alone is not a
 production cutover or proof of overall speedup.
 
 The two-case thread replay `42947499` subsequently **SUCCEEDED** on
@@ -922,5 +922,50 @@ pilot tests passed before mapping (5.577 seconds). `results/pilot.json` SHA-256:
 This validates two resource-rebudgeted cases, not every possible thread/input
 combination or a whole-workflow acceleration. Lower per-case CPU naturally takes
 longer; the scheduling candidate concerns queue starvation and overall resource
-allocation. The candidate remains uninstalled pending the explicit receipt-safe
-resource-plan revision and controller/reader/audit validation described above.
+allocation. The candidate remains separate from the running dispatcher; the receipt-safe
+revision preflight is recorded below.
+
+
+### Receipt-preserving native revision (isolated preflight, not installed)
+
+`stage_native_revision.py` adds an explicit first-generation resource-plan
+revision, without changing the default initial stager. It validates the prior
+plan through that plan's genuine frozen bootstrap/stager/admission, then retains
+its complete operations, native spec/script records, native runtime, guard and
+support source paths, scientific origin and eight-lane memory calibration.
+Revision chains are rejected rather than implicitly trusting recursive plans.
+The new bundle selects `native_fair_admission.py`; all CPU, memory, fast-pool and
+scientific settings remain unchanged. The replacement reader must name the
+currently installed previous native launcher, not the much older science-only
+launcher. The separate two-case 8-to-2 replay is SHA-bound along with its config
+and implementation. Its isolated guard copy is checked by content identity, not
+falsely assigned the production guard's path.
+
+Eight revision tests cover no-workspace-write staging, unchanged existing
+receipts, old and new actual grants, producer/reader/audit module selection,
+prior-plan/source/reader fences, complete replay proof and module restoration.
+Together with existing staging, owner, bindings, audit and both admission suites,
+58 focused tests passed in 2.722 seconds in a SHA-verified Linux temporary copy
+of the source (avoiding Windows-mounted metadata overhead). Fixtures are not
+biological acceptance. The previously completed real replay remains the mapping
+evidence; the default dispatcher and running main jobs are unchanged.
+
+Remote isolated bundle: `native-fair-revision-20261120-1350/` under the comparison
+root. Preflight job `42949276` checks staging and independent controller, reader
+and audit validation on x86, without installing the launcher or owning the
+workspace. Verify its final scheduler state and log before using this candidate.
+A successful preflight is not q0 acceptance or authorization to discard work:
+any later cutover must still weigh in-flight work, secure resources, stop only
+the newer owner, verify normal lock/child exit and retain all old valid outputs.
+
+Preflight `42949276` **SUCCEEDED** on `agent-X86-18`, November 20, 2026,
+13:47:54–13:49:18 CST (2 CPUs / 20 GiB; scheduler peak 132 MiB). All three
+controller/reader/audit validation entrypoints passed, with `q0_completed:false`.
+Staging retained and accepted 189 existing guarded success receipts without
+rewriting specs. Revised plan SHA-256:
+`343f1d1933c71d79105405f958b5241887d1fa0f0c936ed1a3d3a70befe039f3`.
+`final-job.json`, `plan/staging-receipt.json`, `verify_42949276.out` and
+`post-preflight-observation.json` retain the evidence in that isolated directory.
+The installed production reader is still SHA-256
+`43766e880e7cb4196eb70519d79ffc8918238c30a53245bba2db88d1230f0e33`;
+main job `42943728` was not stopped, and no candidate launcher was installed.

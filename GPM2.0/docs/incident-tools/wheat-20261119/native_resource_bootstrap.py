@@ -81,6 +81,35 @@ def scientific_origin(path):
 
 
 @contextmanager
+def previous_resources(row):
+    """Verify a first-generation overlay with its own authentic frozen modules.
+
+    Revision chains are deliberately unsupported here. They need an explicit
+    protocol, not recursion through possibly circular plan references.
+    """
+    path=checked(row); plan=json.loads(path.read_text())
+    if (plan.get("native_resource_schema")!=SCHEMA
+            or "native_previous" in plan.get("dependencies",{})):
+        raise ValueError("a first-generation native resource plan is required")
+    deps=plan["dependencies"]
+    old_bootstrap=module("authentic_previous_native_bootstrap",checked(deps["native_bootstrap"]))
+    names=set(NAMES)|set(old_bootstrap.NAMES)|{"native_resource_bootstrap"}
+    saved={name:sys.modules.get(name) for name in names}; before=list(sys.path)
+    try:
+        sys.modules["native_resource_bootstrap"]=old_bootstrap
+        with old_bootstrap.installed(path,role="native_stager",caller=deps["native_stager"]["path"]) as verified:
+            if verified!=plan:
+                raise ValueError("previous resource plan changed during selection")
+            yield verified
+            checked(row)
+    finally:
+        sys.path[:]=before
+        for name,old in saved.items():
+            if old is None: sys.modules.pop(name,None)
+            else: sys.modules[name]=old
+
+
+@contextmanager
 def installed(path,*,role,caller):
     path=Path(path).resolve(strict=True); sha=digest(path); plan=json.loads(path.read_text())
     deps=plan["dependencies"]

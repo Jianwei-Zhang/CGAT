@@ -1376,3 +1376,46 @@
 - 候选源码/定点测试/调查文档已通过4b038cbd保存推送；当前运行中的42943728仍使用原
   e06f...dispatcher，没有中断。下一步必须保留现有native specs/guard receipts实现资源
   计划revision并验证producer/reader/audit后，才考虑新的ready/安全切换；这个机制仍未实现。
+
+
+### 2026-11-20 13:52：保留receipt的资源修订完成预检，主任务尚未切换
+
+- 当前旧42523432、新42943728仍RUNNING。13:49:53调度器记录新版CPU2490%、RSS65737MiB、
+  峰值73227MiB；旧版CPU1593%、RSS90186MiB、峰值102143MiB。没有OOM或主任务重启。
+- 13:51:47新版成功leaf 822（610复用+17此次fast+195此次guarded native），16路仍活跃。
+  2A flye batch3、1B flye batch45仍未启动，此前11:48:29起被更小work插队的现象还存在。
+  这是调度绕过风险，不是已经量化的全流程性能损失；不要冒称候选已带来提速。
+- 旧版Step2的1D/4D/5D分组均2402/2402完成，当前3D为84/2402、16个活跃分片；不是
+  整个Step2快完成（还含其他染色体）。保持旧对照不动。
+- 原观察器67604本地句柄退出143，不能据此判主作业终态。重新核实两主任务RUNNING后，
+  仅续接只读观察器26767；日志logs/wheat-live-20261120-133819.jsonl，约15:08自然到期。
+  先poll这个句柄，不重复启动观察器，不把观察超时当作主作业失败。
+- 新增stage_native_revision.py，独立于仍未改动的默认stage_native_resources.py。
+  native_resource_bootstrap.py增加previous_resources：用原资源计划绑定的实际旧bootstrap、
+  旧stager、旧admission验证旧计划，临时canonical module选择在成功/异常后恢复。
+  只接受第一代旧资源计划；显式拒绝revision链，避免不经验证的递归/循环引用。
+- 新修订完整保留operations（含native_specs/native_scripts）、native_runtime、native_guard、
+  native_support、原8路native_calibration、科学origin/profile/key及资源预留。只绑定新
+  owner/context/reader/audit/bootstrap/stager/fair admission；prior_launcher必须指向上一代
+  native reader的实际hash。用单独native_thread_calibration和native_thread_pilot依赖绑定
+  已完成两例8→2线程试验，不替换8路内存校准。试验guard是同内容隔离副本，不冒用生产路径。
+- 8项修订专项测试及原staging/owner/audit/bindings/新旧admission共58项通过（2.722秒）。
+  测试在SHA核对的Linux临时源码副本中运行，避免Windows挂载盘元数据开销；合成fixture
+  只证明身份/复用/调用链，不冒称生物学验收。测试日志本地/tmp/wheat-native-revision-focused-tests.log；
+  副本位置索引/tmp/wheat-native-revision-test-root。没有CI、浏览器、整版更新或重新prepare。
+- 独立远端包native-fair-revision-20261120-1350/（比较根下）；预检42949276在agent-X86-18
+  以2CPU/20480MiB运行，13:47:54–13:49:18 SUCCEEDED/exit0，峰值132MiB。staging保留并
+  接受当时189个guarded成功receipt，随后controller --validate-only、reader
+  --validate-reader-only、audit --validate-only全部通过，明确q0_completed:false。
+- 新plan SHA=343f1d1933c71d79105405f958b5241887d1fa0f0c936ed1a3d3a70befe039f3；
+  prior plan SHA仍cad752a468ec890170d1ad6730a851ccc0b359d8804b1d570c8312ec470b5950。
+  新bootstrap SHA=6d33e4ae6753f26c130a3e37d14c6f013bac90a74063f10d81a4356248c21367；
+  revision stager SHA=53472528d9d4d869eb885ab99a0eb76683fe19ebcacc75a507e055d45e01a4f1；
+  fair admission SHA=a54c3d5cdfc830f95986dd23d42bd35dbd22046f23cdb04076b98133b05a67bf。
+  目录内code.sha256、final-job.json、plan/staging-receipt.json、verify_42949276.out和
+  post-preflight-observation.json保存证据。新资源计划没有重新生成任何native spec/script。
+- **尚未切换主任务。** 安装reader SHA仍43766e880e7cb4196eb70519d79ffc8918238c30a53245bba2db88d1230f0e33，
+  新版42943728仍是原e06f...dispatcher、原正常锁持有者；旧42523432未触碰。候选预检成功不代表
+  全q0通过或主任务正在使用fair。下一步先核实时序/在途批次成本和资源，若切换则新建ready/handoff，
+  等新32CPU/320GiB资源ready后仅停42943728，确认正常children/lock释放，备份并安装新reader。
+  不能复用旧handoff中针对42876793的终态证明。当前还没有提交替代主作业或新handoff gate。
