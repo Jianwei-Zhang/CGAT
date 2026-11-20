@@ -1652,3 +1652,29 @@
   前述重复PAF格式验证仍只是源码定位的候选精简项，未为此修改冻结runtime或重提。
   当前远端observer1022372、目录wheat-observer-20261120-1923/、日志192243.jsonl持续运行，
   约20:54窗口结束后按真实进程/调度状态续接；旧对照42523432仍grt_step2，保持不变。
+
+
+#### 20:14 q0_evidence读取路径的只读诊断
+
+- q0_evidence仍运行；incident_q0_routing_reader.json于20:03:37生成（420776字节），说明初始
+  provenance_inputs已通过。随后主job RSS从约0.5GiB增长到约45GiB，未接近320GiB上限。
+  metadata/grt_q0_evidence.json尚未发布；不能将metadata声明当作科学汇总成功。
+- 为区分全序列加载、检查点校验与构建known_pairs，在确认agent-X86-64 cpuFree32、
+  memSched183172MiB及x86队列OPEN/ACTIVE后，提交只读诊断**42964604 SUCCEEDED**，
+  20:11:27–20:13:29，1CPU/1GiB请求；七次采样约120秒，仅访问当前UID/指定workspace进程的
+  /proc状态和fd路径/偏移，不读取基因组内容、不附加调试器、不改变主进程。
+- reader PID1754951（read_native_resources.py，--threads32），parent owner1538453处于等待。
+  reader同一start_ticks，120.22594秒内CPU增加118.72秒（0.987核），持续R，非卡死或零CPU等待。
+  20:11:28打开1B Flye self/result.paf offset460652544，之后切到1B Hifiasm self PAF与1B Flye
+  分组FASTA，再于20:12:28回到1B Flye self PAF offset78577664，至20:13:28推进到361291776。
+  同一PAF确实被再次读取；单凭这点不能把不同语义消费都删掉。
+- 源码_initial_inputs先manager.prepare/validate检查q0 checkpoint，再按alignment验证分组FASTA，
+  用read_paf及aligned_blocks构建known_pairs。它持有完整sources序列；当前低CPU属于这个串行
+  路径，不能说成mapper并发失效。后续候选是融合/复用内容受约束的验证及避免不需要的PAF对象
+  构建，仍需保留名字、方向、区间、CIGAR及内容身份检查，不能盲目跳过整个_initial_inputs。
+  **本轮尚未部署性能修改或重提任务**，也未测得独立提速倍率。
+- 证据q0-reader-diagnostic-20261120-2012/：code.sha256、sample.py、sample.dsub、submission.txt、
+  final-job.json、samples.jsonl、summary.json。sample.py SHA=
+  dd2c564e6ad802b44a5a7dfec9a885b8bb714b635e9399d03c918e5ed4d27915；summary SHA=
+  dced28bcd2a2cc288a72ccd8eb95fa23f5200174eea76f94b9a196784dc017f7。
+  当前observer1022372不变；本地poll工具现在也显示active单元，避免只重复已完成leaf数量。
