@@ -1784,3 +1784,32 @@
   此补丁会改变builder源码身份，不能直接拷贝进冻结runtime冒充原计划；后续有必要受控续跑时
   与57f6d8ff一起按绑定reader/plan及完整复用门禁评估。21:46两主任务仍RUNNING，新版
   q0_evidence约1核/34GiB，manifest/补充任务尚未出现；observer3067484不变。
+
+
+#### 22:27 候选目录进入首个补充比对，观察窗口续接
+
+- 低频只读诊断42968143 SUCCEEDED，22:00:06–22:20:08，agent-X86-64、1CPU/1GiB请求，
+  目录q0-phase-diagnostic-20261120-2155/（目录时间仅是标签，以调度器/采样时间为准）。
+  每120秒一次，共11个非暂停Python栈+自身reader的/proc元数据样本；仍不读取locals、
+  不发信号、不改变主runtime，所有栈采样退出0。1200.729秒墙钟内reader CPU1196.88秒。
+  22:00–22:08依次观测Hifiasm参考PAF offset38281216→215801856→358547456→414892032→556687360；
+  22:10起进入interval_rows/merged_intervals及候选区间列表构建，不是重新跑参考mapper。
+  sample.py SHA=77f3588d4c16e77dc49d99606693afaab87f7fa61092a63bb92744cd5e664dc1；
+  summary SHA=e37cd68c4366d24527889a5cef1e1aa980b6c1c126c9697927d4999ace5cf93f。
+  **该20分钟诊断已结束**，不要把最后22:20的栈当成实时位置；本地poll现在同时显示采样时间、
+  age和sampling_complete。final-job.json/samples.jsonl/stack-*.json/summary.json均保留。
+- 22:21首次观测到补充目录grt/evidence/q0_prepare/tasks/q0-map-8024dde83cbf20e7ffa6d8ee/。
+  至22:25 query.fa已15168078字节、target.fa已32088868779字节；command.json显示150个query
+  segment、38117个target segment，ID集合不相交。真实mapper命令保持原q0补充策略：
+  minimap2 -c -x asm10 -D -P --dual=yes --no-long-join -t 32；未套用内部self快速近似参数。
+  command.json SHA=c8380c36daa8d00a3703ed09160aa23d6e7c0b1a95a37adcae3f1545444a4829。
+  22:26调度器出现新增子进程PID1839627、作业CPU约1.6核，RSS94824MiB（限327680MiB）；
+  stderr/临时PAF尚空、无success.json，不能把输入准备完成称为补充比对成功，也不据安静日志杀任务。
+  第一批1364leaf仍完整，不是被重新计算；最终q0 manifest仍未出现。
+- observer3067484完成181轮（末样22:25:22）后自然退出。22:26独立核验PID不存在、181行
+  和两主作业djob RUNNING后，才续接同字节只读observer。**当前PID944455**、PPID1，
+  目录~/cgat-reads-debug/wheat-observer-20261120-2226/，log=logs/wheat-live-20261120-222639.jsonl。
+  源码SHA仍329074a0550e486dd886d282c11b596e26a25033ba999b9a1d0a8484386153ae；首样22:26:39，
+  预计约23:58到期，仍须以实际PID/日志新鲜度核实。/tmp/wheat-detached-observer-poll.py已更新。
+  旧版42523432仍grt_step2、约16核，未改动；新版42949582仍q0_evidence。
+  仓库57f6d8ff、8f33a52e两个局部性能补丁均未部署到当前冻结任务，未重提主计算。
