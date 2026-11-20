@@ -1594,3 +1594,23 @@
 - 17:50新版1104/1364个leaf成功、剩260，16路/grant28，CPU2343%、RSS45261MiB；
   已无上述6B batch31长尾，当前最长5D Flye batch11约20分钟。旧版仍RUNNING/grt_step2。
   q0完整合并、GRT/LGZ后续与最终audit仍未完成，不能以leaf计数宣布全流程成功。
+
+
+#### 19:23首批q0染色体收尾与观察窗口续接
+
+- 新主任务42949582及旧对照42523432仍RUNNING。新版已有4个q0染色体单元SUCCESS并提交正常
+  checkpoint：1B 19:18:39、6D 19:19:37、7D 19:20:56、5D 19:22:14。
+  19:23:23按冻结plan与本轮TASK_END核对1315/1364成功，剩49（19个guarded native self、
+  29个fast self、1个cross）。普通self有11个已启动未TASK_END；不把pending成功回调都说成
+  当前正在运行的mapper。旧版仍grt_step2，18:53已核实当前3D为698/2402，后续须实时刷新。
+- 19:17后出现多条complete.json已生成但TASK_END尚未写出的批次，调度CPU从约16核降至3核；
+  随后整染色体SUCCESS陆续出现、19:22重新启动一批普通任务，grant合计30。
+  这是需要区别于mapper停滞的收尾/汇总窗口；现有证据尚未证明重复扫描，未为短暂下降重提。
+  若持续串行或重复工作，再沿callback/merge/最终验证调用链排查，仍保留完整性校验。
+- observer2727810完成181轮（末次19:20:35）后退出；19:22确认实际进程不存在，并独立djob
+  确认两计算任务RUNNING，才续接远端只读观察。**当前观察PID1022372**，PPID1，目录
+  ~/cgat-reads-debug/wheat-observer-20261120-1923/；monitor.py与上次完全相同，SHA=
+  329074a0550e486dd886d282c11b596e26a25033ba999b9a1d0a8484386153ae。
+  log=logs/wheat-live-20261120-192243.jsonl，首样19:22:43，预计约20:54窗口到期。
+  /tmp/wheat-detached-observer-poll.py已更新到新观察目录/日志；仍先查真实PID/命令及日志新鲜度。
+  本轮未改变主任务runtime、参数、结果，也未重提计算或触碰旧版。
