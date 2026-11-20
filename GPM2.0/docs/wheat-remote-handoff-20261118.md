@@ -1314,3 +1314,51 @@
   leaf629=610复用+17新增fast+2新增native。CPU2658%（约26.6核），RSS38406MiB、
   当时峰值41297MiB（约40.3GiB），无OOM/失败。后续根据每批线程需要自动增减路数，
   不是固定7/10/16路，也不为凑32个进程超卖线程。整流程和整个q0尚未完成，需继续监控。
+
+
+### 2026-11-20 13:15：观察器已续接；发现线程偏好造成长期绕过，候选验证中
+
+- 原观察器72919于90分钟窗口正常结束（exit0），不是主作业结束。确认退出后启动67604，
+  使用/tmp/cgat-wheat-live-monitor-native-compact.py；新日志
+  logs/wheat-live-20261120-125232.jsonl，约14:23到期。完整样本仍写JSONL，控制台只打印
+  简要状态和最长两条活动leaf，避免16路时输出巨大。两个主作业仍是42523432和42943728。
+- 12:56:33新版累计738成功leaf=610复用+17新增fast+111新增普通，16路/32线程，
+  CPU2172%、RSS57051MiB，峰值73227MiB（约71.5GiB），无OOM或非零退出；3D flye
+  batch12此前执行约37分钟后也正常完成，没有按固定时间阈值杀任务。旧版仍运行Step2。
+- 已确认22个q0 unit都在55-unit执行计划中，包含q0_chr:Un；self plan的22个unit与其
+  完全一致，没有“Un未计划”的问题。当前active只显示21个，是Un尚未启动，不能据此补跑。
+- 新发现：当前native_resource_admission.py把desired线程当作必须一次满足的数量，
+  不足时不断回填较小任务。13:14:59现场fairness-audit-131459.json记录2A flye batch3
+  （偏好5线程）仍未启动，从11:48:29起已有117个work更小的native启动；1B flye batch45
+  （偏好8线程）亦未启动，已有109个更小任务启动。运行中的admission SHA仍是
+  e06fdfd7f0f6119a0372f597e27c965fd39da8100770d96a095ba039658625a7。
+  这是已观察到的绕过/排队长尾风险；不能直接宣称修正一定缩短整体makespan。
+- 新增独立候选native_fair_admission.py（**未部署**），改为对优先native分配
+  min(desired, available)，不改native cache key、mapper科学参数、内存guard或fast池。
+  test_native_fair_admission.py的14项通过（2.464秒），包含旧策略绕过head而候选以2线程
+  启动head的直接复现；原native_resource_admission.py和原11项测试保持原样、仍通过。
+  没有修改当前远端冻结文件，也没有终止/重提主任务。
+- native_concurrency_pilot.py新增显式allow_thread_rebudget+baseline_threads验证模式，
+  未显式启用或无split guard则拒绝改线程；baseline原命令逐项核对，实际输出必须raw与
+  restored PAF均逐字节相同。报告增加baseline/actual grants和driver源码前后SHA检查。
+  更新后16项试验测试通过（4.034秒），dummy测试不是生物学等价验收。
+- 真实小试验42947499，13:00:01在agent-X86-37启动，4CPU/40960MiB；两条已完成的
+  2B flye batch1/2从原8线程各改2线程，在完全隔离目录重放，不采纳结果。目录为比较根下
+  native-thread-rebudget-pilot-20261120-1258/。pilot driver SHA=
+  6762b6939d15f02fb2b7c8d65d50a132da2baaf4f3a90e2ae5ef66fbcf01de6d；config SHA=
+  152e3c9d1c2c11711ab62d80b2cc600656169b8bb244de2cc7886bbf11c42afc。
+  13:15查询仍RUNNING，两个helper PID2129546/2129547，映射试验预算1800秒（仅试验，
+  不是主作业超时）；首批旧8线程基线曾耗时约350秒，2线程可能需要约20多分钟。
+- 下一步先看试验终态与完整PAF比较。不能仅因候选测试通过就停止主作业。
+  若确需切换，必须实现显式resource-plan revision/reuse，而不是重新生成所有native specs：
+  已完成native-resource-receipt绑定旧spec SHA、guard源码路径和实际thread_grant。
+  保留原native_guard/native_support依赖、每个operation的native_specs/native_scripts、
+  native_runtime及科学profile/key；用新admission/owner/context/reader/audit构建新计划。
+  旧stager当前强制MODULES同目录且prior_launcher指向最初extension，需要一个经过验证的
+  previous-native-plan分支：用旧bootstrap/旧stager/旧admission验证旧资源计划，再独立验证
+  新资源差异与当前reader的prior_launcher。不要伪造__file__、不删除receipt检查、不把旧
+  结果追认为新策略执行。这个revision机制**尚未实现**，新候选也尚未挂入默认stager。
+- 保留原8路试验作为native_calibration（内存guard与并发范围依据）；本次2路降线程试验
+  不能替换那个要求8路的槽位。若未来revision使用fair候选，应另行绑定完整的线程重预算
+  验证报告，而不是放松旧8路校验。候选代码单独存为native_fair_admission.py，原默认
+  native_resource_admission.py及其测试未修改，避免把未完成试验的策略悄悄当成默认入口。

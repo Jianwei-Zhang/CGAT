@@ -873,3 +873,42 @@ whole-q0/workflow completion or an established speedup factor; retain monitoring
 for actual reuse, concurrent mapper execution, memory peaks and guarded success
 receipts. No release CI, `update.sh`, full runtime replacement or reprepare was
 performed for this incident.
+
+### Native backfill fairness investigation (candidate only, not deployed)
+
+On November 20, 2026, the running native dispatcher was observed bypassing a
+five-thread-preference batch for over an hour while admitting lower-work batches.
+The job continued making valid progress; this is a queue-tail risk, not proof of
+an output failure or a measured makespan regression. The deployed dispatcher
+remains the original frozen `native_resource_admission.py`.
+
+`native_fair_admission.py` is a separate experimental sibling. It treats
+`AdaptiveDispatcher.desired` as a preference and grants
+`min(preference, available_cpu)` to the highest-work eligible native task instead
+of repeatedly bypassing it. The 1–8 thread bounds, total CPU accounting, 18-GiB
+native reservations, 16-lane ceiling, fast rules and pool separation are unchanged.
+Fourteen focused tests include a reproducer where the deployed backfill selects a
+smaller task but the candidate starts the waiting higher-work task with two CPUs.
+The original dispatcher's eleven tests still pass; no running source was edited.
+
+The replay pilot now accepts a **separate opt-in resource-only thread comparison**:
+set `allow_thread_rebudget: true`, select the split-limit native adapter, and give
+each case its actual `baseline_threads` and intended `threads`. Baseline command
+identity is checked with the original grant; every other mapping option remains
+bound. Both raw and restored PAFs must still be byte-identical. The report records
+both grant lists and the stable driver source identity. Sixteen pilot tests pass;
+synthetic test outputs do not constitute biological acceptance.
+
+Isolated trial `42947499` uses two already-complete 2B Flye batches (1 and 2),
+changing grants from eight to two each, on a 4-CPU / 40-GiB x86 job. The directory
+is `native-thread-rebudget-pilot-20261120-1258/` under the comparison root. It does
+not adopt results, mutate the production plan or restart either main workflow.
+Check its scheduler state and final report before claiming acceptance.
+
+**Do not deploy this sibling by regenerating all native specs.** Existing guarded
+successes bind the original native-spec SHA and guard runtime. A future resource
+revision must explicitly preserve those spec/script records and guard identities,
+verify the prior resource plan with its authentic verifier, and bind a new owner,
+reader and audit consistently. The existing initial stager does not yet implement
+that resource-plan revision protocol. A positive two-case replay alone is not a
+production cutover or proof of overall speedup.

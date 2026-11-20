@@ -1,7 +1,8 @@
 """Compute-node-only bounded native replay; never adopts outputs into a run.
 
 Uses completed native batches and the frozen helper with unchanged mapping
-flags/threads. Four lanes use the original guard; up to sixteen require the
+flags. Thread grants remain unchanged unless explicit resource-only rebudgeting
+is requested and both output PAFs still compare byte-for-byte. Four lanes use the original guard; up to sixteen require the
 explicit native split-limit adapter, within a maximum 32-thread budget. All writable manifest paths and index copies are isolated. The
 32-GiB per-process AS guard covers each helper and its sequential mapper/restore
 child; it is not a cgroup or an aggregate RSS limit. Trial timeout is not a
@@ -83,6 +84,7 @@ def check_bounds(manifest, batch, threads=THREADS):
 
 
 def execute(config_path, output, timeout):
+    driver_record = record(Path(__file__).resolve())
     config_record = record(config_path)
     config = json.loads(config_path.read_text())
     work = Path(config["workspace"]).resolve(strict=True)
@@ -101,6 +103,12 @@ def execute(config_path, output, timeout):
     if (any(type(n) is not int or not 1 <= n <= THREADS for n in grants)
             or sum(grants) > cpu_budget):
         raise ValueError("pilot thread grants exceed the CPU budget")
+    baseline_grants = [c.get("baseline_threads",n) for c,n in zip(config["cases"],grants)]
+    if any(type(n) is not int or not 1 <= n <= THREADS for n in baseline_grants):
+        raise ValueError("invalid baseline thread grant")
+    changed_threads = baseline_grants != grants
+    if changed_threads and (config.get("allow_thread_rebudget") is not True or not adapter_record):
+        raise ValueError("thread rebudgeting requires an explicit split-guard pilot")
     if len({(c["manifest"]["path"], c["batch_index"]) for c in config["cases"]}) != lanes:
         raise ValueError("duplicate replay batch")
     for r in config["runtime"].values():
@@ -124,15 +132,17 @@ def execute(config_path, output, timeout):
         require(source, spec["manifest"]["sha256"])
         m = json.loads(source.read_text()); b = m["batches"][spec["batch_index"]]
         threads = spec.get("threads",THREADS)
+        baseline_threads = spec.get("baseline_threads",threads)
         check_bounds(m, b, threads)
+        check_bounds(m, b, baseline_threads)
         baseline = Path(b["directory"])
         if (baseline / "self-profile-receipt.json").exists():
             raise ValueError("fast-profile result is not a native baseline")
         require(baseline / "complete.json", spec["complete_sha256"])
         original = verify_outputs(baseline, b["key"])
         require(spec["command"]["path"], spec["command"]["sha256"])
-        if json.loads(Path(spec["command"]["path"]).read_text()) != expected_command(m, b, tool, threads):
-            raise ValueError("baseline command differs from the unchanged replay parameters")
+        if json.loads(Path(spec["command"]["path"]).read_text()) != expected_command(m, b, tool, baseline_threads):
+            raise ValueError("baseline command differs from the declared original parameters")
         for key in ("target", "name_map", "restore"):
             once(m[key], m["identities"][key])
         once(tool, m["identities"]["tool"])
@@ -235,9 +245,11 @@ def execute(config_path, output, timeout):
                        "guard":guard_rows[0],"native_resource_receipt":resource_receipt})
     for path, sha in verified: require(path, sha)
     require(config_path, config_record["sha256"])
+    require(driver_record["path"], driver_record["sha256"])
     for r in config["runtime"].values(): require(r["path"], r["sha256"])
     report = {"status":("guarded_native_replays_byte_identical" if adapter_record else "four_native_replays_byte_identical"), "scope":"completed bounded native batches only; not production deployment or whole-run speedup",
-              "config":config_record, "lanes":lanes, "thread_grants":grants,
+              "config":config_record, "implementation":driver_record, "lanes":lanes, "thread_grants":grants,
+              "baseline_thread_grants":baseline_grants,"thread_counts_changed":changed_threads,
               "native_resource_policy":adapter.POLICY if adapter_record else None,
               "execution_seconds":execution_seconds, "total_seconds":time.monotonic()-started,
               "as_limit_bytes_per_process":AS_BYTES, "main_workspace_modified":False, "cases":result}

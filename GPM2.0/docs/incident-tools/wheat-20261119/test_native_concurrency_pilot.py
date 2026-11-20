@@ -1,6 +1,8 @@
 """Pilot plumbing tests; dummy helper is not biological/concurrency acceptance."""
 import copy
 import json
+import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -121,6 +123,59 @@ class NativePilotTests(unittest.TestCase):
         b=m['batches'][0]; b['entries']=[{'name':'q','length':4}]
         pilot.check_bounds(m,b,threads=1)
         with self.assertRaises(ValueError): pilot.check_bounds(m,b,threads=8)
+
+    def test_thread_change_requires_explicit_opt_in_and_split_guard(self):
+        self.cases[0].update(threads=2,baseline_threads=8);self.save()
+        with self.assertRaisesRegex(ValueError,"rebudgeting"):self.run_pilot()
+        self.data['allow_thread_rebudget']=True;self.save()
+        with self.assertRaisesRegex(ValueError,"rebudgeting"):self.run_pilot()
+
+    def test_invalid_baseline_thread_grant_is_rejected(self):
+        self.cases[0]['baseline_threads']=True;self.save()
+        with self.assertRaisesRegex(ValueError,"baseline thread"):self.run_pilot()
+
+    def test_opt_in_rebudget_binds_original_command_and_both_outputs(self):
+        import native_batch_guard
+        self.tool.write_text('#!'+sys.executable+'\nimport resource,sys\nassert resource.getrlimit(resource.RLIMIT_AS)==(16*1024**3,)*2\nassert sys.argv[sys.argv.index("-t")+1]=="2"\nsys.stdout.write("raw\\n")\n')
+        self.tool.chmod(0o700)
+        restore=self.work/'restore.py'
+        restore.write_text('import sys\nsys.stdout.write(sys.stdin.read().replace("raw","restored"))\n')
+        self.helper.write_text("""import hashlib,json,os,resource,shutil,subprocess,sys
+from pathlib import Path
+def run_batch(path,index):
+    assert resource.getrlimit(resource.RLIMIT_AS)==(2*1024**3,16*1024**3)
+    m=json.loads(path.read_text());b=m['batches'][index];d=Path(b['directory']);d.mkdir()
+    command=[shutil.which('minimap2'),'-c','-x',m['preset'],'-X','--no-hash-name',
+        '-m',str(m['min_chain_score']),'-n',str(m['minimizers']),'-t',os.environ['GPM_TASK_THREADS'],
+        str(Path(m['cache'])/'target.mmi'),b['query']]
+    with (d/'raw.paf').open('wb') as out:subprocess.run(command,stdout=out,check=True)
+    with (d/'raw.paf').open('rb') as src,(d/'result.paf').open('wb') as out:
+        subprocess.run([sys.executable,m['restore'],m['name_map']],stdin=src,stdout=out,check=True)
+    (d/'stderr.log').write_text('dummy rebudget success')
+    outputs={n:hashlib.sha256((d/n).read_bytes()).hexdigest() for n in ('raw.paf','result.paf','stderr.log')}
+    (d/'complete.json').write_text(json.dumps({'key':b['key'],'outputs':outputs}))
+    Path(m['output']).write_bytes((d/'result.paf').read_bytes())
+""")
+        diag=self.root/'diagnostics.py';diag.write_text('# synthetic diagnostics\n')
+        self.data['runtime'].update(tool=pilot.record(self.tool),helper=pilot.record(self.helper),
+            native_adapter=pilot.record(Path(native_batch_guard.__file__).resolve()),minimap_diagnostics=pilot.record(diag))
+        for case in self.cases:
+            mp=Path(case['manifest']['path']);m=json.loads(mp.read_text())
+            m['identities'].update(tool=pilot.digest(self.tool),restore=pilot.digest(restore))
+            mp.write_text(json.dumps(m));case['manifest']=pilot.record(mp)
+            case.update(threads=2,baseline_threads=8)
+        cm=self.cache/'complete.json';value=json.loads(cm.read_text())
+        value['key']=pilot.identity({'tool':pilot.digest(self.tool),'target':m['identities']['target'],'preset':'asm10','index_limit':'8G'})
+        cm.write_text(json.dumps(value))
+        self.data.update(allow_thread_rebudget=True,cpu_budget=8);self.save()
+        before={str(p):pilot.digest(p) for p in self.work.rglob('*') if p.is_file()}
+        with patch.dict(os.environ,PATH=str(self.root)+os.pathsep+os.environ['PATH']):result=self.run_pilot()
+        self.assertEqual(result['implementation'],pilot.record(Path(pilot.__file__).resolve()))
+        self.assertTrue(result['thread_counts_changed'])
+        self.assertEqual(result['baseline_thread_grants'],[8]*4)
+        self.assertEqual(result['thread_grants'],[2]*4)
+        self.assertTrue(all(all(c['identical'].values()) for c in result['cases']))
+        self.assertEqual(before,{str(p):pilot.digest(p) for p in self.work.rglob('*') if p.is_file()})
 
     def test_rejects_wrong_native_key(self):
         p=self.work/'0/complete.json'; d=json.loads(p.read_text());d['key']='approximate';p.write_text(json.dumps(d))
