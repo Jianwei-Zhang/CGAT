@@ -1573,3 +1573,24 @@
   code.sha256、submission.txt、final-job.json、samples.jsonl、summary.json均保留；新主任务未重提。
 - 17:23:38新版1057/1364个比对leaf成功，16路、grant31；旧对照仍RUNNING/grt_step2，无新增失败。
   当前观察仍为远端PID2636895，非本地短时读取session；目录/日志见16:18条目，预计17:49到期。
+
+
+#### 17:50 6B长尾成功完成、观察窗口续接
+
+- 6B Hifiasm batch31在**17:45:23 TASK_END exit0**，自14:21:30起约3小时24分钟；实际grant1。
+  mapper日志mapped194 sequences，Real12230.173s/CPU12197.438s/PeakRSS2.019GB。
+  mapping/restore均exit0，complete-marker及stderr摘要匹配guard receipt；raw/result分别
+  24464378/23001626字节，未在登录节点重hash大PAF。receipt SHA=
+  840b7dd96f0098a0fe58a740f7ffe26a73456ef23f85a84e05d3ea3cab482e14。
+  该批没有取消重跑、没有改科学参数，原计算投入保留；不把完成证明外推成所有批次最优性能。
+- 原远端observer2636895已完成181轮采样，末次17:48:17。17:49:19确认实际进程不存在，
+  再独立djob确认新旧任务均RUNNING后，仅续接只读观察窗口，未重提任何计算任务。
+- **当前观察PID2727810**，目录~/cgat-reads-debug/wheat-observer-20261120-1750/，
+  monitor.py与上次逐字节相同（SHA329074a0550e486dd886d282c11b596e26a25033ba999b9a1d0a8484386153ae），
+  nohup独立运行，PPID1，console.log及observer.pid在同目录。
+  全采样日志logs/wheat-live-20261120-175000.jsonl，17:50:00首样；约19:21窗口到期。
+  本地只读查询脚本/tmp/wheat-detached-observer-poll.py已更新到该PID文件/日志，传1为立即单次，
+  传6为间隔60秒六次查询；本地查询被中断不影响远端采样，禁止据此重复启动观察器。
+- 17:50新版1104/1364个leaf成功、剩260，16路/grant28，CPU2343%、RSS45261MiB；
+  已无上述6B batch31长尾，当前最长5D Flye batch11约20分钟。旧版仍RUNNING/grt_step2。
+  q0完整合并、GRT/LGZ后续与最终audit仍未完成，不能以leaf计数宣布全流程成功。
