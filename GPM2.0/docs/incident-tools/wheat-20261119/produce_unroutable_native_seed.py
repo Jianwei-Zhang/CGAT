@@ -4,6 +4,8 @@ This is useful missing work, not a full-data benchmark or a ready main manifest.
 It writes only the isolated artifact root; the original workspace is read-only.
 Target input bytes are copied from the complete first native supplement, while
 all selected query sources are freshly content-verified from the original FAI.
+An explicit experimental score option produces a distinct, non-admitted raw key;
+it must never be relabelled as the normal native seed or auto-installed.
 """
 import argparse
 import csv
@@ -25,11 +27,20 @@ def digest(path):
     return h.hexdigest()
 
 
+def experiment_policy(policy,minimum):
+    if minimum is None:return policy
+    expected=['-D','-P','--dual=yes','--no-long-join']
+    if type(minimum) is not int or minimum!=2000 or policy.get('supplement_flags')!=expected:
+        raise ValueError('unsupported experimental seed profile')
+    return {**policy,'supplement_flags':[*expected,'-m',str(minimum)]}
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('workspace','package-dir','lookup-dir','index-dir','first-supplement','candidate-scope'):
         p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--threads',type=int,default=32)
+    p.add_argument('--experimental-minimum-chain-score',type=int,choices=(2000,),default=None)
     a=p.parse_args();started=time.monotonic();work=a.workspace.resolve(strict=True)
     if a.threads!=32:raise ValueError('this productive plan is bound to 32 threads')
     limit=112*1024**3
@@ -42,6 +53,10 @@ def main():
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         sys.path[:0]=[str(a.package_dir.resolve(strict=True)),str(work/'.prepare_lib/tools')]
         from lgz_core import q0_preparation as prep
+        # Isolated experiment only: the explicit flags are part of the raw
+        # mapping key and actual command. This does not install a main policy,
+        # and the unmodified complete-native-scope reader rejects this profile.
+        prep.POLICY=experiment_policy(prep.POLICY,a.experimental_minimum_chain_score)
         from lgz_core.common import stable_id,executable_identity
         from lgz_core.q0_catalog import CandidateCatalog
         from lgz_core.q0_sources import SourceKey,SourceSegment,Interval,split_source
@@ -102,11 +117,12 @@ def main():
                      'members':[[key,parts[key].sequence_sha256] for key in sorted(set(queries+targets))],
                      'tool':tool,'preset':'asm10','alignment_flags':prep.POLICY['supplement_flags']}
         expected_task_id=stable_id('q0-map',native_spec)
-        plan={'status':'productive_native_seed_prepared','request':request,'expected_task_id':expected_task_id,'query_bases':3953796,'target_parts':len(targets),
+        plan={'status':('experimental_profiled_seed_prepared' if a.experimental_minimum_chain_score else 'productive_native_seed_prepared'),'request':request,'expected_task_id':expected_task_id,'query_bases':3953796,'target_parts':len(targets),
               'target_input_reuse_receipt':receipt_identity,'reference_index_sha256':built['index_sha256'],
               'threads':a.threads,'address_space_bytes':limit,'wall_clock_timeout':None,
               'query_sources_freshly_content_verified':True,'target_input_verified_from_complete_receipt':True,
-              'main_workspace_modified':False,'code_sha256':inputs}
+              'main_workspace_modified':False,'experimental_minimum_chain_score':a.experimental_minimum_chain_score,
+              'alignment_flags':prep.POLICY['supplement_flags'],'production_profile_admitted':False,'code_sha256':inputs}
         prep.atomic_write_json(Path('producer-plan.json'),plan)
         print(json.dumps({k:v for k,v in plan.items() if k not in ('request','code_sha256')}),flush=True)
         catalog=CandidateCatalog({'candidates':[]},sources,parts)
@@ -124,9 +140,11 @@ def main():
             raise ValueError('complete native task cannot be reused by the ordinary API')
         for path,sha in inputs.items():
             if digest(Path(path))!=sha:raise ValueError('productive producer code changed')
-        report={'status':'complete_isolated_native_seed','task':task,'artifact_root':str(root),'seconds':time.monotonic()-started,
+        report={'status':('complete_experimental_profiled_seed_not_adopted' if a.experimental_minimum_chain_score else 'complete_isolated_native_seed'),'task':task,'artifact_root':str(root),'seconds':time.monotonic()-started,
                 'query_sources':len(queries),'query_bases':3953796,'target_parts':len(targets),'tool':tool,'code_sha256':inputs,
-                'normal_native_cache_contract_verified':True,'main_workspace_modified':False,'ready_main_manifest_published':False,
+                'normal_native_cache_contract_verified':a.experimental_minimum_chain_score is None,
+                'same_profile_raw_cache_contract_verified':True,'experimental_minimum_chain_score':a.experimental_minimum_chain_score,
+                'alignment_flags':prep.POLICY['supplement_flags'],'production_profile_admitted':False,'main_workspace_modified':False,'ready_main_manifest_published':False,
                 'producer_plan_sha256':digest(Path('producer-plan.json'))}
         prep.atomic_write_json(Path('summary.json'),report)
         print(json.dumps({k:v for k,v in report.items() if k!='code_sha256'}),flush=True)

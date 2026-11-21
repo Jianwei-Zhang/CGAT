@@ -2541,3 +2541,72 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
    原plan/checkpoint指纹；不要传旧caller或改__file__冒认新执行是旧entry。新reader声明
    scientific_builder_modified=true，旧声明先备份再在正常锁内明确迁移。
 6. 本轮259项q0定向测试通过（1 skip）；没有发布CI、update.sh、整版替换或main切换。
+
+## 2026-11-22 00:07 CST：新 q0 入口预检、全目标快速参数对照与缓存待采纳
+
+### 已完成的真实试验，不等于主任务已切换
+
+- 全目标 whole-query `-m2000` 对照 **43009156 SUCCEEDED**（目录
+  `q0-global-native-score2000-controls-20261121`）。只从已完成 FIRST 原生补充中选取
+  同家族的两条完整 query（47,662 bp / 745,038 bp）；没有重跑150条的大基线。
+  保留 `-P`，12线程、104GiB fresh AS guard；实际 mapper 979.336秒，完整PAF 6,952行，
+  SHA `4523c78aeaebe17ec30f051a3f1eca5bb50add9158e4aa68aa3a8eb61cfa467f`。
+- **原精确坐标保留门槛未通过**：两条 >=10kb native 比对的同target/strand/diagonal
+  M/=坐标保留率为3.09% / 5.01%。不能宣称全目标参数等价，也不能把这个结果当61条
+  缺失query已经测试。`summary.json` 的 `all_long_control_coordinates_retained=false` 保留。
+- 为区分重复落点损失与源关系损失，进行无mapper的二次诊断 **43009288 SUCCEEDED**，
+  `q0-global-controls-inspection-20261121-v2/diagnostics.json`：两条原有target/strand关系
+  各2个，均保留；查询总覆盖各100%；按target的查询边际覆盖约94.96% / 98.66%，
+  **target边际覆盖仅23.32% / 80.92%**。这是更粗的诊断，不能替代精确坐标，更不能把
+  阈值失败改写成通过。首次诊断43009270因漏传read_paf长度表失败，已定点修正，新增
+  使用真实PAF reader的回归测试；保留失败目录，没有重跑mapper。
+- **43009293 RUNNING**：`q0-unroutable-score2000-seed-20261122`，针对真正缺的61条
+  query开展独立显式参数试验，32CPU/160GiB、112GiB fresh AS，无wall-clock timeout。
+  `produce_unroutable_native_seed.py --experimental-minimum-chain-score 2000` 仅在隔离进程
+  改变raw mapping flags，真实command和raw key含`-m 2000`；不改main策略、不伪装native。
+  成功状态应为`complete_experimental_profiled_seed_not_adopted`，且
+  `normal_native_cache_contract_verified=false`、`production_profile_admitted=false`。
+  当前默认`CompletedNativeScopes`仍拒绝这一新profile；后续必须明确设计限域自动门槛、
+  真实profile与复用契约，不能直接挪进main并声称已采用。原native61任务43008458保留。
+  远端producer是纯函数重构前的冻结快照，行为相同但不要冒称其文件SHA等于后续仓库版。
+
+### 新 entry / reader / 安装事务已准备，主任务没有改动
+
+- `q0_science_context.py` 真正绑定新caller，分别验证原native/science/resource来源，
+  不传旧caller、不改`__file__`、不篡改原plan；`origin_probe`不能安装或执行新science。
+- 只读来源探针 **43009212 SUCCEEDED**，137秒；44 self operations / 876 eligible native
+  batches。`q0-science-origin-probe-20261121/summary.json` 确认workspace未改、q0未安装。
+  原plan SHA保持`343f1d1933c71d79105405f958b5241887d1fa0f0c936ed1a3d3a70befe039f3`。
+- `resume_q0_science.py` / `read_q0_science.py` / `stage_q0_science.py`：正常workspace
+  ownership、55-unit/no-DEGAP/CPU预算检查、仅13个lgz_core文件与launcher/declaration的
+  显式备份替换、异常回滚、保留原初始比对身份、新reader如实声明science改变。
+  这些安装/执行路径目前是定向测试通过，**尚未在main执行安装**。
+- **43009226 RUNNING**，`q0-science-transition-20261121-2352`：2CPU/16GiB，只读核验
+  q0之前全部25个outer checkpoints。到00:07已通过两条ref及q0_chr:1A/1B/1D/2A；
+  不能提前说25个全部通过。使用普通只读OuterCheckpointManager，不调用可能迁移assignment
+  的旧ProtectedCheckpoints.validate；不创建Runner、不占main锁、不写主工作区。
+  成功应有`validation.json`和`q0_transition_all_initial_checkpoints_verified_only`状态。
+
+### 已完成索引的直接复用已准备
+
+- **43009290 SUCCEEDED**（61秒），`q0-reference-cache-adoption-20261122/ready.json`。
+  未重建索引、未重跑参考比对，只复制并核对已有sealed DB、catalog绑定和原PAF内容。
+- 待采纳目录位于上述目录的
+  `artifacts/grt/evidence/q0_prepare/indexes/reference-index-fdad41a395b84a35a2176f31`。
+  DB 1,295,220,736 bytes，SHA
+  `18677df675e1a3c5fe9071d3edcd908215c8a20d2fbba4d5effd39411c0909a3`；
+  正常cache success.json SHA
+  `69b80ca1859b83018376434f803707f396f5c4b304cb10c40e2ab81bd69f9e68`。
+  **尚未采纳到main**。需在正常锁内无覆盖原子迁移，记录来源/全部身份/回滚路径；
+  正常builder仍须验证真实catalog与原PAF，不凭ready.json跳过内容检查。
+
+### 当前主任务及下一步边界
+
+- 00:07快照：NEW42949582 RUNNING，recent1196%、RSS284012MiB；OLD42523432 RUNNING，
+  recent1593%、RSS94314MiB。OLD未动；NEW仍旧q0执行路径。native61任务43008458仍RUNNING，
+  已约97分钟，recent199%、RSS35190MiB，不能当成已经高效解决长尾。
+- 本轮45项定向测试通过，另有真实origin/context和sealed-index复用验证；不跑发布CI、
+  不做update.sh、不整版替换。区域规划仍串行，mapper最多4路×2线程，不冒称32核已用满。
+- 下一步核对43009226完整预检、43009293实际flags/结果及43008458进展；完成明确profile
+  与缓存采纳门禁之后，才安排实际资源已就绪的NEW正常锁交接。保留FIRST 5.3小时结果、
+  初始1364任务和原native plan。不要只提交库/探针便宣称主任务完成优化。
