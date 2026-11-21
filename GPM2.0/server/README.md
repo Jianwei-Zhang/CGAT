@@ -454,10 +454,12 @@ for source records and evidence limits.
 
 ## DEGAP2.0 in the shared Server environment
 
-The manual App `DEGAP-JOBS` collection workflow below describes the released
-legacy-layout protocol. Its collector still needs numbered-workspace adaptation;
-do not point it at a new numbered workspace. This is separate from automatic
-post-LGZ refinement and importing that tool's new App delivery package.
+The manual App `DEGAP-JOBS` workflow below describes the released legacy-layout
+protocol. The source collector now isolates numbered-workspace candidates under
+`04_refinement/01_degap/06_manual/01_catalog/` instead of mutating the original LGZ
+metadata. App-exported runtime/seed-source paths still need adaptation, so the
+complete manual workflow on numbered workspaces is not ready yet. This is separate
+from automatic post-LGZ refinement and importing its new App delivery package.
 
 GPM v2.0.20 includes the pinned DEGAP2.0 Server runtime and the matching App
 task-card workflow described below. Update both Server and App to use this workflow.

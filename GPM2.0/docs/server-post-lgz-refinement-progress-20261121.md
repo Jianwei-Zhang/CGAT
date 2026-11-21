@@ -327,3 +327,18 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - `REPORT.md` 区分 LGZ 过程、精修与比较三类报告；包内 `metadata/` 等协议路径不当作工作区 `.runtime/metadata` 改名。指南公开未完成原生内部恢复、未完成旧任务迁移、新 patch 证据、离线交互原生报告及真实环境/原生验收边界。
 - 轻量文档检查通过：每语言 7 个 shell 示例均 `bash -n`，去注释后中英文命令一致；本地链接和四个源码 revision 与锁定清单一致。发布下载指南一致性检查通过，版本仍为 v2.0.21；未构建站点、未打开浏览器、未安装环境或运行科学流水线。
 - 文档追踪另发现手动 App `DEGAP-JOBS` 的 `degap_results.py` 仍直接检查 `server/metadata` 并使用 `server/.run_all`（如 `collect`、`publish`、`collect_locked`）；新的自动精修交付不使用这条收集器路径。旧布局流程仍保留，但编号工作区的手动收集/增量路径需要后续适配并验证，不用文档改名掩盖代码缺口。README 已明确这两条入口的边界。
+
+
+## 2026-11-22：编号工作区的人工 DEGAP 候选目录与原 LGZ 隔离
+
+- 沿实际调用链确认：只替换旧 `metadata/` 路径会让手动收集追加主表，破坏原 LGZ/迁移冻结证明。因此先落独立契约 `server-refinement-manual-catalog-contract-20261122.md`，再新增 `degap_manual_catalog.py`。编号布局的候选来源/比对/包缓存在 `04_refinement/01_degap/06_manual/01_catalog/<generation>/` 分版本保存，以 `.runtime/manual_degap/current.json` 为准，不修改主工作区 LGZ metadata、原始 FASTA 或自动精修 Final Path。
+- 收集器 staging、命令和来源查找均按实际布局处理，继承已验证人工目录并保留先前候选的独立 FASTA 来源；新候选追加只做自己的比对，旧候选包验证复用。包仍用原 incremental App 格式及原导出 receipt，不自动编辑用户的 Final Path；旧布局保持原写回语义。
+- 原始表、完整候选文件/符号链接与不可变 token 包 registry 都按内容绑定。原始大 FASTA 在单进程内依 device/inode/size/mtime/ctime 复用已算内容 SHA，不把这种缓存持久化，也不因恢复 mtime 漏过内容修改。收集结束重新核对结果 receipt、已收集候选快照和只读比对输入，拒绝运行中混入的新内容。
+- 新目录封存后，结果 ZIP 与 current 指针在真实工作区锁下通过持久化 pending/plan/原字节备份发布。中断可完成已验证的新集合或回到旧集合，未知变化的 ZIP/指针/备份拒绝覆盖；未登记目录和 ZIP 文件存在本身不算成功。CLI 明确打印“Manual candidates only; Final Path unchanged”和实际候选目录。
+
+### 必要定向检查与边界
+
+- 收集器及新目录事务两模块 15 项定向测试通过（1.219 秒）；此前新事务 6 项含 process-local 原始 FASTA hash 复用检查通过（0.471 秒）。覆盖旧布局不回归、编号布局连续两批追加/重收集不重比对、原始文件字节不变、来源连续、当前目录/缓存篡改拒绝、发布失败回滚、进程中断、未知输出保护。
+- 最后新增的候选快照输入漂移回归通过（0.130 秒）。初始夹具改错了原生输出文件，已有 collector 快照本来就应不受其影响；已改为篡改真正被消费的 `.gpm_degap_candidate.fa`，生产接纳条件未放宽。
+- 真实旧 LGZ 科学夹具经过显式迁移后，使用迁移实际安装的 `degap_results.py` CLI 及新 helper 完成候选收集；原 `verified_baseline`、完整 `validate_contract` 和原科学文件字节均不变。单个定向检查通过（13.080 秒），比对是显式的受控 PAF 生产器，不冒充真实 minimap2/DEGAP 验收。
+- 全目标仍未完成：App 导出仍写死旧运行库和便携来源路径，精修 patch 的目标 track 不能直接当作源 dataset，旧人工缓存接续也需来源绑定适配；这些在新契约中列为必做项。已同步中英文使用边界，不宣称人工全链路就绪。原生内部子任务恢复、未完成旧任务迁移、新 patch 证据、离线原生可视报告、真实固定环境/双架构及 A01–A18 统一验收继续保留。未运行完整回归/浏览器/生产构建、未操作远端或升级现有环境。

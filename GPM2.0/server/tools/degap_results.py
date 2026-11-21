@@ -7,9 +7,9 @@ mode outputs are collected, never arbitrary FASTA files found recursively.
 from __future__ import annotations
 
 try:
-    from workspace_layout import workspace_join
+    from workspace_layout import workspace_join, WorkspaceLayout, initialize_workspace
 except ModuleNotFoundError:
-    from .workspace_layout import workspace_join
+    from .workspace_layout import workspace_join, WorkspaceLayout, initialize_workspace
 
 import argparse
 import csv
@@ -31,6 +31,8 @@ from run_all_runner import WorkspaceLock, RunnerError
 import add_ctg_stage as stage
 import add_ctg_package as package
 import track_member_order as ordering
+import degap_manual_catalog as manual_catalog
+from run_resources import execution_threads
 
 
 def digest(path):
@@ -186,10 +188,17 @@ def recipes(jobs):
     return result
 
 
-def seed_stage(server, target, selected):
+def seed_stage(server, target, selected, *, owner_root=None):
     """Copy mutable metadata, link immutable alignment inputs; never write through links."""
-    shutil.copytree(server / "metadata", target / "metadata")
-    paths = {row["fasta_relpath"] for row in stage.read_tsv(server / "metadata/reference_chr_locator.tsv")[0]}
+    owner_root = Path(owner_root or server).resolve()
+    if WorkspaceLayout.detect(server).version == 2:
+        initialize_workspace(target)
+    shutil.copytree(workspace_join(server, "metadata"), workspace_join(target, "metadata"))
+    paths = {row["fasta_relpath"] for row in stage.read_tsv(workspace_join(server, "metadata/reference_chr_locator.tsv"))[0]}
+    # Prior manual candidates remain source-addressable after another collection;
+    # aggregates alone are not substitutes for their unique source locators.
+    paths.update(row["fasta_relpath"] for row in stage.read_tsv(workspace_join(server, "metadata/source_seq_locator.tsv"))[0]
+                 if row["dataset_name"] == stage.DERIVED_DATASET)
     for recipe in selected:
         for dataset in stage.chr_dataset_names(server, recipe["target_chr"]):
             paths.add(f"runs/chr_{recipe['target_chr']}/datasets/{dataset}.fa")
@@ -198,12 +207,17 @@ def seed_stage(server, target, selected):
     for recipe in selected:
         paths.add(f"runs/chr_{recipe['target_chr']}/datasets/derived_ctg.fa")
     for relative in paths:
-        original = safe_path(server, relative)
+        relative = str(relative)
+        if Path(relative).is_absolute() or ".." in Path(relative).parts:
+            raise ValueError("Unsafe alignment input: " + relative)
+        original = workspace_join(server, relative)
+        if not original.resolve().is_relative_to(owner_root):
+            raise ValueError("Alignment input leaves the owned Server workspace: " + relative)
         if not original.is_file():
             if original.name == "derived_ctg.fa":
                 continue
             raise ValueError(f"Missing alignment input: {original}")
-        dest = target / relative
+        dest = workspace_join(target, relative)
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.name == "derived_ctg.fa":
             shutil.copy2(original, dest)
@@ -276,29 +290,33 @@ def collect(jobs):
         raise ValueError("A result collection must belong to one Server project")
     server = Path(next(iter(roots))).resolve()
     for name in ("prepare_options.tsv", "source_seq_locator.tsv", "reference_chr_locator.tsv"):
-        if not (server / "metadata" / name).is_file():
+        if not workspace_join(server, "metadata", name).is_file():
             raise ValueError(f"Not a prepared Server project: missing metadata/{name}")
     lock = WorkspaceLock(server, "degap-collect-" + uuid.uuid4().hex)
     lock.acquire()
     try:
-        return collect_locked(jobs)
+        if WorkspaceLayout.detect(server).version == 2:
+            manual_catalog.recover(server, lock)
+        return collect_locked(jobs, lock=lock)
     finally:
         lock.release()
 
 
-def collect_locked(jobs):
+def collect_locked(jobs, *, lock=None):
     tasks = recipes(jobs)
     roots = {r["server_root"] for _, r in tasks}
     if len(roots) != 1:
         raise ValueError("A result collection must belong to one Server project")
     server = Path(next(iter(roots))).resolve()
-    entries, notes = [], []
+    entries, notes, receipt_bindings = [], [], []
     for _, recipe in tasks:
         path = Path(recipe["out_path"]) / ".gpm_degap_result.json"
         if not path.exists():
             notes.append({"job_id": recipe["job_id"], "status": "not_completed"})
             continue
-        entry = json.loads(path.read_text())
+        receipt_bytes = path.read_bytes()
+        entry = json.loads(receipt_bytes)
+        receipt_bindings.append((path, hashlib.sha256(receipt_bytes).hexdigest()))
         if entry.get("recipe") != recipe:
             raise ValueError(f"Stale result receipt: {recipe['job_id']}")
         if entry["status"] != "candidate":
@@ -311,17 +329,36 @@ def collect_locked(jobs):
     if not entries:
         raise ValueError("No completed DEGAP candidates to import; inspect job logs/status.tsv")
     output = jobs.parent / "degap_results.zip"
+    numbered = WorkspaceLayout.detect(server).version == 2
+    if numbered:
+        catalog, catalog_manifest, catalog_pointer = manual_catalog.current(server)
+        published_root = manual_catalog.new_path(server)
+        package_registry = dict(catalog_manifest["packages"])
+    else:
+        catalog, published_root = server, server
     with tempfile.TemporaryDirectory(prefix="gpm-degap-collect-") as temporary:
         root = Path(temporary)
         staged, delivery = workspace_join(root, "stage"), workspace_join(root, "delivery")
-        seed_stage(server, staged, [r for r, _, _ in entries])
+        seed_stage(catalog, staged, [r for r, _, _ in entries], owner_root=server)
+        input_links = ({name: row for name, row in manual_catalog.inventory(staged, server).items() if "link" in row}
+                       if numbered else {})
+        if numbered:
+            options_path = workspace_join(staged, "metadata/prepare_options.tsv")
+            options = stage.read_key_values(options_path)
+            options["threads"] = str(execution_threads(int(options.get("threads", "10")), root=server))
+            stage.write_tsv(options_path, ["key", "value"], [{"key": key, "value": value} for key, value in options.items()])
         (delivery / "packages").mkdir(parents=True)
         results = []
         cache_updates = []
         for index, (recipe, fasta, run_receipt) in enumerate(entries):
             name = "degap_" + recipe["token"][:24]
-            cache = server / ".run_all/degap_packages" / recipe["token"]
-            cached_info = cache.with_suffix(".json")
+            registered = package_registry.get(recipe["token"]) if numbered else None
+            if registered:
+                cached_archive, cached_info = manual_catalog.package_paths(server, registered)
+                cache = cached_archive.with_suffix("")
+            else:
+                cache = workspace_join(staged if numbered else server, ".run_all/degap_packages", recipe["token"])
+                cached_info = cache.with_suffix(".json")
             archive = delivery / "packages" / f"{recipe['token']}.zip"
             if cached_info.exists():
                 info = json.loads(cached_info.read_text())
@@ -336,8 +373,8 @@ def collect_locked(jobs):
                                    track=recipe["target_track"], input=str(fasta),
                                    source="DEGAP:" + recipe["token"] + ":" + recipe["job_id"])
             stage.command_prepare(args)
-            commands = [staged / "runs/add_ctg" / f"{name}_vs_ref/command.sh"]
-            commands += sorted((staged / "runs" / f"chr_{recipe['target_chr']}" / "add_ctg").glob(f"*_vs_{name}/command.sh"))
+            commands = [workspace_join(staged, "runs/add_ctg", f"{name}_vs_ref/command.sh")]
+            commands += sorted(workspace_join(staged, "runs", f"chr_{recipe['target_chr']}", "add_ctg").glob(f"*_vs_{name}/command.sh"))
             for command in commands:
                 subprocess.run(["bash", str(command)], check=True)
             stage.command_finalize(args)
@@ -347,7 +384,7 @@ def collect_locked(jobs):
             package.main(["add_ctg_package.py", str(staged), str(package_dir), name])
             archive = delivery / "packages" / f"{recipe['token']}.zip"
             for command in package_dir.rglob("*.sh"):
-                command.write_text(command.read_text().replace(str(staged), str(server)))
+                command.write_text(command.read_text().replace(str(staged), str(published_root)))
             zip_directory(package_dir, archive)
             info = {"candidate_sha256": digest(fasta), "recipe": recipe,
                     "seed_sha256": run_receipt["seed_sha256"], "runtime": run_receipt["runtime"], "ctg_name": name,
@@ -355,14 +392,39 @@ def collect_locked(jobs):
             results.append(info)
             info_path = workspace_join(root, f"cached-{index}.json")
             atomic_json(info_path, info)
-            cache_updates.extend([(archive, cache.with_suffix(".zip")), (info_path, cached_info)])
+            if numbered:
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(archive, cache.with_suffix(".zip"))
+                shutil.copy2(info_path, cached_info)
+                package_registry[recipe["token"]] = {
+                    "archive": (published_root / cache.with_suffix(".zip").relative_to(staged)).relative_to(server).as_posix(),
+                    "archive_sha256": digest(archive),
+                    "info": (published_root / cached_info.relative_to(staged)).relative_to(server).as_posix(),
+                    "info_sha256": digest(info_path)}
+            else:
+                cache_updates.extend([(archive, cache.with_suffix(".zip")), (info_path, cached_info)])
+        for path, expected in receipt_bindings:
+            if digest(path) != expected:
+                raise ValueError("DEGAP result receipt changed during collection")
+        if any(digest(fasta) != receipt["sha256"] for _, fasta, receipt in entries):
+            raise ValueError("DEGAP candidate sequence changed during collection")
+        if numbered:
+            now = manual_catalog.inventory(staged, server)
+            if any(now.get(name) != expected for name, expected in input_links.items()):
+                raise ValueError("immutable alignment input changed during manual collection")
         atomic_json(delivery / "degap_results.json", {"schema": "gpm.degap.results.v1", "results": results, "notes": notes})
         # Write next to the destination so replacing the final archive is atomic.
         fd, temporary_zip = tempfile.mkstemp(prefix=".degap-results-", suffix=".zip", dir=jobs.parent)
         os.close(fd)
         try:
             zip_directory(delivery, Path(temporary_zip))
-            publish(staged, server, cache_updates, temporary_zip, output)
+            if numbered:
+                pointer = (manual_catalog.seal(server, staged, published_root, catalog_manifest["base"], package_registry)
+                           if package_registry != catalog_manifest["packages"] else catalog_pointer)
+                manual_catalog.publish(server, lock, pointer, temporary_zip, output)
+                print(f"Manual candidates only; Final Path unchanged. Catalog: {server / pointer['catalog']}")
+            else:
+                publish(staged, server, cache_updates, temporary_zip, output)
         finally:
             Path(temporary_zip).unlink(missing_ok=True)
     print(f"App candidate package: {output} ({len(entries)} candidates, {len(notes)} without candidates)")

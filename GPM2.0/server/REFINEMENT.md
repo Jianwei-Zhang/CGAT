@@ -111,6 +111,8 @@ Open `06_report/report.html`, then the per-tool report and its job/native diagno
 
 Import one tool's **Full** archive into a new project in a matching new App. Its authoritative Final Path and exported chromosomes represent that tool's accepted result; the `00_lgz` package remains explicitly unrefined. Full includes source FASTA; Light omits it but retains indexes, metadata and path/source lineage, so FASTA export requires the real sequence sources to be ready. Do not import over an existing manually edited project. The refinement package protocol is schema 5 / App Final Path 4; old Apps reject it rather than silently showing the LGZ path. New-App compatibility with older packages is retained.
 
+Manual App `DEGAP-JOBS` is a separate entrypoint. The source collector now stores versioned manual candidate catalogs under `04_refinement/01_degap/06_manual/01_catalog/`, with an authoritative `.runtime/manual_degap/current.json` pointer, leaving original LGZ tables untouched. App export runtime/source resolution and adoption of older manual caches remain pending; do not treat this Server-side catalog as full manual-workflow acceptance.
+
 After a stopped/failed invocation, rerun the same launcher. Verified complete results are reused. A sealed complete native run can be readmitted without rerunning the engine after an admission/report/publication failure. Report-only or serializer-only changes refresh the reports/archives without replacing unchanged final sequence files. Unfinished native subjob/iteration recovery is not yet implemented; retained partial files alone are never a completion receipt. Do not delete checkpoints or remove locks to force reuse.
 
 ```bash

@@ -45,6 +45,63 @@ class CompletedWorkspaceMigrationTests(unittest.TestCase):
         original_runtime.write_text("# controlled historical code; never imported or executed\nraise RuntimeError('must not run historical engine')\n")
         return rows
 
+    def test_manual_candidate_catalog_does_not_invalidate_the_original_migrated_lgz_proof(self):
+        import degap_results as manual
+        from workspace_layout import workspace_join
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "legacy-project"
+            self.legacy(root)
+            prepared = preview(root, TOOLS.parent)
+            apply(root, TOOLS.parent, prepared.digest, confirm_idle=True)
+            proof = verified_baseline(root)
+            contract = validate_contract(root)
+            scientific = {str(WorkspaceLayout.detect(root).path(row["destination"])):
+                          WorkspaceLayout.detect(root).path(row["destination"]).read_bytes()
+                          for row in proof["scientific_files"]
+                          if WorkspaceLayout.detect(root).path(row["destination"]).is_file()}
+            export = Path(directory) / "export"
+            (export / "degap_jobs").mkdir(parents=True)
+            out = export / "native-job"
+            out.mkdir()
+            recipe = {"schema": "gpm.degap.export.v1", "token": "a" * 64, "project_id": 1,
+                      "job_id": "gap", "job_type": "gapfiller", "out_path": str(out),
+                      "server_root": str(root), "target_chr": "chr1", "target_track": "a", "endpoint_end": "R"}
+            (export / "degap_jobs/gap.json").write_text(json.dumps(recipe))
+            (export / "jobs.tsv").write_text("job_id\tscript_path\tout_path\ngap\tdegap_jobs/gap.sh\t" + str(out) + "\n")
+            for name in ("seqleft.fa", "seqright.fa"):
+                (out / name).write_text(">seed\nACGT\n")
+            manual.begin(recipe)
+            manual.seed(recipe)
+            (out / "native-job.final.fa").write_text(">candidate\nACGT\n")
+            manual.record(recipe)
+            # Exercise the installed collector and dependency closure, with a
+            # controlled PAF producer rather than a native alignment acceptance.
+            fake_bin = Path(directory) / "controlled-bin"
+            fake_bin.mkdir()
+            minimap = fake_bin / "minimap2"
+            minimap.write_text("#!/usr/bin/env python3\nfrom pathlib import Path\nimport sys\n"
+                               "query = Path(sys.argv[-1])\n"
+                               "name = next(line[1:].split()[0] for line in query.read_text().splitlines() if line.startswith('>'))\n"
+                               "Path(sys.argv[sys.argv.index('-o') + 1]).write_text(f'{name}\\t4\\t0\\t4\\t+\\tchr1\\t5000\\t0\\t4\\t4\\t4\\t60\\tcg:Z:4M\\n')\n")
+            minimap.chmod(0o755)
+            layout = WorkspaceLayout.detect(root)
+            self.assertEqual(layout.path(".prepare_lib/tools/degap_manual_catalog.py").read_bytes(),
+                             (TOOLS / "degap_manual_catalog.py").read_bytes())
+            executed = subprocess.run([sys.executable, "-B", str(layout.path(".prepare_lib/tools/degap_results.py")),
+                                       "collect", "--jobs", str(export / "jobs.tsv")], capture_output=True, text=True,
+                                      env={**os.environ, "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
+                                           "PYTHONDONTWRITEBYTECODE": "1"}, timeout=45)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertEqual(verified_baseline(root), proof)
+            self.assertEqual(validate_contract(root), contract)
+            for path, content in scientific.items():
+                self.assertEqual(Path(path).read_bytes(), content, path)
+            catalog, _, _ = manual.manual_catalog.current(root)
+            new_rows = manual.stage.read_tsv(workspace_join(catalog, "metadata/source_seq_locator.tsv"))[0]
+            self.assertTrue(any(row["dataset_name"] == "derived_ctg" for row in new_rows))
+            old_rows = manual.stage.read_tsv(workspace_join(root, "metadata/source_seq_locator.tsv"))[0]
+            self.assertFalse(any(row["dataset_name"] == "derived_ctg" for row in old_rows))
+
     def test_preview_apply_public_resume_preserve_original_proof_and_never_execute_lgz(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "legacy-project"
