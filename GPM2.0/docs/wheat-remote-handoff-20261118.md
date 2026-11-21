@@ -2892,3 +2892,34 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   至少确认主流程已离开参考catalog并实际读取FIRST，而不是只确认缓存被搬进目录。
   不把未显示的3块seed命中或区域mapper启动当作已证实。后续按新源码一起冻结候选；
   不覆写3c57fd10以前已经冻结的文件，仍先预检/资源ready，再正常接管。
+
+## 2026-11-22 06:03 CST：组合补丁已真实stage，25项只读预检进行中
+
+- 候选来自已推送master **ec093edf**（此前准备器/installer修复 **3c57fd10**）。远端
+  bundle：`q0-parallel-cutover-20261122-054517`；transition SHA
+  `47d3bd36960518a6dcc1c5c8b98bf1b5fd61f6a076a42a3109d1d44e128acc01`。
+  通过可信压缩包SHA与全部代码校验后，用实际Python3.10运行了准备器，真实准备receipt
+  也存入仓库`q0-parallel-candidate-prepared-20261122.json`。
+- 已核对上次安装journal/reader声明/全部旧文件及4项科学policy，列明14个runtime：
+  **7个改变（含新增executor1个）、7个内容不变**。新installer不会重写那7个不变文件。
+  不重做已采纳的cache移动，native origin、4个原始受保护runtime及外层contract仍不变；
+  contract SHA仍899b629ca3d2d2fb2d7e768f3368bd1e94a049d345a571928c09442090ba4ffb。
+  `source-repository-receipt.json`核对20份候选源码并记录保护范围；没有安装到工作区。
+- 真实只读预检 **43010327 RUNNING，agent-X86-18，2CPU/16GiB**。冻结包83项准备/
+  installer/上下文/gate测试已通过；06:02:48实际验证 **9/25** 初始检查点，最近为2D，
+  RSS约129MiB、recent99%，`validation.json`尚未生成。这不是失败或卡住，继续查同一job，
+  不重复提交、不因一次SSH/观察超时而重启。预检有一小时诊断上限，不是主流程超时。
+- **主任务已真正进入区域阶段**。run_all.log记录05:42:18 fast61、05:43:01 native9、
+  05:43:14 native1418→52分别完成；结合既有cache/收据可核对其复用，而非仅看目录存在。
+  05:51:15完成100窗口，05:57:39完成200窗口，计划列表61000、fallback_sources=0。
+  这里是区域窗口，不是61000次全基因组比对；计划列表也不能不扣复用直接当精确剩余数。
+  OLD42523432仍运行未动；NEW43010068仍为原52f bundle，当前4×2池、还没启用新执行器。
+- 06:02前后只读observer1505606仍存活，NEW内存约90GB（scheduler 90171MiB）、recent
+  249%；已有参考/assignment/22条q0_chr仍保留。新的2.03x规划、2.45x缓存记录处理均
+  是隔离对照，不是这条存活作业已经获得的倍率。
+- **下一步**：先等43010327实际SUCCEEDED且25项完整proof，核对transition SHA/所有
+  源码仍一致；再生成该bundle的handoff-config和32CPU/320GiB资源ready作业。新allocation
+  已ready后才正常停止旧NEW43010068，确认子进程清空/普通锁释放，再交给新gate安装，
+  绝不停止OLD42523432或改旧journal。当前已有区域raw/project成功缓存保留复用；不要
+  因新模块/validator源码变化删除它们。切换后更新observer目标job及区域progress读取，
+  以真实新产出证明恢复；还没到可宣告“已部署/任务完成”的阶段。

@@ -1,0 +1,68 @@
+{
+  "changed_runtime_files": [
+    ".prepare_lib/tools/lgz_core/q0_alignments.py",
+    ".prepare_lib/tools/lgz_core/q0_catalog.py",
+    ".prepare_lib/tools/lgz_core/q0_preparation.py",
+    ".prepare_lib/tools/lgz_core/q0_reference_index.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_candidates.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_discovery.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_execution.py"
+  ],
+  "existing_cache_adoption_repeated": false,
+  "git_revision": "ec093edfed52f9a1197baf118cd00cef4bdb6b03",
+  "initial_alignment_profiles_modified": false,
+  "job_stopped": false,
+  "native_checkpoints_rewritten": false,
+  "new_runtime_files": [
+    ".prepare_lib/tools/lgz_core/q0_regional_execution.py"
+  ],
+  "outer_contract_replaced": false,
+  "previous_installation": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-science-cutover-20261122-0140/installation/receipt.json",
+    "sha256": "7496aeba32d494f764a78ca55fa84dbe051df0922fe638d3859f16c7c64db0d5"
+  },
+  "previous_job": 43010068,
+  "previous_transition": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-science-cutover-20261122-0140/transition.json",
+    "sha256": "eef0517b215789ffaafc07d779b14ff6b92c0ec673f659f3000545b58a29ff46"
+  },
+  "protected_baseline": 42523432,
+  "runtime_files": 14,
+  "scientific_policy_ast_checks": [
+    {
+      "ast_equal": true,
+      "file": "q0_preparation.py",
+      "symbol": "POLICY"
+    },
+    {
+      "ast_equal": true,
+      "file": "q0_regional_candidates.py",
+      "symbol": "CANDIDATE_POLICY"
+    },
+    {
+      "ast_equal": true,
+      "file": "q0_regional_discovery.py",
+      "symbol": "REGIONAL_POLICY"
+    },
+    {
+      "ast_equal": true,
+      "file": "q0_regional_mapping.py",
+      "symbol": "BASE_FLAGS"
+    }
+  ],
+  "status": "q0_candidate_prepared_not_installed",
+  "transition": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/transition.json",
+    "sha256": "47d3bd36960518a6dcc1c5c8b98bf1b5fd61f6a076a42a3109d1d44e128acc01"
+  },
+  "unchanged_runtime_files": [
+    ".prepare_lib/tools/lgz_core/common.py",
+    ".prepare_lib/tools/lgz_core/q0_cigar_policy.py",
+    ".prepare_lib/tools/lgz_core/q0_mapper_guard.py",
+    ".prepare_lib/tools/lgz_core/q0_neighbor_requests.py",
+    ".prepare_lib/tools/lgz_core/q0_query_windows.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_mapping.py",
+    ".prepare_lib/tools/lgz_core/q0_sources.py"
+  ],
+  "workspace_modified": false
+}
