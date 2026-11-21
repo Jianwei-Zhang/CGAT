@@ -461,7 +461,7 @@ metadata. Matching source builds now resolve the actual Server runtime and bind
 seed sources by identity/content rather than guessing portable App paths. A
 controlled App export/Server collection/original-App import has passed without
 changing the manually edited Final Path; this is not real native-tool acceptance.
-Older manual-cache adoption and final acceptance remain pending. This is separate
+Original migration-bound manual caches can be adopted without rerunning their jobs/alignments; unknown prior result ZIPs remain protected. Final acceptance remains pending. This is separate
 from automatic post-LGZ refinement and importing its new App delivery package.
 
 GPM v2.0.20 includes the pinned DEGAP2.0 Server runtime and the matching App

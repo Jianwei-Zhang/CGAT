@@ -353,3 +353,12 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 实际 Windows App 导出 → WSL Server 执行/收集 → 同一 App 数据库公开导入接口的受控桥接通过。Server 来源路径/换行与 App 不同；导入真实候选 `AACCGTTTTT`，原有手动 Final Path 完全未改，原 LGZ 文件集合/字节未改。原生阶段和比对是明确的受控 producer，不冒充 DEGAP/minimap2 或生物学验收。10bp 候选不产生合格真实 minimap2 命中，保留了该拒绝条件，再显式使用受控 PAF 完成协议检查。
 - 收集阶段单独恢复且核对已完成原生 FASTA/receipt 的 SHA 与 mtime，未重跑 native。初始导出单测 DB 缺少真实项目成员/原始染色体排序，补的是受控夹具初始化而非放宽导入器。最新 `-B` 字符串和夹具 SQL 已落源码但尚未重新链接；最后统一验收必须重新构建最新 Rust 并生成干净桥接目录。
 - 未完成：旧人工缓存的 receipt-bound 接续、未完成旧 LGZ 的迁移/续跑、原生内部子任务恢复、新 patch 比对/注释、原生离线交互报告、真实固定环境与四工具/双架构验收和 A01–A18 统一检查。未修改 master、客户目录/远端作业或现有环境。
+
+
+## 2026-11-22：迁移前人工候选缓存的有据接续
+
+- 扩展人工候选目录契约后新增 `degap_legacy_cache.py`。仅处理已提交完成-LGZ 迁移清单中的旧 `.run_all/degap_packages/<token>.json/.zip`；核对原引擎基线、迁移映射/未变字节、原 recipe、消费 seed/runtime/source proof、当前候选、历史增量包 manifest/locator 和已迁移实际序列，再复制到新的不可变 registry 并记录 adoption 依据。旧缓存和主 LGZ 表不写回。
+- 有效缓存接续不执行 native 或旧候选比对，后续重收集直接走 registry。缓存/来源在安装及封存前重新检查，进程内内容 SHA 复用已有文件身份栅栏，不因重复核对反复读取未变化的大包。新编号目录中的散落缓存、迁移后补入/篡改的旧缓存或任务不一致均拒绝，而不是重跑已存在名字的候选。
+- 未知旧结果 ZIP 的保护前移到 staging 前，避免先做无用比对才拒绝覆盖。保留原 ZIP，可将未改动的原 jobs/receipt 复制到新的空收集目录，不重新导出 token 或重跑原生任务。同步中英文使用边界；没有以缓存接续权限扩大为覆盖外部 ZIP 权限。
+- 最终本段 4 项定向检查通过（15.425 秒）：实际旧收集器产生旧包 → 真实显式迁移 → 迁移安装的新版 CLI 接续/再次收集；旧包 bytes 不变，未触发禁止运行的比对器，native 文件/mtime 不变，原 LGZ 科学契约/完整证明/文件 bytes 不变。另覆盖未知 ZIP 保留、无迁移依据缓存、缓存漂移/未知 token、正常编号目录连续追加与现有目录校验。旧包初次比对使用受控 PAF，不冒充真实 minimap2/DEGAP 验收。
+- 本段未运行全量回归、生产构建、浏览器或环境安装，未触及 master/远端/客户工作区。全目标继续保留：未完成旧 LGZ 阶段适配、原生内部部分子任务复用、新 patch 比对/注释、原生离线报告、四工具真实固定环境/双架构与 A01–A18 统一验收。

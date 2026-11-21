@@ -111,7 +111,7 @@ cgat_server/
 
 将某工具的 **Full** 包导入匹配新版 App 的新项目。其权威 Final Path 和导出染色体对应该工具的接纳结果，`00_lgz` 包则明确未精修。Full 包含来源 FASTA；Light 不含 FASTA，但保留索引、metadata、路径及来源关系，因此导出 FASTA 前需要真实序列来源就绪。不要覆盖已有人工编辑的项目。精修包协议为 schema 5 / App Final Path 4；旧 App 拒绝该协议，不静默显示 LGZ 路径。新 App 保留对旧包的兼容。
 
-手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/01_degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。旧人工缓存接续及原生工具最终验收仍未完成，不能把协议检查等同于手动全链路验收。
+手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/01_degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。已提交迁移清单绑定的旧人工包现可纳入不可变 registry，不重跑原生任务或其比对。未知旧结果 ZIP 仍保护：保留原 ZIP，复制未改动的原 `jobs.tsv` 和 `degap_jobs/` receipt 到新的空目录收集，不重新导出 token。原生工具最终验收仍未完成，不能把协议检查等同于手动全链路验收。
 
 停止或失败后重复同一入口命令；完整且通过校验的结果会复用。已封存完成的原生运行，在接纳/报告/发布失败后可以重新接纳，不重跑工具。只有报告或打包器变化时刷新报告和包，未变化的最终序列文件不替换。未完成的原生子任务/迭代恢复尚未实现，保留的部分文件不能直接作为完成回执。不要通过删除 checkpoint 或移除锁强制复用。
 

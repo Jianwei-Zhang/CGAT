@@ -260,16 +260,22 @@ def recover(server, lock, *, rollback=False):
     return outcome
 
 
+def check_output(output, previous):
+    """Reject unknown prior ZIPs before staging as well as before publication."""
+    output = output_path(str(Path(output).absolute()))
+    before = digest(output) if output.is_file() else None
+    if before is not None and (not previous or previous.get("output") != str(output) or previous.get("output_sha256") != before):
+        raise ValueError("refusing to replace an unowned or changed manual result ZIP; preserve it and collect unchanged original jobs/receipts in a fresh export folder")
+    return output, before
+
+
 def publish(server, lock, pointer, temporary_zip, output):
     layout = layout_and_lock(server, lock)
     if layout.path(PENDING).exists():
         raise ValueError("recover the prior manual publication first")
     verify_catalog(layout.root, pointer)
-    output = output_path(str(Path(output).absolute()))
     _, _, previous = current(layout.root)
-    before = digest(output) if output.is_file() else None
-    if before is not None and (not previous or previous.get("output") != str(output) or previous.get("output_sha256") != before):
-        raise ValueError("refusing to replace an unowned or changed manual result ZIP")
+    output, before = check_output(output, previous)
     home = layout.path(".runtime/manual_degap/transactions/" + uuid.uuid4().hex)
     ensure_directory(home)
     backups = {"pointer": None, "output": None}

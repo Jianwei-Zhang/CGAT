@@ -354,6 +354,7 @@ def collect_locked(jobs, *, lock=None):
         catalog, catalog_manifest, catalog_pointer = manual_catalog.current(server)
         published_root = manual_catalog.new_path(server)
         package_registry = dict(catalog_manifest["packages"])
+        manual_catalog.check_output(output, catalog_pointer)
     else:
         catalog, published_root = server, server
     with tempfile.TemporaryDirectory(prefix="gpm-degap-collect-") as temporary:
@@ -370,10 +371,23 @@ def collect_locked(jobs, *, lock=None):
         (delivery / "packages").mkdir(parents=True)
         results = []
         cache_updates = []
+        adoptions = []
         for index, (recipe, fasta, run_receipt) in enumerate(entries):
             name = "degap_" + recipe["token"][:24]
             registered = package_registry.get(recipe["token"]) if numbered else None
-            if registered:
+            adoption = None
+            if numbered and not registered:
+                from degap_legacy_cache import lookup
+                adoption = lookup(server, recipe, fasta, run_receipt)
+                if adoption is not None:
+                    registered = adoption.install(server, staged, published_root, recipe["token"])
+                    package_registry[recipe["token"]] = registered
+                    adoptions.append(adoption)
+            if adoption is not None:
+                # Installed bytes are private until the catalog is sealed.
+                cache = workspace_join(staged, ".run_all/degap_packages", recipe["token"])
+                cached_info = cache.with_suffix(".json")
+            elif registered:
                 cached_archive, cached_info = manual_catalog.package_paths(server, registered)
                 cache = cached_archive.with_suffix("")
             else:
@@ -425,6 +439,8 @@ def collect_locked(jobs, *, lock=None):
                     "info_sha256": digest(info_path)}
             else:
                 cache_updates.extend([(archive, cache.with_suffix(".zip")), (info_path, cached_info)])
+        for adoption in adoptions:
+            adoption.verify()
         for path, expected in receipt_bindings:
             if digest(path) != expected:
                 raise ValueError("DEGAP result receipt changed during collection")
