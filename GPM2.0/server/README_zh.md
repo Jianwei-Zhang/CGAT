@@ -4,7 +4,9 @@
 
 自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
 
-Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，产物路径、数据协议与持久化阶段 ID 不变。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md)。
+Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，命名别名保留 LGZ 持久化阶段 ID；独立的编号布局和精修包协议变化见下文。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md)。
+
+> **功能分支源码**：LGZ 后四工具精修、编号工作区、旧目录迁移和 App 精修包见[使用指南](REFINEMENT_zh.md)。下方 v2.0.21 下载命令安装的是已发布版本，不会自动获得这些尚待统一验收的新功能。
 
 ## 快速开始
 
@@ -49,7 +51,7 @@ bash "$SERVER/run.sh" \
   -o ./gpm_server
 ```
 
-成功结束时会明确显示 `Final delivery packages` 摘要。最终只交付
+下方下载的已发布 v2.0.21 成功结束时显示 `Final delivery packages` 摘要，按其旧布局交付
 `gpm_server.tar.gz`（Full，含 FASTA 和报告）与 `gpm_server.light.tar.gz`（Light，不含 FASTA、
 包含报告）两个文件；两者都内置完整的 `gpm_server/report/` 目录，不再单独生成
 报告 ZIP。本地报告仍可在 `gpm_server/report/report.html` 直接打开。
@@ -239,9 +241,9 @@ MUMmer 染色体进度以及警告和错误。逐染色体复制/解析耗时和
 日志。运行中的单元静默 60 秒后输出心跳提示；采用逐行追加，不使用终端刷新动画。
 未知子进程输出仍保留，不猜测过滤。
 
-- `logs/progress.log`：精简纯文本进度，多次运行追加记录。
-- `logs/run_all.log`：完整时间、run ID、事件与性能指标等诊断信息。
-- `report/report.html`：格式和数据来源不变。原始事件及子进程输出先进入报告和
+- `.runtime/logs/progress.log`：精简纯文本进度，多次运行追加记录。
+- `.runtime/logs/run_all.log`：完整时间、run ID、事件与性能指标等诊断信息。
+- `06_report/01_lgz/report.html`：格式和数据来源不变。原始事件及子进程输出先进入报告和
   缓存判定，再做展示过滤。报告仍保留原有长度限制的输出尾部，完整诊断以日志为准。
 
 在 Server 工具目录执行：
@@ -252,7 +254,7 @@ python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --follow
 # 改为查看完整诊断。
 python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --detailed --follow
 # 不使用查看器也能直接查看纯文本。
-tail -F ./gpm_server/logs/progress.log
+tail -F ./gpm_server/.runtime/logs/progress.log
 ```
 
 颜色只用于显示的状态标签。自动模式仅在交互终端上色，Slurm `.out` 和管道默认
@@ -286,7 +288,7 @@ LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之�
 | 文件 | 用途 | 何时执行 |
 | --- | --- | --- |
 | `install.sh` | 创建、更新并验证 `cgat-server` 环境 | 首次安装或依赖更新时 |
-| `update.sh` | 检查并更新 Server 工具、已绑定 skill 与项目 `.prepare_lib/` 运行库 | 日常升级维护或对齐旧项目运行库时 |
+| `update.sh` | 检查并更新 Server 工具、已绑定 skill 与项目 `.runtime/prepared/` 运行库 | 日常升级维护或对齐旧项目运行库时 |
 | `env.sh` | `install.sh` 的兼容入口 | 仅供旧命令继续使用 |
 | `run.sh` | 自动准备并执行完整流程，已有工作目录按断点继续 | 首次运行或恢复 |
 | `prepare.sh` | 兼容原有的仅准备命令 | 需要单独生成脚本时 |
@@ -294,7 +296,7 @@ LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之�
 
 重复同一条 `run.sh` 命令，或执行 `bash "$SERVER/run.sh" -o ./gpm_server` 即可恢复；已通过校验的结果会复用。生成的 `run_all.sh` 仍可直接执行。旧作业停止后，可用 `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` 调整线程预算，也可修改 `--lgz-qc-memory-gb`。省略资源参数或直接运行 `run_all.sh` 时沿用上次生效值；恢复前需申请相应调度资源，不会在线调整正在运行的作业。资源修改不改变分析设置，也不会仅因此使其他条件仍有效的已完成结果失效。
 
-计算节点无法访问更新源时，启动会校验本机安装，并在无需下载的情况下对齐 `.prepare_lib`。检查失败的详细信息保存在 `.run_all/update-check.log`；离线启动不表示本机已经是线上最新版本。
+计算节点无法访问更新源时，启动会校验本机安装，并在无需下载的情况下对齐 `.runtime/prepared`。检查失败的详细信息保存在 `.runtime/run_all/update-check.log`；离线启动不表示本机已经是线上最新版本。
 
 `--max-fill <bp>` 设置 Step2 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
 
@@ -382,14 +384,16 @@ bash "$SERVER/library.sh" remove <local_id>   # 使用 list 中显示的本地 I
 命中实际覆盖总长度（重叠只计一次，间隔不算支持）。v1 内部合并间隔暂定 200 bp，待真实数据验收。
 没有命中不等于没有着丝粒。
 
-Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目的 `tel/`、`cen/` 和
-`metadata/annotation_library_snapshot.json`。续跑只读并校验项目快照，工具/库更新不会让旧项目
+Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目的 `03_lgz/06_annotations/tel/`、`03_lgz/06_annotations/cen/` 和
+`.runtime/metadata/annotation_library_snapshot.json`。续跑只读并校验项目快照，工具/库更新不会让旧项目
 自动使用新库；要采用新库需显式重新 prepare，建议使用新输出目录。完整交付包含注释 FASTA；
 轻量交付仍排除所有 FASTA，只保留来源快照与校验值。v2.0.20 App 保留来源信息，并将 schema 7 或更早的工作区迁移到 8，以保存 Local View 任务；升级前请备份，不保证旧版 App
 能打开迁移后的工作区。源码 review 与自动化测试已通过，不代表全基因组生物学或原生窗口验收已通过。
 具体来源与证据边界见 `library/SOURCES.md`。
 
 ## DEGAP2.0 与 Server 共用环境
+
+下方手动导出 App `DEGAP-JOBS` 的收集流程对应已发布的旧布局协议，收集器仍需适配编号工作区，不要直接指向新编号目录。它与 LGZ 后自动精修及导入各工具新版 App 包是两条不同入口。
 
 GPM v2.0.20 附带固定版本的 DEGAP2.0 Server 运行时，以及下文配套的 App 任务卡工作流。
 请同时更新 Server 和 App 后使用。
@@ -433,38 +437,15 @@ reads 路径仍需填写实际远端位置。自定义 DEGAP 路径保留在高�
 
 当前固定版本限制：GapFiller 最大轮数需至少为 1，或留空；TelSeeker 仍支持 0 轮。内置入口会明确拒绝 0 轮 GapFiller，不会擅自修改参数。
 
-### LGZ 后自动补 gap
+### LGZ 后自动精修（当前源码）
 
-**新工作区**直接使用 `--hifi /path/to/hifi.fastq.gz` 和/或
-`--ont /path/to/ont.fastq.gz`，与 DEGAP 原生接口一致。每个参数可接多个文件，
-也可重复指定；同时提供两者就是 HiFi/ONT 混合输入。同一文件不能同时标成两种类型。
+提供 `--hifi` 和/或 `--ont` 后，`run_all.sh` 在 LGZ 完成后默认运行 DEGAP；无 reads 时只运行 LGZ。已完成的编号 LGZ-only 工作区可以原地追加 reads，不重跑有效的 LGZ/参考比对。
 
 ```bash
-bash "$SERVER/run.sh" --ref ref.fa --ds assembly.fa \
-  --hifi hifi_1.fastq.gz hifi_2.fastq.gz --ont ont.fastq.gz -o new_workspace
+bash ./gpm_server/run_all.sh --hifi /reads/hifi.fq.gz --ont /reads/ont.fq.gz
+bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapcloser
 ```
 
-准备阶段会在参考比对前检查 DEGAP 命令及 Python 依赖；需先激活共享 Server 环境。
-当前原生任务脚本要求工作区、运行库及 reads 路径不含空格或 shell 特殊字符。
-这些 reads 不再触发 Meryl/Merqury/CRAQ、q0 质量淘汰或按 reads 质量排序供体。
-新建任务不再接受 `--reads`、`--reads-type` 或 `--reads-qc`。
-旧工作区续跑仍使用保存的 QC 或上一版 LGZ 后补洞配方，不需要改名已有参数；
-更新代码不会给旧执行计划插入 DEGAP 阶段。
+四工具从同一 LGZ 基线串行、独立运行；`--gapfill-tools none` 只关闭本次精修，不需要 `--final-tool`。reads 分配、固定版本/兼容补丁、保存参数替换规则与恢复边界见[完整指南](REFINEMENT_zh.md)。未编号旧目录必须先显式迁移；不要覆盖 prepare 或删除有效结果。
 
-LGZ Step3 完成后，内置 DEGAP AutoGapfiller 在总线程预算内单任务补洞。
-第一版只处理剩余的**内部 N gap**，不做端粒延伸。原始 `grt/q/q3.fa`
-和 App Final Path 保持不变；独立的 `data/degap/post_lgz.fa` 保存接纳后的桥接序列
-及所有未改动的 LGZ 碱基，`metadata/degap_gapfill.json` 按原 LGZ 坐标记录每处决定。
-完整包包含该 FASTA 和记录；轻量包仅包含记录。App 显示的仍是原始 LGZ Final Path，
-不会自动切换为这份额外 FASTA。
-
-DEGAP 成功退出不等于补洞成功：候选必须对应原始完整 N 区间、完整保留两侧非 N
-序列（忽略大小写），并提供正长度的 A/C/G/T 桥接。部分结果、歧义序列、修改两侧
-序列的重叠连接和末端 gap 均保留原样并记录原因。这是保守的结构检查，
-**不等于独立生物学验证**；有效但仅靠重叠直接连接的候选也可能不被自动接纳。
-原生工具跳过不足 20 bp 的 gap，并会合并邻近 gap；第一版不自动接纳跨越已有非 N
-序列的合并替换，逐 gap 记录保留原因。
-完成缓存绑定 reads、LGZ 输入、内置代码与输出内容；失败的原生运行保留在
-`degap/attempts/` 供排查，重试启动新的原生运行，不直接复用未验证的部分结果。
-无 gap 时跳过原生执行。原生工具仍有整基因组内存和 I/O 开销，本次接入不代表
-已经取得小麦全流程加速。
+从 `06_report/report.html` 进入本次报告；`05_final/00_lgz` 明确未精修，每工具真正的接纳结果位于 `05_final/01_degap`、`02_tgsgapcloser`、`03_quartet`、`04_lrgapcloser`，交付包对应放在 `07_delivery/<工具目录>/`。使用匹配新版 App 导入某工具包，Final Path 和导出 FASTA 均来自该精修结果，不再仅提供一份额外 FASTA 而仍显示 LGZ 路径。真实四工具/双架构和 A01–A18 统一验收尚未完成，不据此承诺生物学准确率或性能收益。

@@ -9,6 +9,8 @@
 
 <img src="GPM2.0/app/readme-assets/cgat-main-figure.svg" alt="CGAT 工作流总览" width="100%">
 
+功能分支源码新增的 LGZ 后精修与编号结果目录见[中文指南](GPM2.0/server/REFINEMENT_zh.md)；尚待最终统一验收，不追溯改变下方 v2.0.21 下载包。
+
 ---
 
 ## 核心组件

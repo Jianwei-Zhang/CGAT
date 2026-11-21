@@ -4,9 +4,11 @@
 
 自动修复引擎 **LGZ** 的全称是 **Linking Inter-assembly Units for Genome Zipping**。
 
-Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，产物路径、数据协议与持久化阶段 ID 不变。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](docs/lgz-server-implementation.md)。
+Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，命名别名保留 LGZ 持久化阶段 ID；独立的编号布局和精修包协议变化见下文。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](docs/lgz-server-implementation.md)。
 
 GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流程中，用于导入、浏览、轻量编辑和 Final Path 导出。
+
+> 当前功能分支的 [LGZ 后精修指南](server/REFINEMENT_zh.md)说明四工具、编号路径和旧工作区迁移；已发布 v2.0.21 下载包不追溯增加这些功能，最终统一验收尚待完成。
 
 ## 项目架构
 
@@ -120,14 +122,15 @@ bash "$SERVER/run.sh" \
 | `--ds [<名称>] <fasta>` | 必填，可重复 | 初次输入的组装数据集；省略名称时从文件名自动推导。第一个为主组装，其余为辅助组装。 |
 | `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
-| `-t, --threads <数量>` | `10` | 比对及可选 LGZ 后 DEGAP 的总计算线程预算；旧工作区 QC 也遵守此预算。 |
+| `-t, --threads <数量>` | `10` | 比对及可选 LGZ 后精修工具共享的总线程预算；旧工作区 QC 也遵守此预算。 |
 | `--skip-self` | 关闭 | 跳过同 dataset 自比对；同 dataset Subview 将不可用。 |
 | `--tel <motif> <次数>` | 可追加，可重复 | 在自动启用的官方库 + 本地库之外，追加本次端粒规则。 |
 | `--cen <fasta>` | 可追加 | 追加本次着丝粒相关重复序列；FASTA 名称不绑定染色体。 |
 | `--cen-min-len <bp>` | `10000` | 合并后着丝粒候选区域的最小命中覆盖长度，不计间隔。 |
 | `--cen-min-identity <百分比>` | `80` | 单个着丝粒重复命中的最小一致性百分比。 |
-| `--hifi <文件...>` | 可选，可重复 | HiFi reads，用于 LGZ 后内部 gap 修补，不再前置 QC；保留 LGZ，另存修补 FASTA。 |
+| `--hifi <文件...>` | 可选，可重复 | LGZ 后精修的 HiFi reads；不启用旧前置 QC，保留独立 LGZ 基线。 |
 | `--ont <文件...>` | 可选，可重复 | ONT reads；可以单独使用，也可与 `--hifi` 同时提供。 |
+| `--gapfill-tools <列表>` | 有 reads 时默认 `degap` | 逗号分隔 `degap,tgsgapcloser,quartet,lrgapcloser`，或 `none`；各工具独立交付。 |
 | `--lgz-qc-memory-gb <数量>` | `80` | 旧工作区 reads 质控的内存上限。 |
 | `--lgz-kmer-size <数量>` | `21` | 旧 reads QC 的 k-mer 大小；新 DEGAP 任务不使用。 |
 | `--max-fill <bp>` | `1000000` | Step2 两轮优化补洞的长度上限；恢复时可修改。 |
@@ -180,35 +183,27 @@ GPM Server 的全基因组/成对比对使用 Minimap2，cen 重复扫描使用 
 bash "$SERVER/run.sh" -o ./gpm_server
 ```
 
-该命令串行执行生成的计划，遇到首个错误即停止，复用前会重新校验 checkpoint，并在 `gpm_server/` 同级目录生成两个交付包：
+当前源码串行执行计划并在复用前核对 checkpoint。普通科学阶段失败会停止后续分析；精修工具独立失败，其他成功工具及 LGZ 基线仍可交付，但总退出码非零。`--out` 中的编号结果和交付位置为：
 
-| 交付包 | 内容与用途 |
+| 结果 / 交付 | 路径与用途 |
 | --- | --- |
-| `gpm_server.tar.gz` | 完整 App 包，包含 source/reference FASTA、权威最终 q3 FASTA 和完整 `report/` 目录，可在客户端导出 FASTA。 |
-| `gpm_server.light.tar.gz` | Light App 轻量包，不含 FASTA，保留 `.fai`、metadata、Final Path、source-card 状态、PAF 视图和完整 `report/` 目录，可导入、浏览并导出 PNG/TSV。 |
+| LGZ-only 基线 | `05_final/00_lgz/`；未精修，包在 `07_delivery/00_lgz/gpm_server[.light].tar.gz`。 |
+| 每工具精修 | 如 `05_final/01_degap/assembly.fa`、`final_path.json` 和 `provenance.json`；包在 `07_delivery/01_degap/gpm_server.degap[.light].tar.gz`。其他工具使用固定编号。 |
+| Full / Light | 各工具都生成两种包；Full 含序列，可重建/导出 FASTA，Light 不含 FASTA，保留索引、来源和路径关系。导入匹配新版 App 的独立项目。 |
+| 报告入口 | `06_report/report.html` 总览 → `01_lgz` 过程报告、`02_refinement/<工具>/report.html`、job 诊断及 `03_comparison/<batch>/`。 |
 
-默认使用 pigz 多线程压缩为 `tar.gz`；`--archive-format zip` 可保留 ZIP 格式，App 支持两者。
+方括号表示两个文件，不是文件名的一部分；默认 pigz 多线程 `tar.gz`，`--archive-format zip` 改用 ZIP。不再向输出目录旁边散放新交付文件，也不递归打包 `07_delivery`。只运行 LGZ 或仅存在工具目录不能声明本次精修成功。
 
-这两个压缩包是仅有的最终交付文件，不再单独生成报告 ZIP。可直接打开服务端工作目录或任一解压后交付包中的 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。LGZ 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
-
-为避免校验值引用包含自身的压缩包，报告记录嵌入 `report/` 之前的 App 数据载荷校验值。两个最终压缩包完成后，`run_all.sh` 会明确打印其路径、大小、SHA-256、用途和本地报告路径；同一摘要也写入 `logs/run_all.log`。
-
-复制或解压整个 `report/` 后，可在原工作目录不可访问、网络断开的情况下重新生成：
-
-```bash
-python3 /path/to/report/render_report.py
-```
-
-生成器只读取报告目录内的记录，不重新计算比对或修复。报告不携带原始 FASTA/reads；未测量的质量指标不显示为零。报告中的 gap 统计指连续至少 100 个 N，显式连接 gap 与 N 碱基总数分别记录。当前自动报告覆盖 `prepare.sh` 和 `run_all.sh`；单独执行增量脚本或打包脚本不会更新此前的运行报告。详见 [报告格式与边界](server/REPORT.md)。
+LGZ 过程报告会保留失败、中断、未执行阶段及显式缓存记录，历史在 `.runtime/history/reports/`；完整日志在 `.runtime/logs/run_all.log`。其独立报告目录可复制后运行 `python3 /path/to/report/render_report.py` 离线重建，详见[报告格式与边界](server/REPORT.md)。精修报告使用自己的全部原始 gap 分母，不用 LGZ 过程报告的 ≥100 N 统计阈值替代；上游交互 HTML 的离线验收仍待完成。参数保存/替换、固定版本、逐工具读取策略、真实最终路径和迁移命令见[精修使用指南](server/REFINEMENT_zh.md)。
 
 首次 `run.sh` 会自动准备并运行完整流程；恢复时重复原命令，或仅指定 `-o`。原有 `prepare.sh` 和生成的 `run_all.sh` 仍兼容。旧作业停止后，可用 `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` 调整线程预算，也可修改 `--lgz-qc-memory-gb`。已完成且校验有效的工作会复用；省略资源参数时沿用上次生效值。恢复前需申请相应调度资源，这些参数不会在线调整正在运行的作业。生成的 `run_all.sh` 会继承已保存的预算，但不新增资源参数入口；仍不支持 `--from`、`--until` 或 `--stage` 覆盖。
 
 ```bash
-tail -F ./gpm_server/logs/progress.log
+tail -F ./gpm_server/.runtime/logs/progress.log
 ```
 
-runner 默认输出精简进度，`logs/progress.log` 保存相同的纯文本展示，
-`logs/run_all.log` 保留完整诊断。自动颜色仅用于交互输出，Slurm 日志保持纯文本。
+runner 默认输出精简进度，`.runtime/logs/progress.log` 保存相同的纯文本展示，
+`.runtime/logs/run_all.log` 保留完整诊断。自动颜色仅用于交互输出，Slurm 日志保持纯文本。
 可用只读查看器彩色监控；加 `--detailed` 切换为完整日志：
 
 ```bash

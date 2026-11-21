@@ -4,7 +4,9 @@
 
 The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
 
-Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; output paths, data schemas and persisted stage IDs are unchanged. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md).
+Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; these naming aliases preserve persisted LGZ stage IDs. The separate numbered-layout and refinement-package changes are described below. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md).
+
+> **Feature-branch source**: see the [refinement guide](REFINEMENT.md) for four post-LGZ engines, numbered workspaces, legacy migration and refined App packages. The v2.0.21 download below installs the published release, not these additions awaiting final validation.
 
 ## Quick start
 
@@ -49,7 +51,7 @@ bash "$SERVER/run.sh" \
   -o ./gpm_server
 ```
 
-A successful run ends with an explicit `Final delivery packages` summary. The only
+The published v2.0.21 downloaded above ends with a `Final delivery packages` summary. Its legacy-layout
 delivery files are `gpm_server.tar.gz` (Full: FASTA + report) and
 `gpm_server.light.tar.gz` (Light: FASTA omitted, report included). Both contain the complete
 `gpm_server/report/` directory; no separate report ZIP is created. The local report
@@ -269,9 +271,9 @@ visible. Per-chromosome copy/parse timings and cache hashes stay in the detailed
 A quiet running unit emits a heartbeat after 60 seconds; progress is append-only,
 not a terminal animation. Unknown child output is retained rather than guessed away.
 
-- `logs/progress.log`: compact, plain-text progress; appended across invocations.
-- `logs/run_all.log`: full timestamp/run-ID/event diagnostics, including performance metrics.
-- `report/report.html`: unchanged report schema and data source. Original events and
+- `.runtime/logs/progress.log`: compact, plain-text progress; appended across invocations.
+- `.runtime/logs/run_all.log`: full timestamp/run-ID/event diagnostics, including performance metrics.
+- `06_report/01_lgz/report.html`: unchanged report schema and data source. Original events and
   child output reach reporting/cache detection before presentation filtering. The
   existing bounded report output tail is retained; the full log remains authoritative.
 
@@ -283,7 +285,7 @@ python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --follow
 # Read full diagnostics instead.
 python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --detailed --follow
 # Plain-text viewing works without the viewer.
-tail -F ./gpm_server/logs/progress.log
+tail -F ./gpm_server/.runtime/logs/progress.log
 ```
 
 Colors apply only to displayed status labels. Auto mode colors interactive terminals,
@@ -322,7 +324,7 @@ The installed minimap2 binary and CGAT's alignment defaults are unchanged.
 | File | Purpose | When to run it |
 | --- | --- | --- |
 | `install.sh` | Create, update, and verify the `cgat-server` environment | First installation or dependency updates |
-| `update.sh` | Check and update Server tools, bound skills, and project `.prepare_lib/` runtime | Routine maintenance and workspace runtime alignment |
+| `update.sh` | Check and update Server tools, bound skills, and project `.runtime/prepared/` runtime | Routine maintenance and workspace runtime alignment |
 | `env.sh` | Compatibility entry for `install.sh` | Only for existing commands |
 | `run.sh` | Prepare and execute the full workflow, or resume an existing workspace | First run or recovery |
 | `prepare.sh` | Compatibility entry for preparation only | When separate script generation is needed |
@@ -330,7 +332,7 @@ The installed minimap2 binary and CGAT's alignment defaults are unchanged.
 
 Rerun the same `run.sh` command, or use `bash "$SERVER/run.sh" -o ./gpm_server` to resume with validated results reused. The generated `run_all.sh` remains directly executable. After stopping the previous job, change the thread budget with `bash "$SERVER/run.sh" -o ./gpm_server --threads 64`; `--lgz-qc-memory-gb` may also be adjusted. Omitted budgets retain their last values, including when using `run_all.sh` directly. Request matching scheduler resources first; this does not resize a live job. Resource changes do not alter analysis settings or invalidate otherwise valid completed work.
 
-On compute nodes where update sources are unreachable, startup verifies the local installation and aligns `.prepare_lib` without downloading. Detailed failed checks are saved in `.run_all/update-check.log`; offline startup does not imply that the local version is the latest.
+On compute nodes where update sources are unreachable, startup verifies the local installation and aligns `.runtime/prepared` without downloading. Detailed failed checks are saved in `.runtime/run_all/update-check.log`; offline startup does not imply that the local version is the latest.
 
 `--max-fill <bp>` sets the length limit for both Step2 optimized refill rounds (default: `1000000`). Change it with `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.
 
@@ -440,7 +442,7 @@ The internal v1 merge gap is provisionally 200 bp, pending real-data acceptance.
 A missing signal is not evidence that the assembly has no centromere.
 
 Prepare freezes sequences, thresholds, all source IDs, SHA-256 and notes into
-`tel/`, `cen/` and `metadata/annotation_library_snapshot.json`. Resume uses only
+`03_lgz/06_annotations/tel/`, `03_lgz/06_annotations/cen/` and `.runtime/metadata/annotation_library_snapshot.json`. Resume uses only
 those verified project inputs. Updating installed tools/libraries does not opt an
 existing project into a new library; explicitly prepare again, preferably into a
 new output directory, to adopt it. Full delivery includes the frozen annotation
@@ -451,6 +453,11 @@ not a claim of genome-wide biological or native-window acceptance. See `library/
 for source records and evidence limits.
 
 ## DEGAP2.0 in the shared Server environment
+
+The manual App `DEGAP-JOBS` collection workflow below describes the released
+legacy-layout protocol. Its collector still needs numbered-workspace adaptation;
+do not point it at a new numbered workspace. This is separate from automatic
+post-LGZ refinement and importing that tool's new App delivery package.
 
 GPM v2.0.20 includes the pinned DEGAP2.0 Server runtime and the matching App
 task-card workflow described below. Update both Server and App to use this workflow.
@@ -509,45 +516,15 @@ Its `SOURCE.json` records the upstream revision and per-file SHA-256 hashes.
 
 Pinned-runtime limitation: GapFiller requires a maximum round count of at least 1 (or unset); zero-round TelSeeker is supported. The wrapper rejects zero-round GapFiller explicitly instead of silently changing its parameters.
 
-### Automatic post-LGZ gap filling
+### Automatic post-LGZ refinement (current source)
 
-For **new workspaces**, use `--hifi /path/to/hifi.fastq.gz` and/or
-`--ont /path/to/ont.fastq.gz`, matching the native DEGAP interface. Each flag accepts
-multiple files and can be repeated; supplying both enables mixed HiFi/ONT input.
-The same file cannot be assigned to both technologies. For example:
+With `--hifi` and/or `--ont`, `run_all.sh` runs DEGAP after LGZ by default; no reads means LGZ only. A completed numbered LGZ-only workspace can append reads in place without rerunning valid LGZ/reference work.
 
 ```bash
-bash "$SERVER/run.sh" --ref ref.fa --ds assembly.fa \
-  --hifi hifi_1.fastq.gz hifi_2.fastq.gz --ont ont.fastq.gz -o new_workspace
+bash ./gpm_server/run_all.sh --hifi /reads/hifi.fq.gz --ont /reads/ont.fq.gz
+bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapcloser
 ```
 
-Preparation checks DEGAP executables and Python imports
-before reference mapping. Activate the shared Server environment first; the
-pinned native job writer requires workspace/runtime/reads paths without spaces or
-shell metacharacters. These reads no longer trigger Meryl/Merqury/CRAQ, q0
-quality exclusion, or reads-based donor ranking. `--reads`, `--reads-type`, and
-`--reads-qc` are rejected for new preparations. Existing workspaces retain their
-saved QC or earlier post-LGZ recipe when resumed; do not rename saved arguments.
-Updating code does not insert a new stage into an old plan.
+The four engines run sequentially and independently from the same LGZ baseline. `--gapfill-tools none` disables only this invocation; no `--final-tool` is needed. See the [full guide](REFINEMENT.md) for read allocation, exact pins/disclosed patches, saved-setting replacement and recovery boundaries. Unnumbered old workspaces need explicit migration first; do not re-prepare them or delete valid results.
 
-After LGZ Step3, the bundled DEGAP AutoGapfiller runs with one gap worker within
-the thread budget. Only remaining **internal N gaps** are eligible; no telomere
-extension. Original `grt/q/q3.fa` and App Final Path remain unchanged. The separate
-`data/degap/post_lgz.fa` contains accepted bridges plus all untouched LGZ bases.
-`metadata/degap_gapfill.json` records every gap decision in original LGZ coordinates.
-Full deliveries include both; light deliveries keep the decision report only.
-The App still displays its original LGZ Final Path, not this additional FASTA.
-
-An engine success is not automatically accepted: a proposal must identify an
-original maximal N run, retain both non-N flanks exactly (case-insensitive), and
-supply a positive-length A/C/G/T bridge. Partial, ambiguous, overlapping-flank
-changes and terminal gaps remain unchanged with a reason recorded. These checks
-are conservative structural checks, **not independent biological validation**;
-valid overlap-only joins may therefore remain unaccepted. The native engine skips
-gaps shorter than 20 bp and merges nearby gaps; this first integration does not
-automatically admit merged replacements that span existing non-N sequence. Reads, LGZ inputs,
-bundled code and output content bind the completed-stage cache. Failed native
-attempts remain under `degap/attempts/` for diagnosis; a retry starts a fresh
-native attempt rather than trusting incomplete results. No-gap tasks skip native
-execution. The native engine still has its own whole-genome memory/I/O costs;
-this integration does not claim a wheat runtime speedup.
+Start at `06_report/report.html`. `05_final/00_lgz` is explicitly unrefined; admitted tool results use `05_final/01_degap`, `02_tgsgapcloser`, `03_quartet` and `04_lrgapcloser`, with corresponding archives under `07_delivery/<tool-directory>/`. Import a tool's package with the matching new App: its Final Path and exported FASTA describe that accepted refinement, not an extra FASTA beside an unchanged LGZ view. Real four-engine/two-architecture and A01–A18 acceptance remains pending; these changes do not promise biological accuracy or runtime gains.
