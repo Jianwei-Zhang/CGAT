@@ -1,0 +1,123 @@
+{
+  "status": "isolated_regional_pilot_complete",
+  "sites": [
+    {
+      "core_start": 0,
+      "target_bp": 3378269,
+      "mapper_seconds": 0.6720329159870744,
+      "raw_rows": 103,
+      "completed_cross_exact_paired_bp": 99999,
+      "retained_exact_paired_bp": 99999,
+      "retention": 1.0,
+      "query_scope": "matched_site_control",
+      "qualified_cross_core_covered_bp": 99999,
+      "qualified_within_core_covered_bp": 31347,
+      "raw_paf_sha256": "282bc9f5e06228856916b7ce8e81819209093d465b6d9feeda38dba3a10180ce",
+      "regional_baseline_min100": {
+        "exact_paired_bp": 514788,
+        "retained_exact_paired_bp": 366591,
+        "source_strand_pairs": 54,
+        "retained_source_strand_pairs": 24
+      },
+      "regional_baseline_min10000": {
+        "exact_paired_bp": 99999,
+        "retained_exact_paired_bp": 99999,
+        "source_strand_pairs": 1,
+        "retained_source_strand_pairs": 1
+      }
+    },
+    {
+      "core_start": 145000000,
+      "target_bp": 3299084,
+      "mapper_seconds": 1.4218467073515058,
+      "raw_rows": 158,
+      "completed_cross_exact_paired_bp": 100000,
+      "retained_exact_paired_bp": 100000,
+      "retention": 1.0,
+      "query_scope": "matched_site_control",
+      "qualified_cross_core_covered_bp": 100000,
+      "qualified_within_core_covered_bp": 23810,
+      "raw_paf_sha256": "d0191050a7c45884f527026973f59b5d4598a9829db0f85457cfc04055078a8b",
+      "regional_baseline_min100": {
+        "exact_paired_bp": 390067,
+        "retained_exact_paired_bp": 295474,
+        "source_strand_pairs": 45,
+        "retained_source_strand_pairs": 30
+      },
+      "regional_baseline_min10000": {
+        "exact_paired_bp": 157355,
+        "retained_exact_paired_bp": 157355,
+        "source_strand_pairs": 6,
+        "retained_source_strand_pairs": 6
+      }
+    },
+    {
+      "core_start": 289000000,
+      "target_bp": 3183945,
+      "mapper_seconds": 0.4208114752545953,
+      "raw_rows": 16,
+      "completed_cross_exact_paired_bp": 100000,
+      "retained_exact_paired_bp": 100000,
+      "retention": 1.0,
+      "query_scope": "matched_site_control",
+      "qualified_cross_core_covered_bp": 100000,
+      "qualified_within_core_covered_bp": 0,
+      "raw_paf_sha256": "05d8a6a298aa3500e7f8fbba5da6d4d400e0ca802bbca0d40803f5d4c8d4c407",
+      "regional_baseline_min100": {
+        "exact_paired_bp": 163639,
+        "retained_exact_paired_bp": 110054,
+        "source_strand_pairs": 34,
+        "retained_source_strand_pairs": 2
+      },
+      "regional_baseline_min10000": {
+        "exact_paired_bp": 110054,
+        "retained_exact_paired_bp": 110054,
+        "source_strand_pairs": 2,
+        "retained_source_strand_pairs": 2
+      }
+    }
+  ],
+  "metadata_sha256": {
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-part-lookup-20261121-1600/source-part-lookup.json": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-part-lookup-20261121-1600/receipt.json": "76de0eb08038025bb2d63e8f03a87b6f66da5b1c4d3ad71f4258728d739803b1",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-target-scope-20261121/local-target-plan.json": "4cfee244371cc2e6d5862d9b20a2ccb7f149bd13e2ac1c3ec95ea033f1b000f6",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-target-scope-20261121/summary.json": "a97caca3efeb82190a7dd426cf4cd89836fce4bb96729a736e32eeabce8db014",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-existing-cross-coverage-20261121-v2/summary.json": "f9119227f6882704f23aea1b28d76ab6b2b0fa536bebc7c40d4682e531f063cd",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/data/datasets/JM19_hifiasm.fa.fai": "78f5a9a776fc6a9d2a89fcb4ffc75bad099669e646f2d1baa7c2c4a098921891",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/data/datasets/JM19_flye_ABD.fa.fai": "cf005c2c1435e4c77910557f47b8cf7dcf31bb2d25a1191f16b731b0237a95df",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/metadata/datasets.tsv": "4919e13e102105ce9de9733d7c0787ecc34dfc5641b82b90d541ee24ff2e5057",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_1A/q0_alignment_inputs.json": "0cf163bc8d622bdf0d58b8f66b950e5cc4bf9f0b4bafb5ae24e2c38f209e1e62",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_1B/q0_alignment_inputs.json": "9aae2bf1e13c54c1050e731ee014c4b587c41fd994bddee2f7679f7881950c62",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_1D/q0_alignment_inputs.json": "89ca29c2a9f9687c6fdc751b1a4b8925f29f1180ec5a305fb498bff41aa7b406",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_2A/q0_alignment_inputs.json": "7e2cf85e295e07f8c19a72ac779e1496723aabfa870cc569766a7540516ff5d1",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_2B/q0_alignment_inputs.json": "cd70ad630648104eef9249bd6a795e27d47f6976ca08821ace5c84383e2bfb73",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_2D/q0_alignment_inputs.json": "12dedf29e796dcaa2bf0d9bb6ea01ae3147c468aaafd210360876a58d9551d1f",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_3A/q0_alignment_inputs.json": "7839ceec4cb59361b669a508e5838a4f0fc3d0826385d62cbecb58b3b602e2a6",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_3B/q0_alignment_inputs.json": "8af763e5d4c62ae48045d3f193ebd3a0f4d2c7b076ff65895e8773809bc30167",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_3D/q0_alignment_inputs.json": "a5bca59dde11d11aa5ea26253b7e18f063bcf812615940076a9923b17d27e2b2",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_4A/q0_alignment_inputs.json": "de5f9db596da4200982171af8e05f6178414c3f8209a4e7de84dcf604c8d29fc",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_4B/q0_alignment_inputs.json": "c4eadf68befb618b8dcfae036dd4aedbbbda74f67583820166ead81904482dcb",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_4D/q0_alignment_inputs.json": "83e290409e9d8ddfcb090550cfa95531abde1bed73d3f50fe09abfafa962a6b3",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_5A/q0_alignment_inputs.json": "c41f7b70050c55342abebe1de83449f93b80626c4145d4e2d2e9e64bb191b8dc",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_5B/q0_alignment_inputs.json": "124bacad8f16c0aad315efcf2fb4e6b1c5065b8ee65bf016148a14cfd1314c90",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_5D/q0_alignment_inputs.json": "819ac3e0f596c7ffcb47010405a584267100f14f1fd7f32266c4e29d8611ba1d",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_6A/q0_alignment_inputs.json": "7f9b006a81ea4d1e7c8fa4214ac2f8f8f37096c795839e25f807c08e7a9614c8",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_6B/q0_alignment_inputs.json": "ece89584600dd9215ceea08892ecd07f8c3076cc9a726525cc8f79d69525984d",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_6D/q0_alignment_inputs.json": "7f755fbed0f571049f96e6305c19dfb8374aea7dc957af98aa0f3e9e2a43a4b9",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_7A/q0_alignment_inputs.json": "aa637cafa20cb558af29daeaf9325bf97ec84fbba34203ecdc27c3d8842f29ba",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_7B/q0_alignment_inputs.json": "7b6280ad806068b52d6e0560b9d537af36ba460e37e39912bbe9afa600c0a13b",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_7D/q0_alignment_inputs.json": "4c15972994e295be37508dd0d4ed7614815ef2b3444573e2b40141602f0e1649",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/runs/chr_Un/q0_alignment_inputs.json": "de111f6a8c87e86edfe7d94a807696f2c7d68b104675783ba9f69a2ad42625bd",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-target-pilot-20261121/summary.json": "ecb8627f27b3b5b07501ed2ef4320fe8b81bfd7e5233f378c9a96fcbb1f447a6",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-target-pilot-20261121/site-0/inputs.json": "a91eef6723872049562f2bc72348d621170156cbf532c6dcf424ca94a73bcc98",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-target-pilot-20261121/site-1/inputs.json": "8fd3721f1edcdee29de46c4413c556a33af9f78a94978e67d0af74d9f3f1b2ba",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-target-pilot-20261121/site-2/inputs.json": "ba3e0c5ec3af8cb033754a2b668ecd5728c98f802fc5b467f08e1fc5205d38b3"
+  },
+  "tool_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+  "main_modified": false,
+  "scientific_acceptance": false,
+  "source_whole_content_revalidated": false,
+  "secondary_cap": null,
+  "min_chain_score": 2000,
+  "limitations": "three explicitly scoped cores; residual cores have no baseline retention ratio; new coverage is not uniqueness or final biological accuracy; not all global alternatives; raw window MAPQ not whole-source confidence"
+}

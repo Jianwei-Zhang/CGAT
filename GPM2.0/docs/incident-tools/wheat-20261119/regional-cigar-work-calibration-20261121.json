@@ -1,0 +1,138 @@
+{
+  "status": "read_only_cigar_work_calibration",
+  "sites": [
+    {
+      "role": "control",
+      "core_start": 0,
+      "chains": 727,
+      "all_span_product": 20327269111,
+      "weak_chain_span_product": {
+        "1000": {
+          "chains": 161,
+          "span_product": 2509615085
+        },
+        "5000": {
+          "chains": 39,
+          "span_product": 1896067884
+        },
+        "10000": {
+          "chains": 1,
+          "span_product": 194128489
+        }
+      },
+      "chaining_seconds": 0.9759169016033411
+    },
+    {
+      "role": "control",
+      "core_start": 145000000,
+      "chains": 1160,
+      "all_span_product": 28922063874,
+      "weak_chain_span_product": {
+        "1000": {
+          "chains": 287,
+          "span_product": 3132028850
+        },
+        "5000": {
+          "chains": 21,
+          "span_product": 1455424922
+        },
+        "10000": {
+          "chains": 2,
+          "span_product": 333339235
+        }
+      },
+      "chaining_seconds": 0.6800710707902908
+    },
+    {
+      "role": "control",
+      "core_start": 289000000,
+      "chains": 1332,
+      "all_span_product": 20949519742,
+      "weak_chain_span_product": {
+        "1000": {
+          "chains": 338,
+          "span_product": 4223120158
+        },
+        "5000": {
+          "chains": 45,
+          "span_product": 2948446410
+        },
+        "10000": {
+          "chains": 5,
+          "span_product": 900242399
+        }
+      },
+      "chaining_seconds": 0.42615538742393255
+    },
+    {
+      "role": "residual",
+      "core_start": 51382261,
+      "chains": 12058,
+      "all_span_product": 224131831880,
+      "weak_chain_span_product": {
+        "1000": {
+          "chains": 7119,
+          "span_product": 220948050217
+        },
+        "5000": {
+          "chains": 1767,
+          "span_product": 187777928865
+        },
+        "10000": {
+          "chains": 236,
+          "span_product": 84538593718
+        }
+      },
+      "chaining_seconds": 1.0041903359815478
+    },
+    {
+      "role": "residual",
+      "core_start": 160451708,
+      "chains": 5230,
+      "all_span_product": 47061783597,
+      "weak_chain_span_product": {
+        "1000": {
+          "chains": 2123,
+          "span_product": 18856486820
+        },
+        "5000": {
+          "chains": 175,
+          "span_product": 8444270854
+        },
+        "10000": {
+          "chains": 11,
+          "span_product": 1763421791
+        }
+      },
+      "chaining_seconds": 1.2210828959941864
+    },
+    {
+      "role": "residual",
+      "core_start": 160343284,
+      "chains": 2817,
+      "all_span_product": 39527103899,
+      "weak_chain_span_product": {
+        "1000": {
+          "chains": 1329,
+          "span_product": 14091272945
+        },
+        "5000": {
+          "chains": 167,
+          "span_product": 7543090029
+        },
+        "10000": {
+          "chains": 8,
+          "span_product": 1061401500
+        }
+      },
+      "chaining_seconds": 0.7697462299838662
+    }
+  ],
+  "inputs": {
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-target-pilot-20261121/summary.json": "ecb8627f27b3b5b07501ed2ef4320fe8b81bfd7e5233f378c9a96fcbb1f447a6",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-score2000-pilot-20261121/residual/summary.json": "2224c3cc0cf9c8a68c9c2cadec913cfe549e63ff1edd956e5814ed4884eca480"
+  },
+  "scientific_acceptance": false,
+  "production_policy_changed": false,
+  "limitations": "span product is a cost proxy, not measured DP cells; seed score density is not base identity; approximate PAF never serves as paired evidence"
+}

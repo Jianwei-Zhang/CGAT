@@ -1,0 +1,11 @@
+{
+  "scope": "first true residual core input bytes only; no incomplete PAF accepted",
+  "query_and_target_fasta_sha256_equal": true,
+  "input_sha256": {
+    "query.fa": "e64a928a0180ba72b4ecb533c824019a97cd1a8d8801710523f78fd07b1d1eae",
+    "target.fa": "07b5097c8ed55a98e1c8f80d621591c6da01ca6c471c0f20f588d738dc840a3a"
+  },
+  "tool_sha256_equal": true,
+  "old_complete_cigar_result": false,
+  "new_score2000_complete_cigar_result": true
+}

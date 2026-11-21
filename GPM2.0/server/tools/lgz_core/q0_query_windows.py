@@ -56,7 +56,11 @@ class QueryWindow:
 
     @cached_property
     def window_id(self) -> str:
-        return stable_id("q0-query-window", asdict(self))
+        # The mapper sees context sequence, not which missing core requested it.
+        # Core-selection changes belong to the projection receipt and must not
+        # force an unchanged complete raw alignment to run again.
+        return stable_id("q0-query-window", {"segment_id": self.segment_id,
+            "segment_length": self.segment_length, "start": self.start, "end": self.end})
 
     @cached_property
     def core_ends(self) -> tuple[int, ...]:
@@ -116,7 +120,18 @@ def plan_query_windows(lengths: Mapping[str, int], uncovered: Mapping[str, Itera
                     result.append(QueryWindow(key, length,
                         max(0, cores[0][0] - policy.context_bases),
                         min(length, cores[-1][1] + policy.context_bases), tuple(cores)))
-    return tuple(result)
+    # Large clipped contexts can be identical for neighboring tiles. Give the
+    # mapper one header/sequence and retain the union of all requested cores.
+    contexts = {}
+    for window in result:
+        key = (window.segment_id, window.segment_length, window.start, window.end)
+        previous = contexts.get(key)
+        if previous is None:
+            contexts[key] = window
+        else:
+            cores = merged_intervals(Interval(*row) for row in (*previous.cores, *window.cores))
+            contexts[key] = QueryWindow(*key, tuple((i.start, i.end) for i in cores))
+    return tuple(contexts.values())
 
 
 def project_window_paf(line: str, windows: Mapping[str, QueryWindow],
@@ -158,4 +173,62 @@ def project_window_paf(line: str, windows: Mapping[str, QueryWindow],
     fields.append("qw:Z:" + window.window_id)
     result = "\t".join(fields)
     parse_paf_line(result, artifact=artifact + ".projected", line_number=line_number)
+    return result
+
+
+@dataclass(frozen=True)
+class TargetWindow:
+    """Segment-relative target context, with an identity distinct from queries."""
+    segment_id: str
+    segment_length: int
+    start: int
+    end: int
+
+    def __post_init__(self):
+        QueryWindow(self.segment_id, self.segment_length, self.start, self.end,
+                    ((self.start, self.end),))
+
+    @cached_property
+    def window_id(self) -> str:
+        return stable_id("q0-target-window", asdict(self))
+
+    @property
+    def length(self) -> int:
+        return self.end-self.start
+
+    def record(self) -> dict:
+        return {"window_id": self.window_id, **asdict(self)}
+
+
+def project_regional_paf(line: str, queries: Mapping[str, QueryWindow],
+                         targets: Mapping[str, TargetWindow], *, artifact: str,
+                         line_number: int) -> str | None:
+    """Project both sides without promoting local confidence to whole sources.
+
+    Raw output, both window inventories and source-content bindings must be
+    retained separately by the caller. Same-segment hits are excluded even if
+    different window names would bypass mapper self-name suppression. Split
+    segments retain their separate immutable IDs and admission applies their
+    original source offsets, exactly as for ordinary supplemental evidence.
+    """
+    hit = parse_paf_line(line, artifact=artifact, line_number=line_number)
+    query, target = queries.get(hit.query_name), targets.get(hit.target_name)
+    if (query is None or target is None or query.window_id != hit.query_name
+            or target.window_id != hit.target_name or hit.query_length != query.length
+            or hit.target_length != target.length):
+        raise Q0EvidenceError("regional PAF input identity or length changed")
+    if any(tag.startswith(("qw:", "tw:")) for tag in hit.tags):
+        raise Q0EvidenceError("raw regional PAF already carries a projection marker")
+    if query.segment_id == target.segment_id:
+        return None
+    projected = project_window_paf(line, {query.window_id: query}, {target.window_id: target.length},
+                                   artifact=artifact, line_number=line_number)
+    if projected is None:
+        return None
+    fields = projected.split("\t")
+    fields[5:9] = [target.segment_id, str(target.segment_length),
+                   str(hit.target.start+target.start), str(hit.target.end+target.start)]
+    fields.append("tw:Z:"+target.window_id)
+    result = "\t".join(fields)
+    parse_paf_line(result, artifact=artifact+".regional_projected", line_number=line_number)
     return result

@@ -5,7 +5,10 @@ from bisect import bisect_right
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Callable, Iterable, Mapping, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .q0_regional_index import RegionalIndex
 
 from .common import stable_id
 from .q0_alignments import PafAlignment, read_paf
@@ -60,6 +63,44 @@ class _IntervalUnion:
         return iter(self._merged)
 
 
+class ObservedSourcePairs(set):
+    """Observed relations plus exact cross-source coverage for work selection.
+
+    This does not imply uniqueness, placement or exhaustive alternatives. Only
+    callers that have verified a complete PAF may supply hits. Ordinary set
+    semantics are retained for existing missing-neighbor consumers.
+    """
+    def __init__(self, source_lengths: Mapping[SourceKey, int]):
+        super().__init__()
+        if any(not isinstance(key, SourceKey) or type(length) is not int or length < 1
+               for key, length in source_lengths.items()):
+            raise Q0EvidenceError("invalid observed source inventory")
+        self.source_lengths = dict(source_lengths)
+        self.cross_coverage: dict[SourceKey, _IntervalUnion] = {}
+
+    def observe_alignment(self, hit: PafAlignment, query: SourceKey, target: SourceKey,
+                          *, query_offset: int = 0, target_offset: int = 0) -> None:
+        if (type(query_offset) is not int or type(target_offset) is not int
+                or min(query_offset, target_offset) < 0
+                or query not in self.source_lengths or target not in self.source_lengths
+                or query_offset+hit.query_length > self.source_lengths[query]
+                or target_offset+hit.target_length > self.source_lengths[target]):
+            raise Q0EvidenceError("observed source coverage exceeds its bound inputs")
+        qualify = (query.dataset != target.dataset and hit.matches/hit.block_length >= .95
+                   and sum(n for n, op in hit.cigar if op in "M=") >= 100)
+        paired = False
+        for block in hit.aligned_blocks():
+            paired = True
+            if qualify and block.operation != "X":
+                for source, interval, offset in ((query,block.query,query_offset), (target,block.target,target_offset)):
+                    union = self.cross_coverage.get(source)
+                    if union is None:
+                        union = self.cross_coverage[source] = _IntervalUnion()
+                    union.append(Interval(interval.start+offset, interval.end+offset))
+        if paired:
+            self.add(tuple(sorted((query,target))))
+
+
 def interval_rows(intervals: Iterable[Interval]) -> list[list[int]]:
     return [[i.start, i.end] for i in merged_intervals(intervals)]
 
@@ -74,6 +115,8 @@ class CandidateCatalog:
     payload: dict
     sequences: Mapping[SourceKey, str]
     parts: dict[str, SourceSegment]
+    regional_index_path: Path | None = None
+    regional_index_report: dict | None = None
 
     def sequence(self, segment_id: str) -> str:
         part = self.parts[segment_id]
@@ -97,7 +140,8 @@ class CandidateCatalog:
 
 def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                   reference_lengths: Mapping[str, int],
-                  assignments: Iterable[dict[str, str]], *, min_gap: int = 100) -> CandidateCatalog:
+                  assignments: Iterable[dict[str, str]], *, min_gap: int = 100,
+                  regional_factory: Callable[[Mapping[str, SourceSegment], Mapping[str, int]], RegionalIndex] | None = None) -> CandidateCatalog:
     if type(min_gap) is not int or min_gap < 1:
         raise Q0EvidenceError("q0 minimum gap must be a positive integer")
     grouped = {(row["dataset_name"], row["seq_name"], row["assigned_chr_name"])
@@ -126,48 +170,63 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
     lengths_by_dataset: dict[str, dict[str, int]] = defaultdict(dict)
     for key, sequence in sequences.items():
         lengths_by_dataset[key.dataset][key.contig] = len(sequence)
-    for dataset, lengths in sorted(lengths_by_dataset.items()):
-        relative = f"runs/{dataset}_vs_ref/result.paf"
-        for hit in read_paf(root / relative, query_lengths=lengths,
-                            target_lengths=reference_lengths, artifact=relative):
-            key = SourceKey(dataset, hit.query_name)
-            if key not in by_source:
-                continue
-            source_parts, ends = by_source[key]
-            used = False
-            for block in hit.aligned_blocks():
-                offset = bisect_right(ends, block.query.start)
-                while offset < len(source_parts) and source_parts[offset].interval.start < block.query.end:
-                    part = source_parts[offset]
-                    offset += 1
-                    overlap = part.interval.intersection(block.query)
-                    if overlap is None:
-                        continue
-                    if hit.strand == "+":
-                        target = Interval(block.target.start + overlap.start - block.query.start,
-                                          block.target.start + overlap.end - block.query.start)
-                    else:
-                        target = Interval(block.target.start + block.query.end - overlap.end,
-                                          block.target.start + block.query.end - overlap.start)
-                    identity = (part.segment_id, hit.target_name, hit.strand)
-                    row = accumulated.get(identity)
-                    if row is None:
-                        row = {"query": _IntervalUnion(), "target": _IntervalUnion(),
-                               "evidence": set(), "maximum_mapq": None, "discovery_query": _IntervalUnion()}
-                        accumulated[identity] = row
-                    row["query"].append(overlap)
-                    row["target"].append(target)
-                    if (block.operation != "X" and hit.mapping_quality is not None
-                            and hit.mapping_quality >= DISCOVERY_REFERENCE_MAPQ
-                            and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
-                        row["discovery_query"].append(overlap)
-                    row["evidence"].add(hit.evidence_id)
-                    if (hit.mapping_quality is not None
-                            and (row["maximum_mapq"] is None or hit.mapping_quality > row["maximum_mapq"])):
-                        row["maximum_mapq"] = hit.mapping_quality
-                    used = True
-            if used:
-                payload["evidence"][hit.evidence_id] = evidence_ref(hit)
+    # Optional routing index is fed in the same validated reference scan. Its
+    # grid/hulls never enter candidate coverage or scientific evidence payload.
+    routing = regional_factory(parts, reference_lengths) if regional_factory else None
+    routing_report = None
+    try:
+        for dataset, lengths in sorted(lengths_by_dataset.items()):
+            relative = f"runs/{dataset}_vs_ref/result.paf"
+            for hit in read_paf(root / relative, query_lengths=lengths,
+                                target_lengths=reference_lengths, artifact=relative):
+                key = SourceKey(dataset, hit.query_name)
+                if key not in by_source:
+                    continue
+                source_parts, ends = by_source[key]
+                used = False
+                for block in hit.aligned_blocks():
+                    offset = bisect_right(ends, block.query.start)
+                    while offset < len(source_parts) and source_parts[offset].interval.start < block.query.end:
+                        part = source_parts[offset]
+                        offset += 1
+                        overlap = part.interval.intersection(block.query)
+                        if overlap is None:
+                            continue
+                        if hit.strand == "+":
+                            target = Interval(block.target.start + overlap.start - block.query.start,
+                                              block.target.start + overlap.end - block.query.start)
+                        else:
+                            target = Interval(block.target.start + block.query.end - overlap.end,
+                                              block.target.start + block.query.end - overlap.start)
+                        if (routing is not None and not routing.sealed and block.operation != "X"
+                                and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
+                            routing.observe(part.segment_id, hit.target_name,
+                                            Interval(overlap.start-part.interval.start, overlap.end-part.interval.start),
+                                            target, hit.strand)
+                        identity = (part.segment_id, hit.target_name, hit.strand)
+                        row = accumulated.get(identity)
+                        if row is None:
+                            row = {"query": _IntervalUnion(), "target": _IntervalUnion(),
+                                   "evidence": set(), "maximum_mapq": None, "discovery_query": _IntervalUnion()}
+                            accumulated[identity] = row
+                        row["query"].append(overlap)
+                        row["target"].append(target)
+                        if (block.operation != "X" and hit.mapping_quality is not None
+                                and hit.mapping_quality >= DISCOVERY_REFERENCE_MAPQ
+                                and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
+                            row["discovery_query"].append(overlap)
+                        row["evidence"].add(hit.evidence_id)
+                        if (hit.mapping_quality is not None
+                                and (row["maximum_mapq"] is None or hit.mapping_quality > row["maximum_mapq"])):
+                            row["maximum_mapq"] = hit.mapping_quality
+                        used = True
+                if used:
+                    payload["evidence"][hit.evidence_id] = evidence_ref(hit)
+        if routing is not None:
+            routing_report = routing.build_report() if routing.sealed else routing.seal()
+    finally:
+        if routing is not None:
+            routing.close()
     for (segment_id, chromosome, strand), row in sorted(accumulated.items()):
         part = parts[segment_id]
         payload["candidates"].append({
@@ -181,7 +240,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             "reference_evidence_ids": sorted(row["evidence"]), "pairwise_evidence_ids": [],
             "anchor_candidate_ids": [], "maximum_available_mapq": row["maximum_mapq"],
         })
-    catalog = CandidateCatalog(payload, sequences, parts)
+    catalog = CandidateCatalog(payload, sequences, parts, routing.path if routing else None, routing_report)
     catalog.finish()
     return catalog
 
@@ -291,20 +350,42 @@ def supplemental_groups(catalog: CandidateCatalog, assignments: Iterable[dict[st
     return tasks
 
 
-def partial_source_request(catalog: CandidateCatalog, *, minimum_uncovered_bp: int = 100) -> dict | None:
-    """Request evidence for poorly covered pieces of an already grouped source.
+def partial_source_intervals(catalog: CandidateCatalog, *, minimum_uncovered_bp: int = 100,
+                             observed: ObservedSourcePairs | None = None) -> dict[str, tuple[Interval, ...]]:
+    """Return segment-relative missing pieces, never hulls or accepted placements.
 
-    Whole source segments remain mapper context. This is a targeted subset of
-    queries against the anchored set, not unconditional genome all-versus-all.
-    The coarse coverage screen never authorizes placement or clipping.
+    With `observed`, already covered cross-source bases are excluded from new
+    discovery requests. This is an explicit recall/work-selection policy choice,
+    not proof that every possible alternative relationship was discovered.
     """
     from .q0_sources import subtract_intervals
-    coverage = defaultdict(list)
+    if type(minimum_uncovered_bp) is not int or minimum_uncovered_bp < 1:
+        raise Q0EvidenceError("invalid minimum uncovered interval")
+    coverage: dict[str, _IntervalUnion] = {}
     for candidate in catalog.payload["candidates"]:
         if candidate["placement_kind"] == "reference":
-            coverage[candidate["segment_id"]].extend(Interval(*i) for i in candidate["discovery_query_intervals"])
-    queries = [key for key, intervals in sorted(coverage.items())
-               if any(i.length >= minimum_uncovered_bp for i in subtract_intervals(catalog.parts[key].interval, intervals))]
+            key = candidate["segment_id"]
+            union = coverage.get(key)
+            if union is None:
+                union = coverage[key] = _IntervalUnion()
+            union.extend(Interval(*i) for i in candidate["discovery_query_intervals"])
+    result = {}
+    for key, intervals in sorted(coverage.items()):
+        part = catalog.parts[key]
+        if observed is not None:
+            if observed.source_lengths.get(part.source) != len(catalog.sequences[part.source]):
+                raise Q0EvidenceError("observed coverage source inventory changed")
+            intervals.extend(observed.cross_coverage.get(part.source, ()))
+        holes = tuple(Interval(i.start-part.interval.start, i.end-part.interval.start)
+                      for i in subtract_intervals(part.interval, intervals) if i.length >= minimum_uncovered_bp)
+        if holes:
+            result[key] = holes
+    return result
+
+
+def partial_source_request(catalog: CandidateCatalog, *, minimum_uncovered_bp: int = 100) -> dict | None:
+    """Request whole-source native context for the ordinary discovery path."""
+    queries = sorted(partial_source_intervals(catalog, minimum_uncovered_bp=minimum_uncovered_bp))
     anchors = sorted({row["segment_id"] for row in catalog.payload["candidates"]})
     if queries and len(anchors) > 1:
         return {"kind": "partial_source_discovery", "query_ids": queries, "target_ids": anchors,

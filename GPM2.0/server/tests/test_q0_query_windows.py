@@ -11,6 +11,19 @@ class QueryWindowTests(unittest.TestCase):
         return WindowPolicy(trigger_query_bases=1000, trigger_longest_bases=500,
                             core_bases=200, context_bases=10, minimum_uncovered_bases=5)
 
+    def test_raw_context_identity_does_not_depend_on_projection_cores(self):
+        first=QueryWindow("part",1000,100,200,((110,120),))
+        second=QueryWindow("part",1000,100,200,((180,190),))
+        self.assertEqual(first.window_id,second.window_id)
+        self.assertNotEqual(first.record(),second.record())
+        self.assertNotEqual(first.window_id,QueryWindow("part",1000,100,201,((110,120),)).window_id)
+
+    def test_identical_clipped_contexts_merge_cores_without_duplicate_headers(self):
+        windows=plan_query_windows({"part":1500},{"part":[Interval(0,1500)]},
+            policy=WindowPolicy(trigger_query_bases=1,core_bases=1000,context_bases=10000))
+        self.assertEqual(len(windows),1)
+        self.assertEqual((windows[0].start,windows[0].end,windows[0].cores),(0,1500,((0,1500),)))
+
     def test_small_requests_keep_native_path(self):
         self.assertIsNone(plan_query_windows({"a": 200}, {"a": [Interval(10, 20)]}, policy=self.policy()))
         self.assertIsNone(plan_query_windows({"a": 1000}, {"a": [Interval(10, 14)]}, policy=self.policy()))

@@ -2181,3 +2181,144 @@
 
 精确union与前述诊断提交50229c18已推送master（[skip ci]）；本节新脚本/摘要继续按任务文件
 定向提交，不触碰其他会话笔记/output，不发布Release、不update.sh、不替换整套runtime。
+
+## 2026-11-21 18:40 接续：真实残余区间已完成 CIGAR 试验，生产接入仍未开启
+
+本节替代前节“只测过已匹配core”的状态。OLD 42523432、NEW 42949582仍未改/重启；
+不是生产完成。所有新job都在隔离目录、同一x86工具环境；所有无CIGAR输出仅供诊断。
+
+### 真正孔洞与范围控制
+
+- 43007272，q0-residual-regional-pilot-20261121：17:44:27—17:45:15 FAILED。
+  选ptg000049l真实residual中的三个100kb core：51382261、160451708、160343284。
+  将source邻域±1Mb全部映射到参考，再加100kb参考上下文、桥接2Mb参考间隙，造成
+  447.6/517.8/538.0Mb target；触发100Mb试验输入预算，在启动mapper之前停止。
+  不是OOM、不是主任务失败，也不是把预算直接取消。scope摘要已归档。
+- 改为每个候选chr/strand分别选最近左右flank，保留相同距离的所有候选，不只选原分组。
+  一致方向且距离相容的flank才生成搜索包络；不一致flank仍分别保留，不强行连成大包络。
+  包络仅选择mapper输入，绝不是已覆盖区间或真实比对。query仍100kb+10kb上下文；
+  source anchor检索±1Mb，reference/target上下文10kb。范围缩到12,222,116 /
+  17,724,628 /15,844,054bp。三个区间分别有1组相容flank；另外9/13/12组不相容flank，
+  它们的独立搜索窗口保留，但不能将其解释为生物学邻接或唯一定位。
+- 43007279，q0-residual-nearest-pilot-20261121：17:57:44—18:03:32 FAILED，首个
+  native -P/-c mapper在300秒诊断预算后退出，peak748MiB。首个12.2Mb target索引仅0.88s，
+  mid_occ=337，之后未完成CIGAR；没有完整PAF可采纳。
+- 43007289，q0-regional-secondary100-pilot-20261121：18:07:21—18:12:50 FAILED。
+  去掉-P、显式-p0 -N100，原三个匹配控制样本完整通过，连>=100bp的regional精确配对
+  坐标也都保留，但第一个真正孔洞仍300秒预算失败。不要继续把-N当作这处瓶颈的解药。
+  完整control报告独立保留，未把缺失区间partial当基线；FAILED是该隔离job的终态。
+
+### 已用消融定位：昂贵的是弱链的碱基层延伸，不是找候选链
+
+- 43007294，q0-regional-chaining-diagnostic-20261121，18:14:41—18:14:44 SUCCEEDED。
+  相同第一孔洞query/target输入逐window序列SHA核验，相同2.31-r1302 cb7e8f22...二进制，
+  只拿掉-c并用1线程，完整chaining仅1.195s；approximate.paf=1,337,984 bytes。
+  这份PAF没有cg，永远不能进入q0 evidence或冒充完成的精确比对。
+- 43007318，q0-regional-chain-statistics-20261121，18:26:33—18:26:37 SUCCEEDED。
+  读取完整chaining输出：12058条候选链、13个target window。按s1链得分门槛：
+  40→12058条；200→1990；500→244；1000→55；2000→6（一个target window）；5000→1。
+  原始摘要regional-chain-statistics-20261121.json，PAF SHA
+  2c9f529d8accfe86f82eca6116292e156eebbb110372100a770d5c9fd33501dd。
+  无-c时的matches/span只是估算字段，不能当真实base identity套用0.95准入门槛；
+  最强链s1=26338、span37354，其估算比例约0.705，不能据此认定真实同一率低或删去。
+
+### 成功的真实孔洞候选：保留-P，仅增加-m2000
+
+- 43007334，q0-regional-score2000-pilot-20261121，18:37:00—18:37:16 SUCCEEDED。
+  pilot_local_target_windows.py SHA
+  06e9c730fa13ab13c705e8719a5d6fc10b0ce6c01d687782acb571ac96f2612e；
+  nearest scope helper e4f7153c432c55ff0010018c07b84045c9d8695c614fc3af0185b4ef2937af7b。
+  2CPU/8GiB、每mapper AS4GiB，真正执行-c -x asm10 -D -P --dual=yes --no-long-join
+  -m2000 -t2；不叠加-f或-N变化。仍有独立300秒诊断预算，不是生产统一超时规则。
+- 先跑原三个control，完整initial cross精确坐标都100%保留；对已成功regional -P基线，
+  >=10000bp/hit且identity>=.95的配对坐标/原source-strand关系也都100%保留（1/6/2对）。
+  **不是无损**：>=100bp/hit的regional配对坐标仅保留366591/514788、295474/390067、
+  110054/163639；source-strand关系24/54、30/45、2/34。明显减少短的附加/多重命中。
+  不可将这些比例当最终准确率，也不能把这个profile无差别推广到普通/便宜任务。
+- 三个真正residual core均完整退出、原始CIGAR几何和输入身份验证通过：
+  * 51382261：1.425s，8行，合格cross core覆盖27381bp；within覆盖0。
+  * 160451708：1.674s，84行，合格cross core覆盖99998bp；within覆盖25422bp。
+  * 160343284：1.074s，69行，合格cross core覆盖100000bp；within覆盖22571bp。
+  这三个core原completed cross覆盖为0，retention字段正确为null，而不是捏造100%保留。
+  新的覆盖仍不是唯一定位/最终补洞完成；后续admission必须照常检查竞争关系。
+  摘要regional-score2000-control-20261121.json和regional-score2000-residual-20261121.json。
+- 已提交只读自动触发标定43007382，目录q0-cigar-work-calibration-20261121。
+  在3个控制+3个真实孔洞的已完成输入上，做无-c的廉价预扫描，记录低seed得分密度、
+  长span链的query_span*target_span代理量，区分便宜的正常窗口与弱链DP爆炸窗口。
+  这不是实测DP细胞数，更不是base identity；阈值/生产自动策略尚未开启。刷新终态后归档，
+  不要为标定重跑完整慢-c基线。script SHA
+  2b4e05951e9ed7df989b67dacbf71cad3147a11ead6764c2ba17f8b3ca58ce14，
+  phase helper 9f18d717fe07c55d2dfa501b95600b23745e34346d95273a1dbbb31de5a4cc52。
+
+### 已实现的接入部件和一个不能直接上线的索引方案
+
+- q0_catalog新增ObservedSourcePairs和partial_source_intervals：按合格cross真实M/=双侧
+  坐标减去已有覆盖，保持普通set语义和原native partial_source_request默认行为；检查原source
+  长度和split偏移，保留真正空隙，不用X、同dataset或低identity命中掩盖缺失区间。
+  **尚未在_initial_inputs自动启用此collector**，当前默认生产仍是原native路径。
+- q0_query_windows新增TargetWindow/project_regional_paf：双侧偏移投影、同segment自比对排除、
+  保留原cg并复验geometry，MAPQ=255，去除局部primary/secondary/score，仅增加qw/tw追溯标记。
+  不重复应用原source的N切分偏移。原query-only投影兼容；合成真实minimap两链、两profile
+  比较实际配对坐标通过，不替代全小麦验收。
+- q0_catalog可选regional_factory在已有严格reference扫描内喂routing index，不重新扫描PAF；
+  plain/indexed catalog完整payload相同，N切分相对坐标和sealed重开测试通过。
+  不把搜索网格/包络写成候选的真实query/reference coverage。默认不调用此factory。
+- q0_regional_index.py的100kb稀疏SQLite网格曾做全量只读诊断43007288，18:04:48—18:18:06
+  SUCCEEDED。旧候选模块SHA01bf2a0e00979292ce92bd649658c327a1128cd2bff542f22d99b23a09c7ccaf，
+  probe SHA280313b160257b056a0b01f869a107a771cd6b60eb1f6abe43a45c694efc983f。
+  67,860,323 paired blocks、68,737,740 proposed links、5,581,699去重links，memo避免
+  63,156,041重复插入；796.809s，DB183,439,360bytes，SHA
+  6ea2508f1a679ff61580e45b3578e4e06b449f78aad371087a927ec2195c9c56。
+  六个控制/孔洞的精确计划目标区间都未丢，但网格过度扩大：控制target86–149Mb，孔洞
+  458–712Mb，远大于已测的3Mb/12–18Mb。**不能把“无遗漏”当成已满足提速目标直接上线**。
+  当前module后加build_report方法以支持catalog单遍hook，源SHA已不同于该remote probe。
+- 下一步优先把网格只作候选筛选并精确细化，或改为带原PAF字节offset的record空间索引：
+  SQLite R-tree筛选source/query或reference/target范围，再只解析命中记录的真实CIGAR；
+  保留最近flank/tie/方向判断，产出与已验证exact nearest plan相符的窄目标区间。
+  避免每个window重扫670万行PAF，也避免将整100kb source/ref网格作为最终mapper窗口。
+  180环境SQLite3.45.1已验证四维rtree可用（仅空表/一行模块能力探测，无基因组数据）。
+  如给read_paf增加offset回调，要保留UTF-8、CRLF/CR、注释/空行的真实byte offset与原record
+  identity；默认调用/普通任务不变。caller仍需完整输入SHA和sealed/成功回执验证。
+- 208项q0定向测试已完成（1项skip），未跑发布CI/浏览器/整版替换。所有新快路径仍需
+  raw mapping与投影独立身份、完整receipt/manifest/consumer适配、精确输入复用与资源预算；
+  已完成native补充优先复用，不能把旧结果追认为执行过新profile。
+
+### 切换协议仍需实现；不要为绕过声明更改冻结文件
+
+已读实际resume_native_resources.py：它硬核验work/prepare_q0_evidence.sh SHA等于当前冻结
+plan.dependencies.launcher；原read_native_resources.py最终进入self_profile_evidence_reader。
+不能直接替换launcher再调用原entry，也不能把scientific_builder_modified=false悄悄解释成
+此次科学代码从未变过。原reader-helper的旧声明等值校验必须保留。
+
+可考虑正交的q0科学变更adapter：绑定当前冻结resource plan、真实新entry/reader/launcher、
+旧runtime/declaration备份和新source SHA；原始self/cross/profile/checkpoint验证继续交给原
+冻结模块，新的q0声明明确scientific_builder_modified=true及差异。正常WorkspaceLock下
+安装/迁移，原旧版作业不动；新job资源ready、原新版正常退出/锁释放后才切换。
+这是待实现设计，不是已获接受的迁移凭据；不要伪造module.__file__、删声明、改旧计划冒认
+科学profile未变化，或盲目给native_previous再套任意revision链。
+
+### 18:49 标定终态与内部触发部件
+
+43007382于18:48:38—18:49:00 SUCCEEDED，六项无-c扫描各0.43–1.22s。
+对span>=1000bp、s1/max(query_span,target_span)<0.25的弱链，span乘积累计：
+三个正常control分别2.510/3.132/4.223×10^9；三个真实residual分别
+220.948/18.856/14.091×10^9。摘要regional-cigar-work-calibration-20261121.json。
+
+已实现但**未接入prepare_evidence默认流程**的q0_cigar_policy.py：需完整、输入绑定的
+chaining扫描；仅asm10、reference>=5Gb、query context>=20kb、弱链span乘积>=10^10时
+附加-m2000，保留-P；其他窗口保持native参数。它在这六个测量样本中只选择三项residual，
+不会为省少量时间把三项便宜control也降档。不是整个dataset一律使用激进参数，也不是让
+用户手工判断。原结果复用、近似/精确身份和完整算法回退仍须在调用层接好。
+此门槛是当前有限样本的可追溯工作量策略，不保证所有物种/工具版本/窗口都同样表现；
+低seed得分密度不能代替base identity或唯一定位。新增4项阈值、普通/小查询/不同preset、
+完整性和成本累积测试通过；此前208项q0测试（1 skip）覆盖本轮其余core改动。
+另注意QueryWindow helper默认core仍为1Mb；目前真正成功的小麦候选用的是显式100kb，
+生产接入时必须绑定实测参数，不能不传policy就拿默认1Mb宣称已经验证。
+
+另已修复raw window身份与core选择耦合：QueryWindow.window_id现在只绑定原segment、
+长度与上下文start/end，完整record仍包含cores，留给投影receipt绑定。相同上下文因相邻
+core/tile裁剪而重复时合并cores，不生成重复FASTA header；不填平真实core间隙。
+因此以后仅变更缺失core选择/投影规则时可以复用不变的完整raw mapping，而不必重比对。
+这是新的候选协议，不能将旧私有pilot的literal query/target-n头冒认成新协议执行结果。
+双侧投影/窗口/工作量策略/已有覆盖/索引组件最后32项测试通过；旧普通native路径仍未启用
+任何区域策略。本轮已完成的mapper候选足以支持下一轮接入，不再重复这些控制样本或全局慢基线。

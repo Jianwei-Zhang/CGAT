@@ -1,0 +1,27 @@
+{
+  "status": "chaining_only_exit",
+  "exit_code": 0,
+  "seconds": 1.1949725449085236,
+  "argv": [
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-x86-readiness-20261118/bin/minimap2",
+    "-x",
+    "asm10",
+    "-D",
+    "-P",
+    "--dual=yes",
+    "--no-long-join",
+    "-t",
+    "1",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-residual-nearest-pilot-20261121/candidate/site-0/target.fa",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-residual-nearest-pilot-20261121/candidate/site-0/query.fa"
+  ],
+  "input_sha256": {
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-residual-nearest-pilot-20261121/candidate/site-0/query.fa": "e64a928a0180ba72b4ecb533c824019a97cd1a8d8801710523f78fd07b1d1eae",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-residual-nearest-pilot-20261121/candidate/site-0/target.fa": "07b5097c8ed55a98e1c8f80d621591c6da01ca6c471c0f20f588d738dc840a3a"
+  },
+  "tool_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+  "approximate_output_bytes": 1337984,
+  "production_modified": false,
+  "approximate_output_is_accepted_evidence": false,
+  "scientific_acceptance": false
+}
