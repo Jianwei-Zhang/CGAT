@@ -118,12 +118,17 @@ class NumberedWorkspaceTests(unittest.TestCase):
             reference.write_text(">chr1\n" + "ACGT" * 250 + "\n")
             assembly.write_text(">ctg1\n" + "ACGT" * 250 + "\n")
             root = parent / "numbered"
-            layout = initialize_workspace(root)
             command = ["bash", str(server / "prepare.sh"), "--ref", "ref", str(reference),
                        "--ds", "assembly", str(assembly), "--threads", "1", "--skip-self",
                        "--archive-format", "zip", "-o", str(root)]
             result = subprocess.run(command, capture_output=True, text=True, env=environment)
             self.assertEqual(result.returncode, 0, result.stdout[-2000:] + result.stderr[-4000:])
+            layout = WorkspaceLayout.detect(root)
+            self.assertEqual(layout.version, 2)
+            plan = layout.path(".run_all/plan.tsv").read_text()
+            self.assertLess(plan.index("finalize_evidence"), plan.index("refinement\t"))
+            self.assertLess(plan.index("refinement\t"), plan.index("package_full"))
+            self.assertFalse(layout.path("metadata/degap_inputs.json").exists())
             for logical in ("metadata/datasets.tsv", "metadata/annotation_library_snapshot.json",
                             "data/reference/ref.fa", "data/datasets/assembly.fa", ".run_all/plan.tsv",
                             "run_lgz_step1.sh", ".prepare_lib/tools/run_all_runner.py", "report/report.html"):

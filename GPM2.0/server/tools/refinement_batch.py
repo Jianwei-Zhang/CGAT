@@ -172,13 +172,13 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
             batch["exit_code"] = 1
         atomic_json(target, batch)
         return {"batch": batch, "staged_results": staged, "exit_code": batch["exit_code"]}
-    except BaseException:
+    except BaseException as error:
         for record in batch["tools"].values():
             if record["status"] == "running":
                 record["status"] = "interrupted"
             elif record["status"] == "pending":
                 record["status"] = "not_started"
-        batch.update(status="interrupted", exit_code=130)
+        batch.update(status="interrupted", exit_code=128 + getattr(error, "signal_number", 2))
         atomic_json(target, batch)
         raise
 

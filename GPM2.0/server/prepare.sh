@@ -32,7 +32,7 @@ LGZ_MERYL="meryl"
 LGZ_MERQURY="merqury.sh"
 LGZ_CRAQ=""
 LGZ_READS_QC_MODE="standard"
-DEGAP_READS_TYPE=""
+GAPFILL_TOOLS=""
 LGZ_MINIMAP2="minimap2"
 LGZ_NUCMER="nucmer"
 LGZ_DELTA_FILTER="delta-filter"
@@ -63,6 +63,7 @@ Usage:
     [--cen-min-identity <min_identity_percent>] \
     [--hifi <reads_file> ...] \
     [--ont <reads_file> ...] \
+    [--gapfill-tools degap,tgsgapcloser,quartet,lrgapcloser|none] \
     [--lgz-qc-memory-gb <memory_gb>] \
     [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
@@ -97,7 +98,8 @@ Behavior:
   - --cen-min-identity filters hits; --cen-min-len filters merged candidate support (defaults: 80%, 10000 bp)
   - Manage local entries with library.sh list/add-tel/add-cen/remove; updates leave local/ unchanged
   - The first --ds remains project-primary metadata; q0 is selected across all initial datasets using alignment evidence
-  - --hifi and/or --ont enable post-LGZ DEGAP gap filling only; each accepts multiple files and can repeat
+  - --hifi and/or --ont register post-LGZ refinement reads; each accepts multiple files and can repeat
+  - --gapfill-tools chooses independent refinement tools (default: DEGAP with reads; no reads: LGZ-only)
   - Reads do not filter q0 or rank LGZ donors in new workspaces; original LGZ outputs stay unchanged
   - --max-fill sets the Step2 optimized refill length limit in bp, default: 1000000
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
@@ -105,27 +107,25 @@ Behavior:
   - --lgz-execution-profile baseline restores legacy scheduling and per-chromosome refill
   - --lgz-step2-mummer-scope full restores the complete Step2 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
-  - No reads: skip DEGAP; q0 and frozen D0/Dtel are still prepared
+  - No reads: LGZ-only; later append with bash run_all.sh --hifi reads.fq.gz [--ont reads.fq.gz]
   - --reads, --reads-type and --reads-qc are legacy resume options, not accepted for new preparation
   - Generates staged chromosome-partitioned run commands
   - --skip-self is allowed only when no chr group requires same-dataset candidate alignments
   - Accepts plain FASTA inputs such as .fa/.fasta/.fna
   - Accepts gzip-compressed FASTA inputs such as .fa.gz/.fasta.gz/.fna.gz
-  - Normalizes all inputs into package-local .fa files under data/
+  - Normalizes reference/assembly FASTA under 01_inputs/; refinement reads remain separate typed inputs
   - Creates .fai with samtools faidx when missing
-  - Generates metadata/reference.tsv and metadata/datasets.tsv
-  - Generates metadata/package.tsv
-  - Generates authoritative metadata/track_member_orders.tsv during chr assignment
-  - Generates runs/*/command.sh, <work_root>/.run_all/plan.tsv, and <work_root>/run_all.sh
-  - run_all.sh executes the generated plan serially and stops on the first failed command
-  - run_all.sh writes live progress to <work_root>/logs/run_all.log and current state to logs/status.tsv
+  - Stores reference, dataset, package and track-order metadata under .runtime/metadata/
+  - Generates 02_alignments/*/command.sh, .runtime/run_all/plan.tsv, and <work_root>/run_all.sh
+  - LGZ failures stop execution; refinement tools fail independently, retain successful deliveries, and return aggregate nonzero
+  - run_all.sh writes live progress and current status under <work_root>/.runtime/logs/
   - run_all.sh holds an exclusive workspace lock while active
-  - Records input and stage JSON in report/ and generates an offline report/report.html
-  - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
-  - report/render_report.py regenerates HTML using only report/ and Python's standard library
-  - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step1 -> LGZ Step2 -> LGZ telomere/q3 finalization -> per-chr commands -> LGZ evidence/package validation -> full archive -> light archive
-  - A successful run_all.sh creates both delivery archives in the parent directory of the work root
+  - Open <work_root>/06_report/report.html for the overview, LGZ process and per-tool refinement reports
+  - Baseline and refined final sequences are distinct: 05_final/00_lgz/ and 05_final/<numbered_tool>/
+  - Embeds each finalized process report in its delivery archives; no separate report ZIP is created
+  - Generates package/export helpers under .runtime/commands/
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ telomere/q3 finalization -> per-chr commands -> LGZ evidence/package validation -> refinement -> full baseline archive -> light archive
+  - Full/light App archives stay under <work_root>/07_delivery/00_lgz/ or 07_delivery/<numbered_tool>/
   - --skip-self conflicts with multiple same-dataset q0 candidates; assignment/evidence preparation stops with an error
   - Prints all generated staged commands to the terminal for manual copy/paste
 EOF
@@ -453,8 +453,7 @@ write_prepare_options_metadata() {
     printf 'cen_min_identity\t%s\n' "$CEN_MIN_IDENTITY"
     printf 'grt_workflow\t%s\n' "gpm_grt_precomputed_v2"
     printf 'grt_primary_dataset\t%s\n' "${DATASET_NAMES[0]}"
-    printf 'reads_purpose\tpost_lgz_degap_v1\n'
-    printf 'degap_reads_type\t%s\n' "$DEGAP_READS_TYPE"
+    printf 'reads_purpose\tpost_lgz_refinement_v1\n'
     printf 'grt_reads_qc_enabled\t%s\n' "$reads_qc_enabled"
     printf 'grt_reads_qc_mode\t%s\n' "$LGZ_READS_QC_MODE"
     printf 'grt_meryl\t%s\n' "$LGZ_MERYL"
@@ -739,7 +738,6 @@ REF_SRC=""
 declare -a DATASET_NAMES=()
 declare -a DATASET_SRCS=()
 declare -a TEL_RULE_ARGS=()
-declare -a READS_SRCS=()
 declare -a HIFI_SRCS=()
 declare -a ONT_SRCS=()
 
@@ -866,6 +864,11 @@ while [[ $# -gt 0 ]]; do
       CEN_MIN_IDENTITY="$2"
       shift 2
       ;;
+    --gapfill-tools)
+      [[ "$#" -ge 2 ]] || die "--gapfill-tools requires a value"
+      GAPFILL_TOOLS="$2"
+      shift 2
+      ;;
     --hifi|--ont)
       reads_option="$1"
       shift
@@ -902,14 +905,6 @@ done
 
 [[ -n "$REF_NAME" ]] || die "Missing --ref"
 [[ "${#DATASET_NAMES[@]}" -gt 0 ]] || die "At least one --ds is required"
-READS_SRCS=("${HIFI_SRCS[@]}" "${ONT_SRCS[@]}")
-if [[ "${#HIFI_SRCS[@]}" -gt 0 && "${#ONT_SRCS[@]}" -gt 0 ]]; then
-  DEGAP_READS_TYPE="mixed"
-elif [[ "${#HIFI_SRCS[@]}" -gt 0 ]]; then
-  DEGAP_READS_TYPE="hifi"
-elif [[ "${#ONT_SRCS[@]}" -gt 0 ]]; then
-  DEGAP_READS_TYPE="ont"
-fi
 
 require_cmd samtools
 require_cmd zip
@@ -923,12 +918,12 @@ LGZ_SHOW_COORDS="$(resolve_required_command show-coords)"
 validate_mummer4_capabilities \
   "$LGZ_NUCMER" "$LGZ_DELTA_FILTER" "$LGZ_SHOW_COORDS"
 require_cmd minimap2
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  DEGAP_CHECK_ARGS=(--check-environment --server-dir "$WORK_ROOT")
-  if [[ "${#HIFI_SRCS[@]}" -gt 0 ]]; then DEGAP_CHECK_ARGS+=(--hifi "${HIFI_SRCS[@]}"); fi
-  if [[ "${#ONT_SRCS[@]}" -gt 0 ]]; then DEGAP_CHECK_ARGS+=(--ont "${ONT_SRCS[@]}"); fi
-  python3 "${SCRIPT_DIR}/tools/post_lgz_degap.py" "${DEGAP_CHECK_ARGS[@]}"
-fi
+REFINEMENT_CHECK_ARGS=(--check-environment --server-dir "$WORK_ROOT")
+if [[ "${#HIFI_SRCS[@]}" -gt 0 ]]; then REFINEMENT_CHECK_ARGS+=(--hifi "${HIFI_SRCS[@]}"); fi
+if [[ "${#ONT_SRCS[@]}" -gt 0 ]]; then REFINEMENT_CHECK_ARGS+=(--ont "${ONT_SRCS[@]}"); fi
+if [[ -n "$GAPFILL_TOOLS" ]]; then REFINEMENT_CHECK_ARGS+=(--gapfill-tools "$GAPFILL_TOOLS"); fi
+python3 "${SCRIPT_DIR}/tools/post_lgz_refinement.py" "${REFINEMENT_CHECK_ARGS[@]}"
+
 
 validate_name "$REF_NAME"
 ensure_readable_file "$REF_SRC"
@@ -947,14 +942,19 @@ for i in "${!DATASET_NAMES[@]}"; do
   SEEN_DATASET_NAMES["${DATASET_NAMES[$i]}"]=1
 done
 
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  for i in "${!READS_SRCS[@]}"; do
-    ensure_readable_file "${READS_SRCS[$i]}"
-    if [[ "${READS_SRCS[$i]}" != /* ]]; then
-      READS_SRCS[$i]="$(cd "$(dirname "${READS_SRCS[$i]}")" && pwd)/$(basename "${READS_SRCS[$i]}")"
-    fi
-  done
-fi
+
+# A brand-new preparation uses real numbered paths from its first write.
+python3 - "$WORK_ROOT" "${SCRIPT_DIR}/tools" <<'PYLAYOUT'
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+from workspace_layout import WorkspaceLayout, initialize_workspace
+if not root.exists() or not any(root.iterdir()):
+    initialize_workspace(root)
+elif WorkspaceLayout.detect(root).version != 2:
+    sys.exit("ERROR: existing legacy output is not a new workspace; resume/migrate it instead of running prepare.sh over it")
+PYLAYOUT
 
 # A run.sh preparation inherits its parent's workspace lock. Standalone
 # preparation must not overwrite a workspace while a workflow is running.
@@ -1020,15 +1020,12 @@ ensure_fai "$REF_DST"
 } > "$(cgat_workspace_path "${WORK_ROOT}" "metadata/reference.tsv")"
 
 write_reference_segments_metadata "$REF_DST" "$(cgat_workspace_path "${WORK_ROOT}" "metadata/reference_segments.tsv")"
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  python3 - "$(cgat_workspace_path "${WORK_ROOT}" "metadata/degap_inputs.json")" "${#HIFI_SRCS[@]}" "${READS_SRCS[@]}" <<'PYREADS'
-import json, sys
-from pathlib import Path
-count = int(sys.argv[2])
-Path(sys.argv[1]).write_text(json.dumps({"schema_version": 2, "purpose": "post_lgz_degap_v1",
-    "hifi": sys.argv[3:3 + count], "ont": sys.argv[3 + count:]}, indent=2) + "\n")
-PYREADS
-fi
+REFINEMENT_CONFIG_ARGS=(--configure-prepare --server-dir "$WORK_ROOT")
+if [[ "${#HIFI_SRCS[@]}" -gt 0 ]]; then REFINEMENT_CONFIG_ARGS+=(--hifi "${HIFI_SRCS[@]}"); fi
+if [[ "${#ONT_SRCS[@]}" -gt 0 ]]; then REFINEMENT_CONFIG_ARGS+=(--ont "${ONT_SRCS[@]}"); fi
+if [[ -n "$GAPFILL_TOOLS" ]]; then REFINEMENT_CONFIG_ARGS+=(--gapfill-tools "$GAPFILL_TOOLS"); fi
+python3 "${SCRIPT_DIR}/tools/post_lgz_refinement.py" "${REFINEMENT_CONFIG_ARGS[@]}"
+
 
 
 package_mode="fast"
@@ -1094,7 +1091,7 @@ mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
   || die "Reference FASTA contains no sequence records: $REF_DST"
 
 TOTAL_COMMANDS=$(( DATASET_COUNT + 9 + 2 * ${#REFERENCE_CHR_NAMES[@]} ))
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then TOTAL_COMMANDS=$((TOTAL_COMMANDS + 1)); fi
+TOTAL_COMMANDS=$((TOTAL_COMMANDS + 1))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -1167,18 +1164,7 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "run_lgz_step3.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  {
-    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s\n' \
-      "$(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".prepare_lib/tools/post_lgz_degap.py")")" \
-      "$(shell_quote "$WORK_ROOT")" "$(shell_quote "$THREADS")"
-  } > "$(cgat_workspace_path "${WORK_ROOT}" "run_post_lgz_degap.sh")"
-  make_executable_if_supported "$(cgat_workspace_path "${WORK_ROOT}" "run_post_lgz_degap.sh")"
-  append_run_all_unit "degap_gapfill" "run_post_lgz_degap.sh" "logs/run_all.log"
-  printf '[%s/%s] post_lgz_degap\nbash %s\n\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "$(cgat_workspace_path "${WORK_ROOT}" "run_post_lgz_degap.sh")"
-  COMMAND_INDEX=$((COMMAND_INDEX + 1))
-fi
+
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   run_chr_dir="$(cgat_workspace_path "${WORK_ROOT}" "runs/chr_${chr_name}")"
@@ -1197,6 +1183,18 @@ append_run_all_unit "finalize_evidence" "finalize_lgz_evidence.sh" "logs/run_all
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "finalize_lgz_evidence"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "finalize_lgz_evidence.sh")"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
+# This stage always exists, including LGZ-only: it publishes the explicit
+# baseline and allows saved/new downstream reads to be appended on resume.
+python3 - "$WORK_ROOT" "${SCRIPT_DIR}/tools" <<'PYREFINEMENT'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[2])
+from refinement_config import ensure_plan
+ensure_plan(Path(sys.argv[1]))
+PYREFINEMENT
+printf '[%s/%s] post_lgz_refinement (saved/new reads; default DEGAP)\nbash %s\n\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "$WORK_ROOT/.runtime/commands/run_refinement.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 append_run_all_unit "package_full" "package_full_zip.sh" "logs/run_all.log"

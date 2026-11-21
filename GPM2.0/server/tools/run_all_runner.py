@@ -21,6 +21,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import threading
 import sys
 import tempfile
 import time
@@ -342,6 +343,9 @@ class Runner:
         self.report: ReportSession | None = None
         self.minimap2_failure_hints: dict[str, str] = {}
         self.child_environment = resource_environment(server_dir)
+        self.refinement_exit_code = 0
+        self.refinement_child = None
+        self.refinement_stop_timer = None
 
     def _event(self, event: str, unit: PlanUnit | None, message: str) -> None:
         if unit is None:
@@ -412,11 +416,32 @@ class Runner:
                 os.killpg(child.pid, signal_number)
             except ProcessLookupError:
                 pass
+        if self.refinement_child is not None and self.refinement_stop_timer is None:
+            # Native tools can ignore TERM or keep inherited pipes open after
+            # their worker exits. Bound cancellation without releasing the lock.
+            self.refinement_stop_timer = threading.Timer(5, self._kill_refinement_group, (self.refinement_child.pid,))
+            self.refinement_stop_timer.daemon = True
+            self.refinement_stop_timer.start()
         for child in list(self.active_children.values()):
             try:
                 os.killpg(child.pid, signal_number)
             except ProcessLookupError:
                 pass
+
+    @staticmethod
+    def _kill_refinement_group(pid):
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    def _finish_refinement_group(self):
+        if self.received_signal is not None and self.refinement_child is not None:
+            self._kill_refinement_group(self.refinement_child.pid)
+        if self.refinement_stop_timer is not None:
+            self.refinement_stop_timer.cancel()
+            self.refinement_stop_timer = None
+        self.refinement_child = None
 
     def _run_alignment_group(self, units: list[PlanUnit], threads: int) -> int:
         """Run independent leaf commands; publish checkpoints per original unit."""
@@ -520,6 +545,9 @@ class Runner:
         return next(row for row in self.status_rows if row["unit_id"] == unit.unit_id)
 
     def _terminal_validation(self, unit_id: str) -> tuple[bool, str]:
+        if unit_id == "refinement":
+            from post_lgz_refinement import validate_completion
+            return validate_completion(self.server_dir, self.run_id)
         if unit_id == "degap_gapfill":
             from post_lgz_degap import validate_result
             return validate_result(self.server_dir)
@@ -562,12 +590,13 @@ class Runner:
         by_name = {str(artifact["file"]): artifact for artifact in artifacts}
         full = by_name[delivery_path(self.server_dir, "full").name]
         light = by_name[delivery_path(self.server_dir, "light").name]
+        has_refinement = any(unit.unit_id == "refinement" for unit in self.units)
         self._emit_summary(
             [
                 "",
-                "GPM Server workflow completed successfully.",
+                ("LGZ baseline delivery completed; refinement did not fully succeed." if self.refinement_exit_code else "GPM Server workflow completed successfully."),
                 "",
-                "Final delivery packages:",
+                ("LGZ baseline App packages (not refined):" if has_refinement else "Final delivery packages:"),
                 "  1. Full package (FASTA + report):",
                 f"     {full['path']}",
                 f"     Size: {self._format_size(int(full['size_bytes']))}",
@@ -580,8 +609,10 @@ class Runner:
                 f"     SHA-256: {light['sha256']}",
                 "     Use: App import and browsing; FASTA export is unavailable.",
                 "",
-                "Local report:",
+                ("Local LGZ process report:" if has_refinement else "Local report:"),
                 f"  {workspace_join(self.server_dir, 'report/report.html')}",
+                *(["Overall/refinement report (per-tool refined FASTA, Final Path and full/light App packages):",
+                   str(self.server_dir / "06_report/report.html")] if (self.server_dir / "06_report/report.html").is_file() else []),
             ]
         )
 
@@ -777,12 +808,11 @@ class Runner:
                              **({"GPM_TASK_THREADS": str(threads)} if threads != "unknown" else {})},
                     )
                     self.active_child = child
-                    if self.received_signal is not None and child.poll() is None:
-                        try:
-                            os.killpg(child.pid, self.received_signal)
-                        except ProcessLookupError:
-                            pass
+                    self.refinement_child = child if unit.unit_id == "refinement" else None
+                    if self.received_signal is not None:
+                        self._handle_signal(self.received_signal, None)
                     self._stream_child(unit, child)
+                    self._finish_refinement_group()
                     child_return_code = child.wait()
                     exit_code = (
                         128 - child_return_code
@@ -818,6 +848,9 @@ class Runner:
                             f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'"
                             + self._failure_hint(unit, failure_logs),
                         )
+                        if unit.unit_id == "refinement":
+                            self.refinement_exit_code = exit_code
+                            continue
                         return exit_code
                     try:
                         valid, reason = self._terminal_validation(unit.unit_id)
@@ -834,6 +867,9 @@ class Runner:
                             f"detail={unit.detail_log_relpath} "
                             f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                         )
+                        if unit.unit_id == "refinement":
+                            self.refinement_exit_code = 2
+                            continue
                         return 2
                     cache_markers = STAGE_CACHE_MARKERS.get(unit.unit_id, ())
                     if cache_markers and self.child_cache_markers == set(cache_markers):
@@ -864,11 +900,13 @@ class Runner:
                     row["state"] = "success"
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("SUCCESS", unit, f"elapsed={elapsed:.3f}s")
-                self._event("SUCCESS", None, "pipeline completed")
+                self._event("FAILED" if self.refinement_exit_code else "SUCCESS", None,
+                            "LGZ complete; refinement has failures" if self.refinement_exit_code else "pipeline completed")
                 completed = True
-                return 0
+                return self.refinement_exit_code
             finally:
                 error = sys.exc_info()[1]
+                self._finish_refinement_group()
                 self.active_child = None
                 for signal_number, handler in previous_handlers.items():
                     signal.signal(signal_number, handler)
@@ -890,7 +928,7 @@ class Runner:
                     self._emit_summary(
                         [
                             "",
-                            "GPM Server workflow completed successfully.",
+                            ("LGZ baseline delivery completed; refinement did not fully succeed." if self.refinement_exit_code else "GPM Server workflow completed successfully."),
                             "No delivery package units are present in this execution plan.",
                             f"Local report: {workspace_join(self.server_dir, 'report/report.html')}",
                         ]
@@ -910,6 +948,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--server-dir", required=True, type=Path)
     parser.add_argument("--log-style", choices=("compact", "detailed"), default="compact")
     parser.add_argument("--color", choices=("auto", "always", "never"), default="auto")
+    parser.add_argument("--hifi", nargs="+", action="extend")
+    parser.add_argument("--ont", nargs="+", action="extend")
+    parser.add_argument("--gapfill-tools")
+    parser.add_argument("--threads", "-t", type=int)
     return parser.parse_args()
 
 
@@ -926,8 +968,22 @@ def main() -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     try:
-        units = load_plan(server_dir)
         lock.acquire()
+        from refinement_config import save_request, ensure_plan, resolve, preflight
+        supplied = {"--" + kind: [[str(Path(path).resolve())] for path in getattr(args, kind)]
+                    for kind in ("hifi", "ont") if getattr(args, kind) is not None}
+        if args.gapfill_tools is not None:
+            supplied["--gapfill-tools"] = [[args.gapfill_tools]]
+        _, request = resolve(server_dir, supplied)
+        preflight(request)
+        if args.threads is not None:
+            if args.threads < 1:
+                raise RunnerError("--threads must be positive")
+            from run_resources import update_resources
+            update_resources(server_dir, {"--threads": [[str(args.threads)]]}, run_id)
+        save_request(server_dir, supplied, run_id)
+        ensure_plan(server_dir)
+        units = load_plan(server_dir)
         runtime = workspace_join(server_dir, ".prepare_lib/tools/long_cigar_recovery")
         if runtime.is_dir() and any(unit.unit_id.startswith("ref:") for unit in units):
             # run.sh uses its own locked handoff; direct run_all.sh reaches this

@@ -11,13 +11,13 @@ import re
 import uuid
 
 try:
-    from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES
+    from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, relative_path
     from refinement_reports import page, table, link, gap_anchor, ReportError, stat_key
     from refinement_tools import fingerprint
     from refinement_commit import current_publication
     from run_orchestration import sha256_file as digest, atomic_write_json as atomic_json
 except ModuleNotFoundError:
-    from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES
+    from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, relative_path
     from .refinement_reports import page, table, link, gap_anchor, ReportError, stat_key
     from .refinement_tools import fingerprint
     from .refinement_commit import current_publication
@@ -180,6 +180,15 @@ def render_overview(root, batch, results):
     links += [local_link(root, report, comparison_dir / "comparison.json", "Comparison / 比较 JSON"),
               local_link(root, report, comparison_dir / "gap_comparison.tsv", "All original gaps / 全部原始缺口对照")]
     body += '<p>' + ' · '.join(links) + '</p>'
+    try:
+        from lgz_final import validate_baseline
+    except ModuleNotFoundError:
+        from .lgz_final import validate_baseline
+    if not invalidated and validate_baseline(root):
+        baseline_links = ' · '.join(local_link(root, report, layout.path("05_final/00_lgz/" + name), label)
+                                  for name, label in (("assembly.fa", "LGZ FASTA"), ("final_path.json", "LGZ Final Path"),
+                                                      ("provenance.json", "Baseline provenance / 基线来源")))
+        body += '<p>LGZ baseline only, not a refined result / 以下仅为 LGZ 基线，不是精修结果: ' + baseline_links + '</p>'
     display = []
     for row in rows:
         record = batch["tools"][row["tool"]]
@@ -195,6 +204,11 @@ def render_overview(root, batch, results):
             code = TOOL_DIRECTORIES[row["tool"]]
             final_links = ' · '.join(local_link(root, report, layout.path(f"05_final/{code}/{name}"), label) for name, label in
                                      (("assembly.fa", "Final FASTA"), ("final_path.json", "Final Path"), ("provenance.json", "Provenance / 来源")))
+            delivery_dir = layout.path(f"07_delivery/{code}")
+            delivery = json.loads((delivery_dir / "delivery.json").read_text())
+            final_links += ' · ' + ' · '.join(
+                local_link(root, report, delivery_dir / relative_path(delivery["archives"][mode]["file"]), label)
+                for mode, label in (("full", "Full App package / 完整包"), ("light", "Light App package / 轻量包")))
         display.append((escape(row["tool"]), escape(row["status"]), escape(str(row["counts"])),
                         report_link, final_links, escape(row["error"] or "")))
     body += table(["Tool", "State", "Accepted gap outcomes", "Process report", "Final publication", "Error"], display)
