@@ -164,7 +164,9 @@ def validate_set(final, report, delivery, tool, run_id, validate_delivery):
             or proof.get("schema_version") != 1 or proof.get("tool") != tool or proof.get("run_id") != run_id
             or proof.get("modes") != ["full", "light"] or not proof.get("validator")
             or proof.get("final_path_sha256") != provenance["artifacts"]["final_path.json"]
-            or proof.get("assemblies") != expected):
+            or proof.get("assemblies") != expected
+            or proof.get("provenance_sha256") != digest(final / "provenance.json")
+            or proof.get("report_manifest_sha256") != digest(report / "manifest.json")):
         raise PublicationError("App delivery validator did not prove both packages represent this refined result")
     return proof
 
@@ -183,6 +185,11 @@ def _rollback(layout, journal):
     for area, target in reversed(list(targets(layout, journal["tool"]).items())):
         row = journal["areas"][area]
         prepared, backup = private / "prepared" / area, private / "previous" / area
+        if row.get("unchanged") is True:
+            if (row["new"] != row["previous"] or not matches(target, row["new"])
+                    or prepared.exists() or backup.exists()):
+                raise PublicationError("unchanged publication area changed; refusing rollback: " + area)
+            continue
         if target.exists():
             if matches(target, row["new"]) and not prepared.exists():
                 rename_synced(target, prepared)
@@ -257,11 +264,14 @@ def publish_result(root, lock, result, report, delivery, validate_delivery):
                "state": "preparing", "previous_pointer": prior_pointer, "delivery_validation": proof, "areas": {}}
     for area in AREAS:
         expected = inventory(source[area])
-        shutil.copytree(source[area], private / "prepared" / area)
-        if not matches(private / "prepared" / area, expected) or not matches(source[area], expected):
-            raise PublicationError("publication staging changed during preparation")
-        sync_tree(private / "prepared" / area)
-        journal["areas"][area] = {"new": expected, "previous": previous["areas"][area]["new"] if previous else None}
+        old = previous["areas"][area]["new"] if previous else None
+        unchanged = expected == old and matches(current[area], expected)
+        if not unchanged:
+            shutil.copytree(source[area], private / "prepared" / area)
+            if not matches(private / "prepared" / area, expected) or not matches(source[area], expected):
+                raise PublicationError("publication staging changed during preparation")
+            sync_tree(private / "prepared" / area)
+        journal["areas"][area] = {"new": expected, "previous": old, "unchanged": unchanged}
         ensure_directory(current[area].parent)
     layout_and_lock(root, lock)
     journal["state"] = "publishing"
@@ -269,6 +279,10 @@ def publish_result(root, lock, result, report, delivery, validate_delivery):
     durable_json(pointer, {"schema": SCHEMA, "tool": tool, "status": "publishing", "transaction": transaction})
     try:
         for area in AREAS:
+            if journal["areas"][area].get("unchanged") is True:
+                if not matches(current[area], journal["areas"][area]["new"]):
+                    raise PublicationError("unchanged publication area changed before commit")
+                continue
             if current[area].exists():
                 if not matches(current[area], journal["areas"][area]["previous"]):
                     raise PublicationError("previous publication changed before replacement")

@@ -134,6 +134,13 @@ def validate_payload(root, *, full=None):
             or provenance.get("artifacts", {}).get("final_path.json") != manifest["server_final_path_sha256"]
             or provenance.get("execution", {}).get("status") != "success"):
         raise BundleError("refined delivery provenance is not the completed admitted result")
+    report = json.loads(safe_file(root, "report/manifest.json").read_text())
+    report_files = {name[len("report/"):]: sha for name, sha in observed.items()
+                    if name.startswith("report/") and name != "report/manifest.json"}
+    if (report.get("schema") != "cgat.refinement-report" or report.get("schema_version") != 1
+            or report.get("binding", {}).get("provenance_sha256") != manifest["provenance_sha256"]
+            or report.get("files") != report_files or "report.html" not in report_files):
+        raise BundleError("archived refinement report inventory/provenance mismatch")
     _, packages = read_table(root / "metadata/package.tsv")
     if len(packages) != 1 or any(packages[0].get(key) != value for key, value in {
             "workflow": "gpm_grt_app_precomputed_v2", "schema_version": PACKAGE_VERSION,
@@ -207,4 +214,6 @@ def validate_payload(root, *, full=None):
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise BundleError("refined delivery changed during validation")
     return {"tool": manifest["tool"], "run_id": manifest["run_id"], "mode": manifest["package_mode"],
-            "final_path_sha256": manifest["server_final_path_sha256"], "assemblies": assemblies}
+            "final_path_sha256": manifest["server_final_path_sha256"], "assemblies": assemblies,
+            "provenance_sha256": manifest["provenance_sha256"],
+            "report_manifest_sha256": observed.get("report/manifest.json")}

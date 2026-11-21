@@ -46,6 +46,15 @@ class RefinedBundleTests(unittest.TestCase):
         self.assertNotEqual((self.full / "data/refinement/final.fa").read_bytes(),
                             next(self.root.glob("03_lgz/*/q4.fa")).read_bytes())
 
+    def test_resealed_package_cannot_hide_changed_portable_report_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            copy = Path(directory) / "payload"
+            shutil.copytree(self.full, copy)
+            (copy / "report/report.html").write_text("not the report bound to the accepted publication")
+            seal_manifest(copy, json.loads((copy / MANIFEST).read_text()))
+            with self.assertRaisesRegex(ValueError, "report inventory/provenance"):
+                validate_payload(copy)
+
     def test_resealed_wrong_source_still_fails_sequence_reconstruction(self):
         with tempfile.TemporaryDirectory() as directory:
             copy = Path(directory) / "payload"

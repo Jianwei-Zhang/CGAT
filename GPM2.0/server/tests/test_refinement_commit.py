@@ -29,6 +29,8 @@ def fixture_delivery_validator(delivery, final):
     return {"schema": "cgat.refinement-delivery-validation", "schema_version": 1,
             "validator": "controlled-fixture-only", "tool": path["tool"], "run_id": provenance["run_id"],
             "modes": ["full", "light"], "final_path_sha256": expected,
+            "provenance_sha256": reports.digest(final / "provenance.json"),
+            "report_manifest_sha256": (delivery / "report.sha256").read_text(),
             "assemblies": {row["chr"]: {"length": row["length"], "sha256": row["sha256"]} for row in path["chromosomes"]}}
 
 
@@ -43,6 +45,7 @@ class RefinementCommitTests(unittest.TestCase):
         self.delivery.mkdir()
         for mode in ("full", "light"):
             (self.delivery / (mode + ".fixture")).write_text(reports.digest(Path(self.result["staging"]) / "final_path.json"))
+        (self.delivery / "report.sha256").write_text(self.report["manifest_sha256"])
         self.lock = WorkspaceLock(self.root, "publication-fixture")
         self.lock.acquire()
         self.addCleanup(self.lock.release)
@@ -67,7 +70,7 @@ class RefinementCommitTests(unittest.TestCase):
         (self.delivery / "new-attempt.txt").write_text("second publication")
         real = commit.rename_synced
         def fail(source, target):
-            if source.name == "report" and source.parent.name == "prepared":
+            if source.name == "delivery" and source.parent.name == "prepared":
                 raise OSError("controlled rename failure")
             return real(source, target)
         with mock.patch.object(commit, "rename_synced", side_effect=fail):
@@ -96,6 +99,36 @@ class RefinementCommitTests(unittest.TestCase):
         self.assertTrue((Path(self.result["staging"]) / "provenance.json").is_file())
         self.publish()
         self.assertIsNotNone(commit.current_publication(self.root, "degap"))
+
+    def test_report_only_interruption_recovers_without_touching_the_final_tree(self):
+        previous = self.publish()
+        final = self.root / "05_final/01_degap/assembly.fa"
+        before = final.stat()
+        report_dir = Path(self.report["directory"])
+        (report_dir / "report.html").write_text("updated controlled report")
+        manifest = json.loads((report_dir / "manifest.json").read_text())
+        manifest["files"]["report.html"] = reports.digest(report_dir / "report.html")
+        reports.atomic_json(report_dir / "manifest.json", manifest)
+        self.report["manifest_sha256"] = reports.digest(report_dir / "manifest.json")
+        (self.delivery / "report.sha256").write_text(self.report["manifest_sha256"])
+        self.result = dict(self.result, staging=str(final.parent))
+        real = commit.rename_synced
+        def stop(source, target):
+            result = real(source, target)
+            if source.name == "report" and source.parent.name == "prepared":
+                raise ProcessStopped()
+            return result
+        with mock.patch.object(commit, "rename_synced", side_effect=stop):
+            with self.assertRaises(ProcessStopped):
+                self.publish()
+        self.assertEqual((final.stat().st_ino, final.stat().st_mtime_ns), (before.st_ino, before.st_mtime_ns))
+        commit.recover_publication(self.root, self.lock, "degap", fixture_delivery_validator)
+        self.assertEqual(commit.current_publication(self.root, "degap"), previous)
+        self.assertEqual((final.stat().st_ino, final.stat().st_mtime_ns), (before.st_ino, before.st_mtime_ns))
+        updated = self.publish()
+        self.assertTrue(updated["areas"]["final"]["unchanged"])
+        self.assertFalse(updated["areas"]["report"]["unchanged"])
+        self.assertEqual((final.stat().st_ino, final.stat().st_mtime_ns), (before.st_ino, before.st_mtime_ns))
 
     def test_interruption_after_validation_finishes_the_commit_receipt(self):
         with mock.patch.object(commit, "_commit_pointer", side_effect=ProcessStopped):

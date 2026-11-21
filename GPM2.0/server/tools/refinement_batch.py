@@ -18,7 +18,7 @@ import uuid
 try:
     from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from post_lgz_degap import atomic_json, digest
-    from refinement_tools import ToolError
+    from refinement_tools import ToolError, fingerprint
     from refinement_recipes import select_tools, select_reads
     from refinement_native import stage_refinement
     from refinement_cache import find_completed
@@ -27,7 +27,7 @@ try:
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from .post_lgz_degap import atomic_json, digest
-    from .refinement_tools import ToolError
+    from .refinement_tools import ToolError, fingerprint
     from .refinement_recipes import select_tools, select_reads
     from .refinement_native import stage_refinement
     from .refinement_cache import find_completed
@@ -204,10 +204,10 @@ def publish_batch(root, lock, batch_result):
     """
     try:
         from refinement_commit import layout_and_lock, publish_result, current_publication
-        from refinement_delivery import build_delivery, validate_delivery
+        from refinement_delivery import build_delivery, validate_delivery, delivery_generation
     except ModuleNotFoundError:
         from .refinement_commit import layout_and_lock, publish_result, current_publication
-        from .refinement_delivery import build_delivery, validate_delivery
+        from .refinement_delivery import build_delivery, validate_delivery, delivery_generation
     layout = layout_and_lock(root, lock)
     batch = batch_result["batch"]
     if not batch["tools"]:
@@ -221,7 +221,10 @@ def publish_batch(root, lock, batch_result):
             continue
         try:
             previous = current_publication(layout.root, tool)
-            if previous and previous["run_id"] == result["run_id"]:
+            if (previous and previous["run_id"] == result["run_id"]
+                    and previous["areas"]["report"]["new"]["files"].get("manifest.json") == record["report"]["manifest_sha256"]
+                    and previous["delivery_validation"].get("generation_sha256") == fingerprint(
+                        delivery_generation(layout.root, result, record["report"]))):
                 record.update(status="published", publication_transaction=previous["transaction"], phase="published")
                 continue
             record["phase"] = "app_delivery"

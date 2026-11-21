@@ -30,6 +30,23 @@ except ModuleNotFoundError:
 
 SCHEMA = "cgat.refinement-delivery-archives"
 _VALIDATED = {}
+# Serialization and its source/path helpers have a revision independent of the
+# native/admission recipe. Updating these must refresh delivery, not the science.
+GENERATOR_FILES = ("refinement_delivery.py", "refinement_bundle.py", "refinement_bundle_validate.py",
+                   "lgz_app_package.py", "lgz_display_evidence.py", "delivery_archive.py", "workspace_layout.py",
+                   "refinement_path.py", "refinement_sources.py", "post_lgz_degap.py",
+                   "refinement_reports.py", "refinement_tools.py", "run_orchestration.py")
+
+
+def delivery_generation(root, result, report):
+    final, directory = Path(result["staging"]), Path(report["directory"])
+    if digest(safe_file(directory, "manifest.json")) != report["manifest_sha256"]:
+        raise BundleError("portable refinement report changed before delivery")
+    format_name, _ = archive_options(root)
+    return {"schema": "cgat.refinement-delivery-generation", "schema_version": 1,
+            "provenance_sha256": digest(safe_file(final, "provenance.json")),
+            "report_manifest_sha256": report["manifest_sha256"], "archive_format": format_name,
+            "generators": {name: digest(Path(__file__).with_name(name)) for name in GENERATOR_FILES}}
 
 
 def _extract(archive, target):
@@ -106,7 +123,15 @@ def validate_delivery(directory, final):
         hashes.append(row["sha256"])
     if {p.relative_to(directory).as_posix() for p in directory.rglob("*") if p.is_file()} != files:
         raise BundleError("unknown files in refinement delivery publication")
-    identity = tuple(hashes) + (digest(path_file), provenance["run_id"])
+    generation = definition.get("generation")
+    if generation is not None and (not isinstance(generation, dict)
+            or generation.get("schema") != "cgat.refinement-delivery-generation"
+            or generation.get("schema_version") != 1
+            or generation.get("provenance_sha256") != digest(final / "provenance.json")
+            or generation.get("archive_format") not in {"zip", "tar.gz"}):
+        raise BundleError("refinement delivery generation does not bind this provenance")
+    identity = tuple(hashes) + (digest(path_file), digest(final / "provenance.json"), provenance["run_id"], fingerprint(definition),
+                               digest(Path(__file__)), digest(Path(__file__).with_name("refinement_bundle_validate.py")))
     # A process-local content cache avoids decompressing the exact same two
     # archives again after their filesystem rename in a publication transaction.
     if identity in _VALIDATED:
@@ -119,12 +144,22 @@ def validate_delivery(directory, final):
             proof = validate_payload(payload, full=mode == "full")
             if proof["tool"] != server["tool"] or proof["run_id"] != provenance["run_id"] or proof["final_path_sha256"] != digest(path_file):
                 raise BundleError("archived App payload is not this admitted refinement")
+            if proof["provenance_sha256"] != digest(final / "provenance.json"):
+                raise BundleError("archived App payload has different admitted provenance")
+            if generation is not None and (proof["report_manifest_sha256"] != generation.get("report_manifest_sha256")
+                    or not source.name.endswith("." + generation["archive_format"])):
+                raise BundleError("archived App report/format differs from its delivery generation")
             proofs.append(proof)
+    if proofs[0]["report_manifest_sha256"] != proofs[1]["report_manifest_sha256"]:
+        raise BundleError("full and light archives contain different refinement reports")
     if proofs[0]["assemblies"] != proofs[1]["assemblies"]:
         raise BundleError("full and light archives describe different refined sequences")
     proof = {"schema": "cgat.refinement-delivery-validation", "schema_version": 1,
              "validator": "cgat.refinement-archive-and-sources.v1", "tool": server["tool"], "run_id": provenance["run_id"],
-             "modes": ["full", "light"], "final_path_sha256": digest(path_file), "assemblies": proofs[0]["assemblies"]}
+             "modes": ["full", "light"], "final_path_sha256": digest(path_file), "assemblies": proofs[0]["assemblies"],
+             "provenance_sha256": proofs[0]["provenance_sha256"],
+             "report_manifest_sha256": proofs[0]["report_manifest_sha256"],
+             "generation_sha256": fingerprint(generation) if generation is not None else None}
     expected = {row["chr"]: {"length": row["length"], "sha256": row["sha256"]} for row in server["chromosomes"]}
     if proof["assemblies"] != expected:
         raise BundleError("archive source reconstruction differs from accepted chromosomes")
@@ -140,11 +175,12 @@ def build_delivery(root, result, report):
         raise BundleError("refined delivery requires a numbered workspace")
     final = Path(result["staging"])
     format_name, threads = archive_options(root)
-    key = fingerprint({"final": digest(final / "provenance.json"), "report": report["manifest_sha256"],
-                       "format": format_name, "generator": [digest(Path(__file__)), digest(Path(__file__).with_name("refinement_bundle.py"))]})
+    generation = delivery_generation(root, result, report)
+    key = fingerprint(generation)
     home = layout.path(f".runtime/refinement/delivery/{tool}/{run_id}/{key}")
     if home.exists():
-        validate_delivery(home, final)
+        if validate_delivery(home, final)["generation_sha256"] != key:
+            raise BundleError("cached delivery belongs to a different artifact generation")
         return home
     home.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".build-", dir=home.parent) as temporary:
@@ -156,7 +192,7 @@ def build_delivery(root, result, report):
         archive_set = temporary / "archives"
         archive_set.mkdir()
         definition = {"schema": SCHEMA, "schema_version": 1, "tool": tool, "run_id": run_id,
-                      "server_final_path_sha256": digest(final / "final_path.json"), "archives": {}}
+                      "server_final_path_sha256": digest(final / "final_path.json"), "generation": generation, "archives": {}}
         for mode, payload in (("full", full), ("light", light)):
             filename = bundle_name + (".light" if mode == "light" else "") + "." + format_name
             output = archive_set / filename
@@ -164,5 +200,7 @@ def build_delivery(root, result, report):
             definition["archives"][mode] = {"file": filename, "sha256": digest(output)}
         write_json(archive_set / "delivery.json", definition)
         validate_delivery(archive_set, final)
+        if delivery_generation(root, result, report) != generation:
+            raise BundleError("delivery inputs or serializer changed during archive construction")
         archive_set.rename(home)
     return home
