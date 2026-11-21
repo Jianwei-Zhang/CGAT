@@ -83,6 +83,36 @@ class CandidateDiscoveryTests(unittest.TestCase):
             self.assertEqual(len(expanded[0]["query_ids"]), 1)
             self.assertEqual(len(expanded[0]["target_ids"]), 2)
 
+    def test_observed_partial_pair_is_not_remapped_as_a_missing_neighbor(self):
+        from server.tools.lgz_core.q0_catalog import add_pairwise_candidates
+        from server.tools.lgz_core.q0_alignments import parse_paf_line
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "runs/ds_vs_ref/result.paf"
+            path.parent.mkdir(parents=True)
+            path.write_text("a\t100\t0\t100\t+\tChr\t200\t0\t100\t100\t100\t60\tcg:Z:100M\n"
+                            "b\t100\t0\t100\t+\tChr\t200\t50\t150\t100\t100\t60\tcg:Z:100M\n")
+            sources = {SourceKey("ds", name): "A" * 100 for name in ("a", "b")}
+            assignments = [{"dataset_name": "ds", "seq_name": name, "assigned_chr_name": "Chr"}
+                           for name in ("a", "b")]
+            catalog = build_catalog(root, sources, {"Chr": 200}, assignments)
+            ids = {p.source.contig: p.segment_id for p in catalog.parts.values()}
+            known = set()
+            self.assertTrue(supplemental_groups(catalog, assignments, known))
+            def hit(cigar, matches, span):
+                return parse_paf_line(f"{ids['a']}\t100\t0\t100\t+\t{ids['b']}\t100\t0\t100"
+                                      f"\t{matches}\t{span}\t60\tcg:Z:{cigar}", artifact="supplement.paf", line_number=1)
+            # A gap-only record does not prove an observed paired-base relation.
+            add_pairwise_candidates(catalog, [hit("100I100D", 0, 200)], {ids["a"]}, {ids["b"]},
+                                    include_placed=True, known_pairs=known)
+            self.assertEqual(known, set())
+            add_pairwise_candidates(catalog, [hit("100M", 100, 100)], {ids["a"]}, {ids["b"]},
+                                    include_placed=True, known_pairs=known)
+            self.assertEqual(known, {tuple(sorted(sources))})
+            self.assertEqual(supplemental_groups(catalog, assignments, known), [])
+            # Explicit out-of-group work is not waived by one known source pair.
+            self.assertTrue(supplemental_groups(catalog, assignments[:1], known))
+
     def test_split_same_record_relationships_get_explicit_supplements(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -275,6 +305,23 @@ def fasta(path):
         before = log.read_text()
         self.assertEqual(self.run_prepare(mapper), manifest)
         self.assertEqual(log.read_text(), before)
+
+    def test_completed_discovery_pairs_reach_later_neighbor_planning(self):
+        from server.tools.lgz_core import q0_preparation
+        parts = {row["source"]["contig"]: row["segment_id"] for row in self.catalog()["segments"]}
+        sources = {row["segment_id"]: SourceKey(**row["source"]) for row in self.catalog()["segments"]}
+        pair = (parts["s_unplaced"], parts["p_cover"])
+        mapper, _ = self.mapper([pair])
+        observed = []
+        original = q0_preparation.supplemental_groups
+        def groups(catalog, assignments, known_pairs):
+            observed.append(set(known_pairs))
+            return original(catalog, assignments, known_pairs)
+        with mock.patch.object(q0_preparation, "supplemental_groups", side_effect=groups):
+            manifest = self.run_prepare(mapper)
+        self.assertEqual(len(observed), 1)
+        self.assertIn(tuple(sorted(sources[key] for key in pair)), observed[0])
+        self.assertEqual(load_verified_evidence(self.server), manifest)
 
     def test_discovery_retains_competing_chromosome_candidates(self):
         parts = {row["source"]["contig"]: row["segment_id"] for row in self.catalog()["segments"]}

@@ -139,7 +139,8 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
 
 
 def add_pairwise_candidates(catalog: CandidateCatalog, hits: Iterable[PafAlignment],
-                            query_ids: set[str], target_ids: set[str], *, include_placed: bool = False) -> set[str]:
+                            query_ids: set[str], target_ids: set[str], *, include_placed: bool = False,
+                            known_pairs: set | None = None) -> set[str]:
     """Discover candidate chr relations; never fabricate direct ref alignments.
 
     Only previously unplaced segments are expanded in a round. Candidate links
@@ -162,6 +163,11 @@ def add_pairwise_candidates(catalog: CandidateCatalog, hits: Iterable[PafAlignme
                            for block in hit.aligned_blocks()]
         if not query_intervals:
             continue
+        # The caller supplies only a successfully committed, validated PAF.
+        # Its observed source pairs are evidence just like the initial chr-local
+        # pairs; later missing-neighbor planning must not forget this work.
+        if known_pairs is not None:
+            known_pairs.add(tuple(sorted((query.source, catalog.parts[hit.target_name].source))))
         for anchor in anchors[hit.target_name]:
             orientation = "+" if hit.strand == anchor["orientation"] else "-"
             identity = (hit.query_name, anchor["chromosome"], orientation)

@@ -1920,3 +1920,59 @@
 - 完成上述实际范围、长度、资源及进程核查后，本地poll才将该特定task加入reviewed集合；
   这仅消除已处理的“大输入待核查”重复提示，不代表该任务资源准入安全或低效问题已修复。
   新任务仍触发提示，调度器/内存/失败告警保持原样。第二项参数仍未改动，最终manifest未出现。
+
+
+### 2026-11-21 定向优化进行中：补充关系复用与缺失窗口隔离试验
+
+用户已明确要求“好，推进定向优化”，当前目标仍未完成；不能把下面的局部源码/试验
+当成已部署的新流程。新版42949582、旧版42523432均保持运行，未替换冻结runtime。
+
+- 覆盖诊断42999168 SUCCEEDED，agent-X86-18，81.475秒计算、峰值305MiB。目录
+  `q0-partial-coverage-diagnostic-20261121-1426/`在新版运行目录下；源码SHA
+  `f63d361d9e2c3371d0e40915df8193a808b78c7986a861744274b54d4c7a13f3`。
+  基于现有参考PAF的真实CIGAR配对块/MAPQ/identity，不拿比对跨度填补I/X空洞，不重跑比对。
+  本例原始FAI共38267条，长N区间metadata为空；诊断得到2155+33724=35879条partial query，
+  总长31625089260bp，与当前补充任务实测完全一致。先前“partial_source范围扩张”获得实数支持。
+  >=100bp未覆盖区间合计6039640131bp；各加1kb上下文为7296994757bp、10kb为12535595342bp、
+  100kb为27581766179bp。上述是未额外长窗口分块的尺寸，不是时间倍率或实际mapper内存保证。
+  最长ptg000049l的289508469bp在该筛选下全部未覆盖，单纯加flank不解决此类超长查询。
+  源码、原始摘要与scheduler终态存入incident-tools的partial_coverage_sizing.py及
+  partial-coverage-sizing-20261121.json；探针对真实production解析器的随机双链CIGAR差分测试通过。
+- 生产源码先修复一条确实漏掉的复用链：unplaced和partial补充PAF成功后，把已观察到配对块的
+  source pair纳入known_pairs，再规划后续missing-neighbor任务。空/仅indel记录不算成功关系，
+  split和out-of-group显式补充仍保留，失败/未完成PAF不能进入此链。不是跳过全部后续任务。
+  修改q0_catalog.py、q0_preparation.py；新增两项回归检查实际调用链及不误删显式任务。
+  当前远端进程早已加载旧代码，**此修复尚未在远端生效**。
+- 新增q0_query_windows.py作为隔离候选，尚未接入_supplement/默认生产执行：候选触发阈值为
+  partial query总量>=1Gb或最长>=20Mb；保留>=100bp缺失core、两侧10kb上下文，core上限1Mb。
+  相邻缺口共用上下文，长core带上下文分块，末尾不足100bp的分块尾巴仍保留；不删目标染色体。
+  PAF严格校验后回投原segment坐标，正负链都使用forward query偏移；CIGAR和完整原序列保留。
+  仅context命中/原segment自身命中不变成donor证据，indel跨度不能假装覆盖core。
+  此路径改变比对上下文，不能声称与整段原算法完全无损；没有放宽跨组装种子/比对阈值。
+- 定向测试：q0 windows/preparation/admission/evidence/paths共131项通过（14.564秒），
+  覆盖诊断另3项通过（含>1800个production CIGAR双链差分）；本地真实minimap2 2.26-r1175
+  的小型正/负链、分块接缝控制保留全部指定core配对覆盖。不是远端2.31性能或全小麦验收。
+- 隔离真实试验43000618 RUNNING，agent-X86-25，8CPU/80GiB，14:37:31开始。
+  目录`q0-partial-window-pilot-20261121-1440/`（目录标签不是实际开始时间）。
+  pilot.py SHA `093235a7b7b7f3d76eea2d3b12aa8c3565771ab139c087619e34dda51ed39943`；
+  window helper SHA `c6b26d90f0a2d3f8367bf551eb937c1582b8b53a43375fce6e6117b30e183b05`。
+  对最长289.5Mb实际query选择首/中/末三个窗口，索引只写私有symlink旁边，读取完整selected
+  segment核对当前command的成员SHA，再对原32GB目标运行同一个2.31-r1302、原asm10/flags。
+  14:40:43已进入mapper；显式64GiB地址空间上限、900秒mapper诊断预算，仅作用于本pilot。
+  超时只终止本pilot新建进程组，不动主任务、不接纳partial PAF。不以pilot成功冒充主任务receipt。
+  需继续查scheduler终态、完整四个target index分区、最终raw/projected回执和RSS；不要重提仍活着
+  的pilot，不能将安静日志/一次SSH超时当失败。主observer3770106仍至约15:41有限窗口。
+
+下一步（未完成，不能据上述局部测试结案）：
+1. 收取真实pilot证据，核查保留的跨来源命中/成本/内存；必要时补代表性缺口与长重复区对照。
+2. 窗口路径需要实际接入partial request的精确未覆盖坐标、分片/资源预算及不同执行身份；
+   同时更新receipt/manifest验证和独立下游读取，保留raw PAF与变换来源，不把window结果冒充native。
+   核查已有完整native补充结果的优先复用；缺失部分才算，旧成功结果不改名或删除。
+3. 续跑前还应审查catalog的query/target区间累积：add_pairwise_candidates目前为每个hit/anchor
+   累积大量重复Interval，末尾才union。可评估精确的分批union降低整理时间/驻留内存；不能删证据ID
+   或把跨gap hull当覆盖。首项receipt到第二项命令约7.5小时只是阶段间隔，尚不是该函数独占耗时证明。
+4. 当前native-fair plan有native_previous，禁止盲目再套revision链。只改未完成q0工具有希望保留
+   同一controller/reader，但必须实际检查调用者、输入指纹和独立消费者，不能仅凭“后续步骤”热替换。
+   已查原memory-resume receipt.runtime_files只列self_alignment_batches的两处、assign_chr_groups、
+   lgz_prepare_inputs；这不是其他绑定不存在的证明。先备份/SHA/真实冻结模块回归，再受控停止新版、
+   确认子进程/正常锁退出并续跑。旧版不动，不跑update.sh/发布CI/重prepare。

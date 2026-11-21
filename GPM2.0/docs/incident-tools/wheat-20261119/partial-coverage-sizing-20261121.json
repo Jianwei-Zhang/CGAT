@@ -1,0 +1,69 @@
+{
+  "diagnostic_job": 42999168,
+  "state": "SUCCEEDED",
+  "start_time": "2026-11-21T06:24:34Z",
+  "end_time": "2026-11-21T06:25:57Z",
+  "sampler_sha256": "f63d361d9e2c3371d0e40915df8193a808b78c7986a861744274b54d4c7a13f3",
+  "report": {
+    "policy": "read-only sizing using original whole sources; >=100bp holes; not cache acceptance or a change to scientific policy; assumes no long-N source splits, compare count/bp to current task before use",
+    "datasets": [
+      {
+        "dataset": "JM19_hifiasm",
+        "paf_rows": 2627833,
+        "reference_paf_sha256": "f85202cb6000610eb8487fbb6edb6bb81dab3a3f849d3dd0ec88708a24bf66fd",
+        "source_count": 2377,
+        "reference_candidate_sources": 2348,
+        "partial_query_count": 2155,
+        "whole_query_bp": 14576320970,
+        "uncovered_intervals": 267849,
+        "window_total_bp_by_flank": {
+          "0": 2430599656,
+          "1000": 2911524602,
+          "10000": 5221824446,
+          "100000": 12587053372
+        },
+        "window_count_by_flank": {
+          "0": 267849,
+          "1000": 215240,
+          "10000": 93503,
+          "100000": 17968
+        },
+        "window_max_bp_by_flank": {
+          "0": 289508469,
+          "1000": 289508469,
+          "10000": 289508469,
+          "100000": 289508469
+        }
+      },
+      {
+        "dataset": "JM19_flye_ABD",
+        "paf_rows": 4105189,
+        "reference_paf_sha256": "8d3295b062f66ba14ca609270c3be25d0ad5945f49e2b7ae9ad53b10035f22df",
+        "source_count": 35890,
+        "reference_candidate_sources": 35769,
+        "partial_query_count": 33724,
+        "whole_query_bp": 17048768290,
+        "uncovered_intervals": 464987,
+        "window_total_bp_by_flank": {
+          "0": 3609040475,
+          "1000": 4385470155,
+          "10000": 7313770896,
+          "100000": 14994712807
+        },
+        "window_count_by_flank": {
+          "0": 464987,
+          "1000": 342258,
+          "10000": 129421,
+          "100000": 49816
+        },
+        "window_max_bp_by_flank": {
+          "0": 1284184,
+          "1000": 1284184,
+          "10000": 3986104,
+          "100000": 16845873
+        }
+      }
+    ],
+    "wall_seconds": 81.47550368309021
+  }
+}

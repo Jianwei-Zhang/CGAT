@@ -337,7 +337,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         tasks.append(task)
         hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in remaining},
                         target_lengths={key: catalog.parts[key].interval.length for key in anchors}, artifact=task["paf"])
-        added = add_pairwise_candidates(catalog, hits, set(remaining), set(anchors))
+        added = add_pairwise_candidates(catalog, hits, set(remaining), set(anchors),
+                                        known_pairs=known_pairs)
         catalog.payload["discovery_rounds"].append({"task_id": task["task_id"], "added_segment_ids": sorted(added)})
         if not added:
             break
@@ -349,7 +350,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         tasks.append(task)
         hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
                         target_lengths={key: catalog.parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"])
-        add_pairwise_candidates(catalog, hits, set(task["query_ids"]), set(task["target_ids"]), include_placed=True)
+        add_pairwise_candidates(catalog, hits, set(task["query_ids"]), set(task["target_ids"]),
+                                include_placed=True, known_pairs=known_pairs)
     for request in supplemental_groups(catalog, assignments, known_pairs):
         tasks.append(_supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
                                  skip_self=options.get("skip_self") == "true"))
