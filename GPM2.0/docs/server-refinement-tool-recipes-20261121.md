@@ -9,7 +9,7 @@ The machine-readable authority is `server/contracts/refinement-tools.lock.json`.
 | Tool | Fixed version/source | Distribution |
 | --- | --- | --- |
 | DEGAP | 2.0, commit `0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75` | Bundled source; original manifest and every source file checked |
-| TGS-GapCloser | 1.2.1, upstream tag commit `52818b3e464209477baec506ade3240be43b4fa8` | Bioconda build 4, exact build and archive SHA-256 per architecture; includes distribution patches |
+| TGS-GapCloser | 1.2.1, upstream tag commit `52818b3e464209477baec506ade3240be43b4fa8` | Bioconda build 4 from the `1.2.1_ml` release variant, exact build and archive SHA-256 per architecture |
 | quarTeT GapFiller | 1.3.1, commit `a44d8c87e3f4bcefaf43dc4134e88b6a21890265` | Pinned source archive plus the explicitly recorded Python 3.11 packaging patch below |
 | LR_Gapcloser | 1.0, commit `156381adec01a5c664edbf5df1d866b5c70e82a1` | Exact noarch Bioconda package; uses the separately pinned native BWA for the current architecture |
 
@@ -31,6 +31,7 @@ quarTeT keys some temporary alignment files by input **basename**, not full path
 ## Native output rules that adapters must retain
 
 - DEGAP must provide both its gap-result JSON and its native integrated assembly. The assembly must contain the original chromosome set; it is indexed and summarized, but is not unconditionally adopted as CGAT's final result. A native exit code alone is insufficient.
+- The exact locked TGS-GapCloser package was downloaded and hash-checked separately from the source tag. Its `1.2.1_ml` wrapper filters PAF rows using `qstart < 1000000 OR qlen - qstart < 1000000`. This is a native distribution behavior, not a CGAT-added filter. Some fatal argument checks in this wrapper return **0**: artifact validation is therefore mandatory even when the shell exits successfully. These distinctions are in the machine-readable recipe; the distribution is not presented as byte-identical to vanilla upstream 1.2.1.
 - TGS-GapCloser provides `*.scaff_seqs`, `*.updated_scaff_infos`, `*.orignial_scaff_infos` (upstream spelling) and `*.name_map`. The adapter must use these real artifacts, not an assumed `gap_fill_details` filename.
 - LR_Gapcloser can stop before iteration 3 when no gaps remain. An adapter must validate the last complete iteration and the early-stop condition; merely selecting the largest directory number is insufficient.
 - quarTeT explicitly returns nonzero for “no gap can be closed” or no eligible gaps. These cases require a specific, evidence-backed native no-result classification. They must not be conflated with arbitrary process failure, nor turned into successful final results merely by copying LGZ.

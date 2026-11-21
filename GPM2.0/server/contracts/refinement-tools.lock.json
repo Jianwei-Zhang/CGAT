@@ -53,6 +53,12 @@
           "correction": "native_racon",
           "racon_rounds": 1,
           "minimap": "-x ava-ont"
+        },
+        "distribution": {
+          "upstream_release_variant": "1.2.1_ml",
+          "native_alignment_prefilter": "PAF qstart < 1000000 OR qlen - qstart < 1000000",
+          "fatal_argument_checks_may_exit_zero": true,
+          "required_success_evidence": "complete validated native artifacts; exit code alone is insufficient"
         }
       },
       "license": {

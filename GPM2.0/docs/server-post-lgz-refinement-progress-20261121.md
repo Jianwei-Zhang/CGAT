@@ -104,3 +104,6 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 14 个针对安装/固定配方/小 reads 转换/受控 DEGAP 的最小测试通过（4.560 秒）；另一个“原生退出 0 但缺少整合 FASTA 必须失败”的小测试通过（2.544 秒）；没有跑完整回归，没有修改现有 conda 环境。新增配方记录明确 LR 提前迭代完成、quarTeT 无候选非零退出等尚待公共适配层处理的边界。
 
 本阶段仍未接通三个新增工具的原生接纳、完整 run_all 衔接、最终发布和 App 协议。下一步优先完成共同执行与结果接纳，再处理完整交付，不把“工具版本已锁定”当作四工具已集成完成。
+
+
+补充实际分发件核查：已校验下载的 TGS-GapCloser Bioconda build 4 archive SHA，并对照实际 driver 与源 tag。分发件来自 `1.2.1_ml`，有原生 1 Mb PAF 起点过滤，且部分 fatal 参数分支返回 0。已把这些区别写入工具锁和配方记录；后续公共执行器必须验全输出，不能把退出 0 当作成功。没有因此改写上游算法或声称原生运行验证通过。
