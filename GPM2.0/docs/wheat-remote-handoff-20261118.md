@@ -2837,3 +2837,24 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `q0_regional_execution.py`尚不在旧安装中，需核对installer对“原来不存在”的文件的
   备份/回滚表示；若同时装入7cbcf887的外层validator，还须显式处理既有runtime whitelist。
   不直接覆盖当前15项安装journal，不伪造旧文件摘要，不为了基准数字重启旧版基线。
+
+## 2026-11-22：下一轮 q0 接管准备工具（尚未部署到主任务）
+
+- 核对发现旧installer已经支持`prior_sha256=null`的新文件及失败后删除自有新增文件；
+  不应为不存在的缺口重写安装机制。本轮补充了真实“旧文件+新增模块”混合库存测试，
+  以及不重写内容相同的runtime、备份完成后逐项重核旧身份、拒绝中途出现的未知新文件
+  或父目录软链接。完整备份/已安装库存仍保留，journal另记实际`replaced`路径。
+- 新增`prepare_q0_runtime_transition.py`：仅在隔离bundle写新的transition/launcher/准备
+  receipt。绑定上一次安装journal、真实reader声明和源码；按候选builder自动收集14文件
+  闭包，核对4项科学policy的AST不变，保留原native origin，不重做已经采纳过的cache移动。
+  发现源码/声明漂移、未知目标、已发布q0或已有候选输出即停止，不覆盖、不停作业、不改锁。
+- 本地安装/上下文/gate/准备器定向测试83项通过；真实master的14文件闭包及4项policy与
+  当前52f634d5科学声明相等已核实。这里只验证准备机制，不能当作真实25初始检查点预检。
+- 下一包刻意只取q0 runtime闭包及新的入口/门禁，不顺带替换`run_orchestration.py`。
+  因此外层contract维持原现场字节，7cbcf887的外层validator暂不部署；q0内层parser与
+  并行执行器随闭包进入候选。避免为一项小解析收益扩大旧native provenance/加载边界。
+- 04:46调度器快照：NEW43010068仍RUNNING/q0_evidence，79371MiB，recent99%；
+  OLD42523432 RUNNING/grt_step2，recent1595%。阶段函数需重新采样；不能把04:18的
+  build_catalog栈当作当前栈。两份原参考PAF分别683392866/1061893273 bytes，仅stat，
+  没有登录节点基因组扫描或重比对。后续要实际stage候选、在计算节点做25项只读预检，
+  再核对区域阶段剩余量/吞吐与资源ready条件，才决定何时正常接管。

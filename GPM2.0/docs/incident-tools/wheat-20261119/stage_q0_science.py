@@ -48,6 +48,18 @@ def targets(ctx):
     return rows
 
 
+def verify_prior(ctx,row):
+    target=ctx.work/row['relative']
+    current=ctx.work
+    for part in Path(row['relative']).parts:
+        current/=part
+        if current.is_symlink():raise ValueError('linked q0 installation prior target')
+    if not target.resolve().is_relative_to(ctx.work):raise ValueError('escaped q0 installation target')
+    actual=digest(target) if target.exists() else None
+    if actual!=row['prior_sha256']:
+        raise ValueError('q0 installation prior identity changed: '+row['relative'])
+
+
 def file_stamp(path):
     stat=path.stat()
     return stat.st_dev,stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns
@@ -155,9 +167,7 @@ def install(ctx,lock,make_declaration):
     # Do not guess how to recover an interrupted/previous installation.
     if backup.exists():raise ValueError('prior q0 installation journal requires explicit inspection')
     for row in rows:
-        target=ctx.work/row['relative'];expected=row['prior_sha256']
-        actual=digest(target) if target.exists() else None
-        if actual!=expected:raise ValueError('q0 installation prior identity changed: '+row['relative'])
+        verify_prior(ctx,row)
     backup.mkdir(exist_ok=False);saved=[]
     for i,row in enumerate(rows):
         target=ctx.work/row['relative'];present=target.exists();mode=(target.stat().st_mode&0o777) if present else 0o644
@@ -181,6 +191,8 @@ def install(ctx,lock,make_declaration):
         for row in saved:
             owned(ctx,lock)
             if row['source'] is None:continue
+            verify_prior(ctx,row)
+            if row['prior_sha256']==row['source']['sha256']:continue
             target=ctx.work/row['relative'];changed.append(row)
             atomic_bytes(target,checked(row['source']).read_bytes(),row['mode'])
             if digest(target)!=row['source']['sha256']:raise ValueError('installed q0 runtime differs')
@@ -189,14 +201,14 @@ def install(ctx,lock,make_declaration):
                 or declaration.get('native_checkpoint_rewritten') is not False
                 or declaration.get('transition_sha256')!=ctx.transition_sha):
             raise ValueError('q0 reader declaration is not the explicit science transition')
-        row=saved[-1];owned(ctx,lock);changed.append(row)
+        row=saved[-1];owned(ctx,lock);verify_prior(ctx,row);changed.append(row)
         declaration_bytes=(json.dumps(declaration,indent=2,sort_keys=True)+'\n').encode()
         atomic_bytes(ctx.work/row['relative'],declaration_bytes,row['mode'])
         ctx.verify()
         for row in saved:
             expected=row['source']['sha256'] if row['source'] else hashlib.sha256(declaration_bytes).hexdigest()
             if digest(ctx.work/row['relative'])!=expected:raise ValueError('q0 runtime changed during installation')
-        receipt.update(status='installed',installed=[{'relative':row['relative'],'sha256':digest(ctx.work/row['relative'])} for row in saved])
+        receipt.update(status='installed',replaced=[row['relative'] for row in changed],installed=[{'relative':row['relative'],'sha256':digest(ctx.work/row['relative'])} for row in saved])
         ctx.contract.atomic_write_json(journal,receipt)
     except BaseException:
         # Normal lock is still owned by the caller; restore exact old bytes/mode.

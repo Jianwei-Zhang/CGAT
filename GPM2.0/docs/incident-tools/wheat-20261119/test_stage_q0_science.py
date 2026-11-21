@@ -56,6 +56,59 @@ class InstallationTests(unittest.TestCase):
         self.assertFalse(self.paths[0].exists())
         self.assertEqual(self.paths[1].read_bytes(),self.before[1])
 
+    def extra_runtime(self):
+        target=self.ctx.work/'.prepare_lib/tools/lgz_core/q0_regional_execution.py'
+        source=self.root/'executor.py';source.write_text('new bounded executor')
+        self.ctx.transition['runtime'].append({'relative':str(target.relative_to(self.ctx.work)),
+            'prior_sha256':None,'source':{'path':str(source),'sha256':stage.digest(source)},
+            'new_sha256':stage.digest(source)})
+        return target
+
+    def test_additional_new_module_is_recorded_without_fake_backup(self):
+        target=self.extra_runtime();report=json.loads(self.install().read_text())
+        self.assertEqual(target.read_text(),'new bounded executor')
+        row=next(r for r in report['files'] if r['relative'].endswith('q0_regional_execution.py'))
+        self.assertFalse(row['present']);self.assertIsNone(row['backup']);self.assertIsNone(row['prior_sha256'])
+        self.assertIn(row['relative'],report['replaced'])
+
+    def test_failed_additional_module_install_restores_existing_and_removes_only_new(self):
+        target=self.extra_runtime()
+        def fail():raise RuntimeError('declaration rejected')
+        with self.assertRaises(RuntimeError):self.install(fail)
+        self.assertFalse(target.exists())
+        self.assertEqual([p.read_bytes() for p in self.paths],self.before)
+
+    def test_matching_runtime_is_validated_and_backed_up_without_replacement(self):
+        runtime=self.ctx.transition['runtime'][0]
+        source=Path(runtime['source']['path']);source.write_bytes(self.paths[0].read_bytes())
+        runtime['source']['sha256']=runtime['new_sha256']=stage.digest(source)
+        inode=self.paths[0].stat().st_ino
+        report=json.loads(self.install().read_text())
+        self.assertEqual(self.paths[0].stat().st_ino,inode)
+        self.assertNotIn(runtime['relative'],report['replaced'])
+        self.assertEqual(Path(report['files'][0]['backup']).read_bytes(),self.before[0])
+
+    def test_new_target_appearing_after_backup_is_not_overwritten_or_deleted(self):
+        target=self.extra_runtime();actual=self.ctx.contract.atomic_write_json
+        def journal(path,value):
+            actual(path,value)
+            if value['status']=='backed_up':target.write_text('unexpected external file')
+        self.ctx.contract.atomic_write_json=journal
+        with self.assertRaisesRegex(ValueError,'prior identity'):self.install()
+        self.assertEqual(target.read_text(),'unexpected external file')
+        self.assertEqual([p.read_bytes() for p in self.paths],self.before)
+
+    def test_parent_link_appearing_after_backup_is_rejected(self):
+        actual=self.ctx.contract.atomic_write_json;parent=self.paths[0].parent
+        def journal(path,value):
+            actual(path,value)
+            if value['status']=='backed_up':
+                real=parent.with_name('preserved-core');parent.rename(real)
+                parent.symlink_to(real,target_is_directory=True)
+        self.ctx.contract.atomic_write_json=journal
+        with self.assertRaisesRegex(ValueError,'linked'):self.install()
+        self.assertEqual([p.read_bytes() for p in self.paths],self.before)
+
     def test_owner_identity_is_required(self):
         self.lock._existing_owner=lambda:{'run_id':'other'}
         with self.assertRaisesRegex(ValueError,'ownership'):self.install()
