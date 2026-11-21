@@ -76,8 +76,19 @@ for prefix in ('', 'server.tools.'):
         self.assertEqual(updater.engine_hash(TOOLS), repair_engine_sha256(TOOLS / "lgz_core"))
         self.assertEqual(updater.engine_hash(TOOLS), repair_engine_sha256(TOOLS / "grt_core"))
         files = {p.relative_to(TOOLS).as_posix() for p in engine_source_files(TOOLS)}
-        for name in ("lgz_core/step2_engine.py", "grt_core/step2_engine.py", "lgz_step3.py", "grt_step3.py", "lgz_compat.py", "run_resources.py"):
+        for name in ("lgz_core/step2_engine.py", "grt_core/step2_engine.py", "lgz_step3.py", "grt_step3.py", "lgz_compat.py", "run_resources.py", "workspace_layout.py"):
             self.assertIn(name, files)
+
+    def test_layout_helper_changes_invalidate_engine_identity(self):
+        from server.tools import update_workspace_runtime as updater
+        with tempfile.TemporaryDirectory() as directory:
+            tools = Path(directory)
+            (tools / "grt_core").mkdir()
+            for name in ("grt_core/__init__.py", "grt_step2.py", "grt_step3.py", "run_resources.py", "workspace_layout.py"):
+                (tools / name).write_text("# fixture\n")
+            before = updater.engine_hash(tools)
+            (tools / "workspace_layout.py").write_text("# changed resolver\n")
+            self.assertNotEqual(before, updater.engine_hash(tools))
 
     def test_new_cli_flags_preserve_existing_persisted_option_identity(self):
         from server.tools.server_run import parse_options

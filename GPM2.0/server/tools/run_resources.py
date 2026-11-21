@@ -12,8 +12,10 @@ else:
 from pathlib import Path
 
 try:
+    from workspace_layout import workspace_path
     from run_orchestration import atomic_write_json
 except ModuleNotFoundError:
+    from .workspace_layout import workspace_path
     from .run_orchestration import atomic_write_json
 
 RESOURCE_OPTIONS = {"--threads": "threads", "--grt-qc-memory-gb": "qc_memory_gb",
@@ -29,7 +31,7 @@ def positive(value, name: str) -> int:
 
 
 def read_resources(root: Path) -> dict:
-    path = root / ".run_all/resources.json"
+    path = workspace_path(root, ".run_all/resources.json")
     if not path.exists() and not path.is_symlink():
         return {"schema_version": 1, "effective": {}, "history": []}
     if path.is_symlink() or not path.is_file():
@@ -52,7 +54,7 @@ def read_resources(root: Path) -> dict:
 
 
 def prepared_resources(root: Path) -> dict:
-    path = root / "metadata/prepare_options.tsv"
+    path = workspace_path(root, "metadata/prepare_options.tsv")
     with path.open(newline="", encoding="utf-8") as handle:
         options = {row["key"]: row["value"] for row in csv.DictReader(handle, delimiter="\t")}
     return {"threads": positive(options["threads"], "threads"),
@@ -73,15 +75,15 @@ def update_resources(root: Path, options: dict, run_id: str) -> None:
                for name, budget in requested.items() if previous[name] != budget}
     if not changes:
         return
-    runtime = root / ".prepare_lib"
+    runtime = workspace_path(root, ".prepare_lib")
     if runtime.is_dir() and not (runtime / "tools/run_resources.py").is_file():
         raise ValueError("This workspace runtime predates resource-only resume; update its Server runtime first")
     if "minimap_batch" in requested and runtime.is_dir():
-        for command in (root / "runs").glob("*_vs_ref/command.sh"):
+        for command in (workspace_path(root, "runs")).glob("*_vs_ref/command.sh"):
             text = command.read_text(encoding="utf-8")
             if "long_cigar_recovery/server_alignment.py" not in text and BATCH_ENV not in text:
                 raise ValueError("This workspace command predates -K overrides; preserve it and use a new output directory")
-    plan = root / ".run_all/plan.tsv"
+    plan = workspace_path(root, ".run_all/plan.tsv")
     if plan.is_file():
         with plan.open(newline="", encoding="utf-8") as handle:
             if any(row.get("unit_id") == "grt_step23" for row in csv.DictReader(handle, delimiter="\t")):
@@ -89,7 +91,7 @@ def update_resources(root: Path, options: dict, run_id: str) -> None:
     state["effective"].update(requested)
     state["history"].append({"run_id": run_id,
         "at": datetime.now(timezone.utc).isoformat(), "changes": changes})
-    atomic_write_json(root / ".run_all/resources.json", state)
+    atomic_write_json(workspace_path(root, ".run_all/resources.json"), state)
     print("[RESUME] " + "; ".join(f"{name}: {change['from']} -> {change['to']}"
                                  for name, change in changes.items()), flush=True)
 

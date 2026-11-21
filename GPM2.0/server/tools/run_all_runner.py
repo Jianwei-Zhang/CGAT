@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from run_progress import ProgressDisplay, plain
+from workspace_layout import WorkspaceLayout, workspace_path
 from run_resources import execution_threads, read_resources, resource_environment
 from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
                                   changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
@@ -102,7 +103,8 @@ def validate_relative_path(value: str, label: str) -> str:
 
 
 def load_plan(server_dir: Path) -> list[PlanUnit]:
-    plan_path = server_dir / ".run_all/plan.tsv"
+    layout = WorkspaceLayout.detect(server_dir)
+    plan_path = layout.path(".run_all/plan.tsv")
     if not plan_path.is_file():
         raise RunnerError(f"execution plan is missing: {plan_path}")
     try:
@@ -133,7 +135,9 @@ def load_plan(server_dir: Path) -> list[PlanUnit]:
         detail_relpath = validate_relative_path(
             row.get("detail_log_relpath", ""), f"detail log path for {unit_id}"
         )
-        command_path = server_dir / command_relpath
+        command_relpath = layout.relative(command_relpath)
+        detail_relpath = layout.relative(detail_relpath)
+        command_path = layout.path(command_relpath)
         if not command_path.is_file():
             raise RunnerError(f"command script for {unit_id} is missing: {command_path}")
         units.append(PlanUnit(unit_id, command_relpath, detail_relpath))
@@ -206,11 +210,15 @@ def initial_status_rows(
 
 
 class WorkspaceLock:
-    def __init__(self, server_dir: Path, run_id: str):
+    def __init__(self, server_dir: Path, run_id: str, *, for_migration: bool = False):
         self.server_dir = server_dir
-        self.state_dir = server_dir / ".run_all"
+        # Recovery must acquire the legacy lock even while ordinary launches
+        # are blocked by an unfinished migration journal.
+        self.state_dir = (server_dir / ".run_all" if for_migration
+                          else workspace_path(server_dir, ".run_all"))
         self.lock_dir = self.state_dir / "lock"
         self.run_id = run_id
+        self.for_migration = for_migration
         self.owner = {
             "workspace": str(server_dir),
             "hostname": socket.gethostname(),
@@ -229,6 +237,15 @@ class WorkspaceLock:
             return {}
 
     def _owner_is_active(self, owner: dict[str, object]) -> bool:
+        # A migration cannot infer cross-node inactivity from a missing/broken
+        # owner record or an unexpected workspace identity.
+        if self.for_migration and (not owner or owner.get("workspace") != str(self.server_dir)
+                                   or not owner.get("hostname")
+                                   or type(owner.get("pid")) is not int or owner["pid"] < 1
+                                   or (owner.get("process_start") and
+                                       (not isinstance(owner["process_start"], str)
+                                        or not owner["process_start"].isdigit()))):
+            return True
         if owner.get("workspace") != str(self.server_dir):
             return False
         if owner.get("hostname") != socket.gethostname():
@@ -242,6 +259,12 @@ class WorkspaceLock:
     def acquire(self) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         for _ in range(4):
+            # POSIX rename may replace an empty directory. During migration an
+            # ownerless lock is uncertain, not permission to steal that lock.
+            if self.for_migration and (self.lock_dir.exists() or self.lock_dir.is_symlink()):
+                owner = self._existing_owner()
+                if self.lock_dir.is_symlink() or self._owner_is_active(owner):
+                    raise RunnerError("workspace is already running or migration lock ownership is unknown")
             temporary = Path(
                 tempfile.mkdtemp(prefix=".lock.", dir=self.state_dir)
             )
@@ -891,7 +914,11 @@ def main() -> int:
         print(f"ERROR: Server workspace is missing: {server_dir}", file=sys.stderr)
         return 2
     run_id = new_run_id()
-    lock = WorkspaceLock(server_dir, run_id)
+    try:
+        lock = WorkspaceLock(server_dir, run_id)
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     try:
         units = load_plan(server_dir)
         lock.acquire()
