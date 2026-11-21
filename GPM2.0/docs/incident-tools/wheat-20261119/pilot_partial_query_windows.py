@@ -44,9 +44,13 @@ def main():
     p.add_argument("--window-helper", type=Path, required=True)
     p.add_argument("--threads", type=int, default=8)
     p.add_argument("--mapper-seconds", type=int, default=900)
+    p.add_argument("--core-bases", type=int, default=1_000_000)
+    p.add_argument("--context-bases", type=int, default=10_000)
+    p.add_argument("--core-starts", help="explicit comma-separated core starts for matched-site pilots")
     a = p.parse_args()
     work = a.server_dir.resolve(strict=True); out = Path.cwd().resolve()
-    if out == work or work in out.parents or a.threads < 1 or a.mapper_seconds < 1:
+    if (out == work or work in out.parents or a.threads < 1 or a.mapper_seconds < 1
+            or a.core_bases < 1 or a.context_bases < 0):
         raise ValueError("pilot needs an isolated output directory and positive budgets")
     if Path(a.task).name != a.task: raise ValueError("invalid task name")
     task = work / "grt/evidence/q0_prepare/tasks" / a.task
@@ -78,10 +82,17 @@ def main():
     qlength = lengths(out / "source-query.fa.fai")[a.segment]
     target_lengths = lengths(out / "source-target.fa.fai")
     if sorted(target_lengths) != source_spec["target_ids"]: raise ValueError("target inventory differs")
-    policy = helper.WindowPolicy()
+    policy = helper.WindowPolicy(core_bases=a.core_bases, context_bases=a.context_bases)
     planned = helper.plan_query_windows({a.segment: qlength}, {a.segment: [Interval(0, qlength)]}, policy=policy)
     if not planned: raise ValueError("selected query does not trigger the candidate policy")
-    windows = [planned[i] for i in sorted({0, len(planned)//2, len(planned)-1})]
+    if a.core_starts:
+        starts = [int(value) for value in a.core_starts.split(",")]
+        by_start = {w.cores[0][0]: w for w in planned}
+        if len(set(starts)) != len(starts) or any(start not in by_start for start in starts):
+            raise ValueError("pilot core starts do not identify distinct planned windows")
+        windows = [by_start[start] for start in sorted(starts)]
+    else:
+        windows = [planned[i] for i in sorted({0, len(planned)//2, len(planned)-1})]
     chunks = {w.window_id: [] for w in windows}
     digest = hashlib.sha256(); offset = 0
     emit("extracting_and_verifying_selected_segment", length=qlength, windows=len(windows))

@@ -84,6 +84,13 @@ class ProjectionTests(unittest.TestCase):
         self.assertIsNone(self.project(self.line(target="source-part")))
         self.assertIsNone(self.project(self.line(cigar="10M10I10D20M")))
 
+    def test_window_confidence_is_not_promoted_to_whole_source_confidence(self):
+        raw = self.line() + "\ttp:A:P\ts1:i:40\ts2:i:0\tAS:i:40\tms:i:40\tcm:i:10\trl:i:0\tNM:i:0\tnn:i:0"
+        hit = parse_paf_line(self.project(raw), artifact="projected", line_number=1)
+        self.assertEqual(hit.mapq, 255)
+        self.assertIsNone(hit.mapping_quality)
+        self.assertEqual(set(tag.split(":", 1)[0] for tag in hit.tags), {"cg", "NM", "nn", "qw"})
+
     def test_input_drift_or_double_projection_fails(self):
         for line in (self.line(qlen=41), self.line().replace(self.window.window_id, "unknown"),
                      self.line() + "\tqw:Z:already", self.line(cigar="41M")):
@@ -92,6 +99,12 @@ class ProjectionTests(unittest.TestCase):
 
 class RealWindowMappingTests(unittest.TestCase):
     def test_cross_source_core_evidence_survives_both_strands_and_tile_edges(self):
+        self._compare(["-P"])
+
+    def test_bounded_selection_preserves_controlled_cross_source_core(self):
+        self._compare(["-p", "0", "-N", "100"])
+
+    def _compare(self, candidate_flags):
         import shutil
         import subprocess
         import tempfile
@@ -116,7 +129,8 @@ class RealWindowMappingTests(unittest.TestCase):
                 write_fasta(root / "windows.fa", [(w.window_id, source[w.start:w.end]) for w in windows])
                 found = []
                 for mode in ("whole", "windows"):
-                    completed = subprocess.run([mapper, "-c", "-x", "asm10", "-D", "-P", "--dual=yes",
+                    flags = ["-P"] if mode == "whole" else candidate_flags
+                    completed = subprocess.run([mapper, "-c", "-x", "asm10", "-D", *flags, "--dual=yes",
                         "--no-long-join", "-t", "1", str(root / "target.fa"), str(root / (mode + ".fa"))],
                         text=True, capture_output=True, check=True)
                     hits = []

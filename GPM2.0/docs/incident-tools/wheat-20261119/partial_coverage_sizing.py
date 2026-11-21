@@ -39,7 +39,8 @@ def blocks(cigar, qs, qe, ts, te, strand, minimum=100):
     if last_end!=len(cigar) or not last_end or q!=(qe if strand=="+" else qs) or t!=te:raise ValueError("CIGAR geometry mismatch")
     return covered,has_paired
 
-def diagnose(root,out):
+def diagnose(root,out,*,minimum_mapq=20,include_unavailable_mapq=False):
+    if type(minimum_mapq) is not int or not 0<=minimum_mapq<=254: raise ValueError("invalid diagnostic MAPQ threshold")
     started=time.monotonic(); results=[]; records=[]
     with (root/"metadata/datasets.tsv").open() as f: datasets=list(csv.DictReader(f,delimiter="\t"))
     for dataset in datasets:
@@ -54,7 +55,7 @@ def diagnose(root,out):
                 qname=fields[0];qlen,qs,qe=map(int,fields[1:4]);ts,te=map(int,fields[7:9]);matches,span,mapq=map(int,fields[9:12]);strand=fields[4]
                 assert qlen==lengths[qname] and 0<=qs<qe<=qlen and strand in ["+","-"] and span>0
                 cigars=[tag[5:] for tag in fields[12:] if tag.startswith("cg:Z:")];assert len(cigars)==1
-                if matches/span>=0.9 and 20<=mapq<255:
+                if matches/span>=0.9 and (minimum_mapq<=mapq<255 or (include_unavailable_mapq and mapq==255)):
                     rows,used=blocks(cigars[0],qs,qe,ts,te,strand)
                     if used:present.add(qname);coverage[qname].extend(rows)
                 elif re.search("[M=X]",cigars[0]):present.add(qname)
@@ -71,7 +72,14 @@ def diagnose(root,out):
                 sums[key]+=sum(sizes);counts[key]+=len(sizes);longest[key]=max(longest[key],max(sizes))
         row={"dataset":name,"paf_rows":count,"reference_paf_sha256":digest.hexdigest(),"source_count":len(lengths),"reference_candidate_sources":len(present),"partial_query_count":nqueries,"whole_query_bp":query_bp,"uncovered_intervals":ngaps,"window_total_bp_by_flank":sums,"window_count_by_flank":counts,"window_max_bp_by_flank":longest}
         results.append(row);print(json.dumps(row),flush=True)
-    report={"policy":"read-only sizing using original whole sources; >=100bp holes; not cache acceptance or a change to scientific policy; assumes no long-N source splits, compare count/bp to current task before use","datasets":results,"wall_seconds":time.monotonic()-started}
+    report={"minimum_reference_mapq":minimum_mapq,"include_unavailable_mapq":include_unavailable_mapq,"policy":"read-only sizing using original whole sources; >=100bp holes; not cache acceptance or a change to scientific policy; assumes no long-N source splits, compare count/bp to current task before use","datasets":results,"wall_seconds":time.monotonic()-started}
     out.mkdir(exist_ok=True);(out/"partial-coverage.json").write_text(json.dumps(records)+"\n");(out/"summary.json").write_text(json.dumps(report,indent=2)+"\n");print(json.dumps(report),flush=True)
 
-if __name__=="__main__":diagnose(Path(sys.argv[1]),Path.cwd())
+if __name__=="__main__":
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root",type=Path)
+    parser.add_argument("--minimum-mapq",type=int,default=20)
+    parser.add_argument("--include-unavailable-mapq",action="store_true")
+    args=parser.parse_args()
+    diagnose(args.root,Path.cwd(),minimum_mapq=args.minimum_mapq,include_unavailable_mapq=args.include_unavailable_mapq)

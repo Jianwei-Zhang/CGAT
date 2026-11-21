@@ -1,0 +1,37 @@
+{
+  "production_modified": false,
+  "results": [
+    {
+      "job": 43003122,
+      "directory": "q0-supplement-seed-f001-pilot-20261121-1515",
+      "state": "FAILED",
+      "start": "2026-11-21T07:22:19Z",
+      "end": "2026-11-21T07:54:38Z",
+      "timeout": {
+        "pid": 1817588,
+        "seconds": 1800,
+        "main_action": "none",
+        "partial_result_accepted": false
+      },
+      "peak_mem_mib": 35902,
+      "scheduler_receipt_sha256": "ecbcb367f807a9219422a52650918bfa2a6f34ec6ba9a2e68142b05d6907813c",
+      "successful_result": false
+    },
+    {
+      "job": 43003161,
+      "directory": "q0-supplement-secondary100-pilot-20261121-1541",
+      "state": "FAILED",
+      "start": "2026-11-21T07:40:20Z",
+      "end": "2026-11-21T08:13:20Z",
+      "timeout": {
+        "pid": 2295347,
+        "seconds": 1800,
+        "main_action": "none",
+        "partial_result_accepted": false
+      },
+      "peak_mem_mib": 35057,
+      "scheduler_receipt_sha256": "0746fc8201d814dc372ca850723588efe30743f8a437a1c8c9ae65f39fa1d676",
+      "successful_result": false
+    }
+  ]
+}

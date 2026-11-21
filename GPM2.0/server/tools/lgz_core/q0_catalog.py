@@ -16,6 +16,50 @@ DISCOVERY_REFERENCE_IDENTITY = 0.90
 DISCOVERY_REFERENCE_MAPQ = 20
 
 
+
+class _IntervalUnion:
+    """Exact union with amortized compaction, not an interval-count cutoff.
+
+    Retain all evidence IDs elsewhere, without storing repeated geometry for
+    every hit/anchor. For disjoint intervals the buffer grows with the union,
+    avoiding a quadratic full-union rescan for each small batch of additions.
+    """
+    __slots__ = ("_merged", "_pending", "_threshold", "_starts")
+
+    def __init__(self):
+        self._merged: tuple[Interval, ...] = ()
+        self._pending: list[Interval] = []
+        self._threshold = 1024
+        self._starts: tuple[int, ...] = ()
+
+    def append(self, interval: Interval) -> None:
+        # Repeated full/overlapping alignments often add no new geometry.
+        # Evidence IDs are retained by the caller; avoid buffering/sorting an
+        # interval already represented exactly by one merged interval.
+        if self._merged:
+            index = bisect_right(self._starts, interval.start) - 1
+            if index >= 0 and interval.end <= self._merged[index].end:
+                return
+        self._pending.append(interval)
+        if len(self._pending) >= self._threshold:
+            self._compact()
+
+    def extend(self, intervals: Iterable[Interval]) -> None:
+        for interval in intervals:
+            self.append(interval)
+
+    def _compact(self) -> None:
+        if self._pending:
+            self._merged = merged_intervals((*self._merged, *self._pending))
+            self._pending.clear()
+            self._starts = tuple(interval.start for interval in self._merged)
+            self._threshold = max(1024, len(self._merged))
+
+    def __iter__(self):
+        self._compact()
+        return iter(self._merged)
+
+
 def interval_rows(intervals: Iterable[Interval]) -> list[list[int]]:
     return [[i.start, i.end] for i in merged_intervals(intervals)]
 
@@ -106,8 +150,11 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                         target = Interval(block.target.start + block.query.end - overlap.end,
                                           block.target.start + block.query.end - overlap.start)
                     identity = (part.segment_id, hit.target_name, hit.strand)
-                    row = accumulated.setdefault(identity, {"query": [], "target": [],
-                                                             "evidence": set(), "mapq": [], "discovery_query": []})
+                    row = accumulated.get(identity)
+                    if row is None:
+                        row = {"query": _IntervalUnion(), "target": _IntervalUnion(),
+                               "evidence": set(), "maximum_mapq": None, "discovery_query": _IntervalUnion()}
+                        accumulated[identity] = row
                     row["query"].append(overlap)
                     row["target"].append(target)
                     if (block.operation != "X" and hit.mapping_quality is not None
@@ -115,8 +162,9 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                             and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
                         row["discovery_query"].append(overlap)
                     row["evidence"].add(hit.evidence_id)
-                    if hit.mapping_quality is not None:
-                        row["mapq"].append(hit.mapping_quality)
+                    if (hit.mapping_quality is not None
+                            and (row["maximum_mapq"] is None or hit.mapping_quality > row["maximum_mapq"])):
+                        row["maximum_mapq"] = hit.mapping_quality
                     used = True
             if used:
                 payload["evidence"][hit.evidence_id] = evidence_ref(hit)
@@ -131,7 +179,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             "discovery_query_intervals": interval_rows(row["discovery_query"]),
             "reference_intervals": interval_rows(row["target"]),
             "reference_evidence_ids": sorted(row["evidence"]), "pairwise_evidence_ids": [],
-            "anchor_candidate_ids": [], "maximum_available_mapq": max(row["mapq"], default=None),
+            "anchor_candidate_ids": [], "maximum_available_mapq": row["maximum_mapq"],
         })
     catalog = CandidateCatalog(payload, sequences, parts)
     catalog.finish()
@@ -171,7 +219,10 @@ def add_pairwise_candidates(catalog: CandidateCatalog, hits: Iterable[PafAlignme
         for anchor in anchors[hit.target_name]:
             orientation = "+" if hit.strand == anchor["orientation"] else "-"
             identity = (hit.query_name, anchor["chromosome"], orientation)
-            row = pending.setdefault(identity, {"query": [], "anchors": set(), "evidence": set()})
+            row = pending.get(identity)
+            if row is None:
+                row = {"query": _IntervalUnion(), "anchors": set(), "evidence": set()}
+                pending[identity] = row
             row["query"].extend(query_intervals)
             row["anchors"].add(anchor["candidate_id"])
             row["evidence"].add(hit.evidence_id)

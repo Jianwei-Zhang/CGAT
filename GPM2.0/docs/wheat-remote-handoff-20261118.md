@@ -1976,3 +1976,137 @@
    已查原memory-resume receipt.runtime_files只列self_alignment_batches的两处、assign_chr_groups、
    lgz_prepare_inputs；这不是其他绑定不存在的证明。先备份/SHA/真实冻结模块回归，再受控停止新版、
    确认子进程/正常锁退出并续跑。旧版不动，不跑update.sh/发布CI/重prepare。
+
+
+### 2026-11-21 15:45 定向优化续接：窗口预算结果、精确区间union与候选选择对照
+
+**目标仍active，优化尚未部署到两项主任务；不能用以下控制测试/隔离作业宣告已提速。**
+
+- 1Mb窗口试验43000618 FAILED，14:55:44结束：900秒mapper诊断预算耗尽，首个target part
+  尚无mapped完成行；峰值32669MiB。100kb同位置试验43002943 FAILED，15:13:09结束：
+  900秒内完成两个target parts，进入第三个但未完成全部四个；峰值33534MiB。
+  不是主任务失败或OOM，不接受任何partial raw PAF。两者final-job.json、timeout凭据、日志和
+  原始partial输出都保留；紧凑事实在window-pilot-outcomes-20261121.json。缩短窗口本身不足以
+  证明全量可用，不能因局部单测通过就把1Mb/100kb方案直接接上32GB主计算。
+  100kb试验目录q0-partial-window-100k-pilot-20261121-1456，pilot.py SHA
+  0a116d00b424d06e576789c8645c560df17ad19ae96feb50276b63508ab3598b；旧window helper
+  均为c6b26d90f0a2d3f8367bf551eb937c1582b8b53a43375fce6e6117b30e183b05。
+- 已实现精确区间union优化，同时覆盖build_catalog和add_pairwise_candidates两处：
+  重复geometry分批合并，保留全部evidence/anchor ID；不跨真实gap合并，不删阈值外的数据。
+  如果区间持续不相交，buffer阈值随已保留union增大，避免反复扫描大集合造成平方级工作。
+  同时不再为每个block反复构造setdefault的空字典/list/set，仅保留MAPQ最大值，保持None/0/255区别。
+  新增4项回归含10万不相交区间、随机反序输入、重复证据全部保留和MAPQ边界。
+  控制对照每种3轮交替运行，完整catalog payload SHA逐轮相同。reference模式中位4.082→2.827秒、
+  进程峰值185320→25284KiB；pairwise模式3.305→2.957秒、109380→22100KiB。
+  这是本地Python3.12.3合成重复CIGAR对照，非远端小麦整流程倍率。baseline ba6d9cba，
+  old module SHA3db9b93fd026496c64a41580206a96a3bd3743e9ffe668010af04d7db571465b，
+  new module SHA523b999ec6c69bebaa3223a4a237dd2d1097149356e4d8484ad9140920423e13。
+  复现脚本catalog_union_benchmark.py，结果catalog-union-benchmark-20261121.json。
+- 额外覆盖诊断43003112 SUCCEEDED，15:04:33–15:07:17，计算162.444秒、峰值738MiB；
+  目录q0-geometric-coverage-diagnostic-20261121-1506，sampler SHA
+  eebd37f5c8d50d2b030df07716e3fbd2d4ab10d95fa0f6f2da3a02bc85674f00。
+  仅作诊断地将MAPQ阈值降到0并包括255，仍要求identity>=0.90的实际M/=配对块：未覆盖量变为
+  3968712740bp（原严格覆盖6039640131bp），10kb上下文未分块尺寸11549581880bp。
+  longest ptg000049l原assign为3D、98.489%参考支撑；严格筛选把全289508469bp都请求为partial，
+  此几何诊断则只有4929703bp、4401个>=100bp空洞，最长空洞364967bp。
+  这区分了“没有比对”和“已有比对但未通过置信度门槛”；不能把MAPQ0/255提升成可信定位。
+  生产DISCOVERY_REFERENCE_MAPQ/AdmissionPolicy尚未改变；该宽松诊断不是新科学策略的许可或验收。
+  只改变覆盖筛选仍会选择33414个whole query、约31.545Gb，不能冒称它单独解决整段重算。
+  原始摘要在geometric-coverage-sizing-20261121.json，参考PAF SHA与前次严格诊断相同。
+- 依据minimap2 v2.31原始minimap2.1/options.c核查：-P保留全部chain，不做primary选择，
+  此时-p/-N不生效。不能只在保留-P的命令末尾加-N就声称已限制候选。
+  旧版initial-reference的approximate_reference_cells用native_window_selection而非全链保留；
+  server_alignment等入口明确initial_reference_asm10_only，不能直接绕过scope拿来运行q0。
+- 正在做两个独立、完整原结果可对照的实验；均针对已成功的首项q0-map-8024dde83cbf20e7ffa6d8ee
+  的150查询/原target，不再重跑原参数。基线原mapper19062.863秒、32threads；候选都是8threads，
+  因此时间/内存对照不是纯参数倍率。生产跨组装策略不自动扩展，两个实验都scientific_acceptance=false。
+  * 43003122，q0-supplement-seed-f001-pilot-20261121-1515，15:22:19 RUNNING，15:24:35进入mapper；
+    仅增加-f0.001，原-P保留。首次mid_occ=461（原500）。script SHA
+    f842147a0bc939ddc4f5492806e4b811bcc0b55a66d2147ff1675afeb006d341；geometry helper为eebd37f5...。
+    1800秒仅mapper诊断预算，64GiB AS、8CPU/80GiB；预计预算到15:54:35，实际以日志/状态为准。
+  * 43003161，q0-supplement-secondary100-pilot-20261121-1541；8CPU/80GiB、64GiB AS，1800秒mapper预算。
+    删除-P，显式-p0 -N100，保留-D/--dual=yes/--no-long-join和原seed/preset，不混合-f调参。
+    script SHA7bbbf49394722368f214b405be2bdc2398d10478f4bbf6f4b48cd4609c30884a；geometry helper同上。
+    必须刷新scheduler确认真实运行/终态；提交成功不等于试验完成。
+  脚本replay_supplement_seed_pilot.py会核验完整native receipt四项输出SHA、真实FAI、工具身份；
+  完成后流式比较identity>=0.95且>=100配对bp的M/= query覆盖和有方向query-target-strand集合。
+  输出每query原覆盖保留量与原配对集合保留数，不能把全局query覆盖保留冒充所有竞争定位/最终正确率。
+  新增6项参数/指标回归，显式验证保留query覆盖但丢失替代target时仍报告配对损失。
+  两种candidate代码均只写隔离目录，超时只停止本实验进程组；不能伪造main success.json。
+- 已修正window projection候选的置信度边界：不把窗口局部MAPQ/primary标签/chain score套到
+  原整段source身份。投影MAPQ=255，只保留原cg/NM/nn及qw来源标记；原raw PAF必须单独绑定保存。
+  小型真实minimap对照同时覆盖-P和-p0/-N100，保留所需正负链core；这不是小麦竞争定位验收。
+  因而当前仓库window helper已不同于上述已结束窗口试验的c6b旧SHA；不要谎称新helper已通过远端全量。
+- observer3770106完成181轮后自然退出；核实PID/最后样本及两个主job实时RUNNING且无>90%内存
+  告警后，续接PID1470693、PPID1。目录wheat-observer-20261121-154150，log
+  logs/wheat-live-20261121-154151.jsonl，源码SHA
+  abf4895be8a97acd808785a9c92715554ff51e5f1a712827ee26715154adaf14。
+  仅把range(181)改为range(2881)，30秒一次，正常窗口约至11-22 15:42，遇告警仍提前结束。
+  这是只读长窗口，不自动修复/向聊天通知。launch.json式凭据实际名observer-launch.json。
+  /tmp/wheat-detached-observer-poll.py已更新到新路径，保留已核查任务ID与其他告警条件。
+
+部署前的重要新确认：
+- self_profile_evidence_reader.prepare生成的declaration包含scientific_builder_identity；当前
+  metadata/incident_q0_routing_reader.json已有旧值。即使只改q0代码、不改native plan，直接重提也会
+  因旧declaration与新builder不同而失败。不得删receipt或忽略其一致性检查。
+- 需要显式、持锁的builder/reader声明迁移：备份旧runtime和旧declaration，核对旧builder来自实际
+  旧源码字节；仅允许列明的q0模块/策略差异，原self/cross配置、全部已完成产出和launcher保持不变；
+  生成新declaration并把迁移凭据绑定入新q0 evidence输入/最终报告。独立reader/consumer也要验证。
+  native-fair仍不支持任意revision链，不能为此盲目调用旧stager或伪造module.__file__。
+- 大parent进程目前约120GiB RSS；不要把小pilot的preexec_fn直接照搬到主进程来设64GiB AS，
+  fork时可能已继承超过限制的地址空间。可复用独立guard进程模式，exec清掉parent映射后再设限制。
+- 候选窗口路径尚未接入_supplement、receipt/manifest/cache验证。需要区分raw mapping与投影身份，
+  让投影/校验小修复能复用已完整提交raw，不冒用原native缓存；已完成native补充优先复用。
+  还可优化_initial_inputs只需known_pairs却构造全部PafAlignment/CIGAR对象的路径，但必须保留
+  每行完整CIGAR几何、名字/长度和输出内容核验，不能因为已见source pair就跳过后面的非法记录。
+
+## 2026-11-21 17:25 接续：停止同类参数盲调，量化已有覆盖与候选范围
+
+- 本节是带时间的快照；NEW 42949582、OLD 42523432 未修改/重启。17:24 observer 两项仍
+  RUNNING，新版 q0_evidence、初始1364/1364；内存293038MiB/327680MiB，约17.94核。
+  17:19直接检查第二补充 q0-map-a6056c2d8fcb81f6ca19d1a7，仍仅完成首个索引构建，
+  result.paf.tmp=0；不能把 CPU 活跃说成完成，也不能据此给可靠的整体剩余时间。
+- 前节43003122/43003161的RUNNING已过期：分别于15:54:38和16:13:20在明确1800秒
+  mapper试验预算后失败退出，未完成任何target index part。峰值35902/35057MiB，
+  不是OOM，也不是主任务失败。两项原始final-job.json、pilot-timeout.json保留；
+  仓库supplement-profile-pilot-outcomes-20261121.json记录终态。结合先前两个窗口试验，
+  四项mapper试验均无完整成功结果，不接受部分PAF、不宣称候选保留率或生产加速。
+- source_part_lookup.py通过已完成首补充spec.members中的sequence SHA、原dataset/FAI
+  以及当前全target FAI的长度提示，重算规范q0-source-part ID并唯一匹配，恢复38267条
+  整段source的dataset/contig/length；不是按长度猜身份。59805次hash尝试，无DNA扫描。
+  结果目录q0-source-part-lookup-20261121-1600，lookup SHA
+  2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89；
+  脚本SHA d4856f7c6fb3d3a364ab33abe5774ea73d0e45293c4c04c69377091aab61e797。
+  标签恢复不等于重新验证source DNA，也不提供定位置信度；拆分或不完整inventory必须失败。
+- 候选范围诊断43005051成功，目录q0-candidate-scope-diagnostic-20261121-1615；
+  16:32:40—16:33:50，峰值79MiB，reference PAF SHA核验通过。按染色体组累计整source长度：
+  原assignment 30,372,872,267bp；全部reference candidates 515,439,624,122bp；
+  原分组加identity>=0.90、已知MAPQ>=20且单hit>=100 M/=bp仍449,942,513,615bp。
+  原始摘要candidate-group-scope-20261121.json。它是跨组重复计入的潜在whole-source范围，
+  不是真实新增DNA、已做的计算量或实测运行时间倍率；还未计pairwise discovery扩张。
+  只用强hit筛选whole-source membership不能解决局部支持被扩展为整条contig的问题。
+- 精确区间集合优化覆盖reference和pairwise catalog两条路径：buffer自适应压缩，已有union
+  完全包含的新区间无需再次入buffer；保留全部evidence ID、真正空隙、MAPQ None/0/255区别。
+  catalog_union_benchmark.py的三轮交替、独立进程合成对照，完整catalog payload SHA一致：
+  reference中位4.851→1.920s、peak188620→25208KiB；pairwise3.483→1.707s、109248→21612KiB。
+  最终q0_catalog.py SHA e6f9b81b8dfe0dbb226d8d3dbc842185e44ac25c65231d7bd4af1399c2102a16。
+  原buffer-only试验及补丁嵌套保存于catalog-union-benchmark-20261121.json，不覆盖历史证据。
+  这不是整套小麦倍率，尚未部署。194项q0定向测试完成（1项skip）；本轮额外诊断工具
+  15项测试通过（已有cross覆盖5、profile6、source lookup3、candidate scope1）。
+- 新诊断measure_existing_cross_coverage.py只读22项完整initial cross PAF加完整首补充，
+  验证成功checkpoint/receipt中的PAF完整SHA、大小与前后stat；扫描每行CG/名字/长度，
+  即使低identity/重复source也不跳过几何验证。以不同dataset、identity>=0.95、单hit至少
+  100 M/=bp作实际双侧覆盖，精确扣减严格reference遗留>=100bp孔洞。不把X/跨度hull当覆盖，
+  不用MAPQ把它升级为定位证据，不采用在跑的第二补充partial。结果仅用于选择下一步工作，
+  不是生产cache验收/唯一定位证明；source DNA不重读，reference基线来自先前有SHA的诊断。
+  * 43007242，q0-existing-cross-coverage-20261121-1735：17:21:20退出，诊断脚本误假设
+    最早strict摘要已有后来新增的MAPQ字段；未扫描PAF，主任务不受影响。原脚本/日志保留。
+  * 已修正为只兼容精确SHA f63d361d... 的旧strict producer，不对任意无标记摘要放宽。
+    增加完整临时workspace/receipt端到端测试以及同尺寸PAF内容漂移拒绝测试。
+    43007245，q0-existing-cross-coverage-20261121-v2，17:23:54 RUNNING，1CPU/8GiB，
+    同x86环境以保持受控诊断一致；script SHA
+    db064ec14e2241cce5f31e7d8639740493f4bd3411a0393fe1050633154db598。
+    17:25已扫描完22项initial cross，正在首补充PAF，尚无最终summary时不得宣布成功。
+- 下一步先读这个诊断的完整summary及residual-coverage.json，按实际剩余区间决定复用和
+  query/target双侧局部化方案。不要再启动同类全32Gb-target的参数试验。生产切换仍须遵守
+  前节的builder/reader声明显式迁移；不能简单复制代码后重提，不能清旧receipt。

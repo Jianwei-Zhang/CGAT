@@ -1,0 +1,41 @@
+{
+  "scope": "disposable pilot wall budgets only; incomplete outputs preserved but not adopted",
+  "results": [
+    {
+      "job": 43000618,
+      "state": "FAILED",
+      "core_bases": 1000000,
+      "start_time": "2026-11-21T06:37:31Z",
+      "end_time": "2026-11-21T06:55:44Z",
+      "timeout": {
+        "pid": 2749190,
+        "seconds": 900,
+        "main_action": "none",
+        "partial_result_accepted": false
+      },
+      "completed_target_parts": 0,
+      "index_loads_seen": 1,
+      "peak_mib": 32669,
+      "raw_paf_bytes": 0,
+      "no_main_result_adoption": true
+    },
+    {
+      "job": 43002943,
+      "state": "FAILED",
+      "core_bases": 100000,
+      "start_time": "2026-11-21T06:54:37Z",
+      "end_time": "2026-11-21T07:13:09Z",
+      "timeout": {
+        "pid": 887190,
+        "seconds": 900,
+        "main_action": "none",
+        "partial_result_accepted": false
+      },
+      "completed_target_parts": 2,
+      "index_loads_seen": 3,
+      "peak_mib": 33534,
+      "raw_paf_bytes": 31465472,
+      "no_main_result_adoption": true
+    }
+  ]
+}

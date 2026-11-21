@@ -1,0 +1,214 @@
+{
+  "status": "read_only_scope_sizing",
+  "lookup_sha256": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+  "reference_sha256": {
+    "JM19_hifiasm": "f85202cb6000610eb8487fbb6edb6bb81dab3a3f849d3dd0ec88708a24bf66fd",
+    "JM19_flye_ABD": "8d3295b062f66ba14ca609270c3be25d0ad5945f49e2b7ae9ad53b10035f22df"
+  },
+  "reference_rows": 6733022,
+  "seconds": 65.90838709846139,
+  "chromosomes": [
+    {
+      "chromosome": "1A",
+      "original_count": 2274,
+      "original_bases": 1292378115,
+      "all_reference_candidates_count": 16826,
+      "all_reference_candidates_bases": 21565431519,
+      "original_plus_qualifying_count": 7829,
+      "original_plus_qualifying_bases": 17836150319
+    },
+    {
+      "chromosome": "1B",
+      "original_count": 2960,
+      "original_bases": 1523993595,
+      "all_reference_candidates_count": 19655,
+      "all_reference_candidates_bases": 22882676643,
+      "original_plus_qualifying_count": 10516,
+      "original_plus_qualifying_bases": 20031726951
+    },
+    {
+      "chromosome": "1D",
+      "original_count": 1220,
+      "original_bases": 1027179844,
+      "all_reference_candidates_count": 11944,
+      "all_reference_candidates_bases": 21216267489,
+      "original_plus_qualifying_count": 5275,
+      "original_plus_qualifying_bases": 17835597221
+    },
+    {
+      "chromosome": "2A",
+      "original_count": 2680,
+      "original_bases": 1675577362,
+      "all_reference_candidates_count": 18071,
+      "all_reference_candidates_bases": 22212739965,
+      "original_plus_qualifying_count": 8945,
+      "original_plus_qualifying_bases": 19121731979
+    },
+    {
+      "chromosome": "2B",
+      "original_count": 3917,
+      "original_bases": 1714575336,
+      "all_reference_candidates_count": 20297,
+      "all_reference_candidates_bases": 22853164679,
+      "original_plus_qualifying_count": 11816,
+      "original_plus_qualifying_bases": 19761530013
+    },
+    {
+      "chromosome": "2D",
+      "original_count": 941,
+      "original_bases": 1319694949,
+      "all_reference_candidates_count": 13070,
+      "all_reference_candidates_bases": 21890445749,
+      "original_plus_qualifying_count": 5654,
+      "original_plus_qualifying_bases": 18679457683
+    },
+    {
+      "chromosome": "3A",
+      "original_count": 2404,
+      "original_bases": 1603980369,
+      "all_reference_candidates_count": 17847,
+      "all_reference_candidates_bases": 22013372128,
+      "original_plus_qualifying_count": 8418,
+      "original_plus_qualifying_bases": 18388514528
+    },
+    {
+      "chromosome": "3B",
+      "original_count": 2723,
+      "original_bases": 1755980833,
+      "all_reference_candidates_count": 19254,
+      "all_reference_candidates_bases": 22618462998,
+      "original_plus_qualifying_count": 10503,
+      "original_plus_qualifying_bases": 20075785077
+    },
+    {
+      "chromosome": "3D",
+      "original_count": 1101,
+      "original_bases": 1310538531,
+      "all_reference_candidates_count": 12883,
+      "all_reference_candidates_bases": 21342727356,
+      "original_plus_qualifying_count": 5695,
+      "original_plus_qualifying_bases": 18411057854
+    },
+    {
+      "chromosome": "4A",
+      "original_count": 2430,
+      "original_bases": 1558051936,
+      "all_reference_candidates_count": 20227,
+      "all_reference_candidates_bases": 23387768782,
+      "original_plus_qualifying_count": 9534,
+      "original_plus_qualifying_bases": 19935594548
+    },
+    {
+      "chromosome": "4B",
+      "original_count": 2063,
+      "original_bases": 1452926427,
+      "all_reference_candidates_count": 18260,
+      "all_reference_candidates_bases": 22509535503,
+      "original_plus_qualifying_count": 8831,
+      "original_plus_qualifying_bases": 19232917262
+    },
+    {
+      "chromosome": "4D",
+      "original_count": 766,
+      "original_bases": 1074672025,
+      "all_reference_candidates_count": 10935,
+      "all_reference_candidates_bases": 20999756393,
+      "original_plus_qualifying_count": 4378,
+      "original_plus_qualifying_bases": 17294091918
+    },
+    {
+      "chromosome": "5A",
+      "original_count": 2632,
+      "original_bases": 1534283215,
+      "all_reference_candidates_count": 19486,
+      "all_reference_candidates_bases": 25033922785,
+      "original_plus_qualifying_count": 10238,
+      "original_plus_qualifying_bases": 22133483826
+    },
+    {
+      "chromosome": "5B",
+      "original_count": 3251,
+      "original_bases": 1488075876,
+      "all_reference_candidates_count": 20578,
+      "all_reference_candidates_bases": 24857912207,
+      "original_plus_qualifying_count": 12073,
+      "original_plus_qualifying_bases": 22465956854
+    },
+    {
+      "chromosome": "5D",
+      "original_count": 1596,
+      "original_bases": 1199286564,
+      "all_reference_candidates_count": 14323,
+      "all_reference_candidates_bases": 24385057097,
+      "original_plus_qualifying_count": 6755,
+      "original_plus_qualifying_bases": 21892848425
+    },
+    {
+      "chromosome": "6A",
+      "original_count": 2018,
+      "original_bases": 1275984422,
+      "all_reference_candidates_count": 17912,
+      "all_reference_candidates_bases": 24450697519,
+      "original_plus_qualifying_count": 8574,
+      "original_plus_qualifying_bases": 21322040547
+    },
+    {
+      "chromosome": "6B",
+      "original_count": 3778,
+      "original_bases": 1521846210,
+      "all_reference_candidates_count": 20837,
+      "all_reference_candidates_bases": 24785888866,
+      "original_plus_qualifying_count": 12277,
+      "original_plus_qualifying_bases": 22490881381
+    },
+    {
+      "chromosome": "6D",
+      "original_count": 926,
+      "original_bases": 1000000657,
+      "all_reference_candidates_count": 12496,
+      "all_reference_candidates_bases": 23950341354,
+      "original_plus_qualifying_count": 5217,
+      "original_plus_qualifying_bases": 20627604029
+    },
+    {
+      "chromosome": "7A",
+      "original_count": 2785,
+      "original_bases": 1549917365,
+      "all_reference_candidates_count": 19830,
+      "all_reference_candidates_bases": 25521729292,
+      "original_plus_qualifying_count": 10557,
+      "original_plus_qualifying_bases": 22644875366
+    },
+    {
+      "chromosome": "7B",
+      "original_count": 2968,
+      "original_bases": 1604781567,
+      "all_reference_candidates_count": 20474,
+      "all_reference_candidates_bases": 25241961269,
+      "original_plus_qualifying_count": 11777,
+      "original_plus_qualifying_bases": 22600440429
+    },
+    {
+      "chromosome": "7D",
+      "original_count": 1142,
+      "original_bases": 1328416554,
+      "all_reference_candidates_count": 13942,
+      "all_reference_candidates_bases": 24356189481,
+      "original_plus_qualifying_count": 6473,
+      "original_plus_qualifying_bases": 21734456589
+    },
+    {
+      "chromosome": "Un",
+      "original_count": 4353,
+      "original_bases": 560730515,
+      "all_reference_candidates_count": 21027,
+      "all_reference_candidates_bases": 27363575048,
+      "original_plus_qualifying_count": 12446,
+      "original_plus_qualifying_bases": 25425770816
+    }
+  ],
+  "excludes_pairwise_discovery_expansion": true,
+  "scientific_acceptance": false,
+  "qualifying_definition": "a >=0.90 identity hit with known MAPQ>=20 and >=100 paired M/= bp; not union across several small hits, not admission",
+  "production_policy_changed": false
+}

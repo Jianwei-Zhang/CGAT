@@ -1,0 +1,68 @@
+{
+  "diagnostic_job": 43003112,
+  "sampler_sha256": "eebd37f5c8d50d2b030df07716e3fbd2d4ab10d95fa0f6f2da3a02bc85674f00",
+  "report": {
+    "minimum_reference_mapq": 0,
+    "include_unavailable_mapq": true,
+    "policy": "read-only sizing using original whole sources; >=100bp holes; not cache acceptance or a change to scientific policy; assumes no long-N source splits, compare count/bp to current task before use",
+    "datasets": [
+      {
+        "dataset": "JM19_hifiasm",
+        "paf_rows": 2627833,
+        "reference_paf_sha256": "f85202cb6000610eb8487fbb6edb6bb81dab3a3f849d3dd0ec88708a24bf66fd",
+        "source_count": 2377,
+        "reference_candidate_sources": 2348,
+        "partial_query_count": 2089,
+        "whole_query_bp": 14573819615,
+        "uncovered_intervals": 403218,
+        "window_total_bp_by_flank": {
+          "0": 1458279897,
+          "1000": 2133356135,
+          "10000": 4669239879,
+          "100000": 12063529399
+        },
+        "window_count_by_flank": {
+          "0": 403218,
+          "1000": 276531,
+          "10000": 91838,
+          "100000": 19668
+        },
+        "window_max_bp_by_flank": {
+          "0": 1934265,
+          "1000": 1943011,
+          "10000": 4828089,
+          "100000": 19740098
+        }
+      },
+      {
+        "dataset": "JM19_flye_ABD",
+        "paf_rows": 4105189,
+        "reference_paf_sha256": "8d3295b062f66ba14ca609270c3be25d0ad5945f49e2b7ae9ad53b10035f22df",
+        "source_count": 35890,
+        "reference_candidate_sources": 35769,
+        "partial_query_count": 31325,
+        "whole_query_bp": 16971533089,
+        "uncovered_intervals": 604407,
+        "window_total_bp_by_flank": {
+          "0": 2510432843,
+          "1000": 3511054233,
+          "10000": 6880342001,
+          "100000": 14607189411
+        },
+        "window_count_by_flank": {
+          "0": 604407,
+          "1000": 411814,
+          "10000": 128310,
+          "100000": 48273
+        },
+        "window_max_bp_by_flank": {
+          "0": 1044450,
+          "1000": 1046450,
+          "10000": 2961958,
+          "100000": 16845873
+        }
+      }
+    ],
+    "wall_seconds": 162.44363685697317
+  }
+}

@@ -127,7 +127,10 @@ def project_window_paf(line: str, windows: Mapping[str, QueryWindow],
     Context-only and original-self hits are not new donor evidence. An indel
     spanning a core is not paired coverage. Raw PAF + window manifest must be
     retained by the caller. No CIGAR clipping or source-sequence trimming occurs.
-    Forward query coordinates shift identically on both strands.
+    Forward query coordinates shift identically on both strands. Window-local
+    confidence and chain/selection scores are not whole-source confidence:
+    projected MAPQ is unknown (255); the unmodified raw PAF remains authoritative
+    for those local tags and is required as a separate bound artifact.
     """
     hit = parse_paf_line(line, artifact=artifact, line_number=line_number)
     window = windows.get(hit.query_name)
@@ -148,6 +151,10 @@ def project_window_paf(line: str, windows: Mapping[str, QueryWindow],
     fields = line.rstrip("\r\n").split("\t")
     fields[:4] = [window.segment_id, str(window.segment_length),
                   str(hit.query.start + window.start), str(hit.query.end + window.start)]
+    fields[11] = "255"
+    # Retain unchanged alignment statistics, not local primary/secondary labels,
+    # chain scores or repetitive-base counts under the full source's identity.
+    fields[12:] = [tag for tag in fields[12:] if tag.startswith(("cg:Z:", "NM:i:", "nn:i:"))]
     fields.append("qw:Z:" + window.window_id)
     result = "\t".join(fields)
     parse_paf_line(result, artifact=artifact + ".projected", line_number=line_number)
