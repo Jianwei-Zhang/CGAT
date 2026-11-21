@@ -18,6 +18,7 @@ from .q0_catalog import ObservedSourcePairs, partial_source_intervals
 from .q0_query_windows import WindowPolicy, TargetWindow, plan_query_windows
 from .q0_reference_index import ReferenceIndex, _signature
 from .q0_regional_mapping import MAX_TARGET_BASES, prepare_regional_mapping
+from .q0_regional_execution import ParentRequest, RegionalExecutor
 from .q0_sources import Interval, Q0EvidenceError
 
 REGIONAL_POLICY = {
@@ -142,9 +143,9 @@ def plan_parent(catalog, index, windows):
 def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None):
     """Return complete regional tasks and a declared full-native fallback set.
 
-    Lookup remains on the owner thread. At most one parent plan and four mapper
-    tasks are live; each mapper has <=2 threads and a 4GiB address-space guard.
-    Do not run native fallback concurrently with this pool.
+    With a verified allocation bound, fresh metadata-only planners share the
+    run CPU/memory budget with <=2-thread/4GiB mappers. Unknown memory keeps
+    serial lookup and <=4 mappers. Native fallback never overlaps this pool.
     """
     if not isinstance(observed, ObservedSourcePairs):
         raise Q0EvidenceError("regional work selection requires complete cross coverage")
@@ -159,7 +160,8 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
     policy = WindowPolicy(core_bases=100_000, context_bases=10_000,
                           trigger_query_bases=1, trigger_longest_bases=1, minimum_uncovered_bases=100)
     windows = plan_query_windows({key: part.interval.length for key, part in catalog.parts.items()}, holes, policy=policy) or ()
-    mapper_threads = min(2, threads); workers = max(1, min(4, threads//mapper_threads))
+    execution = RegionalExecutor(index, threads)
+    mapper_threads = execution.budget.mapper_threads; workers = execution.budget.mapper_workers
     tasks, fallback, pending = [], set(), []
     report = {"policy": dict(REGIONAL_POLICY), "window_policy": asdict(policy), "planned_windows": len(windows),
               "residual_source_parts": len(holes), "parents_satisfied_by_complete_native_matrices": 0, "parents_satisfied_by_scoped_approximate_matrices": 0,
@@ -172,14 +174,17 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
         tasks.append(task)
         if len(tasks)%100 == 0:
             print(f"LGZ q0 regional progress: completed={len(tasks)} planned={len(windows)} fallback_sources={len(fallback)}", flush=True)
-    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
+    def requests():
         for segment_id, group in itertools.groupby(windows, key=lambda w: w.segment_id):
             if native_scopes is not None and native_scopes.remaining_targets(segment_id,required_mask) == 0:
                 native_only=native_scopes.remaining_targets(segment_id,required_mask,include_approximate=False)==0
                 field=('parents_satisfied_by_complete_native_matrices' if native_only else 'parents_satisfied_by_scoped_approximate_matrices')
                 report[field] += 1
                 continue  # Tested relationships, not an invented coverage/placement assertion.
-            planned, reason = plan_parent(catalog, index, group)
+            yield ParentRequest("partial", segment_id, tuple(group))
+    with execution, ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
+        for request, (planned, _, reason) in execution.ordered(requests()):
+            segment_id = request.segment_id
             if reason is not None:
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})
                 continue
@@ -189,7 +194,8 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                 if len(pending) >= workers: consume()
                 pending.append(pool.submit(prepare_regional_mapping, root,catalog,query,targets,tool,
                                            reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads))
+                if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
         while pending: consume()
-    index.verify_inputs()
+    report.update(execution.report)
     report["completed_regional_tasks"] = len(tasks)
     return tasks, sorted(fallback), report

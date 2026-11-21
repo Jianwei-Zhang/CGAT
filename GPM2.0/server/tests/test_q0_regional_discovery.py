@@ -46,7 +46,7 @@ class RegionalDiscoveryTests(unittest.TestCase):
         self.assertEqual(tuple(self.observed.cross_coverage[SourceKey('b','t')]),(Interval(200,400),))
 
     def test_native_fallback_subsumes_parent_without_launching_earlier_window(self):
-        index=mock.Mock();index.regions.return_value={'chr':(Interval(0,100),)}
+        index=mock.Mock();index.parts=self.parts;index.regions.return_value={'chr':(Interval(0,100),)}
         index.targets.side_effect=[{self.ids['t']:(Interval(0,1000),)},{}]
         holes={self.ids['q']:(Interval(0,300000),)}
         with mock.patch.object(regional,'partial_source_intervals',return_value=holes), \
@@ -57,7 +57,7 @@ class RegionalDiscoveryTests(unittest.TestCase):
         index.verify_inputs.assert_called_once()
 
     def test_pool_never_multiplies_run_thread_budget_and_keeps_order(self):
-        index=mock.Mock();index.regions.return_value={'chr':(Interval(0,100),)}
+        index=mock.Mock();index.parts=self.parts;index.regions.return_value={'chr':(Interval(0,100),)}
         index.targets.return_value={self.ids['t']:(Interval(0,1000),)}
         holes={self.ids['q']:(Interval(0,300000),)}
         active=peak=0;lock=threading.Lock()
@@ -73,6 +73,30 @@ class RegionalDiscoveryTests(unittest.TestCase):
         self.assertLessEqual(peak,3);self.assertEqual(fallback,[])
         self.assertEqual([t['core'] for t in tasks],[0,100000,200000])
         self.assertEqual(report['completed_regional_tasks'],3)
+
+    def test_one_thread_never_overlaps_owner_planning_with_mapper(self):
+        index=mock.Mock();index.parts=self.parts
+        holes={self.ids['q']:(Interval(0,100),),self.ids['t']:(Interval(0,100),)}
+        active=threading.Event();started=threading.Event();calls=0
+        def plan(catalog,index,windows):
+            nonlocal calls
+            calls+=1
+            if calls==2:
+                self.assertTrue(started.wait(2))
+                self.assertFalse(active.is_set(), 'one CPU cannot plan while mapper computes')
+            query=next(iter(windows))
+            return [(query,[])],None  # The fake mapper never reads DNA/targets.
+        def mapper(*args,**kwargs):
+            self.assertEqual(kwargs['threads'],1)
+            active.set();started.set();time.sleep(.03);active.clear()
+            return {'done':True}
+        with mock.patch.object(regional,'partial_source_intervals',return_value=holes), \
+             mock.patch.object(regional,'plan_parent',side_effect=plan), \
+             mock.patch.object(regional,'prepare_regional_mapping',side_effect=mapper):
+            tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},
+                reference_lengths={'chr':5_000_000_000},preset='asm10',threads=1)
+        self.assertEqual(len(tasks),2);self.assertEqual(fallback,[])
+        self.assertEqual(report['maximum_workers'],1)
 
     def test_sealed_cache_is_local_content_bound_and_corruption_preserved(self):
         refs={'chr':1_000_000};paths=[]
@@ -98,7 +122,7 @@ class RegionalDiscoveryTests(unittest.TestCase):
         package=self.root/'package';(package/'lgz_core').mkdir(parents=True)
         tools=Path(prep.__file__).parent
         names=['common','q0_sources','q0_alignments','q0_catalog','q0_preparation','q0_reference_index',
-               'q0_query_windows','q0_cigar_policy','q0_regional_mapping','q0_mapper_guard','q0_regional_discovery','q0_neighbor_requests','q0_regional_candidates']
+               'q0_query_windows','q0_cigar_policy','q0_regional_mapping','q0_mapper_guard','q0_regional_discovery','q0_neighbor_requests','q0_regional_candidates','q0_regional_execution']
         (package/'lgz_core/__init__.py').write_text('')
         for name in names:shutil.copyfile(tools/f'{name}.py',package/f'lgz_core/{name}.py')
         shutil.copyfile(tools.parent/'run_orchestration.py',package/'run_orchestration.py')

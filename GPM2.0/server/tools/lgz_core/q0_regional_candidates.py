@@ -14,6 +14,7 @@ from .q0_neighbor_requests import known_neighbors
 from .q0_query_windows import WindowPolicy, plan_query_windows, TargetWindow
 from .q0_regional_mapping import BASE_FLAGS, MAX_TARGET_BASES, prepare_regional_mapping
 from .q0_sources import Interval, Q0EvidenceError
+from .q0_regional_execution import ParentRequest, RegionalExecutor, plan_request
 from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 
 CANDIDATE_POLICY = {
@@ -227,23 +228,25 @@ class CandidatePlan(CompletedNativeScopes):
         return plan_query_windows({key:length},{key:tuple(self.cores.get(key,()))},
                     policy=WindowPolicy(core_bases=100000,context_bases=10000,trigger_query_bases=1,trigger_longest_bases=1)) or ()
 
-    def plan_parent(self, key, eligible):
-        """Exact regional plans plus an explicit native-fallback target mask."""
+    def planning_request(self, key, eligible):
+        """Owner retains eligibility decisions; workers receive no DNA/graph."""
         own = 1 << self.ranks[key]
         if not self.routable & own:
-            return [], eligible, "query_without_qualified_reference"
+            return ParentRequest("candidate", key, ready=([], eligible, "query_without_qualified_reference"))
         if key not in self.cores:
-            return [], eligible & ~self.routable, "weak_reference_only_alternatives_not_expanded"
+            return ParentRequest("candidate", key, ready=([], eligible & ~self.routable,
+                                                           "weak_reference_only_alternatives_not_expanded"))
         fallback = eligible & ~self.routable
         regional = eligible & self.routable
-        if not regional: return [], fallback, "target_without_qualified_reference" if fallback else None
-        selection = self.index.target_selection(regional)
-        plans = []
-        for query in self.windows(key):
-            targets,reason = candidate_window_targets(self.index,key,query,self.query_chromosomes[key],selection)
-            if reason is not None: return [], eligible, reason
-            if targets: plans.append((query,targets))
-        return plans, fallback, "target_without_qualified_reference" if fallback else None
+        if not regional:
+            return ParentRequest("candidate", key, ready=([], fallback,
+                                    "target_without_qualified_reference" if fallback else None))
+        return ParentRequest("candidate", key, tuple(self.windows(key)),
+                             tuple(sorted(self.query_chromosomes[key])), regional, fallback, eligible)
+
+    def plan_parent(self, key, eligible):
+        """Exact regional plans plus an explicit native-fallback target mask."""
+        return plan_request(self.planning_request(key, eligible), self.index)
 
 
 def prepare_candidates(root, catalog, index, requests, observed, complete_tasks, tool, *, reference_lengths, preset, threads, skip_self=False, planner=None):
@@ -255,7 +258,8 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
         raise Q0EvidenceError("candidate planner belongs to another preparation")
     if planner.next_unroutable_seed() is not None:
         raise Q0EvidenceError("unroutable native source matrices must complete before regional candidates")
-    mapper_threads = min(2,threads); workers = max(1,min(4,threads//mapper_threads))
+    execution = RegionalExecutor(index, threads)
+    mapper_threads = execution.budget.mapper_threads; workers = execution.budget.mapper_workers
     tasks, pending, fallback = [], [], {}
     report = {"policy":CANDIDATE_POLICY,"requested_parents":len(planner.query_chromosomes),
               "completed_native_scope_task_ids":planner.scope_task_ids,
@@ -263,13 +267,16 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
               "reused_part_pairs":0,"regional_windows":0,"fallback_parents":0,"weak_only_parents_not_expanded":0,"weak_only_parent_ids":[],
               "maximum_workers":workers,"mapper_threads":mapper_threads}
     def consume(): tasks.append(pending.pop(0).result())
-    with ThreadPoolExecutor(max_workers=workers,thread_name_prefix="q0-candidate") as pool:
-        for number,key in enumerate(sorted(planner.query_chromosomes),1):
+    def requests():
+        for key in sorted(planner.query_chromosomes):
             requested,eligible = planner.eligible(key)
             report["requested_part_pairs"] += requested.bit_count()
             report["reused_part_pairs"] += (requested & ~eligible).bit_count()
-            if not eligible: continue
-            planned,native,reason = planner.plan_parent(key,eligible)
+            if eligible:
+                yield planner.planning_request(key, eligible)
+    with execution, ThreadPoolExecutor(max_workers=workers,thread_name_prefix="q0-candidate") as pool:
+        for number, (request, (planned,native,reason)) in enumerate(execution.ordered(requests()), 1):
+            key = request.segment_id
             if reason == "weak_reference_only_alternatives_not_expanded":
                 report["weak_only_parents_not_expanded"] += 1
                 report["weak_only_parent_ids"].append(key)
@@ -287,9 +294,10 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                 if len(pending) >= workers: consume()
                 pending.append(pool.submit(prepare_regional_mapping,root,catalog,query,targets,tool,
                                            reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads))
+                if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
             if number%100 == 0:
-                print(f"LGZ q0 candidate regions: parents={number}/{report['requested_parents']} completed={len(tasks)} fallback={report['fallback_parents']}",flush=True)
+                print(f"LGZ q0 candidate regions: eligible_parents_completed={number} requested_parents={report['requested_parents']} completed={len(tasks)} fallback={report['fallback_parents']}",flush=True)
         while pending: consume()
-    index.verify_inputs()
+    report.update(execution.report)
     report["completed_regional_tasks"] = len(tasks)
     return tasks,list(fallback.values()),report

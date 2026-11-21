@@ -45,6 +45,14 @@ def validate_handoff(config,release,root,ready_sha,host):
         raise ValueError('original whole-source partial completed; re-stage rather than override')
 
 
+def allocation_environment(release, root):
+    """Forward the gate's exact current-job proof, never a free memory guess."""
+    row = release['new_scheduler']; path = checked(row)
+    if path.parent != root:
+        raise ValueError('scheduler allocation proof is outside handoff bundle')
+    return {'_GPM_Q0_SCHEDULER_PROOF':str(path), '_GPM_Q0_SCHEDULER_SHA256':row['sha256']}
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--config',type=Path,required=True);args=p.parse_args()
     config_path=args.config.resolve(strict=True);root=config_path.parent;config_sha=digest(config_path)
@@ -65,10 +73,19 @@ def main():
         release=root/'handoff.json'
         if release.exists():
             if digest(config_path)!=config_sha:raise ValueError('handoff config changed')
-            validate_handoff(config,json.loads(release.read_text()),root,ready_sha,socket.gethostname())
+            handoff=json.loads(release.read_text())
+            validate_handoff(config,handoff,root,ready_sha,socket.gethostname())
             print('Q0_HANDOFF_ACCEPTED',flush=True)
             from resume_q0_science import execute
-            return execute(checked(config['transition']),install_runtime=True,threads=32)
+            environment=allocation_environment(handoff,root)
+            previous={key:os.environ.get(key) for key in environment}
+            try:
+                os.environ.update(environment)
+                return execute(checked(config['transition']),install_runtime=True,threads=32)
+            finally:
+                for key,value in previous.items():
+                    if value is None:os.environ.pop(key,None)
+                    else:os.environ[key]=value
         time.sleep(2)
     raise ValueError('resource-ready wait expired without modifying the workspace')
 

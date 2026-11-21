@@ -2768,3 +2768,72 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   进程与受限mapper池共享32线程预算**；不要从携带31Gb DNA的父进程fork再套小AS限制。
   必须做真正fresh进程、精确计划对照、当前RSS/硬额度/返回计划余量评估，以及失败保留并
   回退完整计划的机制。不借此放开未经测量的超长原生mapper并发，也不做多节点改造。
+
+## 2026-11-22：区域规划的 fresh-process 并行与同作业资源凭据
+
+### 真实小麦小样本，不重跑完整比对
+
+- 新增 `lgz_core/q0_regional_execution.py`，供部分覆盖补比对与候选染色体两条路径共用。
+  owner 保留原有关系选择，worker 只拿源分段元数据/窗口/索引；使用 `spawn`，不复制或
+  fork 31Gb DNA 堆。结果按原父序列/窗口顺序消费，有界预取；父序列整体回退决定先完成。
+  返回计划过大、MemoryError、损坏的进程池均在 owner 中精确重算；内容身份错误继续失败。
+- 同节点、同 Python3.10.12 的第一轮 **43010282 SUCCEEDED**：46个实际父序列、240窗口，
+  三进程138.640秒（含委托快照、spawn和退出），串行292.373秒，2.109x；全部坐标/回退
+  决定逐父比较一致。结果保存在 `regional-planning-hpc-initial-20261122.json`。
+- 加上数据库生命周期/源分段绑定栅栏及真实调度器凭据后，最终 **43010293 SUCCEEDED**：
+  同一批窗口，三进程135.722秒，串行275.728秒，**2.032x**。46份有序完整计划摘要与
+  第一轮完全一致，且本地38份core源码逐字节匹配这次冻结包；结果保存在
+  `regional-planning-hpc-guarded-20261122.json`。远端目录为
+  `q0-planner-calibration-20261122-0350-v3`，同节点agent-X86-06。
+- 两轮均只读原有元数据和PAF，无DNA读取、无mapper、无主工作区改动。串行在并行之后，
+  可能受益于已热的OS页缓存；不把这个约2x说成完整小麦或候选染色体全部场景的提速倍率。
+  最终owner峰值300179456 bytes、单个child最大280571904 bytes，scheduler作业峰值
+  3592MiB（不同统计口径，不能相加或当成实际mapper峰值）。
+- 首次隔离校准包 **43010279** 因缺少 `run_resources` namespace依赖在导入阶段失败；
+  未开始基因组计算，也未改主任务。补全真实包依赖，并在提交前分别验证 namespace/flat
+  两种导入布局；没有删测试断言、伪造服务器目录或重装主环境。
+
+### CPU、内存与完整性边界
+
+- 32线程、现场内存预算足够时，上限为 **owner1 + planner3 + mapper14×2 = 32**；这不是
+  32路各32线程，也不等于已在主任务实际启动14路。owner峰值在池建立时重新测量，不使用
+  先前34GiB快照作为永久依据。小预算保留owner CPU；1线程时规划与mapper严格不重叠。
+- 规划进程各8GiB AS；mapper仍各4GiB AS，原生全长回退与整个区域池不重叠。预算另外
+  预留owner增长、每路提取/解析、预取和展开计划内存。守住限制，不用低RSS样本推断
+  长原生任务也能扩池；RSS/AS/作业cache统计仍不是同一个口径。
+- 实际Donau进程能看到 `container_<jobid>_rg0_...` cgroup，但标准路径下读不到有效
+  memory limit，最终报告的 `cgroup_memory_limit_bytes` 为null，不能据此猜320GiB。
+  新gate通过 `_GPM_Q0_SCHEDULER_PROOF` + `_GPM_Q0_SCHEDULER_SHA256` 转交已经核实的
+  **当前job** djob JSON；reader自动核对SHA、RUNNING、单节点、主机、账号、CPU/内存及
+  自身cgroup的完整job ID。不是用户填内存数值，也没有新增让用户承担判定的命令行参数。
+- 最终校准真实交接了当前43010293的6CPU/60GiB凭据；实际helper返回64424509440 bytes，
+  与调度器核定值一致。没有有效proof或cgroup额度时仍串行规划、最多4 mapper；显式但
+  不匹配的proof则失败，不静默放开资源。普通运行环境不凭节点物理内存扩池。
+- PAF/镜像先由正常open/seal完成整份内容验证，worker只继承此次存活owner的内存证明、
+  元数据和稳定文件身份，自己开SQLite/文件句柄；逐记录SHA仍校验，不重复全扫PAF。
+  数据库在seal/open起即绑定稳定身份，委托前核对分段绑定，worker/owner生命周期均有
+  数据库、原PAF和镜像漂移栅栏。此委托不保存成下次续跑的内容凭据。
+- 原有区域搜索本身的召回边界不变；本次调度改动不另加精度损失。native/approx矩阵
+  关系范围、短序列补齐、窗口/target选择、mapper flags和raw cache身份保持原样。
+  新执行器纳入builder identity，不能把它冒充旧builder或热改冻结源码。
+- 最终本地 **q0测试287项：286通过、1跳过**，resource-ready gate **7项**通过；真实HPC
+  冻结包 **11项**进程/资源/完整性定向测试通过，再完成240窗口校准。没有release CI、
+  App构建、update.sh、网站发布或整套runtime替换。
+
+### 主任务仍独立推进，不能把源码完成当作已部署
+
+- NEW **43010068** 仍是52f634d5对应的冻结bundle：本次执行器以及7cbcf887解析优化均
+  **尚未安装到这个存活reader**。OLD **42523432**只监控，未改变、未取消。
+- 同节点只读诊断 **43010285 SUCCEEDED**，03:52:46–03:56:47由chr_7D推进到chr_Un，
+  240.229秒墙钟内reader CPU增加238.77秒、swap0，并非死锁。目录
+  `q0-live-phase-20261122-0355`；observer1505606继续存活。
+- 后续短诊断 **43010298 SUCCEEDED**，目录 `q0-live-phase-20261122-0420`，04:17:12已看到
+  `build_catalog -> prepare_evidence` 读取既有Flye参考PAF（offset813146112）。因此
+  **已经离开_initial_inputs**；这是参考证据目录构建，不是重跑参考mapper。reader RSS
+  首样本约49.7GiB、swap0；04:18:12第二样本已到offset879910912，RSS约51.2GiB。
+  60.075秒内CPU增加59.87秒，完整summary和终态已保存在该诊断目录；主任务未被改变。
+- 下一步先核实完成扫描后实际命中既有矩阵、进入区域池的真实任务量/吞吐。若收益支持
+  切换，按资源ready、正常锁释放和新transition迁移，保留全部完整结果。新runtime文件
+  `q0_regional_execution.py`尚不在旧安装中，需核对installer对“原来不存在”的文件的
+  备份/回滚表示；若同时装入7cbcf887的外层validator，还须显式处理既有runtime whitelist。
+  不直接覆盖当前15项安装journal，不伪造旧文件摘要，不为了基准数字重启旧版基线。

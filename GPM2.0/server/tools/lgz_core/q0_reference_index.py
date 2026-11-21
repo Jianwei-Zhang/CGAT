@@ -93,6 +93,7 @@ class ReferenceIndex:
         self.files = {}; self.file_names = {}; self.signatures = {}; self.handles = {}
         self.mirrors = {}; self.mirror_signatures = {}
         self.pending = []; self.boxes = []; self.count = 0; self.sealed = False
+        self.database_signature = None
         self.cache = OrderedDict(); self.cache_ops = 0
         self.last_query_report = {}
 
@@ -173,11 +174,13 @@ class ReferenceIndex:
         self.connection.executemany("INSERT INTO metadata VALUES (?,?)",
                                    [("sealed", "true"), ("build_report", json.dumps(report, sort_keys=True))])
         self.connection.commit(); self.sealed = True
+        self.database_signature = _signature(self.path)
         return report
 
     @classmethod
     def open(cls, path, root, parts, refs, *, local_paf_directory=None):
         self = cls.__new__(cls); self._configure(Path(path).resolve(strict=True), root, parts, refs)
+        self.database_signature = _signature(self.path)
         self.connection = sqlite3.connect(self.path.as_uri()+"?mode=ro", uri=True)
         try:
             metadata = dict(self.connection.execute("SELECT name,value FROM metadata"))
@@ -205,15 +208,82 @@ class ReferenceIndex:
             if set(self.files) != set(report["reference_inputs"]): raise Q0EvidenceError("reference input inventory differs")
             self.count = report["records"]; self.sealed = True
             self.connection.execute("PRAGMA cache_size=-32768")
+            self.verify_inputs()
             return self
         except (OSError, ValueError, KeyError, sqlite3.Error):
             self.connection.close(); raise
+
+    def reader_snapshot(self):
+        """Delegate this process's already verified inputs, not a disk receipt.
+
+        Workers own SQLite connections/record caches. Immutable source-part
+        metadata is safe to spawn; the catalog's source DNA is never included.
+        Original and local PAF bytes were checked by open()/seal(). Stable
+        signatures fence that proof across spawn, avoiding N whole-PAF scans.
+        Every fetched record is still checked against its original SHA-256.
+        """
+        if not self.sealed:
+            raise Q0EvidenceError("cannot delegate an unsealed reference index")
+        self.verify_inputs()
+        if self.binding != self.bindings(self.parts, self.reference_lengths):
+            raise Q0EvidenceError("reference part inventory changed before delegation")
+        identity, signature = _identity(self.path)
+        snapshot = _ReaderSnapshot(self.path, self.root, dict(self.parts), dict(self.reference_lengths),
+                                   identity, signature, self.build_report(), dict(self.signatures),
+                                   dict(self.mirrors), dict(self.mirror_signatures))
+        self.verify_inputs()
+        return snapshot
+
+    @classmethod
+    def open_reader(cls, snapshot):
+        """Open a fresh reader from a live owner's in-memory proof only.
+
+        This is deliberately separate from open(): never use a persisted
+        snapshot instead of normal full content validation at cache adoption.
+        """
+        if not isinstance(snapshot, _ReaderSnapshot):
+            raise Q0EvidenceError("reference reader requires an owner snapshot")
+        if (_identity(snapshot.path) != (snapshot.identity, snapshot.signature)):
+            raise Q0EvidenceError("delegated reference database changed")
+        self = cls.__new__(cls)
+        self._configure(snapshot.path, snapshot.root, snapshot.parts, snapshot.references)
+        self.database_signature = _signature(self.path)
+        self.connection = sqlite3.connect(self.path.as_uri()+"?mode=ro", uri=True)
+        try:
+            metadata = dict(self.connection.execute("SELECT name,value FROM metadata"))
+            if (metadata.get("sealed") != "true"
+                    or json.loads(metadata["bindings"]) != json.loads(json.dumps(self.binding))
+                    or json.loads(metadata["build_report"]) != snapshot.report):
+                raise Q0EvidenceError("delegated reference bindings differ")
+            for number, relative in self.connection.execute("SELECT id,path FROM files"):
+                self.files[relative] = number; self.file_names[number] = relative
+            if set(self.files) != set(snapshot.signatures) or set(self.files) != set(snapshot.report["reference_inputs"]):
+                raise Q0EvidenceError("delegated reference inventory differs")
+            self.signatures = dict(snapshot.signatures)
+            self.mirrors = dict(snapshot.mirrors)
+            self.mirror_signatures = dict(snapshot.mirror_signatures)
+            if set(self.mirrors) != set(self.mirror_signatures) or set(self.mirrors)-set(self.files):
+                raise Q0EvidenceError("delegated reference mirror inventory differs")
+            if any(path.is_symlink() for path in self.mirrors.values()):
+                raise Q0EvidenceError("linked delegated PAF mirror is forbidden")
+            self.verify_inputs()
+            if _signature(self.path) != snapshot.signature:
+                raise Q0EvidenceError("delegated reference database changed during open")
+            self.count = snapshot.report["records"]; self.sealed = True
+            self.connection.execute("PRAGMA cache_size=-32768")
+            self.verify_inputs()
+            return self
+        except BaseException:
+            self.connection.close()
+            raise
 
     def build_report(self):
         if not self.sealed: raise Q0EvidenceError("reference index not sealed")
         return json.loads(self.connection.execute("SELECT value FROM metadata WHERE name='build_report'").fetchone()[0])
 
     def verify_inputs(self):
+        if self.database_signature is not None and _signature(self.path) != self.database_signature:
+            raise Q0EvidenceError("sealed reference database changed during lookup")
         for relative, signature in self.signatures.items():
             if _signature(self._artifact(relative)) != signature:
                 raise Q0EvidenceError("indexed reference input changed during lookup")
@@ -354,3 +424,27 @@ class ReferenceIndex:
         for handle in self.handles.values(): handle.close()
         self.handles.clear(); self.cache.clear(); self.cache_ops = 0
         self.connection.close()
+
+
+@dataclass(frozen=True)
+class _ReaderSnapshot:
+    path: Path
+    root: Path
+    parts: dict
+    references: dict
+    identity: dict
+    signature: tuple
+    report: dict
+    signatures: dict
+    mirrors: dict
+    mirror_signatures: dict
+
+    def verify(self):
+        if _signature(self.path) != self.signature:
+            raise Q0EvidenceError("delegated reference database changed during planning")
+        for relative, signature in self.signatures.items():
+            if _signature((self.root/relative).resolve(strict=True)) != signature:
+                raise Q0EvidenceError("delegated reference PAF changed during planning")
+        for relative, signature in self.mirror_signatures.items():
+            if _signature(self.mirrors[relative]) != signature:
+                raise Q0EvidenceError("delegated reference mirror changed during planning")

@@ -98,7 +98,7 @@ def builder_identity() -> str:
         [name, sha256_file(root / name)] for name in (
             "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
             "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
-            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py")])
+            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
 
 
 def load_verified_evidence(root: Path) -> dict:

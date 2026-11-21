@@ -29,6 +29,15 @@ class HandoffTests(unittest.TestCase):
     def validate(self):gate.validate_handoff(self.config,self.release,self.root,'ready','host')
 
     def test_exact_ready_allocation_terminal_previous_and_free_lock_pass(self):self.validate()
+    def test_allocation_environment_is_the_exact_checked_scheduler_receipt(self):
+        self.validate()
+        env=gate.allocation_environment(self.release,self.root)
+        self.assertEqual(env,{'_GPM_Q0_SCHEDULER_PROOF':self.release['new_scheduler']['path'],
+                              '_GPM_Q0_SCHEDULER_SHA256':self.release['new_scheduler']['sha256']})
+        (self.root/'new.json').write_text('{}')
+        with self.assertRaisesRegex(ValueError,'dependency'):
+            gate.allocation_environment(self.release,self.root)
+
     def test_active_previous_or_surviving_child_fails(self):
         self.old['state']='RUNNING';self.save_scheduler()
         with self.assertRaisesRegex(ValueError,'terminal'):self.validate()
