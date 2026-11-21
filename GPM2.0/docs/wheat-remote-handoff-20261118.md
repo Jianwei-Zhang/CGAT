@@ -2699,3 +2699,19 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - **任务未完成**：继续核对43010068，实际进入q0并消费上述三块cache、sealed index、
   开始区域化任务后再评价主流程提速。区域规划仍串行，mapper最多4×2线程，不能声称
   32核已用满。孤立原native61任务43008458仍保留，按真实完成状态决定是否采纳/终止。
+
+### 2026-11-22 02:11 CST：本轮25项全部SKIP_VALID，新q0已实际启动
+
+- NEW43010068的正常Runner从01:39:30开始复核，到02:08:26完成全部25项`SKIP_VALID`，
+  包括两条ref、assignment和22条q0_chr；没有重新运行初始mapper。
+- **02:08:29 `[26/55] [START] [q0_evidence]`**，真实执行已安装的新reader和q0代码。
+  02:11调度器仍RUNNING，child PID2470600，RSS2134MiB，正在启动读取/验证输入。
+  四个supplement成功标记（FIRST+本轮三块）及sealed索引在正常cache；尚不能声称主q0
+  已逐项命中三块缓存或开始区域mapper，应以之后真实进度/日志核实。
+- 孤立原native61作业43008458在替代三块完整、正常API验证通过、实际采纳且新q0启动后，
+  于02:10:50正常请求终止；02:11核实FAILED、pids空。原tmp/log/source目录保留。
+  其共运行约3小时41分仍未完整结束，不继续浪费32核/160GiB allocation。该终态是主动
+  停止冗余计算，不是新版失败；OLD42523432从未终止。FIRST完整5.3小时结果仍保留。
+- 代码修复已推送`0dabbde1`、`52f634d5`；后者18份Python源码与实际冻结bundle完全一致。
+  对应`source-repository-receipt.json`已写入cutover目录，实际安装15个文件摘要复核通过。
+  后续只改交接记录不代表更换运行代码。只读observer1505606继续监控当前新旧主任务。
