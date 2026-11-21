@@ -78,10 +78,12 @@ class OwnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'CPU affinity'):owner.execute('plan',install_runtime=True)
         self.assertNotIn('install',self.events);self.assertEqual(self.events[-1],'release')
 
-    def test_loaded_old_builder_is_not_relabelled(self):
-        with patch.dict(owner.sys.modules,{'lgz_core.q0_preparation':object()}):
-            with self.assertRaisesRegex(ValueError,'already imported'):owner.execute('plan',install_runtime=True)
-        self.assertNotIn('install',self.events)
+    def test_frozen_old_geometry_modules_are_not_reloaded_or_relabelled(self):
+        sentinel=object()
+        with patch.dict(owner.sys.modules,{'lgz_core.q0_preparation':sentinel}):
+            self.assertEqual(owner.execute('plan',install_runtime=True),0)
+            self.assertIs(owner.sys.modules['lgz_core.q0_preparation'],sentinel)
+        self.assertIn('install',self.events)
 
     def test_resume_without_install_requires_installed_context(self):
         self.assertEqual(owner.execute('plan'),0)

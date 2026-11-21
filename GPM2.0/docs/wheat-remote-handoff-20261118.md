@@ -2659,3 +2659,43 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - 本轮275项q0定向测试通过（1 skip），80项incident/reader测试通过，另6项gate测试通过。
   未跑发布CI、update.sh、整版替换。下一步必须实际交接并检查优化后主任务执行，不能以
   提交这些库/测试或资源ready就称完整目标已经实现。
+
+## 2026-11-22 01:43 CST：已实际切换到新 q0 owner，正常检查点复用进行中
+
+- 正式资源ready后，**01:27请求正常终止NEW42949582**，01:28核实调度器FAILED、pids空、
+  正常锁已释放，才放行新owner。FAILED是本次主动交接的终态，不是新的科学计算错误。
+  原a605 incomplete PAF和日志保留，不采纳tmp；OLD42523432未取消/修改。
+- 第一次交接43010044在安装前被入口guard拦截：冻结来源校验合法导入了旧q0 geometry
+  helpers，粗粒度“发现任意q0模块已加载就拒绝”与实际调用链冲突。没有installation目录，
+  runtime/cache未动，正常锁释放。**没有绕过检查或重新运行比对**。
+- 定点修正为新reader的`--describe-only`独立进程：真实绑定的新reader读取真实新builder，
+  生成科学声明；parent保留原来源校验已加载的旧geometry对象，不reload、不改`__file__`。
+  子进程失败仍触发安装事务回滚，stderr进入定点诊断。新增测试覆盖旧模块存在而不冒认新
+  builder、真实子进程argv、返回声明身份拒绝。原initial science/context契约保持不变。
+- **当前主任务NEW43010068，agent-X86-43，32CPU/320GiB**；目录
+  `q0-science-cutover-20261122-0140`。真实transition SHA：
+  `eef0517b215789ffaafc07d779b14ff6b92c0ec673f659f3000545b58a29ff46`。
+  正常run ID `20261121T173455Z-2452020-6b3aa1b6`；01:34获得正常workspace lock。
+- **installation/receipt.json状态installed**，15个runtime/launcher/declaration目标已精确
+  备份并替换，sealed参考索引与三个完整任务已原子移动入正常cache，无覆盖原目标：
+  - fast61 `q0-map-2b19c2c859bdfb5f2e9177e8`；
+  - native9 `q0-map-a2e519761e94eff6ca09e121`；
+  - native短target补齐 `q0-map-b30137a13323db8a99874448`；
+  - sealed DB `reference-index-fdad41a395b84a35a2176f31`。
+  FIRST802...仍在原处。采纳只是完整cache可用，**尚未声称本轮主q0已消费它们**。
+- 01:39:30打印`EXPLICIT_Q0_SCIENCE_RESUME`，进入真正的55-unit Runner；当前是正常初始
+  检查点的内容复核，而非重新比对。01:40:30 `ref:JM19_hifiasm`、01:42:04
+  `ref:JM19_flye_ABD` 均`SKIP_VALID`；下一步assignment及22条q0_chr的完整复用。
+  不因这段校验CPU较低再次中断。旧预检25项通过不替代当前内容检查。
+- 01:44核对远端冻结bundle的18份Python源码（13个core+5个入口/迁移工具）与当前仓库
+  内容SHA全部相同。没有发布CI、update.sh、完整runtime更新或新Release。
+- 旧observer1470693在监控到主动停止的42949582后正常告警退出。临时observer1450366
+  发现非TTY stdout不含RUN header后被替换（仅停此只读observer，不动计算作业）。
+  **当前observer PID1505606 / PPID1**，目录`wheat-observer-20261122-014110`，log
+  `logs/wheat-live-20261122-014111.jsonl`，源码SHA
+  `5c0ad2317fbc304d2bc0b3319adfffb8731ea7c5bb0186bc237ab83b49d7130a`。
+  从真实`gpm_server/logs/run_all.log`取最后一轮RUN段，避免把旧轮取消行当新失败；
+  2881×30秒只读采样，监控OLD42523432/NEW43010068，不自动修复或主动聊天通知。
+- **任务未完成**：继续核对43010068，实际进入q0并消费上述三块cache、sealed index、
+  开始区域化任务后再评价主流程提速。区域规划仍串行，mapper最多4×2线程，不能声称
+  32核已用满。孤立原native61任务43008458仍保留，按真实完成状态决定是否采纳/终止。

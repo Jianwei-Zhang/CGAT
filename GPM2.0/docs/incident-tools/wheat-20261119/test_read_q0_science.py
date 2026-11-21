@@ -56,4 +56,23 @@ class ReaderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'contract'):self.execute()
 
 
+    def test_fresh_description_uses_genuine_reader_process_not_parent_package_reload(self):
+        self.ctx.transition['dependencies']={'reader':{'path':str(self.work/'reader.py')}}
+        self.ctx.transition_path=self.work/'transition.json'
+        record={'reader_sha256':'new-reader','transition_sha256':'new-transition','scientific_builder_modified':True}
+        with patch.object(reader.subprocess,'run',return_value=SimpleNamespace(stdout=__import__('json').dumps(record))) as run:
+            self.assertEqual(reader.describe_in_fresh_process(self.ctx),record)
+        command=run.call_args.args[0]
+        self.assertEqual(command[0],reader.sys.executable)
+        self.assertEqual(command[3],str(self.work/'reader.py'))
+        self.assertIn('--describe-only',command);self.assertTrue(run.call_args.kwargs['check'])
+
+    def test_fresh_description_refuses_another_builder_origin(self):
+        self.ctx.transition['dependencies']={'reader':{'path':str(self.work/'reader.py')}}
+        self.ctx.transition_path=self.work/'transition.json'
+        record={'reader_sha256':'other','transition_sha256':'new-transition','scientific_builder_modified':True}
+        with patch.object(reader.subprocess,'run',return_value=SimpleNamespace(stdout=__import__('json').dumps(record))):
+            with self.assertRaisesRegex(ValueError,'unbound'):reader.describe_in_fresh_process(self.ctx)
+
+
 if __name__=='__main__':unittest.main()

@@ -60,16 +60,13 @@ def execute(path,*,install_runtime=False,threads=32,validate_only=False):
                 raise ValueError('comparison workflow changed')
             available=len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else (os.cpu_count() or 1)
             if available<threads:raise ValueError('allocated CPU affinity is below the requested budget')
-            # Import new science only after replacing the named files, in a new
-            # process. A previously imported old module must not be relabelled.
-            if install_runtime and any(name=='lgz_core.q0_preparation' or name.startswith('lgz_core.q0_') for name in sys.modules):
-                raise ValueError('old q0 module was already imported before installation')
+            # The old origin verifier may import geometry helpers. Keep those
+            # authentic objects untouched; the new declaration and actual q0
+            # builder execute in fresh reader processes after installation.
             reader=ctx.native_bootstrap.module('explicit_q0_reader',checked(ctx.transition['dependencies']['reader']))
             if install_runtime:
                 stager=ctx.native_bootstrap.module('explicit_q0_installer',checked(ctx.transition['dependencies']['stager']))
-                def declaration():
-                    from lgz_core import q0_preparation
-                    return reader.declaration(ctx,q0_preparation)
+                def declaration():return reader.describe_in_fresh_process(ctx)
                 stager.install(ctx,lock,declaration)
             installed(ctx)
             prior_verify=ctx.verify

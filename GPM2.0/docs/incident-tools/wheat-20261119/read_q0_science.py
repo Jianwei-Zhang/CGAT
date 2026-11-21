@@ -1,5 +1,8 @@
 """Truthful changed-q0 reader over unchanged, verified initial alignments."""
 import argparse
+import json
+import subprocess
+import sys
 from pathlib import Path
 from q0_science_context import opened_transition, checked
 
@@ -18,6 +21,28 @@ def declaration(ctx, module):
         'scientific_builder_modified':True,'initial_alignment_profiles_modified':False,
         'native_checkpoint_rewritten':False}
 
+
+
+def describe_in_fresh_process(ctx):
+    """Never import the new q0 package into an owner holding old binding classes.
+
+    Frozen alignment verification legitimately imports old q0 geometry helpers.
+    The genuine new reader runs after installation in a fresh interpreter and
+    returns its real builder/provenance declaration; no __file__ spoof/reload.
+    """
+    path=checked(ctx.transition['dependencies']['reader'])
+    try:
+        result=subprocess.run([sys.executable,'-B','-u',str(path),'--transition',str(ctx.transition_path),
+            '--server-dir',str(ctx.work),'--describe-only'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+            universal_newlines=True,check=True)
+    except subprocess.CalledProcessError as error:
+        raise ValueError('fresh q0 reader declaration failed: '+(error.stderr or '')[-4000:]) from error
+    record=json.loads(result.stdout)
+    if (record.get('reader_sha256')!=ctx.contract.sha256_file(path)
+            or record.get('transition_sha256')!=ctx.transition_sha
+            or record.get('scientific_builder_modified') is not True):
+        raise ValueError('fresh reader returned an unbound builder declaration')
+    return record
 
 def prepare(ctx,module,reader,*,threads,minimap2):
     record=declaration(ctx,module);extra=record['additional_inputs'];original=module._initial_inputs
@@ -44,12 +69,16 @@ def main():
     parser.add_argument('--server-dir',type=Path,required=True)
     parser.add_argument('--threads',type=int,default=1)
     parser.add_argument('--minimap2',default='minimap2')
+    parser.add_argument('--describe-only',action='store_true')
     args=parser.parse_args()
     with opened_transition(args.transition,role='reader',caller=__file__,require_installed=True) as ctx:
         if args.server_dir.resolve(strict=True)!=ctx.work:raise ValueError('reader workspace differs')
         from run_outer_checkpoints import OuterCheckpointManager
         from run_resources import execution_threads
         from lgz_core import q0_preparation
+        if args.describe_only:
+            print(json.dumps(declaration(ctx,q0_preparation)),flush=True)
+            return
         reader=ctx.native_original_context.compose(ctx,OuterCheckpointManager,readonly=True)
         prepare(ctx,q0_preparation,reader,threads=execution_threads(args.threads),minimap2=args.minimap2)
 
