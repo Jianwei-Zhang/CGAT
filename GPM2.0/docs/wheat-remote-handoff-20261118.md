@@ -1859,3 +1859,64 @@
   不冒称远端已部署自动干预服务。
 - 共享文件系统df显示54%使用、inode约1%使用；quota -s退出1且无输出，故未取得用户级
   配额信息，不能把共享空间充足等同于已确认账号无配额限制。
+
+
+### 2026-11-21 14:15 续接监督：初始任务完成，第二项补充范围和内存告警前核查
+
+- 昨日 observer944455已完成181轮，最后样本为11-20 23:57:05；今日核实PID不存在。
+  这段空窗不能称为持续监督。14:02、14:09独立djob确认新版42949582、旧版42523432
+  都RUNNING，之后才续接同字节observer3770106（PPID1），目录
+  `~/cgat-reads-debug/wheat-observer-20261121-141009/`，日志
+  `logs/wheat-live-20261121-141010.jsonl`，源码SHA仍
+  `329074a0550e486dd886d282c11b596e26a25033ba999b9a1d0a8484386153ae`。
+  181轮/30秒，正常窗口约至15:41，遇真实告警会提前结束；不是自动修复/聊天通知服务。
+  本地`/tmp/wheat-detached-observer-poll.py`只更新observer路径，未抹去大输入审查提示。
+- 新版初始1364leaf完整、25外层unit成功、22个q0_chr成功，现仍q0_evidence。
+  首项`q0-map-8024dde83cbf20e7ffa6d8ee`比对在03:43:21结束（19062.863秒，
+  mapper峰值84.185GB），03:52:27提交success.json，result.paf为2666514061字节。
+  今日核验receipt status/spec、四项输出路径/大小及小型command SHA一致；大FASTA/PAF
+  的全内容摘要未在登录节点重读，不把该元数据复核称为独立全内容审计。
+- 第二项`q0-map-a6056c2d8fcb81f6ca19d1a7`的command写于11:20:43。
+  query.fa32021891617字节、35879个query；target.fa32104036857字节、38267个target，
+  所有query ID都在target集合中。实际命令仍`-c -x asm10 -D -P --dual=yes
+  --no-long-join -t 32`；没有把self近似档偷偷套到混合补充任务。
+  这与partial_source_request只要参考未覆盖区间>=100bp就请求整段source的扩张风险一致；
+  尚未靠当前Python栈独立确认调用行，不能把推断写成现场栈证据。
+  不能用1364/1364推断全流程接近结束，也不能按query FASTA字节读取比例推算比对进度。
+- 14:02至14:14新版作业内存293692→293770MiB，峰值300194MiB，硬限制327680MiB；
+  当前约286.9GiB，峰值293.2GiB，余量约33GiB，近期稳定但不保证下一批安全。
+  旧版仍grt_step2、约16核，保持未改动；新版约21核，并非闲置无CPU。
+- 同节点只读诊断42998141 SUCCEEDED（14:11:25–14:12:27），1CPU/1GiB请求，目录
+  `jm19-compare-614589f-20261118/q0-large-supplement-diagnostic-20261121-1413/`。
+  sampler SHA `edb4f32eeb4160629b9a45faf4465da632585510f666563478f3a850ef6aca8a`；
+  核实同UID、精确query路径、mapper PID2282216/start_ticks6264302243；四次60.065秒
+  采样累计进程CPU1258.16秒（20.947核）。mapper RSS174223736KiB、上层reader
+  RSS125594368KiB，两者VmSwap=0；I/O计数不变，query fd约1.09GB、target fd约8.12GB，
+  result.paf.tmp仍0字节。采样时mapper已运行约2小时50分，不能从凌晨首项完成时间推算
+  该mapper已跑10小时。没有读取序列、修改主进程、发送暂停/终止信号。
+  summary SHA `ed563e97230ab8a93695538ecb8b1b64be143039b869d2d08ff3eb28bf84f8fb`。
+- 追补昨晚native perf诊断：42971611因计算节点没有/usr/bin/perf而准备失败，不是主任务失败。
+  之后42971802 SUCCEEDED（11-20 23:48:59–23:49:10），目录
+  `q0-supplement-perf-diagnostic-20261120-2348/`在新版运行目录下；使用私有perf及依赖，
+  不安装共享软件/修改kernel权限。对首项mapper1839627采10秒用户态CPU-clock指令地址，
+  189样本、0丢失，98.41%在ksw_extd2_sse41、1.06%在mm_update_extra。
+  仅证明当时单核长尾窗口以原生比对扩展计算为主，不代表整个首项或当前第二项的占比。
+  已补存final-job.json，SHA `aa233f34dbd1f4b5ef24fbb77de7ca30f5566e40fd57bc87defeb8840eb181cc`。
+- 当前未重启/重提主作业、未修改科学策略或冻结runtime；57f6d8ff/8f33a52e仍未部署。
+  下一步应依据真实query长度和混合比较范围评估补充任务的资源准入、可复用证据及分片，
+  不盲目加并发，不将partial PAF视作完成，不绕过builder/外层检查点绑定。
+
+- 真实query长度诊断42998164 SUCCEEDED（14:13:10–14:16:33），目录
+  `q0-supplement-shape-diagnostic-20261121-1415/`在新版运行目录下。
+  1CPU/1GiB请求，流式只读扫描201.392秒，核验前后文件stat未变化且全部ID/顺序与command
+  相同；不输出序列、不接受或改写主任务缓存。脚本SHA
+  `9ab17e6f9d22c42961b0b3f804bd9d2f716b3e7143af33457d95f8527c8eee33`，
+  本地192个分块边界fixture通过。实际35879条、31625089260bp，中位49667bp；
+  >=1Mb 2807条、>=20Mb 334条、>=100Mb 21条，最长289508469bp。
+  summary SHA `4d4294eb661445d3eb68d42e99139ca47a8f2b244ac7e83a3b22a69274de4977`。
+  因而不能以首项15MB查询的行为估计当前整轮，也不能称“后面没有长序列”。
+  两个本日只读诊断均已结束并存final-job.json。14:17主任务仍RUNNING，
+  新版293788MiB/327680MiB、CPU2094%，旧版89948MiB/163840MiB、CPU1596%。
+- 完成上述实际范围、长度、资源及进程核查后，本地poll才将该特定task加入reviewed集合；
+  这仅消除已处理的“大输入待核查”重复提示，不代表该任务资源准入安全或低效问题已修复。
+  新任务仍触发提示，调度器/内存/失败告警保持原样。第二项参数仍未改动，最终manifest未出现。
