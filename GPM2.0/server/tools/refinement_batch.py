@@ -22,6 +22,8 @@ try:
     from refinement_recipes import select_tools, select_reads
     from refinement_native import stage_refinement
     from refinement_cache import find_completed
+    from refinement_reports import build_tool_report, build_failure_report
+    from refinement_overview import render_overview
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from .post_lgz_degap import atomic_json, digest
@@ -29,6 +31,8 @@ except ModuleNotFoundError:
     from .refinement_recipes import select_tools, select_reads
     from .refinement_native import stage_refinement
     from .refinement_cache import find_completed
+    from .refinement_reports import build_tool_report, build_failure_report
+    from .refinement_overview import render_overview
 
 
 def baseline_seal(root):
@@ -108,7 +112,7 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
                 record.update(status="invalidated", error=str(error))
                 break
             attempt = uuid.uuid4().hex
-            record.update(status="running", run_id=attempt)
+            record.update(status="running", run_id=attempt, phase="native")
             atomic_json(target, batch)
             result = None
             try:
@@ -120,8 +124,15 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
                     record["requested_reads"] = select_reads(tool, groups)
                 record.update(status="staged", run_id=result["run_id"], final_staging=result["staging"])
                 staged[tool] = result
+                record.update(phase="report", native_status="staged")
+                record["report"] = build_tool_report(root, result)
+                record["phase"] = "staged"
             except Exception as error:
                 record.update(status="failed", error_type=type(error).__name__, error=str(error))
+                try:
+                    record["report"] = build_failure_report(root, tool, record["run_id"], error, phase=record["phase"])
+                except Exception as report_error:
+                    record["report_error"] = str(report_error)
             recipe_path = root / "04_refinement" / TOOL_DIRECTORIES[tool] / "01_inputs" / attempt / "recipe.json"
             try:
                 # Failed native attempts still attest which reads were actually
@@ -149,8 +160,16 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
             batch.update(status="invalidated", exit_code=1)
         else:
             failed = any(record["status"] == "failed" for record in batch["tools"].values())
-            batch.update(status="partial_failure" if failed and staged else "failed" if failed else "staged", exit_code=int(failed))
+            ready = any(record["status"] == "staged" for record in batch["tools"].values())
+            batch.update(status="partial_failure" if failed and ready else "failed" if failed else "staged", exit_code=int(failed))
         batch["reads_inputs"] = shared_reads
+        try:
+            batch["overview"] = render_overview(root, batch, staged)
+        except Exception as error:
+            batch["overview_error"] = {"type": type(error).__name__, "message": str(error)}
+            if batch["exit_code"] == 0:
+                batch["status"] = "report_failed"
+            batch["exit_code"] = 1
         atomic_json(target, batch)
         return {"batch": batch, "staged_results": staged, "exit_code": batch["exit_code"]}
     except BaseException:

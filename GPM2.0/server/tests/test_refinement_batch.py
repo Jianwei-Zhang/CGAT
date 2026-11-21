@@ -31,7 +31,7 @@ class RefinementBatchTests(unittest.TestCase):
                 if tool == "degap":
                     raise RuntimeError("controlled native failure")
                 return self.result(root, tool, run_id)
-            with mock.patch.object(batch, "stage_refinement", side_effect=stage):
+            with mock.patch.object(batch, "stage_refinement", side_effect=stage), mock.patch.object(batch, "build_tool_report", return_value={"fixture": "report"}), mock.patch.object(batch, "render_overview", return_value={"fixture": "overview"}):
                 result = batch.execute_batch(root, groups, 3, tools="degap,tgsgapcloser,quartet")
             self.assertEqual(calls, [("degap", 3), ("tgsgapcloser", 3), ("quartet", 3)])
             self.assertEqual(result["exit_code"], 1)
@@ -48,7 +48,7 @@ class RefinementBatchTests(unittest.TestCase):
                 calls.append(tool)
                 genome.write_text(genome.read_text().replace("AAAA", "TTTT", 1))
                 return self.result(root, tool, run_id)
-            with mock.patch.object(batch, "stage_refinement", side_effect=stage):
+            with mock.patch.object(batch, "stage_refinement", side_effect=stage), mock.patch.object(batch, "build_tool_report", return_value={"fixture": "report"}), mock.patch.object(batch, "render_overview", return_value={"fixture": "overview"}):
                 result = batch.execute_batch(root, groups, 2, tools="degap,tgsgapcloser")
             self.assertEqual(calls, ["degap"])
             self.assertEqual(result["batch"]["status"], "invalidated")

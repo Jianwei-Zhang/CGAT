@@ -12,6 +12,8 @@ from pathlib import Path
 import subprocess
 import sys
 import uuid
+import time
+from datetime import datetime, timezone
 
 try:
     from workspace_layout import WorkspaceLayout, workspace_join
@@ -92,6 +94,8 @@ def materialize_patches(edits, catalog, accepted_dir, *, tool="degap"):
 
 
 def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict:
+    stage_started = time.monotonic()
+    stage_started_at = datetime.now(timezone.utc).isoformat()
     """Execute the pinned tool and stage final artifacts, or propagate failure.
 
     No success is returned until source reconstruction has finished. Input/output
@@ -142,7 +146,7 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
                 raise PathError("reads changed while fingerprinting")
             identities[path] = before
             reads_manifest.append({"technology": kind, "path": str(path), "sha256": sha256})
-    recipe = {"schema": RECIPE, "tool": "degap", "revision": PIN,
+    recipe = {"schema": RECIPE, "tool": "degap", "version": lock["tools"]["degap"]["version"], "revision": PIN,
               "engine_manifest_sha256": identity(engine_manifest), "runtime_sha256": identity(runtime),
               "tool_lock_sha256": identity(lock), "reads": reads_manifest,
               "baseline_source_files": catalog.baseline_bindings(), "baseline_sha256": digest(baseline_fasta), "baseline_final_path_sha256": baseline_digest,
@@ -163,14 +167,19 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
                     path = Path(sys.prefix) / relative
                     identities[path] = stat_key(path)
     invocation = {"tool": "degap", "run_id": run_id, "command": command, "threads": threads,
-                  "recipe_sha256": identity(recipe), "status": "running"}
+                  "recipe_sha256": identity(recipe), "status": "running", "timing": {"started_at": stage_started_at}}
     atomic_json(paths["02_jobs"] / "invocation.json", invocation)
     native_artifacts, native_summary = {}, {}
     if gaps:
         log = paths["02_jobs"] / "native.log"
+        native_started = time.monotonic()
         with log.open("xb") as stream:
             result = subprocess.run(command, cwd=native_invocation.cwd, env=native_invocation.environment,
                                     stdout=stream, stderr=subprocess.STDOUT)
+        invocation["timing"]["native_seconds"] = time.monotonic() - native_started
+        invocation["native_returncode"] = result.returncode
+        native_artifacts[log.relative_to(root).as_posix()] = digest(log)
+        atomic_json(paths["02_jobs"] / "invocation.json", invocation)
         if result.returncode:
             atomic_json(paths["02_jobs"] / "invocation.json", {**invocation, "status": "failed", "returncode": result.returncode})
             raise subprocess.CalledProcessError(result.returncode, command)
@@ -197,6 +206,21 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
             native_summary[name] = {"length": length, "sha256": sha.hexdigest(), "n_bases": n_bases}
         identities[native_fasta] = native_index.identity
         native_artifacts[native_fasta.relative_to(root).as_posix()] = digest(native_fasta)
+        summary_path = paths["03_native"] / "autogapfiller_summary.json"
+        config_path = paths["03_native"] / "03.gap_filling/job_manager_config.json"
+        documents = []
+        for file in (summary_path, config_path):
+            before = stat_key(file)
+            data = file.read_bytes()
+            if stat_key(file) != before:
+                raise PathError("DEGAP native child-job summary changed")
+            identities[file] = before
+            native_artifacts[file.relative_to(root).as_posix()] = hashlib.sha256(data).hexdigest()
+            documents.append(json.loads(data))
+        native_jobs = validate_native_job_summary(*documents)
+        atomic_json(paths["02_jobs"] / "native_jobs.json", native_jobs)
+        if native_jobs["hard_failures"]:
+            raise PathError("DEGAP child processes failed despite top-level exit 0: " + ", ".join(native_jobs["hard_failures"]))
     else:
         # The successful no-op is explicit and content-bound, not a failed-tool fallback.
         native_report = paths["02_jobs"] / "no_gaps.json"
@@ -248,8 +272,11 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("baseline or reads changed during refinement")
     catalog.verify_unchanged()
+    invocation["timing"].update(before_publication_seconds=time.monotonic() - stage_started,
+                                admission_finished_at=datetime.now(timezone.utc).isoformat())
     execution = {**invocation, "status": "success", "baseline_sha256": recipe["baseline_sha256"],
-                 "native_executed": bool(gaps), "skip_reason": None if gaps else "no_remaining_gaps",
+                 "native_executed": bool(gaps), "native_outcome": "completed" if gaps else "no_remaining_gaps",
+                 "skip_reason": None if gaps else "no_remaining_gaps",
                  "recipe": recipe, "native_assembly": native_summary,
                  "artifacts": {native_report.relative_to(root).as_posix(): native_digest, **native_artifacts, **candidate_artifacts}}
     atomic_json(paths["02_jobs"] / "execution.json", execution)
@@ -262,6 +289,45 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
                 "provenance_sha256": digest(staging / "provenance.json")})
     return {"tool": "degap", "run_id": run_id, "staging": str(staging), "provenance": provenance}
 
+
+
+def validate_native_job_summary(payload, config):
+    """A zero AutoGapfiller exit must not hide failed child processes.
+
+    Pinned DEGAP calls an exit-zero unresolved job "failed" too. Keep that exact
+    no-fill outcome separate from nonzero exits, exceptions and missing jobs.
+    """
+    try:
+        native = payload["steps"]["step3"]["result"]
+        configured = [row["job_name"] for row in config["jobs"]]
+        if len(configured) != len(set(configured)) or any(not isinstance(name, str) or not name for name in configured):
+            raise ValueError("duplicate or invalid configured job")
+        rows, hard_failures = [], []
+        for field, statuses in (("completed", {"success"}), ("failed", {"failed", "error", "timeout"}), ("skipped", {"skipped"})):
+            values = native[field + "_jobs"]
+            if not isinstance(values, list) or type(native[field]) is not int or native[field] != len(values):
+                raise ValueError("native job count does not match records")
+            for value in values:
+                if not isinstance(value, dict) or value.get("status") not in statuses:
+                    raise ValueError("unexpected native job status")
+                row = dict(value)
+                exit_code = row.get("exit_code")
+                if exit_code is not None and (type(exit_code) is not int or exit_code != 0):
+                    hard_failures.append(row["job_name"])
+                elif field == "failed":
+                    if row["status"] != "failed" or row.get("error") != "Job execution completed but did not produce expected results":
+                        hard_failures.append(row["job_name"])
+                    else:
+                        row["cgat_execution_outcome"] = "completed_without_native_fill"
+                rows.append(row)
+        if (type(native["total_jobs"]) is not int or native["total_jobs"] != len(rows)
+                or len(rows) != len(configured) or len({row["job_name"] for row in rows}) != len(rows)
+                or {row["job_name"] for row in rows} != set(configured)):
+            raise ValueError("missing or duplicated native child jobs")
+        result = {"total_jobs": len(rows), "jobs": rows, "hard_failures": hard_failures}
+        return result
+    except (KeyError, TypeError, ValueError) as error:
+        raise PathError("DEGAP native child-job summary is incomplete: " + str(error)) from error
 
 def stage_degap(root: Path, groups: dict, threads: int, *, run_id: str | None = None) -> dict:
     run_id = run_id or uuid.uuid4().hex

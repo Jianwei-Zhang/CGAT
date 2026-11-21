@@ -133,6 +133,18 @@ def find_completed(root, tool, groups):
     for directory in candidates:
         result = validate_candidate(root, tool, groups, directory, runtime, lock)
         if result:
-            result["already_published"] = directory == published
+            result["already_published"] = False
+            if directory == published:
+                try:
+                    try:
+                        from refinement_commit import current_publication
+                    except ModuleNotFoundError:
+                        from .refinement_commit import current_publication
+                    receipt = current_publication(root, tool)
+                    result["already_published"] = receipt is not None and receipt["run_id"] == result["run_id"]
+                except (OSError, ValueError, KeyError):
+                    # Still a verified native/admission result, but not a final
+                    # three-area publication. The runner must recover/publish.
+                    pass
             return result
     return None

@@ -62,6 +62,13 @@ class DegapRefinedPublicationTests(unittest.TestCase):
             final = output / "04.genome_integration/genome.filled.fasta"
             final.parent.mkdir()
             final.write_text(">chr1\nAAAAGTCCCC\n")
+            config = {"jobs": [{"job_name": "chr1.1." + direction, "job_dir": str(report.parent / ("chr1.1." + direction)),
+                                "chromosome": "chr1", "gap_id": 1, "direction": direction} for direction in ("left", "right")]}
+            (output / "03.gap_filling/job_manager_config.json").write_text(json.dumps(config))
+            summary = {"steps": {"step3": {"result": {"total_jobs": 2, "completed": 1, "failed": 0, "skipped": 1,
+                       "completed_jobs": [{"job_name": "chr1.1.left", "status": "success"}], "failed_jobs": [],
+                       "skipped_jobs": [{"job_name": "chr1.1.right", "status": "skipped"}]}}}}
+            (output / "autogapfiller_summary.json").write_text(json.dumps(summary))
             return subprocess.CompletedProcess(command, 0)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
@@ -101,6 +108,21 @@ class DegapRefinedPublicationTests(unittest.TestCase):
             self.assertFalse((root / ".runtime/refinement/01_degap" / run_id / "final").exists())
             invocation = json.loads((root / "04_refinement/01_degap/02_jobs" / run_id / "invocation.json").read_text())
             self.assertEqual(invocation["status"], "failed")
+
+    def test_native_zero_exit_unfilled_is_distinct_from_child_process_failure(self):
+        config = {"jobs": [{"job_name": "gap.left"}]}
+        native = {"total_jobs": 1, "completed": 0, "failed": 1, "skipped": 0,
+                  "completed_jobs": [], "skipped_jobs": [], "failed_jobs": [{"job_name": "gap.left", "status": "failed",
+                  "error": "Job execution completed but did not produce expected results"}]}
+        payload = {"steps": {"step3": {"result": native}}}
+        result = adapter.validate_native_job_summary(payload, config)
+        self.assertFalse(result["hard_failures"])
+        self.assertEqual(result["jobs"][0]["cgat_execution_outcome"], "completed_without_native_fill")
+        native["failed_jobs"][0]["exit_code"] = 137
+        self.assertEqual(adapter.validate_native_job_summary(payload, config)["hard_failures"], ["gap.left"])
+        native["failed_jobs"] = []
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            adapter.validate_native_job_summary(payload, config)
 
     def test_failed_native_never_stages_a_successful_lgz_copy(self):
         real_run = subprocess.run

@@ -13,6 +13,8 @@ import re
 import subprocess
 import sys
 import uuid
+import time
+from datetime import datetime, timezone
 
 try:
     from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
@@ -107,6 +109,8 @@ def quartet_empty_outcome(code, log, directory, prepared):
 
 
 def _stage(root, tool, groups, threads, run_id):
+    stage_started = time.monotonic()
+    stage_started_at = datetime.now(timezone.utc).isoformat()
     root = Path(root).resolve()
     layout = WorkspaceLayout.detect(root)
     if layout.version != 2 or tool not in {"tgsgapcloser", "quartet", "lrgapcloser"}:
@@ -206,7 +210,8 @@ def _stage(root, tool, groups, threads, run_id):
               "adapter_sources": adapter_hashes}
     atomic_json(paths["01_inputs"] / "recipe.json", recipe)
     invocation_record = {"tool": tool, "run_id": run_id, "command": list(invocation.command), "cwd": str(invocation.cwd),
-                         "threads": threads, "recipe_sha256": fingerprint(recipe), "status": "running"}
+                         "threads": threads, "recipe_sha256": fingerprint(recipe), "status": "running",
+                         "timing": {"started_at": stage_started_at}}
     atomic_json(paths["02_jobs"] / "invocation.json", invocation_record)
     native_artifacts, result_file, result_genome = {}, None, None
     native_executed, returncode = False, None
@@ -225,9 +230,13 @@ def _stage(root, tool, groups, threads, run_id):
             native_artifacts[driver.relative_to(root).as_posix()] = digest(driver)
             identities[driver] = stat_key(driver)
         log = paths["02_jobs"] / "native.log"
+        native_started = time.monotonic()
         with log.open("xb") as stream:
             process = subprocess.run(invocation.command, cwd=invocation.cwd, env=invocation.environment,
                                      stdout=stream, stderr=subprocess.STDOUT)
+        invocation_record["timing"]["native_seconds"] = time.monotonic() - native_started
+        invocation_record["native_returncode"] = process.returncode
+        atomic_json(paths["02_jobs"] / "invocation.json", invocation_record)
         native_executed, returncode = True, process.returncode
         native_artifacts[log.relative_to(root).as_posix()] = digest(log)
         files = [path for values in prepared["prepared"].values() for path in values]
@@ -305,6 +314,8 @@ def _stage(root, tool, groups, threads, run_id):
     catalog.verify_unchanged()
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("refinement inputs/native evidence changed during execution")
+    invocation_record["timing"].update(before_publication_seconds=time.monotonic() - stage_started,
+                                       admission_finished_at=datetime.now(timezone.utc).isoformat())
     execution = {**invocation_record, "status": "success", "baseline_sha256": recipe["baseline_sha256"],
                  "native_executed": native_executed, "native_returncode": returncode, "native_outcome": outcome,
                  "native_assembly": native_summary, "require_native_equality": not rejected and result_genome is not None,
