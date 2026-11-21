@@ -8,6 +8,11 @@ Implementation only; no current handoff/package/customer acceptance is claimed.
 """
 from __future__ import annotations
 
+try:
+    from workspace_binding import workspace_path, workspace_relative
+except ModuleNotFoundError:
+    from .workspace_binding import workspace_path, workspace_relative
+
 from contextlib import ExitStack
 import csv
 import hashlib
@@ -37,7 +42,7 @@ def regular(root,name,*,optional=False):
     part = PurePosixPath(name)
     if not name or part.is_absolute() or ".." in part.parts or "\\" in name:
         raise wa.ExperimentError("reference handoff path escaped its declared root")
-    path = root.joinpath(*part.parts)
+    path = workspace_path(root, *part.parts)
     for ancestor in (path,*path.parents):
         if ancestor==root:
             break
@@ -131,14 +136,14 @@ def direct_process_guard(workspace,*,proc_root=None):
             except (FileNotFoundError,ProcessLookupError):
                 continue
             except (OSError,RuntimeError):
-                if str(workspace) in arg or ".prepare_lib/" in arg:
+                if str(workspace) in arg or ".prepare_lib/" in arg or ".runtime/prepared/" in arg:
                     raise wa.ExperimentError(f"cannot inspect possible reference process PID {process.name}")
                 continue
             if workspace not in path.parents:
                 continue
             relative = path.relative_to(workspace)
-            if (relative.parts[0] in ("runs",".prepare_lib") or path==workspace/"run_all.sh"
-                    or mapper and relative.parts[0]=="data"):
+            if (any(path.is_relative_to(workspace_path(workspace, area)) for area in ("runs", ".prepare_lib", ".runtime/commands")) or path==workspace/"run_all.sh"
+                    or mapper and path.is_relative_to(workspace_path(workspace, "data/reference").parent)):
                 raise wa.ExperimentError(f"reference handoff refuses an active standalone workspace process: PID {process.name}")
 
 
@@ -177,7 +182,7 @@ def quote_values(values):
 
 def render_commands(workspace,run_dir,target,query,threads):
     qr,qt,qq,unknown,adapter,qw = quote_values([run_dir,target,query,"unknown\n",
-        workspace/".prepare_lib/tools/long_cigar_recovery/server_alignment.py",workspace])
+        workspace_path(workspace, ".prepare_lib/tools/long_cigar_recovery/server_alignment.py"),workspace])
     prefix = ("#!/usr/bin/env bash\nset -euo pipefail\n"+f"cd {qr}\n"+
               f"(minimap2 --version > tool_version.txt 2>&1 || printf {unknown} > tool_version.txt)\n")
     cpu = '"${GPM_TASK_THREADS:-'+str(threads)+'}"'
@@ -217,7 +222,7 @@ def baseline_matches(workspace,server_source,base):
     profiles = base.get("source_profiles") if type(base) is dict else None
     if (type(base) is not dict or base.get("schema")!=1 or type(profiles) is not list or not profiles):
         raise wa.ExperimentError("reference handoff baseline source inventory is incomplete")
-    tools = workspace/".prepare_lib/tools"
+    tools = workspace_path(workspace, ".prepare_lib/tools")
     actual = {"tools/"+p.relative_to(tools).as_posix() for p in tools.rglob("*.py")
               if "__pycache__" not in p.parts and p.relative_to(tools).parts[0]!="long_cigar_recovery"
               and not p.relative_to(tools).parts[0].startswith(".long-cigar-runtime-")}
@@ -252,13 +257,15 @@ def atomic_script(path,data,mode):
 
 
 def validate_journal_commands(journal):
+    if not isinstance(journal.get("workspace"), str) or not Path(journal["workspace"]).is_absolute():
+        raise wa.ExperimentError("reference handoff journal lacks a valid workspace scope")
     seen = set()
     for item in journal["commands"]:
         if type(item) is not dict:
             raise wa.ExperimentError("reference handoff journal has a malformed command entry")
         name = str(item.get("unit_id","")).removeprefix("ref:")
         if (not NAME.fullmatch(name) or item.get("unit_id")!="ref:"+name
-                or item.get("path")!=f"runs/{name}_vs_ref/command.sh" or name in seen
+                or item.get("path") not in {f"runs/{name}_vs_ref/command.sh", workspace_relative(Path(journal["workspace"]), f"runs/{name}_vs_ref/command.sh")} or name in seen
                 or type(item.get("mode")) is not int or not 0<=item["mode"]<=0o777
                 or type(item.get("backup")) is not str
                 or not re.fullmatch(r"[0-9]{6}\.command\.sh",item["backup"])
@@ -287,7 +294,7 @@ def restore_commands(workspace,backup,journal):
 
 def recover_incomplete(workspace,run_id):
     recovered = []
-    for backup in sorted((workspace/".run_all").glob(PREFIX+"*")):
+    for backup in sorted((workspace_path(workspace, ".run_all")).glob(PREFIX+"*")):
         if backup.is_symlink() or not backup.is_dir():
             raise wa.ExperimentError("reference handoff backup root must be an original directory")
         if not (backup/"journal.json").exists():
@@ -341,15 +348,16 @@ def handoff(workspace,server_source,run_id,units,manager):
         raise wa.ExperimentError("reference handoff prior status has duplicated execution units")
     statuses = {r["unit_id"]:r.get("state") for r in statuses}
     changes = []
-    runtime = workspace/".prepare_lib/tools/long_cigar_recovery"
+    runtime = workspace_path(workspace, ".prepare_lib/tools/long_cigar_recovery")
     runtime_present = runtime.exists() or runtime.is_symlink()
     for unit in units:
         if not unit.unit_id.startswith("ref:"):
             continue
         name = unit.unit_id[4:]
         expected_path = f"runs/{name}_vs_ref/command.sh"
-        if name not in queries or unit.command_relpath!=expected_path:
+        if name not in queries or unit.command_relpath not in {expected_path, workspace_relative(workspace, expected_path)}:
             raise wa.ExperimentError("reference handoff refuses custom/missing plan-to-dataset command ownership")
+        expected_path = unit.command_relpath
         path = regular(workspace,expected_path)
         prepared = manager.prepare(unit.unit_id,unit.command_relpath)
         if prepared is None:
@@ -397,7 +405,7 @@ def handoff(workspace,server_source,run_id,units,manager):
             stack.enter_context(sa.task_lock((workspace/row["path"]).parent))
         owner_locked(workspace,run_id)
         direct_process_guard(workspace)
-        backup = Path(tempfile.mkdtemp(prefix=PREFIX,dir=workspace/".run_all"))
+        backup = Path(tempfile.mkdtemp(prefix=PREFIX,dir=workspace_path(workspace, ".run_all")))
         journal = {**report,"schema":1,"status":"applying","workspace":str(workspace),"run_id":run_id,
                    "source_runtime_sha256":checked["sha256"],"commands":[],"preserved_logs":[]}
         for i,row in enumerate(changes):

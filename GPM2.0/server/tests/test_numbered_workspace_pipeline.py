@@ -130,6 +130,8 @@ class NumberedWorkspaceTests(unittest.TestCase):
                 self.assertTrue(layout.path(logical).is_file(), logical)
             self.assertEqual(layout.path("report/report.html"), root / "06_report/01_lgz/report.html")
             self.assertFalse((root / "06_report/report.html").exists())
+            self.assertIn("${GPM_FAST_WORK_ROOT}/.runtime/prepared/tools/assign_chr_groups.py",
+                          layout.path("assign_chr_groups.sh").read_text())
             for path in [root / "run_all.sh", *layout.path("run_lgz_step1.sh").parent.glob("*.sh")]:
                 checked = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
                 self.assertEqual(checked.returncode, 0, checked.stderr)

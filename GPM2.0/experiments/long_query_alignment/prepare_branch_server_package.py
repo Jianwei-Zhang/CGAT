@@ -36,7 +36,7 @@ REF_OVERLAY = r'''  if [[ "$MINIMAP_PRESET" == "asm10" ]]; then
       printf 'cd %s\n' "$(shell_quote "$run_dir")"
       printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
       printf 'exec python3 %s --server-dir %s --run-dir %s --target %s --query %s --threads %s --preset asm10 --result result.paf > stdout.log 2> stderr.log\n' \
-        "$(shell_quote "${WORK_ROOT}/.prepare_lib/tools/long_cigar_recovery/server_alignment.py")" \
+        "$(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".prepare_lib/tools/long_cigar_recovery/server_alignment.py")")" \
         "$(shell_quote "$WORK_ROOT")" "$(shell_quote "$run_dir")" \
         "$(shell_quote "$ref_fa")" "$(shell_quote "$ds_fa")" "$runtime_threads"
     } > "${run_dir}/command.sh"
@@ -49,6 +49,8 @@ EXCLUDE = {".git","__pycache__",".pytest_cache","tests","validation"}
 
 def overlay_prepare(text):
     """Exactly the named initial-ref function/copy site; source drift refuses."""
+    if 'source "${SCRIPT_DIR}/lib/workspace_paths.sh"' not in text:
+        raise wa.ExperimentError("reference overlay requires the layout-aware Server shell library")
     if "long_cigar_recovery/server_alignment.py" in text or COPY_OVERLAY in text:
         raise wa.ExperimentError("Server source already contains a branch overlay; do not stack development packages")
     if text.count(REF_ANCHOR)!=1 or text.count(COPY_ANCHOR)!=1:
@@ -64,10 +66,10 @@ def overlay_prepare(text):
     return text.replace(REF_ANCHOR,REF_ANCHOR+REF_OVERLAY).replace(COPY_ANCHOR,COPY_ANCHOR+COPY_OVERLAY)
 
 
-CHECKPOINT_ANCHOR = '        manifest = (self.server_dir / command_relpath).parent / "alignment_tasks.json"\n'
-CHECKPOINT_OVERLAY = '        branch_runtime = self.server_dir / ".prepare_lib/tools/long_cigar_recovery"\n' + (
+CHECKPOINT_ANCHOR = '        manifest = (workspace_join(self.server_dir, command_relpath)).parent / "alignment_tasks.json"\n'
+CHECKPOINT_OVERLAY = '        branch_runtime = workspace_join(self.server_dir, ".prepare_lib/tools/long_cigar_recovery")\n' + (
     '        if (branch_runtime.is_dir() and "long_cigar_recovery/server_alignment.py"\n'
-    '                in (self.server_dir / command_relpath).read_text(encoding="utf-8")):\n'
+    '                in (workspace_join(self.server_dir, command_relpath)).read_text(encoding="utf-8")):\n'
     '            paths.extend(sorted(p for p in branch_runtime.rglob("*")\n'
     '                                if p.is_file() and "__pycache__" not in p.parts))\n'
 )

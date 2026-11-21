@@ -1,6 +1,11 @@
 """Typed initial-reference tuning; no arbitrary minimap2 arguments or retries."""
 from __future__ import annotations
 
+try:
+    from workspace_binding import workspace_path
+except ModuleNotFoundError:
+    from .workspace_binding import workspace_path
+
 import csv
 import os
 from pathlib import Path
@@ -54,7 +59,7 @@ def command_tail(command, tool, *, fraction=None, mid_occ=None):
 
 
 def prepared_options(root):
-    path = Path(root) / "metadata/prepare_options.tsv"
+    path = workspace_path(root, "metadata/prepare_options.tsv")
     if not path.exists() and not path.is_symlink():
         return {}  # Legacy adapter fixtures/workspaces: retain original native flags.
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024**2:

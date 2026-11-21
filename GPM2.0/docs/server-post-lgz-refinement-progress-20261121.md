@@ -154,3 +154,12 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 ### 仍未开放的边界
 
 新工作区默认初始化、真实旧项目迁移适配器、公共 reads/tools 追加与执行入口、每工具 Final Path/报告/App 包联合发布、原生部分任务恢复、App 导入/导出和双架构原生验收均未完成。当前代码支持显式编号的受控准备与 LGZ-only 打包；不据此宣布整体用户流程可用。master、远端作业及现有工作区保持不变。
+
+
+### 同日补充：参考比对恢复运行库同步
+
+编号路径接入后，运行库生成器的严格 hook 检查正确拒绝了仍按旧路径声明的 `prepare.sh` fragment。没有放宽或跳过该检查：canonical 实验源的精确 hook 同步为布局解析调用，并补齐参考恢复中的目录、metadata、私有 attempt 及 journal 路径检查。编号布局仍只允许 adapter 自有的 `*_vs_ref/.long-cigar-attempt-*` 输出；独立原型不得向准备工作区写入。
+
+共享 `workspace_binding.py` 复用 Server 的实际布局解析器，不复制第二份目录映射；旧无 marker 夹具保持原路径，带 marker 的项目缺少解析器或 manifest 无效时明确失败。参考映射不再因为找不到旧 `metadata/prepare_options.tsv` 而静默落回默认参数。
+
+选定的 3 项纯路径/配置/权限范围检查通过（0.047 秒），不执行比对。生成的 runtime 和两个内容 profile 按 canonical 源重新生成，最终统一回归前仍不宣称真实参考恢复全流程或旧项目迁移验收完成。

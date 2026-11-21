@@ -8,6 +8,11 @@ records that actually trigger the exact target assertion can enter recovery.
 """
 from __future__ import annotations
 
+try:
+    from workspace_binding import workspace_path
+except ModuleNotFoundError:
+    from .workspace_binding import workspace_path
+
 import argparse
 import json
 from pathlib import Path
@@ -102,12 +107,12 @@ def experiment(args,*,prepared_workspace=None):
         # It owns a fresh private attempt directly inside an initial-ref run.
         workspace = Path(prepared_workspace).resolve()
         run_dir = root.parent.parent
-        if (not (workspace/".prepare_lib").is_dir() or not (workspace/"metadata").is_dir()
-                or run_dir.parent!=workspace/"runs" or not run_dir.name.endswith("_vs_ref")
+        if (not (workspace_path(workspace, ".prepare_lib")).is_dir() or not (workspace_path(workspace, "metadata")).is_dir()
+                or run_dir.parent!=workspace_path(workspace, "runs") or not run_dir.name.endswith("_vs_ref")
                 or not root.parent.name.startswith(".long-cigar-attempt-") or root.name!="selective"):
             raise wa.ExperimentError("managed reference recovery requires its adapter-owned private attempt scope")
     for parent in (root.parent,*root.parent.parents):
-        if (parent/".prepare_lib").exists() or (parent/"run_all.sh").exists():
+        if (parent/".prepare_lib").exists() or (parent/".runtime/workspace.json").exists() or (parent/"run_all.sh").exists():
             if prepared_workspace is None or parent!=workspace:
                 raise wa.ExperimentError("branch experiment must be outside a prepared Server workspace")
     target_path,query_path = args.target.resolve(),args.query.resolve()

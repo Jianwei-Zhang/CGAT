@@ -514,6 +514,8 @@ write_assignment_script() {
     --shell-var GPM_FAST_MINIMAP_PRESET "$MINIMAP_PRESET" \
     --shell-var GPM_FAST_SELF_MIN_CHAIN_SCORE "$SELF_MIN_CHAIN_SCORE" \
     --shell-var GPM_FAST_SELF_MINIMIZERS "$SELF_MINIMIZERS"
+  python3 "${SCRIPT_DIR}/tools/workspace_layout.py" --server-dir "$work_root" \
+    --render-shell "$output_path" --logical-script "assign_chr_groups.sh"
   make_executable_if_supported "$output_path"
 }
 
