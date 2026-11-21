@@ -42,4 +42,4 @@ bash /work/cgat_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrg
 bash /work/cgat_server/run_all.sh --gapfill-tools none
 ```
 
-These are the implemented launch contracts, not a claim of four-tool native or cross-architecture acceptance. A direct `prepare.sh --gapfill-tools none` records a disabled configuration, since preparation itself is not an execution invocation. Existing unmarked legacy workspaces still need the pending explicit migration adapter; do not run `prepare.sh` over them.
+These are the implemented launch contracts, not a claim of four-tool native or cross-architecture acceptance. A direct `prepare.sh --gapfill-tools none` records a disabled configuration, since preparation itself is not an execution invocation. Completed unmarked legacy workspaces use the explicit completed-baseline migration entrypoint documented in `server-refinement-migration-contract-20261122.md`; do not run `prepare.sh` over them. Unfinished legacy stages still need the separate resume adapter and are not marked complete by this operation.

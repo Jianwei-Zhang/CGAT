@@ -254,3 +254,28 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 ### 下一步与未完成项
 
 公共入口已接入上述生产模块，但整个新建/续跑用户流程仍需要最终统一验收。优先继续实际旧工作区迁移适配器与 CLI、安全复用原始已完成 LGZ 证明；然后补原生部分子任务恢复、受影响新片段比对/注释和离线原生可视报告。四工具的固定环境安装及 x86_64/ARM64 原生小样例、完整文档与 A01–A18 统一检查尚未完成。没有升级现有环境、触碰客户目录/远端作业或修改 master。
+
+
+## 2026-11-22：完成 LGZ 的旧工作区显式迁移与原引擎冻结续跑
+
+### 本轮纵向接入
+
+- 新增 `tools/migrate_workspace.py`，可从新版已安装 Server 对旧目录执行只读 preview、持摘要确认的 apply，以及同事务 resume/rollback；不依赖旧工作区脚本理解新参数。操作命令和边界见 `server-refinement-migration-contract-20261122.md`。
+- preview 绑定物理文件清单、被替换的生成脚本、运行库增补及真实 LGZ contract；apply 获取 legacy 独占锁后重新核对批准摘要。还检查本机独立脚本/原生阶段进程；活跃、外地主机或不明 owner 不被抢锁。跨节点和排队作业由操作者核实后显式 `--confirm-idle`，不是用本机缺少 PID 推断空闲；本轮没有连接任何远端或自动检查调度器。
+- `MigrationTransaction` 增加带内容/权限绑定的 additions 和 adapter metadata，覆盖旧运行库没有的新模块/回执。所有新文件先进入持久化 staging，再以同文件系统原子 rename 安装，避免 live 目录里出现半份复制。中断可按已记录操作恢复，回滚仅移除仍与事务清单一致的新增文件，不删被修改的内容。
+- 增加持锁、限当前进程作用域的 destination validation view。迁移仍处于 `validating` 时，真实 LGZ validator 能检查编号目录；普通 launcher、子进程和其他工作区不会因此获准运行。校验通过后才提交 layout marker；缺失迁移 journal 不能假装新建编号工作区。
+- 新增 `migrated_lgz.py`：保存并核对原科学 stage receipts、完整执行计划和科学文件绑定。迁移时观察到的旧 runtime 另有快照/备份，不把“可能已升级的运行库”虚称为实际生产该 LGZ 结果的精确引擎源码。原科学回执保持原文，不生成新引擎 cache/checkpoint 来替代。
+- 续跑时认证原 LGZ 基线后，reference handoff 与科学前缀不再执行。Runner/过程报告使用独立的 `SKIP_MIGRATED_LGZ` / `frozen_original_lgz` 标识，区别于本次计算和缓存命中；精修及真实 full/light 交付仍走共同入口。失败的冻结证明必须停止，不能退回新引擎重新计算；修改 LGZ 科学参数需新目录。
+- 迁移事务安装新 launcher、打包/导出模板及运行库，更新 mutable launch/typed-reads 路径配置，保存被替换脚本原文。无正式 SOURCE 元数据的开发源码生成明确 unreleased runtime 记录，不沿用旧 Release 标识冒充新版正式来源。已冻结的旧科学命令明确阻止直接重跑，而不是重新创建根目录 data/grt 等影子树。用户 notes/无关文件不被覆盖。
+
+### 必要定向证据
+
+- additions 安装后中断/恢复、只回滚未修改的 owned additions、destination view 作用域与子进程隔离、原有移动/备份用例共 4 项通过（1.169 秒）。这不是全部故障注入矩阵。
+- 初次纵向检查已完成真实迁移、升级后的 public run_all、原引擎前缀跳过及完整/轻量基线包，在用例最后恢复删掉的回执时因测试未还原原文件 mode 而失败；修正测试恢复动作，没有放宽生产校验。
+- 其后 public migration preview/apply → public run_all 受控链路通过（25.651 秒），确认原 data/metadata/grt 科学字节保持、旧 runtime 备份、无旧命令执行、无 reference handoff、报告明确冻结执行、两个实际 ZIP 基线交付、没有新引擎 reference checkpoint，删去回执/改动基线拒绝复用。之后补齐完整 plan 绑定和原子 staging 安装；最后串行运行迁移新增文件恢复/回滚、validation view、旧移动恢复、普通 reads 追加入口与 public 迁移链路共 6 项定向检查，通过（33.756 秒）。额外断言在 plan 后追加科学步骤也必须拒绝，而不是重新计算 LGZ。
+
+- reference handoff 的原引擎冻结判断同时更新生产入口和 canonical overlay，严格 runtime profile 同步通过（42 文件；production_ready=false，未改正式发布）。没有绕过 overlay/哈希校验。
+
+### 仍需继续
+
+当前适配器只认证 **完整且真实 contract 已通过的 LGZ 基线**；未完成旧阶段的版本/内容安全迁移与部分原生子任务恢复仍未完成，不以现有完整基线适配器代替。真实四工具固定环境与双架构原生验收、新片段比对/注释、离线原生可视报告和 A01–A18 最终统一检查仍保留。没有升级用户环境、触碰 master/客户目录/远端作业或执行真实精修工具。

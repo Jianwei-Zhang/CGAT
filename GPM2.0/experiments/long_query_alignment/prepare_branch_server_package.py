@@ -91,7 +91,11 @@ def overlay_checkpoint(text):
 
 RUN_ANCHOR = '        if not ready:\n'
 RUN_OVERLAY = (
-    '        if ready and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):\n'
+    '        from migrated_lgz import verified_baseline\n'
+    '        frozen = verified_baseline(root) if ready else None\n'
+    '        if frozen is not None and "--max-fill" in options:\n'
+    '            raise RunnerError("Migrated LGZ is frozen under its original engine; use a new workspace to change LGZ science.")\n'
+    '        if ready and frozen is None and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):\n'
     '            sys.path.insert(0, str(server_source / "tools/long_cigar_recovery"))\n'
     '            from resume_reference import handoff\n'
     '            from run_outer_checkpoints import OuterCheckpointManager\n'

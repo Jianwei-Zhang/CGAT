@@ -1,8 +1,8 @@
 """Content-bound, resumable physical migration primitives.
 
-The public CLI currently offers inspection only. Applying a migration requires a
-runtime-specific adapter to supply rewritten scripts/receipts and validate the
-complete destination contract. Moving files alone is NOT a completed migration.
+This module's CLI offers physical inspection. The completed-LGZ runtime adapter
+in migrate_workspace.py supplies rewritten scripts/receipts and new runtime
+files, then validates the complete destination contract. Moving files alone is NOT a completed migration.
 All mutations require the existing workspace lock, including cross-host owners.
 """
 from __future__ import annotations
@@ -13,7 +13,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import stat
 from typing import Callable
 import uuid
@@ -196,6 +195,25 @@ def plan_migration(root: Path) -> MigrationPlan:
     return MigrationPlan(tuple(sorted(entries, key=lambda x: x["source"])), tuple(sorted(directories)))
 
 
+def inventory_document(journal: dict) -> dict:
+    payload = {"entries": journal["entries"], "directories": journal["directories"]}
+    for name in ("additions", "adapter_metadata"):
+        if name in journal:
+            payload[name] = journal[name]
+    return payload
+
+
+def validate_addition_path(root: Path, destination: str) -> Path:
+    if not isinstance(destination, str):
+        raise LayoutError("migration addition destination must be a relative path")
+    relative_path(destination)
+    if (canonical_relative(destination) != destination or destination in {MANIFEST, MIGRATION, ".runtime"}
+            or destination == ".runtime/migrations" or destination.startswith(".runtime/migrations/")
+            or destination == ".runtime/run_all/lock" or destination.startswith(".runtime/run_all/lock/")):
+        raise LayoutError("migration addition overlaps reserved or legacy state: " + destination)
+    return plain_path(root, destination)
+
+
 def _check_journal(root: Path, journal: dict) -> None:
     if (not isinstance(journal, dict) or not isinstance(journal.get("entries"), list)
             or not isinstance(journal.get("directories"), list)):
@@ -212,7 +230,7 @@ def _check_journal(root: Path, journal: dict) -> None:
         raise LayoutError("invalid migration journal identity")
     if journal.get("state") not in {"prepared", "moving", "validating", "committed", "rolling_back", "rolled_back"}:
         raise LayoutError("invalid migration state")
-    if journal.get("inventory_sha256") != json_digest({"entries": journal["entries"], "directories": journal["directories"]}):
+    if journal.get("inventory_sha256") != json_digest(inventory_document(journal)):
         raise LayoutError("migration journal entries changed")
     sources, targets = set(), set()
     for entry in journal["entries"]:
@@ -244,6 +262,26 @@ def _check_journal(root: Path, journal: dict) -> None:
                 raise LayoutError("invalid migration symlink")
         if entry["before"]["kind"] != entry["after"]["kind"]:
             raise LayoutError("migration cannot change artifact type")
+    additions = journal.get("additions", [])
+    if not isinstance(additions, list) or ("adapter_metadata" in journal and not isinstance(journal["adapter_metadata"], dict)):
+        raise LayoutError("invalid migration adapter/addition record")
+    for addition in additions:
+        if not isinstance(addition, dict) or set(addition) != {"destination", "after"}:
+            raise LayoutError("invalid migration addition")
+        destination, after = addition["destination"], addition["after"]
+        validate_addition_path(root, destination)
+        if destination in targets:
+            raise LayoutError("duplicate migration addition destination")
+        targets.add(destination)
+        if (not isinstance(after, dict) or set(after) != {"kind", "size", "mode", "sha256"}
+                or after["kind"] != "file" or type(after["size"]) is not int or after["size"] < 0
+                or type(after["mode"]) is not int or not 0 <= after["mode"] <= 0o777
+                or not isinstance(after["sha256"], str) or len(after["sha256"]) != 64
+                or any(c not in "0123456789abcdef" for c in after["sha256"])):
+            raise LayoutError("invalid migration addition file metadata")
+    for destination in targets:
+        if any(parent.as_posix() in targets for parent in Path(destination).parents if str(parent) != "."):
+            raise LayoutError("migration file destinations overlap as parent/child")
 
 
 class MigrationTransaction:
@@ -277,7 +315,8 @@ class MigrationTransaction:
 
     @classmethod
     def begin(cls, root: Path, lock, plan: MigrationPlan, *, adapter: str,
-              rewrites: dict[str, bytes]) -> "MigrationTransaction":
+              rewrites: dict[str, bytes], additions: dict[str, tuple[bytes, int]] | None = None,
+              adapter_metadata: dict | None = None) -> "MigrationTransaction":
         root = root.resolve()
         if not adapter:
             raise LayoutError("migration needs a versioned runtime adapter")
@@ -306,6 +345,22 @@ class MigrationTransaction:
                    "state": "prepared", "plan_sha256": plan.digest, "entries": entries,
                    "directories": list(plan.directories),
                    "inventory_sha256": json_digest({"entries": entries, "directories": list(plan.directories)})}
+        generated = []
+        for destination, (content, mode) in sorted((additions or {}).items()):
+            path = validate_addition_path(root, destination)
+            if destination in {entry["destination"] for entry in entries} or path.exists() or path.is_symlink():
+                raise LayoutError("migration addition destination is occupied: " + destination)
+            if not isinstance(content, bytes) or type(mode) is not int or not 0 <= mode <= 0o777:
+                raise LayoutError("migration addition requires bytes and a regular file mode")
+            generated.append({"destination": destination, "after": {"kind": "file", "mode": mode,
+                              "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}})
+        if generated:
+            journal["additions"] = generated
+        if adapter_metadata is not None:
+            if not isinstance(adapter_metadata, dict):
+                raise LayoutError("migration adapter metadata must be an object")
+            journal["adapter_metadata"] = json.loads(json.dumps(adapter_metadata))
+        journal["inventory_sha256"] = json_digest(inventory_document(journal))
         transaction = cls(root, lock, journal)
         # Publish intent first. Incomplete staging blocks normal execution and
         # can still be explicitly rolled back without deleting original files.
@@ -319,6 +374,14 @@ class MigrationTransaction:
                     stream.flush()
                     os.fsync(stream.fileno())
                 path.chmod(entry["after"]["mode"])
+        for addition in generated:
+            path = plain_path(root, f".runtime/migrations/{journal['id']}/additions/{addition['destination']}")
+            ensure_directory(path.parent)
+            with path.open("xb") as stream:
+                stream.write(additions[addition["destination"]][0])
+                stream.flush()
+                os.fsync(stream.fileno())
+            path.chmod(addition["after"]["mode"])
         return transaction
 
     @classmethod
@@ -386,12 +449,30 @@ class MigrationTransaction:
             if temporary.exists() or temporary.is_symlink():
                 if not matches(temporary, after):
                     raise LayoutError("migration temporary file changed")
+                rename_synced(temporary, target)
             else:
-                shutil.copy2(staged, temporary)
-                with temporary.open("rb") as stream:
-                    os.fsync(stream.fileno())
-            os.replace(temporary, target)
-            sync_directories(target.parent)
+                # Staging is already durable and on this same filesystem.
+                # Consume it with one rename: no partially copied live file.
+                rename_synced(staged, target)
+
+    def _install_addition(self, addition: dict) -> None:
+        target = validate_addition_path(self.root, addition["destination"])
+        expected = addition["after"]
+        if matches(target, expected):
+            return
+        if target.exists() or target.is_symlink():
+            raise LayoutError("migration addition destination changed or occupied: " + addition["destination"])
+        staged = plain_path(self.root, f".runtime/migrations/{self.journal['id']}/additions/{addition['destination']}")
+        if not matches(staged, expected):
+            raise LayoutError("migration addition staging is incomplete or changed")
+        ensure_directory(target.parent)
+        temporary = target.with_name(target.name + ".migration-" + self.journal["id"])
+        if temporary.exists() or temporary.is_symlink():
+            if not matches(temporary, expected):
+                raise LayoutError("migration addition temporary file changed")
+            rename_synced(temporary, target)
+        else:
+            rename_synced(staged, target)
 
     def apply(self, validate: Callable[[WorkspaceLayout], dict]) -> dict:
         self._require_lock()
@@ -400,6 +481,8 @@ class MigrationTransaction:
         self.save("moving")
         for entry in self.journal["entries"]:
             self._install(entry)
+        for addition in self.journal.get("additions", []):
+            self._install_addition(addition)
         self.save("validating")
         layout = WorkspaceLayout(self.root, LAYOUT_VERSION)
         proof = validate(layout)
@@ -408,6 +491,7 @@ class MigrationTransaction:
         # A concurrent writer/new output must not be lost in an inventory that
         # only checks files known before the migration.
         expected = {entry["destination"] for entry in self.journal["entries"]}
+        expected.update(addition["destination"] for addition in self.journal.get("additions", []))
         for directory, dirs, files in os.walk(self.root, followlinks=False):
             parent = Path(directory)
             for name in list(dirs):
@@ -424,12 +508,15 @@ class MigrationTransaction:
         for entry in self.journal["entries"]:
             if not matches(plain_path(self.root, entry["destination"]), entry["after"]):
                 raise LayoutError(f"migrated artifact changed during validation: {entry['destination']}")
+        for addition in self.journal.get("additions", []):
+            if not matches(plain_path(self.root, addition["destination"]), addition["after"]):
+                raise LayoutError("migration addition changed during validation: " + addition["destination"])
         manifest = plain_path(self.root, MANIFEST)
         if manifest.exists() or manifest.is_symlink():
             if manifest.is_symlink() or json.loads(manifest.read_text()).get("migration_id") != self.journal["id"]:
                 raise LayoutError("migration found an unrelated layout manifest")
         durable_json(plain_path(self.root, f".runtime/migrations/{self.journal['id']}/validation.json"), proof)
-        durable_json(manifest, {**layout.manifest(), "migration_id": self.journal["id"]})
+        durable_json(manifest, {**layout.manifest(), "migration_id": self.journal["id"], "migration_adapter": self.journal["adapter"]})
         self.save("committed")
         self.prune_empty_legacy_directories()
         return proof
@@ -439,6 +526,15 @@ class MigrationTransaction:
         if self.journal["state"] == "committed":
             raise LayoutError("committed migration requires a separate validated reverse migration")
         self.save("rolling_back")
+        for addition in reversed(self.journal.get("additions", [])):
+            target = validate_addition_path(self.root, addition["destination"])
+            temporary = target.with_name(target.name + ".migration-" + self.journal["id"])
+            for path in (target, temporary):
+                if path.exists() or path.is_symlink():
+                    if not matches(path, addition["after"]):
+                        raise LayoutError("rollback refuses to delete changed migration addition: " + str(path))
+                    path.unlink()
+                    sync_directories(path.parent)
         for entry in reversed(self.journal["entries"]):
             source = plain_path(self.root, entry["source"])
             target = plain_path(self.root, entry["destination"])

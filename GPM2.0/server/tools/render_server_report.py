@@ -61,7 +61,7 @@ LABELS = {
     "gap_decisions": "逐 gap 接纳记录",
     "success": "完成", "failed": "失败", "interrupted": "中断", "pending": "未执行",
     "running": "运行中", "prepared": "输入已准备，等待运行", "preparing": "准备中",
-    "computed": "本次执行", "cache_reused": "复用已验证缓存", "not_started": "尚未开始",
+    "computed": "本次执行", "cache_reused": "复用已验证缓存", "frozen_original_lgz": "保留原引擎 LGZ 结果（未重新运行）", "not_started": "尚未开始",
     "see_parent_unit": "执行方式见所属阶段", "accepted": "接受", "rejected": "拒绝",
     "unresolved": "未解决", "superseded": "已被替换", "not_finalized": "尚未最终确认",
     "not_enabled": "未启用", "measured": "已测量", "enabled": "已启用",

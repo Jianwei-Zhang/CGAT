@@ -154,13 +154,16 @@ class ReportSession:
             record["command_text"] = script.read_text(encoding="utf-8")
         if event in {"CACHE_HIT", "SKIP_VALID"}:
             record["execution"] = "cache_reused"
-        if event in {"SUCCESS", "SKIP_VALID"}:
+        if event == "SKIP_MIGRATED_LGZ":
+            record["execution"] = "frozen_original_lgz"
+        if event in {"SUCCESS", "SKIP_VALID", "SKIP_MIGRATED_LGZ"}:
             record["facts"] = project_report_facts(collect_unit(self.root, unit.unit_id, self.input_data))
             for path in (self.report / "steps").glob("grt-*.json"):
                 substage = read_json(path)
                 if substage.get("parent_unit") == unit.unit_id:
                     cached = self.cached_stages_by_unit.get(unit.unit_id, set())
-                    substage["execution"] = "cache_reused" if substage["stage_id"] in cached else "computed"
+                    substage["execution"] = ("frozen_original_lgz" if event == "SKIP_MIGRATED_LGZ" else
+                                             "cache_reused" if substage["stage_id"] in cached else "computed")
                     write_json(path, substage)
             if unit.unit_id == "grt_step3":
                 write_json(self.report / "final_snapshot.json", {
@@ -172,7 +175,7 @@ class ReportSession:
             record["output_tail"] = list(self.output_tails.get(unit.unit_id, ()))
         write_json(self.report / filename, record)
         self.save()
-        if event in {"SUCCESS", "SKIP_VALID", "FAILED", "INTERRUPTED"}:
+        if event in {"SUCCESS", "SKIP_VALID", "SKIP_MIGRATED_LGZ", "FAILED", "INTERRUPTED"}:
             self.refresh()
 
     def child_output(self, line: str, unit_id: str | None = None):

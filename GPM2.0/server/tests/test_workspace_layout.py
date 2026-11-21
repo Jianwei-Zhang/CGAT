@@ -12,7 +12,7 @@ from unittest import mock
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 from workspace_layout import (LAYOUT_VERSION, MANIFEST, MIGRATION, LayoutError,
-                              WorkspaceLayout, canonical_relative)
+                              WorkspaceLayout, canonical_relative, migration_validation)
 import workspace_migration
 from workspace_migration import MigrationTransaction, durable_json, plan_migration, json_digest
 from run_all_runner import WorkspaceLock, RunnerError, load_plan
@@ -194,6 +194,65 @@ class MigrationTests(unittest.TestCase):
         self.lock.release()
         transaction.prune_empty_legacy_directories()
         self.assertFalse((self.root / ".run_all").exists())
+
+    def test_adds_runtime_files_transactionally_and_resumes_after_install(self):
+        plan = plan_migration(self.root)
+        lock = self.acquire(migration=True)
+        transaction = MigrationTransaction.begin(self.root, lock, plan, adapter="fixture.v1", rewrites={},
+            additions={".runtime/prepared/tools/new_worker.py": (b"# actual new runtime module\n", 0o640)},
+            adapter_metadata={"approved_runtime": "fixture-only"})
+        target = self.root / ".runtime/prepared/tools/new_worker.py"
+        original = transaction._install_addition
+        def interrupted(addition):
+            original(addition)
+            raise InterruptedError("after owned addition install")
+        with mock.patch.object(transaction, "_install_addition", side_effect=interrupted):
+            with self.assertRaises(InterruptedError):
+                transaction.apply(self.validate)
+        inode = target.stat().st_ino
+        lock.release()
+        restored = MigrationTransaction.resume(self.root, self.acquire(migration=True), adapter="fixture.v1")
+        restored.apply(self.validate)
+        self.assertEqual(target.read_bytes(), b"# actual new runtime module\n")
+        self.assertEqual(target.stat().st_ino, inode)
+        self.assertEqual(target.stat().st_mode & 0o777, 0o640)
+        self.assertEqual(restored.journal["adapter_metadata"], {"approved_runtime": "fixture-only"})
+
+    def test_addition_rollback_removes_only_unchanged_owned_output(self):
+        transaction = MigrationTransaction.begin(self.root, self.acquire(migration=True), plan_migration(self.root),
+            adapter="fixture.v1", rewrites={}, additions={".runtime/prepared/tools/new.py": (b"# new\n", 0o600)})
+        def invalid(_layout):
+            raise ValueError("injected validation failure")
+        with self.assertRaises(ValueError):
+            transaction.apply(invalid)
+        target = self.root / ".runtime/prepared/tools/new.py"
+        target.write_text("user modified")
+        with self.assertRaisesRegex(LayoutError, "changed migration addition"):
+            transaction.rollback()
+        self.assertEqual(target.read_text(), "user modified")
+        target.write_bytes(b"# new\n")
+        transaction.rollback()
+        self.assertFalse(target.exists())
+        self.assertEqual(WorkspaceLayout.detect(self.root).version, 1)
+        self.assertTrue(plan_migration(self.root).entries)
+
+    def test_destination_validation_is_scoped_to_live_owner_and_not_inherited_by_process(self):
+        transaction = self.begin()
+        def validate(layout):
+            with self.assertRaises(LayoutError):
+                WorkspaceLayout.detect(self.root)
+            with migration_validation(self.root, self.lock, transaction.journal["id"]):
+                self.assertEqual(WorkspaceLayout.detect(self.root).version, 2)
+                self.assertEqual(WorkspaceLayout.detect(self.root).path("grt/q/q3.fa"), layout.path("grt/q/q3.fa"))
+                code = "import sys;sys.path.insert(0,sys.argv[1]);from workspace_layout import WorkspaceLayout;WorkspaceLayout.detect(sys.argv[2])"
+                child = subprocess.run([sys.executable, "-B", "-c", code, str(TOOLS), str(self.root)], capture_output=True, text=True)
+                self.assertNotEqual(child.returncode, 0)
+                self.assertIn("migration is incomplete", child.stderr)
+            with self.assertRaises(LayoutError):
+                WorkspaceLayout.detect(self.root)
+            return self.validate(layout)
+        transaction.apply(validate)
+        self.assertEqual(WorkspaceLayout.detect(self.root).version, 2)
 
     def test_resume_after_moved_file_without_recopying_or_recomputing(self):
         transaction = self.begin({"run_all.sh": b"#!/bin/bash\necho new\n"})

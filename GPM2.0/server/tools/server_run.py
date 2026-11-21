@@ -215,7 +215,11 @@ def execute(argv: list[str], server_source: Path) -> int:
         # Persist downstream settings before preparation/handoff so an interrupted
         # first launch can resume with only -o, without losing its supplied reads.
         save_request(root, options, run_id, saved_reads=saved["options"] if saved else None)
-        if ready and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):
+        from migrated_lgz import verified_baseline
+        frozen = verified_baseline(root) if ready else None
+        if frozen is not None and "--max-fill" in options:
+            raise RunnerError("Migrated LGZ is frozen under its original engine; use a new workspace to change LGZ science.")
+        if ready and frozen is None and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):
             sys.path.insert(0, str(server_source / "tools/long_cigar_recovery"))
             from resume_reference import handoff
             from run_outer_checkpoints import OuterCheckpointManager

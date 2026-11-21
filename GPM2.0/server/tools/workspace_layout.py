@@ -8,6 +8,8 @@ symlinks. Immutable legacy receipts may retain logical paths and use this resolv
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
+from contextvars import ContextVar
 import json
 import os
 import tempfile
@@ -64,6 +66,32 @@ _ROOT_COMMANDS = {
     "finalize_evidence.sh", "finalize_lgz_evidence.sh", "finalize_grt_evidence.sh",
     "assign_chr_groups.sh", "add_dataset.sh", "add_ctg.sh",
 }
+
+
+_MIGRATION_VALIDATION = ContextVar("cgat_migration_validation", default=None)
+
+
+def _validation_owner(root, lock, migration_id):
+    import socket
+    if (not lock.acquired or not lock.for_migration or lock.server_dir.resolve() != root
+            or lock.state_dir != root / ".run_all" or lock._existing_owner() != lock.owner
+            or lock.owner.get("pid") != os.getpid() or lock.owner.get("hostname") != socket.gethostname()):
+        raise LayoutError("destination validation requires the live migration owner's lock")
+    journal = _read_object(root / MIGRATION)
+    if journal.get("id") != migration_id or journal.get("state") != "validating":
+        raise LayoutError("destination validation requires this transaction's validating state")
+
+
+@contextmanager
+def migration_validation(root, lock, migration_id):
+    """Read the pending destination without making it runnable to other callers."""
+    root = Path(root).resolve()
+    _validation_owner(root, lock, migration_id)
+    token = _MIGRATION_VALIDATION.set((root, lock, migration_id))
+    try:
+        yield WorkspaceLayout(root, LAYOUT_VERSION)
+    finally:
+        _MIGRATION_VALIDATION.reset(token)
 
 
 class LayoutError(ValueError):
@@ -157,6 +185,10 @@ class WorkspaceLayout:
                     or re.fullmatch(r"[0-9a-f]{32}", migration["id"]) is None):
                 raise LayoutError("invalid workspace migration manifest")
             if migration.get("state") not in {"committed", "rolled_back"}:
+                view = _MIGRATION_VALIDATION.get()
+                if view is not None and view[0] == root and view[2] == migration["id"]:
+                    _validation_owner(*view)
+                    return cls(root, LAYOUT_VERSION)
                 raise LayoutError("workspace migration is incomplete; resume or roll back migration first")
         path = root / MANIFEST
         if not path.exists() and not path.is_symlink():
@@ -164,7 +196,10 @@ class WorkspaceLayout:
                 raise LayoutError("committed migration is missing its layout manifest")
             return cls(root, 1)
         value = _read_object(path)
-        if migration and (migration["state"] == "rolled_back" or value.get("migration_id") != migration["id"]):
+        if value.get("migration_id") and migration is None:
+            raise LayoutError("migrated workspace is missing its committed migration journal")
+        if migration and (migration["state"] == "rolled_back" or value.get("migration_id") != migration["id"]
+                          or value.get("migration_adapter", migration.get("adapter")) != migration.get("adapter")):
             raise LayoutError("layout manifest disagrees with migration receipt")
         if (value.get("schema") != LAYOUT_SCHEMA
                 or type(value.get("layout_version")) is not int

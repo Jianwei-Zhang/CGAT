@@ -634,6 +634,9 @@ class Runner:
         self._emit_summary(lines)
 
     def run(self) -> int:
+        from migrated_lgz import verified_baseline
+        frozen = verified_baseline(self.server_dir)
+        frozen_units = {row["unit_id"] for row in frozen["prefix"]} if frozen else set()
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         prior = load_prior_status(self.status_path)
         self.status_rows, abandoned = initial_status_rows(self.units, prior)
@@ -682,7 +685,7 @@ class Runner:
             for signal_number in previous_handlers:
                 signal.signal(signal_number, self._handle_signal)
             try:
-                if options.get("alignment_engine") == "minimap2" or options.get("grt_minimap2"):
+                if frozen is None and (options.get("alignment_engine") == "minimap2" or options.get("grt_minimap2")):
                     snapshot_path = workspace_join(self.server_dir, ".run_all/diagnostics", self.run_id, "minimap2_runtime.json")
                     try:
                         snapshot = runtime_snapshot(self.server_dir, options)
@@ -705,6 +708,13 @@ class Runner:
                             f"received signal {self.received_signal} between units",
                         )
                         return 128 + self.received_signal
+                    if unit.unit_id in frozen_units:
+                        row = self._row(unit)
+                        row.update(state="success", ended_at=timestamp(), elapsed_seconds="0.000", exit_code="0")
+                        atomic_write_status(self.status_path, self.status_rows)
+                        self._event("SKIP_MIGRATED_LGZ", unit,
+                                    "elapsed=0.000s validated original-engine frozen LGZ; no new-engine checkpoint created")
+                        continue
                     kind = unit.unit_id.split(":", 1)[0]
                     if kind in {"ref", "q0_chr", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
                         group = []
@@ -985,7 +995,8 @@ def main() -> int:
         ensure_plan(server_dir)
         units = load_plan(server_dir)
         runtime = workspace_join(server_dir, ".prepare_lib/tools/long_cigar_recovery")
-        if runtime.is_dir() and any(unit.unit_id.startswith("ref:") for unit in units):
+        from migrated_lgz import verified_baseline
+        if runtime.is_dir() and verified_baseline(server_dir) is None and any(unit.unit_id.startswith("ref:") for unit in units):
             # run.sh uses its own locked handoff; direct run_all.sh reaches this
             # entry instead. Do not perform the handoff twice in Runner.run().
             sys.path.insert(0, str(runtime))
