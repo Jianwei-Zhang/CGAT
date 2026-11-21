@@ -2445,3 +2445,99 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 显式路径把新reader改成绝对路径参数，否则当前native raw key包含command字段，会导致
 有效的第一补充缓存不命中。隔离API probe以绝对路径调用工具，其raw key因此不同；不能
 改写旧key或冒认主任务执行来强制采纳这些小probe结果。先保住5.3小时的native结果。
+
+## 2026-11-21 晚间：candidate_chr 去重复与实际缺失 native seed
+
+### 本地接入，不冒称远端主任务已切换
+
+- master起点已由另一对话推进到 `ab6ed207`（DEGAP submodule更新）；保留该提交，不混改。
+- 新 `q0_neighbor_requests.py` 用活动区间计数/未选择集合代替密集缺失pair枚举，保持旧版
+  supplemental_groups的query集合完全一致。300组随机重叠/间隙/相同source/已知pair与原
+  算法逐项对照；10000个密集缺失关系的测试不再枚举约5000万pair。
+- 新 `q0_regional_candidates.py` 在大数据路径执行这些请求：合并同一source跨染色体的
+  合格M/= query足迹，而不是每条染色体重复整条source；查询只保留参考局部尚未观察到的
+  关系。target bitset在读取原始CIGAR之前就排除已完成/不需要的source；同一原始contig
+  的N分段不能仅凭whole-source存在某个hit就全部略过。
+- 这是显式recall/work-selection变化：仅>=0.90 identity的M/=参考足迹用于额外区域扩展；
+  source已有合格锚点时，弱参考独占的其他候选区域不再整条重比对，但所有原始参考证据和
+  catalog候选保留。原始任务、初始参考/cross/self参数均不因此改变。
+- **Complete native矩阵可含零hit，但绝不代表已覆盖或已放置。** NativeScopes验证实际
+  tool/preset/flags/members/完整receipt结构，最终发布再核对所有输出SHA。它把一次完整
+  native query×target搜索作为已测试的无序source-part关系，不声称穷尽两个方向的启发式
+  mapping。初始近似self任务并不因此被冒认为完整native矩阵。
+
+### 真实上界规划probe发现61条弱参考source
+
+- `43008440` / `q0-candidate-regional-scope-20261121` 完成174.515s。此probe故意不使用
+  初始known pairs，且把全部parts当候选target，是工作量上界样本，不是生产完整计划；
+  不运行mapper，不声称重新校验全基因组DNA或第一补充全部内容。
+- 全部38267parts /31706122489bp；38056有>=.90的M/=参考路由，211条无路由，合计
+  18928468bp。已完成第一补充的150条为14974672bp；其余 **61条为3953796bp**。
+- 16个source的34个首/中/尾候选窗口：最大target46240603bp，没有触发100Mb预算回退。
+  source完整候选window数可到数千（例如82Mb Flye为850），不能把34个样本当剩余数量。
+- 重要修正：不能让每条正常长source为这61条分别whole-source回退，更不能为了归并
+  fallback key把289Mb query自身加入一个原本只有4Mb的target集合——即使-D抑制自比对，
+  建索引仍要付出这289Mb。现在把无路由source放在短query侧批处理完整矩阵。
+
+### seed必须在partial之前，避免两阶段重复做
+
+- 优先探测原完整partial任务缓存（a605...）仍在最前：若它完成且通过完整验证，不再启动
+  区域partial或额外seed。无有效缓存时，对“有参考候选但没有合格参考路由”的source先
+  做一次完整native seed，然后把真实hit加入候选/双侧已观察覆盖。
+- 小麦这一任务正好是61条query→38117条原参考target，target列表与第一补充完全一致。
+  `CompletedNativeScopes` 供partial/candidate两端共用；partial仅在所有请求target关系
+  已经被完整矩阵测试过时跳过该parent，零hit测试不会修改cross_coverage。
+- 候选阶段按已完成矩阵重新计算仍缺的无路由关系，因此后续可能还需初次150条已发现
+  source之间的小矩阵；每次成功后重新规划，不能重复150→38117的5.3小时工作。
+- `_copy_prepared_target` 允许独立任务逐字节复制已完成target输入：核对receipt身份、
+  target IDs、所有target成员SHA、实际FASTA SHA与复制期间的stat fence；不建立指向
+  原输入的symlink/hardlink，原始receipt嵌入新command.json。只为重用输入，不挪用结果。
+- q0 identity改用现有run_orchestration稳定字节SHA memo，首读仍完整哈希，后续以
+  dev/ino/size/mtime/ctime围栏复用；同大小改写再恢复mtime的测试仍拒绝旧摘要。
+  已消除最终发布前旧supplement输出变化仍写success的窗口，复用已有最终SHA，不再多扫。
+- `_initial_inputs` 只保留reference的名字/长度，仍逐条解析完整reference FASTA，不再
+  同时常驻整个reference DNA字典。de novo源仍保留供实际窗口提取；未跳过输入完整性验证。
+
+### 正在执行的生产性独立任务（不是重复完整小麦或超时benchmark）
+
+- **job43008458**，目录 `q0-unroutable-native-seed-20261121`，22:29:56启动于
+  agent-X86-53；32CPU/160GiB，fresh小父进程与mapper继承112GiB RLIMIT_AS。
+  没有诊断wall-clock timeout。只写隔离artifacts，原新版/旧版工作区均不修改。
+- 驱动 `produce_unroutable_native_seed.py`：重新验证61条query DNA，复用第一补充完整
+  target输入，不在第二个父进程载入31.7Gb完整de novo字符串。保留tool.command=`minimap2`。
+- 实际raw key：**`q0-map-4aafb69f1d98272cd023d208`**。
+  私有artifact根：`q0-unroutable-native-seed-20261121/artifacts`；其中task目录仍使用正常
+  `grt/evidence/q0_prepare/tasks/<id>`布局。target.fa32088868779 bytes，query.fa4005749。
+- 成功后驱动还会调用原生cache-only API验证可复用，并写summary.status=
+  `complete_isolated_native_seed`。**现在尚未成功，不能把tmp或存在target.fa当结果采用。**
+  若a605成功标记在启动或输入复制后出现，驱动只写deferred状态，须先验证main结果，不冒充
+  完成了seed。两种状态都不可仅看调度器SUCCEEDED判断科学任务完成。
+- 22:52快照：seed仍RUNNING，CPU recent199%/avg506%，RSS35132MiB、峰值49542MiB，
+  result.paf.tmp仍0；首个8013225629bp target index已构建，仍在原生-P比对。
+  **它也出现少数query的低核CIGAR长尾，不可把“提交了小query集合”描述成已获得高效执行。**
+  后续若持续，针对这个已确认热点处理，不盲目一直等待。可基于已完成第一补充选择少量
+  原始whole-query controls，验证全局target下-m2000/温和阈值；不要重复native大基线。
+  区域-m2000已验证不等于全局target也已验证，参数变化必须独立raw key/真实flags和明确
+  science profile；不能给当前4aaf...改key补写参数或伪装成native成功。
+- 两个主任务22:52仍RUNNING：新版42949582 CPU1197%、RSS283653MiB；旧版42523432
+  CPU1595%、RSS94829MiB。旧版未动，新版尚未安装/执行本轮q0代码。
+
+### 交接门禁与下一步
+
+1. 先查43008458真实进度；处理原生CIGAR低核长尾，同时推进并行规划和新entry/reader迁移，
+   不要把等待这条任务当作停止所有本地工作的理由。尚未做并行规划：当前区域mapper池
+   仍最多4路×2线程，不能称已经用满run_all的32线程预算。
+2. 完成且验证seed后，按真实4aaf... key采纳到新版缓存；可在正常workspace lock下原子
+   迁移完整task目录以避免再复制32Gb，记录原路径、全部身份与回滚路径，不覆盖已有目标。
+   保留producer/采纳receipt。它执行native flags，完全不同于只成功了6个窗口的诊断。
+3. 冻结native plan的launcher依赖实际在隔离目录
+   `native-fair-revision-20261120-1350/plan/prepare_q0_evidence.sh`，SHA69dc8169...，
+   不是工作区launcher本身。因此保留原隔离依赖，另立新q0迁移契约是可行路径。
+4. 原base entry为`memory-exclusive-20261119/resume.py`，其HERE实际指向兄弟目录
+   `memory-resume-20261118`，不能猜receipt在entry父目录。该receipt绑定4个runtime：
+   GPM_Server和.prepare_lib两份self_alignment_batches.py、assign_chr_groups.py、
+   lgz_prepare_inputs.py；没有绑定lgz_core/q0_*.py。必须保持这4个文件与旧plan不动。
+5. 新context应真实绑定新entry/reader，逐项验证原context的cross/self/resource约束并保留
+   原plan/checkpoint指纹；不要传旧caller或改__file__冒认新执行是旧entry。新reader声明
+   scientific_builder_modified=true，旧声明先备份再在正常锁内明确迁移。
+6. 本轮259项q0定向测试通过（1 skip）；没有发布CI、update.sh、整版替换或main切换。

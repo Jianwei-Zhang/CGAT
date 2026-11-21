@@ -117,6 +117,8 @@ class CandidateCatalog:
     parts: dict[str, SourceSegment]
     regional_index_path: Path | None = None
     regional_index_report: dict | None = None
+    reference_routable_parts: frozenset[str] | None = None
+    reference_routable_footprints: dict[tuple[str, str], tuple[Interval, ...]] | None = None
 
     def sequence(self, segment_id: str) -> str:
         part = self.parts[segment_id]
@@ -167,6 +169,8 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
         parts.update((part.segment_id, part) for part in index.segments)
         by_source[key] = (index.segments, [part.interval.end for part in index.segments])
     accumulated = {}
+    reference_routable_parts = set()
+    reference_routable_footprints = {} if regional_factory else None
     lengths_by_dataset: dict[str, dict[str, int]] = defaultdict(dict)
     for key, sequence in sequences.items():
         lengths_by_dataset[key.dataset][key.contig] = len(sequence)
@@ -189,6 +193,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                     continue
                 source_parts, ends = by_source[key]
                 used = False
+                qualified_reference = hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY
                 for block in hit.aligned_blocks():
                     offset = bisect_right(ends, block.query.start)
                     while offset < len(source_parts) and source_parts[offset].interval.start < block.query.end:
@@ -203,8 +208,15 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                         else:
                             target = Interval(block.target.start + block.query.end - overlap.end,
                                               block.target.start + block.query.end - overlap.start)
+                        if block.operation != "X" and qualified_reference:
+                            reference_routable_parts.add(part.segment_id)
+                            if reference_routable_footprints is not None:
+                                footprint_key = (part.segment_id, hit.target_name)
+                                if footprint_key not in reference_routable_footprints:
+                                    reference_routable_footprints[footprint_key] = _IntervalUnion()
+                                reference_routable_footprints[footprint_key].append(overlap)
                         if (routing is not None and not records_index and not routing.sealed and block.operation != "X"
-                                and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
+                                and qualified_reference):
                             routing.observe(part.segment_id, hit.target_name,
                                             Interval(overlap.start-part.interval.start, overlap.end-part.interval.start),
                                             target, hit.strand)
@@ -218,7 +230,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                         row["target"].append(target)
                         if (block.operation != "X" and hit.mapping_quality is not None
                                 and hit.mapping_quality >= DISCOVERY_REFERENCE_MAPQ
-                                and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
+                                and qualified_reference):
                             row["discovery_query"].append(overlap)
                         row["evidence"].add(hit.evidence_id)
                         if (hit.mapping_quality is not None
@@ -245,7 +257,10 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             "reference_evidence_ids": sorted(row["evidence"]), "pairwise_evidence_ids": [],
             "anchor_candidate_ids": [], "maximum_available_mapq": row["maximum_mapq"],
         })
-    catalog = CandidateCatalog(payload, sequences, parts, routing.path if routing else None, routing_report)
+    catalog = CandidateCatalog(payload, sequences, parts, routing.path if routing else None, routing_report,
+                               frozenset(reference_routable_parts),
+                               {key: tuple(value) for key, value in reference_routable_footprints.items()}
+                               if reference_routable_footprints is not None else None)
     # split_source just verified these immutable strings and part digests. A
     # regional mapper need not hash a 289Mb parent again for every short window.
     catalog._regional_verified_parts = {key:(sequences[p.source],p.interval,p.sequence_sha256) for key,p in parts.items()}
@@ -322,6 +337,9 @@ def supplemental_groups(catalog: CandidateCatalog, assignments: Iterable[dict[st
     parts_per_source: dict[SourceKey, int] = defaultdict(int)
     for part in catalog.parts.values():
         parts_per_source[part.source] += 1
+    from .q0_neighbor_requests import known_neighbors, missing_neighbor_queries
+    neighbors = known_neighbors(known_pairs)
+    source_by_part = {key: part.source for key, part in catalog.parts.items()}
     tasks = []
     for chromosome, segment_ids in sorted(catalog.by_chromosome().items()):
         if len(segment_ids) < 2:
@@ -338,20 +356,7 @@ def supplemental_groups(catalog: CandidateCatalog, assignments: Iterable[dict[st
             high = max(end for start, end in row["reference_intervals"])
             previous = bounds.get(row["segment_id"], (low, high))
             bounds[row["segment_id"]] = (min(low, previous[0]), max(high, previous[1]))
-        active = []
-        rightmost = None
-        for segment_id, (low, high) in sorted(bounds.items(), key=lambda item: (*item[1], item[0])):
-            active = [(other, end) for other, end in active if end > low]
-            neighbors = {other for other, end in active}
-            if rightmost is not None:
-                neighbors.add(rightmost[0])
-            for other in neighbors:
-                pair = tuple(sorted((catalog.parts[segment_id].source, catalog.parts[other].source)))
-                if pair not in known_pairs:
-                    queries.add(min(segment_id, other))
-            active.append((segment_id, high))
-            if rightmost is None or high > rightmost[1]:
-                rightmost = (segment_id, high)
+        queries = missing_neighbor_queries(bounds, source_by_part, neighbors, queries)
         if queries:
             tasks.append({"kind": "candidate_chr", "chromosome": chromosome,
                           "query_ids": sorted(queries), "target_ids": sorted(segment_ids)})

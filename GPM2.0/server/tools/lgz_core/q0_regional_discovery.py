@@ -28,7 +28,7 @@ REGIONAL_POLICY = {
     "maximum_target_bases": MAX_TARGET_BASES,
     "covered_cross_bases": "subtract_complete_identity_ge_0.95_paired_ge_100",
     "unroutable": "native_full_source_all_anchors",
-    "later_candidate_chr": "unchanged_native_supplemental_groups",
+    "later_candidate_chr": "regional_execution_with_exact_legacy_query_selection",
     "whole_source_equivalence": False,
 }
 
@@ -139,7 +139,7 @@ def plan_parent(catalog, index, windows):
     return planned, None
 
 
-def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False):
+def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None):
     """Return complete regional tasks and a declared full-native fallback set.
 
     Lookup remains on the owner thread. At most one parent plan and four mapper
@@ -150,6 +150,11 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
         raise Q0EvidenceError("regional work selection requires complete cross coverage")
     if type(threads) is not int or threads < 1:
         raise Q0EvidenceError("regional thread budget must be a positive integer")
+    native_scopes = None
+    if complete_tasks:
+        from .q0_regional_candidates import CompletedNativeScopes
+        native_scopes = CompletedNativeScopes(root,catalog,index,complete_tasks,tool,preset)
+        required_mask = native_scopes.mask(required_target_ids if required_target_ids is not None else catalog.parts)
     holes = partial_source_intervals(catalog, minimum_uncovered_bp=100, observed=observed)
     policy = WindowPolicy(core_bases=100_000, context_bases=10_000,
                           trigger_query_bases=1, trigger_longest_bases=1, minimum_uncovered_bases=100)
@@ -157,7 +162,7 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
     mapper_threads = min(2, threads); workers = max(1, min(4, threads//mapper_threads))
     tasks, fallback, pending = [], set(), []
     report = {"policy": dict(REGIONAL_POLICY), "window_policy": asdict(policy), "planned_windows": len(windows),
-              "residual_source_parts": len(holes), "residual_bases": sum(i.length for values in holes.values() for i in values),
+              "residual_source_parts": len(holes), "parents_satisfied_by_complete_native_matrices": 0, "residual_bases": sum(i.length for values in holes.values() for i in values),
               "mapper_threads": mapper_threads, "maximum_workers": workers,
               "address_space_bytes_per_mapper": 4*1024**3, "fallback_sources": []}
     def consume():
@@ -168,6 +173,9 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
             print(f"LGZ q0 regional progress: completed={len(tasks)} planned={len(windows)} fallback_sources={len(fallback)}", flush=True)
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
         for segment_id, group in itertools.groupby(windows, key=lambda w: w.segment_id):
+            if native_scopes is not None and native_scopes.remaining_targets(segment_id,required_mask) == 0:
+                report["parents_satisfied_by_complete_native_matrices"] += 1
+                continue  # Tested relationships, not an invented coverage/placement assertion.
             planned, reason = plan_parent(catalog, index, group)
             if reason is not None:
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})

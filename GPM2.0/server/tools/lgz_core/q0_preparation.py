@@ -11,6 +11,8 @@ import csv
 import json
 from pathlib import Path
 import subprocess
+import shutil
+import uuid
 from typing import Iterable
 
 from .common import canonical_json, executable_identity, read_fasta, sha256_file, stable_id, write_fasta
@@ -18,6 +20,7 @@ from .q0_alignments import read_paf
 from .q0_catalog import (CATALOG_SCHEMA, CandidateCatalog, DISCOVERY_REFERENCE_IDENTITY, DISCOVERY_REFERENCE_MAPQ,
                          add_pairwise_candidates, build_catalog, partial_source_request, supplemental_groups, ObservedSourcePairs)
 from .q0_regional_discovery import REGIONAL_POLICY, LocalReferenceCache, enabled as regional_enabled, observe_part_hits, prepare_partial
+from .q0_regional_candidates import CANDIDATE_POLICY, CandidatePlan, prepare_candidates
 from .q0_sources import Q0EvidenceError, SourceKey
 try:
     from run_orchestration import atomic_write_json, sha256_file as _partition_sha256
@@ -40,7 +43,7 @@ OuterCheckpointManager = _default_checkpoint_manager
 SCHEMA = "lgz_q0_evidence_v1"
 MANIFEST = "metadata/grt_q0_evidence.json"
 MAPPING_OUTPUT_FILES = ("query.fa", "target.fa", "result.paf", "command.json")
-POLICY = {"version": 3, "regional_partial_discovery": REGIONAL_POLICY, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
+POLICY = {"version": 4, "regional_partial_discovery": REGIONAL_POLICY, "regional_candidate_discovery": CANDIDATE_POLICY, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
           "supplement": "out_of_group_split_and_missing_ref_neighbors",
           "partial_source_discovery_min_uncovered_bp": 100,
           "partial_source_reference_identity": DISCOVERY_REFERENCE_IDENTITY,
@@ -64,7 +67,7 @@ def identity(root: Path, relative: str) -> dict:
     path = artifact_path(root, relative)
     if not path.is_file():
         raise Q0EvidenceError(f"required q0 artifact missing: {relative}")
-    return {"path": relative, "sha256": sha256_file(path), "size": path.stat().st_size}
+    return {"path": relative, "sha256": _partition_sha256(path), "size": path.stat().st_size}
 
 
 def json_file(path: Path) -> dict:
@@ -94,7 +97,7 @@ def builder_identity() -> str:
         [name, sha256_file(root / name)] for name in (
             "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
             "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
-            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_regional_discovery.py")])
+            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py")])
 
 
 def load_verified_evidence(root: Path) -> dict:
@@ -178,7 +181,9 @@ def _initial_inputs(root: Path):
     names = [row["dataset_name"] for row in datasets]
     if len(names) != len(set(names)):
         raise Q0EvidenceError("q0 dataset names must be unique")
-    refs = dict(read_fasta(artifact_path(root, references[0]["fasta_relpath"])))
+    # This stage uses only names/lengths; do not retain a multi-Gb reference
+    # DNA dictionary alongside all de novo sequences. Still parse every record.
+    refs = {name: len(sequence) for name,sequence in read_fasta(artifact_path(root, references[0]["fasta_relpath"]))}
     sources = {}
     paths = {"metadata/datasets.tsv", "metadata/reference.tsv", "metadata/chr_assignments.tsv",
              "metadata/prepare_options.tsv", "metadata/track_member_orders.tsv",
@@ -192,7 +197,7 @@ def _initial_inputs(root: Path):
             sources[key] = sequence
         relative = f"runs/{dataset['dataset_name']}_vs_ref/result.paf"
         paths.update((relative, f"runs/{dataset['dataset_name']}_vs_ref/tool_version.txt"))
-    lengths = {name: len(sequence) for name, sequence in refs.items()}
+    lengths = dict(refs)
     grouped: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for row in assignments:
         key = SourceKey(row["dataset_name"], row["seq_name"])
@@ -270,8 +275,54 @@ def _initial_inputs(root: Path):
     return sources, lengths, assignments, options, sorted(paths), sorted(base_alignments, key=lambda row: row["paf"]), known_pairs
 
 
+def _copy_prepared_target(root, catalog, target_ids, destination, template):
+    """Copy an exactly bound completed target input, not a mapping result.
+
+    This permits isolated productive work without loading the whole source DNA
+    into a second parent heap. No symlink/hardlink is created to mutable caches.
+    The source receipt is embedded in the actual new command provenance.
+    """
+    from .q0_reference_index import _signature
+    source_root = Path(template["root"]).resolve(strict=True)
+    receipt_identity = template["receipt"]
+    if identity(source_root,receipt_identity["path"]) != receipt_identity:
+        raise Q0EvidenceError("prepared target source receipt changed")
+    receipt = json_file(artifact_path(source_root,receipt_identity["path"]))
+    spec = receipt.get("spec",{})
+    relative = f"grt/evidence/q0_prepare/tasks/{stable_id('q0-map',spec)}"
+    members = dict(spec.get("members",[]))
+    if (receipt.get("status") != "success" or spec.get("schema") != "lgz_q0_mapping_v1"
+            or receipt_identity["path"] != relative+"/success.json" or spec.get("target_ids") != target_ids
+            or any(members.get(key) != catalog.parts[key].sequence_sha256 for key in target_ids)):
+        raise Q0EvidenceError("prepared target source inventory differs")
+    outputs = receipt.get("outputs",[])
+    expected_paths = {relative+"/"+name for name in MAPPING_OUTPUT_FILES}
+    if len(outputs)!=len(expected_paths) or {row.get("path") for row in outputs} != expected_paths:
+        raise Q0EvidenceError("prepared target source receipt is incomplete")
+    expected = next(row for row in outputs if row["path"]==relative+"/target.fa")
+    source = artifact_path(source_root,expected["path"])
+    if source.resolve() == destination.resolve():
+        raise Q0EvidenceError("prepared target copy would overwrite its source")
+    signature = _signature(source)
+    if _partition_sha256(source) != expected["sha256"] or source.stat().st_size != expected["size"]:
+        raise Q0EvidenceError("prepared target bytes differ from the complete receipt")
+    if destination.is_symlink(): raise Q0EvidenceError("linked prepared target destination is forbidden")
+    if destination.exists() and (_partition_sha256(destination)!=expected["sha256"] or destination.stat().st_size!=expected["size"]):
+        destination.rename(destination.with_name(destination.name+".invalid-"+uuid.uuid4().hex))
+    if not destination.exists():
+        temporary = destination.with_name(destination.name+".copy-"+uuid.uuid4().hex)
+        shutil.copyfile(source,temporary)
+        temporary.replace(destination)
+    if _partition_sha256(destination)!=expected["sha256"] or destination.stat().st_size!=expected["size"]:
+        raise Q0EvidenceError("prepared target copy changed bytes")
+    if _signature(source)!=signature or identity(source_root,receipt_identity["path"])!=receipt_identity:
+        raise Q0EvidenceError("prepared target source changed during copying")
+    return {"schema":"lgz_q0_prepared_target_reuse_v1","source_root":str(source_root),
+            "source_receipt_identity":receipt_identity,"source_receipt":receipt,"copied_target":expected}
+
+
 def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict,
-                preset: str, threads: int, *, skip_self: bool = False, cache_only: bool = False) -> dict | None:
+                preset: str, threads: int, *, skip_self: bool = False, cache_only: bool = False, prepared_target: dict | None = None) -> dict | None:
     if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
         raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
     query_ids, target_ids = sorted(set(request["query_ids"])), sorted(set(request["target_ids"]))
@@ -313,11 +364,17 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
     directory.mkdir(parents=True, exist_ok=True)
     query, target = directory / "query.fa", directory / "target.fa"
     write_fasta(query, ((key, catalog.sequence(key)) for key in query_ids))
-    write_fasta(target, ((key, catalog.sequence(key)) for key in target_ids))
+    target_reuse = None
+    if prepared_target is None:
+        write_fasta(target, ((key, catalog.sequence(key)) for key in target_ids))
+    else:
+        target_reuse = _copy_prepared_target(root,catalog,target_ids,target,prepared_target)
     temporary = directory / "result.paf.tmp"
     command = [tool["resolved"], "-c", "-x", preset, *POLICY["supplement_flags"], "-t", str(threads),
                "-o", str(temporary), str(target), str(query)]
-    atomic_write_json(directory / "command.json", {"argv": command, "spec": spec})
+    command_record = {"argv": command, "spec": spec}
+    if target_reuse is not None: command_record["prepared_target_reuse"] = target_reuse
+    atomic_write_json(directory / "command.json", command_record)
     input_before = [identity(root, f"{relative}/{name}.fa") for name in ("query", "target")]
     with (directory / "stdout.log").open("w", encoding="utf-8") as stdout, (directory / "stderr.log").open("w", encoding="utf-8") as stderr:
         result = subprocess.run(command, cwd=directory, stdout=stdout, stderr=stderr)
@@ -391,11 +448,30 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
             if task is not None:
                 partial_tasks.append(task)
             else:
+                # Unroutable reference-bearing sources are small queries, not
+                # reasons to remap every large parent against them separately.
+                # Seed before partial discovery, so that phase also reuses the
+                # complete matrix (including negative results) without repeats.
+                reference_ids = sorted({row["segment_id"] for row in catalog.payload["candidates"] if row["placement_kind"] == "reference"})
+                weak_queries = sorted(set(reference_ids)-catalog.reference_routable_parts)
+                if weak_queries:
+                    seed_request = {"kind":"candidate_unroutable_seed","query_ids":weak_queries,"target_ids":reference_ids,
+                                    "reason":"complete_unroutable_relationships_once_before_regional_candidates"}
+                    template_task = next((t for t in tasks if t["kind"]!="regional_discovery" and t["target_ids"]==reference_ids),None)
+                    template = ({"root":str(root),"receipt":identity(root,template_task["receipt"])} if template_task else None)
+                    seed = _supplement(root,catalog,seed_request,tool,preset,threads,
+                                       skip_self=options.get("skip_self") == "true",prepared_target=template)
+                    tasks.append(seed)
+                    seed_hits = read_paf(root/seed["paf"],query_lengths={key:catalog.parts[key].interval.length for key in seed["query_ids"]},
+                                         target_lengths={key:catalog.parts[key].interval.length for key in seed["target_ids"]},artifact=seed["paf"])
+                    add_pairwise_candidates(catalog,observe_part_hits(catalog,seed_hits,known_pairs),set(seed["query_ids"]),set(seed["target_ids"]),
+                                            include_placed=True,known_pairs=known_pairs)
                 from .q0_reference_index import ReferenceIndex
                 with closing(ReferenceIndex.open(cache.path, root, catalog.parts, lengths, local_paf_directory=cache.paf_directory)) as index:
                     regional_tasks, fallback_ids, report = prepare_partial(
                         root, catalog, index, known_pairs, tool, reference_lengths=lengths,
-                        preset=preset, threads=threads, skip_self=options.get("skip_self") == "true")
+                        preset=preset, threads=threads, skip_self=options.get("skip_self") == "true",
+                        complete_tasks=tasks,required_target_ids=request["target_ids"])
                 partial_tasks.extend(regional_tasks)
                 catalog.payload["regional_partial_discovery"] = report
                 if fallback_ids:
@@ -416,9 +492,31 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                     {key for task in partial_tasks for key in task["query_ids"]},
                     {key for task in partial_tasks for key in task["target_ids"]},
                     include_placed=True, known_pairs=known_pairs)
-        for request in supplemental_groups(catalog, assignments, known_pairs):
-            tasks.append(_supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
-                                     skip_self=options.get("skip_self") == "true"))
+        candidate_requests = supplemental_groups(catalog, assignments, known_pairs)
+        pending_candidates = []
+        for request in candidate_requests:
+            task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
+                               skip_self=options.get("skip_self") == "true", cache_only=bool(cache))
+            if task is not None: tasks.append(task)
+            else: pending_candidates.append(request)
+        if pending_candidates:
+            from .q0_reference_index import ReferenceIndex
+            with closing(ReferenceIndex.open(cache.path, root, catalog.parts, lengths, local_paf_directory=cache.paf_directory)) as index:
+                preset = options.get("minimap_preset", "asm10")
+                planner = CandidatePlan(root,catalog,index,pending_candidates,known_pairs,tasks,tool,preset)
+                seed_ids = []
+                while (seed_request := planner.next_unroutable_seed()) is not None:
+                    seed = _supplement(root,catalog,seed_request,tool,preset,threads,skip_self=options.get("skip_self") == "true")
+                    tasks.append(seed);seed_ids.append(seed["task_id"]);planner.add_complete_tasks([seed])
+                regional_tasks, native_requests, report = prepare_candidates(
+                    root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,
+                    preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner)
+                report["unroutable_seed_task_ids"] = seed_ids
+            tasks.extend(regional_tasks)
+            catalog.payload["regional_candidate_discovery"] = report
+            for request in native_requests:
+                tasks.append(_supplement(root,catalog,request,tool,options.get("minimap_preset", "asm10"),threads,
+                                         skip_self=options.get("skip_self") == "true"))
         if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
             raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
         if inputs != [identity(root, relative) for relative in input_paths]:
@@ -434,9 +532,16 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         for task in tasks:
             output_paths.add(task["receipt"])
             output_paths.update(row["path"] for row in json_file(root / task["receipt"])["outputs"])
+        outputs = [identity(root, relative) for relative in sorted(output_paths)]
+        output_identities = {row["path"]: row for row in outputs}
+        # A long later phase must not publish success if any reused earlier
+        # output changed after its validation. Reuse the final hashes above.
+        for task in tasks:
+            if any(output_identities.get(row["path"]) != row for row in json_file(root/task["receipt"])["outputs"]):
+                raise Q0EvidenceError("completed supplementary output changed before publication")
         manifest = {"schema": SCHEMA, "status": "success", "policy": POLICY, "builder": builder,
                     "input_fingerprint": request_identity, "inputs": inputs,
-                    "outputs": [identity(root, relative) for relative in sorted(output_paths)],
+                    "outputs": outputs,
                     "catalog": catalog_name, "tool": tool}
         atomic_write_json(root / MANIFEST, manifest)
         print(f"LGZ q0 evidence prepared: candidates={len(payload['candidates'])} "

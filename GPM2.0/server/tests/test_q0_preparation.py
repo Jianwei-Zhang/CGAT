@@ -389,6 +389,22 @@ def fasta(path):
                 self.assertEqual((self.server / MANIFEST).read_bytes(), before)
                 self.assertTrue(list((self.server / "grt/evidence/q0_prepare/tasks").glob("*/stderr.log")))
 
+    def test_reused_output_changed_in_a_later_phase_cannot_publish_success(self):
+        from server.tools.lgz_core import q0_preparation as prep
+        before=(self.server/MANIFEST).read_bytes();mapper,_=self.mapper();original=prep._supplement
+        first=[]
+        def supplement(*args,**kwargs):
+            task=original(*args,**kwargs)
+            if task is not None:
+                if first and task["task_id"] != first[0]["task_id"]:
+                    path=self.server/first[0]["paf"];path.write_bytes(path.read_bytes()+b"\n")
+                elif not first:first.append(task)
+            return task
+        with mock.patch.object(prep,"_supplement",side_effect=supplement):
+            with self.assertRaisesRegex(Q0EvidenceError,"output changed before publication"):
+                self.run_prepare(mapper)
+        self.assertEqual((self.server/MANIFEST).read_bytes(),before)
+
     def test_missing_success_receipt_cannot_be_replaced_by_an_existing_paf(self):
         receipt = next((self.server / ".run_all/checkpoints").glob("*.json"))
         receipt.unlink()

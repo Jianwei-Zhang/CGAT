@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections import defaultdict, OrderedDict
+from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
@@ -50,6 +51,15 @@ def _project(query: Interval, target: Interval, strand: str, interval: Interval,
             if strand == "+" else Interval(query.end-(overlap.end-target.start), query.end-(overlap.start-target.start)))
 
 
+@dataclass(frozen=True)
+class _TargetSelection:
+    owner: object
+    bits: bytes
+
+    def contains(self, rank):
+        return bool(self.bits[rank // 8] & (1 << (rank % 8)))
+
+
 class ReferenceIndex:
     """Sealed, content-bound index with a bounded parsed-record cache.
 
@@ -68,6 +78,8 @@ class ReferenceIndex:
         self.path, self.root = Path(path), Path(root).resolve(strict=True)
         self.parts = parts; self.reference_lengths = dict(refs)
         self.binding = self.bindings(parts, refs)
+        self.part_order = tuple(sorted(parts))
+        self.part_ranks = {key: i for i, key in enumerate(self.part_order)}
         self.sources = sorted({p.source for p in parts.values()})
         self.source_ids = {key: i for i, key in enumerate(self.sources)}
         self.reference_ids = {key: i for i, key in enumerate(sorted(refs))}
@@ -75,6 +87,8 @@ class ReferenceIndex:
         self.source_parts = defaultdict(list)
         for part in parts.values(): self.source_parts[part.source].append(part)
         for values in self.source_parts.values(): values.sort(key=lambda p: p.interval)
+        self.source_part_ranks = {self.source_ids[key]: tuple(self.part_ranks[p.segment_id] for p in values)
+                                  for key, values in self.source_parts.items()}
         self.source_ends = {key: [p.interval.end for p in values] for key, values in self.source_parts.items()}
         self.files = {}; self.file_names = {}; self.signatures = {}; self.handles = {}
         self.mirrors = {}; self.mirror_signatures = {}
@@ -293,9 +307,17 @@ class ReferenceIndex:
         self.last_query_report = {"records_parsed_or_cached":records,"consistent_flank_pairs":consistent,"discordant_flank_pairs":discordant}
         return result
 
-    def targets(self, regions: Mapping[str, Iterable[Interval]], *, context: int = 10_000, exclude=()):
+    def target_selection(self, mask: int):
+        """Bind a compact candidate-part mask to this exact index inventory."""
+        if type(mask) is not int or mask < 0 or mask.bit_length() > len(self.part_order):
+            raise Q0EvidenceError("invalid target selection mask")
+        return _TargetSelection(self, mask.to_bytes((len(self.part_order)+7)//8, "little"))
+
+    def targets(self, regions: Mapping[str, Iterable[Interval]], *, context: int = 10_000, exclude=(), selection=None):
         if not self.sealed or type(context) is not int or context < 0: raise Q0EvidenceError("invalid target lookup")
         self.verify_inputs()
+        if selection is not None and (not isinstance(selection, _TargetSelection) or selection.owner is not self):
+            raise Q0EvidenceError("target selection belongs to another index")
         excluded = set(exclude)
         if not excluded <= self.parts.keys(): raise Q0EvidenceError("unknown excluded part")
         found = {}
@@ -308,6 +330,8 @@ class ReferenceIndex:
                 if interval.end > self.reference_lengths[chromosome]: raise Q0EvidenceError("reference search exceeds input")
                 for row in self.connection.execute(sql,(rid,rid,interval.end-1,interval.start)):
                     if row[2] != rid or row[5] >= interval.end or row[6] <= interval.start: continue
+                    if selection is not None and not any(selection.contains(rank) for rank in self.source_part_ranks[row[1]]):
+                        continue  # Reject completed/unrequested sources before parsing their CIGAR.
                     hit = self._hit(row); source = self.sources[row[1]]
                     parts = self.source_parts[source]; ends = self.source_ends[source]
                     for block in hit.aligned_blocks():
@@ -317,7 +341,7 @@ class ReferenceIndex:
                         index = bisect_right(ends,projected.start)
                         while index < len(parts) and parts[index].interval.start < projected.end:
                             part = parts[index]; index += 1
-                            if part.segment_id in excluded: continue
+                            if part.segment_id in excluded or (selection is not None and not selection.contains(self.part_ranks[part.segment_id])): continue
                             overlap = part.interval.intersection(projected)
                             if overlap is None: continue
                             window = Interval(max(0,overlap.start-part.interval.start-context),min(part.interval.length,overlap.end-part.interval.start+context))
