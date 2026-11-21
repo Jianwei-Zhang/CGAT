@@ -140,6 +140,11 @@
         "tools/post_lgz_degap.py": "72774d715f2a7d9a912c2abd103622b097255d694631fc410d9734e6ccb3b1fc",
         "tools/promote_server_stage.py": "03fbadff4b9a9325619e4f4c952092a3596a62aada14c5edba659bcd2d9e0e31",
         "tools/reference_segments.py": "e053206dcf20b326520c63a4006e2260df0a0b1c67ac78c77360bde3e919a1c4",
+        "tools/refinement_admission.py": "c569048a0973d1efa809453023bbd5a99ad8d90f9aab5f61005c8b9a517fa663",
+        "tools/refinement_degap.py": "95363189cc39af709fb6beee4e76a46ff1f7d3a324b68f702498605de3e7d94e",
+        "tools/refinement_path.py": "4c5681f24eceec13795fc5d6b88c8f5888171d2fdaa5061c7446d1f58ef0c959",
+        "tools/refinement_publication.py": "b1e677f456c3cc9e604d56c19f4684e87e7073ecfe7fac5cc0668d82695a75fd",
+        "tools/refinement_sources.py": "ecd117d741c4263751b497abd5fee4e147a83a23700a9435947bcfdafdc8532d",
         "tools/render_server_report.py": "f578525f44e70c4728bac03d92a6385cdefc34e5b9a0a86395371107dba20f70",
         "tools/render_template.py": "854efccc70ed4c3fba3ef6d05c1079d599d440923325b83f2575874dc85cd958",
         "tools/run_all_runner.py": "60a1ce6260582690a5e350d4733b47540cdec472a829917127a63aff7066b3dd",
@@ -158,7 +163,7 @@
         "tools/update_workspace_runtime.py": "3609bd5eebf3d536662d391db59801a17ea56b6b880eb581e0776fcc4bd0d9d1",
         "tools/validate_add_dataset_stage.py": "bf08c056a9a1618873802bd8e4d89addbf8c01f02a31d0eba2e6a8c9f511404d",
         "tools/view_run_log.py": "311e3a941bd67c7cb64217e895defdf15862c546c9b2e4d40dd57a0b3d59d91b",
-        "tools/workspace_layout.py": "7439deda02f2a277e81ff3731bdf190ed38837110b700020b56a56c926fc0c29",
+        "tools/workspace_layout.py": "5a3e197101c8c2e47b6098eff40f544e2ca7160bc600119ac8f4d9f4efa17477",
         "tools/workspace_migration.py": "7360249127197a9fc0658cd07aabe1060861d6bdcffeb5f371dc98e03527c14e"
       },
       "reference_launch_checkpoint_recipe_equal": true

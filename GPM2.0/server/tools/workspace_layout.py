@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
+import tempfile
 from pathlib import Path, PurePosixPath
 import re
 
@@ -83,7 +85,7 @@ def canonical_relative(value: str | PurePosixPath) -> str:
     """Translate one full logical artifact path; idempotent on canonical paths."""
     text = relative_path(value)
     # q0..q4 sidecars follow their sequence, including .fai, .sha256 and .tmp.
-    match = re.match(r"grt/q/q([0-4])(?=[._/]|$)", text)
+    match = re.match(r"grt/q/\.?q([0-4])(?=[._/]|$)", text)
     if match:
         stage = {"0": "01_q0", "1": "02_step1", "2": "03_step2",
                  "3": "04_step3", "4": "04_step3"}[match[1]]
@@ -193,3 +195,115 @@ class WorkspaceLayout:
 
 def workspace_path(root: Path, logical: str | PurePosixPath) -> Path:
     return WorkspaceLayout.detect(root).path(logical)
+
+
+def workspace_join(root: Path, *parts: str | Path) -> Path:
+    """Path.joinpath with layout translation only at an identified workspace root.
+
+    This is for existing internal code that also joins explicit external input
+    paths. Validation boundaries must continue using WorkspaceLayout.path (which
+    rejects absolute/traversing paths). No search of ancestor directories or
+    global pathlib monkey-patching is performed.
+    """
+    root = Path(root)
+    joined = root.joinpath(*parts)
+    layout = WorkspaceLayout.detect(root)
+    if layout.version == 1:
+        return joined
+    try:
+        relative = joined.relative_to(root)
+    except ValueError:
+        # An explicitly absolute input can refer outside the workspace. Preserve
+        # that existing caller contract; never reinterpret it as a local output.
+        try:
+            relative = joined.relative_to(layout.root)
+        except ValueError:
+            return joined
+    if relative == Path("."):
+        return layout.root
+    return layout.path(relative.as_posix())
+
+
+def initialize_workspace(root: Path) -> WorkspaceLayout:
+    """Create a numbered workspace in an empty directory; never convert in place."""
+    root = Path(root).resolve()
+    if root.exists() and any(root.iterdir()):
+        raise LayoutError("new workspace must be empty; existing workspaces require migration")
+    root.mkdir(parents=True, exist_ok=True)
+    layout = WorkspaceLayout(root, LAYOUT_VERSION)
+    private = root / ".runtime"
+    private.mkdir(mode=0o700)
+    descriptor, temporary = tempfile.mkstemp(prefix=".workspace.", dir=private)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(layout.manifest(), stream, sort_keys=True, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, root / MANIFEST)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return layout
+
+
+def render_workspace_shell(text: str, layout: WorkspaceLayout, logical_script: str) -> str:
+    """Render repository-owned shell templates, never arbitrary customer scripts.
+
+    The template's shell variables remain variables; no unquoted user path is
+    interpolated. Relocated command scripts discover the root two levels above.
+    """
+    if layout.version == 1:
+        return text
+    if layout.relative(logical_script).startswith(".runtime/commands/"):
+        for variable in ("server_dir", "SCRIPT_DIR"):
+            for pwd in ("pwd", "pwd -P"):
+                original = variable + '="$(cd "$(dirname "${BASH_SOURCE[0]}")" && ' + pwd + ')"'
+                replacement = variable + '="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && ' + pwd + ')"'
+                text = text.replace(original, replacement)
+    variable_root = r"(\$\{(?:server_dir|SCRIPT_DIR|GPM_FAST_WORK_ROOT|work_root)\}/)"
+    # Full q-stage names and relocated commands must win over the broad grt/q
+    # directory mapping. In particular q0 and q1 do not live beside q4.
+    text = re.sub(
+        variable_root + r"(grt/q/\.?q[0-4])(?=[._/\"'\s]|$)",
+        lambda match: match[1] + canonical_relative(match[2]), text,
+    )
+    for command in sorted(_ROOT_COMMANDS):
+        text = re.sub(
+            variable_root + re.escape(command) + r"(?=[\"'\s]|$)",
+            lambda match, command=command: match[1] + layout.relative(command), text,
+        )
+    for prefix in sorted(_PREFIXES, key=len, reverse=True):
+        pattern = variable_root + re.escape(prefix) + r"(?=[/\"'\s]|$)"
+        text = re.sub(pattern, lambda match: match[1] + _PREFIXES[prefix], text)
+    return text
+
+
+def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description="Resolve versioned CGAT workspace paths")
+    parser.add_argument("--server-dir", type=Path, required=True)
+    actions = parser.add_mutually_exclusive_group(required=True)
+    actions.add_argument("--path")
+    actions.add_argument("--relative")
+    actions.add_argument("--initialize", action="store_true")
+    actions.add_argument("--render-shell", type=Path)
+    parser.add_argument("--logical-script")
+    args = parser.parse_args()
+    try:
+        layout = initialize_workspace(args.server_dir) if args.initialize else WorkspaceLayout.detect(args.server_dir)
+        if args.path is not None:
+            print(layout.path(args.path))
+        elif args.relative is not None:
+            print(layout.relative(args.relative))
+        elif args.render_shell:
+            if not args.logical_script:
+                raise LayoutError("--render-shell requires --logical-script")
+            args.render_shell.write_text(render_workspace_shell(args.render_shell.read_text(), layout, args.logical_script))
+        else:
+            print(json.dumps(layout.manifest(), sort_keys=True))
+    except (OSError, ValueError) as exc:
+        parser.exit(2, f"ERROR: workspace layout: {exc}\n")
+
+
+if __name__ == "__main__":
+    main()

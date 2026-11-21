@@ -1,0 +1,241 @@
+"""DEGAP adapter for the multi-tool refinement runner (no scheduler submission).
+
+Stages a real sourced Final Path publication. The caller owns the workspace lock,
+resume selection, per-tool error isolation and final/report/App publication.
+"""
+from __future__ import annotations
+
+from dataclasses import replace
+import json
+from pathlib import Path
+import subprocess
+import sys
+import uuid
+
+try:
+    from workspace_layout import WorkspaceLayout, workspace_join
+    from post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
+    from refinement_path import identity, source_blocks, PathError
+    from refinement_sources import FastaCatalog
+    from refinement_admission import degap_proposal, exclude_conflicts
+    from refinement_publication import prepare_publication, verify_baseline
+except ModuleNotFoundError:
+    from .workspace_layout import WorkspaceLayout, workspace_join
+    from .post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
+    from .refinement_path import identity, source_blocks, PathError
+    from .refinement_sources import FastaCatalog
+    from .refinement_admission import degap_proposal, exclude_conflicts
+    from .refinement_publication import prepare_publication, verify_baseline
+
+PIN = "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75"
+RECIPE = "cgat.degap.exact-anchors.v2"
+
+
+def verify_engine(engine_root: Path) -> dict:
+    manifest = json.loads((engine_root / "SOURCE.json").read_text())
+    if manifest.get("revision") != PIN or manifest.get("schema") != "gpm.degap.runtime.v1":
+        raise PathError("DEGAP source revision does not match the pinned recipe")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not files:
+        raise PathError("DEGAP source content manifest is missing")
+    for name, expected in files.items():
+        if Path(name).is_absolute() or ".." in Path(name).parts or digest(engine_root / name) != expected:
+            raise PathError(f"DEGAP pinned source differs: {name}")
+    actual_python = {p.relative_to(engine_root).as_posix() for p in engine_root.rglob("*.py")}
+    if actual_python != {name for name in files if name.endswith(".py")}:
+        raise PathError("DEGAP runtime contains unpinned Python source")
+    return manifest
+
+
+def materialize_patches(edits, catalog, accepted_dir):
+    """Retain only inserted sequence in the permanent CGAT source dataset.
+
+    Native full candidates remain untouched in 03_native; the evidence retains
+    their exact original source slices. No chromosome is relabeled as a patch.
+    """
+    patch_edits = [edit for edit in edits if edit.replacement]
+    if not patch_edits:
+        return edits
+    patch_file = accepted_dir / "patches.fa"
+    dataset = "cgat_refinement_degap_" + accepted_dir.name
+    if any(name == dataset for name, _ in catalog.sources):
+        raise PathError("refinement dataset identity collides with an original dataset")
+    lengths = {}
+    with patch_file.open("xb") as stream:
+        for edit in patch_edits:
+            stream.write(b">" + edit.edit_id.encode("ascii") + b"\n")
+            length = 0
+            for block in source_blocks(edit.replacement, catalog):
+                stream.write(block)
+                length += len(block)
+            stream.write(b"\n")
+            lengths[edit.edit_id] = length
+    result = []
+    for edit in edits:
+        if edit.replacement:
+            catalog.register(dataset, edit.edit_id, patch_file, origin="refinement:degap")
+            evidence = {**edit.evidence, "native_source": edit.replacement}
+            replacement = {"dataset": dataset, "contig": edit.edit_id, "start": 1,
+                           "end": lengths[edit.edit_id], "orientation": "+"}
+            result.append(replace(edit, replacement=replacement, evidence=evidence))
+        else:
+            result.append(edit)
+    return result
+
+
+def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict:
+    """Execute the pinned tool and stage final artifacts, or propagate failure.
+
+    No success is returned until source reconstruction has finished. Input/output
+    receipts are suitable for the outer runner to validate before cache reuse.
+    """
+    root = root.resolve()
+    layout = WorkspaceLayout.detect(root)
+    if layout.version != 2:
+        raise PathError("post-LGZ refinement requires explicit migration to the numbered workspace")
+    if type(threads) is not int or threads < 1:
+        raise PathError("refinement thread budget must be positive")
+    run_id = run_id or uuid.uuid4().hex
+    if len(run_id) != 32 or any(c not in "0123456789abcdef" for c in run_id):
+        raise PathError("invalid refinement run identity")
+    groups = read_groups({"schema_version": 2, "purpose": "post_lgz_degap_v1", **groups})
+    check_environment(root, groups["hifi"] + groups["ont"])
+    tools_root = Path(__file__).resolve().parent
+    engine_root = tools_root / "degap_core"
+    engine_manifest = verify_engine(engine_root)
+    directory = root / "04_refinement/01_degap"
+    paths = {name: directory / name / run_id for name in ("01_inputs", "02_jobs", "03_native", "04_accepted", "05_report")}
+    # Native program creates 03_native itself. No previously completed attempt is overwritten.
+    for name in ("01_inputs", "02_jobs", "04_accepted", "05_report"):
+        paths[name].mkdir(parents=True, exist_ok=False)
+    catalog = FastaCatalog(root, root / ".runtime/refinement/01_degap" / run_id / "indexes")
+    catalog.load_workspace()
+    baseline_path = workspace_join(root, "metadata/grt_final_path.json")
+    baseline_identity = stat_key(baseline_path)
+    baseline_digest = digest(baseline_path)
+    baseline = json.loads(baseline_path.read_text())
+    baseline_fasta = layout.path(baseline["q4_relpath"])
+    fasta = IndexedFasta(baseline_fasta, catalog.index_directory / "baseline.fa")
+    gaps = verify_baseline(baseline, catalog, fasta)
+    if stat_key(baseline_path) != baseline_identity:
+        raise PathError("baseline Final Path changed during validation")
+    identities = {baseline_path: baseline_identity, baseline_fasta: stat_key(baseline_fasta)}
+    reads_manifest = []
+    for kind, reads in groups.items():
+        for raw in reads:
+            path = Path(raw)
+            before = stat_key(path)
+            sha256 = digest(path)
+            if stat_key(path) != before:
+                raise PathError("reads changed while fingerprinting")
+            identities[path] = before
+            reads_manifest.append({"technology": kind, "path": str(path), "sha256": sha256})
+    recipe = {"schema": RECIPE, "tool": "degap", "revision": PIN,
+              "engine_manifest_sha256": identity(engine_manifest), "reads": reads_manifest,
+              "baseline_sha256": digest(baseline_fasta), "baseline_final_path_sha256": baseline_digest,
+              "adapter_sources": {name: digest(tools_root / name) for name in
+                                  ("refinement_degap.py", "refinement_admission.py", "refinement_path.py",
+                                   "refinement_sources.py", "refinement_publication.py")}}
+    atomic_json(paths["01_inputs"] / "recipe.json", recipe)
+    command = [sys.executable, str(engine_root / "bin/AutoGapfiller.py"), "--genome", str(baseline_fasta),
+               "--output", str(paths["03_native"]), "--work", "1", "--thread", str(threads)]
+    for kind, reads in groups.items():
+        if reads:
+            command += ["--" + kind, *reads]
+    invocation = {"tool": "degap", "run_id": run_id, "command": command, "threads": threads,
+                  "recipe_sha256": identity(recipe), "status": "running"}
+    atomic_json(paths["02_jobs"] / "invocation.json", invocation)
+    if gaps:
+        log = paths["02_jobs"] / "native.log"
+        with log.open("xb") as stream:
+            result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT)
+        if result.returncode:
+            atomic_json(paths["02_jobs"] / "invocation.json", {**invocation, "status": "failed", "returncode": result.returncode})
+            raise subprocess.CalledProcessError(result.returncode, command)
+        native_report = paths["03_native"] / "03.gap_filling/gap_filling_results.json"
+        native_identity = stat_key(native_report)
+        native_digest = digest(native_report)
+        payload = json.loads(native_report.read_text())
+        if stat_key(native_report) != native_identity:
+            raise PathError("native report changed while loading")
+        rows = payload.get("gaps")
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise PathError("DEGAP native gap report is incomplete")
+    else:
+        # The successful no-op is explicit and content-bound, not a failed-tool fallback.
+        native_report = paths["02_jobs"] / "no_gaps.json"
+        atomic_json(native_report, {"reason": "no_remaining_gaps", "baseline_sha256": recipe["baseline_sha256"]})
+        rows = []
+        native_identity = stat_key(native_report)
+        native_digest = digest(native_report)
+    identities[native_report] = native_identity
+    edits, rejected, candidate_artifacts = [], [], {}
+    for index, row in enumerate(rows):
+        covered = [gap.gap_id for gap in gaps if gap.chromosome == row.get("chromosome")
+                   and type(row.get("gap_start")) is int and type(row.get("gap_end")) is int
+                   and row["gap_start"] <= gap.start and gap.end <= row["gap_end"] + 1]
+        rejection = {"native_job": f"{native_report.relative_to(root)}#gap-{index}", "gap_ids": covered}
+        if row.get("filled") is not True:
+            # Unfilled is not a rejected candidate; preserve the native record separately.
+            continue
+        raw = row.get("final_sequence_file")
+        if not isinstance(raw, str) or not raw:
+            rejected.append({**rejection, "reason": "missing_native_candidate"})
+            continue
+        candidate_path = Path(raw)
+        if not candidate_path.is_absolute():
+            candidate_path = paths["03_native"] / candidate_path
+        candidate_path = candidate_path.resolve()
+        if not candidate_path.is_relative_to(paths["03_native"].resolve()) or not candidate_path.is_file():
+            rejected.append({**rejection, "reason": "candidate_outside_native_attempt_or_missing"})
+            continue
+        before = stat_key(candidate_path)
+        sha256 = digest(candidate_path)
+        candidate = IndexedFasta(candidate_path, catalog.index_directory / f"candidate-{index}.fa")
+        if stat_key(candidate_path) != before:
+            raise PathError("native candidate changed during admission")
+        candidate_artifacts[candidate_path.relative_to(root).as_posix()] = sha256
+        dataset = f"native_degap_{run_id}_{index}"
+        edit, reason = degap_proposal(row, fasta, candidate, gaps, source_dataset=dataset,
+                                      native_job=rejection["native_job"], artifact_sha256=sha256)
+        if edit:
+            if edit.replacement:
+                catalog.register(dataset, edit.replacement["contig"], candidate_path, origin="native:degap")
+            edits.append(edit)
+        else:
+            rejected.append({**rejection, "reason": reason})
+    edits, conflicting = exclude_conflicts(edits)
+    rejected += conflicting
+    edits = materialize_patches(edits, catalog, paths["04_accepted"])
+    if any(stat_key(path) != expected for path, expected in identities.items()):
+        raise PathError("baseline or reads changed during refinement")
+    catalog.verify_unchanged()
+    execution = {**invocation, "status": "success", "baseline_sha256": recipe["baseline_sha256"],
+                 "artifacts": {native_report.relative_to(root).as_posix(): native_digest, **candidate_artifacts}}
+    atomic_json(paths["02_jobs"] / "execution.json", execution)
+    staging = root / ".runtime/refinement/01_degap" / run_id / "final"
+    provenance = prepare_publication(staging, baseline, baseline_fasta, catalog, edits, execution, rejected)
+    if any(stat_key(path) != expected for path, expected in identities.items()):
+        raise PathError("baseline, reads or native evidence changed during publication staging")
+    atomic_json(paths["05_report"] / "report.json", provenance)
+    atomic_json(paths["02_jobs"] / "invocation.json", {**invocation, "status": "staged", "native_status": "success"})
+    return {"tool": "degap", "run_id": run_id, "staging": str(staging), "provenance": provenance}
+
+
+def stage_degap(root: Path, groups: dict, threads: int, *, run_id: str | None = None) -> dict:
+    run_id = run_id or uuid.uuid4().hex
+    if len(run_id) != 32 or any(c not in "0123456789abcdef" for c in run_id):
+        raise PathError("invalid refinement run identity")
+    invocation_path = Path(root) / "04_refinement/01_degap/02_jobs" / run_id / "invocation.json"
+    # Do not change an existing attempt, including its failure receipt.
+    if invocation_path.parent.exists():
+        raise PathError("refinement attempt already exists")
+    try:
+        return _stage_degap(root, groups, threads, run_id=run_id)
+    except BaseException as error:
+        if invocation_path.is_file():
+            invocation = json.loads(invocation_path.read_text())
+            invocation.update(status="interrupted" if isinstance(error, KeyboardInterrupt) else "failed",
+                              error_type=type(error).__name__, error=str(error))
+            atomic_json(invocation_path, invocation)
+        raise

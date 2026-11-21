@@ -31,6 +31,7 @@ class LayoutTests(unittest.TestCase):
             "grt/q/q0.fa": "03_lgz/01_q0/q0.fa",
             "grt/q/q1.fa.fai": "03_lgz/02_step1/q1.fa.fai",
             "grt/q/q2.fa.sha256": "03_lgz/03_step2/q2.fa.sha256",
+            "grt/q/.q1.fa.tmp.123": "03_lgz/02_step1/.q1.fa.tmp.123",
             "grt/q/q3.fa": "03_lgz/04_step3/q3.fa",
             "grt/q/q4.fa": "03_lgz/04_step3/q4.fa",
             "grt/checkpoints/step3.json": ".runtime/checkpoints/lgz/step3.json",
