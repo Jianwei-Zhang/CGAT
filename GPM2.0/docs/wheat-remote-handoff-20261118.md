@@ -2970,3 +2970,24 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   删除全部cache。若再修复，以此次transition/journal为新prior，不重放旧handoff或旧安装。
   整套小麦尚未完成；不把受控2.03x/2.45x倍率当作整套已测加速。不跑release CI、update.sh、
   全runtime替换、重新prepare或网站发布。
+
+## 2026-11-22：25项真实复用完成，新q0 reader已执行
+
+- 当前仍是 **NEW43010335 / agent-X86-53**，没有再次重提或改runtime。对实际run
+  `20261121T222113Z-1973018-f3b56813`逐项提取日志，25个SKIP_VALID的unit及顺序与只读
+  预检完全一致；初始阶段没有任何START重跑。06:53:33实际开始第26项`q0_evidence`。
+  这次是主流程实际复用25/25，不再仅是预检或“首个参考已复用”。
+- 真实reader **PID1990559 / start_ticks404157417**。同节点只读诊断 **43010343 SUCCEEDED**，
+  目录`q0-parallel-live-phase-20261122-0655`，不读取locals、不改变主进程。06:55:49看到
+  其验证既有chr_7B自比对PAF的SHA；06:56:49已进入真实新`lgz_core/q0_preparation.py`
+  的`_initial_inputs -> read_fasta`，参考FASTA offset6340870144。60.100秒内CPU增加54.54秒、
+  swap0，阶段已实际推进，不是仅凭job活着或锁存在推断正常。
+- 诊断还核实两项资源proof环境变量确实传到实际reader，指向本次新allocation的
+  `new-scheduler-allocation.json`，SHA ba501c27cf71025649f496600f08303a1cac13fce55817cf3ed39e34514e0c36；
+  reader cgroup明确为43010335，proof也绑定同一job。并发准入没有退化成随意信任一个
+  内存环境数字。**这仍不等于已经观察到区域14路池启动**，当前处于q0输入读取阶段。
+- 远端`initial-reuse-and-reader-verified.json`及诊断`summary.json`/终态保留；前者已同步
+  仓库`q0-parallel-initial-reuse-verified-20261122.json`，SHA
+  774f7978b7f1d1e95e2e7dc6cf506f30492bff3f26e8a1e353c17e0b1bd5a3d4。
+  此轮核实时NEW与OLD42523432均RUNNING，旧基线没有改动；observer3037575继续记录。
+  后续跟踪实际矩阵缓存消费和区域池吞吐，保留当前进程，不能仅因输入阶段单核再次重启。
