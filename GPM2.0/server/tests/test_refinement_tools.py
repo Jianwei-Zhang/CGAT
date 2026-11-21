@@ -4,11 +4,13 @@ import io
 import json
 from pathlib import Path
 import tarfile
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from server.tools import refinement_tools as tools
-from server.tools.refinement_recipes import select_tools, select_reads, make_invocation
+from server.tools.refinement_recipes import select_tools, select_reads, make_invocation, materialize_native_driver
 
 
 class LockedToolTests(unittest.TestCase):
@@ -67,6 +69,19 @@ class LockedToolTests(unittest.TestCase):
                 tools.install_source(root, definition, archive)
             self.assertFalse((root / "outside").exists())
 
+    def test_one_tool_runtime_does_not_validate_unrelated_native_engines(self):
+        lock = tools.load_lock()
+        calls = []
+        def package(prefix, name, definition, architecture):
+            calls.append(name)
+            return {"name": name, "version": "fixture"}
+        with mock.patch.object(tools, "package_receipt", side_effect=package), \
+                mock.patch.object(tools, "bundled_receipt", side_effect=AssertionError("unrelated DEGAP check")), \
+                mock.patch.object(tools, "source_receipt", side_effect=AssertionError("unrelated quarTeT check")):
+            receipt = tools.collect_receipt(Path("/fixture"), lock, tool="tgsgapcloser")
+        self.assertEqual(set(receipt["tools"]), {"tgsgapcloser"})
+        self.assertEqual(set(calls), {"tgsgapcloser", "python", "samtools", "minimap2", "racon"})
+
     def test_both_platform_specs_match_exact_locked_packages(self):
         lock = tools.load_lock()
         server = Path(__file__).resolve().parents[1]
@@ -115,6 +130,32 @@ class NativeRecipeTests(unittest.TestCase):
         self.assertIn("--racon", ont.command)
         self.assertIn("/env/bin/racon", ont.command)
         self.assertNotIn("--ne", ont.command)
+
+    def test_lr_driver_patch_is_content_bound_and_not_confused_by_255_log_path(self):
+        with tempfile.TemporaryDirectory(prefix="cgat255-") as directory:
+            prefix = Path(directory) / "env"
+            (prefix / "bin").mkdir(parents=True)
+            jobs = Path(directory) / "jobs"
+            jobs.mkdir()
+            patch = self.lock["tools"]["lrgapcloser"]["driver_patch"]
+            before = ("#!/bin/bash\n" + patch["old"] + '\nprintf "%s" "$program"\n').encode()
+            after = before.replace(patch["old"].encode(), patch["new"].encode())
+            patch.update(before_sha256=hashlib.sha256(before).hexdigest(), after_sha256=hashlib.sha256(after).hexdigest())
+            original = prefix / "bin/LR_Gapcloser.sh"
+            original.write_bytes(before)
+            invocation = make_invocation("lrgapcloser", Path("/baseline.fa"), self.reads,
+                                         Path(directory) / "native", 1, prefix=prefix,
+                                         runtime={"lock_sha256": tools.fingerprint(self.lock)},
+                                         lock=self.lock, jobs_dir=jobs)
+            driver = materialize_native_driver(invocation)
+            self.assertEqual(original.read_bytes(), before)
+            self.assertEqual(driver.read_bytes(), after)
+            with (jobs / "native255.log").open("wb") as output:
+                subprocess.run(invocation.command, env=invocation.environment, stdout=output, check=True)
+            self.assertEqual((jobs / "native255.log").read_text(), str(prefix / "bin"))
+            original.write_bytes(before + b"# changed\n")
+            with self.assertRaisesRegex(tools.ToolError, "pinned packaging patch input"):
+                materialize_native_driver(invocation)
 
     def test_quartet_and_lr_use_one_task_and_safe_native_file_namespaces(self):
         quartet = self.invocation("quartet")

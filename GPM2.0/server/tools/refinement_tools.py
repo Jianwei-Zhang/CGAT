@@ -20,6 +20,13 @@ import urllib.request
 LOCK_PATH = Path(__file__).resolve().parents[1] / "contracts/refinement-tools.lock.json"
 TOOLS = ("degap", "tgsgapcloser", "quartet", "lrgapcloser")
 RECEIPT = "conda-meta/cgat-refinement-runtime.json"
+TOOL_DEPENDENCIES = {
+    "degap": ("python", "samtools", "minimap2", "biopython", "pysam", "numpy", "matplotlib-base",
+              "scipy", "hifiasm", "seqkit", "parallel", "ripgrep", "perl"),
+    "tgsgapcloser": ("python", "samtools", "minimap2", "racon"),
+    "quartet": ("python", "samtools", "minimap2"),
+    "lrgapcloser": ("python", "samtools", "bwa", "perl"),
+}
 WRAPPER = b"""#!/usr/bin/env python3
 from pathlib import Path
 import sys
@@ -116,7 +123,8 @@ def package_receipt(prefix, name, definition, architecture):
 
 
 def source_location(prefix, definition):
-    return safe_path(prefix, "share/cgat-refinement/quartet/" + definition["revision"])
+    variant = fingerprint({"archive": definition["archive"], "patches": definition.get("patches", [])})[:16]
+    return safe_path(prefix, "share/cgat-refinement/quartet/" + definition["revision"] + "-" + variant)
 
 
 def source_receipt(prefix, definition):
@@ -161,10 +169,12 @@ def bundled_receipt(definition):
     return {"version": definition["version"], "revision": definition["revision"], "manifest_sha256": digest(path), "license": definition.get("license", {"spdx": "NOASSERTION"})}
 
 
-def collect_receipt(prefix, lock):
+def collect_receipt(prefix, lock, tool=None):
+    if tool is not None and tool not in TOOLS:
+        raise ToolError("unknown refinement tool")
     architecture = current_platform()
     tools = {}
-    for name in TOOLS:
+    for name in ((tool,) if tool else TOOLS):
         definition = lock["tools"][name]
         if definition["distribution"] == "bundled":
             tools[name] = bundled_receipt(definition)
@@ -176,21 +186,29 @@ def collect_receipt(prefix, lock):
                 raise ToolError(f"no locked {name} package for {architecture}")
             tools[name] = package_receipt(prefix, pin["name"], definition, architecture)
     dependencies = {name: package_receipt(prefix, name, definition, architecture)
-                    for name, definition in lock["dependencies"].items()}
+                    for name, definition in lock["dependencies"].items()
+                    if tool is None or name in TOOL_DEPENDENCIES[tool]}
     return {"schema": "cgat.refinement-runtime", "schema_version": 1,
             "platform": architecture, "lock_sha256": fingerprint(lock), "tools": tools, "dependencies": dependencies}
 
 
-def validate_runtime(prefix=None, lock=None):
+def validate_runtime(prefix=None, lock=None, tool=None):
     prefix = Path(prefix or sys.prefix).resolve()
     lock = lock or load_lock()
     receipt_path = prefix / RECEIPT
     if not receipt_path.is_file():
         raise ToolError("refinement runtime is not installed in the active environment; run install.sh and activate cgat-server")
     saved = json.loads(receipt_path.read_text())
-    actual = collect_receipt(prefix, lock)
+    actual = collect_receipt(prefix, lock, tool)
+    if tool:
+        saved = {**saved, "tools": {tool: saved.get("tools", {}).get(tool)},
+                 "dependencies": {name: saved.get("dependencies", {}).get(name) for name in TOOL_DEPENDENCIES[tool]}}
     if saved != actual:
         raise ToolError("refinement runtime receipt is stale or its content changed; rerun install.sh")
+    expected_samtools = (prefix / "bin/samtools").resolve()
+    located = shutil.which("samtools")
+    if located is None or Path(located).resolve() != expected_samtools:
+        raise ToolError("FASTA indexing must use the managed samtools; activate cgat-server rather than substituting PATH tools")
     return actual
 
 

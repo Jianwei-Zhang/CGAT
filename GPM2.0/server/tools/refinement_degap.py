@@ -18,7 +18,7 @@ try:
     from post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
     from refinement_path import identity, source_blocks, PathError
     from refinement_sources import FastaCatalog
-    from refinement_admission import degap_proposal, exclude_conflicts
+    from refinement_admission import degap_proposal, exclude_conflicts, preserve_joint_sources
     from refinement_publication import prepare_publication, verify_baseline
     from refinement_tools import validate_runtime, load_lock
     from refinement_recipes import make_invocation
@@ -27,13 +27,16 @@ except ModuleNotFoundError:
     from .post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
     from .refinement_path import identity, source_blocks, PathError
     from .refinement_sources import FastaCatalog
-    from .refinement_admission import degap_proposal, exclude_conflicts
+    from .refinement_admission import degap_proposal, exclude_conflicts, preserve_joint_sources
     from .refinement_publication import prepare_publication, verify_baseline
     from .refinement_tools import validate_runtime, load_lock
     from .refinement_recipes import make_invocation
 
 PIN = "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75"
 RECIPE = "cgat.degap.exact-anchors.v2"
+ADAPTER_FILES = ("refinement_degap.py", "refinement_admission.py", "refinement_path.py",
+                 "refinement_sources.py", "refinement_publication.py", "refinement_tools.py",
+                 "refinement_recipes.py", "refinement_native_trace.py")
 
 
 def verify_engine(engine_root: Path) -> dict:
@@ -52,7 +55,7 @@ def verify_engine(engine_root: Path) -> dict:
     return manifest
 
 
-def materialize_patches(edits, catalog, accepted_dir):
+def materialize_patches(edits, catalog, accepted_dir, *, tool="degap"):
     """Retain only inserted sequence in the permanent CGAT source dataset.
 
     Native full candidates remain untouched in 03_native; the evidence retains
@@ -62,7 +65,7 @@ def materialize_patches(edits, catalog, accepted_dir):
     if not patch_edits:
         return edits
     patch_file = accepted_dir / "patches.fa"
-    dataset = "cgat_refinement_degap_" + accepted_dir.name
+    dataset = "cgat_refinement_" + tool + "_" + accepted_dir.name
     if any(name == dataset for name, _ in catalog.sources):
         raise PathError("refinement dataset identity collides with an original dataset")
     lengths = {}
@@ -78,7 +81,7 @@ def materialize_patches(edits, catalog, accepted_dir):
     result = []
     for edit in edits:
         if edit.replacement:
-            catalog.register(dataset, edit.edit_id, patch_file, origin="refinement:degap")
+            catalog.register(dataset, edit.edit_id, patch_file, origin="refinement:" + tool)
             evidence = {**edit.evidence, "native_source": edit.replacement}
             replacement = {"dataset": dataset, "contig": edit.edit_id, "start": 1,
                            "end": lengths[edit.edit_id], "orientation": "+"}
@@ -109,9 +112,11 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     engine_root = tools_root / "degap_core"
     engine_manifest = verify_engine(engine_root)
     lock = load_lock()
-    runtime = validate_runtime(lock=lock)
+    runtime = validate_runtime(lock=lock, tool="degap")
     directory = root / "04_refinement/01_degap"
     paths = {name: directory / name / run_id for name in ("01_inputs", "02_jobs", "03_native", "04_accepted", "05_report")}
+    if paths["03_native"].exists() or paths["03_native"].is_symlink():
+        raise PathError("native attempt directory already exists; validated resume must be explicit")
     # Native program creates 03_native itself. No previously completed attempt is overwritten.
     for name in ("01_inputs", "02_jobs", "04_accepted", "05_report"):
         paths[name].mkdir(parents=True, exist_ok=False)
@@ -140,10 +145,8 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     recipe = {"schema": RECIPE, "tool": "degap", "revision": PIN,
               "engine_manifest_sha256": identity(engine_manifest), "runtime_sha256": identity(runtime),
               "tool_lock_sha256": identity(lock), "reads": reads_manifest,
-              "baseline_sha256": digest(baseline_fasta), "baseline_final_path_sha256": baseline_digest,
-              "adapter_sources": {name: digest(tools_root / name) for name in
-                                  ("refinement_degap.py", "refinement_admission.py", "refinement_path.py",
-                                   "refinement_sources.py", "refinement_publication.py", "refinement_tools.py", "refinement_recipes.py")}}
+              "baseline_source_files": catalog.baseline_bindings(), "baseline_sha256": digest(baseline_fasta), "baseline_final_path_sha256": baseline_digest,
+              "adapter_sources": {name: digest(tools_root / name) for name in ADAPTER_FILES}}
     atomic_json(paths["01_inputs"] / "recipe.json", recipe)
     native_invocation = make_invocation("degap", baseline_fasta, groups, paths["03_native"], threads,
                                         runtime=runtime, lock=lock)
@@ -239,13 +242,15 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
             rejected.append({**rejection, "reason": reason})
     edits, conflicting = exclude_conflicts(edits)
     rejected += conflicting
+    edits, ambiguous = preserve_joint_sources(edits, fasta, catalog, gaps)
+    rejected += ambiguous
     edits = materialize_patches(edits, catalog, paths["04_accepted"])
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("baseline or reads changed during refinement")
     catalog.verify_unchanged()
     execution = {**invocation, "status": "success", "baseline_sha256": recipe["baseline_sha256"],
                  "native_executed": bool(gaps), "skip_reason": None if gaps else "no_remaining_gaps",
-                 "native_assembly": native_summary,
+                 "recipe": recipe, "native_assembly": native_summary,
                  "artifacts": {native_report.relative_to(root).as_posix(): native_digest, **native_artifacts, **candidate_artifacts}}
     atomic_json(paths["02_jobs"] / "execution.json", execution)
     staging = root / ".runtime/refinement/01_degap" / run_id / "final"
@@ -253,7 +258,8 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("baseline, reads or native evidence changed during publication staging")
     atomic_json(paths["05_report"] / "report.json", provenance)
-    atomic_json(paths["02_jobs"] / "invocation.json", {**invocation, "status": "staged", "native_status": "success"})
+    atomic_json(paths["02_jobs"] / "invocation.json", {**invocation, "status": "staged", "native_status": "success",
+                "provenance_sha256": digest(staging / "provenance.json")})
     return {"tool": "degap", "run_id": run_id, "staging": str(staging), "provenance": provenance}
 
 

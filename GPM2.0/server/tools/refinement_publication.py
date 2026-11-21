@@ -47,6 +47,17 @@ def verify_baseline(baseline: dict, catalog, fasta: IndexedFasta):
     return gaps
 
 
+def trace_source_keys(value):
+    if isinstance(value, dict):
+        if {"dataset", "contig", "start", "end", "orientation"} <= value.keys():
+            yield value["dataset"], value["contig"]
+        for child in value.values():
+            yield from trace_source_keys(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            yield from trace_source_keys(child)
+
+
 def prepare_publication(staging: Path, baseline: dict, baseline_fasta: Path, catalog,
                         edits: list, execution: dict, rejected: list[dict]) -> dict:
     if (execution.get("status") != "success" or not execution.get("run_id")
@@ -68,6 +79,11 @@ def prepare_publication(staging: Path, baseline: dict, baseline_fasta: Path, cat
     staging.mkdir(parents=True, exist_ok=False)
     final = build_final_path(baseline, catalog, edits, tool=execution["tool"],
                              recipe_sha256=execution["recipe_sha256"], baseline_artifact_sha256=execution["baseline_sha256"])
+    if execution.get("require_native_equality"):
+        expected = execution.get("native_assembly", {})
+        actual = {row["chr"]: (row["length"], row["sha256"]) for row in final["chromosomes"]}
+        if actual != {name: (row["length"], row["sha256"]) for name, row in expected.items()}:
+            raise PathError("normalized Final Path does not reproduce the fully admitted native result")
     write_assembly(final, catalog, staging / "assembly.fa")
     write_json(staging / "final_path.json", final)
     write_table(staging / "sources.tsv", ["dataset", "contig", "length", "fasta_path", "path_scope", "origin", "fasta_sha256"],
@@ -88,8 +104,12 @@ def prepare_publication(staging: Path, baseline: dict, baseline_fasta: Path, cat
                          "residual_attribution": "joint" if any(gid in row["original_gap_ids"] and row["attribution"] == "joint"
                                                                  for row in remaining) else "single"})
     provenance = {"schema": "cgat.refinement-publication", "schema_version": 1, "tool": execution["tool"],
-                  "run_id": execution["run_id"], "status": "completed" if edits else "completed_zero_accepted",
+                  "run_id": execution["run_id"], "status": ("native_" + execution["native_outcome"]
+                      if execution.get("native_outcome") in {"no_candidates", "no_eligible_gaps", "no_eligible_flanks", "no_remaining_gaps"}
+                      else "completed" if edits else "completed_zero_accepted"),
                   "execution": execution, "baseline": final["baseline"], "accepted_edit_count": len(edits),
+                  "trace_sources": [{**row, "availability": "server_audit_artifact"}
+                                    for row in catalog.source_rows(set(trace_source_keys([edit.evidence for edit in edits])))],
                   "original_gap_count": len(original_gaps), "gap_outcomes": outcomes, "rejected_candidates": rejected,
                   "counts": {status: sum(g["status"] == status for g in outcomes) for status in ("closed", "partial", "unfilled", "rejected")},
                   "sequence_validation": "reconstructed_from_sources",

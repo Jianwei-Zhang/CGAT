@@ -114,3 +114,49 @@ def exclude_conflicts(edits: list[Edit]) -> tuple[list[Edit], list[dict]]:
             [{"edit_id": edits[index].edit_id, "gap_ids": list(edits[index].gap_ids),
               "native_job": edits[index].native_job, "reason": "conflicting_native_proposals"}
              for index in sorted(conflicts)])
+
+
+def preserve_joint_sources(edits, baseline, catalog, gaps):
+    """Keep uniquely unchanged original islands inside a native merged-gap job."""
+    from dataclasses import replace
+    try:
+        from refinement_native_trace import split_retained_islands, equal_regions, TraceError
+    except ModuleNotFoundError:
+        from .refinement_native_trace import split_retained_islands, equal_regions, TraceError
+    accepted, rejected = [], []
+    for edit in edits:
+        if edit.replacement is None or len(edit.gap_ids) < 2:
+            accepted.append(edit)
+            continue
+        source = edit.replacement
+        class CandidateGenome:
+            records = {edit.chromosome: (catalog.length(source["dataset"], source["contig"]),)}
+            def fetch(self, name, a, b):
+                if name != edit.chromosome:
+                    raise TraceError("joint candidate chromosome differs")
+                return catalog.fetch(source["dataset"], source["contig"], a, b)
+        candidate = CandidateGenome()
+        if source["orientation"] != "+":
+            raise TraceError("DEGAP joint candidate must be in native forward orientation")
+        try:
+            parts = split_retained_islands(baseline, candidate, edit.chromosome,
+                                          (edit.start, edit.end, source["start"] - 1, source["end"]), gaps)
+        except TraceError as error:
+            rejected.append({"edit_id": edit.edit_id, "gap_ids": list(edit.gap_ids),
+                             "native_job": edit.native_job, "reason": str(error)})
+            continue
+        if len(parts) == 1:
+            accepted.append(edit)
+            continue
+        for start, end, left, right in parts:
+            if end - start == right - left and equal_regions(baseline, edit.chromosome, start, candidate, left, end - start):
+                continue
+            gap_ids = tuple(gap.gap_id for gap in gaps if gap.chromosome == edit.chromosome and start < gap.end and gap.start < end)
+            if not gap_ids or start >= end:
+                raise TraceError("joint candidate split is not bound to an original gap")
+            replacement = None if left == right else {**source, "start": left + 1, "end": right}
+            accepted.append(replace(edit, edit_id="degap-" + identity([edit.edit_id, start, end, left, right])[:24],
+                                    start=start, end=end, replacement=replacement, gap_ids=gap_ids,
+                                    evidence={**edit.evidence, "parent_native_edit_id": edit.edit_id,
+                                              "unchanged_internal_islands_retained": True}))
+    return accepted, rejected

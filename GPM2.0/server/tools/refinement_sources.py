@@ -74,6 +74,9 @@ class FastaCatalog:
                 source = segment.get("source") if segment["kind"] != "gap" else segment.get("refinement_source")
                 if source:
                     used.add((source["dataset"], source["contig"]))
+        return self.source_rows(used)
+
+    def source_rows(self, used):
         rows = []
         for dataset, contig in sorted(used):
             source = self.sources[dataset, contig]
@@ -86,3 +89,11 @@ class FastaCatalog:
                          "fasta_path": location, "path_scope": scope, "origin": source["origin"],
                          "fasta_sha256": self.files[source["resolved"]]["sha256"]})
         return rows
+
+    def baseline_bindings(self):
+        used = [key for key, row in self.sources.items() if row["origin"] == "lgz"]
+        unique = {}
+        for row in self.source_rows(used):
+            key = row["path_scope"], row["fasta_path"]
+            unique[key] = {name: row[name] for name in ("path_scope", "fasta_path", "fasta_sha256")}
+        return [unique[key] for key in sorted(unique)]

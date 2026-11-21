@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import hashlib
 from pathlib import Path
 import re
 import sys
@@ -46,7 +47,7 @@ def select_reads(tool: str, groups: dict) -> dict:
         raise ToolError("invalid tool/reads selection")
     if any(not isinstance(paths, list) or any(not isinstance(p, str) or not p for p in paths) for paths in groups.values()):
         raise ToolError("reads inputs must be path lists")
-    groups = {kind: [str(Path(path).resolve()) for path in paths] for kind, paths in groups.items()}
+    groups = {kind: [str(Path(path).resolve()) for path in groups[kind]] for kind in ("hifi", "ont")}
     seen = [path for paths in groups.values() for path in paths]
     if not seen or len(seen) != len(set(seen)):
         raise ToolError("reads must be nonempty and cannot be supplied twice or as both technologies")
@@ -66,10 +67,10 @@ def native_safe_path(path: Path):
 
 
 def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir: Path, threads: int,
-                    *, prefix: Path | None = None, runtime: dict | None = None, lock=None) -> Invocation:
+                    *, prefix: Path | None = None, runtime: dict | None = None, lock=None, jobs_dir: Path | None = None) -> Invocation:
     prefix = Path(prefix or sys.prefix).resolve()
     lock = lock or load_lock()
-    runtime = runtime or validate_runtime(prefix, lock)
+    runtime = runtime or validate_runtime(prefix, lock, tool=tool)
     if tool not in TOOLS or type(threads) is not int or threads < 1:
         raise ToolError("invalid refinement tool/thread budget")
     if runtime.get("lock_sha256") != fingerprint(lock):
@@ -126,11 +127,16 @@ def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir:
                 command += ["--ne"]
             else:
                 command += ["--racon", str(prefix / "bin/racon"), "--r_round", str(parameters["racon_rounds"])]
-            outputs = ("tgs.scaff_seqs", "tgs.updated_scaff_infos", "tgs.orignial_scaff_infos", "tgs.name_map")
+            outputs = ("tgs.scaff_seqs", "tgs.updated_scaff_infos", "tgs.orignial_scaff_infos", "tgs.name_map", "tgs.gap_fill_detail")
             cwd = native_dir
         else:
             parameters = definition["parameters"]
-            command = [bash, str(prefix / "bin/LR_Gapcloser.sh"), "-i", str(baseline), "-l", paths[0],
+            driver = (jobs_dir or native_dir.parent) / "native_driver.sh"
+            native_safe_path(driver)
+            environment["CGAT_LR_PROGRAM_DIR"] = str(prefix / "bin")
+            recipe["driver_patch"] = definition["driver_patch"]
+            recipe["driver_environment"] = {"CGAT_LR_PROGRAM_DIR": str(prefix / "bin")}
+            command = [bash, "-e", "-o", "pipefail", str(driver), "-i", str(baseline), "-l", paths[0],
                        "-s", parameters[inputs["mode"] + "_platform"], "-t", str(threads),
                        "-n", str(parameters["tag_partitions"]), "-r", str(parameters["iterations"]), "-o", str(native_dir)]
             outputs = ("iteration-1/gapclosed.fasta",)  # Native may stop early when no Ns remain.
@@ -153,3 +159,28 @@ def prepare_native_reads(tool: str, groups: dict, cache_root: Path) -> dict:
             prepared[kind] = [conversion["fasta"]]
             conversions[kind] = conversion
     return {"original_selection": selection, "prepared": prepared, "conversions": conversions}
+
+
+def materialize_native_driver(invocation: Invocation) -> Path | None:
+    """Copy one verified driver with an exact path-discovery-only patch.
+
+    The managed conda package is never edited. The script is audit evidence for
+    this attempt and keeps the native helper binaries in their verified prefix.
+    """
+    if invocation.tool != "lrgapcloser":
+        return None
+    patch = invocation.recipe["driver_patch"]
+    original = Path(invocation.environment["CGAT_LR_PROGRAM_DIR"]) / "LR_Gapcloser.sh"
+    payload = original.read_bytes()
+    if hashlib.sha256(payload).hexdigest() != patch["before_sha256"]:
+        raise ToolError("LR driver differs from the pinned packaging patch input")
+    old, new = patch["old"].encode(), patch["new"].encode()
+    if payload.count(old) != 1:
+        raise ToolError("LR helper directory patch does not match exactly once")
+    payload = payload.replace(old, new)
+    if hashlib.sha256(payload).hexdigest() != patch["after_sha256"]:
+        raise ToolError("LR patched driver checksum differs from lock")
+    path = Path(invocation.command[4])
+    with path.open("xb") as stream:
+        stream.write(payload)
+    return path

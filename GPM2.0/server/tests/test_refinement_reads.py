@@ -51,6 +51,18 @@ class RefinementReadsTests(unittest.TestCase):
             second = prepare_fasta([str(reads)], root / "cache")
             self.assertNotEqual(first["fasta"], second["fasta"])
 
+    def test_unicode_original_identifiers_remain_reversible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reads = root / "reads.fa"
+            reads.write_text(">原始读段\nACGT\n", encoding="utf-8")
+            result = prepare_fasta([str(reads)], root / "cache")
+            fasta = Path(result["fasta"])
+            self.assertTrue(Path(str(fasta) + ".fai").is_file())
+            with gzip.open(fasta.parent / "read_ids.tsv.gz", "rt", encoding="utf-8") as stream:
+                rows = list(csv.DictReader(stream, delimiter="\t"))
+            self.assertEqual(rows[0]["original_id"], "原始读段")
+
     def test_invalid_fastq_is_not_silently_reinterpreted_as_fasta(self):
         for text in ("@r\nACG\n+\nII\n", "@r\nACG\n+different\nIII\n", "@r\nACG\n+\nIIII\n"):
             with self.assertRaises(ToolError):

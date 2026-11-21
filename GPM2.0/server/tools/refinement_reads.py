@@ -23,7 +23,7 @@ except ModuleNotFoundError:
     from .run_orchestration import sha256_file
     from .refinement_tools import ToolError, fingerprint
 
-RECIPE = "cgat.reads-to-fasta.v1"
+RECIPE = "cgat.reads-to-fasta.v2"
 
 
 def file_identity(path):
@@ -34,7 +34,7 @@ def file_identity(path):
 def open_reads(path):
     with path.open("rb") as stream:
         magic = stream.read(2)
-    return gzip.open(path, "rt", encoding="ascii", newline=None) if magic == b"\x1f\x8b" else path.open("r", encoding="ascii", newline=None)
+    return gzip.open(path, "rt", encoding="utf-8", newline=None) if magic == b"\x1f\x8b" else path.open("r", encoding="utf-8", newline=None)
 
 
 def checked_sequence(lines):
@@ -119,12 +119,13 @@ def prepare_fasta(inputs: list[str], destination_root: Path) -> dict:
     destination_root = Path(destination_root)
     destination = destination_root / key
     fasta_name = "reads_" + key[:16] + ".fa"
+    index_name = fasta_name + ".fai"
     if destination.exists() or destination.is_symlink():
         receipt_path = destination / "conversion.json"
         if not receipt_path.is_file():
             raise ToolError("incomplete existing reads conversion; preserve it for inspection instead of silently reusing")
         saved = json.loads(receipt_path.read_text())
-        if (saved.get("binding") != binding or set(saved.get("outputs", {})) != {fasta_name, "read_ids.tsv.gz"}
+        if (saved.get("binding") != binding or set(saved.get("outputs", {})) != {fasta_name, index_name, "read_ids.tsv.gz"}
                 or any(sha256_file(destination / name) != digest for name, digest in saved["outputs"].items())):
             raise ToolError("existing reads conversion content changed; not reusable")
         if any(file_identity(path) != expected for path, expected in identities.items()):
@@ -134,7 +135,7 @@ def prepare_fasta(inputs: list[str], destination_root: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix=".reads-", dir=destination_root) as temporary:
         temporary = Path(temporary)
         reads_count, bases = 0, 0
-        with (temporary / fasta_name).open("x", encoding="ascii", newline="\n") as output:
+        with (temporary / fasta_name).open("x", encoding="ascii", newline="\n") as output, (temporary / index_name).open("x", encoding="ascii", newline="\n") as index:
             with (temporary / "read_ids.tsv.gz").open("xb") as raw_mapping:
                 # Fixed gzip header makes the derived mapping content deterministic.
                 with gzip.GzipFile(filename="", mode="wb", fileobj=raw_mapping, mtime=0, compresslevel=1) as compressed:
@@ -146,7 +147,10 @@ def prepare_fasta(inputs: list[str], destination_root: Path) -> dict:
                             with open_reads(path) as stream:
                                 for count, (original_id, sequence) in enumerate(read_records(stream), 1):
                                     record_id = f"cgat_{key[:16]}_{input_index}_{count}"
-                                    output.write(f">{record_id}\n{sequence}\n")
+                                    output.write(f">{record_id}\n")
+                                    offset = output.tell()
+                                    output.write(sequence + "\n")
+                                    index.write(f"{record_id}\t{len(sequence)}\t{offset}\t{len(sequence)}\t{len(sequence)+1}\n")
                                     writer.writerow((record_id, input_index, count, original_id))
                                     reads_count += 1
                                     bases += len(sequence)
@@ -156,7 +160,7 @@ def prepare_fasta(inputs: list[str], destination_root: Path) -> dict:
             raise ToolError("reads changed during conversion")
         receipt = {"schema": "cgat.refinement-reads", "schema_version": 1, "binding": binding,
                    "reads": reads_count, "bases": bases,
-                   "outputs": {name: sha256_file(temporary / name) for name in (fasta_name, "read_ids.tsv.gz")}}
+                   "outputs": {name: sha256_file(temporary / name) for name in (fasta_name, index_name, "read_ids.tsv.gz")}}
         (temporary / "conversion.json").write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
         if destination.exists() or destination.is_symlink():
             raise ToolError("reads conversion appeared concurrently; rerun under the workspace lock")

@@ -32,11 +32,11 @@ quarTeT keys some temporary alignment files by input **basename**, not full path
 
 - DEGAP must provide both its gap-result JSON and its native integrated assembly. The assembly must contain the original chromosome set; it is indexed and summarized, but is not unconditionally adopted as CGAT's final result. A native exit code alone is insufficient.
 - The exact locked TGS-GapCloser package was downloaded and hash-checked separately from the source tag. Its `1.2.1_ml` wrapper filters PAF rows using `qstart < 1000000 OR qlen - qstart < 1000000`. This is a native distribution behavior, not a CGAT-added filter. Some fatal argument checks in this wrapper return **0**: artifact validation is therefore mandatory even when the shell exits successfully. These distinctions are in the machine-readable recipe; the distribution is not presented as byte-identical to vanilla upstream 1.2.1.
-- TGS-GapCloser provides `*.scaff_seqs`, `*.updated_scaff_infos`, `*.orignial_scaff_infos` (upstream spelling) and `*.name_map`. The adapter must use these real artifacts, not an assumed `gap_fill_details` filename.
+- TGS-GapCloser provides `*.scaff_seqs`, `*.updated_scaff_infos`, `*.orignial_scaff_infos` (upstream spelling) , `*.name_map` and `*.gap_fill_detail` (singular, verified against the pinned writer). The adapter must use these real artifacts, not an assumed `gap_fill_details` filename.
 - LR_Gapcloser can stop before iteration 3 when no gaps remain. An adapter must validate the last complete iteration and the early-stop condition; merely selecting the largest directory number is insufficient.
 - quarTeT explicitly returns nonzero for “no gap can be closed” or no eligible gaps. These cases require a specific, evidence-backed native no-result classification. They must not be conflated with arbitrary process failure, nor turned into successful final results merely by copying LGZ.
 
-The latter two special cases still need integration in the common native execution/admission layer. The fixed command recipes alone do not establish successful native execution or accepted refinement.
+The common private staging layer now classifies these special cases using native artifacts and sequence checks. It is not yet connected to public `run_all.sh`, final publication or App delivery. Fixed command recipes and controlled format fixtures alone do not establish full native execution acceptance.
 
 ## Evidence and remaining gates
 
@@ -65,3 +65,20 @@ HiFi/ONT 选择沿用设计：DEGAP 与 quarTeT 单次使用两类输入；TGS�
 本轮还发现并记录了实际原生边界：LR 可能提前结束迭代；quarTeT 在无候选时会返回非零；TGS 的真实文件名不是假定的通用 gap-detail 名。后续公共执行/接纳层必须按这些证据处理，不能把失败统一包装成“成功但零填补”。
 
 当前完成的是固定环境定义、安装/校验代码、命令与输入配方，以及 DEGAP 原生输出的进一步完整性检查。没有在开发中升级真实环境，也未宣称四工具真实 reads、完整共同入口或 ARM64 已验收。最终仍须统一进行环境求解、原生小样例、路径来源、报告与 App 的完整验收。
+
+## Native adapters and explicit packaging patches (2026-11-21 update)
+
+The three additional adapters now reconstruct native output from actual trace formats: TGS scaffold records plus singular `gap_fill_detail`; quarTeT modified AGP plus fill detail and selected input slices; LR per-iteration `info_filter2` plus the original converted read order. Each intermediate/native FASTA is checked against its trace. Edits are then projected onto the original LGZ Final Path, retaining uniquely unchanged internal islands and rejecting ambiguous provenance. These are private staged results, not public final deliveries yet.
+
+Additional exact patches are part of the lock and recipe identity:
+
+- **quarTeT `cgat.quartet.v2`:** besides the Python 3.11 f-string quote patch, GapFiller alone passes an explicit `allow_empty=True` to the minimap helper. A successful empty PAF now reaches the existing no-alignment branch, allowing the next selected input to be tried. A failed aligner is still an error. Other quarTeT callers keep the previous empty-PAF behavior. No nonempty alignment thresholds or candidate ranking are changed. All patch input/output hashes are locked.
+- **LR `cgat.lrgapcloser.v3`:** CGAT copies the verified installed driver into the attempt's `02_jobs/native_driver.sh`, changing only helper-directory discovery to an explicit verified runtime directory. Upstream `/proc` matching can accidentally select any fd line whose log/workspace path contains `255`; the copied driver avoids that ambiguity. The original conda file is unchanged. Both driver hashes, the patch and its environment are recorded. The copied driver runs with shell `-e -o pipefail`; swallowed native command failures are not accepted as completion.
+
+Known pinned behavior is not silently corrected: quarTeT numbers short N runs differently between gap detection and the final AGP writer. If this produces contradictory gap identities, admission rejects it instead of relocating a candidate. LR's reverse-strand partial-fill branch does not add the same synthetic 100-N prefix as its forward branch; the adapter reproduces and validates the actual native output rather than inventing a symmetric algorithm.
+
+The read conversion recipe now writes a content-bound FASTA index and keeps UTF-8 original identifiers in the reversible map. Native lookup retains only requested IDs/ordinals, not every read sequence in memory. Each selected engine validates only its own pinned dependencies at execution time; environment install/check still validates all four engines.
+
+Current evidence remains deliberately lightweight: controlled format/sequence fixtures; the actual pinned TGS splitter/writer on a tiny supplied-fill example; the pinned LR sequence writer with tiny partial-fill rows; and Python 3.11 quarTeT with a controlled successful-empty aligner, confirming both inputs are attempted. The last example is **not** a real alignment test. A separate tiny driver test covers `255` in paths and altered-source rejection. None of these replaces end-to-end native runs, both-architecture environment checks or final Server/App acceptance.
+
+中文补充：新增三工具已接入内部原生执行、来源解析和待发布 Final Path；每工具依次执行、失败隔离，以及内容绑定的完整结果复用也已实现。尚未接入公共运行入口、最终报告和 App 交付。quarTeT 空 PAF 补丁、LR helper 路径补丁均明确锁定，不冒称原版字节不变。只复用已经验证的完整结果；原生子任务中断后的部分复用仍待实现。

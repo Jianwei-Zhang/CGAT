@@ -78,12 +78,13 @@
         "sha256": "51c459512df08aee96e3250c8bddf65d75f1da1a58fbf72c47edae4da9b434b0"
       },
       "read_policy": "native_mixed_fasta",
-      "recipe": "cgat.quartet.v1",
+      "recipe": "cgat.quartet.v2",
       "parameters": {
         "aligner": "minimap2",
         "minimap": "-x asm5",
         "enable_join": false,
-        "native_plot": false
+        "native_plot": false,
+        "empty_alignment": "continue remaining input files; explicit no-candidate outcome after all files"
       },
       "patches": [
         {
@@ -94,6 +95,33 @@
           "old": "{len(info[\"seq\"]) if info[\"seq\"] != '' else 'join'}",
           "new": "{len(info[\"seq\"]) if info[\"seq\"] != \"\" else \"join\"}",
           "purpose": "Python 3.11 quoting compatibility only; no algorithm or parameter changes"
+        },
+        {
+          "id": "gapfiller-empty-paf-optional-v1",
+          "file": "quartet/util.py",
+          "before_sha256": "5554eeb3abeaf092fb6b4aaf6c4ba7026133c3a00117682c06d8b21bf52ed914",
+          "after_sha256": "1a191fe4c7570516add04f1e48c6ab4ba4f7c7997af7e04b60f045458075b819",
+          "old": "def minimap(reffasta, qryfasta, prefix, suffix, minimapoption, plot, overwrite, aligner):",
+          "new": "def minimap(reffasta, qryfasta, prefix, suffix, minimapoption, plot, overwrite, aligner, allow_empty=False):",
+          "purpose": "GapFiller alone continues after a successful aligner with an empty PAF; nonzero aligner errors still fail. No alignment thresholds or candidate selection changes."
+        },
+        {
+          "id": "gapfiller-empty-paf-guard-v1",
+          "file": "quartet/util.py",
+          "before_sha256": "1a191fe4c7570516add04f1e48c6ab4ba4f7c7997af7e04b60f045458075b819",
+          "after_sha256": "09a179dd27eba0388d7e557b49a15f15a119276d33081d085c0b94fc4fb87575",
+          "old": "if os.path.getsize(f'{prefix}.{suffix}.paf') == 0:",
+          "new": "if os.path.getsize(f'{prefix}.{suffix}.paf') == 0 and not allow_empty:",
+          "purpose": "GapFiller alone continues after a successful aligner with an empty PAF; nonzero aligner errors still fail. No alignment thresholds or candidate selection changes."
+        },
+        {
+          "id": "gapfiller-continue-empty-input-v1",
+          "file": "quartet/gapfiller.py",
+          "before_sha256": "8f85a960c1163d0f4d373e28415eaee16f8871249987c5b8b836bdb12b4685a6",
+          "after_sha256": "72c16b23c4a31ac8e8eece3d9dec222edde5dd4c561fb0b3ae8fa4b2c259437e",
+          "old": "util.minimap(gapfillfile, flankingfastafile, prefix, f'flank_map_{gapfiller}', minimapoption, False, overwrite, aligner)",
+          "new": "util.minimap(gapfillfile, flankingfastafile, prefix, f'flank_map_{gapfiller}', minimapoption, False, overwrite, aligner, allow_empty=True)",
+          "purpose": "GapFiller alone continues after a successful aligner with an empty PAF; nonzero aligner errors still fail. No alignment thresholds or candidate selection changes."
         }
       ],
       "license": {
@@ -118,18 +146,28 @@
         }
       },
       "read_policy": "hifi_preferred",
-      "recipe": "cgat.lrgapcloser.v1",
+      "recipe": "cgat.lrgapcloser.v3",
       "parameters": {
         "iterations": 3,
         "tag_partitions": 1,
         "hifi_platform": "p",
-        "ont_platform": "n"
+        "ont_platform": "n",
+        "fail_fast_shell": true
       },
       "license": {
         "spdx": "GPL-3.0-or-later",
         "basis": "pinned upstream LICENSE and distribution metadata",
         "upstream_file": "LICENSE",
         "file_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+      },
+      "driver_patch": {
+        "id": "cgat-lr-helper-directory-v1",
+        "file": "bin/LR_Gapcloser.sh",
+        "before_sha256": "b34d15efb8a1ff91d301a4679c4586136294aeb673b0ff16cec43ecdd2116db7",
+        "after_sha256": "776a9895acdbc7fea77d48915b46fc4ab64c4201202827e712a26cc268905f18",
+        "old": "program=`ls -al /proc/$$/fd/ | awk '/255/{print $NF}' | sed 's#/LR_Gapcloser.sh##'`",
+        "new": "program=\"${CGAT_LR_PROGRAM_DIR:?CGAT must provide the verified LR helper directory}\"",
+        "reason": "Bind helper discovery to the verified package instead of matching any /proc fd line containing 255."
       }
     }
   },

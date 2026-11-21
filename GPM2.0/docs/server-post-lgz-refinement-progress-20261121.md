@@ -107,3 +107,25 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 
 
 补充实际分发件核查：已校验下载的 TGS-GapCloser Bioconda build 4 archive SHA，并对照实际 driver 与源 tag。分发件来自 `1.2.1_ml`，有原生 1 Mb PAF 起点过滤，且部分 fatal 参数分支返回 0。已把这些区别写入工具锁和配方记录；后续公共执行器必须验全输出，不能把退出 0 当作成功。没有因此改写上游算法或声称原生运行验证通过。
+
+
+## 2026-11-21：另外三工具原生适配与内部批次恢复
+
+### 本轮实现（仍未切换公共入口）
+
+- `refinement_native_formats.py` 解析锁定工具的真实 TGS scaffold/detail、quarTeT AGP/detail 和 LR 每轮 `info_filter2`，从真实候选/read 片段建立来源，不把整个原生染色体冒充新来源。
+- `refinement_native_trace.py` 逐轮验证原生 FASTA、处理负链、重叠闭合、局部扩展和联合修改，保留可唯一定位的原始内部岛；有歧义的来源拒绝接纳。DEGAP 同样补上联合候选内部原始来源保留。
+- `refinement_native.py` 建立独立 attempt、日志和内容回执，明确区别原生失败、缺产物、无候选、无适用缺口及成功；LR 提前结束必须确实没有剩余 N。完成标记绑定完整 provenance SHA。
+- `refinement_batch.py` 依次运行所选工具，隔离各工具失败，保持共享基线/reads 内容不变；返回所有成功待发布结果和聚合非零状态。
+- `refinement_cache.py` 只复用来源、原始 reads、工具/适配器、原生证据和全部最终文件均匹配的完整结果。仅修改线程数不会重跑完成结果，回执保留实际旧线程数。**原生子任务部分复用、发布事务恢复尚未完成。**
+- 输入转换带 FAI、UTF-8 原始 ID 可逆映射；运行时按所选工具校验依赖，环境检查仍覆盖全部工具。quarTeT 与 LR 的精确集成补丁和已知边界已同步配方文档。
+
+### 轻量验证记录
+
+- 原生 trace 及三个工具的受控来源重建、LR 染色体别名：选定 9 项通过；批次隔离、基线篡改、线程变化缓存复用/篡改失效：3 项通过。
+- 选定运行时依赖隔离、DEGAP 联合候选岛、UTF-8/FAI：3 项通过。LR driver 的 `255` 日志路径及原始驱动篡改拒绝：1 项通过。
+- 实际固定 TGS splitter/writer 和 LR Perl sequence writer 仅执行微型构造输入；quarTeT 使用真实 Python 3.11 与模拟空 PAF 的 aligner，确认两类输入均尝试。它们不等于真实 reads 原生端到端验收。
+- 开发过程中一处 LR 夹具误把 Bash 的 `-o pipefail` 当成工具输出参数，已修复夹具并清理其两份已知临时输出；未删除其他工作区内容。
+- 未求解或升级真实共享环境，未运行浏览器、App 构建或全量测试。最终统一验收仍待完成。
+
+下一步优先接通编号布局的公共入口、精修后的原子发布/报告/交付和 App 协议，而不是把内部 staging 当成用户可用的最终结果。整体 A01–A18 未完成。
