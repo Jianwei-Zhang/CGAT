@@ -95,9 +95,16 @@ def parse_paf_line(line: str, *, artifact: str, line_number: int) -> PafAlignmen
     if len(cigar_tags) != 1:
         raise Q0EvidenceError(f"{location}: exactly one cg:Z CIGAR is required")
     text = cigar_tags[0]
-    cigar = tuple((int(length), op) for length, op in _CIGAR.findall(text))
-    if not cigar or "".join(f"{length}{op}" for length, op in cigar) != text:
+    tokens = _CIGAR.findall(text)
+    # Non-overlapping regex matches cover the original text exactly iff their
+    # total lengths equal it. No reconstruction/normalization is necessary:
+    # positive ASCII counts have no leading zeros and opcodes are unchanged.
+    if not tokens or sum(len(length) + 1 for length, _op in tokens) != len(text):
         raise Q0EvidenceError(f"{location}: malformed or unsupported PAF CIGAR")
+    cigar = tuple((int(length), operation) for length, operation in tokens)
+    del tokens
+    # Keep built-in sum over parsed integers: on the supported Python 3.10
+    # runtime its C accumulator is faster than per-operation Python += loops.
     if (sum(n for n, op in cigar if op in "MI=X") != query.length
             or sum(n for n, op in cigar if op in "MDN=X") != target.length):
         raise Q0EvidenceError(f"{location}: CIGAR span differs from PAF coordinates")

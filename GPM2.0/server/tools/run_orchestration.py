@@ -276,6 +276,26 @@ def _parse_nonnegative_integer(value: str, label: str, line_number: int) -> int:
     return parsed
 
 
+
+_PAF_CIGAR = re.compile(r"([1-9][0-9]*)([MIDN=X])")
+
+
+def _paf_cigar_spans(text: str) -> tuple[int, int] | None:
+    tokens = _PAF_CIGAR.findall(text)
+    # Matches are disjoint unchanged substrings. Full character coverage proves
+    # the same grammar as rebuilding/joining every token, without a second
+    # CIGAR-sized string. Check grammar before converting any large integer.
+    if not tokens or sum(len(length) + 1 for length, _op in tokens) != len(text):
+        return None
+    query_span = target_span = 0
+    for length, operation in tokens:
+        count = int(length)
+        if operation in "MI=X":
+            query_span += count
+        if operation in "MDN=X":
+            target_span += count
+    return query_span, target_span
+
 def validate_paf(path: Path, *, require_cigar: bool = False) -> PafSummary:
     if not path.is_file():
         raise OrchestrationContractError(f"PAF output is missing: {path}")
@@ -340,11 +360,10 @@ def validate_paf(path: Path, *, require_cigar: bool = False) -> PafSummary:
                 record_count += 1
                 if require_cigar:
                     cigar = next((tag[5:] for tag in fields[12:] if tag.startswith("cg:Z:")), "")
-                    ops = re.findall(r"([1-9][0-9]*)([MIDN=X])", cigar)
-                    if not ops or "".join(length + op for length, op in ops) != cigar:
+                    spans = _paf_cigar_spans(cigar)
+                    if spans is None:
                         raise OrchestrationContractError(f"missing or invalid CIGAR on PAF line {line_number}: {path}")
-                    query_span = sum(int(length) for length, op in ops if op in "MI=X")
-                    target_span = sum(int(length) for length, op in ops if op in "MDN=X")
+                    query_span, target_span = spans
                     if query_span != query_end - query_start or target_span != target_end - target_start:
                         raise OrchestrationContractError(f"CIGAR span mismatch on PAF line {line_number}: {path}")
     except (OSError, UnicodeError) as exc:

@@ -2715,3 +2715,56 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - 代码修复已推送`0dabbde1`、`52f634d5`；后者18份Python源码与实际冻结bundle完全一致。
   对应`source-repository-receipt.json`已写入cutover目录，实际安装15个文件摘要复核通过。
   后续只改交接记录不代表更换运行代码。只读observer1505606继续监控当前新旧主任务。
+
+## 2026-11-22 03:03 CST：定位输入扫描热点；保存跨Python版本验证的轻量解析优化
+
+### 当前运行证据（没有重提主作业）
+
+- 同节点只读诊断 **43010171 SUCCEEDED**，目录`q0-live-phase-20261122-0218`。
+  对当前reader PID2470600 / start_ticks649928865，在02:18:37–02:28:38采6次非暂停栈及
+  自身`/proc`元数据；不读locals、不改ptrace设置、不发主任务信号。600.558秒墙钟里CPU
+  增加591.8秒，VmRSS约31GiB、swap0。经过1B、1D到2A的PAF，读取位置持续推进。
+- 栈定位到`run_orchestration.validate_paf`的CIGAR校验，以及
+  `q0_alignments.parse_paf_line / _initial_inputs / observe_alignment`的证据收集。
+  是已有PAF的校验与关系扫描，**不是重跑参考mapper，也不是已证明卡死**。
+  6个稀疏样本只用于定位，不能把命中比例当准确耗时分解。
+- 后续同节点诊断 **43010201**，目录`q0-live-phase-20261122-0255`，6次/180秒的有界只读
+  窗口；03:03采到`chr_4B/JM19_flye_ABD_vs_self/result.paf`，offset95813632，仍在真实
+  `parse_paf_line -> _initial_inputs`；scheduler NEW43010068 RUNNING、RSS33249MiB、recent99%。
+  OLD42523432保持运行；没有再中断NEW来追求显示更多并发。
+
+### 新的源码定点优化（已验证，尚未装入这条存活作业）
+
+- 两个相同热点一起处理：`run_orchestration.validate_paf`与`q0_alignments.parse_paf_line`。
+  用非重叠正则匹配的总覆盖长度证明完整CIGAR语法，不再为校验而重建整条CIGAR字符串。
+  原生validator将同一长度的重复int转换合并；q0保留返回完整operation tuple及C层sum。
+  全部M/I/D/N/=/X跨度、边界、记录SHA/evidence ID、输入输出完整性检查保留；不丢行、不
+  改mapper参数、不改checkpoint schema或执行引擎版本，也没有关闭任何检查点。
+- 不能只信本地Python3.12微基准：首次in-place融合q0跨度循环在本地快，但真实x86
+  Python3.10对照 **43010196** 的长CIGAR旧/新比仅0.883（回退）。**拒绝该实现**，保留
+  `paf-validator-*-inplace-rejected-20261122.json`及其远端冻结源码/结果，未装进主运行。
+- 修正为保留Python3.10的C层sum后，真实节点对照 **43010200 SUCCEEDED**，目录
+  `paf-validator-calibration-20261122-0245-v2`。同一输入5轮交替、原生和q0完整返回值相等：
+  native普通/长CIGAR为1.231x/1.167x，q0普通/长CIGAR为1.084x/1.129x。
+  native长CIGAR的Python分配峰值18361885→9892421 bytes，q0分配峰值基本持平。
+  **这只是合成数据的解析函数微基准，不是job RSS改善或完整小麦提速倍率**。
+- `benchmark_paf_validation.py`只读提取固定Git revision的旧函数，与候选实函数对比；HPC
+  模式使用SHA绑定的旧源码副本，不联网、不用客户数据、不改主环境。local/HPC JSON均保存。
+  真实远端contract文件SHA899b629c...与仓库旧文件整体不同，但`validate_paf`、数值解析、
+  PafSummary及异常类4项AST逐项完全一致；q0旧模块整体SHA也相同。该区别明确保存在
+  `paf-validator-runtime-function-binding-20261122.json`，不冒称整个旧runtime与master相同。
+- 新增1200组有效CIGAR、8000组畸形文本等价检查、72001-operation长记录、Unicode/零长度/
+  不支持opcode/大整数/跨度错误及记录身份回归。最终21项validator/outer测试通过；275项
+  q0定向测试通过（1 skip），没有发布CI、App构建、update.sh或发布操作。
+- 当前NEW仍运行**52f634d5对应的冻结q0 bundle**，没有现场覆盖这些新源码。现阶段重启
+  会丢掉已有输入扫描进度并再付冷校验成本，局部收益不足以支持这种做法；后续若有其他
+  必须重提的修复，再按正常锁/独立transition/精确备份门禁合并采用。
+
+### 下一阶段关注点
+
+- 继续核对NEW实际完成输入扫描、命中FIRST和三块seed缓存、复用sealed index后再进入区域
+  mapper；不要将“缓存存在/采纳成功”写成已证明主流程命中。
+- 区域规划仍是串行、mapper最多4x2线程。若实际吞吐仍受限，优先评估**小metadata规划
+  进程与受限mapper池共享32线程预算**；不要从携带31Gb DNA的父进程fork再套小AS限制。
+  必须做真正fresh进程、精确计划对照、当前RSS/硬额度/返回计划余量评估，以及失败保留并
+  回退完整计划的机制。不借此放开未经测量的超长原生mapper并发，也不做多节点改造。
