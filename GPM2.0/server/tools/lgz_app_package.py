@@ -404,7 +404,7 @@ def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
         raise ValueError("alignment policy does not bind the delivered complete PAF")
     return value
 
-def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True) -> None:
+def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True, server_sources=None) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
     with (workspace_join(source_root, "metadata/package.tsv")).open(newline="", encoding="utf-8") as handle:
@@ -493,6 +493,8 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include
     else:
         q4_hash = sha256_file(q4_source)
     project_locator_paths(staging_root)
+    from server_source_identity import original_bindings, write_map
+    write_map(staging_root, original_bindings(source_root, source_lengths) if server_sources is None else server_sources)
     write_manifest(staging_root, "full" if include_fasta else "no_fasta", include_fasta, final_path, q4_hash, q4_lengths, schema_version=app_schema)
 
 

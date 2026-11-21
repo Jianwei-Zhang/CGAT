@@ -2039,6 +2039,64 @@ fn parse_fai_index(text: &str) -> HashMap<String, FaiEntry> {
     index
 }
 
+/// Read one source slice without loading an entire chromosome. Invalid/missing
+/// indexes retain the authoritative streaming reader used by ordinary exports.
+pub(crate) fn load_fasta_source_interval(
+    path: &Path,
+    name: &str,
+    start: i64,
+    end: i64,
+) -> Result<String> {
+    if start <= 0 || end < start {
+        bail!("invalid FASTA source interval {start}..{end}");
+    }
+    let indexed = || -> Result<Option<String>> {
+        let text = match fs::read_to_string(format!("{}.fai", path.display())) {
+            Ok(text) => text,
+            Err(_) => return Ok(None),
+        };
+        let index = parse_fai_index(&text);
+        let Some(entry) = index.get(name) else {
+            return Ok(None);
+        };
+        if end as u64 > entry.length || entry.offset == 0 {
+            return Ok(None);
+        }
+        let mut file = File::open(path)?;
+        if !fai_entry_matches_record(&mut file, entry.offset, name)? {
+            return Ok(None);
+        }
+        let first = entry.offset
+            + (start as u64 - 1) / entry.line_bases * entry.line_width
+            + (start as u64 - 1) % entry.line_bases;
+        let last = entry.offset
+            + (end as u64 - 1) / entry.line_bases * entry.line_width
+            + (end as u64 - 1) % entry.line_bases
+            + 1;
+        file.seek(SeekFrom::Start(first))?;
+        let mut bytes = Vec::new();
+        Read::take(&mut file, last - first).read_to_end(&mut bytes)?;
+        bytes.retain(|byte| !matches!(*byte, b'\r' | b'\n'));
+        if bytes.len() != (end - start + 1) as usize
+            || !bytes
+                .iter()
+                .all(|byte| b"ACGTRYSWKMBDHVN".contains(&byte.to_ascii_uppercase()))
+        {
+            return Ok(None);
+        }
+        Ok(Some(String::from_utf8(bytes)?.to_ascii_uppercase()))
+    };
+    if let Some(sequence) = indexed()? {
+        return Ok(sequence);
+    }
+    let records = load_named_sequences_from_fasta(path, &HashSet::from([name.to_string()]))?;
+    let sequence = &records[name];
+    if end as usize > sequence.len() {
+        bail!("FASTA source slice exceeds {name}");
+    }
+    Ok(sequence[(start - 1) as usize..end as usize].to_ascii_uppercase())
+}
+
 pub(crate) fn load_named_sequences_from_fasta(
     fasta_path: &Path,
     needed_names: &HashSet<String>,

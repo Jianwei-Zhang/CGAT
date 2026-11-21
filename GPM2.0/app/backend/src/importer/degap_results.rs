@@ -157,6 +157,65 @@ where
                     "Final Path changed since this DEGAP export; review and re-export the task before importing"
                 );
             }
+            if let Some(plans) = recipe.get("seed_plans") {
+                let proof = &entry["source_proof"];
+                if proof["schema"] != "cgat.degap-seed-sources"
+                    || proof["schema_version"] != 1
+                    || proof["token"] != token
+                {
+                    bail!("DEGAP result lacks the exported source-resolution proof");
+                }
+                let is_sha = |value: &Value| {
+                    value.as_str().is_some_and(|text| {
+                        text.len() == 64 && text.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    })
+                };
+                let plans = plans.as_object().context("invalid exported seed plans")?;
+                let labels = proof["labels"]
+                    .as_object()
+                    .context("missing resolved seed labels")?;
+                if labels.len() != plans.len() {
+                    bail!("resolved seed labels differ from the export");
+                }
+                for (label, plan) in plans {
+                    let resolved = labels.get(label).context("missing resolved seed label")?;
+                    let filename = if label == "endpoint" {
+                        "endpoint.ctg.fa".to_string()
+                    } else {
+                        format!("{label}.fa")
+                    };
+                    if resolved["plan"] != *plan
+                        || !is_sha(&resolved["seed_sha256"])
+                        || resolved["seed_sha256"] != entry["seed_sha256"][&filename]
+                    {
+                        bail!("DEGAP consumed seeds differ from the resolved export plan");
+                    }
+                    let members = plan["members"]
+                        .as_array()
+                        .context("missing seed source members")?;
+                    let sources = resolved["sources"]
+                        .as_array()
+                        .context("missing resolved sources")?;
+                    if members.len() != sources.len() {
+                        bail!("DEGAP resolved source count differs");
+                    }
+                    for (member, source) in members.iter().zip(sources) {
+                        for key in ["dataset", "name", "length", "start", "end"] {
+                            if member[key] != source[key] {
+                                bail!("DEGAP resolved source identity differs");
+                            }
+                        }
+                        for key in ["fasta_sha256", "interval_sha256"] {
+                            if !is_sha(&source[key]) {
+                                bail!("DEGAP resolved source content hash is missing");
+                            }
+                            if !member[key].is_null() && member[key] != source[key] {
+                                bail!("DEGAP source content differs from the exported identity");
+                            }
+                        }
+                    }
+                }
+            }
             let imported_path = PathBuf::from(format!("metadata/degap_imports/{token}.json"));
             let relative = field(entry, "package")?;
             validate_add_payload_relpath("DEGAP nested package", relative)?;

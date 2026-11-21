@@ -457,8 +457,11 @@ for source records and evidence limits.
 The manual App `DEGAP-JOBS` workflow below describes the released legacy-layout
 protocol. The source collector now isolates numbered-workspace candidates under
 `04_refinement/01_degap/06_manual/01_catalog/` instead of mutating the original LGZ
-metadata. App-exported runtime/seed-source paths still need adaptation, so the
-complete manual workflow on numbered workspaces is not ready yet. This is separate
+metadata. Matching source builds now resolve the actual Server runtime and bind
+seed sources by identity/content rather than guessing portable App paths. A
+controlled App export/Server collection/original-App import has passed without
+changing the manually edited Final Path; this is not real native-tool acceptance.
+Older manual-cache adoption and final acceptance remain pending. This is separate
 from automatic post-LGZ refinement and importing its new App delivery package.
 
 GPM v2.0.20 includes the pinned DEGAP2.0 Server runtime and the matching App

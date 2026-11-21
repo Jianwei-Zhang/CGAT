@@ -393,7 +393,7 @@ Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目�
 
 ## DEGAP2.0 与 Server 共用环境
 
-下方手动导出 App `DEGAP-JOBS` 的流程对应已发布旧布局协议。当前源码收集器已将编号工作区的人工候选隔离到 `04_refinement/01_degap/06_manual/01_catalog/`，不追加原 LGZ metadata；App 导出脚本的运行库/种子来源路径仍待适配，因此编号工作区的手动全链路尚未就绪。它与 LGZ 后自动精修及导入各工具新版 App 包是两条不同入口。
+下方手动导出 App `DEGAP-JOBS` 的流程对应已发布旧布局协议。当前源码收集器已将编号工作区的人工候选隔离到 `04_refinement/01_degap/06_manual/01_catalog/`，不追加原 LGZ metadata；匹配源码构建的 App 现已按实际 Server 布局解析运行库，并按身份/内容定位种子来源，不猜测便携路径。受控的 App 导出—Server 收集—原 App 导入检查通过，手动编辑的 Final Path 未改变；这不是原生工具验收。旧人工缓存接续和最终验收仍待完成。它与 LGZ 后自动精修及导入各工具新版 App 包是两条不同入口。
 
 GPM v2.0.20 附带固定版本的 DEGAP2.0 Server 运行时，以及下文配套的 App 任务卡工作流。
 请同时更新 Server 和 App 后使用。

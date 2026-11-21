@@ -218,7 +218,11 @@ def build_full(root, result, report, target):
     with tempfile.TemporaryDirectory(prefix=".bundle-indexes-", dir=target.parent) as private:
         final_dir, provenance, server, sources, catalog = _load_catalog(root, result, Path(private))
         # Exhaustive LGZ validation happens in this repository-owned builder.
-        lgz_app_package.build(root, target, True, include_legacy_gapfill=False)
+        from server_source_identity import write_map
+        original_sources = [{"dataset": dataset, "contig": contig, "length": catalog.length(dataset, contig),
+                             "fasta_sha256": catalog.files[source["resolved"]]["sha256"]}
+                            for (dataset, contig), source in sorted(catalog.sources.items()) if source["origin"] == "lgz"]
+        lgz_app_package.build(root, target, True, include_legacy_gapfill=False, server_sources=original_sources)
         close_source_payload(root, target, Path(private))
         metadata = target / "metadata"
         baseline_view = json.loads((metadata / "grt_final_path.json").read_text())
@@ -318,6 +322,10 @@ def build_full(root, result, report, target):
         if digest(safe_file(report_directory, "manifest.json")) != report["manifest_sha256"]:
             raise BundleError("portable refinement report changed before delivery")
         shutil.copytree(report_directory, target / "report")
+        all_sources = {(row["dataset"], row["contig"]): row for row in original_sources}
+        all_sources.update({(row["dataset"], row["contig"]): {key: row[key] for key in ("dataset", "contig", "length", "fasta_sha256")}
+                            for row in sources})
+        write_map(target, [all_sources[key] for key in sorted(all_sources)])
         catalog.verify_unchanged()
         for name, expected in provenance["artifacts"].items():
             if digest(final_dir / name) != expected:

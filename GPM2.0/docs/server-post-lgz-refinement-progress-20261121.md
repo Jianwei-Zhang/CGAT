@@ -342,3 +342,14 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 最后新增的候选快照输入漂移回归通过（0.130 秒）。初始夹具改错了原生输出文件，已有 collector 快照本来就应不受其影响；已改为篡改真正被消费的 `.gpm_degap_candidate.fa`，生产接纳条件未放宽。
 - 真实旧 LGZ 科学夹具经过显式迁移后，使用迁移实际安装的 `degap_results.py` CLI 及新 helper 完成候选收集；原 `verified_baseline`、完整 `validate_contract` 和原科学文件字节均不变。单个定向检查通过（13.080 秒），比对是显式的受控 PAF 生产器，不冒充真实 minimap2/DEGAP 验收。
 - 全目标仍未完成：App 导出仍写死旧运行库和便携来源路径，精修 patch 的目标 track 不能直接当作源 dataset，旧人工缓存接续也需来源绑定适配；这些在新契约中列为必做项。已同步中英文使用边界，不宣称人工全链路就绪。原生内部子任务恢复、未完成旧任务迁移、新 patch 证据、离线原生可视报告、真实固定环境/双架构及 A01–A18 统一验收继续保留。未运行完整回归/浏览器/生产构建、未操作远端或升级现有环境。
+
+
+## 2026-11-22：App 人工任务运行库与种子来源身份接入
+
+- 先记录 `server-refinement-manual-source-contract-20261122.md`，再移除 App 脚本对旧 `.prepare_lib` 和便携 FASTA 路径的执行依赖。运行时在 Server 解析真实布局并检查声明运行库；缺失 helper、损坏标记或未完成迁移不静默退回旧路径。
+- Full/Light 包增加 `metadata/server_sources.json`，绑定原始及已接纳 patch 来源。App receipt 的 token 绑定具体每侧成员/截取/方向；Full 可绑定实际消费片段的 SHA，Light 使用原 Server FASTA 身份。Server 按原始目录、已封存精修来源和人工候选目录解析，验证长度/内容，用私有索引提取和 IUPAC 反向互补，不往原始 FASTA 写索引。
+- 原生运行前后及 App 导入均核对消费的种子与来源 proof；旧 receipt 仍保留兼容。人工 patch 优先沿用既有派生 track；仅上下文的种子使用真实 primary track 并显式标注“不是同源证据”，不篡改来源 dataset。来源查找只核对封存证明与被消费文件闭包，不扫描无关全基因组/历史候选阻碍有效来源。
+- Python 来源/实际运行库模板 6 项通过（2.062 秒），Windows 已构建二进制中的来源 map/反向截取 2 项通过（0.04 秒）；原有人工导出 4 项此前通过。按用户要求未运行完整回归/生产构建/浏览器。
+- 实际 Windows App 导出 → WSL Server 执行/收集 → 同一 App 数据库公开导入接口的受控桥接通过。Server 来源路径/换行与 App 不同；导入真实候选 `AACCGTTTTT`，原有手动 Final Path 完全未改，原 LGZ 文件集合/字节未改。原生阶段和比对是明确的受控 producer，不冒充 DEGAP/minimap2 或生物学验收。10bp 候选不产生合格真实 minimap2 命中，保留了该拒绝条件，再显式使用受控 PAF 完成协议检查。
+- 收集阶段单独恢复且核对已完成原生 FASTA/receipt 的 SHA 与 mtime，未重跑 native。初始导出单测 DB 缺少真实项目成员/原始染色体排序，补的是受控夹具初始化而非放宽导入器。最新 `-B` 字符串和夹具 SQL 已落源码但尚未重新链接；最后统一验收必须重新构建最新 Rust 并生成干净桥接目录。
+- 未完成：旧人工缓存的 receipt-bound 接续、未完成旧 LGZ 的迁移/续跑、原生内部子任务恢复、新 patch 比对/注释、原生离线交互报告、真实固定环境与四工具/双架构验收和 A01–A18 统一检查。未修改 master、客户目录/远端作业或现有环境。

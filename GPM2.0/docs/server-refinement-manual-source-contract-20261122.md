@@ -1,0 +1,23 @@
+# Manual DEGAP runtime and seed source identity
+
+Date: 2026-11-22. Extends the manual candidate catalog contract; final native/App acceptance remains pending.
+
+A portable App locator is not a Server filesystem locator. New Server projections retain `metadata/server_sources.json` identities for every delivered source (dataset, contig, full record length and original Server FASTA SHA-256), including Light packages. Refined projection extends the same identities with accepted patch sources; it does not reclassify an App-generated FASTA or the final chromosome as the original Server source. Incremental Full sources without a matching map row bind only the actually consumed local sequence interval when exporting. Missing Light FASTA relies on the original Server file identity; a stale/duplicate positive map row is rejected rather than bypassed.
+
+New App receipts bind the concrete per-side seed plans in their token: source identities and 1-based source slices, followed by the existing assembled-side slice and orientation. At job execution the Server resolves dataset/contig/length/hash against its original catalog, completed refinement source receipts and current verified manual catalog. A marked numbered workspace never falls back to guessed portable paths or unmarked legacy behavior. Incomplete migrations, ambiguous/mismatching identities and changed inputs fail before native execution. Old unmarked workspaces retain a clearly identified legacy compatibility path where source hash evidence is unavailable, not a claim of new full identity verification.
+
+The seed resolver uses private indexes and atomic seed publication, preserves IUPAC reverse complementation and records the exact selected source proofs. It does not write indexes or derived metadata into original scientific inputs. Existing read sharing, native parameters, custom DEGAP entrypoints and exported recipe snapshots remain intact.
+
+Runtime lookup happens on the Server when a script runs, not by probing the remote filesystem from the App. It selects the actual workspace runtime, checks its layout through the repository-owned resolver when numbered, and refuses a missing/corrupt declared runtime rather than falling back across a migration. New receipts require the matching helper; old receipts remain importable.
+
+A patch dataset is not automatically a real original track. Export uses an existing derived placement track where available; an internal refinement/context-only seed without such a track uses the actual project primary track with an explicit context-only basis. This is a placement decision, not invented homology or a change to the seed's source dataset.
+
+Necessary intermediate checks are source/runtime/receipt focused. Final acceptance still requires actual App export → Server seed/native/collect → original App import, original/manual/refined sources, Full/Light availability, both layouts, cancellation and unmodified manually edited paths.
+
+## Controlled bridge and reproducible checks
+
+`server/tests/manual_source_bridge.py init` creates an explicitly owned fixture on the shared D drive. The Rust export test `degap_jobs::tests::export_degap_jobs_writes_manifest_and_reverse_oriented_seed_script` emits actual App scripts/receipts and preserves an original client database when `CGAT_MANUAL_EXPORT_FIXTURE_ROOT` (Windows path) and `CGAT_MANUAL_EXPORT_SERVER_ROOT` (absolute WSL Server path) are supplied. Pass both names through `WSLENV` when launching the Windows test binary from WSL.
+
+Then run `python3 -B server/tests/manual_source_bridge.py server --fixture <WSL-fixture>` and the explicit ignored Rust test `degap_jobs::tests::manual_source_bridge_import_preserves_the_edited_final_path` with the same Windows fixture variable. The Server source paths and FASTA wrapping deliberately differ from App portable paths; successful seed preparation must resolve by source identity. The fixture uses a named custom native producer, controlled shared-read preparation and a controlled PAF producer, not DEGAP/minimap2 acceptance. `--collect-only` resumes collection from the completed receipt and asserts native FASTA/receipt hash and mtime preservation; it does not rerun native work.
+
+The public importer checks returned consumed-source proofs and the original export ledger, appends the actual candidate and leaves the exact pre-existing manual Final Path unchanged. Re-importing the already imported positive fixture is not a fresh acceptance run. Final consolidated validation must freshly compile the latest Rust source and regenerate a clean fixture; intermediate reuse of a previously built binary does not establish that latest test-only fixture initialization changes were compiled.

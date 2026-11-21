@@ -104,7 +104,7 @@ def package_paths(server, row):
     return tuple(paths)
 
 
-def verify_catalog(server, pointer):
+def catalog_binding(server, pointer):
     server = Path(server).resolve()
     if pointer.get("schema") != "cgat.manual-degap-current" or pointer.get("schema_version") != 1:
         raise ValueError("unsupported manual candidate pointer")
@@ -114,8 +114,14 @@ def verify_catalog(server, pointer):
         raise ValueError("manual catalog completion receipt changed")
     manifest = read_object(manifest_path)
     if (WorkspaceLayout.detect(catalog).version != 2 or manifest.get("schema") != "cgat.manual-degap-catalog"
-            or manifest.get("schema_version") != 1 or manifest.get("base") != base_binding(server)
-            or manifest.get("files") != inventory(catalog, server)):
+            or manifest.get("schema_version") != 1 or manifest.get("base") != base_binding(server)):
+        raise ValueError("manual catalog or its original LGZ base changed")
+    return catalog, manifest
+
+
+def verify_catalog(server, pointer):
+    catalog, manifest = catalog_binding(server, pointer)
+    if manifest.get("files") != inventory(catalog, Path(server).resolve()):
         raise ValueError("manual catalog or its original LGZ base changed")
     for token, row in manifest["packages"].items():
         if re.fullmatch(r"[0-9a-f]{64}", token) is None:
@@ -127,7 +133,11 @@ def verify_catalog(server, pointer):
     return catalog, manifest
 
 
-def current(server):
+def bound_current(server):
+    """Verify catalog/base binding; callers must verify consumed file closure.
+
+    Use current() when claiming full catalog/registry completion instead.
+    """
     layout = WorkspaceLayout.detect(server)
     pending = layout.path(PENDING)
     if pending.exists() or pending.is_symlink():
@@ -136,7 +146,14 @@ def current(server):
     if not path.exists() and not path.is_symlink():
         return layout.root, {"base": base_binding(server), "packages": {}}, None
     pointer = read_object(path)
-    catalog, manifest = verify_catalog(layout.root, pointer)
+    catalog, manifest = catalog_binding(layout.root, pointer)
+    return catalog, manifest, pointer
+
+
+def current(server):
+    catalog, manifest, pointer = bound_current(server)
+    if pointer:
+        catalog, manifest = verify_catalog(Path(server).resolve(), pointer)
     return catalog, manifest, pointer
 
 

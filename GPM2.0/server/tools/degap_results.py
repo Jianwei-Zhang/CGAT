@@ -99,6 +99,7 @@ def begin(recipe):
     atomic_json(marker, input_identity(recipe))
     (out / ".gpm_degap_result.json").unlink(missing_ok=True)
     (out / ".gpm_degap_seed.json").unlink(missing_ok=True)
+    (out / ".gpm_degap_source_proof.json").unlink(missing_ok=True)
 
 
 def output_signatures(recipe):
@@ -111,8 +112,21 @@ def output_signatures(recipe):
 
 
 def seed(recipe):
+    hashes = seed_hashes(recipe)
+    source_proof = None
+    if "seed_plans" in recipe:
+        source_proof = json.loads((Path(recipe["out_path"]) / ".gpm_degap_source_proof.json").read_text())
+        if (source_proof.get("schema") != "cgat.degap-seed-sources" or source_proof.get("schema_version") != 1
+                or source_proof.get("token") != recipe["token"] or set(source_proof.get("labels", {})) != set(recipe["seed_plans"])):
+            raise ValueError("exported seed plans lack matching resolved source proofs")
+        for label, plan in recipe["seed_plans"].items():
+            proof = source_proof["labels"][label]
+            name = "endpoint.ctg.fa" if label == "endpoint" else label + ".fa"
+            if proof.get("plan") != plan or proof.get("seed_sha256") != hashes[name]:
+                raise ValueError("resolved DEGAP seed changed before native execution")
     atomic_json(Path(recipe["out_path"]) / ".gpm_degap_seed.json", {
-        "token": recipe["token"], "sha256": seed_hashes(recipe), "previous_outputs": output_signatures(recipe)})
+        "token": recipe["token"], "sha256": hashes, "previous_outputs": output_signatures(recipe),
+        "source_proof": source_proof})
 
 
 def candidate(recipe):
@@ -152,6 +166,12 @@ def record(recipe):
                    "source_sha256": digest(runtime_source)}
     result, status = candidate(recipe)
     entry = {"recipe": recipe, "status": status, "seed_sha256": seed_record["sha256"], "runtime": runtime}
+    if "seed_plans" in recipe:
+        proof = seed_record.get("source_proof")
+        if (seed_hashes(recipe) != seed_record["sha256"] or not isinstance(proof, dict) or proof.get("token") != recipe["token"]
+                or json.loads((out / ".gpm_degap_source_proof.json").read_text()) != proof):
+            raise ValueError("DEGAP seed/source proof changed during native execution")
+        entry["source_proof"] = seed_record["source_proof"]
     if result is not None:
         key = result.relative_to(out).as_posix()
         if key in seed_record["previous_outputs"] and seed_record["previous_outputs"][key] == output_signatures(recipe).get(key):
@@ -389,6 +409,8 @@ def collect_locked(jobs, *, lock=None):
             info = {"candidate_sha256": digest(fasta), "recipe": recipe,
                     "seed_sha256": run_receipt["seed_sha256"], "runtime": run_receipt["runtime"], "ctg_name": name,
                     "package": archive.relative_to(delivery).as_posix(), "sha256": digest(archive)}
+            if "source_proof" in run_receipt:
+                info["source_proof"] = run_receipt["source_proof"]
             results.append(info)
             info_path = workspace_join(root, f"cached-{index}.json")
             atomic_json(info_path, info)
