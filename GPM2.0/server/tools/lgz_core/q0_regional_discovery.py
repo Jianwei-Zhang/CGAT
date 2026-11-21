@@ -162,7 +162,8 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
     mapper_threads = min(2, threads); workers = max(1, min(4, threads//mapper_threads))
     tasks, fallback, pending = [], set(), []
     report = {"policy": dict(REGIONAL_POLICY), "window_policy": asdict(policy), "planned_windows": len(windows),
-              "residual_source_parts": len(holes), "parents_satisfied_by_complete_native_matrices": 0, "residual_bases": sum(i.length for values in holes.values() for i in values),
+              "residual_source_parts": len(holes), "parents_satisfied_by_complete_native_matrices": 0, "parents_satisfied_by_scoped_approximate_matrices": 0,
+              "approximate_scope_task_ids":native_scopes.approximate_scope_task_ids if native_scopes else [], "residual_bases": sum(i.length for values in holes.values() for i in values),
               "mapper_threads": mapper_threads, "maximum_workers": workers,
               "address_space_bytes_per_mapper": 4*1024**3, "fallback_sources": []}
     def consume():
@@ -174,7 +175,9 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
         for segment_id, group in itertools.groupby(windows, key=lambda w: w.segment_id):
             if native_scopes is not None and native_scopes.remaining_targets(segment_id,required_mask) == 0:
-                report["parents_satisfied_by_complete_native_matrices"] += 1
+                native_only=native_scopes.remaining_targets(segment_id,required_mask,include_approximate=False)==0
+                field=('parents_satisfied_by_complete_native_matrices' if native_only else 'parents_satisfied_by_scoped_approximate_matrices')
+                report[field] += 1
                 continue  # Tested relationships, not an invented coverage/placement assertion.
             planned, reason = plan_parent(catalog, index, group)
             if reason is not None:

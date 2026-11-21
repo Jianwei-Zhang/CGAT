@@ -84,4 +84,132 @@ class InstallationTests(unittest.TestCase):
         self.assertEqual([p.read_bytes() for p in self.paths],self.before)
 
 
+class ReferenceAdoptionTests(InstallationTests):
+    def setUp(self):
+        super().setUp()
+        key='reference-index-'+'a'*24
+        self.index_source=self.root/'isolated'/key;self.index_source.mkdir(parents=True)
+        db=self.index_source/'reference.sqlite';db.write_bytes(b'fixture already-verified sealed database')
+        receipt=self.index_source/'success.json'
+        receipt.write_text(json.dumps({'status':'success','key':key,'inputs':[],
+                                      'sha256':stage.digest(db),'size':db.stat().st_size}))
+        self.ready=self.root/'ready.json'
+        self.proof={'status':'complete_reference_cache_ready_for_owned_adoption','workspace_modified':False,
+            'relative':'grt/evidence/q0_prepare/indexes/'+key,'source':str(self.index_source),
+            'files':[{'name':p.name,'sha256':stage.digest(p),'size':p.stat().st_size} for p in (db,receipt)]}
+        self.bind_ready()
+        self.index_target=self.ctx.work/self.proof['relative']
+
+    def bind_ready(self):
+        self.ready.write_text(json.dumps(self.proof))
+        self.ctx.transition['reference_index_adoption']={'path':str(self.ready),'sha256':stage.digest(self.ready)}
+
+    def test_reference_is_atomically_moved_without_rebuilding_or_copying(self):
+        inode=(self.index_source/'reference.sqlite').stat().st_ino
+        journal=self.install()
+        self.assertFalse(self.index_source.exists())
+        self.assertEqual((self.index_target/'reference.sqlite').stat().st_ino,inode)
+        self.assertTrue(json.loads(journal.read_text())['reference_index_adoption']['moved'])
+
+    def test_runtime_failure_returns_the_whole_index_to_its_source(self):
+        def fail():raise RuntimeError('new reader rejected')
+        with self.assertRaises(RuntimeError):self.install(fail)
+        self.assertTrue((self.index_source/'reference.sqlite').is_file())
+        self.assertFalse(self.index_target.exists())
+        self.assertEqual([p.read_bytes() for p in self.paths],self.before)
+
+    def test_changed_index_is_rejected_before_runtime_changes(self):
+        (self.index_source/'reference.sqlite').write_bytes(b'corrupt')
+        with self.assertRaisesRegex(ValueError,'content changed'):self.install()
+        self.assertEqual([p.read_bytes() for p in self.paths],self.before)
+        self.assertFalse((self.root/'installation').exists())
+
+    def test_existing_destination_is_never_overwritten(self):
+        self.index_target.mkdir(parents=True);(self.index_target/'preserved').write_text('original')
+        with self.assertRaisesRegex(ValueError,'already exists'):self.install()
+        self.assertTrue((self.index_target/'preserved').is_file())
+        self.assertTrue(self.index_source.is_dir())
+
+    def test_incomplete_and_linked_inputs_are_rejected(self):
+        (self.index_source/'result.tmp').write_bytes(b'partial')
+        with self.assertRaisesRegex(ValueError,'unexpected'):self.install()
+        (self.index_source/'result.tmp').unlink()
+        db=self.index_source/'reference.sqlite';real=self.root/'real-db';db.rename(real);db.symlink_to(real)
+        with self.assertRaisesRegex(ValueError,'linked'):self.install()
+
+    def test_ready_descriptor_drift_is_rejected(self):
+        self.ready.write_text(self.ready.read_text()+'\n')
+        with self.assertRaisesRegex(ValueError,'dependency'):self.install()
+
+
+
+class MappingAdoptionTests(ReferenceAdoptionTests):
+    def setUp(self):
+        super().setUp()
+        spec={'schema':'lgz_q0_mapping_v1','query_ids':['q'],'target_ids':['t'],
+              'members':[['q','a'*64],['t','b'*64]],'tool':{},'preset':'asm10',
+              'alignment_flags':['-D','-P','--dual=yes','--no-long-join','-m','2000']}
+        key='q0-map-'+stage.hashlib.sha256(json.dumps(spec,ensure_ascii=True,sort_keys=True,separators=(',',':')).encode()).hexdigest()[:24]
+        self.mapping_source=self.root/'isolated'/key;self.mapping_source.mkdir()
+        relative='grt/evidence/q0_prepare/tasks/'+key;self.mapping_target=self.ctx.work/relative
+        for name in ('query.fa','target.fa','result.paf','command.json'):(self.mapping_source/name).write_text('fixture '+name)
+        outputs=[{'path':relative+'/'+name,'sha256':stage.digest(self.mapping_source/name),
+                  'size':(self.mapping_source/name).stat().st_size} for name in ('query.fa','target.fa','result.paf','command.json')]
+        (self.mapping_source/'success.json').write_text(json.dumps({'status':'success','spec':spec,'outputs':outputs}))
+        self.mapping_ready=self.root/'mapping-ready.json'
+        self.mapping_proof={'status':'complete_mapping_cache_ready_for_owned_adoption','source':str(self.mapping_source),
+            'relative':relative,'task_id':key,'workspace_modified':False,'normal_cache_validation_completed':True}
+        self.bind_mapping()
+
+    def bind_mapping(self):
+        self.mapping_proof['files']=[{'name':p.name,'sha256':stage.digest(p),'size':p.stat().st_size}
+                                     for p in sorted(self.mapping_source.iterdir()) if p.is_file()]
+        self.mapping_ready.write_text(json.dumps(self.mapping_proof))
+        self.ctx.transition['mapping_adoptions']=[{'path':str(self.mapping_ready),'sha256':stage.digest(self.mapping_ready)}]
+
+    def test_mapping_move_preserves_raw_bytes_and_file_inodes(self):
+        inode=(self.mapping_source/'target.fa').stat().st_ino
+        journal=self.install();record=json.loads(journal.read_text())
+        self.assertFalse(self.mapping_source.exists())
+        self.assertEqual((self.mapping_target/'target.fa').stat().st_ino,inode)
+        self.assertTrue(record['mapping_adoptions'][0]['moved'])
+
+    def test_mapping_failure_rolls_back_both_index_and_mapping(self):
+        def fail():raise RuntimeError('declaration unavailable')
+        with self.assertRaises(RuntimeError):self.install(fail)
+        self.assertTrue(self.mapping_source.is_dir());self.assertTrue(self.index_source.is_dir())
+        self.assertFalse(self.mapping_target.exists());self.assertFalse(self.index_target.exists())
+
+    def test_raw_key_cannot_be_relabelled_after_parameter_change(self):
+        path=self.mapping_source/'success.json';row=json.loads(path.read_text())
+        row['spec']['alignment_flags'].remove('2000');path.write_text(json.dumps(row));self.bind_mapping()
+        with self.assertRaisesRegex(ValueError,'normal receipt'):self.install()
+        self.assertTrue(self.index_source.is_dir());self.assertFalse((self.root/'installation').exists())
+
+    def test_success_receipt_must_match_actual_output_manifest(self):
+        path=self.mapping_source/'success.json';row=json.loads(path.read_text())
+        row['outputs'][0]['sha256']='0'*64;path.write_text(json.dumps(row));self.bind_mapping()
+        with self.assertRaisesRegex(ValueError,'normal receipt'):self.install()
+
+    def test_mapping_without_completed_cache_validation_is_rejected(self):
+        self.mapping_proof['normal_cache_validation_completed']=False;self.bind_mapping()
+        with self.assertRaisesRegex(ValueError,'normal receipt'):self.install()
+
+    def test_mapping_tmp_and_hard_links_are_not_adopted(self):
+        temporary=self.mapping_source/'result.paf.tmp';temporary.write_text('partial')
+        with self.assertRaisesRegex(ValueError,'unexpected'):self.install()
+        temporary.unlink();(self.root/'external-target').hardlink_to(self.mapping_source/'target.fa')
+        with self.assertRaisesRegex(ValueError,'linked'):self.install()
+
+    def test_second_move_failure_restores_the_first_adoption(self):
+        original=stage.move_reference
+        def move(ctx,lock,row):
+            if row['source']==str(self.mapping_source):raise OSError('second move failed')
+            return original(ctx,lock,row)
+        with patch.object(stage,'move_reference',side_effect=move):
+            with self.assertRaises(OSError):self.install()
+        self.assertTrue(self.mapping_source.is_dir());self.assertTrue(self.index_source.is_dir())
+        self.assertFalse(self.mapping_target.exists());self.assertFalse(self.index_target.exists())
+
+
 if __name__=='__main__':unittest.main()

@@ -14,9 +14,10 @@ from .q0_neighbor_requests import known_neighbors
 from .q0_query_windows import WindowPolicy, plan_query_windows, TargetWindow
 from .q0_regional_mapping import BASE_FLAGS, MAX_TARGET_BASES, prepare_regional_mapping
 from .q0_sources import Interval, Q0EvidenceError
+from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 
 CANDIDATE_POLICY = {
-    "version": 1, "core_bases": 100000, "context_bases": 10000, "query_selection": "exact_legacy_missing_neighbor_and_expanded_split",
+    "version": 2, "weak_unroutable_global_profile": WEAK_GLOBAL_SEED_POLICY, "core_bases": 100000, "context_bases": 10000, "query_selection": "exact_legacy_missing_neighbor_and_expanded_split",
     "query_context": "union_qualified_M_equal_reference_footprints_across_requested_chromosomes",
     "reference_identity": DISCOVERY_REFERENCE_IDENTITY, "minimum_query_footprint_bases": 100,
     "weak_only_alternatives": "keep_input_evidence_without_new_expansion_if_source_has_qualified_anchors",
@@ -56,13 +57,14 @@ def candidate_window_targets(index, key, query, chromosomes, selection):
 
 
 class CompletedNativeScopes:
-    """Compact, complete native matrices reused across partial/candidate phases."""
+    """Complete raw matrices; approximate scopes exclude short-part relationships."""
     def __init__(self, root, catalog, index, complete_tasks, tool, preset):
         self.root,self.tool,self.preset = root,tool,preset
         self.catalog,self.index = catalog,index
         self.ids,self.ranks = index.part_order,index.part_ranks
         self.scopes = []
         self.scope_task_ids = []
+        self.approximate_scope_task_ids = []
         self._scope_seen = set()
         self.add_complete_tasks(complete_tasks)
 
@@ -90,12 +92,22 @@ class CompletedNativeScopes:
             if (receipt.get("status") != "success" or spec.get("schema") != "lgz_q0_mapping_v1"
                     or stable_id("q0-map",spec) != task["task_id"]
                     or spec["tool"] != self.tool or spec["preset"] != self.preset
-                    or spec["alignment_flags"] != BASE_FLAGS
                     or spec["query_ids"] != task["query_ids"] or spec["target_ids"] != task["target_ids"]
                     or spec["members"] != [[key,self.catalog.parts[key].sequence_sha256]
                                            for key in sorted(set(task["query_ids"]+task["target_ids"]))]):
                 raise Q0EvidenceError("complete native scope identity differs")
-            self.scopes.append((self.mask(task["query_ids"]),self.mask(task["target_ids"])))
+            queries,targets=task['query_ids'],task['target_ids']
+            flags=spec.get('alignment_flags')
+            if flags!=BASE_FLAGS:
+                if (flags!=[*BASE_FLAGS,'-m',str(WEAK_GLOBAL_SEED_POLICY['minimum_chain_score'])]
+                        or task['kind']!='candidate_unroutable_seed'):
+                    raise Q0EvidenceError('complete matrix has an unsupported scientific profile')
+                queries,targets=weak_global_seed_scope(self.catalog.parts,self.catalog.reference_routable_parts,
+                    queries,targets,reference_bases=sum(self.index.reference_lengths.values()),preset=self.preset)
+                if not queries or not targets:
+                    raise Q0EvidenceError('approximate global seed is outside its limited scientific scope')
+                self.approximate_scope_task_ids.append(task['task_id'])
+            self.scopes.append((self.mask(queries),self.mask(targets)))
             self.scope_task_ids.append(task["task_id"])
             self._scope_seen.add(task["task_id"])
 
@@ -108,13 +120,49 @@ class CompletedNativeScopes:
     def keys(self, mask):
         return [self.ids[i] for i in _indices(mask)]
 
-    def remaining_targets(self, key, requested):
+    def remaining_targets(self, key, requested, *, include_approximate=True):
         own = 1 << self.ranks[key]
         remaining = requested & ~own
-        for queries, targets in self.scopes:
+        for (queries, targets),task_id in zip(self.scopes,self.scope_task_ids):
+            if not include_approximate and task_id in self.approximate_scope_task_ids:continue
             if queries & own: remaining &= ~targets
             if targets & own: remaining &= ~queries
         return remaining
+
+
+    def next_missing_seed(self, query_ids, target_ids):
+        """Batch missing matrix edges without repeating the full global seed.
+
+        Small query members may be included in the target batching key, so the
+        short-target remainder does not fragment into one task per source.
+        Never add a large normal query merely to equalize batching keys.
+        """
+        query_ids=tuple(sorted(set(query_ids)));requested=self.mask(target_ids)
+        missing_by_query={key:self.remaining_targets(key,requested) for key in query_ids}
+        small=self.mask(key for key,missing in missing_by_query.items()
+                        if missing and self.catalog.parts[key].interval.length<=1_000_000)
+        needed=0
+        for missing in missing_by_query.values():needed |= missing
+        peers=small & needed
+        groups={}
+        for key,missing in missing_by_query.items():
+            if not missing:continue
+            own=1 << self.ranks[key]
+            target_mask=missing | peers
+            # Preserve the original whole-matrix key when none of this query's
+            # requested relationships were completed; -D still suppresses self.
+            if small & own and missing==(requested & ~own):target_mask |= own
+            groups.setdefault(target_mask,[]).append(key)
+        if not groups:return None
+        targets=max(groups,key=lambda mask:(mask.bit_count()*len(groups[mask]),mask.bit_count(),tuple(groups[mask])))
+        queries,target_ids=groups[targets],self.keys(targets)
+        floor=WEAK_GLOBAL_SEED_POLICY['minimum_part_bases']
+        reverse=(min(self.catalog.parts[key].interval.length for key in queries)>=floor
+                 and max(self.catalog.parts[key].interval.length for key in target_ids)<floor)
+        return {'kind':'candidate_unroutable_seed','query_ids':target_ids if reverse else queries,
+                'target_ids':queries if reverse else target_ids,
+                'native_short_targets_as_queries':reverse,
+                'reason':'complete_unroutable_relationships_once_before_regional_candidates'}
 
 
 class CandidatePlan(CompletedNativeScopes):
@@ -172,21 +220,7 @@ class CandidatePlan(CompletedNativeScopes):
         """
         used = self.mask(self.query_chromosomes)
         for mask in self.targets.values(): used |= mask
-        groups = {}
-        for i in _indices(used & ~self.routable):
-            own = 1 << i
-            missing = used & ~own
-            for queries, targets in self.scopes:
-                if queries & own: missing &= ~targets
-                if targets & own: missing &= ~queries
-            if not missing: continue
-            # Self is -D suppressed. Only these small/unroutable queries are
-            # included for batching; never add a huge normal query to targets.
-            groups.setdefault(missing | own, []).append(self.ids[i])
-        if not groups: return None
-        target_mask = max(groups, key=lambda mask: (mask.bit_count()*len(groups[mask]),mask.bit_count(),tuple(groups[mask])))
-        return {"kind":"candidate_unroutable_seed","query_ids":groups[target_mask],
-                "target_ids":self.keys(target_mask),"reason":"complete_unroutable_relationships_once_before_regional_candidates"}
+        return self.next_missing_seed(self.keys(used & ~self.routable),self.keys(used))
 
     def windows(self, key):
         length = self.catalog.parts[key].interval.length
@@ -224,7 +258,8 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
     mapper_threads = min(2,threads); workers = max(1,min(4,threads//mapper_threads))
     tasks, pending, fallback = [], [], {}
     report = {"policy":CANDIDATE_POLICY,"requested_parents":len(planner.query_chromosomes),
-              "completed_native_scope_task_ids":planner.scope_task_ids,"requested_part_pairs":0,
+              "completed_native_scope_task_ids":planner.scope_task_ids,
+              "approximate_scope_task_ids":planner.approximate_scope_task_ids,"requested_part_pairs":0,
               "reused_part_pairs":0,"regional_windows":0,"fallback_parents":0,"weak_only_parents_not_expanded":0,"weak_only_parent_ids":[],
               "maximum_workers":workers,"mapper_threads":mapper_threads}
     def consume(): tasks.append(pending.pop(0).result())

@@ -20,7 +20,8 @@ from .q0_alignments import read_paf
 from .q0_catalog import (CATALOG_SCHEMA, CandidateCatalog, DISCOVERY_REFERENCE_IDENTITY, DISCOVERY_REFERENCE_MAPQ,
                          add_pairwise_candidates, build_catalog, partial_source_request, supplemental_groups, ObservedSourcePairs)
 from .q0_regional_discovery import REGIONAL_POLICY, LocalReferenceCache, enabled as regional_enabled, observe_part_hits, prepare_partial
-from .q0_regional_candidates import CANDIDATE_POLICY, CandidatePlan, prepare_candidates
+from .q0_regional_candidates import CANDIDATE_POLICY, CandidatePlan, CompletedNativeScopes, prepare_candidates
+from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 from .q0_sources import Q0EvidenceError, SourceKey
 try:
     from run_orchestration import atomic_write_json, sha256_file as _partition_sha256
@@ -43,7 +44,7 @@ OuterCheckpointManager = _default_checkpoint_manager
 SCHEMA = "lgz_q0_evidence_v1"
 MANIFEST = "metadata/grt_q0_evidence.json"
 MAPPING_OUTPUT_FILES = ("query.fa", "target.fa", "result.paf", "command.json")
-POLICY = {"version": 4, "regional_partial_discovery": REGIONAL_POLICY, "regional_candidate_discovery": CANDIDATE_POLICY, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
+POLICY = {"version": 5, "weak_global_seed": WEAK_GLOBAL_SEED_POLICY, "regional_partial_discovery": REGIONAL_POLICY, "regional_candidate_discovery": CANDIDATE_POLICY, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
           "supplement": "out_of_group_split_and_missing_ref_neighbors",
           "partial_source_discovery_min_uncovered_bp": 100,
           "partial_source_reference_identity": DISCOVERY_REFERENCE_IDENTITY,
@@ -322,7 +323,8 @@ def _copy_prepared_target(root, catalog, target_ids, destination, template):
 
 
 def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict,
-                preset: str, threads: int, *, skip_self: bool = False, cache_only: bool = False, prepared_target: dict | None = None) -> dict | None:
+                preset: str, threads: int, *, skip_self: bool = False, cache_only: bool = False, prepared_target: dict | None = None,
+                weak_seed_fast: bool = False, reference_bases: int = 0) -> dict | None:
     if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
         raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
     query_ids, target_ids = sorted(set(request["query_ids"])), sorted(set(request["target_ids"]))
@@ -332,13 +334,21 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
             targets_by_dataset[catalog.parts[key].source.dataset].add(key)
         if any(targets_by_dataset[catalog.parts[key].source.dataset] - {key} for key in query_ids):
             raise Q0EvidenceError("--skip-self conflicts with required q0 supplementary same-dataset comparisons")
+    flags=POLICY['supplement_flags']
+    if type(weak_seed_fast) is not bool:raise Q0EvidenceError('invalid weak-seed profile selector')
+    if weak_seed_fast:
+        queries,targets=weak_global_seed_scope(catalog.parts,catalog.reference_routable_parts,query_ids,target_ids,
+                                              reference_bases=reference_bases,preset=preset)
+        if request['kind']!='candidate_unroutable_seed' or not queries or not targets:
+            raise Q0EvidenceError('weak global seed profile is outside its limited scope')
+        flags=[*flags,'-m',str(WEAK_GLOBAL_SEED_POLICY['minimum_chain_score'])]
     members = [[key, catalog.parts[key].sequence_sha256] for key in sorted(set(query_ids + target_ids))]
     # Raw mapping identity is independent of candidate-selection code and the
     # discovery round that requested it. Revalidate cached geometry, do not rerun
     # an unchanged mapper/input pair just because the q0 builder was updated.
     spec = {"schema": "lgz_q0_mapping_v1", "query_ids": query_ids, "target_ids": target_ids,
             "members": members, "tool": tool, "preset": preset,
-            "alignment_flags": POLICY["supplement_flags"]}
+            "alignment_flags": flags}
     task_id = stable_id("q0-map", spec)
     relative = f"grt/evidence/q0_prepare/tasks/{task_id}"
     directory = root / relative
@@ -370,7 +380,7 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
     else:
         target_reuse = _copy_prepared_target(root,catalog,target_ids,target,prepared_target)
     temporary = directory / "result.paf.tmp"
-    command = [tool["resolved"], "-c", "-x", preset, *POLICY["supplement_flags"], "-t", str(threads),
+    command = [tool["resolved"], "-c", "-x", preset, *flags, "-t", str(threads),
                "-o", str(temporary), str(target), str(query)]
     command_record = {"argv": command, "spec": spec}
     if target_reuse is not None: command_record["prepared_target_reuse"] = target_reuse
@@ -392,6 +402,41 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
             "paf": f"{relative}/result.paf", "receipt": f"{relative}/success.json",
             "query_ids": query_ids, "target_ids": target_ids}
 
+
+
+def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference_bases, skip_self=False, prepared_target=None):
+    task=_supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,cache_only=True)
+    if task is not None:return task
+    queries,targets=weak_global_seed_scope(catalog.parts,catalog.reference_routable_parts,
+        request['query_ids'],request['target_ids'],reference_bases=reference_bases,preset=preset)
+    fast=bool(queries and targets)
+    # Dense native repeats can exhaust memory even with a tiny target. The
+    # short-side completion uses a separate bounded worker budget, not 32 by default.
+    if request.get('native_short_targets_as_queries'):threads=min(threads,8)
+    return _supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,
+                       prepared_target=prepared_target,weak_seed_fast=fast,reference_bases=reference_bases)
+
+
+def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,known_pairs,tool,preset,threads,*,reference_bases,skip_self):
+    scopes=CompletedNativeScopes(root,catalog,index,tasks,tool,preset)
+    seen={task['task_id'] for task in tasks}
+    while True:
+        request=scopes.next_missing_seed(query_ids,target_ids)
+        if request is None:break
+        template_task=next((task for task in tasks if task['kind']!='regional_discovery'
+                            and task['target_ids']==request['target_ids']),None)
+        template=({'root':str(root),'receipt':identity(root,template_task['receipt'])} if template_task else None)
+        seed=_unroutable_seed(root,catalog,request,tool,preset,threads,reference_bases=reference_bases,
+                             skip_self=skip_self,prepared_target=template)
+        if seed['task_id'] in seen:raise Q0EvidenceError('unroutable seed made no matrix progress')
+        seen.add(seed['task_id']);tasks.append(seed);scopes.add_complete_tasks([seed])
+        hits=read_paf(root/seed['paf'],query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
+                      target_lengths={key:catalog.parts[key].interval.length for key in seed['target_ids']},artifact=seed['paf'])
+        add_pairwise_candidates(catalog,observe_part_hits(catalog,hits,known_pairs),set(seed['query_ids']),set(seed['target_ids']),
+                                include_placed=True,known_pairs=known_pairs)
+        print(f"LGZ q0 weak seed: completed={seed['task_id']} approximate={seed['task_id'] in scopes.approximate_scope_task_ids} "
+              f"queries={len(seed['query_ids'])} targets={len(seed['target_ids'])}",flush=True)
+    return scopes
 
 def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2") -> dict:
     root = root.resolve()
@@ -454,20 +499,11 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                 # complete matrix (including negative results) without repeats.
                 reference_ids = sorted({row["segment_id"] for row in catalog.payload["candidates"] if row["placement_kind"] == "reference"})
                 weak_queries = sorted(set(reference_ids)-catalog.reference_routable_parts)
-                if weak_queries:
-                    seed_request = {"kind":"candidate_unroutable_seed","query_ids":weak_queries,"target_ids":reference_ids,
-                                    "reason":"complete_unroutable_relationships_once_before_regional_candidates"}
-                    template_task = next((t for t in tasks if t["kind"]!="regional_discovery" and t["target_ids"]==reference_ids),None)
-                    template = ({"root":str(root),"receipt":identity(root,template_task["receipt"])} if template_task else None)
-                    seed = _supplement(root,catalog,seed_request,tool,preset,threads,
-                                       skip_self=options.get("skip_self") == "true",prepared_target=template)
-                    tasks.append(seed)
-                    seed_hits = read_paf(root/seed["paf"],query_lengths={key:catalog.parts[key].interval.length for key in seed["query_ids"]},
-                                         target_lengths={key:catalog.parts[key].interval.length for key in seed["target_ids"]},artifact=seed["paf"])
-                    add_pairwise_candidates(catalog,observe_part_hits(catalog,seed_hits,known_pairs),set(seed["query_ids"]),set(seed["target_ids"]),
-                                            include_placed=True,known_pairs=known_pairs)
                 from .q0_reference_index import ReferenceIndex
                 with closing(ReferenceIndex.open(cache.path, root, catalog.parts, lengths, local_paf_directory=cache.paf_directory)) as index:
+                    if weak_queries:
+                        _complete_unroutable_seeds(root,catalog,index,weak_queries,reference_ids,tasks,known_pairs,tool,preset,threads,
+                            reference_bases=sum(lengths.values()),skip_self=options.get('skip_self')=='true')
                     regional_tasks, fallback_ids, report = prepare_partial(
                         root, catalog, index, known_pairs, tool, reference_lengths=lengths,
                         preset=preset, threads=threads, skip_self=options.get("skip_self") == "true",
@@ -506,7 +542,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                 planner = CandidatePlan(root,catalog,index,pending_candidates,known_pairs,tasks,tool,preset)
                 seed_ids = []
                 while (seed_request := planner.next_unroutable_seed()) is not None:
-                    seed = _supplement(root,catalog,seed_request,tool,preset,threads,skip_self=options.get("skip_self") == "true")
+                    seed = _unroutable_seed(root,catalog,seed_request,tool,preset,threads,
+                        reference_bases=sum(lengths.values()),skip_self=options.get("skip_self") == "true")
                     tasks.append(seed);seed_ids.append(seed["task_id"]);planner.add_complete_tasks([seed])
                 regional_tasks, native_requests, report = prepare_candidates(
                     root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,

@@ -72,3 +72,38 @@ def select_cigar_profile(reference_bases: int, query_bases: int, work: ChainWork
             "additional_flags":["-m",str(policy.filtered_minimum_chain_score)] if selected else [],
             "short_additional_chain_recall_reduced":selected,
             "approximate_chaining_is_evidence":False}
+
+
+# Separate from reference-local chaining: complete global mappings may prune
+# alternative repeat copies. Short query AND short target relationships are not
+# covered by this approximate matrix and must still receive native work.
+WEAK_GLOBAL_SEED_POLICY = {
+    'version': 1, 'preset': 'asm10', 'minimum_reference_bases': 5_000_000_000,
+    'minimum_target_bases': 5_000_000_000, 'maximum_query_batch_bases': 8_000_000,
+    'minimum_part_bases': 20_000, 'maximum_query_bases': 1_000_000,
+    'minimum_chain_score': 2000, 'qualified_reference_queries_allowed': False,
+    'short_query_and_target_relationships': 'native_completion_required',
+    'native_short_target_completion': 'short_side_queries_when_all_queries_at_least_floor_and_all_targets_below_floor',
+    'alternative_repeat_copy_recall_reduced': True, 'whole_source_equivalence': False,
+}
+
+
+def weak_global_seed_scope(parts, routable, queries, targets, *, reference_bases, preset):
+    """Return only the long-part relationships covered by this limited profile.
+
+    Queries shorter than the floor can be present in a completed raw cohort,
+    but their absence of hits is NOT an approximate completed relationship.
+    This permits reuse of an input-bound superset without losing native short
+    query/target work. No geometry or negative placement is synthesized.
+    """
+    policy=WEAK_GLOBAL_SEED_POLICY
+    queries,targets=set(queries),set(targets)
+    if (preset!=policy['preset'] or reference_bases<policy['minimum_reference_bases']
+            or not queries or not targets or routable is None or queries & set(routable)):
+        return (),()
+    if (sum(parts[key].interval.length for key in queries)>policy['maximum_query_batch_bases']
+            or max(parts[key].interval.length for key in queries)>policy['maximum_query_bases']
+            or sum(parts[key].interval.length for key in targets)<policy['minimum_target_bases']):
+        return (),()
+    return (tuple(sorted(key for key in queries if parts[key].interval.length>=policy['minimum_part_bases'])),
+            tuple(sorted(key for key in targets if parts[key].interval.length>=policy['minimum_part_bases'])))

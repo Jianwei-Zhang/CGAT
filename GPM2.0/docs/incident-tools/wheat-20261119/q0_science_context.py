@@ -153,6 +153,8 @@ def opened_transition(path,*,role,caller,require_installed):
             if source.is_relative_to(work) or row['new_sha256']!=row['source']['sha256']:
                 raise ValueError('runtime source must be isolated and exactly bound')
         if checked(transition['launcher']).is_relative_to(work):raise ValueError('new launcher source is not isolated')
+        if transition.get('reference_index_adoption') is not None:checked(transition['reference_index_adoption'])
+        for row in transition.get('mapping_adoptions',[]):checked(row)
 
     with native_libraries(transition['native_origin']) as (old_path,old_plan,bootstrap):
         if Path(old_plan['workspace']).resolve()!=work:raise ValueError('transition and native origin workspaces differ')
@@ -164,6 +166,8 @@ def opened_transition(path,*,role,caller,require_installed):
             if phase=='prepared':
                 for row in transition['runtime']:checked(row['source'])
                 checked(transition['launcher'])
+                if transition.get('reference_index_adoption') is not None:checked(transition['reference_index_adoption'])
+                for row in transition.get('mapping_adoptions',[]):checked(row)
             if require_installed:
                 for row in transition['runtime']:
                     target=work/row['relative']

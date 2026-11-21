@@ -2610,3 +2610,52 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - 下一步核对43009226完整预检、43009293实际flags/结果及43008458进展；完成明确profile
   与缓存采纳门禁之后，才安排实际资源已就绪的NEW正常锁交接。保留FIRST 5.3小时结果、
   初始1364任务和原native plan。不要只提交库/探针便宣称主任务完成优化。
+
+## 2026-11-22 01:23 CST：三块补比对已完整，准备实际 q0 交接
+
+### 新证据与限域策略
+
+- **43009226 SUCCEEDED**，`q0-science-transition-20261121-2352/validation.json`：
+  全部25个初始outer checkpoints通过真实只读验证，未改工作区，耗时2317秒。
+- **43009293 SUCCEEDED**：61条query/3,953,796 bp到38,117 targets的显式`-m2000`
+  raw任务 `q0-map-2b19c2c859bdfb5f2e9177e8`。mapper913.901秒，peak47.594GB，
+  进程完整退出、PAF与normal cache-only同profile验证均完成，不是采用tmp。
+- 发现61条中9条短于20kb（最短702bp，总123,348bp），不能对它们宣称-m2000的
+  negative关系已完成；全部targets中1,427条也短于20kb，需保留原生短target关系。
+- **43009370 SUCCEEDED**，`q0-unroutable-short-native-seed-20261122`：9条短query到
+  原38,117 targets，原生`-D -P --dual=yes --no-long-join`完整产出；不降低短query灵敏度。
+- 剩下52条长弱query与1,418条非弱短target（21,227,900bp）的关系，改向让短target作
+  query、52条弱source（3,830,448bp）作target。**43009787 SUCCEEDED**，目录
+  `q0-native-short-target-completion-20261122-v2`；原生flags、8线程、24GiB fresh AS，
+  mapper260.986秒/peak5.383GB，raw key `q0-map-b30137a13323db8a99874448`。
+  前次43009393是32线程/8GiB AS，RSS约6GiB后morecore内存不足、非零退出；没有success，
+  保留失败目录。缩小target不自动证明dense-repeat内存小，已同时限制该路径线程预算。
+- 已有用户授权大数据精度换速度，不再要求所有重复落点精确复现。但必须保留真实变化：
+  全目标-m2000对照两条主要target关系与查询总体覆盖均保留，按target查询覆盖约95/99%，
+  替代重复落点明显减少；不是结果等价。内部自动门槛为asm10、reference>=5Gb、target>=5Gb、
+  无合格参考路由、query cohort<=8Mb、最长query<=1Mb；近似完成scope仅覆盖query与target
+  都>=20kb的关系。小reference、普通有路由query、其他preset和短关系保留原生。
+- `CompletedNativeScopes` 现在显式区分原生矩阵和限域近似矩阵；短query/short-target
+  negative不能被近似矩阵吞掉；三块真实矩阵补齐后才跳过已测试关系，不捏造coverage。
+  完整旧原生cache始终优先于新参数；真实flags进入独立raw key与最终policy/证据声明。
+  `POLICY.version=5`；candidate policy version2；普通supplement raw identity仍不变。
+
+### 缓存采纳与实际切换（此快照尚未切换）
+
+- **43009762 / 43009788 / 43010042 均SUCCEEDED**，分别为fast/short-native/short-target的
+  正常新API cache-only采纳验证，不启动mapper。ready.json目录：
+  `q0-cache-adoption-fast-20261122`、`q0-cache-adoption-short-native-20261122`、
+  `q0-cache-adoption-short-target-20261122`。fast有效scope52 query×36,690 long targets；
+  所有raw文件身份和真实producer来源仍保留。
+- `stage_q0_science.py` 在正常锁内原子移动完整task/index目录，不再复制两个32GB target；
+  每个文件先验证byte SHA，核对raw key和receipt，目标必须不存在。runtime/declaration备份
+  完成后才动目标；中途失败回滚runtime与已移动cache，记录安装journal，不清理失败目录。
+- 新gate `q0_science_handoff_gate.py` 先取得真实单节点32CPU/320GiB allocation，写ready，
+  校验原NEW terminal且pids已清空、正常锁释放、scheduler凭据和各来源绑定，才启动新owner。
+  gate不杀job，也不删锁；若原a605 whole-partial恰好完整，则拒绝切换，先重新stage。
+- 正在stage目录 `q0-science-cutover-20261122-0130`；以其submission/ready/scheduler为准，
+  不把目录存在视为已运行。不取消OLD42523432；只在新allocation ready后处理NEW42949582。
+  原native61 job43008458仍运行，不能把它的部分PAF当完成，也暂不因新试验快而随意丢弃。
+- 本轮275项q0定向测试通过（1 skip），80项incident/reader测试通过，另6项gate测试通过。
+  未跑发布CI、update.sh、整版替换。下一步必须实际交接并检查优化后主任务执行，不能以
+  提交这些库/测试或资源ready就称完整目标已经实现。

@@ -40,11 +40,15 @@ def main():
     for name in ('workspace','package-dir','lookup-dir','index-dir','first-supplement','candidate-scope'):
         p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--threads',type=int,default=32)
-    p.add_argument('--experimental-minimum-chain-score',type=int,choices=(2000,),default=None)
+    profiles=p.add_mutually_exclusive_group()
+    profiles.add_argument('--experimental-minimum-chain-score',type=int,choices=(2000,),default=None)
+    profiles.add_argument('--native-short-queries-only',action='store_true')
+    profiles.add_argument('--native-short-target-completion',action='store_true')
     a=p.parse_args();started=time.monotonic();work=a.workspace.resolve(strict=True)
-    if a.threads!=32:raise ValueError('this productive plan is bound to 32 threads')
-    limit=112*1024**3
-    if resource.getrlimit(resource.RLIMIT_AS)!=(limit,limit):raise ValueError('fresh-process 112GiB address-space guard is absent')
+    expected_threads=8 if a.native_short_target_completion else 32
+    if a.threads!=expected_threads:raise ValueError('productive plan has a different guarded thread budget')
+    limit=(24 if a.native_short_target_completion else 112)*1024**3
+    if resource.getrlimit(resource.RLIMIT_AS)!=(limit,limit):raise ValueError('fresh-process expected address-space guard is absent')
     if (work/'grt/evidence/q0_prepare/tasks/q0-map-a6056c2d8fcb81f6ca19d1a7/success.json').exists():
         report={'status':'deferred_main_partial_marker_requires_validation','mapper_executed':False,'main_workspace_modified':False}
         Path('summary.json').write_text(json.dumps(report)+'\n');print(json.dumps(report),flush=True);return
@@ -97,11 +101,24 @@ def main():
         if (len(queries)!=61 or sum(parts[k].interval.length for k in queries)!=3953796 or len(targets)!=38117
                 or not set(queries)<=set(targets) or max(parts[k].interval.length for k in queries)>1000000):
             raise ValueError('native seed is outside the verified short-query wheat scope')
+        if a.native_short_target_completion:
+            weak=set(queries)
+            queries=sorted(key for key in targets if key not in weak and parts[key].interval.length<20000)
+            targets=sorted(key for key in weak if parts[key].interval.length>=20000)
+            if (len(queries)!=1418 or sum(parts[key].interval.length for key in queries)!=21227900
+                    or len(targets)!=52 or sum(parts[key].interval.length for key in targets)!=3830448):
+                raise ValueError('native short-target completion differs from the verified wheat scope')
+        if a.native_short_queries_only:
+            queries=[key for key in queries if parts[key].interval.length<20000]
+            if len(queries)!=9 or sum(parts[key].interval.length for key in queries)!=123348:
+                raise ValueError('native short-only seed differs from the verified nine-query scope')
+        query_bases=sum(parts[key].interval.length for key in queries)
         datasets=list(csv.DictReader((work/'metadata/datasets.tsv').read_text().splitlines(),delimiter='\t'))
         paths={r['dataset_name']:prep.artifact_path(work,r['fasta_relpath']) for r in datasets}
         indices={r['dataset_name']:{f[0]:tuple(map(int,f[1:5])) for f in (line.split('\t') for line in prep.artifact_path(work,r['fai_relpath']).read_text().splitlines())} for r in datasets}
         sources={}
-        for key in queries:
+        load_keys=sorted(set(queries+targets)) if a.native_short_target_completion else queries
+        for key in load_keys:
             part=parts[key];length,offset,bases,width=indices[part.source.dataset][part.source.contig]
             if length!=part.interval.length:raise ValueError('original source length changed')
             with paths[part.source.dataset].open('rb') as stream:
@@ -112,24 +129,27 @@ def main():
             parts[key]=verified.segments[0]
             sources[part.source]=sequence
         request={'kind':'candidate_unroutable_seed','query_ids':queries,'target_ids':targets,
-                 'reason':'complete_unroutable_relationships_once_before_regional_candidates'}
+                 'reason':'complete_unroutable_relationships_once_before_regional_candidates',
+                 'native_short_targets_as_queries':a.native_short_target_completion}
         native_spec={'schema':'lgz_q0_mapping_v1','query_ids':queries,'target_ids':targets,
                      'members':[[key,parts[key].sequence_sha256] for key in sorted(set(queries+targets))],
                      'tool':tool,'preset':'asm10','alignment_flags':prep.POLICY['supplement_flags']}
         expected_task_id=stable_id('q0-map',native_spec)
-        plan={'status':('experimental_profiled_seed_prepared' if a.experimental_minimum_chain_score else 'productive_native_seed_prepared'),'request':request,'expected_task_id':expected_task_id,'query_bases':3953796,'target_parts':len(targets),
-              'target_input_reuse_receipt':receipt_identity,'reference_index_sha256':built['index_sha256'],
+        plan={'status':('experimental_profiled_seed_prepared' if a.experimental_minimum_chain_score else 'productive_native_seed_prepared'),'request':request,'expected_task_id':expected_task_id,'query_bases':query_bases,'target_parts':len(targets),
+              'target_input_reuse_receipt':None if a.native_short_target_completion else receipt_identity,'reference_index_sha256':built['index_sha256'],
               'threads':a.threads,'address_space_bytes':limit,'wall_clock_timeout':None,
-              'query_sources_freshly_content_verified':True,'target_input_verified_from_complete_receipt':True,
+              'query_sources_freshly_content_verified':True,'target_input_verified_from_complete_receipt':not a.native_short_target_completion,
+              'query_and_target_sources_freshly_content_verified':a.native_short_target_completion,
               'main_workspace_modified':False,'experimental_minimum_chain_score':a.experimental_minimum_chain_score,
+              'native_short_queries_only':a.native_short_queries_only,'native_short_target_completion':a.native_short_target_completion,
               'alignment_flags':prep.POLICY['supplement_flags'],'production_profile_admitted':False,'code_sha256':inputs}
         prep.atomic_write_json(Path('producer-plan.json'),plan)
         print(json.dumps({k:v for k,v in plan.items() if k not in ('request','code_sha256')}),flush=True)
         catalog=CandidateCatalog({'candidates':[]},sources,parts)
-        template={'root':str(work),'receipt':receipt_identity}
+        template=None if a.native_short_target_completion else {'root':str(work),'receipt':receipt_identity}
         directory=root/'grt/evidence/q0_prepare/tasks'/expected_task_id;directory.mkdir(parents=True,exist_ok=True)
-        prep._copy_prepared_target(root,catalog,targets,directory/'target.fa',template)
-        print(json.dumps({'phase':'verified_target_input_ready','task_id':expected_task_id,'seconds':time.monotonic()-started}),flush=True)
+        if template is not None:prep._copy_prepared_target(root,catalog,targets,directory/'target.fa',template)
+        print(json.dumps({'phase':'verified_target_input_ready' if template is not None else 'query_and_target_sources_verified','task_id':expected_task_id,'seconds':time.monotonic()-started}),flush=True)
         if (work/'grt/evidence/q0_prepare/tasks/q0-map-a6056c2d8fcb81f6ca19d1a7/success.json').exists():
             report={'status':'input_ready_deferred_main_partial_marker_requires_validation','task_id':expected_task_id,'mapper_executed':False,'main_workspace_modified':False}
             prep.atomic_write_json(Path('summary.json'),report);print(json.dumps(report),flush=True);return
@@ -141,10 +161,11 @@ def main():
         for path,sha in inputs.items():
             if digest(Path(path))!=sha:raise ValueError('productive producer code changed')
         report={'status':('complete_experimental_profiled_seed_not_adopted' if a.experimental_minimum_chain_score else 'complete_isolated_native_seed'),'task':task,'artifact_root':str(root),'seconds':time.monotonic()-started,
-                'query_sources':len(queries),'query_bases':3953796,'target_parts':len(targets),'tool':tool,'code_sha256':inputs,
+                'query_sources':len(queries),'query_bases':query_bases,'target_parts':len(targets),'tool':tool,'code_sha256':inputs,
                 'normal_native_cache_contract_verified':a.experimental_minimum_chain_score is None,
                 'same_profile_raw_cache_contract_verified':True,'experimental_minimum_chain_score':a.experimental_minimum_chain_score,
-                'alignment_flags':prep.POLICY['supplement_flags'],'production_profile_admitted':False,'main_workspace_modified':False,'ready_main_manifest_published':False,
+                'native_short_queries_only':a.native_short_queries_only,'native_short_target_completion':a.native_short_target_completion,
+              'alignment_flags':prep.POLICY['supplement_flags'],'production_profile_admitted':False,'main_workspace_modified':False,'ready_main_manifest_published':False,
                 'producer_plan_sha256':digest(Path('producer-plan.json'))}
         prep.atomic_write_json(Path('summary.json'),report)
         print(json.dumps({k:v for k,v in report.items() if k!='code_sha256'}),flush=True)
