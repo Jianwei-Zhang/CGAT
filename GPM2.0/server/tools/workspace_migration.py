@@ -372,16 +372,16 @@ class MigrationTransaction:
                 with path.open("xb") as stream:
                     stream.write(rewrites[entry["source"]])
                     stream.flush()
+                    os.fchmod(stream.fileno(), entry["after"]["mode"])
                     os.fsync(stream.fileno())
-                path.chmod(entry["after"]["mode"])
         for addition in generated:
             path = plain_path(root, f".runtime/migrations/{journal['id']}/additions/{addition['destination']}")
             ensure_directory(path.parent)
             with path.open("xb") as stream:
                 stream.write(additions[addition["destination"]][0])
                 stream.flush()
+                os.fchmod(stream.fileno(), addition["after"]["mode"])
                 os.fsync(stream.fileno())
-            path.chmod(addition["after"]["mode"])
         return transaction
 
     @classmethod

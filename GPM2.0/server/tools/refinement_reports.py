@@ -32,7 +32,7 @@ SCHEMA = "cgat.refinement-report"
 PAGE_SIZE = 200
 MAX_ASSET = 20 * 1024 * 1024
 MAX_ASSETS_TOTAL = 200 * 1024 * 1024
-TEXT_ENDINGS = (".json", ".log", ".tsv", ".txt", ".agp", ".gap_fill_detail", ".scaff_infos")
+TEXT_ENDINGS = (".json", ".log", ".tsv", ".txt", ".agp", ".detail", ".gap_fill_detail", "_scaff_infos", ".name_map", "/info_filter2")
 CSS = "body{font:16px system-ui;max-width:1200px;margin:2em auto;padding:0 1em;color:#17212b}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid #ccd3db;padding:.5em;text-align:left;vertical-align:top}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:1em}a{color:#175ba0}code{overflow-wrap:anywhere}.note{border-left:4px solid #a66d00;padding:.8em;background:#fff6df}summary{cursor:pointer}small{color:#52606d}"
 
 
@@ -90,9 +90,34 @@ def native_diagnostics(root, tool, run_id, execution):
     """Only known native diagnostic entrypoints; never recursive reads copying."""
     code = TOOL_DIRECTORIES[tool]
     base = Path("04_refinement") / code
-    native = base / "03_native" / run_id
+    origin = execution.get("native_origin")
+    native_run = origin["run_id"] if origin else run_id
+    native = base / "03_native" / native_run
+    if origin and (not re.fullmatch(r"[0-9a-f]{32}", native_run) or origin.get("native_root") != native.as_posix()
+                   or origin.get("receipt") != (base / "02_jobs" / native_run / "native_complete.json").as_posix()):
+        raise ReportError("native origin does not identify this tool's owned completion")
     selected = dict(execution.get("artifacts", {}))
-    log = (base / "02_jobs" / run_id / "native.log").as_posix()
+    if origin:
+        receipt = safe_file(root, origin["receipt"])
+        value = json.loads(read_bound(receipt, origin["receipt_sha256"], limit=128 * 1024 * 1024))
+        checksum = value.pop("payload_sha256")
+        if (checksum != fingerprint(value) or value.get("schema") != "cgat.native-refinement-completion"
+                or value.get("schema_version") != 1 or value.get("status") != "completed"
+                or value.get("run_id") != native_run or value.get("tool") != tool):
+            raise ReportError("native origin completion receipt is invalid")
+        for relative, sha in value["result"]["artifacts"].items():
+            if relative in selected and selected[relative] != sha:
+                raise ReportError("native origin artifact binding changed")
+            selected[relative] = sha
+        selected[origin["receipt"]] = origin["receipt_sha256"]
+    def select(relative):
+        file = safe_file(root, relative)
+        sha = digest(file)
+        if relative in selected and selected[relative] != sha:
+            raise ReportError("native evidence changed before report generation: " + relative)
+        selected[relative] = sha
+        return file, sha
+    log = (base / "02_jobs" / native_run / "native.log").as_posix()
     if (root / log).is_file():
         selected.setdefault(log, digest(safe_file(root, log)))
     jobs, native_gaps = [], []
@@ -102,11 +127,15 @@ def native_diagnostics(root, tool, run_id, execution):
             native_gaps = json.loads(read_bound(safe_file(root, gap_report), selected[gap_report], limit=128 * 1024 * 1024)).get("gaps", [])
         config = (native / "03.gap_filling/job_manager_config.json").as_posix()
         if (root / config).exists():
-            file = safe_file(root, config)
-            sha = digest(file)
+            file, sha = select(config)
             payload = json.loads(read_bound(file, sha, limit=MAX_ASSET))
             selected[config] = sha
             for item in payload.get("jobs", []):
+                if not item.get("job_dir"):
+                    jobs.append({"job_name": item.get("job_name"), "chromosome": item.get("chromosome"),
+                                 "native_gap_id": item.get("gap_id"), "direction": item.get("direction"),
+                                 "artifacts": [], "diagnostics_availability": "not_recorded"})
+                    continue
                 job_dir = Path(item["job_dir"])
                 if not job_dir.is_absolute():
                     job_dir = root / native / job_dir
@@ -117,7 +146,7 @@ def native_diagnostics(root, tool, run_id, execution):
                     file = job_dir / name
                     if file.exists() or file.is_symlink():
                         relative = file.relative_to(root).as_posix()
-                        selected[relative] = digest(safe_file(root, relative))
+                        select(relative)
                         files.append(relative)
                 jobs.append({"job_name": item.get("job_name"), "chromosome": item.get("chromosome"),
                              "native_gap_id": item.get("gap_id"), "direction": item.get("direction"),
@@ -125,7 +154,7 @@ def native_diagnostics(root, tool, run_id, execution):
         for name in ("autogapfiller_summary.json", "05.visualization/gap_filling_report.html"):
             relative = (native / name).as_posix()
             if (root / relative).exists():
-                selected[relative] = digest(safe_file(root, relative))
+                select(relative)
     if tool == "degap":
         summary_path = (native / "autogapfiller_summary.json").as_posix()
         if summary_path in selected:
@@ -147,7 +176,8 @@ def asset_plan(root, artifacts):
         text = relative.endswith(TEXT_ENDINGS) or relative.endswith(".html")
         include = text and size <= MAX_ASSET and total + size <= MAX_ASSETS_TOTAL
         row = {"workspace_path": relative, "sha256": expected, "size_bytes": size,
-               "availability": "embedded" if include else "server_only_size_limit" if text else "server_only_sequence_or_binary"}
+               "availability": "embedded" if include else "server_only_size_limit" if text else
+                               "server_only_native_script" if relative.endswith(".sh") else "server_only_sequence_or_binary"}
         if include:
             total += size
             row["report_path"] = "assets/" + hashlib.sha256(relative.encode()).hexdigest()[:20] + ".txt"
@@ -223,10 +253,14 @@ def render_site(directory, summary, provenance, final, assets):
         [(escape(r["chromosome"]), escape(str((r["native"]["length"], r["native"]["n_bases"]))) if r["native"] else "Not produced / 未产生",
           escape(str((r["accepted_length"], r["accepted_n_bases"]))), escape(str(r["native_equals_accepted"]))) for r in rows])
     execution = summary["execution"]
+    if execution.get("native_reused"):
+        body += '<p class="note">Verified native evidence was reused; the producer did not run in this attempt. CGAT admission and reconstruction ran again. / 本次复用已验证的原生证据，没有重跑工具；CGAT 重新执行接纳与来源重建。</p>'
     body += '<h2>Inputs, recipe and resources / 输入、配方与资源</h2><pre>' + json_text({
         "tool": summary["tool"], "run_id": summary["run_id"], "threads": execution.get("threads"),
         "timing": execution.get("timing", "not recorded"), "peak_rss": "not measured",
-        "native_executed": execution.get("native_executed"), "recipe": execution.get("recipe"),
+        "native_executed_this_attempt": execution.get("native_executed"), "native_reused": execution.get("native_reused", False),
+        "native_origin": execution.get("native_origin"), "requested_threads": execution.get("requested_threads", execution.get("threads")),
+        "recipe": execution.get("recipe"),
         "command": execution.get("command")}) + '</pre>'
     edits = {row["edit_id"]: row for row in final["edits"]}
     rejected = defaultdict(list)
@@ -343,15 +377,21 @@ def build_failure_report(root, tool, run_id, error, *, phase="native"):
         if (root / relative).exists():
             artifacts[relative] = digest(safe_file(root, relative))
     diagnostics_error = None
+    execution = {}
     try:
-        artifacts, jobs, _ = native_diagnostics(root, tool, run_id, {"artifacts": artifacts})
+        invocation_relative = f"04_refinement/{code}/02_jobs/{run_id}/invocation.json"
+        if invocation_relative in artifacts:
+            execution = json.loads(read_bound(safe_file(root, invocation_relative), artifacts[invocation_relative], limit=MAX_ASSET))
+        artifacts, jobs, _ = native_diagnostics(root, tool, run_id, {**execution, "artifacts": artifacts})
     except (OSError, ValueError, KeyError, TypeError) as diagnostic:
         jobs = []
         diagnostics_error = str(diagnostic)
     assets = asset_plan(root, artifacts)
     summary = {"schema": "cgat.refinement-failure-report", "schema_version": 1, "tool": tool, "run_id": run_id,
                "status": "failed", "phase": phase, "error": str(error), "native_jobs": jobs,
-               "diagnostics_error": diagnostics_error, "final_available": False, "artifacts": assets}
+               "diagnostics_error": diagnostics_error, "final_available": False, "artifacts": assets,
+               "native_status": execution.get("native_status"), "native_reused": execution.get("native_reused", False),
+               "native_origin": execution.get("native_origin")}
     binding = {"summary": summary, "generator_sha256": digest(Path(__file__))}
     destination = layout.path(f"04_refinement/{code}/05_report/{run_id}/failure-{fingerprint(binding)[:20]}")
     if destination.exists():

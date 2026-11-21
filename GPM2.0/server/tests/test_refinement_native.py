@@ -135,7 +135,12 @@ class NativeStageTests(unittest.TestCase):
             with mock.patch.object(native.subprocess, "run", side_effect=empty):
                 result = native.stage_refinement(root, "quartet", groups, 1)
             self.assertEqual(result["provenance"]["status"], "native_no_candidates")
-            self.assertEqual((Path(result["staging"]) / "assembly.fa").read_text(), genome.read_text())
+            # Final FASTA is deliberately wrapped at 60 bp; wrapping is not
+            # a biological change and must not invalidate the no-fill outcome.
+            actual = (Path(result["staging"]) / "assembly.fa").read_text().splitlines()
+            expected = genome.read_text().splitlines()
+            self.assertEqual(actual[0], expected[0])
+            self.assertEqual("".join(actual[1:]), "".join(expected[1:]))
             self.assertEqual(result["provenance"]["execution"]["native_returncode"], 1)
 
     def test_quartet_no_eligible_gaps_does_not_convert_reads(self):

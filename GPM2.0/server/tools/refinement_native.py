@@ -27,6 +27,7 @@ try:
     from refinement_degap import materialize_patches, stage_degap
     from refinement_native_trace import retained, verify_trace, normalized_edits, TraceError
     from refinement_native_formats import CandidateStore, parse_tgs, parse_quartet, parse_lr_rows, apply_lr_round
+    from refinement_native_checkpoint import execute as execute_native, quartet_empty_outcome
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from .post_lgz_degap import IndexedFasta, atomic_json, digest, stat_key
@@ -38,11 +39,12 @@ except ModuleNotFoundError:
     from .refinement_degap import materialize_patches, stage_degap
     from .refinement_native_trace import retained, verify_trace, normalized_edits, TraceError
     from .refinement_native_formats import CandidateStore, parse_tgs, parse_quartet, parse_lr_rows, apply_lr_round
+    from .refinement_native_checkpoint import execute as execute_native, quartet_empty_outcome
 
 
 ADAPTER_FILES = ("refinement_native.py", "refinement_native_formats.py", "refinement_native_trace.py",
                  "refinement_path.py", "refinement_sources.py", "refinement_publication.py",
-                 "refinement_degap.py", "refinement_recipes.py", "refinement_reads.py", "refinement_tools.py")
+                 "refinement_degap.py", "refinement_recipes.py", "refinement_reads.py", "refinement_tools.py", "refinement_native_checkpoint.py")
 
 class NamedGenome:
     def __init__(self, index, original_to_native):
@@ -88,26 +90,6 @@ def sequence_summary(genome):
     return summary
 
 
-def quartet_empty_outcome(code, log, directory, prepared):
-    if code != 1:
-        return None
-    lines = log.read_text(errors="replace").splitlines()
-    if not lines:
-        return None
-    if lines[-1].endswith("[ERROR] Input genome does not have valid gap."):
-        return "no_eligible_flanks"
-    if (not lines[-1].endswith("[ERROR] No gap can be closed.")
-            or not any(line.endswith("All files processed.") for line in lines)):
-        return None
-    # In the pinned CGAT recipe successful empty alignments continue to the next
-    # input. Every selected input must have produced its own fresh PAF.
-    for path in prepared:
-        paf = directory / ("quartet.flank_map_" + Path(path).name + ".paf")
-        if not paf.is_file() or paf.is_symlink():
-            raise TraceError("quarTeT no-candidate outcome lacks a completed alignment artifact")
-    return "no_candidates"
-
-
 def _stage(root, tool, groups, threads, run_id):
     stage_started = time.monotonic()
     stage_started_at = datetime.now(timezone.utc).isoformat()
@@ -149,8 +131,8 @@ def _stage(root, tool, groups, threads, run_id):
             raise ToolError("refinement adapter changed during setup")
         runtime_identities[path] = before
     code = TOOL_DIRECTORIES[tool]
-    directory = root / "04_refinement" / code
-    paths = {name: directory / name / run_id for name in ("01_inputs", "02_jobs", "03_native", "04_accepted", "05_report")}
+    paths = {name: layout.path(f"04_refinement/{code}/{name}/{run_id}")
+             for name in ("01_inputs", "02_jobs", "03_native", "04_accepted", "05_report")}
     if paths["03_native"].exists() or paths["03_native"].is_symlink():
         raise ToolError("native attempt directory already exists; validated resume must be explicit")
     for name in ("01_inputs", "02_jobs", "04_accepted", "05_report"):
@@ -214,7 +196,7 @@ def _stage(root, tool, groups, threads, run_id):
                          "timing": {"started_at": stage_started_at}}
     atomic_json(paths["02_jobs"] / "invocation.json", invocation_record)
     native_artifacts, result_file, result_genome = {}, None, None
-    native_executed, returncode = False, None
+    native_executed, returncode, completion = False, None, None
     traces = {name: [retained(0, row[0])] for name, row in baseline.records.items()}
     if skip:
         outcome = skip
@@ -222,38 +204,29 @@ def _stage(root, tool, groups, threads, run_id):
         atomic_json(receipt, {"reason": skip, "baseline_sha256": recipe["baseline_sha256"]})
         native_artifacts[receipt.relative_to(root).as_posix()] = digest(receipt)
     else:
-        invocation.cwd.mkdir(parents=True, exist_ok=True)
-        if tool == "lrgapcloser" and native_directory.exists():
-            raise ToolError("LR_Gapcloser native output must not already exist")
-        driver = materialize_native_driver(invocation)
-        if driver is not None:
-            native_artifacts[driver.relative_to(root).as_posix()] = digest(driver)
-            identities[driver] = stat_key(driver)
-        log = paths["02_jobs"] / "native.log"
-        native_started = time.monotonic()
-        with log.open("xb") as stream:
-            process = subprocess.run(invocation.command, cwd=invocation.cwd, env=invocation.environment,
-                                     stdout=stream, stderr=subprocess.STDOUT)
-        invocation_record["timing"]["native_seconds"] = time.monotonic() - native_started
-        invocation_record["native_returncode"] = process.returncode
-        atomic_json(paths["02_jobs"] / "invocation.json", invocation_record)
-        native_executed, returncode = True, process.returncode
-        native_artifacts[log.relative_to(root).as_posix()] = digest(log)
+        def verify_inputs():
+            catalog.verify_unchanged()
+            if any(stat_key(path) != expected for path, expected in identities.items()):
+                raise PathError("refinement inputs, runtime or native evidence changed during execution")
+        input_hashes = {row["path"]: row["sha256"] for row in reads_manifest}
+        input_hashes[str(actual_input)] = recipe["native_input_sha256"]
+        names_file = paths["01_inputs"] / "chromosome_names.json"
+        input_hashes[str(names_file)] = digest(names_file)
+        identities[names_file] = stat_key(names_file)
+        for conversion in prepared["conversions"].values():
+            parent = Path(conversion["fasta"]).parent
+            for relative in (*conversion["outputs"], "conversion.json"):
+                file = parent / relative
+                input_hashes[str(file)] = digest(file)
         files = [path for values in prepared["prepared"].values() for path in values]
-        empty = quartet_empty_outcome(returncode, log, native_directory, files) if tool == "quartet" else None
-        if returncode and not empty:
-            raise subprocess.CalledProcessError(returncode, invocation.command)
-        outcome = empty or "completed"
-        if empty:
-            for path in native_directory.glob("quartet.flank_map_*.paf"):
-                native_artifacts[path.relative_to(root).as_posix()] = digest(path)
-        else:
-            for relative in invocation.required_outputs:
-                path = native_directory / relative
-                if not path.is_file() or path.is_symlink():
-                    raise TraceError(f"native exit {returncode} is not success: missing artifact {relative}")
-                native_artifacts[path.relative_to(root).as_posix()] = digest(path)
-                identities[path] = stat_key(path)
+        completion = execute_native(root, invocation, recipe, paths, invocation_record, identities, verify_inputs,
+                                    chromosomes=set(original_to_native.values()), parameters=lock["tools"][tool]["parameters"],
+                                    input_hashes=input_hashes, prepared_files=files, driver_factory=materialize_native_driver)
+        native_directory = paths["03_native"] / "output" if tool == "lrgapcloser" else paths["03_native"]
+        native_artifacts.update(completion["result"]["artifacts"])
+        native_executed, returncode = not completion["reused"], completion["execution"]["returncode"]
+        outcome = completion["result"]["outcome"]
+        if outcome == "completed":
             if tool == "lrgapcloser":
                 maximum = lock["tools"][tool]["parameters"]["iterations"]
                 iterations = [i for i in range(1, maximum + 1) if (native_directory / f"iteration-{i}/gapclosed.fasta").is_file()]
@@ -263,10 +236,10 @@ def _stage(root, tool, groups, threads, run_id):
                 for number, row_file in enumerate(row_files, 1):
                     for artifact in (row_file, native_directory / f"iteration-{number}/gapclosed.fasta"):
                         before = stat_key(artifact)
-                        native_artifacts[artifact.relative_to(root).as_posix()] = digest(artifact)
-                        if stat_key(artifact) != before:
-                            raise TraceError("LR_Gapcloser native evidence changed while binding")
-                        identities[artifact] = before
+                        relative = artifact.relative_to(root).as_posix()
+                        if native_artifacts.get(relative) != digest(artifact) or stat_key(artifact) != before:
+                            raise TraceError("LR_Gapcloser evidence changed or was not sealed at native completion")
+                        identities.setdefault(artifact, before)
                 rounds, lookup = parse_lr_rows(row_files, native_to_original, files[0])
                 previous = baseline
                 for number, rows in enumerate(rounds, 1):
@@ -283,8 +256,6 @@ def _stage(root, tool, groups, threads, run_id):
                     for name in traces:
                         verify_trace(traces[name], name, baseline, catalog, native)
                     previous, result_file, result_genome = native, path, native
-                if len(iterations) < maximum and any(summary["n_bases"] for summary in sequence_summary(result_genome).values()):
-                    raise TraceError("LR_Gapcloser stopped early while gaps still remain")
             else:
                 result_file = native_directory / invocation.required_outputs[0]
                 result_genome = NamedGenome(IndexedFasta(result_file, catalog.index_directory / "native-result.fa"), original_to_native)
@@ -307,7 +278,8 @@ def _stage(root, tool, groups, threads, run_id):
         dataset = f"native_result_{tool}_{run_id}"
         for original, native_name in original_to_native.items():
             catalog.register(dataset, native_name, result_file, origin="native:" + tool)
-        native_summary = sequence_summary(result_genome)
+        native_summary = {original: completion["result"]["native_assembly"][native_name]
+                          for original, native_name in original_to_native.items()}
         edits, rejected = normalized_edits(tool, traces, baseline, result_genome, gaps, native_dataset=dataset,
                                           native_names=original_to_native, job=native_directory.relative_to(root).as_posix())
         edits = materialize_patches(edits, catalog, paths["04_accepted"], tool=tool)

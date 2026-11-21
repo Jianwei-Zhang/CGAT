@@ -1,7 +1,7 @@
 """Reuse only complete, content-verified refinement publications/staging results.
 
-Missing or changed artifacts are not a cache hit. The outer execution layer can
-later recover independently verified native sub-results; this module never treats
+Missing or changed artifacts are not a cache hit. Completed native phase recovery
+is handled separately by refinement_native_checkpoint.py; this module never treats
 an orphan native directory, a zero exit code or a timestamp as completion proof.
 """
 from __future__ import annotations

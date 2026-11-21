@@ -124,11 +124,24 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
                     record["requested_reads"] = select_reads(tool, groups)
                 record.update(status="staged", run_id=result["run_id"], final_staging=result["staging"])
                 staged[tool] = result
-                record.update(phase="report", native_status="staged")
+                execution = result.get("provenance", {}).get("execution", {})
+                record.update(phase="report", native_status="staged", native_reused=execution.get("native_reused", False),
+                              native_origin=execution.get("native_origin"))
                 record["report"] = build_tool_report(root, result)
                 record["phase"] = "staged"
             except Exception as error:
                 record.update(status="failed", error_type=type(error).__name__, error=str(error))
+                if record["phase"] == "native":
+                    marker = root / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / record["run_id"] / "invocation.json"
+                    try:
+                        if marker.is_symlink():
+                            raise ValueError("invalid invocation marker")
+                        state = json.loads(marker.read_text())
+                        if state.get("native_status") == "success" and state.get("phase") == "admission":
+                            record.update(phase="admission", native_status="success", native_reused=state.get("native_reused", False),
+                                          native_origin=state.get("native_origin"))
+                    except (OSError, ValueError, TypeError):
+                        pass
                 try:
                     record["report"] = build_failure_report(root, tool, record["run_id"], error, phase=record["phase"])
                 except Exception as report_error:

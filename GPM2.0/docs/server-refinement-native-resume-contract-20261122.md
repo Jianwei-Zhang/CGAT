@@ -1,0 +1,20 @@
+# Native completion and re-admission recovery
+
+Date: 2026-11-22. This adds a recovery boundary inside each tool attempt, not another scheduler or an orphan-directory fallback.
+
+- A native process and CGAT admission are separate phases. After a real native completion, validate required outputs, chromosome identities, native child/iteration closure and explicit upstream no-candidate outcomes. Seal the native evidence before attempting source reconstruction, report generation or delivery.
+- A reusable native checkpoint binds the selected pinned runtime and native command/parameters, actual assembly, typed raw reads and consumed conversions. Attempt-local output/input/driver locations are normalized by declared roles; thread budget alone is not a scientific input. Admission adapter hashes are deliberately not the native cache key: a corrected parser can re-admit exactly the original evidence without rerunning the producer. The completion verifier revision is recorded separately. A changed verifier must revalidate the same sealed bytes and artifact inventory under its current rules; a logging/verifier code change alone does not force a native rerun or silently trust obsolete validation.
+- Reuse requires the complete sealed input/output inventory and checksums. Parent exit zero, directory existence, a partial FASTA or a failed child summary is not a checkpoint. Existing unsealed native folders are retained but not silently adopted. A missing/changed artifact causes no cache hit; a new attempt never overwrites that history.
+- Re-admission has a new attempt ID and current adapter/version provenance. Native files stay in their original attempt, with an explicit origin link; they are not copied, renamed into the new attempt or represented as newly executed. Reports include the original command, actual original native threads/timing, the requested budget and whether native time was reused. This is not a tool-speed ranking.
+- Baseline/reads/runtime must remain unchanged through checkpoint capture and admission. Native completion never authorizes a failed admission or a fake refined copy of LGZ; only a reconstructed, accepted Final Path may reach final publication.
+- DEGAP child completion and LR iteration completion are checked independently of their parent exit. Only the exact pinned no-fill/no-candidate conditions are successful empty outcomes. Other errors remain failures.
+
+This boundary covers completed native phases after downstream interruption/failure. Reusing unfinished sub-jobs inside an interrupted native program is a separate remaining implementation/acceptance item. Final acceptance still includes real pinned-tool runs, environment/architecture checks and the full A01–A18 matrix; development uses only targeted checks.
+
+## Checkpoint and report locations
+
+A successful producer writes `04_refinement/<numbered_tool>/02_jobs/<producer_run>/native_complete.json` after validating and sealing native evidence. The checkpoint records actual input hashes, native outcome, chromosome sequence/N summaries and child/iteration closure. New attempts keep their own `01_inputs`, `02_jobs`, `04_accepted` and `05_report`; `execution.native_origin` points to the original `03_native/<producer_run>` and completion receipt. No fake new native directory is created on a cache hit.
+
+`native_executed` means execution in the current admission attempt; `native_reused` distinguishes a verified prior producer. Original native command/threads/time remain under `native_origin`, requested budget is separate, and this attempt's native execution time is zero when reused. Admission failures retain a successful native status but have no final publication. Successful and failed reports load the original receipt and preserve its artifact checksums rather than assigning fresh hashes to changed diagnostic files.
+
+A no-remaining-gap DEGAP attempt is an explicit no-op and does not scan/hash unused reads; it is not a failed-tool fallback. Known quartet no-candidate and no-eligible-flank exits retain their exact pinned evidence conditions.
