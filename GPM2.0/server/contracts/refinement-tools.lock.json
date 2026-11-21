@@ -1,0 +1,211 @@
+{
+  "schema": "cgat.refinement-tool-lock",
+  "schema_version": 1,
+  "platforms": [
+    "linux-64",
+    "linux-aarch64"
+  ],
+  "tools": {
+    "degap": {
+      "version": "2.0",
+      "distribution": "bundled",
+      "repository": "https://github.com/Jianwei-Zhang/DEGAP",
+      "revision": "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75",
+      "manifest_sha256": "3c8f190222829efa83d494dcd9130e290aa12b14d805de422f84f18c4abf9da2",
+      "read_policy": "native_mixed",
+      "recipe": "cgat.degap.exact-anchors.v2",
+      "license": {
+        "spdx": "NOASSERTION",
+        "basis": "No LICENSE file in the pinned upstream tree; preserve the existing bundled-source attribution, do not invent a license."
+      }
+    },
+    "tgsgapcloser": {
+      "version": "1.2.1",
+      "distribution": "conda",
+      "repository": "https://github.com/BGI-Qingdao/TGS-GapCloser",
+      "revision": "52818b3e464209477baec506ade3240be43b4fa8",
+      "packages": {
+        "linux-aarch64": {
+          "name": "tgsgapcloser",
+          "version": "1.2.1",
+          "build": "h4914a8e_4",
+          "sha256": "c416ab7c040dd2e8cd65b59bb23c65270f7ce956c4e4153833c2a4b44722bc17",
+          "url": "https://conda.anaconda.org/bioconda/linux-aarch64/tgsgapcloser-1.2.1-h4914a8e_4.tar.bz2"
+        },
+        "linux-64": {
+          "name": "tgsgapcloser",
+          "version": "1.2.1",
+          "build": "h6f25541_4",
+          "sha256": "45b9e9f3ebe849c58bd5a66486d8ce20857637658ced027f40fc511f3cc7563c",
+          "url": "https://conda.anaconda.org/bioconda/linux-64/tgsgapcloser-1.2.1-h6f25541_4.tar.bz2"
+        }
+      },
+      "read_policy": "hifi_preferred",
+      "recipe": "cgat.tgsgapcloser.v1",
+      "parameters": {
+        "hifi": {
+          "tgstype": "pb",
+          "correction": "none",
+          "minimap": "-x asm20"
+        },
+        "ont": {
+          "tgstype": "ont",
+          "correction": "native_racon",
+          "racon_rounds": 1,
+          "minimap": "-x ava-ont"
+        }
+      },
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "basis": "pinned upstream LICENSE and distribution metadata",
+        "upstream_file": "LICENSE",
+        "file_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      }
+    },
+    "quartet": {
+      "version": "1.3.1",
+      "distribution": "source",
+      "repository": "https://github.com/aaranyue/quarTeT",
+      "revision": "a44d8c87e3f4bcefaf43dc4134e88b6a21890265",
+      "archive": {
+        "url": "https://codeload.github.com/aaranyue/quarTeT/tar.gz/a44d8c87e3f4bcefaf43dc4134e88b6a21890265",
+        "sha256": "51c459512df08aee96e3250c8bddf65d75f1da1a58fbf72c47edae4da9b434b0"
+      },
+      "read_policy": "native_mixed_fasta",
+      "recipe": "cgat.quartet.v1",
+      "parameters": {
+        "aligner": "minimap2",
+        "minimap": "-x asm5",
+        "enable_join": false,
+        "native_plot": false
+      },
+      "patches": [
+        {
+          "id": "python311-fstring-quotes-v1",
+          "file": "quartet/gapfiller.py",
+          "before_sha256": "b81b5636a97db253454516c765986ded6a50fbfb95ea2513d8d9a240fe117e98",
+          "after_sha256": "8f85a960c1163d0f4d373e28415eaee16f8871249987c5b8b836bdb12b4685a6",
+          "old": "{len(info[\"seq\"]) if info[\"seq\"] != '' else 'join'}",
+          "new": "{len(info[\"seq\"]) if info[\"seq\"] != \"\" else \"join\"}",
+          "purpose": "Python 3.11 quoting compatibility only; no algorithm or parameter changes"
+        }
+      ],
+      "license": {
+        "spdx": "MIT",
+        "basis": "pinned upstream LICENSE",
+        "upstream_file": "LICENSE",
+        "file_sha256": "4f8096c55edf3cd66f155dfb09a76bbd9ed2befb5e1fcc34514a21dad4b0decf"
+      }
+    },
+    "lrgapcloser": {
+      "version": "1.0",
+      "distribution": "conda",
+      "repository": "https://github.com/CAFS-bioinformatics/LR_Gapcloser",
+      "revision": "156381adec01a5c664edbf5df1d866b5c70e82a1",
+      "packages": {
+        "noarch": {
+          "name": "lr_gapcloser",
+          "version": "1.0",
+          "build": "pl5321hdfd78af_0",
+          "sha256": "320fe518dd128162113574b40ed0ff02d4c2c595a3f5214de99d1041d3427cf6",
+          "url": "https://conda.anaconda.org/bioconda/noarch/lr_gapcloser-1.0-pl5321hdfd78af_0.conda"
+        }
+      },
+      "read_policy": "hifi_preferred",
+      "recipe": "cgat.lrgapcloser.v1",
+      "parameters": {
+        "iterations": 3,
+        "tag_partitions": 1,
+        "hifi_platform": "p",
+        "ont_platform": "n"
+      },
+      "license": {
+        "spdx": "GPL-3.0-or-later",
+        "basis": "pinned upstream LICENSE and distribution metadata",
+        "upstream_file": "LICENSE",
+        "file_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+      }
+    }
+  },
+  "dependencies": {
+    "bwa": {
+      "packages": {
+        "linux-aarch64": {
+          "name": "bwa",
+          "version": "0.7.19",
+          "build": "h0cbc5ad_1",
+          "sha256": "e742a61da07ee6089c3414e40f77be299f2939efa59e7ddab8d4fdadc95b4e2e",
+          "url": "https://conda.anaconda.org/bioconda/linux-aarch64/bwa-0.7.19-h0cbc5ad_1.tar.bz2"
+        },
+        "linux-64": {
+          "name": "bwa",
+          "version": "0.7.19",
+          "build": "h577a1d6_1",
+          "sha256": "6914985666bd9527a86a103251cd0e29667f0857b7fe0a47c55b389e3a3b37be",
+          "url": "https://conda.anaconda.org/bioconda/linux-64/bwa-0.7.19-h577a1d6_1.tar.bz2"
+        }
+      }
+    },
+    "racon": {
+      "packages": {
+        "linux-aarch64": {
+          "name": "racon",
+          "version": "1.5.0",
+          "build": "h1e84f2d_8",
+          "sha256": "5b158f68c2556c7c9999837ac11b2cbfcd9f04aaf08202802ba7a9bbfdd87890",
+          "url": "https://conda.anaconda.org/bioconda/linux-aarch64/racon-1.5.0-h1e84f2d_8.conda"
+        },
+        "linux-64": {
+          "name": "racon",
+          "version": "1.5.0",
+          "build": "h077b44d_8",
+          "sha256": "7ecfcb8f8361957aa49683cddf48101a3fa1fec00c321e859a7ea26b21bd6894",
+          "url": "https://conda.anaconda.org/bioconda/linux-64/racon-1.5.0-h077b44d_8.conda"
+        }
+      }
+    },
+    "minimap2": {
+      "version": "2.31"
+    },
+    "samtools": {
+      "version": "1.23.1"
+    },
+    "perl": {
+      "version": "5.32.1"
+    },
+    "python": {
+      "version": "3.11.14"
+    },
+    "biopython": {
+      "version": "1.88"
+    },
+    "pysam": {
+      "version": "0.24.1"
+    },
+    "numpy": {
+      "version": "2.4.6"
+    },
+    "matplotlib-base": {
+      "version": "3.11.2"
+    },
+    "scipy": {
+      "version": "1.17.1"
+    },
+    "hifiasm": {
+      "version": "0.25.0"
+    },
+    "seqkit": {
+      "version": "2.8.0"
+    },
+    "parallel": {
+      "version": "20260922"
+    },
+    "ripgrep": {
+      "version": "15.1.0"
+    }
+  },
+  "validation": {
+    "linux-64": "pending-native-smoke",
+    "linux-aarch64": "pending-native-smoke"
+  }
+}

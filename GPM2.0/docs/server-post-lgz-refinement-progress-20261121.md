@@ -91,3 +91,16 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 提交时 recovery hash 清单按暂存区源码快照再生成，避免把工作区中尚未提交的路径适配 hash 混入本批提交。
 
 完成编号布局的默认启动/升级入口与旧工作区适配器；将精修适配器接入共同调度、补跑、缓存和发布事务；实现另外三个原生适配器与固定环境；完成坐标证据重建、完整/轻量 App 新协议和可导航报告。联合修复中可证明未改变的内部来源片段还需进一步细分保留。最后统一完成设计 A01–A18 验收，不能以本阶段模块或测试代替全部目标。
+
+
+## 2026-11-21：四工具固定配方、环境定义与 reads 派生输入
+
+- 新增 `contracts/refinement-tools.lock.json`、`refinement_tools.py`：固定 DEGAP 2.0 源码、TGS-GapCloser 1.2.1、quarTeT 1.3.1、LR_Gapcloser 1.0；按平台固定原生分发 build/SHA，并校验环境实际文件。`env.sh` 安装/检查同一共享环境，不在任务运行中下载。
+- x86_64 / aarch64 规格同步新增 TGS、LR、BWA、Racon；原来未固定的 DEGAP Python 库和 GNU parallel 也固定到本地受控环境已共存且上游有对应平台分发的版本。尚未把“有分发件”当作新规格已求解或 ARM64 已运行。
+- 实际 Python 3.11 核查发现 quarTeT 1.3.1 的一处 f-string 引号语法不兼容。加了一条 before/after hash 约束的纯引号补丁，临时安装后的真实 Python 3.11 `GapFiller --help` 通过；未更换共享环境的 Python 版本。
+- 新增 `refinement_recipes.py`、`refinement_reads.py`：统一工具选择/默认规则、一次执行的 reads 选择、原生参数、FASTQ/FASTA/gzip 转换及内容绑定复用、可逆 read ID 对照。不要求用户证明 reads 已纠错。
+- 避免 quarTeT 的真实 basename 缓存冲突：HiFi/ONT 派生文件名不同，命令层还显式拒绝相同 basename。TGS ONT 原生 Racon、quarTeT 关闭实验 join、LR 三轮/单 tag 分区等参数都写入配方。
+- DEGAP 待发布适配器现在使用锁定运行环境构建命令，并要求原生整合 FASTA 完整；报告 JSON、候选和原生整合 FASTA 都进入内容回执，原生/CGAT 接纳差异有独立序列摘要。
+- 14 个针对安装/固定配方/小 reads 转换/受控 DEGAP 的最小测试通过（4.560 秒）；另一个“原生退出 0 但缺少整合 FASTA 必须失败”的小测试通过（2.544 秒）；没有跑完整回归，没有修改现有 conda 环境。新增配方记录明确 LR 提前迭代完成、quarTeT 无候选非零退出等尚待公共适配层处理的边界。
+
+本阶段仍未接通三个新增工具的原生接纳、完整 run_all 衔接、最终发布和 App 协议。下一步优先完成共同执行与结果接纳，再处理完整交付，不把“工具版本已锁定”当作四工具已集成完成。

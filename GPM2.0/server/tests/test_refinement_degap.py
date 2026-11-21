@@ -12,10 +12,16 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import refinement_degap as adapter
 from workspace_layout import initialize_workspace
+from refinement_tools import load_lock, fingerprint
 
 
 @unittest.skipUnless(shutil.which("samtools"), "samtools required for indexed sequence boundary")
 class DegapRefinedPublicationTests(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(adapter, "validate_runtime", return_value={"lock_sha256": fingerprint(load_lock())})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def make_workspace(self, root):
         layout = initialize_workspace(root)
         sequence = "AAAA" + "N" * 20 + "CCCC"
@@ -53,6 +59,9 @@ class DegapRefinedPublicationTests(unittest.TestCase):
                    "left_flank_len": 4, "right_flank_len": 4, "replace_start": 0, "replace_end": 27,
                    "replace_len": 28, "filled": True, "final_sequence_file": str(candidate)}
             report.write_text(json.dumps({"gaps": [row]}))
+            final = output / "04.genome_integration/genome.filled.fasta"
+            final.parent.mkdir()
+            final.write_text(">chr1\nAAAAGTCCCC\n")
             return subprocess.CompletedProcess(command, 0)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
@@ -71,6 +80,27 @@ class DegapRefinedPublicationTests(unittest.TestCase):
             self.assertEqual((root / ".runtime/metadata/grt_final_path.json").read_bytes(), path_before)
             self.assertFalse((root / "05_final").exists(), "staging alone is not an atomic final publication")
             self.assertEqual(len(commands), 1)
+
+    def test_zero_exit_with_missing_native_assembly_is_incomplete(self):
+        real_run = subprocess.run
+        def native(command, **kwargs):
+            if command[0] == "samtools":
+                return real_run(command, **kwargs)
+            output = Path(command[command.index("--output") + 1])
+            report = output / "03.gap_filling/gap_filling_results.json"
+            report.parent.mkdir(parents=True)
+            report.write_text(json.dumps({"gaps": []}))
+            return subprocess.CompletedProcess(command, 0)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            groups, _, _ = self.make_workspace(root)
+            run_id = "b" * 32
+            with mock.patch.object(adapter, "check_environment"), mock.patch.object(adapter.subprocess, "run", side_effect=native):
+                with self.assertRaises(OSError):
+                    adapter.stage_degap(root, groups, 2, run_id=run_id)
+            self.assertFalse((root / ".runtime/refinement/01_degap" / run_id / "final").exists())
+            invocation = json.loads((root / "04_refinement/01_degap/02_jobs" / run_id / "invocation.json").read_text())
+            self.assertEqual(invocation["status"], "failed")
 
     def test_failed_native_never_stages_a_successful_lgz_copy(self):
         real_run = subprocess.run

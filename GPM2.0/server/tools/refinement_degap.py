@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -19,6 +20,8 @@ try:
     from refinement_sources import FastaCatalog
     from refinement_admission import degap_proposal, exclude_conflicts
     from refinement_publication import prepare_publication, verify_baseline
+    from refinement_tools import validate_runtime, load_lock
+    from refinement_recipes import make_invocation
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, workspace_join
     from .post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
@@ -26,6 +29,8 @@ except ModuleNotFoundError:
     from .refinement_sources import FastaCatalog
     from .refinement_admission import degap_proposal, exclude_conflicts
     from .refinement_publication import prepare_publication, verify_baseline
+    from .refinement_tools import validate_runtime, load_lock
+    from .refinement_recipes import make_invocation
 
 PIN = "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75"
 RECIPE = "cgat.degap.exact-anchors.v2"
@@ -103,6 +108,8 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     tools_root = Path(__file__).resolve().parent
     engine_root = tools_root / "degap_core"
     engine_manifest = verify_engine(engine_root)
+    lock = load_lock()
+    runtime = validate_runtime(lock=lock)
     directory = root / "04_refinement/01_degap"
     paths = {name: directory / name / run_id for name in ("01_inputs", "02_jobs", "03_native", "04_accepted", "05_report")}
     # Native program creates 03_native itself. No previously completed attempt is overwritten.
@@ -131,24 +138,36 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
             identities[path] = before
             reads_manifest.append({"technology": kind, "path": str(path), "sha256": sha256})
     recipe = {"schema": RECIPE, "tool": "degap", "revision": PIN,
-              "engine_manifest_sha256": identity(engine_manifest), "reads": reads_manifest,
+              "engine_manifest_sha256": identity(engine_manifest), "runtime_sha256": identity(runtime),
+              "tool_lock_sha256": identity(lock), "reads": reads_manifest,
               "baseline_sha256": digest(baseline_fasta), "baseline_final_path_sha256": baseline_digest,
               "adapter_sources": {name: digest(tools_root / name) for name in
                                   ("refinement_degap.py", "refinement_admission.py", "refinement_path.py",
-                                   "refinement_sources.py", "refinement_publication.py")}}
+                                   "refinement_sources.py", "refinement_publication.py", "refinement_tools.py", "refinement_recipes.py")}}
     atomic_json(paths["01_inputs"] / "recipe.json", recipe)
-    command = [sys.executable, str(engine_root / "bin/AutoGapfiller.py"), "--genome", str(baseline_fasta),
-               "--output", str(paths["03_native"]), "--work", "1", "--thread", str(threads)]
-    for kind, reads in groups.items():
-        if reads:
-            command += ["--" + kind, *reads]
+    native_invocation = make_invocation("degap", baseline_fasta, groups, paths["03_native"], threads,
+                                        runtime=runtime, lock=lock)
+    command = list(native_invocation.command)
+    for relative in engine_manifest["files"]:
+        path = engine_root / relative
+        identities[path] = stat_key(path)
+    for group in (runtime.get("tools", {}), runtime.get("dependencies", {})):
+        for record in group.values():
+            for relative in record.get("files_sha256", {}):
+                # Source-distributed tool paths are relative to their source
+                # tree, not prefix. DEGAP uses only conda scientific dependencies.
+                if record.get("name"):
+                    path = Path(sys.prefix) / relative
+                    identities[path] = stat_key(path)
     invocation = {"tool": "degap", "run_id": run_id, "command": command, "threads": threads,
                   "recipe_sha256": identity(recipe), "status": "running"}
     atomic_json(paths["02_jobs"] / "invocation.json", invocation)
+    native_artifacts, native_summary = {}, {}
     if gaps:
         log = paths["02_jobs"] / "native.log"
         with log.open("xb") as stream:
-            result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT)
+            result = subprocess.run(command, cwd=native_invocation.cwd, env=native_invocation.environment,
+                                    stdout=stream, stderr=subprocess.STDOUT)
         if result.returncode:
             atomic_json(paths["02_jobs"] / "invocation.json", {**invocation, "status": "failed", "returncode": result.returncode})
             raise subprocess.CalledProcessError(result.returncode, command)
@@ -161,6 +180,20 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
         rows = payload.get("gaps")
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             raise PathError("DEGAP native gap report is incomplete")
+        native_fasta = paths["03_native"] / "04.genome_integration/genome.filled.fasta"
+        native_index = IndexedFasta(native_fasta, catalog.index_directory / "native-result.fa")
+        if set(native_index.records) != set(fasta.records):
+            raise PathError("DEGAP native assembly has missing or unexpected chromosomes")
+        for name, (length, *_) in native_index.records.items():
+            sha = hashlib.sha256()
+            n_bases = 0
+            for block in native_index.blocks(name, 0, length):
+                block = block.upper()
+                sha.update(block)
+                n_bases += block.count(b"N")
+            native_summary[name] = {"length": length, "sha256": sha.hexdigest(), "n_bases": n_bases}
+        identities[native_fasta] = native_index.identity
+        native_artifacts[native_fasta.relative_to(root).as_posix()] = digest(native_fasta)
     else:
         # The successful no-op is explicit and content-bound, not a failed-tool fallback.
         native_report = paths["02_jobs"] / "no_gaps.json"
@@ -211,7 +244,9 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
         raise PathError("baseline or reads changed during refinement")
     catalog.verify_unchanged()
     execution = {**invocation, "status": "success", "baseline_sha256": recipe["baseline_sha256"],
-                 "artifacts": {native_report.relative_to(root).as_posix(): native_digest, **candidate_artifacts}}
+                 "native_executed": bool(gaps), "skip_reason": None if gaps else "no_remaining_gaps",
+                 "native_assembly": native_summary,
+                 "artifacts": {native_report.relative_to(root).as_posix(): native_digest, **native_artifacts, **candidate_artifacts}}
     atomic_json(paths["02_jobs"] / "execution.json", execution)
     staging = root / ".runtime/refinement/01_degap" / run_id / "final"
     provenance = prepare_publication(staging, baseline, baseline_fasta, catalog, edits, execution, rejected)

@@ -108,6 +108,10 @@ bash run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapcloser
 
 实施时为每种工具记录版本、完整 commit、来源、许可、文件/下载件 SHA-256 和配方版本。不得运行时拉取 `main/master/latest`，不得无检查地使用 PATH 中另一版本替代。
 
+### 4.2 实施阶段的固定配方
+
+固定版本、分发件、环境依赖与原生入口的实施记录见 [工具配方记录](server-refinement-tool-recipes-20261121.md)，机器可读锁为 `server/contracts/refinement-tools.lock.json`。调查快照表保留原样；实施选定的正式 tag/分发件与调查 HEAD 不混为一谈。Linux x86_64/ARM64 的原生验收仍待最终统一进行。
+
 ## 5. `--out` 的标准布局
 
 ```text

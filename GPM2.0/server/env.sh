@@ -40,6 +40,11 @@ readonly -a REQUIRED_COMMANDS=(
   seqkit
   parallel
   rg
+  tgsgapcloser
+  LR_Gapcloser.sh
+  bwa
+  racon
+  perl
 )
 
 die() {
@@ -261,7 +266,7 @@ update_environment() {
 verify_environment() {
   local report_path="$1"
   local temporary_path="${report_path}.tmp.$$"
-  if ! "$ENV_MANAGER" run -n "$ENV_NAME" python -c '
+  if ! "$ENV_MANAGER" run -n "$ENV_NAME" python -B -c '
 import importlib
 import shutil
 import sys
@@ -290,7 +295,11 @@ for command, resolved in rows:
     rm -f "$temporary_path"
     return 1
   fi
-  if ! "$ENV_MANAGER" run -n "$ENV_NAME" python "$SCRIPT_DIR/tools/degap.py" --help >/dev/null; then
+  if ! "$ENV_MANAGER" run -n "$ENV_NAME" python -B "$SCRIPT_DIR/tools/degap.py" --help >/dev/null; then
+    rm -f "$temporary_path"
+    return 1
+  fi
+  if ! "$ENV_MANAGER" run -n "$ENV_NAME" python -B "$SCRIPT_DIR/tools/refinement_tools.py" --check; then
     rm -f "$temporary_path"
     return 1
   fi
@@ -429,6 +438,9 @@ main() {
   local state_marker="${prefix}/conda-meta/${STATE_MARKER_NAME}"
   local tools_report="${prefix}/conda-meta/${TOOLS_REPORT_NAME}"
   rm -f "$state_marker" "$tools_report"
+  echo "Installing/verifying locked refinement runtimes in '$ENV_NAME'..."
+  "$ENV_MANAGER" run -n "$ENV_NAME" python -B "$SCRIPT_DIR/tools/refinement_tools.py" --install \
+    || die "failed to install the locked refinement runtimes; the environment is not marked verified"
   echo "Verifying required commands in '$ENV_NAME'..."
   if ! verify_environment "$tools_report"; then
     if [[ "$created" == "true" ]]; then
