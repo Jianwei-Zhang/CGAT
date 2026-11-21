@@ -117,7 +117,7 @@ def render_overview(root, batch, results):
     original, summaries, outcomes, rows = None, {}, {}, []
     for tool, record in batch["tools"].items():
         result = results.get(tool)
-        if result is not None and record.get("report") and record["status"] == "staged" and not invalidated:
+        if result is not None and record.get("report") and record["status"] in {"staged", "published"} and not invalidated:
             directory = Path(record["report"]["directory"])
             manifest = json.loads((directory / "manifest.json").read_text())
             if digest(directory / "manifest.json") != record["report"]["manifest_sha256"]:
@@ -133,7 +133,7 @@ def render_overview(root, batch, results):
             summaries[tool] = summary
             outcomes[tool] = {row["gap_id"]: row["status"] for row in result["provenance"]["gap_outcomes"]}
         published = None
-        if record["status"] == "staged" and result is not None:
+        if record["status"] in {"staged", "published"} and result is not None:
             try:
                 candidate = current_publication(root, tool)
                 if candidate and candidate["run_id"] == result["run_id"]:

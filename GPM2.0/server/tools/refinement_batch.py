@@ -181,3 +181,53 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
         batch.update(status="interrupted", exit_code=130)
         atomic_json(target, batch)
         raise
+
+
+def publish_batch(root, lock, batch_result):
+    """Publish every successful branch with the real full/light App validator.
+
+    This does not hold/reacquire a second lock or rerun native tools. The caller
+    owns the existing outer lock for execution, archive creation and publication.
+    """
+    try:
+        from refinement_commit import layout_and_lock, publish_result, current_publication
+        from refinement_delivery import build_delivery, validate_delivery
+    except ModuleNotFoundError:
+        from .refinement_commit import layout_and_lock, publish_result, current_publication
+        from .refinement_delivery import build_delivery, validate_delivery
+    layout = layout_and_lock(root, lock)
+    batch = batch_result["batch"]
+    if not batch["tools"]:
+        return batch_result
+    results = batch_result["staged_results"]
+    if batch["status"] == "invalidated":
+        raise ToolError("shared-input-invalidated refinement results cannot be published")
+    for tool, result in results.items():
+        record = batch["tools"][tool]
+        if record["status"] not in {"staged", "published"}:
+            continue
+        try:
+            previous = current_publication(layout.root, tool)
+            if previous and previous["run_id"] == result["run_id"]:
+                record.update(status="published", publication_transaction=previous["transaction"], phase="published")
+                continue
+            record["phase"] = "app_delivery"
+            delivery = build_delivery(layout.root, result, record["report"])
+            record["phase"] = "publication"
+            receipt = publish_result(layout.root, lock, result, record["report"], delivery, validate_delivery)
+            record.update(status="published", publication_transaction=receipt["transaction"], phase="published")
+        except Exception as error:
+            record.update(status="failed", error_type=type(error).__name__, error=str(error))
+        atomic_json(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json"), batch)
+    failed = any(row["status"] != "published" for row in batch["tools"].values())
+    success = any(row["status"] == "published" for row in batch["tools"].values())
+    batch.update(status="partial_failure" if failed and success else "failed" if failed else "published", exit_code=int(failed))
+    try:
+        batch["overview"] = render_overview(layout.root, batch, results)
+    except Exception as error:
+        batch.update(overview_error={"type": type(error).__name__, "message": str(error)}, exit_code=1)
+        if not failed:
+            batch["status"] = "report_failed"
+    atomic_json(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json"), batch)
+    batch_result["exit_code"] = batch["exit_code"]
+    return batch_result

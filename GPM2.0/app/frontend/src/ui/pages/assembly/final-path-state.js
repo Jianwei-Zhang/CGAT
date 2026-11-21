@@ -1,3 +1,5 @@
+import { normalizeRefinementTrace } from "./refinement-trace-state.js";
+
 export const FINAL_PATH_GAP_BP = 100;
 export const FINAL_PATH_ALL_KEY = "__all__";
 
@@ -125,12 +127,13 @@ export function resolveFinalPathSegmentDisplayName(segment) {
   return `${datasetName}_${ctgName}`;
 }
 
-export function buildFinalPathGapSegment({ segmentId = "", gapSizeBp = FINAL_PATH_GAP_BP } = {}, index = 0) {
+export function buildFinalPathGapSegment({ segmentId = "", gapSizeBp = FINAL_PATH_GAP_BP, refinement = null } = {}, index = 0) {
   const normalizedGapSizeBp = normalizePositiveInteger(gapSizeBp) || FINAL_PATH_GAP_BP;
   return {
     segmentId: normalizeSegmentId(segmentId, index),
     type: "gap",
     gapSizeBp: normalizedGapSizeBp,
+    ...(normalizeRefinementTrace(refinement) ? { refinement: normalizeRefinementTrace(refinement) } : {}),
   };
 }
 
@@ -151,6 +154,7 @@ export function buildFinalPathCtgSegment(
     start = null,
     end = null,
     grtKind = "",
+    refinement = null,
     eventId = "",
     evidenceIds = [],
     sourceCardKey = "",
@@ -178,6 +182,7 @@ export function buildFinalPathCtgSegment(
   const normalizedEnd = normalizePositiveInteger(end);
   const normalizedOrient = normalizeSegmentOrient(orient);
   const traceMetadata = {
+    ...(normalizeRefinementTrace(refinement) ? { refinement: normalizeRefinementTrace(refinement) } : {}),
     ...(normalizePositiveInteger(splitFragmentCtgId) ? { splitFragmentCtgId: normalizePositiveInteger(splitFragmentCtgId) } : {}),
     ...(normalizePositiveInteger(splitFromAssemblyCtgId) ? { splitFromAssemblyCtgId: normalizePositiveInteger(splitFromAssemblyCtgId) } : {}),
     ...(normalizeString(grtKind) ? { grtKind: normalizeString(grtKind) } : {}),
@@ -305,6 +310,7 @@ function normalizeSegment(segment, index = 0) {
       {
         segmentId: segment.segmentId,
         gapSizeBp: segment.gapSizeBp,
+        refinement: segment.refinement,
       },
       index,
     );
@@ -326,6 +332,7 @@ function normalizeSegment(segment, index = 0) {
       start: segment.start,
       end: segment.end,
       grtKind: segment.grtKind,
+      refinement: segment.refinement,
       eventId: segment.eventId,
       evidenceIds: segment.evidenceIds,
       sourceCardKey: segment.sourceCardKey,

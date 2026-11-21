@@ -205,7 +205,13 @@ def validate_prepared_q0(root: Path, *, source_root: Path | None = None, expecte
     initial_datasets = {recipe["primary_dataset"], *json.loads(recipe["support_datasets_json"])}
     expected_fastas = {row["dataset_name"]: row["fasta_relpath"] for row in read_tsv(resolve("metadata/datasets.tsv"))
                        if row["dataset_name"] in initial_datasets}
-    if set(expected_fastas) != initial_datasets or frozen["source_fastas"] != expected_fastas:
+    # A frozen logical path and the new physical numbered spelling may name
+    # the same workspace role. Compare those roles, never sequence similarity
+    # or symlink targets; all original frozen hashes are still checked below.
+    frozen_fastas = frozen["source_fastas"]
+    if (set(expected_fastas) != initial_datasets or set(frozen_fastas) != initial_datasets
+            or {name: workspace_join(source_root, relative) for name, relative in frozen_fastas.items()}
+            != {name: workspace_join(source_root, relative) for name, relative in expected_fastas.items()}):
         raise Q0EvidenceError("q0 source FASTA inventory differs from locked recipe datasets")
     for relative, digest in frozen["artifacts"].items():
         if sha256_file(resolve(relative)) != digest:

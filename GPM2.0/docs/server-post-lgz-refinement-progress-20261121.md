@@ -192,3 +192,38 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 ### 接下来优先完成的纵向链路
 
 下一步直接落实真实 App 精修包生成/校验和 App 导入/导出，再接公共 `--gapfill-tools`、LGZ-only 追加、默认编号初始化及迁移适配器，把上述执行/报告/发布 API 串起来。不要继续把内部模块测试当作用户流程完成。原生部分任务复用、两架构固定环境/原生小样例及 A01–A18 最终统一验收仍待完成。
+
+
+## 2026-11-22：真实精修 App 包、源序列校验与导入/导出
+
+### 这轮推进的是纵向链路
+
+- 新增 App 包 schema **5** / App Final Path schema **4**。旧 schema 2/3/4 保持原解释；旧 App 不会把新包部分导入为 LGZ 路径。新包同时保留精修 Server 路径原文和 App 投影，工具、run、baseline、来源、父片段、坐标 lift 均有明确绑定。
+- `refinement_bundle.py` 从已验证 LGZ 与实际接纳结果构建完整包，再派生轻量包；补入的是实际 bridge 片段来源，不把整条精修染色体改名为单个新来源。FASTA 由来源重建，与已接纳 Server 最终结果校验一致。
+- `refinement_bundle_validate.py` 验证完整文件清单、Server/App 路径投影、来源边界与负链，并在完整包中从源序列重建所有染色体。轻量包保留来源索引和 provenance，但明确无序列，不能假装可导出。
+- `refinement_delivery.py` 生成真正的 ZIP/tar.gz 完整/轻量档案并安全解包校验；不使用 fixture-validator 冒充真实校验。`refinement_batch.publish_batch()` 已把它接到三目录发布事务，成功报告/最终结果/两类 App 包可在受控工作区一起发布。
+- App Rust reader 在修改数据库之前校验新协议与源重建；现有项目模型持久化的是精修路径，能建立 `placement_mode=refinement` 的真实片段卡，并由现有导出器输出正确序列。这里的定位明确是相邻 LGZ 来源上下文，不伪造参考比对命中或 chr_assignment。
+- 前端补上 schema-4 显示支持、精修卡样式/上下文说明，并在可编辑 Final Path 状态中保留父片段、改动/gap 关联和残余 N 来源。恢复预计算路径的文案不再误称总是恢复到 LGZ，而是恢复导入包实际携带的预计算结果。
+
+### 发现并修正的真实路径问题
+
+真实 prepare 写出的 locator 可能是编号路径，分区 FASTA 也可能与完整数据集 FAI 的 header/换行/offset 不同。打包器现在显式投影到可搬移 App 路径，并为每个 source locator 生成自己的 FAI；完整和轻量包均保留该索引。Python/Rust 的重建都使用分区自身的 byte offsets，只以完整数据集 FAI 作长度 catalog。
+
+新受控夹具特意使用编号 locator、带描述的 header 和 47 bp 分区换行，避免仅在旧式单 FASTA 夹具上通过。旧冻结 q0 回执保持原文：q0 验证器仅对逻辑/物理路径拼写做同一 workspace role 比较，仍检查原始文件 hash，不比较“相似序列”来放行，也不改冻结科学证据。
+
+精修 payload 另按实际 source/reference locators 收敛 sequence 白名单，剔除无关 attempt 的 accepted/native 数据和 reads；构建该视图时不先递归复制旧 DEGAP accepted 目录再丢弃，旧 LGZ-only 打包行为仍保留默认兼容；各工具的压缩包使用独立工具名根目录。精修最终 FASTA 改为 60 bp 换行，避免导入器为一个未换行染色体分配整行内存，序列内容、来源和坐标不变。
+
+### 本轮检查边界
+
+- 使用真正冻结的 LGZ scientific fixture，做显式受控 `GTNNAC` 部分接纳；没有执行真实精修工具。新 Python 包用例已验证完整/轻量路径一致、负链/残余 N 来源、篡改 bridge 后即使重封 manifest 仍拒绝、Server 投影篡改拒绝。
+- 真实 ZIP full/light + 发布事务定向检查通过，含 archive root/白名单、源重建、发布后的最终报告状态；另覆盖不安全归档路径、重复 member 拒绝。不是原生工具/客户数据验收。
+- Windows Cargo 的新协议定向用例验证实际 App 导入、来源卡初始化、再次导出与 Server 按染色体序列一致，以及轻量序列不可用。首轮暴露新 patch 不能伪装 chr_assignment 的 ordering 项，已改为由来源卡初始化建立，不弱化原有 assignment 校验。
+- Windows Node 选定 4 项通过：新精修 lineage/残余 N 状态保留、无关 trace 不升级，以及旧 LGZ 投影和可编辑路径 round-trip。未运行生产构建或浏览器。
+- 编号 locator/不同分区 offset 的 Python serializer 专项 3 项通过（0.972 秒）；真实 ZIP full/light → 校验 → 三目录发布的选定集成项通过（3.259 秒）。冻结科学回执原文保留也纳入用例。
+- Windows Rust 新协议 4 项通过（0.27 秒），另选定 ZIP 入口用例通过（0.51 秒，内部覆盖 full/light 两模式）。ZIP 导入器在验证前写自己的 `cache/import.log`：只将这一个固定的运行期日志排除在 archive payload 清单之外；其他未知文件、数据库或改动仍拒绝。用例确认已有项目的人工 note 和数据库不被重复导入覆盖。
+- 真实 tar.gz 读取另有 1 项微型检查通过（0.003 秒），确认不仅 tar member 正常，还会读到 gzip trailer 并拒绝损坏 CRC；未启动完整 tar.gz 原生/交付矩阵。
+- 首次 Rust 编译暴露错误消息泛型边界已修复；中途两次检查命令使用了错误 cwd，修正路径后完成定向检查。未运行全量回归、升级真实环境或更动 master。
+
+### 整体仍未完成
+
+当前是真实包/校验/模型级闭环，不等于公共 `run_all.sh` 已支持本轮完整新流程。公共 reads/tools 配置和 LGZ-only 追加、默认编号 prepare、真实旧工作区迁移、原生部分子任务恢复、受影响新片段注释/比对与完整报告导航、四工具真实固定环境及两架构原生验收、A01–A18 最终统一回归仍继续实施。

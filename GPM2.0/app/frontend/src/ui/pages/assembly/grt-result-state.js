@@ -243,7 +243,7 @@ export function resolveGrtResultContext(assembly) {
     };
   const available = Boolean(
     chrName
-    && ["2", "3"].includes(
+    && ["2", "3", "4"].includes(
       normalizeString(assembly?.grtProjectView?.recipe?.finalPathSchemaVersion),
     )
     && baselineEntry?.grtDisplayAvailable === true

@@ -77,6 +77,7 @@ where
         Some(1),
     )?;
     let q0_v3 = is_q0_package_schema(field(&package_table.rows[0], "schema_version")?);
+    let refined = field(&package_table.rows[0], "schema_version")? == GRT_REFINEMENT_SCHEMA_VERSION;
     let core_specs: &[(&str, &[&str], usize, Option<usize>)] = &[
         ("metadata/package.tsv", PACKAGE_HEADER, 1, Some(1)),
         ("metadata/reference.tsv", REFERENCE_HEADER, 1, Some(1)),
@@ -122,7 +123,7 @@ where
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in core_specs {
         check_grt_validation_cancel(should_cancel)?;
-        let minimum = if q0_v3
+        let minimum = if (q0_v3 || refined)
             && matches!(
                 *relpath,
                 "metadata/chr_assignments.tsv" | "metadata/track_member_orders.tsv"
@@ -139,13 +140,15 @@ where
     let package = one_row(&tables, "metadata/package.tsv")?;
     let final_path_schema_version = field(package, "final_path_schema_version")?;
     if field(package, "workflow")? != GRT_APP_WORKFLOW
-        || (!q0_v3 && field(package, "schema_version")? != GRT_SCHEMA_VERSION)
+        || (!q0_v3 && !refined && field(package, "schema_version")? != GRT_SCHEMA_VERSION)
         || !is_supported_app_final_path_schema(final_path_schema_version)
         || (q0_v3 && final_path_schema_version != GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION)
+        || (refined && final_path_schema_version != GRT_REFINED_FINAL_PATH_SCHEMA_VERSION)
+        || (!refined && final_path_schema_version == GRT_REFINED_FINAL_PATH_SCHEMA_VERSION)
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected App schema 2 (Final Path 1/2/3) or schema 3/4 (Final Path 3)",
+            "expected App schema 2/3/4 or refined schema 5 (Final Path 4); upgrade the App for new delivery formats",
         );
     }
     if q0_v3
@@ -237,11 +240,13 @@ where
         );
     }
     let q4_relpath = json_str(manifest_object, "q4_relpath", "App manifest")?;
-    if q4_relpath
-        != format!(
-            "grt/q/{}.fa",
-            final_q_version(field(package, "schema_version")?)
-        )
+    if (refined && q4_relpath != "data/refinement/final.fa")
+        || (!refined
+            && q4_relpath
+                != format!(
+                    "grt/q/{}.fa",
+                    final_q_version(field(package, "schema_version")?)
+                ))
     {
         return grt_err(
             "INVALID_PATH",
@@ -411,11 +416,12 @@ where
     }
 
     check_grt_validation_cancel(should_cancel)?;
-    validate_app_source_cards(
+    validate_app_source_cards_for_mode(
         table(&tables, "metadata/grt_used_contigs.tsv")?,
         &sources,
         &assignment_baselines,
         &reference_records,
+        refined,
     )?;
     if q0_v3 {
         for card in &table(&tables, "metadata/grt_used_contigs.tsv")?.rows {
@@ -466,6 +472,19 @@ where
     )?;
     if q0_v3 {
         q0_provenance::validate_final_source_uniqueness(&final_path)?;
+    }
+    if refined {
+        on_progress(
+            "validate_refined_sources",
+            "reconstructing accepted refined Final Path from bound sources",
+        );
+        super::refined_delivery::validate_refined_delivery(
+            bundle_root,
+            &tables,
+            &final_path,
+            fasta_available,
+            should_cancel,
+        )?;
     }
     if let Some(expected_lengths) = manifest_object
         .get("q4_chromosome_lengths")

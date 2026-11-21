@@ -11,9 +11,9 @@ evidence in the Final Path document.
 from __future__ import annotations
 
 try:
-    from workspace_layout import workspace_join, WorkspaceLayout
+    from workspace_layout import workspace_join, WorkspaceLayout, logical_relative
 except ModuleNotFoundError:
-    from .workspace_layout import workspace_join, WorkspaceLayout
+    from .workspace_layout import workspace_join, WorkspaceLayout, logical_relative
 
 
 import argparse
@@ -108,6 +108,28 @@ def copy_annotation_tree(source_root: Path, staging_root: Path, directory: str) 
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
 
+
+
+def project_locator_paths(staging_root: Path) -> None:
+    """Never leak Server's physical numbering into portable App locators."""
+    for name in ("reference.tsv", "datasets.tsv", "source_seq_locator.tsv", "reference_chr_locator.tsv", "grt_recipe.tsv"):
+        path = staging_root / "metadata" / name
+        fields, rows = None, []
+        with path.open(newline="", encoding="utf-8") as stream:
+            reader = csv.DictReader(stream, delimiter="\t")
+            fields, rows = list(reader.fieldnames or []), list(reader)
+        changed = False
+        for row in rows:
+            for key in fields:
+                if key.endswith("_relpath") and row[key]:
+                    value = logical_relative(row[key])
+                    changed = changed or value != row[key]
+                    row[key] = value
+        if changed:
+            with path.open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fields, delimiter="\t", lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(rows)
 
 def project_package_table(source: Path, target: Path, package_mode: str) -> str:
     with source.open(newline="", encoding="utf-8") as handle:
@@ -303,6 +325,7 @@ def project_final_path(
         source_lengths,
         display_source_cards,
     )
+    payload["q4_relpath"] = logical_relative(payload["q4_relpath"])
     payload["workflow"] = APP_WORKFLOW
     payload["schema_version"] = FINAL_PATH_SCHEMA_VERSION
     for chromosome in payload["chromosomes"]:
@@ -381,7 +404,7 @@ def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
         raise ValueError("alignment policy does not bind the delivered complete PAF")
     return value
 
-def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
+def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
     with (workspace_join(source_root, "metadata/package.tsv")).open(newline="", encoding="utf-8") as handle:
@@ -398,7 +421,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         shutil.rmtree(staging_root)
     staging_root.mkdir(parents=True)
 
-    if (workspace_join(source_root, "metadata/degap_inputs.json")).is_file():
+    if include_legacy_gapfill and (workspace_join(source_root, "metadata/degap_inputs.json")).is_file():
         from post_lgz_degap import validate_result
         valid, reason = validate_result(source_root)
         if not valid:
@@ -413,6 +436,8 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         else:
             copy_file(source_root, staging_root, f"metadata/{filename}")
     for filename in OPTIONAL_METADATA:
+        if filename == "degap_gapfill.json" and not include_legacy_gapfill:
+            continue
         if (workspace_join(source_root, "metadata", filename)).is_file():
             copy_file(source_root, staging_root, f"metadata/{filename}")
             if filename == "degap_gapfill.json":
@@ -432,7 +457,8 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     if WorkspaceLayout.detect(source_root).version == 2:
         # The logical data subtree is physically split. Do not ship converted
         # raw reads or their ID maps as App source assemblies.
-        for directory in ("data", "data/reference", "data/datasets", "data/degap"):
+        directories = ("data", "data/reference", "data/datasets") + (("data/degap",) if include_legacy_gapfill else ())
+        for directory in directories:
             copy_tree_filtered(source_root, staging_root, directory, include_fasta)
     else:
         copy_tree_filtered(source_root, staging_root, "data", include_fasta)
@@ -466,6 +492,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         q4_hash = sha256_file(q4_source)
     else:
         q4_hash = sha256_file(q4_source)
+    project_locator_paths(staging_root)
     write_manifest(staging_root, "full" if include_fasta else "no_fasta", include_fasta, final_path, q4_hash, q4_lengths, schema_version=app_schema)
 
 

@@ -1,6 +1,6 @@
 # Refinement reporting and publication contract
 
-Date: 2026-11-22. Status: implemented internal APIs; production App integration remains pending.
+Date: 2026-11-22. Status: implemented internal APIs and real App archive validator; public launcher integration remains pending.
 
 ## Reports are not final publications
 
@@ -25,7 +25,7 @@ The App validator must return `cgat.refinement-delivery-validation` version 1, i
 - the admitted Final Path file SHA-256;
 - a chromosome-name map of final sequence lengths and SHA-256 values.
 
-The return value is not a substitute for checking archive contents, source availability and reconstructability. The future production validator must prove those properties before returning it. There is no CLI option accepting a user JSON assertion or an arbitrary validator script. The current tests inject a deliberately named fixture validator to test filesystem behavior only; **that is not App acceptance**.
+The return value is not a substitute for checking archive contents, source availability and reconstructability. The repository-owned `refinement_delivery.validate_delivery()` now checks those properties before returning it; full mode reconstructs the admitted chromosomes from archive source intervals. There is no CLI option accepting a user JSON assertion or an arbitrary validator script. The filesystem transaction tests still inject a deliberately named fixture validator; **those are not App acceptance**. Separate controlled tests now create and validate genuine full/light App archives through `publish_batch()`.
 
 The transaction prepares stable copies and then publishes the following fixed locations:
 
@@ -57,7 +57,7 @@ Native timing is measured independently from requested resource budgets. Report 
 
 ## Remaining integration
 
-No production App archives have been published through this API yet. The App package serializer/validator, importer/exporter, public launch/config/resume wiring, real legacy migration adapter and default numbered initialization are still required. Final validation must include the accepted A01–A18 matrix, real pinned-tool small examples and both architecture environments. Intermediate report/transaction checks do not replace those gates.
+Real full/light App archives have now been built, validated and published through this API on a controlled admitted-result fixture. The Windows App importer/initializer/exporter is checked against that same serializer output. Public launch/config/resume wiring, the real legacy migration adapter, default numbered initialization and final affected-evidence/native acceptance remain required. This is not a real four-engine/customer-data acceptance claim. Final validation must include the accepted A01–A18 matrix, real pinned-tool small examples and both architecture environments. Intermediate report/transaction checks do not replace those gates.
 
 ---
 

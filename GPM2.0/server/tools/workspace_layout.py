@@ -98,6 +98,24 @@ def canonical_relative(value: str | PurePosixPath) -> str:
     return text
 
 
+
+def logical_relative(value: str | PurePosixPath) -> str:
+    """Project a physical numbered path into the portable legacy App namespace.
+
+    This is a delivery projection, never a workspace symlink or proof rewrite.
+    Logical input stays unchanged; full q-stage roles take precedence.
+    """
+    text = relative_path(value)
+    match = re.match(r"03_lgz/(?:01_q0|02_step1|03_step2|04_step3)/([.]?q[0-4](?:[._/].*)?)$", text)
+    if match:
+        return "grt/q/" + match[1]
+    if text.startswith(".runtime/commands/") and text.removeprefix(".runtime/commands/") in _ROOT_COMMANDS:
+        return text.removeprefix(".runtime/commands/")
+    for source, destination in sorted(_PREFIXES.items(), key=lambda row: len(row[1]), reverse=True):
+        if text == destination or text.startswith(destination + "/"):
+            return source + text[len(destination):]
+    return text
+
 def _read_object(path: Path) -> dict:
     if path.is_symlink() or not path.is_file():
         raise LayoutError(f"workspace manifest must be a regular file: {path}")

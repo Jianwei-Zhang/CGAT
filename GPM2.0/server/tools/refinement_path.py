@@ -318,17 +318,22 @@ def write_assembly(final_path: dict, catalog: Catalog, destination: Path) -> Non
             if not name or re.search(r"\s|[\x00-\x1f\x7f]", name):
                 raise PathError("invalid chromosome name")
             stream.write(b">" + name.encode("utf-8") + b"\n")
-            length, sha256 = 0, hashlib.sha256()
+            length, sha256, pending = 0, hashlib.sha256(), b""
             for segment in chromosome["segments"]:
                 if segment.get("output_start") != length:
                     raise PathError("Final Path output coordinates are not contiguous")
                 for block in segment_blocks(segment, catalog):
-                    stream.write(block)
+                    data = pending + block
+                    stop = len(data) // 60 * 60
+                    if stop:
+                        stream.write(b"\n".join(data[index:index + 60] for index in range(0, stop, 60)) + b"\n")
+                    pending = data[stop:]
                     length += len(block)
                     sha256.update(block)
                 if segment.get("output_end") != length:
                     raise PathError("Final Path segment output length mismatch")
-            stream.write(b"\n")
+            if pending:
+                stream.write(pending + b"\n")
             if length != chromosome["length"] or sha256.hexdigest() != chromosome["sha256"]:
                 raise PathError("Final Path changed during reconstruction")
 

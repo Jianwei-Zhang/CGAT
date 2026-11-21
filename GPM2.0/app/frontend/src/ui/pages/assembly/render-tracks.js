@@ -422,7 +422,7 @@ function createRenderTracksRenderer(deps = {}) {
       sourceLength > 0 ? `${i18n.page.finalPathSourceLength}: ${formatBp(sourceLength)}` : "",
       memberSourceRangeText(ctg, i18n), resolveDerivedSourceLabel(ctg),
       memberLocalDetail(ctg, assembly, i18n)?.tooltip,
-      ctg.grtSourceCardKey ? `${i18n.grt.refStatus}: ${ctg.grtRefAlignmentStatus || "-"}; ${i18n.grt.anchorSource}: ${i18n.grt.grtFinalPathAnchor}; ${ctg.grtPlacementMode || "normal"}` : "",
+      ctg.grtSourceCardKey ? `${i18n.grt.refStatus}: ${ctg.grtRefAlignmentStatus || "-"}; ${i18n.grt.anchorSource}: ${ctg.grtPlacementMode === "refinement" ? i18n.grt.refinementContextAnchor : i18n.grt.grtFinalPathAnchor}; ${ctg.grtPlacementMode || "normal"}` : "",
       ...extra].filter(Boolean).join("\n");
   }
   function memberChipBody(ctg, visibleName, i18n, { nameClass = "", tags = [], localAnnotation = "" } = {}) {

@@ -13,6 +13,19 @@ pub fn initialize_grt_project_with_options(
     phased_assembly_enabled: bool,
 ) -> Result<GrtProjectInitializationSummary> {
     let recipe = load_grt_locked_recipe(project_db_path)?;
+    let description = if recipe.schema_version == GRT_REFINEMENT_SCHEMA_VERSION {
+        let path = load_grt_final_path(project_db_path)?;
+        let tool = path
+            .get("tool")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow!("refined recipe has no engine identity"))?;
+        format!(
+            "LGZ + {tool} accepted refinement; locked recipe {}",
+            recipe.recipe_id
+        )
+    } else {
+        format!("locked LGZ recipe {}", recipe.recipe_id)
+    };
     let mut conn = open_workspace_db(project_db_path)?;
     let options = list_initializer_options_with_connection(&conn)?;
     if options.references.len() != 1 {
@@ -60,7 +73,7 @@ pub fn initialize_grt_project_with_options(
             auto_check_new_seq: false,
             phased_assembly_enabled: Some(phased_assembly_enabled),
             chr_assignment_min_coverage_percent: None,
-            description: Some(format!("locked LGZ recipe {}", recipe.recipe_id)),
+            description: Some(description),
         },
     )?;
     let project_id = initialized.project_id;
@@ -129,7 +142,10 @@ pub(super) fn materialize_grt_source_cards_with_connection(
             .as_object()
             .ok_or_else(|| anyhow!("persisted LGZ source card must be an object"))?;
         let placement_mode = json_nonempty_str(object, "placement_mode", "LGZ source card")?;
-        if placement_mode != "grt_promoted" && placement_mode != "cross_chr_grt_usage" {
+        if !matches!(
+            placement_mode,
+            "grt_promoted" | "cross_chr_grt_usage" | "refinement"
+        ) {
             continue;
         }
         let source_card_key = json_nonempty_str(object, "source_card_key", "LGZ source card")?;

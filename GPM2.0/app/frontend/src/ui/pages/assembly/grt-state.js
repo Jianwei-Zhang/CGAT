@@ -1,3 +1,4 @@
+import { normalizeRefinementTrace } from "./refinement-trace-state.js";
 function normalizeString(value) {
   return String(value ?? "").trim();
 }
@@ -87,11 +88,13 @@ function normalizeGrtSegment(segment, index, chrName) {
     || `grt-${chrName}-${index + 1}`;
   const length = normalizePositiveInteger(source.length) || 1;
   const kind = normalizeString(source.kind).toLowerCase() || "source";
+  const refinement = normalizeRefinementTrace({ ...source, source: source.refinement_source });
   if (kind === "gap") {
     return {
       segmentId,
       type: "gap",
       gapSizeBp: length,
+      ...(refinement ? { refinement } : {}),
       serverBaseline: true,
     };
   }
@@ -119,6 +122,7 @@ function normalizeGrtSegment(segment, index, chrName) {
   return {
     segmentId,
     type: "ctg",
+    ...(refinement ? { refinement } : {}),
     assemblyCtgId,
     ...(assemblySourceStart ? { assemblySourceStart } : {}),
     ...(assemblySourceEnd ? { assemblySourceEnd } : {}),
