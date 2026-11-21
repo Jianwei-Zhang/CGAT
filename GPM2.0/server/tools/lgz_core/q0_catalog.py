@@ -1,6 +1,12 @@
 """Cross-dataset q0 candidate discovery, not path selection or chr reassignment."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 from bisect import bisect_right
 from collections import defaultdict
 from dataclasses import asdict, dataclass
@@ -128,7 +134,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
         lengths_by_dataset[key.dataset][key.contig] = len(sequence)
     for dataset, lengths in sorted(lengths_by_dataset.items()):
         relative = f"runs/{dataset}_vs_ref/result.paf"
-        for hit in read_paf(root / relative, query_lengths=lengths,
+        for hit in read_paf(workspace_join(root, relative), query_lengths=lengths,
                             target_lengths=reference_lengths, artifact=relative):
             key = SourceKey(dataset, hit.query_name)
             if key not in by_source:

@@ -5,6 +5,12 @@ mapped here. A ready manifest is published atomically after every task succeeds.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 from collections import defaultdict
 import csv
 import json
@@ -39,7 +45,7 @@ def artifact_path(root: Path, relative: str) -> Path:
     path = Path(relative)
     if not relative or path.is_absolute() or ".." in path.parts or "\\" in relative:
         raise Q0EvidenceError(f"invalid q0 artifact path: {relative!r}")
-    resolved = (root / path).resolve()
+    resolved = (workspace_join(root, path)).resolve()
     try:
         resolved.relative_to(root.resolve())
     except ValueError as exc:
@@ -78,14 +84,14 @@ def table(root: Path, relative: str, fields: Iterable[str]) -> list[dict[str, st
 def builder_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-evidence-builder", [
-        [name, sha256_file(root / name)] for name in (
+        [name, sha256_file(workspace_join(root, name))] for name in (
             "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py")])
 
 
 def load_verified_evidence(root: Path) -> dict:
     """No fallback: consumers must reject missing, stale, or damaged evidence."""
     root = root.resolve()
-    manifest = json_file(root / MANIFEST)
+    manifest = json_file(workspace_join(root, MANIFEST))
     if (manifest.get("schema") != SCHEMA or manifest.get("status") != "success"
             or manifest.get("policy") != POLICY or manifest.get("builder") != builder_identity()):
         raise Q0EvidenceError("q0 evidence manifest has an unsupported or stale identity")
@@ -261,7 +267,7 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
             "alignment_flags": POLICY["supplement_flags"]}
     task_id = stable_id("q0-map", spec)
     relative = f"grt/evidence/q0_prepare/tasks/{task_id}"
-    directory = root / relative
+    directory = workspace_join(root, relative)
     cache = directory / "success.json"
     output = directory / "result.paf"
     required_outputs = {f"{relative}/{name}" for name in MAPPING_OUTPUT_FILES}
@@ -315,7 +321,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
     tool = executable_identity(minimap2)
     request_identity = stable_id("q0-evidence-input", {"inputs": inputs, "tool": tool,
                                 "policy": POLICY, "builder": builder})
-    if (root / MANIFEST).is_file():
+    if (workspace_join(root, MANIFEST)).is_file():
         try:
             previous = load_verified_evidence(root)
             if previous.get("input_fingerprint") == request_identity:
@@ -335,7 +341,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
                            skip_self=options.get("skip_self") == "true")
         tasks.append(task)
-        hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in remaining},
+        hits = read_paf(workspace_join(root, task["paf"]), query_lengths={key: catalog.parts[key].interval.length for key in remaining},
                         target_lengths={key: catalog.parts[key].interval.length for key in anchors}, artifact=task["paf"])
         added = add_pairwise_candidates(catalog, hits, set(remaining), set(anchors),
                                         known_pairs=known_pairs)
@@ -348,7 +354,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
                            skip_self=options.get("skip_self") == "true")
         tasks.append(task)
-        hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
+        hits = read_paf(workspace_join(root, task["paf"]), query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
                         target_lengths={key: catalog.parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"])
         add_pairwise_candidates(catalog, hits, set(task["query_ids"]), set(task["target_ids"]),
                                 include_placed=True, known_pairs=known_pairs)
@@ -365,16 +371,16 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
     payload["base_alignments"] = base_alignments
     payload["supplementary_alignments"] = tasks
     catalog_name = f"grt/evidence/q0_prepare/{stable_id('catalog', payload)}.json"
-    atomic_write_json(root / catalog_name, payload)
+    atomic_write_json(workspace_join(root, catalog_name), payload)
     output_paths = {catalog_name}
     for task in tasks:
         output_paths.add(task["receipt"])
-        output_paths.update(row["path"] for row in json_file(root / task["receipt"])["outputs"])
+        output_paths.update(row["path"] for row in json_file(workspace_join(root, task["receipt"]))["outputs"])
     manifest = {"schema": SCHEMA, "status": "success", "policy": POLICY, "builder": builder,
                 "input_fingerprint": request_identity, "inputs": inputs,
                 "outputs": [identity(root, relative) for relative in sorted(output_paths)],
                 "catalog": catalog_name, "tool": tool}
-    atomic_write_json(root / MANIFEST, manifest)
+    atomic_write_json(workspace_join(root, MANIFEST), manifest)
     print(f"LGZ q0 evidence prepared: candidates={len(payload['candidates'])} "
           f"supplementary_tasks={len(tasks)} unplaced_segments={len(payload['unplaced_segment_ids'])}")
     return manifest

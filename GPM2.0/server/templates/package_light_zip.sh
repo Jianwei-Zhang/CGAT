@@ -52,6 +52,7 @@ else
   temporary_archive="${archive_temporary_dir}/$(basename "$archive_path")"
   python3 "$archive_helper" create --server-dir "$server_dir" --kind "$kind" \
     --staging "$staging_path" --output "$temporary_archive"
+  mkdir -p -- "$(dirname "$archive_path")"
   mv -f -- "$temporary_archive" "$archive_path"
   rm -rf -- "$archive_temporary_dir" "$(dirname "$staging_path")"
   rmdir --ignore-fail-on-non-empty "$(dirname "$(dirname "$staging_path")")" 2>/dev/null || true

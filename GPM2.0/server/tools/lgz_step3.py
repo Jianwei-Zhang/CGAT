@@ -12,6 +12,12 @@ the entrypoint.
 from __future__ import annotations
 
 try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
+try:
     from run_resources import execution_threads
 except ModuleNotFoundError:  # Imported through server.tools.
     from .run_resources import execution_threads
@@ -113,7 +119,7 @@ def load_locked_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
     except ModuleNotFoundError:  # Imported through server.tools.
         from .annotation_library import verify_snapshot
     verify_snapshot(server_dir)
-    rows = read_tsv(server_dir / "metadata/grt_telomere_rules.tsv")
+    rows = read_tsv(workspace_join(server_dir, "metadata/grt_telomere_rules.tsv"))
     rules: list[dict[str, object]] = []
     seen: set[tuple[str, int, int, int]] = set()
     for row in rows:
@@ -260,7 +266,7 @@ def verify_telomere_donor_freeze(
     recipe: dict[str, str],
 ) -> tuple[dict[str, str], list[dict[str, str]], dict[str, str]]:
     donor_sets = read_tsv(
-        server_dir / "metadata/grt_donor_sets.tsv",
+        workspace_join(server_dir, "metadata/grt_donor_sets.tsv"),
         [
             "donor_set_id",
             "donor_kind",
@@ -279,12 +285,12 @@ def verify_telomere_donor_freeze(
     if len(matching) != 1:
         fail("recipe does not identify exactly one frozen telomere donor set")
     donor_set = matching[0]
-    donor_path = server_dir / donor_set["fasta_relpath"]
+    donor_path = workspace_join(server_dir, donor_set["fasta_relpath"])
     if sha256_file(donor_path) != donor_set["fasta_sha256"]:
         fail("frozen Dtel FASTA checksum changed")
-    all_members = read_tsv(server_dir / "metadata/grt_donor_members.tsv", DONOR_MEMBER_FIELDS)
+    all_members = read_tsv(workspace_join(server_dir, "metadata/grt_donor_members.tsv"), DONOR_MEMBER_FIELDS)
     members = [row for row in all_members if row["donor_set_id"] == donor_set["donor_set_id"]]
-    manifest = read_tsv(server_dir / donor_set["manifest_relpath"], DONOR_MEMBER_FIELDS)
+    manifest = read_tsv(workspace_join(server_dir, donor_set["manifest_relpath"]), DONOR_MEMBER_FIELDS)
     if members != manifest or len(members) != int(donor_set["member_count"]):
         fail("frozen Dtel manifest differs from its member registry")
     records = dict(read_fasta_allow_empty(donor_path))
@@ -296,7 +302,7 @@ def verify_telomere_donor_freeze(
         ]:
             fail(f"frozen Dtel member checksum changed: {member['member_id']}")
     donor_freeze = json.loads(
-        (server_dir / "grt/checkpoints/donor_freeze.json").read_text(encoding="utf-8")
+        (workspace_join(server_dir, "grt/checkpoints/donor_freeze.json")).read_text(encoding="utf-8")
     )
     if donor_freeze.get("tel_donor_set_id") != donor_set["donor_set_id"]:
         fail("donor-freeze checkpoint does not reference the recipe Dtel")
@@ -342,7 +348,7 @@ def cached_terminal_mummer(
     }
     fingerprint = json_hash(fingerprint_payload)
     terminal_key = stable_id("terminal", [chromosome, terminal], 16)
-    cache_parent = server_dir / f"grt/cache/telomere/mummer/{terminal_key}"
+    cache_parent = workspace_join(server_dir, f"grt/cache/telomere/mummer/{terminal_key}")
     cache_dir = cache_parent / fingerprint
     checkpoint_path = cache_dir / "cache.json"
     output_names = [
@@ -398,7 +404,7 @@ def cached_terminal_mummer(
         filtered = temporary / "result.filtered.delta"
         coords = temporary / "result.coords"
         if should_align:
-            donor_path = server_dir / donor_set["fasta_relpath"]
+            donor_path = workspace_join(server_dir, donor_set["fasta_relpath"])
             prefix = temporary / "result"
             run_logged(
                 [
@@ -495,7 +501,7 @@ def cached_terminal_mummer(
         }
     except BaseException:
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             failed_dir = failed_root / f"step3-mummer-{terminal_key}-{os.getpid()}"
             if failed_dir.exists():
@@ -731,7 +737,7 @@ def cached_candidate_minimap(
     }
     fingerprint = json_hash(fingerprint_payload)
     candidate_key = stable_id("candidate", candidate["candidate_id"], 18)
-    cache_parent = server_dir / f"grt/cache/telomere/minimap/{candidate_key}"
+    cache_parent = workspace_join(server_dir, f"grt/cache/telomere/minimap/{candidate_key}")
     cache_dir = cache_parent / fingerprint
     output_names = [
         "query.fa",
@@ -829,7 +835,7 @@ def cached_candidate_minimap(
         }
     except BaseException:
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             failed_dir = failed_root / f"step3-minimap-{candidate_key}-{os.getpid()}"
             if failed_dir.exists():
@@ -1413,7 +1419,7 @@ def run_step3(
 ) -> tuple[dict[str, object], bool]:
     authorization = source_authorization or SourceAuthorization.load(server_dir, sources)
     authorization.validate_paths(input_paths)
-    q2_sha256 = sha256_file(server_dir / "grt/q/q2.fa")
+    q2_sha256 = sha256_file(workspace_join(server_dir, "grt/q/q2.fa"))
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
@@ -1452,12 +1458,12 @@ def run_step3(
         return cached, True
     invalidate_step3(server_dir)
     artifact_relpath = "grt/evidence/step3"
-    artifact_dir = server_dir / artifact_relpath
+    artifact_dir = workspace_join(server_dir, artifact_relpath)
     artifact_dir.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=".step3.", dir=artifact_dir.parent))
-    q3_temporary = server_dir / f"grt/q/.q3.fa.tmp.{os.getpid()}"
+    q3_temporary = workspace_join(server_dir, f"grt/q/.q3.fa.tmp.{os.getpid()}")
     members_by_record = {row["fasta_record_name"]: row for row in donor_members}
-    donor_records = dict(read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"]))
+    donor_records = dict(read_fasta_allow_empty(workspace_join(server_dir, donor_set["fasta_relpath"])))
     donor_lengths = {name: len(sequence) for name, sequence in donor_records.items()}
     terminal_rows: list[dict[str, object]] = []
     candidates: list[dict[str, object]] = []
@@ -1834,7 +1840,7 @@ def run_step3(
             newline="",
         )
         commit_stage_directory(temporary, artifact_dir)
-        os.replace(q3_temporary, server_dir / "grt/q/q3.fa")
+        os.replace(q3_temporary, workspace_join(server_dir, "grt/q/q3.fa"))
         output_relpaths = [
             path.relative_to(server_dir).as_posix()
             for path in artifact_dir.rglob("*")
@@ -1857,7 +1863,7 @@ def run_step3(
     except BaseException:
         q3_temporary.unlink(missing_ok=True)
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             failed_dir = failed_root / f"step3-{os.getpid()}"
             if failed_dir.exists():
@@ -2090,7 +2096,7 @@ def reconcile_terminal_supersession(
             tel_events[str(replacing_id)].setdefault("superseded_event_ids", []).append(
                 event["event_id"]
             )
-    q2_records = dict(read_fasta(server_dir / "grt/q/q2.fa"))
+    q2_records = dict(read_fasta(workspace_join(server_dir, "grt/q/q2.fa")))
     for event in events:
         if event.get("status") != "accepted" or not event_is_path_producing(event):
             continue
@@ -2204,7 +2210,7 @@ def write_finalize_checkpoint(
             "metadata/grt_final_path.json": final_path_sha256,
         },
     }
-    path = server_dir / "grt/checkpoints/finalize.json"
+    path = workspace_join(server_dir, "grt/checkpoints/finalize.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(path, checkpoint, pretty=True)
     return path
@@ -2217,7 +2223,7 @@ def publish_metadata_and_finalize(
     tools: dict[str, dict[str, str]],
     minimap: dict[str, str],
 ) -> dict[str, object]:
-    metadata = server_dir / "metadata"
+    metadata = workspace_join(server_dir, "metadata")
     q_rows: list[dict[str, object]] = [
         row
         for row in read_tsv(metadata / "grt_q_segments.tsv", Q_SEGMENT_FIELDS)
@@ -2310,7 +2316,7 @@ def publish_metadata_and_finalize(
         usage_rows,
     )
     q0_lineage = None
-    if read_single(server_dir / "metadata/package.tsv")["schema_version"] in Q0_PACKAGE_SCHEMA_VERSIONS:
+    if read_single(workspace_join(server_dir, "metadata/package.tsv"))["schema_version"] in Q0_PACKAGE_SCHEMA_VERSIONS:
         try:
             from lgz_core.q0_lineage import Q0Lineage
         except ModuleNotFoundError:
@@ -2328,10 +2334,10 @@ def publish_metadata_and_finalize(
     atomic_write_json(metadata / "grt_final_path.json", final_path, pretty=True)
     verify_final_path(
         json.loads((metadata / "grt_final_path.json").read_text(encoding="utf-8")),
-        dict(read_fasta(server_dir / "grt/q/q3.fa")),
+        dict(read_fasta(workspace_join(server_dir, "grt/q/q3.fa"))),
         sources,
     )
-    q3_sha256 = sha256_file(server_dir / "grt/q/q3.fa")
+    q3_sha256 = sha256_file(workspace_join(server_dir, "grt/q/q3.fa"))
     finalize_checkpoint = write_finalize_checkpoint(
         server_dir,
         q3_sha256,
@@ -2359,7 +2365,7 @@ def publish_metadata_and_finalize(
 
 def execute(args: argparse.Namespace) -> None:
     server_dir = args.server_dir.resolve()
-    package = read_single(server_dir / "metadata/package.tsv")
+    package = read_single(workspace_join(server_dir, "metadata/package.tsv"))
     if (
         package.get("workflow") != WORKFLOW
         or package.get("schema_version") != CURRENT_PACKAGE_SCHEMA_VERSION
@@ -2368,7 +2374,7 @@ def execute(args: argparse.Namespace) -> None:
     ):
         fail("unsupported package workflow/schema; Step3 has no legacy fallback")
     recipe = read_single(
-        server_dir / "metadata/grt_recipe.tsv",
+        workspace_join(server_dir, "metadata/grt_recipe.tsv"),
         [
             "recipe_id",
             "primary_dataset",
@@ -2387,9 +2393,9 @@ def execute(args: argparse.Namespace) -> None:
     sources = source_catalog(server_dir)
     authorization = SourceAuthorization.load(server_dir, sources, frozen=frozen_q0)
     assignments = assignment_map(server_dir)
-    q_rows = read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS)
+    q_rows = read_tsv(workspace_join(server_dir, "metadata/grt_q_segments.tsv"), Q_SEGMENT_FIELDS)
     q2_rows = [row for row in q_rows if row["q_version"] == "q2"]
-    if not q2_rows or not (server_dir / "grt/q/q2.fa").is_file():
+    if not q2_rows or not (workspace_join(server_dir, "grt/q/q2.fa")).is_file():
         fail("Step3 requires a completed q2/Step1-3 mapping")
     chromosome_order, q2_paths, q2_records = load_q_paths(
         server_dir, "q2", q2_rows, sources
@@ -2406,7 +2412,7 @@ def execute(args: argparse.Namespace) -> None:
         {
             "recipe_id": recipe["recipe_id"],
             "tel_donor_set_id": donor_set["donor_set_id"],
-            "q2_sha256": sha256_file(server_dir / "grt/q/q2.fa"),
+            "q2_sha256": sha256_file(workspace_join(server_dir, "grt/q/q2.fa")),
             "engine_version": ENGINE_VERSION,
             "tools": {
                 name: command_identity(identity)
@@ -2438,7 +2444,7 @@ def execute(args: argparse.Namespace) -> None:
     print(
         f"LGZ q3 finalized: run={run_id}, Dtel={donor_set['donor_set_id']}, "
         f"chromosomes={len(final_path['chromosomes'])}, "
-        f"q3_sha256={sha256_file(server_dir / 'grt/q/q3.fa')}"
+        f"q3_sha256={sha256_file(workspace_join(server_dir, 'grt/q/q3.fa'))}"
     )
 
 

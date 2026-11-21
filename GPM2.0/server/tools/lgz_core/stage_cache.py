@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
+try:
     from run_resources import execution_threads
 except ModuleNotFoundError:  # Imported through server.tools.
     from ..run_resources import execution_threads
@@ -40,7 +46,7 @@ def checkpoint_result(
     stage: str,
     fingerprint: str,
 ) -> dict[str, object] | None:
-    checkpoint_path = server_dir / f"grt/checkpoints/{stage}.json"
+    checkpoint_path = workspace_join(server_dir, f"grt/checkpoints/{stage}.json")
     if not checkpoint_path.is_file():
         return None
     try:
@@ -53,10 +59,10 @@ def checkpoint_result(
         if not isinstance(output_hashes, dict) or not output_hashes:
             return None
         for relpath, expected_hash in output_hashes.items():
-            path = server_dir / relpath
+            path = workspace_join(server_dir, relpath)
             if not path.is_file() or sha256_file(path) != expected_hash:
                 return None
-        result_path = server_dir / str(checkpoint["result_relpath"])
+        result_path = workspace_join(server_dir, str(checkpoint["result_relpath"]))
         result = json.loads(result_path.read_text(encoding="utf-8"))
         if result.get("stage") != stage or result.get("input_fingerprint") != fingerprint:
             return None
@@ -67,7 +73,7 @@ def checkpoint_result(
 
 def completed_stage_result(server_dir: Path, stage: str) -> dict[str, object]:
     """Load one completed stage without recomputing its producer fingerprint."""
-    checkpoint_path = server_dir / f"grt/checkpoints/{stage}.json"
+    checkpoint_path = workspace_join(server_dir, f"grt/checkpoints/{stage}.json")
     try:
         checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
         if not isinstance(checkpoint, dict):
@@ -82,10 +88,10 @@ def completed_stage_result(server_dir: Path, stage: str) -> dict[str, object]:
         if not isinstance(output_hashes, dict) or not output_hashes:
             fail(f"{stage} checkpoint has no validated outputs")
         for relpath, expected_hash in output_hashes.items():
-            path = server_dir / str(relpath)
+            path = workspace_join(server_dir, str(relpath))
             if not path.is_file() or sha256_file(path) != expected_hash:
                 fail(f"{stage} checkpoint output is missing or changed: {relpath}")
-        result_path = server_dir / str(checkpoint["result_relpath"])
+        result_path = workspace_join(server_dir, str(checkpoint["result_relpath"]))
         result = json.loads(result_path.read_text(encoding="utf-8"))
         if not isinstance(result, dict):
             fail(f"{stage} result must be an object")
@@ -109,9 +115,9 @@ def invalidate_step12_from(server_dir: Path, stage: str) -> None:
     outputs = {"step1": "q1", "step2": "q2"}
     start = order.index(stage)
     for invalid_stage in order[start:]:
-        (server_dir / f"grt/checkpoints/{invalid_stage}.json").unlink(missing_ok=True)
-        (server_dir / f"grt/q/{outputs[invalid_stage]}.fa").unlink(missing_ok=True)
-        artifact = server_dir / f"grt/evidence/{invalid_stage}"
+        (workspace_join(server_dir, f"grt/checkpoints/{invalid_stage}.json")).unlink(missing_ok=True)
+        (workspace_join(server_dir, f"grt/q/{outputs[invalid_stage]}.fa")).unlink(missing_ok=True)
+        artifact = workspace_join(server_dir, f"grt/evidence/{invalid_stage}")
         if artifact.is_dir():
             shutil.rmtree(artifact)
     invalidate_step3(server_dir)
@@ -119,10 +125,10 @@ def invalidate_step12_from(server_dir: Path, stage: str) -> None:
 
 def invalidate_step3(server_dir: Path) -> None:
     for stage in ("step3", "finalize"):
-        (server_dir / f"grt/checkpoints/{stage}.json").unlink(missing_ok=True)
-    (server_dir / "grt/q/q3.fa").unlink(missing_ok=True)
-    (server_dir / "metadata/grt_final_path.json").unlink(missing_ok=True)
-    artifact = server_dir / "grt/evidence/step3"
+        (workspace_join(server_dir, f"grt/checkpoints/{stage}.json")).unlink(missing_ok=True)
+    (workspace_join(server_dir, "grt/q/q3.fa")).unlink(missing_ok=True)
+    (workspace_join(server_dir, "metadata/grt_final_path.json")).unlink(missing_ok=True)
+    artifact = workspace_join(server_dir, "grt/evidence/step3")
     if artifact.is_dir():
         shutil.rmtree(artifact)
 
@@ -134,7 +140,7 @@ def write_checkpoint(
     result_relpath: str,
     output_relpaths: list[str],
 ) -> Path:
-    checkpoint_path = server_dir / f"grt/checkpoints/{stage}.json"
+    checkpoint_path = workspace_join(server_dir, f"grt/checkpoints/{stage}.json")
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     checkpoint = {
         "workflow": WORKFLOW,
@@ -145,7 +151,7 @@ def write_checkpoint(
         "fingerprint_payload": fingerprint_payload,
         "result_relpath": result_relpath,
         "output_hashes": {
-            relpath: sha256_file(server_dir / relpath) for relpath in sorted(output_relpaths)
+            relpath: sha256_file(workspace_join(server_dir, relpath)) for relpath in sorted(output_relpaths)
         },
     }
     temporary = checkpoint_path.with_name(f".{checkpoint_path.name}.tmp.{os.getpid()}")
@@ -229,7 +235,7 @@ def cached_chromosome_alignment(
     }
     fingerprint = json_hash(fingerprint_payload)
     chromosome_key = stable_id("chr", chromosome, 16)
-    cache_parent = server_dir / f"grt/cache/{cache_scope}/{stage}/{chromosome_key}"
+    cache_parent = workspace_join(server_dir, f"grt/cache/{cache_scope}/{stage}/{chromosome_key}")
     cache_dir = cache_parent / fingerprint
     checkpoint_path = cache_dir / "cache.json"
     if checkpoint_path.is_file():
@@ -265,7 +271,7 @@ def cached_chromosome_alignment(
             run_minimap(
                 str(minimap["resolved"]),
                 threads,
-                server_dir / donor_set["fasta_relpath"],
+                workspace_join(server_dir, donor_set["fasta_relpath"]),
                 flank_path,
                 paf_path,
                 temporary,
@@ -307,7 +313,7 @@ def cached_chromosome_alignment(
         return cache_dir, False, chromosome_key
     except BaseException:
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             # Separate attempts in one process must never overwrite earlier evidence.
             failed_dir = Path(tempfile.mkdtemp(prefix=f"{stage}-{chromosome_key}-", dir=failed_root))

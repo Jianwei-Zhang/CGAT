@@ -1,4 +1,8 @@
 import json
+try:
+    from workspace_layout import LayoutError, WorkspaceLayout
+except ModuleNotFoundError:
+    from ...workspace_layout import LayoutError, WorkspaceLayout
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -12,6 +16,18 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     bundle_root = Path(bundle_root).resolve()
     if not bundle_root.is_dir():
         fail("MISSING_BUNDLE", f"bundle directory does not exist: {bundle_root}")
+
+    layout = WorkspaceLayout.detect(bundle_root)
+
+    def artifact_role(value):
+        try:
+            return layout.relative(value)
+        except (ValueError, TypeError):
+            return None
+
+    def same_artifact(left, right):
+        role = artifact_role(left)
+        return role is not None and role == artifact_role(right)
 
     artifact_hash_cache = {}
     fasta_records_cache = {}
@@ -191,7 +207,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         fail("INVALID_VALUE", "recipe and package reads_qc_enabled disagree")
     q0_path = bundle_path(bundle_root, recipe["q0_relpath"], "recipe.q0_relpath")
     q4_path = bundle_path(bundle_root, recipe["final_q_relpath"], "recipe.final_q_relpath")
-    if recipe["q0_relpath"] != "grt/q/q0.fa" or recipe["final_q_relpath"] != f"grt/q/{final_version}.fa":
+    if not same_artifact(recipe["q0_relpath"], "grt/q/q0.fa") or not same_artifact(recipe["final_q_relpath"], f"grt/q/{final_version}.fa"):
         fail("INVALID_VALUE", "recipe q paths must match the package schema")
 
     role_keys = set()
@@ -524,11 +540,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                         or row["coordinate_system"] != "source_0_based_half_open"
                         or row["projection_status"] != "projected" or row["q_version"] != "q0"
                         or row["orientation"] != source_orientation
-                        or row["query_artifact_relpath"] != q0_freeze["source_fastas"][source_key[0]]
+                        or not same_artifact(row["query_artifact_relpath"], q0_freeze["source_fastas"][source_key[0]])
                         or (row["source_dataset"], row["source_contig"]) != source_key
                         or row["target_chr"] != chr_name
                         or evidence_source_start != source_start or evidence_source_end != source_end
-                        or row["raw_artifact_relpath"] != "metadata/grt_q0_selection.json"):
+                        or not same_artifact(row["raw_artifact_relpath"], "metadata/grt_q0_selection.json")):
                     fail("BROKEN_REFERENCE", f"q0 segment {segment_id} is not backed by its frozen source selection")
                 continue
             if (
@@ -813,7 +829,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         or str(final_path.get("schema_version")) != schema["final_path_schema_version"]
     ):
         fail("UNSUPPORTED_SCHEMA", "grt_final_path.json has unsupported workflow/schema")
-    if final_path.get("q4_relpath") != recipe["final_q_relpath"]:
+    if not same_artifact(final_path.get("q4_relpath"), recipe["final_q_relpath"]):
         fail("BROKEN_REFERENCE", "grt_final_path q4_relpath differs from recipe")
     chromosomes = final_path.get("chromosomes")
     if not isinstance(chromosomes, list) or not chromosomes:
@@ -1114,9 +1130,9 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         if row["placement_mode"] == "normal":
             if pairwise_ids and pairwise_provenance != {"existing_main_view"}:
                 fail("BROKEN_REFERENCE", f"normal used contig {source_card_key} must reuse main-view PAF")
-            expected_prefix = f"runs/chr_{row['target_chr']}/"
+            expected_prefix = layout.relative(f"runs/chr_{row['target_chr']}") + "/"
             if any(
-                not evidence[value]["raw_artifact_relpath"].startswith(expected_prefix)
+                not (artifact_role(evidence[value]["raw_artifact_relpath"]) or "").startswith(expected_prefix)
                 for value in pairwise_ids
             ):
                 fail("BROKEN_REFERENCE", f"normal used contig {source_card_key} points outside chr-local PAFs")
@@ -1183,9 +1199,9 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         expected_ref_raw = f"runs/{row['dataset_name']}_vs_ref/result.paf"
         expected_dataset_fasta = datasets_by_name[row["dataset_name"]]["fasta_relpath"]
         if any(
-            profile["query_artifact_relpath"] != expected_dataset_fasta
-            or profile["target_artifact_relpath"] != reference["fasta_relpath"]
-            or profile["raw_artifact_relpath"] != expected_ref_raw
+            not same_artifact(profile["query_artifact_relpath"], expected_dataset_fasta)
+            or not same_artifact(profile["target_artifact_relpath"], reference["fasta_relpath"])
+            or not same_artifact(profile["raw_artifact_relpath"], expected_ref_raw)
             for profile in ref_profiles
         ):
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} ref profile does not reuse ds-vs-ref PAF")

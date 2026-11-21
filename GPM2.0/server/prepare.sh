@@ -12,6 +12,8 @@ COMMON_LIB="${SCRIPT_DIR}/lib/incremental_common.sh"
 }
 # shellcheck source=lib/incremental_common.sh
 source "$COMMON_LIB"
+# shellcheck source=lib/workspace_paths.sh
+source "${SCRIPT_DIR}/lib/workspace_paths.sh"
 
 WORK_ROOT="$(pwd)/gpm_server"
 THREADS="10"
@@ -305,29 +307,31 @@ copy_script_template() {
 
   [[ -f "$template_path" ]] || die "Missing template: $template_path"
   cp -f "$template_path" "$output_path"
+  python3 "${SCRIPT_DIR}/tools/workspace_layout.py" --server-dir "$WORK_ROOT" \
+    --render-shell "$output_path" --logical-script "$template_name"
   make_executable_if_supported "$output_path"
 }
 
 write_package_scripts() {
   local work_root="$1"
 
-  copy_script_template "package_full_zip.sh" "${work_root}/package_full_zip.sh"
-  copy_script_template "package_light_zip.sh" "${work_root}/package_light_zip.sh"
+  copy_script_template "package_full_zip.sh" "$(cgat_workspace_path "${work_root}" "package_full_zip.sh")"
+  copy_script_template "package_light_zip.sh" "$(cgat_workspace_path "${work_root}" "package_light_zip.sh")"
 }
 
 write_export_final_path_fasta_script() {
   local work_root="$1"
-  copy_script_template "export_final_path_fasta.sh" "${work_root}/export_final_path_fasta.sh"
+  copy_script_template "export_final_path_fasta.sh" "$(cgat_workspace_path "${work_root}" "export_final_path_fasta.sh")"
 }
 
 write_prepare_lib() {
   local work_root="$1"
   local lib_src="${SCRIPT_DIR}/lib"
-  local lib_dst="${work_root}/.prepare_lib/lib"
+  local lib_dst="$(cgat_workspace_path "${work_root}" ".prepare_lib/lib")"
   local tools_src="${SCRIPT_DIR}/tools"
-  local tools_dst="${work_root}/.prepare_lib/tools"
+  local tools_dst="$(cgat_workspace_path "${work_root}" ".prepare_lib/tools")"
   local contracts_src="${SCRIPT_DIR}/contracts"
-  local contracts_dst="${work_root}/.prepare_lib/contracts"
+  local contracts_dst="$(cgat_workspace_path "${work_root}" ".prepare_lib/contracts")"
 
   [[ -d "$lib_src" ]] || die "Missing server library directory: $lib_src"
   [[ -d "$tools_src" ]] || die "Missing server tools directory: $tools_src"
@@ -349,20 +353,20 @@ write_prepare_lib() {
   find "$tools_dst/grt_core" "$tools_dst/lgz_core" "$tools_dst/degap_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
   cp -f "$contracts_src"/*.json "$contracts_dst"/
   # Record the actual installation, not a guessed default, for later updates.
-  printf '%s\n' "$SCRIPT_DIR" > "${work_root}/.prepare_lib/server-tools.path"
+  printf '%s\n' "$SCRIPT_DIR" > "$(cgat_workspace_path "${work_root}" ".prepare_lib/server-tools.path")"
   if [[ -f "${SCRIPT_DIR}/SOURCE.json" ]]; then
-    cp -f "${SCRIPT_DIR}/SOURCE.json" "${work_root}/.prepare_lib/SOURCE.json"
+    cp -f "${SCRIPT_DIR}/SOURCE.json" "$(cgat_workspace_path "${work_root}" ".prepare_lib/SOURCE.json")"
   fi
 }
 
 write_add_dataset_script() {
   local work_root="$1"
-  copy_script_template "add_dataset.sh" "${work_root}/add_dataset.sh"
+  copy_script_template "add_dataset.sh" "$(cgat_workspace_path "${work_root}" "add_dataset.sh")"
 }
 
 write_add_ctg_script() {
   local work_root="$1"
-  copy_script_template "add_ctg.sh" "${work_root}/add_ctg.sh"
+  copy_script_template "add_ctg.sh" "$(cgat_workspace_path "${work_root}" "add_ctg.sh")"
 }
 
 write_reference_segments_metadata() {
@@ -423,8 +427,8 @@ write_prepare_options_metadata() {
   local cen_enabled="false"
   local reads_qc_enabled="false"
 
-  if [[ -s "${WORK_ROOT}/tel/rules.tsv" ]]; then tel_enabled="true"; fi
-  if [[ -s "${WORK_ROOT}/cen/reference.tsv" ]]; then cen_enabled="true"; fi
+  if [[ -s "$(cgat_workspace_path "${WORK_ROOT}" "tel/rules.tsv")" ]]; then tel_enabled="true"; fi
+  if [[ -s "$(cgat_workspace_path "${WORK_ROOT}" "cen/reference.tsv")" ]]; then cen_enabled="true"; fi
 
   {
     printf 'key\tvalue\n'
@@ -478,7 +482,7 @@ write_ref_command_script() {
       printf 'cd %s\n' "$(shell_quote "$run_dir")"
       printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
       printf 'exec python3 %s --server-dir %s --run-dir %s --target %s --query %s --threads %s --preset asm10 --result result.paf > stdout.log 2> stderr.log\n' \
-        "$(shell_quote "${WORK_ROOT}/.prepare_lib/tools/long_cigar_recovery/server_alignment.py")" \
+        "$(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".prepare_lib/tools/long_cigar_recovery/server_alignment.py")")" \
         "$(shell_quote "$WORK_ROOT")" "$(shell_quote "$run_dir")" \
         "$(shell_quote "$ref_fa")" "$(shell_quote "$ds_fa")" "$runtime_threads"
     } > "${run_dir}/command.sh"
@@ -519,7 +523,7 @@ write_q0_evidence_script() {
   {
     printf '#!/usr/bin/env bash\nset -euo pipefail\n'
     printf 'exec python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_prepare_evidence.py")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_prepare_evidence.py")")" \
       "$(shell_quote "$work_root")" "$(shell_quote "$THREADS")" "$(shell_quote "$LGZ_MINIMAP2")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
@@ -534,7 +538,7 @@ write_lgz_prepare_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --memory-gb %s --kmer-size %s --meryl %s --merqury %s' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_prepare_inputs.py")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_prepare_inputs.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_QC_MEMORY_GB")" \
@@ -561,7 +565,7 @@ write_lgz_step1_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --execution-profile %s --step1-mummer-scope full\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step1.py")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_step1.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -581,7 +585,7 @@ write_lgz_step2_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s --execution-profile %s --step2-mummer-scope %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step2.py")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_step2.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -603,7 +607,7 @@ write_lgz_step3_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_step3.py")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_step3.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -622,7 +626,7 @@ write_lgz_evidence_package_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_evidence_package.py")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_evidence_package.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")"
@@ -654,7 +658,7 @@ cd $(shell_quote "$run_dir")
   echo "missing q0 chr-local command for ${chr_name}; run assign_chr_groups.sh first" >&2
   exit 1
 }
-exec python3 $(shell_quote "${WORK_ROOT}/.prepare_lib/tools/run_outer_checkpoints.py") --server-dir $(shell_quote "$WORK_ROOT") --run-q0-chr $(shell_quote "$chr_name")
+exec python3 $(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".prepare_lib/tools/run_outer_checkpoints.py")") --server-dir $(shell_quote "$WORK_ROOT") --run-q0-chr $(shell_quote "$chr_name")
 EOF
   make_executable_if_supported "${run_dir}/q0_command.sh"
 }
@@ -719,6 +723,8 @@ append_run_all_unit() {
   local unit_id="$1"
   local command_relpath="$2"
   local detail_log_relpath="$3"
+  command_relpath="$(cgat_workspace_relative "$WORK_ROOT" "$command_relpath")"
+  detail_log_relpath="$(cgat_workspace_relative "$WORK_ROOT" "$detail_log_relpath")"
 
   printf '%s\t%s\t%s\n' \
     "$unit_id" \
@@ -950,23 +956,29 @@ fi
 
 # A run.sh preparation inherits its parent's workspace lock. Standalone
 # preparation must not overwrite a workspace while a workflow is running.
-python3 - "$WORK_ROOT" "${GPM_SERVER_PREPARE_RUN_ID:-}" "$PPID" <<'PYLOCK'
+python3 - "$WORK_ROOT" "${GPM_SERVER_PREPARE_RUN_ID:-}" "$PPID" "${SCRIPT_DIR}/tools" <<'PYLOCK'
 import json
 import sys
 from pathlib import Path
-root, run_id, parent = sys.argv[1:]
-lock = Path(root) / ".run_all/lock"
+root, run_id, parent, tools = sys.argv[1:]
+sys.path.insert(0, tools)
+from workspace_layout import workspace_path
+lock = workspace_path(Path(root), ".run_all/lock")
 if lock.exists() or run_id:
     owner = json.loads((lock / "owner.json").read_text())
     if not run_id or owner.get("run_id") != run_id or str(owner.get("pid")) != parent:
         sys.exit("ERROR: workspace is locked; use run.sh to resume after the current run finishes")
 PYLOCK
 
+if [[ -f "$WORK_ROOT/.runtime/workspace.json" ]]; then
+  mkdir -p "$WORK_ROOT/.runtime/commands"
+fi
+
 mkdir -p \
-  "${WORK_ROOT}/metadata" \
-  "${WORK_ROOT}/data/reference" \
-  "${WORK_ROOT}/data/datasets" \
-  "${WORK_ROOT}/runs"
+  "$(cgat_workspace_path "${WORK_ROOT}" "metadata")" \
+  "$(cgat_workspace_path "${WORK_ROOT}" "data/reference")" \
+  "$(cgat_workspace_path "${WORK_ROOT}" "data/datasets")" \
+  "$(cgat_workspace_path "${WORK_ROOT}" "runs")"
 
 python3 "${SCRIPT_DIR}/tools/server_report.py" prepare-start --server-dir "$WORK_ROOT" -- "${PREPARE_REPORT_ARGS[@]}"
 finish_prepare_report() {
@@ -991,7 +1003,7 @@ done
 if [[ -n "$CEN_SRC" ]]; then LIBRARY_ARGS+=(--cen "$CEN_SRC"); fi
 python3 "${SCRIPT_DIR}/tools/annotation_library.py" "${LIBRARY_ARGS[@]}"
 
-REF_DST="${WORK_ROOT}/data/reference/${REF_NAME}.fa"
+REF_DST="$(cgat_workspace_path "${WORK_ROOT}" "data/reference/${REF_NAME}.fa")"
 materialize_fasta_input "$REF_SRC" "$REF_DST"
 ensure_fai "$REF_DST"
 
@@ -1003,11 +1015,11 @@ ensure_fai "$REF_DST"
     "$REF_NAME" \
     "data/reference/${REF_NAME}.fa" \
     "data/reference/${REF_NAME}.fa.fai"
-} > "${WORK_ROOT}/metadata/reference.tsv"
+} > "$(cgat_workspace_path "${WORK_ROOT}" "metadata/reference.tsv")"
 
-write_reference_segments_metadata "$REF_DST" "${WORK_ROOT}/metadata/reference_segments.tsv"
+write_reference_segments_metadata "$REF_DST" "$(cgat_workspace_path "${WORK_ROOT}" "metadata/reference_segments.tsv")"
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
-  python3 - "${WORK_ROOT}/metadata/degap_inputs.json" "${#HIFI_SRCS[@]}" "${READS_SRCS[@]}" <<'PYREADS'
+  python3 - "$(cgat_workspace_path "${WORK_ROOT}" "metadata/degap_inputs.json")" "${#HIFI_SRCS[@]}" "${READS_SRCS[@]}" <<'PYREADS'
 import json, sys
 from pathlib import Path
 count = int(sys.argv[2])
@@ -1026,14 +1038,14 @@ if [[ "$SKIP_SELF" == "true" ]]; then
   self_alignment_scope="none"
 fi
 write_package_metadata \
-  "${WORK_ROOT}/metadata/package.tsv" \
+  "$(cgat_workspace_path "${WORK_ROOT}" "metadata/package.tsv")" \
   "$package_mode" \
   "$sequence_layout" \
   "$preassigned_chr" \
   "$self_alignment_scope" \
   "$cross_alignment_scope"
 write_prepare_options_metadata \
-  "${WORK_ROOT}/metadata/prepare_options.tsv" \
+  "$(cgat_workspace_path "${WORK_ROOT}" "metadata/prepare_options.tsv")" \
   "$package_mode" \
   "$sequence_layout" \
   "$preassigned_chr" \
@@ -1045,7 +1057,7 @@ write_prepare_options_metadata \
   for i in "${!DATASET_NAMES[@]}"; do
     ds_name="${DATASET_NAMES[$i]}"
     ds_src="${DATASET_SRCS[$i]}"
-    ds_dst="${WORK_ROOT}/data/datasets/${ds_name}.fa"
+    ds_dst="$(cgat_workspace_path "${WORK_ROOT}" "data/datasets/${ds_name}.fa")"
     self_alignment_available="true"
     if [[ "$SKIP_SELF" == "true" ]]; then
       self_alignment_available="false"
@@ -1062,13 +1074,13 @@ write_prepare_options_metadata \
       "data/datasets/${ds_name}.fa.fai" \
       "$self_alignment_available"
   done
-} > "${WORK_ROOT}/metadata/datasets.tsv"
+} > "$(cgat_workspace_path "${WORK_ROOT}" "metadata/datasets.tsv")"
 
-RUN_ALL="${WORK_ROOT}/run_all.sh"
-RUN_ALL_STATE_DIR="${WORK_ROOT}/.run_all"
+RUN_ALL="$(cgat_workspace_path "${WORK_ROOT}" "run_all.sh")"
+RUN_ALL_STATE_DIR="$(cgat_workspace_path "${WORK_ROOT}" ".run_all")"
 RUN_ALL_PLAN="${RUN_ALL_STATE_DIR}/plan.tsv"
 if [[ -z "${GPM_SERVER_PREPARE_RUN_ID:-}" ]]; then
-  rm -rf "$RUN_ALL_STATE_DIR" "${WORK_ROOT}/logs"
+  rm -rf "$RUN_ALL_STATE_DIR" "$(cgat_workspace_path "${WORK_ROOT}" "logs")"
 fi
 mkdir -p "$RUN_ALL_STATE_DIR"
 cp -f "${SCRIPT_DIR}/lib/run_all_launcher.sh" "$RUN_ALL"
@@ -1085,8 +1097,8 @@ COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
   ds_name="${DATASET_NAMES[$i]}"
-  ds_fa="${WORK_ROOT}/data/datasets/${ds_name}.fa"
-  run_ref_dir="${WORK_ROOT}/runs/${ds_name}_vs_ref"
+  ds_fa="$(cgat_workspace_path "${WORK_ROOT}" "data/datasets/${ds_name}.fa")"
+  run_ref_dir="$(cgat_workspace_path "${WORK_ROOT}" "runs/${ds_name}_vs_ref")"
   mkdir -p "$run_ref_dir"
   write_ref_command_script "$run_ref_dir" "$REF_DST" "$ds_fa"
   append_run_all_unit \
@@ -1097,15 +1109,15 @@ for ((i = 0; i < DATASET_COUNT; i++)); do
   COMMAND_INDEX=$((COMMAND_INDEX + 1))
 done
 
-write_assignment_script "${WORK_ROOT}/assign_chr_groups.sh" "$WORK_ROOT" "${DATASET_NAMES[@]}"
+write_assignment_script "$(cgat_workspace_path "${WORK_ROOT}" "assign_chr_groups.sh")" "$WORK_ROOT" "${DATASET_NAMES[@]}"
 append_run_all_unit "assign" "assign_chr_groups.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "assign_chr_groups"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/assign_chr_groups.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "assign_chr_groups.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
-  run_chr_dir="${WORK_ROOT}/runs/chr_${chr_name}"
+  run_chr_dir="$(cgat_workspace_path "${WORK_ROOT}" "runs/chr_${chr_name}")"
   mkdir -p "$run_chr_dir"
   write_chr_placeholder_script "$run_chr_dir" "$chr_name"
   append_run_all_unit "q0_chr:${chr_name}" "runs/chr_${chr_name}/q0_command.sh" "logs/run_all.log"
@@ -1115,59 +1127,59 @@ for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   COMMAND_INDEX=$((COMMAND_INDEX + 1))
 done
 
-write_q0_evidence_script "${WORK_ROOT}/prepare_q0_evidence.sh" "$WORK_ROOT"
+write_q0_evidence_script "$(cgat_workspace_path "${WORK_ROOT}" "prepare_q0_evidence.sh")" "$WORK_ROOT"
 append_run_all_unit "q0_evidence" "prepare_q0_evidence.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_q0_evidence"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/prepare_q0_evidence.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "prepare_q0_evidence.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_lgz_prepare_script "${WORK_ROOT}/prepare_lgz_inputs.sh" "$WORK_ROOT"
+write_lgz_prepare_script "$(cgat_workspace_path "${WORK_ROOT}" "prepare_lgz_inputs.sh")" "$WORK_ROOT"
 append_run_all_unit "grt_prepare" "prepare_lgz_inputs.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_lgz_inputs"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/prepare_lgz_inputs.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "prepare_lgz_inputs.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_lgz_step1_script "${WORK_ROOT}/run_lgz_step1.sh" "$WORK_ROOT"
+write_lgz_step1_script "$(cgat_workspace_path "${WORK_ROOT}" "run_lgz_step1.sh")" "$WORK_ROOT"
 append_run_all_unit "grt_step1" "run_lgz_step1.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step1"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step1.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "run_lgz_step1.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_lgz_step2_script "${WORK_ROOT}/run_lgz_step2.sh" "$WORK_ROOT"
+write_lgz_step2_script "$(cgat_workspace_path "${WORK_ROOT}" "run_lgz_step2.sh")" "$WORK_ROOT"
 append_run_all_unit "grt_step2" "run_lgz_step2.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step2"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step2.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "run_lgz_step2.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_lgz_step3_script "${WORK_ROOT}/run_lgz_step3.sh" "$WORK_ROOT"
+write_lgz_step3_script "$(cgat_workspace_path "${WORK_ROOT}" "run_lgz_step3.sh")" "$WORK_ROOT"
 append_run_all_unit \
   "grt_step3" \
   "run_lgz_step3.sh" \
   "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_lgz_step3"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_lgz_step3.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "run_lgz_step3.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
   {
     printf '#!/usr/bin/env bash\nset -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s\n' \
-      "$(shell_quote "${WORK_ROOT}/.prepare_lib/tools/post_lgz_degap.py")" \
+      "$(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".prepare_lib/tools/post_lgz_degap.py")")" \
       "$(shell_quote "$WORK_ROOT")" "$(shell_quote "$THREADS")"
-  } > "${WORK_ROOT}/run_post_lgz_degap.sh"
-  make_executable_if_supported "${WORK_ROOT}/run_post_lgz_degap.sh"
+  } > "$(cgat_workspace_path "${WORK_ROOT}" "run_post_lgz_degap.sh")"
+  make_executable_if_supported "$(cgat_workspace_path "${WORK_ROOT}" "run_post_lgz_degap.sh")"
   append_run_all_unit "degap_gapfill" "run_post_lgz_degap.sh" "logs/run_all.log"
-  printf '[%s/%s] post_lgz_degap\nbash %s\n\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "${WORK_ROOT}/run_post_lgz_degap.sh"
+  printf '[%s/%s] post_lgz_degap\nbash %s\n\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "$(cgat_workspace_path "${WORK_ROOT}" "run_post_lgz_degap.sh")"
   COMMAND_INDEX=$((COMMAND_INDEX + 1))
 fi
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
-  run_chr_dir="${WORK_ROOT}/runs/chr_${chr_name}"
+  run_chr_dir="$(cgat_workspace_path "${WORK_ROOT}" "runs/chr_${chr_name}")"
   append_run_all_unit \
     "chr:${chr_name}" \
     "runs/chr_${chr_name}/command.sh" \
@@ -1178,23 +1190,23 @@ for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   COMMAND_INDEX=$((COMMAND_INDEX + 1))
 done
 
-write_lgz_evidence_package_script "${WORK_ROOT}/finalize_lgz_evidence.sh" "$WORK_ROOT"
+write_lgz_evidence_package_script "$(cgat_workspace_path "${WORK_ROOT}" "finalize_lgz_evidence.sh")" "$WORK_ROOT"
 append_run_all_unit "finalize_evidence" "finalize_lgz_evidence.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "finalize_lgz_evidence"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/finalize_lgz_evidence.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "finalize_lgz_evidence.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 append_run_all_unit "package_full" "package_full_zip.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_full_zip"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/package_full_zip.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "package_full_zip.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 append_run_all_unit "package_light" "package_light_zip.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_light_zip"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/package_light_zip.sh"
+printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "package_light_zip.sh")"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 make_executable_if_supported "$RUN_ALL"
@@ -1206,28 +1218,28 @@ write_add_ctg_script "$WORK_ROOT"
 
 echo "Prepared GPM2.0 server workspace at: ${WORK_ROOT}"
 echo "Generated:"
-echo "  - ${WORK_ROOT}/metadata/package.tsv"
-echo "  - ${WORK_ROOT}/metadata/prepare_options.tsv"
-echo "  - ${WORK_ROOT}/metadata/reference.tsv"
-echo "  - ${WORK_ROOT}/metadata/reference_segments.tsv"
-echo "  - ${WORK_ROOT}/metadata/datasets.tsv"
-echo "  - ${WORK_ROOT}/run_all.sh"
-echo "  - ${WORK_ROOT}/.run_all/plan.tsv"
-echo "  - ${WORK_ROOT}/tel/rules.tsv"
-echo "  - ${WORK_ROOT}/cen/reference.tsv"
-echo "  - ${WORK_ROOT}/metadata/annotation_library_snapshot.json"
-echo "  - ${WORK_ROOT}/add_dataset.sh"
-echo "  - ${WORK_ROOT}/add_ctg.sh"
-echo "  - ${WORK_ROOT}/prepare_lgz_inputs.sh"
-echo "  - ${WORK_ROOT}/run_lgz_step1.sh"
-echo "  - ${WORK_ROOT}/run_lgz_step2.sh"
-echo "  - ${WORK_ROOT}/run_lgz_step3.sh"
-echo "  - ${WORK_ROOT}/finalize_lgz_evidence.sh"
-echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
-echo "  - ${WORK_ROOT}/.prepare_lib/lib"
-echo "  - ${WORK_ROOT}/.prepare_lib/tools"
-echo "  - ${WORK_ROOT}/package_full_zip.sh"
-echo "  - ${WORK_ROOT}/package_light_zip.sh"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "metadata/package.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "metadata/prepare_options.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "metadata/reference.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "metadata/reference_segments.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "metadata/datasets.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "run_all.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" ".run_all/plan.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "tel/rules.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "cen/reference.tsv")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "metadata/annotation_library_snapshot.json")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "add_dataset.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "add_ctg.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "prepare_lgz_inputs.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "run_lgz_step1.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "run_lgz_step2.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "run_lgz_step3.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "finalize_lgz_evidence.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "export_final_path_fasta.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" ".prepare_lib/lib")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" ".prepare_lib/tools")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "package_full_zip.sh")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" "package_light_zip.sh")"
 echo
 # Compatibility entry points; the plan itself uses only canonical LGZ scripts.
 for pair in \
@@ -1241,28 +1253,28 @@ for pair in \
   {
     printf '#!/usr/bin/env bash\nset -euo pipefail\n'
     printf 'exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/%s.sh" "$@"\n' "$canonical"
-  } > "${WORK_ROOT}/${legacy}.sh"
-  make_executable_if_supported "${WORK_ROOT}/${legacy}.sh"
+  } > "$(cgat_workspace_path "${WORK_ROOT}" "${legacy}.sh")"
+  make_executable_if_supported "$(cgat_workspace_path "${WORK_ROOT}" "${legacy}.sh")"
 done
 
 echo "Next:"
-echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
+echo "  1. Run: bash $(cgat_workspace_path "$WORK_ROOT" "run_all.sh")"
 echo "     - This automatically creates both the full and light delivery archives"
 echo "  2. Or execute the staged commands printed above one by one, including the final two package commands"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, LGZ q0/D0/Dtel, LGZ Step1, LGZ Step1, LGZ Step2, LGZ telomere/q3 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, LGZ q0/D0/Dtel, LGZ Step1, LGZ Step2, LGZ telomere/q3 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi
 echo "  4. Output archives:"
-echo "     - Full package (FASTA + report): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").${ARCHIVE_FORMAT}"
-echo "     - Light package (report included, FASTA omitted): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").light.${ARCHIVE_FORMAT}"
+echo "     - Full package (FASTA + report): $(python3 "${SCRIPT_DIR}/tools/delivery_archive.py" path --server-dir "$WORK_ROOT" --kind full)"
+echo "     - Light package (report included, FASTA omitted): $(python3 "${SCRIPT_DIR}/tools/delivery_archive.py" path --server-dir "$WORK_ROOT" --kind light)"
 echo "  5. To add a dataset later, run:"
-echo "     - bash ${WORK_ROOT}/add_dataset.sh --ds /path/to/dataset.fa"
-echo "     - Or set an explicit name: bash ${WORK_ROOT}/add_dataset.sh --ds <dataset_name> /path/to/dataset.fa"
+echo "     - bash $(cgat_workspace_path "$WORK_ROOT" "add_dataset.sh") --ds /path/to/dataset.fa"
+echo "     - Or set an explicit name: bash $(cgat_workspace_path "$WORK_ROOT" "add_dataset.sh") --ds <dataset_name> /path/to/dataset.fa"
 echo "  6. To add a derived ctg later, run:"
-echo "     - bash ${WORK_ROOT}/add_ctg.sh --ctg <ctg_name> --chr <chr_name> --track <dataset_name> -i /path/to/final.fa"
+echo "     - bash $(cgat_workspace_path "$WORK_ROOT" "add_ctg.sh") --ctg <ctg_name> --chr <chr_name> --track <dataset_name> -i /path/to/final.fa"
 echo "  7. To export final path FASTA on the server, run:"
-echo "     - bash ${WORK_ROOT}/export_final_path_fasta.sh --tsv /path/to/final_path.tsv -o /path/to/final_path.fa"
+echo "     - bash $(cgat_workspace_path "$WORK_ROOT" "export_final_path_fasta.sh") --tsv /path/to/final_path.tsv -o /path/to/final_path.fa"
 echo
 echo "Delivery reminder:"
 echo "  - gpm_next importer does not require metadata/alignments.tsv"

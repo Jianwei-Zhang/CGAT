@@ -8,6 +8,12 @@ The shell entrypoint only supplies a locked environment and then delegates here;
 focused Server integration tests exercise Minimap2 output.
 """
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import csv
 import hashlib
 import json
@@ -533,7 +539,7 @@ work_root = Path(sys.argv[1])
 chr_name = sys.argv[2]
 dataset_specs = parse_dataset_specs(sys.argv[3:])
 rules = read_rules(work_root / "tel" / "rules.tsv")
-with_provenance = (work_root / "metadata/annotation_library_snapshot.json").is_file()
+with_provenance = (workspace_join(work_root, "metadata/annotation_library_snapshot.json")).is_file()
 output_dir = work_root / "tel" / f"chr_{chr_name}"
 output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -587,10 +593,10 @@ for dataset_name, fasta_path in dataset_specs:
 
 
 def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_dataset_fastas, threads, minimap_preset):
-    rows = read_tsv_rows(work_root / "cen" / "reference.tsv")
+    rows = read_tsv_rows(workspace_join(work_root, "cen", "reference.tsv"))
     if not any(row.get("chr_name") in ("*", chr_name) for row in rows):
         return False
-    args = ["python3", str(work_root / ".prepare_lib/tools/cen_scan.py"),
+    args = ["python3", str(workspace_join(work_root, ".prepare_lib/tools/cen_scan.py")),
             "--root", str(work_root), "--chr", chr_name, "--run-dir", str(run_dir),
             "--threads", THREAD_ARGUMENT]
     for dataset_name, fasta_path in selected_dataset_fastas:
@@ -609,7 +615,7 @@ def generated_operation_dirs(chr_run_dir, work_root):
             continue
         payload = json.loads(manifest.read_text(encoding="utf-8"))
         for row in payload["tasks"]:
-            command = (work_root / row["command"]).resolve()
+            command = (workspace_join(work_root, row["command"])).resolve()
             relative = command.relative_to(chr_run_dir.resolve())
             if len(relative.parts) >= 2:
                 result.add(chr_run_dir / relative.parts[0])
@@ -649,8 +655,8 @@ if self_min_chain_score < 1 or self_minimizers < 1:
 from annotation_library import verify_snapshot
 verify_snapshot(work_root)
 
-metadata_dir = work_root / "metadata"
-runs_dir = work_root / "runs"
+metadata_dir = workspace_join(work_root, "metadata")
+runs_dir = workspace_join(work_root, "runs")
 package = read_single_tsv_row(metadata_dir / "package.tsv")
 datasets = read_tsv_rows(metadata_dir / "datasets.tsv")
 reference = read_single_tsv_row(metadata_dir / "reference.tsv")
@@ -661,7 +667,7 @@ except (KeyError, ValueError) as exc:
     fail(f"invalid chr_assignment_min_coverage_percent in package.tsv: {exc}")
 
 skip_self = package.get("self_alignment_scope", "") == "none"
-reference_fasta = work_root / reference["fasta_relpath"]
+reference_fasta = workspace_join(work_root, reference["fasta_relpath"])
 reference_records = read_fasta_records(reference_fasta)
 reference_chr_names = [name for name, _sequence in reference_records]
 reference_by_name = {name: sequence for name, sequence in reference_records}
@@ -672,7 +678,7 @@ dataset_infos = {}
 dataset_order = []
 for row in datasets:
     dataset_name = row["dataset_name"]
-    fasta_path = work_root / row["fasta_relpath"]
+    fasta_path = workspace_join(work_root, row["fasta_relpath"])
     ordered_records = read_fasta_records(fasta_path)
     records_by_name = {name: sequence for name, sequence in ordered_records}
     dataset_order.append(dataset_name)
@@ -820,7 +826,7 @@ with chr_assignments_path.open("w", encoding="utf-8", newline="") as handle:
             ]
         )
 
-reference_chr_dir = work_root / "data" / "reference" / "chrs"
+reference_chr_dir = workspace_join(work_root, "data", "reference", "chrs")
 if reference_chr_dir.exists():
     shutil.rmtree(reference_chr_dir)
 reference_chr_dir.mkdir(parents=True, exist_ok=True)
@@ -837,7 +843,7 @@ with reference_locator_path.open("w", encoding="utf-8", newline="") as handle:
     for chr_name in reference_chr_names:
         writer.writerow([chr_name, f"data/reference/chrs/{chr_name}.fa"])
 
-partition_root = work_root / "data" / "partitions"
+partition_root = workspace_join(work_root, "data", "partitions")
 partition_chr_root = partition_root / "chr"
 partition_unplaced_root = partition_root / "unplaced"
 if partition_root.exists():
@@ -945,7 +951,7 @@ for chr_name in reference_chr_names:
                 query_fasta,
                 name_map,
                 restore_script,
-                work_root / ".prepare_lib/tools/self_alignment_batches.py",
+                workspace_join(work_root, ".prepare_lib/tools/self_alignment_batches.py"),
                 threads=threads,
                 minimap_preset=minimap_preset,
                 self_min_chain_score=self_min_chain_score,
@@ -1001,7 +1007,7 @@ for chr_name in reference_chr_names:
                    indent=2, sort_keys=True) + "\n", encoding="utf-8")
     command_paths = []
 
-    tel_rules_path = work_root / "tel" / "rules.tsv"
+    tel_rules_path = workspace_join(work_root, "tel", "rules.tsv")
     if tel_rules_path.exists() and selected_dataset_fastas:
         run_dir = chr_run_dir / "tel_scan"
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -1015,7 +1021,7 @@ for chr_name in reference_chr_names:
         )
         command_paths.append(command_path)
 
-    cen_reference_path = work_root / "cen" / "reference.tsv"
+    cen_reference_path = workspace_join(work_root, "cen", "reference.tsv")
     if cen_reference_path.exists() and selected_dataset_fastas:
         run_dir = chr_run_dir / "cen_scan"
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -1055,6 +1061,6 @@ for chr_name in reference_chr_names:
     for operation in sorted(previous_operations - active_operations):
         if operation.is_dir() and operation.name not in {"datasets", "add_ctg"}:
             import uuid
-            retired = work_root / ".run_all" / "retired_chr_operations" / chr_name
+            retired = workspace_join(work_root, ".run_all", "retired_chr_operations", chr_name)
             retired.mkdir(parents=True, exist_ok=True)
             operation.rename(retired / f"{operation.name}.{uuid.uuid4().hex}")

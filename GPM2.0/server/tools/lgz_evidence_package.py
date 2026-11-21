@@ -5,6 +5,12 @@
 from __future__ import annotations
 
 try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
+try:
     from run_resources import execution_threads
 except ModuleNotFoundError:  # Imported through server.tools.
     from .run_resources import execution_threads
@@ -267,10 +273,10 @@ def parse_source_paf(path: Path, contig: str, source_length: int) -> list[dict[s
 def alignment_profile(server_dir: Path, dataset_name: str) -> tuple[str, str, str]:
     options = {
         row["key"]: row["value"]
-        for row in read_tsv(server_dir / "metadata/prepare_options.tsv", ["key", "value"])
+        for row in read_tsv(workspace_join(server_dir, "metadata/prepare_options.tsv"), ["key", "value"])
     }
     tool = options.get("alignment_engine", "unknown")
-    version_path = server_dir / f"runs/{dataset_name}_vs_ref/tool_version.txt"
+    version_path = workspace_join(server_dir, f"runs/{dataset_name}_vs_ref/tool_version.txt")
     version = version_path.read_text(encoding="utf-8").strip() if version_path.is_file() else "unknown"
     return tool, version[:200], options.get("minimap_preset", "")
 
@@ -285,7 +291,7 @@ def build_ref_evidence(
     dataset = str(card["dataset_name"])
     contig = str(card["contig_name"])
     target_chr = str(card["target_chr"])
-    paf_path = server_dir / f"runs/{dataset}_vs_ref/result.paf"
+    paf_path = workspace_join(server_dir, f"runs/{dataset}_vs_ref/result.paf")
     hits = parse_source_paf(paf_path, contig, len(source_sequence))
     target_hits = [hit for hit in hits if hit["target"] == target_chr]
     hit_chromosomes = sorted({str(hit["target"]) for hit in hits})
@@ -331,8 +337,8 @@ def build_ref_evidence(
         target_end = ""
         anchor_source = "grt_final_path"
 
-    dataset_path = server_dir / dataset_row["fasta_relpath"]
-    reference_path = server_dir / reference_row["fasta_relpath"]
+    dataset_path = workspace_join(server_dir, dataset_row["fasta_relpath"])
+    reference_path = workspace_join(server_dir, reference_row["fasta_relpath"])
     tool, version, preset = alignment_profile(server_dir, dataset)
     parameters = {
         "anchor_source": anchor_source,
@@ -389,7 +395,7 @@ def existing_display_evidence(
     chr_name = str(card["target_chr"])
     if source_dataset not in names:
         fail(f"source card dataset is absent: {source_dataset}")
-    chr_run = server_dir / f"runs/chr_{chr_name}"
+    chr_run = workspace_join(server_dir, f"runs/chr_{chr_name}")
     results: list[dict[str, object]] = []
     for other_dataset in sorted(names):
         source_fasta = chr_run / f"datasets/{source_dataset}.fa"
@@ -558,7 +564,7 @@ def supplemental_display_evidence(
         ]
         if not target_records:
             continue
-        run_dir = server_dir / f"grt/evidence/display/by_card/{card_dir}/{target_dataset}"
+        run_dir = workspace_join(server_dir, f"grt/evidence/display/by_card/{card_dir}/{target_dataset}")
         query_path, target_path, paf_path = run_display_minimap(
             minimap,
             threads,
@@ -631,7 +637,7 @@ def visible_members(
 
 
 def cleanup_stale_display_dirs(server_dir: Path, cards: list[dict[str, object]]) -> None:
-    root = server_dir / "grt/evidence/display/by_card"
+    root = workspace_join(server_dir, "grt/evidence/display/by_card")
     if not root.is_dir():
         return
     expected = {
@@ -650,7 +656,7 @@ def cleanup_stale_display_dirs(server_dir: Path, cards: list[dict[str, object]])
 
 def execute(args: argparse.Namespace) -> None:
     server_dir = args.server_dir.resolve()
-    package = read_single(server_dir / "metadata/package.tsv")
+    package = read_single(workspace_join(server_dir, "metadata/package.tsv"))
     if (
         package.get("workflow") != WORKFLOW
         or package.get("schema_version") not in {SCHEMA_VERSION, "3", "4"}
@@ -666,14 +672,14 @@ def execute(args: argparse.Namespace) -> None:
             from .lgz_core.q0_publication import validate_prepared_q0
         validate_prepared_q0(server_dir)
 
-    dataset_rows = read_tsv(server_dir / "metadata/datasets.tsv", DATASET_FIELDS)
+    dataset_rows = read_tsv(workspace_join(server_dir, "metadata/datasets.tsv"), DATASET_FIELDS)
     datasets = {row["dataset_name"]: row for row in dataset_rows}
     reference = read_single(
-        server_dir / "metadata/reference.tsv",
+        workspace_join(server_dir, "metadata/reference.tsv"),
         ["reference_name", "species_name", "assembly_label", "fasta_relpath", "fai_relpath"],
     )
     assignment_rows = read_tsv(
-        server_dir / "metadata/chr_assignments.tsv", CHR_ASSIGNMENT_FIELDS
+        workspace_join(server_dir, "metadata/chr_assignments.tsv"), CHR_ASSIGNMENT_FIELDS
     )
     assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
     assignment_baselines: dict[tuple[str, str, str], tuple[str, int]] = {}
@@ -696,9 +702,9 @@ def execute(args: argparse.Namespace) -> None:
         assignments[source_key].add(chromosome)
         assignment_baselines[baseline_key] = (row["source_orientation"], anchor_start)
     sources = source_catalog(server_dir)
-    events = read_events(server_dir / "metadata/grt_events.jsonl")
+    events = read_events(workspace_join(server_dir, "metadata/grt_events.jsonl"))
     final_path = json.loads(
-        (server_dir / "metadata/grt_final_path.json").read_text(encoding="utf-8")
+        (workspace_join(server_dir, "metadata/grt_final_path.json")).read_text(encoding="utf-8")
     )
     q0_lineage = None
     if package["schema_version"] in {"3", "4"}:
@@ -706,7 +712,7 @@ def execute(args: argparse.Namespace) -> None:
             from lgz_core.q0_lineage import Q0Lineage, display_peer_keys
         except ModuleNotFoundError:
             from .lgz_core.q0_lineage import Q0Lineage, display_peer_keys
-        q0_lineage = Q0Lineage(read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS))
+        q0_lineage = Q0Lineage(read_tsv(workspace_join(server_dir, "metadata/grt_q_segments.tsv"), Q_SEGMENT_FIELDS))
     cards = accepted_source_cards(
         events, assignments, final_segment_anchors(final_path), assignment_baselines,
         final_path=final_path, q0_lineage=q0_lineage,
@@ -716,7 +722,7 @@ def execute(args: argparse.Namespace) -> None:
 
     evidence_rows = [
         row
-        for row in read_tsv(server_dir / "metadata/grt_evidence_registry.tsv", EVIDENCE_FIELDS)
+        for row in read_tsv(workspace_join(server_dir, "metadata/grt_evidence_registry.tsv"), EVIDENCE_FIELDS)
         if row["evidence_type"] not in {"grt_usage_ref_profile", "grt_usage_display_pairwise"}
     ]
     needs_supplement = any(
@@ -791,7 +797,7 @@ def execute(args: argparse.Namespace) -> None:
             }
         )
 
-    metadata = server_dir / "metadata"
+    metadata = workspace_join(server_dir, "metadata")
     atomic_write_tsv(metadata / "grt_evidence_registry.tsv", EVIDENCE_FIELDS, evidence_rows)
     atomic_write_tsv(metadata / "grt_used_contigs.tsv", USED_CONTIG_FIELDS, output_cards)
     tool_rows = [

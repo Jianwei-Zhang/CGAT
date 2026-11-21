@@ -7,6 +7,12 @@ and its integrated FASTA are deliberately not acceptance evidence.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import argparse
 import hashlib
 import importlib
@@ -99,12 +105,12 @@ def read_groups(config: dict) -> dict[str, list[str]]:
 
 
 def input_binding(root: Path, engine: Path) -> tuple[str, dict[Path, tuple]]:
-    config = load_json(root / "metadata/degap_inputs.json")
+    config = load_json(workspace_join(root, "metadata/degap_inputs.json"))
     groups = read_groups(config)
     reads = groups["hifi"] + groups["ont"]
     check_native_paths(root, reads)
-    paths = [root / "metadata/degap_inputs.json", root / "grt/q/q3.fa",
-             root / "metadata/grt_final_path.json", Path(__file__).resolve()]
+    paths = [workspace_join(root, "metadata/degap_inputs.json"), workspace_join(root, "grt/q/q3.fa"),
+             workspace_join(root, "metadata/grt_final_path.json"), Path(__file__).resolve()]
     paths += [Path(p) for p in reads]
     tool_paths = {name: shutil.which(name) for name in NATIVE_COMMANDS}
     paths += [Path(path).resolve() for path in tool_paths.values() if path]
@@ -244,16 +250,16 @@ def admit(genome: IndexedFasta, gap: tuple, row: dict, attempt: Path, index: int
 
 def validate_result(root: Path, signature: str | None = None) -> tuple[bool, str]:
     try:
-        checkpoint = load_json(root / CHECKPOINT)
+        checkpoint = load_json(workspace_join(root, CHECKPOINT))
         if checkpoint.get("schema_version") != 1 or (signature is not None and checkpoint.get("signature") != signature):
             return False, "DEGAP inputs changed"
         artifacts = checkpoint.get("artifacts")
         if not isinstance(artifacts, dict) or artifacts.keys() != {OUTPUT, REPORT}:
             return False, "incomplete DEGAP receipt"
         for relative, expected in artifacts.items():
-            if digest(root / relative) != expected:
+            if digest(workspace_join(root, relative)) != expected:
                 return False, f"DEGAP artifact changed: {relative}"
-        report = load_json(root / REPORT)
+        report = load_json(workspace_join(root, REPORT))
         if report.get("input_signature") != checkpoint["signature"]:
             return False, "DEGAP report binding differs"
         return True, "validated post-LGZ DEGAP output"
@@ -271,23 +277,23 @@ def run(root: Path, threads: int) -> dict:
     valid, _ = validate_result(root, signature)
     if valid:
         print("DEGAP gapfill cache hit: validated inputs and outputs", flush=True)
-        return load_json(root / REPORT)
-    attempt = root / "degap/attempts" / uuid.uuid4().hex
+        return load_json(workspace_join(root, REPORT))
+    attempt = workspace_join(root, "degap/attempts", uuid.uuid4().hex)
     attempt.mkdir(parents=True)
-    if (root / CHECKPOINT).is_file():
-        shutil.copy2(root / CHECKPOINT, attempt / "previous-checkpoint.json")
+    if (workspace_join(root, CHECKPOINT)).is_file():
+        shutil.copy2(workspace_join(root, CHECKPOINT), attempt / "previous-checkpoint.json")
     # Retain old artifacts for diagnosis, but do not report/deliver them as this attempt.
-    atomic_json(root / CHECKPOINT, {"schema_version": 1, "signature": signature, "status": "running"})
-    genome = IndexedFasta(root / "grt/q/q3.fa", attempt / "input.fa")
+    atomic_json(workspace_join(root, CHECKPOINT), {"schema_version": 1, "signature": signature, "status": "running"})
+    genome = IndexedFasta(workspace_join(root, "grt/q/q3.fa"), attempt / "input.fa")
     gaps = list(genome.gaps())
-    config = load_json(root / "metadata/degap_inputs.json")
+    config = load_json(workspace_join(root, "metadata/degap_inputs.json"))
     groups = read_groups(config)
     reads_type = "mixed" if all(groups.values()) else next(kind for kind, paths in groups.items() if paths)
     rows = []
     # No-gap tasks do not preprocess reads or launch the native engine.
     if any(start > 0 and end < genome.records[name][0] and end - start >= 20
            for name, start, end in gaps):
-        command = [sys.executable, str(engine), "--genome", str(root / "grt/q/q3.fa"),
+        command = [sys.executable, str(engine), "--genome", str(workspace_join(root, "grt/q/q3.fa")),
                    "--output", str(attempt / "native"), "--work", "1", "--thread", str(threads)]
         for kind, paths in groups.items():
             if paths:
@@ -360,12 +366,12 @@ def run(root: Path, threads: int) -> dict:
               "accepted_count": len(accepted), "unfilled_count": len(gaps) - len(accepted),
               "output_fasta": OUTPUT, "output_sha256": digest(temporary), "decisions": decisions,
               "acceptance": "exact non-N flanks and positive ACGT bridge; not independent biological validation"}
-    (root / OUTPUT).parent.mkdir(parents=True, exist_ok=True)
-    os.replace(temporary, root / OUTPUT)
-    atomic_json(root / REPORT, report)
+    (workspace_join(root, OUTPUT)).parent.mkdir(parents=True, exist_ok=True)
+    os.replace(temporary, workspace_join(root, OUTPUT))
+    atomic_json(workspace_join(root, REPORT), report)
     # Commit marker last. An interrupted publish is not a reusable stage result.
-    atomic_json(root / CHECKPOINT, {"schema_version": 1, "signature": signature,
-                "artifacts": {OUTPUT: report["output_sha256"], REPORT: digest(root / REPORT)}})
+    atomic_json(workspace_join(root, CHECKPOINT), {"schema_version": 1, "signature": signature,
+                "artifacts": {OUTPUT: report["output_sha256"], REPORT: digest(workspace_join(root, REPORT))}})
     print(f"DEGAP gapfill: accepted={len(accepted)} unfilled={len(gaps) - len(accepted)}; LGZ unchanged", flush=True)
     return report
 

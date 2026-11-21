@@ -4,6 +4,12 @@
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 from delivery_archive import delivery_path, delivery_staging_path
 
 import argparse
@@ -318,7 +324,7 @@ class Runner:
         self.server_dir = server_dir
         self.units = units
         self.run_id = run_id
-        self.logs_dir = server_dir / "logs"
+        self.logs_dir = workspace_join(server_dir, "logs")
         self.log_path = self.logs_dir / "run_all.log"
         self.status_path = self.logs_dir / "status.tsv"
         self.status_rows: list[dict[str, str]] = []
@@ -387,7 +393,7 @@ class Runner:
 
     def _failure_logs(self, unit: PlanUnit, command: Path) -> dict:
         # Never attribute another parallel unit's assertion from the shared run log.
-        paths = {command.parent / "stderr.log", self.server_dir / unit.detail_log_relpath}
+        paths = {command.parent / "stderr.log", workspace_join(self.server_dir, unit.detail_log_relpath)}
         return {path: log_identity(path) for path in paths if path.resolve() != self.log_path.resolve()}
 
     def _failure_hint(self, unit: PlanUnit, logs: dict) -> str:
@@ -437,7 +443,7 @@ class Runner:
             unit_tasks = load_tasks(self.server_dir, unit.unit_id, unit.command_relpath)
             assert unit_tasks is not None
             if not unit_tasks:
-                unit_tasks = [AlignmentTask(unit.unit_id, self.server_dir / unit.command_relpath, 1)]
+                unit_tasks = [AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath), 1)]
             prepared[unit.unit_id] = checkpoint
             remaining[unit.unit_id] = len(unit_tasks)
             tasks.extend(unit_tasks)
@@ -575,7 +581,7 @@ class Runner:
                 "     Use: App import and browsing; FASTA export is unavailable.",
                 "",
                 "Local report:",
-                f"  {self.server_dir / 'report/report.html'}",
+                f"  {workspace_join(self.server_dir, 'report/report.html')}",
             ]
         )
 
@@ -589,8 +595,8 @@ class Runner:
             lines.append(f"Failure stage: {failed}")
         lines.extend(
             [
-                f"Diagnostic report: {self.server_dir / 'report/report.html'}",
-                f"Rerun: bash {self.server_dir / 'run_all.sh'}",
+                f"Diagnostic report: {workspace_join(self.server_dir, 'report/report.html')}",
+                f"Rerun: bash {workspace_join(self.server_dir, 'run_all.sh')}",
                 "No delivery package is declared final for this run.",
             ]
         )
@@ -606,7 +612,7 @@ class Runner:
         threads = "unknown"
         options = {}
         completed = False
-        options_path = self.server_dir / "metadata/prepare_options.tsv"
+        options_path = workspace_join(self.server_dir, "metadata/prepare_options.tsv")
         if options_path.is_file():
             try:
                 with options_path.open(newline="", encoding="utf-8") as handle:
@@ -646,7 +652,7 @@ class Runner:
                 signal.signal(signal_number, self._handle_signal)
             try:
                 if options.get("alignment_engine") == "minimap2" or options.get("grt_minimap2"):
-                    snapshot_path = self.server_dir / ".run_all/diagnostics" / self.run_id / "minimap2_runtime.json"
+                    snapshot_path = workspace_join(self.server_dir, ".run_all/diagnostics", self.run_id, "minimap2_runtime.json")
                     try:
                         snapshot = runtime_snapshot(self.server_dir, options)
                         snapshot.update(run_id=self.run_id, recorded_at=timestamp())
@@ -703,7 +709,7 @@ class Runner:
                             unit,
                             f"exit_code=2 checkpoint preparation failed: {exc} "
                             f"detail={unit.detail_log_relpath} "
-                            f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                         )
                         return 2
 
@@ -751,9 +757,9 @@ class Runner:
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("START", unit, f"attempt={attempt} command={unit.command_relpath}")
                     self.child_cache_markers.clear()
-                    failure_logs = self._failure_logs(unit, self.server_dir / unit.command_relpath)
+                    failure_logs = self._failure_logs(unit, workspace_join(self.server_dir, unit.command_relpath))
                     child = subprocess.Popen(
-                        ["bash", str(self.server_dir / unit.command_relpath)],
+                        ["bash", str(workspace_join(self.server_dir, unit.command_relpath))],
                         cwd=self.server_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
@@ -764,7 +770,7 @@ class Runner:
                         start_new_session=True,
                         env={**dispatch_environment(
                                 {**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id},
-                                AlignmentTask(unit.unit_id, self.server_dir / unit.command_relpath,
+                                AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath),
                                               int(threads) if threads != "unknown" else 1),
                                 int(threads) if threads != "unknown" else 1, exclusive=True),
                              "GPM_REPORT_UNIT_ID": unit.unit_id,
@@ -799,7 +805,7 @@ class Runner:
                             "INTERRUPTED",
                             unit,
                             f"signal={self.received_signal} exit_code={exit_code} "
-                            f"detail={unit.detail_log_relpath} rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            f"detail={unit.detail_log_relpath} rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                         )
                         return 128 + self.received_signal
                     if exit_code != 0:
@@ -809,7 +815,7 @@ class Runner:
                             "FAILED",
                             unit,
                             f"exit_code={exit_code} detail={unit.detail_log_relpath} "
-                            f"rerun='bash {self.server_dir / 'run_all.sh'}'"
+                            f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'"
                             + self._failure_hint(unit, failure_logs),
                         )
                         return exit_code
@@ -826,7 +832,7 @@ class Runner:
                             unit,
                             f"exit_code=2 terminal validation failed: {reason} "
                             f"detail={unit.detail_log_relpath} "
-                            f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                         )
                         return 2
                     cache_markers = STAGE_CACHE_MARKERS.get(unit.unit_id, ())
@@ -844,7 +850,7 @@ class Runner:
                                 unit,
                                 f"exit_code=2 output validation/checkpoint failed: {exc} "
                                 f"detail={unit.detail_log_relpath} "
-                                f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                                f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                             )
                             return 2
                         row["state"] = "success"
@@ -886,7 +892,7 @@ class Runner:
                             "",
                             "GPM Server workflow completed successfully.",
                             "No delivery package units are present in this execution plan.",
-                            f"Local report: {self.server_dir / 'report/report.html'}",
+                            f"Local report: {workspace_join(self.server_dir, 'report/report.html')}",
                         ]
                     )
                 else:
@@ -922,13 +928,13 @@ def main() -> int:
     try:
         units = load_plan(server_dir)
         lock.acquire()
-        runtime = server_dir / ".prepare_lib/tools/long_cigar_recovery"
+        runtime = workspace_join(server_dir, ".prepare_lib/tools/long_cigar_recovery")
         if runtime.is_dir() and any(unit.unit_id.startswith("ref:") for unit in units):
             # run.sh uses its own locked handoff; direct run_all.sh reaches this
             # entry instead. Do not perform the handoff twice in Runner.run().
             sys.path.insert(0, str(runtime))
             from resume_reference import handoff
-            report = handoff(server_dir, server_dir / ".prepare_lib", run_id, units, OuterCheckpointManager(server_dir))
+            report = handoff(server_dir, workspace_join(server_dir, ".prepare_lib"), run_id, units, OuterCheckpointManager(server_dir))
             print("[REFERENCE HANDOFF] " + json.dumps(report, ensure_ascii=True), flush=True)
         return Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color).run()
     except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:

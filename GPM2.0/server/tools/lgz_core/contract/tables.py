@@ -2,6 +2,11 @@ import csv
 import json
 from pathlib import Path, PurePosixPath
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ...workspace_layout import workspace_join
+
 from .errors import *
 def safe_relative_path(value, label):
     if not value:
@@ -15,7 +20,7 @@ def safe_relative_path(value, label):
 
 def bundle_path(bundle_root, relpath, label, required=True):
     relative = safe_relative_path(relpath, label)
-    path = bundle_root.joinpath(*relative.parts)
+    path = workspace_join(bundle_root, *relative.parts)
     if required and (not path.exists() or not path.is_file()):
         fail("MISSING_REQUIRED_FILE", f"{label} does not exist: {relpath}")
     try:

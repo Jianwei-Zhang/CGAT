@@ -39,7 +39,7 @@ class LayoutTests(unittest.TestCase):
             "run_lgz_step3.sh": ".runtime/commands/run_lgz_step3.sh",
             "assign_chr_groups.sh": ".runtime/commands/assign_chr_groups.sh",
             "finalize_lgz_evidence.sh": ".runtime/commands/finalize_lgz_evidence.sh",
-            "report/report.html": "06_report/report.html",
+            "report/report.html": "06_report/01_lgz/report.html",
             ".prepare_lib/tools/a.py": ".runtime/prepared/tools/a.py",
             ".run_all/plan.tsv": ".runtime/run_all/plan.tsv",
             "run_all.sh": "run_all.sh",

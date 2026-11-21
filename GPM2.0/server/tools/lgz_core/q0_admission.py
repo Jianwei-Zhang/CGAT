@@ -8,6 +8,12 @@ pairwise-derived placement.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field, replace
 import math
@@ -129,13 +135,13 @@ def load_evidence_input(root: Path) -> EvidenceInput:
     reference_hits, evidence, links = defaultdict(list), {}, []
     for dataset, sequences in sorted(by_dataset.items()):
         relative = f"runs/{dataset}_vs_ref/result.paf"
-        for hit in read_paf(root / relative, query_lengths={k: len(v) for k, v in sequences.items()},
+        for hit in read_paf(workspace_join(root, relative), query_lengths={k: len(v) for k, v in sequences.items()},
                             target_lengths=lengths, artifact=relative):
             reference_hits[SourceKey(dataset, hit.query_name)].append(hit)
             evidence[hit.evidence_id] = evidence_ref(hit)
     for descriptor in catalog["base_alignments"]:
         query, target = descriptor["query_dataset"], descriptor["target_dataset"]
-        for hit in read_paf(root / descriptor["paf"], query_lengths={k: len(v) for k, v in by_dataset[query].items()},
+        for hit in read_paf(workspace_join(root, descriptor["paf"]), query_lengths={k: len(v) for k, v in by_dataset[query].items()},
                             target_lengths={k: len(v) for k, v in by_dataset[target].items()}, artifact=descriptor["paf"]):
             links.append(PairLink(hit, SourceKey(query, hit.query_name), SourceKey(target, hit.target_name)))
             evidence[hit.evidence_id] = evidence_ref(hit)
@@ -144,7 +150,7 @@ def load_evidence_input(root: Path) -> EvidenceInput:
         if task["paf"] in visited:
             continue
         visited.add(task["paf"])
-        for hit in read_paf(root / task["paf"], query_lengths={key: parts[key].interval.length for key in task["query_ids"]},
+        for hit in read_paf(workspace_join(root, task["paf"]), query_lengths={key: parts[key].interval.length for key in task["query_ids"]},
                             target_lengths={key: parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"]):
             query, target = parts[hit.query_name], parts[hit.target_name]
             links.append(PairLink(hit, query.source, target.source, query.interval.start, target.interval.start))
@@ -582,7 +588,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 
 def selector_identity() -> str:
     root = Path(__file__).parent
-    return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
+    return stable_id("q0-selector", [(name, sha256_file(workspace_join(root, name))) for name in
                                     ("q0_admission.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "common.py")])
 
 

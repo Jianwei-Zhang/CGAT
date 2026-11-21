@@ -2,6 +2,12 @@
 """Prepare once, then run/resume the existing Server execution plan under one lock."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import json
 import os
 import re
@@ -106,14 +112,14 @@ def check_resume_options(requested: dict, saved: dict, identities: dict) -> None
 
 def update_fill_limit(root: Path, limit: str) -> None:
     script, runtime_name = next(
-        ((root / filename, module) for filename, module in (
+        ((workspace_join(root, filename), module) for filename, module in (
             ("run_lgz_step2.sh", "lgz_step2.py"),
             ("run_grt_step2.sh", "grt_step2.py"),
             ("run_grt_step12.sh", "grt_step12.py"),
-        ) if (root / filename).is_file()),
-        (root / "run_lgz_step2.sh", "lgz_step2.py"),
+        ) if (workspace_join(root, filename)).is_file()),
+        (workspace_join(root, "run_lgz_step2.sh"), "lgz_step2.py"),
     )
-    runtime = root / ".prepare_lib/tools" / runtime_name
+    runtime = workspace_join(root, ".prepare_lib/tools", runtime_name)
     if not script.is_file() or not runtime.is_file():
         raise RunnerError("This workspace has no staged LGZ Step2 runtime; update its Server runtime before changing the limit.")
     # A legacy script can call the compatibility facade after a code-only update.
@@ -147,11 +153,11 @@ def update_fill_limit(root: Path, limit: str) -> None:
 
 def prepare_workspace(script: Path, argv: list[str], root: Path) -> int:
     # Forward scheduler cancellation to preparation as well as the compute stages.
-    log_path = root / "logs/prepare.log"
+    log_path = workspace_join(root, "logs/prepare.log")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     print(f"[PREPARE] workspace={root} log={log_path}", flush=True)
     log = log_path.open("a", encoding="utf-8")
-    owner = json.loads((root / ".run_all/lock/owner.json").read_text())
+    owner = json.loads((workspace_join(root, ".run_all/lock/owner.json")).read_text())
     environment = {**os.environ, "GPM_SERVER_PREPARE_RUN_ID": owner["run_id"]}
     child = subprocess.Popen(["bash", str(script), *argv], start_new_session=True,
                              env=environment, stdout=log, stderr=subprocess.STDOUT)
@@ -185,13 +191,13 @@ def execute(argv: list[str], server_source: Path) -> int:
         return result.returncode
     options = parse_options(argv, Path.cwd())
     root = Path(options.get("--out", [[str(Path.cwd() / "gpm_server")]])[-1][0])
-    manifest_path = root / ".run_all/launch.json"
+    manifest_path = workspace_join(root, ".run_all/launch.json")
     run_id = new_run_id()
     lock = WorkspaceLock(root, run_id)
     try:
         lock.acquire()
         saved = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
-        ready = saved.get("prepared", False) if saved else (root / "run_all.sh").is_file()
+        ready = saved.get("prepared", False) if saved else (workspace_join(root, "run_all.sh")).is_file()
         if saved:
             check_resume_options(options, saved["options"], saved["inputs"])
         elif ready and any(key not in {"--out", "--max-fill", *RESOURCE_OPTIONS} for key in options):

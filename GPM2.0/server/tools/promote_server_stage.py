@@ -4,6 +4,12 @@
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import argparse
 import shutil
 from pathlib import Path
@@ -43,7 +49,7 @@ def promote(stage_dir: Path, server_dir: Path, optional_entries: list[str]) -> N
 
     for name in (*BASE_ENTRIES, *optional_entries):
         source = stage_dir / name
-        destination = server_dir / name
+        destination = workspace_join(server_dir, name)
         if destination.exists() or destination.is_symlink():
             if destination.is_dir() and not destination.is_symlink():
                 shutil.rmtree(destination)

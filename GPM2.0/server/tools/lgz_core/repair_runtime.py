@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 from .repair_common import *
 from .source_intervals import SourceAuthorization
 from .q0_publication import validate_prepared_q0
@@ -13,7 +19,7 @@ def publish_repair_metadata(
     tools: dict[str, dict[str, str]],
     minimap: dict[str, str],
 ) -> None:
-    metadata = server_dir / "metadata"
+    metadata = workspace_join(server_dir, "metadata")
     q_rows = [
         row
         for row in read_tsv(metadata / "grt_q_segments.tsv", Q_SEGMENT_FIELDS)
@@ -127,7 +133,7 @@ def publish_repair_metadata(
 
 def execution_context(args: argparse.Namespace) -> dict[str, object]:
     server_dir = args.server_dir.resolve()
-    package = read_single(server_dir / "metadata/package.tsv")
+    package = read_single(workspace_join(server_dir, "metadata/package.tsv"))
     if (
         package.get("workflow") != WORKFLOW
         or package.get("schema_version") != CURRENT_PACKAGE_SCHEMA_VERSION
@@ -136,7 +142,7 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
     ):
         fail("unsupported package workflow/schema; Step1/Step2 has no legacy fallback")
     recipe = read_single(
-        server_dir / "metadata/grt_recipe.tsv",
+        workspace_join(server_dir, "metadata/grt_recipe.tsv"),
         [
             "recipe_id",
             "primary_dataset",
@@ -153,9 +159,9 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
     sources = source_catalog(server_dir)
     authorization = SourceAuthorization.load(server_dir, sources, frozen=frozen_q0)
     assignments = assignment_map(server_dir)
-    all_q_rows = read_tsv(server_dir / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS)
+    all_q_rows = read_tsv(workspace_join(server_dir, "metadata/grt_q_segments.tsv"), Q_SEGMENT_FIELDS)
     q0_rows = [row for row in all_q_rows if row["q_version"] == "q0"]
-    if not q0_rows or not (server_dir / "grt/q/q0.fa").is_file():
+    if not q0_rows or not (workspace_join(server_dir, "grt/q/q0.fa")).is_file():
         fail("Step1 requires a prepared q0 mapping")
     chromosome_order, q0_paths, q0_records = load_q_paths(server_dir, "q0", q0_rows, sources)
     authorization.validate_paths(q0_paths)
@@ -172,7 +178,7 @@ def execution_context(args: argparse.Namespace) -> dict[str, object]:
         {
             "recipe_id": recipe["recipe_id"],
             "donor_set_id": donor_set["donor_set_id"],
-            "q0_sha256": sha256_file(server_dir / "grt/q/q0.fa"),
+            "q0_sha256": sha256_file(workspace_join(server_dir, "grt/q/q0.fa")),
             "engine_version": ENGINE_VERSION,
             "engine_sha256": ENGINE_SHA256,
             "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},

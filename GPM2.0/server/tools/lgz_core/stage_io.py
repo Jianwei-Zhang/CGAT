@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 import json
 import os
 import re
@@ -65,7 +71,7 @@ def json_hash(value: object) -> str:
 
 def source_catalog(server_dir: Path) -> dict[tuple[str, str], str]:
     datasets = read_tsv(
-        server_dir / "metadata/datasets.tsv",
+        workspace_join(server_dir, "metadata/datasets.tsv"),
         [
             "dataset_name",
             "assembler",
@@ -77,7 +83,7 @@ def source_catalog(server_dir: Path) -> dict[tuple[str, str], str]:
     )
     sources: dict[tuple[str, str], str] = {}
     for dataset in datasets:
-        for name, sequence in read_fasta(server_dir / dataset["fasta_relpath"]):
+        for name, sequence in read_fasta(workspace_join(server_dir, dataset["fasta_relpath"])):
             key = (dataset["dataset_name"], name)
             if key in sources:
                 fail(f"duplicate source identity: {key[0]}:{key[1]}")
@@ -85,7 +91,7 @@ def source_catalog(server_dir: Path) -> dict[tuple[str, str], str]:
     locator_keys = {
         (row["dataset_name"], row["seq_name"])
         for row in read_tsv(
-            server_dir / "metadata/source_seq_locator.tsv",
+            workspace_join(server_dir, "metadata/source_seq_locator.tsv"),
             ["dataset_name", "seq_name", "fasta_relpath"],
         )
     }
@@ -97,7 +103,7 @@ def source_catalog(server_dir: Path) -> dict[tuple[str, str], str]:
 def assignment_map(server_dir: Path) -> dict[tuple[str, str], set[str]]:
     assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
     for row in read_tsv(
-        server_dir / "metadata/chr_assignments.tsv",
+        workspace_join(server_dir, "metadata/chr_assignments.tsv"),
         CHR_ASSIGNMENT_FIELDS,
     ):
         assignments[(row["dataset_name"], row["seq_name"])].add(
@@ -118,7 +124,7 @@ def load_q_paths(
     q_rows: list[dict[str, str]],
     sources: dict[tuple[str, str], str],
 ) -> tuple[list[str], dict[str, list[dict[str, object]]], dict[str, str]]:
-    q_records = read_fasta(server_dir / f"grt/q/{q_version}.fa")
+    q_records = read_fasta(workspace_join(server_dir, f"grt/q/{q_version}.fa"))
     record_order = [name for name, _sequence in q_records]
     record_map = dict(q_records)
     grouped: dict[str, list[dict[str, str]]] = defaultdict(list)

@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
 import argparse
 import csv
 import hashlib
@@ -185,7 +191,7 @@ def append_unique_row(path, fieldnames, row, duplicate_predicate, duplicate_mess
 
 
 def ensure_derived_dataset_row(server_dir, skip_self):
-    path = server_dir / "metadata" / "datasets.tsv"
+    path = workspace_join(server_dir, "metadata", "datasets.tsv")
     rows, fieldnames = read_tsv(path)
     expected = [
         "dataset_name",
@@ -213,13 +219,13 @@ def ensure_derived_dataset_row(server_dir, skip_self):
 
 
 def find_reference_chr_fasta(server_dir, chr_name):
-    rows, _fieldnames = read_tsv(server_dir / "metadata" / "reference_chr_locator.tsv")
+    rows, _fieldnames = read_tsv(workspace_join(server_dir, "metadata", "reference_chr_locator.tsv"))
     for row in rows:
         if row.get("reference_chr_name") == chr_name:
             relpath = row.get("fasta_relpath", "")
             if not relpath:
                 fail(f"metadata/reference_chr_locator.tsv has empty fasta_relpath for {chr_name}")
-            path = server_dir / relpath
+            path = workspace_join(server_dir, relpath)
             if not path.exists():
                 fail(f"reference chromosome FASTA is missing: {path}")
             return path
@@ -227,7 +233,7 @@ def find_reference_chr_fasta(server_dir, chr_name):
 
 
 def target_track_member_names(server_dir, chr_name, target_track):
-    rows, _fieldnames = read_tsv(server_dir / "metadata" / "chr_assignments.tsv")
+    rows, _fieldnames = read_tsv(workspace_join(server_dir, "metadata", "chr_assignments.tsv"))
     names = [
         row.get("seq_name", "")
         for row in rows
@@ -237,7 +243,7 @@ def target_track_member_names(server_dir, chr_name, target_track):
 
 
 def chr_dataset_names(server_dir, chr_name):
-    rows, _fieldnames = read_tsv(server_dir / "metadata" / "chr_assignments.tsv")
+    rows, _fieldnames = read_tsv(workspace_join(server_dir, "metadata", "chr_assignments.tsv"))
     names = []
     seen = set()
     for row in rows:
@@ -256,9 +262,9 @@ def chr_dataset_names(server_dir, chr_name):
 
 def ensure_no_duplicate_ctg(server_dir, ctg_name):
     paths = [
-        server_dir / "metadata" / "source_seq_locator.tsv",
-        server_dir / "metadata" / "chr_assignments.tsv",
-        server_dir / "metadata" / "derived_ctgs.tsv",
+        workspace_join(server_dir, "metadata", "source_seq_locator.tsv"),
+        workspace_join(server_dir, "metadata", "chr_assignments.tsv"),
+        workspace_join(server_dir, "metadata", "derived_ctgs.tsv"),
     ]
     for path in paths:
         rows, _fieldnames = read_tsv(path)
@@ -271,7 +277,7 @@ def ensure_no_duplicate_ctg(server_dir, ctg_name):
 
 
 def ensure_target_track(server_dir, target_track):
-    rows, _fieldnames = read_tsv(server_dir / "metadata" / "datasets.tsv")
+    rows, _fieldnames = read_tsv(workspace_join(server_dir, "metadata", "datasets.tsv"))
     if not any(row.get("dataset_name") == target_track for row in rows):
         fail(f"Unknown --track dataset: {target_track}")
     if target_track == DERIVED_DATASET:
@@ -293,7 +299,7 @@ def write_alignment_command(path, run_dir, target_fa, query_fa, options, self_mo
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 def parse_ref_paf_assignment(server_dir, ctg_name, chr_name, sequence):
-    paf_path = server_dir / "runs" / "add_ctg" / f"{ctg_name}_vs_ref" / "result.paf"
+    paf_path = workspace_join(server_dir, "runs", "add_ctg", f"{ctg_name}_vs_ref", "result.paf")
     if not paf_path.exists():
         fail(f"missing add_ctg reference alignment result: {paf_path}")
 
@@ -350,7 +356,7 @@ def parse_ref_paf_assignment(server_dir, ctg_name, chr_name, sequence):
 
 
 def write_manifest(server_dir, ctg_name, chr_name, target_track, source, created_at):
-    metadata_dir = server_dir / "metadata"
+    metadata_dir = workspace_join(server_dir, "metadata")
     options = read_key_values(metadata_dir / "prepare_options.tsv")
     reference = read_single_tsv_row(metadata_dir / "reference.tsv")
     manifest_dir = metadata_dir / "add_ctg_manifests"
@@ -386,7 +392,7 @@ def command_prepare(args):
     if "\t" in args.source or "\n" in args.source or "\r" in args.source:
         fail("--source must not contain tabs or newlines")
 
-    metadata_dir = server_dir / "metadata"
+    metadata_dir = workspace_join(server_dir, "metadata")
     options = read_key_values(metadata_dir / "prepare_options.tsv")
     skip_self = options.get("skip_self", "false").lower() == "true"
     ensure_no_duplicate_ctg(server_dir, args.ctg)
@@ -403,31 +409,31 @@ def command_prepare(args):
     if not sequence:
         fail(f"add_ctg -i sequence is empty: {input_fasta}")
 
-    unique_fa = server_dir / "data" / "derived_ctgs" / f"{args.ctg}.fa"
+    unique_fa = workspace_join(server_dir, "data", "derived_ctgs", f"{args.ctg}.fa")
     write_single_record_fasta(unique_fa, args.ctg, sequence)
     write_fasta_index(unique_fa)
 
-    aggregate_fa = server_dir / "data" / "datasets" / f"{DERIVED_DATASET}.fa"
+    aggregate_fa = workspace_join(server_dir, "data", "datasets", f"{DERIVED_DATASET}.fa")
     if not fasta_has_record(aggregate_fa, args.ctg):
         append_or_create_fasta(aggregate_fa, args.ctg, sequence)
     write_fasta_index(aggregate_fa)
 
-    chr_dataset_fa = server_dir / "runs" / f"chr_{args.chr}" / "datasets" / f"{DERIVED_DATASET}.fa"
+    chr_dataset_fa = workspace_join(server_dir, "runs", f"chr_{args.chr}", "datasets", f"{DERIVED_DATASET}.fa")
     if not fasta_has_record(chr_dataset_fa, args.ctg):
         append_or_create_fasta(chr_dataset_fa, args.ctg, sequence)
     write_fasta_index(chr_dataset_fa)
 
     ensure_derived_dataset_row(server_dir, skip_self)
 
-    ref_run_dir = server_dir / "runs" / "add_ctg" / f"{args.ctg}_vs_ref"
+    ref_run_dir = workspace_join(server_dir, "runs", "add_ctg", f"{args.ctg}_vs_ref")
     write_alignment_command(ref_run_dir / "command.sh", ref_run_dir, reference_chr_fa, unique_fa, options)
 
     if not skip_self:
         for dataset_name in chr_dataset_names(server_dir, args.chr):
-            target_chr_fa = server_dir / "runs" / f"chr_{args.chr}" / "datasets" / f"{dataset_name}.fa"
+            target_chr_fa = workspace_join(server_dir, "runs", f"chr_{args.chr}", "datasets", f"{dataset_name}.fa")
             if not target_chr_fa.exists():
                 fail(f"target chromosome FASTA is missing for {dataset_name}: {target_chr_fa}")
-            pair_run_dir = server_dir / "runs" / f"chr_{args.chr}" / "add_ctg" / f"{dataset_name}_vs_{args.ctg}"
+            pair_run_dir = workspace_join(server_dir, "runs", f"chr_{args.chr}", "add_ctg", f"{dataset_name}_vs_{args.ctg}")
             pair_query_fa = pair_run_dir / f"{DERIVED_DATASET}.fa"
             write_single_record_fasta(pair_query_fa, args.ctg, sequence)
             write_alignment_command(pair_run_dir / "command.sh", pair_run_dir, target_chr_fa, pair_query_fa, options)
@@ -436,7 +442,7 @@ def command_prepare(args):
 def command_finalize(args):
     server_dir = Path(args.server_dir)
     input_fasta = Path(args.input)
-    records = read_fasta_records(server_dir / "data" / "derived_ctgs" / f"{args.ctg}.fa")
+    records = read_fasta_records(workspace_join(server_dir, "data", "derived_ctgs", f"{args.ctg}.fa"))
     if len(records) != 1:
         fail(f"staged derived FASTA must contain exactly one sequence for {args.ctg}")
     _name, sequence = records[0]
@@ -444,7 +450,7 @@ def command_finalize(args):
 
     assignment_row = parse_ref_paf_assignment(server_dir, args.ctg, args.chr, sequence)
     append_unique_row(
-        server_dir / "metadata" / "chr_assignments.tsv",
+        workspace_join(server_dir, "metadata", "chr_assignments.tsv"),
         [
             "dataset_name",
             "seq_name",
@@ -463,14 +469,14 @@ def command_finalize(args):
 
     rel_unique_fa = f"data/derived_ctgs/{args.ctg}.fa"
     append_unique_row(
-        server_dir / "metadata" / "source_seq_locator.tsv",
+        workspace_join(server_dir, "metadata", "source_seq_locator.tsv"),
         ["dataset_name", "seq_name", "fasta_relpath"],
         {"dataset_name": DERIVED_DATASET, "seq_name": args.ctg, "fasta_relpath": rel_unique_fa},
         lambda row: row.get("dataset_name") == DERIVED_DATASET and row.get("seq_name") == args.ctg,
         f"ctg name already exists: {args.ctg}\nPlease choose a different --ctg name and rerun add_ctg.sh.",
     )
 
-    n_rows, n_fieldnames = read_tsv(server_dir / "metadata" / "source_seq_n_regions.tsv")
+    n_rows, n_fieldnames = read_tsv(workspace_join(server_dir, "metadata", "source_seq_n_regions.tsv"))
     expected_n = ["dataset_name", "seq_name", "start_bp", "end_bp", "length_bp"]
     if n_fieldnames and n_fieldnames != expected_n:
         fail(f"unexpected header in metadata/source_seq_n_regions.tsv: {n_fieldnames}")
@@ -489,10 +495,10 @@ def command_finalize(args):
                 "length_bp": str(length_bp),
             }
         )
-    write_tsv(server_dir / "metadata" / "source_seq_n_regions.tsv", expected_n, n_rows)
+    write_tsv(workspace_join(server_dir, "metadata", "source_seq_n_regions.tsv"), expected_n, n_rows)
 
     append_unique_row(
-        server_dir / "metadata" / "derived_ctgs.tsv",
+        workspace_join(server_dir, "metadata", "derived_ctgs.tsv"),
         ["derived_dataset", "ctg_name", "source", "source_fasta_name", "source_fasta_sha256", "created_at"],
         {
             "derived_dataset": DERIVED_DATASET,
@@ -507,7 +513,7 @@ def command_finalize(args):
     )
 
     append_unique_row(
-        server_dir / "metadata" / "track_members.tsv",
+        workspace_join(server_dir, "metadata", "track_members.tsv"),
         ["member_dataset", "member_ctg", "target_chr", "target_track", "member_role", "created_at"],
         {
             "member_dataset": DERIVED_DATASET,

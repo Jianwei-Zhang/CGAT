@@ -7,6 +7,12 @@ Coordinates in marks.tsv remain 1-based inclusive, as required by the App.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import argparse
 import csv
 import json
@@ -95,17 +101,17 @@ def merge_hits(hits, entries, chromosome, dataset, min_len):
 
 def scan(root, chromosome, datasets, threads, run_dir):
     verify_snapshot(root)
-    rows = [r for r in table(root / "cen/reference.tsv") if r.get("chr_name") in ("*", chromosome)]
-    output = root / "cen" / f"chr_{chromosome}"
+    rows = [r for r in table(workspace_join(root, "cen/reference.tsv")) if r.get("chr_name") in ("*", chromosome)]
+    output = workspace_join(root, "cen", f"chr_{chromosome}")
     # Preserve legacy package/append TSV headers for an already-prepared project.
-    fields = MARK_FIELDS if (root / "metadata/annotation_library_snapshot.json").is_file() else MARK_FIELDS[:11]
+    fields = MARK_FIELDS if (workspace_join(root, "metadata/annotation_library_snapshot.json")).is_file() else MARK_FIELDS[:11]
     if not rows:
         write_tsv(output / "marks.tsv", fields, [])
         return
     entries = {row["sequence_name"]: row for row in rows}
     sequences = {}
     for relative in sorted({r["fasta_relpath"] for r in rows}):
-        for name, sequence in fasta_records(root / relative):
+        for name, sequence in fasta_records(workspace_join(root, relative)):
             if name in entries:
                 sequences[name] = sequence
     if set(sequences) != set(entries):

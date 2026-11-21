@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
 import argparse
 import csv
 import os
@@ -69,7 +75,7 @@ def load_existing_ranks(path):
 
 
 def build_member_rows(server_dir):
-    metadata_dir = server_dir / "metadata"
+    metadata_dir = workspace_join(server_dir, "metadata")
     assignment_path = metadata_dir / "chr_assignments.tsv"
     member_path = metadata_dir / "track_members.tsv"
     output_path = metadata_dir / "track_member_orders.tsv"

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import argparse
 import codecs
 import json
@@ -154,7 +160,7 @@ def write_manifest(
 
 def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | None:
     q0_phase = unit_id.startswith("q0_chr:")
-    manifest = (root / command).parent / (Q0_MANIFEST if q0_phase else MANIFEST)
+    manifest = (workspace_join(root, command)).parent / (Q0_MANIFEST if q0_phase else MANIFEST)
     if not manifest.is_file():
         if q0_phase:
             raise ValueError(f"required q0 alignment task manifest is missing: {manifest}")
@@ -179,7 +185,7 @@ def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | 
         largest_fraction = row.get("largest_fraction")
         if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
             raise ValueError(f"invalid alignment task command: {manifest}")
-        path = (root / relative).resolve()
+        path = (workspace_join(root, relative)).resolve()
         path.relative_to(root.resolve())
         if (not path.is_file() or path in seen or type(cap) is not int or cap < 1
                 or type(priority) is not int or priority < 0 or type(work) is not int or work < 0

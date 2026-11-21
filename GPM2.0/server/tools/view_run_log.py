@@ -2,6 +2,12 @@
 """Read-only, optionally colored tail of a prepared workspace log."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import argparse
 import os
 from pathlib import Path
@@ -73,7 +79,7 @@ def main():
     args = parser.parse_args()
     if args.lines < 0:
         parser.error("--lines must be non-negative")
-    path = args.server_dir / "logs" / ("run_all.log" if args.detailed else "progress.log")
+    path = workspace_join(args.server_dir, "logs", "run_all.log" if args.detailed else "progress.log")
     try:
         watch(path, args.lines, args.follow, use_color(args.color))
     except KeyboardInterrupt:

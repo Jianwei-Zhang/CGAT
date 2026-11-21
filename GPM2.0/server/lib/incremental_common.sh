@@ -10,6 +10,8 @@ incremental_base_lib="${incremental_lib_dir}/common.sh"
 }
 # shellcheck source=common.sh
 source "$incremental_base_lib"
+# shellcheck source=workspace_paths.sh
+source "${incremental_lib_dir}/workspace_paths.sh"
 
 validate_name() {
   local value="$1"
@@ -66,7 +68,7 @@ read_prepare_option() {
     NR == 1 { next }
     $1 == key { print $2; found = 1; exit }
     END { if (!found) exit 1 }
-  ' "${server_dir}/metadata/prepare_options.tsv"
+  ' "$(cgat_workspace_path "$server_dir" "metadata/prepare_options.tsv")"
 }
 
 materialize_fasta_input() {

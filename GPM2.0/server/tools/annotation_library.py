@@ -6,6 +6,11 @@ The CLI never writes library/; all user edits are serialized under local/library
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
 import argparse
 import contextlib
 import csv
@@ -196,22 +201,22 @@ def snapshot(server: Path, workspace: Path, explicit_tel, explicit_cen, min_len,
                  "fasta_relpath": "cen/library.fa", "min_len": min_len, "min_identity": min_identity,
                  "provenance": json_text(group["entries"])} for group in cen_groups.values()]
     # Validate all input before replacing any prepared input. Re-prepare is explicit.
-    write_tsv(workspace / "tel/rules.tsv", ("rule_id", "motif", "min_repeat", "reverse_complement", "provenance"), tel_rows)
-    atomic_write(workspace / "cen/library.fa", fasta_bytes((g["cen_id"], g["sequence"]) for g in cen_groups.values()))
-    write_tsv(workspace / "cen/reference.tsv", ("cen_id", "chr_name", "sequence_name", "fasta_relpath", "min_len", "min_identity", "provenance"), cen_rows)
+    write_tsv(workspace_join(workspace, "tel/rules.tsv"), ("rule_id", "motif", "min_repeat", "reverse_complement", "provenance"), tel_rows)
+    atomic_write(workspace_join(workspace, "cen/library.fa"), fasta_bytes((g["cen_id"], g["sequence"]) for g in cen_groups.values()))
+    write_tsv(workspace_join(workspace, "cen/reference.tsv"), ("cen_id", "chr_name", "sequence_name", "fasta_relpath", "min_len", "min_identity", "provenance"), cen_rows)
     manifest = {"schema_version": 1, "tel": [{k: v for k, v in g.items() if k != "provenance"} for g in tel_rows],
                 "cen": [{"cen_id": g["cen_id"], "sequence_sha256": digest,
                          "length": len(g["sequence"]), "entries": g["entries"]} for digest, g in cen_groups.items()]}
-    manifest["files"] = {relative: sha256((workspace / relative).read_bytes())
+    manifest["files"] = {relative: sha256((workspace_join(workspace, relative)).read_bytes())
                          for relative in ("tel/rules.tsv", "cen/reference.tsv", "cen/library.fa")}
-    atomic_write(workspace / "metadata/annotation_library_snapshot.json", (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode())
+    atomic_write(workspace_join(workspace, "metadata/annotation_library_snapshot.json"), (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode())
 
 
 def verify_snapshot(workspace: Path):
     """Fail closed on edited/partial new snapshots, but leave legacy projects alone."""
-    path = workspace / "metadata/annotation_library_snapshot.json"
+    path = workspace_join(workspace, "metadata/annotation_library_snapshot.json")
     if not path.exists():
-        rules = workspace / "tel/rules.tsv"
+        rules = workspace_join(workspace, "tel/rules.tsv")
         if rules.is_file():
             with rules.open(encoding="utf-8") as handle:
                 if "provenance" in handle.readline().rstrip("\n").split("\t"):
@@ -222,7 +227,7 @@ def verify_snapshot(workspace: Path):
     if manifest.get("schema_version") != 1 or set(manifest.get("files", {})) != expected:
         raise ValueError("unsupported or incomplete annotation library snapshot")
     for relative, digest in manifest["files"].items():
-        if sha256((workspace / relative).read_bytes()) != digest:
+        if sha256((workspace_join(workspace, relative)).read_bytes()) != digest:
             raise ValueError(f"prepared annotation input changed: {relative}; explicitly prepare again")
 
 

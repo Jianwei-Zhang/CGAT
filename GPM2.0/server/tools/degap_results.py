@@ -5,6 +5,12 @@ Adds candidates to Server metadata with rollback, never edits Final Path. Only k
 mode outputs are collected, never arbitrary FASTA files found recursively.
 """
 from __future__ import annotations
+
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
 import argparse
 import csv
 import hashlib
@@ -64,7 +70,7 @@ def safe_path(root, relative):
     relative = Path(relative)
     if relative.is_absolute() or ".." in relative.parts or not relative.parts:
         raise ValueError(f"Unsafe relative path: {relative}")
-    path = root / relative
+    path = workspace_join(root, relative)
     if not path.resolve().is_relative_to(root.resolve()):
         raise ValueError(f"Path leaves root: {relative}")
     return path
@@ -307,7 +313,7 @@ def collect_locked(jobs):
     output = jobs.parent / "degap_results.zip"
     with tempfile.TemporaryDirectory(prefix="gpm-degap-collect-") as temporary:
         root = Path(temporary)
-        staged, delivery = root / "stage", root / "delivery"
+        staged, delivery = workspace_join(root, "stage"), workspace_join(root, "delivery")
         seed_stage(server, staged, [r for r, _, _ in entries])
         (delivery / "packages").mkdir(parents=True)
         results = []
@@ -337,7 +343,7 @@ def collect_locked(jobs):
             stage.command_finalize(args)
             order_path, rows = ordering.build_member_rows(staged)
             ordering.write_atomic_tsv(order_path, rows)
-            package_dir = root / f"package-{index}"
+            package_dir = workspace_join(root, f"package-{index}")
             package.main(["add_ctg_package.py", str(staged), str(package_dir), name])
             archive = delivery / "packages" / f"{recipe['token']}.zip"
             for command in package_dir.rglob("*.sh"):
@@ -347,7 +353,7 @@ def collect_locked(jobs):
                     "seed_sha256": run_receipt["seed_sha256"], "runtime": run_receipt["runtime"], "ctg_name": name,
                     "package": archive.relative_to(delivery).as_posix(), "sha256": digest(archive)}
             results.append(info)
-            info_path = root / f"cached-{index}.json"
+            info_path = workspace_join(root, f"cached-{index}.json")
             atomic_json(info_path, info)
             cache_updates.extend([(archive, cache.with_suffix(".zip")), (info_path, cached_info)])
         atomic_json(delivery / "degap_results.json", {"schema": "gpm.degap.results.v1", "results": results, "notes": notes})

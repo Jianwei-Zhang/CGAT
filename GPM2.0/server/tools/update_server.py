@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import official_download as downloads
 import server_paths as paths
 import update_workspace_runtime as core
+from workspace_layout import workspace_join, WorkspaceLayout
 
 SKILL_PREFIX = "skills/gpm-server/"
 LEGACY_RUN_ALL = b'''#!/usr/bin/env bash
@@ -35,7 +36,7 @@ exec python3 "${server_dir}/.prepare_lib/tools/run_all_runner.py" --server-dir "
 
 def project_at(cwd):
     for directory in (cwd, *cwd.parents):
-        if (directory / ".prepare_lib").exists() or (directory / "run_all.sh").exists():
+        if (directory / ".prepare_lib").exists() or (directory / ".runtime/workspace.json").exists() or (directory / "run_all.sh").exists():
             return paths.checked(directory)
     return None
 
@@ -114,7 +115,7 @@ def prepare(source, tools, workspace, release):
                              "this code-only update (no second environment is required).\n"
                              + checked.stdout + checked.stderr)
     if workspace:
-        paths.checked(workspace / ".prepare_lib")
+        paths.checked(workspace_join(workspace, ".prepare_lib"))
         nested = tools in workspace.parents
         if nested:
             relative = workspace.relative_to(tools).as_posix()
@@ -123,7 +124,7 @@ def prepare(source, tools, workspace, release):
                     or any(name == relative or name.startswith(relative + "/") or relative.startswith(name + "/") for name in managed)):
                 raise ValueError("Nested project overlaps managed Server files")
         core.validate_targets(workspace, tools, source, allow_nested_workspace=nested)
-        binding = core.regular_path(workspace / ".prepare_lib", "server-tools.path")
+        binding = core.regular_path(workspace_join(workspace, ".prepare_lib"), "server-tools.path")
         if binding.exists():
             recorded = binding.read_text().strip()
             if not Path(recorded).is_absolute() or paths.checked(recorded) != tools:
@@ -134,7 +135,7 @@ def prepare(source, tools, workspace, release):
     roots = {"tools": tools}
     targets = [("tools", source_files, previous.get("files", {}), "")]
     if workspace:
-        runtime = workspace / ".prepare_lib"
+        runtime = workspace_join(workspace, ".prepare_lib")
         roots["runtime"] = runtime
         selected = {n: r for n, r in source_files.items() if runtime_file(n) or n == "SOURCE.json"}
         targets.append(("runtime", selected, metadata(runtime).get("files", {}), ""))
@@ -211,8 +212,8 @@ def prepare(source, tools, workspace, release):
         launcher = core.regular_path(workspace, "run_all.sh")
         template = core.regular_path(source, "lib/run_all_launcher.sh")
         known = {LEGACY_RUN_ALL, template.read_bytes()}
-        old_template = core.regular_path(workspace / ".prepare_lib", "lib/run_all_launcher.sh")
-        old_record = metadata(workspace / ".prepare_lib").get("files", {}).get("lib/run_all_launcher.sh")
+        old_template = core.regular_path(workspace_join(workspace, ".prepare_lib"), "lib/run_all_launcher.sh")
+        old_record = metadata(workspace_join(workspace, ".prepare_lib")).get("files", {}).get("lib/run_all_launcher.sh")
         if old_template.is_file() and old_record and core.digest(old_template.read_bytes()) == old_record.get("sha256"):
             known.add(old_template.read_bytes())
         if launcher.is_file() and launcher.read_bytes() in known:
@@ -243,7 +244,7 @@ def acquire(stack, plan):
     for root in locks_for(plan):
         paths.checked(root)
         for name in (".run_all", ".run_all/lock", ".run_all/lock/owner.json"):
-            paths.checked(root / name)
+            paths.checked(workspace_join(root, name) if plan.get("workspace") and root == Path(plan["workspace"]) else root / name)
         lock = core.workspace_lock(root)
         lock.acquire()
         stack.callback(lock.release)
@@ -268,7 +269,7 @@ def apply(plan):
                     core.digest(path.read_bytes()) != item["sha256"] or
                     stat.S_IMODE(path.stat().st_mode) != item["mode"])):
                 raise ValueError("Target changed after planning; check again: " + str(path))
-        home = (workspace or tools) / ".run_all"
+        home = workspace_join(workspace, ".run_all") if workspace else tools / ".run_all"
         backup = Path(tempfile.mkdtemp(prefix="server-update-", dir=home))
         journal = {**plan, "files": [{k: v for k, v in item.items() if k != "data"} for item in changes], "status": "applying"}
         for item in changes:
@@ -312,7 +313,7 @@ def apply(plan):
 def rollback(backup):
     backup = paths.checked(backup)
     journal = json.loads(core.regular_path(backup, "journal.json").read_text())
-    home = Path(journal["workspace"] or journal["tools_root"]) / ".run_all"
+    home = workspace_join(Path(journal["workspace"]), ".run_all") if journal["workspace"] else Path(journal["tools_root"]) / ".run_all"
     if backup.parent != home or not backup.name.startswith("server-update-"):
         raise ValueError("Not a coordinated-update backup")
     with ExitStack() as stack:
@@ -339,7 +340,7 @@ def align_installed_runtime(tools, workspace):
         # An incomplete installation is not a repair source; a verified network
         # payload may still repair missing files. Offline verification will stop.
         return
-    runtime = workspace / ".prepare_lib"
+    runtime = workspace_join(workspace, ".prepare_lib")
     old = metadata(runtime)
     wanted = {name: record for name, record in manifest.items() if runtime_file(name)}
     equal = old.get("git_revision") == info["git_revision"]
@@ -392,7 +393,7 @@ def run(tools, *, startup=False, workspace=None):
             verify_installed(tools, workspace)
             # Diagnostic logging is best effort and never weakens local integrity gates.
             try:
-                log_path = core.regular_path(workspace or tools, ".run_all/update-check.log")
+                log_path = core.regular_path(workspace or tools, WorkspaceLayout.detect(workspace).relative(".run_all/update-check.log") if workspace else ".run_all/update-check.log")
                 log_path.parent.mkdir(parents=True, exist_ok=True)
                 with log_path.open("a", encoding="utf-8") as log:
                     log.write(dt.datetime.now(dt.timezone.utc).isoformat() + "\n" + diagnostics.getvalue() + type(exc).__name__ + ": " + str(exc) + "\n")
@@ -435,7 +436,7 @@ def verify_installed(tools, workspace):
     info = metadata(tools)
     core.verified_source(tools, info["git_revision"])
     if workspace is not None:
-        runtime = workspace / ".prepare_lib"
+        runtime = workspace_join(workspace, ".prepare_lib")
         old = metadata(runtime)
         if not isinstance(old.get("files"), dict) or not old["files"]:
             raise ValueError("Prepared runtime has no integrity baseline; update.sh must adopt it before automatic startup")
@@ -454,19 +455,19 @@ def launch(tools, mode, argv):
         help_only = any(flag in argv for flag in ("--help", "-h"))
         options = {} if help_only else parse_options(argv, Path.cwd())
         candidate = Path(options.get("--out", [[str(Path.cwd() / "gpm_server")]])[-1][0])
-        workspace = paths.checked(candidate) if (candidate / ".prepare_lib").is_dir() else None
+        workspace = paths.checked(candidate) if (workspace_join(candidate, ".prepare_lib")).is_dir() else None
         command = [sys.executable, "-B", str(tools / "tools/server_run.py"), *argv]
     elif mode == "--launch-workspace":
         if not argv:
             raise ValueError("Missing prepared workspace for internal launch")
         workspace = paths.checked(argv[0])
-        if not (workspace / ".prepare_lib").is_dir():
+        if not (workspace_join(workspace, ".prepare_lib")).is_dir():
             raise ValueError("Not a prepared Server workspace")
-        binding = core.regular_path(workspace / ".prepare_lib", "server-tools.path")
+        binding = core.regular_path(workspace_join(workspace, ".prepare_lib"), "server-tools.path")
         if not binding.is_file() or paths.checked(binding.read_text().strip()) != tools:
             raise ValueError("Prepared workspace belongs to a different Server installation")
         help_only = any(flag in argv[1:] for flag in ("--help", "-h"))
-        command = [sys.executable, "-B", str(workspace / ".prepare_lib/tools/run_all_runner.py"),
+        command = [sys.executable, "-B", str(workspace_join(workspace, ".prepare_lib/tools/run_all_runner.py")),
                    "--server-dir", str(workspace), *argv[1:]]
     else:
         raise ValueError("Unknown internal launch mode")

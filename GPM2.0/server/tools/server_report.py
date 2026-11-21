@@ -2,6 +2,12 @@
 """Record and deliver a portable report for prepare.sh and run_all.sh."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 from delivery_archive import (
     archive_options, attach_tar_report, create_archive, validate_tar_archive,
 )
@@ -47,11 +53,11 @@ def title(unit_id: str) -> str:
 
 
 def fresh_directory(root: Path) -> Path:
-    report = root / "report"
+    report = workspace_join(root, "report")
     if report.exists():
         previous = read_json(report / "manifest.json", {})
         # Archive rather than overwrite records from previous invocations.
-        archive = root / ".report_history" / (str(previous.get("run_id", "unknown")) + "-" + uuid.uuid4().hex[:8])
+        archive = workspace_join(root, ".report_history", str(previous.get("run_id", "unknown")) + "-" + uuid.uuid4().hex[:8])
         archive.parent.mkdir(parents=True, exist_ok=True)
         report.rename(archive)
     (report / "steps").mkdir(parents=True)
@@ -70,7 +76,7 @@ def record_lgz_result(root: Path, result: dict) -> None:
     unit_id = os.environ.get("GPM_REPORT_UNIT_ID")
     if not run_id or not unit_id:
         return
-    report = root / "report"
+    report = workspace_join(root, "report")
     manifest = read_json(report / "manifest.json", {})
     if manifest.get("run_id") != run_id:
         raise ValueError("report invocation does not match the running LGZ stage")
@@ -87,7 +93,7 @@ class ReportSession:
         self.root = root
         self.report = fresh_directory(root)
         self.run_id = run_id
-        saved = read_json(root / "metadata/report_inputs.json")
+        saved = read_json(workspace_join(root, "metadata/report_inputs.json"))
         current_inputs = inputs(root)
         if saved is None:
             saved = {"schema_version": SCHEMA, "provenance": "reconstructed_at_run_start",
@@ -213,7 +219,7 @@ class ReportSession:
 
 
 def _final_report_files(root: Path) -> tuple[Path, list[Path], tuple[Path, ...]]:
-    report = root / "report"
+    report = workspace_join(root, "report")
     required = (report / "manifest.json", report / "report.html", report / "render_report.py")
     missing = next((path for path in required if not path.is_file()), None)
     if missing is not None:
@@ -440,7 +446,7 @@ def prepare_start(root: Path, argv: list[str]):
             "status": "running", "argv": argv, "sources": sources, "facts": {}}
     write_json(report / "inputs.json", data)
     # Invalidate old preparation provenance immediately, including on failure.
-    write_json(root / "metadata/report_inputs.json", data)
+    write_json(workspace_join(root, "metadata/report_inputs.json"), data)
     write_json(report / "manifest.json", {"schema_version": SCHEMA, "run_id": run_id,
                "workspace_name": root.name, "status": "preparing", "started_at": data["started_at"],
                "ended_at": None, "steps": [], "errors": []})
@@ -448,7 +454,7 @@ def prepare_start(root: Path, argv: list[str]):
 
 
 def prepare_finish(root: Path, exit_code: int):
-    report = root / "report"
+    report = workspace_join(root, "report")
     data = read_json(report / "inputs.json")
     if data is None:
         raise ValueError("preparation report was not initialized")
@@ -458,7 +464,7 @@ def prepare_finish(root: Path, exit_code: int):
     else:
         data["notes"] = ["输入准备未完成；没有把残留文件当成本次成功输出。详见 prepare 的终端错误。"]
     write_json(report / "inputs.json", data)
-    write_json(root / "metadata/report_inputs.json", data)
+    write_json(workspace_join(root, "metadata/report_inputs.json"), data)
     manifest = read_json(report / "manifest.json")
     manifest.update(status="prepared" if exit_code == 0 else "failed", ended_at=now())
     write_json(report / "manifest.json", manifest)

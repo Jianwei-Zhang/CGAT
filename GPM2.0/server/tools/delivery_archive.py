@@ -2,6 +2,12 @@
 from __future__ import annotations
 
 try:
+    from workspace_layout import workspace_join, WorkspaceLayout
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join, WorkspaceLayout
+
+
+try:
     from run_resources import execution_threads
 except ModuleNotFoundError:  # Imported through server.tools.
     from .run_resources import execution_threads
@@ -19,7 +25,7 @@ import tempfile
 
 
 def archive_options(root: Path) -> tuple[str, int]:
-    path = root / "metadata/prepare_options.tsv"
+    path = workspace_join(root, "metadata/prepare_options.tsv")
     options = {}
     if path.is_file():
         with path.open(newline="", encoding="utf-8") as handle:
@@ -36,6 +42,8 @@ def archive_options(root: Path) -> tuple[str, int]:
 
 
 def delivery_staging_root(root: Path) -> Path:
+    if WorkspaceLayout.detect(root).version == 2:
+        return workspace_join(root, ".runtime/delivery_staging/00_lgz")
     return root.parent / f".{root.name}.delivery-staging"
 
 
@@ -55,7 +63,7 @@ def publish_delivery_staging(root: Path, kind: str, prepared: Path) -> Path:
     staging_root = delivery_staging_root(root)
     staging_root.mkdir(parents=True, exist_ok=True)
     target_parent = target.parent
-    backup = staging_root / f".{kind}.before-publish"
+    backup = workspace_join(staging_root, f".{kind}.before-publish")
     if backup.exists():
         shutil.rmtree(backup)
     try:
@@ -85,6 +93,8 @@ def validate_delivery_staging(root: Path, kind: str) -> tuple[bool, str]:
 def delivery_path(root: Path, kind: str) -> Path:
     format_name, _ = archive_options(root)
     suffix = "" if kind == "full" else ".light"
+    if WorkspaceLayout.detect(root).version == 2:
+        return workspace_join(root, f"07_delivery/00_lgz/{root.name}{suffix}.{format_name}")
     return root.parent / f"{root.name}{suffix}.{format_name}"
 
 
@@ -119,6 +129,7 @@ def _write_tar_gz(output: Path, threads: int, populate) -> None:
 
 
 def create_archive(staging: Path, output: Path, format_name: str, threads: int) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
     if format_name == "tar.gz":
         _write_tar_gz(output, threads, lambda archive: archive.add(staging, arcname=staging.name))
     elif format_name == "zip":
@@ -144,7 +155,7 @@ def attach_tar_report(source: Path, output: Path, root: Path, report_files: list
                     if content is not None:
                         content.close()
         for path in report_files:
-            destination.add(path, arcname=prefix + path.relative_to(root / "report").as_posix())
+            destination.add(path, arcname=prefix + path.relative_to(workspace_join(root, "report")).as_posix())
 
     _write_tar_gz(output, threads, populate)
 

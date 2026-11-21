@@ -1,6 +1,12 @@
 """Collect facts at stage boundaries; rendering never reads the workspace."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 from collections import Counter, defaultdict
 import csv
 import hashlib
@@ -84,7 +90,7 @@ def sequence_stats(root: Path, path: Path) -> dict | None:
     # persistent metadata agrees. It can reuse an earlier checkpoint hash read.
     current_sha = digest(path)
     key = hashlib.sha256(relative.encode()).hexdigest()
-    cache = root / ".run_all/report-statistics" / f"{key}.json"
+    cache = workspace_join(root, ".run_all/report-statistics", f"{key}.json")
     if cache.parent.is_symlink() or not cache.parent.resolve().is_relative_to(root.resolve()):
         raise ValueError("report statistics cache escapes its workspace")
     saved = _read_statistics_cache(cache)
@@ -102,8 +108,8 @@ def sequence_stats(root: Path, path: Path) -> dict | None:
         # last full re-scan when first installing the persistent-cache fix.
         st = path.stat()
         legacy_key = hashlib.sha256(f"{path.relative_to(root)}:{st.st_size}:{st.st_mtime_ns}:{st.st_ctime_ns}".encode()).hexdigest()
-        candidates = [root / "report/statistics" / f"{legacy_key}.json"]
-        candidates += sorted((root / ".report_history").glob(f"*/statistics/{legacy_key}.json"), reverse=True)[:8]
+        candidates = [workspace_join(root, "report/statistics", f"{legacy_key}.json")]
+        candidates += sorted((workspace_join(root, ".report_history")).glob(f"*/statistics/{legacy_key}.json"), reverse=True)[:8]
         for candidate in candidates:
             if not candidate.resolve().is_relative_to(root.resolve()):
                 continue
@@ -138,12 +144,12 @@ def table(root: Path, relative: str, *, row_limit: int | None = None) -> dict:
 
 
 def options(root: Path) -> dict:
-    return {row["key"]: row["value"] for row in read_tsv(root / "metadata/prepare_options.tsv")}
+    return {row["key"]: row["value"] for row in read_tsv(workspace_join(root, "metadata/prepare_options.tsv"))}
 
 
 def inputs(root: Path) -> dict:
-    datasets = read_tsv(root / "metadata/datasets.tsv")
-    reference = read_tsv(root / "metadata/reference.tsv")
+    datasets = read_tsv(workspace_join(root, "metadata/datasets.tsv"))
+    reference = read_tsv(workspace_join(root, "metadata/reference.tsv"))
     rows = []
     modern_q0 = is_evidence_guided(root)
     for index, entry in enumerate([*reference, *datasets]):
@@ -159,7 +165,7 @@ def inputs(root: Path) -> dict:
             "parameters": options(root),
             "telomere_rules": table(root, "tel/rules.tsv"),
             "centromere_reference": table(root, "cen/reference.tsv"),
-            "annotation_library_snapshot": read_json(root / "metadata/annotation_library_snapshot.json", {}),
+            "annotation_library_snapshot": read_json(workspace_join(root, "metadata/annotation_library_snapshot.json"), {}),
             "package": package}
 
 
@@ -222,13 +228,13 @@ def collect_assignment(root: Path, input_data: dict) -> dict:
 
 
 def collect_lgz_inputs(root: Path) -> dict:
-    recipe = read_tsv(root / "metadata/grt_recipe.tsv")
+    recipe = read_tsv(workspace_join(root, "metadata/grt_recipe.tsv"))
     qc_enabled = bool(recipe and recipe[0].get("reads_qc_enabled") == "true")
     q0_decisions = collect_q0_decisions(root)
     return {"summary": {"reads_qc": "measured" if qc_enabled else "not_enabled"},
             "q0_construction": q0_decisions,
-            "parameters": read_json(root / "grt/checkpoints/donor_freeze.json", {}).get("fingerprint_payload"),
-            "sequence_versions": {"q0": sequence_stats(root, root / "grt/q/q0.fa")},
+            "parameters": read_json(workspace_join(root, "grt/checkpoints/donor_freeze.json"), {}).get("fingerprint_payload"),
+            "sequence_versions": {"q0": sequence_stats(root, workspace_join(root, "grt/q/q0.fa"))},
             "tables": {name: table(root, f"metadata/{filename}.tsv") for name, filename in {
                 "recipe": "grt_recipe", "quality": "grt_contig_quality",
                 "selection": "grt_contig_roles", "donor_sets": "grt_donor_sets",
@@ -251,15 +257,15 @@ def collect_lgz_result(root: Path, result: dict) -> dict:
     evidence_dir = LGZ_STAGES.get(stage)
     tables = {}
     if evidence_dir:
-        for path in sorted((root / evidence_dir).glob("*.tsv")):
+        for path in sorted((workspace_join(root, evidence_dir)).glob("*.tsv")):
             tables[path.stem] = table(root, path.relative_to(root).as_posix(), row_limit=REPORT_PREVIEW_ROWS)
-    versions = {key: sequence_stats(root, root / f"grt/q/{key}.fa")
+    versions = {key: sequence_stats(root, workspace_join(root, f"grt/q/{key}.fa"))
                 for key in (result["q_input_version"], result["q_output_version"])}
     notes = ["这里保留本阶段发布时的事件；最终保留情况见最终结果。"]
     if stage.startswith("step1_") and result.get("q_input_sha256") == result.get("q_output_sha256"):
         notes.append("本阶段序列未改变；外部 contig 模式下的填补／过滤延后到结构修正后的优化填补。")
     return {"summary": event_summary(result.get("events", [])),
-            "parameters": read_json(root / f"grt/checkpoints/{stage}.json", {}).get("fingerprint_payload"),
+            "parameters": read_json(workspace_join(root, f"grt/checkpoints/{stage}.json"), {}).get("fingerprint_payload"),
             "sequence_versions": versions, "result": result, "tables": tables, "notes": notes}
 
 
@@ -307,7 +313,7 @@ def final_summary(root: Path, report_root: Path) -> dict:
                     q0 = facts.get("sequence_versions", {}).get("q0")
                     final["q0_construction"] = facts.get("q0_construction")
     else:
-        q0 = sequence_stats(root, root / "grt/q/q0.fa")
+        q0 = sequence_stats(root, workspace_join(root, "grt/q/q0.fa"))
     if q0:
         final.setdefault("sequence_versions", {})["q0"] = q0
     input_facts = read_json(report_root / "inputs.json", {}).get("facts", {})
@@ -372,7 +378,7 @@ def _positive_int(value) -> int | None:
 def _project_centromere_markers(root: Path, final_path: dict) -> list[dict]:
     """Project source-contig centromere hits onto final q4 chromosome coordinates."""
     hits = defaultdict(list)
-    for path in sorted((root / "cen").glob("chr_*/marks.tsv")):
+    for path in sorted((workspace_join(root, "cen")).glob("chr_*/marks.tsv")):
         for row in read_tsv(path):
             hits[(row.get("dataset_name"), row.get("ctg_name"))].append(row)
     projected = []
@@ -415,16 +421,16 @@ def _project_centromere_markers(root: Path, final_path: dict) -> list[dict]:
 
 
 def final_annotations(root: Path, final_path: dict) -> dict:
-    package = read_tsv(root / "metadata/package.tsv")
+    package = read_tsv(workspace_join(root, "metadata/package.tsv"))
     terminal_stage = "step3" if package and package[0].get("schema_version") == "4" else "step4_telomere"
-    step4 = read_json(root / f"grt/evidence/{terminal_stage}/result.json", {})
-    telomere_rules = root / "tel/rules.tsv"
-    centromere_reference = root / "cen/reference.tsv"
+    step4 = read_json(workspace_join(root, f"grt/evidence/{terminal_stage}/result.json"), {})
+    telomere_rules = workspace_join(root, "tel/rules.tsv")
+    centromere_reference = workspace_join(root, "cen/reference.tsv")
     return {
         "telomere": {
             "configured": telomere_rules.is_file(),
             "terminal_rows": step4.get("terminal_rows", []),
-            "rules": read_tsv(root / "metadata/grt_telomere_rules.tsv"),
+            "rules": read_tsv(workspace_join(root, "metadata/grt_telomere_rules.tsv")),
         },
         "centromere": {
             "configured": centromere_reference.is_file(),
@@ -434,10 +440,10 @@ def final_annotations(root: Path, final_path: dict) -> dict:
 
 
 def capture_final(root: Path) -> dict:
-    final_path = read_json(root / "metadata/grt_final_path.json", {})
-    package = read_tsv(root / "metadata/package.tsv")
+    final_path = read_json(workspace_join(root, "metadata/grt_final_path.json"), {})
+    package = read_tsv(workspace_join(root, "metadata/package.tsv"))
     final_version = "q3" if package and package[0].get("schema_version") == "4" else "q4"
-    q_rows = read_tsv(root / "metadata/grt_q_segments.tsv")
+    q_rows = read_tsv(workspace_join(root, "metadata/grt_q_segments.tsv"))
     contribution = Counter()
     connectors = Counter()
     for version in {row["q_version"] for row in q_rows} & {"q0", final_version}:
@@ -450,9 +456,9 @@ def capture_final(root: Path) -> dict:
         elif row.get("q_version") == final_version:
             contribution[row.get("dataset_name", "unknown")] += int(row["q_end"]) - int(row["q_start"]) + 1
     return {"available": bool(final_path), "final_path": final_path, "final_q_version": final_version,
-            "events": read_events(root / "metadata/grt_events.jsonl"),
-            "sequence_versions": {"q0": sequence_stats(root, root / "grt/q/q0.fa"),
-                                  final_version: sequence_stats(root, root / f"grt/q/{final_version}.fa")},
+            "events": read_events(workspace_join(root, "metadata/grt_events.jsonl")),
+            "sequence_versions": {"q0": sequence_stats(root, workspace_join(root, "grt/q/q0.fa")),
+                                  final_version: sequence_stats(root, workspace_join(root, f"grt/q/{final_version}.fa"))},
             "q0_construction": collect_q0_decisions(root),
             "source_contribution_bp": dict(contribution),
             "explicit_connector_segments": dict(connectors),
@@ -471,11 +477,11 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
         return {"summary": {k: v for k, v in stats.items() if k != "queries"},
                 "tables": {"coverage": {"available": stats["available"], "rows": stats.get("queries", [])}},
                 "tool_version": version.read_text().strip() if version.is_file() else None,
-                "outputs": [{"file": relative, "sha256": digest(root / relative) if stats["available"] else None}]}
+                "outputs": [{"file": relative, "sha256": digest(workspace_join(root, relative)) if stats["available"] else None}]}
     if unit_id == "assign":
         return collect_assignment(root, input_data)
     if unit_id == "q0_evidence":
-        manifest = read_json(root / "metadata/grt_q0_evidence.json", {})
+        manifest = read_json(workspace_join(root, "metadata/grt_q0_evidence.json"), {})
         relative = manifest.get("catalog")
         catalog = read_json(local_path(root, relative), {}) if relative else {}
         return {"summary": {"candidate_count": len(catalog.get("candidates", [])),
@@ -483,13 +489,13 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                              "supplementary_task_count": len(catalog.get("supplementary_alignments", []))},
                 "notes": ["候选发现不等于路径接受；q0 尚未在此阶段构建。"]}
     if unit_id == "degap_gapfill":
-        checkpoint = read_json(root / "degap/checkpoint.json", {})
-        report = read_json(root / "metadata/degap_gapfill.json", {})
+        checkpoint = read_json(workspace_join(root, "degap/checkpoint.json"), {})
+        report = read_json(workspace_join(root, "metadata/degap_gapfill.json"), {})
         artifacts = checkpoint.get("artifacts")
         if (not isinstance(artifacts, dict)
                 or checkpoint.get("signature") != report.get("input_signature")
                 or artifacts.get("metadata/degap_gapfill.json") !=
-                (digest(root / "metadata/degap_gapfill.json") if report else None)
+                (digest(workspace_join(root, "metadata/degap_gapfill.json")) if report else None)
                 or not artifacts):
             return {"summary": {"available": False}, "notes": ["DEGAP 本次运行尚无已提交结果；不展示旧结果。"]}
         return {"summary": {key: report.get(key) for key in
@@ -519,7 +525,7 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                     for path in paths]},
                     **annotation_tables}}
     if unit_id == "finalize_evidence":
-        return {"summary": read_json(root / "metadata/grt_contract_summary.json", {}),
+        return {"summary": read_json(workspace_join(root, "metadata/grt_contract_summary.json"), {}),
                 "tables": {"used_contigs": table(root, "metadata/grt_used_contigs.tsv"),
                            "evidence": table(root, "metadata/grt_evidence_registry.tsv", row_limit=REPORT_PREVIEW_ROWS),
                            "tools": table(root, "metadata/grt_tool_versions.tsv")}}

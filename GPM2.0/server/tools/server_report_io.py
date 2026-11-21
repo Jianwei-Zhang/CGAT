@@ -1,6 +1,12 @@
 """Small, standard-library-only primitives for portable server reports."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import csv
 import json
 import os
@@ -60,7 +66,7 @@ def digest(path: Path) -> str:
 
 
 def local_path(root: Path, relative: str) -> Path:
-    path = (root / relative).resolve()
+    path = (workspace_join(root, relative)).resolve()
     if not path.is_relative_to(root.resolve()):
         raise ValueError(f"report data path escapes its directory: {relative}")
     return path

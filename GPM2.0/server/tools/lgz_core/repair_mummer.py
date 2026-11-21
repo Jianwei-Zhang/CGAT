@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
+try:
     from run_resources import execution_threads
 except ModuleNotFoundError:  # Imported through server.tools.
     from ..run_resources import execution_threads
@@ -134,7 +140,7 @@ def prepare_mummer_inputs(
     Workers only read these files. Never hard-link mutable workspace artifacts.
     The numerical raw-cache key remains identical to the baseline key.
     """
-    parent = server_dir / "grt/cache/step12/inputs/v1"
+    parent = workspace_join(server_dir, "grt/cache/step12/inputs/v1")
     parent.mkdir(parents=True, exist_ok=True)
     inputs = {}
     for index, partition in enumerate(partitions, start=1):
@@ -375,7 +381,7 @@ def mummer_available_memory() -> int:
             if line.startswith("0::")
         )
         root = Path("/sys/fs/cgroup")
-        group = root / relative.lstrip("/")
+        group = workspace_join(root, relative.lstrip("/"))
         groups = [root, *[p for p in [group, *group.parents] if root in p.parents]]
         for path in groups:
             try:
@@ -444,7 +450,7 @@ def raw_mummer_cache_identity(
         "parameters": lgz_mummer_parameters(1),
     }
     fingerprint = json_hash(payload)
-    cache_dir = server_dir / "grt/cache/step12/raw_mummer/v1" / fingerprint
+    cache_dir = workspace_join(server_dir, "grt/cache/step12/raw_mummer/v1", fingerprint)
     return target_payload, payload, fingerprint, cache_dir, ["result.coords", *MUMMER_LOG_NAMES]
 
 
@@ -584,7 +590,7 @@ def cached_mummer_screen_partition(
         "parameters": lgz_mummer_parameters(1),
     }
     fingerprint = json_hash(payload)
-    cache_parent = server_dir / "grt/cache/step12/raw_mummer_screen/v1"
+    cache_parent = workspace_join(server_dir, "grt/cache/step12/raw_mummer_screen/v1")
     cache_dir = cache_parent / fingerprint
     names = ["result.coords", *MUMMER_LOG_NAMES]
     with execution.cache_lock(cache_dir) if execution is not None else nullcontext():
@@ -848,7 +854,7 @@ def cached_mummer_chromosome(
     query_payload = fasta_bytes([(chromosome, q_sequence)])
     parameters = lgz_mummer_parameters(threads)
     target_records = execution.records if execution is not None else dict(
-        read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"])
+        read_fasta_allow_empty(workspace_join(server_dir, donor_set["fasta_relpath"]))
     )
     target_partitions = execution.partitions if execution is not None else partition_mummer_targets(target_records)
     partition_manifest = execution.manifest if execution is not None else mummer_partition_manifest(target_partitions)
@@ -866,7 +872,7 @@ def cached_mummer_chromosome(
         "target_id": donor_set["donor_set_id"],
         "target_sha256": donor_set["fasta_sha256"],
         "donor_fragment_index_sha256": (
-            sha256_file(server_dir / "metadata/grt_donor_fragments.tsv")
+            sha256_file(workspace_join(server_dir, "metadata/grt_donor_fragments.tsv"))
             if target_kind == "ordinary_donor"
             else ""
         ),
@@ -900,7 +906,7 @@ def cached_mummer_chromosome(
     }
     fingerprint = json_hash(fingerprint_payload)
     chromosome_key = stable_id("chr", chromosome, 16)
-    cache_parent = server_dir / f"grt/cache/step12/{stage}/mummer/{chromosome_key}"
+    cache_parent = workspace_join(server_dir, f"grt/cache/step12/{stage}/mummer/{chromosome_key}")
     cache_dir = cache_parent / fingerprint
     checkpoint_path = cache_dir / "cache.json"
     output_names = [
@@ -1110,7 +1116,7 @@ def cached_mummer_chromosome(
         return cache_dir, False, chromosome_key
     except BaseException as error:
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             failed_dir = failed_root / f"{stage}-mummer-{chromosome_key}-{os.getpid()}"
             if failed_dir.exists():
@@ -1158,14 +1164,14 @@ def collect_mummer(
     active_set = donor_set if target_set is None else target_set
     active_members = donor_members if target_members is None else target_members
     members_by_record = {row["fasta_record_name"]: row for row in active_members}
-    donor_records = dict(read_fasta_allow_empty(server_dir / active_set["fasta_relpath"]))
+    donor_records = dict(read_fasta_allow_empty(workspace_join(server_dir, active_set["fasta_relpath"])))
     if set(members_by_record) != set(donor_records):
         fail(f"{target_kind} FASTA records differ from its alignment target manifest")
     donor_lengths = {name: len(sequence) for name, sequence in donor_records.items()}
     target_partitions = partition_mummer_targets(donor_records)
     q0_records: dict[str, str] = {}
     if stage == "step2" and mummer_scope == "gap-screen":
-        q0_records = dict(read_fasta(server_dir / "grt/q/q0.fa"))
+        q0_records = dict(read_fasta(workspace_join(server_dir, "grt/q/q0.fa")))
     execution = None
     input_seconds = 0.0
 

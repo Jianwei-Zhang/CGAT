@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 from .repair_common import *
 from .source_intervals import SourceAuthorization, attach_authorizations
 from .structural_support import OverlapSupport, ReferenceSupport, POLICY as SOURCE_SUPPORT_POLICY
@@ -168,7 +174,7 @@ def run_refill_alignment(
     flank_records, gaps, query_map = build_flanks(
         working_q_version, chromosome_order, records
     )
-    donor_records = dict(read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"]))
+    donor_records = dict(read_fasta_allow_empty(workspace_join(server_dir, donor_set["fasta_relpath"])))
     members_by_record = {row["fasta_record_name"]: row for row in donor_members}
     target_lengths = {name: len(sequence) for name, sequence in donor_records.items()}
     parameters = {
@@ -758,14 +764,14 @@ def reference_alignment_target(
     server_dir: Path,
 ) -> tuple[dict[str, str], list[dict[str, str]], dict[str, int]]:
     reference = read_single(
-        server_dir / "metadata/reference.tsv",
+        workspace_join(server_dir, "metadata/reference.tsv"),
         ["reference_name", "species_name", "assembly_label", "fasta_relpath", "fai_relpath"],
     )
-    records = read_fasta(server_dir / reference["fasta_relpath"])
+    records = read_fasta(workspace_join(server_dir, reference["fasta_relpath"]))
     target = {
         "donor_set_id": f"reference:{reference['reference_name']}",
         "fasta_relpath": reference["fasta_relpath"],
-        "fasta_sha256": sha256_file(server_dir / reference["fasta_relpath"]),
+        "fasta_sha256": sha256_file(workspace_join(server_dir, reference["fasta_relpath"])),
     }
     members = [
         {
@@ -814,7 +820,7 @@ def run_step2(
         fail(f"unsupported Step2 repair mode: {repair_mode}")
     if mummer_scope not in MUMMER_SCOPES:
         fail(f"unsupported MUMmer scope: {mummer_scope}")
-    q_input_sha256 = sha256_file(server_dir / "grt/q/q1.fa")
+    q_input_sha256 = sha256_file(workspace_join(server_dir, "grt/q/q1.fa"))
     if execution_profile not in EXECUTION_PROFILES:
         fail(f"unsupported execution profile: {execution_profile}")
     fingerprint_payload = {
@@ -829,7 +835,7 @@ def run_step2(
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
         "donor_fragment_index_sha256": sha256_file(
-            server_dir / "metadata/grt_donor_fragments.tsv"
+            workspace_join(server_dir, "metadata/grt_donor_fragments.tsv")
         ),
         "structural_target": {
             "kind": "ordinary_donor",
@@ -880,10 +886,10 @@ def run_step2(
         return cached, True
     invalidate_step12_from(server_dir, stage)
     artifact_relpath = "grt/evidence/step2"
-    artifact_dir = server_dir / artifact_relpath
+    artifact_dir = workspace_join(server_dir, artifact_relpath)
     artifact_dir.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=".step2.", dir=artifact_dir.parent))
-    q_output_temporary = server_dir / f"grt/q/.q2.fa.tmp.{os.getpid()}"
+    q_output_temporary = workspace_join(server_dir, f"grt/q/.q2.fa.tmp.{os.getpid()}")
     try:
         alignments, mummer_identities, _tasks = collect_mummer(
             server_dir,
@@ -905,7 +911,7 @@ def run_step2(
         fragment_rows = [
             row
             for row in read_tsv(
-                server_dir / "metadata/grt_donor_fragments.tsv",
+                workspace_join(server_dir, "metadata/grt_donor_fragments.tsv"),
                 DONOR_FRAGMENT_FIELDS,
             )
             if row["donor_set_id"] == donor_set["donor_set_id"]
@@ -1426,7 +1432,7 @@ def run_step2(
             newline="",
         )
         commit_stage_directory(temporary, artifact_dir)
-        os.replace(q_output_temporary, server_dir / "grt/q/q2.fa")
+        os.replace(q_output_temporary, workspace_join(server_dir, "grt/q/q2.fa"))
         output_relpaths = [
             path.relative_to(server_dir).as_posix() for path in artifact_dir.rglob("*") if path.is_file()
         ] + ["grt/q/q2.fa"]
@@ -1447,7 +1453,7 @@ def run_step2(
     except BaseException:
         q_output_temporary.unlink(missing_ok=True)
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             failed_dir = failed_root / f"step2-{os.getpid()}"
             if failed_dir.exists():
@@ -1930,6 +1936,6 @@ def execute_step2(args: argparse.Namespace) -> dict[str, object]:
         fail("Step1/Step2 donor FASTA hash drifted from frozen D0")
     print(
         f"LGZ Step2 complete: run={context['run_id']}, donor_set={donor_set['donor_set_id']}, "
-        f"q2_sha256={sha256_file(server_dir / 'grt/q/q2.fa')}"
+        f"q2_sha256={sha256_file(workspace_join(server_dir, 'grt/q/q2.fa'))}"
     )
     return step2

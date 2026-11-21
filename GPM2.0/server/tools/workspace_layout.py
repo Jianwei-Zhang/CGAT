@@ -46,7 +46,7 @@ _PREFIXES = {
     "grt/q": "03_lgz/04_step3",
     "grt": "03_lgz",
     "degap": "04_refinement/01_degap/03_native",
-    "report": "06_report",
+    "report": "06_report/01_lgz",
     ".report_history": ".runtime/history/reports",
     "metadata": ".runtime/metadata",
     "logs": ".runtime/logs",
@@ -62,7 +62,7 @@ _ROOT_COMMANDS = {
     "run_grt_step12.sh", "run_grt_step23.sh", "run_post_lgz_degap.sh",
     "package_full_zip.sh", "package_light_zip.sh", "export_final_path_fasta.sh",
     "finalize_evidence.sh", "finalize_lgz_evidence.sh", "finalize_grt_evidence.sh",
-    "assign_chr_groups.sh",
+    "assign_chr_groups.sh", "add_dataset.sh", "add_ctg.sh",
 }
 
 
@@ -260,7 +260,7 @@ def render_workspace_shell(text: str, layout: WorkspaceLayout, logical_script: s
                 original = variable + '="$(cd "$(dirname "${BASH_SOURCE[0]}")" && ' + pwd + ')"'
                 replacement = variable + '="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && ' + pwd + ')"'
                 text = text.replace(original, replacement)
-    variable_root = r"(\$\{(?:server_dir|SCRIPT_DIR|GPM_FAST_WORK_ROOT|work_root)\}/)"
+    variable_root = r"(\$\{(?:server_dir|SCRIPT_DIR|GPM_FAST_WORK_ROOT|work_root|stage_dir)\}/)"
     # Full q-stage names and relocated commands must win over the broad grt/q
     # directory mapping. In particular q0 and q1 do not live beside q4.
     text = re.sub(

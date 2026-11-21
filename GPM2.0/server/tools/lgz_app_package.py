@@ -10,6 +10,12 @@ evidence in the Final Path document.
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join, WorkspaceLayout
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join, WorkspaceLayout
+
+
 import argparse
 import csv
 import hashlib
@@ -67,38 +73,38 @@ def read_fai_lengths(path: Path) -> dict[str, int]:
 
 
 def copy_file(source_root: Path, staging_root: Path, relpath: str) -> None:
-    source = source_root / relpath
+    source = workspace_join(source_root, relpath)
     if not source.is_file():
         raise FileNotFoundError(f"required App payload file is missing: {relpath}")
-    target = staging_root / relpath
+    target = workspace_join(staging_root, relpath)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
 
 
 def copy_tree_filtered(source_root: Path, staging_root: Path, directory: str, include_fasta: bool) -> None:
-    source_dir = source_root / directory
+    source_dir = workspace_join(source_root, directory)
     if not source_dir.is_dir():
         return
     for source in sorted(source_dir.rglob("*")):
         if not source.is_file():
             continue
-        relpath = source.relative_to(source_root)
+        relpath = Path(directory) / source.relative_to(source_dir)
         if not include_fasta and source.suffix.lower() in FASTA_SUFFIXES:
             continue
-        target = staging_root / relpath
+        target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
 
 
 def copy_annotation_tree(source_root: Path, staging_root: Path, directory: str) -> None:
-    source_dir = source_root / directory
+    source_dir = workspace_join(source_root, directory)
     if not source_dir.is_dir():
         return
     for source in sorted(source_dir.rglob("*.tsv")):
         if not source.is_file():
             continue
-        relpath = source.relative_to(source_root)
-        target = staging_root / relpath
+        relpath = Path(directory) / source.relative_to(source_dir)
+        target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
 
@@ -184,11 +190,11 @@ def load_display_source_cards(source_root: Path) -> set[tuple[str, str, str]]:
     cards: set[tuple[str, str, str]] = set()
     table_specs = (
         (
-            source_root / "metadata/chr_assignments.tsv",
+            workspace_join(source_root, "metadata/chr_assignments.tsv"),
             ("dataset_name", "seq_name", "assigned_chr_name"),
         ),
         (
-            source_root / "metadata/grt_used_contigs.tsv",
+            workspace_join(source_root, "metadata/grt_used_contigs.tsv"),
             ("dataset_name", "contig_name", "target_chr"),
         ),
     )
@@ -318,11 +324,11 @@ def project_final_path(
 
 
 def validate_source_locators(source_root: Path) -> dict[tuple[str, str], int]:
-    path = source_root / "metadata/source_seq_locator.tsv"
+    path = workspace_join(source_root, "metadata/source_seq_locator.tsv")
     dataset_fai: dict[str, dict[str, int]] = {}
-    with (source_root / "metadata/datasets.tsv").open(newline="", encoding="utf-8") as handle:
+    with (workspace_join(source_root, "metadata/datasets.tsv")).open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
-            dataset_fai[row["dataset_name"]] = read_fai_lengths(source_root / row["fai_relpath"])
+            dataset_fai[row["dataset_name"]] = read_fai_lengths(workspace_join(source_root, row["fai_relpath"]))
     lengths: dict[tuple[str, str], int] = {}
     with path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
@@ -350,7 +356,7 @@ def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, f
         "q4_chromosome_lengths": q4_lengths,
         "final_path_sha256": hashlib.sha256(json.dumps(final_path, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
     }
-    target = staging_root / "metadata/grt_app_manifest.json"
+    target = workspace_join(staging_root, "metadata/grt_app_manifest.json")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -378,7 +384,7 @@ def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
 def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
-    with (source_root / "metadata/package.tsv").open(newline="", encoding="utf-8") as handle:
+    with (workspace_join(source_root, "metadata/package.tsv")).open(newline="", encoding="utf-8") as handle:
         package_rows = list(csv.DictReader(handle, delimiter="\t"))
     if (len(package_rows) != 1 or package_rows[0].get("workflow") != "gpm_grt_precomputed_v2"
             or package_rows[0].get("schema_version") not in {APP_SCHEMA_VERSION, Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}):
@@ -392,7 +398,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         shutil.rmtree(staging_root)
     staging_root.mkdir(parents=True)
 
-    if (source_root / "metadata/degap_inputs.json").is_file():
+    if (workspace_join(source_root, "metadata/degap_inputs.json")).is_file():
         from post_lgz_degap import validate_result
         valid, reason = validate_result(source_root)
         if not valid:
@@ -401,35 +407,41 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     display_source_cards = load_display_source_cards(source_root)
     for filename in REQUIRED_METADATA:
         if filename == "grt_recipe.tsv":
-            project_recipe(source_root / "metadata/grt_recipe.tsv", staging_root / "metadata/grt_recipe.tsv")
+            project_recipe(workspace_join(source_root, "metadata/grt_recipe.tsv"), workspace_join(staging_root, "metadata/grt_recipe.tsv"))
         elif filename == "grt_used_contigs.tsv":
-            project_used_contigs(source_root / "metadata/grt_used_contigs.tsv", staging_root / "metadata/grt_used_contigs.tsv")
+            project_used_contigs(workspace_join(source_root, "metadata/grt_used_contigs.tsv"), workspace_join(staging_root, "metadata/grt_used_contigs.tsv"))
         else:
             copy_file(source_root, staging_root, f"metadata/{filename}")
     for filename in OPTIONAL_METADATA:
-        if (source_root / "metadata" / filename).is_file():
+        if (workspace_join(source_root, "metadata", filename)).is_file():
             copy_file(source_root, staging_root, f"metadata/{filename}")
             if filename == "degap_gapfill.json":
-                report_path = staging_root / "metadata" / filename
+                report_path = workspace_join(staging_root, "metadata", filename)
                 report = json.loads(report_path.read_text())
                 report["fasta_available"] = include_fasta
                 report_path.write_text(json.dumps(report, indent=2) + "\n")
     final_path, q4_lengths = project_final_path(
         source_root,
-        source_root / "metadata/grt_final_path.json",
-        staging_root / "metadata/grt_final_path.json",
+        workspace_join(source_root, "metadata/grt_final_path.json"),
+        workspace_join(staging_root, "metadata/grt_final_path.json"),
         source_lengths,
         display_source_cards,
     )
-    app_schema = project_package_table(source_root / "metadata/package.tsv", staging_root / "metadata/package.tsv", "full" if include_fasta else "no_fasta")
+    app_schema = project_package_table(workspace_join(source_root, "metadata/package.tsv"), workspace_join(staging_root, "metadata/package.tsv"), "full" if include_fasta else "no_fasta")
 
-    copy_tree_filtered(source_root, staging_root, "data", include_fasta)
+    if WorkspaceLayout.detect(source_root).version == 2:
+        # The logical data subtree is physically split. Do not ship converted
+        # raw reads or their ID maps as App source assemblies.
+        for directory in ("data", "data/reference", "data/datasets", "data/degap"):
+            copy_tree_filtered(source_root, staging_root, directory, include_fasta)
+    else:
+        copy_tree_filtered(source_root, staging_root, "data", include_fasta)
     # Keep compact output-bound policy, not private commands/logs/tool caches.
     # Legacy runs without a policy companion remain readable, not certified.
     alignment_policies = []
-    for result in sorted((source_root / "runs").rglob("result.paf")):
-        relpath = result.relative_to(source_root)
-        target = staging_root / relpath
+    for result in sorted((workspace_join(source_root, "runs")).rglob("result.paf")):
+        relpath = Path("runs") / result.relative_to(workspace_join(source_root, "runs"))
+        target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(result, target)
         sidecar = result.with_suffix(".alignment.json")
@@ -437,19 +449,19 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
             alignment_policies.append({"result_paf": relpath.as_posix(),
                                        "policy": delivered_alignment_policy(sidecar, target)})
     if alignment_policies:
-        (staging_root / "metadata/alignment_provenance.json").write_text(json.dumps(
+        (workspace_join(staging_root, "metadata/alignment_provenance.json")).write_text(json.dumps(
             {"schema": 1, "scope": "recorded_initial_reference_alignments_only", "alignments": alignment_policies},
             indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     copy_annotation_tree(source_root, staging_root, "tel")
     copy_annotation_tree(source_root, staging_root, "cen")
-    if include_fasta and (source_root / "cen/library.fa").is_file():
+    if include_fasta and (workspace_join(source_root, "cen/library.fa")).is_file():
         copy_file(source_root, staging_root, "cen/library.fa")
 
     final_relpath = final_path["q4_relpath"]
-    q4_source = source_root / final_relpath
+    q4_source = workspace_join(source_root, final_relpath)
     if include_fasta:
         copy_file(source_root, staging_root, final_relpath)
-        if (source_root / (final_relpath + ".fai")).is_file():
+        if (workspace_join(source_root, final_relpath + ".fai")).is_file():
             copy_file(source_root, staging_root, final_relpath + ".fai")
         q4_hash = sha256_file(q4_source)
     else:
