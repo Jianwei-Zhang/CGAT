@@ -2858,3 +2858,37 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   build_catalog栈当作当前栈。两份原参考PAF分别683392866/1061893273 bytes，仅stat，
   没有登录节点基因组扫描或重比对。后续要实际stage候选、在计算节点做25项只读预检，
   再核对区域阶段剩余量/吞吐与资源ready条件，才决定何时正常接管。
+
+## 2026-11-22：合并缓存校验与证据消费，减少无用几何和重复键对象
+
+- 追踪到`_supplement`的完整cache命中原来先独立`read_paf`校验，再由调用者完整解析一次
+  收集证据。现在未放置发现、partial之前的弱seed、以及完整原生partial cache支持同步
+  `on_cache_hit(task,hits)`：全部输入/输出SHA和spec仍先核对，用同一个已校验记录流完成
+  原有消费，并强制读完尾部、复核receipt语义与所有outputs。callback或尾部错误直接失败，
+  不在catalog已部分更新后重跑一个耗时mapper，也不发布manifest。无callback的API和新
+  mapper成功提交路径仍保留原来校验，未取消任何检查点。
+- 检查了同类路径：多路regional partial仍合并为原来的**一次**发现轮次，不提前把某窗口
+  新候选变成后续窗口的anchor；candidate阶段只有验证、没有当场消费的cache仍完整校验。
+  新原生mapper仍先完成完整校验、原子提交成功，再消费；没有拿不完整PAF当结果。
+- `_add_pairwise_candidates`只需要query区间，不再为每个M/=/X构造用不到的target区间和
+  AlignmentBlock；新query-only投影保持正负链、I/D/N与原顺序。`ObservedSourcePairs`
+  对不产生跨组装coverage的记录只判定是否存在M/=/X关系，不生成无用坐标；X关系仍保留，
+  gap-only仍不是关系。跨组装合格覆盖继续逐块精确求并集，边界检查在快速分支之前保留。
+- 同一bound source键在关系集合中共享对象。受控64 sources/2016边的值完全一致，边中
+  不同SourceKey对象由4032降至64；这不是整套小麦RSS降低倍率，也没有删除任何边/覆盖。
+- 本地297项q0回归（1跳过、无失败）：新增完整catalog/manifest的受控双遍/单遍对照，
+  不重跑缓存mapper、尾部损坏、consumer错误、输入/工具漂移、500组混合CIGAR双链/偏移
+  几何及共享键等价检查。原有语法、跨度、record SHA/evidence ID与最终输出完整性检查保留。
+- 真实x86/Python3.10控制 **43010321 SUCCEEDED**，目录
+  `q0-cache-consumer-calibration-20261122-052902`。只读取已有小型原生cache b30137...：
+  3955602 bytes、12774记录，5轮交替，对照中位数3.703886秒→1.511862秒（2.450x）。
+  完整有序记录/CIGAR、query投影、source关系及精确coverage摘要相等，解析遍数2→1；
+  共享parser/旧aligned_blocks/interval union与bfc6d7a1基线的AST校验通过。全部新core
+  源码与冻结包逐字节相符，报告`cache-consumer-hpc-benchmark-20261122.json`已保存。
+  同包10项定向测试通过。读取了约25MB生成FASTA进行内容核验，没有加载整套DNA、运行
+  真实mapper或写主工作区。2.45x只对应这个受控记录处理组合，不是整套小麦/大矩阵倍率。
+- 当前NEW没有热改。短诊断 **43010314**（目录`q0-live-phase-20261122-050103`）05:02
+  已看到reader读取原有FIRST cache8024.../result.paf，offset683032576，栈在`_runs`；
+  至少确认主流程已离开参考catalog并实际读取FIRST，而不是只确认缓存被搬进目录。
+  不把未显示的3块seed命中或区域mapper启动当作已证实。后续按新源码一起冻结候选；
+  不覆写3c57fd10以前已经冻结的文件，仍先预检/资源ready，再正常接管。

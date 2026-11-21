@@ -57,6 +57,20 @@ class PafAlignment:
                          else Interval(self.query.end - q1, self.query.end - q0))
                 yield AlignmentBlock(query, Interval(t0, t1), self.strand, operation)
 
+    def paired_query_intervals(self) -> Iterator[Interval]:
+        """Same M/= /X query intervals, without constructing unused targets.
+
+        Preserve target-traversal order on both strands. I consumes query only;
+        D/N consumes no query. Record validation already bound every CIGAR span.
+        """
+        q = 0
+        for length, operation in self.cigar:
+            end = q + (length if operation in "MI=X" else 0)
+            if operation in "M=X":
+                yield (Interval(self.query.start+q,self.query.start+end) if self.strand == "+"
+                       else Interval(self.query.end-end,self.query.end-q))
+            q = end
+
 
 @dataclass(frozen=True)
 class Projection:

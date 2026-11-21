@@ -324,7 +324,9 @@ def _copy_prepared_target(root, catalog, target_ids, destination, template):
 
 def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict,
                 preset: str, threads: int, *, skip_self: bool = False, cache_only: bool = False, prepared_target: dict | None = None,
-                weak_seed_fast: bool = False, reference_bases: int = 0) -> dict | None:
+                weak_seed_fast: bool = False, reference_bases: int = 0, on_cache_hit=None) -> dict | None:
+    if on_cache_hit is not None and not callable(on_cache_hit):
+        raise Q0EvidenceError("cached PAF consumer must be callable")
     if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
         raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
     query_ids, target_ids = sorted(set(request["query_ids"])), sorted(set(request["target_ids"]))
@@ -355,18 +357,40 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
     cache = directory / "success.json"
     output = directory / "result.paf"
     required_outputs = {f"{relative}/{name}" for name in MAPPING_OUTPUT_FILES}
+    cached = False
     if cache.is_file():
         try:
             expected = json_file(cache)
-            if (expected.get("spec") == spec and expected.get("status") == "success"
+            cached = (expected.get("spec") == spec and expected.get("status") == "success"
                     and {row["path"] for row in expected["outputs"]} == required_outputs
-                    and all(identity(root, row["path"]) == row for row in expected["outputs"])):
-                for _hit in read_paf(output, query_lengths={key: catalog.parts[key].interval.length for key in query_ids},
-                                     target_lengths={key: catalog.parts[key].interval.length for key in target_ids}):
-                    pass
-                return {"task_id": task_id, "kind": request["kind"], "request": request,
-                        "paf": f"{relative}/result.paf", "receipt": f"{relative}/success.json",
-                        "query_ids": query_ids, "target_ids": target_ids}
+                    and all(identity(root, row["path"]) == row for row in expected["outputs"]))
+        except (Q0EvidenceError, KeyError, TypeError):
+            pass
+    if cached:
+        task = {"task_id": task_id, "kind": request["kind"], "request": request,
+                "paf": f"{relative}/result.paf", "receipt": f"{relative}/success.json",
+                "query_ids": query_ids, "target_ids": target_ids}
+        lengths = {"query_lengths":{key:catalog.parts[key].interval.length for key in query_ids},
+                   "target_lengths":{key:catalog.parts[key].interval.length for key in target_ids}}
+        if on_cache_hit is not None:
+            # Identity checks above still read all committed bytes. Fuse only
+            # the redundant validation-only CIGAR pass with the mandatory
+            # semantic consumer. Keep the final artifact identity, not .tmp or
+            # an absolute-path evidence ID. A failed consumer aborts; never
+            # rerun a multi-hour mapper after partially updating the catalog.
+            hits = read_paf(output, **lengths, artifact=task["paf"])
+            try:
+                on_cache_hit(task, hits)
+                for _hit in hits: pass  # Even an early-returning consumer cannot omit tail validation.
+                if (json_file(cache) != expected
+                        or any(identity(root,row["path"]) != row for row in expected["outputs"])):
+                    raise Q0EvidenceError("cached mapping changed during evidence consumption")
+            finally:
+                hits.close()
+            return task
+        try:
+            for _hit in read_paf(output, **lengths): pass
+            return task
         except (Q0EvidenceError, KeyError, TypeError):
             pass
     if cache_only:
@@ -404,8 +428,8 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
 
 
 
-def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference_bases, skip_self=False, prepared_target=None):
-    task=_supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,cache_only=True)
+def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference_bases, skip_self=False, prepared_target=None, on_cache_hit=None):
+    task=_supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,cache_only=True,on_cache_hit=on_cache_hit)
     if task is not None:return task
     queries,targets=weak_global_seed_scope(catalog.parts,catalog.reference_routable_parts,
         request['query_ids'],request['target_ids'],reference_bases=reference_bases,preset=preset)
@@ -414,7 +438,7 @@ def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference
     # short-side completion uses a separate bounded worker budget, not 32 by default.
     if request.get('native_short_targets_as_queries'):threads=min(threads,8)
     return _supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,
-                       prepared_target=prepared_target,weak_seed_fast=fast,reference_bases=reference_bases)
+                       prepared_target=prepared_target,weak_seed_fast=fast,reference_bases=reference_bases,on_cache_hit=on_cache_hit)
 
 
 def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,known_pairs,tool,preset,threads,*,reference_bases,skip_self):
@@ -426,14 +450,20 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
         template_task=next((task for task in tasks if task['kind']!='regional_discovery'
                             and task['target_ids']==request['target_ids']),None)
         template=({'root':str(root),'receipt':identity(root,template_task['receipt'])} if template_task else None)
+        consumed = False
+        def consume_seed(seed,hits):
+            nonlocal consumed
+            if seed['task_id'] in seen:raise Q0EvidenceError('unroutable seed made no matrix progress')
+            seen.add(seed['task_id']);tasks.append(seed);scopes.add_complete_tasks([seed])
+            add_pairwise_candidates(catalog,observe_part_hits(catalog,hits,known_pairs),set(seed['query_ids']),set(seed['target_ids']),
+                                    include_placed=True,known_pairs=known_pairs)
+            consumed = True
         seed=_unroutable_seed(root,catalog,request,tool,preset,threads,reference_bases=reference_bases,
-                             skip_self=skip_self,prepared_target=template)
-        if seed['task_id'] in seen:raise Q0EvidenceError('unroutable seed made no matrix progress')
-        seen.add(seed['task_id']);tasks.append(seed);scopes.add_complete_tasks([seed])
-        hits=read_paf(root/seed['paf'],query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
-                      target_lengths={key:catalog.parts[key].interval.length for key in seed['target_ids']},artifact=seed['paf'])
-        add_pairwise_candidates(catalog,observe_part_hits(catalog,hits,known_pairs),set(seed['query_ids']),set(seed['target_ids']),
-                                include_placed=True,known_pairs=known_pairs)
+                             skip_self=skip_self,prepared_target=template,on_cache_hit=consume_seed)
+        if not consumed:
+            hits=read_paf(root/seed['paf'],query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
+                          target_lengths={key:catalog.parts[key].interval.length for key in seed['target_ids']},artifact=seed['paf'])
+            consume_seed(seed,hits)
         print(f"LGZ q0 weak seed: completed={seed['task_id']} approximate={seed['task_id'] in scopes.approximate_scope_task_ids} "
               f"queries={len(seed['query_ids'])} targets={len(seed['target_ids'])}",flush=True)
     return scopes
@@ -471,27 +501,41 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         while remaining and anchors:
             request = {"kind": "unplaced_discovery", "round": len(catalog.payload["discovery_rounds"]) + 1,
                        "query_ids": remaining, "target_ids": anchors}
+            consumed = False; added = None
+            def consume_unplaced(task,hits):
+                nonlocal consumed, added
+                tasks.append(task)
+                added = add_pairwise_candidates(catalog, observe_part_hits(catalog,hits,known_pairs),
+                    set(task['query_ids']),set(task['target_ids']),known_pairs=known_pairs)
+                consumed = True
             task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
-                               skip_self=options.get("skip_self") == "true")
-            tasks.append(task)
-            hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in remaining},
-                            target_lengths={key: catalog.parts[key].interval.length for key in anchors}, artifact=task["paf"])
-            added = add_pairwise_candidates(catalog, observe_part_hits(catalog, hits, known_pairs), set(remaining), set(anchors),
-                                            known_pairs=known_pairs)
+                               skip_self=options.get("skip_self") == "true",on_cache_hit=consume_unplaced)
+            if not consumed:
+                hits = read_paf(root/task['paf'],query_lengths={key:catalog.parts[key].interval.length for key in task['query_ids']},
+                                target_lengths={key:catalog.parts[key].interval.length for key in task['target_ids']},artifact=task['paf'])
+                consume_unplaced(task,hits)
             catalog.payload["discovery_rounds"].append({"task_id": task["task_id"], "added_segment_ids": sorted(added)})
             if not added:
                 break
             remaining, anchors = catalog.unplaced(), sorted(added)
         request = partial_source_request(catalog, minimum_uncovered_bp=POLICY["partial_source_discovery_min_uncovered_bp"])
-        partial_tasks = []
+        partial_tasks = []; partial_consumed = False
         if request:
             preset = options.get("minimap_preset", "asm10")
             # A complete original whole-source mapping has priority, even if it
             # finished while an optimized revision was being staged.
+            def consume_native_partial(task,hits):
+                nonlocal partial_consumed
+                # A complete whole-native cache is this phase's ONLY task.
+                # Regional windows retain their one aggregate discovery round.
+                partial_tasks.append(task);tasks.append(task)
+                add_pairwise_candidates(catalog,observe_part_hits(catalog,hits,known_pairs),
+                    set(task['query_ids']),set(task['target_ids']),include_placed=True,known_pairs=known_pairs)
+                partial_consumed = True
             task = _supplement(root, catalog, request, tool, preset, threads,
-                               skip_self=options.get("skip_self") == "true", cache_only=bool(cache))
+                               skip_self=options.get("skip_self") == "true", cache_only=bool(cache),on_cache_hit=consume_native_partial)
             if task is not None:
-                partial_tasks.append(task)
+                if not partial_consumed:partial_tasks.append(task)
             else:
                 # Unroutable reference-bearing sources are small queries, not
                 # reasons to remap every large parent against them separately.
@@ -514,7 +558,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                     fallback_request = {**request, "query_ids": fallback_ids}
                     partial_tasks.append(_supplement(root, catalog, fallback_request, tool, preset, threads,
                                                     skip_self=options.get("skip_self") == "true"))
-            tasks.extend(partial_tasks)
+            if not partial_consumed:tasks.extend(partial_tasks)
             # One discovery round, not one full catalog rebuild per window.
             # Keep each PAF's own declared geometry/artifact while accumulating
             # candidates against the same anchor snapshot as the native round.
@@ -523,7 +567,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                     yield from read_paf(root / task["paf"],
                         query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
                         target_lengths={key: catalog.parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"])
-            if partial_tasks:
+            if partial_tasks and not partial_consumed:
                 add_pairwise_candidates(catalog, observe_part_hits(catalog, partial_hits(), known_pairs),
                     {key for task in partial_tasks for key in task["query_ids"]},
                     {key for task in partial_tasks for key in task["target_ids"]},

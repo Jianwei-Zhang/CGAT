@@ -76,6 +76,7 @@ class ObservedSourcePairs(set):
                for key, length in source_lengths.items()):
             raise Q0EvidenceError("invalid observed source inventory")
         self.source_lengths = dict(source_lengths)
+        self._canonical_sources = {key:key for key in self.source_lengths}
         self.cross_coverage: dict[SourceKey, _IntervalUnion] = {}
 
     def observe_alignment(self, hit: PafAlignment, query: SourceKey, target: SourceKey,
@@ -86,8 +87,15 @@ class ObservedSourcePairs(set):
                 or query_offset+hit.query_length > self.source_lengths[query]
                 or target_offset+hit.target_length > self.source_lengths[target]):
             raise Q0EvidenceError("observed source coverage exceeds its bound inputs")
+        query = self._canonical_sources.setdefault(query,query); target = self._canonical_sources.setdefault(target,target)
         qualify = (query.dataset != target.dataset and hit.matches/hit.block_length >= .95
                    and sum(n for n, op in hit.cigar if op in "M=") >= 100)
+        if not qualify:
+            # Only a paired-base relationship is needed here, not projected
+            # coordinates. Keep X relationships and gap-only negatives exactly.
+            if any(op in "M=X" for _length,op in hit.cigar):
+                self.add(tuple(sorted((query,target))))
+            return
         paired = False
         for block in hit.aligned_blocks():
             paired = True
@@ -288,9 +296,9 @@ def add_pairwise_candidates(catalog: CandidateCatalog, hits: Iterable[PafAlignme
         if hit.query_name == hit.target_name or (hit.query_name in before and not include_placed):
             continue
         query = catalog.parts[hit.query_name]
-        query_intervals = [Interval(query.interval.start + block.query.start,
-                                    query.interval.start + block.query.end)
-                           for block in hit.aligned_blocks()]
+        query_intervals = [interval if query.interval.start == 0 else
+                           Interval(query.interval.start+interval.start,query.interval.start+interval.end)
+                           for interval in hit.paired_query_intervals()]
         if not query_intervals:
             continue
         # The caller supplies only a successfully committed, validated PAF.
