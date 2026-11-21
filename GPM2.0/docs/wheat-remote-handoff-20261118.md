@@ -2110,3 +2110,74 @@
 - 下一步先读这个诊断的完整summary及residual-coverage.json，按实际剩余区间决定复用和
   query/target双侧局部化方案。不要再启动同类全32Gb-target的参数试验。生产切换仍须遵守
   前节的builder/reader声明显式迁移；不能简单复制代码后重提，不能清旧receipt。
+
+## 2026-11-21 17:38：已完成覆盖扣减核算，局部目标首次通过真实mapping试验
+
+### 完整已有证据覆盖核算
+
+43007245于17:31:04 SUCCEEDED，运行427.854s；扫描22项完整initial cross及首补充
+7,129,991行，逐文件完整SHA与成功记录一致。摘要existing-cross-coverage-20261121.json：
+严格reference待补充区间6,039,640,131bp，减去已有合格cross双侧真实配对覆盖后为
+2,319,791,151bp（其中Hifi410,109,446，Flye1,909,681,705），约61.59%的原区间已有覆盖。
+仅initial cross后残余2,327,423,110bp，首补充再减少7,631,959bp。
+残余source数量1179 Hifi+30799 Flye；若仍取整条source则需18,569,109,697bp，所以
+仅删已完全覆盖source而继续整条重比对仍浪费；必须局部化，不是再改一个mapper参数。
+
+原289,508,469bp的JM19_hifiasm:ptg000049l，扣减后17段共898,616bp，最大孔洞：
+[51382261,51827674) 445,413bp；[160451708,160637412) 185,704bp；
+[160343284,160451467) 108,183bp；[128161634,128201675) 40,041bp。
+这是实际配对覆盖的复用口径，不证明所有其他target关系已发现，也不等于最终唯一定位/准确率。
+若生产跳过已有覆盖区间的进一步全局发现，仍要如实声明其潜在新增关系召回取舍。
+
+### 局部目标规模与成功试验（不同于四个全目标超时试验）
+
+- measure_local_target_scope.py在计算节点读取原reference PAF，按同三处100kb core、
+  10kb query context定位reference配对区间，再取所有相关source的实际局部区间，
+  source/ref各10kb上下文；保留identity>=0.90的所有参考候选染色体，包括未知MAPQ。
+  不把whole-source membership作为目标范围，不读DNA、不伪造source-source PAF。
+  显式排除原ptg000049l自身（不是仅不同window ID就允许同ctg自比对）。
+- 43007257，q0-local-target-scope-20261121，17:31:51—17:32:29 SUCCEEDED，37.182s。
+  script SHA 7c2ad6c36bfb8b07b4bc69fb57fe19df9ba945b7b0f97fc36ae4cb6c291e35e3。
+  参考PAF的完整SHA与前次相同。三个core分别0、145000000、289000000；局部target为
+  3,378,269 / 3,299,084 / 3,183,945bp，各108/88/90条source、133/114/124个窗口；
+  对应whole-source总长分别约3.47/3.14/3.89Gb，全原target约32Gb。
+  摘要local-target-scope-20261121.json；远端local-target-plan.json SHA
+  4cfee244371cc2e6d5862d9b20a2ccb7f149bd13e2ac1c3ec95ea033f1b000f6。
+- 43007259，q0-local-target-pilot-20261121，17:36:12—17:36:30 SUCCEEDED。
+  script pilot_local_target_windows.py SHA
+  f4ea2b9738031f824fb23bb080ad52cd841efc780cd7c046ef200807c5e2b388。
+  helpers db064ec14e.../eebd37f5...，相同x86 minimap2 2.31及cb7e8f22...二进制；
+  保持-c -x asm10 -D -P --dual=yes --no-long-join，2threads、2CPU/8GiB申请，
+  每mapper AS4GiB、300s诊断预算。未使用-f或-p/-N新参数。三项均真实exit0：
+  * core0：3.484s，433 raw PAF行；原cross 99,999配对bp，精确坐标保留99,999。
+  * core145Mb：6.183s，851行；原cross 100,000配对bp，保留100,000。
+  * core289Mb：4.279s，486行；原cross 100,000配对bp，保留100,000。
+  原cross比较键为target原part、strand、paired-coordinate diagonal和core query区间，
+  不是只看query覆盖或同名target；移到同target其他重复位置不会冒充保留（新增回归）。
+  原22cross的SHA重核，窗口提取按原FAI逐字节读取，保存每window SHA及raw PAF SHA；
+  source FASTA前后stat不变，但此pilot不声称重验全部32Gb DNA内容/达到生产cache验收。
+  FAI提取测试覆盖跨行、CRLF、大小写；坐标测试覆盖正负链与错误重复定位。
+  摘要local-target-pilot-20261121.json；所有FASTA/PAF/输入列表只留远端隔离目录。
+- 这三个位置是此前同位置全target 100kb试验的匹配区，不是真正未覆盖孔洞；此前8threads
+  三query全target900秒未跑完，而现在2threads局部target三项各数秒，只证明局部化路线
+  在这三个已知区间可行，不能外推整套小麦倍率/所有全局替代位置保留/最终科学正确率。
+  raw window MAPQ仍不是原whole-source MAPQ，不能直接写进生产身份。
+
+### 下一步关键路径（不要重复已完成试验）
+
+1. 针对上面三个真实大孔洞验证局部发现，不能拿三个已匹配core替代未覆盖区间验收。
+   当前planner只投影query自身已有reference M/=块；真正孔洞可能没有这样的块。
+   需要独立、显式的邻近anchor检索上下文（例如先保守测量source ±1Mb对应的reference区域），
+   但mapping query仍只取100kb core+10kb上下文。多染色体/不一致flank/no-anchor不能默默丢掉，
+   必须有可审核的扩大搜索或其他回退、完整source保留和未穷尽搜索标记。
+2. 当前pilot要求原cross core对照>0；真正残余孔洞按定义可能为0。不要删除这一断言来伪造
+   “100%保留”。给缺失区间试验独立scope，绑定residual-coverage.json、确认core确实落在孔洞内，
+   报告新增配对覆盖/无结果，而非不存在的native保留率；保护原完整证据。
+3. 真正孔洞也验证后再接入生产大数据自动策略、query/target双侧投影与raw/projected分离缓存，
+   明确科学取舍和回退。初始参考、1364完成批次与首补充必须原样复用。
+4. 按前文reader/builder声明迁移门禁做小范围续跑切换，不能直接覆写五个builder模块后重提。
+   新旧主任务截至17:33都仍RUNNING，完全未改；本轮只成功了隔离试验，尚未部署到42949582。
+   先核实主任务是否已有新的成功产物再决定切换，不丢弃后来完成的有效结果。
+
+精确union与前述诊断提交50229c18已推送master（[skip ci]）；本节新脚本/摘要继续按任务文件
+定向提交，不触碰其他会话笔记/output，不发布Release、不update.sh、不替换整套runtime。
