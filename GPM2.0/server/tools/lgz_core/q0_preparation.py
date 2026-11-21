@@ -6,6 +6,7 @@ mapped here. A ready manifest is published atomically after every task succeeds.
 from __future__ import annotations
 
 from collections import defaultdict
+from contextlib import nullcontext, closing
 import csv
 import json
 from pathlib import Path
@@ -15,19 +16,31 @@ from typing import Iterable
 from .common import canonical_json, executable_identity, read_fasta, sha256_file, stable_id, write_fasta
 from .q0_alignments import read_paf
 from .q0_catalog import (CATALOG_SCHEMA, CandidateCatalog, DISCOVERY_REFERENCE_IDENTITY, DISCOVERY_REFERENCE_MAPQ,
-                         add_pairwise_candidates, build_catalog, partial_source_request, supplemental_groups)
+                         add_pairwise_candidates, build_catalog, partial_source_request, supplemental_groups, ObservedSourcePairs)
+from .q0_regional_discovery import REGIONAL_POLICY, LocalReferenceCache, enabled as regional_enabled, observe_part_hits, prepare_partial
 from .q0_sources import Q0EvidenceError, SourceKey
 try:
-    from run_outer_checkpoints import OuterCheckpointManager
     from run_orchestration import atomic_write_json, sha256_file as _partition_sha256
 except ModuleNotFoundError:
-    from ..run_outer_checkpoints import OuterCheckpointManager
     from ..run_orchestration import atomic_write_json, sha256_file as _partition_sha256
+
+def _default_checkpoint_manager(root):
+    # Keep the module-level injection point used by provenance-aware incident
+    # readers, without loading the complete workflow just to use regional caches.
+    try:
+        from run_outer_checkpoints import OuterCheckpointManager as manager
+    except ModuleNotFoundError:
+        from ..run_outer_checkpoints import OuterCheckpointManager as manager
+    return manager(root)
+
+
+OuterCheckpointManager = _default_checkpoint_manager
+
 
 SCHEMA = "lgz_q0_evidence_v1"
 MANIFEST = "metadata/grt_q0_evidence.json"
 MAPPING_OUTPUT_FILES = ("query.fa", "target.fa", "result.paf", "command.json")
-POLICY = {"version": 2, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
+POLICY = {"version": 3, "regional_partial_discovery": REGIONAL_POLICY, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
           "supplement": "out_of_group_split_and_missing_ref_neighbors",
           "partial_source_discovery_min_uncovered_bp": 100,
           "partial_source_reference_identity": DISCOVERY_REFERENCE_IDENTITY,
@@ -79,7 +92,9 @@ def builder_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-evidence-builder", [
         [name, sha256_file(root / name)] for name in (
-            "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py")])
+            "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
+            "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
+            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_regional_discovery.py")])
 
 
 def load_verified_evidence(root: Path) -> dict:
@@ -116,7 +131,18 @@ def load_verified_evidence(root: Path) -> dict:
         for row in catalog["base_alignments"]:
             if not {row["query_fasta"], row["target_fasta"], row["paf"]} <= inputs:
                 raise Q0EvidenceError("q0 base alignment is not bound to its inputs")
+        regional_members = None
         for task in catalog["supplementary_alignments"]:
+            if task.get("kind") == "regional_discovery":
+                from .q0_regional_mapping import verify_regional_task
+                if regional_members is None:
+                    regional_members = {row["segment_id"]: (row["interval"]["end"]-row["interval"]["start"], row["sequence_sha256"])
+                                        for row in catalog["segments"]}
+                receipt = verify_regional_task(root, task, members=regional_members)
+                if (task["receipt"] not in outputs or any(outputs.get(row["path"]) != row for row in receipt["outputs"])):
+                    raise Q0EvidenceError("regional evidence dependencies are not bound to the ready manifest")
+                expected_outputs.update({task["receipt"]} | {row["path"] for row in receipt["outputs"]})
+                continue
             task_id = task["task_id"]
             relative = f"grt/evidence/q0_prepare/tasks/{task_id}"
             receipt_path = f"{relative}/success.json"
@@ -175,7 +201,8 @@ def _initial_inputs(root: Path):
         grouped[row["assigned_chr_name"]][row["dataset_name"]].add(row["seq_name"])
     manager = OuterCheckpointManager(root)
     base_alignments = []
-    known_pairs = set()
+    known_pairs = (ObservedSourcePairs({key: len(value) for key,value in sources.items()})
+                   if regional_enabled(lengths, options.get("minimap_preset", "asm10")) else set())
     for chromosome in refs:
         relative = f"runs/chr_{chromosome}/q0_alignment_inputs.json"
         descriptor = json_file(artifact_path(root, relative))
@@ -231,7 +258,9 @@ def _initial_inputs(root: Path):
             tlengths = {name: len(sources[SourceKey(left, name)]) for name in group[left]}
             for hit in read_paf(artifact_path(root, row["paf"]), query_lengths=qlengths,
                                 target_lengths=tlengths, artifact=row["paf"]):
-                if any(hit.aligned_blocks()):
+                if isinstance(known_pairs, ObservedSourcePairs):
+                    known_pairs.observe_alignment(hit, SourceKey(right, hit.query_name), SourceKey(left, hit.target_name))
+                elif any(hit.aligned_blocks()):
                     known_pairs.add(tuple(sorted((SourceKey(right, hit.query_name),
                                                   SourceKey(left, hit.target_name)))))
             paths.add(row["paf"])
@@ -242,7 +271,7 @@ def _initial_inputs(root: Path):
 
 
 def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict,
-                preset: str, threads: int, *, skip_self: bool = False) -> dict:
+                preset: str, threads: int, *, skip_self: bool = False, cache_only: bool = False) -> dict | None:
     if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
         raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
     query_ids, target_ids = sorted(set(request["query_ids"])), sorted(set(request["target_ids"]))
@@ -279,6 +308,8 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
                         "query_ids": query_ids, "target_ids": target_ids}
         except (Q0EvidenceError, KeyError, TypeError):
             pass
+    if cache_only:
+        return None
     directory.mkdir(parents=True, exist_ok=True)
     query, target = directory / "query.fa", directory / "target.fa"
     write_fasta(query, ((key, catalog.sequence(key)) for key in query_ids))
@@ -323,58 +354,91 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                 return previous
         except Q0EvidenceError:
             pass
-    catalog = build_catalog(root, sources, lengths, assignments, min_gap=POLICY["min_gap"])
-    tasks = []
-    # Each productive round adds at least one segment to the anchor set. The
-    # monotone loop terminates after at most the number of source segments.
-    remaining = catalog.unplaced()
-    anchors = sorted(set(catalog.parts) - set(remaining))
-    while remaining and anchors:
-        request = {"kind": "unplaced_discovery", "round": len(catalog.payload["discovery_rounds"]) + 1,
-                   "query_ids": remaining, "target_ids": anchors}
-        task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
-                           skip_self=options.get("skip_self") == "true")
-        tasks.append(task)
-        hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in remaining},
-                        target_lengths={key: catalog.parts[key].interval.length for key in anchors}, artifact=task["paf"])
-        added = add_pairwise_candidates(catalog, hits, set(remaining), set(anchors),
-                                        known_pairs=known_pairs)
-        catalog.payload["discovery_rounds"].append({"task_id": task["task_id"], "added_segment_ids": sorted(added)})
-        if not added:
-            break
-        remaining, anchors = catalog.unplaced(), sorted(added)
-    request = partial_source_request(catalog, minimum_uncovered_bp=POLICY["partial_source_discovery_min_uncovered_bp"])
-    if request:
-        task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
-                           skip_self=options.get("skip_self") == "true")
-        tasks.append(task)
-        hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
+    use_regional = regional_enabled(lengths, options.get("minimap_preset", "asm10"))
+    reference_pafs = {f"runs/{key.dataset}_vs_ref/result.paf" for key in sources}
+    reference_inputs = [row for row in inputs if row["path"] in reference_pafs]
+    with (LocalReferenceCache(root, reference_inputs) if use_regional else nullcontext(None)) as cache:
+        catalog = build_catalog(root, sources, lengths, assignments, min_gap=POLICY["min_gap"],
+                                regional_factory=cache.factory if cache else None)
+        if cache: cache.publish()
+        tasks = []
+        # Each productive round adds at least one segment to the anchor set. The
+        # monotone loop terminates after at most the number of source segments.
+        remaining = catalog.unplaced()
+        anchors = sorted(set(catalog.parts) - set(remaining))
+        while remaining and anchors:
+            request = {"kind": "unplaced_discovery", "round": len(catalog.payload["discovery_rounds"]) + 1,
+                       "query_ids": remaining, "target_ids": anchors}
+            task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
+                               skip_self=options.get("skip_self") == "true")
+            tasks.append(task)
+            hits = read_paf(root / task["paf"], query_lengths={key: catalog.parts[key].interval.length for key in remaining},
+                            target_lengths={key: catalog.parts[key].interval.length for key in anchors}, artifact=task["paf"])
+            added = add_pairwise_candidates(catalog, observe_part_hits(catalog, hits, known_pairs), set(remaining), set(anchors),
+                                            known_pairs=known_pairs)
+            catalog.payload["discovery_rounds"].append({"task_id": task["task_id"], "added_segment_ids": sorted(added)})
+            if not added:
+                break
+            remaining, anchors = catalog.unplaced(), sorted(added)
+        request = partial_source_request(catalog, minimum_uncovered_bp=POLICY["partial_source_discovery_min_uncovered_bp"])
+        partial_tasks = []
+        if request:
+            preset = options.get("minimap_preset", "asm10")
+            # A complete original whole-source mapping has priority, even if it
+            # finished while an optimized revision was being staged.
+            task = _supplement(root, catalog, request, tool, preset, threads,
+                               skip_self=options.get("skip_self") == "true", cache_only=bool(cache))
+            if task is not None:
+                partial_tasks.append(task)
+            else:
+                from .q0_reference_index import ReferenceIndex
+                with closing(ReferenceIndex.open(cache.path, root, catalog.parts, lengths, local_paf_directory=cache.paf_directory)) as index:
+                    regional_tasks, fallback_ids, report = prepare_partial(
+                        root, catalog, index, known_pairs, tool, reference_lengths=lengths,
+                        preset=preset, threads=threads, skip_self=options.get("skip_self") == "true")
+                partial_tasks.extend(regional_tasks)
+                catalog.payload["regional_partial_discovery"] = report
+                if fallback_ids:
+                    fallback_request = {**request, "query_ids": fallback_ids}
+                    partial_tasks.append(_supplement(root, catalog, fallback_request, tool, preset, threads,
+                                                    skip_self=options.get("skip_self") == "true"))
+            tasks.extend(partial_tasks)
+            # One discovery round, not one full catalog rebuild per window.
+            # Keep each PAF's own declared geometry/artifact while accumulating
+            # candidates against the same anchor snapshot as the native round.
+            def partial_hits():
+                for task in partial_tasks:
+                    yield from read_paf(root / task["paf"],
+                        query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
                         target_lengths={key: catalog.parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"])
-        add_pairwise_candidates(catalog, hits, set(task["query_ids"]), set(task["target_ids"]),
-                                include_placed=True, known_pairs=known_pairs)
-    for request in supplemental_groups(catalog, assignments, known_pairs):
-        tasks.append(_supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
-                                 skip_self=options.get("skip_self") == "true"))
-    if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
-        raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
-    if inputs != [identity(root, relative) for relative in input_paths]:
-        raise Q0EvidenceError("q0 evidence inputs changed during preparation; no manifest published")
-    if builder_identity() != builder:
-        raise Q0EvidenceError("q0 evidence builder changed during preparation; no manifest published")
-    payload = catalog.finish()
-    payload["base_alignments"] = base_alignments
-    payload["supplementary_alignments"] = tasks
-    catalog_name = f"grt/evidence/q0_prepare/{stable_id('catalog', payload)}.json"
-    atomic_write_json(root / catalog_name, payload)
-    output_paths = {catalog_name}
-    for task in tasks:
-        output_paths.add(task["receipt"])
-        output_paths.update(row["path"] for row in json_file(root / task["receipt"])["outputs"])
-    manifest = {"schema": SCHEMA, "status": "success", "policy": POLICY, "builder": builder,
-                "input_fingerprint": request_identity, "inputs": inputs,
-                "outputs": [identity(root, relative) for relative in sorted(output_paths)],
-                "catalog": catalog_name, "tool": tool}
-    atomic_write_json(root / MANIFEST, manifest)
-    print(f"LGZ q0 evidence prepared: candidates={len(payload['candidates'])} "
-          f"supplementary_tasks={len(tasks)} unplaced_segments={len(payload['unplaced_segment_ids'])}")
-    return manifest
+            if partial_tasks:
+                add_pairwise_candidates(catalog, observe_part_hits(catalog, partial_hits(), known_pairs),
+                    {key for task in partial_tasks for key in task["query_ids"]},
+                    {key for task in partial_tasks for key in task["target_ids"]},
+                    include_placed=True, known_pairs=known_pairs)
+        for request in supplemental_groups(catalog, assignments, known_pairs):
+            tasks.append(_supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
+                                     skip_self=options.get("skip_self") == "true"))
+        if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
+            raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
+        if inputs != [identity(root, relative) for relative in input_paths]:
+            raise Q0EvidenceError("q0 evidence inputs changed during preparation; no manifest published")
+        if builder_identity() != builder:
+            raise Q0EvidenceError("q0 evidence builder changed during preparation; no manifest published")
+        payload = catalog.finish()
+        payload["base_alignments"] = base_alignments
+        payload["supplementary_alignments"] = tasks
+        catalog_name = f"grt/evidence/q0_prepare/{stable_id('catalog', payload)}.json"
+        atomic_write_json(root / catalog_name, payload)
+        output_paths = {catalog_name}
+        for task in tasks:
+            output_paths.add(task["receipt"])
+            output_paths.update(row["path"] for row in json_file(root / task["receipt"])["outputs"])
+        manifest = {"schema": SCHEMA, "status": "success", "policy": POLICY, "builder": builder,
+                    "input_fingerprint": request_identity, "inputs": inputs,
+                    "outputs": [identity(root, relative) for relative in sorted(output_paths)],
+                    "catalog": catalog_name, "tool": tool}
+        atomic_write_json(root / MANIFEST, manifest)
+        print(f"LGZ q0 evidence prepared: candidates={len(payload['candidates'])} "
+              f"supplementary_tasks={len(tasks)} unplaced_segments={len(payload['unplaced_segment_ids'])}")
+        return manifest

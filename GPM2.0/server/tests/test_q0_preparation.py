@@ -159,6 +159,28 @@ class EvidencePreparationTests(unittest.TestCase):
             writer.writerows(rows)
         seed_q0_evidence(self.server)
 
+    def test_large_route_reaches_real_regional_receipts_and_ready_manifest(self):
+        from server.tools.lgz_core import q0_preparation as prep
+        mapper, _ = self.mapper()  # different identity from the seeded native mapper
+        with mock.patch.object(prep, "regional_enabled", return_value=True), \
+             mock.patch.object(prep, "prepare_partial", wraps=prep.prepare_partial) as regional:
+            manifest = self.run_prepare(mapper)
+        regional.assert_called_once()
+        self.assertEqual(load_verified_evidence(self.server), manifest)
+        catalog = self.catalog()
+        self.assertIn("regional_partial_discovery", catalog)
+        self.assertTrue(any(t["kind"] == "regional_discovery" for t in catalog["supplementary_alignments"]))
+        self.assertTrue(list((self.server/"grt/evidence/q0_prepare/indexes").glob("*/success.json")))
+
+    def test_large_route_prefers_completed_native_partial_result(self):
+        from server.tools.lgz_core import q0_preparation as prep
+        (self.server/MANIFEST).unlink()  # only the disposable synthetic ready manifest
+        with mock.patch.object(prep, "regional_enabled", return_value=True), \
+             mock.patch.object(prep, "prepare_partial", side_effect=AssertionError("must reuse completed native mapping")):
+            manifest = self.run_prepare()
+        self.assertEqual(load_verified_evidence(self.server), manifest)
+        self.assertNotIn("regional_partial_discovery", self.catalog())
+
     def test_partition_parsing_is_reused_across_roles_but_not_invocations(self):
         self.seed_assigned_support()
         from collections import Counter
@@ -278,7 +300,9 @@ def fasta(path):
             + f"queries, targets = fasta(sys.argv[-1]), fasta(sys.argv[-2])\npairs = {list(pairs)!r}\n"
             + "rows = []\nfor q, t in pairs:\n    if q in queries and t in targets:\n        n = min(len(queries[q]),len(targets[t]))\n        rows.append(f'{q}\t{len(queries[q])}\t0\t{n}\t+\t{t}\t{len(targets[t])}\t0\t{n}\t{n}\t{n}\t60\tcg:Z:{n}M')\n"
             + ("rows = ['malformed']\n" if malformed else "")
-            + "Path(sys.argv[sys.argv.index('-o')+1]).write_text(chr(10).join(rows) + (chr(10) if rows else ''))\n"
+            + "result = chr(10).join(rows) + (chr(10) if rows else '')\n"
+            + "if '-o' in sys.argv: Path(sys.argv[sys.argv.index('-o')+1]).write_text(result)\n"
+            + "else: sys.stdout.write(result)\n"
             + (f"with Path({str(mutate)!r}).open('a') as out: out.write(chr(10))\n" if mutate else ""))
         script.chmod(0o755)
         return script, log

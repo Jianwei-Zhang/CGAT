@@ -177,8 +177,13 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
     try:
         for dataset, lengths in sorted(lengths_by_dataset.items()):
             relative = f"runs/{dataset}_vs_ref/result.paf"
+            observer = None
+            records_index = routing is not None and hasattr(routing, "observe_record")
+            if records_index and not routing.sealed:
+                routing.register_artifact(relative)
+                observer = lambda hit, offset, size, dataset=dataset: routing.observe_record(dataset, hit, offset, size)
             for hit in read_paf(root / relative, query_lengths=lengths,
-                                target_lengths=reference_lengths, artifact=relative):
+                                target_lengths=reference_lengths, artifact=relative, record_observer=observer):
                 key = SourceKey(dataset, hit.query_name)
                 if key not in by_source:
                     continue
@@ -198,7 +203,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                         else:
                             target = Interval(block.target.start + block.query.end - overlap.end,
                                               block.target.start + block.query.end - overlap.start)
-                        if (routing is not None and not routing.sealed and block.operation != "X"
+                        if (routing is not None and not records_index and not routing.sealed and block.operation != "X"
                                 and hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY):
                             routing.observe(part.segment_id, hit.target_name,
                                             Interval(overlap.start-part.interval.start, overlap.end-part.interval.start),
@@ -241,6 +246,9 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             "anchor_candidate_ids": [], "maximum_available_mapq": row["maximum_mapq"],
         })
     catalog = CandidateCatalog(payload, sequences, parts, routing.path if routing else None, routing_report)
+    # split_source just verified these immutable strings and part digests. A
+    # regional mapper need not hash a 289Mb parent again for every short window.
+    catalog._regional_verified_parts = {key:(sequences[p.source],p.interval,p.sequence_sha256) for key,p in parts.items()}
     catalog.finish()
     return catalog
 

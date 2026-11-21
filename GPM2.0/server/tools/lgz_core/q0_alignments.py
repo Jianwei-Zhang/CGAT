@@ -110,21 +110,31 @@ def parse_paf_line(line: str, *, artifact: str, line_number: int) -> PafAlignmen
 
 
 def read_paf(path: Path, *, query_lengths: Mapping[str, int],
-             target_lengths: Mapping[str, int], artifact: str | None = None) -> Iterator[PafAlignment]:
+             target_lengths: Mapping[str, int], artifact: str | None = None,
+             record_observer=None) -> Iterator[PafAlignment]:
     """Stream validated records; callers separately require task-success evidence.
 
     An empty stream alone does NOT prove a successful no-hit alignment task.
     Unknown names and length drift fail instead of silently removing evidence.
     """
     try:
-        with path.open(encoding="utf-8") as handle:
+        # Keep original newline bytes while retaining universal line iteration.
+        # Thus UTF-8, CRLF and CR-only files have real byte offsets, while
+        # record identities still use the existing normalized parse_paf_line.
+        with path.open(encoding="utf-8", newline="") as handle:
+            offset = 0
             for number, line in enumerate(handle, 1):
+                if record_observer is not None:
+                    size = len(line.encode("utf-8"))
+                    start, offset = offset, offset + size
                 if not line.strip() or line.startswith("#"):
                     continue
                 hit = parse_paf_line(line, artifact=artifact if artifact is not None else path.as_posix(), line_number=number)
                 if (query_lengths.get(hit.query_name) != hit.query_length
                         or target_lengths.get(hit.target_name) != hit.target_length):
                     raise Q0EvidenceError(f"{path}:{number}: PAF names/lengths differ from inputs")
+                if record_observer is not None:
+                    record_observer(hit, start, size)
                 yield hit
     except (OSError, UnicodeError) as exc:
         raise Q0EvidenceError(f"cannot read q0 alignment evidence {path}: {exc}") from exc

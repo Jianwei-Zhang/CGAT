@@ -2322,3 +2322,126 @@ core/tile裁剪而重复时合并cores，不生成重复FASTA header；不填平
 这是新的候选协议，不能将旧私有pilot的literal query/target-n头冒认成新协议执行结果。
 双侧投影/窗口/工作量策略/已有覆盖/索引组件最后32项测试通过；旧普通native路径仍未启用
 任何区域策略。本轮已完成的mapper候选足以支持下一轮接入，不再重复这些控制样本或全局慢基线。
+
+## 2026-11-21 21:00 后：区域 API 已通过真实数据验证，本地流程已接入，远端尚未切换
+
+### 当前主任务与本轮操作边界
+
+- 21:00:58 调度器快照：新版 `42949582` 仍在 `agent-X86-64` RUNNING，CPU recent
+  1396%，RSS287478MiB、峰值300194MiB；旧版 `42523432` 在 `agent-X86-60`
+  RUNNING，CPU1596%、RSS86036MiB。两个主任务、安装、launcher、reader 声明均未修改。
+- 已完成1364批初始比对、第一补充 `8024dde...` 仍保留；第二补充 `a6056c...` 的
+  20:30 快照仍只有0字节 result.paf.tmp。不要把下面隔离probe成功写成主任务已经提速。
+- 只取消了已被替代的共享盘索引查询probe `43007951`（20:31:57终止、调度器显示
+  FAILED），不是主作业失败；它的完整 sealed DB 和 index-built.json 全部保留。
+
+### 精确记录索引：复用已完成 DB，不重建
+
+- `q0-exact-reference-index-20261121/reference.sqlite`：5867562条合格原始PAF记录，
+  1295220736 bytes，SHA `18677df675e1a3c5fe9071d3edcd908215c8a20d2fbba4d5effd39411c0909a3`。
+  构建1510.180s；首个probe构建完成后共享盘随机查询长时间低CPU。
+- `43008134` / `q0-exact-reference-index-local-20261121` 于20:30:50 SUCCEEDED。
+  仅将该DB逐字节复制到计算节点/tmp并验证SHA；六个窗口的 reference_regions 和
+  target_intervals 与此前独立精确规划完全相等，omitted_bp均0，查询0.28–1.91s。
+  summary SHA `aca20008cb7c1e153db297779f2381b7fdbd071bd6d1f6519095c83ec7ef165f`。
+- 新 `q0_reference_index.py` 是记录级Rtree粗检索＋原始CIGAR精确投影，不使用100kb
+  网格作为最终mapper输入；read_paf回调保留UTF-8/CRLF/CR的真实byte offset。
+  支持N分段的绝对/段相对坐标以及>2^31参考坐标，完整原PAF身份仍为权威。
+- 曾尝试为每条记录额外构造 paired-run数组（`43008143`，隔离目录
+  `q0-exact-reference-index-paired-20261121`）。六窗口几何仍相等，但未证明提速，
+  冷查询观测反而较慢，且不同节点计时不能作严格倍数对照；**已撤回此候选代码**。
+  当前core不含该数组缓存，若重访必须先做同节点受控比较，不要因“索引”名字自动采用。
+
+### 区域 mapper/cache/projection API 的真实端到端验证
+
+- 第一隔离API probe `43008128` 在完成选中源序列验证后失败，原因是薄测试包导入
+  q0_preparation 时提前拉入整个 outer workflow/缺 contract.py；不是小麦mapper失败。
+  已改为惰性加载默认checkpoint manager，并保留模块级 `OuterCheckpointManager`
+  注入点供冻结reader替换；probe也在读取14Gb源序列前先导入所需模块。
+- `43008133` / `q0-regional-api-integration-20261121-v2` 于20:35:11 SUCCEEDED。
+  923条选中原始源序列、14006064823bp实际内容/canonical part验证；不是全数据验证。
+  总315.875s，峰值14203MiB，真实大父进程下fresh-exec guard的4GiB子mapper限制可用。
+  summary SHA `248a0ab7b16a592edaa286e56355d5641bcde8c123ff695eac34f47622985aba`。
+- 三普通control自动保持native flags；API各6.136/10.096/6.466s，原跨组装paired坐标
+  99999/100000/100000bp全部保留。三真实residual自动选择 `-m 2000`、仍保留-P；
+  API各5.294/5.415/5.762s，cross core覆盖27381/99998/100000bp。
+  这些不是最终唯一定位、组装质量或整任务加速倍数。
+- 三层缓存分别绑定完整chaining、真实-c raw mapping、原坐标projection。
+  改核心core但不改上下文时，禁止Popen的测试仍成功复用raw receipt。完整投影产出后
+  可再生的窗口query/target FASTA被清理，完整PAF/receipt/失败输入不作为垃圾清理。
+- 近似无-c结果永远不是科学PAF；manifest验证会核验完整依赖闭包和原坐标投影。
+  本地ready manifest→未修改的admission consumer也已贯通验证。
+
+### 当前本地自动路线（仍待远端迁移）
+
+- `q0_regional_discovery.py` 已接入正常 prepare_evidence：仅asm10且参考>=5Gb自动触发，
+  核心100kb＋两侧10kb；完整初始cross和完整第一补充的双侧M/=覆盖先用于减少重复发现。
+  缺口统计不把已有覆盖解释成唯一性或穷尽全部备选关系。
+- 若原完整whole-source partial receipt已有效，优先复用，不追认它执行过区域策略。
+  无参考目标或目标总量>100Mb的parent保留显式native full-source/all-anchor回退；
+  不丢弃、不接受半成品。决定整个parent是否回退后再启动其窗口，避免先做一半再重复。
+- 目前mapper池最多4路、每路最多2线程/4GiB地址空间；总线程不超过run budget。
+  **尚未实现并行target规划**，不能将线程池误报成所有规划步骤已并行；后续应结合实测
+  扩池/规划进程池，并把parent大堆与各child预算分开，不盲目设置32路×32线程。
+- partial窗口的全部PAF作为同一发现round流式合并，不能每个窗口重建/排序一遍全catalog，
+  也不能让前一个窗口新增的anchor无意改变后一个窗口的科学语义。
+- LocalReferenceCache在/tmp构建/查询、将完整sealed DB＋成功身份持久化；续跑逐字节复用。
+  **还应把已完成隔离DB按正确输入绑定采纳到该cache位置，不能让主流程重建它。**
+- 后续 `candidate_chr` 目前仍是原生 supplemental_groups（策略中明确记录），尚未解决
+  先前515Gb累计whole-source扩大问题。不能称“新版后面都已区域化”；在正式远端切换前
+  需处理这一已知后续重复范围，以及下面的串行规划开销。
+
+### 更广规划样本与局部PAF镜像
+
+- `43008137` / `q0-regional-scope-coordinator-20261121`：仅元数据＋sealed索引，不读DNA、
+  不运行mapper。实际partial策略将31978个residual parent计划成61087个窗口；这是
+  **候选区域工作量，不是已经提交61087个作业，也不是整pipeline剩余任务数**。
+- 选两dataset的长parent及长度分位点，共46parent/240window。该probe完成1154.803s，
+  46个parent均可区域化，无native回退；最长289508469bp的ptg000049l是20个窗口，
+  最大目标17899444bp。样本不能证明剩下全部parent同样可路由。
+- 此较广样本仍确认共享盘原PAF随机seek造成显著等待：DB已本地，但 `_hit` 读PAF仍共享盘。
+  已针对同类I/O问题增加**内容校验过的本地PAF镜像**。原PAF仍每次open完整SHA核验，
+  镜像复制后也核验完整SHA；查询期间原文件和镜像都有stat fence，任一变化即拒绝。
+  不是跳过原输入检查或把镜像冒充原始证据。
+- `43008150` / `q0-exact-reference-index-local-pafs-20261121`：该镜像路径六个精确计划
+  全部相等，查询0.243–1.830s，probe总58.238s。`43008151` /
+  `q0-regional-scope-local-pafs-20261121` 正在跑相同46/240规划样本；查最新终态/summary，
+  不重复提交。早期29parent/151window累计规划154.611s，尚不代表完整终态。
+
+### 下一步优先顺序（不要再重复已完成mapper对照）
+
+1. 核实43008151终态和同样本路由/坐标、CPU/内存；必要时优化串行规划/有保护并发。
+2. 精简后续candidate_chr的重复whole-source范围，不能只解决第二补充又留下已知巨大重复。
+3. 实现明确的q0科学迁移adapter：保留原resource/self/cross计划与其checkpoint指纹，
+   独立绑定新entry/reader/runtime；新声明scientific_builder_modified=true。原冻结
+   load_context严格检查调用者，不能传旧caller或伪造__file__来绕过。
+4. 新资源ready、正常锁/旧新版children退出之后才安装窄补丁并续跑；旧版不动。
+   本轮尚未生成/应用有效迁移receipt，两个主任务仍运行原runtime。
+
+### 21:12 终态补记与当前验证边界
+
+- `43008137` 于21:08:45 SUCCEEDED；`43008151` 于21:11:10 SUCCEEDED。
+  同46parent/240window规划结果的dataset/contig/长度/窗口数/route/reason/最大target bp
+  全部一致，均无native回退。没有记录全部240窗口的完整target区间逐项对照；完整区间
+  等值实测是前述六窗口，不要扩大为240项坐标输出全部已独立比对。
+- 共享PAF版本累计规划1123.030s，完整probe1154.803s；本地PAF版本累计规划256.592s，
+  完整probe286.132s，峰值3166MiB。CPU平均27%→93%，符合减少随机远端I/O等待的判断。
+  前者agent-X86-61、后者agent-X86-18，**不是严格同节点计时**；约4.4倍仅为同样本规划
+  观测值，不是因果隔离的加速比，更不是整个小麦任务加速比。
+- 本地PAF版本最长ptg000049l的20窗口规划23.932s、最大target17899444bp。
+  summary SHA `5276a8f857f6236c227d1415d748432fcbcace9f17ec2472084be05a7f3e8c7f`。
+- 237项q0定向测试通过（1 skip），冻结routing-reader的10项测试通过；随后member循环精简
+  再通过53项相关回归和7项区域API测试（含新增长度/SHA拒绝测试）。未运行发布CI、
+  浏览器、update.sh或整套替换。源码中checkpoint manager仍保留可注入入口；skip-self
+  仅在真的请求同dataset不同part关系时拒绝，不应拒绝纯cross窗口。
+- 项目另有DEGAP2.0 submodule dirty及会话/output未跟踪目录，均与此任务无关，不纳入提交。
+
+最后源码复核还消除了两处随窗口数放大的校验开销：ready-manifest的source member映射只建
+一次；单任务member长度/SHA核验改成每个window单次查找，仍检查全部window，不再按每个
+source重新扫整个target列表。partial合并与验证两端都避免重复扫描，并非省略完整性校验。
+
+迁移时额外注意：完整native第一补充receipt.spec.tool.command实际为字符串`minimap2`，
+resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用字符串**；不要为了
+显式路径把新reader改成绝对路径参数，否则当前native raw key包含command字段，会导致
+有效的第一补充缓存不命中。隔离API probe以绝对路径调用工具，其raw key因此不同；不能
+改写旧key或冒认主任务执行来强制采纳这些小probe结果。先保住5.3小时的native结果。
