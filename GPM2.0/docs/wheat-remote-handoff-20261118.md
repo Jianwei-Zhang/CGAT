@@ -2923,3 +2923,50 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   绝不停止OLD42523432或改旧journal。当前已有区域raw/project成功缓存保留复用；不要
   因新模块/validator源码变化删除它们。切换后更新observer目标job及区域progress读取，
   以真实新产出证明恢复；还没到可宣告“已部署/任务完成”的阶段。
+
+## 2026-11-22 06:26 CST：并行规划与缓存单遍补丁已实际接管 NEW
+
+- **当前 NEW 主任务改为43010335**，`agent-X86-53`，单节点32CPU/320GiB；正常run ID
+  `20261121T222113Z-1973018-f3b56813`。bundle仍为
+  `q0-parallel-cutover-20261122-054517`，transition SHA仍47d3bd36960518a6dcc1c5c8b98bf1b5fd61f6a076a42a3109d1d44e128acc01。
+  源码冻结自master **ec093edf**，现在不再是“只上传、未安装”。旧对照 **42523432**仍
+  RUNNING/grt_step2，约16核，未中止、未改动；后续不要把43010068当作存活NEW。
+- 只读预检 **43010327 SUCCEEDED**，06:18:17结束，25项初始检查点全部通过，冻结包83项
+  定向测试也通过。`validation.json` SHA
+  `f3e96ee771316f8e044dc7980f951b165847098acbfd75ccc65b980c8d586075`。这是实际预检，
+  不是从目录存在或日志片段推断成功。没有重复提交预检。
+- 新allocation06:19已RUNNING，ready PID1973018确实在调度器进程表中，核对32CPU、320GiB
+  allocation及硬内存限额后才在06:20:12请求 **正常dkill 43010068**，没有force。06:20:51
+  核实原NEW终态FAILED、pids清空、正常锁消失，06:20:52才原子放行handoff。FAILED是此次
+  主动性能交接，不是新计算错误；旧run最后记录completed=500/planned=61000区域窗口。
+  不删除锁、不采用未完成PAF、不清理中断现场，也不把61000当作完整基因组比对次数。
+- 06:21:13新owner取得正常锁，06:24:35已核实journal **installed**。库存16项（14个core
+  runtime、launcher、显式科学声明），实际替换9项：7个core含新增executor、launcher、声明。
+  另外7个内容不变的runtime没有重写。全部旧备份SHA、新安装SHA、20份候选源码逐项相等；
+  新模块原来不存在，其backup=null/present=false准确，不伪造原文件。未重复移动任何cache。
+- 四个原始受保护runtime和外层`run_orchestration.py` SHA均未改变，外层7cbcf887解析优化
+  仍刻意不部署。25个原initial checkpoint文件的SHA均仍与预检相同；没有重写原生检查点。
+  四块完整raw cache的success marker保留（FIRST150/fast61/native9/native1418→52）；本次
+  登录节点检查只查小型receipt，并不冒称重新验证其完整大输出，真实reader消费时仍校验。
+- 新reader声明绑定真实新builder/reader，`initial_alignment_profiles_modified=false`、
+  `native_checkpoint_rewritten=false`。仍是原55项对照workflow，不加入DEGAP或其他master
+  新功能。本次并行与记录处理优化没有额外改变4项科学policy、mapper flags或精度范围。
+- 06:24:48真实Runner开始RESUME；06:25:56已经 **SKIP_VALID ref:JM19_hifiasm**，未重跑
+  参考mapper。**当前仍在正常初始校验，不是已经完成25项复用或进入区域14路池**。预检25项
+  与主流程实际SKIP_VALID计数分开报告；不要因为校验期单核或日志安静再次中断。
+- 安装验证receipt已同步仓库：`q0-parallel-deployment-verified-20261122.json`；远端
+  `deployment-verified.json`、`installation/receipt.json`、`normal-stop-request.json`、
+  `old-scheduler-terminal.json`、`new-scheduler-allocation.json`及`handoff.json`均保留。安装
+  journal SHA `9e77800daa968f9a476956d04924a808acc4cfd8984a75dc08c7b1b87239c60e`。
+- 原observer1505606已因旧NEW终止自然退出，未手工杀它。新只读observer **3037575** 位于
+  此bundle的`observer.py`，SHA `8ac77d55799884af0e03547ecee3a9d6759c3ed949e43d62034ec3e56aca45f4`，
+  日志`~/cgat-reads-debug/logs/wheat-live-parallel-20261122-062306.jsonl`。按真实新run过滤旧
+  中断记录，并读regional progress，不再拿native leaf=0误报区域任务没动。该observer是
+  现场运维副本，不是新增科学runtime；只记录和提示检查，不自动修复/取消或主动聊天通知。
+- **接续重点**：查43010335而非重新提交；核实后续25项SKIP_VALID、q0 reader真正启动、
+  四块既有矩阵实际命中，再量测新区域池资源证明、planner/mapper并发和每100窗口吞吐。
+  32线程有充分内存时的上限是owner1+planner3+mapper14×2，不能在尚未进入该池时就宣称
+  14路已生效。原区域raw caches保留，projection因builder身份变化可重新验证，不能因此
+  删除全部cache。若再修复，以此次transition/journal为新prior，不重放旧handoff或旧安装。
+  整套小麦尚未完成；不把受控2.03x/2.45x倍率当作整套已测加速。不跑release CI、update.sh、
+  全runtime替换、重新prepare或网站发布。
