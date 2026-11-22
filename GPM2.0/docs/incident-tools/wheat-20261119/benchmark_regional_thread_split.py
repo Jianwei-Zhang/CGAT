@@ -149,7 +149,7 @@ def load_cases(work, archive, count, *, input_digests=None):
     return cases, signatures, source_bytes
 
 
-def run_phase(out, cases, guard, mapper_threads, workers):
+def run_phase(out, cases, guard, mapper_threads, workers, *, child_env=None):
     out.mkdir()
     started = time.monotonic()
 
@@ -162,7 +162,7 @@ def run_phase(out, cases, guard, mapper_threads, workers):
                     *stage.argv[mapper_threads-1]]
             t = time.monotonic()
             with (case_dir/(stage.kind+".paf")).open("xb") as stdout, (case_dir/(stage.kind+".err")).open("xb") as stderr:
-                subprocess.run(argv, cwd=case_dir, stdout=stdout, stderr=stderr, check=True)
+                subprocess.run(argv, cwd=case_dir, stdout=stdout, stderr=stderr, check=True, env=child_env)
             sha = digest(case_dir/(stage.kind+".paf"))
             if sha != stage.expected_sha256:
                 raise ValueError(f"{stage.kind} {i}: full PAF differs from original")
