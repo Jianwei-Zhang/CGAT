@@ -23,6 +23,25 @@ class CoverageEquivalenceTests(unittest.TestCase):
         self.assertFalse(duplicate)
         self.assertEqual(dict(missing)[self.b], (Interval(100, 106), Interval(110, 113)))
 
+    def test_boundary_index_includes_shared_endpoints_and_keeps_source_gaps(self):
+        from server.tools.lgz_core.q0_coverage import _IncidentRelations
+
+        incident = _IncidentRelations([
+            (Interval(10, 15), self.b, Interval(100, 105), True),
+            (Interval(15, 30), self.c, Interval(200, 215), False),
+            (Interval(2, 31), self.c, Interval(300, 329), True),
+            (Interval(12, 13), self.b, Interval(110, 111), False),
+        ])
+        self.assertCountEqual(list(incident.at(15)), [(self.b, 100), (self.c, 200), (self.c, 316)])
+        self.assertEqual(list(incident.at(31)), [(self.c, 300)])
+        self.assertEqual(list(incident.at(32)), [])
+
+        required = {self.a: [Interval(0, 10), Interval(20, 25)], self.b: [Interval(40, 50)]}
+        model = CoverageModel(required, [Equivalence(self.a, Interval(0, 10), self.b, Interval(40, 50), True, "ab")])
+        represented, duplicate, missing = model.assess([(self.a, Interval(0, 3)), (self.b, Interval(40, 45))])
+        self.assertEqual((represented, duplicate), (8, False))
+        self.assertEqual(dict(missing), {self.a: (Interval(3, 5), Interval(20, 25)), self.b: (Interval(45, 47),)})
+
     def test_same_homology_coordinates_are_duplicate_not_extra_coverage(self):
         required = {self.a: [Interval(0, 10)], self.b: [Interval(20, 30)]}
         model = CoverageModel(required, [Equivalence(self.a, Interval(0, 10), self.b, Interval(20, 30), True, "ab")])
