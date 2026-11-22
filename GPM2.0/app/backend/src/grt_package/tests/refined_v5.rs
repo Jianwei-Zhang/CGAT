@@ -130,12 +130,28 @@ fn refined_full_import_materializes_real_bridge_and_exports_admitted_sequence() 
         load_grt_project_view_for_project(&outcome.project_db_path, project.project_id).unwrap();
     assert_eq!(view.recipe.schema_version, "5");
     assert_eq!(view.recipe.final_q_relpath, "data/refinement/final.fa");
-    assert!(
-        view.source_cards
-            .iter()
-            .any(|card| card.placement_mode == "refinement"
-                && card.ref_alignment_status == "not_measured")
-    );
+    let card = view
+        .source_cards
+        .iter()
+        .find(|card| card.placement_mode == "refinement")
+        .unwrap();
+    assert_eq!(card.ref_alignment_status, "not_measured");
+    let trace =
+        load_grt_source_card_trace(&outcome.project_db_path, &card.source_card_key).unwrap();
+    assert!(trace.accepted_events.is_empty());
+    assert!(trace.ref_evidence.is_empty());
+    assert!(trace.pairwise_evidence.is_empty());
+    assert_eq!(trace.final_path_segments.len(), 3);
+    assert!(trace.final_path_segments[1]["refinement_source"].is_object());
+    for segment in trace.final_path_segments {
+        let source = if segment["kind"] == "gap" {
+            &segment["refinement_source"]
+        } else {
+            &segment["source"]
+        };
+        assert_eq!(source["dataset"], card.dataset_name);
+        assert_eq!(source["contig"], card.contig_name);
+    }
     let path = load_grt_final_path(&outcome.project_db_path).unwrap();
     let output = temp.path().join("export.fa");
     exporter::export_project_final_path_fasta(

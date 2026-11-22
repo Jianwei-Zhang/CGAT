@@ -259,3 +259,67 @@ semantics and native recovery before changing the adapter/environment/lock.
 Existing receipts must not be relabeled as evidence for the new version. This
 sequencing change applies to DEGAP-specific follow-up, not to the remaining
 CGAT tools, provenance, App/report/migration or final consolidated acceptance.
+
+
+## Windows archive roundtrip: reproduction and first finding
+
+Use `scripts/stage-refinement-app-acceptance.py` from `GPM2.0/` with Python 3.11+,
+`--workspace LABEL=/path/to/settled-workspace` for each workspace, and `--out`
+pointing to a new Windows-readable directory. It stages byte-identical Full/Light
+tar deliveries and separately published Server FASTA, verifying refinement
+run identities and publication hashes before writing `cases.json`. It does not
+modify or rerun a Server workspace. Use the Windows host toolchain from
+`GPM2.0/app/src-tauri`; keep a separate target directory if sharing a checkout:
+
+```cmd
+set "CGAT_REFINEMENT_APP_CASES=D:\acceptance\input\cases.json"
+set "CGAT_ACCEPTANCE_NODE=D:\tools\nodejs\node.exe"
+cargo test --lib --locked actual_server_archives_roundtrip_through_desktop_commands -- --ignored --nocapture
+```
+
+The test needs a fresh evidence destination alongside the manifest. It checks
+the bridge-bearing positive cases and zero-admission controls in this sample.
+It drives the same importer/options as the desktop import command, native initialization,
+production frontend state normalization (via Windows Node), the desktop FASTA
+export body and persistence of a manual path edit. It emits an archive-bound
+`desktop-roundtrip/roundtrip-receipt.json` if all cases pass. This is not a GUI,
+WebView, installer or installed-release test.
+
+The first real import of the positive quarTeT package found an empty Final Path
+trace on its otherwise imported refinement source card. Sealed schema-5 cards
+intentionally have no legacy LGZ event or path-ID links. The App now resolves
+these cards by exact chromosome/dataset/contig in the persisted, validated
+refined path, including residual N source intervals, without changing delivery
+bytes, DB schema, LGZ card semantics or homology evidence. Project descriptions
+also distinguish zero accepted edits from a genuinely applied refinement.
+
+### Result with unmodified public archives
+
+Windows host Cargo and Node passed all **14 imports (seven Full/Light pairs)**:
+LGZ plus the four refined outputs from the mixed-read workspace, and LGZ plus
+TGS from the ONT-only workspace. Each Full App export equals the independently
+staged Server FASTA by chromosome name and sequence. Each Light import keeps
+its path and source cards but refuses sequence export and creates no output
+FASTA. All 14 independently save a manual path edit, reject reuse of the same
+import destination, retain the identical database SHA-256, and reload the edit
+without changing the precomputed baseline. No customer project was used.
+
+The Full App exports for quarTeT, LR_Gapcloser and ONT-only TGS differ from their
+own LGZ outputs and preserve the accepted source cards and intervals. The mixed
+DEGAP and TGS runs exported unchanged sequence and are labelled zero-admission,
+not patched. Receipt and log: `evidence/windows-app-roundtrip-receipt.json`,
+`evidence/windows-app-roundtrip.log`; independent comparison to each LGZ App
+export: `evidence/windows-app-vs-lgz.json`. The receipt SHA-256 is
+`9cc14ee53aeb0a5659ce17705157cee7fac4094837d7414649d5dc022b4f86c4`.
+
+### Reverse compatibility with the pre-refinement Windows importer
+
+Built the backend CLI from the immutable pre-feature merge base
+`a8eca1de4bd97761210ce737bc047d6d8a494a66` using Windows Cargo and its locked
+dependencies. The actual LGZ Full and Light controls both imported successfully.
+The same executable rejected the actual quarTeT Full and Light archives with
+exit 1 and `GRT_IMPORT_UNSUPPORTED_SCHEMA`, with no project SQLite database
+and no LGZ fallback. This exercises historical importer code, not a historical
+GUI installation. The executable hash, input archive hashes and errors are in
+`evidence/windows-legacy-import-receipt.json`; build transcript is
+`evidence/windows-legacy-build.log`.

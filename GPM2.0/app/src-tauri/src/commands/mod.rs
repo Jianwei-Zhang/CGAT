@@ -782,6 +782,9 @@ pub use project_preview::*;
 pub use workspace::*;
 
 #[cfg(test)]
+mod refinement_acceptance;
+
+#[cfg(test)]
 mod tests {
     #[test]
     fn blocking_command_executes_off_dispatch_thread_and_preserves_backend_errors() {

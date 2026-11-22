@@ -19,8 +19,13 @@ pub fn initialize_grt_project_with_options(
             .get("tool")
             .and_then(Value::as_str)
             .ok_or_else(|| anyhow!("refined recipe has no engine identity"))?;
+        let outcome = match path.get("edits").and_then(Value::as_array) {
+            Some(edits) if edits.is_empty() => "unchanged after refinement (zero accepted edits)",
+            Some(_) => "accepted refinement",
+            None => "refinement outcome not recorded",
+        };
         format!(
-            "LGZ + {tool} accepted refinement; locked recipe {}",
+            "LGZ + {tool}: {outcome}; locked recipe {}",
             recipe.recipe_id
         )
     } else {

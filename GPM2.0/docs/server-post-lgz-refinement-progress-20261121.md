@@ -519,3 +519,11 @@ Evidence: /tmp/cgat-native-reports-20261122.7bhTSr.log
 用户说明将后续自行合并 DEGAP 的 feat 分支，合并后再检查 CGAT 接入是否需要调整。当前 CGAT 保留已经核验的固定 DEGAP 快照和本轮历史证据，不由本任务代替用户合并、移动 submodule pointer 或自动升级依赖。暂不围绕即将变化的旧版本继续扩大 DEGAP 专项适配/正向样例调参。
 
 待上游合并后，基于实际新 revision 重新核对入口/reads 参数、依赖和平台、报告/候选/最终 FASTA 格式、坐标定义、原生任务与恢复回执，再按变化调整适配器、版本锁、环境和必要回归；旧 runtime/cache 不可静默冒充新版本证据。本轮 1-based 坐标结论只适用于已经 hash 核验的当前固定快照。其余工具、编号输出、来源真实性、App/报告/迁移和统一验收继续，不能因此将整体目标标为完成。
+
+
+## 2026-11-22 — 真实 Full/Light 交付与 Windows App 闭环
+
+- Windows 原生导入器、App 初始化与保存/导出命令逻辑，加上实际前端路径状态归一化，通过 **7 组 Full/Light、共 14 次真实归档导入**。Full 按染色体名和序列与对应 Server FASTA 一致；Light 保留路径与来源，但不生成 FASTA。每次都保存实际人工编辑并尝试重复导入；目标被拒绝、数据库哈希不变，人工编辑重读成功。
+- quarTeT、LR_Gapcloser 和 ONT-only TGS 的 App 导出均不同于各自 LGZ，并能查询到已接纳来源和路径区间；混合 reads 的 DEGAP、TGS 实际零接纳，导出明确保留原序列。第一个正接纳归档暴露来源卡未关联路径，现从已校验路径精确匹配染色体/数据集/contig，同时保留残余 N 来源而不伪造 LGZ 事件。项目说明也区分有改动与零接纳。
+- 单独用精修前的 Windows 原生后端验证反向兼容：LGZ Full/Light 正常导入；quarTeT Full/Light 以 `GRT_IMPORT_UNSUPPORTED_SCHEMA` 拒绝，未生成项目数据库，也没有降级成 LGZ。
+- 验证未启动桌面窗口、WebView 或安装程序；所用是原始 Server tar 与独立发布 FASTA，不是替换归档内容的 fixture。复跑参数、证据及剩余检查见 [统一验收记录](server-refinement-final-acceptance-20261122.md#windows-archive-roundtrip-reproduction-and-first-finding)。

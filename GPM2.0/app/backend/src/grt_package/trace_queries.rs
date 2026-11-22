@@ -136,7 +136,20 @@ pub fn load_grt_source_card_trace(
         .as_object()
         .ok_or_else(|| anyhow!("persisted LGZ source card JSON is invalid"))?;
     let event_ids = stored_string_list(card, "accepted_event_ids_json")?;
-    let segment_ids = stored_string_list(card, "final_path_segment_ids_json")?;
+    let final_path_segments =
+        if card.get("placement_mode").and_then(Value::as_str) == Some("refinement") {
+            // Schema 5 cards do not claim LGZ event links. Trace their accepted
+            // source intervals (including residual Ns) from the validated path.
+            load_refinement_card_segments(&conn, card)?
+        } else {
+            load_many_json(
+                &conn,
+                "grt_final_path_segment",
+                "segment_id",
+                "segment_json",
+                &stored_string_list(card, "final_path_segment_ids_json")?,
+            )?
+        };
     let ref_ids = stored_string_list(card, "ref_evidence_ids_json")?;
     let pairwise_ids = stored_string_list(card, "pairwise_evidence_ids_json")?;
     let donor_usage = load_matching_json(
@@ -178,13 +191,7 @@ pub fn load_grt_source_card_trace(
     Ok(GrtSourceCardTrace {
         source_card,
         accepted_events: load_many_json(&conn, "grt_event", "event_id", "event_json", &event_ids)?,
-        final_path_segments: load_many_json(
-            &conn,
-            "grt_final_path_segment",
-            "segment_id",
-            "segment_json",
-            &segment_ids,
-        )?,
+        final_path_segments,
         ref_evidence: load_many_json(&conn, "grt_evidence", "evidence_id", "row_json", &ref_ids)?,
         pairwise_evidence: load_many_json(
             &conn,
@@ -206,6 +213,33 @@ pub fn load_grt_source_card_trace(
             },
         )?,
     })
+}
+
+fn load_refinement_card_segments(
+    conn: &rusqlite::Connection,
+    card: &Map<String, Value>,
+) -> Result<Vec<Value>> {
+    let label = "persisted refinement source card";
+    let chr = json_nonempty_str(card, "target_chr", label)?;
+    let dataset = json_nonempty_str(card, "dataset_name", label)?;
+    let contig = json_nonempty_str(card, "contig_name", label)?;
+    let mut stmt = conn.prepare(
+        "SELECT segment_json FROM grt_final_path_segment
+         WHERE chr = ?1 AND
+            CASE WHEN kind = 'gap' THEN
+                json_extract(segment_json, '$.refinement_source.dataset') = ?2 AND
+                json_extract(segment_json, '$.refinement_source.contig') = ?3
+            ELSE
+                json_extract(segment_json, '$.source.dataset') = ?2 AND
+                json_extract(segment_json, '$.source.contig') = ?3
+            END
+         ORDER BY segment_order",
+    )?;
+    stmt.query_map(params![chr, dataset, contig], |row| row.get::<_, String>(0))?
+        .map(|row| {
+            serde_json::from_str(&row?).context("persisted refinement segment JSON is invalid")
+        })
+        .collect()
 }
 
 pub fn load_grt_event_trace(project_db_path: &Path, event_id: &str) -> Result<GrtEventTrace> {
