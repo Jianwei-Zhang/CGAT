@@ -25,8 +25,10 @@ from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 from .q0_sources import Q0EvidenceError, SourceKey
 try:
     from run_orchestration import atomic_write_json, sha256_file as _partition_sha256
+    from run_orchestration import file_identity as _file_identity, OrchestrationContractError
 except ModuleNotFoundError:
     from ..run_orchestration import atomic_write_json, sha256_file as _partition_sha256
+    from ..run_orchestration import file_identity as _file_identity, OrchestrationContractError
 
 def _default_checkpoint_manager(root):
     # Keep the module-level injection point used by provenance-aware incident
@@ -52,11 +54,15 @@ POLICY = {"version": 5, "weak_global_seed": WEAK_GLOBAL_SEED_POLICY, "regional_p
           "supplement_flags": ["-D", "-P", "--dual=yes", "--no-long-join"]}
 
 
-def artifact_path(root: Path, relative: str) -> Path:
+def _artifact_member(relative: str) -> Path:
     path = Path(relative)
     if not relative or path.is_absolute() or ".." in path.parts or "\\" in relative:
         raise Q0EvidenceError(f"invalid q0 artifact path: {relative!r}")
-    resolved = (root / path).resolve()
+    return path
+
+
+def artifact_path(root: Path, relative: str) -> Path:
+    resolved = (root / _artifact_member(relative)).resolve()
     try:
         resolved.relative_to(root.resolve())
     except ValueError as exc:
@@ -65,10 +71,14 @@ def artifact_path(root: Path, relative: str) -> Path:
 
 
 def identity(root: Path, relative: str) -> dict:
-    path = artifact_path(root, relative)
-    if not path.is_file():
-        raise Q0EvidenceError(f"required q0 artifact missing: {relative}")
-    return {"path": relative, "sha256": _partition_sha256(path), "size": path.stat().st_size}
+    path = root / _artifact_member(relative)
+    try:
+        bound = _file_identity(path, within=root)
+    except OrchestrationContractError as exc:
+        raise Q0EvidenceError(f"cannot bind q0 artifact {relative}: {exc}") from exc
+    # Receipt paths are logical workspace names, not resolved target paths.
+    bound["path"] = relative
+    return bound
 
 
 def json_file(path: Path) -> dict:

@@ -253,8 +253,13 @@ def sha256_file(path: Path) -> str:
     return _sha256_with_signature(path, file_signature(path))
 
 
-def file_identity(path: Path, *, relative_to: Path | None = None) -> dict[str, object]:
+def file_identity(path: Path, *, relative_to: Path | None = None,
+                  within: Path | None = None) -> dict[str, object]:
     signature = file_signature(path)
+    # Check containment against the SAME resolved target that we will hash.
+    # Keep checking the original pathname at the end, including on cache hits.
+    if within is not None and not Path(signature[0]).is_relative_to(within.resolve(strict=True)):
+        raise OrchestrationContractError(f"file escapes workspace: {path}")
     label = path.relative_to(relative_to).as_posix() if relative_to is not None else str(path)
     # Use the same initial and final signatures for both the declared size
     # and the digest. The hit check and cold hash's fd checks remain intact.

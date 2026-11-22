@@ -4100,3 +4100,23 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   不把单项成功当完整恢复门禁。没有资源提交intent或ready/handoff，旧 `42523432` 仍运行且未改。
   继续核对 PID3458598 及同一预检的权威状态；观察器自然到限且没有intent时才按照 19:10 的规则续接，
   不重提活着的预检，不提前停新版主任务。
+
+### 2026-11-22 21:07 CST：合并区域回执的路径核对，不变配对规则
+
+- `q0_preparation.identity` 服务于区域raw/project回执、原生补证和最终evidence inventory。原来在
+  `artifact_path` / `is_file` / `sha256_file` / 最后一次额外大小`stat`中重复查询目录。现复用通用
+  `file_identity`的同一对签名，按哈希真正绑定的解析路径验证workspace约束，同时继续验证原逻辑路径
+  在读前后（包括温memo）未被换向。输出原始逻辑`path`、size、SHA完全照旧，不放松缓存验收。
+  93项定向测试全部通过；全`test_q0_*.py` 331项（330通过、1跳过）。新测覆盖原label、一次真实冷读、
+  拒绝workspace外链接且不读取，以及命中摘要期间链接换向仍拒绝。
+- `43016380 / agent-X86-08` 21:06:08 **SUCCEEDED/0**。只读32份历史成功raw回执及各自的原
+  command/guard共96个小文件，118,967字节，8段均与冻结的96项`path/size/SHA`逐项相同。
+  每段Python层`Path.resolve` **384→288**、`Path.stat` **576→192**（非内核调用计数）。
+  A1/A2冷memo **9.51/5.43s**，B1/B2 **5.37/5.41s**；温memo A **0.89/0.89s**、B **1.04/0.88s**。
+  受共享盘波动影响，尤其温memo未证明壁钟改善；不把小文件批对照当整麦吞吐。未读FASTA/PAF，未
+  写主 workspace。隔离目录`q0-artifact-identity-abba-20261122-2102`，`job.sha256` SHA
+  `87e1710d29377874e576b28819f0efc878b4ae3514c383c71731605d77dc45e5`，`report.json` SHA
+  `c20d623895acde3e53007285912ce238a0035f1bdfcd742a88ceae307b623edb`，`terminal-43016380.json` SHA
+  `8152fa37e082c983498b1435f88d1d5138c4a4a7c957c4eafda471ac7f3783cb`。
+- 新版 `43012037` 21:04:17报 **8900/61000 / fallback=0**，两份主作业仍RUNNING。只读预检
+  `43015921` 又完成 `assign`，正式已验3/25。冻结的生产文件、预检及原等待资源门不换，不因此重启。

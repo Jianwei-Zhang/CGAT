@@ -1,5 +1,6 @@
 """Candidate discovery and required-evidence publication, not path quality claims."""
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -17,7 +18,66 @@ from server.tests.q0_test_support import seed_q0_evidence
 from server.tools.lgz_core.common import read_fasta, write_fasta
 from server.tools.lgz_core.q0_sources import SourceKey, Q0EvidenceError
 from server.tools.lgz_core.q0_catalog import build_catalog, supplemental_groups
-from server.tools.lgz_core.q0_preparation import MANIFEST, prepare_evidence, load_verified_evidence, artifact_path
+from server.tools import run_orchestration
+from server.tools.lgz_core.q0_preparation import MANIFEST, prepare_evidence, load_verified_evidence, artifact_path, identity
+
+
+class Q0ArtifactIdentityTests(unittest.TestCase):
+    def test_receipt_label_and_byte_identity_with_one_signature_pair(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "parts").mkdir()
+            content = b"exact receipt bytes\r\n"
+            (root / "parts" / "result.paf").write_bytes(content)
+            label = "parts//result.paf"
+            expected = {"path": label, "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+            with (mock.patch.object(run_orchestration, "file_signature", wraps=run_orchestration.file_signature) as stat,
+                  mock.patch.object(run_orchestration, "_sha256_read", wraps=run_orchestration._sha256_read) as read):
+                self.assertEqual(identity(root, label), expected)
+                self.assertEqual(identity(root, label), expected)
+            self.assertEqual(stat.call_count, 4)
+            self.assertEqual(read.call_count, 1)
+
+    def test_outside_symlink_rejected_before_reading_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root = parent / "workspace"
+            root.mkdir()
+            outside = parent / "outside"
+            outside.write_bytes(b"not a workspace artifact")
+            alias = root / "alias"
+            try:
+                alias.symlink_to(outside)
+            except OSError:
+                self.skipTest("symlink support required")
+            with mock.patch.object(run_orchestration, "_sha256_read", side_effect=AssertionError("outside file read")):
+                with self.assertRaisesRegex(Q0EvidenceError, "escapes workspace"):
+                    identity(root, "alias")
+
+    def test_warm_artifact_identity_rejects_alias_retargeted_after_initial_stat(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old, new, alias = (root / name for name in ("old", "new", "alias"))
+            old.write_bytes(b"before")
+            new.write_bytes(b"after ")
+            try:
+                alias.symlink_to(old)
+            except OSError:
+                self.skipTest("symlink support required")
+            self.assertEqual(identity(root, "alias")["path"], "alias")
+            signature = run_orchestration.file_signature
+
+            def retarget(path):
+                original = signature(path)
+                if alias.readlink() == old:
+                    alias.unlink()
+                    alias.symlink_to(new)
+                return original
+
+            with mock.patch.object(run_orchestration, "file_signature", side_effect=retarget):
+                with self.assertRaisesRegex(Q0EvidenceError, "changed during hash reuse"):
+                    identity(root, "alias")
+            self.assertEqual(identity(root, "alias")["sha256"], hashlib.sha256(b"after ").hexdigest())
 
 
 class CandidateDiscoveryTests(unittest.TestCase):
