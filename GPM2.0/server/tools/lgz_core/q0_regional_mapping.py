@@ -219,10 +219,11 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
             if _reuse(root,pre_receipt,pre_spec,required) is None:
                 directory=_fresh_directory(root,pre_rel)
                 _execute(root,directory,context,relative,catalog,query,targets,toolargv,tool,address_space_bytes)
-                chain_work(directory/"result.paf.tmp",query,target_lengths,policy)
+                work=chain_work(directory/"result.paf.tmp",query,target_lengths,policy)
                 (directory/"result.paf.tmp").replace(directory/"result.paf")
                 _ops().atomic_write_json(root/pre_receipt,{"status":"success","spec":pre_spec,"outputs":_outputs(root,required)})
-            work=chain_work(root/pre_rel/"result.paf",query,target_lengths,policy)
+            else:
+                work=chain_work(root/pre_rel/"result.paf",query,target_lengths,policy)
             decision=select_cigar_profile(reference_bases,query.length,work,complete=True,preset=preset,policy=policy)
             decision["chaining_receipt"]=_ops().identity(root,pre_receipt)
             closure.update(required|{pre_receipt})
@@ -244,8 +245,10 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
             for _ in read_paf(directory/"result.paf.tmp",query_lengths={query.window_id:query.length},target_lengths=target_lengths):pass
             (directory/"result.paf.tmp").replace(directory/"result.paf")
             _ops().atomic_write_json(root/raw_receipt,{"status":"success","spec":raw_spec,"outputs":_outputs(root,required)})
-        # Revalidate current geometry even when the expensive mapper is reused.
-        for _ in read_paf(root/raw_rel/"result.paf",query_lengths={query.window_id:query.length},target_lengths=target_lengths):pass
+        # A fresh raw result was validated before publication above. Both a
+        # fresh projection and the final verify_regional_task replay validate
+        # every raw record's CIGAR and window identity, including on a cache
+        # hit. Do not insert another full, identical geometry scan here.
         closure.update(required|{raw_receipt})
         projection_spec=_normal({"schema":PROJECTION_SCHEMA,"raw_receipt":_ops().identity(root,raw_receipt),
             "context":context_identity,"decision":_ops().identity(root,decision_path),"query":query.record(),
@@ -256,11 +259,14 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
         receipt=project_rel+"/success.json";paf=project_rel+"/result.paf";required=closure|{paf}
         if _reuse(root,receipt,projection_spec,required) is None:
             directory=_fresh_directory(root,project_rel)
-            with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
-                for number,line in enumerate(source,1):
-                    if not line.strip() or line.startswith("#"):continue
-                    value=project_regional_paf(line,{query.window_id:query},{w.window_id:w for w in targets},artifact=raw_rel+"/result.paf",line_number=number)
-                    if value is not None:output.write(value+"\n")
+            try:
+                with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
+                    for number,line in enumerate(source,1):
+                        if not line.strip() or line.startswith("#"):continue
+                        value=project_regional_paf(line,{query.window_id:query},{w.window_id:w for w in targets},artifact=raw_rel+"/result.paf",line_number=number)
+                        if value is not None:output.write(value+"\n")
+            except (OSError,UnicodeError) as exc:
+                raise Q0EvidenceError(f"cannot project q0 regional evidence {raw_rel}/result.paf: {exc}") from exc
             (directory/"result.paf.tmp").replace(root/paf)
             _ops().atomic_write_json(root/receipt,{"status":"success","spec":projection_spec,"outputs":_outputs(root,required)})
         # Only owned generated inputs are removed, after success. Original

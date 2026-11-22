@@ -1,0 +1,19 @@
+{
+  "executed_source_sha256": {
+    "benchmark_regional_mapper_dispatch.py": "1e38c6c1caffc09c8bc6ecd548c3a6909134d92a0505132e68fc683c816ef7ea",
+    "probe_regional_guard_startup.py": "51b64ed0a0285f043b6fbafee0a8f2345c9801c7a8f07a2bbb791f410da7d733",
+    "probe_regional_loader_path.py": "17d1193ac176bcbf527a82033097803e4ff4854e40c2042afb7e0fd4fe7893ce",
+    "test_probe_regional_loader_path.py": "e0440d734671cf102d9871b41befcbe6aeca2c79a1241e10fae7a711f095ce9d"
+  },
+  "final_job_sha256": "3dc60a0c275949888766947e089424aa6e7ec5d952d601311f1f98815c761e36",
+  "historical_stdout_replays": 24,
+  "host": "agent-X86-08",
+  "job_id": 43012781,
+  "main_workspace_modified": false,
+  "observed_paired_wall_ratio": 1.154867474559189,
+  "output_sha256": "5815c68f349da8c03df4764d6b889dc54c2fac76e4c185bd2d881bd4cb63388b",
+  "production_strategy_enabled": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-loader-path-20261122-144307",
+  "status": "guarded_native_loader_cleanup_microbenchmark_verified_NOT_production_acceptance",
+  "unique_original_operations": 6
+}

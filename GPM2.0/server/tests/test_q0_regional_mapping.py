@@ -42,6 +42,53 @@ class RegionalMappingTests(unittest.TestCase):
         self.assertNotEqual(first["task_id"],second["task_id"])
         self.assertEqual(old["spec"]["raw_receipt"],new["spec"]["raw_receipt"])
 
+    def test_complete_receipts_do_not_require_a_duplicate_standalone_scan(self):
+        from server.tools.lgz_core import q0_regional_mapping as regional
+
+        policy = CigarWorkPolicy(minimum_query_bases=1)
+        with (mock.patch.object(regional, "read_paf", wraps=regional.read_paf) as exact_scan,
+              mock.patch.object(regional, "chain_work", wraps=regional.chain_work) as coarse_scan):
+            first = self.run_mapping(policy=policy)
+            self.assertEqual(exact_scan.call_count, 1)  # pre-publication raw validation
+            self.assertEqual(coarse_scan.call_count, 2)  # pre-publication and final replay
+        paf = (self.root / first["paf"]).read_bytes()
+        with (mock.patch.object(regional, "read_paf", side_effect=AssertionError("duplicate geometry scan")),
+              mock.patch("subprocess.Popen", side_effect=AssertionError("must reuse both complete mappers"))):
+            second = self.run_mapping(policy=policy)
+        self.assertEqual(first, second)
+        self.assertEqual(paf, (self.root / second["paf"]).read_bytes())
+        verify_regional_task(self.root, second, members=self.catalog.parts)
+
+    def test_reused_raw_window_length_still_checked_before_projection_publication(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        task = self.run_mapping()
+        projection = json.loads((self.root / task["receipt"]).read_text())
+        raw_path = projection["spec"]["raw_receipt"]["path"]
+        raw = json.loads((self.root / raw_path).read_text())
+        result = next(row["path"] for row in raw["outputs"] if row["path"].endswith("/result.paf"))
+        old = (self.root / result).read_text()
+        fields = old.split("\t", 2)
+        self.assertEqual(len(fields), 3)
+        bad_rows = [
+            ("\t".join([fields[0], str(int(fields[1]) + 1), fields[2]]).encode(),
+             "regional PAF input identity or length"),
+            (b"\xff\n", "cannot project q0 regional evidence"),
+        ]
+        projects = (self.root / task["receipt"]).parent.parent
+        before = set(projects.glob("*/success.json"))
+        for bad, error in bad_rows:
+            with self.subTest(error=error):
+                (self.root / result).write_bytes(bad)
+                # Matching content hashes do not override window or encoding
+                # validation, even when a mapper does not need rerunning.
+                raw["outputs"] = [prep.identity(self.root, row["path"]) for row in raw["outputs"]]
+                prep.atomic_write_json(self.root / raw_path, raw)
+                with mock.patch("subprocess.Popen", side_effect=AssertionError("must check raw geometry")):
+                    with self.assertRaisesRegex(Q0EvidenceError, error):
+                        self.run_mapping()
+                self.assertEqual(set(projects.glob("*/success.json")), before)
+
     def test_member_validation_rejects_changed_length_and_hash(self):
         task=self.run_mapping()
         members={key:(part.interval.length,part.sequence_sha256) for key,part in self.catalog.parts.items()}

@@ -3443,3 +3443,23 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   这不是全环境卸掉库路径，也没有改共享环境/MUMmer/生产任务；若不能等价则不继续映射。
 - 14:43:38主新版43012037仍`q0_evidence`，25初始单元已复用、无失败，memReal46249MiB，
   CPU recent约33%；尚未见区域池admission。旧42523432仍运行，不动；禁止仅凭低CPU中断。
+
+#### 14:52：子进程加载路径对照有部分收益；删除生产区域代码的等价冗余扫描
+
+- **43012781 / agent-X86-08 / SUCCEEDED**。仅在诊断子进程清掉`LD_LIBRARY_PATH`时，Python、
+  `resource`、minimap2和限额探针Bash的动态依赖解析到同一批文件；输入、工具、guard和原依赖库
+  SHA前后一致。保持原参数、原工具、原软/硬4GiB限制与PID/PG；3个已完成窗口各做coarse+exact，
+  四次ABBA合计24份stdout均逐字节匹配已封存的历史结果。A=61.156/68.636秒，B=55.392/56.995秒，
+  合计样本wall少13.4%（1.155倍）。空限额探针子进程耗时16.06→4.976秒，**仍有残余启动开销**，
+  三窗口不能外推全麦，也未证明其他环境清空库路径仍等价。报告
+  `regional-loader-path-native-20261122.json` SHA
+  `5815c68f349da8c03df4764d6b889dc54c2fac76e4c185bd2d881bd4cb63388b`。
+  不把`unset`写入共享环境或MUMmer流程；若进入下一轮生产候选，需只作用于核对过依赖身份的
+  区域子进程，并保留原环境回退、命令/环境真实来源及跨节点重复验证。
+- 已在仓库实现精确且可复用的独立改动：`prepare_regional_mapping`的新coarse输出验证一遍后直接
+  使用其`ChainWork`，不再次解析刚原子改名的PAF；移除raw预投影重复geometry扫描，但新raw
+  仍先验证再发布；投影生成和最终receipt replay继续校验每条raw CIGAR、window名/长度及内容。
+  discovery与candidate共用此入口；无参数、科学policy、guard、receipt格式或已有raw/project key变化。
+  回归覆盖已有raw/投影无重算、恶意/损坏的匹配digest记录仍因错误window长/无效UTF-8拒绝、
+  不新增带错误证据的projection成功标记。`test_q0*.py`共307项（306通过、1跳过）；不跑CI发布。
+  当前仅提交仓库，**未改或重启43012037**；未测该去重对整麦的提速，不和加载路径小样本倍率混算。

@@ -1,0 +1,329 @@
+{
+  "attempts": [
+    {
+      "mode": "clear_for_mapper_child",
+      "same_loader_dependency_paths": true
+    }
+  ],
+  "dependency_sha256": {
+    "/usr/lib64/ld-2.28.so": "2429b80402acf78ff366e09cf66b4e210c21b1b27b2b049a5f6ac82e72096898",
+    "/usr/lib64/libc-2.28.so": "99fc12569661113ad39b50539e3f9e9d87cbe4f75525335458622da42db716a5",
+    "/usr/lib64/libcrypt.so.1.1.0": "7ff572f122c2d25e3cf6be0bc16146496a03dc9fed845280ea3a437412fea820",
+    "/usr/lib64/libdl-2.28.so": "a08d8ef8f5677075e9a6217a4e11057ca44042ef7291f4580e52ce34dabd65cb",
+    "/usr/lib64/libm-2.28.so": "cec416998cb1737d7785bd0529c4e4c287c8feead4b7da2e3fa615283a4a41d0",
+    "/usr/lib64/libpthread-2.28.so": "3135a01d79807e060addde90df9be0713fdf138c7b247e1af7cb45cd4a4efbb8",
+    "/usr/lib64/libtinfo.so.6.1": "ecddf12e1735a059292dffbd2e6d29c746fba8849840557276ca4009e4576d87",
+    "/usr/lib64/libutil-2.28.so": "1bc30683b1d313aa98ec10b4498ccbd65d6d109cc8bbce7b113e59f324b4b141",
+    "/usr/lib64/libz.so.1.2.11": "b82035b54b7015162488919ef4a34b89f699a65e2775e8ae6d98e7f64709323e"
+  },
+  "guard_sha256": "b87e4a3f604127319789cc27503fa145acc4a1397549ae5b821eb94ba3002780",
+  "host": "agent-X86-08",
+  "limit_probes": {
+    "clear_for_mapper_child": {
+      "child_seconds": 4.976097309030592,
+      "open_seconds": 0.26200043596327305,
+      "popen_seconds": 0.06044280529022217,
+      "seconds": 5.856981011107564,
+      "stdout_sha256": null
+    },
+    "inherited": {
+      "child_seconds": 16.060330357402563,
+      "open_seconds": 0.1561843603849411,
+      "popen_seconds": 0.024348297156393528,
+      "seconds": 16.701725388877094,
+      "stdout_sha256": null
+    }
+  },
+  "loader_dependency_paths": {
+    "/bin/bash": {
+      "ld-linux-x86-64.so.2": "/usr/lib64/ld-2.28.so",
+      "libc.so.6": "/usr/lib64/libc-2.28.so",
+      "libdl.so.2": "/usr/lib64/libdl-2.28.so",
+      "libtinfo.so.6": "/usr/lib64/libtinfo.so.6.1"
+    },
+    "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/runtime/bin/python3": {
+      "ld-linux-x86-64.so.2": "/usr/lib64/ld-2.28.so",
+      "libc.so.6": "/usr/lib64/libc-2.28.so",
+      "libcrypt.so.1": "/usr/lib64/libcrypt.so.1.1.0",
+      "libdl.so.2": "/usr/lib64/libdl-2.28.so",
+      "libm.so.6": "/usr/lib64/libm-2.28.so",
+      "libpthread.so.0": "/usr/lib64/libpthread-2.28.so",
+      "libutil.so.1": "/usr/lib64/libutil-2.28.so"
+    },
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-x86-readiness-20261118/bin/minimap2": {
+      "ld-linux-x86-64.so.2": "/usr/lib64/ld-2.28.so",
+      "libc.so.6": "/usr/lib64/libc-2.28.so",
+      "libm.so.6": "/usr/lib64/libm-2.28.so",
+      "libpthread.so.0": "/usr/lib64/libpthread-2.28.so",
+      "libz.so.1": "/usr/lib64/libz.so.1.2.11"
+    },
+    "/share/software/app/x86/python/3.10.12/lib/python3.10/lib-dynload/resource.cpython-310-x86_64-linux-gnu.so": {
+      "ld-linux-x86-64.so.2": "/usr/lib64/ld-2.28.so",
+      "libc.so.6": "/usr/lib64/libc-2.28.so",
+      "libpthread.so.0": "/usr/lib64/libpthread-2.28.so"
+    }
+  },
+  "main_workspace_modified": false,
+  "phases": [
+    {
+      "cases": [
+        {
+          "ordinal": 3,
+          "runs": {
+            "coarse": {
+              "child_seconds": 16.51483652740717,
+              "open_seconds": 0.1976230638101697,
+              "popen_seconds": 0.031797051429748535,
+              "seconds": 17.36886903643608,
+              "stdout_sha256": "d6afcea5d351cd639ea1cd1bce5f0d0ceebf4fdb666c535502a9c3bdb501e094"
+            },
+            "exact": {
+              "child_seconds": 42.82875443715602,
+              "open_seconds": 0.15149943437427282,
+              "popen_seconds": 0.045191116631031036,
+              "seconds": 43.67088406253606,
+              "stdout_sha256": "39510e740efd52023e59dc60a71192ceb34ae493bbc5808d9f73514993403bfb"
+            }
+          }
+        },
+        {
+          "ordinal": 25,
+          "runs": {
+            "coarse": {
+              "child_seconds": 15.762760922312737,
+              "open_seconds": 0.17364587541669607,
+              "popen_seconds": 0.026194700971245766,
+              "seconds": 16.561674763448536,
+              "stdout_sha256": "4b470e205e57c165427b363b91437ec58621da4966ee009f3eb0cf6e704681a2"
+            },
+            "exact": {
+              "child_seconds": 20.316998657770455,
+              "open_seconds": 0.16028517298400402,
+              "popen_seconds": 0.03577105700969696,
+              "seconds": 21.074871899560094,
+              "stdout_sha256": "6255377eeffadb473af196a61c4395ee17c1a5f0b5798bf55b022a9e62cc68f9"
+            }
+          }
+        },
+        {
+          "ordinal": 63,
+          "runs": {
+            "coarse": {
+              "child_seconds": 16.847639945335686,
+              "open_seconds": 0.16720708925276995,
+              "popen_seconds": 0.07529155910015106,
+              "seconds": 17.72479191981256,
+              "stdout_sha256": "c49ea45fc0b9b7ed3c2b729d13099a82fdff19b7dfae2d117062b681719d0fb8"
+            },
+            "exact": {
+              "child_seconds": 24.86596549488604,
+              "open_seconds": 0.22012935485690832,
+              "popen_seconds": 0.030273571610450745,
+              "seconds": 25.668979533948004,
+              "stdout_sha256": "83af0d97f1b5676b632f9a9692f23621c50b84608d462e7b6868b88949987ee3"
+            }
+          }
+        }
+      ],
+      "mode": "inherited",
+      "phase": 0,
+      "seconds": 61.15601464826614
+    },
+    {
+      "cases": [
+        {
+          "ordinal": 3,
+          "runs": {
+            "coarse": {
+              "child_seconds": 9.683909223414958,
+              "open_seconds": 0.19358586240559816,
+              "popen_seconds": 0.027017303742468357,
+              "seconds": 10.49443821515888,
+              "stdout_sha256": "d6afcea5d351cd639ea1cd1bce5f0d0ceebf4fdb666c535502a9c3bdb501e094"
+            },
+            "exact": {
+              "child_seconds": 43.96396182477474,
+              "open_seconds": 0.18285133223980665,
+              "popen_seconds": 0.04551390092819929,
+              "seconds": 44.7128981044516,
+              "stdout_sha256": "39510e740efd52023e59dc60a71192ceb34ae493bbc5808d9f73514993403bfb"
+            }
+          }
+        },
+        {
+          "ordinal": 25,
+          "runs": {
+            "coarse": {
+              "child_seconds": 20.427266266196966,
+              "open_seconds": 0.25403956044465303,
+              "popen_seconds": 0.029491394758224487,
+              "seconds": 21.259871943853796,
+              "stdout_sha256": "4b470e205e57c165427b363b91437ec58621da4966ee009f3eb0cf6e704681a2"
+            },
+            "exact": {
+              "child_seconds": 8.158809892833233,
+              "open_seconds": 0.17620525136590004,
+              "popen_seconds": 0.06539606396108866,
+              "seconds": 8.897852404974401,
+              "stdout_sha256": "6255377eeffadb473af196a61c4395ee17c1a5f0b5798bf55b022a9e62cc68f9"
+            }
+          }
+        },
+        {
+          "ordinal": 63,
+          "runs": {
+            "coarse": {
+              "child_seconds": 23.89142581168562,
+              "open_seconds": 0.156266656704247,
+              "popen_seconds": 0.07317765709012747,
+              "seconds": 24.6764261610806,
+              "stdout_sha256": "c49ea45fc0b9b7ed3c2b729d13099a82fdff19b7dfae2d117062b681719d0fb8"
+            },
+            "exact": {
+              "child_seconds": 11.647227764129639,
+              "open_seconds": 0.20422979537397623,
+              "popen_seconds": 0.03232466522604227,
+              "seconds": 12.410906972363591,
+              "stdout_sha256": "83af0d97f1b5676b632f9a9692f23621c50b84608d462e7b6868b88949987ee3"
+            }
+          }
+        }
+      ],
+      "mode": "clear_for_mapper_child",
+      "phase": 1,
+      "seconds": 55.391508270055056
+    },
+    {
+      "cases": [
+        {
+          "ordinal": 3,
+          "runs": {
+            "coarse": {
+              "child_seconds": 5.981770834885538,
+              "open_seconds": 0.12945768609642982,
+              "popen_seconds": 0.10742768552154303,
+              "seconds": 6.845824960619211,
+              "stdout_sha256": "d6afcea5d351cd639ea1cd1bce5f0d0ceebf4fdb666c535502a9c3bdb501e094"
+            },
+            "exact": {
+              "child_seconds": 49.22240134421736,
+              "open_seconds": 0.21494980715215206,
+              "popen_seconds": 0.005724105052649975,
+              "seconds": 49.992117433808744,
+              "stdout_sha256": "39510e740efd52023e59dc60a71192ceb34ae493bbc5808d9f73514993403bfb"
+            }
+          }
+        },
+        {
+          "ordinal": 25,
+          "runs": {
+            "coarse": {
+              "child_seconds": 5.57743176817894,
+              "open_seconds": 0.2519263131543994,
+              "popen_seconds": 0.01621340773999691,
+              "seconds": 6.470929274335504,
+              "stdout_sha256": "4b470e205e57c165427b363b91437ec58621da4966ee009f3eb0cf6e704681a2"
+            },
+            "exact": {
+              "child_seconds": 9.523513757623732,
+              "open_seconds": 0.1851155823096633,
+              "popen_seconds": 0.04380765836685896,
+              "seconds": 10.264884886331856,
+              "stdout_sha256": "6255377eeffadb473af196a61c4395ee17c1a5f0b5798bf55b022a9e62cc68f9"
+            }
+          }
+        },
+        {
+          "ordinal": 63,
+          "runs": {
+            "coarse": {
+              "child_seconds": 6.47422194480896,
+              "open_seconds": 0.19329943228513002,
+              "popen_seconds": 0.10756453964859247,
+              "seconds": 7.346710769459605,
+              "stdout_sha256": "c49ea45fc0b9b7ed3c2b729d13099a82fdff19b7dfae2d117062b681719d0fb8"
+            },
+            "exact": {
+              "child_seconds": 11.745254705660045,
+              "open_seconds": 0.21716564241796732,
+              "popen_seconds": 0.031388042494654655,
+              "seconds": 12.389852819032967,
+              "stdout_sha256": "83af0d97f1b5676b632f9a9692f23621c50b84608d462e7b6868b88949987ee3"
+            }
+          }
+        }
+      ],
+      "mode": "clear_for_mapper_child",
+      "phase": 2,
+      "seconds": 56.9950263351202
+    },
+    {
+      "cases": [
+        {
+          "ordinal": 3,
+          "runs": {
+            "coarse": {
+              "child_seconds": 17.03717342019081,
+              "open_seconds": 0.16406917292624712,
+              "popen_seconds": 0.05012006685137749,
+              "seconds": 17.81961462367326,
+              "stdout_sha256": "d6afcea5d351cd639ea1cd1bce5f0d0ceebf4fdb666c535502a9c3bdb501e094"
+            },
+            "exact": {
+              "child_seconds": 49.8593127168715,
+              "open_seconds": 0.19520912878215313,
+              "popen_seconds": 0.07346138823777437,
+              "seconds": 50.69902090448886,
+              "stdout_sha256": "39510e740efd52023e59dc60a71192ceb34ae493bbc5808d9f73514993403bfb"
+            }
+          }
+        },
+        {
+          "ordinal": 25,
+          "runs": {
+            "coarse": {
+              "child_seconds": 29.64645115286112,
+              "open_seconds": 0.21907529514282942,
+              "popen_seconds": 0.02648284286260605,
+              "seconds": 30.40465579368174,
+              "stdout_sha256": "4b470e205e57c165427b363b91437ec58621da4966ee009f3eb0cf6e704681a2"
+            },
+            "exact": {
+              "child_seconds": 19.61706311814487,
+              "open_seconds": 0.2157495552673936,
+              "popen_seconds": 0.06877516582608223,
+              "seconds": 20.450977658852935,
+              "stdout_sha256": "6255377eeffadb473af196a61c4395ee17c1a5f0b5798bf55b022a9e62cc68f9"
+            }
+          }
+        },
+        {
+          "ordinal": 63,
+          "runs": {
+            "coarse": {
+              "child_seconds": 18.36964494921267,
+              "open_seconds": 0.17194513510912657,
+              "popen_seconds": 0.049373993650078773,
+              "seconds": 19.156674087047577,
+              "stdout_sha256": "c49ea45fc0b9b7ed3c2b729d13099a82fdff19b7dfae2d117062b681719d0fb8"
+            },
+            "exact": {
+              "child_seconds": 35.55124810617417,
+              "open_seconds": 0.20725281536579132,
+              "popen_seconds": 0.07062726747244596,
+              "seconds": 36.3752559190616,
+              "stdout_sha256": "83af0d97f1b5676b632f9a9692f23621c50b84608d462e7b6868b88949987ee3"
+            }
+          }
+        }
+      ],
+      "mode": "inherited",
+      "phase": 3,
+      "seconds": 68.63553874567151
+    }
+  ],
+  "production_strategy_enabled": false,
+  "status": "diagnostic_loader_cleanup_ABBA_historical_stdout_identical_NOT_deployed",
+  "tool_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+  "verified_input_bytes": 38297978
+}
