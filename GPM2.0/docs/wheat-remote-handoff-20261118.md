@@ -3355,3 +3355,45 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   前缀尚无区域pool admission记录，不据单核/安静取消；旧42523432/RUNNING/grt_step2未改。
   本轮新科学策略**全部仍隔离试验，没有安装到主runtime，没有取消或重提主任务**。
   仓库`c8eb6df6`已推送前半轮证据，后续按命名路径提交，不接触并行DEGAP提交/其他输出。
+
+### 2026-11-22 14:09：增加逐core/逐dataset的原生回退试验；主任务未中断
+
+- 前一goal turn属于**实际进展**：定位exact all-chain成本，提交原生控制和源码证据，并启动
+  独立24窗口长尾控制；不能把其强档2.538倍缩写成已经部署或整麦收益。当前继续该目标，
+  goal仍active，完整小麦及新策略现场收益均未验收完成。
+- **43012312 / agent-X86-47**仍RUNNING。24窗口的ABBA已完成A0=472.375秒、
+  B1(`-p0.1 -N200`)=249.840秒、B2=179.058秒；A3和最终逐case区间损失尚待终态报告。
+  两次B差异较大，说明节点/运行时波动不可忽略。**不能只拿A0/B1或两次B就发布倍率或精度结论**。
+  仅需继续读取同一job/日志，不重提、不动其冻结源码、不把观察超时当失败。
+- 新增隔离控制 **43012347 / agent-X86-30**，目录
+  `q0-gated-chain-pilot-20261122-135748`，索引`/tmp/q0-gated-chain-pilot-current.json`。
+  64原生anchors上ABBA测试“快速候选 + 不足则原生完整补算”：coarse、full target与原CIGAR
+  档不变；candidate exact为`-p0.5 -N50`且移除`-P`。只从经过完整PAF验证的高相似paired
+  exact块计算覆盖；对**每一个core、每一个目标dataset分别**要求cross98%、intra90%，
+  任一不足则补跑原完整exact，不再重复coarse。空candidate不能冒充精确负结果。
+- 每份原生回退都要求stdout SHA与历史完整raw一致；候选和回退文件均留存。
+  A两次仍须历史字节一致，B两次不仅比较最终输出，也比较candidate SHA和回退决定，
+  防止最终回退相同掩盖前一候选不确定性。局部短core不能被大core平均覆盖，某dataset
+  不能替另一dataset“补足”。六项针对性gate测试覆盖这些边界，本地/HPC均通过；
+  本地连同前述诊断七组共39项通过。只是诊断，不是已接入生产的policy。
+- ready PID2072907/uid100399、当前job成员、单节点16CPU/160GiB均已核实，allocation SHA
+  `1d6b22d894a095d863eabac60e8c321d73c7e36baaeca402f5ca6265cb6fac0c`；资源保护仍7路×2线程、
+  mapper AS4GiB。输入1505544121 bytes逐份SHA验证完成，但本节点耗165.255秒（此前节点
+  约33–42秒），运行条件有波动；14:07原始A0还有任务，尚无完整ABBA/收益报告。
+  不能把离线任务耗时回放约1.3倍冒称此job实测；需要把额外candidate、回退和验证成本都算上。
+- 14:04:58主43012037仍RUNNING/q0_evidence，25done、无当前run失败、memReal32588MiB、
+  CPU98%；仍未见区域池admission。旧42523432仍RUNNING/grt_step2，未改动。尝试安排同节点
+  只读`/proc`采样前查到agent-X86-39 CPU_FREE=0/CLOSE_FULL，**没有提交采样job**；
+  `/tmp/q0-reader-openfile-sample-current.json`明确status=not_submitted、job_id=null，
+  不是运行中的观察器。不能为采样挤占主任务或改host-key/SSH认证。
+- **上线前必须补齐的生产约束**：旧完整raw先复用；candidate raw仍与cores分离，回退决定
+  必须单独绑定本次cores/policy/目标dataset，不能将某次core验收写成所有投影均适用。
+  审查discovery/candidate两条调用者、raw/投影验收器、ready-manifest和最终companion消费者；
+  当前`load_verified_evidence`给regional verifier的是length/SHA元组，新dataset角色不能只
+  信投影自报，须由catalog源身份绑定。科学flags改变需要显式科学profile迁移，不走旧AST等价
+  的资源-only门禁，不修改初始native/参考或旧基线。
+- 此gate的95%高质量core只是诊断/回退代理，**不证明同一ortholog、全部替代拷贝、染色体/
+  方向候选或最终组装等价**。实际catalog也消费其他paired关系，不能把proxy保留率说成所有
+  消费者信息都保留。试验原始工具未启用`--eqx`；当前100paired-record proxy与生产
+  `ObservedSourcePairs`的100 M/=资格还须在正式集成时统一（排除X对门槛的贡献），不能热改
+  本轮已执行的冻结helper、伪造源SHA或把补做验证追认为当时执行过。
