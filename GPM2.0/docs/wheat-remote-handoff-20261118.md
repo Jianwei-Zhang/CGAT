@@ -4454,3 +4454,9 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - `native_resource_bindings` 的后续定点优化继续保留每个 wrapper/spec 和 receipt/output 的逐项完整性检查，但把同一 operation 的 manifest/restore 身份查询、receipt inventory 和 wrapper canonical-byte 判定合并为有界操作级验证；`native_resource_audit` 复用同一验证结果，不重复逐 receipt 扫描。冻结真实小麦计划上 44 个 operation、876 个 wrapper 的读取画像显示，逐 receipt 触发的 operation 全量检查约 19,236 次降为约 1,749 次（约减少 90.9% 的同类 operation 级扫描）；这是 verifier/启动阶段收益，不冒充比对阶段壁钟收益。
 - 本地定向验证：`test_resume_q0_science.py`、`test_native_resource_bindings.py`、`test_native_resource_audit.py`、`test_stage_q0_science.py` 共 **78/78** 通过；另有 native binding/audit 独立 **14/14** 通过。未运行整版 CI、未 update、未替换 Release。
 - 该补丁仍未安装到活跃 `43016881`；待当前任务终态后再按“有效结果保留、正常锁释放、只对新版切换”的规则决定是否采用。
+
+### 2026-11-23 03:12 CST：不重提，保留 Q0 续跑校验优化
+
+- `43016881` 是有意受控停止，不是科学计算失败。后续 `43017096 / agent-X86-57` 当前仍 RUNNING；01:31:10 启动，01:52:30 取得工作区锁，02:52:08 安装验收完成。03:12 实查本轮已复用两项参考比对、归组以及 1A/1B，共 **5/25**，尚未进入 `q0_evidence`；旧 `42523432` 不改。只读小时巡检记录在 `~/cgat-reads-debug/logs/jm19-hourly-43017096-20261123/samples.jsonl`，回看时仍按实际 job、owner、run 校验。
+- 用户明确本次不为优化校验而重提。实际冻结入口仍在取锁后和安装器内重复调用审计；`45145cc2` 已去掉调用者这次重复，并减少同一 native operation 的回执扫描。留给下一次合法 transition，重新冻结源码、校验绑定后使用，不热替换。**不**复用跨进程的裸摘要作为成功证明，不跳过产物、SHA、PAF 几何或内容身份的完整性验证。
+- 仓库 runner 把外层检查点耗时拆成 `checkpoint_prepare`（输入和身份准备）与 `checkpoint_validate`（检查点及输出核验），均为单调时钟壁钟。原 `elapsed=0.000s` 和状态表仍表示没重跑命令，不是校验耗时。下次在保留相同检查点的只读对照中，分别测安装审计、25 项外层核验及 Q0 旧窗口回读；先按耗时定位重复 I/O，再用相同的复用判定和输出摘要验证优化，不把并行或 I/O 减量直接当成实测收益。
