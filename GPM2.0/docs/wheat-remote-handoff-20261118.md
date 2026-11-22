@@ -2991,3 +2991,26 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   774f7978b7f1d1e95e2e7dc6cf506f30492bff3f26e8a1e353c17e0b1bd5a3d4。
   此轮核实时NEW与OLD42523432均RUNNING，旧基线没有改动；observer3037575继续记录。
   后续跟踪实际矩阵缓存消费和区域池吞吐，保留当前进程，不能仅因输入阶段单核再次重启。
+
+## 2026-11-22 09:05 CST：已核实的持续等待与诊断队列
+
+- NEW43010335仍RUNNING/q0_evidence，reader仍PID1990559，25项初始复用未失效；09:04
+  调度器recent99%、81227MiB、swap0，320GiB限额。没有新FAILED/INTERRUPTED，也没有重提
+  主任务或改runtime。四块完整native cache的成功receipt SHA仍与安装验证一致；这里只查
+  小receipt/文件元数据，不把它说成已经确认新reader消费完全部矩阵或重做大输出校验。
+- 追加只读诊断 **43010349 SUCCEEDED**，目录`q0-parallel-live-phase-20261122-071329`；
+  07:13:33–07:14:34从2B的PAF消费推进到2D的原checkpoint格式验证，60.059秒内CPU增加
+  59.0秒。`summary.json` SHA 6965133238fc612ee615ce1cfb3839eb9508053b3e1ac73fd17eb53c1e79a469。
+  **该栈是历史采样，不能拿2D当09:05的实时位置。**
+- 后续只读诊断 **43010357 PENDING**，目录`q0-parallel-live-phase-20261122-073445`，固定
+  同一agent-X86-53，1CPU/1GiB；提交时该节点CPU_FREE=0，尚未取得样本。继续查同一job，
+  不重复提交，不把诊断排队/观察窗口结束当主任务失败，也不为采样另迁移或重启主任务。
+  PENDING的Donau JSON可能省略taskExecNodes等执行字段；观察脚本用get读取可选字段，
+  不要因打印KeyError误报计算失败。真正的allocation gate仍须严格核对RUNNING资源证明。
+- OLD42523432继续RUNNING、recent1594%，MUMmer的2D组持续产生SUCCESS；09:04可见
+  1184/1185号成功、1200/1201号START。启动编号不是已完成数量，不据此虚报完成百分比。
+  observer3037575仍活着。当前没有区域池实测证据，下一步等实际q0缓存/区域progress或
+  上述诊断新样本，不能把已部署和受控倍率说成整套已验证提速。
+- 本轮监督快照保存在当前cutover bundle的`monitor-verified-20261122-090444.json`，SHA
+  d4321206876916c22550f07ad29bea5602007e536c00de67ff29024dc5c31535；只记录已确认的等待，
+  不标记整套任务完成。继续使用此前冻结transition和安装journal，不重放任何旧安装。
