@@ -4120,3 +4120,9 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `8152fa37e082c983498b1435f88d1d5138c4a4a7c957c4eafda471ac7f3783cb`。
 - 新版 `43012037` 21:04:17报 **8900/61000 / fallback=0**，两份主作业仍RUNNING。只读预检
   `43015921` 又完成 `assign`，正式已验3/25。冻结的生产文件、预检及原等待资源门不换，不因此重启。
+- 原观察器3458598于 **21:08:09** 有界到期、进程已退出；原预检未终止。核对同一 preflight 和两
+  原 job 都运行、原 workspace 锁匹配、无 submit intent/ready/handoff 后，使用原验证过的环境、
+  相同脚本及3h-config SHA，一次续接 **PID488989**（21:11:56，断开重连验证PPID1）。已有
+  `loader-watcher-3h-relay.once`、`.pid`、`.log`；切勿并起另一份。仍最多90轮且只准在25/25等
+  原门禁通过后申请一份等候资源；不会动主任务。21:12 已有 `q0_chr:1A`（实际4/25），新版
+  21:10:48 到 **9000/61000**、fallback=0；旧版仍RUNNING。尚未建立任何资源提交凭据。
