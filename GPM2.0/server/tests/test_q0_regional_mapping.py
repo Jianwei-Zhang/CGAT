@@ -132,6 +132,39 @@ class RegionalMappingTests(unittest.TestCase):
             with self.assertRaises(Q0EvidenceError):
                 verify_regional_task(self.root,task,members={**members,key:changed})
 
+    def test_valid_cached_projection_verified_once_without_preflight_hashes(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        task=self.run_mapping(policy=CigarWorkPolicy(minimum_query_bases=1))
+        identity=prep.identity
+        with (mock.patch.object(prep,"identity",wraps=identity) as check,
+              mock.patch("subprocess.Popen",side_effect=AssertionError("complete cache must not map"))):
+            resumed=self.run_mapping(policy=CigarWorkPolicy(minimum_query_bases=1))
+        self.assertEqual(resumed,task)
+        paths=[call.args[1] for call in check.call_args_list]
+        self.assertEqual(paths.count(task["paf"]),1)
+        raw_leaf=[p for p in paths if "/q0-regional-raw-" in p and p.endswith("/result.paf")]
+        coarse_leaf=[p for p in paths if "/chaining/" in p and p.endswith("/result.paf")]
+        self.assertEqual((len(raw_leaf),len(coarse_leaf)),(2,2))  # leaf acceptance and complete replay
+
+    def test_cached_projection_with_matching_hash_but_wrong_geometry_fails_closed(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        task=self.run_mapping(); receipt=prep.json_file(self.root/task["receipt"])
+        paf=self.root/task["paf"]
+        # A syntactically valid duplicate is still not the bound projection of
+        # the raw output, even when the projection receipt has its real SHA.
+        original=paf.read_bytes();self.assertTrue(original)
+        paf.write_bytes(original+original)
+        receipt["outputs"]=[prep.identity(self.root,path["path"]) for path in receipt["outputs"]]
+        prep.atomic_write_json(self.root/task["receipt"],receipt)
+        projects=paf.parent.parent; before={d.name for d in projects.iterdir()}
+        with mock.patch("subprocess.Popen",side_effect=AssertionError("geometry error must not map")):
+            with self.assertRaisesRegex(Q0EvidenceError,"extra records"):
+                self.run_mapping()
+        self.assertEqual({d.name for d in projects.iterdir()},before)
+        self.assertEqual(paf.read_bytes(),original+original)
+
     def test_projection_damage_is_repaired_without_rerunning_raw_mapping(self):
         task=self.run_mapping();(self.root/task["paf"]).write_text("damaged\n")
         with self.assertRaises(Q0EvidenceError):verify_regional_task(self.root,task)

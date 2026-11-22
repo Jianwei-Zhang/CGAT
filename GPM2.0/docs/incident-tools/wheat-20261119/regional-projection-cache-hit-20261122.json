@@ -1,0 +1,328 @@
+{
+  "all_original_receipts_equal": true,
+  "baseline_sha256": "d760c26f4e2e5139a1fcf895647764c0c2290da46772ecf05ccf32821a839278",
+  "candidate_sha256": "48fbdf1a3d04fd88a5d4474b90ba2404a3116996dd45c5d11b2e4afe1c55f8ba",
+  "cases": [
+    {
+      "phases": [
+        {
+          "cpu_seconds": 0.19712545999999997,
+          "identity_bytes": 2087483,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 1.5903272069990635
+        },
+        {
+          "cpu_seconds": 0.17556322800000002,
+          "identity_bytes": 1297457,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 0.8797639040276408
+        },
+        {
+          "cpu_seconds": 0.1986226470000001,
+          "identity_bytes": 1297457,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 0.8979618027806282
+        },
+        {
+          "cpu_seconds": 0.187104017,
+          "identity_bytes": 2087483,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 0.8430505432188511
+        }
+      ],
+      "raw_paf_bytes": 100016,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-7ffdb8200a3eb4f2d30fa4e7/q0-regional-raw-f009f2bf5ea7544e26f0db3b/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-d2f7b2f9cc0bb8a1d1e51ef6/success.json"
+    },
+    {
+      "phases": [
+        {
+          "cpu_seconds": 0.16765858599999994,
+          "identity_bytes": 1992531,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 1.8107320005074143
+        },
+        {
+          "cpu_seconds": 0.1505516280000001,
+          "identity_bytes": 1120167,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 0.8175617093220353
+        },
+        {
+          "cpu_seconds": 0.15324599000000005,
+          "identity_bytes": 1120167,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 0.7839610241353512
+        },
+        {
+          "cpu_seconds": 0.15669753099999983,
+          "identity_bytes": 1992531,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 0.876558680087328
+        }
+      ],
+      "raw_paf_bytes": 100427,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-74c84431eac54ba0521df044/q0-regional-raw-8a7ddd9e516cd350eee9e526/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-5e35f3b887548f9c6358474e/success.json"
+    },
+    {
+      "phases": [
+        {
+          "cpu_seconds": 0.27462971000000014,
+          "identity_bytes": 3977781,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 2.0691522443667054
+        },
+        {
+          "cpu_seconds": 0.25752657600000006,
+          "identity_bytes": 2308345,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 1.1266976157203317
+        },
+        {
+          "cpu_seconds": 0.2521450139999999,
+          "identity_bytes": 2308345,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 0.9622502913698554
+        },
+        {
+          "cpu_seconds": 0.28147852100000037,
+          "identity_bytes": 3977781,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 1.0671480605378747
+        }
+      ],
+      "raw_paf_bytes": 100528,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-b0d93ae05b2b9f94c40ce0be/q0-regional-raw-110bfe17fbfb04ea3293119b/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-9e6180db3ce3027873fbe12d/success.json"
+    },
+    {
+      "phases": [
+        {
+          "cpu_seconds": 0.19959717499999963,
+          "identity_bytes": 2648244,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 1.969387460500002
+        },
+        {
+          "cpu_seconds": 0.17525159400000012,
+          "identity_bytes": 1498394,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 0.8303908938542008
+        },
+        {
+          "cpu_seconds": 0.1827523959999997,
+          "identity_bytes": 1498394,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 0.6951168682426214
+        },
+        {
+          "cpu_seconds": 0.18814275299999972,
+          "identity_bytes": 2648244,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 0.7834855355322361
+        }
+      ],
+      "raw_paf_bytes": 100580,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-6db7ccf3a3c60c13a1ba2f09/q0-regional-raw-a9a5a1ab3cfa7465a62bf5d7/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-89600d910a39d7a41c107bfd/success.json"
+    },
+    {
+      "phases": [
+        {
+          "cpu_seconds": 2.6564064660000004,
+          "identity_bytes": 21139254,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 8.839727193117142
+        },
+        {
+          "cpu_seconds": 2.6234641949999995,
+          "identity_bytes": 10624597,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 12.469215214252472
+        },
+        {
+          "cpu_seconds": 2.8633247070000003,
+          "identity_bytes": 10624597,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 16.292133066803217
+        },
+        {
+          "cpu_seconds": 2.8092801410000003,
+          "identity_bytes": 21139254,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 15.103812588378787
+        }
+      ],
+      "raw_paf_bytes": 4005645,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-8851d0e7825e53abfb367897/q0-regional-raw-53f45efe43644f0337794369/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-58c1a2ba8e857093da7efcaa/success.json"
+    },
+    {
+      "phases": [
+        {
+          "cpu_seconds": 3.1977562130000017,
+          "identity_bytes": 23402611,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 21.22783032618463
+        },
+        {
+          "cpu_seconds": 3.179941418000002,
+          "identity_bytes": 11756275,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 22.13851789198816
+        },
+        {
+          "cpu_seconds": 3.102543448999999,
+          "identity_bytes": 11756275,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 15.640307635068893
+        },
+        {
+          "cpu_seconds": 3.104094441000001,
+          "identity_bytes": 23402611,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 10.30970243923366
+        }
+      ],
+      "raw_paf_bytes": 4497820,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-f16ee32be975a4d246d0ae30/q0-regional-raw-51c176aef4048395f2f2f34f/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-0d26a8df37c0570ade93faf8/success.json"
+    },
+    {
+      "phases": [
+        {
+          "cpu_seconds": 3.5873375870000004,
+          "identity_bytes": 26805797,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 11.098856283351779
+        },
+        {
+          "cpu_seconds": 3.4781849290000046,
+          "identity_bytes": 13457868,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 5.390789327211678
+        },
+        {
+          "cpu_seconds": 3.5040588239999977,
+          "identity_bytes": 13457868,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 6.248060163110495
+        },
+        {
+          "cpu_seconds": 3.537480170000002,
+          "identity_bytes": 26805797,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 12.835391647182405
+        }
+      ],
+      "raw_paf_bytes": 5124541,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-607f236e26540eadcd3b7bce/q0-regional-raw-f16c5cf65f1b6efc0d8426a3/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-c4f7c59fa446b88684eb20ec/success.json"
+    },
+    {
+      "phases": [
+        {
+          "cpu_seconds": 4.104998436999999,
+          "identity_bytes": 24909186,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 14.487213593907654
+        },
+        {
+          "cpu_seconds": 4.086366736999999,
+          "identity_bytes": 12459143,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 6.9769918620586395
+        },
+        {
+          "cpu_seconds": 4.088976832,
+          "identity_bytes": 12459143,
+          "identity_calls": 15,
+          "mode": "candidate",
+          "paf_identity_calls": 3,
+          "wall_seconds": 12.406061832793057
+        },
+        {
+          "cpu_seconds": 4.103420876999998,
+          "identity_bytes": 24909186,
+          "identity_calls": 26,
+          "mode": "baseline",
+          "paf_identity_calls": 6,
+          "wall_seconds": 7.327468392439187
+        }
+      ],
+      "raw_paf_bytes": 5238967,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-de6f905af1de3df16d08fed3/q0-regional-raw-f2cdcbd2dc39af2306cfe181/success.json",
+      "receipt": "grt/evidence/q0_prepare/regional/projects/q0-regional-project-218a44fb5ca82118e1792ed1/success.json"
+    }
+  ],
+  "limits": [
+    "Actual complete verifying of eight archived project closures, not mapping/restart or end-to-end timing.",
+    "Identity totals omit the independently scanned geometry and code/guard digests."
+  ],
+  "main_workspace_modified": false,
+  "native_mapper_executed": false,
+  "node": "agent-X86-61",
+  "projection_cache_hit_included": true,
+  "status": "complete_archived_receipt_ABBA_not_deployed"
+}

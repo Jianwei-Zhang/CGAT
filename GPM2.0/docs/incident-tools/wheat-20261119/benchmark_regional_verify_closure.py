@@ -22,6 +22,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     for n in ('workspace','trace','baseline','candidate','output'):
         p.add_argument('--'+n,type=Path,required=True)
+    p.add_argument('--projection-cache-hit',action='store_true')
     a=p.parse_args();work=a.workspace.resolve(strict=True);out=a.output.resolve()
     if out.is_relative_to(work) or digest(a.trace)!=TRACE_SHA:
         raise ValueError('outside diagnostic or wrong frozen trace')
@@ -50,7 +51,17 @@ def main():
                 row=identity(root,relative); calls[relative]+=1; bytes_by_file[relative]+=row['size']
                 return row
             with patch.object(q0_preparation,'identity',side_effect=measured):
-                wall=time.monotonic(); cpu=time.process_time(); checked=modules[mode].verify_regional_task(work,task)
+                wall=time.monotonic(); cpu=time.process_time(); module=modules[mode]
+                if a.projection_cache_hit:
+                    paths={row['path'] for row in receipt['outputs']}
+                    if mode=='candidate':
+                        checked=module._verified_projection_hit(work,task,spec,paths,members=None)
+                    elif module._reuse(work,marker,spec,paths) is not None:
+                        checked=module.verify_regional_task(work,task)
+                    else:
+                        raise ValueError('historical project cache no longer matches its inventory')
+                else:
+                    checked=module.verify_regional_task(work,task)
                 elapsed=time.monotonic()-wall; used=time.process_time()-cpu
             if checked!=receipt:
                 raise ValueError('verification accepted a different receipt')
@@ -65,6 +76,7 @@ def main():
         json.dump({'status':'complete_archived_receipt_ABBA_not_deployed','node':socket.gethostname(),
             'main_workspace_modified':False,'native_mapper_executed':False,'all_original_receipts_equal':True,
             'baseline_sha256':digest(a.baseline),'candidate_sha256':digest(a.candidate),'cases':cases,
+            'projection_cache_hit_included':a.projection_cache_hit,
             'limits':['Actual complete verifying of eight archived project closures, not mapping/restart or end-to-end timing.',
                       'Identity totals omit the independently scanned geometry and code/guard digests.']},f,indent=2,sort_keys=True); f.write('\n')
 

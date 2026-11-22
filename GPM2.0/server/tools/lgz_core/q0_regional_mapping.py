@@ -94,6 +94,25 @@ def _reuse(root, receipt, spec, required):
     except (Q0EvidenceError,KeyError,TypeError): return None
 
 
+def _verified_projection_hit(root, task, spec, required, *, members):
+    """Accept a complete project with one full verification, not a preflight reread."""
+    receipt = task["receipt"]
+    if not (root/receipt).is_file():
+        return None
+    try:
+        checked = verify_regional_task(root, task, members=members)
+        if checked["spec"] != spec:
+            raise Q0EvidenceError("verified regional projection differs from requested scope")
+        return checked
+    except Q0EvidenceError:
+        # Preserve the existing recovery boundary: missing/corrupt project
+        # bytes may be regenerated from a valid raw receipt. If the bytes
+        # match their inventory but fail command/geometry checks, fail closed.
+        if _reuse(root, receipt, spec, required) is not None:
+            raise
+        return None
+
+
 def _private_directory(root, relative):
     path = root
     for component in Path(relative).parts:
@@ -275,7 +294,9 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
             "validator_sha256":sha256_file(Path(__file__).with_name("q0_alignments.py"))})
         task_id=stable_id("q0-regional-project",projection_spec);project_rel=f"grt/evidence/q0_prepare/regional/projects/{task_id}"
         receipt=project_rel+"/success.json";paf=project_rel+"/result.paf";required=closure|{paf}
-        if _reuse(root,receipt,projection_spec,required) is None:
+        task={"task_id":task_id,"kind":"regional_discovery","paf":paf,"receipt":receipt,
+              "query_ids":[query.segment_id],"target_ids":sorted({w.segment_id for w in targets})}
+        if _verified_projection_hit(root,task,projection_spec,required,members=catalog.parts) is None:
             directory=_fresh_directory(root,project_rel)
             try:
                 with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
@@ -284,11 +305,9 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
                 raise Q0EvidenceError(f"cannot project q0 regional evidence {raw_rel}/result.paf: {exc}") from exc
             (directory/"result.paf.tmp").replace(root/paf)
             _ops().atomic_write_json(root/receipt,{"status":"success","spec":projection_spec,"outputs":_outputs(root,required)})
+            verify_regional_task(root,task,members=catalog.parts)
         # Only owned generated inputs are removed, after success. Original
         # genomes, native task FASTAs, failed inputs and complete PAFs are kept.
-        task={"task_id":task_id,"kind":"regional_discovery","paf":paf,"receipt":receipt,
-              "query_ids":[query.segment_id],"target_ids":sorted({w.segment_id for w in targets})}
-        verify_regional_task(root,task,members=catalog.parts)
         for name in ("query.fa","target.fa"):(root/relative/name).unlink(missing_ok=True)
         return task
 
