@@ -96,6 +96,72 @@ def owner_locked(workspace,run_id):
         raise wa.ExperimentError("reference handoff lock belongs to another workspace")
 
 
+def _process_identity(process):
+    # /proc/<pid>/stat has a parenthesized comm that can contain spaces and ')'.
+    # Fields after it start with state (3), PPID (4), and include starttime (22).
+    try:
+        _, separator, fields = (process/"stat").read_text().rpartition(")")
+        if separator:
+            row = fields.split()
+            return int(row[1]), int(row[19])
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def _launcher_ancestors(proc):
+    pid = str(os.getpid())
+    child = _process_identity(proc/pid)
+    seen = {pid}
+    parents = {}
+    while child is not None and child[0] > 0:
+        parent = str(child[0])
+        if parent in seen:
+            break
+        identity = _process_identity(proc/parent)
+        if identity is None or identity[1] > child[1]:  # PID disappeared or was recycled
+            break
+        parents[parent] = identity
+        seen.add(parent)
+        child = identity
+    return parents
+
+
+def _micromamba_script_index(args):
+    if len(args) < 3 or Path(args[0]).name != "micromamba" or args[1] != "run":
+        return None
+    idx = 2
+    selector = {"-n", "--name", "-p", "--prefix"}
+    if args[idx] in selector:
+        if len(args) <= idx + 1 or args[idx + 1].startswith("-"):
+            return None
+        idx += 2
+    elif any(args[idx].startswith(flag+"=") and args[idx] != flag+"="
+             for flag in ("--name", "--prefix")):
+        idx += 1
+    if idx < len(args) and args[idx] == "--":
+        idx += 1
+    if idx >= len(args) or Path(args[idx]).name != "bash":
+        return None
+    idx += 1
+    if idx < len(args) and args[idx] == "--":
+        idx += 1
+    return idx if idx < len(args) and not args[idx].startswith("-") else None
+
+
+def _is_own_micromamba_launcher(proc, process):
+    # Do not exempt a competing micromamba run or other command in this PID's
+    # argv. Recheck the executable and starttime against the discovered lineage.
+    identity = _launcher_ancestors(proc).get(process.name)
+    if identity is None:
+        return False
+    try:
+        return (Path(os.readlink(process/"exe")).name == "micromamba"
+                and _process_identity(process) == identity)
+    except OSError:
+        return False
+
+
 def direct_process_guard(workspace,*,proc_root=None):
     """Supplement the normal cross-host workspace lock for local direct jobs."""
     proc = Path("/proc") if proc_root is None else Path(proc_root)
@@ -115,6 +181,7 @@ def direct_process_guard(workspace,*,proc_root=None):
         if not args:
             continue
         mapper = Path(args[0]).name=="minimap2"
+        launcher_script = _micromamba_script_index(args)
         for position,arg in enumerate(args):
             # A bare executable/option value is not a path relative to cwd.
             # In particular "minimap2", "2" (-t) and "asm10" must not invent
@@ -141,7 +208,9 @@ def direct_process_guard(workspace,*,proc_root=None):
                 continue
             if workspace not in path.parents:
                 continue
-            relative = path.relative_to(workspace)
+            if (position == launcher_script and path == workspace/"run_all.sh"
+                    and _is_own_micromamba_launcher(proc, process)):
+                continue
             if (any(path.is_relative_to(workspace_path(workspace, area)) for area in ("runs", ".prepare_lib", ".runtime/commands")) or path==workspace/"run_all.sh"
                     or mapper and path.is_relative_to(workspace_path(workspace, "data/reference").parent)):
                 raise wa.ExperimentError(f"reference handoff refuses an active standalone workspace process: PID {process.name}")

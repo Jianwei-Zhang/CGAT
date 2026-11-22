@@ -4,11 +4,11 @@
 `30dafa1cee9d4cdb03e7b0513dbe1246c3025799`。采用独立任务目录和此前验证过的私有
 ARM 环境；重新核验工具锁和执行环境。本次未修改 `master`、客户任务、共享环境或发布产物。
 
-**合并前仍需修复一个启动问题。** `micromamba run -n cgat-server bash <out>/run_all.sh …`
+**首轮验证发现一个续跑启动误判，已在本分支修复。** `micromamba run -n cgat-server bash <out>/run_all.sh …`
 会被 reference handoff 误判为另一个活跃的工作区进程。最小复现记录了被命中的真实
 父进程命令行；激活相同环境后直接执行 `bash <out>/run_all.sh …` 不触发误判。
-此处应修正对当前启动链的识别，同时保持对无关工作区并发写入的拦截。不要通过删除锁、
-取消进程防护或重建工作区来绕过。激活环境的成功路径不代表 wrapper 已修复。
+修复只放行当前启动链中实际转发工作区 `run_all.sh` 的 Micromamba 父进程，仍检查独立并行
+启动和直接比对进程，保留既有工作区锁策略。
 
 ## 输入与结果
 
@@ -26,10 +26,10 @@ ARM 环境；重新核验工具锁和执行环境。本次未修改 `master`、�
 
 | 拟南芥工具 | CGAT 接纳 | 终版剩余 N | 区间对照 |
 | --- | ---: | ---: | --- |
-| DEGAP `6cd01f1` | 1 | 0 | 三轮闭合。独立 patch 来源重建了 463 bp，与 TAIR12 同源区间逐碱基一致。 |
-| TGS-GapCloser `1.2.1` | 0 | 463 | 原生完成，无接纳改动。 |
-| quarTeT GapFiller `1.3.1` | 0 | 463 | 原生报告无候选，区别于运行失败。 |
-| LR_Gapcloser `1.0` | 1 | 0 | 接纳 629 bp patch，与 463 bp 对照区间不完全相同，不能仅凭缺口消失判定正确。 |
+| DEGAP `6cd01f1` | 1 | 0 | 左侧延伸 2 轮、右侧 1 轮后闭合。独立 patch 来源重建了 463 bp，与 TAIR12 同源区间逐碱基一致。 |
+| TGS-GapCloser `1.2.1` | 0 | 463 | 原生输出仍为 463 个 N；日志 `no common=1`，没有生成补丁，不是 CGAT 拒收。 |
+| quarTeT GapFiller `1.3.1` | 0 | 463 | 原生报告 `No gap can be closed`，没有生成补丁，不是 CGAT 拒收。 |
+| LR_Gapcloser `1.0` | 1 | 0 | 629 bp 补丁替换了 628 bp（463 bp 缺口 + 165 bp 原有右侧翼）；同区间与 DEGAP 只差同聚 A 多 1 个碱基。 |
 
 单个真实缺口仅用于验证接入和结果溯源，不用于工具准确率、吞吐量或两种测序技术的比较。
 
@@ -53,3 +53,23 @@ Full/Light 含真正的报告和来源产物，未把交付校验冒称为本次
 
 `evidence/` 保留输入哈希及公开归档元数据、工具锁探测、基线与终版核验回执、
 `col0-append-junction-comparison.json`、`standalone-guard-probe.PeEayuGY/` 与调度器状态。
+
+## 启动修复和质检复核
+
+二次验证目录：`~/cgat-reads-debug/post-lgz-wrapper-qc-review.DzJko9Fn/`。
+`43016367` 使用同一套公开 Col-0 输入、独立 LGZ-only 工作区和原先失败的真实命令
+`micromamba run -n cgat-server bash <out>/run_all.sh --hifi …`，作业成功。
+原始 PAF、LGZ q0–q3 及基线终版等 10 个文件的哈希和 mtime 均不变；DEGAP 真实重跑后
+仍接纳 1 处，终版 FASTA 与首轮逐字节一致，Full/Light 交付通过。此修复不改变补洞与接纳规则。
+
+`43016395` 复核 Final Path 与原始数据：LR 的 629 bp 替换并非额外插入 166 bp。
+在 LGZ 的 0-based 区间 `[100000, 100628)` 内，LR 与 DEGAP 归一到相同区间后只有一个
+额外 A：LR 终版在右侧翼为 `A19`，DEGAP/TAIR12 为 `A18`。整个窗口序列验证了只有此一碱基差异。
+在该运行的 120,477 条原始 CCS reads 中，以两侧各 31 bp 精确锚定该位点，找到两条：
+一条反向支持 `A18`，一条正向支持 `A19`（后者即 LR 选用的原始 read `ERR13987671.48394`）。
+这是精确锚定的匹配数，不是穷尽的等位型判断；不能据此断言 LR 错误或用参考差异硬拒收。
+
+CGAT 本次验证的是候选确实来自缺口、原生序列可按证据重建、终版与交付一致；这与
+独立的序列正确性验证不同。TGS 和 quarTeT 的 CGAT 拒收数均为 0；没有证据表明质检
+误杀候选。LR 的单碱基差异可追溯到原始数据，也不能仅凭结构接纳就称其生物学正确。
+明细见二次验证目录的 `evidence/col0-shared-interval-and-read-support.json`。

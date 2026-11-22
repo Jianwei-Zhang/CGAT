@@ -37,7 +37,7 @@
     "minimap_options.py": "6c270b7116d8c67a0907016a6e7f687f06a162c906d58db96c94698550cbb6e0",
     "minimap_index_context.py": "ee888f3645288042abb2e16bb4cb1743368bbb81b34aa4cae49405e70c52b5c7",
     "seam_witness.py": "09e80e89a6662f185ec8a042e8fbb9ae4e24bc611b56d3be8d3c99a14429b249",
-    "resume_reference.py": "b8e299892e19f54028347bc6998d4f1feceed64da4fb0d7a754172c349519103",
+    "resume_reference.py": "d23fb8a381fbad540c3f0bf9cc1f70e2659348647b46853d3fa0013ca2702fc5",
     "native_chain_state.c": "c21e66248334e7012ecf123e6795db82a220ee2b16bf1a1137f9cdbe831dad82",
     "MINIMAP2_LICENSE.txt": "439f990fe612f03792ab99de0298d6feace539d8162830c5063c56520760f364"
   },
