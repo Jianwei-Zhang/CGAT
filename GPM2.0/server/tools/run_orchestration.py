@@ -218,8 +218,7 @@ def _sha256_read(signature: tuple) -> str:
     return digest.hexdigest()
 
 
-def sha256_file(path: Path) -> str:
-    signature = file_signature(path)
+def _sha256_with_signature(path: Path, signature: tuple) -> str:
     with _SHA256_CACHE_LOCK:
         cached = _SHA256_CACHE.get(signature)
         if cached is not None:
@@ -239,12 +238,16 @@ def sha256_file(path: Path) -> str:
     return digest
 
 
+def sha256_file(path: Path) -> str:
+    return _sha256_with_signature(path, file_signature(path))
+
+
 def file_identity(path: Path, *, relative_to: Path | None = None) -> dict[str, object]:
     signature = file_signature(path)
     label = path.relative_to(relative_to).as_posix() if relative_to is not None else str(path)
-    digest = sha256_file(path)
-    if file_signature(path) != signature:
-        raise OrchestrationContractError(f"file identity changed while hashing: {path}")
+    # Use the same initial and final signatures for both the declared size
+    # and the digest. The hit check and cold hash's fd checks remain intact.
+    digest = _sha256_with_signature(path, signature)
     return {"path": label, "size": signature[3], "sha256": digest}
 
 

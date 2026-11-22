@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "tools" / "run_orchestration.py"
@@ -96,6 +98,59 @@ class RunOrchestrationContractTests(unittest.TestCase):
             run_orchestration.atomic_write_json(output, {"identity": identity})
             self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["identity"], identity)
             self.assertEqual(list(output.parent.glob(".*.tmp.*")), [])
+
+    def test_file_identity_resolves_twice_and_uses_a_real_hash_only_once(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "artifact.txt"
+            content = b"bound artifact\n"
+            path.write_bytes(content)
+            expected = {"path": "artifact.txt", "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+            with (patch.object(run_orchestration, "file_signature", wraps=run_orchestration.file_signature) as signatures,
+                  patch.object(run_orchestration, "_sha256_read", wraps=run_orchestration._sha256_read) as read):
+                for n in range(2):
+                    self.assertEqual(run_orchestration.file_identity(path, relative_to=root), expected)
+                    self.assertEqual(signatures.call_count, 2 * (n + 1))
+                    self.assertEqual(read.call_count, 1)
+
+    def test_file_identity_rejects_a_path_retargeted_during_a_cache_hit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first, second, alias = (root / name for name in ("first", "second", "alias"))
+            first.write_bytes(b"aaa")
+            second.write_bytes(b"bbb")
+            try:
+                alias.symlink_to(first)
+            except OSError:
+                self.skipTest("symlink support required")
+            run_orchestration.file_identity(alias)
+            original = run_orchestration.file_signature
+            def retarget(path):
+                observed = original(path)
+                if alias.readlink() == first:
+                    alias.unlink()
+                    alias.symlink_to(second)
+                return observed
+            with patch.object(run_orchestration, "file_signature", side_effect=retarget):
+                with self.assertRaisesRegex(run_orchestration.OrchestrationContractError, "changed during hash reuse"):
+                    run_orchestration.file_identity(alias)
+            self.assertEqual(run_orchestration.file_identity(alias)["sha256"], hashlib.sha256(b"bbb").hexdigest())
+
+    def test_file_identity_cold_hash_rejects_replacement_after_read(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "artifact"
+            path.write_bytes(b"old")
+            original = run_orchestration._sha256_read
+            def replace(signature):
+                digest = original(signature)
+                new = path.with_suffix(".replacement")
+                new.write_bytes(b"new")
+                new.replace(path)
+                return digest
+            with patch.object(run_orchestration, "_sha256_read", side_effect=replace):
+                with self.assertRaisesRegex(run_orchestration.OrchestrationContractError, "changed while hashing"):
+                    run_orchestration.file_identity(path)
+            self.assertEqual(run_orchestration.file_identity(path)["sha256"], hashlib.sha256(b"new").hexdigest())
 
     def test_validate_paf_accepts_empty_and_valid_records(self):
         with tempfile.TemporaryDirectory() as temporary:
