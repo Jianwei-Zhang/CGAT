@@ -300,8 +300,18 @@ same 30 GiB quota and two scientific threads. That job exited 0 on
 `agent-ARM-24`: it accepted one DEGAP edit, changed the chromosome sequence,
 validated both archive modes and preserved LGZ/alignment bytes and mtimes.
 Receipt SHA-256: `82587c43e1b91b4803502fe4e2ad261460e3d0f10a32d58717623892f407b5ca`.
-The separate ARM64 all-tool append/repeat and ONT-only validation is job
-`43015933`; do not count it as passed based on the DEGAP resume alone.
+In job `43015933`, native ARM64 LGZ-only, four-tool append and unchanged
+repeat passed. The sample accepted one edit each for DEGAP, quarTeT and LR,
+and zero for HiFi TGS. Full/Light verification and frozen LGZ/reference files
+passed, and the repeat kept all four native producer and assembly hashes.
+The separate ONT-only TGS control stopped in the CGAT stream validator after
+native Racon exited. Its settled FASTA had valid nonempty records; the adapter
+had read the redirected stream before flushing its inherited descriptors.
+The TGS adapter now flushes stdout/stderr before parsing or hashing them,
+including after output replay, without changing Racon or relaxing integrity
+checks. The stopped ONT-only workspace remains available for targeted retry.
+The original mixed/repeat matrix receipt (including the failed ONT control)
+is `0388108502cf08812c1156b11549cbafcd3f938c271a4812e2932c14920aac85`.
 
 ### Windows offline navigation and App delivery for the new pin
 
@@ -339,6 +349,8 @@ All four imports preserved a subsequent manual edit and rejected a duplicate
 import destination. This exercises the existing importer, not an installer or a
 new Windows App build. Receipt SHA-256:
 `e584d0a86e6cf63b72d73685322cec40cd4246c598efc7a352ff9dc1cc7812f1`.
+The updated App export backend was also compiled and tested on Windows: five
+focused `degap_jobs` tests passed, with the optional fixture-only test ignored.
 
 ## Historical sequencing note: re-audit DEGAP after upstream feature merge
 
@@ -668,7 +680,7 @@ legacy versions.
 | A03 | Verified | Real `run_all.sh` four-tool append, unchanged repeat, original scientific file and alignment identity audits. |
 | A04 | Verified | Four actual command/input receipts with mixed and ONT-only cases; grouped same-basename inputs, content-bound reuse, format and source controls. |
 | A05 | Verified on both architectures | x86_64 public install/`--check`, controlled managed-spec upgrade and unmanaged-env refusal. Native ARM64 private install, compute-node `--check` and active pinned runtime verification passed. |
-| A06 | Full matrix on x86_64; DEGAP on ARM64 | All four pinned tools ran on x86_64. The pinned newer DEGAP also ran on native ARM64 and accepted one edit; the ARM64 all-tool matrix is tracked separately. |
+| A06 | All four engines on both architectures; ARM64 ONT TGS control pending | All four pinned tools ran on x86_64 and native ARM64. Both actual mixed runs published four validated results; the separate ARM64 ONT-Racon control is tracked above. |
 | A07 | Verified | Independent source-slice reconstruction equals each published chromosome; accepted newer DEGAP, quarTeT, LR and ONT-only TGS outputs differ from LGZ. Zero-admission results are unchanged and explicitly labelled. |
 | A08 | Verified in fixtures and the synthetic sample | `test_refinement_admission.py`, `test_refinement_native_trace.py` and `test_refinement_path.py` cover orientations, overlap, competing/nearby intervals, partial edits, residual Ns and zero acceptance. |
 | A09 | Verified in controls and native readmission | Proposal conflicts, malformed evidence, mutated inputs and corrupt checkpoints are rejected in admission/path/native tests; the original-frame native readmission audit verifies only validated evidence is reused. |

@@ -237,18 +237,17 @@ class TgsUnits:
             for fd,name in ((1,"stdout"),(2,"stderr")):
                 with (receipt.parent/stream_file(kind,name)).open("rb") as source, os.fdopen(os.dup(fd),"wb") as destination:
                     shutil.copyfileobj(source,destination)
-                if digest(streams[name]) != producer["artifacts"][stream_file(kind,name)]:
-                    raise PathError("TGS replayed stream differs from original producer")
             origin = {"run_id":producer["run_id"],"receipt":receipt.relative_to(self.root).as_posix(),
                       "receipt_sha256":digest(temporary/"producer.json")}
         self.live_owner()
         if any(stat_key(path) != identity for path,identity in identities.items()):
             raise PathError("TGS native command consumed a changing input")
-        result = stream_result(kind,streams["stdout"])
+        result = persisted_stream_result(kind, streams["stdout"])
         artifacts = {}
-        for fd,name in ((1,"stdout"),(2,"stderr")):
-            os.fsync(fd)
+        for name in ("stdout", "stderr"):
             fact,before = file_fact(streams[name])
+            if cached is not None and fact["sha256"] != producer["artifacts"][stream_file(kind,name)]:
+                raise PathError("TGS replayed stream differs from original producer")
             try:
                 os.link(streams[name],temporary/stream_file(kind,name))
             except OSError:
@@ -268,6 +267,15 @@ class TgsUnits:
             raise PathError("TGS command phase executed twice")
         os.rename(temporary,final); sync_directories(self.directory)
         return 0
+
+
+def persisted_stream_result(kind, path):
+    # The child has exited, but a parallel filesystem can still have pending
+    # stream metadata. Flush inherited output descriptors before the first
+    # read/identity check, not after parsing or hashing the redirected files.
+    for fd in (1, 2):
+        os.fsync(fd)
+    return stream_result(kind, path)
 
 
 def stream_result(kind, path):

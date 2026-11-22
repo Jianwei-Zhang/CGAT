@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
 import refinement_native_checkpoint as checkpoint
@@ -59,6 +60,20 @@ else: sys.exit(9)
 
 
 class TgsUnitFormatTests(unittest.TestCase):
+    def test_stable_stream_validation_starts_after_both_descriptors_flush(self):
+        trace = []
+        def parse(kind, path):
+            trace.append((kind, path))
+            return {"outcome": "corrected_fasta"}
+        with patch.object(tgs.os, "fsync", side_effect=trace.append), patch.object(tgs, "stream_result", side_effect=parse):
+            output = Path("tgs.ont.0.0.racon.fasta")
+            self.assertEqual(tgs.persisted_stream_result("racon", output), {"outcome": "corrected_fasta"})
+            self.assertEqual(trace, [1, 2, ("racon", output)])
+        with patch.object(tgs.os, "fsync", side_effect=OSError("flush failed")), patch.object(tgs, "stream_result") as parse:
+            with self.assertRaisesRegex(OSError, "flush failed"):
+                tgs.persisted_stream_result("racon", output)
+            parse.assert_not_called()
+
     def test_owned_command_wrappers_are_server_only_scripts(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); initialize_workspace(root)
