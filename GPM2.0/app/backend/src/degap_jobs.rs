@@ -12,7 +12,13 @@ use crate::db::open_workspace_db;
 mod manual_refinement;
 mod server_runtime;
 
-pub use manual_refinement::{export_manual_refinement, ManualExportSummary, ManualRefinementRequest};
+pub use manual_refinement::{
+    ManualExportSummary, ManualRefinementAction, ManualRefinementImport, ManualRefinementRequest,
+    PatchOperation, ResultPatch, ResultRow, ResultStatus, ValidatedRefinementResults,
+    export_manual_refinement, import_manual_refinement_results, list_manual_refinement_results,
+    switch_manual_refinement_locus, undo_manual_refinement_locus,
+    validate_manual_refinement_results,
+};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct DegapJobExportSettings {

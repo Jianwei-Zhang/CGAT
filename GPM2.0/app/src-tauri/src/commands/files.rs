@@ -169,6 +169,113 @@ pub fn export_project_final_path_agp(
 
 #[tauri::command]
 #[allow(non_snake_case)]
+pub async fn export_manual_refinement(
+    workspaceRoot: String,
+    projectId: i64,
+    outputPath: String,
+    request: gpm_next_backend::degap_jobs::ManualRefinementRequest,
+) -> CommandResult<Value> {
+    run_blocking_command("export_manual_refinement", move || {
+        let summary = gpm_next_backend::degap_jobs::export_manual_refinement(
+            Path::new(&workspaceRoot),
+            projectId,
+            Path::new(&outputPath),
+            &request,
+        )
+        .map_err(format_error)?;
+        Ok(json!({
+            "batch_sha256": summary.batch_sha256,
+            "loci": summary.loci,
+            "tasks": summary.tasks,
+        }))
+    })
+    .await
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn import_manual_refinement_results(
+    workspaceRoot: String,
+    projectId: i64,
+    zipPath: String,
+) -> CommandResult<Value> {
+    run_blocking_command("import_manual_refinement_results", move || {
+        let result = gpm_next_backend::degap_jobs::import_manual_refinement_results(
+            Path::new(&workspaceRoot),
+            projectId,
+            Path::new(&zipPath),
+        )
+        .map_err(format_error)?;
+        Ok(json!(result))
+    })
+    .await
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn list_manual_refinement_results(
+    workspaceRoot: String,
+    projectId: i64,
+) -> CommandResult<Value> {
+    run_blocking_command("list_manual_refinement_results", move || {
+        let results = gpm_next_backend::degap_jobs::list_manual_refinement_results(
+            Path::new(&workspaceRoot),
+            projectId,
+        )
+        .map_err(format_error)?;
+        Ok(json!(results))
+    })
+    .await
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn undo_manual_refinement_locus(
+    workspaceRoot: String,
+    projectId: i64,
+    locusId: String,
+    expectedRevision: u64,
+) -> CommandResult<Value> {
+    run_blocking_command("undo_manual_refinement_locus", move || {
+        let action = gpm_next_backend::degap_jobs::undo_manual_refinement_locus(
+            Path::new(&workspaceRoot),
+            projectId,
+            &locusId,
+            expectedRevision,
+        )
+        .map_err(format_error)?;
+        Ok(json!(action))
+    })
+    .await
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn switch_manual_refinement_locus(
+    workspaceRoot: String,
+    projectId: i64,
+    locusId: String,
+    expectedRevision: u64,
+    resultSha256: String,
+    tool: String,
+) -> CommandResult<Value> {
+    run_blocking_command("switch_manual_refinement_locus", move || {
+        let action = gpm_next_backend::degap_jobs::switch_manual_refinement_locus(
+            Path::new(&workspaceRoot),
+            projectId,
+            &locusId,
+            expectedRevision,
+            &resultSha256,
+            &tool,
+        )
+        .map_err(format_error)?;
+        Ok(json!(action))
+    })
+    .await
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
 pub fn export_degap_jobs(
     workspaceRoot: String,
     projectId: i64,

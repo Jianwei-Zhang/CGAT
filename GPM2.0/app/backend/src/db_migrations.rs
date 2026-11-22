@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension};
 
-use super::{CURRENT_SCHEMA_VERSION, create_current_schema};
+use super::{CURRENT_SCHEMA_VERSION, create_current_schema, create_refinement_result_tables};
 
 const FUTURE_VERSION_ERROR: &str = "WORKSPACE_SCHEMA_FUTURE_VERSION";
 const MISSING_MIGRATION_ERROR: &str = "WORKSPACE_SCHEMA_MIGRATION_MISSING";
@@ -69,6 +69,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 9,
         name: "retain_refinement_read_sources",
         apply: migrate_refinement_inputs_to_v9,
+    },
+    Migration {
+        version: 10,
+        name: "retain_project_refinement_patches_and_receipts",
+        apply: create_refinement_result_tables,
     },
 ];
 

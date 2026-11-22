@@ -171,19 +171,19 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
         VALUES (?1, ?2, '1') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json",
         rusqlite::params![project.project_id, serde_json::to_string(&path).unwrap()]).unwrap();
     let request = serde_json::from_value(serde_json::json!({"loci":[{
-        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","degap","lrgapcloser"]
+        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet"]
     }],"hifi_reads":[],"ont_reads":[]})).unwrap();
     let archive = temp.path().join("tasks.zip");
     let result = crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).unwrap();
     let mut zipped = zip::ZipArchive::new(fs::File::open(&archive).unwrap()).unwrap();
     let mut bytes = Vec::new();
     zipped.by_name("refinement_tasks.json").unwrap().read_to_end(&mut bytes).unwrap();
-    assert_eq!(result.tasks, 3);
+    assert_eq!(result.tasks, 1);
     assert_eq!(result.batch_sha256, format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(&bytes)));
     let value: Value = serde_json::from_slice(&bytes).unwrap();
     let locus = &value["loci"][0];
     assert_eq!(locus["gap_bp"], 117);
-    assert_eq!(locus["tools"], serde_json::json!(["degap", "lrgapcloser", "quartet"]));
+    assert_eq!(locus["tools"], serde_json::json!(["quartet"]));
     assert_eq!(value["reads"]["hifi"], serde_json::json!([]));
     let member = &locus["seed_plans"]["seqleft"]["members"][0];
     assert!(member["fasta_sha256"].is_string() || member["interval_sha256"].is_string());
@@ -192,6 +192,12 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     assert_eq!(ledger["project_id"], project.project_id);
     assert_eq!(ledger["manifest"], value);
     assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).is_err());
+    let rejected_request = serde_json::from_value(serde_json::json!({"loci":[{
+        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","degap"]
+    }]})).unwrap();
+    let rejected = temp.path().join("multiple-tools.zip");
+    assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &rejected, &rejected_request).is_err());
+    assert!(!rejected.exists());
     assert_eq!(fs::read_dir(receipts).unwrap().count(), 2);
 }
 
@@ -491,4 +497,184 @@ fn resealed_measured_final_coordinates_cannot_drift_from_accepted_source_slices(
     reseal_measured_proof(&root, &proof);
     let error = validate(&root).unwrap_err().to_string();
     assert!(error.contains("coordinate map differs"), "{error}");
+}
+
+#[test]
+fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Result<()> {
+    use crate::degap_jobs::{
+        export_manual_refinement, import_manual_refinement_results, list_manual_refinement_results,
+        switch_manual_refinement_locus, undo_manual_refinement_locus,
+    };
+    use sha2::{Digest, Sha256};
+    use std::io::{Read, Write};
+    use zip::{ZipArchive, ZipWriter, write::FileOptions};
+
+    let temp = materialize(false);
+    let root = temp.path().join("refined.degap");
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&root)?;
+    let project = initialize_grt_project(&outcome.project_db_path, "Manual refinement result")?;
+    let pid = project.project_id;
+    let baseline = load_grt_final_path_by_chr_for_project(&outcome.project_db_path, pid)?;
+    let (chr, entry) = baseline.iter().find(|(_, entry)| {
+        entry["segments"].as_array().is_some_and(|rows| rows.iter().any(|r| r["kind"] == "gap"))
+    }).unwrap();
+    let gap = entry["segments"].as_array().unwrap().iter().find(|r| r["kind"] == "gap").unwrap();
+    let target = gap["segment_id"].as_str().unwrap();
+    let original_size = gap["length"].as_u64().unwrap();
+    // A second edited path with its own chromosome key exercises the actual
+    // multi-chromosome manifest, without enlarging the scientific fixture.
+    let other = "controlled-other-chromosome";
+    let conn = crate::db::open_workspace_db(&outcome.project_db_path)?;
+    let overlay = serde_json::to_string(&BTreeMap::from([(other, entry)]))?;
+    conn.execute(
+        "INSERT INTO project_assembly_view_state(project_id, final_path_by_chr_json, updated_at) VALUES (?1,?2,'before')",
+        rusqlite::params![pid,overlay],
+    )?;
+    let request = |chrs: &[&str]| serde_json::from_value(serde_json::json!({"loci": chrs.iter().map(|chr| {
+        serde_json::json!({"chr":chr,"segment_id":target,"kind":"gap"})
+    }).collect::<Vec<_>>() }));
+    let load_manifest = |path: &Path| -> Result<Value> {
+        let mut zip = ZipArchive::new(fs::File::open(path)?)?;
+        let mut bytes = Vec::new();
+        zip.by_name("refinement_tasks.json")?.read_to_end(&mut bytes)?;
+        Ok(serde_json::from_slice(&bytes)?)
+    };
+    let single = temp.path().join("one.zip");
+    let all = temp.path().join("all.zip");
+    let single_summary = export_manual_refinement(&root,pid,&single,&serde_json::from_value(serde_json::json!({
+        "loci":[{"chr":chr,"segment_id":target,"kind":"gap","tools":["quartet"]}]
+    }))?)?;
+    let all_summary = export_manual_refinement(&root,pid,&all,&request(&[chr,other])?)?;
+    let manifest = load_manifest(&all)?;
+    assert_eq!(single_summary.loci,1);
+    assert_eq!(load_manifest(&single)?["loci"][0]["chr"], chr.as_str());
+    assert_eq!(all_summary.loci,2);
+    assert_eq!(all_summary.tasks,2);
+    assert_eq!(manifest["loci"][1]["chr"],other);
+    assert_ne!(manifest["loci"][0]["id"],manifest["loci"][1]["id"]);
+
+    let sha = |data: &[u8]| format!("{:x}",Sha256::digest(data));
+    let write_batch = |path: &Path, batch: &str, manifest: &Value, payload: &[u8], status: &str| -> Result<()> {
+        let mut rows = Vec::new();
+        let mut paths = Vec::new();
+        for locus in manifest["loci"].as_array().unwrap() {
+            let id = locus["id"].as_str().unwrap();
+            let tool = locus["tools"][0].as_str().unwrap();
+            let path = format!("patches/{id}.{tool}.seq");
+            rows.push(serde_json::json!({"locus_id":id,"tool":tool,"status":status,"reason":null,
+                "attempt_id":format!("{tool}-controlled"),"version":"2.0","revision":"synthetic-fixture",
+                "patch":{"path":path,"operation":"replace_gap","original_length":original_size,
+                  "original_sha256":sha(&vec![b'N';original_size as usize]), "length":payload.len(),"sha256":sha(payload)}}));
+            paths.push(path);
+        }
+        let mut zip = ZipWriter::new(fs::File::create(path)?);
+        zip.start_file("refinement_results.json", FileOptions::default())?;
+        zip.write_all(&serde_json::to_vec(&serde_json::json!({"schema":"cgat.app-refinement-results.v1",
+            "batch_sha256":batch,"results":rows}))?)?;
+        for path in paths { zip.start_file(path, FileOptions::default())?; zip.write_all(payload)?; }
+        zip.finish()?;
+        Ok(())
+    };
+    assert!(manifest["loci"].as_array().unwrap().iter().all(|locus| locus["tools"] == serde_json::json!(["degap"])));
+    let result_zip = temp.path().join("result.zip");
+    write_batch(&result_zip, &all_summary.batch_sha256, &manifest, b"AGRY", "closed")?;
+
+    assert!(import_manual_refinement_results(&root,pid+1,&result_zip).is_err());
+    let result = import_manual_refinement_results(&root,pid,&result_zip)?;
+    assert_eq!(result.applied, 2);
+    assert!(result.loci.iter().all(|row| row["appliedTool"] == "degap"));
+    let duplicate = import_manual_refinement_results(&root,pid,&result_zip)?;
+    assert!(duplicate.duplicate);
+    assert_eq!(duplicate.applied,0);
+    assert_eq!(list_manual_refinement_results(&root,pid)?.len(),1);
+
+    let reopened = crate::db::open_workspace_db(&outcome.project_db_path)?;
+    let loaded: String = reopened.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+        [pid], |row| row.get(0))?;
+    let loaded: Value = serde_json::from_str(&loaded)?;
+    let patch_sha = sha(b"AGRY");
+    let projected = loaded[chr]["segments"].as_array().unwrap().iter().map(|row| {
+        let start = row["start"].as_i64();
+        let end = row["end"].as_i64();
+        if row["type"] == "gap" { FinalPathExportSegment::Gap {gap_size_bp:row["gapSizeBp"].as_i64().unwrap()} }
+        else if row["sourceKind"] == "refinement_patch" {
+            assert_eq!(row["refinementPatchSha256"],patch_sha);
+            FinalPathExportSegment::RefinementPatch {sha256:patch_sha.clone(),start:start.unwrap(),end:end.unwrap()}
+        } else { FinalPathExportSegment::Source {dataset_name:row["source"]["dataset"].as_str().unwrap().into(),
+            contig_name:row["source"]["contig"].as_str().unwrap().into(),start:start.unwrap(),end:end.unwrap()} }
+    }).collect();
+    let exported = temp.path().join("reimported.fa");
+    exporter::export_project_final_path_fasta(&outcome.project_db_path,pid,&ExportProjectFinalPathFastaParams {
+        output_path:exported.clone(), records:vec![FinalPathFastaRecord{chr_name:chr.clone(),final_path_segments:projected}],
+    })?;
+    let reimported = read_fasta(&exported,"manual refinement roundtrip",false)?;
+    let original = read_fasta(&root.join("data/refinement/final.fa"),"original path",false)?;
+    let expected = original[chr].replacen(&"N".repeat(original_size as usize),"AGRY",1);
+    assert_eq!(reimported[chr],expected);
+
+    let late_zip = temp.path().join("late.zip");
+    let partial_zip = temp.path().join("partial.zip");
+    // A separate single-tool export from before adoption reaches the same locus.
+    // Its zero-base result removes the Gap slot completely when explicitly selected.
+    let single_manifest = load_manifest(&single)?;
+    let locus_id = single_manifest["loci"][0]["id"].as_str().unwrap();
+    write_batch(&late_zip, &single_summary.batch_sha256, &single_manifest, b"", "closed")?;
+    write_batch(&partial_zip, &single_summary.batch_sha256, &single_manifest, b"CNC", "partial")?;
+    let late = import_manual_refinement_results(&root, pid, &late_zip)?;
+    let partial = import_manual_refinement_results(&root, pid, &partial_zip)?;
+    assert_eq!(late.applied, 0);
+    assert_eq!(late.loci[0]["disposition"], "already_adopted");
+    assert_eq!(late.loci[0]["activeResultSha256"], result.result_sha256);
+    assert_eq!(partial.applied, 0);
+    assert!(switch_manual_refinement_locus(&root, pid, locus_id, 1, &partial.result_sha256, "quartet").is_err());
+    assert!(undo_manual_refinement_locus(&root, pid+1, locus_id, 1).is_err());
+
+    let store = |paths: &Value| -> Result<()> {
+        reopened.execute("UPDATE project_assembly_view_state SET final_path_by_chr_json=?2 WHERE project_id=?1",
+            rusqlite::params![pid, serde_json::to_string(paths)?])?;
+        Ok(())
+    };
+    let reload = || -> Result<Value> {
+        let raw: String = reopened.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+            [pid], |row| row.get(0))?;
+        Ok(serde_json::from_str(&raw)?)
+    };
+    assert_eq!(reload()?, loaded);
+    let patch_slot = loaded[chr]["segments"].as_array().unwrap().iter()
+        .position(|row| row["sourceKind"] == "refinement_patch").unwrap();
+    let mut edited = loaded.clone();
+    edited[chr]["segments"][patch_slot]["start"] = serde_json::json!(2);
+    store(&edited)?;
+    assert!(undo_manual_refinement_locus(&root, pid, locus_id, 1).is_err());
+    assert_eq!(reload()?, edited);
+    edited = loaded.clone();
+    let outside_edit = serde_json::json!({"type":"gap","segmentId":"unrelated-appended-gap","gapSizeBp":12});
+    edited[chr]["segments"].as_array_mut().unwrap().push(outside_edit.clone());
+    store(&edited)?;
+    let switched = switch_manual_refinement_locus(&root, pid, locus_id, 1, &late.result_sha256, "quartet")?;
+    assert_eq!(switched.adoption_revision, 2);
+    assert_eq!(switched.active_tool.as_deref(), Some("quartet"));
+    let zero = reload()?;
+    assert_eq!(zero[chr]["segments"].as_array().unwrap().len(), edited[chr]["segments"].as_array().unwrap().len() - 1);
+    assert_eq!(zero[other], loaded[other]);
+    assert!(undo_manual_refinement_locus(&root, pid, locus_id, 1).is_err());
+    let undone = undo_manual_refinement_locus(&root, pid, locus_id, 2)?;
+    assert_eq!(undone.adoption_revision, 3);
+    assert_eq!(undone.active_result_sha256, None);
+    let restored = reload()?;
+    assert_eq!(restored[chr]["segments"][patch_slot]["segmentId"], target);
+    assert_eq!(restored[chr]["segments"].as_array().unwrap().last(), Some(&outside_edit));
+    let replay = import_manual_refinement_results(&root, pid, &result_zip)?;
+    assert!(replay.duplicate);
+    assert_eq!(replay.loci[0]["adoptionState"], "undone");
+    assert_eq!(reload()?, restored);
+    switch_manual_refinement_locus(&root, pid, locus_id, 3, &result.result_sha256, "degap")?;
+    let history = list_manual_refinement_results(&root, pid)?;
+    assert_eq!(history.len(), 3);
+    assert!(history.iter().all(|batch| batch.loci[0]["activeResultSha256"] == result.result_sha256
+        && batch.loci[0]["adoptionRevision"] == 4));
+    let actions: i64 = reopened.query_row("SELECT count(*) FROM project_refinement_action WHERE project_id=?1",
+        [pid], |row| row.get(0))?;
+    assert_eq!(actions, 3);
+    Ok(())
 }

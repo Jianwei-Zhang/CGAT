@@ -107,7 +107,12 @@ pub fn run() {
             commands::export_final_path_agp,
             commands::export_project_final_path_agp,
             commands::export_project_final_path_fasta,
-            commands::export_degap_jobs
+            commands::export_degap_jobs,
+            commands::export_manual_refinement,
+            commands::import_manual_refinement_results,
+            commands::list_manual_refinement_results,
+            commands::switch_manual_refinement_locus,
+            commands::undo_manual_refinement_locus
         ])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

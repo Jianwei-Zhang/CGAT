@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, params};
+use sha2::{Digest, Sha256};
 
 use crate::db::open_workspace_db;
 
@@ -43,6 +44,11 @@ pub struct ListExportRecordsParams {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FinalPathExportSegment {
+    RefinementPatch {
+        sha256: String,
+        start: i64,
+        end: i64,
+    },
     Source {
         dataset_name: String,
         contig_name: String,
@@ -343,6 +349,19 @@ fn build_final_path_agp(
                     ));
                     begin = next;
                     part += 1;
+                }
+                FinalPathExportSegment::RefinementPatch { sha256, start, end } => {
+                    let length: i64 = conn.query_row(
+                        "SELECT length(sequence) FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",
+                        params![project_id, sha256], |row| row.get(0),
+                    ).context("AGP refinement patch is unavailable in this project")?;
+                    validate_agp_range(*start, *end, length)?;
+                    components.push((
+                        format!("refine-{sha256}"),
+                        format!("refinement:{sha256}"),
+                        *start,
+                        *end,
+                    ));
                 }
                 FinalPathExportSegment::Source {
                     dataset_name,
@@ -666,10 +685,29 @@ fn build_final_path_fasta_records(
 ) -> Result<Vec<(String, String)>> {
     let mut required_ctg_ids = BTreeSet::<i64>::new();
     let mut required_reference_chr_names = BTreeSet::<String>::new();
+    let mut patches = HashMap::<String, String>::new();
     let mut source_id_by_name = HashMap::<(String, String), i64>::new();
     for record in records {
         for segment in &record.final_path_segments {
             match segment {
+                FinalPathExportSegment::RefinementPatch { sha256, .. } => {
+                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                        patches.entry(sha256.clone())
+                    {
+                        let sequence: Vec<u8> = conn.query_row(
+                            "SELECT sequence FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",
+                            params![project_id, sha256], |row| row.get(0),
+                        ).context("Final Path refinement patch is unavailable in this project")?;
+                        if !sequence
+                            .iter()
+                            .all(|base| b"ACGTRYSWKMBDHVN".contains(base))
+                            || format!("{:x}", Sha256::digest(&sequence)) != *sha256
+                        {
+                            bail!("Final Path refinement patch content changed");
+                        }
+                        entry.insert(String::from_utf8(sequence)?);
+                    }
+                }
                 FinalPathExportSegment::Source {
                     dataset_name,
                     contig_name,
@@ -739,6 +777,7 @@ fn build_final_path_fasta_records(
                     &source_sequences,
                     &reference_sequences,
                     &source_id_by_name,
+                    &patches,
                 )?,
             ))
         })
@@ -751,10 +790,23 @@ fn build_final_path_sequence(
     source_sequences: &HashMap<i64, String>,
     reference_sequences: &HashMap<String, String>,
     source_id_by_name: &HashMap<(String, String), i64>,
+    patches: &HashMap<String, String>,
 ) -> Result<String> {
     let mut final_sequence = String::new();
     for segment in segments {
         match segment {
+            FinalPathExportSegment::RefinementPatch { sha256, start, end } => {
+                let sequence = patches
+                    .get(sha256)
+                    .context("missing verified refinement patch")?;
+                validate_agp_range(*start, *end, sequence.len() as i64)?;
+                let slice = &sequence[(start.min(end) - 1) as usize..*start.max(end) as usize];
+                if start <= end {
+                    final_sequence.push_str(slice);
+                } else {
+                    final_sequence.push_str(&reverse_complement_iupac(slice));
+                }
+            }
             FinalPathExportSegment::Source {
                 dataset_name,
                 contig_name,
@@ -1487,6 +1539,28 @@ fn slice_and_orient(source: &str, start: i64, end: i64, orient: &str) -> Result<
         "-" => Ok(reverse_complement(sub)),
         _ => bail!("unsupported orient {}", orient),
     }
+}
+
+pub(crate) fn reverse_complement_iupac(input: &str) -> String {
+    input
+        .bytes()
+        .rev()
+        .map(|base| match base {
+            b'A' => 'T',
+            b'T' => 'A',
+            b'C' => 'G',
+            b'G' => 'C',
+            b'R' => 'Y',
+            b'Y' => 'R',
+            b'K' => 'M',
+            b'M' => 'K',
+            b'B' => 'V',
+            b'V' => 'B',
+            b'D' => 'H',
+            b'H' => 'D',
+            other => char::from(other),
+        })
+        .collect()
 }
 
 fn reverse_complement(input: &str) -> String {
@@ -2337,7 +2411,8 @@ Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
                     &ctgs,
                     &sources,
                     &references,
-                    &ids
+                    &ids,
+                    &HashMap::new(),
                 )
                 .unwrap()
             );
@@ -3139,6 +3214,7 @@ Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
             &source_sequences,
             &reference_sequences,
             &HashMap::new(),
+            &HashMap::new(),
         )
         .unwrap();
         let canonicalized_anchor_split = build_final_path_sequence(
@@ -3162,6 +3238,7 @@ Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
             &ctg_by_id,
             &source_sequences,
             &reference_sequences,
+            &HashMap::new(),
             &HashMap::new(),
         )
         .unwrap();

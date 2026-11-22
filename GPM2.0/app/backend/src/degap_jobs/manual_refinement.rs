@@ -9,6 +9,19 @@ use std::io::{Cursor, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 use zip::{ZipWriter, write::FileOptions};
 
+mod apply;
+mod results;
+
+pub use apply::{
+    ManualRefinementAction, ManualRefinementImport, import_manual_refinement_results,
+    list_manual_refinement_results, switch_manual_refinement_locus, undo_manual_refinement_locus,
+};
+
+pub use results::{
+    PatchOperation, ResultPatch, ResultRow, ResultStatus, ValidatedRefinementResults,
+    validate_manual_refinement_results,
+};
+
 const SCHEMA: &str = "cgat.app-refinement-tasks.v1";
 const MANIFEST: &str = "refinement_tasks.json";
 const TOOLS: &[&str] = &["degap", "lrgapcloser", "tgsgapcloser", "quartet"];
@@ -241,23 +254,16 @@ fn locate<'a>(rows: &'a [Value], req: &LocusRequest) -> Result<Vec<(&'static str
 }
 
 fn tools_for(req: &LocusRequest) -> Result<Vec<String>> {
-    let tools = if req.tools.is_empty() {
-        vec!["degap".into()]
-    } else {
-        req.tools.clone()
+    let tool = match req.tools.as_slice() {
+        [] => "degap",
+        [tool] if TOOLS.contains(&tool.as_str()) => tool,
+        _ => bail!("select exactly one refinement tool for {}", req.segment_id),
     };
-    let distinct: HashSet<_> = tools.iter().collect();
-    if distinct.len() != tools.len()
-        || tools.iter().any(|tool| !TOOLS.contains(&tool.as_str()))
-        || (req.kind != LocusKind::Gap && tools != ["degap"])
-    {
-        bail!("invalid or duplicate tools for {}", req.segment_id);
+    if req.kind != LocusKind::Gap && tool != "degap" {
+        bail!("telomere refinement requires DEGAP TelSeeker");
     }
-    Ok(TOOLS
-        .iter()
-        .filter(|tool| tools.iter().any(|value| value == *tool))
-        .map(|s| s.to_string())
-        .collect())
+    // Keep the v1 manifest array for deployed readers, with one entry per new job.
+    Ok(vec![tool.to_owned()])
 }
 
 fn reads_for(
@@ -475,7 +481,7 @@ pub fn export_manual_refinement(
     zip.start_file(MANIFEST, FileOptions::default())?;
     zip.write_all(&bytes)?;
     zip.start_file("README.txt", FileOptions::default())?;
-    zip.write_all(b"CGAT project manual refinement task manifest. Use with the matching CGAT Server workspace. Do not edit or run code from this archive.\n")?;
+    zip.write_all(b"CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root: \npython .lib/tools/refine.py refinement_tasks.zip\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, writes the batch report under 08_refinement_jobs/02_manual/, updates 06_report/report.html, and produces a refinement_results.zip for import into this App project.\n\nDo not edit or run code from this archive.\n")?;
     let archive = zip.finish()?.into_inner();
     let ledgers = workspace.join("metadata/refinement_exports");
     fs::create_dir_all(&ledgers)?;
