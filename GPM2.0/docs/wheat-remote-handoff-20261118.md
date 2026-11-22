@@ -4381,3 +4381,31 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `q0-indexed-pair-narrow-replay-20261122-2347/report.json` SHA
   `760752f0d998bcd56ba1a62a1234f5b164e0cf169e17c64baab21ee882312e6f`，实验未热改活跃runtime
   或原候选包。需在实际下游入口/已绑定依赖范围另证后再考虑应用，不拿它拖延当前已验证的mapper优化。
+
+### 2026-11-23 00:08 CST：实际候选接管已放行；保留了原节点遗留的失效锁
+
+- 11月22日23:56候选 `43016881 / agent-X86-57` 已有真实`loader-ready.json`及`ready.json`，
+  ready PID **1781624** 与Donau新单节点32CPU/327680MiB分配相符。旧NEW仍同一run和owner，末次
+  11月22日23:53:40 **11000/61000**、fallback=0。以上一节14路实测最保守差、再打7折，以及
+  假设最大已有矩阵可跳窗口后作情景计算，约9.78小时节省对比9小时停机/回读预留；这是是否值得
+  切换的模型，不是线上ETA。`loader-prestop-verified.json` SHA
+  `799d8bb46fdc0827b98b5f70fc2ea93d598420a9754a514823d3e3fd5080b9a8`，含停止前两主作业/候选
+  资源和完整owner绑定。`ready.json` SHA `81ef0e4f346243c5ad3b63f32cbcf55a568a9c11796ed4801e61a89d39b95754`。
+- 只对**原新版43012037**在11月22日23:57:42执行一次正常`dkill`，未使用force。23:58:12
+  Donau确认 `FAILED/143`（本次主动终止、不是分析失败），调度器无pids，但旧`lock/owner.json`
+  未释放。候选继续等待，没有发布handoff或自动清理。此前常规交接均正常释放；这次节点一度为
+  `CLOSE_FAULT`，不能据此认定残留锁原因。首个只读旧节点探针 `43016892` 因看不到PID1的procfs
+  记录失败，未把权限限制误作进程消失。第二个 `43016893 / agent-X86-39 / SUCCEEDED/0` 用信号0
+  （仅存在查询）确认原owner和停止前记录的20个PID全部不存在、且终态为空、owner内容未变；无权限
+  或有任何PID便拒绝。`q0-stale-lock-probe-20261123-0004-r2/same-node-proof.json` SHA
+  `5df026e7f86db756d1f912a1199ced570eafffd9ffcee5ec42a9eb6244ba9af5`。
+- 再确认新分配、原生guard/loader proof、25项小回执、旧NEW终态、旧版仍RUNNING之后，只**原子归档**
+  完整旧锁到工作区 `.run_all/.stale-owner.43012037-preserved-20261123`，原`owner.json` SHA
+  `16dfbaac7ff4ec5c847e36f0ae594c7a815b275c1af171ef0266618733054cd2`，不删除锁，不写新owner，
+  不把这次说成旧进程正常释放。归档凭据 `stale-lock-archive-intent.json` SHA
+  `b4f153fda8263344a0f478d2a41c3a47fcdd29c5400356a50613804b2f812867`。新接管仍须普通新锁。
+- 11月23日00:05:57原子发布 `handoff.json` SHA
+  `c8cacddc9bcc094ac7da8edd3dd688db4a0bd3aba3e033ebfdf2ead2717721dc`，候选日志实际出现
+  `Q0_HANDOFF_ACCEPTED`。截至00:08尚在核验前缀，不能把门禁接收当成runtime安装、25项实际复用
+  或新版完成。仍需按新owner/run核对`installation/receipt.json`、真实SKIP_VALID、`verified_child_only`
+  及14路区域池新增产出。旧 `42523432` 未改变，所有已完成初始比对和区域缓存保留。
