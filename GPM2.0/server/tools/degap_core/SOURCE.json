@@ -1,16 +1,16 @@
 {
   "files": {
-    "README.md": "232fd6c006ef5fb22dac2fff73decba02e6952b270c096f1f723ca13e6771b54",
-    "bin/AutoGapfiller.py": "8bf1f260c220ccffd39b375a8e58e55c1f42d479a16aff91aacb50c38a3748e9",
+    "README.md": "5b24f1c17e5d26fcdd25239c1eb8d2d82b001312804b36a20151803d8bc45683",
+    "bin/AutoGapfiller.py": "9f95ee8a643659a4cd62505c14d6567b18933ed51b54c2cde90a5db2894bcfdb",
     "bin/AutoGapfillerPart1.py": "ec1c2ac05200edee5ce53132d76471a035bcd0df3575de9686c10fa1ee8bbfef",
     "bin/AutoGapfillerPart2.py": "4d888aaee3d013de21df7c4d52d4009c019217bf971ba2cb866c3ef07af8e53e",
-    "bin/AutoGapfillerPart3.py": "68d65e3244232bf0a54937c762b316759114022d7c1c397964a1f0198bddc4f8",
+    "bin/AutoGapfillerPart3.py": "2b31e2fef4a70c2e24a869b0449f42a4563b97cb446a675b1753a39a0888805b",
     "bin/AutoGapfillerPart4.py": "5cf9c3f72d80cf7e38b6faa2a4a83dccb73a5d80ed0fade759f1d096d75554d8",
     "bin/AutoGapfillerVisualizer.py": "1554a44d6253e3254e07980450cdbc39beacb9be6e5b6b11894c25b3b266869a",
     "bin/CtgLinker.py": "4fc1146d7116c5f324aece8c0230a1dcffb4370bb7e781d8a5ded9bfcf451fa6",
     "bin/CtgLinkerCheck.py": "d23d03b917a34c8239e233ceffe6edcfb63329df334306b59208acd9397eccfa",
     "bin/CtgLinkerVisualizer.py": "b2acee0739bbf830f3384f854824f62f9e3164f3d7ffad2ce3baba4291812477",
-    "bin/DEGAP.py": "0ae7a7292515c8d753f55c411c942b5738350edde24cba7b67a1f36242b65461",
+    "bin/DEGAP.py": "2b9e0479bff372866f53a620c37b50dce1470c1cc2efcb58acc6e294bd97e680",
     "bin/ExtensionFamilies.py": "06e27ddfbadd93895ec9936f7d99bfcf44c0e9444115dd1aa5fa1f5a6afda7b6",
     "bin/FamilyCtgLinker.py": "7380d45234624b41ce0fb4bdda215a02e453d3c2a5e1388ec714e1b695502321",
     "bin/FamilyGap.py": "a101c0b409d4d5acf4d85b073c3dd28f777d576b25ad2927eb6e6d239be14031",
@@ -21,6 +21,7 @@
     "bin/FamilyTools.py": "a7074549f28dcbc1222c4d92f8e66731361143c6a5f0bda20d7ef39590fa18ff",
     "bin/FindExtensionContigs.py": "bb35069e3ee1e924306ce6f0d4b05873760ad5a8278d2d9d218abb4935b7823a",
     "bin/FindExtensionReads.py": "87983a9607cdb13307f17528f5a3fd78701bd6c089f827451d30a09886639490",
+    "bin/GapFillDefaults.py": "9d737ebe2a481334b573183f8a43f959ae91acb3ac63f14f7aa2f7a507550602",
     "bin/GapFiller.py": "75b108bda7df682bee74af6bc539c275fbdab62c7f381f0d361d37f04af7229b",
     "bin/GapFillerClass.py": "24a0dc3b6c9ad966b744ada31f14346ab3d1e2b948544bad89995af21587bbf6",
     "bin/GapfillerVisualizer.py": "bcdc1912da6576825df9ae6d7193554536be58077deee3041644afb78aea5033",
@@ -44,6 +45,6 @@
     "environment.yml": "8bdc2cf1c077ba273a81912b92f9e8fc03f53d4d93b2b49896db99521350c7a8"
   },
   "repository": "https://github.com/Jianwei-Zhang/DEGAP",
-  "revision": "6cd01f1b983c43648e51389c129dfbd8b5926284",
+  "revision": "ff4d753511fc8556d77b9a578e064e69fe47ade9",
   "schema": "gpm.degap.runtime.v1"
 }

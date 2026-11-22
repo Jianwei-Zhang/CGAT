@@ -13,6 +13,7 @@ import subprocess
 import time
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from GapFillDefaults import add_options, format_options
 
 
 class JobManager:
@@ -251,8 +252,6 @@ class JobManager:
             'edge': '--edge',
             # 'filterDepthHifi': '--filterDepthHifi',  # 已在 Part1 完成，不再传递
             # 'filterDepthOnt': '--filterDepthOnt',    # 已在 Part1 完成，不再传递
-            'MaximumExtensionLength': '--MaximumExtensionLength',
-            'MaximumExtensionRound': '--MaximumExtensionRound',
             'kmer_size': '--kmer_size',
             'kmer_num': '--kmer_num'
             # Note: -j parameter removed, parallel control unified under -t parameter
@@ -262,9 +261,8 @@ class JobManager:
             if param_key in self.degap_params and self.degap_params[param_key] is not None:
                 cmd_parts.append(f"    {param_flag} {self.degap_params[param_key]} \\")
 
-        # 添加布尔型参数
-        if self.degap_params.get('kmer_filter', False):
-            cmd_parts.append(f"    --kmer_filter \\")
+        for option in format_options(self.degap_params):
+            cmd_parts.append("    " + " ".join(option) + " \\")
 
         # 移除最后一行的反斜杠
         if cmd_parts[-1].endswith(" \\"):
@@ -1209,14 +1207,7 @@ Note: This script requires preprocessing and gap detection to be completed first
     parser.add_argument('--filterDepthOnt', type=float,
                         help='Filter ONT reads by mapped depth. '
                              'Example: 0.2 means keep reads with depth >= 0.2*avgdepth and depth <= (2-0.2)*avgdepth')
-    parser.add_argument('--MaximumExtensionLength', type=int,
-                        help='Maximum cumulative extension length in bp (default: None, no limit). '
-                             'Extension stops when total extended length exceeds this value')
-    parser.add_argument('--MaximumExtensionRound', type=int,
-                        help='Maximum number of extension rounds (default: None, no limit). '
-                             'Extension stops when round number exceeds this value. '
-                             'Minimum recommended value is 5')
-    parser.add_argument('--kmer_filter', action='store_true', help='Enable k-mer filtering')
+    add_options(parser, parser, gapfill=True)
     parser.add_argument('--kmer_size', '-ks', type=int, help='K-mer size for filtering (default: 41)')
     parser.add_argument('--kmer_num', '-kn', type=int, help='Number of k-mers for filtering (default: 20)')
 

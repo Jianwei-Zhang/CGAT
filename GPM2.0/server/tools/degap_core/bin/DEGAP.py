@@ -20,6 +20,7 @@ import subprocess
 import GapfillerVisualizer
 from GapfillerVisualizer import GapfillerLogParser, HTMLReportGenerator
 import glob
+from GapFillDefaults import add_options, resolve_defaults
 def generate_stats_with_seqkit(input_file, output_file):
 	try:
 		# 直接调用 seqkit（不检查是否安装，不做本地检测）
@@ -117,17 +118,13 @@ def usage():
 	print ("                                 outside [0.3*avgdepth, (2-0.3)*avgdepth] range")
 	print ("--edge num                       Max edge length for misassembly detection (default: 500)")
 	print ("\nExtension Control Options:")
-	print ("--MaximumExtensionLength num     Maximum cumulative extension length in bp (default: None, no limit)")
-	print ("                                 Extension stops when total extended length exceeds this value")
-	print ("                                 Applies to all modes (gapfiller/ctglinker/telseeker/telseeker_ctg)")
-	print ("--MaximumExtensionRound num      Maximum number of extension rounds (default: None, no limit)")
-	print ("                                 Extension stops when round number exceeds this value")
-	print ("                                 Applies to all modes (gapfiller/ctglinker/telseeker/telseeker_ctg)")
-	print ("                                 Minimum recommended value: 5")
+	print ("--MaximumExtensionLength BP|unlimited   Shared extension budget; last complete attempt may cross it")
+	print ("--MaximumExtensionRound N|unlimited     Shared left/right attempts, including unsuccessful attempts")
+	print ("                                 GapFiller defaults: 10 attempts and 500000 bp; other modes unchanged")
 	print ("\nK-mer Filtering Options:")
-	print ("--kmer_filter                    Enable k-mer filtering to reduce reads before alignment (default: disabled)")
+	print ("--kmer_filter / --no-kmer-filter        On by default for GapFiller; off for other modes")
 	print ("                                 Note: K-mer filtering can significantly speed up processing for large datasets")
-	print ("                                 If gap filling fails with this option, try without it")
+	print ("                                 If gap filling fails with this option, try --no-kmer-filter")
 	print ("--kmer_size | -ks num            K-mer size for filtering reads (default: 41, only used when --kmer_filter is enabled)")
 	print ("--kmer_num | -kn num             Number of k-mers to use for filtering (default: 20, only used when --kmer_filter is enabled)")
 	print ("\nMode Options:")
@@ -186,16 +183,8 @@ def getoptions():
 	parser.add_argument('--edge', type=int, default=500, help='Edge Controller set max Edge length')
 	parser.add_argument('--filterDepthHifi', type=float, default=None, help='Filter HiFi reads by mapped depth. if num==0.3 means: mapped HiFi reads on depth>=0.3*avgdepth and depth<=(2-0.3)*avgdepth will be filtered')
 	parser.add_argument('--filterDepthOnt', type=float, default=None, help='Filter ONT reads by mapped depth. if num==0.2 means: mapped ONT reads on depth>=0.2*avgdepth and depth<=(2-0.2)*avgdepth will be filtered')
-	parser.add_argument('--MaximumExtensionLength', type=int, default=None,
-	                    help='Maximum cumulative extension length in bp. Family searches share the budget across sides; the last complete attempt may cross it. '
-	                         'Applies to all modes (gapfiller/ctglinker/telseeker). Default: None (no limit)')
-	parser.add_argument('--MaximumExtensionRound', type=int, default=None,
-	                    help='Maximum extension attempts. Family searches count attempts across both sides, including normal unsuccessful attempts. '
-	                         'Applies to all modes (gapfiller/ctglinker/telseeker). Default: None (no limit). '
-	                         'Note: Setting to 0 will skip extension; minimum recommended value is 5')
+	add_options(parser, parser)
 
-	# K-mer related parameters
-	parser.add_argument('--kmer_filter', action='store_true', help='Enable k-mer filtering to reduce reads before alignment (default: disabled)')
 	parser.add_argument('--kmer_size', '-ks', type=int, default=41, help='k-mer size for filtering reads (only used when --kmer_filter is enabled)')
 	parser.add_argument('--kmer_num', '-kn', type=int, default=20, help='number of k-mers to use for filtering reads (only used when --kmer_filter is enabled)')
 
@@ -236,6 +225,7 @@ def getoptions():
 		sys.exit()
 
 	args = parser.parse_args()
+	resolve_defaults(args, gapfill=args.mode == "gapfiller")
 
 	if args.flag is not None:
 		print("Notice: --flag is deprecated and ignored; gap filling extends both families.")

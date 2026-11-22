@@ -10,8 +10,8 @@
       "version": "2.0",
       "distribution": "bundled",
       "repository": "https://github.com/Jianwei-Zhang/DEGAP",
-      "revision": "6cd01f1b983c43648e51389c129dfbd8b5926284",
-      "manifest_sha256": "5cf692e284e00eec615e899ae7d8adaae0615cc6953c44ca1e94cb8d6c50b5c2",
+      "revision": "ff4d753511fc8556d77b9a578e064e69fe47ade9",
+      "manifest_sha256": "792066c247813cab73610c0a3ef59ad0a9793c083fb2e5da21a5d1d7b728d1bb",
       "read_policy": "native_mixed",
       "recipe": "cgat.degap.family-junction.v3",
       "license": {

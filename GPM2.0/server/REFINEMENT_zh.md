@@ -55,12 +55,16 @@ bash /work/lgz_only/run_all.sh --gapfill-tools none
 
 | 顺序 / 参数标识 | 同时提供两种技术时 | 固定源码/分发版本 |
 | --- | --- | --- |
-| `01_degap` / `degap` | 一次原生混合输入运行 | DEGAP 2.0，revision `6cd01f1b983c43648e51389c129dfbd8b5926284` |
+| `01_degap` / `degap` | 一次原生混合输入运行 | DEGAP 2.0，revision `ff4d753511fc8556d77b9a578e064e69fe47ade9` |
 | `02_tgsgapcloser` / `tgsgapcloser` | 仅用 HiFi；没有 HiFi 时使用 ONT | TGS-GapCloser `1.2.1`，分发变体 `1.2.1_ml`、build 4；revision `52818b3e464209477baec506ade3240be43b4fa8` |
 | `03_quartet` / `quartet` | 一次 GapFiller 运行消费两组输入 | quarTeT `1.3.1`，revision `a44d8c87e3f4bcefaf43dc4134e88b6a21890265` |
 | `04_lrgapcloser` / `lrgapcloser` | 仅用 HiFi；没有 HiFi 时使用 ONT | LR_Gapcloser `1.0`、build `pl5321hdfd78af_0`；revision `156381adec01a5c664edbf5df1d866b5c70e82a1` |
 
 仅提供一种技术时，各所选工具使用该组数据。TGS/LR 不会悄悄各跑一遍 HiFi、ONT；报告记录提供、实际消费和未使用的输入。[`contracts/refinement-tools.lock.json`](contracts/refinement-tools.lock.json) 才是各平台包 hash、依赖 build、固定参数和公开 wrapper 补丁的权威清单，仅有版本号不算固定完整版本。环境定义覆盖 `linux-64`、`linux-aarch64`，不表示两种架构都已真实跑通。工具串行运行，共享已保存的线程预算，不为四工具分别同时申请整份预算。
+
+CGAT 锁定了 DEGAP 版本，并显式传入与上游 GapFiller 默认一致的参数：开启 k-mer 过滤、每个缺口左右合计最多 10 次延伸尝试，以及 500,000 bp 的累计延伸预算（最后一次完整尝试可超出该上限）。除已列出的覆盖项外，其他工具均沿用各自锁定的上游默认设置。高级用户可直接编辑已安装 Server 中的 `tools/gapfill.toml`，工作区副本会自动同步，无需新增 CLI 选项，详细说明见配置文件注释。
+
+四个工具的线程预算和输入输出由 CGAT 指定。TGS HiFi 额外使用 `--ne` 与 `-x asm20`；LR 使用 `-n 1`（上游为 `-n 5`）；quarTeT 使用 `--noplot`。
 
 ## 3. 最终结果究竟在哪
 

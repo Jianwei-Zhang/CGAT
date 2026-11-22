@@ -448,6 +448,11 @@ main() {
     fi
     die "environment '$ENV_NAME' is missing one or more required commands"
   fi
+  # The editable file is local installation state, not a signed source file.
+  if [[ -w "$SCRIPT_DIR/tools" && ! -e "$SCRIPT_DIR/tools/gapfill.toml" && ! -L "$SCRIPT_DIR/tools/gapfill.toml" ]]; then
+    (set -o noclobber; cat "$SCRIPT_DIR/tools/gapfill.default.toml" > "$SCRIPT_DIR/tools/gapfill.toml") \
+      || [[ -f "$SCRIPT_DIR/tools/gapfill.toml" ]] || die "could not initialize local gapfill settings"
+  fi
   write_state_marker "$state_marker" "$spec_sha256"
   print_usage_summary "install"
 }

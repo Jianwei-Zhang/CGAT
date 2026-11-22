@@ -10,7 +10,7 @@
 
 Relative to DEGAP 1.0 ([historical v1 guide](v1/README.md)), DEGAP 2.0 adds four core upgrades:
 
-1. **Faster candidate-read selection** — DEGAP 1.0 already offered post-alignment mapped-depth filtering; DEGAP 2.0 adds optional `--kmer_filter` (off by default) to narrow candidate reads *before* alignment, which can reduce mapping work on large datasets.
+1. **Faster candidate-read selection** — DEGAP 1.0 already offered post-alignment mapped-depth filtering; DEGAP 2.0 adds k-mer filtering (enabled by default for GapFiller) to narrow candidate reads *before* alignment, which can reduce mapping work on large datasets.
 2. **Bidirectional gap extension** — Replaces single-sided gap filling with sequential alternating left/right extension: each new version is checked against all opposite historical versions (including initial flanks), and a normally stopped side stays frozen as a target while the other continues.
 3. **TelSeeker chromosome-end extension** — Adds single-ended extension of targeted chromosome ends toward telomeric reads (`telseeker`) plus a contig-end variant (`telseeker_ctg`), supplementing internal-gap filling and contig linking.
 4. **Clearer job reports** — Produces self-contained offline interactive HTML reports (not real-time dashboards) explaining outcomes, extension history, selected connections, evidence, and stop reasons; open the generated `.html` file in a local browser (see the [report guide](HOWTO.md#reading-the-html-reports); `TelSeeker Ctg` uses `result/status.tsv` instead of HTML).
@@ -50,6 +50,8 @@ For manual setup without Micromamba, see [HOWTO.md — Installation](HOWTO.md#in
 Optional chromosome-end review plots and 2 kb end FASTAs can be prepared before running TelSeeker with `python bin/TelSeekerCheck.py --genome <genome.fa> --motif <MOTIF> --out <dir>`.
 
 ## Quick Start
+
+In `GapFiller` and `AutoGapfiller`, candidate-read k-mer filtering is now enabled by default and can be disabled with `--no-kmer-filter`. For each gap, left and right extensions share a default cap of 10 total extension attempts (including normal failed attempts) and a 500,000 bp cumulative extension budget; a final completed attempt may exceed this length budget, and the budget is not an input gap size cutoff. Both limits can be customized via `--MaximumExtensionRound` and `--MaximumExtensionLength`, each of which accepts `unlimited` to remove its limit.
 
 Fill one gap between left and right flanking sequences (`gapfiller`):
 

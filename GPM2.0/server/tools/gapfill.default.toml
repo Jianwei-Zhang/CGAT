@@ -1,0 +1,18 @@
+# CGAT Server: edit the local tools/gapfill.toml, not this packaged template.
+# If tools/gapfill.toml does not exist, create it by copying this file.
+# The next DEGAP run snapshots the installed file into the prepared workspace.
+# 不加命令行参数。请编辑安装目录中的 tools/gapfill.toml，不改此模板。
+# 工作区副本在开始 DEGAP 时自动对齐；安装目录不可用时，沿用最后保存的副本。
+
+[degap]
+# Per gap, left and right share this many attempts, including unsuccessful attempts.
+# 每处缺口左右合计；正常失败也计数。使用正整数，或 "unlimited" 取消此限制。
+max_extension_rounds = 10
+
+# A cumulative budget in bp, not a gap-size filter. The last complete attempt may cross it.
+# 使用正整数（bp），或 "unlimited"。仅在一次尝试完成后检查预算，最后一轮可能越过它。
+max_extension_bp = 500000
+
+# true enables candidate-read k-mer filtering before alignment; false disables it.
+# true 开启候选 reads 的 k-mer 过滤；false 关闭。
+kmer_filter = true

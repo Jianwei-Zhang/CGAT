@@ -42,7 +42,7 @@ def project_at(cwd):
 
 
 def runtime_file(name):
-    return (name.startswith("lib/") or name.startswith(("tools/long_cigar_recovery/", "tools/degap_core/")) or
+    return (name == "tools/gapfill.default.toml" or name.startswith("lib/") or name.startswith(("tools/long_cigar_recovery/", "tools/degap_core/")) or
             (name.startswith("contracts/") and name.endswith(".json")) or
             (name.startswith("tools/") and name.endswith(".py") and
              (len(Path(name).parts) == 2 or name.startswith(("tools/grt_core/", "tools/lgz_core/", "tools/degap_core/")))))

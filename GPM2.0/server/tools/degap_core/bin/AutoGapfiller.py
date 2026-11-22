@@ -19,6 +19,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 import argparse
+from GapFillDefaults import add_options, format_options
 
 # 导入各个 Part 的类
 try:
@@ -263,12 +264,7 @@ class AutoGapfiller:
         optional_params = []
         if self.args.thread:
             optional_params.append(f"-t {self.args.thread}")
-        if self.args.kmer_filter:
-            optional_params.append("--kmer_filter")
-        if self.args.MaximumExtensionRound:
-            optional_params.append(f"--MaximumExtensionRound {self.args.MaximumExtensionRound}")
-        if self.args.MaximumExtensionLength:
-            optional_params.append(f"--MaximumExtensionLength {self.args.MaximumExtensionLength}")
+        optional_params.extend(' '.join(option) for option in format_options(vars(self.args)))
 
         if optional_params:
             print(f"       {' '.join(optional_params)}")
@@ -360,12 +356,9 @@ class AutoGapfiller:
         #     params['filterDepthHifi'] = self.args.filterDepthHifi
         # if self.args.filterDepthOnt is not None:
         #     params['filterDepthOnt'] = self.args.filterDepthOnt
-        if self.args.MaximumExtensionLength is not None:
-            params['MaximumExtensionLength'] = self.args.MaximumExtensionLength
-        if self.args.MaximumExtensionRound is not None:
-            params['MaximumExtensionRound'] = self.args.MaximumExtensionRound
-        if self.args.kmer_filter:
-            params['kmer_filter'] = True
+        params.update(MaximumExtensionLength=self.args.MaximumExtensionLength,
+                      MaximumExtensionRound=self.args.MaximumExtensionRound,
+                      kmer_filter=self.args.kmer_filter)
         if self.args.kmer_size is not None:
             params['kmer_size'] = self.args.kmer_size
         if self.args.kmer_num is not None:
@@ -473,12 +466,7 @@ class AutoGapfiller:
         optional_params = []
         if self.args.thread:
             optional_params.append(f"-t {self.args.thread}")
-        if self.args.kmer_filter:
-            optional_params.append("--kmer_filter")
-        if self.args.MaximumExtensionRound:
-            optional_params.append(f"--MaximumExtensionRound {self.args.MaximumExtensionRound}")
-        if self.args.MaximumExtensionLength:
-            optional_params.append(f"--MaximumExtensionLength {self.args.MaximumExtensionLength}")
+        optional_params.extend(' '.join(option) for option in format_options(vars(self.args)))
 
         if optional_params:
             print(f"       {' '.join(optional_params)}")
@@ -588,8 +576,6 @@ For more information, visit: https://github.com/your-repo/DEGAPv2
     common = parser.add_argument_group('common parameters')
     common.add_argument('--work', '-w', type=int, default=1,
                        help='Number of parallel workers (default: 1)')
-    common.add_argument('--kmer_filter', action='store_true',
-                       help='Enable k-mer filtering')
     common.add_argument('--setup_only', action='store_true',
                        help='Only setup job directories and scripts without executing gap filling. '
                             'Useful for reviewing generated commands before execution')
@@ -602,13 +588,7 @@ For more information, visit: https://github.com/your-repo/DEGAPv2
                          help='K-mer size (default: 41)')
     advanced.add_argument('--kmer_num', '-kn', type=int, default=20,
                          help='Number of k-mers (default: 20)')
-    advanced.add_argument('--MaximumExtensionLength', type=int,
-                         help='Maximum cumulative extension length in bp (default: None, no limit). '
-                              'Extension stops when total extended length exceeds this value')
-    advanced.add_argument('--MaximumExtensionRound', type=int,
-                         help='Maximum number of extension rounds (default: None, no limit). '
-                              'Extension stops when round number exceeds this value. '
-                              'Minimum recommended value is 5')
+    add_options(advanced, common, gapfill=True)
     advanced.add_argument('--filterDepthHifi', type=float,
                          help='Filter HiFi reads by mapped depth. '
                               'Example: 0.3 means keep reads with depth >= 0.3*avgdepth and depth <= (2-0.3)*avgdepth')

@@ -22,6 +22,7 @@ try:
     from refinement_recipes import select_tools, select_reads
     from refinement_native import stage_refinement
     from refinement_cache import find_completed
+    from refinement_presets import sync_workspace
     from refinement_reports import build_tool_report, build_failure_report
     from refinement_overview import render_overview
     from refinement_source_evidence import build as build_source_evidence
@@ -34,6 +35,7 @@ except ModuleNotFoundError:
     from .refinement_recipes import select_tools, select_reads
     from .refinement_native import stage_refinement
     from .refinement_cache import find_completed
+    from .refinement_presets import sync_workspace
     from .refinement_reports import build_tool_report, build_failure_report
     from .refinement_overview import render_overview
     from .refinement_source_evidence import build as build_source_evidence
@@ -134,6 +136,8 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
             atomic_json(target, batch)
             result = None
             try:
+                if tool == "degap":
+                    sync_workspace(root)
                 result = find_completed(root, tool, groups)
                 if result is None:
                     result = stage_refinement(root, tool, groups, threads, run_id=attempt)

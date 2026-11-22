@@ -46,6 +46,20 @@ class RefinementBatchTests(unittest.TestCase):
             self.assertEqual(set(result["staged_results"]), {"tgsgapcloser", "quartet"})
             self.assertFalse((root / "05_final").exists())
 
+    def test_invalid_preset_does_not_stop_the_other_engines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            groups, _, _ = fixture.workspace(root)
+            with (mock.patch.object(batch, "sync_workspace", side_effect=ValueError("invalid gapfill.toml")),
+                  mock.patch.object(batch, "stage_refinement", side_effect=lambda root, tool, groups, threads, *, run_id: self.result(root, tool, run_id)) as stage,
+                  mock.patch.object(batch, "build_tool_report", return_value={}),
+                  mock.patch.object(batch, "build_failure_report", return_value={}),
+                  mock.patch.object(batch, "render_overview", return_value={})):
+                result = batch.execute_batch(root, groups, 2, tools="degap,tgsgapcloser")
+            self.assertEqual(stage.call_count, 1)
+            self.assertEqual(set(result["staged_results"]), {"tgsgapcloser"})
+            self.assertIn("invalid gapfill.toml", result["batch"]["tools"]["degap"]["error"])
+
     def test_baseline_mutation_invalidates_the_group_instead_of_mixing_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"

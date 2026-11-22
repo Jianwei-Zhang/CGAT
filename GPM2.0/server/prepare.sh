@@ -345,7 +345,7 @@ write_prepare_lib() {
   mkdir -p "$tools_dst"
   mkdir -p "$contracts_dst"
   cp -R "$lib_src" "$lib_dst"
-  cp -f "$tools_src"/*.py "$tools_dst"/
+  cp -f "$tools_src"/*.py "$tools_src/gapfill.default.toml" "$tools_dst"/
   cp -R "$tools_src/grt_core" "$tools_dst/grt_core"
   cp -R "$tools_src/lgz_core" "$tools_dst/lgz_core"
   cp -R "$tools_src/degap_core" "$tools_dst/degap_core"

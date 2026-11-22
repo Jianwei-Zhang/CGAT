@@ -24,6 +24,7 @@ try:
     from refinement_publication import prepare_publication, verify_baseline
     from refinement_tools import validate_runtime, load_lock, verify_directory_links
     from refinement_recipes import make_invocation
+    from refinement_presets import effective as effective_degap
     from refinement_degap_units import ENGINE_REVISION as PIN, FAMILY, family_result
     from refinement_native_checkpoint import execute as execute_native, validate_native_job_summary
 except ModuleNotFoundError:
@@ -35,13 +36,14 @@ except ModuleNotFoundError:
     from .refinement_publication import prepare_publication, verify_baseline
     from .refinement_tools import validate_runtime, load_lock, verify_directory_links
     from .refinement_recipes import make_invocation
+    from .refinement_presets import effective as effective_degap
     from .refinement_degap_units import ENGINE_REVISION as PIN, FAMILY, family_result
     from .refinement_native_checkpoint import execute as execute_native, validate_native_job_summary
 
 RECIPE = "cgat.degap.family-junction.v3"
 ADAPTER_FILES = ("refinement_degap.py", "refinement_admission.py", "refinement_path.py",
                  "refinement_sources.py", "refinement_publication.py", "refinement_tools.py",
-                 "refinement_recipes.py", "refinement_native_trace.py", "refinement_native_checkpoint.py",
+                 "refinement_recipes.py", "refinement_presets.py", "refinement_native_trace.py", "refinement_native_checkpoint.py",
                  "refinement_native_units.py", "refinement_native_runner.py", "refinement_degap_units.py", "refinement_tgs_units.py", "refinement_lr_units.py")
 
 
@@ -156,14 +158,15 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
                 raise PathError("reads changed while fingerprinting")
             identities[path] = before
             reads_manifest.append({"technology": kind, "path": str(path), "sha256": sha256})
-    recipe = {"schema": RECIPE, "tool": "degap", "version": lock["tools"]["degap"]["version"], "revision": PIN,
+    parameters = effective_degap(root)
+    recipe = {"schema": RECIPE, "tool": "degap", "extension_parameters": parameters, "version": lock["tools"]["degap"]["version"], "revision": PIN,
               "engine_manifest_sha256": identity(engine_manifest), "runtime_sha256": identity(runtime),
               "tool_lock_sha256": identity(lock), "reads": reads_manifest,
               "baseline_source_files": catalog.baseline_bindings(), "baseline_sha256": digest(baseline_fasta), "baseline_final_path_sha256": baseline_digest,
               "adapter_sources": {name: digest(tools_root / name) for name in ADAPTER_FILES}}
     atomic_json(paths["01_inputs"] / "recipe.json", recipe)
     native_invocation = make_invocation("degap", baseline_fasta, groups, paths["03_native"], threads,
-                                        runtime=runtime, lock=lock)
+                                        runtime=runtime, lock=lock, degap_parameters=parameters)
     command = list(native_invocation.command)
     for relative in engine_manifest["files"]:
         path = engine_root / relative

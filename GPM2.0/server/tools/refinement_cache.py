@@ -17,6 +17,7 @@ try:
     from refinement_tools import load_lock, validate_runtime, fingerprint
     from refinement_recipes import select_reads
     from refinement_degap import ADAPTER_FILES as DEGAP_FILES
+    from refinement_presets import effective as effective_degap
     from refinement_native import ADAPTER_FILES as NATIVE_FILES
 except ModuleNotFoundError:
     from .workspace_layout import TOOL_DIRECTORIES, workspace_join
@@ -24,6 +25,7 @@ except ModuleNotFoundError:
     from .refinement_tools import load_lock, validate_runtime, fingerprint
     from .refinement_recipes import select_reads
     from .refinement_degap import ADAPTER_FILES as DEGAP_FILES
+    from .refinement_presets import effective as effective_degap
     from .refinement_native import ADAPTER_FILES as NATIVE_FILES
 
 
@@ -63,6 +65,8 @@ def validate_candidate(root, tool, groups, directory, runtime, lock):
         definition = lock["tools"][tool]
         if (recipe.get("name", recipe.get("schema")) != definition["recipe"]
                 or recipe.get("revision") != definition["revision"] or recipe.get("runtime_sha256") != fingerprint(runtime)):
+            return None
+        if tool == "degap" and recipe.get("extension_parameters") != effective_degap(root):
             return None
         names = DEGAP_FILES if tool == "degap" else NATIVE_FILES
         if set(recipe.get("adapter_sources", {})) != set(names):

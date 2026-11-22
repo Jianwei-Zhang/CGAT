@@ -4,8 +4,10 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from server.tools.refinement_admission import degap_proposal, degap_family_proposal, exclude_conflicts
 from server.tools.refinement_path import Gap
 
@@ -70,11 +72,13 @@ class RefinementAdmissionTests(unittest.TestCase):
         bundled_receipt(load_lock()["tools"]["degap"])
         directory = Path(__file__).parents[1] / "tools/degap_core/bin"
         modules = []
-        for name in ("AutoGapfillerPart2", "AutoGapfillerPart3"):
-            spec = importlib.util.spec_from_file_location(name, directory / (name + ".py"))
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            modules.append(module)
+        # The native script launcher adds its own bin/ to the import path.
+        with patch.object(sys, "path", [str(directory), *sys.path]):
+            for name in ("AutoGapfillerPart2", "AutoGapfillerPart3"):
+                spec = importlib.util.spec_from_file_location(name, directory / (name + ".py"))
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                modules.append(module)
         with tempfile.TemporaryDirectory() as temporary, contextlib.redirect_stdout(io.StringIO()):
             root = Path(temporary)
             genome = root / "assembly.fa"

@@ -15,8 +15,10 @@ import sys
 
 try:
     from refinement_tools import TOOLS, ToolError, load_lock, source_location, validate_runtime, fingerprint
+    from refinement_presets import defaults as default_degap, degap_args
 except ModuleNotFoundError:
     from .refinement_tools import TOOLS, ToolError, load_lock, source_location, validate_runtime, fingerprint
+    from .refinement_presets import defaults as default_degap, degap_args
 
 
 @dataclass(frozen=True)
@@ -67,7 +69,8 @@ def native_safe_path(path: Path):
 
 
 def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir: Path, threads: int,
-                    *, prefix: Path | None = None, runtime: dict | None = None, lock=None, jobs_dir: Path | None = None) -> Invocation:
+                    *, prefix: Path | None = None, runtime: dict | None = None, lock=None, jobs_dir: Path | None = None,
+                    degap_parameters: dict | None = None) -> Invocation:
     prefix = Path(prefix or sys.prefix).resolve()
     lock = lock or load_lock()
     runtime = runtime or validate_runtime(prefix, lock, tool=tool)
@@ -100,6 +103,9 @@ def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir:
         native_safe_path(engine)
         command = [python, "-B", str(engine), "--genome", str(baseline), "--output", str(native_dir),
                    "--work", "1", "--thread", str(threads)]
+        degap_parameters = default_degap() if degap_parameters is None else degap_parameters
+        recipe["extension_parameters"] = degap_parameters
+        command.extend(degap_args(degap_parameters))
         for kind, paths in reads.items():
             if paths:
                 command += ["--" + kind, *paths]

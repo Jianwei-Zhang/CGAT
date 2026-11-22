@@ -132,6 +132,8 @@ def verified_source(root: Path, revision: str) -> dict[str, dict]:
     required = ENTRYPOINTS | {"run.sh", "prepare.sh", "install.sh", "tools/server_run.py"}
     if canonical:
         required |= LGZ_ENTRYPOINTS
+    if "tools/refinement_presets.py" in manifest:
+        required.add("tools/gapfill.default.toml")
     for relative in required:
         if relative not in manifest:
             raise ValueError(f"source manifest is incomplete: {relative}")
@@ -275,7 +277,7 @@ def update(source: Path, workspace: Path, tools_root: Path, revision: str, *, ap
     runtime = workspace_join(workspace, ".prepare_lib")
     canonical = "tools/lgz_core/__init__.py" in manifest
     selected = {relative: record for relative, record in manifest.items()
-                if relative == "SOURCE.json" or relative in ENTRYPOINTS | LGZ_ENTRYPOINTS
+                if relative in {"SOURCE.json", "tools/gapfill.default.toml"} or relative in ENTRYPOINTS | LGZ_ENTRYPOINTS
                 or relative.startswith(("tools/grt_core/", "tools/lgz_core/", "tools/degap_core/"))
                 or canonical and relative.startswith("tools/") and (
                     len(PurePosixPath(relative).parts) == 2 and relative.endswith(".py")

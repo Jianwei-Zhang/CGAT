@@ -55,12 +55,16 @@ Use exactly the lowercase comma-separated identifiers shown above, without dupli
 
 | Order / identifier | Both technologies supplied | Pinned source/distribution |
 | --- | --- | --- |
-| `01_degap` / `degap` | One native mixed-input run | DEGAP 2.0, revision `6cd01f1b983c43648e51389c129dfbd8b5926284` |
+| `01_degap` / `degap` | One native mixed-input run | DEGAP 2.0, revision `ff4d753511fc8556d77b9a578e064e69fe47ade9` |
 | `02_tgsgapcloser` / `tgsgapcloser` | HiFi only; otherwise ONT | TGS-GapCloser `1.2.1`, distribution variant `1.2.1_ml`, build 4; revision `52818b3e464209477baec506ade3240be43b4fa8` |
 | `03_quartet` / `quartet` | One GapFiller run consuming both groups | quarTeT `1.3.1`, revision `a44d8c87e3f4bcefaf43dc4134e88b6a21890265` |
 | `04_lrgapcloser` / `lrgapcloser` | HiFi only; otherwise ONT | LR_Gapcloser `1.0`, build `pl5321hdfd78af_0`; revision `156381adec01a5c664edbf5df1d866b5c70e82a1` |
 
 With only one technology, each selected engine uses that group. TGS/LR do not silently run two technology-specific jobs. Reports record supplied, consumed and unused inputs. The authoritative platform-specific package hashes, dependency builds, parameters and disclosed wrapper patches are in [`contracts/refinement-tools.lock.json`](contracts/refinement-tools.lock.json); a version label alone is not the pin. The environment definitions cover `linux-64` and `linux-aarch64`; this is not yet a successful native-run claim for either architecture. Engines run sequentially within the saved thread budget, not with four separate full budgets.
+
+CGAT pins DEGAP and explicitly passes its now-matching new upstream GapFiller defaults: k-mer filtering enabled, at most 10 shared left/right attempts per gap, and a 500,000 bp cumulative extension budget (which the last complete attempt may exceed). Other tools use their pinned upstream defaults except for listed overrides. Advanced users can edit the installed Server `tools/gapfill.toml`; the workspace copy syncs automatically without needing a new CLI option, and details live in the config comments.
+
+CGAT explicitly sets the thread budget and I/O for all tools. TGS HiFi also uses `--ne` and `-x asm20`; LR uses `-n 1` instead of the upstream `-n 5`; quarTeT uses `--noplot`.
 
 ## 3. Find the actual final result
 
