@@ -37,7 +37,7 @@ def _inputs(case):
     return names
 
 
-def stage_inputs(inputs, directory, signatures):
+def stage_inputs(inputs, directory, signatures, digests):
     """Copy a bounded complete pair; never accept a changed archive source."""
     copies = tuple(directory/p.name for p in inputs)
     for source, dest in zip(inputs, copies):
@@ -54,8 +54,8 @@ def stage_inputs(inputs, directory, signatures):
             if _signature(os.fstat(incoming.fileno())) != expected:
                 raise ValueError('archive identity changed during local staging')
         if (stamp(source) != expected or dest.stat().st_size != expected[2]
-                or digest(dest) != checksum.hexdigest()):
-            raise ValueError('local stage is not an exact complete copy')
+                or checksum.hexdigest() != digests[source] or digest(dest) != digests[source]):
+            raise ValueError('archived input changed or local copy differs from original receipt')
     return copies
 
 
@@ -63,7 +63,7 @@ def _mount_type(path):
     return subprocess.check_output(['findmnt', '-n', '-o', 'FSTYPE', '-T', str(path)], text=True).strip()
 
 
-def run_arm(out, cases, signatures, guard, scratch=None):
+def run_arm(out, cases, signatures, digests, guard, scratch=None):
     out.mkdir()
 
     def run(index, case):
@@ -74,7 +74,7 @@ def run_arm(out, cases, signatures, guard, scratch=None):
                  if scratch is not None else nullcontext())
         with local as directory:
             start = time.monotonic()
-            inputs = stage_inputs(initial, Path(directory), signatures) if directory else initial
+            inputs = stage_inputs(initial, Path(directory), signatures, digests) if directory else initial
             copy_seconds = time.monotonic() - start if directory else 0.0
             frames = {path:stamp(path) for path in inputs} if directory else {p:signatures[p] for p in inputs}
             rows = []
@@ -122,7 +122,8 @@ def main():
         raise ValueError('guard not identical to historical commands')
     if len(os.sched_getaffinity(0)) < CPU_BUDGET:
         raise ValueError('requires at least six allocated cores')
-    cases, signatures, nbytes = load_cases(work,archive,WINDOWS)
+    digests = {}
+    cases, signatures, nbytes = load_cases(work,archive,WINDOWS, input_digests=digests)
     signatures[guard] = stamp(guard)
     out.mkdir()
     with tempfile.TemporaryDirectory(prefix='cgat-regional-local-io-', dir=scratch_parent) as staging:
@@ -138,11 +139,13 @@ def main():
                           'shared_output_fstype':_mount_type(out)}), flush=True)
         result = []
         for i,storage in enumerate((None,scratch,scratch,None)):
-            arm = run_arm(out/f'phase-{i}', cases, signatures, guard, scratch=storage)
+            arm = run_arm(out/f'phase-{i}', cases, signatures, digests, guard, scratch=storage)
             if any(stamp(p) != s for p,s in signatures.items()):
                 raise ValueError('a frozen artifact changed after a phase')
             print(json.dumps({k:v for k,v in arm.items() if k!='cases'}), flush=True)
             result.append(arm)
+        if any(digest(p) != h or stamp(p) != signatures[p] for p,h in digests.items()):
+            raise ValueError('original archived FASTA does not match the bound source bytes after the experiment')
     with (out/'report.json').open('x') as f:
         json.dump({'status':'exact_regional_local_input_abba', 'node':socket.gethostname(),
                    'stdout_matches_both_original_commands':True, 'scratch_fstype':fstype,

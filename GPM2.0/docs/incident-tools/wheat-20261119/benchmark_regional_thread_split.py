@@ -76,7 +76,7 @@ def checked_argv(command, tool, preset, flags, original_files, archived_files, m
     return (*expected[:-3], str(mapper_threads), *map(str, archived_files))
 
 
-def load_cases(work, archive, count):
+def load_cases(work, archive, count, *, input_digests=None):
     summary_path = within(archive, "summary.json")
     if digest(summary_path) != SUMMARY_SHA:
         raise ValueError("unexpected native archive")
@@ -115,6 +115,9 @@ def load_cases(work, archive, count):
             original_files.append(work/p)  # removable original generated FASTA may be absent
             stored = within(archive/"artifacts", p)
             remember(stored, expected, signatures)
+            if input_digests is not None:
+                if input_digests.setdefault(stored, expected['sha256']) != expected['sha256']:
+                    raise ValueError('archive input is bound to conflicting original digests')
             archived_files.append(stored)
         stages = []
         for kind, directory, rr in (
