@@ -35,7 +35,8 @@ HELPERS = ("refinement_native_units.py", "refinement_native_runner.py")
 
 
 def helper_hashes(tool="quartet"):
-    extra = {"degap": ("refinement_degap_units.py",), "tgsgapcloser": ("refinement_tgs_units.py",)}
+    extra = {"degap": ("refinement_degap_units.py",), "tgsgapcloser": ("refinement_tgs_units.py",),
+             "lrgapcloser": ("refinement_lr_units.py",)}
     names = HELPERS + extra.get(tool, ())
     return {name: digest(Path(__file__).with_name(name)) for name in names}
 
@@ -215,6 +216,12 @@ class UnitStore:
 
 def launch(root, invocation, paths, record, native_binding):
     """Disclose the wrapper separately; never modify the pinned invocation."""
+    if invocation.tool == "lrgapcloser":
+        try:
+            from refinement_lr_units import launch as launch_lr
+        except ModuleNotFoundError:
+            from .refinement_lr_units import launch as launch_lr
+        return launch_lr(root, invocation, paths, record, native_binding)
     if invocation.tool == "tgsgapcloser":
         try:
             from refinement_tgs_units import launch as launch_tgs
@@ -238,6 +245,12 @@ def launch(root, invocation, paths, record, native_binding):
 
 def capture_units(root, tool, run_id, code, *, required=False):
     """All evidence is in the current producer; no external cache needed offline."""
+    if tool == "lrgapcloser":
+        try:
+            from refinement_lr_units import capture_units as capture_lr
+        except ModuleNotFoundError:
+            from .refinement_lr_units import capture_units as capture_lr
+        return capture_lr(root, run_id, code, required=required)
     if tool == "tgsgapcloser":
         try:
             from refinement_tgs_units import capture_units as capture_tgs

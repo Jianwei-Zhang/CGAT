@@ -45,7 +45,7 @@ except ModuleNotFoundError:
 ADAPTER_FILES = ("refinement_native.py", "refinement_native_formats.py", "refinement_native_trace.py",
                  "refinement_path.py", "refinement_sources.py", "refinement_publication.py",
                  "refinement_degap.py", "refinement_recipes.py", "refinement_reads.py", "refinement_tools.py", "refinement_native_checkpoint.py",
-                 "refinement_native_units.py", "refinement_native_runner.py", "refinement_degap_units.py", "refinement_tgs_units.py")
+                 "refinement_native_units.py", "refinement_native_runner.py", "refinement_degap_units.py", "refinement_tgs_units.py", "refinement_lr_units.py")
 
 class NamedGenome:
     def __init__(self, index, original_to_native):

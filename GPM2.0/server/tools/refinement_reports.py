@@ -120,7 +120,7 @@ def native_diagnostics(root, tool, run_id, execution):
     log = (base / "02_jobs" / native_run / "native.log").as_posix()
     if (root / log).is_file():
         selected.setdefault(log, digest(safe_file(root, log)))
-    if tool in {"quartet", "degap", "tgsgapcloser"} and not origin:
+    if tool in {"quartet", "degap", "tgsgapcloser", "lrgapcloser"} and not origin:
         # Failed/interrupted attempts may contain completed units even though
         # no whole-native completion exists. Only named owned diagnostics.
         unit_base = base / "02_jobs" / native_run
@@ -131,7 +131,7 @@ def native_diagnostics(root, tool, run_id, execution):
         for receipt in sorted((root / unit_base / "native_units").glob("*/unit_complete.json")):
             if not re.fullmatch(r"[0-9a-f]{64}", receipt.parent.name):
                 continue
-            for name in ("unit_complete.json", "producer.json", "output.paf", "stdout.paf", "stdout.fasta", "stderr.log"):
+            for name in ("unit_complete.json", "producer.json", "output.paf", "stdout.paf", "stdout.fasta", "stderr.log", "gapclosed.fasta", "info_filter2"):
                 file = receipt.parent / name
                 if file.exists() or file.is_symlink():
                     select(file.relative_to(root).as_posix())

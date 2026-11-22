@@ -426,3 +426,18 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 另选定三工具真实格式解析/来源重建用例通过（2.996 秒），其 producer 是明确的受控夹具。初次 native 脚本用例发现受控 Candidate helper 错误读取不存在的 `--prefix` 参数，修正夹具后通过，没有修改或放宽原生生产校验。
 - 测试解包 lock 校验的原脚本，C++ helpers/Racon 为受控程序；HiFi 无命中用例使用本机实际 minimap2。未执行真实四工具固定环境、ARM、完整生物学、App 或进程终止故障验收。普通 CI 可运行轻量格式用例，精确 driver 用例通过 `CGAT_TEST_TGS_ARCHIVE` 显式启用。
 - 全目标继续保留：LR 迭代恢复、未完成旧 LGZ 阶段迁移、原生离线可视报告、固定环境/四工具/双架构、终止/残留进程故障以及最新 App 闭环与 A01–A18 统一检查。没有升级现有环境、浏览器/生产构建、远端作业或发布；master 和客户工作区未动。
+
+
+## 2026-11-22：LR 迭代处理恢复与后台错误闭环
+
+- 先记录恢复协议，再新增 `refinement_lr_units.py`。从 lock 验证的原分发 driver 及既有路径探测补丁生成私有执行副本；原脚本/参数不改。保留预处理、首个 BWA index、tag split 的原顺序，在首轮 mapping/filter/reconstruction 及后续迭代处理块添加严格 restore/commit 边界。明确不冒称复用首个索引或预处理。
+- 单位同时封存完整 `gapclosed.fasta`、`tmp/info_filter2`、实际输入/版本/线程及原生产者。新尝试只恢复这些消费产物，不搬迁旧 BWA/Perl 临时树；源文件存在、部分 FASTA、协议错误均不会被当作完成或普通 miss。原 gap finder/空 genome-ID 分支仍决定提前停止，原公共输入清理仍执行。
+- 大 normalized reads/tag 文件的内容快照只在本次实际 live controller PID/start epoch 中复用；不使用跨 run 的 stat-only 缓存。完成验证依赖封存输出，不依赖原脚本随后删除的公共输入。新消费文件独立于历史生产者，保留原回执/字节。
+- 原脚本的裸 `wait` 可能掩盖后台 coverage/gap-finder 非零退出；私有副本记录原后台 PID 并逐一等待，保持原命令和并发，失败不生成单位完成回执。restore 的 miss=1 与错误=2 分开，错误不会反过来放行未证明的处理块。
+- 公开中英文恢复说明整理为四工具边界列表，报告接入 LR 单位/FASTA/info 和原生产者。native 完成校验器升级只重验已封存科学结果，不因此重跑工具；Final Path 仍走原 CGAT trace/来源重建和发布。
+
+### 本段必要轻量证据
+
+- 7 项定向检查通过（30.481 秒）：新增 5 项 LR 用例，以及原有完成校验器重验、三工具真实格式解析/来源重建。覆盖第二轮失败后第一轮恢复、第一轮初始 index 仍 fresh、第三轮原生提前停止、公共输入原生清理后的整段复用、后台子进程失败、协议错误不运行 native block、reads/线程/输出漂移、遗漏单位/消费文件、历史文件和独立 inode。
+- driver SHA 来自锁定的原 noarch 分发文件，native 循环/分支和 bash 执行真实；BWA 和 Perl 算法由受控程序替代，不冒称真实 LR、生物学结果、固定环境/双架构或 App 验收。通过 `CGAT_TEST_LR_DRIVER` 显式启用精确 driver 用例；未运行全量回归。
+- 四工具的上述内部恢复边界现均有代码。仍需推进未完成旧 LGZ 阶段迁移、原生离线可视报告、固定环境/真实四工具/双架构、终止和残留进程故障，以及最新 App 闭环与 A01–A18 最后统一检查。没有升级现有环境、运行浏览器/生产构建/远端作业或发布，master 和客户工作区未动。

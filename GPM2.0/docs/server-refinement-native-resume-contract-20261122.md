@@ -54,8 +54,8 @@ All selected inputs still run through native processing. A failure after input A
 can reuse A on retry while executing B again. Final completion still requires the
 native filled outputs or the exact pinned all-input no-candidate outcome.
 
-The implemented DEGAP terminal-child boundary is described below. TGS command units are described below; LR iterations still need a separate
-consumer, input/output closure and failure tests before they are enabled. For DEGAP,
+The implemented DEGAP terminal-child boundary is described below. TGS command units and LR iteration-processing units are described below; each
+has its own consumed-input/output closure and native failure checks. For DEGAP,
 verified cached jobs must remain in the native summary (the upstream all-skipped
 summary is not complete); LR cannot resume from an iteration FASTA alone. No
 adapter may turn bare `.skip_right`, preprocessing files or exit-zero markers into
@@ -198,3 +198,48 @@ not a fixed-environment/real-Racon/C++ filling or ARM execution acceptance. The
 current source SHA was verified against the pinned linux-64 build-4 archive;
 architecture checks remain in the final matrix. Generated executable wrappers
 are server-only script evidence, not active report assets or FASTA payloads.
+
+
+## LR: completed iteration-processing units
+
+Instrument a private copy of the lock-verified, path-discovery-patched LR driver.
+Keep preprocessing, the first BWA index and tag split fresh in their original
+order. Gate the first mapping/filter/reconstruction block, and each subsequent
+iteration-processing block, with a checked restore/commit boundary. The original
+gap-finder/empty-genome-ID test still decides early stop before any restore.
+Do not precreate the native output directory or change scientific parameters.
+
+Each unit binds raw/native runtime recipe, actual normalized reads, read lengths,
+tag partitions, input genome and, for later iterations, fresh gap/ID prelude
+files. The first stage also binds its freshly built BWA index. Completed output
+means the native block exited successfully and both `gapclosed.fasta` (complete
+chromosome identities) and `tmp/info_filter2` exist and are sealed. Restore these
+regular files into the new iteration directory, with original producer receipts;
+never restore a partial BWA/Perl tree or trust an unsealed FASTA by itself.
+
+Native foreground failures remain fatal. Track the original background coverage
+and gap-finder PIDs and wait for each exit status; bare `wait` must not hide a
+failed native child. Keep the same commands and concurrency, rather than turning
+an unchecked parent exit zero into a complete unit. A restore miss is distinct
+from an input/protocol error, so malformed state cannot be treated as permission
+to continue a native block.
+
+A live-attempt input snapshot cache may avoid repeatedly hashing large normalized
+reads across the fixed three iterations. It is regenerated per attempt and guarded
+by the actual controller PID/start identity plus complete file-identity fences;
+no old-run stat-only cache is accepted. Native cleanup still removes its common
+working inputs; final admission and offline validation depend on sealed iteration
+outputs/receipts, not deleted preprocessing files. Shared completed native-phase
+reuse remains the first choice. Reports distinguish this processing-stage reuse
+from fresh preprocessing/initial-index work and still reconstruct the Final Path
+through the existing CGAT trace/admission path.
+
+
+Focused LR validation uses the lock-pinned packaged driver (including the already
+approved helper-discovery patch), its actual loops, branch/early-stop logic and
+shell process execution, with controlled BWA/Perl programs. The optional
+`CGAT_TEST_LR_DRIVER` selects that exact source file and rejects a different SHA.
+It tests iteration 2 failure, iteration 1 replay, original early stop and cleanup,
+background error propagation, restore miss versus protocol error, byte/recipe
+changes and cross-attempt file independence. Real helper algorithms, pinned env,
+ARM and termination/quiescence acceptance remain in the final matrix.

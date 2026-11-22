@@ -133,7 +133,8 @@ class NativeCheckpointTests(unittest.TestCase):
                 "refinement_native_checkpoint.py": "f" * 64,
                 "refinement_native_units.py": real_digest(Path(checkpoints.__file__).with_name("refinement_native_units.py")),
                 "refinement_degap_units.py": real_digest(Path(checkpoints.__file__).with_name("refinement_degap_units.py")),
-                "refinement_tgs_units.py": real_digest(Path(checkpoints.__file__).with_name("refinement_tgs_units.py"))}))
+                "refinement_tgs_units.py": real_digest(Path(checkpoints.__file__).with_name("refinement_tgs_units.py")),
+                "refinement_lr_units.py": real_digest(Path(checkpoints.__file__).with_name("refinement_lr_units.py"))}))
             self.assertEqual(receipt.read_bytes(), raw)
 
     def test_degap_reuses_completed_child_jobs_and_reconstructs_sources_again(self):
