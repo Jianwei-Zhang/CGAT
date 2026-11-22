@@ -6,6 +6,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::process::Command;
 
+#[path = "refinement_acceptance_manual.rs"]
+mod manual;
+
 #[derive(Deserialize)]
 struct Case {
     id: String,
@@ -20,7 +23,9 @@ struct Case {
 }
 
 fn digest(path: &Path) -> String {
-    format!("{:x}", Sha256::digest(fs::read(path).unwrap()))
+    let mut hash = Sha256::new();
+    std::io::copy(&mut fs::File::open(path).unwrap(), &mut hash).unwrap();
+    format!("{:x}", hash.finalize())
 }
 
 fn sequences(path: &Path) -> BTreeMap<String, String> {
@@ -38,18 +43,22 @@ fn sequences(path: &Path) -> BTreeMap<String, String> {
     result
 }
 
-fn normalize_for_export(case_dir: &Path, view: &Value) -> Value {
+fn normalize_for_export(case_dir: &Path, view: &Value, saved: Option<&Value>) -> Value {
     let input = case_dir.join("native-project-view.json");
     fs::write(&input, serde_json::to_vec_pretty(view).unwrap()).unwrap();
-    let output =
-        Command::new(std::env::var_os("CGAT_ACCEPTANCE_NODE").unwrap_or_else(|| "node".into()))
-            .arg(
-                Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../scripts/normalize-refinement-acceptance.mjs"),
-            )
-            .arg(input)
-            .output()
-            .unwrap();
+    let mut node =
+        Command::new(std::env::var_os("CGAT_ACCEPTANCE_NODE").unwrap_or_else(|| "node".into()));
+    node.arg(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../scripts/normalize-refinement-acceptance.mjs"),
+    )
+    .arg(input);
+    if let Some(saved) = saved {
+        let input = case_dir.join("saved-final-path.json");
+        fs::write(&input, serde_json::to_vec(&saved).unwrap()).unwrap();
+        node.arg(input);
+    }
+    let output = node.output().unwrap();
     assert!(
         output.status.success(),
         "{}",
@@ -181,7 +190,7 @@ fn actual_server_archives_roundtrip_through_desktop_commands() {
                     .iter()
                     .all(|dataset| dataset.fasta_available != light)
             );
-            let final_path = normalize_for_export(&case_dir, raw_view);
+            let final_path = normalize_for_export(&case_dir, raw_view, None);
             let export = case_dir.join("app-export.fa");
             let result = export_project_final_path_fasta(
                 workspace_str.clone(),

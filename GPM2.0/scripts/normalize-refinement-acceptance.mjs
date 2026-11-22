@@ -5,4 +5,6 @@ import { canonicalizeFinalPathOverallLengths, normalizeFinalPathByChr } from "..
 
 const view = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const baseline = normalizeFinalPathByChr(normalizeGrtProjectView(view).baselineFinalPathByChr);
-process.stdout.write(JSON.stringify(canonicalizeFinalPathOverallLengths(baseline, baseline)));
+const saved = process.argv[3] ? JSON.parse(readFileSync(process.argv[3], "utf8")) : {};
+const paths = { ...baseline, ...normalizeFinalPathByChr(saved) };
+process.stdout.write(JSON.stringify(canonicalizeFinalPathOverallLengths(paths, baseline)));
