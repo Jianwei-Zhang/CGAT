@@ -3849,3 +3849,23 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   冻结旧实现与候选在400个合成命令路径同字节ABBA，本地冷约54.5→35.8ms、热约54.7→29.2ms（非现场倍率）。
   实样小文件只读ABBA `43015894`仍RUNNING；不修改受绑定的远端`run_orchestration.py`，不把这项混进已验证的
   两模块loader候选或冒称已减少本轮真实预检时间。
+
+### 2026-11-22 18:36 CST：准备条件式资源申请，不提前打断在跑任务
+
+- `43015894 / agent-X86-61` 在360秒诊断上限到达后终止（errCode 124）。最后一个热baseline未结束，
+  **不是完整ABBA**。其余7段均逐项返回503个原冻结命令文件完全相同的 `path/size/SHA`。冷路径A
+  55.78/45.28s、B 33.97/33.33s；热只列实测 A 44.48s、B 12.37/12.74s，不计算完整ABBA倍率。
+  每次完整清单的真实路径签名调用2012→1006；CPU时间仅0.2–0.56s/段，说明此处样本主要在等文件系统，
+  这不是25项预检或整麦加速结果。`q0-checkpoint-identity-scoped-partial-20261122.json` SHA
+  `575ea11f19cde03a0c062a01e622bb3461387e2b4f0026a7b8f6c1b372688569`，全stdout/调度终态/源码留在
+  当前cutover下`identity-abba-182603`。`51febb4f`仍未热改远端保护模块或加入当前切换。
+- **登录节点观察器PID1991023**（已复查PPID1、存活；脚本来自 `bba04342`），首条18:35:38；目录仍为
+  `q0-child-loader-cutover-20261122-180258`，`loader-watcher.log` / `loader-watcher-config.json`，后者SHA
+  `8f7a60afec103d8dfa519de201fe83f4728c157f52187f60646fda6ac6957775`。有界45轮、每分钟按同一作业查询。
+  只有43015292调度成功、43015295实样仍获成功、现新版43012037和旧42523432均RUNNING、主run/锁所有者
+  仍吻合且Q0未完成时，才比较真实新旧25项内容身份并至多**提交一次**32CPU/320GiB等候资源。用独占
+  `loader-resource-submit-intent.json`防dsub结果含糊时盲重投，以`loader-resource-submitted.json`读新job；
+  仅观察到超时/失败不误认终态；若真实预检失败或任一来源漂移则不提交。10项相关fixture本地和180通过。
+- 观察器没有stop/install/写handoff权限路径。新资源仍须在真实节点拿到`loader-ready.json`和正常`ready.json`，
+  之后才由人工核对新旧job、资源、Q0边界、锁释放和净收益；不为抢节点提前停止正产出的43012037。
+  如果已出现intent但没submitted，先查同一目录与调度器，绝不另起watcher或直接重复提交。
