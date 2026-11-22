@@ -6,7 +6,10 @@ When no provisional path exists callers must use the full supplement fallback.
 """
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections import defaultdict
+
+from .q0_catalog import _IntervalUnion
 
 from .q0_sources import Interval, Q0EvidenceError, merged_intervals
 
@@ -75,3 +78,107 @@ def window_touches_frontier(query, targets, parts, frontier) -> bool:
         if any(span.intersection(shoulder) for shoulder in frontier.get(source, ())):
             return True
     return False
+
+
+class UnsearchedWindows:
+    """Conservative union of both axes of every deliberately omitted window.
+
+    Compressed by source part; no per-pair cross product or PAF-derived mask.
+    Coordinates describe planning omissions, not positive or negative evidence.
+    """
+
+    def __init__(self):
+        self._parts = defaultdict(_IntervalUnion)
+
+    def observe(self, query, targets, parts):
+        for window in (query, *targets):
+            _window_span(window, parts)  # Validate the segment/frame before recording it.
+            self._parts[window.segment_id].append(Interval(window.start, window.end))
+
+    def record(self):
+        return [[key, [[v.start, v.end] for v in spans]] for key, spans in sorted(self._parts.items())]
+
+
+def _unsearched_axes(report, parts):
+    if not isinstance(report, dict):
+        raise Q0EvidenceError("q0 scope is not a bound report")
+    rows = report.get("unsearched_part_intervals")
+    if not isinstance(rows, list):
+        raise Q0EvidenceError("q0 scope has no bound unsearched intervals")
+    by_source = defaultdict(list)
+    seen = set()
+    for row in rows:
+        if not isinstance(row, list) or len(row) != 2 or not isinstance(row[0], str):
+            raise Q0EvidenceError("invalid q0 unsearched interval row")
+        segment_id, spans = row
+        if (segment_id not in parts or segment_id in seen or not isinstance(spans, list) or not spans
+                or any(not isinstance(span, list) or len(span) != 2 for span in spans)):
+            raise Q0EvidenceError("invalid q0 unsearched interval inventory")
+        seen.add(segment_id)
+        part = parts[segment_id]
+        relative = tuple(Interval(*r) for r in spans)
+        if relative != merged_intervals(relative) or relative[-1].end > part.interval.length:
+            raise Q0EvidenceError("invalid q0 unsearched interval bounds")
+        start = part.interval.start
+        by_source[part.source].extend(Interval(start + r.start, start + r.end) for r in relative)
+    return {source: (tuple(i.start for i in compact), compact) for source, spans in by_source.items()
+            if (compact := merged_intervals(spans))}
+
+
+def audit_selected_scope(data, admission, searches):
+    """Reject exact cuts or pairwise-localized slices exposed to omitted work.
+
+    A missing competitor could overlap either axis of a positive proof. To
+    avoid inferring absence from skipped work, use the conservative union
+    (even another-pair context on that axis can make the decision uncertain).
+    This guard does not claim equivalence with full discovery or certify the
+    mapper's search. A trial can abstain and request full evidence instead.
+    """
+    axes = _unsearched_axes(data.catalog.get("supplement_scope"), data.parts)
+    if not axes:
+        return
+
+    def touches(source, span):
+        axis = axes.get(source)
+        if axis is None:
+            return False
+        starts, intervals = axis
+        i = bisect_right(starts, span.end - 1) - 1
+        return i >= 0 and intervals[i].end > span.start
+
+    placements = {p.placement_id: p for p in admission.placements}
+    exact, optional = set(), set()
+    for search in searches.values():
+        path = search.path
+        if path is None:
+            continue
+        for join in path.joins:
+            if join.kind == "sequence_overlap":
+                if not join.evidence_ids:
+                    raise Q0EvidenceError("q0 sequence overlap has no recorded pair evidence")
+                exact.update(join.evidence_ids)
+        for s in path.slices:
+            placement = placements[s.placement_id]
+            if placement.localization_kind != "pairwise":
+                continue
+            if touches(placement.source, placement.interval):
+                raise Q0EvidenceError("q0 scoped placement has unsearched competing context; rerun with full supplemental evidence")
+            optional.update(placement.evidence_ids)
+
+    wanted = exact | optional
+    if not wanted:
+        return
+    seen = set()
+    # Keep only IDs needed by the selected paths, not another index over all
+    # source PAF records (the large self matrices can dominate this inventory).
+    for link in data.pair_links:
+        eid = link.hit.evidence_id
+        if eid not in wanted:
+            continue
+        seen.add(eid)
+        for source, interval, offset in ((link.query_source, link.hit.query, link.query_offset),
+                                         (link.target_source, link.hit.target, link.target_offset)):
+            if touches(source, Interval(interval.start + offset, interval.end + offset)):
+                raise Q0EvidenceError("q0 scoped pair evidence has unsearched competing context; rerun with full supplemental evidence")
+    if exact - seen:
+        raise Q0EvidenceError("q0 sequence overlap has no recorded pair evidence")

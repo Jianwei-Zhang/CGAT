@@ -119,7 +119,7 @@ def supplement_policy(scope: str) -> dict:
         raise Q0EvidenceError("unsupported q0 supplement scope")
     from .q0_admission import selector_identity
     from .q0_frontier_scope import FRONTIER_FLANK_BP
-    return {**POLICY, "decision_frontier": {"version": 1, "flank_bp": FRONTIER_FLANK_BP,
+    return {**POLICY, "decision_frontier": {"version": 2, "flank_bp": FRONTIER_FLANK_BP,
                                            "selector": selector_identity(), "whole_source_equivalence": False}}
 
 
@@ -157,8 +157,21 @@ def load_verified_evidence(root: Path) -> dict:
     report = catalog.get("supplement_scope")
     if scoped:
         if (not isinstance(report, dict) or report.get("requested") != scope
-                or report.get("effective") not in ("full", scope)):
+                or report.get("effective") not in ("full", scope)
+                or not isinstance(report.get("unsearched_part_intervals"), list)):
             raise Q0EvidenceError("q0 supplemental catalog lacks its bound scope")
+        skipped = 0
+        for phase in ("regional_partial_discovery", "regional_candidate_discovery"):
+            if phase not in catalog:
+                continue
+            r = catalog[phase]
+            if (not isinstance(r, dict) or r.get("frontier_scope") is not (report["effective"] == scope)
+                    or type(r.get("frontier_omitted_windows")) is not int or r["frontier_omitted_windows"] < 0):
+                raise Q0EvidenceError("q0 regional omission report disagrees with its bound scope")
+            skipped += r["frontier_omitted_windows"]
+        if (bool(skipped) != bool(report["unsearched_part_intervals"])
+                or (report["effective"] == "full" and skipped)):
+            raise Q0EvidenceError("q0 scope and its omitted intervals disagree")
     elif report is not None:
         raise Q0EvidenceError("full q0 manifest cannot attest scoped supplemental work")
     expected_outputs = {manifest["catalog"]}
@@ -584,7 +597,9 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         catalog = build_catalog(root, sources, lengths, assignments, min_gap=POLICY["min_gap"],
                                 regional_factory=cache.factory if cache else None)
         if cache: cache.publish()
+        from .q0_frontier_scope import UnsearchedWindows
         regional_frontier = None
+        unsearched = UnsearchedWindows() if supplement_scope == "decision_frontier" else None
         scope_report = {"requested": supplement_scope, "effective": "full"}
         if supplement_scope == "decision_frontier":
             if not cache:
@@ -664,7 +679,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                         root, catalog, index, known_pairs, tool, reference_lengths=lengths,
                         preset=preset, threads=threads, skip_self=options.get("skip_self") == "true",
                         complete_tasks=tasks,required_target_ids=request["target_ids"],
-                        regional_frontier=regional_frontier)
+                        regional_frontier=regional_frontier, unsearched=unsearched)
                 partial_tasks.extend(regional_tasks)
                 catalog.payload["regional_partial_discovery"] = report
                 if fallback_ids:
@@ -705,7 +720,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                 regional_tasks, native_requests, report = prepare_candidates(
                     root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,
                     preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner,
-                    regional_frontier=regional_frontier)
+                    regional_frontier=regional_frontier, unsearched=unsearched)
                 report["unroutable_seed_task_ids"] = seed_ids
             tasks.extend(regional_tasks)
             catalog.payload["regional_candidate_discovery"] = report
@@ -720,6 +735,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
             raise Q0EvidenceError("q0 evidence builder changed during preparation; no manifest published")
         if supplement_policy(supplement_scope) != run_policy:
             raise Q0EvidenceError("q0 supplement scope changed during preparation; no manifest published")
+        if unsearched is not None:
+            scope_report["unsearched_part_intervals"] = unsearched.record()
         payload = catalog.finish()
         payload["base_alignments"] = base_alignments
         payload["supplementary_alignments"] = tasks

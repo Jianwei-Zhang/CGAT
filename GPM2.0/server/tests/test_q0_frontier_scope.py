@@ -4,6 +4,7 @@ from io import StringIO
 import os
 from pathlib import Path
 from types import SimpleNamespace
+from dataclasses import replace
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -11,7 +12,7 @@ from unittest.mock import patch
 from server.tests.test_q0_admission import EvidenceFixture, bridge_fixture, dna
 from server.tools.lgz_core import q0_admission, q0_preparation
 from server.tools.lgz_core.q0_catalog import build_catalog
-from server.tools.lgz_core.q0_frontier_scope import decision_frontier, window_touches_frontier
+from server.tools.lgz_core.q0_frontier_scope import UnsearchedWindows, decision_frontier, window_touches_frontier
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey
 
 
@@ -89,6 +90,39 @@ class FrontierScopeTests(unittest.TestCase):
             with patch.dict(os.environ, env):
                 rebuild = q0_preparation.prepare_evidence(root, minimap2=mapper)
             self.assertEqual(rebuild, ready)
+
+    def test_bound_scope_refuses_positive_pair_when_only_other_axis_was_omitted(self):
+        fixture, truth = bridge_fixture()
+        data = fixture.data()
+        part = next(p for p in data.parts.values() if p.source.contig == "c")
+        control = q0_admission.construct_q0(data)
+        self.assertEqual(control.records["chr1"], truth)
+        self.assertTrue(any(j.kind == "sequence_overlap" for j in control.paths["chr1"].path.joins))
+        omitted = UnsearchedWindows()
+        passing = replace(data, catalog={"supplement_scope": {"unsearched_part_intervals": omitted.record()}})
+        self.assertEqual(q0_admission.construct_q0(passing).records, control.records)
+        other = next(p for p in data.parts.values() if p.source.contig == "a")
+        def window(p, start, end):
+            return SimpleNamespace(segment_id=p.segment_id, segment_length=p.interval.length, start=start, end=end)
+        omitted.observe(window(other, 0, 100), (), data.parts)
+        unrelated = replace(data, catalog={"supplement_scope": {"unsearched_part_intervals": omitted.record()}})
+        self.assertEqual(q0_admission.construct_q0(unrelated).records, control.records)
+        # Interior non-overlap on the other participant; only c's axis can refute its proof.
+        omitted.observe(window(other, 0, 100), (window(part, 0, 400),), data.parts)
+        with self.assertRaisesRegex(Q0EvidenceError, "unsearched competing context"):
+            q0_admission.construct_q0(replace(data, catalog={
+                "supplement_scope": {"unsearched_part_intervals": omitted.record()}}))
+
+    def test_omissions_merge_relative_intervals_and_reject_bad_frame(self):
+        source = SourceKey("d", "ctg")
+        parts = {"a": SimpleNamespace(source=source, interval=Interval(1000, 1100))}
+        def w(start,end):
+            return SimpleNamespace(segment_id="a", segment_length=100, start=start, end=end)
+        omitted = UnsearchedWindows()
+        omitted.observe(w(0,30),(w(20,50),w(75,85)),parts)
+        self.assertEqual(omitted.record(), [["a",[[0,50],[75,85]]]])
+        with self.assertRaisesRegex(Q0EvidenceError,"exceeds"):
+            omitted.observe(w(99,101),(),parts)
 
     def test_foreign_scope_rejected_before_reading_inputs(self):
         with patch.object(q0_preparation, "_initial_inputs", side_effect=AssertionError("unexpected read")):

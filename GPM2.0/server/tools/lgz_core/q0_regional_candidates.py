@@ -250,7 +250,7 @@ class CandidatePlan(CompletedNativeScopes):
         return plan_request(self.planning_request(key, eligible), self.index)
 
 
-def prepare_candidates(root, catalog, index, requests, observed, complete_tasks, tool, *, reference_lengths, preset, threads, skip_self=False, planner=None, regional_frontier=None):
+def prepare_candidates(root, catalog, index, requests, observed, complete_tasks, tool, *, reference_lengths, preset, threads, skip_self=False, planner=None, regional_frontier=None, unsearched=None):
     if type(threads) is not int or threads < 1:
         raise Q0EvidenceError("candidate thread budget must be positive")
     if planner is None:
@@ -298,6 +298,9 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional candidate comparisons")
                 if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
+                    if unsearched is None:
+                        raise Q0EvidenceError("q0 frontier omissions require a bound scope recorder")
+                    unsearched.observe(query, targets, catalog.parts)
                     report["frontier_omitted_windows"] += 1
                     continue
                 report["regional_windows"] += 1

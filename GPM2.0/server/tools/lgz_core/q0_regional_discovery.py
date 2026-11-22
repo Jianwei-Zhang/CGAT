@@ -141,7 +141,7 @@ def plan_parent(catalog, index, windows):
     return planned, None
 
 
-def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None, regional_frontier=None):
+def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None, regional_frontier=None, unsearched=None):
     """Return complete regional tasks and a declared full-native fallback set.
 
     With a verified allocation bound, fresh metadata-only planners share the
@@ -198,6 +198,9 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional supplementary comparisons")
                 if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
+                    if unsearched is None:
+                        raise Q0EvidenceError("q0 frontier omissions require a bound scope recorder")
+                    unsearched.observe(query, targets, catalog.parts)
                     report["frontier_omitted_windows"] += 1
                     continue
                 if len(pending) >= workers: consume()

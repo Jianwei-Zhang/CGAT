@@ -625,6 +625,9 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
                             "input_gap_joins": sum(j.kind == "input_assembly_gap" for j in search.path.joins)})
     if not records:
         raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
+    if "supplement_scope" in data.catalog:
+        from .q0_frontier_scope import audit_selected_scope
+        audit_selected_scope(data, admission, searches)
     decisions = {"schema": "lgz_q0_construction_v1", "input_fingerprint": data.input_fingerprint,
                  "admission_policy": asdict(admission_policy), "path_policy": asdict(path_policy),
                  "selector_identity": selector_identity(), "ready_manifest_identity": data.ready_manifest_identity,
@@ -661,7 +664,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "common.py")])
+                                    ("q0_admission.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, **kwargs) -> Construction:
