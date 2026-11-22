@@ -3014,3 +3014,28 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - 本轮监督快照保存在当前cutover bundle的`monitor-verified-20261122-090444.json`，SHA
   d4321206876916c22550f07ad29bea5602007e536c00de67ff29024dc5c31535；只记录已确认的等待，
   不标记整套任务完成。继续使用此前冻结transition和安装journal，不重放任何旧安装。
+
+## 2026-11-22：FIRST矩阵有界片段热点分析，不冒充主任务实时栈
+
+- 同节点43010357仍排队时，另外提交可在任意x86计算节点运行的**只读小片段**诊断，
+  不扫描完整矩阵、不载入整套DNA、不调用mapper或改主工作区。新增运维工具
+  `profile_q0_paf_prefix.py`及8项真实parser/资源依赖测试；记录数/字节/单行长度都有上限，
+  截断行不进入parser，坏记录仍失败，任何结果均声明`whole_cache_validated=false`。
+- 第一包43010374在测试导入前FAILED：只带38个lgz_core文件，漏掉真实package initializer
+  引入的run_resources等依赖。**不是小麦失败**，没有消费数据。保留该包不覆盖；新包完整
+  携带原已成功control的42个Server tools源码，核对所有SHA及4个直接使用的q0模块与主
+  runtime一致。用真实依赖和独立import smoke核验，不注入sys.modules或替换__init__。
+- **43010375 SUCCEEDED**，agent-X86-61，Python3.10.12，1CPU/8GiB；8项测试通过。目录
+  `q0-first-prefix-profile-20261122-092001`。读取FIRST150矩阵开头**5000条/2098539bytes**，
+  相对完整PAF2666514061bytes不足0.1%；1.531秒（**含cProfile开销，不能当生产吞吐**），
+  峰值RSS92258304bytes。没有重新校验32GB生成FASTA或创建任何成功cache标记。
+- 该片段parse_paf_line累计0.848秒、paired_query_intervals累计0.334秒；累计时间有嵌套，
+  不能直接相加。仅产生13个关系，cross-coverage摘要等于空集合摘要，因此**没有实际覆盖
+  合格cross-coverage更新分支**。没有建模真实reference-anchor catalog/fanout，也未覆盖
+  大目录、完整PAF、原native checkpoint验证或主任务当前调用栈。不得据此宣称整个任务
+  的热点或倍率，不为这份小样本结果再次中断主任务，也不贸然改区间合并算法。
+- 完整profile和源码SHA已同步仓库`q0-first-prefix-hotspot-20261122.json`，SHA
+  62d81c4cb21ddcae3cd7b86f6bbed25814ea9f2c02270e389d395b38bcfa3116；远端还保留完整
+  `code.sha256`、`runtime-source-verified.json`、`final-job.json`及失败前包。工具运行时
+  必须使用完整Server tools依赖闭包，不能只复制lgz_core目录。主任务仍是43010335，
+  runtime没有因这次诊断改变；下一步继续等实际q0缓存/区域进度和43010357的新样本。
