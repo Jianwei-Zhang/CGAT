@@ -230,11 +230,14 @@ pub(super) fn validate_add_alignment_payloads(
     manifest: &AddDatasetManifest,
     chr_assignment_rows: &[ImportedChrAssignmentRow],
 ) -> Result<()> {
-    let assigned_chrs = chr_assignment_rows
-        .iter()
-        .map(|row| row.assigned_chr_name.clone())
-        .collect::<HashSet<_>>();
-    for chr_name in assigned_chrs {
+    let mut contigs_by_chr: HashMap<&str, HashSet<&str>> = HashMap::new();
+    for row in chr_assignment_rows {
+        contigs_by_chr
+            .entry(&row.assigned_chr_name)
+            .or_default()
+            .insert(&row.seq_name);
+    }
+    for (chr_name, contigs) in contigs_by_chr {
         let chr_run_root = payload_root.join("runs").join(format!("chr_{}", chr_name));
         let self_paf = chr_run_root
             .join(format!("{}_vs_self", manifest.dataset_name))
@@ -246,7 +249,8 @@ pub(super) fn validate_add_alignment_payloads(
                     self_paf.display()
                 );
             }
-        } else if !self_paf.is_file() {
+        } else if contigs.len() > 1 && !self_paf.is_file() {
+            // The Server does not create a self task for a single assigned contig.
             bail!(
                 "add dataset payload is missing self alignment payload for {} chr {}",
                 manifest.dataset_name,
@@ -255,7 +259,7 @@ pub(super) fn validate_add_alignment_payloads(
         }
 
         let existing_dataset_names =
-            existing_dataset_names_with_chr_assignment(conn, &chr_name, &manifest.dataset_name)?;
+            existing_dataset_names_with_chr_assignment(conn, chr_name, &manifest.dataset_name)?;
         for existing_name in existing_dataset_names {
             let existing_vs_added = chr_run_root
                 .join(format!("{}_vs_{}", existing_name, manifest.dataset_name))
