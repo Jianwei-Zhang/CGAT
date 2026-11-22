@@ -192,9 +192,9 @@ def preserve_joint_sources(edits, baseline, catalog, gaps):
     """Keep uniquely unchanged original islands inside a native merged-gap job."""
     from dataclasses import replace
     try:
-        from refinement_native_trace import split_retained_islands, equal_regions, TraceError
+        from refinement_native_trace import split_retained_islands, equal_regions, TraceError, UNSEPARABLE_FLANK
     except ModuleNotFoundError:
-        from .refinement_native_trace import split_retained_islands, equal_regions, TraceError
+        from .refinement_native_trace import split_retained_islands, equal_regions, TraceError, UNSEPARABLE_FLANK
     accepted, rejected = [], []
     for edit in edits:
         if edit.replacement is None or len(edit.gap_ids) < 2:
@@ -217,15 +217,17 @@ def preserve_joint_sources(edits, baseline, catalog, gaps):
             rejected.append({"edit_id": edit.edit_id, "gap_ids": list(edit.gap_ids),
                              "native_job": edit.native_job, "reason": str(error)})
             continue
-        if len(parts) == 1:
-            accepted.append(edit)
-            continue
         for start, end, left, right in parts:
             if end - start == right - left and equal_regions(baseline, edit.chromosome, start, candidate, left, end - start):
                 continue
             gap_ids = tuple(gap.gap_id for gap in gaps if gap.chromosome == edit.chromosome and start < gap.end and gap.start < end)
             if not gap_ids or start >= end:
                 raise TraceError("joint candidate split is not bound to an original gap")
+            if len(gap_ids) > 1:
+                rejected.append({"edit_id": edit.edit_id, "gap_ids": list(gap_ids), "native_job": edit.native_job,
+                                 "chromosome": edit.chromosome, "baseline_interval": [start, end],
+                                 "native_interval": [left, right], "reason": UNSEPARABLE_FLANK})
+                continue
             replacement = None if left == right else {**source, "start": left + 1, "end": right}
             accepted.append(replace(edit, edit_id="degap-" + identity([edit.edit_id, start, end, left, right])[:24],
                                     start=start, end=end, replacement=replacement, gap_ids=gap_ids,

@@ -646,9 +646,30 @@ def summarize(provenance, final, remaining, jobs, native_gaps):
             "publication_state": "not_asserted_by_report", "outcome": provenance["status"],
             "baseline": final["baseline"], "original_gap_count": len(outcomes), "counts": counts,
             "accepted_edit_count": provenance["accepted_edit_count"], "remaining_gap_count": len(remaining),
+            "retained_flank_count": len(retained_flanks(final["edits"]) + [
+                row for candidate in provenance["rejected_candidates"]
+                for row in candidate.get("flank_decisions", []) if row.get("decision") == "retained_lgz"]),
             "chromosomes": comparison, "execution": provenance["execution"], "native_jobs": jobs, "native_gaps_by_original": dict(native_by_original),
             "coordinate_system": "0-based half-open placement; 1-based inclusive sources",
             "biological_accuracy_validated": False, "automatic_best_tool": None}
+
+
+def retained_flanks(edits):
+    return [row for edit in edits for row in edit.get("evidence", {}).get("flank_decisions", [])
+            if row.get("decision") == "retained_lgz"]
+
+
+def render_retained_flanks(rows):
+    return (
+        '<h3>Original flanks retained / 保留 LGZ 原侧翼</h3>'
+        '<p>Gap admission is separate. The native flank change lacks independent support. '
+        '/ 缺口补丁单独判定；原生侧翼变化缺乏独立支持，未写入终版。</p>'
+        + table(["Flank / 侧翼", "LGZ interval / LGZ 区间", "Native interval / 原生区间", "Native length difference / 原生长度差"], [
+            (esc({"left": "Left / 左", "right": "Right / 右"}.get(row["side"], row["side"])),
+             esc(str(row["baseline_interval"])), esc(str(row["native_interval"])),
+             esc(f'{row["native_length_delta_bp"]:+,} bp')) for row in rows
+        ])
+    )
 
 
 def _summarize_reasons_html(rows, *, empty_text="None recorded / 无记录"):
@@ -666,7 +687,11 @@ def _summarize_reasons_html(rows, *, empty_text="None recorded / 无记录"):
         if row.get("status") is not None:
             parts.append(status_badge(row["status"]))
         if reasons:
-            reason_str = " · ".join(f'{esc(k)}: {esc(v)}' for k, v in reasons)
+            descriptions = {
+                "gap_and_flank_cannot_be_separated": "Gap and original sequence could not be separated reliably / 无法可靠区分缺口补丁和已有组装序列",
+                "projected_gap_unchanged": "Gap unchanged after retaining original flanks / 保留原侧翼后缺口未变化",
+            }
+            reason_str = " · ".join(f'{esc(k)}: {esc(descriptions.get(v, v) if isinstance(v, str) else v)}' for k, v in reasons)
             parts.append(reason_str)
         elif not parts:
             parts.append('<span class="muted">Recorded entry (see raw JSON) / 已记录条目（见原始 JSON）</span>')
@@ -771,6 +796,8 @@ def render_site(directory, summary, provenance, final, assets):
         ("Accepted edits / 接纳修改", fmt_int(accepted_edits)),
         ("Remaining gaps / 剩余缺口", fmt_int(remaining_gaps)),
     ]
+    if summary.get("retained_flank_count"):
+        metric_cards.append(("Original flanks retained / 保留原侧翼", fmt_int(summary["retained_flank_count"])))
     body += (
         '<section id="counts" class="panel">'
         '<div class="panel-head"><h2>Accepted Gap Outcomes / 接纳缺口汇总</h2></div>'
@@ -974,6 +1001,12 @@ def render_site(directory, summary, provenance, final, assets):
                 card += disclosure(f"Raw accepted edits JSON ({len(g_edits)}) / 原始接纳修改 JSON", '<pre>' + json_text(g_edits) + '</pre>')
             else:
                 card += '<p class="muted">No accepted changes for this gap. / 该缺口无接纳修改。</p>'
+
+            flanks = retained_flanks(g_edits) + [row for candidate in g_rejected
+                                                for row in candidate.get("flank_decisions", [])
+                                                if row.get("decision") == "retained_lgz"]
+            if flanks:
+                card += render_retained_flanks(flanks)
 
             card += '<h3>Not accepted / 未接纳候选</h3>'
             if g_rejected:

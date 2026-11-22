@@ -73,3 +73,6 @@ CGAT 本次验证的是候选确实来自缺口、原生序列可按证据重建
 独立的序列正确性验证不同。TGS 和 quarTeT 的 CGAT 拒收数均为 0；没有证据表明质检
 误杀候选。LR 的单碱基差异可追溯到原始数据，也不能仅凭结构接纳就称其生物学正确。
 明细见二次验证目录的 `evidence/col0-shared-interval-and-read-support.json`。
+
+后续修正将缺口与已有侧翼分别接纳。新规则及同一数据的重跑结果见
+[Post-LGZ 缺口与侧翼分别接纳](server-refinement-gap-flank-admission.md)。

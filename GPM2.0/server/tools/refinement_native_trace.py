@@ -18,6 +18,11 @@ except ModuleNotFoundError:
     from .refinement_path import BLOCK, Edit, PathError, identity, slice_source, source_blocks
 
 
+FLANK_ANCHOR_BP = 31
+UNSEPARABLE_FLANK = "gap_and_flank_cannot_be_separated"
+FLANK_RETAINED = "native_flank_change_not_independently_supported"
+
+
 class TraceError(PathError):
     pass
 
@@ -172,6 +177,80 @@ def split_retained_islands(baseline, native, chromosome, interval, gaps):
     return result
 
 
+def exact_overlap_deletion(baseline, chromosome, left, right, gap):
+    """Known sequence may be deleted only as an exact duplicate at a join."""
+    if left == gap.start and right > gap.end:
+        length = right - gap.end
+        a, b = gap.start - length, gap.end
+    elif right == gap.end and left < gap.start:
+        length = gap.start - left
+        a, b = left, gap.end
+    else:
+        return False
+    if a < 0 or b + length > baseline.records[chromosome][0]:
+        return False
+    for offset in range(0, length, BLOCK):
+        count = min(BLOCK, length - offset)
+        old = baseline.fetch(chromosome, a + offset, a + offset + count).upper()
+        other = baseline.fetch(chromosome, b + offset, b + offset + count).upper()
+        if old != other or not old or old.strip(b"ACGT"):
+            return False
+    return True
+
+
+def gap_only_projection(baseline, native, chromosome, interval, affected):
+    """Return gap-only coordinates and a decision for each retained known flank.
+
+    A trace boundary or exact trimmed end is already placed. For a boundary
+    covered by the native replacement, require a unique, adjacent exact anchor;
+    the native range may include one anchor's worth of unchanged edge context.
+    Do not align/guess a cut from the reported gap size.
+    """
+    left, right, begin, end = interval
+    first, last = affected[0], affected[-1]
+    if len(affected) != 1:
+        # Known internal islands have already been split if uniquely recoverable.
+        raise TraceError(UNSEPARABLE_FLANK)
+    if begin == end and exact_overlap_deletion(baseline, chromosome, left, right, first):
+        return interval, [], True
+    lcut, rcut = max(left, first.start), min(right, last.end)
+    x, y = begin, end
+    flanks = []
+    old_limit, new_limit = baseline.records[chromosome][0], native.records[chromosome][0]
+    width = FLANK_ANCHOR_BP
+    old_bounds = (max(0, left - width), min(old_limit, right + width))
+    new_bounds = (max(0, begin - width), min(new_limit, end + width))
+    for side, base_start, base_end, anchor_start in (
+        ("left", left, lcut, lcut - width), ("right", rcut, right, rcut),
+    ):
+        if base_start == base_end:
+            continue
+        if not old_bounds[0] <= anchor_start <= old_bounds[1] - width:
+            raise TraceError(UNSEPARABLE_FLANK)
+        pattern = baseline.fetch(chromosome, anchor_start, anchor_start + width).upper()
+        if (len(pattern) != width or pattern.strip(b"ACGT") or len(set(pattern)) == 1
+                or unique_occurrence(baseline, chromosome, *old_bounds, pattern) != anchor_start):
+            raise TraceError(UNSEPARABLE_FLANK)
+        place = unique_occurrence(native, chromosome, *new_bounds, pattern)
+        if type(place) is not int:
+            raise TraceError(UNSEPARABLE_FLANK)
+        boundary = place + width if side == "left" else place
+        if not begin <= boundary <= end:
+            raise TraceError(UNSEPARABLE_FLANK)
+        if side == "left":
+            x, native_span = boundary, [begin, boundary]
+        else:
+            y, native_span = boundary, [boundary, end]
+        flanks.append({"side": side, "decision": "retained_lgz", "reason": FLANK_RETAINED,
+                       "baseline_interval": [base_start, base_end], "native_interval": native_span,
+                       "native_length_delta_bp": native_span[1] - native_span[0] - (base_end - base_start),
+                       "anchor": {"baseline_interval": [anchor_start, anchor_start + width],
+                                  "native_interval": [place, place + width]}})
+    if x > y:
+        raise TraceError(UNSEPARABLE_FLANK)
+    return (lcut, rcut, x, y), flanks, False
+
+
 def normalized_edits(tool, traces, baseline, native, gaps, *, native_dataset, native_names, job):
     edits, rejected = [], []
     for chromosome, trace in traces.items():
@@ -222,12 +301,27 @@ def normalized_edits(tool, traces, baseline, native, gaps, *, native_dataset, na
                         if left > gap.start and begin > 0 and native.fetch(chromosome, begin - 1, begin).upper() == b"N":
                             left, begin = left - 1, begin - 1
                             break
-                gap_ids = tuple(gap.gap_id for gap in gaps if gap.chromosome == chromosome and left < gap.end and gap.start < right)
+                part_gaps = [gap for gap in gaps if gap.chromosome == chromosome and left < gap.end and gap.start < right]
+                gap_ids = tuple(gap.gap_id for gap in part_gaps)
                 if not gap_ids or left >= right:
                     rejected.append({"gap_ids": list(gap_ids), "native_job": job, "chromosome": chromosome,
                                      "baseline_interval": [left, right], "native_interval": [begin, end],
                                      "reason": "native_change_not_bound_to_an_original_gap"})
                     continue
+                flank_decisions, overlap = [], False
+                if len(part_gaps) > 1 or left < part_gaps[0].start or part_gaps[0].end < right:
+                    try:
+                        (left, right, begin, end), flank_decisions, overlap = gap_only_projection(
+                            baseline, native, chromosome, (left, right, begin, end), part_gaps)
+                    except TraceError as error:
+                        rejected.append({"gap_ids": list(gap_ids), "native_job": job, "chromosome": chromosome,
+                                         "baseline_interval": [left, right], "native_interval": [begin, end],
+                                         "reason": str(error)})
+                        continue
+                    if right - left == end - begin and equal_regions(baseline, chromosome, left, native, begin, end - begin):
+                        rejected.append({"gap_ids": list(gap_ids), "native_job": job, "chromosome": chromosome,
+                                         "reason": "projected_gap_unchanged", "flank_decisions": flank_decisions})
+                        continue
                 replacement = None if begin == end else {"dataset": native_dataset, "contig": native_names[chromosome],
                                                           "start": begin + 1, "end": end, "orientation": "+"}
                 eid = tool + "-" + identity([job, chromosome, left, right, begin, end])[:24]
@@ -235,6 +329,8 @@ def normalized_edits(tool, traces, baseline, native, gaps, *, native_dataset, na
                                   {"method": "validated_native_trace", "native_interval": [begin, end],
                                    "native_trace": proof, "original_native_window": list(initial),
                                    "unchanged_internal_islands_retained": len(parts) > 1,
+                                   **({"flank_decisions": flank_decisions} if flank_decisions else {}),
+                                   **({"exact_duplicate_overlap": True} if overlap else {}),
                                    "claim": "traceable native modification; not independent biological validation"}))
     merged = []
     for edit in sorted(edits, key=lambda e: (e.chromosome, e.start, e.end)):
@@ -247,6 +343,9 @@ def normalized_edits(tool, traces, baseline, native, gaps, *, native_dataset, na
                                                "start": begin + 1, "end": end, "orientation": "+"}
             evidence = {"method": "composed_native_trace_insertions", "native_interval": [begin, end],
                         "parents": [previous.evidence, edit.evidence]}
+            decisions = previous.evidence.get("flank_decisions", []) + edit.evidence.get("flank_decisions", [])
+            if decisions:
+                evidence["flank_decisions"] = decisions
             merged.append(replace(previous, edit_id=tool + "-" + identity([job, edit.chromosome, left, right, begin, end])[:24],
                                   start=left, end=right, replacement=source,
                                   gap_ids=tuple(dict.fromkeys(previous.gap_ids + edit.gap_ids)), evidence=evidence))

@@ -291,9 +291,14 @@ def _stage(root, tool, groups, threads, run_id):
         raise PathError("refinement inputs/native evidence changed during execution")
     invocation_record["timing"].update(before_publication_seconds=time.monotonic() - stage_started,
                                        admission_finished_at=datetime.now(timezone.utc).isoformat())
+    # Preserve the whole-native equality check only where all native changes
+    # were admitted. Final Path reconstruction and the sealed native trace are
+    # still validated independently when CGAT retains a changed original flank.
+    retained_flank_chromosomes = sorted({edit.chromosome for edit in edits if edit.evidence.get("flank_decisions")})
     execution = {**invocation_record, "status": "success", "baseline_sha256": recipe["baseline_sha256"],
                  "native_executed": native_executed, "native_returncode": returncode, "native_outcome": outcome,
                  "native_assembly": native_summary, "require_native_equality": not rejected and result_genome is not None,
+                 "retained_flank_chromosomes": retained_flank_chromosomes,
                  "recipe": recipe, "artifacts": native_artifacts}
     atomic_json(paths["02_jobs"] / "execution.json", execution)
     staging = private / "final"

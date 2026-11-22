@@ -106,6 +106,14 @@ A tool directory alone is not proof of current success. Follow the current overv
 
 The final assembly is rebuilt from accepted source edits, not copied from a native whole chromosome or relabeled LGZ FASTA. Valid partial/joint/reverse/overlap edits retain their source lineage; ambiguous or out-of-bounds proposals remain unaccepted with reasons. Zero accepted edits is possible and must be distinguished from native failure. Structural/source validation does **not** establish biological accuracy. Unchanged source-coordinate evidence is retained. New accepted patch sources now receive independent reference alignments and tel/cen scans against the original prepared reference and frozen library, without rerunning LGZ or gap filling. Their measurements live under `04_accepted/<run>/01_source_evidence/<generation>/`; reports and both App modes carry the same evidence. `no_hit`, `disabled`, `no_rules` and `no_chr_library` are distinct states. `metadata/refinement/source_intervals.tsv` and `final_annotations.tsv` trace real source slices to final coordinates, including reverse/clipped intervals. These are source scans and coordinate projections, not an exhaustive final-genome rescan or a biological accuracy claim.
 
+Gap closure and changes to known flanks are evaluated separately. When an exact,
+unique gap-edge anchor distinguishes a bridge from an unsupported change in the
+original flank, CGAT admits the bridge and retains the LGZ flank. The gap detail
+reports the retained interval and the native difference. If the boundary cannot
+be established, CGAT retains the native evidence but does not guess a cut or
+publish the inseparable edit. A mismatch to the reference is not itself a reason
+to reject an edit.
+
 The pinned DEGAP revision runs one bidirectional job per native gap attempt. CGAT validates the sealed `family-result.json`, checks the candidate against the original flanks and admits only the evidenced junction interval, not the entire candidate. An unresolved job retains its reason and is neither an execution exception nor an App candidate. On upgrade, run the new Server `install.sh` to refresh the tool lock in the same managed environment; no separate DEGAP environment is needed. Old runs remain accessible as history and are not reused as results of the new recipe.
 
 ## 4. Reports, App import and recovery

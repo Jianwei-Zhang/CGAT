@@ -82,7 +82,10 @@ def prepare_publication(staging: Path, baseline: dict, baseline_fasta: Path, cat
     if execution.get("require_native_equality"):
         expected = execution.get("native_assembly", {})
         actual = {row["chr"]: (row["length"], row["sha256"]) for row in final["chromosomes"]}
-        if actual != {name: (row["length"], row["sha256"]) for name, row in expected.items()}:
+        retained_flanks = {edit.chromosome for edit in edits if edit.evidence.get("flank_decisions")}
+        if (set(actual) != set(expected)
+                or any(actual[name] != (row["length"], row["sha256"])
+                       for name, row in expected.items() if name not in retained_flanks)):
             raise PathError("normalized Final Path does not reproduce the fully admitted native result")
     write_assembly(final, catalog, staging / "assembly.fa")
     write_json(staging / "final_path.json", final)

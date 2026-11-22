@@ -80,7 +80,7 @@ class RefinementBatchTests(unittest.TestCase):
             self.assertEqual(result["exit_code"], 1)
 
     @unittest.skipUnless(shutil.which("samtools"), "real indexing required for the cache boundary")
-    def test_complete_result_reuses_content_and_tampered_report_is_not_a_hit(self):
+    def test_complete_reuse_requires_current_admission_and_untampered_report(self):
         helper = fixture.NativeStageTests("test_tgs_zero_exit_without_native_artifacts_is_failure")
         helper.real_run = subprocess.run
         runtime = {"lock_sha256": fingerprint(load_lock())}
@@ -101,6 +101,13 @@ class RefinementBatchTests(unittest.TestCase):
                 result = second["staged_results"]["tgsgapcloser"]
                 self.assertTrue(result["cache_hit"])
                 self.assertEqual(result["provenance"]["execution"]["threads"], 2)
+                # Changing only the admission code must invalidate a sealed Final
+                # Path cache hit; the native producer has its own binding.
+                real_digest = cache.digest
+                adapter = Path(cache.__file__).with_name("refinement_native_trace.py")
+                with mock.patch.object(cache, "digest", side_effect=lambda path: "f" * 64 if Path(path) == adapter else real_digest(path)):
+                    self.assertIsNone(cache.find_completed(root, "tgsgapcloser", groups))
+                self.assertIsNotNone(cache.find_completed(root, "tgsgapcloser", groups))
                 record = Path(result["staging"]) / "provenance.json"
                 value = json.loads(record.read_text())
                 value["counts"]["closed"] = 999

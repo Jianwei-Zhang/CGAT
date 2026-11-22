@@ -117,6 +117,34 @@ class RefinementReportTests(unittest.TestCase):
             self.assertFalse((root / "05_final").exists())
             self.assertFalse(any(p.suffix in {".fa", ".fasta", ".fq"} for p in moved.rglob("*")))
 
+    def test_flank_retention_is_reported_separately_from_closed_and_rejected_gaps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            result = fixture(root)
+            staging = Path(result["staging"])
+            final = json.loads((staging / "final_path.json").read_text())
+            final["edits"][0]["evidence"]["flank_decisions"] = [
+                {"side": "right", "decision": "retained_lgz", "baseline_interval": [10, 12],
+                 "native_interval": [10, 13], "native_length_delta_bp": 1}]
+            dump(staging / "final_path.json", final)
+            provenance = result["provenance"]
+            provenance["rejected_candidates"][0]["reason"] = "gap_and_flank_cannot_be_separated"
+            provenance["artifacts"]["final_path.json"] = reports.digest(staging / "final_path.json")
+            dump(staging / "provenance.json", provenance)
+            job = root / "04_refinement/01_degap/02_jobs" / result["run_id"] / "invocation.json"
+            invocation = json.loads(job.read_text())
+            invocation["provenance_sha256"] = reports.digest(staging / "provenance.json")
+            dump(job, invocation)
+            built = Path(reports.build_tool_report(root, result)["directory"])
+            summary = json.loads((built / "summary.json").read_text())
+            self.assertEqual(summary["retained_flank_count"], 1)
+            self.assertEqual(summary["counts"]["closed"], 1)
+            self.assertEqual(summary["counts"]["rejected"], 1)
+            gap_page = (built / "gaps/000001.html").read_text()
+            self.assertIn("保留 LGZ 原侧翼", gap_page)
+            self.assertIn("+1 bp", gap_page)
+            self.assertIn("无法可靠区分缺口补丁和已有组装序列", gap_page)
+
     def test_zero_accepted_is_not_a_native_failure_and_job_reason_is_reported(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"

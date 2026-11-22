@@ -43,14 +43,17 @@ class NativeTraceTests(unittest.TestCase):
         gaps, _ = paths.inspect_baseline(payload, catalog)
         return catalog, payload, gaps, Genome(old), Genome(new)
 
-    def project(self, catalog, payload, gaps, old, new, trace):
+    def project(self, catalog, payload, gaps, old, new, trace, *, expected=None, rejection=None):
         verify_trace(trace, "chr1", old, catalog, new)
         edits, rejected = normalized_edits("lrgapcloser", {"chr1": trace}, old, new, gaps,
                                           native_dataset="native", native_names={"chr1": "chr1"}, job="native/job")
         final = paths.build_final_path(payload, catalog, edits, tool="lrgapcloser", recipe_sha256="a" * 64, baseline_artifact_sha256="b" * 64)
         actual = b"".join(block for row in final["chromosomes"][0]["segments"] for block in paths.segment_blocks(row, catalog))
-        self.assertEqual(actual, new.sequence)
-        self.assertFalse(rejected)
+        self.assertEqual(actual, new.sequence if expected is None else expected.encode())
+        if rejection:
+            self.assertEqual([row["reason"] for row in rejected], [rejection])
+        else:
+            self.assertFalse(rejected)
         return edits, final
 
     def test_joint_native_edit_retains_a_unique_unchanged_internal_island(self):
@@ -88,6 +91,69 @@ class NativeTraceTests(unittest.TestCase):
         final = paths.build_final_path(payload, catalog, edits, tool="degap", recipe_sha256="a" * 64, baseline_artifact_sha256="b" * 64)
         reconstructed = b"".join(block for row in final["chromosomes"][0]["segments"] for block in paths.segment_blocks(row, catalog))
         self.assertEqual(reconstructed, native.sequence)
+
+    flank_anchor = "CTCGTAGACTGCAGCTGTCCATAGGACTCGT"
+
+    def replacement_trace(self, old, new, left_keep, right_keep):
+        return [retained(0, left_keep),
+                inserted(source("native", "chr1", left_keep + 1, len(new) - right_keep), {"native": "mixed"}),
+                retained(len(old) - right_keep, len(old))]
+
+    def test_replace_n_only_in_a_native_lrgapcloser_fill_with_extra_flank_base(self):
+        anchor = self.flank_anchor
+        tail = "A" * 18 + "GGCTA"
+        old = "ATCG" + "N" * 7 + anchor + tail
+        new = "ATCGCCGTA" + anchor + "A" + tail
+        data = self.setup_case(old, new)
+        trace = self.replacement_trace(old, new, 4, len(tail) - 2)
+        edits, final = self.project(*data, trace, expected="ATCGCCGTA" + anchor + tail)
+        edit, = edits
+        self.assertEqual((edit.start, edit.end), (4, 11))
+        proof, = edit.evidence["flank_decisions"]
+        self.assertEqual((proof["side"], proof["decision"], proof["native_length_delta_bp"]), ("right", "retained_lgz", 1))
+        self.assertEqual(proof["anchor"]["baseline_interval"], [11, 42])
+        self.assertEqual(final["chromosomes"][0]["segments"][-1]["source"], source("old", "original", 12, len(old)))
+        self.assertEqual(paths.remaining_gaps(final, data[0]), [])
+
+    def test_verified_adjacent_anchors_on_both_sides_keep_existing_flanks(self):
+        left = "GATTACAGGTTCAATGCTTATCCGTGACTGG"
+        right = self.flank_anchor
+        old = "CCAGAA" + left + "NNNN" + right + "CGAGTC"
+        new = "CCTGAA" + left + "ACTGC" + right + "TGAGTC"
+        edits, _ = self.project(*self.setup_case(old, new), self.replacement_trace(old, new, 2, 5),
+                                expected=old.replace("NNNN", "ACTGC"))
+        self.assertEqual([r["side"] for r in edits[0].evidence["flank_decisions"]], ["left", "right"])
+
+    def test_repeated_native_anchors_or_no_exact_anchor_do_not_guess(self):
+        anchor = self.flank_anchor
+        tail = "A" * 18 + "CGCA"
+        old = "GGTA" + "NNNN" + anchor + tail
+        for proposal in (anchor + "GTT" + anchor, "GTT" + "G" + anchor[1:]):
+            new = "GGTA" + proposal + "A" + tail
+            with self.subTest(proposal=proposal):
+                edits, _ = self.project(*self.setup_case(old, new), self.replacement_trace(old, new, 4, 20),
+                                        expected=old, rejection="gap_and_flank_cannot_be_separated")
+                self.assertFalse(edits)
+
+    def test_native_cannot_discard_known_nonoverlap_or_unresolved_internal_sequence(self):
+        for old, new, trace in [
+            ("AACCNNTTGG", "AACCGG", [retained(0, 4), retained(8, 10)]),
+            ("AANNCCNNGG", "AATTGG", [retained(0, 2), inserted(source("native", "chr1", 3, 4), {}), retained(8, 10)]),
+        ]:
+            with self.subTest(old=old):
+                edits, _ = self.project(*self.setup_case(old, new), trace, expected=old,
+                                        rejection="gap_and_flank_cannot_be_separated")
+                self.assertFalse(edits)
+
+    def test_even_sealed_degap_joint_edit_cannot_discard_unplaced_known_island(self):
+        from server.tools.refinement_admission import preserve_joint_sources
+        catalog, _, gaps, original, _ = self.setup_case("AANNCCNNGG", "AATTCGG")
+        edit = paths.Edit("native-job", "degap", "chr1", 2, 8, source("native", "chr1", 3, 5),
+                          tuple(g.gap_id for g in gaps), "native/merged", {"anchors": "validated"})
+        edits, rejected = preserve_joint_sources([edit], original, catalog, gaps)
+        self.assertEqual(edits, [])
+        self.assertEqual(rejected[0]["gap_ids"], [g.gap_id for g in gaps])
+        self.assertEqual(rejected[0]["reason"], "gap_and_flank_cannot_be_separated")
 
     def test_negative_read_source_slicing_retains_direction_and_interval(self):
         catalog = MemoryCatalog({("read", "r"): "AAGC"})
