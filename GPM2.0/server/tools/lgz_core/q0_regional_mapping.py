@@ -196,6 +196,19 @@ def chain_work(path,query,target_lengths,policy):
     return work
 
 
+def _projected_lines(source, query, targets, *, artifact):
+    # One validated window inventory per stream, not one O(targets) dict per
+    # PAF row. Producer and verifier render exactly the same original lines.
+    query_windows = {query.window_id: query}
+    target_windows = {window.window_id: window for window in targets}
+    for number, line in enumerate(source, 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        projected = project_regional_paf(line, query_windows, target_windows, artifact=artifact, line_number=number)
+        if projected is not None:
+            yield projected + "\n"
+
+
 def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[TargetWindow], tool: dict,
                              *, reference_bases: int, preset="asm10", threads=2,
                              address_space_bytes=4*1024**3, policy=CigarWorkPolicy()):
@@ -261,10 +274,7 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
             directory=_fresh_directory(root,project_rel)
             try:
                 with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
-                    for number,line in enumerate(source,1):
-                        if not line.strip() or line.startswith("#"):continue
-                        value=project_regional_paf(line,{query.window_id:query},{w.window_id:w for w in targets},artifact=raw_rel+"/result.paf",line_number=number)
-                        if value is not None:output.write(value+"\n")
+                    output.writelines(_projected_lines(source,query,targets,artifact=raw_rel+"/result.paf"))
             except (OSError,UnicodeError) as exc:
                 raise Q0EvidenceError(f"cannot project q0 regional evidence {raw_rel}/result.paf: {exc}") from exc
             (directory/"result.paf.tmp").replace(root/paf)
@@ -370,12 +380,9 @@ def verify_regional_task(root, task, *, members=None):
         _read_receipt(root,task["receipt"],spec=spec,required=closure)
         # Replay a small, already-finished raw CIGAR stream, not the mapper or
         # reference scan. This catches wrong offsets even if PAF syntax is valid.
-        target_windows={w.window_id:w for w in targets}
         with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(root/task["paf"]).open(encoding="utf-8") as output:
-            for number,line in enumerate(source,1):
-                if not line.strip() or line.startswith("#"):continue
-                projected=project_regional_paf(line,{query.window_id:query},target_windows,artifact=raw_rel+"/result.paf",line_number=number)
-                if projected is not None and output.readline()!=projected+"\n":raise Q0EvidenceError("projected CIGAR differs from bound raw evidence")
+            for projected in _projected_lines(source,query,targets,artifact=raw_rel+"/result.paf"):
+                if output.readline()!=projected:raise Q0EvidenceError("projected CIGAR differs from bound raw evidence")
             if output.read(1):raise Q0EvidenceError("regional projection contains extra records")
         return receipt
     except (KeyError,IndexError,TypeError,ValueError,OSError) as exc:

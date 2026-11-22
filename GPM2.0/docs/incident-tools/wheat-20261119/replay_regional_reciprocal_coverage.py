@@ -73,7 +73,8 @@ def load(work,row,lookup,parse_budget):
     query=query_window(row['query'])
     targets={r['window_id']:TargetWindow(**{k:v for k,v in r.items() if k!='window_id'}) for r in context['targets']}
     if (context['query']!={k:v for k,v in query.record().items() if k!='cores'}
-            or len(targets)!=row['legacy_target_windows'] or any(w.window_id!=k for k,w in targets.items())):
+            or ('legacy_target_windows' in row and len(targets)!=row['legacy_target_windows'])
+            or any(w.window_id!=k for k,w in targets.items())):
         raise ValueError('original context inventory differs')
     members={w.segment_id for w in [query,*targets.values()]}
     if (dict(context['members'])!={k:lookup[k]['sequence_sha256'] for k in members}
@@ -83,7 +84,9 @@ def load(work,row,lookup,parse_budget):
     if len(items)!=1:
         raise ValueError('missing/ambiguous raw PAF')
     item=items[0]; raw=within(work,item['path'])
-    if (raw!=marker.parent/'result.paf' or item['sha256']!=row['raw_paf_sha256']
+    if (raw!=marker.parent/'result.paf'
+            or ('raw_paf_sha256' in row and item['sha256']!=row['raw_paf_sha256'])
+            or ('paf_bytes' in row and item['size']!=row['paf_bytes'])
             or type(item['size']) is not int or not 0<=item['size']<=min(parse_budget,16*MIB)):
         raise ValueError('unexpected raw PAF binding or byte budget')
     data=bound_bytes(raw,item['sha256'],item['size'])

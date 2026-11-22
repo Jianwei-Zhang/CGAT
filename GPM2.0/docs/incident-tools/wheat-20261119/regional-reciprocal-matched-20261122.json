@@ -1,0 +1,68 @@
+{
+  "limits": [
+    "Windows from one frozen trace, not representative or live pending count.",
+    "Compare both coordinates within oriented segment pairs; not paired position identity, intra-assembly or final candidate equivalence.",
+    "Historical CPU covers native exact work only; partial-window time is not reducible in proportion to bp."
+  ],
+  "main_workspace_modified": false,
+  "matched_full_metadata": 1,
+  "matched_partial_metadata": 2,
+  "native_mapper_executed": false,
+  "node": "agent-X86-18",
+  "seconds": 56.35339801106602,
+  "seed_parts": 562,
+  "seed_windows": 64,
+  "status": "matched_geometry_and_paired_locus_only_NOT_production_admission",
+  "trace_raw_windows": 1189,
+  "verified_candidate_cases": [
+    {
+      "core_bases": 155,
+      "covered_core_bases": 155,
+      "historical_exact_cpu_seconds": 0.268,
+      "oriented_locus_loss_if_covered_cores_omitted": {
+        "groups_completely_missing_ge_1kb": 0,
+        "groups_total": 1,
+        "query_group_bp_not_covered": 0,
+        "target_group_bp_not_covered": 310
+      },
+      "raw_paf_bytes": 6076,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3bdece99f94d1980ddd2af72/q0-regional-raw-2e5caae7a66ee78c3f8757af/success.json",
+      "raw_receipt_sha256": "6a8536da4e2701546a65ca13767eedddac28185d0d7c29e7cdb87b71a7f16113",
+      "segment_id": "q0-source-part-0256190826d646ca82bb0fce",
+      "window_id": "q0-query-window-622cd78e2158cf72e6c51731"
+    },
+    {
+      "core_bases": 11769,
+      "covered_core_bases": 3363,
+      "historical_exact_cpu_seconds": 2.437,
+      "oriented_locus_loss_if_covered_cores_omitted": {
+        "groups_completely_missing_ge_1kb": 100,
+        "groups_total": 102,
+        "query_group_bp_not_covered": 330217,
+        "target_group_bp_not_covered": 340312
+      },
+      "raw_paf_bytes": 80221,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-98eb123b9a02a4ebb90f2894/q0-regional-raw-c6546b35072ace5cc78348f2/success.json",
+      "raw_receipt_sha256": "ae2c5122e21cae9a448cc21ebdc1236016981e718ed7429c0e55944ae8483381",
+      "segment_id": "q0-source-part-0419a8acc6a5a67f9a67ca12",
+      "window_id": "q0-query-window-822669aa17be3547391eb430"
+    },
+    {
+      "core_bases": 58249,
+      "covered_core_bases": 222,
+      "historical_exact_cpu_seconds": 4.359,
+      "oriented_locus_loss_if_covered_cores_omitted": {
+        "groups_completely_missing_ge_1kb": 0,
+        "groups_total": 15,
+        "query_group_bp_not_covered": 3086,
+        "target_group_bp_not_covered": 1876
+      },
+      "raw_paf_bytes": 164403,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-f4288d7f19f0e57cdf4e862e/q0-regional-raw-0bc89929a6c24ccb867f98f3/success.json",
+      "raw_receipt_sha256": "c7b34b06e85c696367bf89cccd5eb86e9ee5118282df9b38f1044143d62de7f4",
+      "segment_id": "q0-source-part-064e35f8fbe295cb30f50913",
+      "window_id": "q0-query-window-9a61ce7755f4ee74e6a652d5"
+    }
+  ],
+  "verified_raw_bytes": 9684170
+}

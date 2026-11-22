@@ -4,6 +4,8 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
+from server.tools.lgz_core import q0_regional_mapping
 from server.tools.lgz_core.common import write_fasta
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_query_windows import QueryWindow, TargetWindow, project_regional_paf
@@ -40,6 +42,25 @@ class RegionalProjectionTests(unittest.TestCase):
         for raw in (self.line()+"\ttw:Z:already",self.line().replace("40M","41M"),self.line().replace("\t200\t20","\t201\t20")):
             with self.assertRaises(Q0EvidenceError):self.project(raw)
         with self.assertRaises(Q0EvidenceError):TargetWindow("bad",100,99,101)
+
+    def test_projection_stream_shares_inventories_without_changing_records_or_line_numbers(self):
+        target2=TargetWindow("tpart2",2000,600,800)
+        source=["# header\n",self.line("+")+"\r\n","\n",self.line("-",target2)+"\n"]
+        expected=[self.project(source[1])+"\n",self.project(source[3],target2)+"\n"]
+        class Once:
+            def __init__(self): self.calls=0
+            def __iter__(self):
+                self.calls+=1
+                if self.calls>1:
+                    raise AssertionError("target inventory reconstructed per record")
+                return iter((self.target,target2))
+        inventory=Once(); inventory.target=self.target
+        with mock.patch.object(q0_regional_mapping,"project_regional_paf",wraps=project_regional_paf) as render:
+            result=list(q0_regional_mapping._projected_lines(iter(source),self.query,inventory,artifact="raw.paf"))
+        self.assertEqual(result,expected)
+        self.assertEqual([call.kwargs['line_number'] for call in render.call_args_list],[2,4])
+        first,second=render.call_args_list
+        self.assertIs(first.args[1],second.args[1]); self.assertIs(first.args[2],second.args[2])
 
     def test_real_mapper_dual_windows_keep_controlled_paired_coordinates(self):
         mapper=shutil.which("minimap2")

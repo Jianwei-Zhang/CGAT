@@ -3610,3 +3610,33 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `q0-first-reader-followup-20261122-160835/samples.jsonl` SHA
   `205173fef0e73eea7ce1acc71043ad946e5b178ba17c34bfa3ab1451084b00c3`。正在解析/消费旧结果，非
   重新比对，55%只指这一个文件，不是Q0或整麦完成百分比。新区间池未报进度前不估全程ETA。
+
+### 2026-11-22 16:25 CST：定向对照否决按覆盖删窗口，改掉每行重建目标清单
+
+- **43013109 SUCCEEDED / agent-X86-18**。固定同一64个种子，从SHA绑定1189份完成窗口的原
+  trace 按真实对侧核心相交找留出，不查看其PAF才选择。6测通过；实际 1 全覆盖、2 部分覆盖，
+  3份完整原PAF均从原receipt/context验证并按原投影重放。全覆盖窗仅155bp、原精比对0.268 CPU秒，
+  相同目标part/方向仍少310bp目标侧区间。部分覆盖的11769bp窗，即使只免算已覆盖的3363bp，
+  仍会少**100组**各有≥1kb证据的原跨组装有向关系；另一部分覆盖窗也有两端坐标差。
+  现有策略不能按coverage union作为免算门，未改科学策略、未复用粗链作负证据。报告
+  `regional-reciprocal-matched-20261122.json` SHA `a71090c05195f7017b121533a79934b135cd21c0309ec927720dd26139a9555c`。
+  现存三条对照非全麦抽样；优先无损复用/验证重复路径，不继续扩大这一未经关系校验的删窗法。
+- **已实现无损定点修复**：区域投影在每条PAF行构造相同的整个target-window字典（实际样本
+  667–2344个目标窗）。将query/target清单在每个PAF流建一次，并在producer、verify replay共用
+  `_projected_lines`；原`project_regional_paf`、CIGAR/坐标验证、artifact/行号、原序/字节和SHA复核
+  都保留。`q0_query_windows.py`、`q0_alignments.py`及raw/projection规格未动，原coarse、raw和project
+  路径仍由同一键生成，不触发已完成窗口换身份。Q0外层builder身份仍按源码正常更新，不能假装
+  在跑进程已加载补丁。测试守护清单只枚举一次、注释/空行后原行号、两向投影/真实mapper和已有
+  cache读取；本地针对27项及隔离Linux fixture齐全的311项（310 pass/1 skip）通过。
+- **实样投影ABBA 43013115 SUCCEEDED / agent-X86-61**：独立验证并读取12窗原raw 1710494 bytes，
+  6个中等/6个目标窗最多的case；48次渲染输出逐case SHA/行数一致。聚合CPU由1.519→0.905秒
+  （**投影子步骤少40.4%**；大清单6例少57.4%）。仅内存内的投影而非mapper、读盘、整麦或重启净收益。
+  `regional-projection-inventory-20261122.json` SHA
+  `bbea75c4012b391705d3b9945b2f0dfd3fdc701d9e0f113bab3039f211b3b075`，verified绑定原调度终态、源码
+  和远端manifest。未安装到活跃任务；不为1个子步骤收益支付已付过的串行前缀、提交或发布代价。
+- **同节点只读43013119 SUCCEEDED**。旧FIRST缓存PAF在16:24:47→16:25:02读位从
+  2639273984到2654502912/2666514061（98.98%→99.55%）；16:25:17同PID1966058、同start ticks
+  仍R，原PAF的FD已关闭。原始`q0-first-reader-followup-20261122-162351/samples.jsonl` SHA
+  `445059701f6aba23a250d3bc7a9d26bffa699da467cd285cc178000451967810`。这不是区域池开始的凭据，也
+  不能凭FD关闭宣称整轮Q0完成。新版与旧42523432均RUNNING且未重启；下一次核实原生区域池实际
+  admission、缓存回收及首批新raw，而非用61000或首轮文件速率硬给整麦ETA。

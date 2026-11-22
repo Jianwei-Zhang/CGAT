@@ -1,0 +1,14 @@
+{
+  "candidate_source_sha256": "1005f9e0e062f0918f568024e5e4f3a28ff54e1d4df975ca34b47521410fb610",
+  "code_manifest_sha256": "d26178dc35f7d9275a962605d062edc9f822f0f40081996092c2af81677d04cb",
+  "end_utc": "2026-11-22T08:23:28Z",
+  "final_job_sha256": "88b3aec3abfd3b042863acee00d37d25062a8e871629fc64ae72e3dbe916e342",
+  "job_id": "43013115",
+  "memory_peak_mib": 72,
+  "node": "agent-X86-61",
+  "not_deployed_to_main": true,
+  "probe_source_sha256": "3311b944bc332d928af21624acbba5194311e3311e76b96f08cd0e9ab30bdf01",
+  "remote_dir": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-projection-inventory-20261122-162142",
+  "result_sha256": "bbea75c4012b391705d3b9945b2f0dfd3fdc701d9e0f113bab3039f211b3b075",
+  "state": "SUCCEEDED"
+}
