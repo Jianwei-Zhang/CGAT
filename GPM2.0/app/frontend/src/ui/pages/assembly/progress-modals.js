@@ -1,3 +1,5 @@
+import { renderManualRefinementExportPreviewModal } from "../manual-refinement-export-preview.js";
+
 export function createAssemblyProgressModalRenderer({
   escapeAttr,
   escapeHtml,
@@ -20,8 +22,14 @@ export function createAssemblyProgressModalRenderer({
     if (kind === "log") {
       return labels.finalPathExportLog || "日志(.log)";
     }
+    if (kind === "refinement-current-chr") {
+      return labels.finalPathExportRefinementCurrentChr || "导出精修任务（当前染色体已选）";
+    }
+    if (kind === "refinement-all") {
+      return labels.finalPathExportRefinementAll || "导出精修任务（本项目全部已选）";
+    }
     if (kind === "degap-jobs") {
-      return labels.finalPathExportDegapJobs || "DEGAP-JOBS";
+      return labels.finalPathExportDegapJobs || "旧版 DEGAP-JOBS（脚本包）";
     }
     if (kind === "all") {
       return labels.finalPathExportAll || "All";
@@ -335,22 +343,37 @@ export function createAssemblyProgressModalRenderer({
   }
 
   function renderFinalPathExportModal(state) {
+    const previewModalHtml = renderManualRefinementExportPreviewModal(
+      state.assembly?.manualRefinementExportPreview,
+      state,
+    );
     const job = state.assembly?.finalPathExportJob;
     if (!job?.open) {
-      return "";
+      return previewModalHtml;
     }
     const pageI18n = getAssemblyI18n(state).page || {};
+    const kind = String(job?.kind || "").trim().toLowerCase();
+    const isRefinementExport = kind === "refinement-current-chr" || kind === "refinement-all";
+    const dialogTitle = isRefinementExport
+      ? (pageI18n.finalPathExportRefinementDialogTitle || "导出精修任务")
+      : (pageI18n.finalPathExportDialogTitle || "正在导出 final path");
     const kindLabel = resolveFinalPathExportKindLabel(job, pageI18n);
     const statusText = resolveFinalPathExportStatusText(job, pageI18n);
     const statusClass = job?.status === "success" ? "success" : "";
-    return `
+    const refinementReceipt = isRefinementExport && job?.status === "success" && (job?.batchSha256 || job?.serverCommand)
+      ? `<div class="manual-ref-receipt">
+          ${job.batchSha256 ? `<p class="muted"><code>batch ${escapeHtml(String(job.batchSha256).slice(0, 12))}</code>${Number.isFinite(Number(job.lociCount)) ? ` · ${escapeHtml(`${job.lociCount} / ${job.tasksCount ?? job.lociCount}`)}` : ""}</p>` : ""}
+          ${job.serverCommand ? `<div class="manual-ref-cmd-row"><code class="manual-ref-cmd">${escapeHtml(String(job.serverCommand))}</code></div>` : ""}
+        </div>`
+      : "";
+    return `${previewModalHtml}
       <div class="modal-overlay assembly-final-path-export-overlay" data-final-path-export-overlay="true">
         <article
           class="card modal-dialog assembly-final-path-export-dialog"
           data-final-path-export-modal="true"
           role="dialog"
           aria-modal="true"
-          aria-label="${escapeAttr(pageI18n.finalPathExportDialogTitle || "正在导出 final path")}"
+          aria-label="${escapeAttr(dialogTitle)}"
         >
           <button
             type="button"
@@ -359,13 +382,14 @@ export function createAssemblyProgressModalRenderer({
           >x</button>
           <div class="assembly-final-path-export-body">
             <header class="assembly-final-path-export-head">
-              <h4>${escapeHtml(pageI18n.finalPathExportDialogTitle || "正在导出 final path")}</h4>
+              <h4>${escapeHtml(dialogTitle)}</h4>
               <p class="muted">${escapeHtml(`${String(job?.chrName || "").trim()} · ${kindLabel}`)}</p>
             </header>
             ${renderFinalPathExportSteps(job)}
             <p class="muted assembly-final-path-export-status ${escapeAttr(statusClass)}">${escapeHtml(statusText)}</p>
             ${job?.error ? `<p class="error-text">${escapeHtml(String(job.error || ""))}</p>` : ""}
             ${renderFinalPathExportCompletedOutputs(job)}
+            ${refinementReceipt}
           </div>
         </article>
       </div>

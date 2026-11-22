@@ -119,9 +119,15 @@ function normalizeGrtSegment(segment, index, chrName) {
   const assemblySourceEnd = normalizePositiveInteger(
     firstDefined(source, "assemblySourceEnd", "assembly_source_end"),
   );
+  const sourceKind = normalizeString(firstDefined(source, "sourceKind", "source_kind")).toLowerCase();
+  const refinementPatchSha256 = normalizeString(
+    firstDefined(source, "refinementPatchSha256", "refinement_patch_sha256"),
+  );
   return {
     segmentId,
     type: "ctg",
+    ...(sourceKind === "refinement_patch" ? { sourceKind: "refinement_patch" } : {}),
+    ...(sourceKind === "refinement_patch" && refinementPatchSha256 ? { refinementPatchSha256 } : {}),
     ...(refinement ? { refinement } : {}),
     assemblyCtgId,
     ...(assemblySourceStart ? { assemblySourceStart } : {}),

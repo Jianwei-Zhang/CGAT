@@ -9,6 +9,7 @@ const mutations = new Set([
   "create_phased_chr_track", "delete_phased_chr_track", "add_ctg_to_phased_chr_track",
   "remove_phased_chr_track_item", "reorder_phased_chr_track_items", "flip_phased_chr_track_item",
   "update_project", "delete_project", "update_project_catalog", "import_add_dataset_package", "import_add_ctg_package",
+  "import_manual_refinement_results", "undo_manual_refinement_locus", "switch_manual_refinement_locus",
 ]);
 
 export function previewSemanticSignature(value) {

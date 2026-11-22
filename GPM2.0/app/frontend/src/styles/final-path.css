@@ -702,3 +702,33 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Lightweight unified provenance accent for segments with actual accepted refinement. */
+.track-ctg.is-refined {
+  stroke: var(--theme-blue-ink, #2b6cb0);
+  stroke-width: 1.5;
+}
+
+.final-path-sort-row.is-refined .final-path-sort-card {
+  border-left-color: var(--theme-blue-ink, #2b6cb0);
+}
+
+.final-path-refinement-tag {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #cbd5e1);
+  background: var(--surface-subtle, #f8fafc);
+  color: var(--text-secondary, #334155);
+  font-size: var(--font-caption);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.final-path-log-note {
+  margin: 0;
+  font-size: var(--font-caption);
+  line-height: 1.45;
+}

@@ -49,6 +49,7 @@ import {
   deletePhasedChrTrack as deletePhasedChrTrackApi,
   exportDegapJobs,
   exportFinalPathFasta,
+  exportManualRefinement,
   getCtgDetail,
   getGrtProjectView,
   getMainViewHistoryStatus,
@@ -117,6 +118,13 @@ import {
 import {
   createAddCtgImportController,
 } from "./assembly/add-ctg-import-controller.js";
+import {
+  bindManualRefinementCard as bindManualRefinementCardImpl,
+  openAssemblyRefinementAllPreview as openAssemblyRefinementAllPreviewImpl,
+  openManualRefinementPanel as openManualRefinementPanelImpl,
+  recordManualRefinementExportReceipt as recordManualRefinementExportReceiptImpl,
+  registerManualRefinementLocus as registerManualRefinementLocusImpl,
+} from "./assembly/manual-refinement-runtime.js";
 import {
   createMainTrackStateController,
 } from "./assembly/main-track-state-controller.js";
@@ -1066,11 +1074,18 @@ function createAssemblyPageBindingDeps(options = {}) {
         pickSaveFilePath,
         exportDegapJobs,
         exportFinalPathFasta,
+        exportManualRefinement,
+        flushAssemblyProjectState,
+        openAssemblyRefinementAllPreview: (h, s) =>
+          openAssemblyRefinementAllPreviewImpl(h, s, manualRefinementRuntimeDeps),
+        onManualRefinementExported: (h, s, receipt) =>
+          recordManualRefinementExportReceiptImpl(h, s, receipt, manualRefinementRuntimeDeps),
         writeFinalPathExportBinaryFile,
         writeFinalPathExportTextFile,
       },
     }),
     bindDegapCard: (host, store) => bindDegapCardImpl(host, store, degapRuntimeDeps),
+    bindManualRefinementCard: (host, store) => bindManualRefinementCardImpl(host, store, manualRefinementRuntimeDeps),
     bindBandCanvasRuntime: (host) => bindBandCanvasRuntimeImpl(host),
     bindSubviewRulerRuntime: (host) => bindSubviewRulerRuntimeImpl(host),
     bindSeqActions: (host, store) => bindSeqActionsImpl(host, store, seqActionsRuntimeDeps),
@@ -1356,6 +1371,16 @@ const degapRuntimeDeps = {
     persistProjectAssemblyViewStateFromStore(host, store, projectAssemblyViewStateRuntimeDeps),
 };
 
+const manualRefinementRuntimeDeps = {
+  rerender: rerenderFinalPathCard,
+  rerenderFull: rerender,
+  pickSaveFilePath,
+  exportManualRefinement,
+  flushAssemblyProjectState,
+  persistDegapProjectState: (host, store) =>
+    persistProjectAssemblyViewStateFromStore(host, store, projectAssemblyViewStateRuntimeDeps),
+};
+
 async function setTrackMembersHidden(host, store, scope, ids, hidden) {
   if (scope.trackRole === "primary") return setSelectedPrimaryTrackCtgsHidden(host, store, ids, hidden);
   const state = store.getState();
@@ -1418,6 +1443,10 @@ const contextMenuRuntimeDeps = {
     requestDegapGapJobImpl(host, store, payload, degapRuntimeDeps),
   requestDegapTelseekerJob: (host, store, payload) =>
     requestDegapTelseekerJobImpl(host, store, payload, degapRuntimeDeps),
+  registerManualRefinementLocus: (host, store, payload) =>
+    registerManualRefinementLocusImpl(host, store, payload, manualRefinementRuntimeDeps),
+  openManualRefinementPanel: (host, store) =>
+    openManualRefinementPanelImpl(host, store, manualRefinementRuntimeDeps),
   addTrackContigToPhasedTrack,
   deletePhasedTrack,
   importAddCtgIntoTrack,

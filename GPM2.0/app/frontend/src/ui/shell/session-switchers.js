@@ -69,6 +69,7 @@ export function buildEmptyAssemblyViewState(stateOrLocale) {
     chromosomes: [],
     chrPickerOpen: false,
     selectedChrName: "",
+    manualRefinementExportPreview: null,
     previewRequestedChrName: "",
     chrCtgs: [],
     refTrackMembers: [],

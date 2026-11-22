@@ -2,6 +2,7 @@ import { collectFinalPathSourceCtgs } from "./final-path-presentation.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import { renderFinalPathCard } from "./final-path-card.js";
 import { renderDegapJobCard, renderDegapRuntime } from "./degap-card.js";
+import { renderManualRefinementCard } from "./manual-refinement-card.js";
 import {
   FINAL_PATH_ALL_KEY,
   areFinalPathEntriesSemanticallyEqual,
@@ -159,6 +160,10 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
     && String(graphPreviewState?.selectedChrName || "").trim() === currentFinalPathChrName
       ? graphPreviewState.previewSegmentOrder
       : null;
+  const manualRefinementResults = Array.isArray(state?.projectExport?.manualRefinementResults)
+    && Number(state?.projectExport?.projectId || 0) === Number(session.projectId || 0)
+    ? state.projectExport.manualRefinementResults
+    : null;
   const finalPathLogModel = buildFinalPathLogModel({
     chrName: currentFinalPathChrName,
     finalPathEntry: currentFinalPath,
@@ -166,6 +171,8 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
     primaryCtgs: assembly.chrCtgs,
     hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
     primaryDatasetName,
+    grtBaselineEntry: assembly.grtProjectView?.baselineFinalPathByChr?.[currentFinalPathChrName] || null,
+    manualRefinementResults,
   });
   const finalPathEntriesWithLog = finalPathDisplayEntries.map((entry) => ({
     ...entry,
@@ -181,6 +188,8 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       primaryCtgs: assembly.chrCtgs,
       hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
       primaryDatasetName,
+      grtBaselineEntry: assembly.grtProjectView?.baselineFinalPathByChr?.[entry.chrName] || null,
+      manualRefinementResults,
     }),
   }));
   const degapRenderDeps = { escapeAttr, escapeHtml, i18n };
@@ -217,7 +226,17 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       graphPreviewSegmentOrder,
       graphAddonByChr,
       degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),
+      manualRefinementBody: renderManualRefinementCard(
+        {
+          chrName: currentFinalPathChrName,
+          finalPathEntry: currentFinalPath,
+          manualRefinement: assembly.degap?.manualRefinement,
+          locale: state.locale,
+        },
+        { escapeAttr, escapeHtml },
+      ),
       canExportFasta: canProjectExportFinalPathFasta(state, currentProject),
+      canExportManualRefinement: true,
       canExportDegapJobs: Array.isArray(assembly.degap?.jobs) && assembly.degap.jobs.length > 0,
       finalPathLogModel,
       phasedFinalPathOptions,

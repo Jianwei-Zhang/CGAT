@@ -22,6 +22,7 @@ import {
   resolveFinalPathExportTarget,
 } from "../final-path-export-runtime.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../../floating-menu-runtime.js";
+import { buildManualRefinementServerCommand } from "../manual-refinement-state.js";
 
 function createStore(state) {
   let currentState = state;
@@ -43,6 +44,53 @@ test("buildFinalPathExportBaseName uses project and chr labels", () => {
     buildFinalPathExportBaseName({ projectName: "project1", chrName: "Chr01" }),
     "project1_Chr01_path",
   );
+});
+
+test("the copied refinement command takes the actual ZIP name as one positional argument", () => {
+  assert.equal(buildManualRefinementServerCommand("/exports/refinement_tasks.zip"),
+    "python .lib/tools/refine.py refinement_tasks.zip");
+  assert.equal(buildManualRefinementServerCommand("C:\\exports\\-project's refinement.zip"),
+    "python .lib/tools/refine.py './-project'\"'\"'s refinement.zip'");
+});
+
+test("current chromosome export sends only queued loci on that chromosome to the refinement backend", async () => {
+  const store = createStore({
+    locale: "en",
+    session: { projectId: 7, workspacePath: "D:\\project", projectName: "Example" },
+    assembly: {
+      selectedChrName: "Chr01",
+      degap: { manualRefinement: { readsMode: "override", ontReadsInput: "/server/reads/ont.fq", loci: [
+        { chr: "Chr02", kind: "gap", segmentId: "another-gap", tool: "quartet" },
+        { chr: "Chr01", kind: "tel_left", segmentId: "left", tool: "quartet", motif: "TTAGGG" },
+        { chr: "Chr01", kind: "gap", segmentId: "selected-gap" },
+      ] } },
+    },
+  });
+  const order = [];
+  const receipt = [];
+  await launchFinalPathExportJob({ host: {}, store, kind: "refinement-current-chr", deps: {
+    resolveFinalPathExportTarget: async () => { order.push("pick"); return "D:\\exports\\selected.zip"; },
+    flushAssemblyProjectState: async () => { order.push("flush"); },
+    exportDegapJobs: async () => { assert.fail("refinement must not call the legacy script exporter"); },
+    exportManualRefinement: async ({ workspaceRoot, projectId, request, outputPath }) => {
+      order.push("refinement");
+      assert.equal(workspaceRoot, "D:\\project");
+      assert.equal(projectId, 7);
+      assert.match(outputPath, /selected.*\.zip$/);
+      assert.deepEqual(request, {
+        loci: [
+          { chr: "Chr01", kind: "tel_left", segment_id: "left", tools: ["degap"], motif: "TTAGGG" },
+          { chr: "Chr01", kind: "gap", segment_id: "selected-gap", tools: ["degap"] },
+        ],
+        hifi_reads: [], ont_reads: ["/server/reads/ont.fq"],
+      });
+      return { batch_sha256: "a".repeat(64), loci: 2, tasks: 2 };
+    },
+    onManualRefinementExported: (_host, _store, value) => receipt.push(value),
+  } });
+  assert.deepEqual(order, ["pick", "flush", "refinement"]);
+  assert.equal(receipt[0].lociCount, 2);
+  assert.equal(receipt[0].scope, "current-chr");
 });
 
 test("export timestamp helpers append sortable timestamps before the extension", () => {

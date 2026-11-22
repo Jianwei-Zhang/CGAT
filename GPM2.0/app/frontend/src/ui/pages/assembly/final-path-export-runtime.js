@@ -20,11 +20,19 @@ import {
   exportDegapJobs,
   exportFinalPathFasta,
   exportFinalPathAgp,
+  exportManualRefinement,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../../../services/workflow-api.js";
 import { buildDegapExportPayload } from "./degap-runtime.js";
 import { normalizeDegapRuntimeState } from "./degap-state.js";
+import {
+  buildManualRefinementExportBaseName,
+  buildManualRefinementExportRequest,
+  buildManualRefinementServerCommand,
+  extractFileName,
+  normalizeManualRefinementState,
+} from "./manual-refinement-state.js";
 import {
   bindDelegatedDelayedFloatingClose,
   cancelDelayedFloatingClose,
@@ -495,6 +503,24 @@ function resolveExportErrorMessage(error, state, deps = {}) {
   return String(error?.message || error || "");
 }
 
+function resolveManualRefinementScopeFromKind(kind) {
+  const normalizedKind = normalizeString(kind).toLowerCase();
+  if (normalizedKind === "refinement-current-chr") {
+    return "current-chr";
+  }
+  if (normalizedKind === "refinement-all") {
+    return "all";
+  }
+  return "";
+}
+
+function isSameProjectSession(state, { workspaceRoot, projectId }) {
+  return (
+    normalizeString(state?.session?.workspacePath) === normalizeString(workspaceRoot)
+    && Number(state?.session?.projectId || 0) === Number(projectId || 0)
+  );
+}
+
 export function planFinalPathExportSteps({
   kind,
   baseName,
@@ -517,6 +543,12 @@ export function planFinalPathExportSteps({
   }
   if (normalizedKind === "fasta") {
     return [{ kind: "fasta", label: "序列(.fasta)", outputPath: targetPath }];
+  }
+  if (normalizedKind === "refinement-current-chr") {
+    return [{ kind: "refinement-current-chr", label: "导出精修任务（当前染色体已选）", outputPath: targetPath }];
+  }
+  if (normalizedKind === "refinement-all") {
+    return [{ kind: "refinement-all", label: "导出精修任务（本项目全部已选）", outputPath: targetPath }];
   }
   if (normalizedKind === "degap-jobs") {
     return [{ kind: "degap-jobs", label: "DEGAP-JOBS", outputPath: targetPath }];
@@ -676,6 +708,18 @@ export async function runFinalPathExportJob({ job, runStep, onUpdate }) {
     if (nextCompletedStepIds.length) {
       nextJob.completedStepIds = [...nextJob.completedStepIds, ...nextCompletedStepIds];
     }
+    if (result?.batchSha256) {
+      nextJob.batchSha256 = normalizeString(result.batchSha256);
+    }
+    if (result?.serverCommand) {
+      nextJob.serverCommand = normalizeString(result.serverCommand);
+    }
+    if (Number.isFinite(Number(result?.lociCount))) {
+      nextJob.lociCount = Number(result.lociCount);
+    }
+    if (Number.isFinite(Number(result?.tasksCount))) {
+      nextJob.tasksCount = Number(result.tasksCount);
+    }
     if (nextJob.cancelRequested) {
       nextJob.status = "canceled";
       await onUpdate({ ...nextJob });
@@ -743,6 +787,12 @@ export async function resolveFinalPathExportTarget({ state, kind, baseName, deps
       filters: [{ name: "FASTA", extensions: ["fasta", "fa"] }],
     }, state);
   }
+  if (normalizedKind === "refinement-current-chr" || normalizedKind === "refinement-all") {
+    return pickSaveFilePathImpl({
+      defaultPath: `${baseName}.zip`,
+      filters: [{ name: "ZIP", extensions: ["zip"] }],
+    }, state);
+  }
   if (normalizedKind === "all") {
     return pickDirectoryPathImpl(state);
   }
@@ -759,13 +809,20 @@ function buildFinalPathLogModelForState(state, finalPathEntry) {
     state?.initializer?.datasets || [],
     currentProject?.primaryDatasetId,
   );
+  const chrName = resolveCurrentFinalPathChrName(assembly) || finalPathEntry?.chrName;
+  const manualRefinementResults = Array.isArray(state?.projectExport?.manualRefinementResults)
+    && Number(state?.projectExport?.projectId || 0) === Number(state?.session?.projectId || 0)
+    ? state.projectExport.manualRefinementResults
+    : null;
   return buildFinalPathLogModel({
-    chrName: resolveCurrentFinalPathChrName(assembly) || finalPathEntry?.chrName,
+    chrName,
     finalPathEntry,
     finalPathByChr: assembly.finalPathByChr,
     primaryCtgs: assembly.chrCtgs,
     hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
     primaryDatasetName,
+    grtBaselineEntry: assembly.grtProjectView?.baselineFinalPathByChr?.[chrName] || null,
+    manualRefinementResults,
   });
 }
 
@@ -775,12 +832,14 @@ export async function runFinalPathExportStep({
   state,
   host,
   deps = {},
+  frozenRefinement = null,
 }) {
   const assembly = state.assembly || {};
   const writeTextFileImpl = deps.writeFinalPathExportTextFile || writeFinalPathExportTextFile;
   const writeBinaryFileImpl = deps.writeFinalPathExportBinaryFile || writeFinalPathExportBinaryFile;
   const exportFastaImpl = deps.exportFinalPathFasta || exportFinalPathFasta;
   const exportDegapJobsImpl = deps.exportDegapJobs || exportDegapJobs;
+  const exportManualRefinementImpl = deps.exportManualRefinement || exportManualRefinement;
   const renderPngImpl = deps.renderFinalPathViewportPng || renderFinalPathViewportPng;
   const viewportSnapshot = () => resolveEffectiveFinalPathViewportSnapshot({
     host,
@@ -825,6 +884,47 @@ export async function runFinalPathExportStep({
     });
     return { outputPath: step.outputPath };
   }
+  if (step?.kind === "refinement-current-chr" || step?.kind === "refinement-all") {
+    const scope = frozenRefinement?.scope || resolveManualRefinementScopeFromKind(step.kind);
+    const workspaceRoot = normalizeString(frozenRefinement?.workspaceRoot ?? state.session?.workspacePath);
+    const projectId = Number(frozenRefinement?.projectId ?? state.session?.projectId ?? 0);
+    const chrName = normalizeString(frozenRefinement?.chrName ?? resolveCurrentFinalPathChrName(assembly));
+    if (!workspaceRoot || !projectId) {
+      throw new Error(state?.locale === "en"
+        ? "Open a project before exporting refinement tasks."
+        : "请先打开有效项目再导出精修任务。");
+    }
+    let request = frozenRefinement?.request || null;
+    if (!request) {
+      const manual = normalizeManualRefinementState(normalizeDegapRuntimeState(assembly.degap).manualRefinement);
+      const built = buildManualRefinementExportRequest(manual, {
+        scope,
+        chrName,
+        locale: state?.locale,
+      });
+      if (!built.ok) {
+        throw new Error(built.error);
+      }
+      request = built.request;
+    }
+    const summary = await exportManualRefinementImpl({
+      workspaceRoot,
+      projectId,
+      outputPath: step.outputPath,
+      request,
+      stateOrLocale: state,
+    });
+    const batchSha256 = normalizeString(summary?.batch_sha256 || summary?.batchSha256);
+    const lociCount = Number(summary?.loci ?? request?.loci?.length ?? 0);
+    const tasksCount = Number(summary?.tasks ?? request?.loci?.length ?? 0);
+    return {
+      outputPath: step.outputPath,
+      batchSha256,
+      lociCount,
+      tasksCount,
+      serverCommand: buildManualRefinementServerCommand(step.outputPath),
+    };
+  }
   if (step?.kind === "degap-jobs") {
     const payload = buildDegapExportPayload(state);
     const result = await exportDegapJobsImpl({
@@ -866,24 +966,74 @@ export async function launchFinalPathExportJob({
   if (runningJob?.open && runningJob.status === "running") {
     return false;
   }
-  const finalPathEntry = getCurrentChrFinalPath(assembly);
-  if (!finalPathEntry) {
-    return false;
-  }
   const normalizedKind = normalizeString(kind).toLowerCase();
   if (!normalizedKind) {
     return false;
   }
-  const canExportLog = canUseFinalPathLog(finalPathEntry);
+  const refinementScope = resolveManualRefinementScopeFromKind(normalizedKind);
+  if (refinementScope === "all") {
+    return deps.openAssemblyRefinementAllPreview?.(host, store) ?? false;
+  }
+  const finalPathEntry = getCurrentChrFinalPath(assembly);
+  if (!refinementScope && !finalPathEntry) {
+    return false;
+  }
+  const canExportLog = finalPathEntry ? canUseFinalPathLog(finalPathEntry) : false;
   if (normalizedKind === "log" && !canExportLog) {
     return false;
   }
+  const currentChrName = resolveCurrentFinalPathChrName(assembly);
+  const frozenWorkspaceRoot = normalizeString(state.session?.workspacePath);
+  const frozenProjectId = Number(state.session?.projectId || 0);
+  const frozenProjectName = normalizeString(state.session?.projectName || frozenProjectId || "project");
+  let frozenRefinement = null;
+  if (refinementScope) {
+    const manual = normalizeManualRefinementState(normalizeDegapRuntimeState(assembly.degap).manualRefinement);
+    const built = buildManualRefinementExportRequest(manual, {
+      scope: refinementScope,
+      chrName: currentChrName,
+      locale: state?.locale,
+    });
+    if (!frozenWorkspaceRoot || !frozenProjectId || !built.ok) {
+      const errorMessage = !frozenWorkspaceRoot || !frozenProjectId
+        ? (state?.locale === "en" ? "Open a project before exporting refinement tasks." : "请先打开有效项目再导出精修任务。")
+        : built.error;
+      setFinalPathExportJob(host, store, {
+        ...createFinalPathExportJob({
+          kind: normalizedKind,
+          chrName: refinementScope === "all" ? frozenProjectName : currentChrName,
+          targetPath: "",
+          steps: [],
+          displaySteps: [],
+        }),
+        status: "error",
+        error: errorMessage,
+      }, deps);
+      return false;
+    }
+    frozenRefinement = {
+      workspaceRoot: frozenWorkspaceRoot,
+      projectId: frozenProjectId,
+      projectName: frozenProjectName,
+      scope: refinementScope,
+      chrName: currentChrName,
+      readsMode: manual.readsMode,
+      loci: built.loci,
+      request: built.request,
+    };
+  }
   const exportTimestamp = resolveExportTimestamp(deps);
   const baseName = buildTimestampedExportBaseName(
-    buildFinalPathExportBaseName({
-      projectName: state.session?.projectName,
-      chrName: resolveCurrentFinalPathChrName(assembly),
-    }),
+    refinementScope
+      ? buildManualRefinementExportBaseName({
+        projectName: frozenProjectName,
+        chrName: currentChrName,
+        scope: refinementScope,
+      })
+      : buildFinalPathExportBaseName({
+        projectName: state.session?.projectName,
+        chrName: currentChrName,
+      }),
     exportTimestamp,
   );
   const resolveTarget = deps.resolveFinalPathExportTarget || resolveFinalPathExportTarget;
@@ -897,7 +1047,10 @@ export async function launchFinalPathExportJob({
   if (!targetPath) {
     return false;
   }
-  if (normalizedKind !== "all" && normalizedKind !== "degap-jobs") {
+  if (refinementScope && !isSameProjectSession(store.getState(), frozenRefinement)) {
+    return false;
+  }
+  if (!refinementScope && normalizedKind !== "all" && normalizedKind !== "degap-jobs") {
     targetPath = appendTimestampToOutputPath(targetPath, exportTimestamp);
   }
   const steps = planFinalPathExportSteps({
@@ -912,7 +1065,7 @@ export async function launchFinalPathExportJob({
   }
   const job = createFinalPathExportJob({
     kind: normalizedKind,
-    chrName: resolveCurrentFinalPathChrName(assembly),
+    chrName: refinementScope === "all" ? frozenProjectName : currentChrName,
     targetPath,
     steps,
     displaySteps: normalizedKind === "degap-jobs" ? buildDegapJobsDisplaySteps(state) : [],
@@ -920,21 +1073,60 @@ export async function launchFinalPathExportJob({
   setFinalPathExportJob(host, store, job, deps);
   await Promise.resolve();
   try {
-    await runFinalPathExportJob({
+    if (refinementScope && typeof deps.flushAssemblyProjectState === "function") {
+      await deps.flushAssemblyProjectState(host, store);
+      if (!isSameProjectSession(store.getState(), frozenRefinement)) {
+        return false;
+      }
+    }
+    const finalJob = await runFinalPathExportJob({
       job,
-      runStep: async (step) => runStep({
-        step,
-        finalPathEntry,
-        state: store.getState(),
-        host,
-        deps,
-      }),
+      runStep: async (step) => {
+        if (refinementScope && !isSameProjectSession(store.getState(), frozenRefinement)) {
+          throw new Error(state?.locale === "en"
+            ? "Active project changed during export; canceled to protect project data."
+            : "导出期间当前项目已切换，已取消导出以避免跨项目写入。");
+        }
+        return runStep({
+          step,
+          finalPathEntry,
+          state: store.getState(),
+          host,
+          deps,
+          frozenRefinement,
+        });
+      },
       onUpdate: async (nextJob) => {
-        setFinalPathExportJob(host, store, nextJob, deps);
+        if (!refinementScope || isSameProjectSession(store.getState(), frozenRefinement)) {
+          setFinalPathExportJob(host, store, nextJob, deps);
+        }
         await Promise.resolve();
       },
     });
+    if (
+      refinementScope
+      && finalJob?.status === "success"
+      && isSameProjectSession(store.getState(), frozenRefinement)
+      && typeof deps.onManualRefinementExported === "function"
+    ) {
+      deps.onManualRefinementExported(host, store, {
+        batchSha256: finalJob.batchSha256 || "exported",
+        exportedAt: new Date().toISOString(),
+        outputPath: targetPath,
+        outputFileName: extractFileName(targetPath) || "refinement_tasks.zip",
+        scope: frozenRefinement.scope,
+        chrName: frozenRefinement.chrName,
+        lociCount: Number(finalJob.lociCount ?? frozenRefinement.request.loci.length),
+        tasksCount: Number(finalJob.tasksCount ?? frozenRefinement.request.loci.length),
+        readsMode: frozenRefinement.readsMode,
+        loci: frozenRefinement.loci,
+        status: "exported_awaiting_server",
+      });
+    }
   } catch (error) {
+    if (refinementScope && !isSameProjectSession(store.getState(), frozenRefinement)) {
+      return false;
+    }
     const currentState = store.getState();
     const currentJob = currentState.assembly?.finalPathExportJob || job;
     setFinalPathExportJob(host, store, {

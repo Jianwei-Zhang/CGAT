@@ -1,4 +1,4 @@
-import { buildFinalPathTooltip } from "./final-path-presentation.js";
+import { buildFinalPathTooltip, describeFinalPathRefinement } from "./final-path-presentation.js";
 import { createContigColorResolver } from "./contig-colors.js";
 import { FINAL_PATH_SEGMENT_MIN_WIDTH_PX, resolveFinalPathVisualLayouts } from "./final-path-visual-layout.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
@@ -520,6 +520,7 @@ function renderFinalPathExportMenu({
   labels,
   canExportFasta = true,
   canExportLog = false,
+  canExportManualRefinement = false,
   canExportDegapJobs = false,
 }) {
   const fastaItem = canExportFasta
@@ -530,11 +531,16 @@ function renderFinalPathExportMenu({
     ? `
         <button type="button" class="final-path-export-item" data-final-path-export-action="log">${escapeHtml(labels.finalPathExportLog || "日志(.log)")}</button>`
     : "";
+  const refinementItems = canExportManualRefinement
+    ? `
+        <button type="button" class="final-path-export-item" data-final-path-export-action="refinement-current-chr">${escapeHtml(labels.finalPathExportRefinementCurrentChr || "导出精修任务（当前染色体已选）")}</button>
+        <button type="button" class="final-path-export-item" data-final-path-export-action="refinement-all">${escapeHtml(labels.finalPathExportRefinementAll || "导出精修任务（本项目全部已选）")}</button>`
+    : "";
   const degapJobsItem = canExportDegapJobs
     ? `
-        <button type="button" class="final-path-export-item" data-final-path-export-action="degap-jobs">${escapeHtml(labels.finalPathExportDegapJobs || "DEGAP-JOBS")}</button>`
+        <button type="button" class="final-path-export-item" data-final-path-export-action="degap-jobs">${escapeHtml(labels.finalPathExportDegapJobs || "旧版 DEGAP-JOBS（脚本包）")}</button>`
     : "";
-  const degapJobsDivider = canExportDegapJobs
+  const extraDivider = (canExportManualRefinement || canExportDegapJobs)
     ? `
         <div class="final-path-export-divider" role="separator" aria-hidden="true"></div>`
     : "";
@@ -553,7 +559,8 @@ function renderFinalPathExportMenu({
         ${fastaItem}
         <button type="button" class="final-path-export-item" data-final-path-export-action="agp">${escapeHtml(labels.finalPathExportAgp || "AGP (.agp)")}</button>
         <button type="button" class="final-path-export-item" data-final-path-export-action="all">${escapeHtml(labels.finalPathExportAll || "All")}</button>
-        ${degapJobsDivider}
+        ${extraDivider}
+        ${refinementItems}
         ${degapJobsItem}
       </div>
     </div>
@@ -684,6 +691,110 @@ function renderFinalPathLogStat({
   `;
 }
 
+function renderFinalPathContributionTable({ contribution, labels = {}, escapeHtml }) {
+  if (!contribution) {
+    return "";
+  }
+  const hasAnyContribution =
+    contribution.lgzRetainedBp > 0
+    || contribution.refinementTotalBp > 0
+    || contribution.otherUnattributedBp > 0
+    || contribution.unresolvedGapCount > 0;
+  if (!hasAnyContribution) {
+    return "";
+  }
+  const isEn = labels?.locale === "en" || labels?.finalPathDetailType === "Type";
+  const sourceCol = labels.finalPathContributionSource || (isEn ? "Source" : "来源");
+  const bpCol = labels.finalPathContributionBp || (isEn ? "Retained / contributed bp" : "保留或贡献 bp");
+  const tasksCol = labels.finalPathContributionTasks || (isEn ? "Refinement tasks" : "精修任务数");
+  const rows = [];
+  if (contribution.hasBaseline || contribution.lgzRetainedBp > 0) {
+    rows.push({
+      source: labels.finalPathContributionLgz || (isEn ? "LGZ retained sequence" : "LGZ 保留序列"),
+      bp: `${formatLogNumber(contribution.lgzRetainedBp)} bp`,
+      tasks: "—",
+    });
+  }
+  const hasAuto = contribution.autoRefinementBp > 0 || contribution.autoTaskCount > 0;
+  const hasManual = contribution.manualRefinementBp > 0 || contribution.manualTaskCount > 0;
+  if (hasAuto && hasManual) {
+    rows.push({
+      source: isEn ? "Refinement tasks (Automatic)" : "精修任务（自动）",
+      bp: `${formatLogNumber(contribution.autoRefinementBp)} bp`,
+      tasks: formatLogNumber(contribution.autoTaskCount),
+    });
+    rows.push({
+      source: isEn ? "Refinement tasks (Manual)" : "精修任务（手动）",
+      bp: `${formatLogNumber(contribution.manualRefinementBp)} bp`,
+      tasks: formatLogNumber(contribution.manualTaskCount),
+    });
+  } else if (hasAuto) {
+    rows.push({
+      source: isEn ? "Refinement tasks (Automatic)" : "精修任务（自动）",
+      bp: `${formatLogNumber(contribution.autoRefinementBp)} bp`,
+      tasks: formatLogNumber(contribution.autoTaskCount),
+    });
+  } else if (hasManual) {
+    rows.push({
+      source: isEn ? "Refinement tasks (Manual)" : "精修任务（手动）",
+      bp: `${formatLogNumber(contribution.manualRefinementBp)} bp`,
+      tasks: formatLogNumber(contribution.manualTaskCount),
+    });
+  } else {
+    rows.push({
+      source: labels.finalPathContributionRefinement || (isEn ? "Refinement tasks" : "精修任务"),
+      bp: "0 bp",
+      tasks: "0",
+    });
+  }
+  rows.push({
+    source: labels.finalPathContributionOther || (isEn ? "Other / unattributed" : "其他 / 未归因"),
+    bp: `${formatLogNumber(contribution.otherUnattributedBp)} bp`,
+    tasks: "—",
+  });
+  if (contribution.unresolvedGapCount > 0) {
+    rows.push({
+      source: isEn
+        ? `Unresolved gaps (${formatLogNumber(contribution.unresolvedGapCount)}, excluded)`
+        : `未解决 Gap（${formatLogNumber(contribution.unresolvedGapCount)} 个，不计入有效贡献）`,
+      bp: "—",
+      tasks: "—",
+    });
+  }
+  const noteText = contribution.zeroBpManualTaskConfirmed
+    ? (isEn
+      ? `Counts actual Final Path sequences (|end - start| + 1); excludes unresolved Gap Ns. Also includes ${formatLogNumber(contribution.zeroBpManualTaskCount)} active 0 bp gap-removal task(s) (0 bp contributed).`
+      : `仅统计当前 Final Path 实际序列（|end - start| + 1），不含未解决 Gap 的 N；另有 ${formatLogNumber(contribution.zeroBpManualTaskCount)} 个当前生效的 0 bp 撤 Gap 任务（不计入 bp）。`)
+    : (isEn
+      ? "Counts actual Final Path sequences (|end - start| + 1) with sequence-bearing tasks; excludes unresolved Gap Ns and 0 bp gap-removal tasks."
+      : "仅统计当前 Final Path 中有实际序列保留或贡献的任务（|end - start| + 1）；不含未解决 Gap 的 N 与 0 bp 撤 Gap 任务。");
+  return `
+    <section class="final-path-log-section">
+      <div class="final-path-log-table-wrap">
+        <table class="final-path-log-table">
+          <thead>
+            <tr>
+              <th>${escapeHtml(sourceCol)}</th>
+              <th>${escapeHtml(bpCol)}</th>
+              <th>${escapeHtml(tasksCol)}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.source)}</td>
+                <td>${escapeHtml(row.bp)}</td>
+                <td>${escapeHtml(row.tasks)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted final-path-log-note">${escapeHtml(noteText)}</p>
+    </section>
+  `;
+}
+
 function renderFinalPathLog({
   escapeHtml,
   escapeAttr,
@@ -706,6 +817,11 @@ function renderFinalPathLog({
       typeLabel: otherChrTypeLabel,
     })),
   ];
+  const contributionSection = renderFinalPathContributionTable({
+    contribution: model.contribution,
+    labels,
+    escapeHtml,
+  });
   const detailSection = detailRows.length
     ? `
       <section class="final-path-log-section">
@@ -748,6 +864,7 @@ function renderFinalPathLog({
           hiddenTitle: `${labels.finalPathLogHidden || "Hidden"}: ${formatLogNumber(model.primaryLength.hiddenBp)}/${formatLogNumber(model.primaryLength.totalBp)} bp`,
         })}
       </div>
+      ${contributionSection}
       ${detailSection}
     </div>
   `;
@@ -1185,10 +1302,12 @@ export function renderFinalPathGraph({
         labels, sourceCtgs: ctgColorContext.sourceCtgs || [...(ctgColorContext.primaryCtgs || []),
           ...(ctgColorContext.supportCtgs || []), ...(ctgColorContext.supportMirroredCtgs || [])],
       });
+      const refinementInfo = describeFinalPathRefinement(segment, labels?.locale || (labels?.finalPathDetailType === "Type" ? "en" : "zh"));
+      const refinementClass = refinementInfo ? " is-refined" : "";
       const colorRole = resolveColorRole(segment);
       const toneClass = colorRole === "ref" ? " is-ref" : (colorRole === "companion" ? " is-companion" : "");
-      const groupClass = `track-ctg-group${toneClass}`;
-      const ctgClass = `track-ctg${toneClass}`;
+      const groupClass = `track-ctg-group${toneClass}${refinementClass}`;
+      const ctgClass = `track-ctg${toneClass}${refinementClass}`;
       const { visualStartX, barWidth } = resolveFinalPathCtgVisualLayout(
         items,
         index,
@@ -1327,7 +1446,12 @@ function renderFinalPathTable({
                   <option value="-" ${orientText === "-" ? "selected" : ""}>-</option>
                 </select>
               `;
-      const rowTypeClass = isGap ? " is-gap" : roleClass;
+      const refinementInfo = isGap ? null : describeFinalPathRefinement(segment, labels?.locale || (labels?.finalPathDetailType === "Type" ? "en" : "zh"));
+      const refinementClass = refinementInfo ? " is-refined" : "";
+      const refinementBadge = refinementInfo
+        ? `<span class="final-path-refinement-tag" data-app-tooltip="${escapeAttr(refinementInfo.detailLines.join("\n"))}">${escapeHtml(refinementInfo.shortLabel)}</span>`
+        : "";
+      const rowTypeClass = isGap ? " is-gap" : `${roleClass}${refinementClass}`;
       return `
         <div data-final-path-row-id="${escapeAttr(segmentId)}" data-final-path-segment-id="${escapeAttr(segmentId)}"${targetChrAttr} class="final-path-sort-row${rowTypeClass}">
           <div class="final-path-row-index-cell">
@@ -1338,7 +1462,7 @@ function renderFinalPathTable({
               <div class="final-path-card-cell final-path-card-drag-cell">
                 <button type="button" class="button ghost tiny final-path-row-drag-handle" data-final-path-row-drag-id="${escapeAttr(segmentId)}"${targetChrAttr} data-app-tooltip="drag">↕</button>
               </div>
-              <div class="final-path-card-cell">
+              <div class="final-path-card-cell${refinementBadge ? " final-path-ctg-cell" : ""}">
                 <input
                   type="text"
                   data-final-path-cell="ctg"
@@ -1349,6 +1473,7 @@ function renderFinalPathTable({
                   autocomplete="off"
                   ${isRefSegment ? "disabled" : ""}
                 />
+                ${refinementBadge}
               </div>
               <div class="final-path-card-cell">
                 <input
@@ -1554,7 +1679,9 @@ export function renderFinalPathCard(
     graphPreviewSegmentOrder = null,
     graphAddonByChr = {},
     degapRuntimeBody = "",
+    manualRefinementBody = "",
     canExportFasta = true,
+    canExportManualRefinement = false,
     canExportDegapJobs = false,
     finalPathLogModel = null,
     phasedFinalPathOptions = [],
@@ -1626,6 +1753,7 @@ export function renderFinalPathCard(
     labels,
     canExportFasta,
     canExportLog: canLog,
+    canExportManualRefinement,
     canExportDegapJobs,
   });
   const trackControlLabels = {
@@ -1777,6 +1905,7 @@ export function renderFinalPathCard(
       <div class="final-path-card-body">
         ${String(degapRuntimeBody || "")}
         ${body}
+        ${String(manualRefinementBody || "")}
       </div>
     </article>
   `;
