@@ -496,6 +496,29 @@ def fasta(path):
         with self.assertRaisesRegex(Q0EvidenceError, "not fully bound"):
             load_verified_evidence(self.server)
 
+    def test_candidate_artifact_lookup_accepts_both_inventories_and_rejects_unbound_path(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        manifest = load_verified_evidence(self.server)
+        catalog_path = self.server / manifest["catalog"]
+        catalog = prep.json_file(catalog_path)
+        # This is the dependency check only; admission separately compares
+        # each evidence record to the corresponding bound PAF row.
+        in_path = next(row["path"] for row in manifest["inputs"] if row["path"].endswith("/result.paf"))
+        out_path = catalog["supplementary_alignments"][0]["paf"]
+        catalog["evidence"].update({"input-test":{"artifact":in_path},"output-test":{"artifact":out_path}})
+        def rebind_catalog():
+            prep.atomic_write_json(catalog_path, catalog)
+            manifest["outputs"] = [prep.identity(self.server,r["path"]) if r["path"]==manifest["catalog"] else r
+                                   for r in manifest["outputs"]]
+            prep.atomic_write_json(self.server / MANIFEST, manifest)
+        rebind_catalog()
+        self.assertEqual(load_verified_evidence(self.server), manifest)
+        catalog["evidence"]["output-test"]["artifact"] = "not-in-the-ready-manifest.paf"
+        rebind_catalog()
+        with self.assertRaisesRegex(Q0EvidenceError, "unbound alignment artifact"):
+            load_verified_evidence(self.server)
+
     def test_builder_changes_during_preparation_do_not_publish_success(self):
         from server.tools.lgz_core import q0_preparation
         original_manifest = (self.server / MANIFEST).read_bytes()

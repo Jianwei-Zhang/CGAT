@@ -165,8 +165,12 @@ def load_verified_evidence(root: Path) -> dict:
             expected_outputs.update(required | {receipt_path})
         if set(outputs) != expected_outputs:
             raise Q0EvidenceError("q0 output inventory differs from the catalog's requirements")
-        if any(row["artifact"] not in inputs | set(outputs) for row in catalog["evidence"].values()):
-            raise Q0EvidenceError("q0 candidate references an unbound alignment artifact")
+        # Both inventories are already indexed by path. Rebuilding their
+        # union for every PAF record turns a linear check into evidence × files.
+        for row in catalog["evidence"].values():
+            artifact = row["artifact"]
+            if artifact not in inputs and artifact not in outputs:
+                raise Q0EvidenceError("q0 candidate references an unbound alignment artifact")
     except (KeyError, TypeError) as exc:
         raise Q0EvidenceError(f"invalid q0 evidence dependency inventory: {exc}") from exc
     return manifest
