@@ -140,7 +140,13 @@ pub(super) fn validate_app_source_cards_for_mode(
         enum_value(
             field(row, "ref_alignment_status")?,
             if placement == "refinement" {
-                &["not_measured"]
+                &[
+                    "not_measured",
+                    "hit",
+                    "multi_hit",
+                    "other_chr_only",
+                    "no_hit",
+                ]
             } else {
                 &["hit", "weak_hit", "multi_hit", "other_chr_only", "no_hit"]
             },

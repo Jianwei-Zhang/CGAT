@@ -21,12 +21,12 @@ from run_orchestration import sha256_file as digest
 from run_all_runner import WorkspaceLock
 
 
-@unittest.skipUnless(shutil.which("samtools") and shutil.which("zip"), "delivery requires indexing/zip")
+@unittest.skipUnless(shutil.which("samtools") and shutil.which("minimap2") and shutil.which("zip"), "delivery requires indexing/zip")
 class RefinedDeliveryTests(unittest.TestCase):
     def test_real_full_light_archives_commit_as_one_refined_publication(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
-            result, _, _ = create(root)
+            result, _, _ = create(root, with_source_evidence=True)
             report = build_tool_report(root, result)
             lock = WorkspaceLock(root, "real-delivery-fixture")
             lock.acquire()
@@ -61,7 +61,7 @@ class RefinedDeliveryTests(unittest.TestCase):
     def test_same_admission_refreshes_report_and_serializer_without_replacing_final(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
-            result, _, _ = create(root)
+            result, _, _ = create(root, with_source_evidence=True)
             report = build_tool_report(root, result)
             lock = WorkspaceLock(root, "delivery-refresh-fixture")
             lock.acquire()
@@ -125,7 +125,7 @@ class RefinedDeliveryTests(unittest.TestCase):
     def test_delivery_validation_cache_cannot_hide_a_changed_report_binding(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
-            result, _, _ = create(root)
+            result, _, _ = create(root, with_source_evidence=True)
             report = build_tool_report(root, result)
             delivery = build_delivery(root, result, report)
             proof = validate_delivery(delivery, result["staging"])

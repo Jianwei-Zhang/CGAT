@@ -35,15 +35,34 @@ _VALIDATED = {}
 GENERATOR_FILES = ("refinement_delivery.py", "refinement_bundle.py", "refinement_bundle_validate.py",
                    "lgz_app_package.py", "lgz_display_evidence.py", "server_source_identity.py", "delivery_archive.py", "workspace_layout.py",
                    "refinement_path.py", "refinement_sources.py", "post_lgz_degap.py",
-                   "refinement_reports.py", "refinement_tools.py", "run_orchestration.py")
+                   "refinement_reports.py", "refinement_tools.py", "run_orchestration.py",
+                   "refinement_source_payload.py", "refinement_source_delivery.py", "refinement_source_marks.py")
+VALIDATOR_FILES = ("refinement_bundle_validate.py", "refinement_source_delivery.py", "refinement_source_marks.py",
+                   "lgz_core/q0_alignments.py", "lgz_core/q0_sources.py")
 
 
 def delivery_generation(root, result, report):
     final, directory = Path(result["staging"]), Path(report["directory"])
     if digest(safe_file(directory, "manifest.json")) != report["manifest_sha256"]:
         raise BundleError("portable refinement report changed before delivery")
+    evidence = result.get("source_evidence")
+    if not evidence:
+        raise BundleError("complete accepted-source measurements before creating refinement delivery")
+    try:
+        from refinement_source_evidence import load, verify_inputs, RECEIPT
+    except ModuleNotFoundError:
+        from .refinement_source_evidence import load, verify_inputs, RECEIPT
+    receipt = load(evidence["directory"])
+    verify_inputs(receipt["recipe"])
+    if (digest(safe_file(Path(evidence["directory"]), RECEIPT)) != evidence["receipt_sha256"]
+            or receipt["recipe"]["provenance_sha256"] != digest(safe_file(final, "provenance.json"))):
+        raise BundleError("source measurements do not bind this admitted refinement")
+    report_binding = json.loads(safe_file(directory, "manifest.json").read_text())["binding"]
+    if report_binding.get("source_evidence_receipt_sha256") != evidence["receipt_sha256"]:
+        raise BundleError("report lacks the current accepted-source measurements")
     format_name, _ = archive_options(root)
     return {"schema": "cgat.refinement-delivery-generation", "schema_version": 1,
+            "source_evidence_receipt_sha256": evidence["receipt_sha256"],
             "provenance_sha256": digest(safe_file(final, "provenance.json")),
             "report_manifest_sha256": report["manifest_sha256"], "archive_format": format_name,
             "generators": {name: digest(Path(__file__).with_name(name)) for name in GENERATOR_FILES}}
@@ -131,7 +150,7 @@ def validate_delivery(directory, final):
             or generation.get("archive_format") not in {"zip", "tar.gz"}):
         raise BundleError("refinement delivery generation does not bind this provenance")
     identity = tuple(hashes) + (digest(path_file), digest(final / "provenance.json"), provenance["run_id"], fingerprint(definition),
-                               digest(Path(__file__)), digest(Path(__file__).with_name("refinement_bundle_validate.py")))
+                               digest(Path(__file__)), fingerprint({name: digest(Path(__file__).parent / name) for name in VALIDATOR_FILES}))
     # A process-local content cache avoids decompressing the exact same two
     # archives again after their filesystem rename in a publication transaction.
     if identity in _VALIDATED:
@@ -147,11 +166,14 @@ def validate_delivery(directory, final):
             if proof["provenance_sha256"] != digest(final / "provenance.json"):
                 raise BundleError("archived App payload has different admitted provenance")
             if generation is not None and (proof["report_manifest_sha256"] != generation.get("report_manifest_sha256")
+                    or proof.get("source_evidence_receipt_sha256") != generation.get("source_evidence_receipt_sha256")
                     or not source.name.endswith("." + generation["archive_format"])):
                 raise BundleError("archived App report/format differs from its delivery generation")
             proofs.append(proof)
     if proofs[0]["report_manifest_sha256"] != proofs[1]["report_manifest_sha256"]:
         raise BundleError("full and light archives contain different refinement reports")
+    if proofs[0].get("source_evidence_receipt_sha256") != proofs[1].get("source_evidence_receipt_sha256"):
+        raise BundleError("full and light archives contain different source measurements")
     if proofs[0]["assemblies"] != proofs[1]["assemblies"]:
         raise BundleError("full and light archives describe different refined sequences")
     proof = {"schema": "cgat.refinement-delivery-validation", "schema_version": 1,
@@ -159,6 +181,7 @@ def validate_delivery(directory, final):
              "modes": ["full", "light"], "final_path_sha256": digest(path_file), "assemblies": proofs[0]["assemblies"],
              "provenance_sha256": proofs[0]["provenance_sha256"],
              "report_manifest_sha256": proofs[0]["report_manifest_sha256"],
+             "source_evidence_receipt_sha256": proofs[0].get("source_evidence_receipt_sha256"),
              "generation_sha256": fingerprint(generation) if generation is not None else None}
     expected = {row["chr"]: {"length": row["length"], "sha256": row["sha256"]} for row in server["chromosomes"]}
     if proof["assemblies"] != expected:

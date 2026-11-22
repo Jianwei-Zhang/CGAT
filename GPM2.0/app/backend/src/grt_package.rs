@@ -32,6 +32,7 @@ mod persistence;
 mod q0_provenance;
 mod read_model;
 mod refined_delivery;
+mod refined_source_evidence;
 mod trace_queries;
 mod types;
 

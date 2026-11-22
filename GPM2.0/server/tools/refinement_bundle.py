@@ -22,6 +22,7 @@ try:
     from refinement_reports import safe_file, read_bound
     from refinement_path import write_assembly, segment_blocks, inspect_baseline
     from refinement_sources import FastaCatalog
+    from refinement_source_payload import write_source_fasta
     from post_lgz_degap import IndexedFasta
     import lgz_app_package
 except ModuleNotFoundError:
@@ -31,6 +32,7 @@ except ModuleNotFoundError:
     from .refinement_reports import safe_file, read_bound
     from .refinement_path import write_assembly, segment_blocks, inspect_baseline
     from .refinement_sources import FastaCatalog
+    from .refinement_source_payload import write_source_fasta
     from .post_lgz_degap import IndexedFasta
     from . import lgz_app_package
 
@@ -106,34 +108,6 @@ def verify_projection(server, projected):
         row.pop("display_evidence", None)
     if expected != actual:
         raise BundleError("App Final Path differs from the authoritative admitted Server path")
-
-
-def write_source_fasta(path, rows, catalog):
-    """Copy complete patch records, not chromosome assemblies; write exact FAI."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fai = []
-    with path.open("xb") as stream:
-        for row in sorted(rows, key=lambda value: value["contig"]):
-            name, dataset, length = row["contig"], row["dataset"], row["length"]
-            if not name or re.search(r"\s|[\x00-\x1f]", name):
-                raise BundleError("patch source has an invalid FASTA identifier")
-            stream.write(b">" + name.encode("utf-8") + b"\n")
-            offset, pending = stream.tell(), b""
-            origin = {"dataset": dataset, "contig": name, "start": 1, "end": length, "orientation": "+"}
-            for block in segment_blocks({"kind": "patch", "length": length, "source": origin, "orientation": "+"}, catalog):
-                data = pending + block
-                end = len(data) // 60 * 60
-                if end:
-                    stream.write(b"\n".join(data[index:index + 60] for index in range(0, end, 60)) + b"\n")
-                pending = data[end:]
-            if pending:
-                stream.write(pending + b"\n")
-            fai.append([name, length, offset, min(60, length), min(60, length) + 1])
-    # Source N intervals use the same bounded index as reconstruction, avoiding
-    # unbounded chromosome/read dictionaries in the delivery serializer.
-    Path(str(path) + ".fai").write_text("".join("\t".join(map(str, row)) + "\n" for row in fai), encoding="utf-8")
-    return fai
-
 
 
 def close_source_payload(root, target, private):
@@ -256,6 +230,16 @@ def build_full(root, result, report, target):
         write_table(metadata / "datasets.tsv", fields, datasets)
         write_table(metadata / "source_seq_locator.tsv", locator_fields, locators)
         write_table(metadata / "source_seq_n_regions.tsv", n_fields, n_rows)
+        measured = None
+        if result.get("source_evidence"):
+            try:
+                from refinement_source_delivery import apply_to_bundle
+            except ModuleNotFoundError:
+                from .refinement_source_delivery import apply_to_bundle
+            measured = apply_to_bundle(result["source_evidence"], target)
+            if measured["recipe"]["provenance_sha256"] != digest(final_dir / "provenance.json"):
+                raise BundleError("source evidence belongs to a different accepted result")
+        measurements = {(row["dataset"], row["contig"], row["chromosome"]): row for row in measured["sources"]} if measured else {}
         # New patch cards are contextual placements, never fake homology hits.
         original_cards = {(row["dataset_name"], row["seq_name"], row["assigned_chr_name"]): row for row in assignments}
         card_lookup = {(row["dataset_name"], row["contig_name"], row["target_chr"]): row for row in cards}
@@ -282,14 +266,17 @@ def build_full(root, result, report, target):
                 row = {field: "" for field in card_fields}
                 row.update(source_card_key=":".join((*key, "refinement")), dataset_name=key[0], contig_name=key[1],
                            target_chr=name, placement_mode="refinement", original_assignment="unplaced",
-                           ref_alignment_status="not_measured", anchor_start=str(anchor), orientation=source["orientation"])
+                           ref_alignment_status=measurements[key]["ref_alignment_status"] if measured else "not_measured",
+                           anchor_start=str(anchor), orientation=source["orientation"])
                 for field in card_fields:
                     if field.endswith("_json"):
                         row[field] = "[]"
                 cards.append(row)
                 card_lookup[key] = row
                 context.append({"source_card_key": row["source_card_key"], "placement_basis": "adjacent_lgz_source_context" if neighbor else "chromosome_context_only",
-                                "anchor_start": anchor, "homology_evidence": False, "annotations": "not_scanned"})
+                                "anchor_start": anchor, "homology_evidence": False,
+                                "annotations": measurements[key]["annotations"] if measured else "not_scanned",
+                                "reference_measurement": measurements.get(key)})
                 # Context-only patch cards are materialized by the App card
                 # initializer, not the reference-assignment ordering table.
         write_table(metadata / "grt_used_contigs.tsv", card_fields, cards)
@@ -341,7 +328,8 @@ def build_full(root, result, report, target):
                     "provenance_sha256": digest(final_dir / "provenance.json"), "baseline": server["baseline"],
                     "sources": [{k: v for k, v in row.items() if k not in {"fasta_path", "path_scope"}} for row in sources],
                     "display_evidence": evidence, "patch_placements": context,
-                    "annotation_policy": "unchanged source coordinates retained; new patches not yet scanned",
+                    "annotation_policy": measured["recipe"]["annotation_policy"] if measured else "unchanged source coordinates retained; new patches not yet scanned",
+                    "source_evidence": {"file": "metadata/refinement/source_evidence.json", "sha256": digest(target / "metadata/refinement/source_evidence.json")} if measured else None,
                     "biological_accuracy_validated": False}
         shutil.copyfile(final_dir / "provenance.json", target / "metadata/refinement/provenance.json")
         seal_manifest(target, manifest)

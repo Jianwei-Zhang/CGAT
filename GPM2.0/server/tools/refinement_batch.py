@@ -24,6 +24,9 @@ try:
     from refinement_cache import find_completed
     from refinement_reports import build_tool_report, build_failure_report
     from refinement_overview import render_overview
+    from refinement_source_evidence import build as build_source_evidence
+    from refinement_source_marks import annotation_inputs
+    from degap_manual_catalog import content_digest
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from .post_lgz_degap import atomic_json, digest
@@ -33,6 +36,9 @@ except ModuleNotFoundError:
     from .refinement_cache import find_completed
     from .refinement_reports import build_tool_report, build_failure_report
     from .refinement_overview import render_overview
+    from .refinement_source_evidence import build as build_source_evidence
+    from .refinement_source_marks import annotation_inputs
+    from .degap_manual_catalog import content_digest
 
 
 def baseline_seal(root):
@@ -44,7 +50,19 @@ def baseline_seal(root):
     paths = {workspace_join(root, payload["q4_relpath"])}
     for row in csv.DictReader(io.StringIO(locator_bytes.decode("utf-8")), delimiter="\t"):
         paths.add(workspace_join(root, row["fasta_relpath"]))
-    sealed = {str(path): digest(path) for path in sorted(paths)}
+    reference = workspace_join(root, "metadata/reference.tsv")
+    if reference.is_file():
+        with reference.open(newline="", encoding="utf-8") as stream:
+            references = list(csv.DictReader(stream, delimiter="\t"))
+        if len(references) != 1:
+            raise ToolError("shared refinement reference catalog is ambiguous")
+        paths.update((reference, workspace_join(root, references[0]["fasta_relpath"])))
+    for name in ("metadata/prepare_options.tsv", "metadata/annotation_library_snapshot.json", "tel/rules.tsv", "cen/reference.tsv", "cen/library.fa"):
+        path = workspace_join(root, name)
+        if path.exists() or path.is_symlink():
+            paths.add(path)
+    paths.update(row["path"] for row in annotation_inputs(root, [row["chr"] for row in payload.get("chromosomes", [])]))
+    sealed = {str(path): content_digest(path) for path in sorted(paths)}
     sealed.update({str(final_path): hashlib.sha256(final_bytes).hexdigest(), str(locator): hashlib.sha256(locator_bytes).hexdigest()})
     check_seal(sealed)
     return sealed
@@ -52,7 +70,7 @@ def baseline_seal(root):
 
 def check_seal(seal):
     for path, expected in seal.items():
-        if digest(Path(path)) != expected:
+        if content_digest(Path(path)) != expected:
             raise ToolError(f"shared refinement input changed: {path}")
 
 
@@ -125,8 +143,12 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
                 record.update(status="staged", run_id=result["run_id"], final_staging=result["staging"])
                 staged[tool] = result
                 execution = result.get("provenance", {}).get("execution", {})
-                record.update(phase="report", native_status="staged", native_reused=execution.get("native_reused", False),
+                record.update(phase="source_evidence", native_status="staged", native_reused=execution.get("native_reused", False),
                               native_origin=execution.get("native_origin"))
+                atomic_json(target, batch)
+                result["source_evidence"] = build_source_evidence(root, result, threads)
+                record["source_evidence"] = result["source_evidence"]
+                record["phase"] = "report"
                 record["report"] = build_tool_report(root, result)
                 record["phase"] = "staged"
             except Exception as error:

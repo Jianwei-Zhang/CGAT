@@ -359,6 +359,9 @@ where
     {
         return fail("delivery provenance is not successful admitted refinement");
     }
+    let measured = super::refined_source_evidence::validate(
+        root, tables, &manifest, &server, &observed, cancel,
+    )?;
     let mut placements = HashSet::new();
     for row in manifest["patch_placements"]
         .as_array()
@@ -371,10 +374,27 @@ where
         }
     }
     for card in &table(tables, "metadata/grt_used_contigs.tsv")?.rows {
-        if field(card, "placement_mode")? == "refinement"
-            && !placements.remove(field(card, "source_card_key")?)
-        {
+        if field(card, "placement_mode")? != "refinement" {
+            continue;
+        }
+        let key = field(card, "source_card_key")?;
+        if !placements.remove(key) {
             return fail("refinement card lacks context provenance");
+        }
+        if !manifest["source_evidence"].is_null() {
+            let measurement = measured
+                .get(key)
+                .ok_or_else(|| anyhow!("refinement card lacks its measured-source proof"))?;
+            let context = manifest["patch_placements"]
+                .as_array()
+                .and_then(|rows| rows.iter().find(|row| row["source_card_key"] == key))
+                .ok_or_else(|| anyhow!("missing measured refinement context"))?;
+            if field(card, "ref_alignment_status")? != string(measurement, "ref_alignment_status")?
+                || context["reference_measurement"] != *measurement
+                || context["annotations"] != measurement["annotations"]
+            {
+                return fail("refinement context does not bind its independent source measurement");
+            }
         }
     }
     if !placements.is_empty() {

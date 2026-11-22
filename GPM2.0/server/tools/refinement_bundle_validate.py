@@ -158,6 +158,11 @@ def validate_payload(root, *, full=None):
         raise BundleError("refined App manifest does not bind the projected path")
     catalog = DeliveryCatalog(root)
     cards = read_table(root / "metadata/grt_used_contigs.tsv")[1]
+    try:
+        from refinement_source_delivery import validate_projection
+    except ModuleNotFoundError:
+        from .refinement_source_delivery import validate_projection
+    measured = validate_projection(root, manifest, server, cards, report)
     placements = {row["source_card_key"]: row for row in manifest.get("patch_placements", [])}
     if len(placements) != len(manifest.get("patch_placements", [])):
         raise BundleError("duplicate contextual refinement placement")
@@ -171,7 +176,14 @@ def validate_payload(root, *, full=None):
         seen_cards.add(expected_key)
         if card["placement_mode"] == "refinement":
             placement = placements.get(expected_key, {})
-            if (key in assigned or card["ref_alignment_status"] != "not_measured"
+            has_measurements = manifest.get("source_evidence") is not None
+            if has_measurements and key not in measured:
+                raise BundleError("refinement card lacks its measured-source proof")
+            expected_status = measured[key]["ref_alignment_status"] if has_measurements else "not_measured"
+            if (has_measurements and (placement.get("reference_measurement") != measured[key]
+                             or placement.get("annotations") != measured[key]["annotations"])):
+                raise BundleError("refinement context does not bind its independent source measurement")
+            if (key in assigned or card["ref_alignment_status"] != expected_status
                     or placement.get("homology_evidence") is not False
                     or placement.get("anchor_start") != int(card["anchor_start"])
                     or int(card["anchor_start"]) < 1):
@@ -216,4 +228,5 @@ def validate_payload(root, *, full=None):
     return {"tool": manifest["tool"], "run_id": manifest["run_id"], "mode": manifest["package_mode"],
             "final_path_sha256": manifest["server_final_path_sha256"], "assemblies": assemblies,
             "provenance_sha256": manifest["provenance_sha256"],
-            "report_manifest_sha256": observed.get("report/manifest.json")}
+            "report_manifest_sha256": observed.get("report/manifest.json"),
+            "source_evidence_receipt_sha256": json.loads(safe_file(root, "metadata/refinement/source_evidence.json").read_text())["source_receipt_sha256"] if manifest.get("source_evidence") else None}

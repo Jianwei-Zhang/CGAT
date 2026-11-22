@@ -5,10 +5,14 @@ use crate::exporter::{
 };
 
 fn materialize(light: bool) -> tempfile::TempDir {
+    materialize_named("controlled_partial.json", light)
+}
+fn materialize_named(name: &str, light: bool) -> tempfile::TempDir {
     let data: Value = serde_json::from_slice(
         &fs::read(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../tests/fixtures/refinement_app_v5/controlled_partial.json"),
+                .join("../../tests/fixtures/refinement_app_v5")
+                .join(name),
         )
         .unwrap(),
     )
@@ -258,4 +262,134 @@ fn refined_zip_import_handles_owned_progress_log_and_cannot_replace_an_existing_
         assert_eq!(sha256_file(&outcome.project_db_path).unwrap(), before);
         assert!(destination.join("cache/import.log").is_file());
     }
+}
+
+#[test]
+fn measured_source_full_light_import_keeps_real_refinement_and_export_identity() {
+    for light in [false, true] {
+        let temp = materialize_named("controlled_measured.json", light);
+        let root = temp.path().join("refined.degap");
+        validate(&root).unwrap();
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(&root).unwrap();
+        let project =
+            initialize_grt_project(&outcome.project_db_path, "Measured source refinement").unwrap();
+        let view = load_grt_project_view_for_project(&outcome.project_db_path, project.project_id)
+            .unwrap();
+        assert!(
+            view.source_cards
+                .iter()
+                .any(|row| row.placement_mode == "refinement"
+                    && row.ref_alignment_status == "no_hit")
+        );
+        let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+        let tel: i64 = conn
+            .query_row("SELECT COUNT(*) FROM source_seq_telomere_mark", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        let cen: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM source_seq_centromere_mark",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            tel > 0 && cen > 0,
+            "measured source annotations must survive Full and Light import"
+        );
+        let path = load_grt_final_path(&outcome.project_db_path).unwrap();
+        let output = temp.path().join("measured-export.fa");
+        let result = exporter::export_project_final_path_fasta(
+            &outcome.project_db_path,
+            project.project_id,
+            &ExportProjectFinalPathFastaParams {
+                output_path: output.clone(),
+                records: records(&path),
+            },
+        );
+        if light {
+            assert!(result.is_err());
+            assert!(!output.exists());
+        } else {
+            result.unwrap();
+            assert_eq!(
+                read_fasta(&output, "measured App export", false).unwrap(),
+                read_fasta(
+                    &root.join("data/refinement/final.fa"),
+                    "accepted refined sequence",
+                    false
+                )
+                .unwrap()
+            );
+        }
+    }
+}
+
+fn reseal_measured_proof(root: &Path, proof: &Value) {
+    let path = root.join("metadata/refinement/source_evidence.json");
+    fs::write(&path, serde_json::to_vec(proof).unwrap()).unwrap();
+    let manifest_path = root.join("metadata/refinement/manifest.json");
+    let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    manifest["source_evidence"]["sha256"] = Value::from(sha256_file(&path).unwrap());
+    fs::write(manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    reseal(root, None);
+}
+
+#[test]
+fn resealed_measured_status_cannot_disagree_with_actual_source_paf() {
+    let temp = materialize_named("controlled_measured.json", false);
+    let root = temp.path().join("refined.degap");
+    let mut proof: Value = serde_json::from_slice(
+        &fs::read(root.join("metadata/refinement/source_evidence.json")).unwrap(),
+    )
+    .unwrap();
+    proof["sources"][0]["ref_alignment_status"] = Value::from("hit");
+    let summary_path = root.join("report/summary.json");
+    let mut summary: Value = serde_json::from_slice(&fs::read(&summary_path).unwrap()).unwrap();
+    summary["source_evidence"]["sources"] = proof["sources"].clone();
+    fs::write(&summary_path, serde_json::to_vec(&summary).unwrap()).unwrap();
+    let report_path = root.join("report/manifest.json");
+    let mut report: Value = serde_json::from_slice(&fs::read(&report_path).unwrap()).unwrap();
+    report["files"]["summary.json"] = Value::from(sha256_file(&summary_path).unwrap());
+    fs::write(report_path, serde_json::to_vec(&report).unwrap()).unwrap();
+    reseal_measured_proof(&root, &proof);
+    let error = validate(&root).unwrap_err().to_string();
+    assert!(error.contains("source status does not describe"), "{error}");
+    assert!(!root.join("project.sqlite").exists());
+}
+
+#[test]
+fn resealed_measured_final_coordinates_cannot_drift_from_accepted_source_slices() {
+    let temp = materialize_named("controlled_measured.json", false);
+    let root = temp.path().join("refined.degap");
+    let path = root.join("metadata/refinement/source_intervals.tsv");
+    let text = fs::read_to_string(&path).unwrap();
+    let mut rows: Vec<Vec<String>> = text
+        .lines()
+        .map(|line| line.split('\t').map(str::to_string).collect())
+        .collect();
+    let column = rows[0]
+        .iter()
+        .position(|name| name == "final_start")
+        .unwrap();
+    rows[1][column] = (rows[1][column].parse::<u64>().unwrap() + 1).to_string();
+    fs::write(
+        &path,
+        rows.iter()
+            .map(|row| row.join("\t"))
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n",
+    )
+    .unwrap();
+    let mut proof: Value = serde_json::from_slice(
+        &fs::read(root.join("metadata/refinement/source_evidence.json")).unwrap(),
+    )
+    .unwrap();
+    proof["files"]["metadata/refinement/source_intervals.tsv"] =
+        Value::from(sha256_file(&path).unwrap());
+    reseal_measured_proof(&root, &proof);
+    let error = validate(&root).unwrap_err().to_string();
+    assert!(error.contains("coordinate map differs"), "{error}");
 }

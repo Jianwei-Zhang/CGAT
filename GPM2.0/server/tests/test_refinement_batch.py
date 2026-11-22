@@ -17,6 +17,13 @@ from server.tests import test_refinement_native as fixture
 
 
 class RefinementBatchTests(unittest.TestCase):
+    def setUp(self):
+        # This class isolates native/batch policy. Actual source measurement,
+        # commands, receipts and serialization have their own focused tests.
+        patch = mock.patch.object(batch, "build_source_evidence", return_value={"fixture": "source measurements"})
+        patch.start()
+        self.addCleanup(patch.stop)
+
     def result(self, root, tool, run_id):
         return {"tool": tool, "run_id": run_id, "staging": str(root / ".runtime" / tool / run_id / "final"),
                 "provenance": {"execution": {"recipe": {"reads": []}}}}
@@ -53,6 +60,24 @@ class RefinementBatchTests(unittest.TestCase):
             self.assertEqual(calls, ["degap"])
             self.assertEqual(result["batch"]["status"], "invalidated")
             self.assertFalse(result["staged_results"])
+
+    def test_source_evidence_failure_keeps_native_result_and_isolates_other_tools(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            groups, _, _ = fixture.workspace(root)
+            def stage(root, tool, groups, threads, *, run_id):
+                return self.result(root, tool, run_id)
+            def measure(root, result, threads):
+                if result["tool"] == "degap":
+                    raise RuntimeError("controlled source measurement failure")
+                return {"fixture": "completed measurements"}
+            with mock.patch.object(batch, "stage_refinement", side_effect=stage), mock.patch.object(batch, "build_source_evidence", side_effect=measure), mock.patch.object(batch, "build_tool_report", return_value={"fixture": "report"}), mock.patch.object(batch, "render_overview", return_value={"fixture": "overview"}):
+                result = batch.execute_batch(root, groups, 2, tools="degap,tgsgapcloser")
+            self.assertEqual(result["batch"]["status"], "partial_failure")
+            self.assertEqual(result["batch"]["tools"]["degap"]["phase"], "source_evidence")
+            self.assertEqual(result["batch"]["tools"]["tgsgapcloser"]["status"], "staged")
+            self.assertIn("degap", result["staged_results"])
+            self.assertEqual(result["exit_code"], 1)
 
     @unittest.skipUnless(shutil.which("samtools"), "real indexing required for the cache boundary")
     def test_complete_result_reuses_content_and_tampered_report_is_not_a_hit(self):

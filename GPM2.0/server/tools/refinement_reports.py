@@ -6,7 +6,7 @@ FASTA, native genome or workstation-only hyperlink is needed to view the report.
 """
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 from bisect import bisect_right
 import csv
 import hashlib
@@ -32,7 +32,7 @@ SCHEMA = "cgat.refinement-report"
 PAGE_SIZE = 200
 MAX_ASSET = 20 * 1024 * 1024
 MAX_ASSETS_TOTAL = 200 * 1024 * 1024
-TEXT_ENDINGS = (".json", ".log", ".tsv", ".txt", ".agp", ".detail", ".gap_fill_detail", "_scaff_infos", ".name_map", "/info_filter2")
+TEXT_ENDINGS = (".json", ".log", ".tsv", ".paf", ".txt", ".agp", ".detail", ".gap_fill_detail", "_scaff_infos", ".name_map", "/info_filter2")
 CSS = "body{font:16px system-ui;max-width:1200px;margin:2em auto;padding:0 1em;color:#17212b}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid #ccd3db;padding:.5em;text-align:left;vertical-align:top}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:1em}a{color:#175ba0}code{overflow-wrap:anywhere}.note{border-left:4px solid #a66d00;padding:.8em;background:#fff6df}summary{cursor:pointer}small{color:#52606d}"
 
 
@@ -262,6 +262,32 @@ def render_site(directory, summary, provenance, final, assets):
         "native_origin": execution.get("native_origin"), "requested_threads": execution.get("requested_threads", execution.get("threads")),
         "recipe": execution.get("recipe"),
         "command": execution.get("command")}) + '</pre>'
+    measured = summary.get("source_evidence")
+    if measured is not None:
+        sources = measured["sources"]
+        body += '<h2>Accepted-source measurements / 精修来源测量</h2><pre>' + json_text({
+            "patch_source_placements": len(sources), "reference_status": dict(Counter(row["ref_alignment_status"] for row in sources)),
+            "final_annotation_rows": measured["final_annotation_rows"], "policy": measured["annotation_policy"],
+            "coordinate_domain": measured["coordinate_domain"]}) + '</pre>'
+        body += '<p>Context placement is not a homology claim. Clipped source marks are coordinate projections, not a complete final-genome rescan. / 显示上下文不是同源证据；切片注释是坐标映射，不冒充完整终版基因组重扫描。</p>'
+        if sources:
+            pages = [sources[i:i + PAGE_SIZE] for i in range(0, len(sources), PAGE_SIZE)]
+            body += '<p>' + link("sources-0001.html", "All measured source placements / 全部来源测量") + '</p>'
+            for number, rows in enumerate(pages, 1):
+                navigation = link("report.html", "Overview / 总览")
+                if number > 1:
+                    navigation += ' · ' + link(f"sources-{number - 1:04}.html", "Previous / 上一页")
+                if number < len(pages):
+                    navigation += ' · ' + link(f"sources-{number + 1:04}.html", "Next / 下一页")
+                content = navigation + table(["Source dataset", "Contig", "Chromosome", "Length", "Reference measurement", "Hits: this chr / all", "Annotations"], [
+                    (escape(row["dataset"]), escape(row["contig"]), escape(row["chromosome"]), escape(str(row["length"])),
+                     escape(row["ref_alignment_status"]), escape(f'{row["hits_on_chromosome"]} / {row["reference_hits"]}'),
+                     escape(json.dumps(row["annotations"], ensure_ascii=False))) for row in rows])
+                (directory / f"sources-{number:04}.html").write_text(page("Accepted-source measurements / 精修来源测量", content), encoding="utf-8")
+        files = [row for row in assets if "/01_source_evidence/" in row["workspace_path"] and "/04_projection/" in row["workspace_path"]]
+        body += table(["Coordinate/summary artifact", "Availability"], [
+            (link(row["report_path"], Path(row["workspace_path"]).name) if row.get("report_path") else escape(Path(row["workspace_path"]).name),
+             escape(row["availability"])) for row in files])
     edits = {row["edit_id"]: row for row in final["edits"]}
     rejected = defaultdict(list)
     for row in provenance["rejected_candidates"]:
@@ -330,9 +356,32 @@ def build_tool_report(root, result):
         remaining = list(csv.DictReader(stream, delimiter="\t"))
     artifacts, jobs, native_gaps = native_diagnostics(root, tool, run_id, provenance["execution"])
     assets = asset_plan(root, artifacts)
+    source_binding, source_summary = {}, None
+    if result.get("source_evidence"):
+        try:
+            from refinement_source_evidence import load, verify_inputs, RECEIPT
+        except ModuleNotFoundError:
+            from .refinement_source_evidence import load, verify_inputs, RECEIPT
+        evidence = result["source_evidence"]
+        directory = Path(evidence["directory"])
+        receipt_path = safe_file(directory, RECEIPT)
+        receipt = load(directory)
+        if digest(receipt_path) != evidence["receipt_sha256"] or receipt["recipe"]["provenance_sha256"] != sha:
+            raise ReportError("source measurements do not bind the reported accepted result")
+        verify_inputs(receipt["recipe"])
+        source_binding = {"source_evidence_receipt_sha256": evidence["receipt_sha256"],
+                          "source_evidence_generation_sha256": receipt["generation_sha256"]}
+        artifacts[receipt_path.relative_to(root).as_posix()] = evidence["receipt_sha256"]
+        for row in receipt["payload"]:
+            artifacts[safe_file(directory, row["file"]).relative_to(root).as_posix()] = row["sha256"]
+        source_summary = json.loads(safe_file(directory, "04_projection/summary.json").read_text())
+        source_summary["generation_sha256"] = receipt["generation_sha256"]
+        assets = asset_plan(root, artifacts)
     summary = summarize(provenance, final, remaining, jobs, native_gaps)
     summary["artifacts"] = assets
-    binding = {"provenance_sha256": sha, "generator_sha256": digest(Path(__file__)), "assets": assets}
+    if source_summary is not None:
+        summary["source_evidence"] = source_summary
+    binding = {"provenance_sha256": sha, "generator_sha256": digest(Path(__file__)), "assets": assets, **source_binding}
     identity = fingerprint(binding)
     home = layout.path(f"04_refinement/{TOOL_DIRECTORIES[tool]}/05_report/{run_id}")
     destination = home / ("site-" + identity[:20])
@@ -386,10 +435,33 @@ def build_failure_report(root, tool, run_id, error, *, phase="native"):
     except (OSError, ValueError, KeyError, TypeError) as diagnostic:
         jobs = []
         diagnostics_error = str(diagnostic)
+    source_diagnostics = getattr(error, "source_evidence_diagnostics", None)
+    if phase == "source_evidence" and source_diagnostics is not None:
+        try:
+            directory = Path(source_diagnostics)
+            parent = layout.path(f"04_refinement/{code}/04_accepted/{run_id}/01_source_evidence")
+            if directory.parent != parent or re.fullmatch(r"failed-[0-9a-f]{20}-[0-9a-f]{32}", directory.name) is None:
+                raise ReportError("source failure diagnostics are outside this attempt")
+            relative = (directory / "failure.json").relative_to(root).as_posix()
+            failure = json.loads(safe_file(root, relative).read_text())
+            if (failure.get("schema") != "cgat.refinement-source-evidence-failure" or failure.get("schema_version") != 1
+                    or failure.get("status") not in {"failed", "interrupted"} or failure.get("recipe", {}).get("tool") != tool
+                    or failure.get("recipe", {}).get("run_id") != run_id):
+                raise ReportError("source failure diagnostics do not bind this attempt")
+            artifacts[relative] = digest(safe_file(root, relative))
+            for name, sha in failure["files"].items():
+                if name.endswith(TEXT_ENDINGS):
+                    relative = (directory / name).relative_to(root).as_posix()
+                    if digest(safe_file(root, relative)) != sha:
+                        raise ReportError("source failure diagnostic changed")
+                    artifacts[relative] = sha
+        except (OSError, ValueError, KeyError, TypeError) as diagnostic:
+            diagnostics_error = (diagnostics_error + "; " if diagnostics_error else "") + str(diagnostic)
     assets = asset_plan(root, artifacts)
     summary = {"schema": "cgat.refinement-failure-report", "schema_version": 1, "tool": tool, "run_id": run_id,
                "status": "failed", "phase": phase, "error": str(error), "native_jobs": jobs,
-               "diagnostics_error": diagnostics_error, "final_available": False, "artifacts": assets,
+               "diagnostics_error": diagnostics_error, "source_diagnostics": str(source_diagnostics) if source_diagnostics else None,
+               "final_available": False, "artifacts": assets,
                "native_status": execution.get("native_status"), "native_reused": execution.get("native_reused", False),
                "native_origin": execution.get("native_origin")}
     binding = {"summary": summary, "generator_sha256": digest(Path(__file__))}
@@ -408,7 +480,7 @@ def build_failure_report(root, tool, run_id, error, *, phase="native"):
                     (temporary / row["report_path"]).write_bytes(read_bound(safe_file(root, row["workspace_path"]), row["sha256"], limit=MAX_ASSET))
             atomic_json(temporary / "summary.json", summary)
             body = '<p class="note">This attempt failed. No final result is declared; earlier successful files remain historical. / 本次任务失败，不声明最终结果；先前成功文件仍是历史结果。</p><pre>' + json_text(summary) + '</pre>'
-            body += table(["Native diagnostic", "Availability"], [(link(row["report_path"], row["workspace_path"]) if "report_path" in row else escape(row["workspace_path"]), escape(row["availability"])) for row in assets])
+            body += table(["Native/source diagnostic", "Availability"], [(link(row["report_path"], row["workspace_path"]) if "report_path" in row else escape(row["workspace_path"]), escape(row["availability"])) for row in assets])
             (temporary / "report.html").write_text(page(tool + " failed attempt / 失败任务", body), encoding="utf-8")
             atomic_json(temporary / "manifest.json", {"schema": summary["schema"], "schema_version": 1, "binding": binding,
                         "files": {path.relative_to(temporary).as_posix(): digest(path) for path in temporary.rglob("*") if path.is_file()}})

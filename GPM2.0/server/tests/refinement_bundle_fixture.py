@@ -3,6 +3,8 @@
 The exact serializer output is frozen for cross-language App contract tests.
 """
 import hashlib
+from contextlib import ExitStack
+import os
 import json
 from pathlib import Path
 import sys
@@ -22,7 +24,7 @@ from refinement_tools import fingerprint
 FIXTURE = Path(__file__).resolve().parents[2] / "tests/fixtures/grt_contract_v3/frozen_bridge_server.json"
 
 
-def create(root):
+def create(root, *, with_source_evidence=False, with_source_annotations=False):
     layout = initialize_workspace(root)
     original = json.loads(FIXTURE.read_text())
     for name, contents in original["files"].items():
@@ -85,23 +87,35 @@ def create(root):
     atomic_json(jobs / "invocation.json", {"status": "staged", "tool": tool, "run_id": run_id,
                                          "provenance_sha256": digest(staging / "provenance.json")})
     result = {"tool": tool, "run_id": run_id, "staging": str(staging), "provenance": provenance}
-    report = build_tool_report(root, result)
-    full, light = root / ".runtime/app-fixture/full", root / ".runtime/app-fixture/light"
-    build_full(root, result, report, full)
-    build_light(full, light)
-    validate_payload(full, full=True)
-    validate_payload(light, full=False)
-    return result, full, light
+    with ExitStack() as stack:
+        if with_source_annotations:
+            from refinement_source_evidence_fixture import frozen_rules, controlled_mummer
+            from unittest import mock
+            frozen_rules(root)
+            folder = controlled_mummer(root.parent)
+            stack.enter_context(mock.patch.dict(os.environ, {"PATH": str(folder) + os.pathsep + os.environ["PATH"]}))
+        if with_source_evidence:
+            from refinement_source_evidence import build
+            result["source_evidence"] = build(root, result, 1)
+        report = build_tool_report(root, result)
+        full, light = root / ".runtime/app-fixture/full", root / ".runtime/app-fixture/light"
+        build_full(root, result, report, full)
+        build_light(full, light)
+        validate_payload(full, full=True)
+        validate_payload(light, full=False)
+        return result, full, light
 
 
-def freeze(output):
+def freeze(output, *, with_source_evidence=False, with_source_annotations=False):
     import tempfile
     with tempfile.TemporaryDirectory(prefix="cgat-refined-app-fixture-") as temporary:
-        _, full, _ = create(Path(temporary) / "workspace")
+        _, full, _ = create(Path(temporary) / "workspace", with_source_evidence=with_source_evidence, with_source_annotations=with_source_annotations)
         files = {path.relative_to(full).as_posix(): path.read_text(encoding="utf-8") for path in sorted(full.rglob("*")) if path.is_file()}
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps({"fixture_schema": "cgat.refined-app-fixture.v1",
-            "provenance": "Controlled admission GTNNAC over frozen_bridge_server.json; real serializer and source reconstruction; no native engine executed.",
+            "provenance": "Controlled admission GTNNAC over frozen_bridge_server.json; real serializer and source reconstruction; no native engine executed." +
+                (" Accepted sources have actual developer-base minimap2 no-hit measurements; no pinned-environment or four-engine acceptance claim." if with_source_evidence else "") +
+                (" Telomere rules are controlled inputs; nucmer/show-coords are explicit controlled producers for annotation contract testing, not real MUMmer acceptance." if with_source_annotations else ""),
             "files": files}, indent=2, sort_keys=True, ensure_ascii=True) + "\n", encoding="utf-8")
         print(output, output.stat().st_size, "bytes", len(files), "files")
 

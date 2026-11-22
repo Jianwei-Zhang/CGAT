@@ -78,6 +78,7 @@ cgat_server/
       02_jobs/<run>/                 command, status, native-completion receipt
       03_native/<run>/               retained native output, not the final result
       04_accepted/<run>/             accepted patch source sequences
+        01_source_evidence/<generation>/  measured reference/annotation evidence
       05_report/<run>/<site>/        portable attempt report
   05_final/
     00_lgz/                          LGZ baseline: refinement_applied=false
@@ -103,7 +104,7 @@ Brackets denote two files, not literal filenames; `--archive-format zip` uses `.
 
 A tool directory alone is not proof of current success. Follow the current overview and its committed, content-bound publication receipt. Failed new attempts retain diagnostics and do not erase an older successful publication or label it as the new result. One tool's failure does not prevent other successful tools or the LGZ baseline being delivered; the overall invocation returns nonzero.
 
-The final assembly is rebuilt from accepted source edits, not copied from a native whole chromosome or relabeled LGZ FASTA. Valid partial/joint/reverse/overlap edits retain their source lineage; ambiguous or out-of-bounds proposals remain unaccepted with reasons. Zero accepted edits is possible and must be distinguished from native failure. Structural/source validation does **not** establish biological accuracy. Unchanged source-coordinate evidence is retained; new-patch reference alignments/annotations are currently marked unmeasured, and their generation remains an integration requirement before final acceptance.
+The final assembly is rebuilt from accepted source edits, not copied from a native whole chromosome or relabeled LGZ FASTA. Valid partial/joint/reverse/overlap edits retain their source lineage; ambiguous or out-of-bounds proposals remain unaccepted with reasons. Zero accepted edits is possible and must be distinguished from native failure. Structural/source validation does **not** establish biological accuracy. Unchanged source-coordinate evidence is retained. New accepted patch sources now receive independent reference alignments and tel/cen scans against the original prepared reference and frozen library, without rerunning LGZ or gap filling. Their measurements live under `04_accepted/<run>/01_source_evidence/<generation>/`; reports and both App modes carry the same evidence. `no_hit`, `disabled`, `no_rules` and `no_chr_library` are distinct states. `metadata/refinement/source_intervals.tsv` and `final_annotations.tsv` trace real source slices to final coordinates, including reverse/clipped intervals. These are source scans and coordinate projections, not an exhaustive final-genome rescan or a biological accuracy claim.
 
 ## 4. Reports, App import and recovery
 

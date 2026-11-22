@@ -497,6 +497,7 @@ class OuterCheckpointManager:
             workspace_join(self.server_dir, "cen/reference.tsv"),
             workspace_join(self.server_dir, "cen/library.fa"),
             workspace_join(self.server_dir, "metadata/annotation_library_snapshot.json"),
+            workspace_join(self.server_dir, ".prepare_lib/tools/tel_scan.py"),
             workspace_join(self.server_dir, ".prepare_lib/tools/cen_scan.py"),
             workspace_join(self.server_dir, ".prepare_lib/tools/annotation_library.py"),
         ]:
@@ -594,7 +595,7 @@ class OuterCheckpointManager:
             ".prepare_lib/tools/self_alignment_batches.py",
             "tel/rules.tsv", "cen/reference.tsv", "cen/library.fa",
             "metadata/annotation_library_snapshot.json",
-            ".prepare_lib/tools/cen_scan.py", ".prepare_lib/tools/annotation_library.py",
+            ".prepare_lib/tools/tel_scan.py", ".prepare_lib/tools/cen_scan.py", ".prepare_lib/tools/annotation_library.py",
         ]
         for name in optional_names:
             path = workspace_join(self.server_dir, name)

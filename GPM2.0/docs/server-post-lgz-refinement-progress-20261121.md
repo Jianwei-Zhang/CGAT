@@ -362,3 +362,20 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 未知旧结果 ZIP 的保护前移到 staging 前，避免先做无用比对才拒绝覆盖。保留原 ZIP，可将未改动的原 jobs/receipt 复制到新的空收集目录，不重新导出 token 或重跑原生任务。同步中英文使用边界；没有以缓存接续权限扩大为覆盖外部 ZIP 权限。
 - 最终本段 4 项定向检查通过（15.425 秒）：实际旧收集器产生旧包 → 真实显式迁移 → 迁移安装的新版 CLI 接续/再次收集；旧包 bytes 不变，未触发禁止运行的比对器，native 文件/mtime 不变，原 LGZ 科学契约/完整证明/文件 bytes 不变。另覆盖未知 ZIP 保留、无迁移依据缓存、缓存漂移/未知 token、正常编号目录连续追加与现有目录校验。旧包初次比对使用受控 PAF，不冒充真实 minimap2/DEGAP 验收。
 - 本段未运行全量回归、生产构建、浏览器或环境安装，未触及 master/远端/客户工作区。全目标继续保留：未完成旧 LGZ 阶段适配、原生内部部分子任务复用、新 patch 比对/注释、原生离线报告、四工具真实固定环境/双架构与 A01–A18 统一验收。
+
+
+## 2026-11-22：精修新来源的实际测量、坐标证据与 App 协议接入
+
+- 先记录 `server-refinement-source-evidence-contract-20261122.md`，再接入独立 `source_evidence` 阶段。只对已接纳的新 patch 来源做参考 PAF 和 tel/cen 扫描，使用原准备参考、原 preset、冻结库和现有线程总预算；不重跑 LGZ 或补洞工具，不向原始/已接纳来源写索引。原参考、库及已有来源注释也纳入跨工具共享输入封存。
+- 测量代际在 `04_refinement/<tool>/04_accepted/<run>/01_source_evidence/<generation>/` 内容绑定缓存，测量和打包/报告生成器分开。报告/包变化不重跑已完成测量；新原生/admission 配方未被这些显示与交付模块改变。包内 `source_intervals.tsv`、`final_annotations.tsv` 按真实切片/方向映射，保留“完整来源标记”和“截断来源支持”的区别，不把来源扫描冒充完整终版基因组重扫描。
+- `no_hit`、`disabled`、`no_rules`、`no_chr_library` 分开。patch 仍是上下文放置，不新增假的原始分配或同源锚点；独立 PAF 状态来自真实输出记录。Full/Light 携带同一 PAF、来源注释与证据投影；生产交付必须绑定测量 receipt 和匹配报告，不能回到未测量状态作成功交付。旧无该 capability 的 schema-5 包仍保持其原有 `not_measured` 语义。
+- Python 和匹配 App 校验实际 PAF 名称/长度/CIGAR/记录数、库身份、完整 patch 放置覆盖与来源到终版的坐标重建；仅更改状态名称或重新计算外层 checksum 不能使假命中/错位通过。新增双模式导入、注释保留、精修序列再导出及错误包拒绝的 Windows 用例和真实序列化冻结夹具。
+- 实际检查发现原内嵌 tel scanner 在独立子进程中缺少路径函数导入并仍用旧目录。提取共用 `tel_scan.py`，两布局和新 patch 使用同一 literal motif/反向互补算法，执行时校验冻结快照；外层 checkpoint 绑定该 helper。相关真实 prepare/cen 集成用例改为通过实际 WorkspaceLayout 取路径，未运行整个 prepare/科学流水线以做中间检查。
+- 测量失败也保留命令、查询、日志及 failure receipt，绝不留下可作完成依据的 receipt；失败报告链接这些诊断。重试保留已完成 native/admission 结果，失败/中断的来源子步骤不因存在文件而冒充完成。
+
+### 本段必要检查与证据边界
+
+- 最终 13 项定向 Python 检查通过（9.494 秒）：真实开发机 minimap2 对 6bp 受控接纳来源产生合法无命中；冻结规则、受控 nucmer/show-coords、CEN 空库/无规则、反向/切片/重复来源坐标；缓存复用、来源/参考不变性、输入漂移、重新封装的假状态/坐标拒绝、实际生成的编号 tel 命令、Unicode/前导连字符名称；来源阶段独立失败；真实 Full/Light 归档校验与原子发布。
+- 另在失败诊断接入后单独检查失败日志保留/恢复、缓存原始数据不变性及归档发布，3 项通过（5.435 秒）。初始归档定向检查发现一个新 receipt 路径的 str/Path 传参错误，已按既有 safe-file 接口修正调用，没有放宽生产校验。
+- Windows `cargo check --lib --tests` 通过（41.82 秒），只做编译/类型检查，没有链接并执行新增 App 用例。新冻结夹具来自实际 serializer 和来源重建；其补洞候选、tel 规则和 MUMmer 输出是明确的受控材料，不冒充原生四工具、固定环境、真实 MUMmer/双架构或生物学验收。
+- 没有运行全量回归、浏览器、生产构建、环境升级、远端作业或发布。全目标继续保留：未完成旧 LGZ 阶段适配、原生内部部分子任务复用、原生离线可视报告、真实固定环境/四工具/双架构，以及包含最新 App 运行闭环的 A01–A18 最后统一验收。
