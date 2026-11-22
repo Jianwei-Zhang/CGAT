@@ -6,9 +6,12 @@ bound original sources. Failed mapping inputs/logs and all complete PAFs remain.
 No diagnostic wall-clock cutoff is installed in production.
 """
 from __future__ import annotations
-from dataclasses import asdict
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -176,18 +179,129 @@ def _ensure_fastas(root,relative,context,catalog,query,targets):
                 raise Q0EvidenceError("regenerated window FASTA differs from bound input")
 
 
+_CHILD_LOADER_POLICY = "clear_same_dependencies_v1"
+_CHILD_LOADER = None
+_CHILD_LOADER_SCOPE = threading.Lock()
+
+
+@dataclass(frozen=True)
+class _MapperLoader:
+    tool_path: str
+    tool_sha256: str
+    path_sha256: str
+    dependencies_sha256: str
+
+    def child(self, tool):
+        env = dict(os.environ)
+        inherited = _library_path(env)
+        if (tool["resolved"] != self.tool_path or tool["sha256"] != self.tool_sha256
+                or inherited is None or sha256_bytes(os.fsencode(inherited)) != self.path_sha256):
+            return None, None
+        del env["LD_LIBRARY_PATH"]
+        return env, {"policy": _CHILD_LOADER_POLICY, "inherited_path_sha256": self.path_sha256,
+                     "dependencies_sha256": self.dependencies_sha256, "tool_sha256": self.tool_sha256}
+
+
+def _library_path(env):
+    path = env.get("LD_LIBRARY_PATH", "")
+    if (not path or env.get("PYTHONHOME") or any(key.startswith(("LD_", "GLIBC_TUNABLES"))
+            and key != "LD_LIBRARY_PATH" and value for key, value in env.items())
+            or any(not item.startswith("/") or "$" in item for item in path.split(":"))):
+        return None
+    return path
+
+
+def _dynamic_paths(binary, env):
+    # Only called for the already selected trusted mapper and this interpreter's
+    # own binaries, by the controlled reader before any mapper threads start.
+    output = subprocess.run(["/usr/bin/ldd", str(binary)], env=env, check=True, text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45).stdout
+    paths = {}
+    for line in output.splitlines():
+        row = re.sub(r"\s+\(0x[0-9a-f]+\)$", "", line.strip())
+        if not row or row.startswith("linux-vdso.so."):
+            continue
+        name, sep, path = row.partition(" => ")
+        dependency = Path(path if sep else name)
+        if name in paths or not dependency.is_absolute() or not dependency.is_file():
+            raise ValueError("nonlocal, missing, or unresolved runtime dependency")
+        paths[name] = str(dependency.resolve(strict=True))
+    if not paths:
+        raise ValueError("no comparable ELF dependency inventory")
+    return paths
+
+
+def _probe_mapper_loader(mapper):
+    inherited = dict(os.environ)
+    search = _library_path(inherited)
+    if sys.platform != "linux" or search is None:
+        return None
+    clean = dict(inherited)
+    del clean["LD_LIBRARY_PATH"]
+    try:
+        import resource
+        resolved = shutil.which(mapper)
+        if resolved is None:
+            return None
+        tool = Path(resolved).resolve(strict=True)
+        python = Path(sys.executable).resolve(strict=True)
+        resource_module = Path(resource.__file__).resolve(strict=True)
+        binaries = [python, resource_module, tool]
+        before = {str(binary): _dynamic_paths(binary, inherited) for binary in binaries}
+        paths = {Path(path) for row in before.values() for path in row.values()} | set(binaries)
+        expected_bytes = {str(path): sha256_file(path) for path in sorted(paths)}
+        if before != {str(binary): _dynamic_paths(binary, clean) for binary in binaries}:
+            return None
+        if any(sha256_file(Path(path)) != fingerprint for path, fingerprint in expected_bytes.items()):
+            return None
+        return _MapperLoader(str(tool), expected_bytes[str(tool)], sha256_bytes(os.fsencode(search)),
+                             sha256_bytes(canonical_json([before, expected_bytes]).encode("utf-8")))
+    except (OSError, ImportError, AttributeError, ValueError, subprocess.SubprocessError):
+        return None  # Different or unverified dependencies: retain original environment.
+
+
+@contextmanager
+def verified_mapper_loader(mapper):
+    """Opt in from a bound incident reader; affect only its regional children."""
+    global _CHILD_LOADER
+    if not _CHILD_LOADER_SCOPE.acquire(blocking=False):
+        raise Q0EvidenceError("cannot replace a regional mapper loader scope in use")
+    try:
+        _CHILD_LOADER = _probe_mapper_loader(mapper)
+        yield _CHILD_LOADER is not None
+    finally:
+        _CHILD_LOADER = None
+        _CHILD_LOADER_SCOPE.release()
+
+
+def _verify_mapper_loader_record(record, tool):
+    if (type(record) is not dict or set(record) != {"policy", "tool_sha256", "inherited_path_sha256", "dependencies_sha256"}
+            or record["policy"] != _CHILD_LOADER_POLICY or record["tool_sha256"] != tool["sha256"]
+            or any(not isinstance(record[k], str) or not re.fullmatch(r"[0-9a-f]{64}", record[k])
+                   for k in ("inherited_path_sha256", "dependencies_sha256"))):
+        raise Q0EvidenceError("invalid regional mapper loader record")
+
+
 def _execute(root,directory,context,relative,catalog,query,targets,argv,tool,address_space_bytes):
     _ensure_fastas(root,relative,context,catalog,query,targets)
     if sha256_file(Path(tool["resolved"])) != tool["sha256"]: raise Q0EvidenceError("regional mapper changed")
     guard=Path(__file__).with_name("q0_mapper_guard.py")
     shutil.copyfile(guard,directory/"guard.py")
     command=[sys.executable,str(directory/"guard.py"),"--address-space-bytes",str(address_space_bytes),"--",*argv]
-    _ops().atomic_write_json(directory/"command.json",{"producer_root":str(root),"argv":argv,"executed_argv":command,
-        "address_space_bytes":address_space_bytes,"guard_sha256":sha256_file(directory/"guard.py"),"wall_clock_limit_added":False})
+    options = {}
+    receipt = {"producer_root":str(root),"argv":argv,"executed_argv":command,
+               "address_space_bytes":address_space_bytes,"guard_sha256":sha256_file(directory/"guard.py"),"wall_clock_limit_added":False}
+    loader = _CHILD_LOADER
+    if loader is not None:
+        child_env, provenance = loader.child(tool)
+        if provenance is not None:
+            options["env"] = child_env
+            receipt["mapper_loader"] = provenance
+    _ops().atomic_write_json(directory/"command.json",receipt)
     # Inherit the owning reader's process group, so ordinary Runner/scheduler
     # cancellation reaches every mapper. The guard execs, it has no child tree.
     with (directory/"result.paf.tmp").open("wb") as output,(directory/"stderr.log").open("wb") as log:
-        process=subprocess.Popen(command,cwd=directory,stdout=output,stderr=log)
+        process=subprocess.Popen(command,cwd=directory,stdout=output,stderr=log,**options)
         try: code=process.wait()
         except BaseException:
             if process.poll() is None:
@@ -315,6 +429,8 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
 def _verify_command(root, relative, context_relative, context_spec, flags):
     command=_ops().json_file(_ops().artifact_path(root,relative+"/command.json"))
     argv=command["argv"];producer=Path(command["producer_root"])
+    if "mapper_loader" in command:
+        _verify_mapper_loader_record(command["mapper_loader"], context_spec["tool"])
     if (not producer.is_absolute() or argv[-4]!="-t" or int(argv[-3])<1
             or type(command["address_space_bytes"]) is not int or command["address_space_bytes"]<16*1024*1024):
         raise Q0EvidenceError("invalid regional execution record")

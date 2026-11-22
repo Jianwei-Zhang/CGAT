@@ -1,5 +1,6 @@
 """Truthful changed-q0 reader over unchanged, verified initial alignments."""
 import argparse
+from contextlib import nullcontext
 import json
 import subprocess
 import sys
@@ -10,7 +11,7 @@ from q0_science_context import opened_transition, checked
 def declaration(ctx, module):
     old_reader=ctx.native_bootstrap.module('authentic_q0_provenance_reader',checked(ctx.plan['dependencies']['reader']))
     extra=old_reader.provenance_inputs(ctx)
-    return {'schema':'incident_q0_regional_science_reader_v1',
+    record = {'schema':'incident_q0_regional_science_reader_v1',
         'scope':'q0_evidence_regional_discovery_with_original_alignments',
         'reader_sha256':ctx.contract.sha256_file(Path(__file__)),
         'transition_sha256':ctx.transition_sha,'self_plan_sha256':ctx.plan_sha,
@@ -20,6 +21,9 @@ def declaration(ctx, module):
         'launcher_sha256':ctx.transition['launcher']['sha256'],'additional_inputs':extra,
         'scientific_builder_modified':True,'initial_alignment_profiles_modified':False,
         'native_checkpoint_rewritten':False}
+    if 'regional_mapper_loader_policy' in ctx.transition:
+        record['regional_mapper_loader_policy'] = ctx.transition['regional_mapper_loader_policy']
+    return record
 
 
 
@@ -80,7 +84,18 @@ def main():
             print(json.dumps(declaration(ctx,q0_preparation)),flush=True)
             return
         reader=ctx.native_original_context.compose(ctx,OuterCheckpointManager,readonly=True)
-        prepare(ctx,q0_preparation,reader,threads=execution_threads(args.threads),minimap2=args.minimap2)
+        policy = ctx.transition.get('regional_mapper_loader_policy')
+        if policy is None:
+            loader = nullcontext(False)
+        elif policy == 'clear_same_dependencies_v1':
+            from lgz_core.q0_regional_mapping import verified_mapper_loader
+            loader = verified_mapper_loader(args.minimap2)
+        else:
+            raise ValueError('unknown regional mapper loader policy')
+        with loader as active:
+            if policy is not None:
+                print('LGZ q0 regional mapper loader: '+('verified_child_only' if active else 'inherited_fallback'), flush=True)
+            prepare(ctx,q0_preparation,reader,threads=execution_threads(args.threads),minimap2=args.minimap2)
 
 
 if __name__=='__main__':main()

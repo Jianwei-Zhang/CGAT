@@ -73,6 +73,9 @@ def prepare(bundle):
             or type(manifest.get('protected_baseline')) is not int or manifest['protected_baseline'] < 1
             or manifest['previous_job'] == manifest['protected_baseline']):
         raise ValueError('invalid candidate source/job identity')
+    scope = manifest.get('regional_mapper_loader_policy')
+    if 'regional_mapper_loader_policy' in manifest and scope != 'clear_same_dependencies_v1':
+        raise ValueError('invalid regional mapper loader candidate policy')
     previous_path = checked(manifest['previous_transition'])
     previous = json.loads(previous_path.read_text())
     work = Path(previous['workspace']).resolve(strict=True)
@@ -148,6 +151,8 @@ def prepare(bundle):
         'scientific_builder_modified':True, 'dependencies':{role:sources[name] for role,name in HELPERS.items()},
         'native_origin':previous['native_origin'], 'runtime':runtime, 'launcher':record(bundle/LAUNCHER),
         'prior_launcher_sha256':installed[LAUNCHER], 'prior_declaration_sha256':installed[DECLARATION]}
+    if scope is not None:
+        transition['regional_mapper_loader_policy'] = scope
     write_new(transition_path, transition)
     checked(manifest_before); checked(journal_before); checked(manifest['previous_transition'])
     for relative, expected in installed.items():

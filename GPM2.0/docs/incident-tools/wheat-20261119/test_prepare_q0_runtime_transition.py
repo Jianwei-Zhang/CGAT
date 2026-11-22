@@ -82,6 +82,19 @@ class CandidatePreparationTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--transition')+1],str(self.bundle/'transition.json'))
         self.assertEqual(argv[argv.index('--server-dir')+1],str(self.work))
 
+    def test_loader_policy_is_explicit_and_does_not_mutate_live_workspace(self):
+        self.manifest['regional_mapper_loader_policy'] = 'unsupported_policy'
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, 'loader candidate policy'):
+            prep.prepare(self.bundle)
+        self.assertFalse((self.bundle/prep.LAUNCHER).exists())
+        self.manifest['regional_mapper_loader_policy'] = 'clear_same_dependencies_v1'
+        self.save_manifest()
+        prep.prepare(self.bundle)
+        transition = json.loads((self.bundle/'transition.json').read_text())
+        self.assertEqual(transition['regional_mapper_loader_policy'], 'clear_same_dependencies_v1')
+        self.assertEqual(self.snapshot(), self.before)
+
     def test_existing_unowned_new_module_is_never_assumed_to_be_a_valid_prior(self):
         p=self.work/'.prepare_lib/tools/lgz_core/q0_regional_execution.py';p.write_text('unrelated file')
         with self.assertRaisesRegex(ValueError,'unexpected existing'):prep.prepare(self.bundle)

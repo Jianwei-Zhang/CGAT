@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 import random
@@ -30,6 +31,67 @@ class RegionalMappingTests(unittest.TestCase):
     def run_mapping(self,query=None,**kwargs):
         return prepare_regional_mapping(self.root,self.catalog,query or self.query,[self.target],self.tool,
                                         reference_bases=5_000_000_000,threads=1,**kwargs)
+
+    def test_verified_loader_applies_only_to_new_children_and_preserves_raw_reuse(self):
+        from server.tools.lgz_core import q0_regional_mapping as regional
+        from server.tools.lgz_core.common import sha256_bytes
+
+        with tempfile.TemporaryDirectory() as baseline:
+            original_root = self.root
+            self.root = Path(baseline)
+            try:
+                original = self.run_mapping(policy=CigarWorkPolicy(minimum_query_bases=1))
+                baseline_paf = (self.root / original["paf"]).read_bytes()
+            finally:
+                self.root = original_root
+        loader = regional._MapperLoader(self.tool["resolved"], self.tool["sha256"],
+                                        sha256_bytes(os.fsencode(str(self.root))), "a" * 64)
+        with (mock.patch.object(regional, "_probe_mapper_loader", return_value=loader),
+              mock.patch.dict(os.environ, {"LD_LIBRARY_PATH": str(self.root), "CGAT_CHILD_TEST": "keep"}, clear=True),
+              mock.patch.object(regional.subprocess, "Popen", wraps=regional.subprocess.Popen) as launch,
+              regional.verified_mapper_loader(self.tool["resolved"]) as active):
+            self.assertTrue(active)
+            result = self.run_mapping(policy=CigarWorkPolicy(minimum_query_bases=1))
+            self.assertEqual(launch.call_count, 2)
+            for call in launch.call_args_list:
+                self.assertEqual(call.kwargs["env"], {"CGAT_CHILD_TEST": "keep"})
+            self.assertEqual(os.environ["LD_LIBRARY_PATH"], str(self.root))
+        self.assertEqual((self.root / result["paf"]).read_bytes(), baseline_paf)
+        checked = verify_regional_task(self.root, result, members=self.catalog.parts)
+        raw = self.root / checked["spec"]["raw_receipt"]["path"]
+        command = json.loads(raw.with_name("command.json").read_text())
+        self.assertEqual(command["mapper_loader"]["tool_sha256"], self.tool["sha256"])
+        self.assertEqual(command["address_space_bytes"], 4 * 1024**3)
+        with mock.patch("subprocess.Popen", side_effect=AssertionError("loader switch must not rerun valid work")):
+            self.assertEqual(result, self.run_mapping(policy=CigarWorkPolicy(minimum_query_bases=1)))
+
+    def test_loader_scope_falls_back_if_unverified_tool_or_environment_changes(self):
+        from server.tools.lgz_core import q0_regional_mapping as regional
+        from server.tools.lgz_core.common import sha256_bytes
+
+        loader = regional._MapperLoader(self.tool["resolved"], self.tool["sha256"], sha256_bytes(b"/same"), "b" * 64)
+        for env in ({"LD_LIBRARY_PATH": "/different"}, {"LD_LIBRARY_PATH": "/same", "LD_AUDIT": "/audit.so"},
+                    {"LD_LIBRARY_PATH": "relative"}, {"LD_LIBRARY_PATH": "/same:"},
+                    {"LD_LIBRARY_PATH": "/same", "PYTHONHOME": "/other"}):
+            with self.subTest(env=env), mock.patch.dict(os.environ, env, clear=True):
+                self.assertEqual(loader.child(self.tool), (None, None))
+        with mock.patch.dict(os.environ, {"LD_LIBRARY_PATH": "/same"}, clear=True):
+            self.assertEqual(loader.child({**self.tool, "sha256": "c" * 64}), (None, None))
+        with self.assertRaisesRegex(Q0EvidenceError, "loader record"):
+            regional._verify_mapper_loader_record({"policy": "clear_same_dependencies_v1"}, self.tool)
+        with mock.patch.object(regional, "_probe_mapper_loader", return_value=None), regional.verified_mapper_loader("unknown") as active:
+            self.assertFalse(active)
+            with self.assertRaisesRegex(Q0EvidenceError, "scope in use"):
+                with regional.verified_mapper_loader("unknown"):
+                    self.fail("nested loader scope was entered")
+
+    def test_dependency_resolution_difference_cannot_enable_loader(self):
+        from server.tools.lgz_core import q0_regional_mapping as regional
+        with (mock.patch.dict(os.environ, {"LD_LIBRARY_PATH": "/opt/module"}, clear=True),
+              mock.patch.object(regional.shutil, "which", return_value=self.tool["resolved"]),
+              mock.patch.object(regional, "_dynamic_paths", side_effect=lambda binary, env:
+                                {"lib": str(binary if "LD_LIBRARY_PATH" in env else self.root)})):
+            self.assertIsNone(regional._probe_mapper_loader(self.tool["resolved"]))
 
     def test_complete_raw_reused_when_cores_change_and_temporary_inputs_are_gone(self):
         first=self.run_mapping();old=verify_regional_task(self.root,first,members=self.catalog.parts)

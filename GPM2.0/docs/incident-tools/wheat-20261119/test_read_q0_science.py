@@ -35,6 +35,12 @@ class ReaderTests(unittest.TestCase):
         self.assertIn({'path':'native-success.json'},result['inputs'])
         self.assertIs(self.module._initial_inputs,self.original)
 
+    def test_loader_policy_is_bound_to_the_immutable_reader_declaration(self):
+        self.ctx.transition['regional_mapper_loader_policy'] = 'clear_same_dependencies_v1'
+        self.execute()
+        self.assertEqual(self.record['regional_mapper_loader_policy'], 'clear_same_dependencies_v1')
+        self.assertFalse(self.record['initial_alignment_profiles_modified'])
+
     def test_missing_provenance_is_rejected(self):
         self.ctx.helper.prepare_with_reader=lambda *a,**kw:{'inputs':[]}
         with self.assertRaisesRegex(ValueError,'missing'):self.execute()
