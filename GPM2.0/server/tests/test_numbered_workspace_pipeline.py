@@ -226,21 +226,49 @@ class NumberedWorkspaceTests(unittest.TestCase):
                 self.assertFalse(any(".runtime" in name or "07_delivery" in name for name in archive.namelist()))
             self.assert_clean_root(root)
 
+    def test_numbered_q0_publication_preserves_frozen_annotation_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root, stage = parent / "workspace", parent / "stage"
+            layout = initialize_workspace(root)
+            frozen = {}
+            for name in ("tel/rules.tsv", "cen/library.fa", "cen/reference.tsv"):
+                path = layout.path(name)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("frozen " + name)
+                frozen[path] = (path.read_bytes(), path.stat().st_mtime_ns, path.stat().st_ino)
+            old = layout.path("grt/q/q0.fa")
+            old.parent.mkdir(parents=True, exist_ok=True)
+            old.write_text(">chr1\nAAAA\n")
+            for name, content in {"grt/q/q0.fa": ">chr1\nTTTT\n", "metadata/grt_new.tsv": "new"}.items():
+                path = stage / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            commit_prepared_outputs(stage / "grt", stage / "metadata", root)
+            self.assertEqual(old.read_text(), ">chr1\nTTTT\n")
+            for path, identity in frozen.items():
+                self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns, path.stat().st_ino), identity)
+            self.assert_clean_root(root)
+
     def test_numbered_q0_publication_rolls_back_multiple_physical_groups(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
             root, staged = parent / "workspace", parent / "stage"
             layout = initialize_workspace(root)
             for relative, content in {"grt/q/q0.fa": ">chr1\nAAAA\n", "grt/checkpoints/donor_freeze.json": "old-checkpoint",
-                                      "metadata/grt_old.tsv": "old-metadata", "metadata/package.tsv": "keep"}.items():
+                                      "metadata/grt_old.tsv": "old-metadata", "metadata/package.tsv": "keep",
+                                      "tel/rules.tsv": "frozen-rule", "cen/library.fa": ">centromere\nACGT\n",
+                                      "grt/owned.txt": "old-root-file"}.items():
                 path = layout.path(relative)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content)
             for relative, content in {"grt/q/q0.fa": ">chr1\nTTTT\n", "grt/checkpoints/donor_freeze.json": "new-checkpoint",
-                                      "metadata/grt_new.tsv": "new-metadata"}.items():
+                                      "metadata/grt_new.tsv": "new-metadata", "grt/owned.txt": "new-root-file"}.items():
                 path = staged / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content)
+            annotations = {layout.path(name): (layout.path(name).read_bytes(), layout.path(name).stat().st_mtime_ns)
+                           for name in ("tel/rules.tsv", "cen/library.fa")}
             original = os.replace
             def interrupted(source, target):
                 if Path(source).name == "grt_new.tsv":
@@ -254,6 +282,9 @@ class NumberedWorkspaceTests(unittest.TestCase):
             self.assertEqual(layout.path("metadata/grt_old.tsv").read_text(), "old-metadata")
             self.assertEqual(layout.path("metadata/package.tsv").read_text(), "keep")
             self.assertFalse(layout.path("metadata/grt_new.tsv").exists())
+            self.assertEqual(layout.path("grt/owned.txt").read_text(), "old-root-file")
+            for path, identity in annotations.items():
+                self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), identity)
             self.assert_clean_root(root)
 
 

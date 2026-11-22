@@ -575,7 +575,18 @@ def commit_numbered_prepared_outputs(stage_grt: Path, stage_metadata: Path, serv
             os.replace(path, target)
         else:
             fail(f"unsupported staged LGZ artifact: {path}")
-    groups = ("03_lgz", ".runtime/checkpoints/lgz", ".runtime/cache/lgz", ".runtime/history/lgz_failed")
+    # Annotation inputs are frozen by prepare.sh, not produced by this LGZ
+    # transaction. Replacing all of 03_lgz would silently delete that snapshot.
+    scientific_root = server_dir / "03_lgz"
+    incoming_root = converted / "03_lgz"
+    reserved = canonical_relative("tel").rsplit("/", 1)[0]
+    if (converted / reserved).exists():
+        fail("staged LGZ outputs overlap reserved annotation inputs")
+    names = {path.name for root in (scientific_root, incoming_root) if root.is_dir()
+             for path in root.iterdir()}
+    groups = tuple("03_lgz/" + name for name in sorted(names)
+                   if "03_lgz/" + name != reserved) + (
+        ".runtime/checkpoints/lgz", ".runtime/cache/lgz", ".runtime/history/lgz_failed")
     backup = stage_grt.parent / "previous_numbered"
     backup.mkdir()
     metadata = workspace_join(server_dir, "metadata")
@@ -610,7 +621,11 @@ def commit_numbered_prepared_outputs(stage_grt: Path, stage_metadata: Path, serv
         for name in saved_metadata:
             os.replace(backup / "metadata" / name, metadata / name)
         for relative in reversed(installed):
-            shutil.rmtree(server_dir / relative)
+            path = server_dir / relative
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
         for relative in reversed(moved):
             os.replace(backup / relative, server_dir / relative)
         raise

@@ -484,3 +484,31 @@ Evidence: /tmp/cgat-native-reports-20261122.7bhTSr.log
 - 轻量 Node VM 实际解析保留的上游 JS，执行总览语言切换/格式化与子报告翻译，不提供 Chart.js。覆盖非法 CDN、gap 数据漂移、缺失详情、失败不声明 final、配额压力下保留总览/说明闭合、内容去重、5,000 页规模的恒定数量导航及普通数据名称不被误判为网络调用。
 - 真实 serializer/来源重建检查验证 Full 与 Light 的完整报告树字节一致；沿用实际来源染色体标识，不为了测试把原始 chr2 改成 chr1。没有覆盖原工作区/原生报告或改动工具源字节。
 - 本段没有浏览器、完整回归、原生补洞/真实 reads、生产构建、远端或环境安装。真实文件浏览器中的 CSP/框架交互、固定环境四工具/双架构、真实历史任务和终止/残留进程、最新 App 闭环与 A01–A18 仍留到最后统一验收。整体目标未完成，未改动 master 或发布版本。
+
+
+## 2026-11-22 — 进入真实固定环境与 public LGZ-only 验收
+
+- 在独立临时 HOME/mamba root/prefix 实际执行公共 installer，195 个 Conda 包已安装；没有修改已有环境。真实 Python 包的 `lib/python3.1 -> python3.11` 目录软链接暴露安装校验误判。新增目录链接结构回执并在原生运行前后重验；普通包文件内容、固定 archive/build/version 检查不削弱。相同 prefix 重试和独立 `install.sh --check` 均通过，21 个命令与四工具 runtime identity 一致。
+- 实际 500-kb/2-kb gap 样例通过版本化生成器生成，两个 HiFi 文件刻意同 basename，另有含确定性替换错误的 ONT。不是准确率/性能数据；不 mock 科学命令。
+- 首次 public LGZ-only 暴露 q0 CLI 硬编码旧路径，修复中央布局解析和 command 指纹一致性；只替换停止测试工作区中的这一模块，保留备份/新旧 hash，不整库更新。继续后又暴露 q0 整体替换 `03_lgz` 删除冻结注释输入，修复为只替换 LGZ 所属子组并覆盖文件型组回滚。
+- 原工作区的三个注释输入通过独立生成与原 manifest **逐项 hash 完全一致**后恢复，原 manifest、参考比对和 LGZ 已完成结果不替换、不删除、不重新 prepare。随后实际 public `run_all.sh` 完成 LGZ-only 和 Full/Light 基线包。原参考/assignment 共 21 个 checkpoint/输出的 hash 和 mtime 仍不变；最终 500,000 bp 基线保留预期 2,000 N。
+- 必要定点检查：目录软链接 3 项；legacy/numbered q0 公共 CLI 1 项（2.241 秒）；编号发布成功/故障回滚 2 项（0.015 秒）。这些不能替代真实四工具和 A01–A18 验收。统一验收记录见 `server-refinement-final-acceptance-20261122.md`；整体未完成，无 master/客户/远端/发布改动。
+
+
+### 同轮实际四工具与来源/脱离工作区包核验
+
+- 原 LGZ-only 工作区经实际 `run_all.sh` 追加两个同 basename HiFi 与一个 ONT，四固定引擎顺序执行并以 0 结束。quarTeT/LR 各接纳 1 个补丁；DEGAP/TGS 均零接纳，明确保留原 gap。没有为了让样例成功改动原生算法或放宽接纳。
+- 独立 stdlib 按实际来源 FASTA/hash、区间和方向重建四条 final path，均与实际 Server 最终序列一致。quarTeT/LR 确实使用新来源且区别于 LGZ；LR 在本已知合成例中恰好等于参考，quarTeT 长度少 43 bp，不能由此宣称最佳工具或生物学准确率。
+- 八个实际 Full/Light 包脱离原工作区解包，经真实 payload 校验器检查库存/来源/路径/报告；Full FASTA 等于已发布 final，Light 明确无序列。各工具 Full/Light 报告字节一致。203 个原基线文件内容未变；13 个 finalization/摘要文件只重写相同字节；原参考/assignment 21 文件 hash+mtime 未变。
+- 补充公共终端的接纳数量/缺口分类和零接纳显式 unchanged 标记，避免成功执行冒称已应用精修；该格式定点检查通过。尚未完成实际相同输入续跑、ONT Racon 分支、新工作区无修复直跑、App/浏览器/ARM 及完整故障/兼容矩阵，整体目标继续。
+
+
+### 同轮续跑、新工作区与 DEGAP 原生坐标核对
+
+- 原四工具工作区无参数续跑实际通过；四个 native 产物树（248/28/18/54 文件）size+mtime 不变，没有新原生产者。零接纳的终端标签也经实际公共入口核对。
+- 独立全新 ONT-only 工作区直接 public `run.sh` 一次完成，无中途补丁/恢复；编号 q0 路由与注释保留修复经真实新准备验证。TGS 实际执行 5 个 minimap2 和 3 个 Racon 命令，接纳一个补丁；Full/Light 脱离工作区校验通过，不冒称其序列准确率。
+- 核对真实 DEGAP 行及固定 Part2/Part3 实现发现其字段实际为 **1-based inclusive**，Part3 的 0-based 注释过时；旧正向受控夹具也按错误原点构造。修复 CGAT 接纳/拒绝归属和报告相交，保留原生坐标审计，不试探平移到可匹配 gap。实际 Python 3.11 定点 7 项通过（6.299 秒），其中真实固定 detector/analyzer 产生坐标；正向补丁仍是明确受控，不能冒称完成真实 DEGAP 填补的正向验收。
+- 后续仍需最新源码统一回归、真实 DEGAP 正向、故障/终止/旧工作区与迁移、App Full/Light 往返/人工编辑保护、文件浏览器及 ARM 独立证据。没有改动原生工具算法、已有环境、master 或发布。整体保持进行中。
+
+
+- 坐标报告边界和受控 DEGAP 完成 checkpoint 复用另有 2 项通过（4.923 秒）。停止的实际测试工作区只同步 3 个 CGAT 接纳/报告模块，不换科学 driver 或 runtime profiles；再经 public `run_all.sh` 实际重接纳通过。四个原生产者树 hash/size/mtime 均未变，新接纳仍指向原 producer；独立来源重建及新八个脱离工作区的 Full/Light 包再次通过。全部证据路径记入统一验收文档；这不补足真实 DEGAP 正向或 App/ARM/全矩阵验收。42 文件运行库同步核验一致，`production_ready:false`，未改正式发布清单。

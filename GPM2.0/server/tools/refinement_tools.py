@@ -87,6 +87,24 @@ def package_pin(definition, architecture):
     return entries.get(architecture, entries.get("noarch"))
 
 
+def directory_link(prefix, relative):
+    path = safe_path(prefix, relative)
+    if not path.is_symlink() or not path.is_dir():
+        raise ToolError("installed directory link changed or disappeared: " + relative)
+    return {"target": os.readlink(path),
+            "resolved_directory": path.resolve().relative_to(Path(prefix).resolve()).as_posix()}
+
+
+def verify_directory_links(runtime, prefix=None):
+    """Check link structure, not target-directory timestamps or cache state."""
+    prefix = Path(prefix or sys.prefix)
+    for group in (runtime.get("tools", {}), runtime.get("dependencies", {})):
+        for record in group.values():
+            for relative, expected in record.get("directory_links", {}).items():
+                if directory_link(prefix, relative) != expected:
+                    raise ToolError("managed runtime directory link changed: " + relative)
+
+
 def package_receipt(prefix, name, definition, architecture):
     pin = package_pin(definition, architecture)
     records = []
@@ -105,12 +123,24 @@ def package_receipt(prefix, name, definition, architecture):
     paths = record.get("paths_data", {}).get("paths")
     if not isinstance(paths, list) or not paths:
         raise ToolError(f"{name} lacks installed-content metadata; reinstall the managed environment")
-    hashes = {}
+    hashes, links = {}, {}
+    members = {row.get("_path") for row in paths if isinstance(row, dict) and row.get("path_type") != "directory" and isinstance(row.get("_path"), str)}
     for row in paths:
         if row.get("path_type") == "directory":
             continue
         relative = row.get("_path")
         path = safe_path(prefix, relative)
+        if row.get("path_type") == "softlink" and path.is_dir():
+            link = directory_link(prefix, relative)
+            target = link["resolved_directory"].rstrip("/") + "/"
+            if not any(name.startswith(target) for name in members):
+                raise ToolError("directory link target has no owned package contents: " + relative)
+            expected = row.get("sha256_in_prefix") or row.get("sha256")
+            if expected not in {None, hashlib.sha256(b"").hexdigest(),
+                                hashlib.sha256(os.fsencode(link["target"])).hexdigest()}:
+                raise ToolError("unrecognized directory-link metadata identity: " + relative)
+            links[relative] = link
+            continue
         actual = digest(path)
         expected = row.get("sha256_in_prefix") or row.get("sha256")
         if expected and actual != expected:
@@ -119,7 +149,7 @@ def package_receipt(prefix, name, definition, architecture):
             raise ToolError(f"installed {name} artifact has no content identity: {relative}")
         hashes[relative] = actual
     return {"name": name, "version": record["version"], "build": record["build"],
-            "archive_sha256": record.get("sha256"), "license": record.get("license", "NOASSERTION"), "files_sha256": hashes}
+            "archive_sha256": record.get("sha256"), "license": record.get("license", "NOASSERTION"), "files_sha256": hashes, **({"directory_links": links} if links else {})}
 
 
 def source_location(prefix, definition):

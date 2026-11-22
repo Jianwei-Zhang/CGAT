@@ -25,6 +25,22 @@ from post_lgz_refinement import validate_completion
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 
 
+class RefinementResultSummaryTests(unittest.TestCase):
+    def test_zero_admission_is_explicitly_unchanged_not_an_applied_refinement(self):
+        from post_lgz_refinement import final_result_lines
+        paths = {"final": Path("05_final/01_degap"), "delivery": Path("07_delivery/01_degap")}
+        for accepted in (0, 1):
+            with self.subTest(accepted=accepted):
+                provenance = {"accepted_edit_count": accepted,
+                              "status": "completed" if accepted else "completed_zero_accepted",
+                              "counts": {"closed": accepted, "partial": 0, "unfilled": 1 - accepted, "rejected": 0}}
+                text = "\n".join(final_result_lines("degap", paths, provenance))
+                self.assertIn(f"accepted_edits={accepted}", text)
+                self.assertIn("[FINAL PATH] degap: 05_final/01_degap/final_path.json", text)
+                self.assertEqual("[REFINED FINAL]" in text, bool(accepted))
+                self.assertEqual("UNCHANGED AFTER REFINEMENT; ZERO ACCEPTED EDITS" in text, not accepted)
+
+
 class RefinementConfigTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

@@ -274,12 +274,14 @@ def summarize(provenance, final, remaining, jobs, native_gaps):
     native_to_original = {}
     for row in native_gaps:
         name, start, end = row.get("chromosome"), row.get("gap_start"), row.get("gap_end")
-        if name not in gap_lookup or type(start) is not int or type(end) is not int or end < start:
+        if name not in gap_lookup or type(start) is not int or type(end) is not int or start < 1 or end < start:
             continue
+        # Fixed DEGAP diagnostics are 1-based inclusive, unlike original LGZ gaps.
+        start -= 1
         matching = []
         for index in range(bisect_right(ends[name], start), len(gap_lookup[name])):
             gap = gap_lookup[name][index]
-            if gap["start"] > end:
+            if gap["start"] >= end:
                 break
             matching.append(gap["gap_id"])
             native_by_original[gap["gap_id"]].append(row)

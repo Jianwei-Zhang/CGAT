@@ -36,6 +36,49 @@ class LockedToolTests(unittest.TestCase):
             with self.assertRaisesRegex(tools.ToolError, "build/archive"):
                 tools.package_receipt(root, "bwa", definition, "linux-64")
 
+    def test_directory_softlink_is_structurally_bound_without_dropping_file_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "conda-meta").mkdir()
+            library = root / "lib/python3.11"
+            library.mkdir(parents=True)
+            source = library / "os.py"
+            source.write_text("# controlled pinned standard-library member\n")
+            alias = root / "lib/python3.1"
+            alias.symlink_to("python3.11", target_is_directory=True)
+            record = {"name":"python", "version":"3.11.14", "build":"controlled", "sha256":"a" * 64,
+                      "paths_data":{"paths":[{"_path":"lib/python3.11/os.py", "path_type":"hardlink", "sha256_in_prefix":tools.digest(source)},
+                                               {"_path":"lib/python3.1", "path_type":"softlink", "sha256_in_prefix":hashlib.sha256(b"").hexdigest()}]}}
+            (root / "conda-meta/python-3.11.14-controlled.json").write_text(json.dumps(record))
+            receipt = tools.package_receipt(root, "python", {"version":"3.11.14"}, "linux-64")
+            self.assertNotIn("lib/python3.1", receipt["files_sha256"])
+            self.assertEqual(receipt["directory_links"]["lib/python3.1"], {"target":"python3.11", "resolved_directory":"lib/python3.11"})
+            runtime = {"dependencies":{"python":receipt}}
+            tools.verify_directory_links(runtime, root)
+            (library / "__pycache__").mkdir()
+            tools.verify_directory_links(runtime, root)  # Directory mtime is not source content.
+            source.write_text("# changed source\n")
+            with self.assertRaisesRegex(tools.ToolError, "content changed"):
+                tools.package_receipt(root, "python", {"version":"3.11.14"}, "linux-64")
+
+    def test_directory_link_retargeting_escape_and_type_changes_are_not_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "prefix"
+            (root / "lib/python3.11").mkdir(parents=True)
+            alias = root / "lib/python3.1"
+            alias.symlink_to("python3.11", target_is_directory=True)
+            runtime = {"dependencies":{"python":{"directory_links":{"lib/python3.1":tools.directory_link(root,"lib/python3.1")}}}}
+            (root / "lib/other").mkdir()
+            alias.unlink();alias.symlink_to("other", target_is_directory=True)
+            with self.assertRaisesRegex(tools.ToolError, "directory link changed"):
+                tools.verify_directory_links(runtime, root)
+            alias.unlink();alias.symlink_to(Path(directory), target_is_directory=True)
+            with self.assertRaisesRegex(tools.ToolError, "outside its installation"):
+                tools.verify_directory_links(runtime, root)
+            alias.unlink();alias.mkdir()
+            with self.assertRaisesRegex(tools.ToolError, "changed or disappeared"):
+                tools.verify_directory_links(runtime, root)
+
     def test_offline_source_install_applies_only_hash_bound_packaging_patch(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

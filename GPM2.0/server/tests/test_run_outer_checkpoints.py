@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import subprocess
 import os
 import sys
 import tempfile
@@ -150,6 +152,40 @@ class OuterCheckpointTests(unittest.TestCase):
             "checkpoint_relpath": checkpoint_relpath,
             "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
         }
+
+    def test_public_q0_entrypoint_uses_layout_path_and_same_command_identity(self):
+        """Actual q0 CLI with controlled leaf output, for both physical layouts."""
+        from server.tools.workspace_layout import initialize_workspace
+        for numbered in (False, True):
+            with self.subTest(numbered=numbered), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                old, fake_bin = self.make_server(directory)
+                write(old / "runs/chr_Chr1/q0_command.sh", "#!/bin/bash\n# controlled q0 wrapper\n")
+                write(old / "runs/chr_Chr1/q0_generated_command.sh", "#!/bin/bash\nbash ./ds_vs_self/command.sh\n")
+                write(old / "runs/chr_Chr1/q0_alignment_tasks.json", '{"tasks":[]}\n')
+                server, command = old, "runs/chr_Chr1/q0_command.sh"
+                if numbered:
+                    server = directory / "numbered"
+                    layout = initialize_workspace(server)
+                    for path in old.rglob("*"):
+                        if path.is_file():
+                            target = layout.path(path.relative_to(old).as_posix())
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copyfile(path, target)
+                    command = layout.relative(command)
+                with mock.patch.dict(os.environ, self.path_environment(fake_bin)):
+                    manager = OuterCheckpointManager(server)
+                    before = manager.prepare("q0_chr:Chr1", command)
+                    alias = manager.prepare("q0_chr:Chr1", "runs/chr_Chr1/q0_command.sh")
+                    self.assertEqual(before.input_fingerprint, alias.input_fingerprint)
+                    ran = subprocess.run([sys.executable, "-B", str(Path(__file__).parents[1] / "tools/run_outer_checkpoints.py"),
+                                          "--server-dir", str(server), "--run-q0-chr", "Chr1"],
+                                         capture_output=True, text=True, timeout=30)
+                    self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+                    self.assertEqual(manager.validate(before)[0], True)
+                    self.assertEqual(json.loads(before.path.read_text())["input_payload"]["command_relpath"], command)
+                if numbered:
+                    self.assertFalse((server / "runs").exists())
 
     def test_reference_checkpoint_reuses_valid_empty_paf_and_rejects_corruption(self):
         with tempfile.TemporaryDirectory() as temporary:

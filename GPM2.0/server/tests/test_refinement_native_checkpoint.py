@@ -55,8 +55,8 @@ class NativeCheckpointTests(unittest.TestCase):
             folder.mkdir(parents=True)
             candidate = output / "candidate.fa"
             candidate.write_text(">candidate\nAAAAGTCCCC\n")
-            row = {"chromosome": "chr1", "gap_id": 1, "gap_start": 4, "gap_end": 23, "gap_len": 20,
-                   "left_flank_len": 4, "right_flank_len": 4, "replace_start": 0, "replace_end": 27,
+            row = {"chromosome": "chr1", "gap_id": 1, "gap_start": 5, "gap_end": 24, "gap_len": 20,
+                   "left_flank_len": 4, "right_flank_len": 4, "replace_start": 1, "replace_end": 28,
                    "replace_len": 28, "filled": True, "final_sequence_file": str(candidate)}
             (folder / "gap_filling_results.json").write_text(json.dumps({"gaps": [row]}))
             final = output / "04.genome_integration/genome.filled.fasta"

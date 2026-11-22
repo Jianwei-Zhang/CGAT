@@ -32,7 +32,7 @@ def fixture(root):
     dump(native / "03.gap_filling/job_manager_config.json", {"jobs": [
         {"job_name": "<img src=x onerror=alert(1)>", "job_dir": str(directory), "chromosome": "chr1", "gap_id": 1, "direction": "left"}]})
     native_gap = native / "03.gap_filling/gap_filling_results.json"
-    dump(native_gap, {"gaps": [{"chromosome": "chr1", "gap_id": 1, "gap_start": 4, "gap_end": 9,
+    dump(native_gap, {"gaps": [{"chromosome": "chr1", "gap_id": 1, "gap_start": 5, "gap_end": 10,
                                "filled": True, "fill_direction": "left", "left_status": "success", "right_status": "skipped"}]})
     visual = native / "05.visualization/gap_filling_report.html"
     visual.parent.mkdir()
@@ -116,6 +116,17 @@ class RefinementReportTests(unittest.TestCase):
             self.assertIn("&lt;img", (moved / "native.html").read_text())
             self.assertFalse((root / "05_final").exists())
             self.assertFalse(any(p.suffix in {".fa", ".fasta", ".fq"} for p in moved.rglob("*")))
+
+    def test_one_based_native_single_base_and_touching_intervals_map_exactly(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = fixture(Path(directory) / "workspace")
+            final = json.loads((Path(result["staging"]) / "final_path.json").read_text())
+            jobs = [{"chromosome": "chr1", "native_gap_id": index} for index in (1, 2, 3)]
+            native = [{"chromosome": "chr1", "gap_id": index, "gap_start": start, "gap_end": end}
+                      for index, start, end in ((1, 10, 10), (2, 11, 14), (3, 15, 15))]
+            summary = reports.summarize(result["provenance"], final, [], jobs, native)
+            self.assertEqual([job["original_gap_ids"] for job in summary["native_jobs"]],
+                             [["gap-1"], [], ["gap-2"]])
 
     def test_changed_result_and_report_are_not_silently_reused(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,6 +1,6 @@
 """Normalize native proposals without adopting an unproven whole-genome output.
 
-DEGAP v2 native coordinates are inclusive; CGAT edit placement is half-open.
+DEGAP v2 native reports are 1-based inclusive; CGAT edit placement is 0-based half-open.
 Exact anchors establish where an edit applies, not biological correctness.
 """
 from __future__ import annotations
@@ -35,13 +35,16 @@ def degap_proposal(row: dict, baseline: Genome, candidate: Genome, gaps: list[Ga
               "replace_start", "replace_end", "replace_len")
     if any(type(row.get(field)) is not int for field in fields):
         return None, "invalid_native_coordinates"
-    name, start, end = row.get("chromosome"), row["gap_start"], row["gap_end"] + 1
+    # Part2 writes start/end +1; Part3 forwards them unchanged despite its
+    # stale "0-based" comments. Never infer coordinates from those comments or
+    # accept a legacy controlled fixture by shifting to whichever gap matches.
+    name, start, end = row.get("chromosome"), row["gap_start"] - 1, row["gap_end"]
     if name not in baseline.records:
         return None, "unknown_baseline_chromosome"
     length = baseline.records[name][0]
     left, right = row["left_flank_len"], row["right_flank_len"]
     if (not 0 <= start < end <= length or left <= 0 or right <= 0 or row["gap_len"] != end - start
-            or row["replace_start"] != start - left or row["replace_end"] != end + right - 1
+            or row["replace_start"] != start - left + 1 or row["replace_end"] != end + right
             or row["replace_len"] != left + end - start + right or start < left or end + right > length):
         return None, "invalid_native_coordinates"
     covered = [gap for gap in gaps if gap.chromosome == name and start <= gap.start < gap.end <= end]

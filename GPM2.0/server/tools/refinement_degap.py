@@ -22,7 +22,7 @@ try:
     from refinement_sources import FastaCatalog
     from refinement_admission import degap_proposal, exclude_conflicts, preserve_joint_sources
     from refinement_publication import prepare_publication, verify_baseline
-    from refinement_tools import validate_runtime, load_lock
+    from refinement_tools import validate_runtime, load_lock, verify_directory_links
     from refinement_recipes import make_invocation
     from refinement_native_checkpoint import execute as execute_native, validate_native_job_summary
 except ModuleNotFoundError:
@@ -32,7 +32,7 @@ except ModuleNotFoundError:
     from .refinement_sources import FastaCatalog
     from .refinement_admission import degap_proposal, exclude_conflicts, preserve_joint_sources
     from .refinement_publication import prepare_publication, verify_baseline
-    from .refinement_tools import validate_runtime, load_lock
+    from .refinement_tools import validate_runtime, load_lock, verify_directory_links
     from .refinement_recipes import make_invocation
     from .refinement_native_checkpoint import execute as execute_native, validate_native_job_summary
 
@@ -181,6 +181,7 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     native_artifacts, native_summary, completion = {}, {}, None
     if gaps:
         def verify_inputs():
+            verify_directory_links(runtime)
             catalog.verify_unchanged()
             if any(stat_key(path) != expected for path, expected in identities.items()):
                 raise PathError("baseline, reads, runtime or native evidence changed during refinement")
@@ -213,7 +214,7 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     for index, row in enumerate(rows):
         covered = [gap.gap_id for gap in gaps if gap.chromosome == row.get("chromosome")
                    and type(row.get("gap_start")) is int and type(row.get("gap_end")) is int
-                   and row["gap_start"] <= gap.start and gap.end <= row["gap_end"] + 1]
+                   and row["gap_start"] - 1 <= gap.start and gap.end <= row["gap_end"]]
         rejection = {"native_job": f"{native_report.relative_to(root)}#gap-{index}", "gap_ids": covered}
         if row.get("filled") is not True:
             # Unfilled is not a rejected candidate; preserve the native record separately.
@@ -251,6 +252,7 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     edits, ambiguous = preserve_joint_sources(edits, fasta, catalog, gaps)
     rejected += ambiguous
     edits = materialize_patches(edits, catalog, paths["04_accepted"])
+    verify_directory_links(runtime)
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("baseline or reads changed during refinement")
     catalog.verify_unchanged()
@@ -264,6 +266,7 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     atomic_json(paths["02_jobs"] / "execution.json", execution)
     staging = root / ".runtime/refinement/01_degap" / run_id / "final"
     provenance = prepare_publication(staging, baseline, baseline_fasta, catalog, edits, execution, rejected)
+    verify_directory_links(runtime)
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("baseline, reads or native evidence changed during publication staging")
     atomic_json(paths["05_report"] / "report.json", provenance)

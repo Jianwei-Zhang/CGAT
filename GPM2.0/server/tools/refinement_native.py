@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 try:
     from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from post_lgz_degap import IndexedFasta, atomic_json, digest, stat_key
-    from refinement_tools import load_lock, validate_runtime, fingerprint, source_location, ToolError
+    from refinement_tools import load_lock, validate_runtime, fingerprint, source_location, ToolError, verify_directory_links
     from refinement_recipes import Invocation, make_invocation, prepare_native_reads, select_reads, materialize_native_driver
     from refinement_sources import FastaCatalog
     from refinement_publication import verify_baseline, prepare_publication
@@ -31,7 +31,7 @@ try:
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from .post_lgz_degap import IndexedFasta, atomic_json, digest, stat_key
-    from .refinement_tools import load_lock, validate_runtime, fingerprint, source_location, ToolError
+    from .refinement_tools import load_lock, validate_runtime, fingerprint, source_location, ToolError, verify_directory_links
     from .refinement_recipes import Invocation, make_invocation, prepare_native_reads, select_reads, materialize_native_driver
     from .refinement_sources import FastaCatalog
     from .refinement_publication import verify_baseline, prepare_publication
@@ -206,6 +206,7 @@ def _stage(root, tool, groups, threads, run_id):
         native_artifacts[receipt.relative_to(root).as_posix()] = digest(receipt)
     else:
         def verify_inputs():
+            verify_directory_links(runtime)
             catalog.verify_unchanged()
             if any(stat_key(path) != expected for path, expected in identities.items()):
                 raise PathError("refinement inputs, runtime or native evidence changed during execution")
@@ -285,6 +286,7 @@ def _stage(root, tool, groups, threads, run_id):
                                           native_names=original_to_native, job=native_directory.relative_to(root).as_posix())
         edits = materialize_patches(edits, catalog, paths["04_accepted"], tool=tool)
     catalog.verify_unchanged()
+    verify_directory_links(runtime)
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("refinement inputs/native evidence changed during execution")
     invocation_record["timing"].update(before_publication_seconds=time.monotonic() - stage_started,
@@ -296,6 +298,7 @@ def _stage(root, tool, groups, threads, run_id):
     atomic_json(paths["02_jobs"] / "execution.json", execution)
     staging = private / "final"
     provenance = prepare_publication(staging, baseline_payload, baseline_path, catalog, edits, execution, rejected)
+    verify_directory_links(runtime)
     if any(stat_key(path) != expected for path, expected in identities.items()):
         raise PathError("refinement inputs/native evidence changed during final reconstruction")
     atomic_json(paths["05_report"] / "report.json", provenance)

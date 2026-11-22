@@ -51,6 +51,19 @@ class ParentLock:
                 and self._is_alive(self.owner["pid"], self.owner.get("process_start", "")))
 
 
+def final_result_lines(tool, paths, provenance):
+    """Do not label a successful zero-admission run as an applied refinement."""
+    accepted = provenance["accepted_edit_count"]
+    counts = provenance["counts"]
+    outcome = (f"[REFINEMENT OUTCOME] {tool}: status={provenance['status']} "
+               f"accepted_edits={accepted} closed={counts['closed']} partial={counts['partial']} "
+               f"unfilled={counts['unfilled']} rejected={counts['rejected']}")
+    label = "REFINED FINAL" if accepted else "UNCHANGED AFTER REFINEMENT; ZERO ACCEPTED EDITS"
+    return [outcome, f"[{label}] {tool}: {paths['final'] / 'assembly.fa'}",
+            f"[FINAL PATH] {tool}: {paths['final'] / 'final_path.json'}",
+            f"[APP DELIVERY] {tool}: {paths['delivery']}"]
+
+
 def run(root, lock, request):
     from lgz_contract import validate_contract
     root = Path(root).resolve()
@@ -90,9 +103,9 @@ def run(root, lock, request):
     for tool, row in batch["tools"].items():
         if row["status"] == "published":
             paths = targets(layout, tool)
-            print(f"[REFINED FINAL] {tool}: {paths['final'] / 'assembly.fa'}", flush=True)
-            print(f"[REFINED FINAL PATH] {tool}: {paths['final'] / 'final_path.json'}", flush=True)
-            print(f"[REFINED APP DELIVERY] {tool}: {paths['delivery']}", flush=True)
+            provenance = batch_result["staged_results"][tool]["provenance"]
+            for line in final_result_lines(tool, paths, provenance):
+                print(line, flush=True)
     print(f"[LGZ BASELINE, NOT REFINED] {layout.path('05_final/00_lgz/assembly.fa')}", flush=True)
     print(f"[REPORT] {layout.path('06_report/report.html')}", flush=True)
     return batch_result["exit_code"]

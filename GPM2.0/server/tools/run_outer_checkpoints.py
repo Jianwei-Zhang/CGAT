@@ -100,7 +100,7 @@ class OuterCheckpointManager:
             **inputs,
         }
         if kind == "q0_chromosome_alignments":
-            input_payload["command_relpath"] = command_relpath
+            input_payload["command_relpath"] = workspace_join(self.server_dir, command_relpath).relative_to(self.server_dir).as_posix()
         digest = fingerprint(unit_id)
         slug = "".join(character if character.isalnum() else "-" for character in unit_id)
         checkpoint_path = self.checkpoint_dir / f"{slug[:48]}.{digest[:16]}.json"
@@ -769,7 +769,7 @@ def main() -> None:
         manager = OuterCheckpointManager(args.server_dir)
         prepared = manager.prepare(unit, f"runs/chr_{args.run_q0_chr}/q0_command.sh")
         assert prepared is not None
-        run_dir = manager.server_dir / f"runs/chr_{args.run_q0_chr}"
+        run_dir = workspace_join(manager.server_dir, f"runs/chr_{args.run_q0_chr}")
         result = subprocess.run(["bash", str(run_dir / "q0_generated_command.sh")], cwd=run_dir)
         if result.returncode:
             raise SystemExit(result.returncode if result.returncode > 0 else 128 - result.returncode)
