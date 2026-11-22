@@ -24,7 +24,7 @@ from refinement_tools import fingerprint
 FIXTURE = Path(__file__).resolve().parents[2] / "tests/fixtures/grt_contract_v3/frozen_bridge_server.json"
 
 
-def create(root, *, with_source_evidence=False, with_source_annotations=False):
+def create(root, *, with_source_evidence=False, with_source_annotations=False, native_diagnostics=None):
     layout = initialize_workspace(root)
     original = json.loads(FIXTURE.read_text())
     for name, contents in original["files"].items():
@@ -97,6 +97,8 @@ def create(root, *, with_source_evidence=False, with_source_annotations=False):
         if with_source_evidence:
             from refinement_source_evidence import build
             result["source_evidence"] = build(root, result, 1)
+        if native_diagnostics is not None:
+            native_diagnostics(native, gap)
         report = build_tool_report(root, result)
         full, light = root / ".runtime/app-fixture/full", root / ".runtime/app-fixture/light"
         build_full(root, result, report, full)

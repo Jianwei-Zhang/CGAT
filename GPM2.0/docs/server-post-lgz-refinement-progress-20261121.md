@@ -462,3 +462,25 @@ PYTHONPATH=server/tests python3 -B -m unittest -v test_legacy_lgz_continuation
 - 实际历史阶段缓存正确命中时保留来源；错误输入指纹在失效前停止；实际历史 q0 重算分支受保护。陈旧审批、损坏输出、变更运行库不启动工作；伪造同 mtime/size 的旧 bytecode 不被导入，也不被删除。
 - 成功路径由明确受控脚本产生可验证的冻结科学包，随后真实执行独立审批的物理迁移，并逐文件确认科学文件字节不变。冻结导出 fixture 缺少原生缓存文件，不能为了测试续跑而放宽完成 checkpoint 校验；该测试不冒称执行了原生 LGZ 算法。
 - 后续仍需原生离线交互报告、真实固定环境与四工具/双架构、真实未完成历史引擎和终止/残留进程场景，以及最新 App 闭环与 A01–A18 最后统一验收。本段没有全量回归、浏览器、生产构建、远端或环境升级，没有修改 master 或发布版本。
+
+
+## 2026-11-22 — 固定原生报告的离线浏览与可搬移资源闭合
+
+- 先记录 `server-refinement-native-report-contract-20261122.md`，再新增 `refinement_native_reports.py` 和独立 `refinement-native-reports.lock.json`。实际固定 DEGAP 的总报告是 `05.visualization/Global.report.html`，不再仅依赖旧的 `gap_filling_report.html` 测试入口；收集实际 LEFT/RIGHT 任务 HTML 及总览拷贝，保留原生文件字节和哈希。
+- 离线浏览保留固定渲染器内嵌 JS/CSS/SVG。其 Chart.js CDN 标签实际没有被代码使用，移除这条浮动网络引用，不额外下载 JS 库、不增加环境依赖；固定 SVG data-URI 与局部渐变仍可用。管理副本加 CSP、独立 `sandbox=allow-scripts` 框架与同框架详情导航，原文仍是 `.txt` 附件，未知 HTML 不提升为普通页面执行。当前另外三个固定工具入口不生成原生 HTML，明确保留实际日志/填补明细/AGP，不伪造上游可视化。
+- 总览闭合依据它实际内嵌的 gap JSON，并与可用原生 gap 诊断的完整记录核对；不以另一批 gap 静默替换。缺失、未知依赖或超限的子报告使用明确的 CGAT 不可用说明，既不悬空链接，也不伪造原生结果。已封存原生 artifact 与报告阶段才观察的诊断分开标注；可视化不是原生完成、CGAT 接纳、生物学验证或最终发布回执。
+- 原文与浏览正文共享大小预算：有可视化时为浏览预留额度、优先总览；先保证总览和缺失详情说明闭合，再放入较大真实子报告。相同内容的原文拷贝只计费/保存一次，来源路径仍各自保留。索引分页每页最多 200 条、导航最多 5 个入口，不在每页重复整个页码列表。实际拷贝名与一次目录清单匹配，不为每个缺口重复进行文件系统探测。索引/manifest 元数据单独保留，不丢完整计数。
+- 主工具报告、逐 job 链接、失败报告及 Full/Light 包均接入独立原生浏览目录；缓存身份包含 helper、固定源/策略及完整视图哈希，展示变化不失效科学原生 checkpoint。中英文指南说明入口、观测/封存区别与未生成/不可用状态。
+
+必要定向检查：
+
+```text
+PYTHONPATH=server/tests python3 -B -m unittest -v test_refinement_native_reports test_refinement_reports
+14 tests passed (3.689s)
+Evidence: /tmp/cgat-native-reports-20261122.7bhTSr.log
+```
+
+- 实际运行固定版上游两类 HTML 渲染器处理受控日志/JSON，不运行补洞算法；脱离原 Server 路径后逐一检查相对链接、iframe、原文/视图哈希、原始文件未变化，以及总览与两方向入口。
+- 轻量 Node VM 实际解析保留的上游 JS，执行总览语言切换/格式化与子报告翻译，不提供 Chart.js。覆盖非法 CDN、gap 数据漂移、缺失详情、失败不声明 final、配额压力下保留总览/说明闭合、内容去重、5,000 页规模的恒定数量导航及普通数据名称不被误判为网络调用。
+- 真实 serializer/来源重建检查验证 Full 与 Light 的完整报告树字节一致；沿用实际来源染色体标识，不为了测试把原始 chr2 改成 chr1。没有覆盖原工作区/原生报告或改动工具源字节。
+- 本段没有浏览器、完整回归、原生补洞/真实 reads、生产构建、远端或环境安装。真实文件浏览器中的 CSP/框架交互、固定环境四工具/双架构、真实历史任务和终止/残留进程、最新 App 闭环与 A01–A18 仍留到最后统一验收。整体目标未完成，未改动 master 或发布版本。

@@ -1,0 +1,27 @@
+{
+  "basis": "Pinned visualizer uses inline SVG and never calls Chart.js; no network fetch at build or view time.",
+  "degap_revision": "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75",
+  "inline_data_images": [
+    "data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%228%22%20viewBox%3D%220%200%2014%208%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L7%207L13%201%22%20stroke%3D%22%23495057%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E"
+  ],
+  "native_entrypoints": {
+    "degap": [
+      "05.visualization/Global.report.html",
+      "03.gap_filling/<job>/visualization_output/gapfiller_report.html"
+    ],
+    "lrgapcloser": [],
+    "quartet": [],
+    "tgsgapcloser": []
+  },
+  "no_added_dependency": true,
+  "policy": "cgat.degap.offline-inline-svg.v1",
+  "schema": "cgat.native-report-policy",
+  "schema_version": 1,
+  "unused_external_scripts": [
+    "https://cdn.jsdelivr.net/npm/chart.js"
+  ],
+  "visualizer_files_sha256": {
+    "AutoGapfillerVisualizer.py": "fe7421ad586a28b1e5a9a62485c7d60b1459a66dfc423b40204369d040b91ac6",
+    "GapfillerVisualizer.py": "bcdc1912da6576825df9ae6d7193554536be58077deee3041644afb78aea5033"
+  }
+}

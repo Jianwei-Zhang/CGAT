@@ -1,4 +1,4 @@
-"""Portable, static refinement reports built from content-bound staged results.
+"""Portable refinement reports with static CGAT pages and managed native views.
 
 A report is not a publication receipt. It records the complete LGZ gap denominator
 and labels staged, native and accepted results separately. No external JS, reads
@@ -23,10 +23,12 @@ try:
     from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout
     from run_orchestration import sha256_file as digest, atomic_write_json as atomic_json
     from refinement_tools import fingerprint
+    import refinement_native_reports as native_reports
 except ModuleNotFoundError:
     from .workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout
     from .run_orchestration import sha256_file as digest, atomic_write_json as atomic_json
     from .refinement_tools import fingerprint
+    from . import refinement_native_reports as native_reports
 
 SCHEMA = "cgat.refinement-report"
 PAGE_SIZE = 200
@@ -142,7 +144,8 @@ def native_diagnostics(root, tool, run_id, execution):
     jobs, native_gaps = [], []
     if tool == "degap":
         gap_report = (native / "03.gap_filling/gap_filling_results.json").as_posix()
-        if gap_report in selected:
+        if (root / gap_report).exists():
+            select(gap_report)
             native_gaps = json.loads(read_bound(safe_file(root, gap_report), selected[gap_report], limit=128 * 1024 * 1024)).get("gaps", [])
         config = (native / "03.gap_filling/job_manager_config.json").as_posix()
         if (root / config).exists():
@@ -161,16 +164,32 @@ def native_diagnostics(root, tool, run_id, execution):
                 if not job_dir.resolve().is_relative_to((root / native).resolve()):
                     raise ReportError("native job diagnostics leave their attempt")
                 files = []
-                for name in ("run.stdout.log", "run.stderr.log", "process.log"):
+                visual_html = None
+                for name in ("run.stdout.log", "run.stderr.log", "process.log", "visualization_output/gapfiller_report.html"):
                     file = job_dir / name
                     if file.exists() or file.is_symlink():
                         relative = file.relative_to(root).as_posix()
                         select(relative)
                         files.append(relative)
+                        if name.endswith(".html"):
+                            visual_html = relative
                 jobs.append({"job_name": item.get("job_name"), "chromosome": item.get("chromosome"),
                              "native_gap_id": item.get("gap_id"), "direction": item.get("direction"),
-                             "artifacts": files})
-        for name in ("autogapfiller_summary.json", "05.visualization/gap_filling_report.html"):
+                             "artifacts": files, "visualization_html": visual_html})
+        visual_dir = WorkspaceLayout(root, 1).path((native / "05.visualization").as_posix())
+        if visual_dir.is_symlink():
+            raise ReportError("native visualization directory cannot be an alias")
+        present = {path.name for path in visual_dir.iterdir()} if visual_dir.is_dir() else set()
+        for gap in native_gaps:
+            direction = gap.get("fill_direction") if gap.get("filled") and gap.get("fill_direction") else "left"
+            try:
+                name = native_reports.detail_name(gap.get("chromosome"), gap.get("gap_id"), direction)
+            except native_reports.UnsupportedView:
+                continue  # Raw evidence is retained; unsupported names are never rewritten.
+            relative = (native / "05.visualization" / name).as_posix()
+            if name in present:
+                select(relative)
+        for name in ("autogapfiller_summary.json", "05.visualization/gap_filling_report.html", "05.visualization/Global.report.html"):
             relative = (native / name).as_posix()
             if (root / relative).exists():
                 select(relative)
@@ -185,24 +204,49 @@ def native_diagnostics(root, tool, run_id, execution):
     return selected, jobs, native_gaps
 
 
+def embedded_size(rows):
+    # Identical source copies keep their logical/provenance rows but share one
+    # inert content-addressed attachment and one byte-budget charge.
+    return sum({row["report_path"]: row["size_bytes"] for row in rows if "report_path" in row}.values())
+
+
 def asset_plan(root, artifacts):
-    rows, total = [], 0
-    for relative, expected in sorted(artifacts.items()):
+    rows, total, copied = [], 0, set()
+    visual = any(name.endswith(("/05.visualization/Global.report.html", "/visualization_output/gapfiller_report.html")) for name in artifacts)
+    raw_budget = MAX_ASSETS_TOTAL // 2 if visual else MAX_ASSETS_TOTAL
+    def priority(item):
+        name = item[0]
+        rank = 0 if name.endswith("/05.visualization/Global.report.html") else 1 if name.endswith(".html") else 2
+        return rank, name
+    for relative, expected in sorted(artifacts.items(), key=priority):
         path = safe_file(root, relative)
         size = path.stat().st_size
-        # HTML is retained as escaped source text, not active code with upstream
-        # CDN references. The main CGAT report is fully static and offline.
+        # Originals are always inert. Reserve part of the shared quota for the
+        # separate closed native view, instead of spending it all on raw logs.
         text = relative.endswith(TEXT_ENDINGS) or relative.endswith(".html")
-        include = text and size <= MAX_ASSET and total + size <= MAX_ASSETS_TOTAL
+        include = text and size <= MAX_ASSET and (expected in copied or total + size <= raw_budget)
         row = {"workspace_path": relative, "sha256": expected, "size_bytes": size,
                "availability": "embedded" if include else "server_only_size_limit" if text else
                                "server_only_native_script" if relative.endswith(".sh") or "/native_commands/" in relative else "server_only_sequence_or_binary"}
         if include:
-            total += size
-            row["report_path"] = "assets/" + hashlib.sha256(relative.encode()).hexdigest()[:20] + ".txt"
+            if expected not in copied:
+                total += size
+                copied.add(expected)
+            row["report_path"] = "assets/" + quote(expected, safe="") + ".txt"
             row["view"] = "original_html_source" if relative.endswith(".html") else "native_text"
         rows.append(row)
     return rows
+
+
+def native_view_plan(root, tool, run_id, execution, jobs, native_gaps, assets, *, failed=False):
+    origin = execution.get("native_origin")
+    native_run = origin["run_id"] if origin else run_id
+    native = f"04_refinement/{TOOL_DIRECTORIES[tool]}/03_native/{native_run}"
+    return native_reports.prepare(tool, native, jobs, native_gaps, assets,
+        lambda name, sha: read_bound(safe_file(root, name), sha, limit=MAX_ASSET),
+        remaining_budget=MAX_ASSETS_TOTAL - embedded_size(assets),
+        page_size=PAGE_SIZE, sealed=set(execution.get("artifacts", {})),
+        diagnostics_page="report.html" if failed else "native.html")
 
 
 def summarize(provenance, final, remaining, jobs, native_gaps):
@@ -336,11 +380,15 @@ def render_site(directory, summary, provenance, final, assets):
     body += '<h2>Original gap → job → decision / 原始缺口 → 任务 → 接纳</h2><p>' + (' · '.join(links) if links else 'No original gaps / 无原始缺口') + '</p>'
     body += '<h2>Unattributed rejected candidates / 无法归属原始缺口的未接纳候选</h2><pre>' + json_text([row for row in provenance["rejected_candidates"] if not row.get("gap_ids")]) + '</pre>'
     body += '<p>' + link("native.html", "Native job reports and logs / 原生 job 报告与日志") + ' · ' + link("summary.json", "Machine-readable summary") + ' · ' + link("final_path.json", "Accepted sourced Final Path") + '</p>'
-    native_body = '<p>' + link("report.html", "Tool report / 工具报告") + '</p><p>Original diagnostics are retained verbatim as text. HTML source is not executed; external CDN scripts are not fetched. Large sequences remain Server-only, with their hashes shown. / 原始诊断以原文保留；不执行原生 HTML 的外部脚本，也不复制大 reads 或整条原生基因组。</p>'
+    native_body = '<p>' + link("report.html", "Tool report / 工具报告") + '</p><p>Original HTML/diagnostics are retained verbatim as inert text. Managed native views are separately sandboxed and offline; no CDN is fetched. Large sequences remain Server-only. / 原始 HTML 与诊断以静态原文保留；管理的原生可视化另设离线隔离视图，不联网加载 CDN，也不复制大 reads 或原生基因组。</p>'
+    native_body += '<h2>Offline native visualization / 离线原生可视化</h2><p>' + link("native_visualization/index.html", "Native visualization and availability / 原生可视化与可用性") + '</p>'
+    visualization_links = {source["workspace_path"]: row["wrapper_path"] for row in summary.get("native_visualization", {}).get("views", []) if "wrapper_path" in row for source in row["sources"]}
     lookup = {row["workspace_path"]: row for row in assets}
     for job in summary["native_jobs"]:
         native_body += '<h2 id="' + gap_anchor(str(job["job_name"])) + '">' + escape(str(job["job_name"])) + '</h2><pre>' + json_text(job) + '</pre><p>'
         native_body += ' · '.join(link(lookup[name]["report_path"], Path(name).name) for name in job["artifacts"] if "report_path" in lookup[name]) + '</p>'
+        if job.get("visualization_html") in visualization_links:
+            native_body += '<p>' + link(visualization_links[job["visualization_html"]], "Offline native job visualization / 离线原生任务可视化") + '</p>'
     native_body += table(["Native artifact", "Availability", "SHA-256"], [(
         link(row["report_path"], row["workspace_path"]) if "report_path" in row else escape(row["workspace_path"]),
         escape(row["availability"]), '<code>' + escape(row["sha256"]) + '</code>') for row in assets])
@@ -397,11 +445,13 @@ def build_tool_report(root, result):
         source_summary = json.loads(safe_file(directory, "04_projection/summary.json").read_text())
         source_summary["generation_sha256"] = receipt["generation_sha256"]
         assets = asset_plan(root, artifacts)
+    visual = native_view_plan(root, tool, run_id, provenance["execution"], jobs, native_gaps, assets)
     summary = summarize(provenance, final, remaining, jobs, native_gaps)
+    summary["native_visualization"] = visual.binding
     summary["artifacts"] = assets
     if source_summary is not None:
         summary["source_evidence"] = source_summary
-    binding = {"provenance_sha256": sha, "generator_sha256": digest(Path(__file__)), "assets": assets, **source_binding}
+    binding = {"provenance_sha256": sha, "generator_sha256": digest(Path(__file__)), "assets": assets, "native_visualization": visual.binding, **source_binding}
     identity = fingerprint(binding)
     home = layout.path(f"04_refinement/{TOOL_DIRECTORIES[tool]}/05_report/{run_id}")
     destination = home / ("site-" + identity[:20])
@@ -419,6 +469,7 @@ def build_tool_report(root, result):
                 continue
             data = read_bound(safe_file(root, row["workspace_path"]), row["sha256"], limit=MAX_ASSET)
             (temporary / row["report_path"]).write_bytes(data)
+        visual.write(temporary)
         (temporary / "final_path.json").write_bytes(final_bytes)
         atomic_json(temporary / "summary.json", summary)
         render_site(temporary, summary, provenance, final, assets)
@@ -447,11 +498,12 @@ def build_failure_report(root, tool, run_id, error, *, phase="native"):
             artifacts[relative] = digest(safe_file(root, relative))
     diagnostics_error = None
     execution = {}
+    native_gaps = []
     try:
         invocation_relative = f"04_refinement/{code}/02_jobs/{run_id}/invocation.json"
         if invocation_relative in artifacts:
             execution = json.loads(read_bound(safe_file(root, invocation_relative), artifacts[invocation_relative], limit=MAX_ASSET))
-        artifacts, jobs, _ = native_diagnostics(root, tool, run_id, {**execution, "artifacts": artifacts})
+        artifacts, jobs, native_gaps = native_diagnostics(root, tool, run_id, {**execution, "artifacts": artifacts})
     except (OSError, ValueError, KeyError, TypeError) as diagnostic:
         jobs = []
         diagnostics_error = str(diagnostic)
@@ -478,7 +530,8 @@ def build_failure_report(root, tool, run_id, error, *, phase="native"):
         except (OSError, ValueError, KeyError, TypeError) as diagnostic:
             diagnostics_error = (diagnostics_error + "; " if diagnostics_error else "") + str(diagnostic)
     assets = asset_plan(root, artifacts)
-    summary = {"schema": "cgat.refinement-failure-report", "schema_version": 1, "tool": tool, "run_id": run_id,
+    visual = native_view_plan(root, tool, run_id, execution, jobs, native_gaps, assets, failed=True)
+    summary = {"native_visualization": visual.binding, "schema": "cgat.refinement-failure-report", "schema_version": 1, "tool": tool, "run_id": run_id,
                "status": "failed", "phase": phase, "error": str(error), "native_jobs": jobs,
                "diagnostics_error": diagnostics_error, "source_diagnostics": str(source_diagnostics) if source_diagnostics else None,
                "final_available": False, "artifacts": assets,
@@ -495,11 +548,13 @@ def build_failure_report(root, tool, run_id, error, *, phase="native"):
         temporary = Path(tempfile.mkdtemp(prefix=".failure-report-", dir=destination.parent))
         try:
             (temporary / "assets").mkdir()
+            visual.write(temporary)
             for row in assets:
                 if "report_path" in row:
                     (temporary / row["report_path"]).write_bytes(read_bound(safe_file(root, row["workspace_path"]), row["sha256"], limit=MAX_ASSET))
             atomic_json(temporary / "summary.json", summary)
             body = '<p class="note">This attempt failed. No final result is declared; earlier successful files remain historical. / 本次任务失败，不声明最终结果；先前成功文件仍是历史结果。</p><pre>' + json_text(summary) + '</pre>'
+            body += '<p>' + link("native_visualization/index.html", "Offline native visualization / 离线原生可视化") + '</p>'
             body += table(["Native/source diagnostic", "Availability"], [(link(row["report_path"], row["workspace_path"]) if "report_path" in row else escape(row["workspace_path"]), escape(row["availability"])) for row in assets])
             (temporary / "report.html").write_text(page(tool + " failed attempt / 失败任务", body), encoding="utf-8")
             atomic_json(temporary / "manifest.json", {"schema": summary["schema"], "schema_version": 1, "binding": binding,

@@ -33,7 +33,7 @@ def fixture(root):
         {"job_name": "<img src=x onerror=alert(1)>", "job_dir": str(directory), "chromosome": "chr1", "gap_id": 1, "direction": "left"}]})
     native_gap = native / "03.gap_filling/gap_filling_results.json"
     dump(native_gap, {"gaps": [{"chromosome": "chr1", "gap_id": 1, "gap_start": 4, "gap_end": 9,
-                               "filled": True, "left_status": "success", "right_status": "skipped"}]})
+                               "filled": True, "fill_direction": "left", "left_status": "success", "right_status": "skipped"}]})
     visual = native / "05.visualization/gap_filling_report.html"
     visual.parent.mkdir()
     visual.write_text('<script src="https://example.invalid/chart.js"></script>')
