@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
@@ -106,6 +107,14 @@ class CompletedWorkspaceMigrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "legacy-project"
             self.legacy(root)
+            # A skipped historical DEGAP may still have the original typed
+            # reads receipt, which must not block either unrefined LGZ archive.
+            reads = Path(directory) / "hifi.fq"
+            reads.write_text("@sample\nACGT\n+\nIIII\n")
+            (root / "metadata/degap_inputs.json").write_text(json.dumps({
+                "purpose": "post_lgz_degap_v1", "schema_version": 2,
+                "hifi": [str(reads)], "ont": [],
+            }))
             contract = validate_contract(root)
             before = {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
             inspected = subprocess.run([sys.executable, "-B", str(TOOLS / "migrate_workspace.py"),
@@ -146,7 +155,12 @@ class CompletedWorkspaceMigrationTests(unittest.TestCase):
             self.assertNotIn("SHOULD-NOT-EXECUTE-OLD", launched.stdout + launched.stderr)
             self.assertNotIn("REFERENCE HANDOFF", launched.stdout)
             self.assertTrue((root / "05_final/00_lgz/assembly.fa").is_file())
-            self.assertEqual(len(list((root / "07_delivery/00_lgz").glob("*.zip"))), 2)
+            archives = list((root / "07_delivery/00_lgz").glob("*.zip"))
+            self.assertEqual(len(archives), 2)
+            for archive in archives:
+                with zipfile.ZipFile(archive) as bundle:
+                    self.assertFalse(any("/data/degap/" in name or "/metadata/degap_" in name
+                                         for name in bundle.namelist()))
             self.assertFalse((root / "05_final/01_degap").exists())
             records = [json.loads(path.read_text()) for path in layout.path("report/steps").glob("*.json")]
             frozen = [row for row in records if row.get("execution") == "frozen_original_lgz"]

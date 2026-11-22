@@ -143,7 +143,9 @@ def inspect(root, engine):
     verify_engine(root, engine)
     old = engine_imports(root)
     manager = old.OuterCheckpointManager(root)
-    units = old.load_plan(root)
+    # The prepared historical launcher schedules DEGAP before per-chromosome
+    # delivery/evidence finalization. Finish LGZ without executing that branch.
+    units = [unit for unit in old.load_plan(root) if unit.unit_id != "degap_gapfill"]
     ids = [unit.unit_id for unit in units]
     prefix = units[:ids.index("finalize_evidence") + 1]
     prior = old.load_prior_status(root / "logs/status.tsv")

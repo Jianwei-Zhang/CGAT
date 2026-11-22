@@ -22,7 +22,7 @@ Destination scientific validation uses a narrowly scoped, lock-checked migration
 
 ## Scope and remaining acceptance
 
-The physical migration adapter covers a fully validated completed LGZ baseline. The separate, content-reviewed original-engine continuation described below now precedes migration for unfinished LGZ work; it does not silently classify pending stages as complete, discard their caches or change engines. Unsupported historical engines remain ineligible until separately reviewed. Real unfinished-native continuation and interruption scenarios remain in the final acceptance matrix. Final acceptance must exercise actual generated scripts, interrupted apply/resume/rollback, live/foreign owners, immutable proof preservation and post-migration append without LGZ execution. Primitive/preview tests do not establish that full workflow.
+The physical migration adapter covers a fully validated completed LGZ baseline. The separate, content-reviewed original-engine continuation described below now precedes migration for unfinished LGZ work; it does not silently classify pending stages as complete, discard their caches or change engines. Unsupported historical engines remain ineligible until separately reviewed. Actual generated scripts from the reviewed historical engine, unfinished native continuation, live-owner refusal, interrupted move/validation recovery and post-migration refinement are recorded in the [native migration acceptance](server-refinement-final-acceptance-20261122.md#native-migration-from-a-genuinely-prepared-legacy-workspace). The evidence is specific to that engine, local process interruption points and workspace; it does not certify arbitrary scheduler/host ownership or historical versions.
 
 ## Completed-workspace commands
 
@@ -87,5 +87,7 @@ there is no automatic environment upgrade or layout commit. A successful attempt
 returns a completed-migration preview, not an implicit approval to replace files.
 This adapter is supported only for engine content manifests explicitly shipped
 with the Server; other historical engines require another reviewed manifest.
-Controlled-script/cache-fence tests are not acceptance of native LGZ execution,
-process termination on every scheduler, or all historical release variants.
+The real pre-numbered plan places old DEGAP before evidence finalization; the
+reviewed LGZ prefix still excludes it. Its reads receipt remains in the migrated
+workspace but is not evidence for a DEGAP result and never prevents packaging
+the separate `00_lgz` baseline.

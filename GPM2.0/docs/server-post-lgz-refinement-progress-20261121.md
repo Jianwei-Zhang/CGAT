@@ -527,3 +527,10 @@ Evidence: /tmp/cgat-native-reports-20261122.7bhTSr.log
 - quarTeT、LR_Gapcloser 和 ONT-only TGS 的 App 导出均不同于各自 LGZ，并能查询到已接纳来源和路径区间；混合 reads 的 DEGAP、TGS 实际零接纳，导出明确保留原序列。第一个正接纳归档暴露来源卡未关联路径，现从已校验路径精确匹配染色体/数据集/contig，同时保留残余 N 来源而不伪造 LGZ 事件。项目说明也区分有改动与零接纳。
 - 单独用精修前的 Windows 原生后端验证反向兼容：LGZ Full/Light 正常导入；quarTeT Full/Light 以 `GRT_IMPORT_UNSUPPORTED_SCHEMA` 拒绝，未生成项目数据库，也没有降级成 LGZ。
 - 验证未启动桌面窗口、WebView 或安装程序；所用是原始 Server tar 与独立发布 FASTA，不是替换归档内容的 fixture。复跑参数、证据及剩余检查见 [统一验收记录](server-refinement-final-acceptance-20261122.md#windows-archive-roundtrip-reproduction-and-first-finding)。
+
+
+## 2026-11-22 — 真旧目录续跑、迁移中断与追加精修
+
+- `f2ceafb0` 的真实 `prepare.sh` 生成含旧 HiFi 配置、无 launch record 的旧目录；在前五项科学任务完成后终止，再由新入口调原引擎完成 LGZ。旧 DEGAP 在计划中实际位于 `finalize_evidence` 前，修正续跑过滤使其不执行，打包尾部也不执行；250 个既有文件哈希及 mtime 不变。
+- 在数据已经移动和目标开始验证两个阶段分别中断实际迁移。前一事务 `--rollback` 精确恢复 623 个文件/链接；后一事务 `--resume` 使用同一 journal 提交。两次中断后启动器均拒绝开跑；本地 live owner 检查已实测，不等于所有远程队列和最早 staging 时点都验证过。
+- 新启动器追加 quarTeT 后接纳一个补片，10 个旧科学单元原样冻结。修正编号 LGZ 打包不能因历史 typed reads 收据而要求旧 DEGAP 输出；保留历史数据但不将其附加到 `00_lgz`。只替换独立验收目录中的打包模块后，原生结果复用，基线和精修各出一组 Full/Light；从来源重建的精修序列不同于 LGZ。见 [统一验收证据](server-refinement-final-acceptance-20261122.md#native-migration-from-a-genuinely-prepared-legacy-workspace)。

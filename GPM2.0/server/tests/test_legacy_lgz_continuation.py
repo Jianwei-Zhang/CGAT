@@ -183,13 +183,16 @@ class OriginalEngineContinuationTests(unittest.TestCase):
                 target = root / ".prepare_lib" / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(Path(OLD) / name, target)
-            rows = [("finalize_evidence", "finalize_grt_evidence.sh"),
+            # The actual pre-numbered prepare.sh inserts legacy DEGAP before
+            # per-chromosome/finalize_evidence, not alongside the archive tail.
+            rows = [("degap_gapfill", "run_post_lgz_degap.sh"),
+                    ("finalize_evidence", "finalize_grt_evidence.sh"),
                     ("package_full", "package_full_zip.sh"), ("package_light", "package_light_zip.sh")]
             write(root / ".run_all/plan.tsv", "unit_id\tcommand_relpath\tdetail_log_relpath\n" +
                   "".join(unit + "\t" + command + "\tlogs/run_all.log\n" for unit, command in rows))
             write(root / "metadata/prepare_options.tsv", "key\tvalue\nthreads\t1\narchive_format\tzip\n")
             write(root / "run_all.sh", "#!/bin/bash\nexit 92\n")
-            for name in ("package_full_zip.sh", "package_light_zip.sh"):
+            for name in ("run_post_lgz_degap.sh", "package_full_zip.sh", "package_light_zip.sh"):
                 write(root / name, "#!/bin/bash\necho MUST-NOT-EXECUTE > forbidden\nexit 91\n")
             # Produce a genuinely validated frozen scientific packet with a
             # disclosed controlled script. Do not weaken continuation checks to

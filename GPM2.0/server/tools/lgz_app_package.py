@@ -407,6 +407,12 @@ def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
 def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True, server_sources=None) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
+    layout = WorkspaceLayout.detect(source_root)
+    # A numbered LGZ delivery represents only the frozen baseline. In migrated
+    # workspaces a legacy reads receipt can survive even when the old DEGAP
+    # stage was intentionally never run. Keep its artifacts in the workspace,
+    # but neither require nor attach them to 00_lgz.
+    include_legacy_gapfill = include_legacy_gapfill and layout.version == 1
     with (workspace_join(source_root, "metadata/package.tsv")).open(newline="", encoding="utf-8") as handle:
         package_rows = list(csv.DictReader(handle, delimiter="\t"))
     if (len(package_rows) != 1 or package_rows[0].get("workflow") != "gpm_grt_precomputed_v2"
@@ -454,11 +460,10 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include
     )
     app_schema = project_package_table(workspace_join(source_root, "metadata/package.tsv"), workspace_join(staging_root, "metadata/package.tsv"), "full" if include_fasta else "no_fasta")
 
-    if WorkspaceLayout.detect(source_root).version == 2:
+    if layout.version == 2:
         # The logical data subtree is physically split. Do not ship converted
         # raw reads or their ID maps as App source assemblies.
-        directories = ("data", "data/reference", "data/datasets") + (("data/degap",) if include_legacy_gapfill else ())
-        for directory in directories:
+        for directory in ("data", "data/reference", "data/datasets"):
             copy_tree_filtered(source_root, staging_root, directory, include_fasta)
     else:
         copy_tree_filtered(source_root, staging_root, "data", include_fasta)

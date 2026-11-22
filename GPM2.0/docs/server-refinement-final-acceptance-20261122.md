@@ -323,3 +323,89 @@ and no LGZ fallback. This exercises historical importer code, not a historical
 GUI installation. The executable hash, input archive hashes and errors are in
 `evidence/windows-legacy-import-receipt.json`; build transcript is
 `evidence/windows-legacy-build.log`.
+
+The separate Windows backend `grt_package::` regression completed with 59
+passed and one ignored (320 outside the filter); see
+`evidence/windows-grt-regression.log`. This includes the controlled residual-N
+source-card trace as well as legacy-source and tamper checks. It does not
+replace the actual archive roundtrip above.
+
+## Native migration from a genuinely prepared legacy workspace
+
+On 2026-11-22, isolated Linux x86_64 validation ran public `prepare.sh` from
+archived historical engine `f2ceafb0df1f9d932122c5af3a733b9214ca7eb2` against the
+same known synthetic sequence. The legacy workspace had typed HiFi inputs, no
+`.run_all/launch.json` and no numbered manifest. The original installation was
+made unavailable by moving only the disposable source archive; the generated
+launcher then used its real embedded runtime, all 202 registered files verified
+against the historical registry. A preview against a live legacy owner refused
+migration before starting work. No customer workspace, remote scheduler, or
+ordinary environment was changed.
+
+The exact scoped historical runner received SIGTERM at the boundary after
+reference alignment, assignment, chr-local q0, supplementary evidence and
+q0/D0/Dtel. It exited 143 with the later LGZ stages still pending. The checked
+continuation preview verified three outer checkpoints, q0 evidence and the
+original donor freeze. It exposed that the real old plan placed `degap_gapfill`
+**before** per-chromosome and evidence finalization. The isolated runner now
+omits that exact old unit, agreeing with preview's already filtered prefix.
+Original scripts/plan and runtime stay unchanged. No packaging or DEGAP ran
+from this successfully interrupted workspace.
+
+The approved `--continue-lgz` reused the three outer units plus the original
+q0/donor result, ran the remaining actual LGZ commands, validated the scientific
+contract and returned a separate physical migration approval. All 250 checked
+original files (202 runtime and 48 script/receipt/output files) retained hashes
+and mtimes. The first observation attempt had let another disposable workspace
+advance further due to an overly narrow observer assertion; it is not counted
+as this interruption or continuation evidence. Authoritative artifacts:
+`evidence/legacy-native-interruption-2-process.json`,
+`evidence/legacy-native-continuation-audit.json` and
+`evidence/legacy-native-continue-1.log`.
+
+Two real process-crash branches used the public migration CLI and its durable
+journal, with no patched filesystem primitives. SIGKILL during `moving` left
+actual files under their new locations; ordinary launch failed and `--rollback`
+restored 623 original files exactly (regular-file contents/mode/mtime and
+literal symlink targets). A fresh approved transaction was cut during
+`validating` after the physical moves and before the ready marker. Launch was
+again refused; `--resume` committed that same journal and original LGZ proof.
+The receipt `evidence/legacy-native-transaction-events.jsonl` includes the
+process identities, signal outcomes, transaction IDs and validation. This
+covers these move/validation interruption points, not every instant during
+initial staging or foreign-scheduler execution.
+
+### Actual append and packaging boundary after migration
+
+On resuming the migrated public `run_all.sh` with typed reads and quarTeT, all
+10 LGZ units were labelled `SKIP_MIGRATED_LGZ`; the native engine admitted one
+sourced edit. Initial baseline packaging then exposed a separate problem: a
+preserved legacy DEGAP reads receipt was incorrectly interpreted as requiring
+an old DEGAP output. The numbered LGZ package now intentionally omits old DEGAP
+attachments. Legacy-layout packaging still uses its previous content checks;
+this does not loosen projection or old-result integrity. The stopped synthetic
+workspace was repaired under lock by changing only its packager module, with the
+previous bytes and hashes recorded, not by rewriting migration/scientific
+receipts or rerunning LGZ.
+
+A normal `run_all.sh` resume completed both LGZ and quarTeT Full/Light tar
+pairs under their numbered paths. The 337 tracked scientific regular files and
+all eight original quarTeT native files retained their hashes and mtimes.
+Independent source-slice reconstruction matches the admitted 499,957-bp
+quarTeT output with zero remaining N and differs from the original LGZ sequence.
+The detached refined Full/Light packages validated, and the old reads receipt
+remained in the workspace but not in either `00_lgz` archive. Evidence:
+`evidence/legacy-native-migrated-quartet-2.log`,
+`evidence/legacy-native-packager-repair/receipt.json`, and
+`evidence/legacy-native-migrated-refinement-audit.json`. These four newly generated
+archives were not separately driven through Windows App in this run. The
+observations are workflow/provenance tests, not tool-accuracy comparisons.
+
+Focused Python 3.11 checks in the private environment also passed: 8 reviewed
+legacy-continuation cases and 18 completed-migration/old App package cases.
+These include the historical DEGAP unit before finalization, numbered baseline
+packaging with a preserved old reads receipt, old-layout DEGAP integrity and
+original cache-miss refusal. Logs: `evidence/legacy-native-continuation-tests.log`
+and `evidence/legacy-native-focused-tests.log` (18 passing executed cases; the
+other module in that initial invocation had a test harness `PYTHONPATH` error
+and was run separately with its correct package root).
