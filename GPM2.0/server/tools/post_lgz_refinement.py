@@ -156,7 +156,7 @@ def validate_completion(root, run_id):
         return False, str(error)
 
 
-def run_child_group(command, *, environment):
+def run_child_group(command, *, environment, cwd=None, output=None):
     """Keep the workspace lock until the worker and its native group stop.
 
     Direct invocations use the same verified parent/worker boundary as run_all.
@@ -182,7 +182,9 @@ def run_child_group(command, *, environment):
     try:
         for number in (signal.SIGINT, signal.SIGTERM):
             previous[number] = signal.signal(number, forward)
-        child = subprocess.Popen(command, env=environment, start_new_session=True)
+        child = subprocess.Popen(command, env=environment, cwd=cwd, stdout=output,
+                                 stderr=subprocess.STDOUT if output is not None else None,
+                                 start_new_session=True)
         if received is not None:
             forward(received, None)
         while True:

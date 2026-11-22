@@ -265,7 +265,7 @@ def prepare_locus(root, stage, batch, locus):
     return target
 
 
-def prepare_batch(root, archive):
+def prepare_batch(root, archive, *, run=False, reads_override=None, threads=None):
     layout = WorkspaceLayout.detect(root.resolve())
     batch, value, raw = _read_task_archive(archive)
     lock = WorkspaceLock(layout.root, "manual-refinement-" + batch[:24])
@@ -287,6 +287,9 @@ def prepare_batch(root, archive):
                 outcomes.append({"id": locus["id"], "status": "input_unavailable", "reason": str(exc)})
         result = {"schema": PREPARED, "batch_sha256": batch, "origin": origin, "loci": outcomes}
         durable_json(directory.parent / "prepared.json", result)
+        if run:
+            from manual_refinement_run import execute_manual
+            return execute_manual(layout, directory.parent, result, value, reads_override or {}, threads)
         return result
     finally:
         lock.release()
@@ -296,13 +299,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--server-dir", type=Path, default=Path.cwd())
     parser.add_argument("--tasks", required=True, type=Path)
+    parser.add_argument("--run", action="store_true", help="run locked tools and collect one result ZIP")
+    parser.add_argument("--hifi", action="append", default=None, help="override one or more HiFi read paths")
+    parser.add_argument("--ont", action="append", default=None, help="override one or more ONT read paths")
+    parser.add_argument("--threads", type=int, help="maximum threads for each run, subject to workspace limits")
     args = parser.parse_args()
+    if (args.hifi is not None or args.ont is not None or args.threads is not None) and not args.run:
+        parser.error("--hifi, --ont and --threads require --run")
+    if args.threads is not None and args.threads < 1:
+        parser.error("--threads must be positive")
     try:
-        result = prepare_batch(args.server_dir, args.tasks)
+        result = prepare_batch(args.server_dir, args.tasks, run=args.run,
+                               reads_override={"hifi": args.hifi, "ont": args.ont}, threads=args.threads)
     except (BadZipFile, OSError, ValueError, KeyError, RunnerError) as exc:
         print(f"manual refinement input error: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(result, ensure_ascii=False))
+    if args.run:
+        return int(any(row["status"] in {"failed", "input_unavailable", "missing_reads", "incomplete"}
+                       for row in result["results"]))
     return int(any(row["status"] != "prepared" for row in result["loci"]))
 
 

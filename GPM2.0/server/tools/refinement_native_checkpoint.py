@@ -222,9 +222,20 @@ def checked_file(root, path, *, prefixes):
 
 
 def capture(root, tool, run_id, native_directory, invocation, code, log, chromosomes, parameters, prepared_files, driver,
-            *, require_units=False):
+            *, require_units=False, manual_attempt=None):
     base = "04_refinement/" + TOOL_DIRECTORIES[tool]
-    prefixes = [base + "/03_native/" + run_id, base + "/02_jobs/" + run_id]
+    if manual_attempt is None:
+        prefixes = [base + "/03_native/" + run_id, base + "/02_jobs/" + run_id]
+    else:
+        # Manual attempts have a separate namespace and never reuse the
+        # whole-assembly scheduler's private units or checkpoints.
+        name = Path(manual_attempt).absolute().relative_to(root).as_posix()
+        if require_units or not re.fullmatch(
+            r"(?:08_refinement_jobs/02_manual|[.]run_all/manual_refinement)/[a-f0-9]{64}/02_jobs/[a-f0-9]{64}/"
+            + re.escape(tool) + r"/[a-f0-9]{32}", name,
+        ):
+            raise PathError("invalid manual native evidence directory")
+        prefixes = [name]
     artifacts, identities, genomes = {}, {}, {}
     def add(path, *, fasta=False, expected=chromosomes):
         path, relative = checked_file(root, path, prefixes=prefixes)
@@ -344,7 +355,8 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
             raise PathError("LR_Gapcloser stopped early while gaps still remain")
     elif not empty:
         terminal = (native_directory / invocation.required_outputs[0]).relative_to(root).as_posix()
-    unit_artifacts = capture_units(root, tool, run_id, code, required=require_units)
+    unit_artifacts = ([] if manual_attempt is not None
+                      else capture_units(root, tool, run_id, code, required=require_units))
     if unit_artifacts:
         summary_path = root / base / "02_jobs" / run_id / SUMMARY
         summary = checked_json(root, summary_path)
@@ -378,8 +390,11 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
                     raise PathError("DEGAP native summary and terminal unit disagree")
     for path in unit_artifacts:
         add(path)
-    return {"outcome": empty or "completed", "artifacts": artifacts, "native_assembly": genomes.get(terminal, {}),
-            "native_jobs": jobs}, identities
+    result = {"outcome": empty or "completed", "artifacts": artifacts, "native_assembly": genomes.get(terminal, {}),
+              "native_jobs": jobs}
+    if manual_attempt is not None:
+        result["terminal"] = terminal
+    return result, identities
 
 
 def find_completed(root, tool, native_binding, current_inputs):
