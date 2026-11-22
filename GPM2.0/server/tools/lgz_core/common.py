@@ -258,13 +258,21 @@ def read_fasta(path: Path) -> list[tuple[str, str]]:
         fail(f"FASTA has no records: {path}")
     return records
 
+_FASTA_WRAP_LINES = re.compile(r".{1,80}", re.DOTALL)
+_FASTA_BLOCK_BASES = 80 * 1024  # A bounded block of whole lines, not a whole contig.
+
+
 def write_fasta(path: Path, records: Iterable[tuple[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         for name, sequence in records:
             handle.write(f">{name}\n")
-            for start in range(0, len(sequence), 80):
-                handle.write(sequence[start : start + 80] + "\n")
+            length = len(sequence)
+            # Preserve UTF-8, LF and the original 80-character wrapping while
+            # avoiding a Python write/encoding call for every 80-base line.
+            for start in range(0, length, _FASTA_BLOCK_BASES):
+                end = min(start + _FASTA_BLOCK_BASES, length)
+                handle.write("\n".join(_FASTA_WRAP_LINES.findall(sequence, start, end)) + "\n")
 
 def write_tsv(path: Path, fields: list[str], rows: Iterable[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
