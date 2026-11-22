@@ -1,0 +1,265 @@
+{
+  "fragments": {
+    "chr1": [
+      [
+        100000,
+        900000
+      ],
+      [
+        940000,
+        1850000
+      ],
+      [
+        795000,
+        1075000
+      ],
+      [
+        360000,
+        570000
+      ],
+      [
+        1335000,
+        1520000
+      ]
+    ],
+    "chr2": [
+      [
+        0,
+        4400
+      ],
+      [
+        5200,
+        10000
+      ],
+      [
+        3600,
+        6000
+      ]
+    ]
+  },
+  "mapper": "2.26-r1175",
+  "record": "Chr01",
+  "ref_slice_sha256": {
+    "chr1": "fe77ec3413ea2e767cdaa6fa81a744068c7fb821292b4aaa53de966278a7b5d5",
+    "chr2": "5d752d6fe8fd76a83998d099be87cf55963b0807d611f31b3b64e47807bd9963"
+  },
+  "runs": [
+    {
+      "against_first_full": {
+        "chr1": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "reference_unknown": 1
+          },
+          "arm_reference_unrepresented_bp": 291500,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "reference_unknown": 1
+          },
+          "full_reference_unrepresented_bp": 291500,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        },
+        "chr2": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "arm_reference_unrepresented_bp": 0,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "full_reference_unrepresented_bp": 0,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        }
+      },
+      "base_load_and_decision_seconds": null,
+      "dispatch_audit": null,
+      "matches_control_reference": {
+        "chr1": false,
+        "chr2": true
+      },
+      "mode": "full",
+      "native_tasks": 0,
+      "preparation_seconds": 4.032533778110519,
+      "regional_tasks": 12,
+      "scientific_inputs_identity": "q0-control-input-1c6d5da997f2898307630b09",
+      "workspace_ready_input_fingerprint": "q0-evidence-input-2ca9bb806b7e23e877fec686"
+    },
+    {
+      "against_first_full": {
+        "chr1": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "reference_unknown": 1
+          },
+          "arm_reference_unrepresented_bp": 291500,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "reference_unknown": 1
+          },
+          "full_reference_unrepresented_bp": 291500,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        },
+        "chr2": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "arm_reference_unrepresented_bp": 0,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "full_reference_unrepresented_bp": 0,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        }
+      },
+      "base_load_and_decision_seconds": 0.5550558629911393,
+      "dispatch_audit": {
+        "omitted": 6,
+        "scheduled": 6
+      },
+      "matches_control_reference": {
+        "chr1": false,
+        "chr2": true
+      },
+      "mode": "frontier",
+      "native_tasks": 0,
+      "preparation_seconds": 2.2837187128607184,
+      "regional_tasks": 6,
+      "scientific_inputs_identity": "q0-control-input-1c6d5da997f2898307630b09",
+      "workspace_ready_input_fingerprint": "q0-evidence-input-876aa3e237378c1276c75760"
+    },
+    {
+      "against_first_full": {
+        "chr1": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "reference_unknown": 1
+          },
+          "arm_reference_unrepresented_bp": 291500,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "reference_unknown": 1
+          },
+          "full_reference_unrepresented_bp": 291500,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        },
+        "chr2": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "arm_reference_unrepresented_bp": 0,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "full_reference_unrepresented_bp": 0,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        }
+      },
+      "base_load_and_decision_seconds": 0.4749586400575936,
+      "dispatch_audit": {
+        "omitted": 6,
+        "scheduled": 6
+      },
+      "matches_control_reference": {
+        "chr1": false,
+        "chr2": true
+      },
+      "mode": "frontier",
+      "native_tasks": 0,
+      "preparation_seconds": 1.8476201239973307,
+      "regional_tasks": 6,
+      "scientific_inputs_identity": "q0-control-input-1c6d5da997f2898307630b09",
+      "workspace_ready_input_fingerprint": "q0-evidence-input-36577755610bbf507db65344"
+    },
+    {
+      "against_first_full": {
+        "chr1": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "reference_unknown": 1
+          },
+          "arm_reference_unrepresented_bp": 291500,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "reference_unknown": 1
+          },
+          "full_reference_unrepresented_bp": 291500,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        },
+        "chr2": {
+          "arm_constructed": true,
+          "arm_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "arm_reference_unrepresented_bp": 0,
+          "changed_or_lost_overlap_cuts": 0,
+          "changed_or_new_overlap_cuts": 0,
+          "full_constructed": true,
+          "full_join_kinds": {
+            "sequence_overlap": 2
+          },
+          "full_reference_unrepresented_bp": 0,
+          "lost_or_reoriented_source_bp": 0,
+          "new_or_reoriented_source_bp": 0,
+          "same_sequence": true
+        }
+      },
+      "base_load_and_decision_seconds": null,
+      "dispatch_audit": null,
+      "matches_control_reference": {
+        "chr1": false,
+        "chr2": true
+      },
+      "mode": "full",
+      "native_tasks": 0,
+      "preparation_seconds": 3.282124466029927,
+      "regional_tasks": 12,
+      "scientific_inputs_identity": "q0-control-input-1c6d5da997f2898307630b09",
+      "workspace_ready_input_fingerprint": "q0-evidence-input-d6fd28ff8ce34739def69b2a"
+    }
+  ],
+  "scope": "artificial fragmentation with real DNA and real minimap2; not natural assembly recall",
+  "source_slices": {
+    "chr1": [
+      0,
+      2000000
+    ],
+    "chr2": [
+      2800000,
+      2810000
+    ]
+  }
+}
