@@ -22,6 +22,7 @@ from refinement_recipes import select_tools, select_reads
 from refinement_batch import execute_batch, publish_batch, check_seal, baseline_seal
 from refinement_commit import current_publication, recover_publication, targets
 from refinement_overview import render_overview
+from refinement_jobs_index import write_automatic_index
 from lgz_final import publish_baseline, validate_baseline
 
 
@@ -98,7 +99,14 @@ def run(root, lock, request):
                "request_sha256": fingerprint(request), "batch_id": batch["batch_id"], "exit_code": batch_result["exit_code"],
                "batch_sha256": sha256_file(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json")),
                "overview_files": {name: sha256_file(layout.path(name)) for name in overview_paths}}
-    atomic_write_json(layout.path(f".runtime/refinement/completions/{request['run_id']}.json"), receipt)
+    completion_path = layout.path(f".runtime/refinement/completions/{request['run_id']}.json")
+    atomic_write_json(completion_path, receipt)
+    try:
+        index = write_automatic_index(layout, completion_path)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f"[REFINEMENT JOB INDEX] unavailable: {error}", file=sys.stderr, flush=True)
+    else:
+        print(f"[REFINEMENT JOB INDEX] {index}", flush=True)
     print(f"[REFINEMENT] status={batch['status']} exit_code={batch_result['exit_code']} threads={budget}", flush=True)
     for tool, row in batch["tools"].items():
         if row["status"] == "published":

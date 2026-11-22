@@ -9,7 +9,10 @@ use sha2::{Digest, Sha256};
 
 use crate::db::open_workspace_db;
 
+mod manual_refinement;
 mod server_runtime;
+
+pub use manual_refinement::{export_manual_refinement, ManualExportSummary, ManualRefinementRequest};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct DegapJobExportSettings {

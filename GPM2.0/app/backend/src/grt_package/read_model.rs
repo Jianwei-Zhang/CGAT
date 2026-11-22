@@ -75,7 +75,14 @@ pub fn load_grt_final_path_by_chr_for_project(
     project_id: i64,
 ) -> Result<BTreeMap<String, Value>> {
     let conn = open_workspace_db(project_db_path)?;
-    let source_lengths = load_persisted_source_lengths(&conn)?;
+    load_grt_final_path_for_project_with_connection(&conn, project_id)
+}
+
+pub(crate) fn load_grt_final_path_for_project_with_connection(
+    conn: &Connection,
+    project_id: i64,
+) -> Result<BTreeMap<String, Value>> {
+    let source_lengths = load_persisted_source_lengths(conn)?;
     let final_path_schema_version: String = conn
         .query_row(
             "SELECT final_path_schema_version FROM grt_package WHERE id = 1",
@@ -86,11 +93,11 @@ pub fn load_grt_final_path_by_chr_for_project(
         .context("failed to query LGZ Final Path schema version")?
         .ok_or_else(|| anyhow!("LGZ package recipe is not available"))?;
     let placements = if is_display_app_final_path_schema(&final_path_schema_version) {
-        Some(load_grt_assembly_source_placements(&conn, project_id)?)
+        Some(load_grt_assembly_source_placements(conn, project_id)?)
     } else {
         None
     };
-    load_grt_final_path_by_chr_with_connection(&conn, &source_lengths, placements.as_ref())
+    load_grt_final_path_by_chr_with_connection(conn, &source_lengths, placements.as_ref())
 }
 
 fn load_grt_final_path_by_chr_with_connection(

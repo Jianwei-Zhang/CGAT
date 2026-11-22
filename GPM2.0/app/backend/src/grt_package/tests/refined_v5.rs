@@ -145,6 +145,57 @@ fn refined_import_retains_original_read_hints_in_full_and_light() {
 }
 
 #[test]
+fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
+    use std::io::Read;
+    let temp = materialize(false);
+    let root = temp.path().join("refined.degap");
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&root).unwrap();
+    let project = initialize_grt_project(&outcome.project_db_path, "Manual export").unwrap();
+    let mut path = load_grt_final_path_by_chr_for_project(&outcome.project_db_path, project.project_id).unwrap();
+    let (chr, record) = path
+        .iter_mut()
+        .find(|(_, record)| record["segments"].as_array().is_some_and(|rows| rows.iter().any(|row| row["kind"] == "gap")))
+        .unwrap();
+    let chr = chr.clone();
+    let segments = record["segments"].as_array_mut().unwrap();
+    let i = segments.iter().position(|row| row["kind"] == "gap").unwrap();
+    let gap = segments[i]["segment_id"].as_str().unwrap().to_string();
+    let original_request = serde_json::from_value(serde_json::json!({"loci":[{
+        "chr":chr,"kind":"gap","segment_id":gap
+    }]})).unwrap();
+    let original = temp.path().join("original-tasks.zip");
+    crate::degap_jobs::export_manual_refinement(&root, project.project_id, &original, &original_request).unwrap();
+    segments[i] = serde_json::json!({"type":"gap","segmentId":gap,"gapSizeBp":117});
+    let conn = crate::db::open_workspace_db(&outcome.project_db_path).unwrap();
+    conn.execute("INSERT INTO project_assembly_view_state (project_id, final_path_by_chr_json, updated_at)
+        VALUES (?1, ?2, '1') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json",
+        rusqlite::params![project.project_id, serde_json::to_string(&path).unwrap()]).unwrap();
+    let request = serde_json::from_value(serde_json::json!({"loci":[{
+        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","degap","lrgapcloser"]
+    }],"hifi_reads":[],"ont_reads":[]})).unwrap();
+    let archive = temp.path().join("tasks.zip");
+    let result = crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).unwrap();
+    let mut zipped = zip::ZipArchive::new(fs::File::open(&archive).unwrap()).unwrap();
+    let mut bytes = Vec::new();
+    zipped.by_name("refinement_tasks.json").unwrap().read_to_end(&mut bytes).unwrap();
+    assert_eq!(result.tasks, 3);
+    assert_eq!(result.batch_sha256, format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(&bytes)));
+    let value: Value = serde_json::from_slice(&bytes).unwrap();
+    let locus = &value["loci"][0];
+    assert_eq!(locus["gap_bp"], 117);
+    assert_eq!(locus["tools"], serde_json::json!(["degap", "lrgapcloser", "quartet"]));
+    assert_eq!(value["reads"]["hifi"], serde_json::json!([]));
+    let member = &locus["seed_plans"]["seqleft"]["members"][0];
+    assert!(member["fasta_sha256"].is_string() || member["interval_sha256"].is_string());
+    let receipts = root.join("metadata/refinement_exports");
+    let ledger: Value = serde_json::from_slice(&fs::read(receipts.join(result.batch_sha256 + ".json")).unwrap()).unwrap();
+    assert_eq!(ledger["project_id"], project.project_id);
+    assert_eq!(ledger["manifest"], value);
+    assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).is_err());
+    assert_eq!(fs::read_dir(receipts).unwrap().count(), 2);
+}
+
+#[test]
 fn refined_full_import_materializes_real_bridge_and_exports_admitted_sequence() {
     let temp = materialize(false);
     let root = temp.path().join("refined.degap");

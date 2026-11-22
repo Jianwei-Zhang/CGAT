@@ -112,23 +112,12 @@ def candidates(root, member):
                 yield source, record["sha256"], "manual_candidate"
 
 
-def prepare_seed(recipe, label):
-    if (recipe.get("schema") != "gpm.degap.export.v1" or re.fullmatch(r"[0-9a-f]{64}", recipe.get("token", "")) is None
-            or label not in {"seqleft", "seqright", "endpoint"}):
-        raise ValueError("invalid exported seed receipt")
-    root, output = Path(recipe["server_root"]), Path(recipe["out_path"])
-    if not root.is_absolute() or not output.is_absolute():
-        raise ValueError("seed Server/output paths must be absolute")
-    layout = WorkspaceLayout.detect(root)
-    owner = read_object(output / ".gpm_degap_inputs.json")
-    if owner != {key: value for key, value in recipe.items() if key not in {"token", "project_id"}}:
-        raise ValueError("seed output directory belongs to another export; run begin first")
-    plan = recipe["seed_plans"][label]
+def resolve_seed(root, plan, scratch, *, require_content):
+    """Resolve and orient source members without publishing legacy job state."""
     if not isinstance(plan.get("members"), list) or not plan["members"]:
         raise ValueError("seed plan has no source members")
-    output.mkdir(parents=True, exist_ok=True)
     parts, proofs = [], []
-    with tempfile.TemporaryDirectory(prefix=".seed-sources-", dir=output) as private:
+    with tempfile.TemporaryDirectory(prefix=".seed-sources-", dir=scratch) as private:
         indexes = {}
         for member in plan["members"]:
             expected = member.get("fasta_sha256")
@@ -139,7 +128,7 @@ def prepare_seed(recipe, label):
                 raise ValueError("invalid seed source length")
             if expected is not None and re.fullmatch(r"[0-9a-f]{64}", expected) is None:
                 raise ValueError("invalid expected Server FASTA identity")
-            if layout.version == 2 and expected is None and interval_sha is None:
+            if require_content and expected is None and interval_sha is None:
                 raise ValueError("numbered Server seeds require source identities; re-export from a matching package or restore FASTA")
             selected, known = [], set()
             for source, admitted_sha, origin in candidates(root, member):
@@ -193,6 +182,24 @@ def prepare_seed(recipe, label):
         for row in proofs:
             if content_digest(Path(row["source"])) != row["fasta_sha256"]:
                 raise ValueError("Server source changed during seed preparation")
+    return sequence, proofs
+
+
+def prepare_seed(recipe, label):
+    if (recipe.get("schema") != "gpm.degap.export.v1" or re.fullmatch(r"[0-9a-f]{64}", recipe.get("token", "")) is None
+            or label not in {"seqleft", "seqright", "endpoint"}):
+        raise ValueError("invalid exported seed receipt")
+    root, output = Path(recipe["server_root"]), Path(recipe["out_path"])
+    if not root.is_absolute() or not output.is_absolute():
+        raise ValueError("seed Server/output paths must be absolute")
+    layout = WorkspaceLayout.detect(root)
+    owner = read_object(output / ".gpm_degap_inputs.json")
+    if owner != {key: value for key, value in recipe.items() if key not in {"token", "project_id"}}:
+        raise ValueError("seed output directory belongs to another export; run begin first")
+    plan = recipe["seed_plans"][label]
+    output.mkdir(parents=True, exist_ok=True)
+    sequence, proofs = resolve_seed(root, plan, output, require_content=layout.version == 2)
+    with tempfile.TemporaryDirectory(prefix=".seed-write-", dir=output) as private:
         filename = "endpoint.ctg.fa" if label == "endpoint" else label + ".fa"
         target = output / filename
         temporary = Path(private) / filename

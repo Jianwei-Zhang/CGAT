@@ -1,0 +1,310 @@
+#!/usr/bin/env python3
+"""Validate project-scoped manual tasks and prepare their local inputs, not LGZ outputs."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
+from zipfile import BadZipFile, ZipFile
+
+from refinement_commit import current_publication
+from run_all_runner import RunnerError, WorkspaceLock
+from run_orchestration import sha256_file as digest
+from server_source_identity import resolve_seed
+from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout
+from workspace_migration import durable_json, rename_synced
+
+SCHEMA = "cgat.app-refinement-tasks.v1"
+PREPARED = "cgat.app-refinement-prepared.v1"
+MANIFEST = "refinement_tasks.json"
+MAX_MANIFEST = 8 * 1024 * 1024
+MAX_GAP_BP = 100_000_000
+TOOLS = ("degap", "lrgapcloser", "tgsgapcloser", "quartet")
+
+
+def sha(value):
+    return isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value) is not None
+
+
+def text(value):
+    return isinstance(value, str) and bool(value) and not any(ord(c) < 32 or ord(c) == 127 for c in value)
+
+
+def positive(value):
+    return type(value) is int and 0 < value <= (1 << 63) - 1
+
+
+def unique_keys(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate manifest field: {key}")
+        value[key] = item
+    return value
+
+
+def checked_plan(value, witness):
+    if not isinstance(value, dict) or set(value) != {"members", "start", "end"} or not isinstance(value["members"], list):
+        raise ValueError("invalid seed plan")
+    length = 0
+    for member in value["members"]:
+        if (not isinstance(member, dict) or set(member) != {"dataset", "name", "length", "start", "end", "fasta_sha256", "interval_sha256"}
+                or not all(text(member[key]) for key in ("dataset", "name"))
+                or not all(positive(member[key]) for key in ("length", "start", "end"))
+                or not member["start"] <= member["end"] <= member["length"]
+                or not any(sha(member[key]) for key in ("fasta_sha256", "interval_sha256"))
+                or any(v is not None and not sha(v) for v in (member["fasta_sha256"], member["interval_sha256"]))):
+            raise ValueError("invalid or unbound seed source interval")
+        length += member["end"] - member["start"] + 1
+    if (not length or length != abs(witness["end"] - witness["start"]) + 1
+            or not all(positive(value[key]) for key in ("start", "end"))
+            or (value["start"], value["end"]) != ((1, length) if witness["start"] <= witness["end"] else (length, 1))):
+        raise ValueError("seed interval does not match its path orientation/length")
+
+
+def check_manifest(value):
+    if (not isinstance(value, dict) or set(value) != {"schema", "export_id", "origin_fasta_sha256", "reads", "loci"}
+            or value["schema"] != SCHEMA or not sha(value["export_id"]) or not sha(value["origin_fasta_sha256"])):
+        raise ValueError("not a supported project refinement task manifest")
+    reads, used = value["reads"], set()
+    if not isinstance(reads, dict) or set(reads) != {"hifi", "ont"}:
+        raise ValueError("invalid reads groups")
+    for rows in reads.values():
+        if not isinstance(rows, list):
+            raise ValueError("invalid reads group")
+        for row in rows:
+            if (not isinstance(row, dict) or set(row) != {"path", "sha256"} or not text(row["path"])
+                    or not row["path"].startswith("/") or row["path"] == "/" or row["path"] in used
+                    or (row["sha256"] is not None and not sha(row["sha256"]))):
+                raise ValueError("invalid or duplicate Server read path")
+            used.add(row["path"])
+    ids = set()
+    if not isinstance(value["loci"], list) or not value["loci"]:
+        raise ValueError("no refinement loci")
+    for locus in value["loci"]:
+        keys = {"id", "chr", "kind", "target", "tools", "witnesses", "seed_plans"}
+        if not isinstance(locus, dict) or not keys.issubset(locus) or locus["kind"] not in ("gap", "tel_left", "tel_right"):
+            raise ValueError("invalid refinement locus")
+        kind = locus["kind"]
+        identity = json.dumps([locus["chr"], kind, locus["target"]], ensure_ascii=False, separators=(",", ":"))
+        if (not text(locus["chr"]) or not text(locus["target"])
+                or locus["id"] != hashlib.sha256(identity.encode()).hexdigest() or locus["id"] in ids):
+            raise ValueError("invalid or duplicate locus identity")
+        ids.add(locus["id"])
+        tools = locus["tools"]
+        if (not isinstance(tools, list) or not tools or tools != [tool for tool in TOOLS if tool in tools]
+                or (kind != "gap" and tools != ["degap"])):
+            raise ValueError("invalid or duplicate locus tool")
+        witnesses, plans = locus["witnesses"], locus["seed_plans"]
+        labels = {"seqleft", "seqright"} if kind == "gap" else {"endpoint"}
+        if (not isinstance(witnesses, dict) or not isinstance(plans, dict) or set(plans) != labels
+                or set(witnesses) != labels | ({"target"} if kind == "gap" else set())):
+            raise ValueError("invalid locus witnesses or seed labels")
+        for label in labels:
+            w = witnesses[label]
+            common = {"segment_id", "kind", "start", "end"}
+            if not isinstance(w, dict):
+                raise ValueError("invalid contig witness")
+            assembly = set(w) == common | {"assembly_ctg_id"} and positive(w["assembly_ctg_id"])
+            source = set(w) == common | {"dataset", "contig"} and all(text(w[key]) for key in ("dataset", "contig"))
+            if (not (assembly or source) or w["kind"] != "ctg" or not text(w["segment_id"])
+                    or not all(positive(w[key]) for key in ("start", "end"))):
+                raise ValueError("invalid contig witness")
+            checked_plan(plans[label], w)
+            if source:
+                members = plans[label]["members"]
+                if (len(members) != 1 or members[0]["dataset"] != w["dataset"] or members[0]["name"] != w["contig"]
+                        or [members[0]["start"], members[0]["end"]] != sorted([w["start"], w["end"]])):
+                    raise ValueError("seed plan does not match the source witness")
+        if kind == "gap":
+            size = locus.get("gap_bp")
+            if (set(locus) != keys | {"gap_bp"} or not positive(size) or size > MAX_GAP_BP
+                    or witnesses["target"] != {"segment_id": locus["target"], "kind": "gap", "gap_bp": size}
+                    or len({witnesses[name]["segment_id"] for name in labels} | {locus["target"]}) != 3):
+                raise ValueError("invalid original N run or duplicated Gap witness")
+        elif (set(locus) != keys | {"motif"} or not isinstance(locus["motif"], str)
+              or not re.fullmatch(r"[ACGT]+", locus["motif"]) or witnesses["endpoint"]["segment_id"] != locus["target"]):
+            raise ValueError("invalid terminal witness or motif")
+
+
+def _read_task_archive(archive):
+    # Do not extract arbitrary paths or execute code from a task ZIP.
+    with ZipFile(archive) as zipped:
+        infos = zipped.infolist()
+        names = [entry.filename for entry in infos]
+        if len(set(names)) != len(names) or not set(names) <= {MANIFEST, "README.txt"} or MANIFEST not in names:
+            raise ValueError("unexpected/duplicate task archive member")
+        if zipped.getinfo(MANIFEST).file_size > MAX_MANIFEST:
+            raise ValueError("refinement task manifest exceeds 8 MiB")
+        with zipped.open(MANIFEST) as stream:
+            raw = stream.read(MAX_MANIFEST + 1)
+    if len(raw) > MAX_MANIFEST:
+        raise ValueError("refinement task manifest exceeds 8 MiB")
+    value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_keys)
+    check_manifest(value)
+    return hashlib.sha256(raw).hexdigest(), value, raw
+
+
+def read_tasks(archive):
+    batch, value, _ = _read_task_archive(archive)
+    return batch, value
+
+
+def save_input_manifest(directory, batch, raw):
+    manifest = directory / MANIFEST
+    if manifest.is_symlink():
+        raise ValueError("saved refinement manifest must not be a symlink")
+    if manifest.exists():
+        if not manifest.is_file() or digest(manifest) != batch:
+            raise ValueError("saved refinement task manifest changed")
+        return
+    with tempfile.TemporaryDirectory(prefix=".manifest-", dir=directory) as work:
+        temp = Path(work) / MANIFEST
+        with temp.open("wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        rename_synced(temp, manifest)
+
+
+def check_origin(layout, expected):
+    base = json.loads(layout.path("metadata/grt_final_path.json").read_text(encoding="utf-8"))
+    final = layout.path(base["q4_relpath"])
+    if final.is_file() and digest(final) == expected:
+        return "lgz"
+    if layout.version == 2:
+        for tool in TOOLS:
+            publication = current_publication(layout.root, tool, verify=False)
+            if not publication or publication["areas"]["final"]["new"]["files"].get("assembly.fa") != expected:
+                continue
+            path = layout.path(f"05_final/{TOOL_DIRECTORIES[tool]}/assembly.fa")
+            if path.is_file() and not path.is_symlink() and digest(path) == expected:
+                return tool
+    raise ValueError("task batch does not match the Server workspace's LGZ or committed refined origin")
+
+
+def write_fasta(path, name, blocks):
+    with path.open("w", encoding="ascii", newline="\n") as stream:
+        stream.write(f">{name}\n")
+        carried = ""
+        for block in blocks:
+            for start in range(0, len(block), 65536):
+                text = carried + block[start:start + 65536]
+                cut = len(text) // 80 * 80
+                if cut:
+                    stream.write("\n".join(text[i:i + 80] for i in range(0, cut, 80)) + "\n")
+                carried = text[cut:]
+        if carried:
+            stream.write(carried + "\n")
+
+
+def gap_blocks(left, size, right):
+    yield left
+    for pos in range(0, size, 65536):
+        yield "N" * min(size - pos, 65536)
+    yield right
+
+
+def verify_prepared(target, batch, locus):
+    receipt = json.loads((target / "prepared.json").read_text(encoding="utf-8"))
+    if (receipt.get("schema") != PREPARED or receipt.get("batch_sha256") != batch
+            or receipt.get("locus_id") != locus["id"]):
+        raise ValueError("existing local input does not belong to this locus")
+    labels = set(locus["seed_plans"])
+    if set(receipt["files"]) != {"local.fa"} | {label + ".fa" for label in labels}:
+        raise ValueError("local input inventory is incomplete")
+    for name, expected in receipt["files"].items():
+        path = target / name
+        if not sha(expected) or path.is_symlink() or digest(path) != expected:
+            raise ValueError("prepared local input changed")
+    if set(receipt["sources"]) != labels:
+        raise ValueError("local input source inventory is incomplete")
+    for label, plan in locus["seed_plans"].items():
+        records = receipt["sources"][label]
+        if len(records) != len(plan["members"]):
+            raise ValueError("local input source inventory changed")
+        for proof, member in zip(records, plan["members"]):
+            if (any(proof[k] != member[k] for k in ("dataset", "name", "length", "start", "end"))
+                    or (member["fasta_sha256"] and proof["fasta_sha256"] != member["fasta_sha256"])
+                    or (member["interval_sha256"] and proof["interval_sha256"] != member["interval_sha256"])):
+                raise ValueError("local input source proof differs from the exported plan")
+    return receipt
+
+
+def prepare_locus(root, stage, batch, locus):
+    target = stage / locus["id"]
+    if target.is_symlink():
+        raise ValueError("manual input directory must not be a symlink")
+    if target.exists():
+        # Prepared bytes are sealed and safe to inspect; the native runner will
+        # revalidate the source inputs before using this proof for a result.
+        verify_prepared(target, batch, locus)
+        return target
+    with tempfile.TemporaryDirectory(prefix=".inputs-", dir=stage) as scratch:
+        scratch = Path(scratch)
+        output = scratch / "payload"
+        output.mkdir()
+        sequences, sources = {}, {}
+        for label, plan in locus["seed_plans"].items():
+            sequences[label], sources[label] = resolve_seed(root, plan, scratch, require_content=True)
+            write_fasta(output / (label + ".fa"), label, (sequences[label],))
+        if locus["kind"] == "gap":
+            blocks = gap_blocks(sequences["seqleft"], locus["gap_bp"], sequences["seqright"])
+        else:
+            blocks = (sequences["endpoint"],)
+        write_fasta(output / "local.fa", "locus", blocks)
+        files = {name.name: digest(name) for name in output.iterdir()}
+        durable_json(output / "prepared.json", {"schema": PREPARED, "batch_sha256": batch,
+                                                   "locus_id": locus["id"], "files": files, "sources": sources})
+        rename_synced(output, target)
+    return target
+
+
+def prepare_batch(root, archive):
+    layout = WorkspaceLayout.detect(root.resolve())
+    batch, value, raw = _read_task_archive(archive)
+    lock = WorkspaceLock(layout.root, "manual-refinement-" + batch[:24])
+    lock.acquire()
+    try:
+        origin = check_origin(layout, value["origin_fasta_sha256"])
+        directory = (layout.path(f"08_refinement_jobs/02_manual/{batch}/01_inputs") if layout.version == 2
+                     else layout.path(f".run_all/manual_refinement/{batch}/01_inputs"))
+        if directory.is_symlink():
+            raise ValueError("manual batch input directory must not be a symlink")
+        directory.mkdir(parents=True, exist_ok=True)
+        save_input_manifest(directory, batch, raw)
+        outcomes = []
+        for locus in value["loci"]:
+            try:
+                target = prepare_locus(layout.root, directory, batch, locus)
+                outcomes.append({"id": locus["id"], "status": "prepared", "receipt": str(target.relative_to(layout.root) / "prepared.json")})
+            except (OSError, ValueError, KeyError) as exc:
+                outcomes.append({"id": locus["id"], "status": "input_unavailable", "reason": str(exc)})
+        result = {"schema": PREPARED, "batch_sha256": batch, "origin": origin, "loci": outcomes}
+        durable_json(directory.parent / "prepared.json", result)
+        return result
+    finally:
+        lock.release()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--server-dir", type=Path, default=Path.cwd())
+    parser.add_argument("--tasks", required=True, type=Path)
+    args = parser.parse_args()
+    try:
+        result = prepare_batch(args.server_dir, args.tasks)
+    except (BadZipFile, OSError, ValueError, KeyError, RunnerError) as exc:
+        print(f"manual refinement input error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=False))
+    return int(any(row["status"] != "prepared" for row in result["loci"]))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

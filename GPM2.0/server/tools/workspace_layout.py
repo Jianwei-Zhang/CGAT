@@ -28,7 +28,7 @@ TOOL_DIRECTORIES = {
 }
 STAGE_DIRECTORIES = (
     "01_inputs", "02_alignments", "03_lgz", "04_refinement",
-    "05_final", "06_report", "07_delivery", ".runtime",
+    "05_final", "06_report", "07_delivery", "08_refinement_jobs", ".runtime",
 )
 # Longest prefixes take precedence. Persisted LGZ proof names (grt, q4) remain
 # readable; changing these scientific identities is not a filesystem migration.
