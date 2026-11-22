@@ -59,7 +59,41 @@ class RegionalMappingTests(unittest.TestCase):
         self.assertEqual(paf, (self.root / second["paf"]).read_bytes())
         verify_regional_task(self.root, second, members=self.catalog.parts)
 
-    def test_reused_raw_window_length_still_checked_before_projection_publication(self):
+    def test_independent_verifier_hashes_each_paf_once_and_detects_content_drift(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        task=self.run_mapping(policy=CigarWorkPolicy(minimum_query_bases=1))
+        with mock.patch.object(prep,"identity",wraps=prep.identity) as identity:
+            receipt=verify_regional_task(self.root,task,members=self.catalog.parts)
+        paths=[r["path"] for r in receipt["outputs"] if r["path"].endswith("/result.paf")]
+        self.assertEqual(len(paths),3)  # complete chaining, raw exact, projection
+        actual=[call.args[1] for call in identity.call_args_list if call.args[1].endswith("/result.paf")]
+        self.assertCountEqual(actual,paths)
+        coarse=next(p for p in paths if "/chaining/" in p)
+        with (self.root/coarse).open("ab") as f:f.write(b"# ignored by the coarse parser\n")
+        with self.assertRaisesRegex(Q0EvidenceError,"regional output content changed"):
+            verify_regional_task(self.root,task,members=self.catalog.parts)
+
+    def test_leaf_hash_cannot_disagree_with_verified_projection_closure(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        task=self.run_mapping(); receipt=verify_regional_task(self.root,task)
+        raw_path=receipt["spec"]["raw_receipt"]["path"]
+        raw=prep.json_file(self.root/raw_path)
+        next(r for r in raw["outputs"] if r["path"].endswith("/result.paf"))["sha256"]="0"*64
+        prep.atomic_write_json(self.root/raw_path,raw)
+        receipt["spec"]["raw_receipt"]=prep.identity(self.root,raw_path)
+        tid=stable_id("q0-regional-project",receipt["spec"])
+        relative=f"grt/evidence/q0_prepare/regional/projects/{tid}"
+        rebound={**task,"task_id":tid,"receipt":relative+"/success.json","paf":relative+"/result.paf"}
+        (self.root/relative).mkdir();shutil.copyfile(self.root/task["paf"],self.root/rebound["paf"])
+        paths=[rebound["paf"] if r["path"]==task["paf"] else r["path"] for r in receipt["outputs"]]
+        receipt["outputs"]=[prep.identity(self.root,p) for p in sorted(paths)]
+        prep.atomic_write_json(self.root/rebound["receipt"],receipt)
+        with self.assertRaisesRegex(Q0EvidenceError,"leaf outputs differ"):
+            verify_regional_task(self.root,rebound,members=self.catalog.parts)
+
+
         from server.tools.lgz_core import q0_preparation as prep
 
         task = self.run_mapping()

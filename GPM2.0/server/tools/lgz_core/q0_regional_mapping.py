@@ -71,13 +71,18 @@ def _outputs(root, paths):
     return [_ops().identity(root,path) for path in sorted(set(paths))]
 
 
-def _read_receipt(root, receipt, *, spec, required):
+def _receipt_inventory(root, receipt, *, spec, required):
     record = _ops().json_file(_ops().artifact_path(root,receipt))
     if (record.get("status") != "success" or record.get("spec") != spec
             or not isinstance(record.get("outputs"),list)
             or len(record["outputs"]) != len(required)
             or {r.get("path") for r in record["outputs"]} != set(required)):
         raise Q0EvidenceError("regional receipt specification or inventory differs")
+    return record
+
+
+def _read_receipt(root, receipt, *, spec, required):
+    record = _receipt_inventory(root,receipt,spec=spec,required=required)
     if record["outputs"] != _outputs(root,required):
         raise Q0EvidenceError("regional output content changed")
     return record
@@ -353,11 +358,13 @@ def verify_regional_task(root, task, *, members=None):
                 or _ops().identity(root,decision_identity["path"])!=decision_identity):
             raise Q0EvidenceError("regional selection decision changed")
         closure={context_identity["path"],decision_identity["path"]};policy=CigarWorkPolicy(**decision["policy"])
+        leaves=[]
         if "chaining_receipt" in decision:
             identity=decision["chaining_receipt"];pre_rel=context_rel+"/chaining";pre_path=pre_rel+"/success.json"
             if identity["path"]!=pre_path or _ops().identity(root,pre_path)!=identity:raise Q0EvidenceError("chaining receipt changed")
             required={pre_rel+"/"+name for name in ("result.paf","command.json","guard.py")}
-            _read_receipt(root,pre_path,spec={"schema":"lgz_q0_regional_chaining_v1","context":context_identity,"flags":BASE_FLAGS},required=required)
+            pre_spec={"schema":"lgz_q0_regional_chaining_v1","context":context_identity,"flags":BASE_FLAGS}
+            leaves.append((pre_path,identity,_receipt_inventory(root,pre_path,spec=pre_spec,required=required),required))
             _verify_command(root,pre_rel,context_rel,context_spec,BASE_FLAGS)
             work=chain_work(root/pre_rel/"result.paf",query,{w.window_id:w.length for w in targets},policy)
             expected=select_cigar_profile(decision["reference_bases"],query.length,work,complete=True,preset=context_spec["preset"],policy=policy)
@@ -374,10 +381,18 @@ def verify_regional_task(root, task, *, members=None):
         if spec["raw_receipt"]["path"]!=raw_path or _ops().identity(root,raw_path)!=spec["raw_receipt"]:
             raise Q0EvidenceError("exact regional raw receipt changed")
         required={raw_rel+"/"+name for name in ("result.paf","command.json","guard.py")}
-        _read_receipt(root,raw_path,spec=raw_spec,required=required)
+        leaves.append((raw_path,spec["raw_receipt"],_receipt_inventory(root,raw_path,spec=raw_spec,required=required),required))
         _verify_command(root,raw_rel,context_rel,context_spec,raw_spec["flags"])
         closure.update(required|{raw_path,task["paf"]})
-        _read_receipt(root,task["receipt"],spec=spec,required=closure)
+        # Read/hash the entire committed closure once, then require every leaf
+        # to declare exactly those verified bytes. Checking leaf inventories
+        # does not by itself admit any raw or chaining result.
+        verified=_read_receipt(root,task["receipt"],spec=spec,required=closure)
+        if verified!=receipt:raise Q0EvidenceError("regional projection receipt changed during verification")
+        outputs={r["path"]:r for r in verified["outputs"]}
+        for leaf,leaf_identity,record,leaf_paths in leaves:
+            if outputs[leaf]!=leaf_identity or record["outputs"]!=[outputs[p] for p in sorted(leaf_paths)]:
+                raise Q0EvidenceError("regional leaf outputs differ from verified projection closure")
         # Replay a small, already-finished raw CIGAR stream, not the mapper or
         # reference scan. This catches wrong offsets even if PAF syntax is valid.
         with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(root/task["paf"]).open(encoding="utf-8") as output:

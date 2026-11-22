@@ -1,0 +1,14 @@
+{
+  "code_manifest_sha256": "306f86066993c7b0c9558c786cf2bccf392e161f5e86878d98d0b7228858f0fe",
+  "end_utc": "2026-11-22T08:42:40Z",
+  "final_job_sha256": "1e6474c46efb9036bdab797361ae12e498ed01f312b1928779ec037f3c862ba3",
+  "job_id": "43013129",
+  "memory_peak_mib": 1476,
+  "node": "agent-X86-65",
+  "not_production_admission": true,
+  "remote_dir": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-dp-cap-ladder-20261122-163020",
+  "report_sha256": "9c868e678b47947c38332c41812d4d37911f193b917a07896e600a239d699f34",
+  "source_sha256": "f7721213bd15aac74dfce12d3db7b8e11c48e2a04de075e6ffee0a0d4f517c3f",
+  "start_utc": "2026-11-22T08:31:02Z",
+  "state": "SUCCEEDED"
+}
