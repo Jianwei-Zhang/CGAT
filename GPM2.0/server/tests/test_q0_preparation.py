@@ -50,6 +50,51 @@ class CandidateDiscoveryTests(unittest.TestCase):
             self.assertEqual(row["reference_intervals"], [[0, 60], [160, 220]])
             self.assertIsNone(row["maximum_available_mapq"])
 
+    def test_reference_single_part_shortcut_matches_full_clipping_on_both_strands(self):
+        from server.tools.lgz_core import q0_catalog as catalog_module
+        from server.tools.lgz_core.q0_reference_index import ReferenceIndex
+        from server.tools.lgz_core.q0_sources import Interval
+
+        def full_clipping(hit, parts, ends):
+            for block in hit.aligned_blocks():
+                for part in parts:
+                    overlap = part.interval.intersection(block.query)
+                    if overlap is None:
+                        continue
+                    a = (overlap.start - block.query.start if hit.strand == "+"
+                         else block.query.end - overlap.end)
+                    start = block.target.start + a
+                    yield part, overlap, Interval(start, start + overlap.length), block.operation
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paf = root / "runs/ds_vs_ref/result.paf"
+            paf.parent.mkdir(parents=True)
+            lines = []
+            for start in (54, 120, 200):  # hits entirely inside and spanning split parts
+                for strand in ("+", "-"):
+                    for mapq in (6, 44, 255):
+                        lines.append(f"c\t360\t{start}\t{start+101}\t{strand}\tChrA\t1000\t20\t120"
+                                     f"\t97\t103\t{mapq}\tcg:Z:35M3I15M2D45=1X2M\n")
+            for strand in ("+", "-"):
+                lines.append(f"c\t360\t55\t305\t{strand}\tChrA\t1000\t20\t270\t250\t250\t6\tcg:Z:250M\n")
+            lines.append("c\t360\t235\t265\t+\tChrA\t1000\t10\t40\t0\t60\t60\tcg:Z:30I30D\n")
+            paf.write_text("".join(lines))
+            sources = {SourceKey("ds", "c"): "A" * 80 + "N" * 100 + "G" * 180}
+            refs = {"ChrA": 1000}
+            db = root / "routing.sqlite"
+            with mock.patch.object(catalog_module, "_reference_blocks", side_effect=full_clipping):
+                original = build_catalog(root, sources, refs, [],
+                        regional_factory=lambda parts, lengths: ReferenceIndex.create(db, root, parts, lengths))
+            fast = build_catalog(root, sources, refs, [],
+                        regional_factory=lambda parts, lengths: ReferenceIndex.open(db, root, parts, lengths))
+            self.assertEqual(fast.payload, original.payload)
+            self.assertEqual(fast.reference_routable_parts, original.reference_routable_parts)
+            self.assertEqual(fast.reference_routable_footprints, original.reference_routable_footprints)
+            self.assertEqual(fast.regional_index_report, original.regional_index_report)
+            self.assertEqual(len(fast.payload["evidence"]), 20)  # the gap-only hit is not evidence
+            self.assertTrue(all(row["maximum_available_mapq"] == 44 for row in fast.payload["candidates"]))
+
     def test_candidate_catalog_is_independent_of_dataset_input_order(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

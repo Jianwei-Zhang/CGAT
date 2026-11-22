@@ -148,6 +148,34 @@ class CandidateCatalog:
         return self.payload
 
 
+def _reference_blocks(hit, parts, ends):
+    """Project paired blocks onto source parts without treating hulls as coverage.
+
+    If one part contains the *whole query envelope*, every paired block is
+    already in that part and its reference coordinates need no clipping. A
+    hit crossing a source boundary (including an N gap) must still project
+    and clip each block individually, in the original CIGAR traversal order.
+    """
+    index = bisect_right(ends, hit.query.start)
+    if index < len(parts) and parts[index].interval.contains(hit.query):
+        part = parts[index]
+        for block in hit.aligned_blocks():
+            yield part, block.query, block.target, block.operation
+        return
+    for block in hit.aligned_blocks():
+        index = bisect_right(ends, block.query.start)
+        while index < len(parts) and parts[index].interval.start < block.query.end:
+            part = parts[index]
+            index += 1
+            overlap = part.interval.intersection(block.query)
+            if overlap is None:
+                continue
+            delta = (overlap.start - block.query.start if hit.strand == "+"
+                     else block.query.end - overlap.end)
+            start = block.target.start + delta
+            yield part, overlap, Interval(start, start + overlap.length), block.operation
+
+
 def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                   reference_lengths: Mapping[str, int],
                   assignments: Iterable[dict[str, str]], *, min_gap: int = 100,
@@ -160,7 +188,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                "gaps": [], "original_connections": [], "candidates": [],
                "evidence": {}, "discovery_rounds": []}
     parts: dict[str, SourceSegment] = {}
-    by_source = {}
+    by_dataset = defaultdict(dict)
     for key, sequence in sorted(sequences.items()):
         try:
             index = split_source(key, sequence, min_gap=min_gap)
@@ -175,7 +203,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
         payload["gaps"].extend(asdict(gap) for gap in index.gaps)
         payload["original_connections"].extend(asdict(edge) for edge in index.adjacencies)
         parts.update((part.segment_id, part) for part in index.segments)
-        by_source[key] = (index.segments, [part.interval.end for part in index.segments])
+        by_dataset[key.dataset][key.contig] = (index.segments, [part.interval.end for part in index.segments])
     accumulated = {}
     reference_routable_parts = set()
     reference_routable_footprints = {} if regional_factory else None
@@ -194,59 +222,56 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             if records_index and not routing.sealed:
                 routing.register_artifact(relative)
                 observer = lambda hit, offset, size, dataset=dataset: routing.observe_record(dataset, hit, offset, size)
-            for hit in read_paf(root / relative, query_lengths=lengths,
+            dataset_parts = by_dataset.get(dataset, {})
+            report_blocks = routing is not None and not records_index and not routing.sealed
+            scan_sealed = records_index and routing.sealed
+            paf = routing.reference_scan_path(relative) if scan_sealed else root / relative
+            for hit in read_paf(paf, query_lengths=lengths,
                                 target_lengths=reference_lengths, artifact=relative, record_observer=observer):
-                key = SourceKey(dataset, hit.query_name)
-                if key not in by_source:
+                source = dataset_parts.get(hit.query_name)
+                if source is None:
                     continue
-                source_parts, ends = by_source[key]
-                used = False
+                previous_part = None
+                mapq = hit.mapping_quality
                 qualified_reference = hit.matches / hit.block_length >= DISCOVERY_REFERENCE_IDENTITY
-                for block in hit.aligned_blocks():
-                    offset = bisect_right(ends, block.query.start)
-                    while offset < len(source_parts) and source_parts[offset].interval.start < block.query.end:
-                        part = source_parts[offset]
-                        offset += 1
-                        overlap = part.interval.intersection(block.query)
-                        if overlap is None:
-                            continue
-                        if hit.strand == "+":
-                            target = Interval(block.target.start + overlap.start - block.query.start,
-                                              block.target.start + overlap.end - block.query.start)
-                        else:
-                            target = Interval(block.target.start + block.query.end - overlap.end,
-                                              block.target.start + block.query.end - overlap.start)
-                        if block.operation != "X" and qualified_reference:
-                            reference_routable_parts.add(part.segment_id)
-                            if reference_routable_footprints is not None:
-                                footprint_key = (part.segment_id, hit.target_name)
-                                if footprint_key not in reference_routable_footprints:
-                                    reference_routable_footprints[footprint_key] = _IntervalUnion()
-                                reference_routable_footprints[footprint_key].append(overlap)
-                        if (routing is not None and not records_index and not routing.sealed and block.operation != "X"
-                                and qualified_reference):
-                            routing.observe(part.segment_id, hit.target_name,
-                                            Interval(overlap.start-part.interval.start, overlap.end-part.interval.start),
-                                            target, hit.strand)
+                qualified_discovery = qualified_reference and mapq is not None and mapq >= DISCOVERY_REFERENCE_MAPQ
+                for part, overlap, target, operation in _reference_blocks(hit, *source):
+                    if part is not previous_part:
+                        # Consecutive CIGAR blocks in the same source part
+                        # share this row; evidence/MAPQ need recording once.
                         identity = (part.segment_id, hit.target_name, hit.strand)
                         row = accumulated.get(identity)
                         if row is None:
                             row = {"query": _IntervalUnion(), "target": _IntervalUnion(),
                                    "evidence": set(), "maximum_mapq": None, "discovery_query": _IntervalUnion()}
                             accumulated[identity] = row
-                        row["query"].append(overlap)
-                        row["target"].append(target)
-                        if (block.operation != "X" and hit.mapping_quality is not None
-                                and hit.mapping_quality >= DISCOVERY_REFERENCE_MAPQ
-                                and qualified_reference):
-                            row["discovery_query"].append(overlap)
                         row["evidence"].add(hit.evidence_id)
-                        if (hit.mapping_quality is not None
-                                and (row["maximum_mapq"] is None or hit.mapping_quality > row["maximum_mapq"])):
-                            row["maximum_mapq"] = hit.mapping_quality
-                        used = True
-                if used:
+                        if mapq is not None and (row["maximum_mapq"] is None or mapq > row["maximum_mapq"]):
+                            row["maximum_mapq"] = mapq
+                        previous_part = part
+                        footprint = None
+                    row["query"].append(overlap)
+                    row["target"].append(target)
+                    if operation == "X" or not qualified_reference:
+                        continue
+                    if reference_routable_footprints is not None and footprint is None:
+                        footprint_key = (part.segment_id, hit.target_name)
+                        footprint = reference_routable_footprints.get(footprint_key)
+                        if footprint is None:
+                            footprint = reference_routable_footprints[footprint_key] = _IntervalUnion()
+                    if reference_routable_footprints is not None:
+                        footprint.append(overlap)
+                    reference_routable_parts.add(part.segment_id)
+                    if report_blocks:
+                        routing.observe(part.segment_id, hit.target_name,
+                                        Interval(overlap.start-part.interval.start, overlap.end-part.interval.start),
+                                        target, hit.strand)
+                    if qualified_discovery:
+                        row["discovery_query"].append(overlap)
+                if previous_part is not None:
                     payload["evidence"][hit.evidence_id] = evidence_ref(hit)
+            if scan_sealed:
+                routing.verify_inputs()
         if routing is not None:
             routing_report = routing.build_report() if routing.sealed else routing.seal()
     finally:

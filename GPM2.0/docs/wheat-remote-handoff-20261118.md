@@ -3463,3 +3463,34 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   回归覆盖已有raw/投影无重算、恶意/损坏的匹配digest记录仍因错误window长/无效UTF-8拒绝、
   不新增带错误证据的projection成功标记。`test_q0*.py`共307项（306通过、1跳过）；不跑CI发布。
   当前仅提交仓库，**未改或重启43012037**；未测该去重对整麦的提速，不和加载路径小样本倍率混算。
+
+### 2026-11-22 15:16：参考证据目录精确提速；核实当前 reader 的真实位置
+
+- 原`build_catalog`对完整落在同一原始source part内的命中，仍逐个CIGAR配对块二分查找、
+  求交和重建已正确的两侧坐标。现在用整个query envelope的包含关系只选择快速路径；**绝不把
+  envelope当覆盖**。每个实际M/=/X块、真实偏移和方向、全部证据ID及MAPQ/qualified规则不变。
+  跨part/N gap仍逐块裁剪，纯I/D不新增候选；相同part的证据集合/最大MAPQ不按块重复更新。
+- **43012908 / agent-X86-47 / SUCCEEDED，15:11:35**。两套真实小麦参考PAF有界分段样本
+  （34,168条证据、779条完整原source记录，未重跑mapper），在同一节点重用真实sealed index，
+  冻结`ac670f24`旧目录builder与候选builder做ABBA。A=38.512/44.398秒，B=26.575/26.734秒，
+  **目录构建样本wall减少35.7%（1.555倍）**。完整catalog payload/每条证据、routable parts、
+  按source/chromosome的footprint与index报告总摘要四次完全一致：
+  `e28d1eca405d004efa781e9d1e001915ec982e8648f07b59002c6592995a37bb`。
+  `reference-catalog-source-fast-path-native-20261122.json` SHA
+  `1789785f7e060309686e1481f3f16cd38e363481c761770c411445f3cc09bbe5`。
+  这是前置目录构建的有界样本，不是整麦或61k窗口mapper的倍率。
+- 同时修复已封存ReferenceIndex缓存命中时的重复共享盘I/O：此前`open`已按内容校验并复制原
+  PAF至节点本地，catalog却重新从共享原路径顺序读一遍。现在读取**已验证的同字节本地镜像**，
+  证据仍记录原PAF相对路径/行号/hash；镜像或原件在扫描中漂移都拒绝，fresh index及无镜像
+  保留原读取路径。此镜像修改不在上面ABBA测速候选中，不能与35.7%相加。
+- 聚焦测试17项通过；挂载目录完整套件出现2次读取builder小文件`Errno 12`，分别重测通过。
+  用相同四个候选源/测试文件及真实仓库基线在独立Linux磁盘冻结的**完整310项q0套件：
+  309通过、1跳过**。未跳过失败测试或改降验证。两项改动不改变raw/project key与mapper
+  精度；最终prepared manifest仍绑定新的真实builder身份，不冒用旧manifest。
+- **15:14:48新版43012037**仍RUNNING/q0_evidence，25项初始缓存已复用、无本轮失败、
+  RSS统计59713MiB、recent CPU约99%，未开始记录区域池吞吐。**旧42523432**仍RUNNING/grt_step2，
+  未改。主节点agent-X86-39重新有16个CPU槽后，已提交独立1CPU只读诊断**43012967**，
+  索引`/tmp/q0-reader-openfile-sample-current.json`；只采样当前主job拥有者/reader的进程、
+  打开文件/offset元数据，不读序列、不附加调试器、不暂停或重启主任务。
+- 当前主reader仍旧冻结版本；前置已经运行很久，不能为这个建设性优化再重做已付出的扫描。
+  新代码进master供后续切换或续跑，仍以现场实际阶段、吞吐和净收益决定是否安装。

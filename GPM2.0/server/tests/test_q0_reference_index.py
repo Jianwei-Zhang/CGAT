@@ -3,6 +3,7 @@ from pathlib import Path
 import random
 import tempfile
 import unittest
+from unittest import mock
 
 from server.tools.lgz_core.q0_alignments import read_paf, parse_paf_line
 from server.tools.lgz_core.q0_catalog import build_catalog
@@ -95,6 +96,40 @@ class ReferenceIndexTests(unittest.TestCase):
             index.close()
             with self.assertRaisesRegex(Q0EvidenceError,"local reference PAF bytes differ"):
                 ReferenceIndex.open(root/"index.sqlite",root,parts,refs,local_paf_directory=mirrors)
+
+    def test_catalog_scans_bound_mirror_but_preserves_original_evidence_identity(self):
+        from server.tools.lgz_core import q0_catalog
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sources, parts, ids, refs, original = self.fixture(root)
+            db = root / "index.sqlite"
+            before = build_catalog(root,sources,refs,[],regional_factory=lambda p,r:ReferenceIndex.create(db,root,p,r))
+            mirrors = root / "local-pafs"; mirrors.mkdir()
+            with mock.patch.object(q0_catalog,"read_paf",wraps=read_paf) as scan:
+                after = build_catalog(root,sources,refs,[],regional_factory=lambda p,r:ReferenceIndex.open(db,root,p,r,local_paf_directory=mirrors))
+            self.assertEqual(scan.call_count,1)
+            self.assertEqual(scan.call_args.args[0].parent,mirrors)
+            self.assertEqual(scan.call_args.kwargs["artifact"],original.relative_to(root).as_posix())
+            self.assertEqual(after.payload,before.payload)
+            self.assertEqual(after.reference_routable_footprints,before.reference_routable_footprints)
+            self.assertEqual(after.regional_index_report,before.regional_index_report)
+
+    def test_catalog_rejects_original_or_mirror_drift_during_sealed_scan(self):
+        from server.tools.lgz_core import q0_catalog
+
+        for side,error in (("original","indexed reference input changed"),("mirror","local indexed reference mirror changed")):
+            with self.subTest(side=side), tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);sources,parts,ids,refs,original=self.fixture(root)
+                db=root/"index.sqlite";mirrors=root/"local-pafs";mirrors.mkdir()
+                build_catalog(root,sources,refs,[],regional_factory=lambda p,r:ReferenceIndex.create(db,root,p,r))
+                def scan_and_drift(path,**kwargs):
+                    yield from read_paf(path,**kwargs)
+                    changed = original if side=="original" else path
+                    changed.write_bytes(changed.read_bytes()+b"\n")
+                with mock.patch.object(q0_catalog,"read_paf",side_effect=scan_and_drift):
+                    with self.assertRaisesRegex(Q0EvidenceError,error):
+                        build_catalog(root,sources,refs,[],regional_factory=lambda p,r:ReferenceIndex.open(db,root,p,r,local_paf_directory=mirrors))
 
     def test_unsealed_and_changed_bindings_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

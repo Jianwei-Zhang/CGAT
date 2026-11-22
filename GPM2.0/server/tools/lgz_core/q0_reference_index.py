@@ -291,6 +291,17 @@ class ReferenceIndex:
             if _signature(self.mirrors[relative]) != signature:
                 raise Q0EvidenceError("local indexed reference mirror changed during lookup")
 
+    def reference_scan_path(self, relative: str) -> Path:
+        """Return a validated byte-identical scan path for a sealed artifact.
+
+        Call ``verify_inputs`` again after the sequential scan. The original
+        relative PAF path, not the private mirror, remains the evidence identity.
+        """
+        if not self.sealed or relative not in self.files:
+            raise Q0EvidenceError("reference scan requires a bound sealed artifact")
+        self.verify_inputs()
+        return self.mirrors[relative] if relative in self.mirrors else self._artifact(relative)
+
     def _hit(self, row):
         number, source, ref, qs, qe, ts, te, file, offset, size, line, digest = row
         cached = self.cache.get(number)
