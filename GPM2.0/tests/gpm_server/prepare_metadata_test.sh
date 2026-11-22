@@ -17,8 +17,19 @@ mkdir -p "$FAKE_BIN"
 REAL_PYTHON="$(command -v python3)"
 cat > "${FAKE_BIN}/python3" <<EOF
 #!/usr/bin/env bash
-if [[ "\${1:-}" == */post_lgz_degap.py && "\${2:-}" == --check-environment ]]; then
-  exit 0  # Environment checker has separate unit coverage; this is a fake-tool plan test.
+if [[ "\${1:-}" == */post_lgz_refinement.py && "\${2:-}" == --check-environment ]]; then
+  # Exercise the real reads/tool validation, replacing only the locked runtime
+  # probe because this preparation fixture supplies fake external commands.
+  exec "$REAL_PYTHON" -c '
+import sys
+from pathlib import Path
+sys.argv = sys.argv[1:]
+sys.path.insert(0, str(Path(sys.argv[0]).parent))
+import refinement_config
+refinement_config.validate_runtime = lambda **kwargs: None
+from post_lgz_refinement import main
+sys.exit(main())
+' "\$@"
 fi
 exec "$REAL_PYTHON" "\$@"
 EOF
@@ -132,9 +143,10 @@ write_multi_fasta "$ref" "Chr01" "AAAAAAAAAAAAAAAAAAAA"
 write_multi_fasta "$ds" "tig_add" "AAAAAAAAAAAAAAAAAAAA"
 write_multi_fasta "$cen" "Chr01_centromere" "AAAAAAAAAA"
 
-mkdir -p "${output_root}/data/reference" "${output_root}/data/datasets"
-printf 'stale_ref\t1\t0\t1\t2\n' > "${output_root}/data/reference/ref_add_options.fa.fai"
-printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/data/datasets/ds_add.fa.fai"
+python3 "${REPO_ROOT}/server/tools/workspace_layout.py" --server-dir "$output_root" --initialize >/dev/null
+mkdir -p "${output_root}/01_inputs/01_reference" "${output_root}/01_inputs/02_assemblies"
+printf 'stale_ref\t1\t0\t1\t2\n' > "${output_root}/01_inputs/01_reference/ref_add_options.fa.fai"
+printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/01_inputs/02_assemblies/ds_add.fa.fai"
 
 (
   cd "$TMP_DIR"
@@ -149,7 +161,7 @@ printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/data/datasets/ds_add.fa.fai"
     -o "$output_root" >/dev/null
 )
 
-metadata_path="${output_root}/metadata/prepare_options.tsv"
+metadata_path="${output_root}/.runtime/metadata/prepare_options.tsv"
 [[ -f "$metadata_path" ]] || {
   echo "expected file: $metadata_path" >&2
   exit 1
@@ -171,7 +183,7 @@ assert_prepare_option "$metadata_path" cen_min_len 10000
 assert_prepare_option "$metadata_path" cen_min_identity 80
 assert_prepare_option "$metadata_path" grt_reads_qc_enabled false
 assert_prepare_option "$metadata_path" grt_reads_qc_mode standard
-! grep -F -- " --reads " "${output_root}/prepare_lgz_inputs.sh" >/dev/null || {
+! grep -F -- " --reads " "${output_root}/.runtime/commands/prepare_lgz_inputs.sh" >/dev/null || {
   echo "no-reads prepare generated an unexpected --reads argument" >&2
   exit 1
 }
@@ -196,7 +208,7 @@ PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --skip-self \
   -o "$auto_output_root" >/dev/null
 
-grep -q $'^Reference_Sample\t' "${auto_output_root}/metadata/reference.tsv" || {
+grep -q $'^Reference_Sample\t' "${auto_output_root}/.runtime/metadata/reference.tsv" || {
   echo "reference name was not inferred from the FASTA filename" >&2
   exit 1
 }
@@ -205,16 +217,16 @@ awk -F '\t' '
   NR == 3 && $1 != "manual.support" { bad = 1 }
   NR == 4 && $1 != "support-v1" { bad = 1 }
   END { exit (!bad && NR == 4) ? 0 : 1 }
-' "${auto_output_root}/metadata/datasets.tsv" || {
+' "${auto_output_root}/.runtime/metadata/datasets.tsv" || {
   echo "inferred and explicit dataset names did not preserve input order" >&2
-  cat "${auto_output_root}/metadata/datasets.tsv" >&2
+  cat "${auto_output_root}/.runtime/metadata/datasets.tsv" >&2
   exit 1
 }
-[[ -f "${auto_output_root}/data/reference/Reference_Sample.fa" ]] || {
+[[ -f "${auto_output_root}/01_inputs/01_reference/Reference_Sample.fa" ]] || {
   echo "inferred reference name was not used for the packaged FASTA" >&2
   exit 1
 }
-[[ -f "${auto_output_root}/data/datasets/primary_assembly.fa" ]] || {
+[[ -f "${auto_output_root}/01_inputs/02_assemblies/primary_assembly.fa" ]] || {
   echo "inferred primary dataset name was not used for the packaged FASTA" >&2
   exit 1
 }
@@ -244,30 +256,31 @@ grep -F "Duplicate dataset name: same" "${TMP_DIR}/duplicate-inferred-name.err" 
   exit 1
 }
 
-plan_path="${output_root}/.run_all/plan.tsv"
+plan_path="${output_root}/.runtime/run_all/plan.tsv"
 [[ -f "$plan_path" ]] || {
   echo "expected generated run_all plan: $plan_path" >&2
   exit 1
 }
 grep -F $'unit_id\tcommand_relpath\tdetail_log_relpath' "$plan_path" >/dev/null
-[[ "$(tail -n +2 "$plan_path" | wc -l)" -eq 12 ]] || {
-  echo "expected 12 units in generated run_all plan" >&2
+[[ "$(tail -n +2 "$plan_path" | wc -l)" -eq 13 ]] || {
+  echo "expected 13 units in generated run_all plan" >&2
   exit 1
 }
 expected_plan="$(cat <<'EOF'
 unit_id	command_relpath	detail_log_relpath
-ref:ds_add	runs/ds_add_vs_ref/command.sh	runs/ds_add_vs_ref/stderr.log
-assign	assign_chr_groups.sh	logs/run_all.log
-q0_chr:Chr01	runs/chr_Chr01/q0_command.sh	logs/run_all.log
-q0_evidence	prepare_q0_evidence.sh	logs/run_all.log
-grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
-grt_step1	run_lgz_step1.sh	logs/run_all.log
-grt_step2	run_lgz_step2.sh	logs/run_all.log
-grt_step3	run_lgz_step3.sh	logs/run_all.log
-chr:Chr01	runs/chr_Chr01/command.sh	logs/run_all.log
-finalize_evidence	finalize_lgz_evidence.sh	logs/run_all.log
-package_full	package_full_zip.sh	logs/run_all.log
-package_light	package_light_zip.sh	logs/run_all.log
+ref:ds_add	02_alignments/ds_add_vs_ref/command.sh	02_alignments/ds_add_vs_ref/stderr.log
+assign	.runtime/commands/assign_chr_groups.sh	.runtime/logs/run_all.log
+q0_chr:Chr01	02_alignments/chr_Chr01/q0_command.sh	.runtime/logs/run_all.log
+q0_evidence	.runtime/commands/prepare_q0_evidence.sh	.runtime/logs/run_all.log
+grt_prepare	.runtime/commands/prepare_lgz_inputs.sh	.runtime/logs/run_all.log
+grt_step1	.runtime/commands/run_lgz_step1.sh	.runtime/logs/run_all.log
+grt_step2	.runtime/commands/run_lgz_step2.sh	.runtime/logs/run_all.log
+grt_step3	.runtime/commands/run_lgz_step3.sh	.runtime/logs/run_all.log
+chr:Chr01	02_alignments/chr_Chr01/command.sh	.runtime/logs/run_all.log
+finalize_evidence	.runtime/commands/finalize_lgz_evidence.sh	.runtime/logs/run_all.log
+refinement	.runtime/commands/run_refinement.sh	.runtime/logs/run_all.log
+package_full	.runtime/commands/package_full_zip.sh	.runtime/logs/run_all.log
+package_light	.runtime/commands/package_light_zip.sh	.runtime/logs/run_all.log
 EOF
 )"
 [[ "$(cat "$plan_path")" == "$expected_plan" ]] || {
@@ -275,20 +288,20 @@ EOF
   cat "$plan_path" >&2
   exit 1
 }
-grep -F -- '.prepare_lib/tools/run_all_runner.py' "${output_root}/run_all.sh" >/dev/null
+cmp "${REPO_ROOT}/server/lib/run_all_launcher.sh" "${output_root}/run_all.sh"
 ! grep -q '^bash ' "${output_root}/run_all.sh" || {
   echo "generated run_all.sh still contains a static bash chain" >&2
   exit 1
 }
-[[ -f "${output_root}/.prepare_lib/tools/run_all_runner.py" ]] || {
+[[ -f "${output_root}/.runtime/prepared/tools/run_all_runner.py" ]] || {
   echo "generated workspace is missing run_all_runner.py" >&2
   exit 1
 }
-[[ -f "${output_root}/.prepare_lib/tools/reference_segments.py" ]] || {
+[[ -f "${output_root}/.runtime/prepared/tools/reference_segments.py" ]] || {
   echo "generated workspace is missing reference_segments.py" >&2
   exit 1
 }
-[[ -f "${output_root}/.prepare_lib/lib/incremental_common.sh" ]] || {
+[[ -f "${output_root}/.runtime/prepared/lib/incremental_common.sh" ]] || {
   echo "generated workspace is missing incremental shell helpers" >&2
   exit 1
 }
@@ -299,46 +312,51 @@ for tool_name in \
   promote_server_stage.py \
   render_template.py \
   validate_add_dataset_stage.py; do
-  [[ -f "${output_root}/.prepare_lib/tools/${tool_name}" ]] || {
+  [[ -f "${output_root}/.runtime/prepared/tools/${tool_name}" ]] || {
     echo "generated workspace is missing ${tool_name}" >&2
     exit 1
   }
 done
-cmp "${REPO_ROOT}/server/templates/add_dataset.sh" "${output_root}/add_dataset.sh"
-cmp "${REPO_ROOT}/server/templates/add_ctg.sh" "${output_root}/add_ctg.sh"
-bash -n "${output_root}/add_dataset.sh"
-bash -n "${output_root}/add_ctg.sh"
-grep -F -- '.prepare_lib/tools/assign_chr_groups.py' "${output_root}/assign_chr_groups.sh" >/dev/null
-! grep -Eq '__[A-Z][A-Z0-9_]*__' "${output_root}/assign_chr_groups.sh" || {
+for entry in add_dataset add_ctg; do
+  rendered="${TMP_DIR}/expected-${entry}.sh"
+  cp "${REPO_ROOT}/server/templates/${entry}.sh" "$rendered"
+  python3 "${REPO_ROOT}/server/tools/workspace_layout.py" --server-dir "$output_root" \
+    --render-shell "$rendered" --logical-script "${entry}.sh"
+  cmp "$rendered" "${output_root}/.runtime/commands/${entry}.sh"
+done
+bash -n "${output_root}/.runtime/commands/add_dataset.sh"
+bash -n "${output_root}/.runtime/commands/add_ctg.sh"
+grep -F -- '.runtime/prepared/tools/assign_chr_groups.py' "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
+! grep -Eq '__[A-Z][A-Z0-9_]*__' "${output_root}/.runtime/commands/assign_chr_groups.sh" || {
   echo "generated assignment script contains an unresolved template variable" >&2
   exit 1
 }
-[[ -f "${output_root}/.prepare_lib/tools/grt_core/__init__.py" ]] || {
+[[ -f "${output_root}/.runtime/prepared/tools/grt_core/__init__.py" ]] || {
   echo "generated workspace is missing the recursive grt_core package" >&2
   exit 1
 }
-[[ -f "${output_root}/.prepare_lib/tools/grt_core/stage_replay.py" ]] || {
+[[ -f "${output_root}/.runtime/prepared/tools/grt_core/stage_replay.py" ]] || {
   echo "generated workspace is missing grt_core stage services" >&2
   exit 1
 }
-[[ -f "${output_root}/.prepare_lib/tools/grt_core/contract/validator.py" ]] || {
+[[ -f "${output_root}/.runtime/prepared/tools/grt_core/contract/validator.py" ]] || {
   echo "generated workspace is missing the recursive grt_core contract package" >&2
   exit 1
 }
-python3 "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py" --help >/dev/null
+python3 "${output_root}/.runtime/prepared/tools/grt_prepare_inputs.py" --help >/dev/null
 
-[[ ! -e "${output_root}/.prepare_lib/tools/grt_step12.py" ]]
-[[ -f "${output_root}/.prepare_lib/tools/grt_core/step1_engine.py" ]]
-[[ -f "${output_root}/.prepare_lib/tools/grt_core/step2_engine.py" ]]
-python3 "${output_root}/.prepare_lib/tools/grt_step1.py" --help >/dev/null
-python3 "${output_root}/.prepare_lib/tools/grt_step2.py" --help >/dev/null
-python3 "${output_root}/.prepare_lib/tools/grt_step3.py" --help >/dev/null
-python3 "${output_root}/.prepare_lib/tools/grt_evidence_package.py" --help >/dev/null
-python3 "${output_root}/.prepare_lib/tools/grt_contract.py" --help >/dev/null
+[[ ! -e "${output_root}/.runtime/prepared/tools/grt_step12.py" ]]
+[[ -f "${output_root}/.runtime/prepared/tools/grt_core/step1_engine.py" ]]
+[[ -f "${output_root}/.runtime/prepared/tools/grt_core/step2_engine.py" ]]
+python3 "${output_root}/.runtime/prepared/tools/grt_step1.py" --help >/dev/null
+python3 "${output_root}/.runtime/prepared/tools/grt_step2.py" --help >/dev/null
+python3 "${output_root}/.runtime/prepared/tools/grt_step3.py" --help >/dev/null
+python3 "${output_root}/.runtime/prepared/tools/grt_evidence_package.py" --help >/dev/null
+python3 "${output_root}/.runtime/prepared/tools/grt_contract.py" --help >/dev/null
 
-[[ -f "${output_root}/run_lgz_step1.sh" ]]
+[[ -f "${output_root}/.runtime/commands/run_lgz_step1.sh" ]]
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
-  "${output_root}/run_lgz_step1.sh" "${output_root}/run_lgz_step2.sh" >/dev/null
+  "${output_root}/.runtime/commands/run_lgz_step1.sh" "${output_root}/.runtime/commands/run_lgz_step2.sh" >/dev/null
 
 no_chmod_bin="${TMP_DIR}/no-chmod-bin"
 no_chmod_log="${TMP_DIR}/no-chmod.log"
@@ -419,22 +437,23 @@ PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ds ds_reads_qc "$ds" \
   --hifi "$reads" \
   -o "$reads_output_root" >/dev/null
-reads_metadata_path="${reads_output_root}/metadata/prepare_options.tsv"
+reads_metadata_path="${reads_output_root}/.runtime/metadata/prepare_options.tsv"
 assert_prepare_option "$reads_metadata_path" grt_reads_qc_enabled false
-assert_prepare_option "$reads_metadata_path" reads_purpose post_lgz_degap_v1
-assert_prepare_option "$reads_metadata_path" degap_reads_type hifi
-! grep -F -- " --reads " "${reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
+! grep -F -- " --reads " "${reads_output_root}/.runtime/commands/prepare_lgz_inputs.sh" >/dev/null
 python3 - "$reads_output_root" "$reads" <<'PYREADS'
 import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
-config = json.loads((root / "metadata/degap_inputs.json").read_text())
-assert config["schema_version"] == 2
-assert config["hifi"] == [sys.argv[2]]
-assert config["ont"] == []
-units = [line.split("\t")[0] for line in (root / ".run_all/plan.tsv").read_text().splitlines()[1:]]
-assert units.index("grt_step3") < units.index("degap_gapfill") < units.index("finalize_evidence")
-assert (root / ".prepare_lib/tools/post_lgz_degap.py").is_file()
+config = json.loads((root / ".runtime/refinement/config.json").read_text())
+assert config["schema"] == "cgat.refinement-config" and config["schema_version"] == 1
+assert config["tools"] is None  # The configured default is DEGAP when reads exist.
+assert config["groups"]["hifi"] == [sys.argv[2]]
+assert config["groups"]["ont"] == []
+units = [line.split("\t")[0] for line in (root / ".runtime/run_all/plan.tsv").read_text().splitlines()[1:]]
+assert units.index("refinement") == units.index("finalize_evidence") + 1
+assert units.index("package_full") == units.index("refinement") + 1
+assert "degap_gapfill" not in units
+assert (root / ".runtime/prepared/tools/post_lgz_refinement.py").is_file()
 PYREADS
 
 for invalid_args in "missing" "invalid" "orphan" "empty-hifi" "empty-ont"; do
@@ -459,22 +478,21 @@ PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --hifi "$reads" \
   --hifi "$reads_second" \
   -o "$multiple_reads_output_root" >/dev/null
-assert_prepare_option "${multiple_reads_output_root}/metadata/prepare_options.tsv" grt_reads_qc_enabled false
-! grep -F -- " --reads " "${multiple_reads_output_root}/prepare_lgz_inputs.sh" >/dev/null
-python3 - "${multiple_reads_output_root}/metadata/degap_inputs.json" "$reads" "$reads_second" <<'PYREADS'
+assert_prepare_option "${multiple_reads_output_root}/.runtime/metadata/prepare_options.tsv" grt_reads_qc_enabled false
+! grep -F -- " --reads " "${multiple_reads_output_root}/.runtime/commands/prepare_lgz_inputs.sh" >/dev/null
+python3 - "${multiple_reads_output_root}/.runtime/refinement/config.json" "$reads" "$reads_second" <<'PYREADS'
 import json, sys
-assert json.load(open(sys.argv[1]))["hifi"] == sys.argv[2:]
+assert json.load(open(sys.argv[1]))["groups"]["hifi"] == sys.argv[2:]
 PYREADS
 
 mixed_output_root="${TMP_DIR}/mixed-reads-gpm-server"
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_mixed "$ref" --ds ds_mixed "$ds" --hifi "$reads" --ont "$reads_second" \
   -o "$mixed_output_root" >/dev/null
-assert_prepare_option "${mixed_output_root}/metadata/prepare_options.tsv" degap_reads_type mixed
-python3 - "${mixed_output_root}/metadata/degap_inputs.json" "$reads" "$reads_second" <<'PYREADS'
+python3 - "${mixed_output_root}/.runtime/refinement/config.json" "$reads" "$reads_second" <<'PYREADS'
 import json, sys
 value = json.load(open(sys.argv[1]))
-assert value["hifi"] == [sys.argv[2]] and value["ont"] == [sys.argv[3]]
+assert value["groups"]["hifi"] == [sys.argv[2]] and value["groups"]["ont"] == [sys.argv[3]]
 PYREADS
 ! "$PREPARE_BASH" "$SCRIPT" --help | grep -F 'shared Meryl database' >/dev/null
 
@@ -554,7 +572,7 @@ GPM_TEST_MUMMER_HELP=$'-l    sequence-length option' \
   --ds ds_delta_l_only "$ds" \
   -o "$delta_l_only_output" \
   >/dev/null
-[[ -f "${delta_l_only_output}/metadata/package.tsv" ]] || {
+[[ -f "${delta_l_only_output}/.runtime/metadata/package.tsv" ]] || {
   echo "delta-filter with required -l but no unused -r did not pass preflight" >&2
   exit 1
 }
@@ -599,11 +617,11 @@ fi
 grep -F 'legacy-only' \
   "${TMP_DIR}/full-missing-craq.err" >/dev/null
 
-grep -q $'^Chr01\t20\t' "${output_root}/data/reference/ref_add_options.fa.fai" || {
+grep -q $'^Chr01\t20\t' "${output_root}/01_inputs/01_reference/ref_add_options.fa.fai" || {
   echo "reference .fai was not regenerated from the current FASTA" >&2
   exit 1
 }
-grep -q $'^tig_add\t20\t' "${output_root}/data/datasets/ds_add.fa.fai" || {
+grep -q $'^tig_add\t20\t' "${output_root}/01_inputs/02_assemblies/ds_add.fa.fai" || {
   echo "dataset .fai was not regenerated from the current FASTA" >&2
   exit 1
 }
@@ -611,29 +629,29 @@ grep -q $'^tig_add\t20\t' "${output_root}/data/datasets/ds_add.fa.fai" || {
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   --ref default_tar_ref "$ref" --ds default_tar_ds "$ds" \
   -t 7 -o "${TMP_DIR}/default-tar-output" >"${TMP_DIR}/default-tar.stdout"
-assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" archive_format tar.gz
-assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" threads 7
-grep -F "${TMP_DIR}/default-tar-output.tar.gz" "${TMP_DIR}/default-tar.stdout" >/dev/null
+assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" archive_format tar.gz
+assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" threads 7
+grep -F "${TMP_DIR}/default-tar-output/07_delivery/00_lgz/default-tar-output.tar.gz" "${TMP_DIR}/default-tar.stdout" >/dev/null
 if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format unknown >/dev/null 2>&1; then
   echo "expected invalid archive format to fail" >&2
   exit 1
 fi
 
-assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_refill_max_length 1000000
-assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_execution_profile optimized
-assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_step1_mummer_scope full
-assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_step2_mummer_scope gap-screen
-grep -F -- "--execution-profile optimized --step1-mummer-scope full" "${TMP_DIR}/default-tar-output/run_lgz_step1.sh" >/dev/null
-grep -F -- "--execution-profile optimized --step2-mummer-scope gap-screen" "${TMP_DIR}/default-tar-output/run_lgz_step2.sh" >/dev/null
+assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" grt_refill_max_length 1000000
+assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" grt_execution_profile optimized
+assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" grt_step1_mummer_scope full
+assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" grt_step2_mummer_scope gap-screen
+grep -F -- "--execution-profile optimized --step1-mummer-scope full" "${TMP_DIR}/default-tar-output/.runtime/commands/run_lgz_step1.sh" >/dev/null
+grep -F -- "--execution-profile optimized --step2-mummer-scope gap-screen" "${TMP_DIR}/default-tar-output/.runtime/commands/run_lgz_step2.sh" >/dev/null
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   --ref refill_ref "$ref" --ds refill_ds "$ds" --max-fill 2000000 \
   --grt-execution-profile baseline --grt-step2-mummer-scope full \
   -o "${TMP_DIR}/refill-output" >/dev/null
-assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_refill_max_length 2000000
-assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_execution_profile baseline
-assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_step2_mummer_scope full
-grep -F -- "--execution-profile baseline --step2-mummer-scope full" "${TMP_DIR}/refill-output/run_lgz_step2.sh" >/dev/null
-grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/run_lgz_step2.sh" >/dev/null
+assert_prepare_option "${TMP_DIR}/refill-output/.runtime/metadata/prepare_options.tsv" grt_refill_max_length 2000000
+assert_prepare_option "${TMP_DIR}/refill-output/.runtime/metadata/prepare_options.tsv" grt_execution_profile baseline
+assert_prepare_option "${TMP_DIR}/refill-output/.runtime/metadata/prepare_options.tsv" grt_step2_mummer_scope full
+grep -F -- "--execution-profile baseline --step2-mummer-scope full" "${TMP_DIR}/refill-output/.runtime/commands/run_lgz_step2.sh" >/dev/null
+grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/.runtime/commands/run_lgz_step2.sh" >/dev/null
 for invalid_limit in 0 -1 1.5 nope; do
   if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --max-fill "$invalid_limit" >/dev/null 2>&1; then
     echo "expected invalid refill limit to fail: $invalid_limit" >&2
@@ -653,19 +671,19 @@ source, ref, ds, temp = sys.argv[1:]
 root = Path(temp) / "entry-workspace"
 argv = ["--ref", "ref", ref, "--ds", "ds", ds, "-o", str(root)]
 def run_checked(runner):
-    assert (root / ".run_all/lock/owner.json").is_file()
-    assert json.loads((root / ".run_all/launch.json").read_text())["prepared"]
-    assert (root / "logs/prepare.log").stat().st_size > 0
+    assert (root / ".runtime/run_all/lock/owner.json").is_file()
+    assert json.loads((root / ".runtime/run_all/launch.json").read_text())["prepared"]
+    assert (root / ".runtime/logs/prepare.log").stat().st_size > 0
     rejected = subprocess.run(["bash", str(Path(source) / "prepare.sh"), *argv], capture_output=True)
     assert rejected.returncode != 0 and b"workspace is locked" in rejected.stderr
     return 7
 with patch.object(server_run.Runner, "run", run_checked):
     assert server_run.execute(argv, Path(source)) == 7
-    manifest = (root / ".run_all/launch.json").read_bytes()
+    manifest = (root / ".runtime/run_all/launch.json").read_bytes()
     with patch.object(server_run, "prepare_workspace", side_effect=AssertionError("must resume")):
         assert server_run.execute(argv, Path(source)) == 7
-    assert (root / ".run_all/launch.json").read_bytes() == manifest
-assert not (root / ".run_all/lock").exists()
+    assert (root / ".runtime/run_all/launch.json").read_bytes() == manifest
+assert not (root / ".runtime/run_all/lock").exists()
 PYENTRY
 
 echo "gpm_server_prepare_metadata_test.sh: ok"

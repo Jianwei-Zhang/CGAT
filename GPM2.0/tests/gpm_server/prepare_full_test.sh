@@ -13,8 +13,19 @@ mkdir -p "$FAKE_BIN"
 REAL_PYTHON="$(command -v python3)"
 cat > "${FAKE_BIN}/python3" <<EOF
 #!/usr/bin/env bash
-if [[ "\${1:-}" == */post_lgz_degap.py && "\${2:-}" == --check-environment ]]; then
-  exit 0  # Environment checker has separate unit coverage; this is a fake-tool plan test.
+if [[ "\${1:-}" == */post_lgz_refinement.py && "\${2:-}" == --check-environment ]]; then
+  # Exercise the real reads/tool validation, replacing only the locked runtime
+  # probe because this preparation fixture supplies fake external commands.
+  exec "$REAL_PYTHON" -c '
+import sys
+from pathlib import Path
+sys.argv = sys.argv[1:]
+sys.path.insert(0, str(Path(sys.argv[0]).parent))
+import refinement_config
+refinement_config.validate_runtime = lambda **kwargs: None
+from post_lgz_refinement import main
+sys.exit(main())
+' "\$@"
 fi
 exec "$REAL_PYTHON" "\$@"
 EOF
@@ -229,7 +240,7 @@ test_score_option_sets_chr_assignment_threshold() {
     --score 72 \
     -o "$output_root" >/dev/null
 
-  assert_package_metadata "${output_root}/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned" "72"
+  assert_package_metadata "${output_root}/.runtime/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned" "72"
 
   local short_output_root="${TMP_DIR}/score_short_gpm_server"
   PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
@@ -238,7 +249,7 @@ test_score_option_sets_chr_assignment_threshold() {
     -s 65 \
     -o "$short_output_root" >/dev/null
 
-  assert_package_metadata "${short_output_root}/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned" "65"
+  assert_package_metadata "${short_output_root}/.runtime/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned" "65"
 }
 
 test_minimap_options_set_preset_and_threads() {
@@ -260,24 +271,24 @@ test_minimap_options_set_preset_and_threads() {
     --threads 12 \
     -o "$output_root" >/dev/null
 
-  grep -F 'minimap2 -c -x asm5 -K "${GPM_RUN_MINIMAP_BATCH:-1G}" -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
+  grep -F 'minimap2 -c -x asm5 -K "${GPM_RUN_MINIMAP_BATCH:-1G}" -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/02_alignments/ds_a_vs_ref/command.sh" >/dev/null || {
     echo "expected ds-vs-ref command to emit CIGAR (-c), use asm5, default K1G and 12 threads" >&2
-    cat "${output_root}/runs/ds_a_vs_ref/command.sh" >&2
+    cat "${output_root}/02_alignments/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
 
-  grep -Fx $'minimap_batch\t1G' "${output_root}/metadata/prepare_options.tsv" >/dev/null
-  grep -Fx $'minimap_filter\tdefault' "${output_root}/metadata/prepare_options.tsv" >/dev/null
+  grep -Fx $'minimap_batch\t1G' "${output_root}/.runtime/metadata/prepare_options.tsv" >/dev/null
+  grep -Fx $'minimap_filter\tdefault' "${output_root}/.runtime/metadata/prepare_options.tsv" >/dev/null
 
-  cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_a_vs_ref/result.paf" <<'EOF'
 tig_a1	10	0	6	+	Chr01	6	0	6	6	6	60
 tig_a2	10	0	6	+	Chr01	6	0	6	6	6	60
 EOF
-  cat > "${output_root}/runs/ds_b_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_b_vs_ref/result.paf" <<'EOF'
 tig_b	10	0	6	+	Chr01	6	0	6	6	6	60
 EOF
 
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
 
   python3 - "$output_root" <<'PYBATCH'
 import json
@@ -285,7 +296,7 @@ import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
-run = root / "runs/chr_Chr01/ds_a_vs_self"
+run = root / "02_alignments/chr_Chr01/ds_a_vs_self"
 manifest_path = run / "self_batch_manifest.json"
 manifest = json.loads(manifest_path.read_text())
 assert manifest["preset"] == "asm5"
@@ -310,13 +321,13 @@ assert "tel_scan" not in (run.parent / "q0_generated_command.sh").read_text()
 assert "cen_scan" not in (run.parent / "q0_generated_command.sh").read_text()
 assert "_vs_" not in (run.parent / "generated_command.sh").read_text()
 PYBATCH
-  [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
+  [[ ! -d "${output_root}/02_alignments/chr_Chr01/ds_b_vs_self" ]] || {
     echo "expected the one-contig ds_b track not to schedule a self run" >&2
     exit 1
   }
-  grep -F 'minimap2 -c -x asm5 -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >/dev/null || {
+  grep -F 'minimap2 -c -x asm5 -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/02_alignments/chr_Chr01/ds_a_vs_ds_b/command.sh" >/dev/null || {
     echo "expected chr-local pair command to emit CIGAR (-c), use asm5 and 12 threads" >&2
-    cat "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >&2
+    cat "${output_root}/02_alignments/chr_Chr01/ds_a_vs_ds_b/command.sh" >&2
     exit 1
   }
   # Completed raw evidence and self caches survive identical assignment regeneration.
@@ -324,32 +335,32 @@ PYBATCH
 import sys
 from pathlib import Path
 root = Path(sys.argv[1])
-sys.path.insert(0, str(root / ".prepare_lib/tools"))
+sys.path.insert(0, str(root / ".runtime/prepared/tools"))
 from run_outer_checkpoints import OuterCheckpointManager
-run = root / "runs/chr_Chr01"
+run = root / "02_alignments/chr_Chr01"
 for name in ("ds_a_vs_self", "ds_a_vs_ds_b"):
     (run / name / "result.paf").write_text("")
 (run / "ds_a_vs_self/cache-marker").write_text("preserve")
 manager = OuterCheckpointManager(root)
-manager.commit(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+manager.commit(manager.prepare("q0_chr:Chr01", "02_alignments/chr_Chr01/q0_command.sh"))
 PYCACHE
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
   PATH="${FAKE_BIN}:$PATH" python3 - "$output_root" <<'PYCACHE'
 import sys
 from pathlib import Path
 root = Path(sys.argv[1])
-sys.path.insert(0, str(root / ".prepare_lib/tools"))
+sys.path.insert(0, str(root / ".runtime/prepared/tools"))
 from run_outer_checkpoints import OuterCheckpointManager
 manager = OuterCheckpointManager(root)
-valid, reason = manager.validate(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+valid, reason = manager.validate(manager.prepare("q0_chr:Chr01", "02_alignments/chr_Chr01/q0_command.sh"))
 assert valid, reason
-assert (root / "runs/chr_Chr01/ds_a_vs_self/cache-marker").read_text() == "preserve"
+assert (root / "02_alignments/chr_Chr01/ds_a_vs_self/cache-marker").read_text() == "preserve"
 PYCACHE
   # Removing an operation retires its data outside active runs/, rather than deleting it.
-  : > "${output_root}/runs/ds_b_vs_ref/result.paf"
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
-  [[ ! -d "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b" ]] || exit 1
-  find "${output_root}/.run_all/retired_chr_operations/Chr01" -path '*/ds_a_vs_ds_b.*/result.paf' | grep -q .
+  : > "${output_root}/02_alignments/ds_b_vs_ref/result.paf"
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
+  [[ ! -d "${output_root}/02_alignments/chr_Chr01/ds_a_vs_ds_b" ]] || exit 1
+  find "${output_root}/.runtime/run_all/retired_chr_operations/Chr01" -path '*/ds_a_vs_ds_b.*/result.paf' | grep -q .
 }
 
 test_self_alignment_restores_unique_cross_contig_pairs() {
@@ -368,7 +379,7 @@ test_self_alignment_restores_unique_cross_contig_pairs() {
     --ds assembly "$ds" \
     -o "$output_root" >/dev/null
 
-  cat > "${output_root}/runs/assembly_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/assembly_vs_ref/result.paf" <<'EOF'
 tig_z	10	0	10	+	Chr01	10	0	10	10	10	60
 tig_a	10	0	10	+	Chr01	10	0	10	10	10	60
 tig_m	10	0	10	+	Chr01	10	0	10	10	10	60
@@ -424,12 +435,12 @@ for query_name, query in queries:
         )
 PYFAKE
   chmod +x "${pair_bin}/minimap2"
-  PATH="${pair_bin}:${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  PATH="${pair_bin}:${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
 
   PATH="${pair_bin}:${FAKE_BIN}:$PATH" bash \
-    "${output_root}/runs/chr_Chr01/assembly_vs_self/command.sh"
+    "${output_root}/02_alignments/chr_Chr01/assembly_vs_self/command.sh"
 
-  local result="${output_root}/runs/chr_Chr01/assembly_vs_self/result.paf"
+  local result="${output_root}/02_alignments/chr_Chr01/assembly_vs_self/result.paf"
   assert_file "$result"
   [[ "$(wc -l < "$result")" -eq 3 ]] || {
     echo "expected exactly three unordered cross-contig pairs" >&2
@@ -466,16 +477,16 @@ test_alignment_engine_defaults_and_validation() {
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     -o "$default_root" >/dev/null
-  grep -F 'long_cigar_recovery/server_alignment.py' "${default_root}/runs/ds_a_vs_ref/command.sh" >/dev/null
-  grep -F -- '--threads "${GPM_TASK_THREADS:-10}" --preset asm10 --result result.paf' "${default_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
+  grep -F 'long_cigar_recovery/server_alignment.py' "${default_root}/02_alignments/ds_a_vs_ref/command.sh" >/dev/null
+  grep -F -- '--threads "${GPM_TASK_THREADS:-10}" --preset asm10 --result result.paf' "${default_root}/02_alignments/ds_a_vs_ref/command.sh" >/dev/null || {
     echo "expected proactive initial-reference adapter with native asm10 and 10 threads" >&2
-    cat "${default_root}/runs/ds_a_vs_ref/command.sh" >&2
+    cat "${default_root}/02_alignments/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
-  assert_file "${default_root}/.prepare_lib/tools/long_cigar_recovery/branch-runtime.json"
+  assert_file "${default_root}/.runtime/prepared/tools/long_cigar_recovery/branch-runtime.json"
   cmp "${default_root}/run_all.sh" "${REPO_ROOT}/server/lib/run_all_launcher.sh"
-  assert_prepare_option "${default_root}/metadata/prepare_options.tsv" alignment_engine minimap2
-  assert_prepare_option "${default_root}/metadata/prepare_options.tsv" threads 10
+  assert_prepare_option "${default_root}/.runtime/metadata/prepare_options.tsv" alignment_engine minimap2
+  assert_prepare_option "${default_root}/.runtime/metadata/prepare_options.tsv" threads 10
 
   local option value
   for option in --aligner --blastn-task --blastn-evalue --winnowmap-kmer; do
@@ -506,7 +517,7 @@ test_out_alias_sets_output_root() {
     --ds ds_out "$ds" \
     --out "$output_root" >/dev/null
 
-  assert_file "${output_root}/metadata/package.tsv"
+  assert_file "${output_root}/.runtime/metadata/package.tsv"
   assert_file "${output_root}/run_all.sh"
 }
 
@@ -514,49 +525,47 @@ assert_chr_partition_run_all_staging() {
   local run_all="$1"
   local output_root="$2"
   local chr_name="$3"
-  local plan="${output_root}/.run_all/plan.tsv"
+  local plan="${output_root}/.runtime/run_all/plan.tsv"
 
   bash -n "$run_all"
-  grep -F '.prepare_lib/tools/run_all_runner.py' "$run_all" >/dev/null || {
-    echo "run_all.sh does not invoke the generated runner" >&2
-    exit 1
-  }
+  cmp "${REPO_ROOT}/server/lib/run_all_launcher.sh" "$run_all"
   [[ -f "$plan" ]] || {
     echo "missing run_all execution plan: $plan" >&2
     exit 1
   }
   mapfile -t command_lines < <(tail -n +2 "$plan")
-  [[ "${#command_lines[@]}" -eq 13 ]] || {
-    echo "expected 13 staged plan units, got ${#command_lines[@]}" >&2
+  [[ "${#command_lines[@]}" -eq 14 ]] || {
+    echo "expected 14 staged plan units, got ${#command_lines[@]}" >&2
     if [[ "${#command_lines[@]}" -gt 0 ]]; then
       printf '%s\n' "${command_lines[@]}" >&2
     fi
     exit 1
   }
 
-  [[ "${command_lines[0]}" == $'ref:ds_a\truns/ds_a_vs_ref/command.sh\truns/ds_a_vs_ref/stderr.log' ]] || {
+  [[ "${command_lines[0]}" == $'ref:ds_a\t02_alignments/ds_a_vs_ref/command.sh\t02_alignments/ds_a_vs_ref/stderr.log' ]] || {
     echo "unexpected first run_all plan unit" >&2
     printf '%s\n' "${command_lines[0]}" >&2
     exit 1
   }
-  [[ "${command_lines[1]}" == $'ref:ds_b\truns/ds_b_vs_ref/command.sh\truns/ds_b_vs_ref/stderr.log' ]] || {
+  [[ "${command_lines[1]}" == $'ref:ds_b\t02_alignments/ds_b_vs_ref/command.sh\t02_alignments/ds_b_vs_ref/stderr.log' ]] || {
     echo "unexpected second run_all plan unit" >&2
     printf '%s\n' "${command_lines[1]}" >&2
     exit 1
   }
   local expected_tail
   expected_tail="$(cat <<EOF
-assign	assign_chr_groups.sh	logs/run_all.log
-q0_chr:${chr_name}	runs/chr_${chr_name}/q0_command.sh	logs/run_all.log
-q0_evidence	prepare_q0_evidence.sh	logs/run_all.log
-grt_prepare	prepare_lgz_inputs.sh	logs/run_all.log
-grt_step1	run_lgz_step1.sh	logs/run_all.log
-grt_step2	run_lgz_step2.sh	logs/run_all.log
-grt_step3	run_lgz_step3.sh	logs/run_all.log
-chr:${chr_name}	runs/chr_${chr_name}/command.sh	logs/run_all.log
-finalize_evidence	finalize_lgz_evidence.sh	logs/run_all.log
-package_full	package_full_zip.sh	logs/run_all.log
-package_light	package_light_zip.sh	logs/run_all.log
+assign	.runtime/commands/assign_chr_groups.sh	.runtime/logs/run_all.log
+q0_chr:${chr_name}	02_alignments/chr_${chr_name}/q0_command.sh	.runtime/logs/run_all.log
+q0_evidence	.runtime/commands/prepare_q0_evidence.sh	.runtime/logs/run_all.log
+grt_prepare	.runtime/commands/prepare_lgz_inputs.sh	.runtime/logs/run_all.log
+grt_step1	.runtime/commands/run_lgz_step1.sh	.runtime/logs/run_all.log
+grt_step2	.runtime/commands/run_lgz_step2.sh	.runtime/logs/run_all.log
+grt_step3	.runtime/commands/run_lgz_step3.sh	.runtime/logs/run_all.log
+chr:${chr_name}	02_alignments/chr_${chr_name}/command.sh	.runtime/logs/run_all.log
+finalize_evidence	.runtime/commands/finalize_lgz_evidence.sh	.runtime/logs/run_all.log
+refinement	.runtime/commands/run_refinement.sh	.runtime/logs/run_all.log
+package_full	.runtime/commands/package_full_zip.sh	.runtime/logs/run_all.log
+package_light	.runtime/commands/package_light_zip.sh	.runtime/logs/run_all.log
 EOF
 )"
   [[ "$(printf '%s\n' "${command_lines[@]:2}")" == "$expected_tail" ]] || {
@@ -564,7 +573,7 @@ EOF
     printf '%s\n' "${command_lines[@]:2}" >&2
     exit 1
   }
-  [[ -f "${output_root}/.prepare_lib/tools/run_all_runner.py" ]] || {
+  [[ -f "${output_root}/.runtime/prepared/tools/run_all_runner.py" ]] || {
     echo "generated workspace is missing run_all_runner.py" >&2
     exit 1
   }
@@ -643,9 +652,9 @@ assert_source_seq_locator_tsv() {
   local expected="${TMP_DIR}/expected_source_seq_locator.tsv"
   cat > "$expected" <<'EOF'
 dataset_name	seq_name	fasta_relpath
-ds_a	tig_multi	data/partitions/chr/Chr01/ds_a.fa
-ds_b	tig_chr1	data/partitions/chr/Chr01/ds_b.fa
-ds_b	tig_unplaced	data/partitions/unplaced/ds_b.fa
+ds_a	tig_multi	01_inputs/04_derived/partitions/chr/Chr01/ds_a.fa
+ds_b	tig_chr1	01_inputs/04_derived/partitions/chr/Chr01/ds_b.fa
+ds_b	tig_unplaced	01_inputs/04_derived/partitions/unplaced/ds_b.fa
 EOF
   diff -u "$expected" "$path"
 }
@@ -705,50 +714,50 @@ test_custom_output_root() {
     exit 1
   fi
 
-  assert_dir "${output_root}/metadata"
-  assert_file "${output_root}/metadata/reference.tsv"
-  assert_file "${output_root}/metadata/package.tsv"
-  assert_file "${output_root}/metadata/datasets.tsv"
+  assert_dir "${output_root}/.runtime/metadata"
+  assert_file "${output_root}/.runtime/metadata/reference.tsv"
+  assert_file "${output_root}/.runtime/metadata/package.tsv"
+  assert_file "${output_root}/.runtime/metadata/datasets.tsv"
   assert_file "${output_root}/run_all.sh"
-  assert_file "${output_root}/export_final_path_fasta.sh"
-  assert_file "${output_root}/.prepare_lib/lib/final_path.sh"
-  assert_file "${output_root}/.prepare_lib/tools/add_dataset_package.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
-  [[ ! -e "${output_root}/.prepare_lib/tools/grt_step12.py" ]]
-  assert_file "${output_root}/.prepare_lib/tools/grt_core/step1_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_core/step2_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_step2.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_step3.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_evidence_package.py"
-  assert_file "${output_root}/.prepare_lib/contracts/grt_precomputed_v2.json"
-  assert_file "${output_root}/prepare_lgz_inputs.sh"
-  [[ -f "${output_root}/run_lgz_step1.sh" ]]
-  assert_file "${output_root}/run_lgz_step1.sh"
-  assert_file "${output_root}/run_lgz_step2.sh"
-  assert_file "${output_root}/run_lgz_step3.sh"
-  assert_file "${output_root}/finalize_lgz_evidence.sh"
+  assert_file "${output_root}/.runtime/commands/export_final_path_fasta.sh"
+  assert_file "${output_root}/.runtime/prepared/lib/final_path.sh"
+  assert_file "${output_root}/.runtime/prepared/tools/add_dataset_package.py"
+  assert_file "${output_root}/.runtime/prepared/tools/grt_prepare_inputs.py"
+  assert_file "${output_root}/.runtime/prepared/tools/grt_step1.py"
+  [[ ! -e "${output_root}/.runtime/prepared/tools/grt_step12.py" ]]
+  assert_file "${output_root}/.runtime/prepared/tools/grt_core/step1_engine.py"
+  assert_file "${output_root}/.runtime/prepared/tools/grt_core/step2_engine.py"
+  assert_file "${output_root}/.runtime/prepared/tools/grt_step1.py"
+  assert_file "${output_root}/.runtime/prepared/tools/grt_step2.py"
+  assert_file "${output_root}/.runtime/prepared/tools/grt_step3.py"
+  assert_file "${output_root}/.runtime/prepared/tools/grt_evidence_package.py"
+  assert_file "${output_root}/.runtime/prepared/contracts/grt_precomputed_v2.json"
+  assert_file "${output_root}/.runtime/commands/prepare_lgz_inputs.sh"
+  [[ -f "${output_root}/.runtime/commands/run_lgz_step1.sh" ]]
+  assert_file "${output_root}/.runtime/commands/run_lgz_step1.sh"
+  assert_file "${output_root}/.runtime/commands/run_lgz_step2.sh"
+  assert_file "${output_root}/.runtime/commands/run_lgz_step3.sh"
+  assert_file "${output_root}/.runtime/commands/finalize_lgz_evidence.sh"
   for name in prepare_grt_inputs run_grt_step1 run_grt_step2 run_grt_step3 finalize_grt_evidence; do
-    assert_file "${output_root}/${name}.sh"
-    grep -F 'exec bash ' "${output_root}/${name}.sh" >/dev/null
-    bash -n "${output_root}/${name}.sh"
+    assert_file "${output_root}/.runtime/commands/${name}.sh"
+    grep -F 'exec bash ' "${output_root}/.runtime/commands/${name}.sh" >/dev/null
+    bash -n "${output_root}/.runtime/commands/${name}.sh"
   done
-  assert_file "${output_root}/.prepare_lib/tools/lgz_compat.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step1_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_core/step2_engine.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_step1.py"
-  assert_file "${output_root}/.prepare_lib/tools/lgz_step2.py"
+  assert_file "${output_root}/.runtime/prepared/tools/lgz_compat.py"
+  assert_file "${output_root}/.runtime/prepared/tools/lgz_core/step1_engine.py"
+  assert_file "${output_root}/.runtime/prepared/tools/lgz_core/step2_engine.py"
+  assert_file "${output_root}/.runtime/prepared/tools/lgz_step1.py"
+  assert_file "${output_root}/.runtime/prepared/tools/lgz_step2.py"
 
-  assert_file "${output_root}/package_full_zip.sh"
-  assert_file "${output_root}/package_light_zip.sh"
+  assert_file "${output_root}/.runtime/commands/package_full_zip.sh"
+  assert_file "${output_root}/.runtime/commands/package_light_zip.sh"
   assert_chr_partition_run_all_staging "${output_root}/run_all.sh" "$output_root" "ref"
-  assert_package_metadata "${output_root}/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned"
-  assert_tsv_has_self_alignment_flag "${output_root}/metadata/datasets.tsv" "true"
+  assert_package_metadata "${output_root}/.runtime/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned"
+  assert_tsv_has_self_alignment_flag "${output_root}/.runtime/metadata/datasets.tsv" "true"
   # Test legacy forwarding with a harmless spy, never by executing real analysis.
   local alias_dir="${output_root}/alias forwarding"
   mkdir -p "$alias_dir"
-  cp "${output_root}/run_grt_step2.sh" "${alias_dir}/run_grt_step2.sh"
+  cp "${output_root}/.runtime/commands/run_grt_step2.sh" "${alias_dir}/run_grt_step2.sh"
   cat > "${alias_dir}/run_lgz_step2.sh" <<'SPY'
 #!/usr/bin/env bash
 printf '%s\n' "$@"
@@ -908,11 +917,11 @@ test_default_output_root_uses_current_working_directory() {
       --ds ds_default "$ds" >/dev/null
   )
 
-  assert_file "${TMP_DIR}/gpm_server/metadata/reference.tsv"
+  assert_file "${TMP_DIR}/gpm_server/.runtime/metadata/reference.tsv"
   assert_file "${TMP_DIR}/gpm_server/run_all.sh"
-  assert_file "${TMP_DIR}/gpm_server/export_final_path_fasta.sh"
-  assert_file "${TMP_DIR}/gpm_server/.prepare_lib/lib/final_path.sh"
-  assert_file "${TMP_DIR}/gpm_server/.prepare_lib/tools/add_dataset_package.py"
+  assert_file "${TMP_DIR}/gpm_server/.runtime/commands/export_final_path_fasta.sh"
+  assert_file "${TMP_DIR}/gpm_server/.runtime/prepared/lib/final_path.sh"
+  assert_file "${TMP_DIR}/gpm_server/.runtime/prepared/tools/add_dataset_package.py"
 }
 
 test_skip_self_option_omits_self_runs() {
@@ -932,17 +941,17 @@ test_skip_self_option_omits_self_runs() {
     -o "$output_root" >/dev/null
 
   assert_file "${output_root}/run_all.sh"
-  [[ ! -d "${output_root}/runs/ds_a_vs_self" ]] || {
+  [[ ! -d "${output_root}/02_alignments/ds_a_vs_self" ]] || {
     echo "expected --skip-self not to create ds_a_vs_self" >&2
     exit 1
   }
-  [[ ! -d "${output_root}/runs/ds_b_vs_self" ]] || {
+  [[ ! -d "${output_root}/02_alignments/ds_b_vs_self" ]] || {
     echo "expected --skip-self not to create ds_b_vs_self" >&2
     exit 1
   }
   assert_chr_partition_run_all_staging "${output_root}/run_all.sh" "$output_root" "ref_skip"
-  assert_package_metadata "${output_root}/metadata/package.tsv" "fast" "true" "none" "chr_partition" "partitioned"
-  assert_tsv_has_self_alignment_flag "${output_root}/metadata/datasets.tsv" "false"
+  assert_package_metadata "${output_root}/.runtime/metadata/package.tsv" "fast" "true" "none" "chr_partition" "partitioned"
+  assert_tsv_has_self_alignment_flag "${output_root}/.runtime/metadata/datasets.tsv" "false"
 }
 
 test_prepare_writes_package_metadata_and_stages_runs() {
@@ -960,14 +969,14 @@ test_prepare_writes_package_metadata_and_stages_runs() {
     --ds ds_b "$ds_b" \
     -o "$output_root" >/dev/null
 
-  assert_file "${output_root}/metadata/package.tsv"
-  [[ ! -f "${output_root}/metadata/chr_assignments.tsv" ]] || {
+  assert_file "${output_root}/.runtime/metadata/package.tsv"
+  [[ ! -f "${output_root}/.runtime/metadata/chr_assignments.tsv" ]] || {
     echo "expected prepare not to precompute metadata/chr_assignments.tsv" >&2
     exit 1
   }
-  assert_file "${output_root}/assign_chr_groups.sh"
-  assert_file "${output_root}/runs/chr_ref_partitioned/command.sh"
-  assert_package_metadata "${output_root}/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned"
+  assert_file "${output_root}/.runtime/commands/assign_chr_groups.sh"
+  assert_file "${output_root}/02_alignments/chr_ref_partitioned/command.sh"
+  assert_package_metadata "${output_root}/.runtime/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned"
   assert_chr_partition_run_all_staging "${output_root}/run_all.sh" "$output_root" "ref_partitioned"
 }
 
@@ -1017,68 +1026,68 @@ test_assignment_helper_generates_chr_assignments_and_chr_local_runs() {
     --ds ds_b "$ds_b" \
     -o "$output_root" >/dev/null
 
-  cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_a_vs_ref/result.paf" <<'EOF'
 tig_multi	10	0	4	+	Chr01	30	4	8	4	4	60
 tig_multi	10	2	6	-	Chr01	30	9	13	4	4	60
 tig_multi	10	0	6	+	Chr02	30	14	20	6	6	60
 EOF
-  cat > "${output_root}/runs/ds_b_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_b_vs_ref/result.paf" <<'EOF'
 tig_chr1	10	1	8	-	Chr01	30	7	14	7	7	60
 EOF
 
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
 
-  assert_file "${output_root}/metadata/chr_assignments.tsv"
-  assert_chr_assignments_tsv "${output_root}/metadata/chr_assignments.tsv"
-  assert_file "${output_root}/metadata/reference_chr_locator.tsv"
-  assert_file "${output_root}/metadata/source_seq_locator.tsv"
-  assert_file "${output_root}/metadata/source_seq_n_regions.tsv"
-  assert_reference_chr_locator_tsv "${output_root}/metadata/reference_chr_locator.tsv"
-  assert_source_seq_locator_tsv "${output_root}/metadata/source_seq_locator.tsv"
-  grep -F $'ds_b\ttig_chr1\t3\t4\t2' "${output_root}/metadata/source_seq_n_regions.tsv" >/dev/null || {
+  assert_file "${output_root}/.runtime/metadata/chr_assignments.tsv"
+  assert_chr_assignments_tsv "${output_root}/.runtime/metadata/chr_assignments.tsv"
+  assert_file "${output_root}/.runtime/metadata/reference_chr_locator.tsv"
+  assert_file "${output_root}/.runtime/metadata/source_seq_locator.tsv"
+  assert_file "${output_root}/.runtime/metadata/source_seq_n_regions.tsv"
+  assert_reference_chr_locator_tsv "${output_root}/.runtime/metadata/reference_chr_locator.tsv"
+  assert_source_seq_locator_tsv "${output_root}/.runtime/metadata/source_seq_locator.tsv"
+  grep -F $'ds_b\ttig_chr1\t3\t4\t2' "${output_root}/.runtime/metadata/source_seq_n_regions.tsv" >/dev/null || {
     echo "expected assigned tig_chr1 N region to be scanned" >&2
-    cat "${output_root}/metadata/source_seq_n_regions.tsv" >&2
+    cat "${output_root}/.runtime/metadata/source_seq_n_regions.tsv" >&2
     exit 1
   }
-  grep -F $'ds_b\ttig_unplaced\t3\t6\t4' "${output_root}/metadata/source_seq_n_regions.tsv" >/dev/null || {
+  grep -F $'ds_b\ttig_unplaced\t3\t6\t4' "${output_root}/.runtime/metadata/source_seq_n_regions.tsv" >/dev/null || {
     echo "expected unplaced tig_unplaced N region to be scanned" >&2
-    cat "${output_root}/metadata/source_seq_n_regions.tsv" >&2
+    cat "${output_root}/.runtime/metadata/source_seq_n_regions.tsv" >&2
     exit 1
   }
-  assert_text_fasta_contents "${output_root}/data/reference/chrs/Chr01.fa" $'>Chr01\nAAAAAA\n'
-  assert_text_fasta_contents "${output_root}/data/reference/chrs/Chr02.fa" $'>Chr02\nCCCCCC\n'
-  assert_text_fasta_contents "${output_root}/data/partitions/chr/Chr01/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
-  assert_text_fasta_contents "${output_root}/data/partitions/chr/Chr01/ds_b.fa" $'>tig_chr1\nCCNNCCCCCC\n'
-  assert_text_fasta_contents "${output_root}/data/partitions/chr/Chr02/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
-  assert_text_fasta_contents "${output_root}/data/partitions/unplaced/ds_b.fa" $'>tig_unplaced\nTTNNNNTTTT\n'
-  assert_text_fasta_contents "${output_root}/runs/chr_Chr01/datasets/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
-  assert_text_fasta_contents "${output_root}/runs/chr_Chr01/datasets/ds_b.fa" $'>tig_chr1\nCCNNCCCCCC\n'
-  assert_text_fasta_contents "${output_root}/runs/chr_Chr02/datasets/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
-  [[ ! -f "${output_root}/runs/chr_Chr02/datasets/ds_b.fa" ]] || {
+  assert_text_fasta_contents "${output_root}/01_inputs/01_reference/chrs/Chr01.fa" $'>Chr01\nAAAAAA\n'
+  assert_text_fasta_contents "${output_root}/01_inputs/01_reference/chrs/Chr02.fa" $'>Chr02\nCCCCCC\n'
+  assert_text_fasta_contents "${output_root}/01_inputs/04_derived/partitions/chr/Chr01/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
+  assert_text_fasta_contents "${output_root}/01_inputs/04_derived/partitions/chr/Chr01/ds_b.fa" $'>tig_chr1\nCCNNCCCCCC\n'
+  assert_text_fasta_contents "${output_root}/01_inputs/04_derived/partitions/chr/Chr02/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
+  assert_text_fasta_contents "${output_root}/01_inputs/04_derived/partitions/unplaced/ds_b.fa" $'>tig_unplaced\nTTNNNNTTTT\n'
+  assert_text_fasta_contents "${output_root}/02_alignments/chr_Chr01/datasets/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
+  assert_text_fasta_contents "${output_root}/02_alignments/chr_Chr01/datasets/ds_b.fa" $'>tig_chr1\nCCNNCCCCCC\n'
+  assert_text_fasta_contents "${output_root}/02_alignments/chr_Chr02/datasets/ds_a.fa" $'>tig_multi\nAAAAAAAAAA\n'
+  [[ ! -f "${output_root}/02_alignments/chr_Chr02/datasets/ds_b.fa" ]] || {
     echo "expected chr_Chr02 not to include ds_b" >&2
     exit 1
   }
-  assert_file "${output_root}/runs/chr_Chr01/generated_command.sh"
-  [[ ! -d "${output_root}/runs/chr_Chr01/ds_a_vs_self" ]] || {
+  assert_file "${output_root}/02_alignments/chr_Chr01/generated_command.sh"
+  [[ ! -d "${output_root}/02_alignments/chr_Chr01/ds_a_vs_self" ]] || {
     echo "expected one-contig chr_Chr01/ds_a track not to schedule a self run" >&2
     exit 1
   }
-  [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
+  [[ ! -d "${output_root}/02_alignments/chr_Chr01/ds_b_vs_self" ]] || {
     echo "expected one-contig chr_Chr01/ds_b track not to schedule a self run" >&2
     exit 1
   }
-  assert_file "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh"
-  assert_file "${output_root}/runs/chr_Chr02/generated_command.sh"
-  [[ ! -d "${output_root}/runs/chr_Chr02/ds_a_vs_self" ]] || {
+  assert_file "${output_root}/02_alignments/chr_Chr01/ds_a_vs_ds_b/command.sh"
+  assert_file "${output_root}/02_alignments/chr_Chr02/generated_command.sh"
+  [[ ! -d "${output_root}/02_alignments/chr_Chr02/ds_a_vs_self" ]] || {
     echo "expected one-contig chr_Chr02/ds_a track not to schedule a self run" >&2
     exit 1
   }
-  [[ ! -d "${output_root}/runs/chr_Chr02/ds_a_vs_ds_b" ]] || {
+  [[ ! -d "${output_root}/02_alignments/chr_Chr02/ds_a_vs_ds_b" ]] || {
     echo "expected chr_Chr02 not to include cross-dataset run" >&2
     exit 1
   }
 
-  if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/package_full_zip.sh" \
+  if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/package_full_zip.sh" \
       >"${TMP_DIR}/premature-package.out" 2>"${TMP_DIR}/premature-package.err"; then
     echo "expected packaging before LGZ finalization to fail" >&2
     exit 1
@@ -1109,17 +1118,16 @@ test_reads_enable_post_lgz_degap_without_qc() {
   awk -F '\t' '
     NR == 1 { for (i = 1; i <= NF; i++) column[$i] = i; next }
     NR == 2 { exit ($(column["reads_qc_enabled"]) == "false" ? 0 : 1) }
-  ' "${output_root}/metadata/package.tsv"
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_reads_qc_enabled false
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" degap_reads_type ont
-  ! grep -F -- " --reads " "${output_root}/prepare_lgz_inputs.sh" >/dev/null
-  grep -F 'degap_gapfill' "${output_root}/.run_all/plan.tsv" >/dev/null
-  python3 - "${output_root}/metadata/degap_inputs.json" "$reads_a" "$reads_b" <<'PYREADS'
+  ' "${output_root}/.runtime/metadata/package.tsv"
+  assert_prepare_option "${output_root}/.runtime/metadata/prepare_options.tsv" grt_reads_qc_enabled false
+  ! grep -F -- " --reads " "${output_root}/.runtime/commands/prepare_lgz_inputs.sh" >/dev/null
+  grep -F $'refinement\t.runtime/commands/run_refinement.sh' "${output_root}/.runtime/run_all/plan.tsv" >/dev/null
+  python3 - "${output_root}/.runtime/refinement/config.json" "$reads_a" "$reads_b" <<'PYREADS'
 import json, sys
 value = json.load(open(sys.argv[1]))
-assert value["schema_version"] == 2
-assert value["ont"] == sys.argv[2:]
-assert value["hifi"] == []
+assert value["schema"] == "cgat.refinement-config" and value["schema_version"] == 1
+assert value["groups"]["ont"] == sys.argv[2:]
+assert value["groups"]["hifi"] == []
 PYREADS
 
 }
@@ -1142,32 +1150,32 @@ test_skip_self_omits_chr_local_self_runs() {
     --skip-self \
     -o "$output_root" >/dev/null
 
-  cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_a_vs_ref/result.paf" <<'EOF'
 tig_multi	10	0	6	+	Chr01	30	4	10	6	6	60
 EOF
-  cat > "${output_root}/runs/ds_b_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_b_vs_ref/result.paf" <<'EOF'
 tig_chr1	10	1	8	+	Chr01	30	7	14	7	7	60
 EOF
 
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
 
-  assert_file "${output_root}/runs/chr_Chr01/generated_command.sh"
-  assert_file "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh"
-  [[ ! -d "${output_root}/runs/chr_Chr01/ds_a_vs_self" ]] || {
+  assert_file "${output_root}/02_alignments/chr_Chr01/generated_command.sh"
+  assert_file "${output_root}/02_alignments/chr_Chr01/ds_a_vs_ds_b/command.sh"
+  [[ ! -d "${output_root}/02_alignments/chr_Chr01/ds_a_vs_self" ]] || {
     echo "expected --skip-self to suppress chr-local ds_a_vs_self" >&2
     exit 1
   }
-  [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
+  [[ ! -d "${output_root}/02_alignments/chr_Chr01/ds_b_vs_self" ]] || {
     echo "expected --skip-self to suppress chr-local ds_b_vs_self" >&2
     exit 1
   }
-  ! grep -q '_vs_self' "${output_root}/runs/chr_Chr01/q0_generated_command.sh" || {
+  ! grep -q '_vs_self' "${output_root}/02_alignments/chr_Chr01/q0_generated_command.sh" || {
     echo "expected generated chr command not to contain self runs when --skip-self is set" >&2
     exit 1
   }
-  printf '>tig_second\nAAAAAAAAAA\n' >> "${output_root}/data/datasets/ds_a.fa"
-  printf 'tig_second\t10\t0\t6\t+\tChr01\t30\t4\t10\t6\t6\t60\n' >> "${output_root}/runs/ds_a_vs_ref/result.paf"
-  if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >"${TMP_DIR}/skip-conflict.log" 2>&1; then
+  printf '>tig_second\nAAAAAAAAAA\n' >> "${output_root}/01_inputs/02_assemblies/ds_a.fa"
+  printf 'tig_second\t10\t0\t6\t+\tChr01\t30\t4\t10\t6\t6\t60\n' >> "${output_root}/02_alignments/ds_a_vs_ref/result.paf"
+  if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >"${TMP_DIR}/skip-conflict.log" 2>&1; then
     echo "expected --skip-self to reject multiple same-dataset q0 candidates" >&2
     exit 1
   fi
@@ -1186,7 +1194,7 @@ test_prepare_writes_reference_segments_metadata() {
     --ds ds_gap "$ds" \
     -o "$output_root" >/dev/null
 
-  assert_reference_segments_tsv "${output_root}/metadata/reference_segments.tsv"
+  assert_reference_segments_tsv "${output_root}/.runtime/metadata/reference_segments.tsv"
 }
 
 test_prepare_normalizes_plain_fna_inputs_to_package_fa() {
@@ -1203,8 +1211,8 @@ test_prepare_normalizes_plain_fna_inputs_to_package_fa() {
     --ds ds_from_fna "$ds" \
     -o "$output_root" >/dev/null
 
-  assert_text_fasta_contents "${output_root}/data/reference/ref_from_fna.fa" "$expected_ref"
-  assert_text_fasta_contents "${output_root}/data/datasets/ds_from_fna.fa" "$expected_ds"
+  assert_text_fasta_contents "${output_root}/01_inputs/01_reference/ref_from_fna.fa" "$expected_ref"
+  assert_text_fasta_contents "${output_root}/01_inputs/02_assemblies/ds_from_fna.fa" "$expected_ds"
 }
 
 test_prepare_decompresses_gzip_inputs_to_package_fa() {
@@ -1225,8 +1233,8 @@ test_prepare_decompresses_gzip_inputs_to_package_fa() {
     --ds ds_from_gz "$ds_gz" \
     -o "$output_root" >/dev/null
 
-  assert_text_fasta_contents "${output_root}/data/reference/ref_from_gz.fa" "$expected_ref"
-  assert_text_fasta_contents "${output_root}/data/datasets/ds_from_gz.fa" "$expected_ds"
+  assert_text_fasta_contents "${output_root}/01_inputs/01_reference/ref_from_gz.fa" "$expected_ref"
+  assert_text_fasta_contents "${output_root}/01_inputs/02_assemblies/ds_from_gz.fa" "$expected_ds"
 }
 
 test_tel_options_generate_chr_local_tel_marks() {
@@ -1246,41 +1254,41 @@ PY
     --tel TTTAGGG 10 \
     -o "$output_root" >/dev/null
 
-  assert_file "${output_root}/tel/rules.tsv"
-  grep -F $'\tTTAGGG\t20\ttrue' "${output_root}/tel/rules.tsv" >/dev/null || {
+  assert_file "${output_root}/03_lgz/06_annotations/tel/rules.tsv"
+  grep -F $'\tTTAGGG\t20\ttrue' "${output_root}/03_lgz/06_annotations/tel/rules.tsv" >/dev/null || {
     echo "expected TTAGGG tel rule" >&2
-    cat "${output_root}/tel/rules.tsv" >&2
+    cat "${output_root}/03_lgz/06_annotations/tel/rules.tsv" >&2
     exit 1
   }
-  grep -F $'\tTTTAGGG\t10\ttrue' "${output_root}/tel/rules.tsv" >/dev/null || {
+  grep -F $'\tTTTAGGG\t10\ttrue' "${output_root}/03_lgz/06_annotations/tel/rules.tsv" >/dev/null || {
     echo "expected TTTAGGG tel rule" >&2
-    cat "${output_root}/tel/rules.tsv" >&2
+    cat "${output_root}/03_lgz/06_annotations/tel/rules.tsv" >&2
     exit 1
   }
 
-  cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_a_vs_ref/result.paf" <<'EOF'
 tig_tel	248	0	200	+	Chr01	1000	1	201	200	200	60
 EOF
 
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
-  assert_file "${output_root}/runs/chr_Chr01/tel_scan/command.sh"
-  assert_file "${output_root}/runs/chr_Chr01/generated_command.sh"
-  grep -F 'tel_scan/command.sh' "${output_root}/runs/chr_Chr01/generated_command.sh" >/dev/null || {
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
+  assert_file "${output_root}/02_alignments/chr_Chr01/tel_scan/command.sh"
+  assert_file "${output_root}/02_alignments/chr_Chr01/generated_command.sh"
+  grep -F 'tel_scan/command.sh' "${output_root}/02_alignments/chr_Chr01/generated_command.sh" >/dev/null || {
     echo "expected generated chr command to include tel scan" >&2
-    cat "${output_root}/runs/chr_Chr01/generated_command.sh" >&2
+    cat "${output_root}/02_alignments/chr_Chr01/generated_command.sh" >&2
     exit 1
   }
 
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/runs/chr_Chr01/command.sh" >/dev/null
-  assert_file "${output_root}/tel/chr_Chr01/ds_a.tsv"
-  grep -F $'\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t3\t122\t+' "${output_root}/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/02_alignments/chr_Chr01/command.sh" >/dev/null
+  assert_file "${output_root}/03_lgz/06_annotations/tel/chr_Chr01/ds_a.tsv"
+  grep -F $'\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t3\t122\t+' "${output_root}/03_lgz/06_annotations/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
     echo "expected forward TTAGGG tel mark" >&2
-    cat "${output_root}/tel/chr_Chr01/ds_a.tsv" >&2
+    cat "${output_root}/03_lgz/06_annotations/tel/chr_Chr01/ds_a.tsv" >&2
     exit 1
   }
-  grep -F $'\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t125\t244\t-' "${output_root}/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
+  grep -F $'\tds_a\ttig_tel\tChr01\tTTAGGG\t20\t20\t125\t244\t-' "${output_root}/03_lgz/06_annotations/tel/chr_Chr01/ds_a.tsv" >/dev/null || {
     echo "expected reverse-complement TTAGGG tel mark" >&2
-    cat "${output_root}/tel/chr_Chr01/ds_a.tsv" >&2
+    cat "${output_root}/03_lgz/06_annotations/tel/chr_Chr01/ds_a.tsv" >&2
     exit 1
   }
 }
@@ -1302,13 +1310,13 @@ test_cen_option_generates_chr_local_cen_marks() {
     --cen-min-identity 80 \
     -o "$output_root" >/dev/null
 
-  assert_file "${output_root}/cen/reference.tsv"
+  assert_file "${output_root}/03_lgz/06_annotations/cen/reference.tsv"
   local cen_query
   cen_query="$(python3 - "$output_root" <<'PYCEN'
 import csv, json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
-rows = list(csv.DictReader((root / 'cen/reference.tsv').open(), delimiter='\t'))
+rows = list(csv.DictReader((root / '03_lgz/06_annotations/cen/reference.tsv').open(), delimiter='\t'))
 assert len(rows) == 5 and all(row['chr_name'] == '*' for row in rows)
 row = next(row for row in rows if any(e['source'] == 'parameter' for e in json.loads(row['provenance'])))
 assert int(row['min_len']) == 5 and float(row['min_identity']) == 80
@@ -1316,27 +1324,27 @@ print(row['sequence_name'])
 PYCEN
 )"
 
-  cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
+  cat > "${output_root}/02_alignments/ds_a_vs_ref/result.paf" <<'EOF'
 tig_cen	40	0	40	+	Chr01	1000	1	41	40	40	60
 EOF
 
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
-  assert_file "${output_root}/runs/chr_Chr01/cen_scan/command.sh"
-  grep -F 'cen_scan/command.sh' "${output_root}/runs/chr_Chr01/generated_command.sh" >/dev/null || {
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
+  assert_file "${output_root}/02_alignments/chr_Chr01/cen_scan/command.sh"
+  grep -F 'cen_scan/command.sh' "${output_root}/02_alignments/chr_Chr01/generated_command.sh" >/dev/null || {
     echo "expected generated chr command to include cen scan" >&2
-    cat "${output_root}/runs/chr_Chr01/generated_command.sh" >&2
+    cat "${output_root}/02_alignments/chr_Chr01/generated_command.sh" >&2
     exit 1
   }
-  grep -F 'cen_scan.py' "${output_root}/runs/chr_Chr01/cen_scan/command.sh" >/dev/null || {
+  grep -F 'cen_scan.py' "${output_root}/02_alignments/chr_Chr01/cen_scan/command.sh" >/dev/null || {
     echo "expected repeat-aware cen scan command" >&2
     exit 1
   }
   local coords="${TMP_DIR}/cen.coords.tsv"
   printf '1\t20\t6\t25\t20\t20\t95.0\t20\t40\t100.0\t50.0\t%s\ttig_cen\n' "$cen_query" > "$coords"
-  FAKE_CEN_COORDS="$coords" PATH="${FAKE_BIN}:$PATH" bash "${output_root}/runs/chr_Chr01/cen_scan/command.sh" >/dev/null
-  assert_file "${output_root}/cen/chr_Chr01/marks.tsv"
+  FAKE_CEN_COORDS="$coords" PATH="${FAKE_BIN}:$PATH" bash "${output_root}/02_alignments/chr_Chr01/cen_scan/command.sh" >/dev/null
+  assert_file "${output_root}/03_lgz/06_annotations/cen/chr_Chr01/marks.tsv"
   grep -F "$(printf '%s\tChr01\t%s\tds_a\ttig_cen\t6\t25\t+\t20\t95.000\t0' "$cen_query" "$cen_query")" \
-    "${output_root}/cen/chr_Chr01/marks.tsv" >/dev/null || {
+    "${output_root}/03_lgz/06_annotations/cen/chr_Chr01/marks.tsv" >/dev/null || {
     echo "expected merged candidate cen mark with real source provenance" >&2
     exit 1
   }
@@ -1384,7 +1392,7 @@ test_cen_accepts_unbound_sequence_names() {
 import csv, json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
-rows = list(csv.DictReader((root / 'cen/reference.tsv').open(), delimiter='\t'))
+rows = list(csv.DictReader((root / '03_lgz/06_annotations/cen/reference.tsv').open(), delimiter='\t'))
 assert all(row['chr_name'] == '*' for row in rows)
 assert any(entry.get('sequence_name') == 'Chr99_centromere'
            for row in rows for entry in json.loads(row['provenance']))

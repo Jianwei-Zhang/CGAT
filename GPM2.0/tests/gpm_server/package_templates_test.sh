@@ -105,10 +105,10 @@ for source in args.source.rglob('*'):
 PY
 
 # Keep the archive helper's runtime dependencies alongside it, as prepare.sh does.
-cp "${REPO_ROOT}/server/tools/"{delivery_archive,run_resources,run_orchestration}.py \
+cp "${REPO_ROOT}/server/tools/"{delivery_archive,run_resources,run_orchestration,workspace_layout}.py \
   "${SERVER_DIR}/.prepare_lib/tools/"
 mkdir -p "${SERVER_DIR}/.prepare_lib/tools/long_cigar_recovery"
-cp "${REPO_ROOT}/server/tools/long_cigar_recovery/minimap_options.py" \
+cp "${REPO_ROOT}/server/tools/long_cigar_recovery/"{minimap_options,workspace_binding}.py \
   "${SERVER_DIR}/.prepare_lib/tools/long_cigar_recovery/"
 cp "${REPO_ROOT}/server/templates/package_full_zip.sh" "${SERVER_DIR}/package_full_zip.sh"
 cp "${REPO_ROOT}/server/templates/package_light_zip.sh" "${SERVER_DIR}/package_light_zip.sh"

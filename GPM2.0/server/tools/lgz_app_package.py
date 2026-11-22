@@ -404,6 +404,37 @@ def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
         raise ValueError("alignment policy does not bind the delivered complete PAF")
     return value
 
+ADD_COMPATIBILITY_OPTIONS = ("alignment_engine", "minimap_preset", "skip_self", "tel_enabled", "cen_enabled")
+
+
+def project_add_compatibility_options(source_root: Path, staging_root: Path) -> None:
+    """Keep the policy the App checks for incremental imports, not private Server options."""
+    source = workspace_join(source_root, "metadata/prepare_options.tsv")
+    if not source.is_file():
+        return
+    with source.open(newline="", encoding="utf-8") as stream:
+        rows = [(row["key"], row["value"]) for row in csv.DictReader(stream, delimiter="\t")
+                if row.get("key") in ADD_COMPATIBILITY_OPTIONS]
+    values = dict(rows)
+    if len(rows) != len(values):
+        raise ValueError("duplicate compatibility keys in Server prepare options")
+    # Older prepared workspaces may have no complete incremental option set.
+    # Leave them on the existing App legacy path rather than guessing flags.
+    if set(values) != set(ADD_COMPATIBILITY_OPTIONS):
+        return
+    if (values["alignment_engine"] != "minimap2"
+            or values["minimap_preset"] not in {"asm5", "asm10", "asm20"}
+            or any(values[name] not in {"true", "false"} for name in ("skip_self", "tel_enabled", "cen_enabled"))):
+        if WorkspaceLayout.detect(source_root).version == 1:
+            return  # Do not change the legacy archive contract for other engines.
+        raise ValueError("invalid incremental compatibility options in Server preparation")
+    destination = staging_root / "metadata/prepare_options.tsv"
+    with destination.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream, delimiter="\t", lineterminator="\n")
+        writer.writerow(("key", "value"))
+        writer.writerows((name, values[name]) for name in ADD_COMPATIBILITY_OPTIONS)
+
+
 def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True, server_sources=None) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
@@ -441,6 +472,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include
             project_used_contigs(workspace_join(source_root, "metadata/grt_used_contigs.tsv"), workspace_join(staging_root, "metadata/grt_used_contigs.tsv"))
         else:
             copy_file(source_root, staging_root, f"metadata/{filename}")
+    project_add_compatibility_options(source_root, staging_root)
     for filename in OPTIONAL_METADATA:
         if filename == "degap_gapfill.json" and not include_legacy_gapfill:
             continue

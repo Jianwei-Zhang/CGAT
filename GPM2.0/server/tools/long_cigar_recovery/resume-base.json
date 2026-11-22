@@ -92,7 +92,7 @@
         "tools/grt_telomere_finalize.py": "633d99951d3c55636add06c0be7d79cf0b74984ea2c0b05925ba9198322127a8",
         "tools/legacy_lgz_continuation.py": "d292cd1b43c12e63a4f663e9b23dbc04f4d763f8f948a4e6ee70e9c1bf44bbc1",
         "tools/legacy_lgz_runner.py": "79e8716510905fdbd6efa2287b3d8a5ebe0e3396a0ea3076a20fd16e403ad0ed",
-        "tools/lgz_app_package.py": "463c97e74a349ea6dd7ee7cf113ec0a0925c351c0a0e68a8766a7dcfe51c8d81",
+        "tools/lgz_app_package.py": "aa5c138a9eb99cf048376c28043e6696838d8e9f4210fe10f5e543c9aa5fe8ea",
         "tools/lgz_compat.py": "149dbbff52f3736bf6dbc4e8106f399c2f851fbded0c498d07423f0fb8e24355",
         "tools/lgz_contract.py": "37100a35cd2465db2704a391372a041c8e40e5100497811f7f1db2a01164df21",
         "tools/lgz_core/__init__.py": "b2982d75955db5cf54499ce0404ccfba4db31d6d8903c0d26d12b63ecf8a058e",

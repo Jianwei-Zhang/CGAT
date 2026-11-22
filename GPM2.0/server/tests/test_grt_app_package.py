@@ -70,6 +70,18 @@ class GrtAppPackageTests(unittest.TestCase):
             if not include_fasta:
                 self.assertFalse(any(path.suffix.lower() in {".fa", ".fasta"} for path in staging.rglob("*")))
 
+    def test_portable_app_packages_carry_only_the_incremental_import_policy(self):
+        options = self.source / "metadata/prepare_options.tsv"
+        policy = ["alignment_engine\tminimap2", "minimap_preset\tasm5", "skip_self\tfalse",
+                  "tel_enabled\ttrue", "cen_enabled\ttrue"]
+        expected = "key\tvalue\n" + "\n".join(policy) + "\n"
+        options.write_text(expected + "private_input\t/work/private/input.fq\n")
+        for full in (True, False):
+            target = self.root / ("full-policy" if full else "light-policy")
+            grt_app_package.build(self.source, target, include_fasta=full)
+            self.assertEqual((target / "metadata/prepare_options.tsv").read_text(), expected)
+        self.assertIn("private_input", options.read_text())
+
     def test_build_emits_display_contract_schema_three(self) -> None:
         staging = self.root / "staging"
         no_fasta_staging = self.root / "staging-no-fasta"

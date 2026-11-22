@@ -11,32 +11,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 FAKE_BIN="${TMP_DIR}/bin"
 mkdir -p "$FAKE_BIN"
 
-cat > "${FAKE_BIN}/samtools" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-[[ "${1:-}" == "faidx" ]] || exit 1
-fasta="$2"
-awk '
-  /^>/ {
-    if (name != "") {
-      printf "%s\t%s\t0\t%s\t%s\n", name, length_bp, length_bp, length_bp + 1
-    }
-    name = $1
-    sub(/^>/, "", name)
-    length_bp = 0
-    next
-  }
-  {
-    gsub(/[[:space:]]/, "")
-    length_bp += length($0)
-  }
-  END {
-    if (name != "") {
-      printf "%s\t%s\t0\t%s\t%s\n", name, length_bp, length_bp, length_bp + 1
-    }
-  }
-' "$fasta" > "${fasta}.fai"
-EOF
+cp "${REPO_ROOT}/tests/gpm_server/fixture_faidx.py" "${FAKE_BIN}/samtools"
 
 cat > "${FAKE_BIN}/minimap2" <<'EOF'
 #!/usr/bin/env bash
@@ -219,10 +194,10 @@ PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
   --minimap-preset asm5 \
   -o "$output_root" >/dev/null
 
-test -x "${output_root}/add_ctg.sh"
+test -x "${output_root}/.runtime/commands/add_ctg.sh"
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh"
 
-PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_ctg.sh" \
+PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/add_ctg.sh" \
   --ctg Chr01_gap3_filled \
   --chr Chr01 \
   --track hifiasm \
@@ -230,18 +205,18 @@ PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_ctg.sh" \
   -i "$final_fa" >/dev/null
 
 test -f "${output_root}/add_Chr01_gap3_filled.zip"
-grep -q $'^derived_ctg\t' "${output_root}/metadata/datasets.tsv"
-grep -q $'^derived_ctg\tChr01_gap3_filled\t[0-9][0-9]*\tChr01\t-\tref_alignment\t' "${output_root}/metadata/chr_assignments.tsv"
-grep -q $'^derived_ctg\tChr01_gap3_filled\tdata/derived_ctgs/Chr01_gap3_filled.fa$' "${output_root}/metadata/source_seq_locator.tsv"
-grep -q $'^derived_ctg\tChr01_gap3_filled\t401\t410\t10$' "${output_root}/metadata/source_seq_n_regions.tsv"
-grep -q $'^derived_ctg\tChr01_gap3_filled\tgapfiller\tgap.final.fa\t' "${output_root}/metadata/derived_ctgs.tsv"
-grep -q $'^derived_ctg\tChr01_gap3_filled\tChr01\thifiasm\tderived\t' "${output_root}/metadata/track_members.tsv"
-grep -q '^>Chr01_gap3_filled$' "${output_root}/data/derived_ctgs/Chr01_gap3_filled.fa"
-test -f "${output_root}/data/derived_ctgs/Chr01_gap3_filled.fa.fai"
-test -f "${output_root}/data/datasets/derived_ctg.fa.fai"
-test -f "${output_root}/runs/add_ctg/Chr01_gap3_filled_vs_ref/result.paf"
-test -f "${output_root}/runs/chr_Chr01/add_ctg/hifiasm_vs_Chr01_gap3_filled/result.paf"
-test -f "${output_root}/runs/chr_Chr01/add_ctg/flye_vs_Chr01_gap3_filled/result.paf"
+grep -q $'^derived_ctg\t' "${output_root}/.runtime/metadata/datasets.tsv"
+grep -q $'^derived_ctg\tChr01_gap3_filled\t[0-9][0-9]*\tChr01\t-\tref_alignment\t' "${output_root}/.runtime/metadata/chr_assignments.tsv"
+grep -q $'^derived_ctg\tChr01_gap3_filled\tdata/derived_ctgs/Chr01_gap3_filled.fa$' "${output_root}/.runtime/metadata/source_seq_locator.tsv"
+grep -q $'^derived_ctg\tChr01_gap3_filled\t401\t410\t10$' "${output_root}/.runtime/metadata/source_seq_n_regions.tsv"
+grep -q $'^derived_ctg\tChr01_gap3_filled\tgapfiller\tgap.final.fa\t' "${output_root}/.runtime/metadata/derived_ctgs.tsv"
+grep -q $'^derived_ctg\tChr01_gap3_filled\tChr01\thifiasm\tderived\t' "${output_root}/.runtime/metadata/track_members.tsv"
+grep -q '^>Chr01_gap3_filled$' "${output_root}/01_inputs/04_derived/derived_ctgs/Chr01_gap3_filled.fa"
+test -f "${output_root}/01_inputs/04_derived/derived_ctgs/Chr01_gap3_filled.fa.fai"
+test -f "${output_root}/01_inputs/02_assemblies/derived_ctg.fa.fai"
+test -f "${output_root}/02_alignments/add_ctg/Chr01_gap3_filled_vs_ref/result.paf"
+test -f "${output_root}/02_alignments/chr_Chr01/add_ctg/hifiasm_vs_Chr01_gap3_filled/result.paf"
+test -f "${output_root}/02_alignments/chr_Chr01/add_ctg/flye_vs_Chr01_gap3_filled/result.paf"
 grep -q 'preset=asm5' "$GPM_TEST_MINIMAP_LOG"
 
 add_zip="${output_root}/add_Chr01_gap3_filled.zip"
@@ -261,7 +236,7 @@ assert_file_contains "$add_zip" "--- gpm_server/runs/chr_Chr01/add_ctg/hifiasm_v
 assert_file_contains "$add_zip" "--- gpm_server/runs/chr_Chr01/add_ctg/flye_vs_Chr01_gap3_filled/result.paf"
 assert_file_contains "$add_zip" $'derived_ctg\tChr01_gap3_filled\t401\t410\t10'
 
-if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_ctg.sh" \
+if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/add_ctg.sh" \
   --ctg Chr01_gap3_filled \
   --chr Chr01 \
   --track hifiasm \

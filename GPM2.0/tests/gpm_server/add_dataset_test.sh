@@ -11,15 +11,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 FAKE_BIN="${TMP_DIR}/bin"
 mkdir -p "$FAKE_BIN"
 
-cat > "${FAKE_BIN}/samtools" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-[[ "${1:-}" == "faidx" ]] || exit 1
-fasta="$2"
-seq_name="$(awk '/^>/ { sub(/^>/, "", $1); print $1; exit }' "$fasta")"
-seq_len="$(awk 'BEGIN { n=0 } !/^>/ { gsub(/[[:space:]]/, ""); n += length($0) } END { print n }' "$fasta")"
-printf '%s\t%s\t0\t%s\t%s\n' "$seq_name" "$seq_len" "$seq_len" "$((seq_len + 1))" > "${fasta}.fai"
-EOF
+cp "${REPO_ROOT}/tests/gpm_server/fixture_faidx.py" "${FAKE_BIN}/samtools"
 
 cat > "${FAKE_BIN}/minimap2" <<'EOF'
 #!/usr/bin/env bash
@@ -203,21 +195,21 @@ PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
   --minimap-preset asm5 \
   -o "$output_root" >/dev/null
 
-test -x "${output_root}/add_dataset.sh"
-add_dataset_help="$(bash "${output_root}/add_dataset.sh" --help)"
+test -x "${output_root}/.runtime/commands/add_dataset.sh"
+add_dataset_help="$(bash "${output_root}/.runtime/commands/add_dataset.sh" --help)"
 grep -F -- '--ds [<dataset_name>] <dataset_fasta_path>' <<<"$add_dataset_help" >/dev/null
 grep -F -- 'FASTA basename: .gz and' <<<"$add_dataset_help" >/dev/null
 grep -F -- 'one .fa, .fasta, or .fna suffix are removed case-insensitively' <<<"$add_dataset_help" >/dev/null
 grep -F -- 'A-Z, a-z, 0-9, dot, underscore, and hyphen are replaced with _' <<<"$add_dataset_help" >/dev/null
 
-PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh"
+PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" > "${TMP_DIR}/initial-run.out"
 
-test -f "${TMP_DIR}/gpm_server.zip"
-test -f "${TMP_DIR}/gpm_server.light.zip"
-assert_file_contains "${TMP_DIR}/gpm_server.zip" "--- gpm_server/data/datasets/ds1.fa"
-assert_file_not_contains "${TMP_DIR}/gpm_server.light.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
-assert_file_contains "${TMP_DIR}/gpm_server.light.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
-python3 - "${TMP_DIR}/gpm_server.zip" "${TMP_DIR}/gpm_server.light.zip" <<'PY'
+test -f "${output_root}/07_delivery/00_lgz/gpm_server.zip"
+test -f "${output_root}/07_delivery/00_lgz/gpm_server.light.zip"
+assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.zip" "--- gpm_server/data/datasets/ds1.fa"
+assert_file_not_contains "${output_root}/07_delivery/00_lgz/gpm_server.light.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
+assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.light.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
+python3 - "${output_root}/07_delivery/00_lgz/gpm_server.zip" "${output_root}/07_delivery/00_lgz/gpm_server.light.zip" <<'PY'
 import sys
 from zipfile import ZipFile
 
@@ -233,9 +225,9 @@ for archive_path in sys.argv[1:]:
 PY
 test ! -e "${TMP_DIR}/gpm_server.report.zip"
 test ! -e "${TMP_DIR}/gpm_server.report.html"
-grep -Fq 'Final delivery packages:' "${output_root}/logs/run_all.log"
-grep -Fq 'Full package (FASTA + report):' "${output_root}/logs/run_all.log"
-grep -Fq 'Light package (report included, FASTA omitted):' "${output_root}/logs/run_all.log"
+grep -Fq 'LGZ baseline App packages (not refined):' "${TMP_DIR}/initial-run.out"
+grep -Fq 'Full package (FASTA + report):' "${output_root}/.runtime/logs/run_all.log"
+grep -Fq 'Light package (report included, FASTA omitted):' "${output_root}/.runtime/logs/run_all.log"
 
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" --log-style detailed > "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [ref:ds1]' "${TMP_DIR}/resume.out"
@@ -252,26 +244,26 @@ awk -F '\t' '
     seen += 1
   }
   END { exit seen == 3 ? 0 : 1 }
-' "${output_root}/logs/status.tsv"
+' "${output_root}/.runtime/logs/status.tsv"
 
 awk -F '\t' 'BEGIN { OFS = "\t" } $1 == "chr_assignment_min_coverage_percent" { $2 = "72" } { print }' \
-  "${output_root}/metadata/prepare_options.tsv" > "${output_root}/metadata/prepare_options.tsv.tmp"
-mv "${output_root}/metadata/prepare_options.tsv.tmp" "${output_root}/metadata/prepare_options.tsv"
+  "${output_root}/.runtime/metadata/prepare_options.tsv" > "${output_root}/.runtime/metadata/prepare_options.tsv.tmp"
+mv "${output_root}/.runtime/metadata/prepare_options.tsv.tmp" "${output_root}/.runtime/metadata/prepare_options.tsv"
 
 # Adding display data must not rewrite the original q0/final sequence or
 # retroactively enlist the dataset in its locked recipe and donor freeze.
-frozen_before="$(sha256sum "${output_root}/metadata/grt_q0_freeze.json" \
-  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q3.fa")"
-PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_dataset.sh" --ds "$ds4" >/dev/null
-[[ "$frozen_before" == "$(sha256sum "${output_root}/metadata/grt_q0_freeze.json" \
-  "${output_root}/metadata/grt_recipe.tsv" "${output_root}/grt/q/q0.fa" "${output_root}/grt/q/q3.fa")" ]]
+frozen_before="$(sha256sum "${output_root}/.runtime/metadata/grt_q0_freeze.json" \
+  "${output_root}/.runtime/metadata/grt_recipe.tsv" "${output_root}/03_lgz/01_q0/q0.fa" "${output_root}/03_lgz/04_step3/q3.fa")"
+PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/add_dataset.sh" --ds "$ds4" >/dev/null
+[[ "$frozen_before" == "$(sha256sum "${output_root}/.runtime/metadata/grt_q0_freeze.json" \
+  "${output_root}/.runtime/metadata/grt_recipe.tsv" "${output_root}/03_lgz/01_q0/q0.fa" "${output_root}/03_lgz/04_step3/q3.fa")" ]]
 
 test -f "${output_root}/add_ds4.zip"
-grep -q '^gpm_grt_precomputed_v2' "${output_root}/metadata/package.tsv"
-grep -q $'^recipe-.*\tds1\t\[\]\tfalse\t' "${output_root}/metadata/grt_recipe.tsv"
-grep -q $'^ds4\t' "${output_root}/metadata/datasets.tsv"
-grep -q $'^ds4\tds4_ctg\t' "${output_root}/metadata/chr_assignments.tsv"
-grep -q $'^ds4\tds4_ctg\t401\t404\t4$' "${output_root}/metadata/source_seq_n_regions.tsv"
+grep -q '^gpm_grt_precomputed_v2' "${output_root}/.runtime/metadata/package.tsv"
+grep -q $'^recipe-.*\tds1\t\[\]\tfalse\t' "${output_root}/.runtime/metadata/grt_recipe.tsv"
+grep -q $'^ds4\t' "${output_root}/.runtime/metadata/datasets.tsv"
+grep -q $'^ds4\tds4_ctg\t' "${output_root}/.runtime/metadata/chr_assignments.tsv"
+grep -q $'^ds4\tds4_ctg\t401\t404\t4$' "${output_root}/.runtime/metadata/source_seq_n_regions.tsv"
 grep -q 'preset=asm5' "$GPM_TEST_MINIMAP_LOG"
 assert_file_contains "${output_root}/add_ds4.zip" $'package_type\tadd_dataset'
 assert_file_contains "${output_root}/add_ds4.zip" $'dataset_name\tds4'
@@ -291,16 +283,33 @@ assert_file_not_contains "${output_root}/add_ds4.zip" $'ds1\tds1\t'
 assert_file_not_contains "${output_root}/add_ds4.zip" $'ds1\tds1_ctg\t'
 assert_file_not_contains "${output_root}/add_ds4.zip" "--- gpm_server/data/datasets/ds1.fa"
 assert_file_not_contains "${output_root}/add_ds4.zip" "--- gpm_server/runs/ds1_vs_ref/result.paf"
+python3 - "${output_root}/add_ds4.zip" <<'PYAPP'
+import csv
+import io
+import sys
+from zipfile import ZipFile
+with ZipFile(sys.argv[1]) as archive:
+    assert archive.testzip() is None
+    names = set(archive.namelist())
+    assert not any(name.startswith(("gpm_server/01_inputs/", "gpm_server/02_alignments/", "gpm_server/.runtime/")) for name in names)
+    for table, fields in (("datasets.tsv", ("fasta_relpath", "fai_relpath")),
+                          ("source_seq_locator.tsv", ("fasta_relpath",))):
+        text = archive.read(f"gpm_server/metadata/{table}").decode()
+        rows = list(csv.DictReader(io.StringIO(text), delimiter="\t"))
+        assert len(rows) == 1 and rows[0]["dataset_name"] == "ds4", rows
+        for field in fields:
+            assert "gpm_server/" + rows[0][field] in names, (field, rows[0])
+PYAPP
 
-if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_dataset.sh" --ds ds4 "$ds4" >"${TMP_DIR}/duplicate.out" 2>&1; then
+if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/add_dataset.sh" --ds ds4 "$ds4" >"${TMP_DIR}/duplicate.out" 2>&1; then
   echo "duplicate dataset add should fail" >&2
   exit 1
 fi
 assert_file_contains "${TMP_DIR}/duplicate.out" "Duplicate dataset name: ds4"
 
-PATH="${FAKE_BIN}:$PATH" bash "${output_root}/package_full_zip.sh" >/dev/null
-test -f "${TMP_DIR}/gpm_server.zip"
-assert_file_contains "${TMP_DIR}/gpm_server.zip" "metadata/datasets.tsv"
-assert_file_contains "${TMP_DIR}/gpm_server.zip" $'ds4\tds4\t'
+PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/package_full_zip.sh" >/dev/null
+test -f "${output_root}/07_delivery/00_lgz/gpm_server.zip"
+assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.zip" "metadata/datasets.tsv"
+assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.zip" $'ds4\tds4\t'
 
 echo "gpm_server_add_dataset_test.sh: ok"
