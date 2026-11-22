@@ -4355,3 +4355,29 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - 23:37两主作业均RUNNING，新版23:36:01 **10800/61000、fallback=0**；未改两主任务。
   等同一个14路试验终态、真实25项proof和新分配再决定是否交接。若14路受控收益不足以抵消近期真实
   吞吐和复用回放成本，不要因新资源已经ready而停止原主任务。
+
+### 2026-11-22 23:54 CST：14路原生对照与25项预检均通过，候选分配已起跑、尚未交接
+
+- `43016759 / agent-X86-57 / SUCCEEDED/0`（23:48:57）。完全同一输入及工具，14路×2线程、
+  每路4GiB guard。原 A=123.066/125.008s，优化 B=93.361/77.462s，墙钟平均少 **31.14%**；28窗、
+  776,558,919 B，四轮的 **224** 份粗/精完整输出均匹配历史SHA。最慢优化轮仍比最快原轮少29.705s，
+  每窗批次摊销 **1.061s**（均值1.379s）。按目前待做规模的示例，即使出于混合任务/调度噪声
+  只按较保守差值的70%估算，减去旧任务已知回读的6–9小时，仍值得走受保护接管；**这不是生产吞吐
+  或总ETA保证**，真正复用及新增产出仍要云端验证。`artifacts/report.json` SHA
+  `0cf232c32b398c9baa0e7d28d15c6d92cbf3cc8a09c6622d2573fa65ca2a7175`，`terminal-43016759.json`
+  SHA `fec2b806a344cac76e807ae9f7b0b69f2ea72fd414f500cae6f04dd5f043fc2d`。
+- `43016469 / SUCCEEDED/0` 于23:51:20，25项均真校验且核对原指纹，`buffered-proof.json` SHA
+  `3ca88d2fe478c78f04582f007ba543b5ea4839c06b61761234af1544404cbf15`、`terminal-43016469.json`
+  SHA `a89bdbd37004d3552918bd16378f5b7a14aa128372e89c335103524a17d82515`。观察器一次性申请
+  **43016881 / agent-X86-57** 23:52:02 RUNNING，确为同一14路实验节点，单节点32 CPU/327680MiB
+  硬限制。首次23:53仍校验启动包，不能把RUNNING或manifest成功当ready，也不能提前停原NEW。`loader-resource-submitted.json`
+  SHA `511f66cac5fc25d656c69be266c49bd967ef425a7880547f3597229e81ea4be9`，`handoff-config.json`
+  SHA `fe1d1234b0c3e34b2f4b2f884ffe8b3c1ea16a67c42f05966cf5e767abcb3522`。
+- 另查后续Q0选路径热点：线上和当前候选包的 `q0_paths.py` 还都是原反复扫竞争配对版本，仓库
+  `02b19c60` 的索引版未装；此模块属于 selector/publication 身份，不属于区域 evidence builder
+  指纹。`43016878 / agent-X86-42 / SUCCEEDED/0` 用16,350,606 B SHA绑定原始区域PAF，22真实源对
+  （5对含双方向），按两方向、两种支持模式共88项，**有序坐标和 evidence IDs均相同**。受控门核
+  CPU 0.1078→0.0164s，不预测完整Q0选路径时间，不把中性placements当完整真实布局验收。
+  `q0-indexed-pair-narrow-replay-20261122-2347/report.json` SHA
+  `760752f0d998bcd56ba1a62a1234f5b164e0cf169e17c64baab21ee882312e6f`，实验未热改活跃runtime
+  或原候选包。需在实际下游入口/已绑定依赖范围另证后再考虑应用，不拿它拖延当前已验证的mapper优化。
