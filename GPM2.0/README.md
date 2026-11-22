@@ -268,10 +268,10 @@ The package preserves the primary and auxiliary dataset roles established during
 
 | Workspace View | Purpose |
 | --- | --- |
-| **1. Project & Datasets** | Import Full/Light archives or `test_data.zip`, manage local workspaces, and inspect per-dataset sequence counts, total lengths, N50, and N90. |
+| **1. Project & Datasets** | Import Full/Light archives or `test_data.zip`, manage local workspaces, inspect per-dataset sequence counts, total lengths, N50, and N90, and check automatic/manual **Refinement** status. |
 | **2. Preview** | Inspect chromosome-level Final Path source contributions and remaining gaps at a glance before entering a chromosome workspace. |
 | **3. Assembly & Subview** | Examine chromosome-wide collinearity ribbons, filter alignments, manipulate contig cards, and zoom in on local pairwise evidence in Subview. |
-| **4. Final Path & Export** | Reorder, flip, or insert contig slices and gaps (with per-chromosome baseline restore), export `DEGAP-JOBS`, or export PNG, TSV, LOG, and FASTA files. |
+| **4. Final Path & Export** | Reorder, flip, or insert contig slices and gaps (with per-chromosome baseline restore and Final Path Log contribution summary), queue and export **Refinement Tasks** (`refinement_tasks.zip` for current chromosome or all queued project loci, paired with `refine.py`) or **Legacy DEGAP-JOBS (scripts)**, or export PNG, TSV, LOG, AGP, and FASTA files. |
 
 ### In-app updates (updater-enabled builds)
 
@@ -309,3 +309,5 @@ bash ./gpm_server/export_final_path_fasta.sh \
 ```
 
 GPM v2.0.20 bundles the pinned DEGAP2.0 runtime with Server in the shared `cgat-server` environment and includes the matching App task-card workflow. In App, leave the custom DEGAP path empty. Export jobs, run `bash run_degap_jobs.sh` on Server, then use **Import DEGAP results** to import `degap_results.zip` as candidates without changing Final Path. See the Server guide for scheduler use, updates and provenance checks.
+
+In the current feature-branch source, Assembly provides project-scoped **Export Refinement Tasks** (`refinement_tasks.zip`, exporting either the current chromosome's queued loci or all queued loci in the project; single tool per Gap job with `DEGAP` default, fixed `DEGAP TelSeeker` for terminal telomeres) paired with Server `python .lib/tools/refine.py refinement_tasks.zip` (reports under `08_refinement_jobs/02_manual/` and `06_report/report.html`, omitting private Server read paths in HTML). Import `refinement_results.zip` back from the Project page **Refinement** card (between **Datasets** and **Pseudomolecule Preview**), which reloads authoritative Assembly and Preview state after import and wires locus-level undo/candidate-switch actions to backend verification (no local simulation). See [server/REFINEMENT.md](server/REFINEMENT.md).

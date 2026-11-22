@@ -100,6 +100,10 @@ cgat_server/
   07_delivery/
     00_lgz/cgat_server[.light].tar.gz
     01_degap/cgat_server.degap[.light].tar.gz
+  08_refinement_jobs/
+    02_manual/
+      <batch_sha256>/                项目级手动精修批次、结果包与 report.html
+  .lib/                              工作区内嵌运行库副本（包含 .lib/tools/refine.py）
   .runtime/                          锁、checkpoint、metadata、日志和历史
     refinement/<tool-dir>/<run>/final/  按来源重建的私有待发布结果
 ```
@@ -127,6 +131,15 @@ TGS-GapCloser、quarTeT GapFiller、LR_Gapcloser 的固定入口不生成原生 
 将某工具的 **Full** 包导入匹配新版 App 的新项目。其权威 Final Path 和导出染色体对应该工具的接纳结果，`00_lgz` 包则明确未精修。Full 包含来源 FASTA；Light 不含 FASTA，但保留索引、metadata、路径及来源关系，因此导出 FASTA 前需要真实序列来源就绪。不要覆盖已有人工编辑的项目。精修包协议为 schema 5 / App Final Path 4；旧 App 拒绝该协议，不静默显示 LGZ 路径。新 App 保留对旧包的兼容。
 
 手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/01_degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。已提交迁移清单绑定的旧人工包现可纳入不可变 registry，不重跑原生任务或其比对。未知旧结果 ZIP 仍保护：保留原 ZIP，复制未改动的原 `jobs.tsv` 和 `degap_jobs/` receipt 到新的空目录收集，不重新导出 token。不能把这些协议检查等同于手动全链路验收。
+
+### 项目级手动精修（`refine.py`，当前源码）
+
+除旧版脚本包入口（App 中明确标为「旧版 DEGAP-JOBS（脚本包）」）外，当前功能分支源码在配套桌面端 App 与 Server 工作区之间新增项目级 **精修任务** 流程：
+
+1. **App 导出（装配页 → 导出精修任务）：** 在装配页按项目跨染色体登记 Final Path 的 **Gap**（每个 Gap **单选**一个工具：默认 `degap`，或单选 `lrgapcloser`、`tgsgapcloser`、`quartet`）及 **左/右端粒端点**（固定 `DEGAP TelSeeker (telseeker_ctg)` 并配置端粒 motif）。导出支持「当前染色体已选」和「本项目全部已选」两种范围（仅汇总本项目已登记位点，不扫描未选位点、不跨项目），写出 `refinement_tasks.zip`。新任务每个位点仅提交 1 个工具（旧多工具任务包继续兼容读取）。默认沿用项目已校验的 reads（界面不展示私有路径），也可显式覆盖或清空；空 reads 同样允许导出。
+2. **Server 运行：** 将 `refinement_tasks.zip` 传到对应 Server 工作区，运行 `python .lib/tools/refine.py refinement_tasks.zip`（或已安装的 `~/bin/refine.py`，内部统一委派工作区运行库）。如需在 Server 端指定或覆盖 reads，可追加 `--hifi <文件...>` / `--ont <文件...>`；参数说明见 `--help`。产物保存在 `08_refinement_jobs/02_manual/<batch_sha256>/`，包含 `refinement_results.zip`、`summary.json` 和 `report.html`，并在 `06_report/report.html` 合并手动精修区段，不会改动自动终版 `05_final/`。
+3. **报告边界与隐私：** 可分享 HTML 报告不公开服务器私有 reads 路径（仅保留测序类型与 SHA-256 摘要），明确区分「等待导回 App」（`pending_app_import`）与「无可导回补丁」（`no_patch`）；无 App 回执前绝不标记为已导回。
+4. **App 导回、来源标记与撤销/切换：** 项目页「精修」卡片（位于数据集表与假分子预览之间）通过 `list_manual_refinement_results` 展示真实导回批次，并通过 `import_manual_refinement_results` 直接导入 `refinement_results.zip`（导入前先保存当前项目待保存的 Final Path，导入成功后重新载入权威装配与预览数据，不新建也不指定轨道）。已采用的精修片段在 Final Path 图与表中统一显示轻量「精修」标记，详细来源见 Tooltip 与 Final Path 日志贡献表。位点级撤销与候选切换已按 `undo_manual_refinement_locus` / `switch_manual_refinement_locus` 协议接入（不做本地模拟，由后端校验版本与边界）。Server CLI 与报告测试位于 `GPM2.0/server/tests/test_refine.py`。
 
 新版 App 为捆绑的双向 DEGAP 单独使用 `shared_prepare.family-v1/`，按哈希记录原始 reads 和转换程序，不接用旧的未校验 FASTA/索引缓存。若旧导出脚本指向旧缓存，请保留旧结果；需要重跑时，用新版 App 重新导出并选择新的 job 输出目录。已有候选包仍按原规则收集或导入。
 

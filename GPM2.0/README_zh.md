@@ -255,10 +255,10 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 
 | 工作区模块 | 功能说明 |
 | --- | --- |
-| **1. 项目导入与数据集表** | 导入 Full / Light 交付包或 `test_data.zip`，管理本地工作区，汇总查看参考、主/辅组装及派生数据集的序列数、总长度、N50 与 N90。 |
+| **1. 项目导入、数据集表与精修** | 导入 Full / Light 交付包或 `test_data.zip`，管理本地工作区，汇总查看参考、主/辅组装及派生数据集的序列数、总长度、N50 与 N90，并查看自动/手动 **精修** 状态。 |
 | **2. Preview（来源总览）** | 全局浏览各染色体 Final Path 的来源数据集分布与剩余 Gap 位置，快速定位待复核染色体。 |
 | **3. Assembly 与 Subview** | 在染色体尺度检查共线性比对色带、调整筛选条件、移动/翻转/隐藏/镜像 contig，并在 Subview 中放大核对局部成对比对与锚点证据。 |
-| **4. Final Path 编辑与导出** | 编辑染色体片段顺序与方向（支持按染色体一键恢复服务端预计算基线），导出 `DEGAP-JOBS` 长读段补洞任务，或导出 PNG、TSV、日志与 FASTA。 |
+| **4. Final Path 编辑与导出** | 编辑染色体片段顺序与方向（支持按染色体一键恢复服务端预计算基线及 Final Path 日志贡献表），按当前染色体或本项目全部已选范围登记并**导出精修任务**（`refinement_tasks.zip`，配合 `refine.py`）或**旧版 DEGAP-JOBS（脚本包）**，或导出 PNG、TSV、日志、AGP 与 FASTA。 |
 
 ### 应用内更新（已启用更新的构建）
 
@@ -296,3 +296,5 @@ bash ./gpm_server/export_final_path_fasta.sh \
 ```
 
 GPM v2.0.20 在 Server 中附带固定版本的 DEGAP2.0，与 GPM 共用 `cgat-server` 环境，并提供配套的 App 任务卡工作流。App 的自定义 DEGAP 路径留空即可。导出任务后在 Server 执行 `bash run_degap_jobs.sh`，再通过“导入 DEGAP 结果”导入 `degap_results.zip`；结果作为候选加入，不改变 Final Path。调度器、旧项目更新和来源校验说明见 Server 指南。
+
+当前功能分支源码在装配页提供项目级「导出精修任务」（支持「当前染色体已选」和「本项目全部已选」两个范围；每个 Gap 任务单选一个工具且默认 `DEGAP`，左/右端粒固定 `DEGAP TelSeeker`），导出 `refinement_tasks.zip` 后在 Server 运行 `python .lib/tools/refine.py refinement_tasks.zip`（产物与报告位于 `08_refinement_jobs/02_manual/` 和 `06_report/report.html`，HTML 报告不公开服务器私有 reads 路径）。完成后在项目页「精修」卡片（位于数据集表与假分子预览之间）点击「导入精修结果」导回 `refinement_results.zip`，自动重新载入权威装配与预览数据，并将位点撤销/候选切换接入后端校验（不做本地模拟）。详见 [server/REFINEMENT_zh.md](server/REFINEMENT_zh.md)。

@@ -87,8 +87,9 @@ per-task allocations separately from the total budget.
 On ARM and x86, validate tools on the actual execution architecture. Do not reuse
 a cross-architecture binary or `.mmi` without the workflow's content/tool/preset
 identity checks, and do not infer an optimization speedup from an ARM/x86 wall
-time difference alone. Existing workspaces retain their copied `.prepare_lib/`
-runtime; updating the source or skill does not hot-edit them.
+time difference alone. New workspaces store their public copied runtime in `.lib/` (legacy `.prepare_lib/`
+and older numbered-workspace `.runtime/prepared/` are compatibility read/migration
+paths only); updating the source or skill does not hot-edit existing workspaces.
 
 ## First run
 
@@ -128,7 +129,9 @@ bash "$SERVER/run.sh" -o "$WORK"
 Resume in the same verified software environment and within the original resource
 budget. Do not supply new inputs or unrelated preparation parameters. The workspace
 stores its options, input identities, plan, checkpoints, and a copied runtime in
-`.prepare_lib/`; updating the source directory does not update that runtime.
+`.lib/` (legacy `.prepare_lib/` and older numbered-workspace `.runtime/prepared/`
+are compatibility read/migration paths only); updating the source directory does
+not update that runtime.
 Use a new output directory when inputs/settings change. A supported, explicitly
 requested `--max-fill` adjustment is an exception; inspect local help first.
 Resuming does not guarantee zero work: the runner validates checkpoints and may
@@ -144,6 +147,30 @@ fixture when available. These establish scheduler/batching correctness and PAF
 equivalence, but do not replace complete-workflow, Final Path, or biological
 acceptance. If a full run is explicitly deferred, preserve its status as
 unvalidated rather than calling the hotspot gate a production result.
+
+## Manual refinement
+
+For App-exported project-scoped manual refinement (`refinement_tasks.zip`), run
+from the matching Server workspace root:
+
+```bash
+python .lib/tools/refine.py /absolute/path/to/refinement_tasks.zip
+# Optional repeatable read overrides; default validates, prepares, and executes directly.
+python .lib/tools/refine.py /absolute/path/to/refinement_tasks.zip --hifi /reads/hifi.fq.gz --ont /reads/ont.fq.gz
+# Advanced option: validate and prepare local inputs without running native tools.
+python .lib/tools/refine.py /absolute/path/to/refinement_tasks.zip --prepare-only
+```
+
+`~/bin/refine.py` may also be used as a global entrypoint; it resolves the current
+project's runtime first (`.lib/`, with legacy `.prepare_lib/` and older
+numbered-workspace `.runtime/prepared/` as compatibility read/migration paths only)
+and never mixes versions across workspaces.
+
+Manual runs write `08_refinement_jobs/02_manual/<batch>/03_report` (`summary.json`,
+`report.html`) and `04_delivery` (`refinement_results.zip`), and update
+`06_report/report.html`. Before importing `refinement_results.zip` back into the
+original App project, manual outputs remain pending deliverables and must not
+write to or impersonate automatic `05_final/` publications.
 
 ## Completion gates
 

@@ -113,8 +113,9 @@ closed stdin). New run/resume launchers check before analysis, then exec fresh c
 An unavailable check before writes can use an integrity-verified installed runtime;
 a failed write or rollback stops startup. Development packages skip auto-updates.
 Updates align tools, registered skill copies and the current project's
-`.prepare_lib/`, preserving `local/`, bindings, logs, results, caches, generated
-scripts and the environment. Stop all affected jobs, including other nodes;
+`.lib/` runtime (legacy `.prepare_lib/` and older numbered-workspace `.runtime/prepared/`
+are compatibility read/migration paths only), preserving `local/`, bindings, logs,
+results, caches, generated scripts and the environment. Stop all affected jobs, including other nodes;
 updates neither start analysis nor reinstall dependencies. A source/version error
 is not “already latest”. Read the reference before handling custom files, dependency
 changes, missing legacy `update.sh`, or rollback.
@@ -150,6 +151,15 @@ before trying a repair. Read only the relevant reference, not every file by defa
 Use `run.sh` for prepare-and-run and for resuming an existing workspace.
 `prepare.sh` only prepares; it is not proof of completed computation.
 The generated workspace's `run_all.sh` is also a supported execution entrypoint.
+For App-exported project-scoped manual refinement (`refinement_tasks.zip`), run
+`python .lib/tools/refine.py refinement_tasks.zip` from the matching Server workspace
+root (`--hifi`/`--ont` are optional; execution runs directly by default; `--prepare-only`
+is an advanced option). Global `~/bin/refine.py` is also supported and resolves the
+current project's runtime first (`.lib/`, with legacy `.prepare_lib/` and older
+numbered-workspace `.runtime/prepared/` as compatibility read/migration paths only)
+without mixing versions. Manual jobs write `08_refinement_jobs/02_manual/<batch>/03_report`
+and `04_delivery`, update `06_report/report.html`, and must never write to or
+impersonate automatic `05_final/` publications before App import.
 Use absolute paths, capture exit status and logs, and keep the job ID for
 asynchronous work. Recheck a live job rather than submitting a duplicate when
 an SSH session ends or a monitoring request times out.

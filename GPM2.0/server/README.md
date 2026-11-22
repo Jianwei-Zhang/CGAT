@@ -133,7 +133,8 @@ bash ~/bin/GPM_Server/update.sh
 This entrypoint requires a source package containing `update.sh`. If an older package lacks it, follow the Server/skill one-time adoption instructions rather than overwriting the installation.
 
 For custom installations use the actual path. Run it from the project root or a
-child directory to align that project's `.prepare_lib/` with tools. Outside a
+child directory to align that project's `.lib/` runtime (legacy `.prepare_lib/`
+and older numbered-workspace `.runtime/prepared/` remain compatibility read/migration paths only) with tools. Outside a
 project, other projects are not scanned. Checks/downloads prefer the
 [official docs](https://riceome.hzau.edu.cn/cgat/downloads), falling back to
 [GitHub Release](https://github.com/Jianwei-Zhang/CGAT/releases/latest) on failure.
@@ -324,7 +325,7 @@ The installed minimap2 binary and CGAT's alignment defaults are unchanged.
 | File | Purpose | When to run it |
 | --- | --- | --- |
 | `install.sh` | Create, update, and verify the `cgat-server` environment | First installation or dependency updates |
-| `update.sh` | Check and update Server tools, bound skills, and project `.runtime/prepared/` runtime | Routine maintenance and workspace runtime alignment |
+| `update.sh` | Check and update Server tools, bound skills, and project `.lib/` runtime (legacy `.prepare_lib/` and `.runtime/prepared/` supported for compatibility/migration) | Routine maintenance and workspace runtime alignment |
 | `env.sh` | Compatibility entry for `install.sh` | Only for existing commands |
 | `run.sh` | Prepare and execute the full workflow, or resume an existing workspace | First run or recovery |
 | `prepare.sh` | Compatibility entry for preparation only | When separate script generation is needed |
@@ -332,7 +333,7 @@ The installed minimap2 binary and CGAT's alignment defaults are unchanged.
 
 Rerun the same `run.sh` command, or use `bash "$SERVER/run.sh" -o ./gpm_server` to resume with validated results reused. The generated `run_all.sh` remains directly executable. After stopping the previous job, change the thread budget with `bash "$SERVER/run.sh" -o ./gpm_server --threads 64`; `--lgz-qc-memory-gb` may also be adjusted. Omitted budgets retain their last values, including when using `run_all.sh` directly. Request matching scheduler resources first; this does not resize a live job. Resource changes do not alter analysis settings or invalidate otherwise valid completed work.
 
-On compute nodes where update sources are unreachable, startup verifies the local installation and aligns `.runtime/prepared` without downloading. Detailed failed checks are saved in `.runtime/run_all/update-check.log`; offline startup does not imply that the local version is the latest.
+On compute nodes where update sources are unreachable, startup verifies the local installation and aligns `.lib/` (or legacy `.prepare_lib/` / `.runtime/prepared/` compatibility runtimes) without downloading. Detailed failed checks are saved in `.runtime/run_all/update-check.log`; offline startup does not imply that the local version is the latest.
 
 `--max-fill <bp>` sets the length limit for both Step2 optimized refill rounds (default: `1000000`). Change it with `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.
 
@@ -462,7 +463,7 @@ seed sources by identity/content rather than guessing portable App paths. A
 controlled App export/Server collection/original-App import has passed without
 changing the manually edited Final Path; this is not real native-tool acceptance.
 Original migration-bound manual caches can be adopted without rerunning their jobs/alignments; unknown prior result ZIPs remain protected. Final acceptance remains pending. This is separate
-from automatic post-LGZ refinement and importing its new App delivery package.
+from automatic post-LGZ refinement and importing its new App delivery package. For the current source's project-scoped manual refinement tasks (`refinement_tasks.zip`), use the `refine.py` entrypoint below.
 
 GPM v2.0.20 includes the pinned DEGAP2.0 Server runtime and the matching App
 task-card workflow described below. Update both Server and App to use this workflow.
@@ -474,7 +475,7 @@ second `degap_env`. The installer updates an existing CGAT-managed environment;
 `--check` verifies both external commands and the required Python modules.
 Stop affected jobs before updating an existing environment. For an older Server
 installation, run the new package's installer first, then update installed tools
-and the project's `.prepare_lib`; keep the existing project and its results.
+and the project runtime (`.lib/` in new workspaces; legacy `.prepare_lib/` and older numbered-workspace `.runtime/prepared/` remain compatibility read/migration paths only); keep the existing project and its results.
 If the old updater still rejects the changed dependency specification, run the
 **new package's** updater against the old installation from the existing project:
 `python /path/to/new/GPM_Server/tools/update_server.py /path/to/installed/GPM_Server`.
@@ -533,3 +534,19 @@ bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapclo
 The four engines run sequentially and independently from the same LGZ baseline. `--gapfill-tools none` disables only this invocation; no `--final-tool` is needed. See the [full guide](REFINEMENT.md) for read allocation, exact pins/disclosed patches, saved-setting replacement and recovery boundaries. Unnumbered old workspaces need explicit migration first; do not re-prepare them or delete valid results.
 
 Start at `06_report/report.html`. `05_final/00_lgz` is explicitly unrefined; admitted tool results use `05_final/01_degap`, `02_tgsgapcloser`, `03_quartet` and `04_lrgapcloser`, with corresponding archives under `07_delivery/<tool-directory>/`. Import a tool's package with the matching new App: its Final Path and exported FASTA describe that accepted refinement, not an extra FASTA beside an unchanged LGZ view. All four pinned engines have run on synthetic inputs on Linux x86_64. ARM64 dependency resolution passed; ARM64 installation and native runs are not yet verified. These checks do not establish biological accuracy or runtime gains.
+
+### Project-scoped manual refinement (current source)
+
+For project-scoped manual refinement tasks (`refinement_tasks.zip`) exported from the matching App, run from the corresponding Server workspace root:
+
+```bash
+python .lib/tools/refine.py refinement_tasks.zip
+# Optional repeatable read overrides; default validates, prepares, and executes directly.
+python .lib/tools/refine.py refinement_tasks.zip --hifi /reads/hifi.fq.gz --ont /reads/ont.fq.gz
+# Advanced option: validate and prepare local inputs without running native tools.
+python .lib/tools/refine.py refinement_tasks.zip --prepare-only
+```
+
+New workspaces expose their public runtime at `.lib/`; legacy `.prepare_lib/` and older numbered-workspace `.runtime/prepared/` are compatibility read/migration paths only. `~/bin/refine.py` may also be used as a global entrypoint; it resolves the current project's runtime first (`.lib/`, falling back only for compatibility to `.prepare_lib/` or `.runtime/prepared/`) without mixing versions across projects.
+
+Manual batches write `08_refinement_jobs/02_manual/<batch>/03_report` (`summary.json`, `report.html`) and `04_delivery` (`refinement_results.zip`), and update the workspace overview `06_report/report.html`. Each new Gap job selects one tool (`degap` by default, or one of `lrgapcloser`, `tgsgapcloser`, `quartet`; legacy multi-tool archives remain read-compatible), while Left/Right Telomere jobs use `DEGAP TelSeeker`. Shareable HTML reports omit private Server read paths (showing read technology and SHA-256 digests) and distinguish `Pending App import` from `No patch to import`. Before importing `refinement_results.zip` back into the original App project via the Project **Refinement** card, manual results remain pending deliverables and must not write to or impersonate automatic `05_final/` publications.

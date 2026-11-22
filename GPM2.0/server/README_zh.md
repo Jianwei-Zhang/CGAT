@@ -126,7 +126,7 @@ bash ~/bin/GPM_Server/update.sh
 此入口要求工具包包含 `update.sh`；旧包缺少该脚本时不要直接覆盖安装，先按 Server/skill 更新说明完成一次性接入。
 
 自定义安装请使用实际路径。在项目根目录或子目录执行，会检测当前项目的
-`.prepare_lib/`，并与 tools 对齐；在项目外执行，不扫描其他项目。
+`.lib/` 运行时目录（旧项目 `.prepare_lib/` 与旧版编号工作区的 `.runtime/prepared/` 仅作兼容读取/迁移路径），并与 tools 对齐；在项目外执行，不扫描其他项目。
 检查和下载优先走[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)，失败回退
 [GitHub Release](https://github.com/Jianwei-Zhang/CGAT/releases/latest)，校验大小、SHA-256
 及包内文件清单。tools 与 skill 来自同一发布源码包，同版本附件刷新也能识别。
@@ -288,7 +288,7 @@ LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之�
 | 文件 | 用途 | 何时执行 |
 | --- | --- | --- |
 | `install.sh` | 创建、更新并验证 `cgat-server` 环境 | 首次安装或依赖更新时 |
-| `update.sh` | 检查并更新 Server 工具、已绑定 skill 与项目 `.runtime/prepared/` 运行库 | 日常升级维护或对齐旧项目运行库时 |
+| `update.sh` | 检查并更新 Server 工具、已绑定 skill 与项目 `.lib/` 运行库（旧 `.prepare_lib/` 和 `.runtime/prepared/` 作兼容读取/迁移路径） | 日常升级维护或对齐项目运行库时 |
 | `env.sh` | `install.sh` 的兼容入口 | 仅供旧命令继续使用 |
 | `run.sh` | 自动准备并执行完整流程，已有工作目录按断点继续 | 首次运行或恢复 |
 | `prepare.sh` | 兼容原有的仅准备命令 | 需要单独生成脚本时 |
@@ -296,7 +296,7 @@ LGZ 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之�
 
 重复同一条 `run.sh` 命令，或执行 `bash "$SERVER/run.sh" -o ./gpm_server` 即可恢复；已通过校验的结果会复用。生成的 `run_all.sh` 仍可直接执行。旧作业停止后，可用 `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` 调整线程预算，也可修改 `--lgz-qc-memory-gb`。省略资源参数或直接运行 `run_all.sh` 时沿用上次生效值；恢复前需申请相应调度资源，不会在线调整正在运行的作业。资源修改不改变分析设置，也不会仅因此使其他条件仍有效的已完成结果失效。
 
-计算节点无法访问更新源时，启动会校验本机安装，并在无需下载的情况下对齐 `.runtime/prepared`。检查失败的详细信息保存在 `.runtime/run_all/update-check.log`；离线启动不表示本机已经是线上最新版本。
+计算节点无法访问更新源时，启动会校验本机安装，并在无需下载的情况下对齐 `.lib/`（旧工作区兼容 `.prepare_lib/` 或 `.runtime/prepared/`）。检查失败的详细信息保存在 `.runtime/run_all/update-check.log`；离线启动不表示本机已经是线上最新版本。
 
 `--max-fill <bp>` 设置 Step2 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
 
@@ -393,7 +393,7 @@ Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目�
 
 ## DEGAP2.0 与 Server 共用环境
 
-下方手动导出 App `DEGAP-JOBS` 的流程对应已发布旧布局协议。当前源码收集器已将编号工作区的人工候选隔离到 `04_refinement/01_degap/06_manual/01_catalog/`，不追加原 LGZ metadata；匹配源码构建的 App 现已按实际 Server 布局解析运行库，并按身份/内容定位种子来源，不猜测便携路径。受控的 App 导出—Server 收集—原 App 导入检查通过，手动编辑的 Final Path 未改变；这不是原生工具验收。迁移清单绑定的旧人工包可接续，不重跑原任务/比对；未知旧结果 ZIP 仍拒绝覆盖。最终验收仍待完成。它与 LGZ 后自动精修及导入各工具新版 App 包是两条不同入口。
+下方手动导出 App `DEGAP-JOBS` 的流程对应已发布旧布局协议。当前源码收集器已将编号工作区的人工候选隔离到 `04_refinement/01_degap/06_manual/01_catalog/`，不追加原 LGZ metadata；匹配源码构建的 App 现已按实际 Server 布局解析运行库，并按身份/内容定位种子来源，不猜测便携路径。受控的 App 导出—Server 收集—原 App 导入检查通过，手动编辑的 Final Path 未改变；这不是原生工具验收。迁移清单绑定的旧人工包可接续，不重跑原任务/比对；未知旧结果 ZIP 仍拒绝覆盖。最终验收仍待完成。它与 LGZ 后自动精修及导入各工具新版 App 包是两条不同入口；当前源码的项目级手动精修任务（`refinement_tasks.zip`）请使用下文 `refine.py` 入口。
 
 GPM v2.0.20 附带固定版本的 DEGAP2.0 Server 运行时，以及下文配套的 App 任务卡工作流。
 请同时更新 Server 和 App 后使用。
@@ -403,7 +403,7 @@ GPM v2.0.20 附带固定版本的 DEGAP2.0 Server 运行时，以及下文配套
 安装到 **cgat-server**，无需另建 `degap_env`。安装器可以更新已有的 CGAT 管理环境；
 `--check` 会检查外部命令和 Python 模块。
 更新已有环境前先停止相关任务。旧安装请先运行新包中的安装器，再更新已安装工具和
-项目 `.prepare_lib`，保留原项目及结果，不要删除或重新准备项目。代码更新器不会代替用户安装依赖。
+项目运行库（新项目为 `.lib/`，旧项目 `.prepare_lib/` 和旧编号工作区 `.runtime/prepared/` 仅作兼容读取/迁移路径），保留原项目及结果，不要删除或重新准备项目。代码更新器不会代替用户安装依赖。
 如果旧更新器仍拒绝依赖规格变化，请在已有项目目录中，用**新包的更新器**更新原安装：
 `python /path/to/new/GPM_Server/tools/update_server.py /path/to/installed/GPM_Server`。
 这样使用新的依赖验证逻辑，保留原安装路径绑定。
@@ -449,3 +449,19 @@ bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapclo
 四工具从同一 LGZ 基线串行、独立运行；`--gapfill-tools none` 只关闭本次精修，不需要 `--final-tool`。reads 分配、固定版本/兼容补丁、保存参数替换规则与恢复边界见[完整指南](REFINEMENT_zh.md)。未编号旧目录必须先显式迁移；不要覆盖 prepare 或删除有效结果。
 
 从 `06_report/report.html` 进入本次报告；`05_final/00_lgz` 明确未精修，每工具真正的接纳结果位于 `05_final/01_degap`、`02_tgsgapcloser`、`03_quartet`、`04_lrgapcloser`，交付包对应放在 `07_delivery/<工具目录>/`。使用匹配新版 App 导入某工具包，Final Path 和导出 FASTA 均来自该精修结果，不再仅提供一份额外 FASTA 而仍显示 LGZ 路径。四种固定版本的工具都已在 Linux x86_64 上用合成数据运行；ARM64 已通过依赖求解，尚未完成安装与原生运行验证。这些检查不代表生物学准确率或性能收益。
+
+### 项目级手动精修（当前源码）
+
+对于匹配新版 App 导出的项目级手动精修任务包（`refinement_tasks.zip`），从对应 Server 工作区根目录执行：
+
+```bash
+python .lib/tools/refine.py refinement_tasks.zip
+# 可选：按需覆盖 HiFi / ONT reads（可重复传入）；默认直接校验、准备并执行。
+python .lib/tools/refine.py refinement_tasks.zip --hifi /reads/hifi.fq.gz --ont /reads/ont.fq.gz
+# 高级选项：仅校验并准备局部输入，不运行原生工具。
+python .lib/tools/refine.py refinement_tasks.zip --prepare-only
+```
+
+新项目公开运行时目录为 `.lib/`，旧项目 `.prepare_lib/` 与旧版编号工作区的 `.runtime/prepared/` 仅作为兼容读取/迁移路径。`~/bin/refine.py` 也可作为全局入口，但严格遵循当前项目运行时优先（先 `.lib/`，再兼容旧 `.prepare_lib/` 或 `.runtime/prepared/`），不混用不同项目的运行时版本。
+
+手动任务会写入 `08_refinement_jobs/02_manual/<batch>/03_report`（`summary.json`、`report.html`）与 `04_delivery`（`refinement_results.zip`），并同步更新总报告 `06_report/report.html`。新 Gap 任务每个位点单选一个工具（默认 `degap`，也可单选 `lrgapcloser`、`tgsgapcloser` 或 `quartet`，旧多工具任务包继续兼容读取），左/右端粒任务固定使用 `DEGAP TelSeeker`。可分享 HTML 报告不公开服务器私有 reads 路径（保留测序类型与 SHA-256 摘要），并明确区分「等待导回 App」与「无可导回补丁」。在通过项目页「精修」卡片将 `refinement_results.zip` 导回原 App 项目前，手动结果仅属于待导回产物，不得写入或冒充自动精修的 `05_final/`。
