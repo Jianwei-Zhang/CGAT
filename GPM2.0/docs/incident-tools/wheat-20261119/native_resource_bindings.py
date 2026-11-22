@@ -6,6 +6,7 @@ objects before the scientific layer merges/commits. Readers use the same receipt
 validation. This module is not an installed context or a production cutover.
 """
 import dataclasses
+import hashlib
 import json
 from pathlib import Path
 import shlex
@@ -48,15 +49,20 @@ class NativeBindings:
         path = Path(path)
         return {"path":str(path), "sha256":self.contract.sha256_file(path)}
 
-    def expected_spec(self, rel, i):
+    def operation_records(self, rel):
+        profile = self.profiles[rel]
+        return self.record(profile.source), self.record(profile.native["restore"])
+
+    def expected_spec(self, rel, i, *, operation_records=None):
         profile = self.profiles[rel]; m = profile.native; row = self.rows[rel]
         command = Path(m["batches"][i]["directory"]) / "command.sh"
+        manifest, restore = self.operation_records(rel) if operation_records is None else operation_records
         return {"schema":guard.SCHEMA,"policy":guard.POLICY,
-                "manifest":self.record(profile.source),"batch_index":i,
+                "manifest":manifest,"batch_index":i,
                 "native_key":m["batches"][i]["key"],
                 "native_command":{"path":str(command),"sha256":row["native_commands"][str(i)]["sha256"]},
                 "runtime":{**self.plan["native_runtime"],"adapter":self.plan["dependencies"]["native_guard"],
-                           "restore":self.record(m["restore"])}}
+                           "restore":restore}}
 
     def checked(self, record, *, isolated=False):
         path = Path(record["path"])
@@ -86,8 +92,13 @@ class NativeBindings:
             keys = eligible(profile)
             if set(row.get("native_scripts",{})) != keys or set(row.get("native_specs",{})) != keys:
                 raise ValueError("native resource inventory differs from eligible native batches")
+            # Every batch in this operation refers to the same manifest and
+            # restore file. Bind them once here, and verify them again before
+            # accepting the operation. Do not cache these records across calls.
+            operation = self.operation_records(rel) if len(keys) > 2 else None
             for key in sorted(keys, key=int):
-                script = self.checked(row["native_scripts"][key], isolated=True)
+                script_record = row["native_scripts"][key]
+                script = self.checked(script_record, isolated=True)
                 spec_path = self.checked(row["native_specs"][key], isolated=True)
                 if script in paths or spec_path in paths or script == spec_path:
                     raise ValueError("duplicate native wrapper or specification")
@@ -96,10 +107,17 @@ class NativeBindings:
                 if token not in self._specs:
                     self._specs[token] = json.loads(spec_path.read_text())
                 spec = self._specs[token]
-                if spec != self.expected_spec(rel,int(key)):
+                if spec != self.expected_spec(rel,int(key),operation_records=operation):
                     raise ValueError("native resource spec changes source, key, tool or parameters")
-                if script.read_text() != wrapper_text(spec["runtime"]["adapter"]["path"],spec_path):
+                expected_wrapper = wrapper_text(spec["runtime"]["adapter"]["path"],spec_path)
+                # checked() already verified the actual byte digest for this
+                # path. Only old newline/encoding variants need the original
+                # text comparison, which preserves the prior acceptance rule.
+                if (hashlib.sha256(expected_wrapper.encode("utf-8")).hexdigest() != script_record["sha256"]
+                        and script.read_text() != expected_wrapper):
                     raise ValueError("native wrapper is not the canonical guarded invocation")
+            if operation is not None and self.operation_records(rel) != operation:
+                raise ValueError("native operation manifest or restore changed during verification")
 
     def verify(self, *, full=False, operations=None):
         self.original.verify(full=full, operations=operations)

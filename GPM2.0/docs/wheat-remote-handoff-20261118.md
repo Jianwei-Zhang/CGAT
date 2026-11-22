@@ -4409,3 +4409,20 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `Q0_HANDOFF_ACCEPTED`。截至00:08尚在核验前缀，不能把门禁接收当成runtime安装、25项实际复用
   或新版完成。仍需按新owner/run核对`installation/receipt.json`、真实SKIP_VALID、`verified_child_only`
   及14路区域池新增产出。旧 `42523432` 未改变，所有已完成初始比对和区域缓存保留。
+
+### 2026-11-23 00:26 CST：接管进程仍在锁前校验，缩减后续可避免的重复读取
+
+- 00:26 Donau 实查 `43016881 / agent-X86-57 / RUNNING`，同一 PID1781624；日志已确认
+  `Q0_HANDOFF_ACCEPTED`，还没有新 `owner.json`、安装凭据或 `SKIP_VALID`。00:14→00:26
+  调度器累计 user CPU 8→15秒、RSS 34→122 MiB，说明同一进程有活动，但不能定位具体文件或
+  宣称卡死。57号节点无空闲CPU，不发同节点采样作业挤占资源，也不重启、跳校验或热改冻结包。
+  只读观察器 PID137993（PPID1）在等待由 `43016881` 实际获得的锁，锁与调度器 PID/节点匹配后
+  才切到新 run 日志。旧 `42523432` 实查仍 RUNNING，未改动。
+- 源码审查发现 `NativeBindings` 在同一操作内对每个批次都重新取同一 manifest/restore 身份，
+  且已核对 wrapper 内容 SHA 后又重读规范 wrapper 文本。SHA 绑定的真实 native plan 有44个操作、
+  876个 wrapper；仅按一次全量 `verify_native_resources()` 静态调用计数，共用身份查询可从
+  1752次降至170次，标准 LF wrapper 不再逐个二次读文本。仍核对每个 wrapper/spec 的实际内容 SHA、
+  完整清单和规范参数；共用身份在该操作开始/结束各查一次，不跨调用缓存；换行等非标准字节仍走原
+  文本判定。无输入/结果格式变化。44项既有定向回归和2项新增回归通过。
+  这不是已定位 `43016881` 当前等待的调用栈，也不是现场壁钟实测；**仅改仓库的后续复用路径**，
+  当前运行及原生验证包保持原SHA，不为这个改动再次中断接管。
