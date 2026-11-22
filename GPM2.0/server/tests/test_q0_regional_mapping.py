@@ -125,6 +125,18 @@ class RegionalMappingTests(unittest.TestCase):
                 self.run_mapping(changed, policy=policy)
         self.assertEqual(set(self.root.rglob("success.json")), before)
 
+    def test_resource_only_mapper_thread_change_reuses_both_complete_stages(self):
+        from server.tools.lgz_core import q0_regional_mapping as regional
+
+        policy = CigarWorkPolicy(minimum_query_bases=1)
+        task = self.run_mapping(policy=policy)
+        before = verify_regional_task(self.root, task, members=self.catalog.parts)
+        with mock.patch.object(regional.subprocess, "Popen", side_effect=AssertionError("must reuse both stages")):
+            resumed = prepare_regional_mapping(self.root, self.catalog, self.query, [self.target], self.tool,
+                                               reference_bases=5_000_000_000, threads=2, policy=policy)
+        self.assertEqual(resumed, task)
+        self.assertEqual(verify_regional_task(self.root, resumed, members=self.catalog.parts), before)
+
     def test_complete_raw_reused_when_cores_change_and_temporary_inputs_are_gone(self):
         first=self.run_mapping();old=verify_regional_task(self.root,first,members=self.catalog.parts)
         self.assertGreater((self.root/first["paf"]).stat().st_size,0)
