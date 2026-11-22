@@ -1,0 +1,16 @@
+{
+  "code_manifest_sha256": "1fef0560c22b8dbca31483ccc23bc85bfbdcee1af9ef4f26d2a3f2864923b605",
+  "diagnostic_source_sha256": "4cfe42b2d1a120db27d5850f9651e51df1482211170e1207c7501b90e69be798",
+  "diagnostic_test_sha256": "3689e53168f14889fc4a7afdaf4269c20b7fe50b8f051c1b88fe03f584a6cd0e",
+  "end_utc": "2026-11-22T07:59:31Z",
+  "final_job_sha256": "a9e77eb47d9482e04e0dbe0ddd292db05509adf651cbda311524071b8cd70045",
+  "job_id": "43013065",
+  "memory_peak_mib": 703,
+  "no_production_changes": true,
+  "node": "agent-X86-47",
+  "production_admission": "rejected_no_measured_net_speedup",
+  "remote_result_dir": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-index-reuse-20261122-155120-fixed",
+  "start_utc": "2026-11-22T07:53:40Z",
+  "state": "SUCCEEDED",
+  "summary_sha256": "020df60d328fbd1c8084bff9bc31b33a56164247c4f6ee4c4fedfac13cda9977"
+}

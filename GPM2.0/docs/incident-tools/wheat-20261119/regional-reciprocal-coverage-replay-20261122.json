@@ -1,0 +1,408 @@
+{
+  "cached_seed_windows_removed_from_opportunity": 64,
+  "frozen_unseeded_backfilled_bases": 1574898,
+  "frozen_unseeded_core_bases": 2317367692,
+  "frozen_unseeded_fully_backfilled_windows": 22,
+  "frozen_unseeded_partially_backfilled_windows": 96,
+  "frozen_windows": 61087,
+  "heldout": [
+    {
+      "core_bases": 52155,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.072,
+      "ordinal": 64
+    },
+    {
+      "core_bases": 17257,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 102.897,
+      "ordinal": 65
+    },
+    {
+      "core_bases": 1967,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.478,
+      "ordinal": 66
+    },
+    {
+      "core_bases": 3841,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 20.397,
+      "ordinal": 67
+    },
+    {
+      "core_bases": 5768,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 50.157,
+      "ordinal": 68
+    },
+    {
+      "core_bases": 2954,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.721,
+      "ordinal": 69
+    },
+    {
+      "core_bases": 1009,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 39.86,
+      "ordinal": 70
+    },
+    {
+      "core_bases": 89906,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.887,
+      "ordinal": 71
+    },
+    {
+      "core_bases": 100000,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 165.569,
+      "ordinal": 72
+    },
+    {
+      "core_bases": 1430,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 3.332,
+      "ordinal": 73
+    },
+    {
+      "core_bases": 4869,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 4.13,
+      "ordinal": 74
+    },
+    {
+      "core_bases": 653,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.376,
+      "ordinal": 75
+    },
+    {
+      "core_bases": 69970,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 5.89,
+      "ordinal": 76
+    },
+    {
+      "core_bases": 44435,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 114.451,
+      "ordinal": 77
+    },
+    {
+      "core_bases": 636,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.687,
+      "ordinal": 78
+    },
+    {
+      "core_bases": 47459,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.616,
+      "ordinal": 79
+    },
+    {
+      "core_bases": 99752,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.288,
+      "ordinal": 80
+    },
+    {
+      "core_bases": 100000,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 54.382,
+      "ordinal": 81
+    },
+    {
+      "core_bases": 7175,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 6.967,
+      "ordinal": 82
+    },
+    {
+      "core_bases": 615,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.779,
+      "ordinal": 83
+    },
+    {
+      "core_bases": 30563,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 7.48,
+      "ordinal": 84
+    },
+    {
+      "core_bases": 6221,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 31.709,
+      "ordinal": 85
+    },
+    {
+      "core_bases": 1662,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.609,
+      "ordinal": 86
+    },
+    {
+      "core_bases": 7465,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 3.922,
+      "ordinal": 87
+    },
+    {
+      "core_bases": 161,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.61,
+      "ordinal": 88
+    },
+    {
+      "core_bases": 54479,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 12.614,
+      "ordinal": 89
+    },
+    {
+      "core_bases": 100000,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 326.033,
+      "ordinal": 90
+    },
+    {
+      "core_bases": 3593,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.087,
+      "ordinal": 91
+    },
+    {
+      "core_bases": 465,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.874,
+      "ordinal": 92
+    },
+    {
+      "core_bases": 97610,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 3.093,
+      "ordinal": 93
+    },
+    {
+      "core_bases": 66513,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 44.979,
+      "ordinal": 94
+    },
+    {
+      "core_bases": 62928,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.241,
+      "ordinal": 95
+    },
+    {
+      "core_bases": 94911,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.276,
+      "ordinal": 96
+    },
+    {
+      "core_bases": 1242,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.445,
+      "ordinal": 97
+    },
+    {
+      "core_bases": 2364,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.381,
+      "ordinal": 98
+    },
+    {
+      "core_bases": 75424,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.166,
+      "ordinal": 99
+    },
+    {
+      "core_bases": 15518,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 229.263,
+      "ordinal": 100
+    },
+    {
+      "core_bases": 120,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.974,
+      "ordinal": 101
+    },
+    {
+      "core_bases": 3038,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.006,
+      "ordinal": 102
+    },
+    {
+      "core_bases": 392,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.929,
+      "ordinal": 103
+    },
+    {
+      "core_bases": 55451,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 11.21,
+      "ordinal": 104
+    },
+    {
+      "core_bases": 100000,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 226.43,
+      "ordinal": 105
+    },
+    {
+      "core_bases": 922,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 5.713,
+      "ordinal": 106
+    },
+    {
+      "core_bases": 23805,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 8.236,
+      "ordinal": 107
+    },
+    {
+      "core_bases": 94763,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.145,
+      "ordinal": 108
+    },
+    {
+      "core_bases": 937,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.601,
+      "ordinal": 109
+    },
+    {
+      "core_bases": 2141,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.546,
+      "ordinal": 110
+    },
+    {
+      "core_bases": 77450,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 8.577,
+      "ordinal": 111
+    },
+    {
+      "core_bases": 15591,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 92.646,
+      "ordinal": 112
+    },
+    {
+      "core_bases": 3621,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.576,
+      "ordinal": 113
+    },
+    {
+      "core_bases": 6015,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.119,
+      "ordinal": 114
+    },
+    {
+      "core_bases": 444,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.872,
+      "ordinal": 115
+    },
+    {
+      "core_bases": 92009,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 4.137,
+      "ordinal": 116
+    },
+    {
+      "core_bases": 100000,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 201.665,
+      "ordinal": 117
+    },
+    {
+      "core_bases": 285,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 3.831,
+      "ordinal": 118
+    },
+    {
+      "core_bases": 95019,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 10.002,
+      "ordinal": 119
+    },
+    {
+      "core_bases": 99721,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.215,
+      "ordinal": 120
+    },
+    {
+      "core_bases": 132,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.923,
+      "ordinal": 121
+    },
+    {
+      "core_bases": 699,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 0.66,
+      "ordinal": 122
+    },
+    {
+      "core_bases": 15236,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 2.585,
+      "ordinal": 123
+    },
+    {
+      "core_bases": 30378,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 48.079,
+      "ordinal": 124
+    },
+    {
+      "core_bases": 4117,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.449,
+      "ordinal": 125
+    },
+    {
+      "core_bases": 3718,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.878,
+      "ordinal": 126
+    },
+    {
+      "core_bases": 2185,
+      "covered_core_bases": 0,
+      "historical_mapper_wall_seconds": 1.492,
+      "ordinal": 127
+    }
+  ],
+  "host": "agent-X86-61",
+  "limitations": [
+    "Frozen residual differs from the live plan. First 64 completed windows are not a random sample.",
+    "No new negative evidence. Geometry-only cover is not complete orientation, locus, or candidate equivalence.",
+    "Held-out locus accounting separates oriented segment pairs and both coordinates, not collinearity or final Q0/Q1 acceptance."
+  ],
+  "main_workspace_modified": false,
+  "native_mapper_executed": false,
+  "raw_PAF_bytes_verified": 48741723,
+  "seconds": 171.26796390954405,
+  "seed_reciprocal_oriented_pairs": 1407,
+  "seed_target_parts": 562,
+  "seed_windows": 64,
+  "status": "frozen_geometric_opportunity_NOT_a_skip_gate"
+}
