@@ -491,5 +491,114 @@ runtime/binary. The gate then reached Python discovery (995 tests, 11 failing
 assertions, 9 errors, 16 skips), not the later shell and App smoke stages.
 `93e85ee1` addresses report/recovery regressions from that run; 42 focused
 checks ran (32 passed, 10 skipped) and the real retry above passed. The
-remaining regression failures require triage and a clean full-gate rerun.
-Do not interpret these results as A01–A18 closure.
+remaining failures were triaged and the complete gate was rerun, as recorded
+below. This earlier run was not an A01–A18 pass.
+
+
+## Numbered workspace and incremental App regression
+
+The full Server suite at `1937cf33` reached 1,002 Python cases with no failures
+(16 skips), and the eight Shell regression scripts completed. Updating only the
+fixtures was not enough: the Shell cases exposed a real two-assembly q0 failure
+and a numbered incremental-promotion bug. The q0 reader now resolves expected
+and recorded PAF paths through the same layout before requiring the exact pair
+and direction. The incremental promoter resolves both endpoints, preserves the
+numbered prepared runtime and distinguishes assemblies/derived data from the
+unmodified reference/reads. Incremental ZIP locators and payload members still
+use the portable App namespace rather than the Server's physical paths.
+
+The public x86_64 `run.sh --gapfill-tools none` on two synthetic assemblies
+produced the actual `alternate_vs_primary` PAF at `02_alignments/chr_chr1/`, a
+successful q0 evidence manifest, and both LGZ-only archives. Its subsequent
+`add_dataset.sh` used actual native alignments and kept the original q0 freeze,
+recipe, q0 and q3 FASTAs, and baseline archive SHA-256 unchanged. The first real
+App append exposed two distinct defects: the base archive omitted the alignment
+and annotation policy that incremental validation reads, and the App expected a
+self PAF even where only one contig was assigned. Full and Light now project only
+five necessary policy keys from the prepared workspace. A single-contig
+chromosome no longer requires a nonexistent self PAF; configured multi-contig
+self and cross-dataset alignment checks remain in place.
+
+With Server `1937cf33` and importer `b0b16c13`, the real backend imported the
+fresh Full baseline and incremental ZIP into an isolated workspace. The database
+contained `alternate`, `primary`, and `supplementary`; the appended FASTA matched
+the Server bytes, with two real pairwise runs indexed and no fabricated self PAF.
+Six focused Rust incremental tests passed, including the strict multi-contig
+negative case. See `evidence/numbered-two-assemblies-2f204cd2.json` and
+`evidence/numbered-incremental-app-roundtrip.json`. This is a Linux CLI/backend
+roundtrip, separate from the earlier Windows refined Full/Light roundtrip.
+
+The Windows host backend rebuilt from the exact `b0b16c13` source also
+imported both unmodified archives into a fresh workspace. SQLite integrity
+passed, the appended FASTA and both PAF files matched the Server bytes, and
+both cross-pair runs indexed two hits each without adding a fake self pair.
+All six incremental Rust regressions passed on Windows. See
+`evidence/windows-incremental-b0b16c13.json` (SHA-256
+`f31308403ad8b5771b66c61194b17467e19474f6202ac3bee73bcb6d7295b771`),
+`evidence/windows-incremental-real-b0b16c13.log` and
+`evidence/windows-incremental-rust-tests-b0b16c13.log`. This verifies native
+Windows backend behavior, not a GUI interaction or release installer.
+
+
+## Consolidated gate and acceptance coverage
+
+The canonical `GPM2.0/scripts/quality-gate-server.sh` at `1937cf33` exited 0
+in an isolated x86_64 checkout with the managed environment and the locked
+frontend dependencies. It ran Python discovery, all eight Shell regression
+scripts, and the Server-to-App LGZ end-to-end check (including the reverse,
+bridge and direct q0 cases through Server, Full and Light modes). See
+`evidence/server-quality-gate-1937cf33.log` (SHA-256
+`3510bc61b3a212a077ca2307b45e9c443f774f00e390277657aa394941a28c3e`) and its
+exit receipt. The exact `b0b16c13` rerun, including the App single-contig fix,
+also exited 0: 1,002 Python cases (986 passed, 16 skipped), eight Shell scripts,
+and the same LGZ Server-to-App check. See `evidence/server-quality-gate-b0b16c13.log`
+(SHA-256 `21d6a41109f463ecc74078bedc8ac416ee05352132a062284e5a173609b69448`)
+and its exit receipt.
+
+Separately, **27 producer-unit tests passed with no skips** at
+`b0b16c13` after supplying the locked TGS archive, original pinned LR shell
+script, and locked quarTeT source archive. These cover interruption/reuse and
+invalid-artifact rejection with controlled subprocesses and one real minimap2
+smoke; they supplement rather than replace the real tool runs above. See
+`evidence/pinned-native-producer-units-b0b16c13.log` (SHA-256
+`f3022568cf133c44410a69216479cf82f6729eb0b2869adb74b7eed9e243c597`).
+
+The table distinguishes real runs from controlled regressions and records the
+scope of each result. It does not certify releases, customer runs or arbitrary
+legacy versions.
+
+| ID | Status in this scope | Evidence / boundary |
+| --- | --- | --- |
+| A01 | Verified | Isolated `feat/server-post-lgz-gapfill-20261121` worktree; shared `master` was not switched or edited. |
+| A02 | Verified | Public no-reads, ONT-only, mixed-read and explicit `none` runs; default DEGAP, grouped/unsupported reads and invalid choices also covered in `test_refinement_launch.py`, `test_refinement_tools.py` and `test_refinement_reads.py`. |
+| A03 | Verified | Real `run_all.sh` four-tool append, unchanged repeat, original scientific file and alignment identity audits. |
+| A04 | Verified | Four actual command/input receipts with mixed and ONT-only cases; grouped same-basename inputs, content-bound reuse, format and source controls. |
+| A05 | Partial | x86_64 public install and read-only `--check`; controlled managed-spec upgrade and unmanaged-env refusal. ARM64 pinned solve passed; actual install, `--check` and native runs remain outstanding. |
+| A06 | Verified on x86_64 | All four pinned native tools ran against the synthetic workspace with inspected outputs and reports. Not a claim of an accepted edit from every tool or native ARM64 coverage. |
+| A07 | Verified | Independent source-slice reconstruction equals each published chromosome; accepted quarTeT, LR and ONT-only TGS outputs differ from LGZ. Zero-admission results are unchanged and explicitly labelled. |
+| A08 | Verified in fixtures and the synthetic sample | `test_refinement_admission.py`, `test_refinement_native_trace.py` and `test_refinement_path.py` cover orientations, overlap, competing/nearby intervals, partial edits, residual Ns and zero acceptance. |
+| A09 | Verified in controls and native readmission | Proposal conflicts, malformed evidence, mutated inputs and corrupt checkpoints are rejected in admission/path/native tests; the original-frame native readmission audit verifies only validated evidence is reused. |
+| A10 | Verified | Actual quarTeT SIGTERM while LR still delivered; nonzero launcher exit and retry of quarTeT only. Separate pinned-driver producer checks. |
+| A11 | Verified | Numbered new and migrated workspaces and public two-assembly run; fixed tool roles and separate baseline/publication directories. Layout resolver tests reject shadow destinations. |
+| A12 | Verified for reviewed legacy engines | Actual old-engine continuation and append, rollback/resume after interruption, old-launcher fence; no-launch-record, stale evidence and active/foreign lock cases in migration regressions. |
+| A13 | Verified | Actual pipeline and detached Full/Light Windows offline report checks. Native diagnostics, CGAT admission, remaining gaps and published files are distinct; DEGAP visualizations preserve sandboxed local navigation. |
+| A14 | Verified | Actual `07_delivery/` inventories and detached Full/Light validators; report trees and paths agree across paired archives, Light does not claim sequence availability, archive inputs do not include the delivery tree. |
+| A15 | Verified | Windows desktop command roundtrip on seven actual Full/Light pairs; sequence exports equal their Server FASTA and positive refinements differ from LGZ. |
+| A16 | Verified | Pre-feature importer accepts LGZ and rejects refined schema; matching App accepts legacy/Light and preserves manual edits, with no Light FASTA export. |
+| A17 | Verified for report scope | Immutable input and native-run identities, selected technologies, resources, unclosed/native-candidate versus accepted gaps in the reports. The sample makes no accuracy, speed or tool-ranking claim. |
+| A18 | Verified for branch handoff | Bilingual Server guides, migration instructions, pinned recipes, platform limitations, source revisions and verification receipts; no release or merge to `master`. |
+
+### Remaining native ARM64 proof
+
+Use an explicitly approved Linux ARM64 worker and a new private managed
+environment/workspace. Start with the reviewed branch revision and the same
+synthetic data (locally retained under `case/`, with SHA-256 in `case.json`).
+Record host architecture, branch revision, lock digest, public install and
+separate read-only `--check` exit status, and the package/runtime identities.
+Then run the same public LGZ-only command and four-tool append, plus the
+ONT-only TGS control. Retain native command/diagnostic receipts, CGAT admission
+and source reconstruction. Compare the reported states and source-bound results;
+a legitimate platform difference needs investigation, not a hardcoded expected
+patch count. A dry solve, no-gap run or copied x86_64 checkpoint is not native
+ARM64 execution evidence. A DEGAP change after the separately planned upstream
+merge requires its own adapter re-audit against that new revision.

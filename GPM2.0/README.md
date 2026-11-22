@@ -8,7 +8,7 @@ Server implementation and new script names use `lgz_*`. Existing `grt_*` Python 
 
 GPM2.0 combines reference-anchored results from multiple de novo assemblies in one workflow for import, inspection, lightweight editing, and Final Path export.
 
-> The current feature branch adds [post-LGZ refinement](server/REFINEMENT.md), numbered paths and explicit legacy migration. Published v2.0.21 downloads are not changed retroactively; consolidated acceptance remains pending.
+> The current feature branch adds [post-LGZ refinement](server/REFINEMENT.md), numbered paths and explicit legacy migration. Published v2.0.21 downloads are unchanged. Linux x86_64 synthetic runs and offline browser checks passed; native ARM64 verification is pending.
 
 ## Architecture
 
@@ -206,7 +206,7 @@ The current source executes the plan serially and validates checkpoints before r
 
 Brackets denote two files, not literal names. Parallel pigz `tar.gz` is the default; `--archive-format zip` selects ZIP. New archives are not scattered beside the workspace and never recursively include `07_delivery`. An LGZ-only run or bare tool directory is not a successful refinement receipt.
 
-The LGZ process report retains failures, interruptions, unexecuted stages and explicit cache records; its history is `.runtime/history/reports/`, and full diagnostics are `.runtime/logs/run_all.log`. Copy its whole report directory to regenerate offline with `python3 /path/to/report/render_report.py`; see [report format and scope](server/REPORT.md). Refinement reports use every original gap as their own denominator, not the LGZ process report's ≥100-N threshold. Offline upstream interactive HTML acceptance remains pending. The [refinement guide](server/REFINEMENT.md) covers saved-setting replacement, exact pins, consumed reads, genuine final paths and migration commands.
+The LGZ process report retains failures, interruptions, unexecuted stages and explicit cache records; its history is `.runtime/history/reports/`, and full diagnostics are `.runtime/logs/run_all.log`. Copy its whole report directory to regenerate offline with `python3 /path/to/report/render_report.py`; see [report format and scope](server/REPORT.md). Refinement reports use every original gap as their own denominator, not the LGZ process report's ≥100-N threshold. Open `06_report/report.html` for refinement status, failure reasons and diagnostics. The pinned DEGAP interactive reports were verified offline in the workspace and in extracted Full and Light archives. The [refinement guide](server/REFINEMENT.md) covers saved-setting replacement, exact pins, consumed reads, genuine final paths and migration commands.
 
 The first `run.sh` invocation prepares and runs the full workflow automatically. Resume with the same command or just `-o`. The existing `prepare.sh` and generated `run_all.sh` remain compatible. After the previous job has stopped, use `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` to change the thread budget; `--lgz-qc-memory-gb` may also be adjusted. Validated completed work is reused, and omitted resource budgets retain their last values. Request matching scheduler resources before resuming; these options do not resize a live job. The generated `run_all.sh` inherits saved budgets but accepts no new resource flags. `--from`, `--until`, and `--stage` overrides remain unsupported.
 

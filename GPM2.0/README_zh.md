@@ -8,7 +8,7 @@ Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、�
 
 GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流程中，用于导入、浏览、轻量编辑和 Final Path 导出。
 
-> 当前功能分支的 [LGZ 后精修指南](server/REFINEMENT_zh.md)说明四工具、编号路径和旧工作区迁移；已发布 v2.0.21 下载包不追溯增加这些功能，最终统一验收尚待完成。
+> 当前功能分支的 [LGZ 后精修指南](server/REFINEMENT_zh.md)说明四工具、编号路径和旧工作区迁移；已发布的 v2.0.21 下载包不变。Linux x86_64 合成样例和报告离线浏览已通过，ARM64 原生验收仍待完成。
 
 ## 项目架构
 
@@ -194,7 +194,7 @@ bash "$SERVER/run.sh" -o ./gpm_server
 
 方括号表示两个文件，不是文件名的一部分；默认 pigz 多线程 `tar.gz`，`--archive-format zip` 改用 ZIP。不再向输出目录旁边散放新交付文件，也不递归打包 `07_delivery`。只运行 LGZ 或仅存在工具目录不能声明本次精修成功。
 
-LGZ 过程报告会保留失败、中断、未执行阶段及显式缓存记录，历史在 `.runtime/history/reports/`；完整日志在 `.runtime/logs/run_all.log`。其独立报告目录可复制后运行 `python3 /path/to/report/render_report.py` 离线重建，详见[报告格式与边界](server/REPORT.md)。精修报告使用自己的全部原始 gap 分母，不用 LGZ 过程报告的 ≥100 N 统计阈值替代；上游交互 HTML 的离线验收仍待完成。参数保存/替换、固定版本、逐工具读取策略、真实最终路径和迁移命令见[精修使用指南](server/REFINEMENT_zh.md)。
+LGZ 过程报告会保留失败、中断、未执行阶段及显式缓存记录，历史在 `.runtime/history/reports/`；完整日志在 `.runtime/logs/run_all.log`。其独立报告目录可复制后运行 `python3 /path/to/report/render_report.py` 离线重建，详见[报告格式与边界](server/REPORT.md)。精修报告使用自己的全部原始 gap 分母，不用 LGZ 过程报告的 ≥100 N 统计阈值替代；打开 `06_report/report.html` 查看精修状态、失败原因及诊断。固定版本 DEGAP 的交互报告已在工作区和解压后的 Full/Light 包中验证可离线浏览。参数保存/替换、固定版本、逐工具读取策略、真实最终路径和迁移命令见[精修使用指南](server/REFINEMENT_zh.md)。
 
 首次 `run.sh` 会自动准备并运行完整流程；恢复时重复原命令，或仅指定 `-o`。原有 `prepare.sh` 和生成的 `run_all.sh` 仍兼容。旧作业停止后，可用 `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` 调整线程预算，也可修改 `--lgz-qc-memory-gb`。已完成且校验有效的工作会复用；省略资源参数时沿用上次生效值。恢复前需申请相应调度资源，这些参数不会在线调整正在运行的作业。生成的 `run_all.sh` 会继承已保存的预算，但不新增资源参数入口；仍不支持 `--from`、`--until` 或 `--stage` 覆盖。
 

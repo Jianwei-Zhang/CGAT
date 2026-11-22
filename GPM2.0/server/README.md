@@ -6,7 +6,7 @@ The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units 
 
 Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; these naming aliases preserve persisted LGZ stage IDs. The separate numbered-layout and refinement-package changes are described below. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md).
 
-> **Feature-branch source**: see the [refinement guide](REFINEMENT.md) for four post-LGZ engines, numbered workspaces, legacy migration and refined App packages. The v2.0.21 download below installs the published release, not these additions awaiting final validation.
+> **Feature-branch source**: see the [refinement guide](REFINEMENT.md) for four post-LGZ engines, numbered workspaces, legacy migration and refined App packages. The v2.0.21 download below installs the published release, not these feature-branch changes.
 
 ## Quick start
 
@@ -532,4 +532,4 @@ bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapclo
 
 The four engines run sequentially and independently from the same LGZ baseline. `--gapfill-tools none` disables only this invocation; no `--final-tool` is needed. See the [full guide](REFINEMENT.md) for read allocation, exact pins/disclosed patches, saved-setting replacement and recovery boundaries. Unnumbered old workspaces need explicit migration first; do not re-prepare them or delete valid results.
 
-Start at `06_report/report.html`. `05_final/00_lgz` is explicitly unrefined; admitted tool results use `05_final/01_degap`, `02_tgsgapcloser`, `03_quartet` and `04_lrgapcloser`, with corresponding archives under `07_delivery/<tool-directory>/`. Import a tool's package with the matching new App: its Final Path and exported FASTA describe that accepted refinement, not an extra FASTA beside an unchanged LGZ view. Real four-engine/two-architecture and A01–A18 acceptance remains pending; these changes do not promise biological accuracy or runtime gains.
+Start at `06_report/report.html`. `05_final/00_lgz` is explicitly unrefined; admitted tool results use `05_final/01_degap`, `02_tgsgapcloser`, `03_quartet` and `04_lrgapcloser`, with corresponding archives under `07_delivery/<tool-directory>/`. Import a tool's package with the matching new App: its Final Path and exported FASTA describe that accepted refinement, not an extra FASTA beside an unchanged LGZ view. All four pinned engines have run on synthetic inputs on Linux x86_64. ARM64 dependency resolution passed; ARM64 installation and native runs are not yet verified. These checks do not establish biological accuracy or runtime gains.

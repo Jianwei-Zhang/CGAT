@@ -6,7 +6,7 @@
 
 Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，命名别名保留 LGZ 持久化阶段 ID；独立的编号布局和精修包协议变化见下文。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md)。
 
-> **功能分支源码**：LGZ 后四工具精修、编号工作区、旧目录迁移和 App 精修包见[使用指南](REFINEMENT_zh.md)。下方 v2.0.21 下载命令安装的是已发布版本，不会自动获得这些尚待统一验收的新功能。
+> **功能分支源码**：LGZ 后四工具精修、编号工作区、旧目录迁移和 App 精修包见[使用指南](REFINEMENT_zh.md)。下方 v2.0.21 下载命令安装的是已发布版本，不包含这些功能分支改动。
 
 ## 快速开始
 
@@ -448,4 +448,4 @@ bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapclo
 
 四工具从同一 LGZ 基线串行、独立运行；`--gapfill-tools none` 只关闭本次精修，不需要 `--final-tool`。reads 分配、固定版本/兼容补丁、保存参数替换规则与恢复边界见[完整指南](REFINEMENT_zh.md)。未编号旧目录必须先显式迁移；不要覆盖 prepare 或删除有效结果。
 
-从 `06_report/report.html` 进入本次报告；`05_final/00_lgz` 明确未精修，每工具真正的接纳结果位于 `05_final/01_degap`、`02_tgsgapcloser`、`03_quartet`、`04_lrgapcloser`，交付包对应放在 `07_delivery/<工具目录>/`。使用匹配新版 App 导入某工具包，Final Path 和导出 FASTA 均来自该精修结果，不再仅提供一份额外 FASTA 而仍显示 LGZ 路径。真实四工具/双架构和 A01–A18 统一验收尚未完成，不据此承诺生物学准确率或性能收益。
+从 `06_report/report.html` 进入本次报告；`05_final/00_lgz` 明确未精修，每工具真正的接纳结果位于 `05_final/01_degap`、`02_tgsgapcloser`、`03_quartet`、`04_lrgapcloser`，交付包对应放在 `07_delivery/<工具目录>/`。使用匹配新版 App 导入某工具包，Final Path 和导出 FASTA 均来自该精修结果，不再仅提供一份额外 FASTA 而仍显示 LGZ 路径。四种固定版本的工具都已在 Linux x86_64 上用合成数据运行；ARM64 已通过依赖求解，尚未完成安装与原生运行验证。这些检查不代表生物学准确率或性能收益。

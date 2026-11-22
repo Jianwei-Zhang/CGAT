@@ -2,7 +2,7 @@
 
 [English](REFINEMENT.md) | **中文** · [Server 手册](README_zh.md)
 
-本指南对应功能分支中的源码实现，不会追溯改变已发布的 v2.0.21 压缩包。四工具真实小样例、Linux x86_64/ARM64 环境及完整验收矩阵仍待最后统一检查。请使用同一版源码构建的安装器与 App；不要覆盖正在使用的安装目录，也不要在作业运行时更新环境。
+本指南对应功能分支中的源码实现，不会追溯改变已发布的 v2.0.21 压缩包。四个固定版本工具已在 Linux x86_64 用合成数据实跑。ARM64 依赖已求解，安装和原生运行仍未验证；具体范围及证据见仓库中的 `GPM2.0/docs/server-refinement-final-acceptance-20261122.md`。请使用同一版源码构建的安装器与 App；不要覆盖正在使用的安装目录，也不要在作业运行时更新环境。
 
 ## 1. 环境与首次运行
 
@@ -108,15 +108,15 @@ cgat_server/
 
 ## 4. 报告、App 导入与恢复
 
-先打开 `06_report/report.html`，再进入每工具报告及其 job/原生诊断链接。报告区分所有原始 gap、原生候选、接纳改动、残余 N 和末端 gap，并说明实际消费的数据差异；不自动评选最佳工具，不编造准确率或峰值内存。复制时带上整个可搬移报告目录，保留相对链接。
+先打开 `06_report/report.html` 看流程总览。`01_lgz/` 是 LGZ 基线报告，`02_refinement/` 按固定编号分工具，`03_comparison/` 保留每批的 TSV/JSON。从总览进入工具或缺口详情，可查看实际使用的 reads、原生任务是运行还是复用、CGAT 接纳了哪些改动、最终结果是否发布。失败会列出已记录的失败阶段和原因，并链接诊断；零接纳则表示保留 LGZ 序列，并不等于失败。复制报告时带上整个目录，以保留报告内部链接；也可解压 App 包后打开 `report/report.html`。工作区总览中的最终结果和交付包链接指向同级的 `05_final/` 和 `07_delivery/`；只复制报告不会带走这些结果。
 
 在工具报告中进入 **原生 job 报告与日志 → 离线原生可视化**（`native_visualization/index.html`）。固定 DEGAP 的 `Global.report.html` 总览和可用 LEFT/RIGHT 任务报告现有独立的离线浏览副本；原始 HTML 仍按字节、哈希保存在静态文本附件中。浏览副本保留上游内嵌 JS/SVG，移除没有使用的 Chart.js CDN 引用，并与 CGAT 接纳页面分开隔离展示，不增加 JS 库或环境依赖。来源绑定会明确显示：`observed_diagnostic` 是「报告时观察」，**不是原生完成回执证明**。缺失、未知依赖或过大的详情有明确状态，不提供悬空链接；总览内嵌 gap 数据也会与可用的原生 gap 诊断核对。
 
-TGS-GapCloser、quarTeT GapFiller、LR_Gapcloser 的固定入口不生成原生 HTML，保留它们实际的日志、填补明细、AGP 等诊断，不伪造上游可视化。Full 与 Light 携带相同报告文件。当前固定渲染器/JS 的受控检查不等于真实浏览器、生物学或 App 最终验收，仍需最后统一检查。
+TGS-GapCloser、quarTeT GapFiller、LR_Gapcloser 的固定入口不生成原生 HTML，保留它们实际的日志、填补明细、AGP 等诊断，不伪造上游可视化。Full 与 Light 携带相同报告文件。已用 Windows 浏览器离线检查批次导航、原生图形，以及 Full/Light 报告解压后的相对链接。报告可正常浏览不代表生物学准确性。
 
 将某工具的 **Full** 包导入匹配新版 App 的新项目。其权威 Final Path 和导出染色体对应该工具的接纳结果，`00_lgz` 包则明确未精修。Full 包含来源 FASTA；Light 不含 FASTA，但保留索引、metadata、路径及来源关系，因此导出 FASTA 前需要真实序列来源就绪。不要覆盖已有人工编辑的项目。精修包协议为 schema 5 / App Final Path 4；旧 App 拒绝该协议，不静默显示 LGZ 路径。新 App 保留对旧包的兼容。
 
-手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/01_degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。已提交迁移清单绑定的旧人工包现可纳入不可变 registry，不重跑原生任务或其比对。未知旧结果 ZIP 仍保护：保留原 ZIP，复制未改动的原 `jobs.tsv` 和 `degap_jobs/` receipt 到新的空目录收集，不重新导出 token。原生工具最终验收仍未完成，不能把协议检查等同于手动全链路验收。
+手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/01_degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。已提交迁移清单绑定的旧人工包现可纳入不可变 registry，不重跑原生任务或其比对。未知旧结果 ZIP 仍保护：保留原 ZIP，复制未改动的原 `jobs.tsv` 和 `degap_jobs/` receipt 到新的空目录收集，不重新导出 token。不能把这些协议检查等同于手动全链路验收。
 
 停止或失败后重复同一入口命令；完整且通过校验的结果会复用。已封存完成的原生运行，在接纳、报告或发布失败后可以重新接纳，不重跑工具。只有报告或打包器变化时刷新报告和包，未变化的最终序列文件不替换。
 
@@ -163,7 +163,7 @@ python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --
 python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --rollback --confirm-idle
 ```
 
-不会覆盖被修改的用户数据，也不会抢占未知/活跃 owner 的锁。遇到拒绝时保留 journal/备份并排查，不删除工作区 metadata。上述源码契约和受控检查仍需发布前真实工具、环境与 A01–A18 最后统一验收。
+不会覆盖被修改的用户数据，也不会抢占未知/活跃 owner 的锁。遇到拒绝时保留 journal/备份并排查，不删除工作区 metadata。已在 x86_64 验证受支持的历史工作区续跑、迁移中断恢复和精修追加；ARM64 原生运行尚待验证，未经核验的旧引擎不在此范围内。
 
 ### 原 LGZ 尚未完成
 
