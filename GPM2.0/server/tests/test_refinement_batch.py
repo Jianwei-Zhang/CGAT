@@ -20,7 +20,7 @@ class RefinementBatchTests(unittest.TestCase):
     def setUp(self):
         # This class isolates native/batch policy. Actual source measurement,
         # commands, receipts and serialization have their own focused tests.
-        patch = mock.patch.object(batch, "build_source_evidence", return_value={"fixture": "source measurements"})
+        patch = mock.patch.object(batch, "build_source_evidence", return_value=None)
         patch.start()
         self.addCleanup(patch.stop)
 

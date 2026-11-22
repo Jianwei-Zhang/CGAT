@@ -106,7 +106,7 @@ class RefinementReportTests(unittest.TestCase):
                 for href in parsed.links:
                     url = urlsplit(href)
                     self.assertFalse(url.scheme or url.netloc or url.path.startswith("/"), href)
-                    target = (path.parent / unquote(url.path)).resolve()
+                    target = (path.parent / unquote(url.path)).resolve() if url.path else path.resolve()
                     self.assertTrue(target.is_relative_to(moved))
                     self.assertTrue(target.is_file(), href)
                     if url.fragment:
@@ -116,6 +116,45 @@ class RefinementReportTests(unittest.TestCase):
             self.assertIn("&lt;img", (moved / "native.html").read_text())
             self.assertFalse((root / "05_final").exists())
             self.assertFalse(any(p.suffix in {".fa", ".fasta", ".fq"} for p in moved.rglob("*")))
+
+    def test_zero_accepted_is_not_a_native_failure_and_job_reason_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            result = fixture(root)
+            run_id = result["run_id"]
+            staging = Path(result["staging"])
+            final = json.loads((staging / "final_path.json").read_text())
+            final["edits"] = []
+            dump(staging / "final_path.json", final)
+            provenance = result["provenance"]
+            provenance.update(status="completed_zero_accepted", accepted_edit_count=0,
+                              counts={"closed": 0, "partial": 0, "unfilled": 2, "rejected": 1})
+            provenance["gap_outcomes"][0].update(status="unfilled", edit_ids=[])
+            provenance["artifacts"]["final_path.json"] = reports.digest(staging / "final_path.json")
+            dump(staging / "provenance.json", provenance)
+            jobs = root / "04_refinement/01_degap/02_jobs" / run_id
+            dump(jobs / "invocation.json", {"tool": "degap", "run_id": run_id, "status": "staged",
+                                             "provenance_sha256": reports.digest(staging / "provenance.json")})
+            native = root / "04_refinement/01_degap/03_native" / run_id
+            config = json.loads((native / "03.gap_filling/job_manager_config.json").read_text())
+            job_name = config["jobs"][0]["job_name"]
+            dump(native / "autogapfiller_summary.json", {"steps": {"step3": {"result": {"failed_jobs": [
+                {"job_name": job_name, "status": "failed", "error": "Missing expected <job output>"},
+            ]}}}})
+            built = reports.build_tool_report(root, result)
+            site = Path(built["directory"])
+            html = (site / "report.html").read_text()
+            self.assertIn("Completed (0 accepted changes)", html)
+            self.assertIn("LGZ sequence retained", html)
+            self.assertNotIn("Failed / 失败", html)
+            self.assertEqual(html.count("Closed / 已闭合"), 1)
+            diagnostics = (site / "native.html").read_text()
+            self.assertIn("Failed / 失败", diagnostics)
+            self.assertIn("Missing expected &lt;job output&gt;", diagnostics)
+            self.assertNotIn("Missing expected <job output>", diagnostics)
+            details = (site / "gaps/000001.html").read_text()
+            self.assertIn("native.html#" + reports.gap_anchor(job_name), details)
+            self.assertIn("ambiguous source", details)
 
     def test_one_based_native_single_base_and_touching_intervals_map_exactly(self):
         with tempfile.TemporaryDirectory() as directory:

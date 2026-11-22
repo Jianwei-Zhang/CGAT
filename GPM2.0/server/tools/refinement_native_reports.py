@@ -22,7 +22,94 @@ CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline
        "base-uri 'none'; form-action 'none'")
 WRAPPER_CSP = ("default-src 'none'; style-src 'unsafe-inline'; frame-src 'self' file:; "
                "connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'")
-CSS = "body{font:16px system-ui;margin:1.5em;color:#17212b}table{border-collapse:collapse;width:100%}td,th{padding:.5em;border:1px solid #ccd3db;text-align:left}a{color:#175ba0}code{overflow-wrap:anywhere}iframe{width:100%;height:85vh;border:1px solid #ccd3db}.note{padding:1em;background:#eef5ff}"
+CSS = """
+:root{
+  color-scheme:light;
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+  font-size:14px;
+  --font-mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+  --card-radius:6px;--control-radius:5px;
+  --surface-app:#f1f5f9;--surface-panel:#ffffff;--surface-subtle:#f8fafc;--surface-muted:#eef2f6;
+  --border-subtle:#dbe3ec;--border-default:#cbd5e1;--border-strong:#94a3b8;
+  --text-primary:#1e293b;--text-secondary:#334155;--text-muted:#64748b;
+  --accent:#2563eb;--action-primary-bg:#234b76;--focus-ring:#4f82b5;
+  --shadow-xs:0 1px 2px rgba(15,23,42,.04);
+  --tone-ok-ink:#166534;--tone-ok-bg:#ecfdf5;--tone-ok-line:#86efac;
+  --tone-warn-ink:#92400e;--tone-warn-bg:#fffbeb;--tone-warn-line:#f59e0b;
+  --tone-err-ink:#991b1b;--tone-err-bg:#fef2f2;--tone-err-line:#fca5a5;
+  --tone-info-ink:#1e40af;--tone-info-bg:#eff6ff;--tone-info-line:#93c5fd;
+  --tone-neutral-ink:#334155;--tone-neutral-bg:#eef2f6;--tone-neutral-line:#cbd5e1;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    color-scheme:dark;
+    --surface-app:#101720;--surface-panel:#17212e;--surface-subtle:#1d2938;--surface-muted:#243244;
+    --border-subtle:#344458;--border-default:#42546a;--border-strong:#748ba5;
+    --text-primary:#e5edf7;--text-secondary:#c7d5e6;--text-muted:#9bacc1;
+    --accent:#8abaff;--action-primary-bg:#2f5f92;--focus-ring:#91bfff;
+    --shadow-xs:0 1px 2px #0003;
+    --tone-ok-ink:#a2dfb3;--tone-ok-bg:#20382d;--tone-ok-line:#77b38b;
+    --tone-warn-ink:#f4d098;--tone-warn-bg:#3a3022;--tone-warn-line:#b79966;
+    --tone-err-ink:#ffb4ae;--tone-err-bg:#422b31;--tone-err-line:#c68989;
+    --tone-info-ink:#a6ccff;--tone-info-bg:#253d57;--tone-info-line:#7fa4d1;
+    --tone-neutral-ink:#c7d5e6;--tone-neutral-bg:#243244;--tone-neutral-line:#42546a;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-app);color:var(--text-primary);line-height:1.5}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+a:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-radius:3px}
+code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-muted);padding:.1em .35em;border-radius:4px;overflow-wrap:anywhere}
+h1,p{margin:0}h1{font-size:1.35rem;line-height:1.25}p{margin:.35rem 0}
+.cgat-header{background:var(--surface-panel);border-top:3px solid var(--action-primary-bg);border-bottom:1px solid var(--border-default);box-shadow:var(--shadow-xs)}
+.cgat-header-inner,.cgat-main{max-width:1240px;margin:0 auto;padding:.85rem 1.2rem}
+.is-wrapper .cgat-header-inner,.is-wrapper .cgat-main{max-width:1440px}
+.cgat-eyebrow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem}
+.scope-pill{display:inline-flex;align-items:center;padding:.12rem .5rem;border-radius:4px;font-size:.75rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;background:var(--surface-muted);color:var(--text-secondary);border:1px solid var(--border-default)}
+.cgat-title-row{display:flex;align-items:center;justify-content:space-between;gap:.65rem;flex-wrap:wrap}
+.cgat-nav{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.65rem;padding-top:.6rem;border-top:1px solid var(--border-subtle);align-items:center}
+.cgat-nav a{display:inline-flex;align-items:center;padding:.24rem .6rem;border-radius:var(--control-radius);border:1px solid var(--border-default);background:var(--surface-subtle);color:var(--text-primary);font-size:.86rem;font-weight:500}
+.cgat-nav a:hover{border-color:var(--border-strong);background:var(--surface-muted);text-decoration:none}
+.cgat-main{padding-top:1rem;padding-bottom:1.5rem;display:flex;flex-direction:column;gap:.8rem}
+.panel{background:var(--surface-panel);border:1px solid var(--border-default);border-radius:var(--card-radius);padding:.9rem 1.05rem;box-shadow:var(--shadow-xs)}
+.note{border-left:3px solid var(--tone-info-line);background:var(--tone-info-bg);color:var(--text-primary);padding:.6rem .85rem;border-radius:0 var(--card-radius) var(--card-radius) 0;font-size:.9rem}
+.note.is-warn{border-left-color:var(--tone-warn-line);background:var(--tone-warn-bg)}
+.badge{display:inline-flex;align-items:center;padding:.14rem .5rem;border-radius:999px;font-size:.78rem;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.tone-ok{color:var(--tone-ok-ink);background:var(--tone-ok-bg);border-color:var(--tone-ok-line)}
+.tone-warn{color:var(--tone-warn-ink);background:var(--tone-warn-bg);border-color:var(--tone-warn-line)}
+.tone-err{color:var(--tone-err-ink);background:var(--tone-err-bg);border-color:var(--tone-err-line)}
+.tone-info{color:var(--tone-info-ink);background:var(--tone-info-bg);border-color:var(--tone-info-line)}
+.tone-neutral{color:var(--tone-neutral-ink);background:var(--tone-neutral-bg);border-color:var(--tone-neutral-line)}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border-subtle);border-radius:var(--card-radius);background:var(--surface-panel)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:.55rem .7rem;border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}
+th{background:var(--surface-subtle);color:var(--text-secondary);font-weight:600;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:var(--surface-subtle)}
+td{overflow-wrap:anywhere}
+iframe{display:block;width:100%;height:82vh;min-height:480px;border:1px solid var(--border-default);border-radius:var(--card-radius);background:#fff}
+.pager{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin-top:.25rem}
+.pager a,.pager span.is-current{padding:.22rem .55rem;border:1px solid var(--border-default);border-radius:4px;background:var(--surface-subtle);font-size:.85rem;font-variant-numeric:tabular-nums}
+.pager span.is-current{background:var(--action-primary-bg);color:#fff;border-color:var(--action-primary-bg);font-weight:600}
+.muted{color:var(--text-muted);font-size:.85rem}
+@media (max-width:760px){.cgat-header-inner,.cgat-main{padding-left:.8rem;padding-right:.8rem}iframe{height:76vh;min-height:360px}}
+"""
+
+COMPACT_CSS = (
+    ":root{color-scheme:light dark;font:14px/1.5 system-ui,-apple-system,sans-serif}"
+    "body{margin:0;padding:1rem 1.25rem;background:#f1f5f9;color:#1e293b}"
+    "@media(prefers-color-scheme:dark){body{background:#101720;color:#e5edf7}.card{background:#17212e;border-color:#42546a}}"
+    ".card{max-width:720px;background:#fff;border:1px solid #cbd5e1;border-top:3px solid #234b76;border-radius:6px;padding:1rem 1.15rem}"
+    "h1{font-size:1.15rem;margin:0 0 .5rem}p{margin:.35rem 0}code{font-family:ui-monospace,monospace;font-size:.9em}"
+)
+
+AVAILABILITY_TONES = {
+    "offline_interactive": ("Offline interactive / 离线交互视图", "ok"),
+    "native_report_not_generated": ("Not generated / 未生成原生报告", "neutral"),
+    "server_only_display_size_limit": ("Server-only (display size limit) / 仅服务器（超展示体积）", "warn"),
+    "server_only_size_limit": ("Server-only (size limit) / 仅服务器（超体积限制）", "warn"),
+    "unsupported_native_display": ("Unsupported display / 不支持离线展示", "err"),
+    "conflicting_native_report_copies": ("Conflicting copies / 存在冲突副本", "err"),
+}
 
 
 def sha(data):
@@ -33,12 +120,39 @@ def encoded(value):
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
 
 
-def page(title, body, *, wrapper=False):
+def availability_badge(value):
+    label, tone = AVAILABILITY_TONES.get(value, (str(value), "neutral"))
+    return (
+        '<span class="badge tone-' + escape(tone, quote=True) + '">'
+        + escape(label) + '</span>'
+    )
+
+
+def page(title, body, *, wrapper=False, scope=None, subtitle=None, nav=None, badge=None, compact=False):
     csp = WRAPPER_CSP if wrapper else CSP.replace("script-src 'unsafe-inline'", "script-src 'none'")
-    return ("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\">"
-            + '<meta http-equiv="Content-Security-Policy" content="' + escape(csp, quote=True) + '">'
-            + "<title>" + escape(title) + "</title><style>" + CSS + "</style></head><body><h1>"
-            + escape(title) + "</h1>" + body + "</body></html>").encode()
+    if compact:
+        return (
+            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<meta http-equiv="Content-Security-Policy" content="' + escape(csp, quote=True) + '">'
+            '<title>' + escape(title) + '</title><style>' + COMPACT_CSS + '</style></head>'
+            '<body><div class="card"><h1>' + escape(title) + '</h1>' + body + '</div></body></html>'
+        ).encode()
+    eyebrow = '<div class="cgat-eyebrow"><span class="scope-pill">' + escape(scope) + '</span></div>' if scope else ""
+    sub_html = '<p class="muted">' + subtitle + '</p>' if subtitle else ""
+    nav_html = '<nav class="cgat-nav" aria-label="Native view navigation">' + nav + '</nav>' if nav else ""
+    body_cls = ' class="is-wrapper"' if wrapper else ""
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" content="' + escape(csp, quote=True) + '">'
+        '<title>' + escape(title) + '</title><style>' + CSS + '</style></head>'
+        '<body' + body_cls + '><header class="cgat-header"><div class="cgat-header-inner">'
+        + eyebrow
+        + '<div class="cgat-title-row"><h1>' + escape(title) + '</h1>' + (badge or "") + '</div>'
+        + sub_html + nav_html
+        + '</div></header><main class="cgat-main">' + body + '</main></body></html>'
+    ).encode()
 
 
 def source_labels(row):
@@ -311,9 +425,10 @@ def prepare(tool, native, jobs, gaps, assets, read, *, remaining_budget, page_si
         row = by_name[name]
         availability = "server_only_display_size_limit" if name in pages else row["availability"]
         return page("Native detail unavailable / 原生详情不可用",
-                    '<p>' + escape(name) + '</p><p>' + escape(availability) +
-                    '</p><p>No native result is invented. See the CGAT job/raw diagnostics navigation. '
-                    '/ 未伪造原生结果；请查看 CGAT 的任务与原始诊断入口。</p>')
+                    '<p><code>' + escape(name) + '</code></p><p>Availability / 可用性: <code>' + escape(availability) +
+                    '</code></p><p>No native result is invented. See the CGAT job/raw diagnostics navigation. '
+                    '/ 未伪造原生结果；请查看 CGAT 的任务与原始诊断入口。</p>',
+                    compact=True)
     budget, chosen, placeholders = max(0, remaining_budget), {}, {}
     if GLOBAL in pages:
         placeholders = {name: placeholder(name) for name in required}
@@ -348,25 +463,68 @@ def prepare(tool, native, jobs, gaps, assets, read, *, remaining_budget, page_si
         row.update(display_path=HOME + "/pages/" + name, wrapper_path=HOME + "/" + wrapper,
                    display_sha256=sha(pages[name]))
         source_kinds = source_labels(row)
-        body = ('<p><a href="index.html">Native visualization index / 原生可视化目录</a> · '
-                '<a href="../' + diagnostics_page + '">CGAT job diagnostics / CGAT 任务诊断</a></p>'
-                '<p>Source binding / 来源绑定: ' + escape(source_kinds) + '</p>'
-                '<p class="note">Native visualization is not accepted/final sequence or biological validation. '
-                '/ 原生可视化不等于接纳、最终序列或生物学验证。</p>'
-                '<iframe title="' + escape(name, quote=True) + '" sandbox="allow-scripts" referrerpolicy="no-referrer" src="pages/'
-                + quote(name) + '"></iframe>')
-        files[wrapper] = page(name, body, wrapper=True)
+        wrapper_nav = (
+            '<a href="index.html">Native visualization index / 原生可视化目录</a>'
+            '<a href="../' + escape(diagnostics_page, quote=True) + '">CGAT job diagnostics / CGAT 任务诊断</a>'
+        )
+        body = (
+            '<p class="note is-warn">Native visualization is not accepted/final sequence or biological validation. '
+            '/ 原生可视化不等于接纳、最终序列或生物学验证。</p>'
+            '<iframe title="' + escape(name, quote=True) + '" sandbox="allow-scripts" referrerpolicy="no-referrer" src="pages/'
+            + quote(name) + '"></iframe>'
+        )
+        files[wrapper] = page(
+            name,
+            body,
+            wrapper=True,
+            scope="CGAT Managed Native View / 离线原生视图封装",
+            subtitle='Source binding / 来源绑定: ' + escape(source_kinds),
+            nav=wrapper_nav,
+            badge='<span class="badge tone-info">Sandboxed Offline / 离线沙盒</span>',
+        )
     groups = [entries[i:i + page_size] for i in range(0, len(entries), page_size)] or [[]]
     for index, group in enumerate(groups):
-        body = '<p><a href="../' + diagnostics_page + '">CGAT native jobs and raw diagnostics / 原生任务与原始诊断</a></p>'
-        body += '<p class="note">' + escape(reason) + ' / Native tool reports and CGAT acceptance are separate.</p>'
-        body += '<table><thead><tr><th>Native report</th><th>Availability</th><th>Source binding</th><th>Original source</th></tr></thead><tbody>'
+        idx_nav = '<a href="../' + escape(diagnostics_page, quote=True) + '">CGAT native jobs and raw diagnostics / 原生任务与原始诊断</a>'
+        body = (
+            '<section class="panel">'
+            '<p class="note">Status reason / 状态原因: <code>' + escape(reason) + '</code> — '
+            'Native tool reports and CGAT acceptance are separate. / 原生工具报告与 CGAT 接纳相互独立。</p>'
+            '<div class="table-wrap"><table><thead><tr>'
+            '<th>Native report / 原生报告</th><th>Availability / 可用性</th>'
+            '<th>Source binding / 来源绑定</th><th>Original source / 原始文件</th>'
+            '</tr></thead><tbody>'
+        )
+        if not group:
+            body += '<tr><td colspan="4" class="muted">No native visualization entries recorded. / 未记录原生可视化条目。</td></tr>'
         for row in group:
-            name = '<a href="' + row["wrapper_path"].removeprefix(HOME + "/") + '">' + escape(row["name"]) + '</a>' if "wrapper_path" in row else escape(row["name"])
-            links = ' · '.join('<a href="' + source["raw_report_path"] + '">HTML source / HTML 原文</a> <code>' + source["sha256"] + '</code>' for source in row["sources"] if source["raw_report_path"])
-            body += '<tr><td>' + name + '</td><td>' + escape(row["availability"]) + ('<br>' + escape(row['reason']) if row.get('reason') else '') + '</td><td>' + escape(source_labels(row)) + '</td><td>' + links + '</td></tr>'
-        body += '</tbody></table><p>' + ' · '.join('<a href="' + ("index.html" if i == 0 else "index-" + str(i + 1) + ".html") + '">' + str(i + 1) + '</a>' for i in nearby_pages(index, len(groups))) + '</p>'
-        files["index.html" if index == 0 else "index-" + str(index + 1) + ".html"] = page("Native visualizations / 原生可视化", body)
+            name = (
+                '<a href="' + escape(row["wrapper_path"].removeprefix(HOME + "/"), quote=True) + '"><strong>' + escape(row["name"]) + '</strong></a>'
+                if "wrapper_path" in row else '<code>' + escape(row["name"]) + '</code>'
+            )
+            links = ' · '.join(
+                '<a href="' + escape(source["raw_report_path"], quote=True) + '">HTML source / HTML 原文</a> <code>' + escape(source["sha256"]) + '</code>'
+                for source in row["sources"] if source["raw_report_path"]
+            ) or '<span class="muted">Not embedded / 未嵌入</span>'
+            avail_html = availability_badge(row["availability"]) + (
+                '<br><small class="muted">' + escape(row["reason"]) + '</small>' if row.get("reason") else ""
+            )
+            body += '<tr><td>' + name + '</td><td>' + avail_html + '</td><td>' + escape(source_labels(row)) + '</td><td>' + links + '</td></tr>'
+        pager_items = []
+        for i in nearby_pages(index, len(groups)):
+            if i == index:
+                pager_items.append('<span class="is-current">' + str(i + 1) + '</span>')
+            else:
+                href = "index.html" if i == 0 else "index-" + str(i + 1) + ".html"
+                pager_items.append('<a href="' + href + '">' + str(i + 1) + '</a>')
+        body += '</tbody></table></div><div class="pager">' + "".join(pager_items) + '</div></section>'
+        files["index.html" if index == 0 else "index-" + str(index + 1) + ".html"] = page(
+            "Native visualizations / 原生可视化",
+            body,
+            scope="CGAT Native Visualization Index / 原生可视化目录",
+            subtitle=f'Tool: <code>{escape(str(tool))}</code> · Page {index + 1} / {len(groups)}',
+            nav=idx_nav,
+            badge='<span class="badge tone-' + ("ok" if pages else "neutral") + '">' + ("Available / 可用" if pages else "Not available / 不可用") + '</span>',
+        )
     binding = {"schema": SCHEMA, "schema_version": 1, "tool": tool, "policy": lock["policy"],
                "policy_sha256": lock_sha, "helper_sha256": sha(Path(__file__).read_bytes()),
                "visualizer_files_sha256": lock["visualizer_files_sha256"], "reason": reason,

@@ -41,7 +41,7 @@ def closed_site(test, site):
         for name in doc.links:
             url = urlsplit(name)
             test.assertFalse(url.scheme or url.netloc or url.path.startswith("/"), name)
-            target = (path.parent / unquote(url.path)).resolve()
+            target = (path.parent / unquote(url.path)).resolve() if url.path else path.resolve()
             test.assertTrue(target.is_relative_to(site.resolve()), name)
             test.assertTrue(target.is_file(), name)
         for frame in doc.frames:

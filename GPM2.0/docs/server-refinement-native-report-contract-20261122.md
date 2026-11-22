@@ -23,6 +23,30 @@ produce native HTML. Their real text/AGP/fill-detail/job diagnostics remain
 available. Do not manufacture an upstream visualization or imply that a CGAT
 report was produced by those tools.
 
+## Reading the HTML reports
+
+Open `06_report/report.html` for the batch overview. Its numbered sections
+cover the LGZ baseline, refinements and comparison data. The LGZ report is
+under `01_lgz/`; the per-tool reports under `02_refinement/` show original gaps,
+CGAT decisions, native jobs and logs. Comparison JSON and TSV stay under
+`03_comparison/`. The overview only links current refined Final Path and App
+archives when the published batch record matches the verified receipt.
+
+The HTML layout and copy were drafted with AGY CLI (`gemini-4-neon-high`) and
+reviewed against CGAT's App styling and the Server's recorded states. Native
+execution (or reuse), CGAT acceptance and final publication are separate.
+Completed with zero accepted changes means the LGZ sequence was retained; it
+is not a failed batch or a closed gap. A missing job status is not counted as
+success or failure. When recorded, the failed phase and exact error are shown
+with links to the relevant diagnostics. IDs, JSON, logs and source evidence
+remain available without repeating their raw contents in the main summary.
+
+The HTML stays standalone: embedded styles, no external dependencies, and
+unchanged archive entrypoints. The CSS, local links and result text were checked
+by regenerating the LGZ and all four tool reports from the existing synthetic
+runs without launching the scientific tools. Automated closure and archive
+checks are not a substitute for the final real-browser acceptance.
+
 ## Portable display and containment
 
 Keep every selected original HTML as an inert, content-bound text attachment.

@@ -3,8 +3,10 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from server.tests.test_refinement_native import workspace
+from server.tests.test_refinement_reports import fixture
 from server.tools import refinement_overview as overview
 from server.tools import refinement_reports as reports
 from server.tools.workspace_layout import WorkspaceLayout
@@ -37,6 +39,24 @@ class RefinementOverviewTests(unittest.TestCase):
             fasta.write_text(fasta.read_text().replace("AAAA", "TTTT"))
             with self.assertRaisesRegex(ValueError, "sequence changed"):
                 overview.baseline_gaps(WorkspaceLayout.detect(root))
+
+    def test_staged_result_does_not_publish_an_old_receipt_for_the_same_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            result = fixture(root)
+            run_id = result["run_id"]
+            built = reports.build_tool_report(root, result)
+            batch = {"batch_id": "b" * 32, "status": "staged", "exit_code": 0,
+                     "tools": {"degap": {"status": "staged", "phase": "staged", "run_id": run_id, "report": built},
+                               "tgsgapcloser": {"status": "pending"}}}
+            with patch.object(overview, "current_publication", return_value={"run_id": run_id, "transaction": "old"}):
+                rendered = overview.render_overview(root, batch, {"degap": result})
+            html = Path(rendered["report"]).read_text()
+            self.assertIn("Staged (not published)", html)
+            self.assertIn("Pending / 等待中", html)
+            self.assertIn("Not available (pending)", html)
+            self.assertNotIn("Final FASTA", html)
+            self.assertNotIn("Full App package", html)
 
     def test_failed_report_retains_logs_without_fabricating_final_files(self):
         with tempfile.TemporaryDirectory() as directory:
