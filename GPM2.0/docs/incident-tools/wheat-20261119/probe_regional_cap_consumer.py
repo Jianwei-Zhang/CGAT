@@ -67,18 +67,27 @@ def merged(groups):
     return {key: merged_intervals(intervals) for key, intervals in groups.items()}
 
 
-def qualify(query, target, links, lookup, policy):
-    observed, qualified = defaultdict(list), defaultdict(list)
-    left = neutral_placement(query, '+', lookup)
+def observed_maps(links, policy):
+    observed = defaultdict(list)
     for link in links:
         if link.hit.matches / link.hit.block_length >= policy.minimum_pair_identity:
             for a, b in link.source_blocks():
                 add_geometry(observed, link.hit.strand, a, b)
+    return merged(observed)
+
+
+def qualified_maps(query, target, links, lookup, policy):
+    qualified = defaultdict(list)
+    left = neutral_placement(query, '+', lookup)
     for strand in ('+', '-'):
         right = neutral_placement(target, strand, lookup)
         for block, _ in qualify_pair_blocks(left, right, links, policy, require_supported=False):
             add_geometry(qualified, strand, left.source_interval(block.left), right.source_interval(block.right))
-    return merged(observed), merged(qualified)
+    return merged(qualified)
+
+
+def qualify(query, target, links, lookup, policy):
+    return observed_maps(links, policy), qualified_maps(query, target, links, lookup, policy)
 
 
 def subtract(left, right):

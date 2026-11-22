@@ -17,7 +17,7 @@ import time
 from benchmark_regional_mapper_dispatch import LOOKUP_SHA, TRACE_SHA
 from lgz_core.q0_paths import PairLink, PathPolicy
 from lgz_core.q0_sources import Interval
-from probe_regional_cap_consumer import qualify, source
+from probe_regional_cap_consumer import observed_maps, qualified_maps, qualify, source
 from replay_regional_reciprocal_coverage import MIB, bound_bytes, covered_bases, length, load, projected, query_window
 
 EDGE_BP = 1000
@@ -69,26 +69,54 @@ def score(query, hits, lookup):
                 or hit.target_length != lookup[t]['length'] or t == q):
             raise ValueError('wrong projected part frame')
         groups[t].append(PairLink(hit, source(q, lookup), source(t, lookup)))
-    summary = Counter(core_bp=core_bp, distinct_cross_observed_core_maps=0, full_cross_qualified_core_maps=0,
-                      intra_observed_core_maps=0, intra_qualified_core_maps=0,
-                      intra_qualified_core_paired_bp=0, intra_qualified_whole_paired_bp=0,
-                      intra_observed_whole_maps=0, intra_projected_rows=0)
+    dataset = lookup[q]['dataset']
+    intra_rows = sum(len(links) for t, links in groups.items() if lookup[t]['dataset'] == dataset)
+    facts = {'core_bp': core_bp, 'interior_core': interior(query), 'intra_projected_rows': intra_rows,
+             'distinct_cross_observed_core_maps': None, 'full_cross_qualified_core_maps': None,
+             'intra_observed_core_maps': None, 'intra_qualified_core_maps': None,
+             'intra_qualified_core_paired_bp': None, 'intra_qualified_whole_paired_bp': None,
+             'intra_observed_whole_maps': None}
+
+    def result(reason):
+        return {**facts, 'screen_outcome': reason, 'single_full_cross_map_screen': reason == 'qualifies'}
+
+    if not facts['interior_core']:
+        return result('terminal_core')
+    # Qualification cannot create new maps or paired bases. Reject scopes that
+    # already fail uniqueness or coverage on the superset of observed maps,
+    # before the expensive fitted-pair checks. Never truncate the links used
+    # for qualification: records outside the core can still block a pair.
+    cross = []
     for t, links in groups.items():
+        if lookup[t]['dataset'] == dataset:
+            continue
+        for mapping, spans in observed_maps(links, policy).items():
+            if (n := covered_bases(cores, spans)):
+                cross.append((t, mapping, n))
+    facts['distinct_cross_observed_core_maps'] = len(cross)
+    if len(cross) != 1 or cross[0][2] != core_bp:
+        return result('not_one_complete_observed_cross_map')
+    target, mapping, _ = cross[0]
+    qualified = qualified_maps(q, target, groups[target], lookup, policy)
+    facts['full_cross_qualified_core_maps'] = int(covered_bases(cores, qualified.get(mapping, ())) == core_bp)
+    if facts['full_cross_qualified_core_maps'] != 1:
+        return result('cross_map_failed_qualification')
+
+    summary = Counter(intra_observed_core_maps=0, intra_qualified_core_maps=0,
+                      intra_qualified_core_paired_bp=0, intra_qualified_whole_paired_bp=0,
+                      intra_observed_whole_maps=0)
+    for t, links in groups.items():
+        if lookup[t]['dataset'] != dataset:
+            continue
         observed, qualified = qualify(q, t, links, lookup, policy)
-        if lookup[q]['dataset'] != lookup[t]['dataset']:
-            summary['distinct_cross_observed_core_maps'] += sum(covered_bases(cores, spans) > 0 for spans in observed.values())
-            summary['full_cross_qualified_core_maps'] += sum(covered_bases(cores, spans) == core_bp for spans in qualified.values())
-        else:
-            summary['intra_projected_rows'] += len(links)
-            summary['intra_observed_whole_maps'] += len(observed)
-            summary['intra_qualified_whole_paired_bp'] += sum(length(spans) for spans in qualified.values())
-            summary['intra_observed_core_maps'] += sum(covered_bases(cores, spans) > 0 for spans in observed.values())
-            qcov = [covered_bases(cores, spans) for spans in qualified.values()]
-            summary['intra_qualified_core_maps'] += sum(n > 0 for n in qcov)
-            summary['intra_qualified_core_paired_bp'] += sum(qcov)
-    return {**summary, 'interior_core': interior(query),
-            'single_full_cross_map_screen': (interior(query) and summary['full_cross_qualified_core_maps'] == 1
-                                             and summary['distinct_cross_observed_core_maps'] == 1)}
+        summary['intra_observed_whole_maps'] += len(observed)
+        summary['intra_qualified_whole_paired_bp'] += sum(length(spans) for spans in qualified.values())
+        summary['intra_observed_core_maps'] += sum(covered_bases(cores, spans) > 0 for spans in observed.values())
+        qcov = [covered_bases(cores, spans) for spans in qualified.values()]
+        summary['intra_qualified_core_maps'] += sum(n > 0 for n in qcov)
+        summary['intra_qualified_core_paired_bp'] += sum(qcov)
+    facts.update(summary)
+    return result('qualifies')
 
 
 def main():
@@ -106,7 +134,10 @@ def main():
     rows = []
     total = 0
     start = time.monotonic()
-    for group, row in choose(trace):
+    # Select high-CPU outliers first to keep cohort membership stable, but
+    # finish some inexpensive short-interior observations before the long tail.
+    selected = sorted(choose(trace), key=lambda pair: pair[0] != 'short_interior')
+    for group, row in selected:
         query, targets, raw = load(work, row, lookup, 128*MIB-total)
         total += len(raw)
         result = score(query, projected(query, targets, raw, row['raw_receipt']), lookup)
@@ -117,6 +148,7 @@ def main():
     passed = [r for r in rows if r['single_full_cross_map_screen']]
     report = {'status': 'archived_intra_deferral_screen_NOT_admission_or_speed', 'node': socket.gethostname(),
               'verified_paf_bytes': total, 'rows': rows, 'cohort': dict(Counter(r['group'] for r in rows)),
+              'screen_outcomes': dict(Counter(r['screen_outcome'] for r in rows)),
               'screen_windows': len(passed), 'screen_with_qualified_intra_core': sum(r['intra_qualified_core_maps'] > 0 for r in passed),
               'screen_with_any_intra': sum(r['intra_projected_rows'] > 0 for r in passed),
               'main_workspace_modified': False, 'native_mapper_executed': False,
