@@ -63,8 +63,12 @@ def scope_rows(summary, workspace, count):
 
 
 def checked_argv(command, tool, preset, flags, original_files, archived_files, mapper_threads):
-    expected = [tool, "-x", preset, *flags, "-t", "2", *map(str, original_files)]
-    if (preset != "asm10" or flags not in (BASE, ["-c", *BASE], ["-c", *BASE, "-m", "2000"])
+    # Preserve the production argv order as well as its values: the raw
+    # receipt's -c is represented before -x, unlike the coarse command.
+    calibrated = flags in (BASE, ["-c", *BASE], ["-c", *BASE, "-m", "2000"])
+    prefix = [tool, "-c", "-x", preset, *flags[1:]] if flags[:1] == ["-c"] else [tool, "-x", preset, *flags]
+    expected = [*prefix, "-t", "2", *map(str, original_files)]
+    if (preset != "asm10" or not calibrated
             or command["argv"] != expected or command["address_space_bytes"] != 4*GIB
             or command["guard_sha256"] != GUARD_SHA or command["wall_clock_limit_added"] is not False
             or mapper_threads not in (1, 2)):

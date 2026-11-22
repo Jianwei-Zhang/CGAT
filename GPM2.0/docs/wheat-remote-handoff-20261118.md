@@ -3951,3 +3951,24 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `ab262552233f98043413c8c96ff23f12d73f468516fae63c62850f49300377da`；续查同作业是否有 `inputs_verified`
   及 `artifacts/report.json`，不把 RUNNING 当成性能验收，不再提交其他等价试验。主新版仍独立产出，19:24:36
   达 **7400/61000，fallback=0**；预检 `43015921` 仍在运行，未触碰新旧主任务。
+
+### 2026-11-22 19:36 CST：两档并发诊断按原始参数顺序核对；减少 FASTA 逐行写入
+
+- `43015937` 的远端八项 helper 测试均通过；随后在首个实际精比对参数绑定拒绝、终态 FAILED/1，
+  未启动任何 mapper。原因是试验脚本把 raw receipt 的 `-c` 放在 `-x asm10` 后，而实际原命令是
+  `-c -x asm10`。不是比对差异、主故障或 OOM。不放宽参数检查：分别验证 coarse/precise 原始格式，
+  固定所有 flag 位序后再替换 `-t` 和隔离归档路径。本地八项通过，登录节点仅仅读 JSON 已将同一组选定的
+  **56 个真实命令**逐一与两个 arm 对齐；没有读 FASTA 或启动 mapper。`metadata-precheck.json` SHA
+  `d0472299c2641857eb2d8c2235f48652572ee658933986a9a4225c25140b2e83`，旧终态 JSON SHA
+  `4f2b78a1028329ad7250643e3282532244b6554e817a0da43cc37c9e81e8722a`。
+- 隔离 `q0-regional-thread-split-20261122-1922-r3` 的同一方案 **43015966** 19:33:42 在
+  `agent-X86-57` 起跑，已确认 16 CPU/81920 MiB 并放行同一作业，完整资源证明 SHA
+  `6e8dbe855d80f476aa3fff8a8729cfec89fb09f7e53ae61cb0474a3feadfa652`；`job.sha256` SHA
+  `dea22d11d515fb6f492dcd0ac75715ec648a91e48c2e479938d9f9d9183fe4c4`。已过 x86 参数门禁，
+  仍在输入核验，无测速结论。之前作业未得 mapper 输出，不做时间对照；继续查询 `43015966`，不重投。
+- 仓库 `lgz_core.common.write_fasta` 仍是原 UTF-8、LF、80 字符折行；每 1024 行成块写一次，
+  不复制整个 contig，不省略输入和 SHA 核对。两项新测分别覆盖输出同字节、分块上界；连同区域 mapper、
+  evidence preparation 和 GRT prepare 共 64 项通过。641 条/17,077,468 字节合成窗口同 SHA，
+  实际新旧 writer 在本地临时盘 ABBA 四次 33.26/17.34/21.40/35.22 ms。是写入 CPU/接口开销，
+  不是共享盘实测或端到端时间；不改当前冻结的 loader/preflight 包，不因此重启。
+- 19:36 新旧主作业及预检 `43015921` 均 RUNNING；新版 19:31:30 达 **7500/61000**、fallback=0。

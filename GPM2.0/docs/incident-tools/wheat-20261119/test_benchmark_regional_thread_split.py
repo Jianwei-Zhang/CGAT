@@ -10,7 +10,7 @@ from benchmark_regional_thread_split import BASE, Case, GIB, GUARD_SHA, Stage, c
 
 class ThreadSplitTests(unittest.TestCase):
     def test_only_threads_and_archived_paths_change(self):
-        prefix = ['/mapper', '-x', 'asm10', '-c', *BASE, '-m', '2000', '-t']
+        prefix = ['/mapper', '-c', '-x', 'asm10', *BASE, '-m', '2000', '-t']
         flags = ['-c', *BASE, '-m', '2000']
         command = {'argv': [*prefix, '2', '/original/target.fa', '/original/query.fa'],
                    'address_space_bytes': 4*GIB, 'guard_sha256': GUARD_SHA, 'wall_clock_limit_added': False}
@@ -25,6 +25,15 @@ class ThreadSplitTests(unittest.TestCase):
                 checked_argv(bad, *args, 1)
         with self.assertRaises(ValueError):
             checked_argv(command, *args, 3)
+
+        # Coarse never has -c. Do not accidentally accept reordered raw
+        # argv merely because it is logically equivalent for this mapper.
+        coarse = ['/mapper', '-x', 'asm10', *BASE, '-t']
+        coarse_command = {**command, 'argv': [*coarse, '2', *args[3]]}
+        self.assertEqual(checked_argv(coarse_command, *args[:2], BASE, *args[3:], 1), (*coarse, '1', *args[4]))
+        old_order = {**command, 'argv': ['/mapper', '-x', 'asm10', '-c', *BASE, '-m', '2000', '-t', '2', *args[3]]}
+        with self.assertRaisesRegex(ValueError, 'calibrated guarded regional command'):
+            checked_argv(old_order, *args, 1)
 
     @unittest.skipUnless(os.name == 'posix', 'requires POSIX exec')
     def test_phase_rejects_altered_stdout_and_retains_pair(self):
