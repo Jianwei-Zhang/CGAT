@@ -120,6 +120,21 @@ def native_diagnostics(root, tool, run_id, execution):
     log = (base / "02_jobs" / native_run / "native.log").as_posix()
     if (root / log).is_file():
         selected.setdefault(log, digest(safe_file(root, log)))
+    if tool == "quartet" and not origin:
+        # Failed/interrupted attempts may contain completed units even though
+        # no whole-native completion exists. Only named owned diagnostics.
+        unit_base = base / "02_jobs" / native_run
+        for name in ("native_launch.json", "native_substeps.json"):
+            relative = (unit_base / name).as_posix()
+            if (root / relative).exists():
+                select(relative)
+        for receipt in sorted((root / unit_base / "native_units").glob("*/unit_complete.json")):
+            if not re.fullmatch(r"[0-9a-f]{64}", receipt.parent.name):
+                continue
+            for name in ("unit_complete.json", "producer.json", "output.paf"):
+                file = receipt.parent / name
+                if file.exists() or file.is_symlink():
+                    select(file.relative_to(root).as_posix())
     jobs, native_gaps = [], []
     if tool == "degap":
         gap_report = (native / "03.gap_filling/gap_filling_results.json").as_posix()
@@ -261,6 +276,7 @@ def render_site(directory, summary, provenance, final, assets):
         "native_executed_this_attempt": execution.get("native_executed"), "native_reused": execution.get("native_reused", False),
         "native_origin": execution.get("native_origin"), "requested_threads": execution.get("requested_threads", execution.get("threads")),
         "recipe": execution.get("recipe"),
+        "launcher_command": execution.get("launcher_command"), "native_substeps": execution.get("native_substeps"),
         "command": execution.get("command")}) + '</pre>'
     measured = summary.get("source_evidence")
     if measured is not None:

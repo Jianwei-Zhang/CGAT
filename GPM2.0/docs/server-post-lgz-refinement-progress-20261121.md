@@ -379,3 +379,18 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 另在失败诊断接入后单独检查失败日志保留/恢复、缓存原始数据不变性及归档发布，3 项通过（5.435 秒）。初始归档定向检查发现一个新 receipt 路径的 str/Path 传参错误，已按既有 safe-file 接口修正调用，没有放宽生产校验。
 - Windows `cargo check --lib --tests` 通过（41.82 秒），只做编译/类型检查，没有链接并执行新增 App 用例。新冻结夹具来自实际 serializer 和来源重建；其补洞候选、tel 规则和 MUMmer 输出是明确的受控材料，不冒充原生四工具、固定环境、真实 MUMmer/双架构或生物学验收。
 - 没有运行全量回归、浏览器、生产构建、环境升级、远端作业或发布。全目标继续保留：未完成旧 LGZ 阶段适配、原生内部部分子任务复用、原生离线可视报告、真实固定环境/四工具/双架构，以及包含最新 App 运行闭环的 A01–A18 最后统一验收。
+
+
+## 2026-11-22：quarTeT 原生内部逐输入比对恢复
+
+- 先扩展 `server-refinement-native-resume-contract-20261122.md`，再实现消耗产物单元。整段 native checkpoint 仍优先；中途失败后使用新原生目录，仅恢复已封存的 PAF，不迁移旧 native 树，不修改固定源码或科学参数。封存同时绑定原生数据/版本/命令、实际线程、launcher/helper 和该次真正消耗的 reference/query FASTA 内容。
+- 新增 `refinement_native_runner.py` 和 `refinement_native_units.py`。显式区分原科学命令与实际 launcher 命令；在 `02_jobs/<run>/native_units/<key>/` 保存不可变消耗副本及原 producer 回执，`native_launch.json`、`native_substeps.json` 记录逐输入实际计算/恢复情况及生产 run。恢复只查询原始 producer，不串接派生缓存链。
+- A 完成而 B 失败时可复用 A，再执行 B；空 PAF 是固定 `allow_empty=True` 规则下完成的无命中，不遗漏后续 reads 输入。整个原生成功阶段仍须覆盖每个所选输入及真正完成的输出/明确无候选条件。恢复不会跳过原生解析/整合、CGAT 接纳、来源重建或最终发布检查。
+- 原生完成证据包含单元回执及真正消耗的 PAF。修改数据、线程、运行时/helper、损坏/符号链接缓存、错 CIGAR、缺失输入、伪造原 producer 状态或改变已消费 PAF，不会被当作完成。完成校验器版本同时绑定单元校验 helper；修正完成检查后重验原封存字节，不因此重算已完成原生科学结果。
+- 固定源码的真实检查发现 `util.minimap` 把 PAF 放入 `tmp/`，原空结果检查只找根目录；现覆盖真实位置，并保留历史已封存/受控根目录证据兼容。成功/失败报告包含逐单元来源、计算/复用统计与诊断；中英文用户指南注明只有 quarTeT 的该边界当前接入，其余工具内部恢复不冒称完成。
+
+### 本段轻量证据
+
+- 11 项定向检查通过（11.603 秒）：新恢复单元用例及既有三工具完成后再接纳、校验器升级重验。不是全量 Server/App 回归。补齐来源封闭与元数据形状检查后，最后 3 项检查通过（2.470 秒）：非法对象/执行结构的缓存失效、重新封装当前回执仍拒绝原生产者失败状态，以及固定源码实际 CLI 的失败/恢复/整段复用。
+- 可选 `CGAT_TEST_QUARTET_ARCHIVE` 用例安装校验过的固定 quarTeT 源码和既定兼容补丁到隔离临时目录，使用本机 `minimap2 2.26-r1175`，注入第二输入退出 7；实际比对调用顺序为 A、B、B，第三次整段 native 复用不再比对。PAF 为短序列真实无命中，不是补洞生物学正确性或固定 conda 环境验收。独立冒烟回执/日志副本保存在 `/tmp/cgat-quartet-partial-evidence-20261122-a5m6ophb/`，副本不是可继续运行的迁移工作区。
+- 未启动全量回归、生产构建、浏览器、现有环境升级、远端作业或发布。继续保留 DEGAP 单 gap、TGS 内部阶段和 LR 迭代恢复、未完成旧 LGZ 阶段迁移、原生离线可视报告、真实固定环境/四工具/双架构，以及最新 App 运行闭环与 A01–A18 最后统一验收。master 和客户工作区未改动。

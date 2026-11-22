@@ -40,7 +40,8 @@ PIN = "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75"
 RECIPE = "cgat.degap.exact-anchors.v2"
 ADAPTER_FILES = ("refinement_degap.py", "refinement_admission.py", "refinement_path.py",
                  "refinement_sources.py", "refinement_publication.py", "refinement_tools.py",
-                 "refinement_recipes.py", "refinement_native_trace.py", "refinement_native_checkpoint.py")
+                 "refinement_recipes.py", "refinement_native_trace.py", "refinement_native_checkpoint.py",
+                 "refinement_native_units.py", "refinement_native_runner.py")
 
 
 def verify_engine(engine_root: Path) -> dict:

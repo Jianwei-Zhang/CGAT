@@ -22,6 +22,7 @@ try:
     from refinement_tools import fingerprint
     from refinement_path import PathError
     from refinement_native_trace import TraceError
+    from refinement_native_units import launch, capture_units, checked_json, SUMMARY
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, relative_path
     from .workspace_migration import durable_json, sync_directories
@@ -29,6 +30,7 @@ except ModuleNotFoundError:
     from .refinement_tools import fingerprint
     from .refinement_path import PathError
     from .refinement_native_trace import TraceError
+    from .refinement_native_units import launch, capture_units, checked_json, SUMMARY
 
 SCHEMA = "cgat.native-refinement-completion"
 NAME = "native_complete.json"
@@ -48,7 +50,12 @@ def quartet_empty_outcome(code, log, directory, prepared):
     # In the pinned CGAT recipe successful empty alignments continue to the next
     # input. Every selected input must have produced its own fresh PAF.
     for path in prepared:
-        paf = directory / ("quartet.flank_map_" + Path(path).name + ".paf")
+        name = "quartet.flank_map_" + Path(path).name + ".paf"
+        # Pinned util.minimap moves PAFs to tmp; root is retained for older
+        # sealed/controlled evidence, never as an unsealed recovery fallback.
+        paf = directory / "tmp" / name
+        if not paf.exists() and not paf.is_symlink():
+            paf = directory / name
         if not paf.is_file() or paf.is_symlink():
             raise TraceError("quarTeT no-candidate outcome lacks a completed alignment artifact")
     return "no_candidates"
@@ -195,7 +202,8 @@ def checked_file(root, path, *, prefixes):
     return safe, relative
 
 
-def capture(root, tool, run_id, native_directory, invocation, code, log, chromosomes, parameters, prepared_files, driver):
+def capture(root, tool, run_id, native_directory, invocation, code, log, chromosomes, parameters, prepared_files, driver,
+            *, require_units=False):
     base = "04_refinement/" + TOOL_DIRECTORIES[tool]
     prefixes = [base + "/03_native/" + run_id, base + "/02_jobs/" + run_id]
     artifacts, identities, genomes = {}, {}, {}
@@ -219,8 +227,9 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
         raise subprocess.CalledProcessError(code, invocation.command)
     jobs = None
     if empty:
-        for path in native_directory.glob("quartet.flank_map_*.paf"):
-            add(path)
+        for parent in (native_directory, native_directory / "tmp"):
+            for path in parent.glob("quartet.flank_map_*.paf"):
+                add(path)
     else:
         for relative in invocation.required_outputs:
             path = native_directory / relative
@@ -276,6 +285,15 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
             raise PathError("LR_Gapcloser stopped early while gaps still remain")
     elif not empty:
         terminal = (native_directory / invocation.required_outputs[0]).relative_to(root).as_posix()
+    unit_artifacts = capture_units(root, tool, run_id, code, required=require_units)
+    if unit_artifacts:
+        summary_path = root / base / "02_jobs" / run_id / SUMMARY
+        summary = checked_json(root, summary_path)
+        expected = [] if empty == "no_eligible_flanks" else ["flank_map_" + Path(path).name for path in prepared_files]
+        if [row["unit"]["suffix"] for row in summary["units"]] != expected:
+            raise PathError("native substeps do not cover every selected quarTeT input in order")
+    for path in unit_artifacts:
+        add(path)
     return {"outcome": empty or "completed", "artifacts": artifacts, "native_assembly": genomes.get(terminal, {}),
             "native_jobs": jobs}, identities
 
@@ -340,7 +358,8 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
     native_binding = binding(invocation, recipe, paths, input_hashes)
     cached = find_completed(root, invocation.tool, native_binding, input_hashes)
     marker = paths["02_jobs"] / "invocation.json"
-    validator = digest(Path(__file__))
+    validator = fingerprint({name: digest(Path(__file__).with_name(name)) for name in
+                             ("refinement_native_checkpoint.py", "refinement_native_units.py")})
     if cached is not None and cached.get("validator_revision") != validator:
         # A verifier/reporting fix is not a changed native program. Recheck the
         # original, sealed bytes under the current completion rules instead of
@@ -367,11 +386,15 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
             raise PathError("LR_Gapcloser native output must not already exist")
         driver = driver_factory(invocation) if driver_factory else None
         log = paths["02_jobs"] / "native.log"
+        launcher, launch_request = launch(root, invocation, paths, record, native_binding)
+        if launch_request is not None:
+            record["launcher_command"] = list(launcher)
+            atomic_json(marker, record)
         started = time.monotonic()
         started_at = datetime.now(timezone.utc).isoformat()
         print(f"[REFINEMENT NATIVE START] tool={invocation.tool} run={record['run_id']} log={log}", flush=True)
         with log.open("xb") as stream:
-            process = subprocess.run(invocation.command, cwd=invocation.cwd, env=invocation.environment,
+            process = subprocess.run(launcher, cwd=invocation.cwd, env=invocation.environment,
                                      stdout=stream, stderr=subprocess.STDOUT)
         seconds = time.monotonic() - started
         record.update(native_returncode=process.returncode, native_status="validating", phase="native")
@@ -379,8 +402,15 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
         atomic_json(marker, record)
         verify_inputs()
         try:
+            if launch_request is not None:
+                substeps = checked_json(root, paths["02_jobs"] / SUMMARY)
+                record["native_substeps"] = {"producer_run_id": record["run_id"], "completed": len(substeps["units"]),
+                                             "computed": sum(not row["reused"] for row in substeps["units"]),
+                                             "reused": sum(row["reused"] for row in substeps["units"]),
+                                             "summary": (paths["02_jobs"] / SUMMARY).relative_to(root).as_posix()}
             result, native_identities = capture(root, invocation.tool, record["run_id"], directory, invocation,
-                                                process.returncode, log, chromosomes, parameters, prepared_files, driver)
+                                                process.returncode, log, chromosomes, parameters, prepared_files, driver,
+                                                require_units=launch_request is not None)
         except Exception:
             record.update(native_status="failed", phase="native")
             atomic_json(marker, record)
@@ -395,6 +425,8 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
                  "execution": {"command": list(invocation.command), "cwd": str(invocation.cwd), "threads": record["threads"],
                                "returncode": process.returncode, "native_seconds": seconds, "started_at": started_at,
                                "driver": driver.relative_to(root).as_posix() if driver is not None else None,
+                               **({"launcher_command": list(launcher), "native_substeps": record["native_substeps"]}
+                                  if launch_request is not None else {}),
                                "ended_at": datetime.now(timezone.utc).isoformat()}, "result": result}
         for relative in result["artifacts"]:
             with (root / relative).open("rb") as stream:
@@ -418,6 +450,9 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
         record["timing"]["native_seconds"] = 0.0
         record["command"], record["cwd"] = cached["execution"]["command"], cached["execution"]["cwd"]
         verify_inputs()
+    for name in ("launcher_command", "native_substeps"):
+        if name in cached["execution"]:
+            record[name] = cached["execution"][name]
     record.update(native_reused=cached["reused"], native_executed=not cached["reused"], native_status="success", phase="admission",
                   native_returncode=cached["execution"]["returncode"], recipe_sha256=fingerprint(recipe),
                   native_origin={"run_id": cached["run_id"], "native_root": cached["native_root"],

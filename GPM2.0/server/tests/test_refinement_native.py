@@ -40,6 +40,9 @@ def workspace(root, *, gap=100, name="chr1"):
 @unittest.skipUnless(shutil.which("samtools"), "real samtools indexing required")
 class NativeStageTests(unittest.TestCase):
     def setUp(self):
+        launcher = mock.patch("refinement_native_checkpoint.launch", side_effect=lambda root, invocation, *args: (invocation.command, None))
+        launcher.start()
+        self.addCleanup(launcher.stop)
         self.runtime = mock.patch.object(native, "validate_runtime", return_value={"lock_sha256": fingerprint(load_lock())})
         self.runtime.start()
         self.addCleanup(self.runtime.stop)

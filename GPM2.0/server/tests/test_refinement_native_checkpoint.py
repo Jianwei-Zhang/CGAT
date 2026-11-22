@@ -30,7 +30,8 @@ class NativeCheckpointTests(unittest.TestCase):
         self.helper = fixture.NativeStageTests()
         self.helper.real_run = self.real_run
         self.runtime = {"lock_sha256": fingerprint(load_lock())}
-        for patcher in (mock.patch.object(native, "validate_runtime", return_value=self.runtime),
+        for patcher in (mock.patch.object(checkpoints, "launch", side_effect=lambda root, invocation, *args: (invocation.command, None)),
+                        mock.patch.object(native, "validate_runtime", return_value=self.runtime),
                         mock.patch.object(degap, "validate_runtime", return_value=self.runtime),
                         mock.patch.object(native, "materialize_native_driver", return_value=None),
                         mock.patch.object(degap, "check_environment")):
@@ -128,7 +129,9 @@ class NativeCheckpointTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             origin = result["provenance"]["execution"]["native_origin"]
             self.assertEqual(origin["validator_revision"], revision)
-            self.assertEqual(origin["verified_by"], "f" * 64)
+            self.assertEqual(origin["verified_by"], fingerprint({
+                "refinement_native_checkpoint.py": "f" * 64,
+                "refinement_native_units.py": real_digest(Path(checkpoints.__file__).with_name("refinement_native_units.py"))}))
             self.assertEqual(receipt.read_bytes(), raw)
 
     def test_degap_reuses_completed_child_jobs_and_reconstructs_sources_again(self):
