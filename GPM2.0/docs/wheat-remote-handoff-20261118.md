@@ -3153,3 +3153,37 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   新preflight validation SHA、old_job43010335、protected42523432。observer3037575只读仍在，
   不具备自动修复/聊天通知功能。后续真实新reader启动时须核对新增admission日志
   `dispatch=completion_order result_order=original`、25项实际SKIP_VALID及缓存命中后新工作吞吐。
+
+
+### 2026-11-22 11:50 CST：窗口必要性/复用只读调查，先不提交新切换作业
+
+- 用户追问“怎么这么多计划窗口，都是必要的吗，能精简/复用吗”。本轮不改科学策略、不停止主任务；
+  先判断工作量来源，不能只修调度后让明显冗余工作继续跑。当前 goal 继续推进，没有暂停授权。
+- 候选预检 **43011976 已 SUCCEEDED**（替代上一节 RUNNING 快照）；`validation.json` SHA
+  `a46396d126d9f1620acf010ff4b5559c64c62c9fdbc75cfbbe138ccb298e6fee`，25 个唯一 initial
+  checkpoint，transition 仍 c0f3ce...；workspace_modified/main_task_submitted/q0_runtime_installed 均 false。
+  **尚未提交新 32CPU 主作业、未安装 completion-order 补丁**；不要因读到上一节接续动作就直接切换。
+- 元数据几何普查 **43012019 SUCCEEDED / agent-X86-61**，1CPU/4GiB，约25秒，峰值217MiB。
+  复用冻结748核心包，核对原47文件manifest；仅读SHA绑定lookup/residual，不读DNA/PAF，不改主工作区。
+  结果在 `q0-window-geometry-census-20261122-114749/census.json`（相对当前compare根目录），SHA
+  `d8a5a1f741e35b9356ed82f0a697b7eef5fd6a0df55e94f03dccc477b5c1139f`；同目录保留源码、manifest、作业脚本和日志。
+- **冻结 residual 不是当前实时 holes**：原100kb+双侧10kb策略得 **61087窗口/31978父contig**，
+  现场日志 planned61000；差87，不能把冻结统计冒充当前精确计划。当前61k不是全基因组比对次数，
+  whole-parent缓存跳过或fallback仍会改变真实执行数量。
+- 冻结分布：flye 30799父/51231窗口（83.87%）；hifiasm 1179父/9856窗口。
+  25454父仅1窗口，6524父合计35633窗口；不是仅几条巨型contig切出了所有任务。
+  核心未覆盖共2319791151bp，查询context累计4066065198bp；其中context重叠344580512bp，
+  不能把所有flank/context都视为可无损删除的重复比对。
+- 只变核心上限、仍保留同样核心bases的**几何估算**：200kb=>49205（-19.45%），
+  500kb=>43452（-28.87%），1Mb=>42097（-31.09%）。各有11260/7237/6215窗口超过现有
+  120kb硬guard；不是可直接上线参数，也未测耗时/内存/结果一致性。不能简单取消guard扩大窗口。
+- 丢弃 <1kb 单个残余洞的几何估算：56701窗口（-7.18%），少探索41223235bp（核心bases的1.777%）；
+  <10kb=>44807（-26.65%），少探索572324942bp（24.671%）。这是遗漏探索范围，不是最终精度损失比例；
+  尚未采用。用户允许有限降精度，也不能把24.7%遗漏解释为轻微代价。
+- 已确认源码差异：partial 在父查询级调用 remaining_targets()==0 跳过已完成矩阵，但
+  plan_parent/index.targets 未传逐pair selection；candidate 已传 eligible target mask。
+  可以调查“只对尚缺 pair 缩目标集”，**尚未量化收益/更改实现或证明输出等价**。保留既有完整raw/project
+  优先命中，避免一改窗口/目标集合就让已完成缓存全部换身份。当前4个矩阵的query侧并集/2573窗口界限仍适用，
+  不能宣传61k大多数已被全局结果覆盖；参考坐标投影不自动等价为精确contig间CIGAR。
+- 11:46:29只读observer：NEW43010335仍RUNNING，最新11:46:14 completed4700/planned61000/fallback0；
+  OLD42523432仍RUNNING/grt_step2。仅新增上述25秒诊断，原任务和旧基线均未中断。
