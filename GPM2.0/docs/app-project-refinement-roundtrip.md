@@ -5,35 +5,37 @@
 ## 用户流程
 
 1. **选位点和导出。** 在 Assembly / Final Path 把 Gap 或左、右端粒加入当前项目的任务清单；Gap 默认选 DEGAP，可给同一位点选多个 GapFiller；Tel 固定使用 DEGAP TelSeeker（`telseeker_ctg`）。用户不用选目标轨道。HiFi 和 ONT 分开：优先保留此项目用户设置（显式清空也算编辑），否则从已验证的精修包提取原始 Server reads，包含用户提供但某个工具没用到的输入，不用转换后的临时文件。没有记录就留空，仍能选位点和导出。端粒 motif 沿用可核实的项目设置并允许更改。
-2. **在 Server 执行。** 导出一个 ZIP，包含任务清单，以及运行说明和一条可复制的命令。命令在对应的 CGAT Server 工作区执行，自动写入 `08_refinement_jobs/02_manual/<batch_id>/`，不让用户逐任务填输出目录或工具二进制。工作区安装的锁定工具和 `gapfill.toml` 是参数来源，不在 App 另设一套 DEGAP GapFiller 数值预设。已有 reads 路径按 Server 路径使用；换机器或缺 reads 时，执行前只补需要的 HiFi/ONT。文件存在、摘要匹配和工具的 reads 要求在 Server 检查；不上传 reads，不让 App 当本地文件探测，不根据后缀猜测技术类型。旧自定义工具路径不继承到新协议。
+2. **在 Server 执行。** 导出一个 ZIP，包含任务清单、运行说明和一条可复制命令（默认在对应的 CGAT Server 工作区根目录执行 `python .lib/tools/refine.py refinement_tasks.zip`，全局入口 `~/bin/refine.py` 同样适用）。执行自动写入 `08_refinement_jobs/02_manual/<batch_id>/` 并同步更新总报告 `06_report/report.html`，不让用户逐任务填输出目录或工具二进制。工作区运行时（新项目 `.lib/`，旧项目兼容 `.prepare_lib/`）安装的锁定工具和 `gapfill.toml` 是参数来源，不在 App 另设一套 DEGAP GapFiller 数值预设。已有 reads 路径按 Server 路径使用；换机器、缺 reads 或需替换输入时，执行时按需传 `--hifi`/`--ont` 覆盖对应技术 reads。文件存在、摘要匹配和工具的 reads 要求在 Server 检查；不上传 reads，不让 App 当本地文件探测，不根据后缀猜测技术类型。旧自定义工具路径不继承到新协议。
 3. **把结果导回原项目。** Server 自动收集批次结果为一个 ZIP。Project 页选中的具体项目右侧有「精修」子卡片，可导入结果并查看进度和历史。在这张卡选包本身就是应用意图；校验通过即更新该项目 Final Path，不弹第二次确认。包不属于该项目即停止，不自动切换项目。打开其他项目、染色体或轨道不会改变已启动导入的目标。
 
 ## Server 工作区与 `08_refinement_jobs`
 
 新版编号工作区增加顶层 `08_refinement_jobs/`，用于快速定位全部精修任务；`07_delivery/` 仍是可导入 App 的整项目交付包，`08_refinement_jobs/` 仅作精修任务导航与过程区：
 
+- `.lib/`：新项目工作区运行时目录（含 `.lib/tools/refine.py` 及锁定工具/脚本）；旧项目 `.prepare_lib/` 作为兼容读取/迁移路径。
 - `08_refinement_jobs/01_automatic/<tool>/`：收录自动精修的任务状态、报告入口与交付包入口，**不复制或移动** `04_refinement/`、`05_final/`、`06_report/`、`07_delivery/` 中的科学产物。
-- `08_refinement_jobs/02_manual/<batch_id>/{01_inputs,02_jobs,03_report,04_delivery}`：存放 App 导出的项目级手动任务输入、运行与质检记录、批次报告及待导回结果包。
+- `08_refinement_jobs/02_manual/<batch_id>/{01_inputs,02_jobs,03_report,04_delivery}`：存放 App 导出的项目级手动任务输入、运行与质检记录、批次报告及待导回结果包；手动精修完成后同步更新总报告 `06_report/report.html`，但手动结果在导回 App 前不得写入或冒充自动精修 `05_final/`。
 - `08_refinement_jobs/` 下的任务索引必须由发布/完成 receipt 生成，不能仅凭裸目录存在判定任务成功。
 
 ```text
 <server_workspace>/
+├── .lib/                             # 新项目运行时与工具（含 tools/refine.py；旧项目兼容 .prepare_lib/）
 ├── 04_refinement/                    # 自动精修中间产物
-├── 05_final/<tool>/                  # 自动精修已发布 accepted result
-├── 06_report/                        # 自动精修整项目报告
+├── 05_final/<tool>/                  # 自动精修已发布 accepted result（不含未导回 App 的手动结果）
+├── 06_report/                        # 整项目总报告（report.html，含自动与手动精修视图）
 ├── 07_delivery/                      # 可导入的整项目交付包
 └── 08_refinement_jobs/               # 精修任务导航与过程区（由 receipt 生成索引）
     ├── 01_automatic/<tool>/          # 自动精修状态、报告入口、交付包入口
     └── 02_manual/<batch_id>/         # App 导出的手动精修批次
         ├── 01_inputs/                # 任务清单与内容绑定局部种子
         ├── 02_jobs/                  # 工具执行与质检记录
-        ├── 03_report/                # 批次报告
-        └── 04_delivery/              # 导回原项目的手动结果 ZIP
+        ├── 03_report/                # 批次报告（summary.json）
+        └── 04_delivery/              # 导回原项目的手动结果 ZIP（refinement_results.zip）
 ```
 
 **用户怎么找：**
 1. 导入整套 Server 项目，看 `07_delivery/`。
-2. 查自动精修的状态、报告和交付入口，看 `08_refinement_jobs/01_automatic/<tool>/`。
+2. 查自动精修的状态、报告和交付入口，看 `08_refinement_jobs/01_automatic/<tool>/`；总览自动与手动精修状态看 `06_report/report.html`。
 3. 查 App 导出的手动精修任务、日志和待导回结果包，看 `08_refinement_jobs/02_manual/<batch_id>/`。
 
 ## 任务与结果的绑定
@@ -82,6 +84,7 @@
 
 ## v1：手动执行与结果包
 
-- **执行与目录布局**：设计入口为 `python3 <prepared-tools>/manual_refinement_tasks.py --server-dir . --tasks <ZIP> --run`，缺失 reads 时可重复传 `--hifi`/`--ont` 按技术覆盖；默认仅准备输入，传 `--run` 在项目锁下执行。批次位于 `08_refinement_jobs/02_manual/<batch_sha256>/`，其中 `02_jobs/<locus_id>/<tool>/<attempt_id>/` 记录固定版本、输入与原生输出，并输出 `03_report/summary.json` 与 `04_delivery/refinement_results.zip`；锁定工具、原生证据与项目归属校验照旧。
+- **执行入口与运行时解析**：手动精修入口脚本为 `refine.py`。用户从对应的 Server 工作区根目录直接执行 `python .lib/tools/refine.py refinement_tasks.zip`（直接在项目锁下完成校验、准备与执行）；`--hifi`/`--ont` 为可选参数，可重复传入以覆盖对应技术 reads，不再将 `--server-dir`、`--tasks`、`--run` 作为普通用户必需参数。新项目运行时目录为 `.lib/`，旧项目 `.prepare_lib/` 作为兼容读取/迁移路径。全局 `~/bin/refine.py` 也可作为入口，但运行时解析严格遵循“当前 Server 工作区 `.lib/` 优先、旧 `.prepare_lib/` 其次”，禁止混用不匹配的运行时与工作区。
+- **批次产物与总报告更新**：批次位于 `08_refinement_jobs/02_manual/<batch_sha256>/`，其中 `02_jobs/<locus_id>/<tool>/<attempt_id>/` 记录固定版本、输入与原生输出；锁定工具、原生证据与项目归属校验照旧。手动精修完成后，除输出批次 `03_report/summary.json` 与 `04_delivery/refinement_results.zip` 外，还必须更新总报告 `06_report/report.html`，清晰呈现批次标识、工具版本、实际使用的 reads、每个位点的状态与候选结果，并明确区分「等待导回 App」与「已导回 App」状态；手动结果在导回 App 前仅属于批次待回导产物，不得写入或冒充自动精修 `05_final/`。
 - **结果包清单**：`refinement_results.zip` 根清单为 `refinement_results.json`（schema `cgat.app-refinement-results.v1`），以 `batch_sha256` 绑定原始导出清单。`results` 每行含 `locus_id`、`tool`、`status`、`reason`、`patch`，可带 `version`/`revision` 等运行信息；允许失败与未完成，不用失败文件冒充补丁。
 - **补丁约束**：`patch` 包含 `operation`（`replace_gap`/`prepend_tel`/`append_tel`）、`original_length`、`original_sha256`、`path`、`length`、`sha256`；序列为 `patches/` 下无换行的大写 ASCII IUPAC 文本。Gap 仅替换已导出的一整段 `N`，空序列只用于明确通过验证的 Gap 删除；带 `N` 属 `partial`，需要更改非 `N` 侧翼的候选标为 `rejected`，不作为自动补丁。Tel 必须有真实延伸且原端点完整，不替换已有端点的序列。
