@@ -133,9 +133,9 @@ python3 "$SERVER/tools/view_run_log.py" --server-dir /work/cgat_server --detaile
 bash "$SERVER/run.sh" --out /work/cgat_server --threads 64
 ```
 
-## 5. 显式迁移已完成的旧工作区
+## 5. 旧工作区的显式续跑与迁移
 
-未标记的旧布局必须先显式迁移再追加；不要覆盖运行 `prepare.sh`，也不要用 symlink 假装已经编号。当前适配器要求原 LGZ 基线**已经完成且可验证**；尚未完成的旧 LGZ 阶段迁移/续跑仍待实现，会拒绝处理，不换用新引擎重算。
+未标记的旧布局必须先显式迁移再追加；不要覆盖运行 `prepare.sh`，也不要用 symlink 假装已经编号。物理迁移要求原 LGZ 基线**已经完成且可验证**。未完成任务先走下方独立的原引擎续跑入口，只接纳经过内容审核的历史引擎；完成后再单独审批迁移，不直接换新引擎重算。
 
 先备份工作区，确认各节点均无活动或**排队**任务可能写入。使用**新版已安装 Server** 的入口，不使用旧工作区内嵌运行库：
 
@@ -160,3 +160,27 @@ python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --
 ```
 
 不会覆盖被修改的用户数据，也不会抢占未知/活跃 owner 的锁。遇到拒绝时保留 journal/备份并排查，不删除工作区 metadata。上述源码契约和受控检查仍需发布前真实工具、环境与 A01–A18 最后统一验收。
+
+### 原 LGZ 尚未完成
+
+先保留原物理布局和已安装引擎继续原流程。目前审核清单覆盖编号目录改造前的
+`f2ceafb0` 源码；按整套已安装运行库的实际内容匹配，**不只看版本号**。
+未知或已修改的引擎会拒绝处理，不自动升级。保存的启动目录和生成脚本中的根路径也必须
+仍指向本工作区；搬移后指向其他目录的旧脚本会拒绝执行，不静默改写或到另一项目写入。
+
+```bash
+python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server \
+  --preview-lgz-continuation
+# 审阅原引擎、科学步骤前缀、有效 checkpoint 和审批摘要；确认所有节点无活动/排队写入任务。
+python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server \
+  --continue-lgz --approve <continuation_approval_sha256> --confirm-idle
+# 成功后返回新的「已完成工作区迁移」预览及独立审批摘要。
+python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server \
+  --apply --approve <new_migration_approval_sha256> --confirm-idle
+```
+
+仅运行原计划到证据汇总的前缀，不运行旧 DEGAP/打包尾部；续跑期间不替换持久化计划、
+科学脚本、原运行库或环境。已完成外层步骤使用原校验器复核；已有 q0/供体/q 阶段的
+缓存不匹配时，在失效和重算之前停止，不伪造缓存命中。每次审批、缓存事件和状态保存在
+`.run_all/legacy_continuation/`。失败后先看原日志，重试前重新预览，不删除 checkpoint
+或绕过缓存保护。目前是受控脚本边界检查，真实原生 LGZ 和调度器终止仍待统一验收。

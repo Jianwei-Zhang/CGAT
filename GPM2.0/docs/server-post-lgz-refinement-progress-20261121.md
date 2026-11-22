@@ -441,3 +441,24 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 7 项定向检查通过（30.481 秒）：新增 5 项 LR 用例，以及原有完成校验器重验、三工具真实格式解析/来源重建。覆盖第二轮失败后第一轮恢复、第一轮初始 index 仍 fresh、第三轮原生提前停止、公共输入原生清理后的整段复用、后台子进程失败、协议错误不运行 native block、reads/线程/输出漂移、遗漏单位/消费文件、历史文件和独立 inode。
 - driver SHA 来自锁定的原 noarch 分发文件，native 循环/分支和 bash 执行真实；BWA 和 Perl 算法由受控程序替代，不冒称真实 LR、生物学结果、固定环境/双架构或 App 验收。通过 `CGAT_TEST_LR_DRIVER` 显式启用精确 driver 用例；未运行全量回归。
 - 四工具的上述内部恢复边界现均有代码。仍需推进未完成旧 LGZ 阶段迁移、原生离线可视报告、固定环境/真实四工具/双架构、终止和残留进程故障，以及最新 App 闭环与 A01–A18 最后统一检查。没有升级现有环境、运行浏览器/生产构建/远端作业或发布，master 和客户工作区未动。
+
+
+## 2026-11-22 — 未完成旧 LGZ 的原引擎续跑与独立迁移审批
+
+- 先扩展迁移契约，再新增 `legacy_lgz_continuation.py` / `legacy_lgz_runner.py`，由新版 `migrate_workspace.py` 提供只读 `--preview-lgz-continuation` 和显式 `--continue-lgz --approve ... --confirm-idle`。续跑仍在原目录执行原运行库，只把到 `finalize_evidence` 的前缀交给原 runner；不修改持久化计划/科学脚本，不执行旧 DEGAP 和打包尾部，不升级环境或用新 LGZ 引擎重算。
+- 新增 `contracts/legacy_lgz_engines.json`：当前只审核编号目录改造前 `f2ceafb0df1f9d932122c5af3a733b9214ca7eb2` 的 202 个运行库文件。匹配实际内容，不以版本号替代来源；未知/修改过的历史运行库拒绝处理。保存的输出目录、生成脚本的运行库/工作区根路径必须仍指向本目录；搬移后残留其他根路径时拒绝，不改写科学脚本或到另一项目执行。该来源是已观察运行库的审核锚点，旧科学 producer receipts 仍独立保留，不把更新后碰巧相同的运行库冒称为过去的精确生产者。
+- 已完成外层步骤使用原输入/输出校验器；已有阶段的实际 output hash/result/目录必须有效。只读缓存保护观察原 `checkpoint_result` 返回和固定源码的 q0/供体重算边界，已有完成回执的 cache miss 会停止，不让原逻辑删除它后重算，不伪造命中。仅对必要的完成缓存边界做局部行跟踪，不逐行跟踪未完成科学算法。Python 历史字节码既不受信任也不删除，使用新的不落盘缓存命名空间读取已审核源码。
+- 每次尝试在 `.run_all/legacy_continuation/<run>/` 保存审批、请求、缓存事件和状态。失败保留旧布局并要求新预览；成功先通过原完整 LGZ 契约，再返回一个新的完整基线迁移预览。后续 `--apply` 需要第二份审批，续跑不会自行提交布局标记。中英文指南补充完整操作顺序和已审核历史引擎范围。
+
+定向轻量检查：
+
+```text
+CGAT_TEST_LEGACY_SERVER=/tmp/cgat-legacy-lgz-f2ceafb0.IO3bYW
+PYTHONPATH=server/tests python3 -B -m unittest -v test_legacy_lgz_continuation
+8 tests passed (33.932s)
+```
+
+- 实际加载经过内容核验的历史 runner/校验器，受控科学命令失败两次后，已完成参考比对 checkpoint 和原计划字节不变；旧尾部不执行。公共 CLI 只读预览与 API 的审批摘要一致；另行检查陈旧的生成脚本根路径被拒绝，原脚本不被改写。
+- 实际历史阶段缓存正确命中时保留来源；错误输入指纹在失效前停止；实际历史 q0 重算分支受保护。陈旧审批、损坏输出、变更运行库不启动工作；伪造同 mtime/size 的旧 bytecode 不被导入，也不被删除。
+- 成功路径由明确受控脚本产生可验证的冻结科学包，随后真实执行独立审批的物理迁移，并逐文件确认科学文件字节不变。冻结导出 fixture 缺少原生缓存文件，不能为了测试续跑而放宽完成 checkpoint 校验；该测试不冒称执行了原生 LGZ 算法。
+- 后续仍需原生离线交互报告、真实固定环境与四工具/双架构、真实未完成历史引擎和终止/残留进程场景，以及最新 App 闭环与 A01–A18 最后统一验收。本段没有全量回归、浏览器、生产构建、远端或环境升级，没有修改 master 或发布版本。

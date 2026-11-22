@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preview and explicitly migrate a completed LGZ workspace without recomputation."""
+"""Explicit legacy LGZ continuation and provenance-preserving workspace migration."""
 from __future__ import annotations
 
 import argparse
@@ -378,11 +378,21 @@ def main():
     mode.add_argument("--apply", action="store_true")
     mode.add_argument("--resume", action="store_true")
     mode.add_argument("--rollback", action="store_true")
+    mode.add_argument("--preview-lgz-continuation", action="store_true")
+    mode.add_argument("--continue-lgz", action="store_true")
     parser.add_argument("--approve")
     parser.add_argument("--confirm-idle", action="store_true")
     args = parser.parse_args()
     try:
-        if args.apply:
+        if args.preview_lgz_continuation or args.continue_lgz:
+            from legacy_lgz_continuation import preview as continuation_preview, continue_lgz
+            if args.continue_lgz:
+                if not args.approve:
+                    raise LayoutError("--continue-lgz requires the reviewed --approve digest")
+                result = continue_lgz(args.server_dir, args.source, args.approve, confirm_idle=args.confirm_idle)
+            else:
+                result = continuation_preview(args.server_dir, args.source).summary()
+        elif args.apply:
             if not args.approve:
                 raise LayoutError("--apply requires the reviewed --approve digest")
             result = apply(args.server_dir, args.source, args.approve, confirm_idle=args.confirm_idle)
@@ -391,7 +401,7 @@ def main():
         else:
             result = preview(args.server_dir, args.source).summary()
         print(json.dumps(result, ensure_ascii=False, indent=2))
-        return 0
+        return result.get("exit_code", 0)
     except (OSError, ValueError, KeyError, TypeError, RunnerError, ContractError) as error:
         print("ERROR: " + str(error), file=sys.stderr)
         return 2

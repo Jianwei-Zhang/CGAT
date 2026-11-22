@@ -22,7 +22,7 @@ Destination scientific validation uses a narrowly scoped, lock-checked migration
 
 ## Scope and remaining acceptance
 
-The first adapter covers a fully validated completed LGZ baseline. Unfinished legacy stages still require a separate content/version-aware resume adapter: they are not silently treated as complete, discarded or rerun. This remaining requirement stays in the feature's acceptance matrix. Final acceptance must exercise actual generated scripts, interrupted apply/resume/rollback, live/foreign owners, immutable proof preservation and post-migration append without LGZ execution. Primitive/preview tests do not establish that full workflow.
+The physical migration adapter covers a fully validated completed LGZ baseline. The separate, content-reviewed original-engine continuation described below now precedes migration for unfinished LGZ work; it does not silently classify pending stages as complete, discard their caches or change engines. Unsupported historical engines remain ineligible until separately reviewed. Real unfinished-native continuation and interruption scenarios remain in the final acceptance matrix. Final acceptance must exercise actual generated scripts, interrupted apply/resume/rollback, live/foreign owners, immutable proof preservation and post-migration append without LGZ execution. Primitive/preview tests do not establish that full workflow.
 
 ## Completed-workspace commands
 
@@ -48,3 +48,44 @@ python3 -B /opt/cgat/server/tools/migrate_workspace.py --server-dir /work/cgat_s
 The confirmation flag records the operator's scheduler/job check; it is **not** a substitute for the live/foreign-owner and local-process checks. The CLI does not guess an SSH target or assume that a missing local PID means another node is idle. A changed approval inventory is rejected. If staging was interrupted before all approved bytes existed, rollback/re-preview is the safe recovery; no unapproved code is generated during resume.
 
 A completed migration preserves original source/checkpoint bytes and their old-engine provenance in the journal/backup. The execution report uses `frozen_original_lgz`, not `computed` or `cache_reused`; no fresh engine checkpoint is fabricated. Direct old scientific scripts explain that the baseline is frozen rather than recreating legacy paths. `--max-fill` and other LGZ science changes are not an append operation; start a separate new workspace for them.
+
+## Unfinished legacy LGZ: original-engine continuation before physical migration
+
+An unfinished workspace must not be renumbered and passed to a different LGZ
+engine. The explicit continuation adapter first finishes only the scientific
+prefix through `finalize_evidence`, in the original physical layout, using the
+workspace's exact, reviewed historical engine. It never invokes the old DEGAP or
+packaging tail and does not edit the persisted plan, scripts, prepare options,
+reads, environment or runtime. Saved launch/output and generated literal root bindings must still resolve to this workspace; moved scripts pointing elsewhere are refused, not automatically rewritten or executed in another project. Custom/moved-root adaptation needs separate review. Once the original LGZ contract validates, the
+existing completed-baseline transaction performs the numbered migration under
+its own fresh approval. The temporary legacy layout is a continuation boundary,
+not a set of shadow directories in a migrated workspace.
+
+`--preview-lgz-continuation` is read-only. It binds the existing inventory,
+original commands, original engine content manifest, current adapter and valid
+completed checkpoints. Unknown/modified engines are ineligible; a version string
+or success row alone is not sufficient. `--continue-lgz --approve <digest>
+--confirm-idle` rechecks that approval under the original workspace lock. Known
+completed outer units must pass their original input/output validator, and
+existing q/stage receipts must still bind their actual output bytes. Corrupt or
+stale completed work fails rather than becoming permission to recompute it.
+
+The original runner receives an in-memory prefix only. Its normal scientific
+commands, threads and internal partial caches remain authoritative. A disclosed
+read-only cache fence in Python child processes stops at a reviewed cache-miss
+boundary whenever an existing completed q0/donor/q-stage would otherwise be
+invalidated. It does not make a failed cache lookup a hit or fabricate a stage
+receipt. This protects valid completed stages when parameters/tools differ and
+leaves interrupted, receipt-less work to the original engine's ordinary rules.
+Engine files are content-checked before import and again at unit dispatch;
+customer Python modules are never imported based only on a claimed version. Historical bytecode caches are neither trusted nor deleted; preview and continuation use a fresh non-writing bytecode namespace.
+
+Each attempt records its approval, original-engine identity, observed reuse and
+exit status separately under `.run_all/legacy_continuation/`. A failed or killed
+attempt stays a legacy workspace and can receive a fresh read-only preview;
+there is no automatic environment upgrade or layout commit. A successful attempt
+returns a completed-migration preview, not an implicit approval to replace files.
+This adapter is supported only for engine content manifests explicitly shipped
+with the Server; other historical engines require another reviewed manifest.
+Controlled-script/cache-fence tests are not acceptance of native LGZ execution,
+process termination on every scheduler, or all historical release variants.

@@ -135,7 +135,7 @@ bash "$SERVER/run.sh" --out /work/cgat_server --threads 64
 
 ## 5. Explicit migration of a completed old workspace
 
-An unmarked old layout must be migrated explicitly before append; do not run `prepare.sh` over it or create symlinks pretending it is numbered. The current adapter requires a verifiably **completed** original LGZ baseline. Migration/resume of unfinished old LGZ stages remains pending and is refused rather than recomputed with a new engine.
+Unmarked legacy layouts require explicit migration before refinement; do not overwrite them with `prepare.sh` or create symlink aliases to pretend they are numbered. Physical migration requires a **completed, validated original LGZ baseline**. For unfinished work, a separate content-reviewed original-engine continuation is available below: only reviewed engine bytes are accepted, completed work is validated rather than reinterpreted by the new engine, and migration needs a second approval.
 
 Back up the workspace and ensure no active **or queued** task can write it on any node. Use the **new installed Server**, not the old embedded runtime:
 
@@ -160,3 +160,34 @@ python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --
 ```
 
 Changed user data or unknown/live lock owners are not overwritten. Preserve the journal/backups and diagnose a refusal instead of deleting workspace metadata. These source-level contracts and controlled checks still require the final real-tool/environment and A01–A18 acceptance pass before release.
+
+### Unfinished LGZ work
+
+The original physical layout and installed engine remain in place until LGZ
+finishes. The currently reviewed registry supports the pre-numbered source
+`f2ceafb0`; matching is by the complete installed runtime content, **not** a
+claimed version. An unknown/modified engine is refused without upgrading it.
+Saved/generated root bindings must still refer to this workspace; stale paths
+into another project are refused, not silently rebased or executed.
+
+```bash
+python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server \
+  --preview-lgz-continuation
+# Review the original engine, scientific prefix, validated checkpoints and digest.
+# Confirm no active OR queued writer on any node before continuing.
+python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server \
+  --continue-lgz --approve <continuation_approval_sha256> --confirm-idle
+# Success returns a NEW completed-migration preview and its approval digest.
+python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server \
+  --apply --approve <new_migration_approval_sha256> --confirm-idle
+```
+
+Only the original prefix through evidence finalization runs; old DEGAP/package
+units do not. The persisted plan, scientific command bytes, original runtime and
+environment are not replaced during continuation. Valid outer checkpoints use
+their original validator; a completed q0/donor/q-stage cache miss stops before
+invalidation instead of silently rerunning it. Each attempt keeps approval,
+cache events and status under `.run_all/legacy_continuation/`. On failure, inspect
+the original logs and request a **fresh** continuation preview before retrying;
+do not remove checkpoints or bypass the cache fence. These are controlled-script
+checks, not yet real-native or scheduler-termination acceptance.
