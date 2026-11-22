@@ -1,0 +1,66 @@
+{
+  "changed_runtime_files": [
+    ".prepare_lib/tools/lgz_core/q0_preparation.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_mapping.py"
+  ],
+  "existing_cache_adoption_repeated": false,
+  "git_revision": "99843b659c0dc0eb728445316ee0c6e6f5e9f8d8",
+  "initial_alignment_profiles_modified": false,
+  "job_stopped": false,
+  "native_checkpoints_rewritten": false,
+  "new_runtime_files": [],
+  "outer_contract_replaced": false,
+  "previous_installation": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-completion-cutover-candidate-20261122-110559/installation/receipt.json",
+    "sha256": "030694dff7efe342927c2ad74091df273a8b069dbd15197d45afe08bd714603c"
+  },
+  "previous_job": 43012037,
+  "previous_transition": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-completion-cutover-candidate-20261122-110559/transition.json",
+    "sha256": "c0f3ce957eb59138dc8ffce9771bacfd351afa6a942ed682b2676bc6a729f210"
+  },
+  "protected_baseline": 42523432,
+  "runtime_files": 14,
+  "scientific_policy_ast_checks": [
+    {
+      "ast_equal": true,
+      "file": "q0_preparation.py",
+      "symbol": "POLICY"
+    },
+    {
+      "ast_equal": true,
+      "file": "q0_regional_candidates.py",
+      "symbol": "CANDIDATE_POLICY"
+    },
+    {
+      "ast_equal": true,
+      "file": "q0_regional_discovery.py",
+      "symbol": "REGIONAL_POLICY"
+    },
+    {
+      "ast_equal": true,
+      "file": "q0_regional_mapping.py",
+      "symbol": "BASE_FLAGS"
+    }
+  ],
+  "status": "q0_candidate_prepared_not_installed",
+  "transition": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-child-loader-cutover-20261122-180258/transition.json",
+    "sha256": "95c2b13113ee94f7f4fb6fe17d484c5797163a0115a72a862a38e6ca7e2fe497"
+  },
+  "unchanged_runtime_files": [
+    ".prepare_lib/tools/lgz_core/common.py",
+    ".prepare_lib/tools/lgz_core/q0_alignments.py",
+    ".prepare_lib/tools/lgz_core/q0_catalog.py",
+    ".prepare_lib/tools/lgz_core/q0_cigar_policy.py",
+    ".prepare_lib/tools/lgz_core/q0_mapper_guard.py",
+    ".prepare_lib/tools/lgz_core/q0_neighbor_requests.py",
+    ".prepare_lib/tools/lgz_core/q0_query_windows.py",
+    ".prepare_lib/tools/lgz_core/q0_reference_index.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_candidates.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_discovery.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_execution.py",
+    ".prepare_lib/tools/lgz_core/q0_sources.py"
+  ],
+  "workspace_modified": false
+}

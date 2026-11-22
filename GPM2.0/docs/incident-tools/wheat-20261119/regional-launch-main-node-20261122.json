@@ -1,0 +1,100 @@
+{
+  "execution_node": "agent-X86-39",
+  "job_id": 43015264,
+  "job_terminal_state": "SUCCEEDED",
+  "main_workspace_modified": false,
+  "mean_wall_seconds": {
+    "clean_libpath": 8.54532577097416,
+    "original": 19.05227790772915
+  },
+  "observations": [
+    {
+      "case": 5,
+      "launcher_basename": "python3",
+      "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+      "native": {
+        "cpu_seconds": 1.566,
+        "native_peak_rss_gb": 0.123,
+        "wall_seconds": 1.428
+      },
+      "ordinal": 0,
+      "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+      "profile": "original",
+      "wall": 17.44444142282009
+    },
+    {
+      "case": 5,
+      "launcher_basename": "python3",
+      "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+      "native": {
+        "cpu_seconds": 1.543,
+        "native_peak_rss_gb": 0.126,
+        "wall_seconds": 1.409
+      },
+      "ordinal": 1,
+      "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+      "profile": "clean_libpath",
+      "wall": 6.42050763964653
+    },
+    {
+      "case": 2,
+      "launcher_basename": "python3",
+      "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+      "native": {
+        "cpu_seconds": 6.257,
+        "native_peak_rss_gb": 0.222,
+        "wall_seconds": 6.758
+      },
+      "ordinal": 0,
+      "paf_sha256": "10a6c57b4f593669988e47fa8e6fe7411226085b6ebf0537dc6db61c965eaaaa",
+      "profile": "clean_libpath",
+      "wall": 12.275874979794025
+    },
+    {
+      "case": 2,
+      "launcher_basename": "python3",
+      "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+      "native": {
+        "cpu_seconds": 6.139,
+        "native_peak_rss_gb": 0.222,
+        "wall_seconds": 6.264
+      },
+      "ordinal": 1,
+      "paf_sha256": "10a6c57b4f593669988e47fa8e6fe7411226085b6ebf0537dc6db61c965eaaaa",
+      "profile": "original",
+      "wall": 22.46849024295807
+    },
+    {
+      "case": 6,
+      "launcher_basename": "python3",
+      "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+      "native": {
+        "cpu_seconds": 2.228,
+        "native_peak_rss_gb": 0.216,
+        "wall_seconds": 2.033
+      },
+      "ordinal": 0,
+      "paf_sha256": "7b40676382a2b320847d1023945369e112af529357c748f6accfbbb258634214",
+      "profile": "original",
+      "wall": 17.243902057409286
+    },
+    {
+      "case": 6,
+      "launcher_basename": "python3",
+      "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+      "native": {
+        "cpu_seconds": 2.237,
+        "native_peak_rss_gb": 0.216,
+        "wall_seconds": 2.05
+      },
+      "ordinal": 1,
+      "paf_sha256": "7b40676382a2b320847d1023945369e112af529357c748f6accfbbb258634214",
+      "profile": "clean_libpath",
+      "wall": 6.939594693481922
+    }
+  ],
+  "only_child_libpath_variable_changed": true,
+  "original_report_sha256": "eda54fb84f1bc24e8d3558da2e31554ec9dd28d5cce73b57d402921d0954ccf8",
+  "same_libs_report_sha256": "995486813b2904d31d2c29144ab426c2b864be5f27e67638aae2dec1e18cbf23",
+  "status": "three_windows_byte_parity_limit_cwd_verified"
+}

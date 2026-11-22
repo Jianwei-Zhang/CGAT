@@ -3782,3 +3782,31 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   prlimit也有局部收益但没有消掉继承的动态库搜索开销；不更换机制或移除资源限制。报告
   `regional-launch-scope-20261122.json` 含两次原报告SHA。主job所在agent-X86-39上独立复验`43015264`已
   RUNNING，检查原/候选的ELF依赖路径和文件SHA再测3窗。单个归档普通窗的倍率不作为整麦或生产验收。
+
+### 2026-11-22 18:06 CST：主节点无损复验通过；真实补丁已stage，现有作业继续运行
+
+- **43015264 / agent-X86-39 / SUCCEEDED**。主任务所在同一节点三份归档普通窗、同一mapper及原科学参数，
+  6次真实输出各与其原PAF SHA一致；原和候选的ELF依赖解析位置及实际文件SHA相同；独立验证工作目录、4GiB
+  软/硬限额。平均墙钟 **19.05→8.55秒**（三窗，非整麦）；扣原生日志墙钟的差额均值 **15.81→5.14秒**。
+  原报告`eda54fb84f1bc24e8d3558da2e31554ec9dd28d5cce73b57d402921d0954ccf8`，依赖证明
+  `995486813b2904d31d2c29144ab426c2b864be5f27e67638aae2dec1e18cbf23`，归档摘要
+  `regional-launch-main-node-20261122.json`。不把诊断结果当主任务产物，也不调整30m精度档。
+- 已推 `99843b65`。区域CIGAR/粗筛共用 `_execute`，仅显式绑定的事故reader启用loader同依赖核验。
+  在目标job重新核对Python、resource和mapper解析到的运行库路径/内容；探测失败或启动环境/mapper
+  不再匹配时保留原环境。只给该子进程传入环境副本，不改全局、其它工具、实际argv/guard/科学policy；
+  command receipt记录选择和依赖摘要，独立verifier验证来源字段，不使已有raw/project失效。
+  本地66项 Server +97项迁移/reader定向测试通过；未跑整版CI、未发release。
+- 真实隔离目录 `q0-child-loader-cutover-20261122-180258`；source SHA通过校验、候选transition
+  **95c2b13113ee94f7f4fb6fe17d484c5797163a0115a72a862a38e6ca7e2fe497**，prior安装
+  `030694dff7efe342927c2ad74091df273a8b069dbd15197d45afe08bd714603c`。14模块中只有
+  `q0_regional_mapping.py`（子进程和现有等价投影/验收修复）和`q0_preparation.py`（线性成员核验）改变；
+  12个原模块保留748版本、4项policy AST一致。证据 `q0-loader-cutover-candidate-prepared-20261122.json`。
+- 只读真实25个初始检查点预检 **43015292** 已启动（测试输出里的`initial:*`不是生产节点验收）；真实
+  writer/旧project复用 smoke **43015291** 已验过两个真实旧窗口完整project闭包并原样返回。初版smoke用
+  精比对argv删`-c`推导粗比对，遗漏两者`-m 2000`差别，**不得**引用其粗比对为生产等价；以改为从SHA
+  绑定原粗比对回执取argv的独立诊断 **43015295** 为准。未就绪前不能停止主新版，两个诊断的超时/失败
+  与主任务无关。旧42523432不改；43012037同run在18:03:32达6100/61000、fallback=0，仍在运行。
+- 下个动作：确认43015295真实粗/精PAF完全相同、新执行命令含经核对的环境来源、旧两个project完全可读；
+  确认43015292生产25项及末尾validation.json。两者通过后才能申请32CPU/320GiB等待资源的主切换作业；
+  在新job真实节点重新验证loader兼容、成功写ready且保守净收益为正后，再正常停止当前新版与等锁释放。
+  不重跑已有比对、不删除cache或锁，不改旧基线，不重放旧handoff/旧installation。
