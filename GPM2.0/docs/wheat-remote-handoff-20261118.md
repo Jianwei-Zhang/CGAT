@@ -3314,3 +3314,44 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `2cc2c41448253c02a11adbf321054dfddb1d32abb7868e318aa0f3114125aa6a`。
   仍是非held-out的诊断；即使样本胜出，也要核对尾部/独立样本、明确科学profile与缓存/
   消费者兼容迁移，**不能借原AST等价资源迁移的门禁悄悄改变科学策略**。主任务不因此停止。
+
+### 2026-11-22 13:48：已定位all-chain精比对策略；强档有实测收益但不能直接上线
+
+- **43012261 SUCCEEDED / agent-X86-37，13:35:43**：原完整target上仅exact加f0.001，
+  ABBA legacy68.812/67.080秒、candidate64.774/65.122秒，只有约1.046倍。cross旧core
+  损失67/2241593bp，intra2380/2302580bp，仍有单例intra损失7.19%；不将小幅样本收益
+  作为再次中断主任务的理由。报告 `regional-full-seed-native-pilot-20261122.json` SHA
+  `320913aaa08d434520abe3cc37117f8b0cc944abe3cd706375aca620097809e4`，执行源码、终态、资源
+  proof由verified绑定。尚未安装该档。
+- 更关键的是现有区域exact命令同时含 **`-P -c`**：no-CIGAR粗筛本来可以保留全部链，
+  但精比对也继续保留全部链会延伸大量重复候选。已按实际工具2.31核对官方v2.31手册/
+  cookbook（原始文件SHA见 `regional-chain-budget-primary-source-check-20261122.json`）。
+  **保留`-P`时`-p`/`-N`不生效**，不能只增加`-N`就宣称限制了候选；`-N`限制secondary，
+  也不是整个PAF严格只有N行。只测区域候选exact，不全局修改initial/native/self/cross flags。
+- 原生控制 **43012281 SUCCEEDED / agent-X86-37，13:43:32**：保持完整target/原coarse
+  及旧CIGAR档，仅candidate exact移除`-P`、增加`-p0.5 -N50`。64个受控anchors，
+  legacy69.454/67.070秒，candidate27.008/26.790秒，**mapper管线实测2.538倍**；
+  两次A精确stdout均匹配历史，两次B彼此一致、全PAF语法/几何通过。
+  但cross旧core损失111712/2241593bp（4.98%），intra135142/2302580bp（5.87%），
+  多个例子的intra/cross旧覆盖全失。**这是定位策略瓶颈的证据，不是可上线的精度验收；
+  不能用加权保留率掩盖个例全失，也不能推成整麦2.5倍。**
+  `regional-chain-budget-native-pilot-20261122.json` SHA
+  `869c48d41cf9de5d939fd5e72de043b09963d5600b08c2c926a1182d27c00d3e`。
+- 已递进更宽松档 **`-p0.1 -N200`**，而不是反复跑同一64短例子：独立作业
+  **43012312 / agent-X86-47**，目录 `q0-chain-heldout-pilot-20261122-134621`，索引
+  `/tmp/q0-chain-heldout-pilot-current.json`。明确选择static probe ordinal64–83、90/100/105/119
+  的24窗口，与64原生调参anchors不相交，含两个组装、短query、空旧PAF、>100Mb父contig
+  片段及旧单条326秒长尾；它们已出现在静态probe，**不是未见过的独立基因组数据**。
+  698706029 target bp按FAI窗口读取，不整套载入DNA；每份FASTA必须与原执行input size/SHA
+  完全一致，original A两次仍要求历史stdout一致。原tool/coarse/profile/完整target均保持。
+  输入准备另计，7路×2线程/4GiB AS/16CPU160GiB不变；40分钟仅为独立诊断上限，不是主任务超时。
+  ready PID1371668、uid100399、当前job成员/单节点资源已严格核实，allocation SHA
+  `3a3680d32d4050299c7f739af2d2aebb91b65a4951e6c6ac584458336816e190`；HPC5项cohort/policy
+  tests通过；实际24份输入合计709820980 bytes已在38.222秒重构并逐份size/SHA验收，
+  已进入原生ABBA（最近采样CPU697%、memReal2850MiB），终态/质量/耗时待核实。若更宽松档仍丢跨组装关键信息，
+  下一步考虑按组装保留候选与core覆盖不足的完整回退，不能以用户允许少量精度下降为由
+  静默接受大面积局部丢失。
+- 主运行13:47:24仍43012037/RUNNING/q0_evidence，25done、无当前失败、CPU99%、memReal32545MiB；
+  前缀尚无区域pool admission记录，不据单核/安静取消；旧42523432/RUNNING/grt_step2未改。
+  本轮新科学策略**全部仍隔离试验，没有安装到主runtime，没有取消或重提主任务**。
+  仓库`c8eb6df6`已推送前半轮证据，后续按命名路径提交，不接触并行DEGAP提交/其他输出。

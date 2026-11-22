@@ -1,0 +1,19 @@
+{
+  "allocation_proof_sha256": "80ccb2ca6e47c7d0ea5b3c4d452dff49a180b7ed147dea06547118881f9a394a",
+  "executed_source_sha256": {
+    "benchmark_regional_batched_search.py": "f1dd0ec303db1865e31af6ecff219b077bb6a5c30f473ad7cb15b99f8d803866",
+    "benchmark_regional_chain_budget.py": "d11f84bc58777b52c9b8c20e28288444713d2f8ef25e05867f100b65ba2c325b",
+    "test_benchmark_regional_chain_budget.py": "77c74912e4bd5984ccca7e644fdfc3d1d8638dccdcb0f1aeee6b81717f87da4c"
+  },
+  "exit_code": 0,
+  "host": "agent-X86-37",
+  "job_id": 43012281,
+  "main_workspace_modified": false,
+  "original_report_sha256": "869c48d41cf9de5d939fd5e72de043b09963d5600b08c2c926a1182d27c00d3e",
+  "production_strategy_enabled": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-chain-budget-pilot-20261122-133909",
+  "repo_report_sha256": "869c48d41cf9de5d939fd5e72de043b09963d5600b08c2c926a1182d27c00d3e",
+  "scheduler_final_json_sha256": "da874cf276ffc007992f0aeace19e3fc91d3b8f4dfed9a4280bdcac119ce4029",
+  "schema": "incident_readonly_diagnostic_verified_v1",
+  "terminal_state": "SUCCEEDED"
+}

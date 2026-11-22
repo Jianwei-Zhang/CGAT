@@ -1,0 +1,27 @@
+{
+  "checked_files": [
+    {
+      "ref": "v2.31",
+      "source_file": "minimap2.1",
+      "source_repository": "lh3/minimap2",
+      "source_sha256": "f376009951ba11649008d68d5b75559d48aa4c07fef25b78a0465bc8f4d84ebe",
+      "used_for": "manual -P/-p/-N semantics"
+    },
+    {
+      "ref": "v2.31",
+      "source_file": "cookbook.md",
+      "source_repository": "lh3/minimap2",
+      "source_sha256": "5f862361defc656ad2e11e7e40103046e8b7f1782054f7c672052166da4ffc28",
+      "used_for": "cookbook self-mapping with all-chain and base-level alignment"
+    }
+  ],
+  "findings": [
+    "-P retains all chains; -p and -N have no effect with it.",
+    "-p controls secondary-to-primary chain score ratio and can prevent DP extension of weaker secondary chains.",
+    "-N is a secondary-alignment limit, not a hard global cap on every PAF row/primary/supplementary alignment.",
+    "Changing exact chain admission is a scientific approximation; original coarse search and full target contexts are kept in this isolated pilot."
+  ],
+  "native_tool_version": "2.31-r1302",
+  "production_changes_enabled": false,
+  "status": "primary_source_checked_for_isolated_chain_admission_experiment"
+}

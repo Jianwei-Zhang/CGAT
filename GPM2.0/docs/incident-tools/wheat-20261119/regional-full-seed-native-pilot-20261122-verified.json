@@ -1,0 +1,19 @@
+{
+  "allocation_proof_sha256": "2cc2c41448253c02a11adbf321054dfddb1d32abb7868e318aa0f3114125aa6a",
+  "executed_source_sha256": {
+    "benchmark_regional_batched_search.py": "f1dd0ec303db1865e31af6ecff219b077bb6a5c30f473ad7cb15b99f8d803866",
+    "benchmark_regional_full_seed_filter.py": "5b140d053ae3b18d8b40c8d76c2d0a42ec3bb21fa6ef5649f1219bdba9a3ab53",
+    "test_benchmark_regional_full_seed_filter.py": "4ee9e43f9a9a1cc75ef32ed58ee1fe813a6d3ba3b62cf77b57239e2db117cbfa"
+  },
+  "exit_code": 0,
+  "host": "agent-X86-37",
+  "job_id": 43012261,
+  "main_workspace_modified": false,
+  "original_report_sha256": "320913aaa08d434520abe3cc37117f8b0cc944abe3cd706375aca620097809e4",
+  "production_strategy_enabled": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-full-seed-pilot-20261122-133010",
+  "repo_report_sha256": "320913aaa08d434520abe3cc37117f8b0cc944abe3cd706375aca620097809e4",
+  "scheduler_final_json_sha256": "2cfb5130aaa68811adcf10562ca55def5f2d3f0e5acdbb3e7ec1630a965577c9",
+  "schema": "incident_readonly_diagnostic_verified_v1",
+  "terminal_state": "SUCCEEDED"
+}
