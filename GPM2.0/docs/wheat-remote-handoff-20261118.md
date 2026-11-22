@@ -4167,3 +4167,17 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   校验。隔离结果写`buffered-proof.json`，不能冒用被冻结切换控制器的`validation.json`，不安装/停作业。
 - 截至21:37：新版 `43012037` 于21:32:16 报 **9300/61000、fallback=0**；旧 `42523432`仍运行。
   原 `43015921` 仍RUNNING、实际4/25、PID488989仍跟踪，未产生新的资源提交或切换。
+
+### 2026-11-22 21:45 CST：只读预检验证超时后才自动启动缓冲候选
+
+- `43015921` 未结束；已另过`q0_chr:1B`和`q0_chr:1D`，实际 **6/25**，旧loader资源观察器
+  PID488989仍活，没有`validation`、`loader-resource-*`或handoff。原 `43012037` 21:39:45 达
+  **9400/61000 / fallback=0**，旧`42523432`仍RUNNING，两个主作业不重启、不改精度。
+- 隔离缓冲验证目录已启用一次性的条件发起器 **PID1952872**，21:44:36启动、重连验证PPID1：
+  `retry-launcher.json`、`retry-watcher.log`、`retry-watcher.pid`，`retry-watcher.sha256` SHA
+  `83368f2a730e5007ed47ec815234f092e5c44e9e580b58d14ddd36aef85a9bdc`。55轮每分钟有界查看。
+  只有同一原诊断经Donau确认**FAILED/124且子进程确实退出**、原job与脚本receipt匹配、没有任何新
+  校验/切换凭据、两个主作业及原工作区锁匹配、真实loader smoke仍通过时，才校验缓冲诊断的两个冻结
+  manifest并发起一次2CPU/16GiB只读缓冲验证。独占`submission.intent`后不盲重投含糊dsub返回；
+  不发停止命令或申请32核切换资源，也不生成原`validation.json`；原预检成功则直接退出，不再跑一遍。
+  本地关联12项测试、远端Python3.10现场5项均通过。截至21:45尚无该缓冲诊断新job或提交intent。
