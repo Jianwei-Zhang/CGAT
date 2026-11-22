@@ -53,15 +53,27 @@ def allocation_environment(release, root):
     return {'_GPM_Q0_SCHEDULER_PROOF':str(path), '_GPM_Q0_SCHEDULER_SHA256':row['sha256']}
 
 
+def validate_initial(config, root):
+    if 'buffered_preflight_scheduler' in config:
+        import q0_buffered_proof as verifier
+        if (checked(config['buffered_gate']) != Path(__file__).resolve()
+                or checked(config['buffered_gate_verifier']) != Path(verifier.__file__).resolve()):
+            raise ValueError('buffered proof acceptance code is not bound to allocation config')
+        verifier.verify_buffered_proof(root,config['transition'],config['initial_preflight'],
+                                       config['buffered_preflight_scheduler'])
+        return
+    report=json.loads(checked(config['initial_preflight']).read_text())
+    if (report.get('status')!='q0_transition_all_initial_checkpoints_verified_only'
+            or report.get('workspace_modified') is not False or len(report.get('initial_checkpoints',[]))!=25):
+        raise ValueError('all initial checkpoints must have passed the real read-only preflight')
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--config',type=Path,required=True);args=p.parse_args()
     config_path=args.config.resolve(strict=True);root=config_path.parent;config_sha=digest(config_path)
     config=json.loads(config_path.read_text());checked(config['transition'])
     if config['old_job']==config['protected_baseline']:raise ValueError('baseline cannot be the handoff target')
-    report=json.loads(checked(config['initial_preflight']).read_text())
-    if (report.get('status')!='q0_transition_all_initial_checkpoints_verified_only'
-            or report.get('workspace_modified') is not False or len(report.get('initial_checkpoints',[]))!=25):
-        raise ValueError('all initial checkpoints must have passed the real read-only preflight')
+    validate_initial(config,root)
     ready={'status':'resource_ready_waiting_q0_handoff','config_sha256':config_sha,
            'transition_sha256':config['transition']['sha256'],'old_job':config['old_job'],
            'protected_baseline':config['protected_baseline'],'host':socket.gethostname(),'pid':os.getpid(),
@@ -75,6 +87,8 @@ def main():
             if digest(config_path)!=config_sha:raise ValueError('handoff config changed')
             handoff=json.loads(release.read_text())
             validate_handoff(config,handoff,root,ready_sha,socket.gethostname())
+            if 'buffered_preflight_scheduler' in config:
+                validate_initial(config,root)
             print('Q0_HANDOFF_ACCEPTED',flush=True)
             from resume_q0_science import execute
             environment=allocation_environment(handoff,root)

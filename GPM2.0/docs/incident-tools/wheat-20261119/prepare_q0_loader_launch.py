@@ -30,7 +30,7 @@ def load_initial(path, transition_sha):
     return rows
 
 
-def prepare(root, environment):
+def prepare(root, environment, *, buffered_proof=None, buffered_scheduler=None):
     root = root.resolve(strict=True)
     stage = json.loads((root / "candidate-prepared.json").read_text())
     if (stage.get("status") != "q0_candidate_prepared_not_installed"
@@ -47,7 +47,29 @@ def prepare(root, environment):
     previous = checked(stage["previous_transition"], root.parent)
     old_validation = previous.with_name("validation.json")
     fresh = root / "validation.json"
-    if load_initial(fresh, stage["transition"]["sha256"]) != load_initial(old_validation, stage["previous_transition"]["sha256"]):
+    gate = root / "q0_science_handoff_gate.py"
+    extra_control = {}
+    fresh_record = None
+    if (buffered_proof is None) != (buffered_scheduler is None):
+        raise ValueError("buffered proof and successful Donau terminal receipt are both required")
+    if buffered_proof is not None:
+        from q0_buffered_proof import verify_buffered_proof
+        if fresh.exists() or fresh.is_symlink():
+            raise ValueError("ordinary preflight exists; do not overwrite or compete with it")
+        fresh = buffered_proof.resolve(strict=True)
+        scheduler_path = buffered_scheduler.resolve(strict=True)
+        controls = Path(__file__).resolve().parent
+        if controls == root or controls.parent != root.parent or controls.is_relative_to(work):
+            raise ValueError("buffered handoff control must not change the original bundle")
+        gate = controls/"q0_science_handoff_gate.py"
+        extra_control = {"buffered_preflight_scheduler": record(scheduler_path),
+                         "buffered_gate": record(gate),
+                         "buffered_gate_verifier": record(controls/"q0_buffered_proof.py")}
+        fresh_record = record(fresh)
+        current_rows = verify_buffered_proof(root, stage["transition"], fresh_record, extra_control["buffered_preflight_scheduler"])
+    else:
+        current_rows = load_initial(fresh, stage["transition"]["sha256"])
+    if current_rows != load_initial(old_validation, stage["previous_transition"]["sha256"]):
         raise ValueError("one of the protected initial identities changed")
     smoke = root / "smoke-v2/smoke.jsonl"
     smoke_scope(smoke)
@@ -70,9 +92,14 @@ def prepare(root, environment):
     environment = environment.resolve(strict=True)
     probe = root / "probe_q0_loader_allocation.py"
     cwd = shlex.quote(str(root))
+    control_command = "exec python3 -B -u q0_science_handoff_gate.py --config handoff-config.json"
+    if extra_control:
+        control_command = (f"PYTHONPATH={cwd}${{PYTHONPATH:+:$PYTHONPATH}} exec python3 -B -u "
+                           f"{shlex.quote(str(gate))} --config handoff-config.json")
     config = {"workspace": str(work), "old_job": stage["previous_job"], "protected_baseline": stage["protected_baseline"],
-              "transition": stage["transition"], "initial_preflight": record(fresh), "loader_smoke": record(smoke),
-              "loader_probe": record(probe), "environment": record(environment), "old_window_sample": record(sample)}
+              "transition": stage["transition"], "initial_preflight": fresh_record or record(fresh), "loader_smoke": record(smoke),
+              "loader_probe": record(probe), "environment": record(environment), "old_window_sample": record(sample),
+              **extra_control}
     script = f'''#!/usr/bin/env bash
 #DSUB -n jm19_q0_verified_loader_cutover
 #DSUB -q x86
@@ -92,7 +119,7 @@ PYTHONPATH={cwd}/package/server/tools${{PYTHONPATH:+:$PYTHONPATH}} timeout --sig
 mv loader-ready.json.tmp loader-ready.json
 sha256sum loader-ready.json
 # The existing resource/owner gate still needs old terminal + no pids + no lock.
-exec python3 -B -u q0_science_handoff_gate.py --config handoff-config.json
+{control_command}
 '''
     with config_path.open("x") as stream:
         json.dump(config, stream, sort_keys=True, indent=2)
@@ -101,7 +128,8 @@ exec python3 -B -u q0_science_handoff_gate.py --config handoff-config.json
         stream.write(script)
     script_path.chmod(0o755)
     with checksum.open("x") as stream:
-        for path in (config_path, script_path, probe, environment, fresh, smoke, sample, tpath):
+        for path in (config_path, script_path, probe, environment, fresh, smoke, sample, tpath,
+                     *(Path(row['path']) for row in extra_control.values())):
             stream.write(f"{sha256(path)}  {path}\n")
     return {"status": "loader_resource_gate_configured_not_submitted", "config": record(config_path),
             "script": record(script_path), "checksums": record(checksum), "workspace_modified": False}
@@ -111,5 +139,8 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--bundle", type=Path, required=True)
     p.add_argument("--environment", type=Path, required=True)
+    p.add_argument("--buffered-proof", type=Path)
+    p.add_argument("--buffered-scheduler", type=Path)
     a = p.parse_args()
-    print(json.dumps(prepare(a.bundle, a.environment), sort_keys=True, indent=2))
+    print(json.dumps(prepare(a.bundle, a.environment, buffered_proof=a.buffered_proof,
+                             buffered_scheduler=a.buffered_scheduler), sort_keys=True, indent=2))

@@ -4181,3 +4181,19 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   manifest并发起一次2CPU/16GiB只读缓冲验证。独占`submission.intent`后不盲重投含糊dsub返回；
   不发停止命令或申请32核切换资源，也不生成原`validation.json`；原预检成功则直接退出，不再跑一遍。
   本地关联12项测试、远端Python3.10现场5项均通过。截至21:45尚无该缓冲诊断新job或提交intent。
+
+### 2026-11-22 21:55 CST：为缓冲结果准备独立验收，不替换原预检报告
+
+- `43015921` 原只读预检仍RUNNING，实际 **9/25**（已过 `q0_chr:2D`）；观察器PID488989、缓冲
+  候选单次发起器PID1952872均存活、无缓冲候选提交、无`loader-resource-*`、ready或handoff。
+  两主项目仍在原job；新版21:48:53报 **9500/61000、fallback=0**。不改精度、原门禁或主任务。
+- 缓冲proof如最终实际通过，使用**独立、可追溯的兼容入口**：冻结原`validation.json`要求不变，不仿写
+  该文件。只有明确提供 `--buffered-proof` 和关联真实`SUCCEEDED/0`的 Donau 终态 JSON时，才额外检查
+  缓冲独立启动回执/旧超时、原state/transition/native origin、探针和读取器SHA、同序25项完整原
+  fingerprint和checkpoint SHA，并重核对25份当前commit JSON。分配节点在ready前及handoff后分别
+  验证该独立证据及控制代码SHA；真正owner获取正常锁后仍重验初始结果。其他loader、资源、原作业结束
+  和独占锁门禁不削弱，绝不由准备脚本停止或提交主作业。
+- 控制文件只stage在同级隔离 `q0-buffered-handoff-controls-20261122`，未替换原cutover目录及源码，
+  `controls.sha256` SHA `c54a6730e36774d5b8d36bc7123044102b6ca16d4867a7d544822297bf1f9b35`。
+  本地27项、180同原保护模块12项定向测试通过。并非真实候选的验证成功；在完整缓冲结果出现前不运行
+  这个接口，不写原handoff文件，不申请备用分配。若原预检成功，沿原观察器路径，不动此备选入口。
