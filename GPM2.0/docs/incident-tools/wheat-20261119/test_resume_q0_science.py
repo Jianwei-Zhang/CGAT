@@ -41,7 +41,12 @@ class OwnerTests(unittest.TestCase):
             contract=SimpleNamespace(sha256_file=owner.digest,atomic_write_json=lambda p,x:p.write_text(json.dumps(x))),
             native_original_context=SimpleNamespace(compose=lambda *a,**kw:Readonly))
         def configure(ctx):self.events.append('configure');return lambda w:object()
-        def install(ctx,lock,callback):self.assertTrue(lock.acquired);self.events.append('install')
+        def install(ctx,lock,callback):
+            self.assertTrue(lock.acquired)
+            # The real transactional installer performs the pre-install audit;
+            # the owner must not duplicate that full audit before calling it.
+            ctx.verify()
+            self.events.append('install')
         modules={'authentic_initial_alignment_owner':SimpleNamespace(configure=configure),
                  'explicit_q0_reader':SimpleNamespace(),'explicit_q0_installer':SimpleNamespace(install=install)}
         self.ctx.native_bootstrap=SimpleNamespace(module=lambda name,p:modules[name])

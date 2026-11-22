@@ -4445,3 +4445,12 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `job.sha256` SHA `20b3e00320efcefd2be185985c703fa8ca301dac24cad839eff59b187fc35ea6`，
   `report.json` SHA `48098d69e2c64fd296214406be827ae5f0816b96328aa5b42ed1703903bcb6c0`，
   `terminal-43017053.json` SHA `0973e9c3a6b1fa588365f41ba8f1efdc0bfbce7837f954c8e0a5ae0afa047f02`。
+
+
+### 2026-11-23 01:09 CST：定向删除重复安装前审计，并收紧 native 回执读取
+
+- 当前新版 `43016881 / agent-X86-57` 仍 RUNNING；01:06 复核为 `wallclock=4445s`、`cpuUtilAvg=2`、`cpuUtilRecent=6`、`memReal=260MiB`，`installation/receipt.json` 仍为 `backed_up`，没有新科学输出或 `installed` 回执。该作业没有被本次源码改动热替换、没有重启；旧版 `42523432` 继续保持不变。
+- 代码审阅确认 `resume_q0_science.execute(..., --install-runtime)` 的调用者先 `ctx.verify()`，随后事务安装器 `stage_q0_science.install()` 又立即执行同一份完整 pre-install 审计；安装器自身仍在安装前和安装后各保留一次完整验证。因此删除调用者这一份重复审计，不削弱 direct-resume 路径（无安装时仍保留 `ctx.verify()`），也不改变安装器的备份、回滚、所有权或安装后验证。
+- `native_resource_bindings` 的后续定点优化继续保留每个 wrapper/spec 和 receipt/output 的逐项完整性检查，但把同一 operation 的 manifest/restore 身份查询、receipt inventory 和 wrapper canonical-byte 判定合并为有界操作级验证；`native_resource_audit` 复用同一验证结果，不重复逐 receipt 扫描。冻结真实小麦计划上 44 个 operation、876 个 wrapper 的读取画像显示，逐 receipt 触发的 operation 全量检查约 19,236 次降为约 1,749 次（约减少 90.9% 的同类 operation 级扫描）；这是 verifier/启动阶段收益，不冒充比对阶段壁钟收益。
+- 本地定向验证：`test_resume_q0_science.py`、`test_native_resource_bindings.py`、`test_native_resource_audit.py`、`test_stage_q0_science.py` 共 **78/78** 通过；另有 native binding/audit 独立 **14/14** 通过。未运行整版 CI、未 update、未替换 Release。
+- 该补丁仍未安装到活跃 `43016881`；待当前任务终态后再按“有效结果保留、正常锁释放、只对新版切换”的规则决定是否采用。

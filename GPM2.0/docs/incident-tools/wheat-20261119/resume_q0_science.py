@@ -54,7 +54,11 @@ def execute(path,*,install_runtime=False,threads=32,validate_only=False):
             return 0
         run_id=rr.new_run_id();lock=rr.WorkspaceLock(ctx.work,run_id)
         try:
-            lock.acquire();ctx.verify()
+            lock.acquire()
+            # install() performs the same full pre-install audit itself. Keep
+            # the direct-resume path audited here, but do not pay for that
+            # audit twice when the transactional installer is active.
+            if not install_runtime:ctx.verify()
             units=rr.load_plan(ctx.work)
             if len(units)!=55 or any(unit.unit_id=='degap_gapfill' for unit in units):
                 raise ValueError('comparison workflow changed')

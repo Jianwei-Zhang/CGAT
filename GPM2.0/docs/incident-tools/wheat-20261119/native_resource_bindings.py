@@ -128,14 +128,20 @@ class NativeBindings:
             self.verify_native_resources(operations=self.operations_for(prepared.unit_id))
         return self.original.bind_prepared(prepared)
 
+    def _receipt_path(self, rel, i):
+        return Path(self.profiles[rel].native["batches"][i]["directory"]) / guard.RECEIPT
+
     def receipt(self, rel, i, *, required=False, threads=None):
-        profile = self.profiles[rel]; b = profile.native["batches"][i]
-        path = Path(b["directory"]) / guard.RECEIPT
+        path = self._receipt_path(rel, i)
         if not path.exists():
             if required: raise ValueError("new guarded native execution has no resource receipt")
             return None  # Verified historical cache, never claimed as guarded.
         self.verify_native_resources(operations=[rel])
-        spec = self.expected_spec(rel,i)
+        self._validate_receipt(rel, i, path, self.expected_spec(rel, i), threads=threads)
+        return path
+
+    def _validate_receipt(self, rel, i, path, spec, *, threads=None):
+        profile = self.profiles[rel]; b = profile.native["batches"][i]
         marker_path = path.parent / "complete.json"
         info = json.loads(path.read_text()); marker = json.loads(marker_path.read_text())
         grant = info.get("thread_grant")
@@ -156,15 +162,40 @@ class NativeBindings:
                 or children not in ([mapping,restore],[index,mapping,restore])
                 or not profile.validate_batch(i)):
             raise ValueError("native resource receipt differs from verified execution/output")
-        return path
+        return info
+
+    def operation_resource_receipts(self, rel):
+        """Check the operation twice, not the entire operation per receipt.
+
+        This is a synchronous inventory read, not a substitute for the single
+        receipt callback at native dispatch. Keep validating each present
+        receipt, completion marker, and corresponding batch's full outputs.
+        """
+        paths = {int(key): self._receipt_path(rel, int(key)) for key in self.rows[rel]["native_scripts"]}
+        present = {i: path for i, path in paths.items() if path.exists()}
+        if not present:
+            return {}  # historical native batches have no guard provenance
+        self.verify_native_resources(operations=[rel])
+        operation = self.operation_records(rel)
+        result = {}
+        for i, path in present.items():
+            identity = self.contract.file_identity(path, relative_to=self.work)
+            marker = path.parent / "complete.json"
+            marker_sha = self.contract.sha256_file(marker)
+            info = self._validate_receipt(rel, i, path, self.expected_spec(rel, i, operation_records=operation))
+            result[i] = (identity, info, marker_sha)
+        self.verify_native_resources(operations=[rel])
+        if (self.operation_records(rel) != operation or {i for i, path in paths.items() if path.exists()} != set(result)
+                or any(self.contract.file_identity(present[i], relative_to=self.work) != identity
+                       or self.contract.sha256_file(present[i].parent / "complete.json") != marker_sha
+                       for i, (identity, _, marker_sha) in result.items())):
+            raise ValueError("native resource receipt inventory changed during verification")
+        return {i: (identity, info) for i, (identity, info, _) in result.items()}
 
     def output_identities(self, unit_id):
         result = self.original.output_identities(unit_id)
         for rel in self.operations_for(unit_id):
-            for key in self.rows[rel]["native_scripts"]:
-                path = self.receipt(rel,int(key))
-                if path is not None:
-                    result.append(self.contract.file_identity(path, relative_to=self.work))
+            result.extend(identity for identity, _ in self.operation_resource_receipts(rel).values())
         return result
 
     def dispatch(self, original_runner):
