@@ -1,11 +1,6 @@
 import { pickSaveFilePath } from "../../../services/backend-api.js";
 import { exportManualRefinement } from "../../../services/workflow-api.js";
 import {
-  executeFrozenManualRefinementExport,
-  isSameRefinementExportProject,
-  prepareFrozenManualRefinementAllPreview,
-} from "../manual-refinement-export-preview.js";
-import {
   buildDegapProjectStateForPersistence,
   normalizeDegapRuntimeState,
 } from "./degap-state.js";
@@ -17,7 +12,6 @@ import {
   buildManualRefinementExportBaseName,
   buildManualRefinementExportRequest,
   extractFileName,
-  normalizeManualRefinementExportScope,
   normalizeManualRefinementState,
   normalizeManualRefinementTool,
   resolveManualRefinementGapCandidate,
@@ -172,10 +166,7 @@ export function registerManualRefinementLocus(host, store, payload = {}, deps = 
   return true;
 }
 
-export async function exportManualRefinementTasks(host, store, options = {}, deps = {}) {
-  if (normalizeManualRefinementExportScope(options?.scope) === "all") {
-    return openAssemblyRefinementAllPreview(host, store, deps);
-  }
+async function exportCurrentChrRefinementTasks(host, store, deps = {}) {
   // Freeze project identity, scope, and queued loci BEFORE opening the file picker
   // so switching project/chromosome mid-dialog can never send the export elsewhere.
   const initialState = store.getState();
@@ -183,8 +174,8 @@ export async function exportManualRefinementTasks(host, store, options = {}, dep
   const frozenWorkspaceRoot = normalizeString(initialState?.session?.workspacePath);
   const frozenProjectId = Number(initialState?.session?.projectId || 0);
   const frozenProjectName = normalizeString(initialState?.session?.projectName || frozenProjectId || "project");
-  const frozenScope = normalizeManualRefinementExportScope(options?.scope);
-  const frozenChrName = normalizeString(options?.chrName || resolveCurrentFinalPathChrName(initialState?.assembly));
+  const frozenScope = "current-chr";
+  const frozenChrName = normalizeString(resolveCurrentFinalPathChrName(initialState?.assembly));
   const frozenManual = getManualRefinementState(store);
 
   if (!frozenWorkspaceRoot || !frozenProjectId) {
@@ -279,152 +270,6 @@ export async function exportManualRefinementTasks(host, store, options = {}, dep
   }
 }
 
-function setAssemblyRefinementPreviewModal(host, store, modal, deps = {}, expectedIdentity = null) {
-  const state = store.getState();
-  if (expectedIdentity && !isSameRefinementExportProject(state, expectedIdentity)) {
-    return false;
-  }
-  store.setState({
-    ...state,
-    assembly: {
-      ...state.assembly,
-      manualRefinementExportPreview: modal,
-    },
-  });
-  (deps.rerenderFull || deps.rerender)?.(host, store);
-  return true;
-}
-
-export function closeAssemblyRefinementAllPreview(host, store, deps = {}) {
-  const current = store.getState()?.assembly?.manualRefinementExportPreview;
-  if (current?.status === "exporting") {
-    return false;
-  }
-  return setAssemblyRefinementPreviewModal(host, store, null, deps);
-}
-
-export async function openAssemblyRefinementAllPreview(host, store, deps = {}) {
-  const state = store.getState();
-  const workspaceRoot = normalizeString(state?.session?.workspacePath);
-  const projectId = Number(state?.session?.projectId || 0);
-  if (!workspaceRoot || !projectId) {
-    return false;
-  }
-  const projectName = normalizeString(state?.session?.projectName || projectId);
-  const frozenIdentity = { workspaceRoot, projectId };
-  const loadingModal = {
-    open: true,
-    status: "loading",
-    workspaceRoot,
-    workspacePath: workspaceRoot,
-    projectId,
-    projectName,
-    loci: [],
-    request: null,
-    validationError: "",
-    error: "",
-  };
-  setAssemblyRefinementPreviewModal(host, store, loadingModal, deps, frozenIdentity);
-  const isCurrent = () => store.getState()?.assembly?.manualRefinementExportPreview === loadingModal
-    && isSameRefinementExportProject(store.getState(), frozenIdentity);
-
-  try {
-    const modal = await prepareFrozenManualRefinementAllPreview({
-      host,
-      store,
-      workspaceRoot,
-      projectId,
-      projectName,
-      locale: state?.locale,
-      deps,
-    });
-    if (!modal || !isCurrent()) {
-      return false;
-    }
-    setAssemblyRefinementPreviewModal(host, store, modal, deps, frozenIdentity);
-    return true;
-  } catch (error) {
-    if (!isCurrent()) {
-      return false;
-    }
-    setAssemblyRefinementPreviewModal(host, store, {
-      open: true,
-      status: "error",
-      workspaceRoot,
-      workspacePath: workspaceRoot,
-      projectId,
-      projectName,
-      loci: [],
-      request: null,
-      validationError: "",
-      error: String(error?.message || error || ""),
-    }, deps, frozenIdentity);
-    return false;
-  }
-}
-
-export async function confirmAssemblyRefinementAllPreview(host, store, deps = {}) {
-  const state = store.getState();
-  const modal = state?.assembly?.manualRefinementExportPreview;
-  if (!modal?.open || modal.status === "exporting" || !modal.request?.loci?.length) {
-    return false;
-  }
-  const frozenIdentity = {
-    workspaceRoot: normalizeString(modal.workspaceRoot ?? modal.workspacePath),
-    projectId: Number(modal.projectId || 0),
-  };
-  if (!isSameRefinementExportProject(state, frozenIdentity)) {
-    return false;
-  }
-  const exportingModal = {
-    ...modal,
-    status: "exporting",
-    error: "",
-    copyFeedback: "",
-  };
-  setAssemblyRefinementPreviewModal(host, store, exportingModal, deps, frozenIdentity);
-  const isCurrent = () => store.getState()?.assembly?.manualRefinementExportPreview === exportingModal
-    && isSameRefinementExportProject(store.getState(), frozenIdentity);
-
-  try {
-    const result = await executeFrozenManualRefinementExport({
-      host,
-      store,
-      modal,
-      deps,
-      isCurrent,
-    });
-    if (result.switched || !isCurrent()) {
-      return false;
-    }
-    if (result.canceled || !result.ok) {
-      setAssemblyRefinementPreviewModal(host, store, {
-        ...modal,
-        status: "ready",
-      }, deps, frozenIdentity);
-      return false;
-    }
-    recordManualRefinementExportReceipt(host, store, result.receipt, deps);
-    setAssemblyRefinementPreviewModal(host, store, {
-      ...modal,
-      status: "success",
-      error: "",
-      receipt: result.receipt,
-    }, deps, frozenIdentity);
-    return true;
-  } catch (error) {
-    if (!isCurrent()) {
-      return false;
-    }
-    setAssemblyRefinementPreviewModal(host, store, {
-      ...modal,
-      status: "ready",
-      error: String(error?.message || error || ""),
-    }, deps, frozenIdentity);
-    return false;
-  }
-}
-
 async function copyTextToClipboard(text) {
   if (globalThis.navigator?.clipboard?.writeText) {
     await globalThis.navigator.clipboard.writeText(text);
@@ -508,44 +353,9 @@ export function bindManualRefinementCard(host, store, deps = {}) {
       return;
     }
 
-    const cancelPreview = event.target?.closest?.("[data-refinement-export-preview-cancel]");
-    if (cancelPreview) {
-      closeAssemblyRefinementAllPreview(host, store, deps);
-      return;
-    }
-
-    const confirmPreview = event.target?.closest?.("[data-refinement-export-preview-confirm]");
-    if (confirmPreview) {
-      void confirmAssemblyRefinementAllPreview(host, store, deps);
-      return;
-    }
-
-    const copyPreviewCmd = event.target?.closest?.("[data-refinement-export-preview-copy]");
-    if (copyPreviewCmd) {
-      const command = normalizeString(copyPreviewCmd.dataset.refinementExportPreviewCopy);
-      if (!command) return;
-      const isEn = store.getState()?.locale === "en";
-      void copyTextToClipboard(command).then((copied) => {
-        const currentModal = store.getState()?.assembly?.manualRefinementExportPreview;
-        if (!currentModal?.open) return;
-        setAssemblyRefinementPreviewModal(host, store, {
-          ...currentModal,
-          copyFeedback: copied
-            ? (isEn ? "Copied Server command." : "已复制 Server 执行命令。")
-            : (isEn ? "Copy manually from the command box." : "请直接选中命令文本手动复制。"),
-        }, deps);
-      }).catch(() => {});
-      return;
-    }
-
-    const exportBtn = event.target?.closest?.("[data-manual-ref-export]");
+    const exportBtn = event.target?.closest?.('[data-manual-ref-export="current-chr"]');
     if (exportBtn) {
-      const scope = normalizeManualRefinementExportScope(exportBtn.dataset.manualRefExport || "all");
-      if (scope === "all") {
-        void openAssemblyRefinementAllPreview(host, store, deps);
-      } else {
-        void exportManualRefinementTasks(host, store, { scope: "current-chr" }, deps);
-      }
+      void exportCurrentChrRefinementTasks(host, store, deps);
     }
   });
 

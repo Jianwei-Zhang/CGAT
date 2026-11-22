@@ -55,8 +55,8 @@ test("renderManualRefinementCard renders compact single-select Gap rows, fixed T
     { escapeAttr, escapeHtml },
   );
 
-  assert.match(html, /data-manual-ref-count-current>当前 Chr01 · 2<\/span>/);
-  assert.match(html, /data-manual-ref-count-all>全项目 · 3<\/span>/);
+  assert.match(html, /<span class="manual-ref-count-pill is-active" data-manual-ref-count-current>当前 Chr01 · 2<\/span>/);
+  assert.match(html, /<span class="manual-ref-count-pill is-total" data-manual-ref-count-all>全项目 · 3<\/span>/);
   assert.doesNotMatch(html, /type="checkbox"/);
   assert.doesNotMatch(html, /manual-ref-seg-id/);
   assert.match(html, /data-app-tooltip="ctg_left_very_long_identifier_001 ↔ ctg_right_very_long_identifier_002"[\s\S]*?data-app-tooltip-overflow/);
@@ -67,7 +67,8 @@ test("renderManualRefinementCard renders compact single-select Gap rows, fixed T
   assert.match(html, /data-manual-ref-motif-input[\s\S]*?value="TTTAGGG"/);
   assert.match(html, /<details class="manual-ref-reads-disclosure">/);
   assert.match(html, /button primary tiny manual-ref-export-primary"[\s\S]*?data-manual-ref-export="current-chr"[\s\S]*?导出当前染色体 \(2\)/);
-  assert.match(html, /button tiny manual-ref-export-secondary"[\s\S]*?data-manual-ref-export="all"[\s\S]*?预览并导出全项目 \(3\)/);
+  assert.doesNotMatch(html, /data-manual-ref-export="all"/);
+  assert.match(html, /染色体预览 → 导出 → 导出全部精修任务/);
 });
 
 test("renderManualRefinementCard covers empty, exporting, override reads, receipt, and English locale states", () => {
@@ -81,11 +82,12 @@ test("renderManualRefinementCard covers empty, exporting, override reads, receip
     { escapeAttr, escapeHtml },
   );
   assert.match(emptyHtml, /Refinement Tasks/);
-  assert.match(emptyHtml, /Chr01 · 0/);
-  assert.match(emptyHtml, /Project · 0/);
+  assert.match(emptyHtml, /<span class="manual-ref-count-pill" data-manual-ref-count-current>Chr01 · 0<\/span>/);
+  assert.match(emptyHtml, /<span class="manual-ref-count-pill" data-manual-ref-count-all>Project · 0<\/span>/);
   assert.match(emptyHtml, /manual-ref-empty/);
   assert.match(emptyHtml, /data-manual-ref-export="current-chr"[\s\S]*?disabled/);
-  assert.match(emptyHtml, /data-manual-ref-export="all"[\s\S]*?disabled/);
+  assert.doesNotMatch(emptyHtml, /data-manual-ref-export="all"/);
+  assert.match(emptyHtml, /Pseudomolecule Preview → Export → Export All Refinement Tasks/);
 
   const exportingHtml = renderManualRefinementCard(
     {

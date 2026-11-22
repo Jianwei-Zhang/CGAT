@@ -533,8 +533,7 @@ function renderFinalPathExportMenu({
     : "";
   const refinementItems = canExportManualRefinement
     ? `
-        <button type="button" class="final-path-export-item" data-final-path-export-action="refinement-current-chr">${escapeHtml(labels.finalPathExportRefinementCurrentChr || "导出精修任务（当前染色体已选）")}</button>
-        <button type="button" class="final-path-export-item" data-final-path-export-action="refinement-all">${escapeHtml(labels.finalPathExportRefinementAll || "导出精修任务（本项目全部已选）")}</button>`
+        <button type="button" class="final-path-export-item" data-final-path-export-action="refinement-current-chr">${escapeHtml(labels.finalPathExportRefinementCurrentChr || "导出精修任务（当前染色体已选）")}</button>`
     : "";
   const degapJobsItem = canExportDegapJobs
     ? `

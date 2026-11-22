@@ -508,9 +508,6 @@ function resolveManualRefinementScopeFromKind(kind) {
   if (normalizedKind === "refinement-current-chr") {
     return "current-chr";
   }
-  if (normalizedKind === "refinement-all") {
-    return "all";
-  }
   return "";
 }
 
@@ -546,9 +543,6 @@ export function planFinalPathExportSteps({
   }
   if (normalizedKind === "refinement-current-chr") {
     return [{ kind: "refinement-current-chr", label: "导出精修任务（当前染色体已选）", outputPath: targetPath }];
-  }
-  if (normalizedKind === "refinement-all") {
-    return [{ kind: "refinement-all", label: "导出精修任务（本项目全部已选）", outputPath: targetPath }];
   }
   if (normalizedKind === "degap-jobs") {
     return [{ kind: "degap-jobs", label: "DEGAP-JOBS", outputPath: targetPath }];
@@ -787,7 +781,7 @@ export async function resolveFinalPathExportTarget({ state, kind, baseName, deps
       filters: [{ name: "FASTA", extensions: ["fasta", "fa"] }],
     }, state);
   }
-  if (normalizedKind === "refinement-current-chr" || normalizedKind === "refinement-all") {
+  if (normalizedKind === "refinement-current-chr") {
     return pickSaveFilePathImpl({
       defaultPath: `${baseName}.zip`,
       filters: [{ name: "ZIP", extensions: ["zip"] }],
@@ -884,7 +878,7 @@ export async function runFinalPathExportStep({
     });
     return { outputPath: step.outputPath };
   }
-  if (step?.kind === "refinement-current-chr" || step?.kind === "refinement-all") {
+  if (step?.kind === "refinement-current-chr") {
     const scope = frozenRefinement?.scope || resolveManualRefinementScopeFromKind(step.kind);
     const workspaceRoot = normalizeString(frozenRefinement?.workspaceRoot ?? state.session?.workspacePath);
     const projectId = Number(frozenRefinement?.projectId ?? state.session?.projectId ?? 0);
@@ -971,9 +965,6 @@ export async function launchFinalPathExportJob({
     return false;
   }
   const refinementScope = resolveManualRefinementScopeFromKind(normalizedKind);
-  if (refinementScope === "all") {
-    return deps.openAssemblyRefinementAllPreview?.(host, store) ?? false;
-  }
   const finalPathEntry = getCurrentChrFinalPath(assembly);
   if (!refinementScope && !finalPathEntry) {
     return false;
@@ -1001,7 +992,7 @@ export async function launchFinalPathExportJob({
       setFinalPathExportJob(host, store, {
         ...createFinalPathExportJob({
           kind: normalizedKind,
-          chrName: refinementScope === "all" ? frozenProjectName : currentChrName,
+          chrName: currentChrName,
           targetPath: "",
           steps: [],
           displaySteps: [],
@@ -1065,7 +1056,7 @@ export async function launchFinalPathExportJob({
   }
   const job = createFinalPathExportJob({
     kind: normalizedKind,
-    chrName: refinementScope === "all" ? frozenProjectName : currentChrName,
+    chrName: currentChrName,
     targetPath,
     steps,
     displaySteps: normalizedKind === "degap-jobs" ? buildDegapJobsDisplaySteps(state) : [],

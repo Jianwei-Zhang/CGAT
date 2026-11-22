@@ -93,6 +93,15 @@ test("current chromosome export sends only queued loci on that chromosome to the
   assert.equal(receipt[0].scope, "current-chr");
 });
 
+test("Assembly rejects the retired project-wide refine export action without opening a save picker", async () => {
+  const deps = {
+    pickSaveFilePath: async () => assert.fail("project-wide refine export belongs to the Project page"),
+    pickDirectoryPath: async () => assert.fail("project-wide refine export is not a path-file export"),
+  };
+  assert.equal(await resolveFinalPathExportTarget({ kind: "refinement-all", deps }), "");
+  assert.deepEqual(planFinalPathExportSteps({ kind: "refinement-all", targetPath: "result.zip" }), []);
+});
+
 test("export timestamp helpers append sortable timestamps before the extension", () => {
   assert.equal(
     formatExportTimestamp(new Date(2026, 3, 30, 20, 59, 30)),

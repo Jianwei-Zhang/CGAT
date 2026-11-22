@@ -1,5 +1,3 @@
-import { renderManualRefinementExportPreviewModal } from "../manual-refinement-export-preview.js";
-
 export function createAssemblyProgressModalRenderer({
   escapeAttr,
   escapeHtml,
@@ -24,9 +22,6 @@ export function createAssemblyProgressModalRenderer({
     }
     if (kind === "refinement-current-chr") {
       return labels.finalPathExportRefinementCurrentChr || "导出精修任务（当前染色体已选）";
-    }
-    if (kind === "refinement-all") {
-      return labels.finalPathExportRefinementAll || "导出精修任务（本项目全部已选）";
     }
     if (kind === "degap-jobs") {
       return labels.finalPathExportDegapJobs || "旧版 DEGAP-JOBS（脚本包）";
@@ -343,17 +338,13 @@ export function createAssemblyProgressModalRenderer({
   }
 
   function renderFinalPathExportModal(state) {
-    const previewModalHtml = renderManualRefinementExportPreviewModal(
-      state.assembly?.manualRefinementExportPreview,
-      state,
-    );
     const job = state.assembly?.finalPathExportJob;
     if (!job?.open) {
-      return previewModalHtml;
+      return "";
     }
     const pageI18n = getAssemblyI18n(state).page || {};
     const kind = String(job?.kind || "").trim().toLowerCase();
-    const isRefinementExport = kind === "refinement-current-chr" || kind === "refinement-all";
+    const isRefinementExport = kind === "refinement-current-chr";
     const dialogTitle = isRefinementExport
       ? (pageI18n.finalPathExportRefinementDialogTitle || "导出精修任务")
       : (pageI18n.finalPathExportDialogTitle || "正在导出 final path");
@@ -366,7 +357,7 @@ export function createAssemblyProgressModalRenderer({
           ${job.serverCommand ? `<div class="manual-ref-cmd-row"><code class="manual-ref-cmd">${escapeHtml(String(job.serverCommand))}</code></div>` : ""}
         </div>`
       : "";
-    return `${previewModalHtml}
+    return `
       <div class="modal-overlay assembly-final-path-export-overlay" data-final-path-export-overlay="true">
         <article
           class="card modal-dialog assembly-final-path-export-dialog"

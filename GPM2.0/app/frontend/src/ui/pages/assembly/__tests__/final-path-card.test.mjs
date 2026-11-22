@@ -166,6 +166,19 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.doesNotMatch(html, /DEGAP job added/);
 });
 
+test("Assembly Final Path exports current-chromosome refinement tasks, not all project tasks", () => {
+  const html = renderFinalPathCard({
+    projectName: "Demo",
+    chrName: "Chr01",
+    finalPathEntry: createEntry(),
+    viewMode: "graph",
+    canExportManualRefinement: true,
+  }, { ...createDeps(), i18n: createI18n() });
+  assert.match(html, /data-final-path-export-action="refinement-current-chr"/);
+  assert.doesNotMatch(html, /data-final-path-export-action="refinement-all"/);
+  assert.match(html, /data-final-path-export-action="all"/); // Ordinary path files.
+});
+
 test("DEGAP reads help uses reusable helper hint styling", () => {
   const baseCss = readStylesheetTree(new URL("../../../../styles/base.css", import.meta.url));
   const componentsCss = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url));

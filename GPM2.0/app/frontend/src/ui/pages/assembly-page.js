@@ -120,7 +120,6 @@ import {
 } from "./assembly/add-ctg-import-controller.js";
 import {
   bindManualRefinementCard as bindManualRefinementCardImpl,
-  openAssemblyRefinementAllPreview as openAssemblyRefinementAllPreviewImpl,
   openManualRefinementPanel as openManualRefinementPanelImpl,
   recordManualRefinementExportReceipt as recordManualRefinementExportReceiptImpl,
   registerManualRefinementLocus as registerManualRefinementLocusImpl,
@@ -1076,8 +1075,6 @@ function createAssemblyPageBindingDeps(options = {}) {
         exportFinalPathFasta,
         exportManualRefinement,
         flushAssemblyProjectState,
-        openAssemblyRefinementAllPreview: (h, s) =>
-          openAssemblyRefinementAllPreviewImpl(h, s, manualRefinementRuntimeDeps),
         onManualRefinementExported: (h, s, receipt) =>
           recordManualRefinementExportReceiptImpl(h, s, receipt, manualRefinementRuntimeDeps),
         writeFinalPathExportBinaryFile,
@@ -1373,7 +1370,6 @@ const degapRuntimeDeps = {
 
 const manualRefinementRuntimeDeps = {
   rerender: rerenderFinalPathCard,
-  rerenderFull: rerender,
   pickSaveFilePath,
   exportManualRefinement,
   flushAssemblyProjectState,

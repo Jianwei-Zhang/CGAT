@@ -41,8 +41,6 @@ const COPY = {
     readsNote: "App 不探测本地路径，也不按后缀猜技术类型；空 reads 仍可导出并由 Server 端 --hifi / --ont 指定。",
     exportCurrentChr: "导出当前染色体 ({count})",
     exportCurrentChrTitle: "导出精修任务（当前染色体 {chr} 已选 · {count}）",
-    exportAllProject: "预览并导出全项目 ({count})",
-    exportAllProjectTitle: "打开全项目精修任务预览与导出确认（本项目全部已选 · {count}）",
     exporting: "正在导出精修任务...",
     clearDraft: "清空草稿",
     exportedTitle: "精修任务包已导出 · 等待 Server 运行",
@@ -52,7 +50,7 @@ const COPY = {
     serverCmdLabel: "Server 命令",
     copyCmd: "复制",
     serverCmdHint: "将 ZIP 传到对应 Server 工作区运行（或 ~/bin/refine.py，按需加 --hifi / --ont）；完成后在「项目页 → 精修」导入结果。",
-    scopeBoundaryNote: "全项目导出仅汇总本项目各染色体已登记位点，不扫描未选位点、不跨项目、不跟随轨道。",
+    scopeBoundaryNote: "此处快捷导出当前染色体；全项目导出请到项目页右侧「染色体预览 → 导出 → 导出全部精修任务」。",
   },
   en: {
     title: "Refinement Tasks",
@@ -86,8 +84,6 @@ const COPY = {
     readsNote: "App never probes local paths or guesses technology from extensions; empty reads remain exportable for Server-side --hifi / --ont.",
     exportCurrentChr: "Export Current Chr ({count})",
     exportCurrentChrTitle: "Export Refinement Tasks (Current chr {chr} · {count})",
-    exportAllProject: "Preview & Export All ({count})",
-    exportAllProjectTitle: "Open preview & confirmation for all queued refinement tasks in project ({count})",
     exporting: "Exporting refinement tasks...",
     clearDraft: "Clear",
     exportedTitle: "Refinement archive exported · awaiting Server run",
@@ -97,7 +93,7 @@ const COPY = {
     serverCmdLabel: "Server command",
     copyCmd: "Copy",
     serverCmdHint: "Copy the ZIP to the matching Server workspace and run (or ~/bin/refine.py, optionally with --hifi / --ont); then import from Project → Refinement.",
-    scopeBoundaryNote: "All Queued exports only loci registered across this project (never scans unselected loci, crosses projects, or follows tracks).",
+    scopeBoundaryNote: "Quick export covers the current chromosome; for all queued project loci, use Project → Pseudomolecule Preview → Export → Export All Refinement Tasks.",
   },
 };
 
@@ -313,9 +309,6 @@ export function renderManualRefinementCard(
     chr: chrName || "-",
     count: currentChrLoci.length,
   });
-  const exportAllTitle = fmt(copy.exportAllProjectTitle, {
-    count: state.loci.length,
-  });
 
   const bodyMarkup = isOpen
     ? `<div class="manual-ref-body" data-manual-ref-body>
@@ -331,13 +324,6 @@ export function renderManualRefinementCard(
           <span class="muted manual-ref-hint">${escapeHtml(copy.scopeBoundaryNote)}</span>
           <div class="manual-ref-foot-actions">
             ${state.loci.length ? `<button type="button" class="button ghost tiny manual-ref-clear-btn" data-manual-ref-clear-all ${state.exporting ? "disabled" : ""}>${escapeHtml(copy.clearDraft)}</button>` : ""}
-            <button
-              type="button"
-              class="button tiny manual-ref-export-secondary"
-              data-manual-ref-export="all"
-              data-app-tooltip="${escapeAttr(exportAllTitle)}"
-              ${!state.loci.length || state.exporting ? "disabled" : ""}
-            >${escapeHtml(state.exporting ? copy.exporting : fmt(copy.exportAllProject, { count: state.loci.length }))}</button>
             <button
               type="button"
               class="button primary tiny manual-ref-export-primary"
