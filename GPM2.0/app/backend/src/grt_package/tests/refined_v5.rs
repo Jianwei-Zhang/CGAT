@@ -173,11 +173,14 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     let request = serde_json::from_value(serde_json::json!({"loci":[{
         "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet"]
     }],"hifi_reads":[],"ont_reads":[]})).unwrap();
-    let archive = temp.path().join("tasks.zip");
+    let archive = temp.path().join("-project's refinement.zip");
     let result = crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).unwrap();
     let mut zipped = zip::ZipArchive::new(fs::File::open(&archive).unwrap()).unwrap();
     let mut bytes = Vec::new();
     zipped.by_name("refinement_tasks.json").unwrap().read_to_end(&mut bytes).unwrap();
+    let mut readme = String::new();
+    zipped.by_name("README.txt").unwrap().read_to_string(&mut readme).unwrap();
+    assert!(readme.contains("python .lib/tools/refine.py './-project'\"'\"'s refinement.zip'\n"));
     assert_eq!(result.tasks, 1);
     assert_eq!(result.batch_sha256, format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(&bytes)));
     let value: Value = serde_json::from_slice(&bytes).unwrap();

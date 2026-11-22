@@ -481,7 +481,9 @@ pub fn export_manual_refinement(
     zip.start_file(MANIFEST, FileOptions::default())?;
     zip.write_all(&bytes)?;
     zip.start_file("README.txt", FileOptions::default())?;
-    zip.write_all(b"CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root: \npython .lib/tools/refine.py refinement_tasks.zip\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, writes the batch report under 08_refinement_jobs/02_manual/, updates 06_report/report.html, and produces a refinement_results.zip for import into this App project.\n\nDo not edit or run code from this archive.\n")?;
+    let filename = output.file_name().and_then(|name| name.to_str()).unwrap_or("refinement_tasks.zip");
+    let argument = if filename.starts_with('-') { format!("./{filename}") } else { filename.to_owned() };
+    write!(zip, "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, writes the batch report under 08_refinement_jobs/02_manual/, updates 06_report/report.html, and produces a refinement_results.zip for import into this App project.\n\nDo not edit or run code from this archive.\n", shell_quote(&argument))?;
     let archive = zip.finish()?.into_inner();
     let ledgers = workspace.join("metadata/refinement_exports");
     fs::create_dir_all(&ledgers)?;
