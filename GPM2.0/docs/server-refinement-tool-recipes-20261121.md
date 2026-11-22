@@ -42,7 +42,7 @@ The common private staging layer now classifies these special cases using native
 
 This batch used small local installer/recipe/conversion checks and a controlled DEGAP adapter with real FASTA indexing. The source archive was downloaded and hash-checked; the temporary patched quarTeT entrypoint was checked with actual Python 3.11. No existing conda environment was upgraded during development.
 
-Bioconda package records exist for the selected Linux x86_64/aarch64 native distributions, and the selected Python library versions have matching platform distributions (GNU parallel is noarch). That is **package availability**, not environment solve, native smoke, accuracy, performance or ARM64 acceptance. Both lock-file platform validation fields remain pending. Complete shared-environment resolution and native small examples are deferred to the final consolidated validation.
+Bioconda package records exist for the selected Linux x86_64/aarch64 native distributions, and the selected Python library versions have matching platform distributions (GNU parallel is noarch). That is **package availability**, not environment solve, native smoke, accuracy, performance or ARM64 acceptance. This was the investigation snapshot. The [consolidated validation](server-refinement-final-acceptance-20261122.md) now has real x86_64 install/check and four-engine evidence, plus an ARM64 resolver receipt. ARM64 installation and native execution remain unverified.
 
 Primary audit sources (immutable tool revisions or distribution archive hashes are in the lock):
 

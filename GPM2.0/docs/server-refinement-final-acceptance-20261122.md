@@ -453,3 +453,43 @@ Receipt and capture files: `evidence/browser-offline-2d5bd017/`, including
 `b58d1a26eb0c293f7fcb45fdcaa40ad614eb90af7448d9bf060aa62eb478b28e`), the
 local CDP harness and three screenshots. This is actual browser behavior,
 not a native App window or Linux ARM acceptance.
+
+
+## Actual partial failure and retry
+
+A fresh local LGZ-only workspace was appended through its generated public
+`run_all.sh` with mixed reads and quarTeT plus LR_Gapcloser. As a controlled
+fault, the observer matched the owned quarTeT launch request to a descendant
+process and used its pidfd to send SIGTERM to that producer only. The batch
+exited 1 (`partial_failure`); LR_Gapcloser published its own validated files and
+App packages, while the failed quarTeT attempt had a diagnostic report and no
+final publication. No command, tool bytes or workspace checkpoints were mocked.
+
+The first run showed a diagnostic ordering bug: a process exit of `-15` was
+reported as missing `native_substeps.json`. Revision `93e85ee1` checks the process
+outcome before reading the substep summary. A new real fault-injected run with
+that revision displayed SIGTERM/`-15` as the reason and preserved the native log.
+The explicit same-input retry ran quarTeT only, published both accepted results,
+and preserved 40 LR native files and 37 alignment files by hash and mtime, as
+well as the LGZ assembly digest. See `native-failure-isolation-3fa6ba49.json`
+and `native-failure-isolation-93e85ee1.json` in the evidence directory. This
+checks A10 at the producer boundary, not arbitrary multi-host failure.
+
+## ARM64 solve and remaining consolidated checks
+
+Micromamba 2.4.0 solved the full pinned `linux-aarch64` environment with strict
+conda-forge/Bioconda priority on an isolated root, using `--dry-run`. All 192
+resolved records were captured; version constraints matched the lock, and the
+TGS-GapCloser, LR_Gapcloser, BWA and Racon records matched their locked build,
+URL and distribution SHA-256. See `evidence/aarch64-solve-2d5bd017.json`. This is
+the resolver portion of A05 only: ARM installation, `--check` and native tool
+execution were not performed and require an authorized ARM worker.
+
+The consolidated Server gate first caught stale generated runtime provenance;
+`3fa6ba49` regenerated the two manifest hashes without changing the reference
+runtime/binary. The gate then reached Python discovery (995 tests, 11 failing
+assertions, 9 errors, 16 skips), not the later shell and App smoke stages.
+`93e85ee1` addresses report/recovery regressions from that run; 42 focused
+checks ran (32 passed, 10 skipped) and the real retry above passed. The
+remaining regression failures require triage and a clean full-gate rerun.
+Do not interpret these results as A01–A18 closure.
