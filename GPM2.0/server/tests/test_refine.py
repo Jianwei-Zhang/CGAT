@@ -179,6 +179,13 @@ class RefineTests(unittest.TestCase):
         self.assertNotIn("Pending App import", overview)
         self.assertIn("Missing reads", Path(result["batch_report"]).read_text())
         self.assertFalse(self.layout.path("05_final").exists())
+        self.assertFalse(list(installed.parent.rglob("__pycache__")),
+                         "isolated refine must not write bytecode into the prepared runtime")
+        isolated = subprocess.run([sys.executable, "-I", str(installed), relative_archive, "--prepare-only"],
+                                  cwd=self.layout.root, capture_output=True, text=True)
+        self.assertEqual(isolated.returncode, 0, isolated.stderr)
+        self.assertEqual(json.loads(isolated.stdout)["batch_sha256"], batch)
+        self.assertFalse(list(installed.parent.rglob("__pycache__")))
 
     def test_global_refine_accepts_numbered_runtime_without_new_marker(self):
         installed = self._install_refine()

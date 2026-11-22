@@ -2,13 +2,20 @@
 """Run project-scoped manual refinement tasks and publish a result bundle."""
 from __future__ import annotations
 
+import os
+import sys
+
+if __name__ == "__main__":
+    # Isolation ignores PYTHONDONTWRITEBYTECODE; preserve a read-only
+    # managed runtime explicitly before importing the workflow or stdlib.
+    if not (sys.flags.isolated and sys.flags.dont_write_bytecode):
+        os.execv(sys.executable, [sys.executable, "-I", "-B", os.path.abspath(__file__), *sys.argv[1:]])
+
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
-import sys
 import tempfile
 from zipfile import BadZipFile, ZipFile
 
@@ -347,8 +354,4 @@ def main():
 
 
 if __name__ == "__main__":
-    if not sys.flags.isolated:
-        # Do not let a global entry's installation or PYTHONPATH provide
-        # missing dependencies of the selected workspace's runtime.
-        os.execv(sys.executable, [sys.executable, "-I", os.path.abspath(__file__), *sys.argv[1:]])
     sys.exit(main())
