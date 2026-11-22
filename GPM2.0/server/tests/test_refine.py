@@ -2,16 +2,22 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from manual_refinement_tasks import MANIFEST, SCHEMA, prepare_batch, read_tasks
+SERVER = Path(__file__).resolve().parents[1]
+TOOLS = SERVER / "tools"
+sys.path.insert(0, str(TOOLS))
+from refine import MANIFEST, SCHEMA, prepare_batch, read_tasks
+from refine_report import SECTION_START, SECTION_END, automatic_overview_digest, merge_manual_overview
+from refine_run import MANIFEST as RESULTS_MANIFEST, publish_results
 from refinement_jobs_index import write_automatic_index
-from workspace_layout import TOOL_DIRECTORIES, initialize_workspace
+from workspace_layout import MANIFEST as WORKSPACE_MARKER, TOOL_DIRECTORIES, WorkspaceLayout, initialize_workspace
 from run_orchestration import sha256_file
 
 
@@ -19,7 +25,7 @@ def hash_text(text):
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-class ManualTasksTests(unittest.TestCase):
+class RefineTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -93,6 +99,95 @@ class ManualTasksTests(unittest.TestCase):
         gap["witnesses"]["seqleft"]["contig"] = "right"
         with self.assertRaisesRegex(ValueError, "source witness"):
             read_tasks(self.archive([gap]))
+
+    def test_publication_keeps_automatic_proof_and_preserves_manual_section_on_regeneration(self):
+        original = "<html><main><h1>automatic report</h1></main></html>"
+        overview = self.write("06_report/report.html", original)
+        sealed = sha256_file(overview)
+        gap = self.locus("chr1", "gap-1")
+        archive = self.archive([gap])
+        preparation = prepare_batch(self.layout.root, archive)
+        with ZipFile(archive) as zipped:
+            manifest = json.loads(zipped.read(MANIFEST))
+        batch = preparation["batch_sha256"]
+        directory = self.layout.path(f"08_refinement_jobs/02_manual/{batch}")
+        patch_file = self.write("patch.seq", "ACGT")
+        patch_name = f"patches/{gap['id']}.degap.seq"
+        row = {"locus_id": gap["id"], "tool": "degap", "status": "closed", "reason": None,
+               "version": "2.0", "revision": "r1", "attempt_id": "attempt-1",
+               "patch": {"operation": "replace_gap", "original_length": 5, "original_sha256": hash_text("NNNNN"),
+                         "path": patch_name, "length": 4, "sha256": hash_text("ACGT")}}
+        reads = {"degap": [{"technology": "hifi", "path": "/reads/a&b.fq.gz", "sha256": "f" * 64}]}
+
+        outputs = publish_results(self.layout, directory, batch, [row], {patch_name: patch_file}, manifest=manifest, reads=reads)
+        report = Path(outputs["batch_report"]).read_text()
+        self.assertIn("HIFI", report.upper())
+        self.assertEqual(json.loads(Path(outputs["report"]).read_text())["reads"], reads)
+        self.assertIn("Pending App import", overview.read_text())
+        self.assertIn("automatic report", overview.read_text())
+        self.assertEqual(automatic_overview_digest(overview), sealed)
+        with ZipFile(outputs["delivery"]) as zipped:
+            self.assertEqual(zipped.read(patch_name), b"ACGT")
+            self.assertEqual(json.loads(zipped.read(RESULTS_MANIFEST))["batch_sha256"], batch)
+        summary = json.loads(Path(outputs["report"]).read_text())
+        self.assertEqual(summary["delivery_sha256"], sha256_file(Path(outputs["delivery"])))
+        html = overview.read_bytes()
+        self.assertEqual(html.count(SECTION_START.encode()), 1)
+        self.assertEqual(html.count(SECTION_END.encode()), 1)
+        publish_results(self.layout, directory, batch, [row], {patch_name: patch_file}, manifest=manifest, reads=reads)
+        self.assertEqual(overview.read_bytes(), html)
+        regenerated = merge_manual_overview(self.layout, original.replace("automatic report", "fresh automatic report"))
+        self.assertIn("fresh automatic report", regenerated)
+        self.assertIn(batch, regenerated)
+        overview.write_text(regenerated, encoding="utf-8")
+        self.assertNotEqual(automatic_overview_digest(overview), sealed)
+
+    def _install_refine(self):
+        tools = self.layout.path(".lib/tools")
+        shutil.copytree(TOOLS, tools, ignore=shutil.ignore_patterns("__pycache__", "degap_core"))
+        shutil.copytree(SERVER / "contracts", tools.parent / "contracts")
+        return tools / "refine.py"
+
+    def test_installed_and_global_refine_cli_use_workspace_runtime(self):
+        marker = self.layout.path(WORKSPACE_MARKER)
+        marker.write_text(json.dumps({**self.layout.manifest(), "prepared_runtime": ".lib"}), encoding="utf-8")
+        self.layout = WorkspaceLayout.detect(self.layout.root)
+        installed = self._install_refine()
+        self.assertEqual(installed, self.layout.root / ".lib/tools/refine.py")
+        self.write("metadata/prepare_options.tsv", "key\tvalue\nthreads\t1\n")
+        archive = self.archive([self.locus("chr1", "gap-1")])
+        relative_archive = "../" + archive.name
+        global_entry = self.home / "bin/refine.py"
+        global_entry.parent.mkdir()
+        shutil.copyfile(installed, global_entry)
+        checked = subprocess.run([sys.executable, str(global_entry), relative_archive, "--prepare-only"],
+                                 cwd=self.layout.root, capture_output=True, text=True)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        batch = json.loads(checked.stdout)["batch_sha256"]
+        self.assertFalse(self.layout.path("06_report/report.html").exists())
+        executed = subprocess.run([sys.executable, str(installed), relative_archive], cwd=self.layout.root,
+                                  capture_output=True, text=True)
+        self.assertEqual(executed.returncode, 1, executed.stderr)
+        result = json.loads(executed.stdout)
+        self.assertEqual({r["status"] for r in result["results"]}, {"missing_reads"})
+        with ZipFile(result["delivery"]) as zipped:
+            self.assertEqual(zipped.namelist(), [RESULTS_MANIFEST])
+            self.assertEqual(json.loads(zipped.read(RESULTS_MANIFEST))["batch_sha256"], batch)
+        overview = Path(result["overview"]).read_text()
+        self.assertIn("尚无自动总报告", overview)
+        self.assertIn("无可导回补丁", overview)
+        self.assertNotIn("Pending App import", overview)
+        self.assertIn("Missing reads", Path(result["batch_report"]).read_text())
+        self.assertFalse(self.layout.path("05_final").exists())
+
+    def test_global_refine_accepts_numbered_runtime_without_new_marker(self):
+        installed = self._install_refine()
+        self.assertIn(".runtime/prepared", installed.as_posix())
+        archive = self.archive([self.locus("chr1", "gap-1")])
+        checked = subprocess.run([sys.executable, str(TOOLS / "refine.py"), str(archive), "--prepare-only"],
+                                 cwd=self.layout.root, capture_output=True, text=True)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertEqual(json.loads(checked.stdout)["loci"][0]["status"], "prepared")
 
     def test_automatic_index_does_not_link_bare_or_unmatched_publication(self):
         batch_id = "a" * 32

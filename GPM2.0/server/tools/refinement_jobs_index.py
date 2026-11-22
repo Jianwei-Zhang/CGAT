@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 
+from refine_report import automatic_overview_digest
 from refinement_commit import current_publication
 from run_orchestration import sha256_file
 from workspace_layout import TOOL_DIRECTORIES, relative_path
@@ -33,7 +34,8 @@ def write_automatic_index(layout, completion_path):
     index_dir = "08_refinement_jobs/01_automatic"
     overview = "06_report/report.html"
     overview_sha = completion["overview_files"].get(overview)
-    if not verify_reference(layout, overview, overview_sha):
+    overview_path = layout.path(overview)
+    if overview_path.is_symlink() or not overview_path.is_file() or automatic_overview_digest(overview_path) != overview_sha:
         raise ValueError("automatic refinement overview differs from its completion receipt")
     jobs = []
     for tool, record in batch["tools"].items():

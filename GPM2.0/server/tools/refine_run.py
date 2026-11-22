@@ -270,7 +270,7 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
                           revision=revision, attempt_id=attempt_id), None
 
 
-def publish_results(layout, batch_dir, batch, rows, patches):
+def publish_results(layout, batch_dir, batch, rows, patches, *, manifest, reads):
     data = {"schema": RESULTS, "batch_sha256": batch, "results": rows}
     output = layout.path((batch_dir / "04_delivery/refinement_results.zip").relative_to(layout.root).as_posix())
     report = layout.path((batch_dir / "03_report/summary.json").relative_to(layout.root).as_posix())
@@ -296,12 +296,13 @@ def publish_results(layout, batch_dir, batch, rows, patches):
             if old.get("schema") != RESULTS or old.get("batch_sha256") != batch:
                 raise PathError("existing result ZIP is not owned by this manual batch")
         rename_synced(staged, output)
-    durable_json(report, {**data, "delivery": str(output.relative_to(layout.root)), "delivery_sha256": sha256_file(output)})
-    return {"delivery": str(output), "report": str(report), "results": rows}
+    from refine_report import publish_manual_report
+    report_paths = publish_manual_report(layout, batch_dir, manifest, data, reads, output)
+    return {"delivery": str(output), **report_paths, "results": rows}
 
 
 def execute_manual(layout, batch_dir, preparation, manifest, override, threads):
-    from manual_refinement_tasks import verify_prepared
+    from refine import verify_prepared
     budget = threads or prepared_resources(layout.root)["threads"]
     budget = min(execution_threads(budget, root=layout.root), len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1)
     lock = load_lock()
@@ -334,4 +335,6 @@ def execute_manual(layout, batch_dir, preparation, manifest, override, threads):
             rows.append(row)
             if patch_file is not None:
                 patches[row["patch"]["path"]] = patch_file
-    return publish_results(layout, batch_dir, batch, rows, patches)
+    reads = {tool: checked[1]
+             for tool, checked in checks.items()}
+    return publish_results(layout, batch_dir, batch, rows, patches, manifest=manifest, reads=reads)

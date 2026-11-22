@@ -335,7 +335,7 @@ PYBATCH
 import sys
 from pathlib import Path
 root = Path(sys.argv[1])
-sys.path.insert(0, str(root / ".runtime/prepared/tools"))
+sys.path.insert(0, str(root / ".lib/tools"))
 from run_outer_checkpoints import OuterCheckpointManager
 run = root / "02_alignments/chr_Chr01"
 for name in ("ds_a_vs_self", "ds_a_vs_ds_b"):
@@ -349,7 +349,7 @@ PYCACHE
 import sys
 from pathlib import Path
 root = Path(sys.argv[1])
-sys.path.insert(0, str(root / ".runtime/prepared/tools"))
+sys.path.insert(0, str(root / ".lib/tools"))
 from run_outer_checkpoints import OuterCheckpointManager
 manager = OuterCheckpointManager(root)
 valid, reason = manager.validate(manager.prepare("q0_chr:Chr01", "02_alignments/chr_Chr01/q0_command.sh"))
@@ -483,7 +483,7 @@ test_alignment_engine_defaults_and_validation() {
     cat "${default_root}/02_alignments/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
-  assert_file "${default_root}/.runtime/prepared/tools/long_cigar_recovery/branch-runtime.json"
+  assert_file "${default_root}/.lib/tools/long_cigar_recovery/branch-runtime.json"
   cmp "${default_root}/run_all.sh" "${REPO_ROOT}/server/lib/run_all_launcher.sh"
   assert_prepare_option "${default_root}/.runtime/metadata/prepare_options.tsv" alignment_engine minimap2
   assert_prepare_option "${default_root}/.runtime/metadata/prepare_options.tsv" threads 10
@@ -573,7 +573,7 @@ EOF
     printf '%s\n' "${command_lines[@]:2}" >&2
     exit 1
   }
-  [[ -f "${output_root}/.runtime/prepared/tools/run_all_runner.py" ]] || {
+  [[ -f "${output_root}/.lib/tools/run_all_runner.py" ]] || {
     echo "generated workspace is missing run_all_runner.py" >&2
     exit 1
   }
@@ -720,18 +720,18 @@ test_custom_output_root() {
   assert_file "${output_root}/.runtime/metadata/datasets.tsv"
   assert_file "${output_root}/run_all.sh"
   assert_file "${output_root}/.runtime/commands/export_final_path_fasta.sh"
-  assert_file "${output_root}/.runtime/prepared/lib/final_path.sh"
-  assert_file "${output_root}/.runtime/prepared/tools/add_dataset_package.py"
-  assert_file "${output_root}/.runtime/prepared/tools/grt_prepare_inputs.py"
-  assert_file "${output_root}/.runtime/prepared/tools/grt_step1.py"
-  [[ ! -e "${output_root}/.runtime/prepared/tools/grt_step12.py" ]]
-  assert_file "${output_root}/.runtime/prepared/tools/grt_core/step1_engine.py"
-  assert_file "${output_root}/.runtime/prepared/tools/grt_core/step2_engine.py"
-  assert_file "${output_root}/.runtime/prepared/tools/grt_step1.py"
-  assert_file "${output_root}/.runtime/prepared/tools/grt_step2.py"
-  assert_file "${output_root}/.runtime/prepared/tools/grt_step3.py"
-  assert_file "${output_root}/.runtime/prepared/tools/grt_evidence_package.py"
-  assert_file "${output_root}/.runtime/prepared/contracts/grt_precomputed_v2.json"
+  assert_file "${output_root}/.lib/lib/final_path.sh"
+  assert_file "${output_root}/.lib/tools/add_dataset_package.py"
+  assert_file "${output_root}/.lib/tools/grt_prepare_inputs.py"
+  assert_file "${output_root}/.lib/tools/grt_step1.py"
+  [[ ! -e "${output_root}/.lib/tools/grt_step12.py" ]]
+  assert_file "${output_root}/.lib/tools/grt_core/step1_engine.py"
+  assert_file "${output_root}/.lib/tools/grt_core/step2_engine.py"
+  assert_file "${output_root}/.lib/tools/grt_step1.py"
+  assert_file "${output_root}/.lib/tools/grt_step2.py"
+  assert_file "${output_root}/.lib/tools/grt_step3.py"
+  assert_file "${output_root}/.lib/tools/grt_evidence_package.py"
+  assert_file "${output_root}/.lib/contracts/grt_precomputed_v2.json"
   assert_file "${output_root}/.runtime/commands/prepare_lgz_inputs.sh"
   [[ -f "${output_root}/.runtime/commands/run_lgz_step1.sh" ]]
   assert_file "${output_root}/.runtime/commands/run_lgz_step1.sh"
@@ -743,11 +743,11 @@ test_custom_output_root() {
     grep -F 'exec bash ' "${output_root}/.runtime/commands/${name}.sh" >/dev/null
     bash -n "${output_root}/.runtime/commands/${name}.sh"
   done
-  assert_file "${output_root}/.runtime/prepared/tools/lgz_compat.py"
-  assert_file "${output_root}/.runtime/prepared/tools/lgz_core/step1_engine.py"
-  assert_file "${output_root}/.runtime/prepared/tools/lgz_core/step2_engine.py"
-  assert_file "${output_root}/.runtime/prepared/tools/lgz_step1.py"
-  assert_file "${output_root}/.runtime/prepared/tools/lgz_step2.py"
+  assert_file "${output_root}/.lib/tools/lgz_compat.py"
+  assert_file "${output_root}/.lib/tools/lgz_core/step1_engine.py"
+  assert_file "${output_root}/.lib/tools/lgz_core/step2_engine.py"
+  assert_file "${output_root}/.lib/tools/lgz_step1.py"
+  assert_file "${output_root}/.lib/tools/lgz_step2.py"
 
   assert_file "${output_root}/.runtime/commands/package_full_zip.sh"
   assert_file "${output_root}/.runtime/commands/package_light_zip.sh"
@@ -920,8 +920,8 @@ test_default_output_root_uses_current_working_directory() {
   assert_file "${TMP_DIR}/gpm_server/.runtime/metadata/reference.tsv"
   assert_file "${TMP_DIR}/gpm_server/run_all.sh"
   assert_file "${TMP_DIR}/gpm_server/.runtime/commands/export_final_path_fasta.sh"
-  assert_file "${TMP_DIR}/gpm_server/.runtime/prepared/lib/final_path.sh"
-  assert_file "${TMP_DIR}/gpm_server/.runtime/prepared/tools/add_dataset_package.py"
+  assert_file "${TMP_DIR}/gpm_server/.lib/lib/final_path.sh"
+  assert_file "${TMP_DIR}/gpm_server/.lib/tools/add_dataset_package.py"
 }
 
 test_skip_self_option_omits_self_runs() {

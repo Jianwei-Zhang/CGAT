@@ -327,11 +327,11 @@ write_export_final_path_fasta_script() {
 write_prepare_lib() {
   local work_root="$1"
   local lib_src="${SCRIPT_DIR}/lib"
-  local lib_dst="$(cgat_workspace_path "${work_root}" ".prepare_lib/lib")"
+  local lib_dst="$(cgat_workspace_path "${work_root}" ".lib/lib")"
   local tools_src="${SCRIPT_DIR}/tools"
-  local tools_dst="$(cgat_workspace_path "${work_root}" ".prepare_lib/tools")"
+  local tools_dst="$(cgat_workspace_path "${work_root}" ".lib/tools")"
   local contracts_src="${SCRIPT_DIR}/contracts"
-  local contracts_dst="$(cgat_workspace_path "${work_root}" ".prepare_lib/contracts")"
+  local contracts_dst="$(cgat_workspace_path "${work_root}" ".lib/contracts")"
 
   [[ -d "$lib_src" ]] || die "Missing server library directory: $lib_src"
   [[ -d "$tools_src" ]] || die "Missing server tools directory: $tools_src"
@@ -353,9 +353,9 @@ write_prepare_lib() {
   find "$tools_dst/grt_core" "$tools_dst/lgz_core" "$tools_dst/degap_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
   cp -f "$contracts_src"/*.json "$contracts_dst"/
   # Record the actual installation, not a guessed default, for later updates.
-  printf '%s\n' "$SCRIPT_DIR" > "$(cgat_workspace_path "${work_root}" ".prepare_lib/server-tools.path")"
+  printf '%s\n' "$SCRIPT_DIR" > "$(cgat_workspace_path "${work_root}" ".lib/server-tools.path")"
   if [[ -f "${SCRIPT_DIR}/SOURCE.json" ]]; then
-    cp -f "${SCRIPT_DIR}/SOURCE.json" "$(cgat_workspace_path "${work_root}" ".prepare_lib/SOURCE.json")"
+    cp -f "${SCRIPT_DIR}/SOURCE.json" "$(cgat_workspace_path "${work_root}" ".lib/SOURCE.json")"
   fi
 }
 
@@ -481,7 +481,7 @@ write_ref_command_script() {
       printf 'cd %s\n' "$(shell_quote "$run_dir")"
       printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
       printf 'exec python3 %s --server-dir %s --run-dir %s --target %s --query %s --threads %s --preset asm10 --result result.paf > stdout.log 2> stderr.log\n' \
-        "$(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".prepare_lib/tools/long_cigar_recovery/server_alignment.py")")" \
+        "$(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".lib/tools/long_cigar_recovery/server_alignment.py")")" \
         "$(shell_quote "$WORK_ROOT")" "$(shell_quote "$run_dir")" \
         "$(shell_quote "$ref_fa")" "$(shell_quote "$ds_fa")" "$runtime_threads"
     } > "${run_dir}/command.sh"
@@ -524,7 +524,7 @@ write_q0_evidence_script() {
   {
     printf '#!/usr/bin/env bash\nset -euo pipefail\n'
     printf 'exec python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
-      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_prepare_evidence.py")")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".lib/tools/lgz_prepare_evidence.py")")" \
       "$(shell_quote "$work_root")" "$(shell_quote "$THREADS")" "$(shell_quote "$LGZ_MINIMAP2")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
@@ -539,7 +539,7 @@ write_lgz_prepare_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --memory-gb %s --kmer-size %s --meryl %s --merqury %s' \
-      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_prepare_inputs.py")")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".lib/tools/lgz_prepare_inputs.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_QC_MEMORY_GB")" \
@@ -566,7 +566,7 @@ write_lgz_step1_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --execution-profile %s --step1-mummer-scope full\n' \
-      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_step1.py")")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".lib/tools/lgz_step1.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -586,7 +586,7 @@ write_lgz_step2_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s --execution-profile %s --step2-mummer-scope %s\n' \
-      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_step2.py")")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".lib/tools/lgz_step2.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -608,7 +608,7 @@ write_lgz_step3_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
-      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_step3.py")")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".lib/tools/lgz_step3.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")" \
@@ -627,7 +627,7 @@ write_lgz_evidence_package_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
-      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".prepare_lib/tools/lgz_evidence_package.py")")" \
+      "$(shell_quote "$(cgat_workspace_path "${work_root}" ".lib/tools/lgz_evidence_package.py")")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$LGZ_MINIMAP2")"
@@ -659,7 +659,7 @@ cd $(shell_quote "$run_dir")
   echo "missing q0 chr-local command for ${chr_name}; run assign_chr_groups.sh first" >&2
   exit 1
 }
-exec python3 $(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".prepare_lib/tools/run_outer_checkpoints.py")") --server-dir $(shell_quote "$WORK_ROOT") --run-q0-chr $(shell_quote "$chr_name")
+exec python3 $(shell_quote "$(cgat_workspace_path "${WORK_ROOT}" ".lib/tools/run_outer_checkpoints.py")") --server-dir $(shell_quote "$WORK_ROOT") --run-q0-chr $(shell_quote "$chr_name")
 EOF
   make_executable_if_supported "${run_dir}/q0_command.sh"
 }
@@ -951,7 +951,7 @@ root = Path(sys.argv[1])
 sys.path.insert(0, sys.argv[2])
 from workspace_layout import WorkspaceLayout, initialize_workspace
 if not root.exists() or not any(root.iterdir()):
-    initialize_workspace(root)
+    initialize_workspace(root, prepared_runtime=".lib")
 elif WorkspaceLayout.detect(root).version != 2:
     sys.exit("ERROR: existing legacy output is not a new workspace; resume/migrate it instead of running prepare.sh over it")
 PYLAYOUT
@@ -1236,8 +1236,8 @@ echo "  - $(cgat_workspace_path "$WORK_ROOT" "run_lgz_step2.sh")"
 echo "  - $(cgat_workspace_path "$WORK_ROOT" "run_lgz_step3.sh")"
 echo "  - $(cgat_workspace_path "$WORK_ROOT" "finalize_lgz_evidence.sh")"
 echo "  - $(cgat_workspace_path "$WORK_ROOT" "export_final_path_fasta.sh")"
-echo "  - $(cgat_workspace_path "$WORK_ROOT" ".prepare_lib/lib")"
-echo "  - $(cgat_workspace_path "$WORK_ROOT" ".prepare_lib/tools")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" ".lib/lib")"
+echo "  - $(cgat_workspace_path "$WORK_ROOT" ".lib/tools")"
 echo "  - $(cgat_workspace_path "$WORK_ROOT" "package_full_zip.sh")"
 echo "  - $(cgat_workspace_path "$WORK_ROOT" "package_light_zip.sh")"
 echo

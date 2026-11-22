@@ -61,8 +61,8 @@ class TelScanTests(unittest.TestCase):
         from test_self_alignment_parameters import load_command_writer
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
-            layout = initialize_workspace(root)
-            runtime = layout.path(".prepare_lib/tools")
+            layout = initialize_workspace(root, prepared_runtime=".lib")
+            runtime = layout.path(".lib/tools")
             runtime.mkdir(parents=True)
             for name in ("tel_scan.py", "workspace_layout.py", "annotation_library.py"):
                 shutil.copy2(TOOLS / name, runtime / name)
@@ -76,7 +76,7 @@ class TelScanTests(unittest.TestCase):
             script = run / "command.sh"
             namespace = load_command_writer()
             namespace["write_tel_scan_command_script"](script, run, root, "-chr", [("-ds", fasta)])
-            self.assertIn("/.runtime/prepared/tools/tel_scan.py", script.read_text())
+            self.assertIn("/.lib/tools/tel_scan.py", script.read_text())
             completed = subprocess.run(["bash", str(script)], capture_output=True, text=True)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertTrue(layout.path("tel/chr_-chr/-ds.tsv").is_file())

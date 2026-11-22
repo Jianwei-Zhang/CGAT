@@ -21,6 +21,7 @@ from refinement_tools import fingerprint
 from refinement_recipes import select_tools, select_reads
 from refinement_batch import execute_batch, publish_batch, check_seal, baseline_seal
 from refinement_commit import current_publication, recover_publication, targets
+from refine_report import automatic_overview_digest
 from refinement_overview import render_overview
 from refinement_jobs_index import write_automatic_index
 from lgz_final import publish_baseline, validate_baseline
@@ -98,7 +99,8 @@ def run(root, lock, request):
     receipt = {"schema": "cgat.refinement-invocation", "schema_version": 1, "run_id": request["run_id"],
                "request_sha256": fingerprint(request), "batch_id": batch["batch_id"], "exit_code": batch_result["exit_code"],
                "batch_sha256": sha256_file(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json")),
-               "overview_files": {name: sha256_file(layout.path(name)) for name in overview_paths}}
+               "overview_files": {name: (automatic_overview_digest if name == "06_report/report.html" else sha256_file)(layout.path(name))
+                                  for name in overview_paths}}
     completion_path = layout.path(f".runtime/refinement/completions/{request['run_id']}.json")
     atomic_write_json(completion_path, receipt)
     try:
@@ -140,7 +142,8 @@ def validate_completion(root, run_id):
             f"06_report/03_comparison/{batch['batch_id']}/{name}"
             for name in ("comparison.json", "original_gaps.json", "gap_comparison.tsv")}
         if (set(receipt.get("overview_files", {})) != overview_paths
-                or any(layout.path(name).is_symlink() or sha256_file(layout.path(name)) != digest
+                or any(layout.path(name).is_symlink() or
+                       (automatic_overview_digest if name == "06_report/report.html" else sha256_file)(layout.path(name)) != digest
                        for name, digest in receipt["overview_files"].items())):
             return False, "refinement overview/comparison report changed or is incomplete"
         if not validate_baseline(root):

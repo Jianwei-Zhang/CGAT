@@ -159,9 +159,12 @@ def _read_object(path: Path) -> dict:
 class WorkspaceLayout:
     root: Path
     version: int
+    prepared_runtime: str | None = None
 
     def __post_init__(self):
         object.__setattr__(self, "root", Path(self.root).resolve())
+        if self.prepared_runtime is not None and (self.version != LAYOUT_VERSION or self.prepared_runtime != ".lib"):
+            raise LayoutError("invalid prepared runtime declaration")
         if type(self.version) is not int or self.version not in {1, LAYOUT_VERSION}:
             raise LayoutError(f"unsupported workspace layout: {self.version!r}")
 
@@ -205,10 +208,15 @@ class WorkspaceLayout:
                 or value.get("layout_version") != LAYOUT_VERSION
                 or value.get("state") != "ready"):
             raise LayoutError("unsupported or incomplete workspace layout manifest")
-        return cls(root, LAYOUT_VERSION)
+        return cls(root, LAYOUT_VERSION, value.get("prepared_runtime"))
 
     def relative(self, logical: str | PurePosixPath) -> str:
         text = relative_path(logical)
+        # Keep old physical paths and persisted logical receipt names stable.
+        if text == ".lib" or text.startswith(".lib/"):
+            text = ".prepare_lib" + text.removeprefix(".lib")
+        if self.prepared_runtime and (text == ".prepare_lib" or text.startswith(".prepare_lib/")):
+            return self.prepared_runtime + text.removeprefix(".prepare_lib")
         return canonical_relative(text) if self.version == LAYOUT_VERSION else text
 
     def path(self, logical: str | PurePosixPath) -> Path:
@@ -242,7 +250,8 @@ class WorkspaceLayout:
     def manifest(self) -> dict:
         if self.version != LAYOUT_VERSION:
             raise LayoutError("legacy workspaces do not have a layout 2 manifest")
-        return {"schema": LAYOUT_SCHEMA, "layout_version": LAYOUT_VERSION, "state": "ready"}
+        return {"schema": LAYOUT_SCHEMA, "layout_version": LAYOUT_VERSION, "state": "ready",
+                **({"prepared_runtime": self.prepared_runtime} if self.prepared_runtime else {})}
 
 
 def workspace_path(root: Path, logical: str | PurePosixPath) -> Path:
@@ -276,13 +285,13 @@ def workspace_join(root: Path, *parts: str | Path) -> Path:
     return layout.path(relative.as_posix())
 
 
-def initialize_workspace(root: Path) -> WorkspaceLayout:
+def initialize_workspace(root: Path, *, prepared_runtime: str | None = None) -> WorkspaceLayout:
     """Create a numbered workspace in an empty directory; never convert in place."""
     root = Path(root).resolve()
     if root.exists() and any(root.iterdir()):
         raise LayoutError("new workspace must be empty; existing workspaces require migration")
     root.mkdir(parents=True, exist_ok=True)
-    layout = WorkspaceLayout(root, LAYOUT_VERSION)
+    layout = WorkspaceLayout(root, LAYOUT_VERSION, prepared_runtime)
     private = root / ".runtime"
     private.mkdir(mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix=".workspace.", dir=private)
@@ -326,7 +335,7 @@ def render_workspace_shell(text: str, layout: WorkspaceLayout, logical_script: s
         )
     for prefix in sorted(_PREFIXES, key=len, reverse=True):
         pattern = variable_root + re.escape(prefix) + r"(?=[/\"'\s]|$)"
-        text = re.sub(pattern, lambda match: match[1] + _PREFIXES[prefix], text)
+        text = re.sub(pattern, lambda match: match[1] + layout.relative(prefix), text)
     return text
 
 
@@ -342,7 +351,7 @@ def main() -> None:
     parser.add_argument("--logical-script")
     args = parser.parse_args()
     try:
-        layout = initialize_workspace(args.server_dir) if args.initialize else WorkspaceLayout.detect(args.server_dir)
+        layout = initialize_workspace(args.server_dir, prepared_runtime=".lib") if args.initialize else WorkspaceLayout.detect(args.server_dir)
         if args.path is not None:
             print(layout.path(args.path))
         elif args.relative is not None:

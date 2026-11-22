@@ -293,15 +293,15 @@ cmp "${REPO_ROOT}/server/lib/run_all_launcher.sh" "${output_root}/run_all.sh"
   echo "generated run_all.sh still contains a static bash chain" >&2
   exit 1
 }
-[[ -f "${output_root}/.runtime/prepared/tools/run_all_runner.py" ]] || {
+[[ -f "${output_root}/.lib/tools/run_all_runner.py" ]] || {
   echo "generated workspace is missing run_all_runner.py" >&2
   exit 1
 }
-[[ -f "${output_root}/.runtime/prepared/tools/reference_segments.py" ]] || {
+[[ -f "${output_root}/.lib/tools/reference_segments.py" ]] || {
   echo "generated workspace is missing reference_segments.py" >&2
   exit 1
 }
-[[ -f "${output_root}/.runtime/prepared/lib/incremental_common.sh" ]] || {
+[[ -f "${output_root}/.lib/lib/incremental_common.sh" ]] || {
   echo "generated workspace is missing incremental shell helpers" >&2
   exit 1
 }
@@ -312,7 +312,7 @@ for tool_name in \
   promote_server_stage.py \
   render_template.py \
   validate_add_dataset_stage.py; do
-  [[ -f "${output_root}/.runtime/prepared/tools/${tool_name}" ]] || {
+  [[ -f "${output_root}/.lib/tools/${tool_name}" ]] || {
     echo "generated workspace is missing ${tool_name}" >&2
     exit 1
   }
@@ -326,33 +326,33 @@ for entry in add_dataset add_ctg; do
 done
 bash -n "${output_root}/.runtime/commands/add_dataset.sh"
 bash -n "${output_root}/.runtime/commands/add_ctg.sh"
-grep -F -- '.runtime/prepared/tools/assign_chr_groups.py' "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
+grep -F -- '.lib/tools/assign_chr_groups.py' "${output_root}/.runtime/commands/assign_chr_groups.sh" >/dev/null
 ! grep -Eq '__[A-Z][A-Z0-9_]*__' "${output_root}/.runtime/commands/assign_chr_groups.sh" || {
   echo "generated assignment script contains an unresolved template variable" >&2
   exit 1
 }
-[[ -f "${output_root}/.runtime/prepared/tools/grt_core/__init__.py" ]] || {
+[[ -f "${output_root}/.lib/tools/grt_core/__init__.py" ]] || {
   echo "generated workspace is missing the recursive grt_core package" >&2
   exit 1
 }
-[[ -f "${output_root}/.runtime/prepared/tools/grt_core/stage_replay.py" ]] || {
+[[ -f "${output_root}/.lib/tools/grt_core/stage_replay.py" ]] || {
   echo "generated workspace is missing grt_core stage services" >&2
   exit 1
 }
-[[ -f "${output_root}/.runtime/prepared/tools/grt_core/contract/validator.py" ]] || {
+[[ -f "${output_root}/.lib/tools/grt_core/contract/validator.py" ]] || {
   echo "generated workspace is missing the recursive grt_core contract package" >&2
   exit 1
 }
-python3 "${output_root}/.runtime/prepared/tools/grt_prepare_inputs.py" --help >/dev/null
+python3 "${output_root}/.lib/tools/grt_prepare_inputs.py" --help >/dev/null
 
-[[ ! -e "${output_root}/.runtime/prepared/tools/grt_step12.py" ]]
-[[ -f "${output_root}/.runtime/prepared/tools/grt_core/step1_engine.py" ]]
-[[ -f "${output_root}/.runtime/prepared/tools/grt_core/step2_engine.py" ]]
-python3 "${output_root}/.runtime/prepared/tools/grt_step1.py" --help >/dev/null
-python3 "${output_root}/.runtime/prepared/tools/grt_step2.py" --help >/dev/null
-python3 "${output_root}/.runtime/prepared/tools/grt_step3.py" --help >/dev/null
-python3 "${output_root}/.runtime/prepared/tools/grt_evidence_package.py" --help >/dev/null
-python3 "${output_root}/.runtime/prepared/tools/grt_contract.py" --help >/dev/null
+[[ ! -e "${output_root}/.lib/tools/grt_step12.py" ]]
+[[ -f "${output_root}/.lib/tools/grt_core/step1_engine.py" ]]
+[[ -f "${output_root}/.lib/tools/grt_core/step2_engine.py" ]]
+python3 "${output_root}/.lib/tools/grt_step1.py" --help >/dev/null
+python3 "${output_root}/.lib/tools/grt_step2.py" --help >/dev/null
+python3 "${output_root}/.lib/tools/grt_step3.py" --help >/dev/null
+python3 "${output_root}/.lib/tools/grt_evidence_package.py" --help >/dev/null
+python3 "${output_root}/.lib/tools/grt_contract.py" --help >/dev/null
 
 [[ -f "${output_root}/.runtime/commands/run_lgz_step1.sh" ]]
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
@@ -453,7 +453,7 @@ units = [line.split("\t")[0] for line in (root / ".runtime/run_all/plan.tsv").re
 assert units.index("refinement") == units.index("finalize_evidence") + 1
 assert units.index("package_full") == units.index("refinement") + 1
 assert "degap_gapfill" not in units
-assert (root / ".runtime/prepared/tools/post_lgz_refinement.py").is_file()
+assert (root / ".lib/tools/post_lgz_refinement.py").is_file()
 PYREADS
 
 for invalid_args in "missing" "invalid" "orphan" "empty-hifi" "empty-ont"; do

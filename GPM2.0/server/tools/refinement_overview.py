@@ -10,6 +10,7 @@ import uuid
 from urllib.parse import quote
 
 try:
+    from refine_report import merge_manual_overview
     from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, relative_path
     from refinement_reports import (
         page, table, link, ReportError, stat_key,
@@ -19,6 +20,7 @@ try:
     from refinement_commit import current_publication
     from run_orchestration import sha256_file as digest, atomic_write_json as atomic_json
 except ModuleNotFoundError:
+    from .refine_report import merge_manual_overview
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, relative_path
     from .refinement_reports import (
         page, table, link, ReportError, stat_key,
@@ -367,14 +369,14 @@ def render_overview(root, batch, results):
     )
     write_html(
         report,
-        page(
+        merge_manual_overview(layout, page(
             "CGAT workflow / 流程总览",
             body,
             scope="CGAT Workflow Overview / 流程总览",
             subtitle=f'Batch: <code>{esc(batch["batch_id"])}</code> · Exit code: <code>{esc(batch["exit_code"])}</code>',
             nav=nav_html,
             badge=status_badge(batch_state),
-        ),
+        )),
     )
     return {"report": str(report), "comparison": str(comparison_dir / "comparison.json"),
             "gap_comparison": str(comparison_dir / "gap_comparison.tsv")}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate project-scoped manual tasks and prepare their local inputs, not LGZ outputs."""
+"""Run project-scoped manual refinement tasks and publish a result bundle."""
 from __future__ import annotations
 
 import argparse
@@ -12,12 +12,13 @@ import sys
 import tempfile
 from zipfile import BadZipFile, ZipFile
 
-from refinement_commit import current_publication
-from run_all_runner import RunnerError, WorkspaceLock
-from run_orchestration import sha256_file as digest
-from server_source_identity import resolve_seed
-from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout
-from workspace_migration import durable_json, rename_synced
+if __name__ != "__main__":
+    from refinement_commit import current_publication
+    from run_all_runner import RunnerError, WorkspaceLock
+    from run_orchestration import sha256_file as digest
+    from server_source_identity import resolve_seed
+    from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout
+    from workspace_migration import durable_json, rename_synced
 
 SCHEMA = "cgat.app-refinement-tasks.v1"
 PREPARED = "cgat.app-refinement-prepared.v1"
@@ -288,7 +289,7 @@ def prepare_batch(root, archive, *, run=False, reads_override=None, threads=None
         result = {"schema": PREPARED, "batch_sha256": batch, "origin": origin, "loci": outcomes}
         durable_json(directory.parent / "prepared.json", result)
         if run:
-            from manual_refinement_run import execute_manual
+            from refine_run import execute_manual
             return execute_manual(layout, directory.parent, result, value, reads_override or {}, threads)
         return result
     finally:
@@ -296,30 +297,58 @@ def prepare_batch(root, archive, *, run=False, reads_override=None, threads=None
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--server-dir", type=Path, default=Path.cwd())
-    parser.add_argument("--tasks", required=True, type=Path)
-    parser.add_argument("--run", action="store_true", help="run locked tools and collect one result ZIP")
-    parser.add_argument("--hifi", action="append", default=None, help="override one or more HiFi read paths")
-    parser.add_argument("--ont", action="append", default=None, help="override one or more ONT read paths")
-    parser.add_argument("--threads", type=int, help="maximum threads for each run, subject to workspace limits")
+    parser = argparse.ArgumentParser(prog="refine.py", description=__doc__, allow_abbrev=False)
+    parser.add_argument("tasks", type=Path, help="exported refinement_tasks.zip")
+    parser.add_argument("--prepare-only", action="store_true", help="validate and prepare inputs without running tools")
+    parser.add_argument("--hifi", action="append", help="override one or more HiFi read paths")
+    parser.add_argument("--ont", action="append", help="override one or more ONT read paths")
     args = parser.parse_args()
-    if (args.hifi is not None or args.ont is not None or args.threads is not None) and not args.run:
-        parser.error("--hifi, --ont and --threads require --run")
-    if args.threads is not None and args.threads < 1:
-        parser.error("--threads must be positive")
+    if args.prepare_only and (args.hifi or args.ont):
+        parser.error("read overrides cannot be used with --prepare-only")
+    root = Path.cwd().resolve()
     try:
-        result = prepare_batch(args.server_dir, args.tasks, run=args.run,
-                               reads_override={"hifi": args.hifi, "ont": args.ont}, threads=args.threads)
-    except (BadZipFile, OSError, ValueError, KeyError, RunnerError) as exc:
+        # A globally copied entrypoint must use the selected workspace's
+        # complete runtime, not borrow dependencies from its installation.
+        marker = root / ".runtime/workspace.json"
+        if marker.is_symlink() or marker.parent.is_symlink():
+            raise ValueError("invalid Server workspace marker")
+        if marker.exists():
+            declaration = json.loads(marker.read_text(encoding="utf-8"))
+            if not isinstance(declaration, dict):
+                raise ValueError("invalid Server workspace marker")
+            area = ".lib" if declaration.get("prepared_runtime") == ".lib" else ".runtime/prepared"
+        else:
+            area = ".prepare_lib"
+        tools = root / area / "tools"
+        for name in ("workspace_layout.py", "refine.py", "refine_run.py", "refine_report.py"):
+            source = tools / name
+            if (source.is_symlink() or not source.is_file()
+                    or any(parent.is_symlink() for parent in source.parents if parent.is_relative_to(root))):
+                raise ValueError(f"matching Server runtime missing {source}; update this workspace without re-preparing it")
+        sys.path.insert(0, str(tools))
+        from workspace_layout import WorkspaceLayout
+        from refine import prepare_batch
+        from run_all_runner import RunnerError
+        if WorkspaceLayout.detect(root).path(".lib/tools") != tools:
+            raise ValueError("Server runtime does not match the declared workspace layout")
+        try:
+            result = prepare_batch(root, args.tasks, run=not args.prepare_only,
+                                   reads_override={"hifi": args.hifi, "ont": args.ont})
+        except RunnerError as exc:
+            raise ValueError(str(exc)) from exc
+    except (BadZipFile, OSError, ValueError, KeyError, ImportError) as exc:
         print(f"manual refinement input error: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(result, ensure_ascii=False))
-    if args.run:
-        return int(any(row["status"] in {"failed", "input_unavailable", "missing_reads", "incomplete"}
-                       for row in result["results"]))
-    return int(any(row["status"] != "prepared" for row in result["loci"]))
+    if args.prepare_only:
+        return int(any(row["status"] != "prepared" for row in result["loci"]))
+    return int(any(row["status"] in {"failed", "input_unavailable", "missing_reads", "incomplete"}
+                   for row in result["results"]))
 
 
 if __name__ == "__main__":
+    if not sys.flags.isolated:
+        # Do not let a global entry's installation or PYTHONPATH provide
+        # missing dependencies of the selected workspace's runtime.
+        os.execv(sys.executable, [sys.executable, "-I", os.path.abspath(__file__), *sys.argv[1:]])
     sys.exit(main())

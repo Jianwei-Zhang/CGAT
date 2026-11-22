@@ -437,7 +437,7 @@ def write_self_batch_scripts(
 
 
 def write_tel_scan_command_script(path, run_dir, work_root, chr_name, selected_dataset_fastas):
-    args = ["python3", "-B", str(workspace_join(work_root, ".prepare_lib/tools/tel_scan.py")),
+    args = ["python3", "-B", str(workspace_join(work_root, ".lib/tools/tel_scan.py")),
             "--root", str(work_root), "--chr=" + chr_name]
     for dataset, fasta in selected_dataset_fastas:
         args.append(f"--dataset={dataset}={fasta}")
@@ -449,7 +449,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
     rows = read_tsv_rows(workspace_join(work_root, "cen", "reference.tsv"))
     if not any(row.get("chr_name") in ("*", chr_name) for row in rows):
         return False
-    args = ["python3", str(workspace_join(work_root, ".prepare_lib/tools/cen_scan.py")),
+    args = ["python3", str(workspace_join(work_root, ".lib/tools/cen_scan.py")),
             "--root", str(work_root), "--chr", chr_name, "--run-dir", str(run_dir),
             "--threads", THREAD_ARGUMENT]
     for dataset_name, fasta_path in selected_dataset_fastas:
@@ -804,7 +804,7 @@ for chr_name in reference_chr_names:
                 query_fasta,
                 name_map,
                 restore_script,
-                workspace_join(work_root, ".prepare_lib/tools/self_alignment_batches.py"),
+                workspace_join(work_root, ".lib/tools/self_alignment_batches.py"),
                 threads=threads,
                 minimap_preset=minimap_preset,
                 self_min_chain_score=self_min_chain_score,

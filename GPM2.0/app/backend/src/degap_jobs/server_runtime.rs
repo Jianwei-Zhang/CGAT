@@ -4,13 +4,22 @@ pub(super) fn runtime_shell(server: &str) -> String {
     format!(
         r#"CGAT_RUNTIME="$(python3 -B - {server} <<'PY'
 from pathlib import Path
+import json
 import sys
 root = Path(sys.argv[1])
 if not root.is_absolute():
     raise SystemExit("GPM Server root must be an absolute Server path")
 root = root.resolve()
 marker = root / ".runtime/workspace.json"
-tools = root / (".runtime/prepared/tools" if marker.exists() or marker.is_symlink() else ".prepare_lib/tools")
+if marker.is_symlink() or marker.parent.is_symlink():
+    raise SystemExit("Invalid Server workspace marker")
+area = ".prepare_lib"
+if marker.exists():
+    declaration = json.loads(marker.read_text(encoding="utf-8"))
+    area = ".lib" if declaration.get("prepared_runtime") == ".lib" else ".runtime/prepared"
+tools = root / area / "tools"
+if tools.is_symlink() or tools.parent.is_symlink():
+    raise SystemExit("Server runtime must not traverse a symlink")
 for name in ("workspace_layout.py", "degap_results.py", "server_source_identity.py"):
     if not (tools / name).is_file():
         raise SystemExit("Matching Server runtime is missing: " + str(tools / name) + "; update tools/runtime without re-preparing the workspace")

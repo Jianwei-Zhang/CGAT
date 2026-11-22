@@ -153,12 +153,13 @@ def ensure_plan(root):
         return
     expected = {"unit_id": UNIT, "command_relpath": COMMAND, "detail_log_relpath": ".runtime/logs/run_all.log"}
     script = layout.path(COMMAND)
-    if script.exists() and (script.is_symlink() or script.read_text() != SCRIPT):
+    script_text = SCRIPT.replace(".runtime/prepared", layout.relative(".lib"))
+    if script.exists() and (script.is_symlink() or script.read_text() != script_text):
         raise ConfigError("refinement command was customized; refusing to overwrite it")
     script.parent.mkdir(parents=True, exist_ok=True)
     if not script.exists():
         with script.open("x", encoding="utf-8") as stream:
-            stream.write(SCRIPT)
+            stream.write(script_text)
         script.chmod(0o755)
     if UNIT in ids:
         if (ids.count(UNIT) != 1 or rows[ids.index(UNIT)] != expected
