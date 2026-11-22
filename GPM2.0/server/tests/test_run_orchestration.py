@@ -152,6 +152,32 @@ class RunOrchestrationContractTests(unittest.TestCase):
                     run_orchestration.file_identity(path)
             self.assertEqual(run_orchestration.file_identity(path)["sha256"], hashlib.sha256(b"new").hexdigest())
 
+    def test_buffered_paf_lines_match_text_iteration_at_read_boundaries(self):
+        # UTF-8 scalar and CRLF across the text decoder's old 8 KiB refill,
+        # a record across a binary read-ahead block, and an unterminated tail.
+        payload = (b"x"*8191 + "麦\r\n\r#next\n".encode("utf-8") + b"z"*(1024*1024) +
+                   "\r\nname\x85not-an-eol\u2028still-one\r\nunterminated tail".encode("utf-8"))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "read_boundaries.paf"
+            for newline in (None, ""):
+                for suffix in (b"", b"\r", b"\r\n"):
+                    path.write_bytes(payload+suffix)
+                    with self.subTest(newline=newline, suffix=suffix):
+                        with path.open(encoding="utf-8", newline=newline) as f:
+                            old = list(f)
+                        with run_orchestration.open_paf_text(path, newline=newline) as f:
+                            self.assertEqual(list(f), old)
+
+    def test_buffered_paf_parser_keeps_long_cigar_and_line_number(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "boundary.paf"
+            path.write_bytes(b"#skip\r\n\r" + b"q\t12000\t0\t12000\t+\tt\t12000\t0\t12000\t12000\t12000\t60\tcg:Z:" + b"1M"*12000)
+            self.assertEqual(run_orchestration.validate_paf(path, require_cigar=True).record_count, 1)
+            with path.open("ab") as f:
+                f.write(b"\r\nbad line")
+            with self.assertRaisesRegex(run_orchestration.OrchestrationContractError, "PAF line 4"):
+                run_orchestration.validate_paf(path, require_cigar=True)
+
     def test_validate_paf_accepts_empty_and_valid_records(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

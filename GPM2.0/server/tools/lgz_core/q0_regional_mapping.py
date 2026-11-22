@@ -25,9 +25,9 @@ from .q0_query_windows import QueryWindow, TargetWindow, project_regional_paf
 from .q0_sources import Q0EvidenceError
 
 try:
-    from run_orchestration import sha256_file as _stable_runtime_sha256
+    from run_orchestration import open_paf_text, sha256_file as _stable_runtime_sha256
 except ModuleNotFoundError:
-    from ..run_orchestration import sha256_file as _stable_runtime_sha256
+    from ..run_orchestration import open_paf_text, sha256_file as _stable_runtime_sha256
 
 BASE_FLAGS = ["-D", "-P", "--dual=yes", "--no-long-join"]
 CONTEXT_SCHEMA = "lgz_q0_regional_context_v1"
@@ -325,7 +325,7 @@ def _execute(root,directory,context,relative,catalog,query,targets,argv,tool,add
 
 def chain_work(path,query,target_lengths,policy):
     work=ChainWork()
-    with path.open(encoding="utf-8") as handle:
+    with open_paf_text(path) as handle:
         for line in handle:
             if not line.strip() or line.startswith("#"):continue
             f=line.rstrip("\r\n").split("\t")
@@ -421,7 +421,7 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
         if _verified_projection_hit(root,task,projection_spec,required,members=catalog.parts) is None:
             directory=_fresh_directory(root,project_rel)
             try:
-                with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
+                with open_paf_text(root/raw_rel/"result.paf") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
                     output.writelines(_projected_lines(source,query,targets,artifact=raw_rel+"/result.paf"))
             except (OSError,UnicodeError) as exc:
                 raise Q0EvidenceError(f"cannot project q0 regional evidence {raw_rel}/result.paf: {exc}") from exc
@@ -538,7 +538,7 @@ def verify_regional_task(root, task, *, members=None):
                 raise Q0EvidenceError("regional leaf outputs differ from verified projection closure")
         # Replay a small, already-finished raw CIGAR stream, not the mapper or
         # reference scan. This catches wrong offsets even if PAF syntax is valid.
-        with (root/raw_rel/"result.paf").open(encoding="utf-8") as source,(root/task["paf"]).open(encoding="utf-8") as output:
+        with open_paf_text(root/raw_rel/"result.paf") as source,open_paf_text(root/task["paf"]) as output:
             for projected in _projected_lines(source,query,targets,artifact=raw_rel+"/result.paf"):
                 if output.readline()!=projected:raise Q0EvidenceError("projected CIGAR differs from bound raw evidence")
             if output.read(1):raise Q0EvidenceError("regional projection contains extra records")

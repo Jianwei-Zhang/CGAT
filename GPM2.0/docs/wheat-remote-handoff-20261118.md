@@ -4005,3 +4005,34 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `647ddadcc153bcaac198cd22164ea3a1745b9088d90660d1a717ce38fa2a95fd`。保留原证据，不重跑整组
   实验、不据缺尾样本一次切入主任务。若需要补证，只补对照臂或做更贴近生产资源的有界验证。
   主 `43012037` 19:50:56 进到 **7800/61000，fallback=0**，只读预检与组装内范围作业仍运行。
+
+### 2026-11-22 20:13 CST：排除整窗“组装内”近似路径，找到续跑 PAF 校验的小读瓶颈
+
+- `43016008` / `agent-X86-18` 在 19:57:48 **SUCCEEDED**。按冻结的 1189 个已完成原始窗口逐份
+  核对回执与输入 context，**1189 个全是混合组装内、跨组装，纯组装内 0 个**；原 `-m 2000` 497 个。
+  这不是剩余窗口的随机样本，也不等同最后利用率。20 个 native wall ≥30s 的窗口占该 cohort
+  原生 CPU 2758.424 / 8409.892s（约32.8%）；其中19个的同组装目标碱基至少一半，不能据此认定
+  CPU耗在组装内或放宽整窗精度。只值得先测少数、不同源part的实际长尾，组装内外物理分开；把新增
+  mapper/准备成本和跨组装配对门变化一起算。若分拆改变必要跨组装证据或净耗时不降，则不接入。
+  `full-scope.json` SHA `d8a96fc3b87e5c2f2dccacf1a40a11e470f0fa1094907ce220734157116c738d`。
+- `43015921` 同一个只读预检开跑约50分钟时仍无整体 unit marker，不是挂死。1CPU只读
+  同节点观测 `43016012 / SUCCEEDED`（目录 `preflight-43015921-observe-1957`），严格绑定
+  scheduler job/pid/cgroup/uid/命令/进程start_ticks，无 attach、不读序列/PAF 内容。
+  19:58:45–19:59:25同进程在 `runs/JM19_hifiasm_vs_ref/result.paf`（683392866 B）偏移
+  629719040→644595712，CPU ticks 增长，`syscr` +1816、偏移 +14876672 B，等价平均每次8192 B。
+  三次采样均 D；是活着且缓慢读数据的证据，不能把路径采样墙钟当整次核验速度。至20:06已出现
+  真实首项 `ref:JM19_hifiasm`，不取消/另投预检。观测 `samples.jsonl` SHA
+  `0d1b14237099224ea73338813f2ed2fca8cae1e46d284b3851af39f04f371e6f`。
+- 源码共用 `open_paf_text`：保留 Python 原 UTF-8 解码、通用换行、行号、CIGAR/名字/尺寸/投影、
+  原 LF/CRLF/CR 及原始 byte-offset 义务；底层只把共享盘的小读合并成 1 MiB 有界二进制预读取，
+  不是只抽查几行或取消内容校验。同类调用覆盖 outer `validate_paf`、Q0 reference/PAF index、
+  区域 coarse、原始 PAF 投影及最终重放。85项定向测试通过，覆盖 UTF-8/CRLF/无末尾换行、跨块
+  长CIGAR、真实 byte-offset、损坏和完整性拦截。临时字符分块候选增加CPU，未采用；最终采用原生解码器。
+- 最终实样 `43016017 / agent-X86-18 / SUCCEEDED`：同一 16,777,379 B / 67,745 行输入前缀，
+  四次行序/字节 SHA 一致，read 系统调用（含计数文件一读）从 **2051降到19**，CPU约75ms不变；
+  A1/B1/B2/A2 wall 0.411/0.247/0.206/0.181s，有缓存波动，**不是全量预检测速，不能宣称核验快百倍**。
+  目录 `q0-preflight-paf-read-abba-20261122-2003-readahead`，`report.json` SHA
+  `eef09c57fdb315f95f7bd63f4fc578359e3c1cf67ba9c6e87d0a4bbf781e30ee`，`source.sha256` SHA
+  `312ec4b100cde106db8634eb7fa462e44c2fda749b22b044e718569ab23401de`。生产三个模块须同一版本，
+  **不热替换**经源SHA绑定的远端预检/旧模块，不混入当前冻结loader包；不为此重启。真实Q0新旧大任务
+  都仍RUNNING，新版20:11:16到 **8100/61000，fallback=0**。

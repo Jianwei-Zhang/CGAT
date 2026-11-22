@@ -13,6 +13,11 @@ from typing import Iterator, Mapping
 from .common import sha256_bytes, stable_id
 from .q0_sources import Interval, Q0EvidenceError
 
+try:
+    from run_orchestration import open_paf_text
+except ModuleNotFoundError:
+    from ..run_orchestration import open_paf_text
+
 _CIGAR = re.compile(r"([1-9][0-9]*)([MIDN=X])")
 
 
@@ -142,7 +147,7 @@ def read_paf(path: Path, *, query_lengths: Mapping[str, int],
         # Keep original newline bytes while retaining universal line iteration.
         # Thus UTF-8, CRLF and CR-only files have real byte offsets, while
         # record identities still use the existing normalized parse_paf_line.
-        with path.open(encoding="utf-8", newline="") as handle:
+        with open_paf_text(path, newline="") as handle:
             offset = 0
             for number, line in enumerate(handle, 1):
                 if record_observer is not None:

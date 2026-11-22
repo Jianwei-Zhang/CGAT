@@ -11,9 +11,11 @@ import re
 import stat
 import threading
 from collections import OrderedDict
+from contextlib import contextmanager
 from dataclasses import dataclass
+from io import BufferedReader, TextIOWrapper
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Iterable, Iterator, Mapping, TextIO
 
 
 CHECKPOINT_SCHEMA_VERSION = 1
@@ -299,13 +301,30 @@ def _paf_cigar_spans(text: str) -> tuple[int, int] | None:
             target_span += count
     return query_span, target_span
 
+class _PafReadAhead(BufferedReader):
+    def read1(self, size: int = -1) -> bytes:
+        # TextIOWrapper's normal read1(size=8192) bypasses read-ahead.
+        # Supply the same number of decoder bytes from a bounded larger buffer
+        # instead of requesting each refill from the shared filesystem.
+        return self.read(size) if size >= 0 else super().read1(size)
+
+
+@contextmanager
+def open_paf_text(path: Path, *, newline: str | None = None) -> Iterator[TextIO]:
+    """Native strict UTF-8/universal newlines with 1 MiB binary read-ahead."""
+    with path.open("rb", buffering=0) as raw:
+        with TextIOWrapper(_PafReadAhead(raw, buffer_size=1024*1024),
+                           encoding="utf-8", newline=newline) as text:
+            yield text
+
+
 def validate_paf(path: Path, *, require_cigar: bool = False) -> PafSummary:
     if not path.is_file():
         raise OrchestrationContractError(f"PAF output is missing: {path}")
 
     record_count = 0
     try:
-        with path.open(encoding="utf-8") as handle:
+        with open_paf_text(path) as handle:
             for line_number, raw_line in enumerate(handle, start=1):
                 line = raw_line.rstrip("\r\n")
                 if not line or line.startswith("#"):
