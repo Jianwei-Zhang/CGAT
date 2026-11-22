@@ -1,0 +1,21 @@
+{
+  "allocation_proof_sha256": "3a3680d32d4050299c7f739af2d2aebb91b65a4951e6c6ac584458336816e190",
+  "deployment_admitted": false,
+  "executed_source_sha256": {
+    "benchmark_regional_chain_budget_heldout.py": "3c7f2df422b36aec6d7cb1043eee6ecb5df1d7bb093e8fd13dbc247f1fb7421d",
+    "regional_heldout_case_inputs.py": "df4fff11f985c5651a3b89c9e82b293a7e3064753b8df6d5ed1fa835a5ceb03f",
+    "test_regional_heldout_case_inputs.py": "4443649f47b5dea974f4917bf2e3463f4cc75e357a81dd8464c4f18e7cb7e37a"
+  },
+  "exit_code": 0,
+  "host": "agent-X86-47",
+  "job_id": 43012312,
+  "main_workspace_modified": false,
+  "original_report_sha256": "75065648ee7c8525b0d2550fa681e9caf63937bc6c50dfa40b009f9b602d1f3c",
+  "production_strategy_enabled": false,
+  "reason": "cross_old_high_quality_core_loss_too_large_and_multiple_local_total_losses",
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-chain-heldout-pilot-20261122-134621",
+  "repo_report_sha256": "75065648ee7c8525b0d2550fa681e9caf63937bc6c50dfa40b009f9b602d1f3c",
+  "scheduler_final_json_sha256": "7091127d8c91d2714923dfbe62be2ca6bcdfacf23a22cbed8457bb6c780f9635",
+  "schema": "incident_readonly_diagnostic_verified_v1",
+  "terminal_state": "SUCCEEDED"
+}

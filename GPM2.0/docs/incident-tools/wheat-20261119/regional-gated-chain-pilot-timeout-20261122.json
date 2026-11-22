@@ -1,0 +1,25 @@
+{
+  "complete_quality_report_admitted": false,
+  "diagnostic_timeout_seconds": 1500,
+  "end_utc": "2026-11-22T06:25:33Z",
+  "host": "agent-X86-30",
+  "job_exit_code": 124,
+  "job_id": 43012347,
+  "main_workspace_modified": false,
+  "observed_completed_phases": [
+    {
+      "mode": "legacy",
+      "phase": 0,
+      "seconds": 494.07636930420995
+    },
+    {
+      "mode": "gated_chain_budget",
+      "phase": 1,
+      "seconds": 699.1331787509844
+    }
+  ],
+  "production_strategy_enabled": false,
+  "status": "diagnostic_timeout_no_complete_ABBA_or_production_acceptance",
+  "terminal_receipt_sha256": "6e9b57f2b71688803d19cbf1b478881f1ca2f6f087721b1ee84a9900d5d640dc",
+  "terminal_state": "FAILED"
+}

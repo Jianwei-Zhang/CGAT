@@ -1,0 +1,6145 @@
+{
+  "cases": 24,
+  "coarse_flags_changed": false,
+  "comparisons": [
+    {
+      "candidate": {
+        "cross": 52153,
+        "intra": 52155
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 52153,
+        "intra": 52155
+      },
+      "ordinal": 0
+    },
+    {
+      "candidate": {
+        "cross": 17249,
+        "intra": 17257
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 5,
+        "intra": 0
+      },
+      "old": {
+        "cross": 17254,
+        "intra": 17257
+      },
+      "ordinal": 1
+    },
+    {
+      "candidate": {
+        "cross": 1967,
+        "intra": 1967
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 1967,
+        "intra": 1967
+      },
+      "ordinal": 2
+    },
+    {
+      "candidate": {
+        "cross": 3841,
+        "intra": 3841
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 3841,
+        "intra": 3841
+      },
+      "ordinal": 3
+    },
+    {
+      "candidate": {
+        "cross": 5768,
+        "intra": 5768
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 5768,
+        "intra": 5768
+      },
+      "ordinal": 4
+    },
+    {
+      "candidate": {
+        "cross": 2954,
+        "intra": 2954
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 2954,
+        "intra": 2954
+      },
+      "ordinal": 5
+    },
+    {
+      "candidate": {
+        "cross": 1009,
+        "intra": 1009
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 1009,
+        "intra": 1009
+      },
+      "ordinal": 6
+    },
+    {
+      "candidate": {
+        "cross": 68225,
+        "intra": 41745
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 3820
+      },
+      "old": {
+        "cross": 68225,
+        "intra": 45565
+      },
+      "ordinal": 7
+    },
+    {
+      "candidate": {
+        "cross": 0,
+        "intra": 32726
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 89338,
+        "intra": 57382
+      },
+      "old": {
+        "cross": 89338,
+        "intra": 90108
+      },
+      "ordinal": 8
+    },
+    {
+      "candidate": {
+        "cross": 1430,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 1430,
+        "intra": 0
+      },
+      "ordinal": 9
+    },
+    {
+      "candidate": {
+        "cross": 1329,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 1329,
+        "intra": 0
+      },
+      "ordinal": 10
+    },
+    {
+      "candidate": {
+        "cross": 0,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 0,
+        "intra": 0
+      },
+      "ordinal": 11
+    },
+    {
+      "candidate": {
+        "cross": 17397,
+        "intra": 5597
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 42
+      },
+      "old": {
+        "cross": 17397,
+        "intra": 5639
+      },
+      "ordinal": 12
+    },
+    {
+      "candidate": {
+        "cross": 0,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 947
+      },
+      "old": {
+        "cross": 0,
+        "intra": 947
+      },
+      "ordinal": 13
+    },
+    {
+      "candidate": {
+        "cross": 0,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 0,
+        "intra": 0
+      },
+      "ordinal": 14
+    },
+    {
+      "candidate": {
+        "cross": 46980,
+        "intra": 26637
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 4505
+      },
+      "old": {
+        "cross": 46980,
+        "intra": 31142
+      },
+      "ordinal": 15
+    },
+    {
+      "candidate": {
+        "cross": 0,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 0,
+        "intra": 0
+      },
+      "ordinal": 16
+    },
+    {
+      "candidate": {
+        "cross": 0,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 1860
+      },
+      "old": {
+        "cross": 0,
+        "intra": 1860
+      },
+      "ordinal": 17
+    },
+    {
+      "candidate": {
+        "cross": 7175,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 689
+      },
+      "old": {
+        "cross": 7175,
+        "intra": 689
+      },
+      "ordinal": 18
+    },
+    {
+      "candidate": {
+        "cross": 0,
+        "intra": 0
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 0,
+        "intra": 0
+      },
+      "ordinal": 19
+    },
+    {
+      "candidate": {
+        "cross": 47490,
+        "intra": 40237
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 39488,
+        "intra": 53815
+      },
+      "old": {
+        "cross": 86978,
+        "intra": 94052
+      },
+      "ordinal": 20
+    },
+    {
+      "candidate": {
+        "cross": 15518,
+        "intra": 15517
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 1
+      },
+      "lost": {
+        "cross": 0,
+        "intra": 0
+      },
+      "old": {
+        "cross": 15518,
+        "intra": 15516
+      },
+      "ordinal": 21
+    },
+    {
+      "candidate": {
+        "cross": 28601,
+        "intra": 18651
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 60756,
+        "intra": 72687
+      },
+      "old": {
+        "cross": 89357,
+        "intra": 91338
+      },
+      "ordinal": 22
+    },
+    {
+      "candidate": {
+        "cross": 22415,
+        "intra": 7803
+      },
+      "gained": {
+        "cross": 0,
+        "intra": 0
+      },
+      "lost": {
+        "cross": 6142,
+        "intra": 7447
+      },
+      "old": {
+        "cross": 28557,
+        "intra": 15250
+      },
+      "ordinal": 23
+    }
+  ],
+  "exact_additional_flags": [
+    "-p",
+    "0.1",
+    "-N",
+    "200"
+  ],
+  "exact_removed_flags": [
+    "-P"
+  ],
+  "historical_full_exact_stdout_all_equal": true,
+  "hostname": "agent-X86-47",
+  "input_bytes_verified": 709820980,
+  "legacy_over_candidate_pipeline_time": 2.8349693961289657,
+  "limitations": [
+    "24 completed windows disjoint from native tuning anchors; includes slow/short/empty/long-parent cases, not whole-wheat acceptance.",
+    "Secondary-chain admission changes scientific output; it is NOT a resource-only transition.",
+    "Expanded cases predeclared from the static probe, not unseen genome data; same original coarse/profile/targets.",
+    "Common input validation excluded; no planning/catalog/final assembly/large-owner-heap measured."
+  ],
+  "main_workspace_modified": false,
+  "mapper_AS_bytes": 4294967296,
+  "mappers": 7,
+  "phases": [
+    {
+      "completion_order": [
+        5,
+        2,
+        0,
+        7,
+        9,
+        10,
+        11,
+        12,
+        3,
+        14,
+        15,
+        16,
+        18,
+        19,
+        6,
+        4,
+        17,
+        23,
+        1,
+        13,
+        8,
+        22,
+        21,
+        20
+      ],
+      "mode": "legacy",
+      "phase": 0,
+      "results": [
+        {
+          "coarse_seconds": 1.4119535982608795,
+          "ordinal": 0,
+          "paf_rows": 156,
+          "quality": {
+            "bases": {
+              "cross": 52153,
+              "intra": 52155
+            },
+            "intervals": {
+              "cross": [
+                [
+                  108540,
+                  109066
+                ],
+                [
+                  109068,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ],
+              "intra": [
+                [
+                  108540,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-79a993cbd96b0dfe3b514936/q0-regional-raw-3cc954b5a281135a15feb39a/success.json",
+          "seconds": 4.3127996027469635,
+          "sha256": "d5c8bf0b5efaa9d5eac89374be5e824b84ea8160200beb45988efe4ebfc4e58a"
+        },
+        {
+          "coarse_seconds": 1.2490853294730186,
+          "ordinal": 1,
+          "paf_rows": 9470,
+          "quality": {
+            "bases": {
+              "cross": 17254,
+              "intra": 17257
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1846,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21624
+                ]
+              ],
+              "intra": [
+                [
+                  1846,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21627
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3bb173a52c6a4b9cfe60bbdc/q0-regional-raw-b9378969607ef6814c1defe2/success.json",
+          "seconds": 138.43946162611246,
+          "sha256": "5bd045faea5f0973ce0e3e3504ca07b802f18dc49ac529df246714f88f35a06e"
+        },
+        {
+          "coarse_seconds": 1.162238471210003,
+          "ordinal": 2,
+          "paf_rows": 430,
+          "quality": {
+            "bases": {
+              "cross": 1967,
+              "intra": 1967
+            },
+            "intervals": {
+              "cross": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ],
+              "intra": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-6cb03b65e4c12980564d4c84/q0-regional-raw-c544190e18d8756a4a352db6/success.json",
+          "seconds": 4.195153675973415,
+          "sha256": "03ff60c7ada6fed211513fc1209ac24e7954707cb853bef6104f0ba6b69a0a82"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 3,
+          "paf_rows": 5195,
+          "quality": {
+            "bases": {
+              "cross": 3841,
+              "intra": 3841
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  3841
+                ]
+              ],
+              "intra": [
+                [
+                  0,
+                  3841
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-115a9878899d5819b0b900f7/q0-regional-raw-46134e40fa8ff1686df7ed5c/success.json",
+          "seconds": 27.862010166049004,
+          "sha256": "f5eb2a2d2ff3a61f5bac301377a3c65321682350f42a1fec53de57de6acf6efb"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 4,
+          "paf_rows": 2346,
+          "quality": {
+            "bases": {
+              "cross": 5768,
+              "intra": 5768
+            },
+            "intervals": {
+              "cross": [
+                [
+                  194180,
+                  199948
+                ]
+              ],
+              "intra": [
+                [
+                  194180,
+                  199948
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-400a73488d929a5bd6983627/q0-regional-raw-4bc746f22dc01f75189e6a47/success.json",
+          "seconds": 67.71352899819613,
+          "sha256": "4c86b02357933f9ab236cdeabcdf2af484b0c1abacc2394dfd5f9fdb70f20cb5"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 5,
+          "paf_rows": 79,
+          "quality": {
+            "bases": {
+              "cross": 2954,
+              "intra": 2954
+            },
+            "intervals": {
+              "cross": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ],
+              "intra": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bc0018ff644a7c0b71394d8d/q0-regional-raw-b4ec5820a371f0ca48884d04/success.json",
+          "seconds": 1.2456198260188103,
+          "sha256": "abd7a740383925b48ce214a3c5f2d30c0d58d810602b0c6ea6af2bb52aeb579f"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 6,
+          "paf_rows": 3284,
+          "quality": {
+            "bases": {
+              "cross": 1009,
+              "intra": 1009
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ],
+              "intra": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-94c21b60b409112a914dd2f8/q0-regional-raw-72309b599a6def6d6ab419b4/success.json",
+          "seconds": 51.832008220255375,
+          "sha256": "80da67e298d17fcda182d239b20b268cda1f0aae9aef5f2b243910329e459fc0"
+        },
+        {
+          "coarse_seconds": 1.7892965897917747,
+          "ordinal": 7,
+          "paf_rows": 116,
+          "quality": {
+            "bases": {
+              "cross": 68225,
+              "intra": 45565
+            },
+            "intervals": {
+              "cross": [
+                [
+                  4068650,
+                  4080624
+                ],
+                [
+                  4084534,
+                  4094534
+                ],
+                [
+                  4107659,
+                  4120210
+                ],
+                [
+                  4125292,
+                  4150980
+                ],
+                [
+                  4159536,
+                  4167548
+                ]
+              ],
+              "intra": [
+                [
+                  4080397,
+                  4080624
+                ],
+                [
+                  4084534,
+                  4084693
+                ],
+                [
+                  4092036,
+                  4095470
+                ],
+                [
+                  4125803,
+                  4167548
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-1c603a06c11b516cd733aa48/q0-regional-raw-e0687c7d5b6b59046f681d44/success.json",
+          "seconds": 4.265117146074772,
+          "sha256": "b37ffb9f5f41325a234c6a0337dfd1f29b8c3de1128a97df5455d315a94f80fa"
+        },
+        {
+          "coarse_seconds": 3.6666001677513123,
+          "ordinal": 8,
+          "paf_rows": 10395,
+          "quality": {
+            "bases": {
+              "cross": 89338,
+              "intra": 90108
+            },
+            "intervals": {
+              "cross": [
+                [
+                  201723,
+                  203064
+                ],
+                [
+                  204402,
+                  205407
+                ],
+                [
+                  206015,
+                  216287
+                ],
+                [
+                  216288,
+                  225337
+                ],
+                [
+                  225340,
+                  226495
+                ],
+                [
+                  233482,
+                  235558
+                ],
+                [
+                  235559,
+                  282706
+                ],
+                [
+                  282707,
+                  300000
+                ]
+              ],
+              "intra": [
+                [
+                  201478,
+                  203064
+                ],
+                [
+                  204402,
+                  226495
+                ],
+                [
+                  233482,
+                  284387
+                ],
+                [
+                  284476,
+                  300000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-567a6a1266da5cb07d941359/q0-regional-raw-7d4418e50e954faa95d34719/success.json",
+          "seconds": 218.69263897836208,
+          "sha256": "31a9ac910e5d9c6e37fbd8dd08939934cc203b79b799d0040cfa516d8ee8e93a"
+        },
+        {
+          "coarse_seconds": 0.8818943127989769,
+          "ordinal": 9,
+          "paf_rows": 484,
+          "quality": {
+            "bases": {
+              "cross": 1430,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  7486365,
+                  7487475
+                ],
+                [
+                  7488026,
+                  7488346
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-7bc00b0352c02ca669c594cf/q0-regional-raw-20b93cdcaa385a9c951c6633/success.json",
+          "seconds": 5.3314580246806145,
+          "sha256": "5b2ce91e2ece3440ed764939a14d49c6b949d0ed2afc9d6931e4a0d6b8e273bf"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 10,
+          "paf_rows": 84,
+          "quality": {
+            "bases": {
+              "cross": 1329,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1186538,
+                  1187236
+                ],
+                [
+                  1187237,
+                  1187868
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3ce5aa54680b1b24eecd8ad4/q0-regional-raw-f81437516975bdbadc244d99/success.json",
+          "seconds": 6.922403298318386,
+          "sha256": "db9a9bbe728e0608cf3294b74e483c9fe707e76ca0201c4118cf3fd6efefafad"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 11,
+          "paf_rows": 29,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-fb0c5ef77823757a68af52f6/q0-regional-raw-c1939d38c1225545e166247c/success.json",
+          "seconds": 4.662215068936348,
+          "sha256": "bebab58dd7a221a7ff7a474d2a3009959768f7e2ff6386e5f18ee343e1a17274"
+        },
+        {
+          "coarse_seconds": 5.130187481641769,
+          "ordinal": 12,
+          "paf_rows": 678,
+          "quality": {
+            "bases": {
+              "cross": 17397,
+              "intra": 5639
+            },
+            "intervals": {
+              "cross": [
+                [
+                  31605,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  64314,
+                  70217
+                ],
+                [
+                  70218,
+                  71299
+                ],
+                [
+                  71301,
+                  76001
+                ],
+                [
+                  84724,
+                  84847
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ],
+              "intra": [
+                [
+                  31565,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  75996,
+                  76001
+                ],
+                [
+                  84724,
+                  84728
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3b50d6e77db8a147214331bd/q0-regional-raw-ce27afc572017a8309189e45/success.json",
+          "seconds": 13.303140565752983,
+          "sha256": "d45f39d7f5be1a84edfc812f92510c8b6caa30dcb5f3e548f04360b2fdf348ee"
+        },
+        {
+          "coarse_seconds": 3.8466765135526657,
+          "ordinal": 13,
+          "paf_rows": 3211,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 947
+            },
+            "intervals": {
+              "cross": [],
+              "intra": [
+                [
+                  112414,
+                  112519
+                ],
+                [
+                  139004,
+                  139419
+                ],
+                [
+                  142899,
+                  143326
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2ce26b7195656d2ad52a73f6/q0-regional-raw-2aea14b76318782dbdec5f45/success.json",
+          "seconds": 157.77055881917477,
+          "sha256": "586c51e213bcee0f5b431d4bc4aeeb0f0b99a1fcf4e4ad2885a1a1dd22c20e3d"
+        },
+        {
+          "coarse_seconds": 1.371945321559906,
+          "ordinal": 14,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-24503adfcde3c47e3241485c/q0-regional-raw-e49979b9ee6989da6f9d9cca/success.json",
+          "seconds": 2.3722646310925484,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 1.761143870651722,
+          "ordinal": 15,
+          "paf_rows": 142,
+          "quality": {
+            "bases": {
+              "cross": 46980,
+              "intra": 31142
+            },
+            "intervals": {
+              "cross": [
+                [
+                  109094711,
+                  109118291
+                ],
+                [
+                  109122361,
+                  109123083
+                ],
+                [
+                  109123484,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109160461
+                ]
+              ],
+              "intra": [
+                [
+                  109104507,
+                  109118291
+                ],
+                [
+                  109122367,
+                  109122800
+                ],
+                [
+                  109122802,
+                  109123083
+                ],
+                [
+                  109123484,
+                  109127275
+                ],
+                [
+                  109133282,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109153282
+                ],
+                [
+                  109153283,
+                  109157017
+                ],
+                [
+                  109157028,
+                  109157158
+                ],
+                [
+                  109157159,
+                  109158736
+                ],
+                [
+                  109158737,
+                  109159643
+                ],
+                [
+                  109159645,
+                  109160361
+                ],
+                [
+                  109160372,
+                  109160461
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bac973007de40eced82c7847/q0-regional-raw-9f133bc713097ba38355261a/success.json",
+          "seconds": 5.459043174982071,
+          "sha256": "1af662e6b7d203b37cfeffc7868292095a8b30c03778cd229829299b1e7c5bc8"
+        },
+        {
+          "coarse_seconds": 3.860533185303211,
+          "ordinal": 16,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-4c69d1800141d7164a5e462a/q0-regional-raw-5007cf3bc61600ac3387de04/success.json",
+          "seconds": 7.884552255272865,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 3.5927762389183044,
+          "ordinal": 17,
+          "paf_rows": 1890,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 1860
+            },
+            "intervals": {
+              "cross": [],
+              "intra": [
+                [
+                  29061,
+                  29282
+                ],
+                [
+                  32811,
+                  33041
+                ],
+                [
+                  38727,
+                  38950
+                ],
+                [
+                  38956,
+                  39068
+                ],
+                [
+                  71937,
+                  72236
+                ],
+                [
+                  86798,
+                  86902
+                ],
+                [
+                  86905,
+                  86995
+                ],
+                [
+                  86998,
+                  87060
+                ],
+                [
+                  87063,
+                  87253
+                ],
+                [
+                  89387,
+                  89716
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-90105f0e662f601d0c2906db/q0-regional-raw-595a37e532591fd2aeab0541/success.json",
+          "seconds": 76.08939093351364,
+          "sha256": "a81f44fb2895ca45e47c40854c3a2bc1a65f8697becd363205878c94c643f00e"
+        },
+        {
+          "coarse_seconds": 1.381639987230301,
+          "ordinal": 18,
+          "paf_rows": 1079,
+          "quality": {
+            "bases": {
+              "cross": 7175,
+              "intra": 689
+            },
+            "intervals": {
+              "cross": [
+                [
+                  35482,
+                  35750
+                ],
+                [
+                  40107,
+                  40213
+                ],
+                [
+                  44536,
+                  50997
+                ],
+                [
+                  68314,
+                  68654
+                ]
+              ],
+              "intra": [
+                [
+                  49333,
+                  49858
+                ],
+                [
+                  49859,
+                  50023
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2aa70524c4036e808f350ee1/q0-regional-raw-4a0cd1789292197f118641c5/success.json",
+          "seconds": 10.432688221335411,
+          "sha256": "6b48b4db411cdef06ad1ae377c53c8f5c01c5739c341d259a7af04156d5445db"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 19,
+          "paf_rows": 82,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-57fb6d980bebc7da11b1a881/q0-regional-raw-0ec91cfcc934e2d1c22a5d9f/success.json",
+          "seconds": 1.247211292386055,
+          "sha256": "fab158b5de39d5744ae551dc0421654c82a0f685069da2a6f800bf1d29de1c74"
+        },
+        {
+          "coarse_seconds": 3.765894867479801,
+          "ordinal": 20,
+          "paf_rows": 16274,
+          "quality": {
+            "bases": {
+              "cross": 86978,
+              "intra": 94052
+            },
+            "intervals": {
+              "cross": [
+                [
+                  600000,
+                  600257
+                ],
+                [
+                  600263,
+                  602025
+                ],
+                [
+                  602028,
+                  602875
+                ],
+                [
+                  605127,
+                  607221
+                ],
+                [
+                  609366,
+                  610752
+                ],
+                [
+                  611464,
+                  619463
+                ],
+                [
+                  623027,
+                  624502
+                ],
+                [
+                  626941,
+                  627586
+                ],
+                [
+                  627589,
+                  629599
+                ],
+                [
+                  631396,
+                  635678
+                ],
+                [
+                  635679,
+                  637797
+                ],
+                [
+                  637798,
+                  639916
+                ],
+                [
+                  639917,
+                  642035
+                ],
+                [
+                  642036,
+                  644862
+                ],
+                [
+                  644863,
+                  646276
+                ],
+                [
+                  646277,
+                  647690
+                ],
+                [
+                  647691,
+                  649104
+                ],
+                [
+                  649105,
+                  651223
+                ],
+                [
+                  651224,
+                  653342
+                ],
+                [
+                  653343,
+                  654756
+                ],
+                [
+                  654757,
+                  656170
+                ],
+                [
+                  656171,
+                  679143
+                ],
+                [
+                  679232,
+                  700000
+                ]
+              ],
+              "intra": [
+                [
+                  600000,
+                  602025
+                ],
+                [
+                  602028,
+                  602875
+                ],
+                [
+                  603006,
+                  604109
+                ],
+                [
+                  605127,
+                  607422
+                ],
+                [
+                  608189,
+                  609304
+                ],
+                [
+                  609366,
+                  611215
+                ],
+                [
+                  611218,
+                  620634
+                ],
+                [
+                  620637,
+                  621351
+                ],
+                [
+                  623046,
+                  624502
+                ],
+                [
+                  625148,
+                  626930
+                ],
+                [
+                  626941,
+                  627586
+                ],
+                [
+                  627589,
+                  629599
+                ],
+                [
+                  631160,
+                  679143
+                ],
+                [
+                  679188,
+                  700000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-607f236e26540eadcd3b7bce/q0-regional-raw-f16c5cf65f1b6efc0d8426a3/success.json",
+          "seconds": 424.65366549789906,
+          "sha256": "34116ac9d3497490b60c1f903f3494fde7a96fa10cb3004629a751d1bd87e6a5"
+        },
+        {
+          "coarse_seconds": 0.822899341583252,
+          "ordinal": 21,
+          "paf_rows": 11174,
+          "quality": {
+            "bases": {
+              "cross": 15518,
+              "intra": 15516
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  189
+                ],
+                [
+                  9452,
+                  24781
+                ]
+              ],
+              "intra": [
+                [
+                  1,
+                  189
+                ],
+                [
+                  9452,
+                  24780
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-de6f905af1de3df16d08fed3/q0-regional-raw-f2cdcbd2dc39af2306cfe181/success.json",
+          "seconds": 307.9406932666898,
+          "sha256": "59e17559fbf16d60aa81f83c14f029897c44d461f45a5ae9ed7674ccb733d866"
+        },
+        {
+          "coarse_seconds": 3.6947037801146507,
+          "ordinal": 22,
+          "paf_rows": 12487,
+          "quality": {
+            "bases": {
+              "cross": 89357,
+              "intra": 91338
+            },
+            "intervals": {
+              "cross": [
+                [
+                  400000,
+                  428572
+                ],
+                [
+                  428573,
+                  431402
+                ],
+                [
+                  431403,
+                  432819
+                ],
+                [
+                  432820,
+                  445484
+                ],
+                [
+                  445603,
+                  461232
+                ],
+                [
+                  461551,
+                  462179
+                ],
+                [
+                  462222,
+                  464695
+                ],
+                [
+                  465117,
+                  465540
+                ],
+                [
+                  465543,
+                  466341
+                ],
+                [
+                  467002,
+                  468133
+                ],
+                [
+                  468136,
+                  469969
+                ],
+                [
+                  470397,
+                  470841
+                ],
+                [
+                  470844,
+                  471412
+                ],
+                [
+                  471413,
+                  474947
+                ],
+                [
+                  474948,
+                  475379
+                ],
+                [
+                  475700,
+                  476144
+                ],
+                [
+                  476147,
+                  476852
+                ],
+                [
+                  476855,
+                  477039
+                ],
+                [
+                  482004,
+                  482985
+                ],
+                [
+                  483252,
+                  483926
+                ],
+                [
+                  484518,
+                  485305
+                ],
+                [
+                  485701,
+                  486383
+                ],
+                [
+                  486386,
+                  488030
+                ],
+                [
+                  488031,
+                  488224
+                ],
+                [
+                  490310,
+                  500000
+                ]
+              ],
+              "intra": [
+                [
+                  400000,
+                  445484
+                ],
+                [
+                  445603,
+                  464695
+                ],
+                [
+                  465117,
+                  466341
+                ],
+                [
+                  467002,
+                  469969
+                ],
+                [
+                  470397,
+                  475379
+                ],
+                [
+                  475700,
+                  477039
+                ],
+                [
+                  479361,
+                  480336
+                ],
+                [
+                  482004,
+                  483926
+                ],
+                [
+                  485243,
+                  488906
+                ],
+                [
+                  490310,
+                  500000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-ed6c9d078d43384fa753d722/q0-regional-raw-b7b58f98b05779b916043d52/success.json",
+          "seconds": 288.11314817517996,
+          "sha256": "bae862e611a41cf1ff06e8c9510160194c53a73033accb9ffd4f9f8ea4288820"
+        },
+        {
+          "coarse_seconds": 1.2284497544169426,
+          "ordinal": 23,
+          "paf_rows": 1151,
+          "quality": {
+            "bases": {
+              "cross": 28557,
+              "intra": 15250
+            },
+            "intervals": {
+              "cross": [
+                [
+                  111866635,
+                  111866862
+                ],
+                [
+                  111870888,
+                  111881681
+                ],
+                [
+                  111887088,
+                  111888558
+                ],
+                [
+                  111888559,
+                  111888777
+                ],
+                [
+                  111898852,
+                  111899424
+                ],
+                [
+                  111900142,
+                  111900746
+                ],
+                [
+                  111901692,
+                  111902565
+                ],
+                [
+                  111909931,
+                  111910413
+                ],
+                [
+                  111924910,
+                  111926079
+                ],
+                [
+                  111928768,
+                  111933385
+                ],
+                [
+                  111933393,
+                  111933478
+                ],
+                [
+                  111933493,
+                  111933578
+                ],
+                [
+                  111933581,
+                  111933621
+                ],
+                [
+                  111934459,
+                  111934794
+                ],
+                [
+                  111934807,
+                  111935226
+                ],
+                [
+                  111935320,
+                  111936754
+                ],
+                [
+                  111961501,
+                  111966635
+                ]
+              ],
+              "intra": [
+                [
+                  111866792,
+                  111866862
+                ],
+                [
+                  111870888,
+                  111870898
+                ],
+                [
+                  111871110,
+                  111871365
+                ],
+                [
+                  111871366,
+                  111871681
+                ],
+                [
+                  111875779,
+                  111876743
+                ],
+                [
+                  111898852,
+                  111899424
+                ],
+                [
+                  111900142,
+                  111900264
+                ],
+                [
+                  111900265,
+                  111900818
+                ],
+                [
+                  111901692,
+                  111902565
+                ],
+                [
+                  111909931,
+                  111910413
+                ],
+                [
+                  111924910,
+                  111926079
+                ],
+                [
+                  111928768,
+                  111933382
+                ],
+                [
+                  111933391,
+                  111933439
+                ],
+                [
+                  111933440,
+                  111933463
+                ],
+                [
+                  111933465,
+                  111933629
+                ],
+                [
+                  111934182,
+                  111934793
+                ],
+                [
+                  111934807,
+                  111936753
+                ],
+                [
+                  111955403,
+                  111955501
+                ],
+                [
+                  111955502,
+                  111955517
+                ],
+                [
+                  111955519,
+                  111955536
+                ],
+                [
+                  111955540,
+                  111956347
+                ],
+                [
+                  111956348,
+                  111957054
+                ],
+                [
+                  111965294,
+                  111965640
+                ],
+                [
+                  111966093,
+                  111966563
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3d675996338ca726a0a2b6bc/q0-regional-raw-3e9a8bc22555f8478764e45f/success.json",
+          "seconds": 14.393347628414631,
+          "sha256": "3a51672643bcd7b86bb4b4d4767aaa88e997f138eedb951b3c276c4e113a42aa"
+        }
+      ],
+      "seconds": 472.37500125169754
+    },
+    {
+      "completion_order": [
+        6,
+        5,
+        3,
+        4,
+        1,
+        2,
+        0,
+        10,
+        11,
+        8,
+        9,
+        7,
+        14,
+        12,
+        18,
+        15,
+        13,
+        19,
+        16,
+        17,
+        20,
+        21,
+        23,
+        22
+      ],
+      "mode": "exact_gentle_chain_budget",
+      "phase": 1,
+      "results": [
+        {
+          "coarse_seconds": 37.87369152158499,
+          "ordinal": 0,
+          "paf_rows": 3,
+          "quality": {
+            "bases": {
+              "cross": 52153,
+              "intra": 52155
+            },
+            "intervals": {
+              "cross": [
+                [
+                  108540,
+                  109066
+                ],
+                [
+                  109068,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ],
+              "intra": [
+                [
+                  108540,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-79a993cbd96b0dfe3b514936/q0-regional-raw-3cc954b5a281135a15feb39a/success.json",
+          "seconds": 89.58530405163765,
+          "sha256": "303b7bf47bf1c048943fc8e9677ebceaf4b5320ddb023fcc63dc76c82abcb4e3"
+        },
+        {
+          "coarse_seconds": 33.86367382109165,
+          "ordinal": 1,
+          "paf_rows": 95,
+          "quality": {
+            "bases": {
+              "cross": 17249,
+              "intra": 17257
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1846,
+                  2393
+                ],
+                [
+                  2394,
+                  2468
+                ],
+                [
+                  2469,
+                  2502
+                ],
+                [
+                  2503,
+                  2560
+                ],
+                [
+                  2561,
+                  3216
+                ],
+                [
+                  3217,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21624
+                ]
+              ],
+              "intra": [
+                [
+                  1846,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21627
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3bb173a52c6a4b9cfe60bbdc/q0-regional-raw-b9378969607ef6814c1defe2/success.json",
+          "seconds": 69.28679193556309,
+          "sha256": "19e8d0b1f584a398d9c74031924607c82a21a094af12be408a34d873dad46aca"
+        },
+        {
+          "coarse_seconds": 38.26191382110119,
+          "ordinal": 2,
+          "paf_rows": 201,
+          "quality": {
+            "bases": {
+              "cross": 1967,
+              "intra": 1967
+            },
+            "intervals": {
+              "cross": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ],
+              "intra": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-6cb03b65e4c12980564d4c84/q0-regional-raw-c544190e18d8756a4a352db6/success.json",
+          "seconds": 89.25771560519934,
+          "sha256": "358985e1834168583b3718253295b5df52961bca644beeff3c918bb2888ee8db"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 3,
+          "paf_rows": 201,
+          "quality": {
+            "bases": {
+              "cross": 3841,
+              "intra": 3841
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  3841
+                ]
+              ],
+              "intra": [
+                [
+                  0,
+                  3841
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-115a9878899d5819b0b900f7/q0-regional-raw-46134e40fa8ff1686df7ed5c/success.json",
+          "seconds": 37.877570733428,
+          "sha256": "f6ccf576d4aad27645d8d62559ac0a276f725959f462f3accd5f3198dbed51e6"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 4,
+          "paf_rows": 17,
+          "quality": {
+            "bases": {
+              "cross": 5768,
+              "intra": 5768
+            },
+            "intervals": {
+              "cross": [
+                [
+                  194180,
+                  199948
+                ]
+              ],
+              "intra": [
+                [
+                  194180,
+                  199948
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-400a73488d929a5bd6983627/q0-regional-raw-4bc746f22dc01f75189e6a47/success.json",
+          "seconds": 46.808521561324596,
+          "sha256": "a2b70b84695f8ec5a92d5d7a77f1bdfc2b99cf600b43647e7dbd87f765c8f883"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 5,
+          "paf_rows": 3,
+          "quality": {
+            "bases": {
+              "cross": 2954,
+              "intra": 2954
+            },
+            "intervals": {
+              "cross": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ],
+              "intra": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bc0018ff644a7c0b71394d8d/q0-regional-raw-b4ec5820a371f0ca48884d04/success.json",
+          "seconds": 35.73905124515295,
+          "sha256": "509020c2a8c10989818da26ee134910b1fba811f3059a859c8d71e96ef280081"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 6,
+          "paf_rows": 193,
+          "quality": {
+            "bases": {
+              "cross": 1009,
+              "intra": 1009
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ],
+              "intra": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-94c21b60b409112a914dd2f8/q0-regional-raw-72309b599a6def6d6ab419b4/success.json",
+          "seconds": 35.396984092891216,
+          "sha256": "39da5f49f8db1a5c8d7f84124f298937f199f71e0c9df6b5c85abdfd65db5040"
+        },
+        {
+          "coarse_seconds": 31.89266660064459,
+          "ordinal": 7,
+          "paf_rows": 29,
+          "quality": {
+            "bases": {
+              "cross": 68225,
+              "intra": 41745
+            },
+            "intervals": {
+              "cross": [
+                [
+                  4068650,
+                  4080624
+                ],
+                [
+                  4084534,
+                  4094534
+                ],
+                [
+                  4107659,
+                  4120210
+                ],
+                [
+                  4125292,
+                  4150980
+                ],
+                [
+                  4159536,
+                  4167548
+                ]
+              ],
+              "intra": [
+                [
+                  4125803,
+                  4167548
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-1c603a06c11b516cd733aa48/q0-regional-raw-e0687c7d5b6b59046f681d44/success.json",
+          "seconds": 87.93252313882113,
+          "sha256": "fd481a8027f61b690ca698fac62100c1344ad944c2576620715b5f76e891470c"
+        },
+        {
+          "coarse_seconds": 30.668934106826782,
+          "ordinal": 8,
+          "paf_rows": 215,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 32726
+            },
+            "intervals": {
+              "cross": [],
+              "intra": [
+                [
+                  240361,
+                  240778
+                ],
+                [
+                  240779,
+                  241350
+                ],
+                [
+                  241351,
+                  243598
+                ],
+                [
+                  243599,
+                  244170
+                ],
+                [
+                  244171,
+                  246418
+                ],
+                [
+                  246419,
+                  246990
+                ],
+                [
+                  246991,
+                  248533
+                ],
+                [
+                  248534,
+                  249105
+                ],
+                [
+                  249106,
+                  250179
+                ],
+                [
+                  253751,
+                  259953
+                ],
+                [
+                  268415,
+                  268978
+                ],
+                [
+                  268979,
+                  269550
+                ],
+                [
+                  269551,
+                  271798
+                ],
+                [
+                  271799,
+                  272370
+                ],
+                [
+                  272371,
+                  274618
+                ],
+                [
+                  274619,
+                  275190
+                ],
+                [
+                  275191,
+                  276733
+                ],
+                [
+                  276734,
+                  277305
+                ],
+                [
+                  277306,
+                  278379
+                ],
+                [
+                  284998,
+                  291206
+                ],
+                [
+                  299450,
+                  300000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-567a6a1266da5cb07d941359/q0-regional-raw-7d4418e50e954faa95d34719/success.json",
+          "seconds": 79.43736343830824,
+          "sha256": "e402495ccfcae3dfddc45738cb7cb1ed703134f6fb521c5f38d2f05a5c1afe8b"
+        },
+        {
+          "coarse_seconds": 28.157311841845512,
+          "ordinal": 9,
+          "paf_rows": 18,
+          "quality": {
+            "bases": {
+              "cross": 1430,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  7486365,
+                  7487475
+                ],
+                [
+                  7488026,
+                  7488346
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-7bc00b0352c02ca669c594cf/q0-regional-raw-20b93cdcaa385a9c951c6633/success.json",
+          "seconds": 81.12396642565727,
+          "sha256": "daf51a99db9811a93c0138499feedd798e63199e3d3ae4f54f1da062b53c3b03"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 10,
+          "paf_rows": 84,
+          "quality": {
+            "bases": {
+              "cross": 1329,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1186538,
+                  1187236
+                ],
+                [
+                  1187237,
+                  1187868
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3ce5aa54680b1b24eecd8ad4/q0-regional-raw-f81437516975bdbadc244d99/success.json",
+          "seconds": 58.648086331784725,
+          "sha256": "2298b769ddb0a051c36b0829125aa5f1092cd4f3f0085634b8989c4c91127acf"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 11,
+          "paf_rows": 29,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-fb0c5ef77823757a68af52f6/q0-regional-raw-c1939d38c1225545e166247c/success.json",
+          "seconds": 36.86131256073713,
+          "sha256": "195a986c903eff9d7e48ad6c5f90d4eb3bd985593884710c3baebb43546e3794"
+        },
+        {
+          "coarse_seconds": 34.345880568027496,
+          "ordinal": 12,
+          "paf_rows": 202,
+          "quality": {
+            "bases": {
+              "cross": 17397,
+              "intra": 5597
+            },
+            "intervals": {
+              "cross": [
+                [
+                  31605,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  64314,
+                  70217
+                ],
+                [
+                  70218,
+                  71299
+                ],
+                [
+                  71301,
+                  76001
+                ],
+                [
+                  84724,
+                  84847
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ],
+              "intra": [
+                [
+                  31605,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  75996,
+                  76001
+                ],
+                [
+                  84724,
+                  84726
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3b50d6e77db8a147214331bd/q0-regional-raw-ce27afc572017a8309189e45/success.json",
+          "seconds": 78.3572718128562,
+          "sha256": "f7e0440db317c0285f0535e965282aec139945fec73ebd90e41b38cfdba6ebaf"
+        },
+        {
+          "coarse_seconds": 34.4557538703084,
+          "ordinal": 13,
+          "paf_rows": 205,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2ce26b7195656d2ad52a73f6/q0-regional-raw-2aea14b76318782dbdec5f45/success.json",
+          "seconds": 94.37368083000183,
+          "sha256": "49b62d170e14b55a389acc2d80d6672ea44ea2f1e198bf226fb13156286606bb"
+        },
+        {
+          "coarse_seconds": 25.625870123505592,
+          "ordinal": 14,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-24503adfcde3c47e3241485c/q0-regional-raw-e49979b9ee6989da6f9d9cca/success.json",
+          "seconds": 51.716789081692696,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 47.54222609102726,
+          "ordinal": 15,
+          "paf_rows": 35,
+          "quality": {
+            "bases": {
+              "cross": 46980,
+              "intra": 26637
+            },
+            "intervals": {
+              "cross": [
+                [
+                  109094711,
+                  109118291
+                ],
+                [
+                  109122361,
+                  109123083
+                ],
+                [
+                  109123484,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109160461
+                ]
+              ],
+              "intra": [
+                [
+                  109104507,
+                  109118291
+                ],
+                [
+                  109133282,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109153282
+                ],
+                [
+                  109153283,
+                  109157017
+                ],
+                [
+                  109157028,
+                  109157158
+                ],
+                [
+                  109157159,
+                  109158736
+                ],
+                [
+                  109158737,
+                  109159643
+                ],
+                [
+                  109159645,
+                  109160361
+                ],
+                [
+                  109160372,
+                  109160461
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bac973007de40eced82c7847/q0-regional-raw-9f133bc713097ba38355261a/success.json",
+          "seconds": 72.22413713485003,
+          "sha256": "4f3bbe2d39e72f7db7f43619ce10be20927bc2721df5f9ba739c040047a8ccc4"
+        },
+        {
+          "coarse_seconds": 28.512208677828312,
+          "ordinal": 16,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-4c69d1800141d7164a5e462a/q0-regional-raw-5007cf3bc61600ac3387de04/success.json",
+          "seconds": 79.82742964476347,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 47.90668873488903,
+          "ordinal": 17,
+          "paf_rows": 210,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-90105f0e662f601d0c2906db/q0-regional-raw-595a37e532591fd2aeab0541/success.json",
+          "seconds": 84.14847595244646,
+          "sha256": "b2803be216b13cfd17a5ec78a97ecb2dabdb9b8ba589df915630296a607e4034"
+        },
+        {
+          "coarse_seconds": 24.17969849705696,
+          "ordinal": 18,
+          "paf_rows": 98,
+          "quality": {
+            "bases": {
+              "cross": 7175,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  35482,
+                  35750
+                ],
+                [
+                  40107,
+                  40213
+                ],
+                [
+                  44536,
+                  50997
+                ],
+                [
+                  68314,
+                  68654
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2aa70524c4036e808f350ee1/q0-regional-raw-4a0cd1789292197f118641c5/success.json",
+          "seconds": 54.85682851821184,
+          "sha256": "720d7eedc024b0620c9c0399794e223a86548051b097380159473c08590f4187"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 19,
+          "paf_rows": 30,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-57fb6d980bebc7da11b1a881/q0-regional-raw-0ec91cfcc934e2d1c22a5d9f/success.json",
+          "seconds": 36.38295727223158,
+          "sha256": "66af46bf3f3ec50f7575d32cd00187c52a5c505d99e068c4d6b4b16ab235696a"
+        },
+        {
+          "coarse_seconds": 26.26199023425579,
+          "ordinal": 20,
+          "paf_rows": 218,
+          "quality": {
+            "bases": {
+              "cross": 47490,
+              "intra": 40237
+            },
+            "intervals": {
+              "cross": [
+                [
+                  631396,
+                  632202
+                ],
+                [
+                  632320,
+                  632775
+                ],
+                [
+                  632896,
+                  635678
+                ],
+                [
+                  635679,
+                  637797
+                ],
+                [
+                  637798,
+                  639916
+                ],
+                [
+                  639917,
+                  642035
+                ],
+                [
+                  642036,
+                  643627
+                ],
+                [
+                  643745,
+                  644862
+                ],
+                [
+                  644863,
+                  646276
+                ],
+                [
+                  646277,
+                  647690
+                ],
+                [
+                  647691,
+                  649104
+                ],
+                [
+                  649105,
+                  651223
+                ],
+                [
+                  651224,
+                  653342
+                ],
+                [
+                  653343,
+                  654756
+                ],
+                [
+                  654757,
+                  656170
+                ],
+                [
+                  656171,
+                  659487
+                ],
+                [
+                  662133,
+                  663296
+                ],
+                [
+                  663414,
+                  672081
+                ],
+                [
+                  684379,
+                  685657
+                ],
+                [
+                  685775,
+                  694435
+                ]
+              ],
+              "intra": [
+                [
+                  631396,
+                  632221
+                ],
+                [
+                  632320,
+                  632776
+                ],
+                [
+                  632896,
+                  642035
+                ],
+                [
+                  642036,
+                  643635
+                ],
+                [
+                  643745,
+                  661312
+                ],
+                [
+                  661430,
+                  672081
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-607f236e26540eadcd3b7bce/q0-regional-raw-f16c5cf65f1b6efc0d8426a3/success.json",
+          "seconds": 55.968962140381336,
+          "sha256": "ec091ae261eb3e524643a82a386fe5d48596b9bef15095456a48428b59aa2c72"
+        },
+        {
+          "coarse_seconds": 20.62086521834135,
+          "ordinal": 21,
+          "paf_rows": 22,
+          "quality": {
+            "bases": {
+              "cross": 15518,
+              "intra": 15517
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  189
+                ],
+                [
+                  9452,
+                  24781
+                ]
+              ],
+              "intra": [
+                [
+                  1,
+                  189
+                ],
+                [
+                  9452,
+                  24781
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-de6f905af1de3df16d08fed3/q0-regional-raw-f2cdcbd2dc39af2306cfe181/success.json",
+          "seconds": 50.24062905460596,
+          "sha256": "261dc75e37e34447c49860bcf81eabcc04c32d02d8fcdfdf4d11632640ed25a9"
+        },
+        {
+          "coarse_seconds": 37.673410169780254,
+          "ordinal": 22,
+          "paf_rows": 217,
+          "quality": {
+            "bases": {
+              "cross": 28601,
+              "intra": 18651
+            },
+            "intervals": {
+              "cross": [
+                [
+                  400000,
+                  403213
+                ],
+                [
+                  425393,
+                  425741
+                ],
+                [
+                  425742,
+                  426450
+                ],
+                [
+                  426451,
+                  426683
+                ],
+                [
+                  426801,
+                  428572
+                ],
+                [
+                  428573,
+                  431402
+                ],
+                [
+                  431403,
+                  432819
+                ],
+                [
+                  432820,
+                  435472
+                ],
+                [
+                  436390,
+                  436953
+                ],
+                [
+                  436954,
+                  437522
+                ],
+                [
+                  437523,
+                  439782
+                ],
+                [
+                  439783,
+                  440351
+                ],
+                [
+                  440352,
+                  442613
+                ],
+                [
+                  442614,
+                  443183
+                ],
+                [
+                  443184,
+                  444734
+                ],
+                [
+                  444735,
+                  445304
+                ],
+                [
+                  445305,
+                  445385
+                ],
+                [
+                  445618,
+                  446620
+                ],
+                [
+                  494436,
+                  495711
+                ],
+                [
+                  495829,
+                  498399
+                ],
+                [
+                  498402,
+                  500000
+                ]
+              ],
+              "intra": [
+                [
+                  400000,
+                  403213
+                ],
+                [
+                  425393,
+                  426695
+                ],
+                [
+                  426801,
+                  435472
+                ],
+                [
+                  494436,
+                  495730
+                ],
+                [
+                  495829,
+                  500000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-ed6c9d078d43384fa753d722/q0-regional-raw-b7b58f98b05779b916043d52/success.json",
+          "seconds": 70.46193300187588,
+          "sha256": "df6e5c427041ae21f6deeeac4166d7c20b37845a3a20ebe0de95907c6646611f"
+        },
+        {
+          "coarse_seconds": 26.258003883063793,
+          "ordinal": 23,
+          "paf_rows": 221,
+          "quality": {
+            "bases": {
+              "cross": 22415,
+              "intra": 7803
+            },
+            "intervals": {
+              "cross": [
+                [
+                  111866635,
+                  111866862
+                ],
+                [
+                  111870888,
+                  111881681
+                ],
+                [
+                  111928768,
+                  111933385
+                ],
+                [
+                  111933393,
+                  111933478
+                ],
+                [
+                  111933493,
+                  111933578
+                ],
+                [
+                  111933581,
+                  111933621
+                ],
+                [
+                  111935320,
+                  111936754
+                ],
+                [
+                  111961501,
+                  111966635
+                ]
+              ],
+              "intra": [
+                [
+                  111870888,
+                  111870898
+                ],
+                [
+                  111928768,
+                  111933382
+                ],
+                [
+                  111933391,
+                  111933439
+                ],
+                [
+                  111933440,
+                  111933463
+                ],
+                [
+                  111933465,
+                  111933629
+                ],
+                [
+                  111935320,
+                  111936753
+                ],
+                [
+                  111955542,
+                  111956347
+                ],
+                [
+                  111956348,
+                  111957054
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3d675996338ca726a0a2b6bc/q0-regional-raw-3e9a8bc22555f8478764e45f/success.json",
+          "seconds": 51.620444655418396,
+          "sha256": "d574f59d9d8a8f5ff479266b3487bc85503e2bfbc620a6ce3a2f167ff43e0399"
+        }
+      ],
+      "seconds": 249.83984684199095
+    },
+    {
+      "completion_order": [
+        6,
+        5,
+        3,
+        0,
+        2,
+        1,
+        4,
+        7,
+        10,
+        9,
+        8,
+        11,
+        12,
+        13,
+        15,
+        14,
+        19,
+        16,
+        18,
+        17,
+        21,
+        20,
+        23,
+        22
+      ],
+      "mode": "exact_gentle_chain_budget",
+      "phase": 2,
+      "results": [
+        {
+          "coarse_seconds": 25.038767024874687,
+          "ordinal": 0,
+          "paf_rows": 3,
+          "quality": {
+            "bases": {
+              "cross": 52153,
+              "intra": 52155
+            },
+            "intervals": {
+              "cross": [
+                [
+                  108540,
+                  109066
+                ],
+                [
+                  109068,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ],
+              "intra": [
+                [
+                  108540,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-79a993cbd96b0dfe3b514936/q0-regional-raw-3cc954b5a281135a15feb39a/success.json",
+          "seconds": 57.37159971892834,
+          "sha256": "303b7bf47bf1c048943fc8e9677ebceaf4b5320ddb023fcc63dc76c82abcb4e3"
+        },
+        {
+          "coarse_seconds": 24.556207478046417,
+          "ordinal": 1,
+          "paf_rows": 95,
+          "quality": {
+            "bases": {
+              "cross": 17249,
+              "intra": 17257
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1846,
+                  2393
+                ],
+                [
+                  2394,
+                  2468
+                ],
+                [
+                  2469,
+                  2502
+                ],
+                [
+                  2503,
+                  2560
+                ],
+                [
+                  2561,
+                  3216
+                ],
+                [
+                  3217,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21624
+                ]
+              ],
+              "intra": [
+                [
+                  1846,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21627
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3bb173a52c6a4b9cfe60bbdc/q0-regional-raw-b9378969607ef6814c1defe2/success.json",
+          "seconds": 62.32880950719118,
+          "sha256": "19e8d0b1f584a398d9c74031924607c82a21a094af12be408a34d873dad46aca"
+        },
+        {
+          "coarse_seconds": 25.177839398384094,
+          "ordinal": 2,
+          "paf_rows": 201,
+          "quality": {
+            "bases": {
+              "cross": 1967,
+              "intra": 1967
+            },
+            "intervals": {
+              "cross": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ],
+              "intra": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-6cb03b65e4c12980564d4c84/q0-regional-raw-c544190e18d8756a4a352db6/success.json",
+          "seconds": 61.041624523699284,
+          "sha256": "358985e1834168583b3718253295b5df52961bca644beeff3c918bb2888ee8db"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 3,
+          "paf_rows": 201,
+          "quality": {
+            "bases": {
+              "cross": 3841,
+              "intra": 3841
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  3841
+                ]
+              ],
+              "intra": [
+                [
+                  0,
+                  3841
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-115a9878899d5819b0b900f7/q0-regional-raw-46134e40fa8ff1686df7ed5c/success.json",
+          "seconds": 53.6295617967844,
+          "sha256": "f6ccf576d4aad27645d8d62559ac0a276f725959f462f3accd5f3198dbed51e6"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 4,
+          "paf_rows": 17,
+          "quality": {
+            "bases": {
+              "cross": 5768,
+              "intra": 5768
+            },
+            "intervals": {
+              "cross": [
+                [
+                  194180,
+                  199948
+                ]
+              ],
+              "intra": [
+                [
+                  194180,
+                  199948
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-400a73488d929a5bd6983627/q0-regional-raw-4bc746f22dc01f75189e6a47/success.json",
+          "seconds": 66.17304330319166,
+          "sha256": "a2b70b84695f8ec5a92d5d7a77f1bdfc2b99cf600b43647e7dbd87f765c8f883"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 5,
+          "paf_rows": 3,
+          "quality": {
+            "bases": {
+              "cross": 2954,
+              "intra": 2954
+            },
+            "intervals": {
+              "cross": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ],
+              "intra": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bc0018ff644a7c0b71394d8d/q0-regional-raw-b4ec5820a371f0ca48884d04/success.json",
+          "seconds": 41.533131927251816,
+          "sha256": "509020c2a8c10989818da26ee134910b1fba811f3059a859c8d71e96ef280081"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 6,
+          "paf_rows": 193,
+          "quality": {
+            "bases": {
+              "cross": 1009,
+              "intra": 1009
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ],
+              "intra": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-94c21b60b409112a914dd2f8/q0-regional-raw-72309b599a6def6d6ab419b4/success.json",
+          "seconds": 26.943222023546696,
+          "sha256": "39da5f49f8db1a5c8d7f84124f298937f199f71e0c9df6b5c85abdfd65db5040"
+        },
+        {
+          "coarse_seconds": 33.57563767582178,
+          "ordinal": 7,
+          "paf_rows": 29,
+          "quality": {
+            "bases": {
+              "cross": 68225,
+              "intra": 41745
+            },
+            "intervals": {
+              "cross": [
+                [
+                  4068650,
+                  4080624
+                ],
+                [
+                  4084534,
+                  4094534
+                ],
+                [
+                  4107659,
+                  4120210
+                ],
+                [
+                  4125292,
+                  4150980
+                ],
+                [
+                  4159536,
+                  4167548
+                ]
+              ],
+              "intra": [
+                [
+                  4125803,
+                  4167548
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-1c603a06c11b516cd733aa48/q0-regional-raw-e0687c7d5b6b59046f681d44/success.json",
+          "seconds": 54.11400803923607,
+          "sha256": "fd481a8027f61b690ca698fac62100c1344ad944c2576620715b5f76e891470c"
+        },
+        {
+          "coarse_seconds": 29.321729205548763,
+          "ordinal": 8,
+          "paf_rows": 215,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 32726
+            },
+            "intervals": {
+              "cross": [],
+              "intra": [
+                [
+                  240361,
+                  240778
+                ],
+                [
+                  240779,
+                  241350
+                ],
+                [
+                  241351,
+                  243598
+                ],
+                [
+                  243599,
+                  244170
+                ],
+                [
+                  244171,
+                  246418
+                ],
+                [
+                  246419,
+                  246990
+                ],
+                [
+                  246991,
+                  248533
+                ],
+                [
+                  248534,
+                  249105
+                ],
+                [
+                  249106,
+                  250179
+                ],
+                [
+                  253751,
+                  259953
+                ],
+                [
+                  268415,
+                  268978
+                ],
+                [
+                  268979,
+                  269550
+                ],
+                [
+                  269551,
+                  271798
+                ],
+                [
+                  271799,
+                  272370
+                ],
+                [
+                  272371,
+                  274618
+                ],
+                [
+                  274619,
+                  275190
+                ],
+                [
+                  275191,
+                  276733
+                ],
+                [
+                  276734,
+                  277305
+                ],
+                [
+                  277306,
+                  278379
+                ],
+                [
+                  284998,
+                  291206
+                ],
+                [
+                  299450,
+                  300000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-567a6a1266da5cb07d941359/q0-regional-raw-7d4418e50e954faa95d34719/success.json",
+          "seconds": 54.63408932834864,
+          "sha256": "e402495ccfcae3dfddc45738cb7cb1ed703134f6fb521c5f38d2f05a5c1afe8b"
+        },
+        {
+          "coarse_seconds": 21.46735120564699,
+          "ordinal": 9,
+          "paf_rows": 18,
+          "quality": {
+            "bases": {
+              "cross": 1430,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  7486365,
+                  7487475
+                ],
+                [
+                  7488026,
+                  7488346
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-7bc00b0352c02ca669c594cf/q0-regional-raw-20b93cdcaa385a9c951c6633/success.json",
+          "seconds": 42.07414514571428,
+          "sha256": "daf51a99db9811a93c0138499feedd798e63199e3d3ae4f54f1da062b53c3b03"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 10,
+          "paf_rows": 84,
+          "quality": {
+            "bases": {
+              "cross": 1329,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1186538,
+                  1187236
+                ],
+                [
+                  1187237,
+                  1187868
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3ce5aa54680b1b24eecd8ad4/q0-regional-raw-f81437516975bdbadc244d99/success.json",
+          "seconds": 25.95582840591669,
+          "sha256": "2298b769ddb0a051c36b0829125aa5f1092cd4f3f0085634b8989c4c91127acf"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 11,
+          "paf_rows": 29,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-fb0c5ef77823757a68af52f6/q0-regional-raw-c1939d38c1225545e166247c/success.json",
+          "seconds": 47.35785671323538,
+          "sha256": "195a986c903eff9d7e48ad6c5f90d4eb3bd985593884710c3baebb43546e3794"
+        },
+        {
+          "coarse_seconds": 23.01485474407673,
+          "ordinal": 12,
+          "paf_rows": 202,
+          "quality": {
+            "bases": {
+              "cross": 17397,
+              "intra": 5597
+            },
+            "intervals": {
+              "cross": [
+                [
+                  31605,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  64314,
+                  70217
+                ],
+                [
+                  70218,
+                  71299
+                ],
+                [
+                  71301,
+                  76001
+                ],
+                [
+                  84724,
+                  84847
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ],
+              "intra": [
+                [
+                  31605,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  75996,
+                  76001
+                ],
+                [
+                  84724,
+                  84726
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3b50d6e77db8a147214331bd/q0-regional-raw-ce27afc572017a8309189e45/success.json",
+          "seconds": 48.43727304786444,
+          "sha256": "f7e0440db317c0285f0535e965282aec139945fec73ebd90e41b38cfdba6ebaf"
+        },
+        {
+          "coarse_seconds": 21.95948250591755,
+          "ordinal": 13,
+          "paf_rows": 205,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2ce26b7195656d2ad52a73f6/q0-regional-raw-2aea14b76318782dbdec5f45/success.json",
+          "seconds": 55.98651580512524,
+          "sha256": "49b62d170e14b55a389acc2d80d6672ea44ea2f1e198bf226fb13156286606bb"
+        },
+        {
+          "coarse_seconds": 19.935786701738834,
+          "ordinal": 14,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-24503adfcde3c47e3241485c/q0-regional-raw-e49979b9ee6989da6f9d9cca/success.json",
+          "seconds": 47.05062346160412,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 19.76627316325903,
+          "ordinal": 15,
+          "paf_rows": 35,
+          "quality": {
+            "bases": {
+              "cross": 46980,
+              "intra": 26637
+            },
+            "intervals": {
+              "cross": [
+                [
+                  109094711,
+                  109118291
+                ],
+                [
+                  109122361,
+                  109123083
+                ],
+                [
+                  109123484,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109160461
+                ]
+              ],
+              "intra": [
+                [
+                  109104507,
+                  109118291
+                ],
+                [
+                  109133282,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109153282
+                ],
+                [
+                  109153283,
+                  109157017
+                ],
+                [
+                  109157028,
+                  109157158
+                ],
+                [
+                  109157159,
+                  109158736
+                ],
+                [
+                  109158737,
+                  109159643
+                ],
+                [
+                  109159645,
+                  109160361
+                ],
+                [
+                  109160372,
+                  109160461
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bac973007de40eced82c7847/q0-regional-raw-9f133bc713097ba38355261a/success.json",
+          "seconds": 40.480449326336384,
+          "sha256": "4f3bbe2d39e72f7db7f43619ce10be20927bc2721df5f9ba739c040047a8ccc4"
+        },
+        {
+          "coarse_seconds": 27.42974103242159,
+          "ordinal": 16,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-4c69d1800141d7164a5e462a/q0-regional-raw-5007cf3bc61600ac3387de04/success.json",
+          "seconds": 51.26538001745939,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 22.872512139379978,
+          "ordinal": 17,
+          "paf_rows": 210,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-90105f0e662f601d0c2906db/q0-regional-raw-595a37e532591fd2aeab0541/success.json",
+          "seconds": 58.21739799529314,
+          "sha256": "b2803be216b13cfd17a5ec78a97ecb2dabdb9b8ba589df915630296a607e4034"
+        },
+        {
+          "coarse_seconds": 21.377093575894833,
+          "ordinal": 18,
+          "paf_rows": 98,
+          "quality": {
+            "bases": {
+              "cross": 7175,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  35482,
+                  35750
+                ],
+                [
+                  40107,
+                  40213
+                ],
+                [
+                  44536,
+                  50997
+                ],
+                [
+                  68314,
+                  68654
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2aa70524c4036e808f350ee1/q0-regional-raw-4a0cd1789292197f118641c5/success.json",
+          "seconds": 44.49570827931166,
+          "sha256": "720d7eedc024b0620c9c0399794e223a86548051b097380159473c08590f4187"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 19,
+          "paf_rows": 30,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-57fb6d980bebc7da11b1a881/q0-regional-raw-0ec91cfcc934e2d1c22a5d9f/success.json",
+          "seconds": 21.18042779713869,
+          "sha256": "66af46bf3f3ec50f7575d32cd00187c52a5c505d99e068c4d6b4b16ab235696a"
+        },
+        {
+          "coarse_seconds": 26.980820544064045,
+          "ordinal": 20,
+          "paf_rows": 218,
+          "quality": {
+            "bases": {
+              "cross": 47490,
+              "intra": 40237
+            },
+            "intervals": {
+              "cross": [
+                [
+                  631396,
+                  632202
+                ],
+                [
+                  632320,
+                  632775
+                ],
+                [
+                  632896,
+                  635678
+                ],
+                [
+                  635679,
+                  637797
+                ],
+                [
+                  637798,
+                  639916
+                ],
+                [
+                  639917,
+                  642035
+                ],
+                [
+                  642036,
+                  643627
+                ],
+                [
+                  643745,
+                  644862
+                ],
+                [
+                  644863,
+                  646276
+                ],
+                [
+                  646277,
+                  647690
+                ],
+                [
+                  647691,
+                  649104
+                ],
+                [
+                  649105,
+                  651223
+                ],
+                [
+                  651224,
+                  653342
+                ],
+                [
+                  653343,
+                  654756
+                ],
+                [
+                  654757,
+                  656170
+                ],
+                [
+                  656171,
+                  659487
+                ],
+                [
+                  662133,
+                  663296
+                ],
+                [
+                  663414,
+                  672081
+                ],
+                [
+                  684379,
+                  685657
+                ],
+                [
+                  685775,
+                  694435
+                ]
+              ],
+              "intra": [
+                [
+                  631396,
+                  632221
+                ],
+                [
+                  632320,
+                  632776
+                ],
+                [
+                  632896,
+                  642035
+                ],
+                [
+                  642036,
+                  643635
+                ],
+                [
+                  643745,
+                  661312
+                ],
+                [
+                  661430,
+                  672081
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-607f236e26540eadcd3b7bce/q0-regional-raw-f16c5cf65f1b6efc0d8426a3/success.json",
+          "seconds": 52.52086349576712,
+          "sha256": "ec091ae261eb3e524643a82a386fe5d48596b9bef15095456a48428b59aa2c72"
+        },
+        {
+          "coarse_seconds": 21.123583041131496,
+          "ordinal": 21,
+          "paf_rows": 22,
+          "quality": {
+            "bases": {
+              "cross": 15518,
+              "intra": 15517
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  189
+                ],
+                [
+                  9452,
+                  24781
+                ]
+              ],
+              "intra": [
+                [
+                  1,
+                  189
+                ],
+                [
+                  9452,
+                  24781
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-de6f905af1de3df16d08fed3/q0-regional-raw-f2cdcbd2dc39af2306cfe181/success.json",
+          "seconds": 46.65349315851927,
+          "sha256": "261dc75e37e34447c49860bcf81eabcc04c32d02d8fcdfdf4d11632640ed25a9"
+        },
+        {
+          "coarse_seconds": 25.12057790160179,
+          "ordinal": 22,
+          "paf_rows": 217,
+          "quality": {
+            "bases": {
+              "cross": 28601,
+              "intra": 18651
+            },
+            "intervals": {
+              "cross": [
+                [
+                  400000,
+                  403213
+                ],
+                [
+                  425393,
+                  425741
+                ],
+                [
+                  425742,
+                  426450
+                ],
+                [
+                  426451,
+                  426683
+                ],
+                [
+                  426801,
+                  428572
+                ],
+                [
+                  428573,
+                  431402
+                ],
+                [
+                  431403,
+                  432819
+                ],
+                [
+                  432820,
+                  435472
+                ],
+                [
+                  436390,
+                  436953
+                ],
+                [
+                  436954,
+                  437522
+                ],
+                [
+                  437523,
+                  439782
+                ],
+                [
+                  439783,
+                  440351
+                ],
+                [
+                  440352,
+                  442613
+                ],
+                [
+                  442614,
+                  443183
+                ],
+                [
+                  443184,
+                  444734
+                ],
+                [
+                  444735,
+                  445304
+                ],
+                [
+                  445305,
+                  445385
+                ],
+                [
+                  445618,
+                  446620
+                ],
+                [
+                  494436,
+                  495711
+                ],
+                [
+                  495829,
+                  498399
+                ],
+                [
+                  498402,
+                  500000
+                ]
+              ],
+              "intra": [
+                [
+                  400000,
+                  403213
+                ],
+                [
+                  425393,
+                  426695
+                ],
+                [
+                  426801,
+                  435472
+                ],
+                [
+                  494436,
+                  495730
+                ],
+                [
+                  495829,
+                  500000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-ed6c9d078d43384fa753d722/q0-regional-raw-b7b58f98b05779b916043d52/success.json",
+          "seconds": 49.90357517451048,
+          "sha256": "df6e5c427041ae21f6deeeac4166d7c20b37845a3a20ebe0de95907c6646611f"
+        },
+        {
+          "coarse_seconds": 20.662015825510025,
+          "ordinal": 23,
+          "paf_rows": 221,
+          "quality": {
+            "bases": {
+              "cross": 22415,
+              "intra": 7803
+            },
+            "intervals": {
+              "cross": [
+                [
+                  111866635,
+                  111866862
+                ],
+                [
+                  111870888,
+                  111881681
+                ],
+                [
+                  111928768,
+                  111933385
+                ],
+                [
+                  111933393,
+                  111933478
+                ],
+                [
+                  111933493,
+                  111933578
+                ],
+                [
+                  111933581,
+                  111933621
+                ],
+                [
+                  111935320,
+                  111936754
+                ],
+                [
+                  111961501,
+                  111966635
+                ]
+              ],
+              "intra": [
+                [
+                  111870888,
+                  111870898
+                ],
+                [
+                  111928768,
+                  111933382
+                ],
+                [
+                  111933391,
+                  111933439
+                ],
+                [
+                  111933440,
+                  111933463
+                ],
+                [
+                  111933465,
+                  111933629
+                ],
+                [
+                  111935320,
+                  111936753
+                ],
+                [
+                  111955542,
+                  111956347
+                ],
+                [
+                  111956348,
+                  111957054
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3d675996338ca726a0a2b6bc/q0-regional-raw-3e9a8bc22555f8478764e45f/success.json",
+          "seconds": 45.05541519075632,
+          "sha256": "d574f59d9d8a8f5ff479266b3487bc85503e2bfbc620a6ce3a2f167ff43e0399"
+        }
+      ],
+      "seconds": 179.0579021498561
+    },
+    {
+      "completion_order": [
+        5,
+        2,
+        3,
+        0,
+        7,
+        6,
+        9,
+        11,
+        4,
+        10,
+        12,
+        14,
+        15,
+        19,
+        16,
+        1,
+        18,
+        23,
+        17,
+        13,
+        8,
+        22,
+        21,
+        20
+      ],
+      "mode": "legacy",
+      "phase": 3,
+      "results": [
+        {
+          "coarse_seconds": 45.05294930934906,
+          "ordinal": 0,
+          "paf_rows": 156,
+          "quality": {
+            "bases": {
+              "cross": 52153,
+              "intra": 52155
+            },
+            "intervals": {
+              "cross": [
+                [
+                  108540,
+                  109066
+                ],
+                [
+                  109068,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ],
+              "intra": [
+                [
+                  108540,
+                  109709
+                ],
+                [
+                  110371,
+                  111334
+                ],
+                [
+                  113067,
+                  113445
+                ],
+                [
+                  119787,
+                  120241
+                ],
+                [
+                  121245,
+                  124868
+                ],
+                [
+                  127208,
+                  132037
+                ],
+                [
+                  133757,
+                  133903
+                ],
+                [
+                  134562,
+                  145323
+                ],
+                [
+                  149448,
+                  166188
+                ],
+                [
+                  171932,
+                  175515
+                ],
+                [
+                  183374,
+                  183510
+                ],
+                [
+                  185581,
+                  185687
+                ],
+                [
+                  191319,
+                  195738
+                ],
+                [
+                  200737,
+                  203044
+                ],
+                [
+                  205999,
+                  208540
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-79a993cbd96b0dfe3b514936/q0-regional-raw-3cc954b5a281135a15feb39a/success.json",
+          "seconds": 69.59364473074675,
+          "sha256": "d5c8bf0b5efaa9d5eac89374be5e824b84ea8160200beb45988efe4ebfc4e58a"
+        },
+        {
+          "coarse_seconds": 20.912132270634174,
+          "ordinal": 1,
+          "paf_rows": 9470,
+          "quality": {
+            "bases": {
+              "cross": 17254,
+              "intra": 17257
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1846,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21624
+                ]
+              ],
+              "intra": [
+                [
+                  1846,
+                  16666
+                ],
+                [
+                  17854,
+                  18192
+                ],
+                [
+                  19528,
+                  21627
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3bb173a52c6a4b9cfe60bbdc/q0-regional-raw-b9378969607ef6814c1defe2/success.json",
+          "seconds": 196.11708199977875,
+          "sha256": "5bd045faea5f0973ce0e3e3504ca07b802f18dc49ac529df246714f88f35a06e"
+        },
+        {
+          "coarse_seconds": 20.456239514052868,
+          "ordinal": 2,
+          "paf_rows": 430,
+          "quality": {
+            "bases": {
+              "cross": 1967,
+              "intra": 1967
+            },
+            "intervals": {
+              "cross": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ],
+              "intra": [
+                [
+                  9766,
+                  10345
+                ],
+                [
+                  13694,
+                  15082
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-6cb03b65e4c12980564d4c84/q0-regional-raw-c544190e18d8756a4a352db6/success.json",
+          "seconds": 44.26145627349615,
+          "sha256": "03ff60c7ada6fed211513fc1209ac24e7954707cb853bef6104f0ba6b69a0a82"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 3,
+          "paf_rows": 5195,
+          "quality": {
+            "bases": {
+              "cross": 3841,
+              "intra": 3841
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  3841
+                ]
+              ],
+              "intra": [
+                [
+                  0,
+                  3841
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-115a9878899d5819b0b900f7/q0-regional-raw-46134e40fa8ff1686df7ed5c/success.json",
+          "seconds": 53.635321259498596,
+          "sha256": "f5eb2a2d2ff3a61f5bac301377a3c65321682350f42a1fec53de57de6acf6efb"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 4,
+          "paf_rows": 2346,
+          "quality": {
+            "bases": {
+              "cross": 5768,
+              "intra": 5768
+            },
+            "intervals": {
+              "cross": [
+                [
+                  194180,
+                  199948
+                ]
+              ],
+              "intra": [
+                [
+                  194180,
+                  199948
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-400a73488d929a5bd6983627/q0-regional-raw-4bc746f22dc01f75189e6a47/success.json",
+          "seconds": 109.53067583590746,
+          "sha256": "4c86b02357933f9ab236cdeabcdf2af484b0c1abacc2394dfd5f9fdb70f20cb5"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 5,
+          "paf_rows": 79,
+          "quality": {
+            "bases": {
+              "cross": 2954,
+              "intra": 2954
+            },
+            "intervals": {
+              "cross": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ],
+              "intra": [
+                [
+                  101684,
+                  103303
+                ],
+                [
+                  106948,
+                  108283
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bc0018ff644a7c0b71394d8d/q0-regional-raw-b4ec5820a371f0ca48884d04/success.json",
+          "seconds": 22.253799200057983,
+          "sha256": "abd7a740383925b48ce214a3c5f2d30c0d58d810602b0c6ea6af2bb52aeb579f"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 6,
+          "paf_rows": 3284,
+          "quality": {
+            "bases": {
+              "cross": 1009,
+              "intra": 1009
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ],
+              "intra": [
+                [
+                  1499,
+                  1640
+                ],
+                [
+                  4131,
+                  4565
+                ],
+                [
+                  11154,
+                  11588
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-94c21b60b409112a914dd2f8/q0-regional-raw-72309b599a6def6d6ab419b4/success.json",
+          "seconds": 80.6324570402503,
+          "sha256": "80da67e298d17fcda182d239b20b268cda1f0aae9aef5f2b243910329e459fc0"
+        },
+        {
+          "coarse_seconds": 28.1966070830822,
+          "ordinal": 7,
+          "paf_rows": 116,
+          "quality": {
+            "bases": {
+              "cross": 68225,
+              "intra": 45565
+            },
+            "intervals": {
+              "cross": [
+                [
+                  4068650,
+                  4080624
+                ],
+                [
+                  4084534,
+                  4094534
+                ],
+                [
+                  4107659,
+                  4120210
+                ],
+                [
+                  4125292,
+                  4150980
+                ],
+                [
+                  4159536,
+                  4167548
+                ]
+              ],
+              "intra": [
+                [
+                  4080397,
+                  4080624
+                ],
+                [
+                  4084534,
+                  4084693
+                ],
+                [
+                  4092036,
+                  4095470
+                ],
+                [
+                  4125803,
+                  4167548
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-1c603a06c11b516cd733aa48/q0-regional-raw-e0687c7d5b6b59046f681d44/success.json",
+          "seconds": 51.975284710526466,
+          "sha256": "b37ffb9f5f41325a234c6a0337dfd1f29b8c3de1128a97df5455d315a94f80fa"
+        },
+        {
+          "coarse_seconds": 24.663950726389885,
+          "ordinal": 8,
+          "paf_rows": 10395,
+          "quality": {
+            "bases": {
+              "cross": 89338,
+              "intra": 90108
+            },
+            "intervals": {
+              "cross": [
+                [
+                  201723,
+                  203064
+                ],
+                [
+                  204402,
+                  205407
+                ],
+                [
+                  206015,
+                  216287
+                ],
+                [
+                  216288,
+                  225337
+                ],
+                [
+                  225340,
+                  226495
+                ],
+                [
+                  233482,
+                  235558
+                ],
+                [
+                  235559,
+                  282706
+                ],
+                [
+                  282707,
+                  300000
+                ]
+              ],
+              "intra": [
+                [
+                  201478,
+                  203064
+                ],
+                [
+                  204402,
+                  226495
+                ],
+                [
+                  233482,
+                  284387
+                ],
+                [
+                  284476,
+                  300000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-567a6a1266da5cb07d941359/q0-regional-raw-7d4418e50e954faa95d34719/success.json",
+          "seconds": 315.2758792042732,
+          "sha256": "31a9ac910e5d9c6e37fbd8dd08939934cc203b79b799d0040cfa516d8ee8e93a"
+        },
+        {
+          "coarse_seconds": 19.87710991501808,
+          "ordinal": 9,
+          "paf_rows": 484,
+          "quality": {
+            "bases": {
+              "cross": 1430,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  7486365,
+                  7487475
+                ],
+                [
+                  7488026,
+                  7488346
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-7bc00b0352c02ca669c594cf/q0-regional-raw-20b93cdcaa385a9c951c6633/success.json",
+          "seconds": 44.66450819373131,
+          "sha256": "5b2ce91e2ece3440ed764939a14d49c6b949d0ed2afc9d6931e4a0d6b8e273bf"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 10,
+          "paf_rows": 84,
+          "quality": {
+            "bases": {
+              "cross": 1329,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [
+                [
+                  1186538,
+                  1187236
+                ],
+                [
+                  1187237,
+                  1187868
+                ]
+              ],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3ce5aa54680b1b24eecd8ad4/q0-regional-raw-f81437516975bdbadc244d99/success.json",
+          "seconds": 49.85996922105551,
+          "sha256": "db9a9bbe728e0608cf3294b74e483c9fe707e76ca0201c4118cf3fd6efefafad"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 11,
+          "paf_rows": 29,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-fb0c5ef77823757a68af52f6/q0-regional-raw-c1939d38c1225545e166247c/success.json",
+          "seconds": 26.738394767045975,
+          "sha256": "bebab58dd7a221a7ff7a474d2a3009959768f7e2ff6386e5f18ee343e1a17274"
+        },
+        {
+          "coarse_seconds": 24.18969239294529,
+          "ordinal": 12,
+          "paf_rows": 678,
+          "quality": {
+            "bases": {
+              "cross": 17397,
+              "intra": 5639
+            },
+            "intervals": {
+              "cross": [
+                [
+                  31605,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  64314,
+                  70217
+                ],
+                [
+                  70218,
+                  71299
+                ],
+                [
+                  71301,
+                  76001
+                ],
+                [
+                  84724,
+                  84847
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ],
+              "intra": [
+                [
+                  31565,
+                  31609
+                ],
+                [
+                  33614,
+                  34324
+                ],
+                [
+                  41883,
+                  41988
+                ],
+                [
+                  75996,
+                  76001
+                ],
+                [
+                  84724,
+                  84728
+                ],
+                [
+                  86098,
+                  88305
+                ],
+                [
+                  93258,
+                  95822
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3b50d6e77db8a147214331bd/q0-regional-raw-ce27afc572017a8309189e45/success.json",
+          "seconds": 53.63244953006506,
+          "sha256": "d45f39d7f5be1a84edfc812f92510c8b6caa30dcb5f3e548f04360b2fdf348ee"
+        },
+        {
+          "coarse_seconds": 23.419637106359005,
+          "ordinal": 13,
+          "paf_rows": 3211,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 947
+            },
+            "intervals": {
+              "cross": [],
+              "intra": [
+                [
+                  112414,
+                  112519
+                ],
+                [
+                  139004,
+                  139419
+                ],
+                [
+                  142899,
+                  143326
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2ce26b7195656d2ad52a73f6/q0-regional-raw-2aea14b76318782dbdec5f45/success.json",
+          "seconds": 242.5486679971218,
+          "sha256": "586c51e213bcee0f5b431d4bc4aeeb0f0b99a1fcf4e4ad2885a1a1dd22c20e3d"
+        },
+        {
+          "coarse_seconds": 19.489824816584587,
+          "ordinal": 14,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-24503adfcde3c47e3241485c/q0-regional-raw-e49979b9ee6989da6f9d9cca/success.json",
+          "seconds": 39.1815710067749,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 20.03598963469267,
+          "ordinal": 15,
+          "paf_rows": 142,
+          "quality": {
+            "bases": {
+              "cross": 46980,
+              "intra": 31142
+            },
+            "intervals": {
+              "cross": [
+                [
+                  109094711,
+                  109118291
+                ],
+                [
+                  109122361,
+                  109123083
+                ],
+                [
+                  109123484,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109160461
+                ]
+              ],
+              "intra": [
+                [
+                  109104507,
+                  109118291
+                ],
+                [
+                  109122367,
+                  109122800
+                ],
+                [
+                  109122802,
+                  109123083
+                ],
+                [
+                  109123484,
+                  109127275
+                ],
+                [
+                  109133282,
+                  109133732
+                ],
+                [
+                  109141482,
+                  109141771
+                ],
+                [
+                  109143296,
+                  109144308
+                ],
+                [
+                  109145170,
+                  109148296
+                ],
+                [
+                  109152458,
+                  109153282
+                ],
+                [
+                  109153283,
+                  109157017
+                ],
+                [
+                  109157028,
+                  109157158
+                ],
+                [
+                  109157159,
+                  109158736
+                ],
+                [
+                  109158737,
+                  109159643
+                ],
+                [
+                  109159645,
+                  109160361
+                ],
+                [
+                  109160372,
+                  109160461
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bac973007de40eced82c7847/q0-regional-raw-9f133bc713097ba38355261a/success.json",
+          "seconds": 43.143723867833614,
+          "sha256": "1af662e6b7d203b37cfeffc7868292095a8b30c03778cd229829299b1e7c5bc8"
+        },
+        {
+          "coarse_seconds": 49.65420363843441,
+          "ordinal": 16,
+          "paf_rows": 0,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-4c69d1800141d7164a5e462a/q0-regional-raw-5007cf3bc61600ac3387de04/success.json",
+          "seconds": 75.74665709584951,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "coarse_seconds": 23.556938499212265,
+          "ordinal": 17,
+          "paf_rows": 1890,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 1860
+            },
+            "intervals": {
+              "cross": [],
+              "intra": [
+                [
+                  29061,
+                  29282
+                ],
+                [
+                  32811,
+                  33041
+                ],
+                [
+                  38727,
+                  38950
+                ],
+                [
+                  38956,
+                  39068
+                ],
+                [
+                  71937,
+                  72236
+                ],
+                [
+                  86798,
+                  86902
+                ],
+                [
+                  86905,
+                  86995
+                ],
+                [
+                  86998,
+                  87060
+                ],
+                [
+                  87063,
+                  87253
+                ],
+                [
+                  89387,
+                  89716
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-90105f0e662f601d0c2906db/q0-regional-raw-595a37e532591fd2aeab0541/success.json",
+          "seconds": 161.76574134081602,
+          "sha256": "a81f44fb2895ca45e47c40854c3a2bc1a65f8697becd363205878c94c643f00e"
+        },
+        {
+          "coarse_seconds": 20.16184126585722,
+          "ordinal": 18,
+          "paf_rows": 1079,
+          "quality": {
+            "bases": {
+              "cross": 7175,
+              "intra": 689
+            },
+            "intervals": {
+              "cross": [
+                [
+                  35482,
+                  35750
+                ],
+                [
+                  40107,
+                  40213
+                ],
+                [
+                  44536,
+                  50997
+                ],
+                [
+                  68314,
+                  68654
+                ]
+              ],
+              "intra": [
+                [
+                  49333,
+                  49858
+                ],
+                [
+                  49859,
+                  50023
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2aa70524c4036e808f350ee1/q0-regional-raw-4a0cd1789292197f118641c5/success.json",
+          "seconds": 65.77942435443401,
+          "sha256": "6b48b4db411cdef06ad1ae377c53c8f5c01c5739c341d259a7af04156d5445db"
+        },
+        {
+          "coarse_seconds": 0,
+          "ordinal": 19,
+          "paf_rows": 82,
+          "quality": {
+            "bases": {
+              "cross": 0,
+              "intra": 0
+            },
+            "intervals": {
+              "cross": [],
+              "intra": []
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-57fb6d980bebc7da11b1a881/q0-regional-raw-0ec91cfcc934e2d1c22a5d9f/success.json",
+          "seconds": 20.804133772850037,
+          "sha256": "fab158b5de39d5744ae551dc0421654c82a0f685069da2a6f800bf1d29de1c74"
+        },
+        {
+          "coarse_seconds": 26.826282747089863,
+          "ordinal": 20,
+          "paf_rows": 16274,
+          "quality": {
+            "bases": {
+              "cross": 86978,
+              "intra": 94052
+            },
+            "intervals": {
+              "cross": [
+                [
+                  600000,
+                  600257
+                ],
+                [
+                  600263,
+                  602025
+                ],
+                [
+                  602028,
+                  602875
+                ],
+                [
+                  605127,
+                  607221
+                ],
+                [
+                  609366,
+                  610752
+                ],
+                [
+                  611464,
+                  619463
+                ],
+                [
+                  623027,
+                  624502
+                ],
+                [
+                  626941,
+                  627586
+                ],
+                [
+                  627589,
+                  629599
+                ],
+                [
+                  631396,
+                  635678
+                ],
+                [
+                  635679,
+                  637797
+                ],
+                [
+                  637798,
+                  639916
+                ],
+                [
+                  639917,
+                  642035
+                ],
+                [
+                  642036,
+                  644862
+                ],
+                [
+                  644863,
+                  646276
+                ],
+                [
+                  646277,
+                  647690
+                ],
+                [
+                  647691,
+                  649104
+                ],
+                [
+                  649105,
+                  651223
+                ],
+                [
+                  651224,
+                  653342
+                ],
+                [
+                  653343,
+                  654756
+                ],
+                [
+                  654757,
+                  656170
+                ],
+                [
+                  656171,
+                  679143
+                ],
+                [
+                  679232,
+                  700000
+                ]
+              ],
+              "intra": [
+                [
+                  600000,
+                  602025
+                ],
+                [
+                  602028,
+                  602875
+                ],
+                [
+                  603006,
+                  604109
+                ],
+                [
+                  605127,
+                  607422
+                ],
+                [
+                  608189,
+                  609304
+                ],
+                [
+                  609366,
+                  611215
+                ],
+                [
+                  611218,
+                  620634
+                ],
+                [
+                  620637,
+                  621351
+                ],
+                [
+                  623046,
+                  624502
+                ],
+                [
+                  625148,
+                  626930
+                ],
+                [
+                  626941,
+                  627586
+                ],
+                [
+                  627589,
+                  629599
+                ],
+                [
+                  631160,
+                  679143
+                ],
+                [
+                  679188,
+                  700000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-607f236e26540eadcd3b7bce/q0-regional-raw-f16c5cf65f1b6efc0d8426a3/success.json",
+          "seconds": 569.6298837959766,
+          "sha256": "34116ac9d3497490b60c1f903f3494fde7a96fa10cb3004629a751d1bd87e6a5"
+        },
+        {
+          "coarse_seconds": 22.2148569971323,
+          "ordinal": 21,
+          "paf_rows": 11174,
+          "quality": {
+            "bases": {
+              "cross": 15518,
+              "intra": 15516
+            },
+            "intervals": {
+              "cross": [
+                [
+                  0,
+                  189
+                ],
+                [
+                  9452,
+                  24781
+                ]
+              ],
+              "intra": [
+                [
+                  1,
+                  189
+                ],
+                [
+                  9452,
+                  24780
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-de6f905af1de3df16d08fed3/q0-regional-raw-f2cdcbd2dc39af2306cfe181/success.json",
+          "seconds": 407.91630620509386,
+          "sha256": "59e17559fbf16d60aa81f83c14f029897c44d461f45a5ae9ed7674ccb733d866"
+        },
+        {
+          "coarse_seconds": 24.672926127910614,
+          "ordinal": 22,
+          "paf_rows": 12487,
+          "quality": {
+            "bases": {
+              "cross": 89357,
+              "intra": 91338
+            },
+            "intervals": {
+              "cross": [
+                [
+                  400000,
+                  428572
+                ],
+                [
+                  428573,
+                  431402
+                ],
+                [
+                  431403,
+                  432819
+                ],
+                [
+                  432820,
+                  445484
+                ],
+                [
+                  445603,
+                  461232
+                ],
+                [
+                  461551,
+                  462179
+                ],
+                [
+                  462222,
+                  464695
+                ],
+                [
+                  465117,
+                  465540
+                ],
+                [
+                  465543,
+                  466341
+                ],
+                [
+                  467002,
+                  468133
+                ],
+                [
+                  468136,
+                  469969
+                ],
+                [
+                  470397,
+                  470841
+                ],
+                [
+                  470844,
+                  471412
+                ],
+                [
+                  471413,
+                  474947
+                ],
+                [
+                  474948,
+                  475379
+                ],
+                [
+                  475700,
+                  476144
+                ],
+                [
+                  476147,
+                  476852
+                ],
+                [
+                  476855,
+                  477039
+                ],
+                [
+                  482004,
+                  482985
+                ],
+                [
+                  483252,
+                  483926
+                ],
+                [
+                  484518,
+                  485305
+                ],
+                [
+                  485701,
+                  486383
+                ],
+                [
+                  486386,
+                  488030
+                ],
+                [
+                  488031,
+                  488224
+                ],
+                [
+                  490310,
+                  500000
+                ]
+              ],
+              "intra": [
+                [
+                  400000,
+                  445484
+                ],
+                [
+                  445603,
+                  464695
+                ],
+                [
+                  465117,
+                  466341
+                ],
+                [
+                  467002,
+                  469969
+                ],
+                [
+                  470397,
+                  475379
+                ],
+                [
+                  475700,
+                  477039
+                ],
+                [
+                  479361,
+                  480336
+                ],
+                [
+                  482004,
+                  483926
+                ],
+                [
+                  485243,
+                  488906
+                ],
+                [
+                  490310,
+                  500000
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-ed6c9d078d43384fa753d722/q0-regional-raw-b7b58f98b05779b916043d52/success.json",
+          "seconds": 391.1222968772054,
+          "sha256": "bae862e611a41cf1ff06e8c9510160194c53a73033accb9ffd4f9f8ea4288820"
+        },
+        {
+          "coarse_seconds": 24.296814247965813,
+          "ordinal": 23,
+          "paf_rows": 1151,
+          "quality": {
+            "bases": {
+              "cross": 28557,
+              "intra": 15250
+            },
+            "intervals": {
+              "cross": [
+                [
+                  111866635,
+                  111866862
+                ],
+                [
+                  111870888,
+                  111881681
+                ],
+                [
+                  111887088,
+                  111888558
+                ],
+                [
+                  111888559,
+                  111888777
+                ],
+                [
+                  111898852,
+                  111899424
+                ],
+                [
+                  111900142,
+                  111900746
+                ],
+                [
+                  111901692,
+                  111902565
+                ],
+                [
+                  111909931,
+                  111910413
+                ],
+                [
+                  111924910,
+                  111926079
+                ],
+                [
+                  111928768,
+                  111933385
+                ],
+                [
+                  111933393,
+                  111933478
+                ],
+                [
+                  111933493,
+                  111933578
+                ],
+                [
+                  111933581,
+                  111933621
+                ],
+                [
+                  111934459,
+                  111934794
+                ],
+                [
+                  111934807,
+                  111935226
+                ],
+                [
+                  111935320,
+                  111936754
+                ],
+                [
+                  111961501,
+                  111966635
+                ]
+              ],
+              "intra": [
+                [
+                  111866792,
+                  111866862
+                ],
+                [
+                  111870888,
+                  111870898
+                ],
+                [
+                  111871110,
+                  111871365
+                ],
+                [
+                  111871366,
+                  111871681
+                ],
+                [
+                  111875779,
+                  111876743
+                ],
+                [
+                  111898852,
+                  111899424
+                ],
+                [
+                  111900142,
+                  111900264
+                ],
+                [
+                  111900265,
+                  111900818
+                ],
+                [
+                  111901692,
+                  111902565
+                ],
+                [
+                  111909931,
+                  111910413
+                ],
+                [
+                  111924910,
+                  111926079
+                ],
+                [
+                  111928768,
+                  111933382
+                ],
+                [
+                  111933391,
+                  111933439
+                ],
+                [
+                  111933440,
+                  111933463
+                ],
+                [
+                  111933465,
+                  111933629
+                ],
+                [
+                  111934182,
+                  111934793
+                ],
+                [
+                  111934807,
+                  111936753
+                ],
+                [
+                  111955403,
+                  111955501
+                ],
+                [
+                  111955502,
+                  111955517
+                ],
+                [
+                  111955519,
+                  111955536
+                ],
+                [
+                  111955540,
+                  111956347
+                ],
+                [
+                  111956348,
+                  111957054
+                ],
+                [
+                  111965294,
+                  111965640
+                ],
+                [
+                  111966093,
+                  111966563
+                ]
+              ]
+            }
+          },
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3d675996338ca726a0a2b6bc/q0-regional-raw-3e9a8bc22555f8478764e45f/success.json",
+          "seconds": 67.1508487612009,
+          "sha256": "3a51672643bcd7b86bb4b4d4767aaa88e997f138eedb951b3c276c4e113a42aa"
+        }
+      ],
+      "seconds": 743.5369912087917
+    }
+  ],
+  "production_strategy_enabled": false,
+  "quality": {
+    "lost_old_paired_core_bases": {
+      "cross": 195729,
+      "intra": 203194
+    },
+    "old_paired_core_bases": {
+      "cross": 537230,
+      "intra": 477057
+    }
+  },
+  "seconds": 1683.354143038392,
+  "status": "native_disjoint_tail_chain_budget_completed_NOT_production_acceptance",
+  "target_context_changed": false,
+  "threads": 16
+}

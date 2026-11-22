@@ -3397,3 +3397,49 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   消费者信息都保留。试验原始工具未启用`--eqx`；当前100paired-record proxy与生产
   `ObservedSourcePairs`的100 M/=资格还须在正式集成时统一（排除X对门槛的贡献），不能热改
   本轮已执行的冻结helper、伪造源SHA或把补做验证追认为当时执行过。
+
+### 2026-11-22 14:35：长尾温和档被否决，回退诊断超时；转测不改变精度的启动开销
+
+- **43012312 / agent-X86-47 / SUCCEEDED**，24个未参与64个原生调参窗口的慢/短/空/长父序列例。
+  完整原参数A=472.375/743.537秒，宽松限制`-p0.1 -N200`的B=249.840/179.058秒，
+  样本mapper管线2.835倍；节点波动大，不外推整麦。两次A历史stdout匹配、两次B彼此匹配。
+  **拒绝部署**：旧高质量cross core实际丢195729/537230bp（36.43%），intra丢203194/477057bp
+  （42.59%）。ordinal8跨组装原89338bp全失，ordinal22丢约68%。宽松档在长尾样本上的代价
+  远高于强档在64个调参窗口中的平均代价，不能用后者替代该验证。
+  报告 `regional-chain-budget-heldout-native-20261122.json` SHA
+  `75065648ee7c8525b0d2550fa681e9caf63937bc6c50dfa40b009f9b602d1f3c`。
+- **43012347 / agent-X86-30 / FAILED，jobExitCode=124**，14:25:33达到隔离诊断1500秒上限。
+  原参数A0=494.076秒、带逐core/dataset原生回退B1=699.133秒；没有完整ABBA、最终质量或提速
+  验收，不接纳任何试验产物到主任务。无需盲目放宽时限重提相同64样本。主新版不受其超时影响。
+- 在已完成的A0日志抽查8个case（0/1/3/8/25/37/50/63）的coarse/exact：慢节点上
+  `stderr mtime - command.json mtime - minimap2自报real`约16.7–18.9秒/调用，之前节点同一批
+  约0.1–0.7秒/调用。它是文件时间戳估算，可能包含stdout/stderr打开、子进程启动、远端文件系统
+  及缓冲的延迟，**不直接证明guard或某个文件系统是因果**。原参数与回退本来做同样比对，却跨
+  节点耗时显著不同；这种条件下不应仅靠更多剪枝调参去掩盖固定开销。
+- 已提交同为x86、拿到**同一慢节点agent-X86-30**的无DNA启动诊断 **43012713**，
+  4CPU/4GiB，目录 `q0-guard-startup-20261122-143421`，索引 `/tmp/q0-guard-startup-current.json`。
+  以小命令隔离`command.json`落盘后open/Popen/child.wait；原guard、Python`-S`、相同guard
+  脚本放节点`/tmp`、系统`prlimit`按轮反序比较。每种都验证PID保持、PG继承、4GiB软/硬限制
+  等值；不把无保护作为性能候选。不改主runtime，不引入新运行时依赖，不重跑任何小麦序列。
+- 14:34:35主43012037仍RUNNING/q0_evidence，25初始单元已经实际复用、无失败，memReal
+  42148MiB/320GiB；CPU recent约31%。尚无实际区域池吞吐，不能把它当作窗口速率或卡死证据。
+  旧42523432仍RUNNING/grt_step2且不改。14:30 agent-X86-39仍无可用CPU槽，没有提交同节点
+  主任务进程采样。目标继续active，完整小麦和新的现场加速仍未验收。
+
+#### 14:44：启动固定开销已在慢节点重现，真实mapper单变量控制在跑
+
+- **43012713 / agent-X86-30 / SUCCEEDED，14:36:45**。无DNA启动对照12次，子PID/PG和4GiB
+  软/硬上限均等。原Python guard记录命令后中位18.436秒，其中`Popen`0.050秒、等子进程
+  18.188秒；本地guard脚本18.200秒、`-S`17.832秒、`prlimit`11.962秒（均为记录命令后）；
+  不足以解释或解决整段延迟。由同一慢节点重现，排除“必须运行小麦或改变科学档才慢”，但
+  尚不能把全部延迟归到某个库或文件系统。报告 `regional-guard-startup-native-20261122.json`
+  SHA `3349855fb0d2d751246053602fe351ce5a97c583dc56b2c4fecf3a113041b605`。
+- 运行环境为MUMmer和模块栈设置了共享库搜索路径；区域minimap2自身是动态链接程序。
+  对照 **43012781 / agent-X86-08**，目录 `q0-regional-loader-path-20261122-144307`，索引
+  `/tmp/q0-regional-loader-path-current.json`。只改变诊断子进程的`LD_LIBRARY_PATH`，先比较
+  原/候选解析出的库绝对身份；只有相同才继续。原/候选均以相同Python保护器核查PID/PG/软硬限额，
+  用3个已完成窗口在同一节点跑继承/清理/清理/继承的coarse+exact，要求**每份历史PAF字节相同**，
+  输入不超过50MiB，库与原工具、guard和FASTA的SHA前后不变。7项本地启动/loader测试通过。
+  这不是全环境卸掉库路径，也没有改共享环境/MUMmer/生产任务；若不能等价则不继续映射。
+- 14:43:38主新版43012037仍`q0_evidence`，25初始单元已复用、无失败，memReal46249MiB，
+  CPU recent约33%；尚未见区域池admission。旧42523432仍运行，不动；禁止仅凭低CPU中断。
