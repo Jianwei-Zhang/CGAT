@@ -3096,3 +3096,60 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   recent1594%。本次源码修复保存到master，但**没有安装到正在执行的ec093edf实例**。
   保留主任务继续产出，不重新执行handoff/update.sh、不动原锁或基线。后续须结合实际
   mapper长尾/队列损失与剩余阶段评估净收益，再决定是否正常停止并定点续跑。
+
+## 2026-11-22 11:30 CST：真实原生队列对照约1.92x，候选已准备，主任务未停
+
+- 原生control **43011969 SUCCEEDED / agent-X86-10**，目录
+  `q0-native-dispatch-control-20261122-110235`，单节点16CPU/160GiB；使用与生产预算一致的
+  7路×2线程、每路4GiB RLIMIT_AS。只重建选中窗口，不加载整套源DNA；**1505544121bytes
+  的生成FASTA先逐一匹配原context完整SHA/size**，原完整raw receipt/命令/tool/PAF也核对。
+  选取新raw完成队列中第43号起连续64个窗口，各历史native real<=45秒，故不覆盖326秒
+  极端尾部，也不是随意剪掉生产任务。直接调用真实`q0_regional_mapping._execute`，保留
+  原raw argv/精度profile，仅替换隔离目录输入路径；不写主工作区或采纳诊断副本为新结果。
+- 旧→新→新→旧 **ABBA** 同节点运行，墙钟分别114.9371 / 61.6519 / 59.6847 / 118.5239秒。
+  **256次完整原生stdout均逐字节等于各自原完成PAF**，mapper数/线程/guard未变；两次合计
+  原生子步骤1.9241x、墙钟减少48.03%。本地/HPC的6项定向helper测试通过。仍不测规划/
+  pre-CIGAR/catalog消费；control owner没有生产85GiB DNA堆，未覆盖真实大堆fork成本。
+  **不冒称整套1.92x，也不与前一规划1.14x相乘。**
+- 此前1189条真实raw耗时的all-ready模型：14路FIFO1790.303秒、完成顺序606.815秒，约2.95x；
+  模型不含规划、chaining、I/O、future未完成部分及缓存验证。仅用于识别长尾队首损失；
+  此次真实原生ABBA才是更强的子步骤证据。完整报告
+  `regional-mapper-dispatch-hpc-control-20261122.json` SHA
+  8d774d0fd5ac8652f503375a75c997c8182852041d5fe052e3c6a88c66047901，
+  `regional-mapper-dispatch-hpc-verified-20261122.json`绑定全部源码/终态/资源proof及原输出SHA。
+- 为避免把61000个planned窗口误判为“多数已由native矩阵满足”，另做纯元数据界限诊断。
+  **43011989 SUCCEEDED / agent-X86-18**，1CPU/2GiB，2项测试（5000种随机+边界几何与真实
+  plan_query_windows比对）。4个native成功receipt SHA均不变，完整矩阵query侧并集1629part、
+  共40156368bp。即使把这些父查询全部算作可跳过，它们也最多对应**2573个**100kb窗口；
+  因而planned61000里至少58427窗口并非已被当前native矩阵完整覆盖。
+- 11:27只读observer所见最新completed4100（11:24:01）、fallback0；再扣除最大可跳过数和
+  未打印/待回收完成的保守余量后，仍有**54214个planned窗口待交代**。这不是独立mapper
+  次数：有的父查询可能转为整组native fallback，统计也不是大输出重新验收。partial targets
+  包含原38117个reference anchors，可能还包含pairwise新增候选；此处证明只用其ref子集。
+  完整界限/源码证明见`regional-native-matrix-skip-bound-20261122.json`及其`-verified-`文件。
+  前一43011984结果保留；v2只澄清target集合是包含ref子集而非恰等于ref，未更改界限算法。
+- 三模块候选已隔离prepare，**尚未安装**。目录
+  `q0-completion-cutover-candidate-20261122-110559`，源码冻结748fddd0；新transition SHA
+  **c0f3ce957eb59138dc8ffce9771bacfd351afa6a942ed682b2676bc6a729f210**，prior仍为当前ec
+  transition47d3bd...，绑定当前安装journal9e7780...与previous_job **43010335**，保护42523432。
+  仅3个`q0_regional_{execution,discovery,candidates}.py`改变，另11核心模块为no-op，4项科学
+  policy AST全部相同；无新core文件、未改outer contract、未改initial profile/native checkpoint。
+  `q0-completion-candidate-prepared-20261122.json`记录`workspace_modified=false/job_stopped=false`。
+- 候选只读初始预检 **43011976 RUNNING / agent-X86-41**，11:09:48开始，2CPU/16GiB，
+  83项针对性handoff/transition/context测试已通过，继续核对真实25项initial checkpoints。
+  最后查询时尚无最终validation.json；**不能拿测试通过或进程活着代替25项完整预检终态**。
+  原主任务在预检期间继续产出，11:23仍43010335/ec093edf、completed4000、recent720%、
+  memReal89776MiB/max95956MiB；旧42523432仍RUNNING、recent1596%。没有再停任何主任务。
+- **接续动作**：先查43011976终态、validation.json是否25/25且work_modified=false，核对
+  当前run仍q0_evidence且最终q0证据尚未发布。上述真实native收益+仍有大量未被矩阵覆盖的
+  窗口支持推进受保护切换，但不把任一子步骤倍率当作已证明的完整净收益；保留约3小时
+  既有续跑前缀成本作判断。届时新申请32CPU/320GiB资源ready gate（**目前尚未提交**），
+  得到并严格核对新job资源后，才正常stop **43010335**；等旧pids/正常锁释放，再原子handoff。
+  只安装3模块及新launcher/declaration，保留所有native和新增regional成功缓存。不触碰旧
+  基线，不删锁、不重跑update.sh/发布CI，不重prepare，不采纳或覆盖诊断PAF为主结果。
+- 新候选本地索引`/tmp/q0-completion-cutover-candidate.json`，当前live索引
+  `/tmp/q0-next-transition-current.json`仍指原主43010335；不要提前覆盖。原bundle的旧config
+  仍指43010068，**不能重放**。新handoff-config/resume.dsub尚未生成，须绑定新transition、
+  新preflight validation SHA、old_job43010335、protected42523432。observer3037575只读仍在，
+  不具备自动修复/聊天通知功能。后续真实新reader启动时须核对新增admission日志
+  `dispatch=completion_order result_order=original`、25项实际SKIP_VALID及缓存命中后新工作吞吐。

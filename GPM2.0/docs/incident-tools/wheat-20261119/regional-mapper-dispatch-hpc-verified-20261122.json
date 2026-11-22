@@ -1,0 +1,65 @@
+{
+  "status": "native_mapper_dispatch_abba_verified",
+  "job": 43011969,
+  "state": "SUCCEEDED",
+  "node": "agent-X86-10",
+  "hpc_tests": "Ran 6 tests in 0.204s",
+  "sample_cases": 64,
+  "total_native_invocations": 256,
+  "complete_stdout_matches_original": true,
+  "phase_seconds": [
+    {
+      "dispatch": "ordered",
+      "seconds": 114.93714101612568
+    },
+    {
+      "dispatch": "completed",
+      "seconds": 61.65185759216547
+    },
+    {
+      "dispatch": "completed",
+      "seconds": 59.68468497693539
+    },
+    {
+      "dispatch": "ordered",
+      "seconds": 118.5238753631711
+    }
+  ],
+  "ordered_over_completed": 1.9240783644905763,
+  "wall_time_reduction_fraction": 0.48027064881800574,
+  "input_window_fasta_bytes": 1505544121,
+  "all_input_fasta_byte_identities_matched_original": true,
+  "source_dna_loaded_whole": false,
+  "mapper_workers": 7,
+  "mapper_threads": 2,
+  "CPU_requested": 16,
+  "memory_requested_mib": 163840,
+  "address_space_bytes_per_mapper": 4294967296,
+  "main_job": 43010335,
+  "protected_baseline": 42523432,
+  "main_workspace_modified": false,
+  "main_restarted": false,
+  "raw_only_replay_NOT_measurement": {
+    "completed_raw_cohort": 1189,
+    "workers14_ordered_seconds": 1790.3029999999999,
+    "workers14_completed_seconds": 606.815,
+    "ordered_over_completed_model": 2.950327529807272
+  },
+  "limitations": [
+    "native exact-CIGAR step only: excludes planning/chaining/catalog, partial native outputs not sampled",
+    "completed bounded cohort is not all remaining work and excludes worst >45s raw long-tail cases",
+    "control owner has no whole-DNA heap; not full production process-launch cost or whole-wheat speedup",
+    "ABBA reduces but does not eliminate hardware/cache/shared-node noise"
+  ],
+  "restart_roi_proven": false,
+  "full_wheat_completed": false,
+  "artifact_sha256": {
+    "summary.json": "8d774d0fd5ac8652f503375a75c997c8182852041d5fe052e3c6a88c66047901",
+    "code.sha256": "f4683d34a6881c16f40bea846823afc161c0b1b8bd9652a4c398b1a8c45dbf49",
+    "allocation.json": "1e6c8632f26708d6de9276f40a576f62f85a126822b6d8b4a407127389c7d02d",
+    "allocation.digest": "c95ce9c893560d32304c15ca7687a533990a8c87280d9aeb94d90f3fbbe4fa85",
+    "final-job.json": "1152171e3872299ca22d4b04ccf31619b5181946fe01ffc45f20e9599582925d",
+    "benchmark_regional_mapper_dispatch.py": "1e38c6c1caffc09c8bc6ecd548c3a6909134d92a0505132e68fc683c816ef7ea",
+    "test_benchmark_regional_mapper_dispatch.py": "973613de25d2d76be82fe715d97d7905dcfa63fc808af650eac12a96205522a8"
+  }
+}

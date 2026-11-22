@@ -1,0 +1,17 @@
+{
+  "status": "native_matrix_skip_bound_verified_metadata_only",
+  "job": 43011989,
+  "node": "agent-X86-18",
+  "state": "SUCCEEDED",
+  "hpc_tests": "Ran 2 tests in 0.637s",
+  "main_workspace_modified": false,
+  "source_dna_or_paf_read": false,
+  "artifact_sha256": {
+    "summary.json": "969d094af13a57a95258aa71e7ac54192eaa28bd8055ecf310e654ec7c23a349",
+    "code.sha256": "b018520b4ccfc9b39c8a89698305dd3f63da224ff3baef4578837e880af8f2dc",
+    "final-job.json": "170a4c033116965a5f2ca5031b63e8687acacf655ecea057dd8e319a8342ad53",
+    "bound_regional_scope_from_native_receipts.py": "23c413e442d225a024ba9fb1238da17914dd0ff20bd7eaf89338cb7d5fb2bcc9",
+    "test_bound_regional_scope_from_native_receipts.py": "fa07b15cfb144540c63d8ae7764a8ceaf523b2ad64a59392a2330ee43c26d768",
+    "scope.dsub": "1fe3ef54fc15b068e84ff14db70a7cb1095ee247470ce5824eed33ea5c5e6e4e"
+  }
+}
