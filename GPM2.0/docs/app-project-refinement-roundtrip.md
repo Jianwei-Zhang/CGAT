@@ -79,3 +79,9 @@
 - `witnesses` 记录导出时需要保持的相邻路径段（稳定 ID、来源、区段、方向）；不可把序列位置的变化当成另一个位点。Gap 种子 label 为 `seqleft/seqright`，Tel 为 `endpoint`，使用现有内容绑定的种子计划（明确源名称、正向 1-based 闭区间、源长度、完整源文件或所用区间 SHA-256；最终按 `start/end` 定向）。种子使用当前路径的左右立即相邻来源或实际端点；编辑过的项目仍以其保存的路径为准。无正长度 N、缺直接端点/侧翼、不可定位来源或无内容证据，明确报该位点不可导出/准备，不能跳过相邻缺口拼成另一个缺口。
 - Server 在已准备好的对应工作区启动；不接受 ZIP 提供输出目录或 Server 可执行路径。校验原交付归属后，在工作区自己的编号任务目录，用已准备工具解析内容绑定计划。Gap 局部输入是正向 `left + N*gap_bp + right`，Tel 局部输入只有定向端点；证据与局部 FASTA 一起保存。输入准备不修改 LGZ/自动精修已发布文件，也不是任务已完成的证据。
 - 后续结果包按本次 `batch_sha256` 和 `locus_id × tool` 关联回导，不能以一次归档定义取代本地导出凭据。补丁必须绑定目标和实际替换区间、前后序列摘要及 Server 质量判定。没有足够证据验证的提案不得生成自动应用操作。该段不改变旧 DEGAP-JOBS 完整性和回导边界。
+
+## v1：手动执行与结果包
+
+- **执行与目录布局**：设计入口为 `python3 <prepared-tools>/manual_refinement_tasks.py --server-dir . --tasks <ZIP> --run`，缺失 reads 时可重复传 `--hifi`/`--ont` 按技术覆盖；默认仅准备输入，传 `--run` 在项目锁下执行。批次位于 `08_refinement_jobs/02_manual/<batch_sha256>/`，其中 `02_jobs/<locus_id>/<tool>/<attempt_id>/` 记录固定版本、输入与原生输出，并输出 `03_report/summary.json` 与 `04_delivery/refinement_results.zip`；锁定工具、原生证据与项目归属校验照旧。
+- **结果包清单**：`refinement_results.zip` 根清单为 `refinement_results.json`（schema `cgat.app-refinement-results.v1`），以 `batch_sha256` 绑定原始导出清单。`results` 每行含 `locus_id`、`tool`、`status`、`reason`、`patch`，可带 `version`/`revision` 等运行信息；允许失败与未完成，不用失败文件冒充补丁。
+- **补丁约束**：`patch` 包含 `operation`（`replace_gap`/`prepend_tel`/`append_tel`）、`original_length`、`original_sha256`、`path`、`length`、`sha256`；序列为 `patches/` 下无换行的大写 ASCII IUPAC 文本。Gap 仅替换已导出的一整段 `N`，空序列只用于明确通过验证的 Gap 删除；带 `N` 属 `partial`，需要更改非 `N` 侧翼的候选标为 `rejected`，不作为自动补丁。Tel 必须有真实延伸且原端点完整，不替换已有端点的序列。
