@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -34,6 +35,17 @@ except ModuleNotFoundError:
 
 SCHEMA = "cgat.native-refinement-completion"
 NAME = "native_complete.json"
+
+
+class NativeProcessError(subprocess.CalledProcessError):
+    def __str__(self):
+        if self.returncode < 0:
+            try:
+                name = signal.Signals(-self.returncode).name
+            except ValueError:
+                name = str(-self.returncode)
+            return f"Native tool process terminated by signal {name} (return code {self.returncode}). See the native execution log."
+        return f"Native tool process exited with code {self.returncode}. See the native execution log."
 
 
 def quartet_empty_outcome(code, log, directory, prepared):
@@ -224,7 +236,7 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
         add(driver)
     empty = quartet_empty_outcome(code, log, native_directory, prepared_files) if tool == "quartet" else None
     if code and not empty:
-        raise subprocess.CalledProcessError(code, invocation.command)
+        raise NativeProcessError(code, invocation.command)
     jobs = None
     if empty:
         for parent in (native_directory, native_directory / "tmp"):
@@ -427,15 +439,18 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
         atomic_json(marker, record)
         verify_inputs()
         try:
+            # A failed producer may never write its substep summary. Report the
+            # actual process exit first; capture still requires valid substeps
+            # for a successful or explicitly supported no-candidate outcome.
+            result, native_identities = capture(root, invocation.tool, record["run_id"], directory, invocation,
+                                                process.returncode, log, chromosomes, parameters, prepared_files, driver,
+                                                require_units=launch_request is not None)
             if launch_request is not None:
                 substeps = checked_json(root, paths["02_jobs"] / SUMMARY)
                 record["native_substeps"] = {"producer_run_id": record["run_id"], "completed": len(substeps["units"]),
                                              "computed": sum(not row["reused"] for row in substeps["units"]),
                                              "reused": sum(row["reused"] for row in substeps["units"]),
                                              "summary": (paths["02_jobs"] / SUMMARY).relative_to(root).as_posix()}
-            result, native_identities = capture(root, invocation.tool, record["run_id"], directory, invocation,
-                                                process.returncode, log, chromosomes, parameters, prepared_files, driver,
-                                                require_units=launch_request is not None)
         except Exception:
             record.update(native_status="failed", phase="native")
             atomic_json(marker, record)

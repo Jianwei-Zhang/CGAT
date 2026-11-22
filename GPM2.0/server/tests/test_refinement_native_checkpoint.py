@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import tempfile
 import unittest
@@ -71,6 +72,27 @@ class NativeCheckpointTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0)
         return run
 
+    def test_killed_producer_without_substep_summary_keeps_original_failure_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            groups, _, _ = fixture.workspace(root)
+            def run(command, **kwargs):
+                if Path(command[0]).name == "samtools":
+                    return self.real_run(command, **kwargs)
+                return subprocess.CompletedProcess(command, -signal.SIGTERM)
+            with mock.patch.object(checkpoints, "launch", side_effect=lambda root, invocation, *args: (invocation.command, True)), \
+                 mock.patch.object(native.subprocess, "run", side_effect=run):
+                result = batch.execute_batch(root, groups, 2, tools="quartet")
+            record = result["batch"]["tools"]["quartet"]
+            self.assertNotEqual(result["exit_code"], 0)
+            self.assertEqual(record["phase"], "native")
+            self.assertIn("terminated by signal SIGTERM (return code -15)", record["error"])
+            self.assertNotIn("native_substeps.json", record["error"])
+            report = Path(record["report"]["report"])
+            self.assertIn("terminated by signal SIGTERM", report.read_text())
+            self.assertTrue(any(asset.read_text() == "" for asset in (report.parent / "assets").glob("*.txt")))
+            self.assertFalse((root / "05_final/03_quartet").exists())
+
     def test_three_native_producers_are_not_rerun_after_admission_failure(self):
         for tool in ("tgsgapcloser", "quartet", "lrgapcloser"):
             with self.subTest(tool=tool), tempfile.TemporaryDirectory() as directory:
@@ -101,7 +123,8 @@ class NativeCheckpointTests(unittest.TestCase):
                 self.assertTrue(all(path.read_bytes() == content for path, content in native_files.items()))
                 report = build_tool_report(root, result)
                 html = Path(report["report"]).read_text()
-                self.assertIn("producer did not run in this attempt", html)
+                self.assertIn("Reused native evidence / 复用原生证据", html)
+                self.assertIn("Origin run / 原始运行", html)
                 summary = json.loads((Path(report["directory"]) / "summary.json").read_text())
                 self.assertEqual(summary["execution"]["native_origin"]["run_id"], "1" * 32)
                 assets = {Path(row["workspace_path"]).name: row for row in summary["artifacts"]}
@@ -239,7 +262,8 @@ class NativeCheckpointTests(unittest.TestCase):
                 failure = json.loads((Path(row["report"]["directory"]) / "summary.json").read_text())
                 self.assertFalse(failure["final_available"])
                 self.assertEqual(failure["native_status"], "success")
-                completed = batch.execute_batch(root, groups, 8, tools="tgsgapcloser")
+                with mock.patch.object(batch, "build_source_evidence", return_value=None):
+                    completed = batch.execute_batch(root, groups, 8, tools="tgsgapcloser")
             self.assertEqual(completed["exit_code"], 0, completed)
             self.assertEqual(len(calls), 1)
             row = completed["batch"]["tools"]["tgsgapcloser"]

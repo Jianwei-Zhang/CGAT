@@ -315,7 +315,7 @@ class PublicRefinementWorkerTests(unittest.TestCase):
             self.assertTrue((root / "05_final/00_lgz/assembly.fa").is_file())
             overview = (root / "06_report/report.html").read_text()
             self.assertIn("../05_final/00_lgz/assembly.fa", overview)
-            self.assertIn("not a refined result", overview)
+            self.assertIn("LGZ 基线（非精修结果）", overview)
             self.assertFalse((root / "05_final/01_degap").exists())
             self.assertTrue(all(path.read_bytes() == data for path, data in original.items()))
             completion = next((root / ".runtime/refinement/completions").glob("*.json"))
