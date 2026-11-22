@@ -44,8 +44,8 @@ remain available without repeating their raw contents in the main summary.
 The HTML stays standalone: embedded styles, no external dependencies, and
 unchanged archive entrypoints. The CSS, local links and result text were checked
 by regenerating the LGZ and all four tool reports from the existing synthetic
-runs without launching the scientific tools. Automated closure and archive
-checks are not a substitute for the final real-browser acceptance.
+runs without launching the scientific tools. The [Windows offline browser acceptance](server-refinement-final-acceptance-20261122.md#windows-file-browser-acceptance)
+separately exercised the real `file://` browser and sandbox.
 
 ## Portable display and containment
 

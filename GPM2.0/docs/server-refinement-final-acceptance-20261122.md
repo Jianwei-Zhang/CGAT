@@ -421,3 +421,35 @@ original cache-miss refusal. Logs: `evidence/legacy-native-continuation-tests.lo
 and `evidence/legacy-native-focused-tests.log` (18 passing executed cases; the
 other module in that initial invocation had a test harness `PYTHONPATH` error
 and was run separately with its correct package root).
+
+
+## Windows file-browser acceptance
+
+On 2026-11-22, stock Windows Chrome `157.0.8103.80` in an isolated headless
+profile loaded the redesigned reports from `file://`, including directories
+with spaces and Chinese characters. The tested renderer revision was
+`2d5bd017d79865b1bd1684141c696d0657d788d1`. HTTP(S) and WS(S) were blocked in
+both the page and attached iframe sessions; there were zero network attempts,
+failed resources or runtime/security errors during the audited navigation.
+
+- Opened the current publication's report from the workflow overview, checked
+  its Final Path and Full/Light file links, and followed an original gap to its
+  native job fragment. This used actual packaging/publication over controlled
+  partial admission, not an additional scientific benchmark.
+- Extracted the actual Full/Light ZIPs outside the Server tree and opened each
+  copy of `report/report.html`. Both rendered the DEGAP global gap track and
+  both directions' inline graphics; the language switch and table expansion
+  worked inside `sandbox=allow-scripts`. The wrapper could not read the frame's
+  document, and no same-origin permission was used. The report bytes matched
+  across the two separately validated packages.
+- Opened the regenerated reports from the actual synthetic LGZ/four-tool runs.
+  The LGZ audit rows rendered on expansion, admissions displayed 0/0/1/1 as
+  measured, and the DEGAP job page showed the recorded missing-output error.
+  The same page switched light/dark palettes and stayed within a 390 px
+  document viewport; wide tables scroll within their own containers.
+
+Receipt and capture files: `evidence/browser-offline-2d5bd017/`, including
+`browser-receipt.json` (SHA-256
+`b58d1a26eb0c293f7fcb45fdcaa40ad614eb90af7448d9bf060aa62eb478b28e`), the
+local CDP harness and three screenshots. This is actual browser behavior,
+not a native App window or Linux ARM acceptance.
