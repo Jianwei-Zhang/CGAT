@@ -12,7 +12,8 @@ from unittest.mock import patch
 from server.tests.test_q0_admission import EvidenceFixture, bridge_fixture, dna
 from server.tools.lgz_core import q0_admission, q0_preparation
 from server.tools.lgz_core.q0_catalog import build_catalog
-from server.tools.lgz_core.q0_frontier_scope import UnsearchedWindows, decision_frontier, window_touches_frontier
+from server.tools.lgz_core.q0_frontier_scope import (UnsearchedWindows, decision_frontier, selected_proof_frontier,
+                                                     window_touches_frontier)
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey
 
 
@@ -115,6 +116,9 @@ class FrontierScopeTests(unittest.TestCase):
         other = next(p for p in data.parts.values() if p.source.contig == "a")
         def window(p, start, end):
             return SimpleNamespace(segment_id=p.segment_id, segment_length=p.interval.length, start=start, end=end)
+        proof = selected_proof_frontier(data, control.admission, control.paths)
+        self.assertFalse(window_touches_frontier(window(other, 0, 100), (), data.parts, proof))
+        self.assertTrue(window_touches_frontier(window(other, 0, 100), (window(part, 0, 400),), data.parts, proof))
         omitted.observe(window(other, 0, 100), (), data.parts)
         unrelated = replace(data, catalog={"supplement_scope": {"unsearched_part_intervals": omitted.record()}})
         self.assertEqual(q0_admission.construct_q0(unrelated).records, control.records)
@@ -123,6 +127,17 @@ class FrontierScopeTests(unittest.TestCase):
         with self.assertRaisesRegex(Q0EvidenceError, "unsearched competing context"):
             q0_admission.construct_q0(replace(data, catalog={
                 "supplement_scope": {"unsearched_part_intervals": omitted.record()}}))
+
+    def test_proof_repair_covers_pairwise_placement_and_both_offset_evidence_axes(self):
+        a, b = SourceKey("a", "a"), SourceKey("b", "b")
+        placement = SimpleNamespace(placement_id="p", source=a, interval=Interval(108, 160),
+                                    localization_kind="pairwise", evidence_ids=("pair", "reference"))
+        link = SimpleNamespace(hit=SimpleNamespace(evidence_id="pair", query=Interval(10, 20), target=Interval(40, 60)),
+                               query_source=a, target_source=b, query_offset=100, target_offset=400)
+        data = SimpleNamespace(pair_links=(link,))
+        search = SimpleNamespace(path=SimpleNamespace(slices=(SimpleNamespace(placement_id="p"),), joins=()))
+        frontier = selected_proof_frontier(data, SimpleNamespace(placements=(placement,)), {"chr": search})
+        self.assertEqual(frontier, {a: (Interval(108, 160),), b: (Interval(440, 460),)})
 
     def test_omissions_merge_relative_intervals_and_reject_bad_frame(self):
         source = SourceKey("d", "ctg")

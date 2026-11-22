@@ -125,27 +125,8 @@ def _unsearched_axes(report, parts):
             if (compact := merged_intervals(spans))}
 
 
-def audit_selected_scope(data, admission, searches):
-    """Reject exact cuts or pairwise-localized slices exposed to omitted work.
-
-    A missing competitor could overlap either axis of a positive proof. To
-    avoid inferring absence from skipped work, use the conservative union
-    (even another-pair context on that axis can make the decision uncertain).
-    This guard does not claim equivalence with full discovery or certify the
-    mapper's search. A trial can abstain and request full evidence instead.
-    """
-    axes = _unsearched_axes(data.catalog.get("supplement_scope"), data.parts)
-    if not axes:
-        return
-
-    def touches(source, span):
-        axis = axes.get(source)
-        if axis is None:
-            return False
-        starts, intervals = axis
-        i = bisect_right(starts, span.end - 1) - 1
-        return i >= 0 and intervals[i].end > span.start
-
+def _selected_proof_axes(data, admission, searches):
+    """Positive-proof geometry shared by the dispatch repair and final guard."""
     placements = {p.placement_id: p for p in admission.placements}
     exact, optional = set(), set()
     for search in searches.values():
@@ -161,8 +142,7 @@ def audit_selected_scope(data, admission, searches):
             placement = placements[s.placement_id]
             if placement.localization_kind != "pairwise":
                 continue
-            if touches(placement.source, placement.interval):
-                raise Q0EvidenceError("q0 scoped placement has unsearched competing context; rerun with full supplemental evidence")
+            yield "placement", placement.source, placement.interval
             optional.update(placement.evidence_ids)
 
     wanted = exact | optional
@@ -178,7 +158,41 @@ def audit_selected_scope(data, admission, searches):
         seen.add(eid)
         for source, interval, offset in ((link.query_source, link.hit.query, link.query_offset),
                                          (link.target_source, link.hit.target, link.target_offset)):
-            if touches(source, Interval(interval.start + offset, interval.end + offset)):
-                raise Q0EvidenceError("q0 scoped pair evidence has unsearched competing context; rerun with full supplemental evidence")
+            yield "pair evidence", source, Interval(interval.start + offset, interval.end + offset)
     if exact - seen:
         raise Q0EvidenceError("q0 sequence overlap has no recorded pair evidence")
+
+
+def selected_proof_frontier(data, admission, searches):
+    """Find omitted whole contexts that could affect the selected claims.
+
+    This is work selection, not authorization: after adding those contexts the
+    paths can change and the ordinary omission guard must run again.
+    """
+    spans = defaultdict(_IntervalUnion)
+    for _kind, source, span in _selected_proof_axes(data, admission, searches):
+        spans[source].append(span)
+    return {source: tuple(intervals) for source, intervals in spans.items()}
+
+
+def audit_selected_scope(data, admission, searches):
+    """Reject exact cuts or pairwise-localized slices exposed to omitted work.
+
+    A missing competitor could overlap either axis of a positive proof. To
+    avoid inferring absence from skipped work, use the conservative union
+    (even another-pair context on that axis can make the decision uncertain).
+    This guard does not claim equivalence with full discovery or certify the
+    mapper's search. A trial can abstain and request full evidence instead.
+    """
+    axes = _unsearched_axes(data.catalog.get("supplement_scope"), data.parts)
+    if not axes:
+        return
+
+    for kind, source, span in _selected_proof_axes(data, admission, searches):
+        axis = axes.get(source)
+        if axis is None:
+            continue
+        starts, intervals = axis
+        i = bisect_right(starts, span.end - 1) - 1
+        if i >= 0 and intervals[i].end > span.start:
+            raise Q0EvidenceError(f"q0 scoped {kind} has unsearched competing context; rerun with full supplemental evidence")
