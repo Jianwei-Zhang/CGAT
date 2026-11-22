@@ -4494,6 +4494,6 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 
 - 本地 `master` 新增 `q0_supplement_scope=decision_frontier` opt-in：先用已完成的参考证据和跨组装基础 PAF 构造 provisional Q0，只在路径端点和未解决 join 两侧保留 source-coordinate shoulder；区域 query/target 窗口仍保留原目标全集，未选窗口不会被写成负证据。若 provisional Q0 无路径、区域路由未启用或规划异常，自动回到 `full`，不做有损跳过。scope、实际 omitted 数和 frontier 大小写入 catalog；self 矩阵不参与 provisional join 证明。
 - 该策略只作用于 `prepare_partial`/`prepare_candidates` 的区域窗口派发；native fallback、完整已完成矩阵、PAF 原始字节、下游 Q0 admission/竞争门不变。没有安装到远端 `43017096`，没有修改当前运行任务，也没有改默认 `full`。
-- 本地 Q0 定向测试 **135/135** 通过，另有决策前沿单元测试与真实小麦 4B/5B 隔离结果。新策略的证据边界仍是允许的信息损失：它可能不再发现不触及当前 provisional 路径的新候选，不得称为无损等价。
+- 本地 Q0 定向测试 **136/136** 通过，其中包含真实 bridge fixture 的 provisional-frontier 读取冒烟；另有决策前沿单元测试与真实小麦 4B/5B 隔离结果。新策略的证据边界仍是允许的信息损失：它可能不再发现不触及当前 provisional 路径的新候选，不得称为无损等价。
 - 3D 天然面板作业 `43017437` 于 05:41:05 启动，最终因诊断脚本独立 `timeout` 以 `exitCode=124` 结束；已生成 24 个区域项目回执但没有完整 3D report。该终态是诊断预算耗尽，不是比对科学失败，不重提同一诊断。4B/5B 已完成的结果仍有效。新版 `43017096` 与旧版 `42523432` 仍 RUNNING，06:26:32 已推进到 **23/55**（7B）。
 - 用户约定继续只本地 commit，不 push。
