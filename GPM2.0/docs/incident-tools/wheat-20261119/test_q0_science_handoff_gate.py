@@ -62,6 +62,28 @@ class HandoffTests(unittest.TestCase):
         marker=self.work/'grt/evidence/q0_prepare/tasks/q0-map-a6056c2d8fcb81f6ca19d1a7/success.json'
         marker.parent.mkdir(parents=True);marker.write_text('{}')
         with self.assertRaisesRegex(ValueError,'re-stage'):self.validate()
+    def test_replay_ready_binds_both_native_outputs_and_control(self):
+        control=self.root/'control.py';control.write_text('read only')
+        self.config['loader_replay_controls']={'control.py':self.record(control)}
+        self.config['loader_smoke']=self.config['initial_preflight']
+        isolated=self.root/'allocation-loader-archive-replay/verified_child/0';isolated.mkdir(parents=True)
+        files={}
+        for name in ('precise','chaining'):
+            files[name]=isolated/(name+'.paf');files[name].write_text(name)
+        ready=self.root/'loader-ready.json'
+        row={'status':'regional_loader_ready_before_handoff','host':'host','workspace_modified':False,
+             'config_sha256':'config','transition_sha256':self.config['transition']['sha256'],
+             'loader_smoke_sha256':self.config['loader_smoke']['sha256'],
+             'acceptance':{'mode':'inherited_path_changed_with_same_allocation_archive_replay',
+                           'archive_input_bytes':30,'paf_sha256':{n:gate.digest(p) for n,p in files.items()}}}
+        ready.write_text(json.dumps(row))
+        self.assertEqual(gate.check_loader_ready(self.config,self.root,'config','host'),gate.digest(ready))
+        with self.assertRaisesRegex(ValueError,'not bound'):
+            gate.check_loader_ready(self.config,self.root,'config','another')
+        files['precise'].write_text('changed')
+        with self.assertRaisesRegex(ValueError,'dependency'):
+            gate.check_loader_ready(self.config,self.root,'config','host')
+
     def test_forged_ready_binding_and_changed_scheduler_bytes_fail(self):
         self.release['ready_sha256']='other'
         with self.assertRaisesRegex(ValueError,'identity'):self.validate()

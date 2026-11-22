@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from probe_q0_loader_allocation import checked, probe, smoke_scope, POLICY
+from probe_q0_loader_allocation import checked, probe, qualify_loader, smoke_scope, POLICY
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,24 @@ class AllocationLoaderProofTests(unittest.TestCase):
             smoke_scope(checked(self.save('other'), self.root))
         with self.assertRaisesRegex(ValueError, 'no successful isolated'):
             smoke_scope(checked(self.save(modified=True), self.root))
+
+    def test_only_search_path_drift_may_request_new_native_parity(self):
+        prior = self.loader
+        drift = {**prior, 'inherited_path_sha256': 'd'*64}
+        with self.assertRaisesRegex(ValueError, 'identities differ'):
+            qualify_loader(drift, prior)
+        with patch('probe_q0_loader_allocation.sha256', side_effect=AssertionError('unneeded')):
+            self.assertEqual(qualify_loader(prior, prior), {'mode': 'original_writer_smoke_match'})
+        for k in ('dependencies_sha256', 'tool_sha256', 'policy'):
+            with self.assertRaisesRegex(ValueError, 'identities differ'):
+                qualify_loader({**drift, k: 'e'*64}, prior,
+                               lambda: self.fail('unsafe path entered archive replay'))
+        with self.assertRaisesRegex(RuntimeError, 'not identical'):
+            def mismatch():
+                raise RuntimeError('not identical')
+            qualify_loader(drift, prior, mismatch)
+        result = qualify_loader(drift, prior, lambda: {'paf_sha256': {'chaining': 'x', 'precise': 'y'}})
+        self.assertEqual(result['mode'], 'inherited_path_changed_with_same_allocation_archive_replay')
 
     def test_no_proof_mutation_or_path_escape(self):
         proof = self.save()

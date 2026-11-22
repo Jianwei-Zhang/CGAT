@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import shlex
 
-from probe_q0_loader_allocation import checked, sha256, smoke_scope, POLICY
+from probe_q0_loader_allocation import checked, sha256, smoke_scope, POLICY, REPLAY_FILES
 
 
 def record(path):
@@ -30,7 +30,7 @@ def load_initial(path, transition_sha):
     return rows
 
 
-def prepare(root, environment, *, buffered_proof=None, buffered_scheduler=None):
+def prepare(root, environment, *, buffered_proof=None, buffered_scheduler=None, allocation_replay=False):
     root = root.resolve(strict=True)
     stage = json.loads((root / "candidate-prepared.json").read_text())
     if (stage.get("status") != "q0_candidate_prepared_not_installed"
@@ -52,6 +52,8 @@ def prepare(root, environment, *, buffered_proof=None, buffered_scheduler=None):
     fresh_record = None
     if (buffered_proof is None) != (buffered_scheduler is None):
         raise ValueError("buffered proof and successful Donau terminal receipt are both required")
+    if allocation_replay and buffered_proof is None:
+        raise ValueError("allocation replay requires independent buffered controls")
     if buffered_proof is not None:
         from q0_buffered_proof import verify_buffered_proof
         if fresh.exists() or fresh.is_symlink():
@@ -91,6 +93,11 @@ def prepare(root, environment, *, buffered_proof=None, buffered_scheduler=None):
         raise ValueError("handoff launch already staged; will not overwrite")
     environment = environment.resolve(strict=True)
     probe = root / "probe_q0_loader_allocation.py"
+    replay_files = {}
+    if allocation_replay:
+        probe = controls / probe.name
+        replay_files = {name: record(controls / name) for name in sorted(REPLAY_FILES)}
+        extra_control["loader_replay_controls"] = replay_files
     cwd = shlex.quote(str(root))
     control_command = "exec python3 -B -u q0_science_handoff_gate.py --config handoff-config.json"
     if extra_control:
@@ -115,7 +122,7 @@ sha256sum -c code.sha256
 # This timeout applies only to the isolated loader check, never the analysis.
 test ! -e loader-ready.json
 PYTHONPATH={cwd}/package/server/tools${{PYTHONPATH:+:$PYTHONPATH}} timeout --signal=TERM --kill-after=10s 350s \\
-  python3 -B -u probe_q0_loader_allocation.py --config handoff-config.json > loader-ready.json.tmp
+  python3 -B -u {shlex.quote(str(probe))} --config handoff-config.json > loader-ready.json.tmp
 mv loader-ready.json.tmp loader-ready.json
 sha256sum loader-ready.json
 # The existing resource/owner gate still needs old terminal + no pids + no lock.
@@ -129,7 +136,8 @@ sha256sum loader-ready.json
     script_path.chmod(0o755)
     with checksum.open("x") as stream:
         for path in (config_path, script_path, probe, environment, fresh, smoke, sample, tpath,
-                     *(Path(row['path']) for row in extra_control.values())):
+                     *(Path(row['path']) for key, row in extra_control.items() if key != 'loader_replay_controls'),
+                     *(Path(row['path']) for name, row in replay_files.items() if name != probe.name)):
             stream.write(f"{sha256(path)}  {path}\n")
     return {"status": "loader_resource_gate_configured_not_submitted", "config": record(config_path),
             "script": record(script_path), "checksums": record(checksum), "workspace_modified": False}
@@ -141,6 +149,7 @@ if __name__ == "__main__":
     p.add_argument("--environment", type=Path, required=True)
     p.add_argument("--buffered-proof", type=Path)
     p.add_argument("--buffered-scheduler", type=Path)
+    p.add_argument("--allocation-replay", action="store_true")
     a = p.parse_args()
     print(json.dumps(prepare(a.bundle, a.environment, buffered_proof=a.buffered_proof,
-                             buffered_scheduler=a.buffered_scheduler), sort_keys=True, indent=2))
+                             buffered_scheduler=a.buffered_scheduler, allocation_replay=a.allocation_replay), sort_keys=True, indent=2))

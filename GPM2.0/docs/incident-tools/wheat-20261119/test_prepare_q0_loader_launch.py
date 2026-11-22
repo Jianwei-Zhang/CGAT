@@ -52,6 +52,11 @@ class PrepareLoaderLaunchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'not overwrite'):
             prepare(self.bundle, self.env)
 
+    def test_allocation_replay_is_opt_in_with_independent_initial_proof(self):
+        with self.assertRaisesRegex(ValueError, 'independent buffered'):
+            prepare(self.bundle, self.env, allocation_replay=True)
+        self.assertFalse((self.bundle/'resume.dsub').exists())
+
     def test_checks_real_prior_identities_and_does_not_write_a_partial_launch(self):
         current = self.bundle/'validation.json'
         payload = json.loads(current.read_text()); payload['initial_checkpoints'][-1]['checkpoint_sha256'] = 'different'

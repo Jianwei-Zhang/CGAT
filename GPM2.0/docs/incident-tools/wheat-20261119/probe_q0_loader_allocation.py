@@ -61,6 +61,35 @@ def prior_window_tool(work, sample):
     return json.loads((work / declared["context"]["path"]).read_text())["spec"]["tool"]
 
 
+REPLAY_FILES = frozenset(('probe_q0_loader_allocation.py', 'benchmark_regional_thread_split.py',
+                          'benchmark_regional_mapper_dispatch.py', 'q0_allocation_loader_replay.py'))
+
+
+def replay_controls(config, root):
+    records = config['loader_replay_controls']
+    if set(records) != REPLAY_FILES:
+        raise ValueError('incomplete allocation replay controls')
+    paths = {name: checked(record, root.parent) for name, record in records.items()}
+    parent = paths['probe_q0_loader_allocation.py'].parent
+    if (parent == root or parent.parent != root.parent
+            or any(path.parent != parent or path.name != name for name, path in paths.items())
+            or paths['probe_q0_loader_allocation.py'] != Path(__file__).resolve()):
+        raise ValueError('allocation replay controls are not an isolated bound packet')
+    if config['loader_probe'] != records['probe_q0_loader_allocation.py']:
+        raise ValueError('allocation probe has a different identity')
+    return paths
+
+
+def qualify_loader(enabled, stored, replay=None):
+    if enabled is not None and enabled == stored:
+        return {'mode': 'original_writer_smoke_match'}
+    scope = {'policy', 'tool_sha256', 'dependencies_sha256', 'inherited_path_sha256'}
+    if (replay is None or not isinstance(enabled, dict) or set(enabled) != scope or set(stored) != scope
+            or {key for key in scope if enabled[key] != stored[key]} != {'inherited_path_sha256'}):
+        raise ValueError("the new allocation's loader identities differ from the successful smoke")
+    return {'mode': 'inherited_path_changed_with_same_allocation_archive_replay', **replay()}
+
+
 def probe(config_path):
     from lgz_core import q0_regional_mapping as mapping
     from lgz_core.common import executable_identity
@@ -93,19 +122,27 @@ def probe(config_path):
     if loader is None:
         raise ValueError("this allocation cannot safely enable the regional mapper loader")
     tool = {"resolved": loader.tool_path, "sha256": loader.tool_sha256}
-    _, enabled = loader.child(tool)
-    if enabled != stored:
-        raise ValueError("the new allocation's loader identities differ from the successful smoke")
+    env, enabled = loader.child(tool)
     if len(os.sched_getaffinity(0)) < 32:
         raise ValueError("new allocation has less than 32 CPUs in its affinity")
+    replay = None
+    if 'loader_replay_controls' in config:
+        paths = replay_controls(config, root)
+        from q0_allocation_loader_replay import replay_archive
+        if Path(replay_archive.__code__.co_filename).resolve(strict=True) != paths['q0_allocation_loader_replay.py']:
+            raise ValueError('wrong allocation replay module loaded')
+        replay = lambda: replay_archive(root, work, env)
+    acceptance = qualify_loader(enabled, stored, replay)
     if sha256(config_path) != config_sha:
         raise ValueError("allocation configuration changed while checking the loader")
     checked(config["transition"], root)
     checked(config["loader_smoke"], root)
+    if replay is not None:
+        replay_controls(config, root)
     return {"status": "regional_loader_ready_before_handoff", "host": socket.gethostname(),
             "config_sha256": config_sha, "transition_sha256": config["transition"]["sha256"],
             "candidate_sha256": sha256(module_path), "loader_smoke_sha256": config["loader_smoke"]["sha256"],
-            "loader": asdict(loader), "expected_cached_tool": expected_tool, "workspace_modified": False}
+            "loader": asdict(loader), "acceptance": acceptance, "expected_cached_tool": expected_tool, "workspace_modified": False}
 
 
 if __name__ == "__main__":

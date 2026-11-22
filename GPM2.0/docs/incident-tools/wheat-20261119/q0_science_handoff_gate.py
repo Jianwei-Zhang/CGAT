@@ -68,16 +68,47 @@ def validate_initial(config, root):
         raise ValueError('all initial checkpoints must have passed the real read-only preflight')
 
 
+def check_loader_ready(config, root, config_sha, host):
+    """In the replay path, bind separate node-local acceptance to actual ready."""
+    if 'loader_replay_controls' not in config:
+        return None
+    path = root/'loader-ready.json'
+    sha = digest(path)
+    doc = json.loads(checked({'path': str(path), 'sha256': sha}).read_text())
+    if (path.is_symlink() or doc.get('status') != 'regional_loader_ready_before_handoff'
+            or doc.get('workspace_modified') is not False or doc.get('host') != host
+            or doc.get('config_sha256') != config_sha or doc.get('transition_sha256') != config['transition']['sha256']
+            or doc.get('loader_smoke_sha256') != config['loader_smoke']['sha256']):
+        raise ValueError('loader readiness is not bound to this allocation and config')
+    for row in config['loader_replay_controls'].values():
+        checked(row)
+    evidence = doc['acceptance']
+    if evidence.get('mode') == 'inherited_path_changed_with_same_allocation_archive_replay':
+        paf = evidence.get('paf_sha256', {})
+        if (set(paf) != {'chaining', 'precise'} or type(evidence.get('archive_input_bytes')) is not int
+                or not 0 < evidence['archive_input_bytes'] <= 128*1024**2):
+            raise ValueError('node-local replay proof is incomplete')
+        for name, expected in paf.items():
+            checked({'path': str(root/'allocation-loader-archive-replay'/'verified_child'/'0'/(name+'.paf')),
+                     'sha256': expected})
+    elif evidence != {'mode': 'original_writer_smoke_match'}:
+        raise ValueError('unknown loader readiness mode')
+    return sha
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--config',type=Path,required=True);args=p.parse_args()
     config_path=args.config.resolve(strict=True);root=config_path.parent;config_sha=digest(config_path)
     config=json.loads(config_path.read_text());checked(config['transition'])
     if config['old_job']==config['protected_baseline']:raise ValueError('baseline cannot be the handoff target')
     validate_initial(config,root)
+    loader_sha = check_loader_ready(config, root, config_sha, socket.gethostname())
     ready={'status':'resource_ready_waiting_q0_handoff','config_sha256':config_sha,
            'transition_sha256':config['transition']['sha256'],'old_job':config['old_job'],
            'protected_baseline':config['protected_baseline'],'host':socket.gethostname(),'pid':os.getpid(),
            'at':datetime.datetime.now().astimezone().isoformat()}
+    if loader_sha is not None:
+        ready['loader_ready_sha256'] = loader_sha
     with (root/'ready.json').open('x') as stream:
         json.dump(ready,stream,indent=2);stream.flush();os.fsync(stream.fileno())
     ready_sha=digest(root/'ready.json');print('Q0_RESOURCE_READY',json.dumps(ready),flush=True)
@@ -89,6 +120,8 @@ def main():
             validate_handoff(config,handoff,root,ready_sha,socket.gethostname())
             if 'buffered_preflight_scheduler' in config:
                 validate_initial(config,root)
+            if check_loader_ready(config, root, config_sha, socket.gethostname()) != loader_sha:
+                raise ValueError('loader readiness changed since the allocation was declared ready')
             print('Q0_HANDOFF_ACCEPTED',flush=True)
             from resume_q0_science import execute
             environment=allocation_environment(handoff,root)
