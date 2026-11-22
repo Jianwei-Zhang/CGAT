@@ -16,6 +16,7 @@ THREADS = 2
 CPU_BUDGET = 10
 MEMORY_BUDGET_MIB = 32768
 LOADER_SHA = '25866e25156c2bf5d7cc90b66ee821c1b7d1485fc64752050092f75c9037c33a'
+NODE_LOCAL_ONLY = frozenset(('dependencies_sha256', 'inherited_path_sha256'))
 
 
 def exact_child_env(inherited, candidate):
@@ -27,10 +28,22 @@ def exact_child_env(inherited, candidate):
     return candidate
 
 
+def smoke_comparison(local, prior, *, allow_node_local_proof=False):
+    fields = NODE_LOCAL_ONLY | {'policy', 'tool_sha256'}
+    if set(local) != fields or set(prior) != fields:
+        raise ValueError('loader proof field inventory differs')
+    differences = sorted(k for k in fields if local[k] != prior[k])
+    if differences and (not allow_node_local_proof or not set(differences) <= NODE_LOCAL_ONLY):
+        raise ValueError('loader proof differs from validated writer smoke: '+', '.join(differences))
+    return differences
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('workspace','archive','stage','output'):
         parser.add_argument('--'+name,type=Path,required=True)
+    parser.add_argument('--measure-node-local-proof',action='store_true',
+                        help='measure the guarded same-node variant; never authorize production handoff')
     args = parser.parse_args()
     work, archive, stage, out = (p.resolve() for p in (args.workspace,args.archive,args.stage,args.output))
     if any(out.is_relative_to(p) or p.is_relative_to(out) for p in (work,archive,stage)):
@@ -57,10 +70,11 @@ def main():
     tool = {'resolved':loader.tool_path,'sha256':loader.tool_sha256}
     child, source = loader.child(tool)
     clean = exact_child_env(inherited,child)
-    if source != smoke_scope(smoke):
-        raise ValueError('loader dependency/byte identities differ from validated writer smoke')
+    tested_smoke = smoke_scope(smoke)
+    differences = smoke_comparison(source,tested_smoke,allow_node_local_proof=args.measure_node_local_proof)
     loader_time = time.monotonic() - begin
-    print(json.dumps({'phase':'loader_verified','seconds':loader_time}),flush=True)
+    print(json.dumps({'phase':'loader_verified','seconds':loader_time,'host':socket.gethostname(),
+                      'cross_node_proof_difference':differences,'local_loader':source,'writer_smoke':tested_smoke}),flush=True)
     begin = time.monotonic()
     hashes = {}
     cases, identities, nbytes = load_cases(work,archive,WINDOWS,input_digests=hashes)
@@ -89,6 +103,8 @@ def main():
         json.dump({'status':'native_loader_pool_abba_raw_pair_byte_identical','host':socket.gethostname(),
                    'main_workspace_modified':False,'input_bytes':nbytes,'windows':WINDOWS,'measured_workers':WORKERS,
                    'coarse_and_precise_equal_original_stdout':True,'loader_proof':source,'loader_check_seconds':loader_time,
+                   'writer_smoke_proof':tested_smoke,'cross_node_proof_difference':differences,
+                   'no_handoff_authority':True,
                    'original_seconds':base,'verified_child_seconds':candidate,
                    'pool_wall_seconds_saved_per_completed_window':(statistics.mean(base)-statistics.mean(candidate))/WINDOWS,
                    'mean_window_service_seconds':{mode:window_mean(mode) for mode in ('original','verified_child')},
