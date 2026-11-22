@@ -394,3 +394,19 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 11 项定向检查通过（11.603 秒）：新恢复单元用例及既有三工具完成后再接纳、校验器升级重验。不是全量 Server/App 回归。补齐来源封闭与元数据形状检查后，最后 3 项检查通过（2.470 秒）：非法对象/执行结构的缓存失效、重新封装当前回执仍拒绝原生产者失败状态，以及固定源码实际 CLI 的失败/恢复/整段复用。
 - 可选 `CGAT_TEST_QUARTET_ARCHIVE` 用例安装校验过的固定 quarTeT 源码和既定兼容补丁到隔离临时目录，使用本机 `minimap2 2.26-r1175`，注入第二输入退出 7；实际比对调用顺序为 A、B、B，第三次整段 native 复用不再比对。PAF 为短序列真实无命中，不是补洞生物学正确性或固定 conda 环境验收。独立冒烟回执/日志副本保存在 `/tmp/cgat-quartet-partial-evidence-20261122-a5m6ophb/`，副本不是可继续运行的迁移工作区。
 - 未启动全量回归、生产构建、浏览器、现有环境升级、远端作业或发布。继续保留 DEGAP 单 gap、TGS 内部阶段和 LR 迭代恢复、未完成旧 LGZ 阶段迁移、原生离线可视报告、真实固定环境/四工具/双架构，以及最新 App 运行闭环与 A01–A18 最后统一验收。master 和客户工作区未改动。
+
+
+## 2026-11-22：DEGAP 终止 gap 子任务复用与原生调度闭环
+
+- 先扩展原生恢复协议，再新增 `refinement_degap_units.py`，由公共 launcher 接入。固定 `AutoGapfillerPart3.JobExecutor` 的原 ProcessPool、`--work 1`、LEFT/RIGHT 依赖和科学参数保持不变；只在真正执行 child 的边界封存/恢复终止结果，未修改 bundled DEGAP 字节或其版本。此阶段不恢复预处理或未完成的延伸轮次。
+- 新 attempt 重新执行预处理、检测和 setup。单元 key 绑定实际 reads/index/stat/split 文件、两个 flank（包括明确缺失的 flank）、真实生成命令的已声明路径角色、gap 几何、原 raw-input/runtime/helper 和线程。只复制原生消费者需要的顶层 final FASTA 与日志；不搬迁旧 round 树，不接受裸 `checkpoint.info`、`.skip_right` 或存在性作为完成依据。
+- 恢复成功 LEFT 后仍由原生调度器跳过 RIGHT；恢复固定版“退出零但未补上”的 LEFT 后仍调度 RIGHT。复用结果正常返回 future 并进入完整 native summary，原日志字节保留，当前恢复耗时与原生产者时间分开。非零/error/timeout 不生成完成回执；另一个 gap 失败时已封存 gap 保留可用。
+- Native 完成同时核对子任务覆盖、LEFT 成功才允许跳过 RIGHT、配置几何、真实已消费字节与选择的合法 FASTA。多份 eligible final FASTA 的原生选择保留但不做部分复用，避免改变上游 glob 选择，也不因此否决合法原生运行。新生成的脚本只允许一条与 job/flank/direction 匹配的原生命令，保留 shell-safe Unicode/标点，防止未知目录别名进入准备输入。
+- 成功/失败报告纳入单元回执、原生产者快照和 child 诊断；公开中英文指南区分已实现的 DEGAP/quarTeT 边界与仍待接入的 TGS/LR。恢复仍通过原生分析/整合和既有 CGAT 接纳、来源重建及 Final Path 发布，不新增 LGZ 整体复制或失败回退路径。
+
+### 本段必要轻量证据
+
+- 最终 9 项定向检查通过（24.383 秒）：新增 6 项 DEGAP 恢复用例，以及既有 quarTeT 恢复、完成校验器升级和 DEGAP 接纳来源重建。覆盖真实 fork/shell、未补上 LEFT 后 RIGHT、原 LEFT 成功后跳过、多候选不部分复用、reads/线程/缓存损坏、几何/跳过原因/遗漏任务/消费字节，以及 Unicode、明确缺失 flank、脚本和目录别名。
+- 去掉每完成一个 child 都重扫并重写全部单位摘要的二次方元数据工作：worker 只提交自身 durable 回执，parent 退出时汇总一次；LEFT 依赖预先建索引。未改变原生调度或科学参数，未以单元检查冒充整流程性能基准。没有执行全量回归。
+- 调度器/管理器/分析器取自 lock 绑定 manifest 校验过的 bundled Part3，子任务使用真实 fork worker 和 bash。预处理、child 组装和整合 FASTA 是受控夹具，不冒称完整 DEGAP、固定 conda 环境、双架构、真实补洞生物学或 App 验收。
+- 全目标仍保留：TGS 原生阶段、LR 迭代恢复、未完成旧 LGZ 阶段迁移、原生离线可视报告、真实固定环境/四工具/双架构、终止与残留进程故障注入，以及最新 App 闭环和 A01–A18 最后统一检查。没有升级现有环境、运行远端/浏览器/生产构建或发布；master 和客户工作区未动。

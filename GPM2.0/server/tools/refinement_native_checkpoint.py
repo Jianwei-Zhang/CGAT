@@ -289,9 +289,34 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
     if unit_artifacts:
         summary_path = root / base / "02_jobs" / run_id / SUMMARY
         summary = checked_json(root, summary_path)
-        expected = [] if empty == "no_eligible_flanks" else ["flank_map_" + Path(path).name for path in prepared_files]
-        if [row["unit"]["suffix"] for row in summary["units"]] != expected:
-            raise PathError("native substeps do not cover every selected quarTeT input in order")
+        if tool == "quartet":
+            expected = [] if empty == "no_eligible_flanks" else ["flank_map_" + Path(path).name for path in prepared_files]
+            if [row["unit"]["suffix"] for row in summary["units"]] != expected:
+                raise PathError("native substeps do not cover every selected quarTeT input in order")
+        elif tool == "degap":
+            attempted = {row["job_name"]: row for row in jobs["jobs"] if row["status"] != "skipped"}
+            covered = [row["unit"]["job_name"] for row in summary["units"]]
+            if len(covered) != len(set(covered)) or set(covered) != set(attempted):
+                raise PathError("DEGAP native substeps do not cover every attempted child")
+            definitions = {row["job_name"]: row for row in configuration["jobs"]}
+            left_definitions = {}
+            for definition in configuration["jobs"]:
+                if definition.get("direction") == "left":
+                    left_definitions.setdefault((definition.get("chromosome"), definition.get("gap_id")), []).append(definition)
+            for skipped in (row for row in jobs["jobs"] if row["status"] == "skipped"):
+                definition = definitions[skipped["job_name"]]
+                lefts = left_definitions.get((definition.get("chromosome"), definition.get("gap_id")), [])
+                if (definition.get("direction") != "right" or skipped.get("reason") != "LEFT task succeeded"
+                        or len(lefts) != 1 or attempted.get(lefts[0]["job_name"], {}).get("status") != "success"):
+                    raise PathError("DEGAP skipped child lacks a successful LEFT dependency")
+            for row in summary["units"]:
+                name = row["unit"]["job_name"]
+                expected_result = attempted[name]
+                expected_config = {key: value for key, value in definitions[name].items() if key != "job_dir"}
+                if row["unit"]["configuration"] != expected_config:
+                    raise PathError("DEGAP unit geometry differs from its native job configuration")
+                if (row["result"]["outcome"] == "completed") != (expected_result["status"] == "success"):
+                    raise PathError("DEGAP native summary and terminal unit disagree")
     for path in unit_artifacts:
         add(path)
     return {"outcome": empty or "completed", "artifacts": artifacts, "native_assembly": genomes.get(terminal, {}),
@@ -359,7 +384,7 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
     cached = find_completed(root, invocation.tool, native_binding, input_hashes)
     marker = paths["02_jobs"] / "invocation.json"
     validator = fingerprint({name: digest(Path(__file__).with_name(name)) for name in
-                             ("refinement_native_checkpoint.py", "refinement_native_units.py")})
+                             ("refinement_native_checkpoint.py", "refinement_native_units.py", "refinement_degap_units.py")})
     if cached is not None and cached.get("validator_revision") != validator:
         # A verifier/reporting fix is not a changed native program. Recheck the
         # original, sealed bytes under the current completion rules instead of

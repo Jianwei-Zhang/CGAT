@@ -1,6 +1,6 @@
 """Run the exact pinned CLI with bounded consumed-output recovery hooks.
 
-Invoked using the managed Python's -I -B flags. No edits to upstream sources, no
+Invoked using the managed Python's original per-tool flags. No edits to upstream sources, no
 alternate scientific command or hidden corrected-reads claim.
 """
 from __future__ import annotations
@@ -15,6 +15,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from refinement_native_units import UnitStore, checked_json, helper_hashes, owned, validate_paf, REQUEST
 from refinement_path import PathError
+from workspace_layout import TOOL_DIRECTORIES
 
 
 def install_quartet_hook(util, store, native_directory):
@@ -70,21 +71,31 @@ def main():
     # The request location supplies the root without trusting a path inside JSON.
     root = request_path.parents[4]
     request = checked_json(root, request_path)
+    tool = request.get("tool")
+    script_index = 3 if tool == "quartet" else 2
+    flags = ["-I", "-B"] if tool == "quartet" else ["-B"]
     if (request.get("schema") != "cgat.native-refinement-launch" or request.get("schema_version") != 1
-            or request.get("root") != str(root) or request.get("tool") != "quartet"
-            or request.get("helpers") != helper_hashes() or request["session"]["helpers"] != request["helpers"]
-            or request.get("cwd") != str(Path.cwd()) or request["command"][3:] != sys.argv[4:]
-            or request["command"][1:3] != ["-I", "-B"]):
+            or request.get("root") != str(root) or tool not in {"quartet", "degap"}
+            or request.get("helpers") != helper_hashes(tool) or request["session"]["helpers"] != request["helpers"]
+            or request.get("cwd") != str(Path.cwd()) or request["command"][script_index:] != sys.argv[4:]
+            or request["command"][1:script_index] != flags):
         raise PathError("native launcher request does not match invocation")
-    expected = root / "04_refinement/03_quartet/02_jobs" / request["run_id"] / REQUEST
+    expected = root / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / request["run_id"] / REQUEST
     if request_path != expected:
         raise PathError("native launcher request has an unowned location")
-    entrypoint = Path(request["command"][3])
-    sys.path.insert(0, str(entrypoint.parent / "source"))
-    from quartet import util
-    store = UnitStore(root, "quartet", request["run_id"], request["session"], request["command"])
-    install_quartet_hook(util, store, request["cwd"])
-    sys.argv = request["command"][3:]
+    entrypoint = Path(request["command"][script_index])
+    if tool == "quartet":
+        sys.path.insert(0, str(entrypoint.parent / "source"))
+        from quartet import util
+        store = UnitStore(root, tool, request["run_id"], request["session"], request["command"])
+        install_quartet_hook(util, store, request["cwd"])
+    else:
+        sys.path.insert(0, str(entrypoint.parent))
+        import AutoGapfillerPart3
+        from refinement_degap_units import DegapUnits, install_hook
+        store = DegapUnits(request, create=True)
+        install_hook(AutoGapfillerPart3, request)
+    sys.argv = request["command"][script_index:]
     code = 1
     try:
         runpy.run_path(str(entrypoint), run_name="__main__")

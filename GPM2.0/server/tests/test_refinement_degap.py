@@ -18,6 +18,9 @@ from refinement_tools import load_lock, fingerprint
 @unittest.skipUnless(shutil.which("samtools"), "samtools required for indexed sequence boundary")
 class DegapRefinedPublicationTests(unittest.TestCase):
     def setUp(self):
+        launcher = mock.patch("refinement_native_checkpoint.launch", side_effect=lambda root, invocation, *args: (invocation.command, None))
+        launcher.start()
+        self.addCleanup(launcher.stop)
         patcher = mock.patch.object(adapter, "validate_runtime", return_value={"lock_sha256": fingerprint(load_lock())})
         patcher.start()
         self.addCleanup(patcher.stop)

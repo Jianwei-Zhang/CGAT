@@ -54,8 +54,9 @@ All selected inputs still run through native processing. A failure after input A
 can reuse A on retry while executing B again. Final completion still requires the
 native filled outputs or the exact pinned all-input no-candidate outcome.
 
-DEGAP per-gap jobs, TGS native stages and LR iterations require separate consumers,
-input/output closures and failure tests before they are enabled. For DEGAP,
+The implemented DEGAP terminal-child boundary is described below. TGS native
+stages and LR iterations still need separate consumers, input/output closures
+and failure tests before they are enabled. For DEGAP,
 verified cached jobs must remain in the native summary (the upstream all-skipped
 summary is not complete); LR cannot resume from an iteration FASTA alone. No
 adapter may turn bare `.skip_right`, preprocessing files or exit-zero markers into
@@ -87,3 +88,65 @@ pinned-package/architecture acceptance. From `GPM2.0`, opt in with
 `CGAT_TEST_QUARTET_ARCHIVE=/path/to/pinned-quartet.tar.gz`,
 `PYTHONDONTWRITEBYTECODE=1`, `PYTHONPATH=server/tests` and
 `python3 -B -m unittest test_refinement_native_units.NativeUnitTests.test_pinned_source_with_developer_aligner_smoke`.
+
+
+## DEGAP: terminal per-gap/direction consumed outputs
+
+DEGAP resumes at the pinned `JobExecutor._run_single_job` boundary inside its
+original ProcessPool executor, not by invoking the native bare checkpoint/skip
+markers. Keep `--work 1`, the original job order/LEFT-before-RIGHT dependency and
+all scientific parameters. The managed Python is the pinned Linux Python 3.11
+fork runtime; refuse an incompatible process start method rather than silently
+losing instrumentation in spawned workers. Upstream sources remain unchanged.
+
+Each retry uses fresh preprocessing, detection and job setup, then may restore a
+sealed terminal child result. The key binds actual prepared read/split/index/stat
+contents, both copied flanks (including an explicitly absent native flank),
+normalized declared output/native path roles in the
+generated argv, gap geometry, whole raw-input/runtime binding and exact threads.
+Do not reuse an interrupted round, `checkpoint.info`, `.skip_right` or a parent
+exit code as proof. This boundary does not yet reuse preprocessing itself.
+
+A terminal child is either native success or the exact pinned exit-zero unresolved
+result. Nonzero/error/timeout jobs have no unit completion. Preserve success versus
+unresolved: a reused unresolved LEFT still schedules RIGHT; a reused successful
+LEFT still skips RIGHT through the original scheduler. Cached results pass back
+through normal futures and appear in the complete native child summary, avoiding
+the native all-skipped/missing-summary case.
+
+Seal only the consumer-visible top-level final FASTAs, process/stdout/stderr logs
+and native result, not a relocated round tree or index databases. On restore,
+retain original log bytes, reference the original producer receipt and rebind only
+the structured result's job directory. Report current restore time separately
+from original native child time. The native analyzer, integration and CGAT admission
+still execute against the new native directory. Ambiguous native selection among
+multiple eligible final FASTAs is recorded but not reused; it must not silently
+change which candidate the upstream glob selected or veto an otherwise valid run.
+
+Worker receipts are immutable and the parent rebuilds its substep summary from
+committed current-attempt units. Whole-native completion checks configured jobs,
+non-skipped result coverage, exact unresolved outcomes, restored consumer bytes,
+native result/producer identity and chosen FASTA validity. The report retains these
+unit diagnostics even when a later native child makes the overall attempt fail.
+
+
+The DEGAP launcher validates that generated `run.sh` is one native command and
+that its declared job/flank/direction arguments match the actual job. Preserve
+shell-safe Unicode and punctuation; do not replace this with a narrow ASCII
+chromosome-name gate. Bind explicitly absent flank inputs without claiming they
+are present or completed, and leave the pinned child to determine its outcome.
+Prepared-read links must target the freshly generated, owned preprocessing tree;
+unknown directory aliases cannot enter the cache key as unrecorded inputs.
+
+Focused validation uses the checksummed bundled `AutoGapfillerPart3.py`, its real
+JobManager/JobExecutor/GapFillingAnalyzer, real fork workers and shell children.
+Preprocessing and child assemblies are controlled fixtures, so these checks do not
+establish full DEGAP, fixed-environment, architecture or biological acceptance.
+
+
+Each DEGAP child commits only its own immutable receipt; it does not rescan and
+rewrite all earlier units. The parent builds the aggregate on normal/error exit,
+keeping metadata work linear in job count. An abruptly killed parent can retain a
+provisional running summary; committed unit receipts, not that aggregate, are the
+recovery authority. LEFT dependency lookup is indexed rather than a whole-config
+scan for every skipped RIGHT. Neither optimization changes native scheduling.

@@ -34,8 +34,9 @@ RECEIPT = "unit_complete.json"
 HELPERS = ("refinement_native_units.py", "refinement_native_runner.py")
 
 
-def helper_hashes():
-    return {name: digest(Path(__file__).with_name(name)) for name in HELPERS}
+def helper_hashes(tool="quartet"):
+    names = HELPERS + (("refinement_degap_units.py",) if tool == "degap" else ())
+    return {name: digest(Path(__file__).with_name(name)) for name in names}
 
 
 def owned(root, path):
@@ -212,22 +213,29 @@ class UnitStore:
 
 def launch(root, invocation, paths, record, native_binding):
     """Disclose the wrapper separately; never modify the pinned invocation."""
-    if invocation.tool != "quartet":
+    if invocation.tool not in {"quartet", "degap"}:
         return invocation.command, None
-    helpers = helper_hashes()
+    helpers = helper_hashes(invocation.tool)
+    script_index = 3 if invocation.tool == "quartet" else 2
     request = {"schema": "cgat.native-refinement-launch", "schema_version": 1,
                "root": str(root), "tool": invocation.tool, "run_id": record["run_id"],
                "command": list(invocation.command), "cwd": str(invocation.cwd), "helpers": helpers,
                "session": {"native_binding": native_binding, "threads": record["threads"], "helpers": helpers}}
     destination = paths["02_jobs"] / REQUEST
     seal(destination, request)
-    command = (*invocation.command[:3], str(Path(__file__).with_name("refinement_native_runner.py")),
-               "--request", str(destination), "--", *invocation.command[3:])
+    command = (*invocation.command[:script_index], str(Path(__file__).with_name("refinement_native_runner.py")),
+               "--request", str(destination), "--", *invocation.command[script_index:])
     return command, destination
 
 
 def capture_units(root, tool, run_id, code, *, required=False):
     """All evidence is in the current producer; no external cache needed offline."""
+    if tool == "degap":
+        try:
+            from refinement_degap_units import capture_units as capture_degap
+        except ModuleNotFoundError:
+            from .refinement_degap_units import capture_units as capture_degap
+        return capture_degap(root, run_id, code, required=required)
     jobs = Path(root) / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / run_id
     summary_path = jobs / SUMMARY
     if not summary_path.exists() and not summary_path.is_symlink() and not required:
