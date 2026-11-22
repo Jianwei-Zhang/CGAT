@@ -120,6 +120,8 @@ TGS-GapCloser、quarTeT GapFiller、LR_Gapcloser 的固定入口不生成原生 
 
 手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/01_degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。已提交迁移清单绑定的旧人工包现可纳入不可变 registry，不重跑原生任务或其比对。未知旧结果 ZIP 仍保护：保留原 ZIP，复制未改动的原 `jobs.tsv` 和 `degap_jobs/` receipt 到新的空目录收集，不重新导出 token。不能把这些协议检查等同于手动全链路验收。
 
+新版 App 为捆绑的双向 DEGAP 单独使用 `shared_prepare.family-v1/`，按哈希记录原始 reads 和转换程序，不接用旧的未校验 FASTA/索引缓存。若旧导出脚本指向旧缓存，请保留旧结果；需要重跑时，用新版 App 重新导出并选择新的 job 输出目录。已有候选包仍按原规则收集或导入。
+
 停止或失败后重复同一入口命令；完整且通过校验的结果会复用。已封存完成的原生运行，在接纳、报告或发布失败后可以重新接纳，不重跑工具。只有报告或打包器变化时刷新报告和包，未变化的最终序列文件不替换。
 
 原生内部恢复边界：

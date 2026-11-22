@@ -48,6 +48,7 @@ class CompletedWorkspaceMigrationTests(unittest.TestCase):
 
     def test_manual_candidate_catalog_does_not_invalidate_the_original_migrated_lgz_proof(self):
         import degap_results as manual
+        from test_degap_results import write_family
         from workspace_layout import workspace_join
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "legacy-project"
@@ -73,7 +74,7 @@ class CompletedWorkspaceMigrationTests(unittest.TestCase):
                 (out / name).write_text(">seed\nACGT\n")
             manual.begin(recipe)
             manual.seed(recipe)
-            (out / "native-job.final.fa").write_text(">candidate\nACGT\n")
+            write_family(out, sequence="ACGT")
             manual.record(recipe)
             # Exercise the installed collector and dependency closure, with a
             # controlled PAF producer rather than a native alignment acceptance.

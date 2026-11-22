@@ -998,12 +998,30 @@ fn can_use_shared_reads(
 ) -> bool {
     settings.hifi_reads == shared_settings.hifi_reads
         && settings.ont_reads == shared_settings.ont_reads
+        && settings.degap_path == shared_settings.degap_path
+        && settings.gpm_server_path == shared_settings.gpm_server_path
+}
+
+fn family_shared_layout(settings: &DegapJobExportSettings) -> &'static str {
+    if settings.degap_path.trim().is_empty() {
+        r#"if [ -f "$CGAT_RUNTIME/degap_core/bin/PreparedReads.py" ]; then
+  CGAT_FAMILY_SHARED=1
+  SHARED_OUT="$SHARED_OUT.family-v1"
+fi"#
+    } else {
+        ""
+    }
 }
 
 fn build_shared_prepare_script(settings: &DegapJobExportSettings) -> String {
     let shared_out = shared_prepare_out(settings);
     let hifi_count = settings.hifi_reads.len();
     let ont_count = settings.ont_reads.len();
+    let runtime = if settings.degap_path.trim().is_empty() {
+        server_runtime::runtime_shell(&settings.gpm_server_path)
+    } else {
+        String::new()
+    };
     format!(
         r#"#!/usr/bin/env bash
 set -euo pipefail
@@ -1015,15 +1033,17 @@ set -euo pipefail
 SHARED_OUT={quoted_shared_out}
 HIFI_READS=({hifi_reads})
 ONT_READS=({ont_reads})
-
+{runtime}
+CGAT_FAMILY_SHARED=0
+{family_layout}
 mkdir -p "$SHARED_OUT/processed_reads"
 
-python3 - <<'PY'
+python3 - "$SHARED_OUT" <<'PY'
 from pathlib import Path
 import json
 import sys
 
-shared_out = Path({shared_out_py})
+shared_out = Path(sys.argv[1])
 manifest = shared_out / "cache_manifest.json"
 requested = {{
     "hifi": {hifi_reads_py},
@@ -1093,14 +1113,25 @@ prepare_split() {{
   fi
 }}
 
+if [ "$CGAT_FAMILY_SHARED" -eq 1 ]; then
+  read_args=()
+  if [ {hifi_count} -gt 0 ]; then read_args+=(--hifi "${{HIFI_READS[@]}}"); fi
+  if [ {ont_count} -gt 0 ]; then read_args+=(--ont "${{ONT_READS[@]}}"); fi
+  python3 -B "$CGAT_DEGAP_TOOL" prepare-shared-reads --out "$SHARED_OUT" "${{read_args[@]}}"
+fi
+
 if [ {hifi_count} -gt 0 ]; then
-  prepare_reads "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "${{HIFI_READS[@]}}"
+  if [ "$CGAT_FAMILY_SHARED" -eq 0 ]; then
+    prepare_reads "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "${{HIFI_READS[@]}}"
+  fi
   prepare_index "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "$SHARED_OUT/hifi_reads.idx"
   prepare_split "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "$SHARED_OUT/hifi_reads_part"
 fi
 
 if [ {ont_count} -gt 0 ]; then
-  prepare_reads "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "${{ONT_READS[@]}}"
+  if [ "$CGAT_FAMILY_SHARED" -eq 0 ]; then
+    prepare_reads "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "${{ONT_READS[@]}}"
+  fi
   prepare_index "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "$SHARED_OUT/ont_reads.idx"
   prepare_split "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "$SHARED_OUT/ont_reads_part"
 fi
@@ -1113,7 +1144,8 @@ echo "[done] DEGAP shared prepare outputs are ready in $SHARED_OUT"
         ont_reads = shell_array(&settings.ont_reads),
         hifi_count = hifi_count,
         ont_count = ont_count,
-        shared_out_py = python_string(&shared_out),
+        runtime = runtime,
+        family_layout = family_shared_layout(settings),
         hifi_reads_py = python_string_list(&settings.hifi_reads),
         ont_reads_py = python_string_list(&settings.ont_reads),
     )
@@ -1126,7 +1158,7 @@ fn build_shared_link_block(
     include_index_and_split: bool,
 ) -> String {
     if !can_use_shared_reads(settings, shared_settings) {
-        return r#"echo "[shared] per-job reads differ from global settings; this job will build its own read cache"
+        return r#"echo "[shared] per-job reads or runtime differ from global settings; this job will build its own read cache"
 "#
         .to_string();
     }
@@ -1150,6 +1182,8 @@ fn build_shared_link_block(
     format!(
         r#"SHARED_OUT={quoted_shared_out}
 JOB_OUT={quoted_out}
+CGAT_FAMILY_SHARED=0
+{family_layout}
 
 if [ ! -d "$SHARED_OUT" ]; then
   echo "[error] Missing DEGAP shared prepare output: $SHARED_OUT" >&2
@@ -1171,8 +1205,16 @@ link_shared_artifact() {{
       echo "[shared] $target already links to $source"
       return 0
     fi
+    if [ "$CGAT_FAMILY_SHARED" -eq 1 ]; then
+      echo "[error] Old or different DEGAP read cache in $JOB_OUT; choose a new job output directory." >&2
+      exit 1
+    fi
     rm "$target"
   elif [ -e "$target" ]; then
+    if [ "$CGAT_FAMILY_SHARED" -eq 1 ]; then
+      echo "[error] Job-local DEGAP read artifacts in $JOB_OUT cannot be mixed with the new shared cache; choose a new job output directory." >&2
+      exit 1
+    fi
     echo "[shared] keeping existing job-local artifact: $target"
     return 0
   fi
@@ -1184,6 +1226,7 @@ link_shared_artifact() {{
 "#,
         quoted_shared_out = shell_quote(&shared_out),
         quoted_out = shell_quote(out_path),
+        family_layout = family_shared_layout(settings),
         artifact_lines = artifact_lines,
     )
 }
@@ -1686,6 +1729,21 @@ mod tests {
         let seq = crate::exporter::load_fasta_source_interval(Path::new(&path), &name, 1, 10)?;
         assert_eq!(seq, "AACCGTTTTT");
         Ok(())
+    }
+
+    #[test]
+    fn bundled_shared_reads_use_a_separate_cache_for_family_runtime() {
+        let mut bundled = test_settings();
+        let legacy_custom = bundled.clone();
+        bundled.degap_path.clear();
+        let prepare = build_shared_prepare_script(&bundled);
+        assert!(prepare.contains("$SHARED_OUT.family-v1"));
+        assert!(prepare.contains("prepare-shared-reads --out"));
+        let links = build_shared_link_block("/srv/job", &bundled, &bundled, true);
+        assert!(links.contains("$SHARED_OUT.family-v1"));
+        assert!(links.contains("cannot be mixed with the new shared cache"));
+        assert!(!build_shared_prepare_script(&legacy_custom).contains("$SHARED_OUT.family-v1"));
+        assert!(!can_use_shared_reads(&bundled, &legacy_custom));
     }
 
     #[test]

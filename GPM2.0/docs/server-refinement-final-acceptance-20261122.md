@@ -264,6 +264,24 @@ Run the public installer to refresh the runtime receipt even when the environmen
 specification is unchanged. Prior runs below remain evidence for their original
 pin, not coverage for the new recipe.
 
+On native Linux x86_64, all eight steps passed against `fdd6567a`: install
+verification, active runtime validation, input generation, fresh DEGAP default,
+LGZ-only preparation, four-tool append, unchanged repeat and ONT-only TGS.
+The synthetic mixed-read case accepted one edit each for DEGAP, quarTeT and
+LR_Gapcloser, and zero for the HiFi TGS run; the separate ONT TGS run accepted
+one. DEGAP inserted a traced 2,000 bp sequence, and both its sealed global and
+bidirectional detail HTML were included in the portable report. Both App archive
+modes were verified, as were unchanged LGZ/reference outputs on append and repeat.
+Receipt SHA-256: `1d21f177dcb84770a5613098e72693a0cdb11a522166e9a88f013d2f6acac837`.
+
+A separate real manual App roundtrip ran the new bundled GapFiller against a
+synthetic 4,000 bp gap. The exported job used `shared_prepare.family-v1/` with
+the upstream read manifest. The imported 24,000 bp candidate matched the
+synthetic reference, preserved the edited App Final Path and rejected duplicate
+import without mutation. This is candidate delivery, not automatic publication.
+Legacy/custom runtimes keep their existing cache selection; old unsealed shared
+reads and old job-local artifacts are never reclassified as valid family inputs.
+
 ## Historical sequencing note: re-audit DEGAP after upstream feature merge
 
 On 2026-11-22 the user specified that they will merge DEGAP's feature branch

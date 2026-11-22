@@ -54,7 +54,8 @@ def main():
     run("server", ["bash", server_tools / "run.sh", "--ref", "ref", root / "reference.fa",
                    "--ds", "primary", root / "primary.fa", "--ds", "support", root / "support.fa",
                    "-t", "2", "-o", server])
-    run("import-project", [backend, "import-zip", native(root / "server.tar.gz"), native(app)])
+    baseline = server / "07_delivery/00_lgz" / f"{server.name}.tar.gz"
+    run("import-project", [backend, "import-zip", native(baseline), native(app)])
     run("initialize", [backend, "initialize-project", native(app), "DEGAP-roundtrip"])
     conn = sqlite3.connect(app / "project.sqlite")
     project = conn.execute("SELECT id FROM project").fetchone()[0]

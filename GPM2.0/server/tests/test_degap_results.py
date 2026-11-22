@@ -17,6 +17,20 @@ import degap_results as results
 from workspace_layout import initialize_workspace, workspace_join
 
 
+def write_family(out, *, status="closed", sequence="ACGTN"):
+    final = f"{out.name}.final.fa"
+    (out / final).write_text(f">candidate\n{sequence}\n")
+    artifacts = {final: results.digest(out / final)}
+    for name in ("family-components.fa", "process.agp", "process.log", "process.summary",
+                 "family-report.html", "connection-diagnostics.json"):
+        (out / name).write_text("controlled fixture\n")
+        artifacts[name] = results.digest(out / name)
+    manifest = {"schema": "degap-family-result-v1", "status": status, "final_sequence": final,
+                "artifacts": artifacts, "winner": {} if status == "closed" else None}
+    manifest["payload_sha256"] = results.hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+    (out / results.FAMILY).write_text(json.dumps(manifest))
+
+
 class DegapResultsTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -31,23 +45,10 @@ class DegapResultsTests(unittest.TestCase):
         for name in ("seqleft.fa", "seqright.fa", "endpoint.ctg.fa"):
             (self.out / name).write_text(">endpoint\nACGT\n")
 
-    def write_family(self, out, *, status="closed", sequence="ACGTN"):
-        final = f"{out.name}.final.fa"
-        (out / final).write_text(f">candidate\n{sequence}\n")
-        artifacts = {final: results.digest(out / final)}
-        for name in ("family-components.fa", "process.agp", "process.log", "process.summary",
-                     "family-report.html", "connection-diagnostics.json"):
-            (out / name).write_text("controlled fixture\n")
-            artifacts[name] = results.digest(out / name)
-        manifest = {"schema": "degap-family-result-v1", "status": status, "final_sequence": final,
-                    "artifacts": artifacts, "winner": {} if status == "closed" else None}
-        manifest["payload_sha256"] = results.hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
-        (out / results.FAMILY).write_text(json.dumps(manifest))
-
     def test_unclosed_family_is_not_an_app_candidate(self):
         results.begin(self.recipe)
         results.seed(self.recipe)
-        self.write_family(self.out, status="exhausted")
+        write_family(self.out, status="exhausted")
         results.record(self.recipe)
         receipt = json.loads((self.out / ".gpm_degap_result.json").read_text())
         self.assertEqual(receipt["status"], "exhausted")
@@ -74,7 +75,7 @@ class DegapResultsTests(unittest.TestCase):
     def test_gap_candidate_snapshot_and_stale_run_rejected(self):
         results.begin(self.recipe)
         results.seed(self.recipe)
-        self.write_family(self.out)
+        write_family(self.out)
         results.record(self.recipe)
         receipt = json.loads((self.out / ".gpm_degap_result.json").read_text())
         self.assertEqual(receipt["status"], "candidate")  # not a claim of gap closure
@@ -87,7 +88,7 @@ class DegapResultsTests(unittest.TestCase):
 
     def test_old_candidate_cannot_be_admitted_as_a_new_run(self):
         results.begin(self.recipe)
-        self.write_family(self.out)
+        write_family(self.out)
         results.seed(self.recipe)
         (self.out / results.FAMILY).write_text((self.out / results.FAMILY).read_text() + "\n")
         with self.assertRaisesRegex(ValueError, "stale FASTA"):
@@ -169,7 +170,7 @@ class DegapResultsTests(unittest.TestCase):
                 (out / seed).write_text(">seed\nACGT\n")
             results.begin(recipe)
             results.seed(recipe)
-            self.write_family(out, sequence="ACGT")
+            write_family(out, sequence="ACGT")
             results.record(recipe)
             rows.append(f"gap{index}\tdegap_jobs/job{index}.sh\t{out}")
         jobs.write_text("\n".join(rows) + "\n")
@@ -218,7 +219,7 @@ class DegapResultsTests(unittest.TestCase):
                 (out / seed).write_text(">seed\nACGT\n")
             results.begin(recipe)
             results.seed(recipe)
-            self.write_family(out, sequence="ACGT")
+            write_family(out, sequence="ACGT")
             results.record(recipe)
             with jobs.open("a") as stream:
                 stream.write(f"gap2\tdegap_jobs/job2.sh\t{out}\n")

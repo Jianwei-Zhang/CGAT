@@ -2,8 +2,10 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -44,6 +46,37 @@ class DegapRuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "requires.*>= 1"):
                 degap.main()
         execute.assert_not_called()
+
+    @unittest.skipUnless(shutil.which("seqkit"), "native shared preparation uses seqkit")
+    def test_shared_prepare_seals_reads_without_adopting_legacy_or_changed_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reads = root / "reads.fa"
+            reads.write_text(">r\nAGTC\n")
+            prepared = root / "shared" / "processed_reads"
+            base = [sys.executable, "-B", SERVER / "tools/degap.py", "prepare-shared-reads",
+                    "--out", prepared.parent, "--hifi", reads]
+            subprocess.run(base, check=True, capture_output=True)
+            receipt = json.loads((prepared / "manifest.json").read_text())
+            self.assertEqual(receipt["contract"]["sources"]["hifi"], [
+                {"path": str(reads), "sha256": hashlib.sha256(reads.read_bytes()).hexdigest()}])
+            cached = prepared / "hifi_reads.fa"
+            before = cached.stat().st_mtime_ns
+            subprocess.run(base, check=True, capture_output=True)
+            self.assertEqual(cached.stat().st_mtime_ns, before)
+            reads.write_text(">r\nGGGG\n")
+            rejected = subprocess.run(base, capture_output=True, text=True)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("Original read inputs or converter changed", rejected.stderr)
+            self.assertEqual(cached.stat().st_mtime_ns, before)
+            legacy = root / "legacy" / "processed_reads"
+            legacy.mkdir(parents=True)
+            shutil.copyfile(cached, legacy / "hifi_reads.fa")
+            old_command = [*base[:4], "--out", legacy.parent, "--hifi", reads]
+            rejected = subprocess.run(old_command, capture_output=True, text=True)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("lack an input manifest", rejected.stderr)
+            self.assertFalse((legacy / "manifest.json").exists())
 
     def test_updater_includes_nested_code_and_source_provenance(self):
         for name in ("tools/degap.py", "tools/degap_core/bin/DEGAP.py", "tools/degap_core/SOURCE.json", "tools/degap_core/environment.yml"):

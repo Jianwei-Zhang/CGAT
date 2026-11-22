@@ -13,7 +13,7 @@
         "tools/assign_chr_groups.py": "281870d1af2c80450b405a933a901b34b109e26964d575f13ef15c4d7d6fb184",
         "tools/cen_reference_metadata.py": "fa2622e0cc7424719b5d263155a6e908211290b0f2865ae32e9327f801bedaef",
         "tools/cen_scan.py": "efbf94ed45fa4e17fd480441c4210fcc0ce457255d5edba5ea89f2ac3b717e0c",
-        "tools/degap.py": "9e57f82bc85f81ebcf64fd093b9d1155da39e9d00237be4369f40a9d2711f3c0",
+        "tools/degap.py": "a940114834d847de43b10535ee68c38e60ef01c4c38006009b741226b961535e",
         "tools/degap_core/bin/AutoGapfiller.py": "8bf1f260c220ccffd39b375a8e58e55c1f42d479a16aff91aacb50c38a3748e9",
         "tools/degap_core/bin/AutoGapfillerPart1.py": "ec1c2ac05200edee5ce53132d76471a035bcd0df3575de9686c10fa1ee8bbfef",
         "tools/degap_core/bin/AutoGapfillerPart2.py": "4d888aaee3d013de21df7c4d52d4009c019217bf971ba2cb866c3ef07af8e53e",

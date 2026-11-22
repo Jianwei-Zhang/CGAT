@@ -14,6 +14,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import server_source_identity as sources
 import degap_results
+from test_degap_results import write_family
 from workspace_layout import initialize_workspace, workspace_join
 
 
@@ -57,7 +58,7 @@ class SeedIdentityTests(unittest.TestCase):
         self.assertEqual(proof["labels"]["seqleft"]["binding"], "content")
         self.assertFalse(Path(str(self.fasta) + ".fai").exists())
         degap_results.seed(recipe)
-        (out / "job.final.fa").write_text(">candidate\nACGT\n")
+        write_family(out, sequence="ACGT")
         degap_results.record(recipe)
         recorded = json.loads((out / ".gpm_degap_result.json").read_text())
         self.assertEqual(recorded["source_proof"], proof)
