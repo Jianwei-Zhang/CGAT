@@ -12,10 +12,16 @@ import GapFillerClass
 import subprocess
 import tempfile
 import time
+from pathlib import Path
+
+class HifiasmExecutionError(RuntimeError):
+	"""A tool error must never become a normal exhausted-family result."""
+
 
 class FindExtensionContigs(object):
 	def __init__(self,ExtensionReads, data_type='hifi', ont_reads=None, original_reads_info=None):
 		self.extensionReads=ExtensionReads
+		self.strict_tools = getattr(ExtensionReads.roundInput.elongation.base, "family_mode", False)
 		self.data_type=data_type
 		self.ont_reads=ont_reads
 		self.original_reads_info=original_reads_info
@@ -46,7 +52,11 @@ class FindExtensionContigs(object):
 		else:
 			logfilet=open(self.log,'w')
 
-			self.hifiasm()
+			cache_assembler = getattr(self.extensionReads.roundInput.elongation.base, "family_assembler", None)
+			if self.strict_tools and cache_assembler:
+				cache_assembler(self)
+			else:
+				self.hifiasm()
 
 			# Check if hifiasm attributes were properly initialized
 			hifiasm_command = getattr(self, 'hifiasmCommand', 'Not initialized (skipped due to no extension reads)')
@@ -74,6 +84,11 @@ class FindExtensionContigs(object):
 			logLine+='extensionContigs\t'+self.extensionContigs+"\n"
 			self.selectContigNote=''
 			self.selectContigNote=self.selectContig()
+			if self.strict_tools and 'No extension contigs or reads found' in self.selectContigNote:
+				# Normal exhaustion has no selected-alignment metrics to serialize.
+				logfilet.write(logLine + 'selectContigNote\t' + self.selectContigNote + '\n')
+				logfilet.close()
+				return
 			if 'hifiasmHasNoAccurateAssembly' in self.selectContigNote:
 				print (self.selectContigNote)
 				self.readCommon()
@@ -146,7 +161,7 @@ class FindExtensionContigs(object):
 			self.selectExtensionContigsAln = []
 			return "No extension contigs or reads found"
 
-		self.potentialExtensionContigsAln=GapFillerClass.mummer(self.extensionReads.roundInput.inputSeq,self.extensionContigs,self.potentialExtensionContigsAln)
+		self.potentialExtensionContigsAln=GapFillerClass.mummer(self.extensionReads.roundInput.inputSeq,self.extensionContigs,self.potentialExtensionContigsAln, strict=self.strict_tools)
 		self.selectContigIdentity=99.0
 		self.selectContigDistance=10
 		self.selectContigAlnLength=1000
@@ -489,7 +504,8 @@ class FindExtensionContigs(object):
 		prefilter_mummerout = GapFillerClass.mummer(
 			seed_seq_file,
 			extension_reads_file,
-			self.extensionReads.roundInput.elongation.roundDir+'/temp3_prefilter'
+			self.extensionReads.roundInput.elongation.roundDir+'/temp3_prefilter',
+			strict=self.strict_tools
 		)
 		
 		# 第二步：从 MUMmer 结果中提取通过预过滤的 reads ID
@@ -512,6 +528,8 @@ class FindExtensionContigs(object):
 					pass
 					
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"Error during pre-filtering: {e}")
 			print("Falling back to using all extension reads (no pre-filtering)")
 			# 如果预过滤失败，回退到使用所有 reads
@@ -521,6 +539,8 @@ class FindExtensionContigs(object):
 					if record.id not in readlisttemp:
 						readlisttemp.append(record.id)
 			except Exception as e2:
+				if getattr(self, "strict_tools", False):
+					raise
 				print(f"Error reading extension reads file: {e2}")
 				readlisttemp = []
 		file1=open(self.readCommonResult,'w')
@@ -692,6 +712,8 @@ class FindExtensionContigs(object):
 					pass
 				
 			except Exception as e:
+				if getattr(self, "strict_tools", False):
+					raise
 				print(f"Error during minimap2 all-vs-all: {e}")
 				print("Falling back to original MUMmer-based pairwise comparison...")
 				
@@ -722,7 +744,7 @@ class FindExtensionContigs(object):
 								ft2.writelines(l)
 								ft2.close()
 
-								mummerout=GapFillerClass.mummer(self.extensionReads.roundInput.elongation.roundDir+'/temp2',self.extensionReads.roundInput.elongation.roundDir+'/temp1',self.extensionReads.roundInput.elongation.roundDir+'/temp3')
+								mummerout=GapFillerClass.mummer(self.extensionReads.roundInput.elongation.roundDir+'/temp2',self.extensionReads.roundInput.elongation.roundDir+'/temp1',self.extensionReads.roundInput.elongation.roundDir+'/temp3', strict=self.strict_tools)
 								ft3=open(mummerout,'r')
 								maxCommonLen=0
 								mummeresult=[]
@@ -760,28 +782,18 @@ class FindExtensionContigs(object):
 				file1.writelines(l)
 		file1.close()
 
-	def prepareHifiasmReads(self):
-		"""
-		为hifiasm准备正确格式的筛选后FASTQ文件
-		将extension reads FASTA转换为FASTQ，从原始FASTQ中恢复质量信息
-		根据混合模式状态决定使用哪些reads
-		混合模式只处理两种情况：hifi_only 或 ont_only
-		"""
-		# 检查混合模式状态
-		mixed_mode_status = getattr(self.extensionReads, 'mixed_mode_status', None)
+	def _assembly_mode(self):
+		status = getattr(self.extensionReads, 'mixed_mode_status', None)
+		if self.data_type == 'mixed' and status in ('ont_only', 'hifi_only'):
+			return 'ont' if status == 'ont_only' else 'hifi'
+		return self.data_type
 
-		if mixed_mode_status == 'both_failed':
-			print("混合模式：HiFi和ONT都失败，无法准备hifiasm reads")
+	def prepareHifiasmReads(self):
+		if getattr(self.extensionReads, 'mixed_mode_status', None) == 'both_failed':
 			return None
-		elif mixed_mode_status == 'ont_only':
-			print("混合模式：只有ONT成功，使用ONT reads进行hifiasm")
+		if self._assembly_mode() == 'ont':
 			return self._prepareONTOnlyReads()
-		elif mixed_mode_status == 'hifi_only':
-			print("混合模式：只有HiFi成功，使用HiFi reads进行hifiasm")
-			return self._prepareHiFiOnlyReads()
-		else:
-			# 非混合模式或未设置状态，使用原有逻辑
-			return self._prepareHiFiOnlyReads()
+		return self._prepareHiFiOnlyReads()
 
 	def _prepareHiFiOnlyReads(self):
 		"""准备HiFi reads用于hifiasm"""
@@ -839,53 +851,14 @@ class FindExtensionContigs(object):
 		return hifi_extension_fasta
 
 	def _prepareONTOnlyReads(self):
-		"""准备ONT reads用于hifiasm"""
-		if not hasattr(self.extensionReads, 'ont_extensionReads'):
-			print("Warning: No ONT extension reads available")
+		"""ONT assembly needs original qualities, including reversed read orientation."""
+		from ONTAssemblyReads import prepare_ont_fastq
+		selected = getattr(self.extensionReads, 'ont_extensionReads', None) or getattr(self.extensionReads, 'extensionReads', None)
+		if not selected or not os.path.isfile(selected) or not os.path.getsize(selected):
 			return None
-
-		ont_extension_fasta = self.extensionReads.ont_extensionReads
-		if not os.path.exists(ont_extension_fasta):
-			print(f"Warning: ONT extension reads file does not exist: {ont_extension_fasta}")
-			return None
-
-		# 禁用FA→FQ转换，直接使用FASTA文件
-		# ont_extension_fastq = ont_extension_fasta.replace('.fa', '.fq')
-		# 
-		# # 简化逻辑：根据 processed_reads/ont_reads.fq 是否存在来决定
-		# # - 存在 .fq → 原始输入是FASTQ → 执行FA→FQ转换
-		# # - 不存在 .fq → 原始输入是FASTA → 直接使用FASTA
-		# # 理由：DEGAP.py预处理阶段已经明确区分了格式
-		# 
-		# out_dir = self.extensionReads.roundInput.elongation.base.out
-		# processed_ont_fq = os.path.join(out_dir, "processed_reads", "ont_reads.fq")
-		# 
-		# if os.path.exists(processed_ont_fq):
-		# 	# 原始输入是FASTQ格式 → 需要转换extension reads为FASTQ
-		# 	print(f"Detected original ONT input is FASTQ (found {processed_ont_fq})")
-		# 	print(f"Converting ONT extension reads to FASTQ: {ont_extension_fasta} → {ont_extension_fastq}")
-		# 	
-		# 	ont_fastq_result = self._convert_extension_fasta_to_fastq(
-		# 		ont_extension_fasta,
-		# 		processed_ont_fq,
-		# 		ont_extension_fastq
-		# 	)
-		# 	
-		# 	if ont_fastq_result:
-		# 		print(f"✅ ONT extension FASTQ ready: {ont_fastq_result}")
-		# 		return ont_fastq_result
-		# 	else:
-		# 		print("⚠️ Failed to convert ONT extension reads to FASTQ, using FASTA fallback")
-		# 		return ont_extension_fasta
-		# else:
-		# 	# 原始输入是FASTA格式 → 直接使用FASTA
-		# 	print(f"Detected original ONT input is FASTA (no .fq file in processed_reads/)")
-		# 	print(f"Using FASTA directly for hifiasm: {ont_extension_fasta}")
-		# 	return ont_extension_fasta
-		
-		# 直接使用FASTA文件，不进行FA→FQ转换
-		print(f"Using FASTA directly for hifiasm (FA→FQ conversion disabled): {ont_extension_fasta}")
-		return ont_extension_fasta
+		base = self.extensionReads.roundInput.elongation.base
+		output = Path(self.extensionReads.roundInput.elongation.roundDir) / 'ont.extension.fastq'
+		return prepare_ont_fastq(selected, base, output)
 
 	def combineExtensionReadsForReadsCommon(self):
 		"""
@@ -922,6 +895,8 @@ class FindExtensionContigs(object):
 			return combined_file
 			
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"Error combining extension reads: {e}")
 			return None
 
@@ -974,146 +949,11 @@ class FindExtensionContigs(object):
 		return ont_extension_fasta
 
 	def _convert_extension_fasta_to_fastq(self, extension_fasta, original_fastq, output_fastq):
-		"""
-		将筛选后的extension reads FASTA转换为FASTQ
-		从原始FASTQ中提取对应reads的质量信息
-		使用seqkit高性能工具优化
-		"""
-		import subprocess
-		import tempfile
-		import os
-		
-		if not os.path.exists(extension_fasta) or os.path.getsize(extension_fasta) == 0:
-			print(f"Warning: Extension FASTA file not found or empty: {extension_fasta}")
-			return None
-
-		if not os.path.exists(original_fastq):
-			print(f"Warning: Original FASTQ file not found: {original_fastq}")
-			return None
-
-		print(f"Converting {extension_fasta} to FASTQ format using seqkit (high performance)")
-		print(f"Source: {extension_fasta}")
-		print(f"Original: {original_fastq}")
-		print(f"Output: {output_fastq}")
-
-		try:
-			# Step 1: 提取extension reads的ID列表
-			extension_ids = []
-			for record in SeqIO.parse(extension_fasta, "fasta"):
-				extension_ids.append(record.id)
-			
-			print(f"Found {len(extension_ids)} extension reads to convert")
-			
-			if len(extension_ids) == 0:
-				print("No extension reads found in FASTA file")
-				return None
-
-			# Step 2: 创建临时ID文件供seqkit使用
-			with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_id_file:
-				temp_id_path = temp_id_file.name
-				for read_id in extension_ids:
-					temp_id_file.write(f"{read_id}\n")
-			
-			print(f"Created temporary ID file: {temp_id_path}")
-
-			# Step 3: 检测原始文件格式
-			if original_fastq.endswith(('.fastq', '.fq', '.fastq.gz', '.fq.gz')):
-				format_type = "fastq"
-				use_seqkit = True
-			else:
-				format_type = "fasta"
-				use_seqkit = False
-				print("Original file is FASTA format, will use Python fallback with dummy quality")
-
-			# Step 4: 使用seqkit高效提取（仅当原始文件是FASTQ时）
-			if use_seqkit:
-				print("Using seqkit for high-performance extraction...")
-				
-				# 构造seqkit命令
-				if original_fastq.endswith('.gz'):
-					# 处理压缩文件
-					seqkit_cmd = f"seqkit grep -f {temp_id_path} {original_fastq} -o {output_fastq}"
-				else:
-					# 处理未压缩文件
-					seqkit_cmd = f"seqkit grep -f {temp_id_path} {original_fastq} -o {output_fastq}"
-				
-				print(f"Executing: {seqkit_cmd}")
-				
-				# 执行seqkit命令（无时间限制）
-				start_time = time.time()
-				result = subprocess.run(seqkit_cmd, shell=True, capture_output=True, text=True)
-				end_time = time.time()
-				
-				if result.returncode == 0:
-					print(f"seqkit extraction completed in {end_time - start_time:.2f} seconds")
-					
-					# 验证输出文件
-					if os.path.exists(output_fastq) and os.path.getsize(output_fastq) > 0:
-						# 统计转换的reads数量
-						converted_count = 0
-						try:
-							for record in SeqIO.parse(output_fastq, "fastq"):
-								converted_count += 1
-						except:
-							# 如果读取失败，使用简单的行数统计
-							with open(output_fastq, 'r') as f:
-								converted_count = sum(1 for line in f if line.startswith('@')) 
-						
-						print(f"Successfully converted {converted_count} reads to FASTQ format using seqkit")
-						print(f"Performance improvement: ~{int(len(extension_ids) / max(end_time - start_time, 0.1))} reads/second")
-						
-						# 清理临时文件
-						try:
-							os.unlink(temp_id_path)
-						except:
-							pass
-						
-						return output_fastq if converted_count > 0 else None
-					else:
-						print("seqkit command succeeded but output file is empty or missing")
-						use_seqkit = False  # 降级到Python实现
-				else:
-					print(f"seqkit command failed with return code {result.returncode}")
-					print(f"stderr: {result.stderr}")
-					print("Falling back to Python implementation...")
-					use_seqkit = False  # 降级到Python实现
-
-			# Step 5: Python fallback implementation (原有逻辑作为备用)
-			if not use_seqkit:
-				print("Using Python fallback implementation...")
-				converted_count = 0
-				
-				with open(output_fastq, 'w') as out_f:
-					for record in SeqIO.parse(original_fastq, format_type):
-						if record.id in extension_ids:
-							if format_type == "fastq":
-								# Write as FASTQ with original quality
-								SeqIO.write(record, out_f, "fastq")
-							else:
-								# If original was FASTA, generate dummy quality scores
-								record.letter_annotations["phred_quality"] = [40] * len(record.seq)
-								SeqIO.write(record, out_f, "fastq")
-							converted_count += 1
-
-				print(f"Python fallback completed: {converted_count} reads converted")
-				
-				# 清理临时文件
-				try:
-					os.unlink(temp_id_path)
-				except:
-					pass
-				
-				return output_fastq if converted_count > 0 else None
-
-		except Exception as e:
-			print(f"Error in seqkit conversion: {e}")
-			# 清理临时文件
-			try:
-				if 'temp_id_path' in locals():
-					os.unlink(temp_id_path)
-			except:
-				pass
-			return None
+		"""Compatibility entry: never invent qualities or join solely by ID."""
+		from ONTAssemblyReads import restore_fastq, source_contract
+		base = self.extensionReads.roundInput.elongation.base
+		return restore_fastq(extension_fasta, source_contract(original_fastq), output_fastq,
+		                     Path(base.out) / 'ont-quality-cache')
 
 	def combineMixedExtensionReads(self, output_file):
 		"""
@@ -1178,6 +1018,8 @@ class FindExtensionContigs(object):
 
 		# Check if reads preparation was successful
 		if reads_file is None:
+			if self.strict_tools:
+				raise ValueError("Selected extension reads could not be prepared for hifiasm")
 			print("Warning: Failed to prepare reads for hifiasm. Skipping hifiasm assembly.")
 			# Set proper termination condition instead of creating empty files
 			self.extensionSeqNote = "No extension reads available for hifiasm preparation"
@@ -1185,7 +1027,8 @@ class FindExtensionContigs(object):
 			self.hifiasmResultDict = {}
 			return
 
-		if self.data_type == 'mixed':
+		assembly_mode = self._assembly_mode()
+		if assembly_mode == 'mixed':
 			# Mixed mode: HiFi + Ultra-long ONT
 			# Prepare ONT extension reads FASTQ
 			ont_extension_fastq = self.prepareONTHifiasmReads()
@@ -1199,7 +1042,7 @@ class FindExtensionContigs(object):
 				print("Warning: ONT extension reads not available, falling back to HiFi-only mode")
 				self.hifiasmCommand = f"hifiasm -i -n 1 -o {hifiasmID} -t {threads} {reads_file}"
 				print("Using HiFi-only mode for hifiasm assembly")
-		elif self.data_type == 'ont':
+		elif assembly_mode == 'ont':
 			# ONT mode: use --ont parameter
 			self.hifiasmCommand = f"hifiasm -i -n 1 -o {hifiasmID} -t {threads} --ont {reads_file}"
 			print("Using ONT mode for hifiasm assembly")
@@ -1233,6 +1076,8 @@ class FindExtensionContigs(object):
 
 			# Skip hifiasm execution if input files are problematic
 			if has_empty_files:
+				if self.strict_tools:
+					raise ValueError("hifiasm input is missing or empty")
 				print("🚫 Skipping hifiasm execution due to empty or missing input files")
 				print("This prevents hifiasm crashes and core file generation")
 				return
@@ -1263,10 +1108,14 @@ class FindExtensionContigs(object):
 					else:
 						print("hifiasm version: Unknown (version check failed)")
 				else:
+					if self.strict_tools:
+						raise FileNotFoundError("hifiasm is unavailable")
 					print("❌ Error: hifiasm not found in PATH")
 					print("Please ensure hifiasm is installed and accessible")
 					return
 			except Exception as e:
+				if self.strict_tools:
+					raise
 				print(f"Error checking hifiasm availability: {e}")
 				print("Proceeding with caution...")
 
@@ -1347,7 +1196,13 @@ class FindExtensionContigs(object):
 				except Exception as e:
 					print(f"Error checking for core files: {e}")
 
+				explicit_errors = re.findall(r"(?im)^\s*(?:\[ERROR\]|\[E::[^\]]+\]|(?:fatal )?error\s*:).*", (result.stderr or '') + '\n' + (result.stdout or ''))
+				if explicit_errors:
+					raise HifiasmExecutionError('hifiasm reported an error (exit %s): %s' % (result.returncode, '; '.join(explicit_errors)))
+
 				if result.returncode != 0:
+					if self.strict_tools:
+						raise subprocess.CalledProcessError(result.returncode, self.hifiasmCommand, result.stdout, result.stderr)
 					print(f"Warning: hifiasm command failed with return code {result.returncode}")
 					print(f"Error output: {result.stderr}")
 					print(f"Standard output: {result.stdout}")
@@ -1387,6 +1242,8 @@ class FindExtensionContigs(object):
 						pass
 
 			except subprocess.TimeoutExpired as te:
+				if getattr(self, "strict_tools", False):
+					raise
 				print("⏰ TIMEOUT: hifiasm command timed out after 1 hour")
 				print("🔧 Possible solutions:")
 				print("   1. Reduce input data size")
@@ -1430,7 +1287,11 @@ class FindExtensionContigs(object):
 				except Exception:
 					pass
 
+			except HifiasmExecutionError:
+				raise
 			except Exception as e:
+				if getattr(self, "strict_tools", False):
+					raise
 				print(f"❌ Exception while executing hifiasm: {e}")
 				print("🔧 Will continue with readCommon fallback method")
 				print("Will continue with fallback assembly methods")
@@ -1459,6 +1320,8 @@ class FindExtensionContigs(object):
 			else:
 				print(f"Warning: hifiasm directory does not exist or is not a directory: {self.hifiasmDir}")
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"Error listing files in hifiasm directory {self.hifiasmDir}: {e}")
 			print("This may indicate hifiasm failed to run or the directory was corrupted")
 		
@@ -1469,20 +1332,7 @@ class FindExtensionContigs(object):
 
 		# Check if hifiasm result file exists before trying to open it
 		if not os.path.exists(self.hifiasmResultInput):
-			print(f"Error: hifiasm result file does not exist: {self.hifiasmResultInput}")
-			print("This indicates hifiasm failed to produce output. Will create empty result file.")
-
-			# Create empty result file to prevent downstream errors
-			try:
-				with open(self.hifiasmResult, 'w') as empty_file:
-					pass  # Create empty file
-				print(f"Created empty hifiasm result file: {self.hifiasmResult}")
-			except Exception as e:
-				print(f"Error creating empty result file: {e}")
-
-			# Set empty result dictionary
-			self.hifiasmResultDict = {}
-			return
+			raise HifiasmExecutionError("hifiasm produced no primary-contig GFA: " + self.hifiasmResultInput)
 
 		try:
 			file1=open(self.hifiasmResultInput,'r')
@@ -1508,6 +1358,8 @@ class FindExtensionContigs(object):
 			print(f"Successfully processed hifiasm result file with {len(hifiasmResultDict)} contigs")
 
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"Error processing hifiasm result file: {e}")
 			print("This may indicate corrupted hifiasm output or file access issues")
 

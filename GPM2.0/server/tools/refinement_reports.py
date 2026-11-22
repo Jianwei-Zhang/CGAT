@@ -24,11 +24,13 @@ try:
     from run_orchestration import sha256_file as digest, atomic_write_json as atomic_json
     from refinement_tools import fingerprint
     import refinement_native_reports as native_reports
+    from refinement_degap_units import terminal as degap_child_terminal
 except ModuleNotFoundError:
     from .workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout
     from .run_orchestration import sha256_file as digest, atomic_write_json as atomic_json
     from .refinement_tools import fingerprint
     from . import refinement_native_reports as native_reports
+    from .refinement_degap_units import terminal as degap_child_terminal
 
 SCHEMA = "cgat.refinement-report"
 PAGE_SIZE = 200
@@ -200,6 +202,8 @@ STATUS_VOCAB = {
     "staged": ("Staged (not published) / 已暂存（未发布）", "warn"),
     "completed": ("Completed / 已完成", "ok"),
     "complete": ("Completed / 已完成", "ok"),
+    "completed_without_native_fill": ("Completed (gap not filled) / 已完成（未补上）", "neutral"),
+    "exception": ("Execution error / 执行异常", "err"),
     "not_started": ("Not started / 未开始", "neutral"),
     "publication_unverified": ("Publication not verified / 发布未验证", "warn"),
     "completed_no_changes": ("Completed (0 accepted changes) / 已完成（无接纳修改）", "neutral"),
@@ -502,7 +506,10 @@ def native_diagnostics(root, tool, run_id, execution):
                     raise ReportError("native job diagnostics leave their attempt")
                 files = []
                 visual_html = None
-                for name in ("run.stdout.log", "run.stderr.log", "process.log", "visualization_output/gapfiller_report.html"):
+                family = item.get("direction") == "bidirectional"
+                fileset = ("family-result.json", "family-report.html", "junction-evidence.json", "connection-diagnostics.json",
+                           "process.summary", "process.agp", "families.json") if family else ("visualization_output/gapfiller_report.html",)
+                for name in ("run.stdout.log", "run.stderr.log", "process.log", *fileset):
                     file = job_dir / name
                     if file.exists() or file.is_symlink():
                         relative = file.relative_to(root).as_posix()
@@ -518,7 +525,7 @@ def native_diagnostics(root, tool, run_id, execution):
             raise ReportError("native visualization directory cannot be an alias")
         present = {path.name for path in visual_dir.iterdir()} if visual_dir.is_dir() else set()
         for gap in native_gaps:
-            direction = gap.get("fill_direction") if gap.get("filled") and gap.get("fill_direction") else "left"
+            direction = native_reports.reported_direction(gap)
             try:
                 name = native_reports.detail_name(gap.get("chromosome"), gap.get("gap_id"), direction)
             except native_reports.UnsupportedView:
@@ -672,6 +679,8 @@ def _job_status_summary(job):
     if not isinstance(result, dict):
         return badge_html("No execution row recorded / 未记录执行条目"), ""
     status = result.get("status") or "not_recorded"
+    if status == "failed" and degap_child_terminal(result):
+        status = "completed_without_native_fill"
     details = [value for _, value in extract_recorded_reasons(result)]
     for keys, label in ((("exit_code", "return_code", "returncode"), "Exit / 退出码"),
                         (("elapsed_time", "elapsed_seconds", "elapsed", "duration"), "Time / 耗时 (s)")):

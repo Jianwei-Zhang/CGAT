@@ -1,27 +1,30 @@
 {
-  "basis": "Pinned visualizer uses inline SVG and never calls Chart.js; no network fetch at build or view time.",
-  "degap_revision": "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75",
+  "basis": "The pinned family overview and detail use inline CSS/SVG/JS without an external script.",
+  "degap_revision": "6cd01f1b983c43648e51389c129dfbd8b5926284",
   "inline_data_images": [
-    "data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%228%22%20viewBox%3D%220%200%2014%208%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L7%207L13%201%22%20stroke%3D%22%23495057%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E"
+    "data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%228%22%20viewBox%3D%220%200%2014%208%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L7%207L13%201%22%20stroke%3D%22%23495057%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E",
+    "data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2212%22%20height%3D%227%22%20viewBox%3D%220%200%2012%207%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L6%206L11%201%22%20stroke%3D%22%23334155%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E"
   ],
   "native_entrypoints": {
     "degap": [
       "05.visualization/Global.report.html",
-      "03.gap_filling/<job>/visualization_output/gapfiller_report.html"
+      "03.gap_filling/<job>/family-report.html"
     ],
     "lrgapcloser": [],
     "quartet": [],
     "tgsgapcloser": []
   },
   "no_added_dependency": true,
-  "policy": "cgat.degap.offline-inline-svg.v1",
+  "policy": "cgat.degap.offline-family-junction.v2",
   "schema": "cgat.native-report-policy",
   "schema_version": 1,
   "unused_external_scripts": [
     "https://cdn.jsdelivr.net/npm/chart.js"
   ],
   "visualizer_files_sha256": {
-    "AutoGapfillerVisualizer.py": "fe7421ad586a28b1e5a9a62485c7d60b1459a66dfc423b40204369d040b91ac6",
-    "GapfillerVisualizer.py": "bcdc1912da6576825df9ae6d7193554536be58077deee3041644afb78aea5033"
+    "AutoGapfillerVisualizer.py": "1554a44d6253e3254e07980450cdbc39beacb9be6e5b6b11894c25b3b266869a",
+    "FamilyResult.py": "51bb12075cb20efe8b0f2ec00a6396cdc73a9aa5959351131630d188beed0309",
+    "JunctionReport.py": "693887967c7d6aebdd1dd458fb3ae2a0b458f55cad8ba03d308355dce7fb18f9",
+    "ReportStyle.py": "bcf3d9159a84858ff07377f8f4183d9373dd5787790b5fda39a411e0c8cf7523"
   }
 }

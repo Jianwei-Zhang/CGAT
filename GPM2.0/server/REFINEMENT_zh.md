@@ -55,7 +55,7 @@ bash /work/lgz_only/run_all.sh --gapfill-tools none
 
 | 顺序 / 参数标识 | 同时提供两种技术时 | 固定源码/分发版本 |
 | --- | --- | --- |
-| `01_degap` / `degap` | 一次原生混合输入运行 | DEGAP 2.0，revision `0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75` |
+| `01_degap` / `degap` | 一次原生混合输入运行 | DEGAP 2.0，revision `6cd01f1b983c43648e51389c129dfbd8b5926284` |
 | `02_tgsgapcloser` / `tgsgapcloser` | 仅用 HiFi；没有 HiFi 时使用 ONT | TGS-GapCloser `1.2.1`，分发变体 `1.2.1_ml`、build 4；revision `52818b3e464209477baec506ade3240be43b4fa8` |
 | `03_quartet` / `quartet` | 一次 GapFiller 运行消费两组输入 | quarTeT `1.3.1`，revision `a44d8c87e3f4bcefaf43dc4134e88b6a21890265` |
 | `04_lrgapcloser` / `lrgapcloser` | 仅用 HiFi；没有 HiFi 时使用 ONT | LR_Gapcloser `1.0`、build `pl5321hdfd78af_0`；revision `156381adec01a5c664edbf5df1d866b5c70e82a1` |
@@ -106,11 +106,13 @@ cgat_server/
 
 最终组装由已接纳、可追溯来源的改动重建，不直接复制原生整条染色体，也不把 LGZ FASTA 改名冒充精修。合法的部分修复、联合缺口、负链和重叠连接保留来源关系；歧义或越界候选不接纳并记录原因。可能出现零接纳，必须与原生失败区分。结构/来源检查**不等于生物学正确性验证**。未变来源坐标上的证据会保留。新接纳的 patch 来源现会对原准备参考独立比对，并使用冻结库执行 tel/cen 扫描，不重跑 LGZ 或补洞工具。测量保存在 `04_accepted/<run>/01_source_evidence/<generation>/`，报告及两类 App 包携带同一证据；`no_hit`（测量无命中）、`disabled`（未启用）、`no_rules`（无规则）和 `no_chr_library`（无该染色体库）分开记录。包内 `metadata/refinement/source_intervals.tsv`、`final_annotations.tsv` 按真实切片、反向及截断关系映射到新坐标。这是来源扫描和坐标映射，不冒充完整终版基因组重扫描或准确性验证。
 
+新版 DEGAP 对每个原生缺口尝试运行一个双向任务。CGAT 校验已封存的 `family-result.json`，用原始侧翼核对候选，且只接纳有证据的接点区间，而不是整段候选。未补上的任务保留原因，不当成执行异常或 App 候选。升级时用新版 Server 的 `install.sh` 刷新同一个受管环境的工具锁，不必单建 DEGAP 环境；旧运行保留为历史，不当作新版任务复用。
+
 ## 4. 报告、App 导入与恢复
 
 先打开 `06_report/report.html` 看流程总览。`01_lgz/` 是 LGZ 基线报告，`02_refinement/` 按固定编号分工具，`03_comparison/` 保留每批的 TSV/JSON。从总览进入工具或缺口详情，可查看实际使用的 reads、原生任务是运行还是复用、CGAT 接纳了哪些改动、最终结果是否发布。失败会列出已记录的失败阶段和原因，并链接诊断；零接纳则表示保留 LGZ 序列，并不等于失败。复制报告时带上整个目录，以保留报告内部链接；也可解压 App 包后打开 `report/report.html`。工作区总览中的最终结果和交付包链接指向同级的 `05_final/` 和 `07_delivery/`；只复制报告不会带走这些结果。
 
-在工具报告中进入 **原生 job 报告与日志 → 离线原生可视化**（`native_visualization/index.html`）。固定 DEGAP 的 `Global.report.html` 总览和可用 LEFT/RIGHT 任务报告现有独立的离线浏览副本；原始 HTML 仍按字节、哈希保存在静态文本附件中。浏览副本保留上游内嵌 JS/SVG，移除没有使用的 Chart.js CDN 引用，并与 CGAT 接纳页面分开隔离展示，不增加 JS 库或环境依赖。来源绑定会明确显示：`observed_diagnostic` 是「报告时观察」，**不是原生完成回执证明**。缺失、未知依赖或过大的详情有明确状态，不提供悬空链接；总览内嵌 gap 数据也会与可用的原生 gap 诊断核对。
+在工具报告中进入 **原生 job 报告与日志 → 离线原生可视化**（`native_visualization/index.html`）。新版 DEGAP 的 `Global.report.html` 总览和各双向任务的 `family-report.html` 有独立的离线浏览副本；原始 HTML 作为带哈希的静态文本附件保留。离线副本保留上游内嵌 JS/SVG，与 CGAT 接纳页面隔离，不依赖 CDN；原生页中指向工作目录的文件链接改由 CGAT 诊断区提供。旧 LEFT/RIGHT 历史报告使用其对应的可移植规则。来源绑定会明确显示：`observed_diagnostic` 是「报告时观察」，**不是原生完成回执证明**。缺失、未知依赖或过大的详情有明确状态，不提供悬空链接；总览内嵌 gap 数据也会与可用的原生 gap 诊断核对。
 
 TGS-GapCloser、quarTeT GapFiller、LR_Gapcloser 的固定入口不生成原生 HTML，保留它们实际的日志、填补明细、AGP 等诊断，不伪造上游可视化。Full 与 Light 携带相同报告文件。已用 Windows 浏览器离线检查批次导航、原生图形，以及 Full/Light 报告解压后的相对链接。报告可正常浏览不代表生物学准确性。
 
@@ -122,7 +124,7 @@ TGS-GapCloser、quarTeT GapFiller、LR_Gapcloser 的固定入口不生成原生 
 
 原生内部恢复边界：
 
-- **DEGAP：**由原 LEFT/RIGHT 调度器恢复已封存的终止子任务。LEFT 未补上时仍运行 RIGHT；预处理和缺口检测重新执行，不接续未完成的延伸轮次。
+- **DEGAP：**由新版原生调度器恢复已封存的终止双向任务，校验缺口定义、输入、结果清单及其明细。预处理与缺口检测重新执行，不接续未完成的延伸轮次。
 - **quarTeT：**恢复通过校验的逐输入 PAF，包括明确的空比对结果；后续输入仍进入原生处理。
 - **TGS：**按原生分块/轮次复用已完成的 minimap2/Racon 命令输出。scaffold/候选准备与整合仍执行，不恢复原生 done 标记。
 - **LR：**同时恢复完整迭代处理 FASTA **和** `info_filter2` 证据。预处理和首个索引重新执行，仍由原缺口检测判断是否提前结束；仅有一个 FASTA 或后台子进程失败，不能算完成。

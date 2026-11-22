@@ -167,6 +167,8 @@ class TelSeekerCtg:
         print("Starting TelSeeker Ctg Endpoint Workflow")
         print("=" * 80 + "\n")
 
+        from FamilyTelomere import reject_legacy_telomere_project
+        reject_legacy_telomere_project(self.out)
         self._validate_parameters()
         self._prepare_task_inputs()
         self._ensure_manifest()
@@ -239,6 +241,10 @@ class TelSeekerCtg:
             tasks.append(task)
             records.append(SeqRecord(record.seq, id=safe_ctg_id, description=f"original_id={record.id}"))
 
+        # Validate every requested endpoint before rewriting aggregate inputs.
+        for task in tasks:
+            self._ensure_task_contract(task)
+            self._read_existing_status(task)
         SeqIO.write(records, self.ctgs_fasta, "fasta")
         self._write_tasks_tsv(tasks)
         self.tasks = tasks
@@ -309,13 +315,80 @@ class TelSeekerCtg:
                 runnable.append(task)
         return runnable
 
+    def _task_contract(self, task):
+        from FamilyTools import content_hash
+        reads = [path for platform in ("hifi", "ont")
+                 for path in _normalize_file_list(self.read_inputs.get(platform))]
+        return {"schema": "telomere-ctg-task-v1", "endpoint": task["chr_end"],
+                "contig": {"path": str(Path(task["ctg_file"]).resolve()),
+                           "sha256": content_hash(task["ctg_file"])},
+                "reads": {path: content_hash(path) for path in reads},
+                "motif": self.motif, "tel_params": self.tel_params,
+                "parameters": {name: getattr(self, name) for name in
+                               ("MaximumExtensionRound", "MaximumExtensionLength", "edge",
+                                "thread", "kmer_num", "kmer_size", "kmer_filter")},
+                "code": {name: content_hash(Path(__file__).parent / name) for name in
+                         ("TelSeekerCtg.py", "TelSeekerPart1.py", "TelSeekerPart2.py",
+                          "FamilyTelomere.py", "FamilyRound.py", "ExtensionFamilies.py", "TelomereTargets.py")}}
+
+    def _ensure_task_contract(self, task):
+        from ExtensionFamilies import atomic_json, read_json
+        job = Path(task["job_dir"])
+        marker = job / "task-contract.json"
+        contract = self._task_contract(task)
+        if marker.exists():
+            if read_json(marker) != contract:
+                raise ValueError(f"Telomere endpoint inputs/parameters changed: {job}; use a new output directory")
+        elif (job / "result" / "status.tsv").exists():
+            raise ValueError(f"Legacy telomere endpoint result: {job}; use a new output directory")
+        else:
+            job.mkdir(parents=True, exist_ok=True)
+            atomic_json(marker, contract)
+
+    def _publish_task_receipt(self, task):
+        from ExtensionFamilies import atomic_json, fingerprint
+        from FamilyTools import content_hash
+        job = Path(task["job_dir"])
+        files = [p for p in (job / "result").rglob("*") if p.is_file() and p.name != "receipt.json"]
+        files += [p for p in (job / "linker.fa", job / "linker.info",
+                              job / "extension" / "telomere-result.json",
+                              self.part1_dir / "Global.left.telo.reads.fa",
+                              self.part1_dir / "Global.right.telo.reads.fa") if p.is_file()]
+        receipt = {"contract": self._task_contract(task),
+                   "files": {str(path.resolve()): content_hash(path) for path in files}}
+        receipt["payload_sha256"] = fingerprint(receipt)
+        atomic_json(job / "result" / "receipt.json", receipt)
+
     def _read_existing_status(self, task) -> Optional[Dict]:
-        status_file = Path(task["job_dir"]) / "result" / "status.tsv"
-        if not status_file.exists():
+        from ExtensionFamilies import fingerprint, read_json
+        from FamilyTools import content_hash
+        job = Path(task["job_dir"])
+        status_file = job / "result" / "status.tsv"
+        receipt_path = job / "result" / "receipt.json"
+        if not receipt_path.exists():
+            # A contract marker distinguishes an interrupted new publication
+            # from a legacy status-only job. Never accept status.tsv by itself.
+            if status_file.exists() and not (job / "task-contract.json").exists():
+                raise ValueError(f"Legacy telomere endpoint result: {job}; use a new output directory")
             return None
+        receipt = read_json(receipt_path)
+        body = {key: value for key, value in receipt.items() if key != "payload_sha256"}
+        if receipt.get("payload_sha256") != fingerprint(body) or receipt.get("contract") != self._task_contract(task):
+            raise ValueError(f"Changed telomere endpoint result contract: {receipt_path}")
+        for path, digest in receipt["files"].items():
+            if not Path(path).is_file() or content_hash(path) != digest:
+                raise ValueError(f"Changed telomere endpoint result artifact: {path}")
+        family = job / "extension" / "telomere-result.json"
+        if family.exists():
+            from FamilyTelomere import load_telomere_result
+            load_telomere_result(family.parent)
+        elif (job / "extension" / "families.json").exists():
+            raise ValueError(f"Incomplete family result must not have a final status receipt: {job}")
         with open(status_file, newline="") as f:
             rows = list(csv.DictReader(f, delimiter="\t"))
-        return rows[0] if rows else None
+        if len(rows) != 1:
+            raise ValueError(f"Invalid telomere endpoint status: {status_file}")
+        return rows[0]
 
     def _write_failure(self, task, stop_reason: str):
         row = self._base_status_row(task)
@@ -328,6 +401,7 @@ class TelSeekerCtg:
         result_dir.mkdir(parents=True, exist_ok=True)
         (result_dir / "failed.reason.txt").write_text(stop_reason + "\n")
         self._write_status_file(result_dir / "status.tsv", [row])
+        self._publish_task_receipt(task)
         self.status_rows.append(row)
 
     def _run_part2_for_tasks(self, runnable):
@@ -384,11 +458,30 @@ class TelSeekerCtg:
             else:
                 (result_dir / "failed.reason.txt").write_text(row["stop_reason"] + "\n")
             self._write_status_file(result_dir / "status.tsv", [row])
+            self._publish_task_receipt(task)
             self.status_rows.append(row)
 
     def _status_from_job(self, task):
         row = self._base_status_row(task)
         job_dir = Path(task["job_dir"])
+        family_manifest = job_dir / "extension" / "telomere-result.json"
+        if family_manifest.exists():
+            from FamilyTelomere import load_telomere_result
+            result = load_telomere_result(family_manifest.parent)["result"]
+            row.update(round_num=str(result["rounds"]), extension_length=str(result["total_extension_length"]),
+                       stop_reason=self._normalize_stop_reason(result["stop_reason"]))
+            if result["success"]:
+                # Finalization must have succeeded as well as extension detection.
+                from FamilyTools import content_hash
+                linker = job_dir / "linker.fa"
+                source = Path(result["connection_info"]["linker_file"])
+                if not linker.is_file() or content_hash(linker) != content_hash(source):
+                    raise ValueError(f"Missing or changed finalized telomere linker: {linker}")
+                row.update(status="success", connection_type="extension",
+                           connected_read=result["connection_info"]["read_id"], stop_reason="connection_found")
+            return row
+        if (job_dir / "extension" / "families.json").exists():
+            raise RuntimeError(f"Incomplete telomere family job: {job_dir}; rerun to resume")
         linker_file = job_dir / "linker.fa"
         linker_info = job_dir / "linker.info"
         seed_file = job_dir / "seed.fa"

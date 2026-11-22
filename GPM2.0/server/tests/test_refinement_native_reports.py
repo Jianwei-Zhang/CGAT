@@ -112,7 +112,7 @@ const vm = require('node:vm');
 let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>input+=x);process.stdin.on('end',()=>{
  for (const sample of JSON.parse(input)) {
   const en={style:{}}, zh={style:{}};
-  const context=vm.createContext({console,document:{addEventListener(){},querySelectorAll(q){return q==='.lang-en'?[en]:q==='.lang-zh'?[zh]:[];}},event:{target:{classList:{add(){}}}},window:{}});
+  const context=vm.createContext({console,document:{documentElement:{setAttribute(){}},getElementById(){return null},addEventListener(){},querySelectorAll(q){return q==='.lang-en'?[en]:q==='.lang-zh'?[zh]:[];}},event:{target:{classList:{add(){}}}},window:{}});
   vm.runInContext(sample.code,context,{timeout:2000});
   if (sample.name==='Global.report.html') {
    context.switchLanguage('zh');if(en.style.display!=='none'||zh.style.display!=='') throw Error('language handler did not run');
@@ -224,6 +224,16 @@ let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>input+
             self.assertEqual(summary["native_visualization"]["status"], "available")
             self.assertIn("native_visualization/index.html", (site / "report.html").read_text())
             closed_site(self, site)
+
+    def test_family_report_only_detaches_reviewed_own_artifact_links(self):
+        raw = b'<html><head><title>Family</title></head><body><a href="../03.gap_filling/chr1.1.bidirectional/junction-evidence.json">Junction</a></body></html>'
+        managed, changes = visual.transform(raw, [], [], artifact_job="chr1.1.bidirectional")
+        self.assertIn(b'aria-disabled="true"', managed)
+        self.assertIn(b'>Junction</a>', managed)
+        self.assertEqual(changes["detached_native_artifact_links"], 1)
+        self.assertNotIn(b'../03.gap_filling', managed)
+        with self.assertRaisesRegex(ValueError, "unclosed or external"):
+            visual.transform(raw.replace(b"chr1.1.bidirectional", b"chr1.2.bidirectional"), [], [], artifact_job="chr1.1.bidirectional")
 
     def test_plain_diagnostic_names_are_not_mistaken_for_network_calls(self):
         source = b'<html><head><title>diagnostic</title><style>path{fill:url(#gradient)}</style></head><body><script>const chromosome="fetch";const folder="Worker";</script></body></html>'

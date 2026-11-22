@@ -100,6 +100,75 @@ def degap_proposal(row: dict, baseline: Genome, candidate: Genome, gaps: list[Ga
                 native_job, evidence), "accepted"
 
 
+def degap_family_proposal(row, baseline, integration, full_candidate, gaps, *, source_dataset, native_job,
+                          artifact_sha256, junction_policy, max_flank_replacement_bp):
+    """Require the sealed integration slice and intact anchors outside the junction.
+
+    GAP coordinates remain 1-based inclusive; the new integrator's replace_*
+    fields are 0-based inclusive. Native read support is recorded, not inferred
+    from the full candidate or reinterpreted as an independent CGAT call.
+    """
+    fields = ("gap_start", "gap_end", "gap_len", "left_flank_len", "right_flank_len",
+              "replace_start", "replace_end", "replace_len")
+    if row.get("filled") is not True:
+        return None, "native_unfilled"
+    junction = row.get("junction")
+    if (not isinstance(junction, dict) or not isinstance(junction.get("policy"), dict)
+            or junction["policy"].get("version") != junction_policy
+            or any(type(row.get(k)) is not int for k in fields)
+            or any(type(junction.get(k)) is not int for k in ("left_replace_bases", "right_replace_bases",
+                                                             "gap_length", "flank_length_delta", "overlap_trim"))):
+        return None, "invalid_native_junction_coordinates"
+    name = row.get("chromosome")
+    if name not in baseline.records:
+        return None, "unknown_baseline_chromosome"
+    size = baseline.records[name][0]
+    g0, g1 = row["gap_start"] - 1, row["gap_end"]
+    left, right = row["left_flank_len"], row["right_flank_len"]
+    lcut, rcut = junction["left_replace_bases"], junction["right_replace_bases"]
+    start, end = g0 - lcut, g1 + rcut
+    if (not 0 <= g0 - left <= start <= g0 < g1 <= end <= g1 + right <= size
+            or not 0 <= lcut < left or not 0 <= rcut < right or row["gap_len"] != g1 - g0
+            or (row["replace_start"], row["replace_end"], row["replace_len"]) != (start, end - 1, end - start)):
+        return None, "invalid_native_junction_coordinates"
+    distinct = [gap for gap in gaps if gap.chromosome == name and start < gap.end and gap.start < end]
+    if not distinct or distinct[0].start != g0 or distinct[-1].end != g1:
+        return None, "native_junction_does_not_identify_original_gaps"
+    mode, gap_len = junction.get("mode"), junction["gap_length"]
+    delta, trim = junction["flank_length_delta"], junction["overlap_trim"]
+    if mode == "overlap":
+        if (lcut != 0 or delta != 0 or not 0 < trim == rcut <= left or gap_len != -trim
+                or not exact_anchor(baseline, name, g0 - trim, baseline, name, g1, trim)):
+            return None, "unproven_native_overlap"
+    elif (mode != "gap" or trim != 0 or min(gap_len, lcut + rcut + delta) < 0
+          or max(lcut, rcut) > max_flank_replacement_bp):
+        return None, "native_flank_replacement_exceeds_policy"
+    bridge_len = lcut + rcut + gap_len + delta
+    if len(full_candidate.records) != 1 or (integration is not None and len(integration.records) != 1):
+        return None, "ambiguous_candidate_records"
+    full_name, (full_length, *_) = next(iter(full_candidate.records.items()))
+    a, b = left - lcut, right - rcut
+    if (full_length != a + bridge_len + b
+            or not exact_anchor(baseline, name, g0 - left, full_candidate, full_name, 0, a)
+            or not exact_anchor(baseline, name, end, full_candidate, full_name, a + bridge_len, b)):
+        return None, "native_junction_exterior_does_not_reconstruct_baseline"
+    replacement = None
+    if integration is not None:
+        cname, (length, *_) = next(iter(integration.records.items()))
+        if length != bridge_len or not exact_anchor(full_candidate, full_name, a, integration, cname, 0, length):
+            return None, "native_integration_slice_disagrees_with_full_candidate"
+        replacement = {"dataset": source_dataset, "contig": cname, "start": 1, "end": length, "orientation": "+"}
+    elif bridge_len != 0:
+        return None, "missing_native_junction_sequence"
+    method = "sealed_family_overlap" if mode == "overlap" else "sealed_family_junction"
+    edit_id = "degap-" + identity([name, start, end, native_job, artifact_sha256])[:24]
+    return Edit(edit_id, "degap", name, start, end, replacement, tuple(g.gap_id for g in distinct), native_job,
+                {"method": method, "candidate_sha256": artifact_sha256, "native_gap_id": row.get("gap_id"),
+                 "native_coordinates": {key: row[key] for key in fields}, "junction": junction,
+                 "anchors": {"left_bp": a, "right_bp": b},
+                 "claim": "traceable native edit; not independent biological validation"}), "accepted"
+
+
 def exclude_conflicts(edits: list[Edit]) -> tuple[list[Edit], list[dict]]:
     """Reject every conflicting proposal; never prefer arbitrary file/list order."""
     conflicts = set()

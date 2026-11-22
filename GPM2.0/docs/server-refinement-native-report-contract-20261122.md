@@ -3,7 +3,11 @@
 Date: 2026-11-22. Implements the approved native/offline portion of A13; it
 neither changes scientific recipes nor treats a report as a publication receipt.
 
-## Evidence and fixed producers
+## DEGAP bidirectional family revision
+
+At `6cd01f1b983c43648e51389c129dfbd8b5926284`, AutoGapfiller still emits `Global.report.html`. Its detail view now comes from each bidirectional job’s sealed `family-report.html`, with the relative link from the overview generated for that job. The new producer uses bundled inline JS/SVG, not Chart.js. Managed copies use the same frame and CSP. Approved native links to working files are disabled within the display copy; the corresponding selected JSON, AGP and logs are exposed separately by CGAT diagnostics. An exhaustive family search with no candidate is labeled as a completed search with no fill, not an execution failure. Report-source hashes and the allowlist capture the precise pinned renderer dependencies.
+
+## Evidence and fixed producers (previous DEGAP pin)
 
 The bundled DEGAP visualizer actually writes `05.visualization/Global.report.html`.
 Its chosen per-gap reports are copied beside it; individual LEFT/RIGHT jobs can

@@ -59,176 +59,54 @@ def generate_stats_with_seqkit(input_file, output_file):
 
 
 def preprocess_reads_files(hifi_reads, ont_reads, out, data_type):
-    """
-    预处理reads文件（STEP 1）：
-    1. 检测文件格式（FASTQ或FASTA）
-    2. 统一转换为FASTA格式供workflow使用
-       - 支持单文件和多文件输入（FASTA/FASTQ/.gz）
-       - 使用 seqkit fq2fa 合并/转换，始终输出 FASTA
+    """Prepare or verify the FASTA used by the workflow while retaining source formats."""
+    from pathlib import Path
+    from PreparedReads import contract, prepare
 
-    Returns: (hifi_fa, hifi_orig, hifi_fmt, ont_fa, ont_orig, ont_fmt)
-    """
-    processed_dir = os.path.join(out, "processed_reads")
-    os.makedirs(processed_dir, exist_ok=True)
+    def describe(value):
+        if not value:
+            return [], None, None
+        files = [str(p) for p in value] if isinstance(value, (list, tuple)) else [str(value)]
+        formats = set()
+        for path in files:
+            lower = path.lower()
+            if lower.endswith(('.fastq', '.fastq.gz', '.fq', '.fq.gz')):
+                formats.add('fastq')
+            elif lower.endswith(('.fasta', '.fasta.gz', '.fa', '.fa.gz', '.fna', '.fna.gz')):
+                formats.add('fasta')
+            else:
+                raise ValueError(f"Unsupported file format: {path}")
+        return files, files if len(files) > 1 else files[0], formats.pop() if len(formats) == 1 else 'mixed'
 
-    def normalize_file_list(file_input):
-        if file_input is None:
-            return []
-        if isinstance(file_input, (list, tuple)):
-            return [str(f) for f in file_input if f]
-        return [str(file_input)]
-
-    def detect_file_format(file_path):
-        lower = file_path.lower()
-        if lower.endswith(('.fastq', '.fastq.gz', '.fq', '.fq.gz')):
-            return 'fastq'
-        if lower.endswith(('.fasta', '.fasta.gz', '.fa', '.fa.gz', '.fna', '.fna.gz')):
-            return 'fasta'
-        raise ValueError(f"Unsupported file format: {file_path}")
-
-    def process_single_file(file_input, file_type="HiFi"):
-        """
-        处理单个或多个reads文件，输出统一的FASTA文件
-        """
-        file_list = normalize_file_list(file_input)
-        if not file_list:
-            return None, None, None
-
-        prefix = "ont_reads" if file_type == "ONT" else "hifi_reads"
-        working_fa = os.path.join(processed_dir, f"{prefix}.fa")
-
-        input_formats = []
-        for file_path in file_list:
-            if not os.path.exists(file_path):
-                print(f"Error: {file_type} reads file does not exist: {file_path}")
-                sys.exit(1)
-            try:
-                input_formats.append(detect_file_format(file_path))
-            except ValueError as e:
-                print(f"Error: {e}")
-                sys.exit(1)
-
-        if 'fastq' in input_formats and 'fasta' in input_formats:
-            original_format = 'mixed'
-        elif 'fastq' in input_formats:
-            original_format = 'fastq'
-        else:
-            original_format = 'fasta'
-
-        if not os.path.exists(working_fa):
-            try:
-                if len(file_list) == 1:
-                    print(f"Converting {file_type} reads to FASTA...")
-                    print(f"    Input:  {file_list[0]}")
-                else:
-                    print(f"Merging and converting {len(file_list)} {file_type} files to FASTA...")
-                    for idx, f in enumerate(file_list, 1):
-                        print(f"    [{idx}] {f}")
-                print(f"    Output: {working_fa}")
-
-                # seqkit fq2fa handles FASTA/FASTQ and .gz, always outputs FASTA
-                cmd = ['seqkit', 'fq2fa', '-o', working_fa] + file_list
-                subprocess.run(cmd, check=True, capture_output=True, text=True)
-                print(f"  ✓ {file_type} FASTA ready: {working_fa}")
-            except subprocess.CalledProcessError as e:
-                print(f"  ✗ Error preparing {file_type} FASTA:")
-                print(f"    {e.stderr}")
-                sys.exit(1)
-            except FileNotFoundError:
-                print(f"  ✗ Error: seqkit not found. Please install seqkit:")
-                print(f"    conda install -c bioconda seqkit")
-                sys.exit(1)
-        else:
-            print(f"  ✓ Using existing {file_type} FASTA: {working_fa}")
-
-        original_input = file_list if len(file_list) > 1 else file_list[0]
-        return working_fa, original_input, original_format
-
-    # 根据data_type处理文件
-    if data_type == 'mixed':
-        hifi_fa, hifi_orig, hifi_fmt = process_single_file(hifi_reads, "HiFi")
-        ont_fa, ont_orig, ont_fmt = process_single_file(ont_reads, "ONT")
-    elif data_type == 'ont':
-        # 单ONT模式：hifi_reads参数实际传入的是ONT文件（现在可能是列表）
-        ont_fa, ont_orig, ont_fmt = process_single_file(hifi_reads, "ONT")
-        hifi_fa, hifi_orig, hifi_fmt = None, None, None
-    else:
-        # 单HiFi模式
-        hifi_fa, hifi_orig, hifi_fmt = process_single_file(hifi_reads, "HiFi")
-        ont_fa, ont_orig, ont_fmt = None, None, None
-
-    return (hifi_fa, hifi_orig, hifi_fmt, ont_fa, ont_orig, ont_fmt)
+    if data_type == 'ont':
+        hifi_reads, ont_reads = None, hifi_reads
+    hifi_files, hifi_original, hifi_format = describe(hifi_reads)
+    ont_files, ont_original, ont_format = describe(ont_reads)
+    outputs = prepare(Path(out) / 'processed_reads', contract(hifi_files, ont_files))
+    return (str(outputs['hifi']) if 'hifi' in outputs else None, hifi_original, hifi_format,
+            str(outputs['ont']) if 'ont' in outputs else None, ont_original, ont_format)
 
 def convert_extension_fasta_to_fastq(extension_fasta, original_fastq, output_fastq):
-	"""
-	将筛选后的extension reads FASTA转换为FASTQ
-	从原始FASTQ中提取对应reads的质量信息
-	"""
-	if not os.path.exists(extension_fasta) or os.path.getsize(extension_fasta) == 0:
-		print(f"Warning: Extension FASTA file not found or empty: {extension_fasta}")
-		return None
+    """Compatibility helper with genuine source qualities and sequence checks."""
+    from pathlib import Path
+    from ONTAssemblyReads import restore_fastq, source_contract
+    return restore_fastq(extension_fasta, source_contract(original_fastq), output_fastq,
+                         Path(output_fastq).parent / "ont-quality-cache")
 
-	if not os.path.exists(original_fastq):
-		print(f"Warning: Original FASTQ file not found: {original_fastq}")
-		return None
-
-	print(f"Converting {extension_fasta} to FASTQ format using quality from {original_fastq}")
-
-	# 读取extension reads ID列表
-	extension_ids = set()
-	try:
-		for record in SeqIO.parse(extension_fasta, "fasta"):
-			extension_ids.add(record.id)
-		print(f"Found {len(extension_ids)} extension reads to convert")
-	except Exception as e:
-		print(f"Error reading extension FASTA: {e}")
-		return None
-
-	if len(extension_ids) == 0:
-		print("No extension reads found in FASTA file")
-		return None
-
-	# 从原始FASTQ中提取对应reads
-	converted_count = 0
-	try:
-		with open(output_fastq, 'w') as out_f:
-			# Determine format of original file
-			if original_fastq.endswith(('.fastq', '.fq', '.fastq.gz', '.fq.gz')):
-				format_type = "fastq"
-			else:
-				format_type = "fasta"
-
-			for record in SeqIO.parse(original_fastq, format_type):
-				if record.id in extension_ids:
-					if format_type == "fastq":
-						# Write as FASTQ with original quality
-						SeqIO.write(record, out_f, "fastq")
-					else:
-						# If original was FASTA, generate dummy quality scores
-						record.letter_annotations["phred_quality"] = [40] * len(record.seq)
-						SeqIO.write(record, out_f, "fastq")
-					converted_count += 1
-
-		print(f"Successfully converted {converted_count} reads to FASTQ format: {output_fastq}")
-		return output_fastq if converted_count > 0 else None
-
-	except Exception as e:
-		print(f"Error converting to FASTQ: {e}")
-		return None
 
 def usage():
 	print ("DEGAP v2.0 - Dynamic Elongation of a Genome Assembly Path")
 	print ("==========================================================")
 	print ("\nData Input Options:")
 	print ("--hifi file1 [file2 ...]         HiFi read file(s) (FASTA/FASTQ, supports multiple files)")
-	print ("--ont file1 [file2 ...]          ONT read file(s) (FASTA/FASTQ, supports multiple files)")
+	print ("--ont file1 [file2 ...]          ONT read file(s) (FASTQ required for ONT-only assembly; multiple files supported)")
 	print ("Note: Use --hifi alone for HiFi-only mode")
 	print ("      Use --ont alone for ONT-only mode")
 	print ("      Use both --hifi and --ont for Mixed mode")
 	print ("\nBasic Options:")
 	print ("-o | --out ./path/               Output directory")
 	print ("-t | --thread num                Number of threads (default: 20)")
-	print ("--remove 1|2|3                   File cleanup level (default: 2)")
+	print ("--remove 1|2|3                   Legacy cleanup level; family recovery files are retained (default: 2)")
 	print ("                                 1: only keep final result")
 	print ("                                 2: keep every round basic result")
 	print ("                                 3: keep all files")
@@ -255,13 +133,13 @@ def usage():
 	print ("\nMode Options:")
 	print ("--mode gapfiller|ctglinker|telseeker|telseeker_ctg")
 	print ("\nResume Options:")
-	print ("--resume num                     Resume from specified round (e.g.: --resume 118)")
-	print ("--resume_auto                    Automatically resume from last interrupted round")
+	print ("--resume num                     Unsupported legacy single-sided round selection")
+	print ("--resume_auto                    Resume verified family state (also automatic on rerun)")
 	print ("\n=== MODE SPECIFIC PARAMETERS ===")
 	print ("\ngapfiller mode:")
 	print ("\t--seqleft sequence_file      Sequence before GAP (FASTA format)")
 	print ("\t--seqright sequence_file     Sequence after GAP (FASTA format)")
-	print ("\t--flag left|right            Choose seqleft or seqright as seed (default: left)")
+	print ("\t--flag left|right            Deprecated compatibility option; ignored (bidirectional extension)")
 
 	print ("\ntelseeker mode:")
 	print ("\t--genome genome.fasta         Genome file with all chromosomes (FASTA)")
@@ -301,18 +179,18 @@ def getoptions():
 	# Reads input parameters (can be used individually or together for mixed mode)
 	# Support multiple input files: --hifi F1.fq.gz F2.fq.gz F3.fq.gz
 	parser.add_argument('--hifi', nargs='+', help='HiFi reads file(s) (FASTA/FASTQ format, multiple files supported)')
-	parser.add_argument('--ont', nargs='+', help='ONT reads file(s) (FASTA/FASTQ format, multiple files supported)')
+	parser.add_argument('--ont', nargs='+', help='ONT reads file(s); FASTQ(.gz) with original qualities required for ONT-only assembly; FASTA allowed as mixed --ul input')
 
 	parser.add_argument('--remove', type=int, default=2,
-	                   help='1: only keep final result; 2: keep every round basic result; 3: keep all files')
+	                   help='Legacy cleanup level (1/2/3); family histories, prepared reads and verified stages are always retained')
 	parser.add_argument('--edge', type=int, default=500, help='Edge Controller set max Edge length')
 	parser.add_argument('--filterDepthHifi', type=float, default=None, help='Filter HiFi reads by mapped depth. if num==0.3 means: mapped HiFi reads on depth>=0.3*avgdepth and depth<=(2-0.3)*avgdepth will be filtered')
 	parser.add_argument('--filterDepthOnt', type=float, default=None, help='Filter ONT reads by mapped depth. if num==0.2 means: mapped ONT reads on depth>=0.2*avgdepth and depth<=(2-0.2)*avgdepth will be filtered')
 	parser.add_argument('--MaximumExtensionLength', type=int, default=None,
-	                    help='Maximum cumulative extension length in bp. Extension stops when total extended length exceeds this value. '
+	                    help='Maximum cumulative extension length in bp. Family searches share the budget across sides; the last complete attempt may cross it. '
 	                         'Applies to all modes (gapfiller/ctglinker/telseeker). Default: None (no limit)')
 	parser.add_argument('--MaximumExtensionRound', type=int, default=None,
-	                    help='Maximum number of extension rounds. Extension stops when round number exceeds this value. '
+	                    help='Maximum extension attempts. Family searches count attempts across both sides, including normal unsuccessful attempts. '
 	                         'Applies to all modes (gapfiller/ctglinker/telseeker). Default: None (no limit). '
 	                         'Note: Setting to 0 will skip extension; minimum recommended value is 5')
 
@@ -346,7 +224,7 @@ def getoptions():
 	# Parameters for gapfiller mode
 	parser.add_argument('--seqleft', type=str, help='Sequence before GAP (FASTA format)')
 	parser.add_argument('--seqright', type=str, help='Sequence after GAP (FASTA format)')
-	parser.add_argument('--flag', type=str, default='left', help='Choose seqleft or seqright as seed to fill the gap')
+	parser.add_argument('--flag', type=str, default=None, help='Deprecated: accepted but ignored; extension is bidirectional')
 
 	# ctglinker mode specific parameters
 	parser.add_argument('--ctgseq', type=str, help='Contig set file path')
@@ -358,6 +236,29 @@ def getoptions():
 		sys.exit()
 
 	args = parser.parse_args()
+
+	if args.flag is not None:
+		print("Notice: --flag is deprecated and ignored; gap filling extends both families.")
+	args.flag = 'left'  # Internal legacy-call placeholder, not a user-selected direction.
+	for limit in (args.MaximumExtensionRound, args.MaximumExtensionLength):
+		if limit is not None and limit < 0:
+			parser.error("Extension limits must be nonnegative")
+	if args.mode in ('gapfiller', 'ctglinker', 'telseeker', 'telseeker_ctg'):
+		if args.resume is not None:
+			parser.error("Single-sided --resume ROUND is unsupported; rerun the same command to resume family state")
+		if args.out:
+			from FamilyGap import reject_legacy_output
+			try:
+				if args.mode in ('telseeker', 'telseeker_ctg'):
+					from FamilyTelomere import reject_legacy_telomere_project
+					reject_legacy_telomere_project(args.out)
+				elif args.mode == 'ctglinker':
+					from FamilyCtgLinker import reject_legacy_ctg_output
+					reject_legacy_ctg_output(args.out)
+				else:
+					reject_legacy_output(args.out)
+			except ValueError as error:
+				parser.error(str(error))
 
 	# Handle help information
 	if args.help:
@@ -525,9 +426,6 @@ def getoptions():
 			if ctg_end.upper() not in ["L", "R"]:
 				print(f"--ctg endpoint must be L or R: {ctg_file} {ctg_end}")
 				sys.exit()
-		if args.resume is not None or args.resume_auto:
-			print("telseeker_ctg mode does not support --resume or --resume_auto in v1")
-			sys.exit()
 		if args.filterDepthHifi is not None or args.filterDepthOnt is not None:
 			print("telseeker_ctg mode does not support --filterDepthHifi or --filterDepthOnt in v1")
 			sys.exit()
@@ -582,6 +480,12 @@ def generate_gapfiller_visualization_report(output_dir, flag, max_extension_leng
         flag (str): 延伸方向 ('left' 或 'right')
         max_extension_length (int): 最大延伸长度限制
     """
+    if os.path.exists(os.path.join(output_dir, "family-result.json")):
+        from FamilyResult import load_result
+        load_result(output_dir)
+        print(f"Family report / 双向家族报告: {os.path.join(output_dir, 'family-report.html')}")
+        return
+
     try:
         print("正在生成可视化报告...")
 
@@ -1380,6 +1284,8 @@ elif parameter[0] == "ctglinker":
         print(f"CtgLinker check completed: {len(check_result['valid_scaffolds'])} valid scaffolds")
         
     except Exception as e:
+        if os.path.exists(os.path.join(parameter[4], "ctglinker-result.json")):
+            raise
         print(f"Error running CtgLinker check: {e}")
         print("Continuing with visualization...")
         check_result = None
@@ -1397,6 +1303,8 @@ elif parameter[0] == "ctglinker":
         print(f"Please open in browser: {report_path}")
         
     except Exception as e:
+        if os.path.exists(os.path.join(parameter[4], "ctglinker-result.json")):
+            raise
         print(f"Error generating CtgLinker visualization report: {e}")
         print("Continuing execution...")
 elif parameter[0] == "telseeker":
@@ -1434,27 +1342,9 @@ elif parameter[0] == "telseeker_ctg":
     from TelSeekerCtg import TelSeekerCtg
     telseeker_ctg = TelSeekerCtg(parameter, kparameters)
     telseeker_ctg.run()
-# 清理预处理文件（当 --remove=1 或 --remove=2 时）
-if parameter[1] in [1, 2] and parameter[0] != "telseeker_ctg":
-    import shutil
-    out_dir = parameter[4]
-    cleanup_dirs = [
-        os.path.join(out_dir, 'processed_reads'),
-        os.path.join(out_dir, 'hifi_reads_part'),
-        os.path.join(out_dir, 'ont_reads_part'),
-    ]
-    for d in cleanup_dirs:
-        if os.path.exists(d) or os.path.islink(d):
-            # 跳过软链接，不删除
-            if os.path.islink(d):
-                continue
-            try:
-                if os.path.isdir(d):
-                    shutil.rmtree(d)
-                else:
-                    os.remove(d)
-                print(f"Cleaned up: {d}")
-            except Exception as e:
-                print(f"Warning: Failed to clean up {d}: {e}")
+# Prepared reads/parts and their indices are part of the verified recovery
+# contract and are shared by all families. Do not delete them after publication.
+if parameter[1] in [1, 2]:
+    print("Family recovery: retaining prepared reads, indices, histories and verified stages despite --remove.")
 
 print('welldone')

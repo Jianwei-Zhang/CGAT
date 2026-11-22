@@ -48,6 +48,10 @@ class LegacyManualCacheTests(unittest.TestCase):
             recipe = {"schema": "gpm.degap.export.v1", "token": token, "project_id": 1,
                       "job_id": "old-gap", "job_type": "gapfiller", "out_path": str(out),
                       "server_root": str(server), "target_chr": "chr1", "target_track": "a", "endpoint_end": "R"}
+            # Model an older GapFiller with a bare candidate instead of a family manifest.
+            historical_engine = home / "legacy-degap.py"
+            historical_engine.write_text("# controlled legacy engine identity\n")
+            recipe["settings"] = {"degap_path": str(historical_engine)}
             (export / "degap_jobs/old.json").write_text(json.dumps(recipe))
             jobs = export / "jobs.tsv"
             jobs.write_text("job_id\tscript_path\tout_path\nold-gap\tdegap_jobs/old.sh\t" + str(out) + "\n")

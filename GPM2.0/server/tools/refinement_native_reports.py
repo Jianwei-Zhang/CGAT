@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-from html import escape
+from html import escape, unescape
 from html.parser import HTMLParser
 import json
 from pathlib import Path
 import re
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 SCHEMA = "cgat.native-report-view"
 HOME = "native_visualization"
@@ -181,10 +181,11 @@ def check_css(text, inline_images):
 
 class Inspector(HTMLParser):
     """Validate native resources and remove only the known unused CDN tag."""
-    def __init__(self, text, unused_scripts, local_pages, inline_images=()):
+    def __init__(self, text, unused_scripts, local_pages, inline_images=(), artifact_job=None):
         super().__init__(convert_charrefs=False)
         self.text, self.unused, self.local_pages = text, set(unused_scripts), set(local_pages)
         self.inline_images = set(inline_images)
+        self.artifact_job, self.detached_artifacts = artifact_job, 0
         self.offsets, offset = [], 0
         for line in text.splitlines(keepends=True):
             self.offsets.append(offset)
@@ -227,6 +228,23 @@ class Inspector(HTMLParser):
                 parsed = urlsplit(value)
                 if not parsed.scheme and not parsed.netloc and parsed.path in self.local_pages:
                     continue
+                if self.artifact_job and not (parsed.scheme or parsed.netloc or parsed.query or parsed.fragment):
+                    allowed = {"family-result.json", "family-components.fa", "families.json", "process.agp",
+                               "connection-diagnostics.json", "junction-evidence.json", self.artifact_job + ".final.fa"}
+                    local = unquote(parsed.path)
+                    rebased = f"../03.gap_filling/{self.artifact_job}/"
+                    if local in allowed or (local.startswith(rebased) and local[len(rebased):] in allowed):
+                        # Keep the label, not a navigation out of the portable
+                        # native frame. The CGAT diagnostics page owns attachments.
+                        raw_tag = self.get_starttag_text()
+                        match = re.search(r"\s+href\s*=\s*([\"'])(.*?)\1", raw_tag, re.I | re.S)
+                        if not match or unescape(match[2]) != value:
+                            raise UnsupportedView("unsupported native artifact link encoding")
+                        offset = self.position()
+                        self.patches.append((offset + match.start(), offset + match.end(),
+                                             ' aria-disabled="true" title="See the CGAT diagnostics and original attachments"'))
+                        self.detached_artifacts += 1
+                        continue
             if tag == "img" and name == "src" and value.startswith(("data:image/png;", "data:image/jpeg;")):
                 continue
             raise UnsupportedView("unclosed or external native resource: " + name + "=" + value)
@@ -258,12 +276,12 @@ class Inspector(HTMLParser):
             self.scripts.append(body)
 
 
-def transform(raw, unused_scripts, local_pages, inline_images=()):
+def transform(raw, unused_scripts, local_pages, inline_images=(), *, artifact_job=None):
     try:
         text = raw.decode("utf-8", errors="strict")
     except UnicodeError as error:
         raise UnsupportedView("native report is not UTF-8") from error
-    inspect = Inspector(text, unused_scripts, local_pages, inline_images)
+    inspect = Inspector(text, unused_scripts, local_pages, inline_images, artifact_job)
     inspect.feed(text)
     inspect.close()
     if inspect.script is not None or inspect.head_end is None or inspect.body_end is None or not inspect.title:
@@ -287,7 +305,8 @@ def transform(raw, unused_scripts, local_pages, inline_images=()):
     # Upstream creates its detail links inside a JS template string. Stay in
     # the existing sandbox instead of asking it for prohibited popup windows.
     text = re.sub(r'target\s*=\s*([\'"])_blank\1', 'target="_self"', text, flags=re.I)
-    return text.encode(), {"removed_unused_external_scripts": len(inspect.patches),
+    return text.encode(), {"removed_unused_external_scripts": len(inspect.patches) - inspect.detached_artifacts,
+                           "detached_native_artifact_links": inspect.detached_artifacts,
                            "csp": CSP, "popup_links": "same-frame", "scripts": len(inspect.scripts)}
 
 
@@ -299,9 +318,14 @@ def component(value):
 
 
 def detail_name(chromosome, gap_id, direction):
-    if chromosome is None or gap_id is None or direction not in {"left", "right"}:
+    if chromosome is None or gap_id is None or direction not in {"left", "right", "bidirectional"}:
         raise UnsupportedView("unknown native direction")
     return component(chromosome) + "." + component(gap_id) + "." + direction + ".html"
+
+
+def reported_direction(row):
+    direction = row.get("report_direction")
+    return direction or (row.get("fill_direction") if row.get("filled") and row.get("fill_direction") else "left")
 
 
 def global_details(raw, source_gaps):
@@ -322,8 +346,7 @@ def global_details(raw, source_gaps):
             return sorted(json.dumps(row, sort_keys=True) for row in rows)
         if source_gaps and identities(embedded) != identities(source_gaps):
             raise UnsupportedView("native overview data differs from current native gap diagnostics")
-        return {detail_name(row["chromosome"], row["gap_id"], row.get("fill_direction")
-                            if row.get("filled") and row.get("fill_direction") else "left") for row in embedded}
+        return {detail_name(row["chromosome"], row["gap_id"], reported_direction(row)) for row in embedded}
     except (KeyError, TypeError, AttributeError, ValueError) as error:
         raise UnsupportedView("unusable native overview gap data: " + str(error)) from error
 
@@ -368,12 +391,16 @@ def prepare(tool, native, jobs, gaps, assets, read, *, remaining_budget, page_si
         add(GLOBAL, native + "/05.visualization/" + GLOBAL)
         try:
             for gap in gaps:
-                direction = gap.get("fill_direction") if gap.get("filled") and gap.get("fill_direction") else "left"
+                direction = reported_direction(gap)
                 name = detail_name(gap.get("chromosome"), gap.get("gap_id"), direction)
                 add(name, native + "/05.visualization/" + name)
             for job in jobs:
                 if job.get("visualization_html"):
                     name = detail_name(job["chromosome"], job["native_gap_id"], str(job["direction"]).lower())
+                    if job["direction"] == "bidirectional":
+                        # The upstream copied overview-link target rewrites its
+                        # own artifact hrefs. Use the sealed original when present.
+                        candidates.pop(name, None)
                     add(name, job["visualization_html"])
         except UnsupportedView as error:
             # The original remains inert and accessible; do not rewrite source
@@ -411,7 +438,9 @@ def prepare(tool, native, jobs, gaps, assets, read, *, remaining_budget, page_si
                     if name == GLOBAL and global_error:
                         raise UnsupportedView(global_error)
                     raw = global_raw if name == GLOBAL else read(source["workspace_path"], source["sha256"])
-                    content, changes = transform(raw, lock["unused_external_scripts"], names, lock["inline_data_images"])
+                    family_job = name[:-5] if name.endswith(".bidirectional.html") else None
+                    content, changes = transform(raw, lock["unused_external_scripts"], names, lock["inline_data_images"],
+                                                 artifact_job=family_job)
                     row.update(availability="offline_interactive", transformations=changes)
                     pages[name] = content
                 except UnsupportedView as error:

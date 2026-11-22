@@ -123,6 +123,10 @@ class DegapRefinedPublicationTests(unittest.TestCase):
         self.assertEqual(result["jobs"][0]["cgat_execution_outcome"], "completed_without_native_fill")
         native["failed_jobs"][0]["exit_code"] = 137
         self.assertEqual(adapter.validate_native_job_summary(payload, config)["hard_failures"], ["gap.left"])
+        native["failed_jobs"][0].update(status="exception", error="native index changed", exit_code=None)
+        result = adapter.validate_native_job_summary(payload, config)
+        self.assertEqual(result["hard_failures"], ["gap.left"])
+        self.assertEqual(result["jobs"][0]["error"], "native index changed")
         native["failed_jobs"] = []
         with self.assertRaisesRegex(ValueError, "incomplete"):
             adapter.validate_native_job_summary(payload, config)

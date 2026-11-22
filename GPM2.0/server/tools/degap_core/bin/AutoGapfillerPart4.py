@@ -219,6 +219,8 @@ class GenomeIntegrator:
             gap_id = gap['gap_id']
             replace_start = gap['replace_start']
             replace_end = gap['replace_end']
+            if gap.get('junction') and (replace_start < 0 or replace_end >= len(original_seq) or replace_end < replace_start):
+                raise ValueError(f"Out-of-range bounded junction patch: {gap_id}")
             
             # 检查位置是否合法
             if replace_start < 0:
@@ -229,6 +231,9 @@ class GenomeIntegrator:
                 print(f"    Warning: Gap {gap_id} replace_end={replace_end} >= seq_len={len(original_seq)}, adjusting")
                 replace_end = len(original_seq) - 1
             
+            # New bounded junction patches must never be silently truncated.
+            if gap.get('junction') and (replace_start < current_pos or replace_start < 0 or replace_end >= len(original_seq)):
+                raise ValueError(f"Conflicting or out-of-range bounded junction patch: {gap_id}")
             # 检查是否有重叠
             if replace_start < current_pos:
                 print(f"    Warning: Gap {gap_id} overlaps with previous gap!")

@@ -24,6 +24,7 @@ try:
     from refinement_path import PathError
     from refinement_native_trace import TraceError
     from refinement_native_units import launch, capture_units, checked_json, SUMMARY
+    from refinement_degap_units import FAMILY, FAMILY_NO_FILL, family_result
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, relative_path
     from .workspace_migration import durable_json, sync_directories
@@ -32,6 +33,7 @@ except ModuleNotFoundError:
     from .refinement_path import PathError
     from .refinement_native_trace import TraceError
     from .refinement_native_units import launch, capture_units, checked_json, SUMMARY
+    from .refinement_degap_units import FAMILY, FAMILY_NO_FILL, family_result
 
 SCHEMA = "cgat.native-refinement-completion"
 NAME = "native_complete.json"
@@ -83,10 +85,11 @@ def validate_native_job_summary(payload, config):
     try:
         native = payload["steps"]["step3"]["result"]
         configured = [row["job_name"] for row in config["jobs"]]
+        families = {row["job_name"] for row in config["jobs"] if row.get("direction") == "bidirectional"}
         if len(configured) != len(set(configured)) or any(not isinstance(name, str) or not name for name in configured):
             raise ValueError("duplicate or invalid configured job")
         rows, hard_failures = [], []
-        for field, statuses in (("completed", {"success"}), ("failed", {"failed", "error", "timeout"}), ("skipped", {"skipped"})):
+        for field, statuses in (("completed", {"success"}), ("failed", {"failed", "error", "timeout", "exception"}), ("skipped", {"skipped"})):
             values = native[field + "_jobs"]
             if not isinstance(values, list) or type(native[field]) is not int or native[field] != len(values):
                 raise ValueError("native job count does not match records")
@@ -98,10 +101,14 @@ def validate_native_job_summary(payload, config):
                 if exit_code is not None and (type(exit_code) is not int or exit_code != 0):
                     hard_failures.append(row["job_name"])
                 elif field == "failed":
-                    if row["status"] != "failed" or row.get("error") != "Job execution completed but did not produce expected results":
+                    expected = ({"Family search ended: " + state for state in FAMILY_NO_FILL}
+                                if row["job_name"] in families else {"Job execution completed but did not produce expected results"})
+                    if row["status"] != "failed" or row.get("error") not in expected:
                         hard_failures.append(row["job_name"])
                     else:
                         row["cgat_execution_outcome"] = "completed_without_native_fill"
+                if field == "skipped" and row["job_name"] in families:
+                    hard_failures.append(row["job_name"])
                 rows.append(row)
         if (type(native["total_jobs"]) is not int or native["total_jobs"] != len(rows)
                 or len(rows) != len(configured) or len({row["job_name"] for row in rows}) != len(rows)
@@ -260,14 +267,54 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
         configuration = json.loads(config.read_text())
         jobs = validate_native_job_summary(json.loads(summary.read_text()), configuration)
         if jobs["hard_failures"]:
-            raise PathError("DEGAP child processes failed despite top-level exit 0: " + ", ".join(jobs["hard_failures"]))
+            failed = set(jobs["hard_failures"])
+            details = [f"{row['job_name']}: {row.get('error') or row['status']}" for row in jobs["jobs"]
+                       if row["job_name"] in failed]
+            raise PathError("DEGAP child processes failed despite top-level exit 0: " + "; ".join(details))
+        by_job = {row["job_name"]: row for row in jobs["jobs"]}
+        families = {}
+        for definition in configuration["jobs"]:
+            if definition.get("direction") != "bidirectional":
+                continue
+            name = definition["job_name"]
+            directory = native_directory / "03.gap_filling" / name
+            if Path(name).name != name or name in {".", ".."} or Path(definition["job_dir"]) != directory:
+                raise PathError("DEGAP family job directory does not match its native identity")
+            add(directory / FAMILY)
+            family = family_result(directory)
+            job = by_job[name]
+            closed = family["status"] == "closed"
+            if (closed != (job["status"] == "success") or (not closed and
+                    job.get("error") != "Family search ended: " + family["status"])):
+                raise PathError("DEGAP family manifest disagrees with completed job")
+            for name, expected in family["artifacts"].items():
+                relative = add(directory / name)
+                if artifacts[relative] != expected:
+                    raise PathError("DEGAP family artifact changed during native capture")
+            key = (definition["chromosome"], definition["gap_id"])
+            if key in families:
+                raise PathError("duplicate DEGAP family result for one native gap")
+            families[key] = (directory, family)
         for row in payload["gaps"]:
+            key = (row.get("chromosome"), row.get("gap_id"))
+            if row.get("report_direction") == "bidirectional" or key in families:
+                if key not in families or row.get("report_direction") != "bidirectional":
+                    raise PathError("DEGAP family gap row lacks a matching native job")
+                directory, family = families.pop(key)
+                closed = family["status"] == "closed"
+                candidate = directory / (family.get("integration_sequence") or family["final_sequence"])
+                if ((row.get("filled") is True) != closed or row.get("junction") != family.get("junction")
+                        or (closed and Path(row.get("final_sequence_file") or "") != candidate)):
+                    raise PathError("DEGAP family gap row does not bind the sealed integration result")
+                continue  # Manifest-owned sequence can be empty for verified overlap deletion.
             if row.get("filled") is True:
                 value = row.get("final_sequence_file")
                 if not isinstance(value, str) or not value:
                     raise PathError("completed DEGAP candidate has no source FASTA")
                 path = Path(value)
                 add(path if path.is_absolute() else native_directory / path, fasta=True, expected=None)
+        if families:
+            raise PathError("missing DEGAP gap rows for completed family jobs")
         for row in configuration["jobs"]:
             if not row.get("job_dir"):
                 continue  # Missing optional diagnostics is not missing scientific output.
@@ -278,7 +325,7 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
                 path = directory / name
                 if path.exists() or path.is_symlink():
                     add(path)
-        visual = native_directory / "05.visualization/gap_filling_report.html"
+        visual = native_directory / "05.visualization/Global.report.html"
         if visual.exists() or visual.is_symlink():
             add(visual)
         terminal = (native_directory / invocation.required_outputs[1]).relative_to(root).as_posix()

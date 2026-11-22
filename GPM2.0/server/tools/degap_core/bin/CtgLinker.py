@@ -33,14 +33,14 @@ class CtgLinker(object):
 			self.filterDepth = self.filterDepthHifi  # For backward compatibility
 
 		elif len(parameterlist) >= 19:
-			# Format with dual seed lengths but no ONT readsDict:
+			# Current CLI format: dual seed lengths and the ONT reads index at position 18:
 			# [mode, remove, thread, reads, out, genomeSeq, edge, filterDepthHifi, filterDepthOnt,
 			#  MaximumExtensionLength, MaximumExtensionRound, data_type, ont_reads, readsDict,
 			#  maxReadsLen, hifiSeedLen, ontSeedLen, original_reads_info]
 			self.mode,self.remove,self.thread,self.reads,self.out,self.genomeSeq,self.edge,self.filterDepthHifi,self.filterDepthOnt,self.MaximunExtensionLength,self.MaximumExtensionRound,self.data_type,self.ont_reads,self.readsDict,self.maxReadsLen,self.hifiSeedLen=parameterlist[:16]
 			self.ontSeedLen = parameterlist[16] if len(parameterlist) > 16 else None
 			self.original_reads_info = parameterlist[17] if len(parameterlist) > 17 else None
-			self.ont_readsDict = None
+			self.ont_readsDict = parameterlist[18] if len(parameterlist) > 18 else None
 			# For backward compatibility, set seedLen to hifiSeedLen
 			self.seedLen = self.hifiSeedLen
 			self.filterDepth = self.filterDepthHifi  # For backward compatibility
@@ -106,6 +106,17 @@ class CtgLinker(object):
 		print(f"  ontSeedLen: {self.ontSeedLen}")
 		print(f"  seedLen (primary): {self.seedLen}")
 		print(f"  ont_readsDict: {'Available' if self.ont_readsDict is not None else 'None'}")
+
+		# New projects use explicit assembly membership and endpoint-family state.
+		# Legacy methods remain for old report readers, never as an error fallback.
+		from FamilyCtgLinker import CtgFamilyPipeline
+		self.family_result = CtgFamilyPipeline(self).run()
+		self.scaffoldSeq = os.path.join(self.out, "DG.scaffold.fa")
+		self.scaffoldSeqLog = os.path.join(self.out, "DG.scaffold.log")
+		self.agp = os.path.join(self.out, "DG.scaffold.agp")
+		self.ctgSeq = os.path.join(self.out, "Genome.inputCtg.fa")
+		self.ctgSeqLog = os.path.join(self.out, "Genome.inputCtg.log")
+		return
 
 		self.ctgSeq=self.out+"/Genome.inputCtg.fa"
 		self.ctgSeqLog=self.out+"/Genome.inputCtg.log"

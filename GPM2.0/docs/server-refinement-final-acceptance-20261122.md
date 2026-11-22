@@ -246,7 +246,25 @@ not replaced. This proves actual evidence reuse across the CGAT adapter repair,
 not a positive DEGAP native gap closure or whole-matrix completion.
 
 
-## User sequencing update: re-audit DEGAP after upstream feature merge
+## New DEGAP release integration
+
+The user confirmed the upstream merge. The isolated feature branch adopts DEGAP
+`6cd01f1b983c43648e51389c129dfbd8b5926284` from upstream `main`, replacing the
+old LEFT/RIGHT scheduling contract with `cgat.degap.family-junction.v3`. The
+native manifest, full candidate, junction slice and diagnostics are bound by
+hash. In the family result, base gap coordinates remain 1-based inclusive;
+`replace_start` and `replace_end` are 0-based inclusive. For an accepted edit,
+CGAT checks the unaffected outer flanks and the native integration slice against
+the full candidate and rebuilds the result from sources. An exact supported native
+overlap can instead produce an auditable deletion without fictitious patch bases.
+
+The declared environment did not add packages: the new `rg` requirement is
+already covered by the pinned `ripgrep=15.1.0` in both managed-platform specs.
+Run the public installer to refresh the runtime receipt even when the environment
+specification is unchanged. Prior runs below remain evidence for their original
+pin, not coverage for the new recipe.
+
+## Historical sequencing note: re-audit DEGAP after upstream feature merge
 
 On 2026-11-22 the user specified that they will merge DEGAP's feature branch
 later, then re-evaluate the CGAT integration. Keep the present pinned snapshot,

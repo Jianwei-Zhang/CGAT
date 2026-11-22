@@ -5,6 +5,8 @@ folders and preprocessor state are never adopted as completed work.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import multiprocessing
 import os
 from pathlib import Path
@@ -19,16 +21,23 @@ try:
     from post_lgz_degap import digest, stat_key, atomic_json
     from refinement_tools import fingerprint
     from refinement_path import PathError
+    from run_orchestration import OrchestrationContractError
     from workspace_migration import sync_directories
 except ModuleNotFoundError:
     from .refinement_native_units import owned, file_fact, seal, checked_json, RECEIPT, SUMMARY, REQUEST, SCHEMA
     from .post_lgz_degap import digest, stat_key, atomic_json
     from .refinement_tools import fingerprint
     from .refinement_path import PathError
+    from .run_orchestration import OrchestrationContractError
     from .workspace_migration import sync_directories
 
 NO_FILL = "Job execution completed but did not produce expected results"
 LOGS = ("process.log", "run.stdout.log", "run.stderr.log")
+ENGINE_REVISION = "6cd01f1b983c43648e51389c129dfbd8b5926284"
+FAMILY = "family-result.json"
+FAMILY_NO_FILL = frozenset({"terminal", "round_limit", "length_limit", "exhausted"})
+FAMILY_FILES = {"connection-diagnostics.json", "family-components.fa", "family-report.html", "process.agp",
+                "process.log", "process.summary", "junction-evidence.json", "junction-integration.fa"}
 _CONTEXT = None
 _ORIGINAL = None
 
@@ -37,16 +46,70 @@ def terminal(result):
     if (not isinstance(result, dict) or (result.get("exit_code") is not None
             and (type(result["exit_code"]) is not int or result["exit_code"] != 0))):
         return False
-    return result.get("status") == "success" or (result.get("status") == "failed" and result.get("error") == NO_FILL)
+    return result.get("status") == "success" or (result.get("status") == "failed" and (
+        result.get("error") == NO_FILL or result.get("error") in {"Family search ended: " + state for state in FAMILY_NO_FILL}))
+
+
+def family_artifact_name(name):
+    return isinstance(name, str) and (name in FAMILY_FILES or (Path(name).name == name and "\\" not in name and name.endswith(".final.fa")))
+
+
+def family_result(directory):
+    """Read the pinned upstream terminal manifest, not heuristic log strings."""
+    path = directory / FAMILY
+    if path.is_symlink() or not path.is_file():
+        raise PathError("missing regular DEGAP family manifest")
+    value = json.loads(path.read_text())
+    if not isinstance(value, dict):
+        raise PathError("invalid DEGAP family manifest")
+    payload = {k: v for k, v in value.items() if k != "payload_sha256"}
+    identity = hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
+    status, artifacts, final = value.get("status"), value.get("artifacts"), value.get("final_sequence")
+    if (value.get("schema") != "degap-family-result-v1" or value.get("payload_sha256") != identity
+            or status not in FAMILY_NO_FILL | {"closed"} or (status == "closed") != isinstance(value.get("winner"), dict)
+            or not family_artifact_name(final) or not final.endswith(".final.fa") or not isinstance(artifacts, dict)
+            or not ({final, "family-components.fa", "process.agp", "process.log", "process.summary",
+                      "family-report.html", "connection-diagnostics.json"} <= set(artifacts))):
+        raise PathError("incomplete or invalid DEGAP family manifest")
+    integration = value.get("integration_sequence")
+    if ((integration is not None) != isinstance(value.get("junction"), dict) or (integration is not None and (
+            status != "closed" or integration != "junction-integration.fa"
+            or not {integration, "junction-evidence.json"} <= set(artifacts)))):
+        raise PathError("DEGAP family junction artifacts disagree")
+    for name, sha in artifacts.items():
+        if not family_artifact_name(name):
+            raise PathError("unexpected DEGAP family artifact role")
+        source = directory / name
+        if source.is_symlink() or not source.is_file() or digest(source) != sha:
+            raise PathError("DEGAP family artifact changed: " + name)
+    return value
 
 
 def output_names(directory):
+    if (directory / FAMILY).is_file():
+        return sorted({FAMILY, *LOGS, *family_result(directory)["artifacts"]})
     return [name for name in LOGS if (directory / name).exists() or (directory / name).is_symlink()] + sorted(path.name for path in directory.glob("*.final.fa"))
 
 
-def outcome(directory, result, *, selected=None):
+def outcome(directory, result, *, selected=None, family=False):
     if not terminal(result):
         raise PathError("DEGAP nonterminal child cannot be sealed")
+    if family:
+        value = family_result(directory)
+        closed = value["status"] == "closed"
+        if closed != (result["status"] == "success") or (not closed and result.get("error") != "Family search ended: " + value["status"]):
+            raise PathError("DEGAP family state disagrees with scheduler outcome")
+        rounds = value.get("total_rounds")
+        if type(rounds) is not int or rounds < 0:
+            raise PathError("invalid DEGAP completed family round count")
+        chosen = (value.get("integration_sequence") or value["final_sequence"]) if closed else None
+        if selected is not None and chosen != selected:
+            raise PathError("DEGAP family selected result changed")
+        return {"outcome": "completed" if closed else "completed_without_native_fill",
+                "analysis": {"rounds": rounds, "fill_type": ("extension" if rounds else "direct_connection") if closed else "unfilled",
+                             "fill_length": value.get("gap_length", 0), "selected": chosen, "family_status": value["status"]},
+                "selected_fasta": {"name": chosen, "sha256": value["artifacts"][chosen]} if chosen else None,
+                "recoverable": True}
     log = directory / "process.log"
     text = log.read_text() if log.exists() else ""
     direct = "Decided to use direct connection result" in text
@@ -76,6 +139,20 @@ def outcome(directory, result, *, selected=None):
             "analysis": analysis, "selected_fasta": fasta, "recoverable": len(eligible) <= 1}
 
 
+def prepared_index_fact(path):
+    """Permit a fresh SQLite index to settle before its first stable byte read."""
+    for delay in (0.1, 0.25, 1.0, None):
+        try:
+            return file_fact(path)
+        except (OrchestrationContractError, PathError) as error:
+            message = str(error)
+            if delay is None or not message.startswith(("file changed before hashing:", "file changed while hashing:",
+                                                        "file changed during hashing:",
+                                                        "file changed during hash reuse:", "native unit input changed while hashing")):
+                raise
+            time.sleep(delay)
+
+
 def input_binding(root, native, job):
     directory = owned(root, native / "03.gap_filling" / job["job_name"])
     if Path(job["job_dir"]).absolute() != directory:
@@ -88,8 +165,13 @@ def input_binding(root, native, job):
     argv = shlex.split(lines[0], comments=True)
     if not argv or argv[0] != "python" or "--mode" not in argv or argv[argv.index("--mode") + 1] != "gapfiller":
         raise PathError("unexpected DEGAP generated command")
-    for option, expected in (("--out", str(directory)), ("--seqleft", str(directory / "seqleft.fasta")),
-                             ("--seqright", str(directory / "seqright.fasta")), ("--flag", job["direction"])):
+    direction = job["direction"]
+    options = [("--out", str(directory)), ("--seqleft", str(directory / "seqleft.fasta")), ("--seqright", str(directory / "seqright.fasta"))]
+    if direction in {"left", "right"}:
+        options.append(("--flag", direction))
+    elif direction != "bidirectional" or any(value == "--flag" or value.startswith("--flag=") for value in argv):
+        raise PathError("unexpected DEGAP family direction flag")
+    for option, expected in options:
         if argv.count(option) != 1 or argv[argv.index(option) + 1] != expected:
             raise PathError("DEGAP generated command does not identify its child inputs")
     if any(any(char in value for char in "$`*?[]{};&|<>()") for value in argv):
@@ -107,6 +189,11 @@ def input_binding(root, native, job):
         if entry.name == "preprocessing_config.json":
             continue
         entry = owned(root, entry)
+        if entry.name == "preprocessing-inputs.json" and direction == "bidirectional":
+            # The new upstream manager intentionally does not link this parent
+            # receipt. Bind it as evidence without requiring a nonexistent link.
+            files["prepared/" + entry.name] = entry
+            continue
         linked = directory / entry.name
         if not linked.is_symlink() or linked.resolve() != entry.resolve():
             raise PathError("DEGAP job lacks its fresh prepared-read input link")
@@ -119,7 +206,8 @@ def input_binding(root, native, job):
         if not path.exists():
             facts[role], identities[path] = {"missing": True}, None
         else:
-            facts[role], identities[path] = file_fact(path)
+            read_fact = prepared_index_fact if role in {"prepared/hifi_reads.idx", "prepared/ont_reads.idx"} else file_fact
+            facts[role], identities[path] = read_fact(path)
     identities[script] = stat_key(script)
     configuration = {key: value for key, value in job.items() if key != "job_dir"}
     return directory, {"kind": "degap.gap", "job_name": job["job_name"], "argv": normalized,
@@ -190,7 +278,7 @@ class DegapUnits:
             seal(temporary / "native_result.json", native_result)
             if not terminal(native_result):
                 return native_result
-            result = outcome(directory, native_result)
+            result = outcome(directory, native_result, family=job["direction"] == "bidirectional")
         else:
             receipt, producer = cached
             shutil.copyfile(receipt, temporary / "producer.json")
@@ -204,7 +292,7 @@ class DegapUnits:
             original_seconds = producer["native_result"]["elapsed_time"]
             native_result = {**producer["native_result"], "job_name": job["job_name"], "job_dir": str(directory),
                              "elapsed_time": time.monotonic() - started}
-            result = outcome(directory, native_result)
+            result = outcome(directory, native_result, family=job["direction"] == "bidirectional")
             if result != producer["result"]:
                 raise PathError("DEGAP restored native consumer differs from producer")
             origin = {"run_id": producer["run_id"], "receipt": receipt.relative_to(self.root).as_posix(),
@@ -262,9 +350,11 @@ def validate_bundle(root, receipt, value, *, receipt_required=True):
             or value["native_result"].get("job_dir") != str(expected_job)):
         raise PathError("DEGAP unit result is not its declared native consumer")
     outputs = value["outputs"]
+    family = unit.get("configuration", {}).get("direction") == "bidirectional"
     if (not isinstance(outputs, list) or len(outputs) != len(set(outputs))
             or any(not isinstance(name, str) or Path(name).name != name or "\\" in name
-                   or (name not in LOGS and not name.endswith(".final.fa")) for name in outputs)
+                   or (name not in LOGS and not (family_artifact_name(name) or name == FAMILY if family
+                                                 else name.endswith(".final.fa"))) for name in outputs)
             or not {"run.stdout.log", "run.stderr.log"}.issubset(outputs)):
         raise PathError("DEGAP unit has an invalid consumed-output inventory")
     expected = {"outputs/" + name for name in outputs} | ({"producer.json"} if value["origin"] else set())
@@ -276,8 +366,11 @@ def validate_bundle(root, receipt, value, *, receipt_required=True):
         if digest(path) != sha:
             raise PathError("DEGAP unit artifact changed")
         artifacts.append(path)
+    saved_output = receipt.parent / "outputs"
+    if family and set(outputs) != {FAMILY, *LOGS, *family_result(saved_output)["artifacts"]}:
+        raise PathError("DEGAP family terminal outputs are incomplete")
     preferred = value["result"]["analysis"]["selected"]
-    if outcome(receipt.parent / "outputs", value["native_result"], selected=preferred) != value["result"]:
+    if outcome(saved_output, value["native_result"], selected=preferred, family=family) != value["result"]:
         raise PathError("DEGAP unit does not reproduce its native terminal consumer")
     if value["origin"]:
         producer = checked_json(root, receipt.parent / "producer.json")
@@ -343,7 +436,7 @@ def capture_units(root, run_id, code, *, required=False):
             if digest(path) != value["artifacts"]["outputs/" + name]:
                 raise PathError("DEGAP consumed native child output changed")
             artifacts.append(path)
-        if outcome(directory, value["native_result"]) != value["result"]:
+        if outcome(directory, value["native_result"], family=row["unit"]["configuration"].get("direction") == "bidirectional") != value["result"]:
             raise PathError("DEGAP native consumer no longer selects the sealed result")
     return list(dict.fromkeys(artifacts))
 

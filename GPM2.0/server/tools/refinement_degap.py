@@ -20,24 +20,25 @@ try:
     from post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
     from refinement_path import identity, source_blocks, PathError
     from refinement_sources import FastaCatalog
-    from refinement_admission import degap_proposal, exclude_conflicts, preserve_joint_sources
+    from refinement_admission import degap_proposal, degap_family_proposal, exclude_conflicts, preserve_joint_sources
     from refinement_publication import prepare_publication, verify_baseline
     from refinement_tools import validate_runtime, load_lock, verify_directory_links
     from refinement_recipes import make_invocation
+    from refinement_degap_units import ENGINE_REVISION as PIN, FAMILY, family_result
     from refinement_native_checkpoint import execute as execute_native, validate_native_job_summary
 except ModuleNotFoundError:
     from .workspace_layout import WorkspaceLayout, workspace_join
     from .post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
     from .refinement_path import identity, source_blocks, PathError
     from .refinement_sources import FastaCatalog
-    from .refinement_admission import degap_proposal, exclude_conflicts, preserve_joint_sources
+    from .refinement_admission import degap_proposal, degap_family_proposal, exclude_conflicts, preserve_joint_sources
     from .refinement_publication import prepare_publication, verify_baseline
     from .refinement_tools import validate_runtime, load_lock, verify_directory_links
     from .refinement_recipes import make_invocation
+    from .refinement_degap_units import ENGINE_REVISION as PIN, FAMILY, family_result
     from .refinement_native_checkpoint import execute as execute_native, validate_native_job_summary
 
-PIN = "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75"
-RECIPE = "cgat.degap.exact-anchors.v2"
+RECIPE = "cgat.degap.family-junction.v3"
 ADAPTER_FILES = ("refinement_degap.py", "refinement_admission.py", "refinement_path.py",
                  "refinement_sources.py", "refinement_publication.py", "refinement_tools.py",
                  "refinement_recipes.py", "refinement_native_trace.py", "refinement_native_checkpoint.py",
@@ -234,13 +235,40 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
         sha256 = digest(candidate_path)
         if native_artifacts.get(candidate_path.relative_to(root).as_posix()) != sha256:
             raise PathError("DEGAP candidate changed or was not sealed at native completion")
-        candidate = IndexedFasta(candidate_path, catalog.index_directory / f"candidate-{index}.fa")
+        dataset = f"native_degap_{run_id}_{index}"
+        evidence_args = {"source_dataset": dataset, "native_job": rejection["native_job"], "artifact_sha256": sha256}
+        bidirectional = row.get("report_direction") == "bidirectional"
+        if bidirectional and row.get("junction") is not None:
+            manifest_file = candidate_path.parent / FAMILY
+            if native_artifacts.get(manifest_file.relative_to(root).as_posix()) != digest(manifest_file):
+                raise PathError("DEGAP junction is not tied to its sealed family result")
+            manifest = family_result(candidate_path.parent)
+            full_path = candidate_path.parent / manifest["final_sequence"]
+            full_before = stat_key(full_path)
+            if (native_artifacts.get(full_path.relative_to(root).as_posix()) != digest(full_path)
+                    or row["junction"] != manifest["junction"]):
+                raise PathError("DEGAP full candidate changed after native completion")
+            full = IndexedFasta(full_path, catalog.index_directory / f"full-candidate-{index}.fa")
+            with candidate_path.open("rb") as file:
+                header = file.readline(65536)
+                empty = header.startswith(b">") and header.endswith(b"\n") and not file.read(1)
+            candidate = None if empty else IndexedFasta(candidate_path, catalog.index_directory / f"candidate-{index}.fa")
+            edit, reason = degap_family_proposal(row, fasta, candidate, full, gaps, **evidence_args,
+                                                **lock["tools"]["degap"]["parameters"])
+            if stat_key(full_path) != full_before:
+                raise PathError("DEGAP full candidate changed during admission")
+        else:
+            candidate = IndexedFasta(candidate_path, catalog.index_directory / f"candidate-{index}.fa")
+            # A full-family result without a junction uses the same exact-anchor
+            # proof, with the new explicit 0-based inclusive replace coordinates.
+            placement = ({**row, "replace_start": row["replace_start"] + 1,
+                          "replace_end": row["replace_end"] + 1}
+                         if bidirectional and type(row.get("replace_start")) is int
+                         and type(row.get("replace_end")) is int else row)
+            edit, reason = degap_proposal(placement, fasta, candidate, gaps, **evidence_args)
         if stat_key(candidate_path) != before:
             raise PathError("native candidate changed during admission")
         candidate_artifacts[candidate_path.relative_to(root).as_posix()] = sha256
-        dataset = f"native_degap_{run_id}_{index}"
-        edit, reason = degap_proposal(row, fasta, candidate, gaps, source_dataset=dataset,
-                                      native_job=rejection["native_job"], artifact_sha256=sha256)
         if edit:
             if edit.replacement:
                 catalog.register(dataset, edit.replacement["contig"], candidate_path, origin="native:degap")

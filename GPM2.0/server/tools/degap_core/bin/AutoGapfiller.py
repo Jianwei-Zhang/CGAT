@@ -528,7 +528,7 @@ class AutoGapfiller:
         # 显示关键输出文件
         print("📁 Key Output Files:")
         print(f"  • Filled genome:     {self.output_dir}/04.genome_integration/genome.filled.fasta")
-        print(f"  • Visualization:     {self.output_dir}/05.visualization/gap_filling_report.html")
+        print(f"  • Visualization:     {self.output_dir}/05.visualization/Global.report.html")
         print(f"  • Gap statistics:    {self.output_dir}/03.gap_filling/gap_filling_results.json")
         print(f"  • Summary report:    {self.output_dir}/autogapfiller_summary.json")
         
@@ -618,7 +618,7 @@ For more information, visit: https://github.com/your-repo/DEGAPv2
     advanced.add_argument('--edge', type=int, default=500,
                          help='Edge length for misassembly detection (default: 500)')
     advanced.add_argument('--remove', type=int, choices=[1, 2, 3], default=2,
-                         help='File cleanup level: 1=keep all, 2=remove some, 3=remove most (default: 2)')
+                         help='Legacy cleanup level; family recovery inputs, histories and verified stages are retained (default: 2)')
     
     args = parser.parse_args()
     

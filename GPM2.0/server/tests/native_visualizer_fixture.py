@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import sys
 from pathlib import Path
 
 
@@ -10,7 +11,11 @@ def module(name):
     path = Path(__file__).resolve().parents[1] / "tools/degap_core/bin" / (name + ".py")
     spec = importlib.util.spec_from_file_location("controlled_" + name, path)
     value = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(value)
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(value)
+    finally:
+        sys.path.pop(0)
     return value
 
 
@@ -44,6 +49,10 @@ def create(native, gap=None):
                          "gap_id": first["gap_id"], "direction": direction})
     config.write_text(json.dumps({"jobs": jobs}))
     global_renderer = module("AutoGapfillerVisualizer")
-    with contextlib.redirect_stdout(io.StringIO()):
-        global_renderer.GapFillingVisualizer(native).generate_report()
+    sys.path.insert(0, str(Path(global_renderer.__file__).parent))
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            global_renderer.GapFillingVisualizer(native).generate_report()
+    finally:
+        sys.path.pop(0)
     return native

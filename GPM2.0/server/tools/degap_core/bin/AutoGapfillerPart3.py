@@ -111,8 +111,8 @@ class JobManager:
             for gap in info['gaps']:
                 gap_id = gap['id']
                 
-                # 为每个 gap 创建两个方向的工作目录
-                for direction in ['left', 'right']:
+                # One job owns both historical extension families.
+                for direction in ['bidirectional']:
                     job_name = f"{chrom}.{gap_id}.{direction}"
                     job_dir = self.output_dir / job_name
                     
@@ -140,7 +140,7 @@ class JobManager:
                     
                     total_created += 1
             
-            print(f"    Created {info['count'] * 2} working directories")
+            print(f"    Created {info['count']} working directories")
         
         print(f"\n  Total working directories created: {total_created}")
     
@@ -154,7 +154,7 @@ class JobManager:
         # 遍历 01.reads_preprocessor/ 下的所有文件和目录
         for item in self.preprocessing_dir.iterdir():
             # 跳过 preprocessing_config.json
-            if item.name == 'preprocessing_config.json':
+            if item.name in {"preprocessing_config.json", "preprocessing-inputs.json"}:
                 continue
             
             # 目标软链接路径
@@ -182,16 +182,26 @@ class JobManager:
         # 左侧序列
         left_source = self.gap_data_dir / f"{chrom}.{gap_id}.left.fasta"
         left_target = job_dir / "seqleft.fasta"
-        if left_source.exists() and not left_target.exists():
-            import shutil
-            shutil.copy2(left_source, left_target)
+        if left_source.exists():
+            from FamilyTools import content_hash
+            if left_target.exists():
+                if content_hash(left_source) != content_hash(left_target):
+                    raise ValueError(f"Gap flank changed; use a new job directory: {left_target}")
+            else:
+                import shutil
+                shutil.copy2(left_source, left_target)
 
         # 右侧序列
         right_source = self.gap_data_dir / f"{chrom}.{gap_id}.right.fasta"
         right_target = job_dir / "seqright.fasta"
-        if right_source.exists() and not right_target.exists():
-            import shutil
-            shutil.copy2(right_source, right_target)
+        if right_source.exists():
+            from FamilyTools import content_hash
+            if right_target.exists():
+                if content_hash(right_source) != content_hash(right_target):
+                    raise ValueError(f"Gap flank changed; use a new job directory: {right_target}")
+            else:
+                import shutil
+                shutil.copy2(right_source, right_target)
 
     def _generate_run_script(self, job_dir, direction):
         """
@@ -231,8 +241,7 @@ class JobManager:
                 ont_paths = str(Path(ont_value).resolve())
             cmd_parts.append(f"    --ont {ont_paths} \\")
 
-        # 添加 --flag 参数（根据工作目录的方向自动设置）
-        cmd_parts.append(f"    --flag {direction} \\")
+        # Direction is internal to the shared family scheduler; no --flag.
 
         # 添加可选参数（只有用户指定了才添加，排除 flag）
         # NOTE: 不传递 filterDepthHifi/Ont 参数，因为深度过滤已在 Part1 统一完成
@@ -330,7 +339,8 @@ class GapFillingAnalyzer:
                     'gap_id': job['gap_id'],
                     'gap_info': job['gap_info'],
                     'left': None,
-                    'right': None
+                    'right': None,
+                    'bidirectional': None
                 }
 
             direction = job['direction']
@@ -357,12 +367,17 @@ class GapFillingAnalyzer:
         Returns:
             dict: gap 的统计信息
         """
-        # 检查 left 和 right 方向
+        bidirectional_data = gap_data.get('bidirectional')
+        bidirectional_result = self._analyze_direction(bidirectional_data) if bidirectional_data else None
+        # Legacy result directories remain readable; new jobs run only once.
         left_result = self._analyze_direction(gap_data['left']) if gap_data['left'] else None
         right_result = self._analyze_direction(gap_data['right']) if gap_data['right'] else None
 
         # 确定最终结果（优先使用成功的方向）
-        if left_result and left_result['filled']:
+        if bidirectional_result is not None:
+            final_result = bidirectional_result
+            final_result['fill_direction'] = 'bidirectional' if final_result['filled'] else 'none'
+        elif left_result and left_result['filled']:
             final_result = left_result
             final_result['fill_direction'] = 'left'
         elif right_result and right_result['filled']:
@@ -389,9 +404,17 @@ class GapFillingAnalyzer:
         # 替换区域的起始和结束位置（包含 seqleft 和 seqright）
         # seqleft 的起始位置 = gap_start - left_len
         # seqright 的结束位置 = gap_end + right_len
-        replace_start = gap_start - left_len
-        replace_end = gap_end + right_len
+        # GapDetector stores 1-based inclusive genomic coordinates. The
+        # integrator slices Python strings using 0-based inclusive endpoints.
+        replace_start = gap_start - 1 - left_len
+        replace_end = gap_end - 1 + right_len
 
+        junction = final_result.get('junction')
+        integration_file = final_result.get('integration_sequence_file')
+        if junction and integration_file:
+            # Only the actual gap and explicitly approved end edits are replaced.
+            replace_start = gap_start - 1 - junction['left_replace_bases']
+            replace_end = gap_end - 1 + junction['right_replace_bases']
         # 组合结果
         return {
             'chromosome': gap_data['chromosome'],
@@ -409,9 +432,13 @@ class GapFillingAnalyzer:
             'fill_direction': final_result['fill_direction'],
             'fill_length': final_result['fill_length'],
             'rounds': final_result['rounds'],
-            'final_sequence_file': final_result.get('final_sequence_file', ''),
-            'left_status': left_result['status'] if left_result else 'not_executed',
-            'right_status': right_result['status'] if right_result else 'not_executed'
+            'final_sequence_file': integration_file or final_result.get('final_sequence_file', ''),
+            'junction': junction,
+            'anchor_retries': final_result.get('anchor_retries', []),
+            'connection_diagnostics': final_result.get('connection_diagnostics', []),
+            'report_direction': 'bidirectional' if bidirectional_data else final_result['fill_direction'] if final_result['filled'] else 'left',
+            'left_status': bidirectional_result.get('left_status', bidirectional_result['status']) if bidirectional_result else left_result['status'] if left_result else 'not_executed',
+            'right_status': bidirectional_result.get('right_status', bidirectional_result['status']) if bidirectional_result else right_result['status'] if right_result else 'not_executed'
         }
 
     def _analyze_direction(self, direction_data):
@@ -424,6 +451,26 @@ class GapFillingAnalyzer:
         job_dir = direction_data['job_dir']
         execution_status = direction_data.get('execution_status', 'unknown')
         process_log = job_dir / 'process.log'
+        if (job_dir / 'family-result.json').exists():
+            from FamilyResult import load_result
+            result = load_result(job_dir)
+            closed = result['status'] == 'closed'
+            statuses = {f['key']: f['stop_reason'] or ('success' if closed else result['status'])
+                        for f in result['families']}
+            return {
+                'filled': closed,
+                'junction': result.get('junction'),
+                'anchor_retries': result.get('anchor_retries', []),
+                'connection_diagnostics': result.get('connection_diagnostics', []),
+                'integration_sequence_file': str((job_dir / result['integration_sequence']).resolve()) if closed and result.get('integration_sequence') else '',
+                'fill_type': ('direct_connection' if result['total_rounds'] == 0 else 'extension') if closed else 'unfilled',
+                'fill_length': result['gap_length'] if closed else 0,
+                'rounds': result['total_rounds'],
+                'final_sequence_file': str((job_dir / result['final_sequence']).resolve()) if closed else '',
+                'status': 'success' if closed else result['status'],
+                'left_status': statuses.get('L', 'not_executed'),
+                'right_status': statuses.get('R', 'not_executed'),
+            }
 
         # 如果任务被跳过，直接返回
         if execution_status == 'skipped':
@@ -644,7 +691,16 @@ class JobExecutor:
         for gap_key in sorted(jobs_by_gap.keys()):
             gap_jobs = jobs_by_gap[gap_key]
 
-            # 先添加 left 任务
+            if 'bidirectional' in gap_jobs:
+                job = gap_jobs['bidirectional']
+                # Artifact integrity alone does not prove compatibility with
+                # this invocation. Let DEGAP validate the live family contract;
+                # a matching completed checkpoint will not run another round.
+                self.job_list.append({'job': job, 'gap_key': gap_key,
+                                      'has_right': False, 'right_job': None})
+                continue
+
+            # Legacy job configurations remain readable/executable.
             if 'left' in gap_jobs:
                 left_job = gap_jobs['left']
                 # 检查是否已经完成
@@ -764,23 +820,27 @@ class JobExecutor:
             with open(stderr_log, 'w') as f:
                 f.write(result.stderr if result.stderr else "")
 
-            # 检查退出码
+            bidirectional = job['direction'] == 'bidirectional'
             if result.returncode != 0:
                 error_msg = f"Exit code: {result.returncode}"
-                if result.stderr:
-                    error_msg += f"\nStderr: {result.stderr[:500]}"  # 只显示前500字符
+                if result.stderr and result.stderr.strip():
+                    error_msg += f"\nStderr: {result.stderr.strip().splitlines()[-1]}"
 
                 return {
                     'job_name': job_name,
-                    'status': 'failed',
+                    'status': 'error' if bidirectional else 'failed',
                     'elapsed_time': elapsed_time,
                     'job_dir': str(job_dir),
                     'error': error_msg,
                     'exit_code': result.returncode
                 }
 
-            # 检查是否成功（通过 process.log 判断）
-            success = self._check_job_success(job_dir)
+            if bidirectional:
+                from FamilyResult import load_result
+                family_result = load_result(job_dir)
+                success = family_result['status'] == 'closed'
+            else:
+                success = self._check_job_success(job_dir)
 
             if success:
                 return {
@@ -795,7 +855,8 @@ class JobExecutor:
                     'status': 'failed',
                     'elapsed_time': elapsed_time,
                     'job_dir': str(job_dir),
-                    'error': 'Job execution completed but did not produce expected results'
+                    'error': (f"Family search ended: {family_result['status']}" if bidirectional
+                              else 'Job execution completed but did not produce expected results')
                 }
 
         except subprocess.TimeoutExpired:
@@ -836,6 +897,12 @@ class JobExecutor:
             bool: 任务是否成功
         """
         job_dir = Path(job_dir)
+        if (job_dir / "family-result.json").exists():
+            from FamilyResult import load_result
+            try:
+                return load_result(job_dir)['status'] == 'closed'
+            except (ValueError, OSError, KeyError):
+                return False
 
         # 检查 process.log 是否存在
         process_log = job_dir / "process.log"
@@ -895,7 +962,10 @@ class JobExecutor:
         total_jobs = self._collect_jobs()
 
         if total_jobs == 0:
-            print("\nNo jobs to execute!")
+            print("\nNo jobs to execute; collecting verified existing results.")
+            analyzer = GapFillingAnalyzer(self.main_output_dir)
+            analyzer.analyze_all_gaps(self.job_config.get('jobs', []))
+            analyzer.save_to_json(self.gap_filling_dir / 'gap_filling_results.json')
             return {
                 'total_jobs': 0,
                 'completed': 0,
@@ -905,7 +975,7 @@ class JobExecutor:
 
         print(f"\n{'='*60}")
         print(f"Starting parallel execution (workers={self.workers})")
-        print(f"Strategy: For each gap, LEFT must complete before RIGHT can start")
+        print(f"Strategy: One bidirectional family search per gap (legacy left/right jobs remain readable)")
         print(f"{'='*60}\n")
 
         # 按 gap 组织任务
@@ -932,14 +1002,19 @@ class JobExecutor:
 
             # 初始化：提交所有 left 任务
             print(f"\n{'='*60}")
-            print(f"Submitting initial LEFT tasks...")
+            print(f"Submitting gap tasks...")
             print(f"{'='*60}\n")
 
             for gap_key, gap_jobs in jobs_by_gap.items():
                 gap_status[gap_key] = {'left_done': False, 'left_success': False}
 
-                if 'left' in gap_jobs:
-                    # 有 left 任务，提交执行
+                if 'bidirectional' in gap_jobs:
+                    job_info = gap_jobs['bidirectional']
+                    print(f"  → Submitting: {job_info['job']['job_name']}")
+                    future = executor.submit(self._run_single_job, job_info)
+                    active_futures[future] = job_info
+                elif 'left' in gap_jobs:
+                    # Legacy left job, submitted before its right fallback
                     job_info = gap_jobs['left']
                     print(f"  → Submitting: {job_info['job']['job_name']}")
                     future = executor.submit(self._run_single_job, job_info)
@@ -1056,6 +1131,17 @@ class JobExecutor:
         print(f"  Failed: {len(self.failed_jobs)}")
         print(f"  Skipped: {len(self.skipped_jobs)} (LEFT succeeded)")
 
+        # Never let the analyzer integrate a previous valid publication after
+        # the current invocation rejected its contract. Biological exhaustion
+        # (exit zero with a verified non-closed result) is not a tool error.
+        family_jobs = {entry['job']['job_name'] for entry in self.job_list
+                       if entry['job']['direction'] == 'bidirectional'}
+        errors = [result for result in self.failed_jobs
+                  if result['job_name'] in family_jobs and result['status'] != 'failed']
+        if errors:
+            detail = "; ".join(f"{r['job_name']}: {r.get('error', r['status'])}" for r in errors)
+            raise RuntimeError(f"AutoGapfiller could not verify or finish family jobs: {detail}")
+
         # 生成 gap filling 统计信息
         analyzer = GapFillingAnalyzer(self.main_output_dir)
 
@@ -1108,7 +1194,7 @@ Note: This script requires preprocessing and gap detection to be completed first
     # 必需参数
     parser.add_argument('--output', '-o', required=True, help='Output directory')
     parser.add_argument('--hifi', nargs='+', help='HiFi reads file path(s) (FASTA/FASTQ format, multiple files supported)')
-    parser.add_argument('--ont', nargs='+', help='ONT reads file path(s) (FASTA/FASTQ format, multiple files supported)')
+    parser.add_argument('--ont', nargs='+', help='ONT reads file path(s); original FASTQ(.gz) required for ONT-only assembly (multiple files supported)')
 
     # 并行控制参数
     parser.add_argument('--work', '-w', type=int, default=1, help='Maximum parallel workers (default: 1)')

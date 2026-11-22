@@ -33,6 +33,7 @@ import add_ctg_package as package
 import track_member_order as ordering
 import degap_manual_catalog as manual_catalog
 from run_resources import execution_threads
+from refinement_degap_units import ENGINE_REVISION, FAMILY, family_result
 
 
 def digest(path):
@@ -94,7 +95,7 @@ def begin(recipe):
     if marker.exists():
         if json.loads(marker.read_text()) != input_identity(recipe):
             raise ValueError("DEGAP output directory belongs to different inputs/settings; choose a new output directory")
-    elif any(out.glob("*.final.fa")) or (out / "result/status.tsv").exists():
+    elif any(out.glob("*.final.fa")) or (out / FAMILY).exists() or (out / "result/status.tsv").exists():
         raise ValueError("Existing DEGAP results have no matching GPM provenance; choose a new output directory")
     atomic_json(marker, input_identity(recipe))
     (out / ".gpm_degap_result.json").unlink(missing_ok=True)
@@ -104,7 +105,7 @@ def begin(recipe):
 
 def output_signatures(recipe):
     out = Path(recipe["out_path"])
-    paths = ([out / f"{out.name}.final.fa", out / f"{out.name}.direct.final.fa"]
+    paths = ([out / f"{out.name}.final.fa", out / f"{out.name}.direct.final.fa", out / FAMILY]
              if recipe["job_type"] == "gapfiller" else
              [out / "telseeker_ctg.jobs" / f"endpoint.{recipe['endpoint_end']}" / "result/extended.ctg.fa"])
     return {p.relative_to(out).as_posix(): {"size": p.stat().st_size, "mtime_ns": p.stat().st_mtime_ns,
@@ -129,9 +130,19 @@ def seed(recipe):
         "source_proof": source_proof})
 
 
-def candidate(recipe):
+def candidate(recipe, *, family_required=False):
     out = Path(recipe["out_path"])
     if recipe["job_type"] == "gapfiller":
+        manifest = out / FAMILY
+        if manifest.exists() or manifest.is_symlink():
+            family = family_result(out)
+            if family["status"] != "closed":
+                return None, family["status"]  # Unclosed family records are not an App candidate.
+            if family["final_sequence"] != f"{out.name}.final.fa":
+                raise ValueError("DEGAP family sequence does not match the exported job identity")
+            return out / family["final_sequence"], "candidate"
+        if family_required:
+            raise ValueError("Bundled DEGAP did not produce its final family manifest")
         candidates = [p for p in (out / f"{out.name}.direct.final.fa", out / f"{out.name}.final.fa")
                       if p.is_file() and p.stat().st_size]
         if len(candidates) != 1:
@@ -164,7 +175,10 @@ def record(recipe):
         runtime_source = Path(__file__).resolve().parent / "degap_core/SOURCE.json"
         runtime = {"kind": "bundled", "revision": json.loads(runtime_source.read_text())["revision"],
                    "source_sha256": digest(runtime_source)}
-    result, status = candidate(recipe)
+    previous = seed_record["previous_outputs"]
+    if FAMILY in previous and previous[FAMILY] == output_signatures(recipe).get(FAMILY):
+        raise ValueError("DEGAP did not produce a new family manifest in this run; use the existing result package")
+    result, status = candidate(recipe, family_required=runtime.get("revision") == ENGINE_REVISION)
     entry = {"recipe": recipe, "status": status, "seed_sha256": seed_record["sha256"], "runtime": runtime}
     if "seed_plans" in recipe:
         proof = seed_record.get("source_proof")

@@ -10,13 +10,17 @@
       "version": "2.0",
       "distribution": "bundled",
       "repository": "https://github.com/Jianwei-Zhang/DEGAP",
-      "revision": "0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75",
-      "manifest_sha256": "3c8f190222829efa83d494dcd9130e290aa12b14d805de422f84f18c4abf9da2",
+      "revision": "6cd01f1b983c43648e51389c129dfbd8b5926284",
+      "manifest_sha256": "5cf692e284e00eec615e899ae7d8adaae0615cc6953c44ca1e94cb8d6c50b5c2",
       "read_policy": "native_mixed",
-      "recipe": "cgat.degap.exact-anchors.v2",
+      "recipe": "cgat.degap.family-junction.v3",
       "license": {
         "spdx": "NOASSERTION",
         "basis": "No LICENSE file in the pinned upstream tree; preserve the existing bundled-source attribution, do not invent a license."
+      },
+      "parameters": {
+        "junction_policy": "bounded-read-backed-v4",
+        "max_flank_replacement_bp": 2000
       }
     },
     "tgsgapcloser": {
