@@ -4146,3 +4146,24 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   本地三组10项测试通过。新作业 **43016420** 在`q0-regional-local-io-abba-20261122-2118-r2`单次
   提交；test的临时文件只落私有节点本地目录，并增加独立240s测试预算；`job.sha256` SHA
   `390961549fc9f2c53c12597899fa275120d2e59d20d2213153b733383e63f8d9`。等待该作业终态再判断净收益。
+
+### 2026-11-22 21:37 CST：预备全量只读缓冲校验，不再盲重投本地 FASTA 对照
+
+- `43016420 / agent-X86-60` 在21:34:20 **FAILED/124**，出在独立240s单测预算（尚未完成测试、
+  未创建 native artifacts、没有任一组mapper/速度结果）。与主分析的资源、旧版进度、真实比对精度无关；
+  `terminal-43016420.json` SHA `1eaddb9b50814105a5224c23d84e0105eae622ea9e3089267433000c09251cfb`。
+  不将该诊断终态当成节点本地一定慢/原主失败；不再投同样的测速包，先保留已有投入。
+- 回查上次真实25项证明 `a46396d126d9f1620acf010ff4b5559c64c62c9fdbc75cfbbe138ccb298e6fee`：
+  本次工作区25份原checkpoint JSON的当前内容SHA全部相同。其声明的输出里有68份 PAF，参考
+  1,745,286,139字节、区域初始染色体 12,522,376,422字节（合计约14.27 GB）；**只核验JSON元数据，
+  不表示本次重新读过PAF或25项通过**。原真实预检8 KiB读取已实地观察到，不再靠增加旧诊断上限解决。
+- 已准备隔离 `q0-buffered-preflight-probe-20261122-2137`，真实独立 `origin_probe` 角色绑定
+  基础transition/原native origin、原25项proof和 SHA 锁定工作区冻结 verifier，原有输入 fingerprint、
+  native/cross/self及最终封套验证完整保留。只替换输出PAF流为1MiB缓冲、完整几何/CIGAR与原字节SHA
+  同次读取；逐项匹配原成功预检的真实input fingerprint和 checkpoint SHA。23项本地定向测试通过。
+  `job.sha256` SHA `39191ac388f95c7d0bb8895a989b2b2840b5e3a92e1289019e233dbc39059599`，
+  `config.sha256` SHA `392ef9630cc6643f0825925ec635abb005055b17d2da0b9ce686c7d1ce2004fc`。**已stage
+  未提交**；只有原 `43015921` 权威终态未通过且没有有效交接凭据，再判断是否提交一次，不并跑相同全量
+  校验。隔离结果写`buffered-proof.json`，不能冒用被冻结切换控制器的`validation.json`，不安装/停作业。
+- 截至21:37：新版 `43012037` 于21:32:16 报 **9300/61000、fallback=0**；旧 `42523432`仍运行。
+  原 `43015921` 仍RUNNING、实际4/25、PID488989仍跟踪，未产生新的资源提交或切换。
