@@ -11,6 +11,7 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field, replace
+from functools import lru_cache
 import math
 from pathlib import Path
 from typing import Mapping
@@ -438,6 +439,13 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
             records.append({"placement_id": local.placement_id, "segment_id": part.segment_id, "status": "accepted",
                             "reason": "independently_anchored_cross_chr_tail", "anchor_placement_ids": sorted(value["parents"])})
 
+    # A fragmented pair can have thousands of CIGAR blocks rooting to the
+    # same immutable admitted span. Screen that full source context once,
+    # not once per block. Keep the cache local to this admission and bounded.
+    @lru_cache(maxsize=128)
+    def rooted_context(segment_id, interval):
+        return clean_intervals(data.parts[segment_id], (interval,))
+
     # Only previous-round independent anchors can establish new placements.
     # Multiple loci/strands remain alternatives, not a majority vote by ds.
     for round_number in range(1, len(data.parts) + 1):
@@ -453,12 +461,14 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                     temporary = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
                                            (l.hit.evidence_id for l in links), kind="pairwise")
                     qualified = qualify_pair_blocks(temporary, anchor, links, path_policy, require_supported=False)
+                    if not qualified:
+                        continue
+                    # Full accepted contig context can root an off-ref
+                    # neighbor; known ambiguous/repetitive positions cannot.
+                    context = rooted_context(anchor.segment_id, anchor.interval)
                     intervals, ids = [], set()
                     for block, evidence_id in qualified:
-                        # Full accepted contig context can root an off-ref
-                        # neighbor; known ambiguous/repetitive positions cannot.
-                        anchor_part = data.parts[anchor.segment_id]
-                        for source_anchor in clean_intervals(anchor_part, (anchor.interval,)):
+                        for source_anchor in context:
                             overlap = block.right.intersection(anchor.local(source_anchor))
                             if overlap is None:
                                 continue
@@ -516,6 +526,8 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                 added += 1
         if not added:
             break
+
+    rooted_context.cache_clear()
 
     # Extend supported anchors into non-ref sequence only with a noncompeting,
     # high-complexity pair match between already localized sources. Direct ref

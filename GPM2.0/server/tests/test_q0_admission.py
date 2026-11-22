@@ -7,7 +7,9 @@ import random
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
+from server.tools.lgz_core import q0_admission
 from server.tools.lgz_core.common import reverse_complement
 from server.tools.lgz_core.q0_admission import (AdmissionPolicy, EvidenceInput, admit_placements,
                                                build_q0, construct_q0, load_evidence_input,
@@ -113,6 +115,21 @@ def bridge_fixture(reverse=False):
 
 
 class Q0AdmissionTests(unittest.TestCase):
+    def test_fragmented_pair_screens_full_root_context_once(self):
+        fixture = EvidenceFixture()
+        source = dna(8000)
+        anchor = fixture.source("root", source)
+        fixture.ref(anchor, (0, 2500), (0, 2500))
+        for name, start in (("off_ref", 3000), ("off_ref_second", 5000)):
+            child = fixture.source(name, source[start:start + 2000])
+            for offset in range(0, 2000, 200):
+                fixture.pair(child, anchor, (offset, offset + 200), (start + offset, start + offset + 200))
+        with patch.object(q0_admission, "_complex_intervals", wraps=q0_admission._complex_intervals) as check:
+            admission = admit_placements(fixture.data())
+        self.assertEqual({p.source.contig for p in admission.placements if p.localization_kind == "pairwise"},
+                         {"off_ref", "off_ref_second"})
+        self.assertEqual(sum(args[:2] == (source, Interval(0, len(source))) for args, _ in check.call_args_list), 1)
+
     def test_reference_block_index_is_complete_for_nested_touching_and_random_intervals(self):
         rng = random.Random(9)
         pairs = [(0, 120), (1, 2), (2, 3), (121, 140), (3, 121)]
