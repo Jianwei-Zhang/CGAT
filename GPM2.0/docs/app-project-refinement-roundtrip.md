@@ -40,3 +40,12 @@
 - 「精修」放在选中项目右侧详情的数据集与染色体预览之间；复用 `.project-section-divider`、`--border-subtle`、`--font-small`，窄窗允许换行，键盘可达。
 - 顶栏保留一个「导入精修结果」动作，摘要同时区分填补缺口、延伸端粒、未应用；展开按位点看曾采用/备选及原因，提供定位和安全时的位点撤销，不弹第二个确认框，不新建轨道。
 - Final Path 保持标记简短，详情再展示工具和来源。导出表单的预填状态只提示「沿用项目 reads」，Gap 工具可多选，Tel 工具只读。不在摘要重复路径、报告正文或同一状态。
+
+## v1：任务包与 Server 输入边界
+
+- 任务 ZIP 的协议入口为根目录 `refinement_tasks.json`（`cgat.app-refinement-tasks.v1`，UTF-8），可带 `README.txt`。不运行归档内代码。`export_id` 是单次导出的不透明标识；以**原始 JSON 字节** SHA-256 作为 `batch_sha256`。App 在本项目同一工作区的私有凭据中登记项目 ID 和原清单，后续以登记内容而不是 ZIP 文件名或当前界面判断归属。
+- 清单顶层为 `schema`、`export_id`、`origin_fasta_sha256`、`reads`、`loci`。`origin_fasta_sha256` 来自 App 导入时已校验的整套 Server 交付；Server 以对应项目的 LGZ 或已发布精修 FASTA 验证它。此摘要只证明原交付归属，**不是手动位点输入**。`reads.hifi` / `reads.ont` 为 `{path, sha256}` 数组，未带摘要用 `null`，允许空数组。同一文件不得同时属于两种技术。App 显式提交空数组时，不用导入提示覆盖。
+- 每个 `loci` 项有 `id/chr/kind/target/tools/witnesses/seed_plans`，Gap 另有 `gap_bp`，Tel 另有 `motif`。`kind` 为 `gap`、`tel_left` 或 `tel_right`。`target` 是选中段的 `segmentId`；位点 ID 以染色体、类型和该 ID 派生，不含坐标和工具；工具编码复用 `degap/lrgapcloser/tgsgapcloser/quartet`。同 Gap 可包含多个工具，Tel 只接受 `degap`。浏览器/前端只提交选择和可选设置，后端从落盘的项目 Final Path 取区段，不能提交任意种子去替换项目路径。
+- `witnesses` 记录导出时需要保持的相邻路径段（稳定 ID、来源、区段、方向）；不可把序列位置的变化当成另一个位点。Gap 种子 label 为 `seqleft/seqright`，Tel 为 `endpoint`，使用现有内容绑定的种子计划（明确源名称、正向 1-based 闭区间、源长度、完整源文件或所用区间 SHA-256；最终按 `start/end` 定向）。种子使用当前路径的左右立即相邻来源或实际端点；编辑过的项目仍以其保存的路径为准。无正长度 N、缺直接端点/侧翼、不可定位来源或无内容证据，明确报该位点不可导出/准备，不能跳过相邻缺口拼成另一个缺口。
+- Server 在已准备好的对应工作区启动；不接受 ZIP 提供输出目录或 Server 可执行路径。校验原交付归属后，在工作区自己的编号任务目录，用已准备工具解析内容绑定计划。Gap 局部输入是正向 `left + N*gap_bp + right`，Tel 局部输入只有定向端点；证据与局部 FASTA 一起保存。输入准备不修改 LGZ/自动精修已发布文件，也不是任务已完成的证据。
+- 后续结果包按本次 `batch_sha256` 和 `locus_id × tool` 关联回导，不能以一次归档定义取代本地导出凭据。补丁必须绑定目标和实际替换区间、前后序列摘要及 Server 质量判定。没有足够证据验证的提案不得生成自动应用操作。该段不改变旧 DEGAP-JOBS 完整性和回导边界。
