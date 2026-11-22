@@ -2,12 +2,16 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 from server.tools.lgz_core.q0_catalog import build_catalog
 from server.tools.lgz_core.q0_sources import SourceKey,Q0EvidenceError,Interval
 from server.tools.lgz_core.q0_reference_index import ReferenceIndex
 from server.tools.lgz_core.q0_regional_candidates import CandidatePlan,prepare_candidates
+from server.tools.lgz_core import q0_regional_candidates as candidates
+from server.tools.lgz_core.q0_regional_execution import ParentRequest
+from server.tools.lgz_core.q0_query_windows import QueryWindow
 from server.tools.lgz_core.q0_regional_mapping import BASE_FLAGS
 from server.tools.lgz_core.common import stable_id
 from server.tools.lgz_core import q0_preparation as prep
@@ -152,6 +156,37 @@ class RegionalCandidatesTests(unittest.TestCase):
             tasks,native,report=prepare_candidates(self.root,self.catalog,self.index,self.requests,set(),[],{},reference_lengths=self.refs,preset='asm10',threads=4)
         self.assertEqual(run.call_count,1);self.assertEqual(native,[]);self.assertEqual(tasks[0]['targets'],[self.ids['b']])
         self.assertEqual(report['regional_windows'],1)
+
+
+    def test_completion_parent_order_restores_tasks_and_interleaved_native_groups(self):
+        keys=sorted(self.ids.values()); requests=[]
+        for ordinal,key in enumerate(keys):
+            query=QueryWindow(key,10000,0,1000,((0,1000),))
+            native=1 if ordinal in (0,2) else 2
+            requests.append(ParentRequest('candidate',key,ready=([(query,[])],native,
+                'weak_reference_only_alternatives_not_expanded')))
+        planner=SimpleNamespace(root=self.root,catalog=self.catalog,index=self.index,tool={},preset='asm10',
+            query_chromosomes=dict.fromkeys(keys),scope_task_ids=[],approximate_scope_task_ids=[],
+            next_unroutable_seed=lambda:None,eligible=lambda key:(7,7),
+            planning_request=lambda key,eligible:requests[keys.index(key)],
+            keys=lambda mask:[keys[0]] if mask==1 else [keys[1]])
+        def completed(runner,items):
+            values=list(items)
+            for ordinal in (1,2,0):yield ordinal,values[ordinal],values[ordinal].ready
+        with mock.patch.object(candidates.RegionalExecutor,'completed',completed), \
+             mock.patch.object(candidates,'prepare_regional_mapping',side_effect=lambda *args,**kwargs:{'query':args[2].segment_id}):
+            tasks,native,report=prepare_candidates(self.root,self.catalog,self.index,[],set(),[],{},
+                reference_lengths=self.refs,preset='asm10',threads=6,planner=planner)
+        self.assertEqual([row['query'] for row in tasks],keys)
+        self.assertEqual([row['query_ids'] for row in native],[[keys[0],keys[2]],[keys[1]]])
+        self.assertEqual([row['target_ids'] for row in native],[[keys[0]],[keys[1]]])
+        self.assertEqual([[r['query'] for r in row['regional_fallback']] for row in native],
+            [[keys[0],keys[2]],[keys[1]]])
+        self.assertEqual(report['weak_only_parent_ids'],keys)
+        self.assertEqual(report['requested_part_pairs'],9)
+        self.assertEqual(report['reused_part_pairs'],0)
+        self.assertEqual(report['regional_windows'],3)
+        self.assertEqual(report['fallback_parents'],3)
 
 
 if __name__=='__main__':unittest.main()

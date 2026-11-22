@@ -14,7 +14,7 @@ from .q0_neighbor_requests import known_neighbors
 from .q0_query_windows import WindowPolicy, plan_query_windows, TargetWindow
 from .q0_regional_mapping import BASE_FLAGS, MAX_TARGET_BASES, prepare_regional_mapping
 from .q0_sources import Interval, Q0EvidenceError
-from .q0_regional_execution import ParentRequest, RegionalExecutor, plan_request
+from .q0_regional_execution import ParentRequest, RegionalExecutor, plan_request, completed_result
 from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 
 CANDIDATE_POLICY = {
@@ -260,13 +260,17 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
         raise Q0EvidenceError("unroutable native source matrices must complete before regional candidates")
     execution = RegionalExecutor(index, threads)
     mapper_threads = execution.budget.mapper_threads; workers = execution.budget.mapper_workers
-    tasks, pending, fallback = [], [], {}
+    print(f"LGZ q0 regional execution: phase=candidate planners={execution.budget.planner_workers} "
+          f"mappers={workers} mapper_threads={mapper_threads} total_threads={threads} "
+          "dispatch=completion_order result_order=original", flush=True)
+    tasks, pending, fallback = [], {}, {}
+    parent_order = {}
     report = {"policy":CANDIDATE_POLICY,"requested_parents":len(planner.query_chromosomes),
               "completed_native_scope_task_ids":planner.scope_task_ids,
               "approximate_scope_task_ids":planner.approximate_scope_task_ids,"requested_part_pairs":0,
               "reused_part_pairs":0,"regional_windows":0,"fallback_parents":0,"weak_only_parents_not_expanded":0,"weak_only_parent_ids":[],
               "maximum_workers":workers,"mapper_threads":mapper_threads}
-    def consume(): tasks.append(pending.pop(0).result())
+    def consume(): tasks.append(completed_result(pending))
     def requests():
         for key in sorted(planner.query_chromosomes):
             requested,eligible = planner.eligible(key)
@@ -275,8 +279,9 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
             if eligible:
                 yield planner.planning_request(key, eligible)
     with execution, ThreadPoolExecutor(max_workers=workers,thread_name_prefix="q0-candidate") as pool:
-        for number, (request, (planned,native,reason)) in enumerate(execution.ordered(requests()), 1):
+        for number, (parent_number, request, (planned,native,reason)) in enumerate(execution.completed(requests()), 1):
             key = request.segment_id
+            parent_order[key] = parent_number
             if reason == "weak_reference_only_alternatives_not_expanded":
                 report["weak_only_parents_not_expanded"] += 1
                 report["weak_only_parent_ids"].append(key)
@@ -288,16 +293,23 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                 item["query_ids"].append(key);item["regional_fallback"].append({"query":key,"reason":reason})
                 report["fallback_parents"] += 1
             report["regional_windows"] += len(planned)
-            for query,targets in planned:
+            for window_number, (query,targets) in enumerate(planned):
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional candidate comparisons")
                 if len(pending) >= workers: consume()
-                pending.append(pool.submit(prepare_regional_mapping,root,catalog,query,targets,tool,
-                                           reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads))
+                future = pool.submit(prepare_regional_mapping,root,catalog,query,targets,tool,
+                                     reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
+                pending[future] = (parent_number, window_number)
                 if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
             if number%100 == 0:
                 print(f"LGZ q0 candidate regions: eligible_parents_completed={number} requested_parents={report['requested_parents']} completed={len(tasks)} fallback={report['fallback_parents']}",flush=True)
         while pending: consume()
     report.update(execution.report)
     report["completed_regional_tasks"] = len(tasks)
-    return tasks,list(fallback.values()),report
+    report["weak_only_parent_ids"].sort(key=parent_order.__getitem__)
+    native_groups = list(fallback.values())
+    for item in native_groups:
+        item["query_ids"].sort(key=parent_order.__getitem__)
+        item["regional_fallback"].sort(key=lambda row:parent_order[row["query"]])
+    native_groups.sort(key=lambda item:min(parent_order[key] for key in item["query_ids"]))
+    return [task for _ordinal, task in sorted(tasks, key=lambda row:row[0])], native_groups, report

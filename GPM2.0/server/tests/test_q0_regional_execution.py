@@ -6,6 +6,7 @@ from pathlib import Path
 import pickle
 import tempfile
 import unittest
+from concurrent.futures import Future, CancelledError
 from unittest import mock
 
 from server.tools.lgz_core import q0_regional_execution as execution
@@ -86,6 +87,36 @@ class AllocationProofTests(unittest.TestCase):
             with self.assertRaises(Q0EvidenceError):check()
             self.assertIsNone(execution.allocation_memory_limit(32,environ={}))
             with self.assertRaises(Q0EvidenceError):execution.allocation_memory_limit(32,environ={execution.SCHEDULER_SHA_ENV:'0'*64})
+
+
+class CompletionTests(unittest.TestCase):
+    def test_mapper_reclaims_ready_slot_instead_of_waiting_for_oldest(self):
+        first, second, third = Future(), Future(), Future()
+        third.set_result('third'); second.set_result('second')
+        pending = {first:(0,0), third:(2,0), second:(1,0)}
+        self.assertEqual(execution.completed_result(pending), ((1,0),'second'))
+        self.assertEqual(execution.completed_result(pending), ((2,0),'third'))
+        self.assertEqual(list(pending), [first])
+        first.set_result('first')
+        self.assertEqual(execution.completed_result(pending), ((0,0),'first'))
+        with self.assertRaises(Q0EvidenceError): execution.completed_result(pending)
+
+    def test_mapper_waits_for_any_completion_and_propagates_errors(self):
+        first, second = Future(), Future()
+        pending = {first:(0,0), second:(1,0)}
+        def finish(futures, *, return_when):
+            self.assertEqual(set(futures), {first,second})
+            self.assertIs(return_when, execution.FIRST_COMPLETED)
+            second.set_result('second')
+            return {second}, {first}
+        with mock.patch.object(execution,'wait',side_effect=finish):
+            self.assertEqual(execution.completed_result(pending), ((1,0),'second'))
+        for error in (Q0EvidenceError('bad mapping'), MemoryError('mapping resource')):
+            future=Future(); future.set_exception(error)
+            with self.subTest(error=type(error).__name__), self.assertRaises(type(error)):
+                execution.completed_result({future:(0,0)})
+        cancelled=Future(); cancelled.cancel()
+        with self.assertRaises(CancelledError): execution.completed_result({cancelled:(0,0)})
 
 
 class ExecutionTests(unittest.TestCase):
@@ -213,6 +244,73 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(active, 0)
         self.assertLessEqual(peak, 2*self.budget.planner_workers)
         self.assertEqual([r for r, _ in actual], requests)
+
+
+    @unittest.skipIf(execution.resource is None, 'POSIX resource guard required')
+    def test_spawned_completion_plans_restore_exact_owner_results(self):
+        requests=self.requests()*3
+        expected=[execution.plan_request(r,self.index) for r in requests]
+        with execution.RegionalExecutor(self.index,16,budget=self.budget) as runner:
+            actual=sorted(runner.completed(requests),key=lambda row:row[0])
+        self.assertEqual([ordinal for ordinal,_,_ in actual],list(range(len(requests))))
+        self.assertEqual([request for _,request,_ in actual],requests)
+        self.assertEqual([result for _,_,result in actual],expected)
+        self.assertEqual(runner.report['parallel_parents'],9)
+        self.assertEqual(runner.report['serial_parents'],3)
+        self.assertIsNone(runner.report['pool_failure'])
+
+    def test_completion_planner_refills_behind_unfinished_first_with_same_bound(self):
+        request=self.requests()[0]; requests=[request]*9
+        expected=execution.plan_request(request,self.index)
+        first=Future(); active=peak=0; submitted=0
+        class TrackedFuture(Future):
+            def result(future,*args,**kwargs):
+                nonlocal active
+                self.assertTrue(future.done(),'must not await oldest unfinished plan')
+                active-=1
+                return super(TrackedFuture,future).result(*args,**kwargs)
+        first=TrackedFuture()
+        def submit(_fn,_request):
+            nonlocal active,peak,submitted
+            active+=1; peak=max(peak,active); submitted+=1
+            if submitted==1:return first
+            result=TrackedFuture(); result.set_result(pickle.dumps(expected)); return result
+        pool=mock.Mock();pool.submit.side_effect=submit
+        with mock.patch.object(execution,'ProcessPoolExecutor',return_value=pool):
+            with execution.RegionalExecutor(self.index,16,budget=self.budget) as runner:
+                values=runner.completed(requests)
+                first_result=next(values); self.assertEqual(first_result[0],1)
+                second_result=next(values); self.assertEqual(second_result[0],2)
+                self.assertGreater(submitted,2*self.budget.planner_workers)
+                first.set_result(pickle.dumps(expected))
+                actual=[first_result,second_result]+list(values)
+        self.assertEqual(active,0); self.assertEqual(peak,2*self.budget.planner_workers)
+        self.assertEqual(sorted(row[0] for row in actual),list(range(9)))
+        self.assertTrue(all(row[2]==expected for row in actual))
+
+    def test_completion_failure_replans_exactly_but_content_error_stays_fatal(self):
+        requests=self.requests()*2
+        expected=[execution.plan_request(r,self.index) for r in requests]
+        for error in (execution.BrokenProcessPool('resource'),MemoryError('resource'),None):
+            def submit(_fn,_request):
+                future=Future()
+                if error is None:future.set_result(None)
+                else:future.set_exception(error)
+                return future
+            pool=mock.Mock();pool.submit.side_effect=submit
+            with self.subTest(error=type(error).__name__), mock.patch.object(execution,'ProcessPoolExecutor',return_value=pool):
+                with execution.RegionalExecutor(self.index,16,budget=self.budget) as runner:
+                    actual=sorted(runner.completed(requests),key=lambda row:row[0])
+                self.assertEqual([r for _,_,r in actual],expected)
+                self.assertEqual(runner.report['serial_parents'],len(requests))
+                self.assertGreater(runner.report['exact_owner_replans'],0)
+        for error in (Q0EvidenceError('bad record'),CancelledError('cancelled')):
+            future=Future();future.set_exception(error)
+            pool=mock.Mock();pool.submit.return_value=future
+            with mock.patch.object(execution,'ProcessPoolExecutor',return_value=pool):
+                with execution.RegionalExecutor(self.index,16,budget=self.budget) as runner:
+                    with self.assertRaises(type(error)):list(runner.completed(requests))
+                self.assertEqual(runner.report['exact_owner_replans'],0)
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ Unknown job memory retains the earlier serial-planner/four-mapper ceiling.
 from __future__ import annotations
 
 from collections import deque
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import asdict, dataclass
 import multiprocessing
@@ -238,6 +238,22 @@ def _plan_in_worker(request):
         return None  # Exact owner replan, never drop/approximate a parent.
 
 
+def completed_result(pending):
+    """Reclaim a ready mapper slot, not the oldest submitted slow task.
+
+    Callers retain the original ordinal beside each result and restore that
+    order before scientific evidence consumption. The pending bound is unchanged.
+    """
+    if not pending:
+        raise Q0EvidenceError("no pending regional mapping result")
+    ready = [future for future in pending if future.done()]
+    if not ready:
+        ready, _ = wait(tuple(pending), return_when=FIRST_COMPLETED)
+    future = min(ready, key=pending.__getitem__)
+    ordinal = pending.pop(future)
+    return ordinal, future.result()
+
+
 class RegionalExecutor:
     def __init__(self, index, threads, *, budget=None):
         if type(threads) is not int or threads < 1:
@@ -273,12 +289,37 @@ class RegionalExecutor:
             self.snapshot.verify()
         self.index.verify_inputs()
 
-    def ordered(self, requests):
-        """Bounded FIFO prefetch; whole-parent fallback precedes any mapping.
+    def _submit(self, request):
+        if self.pool is not None and not self.report["pool_failure"] and request.ready is None:
+            try:
+                return self.pool.submit(_plan_in_worker, request)
+            except (BrokenProcessPool, OSError, MemoryError) as exc:
+                self.report["pool_failure"] = type(exc).__name__
+        return None
 
-        Only this module's own spawned workers produce the pickle byte stream.
-        No persistent pickle cache or customer-supplied pickle is read here.
-        """
+    def _result(self, request, future):
+        # Only our own spawned workers produce this transient pickle stream.
+        # No customer/persistent pickle is loaded, and content errors propagate.
+        payload = None
+        if future is not None:
+            try:
+                payload = future.result()
+            except (BrokenProcessPool, MemoryError) as exc:
+                self.report["pool_failure"] = type(exc).__name__
+            if self.snapshot is not None:
+                self.snapshot.verify()
+        if payload is not None:
+            result = pickle.loads(payload)
+            self.report["parallel_parents"] += 1
+        else:
+            if future is not None:
+                self.report["exact_owner_replans"] += 1
+            result = plan_request(request, self.index)
+            self.report["serial_parents"] += 1
+        return result
+
+    def ordered(self, requests):
+        """Compatibility iterator for consumers that need immediate FIFO order."""
         pending = deque(); requests = iter(requests); exhausted = False
         limit = max(1, 2*self.budget.planner_workers)
         while pending or not exhausted:
@@ -288,30 +329,38 @@ class RegionalExecutor:
                 except StopIteration:
                     exhausted = True
                     break
-                future = None
-                if self.pool is not None and not self.report["pool_failure"] and request.ready is None:
-                    try:
-                        future = self.pool.submit(_plan_in_worker, request)
-                    except (BrokenProcessPool, OSError, MemoryError) as exc:
-                        self.report["pool_failure"] = type(exc).__name__
-                pending.append((request, future))
+                pending.append((request, self._submit(request)))
+            if pending:
+                request, future = pending.popleft()
+                yield request, self._result(request, future)
+
+    def completed(self, requests):
+        """Bounded completion-order whole-parent plans with original ordinals.
+
+        This is for consumers that restore final task/fallback order themselves.
+        A parent still finishes its complete regional/native decision before any
+        of its windows can map; failures retain the same exact-owner replan.
+        """
+        pending = {}; requests = enumerate(requests); exhausted = False
+        limit = max(1, 2*self.budget.planner_workers)
+        while pending or not exhausted:
+            while not exhausted and len(pending) < limit:
+                try:
+                    ordinal, request = next(requests)
+                except StopIteration:
+                    exhausted = True
+                    break
+                pending[ordinal] = (request, self._submit(request))
             if not pending:
                 continue
-            request, future = pending.popleft()
-            payload = None
-            if future is not None:
-                try:
-                    payload = future.result()
-                except (BrokenProcessPool, MemoryError) as exc:
-                    self.report["pool_failure"] = type(exc).__name__
-                if self.snapshot is not None:
-                    self.snapshot.verify()
-            if payload is not None:
-                result = pickle.loads(payload)
-                self.report["parallel_parents"] += 1
-            else:
-                if future is not None:
-                    self.report["exact_owner_replans"] += 1
-                result = plan_request(request, self.index)
-                self.report["serial_parents"] += 1
-            yield request, result
+            ready = [ordinal for ordinal, (request, future) in pending.items()
+                     if (future is not None and future.done())
+                     or (future is None and request.ready is not None)]
+            if not ready:
+                ready = [ordinal for ordinal, (_request, future) in pending.items() if future is None]
+            if not ready:
+                wait([future for _request, future in pending.values()], return_when=FIRST_COMPLETED)
+                ready = [ordinal for ordinal, (_request, future) in pending.items() if future.done()]
+            ordinal = min(ready)
+            request, future = pending.pop(ordinal)
+            yield ordinal, request, self._result(request, future)

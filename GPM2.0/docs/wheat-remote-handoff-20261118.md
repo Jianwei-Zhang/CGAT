@@ -3039,3 +3039,60 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   `code.sha256`、`runtime-source-verified.json`、`final-job.json`及失败前包。工具运行时
   必须使用完整Server tools依赖闭包，不能只复制lgz_core目录。主任务仍是43010335，
   runtime没有因这次诊断改变；下一步继续等实际q0缓存/区域进度和43010357的新样本。
+
+## 2026-11-22 10:31 CST：已进入真实区域池，确认两层队首阻塞
+
+- NEW仍为 **43010335 / agent-X86-53**，原reader **1990559 / start_ticks404157417**，
+  冻结runtime仍ec093edf；本轮未替换远端runtime或重提主任务。实际weak-seed日志于09:24–25
+  记录fast61、native9及reverse1418→52；区域进度从09:28的100到10:31:25的**2300**，
+  planned=61000、fallback_sources=0。planned是该阶段窗口总量，包含可跳过父查询，不能
+  直接当作剩余原生全基因组比对数，也不拿前500个缓存复用窗口推算新计算吞吐。
+- 10:18元数据实证：1717个完整raw成功标记中528个为此前已有、1189个为此次新增；1748个
+  新projection中528个绑定此前raw receipt的真实SHA。完成标记的元数据统计不是独立全输出
+  验收，真实reader仍执行正常内容/几何验证。主native缓存和区域raw均保留，不删除有效结果。
+  实测1189条新raw native命令均t2、4GiB RLIMIT_AS，real中位3.601秒、最长326.033秒；
+  stderr打印的Peak RSS约82GB不能当作当前单mapper RSS或相加推导OOM，尚未证明其成因。
+  详见`q0-regional-live-verified-20261122.json`，SHA
+  0f5ef3ce7c1f8e2729eba4a7d2e746aaa807b8768dc36fb697ad3924ca750c00。
+- 先前排队的 **43010357已SUCCEEDED**，不能再写成PENDING。同节点09:47:16真实栈显示
+  主线程在`RegionalExecutor.ordered -> Future.result`等待规划队首；**14个mapper线程
+  全部在thread.py:81的work_queue.get(block=True)空闲等待**。PID、start_ticks、cgroup及
+  scheduler SHA均绑定43010335。09:46另一采样中mapper还在运行，故这是实际空窗的实证，
+  不是整段持续空闲的时长测量；不凭一次栈宣称整套倍率。只读诊断的结构化证明
+  `q0-regional-head-of-line-observed-20261122.json` SHA
+  95cb706d030d29e3c6097c8f3589d22af27f447f6c2e5c59cf54798043c252a0。
+- 对应源码有两处同类问题：规划有界预取始终取队首、partial/candidate mapper始终pop(0)。
+  本地定点修改三模块，先完成先回收补位；最终任务、原生回退组及组内query/报告列表恢复
+  原顺序。保持3planner+14mapper×2的预算、预取上限、全父查询回退判定和全部科学参数；
+  不扩大池、不放松guard、不新增科学功能。保留ordered接口供原序消费者使用。
+- 本地**55项regional定向测试通过**，包含阻塞队首仍能补位、真实spawn结果逐项等价、
+  有界预取、取消/内容错误传播、资源失败精确重算、原生交错分组还原、单CPU不重叠；
+  扩展q0测试**共305项，其余通过、1项环境条件跳过**，106.287秒。没有跑release CI或update.sh。
+- 仅提交隔离实样control **43011908**，目录`q0-completion-dispatch-control-20261122-103546`，
+  x86单节点6CPU/60GiB（实际3规划+owner），对照与主任务相同架构/依赖。42文件完整工具
+  闭包先对照原成功包SHA，再覆盖ec093edf的14模块和此次3模块；全部52项代码/脚本/输入
+  manifest验证后执行。实际ready与djob同为agent-X86-06，资源证明SHA已绑定；不写主工作区。
+  以原guarded calibration相同46父查询/240窗口元数据分别跑FIFO与completion，两者须逐项
+  匹配原serial-owner hashes。该control不读DNA、不运行mapper，结果只用于规划等价/可用性；
+  **后续须查43011908的真实终态及summary，不要因提交成功就写成已加速或已部署主任务。**
+- 当前旧基线42523432仍RUNNING/grt_step2，约1596%CPU；未改动。新版10:32约642%CPU、
+  memReal89781MiB、max95956MiB、swap0，320GiB额度。当前一次再续跑已实测约3小时的
+  正常初始复用验证+q0输入/catalog/cache消费成本；新补丁须先验证并评估净收益，不能只为
+  展示新调度再次重启。只读observer3037575继续运行，不能声称它能自动修复或主动聊天通知。
+
+### 10:47 CST补记：实样control完成，暂不再次重启主任务
+
+- **43011908 SUCCEEDED / agent-X86-06**，实际HPC三模块39项测试全部通过。原46父查询/
+  240窗口的FIFO与completion结果hash均逐项等于此前guarded serial-owner；无pool故障或
+  owner资源重算。FIFO135.9539秒、completion118.7441秒，小样本墙钟少12.66%（1.1449x）。
+  FIFO先跑，后者可能受益于OS/索引预热；不包含DNA、实际mapper或科学catalog消费，故
+  **不是整套提速倍率，也不足以单独证明值得支付约3小时重启前缀成本**。
+- 完整报告`regional-dispatch-hpc-control-20261122.json` SHA
+  e7d4600c83a616cab6f4b9f98a113a6ad139cb1fd73b63ea9d41f9de68be34a0；
+  `regional-dispatch-hpc-verified-20261122.json`绑定终态、代码manifest及全部3个补丁模块SHA，
+  本地源码也逐项核对相等。control远端`verified.json`/`final-job.json`/allocation和所有日志保留。
+- 10:46:42只读observer实际查到主新版43010335仍RUNNING；最新进度为**2700窗口**
+  （10:44:57）、fallback0，recent461%、memReal89103MiB、max95956MiB；旧42523432仍RUNNING、
+  recent1594%。本次源码修复保存到master，但**没有安装到正在执行的ec093edf实例**。
+  保留主任务继续产出，不重新执行handoff/update.sh、不动原锁或基线。后续须结合实际
+  mapper长尾/队列损失与剩余阶段评估净收益，再决定是否正常停止并定点续跑。

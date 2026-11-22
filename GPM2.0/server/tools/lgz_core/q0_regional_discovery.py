@@ -18,7 +18,7 @@ from .q0_catalog import ObservedSourcePairs, partial_source_intervals
 from .q0_query_windows import WindowPolicy, TargetWindow, plan_query_windows
 from .q0_reference_index import ReferenceIndex, _signature
 from .q0_regional_mapping import MAX_TARGET_BASES, prepare_regional_mapping
-from .q0_regional_execution import ParentRequest, RegionalExecutor
+from .q0_regional_execution import ParentRequest, RegionalExecutor, completed_result
 from .q0_sources import Interval, Q0EvidenceError
 
 REGIONAL_POLICY = {
@@ -162,16 +162,19 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
     windows = plan_query_windows({key: part.interval.length for key, part in catalog.parts.items()}, holes, policy=policy) or ()
     execution = RegionalExecutor(index, threads)
     mapper_threads = execution.budget.mapper_threads; workers = execution.budget.mapper_workers
-    tasks, fallback, pending = [], set(), []
+    print(f"LGZ q0 regional execution: phase=partial planners={execution.budget.planner_workers} "
+          f"mappers={workers} mapper_threads={mapper_threads} total_threads={threads} "
+          "dispatch=completion_order result_order=original", flush=True)
+    tasks, fallback, pending = [], set(), {}
+    parent_order = {}
     report = {"policy": dict(REGIONAL_POLICY), "window_policy": asdict(policy), "planned_windows": len(windows),
               "residual_source_parts": len(holes), "parents_satisfied_by_complete_native_matrices": 0, "parents_satisfied_by_scoped_approximate_matrices": 0,
               "approximate_scope_task_ids":native_scopes.approximate_scope_task_ids if native_scopes else [], "residual_bases": sum(i.length for values in holes.values() for i in values),
               "mapper_threads": mapper_threads, "maximum_workers": workers,
               "address_space_bytes_per_mapper": 4*1024**3, "fallback_sources": []}
     def consume():
-        future = pending.pop(0)
-        task = future.result()
-        tasks.append(task)
+        ordinal, task = completed_result(pending)
+        tasks.append((ordinal, task))
         if len(tasks)%100 == 0:
             print(f"LGZ q0 regional progress: completed={len(tasks)} planned={len(windows)} fallback_sources={len(fallback)}", flush=True)
     def requests():
@@ -183,19 +186,22 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                 continue  # Tested relationships, not an invented coverage/placement assertion.
             yield ParentRequest("partial", segment_id, tuple(group))
     with execution, ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
-        for request, (planned, _, reason) in execution.ordered(requests()):
+        for parent_number, request, (planned, _, reason) in execution.completed(requests()):
             segment_id = request.segment_id
+            parent_order[segment_id] = parent_number
             if reason is not None:
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})
                 continue
-            for query, targets in planned:
+            for window_number, (query, targets) in enumerate(planned):
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional supplementary comparisons")
                 if len(pending) >= workers: consume()
-                pending.append(pool.submit(prepare_regional_mapping, root,catalog,query,targets,tool,
-                                           reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads))
+                future = pool.submit(prepare_regional_mapping, root,catalog,query,targets,tool,
+                                     reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
+                pending[future] = (parent_number, window_number)
                 if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
         while pending: consume()
     report.update(execution.report)
     report["completed_regional_tasks"] = len(tasks)
-    return tasks, sorted(fallback), report
+    report["fallback_sources"].sort(key=lambda row:parent_order[row["segment_id"]])
+    return [task for _ordinal, task in sorted(tasks, key=lambda row:row[0])], sorted(fallback), report

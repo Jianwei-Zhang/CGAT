@@ -1,0 +1,36 @@
+{
+  "status": "same_node_real_wheat_dispatch_control_verified",
+  "job_id": 43011908,
+  "job_state": "SUCCEEDED",
+  "node": "agent-X86-06",
+  "base_runtime": "ec093edfed52f9a1197baf118cd00cef4bdb6b03",
+  "package_source_files": 42,
+  "hpc_unit_tests": "Ran 39 tests in 1.541s",
+  "sample_parents": 46,
+  "sample_windows": 240,
+  "both_modes_equal_guarded_serial_owner": true,
+  "ordered_seconds": 135.9538969397545,
+  "completed_seconds": 118.74409729987383,
+  "ordered_over_completed": 1.1449318326654958,
+  "same_sample_wall_time_reduction_fraction": 0.12658555603968358,
+  "limitations": [
+    "FIFO first: OS/cache warm-up may benefit completed mode",
+    "no native mapping / source DNA / scientific catalog consumption measured",
+    "not a whole-task speedup or sufficient standalone restart ROI proof"
+  ],
+  "main_job": 43010335,
+  "protected_baseline_job": 42523432,
+  "main_runtime_modified": false,
+  "main_resubmitted": false,
+  "files_sha256": {
+    "summary.json": "e7d4600c83a616cab6f4b9f98a113a6ad139cb1fd73b63ea9d41f9de68be34a0",
+    "code.sha256": "8990241de6236fa3e5a0a82a380624dd14ac4d06eb05588665050e84e7e2690b",
+    "allocation.json": "0802fca6a385eaf9885ff0641731302b1fdb490c370f3113f8b0451c1bb50f06",
+    "allocation.digest": "953c9383f042ab0c024b4275dac83523ab17cae127406c4af84d285b7edfdebb",
+    "final-job.json": "94666927f0a1da28fd27715196a68bf75f857243e8584158259f126f81c7ba25",
+    "benchmark_regional_dispatch.py": "549d3fa16051dbe1420d1a52d02eb0947d9d234eed5a6a38f972139833b5aa96",
+    "q0_regional_execution.py": "f8806a0c05ec355b40b061f1978511b3e837d158b7b64592f64deff76cbb379f",
+    "q0_regional_discovery.py": "32413412933031eda0c10f7110b4c31d016ffc1435ce96711cd4c4c23ffdb46d",
+    "q0_regional_candidates.py": "6be05ad7feb3dd57f6a87de0508e12dcdbbddab3fdadad40df7eab0956727fcd"
+  }
+}

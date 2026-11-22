@@ -74,6 +74,40 @@ class RegionalDiscoveryTests(unittest.TestCase):
         self.assertEqual([t['core'] for t in tasks],[0,100000,200000])
         self.assertEqual(report['completed_regional_tasks'],3)
 
+    def test_ready_mapper_refills_pool_while_oldest_waits_and_output_stays_ordered(self):
+        index=mock.Mock();index.parts=self.parts
+        index.regions.return_value={'chr':(Interval(0,100),)}
+        index.targets.return_value={self.ids['t']:(Interval(0,1000),)}
+        third_started=threading.Event(); finished=[]; lock=threading.Lock()
+        def mapper(root,catalog,query,targets,tool,**kwargs):
+            core=query.cores[0][0]
+            if core==0:self.assertTrue(third_started.wait(3),'ready second mapper must refill third slot')
+            if core==200000:third_started.set()
+            with lock:finished.append(core)
+            return {'core':core}
+        with mock.patch.object(regional,'partial_source_intervals',return_value={self.ids['q']:(Interval(0,300000),)}), \
+             mock.patch.object(regional,'prepare_regional_mapping',side_effect=mapper):
+            tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},
+                reference_lengths={'chr':5_000_000_000},preset='asm10',threads=6)
+        self.assertEqual(report['maximum_workers'],2)
+        self.assertEqual(finished[0],100000)
+        self.assertEqual([row['core'] for row in tasks],[0,100000,200000])
+        self.assertEqual(fallback,[])
+
+    def test_completion_parent_fallback_restores_original_report_order(self):
+        index=mock.Mock();index.parts=self.parts
+        holes={key:(Interval(0,100),) for key in self.parts}
+        def reversed_plans(runner,requests):
+            values=list(enumerate(requests))
+            for ordinal,request in reversed(values):yield ordinal,request,([],0,'no_reference_targets')
+        with mock.patch.object(regional,'partial_source_intervals',return_value=holes), \
+             mock.patch.object(regional.RegionalExecutor,'completed',reversed_plans), \
+             mock.patch.object(regional,'prepare_regional_mapping',side_effect=AssertionError('fallback cannot map')):
+            tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},
+                reference_lengths={'chr':5_000_000_000},preset='asm10',threads=6)
+        self.assertEqual(tasks,[]);self.assertEqual(fallback,sorted(self.parts))
+        self.assertEqual([row['segment_id'] for row in report['fallback_sources']],sorted(self.parts))
+
     def test_one_thread_never_overlaps_owner_planning_with_mapper(self):
         index=mock.Mock();index.parts=self.parts
         holes={self.ids['q']:(Interval(0,100),),self.ids['t']:(Interval(0,100),)}
