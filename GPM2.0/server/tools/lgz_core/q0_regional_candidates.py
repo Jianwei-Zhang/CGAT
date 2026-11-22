@@ -13,6 +13,7 @@ from .q0_catalog import _IntervalUnion, DISCOVERY_REFERENCE_IDENTITY
 from .q0_neighbor_requests import known_neighbors
 from .q0_query_windows import WindowPolicy, plan_query_windows, TargetWindow
 from .q0_regional_mapping import BASE_FLAGS, MAX_TARGET_BASES, prepare_regional_mapping
+from .q0_frontier_scope import window_touches_frontier
 from .q0_sources import Interval, Q0EvidenceError
 from .q0_regional_execution import ParentRequest, RegionalExecutor, plan_request, completed_result
 from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
@@ -249,7 +250,7 @@ class CandidatePlan(CompletedNativeScopes):
         return plan_request(self.planning_request(key, eligible), self.index)
 
 
-def prepare_candidates(root, catalog, index, requests, observed, complete_tasks, tool, *, reference_lengths, preset, threads, skip_self=False, planner=None):
+def prepare_candidates(root, catalog, index, requests, observed, complete_tasks, tool, *, reference_lengths, preset, threads, skip_self=False, planner=None, regional_frontier=None):
     if type(threads) is not int or threads < 1:
         raise Q0EvidenceError("candidate thread budget must be positive")
     if planner is None:
@@ -269,7 +270,8 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
               "completed_native_scope_task_ids":planner.scope_task_ids,
               "approximate_scope_task_ids":planner.approximate_scope_task_ids,"requested_part_pairs":0,
               "reused_part_pairs":0,"regional_windows":0,"fallback_parents":0,"weak_only_parents_not_expanded":0,"weak_only_parent_ids":[],
-              "maximum_workers":workers,"mapper_threads":mapper_threads}
+              "maximum_workers":workers,"mapper_threads":mapper_threads,
+              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0}
     def consume(): tasks.append(completed_result(pending))
     def requests():
         for key in sorted(planner.query_chromosomes):
@@ -293,7 +295,14 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                 item["query_ids"].append(key);item["regional_fallback"].append({"query":key,"reason":reason})
                 report["fallback_parents"] += 1
             report["regional_windows"] += len(planned)
-            for window_number, (query,targets) in enumerate(planned):
+            selected = []
+            for query, targets in planned:
+                if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
+                    report["frontier_omitted_windows"] += 1
+                    continue
+                selected.append((query, targets))
+            report["regional_windows"] -= len(planned) - len(selected)
+            for window_number, (query,targets) in enumerate(selected):
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional candidate comparisons")
                 if len(pending) >= workers: consume()

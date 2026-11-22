@@ -4489,3 +4489,11 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - 4B：区域任务 4→2；全补准备＋读取选择约 135.27 s，定向约 118.66 s，净约 12.28%。5B：区域任务 6→4（另有 1 个 partial native-scope 保留）；约 193.67 s→163.99 s，净约 15.33%。这些是隔离小组的真实 mapper/规划器时间，不是全麦预测。
 - 两组 `targeted_vs_full` 的最终 Q0 FASTA、路径连接种类、切换坐标和源区间均一致；两个小组都没有精确 `sequence_overlap` 连接，因此只能证明“没有误伤已有结论”，不能证明对真正有精确桥接的染色体足够。全补与定向均保留完整目标列表，定向只省掉不触及当前决策前沿的区域窗口；未知竞争仍未被当作不存在。
 - 这两组当前 `runtime_known_competitor_audit` 和保守 oracle audit 均为 0 个受影响精确连接；这是小组事实，不扩展为全基因组安全证明。下一步等待 3D 组，它包含 97 条 contig、15 个原分组，最有机会暴露竞争路径差异。
+
+### 11/23 06:28 — 定向补比对已落成显式 opt-in，3D 面板超时不作科学结论
+
+- 本地 `master` 新增 `q0_supplement_scope=decision_frontier` opt-in：先用已完成的参考证据和跨组装基础 PAF 构造 provisional Q0，只在路径端点和未解决 join 两侧保留 source-coordinate shoulder；区域 query/target 窗口仍保留原目标全集，未选窗口不会被写成负证据。若 provisional Q0 无路径、区域路由未启用或规划异常，自动回到 `full`，不做有损跳过。scope、实际 omitted 数和 frontier 大小写入 catalog；self 矩阵不参与 provisional join 证明。
+- 该策略只作用于 `prepare_partial`/`prepare_candidates` 的区域窗口派发；native fallback、完整已完成矩阵、PAF 原始字节、下游 Q0 admission/竞争门不变。没有安装到远端 `43017096`，没有修改当前运行任务，也没有改默认 `full`。
+- 本地 Q0 定向测试 **135/135** 通过，另有决策前沿单元测试与真实小麦 4B/5B 隔离结果。新策略的证据边界仍是允许的信息损失：它可能不再发现不触及当前 provisional 路径的新候选，不得称为无损等价。
+- 3D 天然面板作业 `43017437` 于 05:41:05 启动，最终因诊断脚本独立 `timeout` 以 `exitCode=124` 结束；已生成 24 个区域项目回执但没有完整 3D report。该终态是诊断预算耗尽，不是比对科学失败，不重提同一诊断。4B/5B 已完成的结果仍有效。新版 `43017096` 与旧版 `42523432` 仍 RUNNING，06:26:32 已推进到 **23/55**（7B）。
+- 用户约定继续只本地 commit，不 push。

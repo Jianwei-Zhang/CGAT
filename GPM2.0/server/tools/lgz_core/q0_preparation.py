@@ -108,7 +108,7 @@ def builder_identity() -> str:
         [name, sha256_file(root / name)] for name in (
             "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
             "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
-            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
+            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_frontier_scope.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
 
 
 def load_verified_evidence(root: Path) -> dict:
@@ -288,6 +288,58 @@ def _initial_inputs(root: Path):
         if actual != expected:
             raise Q0EvidenceError(f"missing required q0 pairs for {chromosome}: {sorted(expected - actual)}")
     return sources, lengths, assignments, options, sorted(paths), sorted(base_alignments, key=lambda row: row["paf"]), known_pairs
+
+
+
+def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_alignments):
+    """Build a base-only Q0 graph for an explicit lossy supplement scope.
+
+    This is a planning pass, not a published evidence set. Reference PAFs and
+    cross-assembly base PAFs are parsed with their original bounds and CIGARs;
+    self matrices are deliberately excluded because same-source placements do
+    not authorize a Q0 join. A no-path result must fall back to full scope.
+    """
+    from .q0_admission import EvidenceInput, construct_q0
+    from .q0_catalog import evidence_ref
+    from .q0_frontier_scope import decision_frontier
+    from .q0_paths import PairLink
+    from .q0_sources import split_source
+
+    by_dataset = defaultdict(dict)
+    for key, sequence in sources.items():
+        by_dataset[key.dataset][key.contig] = sequence
+    reference_hits = defaultdict(list)
+    pair_links = []
+    evidence = {}
+    for dataset, sequences in sorted(by_dataset.items()):
+        relative = f"runs/{dataset}_vs_ref/result.paf"
+        for hit in read_paf(root / relative, query_lengths={name: len(sequence) for name, sequence in sequences.items()},
+                            target_lengths=reference_lengths, artifact=relative):
+            source = SourceKey(dataset, hit.query_name)
+            reference_hits[source].append(hit)
+            evidence[hit.evidence_id] = evidence_ref(hit)
+    for descriptor in base_alignments:
+        if descriptor["query_dataset"] == descriptor["target_dataset"]:
+            continue
+        query_dataset = descriptor["query_dataset"]
+        target_dataset = descriptor["target_dataset"]
+        relative = descriptor["paf"]
+        for hit in read_paf(root / relative, query_lengths={name: len(sequence) for name, sequence in by_dataset[query_dataset].items()},
+                            target_lengths={name: len(sequence) for name, sequence in by_dataset[target_dataset].items()}, artifact=relative):
+            query = SourceKey(query_dataset, hit.query_name)
+            target = SourceKey(target_dataset, hit.target_name)
+            pair_links.append(PairLink(hit, query, target))
+            evidence[hit.evidence_id] = evidence_ref(hit)
+    adjacencies = []
+    for source, sequence in sorted(sources.items()):
+        try:
+            adjacencies.extend(split_source(source, sequence).adjacencies)
+        except Q0EvidenceError:
+            continue
+    data = EvidenceInput(dict(sources), dict(catalog.parts), dict(reference_lengths),
+                         dict(reference_hits), tuple(pair_links), tuple(adjacencies), evidence,
+                         stable_id("q0-provisional-frontier", [base_alignments, catalog.payload["segments"]]))
+    return decision_frontier(construct_q0(data))
 
 
 def _copy_prepared_target(root, catalog, target_ids, destination, template):
@@ -507,6 +559,29 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         catalog = build_catalog(root, sources, lengths, assignments, min_gap=POLICY["min_gap"],
                                 regional_factory=cache.factory if cache else None)
         if cache: cache.publish()
+        supplement_scope = options.get("q0_supplement_scope", "full")
+        if supplement_scope not in {"full", "decision_frontier"}:
+            raise Q0EvidenceError("unsupported q0 supplement scope")
+        regional_frontier = None
+        scope_report = {"requested": supplement_scope, "effective": "full"}
+        if supplement_scope == "decision_frontier":
+            if not cache:
+                scope_report["reason"] = "regional_route_disabled"
+            else:
+                try:
+                    regional_frontier = _provisional_frontier(root, sources, lengths, catalog, base_alignments)
+                except Q0EvidenceError as exc:
+                    if str(exc) == "no chromosome has a trustworthy q0 path":
+                        scope_report["reason"] = "provisional_q0_has_no_path"
+                    else:
+                        raise
+                if regional_frontier is not None:
+                    scope_report["effective"] = "decision_frontier"
+                    scope_report["frontier_sources"] = len(regional_frontier)
+                    scope_report["frontier_bp"] = sum(i.length for rows in regional_frontier.values() for i in rows)
+                elif "reason" not in scope_report:
+                    scope_report["reason"] = "provisional_q0_has_no_path"
+        catalog.payload["supplement_scope"] = scope_report
         tasks = []
         # Each productive round adds at least one segment to the anchor set. The
         # monotone loop terminates after at most the number of source segments.
@@ -565,7 +640,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                     regional_tasks, fallback_ids, report = prepare_partial(
                         root, catalog, index, known_pairs, tool, reference_lengths=lengths,
                         preset=preset, threads=threads, skip_self=options.get("skip_self") == "true",
-                        complete_tasks=tasks,required_target_ids=request["target_ids"])
+                        complete_tasks=tasks,required_target_ids=request["target_ids"],
+                        regional_frontier=regional_frontier)
                 partial_tasks.extend(regional_tasks)
                 catalog.payload["regional_partial_discovery"] = report
                 if fallback_ids:
@@ -605,7 +681,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                     tasks.append(seed);seed_ids.append(seed["task_id"]);planner.add_complete_tasks([seed])
                 regional_tasks, native_requests, report = prepare_candidates(
                     root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,
-                    preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner)
+                    preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner,
+                    regional_frontier=regional_frontier)
                 report["unroutable_seed_task_ids"] = seed_ids
             tasks.extend(regional_tasks)
             catalog.payload["regional_candidate_discovery"] = report

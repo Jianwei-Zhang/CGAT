@@ -18,6 +18,7 @@ from .q0_catalog import ObservedSourcePairs, partial_source_intervals
 from .q0_query_windows import WindowPolicy, TargetWindow, plan_query_windows
 from .q0_reference_index import ReferenceIndex, _signature
 from .q0_regional_mapping import MAX_TARGET_BASES, prepare_regional_mapping
+from .q0_frontier_scope import window_touches_frontier
 from .q0_regional_execution import ParentRequest, RegionalExecutor, completed_result
 from .q0_sources import Interval, Q0EvidenceError
 
@@ -140,7 +141,7 @@ def plan_parent(catalog, index, windows):
     return planned, None
 
 
-def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None):
+def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None, regional_frontier=None):
     """Return complete regional tasks and a declared full-native fallback set.
 
     With a verified allocation bound, fresh metadata-only planners share the
@@ -171,7 +172,8 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
               "residual_source_parts": len(holes), "parents_satisfied_by_complete_native_matrices": 0, "parents_satisfied_by_scoped_approximate_matrices": 0,
               "approximate_scope_task_ids":native_scopes.approximate_scope_task_ids if native_scopes else [], "residual_bases": sum(i.length for values in holes.values() for i in values),
               "mapper_threads": mapper_threads, "maximum_workers": workers,
-              "address_space_bytes_per_mapper": 4*1024**3, "fallback_sources": []}
+              "address_space_bytes_per_mapper": 4*1024**3, "fallback_sources": [],
+              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0}
     def consume():
         ordinal, task = completed_result(pending)
         tasks.append((ordinal, task))
@@ -192,7 +194,13 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
             if reason is not None:
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})
                 continue
-            for window_number, (query, targets) in enumerate(planned):
+            selected = []
+            for query, targets in planned:
+                if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
+                    report["frontier_omitted_windows"] += 1
+                    continue
+                selected.append((query, targets))
+            for window_number, (query, targets) in enumerate(selected):
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional supplementary comparisons")
                 if len(pending) >= workers: consume()
