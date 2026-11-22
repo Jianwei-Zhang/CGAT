@@ -328,13 +328,12 @@ def _initial_inputs(root: Path):
 def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_alignments):
     """Build a base-only Q0 graph for an explicit lossy supplement scope.
 
-    This is a planning pass, not a published evidence set. Reference PAFs and
-    cross-assembly base PAFs are parsed with their original bounds and CIGARs;
-    self matrices are deliberately excluded because same-source placements do
-    not authorize a Q0 join. A no-path result must fall back to full scope.
+    Select path coordinates without materializing DNA or a decision report.
+    Reference and cross-assembly base PAFs keep their original bounds and
+    CIGARs. As before, self matrices are excluded from this planning input.
+    A no-path result falls back to full scope.
     """
-    from .q0_admission import EvidenceInput, construct_q0
-    from .q0_catalog import evidence_ref
+    from .q0_admission import EvidenceInput, select_q0_paths
     from .q0_frontier_scope import decision_frontier
     from .q0_paths import PairLink
     from .q0_sources import Interval, OriginalAdjacency
@@ -344,14 +343,12 @@ def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_
         by_dataset[key.dataset][key.contig] = len(sequence)
     reference_hits = defaultdict(list)
     pair_links = []
-    evidence = {}
     for dataset, lengths in sorted(by_dataset.items()):
         relative = f"runs/{dataset}_vs_ref/result.paf"
         for hit in read_paf(artifact_path(root, relative), query_lengths=lengths,
                             target_lengths=reference_lengths, artifact=relative):
             source = SourceKey(dataset, hit.query_name)
             reference_hits[source].append(hit)
-            evidence[hit.evidence_id] = evidence_ref(hit)
     for descriptor in base_alignments:
         if descriptor["query_dataset"] == descriptor["target_dataset"]:
             continue
@@ -363,17 +360,15 @@ def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_
             query = SourceKey(query_dataset, hit.query_name)
             target = SourceKey(target_dataset, hit.target_name)
             pair_links.append(PairLink(hit, query, target))
-            evidence[hit.evidence_id] = evidence_ref(hit)
     adjacencies = []
     for row in catalog.payload["original_connections"]:
         edge = OriginalAdjacency(**{**row, "source": SourceKey(**row["source"]),
                                     "gap_interval": Interval(**row["gap_interval"])})
         adjacencies.append(edge)
-        evidence[edge.adjacency_id] = {"kind": "input_assembly_adjacency", **row}
     data = EvidenceInput(dict(sources), dict(catalog.parts), dict(reference_lengths),
-                         dict(reference_hits), tuple(pair_links), tuple(adjacencies), evidence,
+                         dict(reference_hits), tuple(pair_links), tuple(adjacencies), {},
                          "provisional-not-published")
-    return decision_frontier(construct_q0(data))
+    return decision_frontier(select_q0_paths(data))
 
 
 def _copy_prepared_target(root, catalog, target_ids, destination, template):
@@ -605,18 +600,12 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
             if not cache:
                 scope_report["reason"] = "regional_route_disabled"
             else:
-                try:
-                    regional_frontier = _provisional_frontier(root, sources, lengths, catalog, base_alignments)
-                except Q0EvidenceError as exc:
-                    if str(exc) == "no chromosome has a trustworthy q0 path":
-                        scope_report["reason"] = "provisional_q0_has_no_path"
-                    else:
-                        raise
+                regional_frontier = _provisional_frontier(root, sources, lengths, catalog, base_alignments)
                 if regional_frontier is not None:
                     scope_report["effective"] = "decision_frontier"
                     scope_report["frontier_sources"] = len(regional_frontier)
                     scope_report["frontier_bp"] = sum(i.length for rows in regional_frontier.values() for i in rows)
-                elif "reason" not in scope_report:
+                else:
                     scope_report["reason"] = "provisional_q0_has_no_path"
         if supplement_scope != "full":
             catalog.payload["supplement_scope"] = scope_report

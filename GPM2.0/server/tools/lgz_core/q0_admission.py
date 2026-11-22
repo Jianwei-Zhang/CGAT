@@ -71,6 +71,13 @@ class Admission:
 
 
 @dataclass
+class PathSelection:
+    admission: Admission
+    paths: dict[str, SearchResult]
+    occupied: dict[SourceKey, list[Interval]]
+
+
+@dataclass
 class Construction:
     records: dict[str, str]
     paths: dict[str, SearchResult]
@@ -588,46 +595,63 @@ def _links_for_path_graphs(placements, links):
     return by_chromosome
 
 
-def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
-                 path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Construction:
+def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
+                    path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> PathSelection:
+    """Select and check source geometry without reconstructing sequences or building a report."""
     admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass)
     groups = defaultdict(list)
     for placement in admission.placements:
         groups[placement.chromosome].append(placement)
-    records, searches, occupied, chromosomes = {}, {}, defaultdict(list), []
+    searches, occupied = {}, defaultdict(list)
     graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
-    for chromosome, length in sorted(data.reference_lengths.items()):
+    for chromosome in sorted(data.reference_lengths):
         search = search_paths(PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy))
         searches[chromosome] = search
         if search.path is None:
-            chromosomes.append({"chromosome": chromosome, "status": "not_constructed"})
             continue
-        by_id = {p.placement_id: p for p in groups[chromosome]}
-        ref_coverage = []
         for item in search.path.slices:
+            if item.interval.end > len(data.sources[item.source]):
+                raise Q0EvidenceError("q0 path source exceeds sequence length")
             if any(item.interval.intersection(previous) for previous in occupied[item.source]):
                 raise Q0EvidenceError("q0 source interval selected on multiple chromosomes")
             occupied[item.source].append(item.interval)
-            placement = by_id[item.placement_id]
-            for anchor in placement.reference_blocks:
-                overlap = anchor.source.intersection(item.interval)
-                if overlap:
-                    ref_coverage.append(_project(anchor.source, anchor.reference, item.orientation, overlap))
         for join in search.path.joins:
             if join.kind == "input_assembly_gap":
                 if any(join.gap_interval.intersection(previous) for previous in occupied[join.gap_source]):
                     raise Q0EvidenceError("original N source interval selected more than once")
                 occupied[join.gap_source].append(join.gap_interval)
-        records[chromosome] = reconstruct(search.path, data.sources)
-        chromosomes.append({"chromosome": chromosome, "status": "partial_path",
-                            "reference_unrepresented": [asdict(i) for i in subtract_intervals(Interval(0, length), ref_coverage)],
-                            "unknown_joins": sum(j.kind == "reference_unknown" for j in search.path.joins),
-                            "input_gap_joins": sum(j.kind == "input_assembly_gap" for j in search.path.joins)})
-    if not records:
+    return PathSelection(admission, searches, occupied)
+
+
+def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
+                 path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Construction:
+    selection = select_q0_paths(data, admission_policy=admission_policy, path_policy=path_policy,
+                                quality_pass=quality_pass)
+    admission, searches, occupied = selection.admission, selection.paths, selection.occupied
+    if not any(search.path is not None for search in searches.values()):
         raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
     if "supplement_scope" in data.catalog:
         from .q0_frontier_scope import audit_selected_scope
         audit_selected_scope(data, admission, searches)
+    records, chromosomes = {}, []
+    by_id = {p.placement_id: p for p in admission.placements}
+    for chromosome, search in searches.items():
+        if search.path is None:
+            chromosomes.append({"chromosome": chromosome, "status": "not_constructed"})
+            continue
+        ref_coverage = []
+        for item in search.path.slices:
+            placement = by_id[item.placement_id]
+            for anchor in placement.reference_blocks:
+                overlap = anchor.source.intersection(item.interval)
+                if overlap:
+                    ref_coverage.append(_project(anchor.source, anchor.reference, item.orientation, overlap))
+        records[chromosome] = reconstruct(search.path, data.sources)
+        length = data.reference_lengths[chromosome]
+        chromosomes.append({"chromosome": chromosome, "status": "partial_path",
+                            "reference_unrepresented": [asdict(i) for i in subtract_intervals(Interval(0, length), ref_coverage)],
+                            "unknown_joins": sum(j.kind == "reference_unknown" for j in search.path.joins),
+                            "input_gap_joins": sum(j.kind == "input_assembly_gap" for j in search.path.joins)})
     decisions = {"schema": "lgz_q0_construction_v1", "input_fingerprint": data.input_fingerprint,
                  "admission_policy": asdict(admission_policy), "path_policy": asdict(path_policy),
                  "selector_identity": selector_identity(), "ready_manifest_identity": data.ready_manifest_identity,

@@ -50,12 +50,23 @@ class FrontierScopeTests(unittest.TestCase):
                 {"paf": "runs/chr_chr1/b_vs_c/result.paf", "query_dataset": "c", "target_dataset": "b"},
             ]
             before = set(root.rglob("*"))
-            frontier = q0_preparation._provisional_frontier(
-                root, data.sources, data.reference_lengths, catalog, descriptors)
+            control = decision_frontier(q0_admission.construct_q0(data))
+            with (patch.object(q0_admission, "reconstruct", side_effect=AssertionError("draft FASTA")),
+                  patch.object(q0_admission, "selector_identity", side_effect=AssertionError("draft report"))):
+                frontier = q0_preparation._provisional_frontier(
+                    root, data.sources, data.reference_lengths, catalog, descriptors)
+            self.assertEqual(frontier, control)
             self.assertEqual(set(frontier), {SourceKey("a", "a"), SourceKey("b", "b")})
             self.assertEqual(set(root.rglob("*")), before)
 
-    def test_provisional_frontier_preserves_original_gap_and_its_evidence(self):
+    def test_path_selection_without_placements_is_empty_not_bad_evidence(self):
+        fixture, _ = bridge_fixture()
+        data = replace(fixture.data(), reference_hits={}, pair_links=())
+        self.assertIsNone(decision_frontier(q0_admission.select_q0_paths(data)))
+        with self.assertRaisesRegex(Q0EvidenceError, "no chromosome has a trustworthy q0 path"):
+            q0_admission.construct_q0(data)
+
+    def test_provisional_frontier_preserves_original_gap_shoulders(self):
         fixture = EvidenceFixture()
         key = fixture.source("gapped", dna(400) + "N" * 108 + dna(550, seed=44))
         fixture.ref(key, (0, 400), (0, 400))
