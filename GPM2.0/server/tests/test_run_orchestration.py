@@ -152,6 +152,46 @@ class RunOrchestrationContractTests(unittest.TestCase):
                     run_orchestration.file_identity(path)
             self.assertEqual(run_orchestration.file_identity(path)["sha256"], hashlib.sha256(b"new").hexdigest())
 
+    def test_paf_identity_hashes_actual_bytes_in_the_geometry_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paf = root / "alignment.paf"
+            payload = ("#小麦备注\r\nq\t10\t0\t10\t+\tt\t10\t0\t10\t10\t10\t60\tcg:Z:10M\r".encode("utf-8") * 25000)
+            paf.write_bytes(payload)
+            with patch.object(run_orchestration, "_sha256_read", side_effect=AssertionError("second raw pass")):
+                first = run_orchestration.paf_file_identity(paf, relative_to=root, require_cigar=True)
+                warm = run_orchestration.file_identity(paf, relative_to=root)
+            self.assertEqual(first, {"path":"alignment.paf", "size":len(payload),
+                                     "sha256":hashlib.sha256(payload).hexdigest()})
+            self.assertEqual(first, warm)
+
+    def test_paf_identity_does_not_publish_if_bytes_are_replaced_after_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paf = root / "alignment.paf"
+            paf.write_text("# old\n", encoding="utf-8")
+            original = run_orchestration._validate_paf_lines
+            def replace(handle, path, require_cigar):
+                summary = original(handle, path, require_cigar)
+                new = paf.with_suffix(".tmp")
+                new.write_text("# new\n", encoding="utf-8")
+                new.replace(paf)
+                return summary
+            with patch.object(run_orchestration, "_validate_paf_lines", side_effect=replace):
+                with self.assertRaisesRegex(run_orchestration.OrchestrationContractError, "PAF output changed"):
+                    run_orchestration.paf_file_identity(paf, relative_to=root, require_cigar=True)
+            self.assertEqual(run_orchestration.file_identity(paf, relative_to=root)["sha256"],
+                             hashlib.sha256(b"# new\n").hexdigest())
+
+    def test_warm_generic_digest_does_not_replace_paf_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paf = root / "malformed.paf"
+            paf.write_text("not a record\n", encoding="utf-8")
+            run_orchestration.file_identity(paf, relative_to=root)
+            with self.assertRaisesRegex(run_orchestration.OrchestrationContractError, "PAF line 1"):
+                run_orchestration.paf_file_identity(paf, relative_to=root, require_cigar=True)
+
     def test_buffered_paf_lines_match_text_iteration_at_read_boundaries(self):
         # UTF-8 scalar and CRLF across the text decoder's old 8 KiB refill,
         # a record across a binary read-ahead block, and an unterminated tail.
