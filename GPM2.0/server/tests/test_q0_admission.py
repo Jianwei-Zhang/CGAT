@@ -5,11 +5,13 @@ import json
 from pathlib import Path
 import random
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 from server.tools.lgz_core.common import reverse_complement
 from server.tools.lgz_core.q0_admission import (AdmissionPolicy, EvidenceInput, admit_placements,
-                                               build_q0, construct_q0, load_evidence_input)
+                                               build_q0, construct_q0, load_evidence_input,
+                                               _links_for_path_graphs, _pair_neighbors, _PlacementNeighbors)
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_catalog import evidence_ref
 from server.tools.lgz_core.q0_paths import PairLink
@@ -110,6 +112,34 @@ def bridge_fixture(reverse=False):
 
 
 class Q0AdmissionTests(unittest.TestCase):
+    def test_sparse_neighbors_keep_snapshot_order_and_every_link_in_both_directions(self):
+        f = EvidenceFixture()
+        a, b, c, missing, unused = (f.source(name, dna(1000)) for name in ('a', 'b', 'c', 'm', 'u'))
+        for left, right in ((a, c), (b, a), (a, missing), (a, a), (c, a)):
+            f.pair(left, right, (0, 250), (500, 750))
+        by_source = _pair_neighbors(f.links)
+        self.assertIs(by_source[a][c], by_source[c][a])
+        self.assertNotIn(a, by_source[a])
+        placements = [SimpleNamespace(source=source, placement_id=str(i))
+                      for i, source in enumerate((c, unused, b, c, a))]
+        ordered = _PlacementNeighbors(placements, by_source)
+        linked = ordered.for_source(a)
+        self.assertEqual([p.placement_id for p, _ in linked], ['0', '2', '3'])
+        self.assertEqual([list(links) for _, links in linked], [[f.links[0], f.links[4]], [f.links[1]], [f.links[0], f.links[4]]])
+        self.assertEqual([p.placement_id for p, _ in ordered.for_source(a, after=2)], ['3'])
+        self.assertEqual(ordered.for_source(unused), [])
+
+    def test_path_graph_routing_keeps_all_conflicts_and_same_source_links_on_shared_chr(self):
+        f = EvidenceFixture()
+        a, b, c, unplaced = (f.source(name, dna(1000)) for name in ('a', 'b', 'c', 'u'))
+        for left, right, strand in ((a, b, '+'), (a, c, '+'), (a, a, '-'), (a, b, '-'), (a, unplaced, '+')):
+            f.pair(left, right, (0, 250), (500, 750), strand=strand)
+        placements = [SimpleNamespace(source=s, chromosome=chr) for s, chr in
+                      ((a, 'x'), (b, 'x'), (a, 'y'), (b, 'y'), (c, 'z'))]
+        actual = _links_for_path_graphs(placements, f.links)
+        self.assertEqual(dict(actual), {'x': [f.links[0], f.links[2], f.links[3]],
+                                        'y': [f.links[0], f.links[2], f.links[3]]})
+
     def test_raw_reference_and_pairwise_evidence_build_bridge_without_admitted_test_nodes(self):
         fixture, truth = bridge_fixture()
         result = construct_q0(fixture.data())

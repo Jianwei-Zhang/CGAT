@@ -245,6 +245,36 @@ def _placement(part, chromosome, strand, interval, anchors, reference_blocks, ev
                      reference_blocks, seed, kind)
 
 
+def _pair_neighbors(links):
+    """Share one encounter-ordered link list between the two source directions."""
+    neighbors = defaultdict(dict)
+    for link in links:
+        a, b = link.query_source, link.target_source
+        if a == b:
+            continue  # Unchanged admission rule; path construction is separate.
+        group = neighbors[a].get(b)
+        if group is None:
+            group = neighbors[a][b] = neighbors[b][a] = []
+        group.append(link)
+    return neighbors
+
+
+class _PlacementNeighbors:
+    """Join a fixed placement snapshot to actual pair links, in snapshot order."""
+
+    def __init__(self, placements, links_by_source):
+        self.by_source = defaultdict(list)
+        for rank, placement in enumerate(placements):
+            self.by_source[placement.source].append((rank, placement))
+        self.links_by_source = links_by_source
+
+    def for_source(self, source, *, after=-1):
+        candidates = [(rank, placement, links)
+                      for other, links in self.links_by_source.get(source, {}).items()
+                      for rank, placement in self.by_source.get(other, ()) if rank > after]
+        return [(placement, links) for _, placement, links in sorted(candidates, key=lambda row: row[0])]
+
+
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),
                      path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Admission:
     if quality_pass is not None and (set(quality_pass) != set(data.sources) or any(type(v) is not bool for v in quality_pass.values())):
@@ -274,10 +304,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                             "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
                             "qc": "not_measured" if quality_pass is None else "passed"})
     ambiguous = {key: merged_intervals(value) for key, value in ambiguous.items()}
-    pair_index = defaultdict(list)
-    for link in data.pair_links:
-        if link.query_source != link.target_source:
-            pair_index[tuple(sorted((link.query_source, link.target_source)))].append(link)
+    pair_neighbors = _pair_neighbors(data.pair_links)
 
     def clean_intervals(part, intervals):
         return merged_intervals(piece for i in intervals
@@ -288,17 +315,16 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     # another chr supports a previously unlocalized tail. This is local source
     # selection, not a claim that the input assembler made a biological error.
     reference_seeds = tuple(accepted.values())
+    seed_neighbors = _PlacementNeighbors(reference_seeds, pair_neighbors)
     for current in reference_seeds:
         part = data.parts[current.segment_id]
         if current.interval != part.interval:
             continue
         main_anchors = merged_intervals(a.source for a in current.reference_blocks)
         alternatives = defaultdict(lambda: {"intervals": [], "ids": set(), "parents": set()})
-        for anchor in reference_seeds:
-            if anchor.chromosome == current.chromosome or anchor.source == current.source:
-                continue
-            links = pair_index.get(tuple(sorted((part.source, anchor.source))), ())
-            if not links:
+        linked_seeds = seed_neighbors.for_source(current.source)
+        for anchor, links in linked_seeds:
+            if anchor.chromosome == current.chromosome:
                 continue
             for orientation in ("+", "-"):
                 probe = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
@@ -327,10 +353,9 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
         if not alternatives:
             continue
         continuity_ids = set()
-        for anchor in reference_seeds:
-            if anchor.chromosome != current.chromosome or anchor.source == current.source:
+        for anchor, links in linked_seeds:
+            if anchor.chromosome != current.chromosome:
                 continue
-            links = pair_index.get(tuple(sorted((part.source, anchor.source))), ())
             by_evidence = defaultdict(list)
             for block, eid in qualify_pair_blocks(current, anchor, links, path_policy, require_supported=False):
                 by_evidence[eid].append(current.source_interval(block.left))
@@ -372,15 +397,13 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     for round_number in range(1, len(data.parts) + 1):
         before = tuple(accepted.values())
         placed = {p.segment_id for p in before}
+        placed_neighbors = _PlacementNeighbors(before, pair_neighbors)
         proposed = defaultdict(dict)
         for key in sorted(allowed - placed):
             part = data.parts[key]
-            for anchor in before:
-                links = pair_index.get(tuple(sorted((part.source, anchor.source))), ())
+            for anchor, links in placed_neighbors.for_source(part.source):
                 for orientation in ("+", "-"):
                     # Geometry probe has explicit raw evidence; it is never returned as admitted.
-                    if not links:
-                        continue
                     temporary = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
                                            (l.hit.evidence_id for l in links), kind="pairwise")
                     qualified = qualify_pair_blocks(temporary, anchor, links, path_policy, require_supported=False)
@@ -454,11 +477,11 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     additions = defaultdict(list)
     addition_ids = defaultdict(set)
     placed_list = sorted(accepted.values(), key=lambda p: p.placement_id)
+    placed_neighbors = _PlacementNeighbors(placed_list, pair_neighbors)
     for i, left in enumerate(placed_list):
-        for right in placed_list[i+1:]:
-            if left.chromosome != right.chromosome or left.source == right.source:
+        for right, links in placed_neighbors.for_source(left.source, after=i):
+            if left.chromosome != right.chromosome:
                 continue
-            links = pair_index.get(tuple(sorted((left.source, right.source))), ())
             for block, evidence_id in qualify_pair_blocks(left, right, links, path_policy, require_supported=False):
                 for placement, interval in ((left, left.source_interval(block.left)), (right, right.source_interval(block.right))):
                     part = data.parts[placement.segment_id]
@@ -511,6 +534,21 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                      tuple(sorted(set(data.parts) - placed)), ambiguous, policy)
 
 
+def _links_for_path_graphs(placements, links):
+    # A graph's lookup and coverage model only consume pairs where both
+    # endpoints have a placement on its chromosome. Keep all such records in
+    # original order (including conflicts and same-source non-overlap links).
+    chromosomes_by_source = defaultdict(set)
+    for placement in placements:
+        chromosomes_by_source[placement.source].add(placement.chromosome)
+    by_chromosome = defaultdict(list)
+    absent = frozenset()
+    for link in links:
+        for chromosome in chromosomes_by_source.get(link.query_source, absent) & chromosomes_by_source.get(link.target_source, absent):
+            by_chromosome[chromosome].append(link)
+    return by_chromosome
+
+
 def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
                  path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Construction:
     admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass)
@@ -518,8 +556,9 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
     for placement in admission.placements:
         groups[placement.chromosome].append(placement)
     records, searches, occupied, chromosomes = {}, {}, defaultdict(list), []
+    graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
     for chromosome, length in sorted(data.reference_lengths.items()):
-        search = search_paths(PathGraph(groups[chromosome], data.pair_links, data.original_adjacencies, path_policy))
+        search = search_paths(PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy))
         searches[chromosome] = search
         if search.path is None:
             chromosomes.append({"chromosome": chromosome, "status": "not_constructed"})
