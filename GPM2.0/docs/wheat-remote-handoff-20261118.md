@@ -3831,3 +3831,21 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   且不动。仅作切换成本参考：按历史首个新raw约5h16m、留6h、14个mapper槽和保守扣除2573完整矩阵
   可跳窗，目前要平均省约5.8秒/待做窗口才能覆盖恢复成本。三份真样本只精比对即省约10.5秒/次，另有
   粗筛和验证收益，值得继续走预检；样本与理想并行测算不保证端到端，切换时重核实际工作量、资源和收益。
+
+### 2026-11-22 18:29 CST：续跑预检仍在核对绑定；移除通用文件身份的重复路径解析
+
+- 主新版43012037、旧42523432均仍运行；18:25:16 新版报6500/61000、fallback=0。43015292只读预检
+  尚未提交最终`validation.json`，不能用测试fixture里的25项冒充真实校验。没有申请新32核主资源、没有停现job。
+- `43015880 / agent-X86-18 / SUCCEEDED` 只采同UID、同作业cgroup及确切启动tick的只读预检PID3640947，
+  不暂停、不读locals、不向主任务发信号。18:23:12先观察到`SelfBindings.verify(full=True)`逐个命令身份的
+  `file_identity→file_signature→realpath`，18:23:37已进入`NativeBindings.verify_native_resources`的原包装/规格
+  核验（`_sha256_read/open`），18:24:02仍在该模块的`expected_spec`匹配。其源/原输出的25项最终核验未过；
+  不能把高I/O等待等同于挂死。report `preflight-stack-182148-v2/samples.jsonl` SHA
+  `376872432559bb47700fee15f44b78df57d4fdd1ebac8c0e2e497062a87ab682`。初次43015877仅因诊断把
+  相对的`resume_q0_science.py`参数误当非目标而拒绝，未读取不匹配PID或改动权限；修订后仍绑定实际cmd/cwd/job。
+- 已推 `51febb4f`：通用`file_identity`的size/摘要共用同一次前与后路径签名，原4次resolve/stat降为2次；
+  不去掉实际冷哈希、打开文件描述符前后的一致性检查，及命中后路径/设备/inode/大小/mtime/ctime核对。
+  回归覆盖热缓存期间链接改向与冷读取后原子替换；47项orchestration/checkpoint/report定向测试，46通过+1跳过。
+  冻结旧实现与候选在400个合成命令路径同字节ABBA，本地冷约54.5→35.8ms、热约54.7→29.2ms（非现场倍率）。
+  实样小文件只读ABBA `43015894`仍RUNNING；不修改受绑定的远端`run_orchestration.py`，不把这项混进已验证的
+  两模块loader候选或冒称已减少本轮真实预检时间。
