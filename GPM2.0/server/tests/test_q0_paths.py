@@ -9,7 +9,8 @@ import unittest
 from server.tools.lgz_core.common import reverse_complement
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_paths import (
-    PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor, pair_blocks, reconstruct, search_paths,
+    PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor, _CompetingAxis,
+    pair_blocks, qualify_pair_blocks, reconstruct, search_paths,
 )
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey, split_source
 
@@ -60,6 +61,51 @@ def bridge_fixture(reverse=False, original_gap=False):
 
 
 class Q0PathKernelTests(unittest.TestCase):
+    def test_competing_axis_matches_direct_interval_intersection(self):
+        rng = random.Random(42)
+        for _ in range(40):
+            threshold = rng.randrange(1, 30)
+            spans = [(start, start + rng.randrange(1, 60), mapping)
+                     for start, mapping in ((rng.randrange(100), rng.randrange(7)) for _ in range(40))]
+            axis = _CompetingAxis((start, end - threshold, mapping)
+                                  for start, end, mapping in spans if end - start >= threshold)
+            for _ in range(80):
+                start, mapping = rng.randrange(100), rng.randrange(9)
+                end = start + rng.randrange(threshold, 70)
+                expected = any(m != mapping and min(end, b) - max(start, a) >= threshold for a, b, m in spans)
+                self.assertEqual(axis.intersects_other_map(Interval(start, end), threshold, mapping), expected)
+
+    def test_competing_maps_on_either_axis_and_in_either_direction(self):
+        for strand, same_side in itertools.product(("+", "-"), ("left", "right")):
+            with self.subTest(strand=strand, shared=same_side):
+                a, b = placement("a", 0, 2000), placement("b", 0, 2000, orientation=strand)
+                a, b = (replace(p, reference_intervals=(), reference_blocks=()) for p in (a, b))
+                primary = link(a, b, (0, 400), (0, 400))
+                # Exactly 100 shared bases on only one axis. Reverse the
+                # query/target order of the competitor without changing its map.
+                arange, brange = ((300, 500), (600, 800)) if same_side == "left" else ((600, 800), (300, 500))
+                alternate = link(b, a, brange, arange, number=2)
+                self.assertFalse(qualify_pair_blocks(a, b, (primary, alternate), PathPolicy()))
+                self.assertIn(primary.hit.evidence_id, {e for _, e in qualify_pair_blocks(a, b, (primary, alternate),
+                                                                                          PathPolicy(minimum_anchor_bp=101))})
+
+    def test_opposite_strand_remains_a_competitor_even_if_not_a_path_candidate(self):
+        a, b = (replace(p, reference_intervals=(), reference_blocks=())
+                for p in (placement("a", 0, 2000), placement("b", 0, 2000)))
+        request = link(a, b, (0, 400), (0, 400))
+        opposite = link(a, replace(b, orientation="-"), (0, 400), (1600, 2000), number=2)
+        self.assertFalse(pair_blocks(opposite, a, b))
+        self.assertFalse(qualify_pair_blocks(a, b, (request, opposite), PathPolicy()))
+
+    def test_same_map_not_a_competitor_and_short_cigar_blocks_do_not_combine(self):
+        a, b = (replace(p, reference_intervals=(), reference_blocks=())
+                for p in (placement("a", 0, 2000), placement("b", 0, 2000)))
+        primary = link(a, b, (0, 400), (0, 400))
+        same_map = link(b, a, (200, 500), (200, 500), number=2)
+        fragmented = link(a, b, (20, 218), (720, 918), number=3, cigar="99M99M")
+        actual = qualify_pair_blocks(a, b, (primary, same_map, fragmented), PathPolicy())
+        self.assertEqual({e for _, e in actual}, {p.hit.evidence_id for p in (primary, same_map, fragmented)})
+
     def test_two_sided_bridge_keeps_outer_sequence_and_removes_unknown_join(self):
         truth, nodes, links, sequences, original = bridge_fixture()
         result = search_paths(PathGraph(nodes, links))

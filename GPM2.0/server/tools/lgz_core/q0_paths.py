@@ -8,7 +8,7 @@ consensus bases, and never treats an N count as a measured physical distance.
 """
 from __future__ import annotations
 
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from itertools import product
@@ -187,6 +187,54 @@ def _source_pairs(link: PairLink, left: SourceKey, right: SourceKey):
             yield t, q
 
 
+def _paired_map(reverse: bool, left: Interval, right: Interval):
+    return reverse, (right.end + left.start if reverse else right.start - left.start)
+
+
+class _CompetingAxis:
+    """Prefix maxima for two different maps, querying overlap with any other map."""
+
+    def __init__(self, spans):
+        self.starts = []
+        self.by_prefix = []
+        best = alternate = None
+        for start, last_start, mapping in sorted(spans):
+            if best is None:
+                best = last_start, mapping
+            elif mapping == best[1]:
+                best = max(best[0], last_start), mapping
+            elif last_start > best[0]:
+                alternate, best = best, (last_start, mapping)
+            elif alternate is None or last_start > alternate[0]:
+                alternate = last_start, mapping
+            self.starts.append(start)
+            self.by_prefix.append((best, alternate))
+
+    def intersects_other_map(self, interval, minimum, mapping):
+        i = bisect_right(self.starts, interval.end - minimum) - 1
+        if i < 0:
+            return False
+        best, alternate = self.by_prefix[i]
+        other = alternate if best[1] == mapping else best
+        return other is not None and other[0] >= interval.start
+
+
+def _competing_axes(links, left, right, minimum):
+    left_spans, right_spans = [], []
+    for link in links:
+        reverse = link.hit.strand == "-"
+        for a, b in _source_pairs(link, left, right):
+            if a.length < minimum:
+                continue
+            # Overlap >= minimum iff a minimum-length run can start within
+            # both closed [start, end-minimum] ranges. Do NOT merge CIGAR runs:
+            # a different map competes only via an individual paired block.
+            mapping = _paired_map(reverse, a, b)
+            left_spans.append((a.start, a.end - minimum, mapping))
+            right_spans.append((b.start, b.end - minimum, mapping))
+    return _CompetingAxis(left_spans), _CompetingAxis(right_spans)
+
+
 def qualify_pair_blocks(left: Placement, right: Placement, links: Iterable[PairLink], policy: PathPolicy,
                         *, require_supported: bool = True) -> tuple[tuple[Block, str], ...]:
     """Retain coordinate-unique blocks; all observed loci compete, even outside
@@ -196,6 +244,9 @@ def qualify_pair_blocks(left: Placement, right: Placement, links: Iterable[PairL
     """
     links = tuple(link for link in links if link.hit.matches / link.hit.block_length >= policy.minimum_pair_identity)
     result = []
+    axes = None
+    minimum = policy.minimum_anchor_bp
+    reverse = left.orientation != right.orientation
     for link in links:
         blocks = pair_blocks(link, left, right)
         if not blocks or any(not reference_consistent(block, left, right) for block in blocks):
@@ -216,26 +267,16 @@ def qualify_pair_blocks(left: Placement, right: Placement, links: Iterable[PairL
         if _size(supported) < policy.minimum_anchor_bp:
             continue
         for block in blocks:
-            left_global, right_global = left.source_interval(block.left), right.source_interval(block.right)
-            reverse = left.orientation != right.orientation
-            conflicts = False
-            for alternative in links:
-                for a, b in _source_pairs(alternative, left.source, right.source):
-                    qa, qb = left_global.intersection(a), right_global.intersection(b)
-                    if max(qa.length if qa else 0, qb.length if qb else 0) < policy.minimum_anchor_bp:
-                        continue
-                    opposite = (alternative.hit.strand == "-") != reverse
-                    # For matching orientations, a single boundary identifies
-                    # the affine paired-base map over each ungapped run.
-                    same_map = (right_global.end + left_global.start == b.end + a.start if reverse else
-                                right_global.start - left_global.start == b.start - a.start)
-                    if opposite or not same_map:
-                        conflicts = True
-                        break
-                if conflicts:
-                    break
-            if not conflicts:
-                result.append((block, link.hit.evidence_id))
+            if block.left.length >= minimum:
+                if axes is None:
+                    axes = _competing_axes(links, left.source, right.source, minimum)
+                left_global = left.source_interval(block.left)
+                right_global = right.source_interval(block.right)
+                mapping = _paired_map(reverse, left_global, right_global)
+                if (axes[0].intersects_other_map(left_global, minimum, mapping)
+                        or axes[1].intersects_other_map(right_global, minimum, mapping)):
+                    continue
+            result.append((block, link.hit.evidence_id))
     return tuple(sorted(set(result), key=lambda item: (item[0], item[1])))
 
 
