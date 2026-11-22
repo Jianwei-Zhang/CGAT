@@ -3942,3 +3942,12 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   本地八项试验 helper 测试通过。该试验测两段原生子步骤和调度，不包含生产 owner 的大堆、规划和消费；
   不预先改主任务，不把 14 路诊断结果换算成所有长序列并发或整麦倍率。若真实有效再按 32 核生产配置重算
   owner/规划/地址空间和文件系统余量及切换净收益。诊断 15 分钟上限不适用于主任务。
+- `43015934` 19:25:27 终态 FAILED/1：本轮新增的两项 helper 测试均通过，但作业还声明调用了旧
+  `test_benchmark_regional_mapper_dispatch.py`，该测试文件未在首份 staging manifest 中；原生 ABBA 未启动。
+  已在 `q0-regional-thread-split-20261122-1922-r2` 定点补齐该文件，并按脚本实际调用核对四份 Python
+  文件和环境 SHA。`job.sha256` SHA `a43b269b0c86229a55fa56a3cf307c91c6bc5c55a7ac67f5ab57c532138d462a`，
+  旧作业终态 JSON SHA `a216cf6079ba0a0b6669b0ce765896bf38e3f0c8faf91c9a34873bee18723f64`。
+  同一方案 `43015937` 19:26:38 已在 `agent-X86-08` 启动，真实 16 CPU/81920 MiB 资源证明 SHA
+  `ab262552233f98043413c8c96ff23f12d73f468516fae63c62850f49300377da`；续查同作业是否有 `inputs_verified`
+  及 `artifacts/report.json`，不把 RUNNING 当成性能验收，不再提交其他等价试验。主新版仍独立产出，19:24:36
+  达 **7400/61000，fallback=0**；预检 `43015921` 仍在运行，未触碰新旧主任务。
