@@ -92,7 +92,7 @@ class RefinementBatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
             groups, _, _ = fixture.workspace(root)
-            with mock.patch.object(native, "validate_runtime", return_value=runtime), mock.patch.object(cache, "validate_runtime", return_value=runtime), mock.patch.object(native.subprocess, "run", side_effect=command):
+            with mock.patch("refinement_native_checkpoint.launch", side_effect=lambda root, invocation, *args: (invocation.command, None)), mock.patch.object(native, "validate_runtime", return_value=runtime), mock.patch.object(cache, "validate_runtime", return_value=runtime), mock.patch.object(native.subprocess, "run", side_effect=command):
                 first = batch.execute_batch(root, groups, 2, tools="tgsgapcloser")
                 second = batch.execute_batch(root, groups, 8, tools="tgsgapcloser")
                 self.assertEqual(first["exit_code"], 0)

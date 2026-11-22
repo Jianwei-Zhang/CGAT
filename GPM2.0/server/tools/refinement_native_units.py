@@ -35,7 +35,8 @@ HELPERS = ("refinement_native_units.py", "refinement_native_runner.py")
 
 
 def helper_hashes(tool="quartet"):
-    names = HELPERS + (("refinement_degap_units.py",) if tool == "degap" else ())
+    extra = {"degap": ("refinement_degap_units.py",), "tgsgapcloser": ("refinement_tgs_units.py",)}
+    names = HELPERS + extra.get(tool, ())
     return {name: digest(Path(__file__).with_name(name)) for name in names}
 
 
@@ -72,7 +73,7 @@ def file_fact(path):
     return {"sha256": sha, "bytes": before[2]}, before
 
 
-def validate_paf(path, *, allow_empty):
+def validate_paf(path, *, allow_empty, require_cigar=True):
     """Validate native output structure, not an invented accuracy assessment."""
     count = 0
     with Path(path).open() as stream:
@@ -85,14 +86,15 @@ def validate_paf(path, *, allow_empty):
                 if not (0 <= a < b <= qlen and 0 <= x < y <= tlen and 0 <= matches <= block and block > 0 and 0 <= quality <= 255):
                     raise ValueError()
                 cigars = [field[5:] for field in fields[12:] if field.startswith("cg:Z:")]
-                if len(cigars) != 1:
+                if len(cigars) > 1 or (require_cigar and not cigars):
                     raise ValueError()
-                parts = re.findall(r"([1-9][0-9]*)([MIDN=X])", cigars[0])
-                if "".join(n + op for n, op in parts) != cigars[0]:
-                    raise ValueError()
-                if (sum(int(n) for n, op in parts if op in "MI=X") != b - a
-                        or sum(int(n) for n, op in parts if op in "MDN=X") != y - x):
-                    raise ValueError()
+                if cigars:
+                    parts = re.findall(r"([1-9][0-9]*)([MIDN=X])", cigars[0])
+                    if "".join(n + op for n, op in parts) != cigars[0]:
+                        raise ValueError()
+                    if (sum(int(n) for n, op in parts if op in "MI=X") != b - a
+                            or sum(int(n) for n, op in parts if op in "MDN=X") != y - x):
+                        raise ValueError()
             except (ValueError, IndexError) as error:
                 raise PathError("invalid completed native PAF") from error
             count += 1
@@ -213,6 +215,12 @@ class UnitStore:
 
 def launch(root, invocation, paths, record, native_binding):
     """Disclose the wrapper separately; never modify the pinned invocation."""
+    if invocation.tool == "tgsgapcloser":
+        try:
+            from refinement_tgs_units import launch as launch_tgs
+        except ModuleNotFoundError:
+            from .refinement_tgs_units import launch as launch_tgs
+        return launch_tgs(root, invocation, paths, record, native_binding)
     if invocation.tool not in {"quartet", "degap"}:
         return invocation.command, None
     helpers = helper_hashes(invocation.tool)
@@ -230,6 +238,12 @@ def launch(root, invocation, paths, record, native_binding):
 
 def capture_units(root, tool, run_id, code, *, required=False):
     """All evidence is in the current producer; no external cache needed offline."""
+    if tool == "tgsgapcloser":
+        try:
+            from refinement_tgs_units import capture_units as capture_tgs
+        except ModuleNotFoundError:
+            from .refinement_tgs_units import capture_units as capture_tgs
+        return capture_tgs(root, run_id, code, required=required)
     if tool == "degap":
         try:
             from refinement_degap_units import capture_units as capture_degap

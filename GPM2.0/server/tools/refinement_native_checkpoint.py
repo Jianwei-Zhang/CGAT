@@ -384,7 +384,7 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
     cached = find_completed(root, invocation.tool, native_binding, input_hashes)
     marker = paths["02_jobs"] / "invocation.json"
     validator = fingerprint({name: digest(Path(__file__).with_name(name)) for name in
-                             ("refinement_native_checkpoint.py", "refinement_native_units.py", "refinement_degap_units.py")})
+                             ("refinement_native_checkpoint.py", "refinement_native_units.py", "refinement_degap_units.py", "refinement_tgs_units.py")})
     if cached is not None and cached.get("validator_revision") != validator:
         # A verifier/reporting fix is not a changed native program. Recheck the
         # original, sealed bytes under the current completion rules instead of

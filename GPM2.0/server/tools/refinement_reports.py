@@ -120,7 +120,7 @@ def native_diagnostics(root, tool, run_id, execution):
     log = (base / "02_jobs" / native_run / "native.log").as_posix()
     if (root / log).is_file():
         selected.setdefault(log, digest(safe_file(root, log)))
-    if tool in {"quartet", "degap"} and not origin:
+    if tool in {"quartet", "degap", "tgsgapcloser"} and not origin:
         # Failed/interrupted attempts may contain completed units even though
         # no whole-native completion exists. Only named owned diagnostics.
         unit_base = base / "02_jobs" / native_run
@@ -131,7 +131,7 @@ def native_diagnostics(root, tool, run_id, execution):
         for receipt in sorted((root / unit_base / "native_units").glob("*/unit_complete.json")):
             if not re.fullmatch(r"[0-9a-f]{64}", receipt.parent.name):
                 continue
-            for name in ("unit_complete.json", "producer.json", "output.paf"):
+            for name in ("unit_complete.json", "producer.json", "output.paf", "stdout.paf", "stdout.fasta", "stderr.log"):
                 file = receipt.parent / name
                 if file.exists() or file.is_symlink():
                     select(file.relative_to(root).as_posix())
@@ -196,7 +196,7 @@ def asset_plan(root, artifacts):
         include = text and size <= MAX_ASSET and total + size <= MAX_ASSETS_TOTAL
         row = {"workspace_path": relative, "sha256": expected, "size_bytes": size,
                "availability": "embedded" if include else "server_only_size_limit" if text else
-                               "server_only_native_script" if relative.endswith(".sh") else "server_only_sequence_or_binary"}
+                               "server_only_native_script" if relative.endswith(".sh") or "/native_commands/" in relative else "server_only_sequence_or_binary"}
         if include:
             total += size
             row["report_path"] = "assets/" + hashlib.sha256(relative.encode()).hexdigest()[:20] + ".txt"

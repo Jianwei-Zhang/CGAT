@@ -54,9 +54,8 @@ All selected inputs still run through native processing. A failure after input A
 can reuse A on retry while executing B again. Final completion still requires the
 native filled outputs or the exact pinned all-input no-candidate outcome.
 
-The implemented DEGAP terminal-child boundary is described below. TGS native
-stages and LR iterations still need separate consumers, input/output closures
-and failure tests before they are enabled. For DEGAP,
+The implemented DEGAP terminal-child boundary is described below. TGS command units are described below; LR iterations still need a separate
+consumer, input/output closure and failure tests before they are enabled. For DEGAP,
 verified cached jobs must remain in the native summary (the upstream all-skipped
 summary is not complete); LR cannot resume from an iteration FASTA alone. No
 adapter may turn bare `.skip_right`, preprocessing files or exit-zero markers into
@@ -150,3 +149,52 @@ keeping metadata work linear in job count. An abruptly killed parent can retain 
 provisional running summary; committed unit receipts, not that aggregate, are the
 recovery authority. LEFT dependency lookup is indexed rather than a whole-config
 scan for every skipped RIGHT. Neither optimization changes native scheduling.
+
+
+## TGS: native alignment/correction command units
+
+Use the exact pinned bioconda build-4 driver, not the different upstream release
+script. A private driver copy changes only helper discovery for its new location
+and routes `MiniMap2`/`RACON` through CGAT-owned executable wrappers after the
+original argument checks. The original script, native argv, thresholds, chunk and
+round loops, candidate selection, merge, gap filling and sequence generation stay
+unchanged. Record original source SHA, exact driver/wrapper bytes and actual
+launcher command; never relabel the instrumented copy as unmodified upstream.
+
+Each retry starts fresh. Scaffold split, candidate selection, shell filtering,
+merge and integration run again; successful expensive minimap2/Racon calls may
+restore their sealed stdout/stderr. The original shell still sets loop variables
+and writes fresh done tags after each successful wrapper return. Do not restore
+native done tags or use their existence as completion proof. Individual correction
+chunks/rounds can be reused without skipping later chunks or native integration.
+
+A unit binds the normalized declared attempt paths, original binary/argv, actual
+consumed FASTA/PAF bytes, phase and native threads/runtime/helper binding. Minimap2
+uses its pinned native PAF policy (no fabricated mandatory CIGAR when the native
+command does not request `-c`); an exit-zero empty PAF is explicit empty output.
+Racon output is validated FASTA, with exit-zero empty output kept distinct. Failed
+calls leave diagnostics but no completion receipt.
+
+Native stdout/stderr already target fresh owned regular native files. Execute the
+original binary using those descriptors unchanged, then seal snapshots before the
+script deletes or moves them. A producer snapshot may hard-link its own declared
+read-only command outputs; a new attempt copies bytes to its fresh descriptors,
+never hard-links a new consumer to historical evidence. Original logs remain
+unchanged and unit receipts identify the actual producer and replay.
+
+Raw prepared inputs already hashed by the live outer native attempt may use that
+attempt's content SHA plus full file-identity fence across wrapper processes.
+Those snapshots are regenerated for every new attempt, never a cross-run stat-only
+cache. Generated native inputs are content-hashed. Parent completion verifies the
+ordered expected command phases, receipts, output structure, source/wrapper pins
+and original producer snapshots before CGAT admission. Full pinned-tool,
+architecture and termination/process-quiescence acceptance is still required.
+
+
+The optional `CGAT_TEST_TGS_ARCHIVE` tests verify the archive against the tool lock
+and use its exact driver with controlled native helper programs. One HiFi test
+uses the developer minimap2 to produce a genuine short-input empty PAF. This is
+not a fixed-environment/real-Racon/C++ filling or ARM execution acceptance. The
+current source SHA was verified against the pinned linux-64 build-4 archive;
+architecture checks remain in the final matrix. Generated executable wrappers
+are server-only script evidence, not active report assets or FASTA payloads.

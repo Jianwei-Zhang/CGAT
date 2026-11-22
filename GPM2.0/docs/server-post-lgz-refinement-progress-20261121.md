@@ -410,3 +410,19 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=server/tests python3 -B -m unittest \
 - 去掉每完成一个 child 都重扫并重写全部单位摘要的二次方元数据工作：worker 只提交自身 durable 回执，parent 退出时汇总一次；LEFT 依赖预先建索引。未改变原生调度或科学参数，未以单元检查冒充整流程性能基准。没有执行全量回归。
 - 调度器/管理器/分析器取自 lock 绑定 manifest 校验过的 bundled Part3，子任务使用真实 fork worker 和 bash。预处理、child 组装和整合 FASTA 是受控夹具，不冒称完整 DEGAP、固定 conda 环境、双架构、真实补洞生物学或 App 验收。
 - 全目标仍保留：TGS 原生阶段、LR 迭代恢复、未完成旧 LGZ 阶段迁移、原生离线可视报告、真实固定环境/四工具/双架构、终止与残留进程故障注入，以及最新 App 闭环和 A01–A18 最后统一检查。没有升级现有环境、运行远端/浏览器/生产构建或发布；master 和客户工作区未动。
+
+
+## 2026-11-22：TGS 原生比对/校正命令恢复
+
+- 先记录恢复边界，再新增 `refinement_tgs_units.py`。核对真实 bioconda build-4 档案 SHA 与脚本 SHA；不把不同的上游脚本当作该分发版。运行私有 driver 副本，仅校正新位置的 helper 查找并在原参数检查后路由 minimap2/Racon；原脚本、科学参数和运行时 lock 没有修改。实际 launcher、原脚本 SHA、私有 driver/wrapper hash 均进入回执。
+- 原分块/轮次循环、候选选择、filter/merge、gap filling 与 seqgen 继续执行。恢复仅回放完成命令的 stdout/stderr，不恢复 done tag，因此不会丢失 shell 变量或跳过后续 chunks。HiFi `--ne` 与 ONT 原生 Racon 路径分别按实际原生命令检查有序阶段覆盖。
+- key 绑定实际程序/参数、输入 FASTA/PAF 字节、阶段、线程和原生数据/runtime/helper。大 raw 输入可使用本次 live native attempt 已计算的 SHA 与完整文件身份 fence；PID/start 身份验证限制其生命周期，不做跨 run 的 stat-only 缓存。动态原生产物仍按内容绑定，失败不生成单位完成回执。
+- 直接沿用原生命令的已重定向输出描述符。原 producer 只对自身只读流建立持久快照；新 attempt 复制到新文件，不与历史证据共享可写 inode。保留旧日志/原 producer，stdout 格式和完整单位清单在 native 完成时重验；minimap2 未请求 `-c` 时不虚构强制 CIGAR，quarTeT 的原强校验保持不变。
+- 报告包含阶段回执、PAF/校正来源和日志；私有可执行 wrapper 按 server-only script 标注。公开中英文指南同步实际恢复范围，不把重新运行的 scaffold/候选/整合阶段冒称复用。
+
+### 本段必要轻量证据
+
+- 8 项定向检查通过（39.514 秒）：固定分发脚本的 ONT 3 chunks、7 已完成命令后最后比对失败/恢复、整段 native 再复用；真实开发机 minimap2 空 PAF 后下游失败/复用；输入/线程/流损坏、完整阶段与 driver 漂移、结束后的 snapshot lease 拒绝、无跨 attempt inode 共享；兼容既有完成校验器与 quarTeT 恢复。
+- 另选定三工具真实格式解析/来源重建用例通过（2.996 秒），其 producer 是明确的受控夹具。初次 native 脚本用例发现受控 Candidate helper 错误读取不存在的 `--prefix` 参数，修正夹具后通过，没有修改或放宽原生生产校验。
+- 测试解包 lock 校验的原脚本，C++ helpers/Racon 为受控程序；HiFi 无命中用例使用本机实际 minimap2。未执行真实四工具固定环境、ARM、完整生物学、App 或进程终止故障验收。普通 CI 可运行轻量格式用例，精确 driver 用例通过 `CGAT_TEST_TGS_ARCHIVE` 显式启用。
+- 全目标继续保留：LR 迭代恢复、未完成旧 LGZ 阶段迁移、原生离线可视报告、固定环境/四工具/双架构、终止/残留进程故障以及最新 App 闭环与 A01–A18 统一检查。没有升级现有环境、浏览器/生产构建、远端作业或发布；master 和客户工作区未动。
