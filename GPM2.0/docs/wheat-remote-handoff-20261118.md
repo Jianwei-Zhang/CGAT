@@ -4426,3 +4426,22 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   文本判定。无输入/结果格式变化。44项既有定向回归和2项新增回归通过。
   这不是已定位 `43016881` 当前等待的调用栈，也不是现场壁钟实测；**仅改仓库的后续复用路径**，
   当前运行及原生验证包保持原SHA，不为这个改动再次中断接管。
+
+### 2026-11-23 00:40 CST：新作业已取得工作区锁，16份安装备份已核验
+
+- 新版 `43016881 / agent-X86-57` 在 **00:30:29** 自行取得普通工作区锁，实际 run
+  `20261122T163029Z-1781624-e66acac9`、同 Donau PID1781624；接管放行后约24分32秒。
+  `owner.json` SHA `ea5fa953280a0e2a7774fc987d425562019a7eaeafa9e732a67165be1db5d740`。
+  原只读等待器 PID137993 已切到该真实 run，日志 `logs/wheat-live-loader-20261123-003034.jsonl`，
+  start receipt SHA `1b6c5d270ae6d7951a92425428854ce5fd0fdb5d8b6489e1be56e7d25f9965a2`。
+  00:39:56安装回执仍 `backed_up`，实际复核16份旧文件备份的内容SHA和路径，未把备份/持锁当
+  `installed` 或复用成功。该快照无本轮 `SKIP_VALID` 或新区域窗；旧 `42523432` 仍在Step 2。
+- 与主节点独立的1CPU只读实样 ABBA `43017053 / agent-X86-18 / SUCCEEDED/0`，00:34:13–00:36:13。
+  从冻结真实 native plan 选小/中/大三组、合计69个 wrapper/spec，用原及 `9173170a` 的真实
+  verifier 校验相同输入；每轮清空该诊断进程 SHA/JSON memo、不操纵共享盘缓存。四轮全部通过，
+  共用身份查询138→10；墙钟 A=15.829/12.520s、B=9.655/9.267s，均值14.17→9.46s，约少33%。
+  样本限于 wrapper/spec verifier，不含原始profiles构建、输入/PAF校验或全套启动，不推算主任务
+  壁钟；不把该仓库候选部署给活跃 `43016881`。目录 `q0-native-binding-read-abba-20261123-0034`，
+  `job.sha256` SHA `20b3e00320efcefd2be185985c703fa8ca301dac24cad839eff59b187fc35ea6`，
+  `report.json` SHA `48098d69e2c64fd296214406be827ae5f0816b96328aa5b42ed1703903bcb6c0`，
+  `terminal-43017053.json` SHA `0973e9c3a6b1fa588365f41ba8f1efdc0bfbce7837f954c8e0a5ae0afa047f02`。
