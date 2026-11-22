@@ -8,6 +8,7 @@ pairwise-derived placement.
 """
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field, replace
 import math
@@ -188,6 +189,31 @@ class _RefBlock:
     mapq: int | None
 
 
+class _ReferenceBlockCandidates:
+    """Safe overlap bounds; a long block may widen the scan, never omit hits."""
+
+    def __init__(self, blocks):
+        self.blocks = sorted(blocks, key=lambda b: b.query.start)
+        self.starts = []
+        self.prefix_end = []
+        farthest = 0
+        for b in self.blocks:
+            farthest = max(farthest, b.query.end)
+            self.starts.append(b.query.start)
+            self.prefix_end.append(farthest)
+
+    def intersecting(self, interval):
+        # Before first: all earlier ends <= interval.start. From stop onward
+        # all starts >= interval.end. A remaining block can still be disjoint.
+        first = bisect_right(self.prefix_end, interval.start)
+        stop = bisect_left(self.starts, interval.end, lo=first)
+        for index in range(first, stop):
+            other = self.blocks[index]
+            overlap = interval.intersection(other.query)
+            if overlap is not None:
+                yield other, overlap
+
+
 def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy):
     blocks = []
     for hit in data.reference_hits.get(part.source, ()):
@@ -200,11 +226,11 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
                 blocks.append(_RefBlock(overlap, _project(block.query, block.target, hit.strand, overlap),
                                         hit.target_name, hit.strand, hit.evidence_id, identity, hit.mapping_quality))
     groups, high, ambiguity = defaultdict(list), defaultdict(list), []
+    candidates = _ReferenceBlockCandidates(blocks)
     for block in blocks:
         conflicts = []
-        for other in blocks:
-            overlap = block.query.intersection(other.query)
-            if overlap is None or other.identity + policy.competing_identity_margin < block.identity:
+        for other, overlap in candidates.intersecting(block.query):
+            if other.identity + policy.competing_identity_margin < block.identity:
                 continue
             if (block.chromosome != other.chromosome or block.strand != other.strand
                     or _project(block.query, block.target, block.strand, overlap)
@@ -225,14 +251,27 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
 
 
 def _ordered(anchors, orientation):
+    # Only disjoint source intervals constrain order. Scan their two boundary
+    # orders together, keeping the one most restrictive earlier reference end
+    # (forward) or start (reverse). Touching half-open intervals are disjoint.
     anchors = tuple(anchors)
-    for i, a in enumerate(anchors):
-        for b in anchors[i + 1:]:
-            if a.source.intersection(b.source):
-                continue
-            left, right = (a, b) if (a.source.start < b.source.start) == (orientation == "+") else (b, a)
-            if left.reference.end > right.reference.start:
-                return False
+    if len(anchors) < 2:
+        return True
+    by_end = sorted(anchors, key=lambda a: a.source.end)
+    pointer = 0
+    bound = None
+    forward = orientation == "+"
+    for current in sorted(anchors, key=lambda a: a.source.start):
+        while pointer < len(by_end) and by_end[pointer].source.end <= current.source.start:
+            ref = by_end[pointer].reference
+            pos = ref.end if forward else ref.start
+            if bound is None:
+                bound = pos
+            else:
+                bound = max(bound, pos) if forward else min(bound, pos)
+            pointer += 1
+        if bound is not None and (bound > current.reference.start if forward else current.reference.end > bound):
+            return False
     return True
 
 
