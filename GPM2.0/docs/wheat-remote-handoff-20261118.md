@@ -3187,3 +3187,51 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   不能宣传61k大多数已被全局结果覆盖；参考坐标投影不自动等价为精确contig间CIGAR。
 - 11:46:29只读observer：NEW43010335仍RUNNING，最新11:46:14 completed4700/planned61000/fallback0；
   OLD42523432仍RUNNING/grt_step2。仅新增上述25秒诊断，原任务和旧基线均未中断。
+
+
+### 2026-11-22 12:11 CST：复用收益实样核对后，已受保护切换 completion-order
+
+- 用户继续推进定向优化。本轮从源码潜在缺口落实到实际目标核对，而非直接上线逐pair过滤。
+  **43012023 SUCCEEDED / agent-X86-61**：39父/51窗口、三个完整native矩阵，过滤前后最终
+  target windows均33766、target bases均974533380；lookup合计53.6516/52.5129秒，不能支持大幅收益。
+- **43012034 SUCCEEDED / agent-X86-18**再次纳入第4个快速矩阵。按真实sealed reference记录
+  核对61个fast queries无qualified routing，再用原weak_global_seed_scope限制到52个有效query和
+  其原目标范围，不把快速矩阵扩大成原生全覆盖。同一51窗口最终目标仍完全不变；lookup
+  43.5834/43.8653秒，PAF decode计数88345/85840（少2.84%，并非少了mapper任务）。这是
+  分层元数据样本、不代表全队列或所有输入；**不实现本轮逐pair目标裁剪、不采用丢小洞/扩大窗口**。
+  报告 `regional-completed-target-pruning-sample-20261122.json` SHA
+  `4ebd66f050be82cdb6b8c78b6d166311b421a3ddb39d37d87e8e961f63705505`，对应verified文件绑定源码/终态。
+  原执行脚本留远端 `q0-partial-target-reuse-20261122-115906-all-scopes`；仓库helper仅修正
+  顶部docstring，除docstring外AST逐项相同，两个SHA均明确记录，未冒称修订文件就是原执行字节。
+- 继续已有强证据的调度修复，不为未证实的少算路线延误。新主资源 **43012037 RUNNING /
+  agent-X86-39，32CPU/327680MiB**。12:02:39严格核对ready PID1245020属于新job、单节点资源、
+  旧reader1990559属于43010335、当前旧run仍q0_evidence、旧基线RUNNING。新config SHA
+  `005254ecab0d41e0641c542e84402e2533d85f8d29efe5fddf2e35f5169cd24a`，旧job明确43010335，
+  **不是43010068，不是42523432**；真实25项preflight列表与上一主作业完整一致。
+- 12:03:44仅执行一次正常 **dkill 43010335**，force=false。12:04:40旧job已FAILED（本次
+  主动正常停止的调度终态）、全部pids消失、正常lock已释放；未手工删除lock或强杀。
+  新job仍RUNNING/同host/32CPU/320GiB，12:04:41原子发布handoff，SHA
+  `778e8f932ae347315e9487d98bed8a969cbcb62db8b55fd9c83f1b993f09639b`。12:04–05新gate接受handoff。
+- **安装已完成并验证，不只是prepare。** 新run **20261122T040506Z-1245020-39aa9341**，owner1245020。
+  `installation/receipt.json` status=installed，SHA
+  `030694dff7efe342927c2ad74091df273a8b069dbd15197d45afe08bd714603c`。16份原文件备份SHA及16项
+  安装清单均逐一核对；仅3个regional模块+launcher/declaration替换，另11core no-op不重写，
+  原self_alignment/assign_chr/lgz_prepare_inputs/outer contract 5项保护SHA全部未变。四个完整native
+  success receipt SHA不变；metadata统计5453 raw success / 5981 project success，**不是本轮
+  完整PAF重验、不是当前进度计数**。保留所有原cache，原窗口/精度/预算/policy AST不变。
+- 12:10安装验收见 `q0-completion-installation-verified-20261122.json`，SHA
+  `111fa1e0c0c518211e01188d2156028979ffa189d559cd7f189713a21dc8b3fd`。
+  本地三个regional测试模块再次 **39/39通过**（2.537秒）；真实预检83项和此前原生ABBA证据仍保留。
+- 12:10:28新observer确认43012037 RUNNING，12:09:38已有新run PREFLIGHT事件，CPU99%、memReal175MiB；
+  尚在正常续跑前缀，不是mapper池低占用证据。**尚未证明新run实际25项全SKIP_VALID，也尚未看到
+  新run的completion-order admission/新增窗口吞吐；不能把安装成功说成整麦已提速验收通过。**
+  OLD42523432仍RUNNING/grt_step2、recent1594%，未改动。
+- 当前live索引 `/tmp/q0-next-transition-current.json` 已指43012037（previous_main_job43010335）；
+  候选索引同步记录installed_initial_resume_pending。新只读observer **3593216**，源码SHA
+  `7a14c6d07ed94bd7e716b9f45ea5daa0a80cb537ff9d011c0d885334610719b2`，日志
+  `~/cgat-reads-debug/logs/wheat-live-completion-20261122-120557.jsonl`，过滤上述新run；无自动修复/通知。
+  原旧observer会在旧job终态后自然退出，不再把旧索引当活跃主任务。
+- **下一步**：只读跟踪当前43012037，先核对25项实际SKIP_VALID、q0真实reader/当前资源proof，
+  再核对native/区域缓存命中和`dispatch=completion_order result_order=original`；只有其后新工作
+  的吞吐才可判定现场收益。不因正常前缀/观察超时再次停任务。继续留意失败、明确低效步骤和内存；
+  不跑发布CI/update.sh/全量替换，不修改旧基线。整个小麦任务尚未完成，goal保持active。

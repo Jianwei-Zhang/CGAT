@@ -1,0 +1,47 @@
+{
+  "status": "completion_dispatch_runtime_installed_and_backups_verified",
+  "at": "2026-11-22T12:10:04.800960+08:00",
+  "new_job": 43012037,
+  "old_job": 43010335,
+  "protected_baseline": 42523432,
+  "run_id": "20261122T040506Z-1245020-39aa9341",
+  "host": "agent-X86-39",
+  "git_revision": "748fddd0952bd24afa96fc265bea3824b4826411",
+  "transition_sha256": "c0f3ce957eb59138dc8ffce9771bacfd351afa6a942ed682b2676bc6a729f210",
+  "installation_receipt_sha256": "030694dff7efe342927c2ad74091df273a8b069dbd15197d45afe08bd714603c",
+  "backups_verified": 16,
+  "installed_inventory_verified": 16,
+  "replaced": [
+    ".prepare_lib/tools/lgz_core/q0_regional_candidates.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_discovery.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_execution.py",
+    "prepare_q0_evidence.sh",
+    "metadata/incident_q0_routing_reader.json"
+  ],
+  "unchanged_core_files": 11,
+  "native_success_receipt_sha256": {
+    "q0-map-8024dde83cbf20e7ffa6d8ee": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e",
+    "q0-map-2b19c2c859bdfb5f2e9177e8": "ba5553ff1640cd1feff0db518b671baabed44fba84e02c7992e30a1cb76dd50a",
+    "q0-map-a2e519761e94eff6ca09e121": "c36e5d98b8cbeac165865060565ed8c8953824f42baafa9c7db2e94b1ec7679f",
+    "q0-map-b30137a13323db8a99874448": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3"
+  },
+  "observed_regional_receipt_counts_metadata_only": {
+    "raw_success_receipts": 5453,
+    "project_success_receipts": 5981
+  },
+  "native_PAFs_revalidated_by_this_report": false,
+  "actual_new_run_25_skip_valid_confirmed": false,
+  "actual_new_run_dispatch_log_confirmed": false,
+  "old_baseline_modified": false,
+  "workspace_lock_deleted": false,
+  "observer": {
+    "status": "read_only_observer_started",
+    "pid": 3593216,
+    "new_job": 43012037,
+    "protected_baseline": 42523432,
+    "expected_run": "20261122T040506Z-1245020-39aa9341",
+    "script_sha256": "7a14c6d07ed94bd7e716b9f45ea5daa0a80cb537ff9d011c0d885334610719b2",
+    "automatic_repair_or_notifications": false
+  },
+  "observer_log": "/share/home/xbzhang26/cgat-reads-debug/logs/wheat-live-completion-20261122-120557.jsonl"
+}

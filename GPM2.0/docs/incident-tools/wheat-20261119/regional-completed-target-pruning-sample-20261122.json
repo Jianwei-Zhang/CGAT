@@ -1,0 +1,1530 @@
+{
+  "status": "all_scoped_completed_target_subsets_verified",
+  "hostname": "agent-X86-18",
+  "metadata_only_not_native_output_revalidation": true,
+  "native_receipt_sha256": {
+    "q0-map-2b19c2c859bdfb5f2e9177e8": "ba5553ff1640cd1feff0db518b671baabed44fba84e02c7992e30a1cb76dd50a",
+    "q0-map-8024dde83cbf20e7ffa6d8ee": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e",
+    "q0-map-a2e519761e94eff6ca09e121": "c36e5d98b8cbeac165865060565ed8c8953824f42baafa9c7db2e94b1ec7679f",
+    "q0-map-b30137a13323db8a99874448": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3"
+  },
+  "approximate_seed_matrix_omitted": false,
+  "fast_seed_queries_verified_unroutable": 61,
+  "fast_seed_effective_query_parts": 52,
+  "DNA_read": false,
+  "reference_PAF_read": true,
+  "native_mapper_executed": false,
+  "main_workspace_modified": false,
+  "sample_parents": 39,
+  "sample_windows": 51,
+  "frozen_planned_windows": 61087,
+  "aggregate": {
+    "target_windows": {
+      "legacy": 33766,
+      "filtered": 33766
+    },
+    "target_bases": {
+      "legacy": 974533380,
+      "filtered": 974533380
+    },
+    "lookup_seconds": {
+      "legacy": 43.583423398435116,
+      "filtered": 43.86531225126237
+    },
+    "paf_decodes": {
+      "legacy": 88345,
+      "filtered": 85840
+    }
+  },
+  "windows_with_target_pruning": 0,
+  "newly_empty_windows": 0,
+  "rows": [
+    {
+      "query_part": "q0-source-part-3835de9de58a217e6ac30d8b",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 487,
+      "core_bases": 487,
+      "legacy_targets": 419,
+      "filtered_targets": 419,
+      "target_windows": {
+        "legacy": 442,
+        "filtered": 442
+      },
+      "target_bases": {
+        "legacy": 9310486,
+        "filtered": 9310486
+      },
+      "lookup_seconds": {
+        "legacy": 0.3029490699991584,
+        "filtered": 0.2537918370217085
+      },
+      "paf_decodes": {
+        "legacy": 514,
+        "filtered": 506
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-35348ad2cf825069b18365ca",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 23472,
+      "core_bases": 10445,
+      "legacy_targets": 88,
+      "filtered_targets": 88,
+      "target_windows": {
+        "filtered": 93,
+        "legacy": 93
+      },
+      "target_bases": {
+        "filtered": 2387929,
+        "legacy": 2387929
+      },
+      "lookup_seconds": {
+        "filtered": 0.10177383851259947,
+        "legacy": 0.08516132645308971
+      },
+      "paf_decodes": {
+        "filtered": 116,
+        "legacy": 121
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-eafccc8492ce31cb89e5d575",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 1518,
+      "query_end": 28941,
+      "core_bases": 898,
+      "legacy_targets": 131,
+      "filtered_targets": 131,
+      "target_windows": {
+        "legacy": 189,
+        "filtered": 189
+      },
+      "target_bases": {
+        "legacy": 4803536,
+        "filtered": 4803536
+      },
+      "lookup_seconds": {
+        "legacy": 0.2620111405849457,
+        "filtered": 0.2334790201857686
+      },
+      "paf_decodes": {
+        "legacy": 360,
+        "filtered": 340
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-99c98c34b93accc4353e0d65",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 33144,
+      "core_bases": 32792,
+      "legacy_targets": 355,
+      "filtered_targets": 355,
+      "target_windows": {
+        "filtered": 410,
+        "legacy": 410
+      },
+      "target_bases": {
+        "filtered": 11149035,
+        "legacy": 11149035
+      },
+      "lookup_seconds": {
+        "filtered": 0.5923155127093196,
+        "legacy": 0.5268615782260895
+      },
+      "paf_decodes": {
+        "filtered": 639,
+        "legacy": 678
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-bf208e736726785a48e89560",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 36814,
+      "core_bases": 32410,
+      "legacy_targets": 486,
+      "filtered_targets": 486,
+      "target_windows": {
+        "legacy": 619,
+        "filtered": 619
+      },
+      "target_bases": {
+        "legacy": 16097495,
+        "filtered": 16097495
+      },
+      "lookup_seconds": {
+        "legacy": 1.0888128243386745,
+        "filtered": 0.99109822884202
+      },
+      "paf_decodes": {
+        "legacy": 1216,
+        "filtered": 1167
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-8aa0136ae925e642ae16637c",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 39887,
+      "core_bases": 39656,
+      "legacy_targets": 392,
+      "filtered_targets": 392,
+      "target_windows": {
+        "filtered": 596,
+        "legacy": 596
+      },
+      "target_bases": {
+        "filtered": 16119970,
+        "legacy": 16119970
+      },
+      "lookup_seconds": {
+        "filtered": 0.9758246373385191,
+        "legacy": 0.8897053180262446
+      },
+      "paf_decodes": {
+        "filtered": 824,
+        "legacy": 881
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-b4e1482f5a89649732bb02a4",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 42931,
+      "core_bases": 32879,
+      "legacy_targets": 202,
+      "filtered_targets": 202,
+      "target_windows": {
+        "legacy": 318,
+        "filtered": 318
+      },
+      "target_bases": {
+        "legacy": 8222320,
+        "filtered": 8222320
+      },
+      "lookup_seconds": {
+        "legacy": 0.6974400412291288,
+        "filtered": 0.6756804436445236
+      },
+      "paf_decodes": {
+        "legacy": 401,
+        "filtered": 375
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-a6c04e9c34a6b54486cecc5f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 9406,
+      "query_end": 39241,
+      "core_bases": 9835,
+      "legacy_targets": 375,
+      "filtered_targets": 375,
+      "target_windows": {
+        "filtered": 586,
+        "legacy": 586
+      },
+      "target_bases": {
+        "filtered": 17365270,
+        "legacy": 17365270
+      },
+      "lookup_seconds": {
+        "filtered": 0.9403605042025447,
+        "legacy": 0.8564852643758059
+      },
+      "paf_decodes": {
+        "filtered": 858,
+        "legacy": 892
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-3e4722da9637a5e885b4285e",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 2568,
+      "query_end": 49173,
+      "core_bases": 8002,
+      "legacy_targets": 504,
+      "filtered_targets": 504,
+      "target_windows": {
+        "legacy": 733,
+        "filtered": 733
+      },
+      "target_bases": {
+        "legacy": 19179091,
+        "filtered": 19179091
+      },
+      "lookup_seconds": {
+        "legacy": 1.6169764716178179,
+        "filtered": 1.3539290949702263
+      },
+      "paf_decodes": {
+        "legacy": 1277,
+        "filtered": 1193
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-86b77fbfe381ee96cf919833",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 8744,
+      "query_end": 46698,
+      "core_bases": 7169,
+      "legacy_targets": 666,
+      "filtered_targets": 666,
+      "target_windows": {
+        "filtered": 871,
+        "legacy": 871
+      },
+      "target_bases": {
+        "filtered": 26983136,
+        "legacy": 26983136
+      },
+      "lookup_seconds": {
+        "filtered": 1.3303988482803106,
+        "legacy": 1.310491006821394
+      },
+      "paf_decodes": {
+        "filtered": 4152,
+        "legacy": 4204
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-4331119007438124988e6096",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 5179,
+      "query_end": 60438,
+      "core_bases": 4404,
+      "legacy_targets": 506,
+      "filtered_targets": 506,
+      "target_windows": {
+        "legacy": 772,
+        "filtered": 772
+      },
+      "target_bases": {
+        "legacy": 19638858,
+        "filtered": 19638858
+      },
+      "lookup_seconds": {
+        "legacy": 1.1975306142121553,
+        "filtered": 1.0931293871253729
+      },
+      "paf_decodes": {
+        "legacy": 1354,
+        "filtered": 1282
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-67fa734febb6cf2f53c42610",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 71939,
+      "core_bases": 32718,
+      "legacy_targets": 299,
+      "filtered_targets": 299,
+      "target_windows": {
+        "filtered": 375,
+        "legacy": 375
+      },
+      "target_bases": {
+        "filtered": 10092932,
+        "legacy": 10092932
+      },
+      "lookup_seconds": {
+        "filtered": 0.5432514222338796,
+        "legacy": 0.5008764890953898
+      },
+      "paf_decodes": {
+        "filtered": 504,
+        "legacy": 529
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-a1609afd53c24f6dfbbddf65",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 90796,
+      "core_bases": 43219,
+      "legacy_targets": 613,
+      "filtered_targets": 613,
+      "target_windows": {
+        "legacy": 837,
+        "filtered": 837
+      },
+      "target_bases": {
+        "legacy": 23394633,
+        "filtered": 23394633
+      },
+      "lookup_seconds": {
+        "legacy": 1.6403240347281098,
+        "filtered": 1.5026379665359855
+      },
+      "paf_decodes": {
+        "legacy": 1626,
+        "filtered": 1567
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-c038a18002b62bcca0226f08",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 111585,
+      "core_bases": 66481,
+      "legacy_targets": 855,
+      "filtered_targets": 855,
+      "target_windows": {
+        "filtered": 1429,
+        "legacy": 1429
+      },
+      "target_bases": {
+        "filtered": 37187020,
+        "legacy": 37187020
+      },
+      "lookup_seconds": {
+        "filtered": 2.0474796192720532,
+        "legacy": 1.7552938871085644
+      },
+      "paf_decodes": {
+        "filtered": 1830,
+        "legacy": 1944
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-c038a18002b62bcca0226f08",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 96226,
+      "query_end": 136608,
+      "core_bases": 11204,
+      "legacy_targets": 481,
+      "filtered_targets": 481,
+      "target_windows": {
+        "legacy": 590,
+        "filtered": 590
+      },
+      "target_bases": {
+        "legacy": 14812197,
+        "filtered": 14812197
+      },
+      "lookup_seconds": {
+        "legacy": 0.8088934347033501,
+        "filtered": 0.8119041593745351
+      },
+      "paf_decodes": {
+        "legacy": 835,
+        "filtered": 785
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-b545c991bd579747df935e4f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 61608,
+      "core_bases": 30966,
+      "legacy_targets": 718,
+      "filtered_targets": 718,
+      "target_windows": {
+        "filtered": 928,
+        "legacy": 928
+      },
+      "target_bases": {
+        "filtered": 27177428,
+        "legacy": 27177428
+      },
+      "lookup_seconds": {
+        "filtered": 1.6783559089526534,
+        "legacy": 1.7113724872469902
+      },
+      "paf_decodes": {
+        "filtered": 1514,
+        "legacy": 1581
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-b545c991bd579747df935e4f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 65059,
+      "query_end": 181948,
+      "core_bases": 81435,
+      "legacy_targets": 955,
+      "filtered_targets": 955,
+      "target_windows": {
+        "legacy": 1269,
+        "filtered": 1269
+      },
+      "target_bases": {
+        "legacy": 35530336,
+        "filtered": 35530336
+      },
+      "lookup_seconds": {
+        "legacy": 2.0722556579858065,
+        "filtered": 2.1341532291844487
+      },
+      "paf_decodes": {
+        "legacy": 2306,
+        "filtered": 2211
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-b980fe5e0c5812d23eec5f7d",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 40889669,
+      "query_end": 40910178,
+      "core_bases": 509,
+      "legacy_targets": 612,
+      "filtered_targets": 612,
+      "target_windows": {
+        "filtered": 805,
+        "legacy": 805
+      },
+      "target_bases": {
+        "filtered": 22975647,
+        "legacy": 22975647
+      },
+      "lookup_seconds": {
+        "filtered": 0.9992031715810299,
+        "legacy": 0.9033699128776789
+      },
+      "paf_decodes": {
+        "filtered": 1271,
+        "legacy": 1329
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-b980fe5e0c5812d23eec5f7d",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 43259942,
+      "query_end": 43282956,
+      "core_bases": 3014,
+      "legacy_targets": 390,
+      "filtered_targets": 390,
+      "target_windows": {
+        "legacy": 547,
+        "filtered": 547
+      },
+      "target_bases": {
+        "legacy": 14320367,
+        "filtered": 14320367
+      },
+      "lookup_seconds": {
+        "legacy": 0.8495859494432807,
+        "filtered": 0.803484276868403
+      },
+      "paf_decodes": {
+        "legacy": 750,
+        "filtered": 687
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-aba2252f6caa567a4a5453fb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 17164,
+      "core_bases": 3521,
+      "legacy_targets": 54,
+      "filtered_targets": 54,
+      "target_windows": {
+        "filtered": 61,
+        "legacy": 61
+      },
+      "target_bases": {
+        "filtered": 1418299,
+        "legacy": 1418299
+      },
+      "lookup_seconds": {
+        "filtered": 0.13562549371272326,
+        "legacy": 0.12763915676623583
+      },
+      "paf_decodes": {
+        "filtered": 69,
+        "legacy": 82
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-426fb518d72cf4e38a7f7756",
+      "dataset": "JM19_hifiasm",
+      "query_start": 5,
+      "query_end": 38554,
+      "core_bases": 10106,
+      "legacy_targets": 481,
+      "filtered_targets": 481,
+      "target_windows": {
+        "legacy": 669,
+        "filtered": 669
+      },
+      "target_bases": {
+        "legacy": 27461069,
+        "filtered": 27461069
+      },
+      "lookup_seconds": {
+        "legacy": 0.5388887310400605,
+        "filtered": 0.5468938518315554
+      },
+      "paf_decodes": {
+        "legacy": 3443,
+        "filtered": 3430
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-2c48cadab287de61549e1faa",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 50635,
+      "core_bases": 42868,
+      "legacy_targets": 118,
+      "filtered_targets": 118,
+      "target_windows": {
+        "filtered": 134,
+        "legacy": 134
+      },
+      "target_bases": {
+        "filtered": 4062827,
+        "legacy": 4062827
+      },
+      "lookup_seconds": {
+        "filtered": 0.1913112634792924,
+        "legacy": 0.16578164976090193
+      },
+      "paf_decodes": {
+        "filtered": 183,
+        "legacy": 191
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-20f493f2099355225315b610",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 69816,
+      "core_bases": 38627,
+      "legacy_targets": 446,
+      "filtered_targets": 446,
+      "target_windows": {
+        "legacy": 619,
+        "filtered": 619
+      },
+      "target_bases": {
+        "legacy": 26094159,
+        "filtered": 26094159
+      },
+      "lookup_seconds": {
+        "legacy": 0.4182122526690364,
+        "filtered": 0.4325845828279853
+      },
+      "paf_decodes": {
+        "legacy": 2515,
+        "filtered": 2509
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-911fed0ce411bc1b414b0492",
+      "dataset": "JM19_hifiasm",
+      "query_start": 18551,
+      "query_end": 39381,
+      "core_bases": 830,
+      "legacy_targets": 155,
+      "filtered_targets": 155,
+      "target_windows": {
+        "filtered": 193,
+        "legacy": 193
+      },
+      "target_bases": {
+        "filtered": 5436438,
+        "legacy": 5436438
+      },
+      "lookup_seconds": {
+        "filtered": 0.41244423296302557,
+        "legacy": 0.4226896623149514
+      },
+      "paf_decodes": {
+        "filtered": 209,
+        "legacy": 233
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-88fded1709d7f4e11352696d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 110739,
+      "core_bases": 100000,
+      "legacy_targets": 448,
+      "filtered_targets": 448,
+      "target_windows": {
+        "legacy": 607,
+        "filtered": 607
+      },
+      "target_bases": {
+        "legacy": 22579122,
+        "filtered": 22579122
+      },
+      "lookup_seconds": {
+        "legacy": 0.5526637732982635,
+        "filtered": 0.2826775945723057
+      },
+      "paf_decodes": {
+        "legacy": 1980,
+        "filtered": 1970
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-88fded1709d7f4e11352696d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 90739,
+      "query_end": 160227,
+      "core_bases": 14320,
+      "legacy_targets": 456,
+      "filtered_targets": 456,
+      "target_windows": {
+        "filtered": 615,
+        "legacy": 615
+      },
+      "target_bases": {
+        "filtered": 22758771,
+        "legacy": 22758771
+      },
+      "lookup_seconds": {
+        "filtered": 0.330755066126585,
+        "legacy": 0.31265159975737333
+      },
+      "paf_decodes": {
+        "filtered": 2002,
+        "legacy": 2016
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-c568f1fb59bea3155c169d02",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 110000,
+      "core_bases": 100000,
+      "legacy_targets": 277,
+      "filtered_targets": 277,
+      "target_windows": {
+        "legacy": 492,
+        "filtered": 492
+      },
+      "target_bases": {
+        "legacy": 11763642,
+        "filtered": 11763642
+      },
+      "lookup_seconds": {
+        "legacy": 0.2649433668702841,
+        "filtered": 0.21317045111209154
+      },
+      "paf_decodes": {
+        "legacy": 827,
+        "filtered": 812
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-c568f1fb59bea3155c169d02",
+      "dataset": "JM19_hifiasm",
+      "query_start": 90000,
+      "query_end": 210000,
+      "core_bases": 100000,
+      "legacy_targets": 283,
+      "filtered_targets": 283,
+      "target_windows": {
+        "filtered": 501,
+        "legacy": 501
+      },
+      "target_bases": {
+        "filtered": 11960643,
+        "legacy": 11960643
+      },
+      "lookup_seconds": {
+        "filtered": 0.2436242401599884,
+        "legacy": 0.24007710441946983
+      },
+      "paf_decodes": {
+        "filtered": 824,
+        "legacy": 840
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-429ead8f39ce5faef755bd2a",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 110000,
+      "core_bases": 78996,
+      "legacy_targets": 619,
+      "filtered_targets": 619,
+      "target_windows": {
+        "legacy": 757,
+        "filtered": 757
+      },
+      "target_bases": {
+        "legacy": 20664076,
+        "filtered": 20664076
+      },
+      "lookup_seconds": {
+        "legacy": 1.2159578558057547,
+        "filtered": 1.133656796067953
+      },
+      "paf_decodes": {
+        "legacy": 1243,
+        "filtered": 1170
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-429ead8f39ce5faef755bd2a",
+      "dataset": "JM19_hifiasm",
+      "query_start": 502337,
+      "query_end": 622337,
+      "core_bases": 68685,
+      "legacy_targets": 1047,
+      "filtered_targets": 1047,
+      "target_windows": {
+        "filtered": 1293,
+        "legacy": 1293
+      },
+      "target_bases": {
+        "filtered": 34619504,
+        "legacy": 34619504
+      },
+      "lookup_seconds": {
+        "filtered": 1.3908053394407034,
+        "legacy": 1.2668053079396486
+      },
+      "paf_decodes": {
+        "filtered": 1849,
+        "legacy": 1944
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-1944f0c4757a5d466e3ff1bb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 743142,
+      "query_end": 764592,
+      "core_bases": 1450,
+      "legacy_targets": 665,
+      "filtered_targets": 665,
+      "target_windows": {
+        "legacy": 814,
+        "filtered": 814
+      },
+      "target_bases": {
+        "legacy": 20377029,
+        "filtered": 20377029
+      },
+      "lookup_seconds": {
+        "legacy": 0.9178162841126323,
+        "filtered": 0.8662770465016365
+      },
+      "paf_decodes": {
+        "legacy": 1043,
+        "filtered": 1000
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-5f9fac4d96e084b9b35302bb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 3079651,
+      "query_end": 3199445,
+      "core_bases": 84539,
+      "legacy_targets": 547,
+      "filtered_targets": 547,
+      "target_windows": {
+        "filtered": 1091,
+        "legacy": 1091
+      },
+      "target_bases": {
+        "filtered": 32407524,
+        "legacy": 32407524
+      },
+      "lookup_seconds": {
+        "filtered": 0.7247113892808557,
+        "legacy": 0.7217639358714223
+      },
+      "paf_decodes": {
+        "filtered": 2921,
+        "legacy": 3026
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-5f9fac4d96e084b9b35302bb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 3379651,
+      "query_end": 3499651,
+      "core_bases": 97256,
+      "legacy_targets": 491,
+      "filtered_targets": 491,
+      "target_windows": {
+        "legacy": 973,
+        "filtered": 973
+      },
+      "target_bases": {
+        "legacy": 27581327,
+        "filtered": 27581327
+      },
+      "lookup_seconds": {
+        "legacy": 0.5681112864986062,
+        "filtered": 0.5733401477336884
+      },
+      "paf_decodes": {
+        "legacy": 2400,
+        "filtered": 2352
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-37a368663f31b2378f9bff6b",
+      "dataset": "JM19_hifiasm",
+      "query_start": 4058700,
+      "query_end": 4178700,
+      "core_bases": 100000,
+      "legacy_targets": 960,
+      "filtered_targets": 960,
+      "target_windows": {
+        "filtered": 1558,
+        "legacy": 1558
+      },
+      "target_bases": {
+        "filtered": 60432528,
+        "legacy": 60432528
+      },
+      "lookup_seconds": {
+        "filtered": 2.1407810617238283,
+        "legacy": 1.9303926695138216
+      },
+      "paf_decodes": {
+        "filtered": 13761,
+        "legacy": 13848
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-37a368663f31b2378f9bff6b",
+      "dataset": "JM19_hifiasm",
+      "query_start": 4158700,
+      "query_end": 4216235,
+      "core_bases": 37535,
+      "legacy_targets": 951,
+      "filtered_targets": 951,
+      "target_windows": {
+        "legacy": 1541,
+        "filtered": 1541
+      },
+      "target_bases": {
+        "legacy": 59958573,
+        "filtered": 59958573
+      },
+      "lookup_seconds": {
+        "legacy": 1.8913406981155276,
+        "filtered": 2.095416309311986
+      },
+      "paf_decodes": {
+        "legacy": 13786,
+        "filtered": 13701
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-fdee4afd513a2dd145136e6c",
+      "dataset": "JM19_hifiasm",
+      "query_start": 2812318,
+      "query_end": 2832773,
+      "core_bases": 455,
+      "legacy_targets": 608,
+      "filtered_targets": 608,
+      "target_windows": {
+        "filtered": 757,
+        "legacy": 757
+      },
+      "target_bases": {
+        "filtered": 20129024,
+        "legacy": 20129024
+      },
+      "lookup_seconds": {
+        "filtered": 0.6437301328405738,
+        "legacy": 0.5442070439457893
+      },
+      "paf_decodes": {
+        "filtered": 974,
+        "legacy": 1027
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-fdee4afd513a2dd145136e6c",
+      "dataset": "JM19_hifiasm",
+      "query_start": 8351909,
+      "query_end": 8376046,
+      "core_bases": 3821,
+      "legacy_targets": 930,
+      "filtered_targets": 930,
+      "target_windows": {
+        "legacy": 1489,
+        "filtered": 1489
+      },
+      "target_bases": {
+        "legacy": 38152996,
+        "filtered": 38152996
+      },
+      "lookup_seconds": {
+        "legacy": 0.9691062616184354,
+        "filtered": 0.9837497612461448
+      },
+      "paf_decodes": {
+        "legacy": 2166,
+        "filtered": 2107
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-3ba3a72d97ff0e6f3378451f",
+      "dataset": "JM19_hifiasm",
+      "query_start": 5592526,
+      "query_end": 5615428,
+      "core_bases": 2064,
+      "legacy_targets": 573,
+      "filtered_targets": 573,
+      "target_windows": {
+        "filtered": 634,
+        "legacy": 634
+      },
+      "target_bases": {
+        "filtered": 16557861,
+        "legacy": 16557861
+      },
+      "lookup_seconds": {
+        "filtered": 0.5010997848585248,
+        "legacy": 0.42647145222872496
+      },
+      "paf_decodes": {
+        "filtered": 824,
+        "legacy": 869
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-3ba3a72d97ff0e6f3378451f",
+      "dataset": "JM19_hifiasm",
+      "query_start": 5840285,
+      "query_end": 5863182,
+      "core_bases": 1130,
+      "legacy_targets": 564,
+      "filtered_targets": 564,
+      "target_windows": {
+        "legacy": 625,
+        "filtered": 625
+      },
+      "target_bases": {
+        "legacy": 16345763,
+        "filtered": 16345763
+      },
+      "lookup_seconds": {
+        "legacy": 0.44691843166947365,
+        "filtered": 0.4555435348302126
+      },
+      "paf_decodes": {
+        "legacy": 880,
+        "filtered": 836
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-17439c4d9cafdb3c5eacbb9b",
+      "dataset": "JM19_hifiasm",
+      "query_start": 6927948,
+      "query_end": 6948244,
+      "core_bases": 296,
+      "legacy_targets": 366,
+      "filtered_targets": 366,
+      "target_windows": {
+        "filtered": 446,
+        "legacy": 446
+      },
+      "target_bases": {
+        "filtered": 11469712,
+        "legacy": 11469712
+      },
+      "lookup_seconds": {
+        "filtered": 0.7369372891262174,
+        "legacy": 0.6725664911791682
+      },
+      "paf_decodes": {
+        "filtered": 503,
+        "legacy": 550
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-911f7c307a135053c40bb054",
+      "dataset": "JM19_hifiasm",
+      "query_start": 7044231,
+      "query_end": 7065774,
+      "core_bases": 1543,
+      "legacy_targets": 393,
+      "filtered_targets": 393,
+      "target_windows": {
+        "legacy": 566,
+        "filtered": 566
+      },
+      "target_bases": {
+        "legacy": 14974590,
+        "filtered": 14974590
+      },
+      "lookup_seconds": {
+        "legacy": 1.0514988545328379,
+        "filtered": 0.9955392861738801
+      },
+      "paf_decodes": {
+        "legacy": 770,
+        "filtered": 689
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-911f7c307a135053c40bb054",
+      "dataset": "JM19_hifiasm",
+      "query_start": 10443344,
+      "query_end": 10562652,
+      "core_bases": 45671,
+      "legacy_targets": 570,
+      "filtered_targets": 570,
+      "target_windows": {
+        "filtered": 1233,
+        "legacy": 1233
+      },
+      "target_bases": {
+        "filtered": 34770396,
+        "legacy": 34770396
+      },
+      "lookup_seconds": {
+        "filtered": 2.0967185692861676,
+        "legacy": 1.9703487008810043
+      },
+      "paf_decodes": {
+        "filtered": 1805,
+        "legacy": 2038
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-60782e2e555f64d061cb954d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 2423665,
+      "query_end": 2448197,
+      "core_bases": 4532,
+      "legacy_targets": 204,
+      "filtered_targets": 204,
+      "target_windows": {
+        "legacy": 315,
+        "filtered": 315
+      },
+      "target_bases": {
+        "legacy": 8603536,
+        "filtered": 8603536
+      },
+      "lookup_seconds": {
+        "legacy": 0.6595275988802314,
+        "filtered": 0.561588634736836
+      },
+      "paf_decodes": {
+        "legacy": 523,
+        "filtered": 488
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-60782e2e555f64d061cb954d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 104460078,
+      "query_end": 104514608,
+      "core_bases": 34530,
+      "legacy_targets": 201,
+      "filtered_targets": 201,
+      "target_windows": {
+        "filtered": 297,
+        "legacy": 297
+      },
+      "target_bases": {
+        "filtered": 8103091,
+        "legacy": 8103091
+      },
+      "lookup_seconds": {
+        "filtered": 0.8900474244728684,
+        "legacy": 0.9413345232605934
+      },
+      "paf_decodes": {
+        "filtered": 911,
+        "legacy": 948
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": false,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-0004b0de6132781258e4f66b",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 10149,
+      "core_bases": 10149,
+      "legacy_targets": 38,
+      "filtered_targets": 38,
+      "target_windows": {
+        "legacy": 44,
+        "filtered": 44
+      },
+      "target_bases": {
+        "legacy": 1293113,
+        "filtered": 1293113
+      },
+      "lookup_seconds": {
+        "legacy": 0.11518035177141428,
+        "filtered": 0.10690215043723583
+      },
+      "paf_decodes": {
+        "legacy": 80,
+        "filtered": 74
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-7cc88f92c15f1484b47ce7c5",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 10396,
+      "core_bases": 396,
+      "legacy_targets": 79,
+      "filtered_targets": 79,
+      "target_windows": {
+        "filtered": 94,
+        "legacy": 94
+      },
+      "target_bases": {
+        "filtered": 2636145,
+        "legacy": 2636145
+      },
+      "lookup_seconds": {
+        "filtered": 0.21616933587938547,
+        "legacy": 0.2021781262010336
+      },
+      "paf_decodes": {
+        "filtered": 166,
+        "legacy": 174
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-eb39b6bb48c26cb3c59df32f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 17016,
+      "core_bases": 17016,
+      "legacy_targets": 0,
+      "filtered_targets": 0,
+      "target_windows": {
+        "legacy": 0,
+        "filtered": 0
+      },
+      "target_bases": {
+        "legacy": 0,
+        "filtered": 0
+      },
+      "lookup_seconds": {
+        "legacy": 0.00029679201543331146,
+        "filtered": 0.00017012283205986023
+      },
+      "paf_decodes": {
+        "legacy": 0,
+        "filtered": 0
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": true,
+      "empty_after": true
+    },
+    {
+      "query_part": "q0-source-part-55fb529ec476c945a5ede3a3",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 18051,
+      "core_bases": 12895,
+      "legacy_targets": 586,
+      "filtered_targets": 586,
+      "target_windows": {
+        "filtered": 998,
+        "legacy": 998
+      },
+      "target_bases": {
+        "filtered": 27475670,
+        "legacy": 27475670
+      },
+      "lookup_seconds": {
+        "filtered": 2.0927844429388642,
+        "legacy": 1.9207693198695779
+      },
+      "paf_decodes": {
+        "filtered": 1413,
+        "legacy": 1500
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-14d9d6a584cf77faf2456b9a",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 18900,
+      "core_bases": 8250,
+      "legacy_targets": 310,
+      "filtered_targets": 310,
+      "target_windows": {
+        "legacy": 352,
+        "filtered": 352
+      },
+      "target_bases": {
+        "legacy": 8629101,
+        "filtered": 8629101
+      },
+      "lookup_seconds": {
+        "legacy": 0.49756592605262995,
+        "filtered": 0.439090677537024
+      },
+      "paf_decodes": {
+        "legacy": 587,
+        "filtered": 554
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-4fac4b670c4801d0d09d4555",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 19469,
+      "core_bases": 6403,
+      "legacy_targets": 155,
+      "filtered_targets": 155,
+      "target_windows": {
+        "filtered": 176,
+        "legacy": 176
+      },
+      "target_bases": {
+        "filtered": 4640070,
+        "legacy": 4640070
+      },
+      "lookup_seconds": {
+        "filtered": 0.2781240437179804,
+        "legacy": 0.26003846526145935
+      },
+      "paf_decodes": {
+        "filtered": 227,
+        "legacy": 246
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    },
+    {
+      "query_part": "q0-source-part-64b0ea272cc147b5e13e770e",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 13871,
+      "core_bases": 3350,
+      "legacy_targets": 1064,
+      "filtered_targets": 1064,
+      "target_windows": {
+        "legacy": 1413,
+        "filtered": 1413
+      },
+      "target_bases": {
+        "legacy": 34429095,
+        "filtered": 34429095
+      },
+      "lookup_seconds": {
+        "legacy": 2.273283215239644,
+        "filtered": 2.090791086666286
+      },
+      "paf_decodes": {
+        "legacy": 3772,
+        "filtered": 3686
+      },
+      "filter_equals_exact_legacy_subset": true,
+      "query_in_native_query_union": true,
+      "empty_before": false,
+      "empty_after": false
+    }
+  ],
+  "limitations": [
+    "Stratified sample, deliberately includes native-query parents; not weighted to live queue.",
+    "Frozen holes predate current weak-seed evidence; whole-parent fallback decisions not predicted.",
+    "No native mapping executed, no claim of final PAF equivalence or speedup.",
+    "Includes the fourth approximate seed only within production weak_global_seed_scope; query routing verified from actual sealed reference records.",
+    "Removing tested targets changes mapper context; existing complete cache must retain priority."
+  ],
+  "seconds": 121.60087436251342
+}
