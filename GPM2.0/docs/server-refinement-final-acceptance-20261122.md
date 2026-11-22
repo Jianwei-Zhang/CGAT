@@ -282,6 +282,20 @@ import without mutation. This is candidate delivery, not automatic publication.
 Legacy/custom runtimes keep their existing cache selection; old unsealed shared
 reads and old job-local artifacts are never reclassified as valid family inputs.
 
+The final local Server gate at `008c3fc8` passed: 1,009 Python tests with 16
+skips, all eight Shell groups and LGZ-to-App E2E. The targeted Rust DEGAP export
+suite passed five tests, with its controlled fixture-only test ignored; the
+real App roundtrip above independently exercised candidate import.
+
+On native Donau ARM64, the installer and compute-node runtime checks passed.
+Job `43015905` reached the new family DEGAP engine, then the scheduler stopped
+it at the 10 GiB memory quota. The corresponding x86_64 native hifiasm log
+recorded a 13.659 GB peak RSS; this was a quota failure, not a completed no-fill.
+Job `43015911` was submitted with a 30 GiB quota to resume the same stopped
+synthetic workspace, leaving the scientific invocation at two threads and
+checking that already-completed LGZ/reference artifacts are unchanged. The
+ARM64 validation is not yet a pass; both attempts remain separately recorded.
+
 ## Historical sequencing note: re-audit DEGAP after upstream feature merge
 
 On 2026-11-22 the user specified that they will merge DEGAP's feature branch
