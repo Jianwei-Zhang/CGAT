@@ -331,7 +331,7 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
                 weak_seed_fast: bool = False, reference_bases: int = 0, on_cache_hit=None) -> dict | None:
     if on_cache_hit is not None and not callable(on_cache_hit):
         raise Q0EvidenceError("cached PAF consumer must be callable")
-    if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
+    if _partition_sha256(Path(tool["resolved"])) != tool["sha256"]:
         raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
     query_ids, target_ids = sorted(set(request["query_ids"])), sorted(set(request["target_ids"]))
     if skip_self:
@@ -602,7 +602,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
             for request in native_requests:
                 tasks.append(_supplement(root,catalog,request,tool,options.get("minimap_preset", "asm10"),threads,
                                          skip_self=options.get("skip_self") == "true"))
-        if sha256_file(Path(tool["resolved"])) != tool["sha256"]:
+        if _partition_sha256(Path(tool["resolved"])) != tool["sha256"]:
             raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
         if inputs != [identity(root, relative) for relative in input_paths]:
             raise Q0EvidenceError("q0 evidence inputs changed during preparation; no manifest published")

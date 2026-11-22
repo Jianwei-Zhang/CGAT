@@ -24,6 +24,11 @@ from .q0_cigar_policy import ChainWork, CigarWorkPolicy, select_cigar_profile
 from .q0_query_windows import QueryWindow, TargetWindow, project_regional_paf
 from .q0_sources import Q0EvidenceError
 
+try:
+    from run_orchestration import sha256_file as _stable_runtime_sha256
+except ModuleNotFoundError:
+    from ..run_orchestration import sha256_file as _stable_runtime_sha256
+
 BASE_FLAGS = ["-D", "-P", "--dual=yes", "--no-long-join"]
 CONTEXT_SCHEMA = "lgz_q0_regional_context_v1"
 PROJECTION_SCHEMA = "lgz_q0_regional_projection_v1"
@@ -284,7 +289,10 @@ def _verify_mapper_loader_record(record, tool):
 
 def _execute(root,directory,context,relative,catalog,query,targets,argv,tool,address_space_bytes):
     _ensure_fastas(root,relative,context,catalog,query,targets)
-    if sha256_file(Path(tool["resolved"])) != tool["sha256"]: raise Q0EvidenceError("regional mapper changed")
+    # Share the cold binary digest across mapper workers and coarse/exact
+    # launches. The process-local memo rechecks resolved path, inode, size,
+    # mtime and ctime on every call; any change forces a stable full read.
+    if _stable_runtime_sha256(Path(tool["resolved"])) != tool["sha256"]: raise Q0EvidenceError("regional mapper changed")
     guard=Path(__file__).with_name("q0_mapper_guard.py")
     shutil.copyfile(guard,directory/"guard.py")
     command=[sys.executable,str(directory/"guard.py"),"--address-space-bytes",str(address_space_bytes),"--",*argv]
@@ -312,7 +320,7 @@ def _execute(root,directory,context,relative,catalog,query,targets,argv,tool,add
     if code:raise Q0EvidenceError(f"regional mapper failed ({code}); retain {directory}/stderr.log")
     if context["inputs"] != _outputs(root,[r["path"] for r in context["inputs"]]):
         raise Q0EvidenceError("regional mapping inputs changed during execution")
-    if sha256_file(Path(tool["resolved"])) != tool["sha256"]: raise Q0EvidenceError("regional mapper changed during execution")
+    if _stable_runtime_sha256(Path(tool["resolved"])) != tool["sha256"]: raise Q0EvidenceError("regional mapper changed during execution")
 
 
 def chain_work(path,query,target_lengths,policy):
@@ -404,8 +412,8 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
         projection_spec=_normal({"schema":PROJECTION_SCHEMA,"raw_receipt":_ops().identity(root,raw_receipt),
             "context":context_identity,"decision":_ops().identity(root,decision_path),"query":query.record(),
             "targets":[w.record() for w in sorted(targets,key=lambda w:w.window_id)],
-            "projector_sha256":sha256_file(Path(__file__).with_name("q0_query_windows.py")),
-            "validator_sha256":sha256_file(Path(__file__).with_name("q0_alignments.py"))})
+            "projector_sha256":_stable_runtime_sha256(Path(__file__).with_name("q0_query_windows.py")),
+            "validator_sha256":_stable_runtime_sha256(Path(__file__).with_name("q0_alignments.py"))})
         task_id=stable_id("q0-regional-project",projection_spec);project_rel=f"grt/evidence/q0_prepare/regional/projects/{task_id}"
         receipt=project_rel+"/success.json";paf=project_rel+"/result.paf";required=closure|{paf}
         task={"task_id":task_id,"kind":"regional_discovery","paf":paf,"receipt":receipt,
@@ -458,8 +466,8 @@ def verify_regional_task(root, task, *, members=None):
         task_id=stable_id("q0-regional-project",spec);relative=f"grt/evidence/q0_prepare/regional/projects/{task_id}"
         if (task["task_id"]!=task_id or task["receipt"]!=relative+"/success.json" or task["paf"]!=relative+"/result.paf"):
             raise Q0EvidenceError("regional task path differs from its identity")
-        if (spec["projector_sha256"]!=sha256_file(Path(__file__).with_name("q0_query_windows.py"))
-                or spec["validator_sha256"]!=sha256_file(Path(__file__).with_name("q0_alignments.py"))):
+        if (spec["projector_sha256"]!=_stable_runtime_sha256(Path(__file__).with_name("q0_query_windows.py"))
+                or spec["validator_sha256"]!=_stable_runtime_sha256(Path(__file__).with_name("q0_alignments.py"))):
             raise Q0EvidenceError("regional projection implementation changed")
         row=spec["query"];query=QueryWindow(row["segment_id"],row["segment_length"],row["start"],row["end"],tuple(tuple(i) for i in row["cores"]))
         targets=[TargetWindow(r["segment_id"],r["segment_length"],r["start"],r["end"]) for r in spec["targets"]]

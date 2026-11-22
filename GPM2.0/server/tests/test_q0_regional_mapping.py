@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 from dataclasses import asdict
@@ -92,6 +93,37 @@ class RegionalMappingTests(unittest.TestCase):
               mock.patch.object(regional, "_dynamic_paths", side_effect=lambda binary, env:
                                 {"lib": str(binary if "LD_LIBRARY_PATH" in env else self.root)})):
             self.assertIsNone(regional._probe_mapper_loader(self.tool["resolved"]))
+
+    def test_shared_runtime_digest_uses_one_cold_mapper_read_and_rejects_drift(self):
+        from server.tools.lgz_core import q0_regional_mapping as regional
+
+        mapper = self.root / "fixture-minimap2"
+        shutil.copy2(self.tool["resolved"], mapper)
+        self.tool = executable_identity(str(mapper))
+        signatures = importlib.import_module(regional._stable_runtime_sha256.__module__)
+        policy = CigarWorkPolicy(minimum_query_bases=1)
+        with mock.patch.object(signatures, "_sha256_read", wraps=signatures._sha256_read) as read:
+            self.run_mapping(policy=policy)
+        cold = [call.args[0][0] for call in read.call_args_list]
+        self.assertEqual(cold.count(str(mapper)), 1)  # two launches, before/after each
+
+        def tamper_during_mapper(*args, **kwargs):
+            prior = mapper.stat()
+            with mapper.open("r+b") as stream:
+                first = stream.read(1)
+                stream.seek(0)
+                stream.write(bytes([first[0] ^ 1]))
+            os.utime(mapper, ns=(prior.st_atime_ns, prior.st_mtime_ns))
+            return mock.Mock(wait=mock.Mock(return_value=0))
+
+        # Shift the actual input span (not just the projection cores) so this
+        # run cannot reuse the completed raw result from the verified tool.
+        changed = QueryWindow(self.query.segment_id, 30000, 8499, 12500, ((9000, 12000),))
+        before = set(self.root.rglob("success.json"))
+        with mock.patch.object(regional.subprocess, "Popen", side_effect=tamper_during_mapper):
+            with self.assertRaisesRegex(Q0EvidenceError, "mapper changed during execution"):
+                self.run_mapping(changed, policy=policy)
+        self.assertEqual(set(self.root.rglob("success.json")), before)
 
     def test_complete_raw_reused_when_cores_change_and_temporary_inputs_are_gone(self):
         first=self.run_mapping();old=verify_regional_task(self.root,first,members=self.catalog.parts)

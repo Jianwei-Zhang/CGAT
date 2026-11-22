@@ -3885,3 +3885,43 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   拒绝。稀疏合成2500候选、5000 links的邻居枚举单核2.70s→4.9ms（不含其余Q0计算、不能当整麦
   倍率）；没有拿当前6.8k mapper进度宣称该候选已生效。这是后续selector优化，未装入远端当前或已
   冻结的loader切换包；不得在其已经捕获selector身份后热替换。
+
+### 2026-11-22 19:10 CST：只读预检到既定上限，保持两个主任务，再跑同一套核验
+
+- `43015292 / agent-X86-18` 已由 Donau 确认 **FAILED / jobExitCode 124**，终态时刻 19:05:29 CST。
+  这是 `preflight.dsub` 内 `timeout 3600s` 的退出，不是观察超时，也不是新版主任务故障。日志中真实
+  参考、assign、染色体检查点共通过 **11/25**；`initial:*` 仍是测试条目，不计入。无 `validation.json`，
+  这 11 行不作完整检查点证明。原观察器 PID1991023 遇预检真实失败退出，无资源提交 intent 或切换产物。
+  原 Donau JSON 已封存 `preflight-43015292-terminal.json`，SHA
+  `3be9587f7e1c0b7b50c11d6020139e32a4334c855b6de8ff949516fa89afbae7`。
+- 在同一隔离候选目录只增加 `preflight-3h.dsub`（SHA
+  `b6f8efcad327ec6f1dc2c29225a6d6db6dde21b3424f331d097b2e2dc0860723`）：除独立名称/日志，从 3600s
+  调到 10800s，真实源、校验代码、25 项检查条件和 2 CPU / 16 GiB 都不变。不以历史日志替代这次校验，
+  不提高或给生产 mapper 引入超时。原新旧作业、主锁 run、smoke 终态及未发布 Q0 边界验证后，以独占
+  intent 单次提交 `43015921`，19:08:56 已实际在 `agent-X86-18` 起跑。提交回执
+  `preflight-3h-retry-submitted.json` SHA `5bf23ed061d8db52ef0097e42632d6f4812f8c94375159d502172bbf2cd475b0`。
+- PID **3458598** 是复用原脚本的 120 轮、每分钟只读观察器；`loader-watcher-3h-config.json` SHA
+  `2fe731ef11857fb728405dc8a0fae4485bfd70b8a5a695bbf5ed37c039aed21b`，日志 `loader-watcher-3h.log`。
+  仍仅在完整预检、实样、原锁和调度终态门禁通过后申请一份等待资源。若约 21:08 观察期结束而预检仍活，
+  查询同一作业，不重投；若出现提交 intent 先查调度及 receipt；若只读通过但没有观察器再按原门禁续接。
+  有待验证的资源就绪或 staging 不代表应立刻停止 `43012037`，仍需重算剩余有效窗口、实测增益和切换成本。
+- 19:10 两个生产作业均 RUNNING；新版 `43012037` 最近 `7100/61000`（19:04:53，fallback=0），
+  旧版 `42523432` 未改。无整版替换、CI、发布，旧基线未触碰。
+
+### 2026-11-22 19:15 CST：消除区域 mapper 和固定投影代码的重复全文件读取
+
+- 仓库候选把每次 coarse/precise 前后同一 `minimap2` 的全读 SHA、同一 projector/validator 代码在
+  生成/回放中的重复全读，以及全原生补充路径的同类工具复核，改用已有的进程内稳定摘要 memo。
+  第一次必须打开真实文件并核对 fd 前后身份；命中仍核对解析路径、设备、inode、size、mtime、ctime，
+  变化回到完整读/hash。不改 mapper 参数、结果路径、PAF/guard 验收、科学命中或 checkpoint schema；
+  子进程执行前后仍分别核对。新增真实两次 mapper 测试仅冷读工具一次，同时测试运行中改同尺寸字节并恢复
+  mtime 仍拒绝写 success。六组定向测试 89 项通过，全部 `test_q0_*.py` 327 项中 326 通过、1 跳过。
+- 只读 `43015930 / agent-X86-18 / SUCCEEDED`：冻结真实 1,326,552 字节工具与两份现用静态代码，
+  不读序列、不起 mapper。每臂各文件 48 次、144 次 SHA 全同，直接读 A1/A2 **6.274 / 6.081 秒**，
+  稳定 memo B1/B2 **0.239 / 0.018 秒**（第一臂也做真实冷读）。隔离目录 `runtime-digest-abba-1912`，
+  `bench_43015930.out` SHA `86863dc78fe5c689fbd2d47bc971cc95144cc4cc6bc353608cc25658b86aa3b5`，
+  `manifest.sha256` SHA `54928d224ce752842ab1664979bc868a391a7a331bf0dbeec5ddc7dd45fe8f9c`。
+  局部收益依赖文件系统：WSL 挂载目录的小脚本测得 memo 的多路径分量 stat 比直接读慢；不报整麦倍率。
+  此候选不混入当前冻结的 loader/preflight 包，不为它重启主作业。
+- 19:15 已实时确认新版 `43012037` 最新 **7200/61000，fallback=0**（19:11:24），旧版 `42523432`
+  与同一只读预检 `43015921` 均仍 RUNNING，PID3458598 仍在轮询。无新资源提交/手工切换。
