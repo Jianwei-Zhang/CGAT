@@ -512,3 +512,10 @@ Evidence: /tmp/cgat-native-reports-20261122.7bhTSr.log
 
 
 - 坐标报告边界和受控 DEGAP 完成 checkpoint 复用另有 2 项通过（4.923 秒）。停止的实际测试工作区只同步 3 个 CGAT 接纳/报告模块，不换科学 driver 或 runtime profiles；再经 public `run_all.sh` 实际重接纳通过。四个原生产者树 hash/size/mtime 均未变，新接纳仍指向原 producer；独立来源重建及新八个脱离工作区的 Full/Light 包再次通过。全部证据路径记入统一验收文档；这不补足真实 DEGAP 正向或 App/ARM/全矩阵验收。42 文件运行库同步核验一致，`production_ready:false`，未改正式发布清单。
+
+
+## 2026-11-22 — DEGAP 上游合并后的接入复核安排
+
+用户说明将后续自行合并 DEGAP 的 feat 分支，合并后再检查 CGAT 接入是否需要调整。当前 CGAT 保留已经核验的固定 DEGAP 快照和本轮历史证据，不由本任务代替用户合并、移动 submodule pointer 或自动升级依赖。暂不围绕即将变化的旧版本继续扩大 DEGAP 专项适配/正向样例调参。
+
+待上游合并后，基于实际新 revision 重新核对入口/reads 参数、依赖和平台、报告/候选/最终 FASTA 格式、坐标定义、原生任务与恢复回执，再按变化调整适配器、版本锁、环境和必要回归；旧 runtime/cache 不可静默冒充新版本证据。本轮 1-based 坐标结论只适用于已经 hash 核验的当前固定快照。其余工具、编号输出、来源真实性、App/报告/迁移和统一验收继续，不能因此将整体目标标为完成。

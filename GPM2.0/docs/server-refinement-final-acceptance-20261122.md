@@ -244,3 +244,18 @@ were targeted into the stopped controlled workspace; original pinned driver
 bytes, scientific artifacts, runtime hash profiles and completed LGZ proof were
 not replaced. This proves actual evidence reuse across the CGAT adapter repair,
 not a positive DEGAP native gap closure or whole-matrix completion.
+
+
+## User sequencing update: re-audit DEGAP after upstream feature merge
+
+On 2026-11-22 the user specified that they will merge DEGAP's feature branch
+later, then re-evaluate the CGAT integration. Keep the present pinned snapshot,
+its verified findings and actual evidence as a dated baseline. Do not merge that
+upstream branch, move the submodule pointer, upgrade the runtime, tune more
+old-version DEGAP cases or assume its future interface from this checkout.
+After the user's merge, inspect the actual new revision and re-check commands,
+typed reads, dependencies/platforms, report/candidate/final artifacts, coordinate
+semantics and native recovery before changing the adapter/environment/lock.
+Existing receipts must not be relabeled as evidence for the new version. This
+sequencing change applies to DEGAP-specific follow-up, not to the remaining
+CGAT tools, provenance, App/report/migration or final consolidated acceptance.
