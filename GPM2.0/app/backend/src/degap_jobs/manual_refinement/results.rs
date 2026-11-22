@@ -99,6 +99,14 @@ fn read_bounded(mut reader: impl Read, limit: u64) -> Result<Vec<u8>> {
 }
 
 pub(super) fn registered_export(workspace: &Path, project_id: i64, batch: &str) -> Result<Value> {
+    Ok(registered_export_receipt(workspace, project_id, batch)?["manifest"].take())
+}
+
+pub(super) fn registered_export_receipt(
+    workspace: &Path,
+    project_id: i64,
+    batch: &str,
+) -> Result<Value> {
     if !is_sha(batch) {
         bail!("invalid refinement batch digest");
     }
@@ -120,7 +128,7 @@ pub(super) fn registered_export(workspace: &Path, project_id: i64, batch: &str) 
     {
         bail!("refinement results do not match the selected project's original export receipt");
     }
-    Ok(export.clone())
+    Ok(saved)
 }
 
 fn all_ns_digest(length: u64) -> String {

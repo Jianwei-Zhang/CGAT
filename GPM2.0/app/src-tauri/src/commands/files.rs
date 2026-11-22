@@ -230,6 +230,23 @@ pub async fn list_manual_refinement_results(
 
 #[tauri::command]
 #[allow(non_snake_case)]
+pub async fn list_manual_refinement_exports(
+    workspaceRoot: String,
+    projectId: i64,
+) -> CommandResult<Value> {
+    run_blocking_command("list_manual_refinement_exports", move || {
+        let exports = gpm_next_backend::degap_jobs::list_manual_refinement_exports(
+            Path::new(&workspaceRoot),
+            projectId,
+        )
+        .map_err(format_error)?;
+        Ok(json!(exports))
+    })
+    .await
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
 pub async fn undo_manual_refinement_locus(
     workspaceRoot: String,
     projectId: i64,

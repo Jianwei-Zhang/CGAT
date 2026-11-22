@@ -110,6 +110,7 @@ pub fn run() {
             commands::export_degap_jobs,
             commands::export_manual_refinement,
             commands::import_manual_refinement_results,
+            commands::list_manual_refinement_exports,
             commands::list_manual_refinement_results,
             commands::switch_manual_refinement_locus,
             commands::undo_manual_refinement_locus

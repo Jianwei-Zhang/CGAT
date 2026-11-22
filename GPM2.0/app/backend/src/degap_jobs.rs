@@ -13,9 +13,9 @@ mod manual_refinement;
 mod server_runtime;
 
 pub use manual_refinement::{
-    ManualExportSummary, ManualRefinementAction, ManualRefinementImport, ManualRefinementRequest,
+    ManualExportSummary, ManualRefinementAction, ManualRefinementExportReceipt, ManualRefinementImport, ManualRefinementRequest,
     PatchOperation, ResultPatch, ResultRow, ResultStatus, ValidatedRefinementResults,
-    export_manual_refinement, import_manual_refinement_results, list_manual_refinement_results,
+    export_manual_refinement, import_manual_refinement_results, list_manual_refinement_exports, list_manual_refinement_results,
     switch_manual_refinement_locus, undo_manual_refinement_locus,
     validate_manual_refinement_results,
 };

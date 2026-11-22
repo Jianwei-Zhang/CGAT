@@ -191,7 +191,9 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     let member = &locus["seed_plans"]["seqleft"]["members"][0];
     assert!(member["fasta_sha256"].is_string() || member["interval_sha256"].is_string());
     let receipts = root.join("metadata/refinement_exports");
-    let ledger: Value = serde_json::from_slice(&fs::read(receipts.join(result.batch_sha256 + ".json")).unwrap()).unwrap();
+    let exported_batch = result.batch_sha256;
+    let ledger_file = receipts.join(format!("{exported_batch}.json"));
+    let ledger: Value = serde_json::from_slice(&fs::read(&ledger_file).unwrap()).unwrap();
     assert_eq!(ledger["project_id"], project.project_id);
     assert_eq!(ledger["manifest"], value);
     assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).is_err());
@@ -202,6 +204,25 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &rejected, &rejected_request).is_err());
     assert!(!rejected.exists());
     assert_eq!(fs::read_dir(receipts).unwrap().count(), 2);
+
+    // The preview's persistent history comes from sealed exports, never from
+    // a whole-view overwrite or private Server input paths.
+    let history = serde_json::to_value(crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id).unwrap()).unwrap();
+    let rows = history.as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    let row = rows.iter().find(|row| row["batchSha256"] == exported_batch).unwrap();
+    assert_eq!(row["outputFileName"], "-project's refinement.zip");
+    assert_eq!(row["loci"][0]["tools"], serde_json::json!(["quartet"]));
+    assert_eq!(row["tasksCount"], 1);
+    assert!(!row.to_string().contains("seed_plans"));
+    assert!(!row.to_string().contains("reads"));
+    assert!(crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id + 999).is_err());
+    let mut tampered = ledger;
+    tampered["manifest"]["loci"][0]["gap_bp"] = serde_json::json!(120);
+    fs::write(&ledger_file, serde_json::to_vec(&tampered).unwrap()).unwrap();
+    let verified = serde_json::to_value(crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id).unwrap()).unwrap();
+    assert_eq!(verified.as_array().unwrap().len(), 1);
+    assert_ne!(verified[0]["batchSha256"], exported_batch);
 }
 
 #[test]

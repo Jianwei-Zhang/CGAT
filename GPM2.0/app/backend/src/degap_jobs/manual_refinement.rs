@@ -63,6 +63,17 @@ pub struct ManualExportSummary {
     pub tasks: usize,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualRefinementExportReceipt {
+    batch_sha256: String,
+    output_file_name: String,
+    exported_at_ms: u64,
+    loci_count: usize,
+    tasks_count: usize,
+    loci: Vec<Value>,
+}
+
 fn hex_sha(data: &[u8]) -> String {
     format!("{:x}", Sha256::digest(data))
 }
@@ -460,14 +471,12 @@ pub fn export_manual_refinement(
     let reads = reads_for(request, defaults)?;
     let mut conn = open_workspace_db(&db)?;
     let tx = conn.transaction()?;
+    let exported_at = SystemTime::now().duration_since(UNIX_EPOCH)?;
     let export_id = hex_sha(&serde_json::to_vec(&(
         workspace.to_string_lossy(),
         project_id,
         output.to_string_lossy(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_nanos()
-            .to_string(),
+        exported_at.as_nanos().to_string(),
     ))?);
     let (manifest, mut summary) =
         build_manifest(&tx, workspace, project_id, request, reads, &export_id)?;
@@ -481,17 +490,30 @@ pub fn export_manual_refinement(
     zip.start_file(MANIFEST, FileOptions::default())?;
     zip.write_all(&bytes)?;
     zip.start_file("README.txt", FileOptions::default())?;
-    let filename = output.file_name().and_then(|name| name.to_str()).unwrap_or("refinement_tasks.zip");
-    let argument = if filename.starts_with('-') { format!("./{filename}") } else { filename.to_owned() };
-    write!(zip, "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, writes the batch report under 08_refinement_jobs/02_manual/, updates 06_report/report.html, and produces a refinement_results.zip for import into this App project.\n\nDo not edit or run code from this archive.\n", shell_quote(&argument))?;
+    let filename = output
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("refinement_tasks.zip");
+    let argument = if filename.starts_with('-') {
+        format!("./{filename}")
+    } else {
+        filename.to_owned()
+    };
+    write!(
+        zip,
+        "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, writes the batch report under 08_refinement_jobs/02_manual/, updates 06_report/report.html, and produces a refinement_results.zip for import into this App project.\n\nDo not edit or run code from this archive.\n",
+        shell_quote(&argument)
+    )?;
     let archive = zip.finish()?.into_inner();
     let ledgers = workspace.join("metadata/refinement_exports");
+    ensure_refinement_export_directory(workspace, &ledgers)?;
     fs::create_dir_all(&ledgers)?;
     let ledger = ledgers.join(format!("{}.json", summary.batch_sha256));
     create_payload(
         &ledger,
         &serde_json::to_vec(
-            &json!({"project_id":project_id,"batch_sha256":summary.batch_sha256,"manifest":manifest}),
+            &json!({"project_id":project_id,"batch_sha256":summary.batch_sha256,"manifest":manifest,
+                "output_file_name": filename, "exported_at_ms": u64::try_from(exported_at.as_millis())? }),
         )?,
     )?;
     if let Err(error) = create_payload(output, &archive) {
@@ -500,4 +522,77 @@ pub fn export_manual_refinement(
         return Err(error);
     }
     Ok(summary)
+}
+
+fn ensure_refinement_export_directory(workspace: &Path, dir: &Path) -> Result<()> {
+    if [&workspace.join("metadata"), dir].iter().any(|path| {
+        path.symlink_metadata()
+            .is_ok_and(|meta| meta.is_symlink() || !meta.is_dir())
+    }) {
+        bail!("refinement export receipts must be stored in an ordinary workspace directory");
+    }
+    Ok(())
+}
+
+/// Reconstruct recent export history from the very receipts used for import.
+/// This never saves the Assembly view, or returns private reads/seed paths.
+pub fn list_manual_refinement_exports(
+    workspace: &Path,
+    project_id: i64,
+) -> Result<Vec<ManualRefinementExportReceipt>> {
+    let db = workspace.join("project.sqlite");
+    if !db.is_file() {
+        bail!("refinement export history requires an existing project workspace");
+    }
+    validate_project_exists(&open_workspace_db(&db)?, project_id)?;
+    let ledgers = workspace.join("metadata/refinement_exports");
+    ensure_refinement_export_directory(workspace, &ledgers)?;
+    if !ledgers.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut receipts = fs::read_dir(&ledgers)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            if !entry.file_type().ok()?.is_file() {
+                return None;
+            }
+            let batch = entry
+                .file_name()
+                .to_str()?
+                .strip_suffix(".json")?
+                .to_owned();
+            is_sha(&batch).then_some((entry.metadata().ok()?.modified().ok()?, batch))
+        })
+        .collect::<Vec<_>>();
+    receipts.sort_unstable_by(|a, b| b.cmp(a));
+    Ok(receipts
+        .into_iter()
+        .filter_map(|(_, batch)| {
+            let receipt = results::registered_export_receipt(workspace, project_id, &batch).ok()?;
+            let filename = field(&receipt, "output_file_name").ok()?;
+            if filename.contains(['/', '\\']) || matches!(filename, "." | "..") {
+                return None;
+            }
+            let loci = receipt["manifest"]["loci"].as_array()?;
+            let tasks_count = loci
+                .iter()
+                .map(|locus| locus["tools"].as_array().map_or(0, Vec::len))
+                .sum();
+            Some(ManualRefinementExportReceipt {
+                batch_sha256: batch,
+                output_file_name: filename.to_owned(),
+                exported_at_ms: receipt["exported_at_ms"].as_u64()?,
+                loci_count: loci.len(),
+                tasks_count,
+                loci: loci
+                    .iter()
+                    .map(|locus| {
+                        json!({"chr":locus["chr"], "kind":locus["kind"],
+                "segmentId":locus["target"], "tools":locus["tools"], "motif":locus["motif"]})
+                    })
+                    .collect(),
+            })
+        })
+        .take(20)
+        .collect())
 }
