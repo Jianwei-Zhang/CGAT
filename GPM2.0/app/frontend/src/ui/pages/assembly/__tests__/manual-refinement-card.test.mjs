@@ -118,3 +118,14 @@ test("renderManualRefinementCard covers empty, exporting, override reads, receip
   assert.match(exportingHtml, /data-manual-ref-receipt/);
   assert.match(exportingHtml, /data-manual-ref-copy-cmd="python \.lib\/tools\/refine\.py proj_Chr01_refinement_tasks\.zip"/);
 });
+
+test("the queue defaults to expanded on restore but can be collapsed without hiding its counts", () => {
+  const args = { chrName: "Chr01", finalPathEntry: sampleFinalPathEntry,
+    manualRefinement: { loci: [{ chr: "Chr01", kind: "gap", segmentId: "gap-1" }] } };
+  assert.match(renderManualRefinementCard(args, { escapeAttr, escapeHtml }), /data-manual-ref-body/);
+  args.manualRefinement.panelOpen = false;
+  const collapsed = renderManualRefinementCard(args, { escapeAttr, escapeHtml });
+  assert.doesNotMatch(collapsed, /data-manual-ref-body/);
+  assert.match(collapsed, /aria-expanded="false"/);
+  assert.match(collapsed, /data-manual-ref-count-current>当前 Chr01 · 1</);
+});

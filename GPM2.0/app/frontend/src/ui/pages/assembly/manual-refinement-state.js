@@ -156,7 +156,7 @@ export function normalizeManualRefinementState(value = {}) {
     readsMode: source.readsMode === "override" ? "override" : "inherit",
     hifiReadsInput: normalizeString(source.hifiReadsInput),
     ontReadsInput: normalizeString(source.ontReadsInput),
-    panelOpen: source.panelOpen === true,
+    panelOpen: typeof source.panelOpen === "boolean" ? source.panelOpen : (loci.length > 0 || Boolean(source.lastExport)),
     exporting: source.exporting === true,
     feedback: normalizeString(source.feedback),
     error: normalizeString(source.error),

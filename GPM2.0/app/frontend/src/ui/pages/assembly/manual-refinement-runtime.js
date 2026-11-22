@@ -441,12 +441,7 @@ export function bindManualRefinementCard(host, store, deps = {}) {
     const toggle = event.target?.closest?.("[data-manual-ref-toggle]");
     if (toggle) {
       const current = getManualRefinementState(store);
-      const isOpen = current.panelOpen || current.loci.length > 0 || Boolean(current.lastExport);
-      if (isOpen && (current.loci.length > 0 || current.lastExport)) {
-        updateManualRefinementState(host, store, { panelOpen: !current.panelOpen }, deps);
-      } else {
-        updateManualRefinementState(host, store, { panelOpen: !isOpen }, deps);
-      }
+      updateManualRefinementState(host, store, { panelOpen: !current.panelOpen }, deps);
       return;
     }
 

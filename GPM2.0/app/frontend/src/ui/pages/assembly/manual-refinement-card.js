@@ -235,7 +235,7 @@ export function renderManualRefinementCard(
     scope: "current-chr",
     chrName,
   });
-  const isOpen = state.panelOpen || state.loci.length > 0 || Boolean(state.lastExport);
+  const isOpen = state.panelOpen;
   const candidates = listManualRefinementCandidatesForEntry(finalPathEntry);
   const queuedKeys = new Set(state.loci.map((item) => item.locusKey));
   const toggleLabel = isOpen ? copy.toggleClose : copy.toggleOpen;

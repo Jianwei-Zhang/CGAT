@@ -2709,6 +2709,8 @@ test("assembly page public binder wires host-level listeners once for the same h
     "focusin",
     "focusout",
     "click",
+    "click", // refinement task card actions
+    "change", // refinement tool and input controls
     "pointerover",
     "pointerout",
     "focusin",

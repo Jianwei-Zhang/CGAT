@@ -1108,7 +1108,7 @@ export function renderProjectRefinementCard(state) {
 }
 
 export function bindProjectRefinementCard(host, store, rerender, deps = {}) {
-  if (!host || host[PROJECT_REFINEMENT_BOUND]) {
+  if (typeof host?.addEventListener !== "function" || host[PROJECT_REFINEMENT_BOUND]) {
     return;
   }
   host.addEventListener("click", (event) => {
