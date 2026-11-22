@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import server_run
+from workspace_layout import WorkspaceLayout
 from server.tests import test_run_all_runner as runner_fixture
 from grt_core.stage_alignment import build_candidates
 
@@ -24,9 +25,9 @@ class ServerRunTests(unittest.TestCase):
             fixture = runner_fixture.RunAllRunnerTests()
             template_root = root / "template"
             template = fixture.make_workspace(template_root, [
-                ("ref:ds", "printf 'run\\n' >> run-count.txt\nmkdir -p runs/ds_vs_ref\n"
-                 "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n' > runs/ds_vs_ref/result.paf\n"
-                 "printf 'fixture\\n' > runs/ds_vs_ref/tool_version.txt"),
+                ("ref:ds", "printf 'run\\n' >> run-count.txt\nmkdir -p 02_alignments/ds_vs_ref\n"
+                 "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n' > 02_alignments/ds_vs_ref/result.paf\n"
+                 "printf 'fixture\\n' > 02_alignments/ds_vs_ref/tool_version.txt"),
                 ("last", "exit 7"),
             ])
             env = fixture.configure_reference_inputs(template, template_root, ["ds"])
@@ -38,24 +39,31 @@ class ServerRunTests(unittest.TestCase):
             ref.write_text(">r\nACGT\n")
             argv = ["--ref", str(ref), "--ds", str(ref), "-o", str(output), "--threads", "10"]
             def prepare(_script, _args, target):
-                self.assertTrue((target / ".run_all/lock").is_dir())
-                shutil.copytree(template, target, dirs_exist_ok=True)
+                layout = WorkspaceLayout.detect(target)
+                self.assertEqual(layout.version, 2)
+                self.assertTrue(layout.path(".run_all/lock").is_dir())
+                for source in template.rglob("*"):
+                    if source.is_file():
+                        dest = layout.path(source.relative_to(template).as_posix())
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source, dest)
                 return 0
             # This unit fixture has custom commands and no real Server source.
             # Real production handoff is covered separately with generated commands.
             handoff = Mock(return_value={"status": "fixture_no_handoff"})
             with patch.dict(sys.modules, {"resume_reference": SimpleNamespace(handoff=handoff)}), patch.dict(os.environ, env), patch.object(server_run, "prepare_workspace", side_effect=prepare) as preparation, contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(server_run.execute(argv, root), 7)
-                self.assertFalse((output / ".run_all/lock").exists())
-                original_metadata = (output / "metadata/prepare_options.tsv").read_bytes()
+                layout = WorkspaceLayout.detect(output)
+                self.assertFalse(layout.path(".run_all/lock").exists())
+                original_metadata = layout.path("metadata/prepare_options.tsv").read_bytes()
                 (output / "commands/last.sh").write_text("exit 0\n")
                 self.assertEqual(server_run.execute(argv + ["--threads", "64", "--lgz-qc-memory-gb", "120"], root), 0)
                 self.assertEqual(preparation.call_count, 1)
-                launch = json.loads((output / ".run_all/launch.json").read_text())
+                launch = json.loads(layout.path(".run_all/launch.json").read_text())
                 self.assertEqual(launch["options"]["--threads"], [["10"]])
                 self.assertEqual((output / "run-count.txt").read_text(), "run\n")
-                self.assertEqual((output / "metadata/prepare_options.tsv").read_bytes(), original_metadata)
-                self.assertIn("[SKIP_VALID] [ref:ds]", (output / "logs/run_all.log").read_text())
+                self.assertEqual(layout.path("metadata/prepare_options.tsv").read_bytes(), original_metadata)
+                self.assertIn("[SKIP_VALID] [ref:ds]", layout.path("logs/run_all.log").read_text())
                 self.assertEqual(server_run.execute(["-o", str(output)], root), 0)
                 self.assertEqual(handoff.call_count, 2)
                 ref.write_text(">r\nACGTACGT\n")

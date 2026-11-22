@@ -13,6 +13,8 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import post_lgz_degap as gapfill
 from run_orchestration import build_unit_plan
+from refinement_config import load_request, save_request
+from workspace_layout import initialize_workspace
 import server_run
 
 
@@ -273,22 +275,34 @@ class PostLgzPlanTests(unittest.TestCase):
         server_run.parse_options(["--reads", "reads.fq", "--reads-qc", "full"], cwd)
         server_run.parse_options(["--reads", "reads.fq", "--reads-type", "ont"], cwd)
 
-    def test_all_read_files_and_technology_are_locked_on_resume(self):
+    def test_lgz_qc_reads_remain_locked_but_typed_refinement_reads_can_be_replaced(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for name in ("a.fq", "b.fq", "o.fq"):
-                (root / name).write_text("reads")
-            saved = server_run.parse_options(["--hifi", "a.fq", "b.fq", "--ont", "o.fq"], root)
+            initialize_workspace(root)
+            for name in ("qc.fq", "a.fq", "b.fq", "o.fq"):
+                (root / name).write_text("@r\nACGT\n+\nIIII\n")
+            saved = server_run.parse_options(["--reads", "qc.fq", "--reads-type", "hifi"], root)
+            hifi_ont = server_run.parse_options(["--hifi", "a.fq", "b.fq", "--ont", "o.fq"], root)
+            self.assertEqual(server_run.input_identities(hifi_ont), {})
             identities = server_run.input_identities(saved)
-            self.assertEqual(len(identities), 3)
+            self.assertEqual(set(identities), {str(root / "qc.fq")})
+            server_run.check_resume_options({**saved, **hifi_ont}, saved, identities)
+            first = save_request(root, hifi_ont, "first")
+            self.assertEqual(first["groups"], {"hifi": [str(root / "a.fq"), str(root / "b.fq")], "ont": [str(root / "o.fq")]})
             equivalent = server_run.parse_options(["--hifi", "a.fq", "--hifi", "b.fq", "--ont", "o.fq"], root)
-            server_run.check_resume_options(equivalent, saved, identities)
-            changed_type = server_run.parse_options(["--ont", "a.fq", "b.fq", "o.fq"], root)
+            self.assertEqual(save_request(root, equivalent, "again")["configuration_sha256"], first["configuration_sha256"])
+            replacement = server_run.parse_options(["--ont", "o.fq"], root)
+            server_run.check_resume_options(replacement, saved, identities)
+            new = save_request(root, replacement, "replacement")
+            self.assertEqual(new["groups"], {"hifi": [], "ont": [str(root / "o.fq")]})
+            self.assertNotEqual(new["configuration_sha256"], first["configuration_sha256"])
+            self.assertEqual(load_request(root, "first"), first)
+            changed_type = server_run.parse_options(["--reads", "qc.fq", "--reads-type", "ont"], root)
             with self.assertRaisesRegex(server_run.RunnerError, "differs"):
                 server_run.check_resume_options(changed_type, saved, identities)
-            (root / "b.fq").write_text("changed second reads file")
+            (root / "qc.fq").write_text("changed LGZ QC reads")
             with self.assertRaisesRegex(server_run.RunnerError, "Input changed"):
-                server_run.check_resume_options(equivalent, saved, identities)
+                server_run.check_resume_options(saved, saved, identities)
 
 
 if __name__ == "__main__":

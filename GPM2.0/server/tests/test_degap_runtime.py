@@ -52,10 +52,14 @@ class DegapRuntimeTests(unittest.TestCase):
     def test_both_architectures_share_the_complete_environment(self):
         specs = [set((SERVER / name).read_text().splitlines()) for name in
                  ("cgat-server.conda-spec.txt", "cgat-server.linux-aarch64.conda-spec.txt")]
-        required = {"python=3.11.14", "samtools=1.23.1", "minimap2=2.31", "biopython", "pysam",
-                    "numpy", "matplotlib-base", "scipy", "hifiasm=0.25.0", "seqkit=2.8.0", "parallel", "ripgrep=15.1.0"}
+        required = {"python", "samtools", "minimap2", "biopython", "pysam", "numpy", "matplotlib-base",
+                    "scipy", "hifiasm", "seqkit", "parallel", "ripgrep"}
+        lock = json.loads((SERVER / "contracts/refinement-tools.lock.json").read_text())
+        pinned = {f'{name}={lock["dependencies"][name]["version"]}' for name in required}
         for spec in specs:
-            self.assertTrue(required <= spec)
+            self.assertEqual({line.split("=")[0] for line in spec if line and not line.startswith("#")} & required,
+                             required)
+            self.assertFalse(pinned - spec, f"Missing shared pins: {sorted(pinned - spec)}")
 
 
 if __name__ == "__main__":

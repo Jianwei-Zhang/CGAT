@@ -6,6 +6,7 @@ import unittest
 
 from server.tools import refinement_path as paths
 from server.tools.refinement_native_trace import retained, inserted, normalized_edits, verify_trace, trace_slice, TraceError
+from server.tools import refinement_native_formats as native_formats
 from server.tools.refinement_native_formats import ReadLookup, parse_lr_rows, apply_lr_round, parse_quartet
 from server.tools.refinement_reads import prepare_fasta
 from server.tests.test_refinement_path import MemoryCatalog, source, segment, baseline
@@ -134,7 +135,7 @@ class NativeTraceTests(unittest.TestCase):
             (root / "quartet.genome.filled.detail").write_text(f"chr1\t1\tClosed\t{src}\t5-6\t2\t+\t1.0\nchr1\t2\tNot_closed\n")
             (root / "quartet.genome.filled.modified.agp").write_text(
                 f"chr1\t1\t6\t1\tP\tchr1\t1\t6\t+\nchr1\t7\t8\t2\tW\t{src}\t5\t6\t+\nchr1\t9\t10\t3\tP\tchr1\t107\t108\t+\n")
-            with self.assertRaisesRegex(TraceError, "gap/detail identity"):
+            with self.assertRaisesRegex(native_formats.TraceError, "gap/detail identity"):
                 parse_quartet(root, data[3], data[2], {"chr1": "chr1"}, [str(converted)], Store(data[0]))
 
 

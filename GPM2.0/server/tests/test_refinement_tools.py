@@ -10,7 +10,7 @@ import unittest
 from unittest import mock
 
 from server.tools import refinement_tools as tools
-from server.tools.refinement_recipes import select_tools, select_reads, make_invocation, materialize_native_driver
+from server.tools.refinement_recipes import ToolError as RecipeError, select_tools, select_reads, make_invocation, materialize_native_driver
 
 
 class LockedToolTests(unittest.TestCase):
@@ -153,7 +153,7 @@ class NativeRecipeTests(unittest.TestCase):
         self.assertEqual(select_tools("none", has_reads=True), ())
         self.assertEqual(select_tools("quartet,degap", has_reads=True), ("degap", "quartet"))
         for value in ("none,degap", "degap,degap", "unknown"):
-            with self.assertRaises(tools.ToolError):
+            with self.assertRaises(RecipeError):
                 select_tools(value, has_reads=True)
 
     def test_supported_inputs_are_selected_once_and_unused_reads_reported(self):
@@ -197,7 +197,7 @@ class NativeRecipeTests(unittest.TestCase):
                 subprocess.run(invocation.command, env=invocation.environment, stdout=output, check=True)
             self.assertEqual((jobs / "native255.log").read_text(), str(prefix / "bin"))
             original.write_bytes(before + b"# changed\n")
-            with self.assertRaisesRegex(tools.ToolError, "pinned packaging patch input"):
+            with self.assertRaisesRegex(RecipeError, "pinned packaging patch input"):
                 materialize_native_driver(invocation)
 
     def test_quartet_and_lr_use_one_task_and_safe_native_file_namespaces(self):
@@ -205,7 +205,7 @@ class NativeRecipeTests(unittest.TestCase):
         self.assertIn("/reads/hifi.fa", quartet.command)
         self.assertIn("/reads/ont.fa", quartet.command)
         self.assertNotIn("--enablejoin", quartet.command)
-        with self.assertRaisesRegex(tools.ToolError, "basenames"):
+        with self.assertRaisesRegex(RecipeError, "basenames"):
             self.invocation("quartet", {"hifi": ["/hifi/reads.fa"], "ont": ["/ont/reads.fa"]})
         lr = self.invocation("lrgapcloser")
         self.assertEqual(lr.command[lr.command.index("-n") + 1], "1")

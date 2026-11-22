@@ -13,6 +13,8 @@ import unittest
 
 PROJECT = Path(__file__).resolve().parents[2]
 TOOLS = PROJECT / "server/tools"
+# A new LGZ-only finalizer and the compatibility helper never had old CLI names.
+LGZ_ONLY = {"lgz_compat.py", "lgz_final.py"}
 sys.path.insert(0, str(TOOLS))
 
 
@@ -27,7 +29,7 @@ class LgzCompatibilityTests(unittest.TestCase):
                 new = importlib.import_module("server.tools.lgz_core." + suffix)
                 self.assertIs(old, new)
         for path in TOOLS.glob("lgz_*.py"):
-            if path.name == "lgz_compat.py":
+            if path.name in LGZ_ONLY:
                 continue
             with self.subTest(module=path.stem):
                 self.assertIs(importlib.import_module("server.tools." + path.stem),
@@ -50,7 +52,7 @@ for prefix in ('', 'server.tools.'):
 
     def test_old_and_new_cli_help_are_equivalent_except_program_name(self):
         for path in sorted(TOOLS.glob("lgz_*.py")):
-            if path.name == "lgz_compat.py":
+            if path.name in LGZ_ONLY:
                 continue
             old = path.with_name(path.name.replace("lgz_", "grt_", 1))
             with self.subTest(module=path.stem):

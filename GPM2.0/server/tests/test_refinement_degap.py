@@ -106,7 +106,7 @@ class DegapRefinedPublicationTests(unittest.TestCase):
             groups, _, _ = self.make_workspace(root)
             run_id = "b" * 32
             with mock.patch.object(adapter, "check_environment"), mock.patch.object(adapter.subprocess, "run", side_effect=native):
-                with self.assertRaises(OSError):
+                with self.assertRaisesRegex(adapter.PathError, "missing artifact .*genome\\.filled\\.fasta"):
                     adapter.stage_degap(root, groups, 2, run_id=run_id)
             self.assertFalse((root / ".runtime/refinement/01_degap" / run_id / "final").exists())
             invocation = json.loads((root / "04_refinement/01_degap/02_jobs" / run_id / "invocation.json").read_text())

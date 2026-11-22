@@ -5,8 +5,7 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
-from server.tools.refinement_reads import prepare_fasta, read_records
-from server.tools.refinement_tools import ToolError
+from server.tools.refinement_reads import ToolError, prepare_fasta, read_records
 
 
 class RefinementReadsTests(unittest.TestCase):
