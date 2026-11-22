@@ -110,7 +110,7 @@ cgat_server/
 
 ## 4. 报告、App 导入与恢复
 
-先打开 `06_report/report.html` 看流程总览。`01_lgz/` 是 LGZ 基线报告，`02_refinement/` 按固定编号分工具，`03_comparison/` 保留每批的 TSV/JSON。从总览进入工具或缺口详情，可查看实际使用的 reads、原生任务是运行还是复用、CGAT 接纳了哪些改动、最终结果是否发布。失败会列出已记录的失败阶段和原因，并链接诊断；零接纳则表示保留 LGZ 序列，并不等于失败。复制报告时带上整个目录，以保留报告内部链接；也可解压 App 包后打开 `report/report.html`。工作区总览中的最终结果和交付包链接指向同级的 `05_final/` 和 `07_delivery/`；只复制报告不会带走这些结果。
+先打开 `06_report/report.html` 看流程总览。`01_lgz/` 是 LGZ 基线报告，`02_refinement/` 按固定编号分工具，`03_comparison/` 保留每批的 TSV/JSON。从总览进入工具或缺口详情，可查看实际使用的 reads、原生任务是运行还是复用、CGAT 接纳了哪些改动、最终结果是否发布。失败会列出已记录的失败阶段和原因，并链接诊断；零接纳则表示保留 LGZ 序列，并不等于失败。复制整个 `06_report/` 可保留 LGZ、当前已发布的精修报告及比较表之间的链接；也可解压 App 包后打开 `report/report.html`。未发布或失败的尝试详情可能在 `04_refinement/`，最终结果和交付包则位于同级的 `05_final/`、`07_delivery/`；如需保留这些链接，请连同工作区布局一起复制。
 
 在工具报告中进入 **原生 job 报告与日志 → 离线原生可视化**（`native_visualization/index.html`）。新版 DEGAP 的 `Global.report.html` 总览和各双向任务的 `family-report.html` 有独立的离线浏览副本；原始 HTML 作为带哈希的静态文本附件保留。离线副本保留上游内嵌 JS/SVG，与 CGAT 接纳页面隔离，不依赖 CDN；原生页中指向工作目录的文件链接改由 CGAT 诊断区提供。旧 LEFT/RIGHT 历史报告使用其对应的可移植规则。来源绑定会明确显示：`observed_diagnostic` 是「报告时观察」，**不是原生完成回执证明**。缺失、未知依赖或过大的详情有明确状态，不提供悬空链接；总览内嵌 gap 数据也会与可用的原生 gap 诊断核对。
 

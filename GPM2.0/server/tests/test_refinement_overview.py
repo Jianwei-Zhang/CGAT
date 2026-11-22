@@ -57,6 +57,8 @@ class RefinementOverviewTests(unittest.TestCase):
             self.assertIn("Not available (pending)", html)
             self.assertNotIn("Final FASTA", html)
             self.assertNotIn("Full App package", html)
+            self.assertIn("Attempt diagnostics (workspace)", html)
+            self.assertNotIn('href="02_refinement/01_degap/report.html"', html)
 
     def test_failed_report_retains_logs_without_fabricating_final_files(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -324,6 +324,14 @@ The browser recorded no external requests, failed resources, or runtime/security
 errors. Hashes: refresh receipt `da0eb0a5afa8d4d3ec444cf605b2bdc74b5b08aa20cccd5ae19ae67e4afcbd9f`;
 browser receipt `4362f4c0aff4e71c3d184924bddf871a63de50253f4bc8c7eefa8a44f391332e`.
 
+The current workspace overview links to the receipt-matching published tool
+report under `06_report/02_refinement/`, not to its private generation under
+`04_refinement/`. A separate copy containing only `06_report/` resolved all of
+the overview's internal links, including DEGAP, LGZ and comparison tables. It
+intentionally did not include sibling final files or archives. Unpublished and
+failed attempts retain separately labelled workspace diagnostics. Report-only
+copy receipt: `3d8b4c93051e2e61a8ae8413e6897229e1802324fb662e6168abc659b03acfa7`.
+
 The existing Windows desktop acceptance binary imported both the corresponding
 LGZ-only pair and the refreshed DEGAP pair. Full exported the same sourced
 chromosomes as Server; Light retained its trace and refused FASTA export.

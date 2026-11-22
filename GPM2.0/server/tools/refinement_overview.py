@@ -152,8 +152,10 @@ def render_overview(root, batch, results):
         if record["status"] in {"staged", "published"} and result is not None:
             try:
                 candidate = current_publication(root, tool)
-                if candidate and candidate["run_id"] == result["run_id"]:
-                    published = candidate
+                if candidate and candidate["run_id"] == result["run_id"] and record.get("report"):
+                    current_manifest = candidate.get("areas", {}).get("report", {}).get("new", {}).get("files", {}).get("manifest.json")
+                    if current_manifest == record["report"]["manifest_sha256"]:
+                        published = candidate
             except (OSError, ValueError):
                 pass
         summary = summaries.get(tool, {})
@@ -289,8 +291,14 @@ def render_overview(root, batch, results):
         counts_cell = format_counts_html(row["counts"], status=state, invalidated=invalidated)
 
         report_link = '<span class="muted">No completed report / 无完整报告</span>'
-        if record.get("report", {}).get("report") and Path(record["report"]["report"]).is_file():
-            report_link = local_link(root, report, Path(record["report"]["report"]), "Jobs, native evidence, decisions / 任务、原生证据与接纳", cls="link-pill")
+        if row["tool"] in published_tools:
+            # Keep the current-process link inside a copied 06_report tree.
+            # Only the matching verified publication can use this public slot.
+            target = layout.path(f"06_report/02_refinement/{TOOL_DIRECTORIES[row['tool']]}/report.html")
+            report_link = local_link(root, report, target, "Jobs, native evidence, decisions / 任务、原生证据与接纳", cls="link-pill")
+        elif record.get("report", {}).get("report") and Path(record["report"]["report"]).is_file():
+            report_link = local_link(root, report, Path(record["report"]["report"]),
+                                     "Attempt diagnostics (workspace) / 尝试诊断（工作区）", cls="link-pill")
         if not record.get("report") and row["run_id"]:
             failed_log = layout.path(f"04_refinement/{TOOL_DIRECTORIES[row['tool']]}/02_jobs/{row['run_id']}/native.log")
             if failed_log.is_file():

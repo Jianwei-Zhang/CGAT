@@ -54,6 +54,10 @@ class RefinedDeliveryTests(unittest.TestCase):
                 for row in archives.values():
                     self.assertIn("../07_delivery/01_degap/" + row["file"], overview)
                 self.assertIn("../05_final/01_degap/assembly.fa", overview)
+                self.assertIn('href="02_refinement/01_degap/report.html"', overview)
+                self.assertNotIn('../04_refinement/01_degap', overview)
+                self.assertEqual(digest(root / "06_report/02_refinement/01_degap/report.html"),
+                                 digest(Path(report["report"])))
                 validate_delivery(delivery, root / "05_final/01_degap")
             finally:
                 lock.release()
