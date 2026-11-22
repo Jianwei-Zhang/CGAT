@@ -1,8 +1,10 @@
 # Post-LGZ refinement: consolidated acceptance
 
-Started 2026-11-22. **In progress, not a release or completion claim.**
-The requirements remain A01–A18 in the approved design. Green controlled tests
-are not substitutes for installed/native, architecture, file-browser or App checks.
+Started and closed on 2026-11-22. **A01–A18 verified in the agreed feature-branch
+scope.** The two architectures, pinned native tools, reviewed legacy migrations,
+Windows offline report/App checks and final regression gate have distinct evidence
+below. This is not a release, a merge to `master`, a customer-workspace guarantee
+or a biological benchmark.
 
 ## Isolated environment
 
@@ -309,9 +311,15 @@ native Racon exited. Its settled FASTA had valid nonempty records; the adapter
 had read the redirected stream before flushing its inherited descriptors.
 The TGS adapter now flushes stdout/stderr before parsing or hashing them,
 including after output replay, without changing Racon or relaxing integrity
-checks. The stopped ONT-only workspace remains available for targeted retry.
-The original mixed/repeat matrix receipt (including the failed ONT control)
+checks. Targeted resume job `43015981` exited 0 on `agent-ARM-06` using the
+exact updated adapter SHA-256
+`891b0b4587b9aae99a1afe6aeec110800f9a3b0da81bd5ddfeeaaea3a0356c86`.
+It ran three native Racon chunks, accepted one sourced edit, verified both
+Full/Light archives and kept LGZ/reference bytes and mtimes.
+The mixed/repeat matrix receipt, including the original failed ONT control,
 is `0388108502cf08812c1156b11549cbafcd3f938c271a4812e2932c14920aac85`.
+The successful ONT retry receipt is
+`f8d4f04240258cef89aa62a6487bf949078fde3b52d8b94c4b6996ef2357795c`.
 
 ### Windows offline navigation and App delivery for the new pin
 
@@ -351,6 +359,15 @@ new Windows App build. Receipt SHA-256:
 `e584d0a86e6cf63b72d73685322cec40cd4246c598efc7a352ff9dc1cc7812f1`.
 The updated App export backend was also compiled and tested on Windows: five
 focused `degap_jobs` tests passed, with the optional fixture-only test ignored.
+
+### Final regression gate
+
+The isolated canonical Server gate at production-code revision `e0b1cce9`
+exited 0: 1,011 Python tests (999 passed, 12 skipped), all eight Shell groups,
+and LGZ Server-to-App E2E. The pinned TGS archive was provided to the opt-in
+producer tests. This covers the numbered report links, sandbox wrapper, and
+flushed TGS stream verification together. Gate log SHA-256:
+`d3bbe05c4b0b960bc18a8e951b37f982b369d56cd7dcd38388920cac929cc565`.
 
 ## Historical sequencing note: re-audit DEGAP after upstream feature merge
 
@@ -680,7 +697,7 @@ legacy versions.
 | A03 | Verified | Real `run_all.sh` four-tool append, unchanged repeat, original scientific file and alignment identity audits. |
 | A04 | Verified | Four actual command/input receipts with mixed and ONT-only cases; grouped same-basename inputs, content-bound reuse, format and source controls. |
 | A05 | Verified on both architectures | x86_64 public install/`--check`, controlled managed-spec upgrade and unmanaged-env refusal. Native ARM64 private install, compute-node `--check` and active pinned runtime verification passed. |
-| A06 | All four engines on both architectures; ARM64 ONT TGS control pending | All four pinned tools ran on x86_64 and native ARM64. Both actual mixed runs published four validated results; the separate ARM64 ONT-Racon control is tracked above. |
+| A06 | Verified on both architectures | All four pinned tools ran on x86_64 and native ARM64, and both mixed runs published four validated results. Separate ONT-only TGS runs exercised three native Racon chunks and accepted one edit on each architecture. |
 | A07 | Verified | Independent source-slice reconstruction equals each published chromosome; accepted newer DEGAP, quarTeT, LR and ONT-only TGS outputs differ from LGZ. Zero-admission results are unchanged and explicitly labelled. |
 | A08 | Verified in fixtures and the synthetic sample | `test_refinement_admission.py`, `test_refinement_native_trace.py` and `test_refinement_path.py` cover orientations, overlap, competing/nearby intervals, partial edits, residual Ns and zero acceptance. |
 | A09 | Verified in controls and native readmission | Proposal conflicts, malformed evidence, mutated inputs and corrupt checkpoints are rejected in admission/path/native tests; the original-frame native readmission audit verifies only validated evidence is reused. |

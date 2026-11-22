@@ -1,6 +1,6 @@
 # Pinned post-LGZ tool recipes / 精修工具固定配方
 
-This is an implementation record, not a claim that the four-tool workflow or either architecture has passed acceptance. The complete acceptance criteria remain in `server-post-lgz-refinement-design-20261121.md`.
+The fixed recipe is summarized here; the lock is authoritative. The [consolidated validation](server-refinement-final-acceptance-20261122.md) records actual x86_64 and ARM64 installation, native runs, delivery and branch acceptance. These are synthetic workflow checks, not a tool ranking or biological benchmark.
 
 ## Installation and reproducibility
 
@@ -8,7 +8,7 @@ The machine-readable authority is `server/contracts/refinement-tools.lock.json`.
 
 | Tool | Fixed version/source | Distribution |
 | --- | --- | --- |
-| DEGAP | 2.0, commit `0b3c9bc7acc5bd290ad2b23d53cc57815f1c7e75` | Bundled source; original manifest and every source file checked |
+| DEGAP | 2.0, commit `6cd01f1b983c43648e51389c129dfbd8b5926284` | Bundled source; original manifest and every source file checked |
 | TGS-GapCloser | 1.2.1, upstream tag commit `52818b3e464209477baec506ade3240be43b4fa8` | Bioconda build 4 from the `1.2.1_ml` release variant, exact build and archive SHA-256 per architecture |
 | quarTeT GapFiller | 1.3.1, commit `a44d8c87e3f4bcefaf43dc4134e88b6a21890265` | Pinned source archive plus the explicitly recorded Python 3.11 packaging patch below |
 | LR_Gapcloser | 1.0, commit `156381adec01a5c664edbf5df1d866b5c70e82a1` | Exact noarch Bioconda package; uses the separately pinned native BWA for the current architecture |
@@ -19,7 +19,7 @@ For quarTeT, the upstream 1.3.1 gap-detail f-string uses quote reuse that Python
 
 ## Input and invocation recipes
 
-- DEGAP receives the original typed HiFi/ONT inputs in one native mixed invocation. Its native per-gap worker count is 1; that worker receives the total thread budget.
+- DEGAP receives the original typed HiFi/ONT inputs in one native mixed invocation. The pinned family recipe runs one bidirectional job per native gap, with one worker receiving the total thread budget. Its sealed junction and exterior flanks are checked before admission.
 - TGS-GapCloser receives HiFi when both technologies are supplied, otherwise the supplied technology. HiFi uses `--ne`, `--tgstype pb` and the explicit `-x asm20` minimap2 preset. ONT uses the tool's own one-round Racon stage and `-x ava-ont`; this is recorded native processing, not an additional hidden correction pipeline.
 - quarTeT receives both selected FASTA inputs in one GapFiller invocation, using minimap2 with the explicit upstream `-x asm5` preset. Experimental join mode stays off. `--noplot` avoids installing the unrelated plotting stack; native detail and modified AGP outputs remain required and available to the CGAT report.
 - LR_Gapcloser receives HiFi when both are supplied, otherwise the supplied technology; it uses the native PacBio/ONT switch. Three iterations and one tag partition are explicit recipe settings. One partition prevents its background coverage jobs from exceeding a one-thread allocation. The upstream documentation's corrected-read recommendation does not become an extra CGAT input gate; no external correction step is inserted.
@@ -36,13 +36,13 @@ quarTeT keys some temporary alignment files by input **basename**, not full path
 - LR_Gapcloser can stop before iteration 3 when no gaps remain. An adapter must validate the last complete iteration and the early-stop condition; merely selecting the largest directory number is insufficient.
 - quarTeT explicitly returns nonzero for “no gap can be closed” or no eligible gaps. These cases require a specific, evidence-backed native no-result classification. They must not be conflated with arbitrary process failure, nor turned into successful final results merely by copying LGZ.
 
-The common private staging layer now classifies these special cases using native artifacts and sequence checks. It is not yet connected to public `run_all.sh`, final publication or App delivery. Fixed command recipes and controlled format fixtures alone do not establish full native execution acceptance.
+The common private staging layer now classifies these special cases using native artifacts and sequence checks. Public `run_all.sh` uses the same classifications before publishing numbered Final Path, reports and App deliveries. Fixed recipes and format fixtures alone do not establish native acceptance.
 
-## Evidence and remaining gates
+## Initial investigation (historical)
 
 This batch used small local installer/recipe/conversion checks and a controlled DEGAP adapter with real FASTA indexing. The source archive was downloaded and hash-checked; the temporary patched quarTeT entrypoint was checked with actual Python 3.11. No existing conda environment was upgraded during development.
 
-Bioconda package records exist for the selected Linux x86_64/aarch64 native distributions, and the selected Python library versions have matching platform distributions (GNU parallel is noarch). That is **package availability**, not environment solve, native smoke, accuracy, performance or ARM64 acceptance. This was the investigation snapshot. The [consolidated validation](server-refinement-final-acceptance-20261122.md) now has real x86_64 install/check and four-engine evidence, plus an ARM64 resolver receipt. ARM64 installation and native execution remain unverified.
+Bioconda package records exist for the selected Linux x86_64/aarch64 native distributions, and the selected Python library versions have matching platform distributions (GNU parallel is noarch). That is **package availability**, not environment solve, native smoke, accuracy, performance or ARM64 acceptance. These were only the initial findings. The later consolidated validation supersedes this evidence with separate native install and tool receipts on both architectures.
 
 Primary audit sources (immutable tool revisions or distribution archive hashes are in the lock):
 
@@ -64,7 +64,7 @@ HiFi/ONT 选择沿用设计：DEGAP 与 quarTeT 单次使用两类输入；TGS�
 
 本轮还发现并记录了实际原生边界：LR 可能提前结束迭代；quarTeT 在无候选时会返回非零；TGS 的真实文件名不是假定的通用 gap-detail 名。后续公共执行/接纳层必须按这些证据处理，不能把失败统一包装成“成功但零填补”。
 
-当前完成的是固定环境定义、安装/校验代码、命令与输入配方，以及 DEGAP 原生输出的进一步完整性检查。没有在开发中升级真实环境，也未宣称四工具真实 reads、完整共同入口或 ARM64 已验收。最终仍须统一进行环境求解、原生小样例、路径来源、报告与 App 的完整验收。
+当前固定配方已接入公共入口、报告和 App 交付。两架构的环境、真实原生命令、路径来源和验收证据以统一验收文档为准。这里保留早期的原生边界调查，不用于判断工具优劣。
 
 ## Native adapters and explicit packaging patches (2026-11-21 update)
 
@@ -79,6 +79,6 @@ Known pinned behavior is not silently corrected: quarTeT numbers short N runs di
 
 The read conversion recipe now writes a content-bound FASTA index and keeps UTF-8 original identifiers in the reversible map. Native lookup retains only requested IDs/ordinals, not every read sequence in memory. Each selected engine validates only its own pinned dependencies at execution time; environment install/check still validates all four engines.
 
-Current evidence remains deliberately lightweight: controlled format/sequence fixtures; the actual pinned TGS splitter/writer on a tiny supplied-fill example; the pinned LR sequence writer with tiny partial-fill rows; and Python 3.11 quarTeT with a controlled successful-empty aligner, confirming both inputs are attempted. The last example is **not** a real alignment test. A separate tiny driver test covers `255` in paths and altered-source rejection. None of these replaces end-to-end native runs, both-architecture environment checks or final Server/App acceptance.
+At this historical implementation checkpoint, evidence remained deliberately lightweight: controlled format/sequence fixtures; the actual pinned TGS splitter/writer on a tiny supplied-fill example; the pinned LR sequence writer with tiny partial-fill rows; and Python 3.11 quarTeT with a controlled successful-empty aligner, confirming both inputs are attempted. The last example is **not** a real alignment test. A separate tiny driver test covers `255` in paths and altered-source rejection. None of these replaces end-to-end native runs, both-architecture environment checks or final Server/App acceptance.
 
-中文补充：新增三工具已接入内部原生执行、来源解析和待发布 Final Path；每工具依次执行、失败隔离，以及内容绑定的完整结果复用也已实现。尚未接入公共运行入口、最终报告和 App 交付。quarTeT 空 PAF 补丁、LR helper 路径补丁均明确锁定，不冒称原版字节不变。只复用已经验证的完整结果；原生子任务中断后的部分复用仍待实现。
+中文补充（2026-11-21 当时状态）：新增三工具已接入内部原生执行、来源解析和待发布 Final Path；每工具依次执行、失败隔离，以及内容绑定的完整结果复用也已实现。尚未接入公共运行入口、最终报告和 App 交付。quarTeT 空 PAF 补丁、LR helper 路径补丁均明确锁定，不冒称原版字节不变。只复用已经验证的完整结果；原生子任务中断后的部分复用仍待实现。

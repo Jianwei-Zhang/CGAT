@@ -2,7 +2,7 @@
 
 [English](REFINEMENT.md) | **中文** · [Server 手册](README_zh.md)
 
-本指南对应功能分支中的源码实现，不会追溯改变已发布的 v2.0.21 压缩包。四个固定版本工具已在 Linux x86_64 用合成数据实跑。ARM64 依赖已求解，安装和原生运行仍未验证；具体范围及证据见仓库中的 `GPM2.0/docs/server-refinement-final-acceptance-20261122.md`。请使用同一版源码构建的安装器与 App；不要覆盖正在使用的安装目录，也不要在作业运行时更新环境。
+本指南对应功能分支中的源码实现，不会追溯改变已发布的 v2.0.21 压缩包。已在原生 Linux x86_64 和 ARM64 上验证统一环境，并用合成数据实跑四个固定版本工具；具体范围及证据见仓库中的 `GPM2.0/docs/server-refinement-final-acceptance-20261122.md`。请使用同一版源码构建的安装器与 App；不要覆盖正在使用的安装目录，也不要在作业运行时更新环境。
 
 ## 1. 环境与首次运行
 
@@ -167,7 +167,7 @@ python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --
 python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --rollback --confirm-idle
 ```
 
-不会覆盖被修改的用户数据，也不会抢占未知/活跃 owner 的锁。遇到拒绝时保留 journal/备份并排查，不删除工作区 metadata。已在 x86_64 验证受支持的历史工作区续跑、迁移中断恢复和精修追加；ARM64 原生运行尚待验证，未经核验的旧引擎不在此范围内。
+不会覆盖被修改的用户数据，也不会抢占未知/活跃 owner 的锁。遇到拒绝时保留 journal/备份并排查，不删除工作区 metadata。已在 x86_64 验证受支持的历史工作区续跑、迁移中断恢复和精修追加；ARM64 实跑验收针对当前固定工具，不覆盖未经核验的旧引擎。
 
 ### 原 LGZ 尚未完成
 

@@ -2,7 +2,7 @@
 
 **English** | [中文](REFINEMENT_zh.md) · [Server manual](README.md)
 
-This guide describes the feature-branch source implementation, not a feature retroactively added to published v2.0.21 archives. The four pinned tools were exercised on synthetic inputs on Linux x86_64. ARM64 dependency resolution passed, but the ARM64 install and native runs have not been verified. The repository’s `GPM2.0/docs/server-refinement-final-acceptance-20261122.md` records scope and evidence. Use the installer and App built from the matching source; do not overwrite an active installation or update an environment while jobs use it.
+This guide describes the feature-branch source implementation, not a feature retroactively added to published v2.0.21 archives. The shared environment and all four pinned tools were verified with synthetic inputs on native Linux x86_64 and ARM64. The repository’s `GPM2.0/docs/server-refinement-final-acceptance-20261122.md` records scope and evidence. Use the installer and App built from the matching source; do not overwrite an active installation or update an environment while jobs use it.
 
 ## 1. Environment and first run
 
@@ -167,7 +167,7 @@ python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --
 python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server --rollback --confirm-idle
 ```
 
-Changed user data or unknown/live lock owners are not overwritten. Preserve the journal/backups and diagnose a refusal instead of deleting workspace metadata. The reviewed x86_64 legacy workspace has passed continuation, interrupted migration and refinement append checks. ARM64 native validation is still pending; results do not certify unknown historical engines.
+Changed user data or unknown/live lock owners are not overwritten. Preserve the journal/backups and diagnose a refusal instead of deleting workspace metadata. The reviewed x86_64 legacy workspace passed continuation, interrupted migration and refinement append checks. The separate native ARM64 checks cover the current engines, not unknown historical runtimes.
 
 ### Unfinished LGZ work
 
