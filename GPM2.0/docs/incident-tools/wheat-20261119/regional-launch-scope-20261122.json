@@ -1,0 +1,157 @@
+{
+  "cases": [
+    {
+      "case": 5,
+      "input_bytes": 28302682,
+      "job_id": "43015257",
+      "node": "agent-X86-61",
+      "observations": [
+        {
+          "launcher_basename": "python3",
+          "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+          "native": {
+            "cpu_seconds": 1.645,
+            "native_peak_rss_gb": 0.124,
+            "wall_seconds": 5.723
+          },
+          "ordinal": 0,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "original",
+          "wall": 24.749560859054327
+        },
+        {
+          "launcher_basename": "python3",
+          "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+          "native": {
+            "cpu_seconds": 1.597,
+            "native_peak_rss_gb": 0.12,
+            "wall_seconds": 5.677
+          },
+          "ordinal": 1,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "clean_libpath",
+          "wall": 11.500691298395395
+        },
+        {
+          "launcher_basename": "python3",
+          "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+          "native": {
+            "cpu_seconds": 1.606,
+            "native_peak_rss_gb": 0.122,
+            "wall_seconds": 3.335
+          },
+          "ordinal": 2,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "clean_libpath",
+          "wall": 9.512184643186629
+        },
+        {
+          "launcher_basename": "python3",
+          "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+          "native": {
+            "cpu_seconds": 1.617,
+            "native_peak_rss_gb": 0.124,
+            "wall_seconds": 3.356
+          },
+          "ordinal": 3,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "original",
+          "wall": 20.731831692159176
+        }
+      ],
+      "original_report_sha256": "39f1932c5d6b81cdb75e5f07b3a1ba315cc620ba14a0e0e93ef728e92f136fd2",
+      "state": "SUCCEEDED",
+      "status": "one_window_byte_parity_limit_cwd_verified"
+    },
+    {
+      "case": 5,
+      "input_bytes": 28302682,
+      "job_id": "43015254",
+      "node": "agent-X86-61",
+      "observations": [
+        {
+          "launcher_basename": "python3",
+          "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+          "native": {
+            "cpu_seconds": 1.669,
+            "native_peak_rss_gb": 0.125,
+            "wall_seconds": 5.497
+          },
+          "ordinal": 0,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "original",
+          "wall": 24.498079518787563
+        },
+        {
+          "launcher_basename": "prlimit",
+          "launcher_sha256": "e2e16415c6913cf0f54f4aa5ba51c31789bbd5e1bb1a21022b7ff0c2b08f41c9",
+          "native": {
+            "cpu_seconds": 1.578,
+            "native_peak_rss_gb": 0.128,
+            "wall_seconds": 10.113
+          },
+          "ordinal": 1,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "prlimit",
+          "wall": 22.445049172267318
+        },
+        {
+          "launcher_basename": "platform-python3.6",
+          "launcher_sha256": "3612278b1e9c9962f4749213b895e21bfd23212ba1c366e5b27eb9f4cb114677",
+          "native": {
+            "cpu_seconds": 1.618,
+            "native_peak_rss_gb": 0.126,
+            "wall_seconds": 5.711
+          },
+          "ordinal": 2,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "system_python",
+          "wall": 18.57096989173442
+        },
+        {
+          "launcher_basename": "platform-python3.6",
+          "launcher_sha256": "3612278b1e9c9962f4749213b895e21bfd23212ba1c366e5b27eb9f4cb114677",
+          "native": {
+            "cpu_seconds": 1.588,
+            "native_peak_rss_gb": 0.126,
+            "wall_seconds": 4.888
+          },
+          "ordinal": 3,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "system_python",
+          "wall": 18.84658656362444
+        },
+        {
+          "launcher_basename": "prlimit",
+          "launcher_sha256": "e2e16415c6913cf0f54f4aa5ba51c31789bbd5e1bb1a21022b7ff0c2b08f41c9",
+          "native": {
+            "cpu_seconds": 1.599,
+            "native_peak_rss_gb": 0.123,
+            "wall_seconds": 5.348
+          },
+          "ordinal": 4,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "prlimit",
+          "wall": 17.675510031171143
+        },
+        {
+          "launcher_basename": "python3",
+          "launcher_sha256": "7fddeb4292b713aa28dd8335af82280bb35d3acdbaf0ee96259613c5ea7ca1ad",
+          "native": {
+            "cpu_seconds": 1.7,
+            "native_peak_rss_gb": 0.127,
+            "wall_seconds": 7.168
+          },
+          "ordinal": 5,
+          "paf_sha256": "f9c39a3bb434f19bd2ec1b8e2aa8886a5d80601c16c54e1c69674c02be9b1451",
+          "profile": "original",
+          "wall": 26.749424681067467
+        }
+      ],
+      "original_report_sha256": "441ee1849fd9939a01dfc9f312e0711102344541293b6280da3f74e5a22e2a8c",
+      "state": "SUCCEEDED",
+      "status": "one_window_byte_parity_limit_cwd_verified"
+    }
+  ],
+  "scope": "same-node archived diagnostic, one source window, same source inputs and scientific mapper flags; main untouched"
+}
