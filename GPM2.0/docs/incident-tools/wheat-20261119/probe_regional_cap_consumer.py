@@ -11,8 +11,6 @@ import json
 from pathlib import Path
 
 from benchmark_regional_mapper_dispatch import LOOKUP_SHA, digest, read_json, within
-from probe_regional_dp_budget import load_case
-from probe_regional_dp_cap_ladder import CASES, QUALITY_SHA
 
 from lgz_core.q0_alignments import parse_paf_line
 from lgz_core.q0_paths import PairLink, PathPolicy, Placement, qualify_pair_blocks
@@ -126,6 +124,9 @@ def compare(query, exact, capped, lookup, policy=PathPolicy()):
 
 
 def main():
+    from probe_regional_dp_budget import load_case
+    from probe_regional_dp_cap_ladder import CASES, QUALITY_SHA
+
     parser = argparse.ArgumentParser(description=__doc__)
     for arg in ('workspace', 'archived', 'heldout', 'quality', 'lookup', 'ladder'):
         parser.add_argument('--'+arg, required=True, type=Path)
