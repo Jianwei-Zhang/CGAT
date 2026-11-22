@@ -11,6 +11,7 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from collections import defaultdict
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from itertools import product
 from typing import Iterable, Mapping
 
@@ -82,6 +83,10 @@ class Placement:
             raise Q0EvidenceError("reference block escapes q0 placement")
         if any(not self.interval.contains(interval) for interval in self.anchor_intervals):
             raise Q0EvidenceError("q0 anchor escapes source placement")
+
+    @cached_property
+    def _reference_loci(self):
+        return _ReferenceLoci(self)
 
     def local(self, interval: Interval) -> Interval:
         if not self.interval.contains(interval):
@@ -161,20 +166,42 @@ def pair_blocks(link: PairLink, left: Placement, right: Placement) -> tuple[Bloc
     return tuple(sorted(result))
 
 
+class _ReferenceLoci:
+    """Oriented local spans and exact reference offsets; preserve all overlaps."""
+
+    def __init__(self, placement: Placement):
+        rows = []
+        for anchor in placement.reference_blocks:
+            local = placement.local(anchor.source)
+            rows.append((local.start, local.end, anchor.reference.start - local.start))
+        self.rows = sorted(rows)
+        self.starts, self.prefix_ends = [], []
+        farthest = 0
+        for start, end, _ in self.rows:
+            farthest = max(farthest, end)
+            self.starts.append(start)
+            self.prefix_ends.append(farthest)
+
+    def intersecting(self, start, end):
+        first = bisect_right(self.prefix_ends, start)
+        stop = bisect_left(self.starts, end, lo=first)
+        for i in range(first, stop):
+            lo, hi, offset = self.rows[i]
+            if hi > start:
+                yield max(lo, start), min(hi, end), offset
+
+
 def reference_consistent(block: Block, left: Placement, right: Placement) -> bool:
     """Compare corresponding paired bases, never reference bounding hulls."""
-    for a in left.reference_blocks:
-        local_a = left.local(a.source)
-        clipped = block.clip_left(local_a)
-        if clipped is None:
-            continue
-        for b in right.reference_blocks:
-            local_b = right.local(b.source)
-            overlap = clipped.right.intersection(local_b)
-            if overlap is None:
-                continue
-            left_position = clipped.left.start + overlap.start - clipped.right.start
-            if a.reference.start + left_position - local_a.start != b.reference.start + overlap.start - local_b.start:
+    if not left.reference_blocks or not right.reference_blocks:
+        return True
+    shift = block.right.start - block.left.start
+    right_loci = right._reference_loci
+    for lo, hi, offset in left._reference_loci.intersecting(block.left.start, block.left.end):
+        for _, _, other_offset in right_loci.intersecting(lo + shift, hi + shift):
+            # The pair block maps x to x + shift, so the projections agree
+            # across this whole intersection iff both offsets agree here.
+            if offset != other_offset + shift:
                 return False
     return True
 

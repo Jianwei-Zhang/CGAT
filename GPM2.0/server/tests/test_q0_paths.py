@@ -9,8 +9,8 @@ import unittest
 from server.tools.lgz_core.common import reverse_complement
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_paths import (
-    PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor, _CompetingAxis,
-    pair_blocks, qualify_pair_blocks, reconstruct, search_paths,
+    Block, PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor, _CompetingAxis,
+    pair_blocks, qualify_pair_blocks, reconstruct, reference_consistent, search_paths,
 )
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey, split_source
 
@@ -61,6 +61,59 @@ def bridge_fixture(reverse=False, original_gap=False):
 
 
 class Q0PathKernelTests(unittest.TestCase):
+    def test_reference_consistency_index_matches_nested_projection_on_both_strands(self):
+        rng = random.Random(124)
+
+        def legacy(block, left, right):
+            for a in left.reference_blocks:
+                local_a = left.local(a.source)
+                clipped = block.clip_left(local_a)
+                if clipped is None:
+                    continue
+                for b in right.reference_blocks:
+                    local_b = right.local(b.source)
+                    overlap = clipped.right.intersection(local_b)
+                    if overlap is None:
+                        continue
+                    corresponding = clipped.left.start + overlap.start - clipped.right.start
+                    if a.reference.start + corresponding - local_a.start != b.reference.start + overlap.start - local_b.start:
+                        return False
+            return True
+
+        def with_anchors(p, rows):
+            anchors = tuple(ReferenceAnchor(p.source_interval(Interval(a, b)), Interval(a + shift, b + shift), f"ref-{i}")
+                            for i, (a, b, shift) in enumerate(rows))
+            return replace(p, reference_intervals=tuple(a.reference for a in anchors), reference_blocks=anchors)
+
+        agree, conflict = 0, 0
+        for left_dir, right_dir in itertools.product("+-", repeat=2):
+            left = placement("a", 0, 250, offset=1000, orientation=left_dir)
+            right = placement("b", 0, 250, offset=2000, orientation=right_dir)
+            for _ in range(32):
+                def rows():
+                    result = []
+                    for _ in range(rng.randrange(0, 18)):
+                        start = rng.randrange(240)
+                        result.append((start, rng.randrange(start + 1, 251), rng.choice((45, 60, 75))))
+                    rng.shuffle(result)
+                    return result
+                ax, bx = with_anchors(left, rows()), with_anchors(right, rows())
+                for _ in range(16):
+                    a, b, width = rng.randrange(220), rng.randrange(220), rng.randrange(1, 32)
+                    block = Block(Interval(a, a + width), Interval(b, b + width))
+                    expected = legacy(block, ax, bx)
+                    self.assertEqual(reference_consistent(block, ax, bx), expected)
+                    agree += expected
+                    conflict += not expected
+            # A long nested anchor with the wrong map must still veto while
+            # a block that only touches it at an endpoint has no conflict.
+            ax = with_anchors(left, [(0, 200, 45), (90, 200, 60)])
+            bx = with_anchors(right, [(0, 250, 60)])
+            self.assertFalse(reference_consistent(Block(Interval(190, 200), Interval(190, 200)), ax, bx))
+            self.assertTrue(reference_consistent(Block(Interval(200, 250), Interval(200, 250)), ax, bx))
+        self.assertGreater(agree, 100)
+        self.assertGreater(conflict, 100)
+
     def test_competing_axis_matches_direct_interval_intersection(self):
         rng = random.Random(42)
         for _ in range(40):
