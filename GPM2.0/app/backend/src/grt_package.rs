@@ -32,6 +32,7 @@ mod persistence;
 mod q0_provenance;
 mod read_model;
 mod refined_delivery;
+mod refinement_inputs;
 mod refined_source_evidence;
 mod trace_queries;
 mod types;
@@ -51,6 +52,9 @@ pub use read_model::{
 pub use trace_queries::{
     load_grt_event_trace, load_grt_evidence, load_grt_source_card_trace,
     verify_persisted_grt_final_path,
+};
+pub use refinement_inputs::{
+    RefinementReadInputs, RefinementReadSource, load_project_refinement_read_inputs,
 };
 pub(crate) use types::ValidatedGrtPackage;
 pub use types::{

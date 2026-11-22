@@ -113,6 +113,38 @@ fn records(projected: &Value) -> Vec<FinalPathFastaRecord> {
 }
 
 #[test]
+fn refined_import_retains_original_read_hints_in_full_and_light() {
+    for light in [false, true] {
+        let temp = materialize(light);
+        let root = temp.path().join("refined.degap");
+        let provenance_path = root.join("metadata/refinement/provenance.json");
+        let mut provenance: Value = serde_json::from_slice(&fs::read(&provenance_path).unwrap()).unwrap();
+        provenance["execution"]["recipe"] = serde_json::json!({
+            "reads": [{"technology":"hifi", "path":"/server/original.hifi.fq.gz", "sha256":"a".repeat(64)}],
+        });
+        fs::write(&provenance_path, serde_json::to_vec(&provenance).unwrap()).unwrap();
+        let manifest_path = root.join("metadata/refinement/manifest.json");
+        let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["provenance_sha256"] = Value::from(sha256_file(&provenance_path).unwrap());
+        fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        reseal(&root, None);
+        // The fake path is intentionally not available on the desktop host.
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(&root).unwrap();
+        let project = initialize_grt_project(&outcome.project_db_path, "Refined inputs").unwrap();
+        let inputs = crate::grt_package::load_project_refinement_read_inputs(
+            &outcome.project_db_path, project.project_id,
+        ).unwrap();
+        assert_eq!(inputs.hifi[0].path, "/server/original.hifi.fq.gz");
+        assert_eq!(inputs.hifi[0].sha256.as_deref(), Some("a".repeat(64).as_str()));
+        let other = crate::grt_package::load_project_refinement_read_inputs(
+            &outcome.project_db_path, project.project_id + 1,
+        ).unwrap();
+        assert!(other.hifi.is_empty());
+        assert!(inputs.ont.is_empty());
+    }
+}
+
+#[test]
 fn refined_full_import_materializes_real_bridge_and_exports_admitted_sequence() {
     let temp = materialize(false);
     let root = temp.path().join("refined.degap");

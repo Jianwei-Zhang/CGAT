@@ -68,6 +68,7 @@ pub(crate) struct ValidatedGrtPackage {
     pub(super) final_path: Value,
     pub(super) q0_artifact_sha256: String,
     pub(super) q4_artifact_sha256: String,
+    pub(super) refinement_reads: refinement_inputs::RefinementReadInputs,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

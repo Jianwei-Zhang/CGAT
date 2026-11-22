@@ -87,6 +87,7 @@ pub fn initialize_grt_project_with_options(
         let materialized_source_card_count =
             materialize_grt_source_cards_with_connection(&mut conn, project_id)?;
         verify_project_assignment_orientation_projection(&conn, project_id)?;
+        refinement_inputs::bind_imported_inputs(&conn, project_id)?;
         set_project_auto_pipeline_done_with_connection(&mut conn, project_id, true)?;
         Ok((assembly, materialized_source_card_count))
     })();

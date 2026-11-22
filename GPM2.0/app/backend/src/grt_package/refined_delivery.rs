@@ -276,7 +276,7 @@ pub(super) fn validate_refined_delivery<C>(
     projected: &Value,
     full: bool,
     cancel: &mut C,
-) -> Result<()>
+) -> Result<RefinementReadInputs>
 where
     C: FnMut() -> bool,
 {
@@ -491,5 +491,5 @@ where
             "accepted refined FASTA",
         )?;
     }
-    Ok(())
+    Ok(RefinementReadInputs::from_recipe(&provenance["execution"]["recipe"]))
 }

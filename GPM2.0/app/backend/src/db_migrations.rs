@@ -65,7 +65,27 @@ const MIGRATIONS: &[Migration] = &[
         name: "add_project_local_view_tasks",
         apply: migrate_local_view_tasks_to_v8,
     },
+    Migration {
+        version: 9,
+        name: "retain_refinement_read_sources",
+        apply: migrate_refinement_inputs_to_v9,
+    },
 ];
+
+fn migrate_refinement_inputs_to_v9(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS grt_refinement_inputs (
+            package_id INTEGER PRIMARY KEY CHECK (package_id = 1)
+                REFERENCES grt_package(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS project_refinement_inputs (
+            project_id INTEGER PRIMARY KEY REFERENCES project(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
+        );",
+    )
+    .context("failed to create refinement read source storage")
+}
 
 fn migrate_local_view_tasks_to_v8(conn: &Connection) -> Result<()> {
     conn.execute_batch(

@@ -473,7 +473,7 @@ where
     if q0_v3 {
         q0_provenance::validate_final_source_uniqueness(&final_path)?;
     }
-    if refined {
+    let refinement_reads = if refined {
         on_progress(
             "validate_refined_sources",
             "reconstructing accepted refined Final Path from bound sources",
@@ -484,8 +484,10 @@ where
             &final_path,
             fasta_available,
             should_cancel,
-        )?;
-    }
+        )?
+    } else {
+        Default::default()
+    };
     if let Some(expected_lengths) = manifest_object
         .get("q4_chromosome_lengths")
         .and_then(Value::as_object)
@@ -527,6 +529,7 @@ where
         final_path,
         q0_artifact_sha256: String::new(),
         q4_artifact_sha256: q4_artifact_sha256.to_string(),
+        refinement_reads,
     })
 }
 

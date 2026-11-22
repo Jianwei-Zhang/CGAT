@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 8;
+pub const CURRENT_SCHEMA_VERSION: i64 = 9;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -113,6 +113,12 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             q0_artifact_sha256 TEXT NOT NULL,
             q4_artifact_sha256 TEXT NOT NULL,
             final_path_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_refinement_inputs (
+            package_id INTEGER PRIMARY KEY CHECK (package_id = 1)
+                REFERENCES grt_package(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS grt_contig_role (
@@ -523,6 +529,11 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             degap_workspace_settings_json TEXT NOT NULL DEFAULT '{}',
             updated_at TEXT NOT NULL,
             note TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS project_refinement_inputs (
+            project_id INTEGER PRIMARY KEY REFERENCES project(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS project_assembly_view_state (

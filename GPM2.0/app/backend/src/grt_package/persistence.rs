@@ -38,6 +38,13 @@ pub(crate) fn persist_grt_package(
         ],
     )
     .context("failed to persist locked LGZ package recipe")?;
+    if !package.refinement_reads.is_empty() {
+        tx.execute(
+            "INSERT INTO grt_refinement_inputs (package_id, reads_json) VALUES (1, ?1)",
+            [serde_json::to_string(&package.refinement_reads)?],
+        )
+        .context("failed to persist refinement read sources")?;
+    }
 
     persist_row_table(
         tx,
@@ -201,6 +208,7 @@ pub(super) fn clear_grt_tables(tx: &Transaction<'_>) -> Result<()> {
         "grt_contig_role",
         "grt_stage_status",
         "grt_tool_version",
+        "grt_refinement_inputs",
         "grt_package",
     ] {
         tx.execute(&format!("DELETE FROM {table}"), [])
