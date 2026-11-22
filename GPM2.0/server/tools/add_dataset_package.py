@@ -2,9 +2,9 @@
 
 
 try:
-    from workspace_layout import workspace_join
+    from workspace_layout import logical_relative, workspace_join
 except ModuleNotFoundError:
-    from .workspace_layout import workspace_join
+    from .workspace_layout import logical_relative, workspace_join
 
 import csv
 import shutil
@@ -49,6 +49,11 @@ def write_filtered_tsv(src, dst, predicate):
     selected = [row for row in rows if predicate(row)]
     if not selected:
         return []
+    # Incremental App archives still use the portable, unnumbered layout.
+    for row in selected:
+        for field in ("fasta_relpath", "fai_relpath"):
+            if row.get(field):
+                row[field] = logical_relative(row[field])
     dst.parent.mkdir(parents=True, exist_ok=True)
     with dst.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
@@ -161,7 +166,7 @@ def main(argv):
     for chr_dir in sorted((workspace_join(server_dir, "runs")).glob("chr_*")):
         if not chr_dir.is_dir():
             continue
-        rel_chr = chr_dir.relative_to(server_dir)
+        rel_chr = logical_relative(chr_dir.relative_to(server_dir).as_posix())
         copy_file(
             chr_dir / "datasets" / f"{dataset_name}.fa",
             payload_root / rel_chr / "datasets" / f"{dataset_name}.fa",
@@ -177,12 +182,12 @@ def main(argv):
                 copy_tree(child, payload_root / rel_chr / child.name)
 
     for tel_path in sorted((workspace_join(server_dir, "tel")).glob(f"chr_*/{dataset_name}.tsv")):
-        copy_file(tel_path, payload_root / tel_path.relative_to(server_dir))
+        copy_file(tel_path, payload_root / logical_relative(tel_path.relative_to(server_dir).as_posix()))
 
     for marks_path in sorted((workspace_join(server_dir, "cen")).glob("chr_*/marks.tsv")):
         write_filtered_tsv_allow_empty(
             marks_path,
-            payload_root / marks_path.relative_to(server_dir),
+            payload_root / logical_relative(marks_path.relative_to(server_dir).as_posix()),
             lambda row: row.get("dataset_name") == dataset_name,
         )
 

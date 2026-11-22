@@ -371,6 +371,40 @@ def fasta(path):
         with self.assertRaisesRegex(Q0EvidenceError, "not complete"):
             self.run_prepare()
 
+    def test_numbered_q0_accepts_both_forms_of_the_same_pair_but_rejects_wrong_direction(self):
+        from server.tools.lgz_core.q0_preparation import _initial_inputs
+        from server.tools.run_outer_checkpoints import OuterCheckpointManager
+        from server.tools.workspace_layout import initialize_workspace
+
+        self.seed_assigned_support()
+        layout = initialize_workspace(self.root / "numbered")
+        for source in self.server.rglob("*"):
+            if source.is_file():
+                target = layout.path(source.relative_to(self.server).as_posix())
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+        descriptor = layout.path("runs/chr_Chr01/q0_alignment_inputs.json")
+        values = json.loads(descriptor.read_text())
+        cross = next(row for row in values["alignments"] if row["kind"] == "cross")
+        logical = cross["paf"]
+        self.assertTrue(logical.startswith("runs/"))
+        manager = OuterCheckpointManager(layout.root)
+        for extra in layout.path("runs").glob("chr_*/q0_command.sh"):
+            chromosome = extra.parent.name.removeprefix("chr_")
+            manager.commit(manager.prepare(f"q0_chr:{chromosome}", extra.relative_to(layout.root).as_posix()))
+        for supplied in (logical, layout.relative(logical)):
+            with self.subTest(paf=supplied):
+                cross["paf"] = supplied
+                descriptor.write_text(json.dumps(values))
+                manager.commit(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+                self.assertIn(supplied, {row["paf"] for row in _initial_inputs(layout.root)[5]})
+        cross["paf"] = layout.relative(logical).replace("_vs_support/", "_vs_self/")
+        self.assertNotEqual(cross["paf"], layout.relative(logical))
+        descriptor.write_text(json.dumps(values))
+        manager.commit(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+        with self.assertRaisesRegex(Q0EvidenceError, "does not match its declared direction"):
+            _initial_inputs(layout.root)
+
     def test_missing_mandatory_pair_is_rejected_even_with_a_fresh_receipt(self):
         from server.tools.run_outer_checkpoints import OuterCheckpointManager
         descriptor = self.server / "runs/chr_Chr01/q0_alignment_inputs.json"

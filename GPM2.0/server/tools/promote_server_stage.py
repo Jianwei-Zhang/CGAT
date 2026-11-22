@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 try:
-    from workspace_layout import workspace_join
+    from workspace_layout import WorkspaceLayout
 except ModuleNotFoundError:
-    from .workspace_layout import workspace_join
+    from .workspace_layout import WorkspaceLayout
 
 
 import argparse
@@ -39,6 +39,22 @@ def promote(stage_dir: Path, server_dir: Path, optional_entries: list[str]) -> N
 
     stage_dir = stage_dir.resolve()
     server_dir = server_dir.resolve()
+    source_layout, destination_layout = (WorkspaceLayout.detect(root) for root in (stage_dir, server_dir))
+    if source_layout.version != destination_layout.version:
+        raise ValueError("incremental stage and workspace use different layouts")
+    names = (*BASE_ENTRIES, *optional_entries)
+    if source_layout.version == 2:
+        # The legacy data root splits into separate physical subtrees; these
+        # incrementals write assemblies/derived files, not reference or reads.
+        names = tuple(name for name in names if name != "data") + ("data/datasets", "data")
+    entries = [(source_layout.path(name), destination_layout.path(name)) for name in names]
+    # A staged copy must retain the prepared runtime and entrypoints. Refuse
+    # before replacing anything if the input is not a complete stage.
+    for name in (".prepare_lib", "run_all.sh"):
+        source = source_layout.path(name)
+        destination = destination_layout.path(name)
+        if destination.exists() and (not source.exists() or source.is_symlink()):
+            raise ValueError(f"incremental stage is missing a prepared entry: {name}")
     for path in stage_dir.rglob("*.sh"):
         text = path.read_text(encoding="utf-8")
         path.write_text(
@@ -47,9 +63,7 @@ def promote(stage_dir: Path, server_dir: Path, optional_entries: list[str]) -> N
             newline="",
         )
 
-    for name in (*BASE_ENTRIES, *optional_entries):
-        source = stage_dir / name
-        destination = workspace_join(server_dir, name)
+    for source, destination in entries:
         if destination.exists() or destination.is_symlink():
             if destination.is_dir() and not destination.is_symlink():
                 shutil.rmtree(destination)

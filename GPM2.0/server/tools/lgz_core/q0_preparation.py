@@ -6,9 +6,9 @@ mapped here. A ready manifest is published atomically after every task succeeds.
 from __future__ import annotations
 
 try:
-    from workspace_layout import workspace_join
+    from workspace_layout import WorkspaceLayout, workspace_join
 except ModuleNotFoundError:
-    from ..workspace_layout import workspace_join
+    from ..workspace_layout import WorkspaceLayout, workspace_join
 
 
 from collections import defaultdict
@@ -149,6 +149,7 @@ def load_verified_evidence(root: Path) -> dict:
 
 
 def _initial_inputs(root: Path):
+    layout = WorkspaceLayout.detect(root)
     datasets = table(root, "metadata/datasets.tsv", ("dataset_name", "fasta_relpath"))
     references = table(root, "metadata/reference.tsv", ("fasta_relpath",))
     assignments = table(root, "metadata/chr_assignments.tsv", ("dataset_name", "seq_name", "assigned_chr_name"))
@@ -219,7 +220,10 @@ def _initial_inputs(root: Path):
                 raise Q0EvidenceError(f"unexpected or duplicate q0 pair: {chromosome}:{pair}")
             actual.add(pair)
             stem = f"{left}_vs_self" if left == right else f"{left}_vs_{right}"
-            if row["paf"] != f"runs/chr_{chromosome}/{stem}/result.paf":
+            expected_paf = layout.relative(f"runs/chr_{chromosome}/{stem}/result.paf")
+            # Old descriptors use logical paths; current producers record
+            # numbered paths. Require the same exact owned pair/direction.
+            if layout.relative(row["paf"]) != expected_paf:
                 raise Q0EvidenceError("q0 pair PAF does not match its declared direction")
             for field, dataset in (("query_fasta", right), ("target_fasta", left)):
                 partition = artifact_path(root, row[field])
