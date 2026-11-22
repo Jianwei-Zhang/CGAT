@@ -5,6 +5,7 @@ only: no native command/checkpoint, scientific acceptance or source path changes
 """
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 import hashlib
 from html import escape, unescape
@@ -22,6 +23,35 @@ CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline
        "base-uri 'none'; form-action 'none'")
 WRAPPER_CSP = ("default-src 'none'; style-src 'unsafe-inline'; frame-src 'self' file:; "
                "connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'")
+# Opaque sandbox origins cannot navigate even their own file:// frame. The
+# native overview may request a generated filename, never a path or URL.
+DETAIL_REQUEST = "cgat.native-report.open-detail"
+DETAIL_CLICK = f"""(()=>{{
+  for (const kind of ["click", "auxclick"]) document.addEventListener(kind, event => {{
+    const link = event.target?.closest?.("a.table-link");
+    if (!link) return;
+    event.preventDefault();
+    if (kind === "click" && window.parent !== window) {{
+      window.parent.postMessage({{type: "{DETAIL_REQUEST}", name: link.getAttribute("href")}}, "*");
+    }}
+  }}, true);
+}})();"""
+
+
+def overview_navigation(names):
+    allowed = json.dumps(sorted(names), ensure_ascii=True)
+    return f"""(()=>{{
+  const names = new Set({allowed});
+  const frame = document.getElementById("native-view");
+  window.addEventListener("message", ({{source, origin, data}}) => {{
+    if (source !== frame.contentWindow || origin !== "null" ||
+        !data || data.type !== "{DETAIL_REQUEST}" || !names.has(data.name)) return;
+    frame.src = "pages/" + encodeURIComponent(data.name);
+    frame.title = data.name;
+  }});
+}})();"""
+
+
 CSS = """
 :root{
   color-scheme:light;
@@ -128,8 +158,14 @@ def availability_badge(value):
     )
 
 
-def page(title, body, *, wrapper=False, scope=None, subtitle=None, nav=None, badge=None, compact=False):
+def page(title, body, *, wrapper=False, scope=None, subtitle=None, nav=None, badge=None, compact=False,
+         wrapper_script=None):
     csp = WRAPPER_CSP if wrapper else CSP.replace("script-src 'unsafe-inline'", "script-src 'none'")
+    end_script = ""
+    if wrapper_script is not None:
+        checksum = base64.b64encode(hashlib.sha256(wrapper_script.encode()).digest()).decode("ascii")
+        csp += f"; script-src 'sha256-{checksum}'"
+        end_script = "<script>" + wrapper_script + "</script>"
     if compact:
         return (
             '<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -151,7 +187,7 @@ def page(title, body, *, wrapper=False, scope=None, subtitle=None, nav=None, bad
         + eyebrow
         + '<div class="cgat-title-row"><h1>' + escape(title) + '</h1>' + (badge or "") + '</div>'
         + sub_html + nav_html
-        + '</div></header><main class="cgat-main">' + body + '</main></body></html>'
+        + '</div></header><main class="cgat-main">' + body + '</main>' + end_script + '</body></html>'
     ).encode()
 
 
@@ -276,7 +312,7 @@ class Inspector(HTMLParser):
             self.scripts.append(body)
 
 
-def transform(raw, unused_scripts, local_pages, inline_images=(), *, artifact_job=None):
+def transform(raw, unused_scripts, local_pages, inline_images=(), *, artifact_job=None, overview=False):
     try:
         text = raw.decode("utf-8", errors="strict")
     except UnicodeError as error:
@@ -298,6 +334,8 @@ def transform(raw, unused_scripts, local_pages, inline_images=(), *, artifact_jo
     note = ('<div style="padding:.7em;background:#eef5ff;color:#17212b;font:14px system-ui">'
             'Native tool visualization, not CGAT accepted/final sequence. Use the CGAT navigation above this frame. '
             '/ 原生工具可视化，不是 CGAT 接纳或最终序列；请使用框架上方的 CGAT 导航。</div>')
+    if overview:
+        note += "<script>" + DETAIL_CLICK + "</script>"
     patches = [*inspect.patches, (inspect.head_end, inspect.head_end, insert),
                (inspect.body_end, inspect.body_end, note)]
     for start, end, replacement in sorted(patches, reverse=True):
@@ -307,7 +345,8 @@ def transform(raw, unused_scripts, local_pages, inline_images=(), *, artifact_jo
     text = re.sub(r'target\s*=\s*([\'"])_blank\1', 'target="_self"', text, flags=re.I)
     return text.encode(), {"removed_unused_external_scripts": len(inspect.patches) - inspect.detached_artifacts,
                            "detached_native_artifact_links": inspect.detached_artifacts,
-                           "csp": CSP, "popup_links": "same-frame", "scripts": len(inspect.scripts)}
+                           "csp": CSP, "detail_navigation": "allowlisted_wrapper_frame" if overview else "none",
+                           "scripts": len(inspect.scripts)}
 
 
 def component(value):
@@ -440,7 +479,7 @@ def prepare(tool, native, jobs, gaps, assets, read, *, remaining_budget, page_si
                     raw = global_raw if name == GLOBAL else read(source["workspace_path"], source["sha256"])
                     family_job = name[:-5] if name.endswith(".bidirectional.html") else None
                     content, changes = transform(raw, lock["unused_external_scripts"], names, lock["inline_data_images"],
-                                                 artifact_job=family_job)
+                                                 artifact_job=family_job, overview=name == GLOBAL)
                     row.update(availability="offline_interactive", transformations=changes)
                     pages[name] = content
                 except UnsupportedView as error:
@@ -496,16 +535,20 @@ def prepare(tool, native, jobs, gaps, assets, read, *, remaining_budget, page_si
             '<a href="index.html">Native visualization index / 原生可视化目录</a>'
             '<a href="../' + escape(diagnostics_page, quote=True) + '">CGAT job diagnostics / CGAT 任务诊断</a>'
         )
+        script = overview_navigation(required) if name == GLOBAL and required else None
+        if script is not None:
+            wrapper_nav += '<a href="' + wrapper + '">Reset to native overview / 返回原生总览</a>'
         body = (
             '<p class="note is-warn">Native visualization is not accepted/final sequence or biological validation. '
             '/ 原生可视化不等于接纳、最终序列或生物学验证。</p>'
-            '<iframe title="' + escape(name, quote=True) + '" sandbox="allow-scripts" referrerpolicy="no-referrer" src="pages/'
+            '<iframe id="native-view" title="' + escape(name, quote=True) + '" sandbox="allow-scripts" referrerpolicy="no-referrer" src="pages/'
             + quote(name) + '"></iframe>'
         )
         files[wrapper] = page(
             name,
             body,
             wrapper=True,
+            wrapper_script=script,
             scope="CGAT Managed Native View / 离线原生视图封装",
             subtitle='Source binding / 来源绑定: ' + escape(source_kinds),
             nav=wrapper_nav,

@@ -178,7 +178,7 @@
         "tools/refinement_native.py": "a5d87b3e00b41a07030b4f1bf6ae9a849eca51a7819785906c88402139af5a69",
         "tools/refinement_native_checkpoint.py": "56b267cf4b69938fb2d8232b968363d6d1c0e950b4c057e25beed8d94631d652",
         "tools/refinement_native_formats.py": "f228d28bcb2b237b370e6d71bdc3e0e2a43ac185ae8d15398c21cc030e2964f9",
-        "tools/refinement_native_reports.py": "78b4592e4a359a5b75efe293075fea77ea270740712234f8879e0751957cc52b",
+        "tools/refinement_native_reports.py": "175c6d0e1a05083ed88f2cf68018c458fb78f0ff52a8e001ba6a00b99096b8b8",
         "tools/refinement_native_runner.py": "f01270d6b46bf47d16adece12904ad781285290f8715b9691da4a6c3516b2ed8",
         "tools/refinement_native_trace.py": "e87fa47fc5e35fdcf6b77cd226d3abb5f56448e413765117d61e5c692bc6de37",
         "tools/refinement_native_units.py": "d4e2874cc1afeeb9d990f87a21a5bf399c5538e4a594384864747abdac728b53",

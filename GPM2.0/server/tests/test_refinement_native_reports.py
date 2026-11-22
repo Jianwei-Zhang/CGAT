@@ -1,5 +1,8 @@
 """Portable native HTML closure using the pinned visualizers, not native biology."""
+import base64
+import hashlib
 from html import escape
+import re
 from html.parser import HTMLParser
 import json
 from pathlib import Path
@@ -128,6 +131,37 @@ let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>input+
             run = subprocess.run([shutil.which("node"), "-e", code], input=json.dumps(samples), capture_output=True, text=True, timeout=10)
             self.assertEqual(run.returncode, 0, run.stderr)
             self.assertIn("passed without Chart.js", run.stdout)
+
+    @unittest.skipUnless(shutil.which("node"), "local message handler VM check requires Node")
+    def test_overview_route_requires_opaque_frame_and_exact_packaged_filename(self):
+        name = "chr1.1.bidirectional.html"
+        script = visual.overview_navigation({name})
+        wrapper = visual.page("overview", '<iframe id="native-view"></iframe>', wrapper=True, wrapper_script=script)
+        token = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
+        doc = Documents(); doc.feed(wrapper.decode())
+        self.assertIn(f"script-src 'sha256-{token}'", doc.csp[0])
+        self.assertNotIn("script-src 'unsafe-inline'", doc.csp[0])
+        self.assertEqual(re.findall(r"<script>(.*?)</script>", wrapper.decode(), re.S), [script])
+        code = r"""
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const {parentCode, childCode, request, name} = JSON.parse(require('node:fs').readFileSync(0));
+const frame={contentWindow:{},src:'pages/Global.report.html'}, handlers={};
+vm.runInNewContext(parentCode, {document:{getElementById:()=>frame},window:{addEventListener:(_,f)=>handlers.message=f}});
+const send=(name, origin='null', source=frame.contentWindow, type=request)=>handlers.message({origin,source,data:{type,name}});
+for (const bad of ['../secret.html','https://example.invalid/x','%2e%2e%2fprivate.html','unpackaged.html',name+'?other',null]) send(bad);
+send(name,'https://example.invalid');send(name,'null',{});send(name,'null',frame.contentWindow,'other');
+assert.equal(frame.src,'pages/Global.report.html');
+const native = {parent:{postMessage:(data,target)=>{assert.equal(target,'*'); assert.equal(data.type,request); send(data.name);}}};
+vm.runInNewContext(childCode,{window:native,document:{addEventListener:(kind,f)=>handlers[kind]=f}});
+const click={target:{closest:()=>({getAttribute:()=>name})},preventDefault(){this.prevented=true;}};
+handlers.auxclick(click);assert.equal(frame.src,'pages/Global.report.html');
+handlers.click(click);assert(click.prevented);assert.equal(frame.src,`pages/${name}`);assert.equal(frame.title,name);
+"""
+        result = subprocess.run([shutil.which("node"), "-e", code], input=json.dumps({"parentCode": script,
+                                "childCode": visual.DETAIL_CLICK, "request": visual.DETAIL_REQUEST, "name": name}),
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_detail_and_unapproved_script_remain_explicit_and_closed(self):
         with tempfile.TemporaryDirectory() as directory:

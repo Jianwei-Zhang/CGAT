@@ -63,9 +63,15 @@ arbitrary HTML and not grounds for rerunning a successful native analysis.
 The display retains native inline JS/CSS/SVG and makes only disclosed presentation
 changes: remove the unused CDN tag, add restrictive CSP, keep approved inline SVG data-URI/gradient assets and detail navigation
 inside its report frame and add native-versus-accepted provenance/navigation.
-A script-free CGAT wrapper embeds each native page with `sandbox=allow-scripts`,
-without same-origin, top-navigation or popup permissions. Native detail links
-stay within the copied report closure. Closure is derived from the overview's actual embedded gap JSON and checked against available native gap diagnostics; a drifted overview is not silently relabeled with another gap list. Missing, blocked or quota-limited detail
+Each CGAT wrapper embeds native content with `sandbox=allow-scripts`, without
+same-origin, top-navigation or popup permissions. Windows Chrome blocks a
+sandboxed `file://` document from navigating itself to another local file. The
+overview therefore sends a fixed detail-selection message to its own wrapper.
+Only the overview wrapper runs a CSP-hash-pinned script, which checks the sender
+and resolves the exact detail name against its own list of packaged pages and
+explicit unavailable placeholders. It never accepts a URL from the frame. Other
+wrappers are script-free. Native detail links stay inside the sandbox and within
+the copied report closure. Closure is derived from the overview's actual embedded gap JSON and checked against available native gap diagnostics; a drifted overview is not silently relabeled with another gap list. Missing, blocked or quota-limited detail
 reports get an explicit CGAT unavailable page rather than a dangling hyperlink
 or fabricated native result. The native overview, both available job directions,
 CGAT original-gap pages and raw diagnostic attachments remain separately labeled.

@@ -291,10 +291,46 @@ On native Donau ARM64, the installer and compute-node runtime checks passed.
 Job `43015905` reached the new family DEGAP engine, then the scheduler stopped
 it at the 10 GiB memory quota. The corresponding x86_64 native hifiasm log
 recorded a 13.659 GB peak RSS; this was a quota failure, not a completed no-fill.
-Job `43015911` was submitted with a 30 GiB quota to resume the same stopped
-synthetic workspace, leaving the scientific invocation at two threads and
-checking that already-completed LGZ/reference artifacts are unchanged. The
-ARM64 validation is not yet a pass; both attempts remain separately recorded.
+At 30 GiB, resume job `43015911` stopped in the validation driver, before
+starting Server. The killed original driver left its receipt at `running`;
+Donau's terminal state, not the stale receipt, proved it had exited. The
+corrected driver verified terminal scheduler states, the pinned source and
+completed install/runtime/generator checks, then submitted `43015918` at the
+same 30 GiB quota and two scientific threads. That job exited 0 on
+`agent-ARM-24`: it accepted one DEGAP edit, changed the chromosome sequence,
+validated both archive modes and preserved LGZ/alignment bytes and mtimes.
+Receipt SHA-256: `82587c43e1b91b4803502fe4e2ad261460e3d0f10a32d58717623892f407b5ca`.
+The separate ARM64 all-tool append/repeat and ONT-only validation is job
+`43015933`; do not count it as passed based on the DEGAP resume alone.
+
+### Windows offline navigation and App delivery for the new pin
+
+Windows Chrome 157 blocked the original attempt to follow a local file link
+from inside the opaque sandbox. The renderer now uses an allowlisted message
+between the native overview and its own wrapper, which selects only an exact
+packaged detail name; iframe permissions remain `sandbox=allow-scripts`.
+The wrapper script has its own CSP hash; it cannot load a URL supplied by the
+iframe. The raw upstream HTML remains unmodified.
+
+A report-only refresh of the real x86_64 DEGAP run produced new Full/Light
+archives without changing the native completion receipt, LGZ and alignment
+artifacts, or the published Final Path and assembly (bytes and mtimes).
+The publication journal records the previous report/delivery generation.
+The detached archives were then opened from `file://` under paths with spaces
+and Chinese characters. In both modes, the language switch and task table
+expanded; the actual table link opened the bidirectional task in the existing
+sandbox; the user could expand junction details and return to the overview.
+The browser recorded no external requests, failed resources, or runtime/security
+errors. Hashes: refresh receipt `da0eb0a5afa8d4d3ec444cf605b2bdc74b5b08aa20cccd5ae19ae67e4afcbd9f`;
+browser receipt `4362f4c0aff4e71c3d184924bddf871a63de50253f4bc8c7eefa8a44f391332e`.
+
+The existing Windows desktop acceptance binary imported both the corresponding
+LGZ-only pair and the refreshed DEGAP pair. Full exported the same sourced
+chromosomes as Server; Light retained its trace and refused FASTA export.
+All four imports preserved a subsequent manual edit and rejected a duplicate
+import destination. This exercises the existing importer, not an installer or a
+new Windows App build. Receipt SHA-256:
+`e584d0a86e6cf63b72d73685322cec40cd4246c598efc7a352ff9dc1cc7812f1`.
 
 ## Historical sequencing note: re-audit DEGAP after upstream feature merge
 
@@ -623,9 +659,9 @@ legacy versions.
 | A02 | Verified | Public no-reads, ONT-only, mixed-read and explicit `none` runs; default DEGAP, grouped/unsupported reads and invalid choices also covered in `test_refinement_launch.py`, `test_refinement_tools.py` and `test_refinement_reads.py`. |
 | A03 | Verified | Real `run_all.sh` four-tool append, unchanged repeat, original scientific file and alignment identity audits. |
 | A04 | Verified | Four actual command/input receipts with mixed and ONT-only cases; grouped same-basename inputs, content-bound reuse, format and source controls. |
-| A05 | Partial | x86_64 public install and read-only `--check`; controlled managed-spec upgrade and unmanaged-env refusal. ARM64 pinned solve passed; actual install, `--check` and native runs remain outstanding. |
-| A06 | Verified on x86_64 | All four pinned native tools ran against the synthetic workspace with inspected outputs and reports. Not a claim of an accepted edit from every tool or native ARM64 coverage. |
-| A07 | Verified | Independent source-slice reconstruction equals each published chromosome; accepted quarTeT, LR and ONT-only TGS outputs differ from LGZ. Zero-admission results are unchanged and explicitly labelled. |
+| A05 | Verified on both architectures | x86_64 public install/`--check`, controlled managed-spec upgrade and unmanaged-env refusal. Native ARM64 private install, compute-node `--check` and active pinned runtime verification passed. |
+| A06 | Full matrix on x86_64; DEGAP on ARM64 | All four pinned tools ran on x86_64. The pinned newer DEGAP also ran on native ARM64 and accepted one edit; the ARM64 all-tool matrix is tracked separately. |
+| A07 | Verified | Independent source-slice reconstruction equals each published chromosome; accepted newer DEGAP, quarTeT, LR and ONT-only TGS outputs differ from LGZ. Zero-admission results are unchanged and explicitly labelled. |
 | A08 | Verified in fixtures and the synthetic sample | `test_refinement_admission.py`, `test_refinement_native_trace.py` and `test_refinement_path.py` cover orientations, overlap, competing/nearby intervals, partial edits, residual Ns and zero acceptance. |
 | A09 | Verified in controls and native readmission | Proposal conflicts, malformed evidence, mutated inputs and corrupt checkpoints are rejected in admission/path/native tests; the original-frame native readmission audit verifies only validated evidence is reused. |
 | A10 | Verified | Actual quarTeT SIGTERM while LR still delivered; nonzero launcher exit and retry of quarTeT only. Separate pinned-driver producer checks. |
@@ -633,7 +669,7 @@ legacy versions.
 | A12 | Verified for reviewed legacy engines | Actual old-engine continuation and append, rollback/resume after interruption, old-launcher fence; no-launch-record, stale evidence and active/foreign lock cases in migration regressions. |
 | A13 | Verified | Actual pipeline and detached Full/Light Windows offline report checks. Native diagnostics, CGAT admission, remaining gaps and published files are distinct; DEGAP visualizations preserve sandboxed local navigation. |
 | A14 | Verified | Actual `07_delivery/` inventories and detached Full/Light validators; report trees and paths agree across paired archives, Light does not claim sequence availability, archive inputs do not include the delivery tree. |
-| A15 | Verified | Windows desktop command roundtrip on seven actual Full/Light pairs; sequence exports equal their Server FASTA and positive refinements differ from LGZ. |
+| A15 | Verified | Windows desktop command roundtrip on seven original Full/Light pairs and two more with the new DEGAP pin; sequence exports equal their Server FASTA and positive refinements differ from LGZ. |
 | A16 | Verified | Pre-feature importer accepts LGZ and rejects refined schema; matching App accepts legacy/Light and preserves manual edits, with no Light FASTA export. |
 | A17 | Verified for report scope | Immutable input and native-run identities, selected technologies, resources, unclosed/native-candidate versus accepted gaps in the reports. The sample makes no accuracy, speed or tool-ranking claim. |
 | A18 | Verified for branch handoff | Bilingual Server guides, migration instructions, pinned recipes, platform limitations, source revisions and verification receipts; no release or merge to `master`. |
