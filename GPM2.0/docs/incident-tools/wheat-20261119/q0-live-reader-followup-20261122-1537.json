@@ -1,0 +1,87 @@
+{
+  "host": "agent-X86-39",
+  "input_sha256": "9074aaa24022b3bd1c405812b492fa279c95431b55cea2d78948b9f5b08166f0",
+  "main_job": 43012037,
+  "main_workspace_modified": false,
+  "observations": [
+    {
+      "at": "2026-11-22T15:35:46.397315+08:00",
+      "clock_ticks_per_second": 100,
+      "cpu_ticks": 740850,
+      "monotonic": 65770789.37269244,
+      "pid": 1966058,
+      "rss_kib": 68416940,
+      "start_ticks": 6576032463,
+      "state": "D",
+      "swap_kib": 0,
+      "threads": 1,
+      "workspace_fds": [
+        {
+          "offset": 637812736,
+          "relative_path": "runs/JM19_hifiasm_vs_ref/result.paf",
+          "size": 683392866
+        }
+      ]
+    },
+    {
+      "at": "2026-11-22T15:36:06.577145+08:00",
+      "clock_ticks_per_second": 100,
+      "cpu_ticks": 741423,
+      "monotonic": 65770809.55251599,
+      "pid": 1966058,
+      "rss_kib": 68551208,
+      "start_ticks": 6576032463,
+      "state": "D",
+      "swap_kib": 0,
+      "threads": 1,
+      "workspace_fds": [
+        {
+          "offset": 644571136,
+          "relative_path": "runs/JM19_hifiasm_vs_ref/result.paf",
+          "size": 683392866
+        }
+      ]
+    },
+    {
+      "at": "2026-11-22T15:36:26.699113+08:00",
+      "clock_ticks_per_second": 100,
+      "cpu_ticks": 741914,
+      "monotonic": 65770829.67448237,
+      "pid": 1966058,
+      "rss_kib": 68683112,
+      "start_ticks": 6576032463,
+      "state": "D",
+      "swap_kib": 0,
+      "threads": 1,
+      "workspace_fds": [
+        {
+          "offset": 651296768,
+          "relative_path": "runs/JM19_hifiasm_vs_ref/result.paf",
+          "size": 683392866
+        }
+      ]
+    },
+    {
+      "at": "2026-11-22T15:36:46.783444+08:00",
+      "clock_ticks_per_second": 100,
+      "cpu_ticks": 742447,
+      "monotonic": 65770849.75881173,
+      "pid": 1966058,
+      "rss_kib": 68821368,
+      "start_ticks": 6576032463,
+      "state": "D",
+      "swap_kib": 0,
+      "threads": 1,
+      "workspace_fds": [
+        {
+          "offset": 658128896,
+          "relative_path": "runs/JM19_hifiasm_vs_ref/result.paf",
+          "size": 683392866
+        }
+      ]
+    }
+  ],
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-reader-openfile-followup-20261122-153446",
+  "sample_job": 43013000,
+  "status": "verified_readonly_main_reader_followup"
+}
