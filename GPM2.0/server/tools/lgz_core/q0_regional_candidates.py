@@ -294,17 +294,13 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                 item = fallback.setdefault(targets,{"kind":"candidate_chr","query_ids":[],"target_ids":list(targets),"regional_fallback":[]})
                 item["query_ids"].append(key);item["regional_fallback"].append({"query":key,"reason":reason})
                 report["fallback_parents"] += 1
-            report["regional_windows"] += len(planned)
-            selected = []
-            for query, targets in planned:
+            for window_number, (query, targets) in enumerate(planned):
+                if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
+                    raise Q0EvidenceError("--skip-self conflicts with required regional candidate comparisons")
                 if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
                     report["frontier_omitted_windows"] += 1
                     continue
-                selected.append((query, targets))
-            report["regional_windows"] -= len(planned) - len(selected)
-            for window_number, (query,targets) in enumerate(selected):
-                if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
-                    raise Q0EvidenceError("--skip-self conflicts with required regional candidate comparisons")
+                report["regional_windows"] += 1
                 if len(pending) >= workers: consume()
                 future = pool.submit(prepare_regional_mapping,root,catalog,query,targets,tool,
                                      reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)

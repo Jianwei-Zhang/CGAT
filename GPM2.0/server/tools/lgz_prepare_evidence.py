@@ -20,9 +20,12 @@ def main():
     parser.add_argument("--server-dir", required=True, type=Path)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--minimap2", default="minimap2")
+    parser.add_argument("--supplement-scope", choices=("full", "decision_frontier"), default="full",
+                        help="experimental lossy regional window scope; default retains full evidence search")
     args = parser.parse_args()
     try:
-        prepare_evidence(args.server_dir, threads=execution_threads(args.threads), minimap2=args.minimap2)
+        prepare_evidence(args.server_dir, threads=execution_threads(args.threads), minimap2=args.minimap2,
+                         supplement_scope=args.supplement_scope)
     except (OSError, ValueError, Q0EvidenceError, OrchestrationContractError) as exc:
         parser.exit(1, f"q0 evidence preparation failed: {exc}\n")
 

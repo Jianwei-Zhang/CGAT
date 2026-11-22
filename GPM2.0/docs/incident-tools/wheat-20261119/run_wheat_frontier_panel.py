@@ -24,6 +24,7 @@ from lgz_core.q0_alignments import read_paf
 from lgz_core.q0_catalog import ObservedSourcePairs, evidence_ref
 from lgz_core.q0_paths import PairLink
 from lgz_core.q0_regional_execution import RegionalExecutor
+from lgz_core.q0_regional_mapping import verify_regional_task
 from lgz_core.q0_sources import Interval, SourceKey, split_source
 from probe_q0_decision_frontier import compare, decision_frontier, member_geometry, timed
 
@@ -122,12 +123,74 @@ def missing_competitor_contexts(data, construction, omitted):
             "potential_additional_raw_contexts":len({c[0] for _,c in incomplete})}
 
 
-def run_arm(root, panel, manifest, data, assignments, desc, mapper, threads, frontier):
+def restore_committed_tasks(previous, root, parts):
+    """Copy only complete, content-bound tasks from a terminal isolated arm."""
+    if previous == root or root.is_relative_to(previous) or previous.is_relative_to(root):
+        raise ValueError("overlapping diagnostic cache roots")
+    prefix = "grt/evidence/q0_prepare"
+    regionals = sorted((previous / prefix / "regional/projects").glob("*/success.json"))
+    natives = sorted((previous / prefix / "tasks").glob("q0-map-*/success.json"))
+    if len(regionals) + len(natives) > 1000:
+        raise ValueError("diagnostic resume inventory exceeds its budget")
+    frozen = {}
+
+    def add(path, expected):
+        if path in frozen and frozen[path] != expected:
+            raise ValueError("ambiguous prior diagnostic output identity")
+        frozen[path] = expected
+
+    for path in regionals + natives:
+        receipt = path.relative_to(previous).as_posix()
+        receipt_identity = prep.identity(previous, receipt)
+        record = prep.json_file(within(previous, receipt))
+        spec = record["spec"]
+        task_id = path.parent.name
+        if record["status"] != "success":
+            raise ValueError("diagnostic tasks must have complete success receipts")
+        if path.parent.parent.name == "projects":
+            task = {"task_id":task_id, "kind":"regional_discovery", "receipt":receipt,
+                    "paf":receipt.removesuffix("success.json")+"result.paf",
+                    "query_ids":[spec["query"]["segment_id"]],
+                    "target_ids":sorted({r["segment_id"] for r in spec["targets"]})}
+            if verify_regional_task(previous, task, members=parts) != record:
+                raise ValueError("diagnostic projection verification changed its receipt")
+        else:
+            source_ids = set(spec["query_ids"] + spec["target_ids"])
+            expected_members = dict(spec["members"])
+            if (spec["schema"] != "lgz_q0_mapping_v1" or stable_id("q0-map",spec) != task_id
+                    or expected_members.keys() != source_ids or len(expected_members) != len(spec["members"])
+                    or not source_ids <= parts.keys()
+                    or any(parts[key].sequence_sha256 != sha for key,sha in expected_members.items())):
+                raise ValueError("diagnostic native receipt has different inputs")
+            required={receipt.removesuffix("success.json")+name for name in prep.MAPPING_OUTPUT_FILES}
+            if required != {r["path"] for r in record["outputs"]} or len(record["outputs"]) != len(required):
+                raise ValueError("incomplete diagnostic native receipt inventory")
+        add(receipt,receipt_identity)
+        for row in record["outputs"]:
+            add(row["path"],row)
+    if sum(row["size"] for row in frozen.values()) > 512*1024**2:
+        raise ValueError("diagnostic resume bytes exceed their budget")
+    for relative, expected in frozen.items():
+        source = within(previous,relative)
+        if prep.identity(previous,relative) != expected:
+            raise ValueError("frozen diagnostic artifact differs from receipt")
+        destination = root / relative
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        if destination.exists():
+            raise ValueError("diagnostic resume destination is not fresh")
+        shutil.copyfile(source,destination)
+        if prep.identity(root,relative) != expected:
+            raise ValueError("restored diagnostic artifact differs from receipt")
+    return {"regional_successes":len(regionals),"native_successes":len(natives),"files":len(frozen)}
+
+
+def run_arm(root, panel, manifest, data, assignments, desc, mapper, threads, frontier, previous=None):
     for name,sha in manifest["artifacts"].items():
         src=within(panel,name); dest=root/name
         dest.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(src,dest)
         if digest(dest)!=sha:
             raise ValueError("frozen natural input changed")
+    restored = restore_committed_tasks(previous, root, data.parts) if previous is not None else None
     def initial(request):
         if request!=root:
             raise ValueError("natural panel cannot initialize another workspace")
@@ -150,13 +213,14 @@ def run_arm(root, panel, manifest, data, assignments, desc, mapper, threads, fro
     built, select_seconds=timed(observed,allow_no_path=True)
     return built,observed,plans,{
         "prepare_seconds":prep_seconds,"load_and_select_seconds":time.monotonic()-start,
+        "restored_prior_completed_tasks":restored,
         "select_seconds":select_seconds,"dispatch":dict(counts),"ready_catalog":ready["catalog"],
         "task_kinds":dict(Counter(r["kind"] for r in observed.catalog["supplementary_alignments"])),
         "unique_projection_plans":len(plans),"unique_raw_contexts":len({k[0] for k in plans}),"reference_loci_chromosomes":len({h.target_name for hits in data.reference_hits.values() for h in hits}),
         "sequence_sha256":{} if built is None else {k:sha256(v.encode("ascii")).hexdigest() for k,v in built.records.items()}}
 
 
-def panel_run(panel, out, mapper, threads):
+def panel_run(panel, out, mapper, threads, previous_full=None):
     manifest=json.loads((panel/"panel.json").read_text())
     if manifest["panel"]!=panel.name or out.exists() or out.is_relative_to(panel) or panel.is_relative_to(out):
         raise ValueError("mismatched panel or not isolated")
@@ -167,6 +231,7 @@ def panel_run(panel, out, mapper, threads):
     base_data,assignments,desc=base_input(panel,manifest)
     base,base_seconds=timed(base_data,allow_no_path=True)
     elapsed=time.monotonic()-start
+    print(f"{panel.name}: base load and selection complete ({elapsed:.1f}s)",flush=True)
     frontier=None if base is None else decision_frontier(base,100_000)
     out.mkdir()
     report={"panel":manifest["panel"],"members":manifest["members"],"source_bases":manifest["source_bases"],
@@ -175,7 +240,8 @@ def panel_run(panel, out, mapper, threads):
                             "not full JM19 target/competitor universe or downstream LGZ acceptance",
                             "no production ready artifact or policy change"]}
     def run(mode,wanted):
-        result=run_arm(out/mode,panel,manifest,base_data,assignments,desc,mapper,threads,wanted)
+        result=run_arm(out/mode,panel,manifest,base_data,assignments,desc,mapper,threads,wanted,
+                       previous=previous_full if mode=="full" else None)
         print(f"{panel.name}: completed {mode}",flush=True)
         return result
     a,_,all_plans,report["full"]=run("full",None)
@@ -199,9 +265,11 @@ def main():
     p.add_argument("--panel",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
     p.add_argument("--mapper",required=True)
+    p.add_argument("--restore-terminal-full",type=Path,help="verified receipt-only cache of a terminal isolated full arm")
     p.add_argument("--threads",type=int,choices=(2,4,6),default=6)
     a=p.parse_args()
-    panel_run(a.panel.resolve(strict=True),a.output.resolve(),a.mapper,a.threads)
+    previous=a.restore_terminal_full.resolve(strict=True) if a.restore_terminal_full else None
+    panel_run(a.panel.resolve(strict=True),a.output.resolve(),a.mapper,a.threads,previous_full=previous)
 
 
 if __name__=="__main__":

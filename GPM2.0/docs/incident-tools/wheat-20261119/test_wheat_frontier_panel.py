@@ -1,15 +1,18 @@
 from collections import Counter
 from hashlib import sha256
+import json
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
 
 from lgz_core.q0_paths import PairLink
+from lgz_core.common import stable_id
+from lgz_core.q0_preparation import identity, MAPPING_OUTPUT_FILES
 from lgz_core.q0_alignments import parse_paf_line
 from lgz_core.q0_sources import Interval, SourceKey
 from prepare_wheat_frontier_panel import read_bound
-from run_wheat_frontier_panel import context_inventory, missing_competitor_contexts
+from run_wheat_frontier_panel import context_inventory, missing_competitor_contexts, restore_committed_tasks
 
 
 class WheatFrontierPanelTests(unittest.TestCase):
@@ -42,6 +45,28 @@ class WheatFrontierPanelTests(unittest.TestCase):
         self.assertEqual(list(dispatch(None,None)),[(0,"parent", ([(a,[b,c])], "native-fallback-mask", "reason"))])
         self.assertEqual(counts,Counter(scheduled=1,omitted=1))
         self.assertEqual(len(plans),2)
+
+    def test_terminal_native_resume_copies_success_closure_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            previous, new = (Path(temporary)/name for name in ("old", "new"))
+            parts = {key:SimpleNamespace(sequence_sha256=key*64) for key in ("a", "b")}
+            spec = {"schema":"lgz_q0_mapping_v1", "query_ids":["a"], "target_ids":["b"],
+                    "members":[[k,p.sequence_sha256] for k,p in parts.items()]}
+            rel = "grt/evidence/q0_prepare/tasks/" + stable_id("q0-map",spec)
+            (previous/rel).mkdir(parents=True)
+            outputs = []
+            for name in MAPPING_OUTPUT_FILES:
+                (previous/rel/name).write_text(name)
+                outputs.append(identity(previous,f"{rel}/{name}"))
+            for name in ("result.paf.tmp", "stderr.log"):
+                (previous/rel/name).write_text("uncommitted input")
+            (previous/rel/"success.json").write_text(json.dumps({"status":"success","spec":spec,"outputs":outputs}))
+            receipt=restore_committed_tasks(previous,new,parts)
+            self.assertEqual(receipt,{"native_successes":1,"regional_successes":0,"files":len(outputs)+1})
+            self.assertEqual({p.name for p in (new/rel).iterdir()},set(MAPPING_OUTPUT_FILES)|{"success.json"})
+            (previous/rel/"result.paf").write_text("corrupted")
+            with self.assertRaisesRegex(ValueError,"differs from receipt"):
+                restore_committed_tasks(previous,Path(temporary)/"other",parts)
 
     def test_competitor_outside_join_region_still_triggers_on_either_axis(self):
         q,t,u = (SourceKey("ds",k) for k in ("query","target","other"))

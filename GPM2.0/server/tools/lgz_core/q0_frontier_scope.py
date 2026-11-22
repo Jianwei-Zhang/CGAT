@@ -10,10 +10,11 @@ from collections import defaultdict
 
 from .q0_sources import Interval, Q0EvidenceError, merged_intervals
 
+FRONTIER_FLANK_BP = 100_000
 OPEN_JOIN_KINDS = frozenset(("reference_unknown", "input_assembly_gap"))
 
 
-def decision_frontier(construction, *, flank_bp: int = 100_000):
+def decision_frontier(construction, *, flank_bp: int = FRONTIER_FLANK_BP):
     """Return source-coordinate shoulders around unresolved Q0 decisions.
 
     ``None`` means the provisional graph did not produce a path and therefore
@@ -30,7 +31,7 @@ def decision_frontier(construction, *, flank_bp: int = 100_000):
 
     def add(slice_, *, entering: bool):
         placement = placements.get(slice_.placement_id)
-        if placement is None or slice_.source != placement.source or slice_.orientation not in {"+", "-"}:
+        if placement is None or slice_.source != placement.source or slice_.orientation != placement.orientation or slice_.orientation not in {"+", "-"}:
             raise Q0EvidenceError("q0 frontier slice is not bound to an admitted placement")
         if not placement.interval.contains(slice_.interval):
             raise Q0EvidenceError("q0 frontier slice escapes its placement")
@@ -60,6 +61,8 @@ def _window_span(window, parts):
     if part is None or window.segment_length != part.interval.length:
         raise Q0EvidenceError("regional window source geometry differs from q0 parts")
     relative = Interval(window.start, window.end)
+    if relative.end > window.segment_length:
+        raise Q0EvidenceError("regional window exceeds its source part")
     return part.source, Interval(part.interval.start + relative.start, part.interval.start + relative.end)
 
 

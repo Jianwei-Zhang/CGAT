@@ -194,15 +194,12 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
             if reason is not None:
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})
                 continue
-            selected = []
-            for query, targets in planned:
+            for window_number, (query, targets) in enumerate(planned):
+                if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
+                    raise Q0EvidenceError("--skip-self conflicts with required regional supplementary comparisons")
                 if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
                     report["frontier_omitted_windows"] += 1
                     continue
-                selected.append((query, targets))
-            for window_number, (query, targets) in enumerate(selected):
-                if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
-                    raise Q0EvidenceError("--skip-self conflicts with required regional supplementary comparisons")
                 if len(pending) >= workers: consume()
                 future = pool.submit(prepare_regional_mapping, root,catalog,query,targets,tool,
                                      reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)

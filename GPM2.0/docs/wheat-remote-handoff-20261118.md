@@ -4492,8 +4492,15 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 
 ### 11/23 06:28 — 定向补比对已落成显式 opt-in，3D 面板超时不作科学结论
 
-- 本地 `master` 新增 `q0_supplement_scope=decision_frontier` opt-in：先用已完成的参考证据和跨组装基础 PAF 构造 provisional Q0，只在路径端点和未解决 join 两侧保留 source-coordinate shoulder；区域 query/target 窗口仍保留原目标全集，未选窗口不会被写成负证据。若 provisional Q0 无路径、区域路由未启用或规划异常，自动回到 `full`，不做有损跳过。scope、实际 omitted 数和 frontier 大小写入 catalog；self 矩阵不参与 provisional join 证明。
+- 本地 `master` 初版增加显式 `decision_frontier` opt-in（后续改在证据命令传入，见下）：先用已完成的参考证据和跨组装基础 PAF 构造 provisional Q0，只在路径端点和未解决 join 两侧保留 source-coordinate shoulder；区域 query/target 窗口仍保留原目标全集，未选窗口不会被写成负证据。若 provisional Q0 无路径或区域路由未启用，回到 `full`；损坏证据等异常仍报错。scope、实际 omitted 数和 frontier 大小写入 catalog；self 矩阵不参与 provisional join 证明。
 - 该策略只作用于 `prepare_partial`/`prepare_candidates` 的区域窗口派发；native fallback、完整已完成矩阵、PAF 原始字节、下游 Q0 admission/竞争门不变。没有安装到远端 `43017096`，没有修改当前运行任务，也没有改默认 `full`。
 - 本地 Q0 定向测试 **136/136** 通过，其中包含真实 bridge fixture 的 provisional-frontier 读取冒烟；另有决策前沿单元测试与真实小麦 4B/5B 隔离结果。新策略的证据边界仍是允许的信息损失：它可能不再发现不触及当前 provisional 路径的新候选，不得称为无损等价。
 - 3D 天然面板作业 `43017437` 于 05:41:05 启动，最终因诊断脚本独立 `timeout` 以 `exitCode=124` 结束；已生成 24 个区域项目回执但没有完整 3D report。该终态是诊断预算耗尽，不是比对科学失败，不重提同一诊断。4B/5B 已完成的结果仍有效。新版 `43017096` 与旧版 `42523432` 仍 RUNNING，06:26:32 已推进到 **23/55**（7B）。
 - 用户约定继续只本地 commit，不 push。
+
+### 11/23 06:55 — Q0-only 参数绑定与 3D 回执续测
+
+- `43017096` 06:37:26 复用了第 25/25 项初始检查点（Un），06:37:27 启动 `q0_evidence` attempt=5。未改运行工作区，也未改旧版 `42523432`。不把子步骤 `[START]` 当成新 mapper 进度。
+- 改为仅在 evidence 命令显式传 `--supplement-scope decision_frontier`。不写 `prepare_options.tsv`：该文件也在初始染色体检查点输入内，绕用它会导致不必要的失效。显式试验档的 ready 指纹绑定 scope、带宽、规划选择器身份和全量输入；原 `full` 不使用定向 ready，完整的底层 PAF 仍各按原回执复用。无 provisional path 或非区域路由可以正常回退，坏证据抛错。保留实际 `--skip-self` 检查；provisional 直接复用 catalog 中既有长 N 原始邻接，省一次整套 contig 拆分。不是证明加速档与 full 等价，也不是生产启用。
+- 初次只读全麦诊断 `43020545` 06:38:35 退出（隔离脚本环境相对路径错误，未读输入）。不再提交会并行扫整套大麦输入的副本；改续做已冻结的天然 3D 对照。独立诊断 `43020546 / agent-X86-18` 使用现有冻结源码和真实 mapper，工作目录在计算节点本地 `/tmp`；对已终态 `43017437` 的 full arm，仅准备复用能逐项验证的 24 个区域成功回执和 1 个 native 成功回执依赖，不复制未提交的产物。定向 arm 不使用该缓存。其 full 准备时间不与定向当成冷启动 A/B 倍率比较；证据/决策差异、上下文数量以及各阶段计时仍有用。06:53 查到作业仍在 provisional 计算，尚无 3D 终态结论。
+- 本地 backend 定向 139 项、事故探针 10 项通过。验证了两个 scope 使用相同初始检查点内容、ready 不能互冒、选择器变动拒收、原 N-gap 邻接和坏回执拒收。仍只做本地提交，不 push。

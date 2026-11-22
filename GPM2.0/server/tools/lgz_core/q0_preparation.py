@@ -111,12 +111,27 @@ def builder_identity() -> str:
             "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_frontier_scope.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
 
 
+def supplement_policy(scope: str) -> dict:
+    """Bind the explicit Q0-only profile without editing base checkpoint inputs."""
+    if scope == "full":
+        return POLICY
+    if scope != "decision_frontier":
+        raise Q0EvidenceError("unsupported q0 supplement scope")
+    from .q0_admission import selector_identity
+    from .q0_frontier_scope import FRONTIER_FLANK_BP
+    return {**POLICY, "decision_frontier": {"version": 1, "flank_bp": FRONTIER_FLANK_BP,
+                                           "selector": selector_identity(), "whole_source_equivalence": False}}
+
+
 def load_verified_evidence(root: Path) -> dict:
     """No fallback: consumers must reject missing, stale, or damaged evidence."""
     root = root.resolve()
     manifest = json_file(root / MANIFEST)
+    policy = manifest.get("policy")
+    scoped = isinstance(policy, dict) and "decision_frontier" in policy
+    scope = "decision_frontier" if scoped else "full"
     if (manifest.get("schema") != SCHEMA or manifest.get("status") != "success"
-            or manifest.get("policy") != POLICY or manifest.get("builder") != builder_identity()):
+            or policy != supplement_policy(scope) or manifest.get("builder") != builder_identity()):
         raise Q0EvidenceError("q0 evidence manifest has an unsupported or stale identity")
     for field in ("inputs", "outputs"):
         rows = manifest.get(field)
@@ -130,7 +145,7 @@ def load_verified_evidence(root: Path) -> dict:
                 raise Q0EvidenceError(f"q0 evidence changed or duplicated: {row['path']}")
             paths.add(row["path"])
     expected_input = stable_id("q0-evidence-input", {"inputs": manifest["inputs"],
-                               "tool": manifest.get("tool"), "policy": POLICY, "builder": manifest["builder"]})
+                               "tool": manifest.get("tool"), "policy": policy, "builder": manifest["builder"]})
     if manifest.get("input_fingerprint") != expected_input:
         raise Q0EvidenceError("q0 evidence input fingerprint is inconsistent")
     outputs = {row["path"]: row for row in manifest["outputs"]}
@@ -139,6 +154,13 @@ def load_verified_evidence(root: Path) -> dict:
     catalog = json_file(artifact_path(root, manifest["catalog"]))
     if catalog.get("schema") != CATALOG_SCHEMA:
         raise Q0EvidenceError("unsupported q0 candidate catalog")
+    report = catalog.get("supplement_scope")
+    if scoped:
+        if (not isinstance(report, dict) or report.get("requested") != scope
+                or report.get("effective") not in ("full", scope)):
+            raise Q0EvidenceError("q0 supplemental catalog lacks its bound scope")
+    elif report is not None:
+        raise Q0EvidenceError("full q0 manifest cannot attest scoped supplemental work")
     expected_outputs = {manifest["catalog"]}
     inputs = {row["path"] for row in manifest["inputs"]}
     try:
@@ -290,7 +312,6 @@ def _initial_inputs(root: Path):
     return sources, lengths, assignments, options, sorted(paths), sorted(base_alignments, key=lambda row: row["paf"]), known_pairs
 
 
-
 def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_alignments):
     """Build a base-only Q0 graph for an explicit lossy supplement scope.
 
@@ -303,17 +324,17 @@ def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_
     from .q0_catalog import evidence_ref
     from .q0_frontier_scope import decision_frontier
     from .q0_paths import PairLink
-    from .q0_sources import split_source
+    from .q0_sources import Interval, OriginalAdjacency
 
     by_dataset = defaultdict(dict)
     for key, sequence in sources.items():
-        by_dataset[key.dataset][key.contig] = sequence
+        by_dataset[key.dataset][key.contig] = len(sequence)
     reference_hits = defaultdict(list)
     pair_links = []
     evidence = {}
-    for dataset, sequences in sorted(by_dataset.items()):
+    for dataset, lengths in sorted(by_dataset.items()):
         relative = f"runs/{dataset}_vs_ref/result.paf"
-        for hit in read_paf(root / relative, query_lengths={name: len(sequence) for name, sequence in sequences.items()},
+        for hit in read_paf(artifact_path(root, relative), query_lengths=lengths,
                             target_lengths=reference_lengths, artifact=relative):
             source = SourceKey(dataset, hit.query_name)
             reference_hits[source].append(hit)
@@ -324,21 +345,21 @@ def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_
         query_dataset = descriptor["query_dataset"]
         target_dataset = descriptor["target_dataset"]
         relative = descriptor["paf"]
-        for hit in read_paf(root / relative, query_lengths={name: len(sequence) for name, sequence in by_dataset[query_dataset].items()},
-                            target_lengths={name: len(sequence) for name, sequence in by_dataset[target_dataset].items()}, artifact=relative):
+        for hit in read_paf(artifact_path(root, relative), query_lengths=by_dataset[query_dataset],
+                            target_lengths=by_dataset[target_dataset], artifact=relative):
             query = SourceKey(query_dataset, hit.query_name)
             target = SourceKey(target_dataset, hit.target_name)
             pair_links.append(PairLink(hit, query, target))
             evidence[hit.evidence_id] = evidence_ref(hit)
     adjacencies = []
-    for source, sequence in sorted(sources.items()):
-        try:
-            adjacencies.extend(split_source(source, sequence).adjacencies)
-        except Q0EvidenceError:
-            continue
+    for row in catalog.payload["original_connections"]:
+        edge = OriginalAdjacency(**{**row, "source": SourceKey(**row["source"]),
+                                    "gap_interval": Interval(**row["gap_interval"])})
+        adjacencies.append(edge)
+        evidence[edge.adjacency_id] = {"kind": "input_assembly_adjacency", **row}
     data = EvidenceInput(dict(sources), dict(catalog.parts), dict(reference_lengths),
                          dict(reference_hits), tuple(pair_links), tuple(adjacencies), evidence,
-                         stable_id("q0-provisional-frontier", [base_alignments, catalog.payload["segments"]]))
+                         "provisional-not-published")
     return decision_frontier(construct_q0(data))
 
 
@@ -534,16 +555,20 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
               f"queries={len(seed['query_ids'])} targets={len(seed['target_ids'])}",flush=True)
     return scopes
 
-def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2") -> dict:
+def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2",
+                     supplement_scope: str = "full") -> dict:
     root = root.resolve()
     if threads < 1:
         raise Q0EvidenceError("q0 evidence threads must be positive")
+    run_policy = supplement_policy(supplement_scope)
     builder = builder_identity()
     sources, lengths, assignments, options, input_paths, base_alignments, known_pairs = _initial_inputs(root)
+    if "q0_supplement_scope" in options:
+        raise Q0EvidenceError("set experimental q0 scope on the evidence command, not prepare_options.tsv")
     inputs = [identity(root, relative) for relative in input_paths]
     tool = executable_identity(minimap2)
     request_identity = stable_id("q0-evidence-input", {"inputs": inputs, "tool": tool,
-                                "policy": POLICY, "builder": builder})
+                                "policy": run_policy, "builder": builder})
     if (root / MANIFEST).is_file():
         try:
             previous = load_verified_evidence(root)
@@ -559,9 +584,6 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         catalog = build_catalog(root, sources, lengths, assignments, min_gap=POLICY["min_gap"],
                                 regional_factory=cache.factory if cache else None)
         if cache: cache.publish()
-        supplement_scope = options.get("q0_supplement_scope", "full")
-        if supplement_scope not in {"full", "decision_frontier"}:
-            raise Q0EvidenceError("unsupported q0 supplement scope")
         regional_frontier = None
         scope_report = {"requested": supplement_scope, "effective": "full"}
         if supplement_scope == "decision_frontier":
@@ -581,7 +603,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                     scope_report["frontier_bp"] = sum(i.length for rows in regional_frontier.values() for i in rows)
                 elif "reason" not in scope_report:
                     scope_report["reason"] = "provisional_q0_has_no_path"
-        catalog.payload["supplement_scope"] = scope_report
+        if supplement_scope != "full":
+            catalog.payload["supplement_scope"] = scope_report
         tasks = []
         # Each productive round adds at least one segment to the anchor set. The
         # monotone loop terminates after at most the number of source segments.
@@ -695,6 +718,8 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
             raise Q0EvidenceError("q0 evidence inputs changed during preparation; no manifest published")
         if builder_identity() != builder:
             raise Q0EvidenceError("q0 evidence builder changed during preparation; no manifest published")
+        if supplement_policy(supplement_scope) != run_policy:
+            raise Q0EvidenceError("q0 supplement scope changed during preparation; no manifest published")
         payload = catalog.finish()
         payload["base_alignments"] = base_alignments
         payload["supplementary_alignments"] = tasks
@@ -711,7 +736,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         for task in tasks:
             if any(output_identities.get(row["path"]) != row for row in json_file(root/task["receipt"])["outputs"]):
                 raise Q0EvidenceError("completed supplementary output changed before publication")
-        manifest = {"schema": SCHEMA, "status": "success", "policy": POLICY, "builder": builder,
+        manifest = {"schema": SCHEMA, "status": "success", "policy": run_policy, "builder": builder,
                     "input_fingerprint": request_identity, "inputs": inputs,
                     "outputs": outputs,
                     "catalog": catalog_name, "tool": tool}
