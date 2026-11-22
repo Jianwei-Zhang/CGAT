@@ -41,8 +41,29 @@ def smoke_scope(path):
     return observed["precise"]
 
 
+def prior_window_tool(work, sample):
+    """Read only receipt metadata; its bound native tool is part of every key."""
+    row = json.loads(sample.read_text())["rows"][0]
+    project = Path(row["project"])
+    if len(project.parts) != 1 or not project.name.startswith("q0-regional-project-"):
+        raise ValueError("invalid cached window smoke identity")
+    marker = work / "grt/evidence/q0_prepare/regional/projects" / project / "success.json"
+    if not marker.resolve(strict=True).is_relative_to(work):
+        raise ValueError("prior window escaped the workspace")
+    declared = json.loads(marker.read_text())["spec"]
+    for item in (declared["raw_receipt"], declared["context"]):
+        relative = Path(item["path"])
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("invalid cached window artifact path")
+        checked({**item, "path": str(work / relative)}, work)
+    if declared["raw_receipt"]["sha256"] != row["raw_receipt_sha256"]:
+        raise ValueError("prior window receipt changed")
+    return json.loads((work / declared["context"]["path"]).read_text())["spec"]["tool"]
+
+
 def probe(config_path):
     from lgz_core import q0_regional_mapping as mapping
+    from lgz_core.common import executable_identity
 
     config_path = config_path.resolve(strict=True)
     root = config_path.parent
@@ -57,6 +78,12 @@ def probe(config_path):
             or config["old_job"] == config["protected_baseline"]):
         raise ValueError("invalid q0 loader handoff scope")
     stored = smoke_scope(checked(config["loader_smoke"], root))
+    # The regular builder includes the version string in context/raw keys. A
+    # slow/dead --version probe may return "unknown" with the *same* binary.
+    # Byte compatibility alone would then fail to reuse thousands of caches.
+    expected_tool = prior_window_tool(work, checked(config["old_window_sample"], root))
+    if expected_tool.get("version") in (None, "unknown") or executable_identity("minimap2") != expected_tool:
+        raise ValueError("mapper cache identity (including version) differs on this allocation")
     row = next(row for row in transition["runtime"] if row["relative"].endswith("/q0_regional_mapping.py"))
     module_path = root / "package/server/tools/lgz_core/q0_regional_mapping.py"
     if (Path(mapping.__file__).resolve(strict=True) != module_path or sha256(module_path) != row["new_sha256"]
@@ -78,7 +105,7 @@ def probe(config_path):
     return {"status": "regional_loader_ready_before_handoff", "host": socket.gethostname(),
             "config_sha256": config_sha, "transition_sha256": config["transition"]["sha256"],
             "candidate_sha256": sha256(module_path), "loader_smoke_sha256": config["loader_smoke"]["sha256"],
-            "loader": asdict(loader), "workspace_modified": False}
+            "loader": asdict(loader), "expected_cached_tool": expected_tool, "workspace_modified": False}
 
 
 if __name__ == "__main__":

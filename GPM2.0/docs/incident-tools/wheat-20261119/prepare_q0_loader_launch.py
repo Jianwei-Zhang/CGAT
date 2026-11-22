@@ -51,6 +51,7 @@ def prepare(root, environment):
         raise ValueError("one of the protected initial identities changed")
     smoke = root / "smoke-v2/smoke.jsonl"
     smoke_scope(smoke)
+    sample = root / "live-sample.json"
     for row in transition["runtime"]:
         runtime = work / row["relative"]
         if (not runtime.resolve(strict=True).is_relative_to(work) or runtime.is_symlink()
@@ -71,7 +72,7 @@ def prepare(root, environment):
     cwd = shlex.quote(str(root))
     config = {"workspace": str(work), "old_job": stage["previous_job"], "protected_baseline": stage["protected_baseline"],
               "transition": stage["transition"], "initial_preflight": record(fresh), "loader_smoke": record(smoke),
-              "loader_probe": record(probe), "environment": record(environment)}
+              "loader_probe": record(probe), "environment": record(environment), "old_window_sample": record(sample)}
     script = f'''#!/usr/bin/env bash
 #DSUB -n jm19_q0_verified_loader_cutover
 #DSUB -q x86
@@ -100,7 +101,7 @@ exec python3 -B -u q0_science_handoff_gate.py --config handoff-config.json
         stream.write(script)
     script_path.chmod(0o755)
     with checksum.open("x") as stream:
-        for path in (config_path, script_path, probe, environment, fresh, smoke, tpath):
+        for path in (config_path, script_path, probe, environment, fresh, smoke, sample, tpath):
             stream.write(f"{sha256(path)}  {path}\n")
     return {"status": "loader_resource_gate_configured_not_submitted", "config": record(config_path),
             "script": record(script_path), "checksums": record(checksum), "workspace_modified": False}

@@ -72,14 +72,28 @@ class AllocationLoaderProofTests(unittest.TestCase):
         t = stage/'transition.json'; t.write_text(json.dumps({'workspace': str(work), 'regional_mapper_loader_policy': POLICY,
              'runtime': [{'relative': '.prepare_lib/tools/lgz_core/q0_regional_mapping.py', 'source': record(source),
                           'new_sha256': record(source)['sha256']}]}))
+        tool = {'command': 'minimap2', 'resolved': '/path/to/minimap2', 'sha256': 'a'*64, 'version': 'bound-version'}
+        regional = work/'grt/evidence/q0_prepare/regional'; regional.mkdir(parents=True)
+        prior_raw = regional/'historical_raw.json'; prior_raw.write_text('{}')
+        prior_ctx = regional/'historical_context.json'; prior_ctx.write_text(json.dumps({'spec': {'tool': tool}}))
+        prior_project = regional/'projects/q0-regional-project-pinned'; prior_project.mkdir(parents=True)
+        (prior_project/'success.json').write_text(json.dumps({'spec': {key: {'path': str(path.relative_to(work)),
+                'sha256': record(path)['sha256']} for key, path in [('raw_receipt', prior_raw), ('context',prior_ctx)]}}))
+        sample = stage/'live-sample.json'; sample.write_text(json.dumps({'rows': [{'project': prior_project.name,
+                                                                     'raw_receipt_sha256': record(prior_raw)['sha256']}]}))
         c = stage/'config.json'; c.write_text(json.dumps({'workspace': str(work), 'old_job': 1, 'protected_baseline': 2,
-             'transition': record(t), 'loader_smoke': {**loader_smoke, 'path': str(inside)}}))
+             'transition': record(t), 'loader_smoke': {**loader_smoke, 'path': str(inside)}, 'old_window_sample': record(sample)}))
         loader = StubLoader('/path/to/minimap2', 'a'*64, 'b'*64, 'c'*64)
         mapping = SimpleNamespace(__file__=str(module), _probe_mapper_loader=lambda command: loader)
-        with patch.dict(sys.modules, {'lgz_core': SimpleNamespace(q0_regional_mapping=mapping)}):
+        common=SimpleNamespace(executable_identity=lambda command: tool)
+        with patch.dict(sys.modules, {'lgz_core': SimpleNamespace(q0_regional_mapping=mapping), 'lgz_core.common': common}):
             with patch('os.sched_getaffinity', return_value=set(range(32)), create=True):
                 self.assertEqual(probe(c)['config_sha256'], record(c)['sha256'])
                 self.assertFalse(probe(c)['workspace_modified'])
+                common.executable_identity=lambda command: {**tool,'version':'unknown'}
+                with self.assertRaisesRegex(ValueError, 'including version'):
+                    probe(c)
+                common.executable_identity=lambda command: tool
                 mapping._probe_mapper_loader = lambda command: StubLoader('/path/to/minimap2', 'a'*64, 'b'*64, 'd'*64)
                 with self.assertRaisesRegex(ValueError, 'identities differ'):
                     probe(c)

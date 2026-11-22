@@ -16,6 +16,7 @@ class PrepareLoaderLaunchTests(unittest.TestCase):
         self.prior = self.root / 'prior'; self.prior.mkdir()
         self.env = self.root / 'environment.sh'; self.env.write_text('# test environment\n')
         (self.bundle / 'probe_q0_loader_allocation.py').write_text('# test probe\n')
+        (self.bundle / 'live-sample.json').write_text('{}\n')
         rel = '.prepare_lib/tools/lgz_core/q0_regional_mapping.py'
         target = self.work / rel; target.parent.mkdir(parents=True); target.write_text('# old runtime\n')
         source = self.bundle / 'candidate.py'; source.write_text('# new runtime\n')

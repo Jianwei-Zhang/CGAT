@@ -3810,3 +3810,24 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   确认43015292生产25项及末尾validation.json。两者通过后才能申请32CPU/320GiB等待资源的主切换作业；
   在新job真实节点重新验证loader兼容、成功写ready且保守净收益为正后，再正常停止当前新版与等锁释放。
   不重跑已有比对、不删除cache或锁，不改旧基线，不重放旧handoff/旧installation。
+
+### 2026-11-22 18:16 CST：真实粗/精writer验收通过；切换资源门已准备，主作业未动
+
+- **43015295 / agent-X86-39 / SUCCEEDED**。纠正试验命令后，真实候选 `_execute` 按SHA绑定的原粗、精argv
+  在隔离产出中各得到逐字节相同的历史PAF，均记录已核对的子进程环境、保持原4GiB guard；候选独立读取
+  两份旧project完整闭包并原样返回。`regional-loader-writer-smoke-20261122.jsonl` SHA
+  `04128820aef899c062bdbe0aae39ba3cd3408e2daeae77edf25c612a2060f861`。被替代的43015291仅为
+  粗测试命令带了精比对的额外参数而失败；不据此认为生产代码或在跑的任务失败，不采纳任何诊断PAF。
+- 新资源门 `prepare_q0_loader_launch.py` + `probe_q0_loader_allocation.py`：准备真实25项校验完成后的独立
+  启动脚本，先比较旧/新校验全清单（包含每项input fingerprint与checkpoint SHA），随后在**实际新分配节点**
+  核对装载库、mapper路径/SHA/`--version`与既有region key（同SHA不等于version不会超时成为`unknown`）。
+  必须先有 `loader-ready.json`，再进入原资源门 `ready.json`；原旧进程未终止/有pids/有锁时仍不会安装。
+  新配置只准备/校验，不会自己停任务、改数据或提交。针对性6项本地+180纯fixture测试；真实新资源还未申请。
+- 只读预检43015292（不是主新版）18:15仍RUNNING。`43015567 / agent-X86-18 / SUCCEEDED`：仅观测
+  绑定当前UID/作业的`/proc`元数据，PID3640947连续3次D状态但50秒CPU ticks 600→688，`rchar`
+  85.4→95.5MB，不能认定卡死/崩溃或具体大文件，保留预检继续跑。报告
+  `preflight-readonly-181454/samples.jsonl` SHA `fb727e077c8ff7092389f43872cdba4b676d1717ab7aa67fffe3ec76ba43ca72`。
+- 现主新版原run在18:14:37 **6300/61000，fallback=0**，过去 ~100个/5–6分钟；旧42523432仍RUNNING
+  且不动。仅作切换成本参考：按历史首个新raw约5h16m、留6h、14个mapper槽和保守扣除2573完整矩阵
+  可跳窗，目前要平均省约5.8秒/待做窗口才能覆盖恢复成本。三份真样本只精比对即省约10.5秒/次，另有
+  粗筛和验证收益，值得继续走预检；样本与理想并行测算不保证端到端，切换时重核实际工作量、资源和收益。
