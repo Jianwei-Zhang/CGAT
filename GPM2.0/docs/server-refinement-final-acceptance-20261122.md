@@ -588,17 +588,49 @@ legacy versions.
 | A17 | Verified for report scope | Immutable input and native-run identities, selected technologies, resources, unclosed/native-candidate versus accepted gaps in the reports. The sample makes no accuracy, speed or tool-ranking claim. |
 | A18 | Verified for branch handoff | Bilingual Server guides, migration instructions, pinned recipes, platform limitations, source revisions and verification receipts; no release or merge to `master`. |
 
-### Remaining native ARM64 proof
+### Repeatable native validation and ARM64 handoff
 
-Use an explicitly approved Linux ARM64 worker and a new private managed
-environment/workspace. Start with the reviewed branch revision and the same
-synthetic data (locally retained under `case/`, with SHA-256 in `case.json`).
-Record host architecture, branch revision, lock digest, public install and
-separate read-only `--check` exit status, and the package/runtime identities.
-Then run the same public LGZ-only command and four-tool append, plus the
-ONT-only TGS control. Retain native command/diagnostic receipts, CGAT admission
-and source reconstruction. Compare the reported states and source-bound results;
-a legitimate platform difference needs investigation, not a hardcoded expected
-patch count. A dry solve, no-gap run or copied x86_64 checkpoint is not native
-ARM64 execution evidence. A DEGAP change after the separately planned upstream
-merge requires its own adapter re-audit against that new revision.
+The new runner passed all eight steps on Linux x86_64 against Server source
+`e3409e5e` in the isolated environment. Evidence:
+`/tmp/cgat-native-validation-final.NRAAS2p3/evidence/validation.json` (SHA-256
+`e896cf84fae5a6353dff6f9d761720889064d7b0b4fa5e12ba34cbe9bc9f4da9`). The
+fresh command without `--gapfill-tools` ran DEGAP only. Its zero-acceptance
+FASTA was rewrapped, but the chromosome sequence matched LGZ. The real
+four-tool append had 0/0/1/1 accepted edits; the unchanged repeat kept the
+native receipt and assembly file hash for each tool. The four LGZ stage FASTAs
+and reference PAF retained bytes and mtimes. Fresh ONT-only TGS recorded three
+computed Racon substeps and one accepted edit. All six refined Full/Light
+pairs were revalidated; wrong-architecture and existing-output guards refused
+without overwriting output. These are synthetic results, not a ranking.
+
+On an explicitly approved Linux ARM64 worker, use a clean checkout of the
+reviewed revision and a new private Micromamba root. For example, with an
+existing private `/work/private` directory and verified Micromamba on `PATH`:
+
+```bash
+export MAMBA_ROOT_PREFIX=/work/private/refinement-mamba
+bash GPM2.0/server/install.sh --manager micromamba > /work/private/refinement-install.log 2>&1
+# Continue only after installation exits 0. Retain the transcript separately.
+micromamba run -n cgat-server python -B GPM2.0/scripts/validate-refinement-native.py \
+  --arch aarch64 --manager micromamba --out /work/private/refinement-audit
+```
+
+The parent directory must already exist and the output directory must be new.
+The runner refuses an architecture mismatch and does not install or update
+software. It runs the public read-only environment check, verifies the active
+pinned runtime, regenerates the known synthetic data with recorded hashes,
+and uses the public launchers for a fresh default DEGAP run, an LGZ-only run
+with a four-tool append and unchanged repeat, and the fresh ONT-only TGS
+control. `validation.json` ties the step logs, selected read hashes, sealed
+native producer receipts, retained LGZ/alignment files and Full/Light source
+reconstruction proofs to the source revision. An unexpected result is
+reported rather than repaired or overwritten. Compare measured states, not
+hardcoded x86_64 patch counts; the helper nevertheless requires at least one
+source-backed changed path and actual Racon substeps in the ONT TGS control.
+
+The same runner accepts `--arch x86_64` for local regression. The receipt
+records the OS-reported architecture; it does not assert that a remote host
+is authorized or that an emulated OS is physical ARM64 hardware. A dry solve,
+no-gap run or imported x86_64 checkpoint is not native ARM64 execution
+evidence. A DEGAP change after the user’s planned upstream merge requires
+its own adapter re-audit against that new revision.
