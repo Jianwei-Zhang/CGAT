@@ -372,8 +372,20 @@ literal symlink targets). A fresh approved transaction was cut during
 again refused; `--resume` committed that same journal and original LGZ proof.
 The receipt `evidence/legacy-native-transaction-events.jsonl` includes the
 process identities, signal outcomes, transaction IDs and validation. This
-covers these move/validation interruption points, not every instant during
-initial staging or foreign-scheduler execution.
+covers these move/validation interruption points, not foreign-scheduler execution.
+
+An additional genuine legacy launch exposed an earlier gap: after SIGKILL at
+`prepared` and before the first move, the old launcher ignored the new marker
+and rewrote its status, log and report. With the fence installed at the old
+lock path, the same legacy launcher exited 2 without changing any of the 600
+original files or links. `--resume` rejected incomplete staged bytes before
+moving anything, `--rollback` preserved all 600 entries (bytes, modes, mtimes
+and symlink targets) and released the fence, and a fresh approved apply
+committed without starting analysis. The migrated LGZ FASTA matched the validated
+historical digest. Receipts: `evidence/early-migration-before-fix-audit.json`,
+`evidence/early-migration-after-fix-audit.json`, and
+`evidence/early-migration-after-fix-reapply.json`. This tests local process loss,
+not a power-cut simulation or a multi-host filesystem.
 
 ### Actual append and packaging boundary after migration
 

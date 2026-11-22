@@ -72,10 +72,9 @@ _MIGRATION_VALIDATION = ContextVar("cgat_migration_validation", default=None)
 
 
 def _validation_owner(root, lock, migration_id):
-    import socket
-    if (not lock.acquired or not lock.for_migration or lock.server_dir.resolve() != root
-            or lock.state_dir != root / ".run_all" or lock._existing_owner() != lock.owner
-            or lock.owner.get("pid") != os.getpid() or lock.owner.get("hostname") != socket.gethostname()):
+    if (not lock.for_migration or lock.server_dir.resolve() != root
+            or lock.state_dir != root / ".run_all" or not getattr(lock, "holds", lambda: False)()
+            or lock.bound_id != migration_id):
         raise LayoutError("destination validation requires the live migration owner's lock")
     journal = _read_object(root / MIGRATION)
     if journal.get("id") != migration_id or journal.get("state") != "validating":

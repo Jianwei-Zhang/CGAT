@@ -38,6 +38,8 @@ python3 -B /opt/cgat/server/tools/migrate_workspace.py --server-dir /work/cgat_s
 bash /work/cgat_server/run_all.sh --hifi /reads/hifi.fq.gz [--ont /reads/ont.fq.gz]
 ```
 
+The migration leaves a fence in the original `.run_all/lock` before publishing migration intent. This also blocks legacy launchers that do not recognize the migration journal. Only explicit `--resume` or `--rollback` can reclaim the fence on the recorded host and while no other controller holds it. Do not remove the lock manually. A rollback or committed migration releases the fence.
+
 An interrupted transaction blocks ordinary launches. Use its recorded version/source to continue, or roll it back while its owned files are unchanged:
 
 ```bash

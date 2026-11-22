@@ -16,6 +16,7 @@ from workspace_layout import (LAYOUT_VERSION, MANIFEST, MIGRATION, LayoutError,
 import workspace_migration
 from workspace_migration import MigrationTransaction, durable_json, plan_migration, json_digest
 from run_all_runner import WorkspaceLock, RunnerError, load_plan
+from migration_lock import MigrationLock
 from run_resources import update_resources, read_resources
 
 
@@ -146,8 +147,9 @@ class MigrationTests(unittest.TestCase):
                 result[path.relative_to(self.root).as_posix()] = ("link", os.readlink(path))
         return result
 
-    def acquire(self, migration=False):
-        lock = WorkspaceLock(self.root, "test-migration", for_migration=migration)
+    def acquire(self, migration=False, recovery=False):
+        lock = (MigrationLock(self.root, "test-migration", recovery=recovery) if migration
+                else WorkspaceLock(self.root, "test-ordinary"))
         lock.acquire()
         self.addCleanup(lock.release)
         self.lock = lock
@@ -211,7 +213,7 @@ class MigrationTests(unittest.TestCase):
                 transaction.apply(self.validate)
         inode = target.stat().st_ino
         lock.release()
-        restored = MigrationTransaction.resume(self.root, self.acquire(migration=True), adapter="fixture.v1")
+        restored = MigrationTransaction.resume(self.root, self.acquire(migration=True, recovery=True), adapter="fixture.v1")
         restored.apply(self.validate)
         self.assertEqual(target.read_bytes(), b"# actual new runtime module\n")
         self.assertEqual(target.stat().st_ino, inode)
@@ -270,7 +272,7 @@ class MigrationTests(unittest.TestCase):
         self.lock.release()
         with self.assertRaises(LayoutError):
             WorkspaceLock(self.root, "ordinary-run")
-        lock = self.acquire(migration=True)
+        lock = self.acquire(migration=True, recovery=True)
         restored = MigrationTransaction.resume(self.root, lock, adapter="fixture.v1")
         restored.apply(self.validate)
         self.assertEqual(WorkspaceLayout.detect(self.root).version, 2)
@@ -388,6 +390,9 @@ class MigrationTests(unittest.TestCase):
             with self.assertRaises(InterruptedError):
                 MigrationTransaction.begin(self.root, lock, plan, adapter="fixture.v1", rewrites={})
         self.assertFalse((self.root / MIGRATION).exists())
+        lock.release()
+        self.assertTrue((self.root / ".run_all/lock").is_dir())
+        lock = self.acquire(migration=True, recovery=True)
         resumed = MigrationTransaction.resume(self.root, lock, adapter="fixture.v1")
         resumed.rollback()
         self.assertEqual(WorkspaceLayout.detect(self.root).version, 1)
@@ -416,12 +421,53 @@ class MigrationTests(unittest.TestCase):
             first.apply(lambda layout: (_ for _ in ()).throw(ValueError("test")))
         first.rollback()
         first_id = first.journal["id"]
+        self.lock.release()
         plan = plan_migration(self.root)
-        second = MigrationTransaction.begin(self.root, self.lock, plan, adapter="fixture.v1", rewrites={})
+        second = MigrationTransaction.begin(self.root, self.acquire(migration=True), plan,
+                                            adapter="fixture.v1", rewrites={})
         second.apply(self.validate)
         self.assertNotEqual(second.journal["id"], first_id)
         self.assertEqual(json.loads((first.private / "journal.json").read_text())["state"], "rolled_back")
         self.assertEqual(WorkspaceLayout.detect(self.root).version, 2)
+
+    def test_pending_fence_blocks_legacy_owner_and_only_one_explicit_recovery(self):
+        transaction = self.begin()
+        path = self.root / ".run_all/lock/owner.json"
+        record = json.loads(path.read_text())
+        # The reviewed old runner's compatibility boundary is the legacy
+        # hostname test, not knowledge of the new journal.
+        self.assertEqual(record["workspace"], str(self.root))
+        self.assertNotEqual(record["hostname"], socket.gethostname())
+        self.assertEqual(record["migration_fence"]["host"], socket.gethostname())
+        contender = MigrationLock(self.root, "contender", recovery=True)
+        with self.assertRaisesRegex(LayoutError, "live controller"):
+            contender.acquire()
+        self.lock.release()
+        self.assertEqual(json.loads(path.read_text()), record)
+        with self.assertRaisesRegex(RunnerError, "already running"):
+            self.acquire(migration=True)
+        first_recovery = self.acquire(migration=True, recovery=True)
+        self.assertEqual(first_recovery.bound_id, transaction.journal["id"])
+        with self.assertRaisesRegex(LayoutError, "live controller"):
+            contender.acquire()
+        self.assertEqual(json.loads(path.read_text()), record)
+        restored = MigrationTransaction.resume(self.root, first_recovery, adapter="fixture.v1")
+        restored.rollback()
+        first_recovery.release()
+        self.assertFalse(path.exists())
+        self.acquire()  # legacy becomes runnable only after rollback
+
+    def test_explicit_recovery_refuses_foreign_fenced_owner(self):
+        self.begin()
+        path = self.root / ".run_all/lock/owner.json"
+        owner = json.loads(path.read_text())
+        self.lock.release()
+        owner["migration_fence"]["host"] += "-foreign"
+        owner["hostname"] += "-foreign"
+        durable_json(path, owner)
+        with self.assertRaisesRegex(LayoutError, "foreign host"):
+            self.acquire(migration=True, recovery=True)
+        self.assertEqual(json.loads(path.read_text()), owner)
 
     def test_unknown_lock_owner_is_not_stolen_for_migration(self):
         (self.root / ".run_all/lock").mkdir()
@@ -444,6 +490,8 @@ class MigrationTests(unittest.TestCase):
         (transaction.private / "rewrites/run_all.sh").unlink()
         with self.assertRaisesRegex(LayoutError, "staging"):
             transaction.apply(self.validate)
+        self.assertEqual(json.loads((self.root / MIGRATION).read_text())["state"], "prepared")
+        self.assertFalse((self.root / canonical_relative("grt/q/q3.fa")).exists())
         transaction.rollback()
         for name, content in original.items():
             self.assertEqual(self.snapshot()[name], content)

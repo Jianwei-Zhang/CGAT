@@ -285,7 +285,7 @@ def _check_journal(root: Path, journal: dict) -> None:
 
 
 class MigrationTransaction:
-    """Internal migration adapter API; caller must hold and retain WorkspaceLock.
+    """Internal migration adapter API; caller must hold and retain MigrationLock.
 
     No generic CLI can call commit: a format-aware validator is mandatory. The
     adapters that regenerate scripts, translate references and preserve valid
@@ -300,10 +300,9 @@ class MigrationTransaction:
         self.private = self.root / ".runtime/migrations" / journal["id"]
 
     def _require_lock(self) -> None:
-        if (not self.lock.acquired or not self.lock.for_migration
-                or self.lock.server_dir.resolve() != self.root
+        if (not self.lock.for_migration or self.lock.server_dir.resolve() != self.root
                 or self.lock.state_dir != self.root / ".run_all"
-                or self.lock._existing_owner() != self.lock.owner):
+                or not getattr(self.lock, "holds", lambda: False)()):
             raise LayoutError("migration requires the held legacy workspace lock")
 
     def save(self, state: str) -> None:
@@ -311,6 +310,10 @@ class MigrationTransaction:
         self.journal["state"] = state
         private = plain_path(self.root, f".runtime/migrations/{self.journal['id']}/journal.json")
         durable_json(private, self.journal)
+        # Arm before the public marker. A crash before arming has not changed
+        # any legacy artifact; after arming, even a pre-numbering launcher
+        # sees an occupied legacy lock without needing to know the journal.
+        self.lock.arm(self.journal["id"])
         durable_json(plain_path(self.root, MIGRATION), self.journal)
 
     @classmethod
@@ -386,28 +389,44 @@ class MigrationTransaction:
 
     @classmethod
     def resume(cls, root: Path, lock, *, adapter: str) -> "MigrationTransaction":
-        path = plain_path(root.resolve(), MIGRATION)
+        root = root.resolve()
+        path = plain_path(root, MIGRATION)
         if path.is_symlink():
             raise LayoutError("migration journal must not be a symlink")
-        if not path.exists():
-            # A crash between private intent persistence and publishing the
-            # active marker has not moved data. Recover that intent for rollback.
+        journal = json.loads(path.read_text()) if path.exists() else None
+        if journal is not None and not isinstance(journal, dict):
+            raise LayoutError("invalid public migration journal")
+        if lock.bound_id and (journal is None or journal.get("id") != lock.bound_id):
+            if journal is not None and journal.get("state") not in {"rolled_back", "committed"}:
+                raise LayoutError("active journal does not belong to the migration fence")
+            # Crash before replacement of the public marker (possibly still
+            # showing a previous rollback): the fence binds the exact intent.
+            private = plain_path(root, f".runtime/migrations/{lock.bound_id}/journal.json")
+            if private.is_symlink() or not private.is_file():
+                raise LayoutError("migration fence has no recoverable private intent")
+            journal = json.loads(private.read_text())
+        elif journal is None:
+            # Backward-compatible recovery of an unfenced private intent.
             candidates = []
-            store = plain_path(root.resolve(), ".runtime/migrations")
+            store = plain_path(root, ".runtime/migrations")
             for candidate in store.glob("*/journal.json"):
-                checked = plain_path(root.resolve(), candidate.relative_to(root.resolve()).as_posix())
+                checked = plain_path(root, candidate.relative_to(root).as_posix())
                 if checked.is_symlink():
                     raise LayoutError("private migration journal must not be a symlink")
                 value = json.loads(checked.read_text())
                 if isinstance(value, dict) and value.get("state") not in {"committed", "rolled_back"}:
-                    candidates.append(checked)
+                    candidates.append(value)
             if len(candidates) != 1:
                 raise LayoutError("cannot identify one recoverable migration intent")
-            path = candidates[0]
-        journal = json.loads(path.read_text())
+            journal = candidates[0]
         if not isinstance(journal, dict) or journal.get("adapter") != adapter:
             raise LayoutError("resume needs the same migration adapter")
-        return cls(root, lock, journal)
+        if lock.bound_id and journal.get("id") != lock.bound_id:
+            raise LayoutError("migration journal differs from the fenced intent")
+        result = cls(root, lock, journal)
+        if journal["state"] not in {"committed", "rolled_back"}:
+            lock.arm(journal["id"])
+        return result
 
     def _install(self, entry: dict) -> None:
         source = plain_path(self.root, entry["source"])
@@ -478,6 +497,18 @@ class MigrationTransaction:
         self._require_lock()
         if self.journal["state"] in {"rolling_back", "rolled_back", "committed"}:
             raise LayoutError("transaction is not available for forward migration")
+        if self.journal["state"] == "prepared":
+            # A SIGKILL during staging may leave only a prefix of the approved
+            # rewrites. Refuse before the first move, not partway through it.
+            staged = [(f"rewrites/{entry['source']}", entry["after"])
+                      for entry in self.journal["entries"]
+                      if entry["before"]["kind"] == "file" and entry["before"] != entry["after"]]
+            staged += [(f"additions/{entry['destination']}", entry["after"])
+                       for entry in self.journal.get("additions", [])]
+            for relpath, expected in staged:
+                candidate = plain_path(self.root, (self.private / relpath).relative_to(self.root).as_posix())
+                if not matches(candidate, expected):
+                    raise LayoutError("migration staging is incomplete or changed; roll back and preview again")
         self.save("moving")
         for entry in self.journal["entries"]:
             self._install(entry)

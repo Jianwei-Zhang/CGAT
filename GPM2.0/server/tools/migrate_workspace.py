@@ -22,9 +22,10 @@ from workspace_layout import (WorkspaceLayout, LayoutError, MIGRATION, canonical
 from workspace_migration import (MigrationTransaction, MigrationPlan, plan_migration, json_digest,
                                  identity, matches, plain_path)
 from run_all_runner import WorkspaceLock, new_run_id, RunnerError
+from migration_lock import MigrationLock, fence_id
 from lgz_contract import validate_contract, ContractError
 from refinement_config import SCRIPT, COMMAND, CONFIG, SCHEMA as CONFIG_SCHEMA, validate_config
-from migrated_lgz import ADAPTER, PROOF, SCHEMA
+from migrated_lgz import ADAPTER, PROOF, SCHEMA, verified_baseline
 
 
 def encoded(value):
@@ -65,7 +66,7 @@ def source_runtime(source):
     return files
 
 
-def process_guard(root, source, *, owned=False):
+def process_guard(root, source, *, owned=False, migration_lock=None, recovering=False):
     """Check the real legacy lock and standalone scripts, not just lock absence.
 
     Other-node/queued jobs still require explicit operator idle confirmation.
@@ -75,8 +76,11 @@ def process_guard(root, source, *, owned=False):
         if probe.lock_dir.is_symlink():
             raise LayoutError("symlinked or unknown migration lock")
         owner = probe._existing_owner()
-        if not (owned and owner.get("pid") == os.getpid() and owner.get("workspace") == str(root)
-                and owner.get("hostname") == socket.gethostname()):
+        ordinary_owner = (owned and owner.get("pid") == os.getpid() and owner.get("workspace") == str(root)
+                          and owner.get("hostname") == socket.gethostname())
+        fence_owned = migration_lock is not None and migration_lock.server_dir == root and migration_lock.holds()
+        reclaimable = recovering and fence_id(root, owner) is not None  # actual claim is exclusive
+        if not (ordinary_owner or fence_owned or reclaimable):
             if probe._owner_is_active(owner):
                 raise LayoutError("workspace has a live, foreign-host or unknown owner; stop/verify jobs before migration")
     proc = Path("/proc")
@@ -296,7 +300,7 @@ def preview(root, source, *, owned=False):
 def validate_destination(transaction, source):
     root = transaction.root
     metadata = transaction.journal["adapter_metadata"]
-    process_guard(root, source, owned=True)
+    process_guard(root, source, migration_lock=transaction.lock)
     current = source_runtime(source)
     runtime_sha = json_digest({name: {"sha256": hashlib.sha256(content).hexdigest(), "mode": mode}
                                for name, (content, mode) in sorted(current.items())})
@@ -322,7 +326,7 @@ def apply(root, source, approval, *, confirm_idle=False):
         raise LayoutError("confirm no active/queued jobs on any node with --confirm-idle")
     if not root.is_dir() or not (root / "run_all.sh").is_file() or not (root / ".run_all/plan.tsv").is_file():
         raise LayoutError("not a prepared legacy Server workspace")
-    lock = WorkspaceLock(root, new_run_id(), for_migration=True)
+    lock = MigrationLock(root, new_run_id())
     lock.acquire()
     transaction = None
     try:
@@ -348,14 +352,28 @@ def recover(root, source, *, rollback=False, confirm_idle=False):
     if not root.is_dir() or (not (root / MIGRATION).is_file()
                               and not list((root / ".runtime/migrations").glob("*/journal.json"))):
         raise LayoutError("no migration transaction to recover")
-    process_guard(root, source)
-    lock = WorkspaceLock(root, new_run_id(), for_migration=True)
+    process_guard(root, source, recovering=True)
+    lock = MigrationLock(root, new_run_id(), recovery=True)
     lock.acquire()
     transaction = None
     try:
         transaction = MigrationTransaction.resume(root, lock, adapter=ADAPTER)
+        state = transaction.journal["state"]
+        if state == "committed":
+            if rollback:
+                raise LayoutError("a committed migration cannot be rolled back")
+            proof = verified_baseline(root)
+            if proof is None:
+                raise LayoutError("committed migration has no certified baseline")
+            return {"adapter": ADAPTER, "status": "committed", "analysis_started": False,
+                    "original_proof_preserved": True, "contract": proof["contract"],
+                    "migration_id": transaction.journal["id"],
+                    "approval_sha256": transaction.journal["adapter_metadata"]["approval_sha256"]}
+        if state == "rolled_back" and not rollback:
+            raise LayoutError("migration was rolled back; preview a new transaction")
         if rollback:
-            transaction.rollback()
+            if state != "rolled_back":
+                transaction.rollback()
             return {"adapter": ADAPTER, "status": "rolled_back", "analysis_started": False}
         # Resume consumes staged bytes, never regenerated science or new code.
         expected = transaction.journal["adapter_metadata"]["source"]
