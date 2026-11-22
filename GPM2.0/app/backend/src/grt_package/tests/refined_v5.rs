@@ -678,3 +678,124 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     assert_eq!(actions, 3);
     Ok(())
 }
+
+#[test]
+fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Result<()> {
+    use crate::degap_jobs::{
+        export_manual_refinement, import_manual_refinement_results, undo_manual_refinement_locus,
+    };
+    use sha2::{Digest, Sha256};
+    use std::io::{Read, Write};
+    use zip::{ZipArchive, ZipWriter, write::FileOptions};
+
+    let temp = materialize(false);
+    let root = temp.path().join("refined.degap");
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&root)?;
+    let db = &outcome.project_db_path;
+    let pid = initialize_grt_project(db, "Mixed manual refinement")?.project_id;
+    let baseline = load_grt_final_path_by_chr_for_project(db, pid)?;
+    let (chr, entry) = baseline.iter().find(|(_, entry)| {
+        entry["segments"].as_array().is_some_and(|rows| rows.iter().any(|r| r["kind"] == "gap"))
+    }).context("controlled chromosome with a Gap")?;
+    let segments = entry["segments"].as_array().context("controlled chromosome segments")?;
+    let original = read_fasta(&root.join("data/refinement/final.fa"), "controlled baseline", false)?;
+    let original = &original[chr];
+    let gap = segments.iter().find(|r| r["kind"] == "gap").unwrap();
+    let left = segments.first().unwrap();
+    let right = segments.last().unwrap();
+    let task_zip = temp.path().join("mixed.zip");
+    let request = serde_json::from_value(serde_json::json!({"loci":[
+        {"chr":chr,"segment_id":left["segment_id"],"kind":"tel_left","motif":"TTAGGG"},
+        {"chr":chr,"segment_id":gap["segment_id"],"kind":"gap","tools":["lrgapcloser"]},
+        {"chr":chr,"segment_id":right["segment_id"],"kind":"tel_right","motif":"TTAGGG"},
+    ]}))?;
+    let batch = export_manual_refinement(&root,pid,&task_zip,&request)?;
+    assert_eq!((batch.loci,batch.tasks),(3,3));
+    let manifest: Value = {
+        let mut archive = ZipArchive::new(fs::File::open(&task_zip)?)?;
+        let mut data = Vec::new();
+        archive.by_name("refinement_tasks.json")?.read_to_end(&mut data)?;
+        serde_json::from_slice(&data)?
+    };
+    let sha = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+    let close = b"GCTA";
+    let head = b"CCCTAA";
+    let tail = b"TTAGGGTTAGGG";
+    let loci = manifest["loci"].as_array().unwrap();
+    let return_zip = |file: &Path, corrupt_right_witness: bool| -> Result<()> {
+        let mut rows = Vec::new();
+        let mut zip = ZipWriter::new(fs::File::create(file)?);
+        for locus in loci {
+            let id = locus["id"].as_str().unwrap();
+            let kind = locus["kind"].as_str().unwrap();
+            let tool = locus["tools"][0].as_str().unwrap();
+            let (status, operation, segment, replacement) = match kind {
+                "gap" => ("closed", "replace_gap", gap, close.as_slice()),
+                "tel_left" => ("extended", "prepend_tel", left, head.as_slice()),
+                "tel_right" => ("extended", "append_tel", right, tail.as_slice()),
+                _ => unreachable!(),
+            };
+            let start = segment["output_start"].as_u64().unwrap() as usize;
+            let end = segment["output_end"].as_u64().unwrap() as usize;
+            let before = if corrupt_right_witness && kind == "tel_right" { "f".repeat(64) }
+                else { sha(&original.as_bytes()[start..end]) };
+            let path = format!("patches/{id}.{tool}.seq");
+            zip.start_file(&path, FileOptions::default())?;
+            zip.write_all(replacement)?;
+            rows.push(serde_json::json!({"locus_id":id,"tool":tool,"status":status,"reason":null,
+                "attempt_id":"controlled","version":"synthetic-fixture","revision":"test",
+                "patch":{"path":path,"operation":operation,"original_length":end-start,
+                    "original_sha256":before,"length":replacement.len(),"sha256":sha(replacement)}}));
+        }
+        zip.start_file("refinement_results.json", FileOptions::default())?;
+        zip.write_all(&serde_json::to_vec(&serde_json::json!({"schema":"cgat.app-refinement-results.v1",
+            "batch_sha256":batch.batch_sha256,"results":rows}))?)?;
+        zip.finish()?;
+        Ok(())
+    };
+
+    let wrong_endpoint = temp.path().join("wrong-endpoint.zip");
+    let correct_endpoint = temp.path().join("correct-endpoint.zip");
+    return_zip(&wrong_endpoint, true)?;
+    return_zip(&correct_endpoint, false)?;
+    let first = import_manual_refinement_results(&root,pid,&wrong_endpoint)?;
+    assert_eq!(first.applied,2);
+    assert!(first.loci.iter().any(|row| row["kind"] == "tel_right" && row["disposition"] == "endpoint_digest_mismatch"));
+    let second = import_manual_refinement_results(&root,pid,&correct_endpoint)?;
+    assert_eq!(second.applied,1);
+    assert!(second.loci.iter().any(|row| row["kind"] == "tel_right" && row["disposition"] == "applied"));
+
+    let verify = |file: &Path, left_ext: &str, right_ext: &str| -> Result<()> {
+        let conn = crate::db::open_workspace_db(db)?;
+        let raw: String = conn.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+            [pid], |row| row.get(0))?;
+        let saved: Value = serde_json::from_str(&raw)?;
+        let rows = saved[chr]["segments"].as_array().unwrap();
+        let projected = rows.iter().map(|segment| {
+            let start = segment["start"].as_i64().unwrap();
+            let end = segment["end"].as_i64().unwrap();
+            if segment["sourceKind"] == "refinement_patch" {
+                FinalPathExportSegment::RefinementPatch {
+                    sha256:segment["refinementPatchSha256"].as_str().unwrap().into(), start, end,
+                }
+            } else {
+                let src = &segment["source"];
+                FinalPathExportSegment::Source {dataset_name:src["dataset"].as_str().unwrap().into(),
+                    contig_name:src["contig"].as_str().unwrap().into(),start,end}
+            }
+        }).collect();
+        exporter::export_project_final_path_fasta(db,pid,&ExportProjectFinalPathFastaParams {
+            output_path:file.to_path_buf(), records:vec![FinalPathFastaRecord{chr_name:chr.clone(),final_path_segments:projected}],
+        })?;
+        let output = read_fasta(file,"mixed result",false)?;
+        let before = gap["output_start"].as_u64().unwrap() as usize;
+        let after = gap["output_end"].as_u64().unwrap() as usize;
+        assert_eq!(output[chr], format!("{}{}{}{}{}",left_ext,&original[..before],std::str::from_utf8(close)?,&original[after..],right_ext));
+        Ok(())
+    };
+    verify(&temp.path().join("both-ends.fa"), "CCCTAA", "TTAGGGTTAGGG")?;
+    let left_id = loci.iter().find(|locus| locus["kind"] == "tel_left").unwrap()["id"].as_str().unwrap();
+    undo_manual_refinement_locus(&root,pid,left_id,1)?;
+    verify(&temp.path().join("only-right.fa"), "", "TTAGGGTTAGGG")?;
+    Ok(())
+}

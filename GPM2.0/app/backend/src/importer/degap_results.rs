@@ -11,7 +11,11 @@ pub fn is_degap_results_package(path: &Path) -> Result<bool> {
         return Ok(false);
     }
     let mut archive = ZipArchive::new(File::open(path)?)?;
-    Ok(archive.by_name("degap_results.json").is_ok())
+    let legacy = archive.by_name("degap_results.json").is_ok();
+    if legacy && archive.by_name("refinement_results.json").is_ok() {
+        bail!("ambiguous refinement archive contains both legacy and current manifests");
+    }
+    Ok(legacy)
 }
 
 fn hash_file(path: &Path) -> Result<String> {
@@ -56,6 +60,54 @@ pub fn import_degap_results_with_hooks<P, C>(
     zip_path: &Path,
     workspace_root: &Path,
     project_id: i64,
+    on_progress: &mut P,
+    should_cancel: &mut C,
+) -> Result<(Vec<Value>, Vec<ImportProgress>)>
+where
+    P: FnMut(ImportProgress),
+    C: FnMut() -> bool,
+{
+    process_degap_results(
+        zip_path,
+        workspace_root,
+        project_id,
+        false,
+        on_progress,
+        should_cancel,
+    )
+}
+
+/// The project refinement card may accept verified legacy candidate metadata,
+/// but these archives do not establish a modern locus and replacement interval.
+pub(crate) fn validate_legacy_degap_candidates(
+    zip_path: &Path,
+    workspace_root: &Path,
+    project_id: i64,
+) -> Result<Vec<Value>> {
+    let (candidates, _) = process_degap_results(
+        zip_path,
+        workspace_root,
+        project_id,
+        true,
+        &mut |_| {},
+        &mut || false,
+    )?;
+    Ok(candidates)
+}
+
+fn legacy_candidate(entry: &Value) -> Value {
+    let recipe = &entry["recipe"];
+    json!({"locusId":recipe["token"], "chr":recipe["chr_name"], "kind":"legacy",
+        "target":recipe["job_id"], "disposition":"legacy_candidate_only",
+        "candidates":[{"tool":"degap","status":"legacy_candidate_only",
+            "ctgName":entry["ctg_name"], "sha256":entry["sha256"]}]})
+}
+
+fn process_degap_results<P, C>(
+    zip_path: &Path,
+    workspace_root: &Path,
+    project_id: i64,
+    candidates_only: bool,
     on_progress: &mut P,
     should_cancel: &mut C,
 ) -> Result<(Vec<Value>, Vec<ImportProgress>)>
@@ -115,6 +167,7 @@ where
         let conn = open_workspace_db(&db)?;
         let mut tokens = HashSet::new();
         let mut packages = Vec::new();
+        let mut candidates = Vec::new();
         for (index, entry) in entries.iter().enumerate() {
             check_import_cancel(should_cancel)?;
             let recipe = &entry["recipe"];
@@ -125,9 +178,14 @@ where
             {
                 bail!("Invalid or duplicate DEGAP task token");
             }
-            let ledger = workspace_root
-                .join("metadata/degap_exports")
-                .join(format!("{token}.json"));
+            let metadata = workspace_root.join("metadata");
+            let exports = metadata.join("degap_exports");
+            let ledger = exports.join(format!("{token}.json"));
+            for path in [&metadata, &exports, &ledger] {
+                if path.symlink_metadata().is_ok_and(|meta| meta.is_symlink()) {
+                    bail!("DEGAP export receipt must not traverse a symlink");
+                }
+            }
             let saved: Value = serde_json::from_slice(
                 &fs::read(&ledger)
                     .with_context(|| "This DEGAP task was not exported from this workspace")?,
@@ -219,6 +277,12 @@ where
             let imported_path = PathBuf::from(format!("metadata/degap_imports/{token}.json"));
             let relative = field(entry, "package")?;
             validate_add_payload_relpath("DEGAP nested package", relative)?;
+            if !relative
+                .strip_prefix("packages/")
+                .is_some_and(|name| !name.contains('/') && name.ends_with(".zip"))
+            {
+                bail!("invalid DEGAP nested candidate package path");
+            }
             let archive = root.join(relative);
             if hash_file(&archive)? != field(entry, "sha256")? {
                 bail!("DEGAP result package checksum mismatch");
@@ -228,9 +292,21 @@ where
             // never overwrite a prior candidate or trust a token alone.
             let imported_receipt = workspace_root.join(&imported_path);
             if imported_receipt.exists() {
+                if imported_receipt.symlink_metadata()?.is_symlink()
+                    || imported_receipt
+                        .parent()
+                        .context("missing DEGAP receipt directory")?
+                        .symlink_metadata()?
+                        .is_symlink()
+                {
+                    bail!("DEGAP import receipt must not traverse a symlink");
+                }
                 let previous: Value = serde_json::from_slice(&fs::read(imported_receipt)?)?;
                 if previous["recipe"] != *recipe || previous["delivery"] != *entry {
                     bail!("DEGAP result differs from the previously imported task receipt");
+                }
+                if candidates_only {
+                    candidates.push(legacy_candidate(entry));
                 }
                 continue;
             }
@@ -254,12 +330,26 @@ where
             }
             let payload = extracted.join("gpm_server");
             validate_add_ctg_payload_merge_targets(&payload, workspace_root, &payload)?;
+            if candidates_only {
+                manifests::validate_add_ctg_package(
+                    &db,
+                    workspace_root,
+                    project_id,
+                    &nested,
+                    &payload,
+                )?;
+                candidates.push(legacy_candidate(entry));
+                continue;
+            }
             register_payload_paths(&payload, &payload, &union)?;
             fs::create_dir_all(union.join("metadata/degap_imports"))?;
             fs::write(union.join(&imported_path), b"")?;
             packages.push((archive, imported_path, entry.clone()));
         }
         drop(conn);
+        if candidates_only {
+            return Ok((candidates, progress));
+        }
         if packages.is_empty() {
             bail!("All DEGAP tasks in this package have already been imported");
         }

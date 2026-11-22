@@ -101,6 +101,83 @@ fn result_zip_candidates(path: &Path, candidates: &[PathBuf], receipts: &[Value]
 }
 
 #[test]
+fn project_refinement_card_records_legacy_without_creating_a_track_or_changing_final_path() {
+    use crate::degap_jobs::{import_manual_refinement_results, list_manual_refinement_results};
+    let temp = tempdir().unwrap();
+    let (outcome, project) = import_workspace_with_project(temp.path());
+    let token = "a".repeat(64);
+    let saved = receipt(
+        &outcome.workspace_root,
+        &outcome.project_db_path,
+        project,
+        &token,
+    );
+    let nested = temp.path().join("candidate.zip");
+    write_add_ctg_zip(&nested);
+    let package = temp.path().join("results.zip");
+    let corrupt = temp.path().join("corrupt.zip");
+    result_zip(&package, &nested, &[saved.clone()], false);
+    result_zip(&corrupt, &nested, &[saved], true);
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    let path = || crate::degap_jobs::degap_final_path_snapshot(&conn, project, "r").unwrap();
+    let original = path();
+    let source_count = count_rows(&outcome.project_db_path, "source_seq");
+    let dataset_count = count_rows(&outcome.project_db_path, "dataset");
+    assert!(
+        import_manual_refinement_results(&outcome.workspace_root, project + 1, &package).is_err()
+    );
+    assert!(import_manual_refinement_results(&outcome.workspace_root, project, &corrupt).is_err());
+    assert!(
+        list_manual_refinement_results(&outcome.workspace_root, project)
+            .unwrap()
+            .is_empty()
+    );
+    let recorded =
+        import_manual_refinement_results(&outcome.workspace_root, project, &package).unwrap();
+    assert_eq!(recorded.applied, 0);
+    assert!(!recorded.duplicate);
+    assert_eq!(recorded.loci[0]["disposition"], "legacy_candidate_only");
+    assert_eq!(recorded.loci[0]["candidates"][0]["ctgName"], "gap_filled");
+    assert!(
+        import_manual_refinement_results(&outcome.workspace_root, project, &package)
+            .unwrap()
+            .duplicate
+    );
+    assert_eq!(
+        list_manual_refinement_results(&outcome.workspace_root, project)
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(path(), original);
+    assert_eq!(
+        count_rows(&outcome.project_db_path, "source_seq"),
+        source_count
+    );
+    assert_eq!(
+        count_rows(&outcome.project_db_path, "dataset"),
+        dataset_count
+    );
+    assert!(
+        !outcome
+            .workspace_root
+            .join(format!("metadata/degap_imports/{token}.json"))
+            .exists()
+    );
+    // The separate older Add Contig action still works when explicitly chosen.
+    let (old, _) = import_degap_results_with_hooks(
+        &package,
+        &outcome.workspace_root,
+        project,
+        &mut |_| {},
+        &mut || false,
+    )
+    .unwrap();
+    assert_eq!(old.len(), 1);
+    assert_eq!(path(), original);
+}
+
+#[test]
 fn degap_batch_import_associates_candidate_and_rejects_duplicates() {
     let temp = tempdir().unwrap();
     let (outcome, project) = import_workspace_with_project(temp.path());

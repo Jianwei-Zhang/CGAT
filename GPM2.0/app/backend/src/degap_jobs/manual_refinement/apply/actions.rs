@@ -22,6 +22,15 @@ pub(super) fn annotate_adoption(row: &mut Value, adoption: &Adoption) -> Result<
     } else {
         Some(field(&adoption.row, "tool")?)
     });
+    row["activePatchLengthBp"] = json!(if adoption.undone {
+        None
+    } else {
+        Some(
+            adoption.row["patch"]["length"]
+                .as_u64()
+                .context("active adoption has an invalid patch length")?,
+        )
+    });
     let locate_id = match (adoption.undone, adoption.replacement.as_ref()) {
         (true, _) => field(&adoption.locus, "target")?,
         (false, Some(replacement)) => segment_id(replacement)?,

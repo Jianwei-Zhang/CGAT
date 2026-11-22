@@ -343,6 +343,9 @@ pub fn import_manual_refinement_results(
     project_id: i64,
     archive: &Path,
 ) -> Result<ManualRefinementImport> {
+    if crate::importer::is_degap_results_package(archive)? {
+        return import_legacy_candidates(workspace, project_id, archive);
+    }
     let mut bundle = validate_manual_refinement_results(workspace, project_id, archive)?;
     // Canonical order also makes re-zipping or reordering identical rows idempotent.
     bundle
@@ -546,6 +549,64 @@ pub fn import_manual_refinement_results(
     Ok(result)
 }
 
+fn import_legacy_candidates(
+    workspace: &Path,
+    project_id: i64,
+    archive: &Path,
+) -> Result<ManualRefinementImport> {
+    let mut loci =
+        crate::importer::validate_legacy_degap_candidates(archive, workspace, project_id)?;
+    loci.sort_by(|left, right| left["locusId"].as_str().cmp(&right["locusId"].as_str()));
+    let tokens = loci
+        .iter()
+        .map(|row| field(row, "locusId"))
+        .collect::<Result<Vec<_>>>()?;
+    let batch_sha256 = hex_sha(&serde_json::to_vec(&("legacy-degap", tokens))?);
+    let result_sha256 = hex_sha(&serde_json::to_vec(&(&batch_sha256, &loci))?);
+    let mut conn = open_workspace_db(&workspace.join("project.sqlite"))?;
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    validate_project_exists(&tx, project_id)?;
+    let duplicate: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM project_refinement_import WHERE project_id=?1 AND result_sha256=?2)",
+        params![project_id, result_sha256], |row| row.get(0),
+    )?;
+    if !duplicate {
+        let mut statement = tx.prepare(
+            "SELECT json_extract(locus.value, '$.candidates[0].sha256')
+             FROM project_refinement_import AS imported, json_each(imported.report_json, '$.loci') AS locus
+             WHERE imported.project_id=?1 AND json_extract(locus.value, '$.kind')='legacy'
+               AND json_extract(locus.value, '$.locusId')=?2",
+        )?;
+        for locus in &loci {
+            let previous = statement
+                .query_map(params![project_id, field(locus, "locusId")?], |row| {
+                    row.get::<_, String>(0)
+                })?;
+            for digest in previous {
+                if locus["candidates"][0]["sha256"] != digest? {
+                    bail!(
+                        "legacy candidate differs from the previously recorded DEGAP task receipt"
+                    );
+                }
+            }
+        }
+    }
+    let result = ManualRefinementImport {
+        result_sha256,
+        batch_sha256,
+        applied: 0,
+        duplicate,
+        changed_chromosomes: Vec::new(),
+        loci,
+    };
+    if !duplicate {
+        tx.execute("INSERT INTO project_refinement_import(project_id,result_sha256,batch_sha256,report_json) VALUES (?1,?2,?3,?4)",
+                   params![project_id,result.result_sha256,result.batch_sha256,serde_json::to_string(&result)?])?;
+    }
+    tx.commit()?;
+    Ok(result)
+}
+
 pub fn list_manual_refinement_results(
     workspace: &Path,
     project_id: i64,
@@ -567,6 +628,9 @@ pub fn list_manual_refinement_results(
     let mut adoptions = HashMap::new();
     for report in &mut reports {
         for row in &mut report.loci {
+            if row["kind"] == "legacy" {
+                continue;
+            }
             let id = field(row, "locusId")?.to_owned();
             if !adoptions.contains_key(&id) {
                 adoptions.insert(id.clone(), prior_adoption(&tx, project_id, &id)?);
