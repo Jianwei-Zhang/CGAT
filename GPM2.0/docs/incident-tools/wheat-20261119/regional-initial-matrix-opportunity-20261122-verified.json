@@ -1,0 +1,15 @@
+{
+  "executed_source_sha256": {},
+  "exit_code": 0,
+  "host": "agent-X86-61",
+  "job_id": 43012104,
+  "main_workspace_modified": false,
+  "original_report_sha256": "d720483712797bc6f8c0e1aa7a883ccc9532188316e05b0a9d8fb1cf1ddd26eb",
+  "production_strategy_enabled": false,
+  "remote_measure_py_sha256": "0f6def9cf8d2e58014c60879c2c2fd6d5558c2ede6ec7bbf4565703e1e1073e3",
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-initial-matrix-opportunity-20261122-124337",
+  "repo_report_sha256": "d720483712797bc6f8c0e1aa7a883ccc9532188316e05b0a9d8fb1cf1ddd26eb",
+  "scheduler_final_json_sha256": "be0dfca3c1e227cb7b26bdefb6212852d5009e712f2d1e10f4a9579be82ab059",
+  "schema": "incident_readonly_diagnostic_verified_v1",
+  "terminal_state": "SUCCEEDED"
+}

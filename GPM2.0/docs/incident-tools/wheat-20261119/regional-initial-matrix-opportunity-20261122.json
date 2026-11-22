@@ -1,0 +1,2141 @@
+{
+  "status": "initial_matrix_overlap_opportunity_not_admitted_negative_reuse",
+  "hostname": "agent-X86-61",
+  "sample_parents": 39,
+  "sample_windows": 51,
+  "initial_matrix_bindings": [
+    {
+      "chromosome": "1A",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2251,
+      "target_parts": 2251,
+      "initial_paf_identity": {
+        "path": "runs/chr_1A/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "7cf4fc3411491970a83d01139854ff7e7aca0b39de5ee1907022311c9b7c42c3",
+        "size": 278841984
+      },
+      "checkpoint_sha256": "690ca355e8ee667f53f15f3d0b90bfe0ab2badd38dd196357f0419dc68c0b0de"
+    },
+    {
+      "chromosome": "1A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 23,
+      "target_parts": 23,
+      "initial_paf_identity": {
+        "path": "runs/chr_1A/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "d807e8fb29fd007ce6df299d01d35ec08d89d9f4e1bb60d6c6ca84b54eee0937",
+        "size": 24445520
+      },
+      "checkpoint_sha256": "690ca355e8ee667f53f15f3d0b90bfe0ab2badd38dd196357f0419dc68c0b0de"
+    },
+    {
+      "chromosome": "1A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 23,
+      "target_parts": 2251,
+      "initial_paf_identity": {
+        "path": "runs/chr_1A/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "3ae7ef87f7d0db09861947fef8e7dfe336599b0d1d7c5b59fee7f2251a8cd948",
+        "size": 226439
+      },
+      "checkpoint_sha256": "690ca355e8ee667f53f15f3d0b90bfe0ab2badd38dd196357f0419dc68c0b0de"
+    },
+    {
+      "chromosome": "1B",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2474,
+      "target_parts": 2474,
+      "initial_paf_identity": {
+        "path": "runs/chr_1B/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "c83041fca330194e662cd027942b106c8c978424d01b009abd76f6fe1abaa30b",
+        "size": 635010397
+      },
+      "checkpoint_sha256": "f48b08f8f4f55cef1be0ac767ca69eac44641fce6a0ae86068e6bc0baf1822be"
+    },
+    {
+      "chromosome": "1B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 486,
+      "target_parts": 486,
+      "initial_paf_identity": {
+        "path": "runs/chr_1B/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "4bb7271a441834704394f2afd57313ca60548987b6387fa1ddd273be57fec4fd",
+        "size": 220902608
+      },
+      "checkpoint_sha256": "f48b08f8f4f55cef1be0ac767ca69eac44641fce6a0ae86068e6bc0baf1822be"
+    },
+    {
+      "chromosome": "1B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 486,
+      "target_parts": 2474,
+      "initial_paf_identity": {
+        "path": "runs/chr_1B/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "0ac421fe71a768172d8b1a3c5cd5d987c2d1a23440abab6fff9d870c67c4d77e",
+        "size": 2565988
+      },
+      "checkpoint_sha256": "f48b08f8f4f55cef1be0ac767ca69eac44641fce6a0ae86068e6bc0baf1822be"
+    },
+    {
+      "chromosome": "1D",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 934,
+      "target_parts": 934,
+      "initial_paf_identity": {
+        "path": "runs/chr_1D/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "4dc9de98baaf734b1d9b035cacd8df7e3f037a2f2ab2131414a5d72865f7462a",
+        "size": 353440376
+      },
+      "checkpoint_sha256": "e97bc15634ee2a139ed8cfd56d3273bd2a2dfe1c769d2919c6c7068917a58625"
+    },
+    {
+      "chromosome": "1D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 286,
+      "target_parts": 286,
+      "initial_paf_identity": {
+        "path": "runs/chr_1D/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "c5b4e61dfa073ee1ff425023e258e3088bc5b6c4f9f8c22ce67f1ddce23ae6ad",
+        "size": 45506093
+      },
+      "checkpoint_sha256": "e97bc15634ee2a139ed8cfd56d3273bd2a2dfe1c769d2919c6c7068917a58625"
+    },
+    {
+      "chromosome": "1D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 286,
+      "target_parts": 934,
+      "initial_paf_identity": {
+        "path": "runs/chr_1D/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "0c6f3c0d70b288e924fb3b3603d6d8c7c165f383da0769c2c879549cd61abb70",
+        "size": 435929
+      },
+      "checkpoint_sha256": "e97bc15634ee2a139ed8cfd56d3273bd2a2dfe1c769d2919c6c7068917a58625"
+    },
+    {
+      "chromosome": "2A",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2630,
+      "target_parts": 2630,
+      "initial_paf_identity": {
+        "path": "runs/chr_2A/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "202d1a82d6e8d25a0aa851b5e0316ce28fe8c5a4b4d4405756d5826e92fb6987",
+        "size": 467048607
+      },
+      "checkpoint_sha256": "95744f211edce9b3fdba2a67fe5c3488e2225ef5fcfd8f99c36b8a6cad51903d"
+    },
+    {
+      "chromosome": "2A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 50,
+      "target_parts": 50,
+      "initial_paf_identity": {
+        "path": "runs/chr_2A/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "a154ad07db922a539eed4ce5e3ac939e355be81744cd3f5f1596ea22cb92c295",
+        "size": 43318369
+      },
+      "checkpoint_sha256": "95744f211edce9b3fdba2a67fe5c3488e2225ef5fcfd8f99c36b8a6cad51903d"
+    },
+    {
+      "chromosome": "2A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 50,
+      "target_parts": 2630,
+      "initial_paf_identity": {
+        "path": "runs/chr_2A/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "02c48341b6c27f96b293d34c0eb68321cacc8dbe1326e59fb35451540d1e1344",
+        "size": 446443
+      },
+      "checkpoint_sha256": "95744f211edce9b3fdba2a67fe5c3488e2225ef5fcfd8f99c36b8a6cad51903d"
+    },
+    {
+      "chromosome": "2B",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 3801,
+      "target_parts": 3801,
+      "initial_paf_identity": {
+        "path": "runs/chr_2B/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "35cb85f84366f94511489378ba45133a90e6a930edee0248317303cffb6e9efa",
+        "size": 629074358
+      },
+      "checkpoint_sha256": "67bd469d8b044be4f6473184bad5aaa769fe7416e5c3a6c9e5355106cdba75ce"
+    },
+    {
+      "chromosome": "2B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 116,
+      "target_parts": 116,
+      "initial_paf_identity": {
+        "path": "runs/chr_2B/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "5d16180e21df1f27394dda282536b12cb320eddb4b29507fc17c89813c001369",
+        "size": 95101327
+      },
+      "checkpoint_sha256": "67bd469d8b044be4f6473184bad5aaa769fe7416e5c3a6c9e5355106cdba75ce"
+    },
+    {
+      "chromosome": "2B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 116,
+      "target_parts": 3801,
+      "initial_paf_identity": {
+        "path": "runs/chr_2B/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "9de708c2ea49a5cc03468090a3e84f844f49cc21bfafd768313888ebec2cca98",
+        "size": 837325
+      },
+      "checkpoint_sha256": "67bd469d8b044be4f6473184bad5aaa769fe7416e5c3a6c9e5355106cdba75ce"
+    },
+    {
+      "chromosome": "2D",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 921,
+      "target_parts": 921,
+      "initial_paf_identity": {
+        "path": "runs/chr_2D/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "83766487a0700fb618f19940f33731d31eeecbac4e03dbde30e72e7127ec8bba",
+        "size": 651512246
+      },
+      "checkpoint_sha256": "81c8dbdfae66a1fb2fc734f146ca25b6cff54b4b2d1ecc3cf207cf43532375ba"
+    },
+    {
+      "chromosome": "2D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 20,
+      "target_parts": 20,
+      "initial_paf_identity": {
+        "path": "runs/chr_2D/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "04d4187785bcb877e31a4bfb18ae708e3d357a4b9dfcf9a072d95b626d375f76",
+        "size": 23387700
+      },
+      "checkpoint_sha256": "81c8dbdfae66a1fb2fc734f146ca25b6cff54b4b2d1ecc3cf207cf43532375ba"
+    },
+    {
+      "chromosome": "2D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 20,
+      "target_parts": 921,
+      "initial_paf_identity": {
+        "path": "runs/chr_2D/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "2492479b72f1da78d1365ba2bb6c0d18cf0aa5cfd53fb9c5f0f90363a724663e",
+        "size": 688688
+      },
+      "checkpoint_sha256": "81c8dbdfae66a1fb2fc734f146ca25b6cff54b4b2d1ecc3cf207cf43532375ba"
+    },
+    {
+      "chromosome": "3A",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2290,
+      "target_parts": 2290,
+      "initial_paf_identity": {
+        "path": "runs/chr_3A/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "36613b0da58a1bf06e754718326a89be1d82dc9a970b9c553e6ab2a352fcca45",
+        "size": 356336882
+      },
+      "checkpoint_sha256": "f2032231aa4f185a6fca4eda482fa6be448bff989035cbf6e3ce893cd8b0d724"
+    },
+    {
+      "chromosome": "3A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 114,
+      "target_parts": 114,
+      "initial_paf_identity": {
+        "path": "runs/chr_3A/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "9ad12f0fac437a14972483364b434713c0c27ff09f696bedc891cd59d6be8a14",
+        "size": 46618776
+      },
+      "checkpoint_sha256": "f2032231aa4f185a6fca4eda482fa6be448bff989035cbf6e3ce893cd8b0d724"
+    },
+    {
+      "chromosome": "3A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 114,
+      "target_parts": 2290,
+      "initial_paf_identity": {
+        "path": "runs/chr_3A/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "705137e1259df1cd0f20ba46a7d372d19f6773de64abcd5b6569c0cc1b24b8f4",
+        "size": 520907
+      },
+      "checkpoint_sha256": "f2032231aa4f185a6fca4eda482fa6be448bff989035cbf6e3ce893cd8b0d724"
+    },
+    {
+      "chromosome": "3B",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2259,
+      "target_parts": 2259,
+      "initial_paf_identity": {
+        "path": "runs/chr_3B/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "664992f2e94923b772ddc5c3f060b3c9c4d8193f0e47bd49cfbe8aea7f6e0e9d",
+        "size": 646044571
+      },
+      "checkpoint_sha256": "d90e9b5af6f4f2fa0ec79e4516ecdf51629566934303898afbaa57ecd9657c3b"
+    },
+    {
+      "chromosome": "3B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 464,
+      "target_parts": 464,
+      "initial_paf_identity": {
+        "path": "runs/chr_3B/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "dd18ccac867fcfbc4b383d32175b1984a61f213f75e343ae55c0a2a5d5939585",
+        "size": 131407711
+      },
+      "checkpoint_sha256": "d90e9b5af6f4f2fa0ec79e4516ecdf51629566934303898afbaa57ecd9657c3b"
+    },
+    {
+      "chromosome": "3B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 464,
+      "target_parts": 2259,
+      "initial_paf_identity": {
+        "path": "runs/chr_3B/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "310326e53d7fbc96c595aac2e5fa34d3c76c7c1d3e84cf29a290f5fd84d0f2df",
+        "size": 731788
+      },
+      "checkpoint_sha256": "d90e9b5af6f4f2fa0ec79e4516ecdf51629566934303898afbaa57ecd9657c3b"
+    },
+    {
+      "chromosome": "3D",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 988,
+      "target_parts": 988,
+      "initial_paf_identity": {
+        "path": "runs/chr_3D/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "c195d38bdde454dea7aeea121fe9811caa3856054bd926c83f80369e83c85ce4",
+        "size": 448365475
+      },
+      "checkpoint_sha256": "f2599d7be77e974fbb979a06a97ea33ff3db1c03c4841cfd07d49a940ca10432"
+    },
+    {
+      "chromosome": "3D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 113,
+      "target_parts": 113,
+      "initial_paf_identity": {
+        "path": "runs/chr_3D/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "7497207c3ad6beaf7611ddca8149faa2c04604fdef92494cf28b70ec20aac32f",
+        "size": 217010385
+      },
+      "checkpoint_sha256": "f2599d7be77e974fbb979a06a97ea33ff3db1c03c4841cfd07d49a940ca10432"
+    },
+    {
+      "chromosome": "3D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 113,
+      "target_parts": 988,
+      "initial_paf_identity": {
+        "path": "runs/chr_3D/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "7f9e6078b5d489fccb823c15e27a260d38b2cbc2bc2020a5d2d165216328cce4",
+        "size": 327060
+      },
+      "checkpoint_sha256": "f2599d7be77e974fbb979a06a97ea33ff3db1c03c4841cfd07d49a940ca10432"
+    },
+    {
+      "chromosome": "4A",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2330,
+      "target_parts": 2330,
+      "initial_paf_identity": {
+        "path": "runs/chr_4A/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "de6bc2c3be7e339d72a948aac7a49d4c991bfc325609344f658c5af8cde435ee",
+        "size": 299852728
+      },
+      "checkpoint_sha256": "9c3b8b5697dab4ecc97918870a7b6221bdb557b6296c53fe27ff82fadff3a0dc"
+    },
+    {
+      "chromosome": "4A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 100,
+      "target_parts": 100,
+      "initial_paf_identity": {
+        "path": "runs/chr_4A/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "bae1af2574989d81dfe333b1a0b3cc507f774bb2ef8b9f507b5f39eccb6dfddc",
+        "size": 37603025
+      },
+      "checkpoint_sha256": "9c3b8b5697dab4ecc97918870a7b6221bdb557b6296c53fe27ff82fadff3a0dc"
+    },
+    {
+      "chromosome": "4A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 100,
+      "target_parts": 2330,
+      "initial_paf_identity": {
+        "path": "runs/chr_4A/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "7945ecbce81350221ebcce1fdfc98bc2ac9bbd677dff8c66202f023cd395fabc",
+        "size": 686297
+      },
+      "checkpoint_sha256": "9c3b8b5697dab4ecc97918870a7b6221bdb557b6296c53fe27ff82fadff3a0dc"
+    },
+    {
+      "chromosome": "4B",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 1979,
+      "target_parts": 1979,
+      "initial_paf_identity": {
+        "path": "runs/chr_4B/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "da5586bd8c5461aa3670f88eb056f047093eca451a3ab4b19fb71134d7f57372",
+        "size": 539901103
+      },
+      "checkpoint_sha256": "bfadc5379760e6d3be9b327f4c0c9db3404e99dcd79b2b634da864d4fc66573c"
+    },
+    {
+      "chromosome": "4B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 84,
+      "target_parts": 84,
+      "initial_paf_identity": {
+        "path": "runs/chr_4B/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "28509f7a2fff1ab6b6edb7af1d86580af3d3514f8850f62b79883fba69a9e346",
+        "size": 139085239
+      },
+      "checkpoint_sha256": "bfadc5379760e6d3be9b327f4c0c9db3404e99dcd79b2b634da864d4fc66573c"
+    },
+    {
+      "chromosome": "4B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 84,
+      "target_parts": 1979,
+      "initial_paf_identity": {
+        "path": "runs/chr_4B/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "5e6dc596cf05b90a89cfce5048861802f9f5eac80dad383f9569dc341e7c8464",
+        "size": 635372
+      },
+      "checkpoint_sha256": "bfadc5379760e6d3be9b327f4c0c9db3404e99dcd79b2b634da864d4fc66573c"
+    },
+    {
+      "chromosome": "4D",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 760,
+      "target_parts": 760,
+      "initial_paf_identity": {
+        "path": "runs/chr_4D/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "333bc2da257cd7997428ded45833d0dd7f7799655aff3302a7abb030cc49111d",
+        "size": 355170577
+      },
+      "checkpoint_sha256": "428e5615662a5f65cfc28322afd9754740433765634389b9b3329db4ebd80e15"
+    },
+    {
+      "chromosome": "4D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 6,
+      "target_parts": 6,
+      "initial_paf_identity": {
+        "path": "runs/chr_4D/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "98ebb2d98530d1d6fda9ae0f1427ad801980d8cb4c38578ba97ecca410fcf839",
+        "size": 22986942
+      },
+      "checkpoint_sha256": "428e5615662a5f65cfc28322afd9754740433765634389b9b3329db4ebd80e15"
+    },
+    {
+      "chromosome": "4D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 6,
+      "target_parts": 760,
+      "initial_paf_identity": {
+        "path": "runs/chr_4D/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "b5035eb7972197d41f2b3b9bc7a0f18cd0517ad1465f057171fbdfbf292e7b63",
+        "size": 95939
+      },
+      "checkpoint_sha256": "428e5615662a5f65cfc28322afd9754740433765634389b9b3329db4ebd80e15"
+    },
+    {
+      "chromosome": "5A",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2609,
+      "target_parts": 2609,
+      "initial_paf_identity": {
+        "path": "runs/chr_5A/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "4300d880faa50f5ce8d52a5ecd98906a2d40dd120256212c03516fc51a46a002",
+        "size": 410934260
+      },
+      "checkpoint_sha256": "2aa93b7aab4cdf3cf234f6a7c23590e0587c34f31555211cb570a306cb4c6967"
+    },
+    {
+      "chromosome": "5A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 23,
+      "target_parts": 23,
+      "initial_paf_identity": {
+        "path": "runs/chr_5A/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "89517b44076cd2659aa06346570ef6bd05cc721d072b51c60e1cbac90a94d88f",
+        "size": 28932026
+      },
+      "checkpoint_sha256": "2aa93b7aab4cdf3cf234f6a7c23590e0587c34f31555211cb570a306cb4c6967"
+    },
+    {
+      "chromosome": "5A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 23,
+      "target_parts": 2609,
+      "initial_paf_identity": {
+        "path": "runs/chr_5A/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "1df3fda4516470e3bb2eb014977aa2d6d0018bebb53ad9ddf6688470ebed41c7",
+        "size": 321203
+      },
+      "checkpoint_sha256": "2aa93b7aab4cdf3cf234f6a7c23590e0587c34f31555211cb570a306cb4c6967"
+    },
+    {
+      "chromosome": "5B",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 3144,
+      "target_parts": 3144,
+      "initial_paf_identity": {
+        "path": "runs/chr_5B/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "e4ee4fc17224d6187bad266813f27bc46137dd41f2f119b42dc9eeb5a3a4b7cb",
+        "size": 640677909
+      },
+      "checkpoint_sha256": "62895836eaf74a911cf64c378df099df7dc30c4fc3b26debd852dec7c67ad80e"
+    },
+    {
+      "chromosome": "5B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 107,
+      "target_parts": 107,
+      "initial_paf_identity": {
+        "path": "runs/chr_5B/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "0ef04dffe7ec8d10440310b8e25d803ec49d36ebf1ba4b1aacb8299291bf12eb",
+        "size": 162265958
+      },
+      "checkpoint_sha256": "62895836eaf74a911cf64c378df099df7dc30c4fc3b26debd852dec7c67ad80e"
+    },
+    {
+      "chromosome": "5B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 107,
+      "target_parts": 3144,
+      "initial_paf_identity": {
+        "path": "runs/chr_5B/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "df876418f1e610fa12d1bd3a709c7e26aa3f3c4d9fc5e04311c1062cc74d7c6c",
+        "size": 1107095
+      },
+      "checkpoint_sha256": "62895836eaf74a911cf64c378df099df7dc30c4fc3b26debd852dec7c67ad80e"
+    },
+    {
+      "chromosome": "5D",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 955,
+      "target_parts": 955,
+      "initial_paf_identity": {
+        "path": "runs/chr_5D/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "42e7dd67d5d189ba81f029bf9c0879a5aacc20b6b6cb00a65260ce278b971b79",
+        "size": 415382657
+      },
+      "checkpoint_sha256": "6db926dfa2afae9f5dcb2600cf12a7169927f740b3744bcee0457dad34b923bd"
+    },
+    {
+      "chromosome": "5D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 641,
+      "target_parts": 641,
+      "initial_paf_identity": {
+        "path": "runs/chr_5D/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "c9d024d17608043614b5bba2d1a3248dc1e01fed6899db1994688cb1dfb06f32",
+        "size": 74707331
+      },
+      "checkpoint_sha256": "6db926dfa2afae9f5dcb2600cf12a7169927f740b3744bcee0457dad34b923bd"
+    },
+    {
+      "chromosome": "5D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 641,
+      "target_parts": 955,
+      "initial_paf_identity": {
+        "path": "runs/chr_5D/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "0559de26a82882cdebbb287adaabc53bf66a27220463db0efbaf65fd3c7bae13",
+        "size": 1023183
+      },
+      "checkpoint_sha256": "6db926dfa2afae9f5dcb2600cf12a7169927f740b3744bcee0457dad34b923bd"
+    },
+    {
+      "chromosome": "6A",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 1991,
+      "target_parts": 1991,
+      "initial_paf_identity": {
+        "path": "runs/chr_6A/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "3535a877d86c30295bbd9eaeb8ccc6190b9215cdf54e4371936ce0d9ba03cc76",
+        "size": 245781085
+      },
+      "checkpoint_sha256": "d6f88314bc3d3f22d4d39c81cd75d2bc1435c40022181339e4d7cd008ef9380d"
+    },
+    {
+      "chromosome": "6A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 27,
+      "target_parts": 27,
+      "initial_paf_identity": {
+        "path": "runs/chr_6A/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "ffa5742bca33c5907afacb0a4b22a0e9eff9ae771799a59c5ae3f06db3ae167a",
+        "size": 33321404
+      },
+      "checkpoint_sha256": "d6f88314bc3d3f22d4d39c81cd75d2bc1435c40022181339e4d7cd008ef9380d"
+    },
+    {
+      "chromosome": "6A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 27,
+      "target_parts": 1991,
+      "initial_paf_identity": {
+        "path": "runs/chr_6A/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "1a9fcfabdeafb92f9ca457eed8f90a706713d935018bea098136336a77503b1d",
+        "size": 374911
+      },
+      "checkpoint_sha256": "d6f88314bc3d3f22d4d39c81cd75d2bc1435c40022181339e4d7cd008ef9380d"
+    },
+    {
+      "chromosome": "6B",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 3318,
+      "target_parts": 3318,
+      "initial_paf_identity": {
+        "path": "runs/chr_6B/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "e9bf825252ef5c26fe9c7243bdeb682ab472194d1fb924b2c826539b4d309d95",
+        "size": 658307666
+      },
+      "checkpoint_sha256": "0adff85d0c8bb1461e5acc433228dcaa698b67609932f42ef80addea2a7edea3"
+    },
+    {
+      "chromosome": "6B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 460,
+      "target_parts": 460,
+      "initial_paf_identity": {
+        "path": "runs/chr_6B/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "a607776aed1f9b0c488706883a56898689a4b7bb4fc12bff0cbf6b5b00bde0ed",
+        "size": 206930774
+      },
+      "checkpoint_sha256": "0adff85d0c8bb1461e5acc433228dcaa698b67609932f42ef80addea2a7edea3"
+    },
+    {
+      "chromosome": "6B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 460,
+      "target_parts": 3318,
+      "initial_paf_identity": {
+        "path": "runs/chr_6B/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "63d1c38cbc250fda1fff850ad2936f8645f5e969c679f3a98da1c9c3df6bfcf4",
+        "size": 6080698
+      },
+      "checkpoint_sha256": "0adff85d0c8bb1461e5acc433228dcaa698b67609932f42ef80addea2a7edea3"
+    },
+    {
+      "chromosome": "6D",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 912,
+      "target_parts": 912,
+      "initial_paf_identity": {
+        "path": "runs/chr_6D/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "879bcf0252fe3fc3984121a46403625d66374f3714bc1e8d484ec8fa5c35f08d",
+        "size": 430283818
+      },
+      "checkpoint_sha256": "8eb23ad98090389f1f6256f164dbcedf3a69c98e1e4b1d4dfdaa8ab3336a1bc0"
+    },
+    {
+      "chromosome": "6D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 14,
+      "target_parts": 14,
+      "initial_paf_identity": {
+        "path": "runs/chr_6D/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "f9ebf9f2505ff15d7fcf76bbe8a14a32678d61f099c807faa17b6c4b1ad67168",
+        "size": 22930604
+      },
+      "checkpoint_sha256": "8eb23ad98090389f1f6256f164dbcedf3a69c98e1e4b1d4dfdaa8ab3336a1bc0"
+    },
+    {
+      "chromosome": "6D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 14,
+      "target_parts": 912,
+      "initial_paf_identity": {
+        "path": "runs/chr_6D/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "d3fdeab5d3cb0e31b18858860a89f97a1c9492139664332438f07ba537377578",
+        "size": 702207
+      },
+      "checkpoint_sha256": "8eb23ad98090389f1f6256f164dbcedf3a69c98e1e4b1d4dfdaa8ab3336a1bc0"
+    },
+    {
+      "chromosome": "7A",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2742,
+      "target_parts": 2742,
+      "initial_paf_identity": {
+        "path": "runs/chr_7A/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "ef989dc70c6655caa412060aa4d14d697f484a53ffa4c8aba22943cbf01af4d0",
+        "size": 371243339
+      },
+      "checkpoint_sha256": "92f39dc22d2e00fac50e5f7c004ffd76b97b1ac022cb2009d57856a385703ae2"
+    },
+    {
+      "chromosome": "7A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 43,
+      "target_parts": 43,
+      "initial_paf_identity": {
+        "path": "runs/chr_7A/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "926a758ac36dbc2574e14c312d24bc9812a3efde4ddadb85a188815594a2de84",
+        "size": 30834799
+      },
+      "checkpoint_sha256": "92f39dc22d2e00fac50e5f7c004ffd76b97b1ac022cb2009d57856a385703ae2"
+    },
+    {
+      "chromosome": "7A",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 43,
+      "target_parts": 2742,
+      "initial_paf_identity": {
+        "path": "runs/chr_7A/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "d85c8824d57a53aaaa5c19d1704ebd1f94e57daeafae9c88123fa408068114bb",
+        "size": 638677
+      },
+      "checkpoint_sha256": "92f39dc22d2e00fac50e5f7c004ffd76b97b1ac022cb2009d57856a385703ae2"
+    },
+    {
+      "chromosome": "7B",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 2859,
+      "target_parts": 2859,
+      "initial_paf_identity": {
+        "path": "runs/chr_7B/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "023c8747cbd680d9df4b2e9be1177450fd726e7f389d69ad5db83a875616bf7c",
+        "size": 821857031
+      },
+      "checkpoint_sha256": "119e9196afa2a4be3fc906f555c4becb806f1b2c58dc68d2512e4e3004348641"
+    },
+    {
+      "chromosome": "7B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 109,
+      "target_parts": 109,
+      "initial_paf_identity": {
+        "path": "runs/chr_7B/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "f219b8f41e29c1f1ee5f697cfe0938b1432f9f0c04d282df907196b3f4a71ccb",
+        "size": 283893583
+      },
+      "checkpoint_sha256": "119e9196afa2a4be3fc906f555c4becb806f1b2c58dc68d2512e4e3004348641"
+    },
+    {
+      "chromosome": "7B",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 109,
+      "target_parts": 2859,
+      "initial_paf_identity": {
+        "path": "runs/chr_7B/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "e782df4a0e175ccbf7138520f249c2184c7edde676301f70a28aa0b7d40b0723",
+        "size": 945493
+      },
+      "checkpoint_sha256": "119e9196afa2a4be3fc906f555c4becb806f1b2c58dc68d2512e4e3004348641"
+    },
+    {
+      "chromosome": "7D",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 1103,
+      "target_parts": 1103,
+      "initial_paf_identity": {
+        "path": "runs/chr_7D/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "ff543ed526e654c2dfc03150c04b34499281d76ce2d614300a6ddbf76f2855fe",
+        "size": 657631742
+      },
+      "checkpoint_sha256": "abef303ac6b0b1d82c51234090d7de6d438b12dd6b8b81c057266957acae2ffb"
+    },
+    {
+      "chromosome": "7D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 39,
+      "target_parts": 39,
+      "initial_paf_identity": {
+        "path": "runs/chr_7D/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "2186a56ff4e62e4ddecc932ecc26b4fab76d186d1f572f8ebce65fb774255d27",
+        "size": 35582758
+      },
+      "checkpoint_sha256": "abef303ac6b0b1d82c51234090d7de6d438b12dd6b8b81c057266957acae2ffb"
+    },
+    {
+      "chromosome": "7D",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 39,
+      "target_parts": 1103,
+      "initial_paf_identity": {
+        "path": "runs/chr_7D/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "24cba4457849c5df787c954a74a6eb740d636b41cc0c6e722f0fd6565eec2b4d",
+        "size": 389748
+      },
+      "checkpoint_sha256": "abef303ac6b0b1d82c51234090d7de6d438b12dd6b8b81c057266957acae2ffb"
+    },
+    {
+      "chromosome": "Un",
+      "query_dataset": "JM19_flye_ABD",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 4227,
+      "target_parts": 4227,
+      "initial_paf_identity": {
+        "path": "runs/chr_Un/JM19_flye_ABD_vs_self/result.paf",
+        "sha256": "6a82d259cfa437451ac1beccc8aefd77398defe69c0e37495dee6562cf189560",
+        "size": 259264697
+      },
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe"
+    },
+    {
+      "chromosome": "Un",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_hifiasm",
+      "query_parts": 126,
+      "target_parts": 126,
+      "initial_paf_identity": {
+        "path": "runs/chr_Un/JM19_hifiasm_vs_self/result.paf",
+        "sha256": "8638679e90f9966f9c81e6418dc7db81766a1efe0dd5a0ac9dbee4e73bcccd47",
+        "size": 3615739
+      },
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe"
+    },
+    {
+      "chromosome": "Un",
+      "query_dataset": "JM19_hifiasm",
+      "target_dataset": "JM19_flye_ABD",
+      "query_parts": 126,
+      "target_parts": 4227,
+      "initial_paf_identity": {
+        "path": "runs/chr_Un/JM19_flye_ABD_vs_JM19_hifiasm/result.paf",
+        "sha256": "f33407608a4da48939d3733e63b51690d68f2000edb2ee487116c9d71fea0cf5",
+        "size": 242853
+      },
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe"
+    }
+  ],
+  "aggregate": {
+    "legacy": {
+      "parts": 23686,
+      "windows": 33766,
+      "bases": 974533380
+    },
+    "if_reuse_initial_self_scope": {
+      "parts": 20874,
+      "windows": 29966,
+      "bases": 846034253
+    },
+    "if_reuse_initial_all_scopes": {
+      "parts": 19713,
+      "windows": 28052,
+      "bases": 792322251
+    }
+  },
+  "fully_empty_opportunity_windows": {
+    "if_reuse_initial_self_scope": 0,
+    "if_reuse_initial_all_scopes": 0
+  },
+  "completed_raw_coarse_receipt_counts_metadata_only": {
+    "raw_success": 5453,
+    "raw_empty": 20,
+    "with_coarse_receipt": 5052,
+    "without_coarse_receipt": 401,
+    "coarse_nonempty_raw_empty": 19
+  },
+  "raw_coarse_metadata_inventory_sha256": "bc3c6168a98b72d0ec6c202b0e620bfcb911c3fdcda4ebdb3a6eeaef8db27ce4",
+  "rows": [
+    {
+      "query_part": "q0-source-part-3835de9de58a217e6ac30d8b",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 487,
+      "assignment_chromosomes": [
+        "1A",
+        "1D",
+        "3B",
+        "5D",
+        "6D",
+        "7A"
+      ],
+      "legacy": {
+        "parts": 419,
+        "windows": 442,
+        "bases": 9310486
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 374,
+        "windows": 392,
+        "bases": 8362208
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 159,
+        "windows": 167,
+        "bases": 3319768
+      }
+    },
+    {
+      "query_part": "q0-source-part-35348ad2cf825069b18365ca",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 23472,
+      "assignment_chromosomes": [
+        "2A"
+      ],
+      "legacy": {
+        "parts": 88,
+        "windows": 93,
+        "bases": 2387929
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 81,
+        "windows": 86,
+        "bases": 2227669
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 77,
+        "windows": 82,
+        "bases": 2125582
+      }
+    },
+    {
+      "query_part": "q0-source-part-eafccc8492ce31cb89e5d575",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 1518,
+      "query_end": 28941,
+      "assignment_chromosomes": [
+        "Un"
+      ],
+      "legacy": {
+        "parts": 131,
+        "windows": 189,
+        "bases": 4803536
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 95,
+        "windows": 138,
+        "bases": 3613504
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 93,
+        "windows": 135,
+        "bases": 3553115
+      }
+    },
+    {
+      "query_part": "q0-source-part-99c98c34b93accc4353e0d65",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 33144,
+      "assignment_chromosomes": [
+        "1B",
+        "2B",
+        "3B",
+        "4B",
+        "6B"
+      ],
+      "legacy": {
+        "parts": 355,
+        "windows": 410,
+        "bases": 11149035
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 268,
+        "windows": 321,
+        "bases": 8498148
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 229,
+        "windows": 270,
+        "bases": 6634901
+      }
+    },
+    {
+      "query_part": "q0-source-part-bf208e736726785a48e89560",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 36814,
+      "assignment_chromosomes": [
+        "3A"
+      ],
+      "legacy": {
+        "parts": 486,
+        "windows": 619,
+        "bases": 16097495
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 449,
+        "windows": 578,
+        "bases": 15109960
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 437,
+        "windows": 546,
+        "bases": 14360468
+      }
+    },
+    {
+      "query_part": "q0-source-part-8aa0136ae925e642ae16637c",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 39887,
+      "assignment_chromosomes": [
+        "6A"
+      ],
+      "legacy": {
+        "parts": 392,
+        "windows": 596,
+        "bases": 16119970
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 355,
+        "windows": 549,
+        "bases": 15057270
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 345,
+        "windows": 514,
+        "bases": 14164153
+      }
+    },
+    {
+      "query_part": "q0-source-part-b4e1482f5a89649732bb02a4",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 42931,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 202,
+        "windows": 318,
+        "bases": 8222320
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 202,
+        "windows": 318,
+        "bases": 8222320
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 202,
+        "windows": 318,
+        "bases": 8222320
+      }
+    },
+    {
+      "query_part": "q0-source-part-a6c04e9c34a6b54486cecc5f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 9406,
+      "query_end": 39241,
+      "assignment_chromosomes": [
+        "3A",
+        "5A",
+        "6A"
+      ],
+      "legacy": {
+        "parts": 375,
+        "windows": 586,
+        "bases": 17365270
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 281,
+        "windows": 466,
+        "bases": 13933241
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 254,
+        "windows": 398,
+        "bases": 11584813
+      }
+    },
+    {
+      "query_part": "q0-source-part-3e4722da9637a5e885b4285e",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 2568,
+      "query_end": 49173,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 504,
+        "windows": 733,
+        "bases": 19179091
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 504,
+        "windows": 733,
+        "bases": 19179091
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 504,
+        "windows": 733,
+        "bases": 19179091
+      }
+    },
+    {
+      "query_part": "q0-source-part-86b77fbfe381ee96cf919833",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 8744,
+      "query_end": 46698,
+      "assignment_chromosomes": [
+        "3B"
+      ],
+      "legacy": {
+        "parts": 666,
+        "windows": 871,
+        "bases": 26983136
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 602,
+        "windows": 792,
+        "bases": 23832373
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 576,
+        "windows": 749,
+        "bases": 22655603
+      }
+    },
+    {
+      "query_part": "q0-source-part-4331119007438124988e6096",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 5179,
+      "query_end": 60438,
+      "assignment_chromosomes": [
+        "Un"
+      ],
+      "legacy": {
+        "parts": 506,
+        "windows": 772,
+        "bases": 19638858
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 438,
+        "windows": 697,
+        "bases": 17977812
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 432,
+        "windows": 689,
+        "bases": 17811351
+      }
+    },
+    {
+      "query_part": "q0-source-part-67fa734febb6cf2f53c42610",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 71939,
+      "assignment_chromosomes": [
+        "1A"
+      ],
+      "legacy": {
+        "parts": 299,
+        "windows": 375,
+        "bases": 10092932
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 270,
+        "windows": 344,
+        "bases": 9312505
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 266,
+        "windows": 328,
+        "bases": 8916268
+      }
+    },
+    {
+      "query_part": "q0-source-part-a1609afd53c24f6dfbbddf65",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 90796,
+      "assignment_chromosomes": [
+        "4B"
+      ],
+      "legacy": {
+        "parts": 613,
+        "windows": 837,
+        "bases": 23394633
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 556,
+        "windows": 768,
+        "bases": 21598157
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 527,
+        "windows": 710,
+        "bases": 20011063
+      }
+    },
+    {
+      "query_part": "q0-source-part-c038a18002b62bcca0226f08",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 111585,
+      "assignment_chromosomes": [
+        "6A"
+      ],
+      "legacy": {
+        "parts": 855,
+        "windows": 1429,
+        "bases": 37187020
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 787,
+        "windows": 1332,
+        "bases": 34691684
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 776,
+        "windows": 1269,
+        "bases": 32837735
+      }
+    },
+    {
+      "query_part": "q0-source-part-c038a18002b62bcca0226f08",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 96226,
+      "query_end": 136608,
+      "assignment_chromosomes": [
+        "6A"
+      ],
+      "legacy": {
+        "parts": 481,
+        "windows": 590,
+        "bases": 14812197
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 455,
+        "windows": 557,
+        "bases": 13936745
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 445,
+        "windows": 540,
+        "bases": 13508998
+      }
+    },
+    {
+      "query_part": "q0-source-part-b545c991bd579747df935e4f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 61608,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 718,
+        "windows": 928,
+        "bases": 27177428
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 718,
+        "windows": 928,
+        "bases": 27177428
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 718,
+        "windows": 928,
+        "bases": 27177428
+      }
+    },
+    {
+      "query_part": "q0-source-part-b545c991bd579747df935e4f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 65059,
+      "query_end": 181948,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 955,
+        "windows": 1269,
+        "bases": 35530336
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 955,
+        "windows": 1269,
+        "bases": 35530336
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 955,
+        "windows": 1269,
+        "bases": 35530336
+      }
+    },
+    {
+      "query_part": "q0-source-part-b980fe5e0c5812d23eec5f7d",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 40889669,
+      "query_end": 40910178,
+      "assignment_chromosomes": [
+        "2A"
+      ],
+      "legacy": {
+        "parts": 612,
+        "windows": 805,
+        "bases": 22975647
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 586,
+        "windows": 779,
+        "bases": 22292535
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 573,
+        "windows": 741,
+        "bases": 21121989
+      }
+    },
+    {
+      "query_part": "q0-source-part-b980fe5e0c5812d23eec5f7d",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 43259942,
+      "query_end": 43282956,
+      "assignment_chromosomes": [
+        "2A"
+      ],
+      "legacy": {
+        "parts": 390,
+        "windows": 547,
+        "bases": 14320367
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 356,
+        "windows": 513,
+        "bases": 13537292
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 341,
+        "windows": 475,
+        "bases": 12346385
+      }
+    },
+    {
+      "query_part": "q0-source-part-aba2252f6caa567a4a5453fb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 17164,
+      "assignment_chromosomes": [
+        "2B"
+      ],
+      "legacy": {
+        "parts": 54,
+        "windows": 61,
+        "bases": 1418299
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 54,
+        "windows": 61,
+        "bases": 1418299
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 54,
+        "windows": 61,
+        "bases": 1418299
+      }
+    },
+    {
+      "query_part": "q0-source-part-426fb518d72cf4e38a7f7756",
+      "dataset": "JM19_hifiasm",
+      "query_start": 5,
+      "query_end": 38554,
+      "assignment_chromosomes": [
+        "1B",
+        "6B"
+      ],
+      "legacy": {
+        "parts": 481,
+        "windows": 669,
+        "bases": 27461069
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 93,
+        "windows": 126,
+        "bases": 6543518
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 61,
+        "windows": 80,
+        "bases": 5164892
+      }
+    },
+    {
+      "query_part": "q0-source-part-2c48cadab287de61549e1faa",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 50635,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 118,
+        "windows": 134,
+        "bases": 4062827
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 118,
+        "windows": 134,
+        "bases": 4062827
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 118,
+        "windows": 134,
+        "bases": 4062827
+      }
+    },
+    {
+      "query_part": "q0-source-part-20f493f2099355225315b610",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 69816,
+      "assignment_chromosomes": [
+        "1B"
+      ],
+      "legacy": {
+        "parts": 446,
+        "windows": 619,
+        "bases": 26094159
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 66,
+        "windows": 109,
+        "bases": 6196831
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 37,
+        "windows": 73,
+        "bases": 5137593
+      }
+    },
+    {
+      "query_part": "q0-source-part-911fed0ce411bc1b414b0492",
+      "dataset": "JM19_hifiasm",
+      "query_start": 18551,
+      "query_end": 39381,
+      "assignment_chromosomes": [
+        "5D"
+      ],
+      "legacy": {
+        "parts": 155,
+        "windows": 193,
+        "bases": 5436438
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 142,
+        "windows": 167,
+        "bases": 4724501
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 125,
+        "windows": 150,
+        "bases": 4223719
+      }
+    },
+    {
+      "query_part": "q0-source-part-88fded1709d7f4e11352696d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 110739,
+      "assignment_chromosomes": [
+        "1B",
+        "6B"
+      ],
+      "legacy": {
+        "parts": 448,
+        "windows": 607,
+        "bases": 22579122
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 73,
+        "windows": 102,
+        "bases": 2713414
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 43,
+        "windows": 61,
+        "bases": 1493720
+      }
+    },
+    {
+      "query_part": "q0-source-part-88fded1709d7f4e11352696d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 90739,
+      "query_end": 160227,
+      "assignment_chromosomes": [
+        "1B",
+        "6B"
+      ],
+      "legacy": {
+        "parts": 456,
+        "windows": 615,
+        "bases": 22758771
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 81,
+        "windows": 110,
+        "bases": 2883174
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 51,
+        "windows": 69,
+        "bases": 1663412
+      }
+    },
+    {
+      "query_part": "q0-source-part-c568f1fb59bea3155c169d02",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 110000,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 277,
+        "windows": 492,
+        "bases": 11763642
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 277,
+        "windows": 492,
+        "bases": 11763642
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 277,
+        "windows": 492,
+        "bases": 11763642
+      }
+    },
+    {
+      "query_part": "q0-source-part-c568f1fb59bea3155c169d02",
+      "dataset": "JM19_hifiasm",
+      "query_start": 90000,
+      "query_end": 210000,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 283,
+        "windows": 501,
+        "bases": 11960643
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 283,
+        "windows": 501,
+        "bases": 11960643
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 283,
+        "windows": 501,
+        "bases": 11960643
+      }
+    },
+    {
+      "query_part": "q0-source-part-429ead8f39ce5faef755bd2a",
+      "dataset": "JM19_hifiasm",
+      "query_start": 0,
+      "query_end": 110000,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 619,
+        "windows": 757,
+        "bases": 20664076
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 619,
+        "windows": 757,
+        "bases": 20664076
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 619,
+        "windows": 757,
+        "bases": 20664076
+      }
+    },
+    {
+      "query_part": "q0-source-part-429ead8f39ce5faef755bd2a",
+      "dataset": "JM19_hifiasm",
+      "query_start": 502337,
+      "query_end": 622337,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 1047,
+        "windows": 1293,
+        "bases": 34619504
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 1047,
+        "windows": 1293,
+        "bases": 34619504
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 1047,
+        "windows": 1293,
+        "bases": 34619504
+      }
+    },
+    {
+      "query_part": "q0-source-part-1944f0c4757a5d466e3ff1bb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 743142,
+      "query_end": 764592,
+      "assignment_chromosomes": [
+        "4B"
+      ],
+      "legacy": {
+        "parts": 665,
+        "windows": 814,
+        "bases": 20377029
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 642,
+        "windows": 782,
+        "bases": 19529340
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 601,
+        "windows": 725,
+        "bases": 17981633
+      }
+    },
+    {
+      "query_part": "q0-source-part-5f9fac4d96e084b9b35302bb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 3079651,
+      "query_end": 3199445,
+      "assignment_chromosomes": [
+        "7D"
+      ],
+      "legacy": {
+        "parts": 547,
+        "windows": 1091,
+        "bases": 32407524
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 541,
+        "windows": 1070,
+        "bases": 31912472
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 529,
+        "windows": 1046,
+        "bases": 31187169
+      }
+    },
+    {
+      "query_part": "q0-source-part-5f9fac4d96e084b9b35302bb",
+      "dataset": "JM19_hifiasm",
+      "query_start": 3379651,
+      "query_end": 3499651,
+      "assignment_chromosomes": [
+        "7D"
+      ],
+      "legacy": {
+        "parts": 491,
+        "windows": 973,
+        "bases": 27581327
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 485,
+        "windows": 950,
+        "bases": 26999958
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 473,
+        "windows": 930,
+        "bases": 26436520
+      }
+    },
+    {
+      "query_part": "q0-source-part-37a368663f31b2378f9bff6b",
+      "dataset": "JM19_hifiasm",
+      "query_start": 4058700,
+      "query_end": 4178700,
+      "assignment_chromosomes": [
+        "7B"
+      ],
+      "legacy": {
+        "parts": 960,
+        "windows": 1558,
+        "bases": 60432528
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 923,
+        "windows": 1471,
+        "bases": 56973353
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 861,
+        "windows": 1392,
+        "bases": 54892663
+      }
+    },
+    {
+      "query_part": "q0-source-part-37a368663f31b2378f9bff6b",
+      "dataset": "JM19_hifiasm",
+      "query_start": 4158700,
+      "query_end": 4216235,
+      "assignment_chromosomes": [
+        "7B"
+      ],
+      "legacy": {
+        "parts": 951,
+        "windows": 1541,
+        "bases": 59958573
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 914,
+        "windows": 1454,
+        "bases": 56499398
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 852,
+        "windows": 1375,
+        "bases": 54418708
+      }
+    },
+    {
+      "query_part": "q0-source-part-fdee4afd513a2dd145136e6c",
+      "dataset": "JM19_hifiasm",
+      "query_start": 2812318,
+      "query_end": 2832773,
+      "assignment_chromosomes": [
+        "4B"
+      ],
+      "legacy": {
+        "parts": 608,
+        "windows": 757,
+        "bases": 20129024
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 597,
+        "windows": 745,
+        "bases": 19839725
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 573,
+        "windows": 711,
+        "bases": 18727241
+      }
+    },
+    {
+      "query_part": "q0-source-part-fdee4afd513a2dd145136e6c",
+      "dataset": "JM19_hifiasm",
+      "query_start": 8351909,
+      "query_end": 8376046,
+      "assignment_chromosomes": [
+        "4B"
+      ],
+      "legacy": {
+        "parts": 930,
+        "windows": 1489,
+        "bases": 38152996
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 918,
+        "windows": 1467,
+        "bases": 37637128
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 886,
+        "windows": 1420,
+        "bases": 36275389
+      }
+    },
+    {
+      "query_part": "q0-source-part-3ba3a72d97ff0e6f3378451f",
+      "dataset": "JM19_hifiasm",
+      "query_start": 5592526,
+      "query_end": 5615428,
+      "assignment_chromosomes": [
+        "6B"
+      ],
+      "legacy": {
+        "parts": 573,
+        "windows": 634,
+        "bases": 16557861
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 562,
+        "windows": 618,
+        "bases": 16133897
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 505,
+        "windows": 544,
+        "bases": 14222019
+      }
+    },
+    {
+      "query_part": "q0-source-part-3ba3a72d97ff0e6f3378451f",
+      "dataset": "JM19_hifiasm",
+      "query_start": 5840285,
+      "query_end": 5863182,
+      "assignment_chromosomes": [
+        "6B"
+      ],
+      "legacy": {
+        "parts": 564,
+        "windows": 625,
+        "bases": 16345763
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 554,
+        "windows": 611,
+        "bases": 15972196
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 495,
+        "windows": 535,
+        "bases": 13957097
+      }
+    },
+    {
+      "query_part": "q0-source-part-17439c4d9cafdb3c5eacbb9b",
+      "dataset": "JM19_hifiasm",
+      "query_start": 6927948,
+      "query_end": 6948244,
+      "assignment_chromosomes": [
+        "7B"
+      ],
+      "legacy": {
+        "parts": 366,
+        "windows": 446,
+        "bases": 11469712
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 351,
+        "windows": 425,
+        "bases": 10971828
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 322,
+        "windows": 390,
+        "bases": 10135976
+      }
+    },
+    {
+      "query_part": "q0-source-part-911f7c307a135053c40bb054",
+      "dataset": "JM19_hifiasm",
+      "query_start": 7044231,
+      "query_end": 7065774,
+      "assignment_chromosomes": [
+        "5D"
+      ],
+      "legacy": {
+        "parts": 393,
+        "windows": 566,
+        "bases": 14974590
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 388,
+        "windows": 547,
+        "bases": 14532782
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 373,
+        "windows": 528,
+        "bases": 13996582
+      }
+    },
+    {
+      "query_part": "q0-source-part-911f7c307a135053c40bb054",
+      "dataset": "JM19_hifiasm",
+      "query_start": 10443344,
+      "query_end": 10562652,
+      "assignment_chromosomes": [
+        "5D"
+      ],
+      "legacy": {
+        "parts": 570,
+        "windows": 1233,
+        "bases": 34770396
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 562,
+        "windows": 1215,
+        "bases": 34299326
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 534,
+        "windows": 1167,
+        "bases": 32605559
+      }
+    },
+    {
+      "query_part": "q0-source-part-60782e2e555f64d061cb954d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 2423665,
+      "query_end": 2448197,
+      "assignment_chromosomes": [
+        "3D"
+      ],
+      "legacy": {
+        "parts": 204,
+        "windows": 315,
+        "bases": 8603536
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 198,
+        "windows": 305,
+        "bases": 8359768
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 183,
+        "windows": 275,
+        "bases": 7531575
+      }
+    },
+    {
+      "query_part": "q0-source-part-60782e2e555f64d061cb954d",
+      "dataset": "JM19_hifiasm",
+      "query_start": 104460078,
+      "query_end": 104514608,
+      "assignment_chromosomes": [
+        "3D"
+      ],
+      "legacy": {
+        "parts": 201,
+        "windows": 297,
+        "bases": 8103091
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 196,
+        "windows": 289,
+        "bases": 7916323
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 160,
+        "windows": 244,
+        "bases": 6456808
+      }
+    },
+    {
+      "query_part": "q0-source-part-0004b0de6132781258e4f66b",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 10149,
+      "assignment_chromosomes": [
+        "1B",
+        "2A",
+        "4A",
+        "7B"
+      ],
+      "legacy": {
+        "parts": 38,
+        "windows": 44,
+        "bases": 1293113
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 28,
+        "windows": 34,
+        "bases": 961285
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 20,
+        "windows": 21,
+        "bases": 505186
+      }
+    },
+    {
+      "query_part": "q0-source-part-7cc88f92c15f1484b47ce7c5",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 10396,
+      "assignment_chromosomes": [
+        "1A",
+        "3A",
+        "4A",
+        "6A",
+        "7A"
+      ],
+      "legacy": {
+        "parts": 79,
+        "windows": 94,
+        "bases": 2636145
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 55,
+        "windows": 69,
+        "bases": 1907558
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 39,
+        "windows": 44,
+        "bases": 1174159
+      }
+    },
+    {
+      "query_part": "q0-source-part-eb39b6bb48c26cb3c59df32f",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 17016,
+      "assignment_chromosomes": [
+        "4B",
+        "Un"
+      ],
+      "legacy": {
+        "parts": 0,
+        "windows": 0,
+        "bases": 0
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 0,
+        "windows": 0,
+        "bases": 0
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 0,
+        "windows": 0,
+        "bases": 0
+      }
+    },
+    {
+      "query_part": "q0-source-part-55fb529ec476c945a5ede3a3",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 18051,
+      "assignment_chromosomes": [
+        "1A",
+        "2A",
+        "3A",
+        "4A",
+        "5A",
+        "6A",
+        "7A"
+      ],
+      "legacy": {
+        "parts": 586,
+        "windows": 998,
+        "bases": 27475670
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 320,
+        "windows": 642,
+        "bases": 18053973
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 247,
+        "windows": 360,
+        "bases": 9928772
+      }
+    },
+    {
+      "query_part": "q0-source-part-14d9d6a584cf77faf2456b9a",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 18900,
+      "assignment_chromosomes": [],
+      "legacy": {
+        "parts": 310,
+        "windows": 352,
+        "bases": 8629101
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 310,
+        "windows": 352,
+        "bases": 8629101
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 310,
+        "windows": 352,
+        "bases": 8629101
+      }
+    },
+    {
+      "query_part": "q0-source-part-4fac4b670c4801d0d09d4555",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 19469,
+      "assignment_chromosomes": [
+        "7A"
+      ],
+      "legacy": {
+        "parts": 155,
+        "windows": 176,
+        "bases": 4640070
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 136,
+        "windows": 157,
+        "bases": 4191637
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 129,
+        "windows": 145,
+        "bases": 3913508
+      }
+    },
+    {
+      "query_part": "q0-source-part-64b0ea272cc147b5e13e770e",
+      "dataset": "JM19_flye_ABD",
+      "query_start": 0,
+      "query_end": 13871,
+      "assignment_chromosomes": [
+        "7A"
+      ],
+      "legacy": {
+        "parts": 1064,
+        "windows": 1413,
+        "bases": 34429095
+      },
+      "if_reuse_initial_self_scope": {
+        "parts": 1009,
+        "windows": 1351,
+        "bases": 33072498
+      },
+      "if_reuse_initial_all_scopes": {
+        "parts": 997,
+        "windows": 1316,
+        "bases": 32112892
+      }
+    }
+  ],
+  "source_DNA_read": false,
+  "reference_PAF_read": true,
+  "native_mapper_executed": false,
+  "main_workspace_modified": false,
+  "limitations": [
+    "Initial matrix membership overlap is NOT proof of equal precision/profile, window-context equivalence, or permission to treat every absent hit as an exact negative.",
+    "Initial self/cross profiles require explicit admission per real batch policy; existing aggressive initial self must not be mislabeled native-precision.",
+    "Stratified sample is not weighted to the live queue and uses frozen holes.",
+    "Empty output sizes come from success metadata, not independent raw/chaining content validation.",
+    "No production skip policy has been implemented or enabled."
+  ],
+  "seconds": 1068.8015055945143
+}

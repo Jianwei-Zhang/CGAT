@@ -3235,3 +3235,82 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
   再核对native/区域缓存命中和`dispatch=completion_order result_order=original`；只有其后新工作
   的吞吐才可判定现场收益。不因正常前缀/观察超时再次停任务。继续留意失败、明确低效步骤和内存；
   不跑发布CI/update.sh/全量替换，不修改旧基线。整个小麦任务尚未完成，goal保持active。
+
+### 2026-11-22 13:20：25项实际复用已确认；61k候选流程优化不是简单减窗口
+
+- 主任务仍为 **43012037 / agent-X86-39**，run
+  `20261122T040506Z-1245020-39aa9341`。12:41:21实际完成25个唯一初始单元的
+  `SKIP_VALID`并进入`q0_evidence`，不是只有预检通过。只读watcher将实际run/log/checkpoint
+  身份与原25项preflight对应，凭据 `q0-actual-initial-reuse-20261122.json` SHA
+  `d7a428781ee7f12a74d21b98acf5f867fb2425261bc0cd41c5420b3410b804b2`。
+  watcher没有再次独立全量hash输出；实际验收由主流程完成。13:13:46新job仍RUNNING、
+  CPU99%、memReal32472MiB、无当前run失败，处于输入/目录建立前缀；尚未见真实区域池
+  admission/新增工作吞吐，不因安静或单核立即再次重启。旧42523432仍RUNNING/grt_step2，未改动。
+- **初始染色体self/cross矩阵也查了，不把四个supplemental矩阵当作全部历史信息。**
+  只读诊断 **43012104 SUCCEEDED / agent-X86-61**（13:01:48），39父/51窗口、66个初始
+  矩阵绑定。原974533380 target bp；若profile/上下文允许复用初始self范围，条件重叠
+  后846034253；若所有初始矩阵都允许，则792322251（约少18.7%）。没有一个查询窗口
+  变成全空。**这是矩阵成员范围重叠，不是已准入的无损负结果复用**；初始profile、
+  window seed上下文、目标范围差异仍需证明，未接入生产。最终报告
+  `regional-initial-matrix-opportunity-20261122.json` SHA
+  `d720483712797bc6f8c0e1aa7a883ccc9532188316e05b0a9d8fb1cf1ddd26eb`。
+  此job后半段约15分钟为共享FS上的5453个已完成raw/coarse元数据inventory；
+  不是主任务卡死/原生比对，统计不能替代完整内容验收，不重复启动这个全目录扫描。
+- 当前区域代码已有no-CIGAR粗比对，但主要用于选CIGAR工作档，随后仍对原全部targets执行
+  `-c`。因此61k是现有窗口计划量，不等于必须付出61k次相同成本的全目标精比对；可评估
+  候选短名单、批量查询/共享index、按工作量触发的分层策略，不能只讨论并发。
+- **静态短名单探针43012133 SUCCEEDED**：64受控anchors+64分层已完成窗口，128例，
+  完整旧raw/coarse PAF校验。按每core/每dataset选top4 intra、top8 cross并保留方向多样性，
+  原target bp3186047602→557985390，旧高质量core覆盖保留约99.46% intra/99.81% cross。
+  对无旧coarse的例子保留全部targets。报告
+  `regional-candidate-static-probe-20261122.json` SHA
+  `b2b8b2b06cd25aa9c511b198e406c308d00736923dce615f584471d00060a438`。
+  **只是旧精确PAF的子集覆盖评估，不是候选mapper实测或全麦精度保证。**
+- **真实原生ABBA 43012150 SUCCEEDED / agent-X86-37**（13:11:24）：同x86工具、
+  16CPU/160GiB、7路×2线程、每进程4GiB AS，核对ready PID/uid/job成员后才放行。
+  64个原窗口FASTA共1505544121 bytes逐一验证；完整目标A两次精确stdout均等于历史PAF，
+  筛目标B两次也彼此一致。A=68.151/76.273秒；B=88.140/89.444秒，
+  **筛目标后精比对target bp1480706136→72098048（少95.13%），总mapper管线却慢约23%。**
+  原生stderr显示部分例子精比对本身反而变慢，不只是生成子集文件开销；目标上下文变化
+  影响seed/index行为，不能用目标bp缩减直接承诺提速。
+- 上述B的跨组装旧高质量core区间实际损失1285/2241593bp（约0.057%），intra损失
+  3724/2302580bp（约0.162%）；新获得的区间单独记账，**不能用净覆盖增加掩盖旧区间损失**。
+  个例intra覆盖可全失（ordinal63原831bp），加权平均不是每个case的保证。报告
+  `regional-candidate-native-pilot-20261122.json` SHA
+  `7e450069554e0a147af73d2a5fd0c0a18dd84fac2534c0a561d566a3dd9d3572`。
+  helper/test和原执行源码SHA在verified文件绑定；本地/HPC均12项针对性测试通过。
+  **拒绝将该较慢方案直接安装到主任务，尚未启用新的科学筛选策略。**
+- 下一轮为独立原生批量试验 **43012243 / agent-X86-37**，目录
+  `q0-batched-native-pilot-20261122-131841`：单批最多4个不同query、原exact flags兼容、
+  union targets≤100Mb，七路/2线程/4GiB AS不变；每个原query只消费自己原目标范围的输出，
+  校验所有额外PAF行。比较legacy / batch / batch+显式f0.005，再逆序复测；原每query的
+  CIGAR档在本试验冻结，**尚未实现生产的batch粗筛后逐query选档**。公共输入验证/批量输入
+  准备耗时分开记录；原始A再次要求stdout历史字节一致，候选按实际区间差集计损益。
+  此f0.005只在隔离诊断启用（也会作用于cross），不是已授权或已通过验收的生产cross档。
+  本地7项batch helper测试通过，资源ready PID2055419与当前job/uid100399/16CPU/160GiB
+  一致，分配凭据SHA `f04968acb54ebab66ad79af34fd4a73141dd9c0251b32f803e7d90a4eabcb1be`。
+  结果待核实；不改初始比对、不改旧基线、不热改主runtime，不重跑release CI/update.sh。
+
+#### 批量原生试验已完成；进一步拆分“目标上下文”和“过滤参数”的效果
+
+- **43012243已于13:28:34 SUCCEEDED**。legacy两次64.067/74.975秒；batch两次
+  69.366/75.865秒，mapper批次64→18但仍慢约4.45%；batch+f0.005为59.430/58.051秒，
+  mapper阶段约1.18倍，另有48.892秒的批量输入准备未计入该倍率。不能将18批或1.18倍
+  推成整流程收益。所有legacy输出再次字节匹配历史，两个候选各自两次输出一致，PAF全量
+  语法/几何验证、逐query恢复原target白名单、core区间差集比较均通过。
+- batch未过滤时，样本cross旧core损失为0，intra损失2648/2302580bp；但batch+f0.005
+  cross损失14906/2241593bp（约0.665%），intra损失15980/2302580bp（约0.694%），
+  **个例ordinal0 cross损失约15.93%**。这点mapper提速及平均保留率不足以证明该策略值得
+  上线，特别是计入准备成本和个例损失后。未安装任何batch/seed近似生产补丁。
+  `regional-batched-native-pilot-20261122.json` SHA
+  `93bc1f4f2b64559484b937eb3348eb4a5e8754a5e1a4f0f5860d7f2cbcadccf1`，verified文件绑定终态/
+  原执行源码/资源proof。HPC7项batch helper测试通过；本地四组diagnostic测试合计23项通过。
+- 已提交下一项更窄的隔离控制 **43012261 / agent-X86-37**，目录
+  `q0-full-seed-pilot-20261122-133010`，索引`/tmp/q0-full-seed-pilot-current.json`：
+  **保持完整原target、原coarse/逐query CIGAR档不变，仅精比对加温和f0.001**；同一64个
+  anchors进行ABBA，再按真实区间损失分开报告intra/cross。这样才能区分之前变慢来自
+  batch/shortlist上下文还是seed参数，不能把两个改动的总差值当作单因素效果。
+  ready PID2064983/uid100399/当前job成员/16CPU/160GiB已核实，allocation SHA
+  `2cc2c41448253c02a11adbf321054dfddb1d32abb7868e318aa0f3114125aa6a`。
+  仍是非held-out的诊断；即使样本胜出，也要核对尾部/独立样本、明确科学profile与缓存/
+  消费者兼容迁移，**不能借原AST等价资源迁移的门禁悄悄改变科学策略**。主任务不因此停止。

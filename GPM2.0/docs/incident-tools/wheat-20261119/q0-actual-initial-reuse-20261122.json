@@ -1,0 +1,212 @@
+{
+  "status": "actual_new_run_25_initial_units_skip_valid_verified",
+  "at": "2026-11-22T12:42:01.564801+08:00",
+  "job": 43012037,
+  "run_id": "20261122T040506Z-1245020-39aa9341",
+  "host": "agent-X86-39",
+  "initial_preflight_sha256": "a46396d126d9f1620acf010ff4b5559c64c62c9fdbc75cfbbe138ccb298e6fee",
+  "initial_checkpoints": [
+    {
+      "unit_id": "ref:JM19_hifiasm",
+      "checkpoint": ".run_all/checkpoints/ref-JM19-hifiasm.bfcc1a4b55a45f4d.json",
+      "checkpoint_sha256": "ffc0fe217d5ef7046167e391ad416b8855d62f3f335403a4939b979d702a9ef1",
+      "input_fingerprint": "bd33efe42347dd02d177e53e583a258ce248d81562e4be9eb3c269c7100eba15",
+      "actual_skip_valid_event": "2026-11-22T12:10:38+08:00 [run=20261122T040506Z-1245020-39aa9341] [1/55] [SKIP_VALID] [ref:JM19_hifiasm] elapsed=0.000s checkpoint=.run_all/checkpoints/ref-JM19-hifiasm.bfcc1a4b55a45f4d.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "ref:JM19_flye_ABD",
+      "checkpoint": ".run_all/checkpoints/ref-JM19-flye-ABD.23d185e5f3c90d9b.json",
+      "checkpoint_sha256": "7d55963244b3b1e56cdb9da443b5eeb2b20d6a5a903e834cd5e566fdc9b1e65a",
+      "input_fingerprint": "557c37364bddbf2452ec4f243ebd387574158d4469e45cacd8dc0d5e93e8a2d8",
+      "actual_skip_valid_event": "2026-11-22T12:12:11+08:00 [run=20261122T040506Z-1245020-39aa9341] [2/55] [SKIP_VALID] [ref:JM19_flye_ABD] elapsed=0.000s checkpoint=.run_all/checkpoints/ref-JM19-flye-ABD.23d185e5f3c90d9b.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "assign",
+      "checkpoint": ".run_all/checkpoints/assign.80a737d469c64759.json",
+      "checkpoint_sha256": "7a1d30112355d7c40ce3c1a195e842af630346fd3b31520e434ad6784a876879",
+      "input_fingerprint": "9a46d43dfaf1b18e8d420948c9fa8a7bf5ba0e46ad228492d10105616ea08a5a",
+      "actual_skip_valid_event": "2026-11-22T12:16:29+08:00 [run=20261122T040506Z-1245020-39aa9341] [3/55] [SKIP_VALID] [assign] elapsed=0.000s checkpoint=.run_all/checkpoints/assign.80a737d469c64759.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:1A",
+      "checkpoint": ".run_all/checkpoints/q0-chr-1A.cba37307325f9f05.json",
+      "checkpoint_sha256": "690ca355e8ee667f53f15f3d0b90bfe0ab2badd38dd196357f0419dc68c0b0de",
+      "input_fingerprint": "daa8010fd3d6da83a6b96178ad11cc48b310bfd85ac07e61923bc89a61bc7d76",
+      "actual_skip_valid_event": "2026-11-22T12:17:07+08:00 [run=20261122T040506Z-1245020-39aa9341] [4/55] [SKIP_VALID] [q0_chr:1A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-1A.cba37307325f9f05.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:1B",
+      "checkpoint": ".run_all/checkpoints/q0-chr-1B.da8e6312e3f7f4c2.json",
+      "checkpoint_sha256": "f48b08f8f4f55cef1be0ac767ca69eac44641fce6a0ae86068e6bc0baf1822be",
+      "input_fingerprint": "d15b7819b0b8019fa72e7ddb8a1a61d16395bba700fc0f5112569a8e5b251de9",
+      "actual_skip_valid_event": "2026-11-22T12:18:40+08:00 [run=20261122T040506Z-1245020-39aa9341] [5/55] [SKIP_VALID] [q0_chr:1B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-1B.da8e6312e3f7f4c2.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:1D",
+      "checkpoint": ".run_all/checkpoints/q0-chr-1D.7cbbaad018c83abf.json",
+      "checkpoint_sha256": "e97bc15634ee2a139ed8cfd56d3273bd2a2dfe1c769d2919c6c7068917a58625",
+      "input_fingerprint": "6700ce4637ae1d8d6b222c315f544eafb5a960de9c89b423391f9c6ff97fdc71",
+      "actual_skip_valid_event": "2026-11-22T12:19:41+08:00 [run=20261122T040506Z-1245020-39aa9341] [6/55] [SKIP_VALID] [q0_chr:1D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-1D.7cbbaad018c83abf.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:2A",
+      "checkpoint": ".run_all/checkpoints/q0-chr-2A.e7dca28a153347fe.json",
+      "checkpoint_sha256": "95744f211edce9b3fdba2a67fe5c3488e2225ef5fcfd8f99c36b8a6cad51903d",
+      "input_fingerprint": "c57c73b4c4eeb7ce84ed6148cef4b723a9135d376e5d87960e15445713f410eb",
+      "actual_skip_valid_event": "2026-11-22T12:20:39+08:00 [run=20261122T040506Z-1245020-39aa9341] [7/55] [SKIP_VALID] [q0_chr:2A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-2A.e7dca28a153347fe.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:2B",
+      "checkpoint": ".run_all/checkpoints/q0-chr-2B.80dbf24626c48ce4.json",
+      "checkpoint_sha256": "67bd469d8b044be4f6473184bad5aaa769fe7416e5c3a6c9e5355106cdba75ce",
+      "input_fingerprint": "7fdf14281d281c30c8715ceaeed970c758203489a7ce7ade9a73f949c10e2d1b",
+      "actual_skip_valid_event": "2026-11-22T12:21:59+08:00 [run=20261122T040506Z-1245020-39aa9341] [8/55] [SKIP_VALID] [q0_chr:2B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-2B.80dbf24626c48ce4.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:2D",
+      "checkpoint": ".run_all/checkpoints/q0-chr-2D.e7f99abb647ca684.json",
+      "checkpoint_sha256": "81c8dbdfae66a1fb2fc734f146ca25b6cff54b4b2d1ecc3cf207cf43532375ba",
+      "input_fingerprint": "d2088631248387c929d74abb6b6764ecc95f8e3f44994dc29b604293fa81dc33",
+      "actual_skip_valid_event": "2026-11-22T12:23:21+08:00 [run=20261122T040506Z-1245020-39aa9341] [9/55] [SKIP_VALID] [q0_chr:2D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-2D.e7f99abb647ca684.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:3A",
+      "checkpoint": ".run_all/checkpoints/q0-chr-3A.47683ff5693d75d3.json",
+      "checkpoint_sha256": "f2032231aa4f185a6fca4eda482fa6be448bff989035cbf6e3ce893cd8b0d724",
+      "input_fingerprint": "3844bb48ca47230f9a2ab4a8e020769d019aacca514d53d916f224a6f7ab8c28",
+      "actual_skip_valid_event": "2026-11-22T12:24:14+08:00 [run=20261122T040506Z-1245020-39aa9341] [10/55] [SKIP_VALID] [q0_chr:3A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-3A.47683ff5693d75d3.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:3B",
+      "checkpoint": ".run_all/checkpoints/q0-chr-3B.15c0f022c218907f.json",
+      "checkpoint_sha256": "d90e9b5af6f4f2fa0ec79e4516ecdf51629566934303898afbaa57ecd9657c3b",
+      "input_fingerprint": "347e33d6b30d566f39743700c927a7569bb4e59e8d262d570c2b4f955b32463d",
+      "actual_skip_valid_event": "2026-11-22T12:25:40+08:00 [run=20261122T040506Z-1245020-39aa9341] [11/55] [SKIP_VALID] [q0_chr:3B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-3B.15c0f022c218907f.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:3D",
+      "checkpoint": ".run_all/checkpoints/q0-chr-3D.3ad34da4c13c3561.json",
+      "checkpoint_sha256": "f2599d7be77e974fbb979a06a97ea33ff3db1c03c4841cfd07d49a940ca10432",
+      "input_fingerprint": "50bbb96f41cdd9cc4dc49d8cc8d7118db5384799a7302cea52f7189278a08a96",
+      "actual_skip_valid_event": "2026-11-22T12:26:59+08:00 [run=20261122T040506Z-1245020-39aa9341] [12/55] [SKIP_VALID] [q0_chr:3D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-3D.3ad34da4c13c3561.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:4A",
+      "checkpoint": ".run_all/checkpoints/q0-chr-4A.a105f378eb230856.json",
+      "checkpoint_sha256": "9c3b8b5697dab4ecc97918870a7b6221bdb557b6296c53fe27ff82fadff3a0dc",
+      "input_fingerprint": "9b599d6216933add7ac4c29e45c4e24ec37937f827df4c17a5f874306d690994",
+      "actual_skip_valid_event": "2026-11-22T12:27:46+08:00 [run=20261122T040506Z-1245020-39aa9341] [13/55] [SKIP_VALID] [q0_chr:4A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-4A.a105f378eb230856.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:4B",
+      "checkpoint": ".run_all/checkpoints/q0-chr-4B.2d8e62cc786cdf72.json",
+      "checkpoint_sha256": "bfadc5379760e6d3be9b327f4c0c9db3404e99dcd79b2b634da864d4fc66573c",
+      "input_fingerprint": "6a06241f3e9667d68c06b73ffefe7e9f4af9f53ed38b81e09d75d0f521a2fb02",
+      "actual_skip_valid_event": "2026-11-22T12:29:02+08:00 [run=20261122T040506Z-1245020-39aa9341] [14/55] [SKIP_VALID] [q0_chr:4B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-4B.2d8e62cc786cdf72.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:4D",
+      "checkpoint": ".run_all/checkpoints/q0-chr-4D.903a31e1bffe4c04.json",
+      "checkpoint_sha256": "428e5615662a5f65cfc28322afd9754740433765634389b9b3329db4ebd80e15",
+      "input_fingerprint": "1181b52a6f786a5d83cb43e14a5bd4a591b1b8d7cba8acd08ef53010e4c96e85",
+      "actual_skip_valid_event": "2026-11-22T12:29:54+08:00 [run=20261122T040506Z-1245020-39aa9341] [15/55] [SKIP_VALID] [q0_chr:4D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-4D.903a31e1bffe4c04.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:5A",
+      "checkpoint": ".run_all/checkpoints/q0-chr-5A.016318070415a97f.json",
+      "checkpoint_sha256": "2aa93b7aab4cdf3cf234f6a7c23590e0587c34f31555211cb570a306cb4c6967",
+      "input_fingerprint": "e8fa72ed9c5f60233651808584ad277a7a74dc1f179c9a92c0eaf75a131e99e8",
+      "actual_skip_valid_event": "2026-11-22T12:30:46+08:00 [run=20261122T040506Z-1245020-39aa9341] [16/55] [SKIP_VALID] [q0_chr:5A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-5A.016318070415a97f.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:5B",
+      "checkpoint": ".run_all/checkpoints/q0-chr-5B.1b117c49e0f80be3.json",
+      "checkpoint_sha256": "62895836eaf74a911cf64c378df099df7dc30c4fc3b26debd852dec7c67ad80e",
+      "input_fingerprint": "0a4f7ab0b87de6b2a4e39710c38627070438387050a16bb41a547aa34e3fe4dc",
+      "actual_skip_valid_event": "2026-11-22T12:32:13+08:00 [run=20261122T040506Z-1245020-39aa9341] [17/55] [SKIP_VALID] [q0_chr:5B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-5B.1b117c49e0f80be3.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:5D",
+      "checkpoint": ".run_all/checkpoints/q0-chr-5D.d05cd73c5926e719.json",
+      "checkpoint_sha256": "6db926dfa2afae9f5dcb2600cf12a7169927f740b3744bcee0457dad34b923bd",
+      "input_fingerprint": "2a0792161fc47d1aebf6fdab26fb825cf73091ce984d36966cfa186fe3d97e29",
+      "actual_skip_valid_event": "2026-11-22T12:33:18+08:00 [run=20261122T040506Z-1245020-39aa9341] [18/55] [SKIP_VALID] [q0_chr:5D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-5D.d05cd73c5926e719.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:6A",
+      "checkpoint": ".run_all/checkpoints/q0-chr-6A.a467c50ec8c919bf.json",
+      "checkpoint_sha256": "d6f88314bc3d3f22d4d39c81cd75d2bc1435c40022181339e4d7cd008ef9380d",
+      "input_fingerprint": "97cfdb35ec6bb24a8e2959c91bdac9fdb3b27198d162982bbd029876c43d0340",
+      "actual_skip_valid_event": "2026-11-22T12:33:57+08:00 [run=20261122T040506Z-1245020-39aa9341] [19/55] [SKIP_VALID] [q0_chr:6A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-6A.a467c50ec8c919bf.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:6B",
+      "checkpoint": ".run_all/checkpoints/q0-chr-6B.77dfbb4d5f2ebe20.json",
+      "checkpoint_sha256": "0adff85d0c8bb1461e5acc433228dcaa698b67609932f42ef80addea2a7edea3",
+      "input_fingerprint": "b04f8fcabb4cbfa66cf30b7b62013917214e43bec44cddeea16bbedd49e75b6f",
+      "actual_skip_valid_event": "2026-11-22T12:35:29+08:00 [run=20261122T040506Z-1245020-39aa9341] [20/55] [SKIP_VALID] [q0_chr:6B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-6B.77dfbb4d5f2ebe20.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:6D",
+      "checkpoint": ".run_all/checkpoints/q0-chr-6D.48f374a5795588d4.json",
+      "checkpoint_sha256": "8eb23ad98090389f1f6256f164dbcedf3a69c98e1e4b1d4dfdaa8ab3336a1bc0",
+      "input_fingerprint": "a5fee90491085de81dda303346f118b2053e0dc6dc83dd0518a11e05efd67be6",
+      "actual_skip_valid_event": "2026-11-22T12:36:31+08:00 [run=20261122T040506Z-1245020-39aa9341] [21/55] [SKIP_VALID] [q0_chr:6D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-6D.48f374a5795588d4.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:7A",
+      "checkpoint": ".run_all/checkpoints/q0-chr-7A.1beff895e3c9975d.json",
+      "checkpoint_sha256": "92f39dc22d2e00fac50e5f7c004ffd76b97b1ac022cb2009d57856a385703ae2",
+      "input_fingerprint": "9adbd1deec67ae5e1999b3a043748e1cd834aae75c062e1e28a04a80fa368a5b",
+      "actual_skip_valid_event": "2026-11-22T12:37:20+08:00 [run=20261122T040506Z-1245020-39aa9341] [22/55] [SKIP_VALID] [q0_chr:7A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-7A.1beff895e3c9975d.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:7B",
+      "checkpoint": ".run_all/checkpoints/q0-chr-7B.09f3acac6aa65d98.json",
+      "checkpoint_sha256": "119e9196afa2a4be3fc906f555c4becb806f1b2c58dc68d2512e4e3004348641",
+      "input_fingerprint": "85e22ec8a335c5710fdb5e845bdd4c5c2de29ea89827676e8a4102c36669f6d7",
+      "actual_skip_valid_event": "2026-11-22T12:39:17+08:00 [run=20261122T040506Z-1245020-39aa9341] [23/55] [SKIP_VALID] [q0_chr:7B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-7B.09f3acac6aa65d98.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:7D",
+      "checkpoint": ".run_all/checkpoints/q0-chr-7D.c660892d3022388a.json",
+      "checkpoint_sha256": "abef303ac6b0b1d82c51234090d7de6d438b12dd6b8b81c057266957acae2ffb",
+      "input_fingerprint": "c441fee4f77f4054648917be14091255ce255b8020196f648d757c16d790010e",
+      "actual_skip_valid_event": "2026-11-22T12:40:41+08:00 [run=20261122T040506Z-1245020-39aa9341] [24/55] [SKIP_VALID] [q0_chr:7D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-7D.c660892d3022388a.json checkpoint and outputs are valid"
+    },
+    {
+      "unit_id": "q0_chr:Un",
+      "checkpoint": ".run_all/checkpoints/q0-chr-Un.32e221ccfce4b25c.json",
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+      "input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+      "actual_skip_valid_event": "2026-11-22T12:41:18+08:00 [run=20261122T040506Z-1245020-39aa9341] [25/55] [SKIP_VALID] [q0_chr:Un] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-Un.32e221ccfce4b25c.json checkpoint and outputs are valid"
+    }
+  ],
+  "source_log": "logs/run_all.log",
+  "metadata_only_not_independent_output_rehash": true,
+  "main_workspace_modified_by_watcher": false,
+  "q0_regional_dispatch_or_throughput_confirmed": false,
+  "live_snapshot": {
+    "job": 43012037,
+    "at": "2026-11-22T12:41:38.266706+08:00",
+    "state": "RUNNING",
+    "node": "agent-X86-39",
+    "expected_run": "20261122T040506Z-1245020-39aa9341",
+    "latest_event": "2026-11-22T12:41:21+08:00 [run=20261122T040506Z-1245020-39aa9341] [26/55] [START] [q0_evidence] attempt=4 command=prepare_q0_evidence.sh",
+    "recent_q0_events": [],
+    "active": [
+      "q0_evidence"
+    ],
+    "done": 25,
+    "failed": [],
+    "usage": [
+      {
+        "cpu_recent": 97,
+        "cpu_seconds": 2063,
+        "mem_real": 334,
+        "mem_max": 703,
+        "mem_limit": 327680
+      }
+    ]
+  }
+}
