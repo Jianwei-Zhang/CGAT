@@ -164,6 +164,11 @@ export async function initializeProject({
   });
 }
 
+export async function previewProjectRefinementVersion(args) {
+  if (!isTauriRuntime()) throw new Error(args.stateOrLocale === "en" ? "Version preview requires the desktop App." : "版本预览需要桌面 App。");
+  return tauri.previewProjectRefinementVersion(args);
+}
+
 export async function getGrtProjectView({ workspaceRoot, projectId }) {
   if (isTauriRuntime()) {
     return tauri.getGrtProjectView({ workspaceRoot, projectId });

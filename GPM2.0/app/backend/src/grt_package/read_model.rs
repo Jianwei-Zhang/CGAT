@@ -657,15 +657,21 @@ pub fn load_grt_source_card_statuses(project_db_path: &Path) -> Result<Vec<GrtSo
 
 fn load_auto_effects(path: &Path, project: Option<i64>) -> Result<Vec<AutoRefinementEffect>> {
     let conn = open_workspace_db(path)?;
-    let mut stmt = conn.prepare("SELECT effect_json FROM grt_auto_refinement_effect WHERE package_id=1
-        UNION ALL SELECT effect_json FROM project_auto_version WHERE project_id=?1 ORDER BY 1")?;
-    let rows = stmt.query_map([project], |row| row.get::<_, String>(0))?;
-    let mut versions = BTreeMap::new();
+    let mut stmt = conn.prepare("SELECT effect_json, NULL FROM grt_auto_refinement_effect WHERE package_id=1
+        UNION ALL SELECT effect_json, light_manifest FROM project_auto_version WHERE project_id=?1 ORDER BY 1,2")?;
+    let rows=stmt.query_map([project], |r| Ok((r.get::<_,String>(0)?,r.get::<_,Option<String>>(1)?)))?;
+    let mut versions=BTreeMap::new();
+    let mut legacy=BTreeMap::new();
     for row in rows {
-        let effect: AutoRefinementEffect = serde_json::from_str(&row?)?;
-        versions.insert((effect.tool.clone(), effect.run_id.clone()), effect);
+        let (json,manifest)=row?;
+        let mut effect:AutoRefinementEffect=serde_json::from_str(&json)?;
+        effect.version_id=manifest.clone();
+        let k=(effect.tool.clone(),effect.run_id.clone());
+        if let Some(key)=manifest { versions.insert((k,key),effect); }
+        else { legacy.insert(k,effect); }
     }
-    Ok(versions.into_values().collect())
+    for (k,_) in versions.keys() { legacy.remove(k); }
+    Ok(versions.into_values().chain(legacy.into_values()).collect())
 }
 
 pub fn load_grt_project_view(project_db_path: &Path) -> Result<GrtProjectView> {

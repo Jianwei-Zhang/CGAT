@@ -380,6 +380,14 @@ pub async fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> Comm
 }
 
 #[tauri::command]
+#[allow(non_snake_case)]
+pub async fn preview_project_refinement_version(workspaceRoot: String, projectId: i64, tool: String, versionId: String) -> CommandResult<Value> {
+    run_blocking_command("preview_project_refinement_version", move || {
+        gpm_next_backend::grt_package::preview_project_refinement_version(&project_db_path(&workspaceRoot), projectId, &tool, &versionId).map_err(format_error)
+    }).await
+}
+
+#[tauri::command]
 pub fn update_project(request: UpdateProjectCommandRequest) -> CommandResult<Value> {
     let UpdateProjectCommandRequest {
         workspace_root,

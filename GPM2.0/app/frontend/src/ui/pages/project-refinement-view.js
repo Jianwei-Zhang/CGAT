@@ -2,6 +2,7 @@ import { projectIcon } from "./project-icons.js";
 import { pickZipFilePath } from "../../services/backend-api.js";
 import {
   getGrtProjectView,
+  previewProjectRefinementVersion,
   getProjectAssemblyViewState,
   importManualRefinementResults,
   listManualRefinementResults,
@@ -29,6 +30,8 @@ const PROJECT_REFINEMENT_BOUND = Symbol("projectRefinementBound");
 const COPY = {
   zh: {
     sectionTitle: "精修",
+    preview: "查看版本", previewHint: "只读预览，不切换工作版本。", loadingVersion: "正在读取版本…",
+    recordHeaders: ["染色体", "长度 (bp)", "片段数", "Gap 片段数"],
     importAction: "导入精修补丁",
     autoPatchImported: "已加入自动精修结果：{tools}。当前工作路径未改变。",
     autoPatchDuplicate: "这些自动精修结果已在项目中，未重复导入。",
@@ -110,6 +113,8 @@ const COPY = {
     },
   },
   en: {
+    preview: "View version", previewHint: "Read-only preview; the working version is unchanged.", loadingVersion: "Loading version…",
+    recordHeaders: ["Chromosome", "Length (bp)", "Segments", "Gap segments"],
     sectionTitle: "Refinement",
     importAction: "Import refinement patch",
     autoPatchImported: "Added automatic results: {tools}. The working path has not changed.",
@@ -947,13 +952,17 @@ function renderImportedLocusRow(batch, locus, copy, busy) {
 
 function refinementTableRows({ auto, manual }, copy) {
   const rows = [];
-  const autoRow = (label, counts, result) => rows.push([copy.autoTitle, label, ...counts, result]);
+  const autoRow = (label, counts, result, version = null) => rows.push({ source: copy.autoTitle, label, cells: [...counts, result], version });
   const absent = [null, null, null, null];
   const reported = new Set();
   for (const effect of auto.effects) {
     reported.add(effect.tool);
-    autoRow(formatToolLabel(effect.tool), [effect.closed, effect.partial, effect.unfilled, effect.rejected],
-      fmt(copy.editCount, { n: effect.accepted_edits ?? effect.acceptedEdits }));
+    const id = effect.version_id ?? effect.versionId;
+    const version = /^[a-f0-9]{64}$/.test(id || "") ? { id, tool: effect.tool } : null;
+    const duplicateTool = auto.effects.some((other) => other !== effect && other.tool === effect.tool);
+    const label = formatToolLabel(effect.tool) + (duplicateTool && version ? ` · ${id.slice(0, 8)}` : "");
+    autoRow(label, [effect.closed, effect.partial, effect.unfilled, effect.rejected],
+      fmt(copy.editCount, { n: effect.accepted_edits ?? effect.acceptedEdits }), version);
   }
   // Old project databases retain accepted segments, not per-gap closure measurements.
   const legacy = new Map();
@@ -966,7 +975,7 @@ function refinementTableRows({ auto, manual }, copy) {
     auto.schemaVersion === "5" ? copy.unknownStats : copy.statusAutoUnrefined);
 
   const toolNames = (ids) => formatTools([...new Set(ids.filter(Boolean))]);
-  const manualRow = (label, counts, status) => rows.push([copy.manualTitle, label, ...counts, status]);
+  const manualRow = (label, counts, status) => rows.push({ source: copy.manualTitle, label, cells: [...counts, status] });
   for (const batch of manual.importedResults) {
     const gaps = batch.loci.filter((locus) => locus.kind === "gap" && !locus.isLegacy);
     const outcomes = gaps.map((gap) => {
@@ -988,6 +997,43 @@ function refinementTableRows({ auto, manual }, copy) {
   if (manual.draftLoci.length) manualRow(toolNames(manual.draftLoci.flatMap((l) => l.tools)), absent,
     `${copy.statusManualDraft} · ${fmt(copy.lociCount, { n: manual.draftLoci.length })}`);
   return rows;
+}
+
+function versionTableRow({ source, label, cells, version }, ui, copy, locale) {
+  const open = version && ui.previewId === version.id && ui.previewTool === version.tool;
+  const button = version ? `<button type="button" class="button ghost project-refinement-locate" data-preview-version="${escapeAttr(version.id)}" data-version-tool="${escapeAttr(version.tool)}" aria-expanded="${Boolean(open)}" aria-label="${escapeAttr(`${copy.preview}: ${label}`)}">${escapeHtml(copy.preview)}</button>` : "";
+  const row = `<tr><td>${escapeHtml(source)}</td><th scope="row">${escapeHtml(label || "—")} ${button}</th>${cells.map((v) => `<td>${escapeHtml(String(v ?? "—"))}</td>`).join("")}</tr>`;
+  if (!open) return row;
+  const data = ui.previewData;
+  const counts = new Intl.NumberFormat(locale === "en" ? "en-US" : "zh-CN");
+  const details = ui.previewError ? `<span role="alert">${escapeHtml(ui.previewError)}</span>`
+    : !data ? `<span role="status">${escapeHtml(copy.loadingVersion)}</span>`
+    : `<p class="muted">${escapeHtml(copy.previewHint)} <code>${escapeHtml(version.id.slice(0, 12))}</code></p><table><thead><tr>${copy.recordHeaders.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${data.chromosomes.map((c) => `<tr><th scope="row">${escapeHtml(c.chr)}</th>${[c.bp,c.segments,c.gapSegments].map((n) => `<td>${escapeHtml(counts.format(n))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  return `${row}<tr><td colspan="${cells.length + 2}">${details}</td></tr>`;
+}
+
+let previewRequest = 0;
+async function toggleVersionPreview(host, store, button, rerender, deps) {
+  const state = store.getState();
+  const identity = { workspaceRoot: state.session?.workspacePath, projectId: Number(state.session?.projectId) };
+  if (!buildProjectSessionKey(identity)) return;
+  const versionId = button.dataset.previewVersion, tool = button.dataset.versionTool;
+  const ui = readScopedRefinementUi(state), request = ++previewRequest;
+  const close = ui.previewId === versionId && ui.previewTool === tool;
+  setRefinementUi(store, { previewId: close ? null : versionId, previewTool: tool, previewRequest: request, previewData: null, previewError: "" }, identity);
+  rerender?.(host, store);
+  if (close) return;
+  const current = () => isSameProjectSession(store.getState(), identity) && readScopedRefinementUi(store.getState()).previewRequest === request;
+  try {
+    const data = await (deps.previewProjectRefinementVersion || previewProjectRefinementVersion)({ ...identity, versionId, tool, stateOrLocale: state.locale });
+    if (!current()) return;
+    if (data?.versionId !== versionId || data.tool !== tool || !Array.isArray(data.chromosomes)) throw new Error(state.locale === "en" ? "Version identity mismatch" : "版本身份不匹配");
+    setRefinementUi(store, { previewData: data }, identity);
+  } catch (error) {
+    if (!current()) return;
+    setRefinementUi(store, { previewError: String(error?.message || error) }, identity);
+  }
+  rerender?.(host, store);
 }
 
 export function renderProjectRefinementCard(state) {
@@ -1120,7 +1166,7 @@ export function renderProjectRefinementCard(state) {
     ${copyFeedbackMarkup}
     ${rows.length ? `<div class="project-refinement-table-scroll"><table class="project-refinement-table" aria-labelledby="project-refinement-title" aria-describedby="project-refinement-table-note">
       <thead><tr>${copy.tableColumns.map((col) => `<th scope="col">${escapeHtml(col)}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map(([source, label, ...cells]) => `<tr><td>${escapeHtml(source)}</td><th scope="row">${escapeHtml(label || "—")}</th>${cells.map((v) => `<td>${escapeHtml(String(v ?? "—"))}</td>`).join("")}</tr>`).join("")}</tbody>
+      <tbody>${rows.map((row) => versionTableRow(row, ui, copy, state?.locale)).join("")}</tbody>
     </table></div><p id="project-refinement-table-note" class="muted project-refinement-note">${escapeHtml(copy.tableHint)}</p>` : ""}
     ${autoDetails}
     ${manualImportedMarkup ? `<p class="muted project-refinement-note">${escapeHtml(copy.metricActiveManualEdits)}: ${model.manual.activeManualCount}</p>` : ""}
@@ -1136,6 +1182,8 @@ export function bindProjectRefinementCard(host, store, rerender, deps = {}) {
     return;
   }
   host.addEventListener("click", (event) => {
+    const preview = event.target?.closest?.("[data-preview-version]");
+    if (preview) { void toggleVersionPreview(host, store, preview, rerender, deps); return; }
     const importBtn = event.target?.closest?.("[data-project-refinement-import]");
     if (importBtn) {
       void runImportManualRefinementResults(host, store, rerender, deps);

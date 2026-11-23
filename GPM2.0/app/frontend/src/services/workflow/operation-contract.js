@@ -16,6 +16,7 @@ const DEFINITIONS = {
     ["requestProjectCopyCancel", "mock"],
     ["initializeProject", "bridge"],
     ["getGrtProjectView", "bridge"],
+    ["previewProjectRefinementVersion", "unavailable"],
     ["deleteProject", "bridge"],
     ["updateProject", "bridge"],
     ["bootstrapProjectAssembly", "bridge"],

@@ -40,6 +40,9 @@ export function createTauriTransport({
     requestImportCancel({ runId, stateOrLocale = "zh" }) {
       return invokeNormalized("request_import_cancel", { runId }, stateOrLocale);
     },
+    previewProjectRefinementVersion({ workspaceRoot, projectId, tool, versionId, stateOrLocale = "zh" }) {
+      return invokeNormalized("preview_project_refinement_version", { workspaceRoot, projectId, tool, versionId }, stateOrLocale);
+    },
     getGrtProjectView({ workspaceRoot, projectId }) {
       return invokeNormalized("get_grt_project_view", { workspaceRoot, projectId });
     },

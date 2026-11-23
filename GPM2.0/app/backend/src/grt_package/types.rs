@@ -147,6 +147,9 @@ pub struct GrtProjectInitializationSummary {
 /// Counts refer to distinct original LGZ gaps, not output segments or native candidates.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AutoRefinementEffect {
+    /// Only populated by the project read model, never guessed from a tool/run label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<String>,
     pub tool: String,
     pub run_id: String,
     pub original_gaps: usize,

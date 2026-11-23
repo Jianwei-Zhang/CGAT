@@ -50,6 +50,7 @@ pub fn run() {
             commands::reveal_project_location,
             commands::initialize_project,
             commands::get_grt_project_view,
+            commands::preview_project_refinement_version,
             commands::update_project,
             commands::delete_project,
             commands::bootstrap_project_assembly,
