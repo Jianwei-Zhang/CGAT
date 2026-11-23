@@ -455,6 +455,11 @@ class _PlacementProgress:
             self.thread = Thread(target=self._heartbeat, name="q0-placement-progress", daemon=True)
             self.thread.start()
 
+    def completed(self, count):
+        if self.log is not _quiet:
+            with self.lock:
+                self.state[2] = count
+
     def items(self, label, values):
         if self.log is _quiet:
             yield from values
@@ -479,6 +484,70 @@ def _overlapping_spans(span, disjoint):
         if candidate.start >= span.end:
             break
         yield candidate
+
+
+def _clean_source_intervals(sequence, mask, intervals, policy):
+    return merged_intervals(piece for i in intervals for unique in _outside_merged_mask(i, mask)
+                            for piece in _complex_intervals(sequence, unique, policy))
+
+
+def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_context):
+    """One candidate, fixed round inputs; no shared proposal writes or early tie-breaking."""
+    delta = {}; geometry = complexity = 0.0
+    direct_spans = {}  # Immutable source coverage, only for this segment and round.
+    for anchor, links in linked:
+        for orientation in ("+", "-"):
+            group = (anchor.chromosome, orientation)
+            direct = groups.get(group, ())
+            if groups and not direct:
+                continue  # This locus cannot propose a placement, regardless of pair evidence.
+            # Geometry probe has explicit raw evidence; it is never returned as admitted.
+            stamp = monotonic()
+            temporary = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
+                                   (l.hit.evidence_id for l in links), kind="pairwise")
+            qualified = qualify_pair_blocks(temporary, anchor, links, path_policy, require_supported=False)
+            geometry += monotonic() - stamp
+            if not qualified:
+                continue
+            # Full accepted contig context can root an off-ref
+            # neighbor; known ambiguous/repetitive positions cannot.
+            stamp = monotonic()
+            context = rooted_context(anchor)
+            complexity += monotonic() - stamp
+            intervals, ids = [], set()
+            for block, evidence_id in qualified:
+                # Screen only source intervals that touch this block; keep the original
+                # source-coordinate order and orientation-specific projection below.
+                target_span = anchor.source_interval(block.right)
+                for source_anchor in _overlapping_spans(target_span, context):
+                    overlap = block.right.intersection(anchor.local(source_anchor))
+                    if overlap is None:
+                        continue
+                    start = block.left.start + overlap.start - block.right.start
+                    intervals.append(temporary.source_interval(Interval(start, start + overlap.length)))
+                    ids.add(evidence_id)
+            stamp = monotonic()
+            intervals = clean(intervals)
+            complexity += monotonic() - stamp
+            if sum(i.length for i in intervals) < min(policy.minimum_anchor_bp, part.interval.length):
+                continue
+            item = delta.setdefault(group, {"intervals": [], "ids": set(), "parents": set()})
+            if direct:
+                # Only the union of intersections is consumed here. Both axes are
+                # merged before clipping, so these half-open overlaps are already
+                # ordered and disjoint. Keep the original reference anchors in refs.
+                if group not in direct_spans:
+                    direct_spans[group] = merged_intervals(b.source for b in direct)
+                cover = direct_spans[group]
+                item["intervals"].extend(a.intersection(b) for a in intervals
+                                         for b in _overlapping_spans(a, cover))
+            else:
+                item["intervals"].extend(intervals)
+            item["ids"].update(ids | set(anchor.evidence_ids))
+            item["parents"].add(anchor.placement_id)
+    for item in delta.values():
+        item['intervals'] = merged_intervals(item['intervals'])
+    return delta, geometry, complexity
 
 
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),
@@ -528,10 +597,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
     pair_neighbors = _pair_neighbors(data.pair_links)
 
     def clean_intervals(part, intervals):
-        mask = ambiguous.get(part.source, ())
-        return merged_intervals(piece for i in intervals
-                                for unique in _outside_merged_mask(i, mask)
-                                for piece in _complex_intervals(data.sources[part.source], unique, policy))
+        return _clean_source_intervals(data.sources[part.source], ambiguous.get(part.source, ()), intervals, policy)
 
     # Revisit a reference seed when independently ref-anchored sequence on
     # another chr supports a previously unlocalized tail. This is local source
@@ -624,6 +690,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
     # Anchors are immutable until the extension phase below. Accumulate each
     # candidate/anchor contribution exactly once, but resolve at the original round
     # boundary (never let encounter order choose between competing loci).
+    old_neighbors = Counter()
     frontier = tuple(accepted.values())
     unplaced = allowed - {p.segment_id for p in frontier}
     proposed = defaultdict(dict)
@@ -633,55 +700,31 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
         candidates = sorted(key for key in unplaced if data.parts[key].source in neighbors)
         screen_progress(f"placement pair round={round_number}: new_anchors={len(frontier)} "
                         f"unplaced={len(unplaced)} with_new_neighbors={len(candidates)}")
-        for key in phases.items(f"anchor unplaced segments round={round_number}", candidates):
+        from .q0_pair_lanes import ordered_deltas
+        def owner(key, linked):
             part = data.parts[key]
-            direct_spans = {}  # Immutable source coverage, only for this segment and round.
-            for anchor, links in placed_neighbors.for_source(part.source):
-                for orientation in ("+", "-"):
-                    group = (anchor.chromosome, orientation)
-                    direct = groups.get(key, {}).get(group, ())
-                    if groups.get(key) and not direct:
-                        continue  # This locus cannot propose a placement, regardless of pair evidence.
-                    # Geometry probe has explicit raw evidence; it is never returned as admitted.
-                    temporary = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
-                                           (l.hit.evidence_id for l in links), kind="pairwise")
-                    qualified = qualify_pair_blocks(temporary, anchor, links, path_policy, require_supported=False)
-                    if not qualified:
-                        continue
-                    # Full accepted contig context can root an off-ref
-                    # neighbor; known ambiguous/repetitive positions cannot.
-                    context = rooted_context(anchor.segment_id, anchor.interval)
-                    intervals, ids = [], set()
-                    for block, evidence_id in qualified:
-                        # Screen only source intervals that touch this block; keep the original
-                        # source-coordinate order and orientation-specific projection below.
-                        target_span = anchor.source_interval(block.right)
-                        for source_anchor in _overlapping_spans(target_span, context):
-                            overlap = block.right.intersection(anchor.local(source_anchor))
-                            if overlap is None:
-                                continue
-                            start = block.left.start + overlap.start - block.right.start
-                            intervals.append(temporary.source_interval(Interval(start, start + overlap.length)))
-                            ids.add(evidence_id)
-                    intervals = clean_intervals(part, intervals)
-                    if sum(i.length for i in intervals) < min(policy.minimum_anchor_bp, part.interval.length):
-                        continue
-                    item = proposed[key].setdefault(group, {"intervals": [], "ids": set(), "parents": set(), "refs": direct})
-                    if direct:
-                        # Only the union of intersections is consumed here. Both axes are
-                        # merged before clipping, so these half-open overlaps are already
-                        # ordered and disjoint. Keep the original reference anchors in refs.
-                        if group not in direct_spans:
-                            direct_spans[group] = merged_intervals(b.source for b in direct)
-                        cover = direct_spans[group]
-                        item["intervals"].extend(a.intersection(b) for a in intervals
-                                                 for b in _overlapping_spans(a, cover))
-                    else:
-                        item["intervals"].extend(intervals)
-                    item["ids"].update(ids | set(anchor.evidence_ids))
-                    item["parents"].add(anchor.placement_id)
-            for value in proposed.get(key, {}).values():
-                value["intervals"] = list(merged_intervals(value["intervals"]))
+            return _candidate_delta(part, groups.get(key, {}), linked, policy, path_policy,
+                                    lambda spans: clean_intervals(part, spans),
+                                    lambda anchor: rooted_context(anchor.segment_id, anchor.interval))
+
+        prior = sum(old_neighbors.get(data.parts[k].source, 0) for k in unplaced)
+        for src, anchors in placed_neighbors.by_source.items():
+            for other in pair_neighbors.get(src, ()):
+                old_neighbors[other] += len(anchors)
+        screen_progress(f"placement pair round={round_number}: old_relations_not_recomputed={prior}")
+        phases.start(f"anchor unplaced segments round={round_number}", len(candidates))
+        deltas = ordered_deltas(candidates, data, groups, ambiguous, placed_neighbors, policy,
+                                path_policy, screen_threads, owner, screen_progress, round_number)
+        for n, (key, delta) in enumerate(deltas, 1):
+            for group, row in delta.items():
+                item = proposed[key].get(group)
+                if item is None:
+                    row['refs'] = groups.get(key, {}).get(group, ())
+                    proposed[key][group] = row
+                else:
+                    item['intervals'] = merged_intervals((*item['intervals'], *row['intervals']))
+                    item['ids'].update(row['ids']); item['parents'].update(row['parents'])
+            phases.completed(n)
         next_frontier = []
         for key, alternatives in phases.items(f"resolve pair proposals round={round_number}", sorted(proposed.items())):
             part = data.parts[key]
@@ -916,7 +959,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
+                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, **kwargs) -> Construction:
