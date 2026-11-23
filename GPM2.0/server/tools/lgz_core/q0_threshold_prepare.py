@@ -10,7 +10,7 @@ from .q0_alignments import read_paf_observations as _native_observations
 from .q0_retained_hits import read_retained_paf, retained_geometry_cache, retained_names
 from .q0_paths import PairLink
 from .q0_sources import Q0EvidenceError, merged_intervals, split_source
-from .q0_threshold_acceptance import MAX_REPAIRS, SCOPE, SEMANTICS, audit
+from .q0_threshold_acceptance import MAX_REPAIRS, SCOPE, SEMANTICS, ThresholdRepairRequired, audit
 
 
 class _CoverageRow:
@@ -181,8 +181,6 @@ def initial_generation(root, snapshot, mapper, *, threads=1):
 
 def prepare(root, threads, mapper):
     from .q0_admission import load_evidence_input, select_q0_paths
-    from .q0_frontier_scope import UnsearchedQ0Context
-    from .q0_threshold_questions import questions
     if threads < 1:
         raise Q0EvidenceError('q0 evidence threads must be positive')
     root = root.resolve(); prep._readless_package(root)
@@ -199,8 +197,9 @@ def prepare(root, threads, mapper):
         data = load_evidence_input(root,_draft=receipt); selection = select_q0_paths(data)
         try:
             audit(data,selection)
-        except UnsearchedQ0Context:
+        except ThresholdRepairRequired as stopped:
             if full: raise
+            need = stopped.demand
         else:
             if not any(r.path is not None for r in selection.paths.values()):
                 raise Q0EvidenceError('no chromosome has a trustworthy q0 path')
@@ -214,8 +213,6 @@ def prepare(root, threads, mapper):
             if not cached:
                 prep.atomic_write_json(prep.workspace_artifact_path(root, prep.MANIFEST), receipt)
             return receipt
-        assignments = ({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in data.threshold_scope.assignments)
-        need,_ = questions(data,selection,assignments)
         del data,selection
         if need is None or n >= MAX_REPAIRS or wanted is None:
             full = True

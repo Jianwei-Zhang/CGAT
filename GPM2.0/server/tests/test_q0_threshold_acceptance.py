@@ -1,5 +1,6 @@
 """Positive threshold is a distinct, bound final search contract, never a bypass for old scopes."""
 import os
+import pickle
 from pathlib import Path
 import subprocess
 import sys
@@ -10,6 +11,7 @@ from unittest.mock import patch
 
 from server.tests.test_q0_admission import EvidenceFixture, bridge_fixture, dna
 from server.tools.lgz_core import q0_admission as adm, q0_preparation as prep
+from server.tools.lgz_core import q0_threshold_prepare as threshold, q0_threshold_questions as demand_rule
 from server.tools.lgz_core.common import stable_id
 from server.tools.lgz_core.q0_frontier_scope import UnsearchedQ0Context, audit_selected_scope
 from server.tools.lgz_core.q0_sources import Q0EvidenceError
@@ -45,12 +47,43 @@ class ThresholdAcceptanceTests(unittest.TestCase):
             with self.assertRaisesRegex(UnsearchedQ0Context,'overlaps an unsearched'):
                 adm.construct_q0(with_scope(data,need,[[part.segment_id,[[cut,cut+1]]]]))
             incomplete={s:spans for s,spans in need.items() if s!=source}
-            with self.assertRaisesRegex(UnsearchedQ0Context,'not requested'):
+            with self.assertRaisesRegex(UnsearchedQ0Context,'not requested') as rejected:
                 adm.construct_q0(with_scope(data,incomplete))
+            self.assertEqual(pickle.loads(pickle.dumps(rejected.exception)).demand, need)
         accepted=adm.construct_q0(with_scope(data,need))
         self.assertEqual([j.kind for j in accepted.paths['chr1'].path.joins],['reference_unknown'])
         self.assertGreater(accepted.decisions['supplement_acceptance']['decision_counts']['unproven_join'],0)
         with self.assertRaises(UnsearchedQ0Context): adm.construct_q0(with_scope(data,{},mode='base_only'))
+
+    def test_repair_dispatch_uses_audited_demand_once_then_rechecks_changed_evidence(self):
+        f, _ = bridge_fixture(); strong = f.data(); weak = replace(strong, pair_links=())
+        expected, _ = questions(weak, adm.select_q0_paths(weak), []); self.assertTrue(expected)
+        first = with_scope(weak, {}, mode='base_only'); second = with_scope(strong, expected)
+        class ReachedFinalVerification(Exception): pass
+        with (tempfile.TemporaryDirectory() as directory, patch.object(prep, '_readless_package'),
+              patch.object(threshold, 'initial_generation', return_value=('request', None, False, {})),
+              patch.object(prep, '_prepare_evidence_pass', return_value=({'outputs':[]}, None, None)) as dispatch,
+              patch.object(adm, 'load_evidence_input', side_effect=[first, second]),
+              patch.object(demand_rule, 'questions', wraps=questions) as ask,
+              patch.object(threshold._ThresholdInputs, 'verify', side_effect=ReachedFinalVerification),
+              self.assertRaises(ReachedFinalVerification)):
+            threshold.prepare(Path(directory), 1, 'unused')
+        self.assertEqual([c.kwargs['frontier_override'] for c in dispatch.call_args_list], [{},expected])
+        self.assertEqual([id(c.args[0]) for c in ask.call_args_list], [id(first), id(second)])
+
+    def test_rooted_full_fallback_is_not_an_empty_repair(self):
+        f, _ = bridge_fixture(); data = with_scope(f.data(), {}, mode='base_only')
+        class ReachedFullDispatch(Exception): pass
+        with (tempfile.TemporaryDirectory() as directory, patch.object(prep, '_readless_package'),
+              patch.object(threshold, 'initial_generation', return_value=('request', None, False, {})),
+              patch.object(prep, '_prepare_evidence_pass', side_effect=[({'outputs':[]}, None, None), ReachedFullDispatch]) as dispatch,
+              patch.object(adm, 'load_evidence_input', return_value=data),
+              patch.object(demand_rule, 'questions', return_value=(None, {'rooted_no_path_full_fallback':1})) as ask,
+              self.assertRaises(ReachedFullDispatch)):
+            threshold.prepare(Path(directory), 1, 'unused')
+        ask.assert_called_once()
+        self.assertIsNone(dispatch.call_args.kwargs['frontier_override'])
+        self.assertEqual(dispatch.call_args.kwargs['fallback_reason'], 'threshold_full_fallback')
 
     def test_regular_scope_reuses_complete_enumeration_but_not_an_omitted_weak_shoulder(self):
         f,_=bridge_fixture(); data=replace(f.data(),pair_links=()); need,_=questions(data,adm.select_q0_paths(data),[])

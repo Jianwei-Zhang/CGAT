@@ -57,6 +57,16 @@ class VerifiedScope:
     report_identity: str
 
 
+class ThresholdRepairRequired(UnsearchedQ0Context):
+    """Private handoff of this selection's exact demand (None means full search)."""
+    def __init__(self, reason, demand):
+        super().__init__(reason)
+        self.demand = demand
+
+    def __reduce__(self):
+        return type(self), (self.args[0], self.demand)
+
+
 def complete_window_accounting(catalog):
     """Both planners finished. Each skipped *whole* context recorded both axes before dispatch.
 
@@ -102,19 +112,19 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
         raise Q0EvidenceError('invalid threshold search mode')
     assignments=({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in binding.assignments)
     need,counts=questions(data,selection,assignments)
-    if need is None: raise UnsearchedQ0Context('threshold selector needs full supplemental evidence')
+    if need is None: raise ThresholdRepairRequired('threshold selector needs full supplemental evidence', need)
     enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog)
     covered_without_repair = 0
     for s,spans in need.items():
         for span in spans:
             if subtract_intervals(span,frontier.get(s,())):
                 if not enumerated:
-                    raise UnsearchedQ0Context('threshold decision was not requested on this source interval')
+                    raise ThresholdRepairRequired('threshold decision was not requested on this source interval', need)
                 covered_without_repair += 1
             if s in axes:
                 starts,omitted=axes[s]; j=bisect_right(starts,span.end-1)-1
                 if j>=0 and omitted[j].end>span.start:
-                    raise UnsearchedQ0Context('threshold decision overlaps an unsearched source interval')
+                    raise ThresholdRepairRequired('threshold decision overlaps an unsearched source interval', need)
     if covered_without_repair:
         counts['expanded_intervals_already_covered_by_planner'] = covered_without_repair
     return counts
