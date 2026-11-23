@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from .q0_regional_index import RegionalIndex
 
 from .common import stable_id
-from .q0_alignments import PafAlignment, read_paf
+from .q0_alignments import PafAlignment, PafObservation, read_paf
 from .q0_sources import Interval, Q0EvidenceError, SourceKey, SourceSegment, merged_intervals, split_source
 
 CATALOG_SCHEMA = "lgz_q0_candidates_v1"
@@ -92,7 +92,7 @@ class ObservedSourcePairs(set):
         other.cross_coverage = {key: union.fork() for key, union in self.cross_coverage.items()}
         return other
 
-    def observe_alignment(self, hit: PafAlignment, query: SourceKey, target: SourceKey,
+    def observe_alignment(self, hit: PafAlignment | PafObservation, query: SourceKey, target: SourceKey,
                           *, query_offset: int = 0, target_offset: int = 0) -> None:
         if (type(query_offset) is not int or type(target_offset) is not int
                 or min(query_offset, target_offset) < 0

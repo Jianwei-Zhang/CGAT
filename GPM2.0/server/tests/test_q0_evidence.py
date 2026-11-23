@@ -12,7 +12,7 @@ from server.tools.lgz_core.q0_sources import (
     split_source, subtract_intervals,
 )
 from server.tools.lgz_core.q0_alignments import (
-    parse_paf_line, project_query_interval, project_target_interval, read_paf,
+    parse_paf_line, project_query_interval, project_target_interval, read_paf, read_paf_observations,
 )
 
 
@@ -182,6 +182,54 @@ class AlignmentEvidenceTests(unittest.TestCase):
         self.assertIn("tp:A:S", alignment.tags)
         self.assertEqual(alignment, hit(extra=("tp:A:S", "AS:i:20")))
         self.assertNotEqual(alignment.evidence_id, hit(extra=("tp:A:P", "AS:i:20")).evidence_id)
+
+    def test_planning_observations_keep_geometry_and_coverage_without_row_identity(self):
+        from server.tools.lgz_core import q0_alignments
+        from server.tools.lgz_core.q0_catalog import ObservedSourcePairs
+
+        ops = ((100, "="), (2, "I"), (1, "D"), (2, "X"), (100, "M"))
+        rows = [paf(ops, strand=strand, extra=("tp:A:S", "AS:i:42")) for strand in ("+", "-")]
+        rows += [paf(((2, "I"), (2, "N"))), paf(((5, "X"),))]
+        query, target = SourceKey("Q", "q"), SourceKey("T", "chr1")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "input.paf"
+            for row in rows:
+                path.write_bytes(("# comment\r\n\r" + row + "\r\n").encode())
+                fields = row.split("\t")
+                lengths = {"query_lengths": {query.contig: int(fields[1])},
+                           "target_lengths": {target.contig: int(fields[6])}}
+                expected, = read_paf(path, **lengths)
+                with patch.object(q0_alignments, "sha256_bytes", side_effect=AssertionError("hashed a planning row")), \
+                     patch.object(q0_alignments, "stable_id", side_effect=AssertionError("created a planning row ID")):
+                    observed, = read_paf_observations(path, **lengths)
+                self.assertFalse(hasattr(observed, "evidence_id"))
+                self.assertFalse(hasattr(observed, "tags"))
+                self.assertEqual(asdict(observed), {k: asdict(expected)[k] for k in asdict(observed)})
+                self.assertEqual(tuple(observed.aligned_blocks()), tuple(expected.aligned_blocks()))
+                pairs = []
+                for record in (expected, observed):
+                    obs = ObservedSourcePairs({query: 1000, target: 1000})
+                    obs.observe_alignment(record, query, target, query_offset=7, target_offset=13)
+                    pairs.append((set(obs), {key: tuple(span) for key, span in obs.cross_coverage.items()}))
+                self.assertEqual(*pairs)
+                self.assertEqual(expected.line_number, 3)
+
+    def test_planning_observations_reject_bad_cigar_names_and_lengths(self):
+        good = paf()
+        cases = [good.replace("20M", "19M"), good + "\tcg:Z:20M", good.replace("20M", "020M"),
+                 good.replace("20M", "20Mjunk"), good.replace("20M", "20N"),
+                 good.replace("\t60\t", "\t999\t"), good.replace("q\t37", "q\t38"),
+                 good.replace("chr1\t", "wrong_name\t")]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "input.paf"
+            for row in cases:
+                path.write_text(row + "\n")
+                errors = []
+                for reader in (read_paf, read_paf_observations):
+                    with self.subTest(row=row, reader=reader), self.assertRaises(Q0EvidenceError) as error:
+                        list(reader(path, query_lengths={"q": 37}, target_lengths={"chr1": 129}))
+                    errors.append(str(error.exception))
+                self.assertEqual(*errors)
 
     def test_unknown_mapq_is_not_high_confidence(self):
         self.assertIsNone(hit(mapq=255).mapping_quality)

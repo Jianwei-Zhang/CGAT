@@ -16,7 +16,7 @@ import uuid
 from typing import Iterable
 
 from .common import canonical_json, executable_identity, read_fasta, sha256_file, stable_id, write_fasta
-from .q0_alignments import read_paf
+from .q0_alignments import read_paf, read_paf_observations
 from .q0_catalog import (CATALOG_SCHEMA, CandidateCatalog, DISCOVERY_REFERENCE_IDENTITY, DISCOVERY_REFERENCE_MAPQ,
                          add_pairwise_candidates, build_catalog, partial_source_request, supplemental_groups, ObservedSourcePairs)
 from .q0_regional_discovery import REGIONAL_POLICY, LocalReferenceCache, enabled as regional_enabled, observe_part_hits, prepare_partial
@@ -334,13 +334,15 @@ def _initial_inputs(root: Path):
                 paths.add(row[field])
             qlengths = {name: len(sources[SourceKey(right, name)]) for name in group[right]}
             tlengths = {name: len(sources[SourceKey(left, name)]) for name in group[left]}
-            for hit in read_paf(artifact_path(root, row["paf"]), query_lengths=qlengths,
-                                target_lengths=tlengths, artifact=row["paf"]):
+            qkeys = {name: SourceKey(right, name) for name in qlengths}
+            tkeys = {name: SourceKey(left, name) for name in tlengths}
+            for hit in read_paf_observations(artifact_path(root, row["paf"]), query_lengths=qlengths,
+                                            target_lengths=tlengths, artifact=row["paf"]):
+                query, target = qkeys[hit.query_name], tkeys[hit.target_name]
                 if isinstance(known_pairs, ObservedSourcePairs):
-                    known_pairs.observe_alignment(hit, SourceKey(right, hit.query_name), SourceKey(left, hit.target_name))
-                elif any(hit.aligned_blocks()):
-                    known_pairs.add(tuple(sorted((SourceKey(right, hit.query_name),
-                                                  SourceKey(left, hit.target_name)))))
+                    known_pairs.observe_alignment(hit, query, target)
+                elif any(op in "M=X" for _length, op in hit.cigar):
+                    known_pairs.add(tuple(sorted((query, target))))
             paths.add(row["paf"])
             base_alignments.append({**row, "chromosome": chromosome})
         if actual != expected:
