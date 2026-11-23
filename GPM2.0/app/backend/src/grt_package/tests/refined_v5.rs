@@ -118,13 +118,15 @@ fn refined_import_retains_original_read_hints_in_full_and_light() {
         let temp = materialize(light);
         let root = temp.path().join("refined.degap");
         let provenance_path = root.join("metadata/refinement/provenance.json");
-        let mut provenance: Value = serde_json::from_slice(&fs::read(&provenance_path).unwrap()).unwrap();
+        let mut provenance: Value =
+            serde_json::from_slice(&fs::read(&provenance_path).unwrap()).unwrap();
         provenance["execution"]["recipe"] = serde_json::json!({
             "reads": [{"technology":"hifi", "path":"/server/original.hifi.fq.gz", "sha256":"a".repeat(64)}],
         });
         fs::write(&provenance_path, serde_json::to_vec(&provenance).unwrap()).unwrap();
         let manifest_path = root.join("metadata/refinement/manifest.json");
-        let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        let mut manifest: Value =
+            serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
         manifest["provenance_sha256"] = Value::from(sha256_file(&provenance_path).unwrap());
         fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
         reseal(&root, None);
@@ -132,13 +134,20 @@ fn refined_import_retains_original_read_hints_in_full_and_light() {
         let (outcome, _) = crate::importer::import_from_extracted_bundle(&root).unwrap();
         let project = initialize_grt_project(&outcome.project_db_path, "Refined inputs").unwrap();
         let inputs = crate::grt_package::load_project_refinement_read_inputs(
-            &outcome.project_db_path, project.project_id,
-        ).unwrap();
+            &outcome.project_db_path,
+            project.project_id,
+        )
+        .unwrap();
         assert_eq!(inputs.hifi[0].path, "/server/original.hifi.fq.gz");
-        assert_eq!(inputs.hifi[0].sha256.as_deref(), Some("a".repeat(64).as_str()));
+        assert_eq!(
+            inputs.hifi[0].sha256.as_deref(),
+            Some("a".repeat(64).as_str())
+        );
         let other = crate::grt_package::load_project_refinement_read_inputs(
-            &outcome.project_db_path, project.project_id + 1,
-        ).unwrap();
+            &outcome.project_db_path,
+            project.project_id + 1,
+        )
+        .unwrap();
         assert!(other.hifi.is_empty());
         assert!(inputs.ont.is_empty());
     }
@@ -151,20 +160,36 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     let root = temp.path().join("refined.degap");
     let (outcome, _) = crate::importer::import_from_extracted_bundle(&root).unwrap();
     let project = initialize_grt_project(&outcome.project_db_path, "Manual export").unwrap();
-    let mut path = load_grt_final_path_by_chr_for_project(&outcome.project_db_path, project.project_id).unwrap();
+    let mut path =
+        load_grt_final_path_by_chr_for_project(&outcome.project_db_path, project.project_id)
+            .unwrap();
     let (chr, record) = path
         .iter_mut()
-        .find(|(_, record)| record["segments"].as_array().is_some_and(|rows| rows.iter().any(|row| row["kind"] == "gap")))
+        .find(|(_, record)| {
+            record["segments"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|row| row["kind"] == "gap"))
+        })
         .unwrap();
     let chr = chr.clone();
     let segments = record["segments"].as_array_mut().unwrap();
-    let i = segments.iter().position(|row| row["kind"] == "gap").unwrap();
+    let i = segments
+        .iter()
+        .position(|row| row["kind"] == "gap")
+        .unwrap();
     let gap = segments[i]["segment_id"].as_str().unwrap().to_string();
     let original_request = serde_json::from_value(serde_json::json!({"loci":[{
         "chr":chr,"kind":"gap","segment_id":gap
-    }]})).unwrap();
+    }]}))
+    .unwrap();
     let original = temp.path().join("original-tasks.zip");
-    crate::degap_jobs::export_manual_refinement(&root, project.project_id, &original, &original_request).unwrap();
+    crate::degap_jobs::export_manual_refinement(
+        &root,
+        project.project_id,
+        &original,
+        &original_request,
+    )
+    .unwrap();
     segments[i] = serde_json::json!({"type":"gap","segmentId":gap,"gapSizeBp":117});
     let conn = crate::db::open_workspace_db(&outcome.project_db_path).unwrap();
     conn.execute("INSERT INTO project_assembly_view_state (project_id, final_path_by_chr_json, updated_at)
@@ -172,18 +197,32 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
         rusqlite::params![project.project_id, serde_json::to_string(&path).unwrap()]).unwrap();
     let request = serde_json::from_value(serde_json::json!({"loci":[{
         "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","degap"]
-    }],"hifi_reads":[],"ont_reads":[]})).unwrap();
+    }],"hifi_reads":[],"ont_reads":[]}))
+    .unwrap();
     let archive = temp.path().join("-project's refinement.zip");
-    let result = crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).unwrap();
+    let result =
+        crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request)
+            .unwrap();
     let mut zipped = zip::ZipArchive::new(fs::File::open(&archive).unwrap()).unwrap();
     let mut bytes = Vec::new();
-    zipped.by_name("refinement_tasks.json").unwrap().read_to_end(&mut bytes).unwrap();
+    zipped
+        .by_name("refinement_tasks.json")
+        .unwrap()
+        .read_to_end(&mut bytes)
+        .unwrap();
     let mut readme = String::new();
-    zipped.by_name("README.txt").unwrap().read_to_string(&mut readme).unwrap();
+    zipped
+        .by_name("README.txt")
+        .unwrap()
+        .read_to_string(&mut readme)
+        .unwrap();
     assert!(readme.contains("python .lib/tools/refine.py './-project'\"'\"'s refinement.zip'\n"));
     assert_eq!(result.loci, 1);
     assert_eq!(result.tasks, 2);
-    assert_eq!(result.batch_sha256, format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(&bytes)));
+    assert_eq!(
+        result.batch_sha256,
+        format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(&bytes))
+    );
     let value: Value = serde_json::from_slice(&bytes).unwrap();
     let locus = &value["loci"][0];
     assert_eq!(locus["gap_bp"], 117);
@@ -197,31 +236,57 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     let ledger: Value = serde_json::from_slice(&fs::read(&ledger_file).unwrap()).unwrap();
     assert_eq!(ledger["project_id"], project.project_id);
     assert_eq!(ledger["manifest"], value);
-    assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).is_err());
+    assert!(
+        crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request)
+            .is_err()
+    );
     let rejected_request = serde_json::from_value(serde_json::json!({"loci":[{
         "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","quartet"]
-    }]})).unwrap();
+    }]}))
+    .unwrap();
     let rejected = temp.path().join("duplicate-tools.zip");
-    assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &rejected, &rejected_request).is_err());
+    assert!(
+        crate::degap_jobs::export_manual_refinement(
+            &root,
+            project.project_id,
+            &rejected,
+            &rejected_request
+        )
+        .is_err()
+    );
     assert!(!rejected.exists());
     assert_eq!(fs::read_dir(receipts).unwrap().count(), 2);
 
     // The preview's persistent history comes from sealed exports, never from
     // a whole-view overwrite or private Server input paths.
-    let history = serde_json::to_value(crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id).unwrap()).unwrap();
+    let history = serde_json::to_value(
+        crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id).unwrap(),
+    )
+    .unwrap();
     let rows = history.as_array().unwrap();
     assert_eq!(rows.len(), 2);
-    let row = rows.iter().find(|row| row["batchSha256"] == exported_batch).unwrap();
+    let row = rows
+        .iter()
+        .find(|row| row["batchSha256"] == exported_batch)
+        .unwrap();
     assert_eq!(row["outputFileName"], "-project's refinement.zip");
-    assert_eq!(row["loci"][0]["tools"], serde_json::json!(["degap", "quartet"]));
+    assert_eq!(
+        row["loci"][0]["tools"],
+        serde_json::json!(["degap", "quartet"])
+    );
     assert_eq!(row["tasksCount"], 2);
     assert!(!row.to_string().contains("seed_plans"));
     assert!(!row.to_string().contains("reads"));
-    assert!(crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id + 999).is_err());
+    assert!(
+        crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id + 999).is_err()
+    );
     let mut tampered = ledger;
     tampered["manifest"]["loci"][0]["gap_bp"] = serde_json::json!(120);
     fs::write(&ledger_file, serde_json::to_vec(&tampered).unwrap()).unwrap();
-    let verified = serde_json::to_value(crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id).unwrap()).unwrap();
+    let verified = serde_json::to_value(
+        crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id).unwrap(),
+    )
+    .unwrap();
     assert_eq!(verified.as_array().unwrap().len(), 1);
     assert_ne!(verified[0]["batchSha256"], exported_batch);
 }
@@ -245,7 +310,15 @@ fn refined_full_import_materializes_real_bridge_and_exports_admitted_sequence() 
     assert_eq!(view.auto_refinement_effects.len(), 1);
     let effect = &view.auto_refinement_effects[0];
     assert_eq!(effect.tool, "degap");
-    assert_eq!((effect.closed, effect.partial, effect.original_gaps, effect.accepted_edits), (0, 1, 1, 1));
+    assert_eq!(
+        (
+            effect.closed,
+            effect.partial,
+            effect.original_gaps,
+            effect.accepted_edits
+        ),
+        (0, 1, 1, 1)
+    );
     assert_eq!(view.recipe.schema_version, "5");
     assert_eq!(view.recipe.final_q_relpath, "data/refinement/final.fa");
     let card = view
@@ -297,9 +370,18 @@ fn refined_light_import_keeps_provenance_but_does_not_claim_sequences_available(
     validate(&root).unwrap();
     let (outcome, _) = crate::importer::import_from_extracted_bundle(&root).unwrap();
     let project = initialize_grt_project(&outcome.project_db_path, "Light refinement").unwrap();
-    let effects = load_grt_project_view_for_project(&outcome.project_db_path, project.project_id).unwrap().auto_refinement_effects;
+    let effects = load_grt_project_view_for_project(&outcome.project_db_path, project.project_id)
+        .unwrap()
+        .auto_refinement_effects;
     assert_eq!(effects.len(), 1);
-    assert_eq!((effects[0].tool.as_str(), effects[0].closed, effects[0].partial), ("degap", 0, 1));
+    assert_eq!(
+        (
+            effects[0].tool.as_str(),
+            effects[0].closed,
+            effects[0].partial
+        ),
+        ("degap", 0, 1)
+    );
     let path = load_grt_final_path(&outcome.project_db_path).unwrap();
     assert!(path["chromosomes"].as_array().unwrap().iter().any(|chr| {
         chr["segments"]
@@ -322,15 +404,21 @@ fn refined_light_import_keeps_provenance_but_does_not_claim_sequences_available(
 }
 
 #[test]
-fn previous_workspace_gains_an_empty_effect_catalog_without_reinterpreting_its_final_path() -> Result<()> {
+fn previous_workspace_gains_an_empty_effect_catalog_without_reinterpreting_its_final_path()
+-> Result<()> {
     let temp = materialize(true);
-    let (outcome, _) = crate::importer::import_from_extracted_bundle(&temp.path().join("refined.degap"))?;
+    let (outcome, _) =
+        crate::importer::import_from_extracted_bundle(&temp.path().join("refined.degap"))?;
     let db = &outcome.project_db_path;
     let original = load_grt_final_path(db)?;
     let conn = crate::db::open_workspace_db(db)?;
     conn.execute_batch("DROP TABLE grt_auto_refinement_effect; PRAGMA user_version=10;")?;
     drop(conn);
-    assert!(load_grt_project_view(db)?.auto_refinement_effects.is_empty());
+    assert!(
+        load_grt_project_view(db)?
+            .auto_refinement_effects
+            .is_empty()
+    );
     assert_eq!(load_grt_final_path(db)?, original);
     Ok(())
 }
@@ -561,10 +649,20 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     let project = initialize_grt_project(&outcome.project_db_path, "Manual refinement result")?;
     let pid = project.project_id;
     let baseline = load_grt_final_path_by_chr_for_project(&outcome.project_db_path, pid)?;
-    let (chr, entry) = baseline.iter().find(|(_, entry)| {
-        entry["segments"].as_array().is_some_and(|rows| rows.iter().any(|r| r["kind"] == "gap"))
-    }).unwrap();
-    let gap = entry["segments"].as_array().unwrap().iter().find(|r| r["kind"] == "gap").unwrap();
+    let (chr, entry) = baseline
+        .iter()
+        .find(|(_, entry)| {
+            entry["segments"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|r| r["kind"] == "gap"))
+        })
+        .unwrap();
+    let gap = entry["segments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["kind"] == "gap")
+        .unwrap();
     let target = gap["segment_id"].as_str().unwrap();
     let original_size = gap["length"].as_u64().unwrap();
     // Additional edited paths with their own chromosome keys exercise the actual
@@ -573,36 +671,58 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     let unfilled = "controlled-no-closure";
     let partial_then_closed = "controlled-partial-and-closed";
     let conn = crate::db::open_workspace_db(&outcome.project_db_path)?;
-    let overlay = serde_json::to_string(&BTreeMap::from([(other, entry), (unfilled, entry), (partial_then_closed, entry)]))?;
+    let overlay = serde_json::to_string(&BTreeMap::from([
+        (other, entry),
+        (unfilled, entry),
+        (partial_then_closed, entry),
+    ]))?;
     conn.execute(
         "INSERT INTO project_assembly_view_state(project_id, final_path_by_chr_json, updated_at) VALUES (?1,?2,'before')",
         rusqlite::params![pid,overlay],
     )?;
-    let request = |chrs: &[&str]| serde_json::from_value(serde_json::json!({"loci": chrs.iter().map(|chr| {
+    let request = |chrs: &[&str]| {
+        serde_json::from_value(serde_json::json!({"loci": chrs.iter().map(|chr| {
         serde_json::json!({"chr":chr,"segment_id":target,"kind":"gap","tools":["quartet","degap"]})
-    }).collect::<Vec<_>>() }));
+    }).collect::<Vec<_>>() }))
+    };
     let load_manifest = |path: &Path| -> Result<Value> {
         let mut zip = ZipArchive::new(fs::File::open(path)?)?;
         let mut bytes = Vec::new();
-        zip.by_name("refinement_tasks.json")?.read_to_end(&mut bytes)?;
+        zip.by_name("refinement_tasks.json")?
+            .read_to_end(&mut bytes)?;
         Ok(serde_json::from_slice(&bytes)?)
     };
     let single = temp.path().join("one.zip");
     let all = temp.path().join("all.zip");
-    let single_summary = export_manual_refinement(&root,pid,&single,&serde_json::from_value(serde_json::json!({
-        "loci":[{"chr":chr,"segment_id":target,"kind":"gap","tools":["quartet"]}]
-    }))?)?;
-    let all_summary = export_manual_refinement(&root,pid,&all,&request(&[chr,other,unfilled,partial_then_closed])?)?;
+    let single_summary = export_manual_refinement(
+        &root,
+        pid,
+        &single,
+        &serde_json::from_value(serde_json::json!({
+            "loci":[{"chr":chr,"segment_id":target,"kind":"gap","tools":["quartet"]}]
+        }))?,
+    )?;
+    let all_summary = export_manual_refinement(
+        &root,
+        pid,
+        &all,
+        &request(&[chr, other, unfilled, partial_then_closed])?,
+    )?;
     let manifest = load_manifest(&all)?;
-    assert_eq!(single_summary.loci,1);
+    assert_eq!(single_summary.loci, 1);
     assert_eq!(load_manifest(&single)?["loci"][0]["chr"], chr.as_str());
-    assert_eq!(all_summary.loci,4);
-    assert_eq!(all_summary.tasks,8);
-    assert_eq!(manifest["loci"][1]["chr"],other);
-    assert_ne!(manifest["loci"][0]["id"],manifest["loci"][1]["id"]);
+    assert_eq!(all_summary.loci, 4);
+    assert_eq!(all_summary.tasks, 8);
+    assert_eq!(manifest["loci"][1]["chr"], other);
+    assert_ne!(manifest["loci"][0]["id"], manifest["loci"][1]["id"]);
 
-    let sha = |data: &[u8]| format!("{:x}",Sha256::digest(data));
-    let write_batch = |path: &Path, batch: &str, manifest: &Value, payload: &[u8], status: &str| -> Result<()> {
+    let sha = |data: &[u8]| format!("{:x}", Sha256::digest(data));
+    let write_batch = |path: &Path,
+                       batch: &str,
+                       manifest: &Value,
+                       payload: &[u8],
+                       status: &str|
+     -> Result<()> {
         let mut rows = Vec::new();
         let mut paths = Vec::new();
         for locus in manifest["loci"].as_array().unwrap() {
@@ -613,9 +733,13 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
                     rows.push(serde_json::json!({"locus_id":id,"tool":tool,"status":"failed","reason":"controlled_failure","patch":null}));
                     continue;
                 }
-                let (status, payload) = if locus["chr"] == unfilled || (locus["chr"] == partial_then_closed && tool == "degap") {
+                let (status, payload) = if locus["chr"] == unfilled
+                    || (locus["chr"] == partial_then_closed && tool == "degap")
+                {
                     ("partial", b"ANT".as_slice())
-                } else { (status, payload) };
+                } else {
+                    (status, payload)
+                };
                 let path = format!("patches/{id}.{tool}.seq");
                 rows.push(serde_json::json!({"locus_id":id,"tool":tool,"status":status,"reason":null,
                     "attempt_id":format!("{tool}-controlled"),"version":"2.0","revision":"synthetic-fixture",
@@ -626,51 +750,101 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
         }
         let mut zip = ZipWriter::new(fs::File::create(path)?);
         zip.start_file("refinement_results.json", FileOptions::default())?;
-        zip.write_all(&serde_json::to_vec(&serde_json::json!({"schema":"cgat.app-refinement-results.v1",
-            "batch_sha256":batch,"results":rows}))?)?;
-        for (path, bytes) in paths { zip.start_file(path, FileOptions::default())?; zip.write_all(&bytes)?; }
+        zip.write_all(&serde_json::to_vec(
+            &serde_json::json!({"schema":"cgat.app-refinement-results.v1",
+            "batch_sha256":batch,"results":rows}),
+        )?)?;
+        for (path, bytes) in paths {
+            zip.start_file(path, FileOptions::default())?;
+            zip.write_all(&bytes)?;
+        }
         zip.finish()?;
         Ok(())
     };
-    assert!(manifest["loci"].as_array().unwrap().iter().all(|locus| locus["tools"] == serde_json::json!(["degap","quartet"])));
+    assert!(
+        manifest["loci"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|locus| locus["tools"] == serde_json::json!(["degap", "quartet"]))
+    );
     let result_zip = temp.path().join("result.zip");
-    write_batch(&result_zip, &all_summary.batch_sha256, &manifest, b"AGRY", "closed")?;
+    write_batch(
+        &result_zip,
+        &all_summary.batch_sha256,
+        &manifest,
+        b"AGRY",
+        "closed",
+    )?;
 
-    assert!(import_manual_refinement_results(&root,pid+1,&result_zip).is_err());
-    let result = import_manual_refinement_results(&root,pid,&result_zip)?;
+    assert!(import_manual_refinement_results(&root, pid + 1, &result_zip).is_err());
+    let result = import_manual_refinement_results(&root, pid, &result_zip)?;
     assert_eq!(result.applied, 3);
     assert_eq!(result.loci[0]["appliedTool"], "degap"); // Both closed; ignore return order.
     assert_eq!(result.loci[1]["appliedTool"], "quartet"); // DEGAP failed only at this locus.
     assert_eq!(result.loci[2]["disposition"], "no_eligible_patch");
     assert_eq!(result.loci[3]["appliedTool"], "quartet"); // Closed beats higher-ranked partial.
-    let duplicate = import_manual_refinement_results(&root,pid,&result_zip)?;
+    let duplicate = import_manual_refinement_results(&root, pid, &result_zip)?;
     assert!(duplicate.duplicate);
-    assert_eq!(duplicate.applied,0);
-    assert_eq!(list_manual_refinement_results(&root,pid)?.len(),1);
+    assert_eq!(duplicate.applied, 0);
+    assert_eq!(list_manual_refinement_results(&root, pid)?.len(), 1);
 
     let reopened = crate::db::open_workspace_db(&outcome.project_db_path)?;
-    let loaded: String = reopened.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
-        [pid], |row| row.get(0))?;
+    let loaded: String = reopened.query_row(
+        "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+        [pid],
+        |row| row.get(0),
+    )?;
     let loaded: Value = serde_json::from_str(&loaded)?;
     let patch_sha = sha(b"AGRY");
-    let projected = loaded[chr]["segments"].as_array().unwrap().iter().map(|row| {
-        let start = row["start"].as_i64();
-        let end = row["end"].as_i64();
-        if row["type"] == "gap" { FinalPathExportSegment::Gap {gap_size_bp:row["gapSizeBp"].as_i64().unwrap()} }
-        else if row["sourceKind"] == "refinement_patch" {
-            assert_eq!(row["refinementPatchSha256"],patch_sha);
-            FinalPathExportSegment::RefinementPatch {sha256:patch_sha.clone(),start:start.unwrap(),end:end.unwrap()}
-        } else { FinalPathExportSegment::Source {dataset_name:row["source"]["dataset"].as_str().unwrap().into(),
-            contig_name:row["source"]["contig"].as_str().unwrap().into(),start:start.unwrap(),end:end.unwrap()} }
-    }).collect();
+    let projected = loaded[chr]["segments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            let start = row["start"].as_i64();
+            let end = row["end"].as_i64();
+            if row["type"] == "gap" {
+                FinalPathExportSegment::Gap {
+                    gap_size_bp: row["gapSizeBp"].as_i64().unwrap(),
+                }
+            } else if row["sourceKind"] == "refinement_patch" {
+                assert_eq!(row["refinementPatchSha256"], patch_sha);
+                FinalPathExportSegment::RefinementPatch {
+                    sha256: patch_sha.clone(),
+                    start: start.unwrap(),
+                    end: end.unwrap(),
+                }
+            } else {
+                FinalPathExportSegment::Source {
+                    dataset_name: row["source"]["dataset"].as_str().unwrap().into(),
+                    contig_name: row["source"]["contig"].as_str().unwrap().into(),
+                    start: start.unwrap(),
+                    end: end.unwrap(),
+                }
+            }
+        })
+        .collect();
     let exported = temp.path().join("reimported.fa");
-    exporter::export_project_final_path_fasta(&outcome.project_db_path,pid,&ExportProjectFinalPathFastaParams {
-        output_path:exported.clone(), records:vec![FinalPathFastaRecord{chr_name:chr.clone(),final_path_segments:projected}],
-    })?;
-    let reimported = read_fasta(&exported,"manual refinement roundtrip",false)?;
-    let original = read_fasta(&root.join("data/refinement/final.fa"),"original path",false)?;
-    let expected = original[chr].replacen(&"N".repeat(original_size as usize),"AGRY",1);
-    assert_eq!(reimported[chr],expected);
+    exporter::export_project_final_path_fasta(
+        &outcome.project_db_path,
+        pid,
+        &ExportProjectFinalPathFastaParams {
+            output_path: exported.clone(),
+            records: vec![FinalPathFastaRecord {
+                chr_name: chr.clone(),
+                final_path_segments: projected,
+            }],
+        },
+    )?;
+    let reimported = read_fasta(&exported, "manual refinement roundtrip", false)?;
+    let original = read_fasta(
+        &root.join("data/refinement/final.fa"),
+        "original path",
+        false,
+    )?;
+    let expected = original[chr].replacen(&"N".repeat(original_size as usize), "AGRY", 1);
+    assert_eq!(reimported[chr], expected);
 
     let late_zip = temp.path().join("late.zip");
     let partial_zip = temp.path().join("partial.zip");
@@ -678,44 +852,76 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     // Its zero-base result removes the Gap slot completely when explicitly selected.
     let single_manifest = load_manifest(&single)?;
     let locus_id = single_manifest["loci"][0]["id"].as_str().unwrap();
-    write_batch(&late_zip, &single_summary.batch_sha256, &single_manifest, b"", "closed")?;
-    write_batch(&partial_zip, &single_summary.batch_sha256, &single_manifest, b"CNC", "partial")?;
+    write_batch(
+        &late_zip,
+        &single_summary.batch_sha256,
+        &single_manifest,
+        b"",
+        "closed",
+    )?;
+    write_batch(
+        &partial_zip,
+        &single_summary.batch_sha256,
+        &single_manifest,
+        b"CNC",
+        "partial",
+    )?;
     let late = import_manual_refinement_results(&root, pid, &late_zip)?;
     let partial = import_manual_refinement_results(&root, pid, &partial_zip)?;
     assert_eq!(late.applied, 0);
     assert_eq!(late.loci[0]["disposition"], "already_adopted");
     assert_eq!(late.loci[0]["activeResultSha256"], result.result_sha256);
     assert_eq!(partial.applied, 0);
-    assert!(switch_manual_refinement_locus(&root, pid, locus_id, 1, &partial.result_sha256, "quartet").is_err());
-    assert!(undo_manual_refinement_locus(&root, pid+1, locus_id, 1).is_err());
+    assert!(
+        switch_manual_refinement_locus(&root, pid, locus_id, 1, &partial.result_sha256, "quartet")
+            .is_err()
+    );
+    assert!(undo_manual_refinement_locus(&root, pid + 1, locus_id, 1).is_err());
 
     let store = |paths: &Value| -> Result<()> {
-        reopened.execute("UPDATE project_assembly_view_state SET final_path_by_chr_json=?2 WHERE project_id=?1",
-            rusqlite::params![pid, serde_json::to_string(paths)?])?;
+        reopened.execute(
+            "UPDATE project_assembly_view_state SET final_path_by_chr_json=?2 WHERE project_id=?1",
+            rusqlite::params![pid, serde_json::to_string(paths)?],
+        )?;
         Ok(())
     };
     let reload = || -> Result<Value> {
-        let raw: String = reopened.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
-            [pid], |row| row.get(0))?;
+        let raw: String = reopened.query_row(
+            "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+            [pid],
+            |row| row.get(0),
+        )?;
         Ok(serde_json::from_str(&raw)?)
     };
     assert_eq!(reload()?, loaded);
-    let patch_slot = loaded[chr]["segments"].as_array().unwrap().iter()
-        .position(|row| row["sourceKind"] == "refinement_patch").unwrap();
+    let patch_slot = loaded[chr]["segments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|row| row["sourceKind"] == "refinement_patch")
+        .unwrap();
     let mut edited = loaded.clone();
     edited[chr]["segments"][patch_slot]["start"] = serde_json::json!(2);
     store(&edited)?;
     assert!(undo_manual_refinement_locus(&root, pid, locus_id, 1).is_err());
     assert_eq!(reload()?, edited);
     edited = loaded.clone();
-    let outside_edit = serde_json::json!({"type":"gap","segmentId":"unrelated-appended-gap","gapSizeBp":12});
-    edited[chr]["segments"].as_array_mut().unwrap().push(outside_edit.clone());
+    let outside_edit =
+        serde_json::json!({"type":"gap","segmentId":"unrelated-appended-gap","gapSizeBp":12});
+    edited[chr]["segments"]
+        .as_array_mut()
+        .unwrap()
+        .push(outside_edit.clone());
     store(&edited)?;
-    let switched = switch_manual_refinement_locus(&root, pid, locus_id, 1, &late.result_sha256, "quartet")?;
+    let switched =
+        switch_manual_refinement_locus(&root, pid, locus_id, 1, &late.result_sha256, "quartet")?;
     assert_eq!(switched.adoption_revision, 2);
     assert_eq!(switched.active_tool.as_deref(), Some("quartet"));
     let zero = reload()?;
-    assert_eq!(zero[chr]["segments"].as_array().unwrap().len(), edited[chr]["segments"].as_array().unwrap().len() - 1);
+    assert_eq!(
+        zero[chr]["segments"].as_array().unwrap().len(),
+        edited[chr]["segments"].as_array().unwrap().len() - 1
+    );
     assert_eq!(zero[other], loaded[other]);
     assert!(undo_manual_refinement_locus(&root, pid, locus_id, 1).is_err());
     let undone = undo_manual_refinement_locus(&root, pid, locus_id, 2)?;
@@ -723,7 +929,10 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     assert_eq!(undone.active_result_sha256, None);
     let restored = reload()?;
     assert_eq!(restored[chr]["segments"][patch_slot]["segmentId"], target);
-    assert_eq!(restored[chr]["segments"].as_array().unwrap().last(), Some(&outside_edit));
+    assert_eq!(
+        restored[chr]["segments"].as_array().unwrap().last(),
+        Some(&outside_edit)
+    );
     let replay = import_manual_refinement_results(&root, pid, &result_zip)?;
     assert!(replay.duplicate);
     assert_eq!(replay.loci[0]["adoptionState"], "undone");
@@ -731,10 +940,17 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     switch_manual_refinement_locus(&root, pid, locus_id, 3, &result.result_sha256, "degap")?;
     let history = list_manual_refinement_results(&root, pid)?;
     assert_eq!(history.len(), 3);
-    assert!(history.iter().all(|batch| batch.loci[0]["activeResultSha256"] == result.result_sha256
-        && batch.loci[0]["adoptionRevision"] == 4));
-    let actions: i64 = reopened.query_row("SELECT count(*) FROM project_refinement_action WHERE project_id=?1",
-        [pid], |row| row.get(0))?;
+    assert!(
+        history.iter().all(
+            |batch| batch.loci[0]["activeResultSha256"] == result.result_sha256
+                && batch.loci[0]["adoptionRevision"] == 4
+        )
+    );
+    let actions: i64 = reopened.query_row(
+        "SELECT count(*) FROM project_refinement_action WHERE project_id=?1",
+        [pid],
+        |row| row.get(0),
+    )?;
     assert_eq!(actions, 3);
     Ok(())
 }
@@ -754,11 +970,22 @@ fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Res
     let db = &outcome.project_db_path;
     let pid = initialize_grt_project(db, "Mixed manual refinement")?.project_id;
     let baseline = load_grt_final_path_by_chr_for_project(db, pid)?;
-    let (chr, entry) = baseline.iter().find(|(_, entry)| {
-        entry["segments"].as_array().is_some_and(|rows| rows.iter().any(|r| r["kind"] == "gap"))
-    }).context("controlled chromosome with a Gap")?;
-    let segments = entry["segments"].as_array().context("controlled chromosome segments")?;
-    let original = read_fasta(&root.join("data/refinement/final.fa"), "controlled baseline", false)?;
+    let (chr, entry) = baseline
+        .iter()
+        .find(|(_, entry)| {
+            entry["segments"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|r| r["kind"] == "gap"))
+        })
+        .context("controlled chromosome with a Gap")?;
+    let segments = entry["segments"]
+        .as_array()
+        .context("controlled chromosome segments")?;
+    let original = read_fasta(
+        &root.join("data/refinement/final.fa"),
+        "controlled baseline",
+        false,
+    )?;
     let original = &original[chr];
     let gap = segments.iter().find(|r| r["kind"] == "gap").unwrap();
     let left = segments.first().unwrap();
@@ -769,12 +996,14 @@ fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Res
         {"chr":chr,"segment_id":gap["segment_id"],"kind":"gap","tools":["lrgapcloser"]},
         {"chr":chr,"segment_id":right["segment_id"],"kind":"tel_right","motif":"TTAGGG"},
     ]}))?;
-    let batch = export_manual_refinement(&root,pid,&task_zip,&request)?;
-    assert_eq!((batch.loci,batch.tasks),(3,3));
+    let batch = export_manual_refinement(&root, pid, &task_zip, &request)?;
+    assert_eq!((batch.loci, batch.tasks), (3, 3));
     let manifest: Value = {
         let mut archive = ZipArchive::new(fs::File::open(&task_zip)?)?;
         let mut data = Vec::new();
-        archive.by_name("refinement_tasks.json")?.read_to_end(&mut data)?;
+        archive
+            .by_name("refinement_tasks.json")?
+            .read_to_end(&mut data)?;
         serde_json::from_slice(&data)?
     };
     let sha = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
@@ -797,8 +1026,11 @@ fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Res
             };
             let start = segment["output_start"].as_u64().unwrap() as usize;
             let end = segment["output_end"].as_u64().unwrap() as usize;
-            let before = if corrupt_right_witness && kind == "tel_right" { "f".repeat(64) }
-                else { sha(&original.as_bytes()[start..end]) };
+            let before = if corrupt_right_witness && kind == "tel_right" {
+                "f".repeat(64)
+            } else {
+                sha(&original.as_bytes()[start..end])
+            };
             let path = format!("patches/{id}.{tool}.seq");
             zip.start_file(&path, FileOptions::default())?;
             zip.write_all(replacement)?;
@@ -808,8 +1040,10 @@ fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Res
                     "original_sha256":before,"length":replacement.len(),"sha256":sha(replacement)}}));
         }
         zip.start_file("refinement_results.json", FileOptions::default())?;
-        zip.write_all(&serde_json::to_vec(&serde_json::json!({"schema":"cgat.app-refinement-results.v1",
-            "batch_sha256":batch.batch_sha256,"results":rows}))?)?;
+        zip.write_all(&serde_json::to_vec(
+            &serde_json::json!({"schema":"cgat.app-refinement-results.v1",
+            "batch_sha256":batch.batch_sha256,"results":rows}),
+        )?)?;
         zip.finish()?;
         Ok(())
     };
@@ -818,44 +1052,90 @@ fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Res
     let correct_endpoint = temp.path().join("correct-endpoint.zip");
     return_zip(&wrong_endpoint, true)?;
     return_zip(&correct_endpoint, false)?;
-    let first = import_manual_refinement_results(&root,pid,&wrong_endpoint)?;
-    assert_eq!(first.applied,2);
-    assert!(first.loci.iter().any(|row| row["kind"] == "tel_right" && row["disposition"] == "endpoint_digest_mismatch"));
-    let second = import_manual_refinement_results(&root,pid,&correct_endpoint)?;
-    assert_eq!(second.applied,1);
-    assert!(second.loci.iter().any(|row| row["kind"] == "tel_right" && row["disposition"] == "applied"));
+    let first = import_manual_refinement_results(&root, pid, &wrong_endpoint)?;
+    assert_eq!(first.applied, 2);
+    assert!(
+        first
+            .loci
+            .iter()
+            .any(|row| row["kind"] == "tel_right"
+                && row["disposition"] == "endpoint_digest_mismatch")
+    );
+    let second = import_manual_refinement_results(&root, pid, &correct_endpoint)?;
+    assert_eq!(second.applied, 1);
+    assert!(
+        second
+            .loci
+            .iter()
+            .any(|row| row["kind"] == "tel_right" && row["disposition"] == "applied")
+    );
 
     let verify = |file: &Path, left_ext: &str, right_ext: &str| -> Result<()> {
         let conn = crate::db::open_workspace_db(db)?;
-        let raw: String = conn.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
-            [pid], |row| row.get(0))?;
+        let raw: String = conn.query_row(
+            "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+            [pid],
+            |row| row.get(0),
+        )?;
         let saved: Value = serde_json::from_str(&raw)?;
         let rows = saved[chr]["segments"].as_array().unwrap();
-        let projected = rows.iter().map(|segment| {
-            let start = segment["start"].as_i64().unwrap();
-            let end = segment["end"].as_i64().unwrap();
-            if segment["sourceKind"] == "refinement_patch" {
-                FinalPathExportSegment::RefinementPatch {
-                    sha256:segment["refinementPatchSha256"].as_str().unwrap().into(), start, end,
+        let projected = rows
+            .iter()
+            .map(|segment| {
+                let start = segment["start"].as_i64().unwrap();
+                let end = segment["end"].as_i64().unwrap();
+                if segment["sourceKind"] == "refinement_patch" {
+                    FinalPathExportSegment::RefinementPatch {
+                        sha256: segment["refinementPatchSha256"].as_str().unwrap().into(),
+                        start,
+                        end,
+                    }
+                } else {
+                    let src = &segment["source"];
+                    FinalPathExportSegment::Source {
+                        dataset_name: src["dataset"].as_str().unwrap().into(),
+                        contig_name: src["contig"].as_str().unwrap().into(),
+                        start,
+                        end,
+                    }
                 }
-            } else {
-                let src = &segment["source"];
-                FinalPathExportSegment::Source {dataset_name:src["dataset"].as_str().unwrap().into(),
-                    contig_name:src["contig"].as_str().unwrap().into(),start,end}
-            }
-        }).collect();
-        exporter::export_project_final_path_fasta(db,pid,&ExportProjectFinalPathFastaParams {
-            output_path:file.to_path_buf(), records:vec![FinalPathFastaRecord{chr_name:chr.clone(),final_path_segments:projected}],
-        })?;
-        let output = read_fasta(file,"mixed result",false)?;
+            })
+            .collect();
+        exporter::export_project_final_path_fasta(
+            db,
+            pid,
+            &ExportProjectFinalPathFastaParams {
+                output_path: file.to_path_buf(),
+                records: vec![FinalPathFastaRecord {
+                    chr_name: chr.clone(),
+                    final_path_segments: projected,
+                }],
+            },
+        )?;
+        let output = read_fasta(file, "mixed result", false)?;
         let before = gap["output_start"].as_u64().unwrap() as usize;
         let after = gap["output_end"].as_u64().unwrap() as usize;
-        assert_eq!(output[chr], format!("{}{}{}{}{}",left_ext,&original[..before],std::str::from_utf8(close)?,&original[after..],right_ext));
+        assert_eq!(
+            output[chr],
+            format!(
+                "{}{}{}{}{}",
+                left_ext,
+                &original[..before],
+                std::str::from_utf8(close)?,
+                &original[after..],
+                right_ext
+            )
+        );
         Ok(())
     };
     verify(&temp.path().join("both-ends.fa"), "CCCTAA", "TTAGGGTTAGGG")?;
-    let left_id = loci.iter().find(|locus| locus["kind"] == "tel_left").unwrap()["id"].as_str().unwrap();
-    undo_manual_refinement_locus(&root,pid,left_id,1)?;
+    let left_id = loci
+        .iter()
+        .find(|locus| locus["kind"] == "tel_left")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap();
+    undo_manual_refinement_locus(&root, pid, left_id, 1)?;
     verify(&temp.path().join("only-right.fa"), "", "TTAGGGTTAGGG")?;
     Ok(())
 }
@@ -863,20 +1143,29 @@ fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Res
 #[test]
 #[ignore = "requires Python, samtools, minimap2 and ZIP for real Server publications"]
 fn cumulative_server_auto_patch_imports_all_versions_without_changing_edited_paths() -> Result<()> {
-    let dir=tempdir()?;
-    let script=Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_auto_patch_fixture.py");
-    let generator=std::process::Command::new("python3").arg(script).arg(dir.path()).output()?;
-    assert!(generator.status.success(),"{}",String::from_utf8_lossy(&generator.stderr));
-    let root=dir.path().join("baseline");
-    let (outcome,_) = crate::importer::import_from_extracted_bundle(&root)?;
-    let db=&outcome.project_db_path;
-    let p=initialize_grt_project(db,"already edited LGZ")?.project_id;
-    let p2=initialize_grt_project(db,"independent LGZ")?.project_id;
-    let conn=crate::db::open_workspace_db(db)?;
-    let edit="{\"chr2\":{\"user_edit_marker\":\"do not replace\"}}";
+    let dir = tempdir()?;
+    let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../server/tests/project_auto_patch_fixture.py");
+    let generator = std::process::Command::new("python3")
+        .arg(script)
+        .arg(dir.path())
+        .output()?;
+    assert!(
+        generator.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generator.stderr)
+    );
+    let root = dir.path().join("baseline");
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&root)?;
+    let db = &outcome.project_db_path;
+    let p = initialize_grt_project(db, "already edited LGZ")?.project_id;
+    let p2 = initialize_grt_project(db, "independent LGZ")?.project_id;
+    let conn = crate::db::open_workspace_db(db)?;
+    let edit = "{\"chr2\":{\"user_edit_marker\":\"do not replace\"}}";
     conn.execute("INSERT INTO project_assembly_view_state(project_id,final_path_by_chr_json,updated_at) VALUES(?1,?2,'before') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json",params![p,edit])?;
-    let call=|project,filename:&str| -> Result<Value> {
-        import_auto_patch_if_recognized(&root,project,&dir.path().join(filename))?.context("unrecognized automatic patch")
+    let call = |project, filename: &str| -> Result<Value> {
+        import_auto_patch_if_recognized(&root, project, &dir.path().join(filename))?
+            .context("unrecognized automatic patch")
     };
     // A resealed ZIP with one damaged content object must not register even its intact tool.
     {
@@ -900,65 +1189,150 @@ fn cumulative_server_auto_patch_imports_all_versions_without_changing_edited_pat
         let err = call(p, "damaged.zip").unwrap_err();
         assert!(err.to_string().contains("digest mismatch"), "{err:#}");
         for table in ["project_auto_version", "project_auto_version_object"] {
-            assert_eq!(conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get::<_,i64>(0))?,0);
+            assert_eq!(
+                conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r
+                    .get::<_, i64>(0))?,
+                0
+            );
         }
     }
-    assert_eq!(call(p,"degap.zip")?["addedTools"],serde_json::json!(["degap"]));
-    assert_eq!(call(p,"tgsgapcloser.zip")?["addedTools"],serde_json::json!(["tgsgapcloser"]));
-    assert_eq!(call(p,"tgsgapcloser.zip")?["duplicate"],true);
-    let version_count=|project|conn.query_row("SELECT COUNT(*) FROM project_auto_version WHERE project_id=?1",[project],|r|r.get::<_,i64>(0));
-    assert_eq!(version_count(p)?,2); assert_eq!(version_count(p2)?,0);
-    let objects=||conn.query_row("SELECT COUNT(*) FROM project_auto_version_object",[],|r|r.get::<_,i64>(0));
-    let first=objects()?;
-    assert_eq!(call(p2,"tgsgapcloser.zip")?["addedTools"],serde_json::json!(["degap","tgsgapcloser"]));
-    assert_eq!(first,objects()?);
-    let view=load_grt_project_view_for_project(db,p)?;
-    assert_eq!(view.auto_refinement_effects.iter().map(|e|(&*e.tool,e.partial)).collect::<Vec<_>>(),vec![("degap",1),("tgsgapcloser",1)]);
-    let after:String=conn.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",[p],|r|r.get(0))?;
-    assert_eq!(after,edit);
+    assert_eq!(
+        call(p, "degap.zip")?["addedTools"],
+        serde_json::json!(["degap"])
+    );
+    assert_eq!(
+        call(p, "tgsgapcloser.zip")?["addedTools"],
+        serde_json::json!(["tgsgapcloser"])
+    );
+    assert_eq!(call(p, "tgsgapcloser.zip")?["duplicate"], true);
+    let version_count = |project| {
+        conn.query_row(
+            "SELECT COUNT(*) FROM project_auto_version WHERE project_id=?1",
+            [project],
+            |r| r.get::<_, i64>(0),
+        )
+    };
+    assert_eq!(version_count(p)?, 2);
+    assert_eq!(version_count(p2)?, 0);
+    let objects = || {
+        conn.query_row(
+            "SELECT COUNT(*) FROM project_auto_version_object",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+    };
+    let first = objects()?;
+    assert_eq!(
+        call(p2, "tgsgapcloser.zip")?["addedTools"],
+        serde_json::json!(["degap", "tgsgapcloser"])
+    );
+    assert_eq!(first, objects()?);
+    let view = load_grt_project_view_for_project(db, p)?;
+    assert_eq!(
+        view.auto_refinement_effects
+            .iter()
+            .map(|e| (&*e.tool, e.partial))
+            .collect::<Vec<_>>(),
+        vec![("degap", 1), ("tgsgapcloser", 1)]
+    );
+    let after: String = conn.query_row(
+        "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+        [p],
+        |r| r.get(0),
+    )?;
+    assert_eq!(after, edit);
     // A different immutable LGZ path is not the same project origin even when the FASTA hash still matches.
     conn.execute("UPDATE grt_package SET final_path_json=json_set(final_path_json,'$.other_origin',1) WHERE id=1",[])?;
-    assert!(call(p,"tgsgapcloser.zip").is_err()); assert_eq!(version_count(p)?,2); assert_eq!(first,objects()?);
+    assert!(call(p, "tgsgapcloser.zip").is_err());
+    assert_eq!(version_count(p)?, 2);
+    assert_eq!(first, objects()?);
     Ok(())
 }
 
 #[test]
 #[ignore = "requires Python, samtools, minimap2, pigz and ZIP for Server-generated project archives"]
 fn project_full_and_light_import_both_automatic_versions_without_a_picker() -> Result<()> {
-    let dir=tempdir()?;
-    let script=Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_auto_patch_fixture.py");
-    let generated=std::process::Command::new("python3").arg(script).arg(dir.path()).arg("--project-packages").output()?;
-    assert!(generated.status.success(),"{}",String::from_utf8_lossy(&generated.stderr));
-    let mut records=Vec::new();
-    for (mode,ext) in [("full","zip"),("light","tar.gz")] {
+    let dir = tempdir()?;
+    let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../server/tests/project_auto_patch_fixture.py");
+    let generated = std::process::Command::new("python3")
+        .arg(script)
+        .arg(dir.path())
+        .arg("--project-packages")
+        .output()?;
+    assert!(
+        generated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    let mut records = Vec::new();
+    for (mode, ext) in [("full", "zip"), ("light", "tar.gz")] {
         let root = dir.path().join(format!("app-{mode}"));
         let archive = dir.path().join(format!("job.{mode}.{ext}"));
-        let (out,_) = crate::importer::import_from_zip(&archive,&root)?;
+        let (out, _) = crate::importer::import_from_zip(&archive, &root)?;
         let db = &out.project_db_path;
-        let p=initialize_grt_project(db,"new project")?.project_id;
-        let conn=crate::db::open_workspace_db(db)?;
-        let view=load_grt_project_view_for_project(db,p)?;
-        assert_eq!(view.auto_refinement_effects.iter().map(|e|(&*e.tool,e.partial)).collect::<Vec<_>>(),vec![("degap",1),("tgsgapcloser",1)]);
+        let p = initialize_grt_project(db, "new project")?.project_id;
+        let conn = crate::db::open_workspace_db(db)?;
+        let view = load_grt_project_view_for_project(db, p)?;
+        assert_eq!(
+            view.auto_refinement_effects
+                .iter()
+                .map(|e| (&*e.tool, e.partial))
+                .collect::<Vec<_>>(),
+            vec![("degap", 1), ("tgsgapcloser", 1)]
+        );
         let mut stmt=conn.prepare("SELECT descriptor_json, baseline_json, effect_json FROM project_auto_version WHERE project_id=?1 ORDER BY tool")?;
-        records.push(stmt.query_map([p],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?)))?.collect::<std::result::Result<Vec<_>,_>>()?);
-        let count=||conn.query_row("SELECT COUNT(*) FROM project_auto_version_object",[],|r|r.get::<_,i64>(0));
-        let before=count()?;
-        let again=import_auto_patch_if_recognized(&root,p,&dir.path().join("tgsgapcloser.zip"))?.unwrap();
-        assert_eq!(again["duplicate"], mode == "full", "first patch hydrates missing Light objects");
+        records.push(
+            stmt.query_map([p], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?,
+        );
+        let count = || {
+            conn.query_row(
+                "SELECT COUNT(*) FROM project_auto_version_object",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+        };
+        let before = count()?;
+        let again =
+            import_auto_patch_if_recognized(&root, p, &dir.path().join("tgsgapcloser.zip"))?
+                .unwrap();
+        assert_eq!(
+            again["duplicate"],
+            mode == "full",
+            "first patch hydrates missing Light objects"
+        );
         assert_eq!(again["applied"], 0);
-        let repeat=import_auto_patch_if_recognized(&root,p,&dir.path().join("tgsgapcloser.zip"))?.unwrap();
+        let repeat =
+            import_auto_patch_if_recognized(&root, p, &dir.path().join("tgsgapcloser.zip"))?
+                .unwrap();
         assert_eq!(repeat["duplicate"], true);
-        if mode == "full" { assert_eq!(count()?,before); } else { assert!(count()?>before,"Light did not omit accepted FASTAs"); }
+        if mode == "full" {
+            assert_eq!(count()?, before);
+        } else {
+            assert!(count()? > before, "Light did not omit accepted FASTAs");
+        }
         // Templates are immutable: a second project inherits the archive, not edits made to its sibling.
-        let second=initialize_grt_project(db,"new sibling")?.project_id;
-        assert_eq!(load_grt_project_view_for_project(db,second)?.auto_refinement_effects.len(),2);
+        let second = initialize_grt_project(db, "new sibling")?.project_id;
+        assert_eq!(
+            load_grt_project_view_for_project(db, second)?
+                .auto_refinement_effects
+                .len(),
+            2
+        );
     }
-    assert_eq!(records[0],records[1]);
+    assert_eq!(records[0], records[1]);
     let bad = dir.path().join("light/job");
-    let index=bad.join("project_versions/index.json");
-    fs::write(&index,b"{}")?;
-    let err=crate::importer::import_from_extracted_bundle(&bad).unwrap_err();
-    assert!(format!("{err:#}").contains("index checksum"),"{err:#}");
+    let index = bad.join("project_versions/index.json");
+    fs::write(&index, b"{}")?;
+    let err = crate::importer::import_from_extracted_bundle(&bad).unwrap_err();
+    assert!(format!("{err:#}").contains("index checksum"), "{err:#}");
     assert!(!bad.join("project.sqlite").exists());
     Ok(())
 }
@@ -968,12 +1342,19 @@ fn project_full_and_light_import_both_automatic_versions_without_a_picker() -> R
 fn auto_gap_import_prefers_complete_closure_then_tool_priority() -> Result<()> {
     for (both_closed, expected) in [(true, "degap"), (false, "tgsgapcloser")] {
         let dir = tempdir()?;
-        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_auto_patch_fixture.py");
+        let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../server/tests/project_auto_patch_fixture.py");
         let mut generator = std::process::Command::new("python3");
         generator.arg(script).arg(dir.path()).arg("--close-tgs");
-        if both_closed { generator.arg("--close-degap"); }
+        if both_closed {
+            generator.arg("--close-degap");
+        }
         let output = generator.output()?;
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         let root = dir.path().join("baseline");
         let (out, _) = crate::importer::import_from_extracted_bundle(&root)?;
         let db = &out.project_db_path;
@@ -984,11 +1365,20 @@ fn auto_gap_import_prefers_complete_closure_then_tool_priority() -> Result<()> {
         let view = load_grt_project_view_for_project(db, p)?;
         assert_eq!(view.auto_refinement_effects.len(), 2);
         for tool in view.auto_refinement_effects {
-            assert_eq!(tool.project_adopted_gaps, Some(usize::from(tool.tool == expected)));
-            assert_eq!(tool.closed, usize::from(both_closed || tool.tool == "tgsgapcloser"));
+            assert_eq!(
+                tool.project_adopted_gaps,
+                Some(usize::from(tool.tool == expected))
+            );
+            assert_eq!(
+                tool.closed,
+                usize::from(both_closed || tool.tool == "tgsgapcloser")
+            );
             assert_eq!(tool.chromosomes.len(), tool.closed);
         }
-        assert_eq!(import_auto_patch_if_recognized(&root, p, &patch)?.unwrap()["duplicate"], true);
+        assert_eq!(
+            import_auto_patch_if_recognized(&root, p, &patch)?.unwrap()["duplicate"],
+            true
+        );
     }
     Ok(())
 }
@@ -997,13 +1387,20 @@ fn auto_gap_import_prefers_complete_closure_then_tool_priority() -> Result<()> {
 #[ignore = "requires Python, samtools, minimap2 and ZIP for a manual project round trip"]
 fn project_manual_snapshot_and_parameters_roundtrip_without_replacing_archives() -> Result<()> {
     let dir = tempdir()?;
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_manual_roundtrip_fixture.py");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../server/tests/project_manual_roundtrip_fixture.py");
     let server = |tasks: Option<&Path>| -> Result<()> {
         let mut cmd = std::process::Command::new("python3");
         cmd.arg(&script).arg(dir.path());
-        if let Some(tasks) = tasks { cmd.arg(tasks); }
+        if let Some(tasks) = tasks {
+            cmd.arg(tasks);
+        }
         let run = cmd.output()?;
-        assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+        assert!(
+            run.status.success(),
+            "{}",
+            String::from_utf8_lossy(&run.stderr)
+        );
         Ok(())
     };
     server(None)?;
@@ -1013,30 +1410,61 @@ fn project_manual_snapshot_and_parameters_roundtrip_without_replacing_archives()
     let db = &out.project_db_path;
     let p = initialize_grt_project(db, "manual round trip")?.project_id;
     let paths = load_grt_final_path_by_chr_for_project(db, p)?;
-    let (chr, entry) = paths.iter().find(|(_,e)| e["segments"].as_array().is_some_and(|v|v.iter().any(|s|s["kind"]=="gap"))).unwrap();
-    let gap = entry["segments"].as_array().unwrap().iter().find(|s|s["kind"]=="gap").unwrap();
+    let (chr, entry) = paths
+        .iter()
+        .find(|(_, e)| {
+            e["segments"]
+                .as_array()
+                .is_some_and(|v| v.iter().any(|s| s["kind"] == "gap"))
+        })
+        .unwrap();
+    let gap = entry["segments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["kind"] == "gap")
+        .unwrap();
     // A separate user-created chromosome is not a selected task, but is part of the exported assembly.
     let other = "controlled-other";
     let conn = crate::db::open_workspace_db(db)?;
     conn.execute("INSERT INTO project_assembly_view_state(project_id, final_path_by_chr_json, updated_at) VALUES(?1,?2,'fixture') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json",
                  params![p,serde_json::to_string(&BTreeMap::from([(other,entry)]))?])?;
-    let request = serde_json::from_value(serde_json::json!({"loci":[{"chr":chr,"kind":"gap","segment_id":gap["segment_id"],"tools":["lrgapcloser","degap"]}],"tool_parameters":{"lrgapcloser":{"iterations":5}}}))?;
+    let request = serde_json::from_value(
+        serde_json::json!({"loci":[{"chr":chr,"kind":"gap","segment_id":gap["segment_id"],"tools":["lrgapcloser","degap"]}],"tool_parameters":{"lrgapcloser":{"iterations":5}}}),
+    )?;
     let tasks = dir.path().join("tasks.zip");
     let exported = crate::degap_jobs::export_manual_refinement(&root, p, &tasks, &request)?;
     server(Some(&tasks))?;
     let tag = &exported.batch_sha256[..16];
     let patch = job.join(format!("07_delivery/manual/job.manual-{tag}.patch.zip"));
-    let imported = crate::degap_jobs::import_manual_refinement_results(&root,p,&patch)?;
+    let imported = crate::degap_jobs::import_manual_refinement_results(&root, p, &patch)?;
     assert_eq!(imported.applied, 1);
-    assert!(crate::degap_jobs::import_manual_refinement_results(&root,p,&patch)?.duplicate);
-    let genome = read_fasta(&job.join(format!("05_final/job.manual-{tag}.fa")), "Server manual genome", false)?;
+    assert!(crate::degap_jobs::import_manual_refinement_results(&root, p, &patch)?.duplicate);
+    let genome = read_fasta(
+        &job.join(format!("05_final/job.manual-{tag}.fa")),
+        "Server manual genome",
+        false,
+    )?;
     let initial = read_fasta(&job.join("05_final/job.lgz.fa"), "unchanged LGZ", false)?;
     assert_eq!(genome[other], initial[chr]);
-    let expected = initial[chr].replacen(&"N".repeat(gap["length"].as_u64().unwrap() as usize), "GATTACA", 1);
+    let expected = initial[chr].replacen(
+        &"N".repeat(gap["length"].as_u64().unwrap() as usize),
+        "GATTACA",
+        1,
+    );
     assert_eq!(genome[chr], expected);
-    let saved: String = conn.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1", [p], |r|r.get(0))?;
+    let saved: String = conn.query_row(
+        "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
+        [p],
+        |r| r.get(0),
+    )?;
     let saved: Value = serde_json::from_str(&saved)?;
-    let selected = saved[chr]["segments"].as_array().unwrap().iter().find(|r|r["sourceKind"]=="refinement_patch").unwrap();
+    let selected = saved[chr]["segments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["sourceKind"] == "refinement_patch")
+        .unwrap();
     assert_eq!(selected["refinementPatchSha256"], sha256_bytes(b"GATTACA"));
     Ok(())
 }

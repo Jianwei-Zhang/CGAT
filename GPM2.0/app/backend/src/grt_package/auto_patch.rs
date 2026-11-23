@@ -212,7 +212,8 @@ fn validate_version(
     for (name, hash) in files {
         check_name(name)?;
         let low = name.to_ascii_lowercase();
-        if low.starts_with("project_versions/") || !names.insert(low.clone())
+        if low.starts_with("project_versions/")
+            || !names.insert(low.clone())
             || [
                 ".fa",
                 ".fasta",
@@ -276,7 +277,7 @@ fn validate_version(
     if sources.keys().ne(v.accepted_sequence_objects.iter()) {
         bail!("automatic patch sequence set differs from accepted sources");
     }
-    let gap_runs=gap_sources::GapRuns::load(view,&m)?;
+    let gap_runs = gap_sources::GapRuns::load(view, &m)?;
     for (sha, expected) in sources {
         if !is_hash(&sha) {
             bail!("invalid accepted sequence digest");
@@ -292,7 +293,9 @@ fn validate_version(
         {
             bail!("automatic patch source sequences do not match the tool catalog");
         }
-        for (name,seq) in &records {gap_runs.verify(&sha,name,seq)?;}
+        for (name, seq) in &records {
+            gap_runs.verify(&sha, name, seq)?;
+        }
         used.insert(sha);
     }
     let validated =
@@ -304,8 +307,12 @@ fn validate_version(
         .context("automatic version lacks verified per-tool outcome evidence")
 }
 
-fn retain_objects(tx: &Transaction<'_>, objects: &Path, used: &HashSet<String>) -> Result<HashSet<String>> {
-    let mut fresh=HashSet::new();
+fn retain_objects(
+    tx: &Transaction<'_>,
+    objects: &Path,
+    used: &HashSet<String>,
+) -> Result<HashSet<String>> {
+    let mut fresh = HashSet::new();
     for sha in used {
         let path = obj(objects, sha)?;
         let size = i64::try_from(fs::metadata(&path)?.len())?;
@@ -408,8 +415,14 @@ pub fn import_auto_patch_if_recognized(
     let mut conn = open_workspace_db(&db)?;
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     base_matches(&tx, project, &index, &base)?;
-    let fresh=retain_objects(&tx, &objects, &used)?;
-    let new_sequence_objects=index.variants.values().flat_map(|v|&v.accepted_sequence_objects).filter(|h|fresh.contains(*h)).collect::<HashSet<_>>().len();
+    let fresh = retain_objects(&tx, &objects, &used)?;
+    let new_sequence_objects = index
+        .variants
+        .values()
+        .flat_map(|v| &v.accepted_sequence_objects)
+        .filter(|h| fresh.contains(*h))
+        .collect::<HashSet<_>>()
+        .len();
     let mut added = Vec::new();
     for (tool, v) in &index.variants {
         let descriptor = serde_json::to_string(v)?;
@@ -421,7 +434,7 @@ pub fn import_auto_patch_if_recognized(
         if n!=0 { added.push(tool); }
         else if !tx.query_row("SELECT descriptor_json=?4 AND baseline_json=?5 AND effect_json=?6 FROM project_auto_version WHERE project_id=?1 AND tool=?2 AND light_manifest=?3",params![project,tool,v.light_manifest,descriptor,base_record,effect],|r|r.get::<_,bool>(0))? { bail!("existing automatic version has a different identity"); }
     }
-    let applied=gap_adoption::adopt(&tx,project,&index.variants)?;
+    let applied = gap_adoption::adopt(&tx, project, &index.variants)?;
     tx.commit()?;
     Ok(Some(
         serde_json::json!({"kind":"automatic", "addedTools":added,"versions":index.variants.len(),"applied":applied,"sequenceObjectsAdded":new_sequence_objects,"duplicate":added.is_empty() && applied==0 && new_sequence_objects==0}),
@@ -458,15 +471,22 @@ mod working_version;
 pub use working_version::preview_project_refinement_version;
 
 mod gap_sources;
-pub(crate) use gap_sources::{lookup_auto_source, load_auto_records};
+pub(crate) use gap_sources::{load_auto_records, lookup_auto_source};
 
-mod gap_candidates;
 mod gap_adoption;
-pub(super) fn apply_package_gaps(tx:&Transaction<'_>,project:i64)->Result<()> {
-    let mut stmt=tx.prepare("SELECT tool,descriptor_json FROM project_auto_version WHERE project_id=?1")?;
-    let mut versions=BTreeMap::new();
-    for row in stmt.query_map([project],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?)))? {
-        let (tool,raw)=row?; if versions.insert(tool,serde_json::from_str(&raw)?).is_some(){bail!("ambiguous tool generation during initialization");}
+mod gap_candidates;
+pub(super) fn apply_package_gaps(tx: &Transaction<'_>, project: i64) -> Result<()> {
+    let mut stmt =
+        tx.prepare("SELECT tool,descriptor_json FROM project_auto_version WHERE project_id=?1")?;
+    let mut versions = BTreeMap::new();
+    for row in stmt.query_map([project], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+    })? {
+        let (tool, raw) = row?;
+        if versions.insert(tool, serde_json::from_str(&raw)?).is_some() {
+            bail!("ambiguous tool generation during initialization");
+        }
     }
-    gap_adoption::adopt(tx,project,&versions)?; Ok(())
+    gap_adoption::adopt(tx, project, &versions)?;
+    Ok(())
 }

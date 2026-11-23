@@ -530,7 +530,13 @@ where
             .or_insert_with(|| TsvTable { rows: Vec::new() });
         let _ = header;
     }
-    let project_versions = auto_patch::validate_project_versions(bundle_root, &manifest, &final_path, refined, should_cancel)?;
+    let project_versions = auto_patch::validate_project_versions(
+        bundle_root,
+        &manifest,
+        &final_path,
+        refined,
+        should_cancel,
+    )?;
     Ok(ValidatedGrtPackage {
         tables,
         events: Vec::new(),

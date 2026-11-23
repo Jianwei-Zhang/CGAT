@@ -10,7 +10,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use zip::{ZipWriter, write::FileOptions};
 
 mod apply;
-pub(crate) use apply::{load_project_paths, write_project_paths, canonicalize_entry, update_length};
+pub(crate) use apply::{
+    canonicalize_entry, load_project_paths, update_length, write_project_paths,
+};
 mod results;
 mod snapshot;
 
@@ -206,9 +208,13 @@ pub(crate) fn witness(row: &Value) -> Result<Value> {
             Ok(json!({"segment_id":id,"kind":"gap","gap_bp":positive(row,key)?}))
         }
         "ctg" if row["sourceKind"] == "refinement_patch" => {
-            let sha = field(row,"refinementPatchSha256")?;
-            if !is_sha(sha) { bail!("invalid manual patch identity"); }
-            Ok(json!({"segment_id":id,"kind":"ctg","patch_sha256":sha,"start":positive(row,"start")?,"end":positive(row,"end")?}))
+            let sha = field(row, "refinementPatchSha256")?;
+            if !is_sha(sha) {
+                bail!("invalid manual patch identity");
+            }
+            Ok(
+                json!({"segment_id":id,"kind":"ctg","patch_sha256":sha,"start":positive(row,"start")?,"end":positive(row,"end")?}),
+            )
         }
         "ctg" if row["sourceKind"] == "ref_segment" => Ok(json!({"segment_id":id,"kind":"ctg",
             "reference":field(row,"referenceChrName")?, "member_start":positive(row,"memberStartBp")?,
@@ -245,10 +251,22 @@ pub(crate) fn witness(row: &Value) -> Result<Value> {
 }
 
 fn seed_plan(conn: &Connection, workspace: &Path, project_id: i64, w: &Value) -> Result<Value> {
-    seed_plan_with_maps(conn, workspace, project_id, w, &mut server_runtime::SourceMaps::default())
+    seed_plan_with_maps(
+        conn,
+        workspace,
+        project_id,
+        w,
+        &mut server_runtime::SourceMaps::default(),
+    )
 }
 
-fn seed_plan_with_maps(conn: &Connection, workspace: &Path, project_id: i64, w: &Value, maps: &mut server_runtime::SourceMaps) -> Result<Value> {
+fn seed_plan_with_maps(
+    conn: &Connection,
+    workspace: &Path,
+    project_id: i64,
+    w: &Value,
+    maps: &mut server_runtime::SourceMaps,
+) -> Result<Value> {
     let start = positive(w, "start")?;
     let end = positive(w, "end")?;
     let (seed, members) = if let Some(id) = w["assembly_ctg_id"].as_i64() {
@@ -262,11 +280,17 @@ fn seed_plan_with_maps(conn: &Connection, workspace: &Path, project_id: i64, w: 
     } else {
         let dataset = field(w, "dataset")?;
         let contig = field(w, "contig")?;
-        if let Some((native,sha,len))=crate::grt_package::lookup_auto_source(conn,project_id,dataset,contig)? {
-            if start.max(end)>len {bail!("adopted automatic source interval exceeds its record");}
-            let n=start.abs_diff(end)+1;
-            return Ok(json!({"start": if start<=end{1}else{n},"end":if start<=end{n}else{1},"members":[{
-                "dataset":native,"name":contig,"length":len,"start":start.min(end),"end":start.max(end),"fasta_sha256":sha,"interval_sha256":null}]}));
+        if let Some((native, sha, len)) =
+            crate::grt_package::lookup_auto_source(conn, project_id, dataset, contig)?
+        {
+            if start.max(end) > len {
+                bail!("adopted automatic source interval exceeds its record");
+            }
+            let n = start.abs_diff(end) + 1;
+            return Ok(
+                json!({"start": if start<=end{1}else{n},"end":if start<=end{n}else{1},"members":[{
+                "dataset":native,"name":contig,"length":len,"start":start.min(end),"end":start.max(end),"fasta_sha256":sha,"interval_sha256":null}]}),
+            );
         }
         let (length, fasta): (i64, String) = conn
             .query_row(
@@ -364,11 +388,17 @@ fn tools_for(req: &LocusRequest) -> Result<Vec<String>> {
         return Ok(vec!["degap".to_owned()]);
     }
     // Serialize in admission priority order, independent of the UI click order.
-    let tools: Vec<String> = TOOLS.iter().copied()
+    let tools: Vec<String> = TOOLS
+        .iter()
+        .copied()
         .filter(|tool| req.tools.iter().any(|requested| requested == tool))
-        .map(str::to_owned).collect();
+        .map(str::to_owned)
+        .collect();
     if tools.len() != req.tools.len() {
-        bail!("unknown or duplicate refinement tool for {}", req.segment_id);
+        bail!(
+            "unknown or duplicate refinement tool for {}",
+            req.segment_id
+        );
     }
     if req.kind != LocusKind::Gap && tools.as_slice() != ["degap"] {
         bail!("telomere refinement requires DEGAP TelSeeker");
@@ -750,20 +780,34 @@ pub fn export_manual_refinement(
         output.to_string_lossy(),
         exported_at.as_nanos().to_string(),
     ))?);
-    if request.loci.is_empty() { bail!("select at least one actual Gap or Tel locus"); }
+    if request.loci.is_empty() {
+        bail!("select at least one actual Gap or Tel locus");
+    }
     let snapshot = snapshot::capture_if_supported(&tx, workspace, project_id, &request.loci)?;
-    let (manifest, mut summary) =
-        build_manifest(&tx, workspace, project_id, request, reads, &export_id, snapshot.as_ref())?;
+    let (manifest, mut summary) = build_manifest(
+        &tx,
+        workspace,
+        project_id,
+        request,
+        reads,
+        &export_id,
+        snapshot.as_ref(),
+    )?;
     let bytes = serde_json::to_vec(&manifest)?;
     if bytes.len() > MAX_MANIFEST {
         bail!("manual refinement manifest exceeds 8 MiB");
     }
     summary.batch_sha256 = hex_sha(&bytes);
     tx.commit()?;
-    let parent = output.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let parent = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     let mut pending = tempfile::NamedTempFile::new_in(parent)?;
     let mut zip = ZipWriter::new(pending.as_file_mut());
-    if let Some(snapshot) = &snapshot { snapshot.write_to(&mut zip)?; }
+    if let Some(snapshot) = &snapshot {
+        snapshot.write_to(&mut zip)?;
+    }
     zip.start_file(MANIFEST, FileOptions::default())?;
     zip.write_all(&bytes)?;
     zip.start_file("README.txt", FileOptions::default())?;

@@ -80,10 +80,26 @@ const MIGRATIONS: &[Migration] = &[
         name: "retain_per_tool_automatic_refinement_effects",
         apply: super::create_auto_refinement_effects,
     },
-    Migration { version: 12, name: "retain_project_scoped_automatic_versions", apply: super::create_project_auto_versions },
-    Migration { version: 13, name: "inherit_all_package_versions", apply: super::create_package_auto_versions },
-    Migration { version: 14, name: "retain_project_delivery_identity", apply: super::create_project_delivery_identity },
-    Migration { version: 15, name: "track_adopted_automatic_gaps_and_sources", apply: super::create_auto_adoptions },
+    Migration {
+        version: 12,
+        name: "retain_project_scoped_automatic_versions",
+        apply: super::create_project_auto_versions,
+    },
+    Migration {
+        version: 13,
+        name: "inherit_all_package_versions",
+        apply: super::create_package_auto_versions,
+    },
+    Migration {
+        version: 14,
+        name: "retain_project_delivery_identity",
+        apply: super::create_project_delivery_identity,
+    },
+    Migration {
+        version: 15,
+        name: "track_adopted_automatic_gaps_and_sources",
+        apply: super::create_auto_adoptions,
+    },
 ];
 
 fn migrate_refinement_inputs_to_v9(conn: &Connection) -> Result<()> {

@@ -42,8 +42,10 @@ pub(crate) fn persist_grt_package(
         auto_patch::retain_package_versions(tx, versions)?;
     }
     if let Some(effect) = &package.auto_effect {
-        tx.execute("INSERT INTO grt_auto_refinement_effect(package_id,tool,effect_json) VALUES(1,?1,?2)",
-            params![effect.tool, serde_json::to_string(effect)?])?;
+        tx.execute(
+            "INSERT INTO grt_auto_refinement_effect(package_id,tool,effect_json) VALUES(1,?1,?2)",
+            params![effect.tool, serde_json::to_string(effect)?],
+        )?;
     }
     if !package.refinement_reads.is_empty() {
         tx.execute(

@@ -659,23 +659,32 @@ fn load_auto_effects(path: &Path, project: Option<i64>) -> Result<Vec<AutoRefine
     let conn = open_workspace_db(path)?;
     let mut stmt = conn.prepare("SELECT effect_json, NULL FROM grt_auto_refinement_effect WHERE package_id=1
         UNION ALL SELECT effect_json, light_manifest FROM project_auto_version WHERE project_id=?1 ORDER BY 1,2")?;
-    let rows=stmt.query_map([project], |r| Ok((r.get::<_,String>(0)?,r.get::<_,Option<String>>(1)?)))?;
-    let mut versions=BTreeMap::new();
-    let mut legacy=BTreeMap::new();
+    let rows = stmt.query_map([project], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
+    })?;
+    let mut versions = BTreeMap::new();
+    let mut legacy = BTreeMap::new();
     for row in rows {
-        let (json,manifest)=row?;
-        let mut effect:AutoRefinementEffect=serde_json::from_str(&json)?;
-        if let (Some(project),Some(key))=(project,manifest.as_ref()) {
+        let (json, manifest) = row?;
+        let mut effect: AutoRefinementEffect = serde_json::from_str(&json)?;
+        if let (Some(project), Some(key)) = (project, manifest.as_ref()) {
             let mut chrs = conn.prepare("SELECT DISTINCT chr FROM project_auto_gap_review WHERE project_id=?1 AND tool=?2 AND light_manifest=?3 ORDER BY chr")?;
-            effect.chromosomes = chrs.query_map(params![project,effect.tool,key], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+            effect.chromosomes = chrs
+                .query_map(params![project, effect.tool, key], |r| r.get(0))?
+                .collect::<rusqlite::Result<_>>()?;
             effect.project_adopted_gaps=Some(conn.query_row("SELECT COUNT(*) FROM project_auto_gap_adoption WHERE project_id=?1 AND tool=?2 AND light_manifest=?3",params![project,effect.tool,key],|r|r.get::<_,i64>(0))? as usize);
         }
-        effect.version_id=manifest.clone();
-        let k=(effect.tool.clone(),effect.run_id.clone());
-        if let Some(key)=manifest { versions.insert((k,key),effect); }
-        else { legacy.insert(k,effect); }
+        effect.version_id = manifest.clone();
+        let k = (effect.tool.clone(), effect.run_id.clone());
+        if let Some(key) = manifest {
+            versions.insert((k, key), effect);
+        } else {
+            legacy.insert(k, effect);
+        }
     }
-    for (k,_) in versions.keys() { legacy.remove(k); }
+    for (k, _) in versions.keys() {
+        legacy.remove(k);
+    }
     Ok(versions.into_values().chain(legacy.into_values()).collect())
 }
 

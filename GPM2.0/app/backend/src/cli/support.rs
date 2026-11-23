@@ -106,11 +106,17 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             }
         }
         Commands::ExportRefinementTasks {
-            workspace_root, project_id, output_zip, request_json,
+            workspace_root,
+            project_id,
+            output_zip,
+            request_json,
         } => {
             let request = serde_json::from_slice(&std::fs::read(request_json)?)?;
             let result = gpm_next_backend::degap_jobs::export_manual_refinement(
-                &workspace_root, project_id, &output_zip, &request,
+                &workspace_root,
+                project_id,
+                &output_zip,
+                &request,
             )?;
             println!("{}", serde_json::to_string(&result)?);
         }

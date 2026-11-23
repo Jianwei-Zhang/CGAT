@@ -369,11 +369,21 @@ fn build_final_path_agp(
                     start,
                     end,
                 } => {
-                    if let Some((_,sha,length))=crate::grt_package::lookup_auto_source(conn,project_id,dataset_name,contig_name)? {
-                        validate_agp_range(*start,*end,length)?;
-                        components.push((format!("{contig_name}@{sha}"),format!("automatic:{sha}:{contig_name}"),*start,*end));
+                    if let Some((_, sha, length)) = crate::grt_package::lookup_auto_source(
+                        conn,
+                        project_id,
+                        dataset_name,
+                        contig_name,
+                    )? {
+                        validate_agp_range(*start, *end, length)?;
+                        components.push((
+                            format!("{contig_name}@{sha}"),
+                            format!("automatic:{sha}:{contig_name}"),
+                            *start,
+                            *end,
+                        ));
                     } else {
-                    let (id, length): (i64, i64) = conn.query_row(
+                        let (id, length): (i64, i64) = conn.query_row(
                         "SELECT ss.id, ss.length FROM source_seq ss
                          JOIN dataset d ON d.id = ss.dataset_id
                          JOIN project_dataset pd ON pd.dataset_id = d.id
@@ -381,8 +391,13 @@ fn build_final_path_agp(
                         params![project_id, dataset_name, contig_name],
                         |row| Ok((row.get(0)?, row.get(1)?)),
                     ).with_context(|| format!("AGP source {dataset_name}:{contig_name} not found in project {project_id}"))?;
-                    validate_agp_range(*start, *end, length)?;
-                    components.push((contig_name.clone(), format!("source:{id}"), *start, *end));
+                        validate_agp_range(*start, *end, length)?;
+                        components.push((
+                            contig_name.clone(),
+                            format!("source:{id}"),
+                            *start,
+                            *end,
+                        ));
                     }
                 }
                 FinalPathExportSegment::RefSegment {
@@ -690,8 +705,8 @@ fn build_final_path_fasta_records(
 ) -> Result<Vec<(String, String)>> {
     // Negative ids exist only in this export, never in SQLite. Retain the original contig
     // coordinate system while resolving admitted FASTAs directly from the project object store.
-    let mut auto_inputs=HashMap::<String,Vec<(i64,String,i64)>>::new();
-    let mut auto_id=0i64;
+    let mut auto_inputs = HashMap::<String, Vec<(i64, String, i64)>>::new();
+    let mut auto_id = 0i64;
     let mut required_ctg_ids = BTreeSet::<i64>::new();
     let mut required_reference_chr_names = BTreeSet::<String>::new();
     let mut patches = HashMap::<String, String>::new();
@@ -726,10 +741,20 @@ fn build_final_path_fasta_records(
                     if let std::collections::hash_map::Entry::Vacant(entry) =
                         source_id_by_name.entry(key)
                     {
-                        if let Some((_,sha,len))=crate::grt_package::lookup_auto_source(conn,project_id,dataset_name,contig_name)? {
-                            auto_id-=1;
-                            auto_inputs.entry(sha).or_default().push((auto_id,contig_name.clone(),len));
-                            entry.insert(auto_id);continue;
+                        if let Some((_, sha, len)) = crate::grt_package::lookup_auto_source(
+                            conn,
+                            project_id,
+                            dataset_name,
+                            contig_name,
+                        )? {
+                            auto_id -= 1;
+                            auto_inputs.entry(sha).or_default().push((
+                                auto_id,
+                                contig_name.clone(),
+                                len,
+                            ));
+                            entry.insert(auto_id);
+                            continue;
                         }
                         let source_id: i64 = conn.query_row(
                             "SELECT ss.id FROM source_seq ss
@@ -768,7 +793,11 @@ fn build_final_path_fasta_records(
         .iter()
         .map(|ctg| (ctg.id, ctg.clone()))
         .collect::<HashMap<_, _>>();
-    let mut required_source_ids = source_id_by_name.values().copied().filter(|id|*id>0).collect::<BTreeSet<_>>();
+    let mut required_source_ids = source_id_by_name
+        .values()
+        .copied()
+        .filter(|id| *id > 0)
+        .collect::<BTreeSet<_>>();
     required_source_ids.extend(
         required_ctgs
             .iter()
@@ -778,10 +807,13 @@ fn build_final_path_fasta_records(
     );
     let mut source_sequences = load_source_sequences_by_ids(conn, &required_source_ids)?;
     for (sha, requested) in auto_inputs {
-        let seqs=crate::grt_package::load_auto_records(conn,&sha)?;
-        for (id,name,len) in requested {
-            let seq=seqs.get(&name).filter(|s|s.len() as i64==len).context("adopted source record differs from project locator")?;
-            source_sequences.insert(id,seq.clone());
+        let seqs = crate::grt_package::load_auto_records(conn, &sha)?;
+        for (id, name, len) in requested {
+            let seq = seqs
+                .get(&name)
+                .filter(|s| s.len() as i64 == len)
+                .context("adopted source record differs from project locator")?;
+            source_sequences.insert(id, seq.clone());
         }
     }
     let reference_sequences =

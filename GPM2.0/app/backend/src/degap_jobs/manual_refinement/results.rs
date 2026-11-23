@@ -16,7 +16,7 @@ const MAX_RECEIPT: u64 = MAX_MANIFEST as u64 + 1024;
 struct ResultManifest {
     schema: String,
     batch_sha256: String,
-    #[serde(default,skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly: Option<AssemblyReturn>,
     results: Vec<ResultRow>,
 }
@@ -26,7 +26,7 @@ struct ResultManifest {
 struct AssemblyReturn {
     snapshot_sha256: String,
     genome_sha256: String,
-    selected: std::collections::BTreeMap<String,Option<String>>,
+    selected: std::collections::BTreeMap<String, Option<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -134,7 +134,9 @@ pub(super) fn registered_export_receipt(
     let export = &saved["manifest"];
     if saved["project_id"].as_i64() != Some(project_id)
         || saved["batch_sha256"] != batch
-        || !(export["schema"] == SCHEMA || export["schema"] == SNAPSHOT_TASKS && export["snapshot_sha256"].as_str().is_some_and(is_sha))
+        || !(export["schema"] == SCHEMA
+            || export["schema"] == SNAPSHOT_TASKS
+                && export["snapshot_sha256"].as_str().is_some_and(is_sha))
         || hex_sha(&serde_json::to_vec(export)?) != batch
     {
         bail!("refinement results do not match the selected project's original export receipt");
@@ -286,7 +288,8 @@ pub fn validate_manual_refinement_results(
     }
     let export = registered_export(workspace, project_id, &batch)?;
     if (export["schema"] == SNAPSHOT_TASKS) != (manifest.schema == SNAPSHOT_RESULTS)
-        || (manifest.schema == SNAPSHOT_RESULTS) != manifest.assembly.is_some() {
+        || (manifest.schema == SNAPSHOT_RESULTS) != manifest.assembly.is_some()
+    {
         bail!("manual return does not match the exported snapshot protocol");
     }
     let mut expected = HashMap::new();
@@ -342,20 +345,32 @@ pub fn validate_manual_refinement_results(
         bail!("incomplete refinement result archive");
     }
     if let Some(assembly) = &manifest.assembly {
-        if export["snapshot_sha256"] != assembly.snapshot_sha256 || !is_sha(&assembly.genome_sha256) {
+        if export["snapshot_sha256"] != assembly.snapshot_sha256 || !is_sha(&assembly.genome_sha256)
+        {
             bail!("manual genome return differs from the registered assembly snapshot");
         }
         let mut chosen = std::collections::BTreeMap::new();
         for locus in export["loci"].as_array().context("missing exported loci")? {
-            chosen.insert(field(locus,"id")?.to_owned(),None::<String>);
+            chosen.insert(field(locus, "id")?.to_owned(), None::<String>);
         }
         for row in &manifest.results {
-            if !matches!(row.status, ResultStatus::Closed | ResultStatus::Extended) { continue; }
-            let best = chosen.get_mut(&row.locus_id).context("unknown manual locus")?;
-            let priority = |tool: &str| TOOLS.iter().position(|&t|t==tool).unwrap_or(usize::MAX);
-            if best.as_ref().is_none_or(|t|priority(&row.tool)<priority(t)) { *best=Some(row.tool.clone()); }
+            if !matches!(row.status, ResultStatus::Closed | ResultStatus::Extended) {
+                continue;
+            }
+            let best = chosen
+                .get_mut(&row.locus_id)
+                .context("unknown manual locus")?;
+            let priority = |tool: &str| TOOLS.iter().position(|&t| t == tool).unwrap_or(usize::MAX);
+            if best
+                .as_ref()
+                .is_none_or(|t| priority(&row.tool) < priority(t))
+            {
+                *best = Some(row.tool.clone());
+            }
         }
-        if assembly.selected != chosen { bail!("Server genome selected different tools than the validated manual batch"); }
+        if assembly.selected != chosen {
+            bail!("Server genome selected different tools than the validated manual batch");
+        }
     }
     for row in &manifest.results {
         if let Some(patch) = &row.patch {

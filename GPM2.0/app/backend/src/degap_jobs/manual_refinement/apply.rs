@@ -152,7 +152,12 @@ fn locus_req(locus: &Value) -> Result<LocusRequest> {
     })
 }
 
-fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value, witness: &Value) -> Result<String> {
+fn endpoint_sha(
+    conn: &Connection,
+    project_id: i64,
+    plan: &Value,
+    witness: &Value,
+) -> Result<String> {
     let mut hash = Sha256::new();
     let reverse = positive(plan, "start")? > positive(plan, "end")?;
     let members = plan["members"]
@@ -166,39 +171,62 @@ fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value, witness: &Valu
         let member = &members[index];
         let dataset = field(member, "dataset")?;
         let name = field(member, "name")?;
-        let lo=positive(member,"start")?;
-        let hi=positive(member,"end")?;
-        let auto=crate::grt_package::lookup_auto_source(conn,project_id,witness["dataset"].as_str().unwrap_or(""),name)?;
-        let sequence=if let Some((native,sha,len))=&auto {
-            if native!=dataset || member["fasta_sha256"].as_str()!=Some(sha.as_str()) || lo<1 || hi<lo || hi>*len {bail!("automatic endpoint binding changed");}
-            let records=crate::grt_package::load_auto_records(conn,sha)?;
-            let seq=records.get(name).filter(|s|s.len() as i64==*len).context("missing automatic endpoint record")?;
-            seq[(lo-1) as usize..hi as usize].to_owned()
-        }else if witness["patch_sha256"].is_string() {
-            let bytes:Vec<u8>=conn.query_row("SELECT sequence FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",params![project_id,name],|r|r.get(0))?;
-            if lo>hi || hi as u64>bytes.len() as u64 || hex_sha(&bytes)!=name { bail!("manual endpoint source changed"); }
-            String::from_utf8(bytes[(lo-1) as usize..hi as usize].to_vec())?
+        let lo = positive(member, "start")?;
+        let hi = positive(member, "end")?;
+        let auto = crate::grt_package::lookup_auto_source(
+            conn,
+            project_id,
+            witness["dataset"].as_str().unwrap_or(""),
+            name,
+        )?;
+        let sequence = if let Some((native, sha, len)) = &auto {
+            if native != dataset
+                || member["fasta_sha256"].as_str() != Some(sha.as_str())
+                || lo < 1
+                || hi < lo
+                || hi > *len
+            {
+                bail!("automatic endpoint binding changed");
+            }
+            let records = crate::grt_package::load_auto_records(conn, sha)?;
+            let seq = records
+                .get(name)
+                .filter(|s| s.len() as i64 == *len)
+                .context("missing automatic endpoint record")?;
+            seq[(lo - 1) as usize..hi as usize].to_owned()
+        } else if witness["patch_sha256"].is_string() {
+            let bytes: Vec<u8> = conn.query_row(
+                "SELECT sequence FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",
+                params![project_id, name],
+                |r| r.get(0),
+            )?;
+            if lo > hi || hi as u64 > bytes.len() as u64 || hex_sha(&bytes) != name {
+                bail!("manual endpoint source changed");
+            }
+            String::from_utf8(bytes[(lo - 1) as usize..hi as usize].to_vec())?
         } else if witness["reference"].is_string() {
             let fasta:String=conn.query_row("SELECT rcl.fasta_path FROM project p JOIN reference_chr rc ON rc.reference_genome_id=p.reference_genome_id JOIN reference_chr_locator rcl ON rcl.reference_chr_id=rc.id WHERE p.id=?1 AND rc.chr_name=?2",params![project_id,name],|r|r.get(0))?;
-            load_fasta_source_interval(Path::new(&fasta),name,lo,hi)?
+            load_fasta_source_interval(Path::new(&fasta), name, lo, hi)?
         } else {
-        let fasta: String = conn.query_row(
-            "SELECT ssl.fasta_path FROM source_seq_locator ssl
+            let fasta: String = conn.query_row(
+                "SELECT ssl.fasta_path FROM source_seq_locator ssl
              JOIN source_seq ss ON ss.id=ssl.source_seq_id
              JOIN dataset d ON d.id=ss.dataset_id
              JOIN project_dataset pd ON pd.dataset_id=d.id
              WHERE pd.project_id=?1 AND d.name=?2 AND ss.seq_name=?3",
-            params![project_id, dataset, name],
-            |row| row.get(0),
-        )?;
-        load_fasta_source_interval(
-            Path::new(&fasta),
-            name,
-            positive(member, "start")?,
-            positive(member, "end")?,
-        )?
+                params![project_id, dataset, name],
+                |row| row.get(0),
+            )?;
+            load_fasta_source_interval(
+                Path::new(&fasta),
+                name,
+                positive(member, "start")?,
+                positive(member, "end")?,
+            )?
         };
-        if auto.is_none() && member["interval_sha256"].as_str() != Some(hex_sha(sequence.as_bytes()).as_str()) {
+        if auto.is_none()
+            && member["interval_sha256"].as_str() != Some(hex_sha(sequence.as_bytes()).as_str())
+        {
             bail!("local endpoint sequence does not match the registered interval");
         }
         if reverse {
@@ -239,9 +267,11 @@ fn check_current_locus(
             bail!("exported witness no longer identifies this segment");
         }
         if label != "target" {
-            let plan=if actual["reference"].is_string() || actual["patch_sha256"].is_string() {
-                snapshot::special_current_plan(conn,workspace,project,&actual)?
-            } else { seed_plan(conn, workspace, project, &actual)? };
+            let plan = if actual["reference"].is_string() || actual["patch_sha256"].is_string() {
+                snapshot::special_current_plan(conn, workspace, project, &actual)?
+            } else {
+                seed_plan(conn, workspace, project, &actual)?
+            };
             if plan != locus["seed_plans"][label] {
                 bail!("current source ranges or content differ from the export");
             }

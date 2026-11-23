@@ -715,10 +715,12 @@ fn create_auto_adoptions(conn: &Connection) -> Result<()> {
 }
 
 fn create_project_delivery_identity(conn: &Connection) -> Result<()> {
-    conn.execute_batch("CREATE TABLE IF NOT EXISTS package_delivery_identity (
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS package_delivery_identity (
         package_id INTEGER PRIMARY KEY REFERENCES grt_package(id) ON DELETE CASCADE,
         generation TEXT NOT NULL, reference_sources_json TEXT NOT NULL
-    );")?;
+    );",
+    )?;
     Ok(())
 }
 
@@ -745,10 +747,12 @@ fn create_project_auto_versions(conn: &Connection) -> Result<()> {
 }
 
 fn create_auto_refinement_effects(conn: &Connection) -> Result<()> {
-    conn.execute_batch("CREATE TABLE IF NOT EXISTS grt_auto_refinement_effect (
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS grt_auto_refinement_effect (
         package_id INTEGER NOT NULL REFERENCES grt_package(id) ON DELETE CASCADE,
         tool TEXT NOT NULL, effect_json TEXT NOT NULL, PRIMARY KEY(package_id, tool)
-    );")?;
+    );",
+    )?;
     Ok(())
 }
 

@@ -11,13 +11,16 @@ use crate::db::open_workspace_db;
 
 mod manual_refinement;
 mod server_runtime;
-pub(crate) use manual_refinement::{load_project_paths, write_project_paths, canonicalize_entry, update_length, witness};
+pub(crate) use manual_refinement::{
+    canonicalize_entry, load_project_paths, update_length, witness, write_project_paths,
+};
 
 pub use manual_refinement::{
-    ManualExportSummary, ManualRefinementAction, ManualRefinementExportReceipt, ManualRefinementImport, ManualRefinementRequest,
-    PatchOperation, ResultPatch, ResultRow, ResultStatus, ValidatedRefinementResults,
-    export_manual_refinement, import_manual_refinement_results, list_manual_refinement_exports, list_manual_refinement_results,
-    switch_manual_refinement_locus, undo_manual_refinement_locus,
+    ManualExportSummary, ManualRefinementAction, ManualRefinementExportReceipt,
+    ManualRefinementImport, ManualRefinementRequest, PatchOperation, ResultPatch, ResultRow,
+    ResultStatus, ValidatedRefinementResults, export_manual_refinement,
+    import_manual_refinement_results, list_manual_refinement_exports,
+    list_manual_refinement_results, switch_manual_refinement_locus, undo_manual_refinement_locus,
     validate_manual_refinement_results,
 };
 
@@ -789,7 +792,14 @@ fn load_seed_plan(
     gpm_server_path: &str,
     segment: &DegapJobSeedSegment,
 ) -> Result<Vec<SeedMemberPlan>> {
-    load_seed_plan_with_maps(conn, workspace_root, project_id, gpm_server_path, segment, &mut server_runtime::SourceMaps::default())
+    load_seed_plan_with_maps(
+        conn,
+        workspace_root,
+        project_id,
+        gpm_server_path,
+        segment,
+        &mut server_runtime::SourceMaps::default(),
+    )
 }
 
 fn load_seed_plan_with_maps(

@@ -23,6 +23,7 @@ use crate::project_initializer::{
     list_initializer_options_with_connection, set_project_auto_pipeline_done_with_connection,
 };
 
+mod auto_patch;
 mod contract_validator;
 mod delivery_validator;
 mod domain_validation;
@@ -32,11 +33,10 @@ mod persistence;
 mod q0_provenance;
 mod read_model;
 mod refined_delivery;
-mod auto_patch;
 pub use auto_patch::{import_auto_patch_if_recognized, preview_project_refinement_version};
-pub(crate) use auto_patch::{lookup_auto_source, load_auto_records};
-mod refinement_inputs;
+pub(crate) use auto_patch::{load_auto_records, lookup_auto_source};
 mod refined_source_evidence;
+mod refinement_inputs;
 mod trace_queries;
 mod types;
 
@@ -53,20 +53,20 @@ pub use read_model::{
     load_grt_project_view_for_project, load_grt_source_card_statuses, load_grt_source_cards,
     load_persisted_grt_final_path_verification,
 };
+pub use refinement_inputs::{
+    RefinementReadInputs, RefinementReadSource, load_project_refinement_read_inputs,
+};
 pub use trace_queries::{
     load_grt_event_trace, load_grt_evidence, load_grt_source_card_trace,
     verify_persisted_grt_final_path,
 };
-pub use refinement_inputs::{
-    RefinementReadInputs, RefinementReadSource, load_project_refinement_read_inputs,
-};
 pub(crate) use types::ValidatedGrtPackage;
 pub use types::{
-    AutoRefinementEffect,
-    GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION, GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION,
-    GRT_APP_WORKFLOW, GRT_FINAL_PATH_SCHEMA_VERSION, GRT_Q0_SCHEMA_VERSION, GRT_SCHEMA_VERSION,
-    GRT_WORKFLOW, GrtEventTrace, GrtFinalPathVerification, GrtLockedRecipe,
-    GrtProjectInitializationSummary, GrtProjectView, GrtSourceCardStatus, GrtSourceCardTrace,
+    AutoRefinementEffect, GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION,
+    GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION, GRT_APP_WORKFLOW,
+    GRT_FINAL_PATH_SCHEMA_VERSION, GRT_Q0_SCHEMA_VERSION, GRT_SCHEMA_VERSION, GRT_WORKFLOW,
+    GrtEventTrace, GrtFinalPathVerification, GrtLockedRecipe, GrtProjectInitializationSummary,
+    GrtProjectView, GrtSourceCardStatus, GrtSourceCardTrace,
 };
 
 use domain_validation::*;
