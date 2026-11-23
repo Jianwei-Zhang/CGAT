@@ -244,7 +244,7 @@ fn stage_actual_manual_refinement_tasks() -> Result<()> {
         ))
         .map_err(|error| anyhow!(error.message))?;
         assert_eq!(result["loci"], loci.len());
-        assert_eq!(result["tasks"], loci.len()); // New exports always choose one tool per locus.
+        assert_eq!(result["tasks"], loci.len()); // This fixture requests one tool per locus.
         let batch_sha256 = result["batch_sha256"]
             .as_str()
             .context("missing batch SHA")?

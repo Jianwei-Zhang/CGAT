@@ -37,20 +37,12 @@ export function normalizeManualRefinementMotif(value) {
   return upper && /^[ACGT]+$/.test(upper) ? upper : "";
 }
 
-// Each Gap job selects a single tool (default: degap). Telomere endpoints are
-// fixed to DEGAP TelSeeker. The wire format still carries a 1-element tools array.
-export function normalizeManualRefinementTool(value, kind = "gap") {
-  if (kind !== "gap") {
-    return "degap";
-  }
-  const candidate = Array.isArray(value)
-    ? value.map((item) => normalizeString(item).toLowerCase()).find((item) => MANUAL_REFINEMENT_GAP_TOOLS.includes(item))
-    : normalizeString(value).toLowerCase();
-  return candidate && MANUAL_REFINEMENT_GAP_TOOLS.includes(candidate) ? candidate : "degap";
-}
-
-export function normalizeManualRefinementTools(tools, kind = "gap") {
-  return [normalizeManualRefinementTool(tools, kind)];
+// Older drafts used a scalar tool; the current task keeps the entire selection.
+export function normalizeManualRefinementTools(value, kind = "gap") {
+  if (kind !== "gap") return ["degap"];
+  const values = (Array.isArray(value) ? value : [value]).map((v) => normalizeString(v).toLowerCase());
+  const tools = MANUAL_REFINEMENT_GAP_TOOLS.filter((tool) => values.includes(tool));
+  return tools.length ? tools : ["degap"];
 }
 
 export function normalizeManualRefinementExportScope(scope) {
@@ -82,15 +74,15 @@ export function normalizeManualRefinementLocus(value) {
     return null;
   }
   const motif = kind === "gap" ? "" : normalizeString(value.motif).toUpperCase();
-  const selectedTool = normalizeManualRefinementTool(value.tool ?? value.tools, kind);
+  const tools = normalizeManualRefinementTools(value.tools ?? value.tool, kind);
   return {
     locusKey: buildManualRefinementLocusKey({ chr, kind, segmentId }),
     chr,
     kind,
     segmentId,
     label: normalizeString(value.label),
-    tool: selectedTool,
-    tools: [selectedTool],
+    tool: tools[0],
+    tools,
     motif,
   };
 }
@@ -111,7 +103,7 @@ function normalizeExportedBatch(value) {
     : loci.length;
   const tasksCount = Number.isInteger(Number(value.tasksCount ?? value.tasks))
     ? Number(value.tasksCount ?? value.tasks)
-    : loci.length;
+    : loci.reduce((count, locus) => count + locus.tools.length, 0);
   return {
     batchSha256,
     exportedAt: normalizeString(value.exportedAt || value.exported_at),
@@ -371,12 +363,11 @@ export function buildManualRefinementExportRequest(
 
   const requestLoci = [];
   for (const locus of scopedLoci) {
-    const selectedTool = normalizeManualRefinementTool(locus.tool ?? locus.tools, locus.kind);
     const entry = {
       chr: locus.chr,
       kind: locus.kind,
       segment_id: locus.segmentId,
-      tools: [selectedTool],
+      tools: locus.tools,
     };
     if (locus.kind !== "gap" && locus.motif) {
       const validMotif = normalizeManualRefinementMotif(locus.motif);

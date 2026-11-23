@@ -13,7 +13,7 @@ import {
   buildManualRefinementExportRequest,
   extractFileName,
   normalizeManualRefinementState,
-  normalizeManualRefinementTool,
+  MANUAL_REFINEMENT_GAP_TOOLS,
   resolveManualRefinementGapCandidate,
   resolveManualRefinementTelCandidate,
 } from "./manual-refinement-state.js";
@@ -94,8 +94,8 @@ export function recordManualRefinementExportReceipt(host, store, receipt, deps =
     exporting: false,
     error: "",
     feedback: isEn
-      ? `Exported refinement tasks (${scopeLabel}): ${receipt.lociCount} loci / ${receipt.tasksCount} tasks. Run refine.py on Server next.`
-      : `已导出精修任务（${scopeLabel}）：${receipt.lociCount} 个位点 / ${receipt.tasksCount} 个任务，请传到 Server 运行 refine.py。`,
+      ? `Exported refinement tasks (${scopeLabel}): ${receipt.lociCount} loci / ${receipt.tasksCount} tool runs. Run refine.py on Server next.`
+      : `已导出精修任务（${scopeLabel}）：${receipt.lociCount} 个位点 / ${receipt.tasksCount} 次工具运行，请传到 Server 运行 refine.py。`,
     lastExport: receipt,
     exportedBatches: [
       receipt,
@@ -249,7 +249,7 @@ async function exportCurrentChrRefinementTasks(host, store, deps = {}) {
       scope: frozenScope,
       chrName: frozenChrName,
       lociCount: Number(summary?.loci ?? built.request.loci.length),
-      tasksCount: Number(summary?.tasks ?? built.request.loci.length),
+      tasksCount: Number(summary?.tasks ?? built.request.loci.reduce((n, locus) => n + locus.tools.length, 0)),
       readsMode: frozenManual.readsMode,
       loci: built.loci,
       status: "exported_awaiting_server",
@@ -363,17 +363,19 @@ export function bindManualRefinementCard(host, store, deps = {}) {
     const toolSelect = event.target?.closest?.("[data-manual-ref-tool-select]");
     if (toolSelect) {
       const key = normalizeString(toolSelect.dataset.manualRefLocusKey);
-      const selectedTool = normalizeManualRefinementTool(toolSelect.value, "gap");
+      const tool = toolSelect.value;
+      if (!MANUAL_REFINEMENT_GAP_TOOLS.includes(tool)) return;
       updateManualRefinementState(host, store, (current) => ({
         loci: current.loci.map((item) => {
           if (item.locusKey !== key || item.kind !== "gap") {
             return item;
           }
-          return {
-            ...item,
-            tool: selectedTool,
-            tools: [selectedTool],
-          };
+          const tools = toolSelect.checked ? [...item.tools, tool] : item.tools.filter((id) => id !== tool);
+          if (!tools.length) {
+            toolSelect.checked = true;
+            return item;
+          }
+          return { ...item, tools };
         }),
         error: "",
       }), deps, { persist: true });

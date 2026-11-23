@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 
 import { renderManualRefinementCard } from "../manual-refinement-card.js";
 
+import { bindManualRefinementCard } from "../manual-refinement-runtime.js";
+import { buildManualRefinementExportRequest } from "../manual-refinement-state.js";
+
 const escapeHtml = (value) => String(value ?? "")
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
@@ -18,7 +21,7 @@ const sampleFinalPathEntry = {
   ],
 };
 
-test("renderManualRefinementCard renders compact single-select Gap rows, fixed Tel rows, overflow tooltips, and distinct scope counts", () => {
+test("renderManualRefinementCard renders compact multi-select Gap rows, fixed Tel rows, overflow tooltips, and distinct scope counts", () => {
   const html = renderManualRefinementCard(
     {
       chrName: "Chr01",
@@ -33,7 +36,7 @@ test("renderManualRefinementCard renders compact single-select Gap rows, fixed T
             kind: "gap",
             segmentId: "gap-1",
             label: "ctg_left_very_long_identifier_001 ↔ ctg_right_very_long_identifier_002",
-            tool: "degap",
+            tools: ["degap", "tgsgapcloser"],
           },
           {
             chr: "Chr01",
@@ -57,7 +60,9 @@ test("renderManualRefinementCard renders compact single-select Gap rows, fixed T
 
   assert.match(html, /<span class="manual-ref-count-pill is-active" data-manual-ref-count-current>当前 Chr01 · 2<\/span>/);
   assert.match(html, /<span class="manual-ref-count-pill is-total" data-manual-ref-count-all>全项目 · 3<\/span>/);
-  assert.doesNotMatch(html, /type="checkbox"/);
+  assert.match(html, /type="checkbox"/);
+  assert.match(html, /value="tgsgapcloser"\s+checked/);
+  assert.doesNotMatch(html, /value="lrgapcloser"\s+checked/);
   assert.doesNotMatch(html, /manual-ref-seg-id/);
   assert.match(html, /data-app-tooltip="ctg_left_very_long_identifier_001 ↔ ctg_right_very_long_identifier_002"[\s\S]*?data-app-tooltip-overflow/);
   assert.match(html, /manual-ref-sr-only">Chr01 Gap ctg_left_very_long_identifier_001 ↔ ctg_right_very_long_identifier_002 \(gap-1\)/);
@@ -130,4 +135,31 @@ test("the queue defaults to expanded on restore but can be collapsed without hid
   assert.doesNotMatch(collapsed, /data-manual-ref-body/);
   assert.match(collapsed, /aria-expanded="false"/);
   assert.match(collapsed, /data-manual-ref-count-current>当前 Chr01 · 1</);
+});
+
+
+test("a Gap keeps checked tools through persistence, reload and export; the last tool cannot be cleared", () => {
+  const key = "Chr01\tgap\tg1";
+  const handlers = {};
+  const host = { addEventListener: (name, fn) => { handlers[name] = fn; } };
+  let state = { assembly: { degap: { manualRefinement: {
+    loci: [{ chr: "Chr01", kind: "gap", segmentId: "g1" }],
+  } } } };
+  const store = { getState: () => state, setState: (next) => { state = next; } };
+  bindManualRefinementCard(host, store);
+  const toggle = (value, checked) => {
+    const input = { value, checked, dataset: { manualRefLocusKey: key },
+      closest: (selector) => selector === "[data-manual-ref-tool-select]" ? input : null };
+    handlers.change({ target: input });
+    return input.checked;
+  };
+  const request = () => buildManualRefinementExportRequest(
+    JSON.parse(JSON.stringify(state.assembly.degapProjectState)).manualRefinement,
+  ).request.loci;
+  toggle("quartet", true);
+  assert.deepEqual(request(), [{ chr: "Chr01", kind: "gap", segment_id: "g1", tools: ["degap", "quartet"] }]);
+  toggle("degap", false);
+  assert.deepEqual(request()[0].tools, ["quartet"]);
+  assert.equal(toggle("quartet", false), true);
+  assert.deepEqual(request()[0].tools, ["quartet"]);
 });

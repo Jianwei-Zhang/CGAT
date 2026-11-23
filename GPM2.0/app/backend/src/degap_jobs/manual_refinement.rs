@@ -265,16 +265,20 @@ fn locate<'a>(rows: &'a [Value], req: &LocusRequest) -> Result<Vec<(&'static str
 }
 
 fn tools_for(req: &LocusRequest) -> Result<Vec<String>> {
-    let tool = match req.tools.as_slice() {
-        [] => "degap",
-        [tool] if TOOLS.contains(&tool.as_str()) => tool,
-        _ => bail!("select exactly one refinement tool for {}", req.segment_id),
-    };
-    if req.kind != LocusKind::Gap && tool != "degap" {
+    if req.tools.is_empty() {
+        return Ok(vec!["degap".to_owned()]);
+    }
+    // Serialize in admission priority order, independent of the UI click order.
+    let tools: Vec<String> = TOOLS.iter().copied()
+        .filter(|tool| req.tools.iter().any(|requested| requested == tool))
+        .map(str::to_owned).collect();
+    if tools.len() != req.tools.len() {
+        bail!("unknown or duplicate refinement tool for {}", req.segment_id);
+    }
+    if req.kind != LocusKind::Gap && tools.as_slice() != ["degap"] {
         bail!("telomere refinement requires DEGAP TelSeeker");
     }
-    // Keep the v1 manifest array for deployed readers, with one entry per new job.
-    Ok(vec![tool.to_owned()])
+    Ok(tools)
 }
 
 fn reads_for(

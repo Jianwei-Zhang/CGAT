@@ -5,7 +5,6 @@ import {
   filterManualRefinementLociByScope,
   listManualRefinementCandidatesForEntry,
   normalizeManualRefinementState,
-  normalizeManualRefinementTool,
 } from "./manual-refinement-state.js";
 
 const COPY = {
@@ -16,14 +15,14 @@ const COPY = {
     scopeCurrentPill: "当前 {chr} · {count}",
     scopeCurrentFallback: "当前染色体 · {count}",
     scopeAllPill: "全项目 · {count}",
-    empty: "暂未登记精修任务。右键上方 Final Path 中的 Gap 或两端 Contig，或从下方候选快速添加；每个 Gap 单选 1 个工具（默认 DEGAP）。",
+    empty: "暂未登记精修任务。右键上方 Final Path 中的 Gap 或两端 Contig，或从下方候选快速添加；每个 Gap 可选多个工具，默认只选 DEGAP。",
     quickAddTitle: "快速添加 ({chr})",
     noCandidates: "当前染色体暂无符合条件的 Gap（需两侧直连 Contig）或端粒端点。",
     addedTag: "已加入",
     kindGap: "Gap",
     kindTelLeft: "左端粒",
     kindTelRight: "右端粒",
-    toolGroupHint: "补洞工具（单选）",
+    toolGroupHint: "补洞工具（可多选）",
     telToolShort: "DEGAP TelSeeker",
     telToolFull: "固定使用 DEGAP TelSeeker (telseeker_ctg)",
     motifLabel: "Motif",
@@ -46,7 +45,7 @@ const COPY = {
     exportedTitle: "精修任务包已导出 · 等待 Server 运行",
     exportedScopeCurrent: "当前染色体 ({chr})",
     exportedScopeAll: "本项目全部已选",
-    exportedMeta: "批次 {batch} · {loci} 位点 / {tasks} 任务",
+    exportedMeta: "批次 {batch} · {loci} 位点 / {tasks} 次工具运行",
     serverCmdLabel: "Server 命令",
     copyCmd: "复制",
     serverCmdHint: "将 ZIP 传到对应 Server 工作区运行（或 ~/bin/refine.py，按需加 --hifi / --ont）；完成后在「项目页 → 精修」导入结果。",
@@ -59,14 +58,14 @@ const COPY = {
     scopeCurrentPill: "{chr} · {count}",
     scopeCurrentFallback: "Current chr · {count}",
     scopeAllPill: "Project · {count}",
-    empty: "No refinement tasks queued. Right-click a Gap or terminal contig in the Final Path above, or quick-add below; each Gap selects one tool (default: DEGAP).",
+    empty: "No refinement tasks queued. Right-click a Gap or terminal contig in the Final Path above, or quick-add below; each Gap can use multiple tools (default: DEGAP only).",
     quickAddTitle: "Quick add ({chr})",
     noCandidates: "No eligible Gap (requiring direct left/right contigs) or terminal telomere endpoint on this Final Path.",
     addedTag: "Queued",
     kindGap: "Gap",
     kindTelLeft: "Left Tel",
     kindTelRight: "Right Tel",
-    toolGroupHint: "Gap filler tool (single choice)",
+    toolGroupHint: "Gap filler tools (select one or more)",
     telToolShort: "DEGAP TelSeeker",
     telToolFull: "Fixed to DEGAP TelSeeker (telseeker_ctg)",
     motifLabel: "Motif",
@@ -89,7 +88,7 @@ const COPY = {
     exportedTitle: "Refinement archive exported · awaiting Server run",
     exportedScopeCurrent: "Current chr ({chr})",
     exportedScopeAll: "All queued in project",
-    exportedMeta: "Batch {batch} · {loci} loci / {tasks} tasks",
+    exportedMeta: "Batch {batch} · {loci} loci / {tasks} tool runs",
     serverCmdLabel: "Server command",
     copyCmd: "Copy",
     serverCmdHint: "Copy the ZIP to the matching Server workspace and run (or ~/bin/refine.py, optionally with --hifi / --ont); then import from Project → Refinement.",
@@ -107,11 +106,9 @@ function kindLabel(kind, copy) {
   return copy.kindGap;
 }
 
-function renderLocusRow(locus, index, { chrName, exporting, copy, escapeAttr, escapeHtml }) {
+function renderLocusRow(locus, { chrName, exporting, copy, escapeAttr, escapeHtml }) {
   const key = locus.locusKey;
   const isCurrentChr = Boolean(chrName && locus.chr === chrName);
-  const selectedTool = normalizeManualRefinementTool(locus.tool ?? locus.tools, locus.kind);
-  const radioName = `manual-ref-tool-${index}`;
   const kindText = kindLabel(locus.kind, copy);
   const displayTarget = locus.label || locus.segmentId;
   const srTargetSummary = locus.label && locus.label !== locus.segmentId
@@ -122,17 +119,16 @@ function renderLocusRow(locus, index, { chrName, exporting, copy, escapeAttr, es
   const controlsMarkup = locus.kind === "gap"
     ? `<div
         class="manual-ref-tool-group"
-        role="radiogroup"
+        role="group"
         aria-label="${escapeAttr(`${locus.chr} ${displayTarget} ${copy.toolGroupHint}`)}"
       >
         ${MANUAL_REFINEMENT_GAP_TOOLS.map((tool) => {
-          const checked = selectedTool === tool;
+          const checked = locus.tools.includes(tool);
           const label = MANUAL_REFINEMENT_TOOL_LABELS[tool] || tool;
           return `<label class="manual-ref-tool-option${checked ? " is-selected" : ""}">
             <input
-              type="radio"
-              class="manual-ref-tool-radio"
-              name="${escapeAttr(radioName)}"
+              type="checkbox"
+              class="manual-ref-tool-checkbox"
               data-manual-ref-tool-select
               data-manual-ref-locus-key="${escapeAttr(key)}"
               value="${escapeAttr(tool)}"
@@ -314,7 +310,7 @@ export function renderManualRefinementCard(
     ? `<div class="manual-ref-body" data-manual-ref-body>
         ${quickAddSection}
         ${state.loci.length
-          ? `<div class="manual-ref-loci-list" role="list">${state.loci.map((locus, idx) => renderLocusRow(locus, idx, { chrName, exporting: state.exporting, copy, escapeAttr, escapeHtml })).join("")}</div>`
+          ? `<div class="manual-ref-loci-list" role="list">${state.loci.map((locus) => renderLocusRow(locus, { chrName, exporting: state.exporting, copy, escapeAttr, escapeHtml })).join("")}</div>`
           : `<p class="muted manual-ref-empty">${escapeHtml(copy.empty)}</p>`}
         ${readsSection}
         ${state.error ? `<p class="error-text manual-ref-feedback is-error" role="alert">${escapeHtml(state.error)}</p>` : ""}

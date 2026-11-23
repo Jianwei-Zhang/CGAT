@@ -10,7 +10,7 @@ import {
   buildManualRefinementServerCommand,
   extractFileName,
   normalizeManualRefinementState,
-  normalizeManualRefinementTool,
+  normalizeManualRefinementTools,
 } from "./assembly/manual-refinement-state.js";
 import {
   buildTimestampedExportBaseName,
@@ -35,7 +35,7 @@ const COPY = {
     confirm: "确认导出",
     exporting: "正在导出...",
     successTitle: "精修任务包已导出，等待 Server 运行",
-    batchMeta: "批次 {batch} · {loci} 位点 / {tasks} 任务",
+    batchMeta: "批次 {batch} · {loci} 位点 / {tasks} 次工具运行",
     serverCmdLabel: "Server 命令",
     copyCmd: "复制命令",
     copiedCmd: "已复制 Server 命令。",
@@ -60,7 +60,7 @@ const COPY = {
     confirm: "Confirm Export",
     exporting: "Exporting...",
     successTitle: "Refinement archive exported · awaiting Server run",
-    batchMeta: "Batch {batch} · {loci} loci / {tasks} tasks",
+    batchMeta: "Batch {batch} · {loci} loci / {tasks} tool runs",
     serverCmdLabel: "Server command",
     copyCmd: "Copy",
     copiedCmd: "Copied Server command.",
@@ -156,7 +156,7 @@ export function renderManualRefinementExportPreviewModal(modal, state) {
               ${group.loci.map((locus) => {
                 const targetText = locus.label || locus.segmentId;
                 const toolText = locus.kind === "gap"
-                  ? (MANUAL_REFINEMENT_TOOL_LABELS[normalizeManualRefinementTool(locus.tool ?? locus.tools, "gap")] || "DEGAP")
+                  ? normalizeManualRefinementTools(locus.tools ?? locus.tool).map((tool) => MANUAL_REFINEMENT_TOOL_LABELS[tool]).join(", ")
                   : copy.telFixedTool;
                 return `<li class="manual-ref-preview-row">
                   <span class="manual-ref-kind-badge is-${escapeAttr(locus.kind)}">${escapeHtml(kindLabel(locus.kind, copy))}</span>
@@ -362,7 +362,7 @@ export async function executeFrozenManualRefinementExport({
     scope: "all",
     chrName: "",
     lociCount: Number(summary?.loci ?? modal.request.loci.length),
-    tasksCount: Number(summary?.tasks ?? modal.request.loci.length),
+    tasksCount: Number(summary?.tasks ?? modal.request.loci.reduce((n, locus) => n + locus.tools.length, 0)),
     readsMode: modal.readsMode === "override" ? "override" : "inherit",
     loci: modal.loci,
     status: "exported_awaiting_server",

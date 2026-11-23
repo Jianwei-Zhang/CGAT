@@ -596,7 +596,7 @@
   margin-left: auto;
 }
 
-/* Segmented single-select radio control for Gap tools. */
+/* Segmented multi-select control for Gap tools. */
 .manual-ref-tool-group {
   display: inline-flex;
   flex-wrap: wrap;
@@ -638,17 +638,17 @@
   font-weight: 600;
 }
 
-.manual-ref-tool-option:has(.manual-ref-tool-radio:focus-visible) {
+.manual-ref-tool-option:has(.manual-ref-tool-checkbox:focus-visible) {
   outline: 2px solid var(--focus-ring, #4f82b5);
   outline-offset: 1px;
 }
 
-.manual-ref-tool-option:has(.manual-ref-tool-radio:disabled) {
+.manual-ref-tool-option:has(.manual-ref-tool-checkbox:disabled) {
   opacity: 0.6;
   cursor: default;
 }
 
-.manual-ref-tool-radio {
+.manual-ref-tool-checkbox {
   position: absolute;
   opacity: 0;
   width: 1px;

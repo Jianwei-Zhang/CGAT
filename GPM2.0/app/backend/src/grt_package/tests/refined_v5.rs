@@ -171,7 +171,7 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
         VALUES (?1, ?2, '1') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json",
         rusqlite::params![project.project_id, serde_json::to_string(&path).unwrap()]).unwrap();
     let request = serde_json::from_value(serde_json::json!({"loci":[{
-        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet"]
+        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","degap"]
     }],"hifi_reads":[],"ont_reads":[]})).unwrap();
     let archive = temp.path().join("-project's refinement.zip");
     let result = crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).unwrap();
@@ -181,12 +181,13 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     let mut readme = String::new();
     zipped.by_name("README.txt").unwrap().read_to_string(&mut readme).unwrap();
     assert!(readme.contains("python .lib/tools/refine.py './-project'\"'\"'s refinement.zip'\n"));
-    assert_eq!(result.tasks, 1);
+    assert_eq!(result.loci, 1);
+    assert_eq!(result.tasks, 2);
     assert_eq!(result.batch_sha256, format!("{:x}", <sha2::Sha256 as sha2::Digest>::digest(&bytes)));
     let value: Value = serde_json::from_slice(&bytes).unwrap();
     let locus = &value["loci"][0];
     assert_eq!(locus["gap_bp"], 117);
-    assert_eq!(locus["tools"], serde_json::json!(["quartet"]));
+    assert_eq!(locus["tools"], serde_json::json!(["degap", "quartet"]));
     assert_eq!(value["reads"]["hifi"], serde_json::json!([]));
     let member = &locus["seed_plans"]["seqleft"]["members"][0];
     assert!(member["fasta_sha256"].is_string() || member["interval_sha256"].is_string());
@@ -198,9 +199,9 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     assert_eq!(ledger["manifest"], value);
     assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &archive, &request).is_err());
     let rejected_request = serde_json::from_value(serde_json::json!({"loci":[{
-        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","degap"]
+        "chr":chr,"kind":"gap","segment_id":gap,"tools":["quartet","quartet"]
     }]})).unwrap();
-    let rejected = temp.path().join("multiple-tools.zip");
+    let rejected = temp.path().join("duplicate-tools.zip");
     assert!(crate::degap_jobs::export_manual_refinement(&root, project.project_id, &rejected, &rejected_request).is_err());
     assert!(!rejected.exists());
     assert_eq!(fs::read_dir(receipts).unwrap().count(), 2);
@@ -212,8 +213,8 @@ fn refined_manual_export_uses_saved_locus_and_registers_project_owner() {
     assert_eq!(rows.len(), 2);
     let row = rows.iter().find(|row| row["batchSha256"] == exported_batch).unwrap();
     assert_eq!(row["outputFileName"], "-project's refinement.zip");
-    assert_eq!(row["loci"][0]["tools"], serde_json::json!(["quartet"]));
-    assert_eq!(row["tasksCount"], 1);
+    assert_eq!(row["loci"][0]["tools"], serde_json::json!(["degap", "quartet"]));
+    assert_eq!(row["tasksCount"], 2);
     assert!(!row.to_string().contains("seed_plans"));
     assert!(!row.to_string().contains("reads"));
     assert!(crate::degap_jobs::list_manual_refinement_exports(&root, project.project_id + 999).is_err());
@@ -545,17 +546,19 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     let gap = entry["segments"].as_array().unwrap().iter().find(|r| r["kind"] == "gap").unwrap();
     let target = gap["segment_id"].as_str().unwrap();
     let original_size = gap["length"].as_u64().unwrap();
-    // A second edited path with its own chromosome key exercises the actual
+    // Additional edited paths with their own chromosome keys exercise the actual
     // multi-chromosome manifest, without enlarging the scientific fixture.
     let other = "controlled-other-chromosome";
+    let unfilled = "controlled-no-closure";
+    let partial_then_closed = "controlled-partial-and-closed";
     let conn = crate::db::open_workspace_db(&outcome.project_db_path)?;
-    let overlay = serde_json::to_string(&BTreeMap::from([(other, entry)]))?;
+    let overlay = serde_json::to_string(&BTreeMap::from([(other, entry), (unfilled, entry), (partial_then_closed, entry)]))?;
     conn.execute(
         "INSERT INTO project_assembly_view_state(project_id, final_path_by_chr_json, updated_at) VALUES (?1,?2,'before')",
         rusqlite::params![pid,overlay],
     )?;
     let request = |chrs: &[&str]| serde_json::from_value(serde_json::json!({"loci": chrs.iter().map(|chr| {
-        serde_json::json!({"chr":chr,"segment_id":target,"kind":"gap"})
+        serde_json::json!({"chr":chr,"segment_id":target,"kind":"gap","tools":["quartet","degap"]})
     }).collect::<Vec<_>>() }));
     let load_manifest = |path: &Path| -> Result<Value> {
         let mut zip = ZipArchive::new(fs::File::open(path)?)?;
@@ -568,12 +571,12 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
     let single_summary = export_manual_refinement(&root,pid,&single,&serde_json::from_value(serde_json::json!({
         "loci":[{"chr":chr,"segment_id":target,"kind":"gap","tools":["quartet"]}]
     }))?)?;
-    let all_summary = export_manual_refinement(&root,pid,&all,&request(&[chr,other])?)?;
+    let all_summary = export_manual_refinement(&root,pid,&all,&request(&[chr,other,unfilled,partial_then_closed])?)?;
     let manifest = load_manifest(&all)?;
     assert_eq!(single_summary.loci,1);
     assert_eq!(load_manifest(&single)?["loci"][0]["chr"], chr.as_str());
-    assert_eq!(all_summary.loci,2);
-    assert_eq!(all_summary.tasks,2);
+    assert_eq!(all_summary.loci,4);
+    assert_eq!(all_summary.tasks,8);
     assert_eq!(manifest["loci"][1]["chr"],other);
     assert_ne!(manifest["loci"][0]["id"],manifest["loci"][1]["id"]);
 
@@ -583,30 +586,42 @@ fn manual_refinement_export_supports_both_scopes_and_roundtrips_sequence() -> Re
         let mut paths = Vec::new();
         for locus in manifest["loci"].as_array().unwrap() {
             let id = locus["id"].as_str().unwrap();
-            let tool = locus["tools"][0].as_str().unwrap();
-            let path = format!("patches/{id}.{tool}.seq");
-            rows.push(serde_json::json!({"locus_id":id,"tool":tool,"status":status,"reason":null,
-                "attempt_id":format!("{tool}-controlled"),"version":"2.0","revision":"synthetic-fixture",
-                "patch":{"path":path,"operation":"replace_gap","original_length":original_size,
-                  "original_sha256":sha(&vec![b'N';original_size as usize]), "length":payload.len(),"sha256":sha(payload)}}));
-            paths.push(path);
+            for tool in locus["tools"].as_array().unwrap().iter().rev() {
+                let tool = tool.as_str().unwrap();
+                if locus["chr"] == other && tool == "degap" {
+                    rows.push(serde_json::json!({"locus_id":id,"tool":tool,"status":"failed","reason":"controlled_failure","patch":null}));
+                    continue;
+                }
+                let (status, payload) = if locus["chr"] == unfilled || (locus["chr"] == partial_then_closed && tool == "degap") {
+                    ("partial", b"ANT".as_slice())
+                } else { (status, payload) };
+                let path = format!("patches/{id}.{tool}.seq");
+                rows.push(serde_json::json!({"locus_id":id,"tool":tool,"status":status,"reason":null,
+                    "attempt_id":format!("{tool}-controlled"),"version":"2.0","revision":"synthetic-fixture",
+                    "patch":{"path":path,"operation":"replace_gap","original_length":original_size,
+                      "original_sha256":sha(&vec![b'N';original_size as usize]), "length":payload.len(),"sha256":sha(payload)}}));
+                paths.push((path, payload.to_vec()));
+            }
         }
         let mut zip = ZipWriter::new(fs::File::create(path)?);
         zip.start_file("refinement_results.json", FileOptions::default())?;
         zip.write_all(&serde_json::to_vec(&serde_json::json!({"schema":"cgat.app-refinement-results.v1",
             "batch_sha256":batch,"results":rows}))?)?;
-        for path in paths { zip.start_file(path, FileOptions::default())?; zip.write_all(payload)?; }
+        for (path, bytes) in paths { zip.start_file(path, FileOptions::default())?; zip.write_all(&bytes)?; }
         zip.finish()?;
         Ok(())
     };
-    assert!(manifest["loci"].as_array().unwrap().iter().all(|locus| locus["tools"] == serde_json::json!(["degap"])));
+    assert!(manifest["loci"].as_array().unwrap().iter().all(|locus| locus["tools"] == serde_json::json!(["degap","quartet"])));
     let result_zip = temp.path().join("result.zip");
     write_batch(&result_zip, &all_summary.batch_sha256, &manifest, b"AGRY", "closed")?;
 
     assert!(import_manual_refinement_results(&root,pid+1,&result_zip).is_err());
     let result = import_manual_refinement_results(&root,pid,&result_zip)?;
-    assert_eq!(result.applied, 2);
-    assert!(result.loci.iter().all(|row| row["appliedTool"] == "degap"));
+    assert_eq!(result.applied, 3);
+    assert_eq!(result.loci[0]["appliedTool"], "degap"); // Both closed; ignore return order.
+    assert_eq!(result.loci[1]["appliedTool"], "quartet"); // DEGAP failed only at this locus.
+    assert_eq!(result.loci[2]["disposition"], "no_eligible_patch");
+    assert_eq!(result.loci[3]["appliedTool"], "quartet"); // Closed beats higher-ranked partial.
     let duplicate = import_manual_refinement_results(&root,pid,&result_zip)?;
     assert!(duplicate.duplicate);
     assert_eq!(duplicate.applied,0);

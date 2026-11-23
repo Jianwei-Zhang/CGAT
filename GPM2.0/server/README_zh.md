@@ -464,4 +464,4 @@ python .lib/tools/refine.py refinement_tasks.zip --prepare-only
 
 新项目公开运行时目录为 `.lib/`，旧项目 `.prepare_lib/` 与旧版编号工作区的 `.runtime/prepared/` 仅作为兼容读取/迁移路径。`~/bin/refine.py` 也可作为全局入口，但严格遵循当前项目运行时优先（先 `.lib/`，再兼容旧 `.prepare_lib/` 或 `.runtime/prepared/`），不混用不同项目的运行时版本。
 
-手动任务会写入 `08_refinement_jobs/02_manual/<batch>/03_report`（`summary.json`、`report.html`）与 `04_delivery`（`refinement_results.zip`），并同步更新总报告 `06_report/report.html`。新 Gap 任务每个位点单选一个工具（默认 `degap`，也可单选 `lrgapcloser`、`tgsgapcloser` 或 `quartet`，旧多工具任务包继续兼容读取），左/右端粒任务固定使用 `DEGAP TelSeeker`。可分享 HTML 报告不公开服务器私有 reads 路径（保留测序类型与 SHA-256 摘要），并明确区分「等待导回 App」与「无可导回补丁」。在通过项目页「精修」卡片将 `refinement_results.zip` 导回原 App 项目前，手动结果仅属于待导回产物，不得写入或冒充自动精修的 `05_final/`。
+手动任务会写入 `08_refinement_jobs/02_manual/<batch>/03_report`（`summary.json`、`report.html`）与 `04_delivery`（`refinement_results.zip`），并同步更新总报告 `06_report/report.html`。每个 Gap 任务可多选工具，默认仅选 `degap`；多个工具均闭合时按 DEGAP、LR_Gapcloser、TGS-GapCloser、quarTeT 的顺序采用一个，左/右端粒任务固定使用 `DEGAP TelSeeker`。可分享 HTML 报告不公开服务器私有 reads 路径（保留测序类型与 SHA-256 摘要），并明确区分「等待导回 App」与「无可导回补丁」。在通过项目页「精修」卡片将 `refinement_results.zip` 导回原 App 项目前，手动结果仅属于待导回产物，不得写入或冒充自动精修的 `05_final/`。

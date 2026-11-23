@@ -56,7 +56,7 @@ test("prepareFrozenManualRefinementAllPreview reads scoped DB state and ignores 
             manualRefinement: {
               readsMode: "inherit",
               loci: [
-                { chr: "Chr02", kind: "gap", segmentId: "gap-2", label: "ctg3 ↔ ctg4", tool: "quartet" },
+                { chr: "Chr02", kind: "gap", segmentId: "gap-2", label: "ctg3 ↔ ctg4", tool: "quartet", tools: ["quartet", "tgsgapcloser"] },
                 { chr: "Chr01", kind: "gap", segmentId: "gap-1", label: "ctg1 ↔ ctg2", tool: "degap" },
                 { chr: "Chr01", kind: "tel_left", segmentId: "seg-1", label: "ctg1", motif: "TTTAGGG" },
               ],
@@ -74,7 +74,7 @@ test("prepareFrozenManualRefinementAllPreview reads scoped DB state and ignores 
     loci: [
       { chr: "Chr01", kind: "tel_left", segment_id: "seg-1", tools: ["degap"], motif: "TTTAGGG" },
       { chr: "Chr01", kind: "gap", segment_id: "gap-1", tools: ["degap"] },
-      { chr: "Chr02", kind: "gap", segment_id: "gap-2", tools: ["quartet"] },
+      { chr: "Chr02", kind: "gap", segment_id: "gap-2", tools: ["tgsgapcloser", "quartet"] },
     ],
   });
 
@@ -85,7 +85,7 @@ test("prepareFrozenManualRefinementAllPreview reads scoped DB state and ignores 
   assert.match(html, /data-refinement-export-preview-chr="Chr02"/);
   assert.match(html, /DEGAP TelSeeker/);
   assert.match(html, /Motif: TTTAGGG/);
-  assert.match(html, /quarTeT/);
+  assert.match(html, /TGS-GapCloser, quarTeT/);
   assert.match(html, /data-refinement-export-preview-confirm="true"/);
   assert.doesNotMatch(html, /STALE/);
 });
