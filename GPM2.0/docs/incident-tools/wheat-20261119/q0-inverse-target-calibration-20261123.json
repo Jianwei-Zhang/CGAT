@@ -1,0 +1,23 @@
+{
+  "calibration": {
+    "artificial_probe_sources": 10,
+    "limits": "Predeclared ordinal sample from frozen contexts. Probe shoulders deliberately taken from a few real target windows, not the global first request; not mapper savings.",
+    "outcomes": {
+      "target_hit": 5,
+      "target_miss": 29
+    },
+    "seconds": {
+      "inverse_build": 0.08727182447910309,
+      "inverse_lookup": 0.0015216395258903503,
+      "ordinary_target_enumeration": 33.43015521764755,
+      "query_regions": 1.159282647073269
+    },
+    "verdict_sha256": "15639e68d3bb59184c00ce7ab28ef9299efb82e481a6635946095cbc2f442c08",
+    "windows": 34
+  },
+  "index_receipt_sha256": "69b80ca1859b83018376434f803707f396f5c4b304cb10c40e2ab81bd69f9e68",
+  "mapper_calls": 0,
+  "mode": "calibrate",
+  "schema": "wheat_inverse_exact_target_test_v1",
+  "snapshot": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d"
+}
