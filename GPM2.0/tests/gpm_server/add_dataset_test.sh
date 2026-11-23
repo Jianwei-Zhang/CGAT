@@ -204,12 +204,12 @@ grep -F -- 'A-Z, a-z, 0-9, dot, underscore, and hyphen are replaced with _' <<<"
 
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" > "${TMP_DIR}/initial-run.out"
 
-test -f "${output_root}/07_delivery/00_lgz/gpm_server.zip"
-test -f "${output_root}/07_delivery/00_lgz/gpm_server.light.zip"
-assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.zip" "--- gpm_server/data/datasets/ds1.fa"
-assert_file_not_contains "${output_root}/07_delivery/00_lgz/gpm_server.light.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
-assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.light.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
-python3 - "${output_root}/07_delivery/00_lgz/gpm_server.zip" "${output_root}/07_delivery/00_lgz/gpm_server.light.zip" <<'PY'
+test -f "${output_root}/07_delivery/gpm_server.full.zip"
+test -f "${output_root}/07_delivery/gpm_server.light.zip"
+assert_file_contains "${output_root}/07_delivery/gpm_server.full.zip" "--- gpm_server/data/datasets/ds1.fa"
+assert_file_not_contains "${output_root}/07_delivery/gpm_server.light.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
+assert_file_contains "${output_root}/07_delivery/gpm_server.light.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
+python3 - "${output_root}/07_delivery/gpm_server.full.zip" "${output_root}/07_delivery/gpm_server.light.zip" <<'PY'
 import sys
 from zipfile import ZipFile
 
@@ -225,7 +225,7 @@ for archive_path in sys.argv[1:]:
 PY
 test ! -e "${TMP_DIR}/gpm_server.report.zip"
 test ! -e "${TMP_DIR}/gpm_server.report.html"
-grep -Fq 'LGZ baseline App packages (not refined):' "${TMP_DIR}/initial-run.out"
+grep -Fq 'Project App packages (LGZ + all published automatic tools):' "${TMP_DIR}/initial-run.out"
 grep -Fq 'Full package (FASTA + report):' "${output_root}/.runtime/logs/run_all.log"
 grep -Fq 'Light package (report included, FASTA omitted):' "${output_root}/.runtime/logs/run_all.log"
 
@@ -254,7 +254,10 @@ mv "${output_root}/.runtime/metadata/prepare_options.tsv.tmp" "${output_root}/.r
 # retroactively enlist the dataset in its locked recipe and donor freeze.
 frozen_before="$(sha256sum "${output_root}/.runtime/metadata/grt_q0_freeze.json" \
   "${output_root}/.runtime/metadata/grt_recipe.tsv" "${output_root}/03_lgz/01_q0/q0.fa" "${output_root}/03_lgz/04_step3/q3.fa")"
+project_pair=("${output_root}/07_delivery/gpm_server.full.zip" "${output_root}/07_delivery/gpm_server.light.zip")
+published_before="$(sha256sum "${project_pair[@]}")"
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/add_dataset.sh" --ds "$ds4" >/dev/null
+[[ "$(sha256sum "${project_pair[@]}")" == "$published_before" ]]
 [[ "$frozen_before" == "$(sha256sum "${output_root}/.runtime/metadata/grt_q0_freeze.json" \
   "${output_root}/.runtime/metadata/grt_recipe.tsv" "${output_root}/03_lgz/01_q0/q0.fa" "${output_root}/03_lgz/04_step3/q3.fa")" ]]
 
@@ -307,9 +310,20 @@ if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/add_dataset.s
 fi
 assert_file_contains "${TMP_DIR}/duplicate.out" "Duplicate dataset name: ds4"
 
-PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/package_full_zip.sh" >/dev/null
-test -f "${output_root}/07_delivery/00_lgz/gpm_server.zip"
-assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.zip" "metadata/datasets.tsv"
-assert_file_contains "${output_root}/07_delivery/00_lgz/gpm_server.zip" $'ds4\tds4\t'
+# Display datasets travel in add_ds4.zip. One packaging command must not
+# replace the committed pair with a different baseline.
+if PATH="${FAKE_BIN}:$PATH" bash "${output_root}/.runtime/commands/package_full_zip.sh" >"${TMP_DIR}/repack.log" 2>&1; then
+  echo "unexpected project republish after a display-only dataset addition" >&2
+  exit 1
+fi
+assert_file_contains "${TMP_DIR}/repack.log" 'LGZ delivery payload changed'
+[[ "$(sha256sum "${project_pair[@]}")" == "$published_before" ]]
+python3 - "${project_pair[@]}" <<'PYPAIR'
+import csv, io, sys, zipfile
+for path in sys.argv[1:]:
+    with zipfile.ZipFile(path) as archive:
+        rows = csv.DictReader(io.StringIO(archive.read('gpm_server/metadata/datasets.tsv').decode()), delimiter='\t')
+        assert [r['dataset_name'] for r in rows] == ['ds1']
+PYPAIR
 
 echo "gpm_server_add_dataset_test.sh: ok"

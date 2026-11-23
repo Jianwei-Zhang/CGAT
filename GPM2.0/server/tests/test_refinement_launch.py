@@ -219,7 +219,9 @@ time.sleep(60)
         code = "import os,sys;sys.path.insert(0,sys.argv[1]);from post_lgz_refinement import run_child_group;raise SystemExit(run_child_group([sys.executable,'-B','-c',sys.argv[2]],environment=dict(os.environ)))"
         process = subprocess.Popen([sys.executable, "-B", "-c", code, str(TOOLS), worker], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            deadline = time.monotonic() + 10
+            # Startup includes importing the installed runtime (slow on shared mounts).
+            # The separate SIGTERM completion and descendant-death deadlines remain strict.
+            deadline = time.monotonic() + 60
             while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
                 time.sleep(.02)
             if not ready.exists():
@@ -258,7 +260,9 @@ time.sleep(60)
         self.layout.path(".run_all/plan.tsv").write_text("unit_id\tcommand_relpath\tdetail_log_relpath\nrefinement\t.runtime/commands/cancel_probe.sh\t.runtime/logs/run_all.log\nlater\t.runtime/commands/later.sh\t.runtime/logs/run_all.log\n")
         process = subprocess.Popen([sys.executable, "-B", str(TOOLS / "run_all_runner.py"), "--server-dir", str(self.root), "--color", "never"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            deadline = time.monotonic() + 10
+            # Startup includes importing the installed runtime (slow on shared mounts).
+            # The separate SIGTERM completion and descendant-death deadlines remain strict.
+            deadline = time.monotonic() + 60
             while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
                 time.sleep(.02)
             if not ready.exists():

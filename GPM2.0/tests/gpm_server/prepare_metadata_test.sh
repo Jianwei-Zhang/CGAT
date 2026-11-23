@@ -631,7 +631,9 @@ PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   -t 7 -o "${TMP_DIR}/default-tar-output" >"${TMP_DIR}/default-tar.stdout"
 assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" archive_format tar.gz
 assert_prepare_option "${TMP_DIR}/default-tar-output/.runtime/metadata/prepare_options.tsv" threads 7
-grep -F "${TMP_DIR}/default-tar-output/07_delivery/00_lgz/default-tar-output.tar.gz" "${TMP_DIR}/default-tar.stdout" >/dev/null
+for mode in full light; do
+  grep -F "${TMP_DIR}/default-tar-output/07_delivery/default-tar-output.${mode}.tar.gz" "${TMP_DIR}/default-tar.stdout" >/dev/null
+done
 if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format unknown >/dev/null 2>&1; then
   echo "expected invalid archive format to fail" >&2
   exit 1

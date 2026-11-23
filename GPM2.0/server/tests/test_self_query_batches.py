@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json,sys,tempfile,unittest
+import json,sys,tempfile,time,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"validation"))
 from self_query_batches import plan_batches,validate_raw,publish,valid,Admission
@@ -50,13 +50,18 @@ class HotspotFixtureTests(unittest.TestCase):
             self.assertEqual(result['status'], 'TIMEOUT')
             pid = int((root/'run/raw.paf').read_text().strip())
             status = Path(f'/proc/{pid}/status')
-            try:
-                lines = status.read_text().splitlines()
-            except FileNotFoundError:
-                lines = []
-            if lines:
-                state = next(x for x in lines if x.startswith('State:'))
-                self.assertIn('Z', state)  # dead, waiting for its init reaper
+            # SIGKILL is delivered to the group, but the kernel can still report
+            # a dying descendant as runnable just after its group leader was reaped.
+            deadline = time.monotonic() + 2
+            while True:
+                try:
+                    state = next(line for line in status.read_text().splitlines() if line.startswith('State:'))
+                except FileNotFoundError:
+                    break
+                if state.split()[1] == 'Z':
+                    break
+                self.assertLess(time.monotonic(), deadline, f'descendant {pid} survived: {state}')
+                time.sleep(.02)
 
     def test_comparison_uses_real_summary_keys(self):
         from self_hotspot_fixture import comparison
