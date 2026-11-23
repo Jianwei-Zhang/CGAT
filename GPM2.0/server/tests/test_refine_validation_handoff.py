@@ -121,6 +121,26 @@ with patch("lgz_contract.validate_contract", wraps=validate_contract) as check, 
             self.assertEqual(channel.exists(), valid)
             self.assertEqual(can_reuse_validation(channel, self.root, run_id), valid)
 
+    def test_initial_contract_and_refine_baseline_share_only_unchanged_content_reads(self):
+        import run_orchestration
+        from lgz_final import digest as baseline_digest
+        final_path = json.loads(self.layout.path("metadata/grt_final_path.json").read_text())
+        fasta = self.layout.path(final_path["q4_relpath"])
+        with mock.patch.object(run_orchestration, "_sha256_read", wraps=run_orchestration._sha256_read) as read:
+            summary = validate_contract(self.root)
+            self.assertEqual(baseline_digest(fasta), summary["q4_sha256"])
+            def scans():
+                return sum(call.args[0][0] == str(fasta.resolve()) for call in read.call_args_list)
+            self.assertEqual(scans(), 1)
+            # Same size and mtime, different inode/content: old value cannot win.
+            st = fasta.stat()
+            other = fasta.with_suffix(".replacement")
+            other.write_bytes(fasta.read_bytes().replace(b"A", b"T"))
+            os.utime(other, ns=(st.st_atime_ns, st.st_mtime_ns))
+            os.replace(other, fasta)
+            self.assertNotEqual(baseline_digest(fasta), summary["q4_sha256"])
+            self.assertEqual(scans(), 2)
+
     def test_missing_malformed_or_stale_inputs_fall_back(self):
         self.assertFalse(can_reuse_validation(self.channel, self.root, "owner"))
         self.publish()

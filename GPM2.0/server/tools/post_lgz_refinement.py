@@ -75,9 +75,15 @@ def run(root, lock, request):
         raise ValueError("post-LGZ refinement requires explicit legacy workspace migration")
     # Existing scientific proof is checked, not rewritten to the new engine.
     channel = refinement_channel() if isinstance(lock, ParentLock) and lock.acquired else None
-    if not channel or not can_reuse_validation(channel, root, request["run_id"]):
+    started = time.monotonic()
+    reused = bool(channel and can_reuse_validation(channel, root, request["run_id"]))
+    if not reused:
         validate_contract(root)
+    validated = time.monotonic()
+    print(f"[REFINE CHECK] LGZ evidence: {'same-run reuse' if reused else 'full validation'} "
+          f"in {validated - started:.2f}s", flush=True)
     publish_baseline(root, lock)
+    print(f"[REFINE CHECK] LGZ baseline ready in {time.monotonic() - validated:.2f}s", flush=True)
     options = {}
     with layout.path("metadata/prepare_options.tsv").open(newline="", encoding="utf-8") as stream:
         options = {row["key"]: row["value"] for row in csv.DictReader(stream, delimiter="\t")}
