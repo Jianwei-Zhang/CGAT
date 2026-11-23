@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 10;
+pub const CURRENT_SCHEMA_VERSION: i64 = 11;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -685,7 +685,16 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
         ",
     )
     .context("failed to create current workspace sqlite schema")?;
-    create_refinement_result_tables(conn)
+    create_refinement_result_tables(conn)?;
+    create_auto_refinement_effects(conn)
+}
+
+fn create_auto_refinement_effects(conn: &Connection) -> Result<()> {
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS grt_auto_refinement_effect (
+        package_id INTEGER NOT NULL REFERENCES grt_package(id) ON DELETE CASCADE,
+        tool TEXT NOT NULL, effect_json TEXT NOT NULL, PRIMARY KEY(package_id, tool)
+    );")?;
+    Ok(())
 }
 
 fn create_refinement_result_tables(conn: &Connection) -> Result<()> {

@@ -276,7 +276,7 @@ pub(super) fn validate_refined_delivery<C>(
     projected: &Value,
     full: bool,
     cancel: &mut C,
-) -> Result<RefinementReadInputs>
+) -> Result<(RefinementReadInputs, Option<AutoRefinementEffect>)>
 where
     C: FnMut() -> bool,
 {
@@ -491,5 +491,64 @@ where
             "accepted refined FASTA",
         )?;
     }
-    Ok(RefinementReadInputs::from_recipe(&provenance["execution"]["recipe"]))
+    let effect = validated_effect(&provenance, &server)?;
+    Ok((RefinementReadInputs::from_recipe(&provenance["execution"]["recipe"]), effect))
+}
+
+
+fn validated_effect(proof: &Value, path: &Value) -> Result<Option<AutoRefinementEffect>> {
+    // A pre-summary delivery remains usable; do not invent zeroes for it.
+    if proof.get("gap_outcomes").is_none() && proof.get("counts").is_none() {
+        return Ok(None);
+    }
+    let original = path["original_gaps"].as_array().context("missing original gaps for refinement outcome")?;
+    let mut pending: HashSet<&str> = original.iter().map(|r| string(r, "gap_id")).collect::<Result<_>>()?;
+    if pending.len() != original.len() {
+        return fail("duplicate original gap in outcome summary");
+    }
+    let kinds = ["closed", "partial", "unfilled", "rejected"];
+    let mut n = [0usize; 4];
+    for row in proof["gap_outcomes"].as_array().context("missing per-gap outcome evidence")? {
+        if !pending.remove(string(row, "gap_id")?) {
+            return fail("unknown or repeated gap outcome");
+        }
+        let status = string(row, "status")?;
+        let index = kinds.iter().position(|kind| *kind == status).context("unknown gap outcome")?;
+        n[index] += 1;
+    }
+    let edits = path["edits"].as_array().context("missing automatic edits")?.len();
+    if !pending.is_empty()
+        || proof["accepted_edit_count"].as_u64() != Some(edits as u64)
+        || proof["original_gap_count"].as_u64() != Some(original.len() as u64)
+        || kinds.iter().zip(n).any(|(k, count)| proof["counts"][*k].as_u64() != Some(count as u64))
+    {
+        return fail("refinement outcome totals disagree with the original gaps or accepted edits");
+    }
+    Ok(Some(AutoRefinementEffect {
+        tool: string(proof, "tool")?.into(), run_id: string(proof, "run_id")?.into(),
+        original_gaps: original.len(), accepted_edits: edits,
+        closed: n[0], partial: n[1], unfilled: n[2], rejected: n[3],
+    }))
+}
+
+#[cfg(test)]
+mod effect_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn gap_results_require_distinct_originals_and_matching_totals() {
+        let path = json!({"original_gaps":[{"gap_id":"A"},{"gap_id":"B"}],"edits":[]});
+        let mut proof = json!({"tool":"degap","run_id":"run","accepted_edit_count":0,"original_gap_count":2,
+            "gap_outcomes":[{"gap_id":"A","status":"unfilled"},{"gap_id":"B","status":"rejected"}],
+            "counts":{"closed":0,"partial":0,"unfilled":1,"rejected":1}});
+        let effect = validated_effect(&proof, &path).unwrap().unwrap();
+        assert_eq!((effect.accepted_edits, effect.rejected, effect.unfilled), (0, 1, 1));
+        proof["counts"]["closed"] = json!(1);
+        assert!(validated_effect(&proof, &path).is_err());
+        proof["counts"]["closed"] = json!(0);
+        proof["gap_outcomes"][1]["gap_id"] = json!("A");
+        assert!(validated_effect(&proof, &path).is_err());
+        assert_eq!(validated_effect(&json!({}), &path).unwrap(), None);
+    }
 }

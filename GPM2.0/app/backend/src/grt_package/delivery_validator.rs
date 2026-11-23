@@ -473,7 +473,7 @@ where
     if q0_v3 {
         q0_provenance::validate_final_source_uniqueness(&final_path)?;
     }
-    let refinement_reads = if refined {
+    let (refinement_reads, auto_effect) = if refined {
         on_progress(
             "validate_refined_sources",
             "reconstructing accepted refined Final Path from bound sources",
@@ -530,6 +530,7 @@ where
         q0_artifact_sha256: String::new(),
         q4_artifact_sha256: q4_artifact_sha256.to_string(),
         refinement_reads,
+        auto_effect,
     })
 }
 

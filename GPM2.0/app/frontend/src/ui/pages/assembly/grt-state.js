@@ -261,6 +261,8 @@ export function normalizeGrtProjectView(value) {
     : []).map(normalizeSourceCard);
   const verificationSource = firstDefined(source, "verification") || {};
   return {
+    autoRefinementEffects: Array.isArray(source.autoRefinementEffects ?? source.auto_refinement_effects)
+      ? (source.autoRefinementEffects ?? source.auto_refinement_effects) : [],
     recipe: normalizeGrtRecipe(source.recipe),
     baselineFinalPathByChr: normalizeGrtFinalPathByChr(
       firstDefined(source, "finalPathByChr", "final_path_by_chr"),

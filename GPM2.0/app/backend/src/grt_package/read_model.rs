@@ -655,8 +655,16 @@ pub fn load_grt_source_card_statuses(project_db_path: &Path) -> Result<Vec<GrtSo
         .collect()
 }
 
+fn load_auto_effects(path: &Path) -> Result<Vec<AutoRefinementEffect>> {
+    let conn = open_workspace_db(path)?;
+    let mut stmt = conn.prepare("SELECT effect_json FROM grt_auto_refinement_effect WHERE package_id=1 ORDER BY tool")?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    rows.map(|raw| Ok(serde_json::from_str(&raw?)?)).collect()
+}
+
 pub fn load_grt_project_view(project_db_path: &Path) -> Result<GrtProjectView> {
     Ok(GrtProjectView {
+        auto_refinement_effects: load_auto_effects(project_db_path)?,
         recipe: load_grt_locked_recipe(project_db_path)?,
         final_path_by_chr: load_grt_final_path_by_chr(project_db_path)?,
         source_cards: load_grt_source_card_statuses(project_db_path)?,
@@ -669,6 +677,7 @@ pub fn load_grt_project_view_for_project(
     project_id: i64,
 ) -> Result<GrtProjectView> {
     Ok(GrtProjectView {
+        auto_refinement_effects: load_auto_effects(project_db_path)?,
         recipe: load_grt_locked_recipe(project_db_path)?,
         final_path_by_chr: load_grt_final_path_by_chr_for_project(project_db_path, project_id)?,
         source_cards: load_grt_source_card_statuses(project_db_path)?,

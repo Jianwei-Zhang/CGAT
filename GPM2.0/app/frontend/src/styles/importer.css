@@ -907,50 +907,17 @@
   gap: 10px;
 }
 
-.project-refinement-divider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.project-refinement-divider::after { order: 1; }
+.project-refinement-divider .project-refinement-import-btn { order: 2; flex: 0 0 auto; }
+.project-refinement-table-scroll { overflow-x: auto; }
+.project-refinement-table { width: 100%; border-collapse: collapse; font-size: var(--font-small); }
+.project-refinement-table :is(th, td) {
+  padding: 6px 9px; border-bottom: 1px solid var(--border-subtle, #dbe3ec);
+  text-align: start; vertical-align: top; font-variant-numeric: tabular-nums;
 }
-
-.project-refinement-import-btn {
-  margin-left: auto;
-  font-size: var(--font-small);
-  min-height: 28px;
-  padding: 4px 10px;
-}
-
-.project-refinement-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
-}
-
-.project-refinement-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--border-subtle, #dbe3ec);
-  border-radius: var(--card-radius, 8px);
-  background: var(--surface-panel, #fff);
-  min-width: 0;
-}
-
-.project-refinement-pane-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.project-refinement-pane-head h4 {
-  margin: 0;
-  font-size: var(--font-body);
-  font-weight: 600;
-}
+.project-refinement-table thead th { color: var(--text-muted, #64748b); white-space: nowrap; }
+.project-refinement-table tbody th { font-weight: 600; }
+.project-refinement-table :is(th, td):nth-child(n+3):nth-child(-n+6) { text-align: end; }
 
 .project-refinement-badge {
   display: inline-flex;
@@ -980,33 +947,6 @@
 .project-refinement-badge.is-neutral {
   background: var(--surface-muted, #eef2f6);
   color: var(--text-secondary, #334155);
-}
-
-.project-refinement-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-
-.project-refinement-metrics > div {
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: var(--surface-subtle, #f8fafc);
-  border: 1px solid var(--border-subtle, #e2e8f0);
-}
-
-.project-refinement-metrics dt {
-  font-size: var(--font-caption);
-  color: var(--text-muted, #64748b);
-  margin: 0;
-}
-
-.project-refinement-metrics dd {
-  margin: 2px 0 0;
-  font-size: var(--font-body);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
 }
 
 .project-refinement-details {

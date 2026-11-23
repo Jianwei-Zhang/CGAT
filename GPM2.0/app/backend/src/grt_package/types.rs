@@ -68,6 +68,7 @@ pub(crate) struct ValidatedGrtPackage {
     pub(super) final_path: Value,
     pub(super) q0_artifact_sha256: String,
     pub(super) q4_artifact_sha256: String,
+    pub(super) auto_effect: Option<AutoRefinementEffect>,
     pub(super) refinement_reads: refinement_inputs::RefinementReadInputs,
 }
 
@@ -142,8 +143,23 @@ pub struct GrtProjectInitializationSummary {
     pub materialized_source_card_count: usize,
 }
 
+/// Counts refer to distinct original LGZ gaps, not output segments or native candidates.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AutoRefinementEffect {
+    pub tool: String,
+    pub run_id: String,
+    pub original_gaps: usize,
+    pub accepted_edits: usize,
+    pub closed: usize,
+    pub partial: usize,
+    pub unfilled: usize,
+    pub rejected: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrtProjectView {
+    #[serde(default)]
+    pub auto_refinement_effects: Vec<AutoRefinementEffect>,
     pub recipe: GrtLockedRecipe,
     pub final_path_by_chr: BTreeMap<String, Value>,
     pub source_cards: Vec<GrtSourceCardStatus>,

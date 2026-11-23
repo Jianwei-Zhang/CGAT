@@ -242,6 +242,10 @@ fn refined_full_import_materializes_real_bridge_and_exports_admitted_sequence() 
     let project = initialize_grt_project(&outcome.project_db_path, "DEGAP refined").unwrap();
     let view =
         load_grt_project_view_for_project(&outcome.project_db_path, project.project_id).unwrap();
+    assert_eq!(view.auto_refinement_effects.len(), 1);
+    let effect = &view.auto_refinement_effects[0];
+    assert_eq!(effect.tool, "degap");
+    assert_eq!((effect.closed, effect.partial, effect.original_gaps, effect.accepted_edits), (0, 1, 1, 1));
     assert_eq!(view.recipe.schema_version, "5");
     assert_eq!(view.recipe.final_q_relpath, "data/refinement/final.fa");
     let card = view
@@ -293,6 +297,9 @@ fn refined_light_import_keeps_provenance_but_does_not_claim_sequences_available(
     validate(&root).unwrap();
     let (outcome, _) = crate::importer::import_from_extracted_bundle(&root).unwrap();
     let project = initialize_grt_project(&outcome.project_db_path, "Light refinement").unwrap();
+    let effects = load_grt_project_view_for_project(&outcome.project_db_path, project.project_id).unwrap().auto_refinement_effects;
+    assert_eq!(effects.len(), 1);
+    assert_eq!((effects[0].tool.as_str(), effects[0].closed, effects[0].partial), ("degap", 0, 1));
     let path = load_grt_final_path(&outcome.project_db_path).unwrap();
     assert!(path["chromosomes"].as_array().unwrap().iter().any(|chr| {
         chr["segments"]
@@ -312,6 +319,20 @@ fn refined_light_import_keeps_provenance_but_does_not_claim_sequences_available(
     .unwrap_err();
     assert!(!error.to_string().is_empty());
     assert!(!temp.path().join("not-ready.fa").exists());
+}
+
+#[test]
+fn previous_workspace_gains_an_empty_effect_catalog_without_reinterpreting_its_final_path() -> Result<()> {
+    let temp = materialize(true);
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&temp.path().join("refined.degap"))?;
+    let db = &outcome.project_db_path;
+    let original = load_grt_final_path(db)?;
+    let conn = crate::db::open_workspace_db(db)?;
+    conn.execute_batch("DROP TABLE grt_auto_refinement_effect; PRAGMA user_version=10;")?;
+    drop(conn);
+    assert!(load_grt_project_view(db)?.auto_refinement_effects.is_empty());
+    assert_eq!(load_grt_final_path(db)?, original);
+    Ok(())
 }
 
 #[test]

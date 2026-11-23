@@ -1,3 +1,4 @@
+import { projectIcon } from "./project-icons.js";
 import { pickZipFilePath } from "../../services/backend-api.js";
 import {
   getGrtProjectView,
@@ -28,7 +29,11 @@ const PROJECT_REFINEMENT_BOUND = Symbol("projectRefinementBound");
 const COPY = {
   zh: {
     sectionTitle: "精修",
-    importAction: "导入精修结果",
+    importAction: "导入精修补丁",
+    tableColumns: ["来源", "工具 / 批次", "已闭合", "部分填补", "未填补", "拒绝", "结果"],
+    tableHint: "自动行按原始缺口计数；手动行按所选 Gap 的候选结果计数，不代表已采用。— 表示无此项或未记录。",
+    editCount: "接纳 {n} 处修改", legacySegments: "记录了 {n} 个接纳片段", unknownStats: "未留存逐缺口统计",
+    appliedCount: "本次导回采用 {n} 处", lociCount: "{n} 个位点",
     importingAction: "正在导入精修结果...",
     workingAction: "正在更新精修状态...",
     dismissNotice: "关闭",
@@ -56,7 +61,7 @@ const COPY = {
     manualImportedSummary: "已导回精修结果批次（{count}）",
     manualBatchesSummary: "已导出待运行 / 待导回批次（{count}）",
     manualDraftSummary: "当前项目待导出精修任务（{count}）",
-    manualEmptyNote: "尚未登记精修任务或导回精修结果。进入「装配」页后，可在 Final Path 上按项目登记 Gap 或左/右端粒位点并导出精修任务包（.zip），在 Server 运行 refine.py 后点击右上角「导入精修结果」。",
+    manualEmptyNote: "尚未登记精修任务或导回精修结果。进入「装配」页后，可在 Final Path 上按项目登记 Gap 或左/右端粒位点并导出精修任务包（.zip），在 Server 运行 refine.py 后点击右上角的导入补丁图标。",
     manualReceiptBoundary: "无后端导回记录前，已导出批次始终标记为「等待 Server 运行与导回」；卡片摘要不展示私有 reads 路径。",
     locateInFinalPath: "在 Final Path 中定位",
     copyCommand: "复制 Server 命令",
@@ -104,7 +109,11 @@ const COPY = {
   },
   en: {
     sectionTitle: "Refinement",
-    importAction: "Import Refinement Results",
+    importAction: "Import refinement patch",
+    tableColumns: ["Source", "Tool / batch", "Closed", "Partial", "Unfilled", "Rejected", "Result"],
+    tableHint: "Automatic rows count original gaps. Manual rows count candidate outcomes per selected Gap, not adoptions. A dash means not recorded or not applicable.",
+    editCount: "{n} accepted edits", legacySegments: "{n} recorded accepted segments", unknownStats: "Gap outcomes not recorded",
+    appliedCount: "{n} applied on import", lociCount: "{n} loci",
     importingAction: "Importing refinement results...",
     workingAction: "Updating refinement state...",
     dismissNotice: "Dismiss",
@@ -132,7 +141,7 @@ const COPY = {
     manualImportedSummary: "Imported refinement result batches ({count})",
     manualBatchesSummary: "Exported batches awaiting Server / App import ({count})",
     manualDraftSummary: "Queued project refinement tasks ({count})",
-    manualEmptyNote: "No refinement tasks or imported results yet. Open Assembly to queue Gap or Left/Right Telomere loci, export refinement tasks (.zip), run refine.py on Server, then click Import Refinement Results.",
+    manualEmptyNote: "No refinement tasks or imported results yet. Open Assembly to queue Gap or Left/Right Telomere loci, export refinement tasks (.zip), run refine.py on Server, then use the import patch icon.",
     manualReceiptBoundary: "Exported batches remain marked awaiting Server/import until backed by an imported result record. Private Server read paths are never shown here.",
     locateInFinalPath: "Locate in Final Path",
     copyCommand: "Copy Server command",
@@ -510,11 +519,12 @@ export function buildProjectRefinementModel(state) {
   const hasNonLegacyImportedResults = importedResults.some((batch) => !batch.isLegacyOnly);
   const hasOnlyLegacyImportedResults = importedResults.length > 0 && !hasNonLegacyImportedResults && manualAppliedSegments.length === 0;
 
+  const effects = Array.isArray(grtView?.autoRefinementEffects) ? grtView.autoRefinementEffects : [];
   let autoStatus = "unrefined";
-  if (autoSegments.length > 0 || refinementSourceCards.length > 0) {
+  if (autoSegments.length || refinementSourceCards.length || effects.some((row) => (row.accepted_edits ?? row.acceptedEdits) > 0)) {
     autoStatus = "accepted";
-  } else if (isRefinementSchema) {
-    autoStatus = "zero_accepted";
+  } else if (isRefinementSchema || effects.length) {
+    autoStatus = effects.length ? "zero_accepted" : "not_recorded";
   }
 
   let manualStatus = "idle";
@@ -532,6 +542,7 @@ export function buildProjectRefinementModel(state) {
     auto: {
       status: autoStatus,
       schemaVersion,
+      effects,
       chromosomeCount: autoChrSet.size,
       acceptedSegmentCount: autoSegments.length,
       affectedGapCount: autoGapSet.size,
@@ -928,6 +939,51 @@ function renderImportedLocusRow(batch, locus, copy, busy) {
   </li>`;
 }
 
+function refinementTableRows({ auto, manual }, copy) {
+  const rows = [];
+  const autoRow = (label, counts, result) => rows.push([copy.autoTitle, label, ...counts, result]);
+  const absent = [null, null, null, null];
+  const reported = new Set();
+  for (const effect of auto.effects) {
+    reported.add(effect.tool);
+    autoRow(formatToolLabel(effect.tool), [effect.closed, effect.partial, effect.unfilled, effect.rejected],
+      fmt(copy.editCount, { n: effect.accepted_edits ?? effect.acceptedEdits }));
+  }
+  // Old project databases retain accepted segments, not per-gap closure measurements.
+  const legacy = new Map();
+  for (const segment of auto.segments) {
+    const tool = normalizeString(segment.tool).toLowerCase();
+    if (!reported.has(tool)) legacy.set(tool, (legacy.get(tool) || 0) + 1);
+  }
+  for (const [tool, n] of legacy) autoRow(formatToolLabel(tool), absent, fmt(copy.legacySegments, { n }));
+  if (!rows.length && auto.schemaVersion) autoRow(auto.schemaVersion === "5" ? "—" : "LGZ", absent,
+    auto.schemaVersion === "5" ? copy.unknownStats : copy.statusAutoUnrefined);
+
+  const toolNames = (ids) => formatTools([...new Set(ids.filter(Boolean))]);
+  const manualRow = (label, counts, status) => rows.push([copy.manualTitle, label, ...counts, status]);
+  for (const batch of manual.importedResults) {
+    const gaps = batch.loci.filter((locus) => locus.kind === "gap" && !locus.isLegacy);
+    const outcomes = gaps.map((gap) => {
+      const states = new Set(gap.candidates.map((c) => c.status));
+      if (states.has("closed")) return "closed";
+      if (states.has("partial")) return "partial";
+      if (states.size === 1 && states.has("no_candidate")) return "unfilled";
+      if (states.size === 1 && states.has("rejected")) return "rejected";
+      return null; // e.g. missing reads is neither rejection nor an unfilled measurement
+    });
+    const tools = toolNames(batch.loci.flatMap((l) => l.candidates.map((c) => c.tool)));
+    const label = [tools, (batch.batchSha256 || batch.resultSha256).slice(0, 12)].filter(Boolean).join(" · ");
+    manualRow(label, outcomes.some(Boolean)
+      ? ["closed", "partial", "unfilled", "rejected"].map((k) => outcomes.filter((v) => v === k).length) : absent,
+      batch.isLegacyOnly ? copy.statusManualLegacyOnly : fmt(copy.appliedCount, { n: batch.applied }));
+  }
+  for (const batch of manual.exportedBatches) manualRow([toolNames(batch.loci.flatMap((l) => l.tools)),
+    batch.batchSha256.slice(0, 12)].filter(Boolean).join(" · "), absent, copy.statusManualExported);
+  if (manual.draftLoci.length) manualRow(toolNames(manual.draftLoci.flatMap((l) => l.tools)), absent,
+    `${copy.statusManualDraft} · ${fmt(copy.lociCount, { n: manual.draftLoci.length })}`);
+  return rows;
+}
+
 export function renderProjectRefinementCard(state) {
   const copy = COPY[state?.locale === "en" ? "en" : "zh"];
   const model = buildProjectRefinementModel(state);
@@ -935,31 +991,15 @@ export function renderProjectRefinementCard(state) {
   const inFlightForCurrentProject = Boolean(ui.inFlight);
   const busy = Boolean(state?.importer?.inFlight || state?.initializer?.autoPipelineRunning || inFlightForCurrentProject);
 
-  const totalCount =
-    model.auto.acceptedSegmentCount
-    + model.manual.importedResults.length
-    + model.manual.exportedBatches.length
-    + model.manual.draftLoci.length;
-
-  const autoBadge = model.auto.status === "accepted"
-    ? `<span class="project-refinement-badge is-ok">${escapeHtml(copy.statusAutoAccepted)}</span>`
-    : model.auto.status === "zero_accepted"
-      ? `<span class="project-refinement-badge is-neutral">${escapeHtml(copy.statusAutoZero)}</span>`
-      : `<span class="project-refinement-badge is-neutral">${escapeHtml(copy.statusAutoUnrefined)}</span>`;
-
-  const manualBadge = model.manual.status === "imported"
-    ? `<span class="project-refinement-badge is-ok">${escapeHtml(copy.statusManualImported)}</span>`
-    : model.manual.status === "exported"
-      ? `<span class="project-refinement-badge is-warn">${escapeHtml(copy.statusManualExported)}</span>`
-      : model.manual.status === "draft"
-        ? `<span class="project-refinement-badge is-info">${escapeHtml(copy.statusManualDraft)}</span>`
-        : model.manual.status === "legacy_only"
-          ? `<span class="project-refinement-badge is-neutral">${escapeHtml(copy.statusManualLegacyOnly)}</span>`
-          : `<span class="project-refinement-badge is-neutral">${escapeHtml(copy.statusManualIdle)}</span>`;
-
+  const rows = refinementTableRows(model, copy);
+  const importLabel = inFlightForCurrentProject ? (ui.busyLabel || copy.importingAction) : copy.importAction;
   const autoDetails = model.auto.segments.length
     ? `<details class="project-refinement-details">
         <summary>${escapeHtml(fmt(copy.autoDetailsSummary, { count: model.auto.segments.length }))}</summary>
+        <p class="muted project-refinement-note">${escapeHtml([
+          `${copy.metricChromosomes}: ${model.auto.chromosomeCount}`, `${copy.metricAffectedGaps}: ${model.auto.affectedGapCount}`,
+          `${copy.metricSourceCards}: ${model.auto.sourceCardCount}`,
+        ].join(" · "))}</p>
         <ul class="project-refinement-list">
           ${model.auto.segments.map((item) => `<li class="project-refinement-item">
             <div class="project-refinement-item-main">
@@ -972,7 +1012,7 @@ export function renderProjectRefinementCard(state) {
           </li>`).join("")}
         </ul>
       </details>`
-    : `<p class="muted project-refinement-note">${escapeHtml(model.auto.status === "zero_accepted" ? copy.autoZeroNote : copy.autoUnrefinedNote)}</p>`;
+    : "";
 
   const manualImportedMarkup = model.manual.importedResults.length
     ? `<details class="project-refinement-details" open>
@@ -1062,48 +1102,26 @@ export function renderProjectRefinementCard(state) {
   return `<section id="project-refinement" class="project-refinement" aria-labelledby="project-refinement-title" aria-busy="${inFlightForCurrentProject}">
     <header class="project-section-divider project-refinement-divider">
       <h3 id="project-refinement-title">${escapeHtml(copy.sectionTitle)}</h3>
-      ${totalCount > 0 ? `<span class="project-section-count"><span aria-hidden="true">·</span>${totalCount}</span>` : ""}
       <button
         type="button"
-        class="button project-refinement-import-btn"
+        class="button project-icon-button project-refinement-import-btn"
+        aria-label="${escapeAttr(importLabel)}" data-app-tooltip="${escapeAttr(importLabel)}"
         data-project-refinement-import
         ${busy ? "disabled" : ""}
-      >${escapeHtml(inFlightForCurrentProject ? (ui.busyLabel || copy.importingAction) : copy.importAction)}</button>
+      >${projectIcon("import")}</button>
     </header>
     ${feedbackBanner}
     ${copyFeedbackMarkup}
-    <div class="project-refinement-grid">
-      <article class="project-refinement-pane" data-project-refinement-auto>
-        <div class="project-refinement-pane-head">
-          <h4>${escapeHtml(copy.autoTitle)}</h4>
-          ${autoBadge}
-        </div>
-        <dl class="project-refinement-metrics">
-          <div><dt>${escapeHtml(copy.metricChromosomes)}</dt><dd>${model.auto.chromosomeCount}</dd></div>
-          <div><dt>${escapeHtml(copy.metricAcceptedSegments)}</dt><dd>${model.auto.acceptedSegmentCount}</dd></div>
-          <div><dt>${escapeHtml(copy.metricAffectedGaps)}</dt><dd>${model.auto.affectedGapCount}</dd></div>
-          <div><dt>${escapeHtml(copy.metricSourceCards)}</dt><dd>${model.auto.sourceCardCount}</dd></div>
-        </dl>
-        ${autoDetails}
-      </article>
-      <article class="project-refinement-pane" data-project-refinement-manual>
-        <div class="project-refinement-pane-head">
-          <h4>${escapeHtml(copy.manualTitle)}</h4>
-          ${manualBadge}
-        </div>
-        <dl class="project-refinement-metrics">
-          <div><dt>${escapeHtml(copy.metricDraftLoci)}</dt><dd>${model.manual.draftLoci.length}</dd></div>
-          <div><dt>${escapeHtml(copy.metricExportedBatches)}</dt><dd>${model.manual.exportedBatches.length}</dd></div>
-          <div><dt>${escapeHtml(copy.metricImportedResults)}</dt><dd>${model.manual.importedResults.length}</dd></div>
-          <div><dt>${escapeHtml(copy.metricActiveManualEdits)}</dt><dd>${model.manual.activeManualCount}</dd></div>
-        </dl>
-        ${manualImportedMarkup}
-        ${manualBatchesMarkup}
-        ${manualDraftMarkup}
-        ${!manualImportedMarkup && !manualBatchesMarkup && !manualDraftMarkup ? `<p class="muted project-refinement-note">${escapeHtml(copy.manualEmptyNote)}</p>` : ""}
-        <p class="muted project-refinement-note">${escapeHtml(copy.manualReceiptBoundary)}</p>
-      </article>
-    </div>
+    ${rows.length ? `<div class="project-refinement-table-scroll"><table class="project-refinement-table" aria-labelledby="project-refinement-title" aria-describedby="project-refinement-table-note">
+      <thead><tr>${copy.tableColumns.map((col) => `<th scope="col">${escapeHtml(col)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(([source, label, ...cells]) => `<tr><td>${escapeHtml(source)}</td><th scope="row">${escapeHtml(label || "—")}</th>${cells.map((v) => `<td>${escapeHtml(String(v ?? "—"))}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table></div><p id="project-refinement-table-note" class="muted project-refinement-note">${escapeHtml(copy.tableHint)}</p>` : ""}
+    ${autoDetails}
+    ${manualImportedMarkup ? `<p class="muted project-refinement-note">${escapeHtml(copy.metricActiveManualEdits)}: ${model.manual.activeManualCount}</p>` : ""}
+    ${manualImportedMarkup}
+    ${manualBatchesMarkup}
+    ${manualDraftMarkup}
+    ${!manualImportedMarkup && !manualBatchesMarkup && !manualDraftMarkup && !model.auto.effects.length && !model.auto.segments.length ? `<p class="muted project-refinement-note">${escapeHtml(copy.manualEmptyNote)}</p>` : ""}
   </section>`;
 }
 

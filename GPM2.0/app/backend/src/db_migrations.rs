@@ -75,6 +75,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "retain_project_refinement_patches_and_receipts",
         apply: create_refinement_result_tables,
     },
+    Migration {
+        version: 11,
+        name: "retain_per_tool_automatic_refinement_effects",
+        apply: super::create_auto_refinement_effects,
+    },
 ];
 
 fn migrate_refinement_inputs_to_v9(conn: &Connection) -> Result<()> {

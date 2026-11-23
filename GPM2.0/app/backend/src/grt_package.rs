@@ -59,6 +59,7 @@ pub use refinement_inputs::{
 };
 pub(crate) use types::ValidatedGrtPackage;
 pub use types::{
+    AutoRefinementEffect,
     GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION, GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION,
     GRT_APP_WORKFLOW, GRT_FINAL_PATH_SCHEMA_VERSION, GRT_Q0_SCHEMA_VERSION, GRT_SCHEMA_VERSION,
     GRT_WORKFLOW, GrtEventTrace, GrtFinalPathVerification, GrtLockedRecipe,

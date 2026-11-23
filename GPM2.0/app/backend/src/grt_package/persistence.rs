@@ -38,6 +38,10 @@ pub(crate) fn persist_grt_package(
         ],
     )
     .context("failed to persist locked LGZ package recipe")?;
+    if let Some(effect) = &package.auto_effect {
+        tx.execute("INSERT INTO grt_auto_refinement_effect(package_id,tool,effect_json) VALUES(1,?1,?2)",
+            params![effect.tool, serde_json::to_string(effect)?])?;
+    }
     if !package.refinement_reads.is_empty() {
         tx.execute(
             "INSERT INTO grt_refinement_inputs (package_id, reads_json) VALUES (1, ?1)",
@@ -208,6 +212,7 @@ pub(super) fn clear_grt_tables(tx: &Transaction<'_>) -> Result<()> {
         "grt_contig_role",
         "grt_stage_status",
         "grt_tool_version",
+        "grt_auto_refinement_effect",
         "grt_refinement_inputs",
         "grt_package",
     ] {

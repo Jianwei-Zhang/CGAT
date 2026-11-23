@@ -329,3 +329,29 @@ test("a reopened project shows native export receipts, and stops marking an impo
   state.session.workspacePath = "/other/project"; // identical numeric ID in a different workspace
   assert.equal(buildProjectRefinementModel(state).manual.importedResults.length, 0);
 });
+
+
+test("one refinement table compares both automatic tools alongside a manual batch; import is a named icon", async () => {
+  const { normalizeGrtProjectView } = await import("../assembly/grt-state.js");
+  const grt = normalizeGrtProjectView({ recipe: { schema_version: "5" }, auto_refinement_effects: [
+    { tool: "degap", accepted_edits: 1, closed: 0, partial: 1, unfilled: 3, rejected: 0 },
+    { tool: "quartet", accepted_edits: 2, closed: 2, partial: 0, unfilled: 1, rejected: 1 },
+  ] });
+  const state = { locale: "zh", session: { projectId: 2, workspacePath: "/col0" },
+    projectExport: { projectId: 2, workspacePath: "/col0", grtProjectView: grt,
+      manualRefinementResults: [{ resultSha256: "a".repeat(64), batchSha256: "b".repeat(64), applied: 0,
+        loci: [{ locusId: "g1", kind: "gap", disposition: "target_or_boundary_changed", candidates: [
+          { tool: "quartet", status: "partial" }, { tool: "degap", status: "closed" }] }] }] } };
+  const html = renderProjectRefinementCard(state);
+  const table = html.match(/<table [^>]*>[\s\S]+?<\/table>/g);
+  assert.equal(table.length, 1);
+  assert.match(table[0], /自动精修<\/td><th scope="row">DEGAP<\/th><td>0<\/td><td>1<\/td><td>3<\/td><td>0<\/td>/);
+  assert.match(table[0], /自动精修<\/td><th scope="row">quarTeT<\/th><td>2<\/td>/);
+  assert.match(table[0], /手动精修[\s\S]*?bbbbbbbbbbbb[\s\S]*?本次导回采用 0 处/);
+  assert.match(html, /<header[^>]*>[\s\S]*?aria-label="导入精修补丁" data-app-tooltip="导入精修补丁"[\s\S]*?<svg[^>]*aria-hidden="true"[\s\S]*?<\/button>[\s\S]*?<\/header>/);
+  assert.doesNotMatch(html, /project-refinement-(grid|pane)|<select/);
+  state.projectExport.grtProjectView = normalizeGrtProjectView({ recipe: { schema_version: "5" } });
+  const legacy = renderProjectRefinementCard(state);
+  assert.match(legacy, /未留存逐缺口统计/);
+  assert.doesNotMatch(legacy, /接纳 0 处修改/);
+});
