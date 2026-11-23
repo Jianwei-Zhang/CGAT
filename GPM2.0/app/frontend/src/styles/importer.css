@@ -811,10 +811,15 @@
 .library-tree [data-library-group]:hover > [role="group"]::before { background: var(--border-default, #cbd5e1); opacity: 1; }
 
 .library-folder-row, .library-tree .project-recent-row {
-  min-width: 0; min-height: 32px; margin: 1px 0; border: 1px solid transparent;
-  border-radius: 6px; padding: 0 4px 0 calc(4px + var(--library-depth, 0) * 16px);
+  min-width: 0; min-height: 32px; margin: 1px 0 1px calc(var(--library-depth, 0) * 16px); border: 1px solid transparent;
+  border-radius: 6px; padding: 0 4px;
   background: transparent; gap: 2px;
   transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+.library-tree [role="group"] > .project-recent-row,
+.library-tree [role="group"] > [data-library-group] > .library-folder-row {
+  margin-left: calc(var(--library-depth, 0) * 16px + 4px);
+  padding-left: 0;
 }
 .library-folder-row { display: flex; align-items: center; position: relative; }
 .library-folder-row:hover, .library-tree .project-recent-row:hover { background: var(--surface-muted, #eef2f6); }
