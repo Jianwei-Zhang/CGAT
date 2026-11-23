@@ -136,6 +136,12 @@ def current_publication(root, tool, *, verify=True):
 
 def committed_final_history(layout, tool):
     """Older App projects can still resolve their exact sources after staging is reclaimed."""
+    yield from committed_area_history(layout, tool, "final")
+
+
+def committed_area_history(layout, tool, name):
+    if name not in AREAS:
+        raise PublicationError("unknown publication area")
     current = current_publication(layout.root,tool,verify=False)
     seen = set()
     while current:
@@ -152,12 +158,12 @@ def committed_final_history(layout, tool):
         if digest(old) != previous["journal_sha256"]:
             raise PublicationError("previous tool publication journal changed")
         history = read_json(old)
-        area = current["areas"]["final"]
+        area = current["areas"][name]
         if (history.get("state") != "committed" or history.get("tool") != tool
-                or history.get("transaction") != previous["transaction"] or history["areas"]["final"]["new"] != area["previous"]):
+                or history.get("transaction") != previous["transaction"] or history["areas"][name]["new"] != area["previous"]):
             raise PublicationError("previous tool publication does not match its successor")
         if not area.get("unchanged"):
-            yield journal_path(layout,txid).parent / "previous/final", area["previous"]["files"]
+            yield journal_path(layout,txid).parent / "previous" / name, area["previous"]["files"]
         current = history
 
 

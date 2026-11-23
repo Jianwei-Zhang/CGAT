@@ -6,7 +6,7 @@ The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units 
 
 Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; these naming aliases preserve persisted LGZ stage IDs. The separate numbered-layout and refinement-package changes are described below. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md).
 
-> **Feature-branch source**: see the [refinement guide](REFINEMENT.md) for four post-LGZ engines, numbered workspaces, legacy migration and refined App packages. The v2.0.21 download below installs the published release, not these feature-branch changes.
+> **Current source tree**: see the [refinement guide](REFINEMENT.md) for four post-LGZ engines, numbered workspaces, legacy migration and refined App packages. The v2.0.21 download below installs the published release, not the new output layout described here.
 
 ## Quick start
 
@@ -457,7 +457,7 @@ for source records and evidence limits.
 
 The manual App `DEGAP-JOBS` workflow below describes the released legacy-layout
 protocol. The source collector now isolates numbered-workspace candidates under
-`04_refinement/01_degap/06_manual/01_catalog/` instead of mutating the original LGZ
+`04_refinement/automatic/degap/06_manual/01_catalog/` instead of mutating the original LGZ
 metadata. Matching source builds now resolve the actual Server runtime and bind
 seed sources by identity/content rather than guessing portable App paths. A
 controlled App export/Server collection/original-App import has passed without
@@ -533,7 +533,7 @@ bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapclo
 
 The four engines run sequentially and independently from the same LGZ baseline. `--gapfill-tools none` disables only this invocation; no `--final-tool` is needed. See the [full guide](REFINEMENT.md) for read allocation, exact pins/disclosed patches, saved-setting replacement and recovery boundaries. Unnumbered old workspaces need explicit migration first; do not re-prepare them or delete valid results.
 
-Start at `06_report/report.html`. `05_final/00_lgz` is explicitly unrefined; admitted tool results use `05_final/01_degap`, `02_tgsgapcloser`, `03_quartet` and `04_lrgapcloser`, with corresponding archives under `07_delivery/<tool-directory>/`. Import a tool's package with the matching new App: its Final Path and exported FASTA describe that accepted refinement, not an extra FASTA beside an unchanged LGZ view. All four pinned engines have run on synthetic inputs on Linux x86_64. ARM64 dependency resolution passed; ARM64 installation and native runs are not yet verified. These checks do not establish biological accuracy or runtime gains.
+On a new job, `05_final/results.tsv` lists the direct LGZ, automatic-tool and manual-batch FASTAs; details are in `06_report/report.html`. `07_delivery/` publishes one project Full/Light pair. Adding automatic results updates the pair and produces a cumulative automatic patch. Project import does not require picking a tool version.
 
 ### Project-scoped manual refinement (current source)
 
@@ -549,4 +549,4 @@ python .lib/tools/refine.py refinement_tasks.zip --prepare-only
 
 New workspaces expose their public runtime at `.lib/`; legacy `.prepare_lib/` and older numbered-workspace `.runtime/prepared/` are compatibility read/migration paths only. `~/bin/refine.py` may also be used as a global entrypoint; it resolves the current project's runtime first (`.lib/`, falling back only for compatibility to `.prepare_lib/` or `.runtime/prepared/`) without mixing versions across projects.
 
-Manual batches write `08_refinement_jobs/02_manual/<batch>/03_report` (`summary.json`, `report.html`) and `04_delivery` (`refinement_results.zip`), and update the workspace overview `06_report/report.html`. Each Gap job can select multiple tools (`degap` alone by default); if several candidates close the same Gap, prefer `degap`, `lrgapcloser`, `tgsgapcloser`, then `quartet`, while Left/Right Telomere jobs use `DEGAP TelSeeker`. Shareable HTML reports omit private Server read paths (showing read technology and SHA-256 digests) and distinguish `Pending App import` from `No patch to import`. Before importing `refinement_results.zip` back into the original App project via the Project **Refinement** card, manual results remain pending deliverables and must not write to or impersonate automatic `05_final/` publications.
+Manual batch reports are under `04_refinement/manual/<full-batch-digest>/03_report/`. With a new task snapshot, use `05_final/<out>.manual-<batch16>.fa` directly and import `07_delivery/manual/<out>.manual-<batch16>.patch.zip` into the original App project via **Refinement**. The project Full/Light pair is unchanged. Legacy tasks without snapshots return only local patches. Each Gap may use multiple tools; complete closures take precedence, with ties resolved by DEGAP, LR_Gapcloser, TGS-GapCloser, then quarTeT. Telomere tasks still use DEGAP TelSeeker.

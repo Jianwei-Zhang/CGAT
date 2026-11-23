@@ -2,7 +2,7 @@
 
 **English** | [中文](REFINEMENT_zh.md) · [Server manual](README.md)
 
-This guide describes the feature-branch source implementation, not a feature retroactively added to published v2.0.21 archives. The shared environment and all four pinned tools were verified with synthetic inputs on native Linux x86_64 and ARM64. The repository’s `GPM2.0/docs/server-refinement-final-acceptance-20261122.md` records scope and evidence. Use the installer and App built from the matching source; do not overwrite an active installation or update an environment while jobs use it.
+This guide describes the current source implementation, not a feature retroactively added to published v2.0.21 archives. Earlier native refinement work (not the new output layout or compaction) was verified for the shared environment and all four pinned tools with synthetic inputs on native Linux x86_64 and ARM64. The repository’s `GPM2.0/docs/server-refinement-final-acceptance-20261122.md` records scope and evidence. Use the installer and App built from the matching source; do not overwrite an active installation or update an environment while jobs use it.
 
 ## 1. Environment and first run
 
@@ -51,7 +51,7 @@ bash /work/lgz_only/run_all.sh --gapfill-tools quartet,lrgapcloser
 bash /work/lgz_only/run_all.sh --gapfill-tools none
 ```
 
-Use exactly the lowercase comma-separated identifiers shown above, without duplicates; `none` must stand alone. Selecting an engine without available typed reads is an error. Omitting the tool flag reuses the saved choice; a new reads-backed task defaults to `degap`. A direct preparation-only `prepare.sh --gapfill-tools none` instead seeds a disabled configuration. There is **no `--final-tool`**: each successful selected engine has its own final result and independent App project, not a hidden winning result.
+Use exactly the lowercase comma-separated identifiers shown above, without duplicates; `none` must stand alone. Selecting an engine without available typed reads is an error. Omitting the tool flag reuses the saved choice; a new reads-backed task defaults to `degap`. A direct preparation-only `prepare.sh --gapfill-tools none` instead seeds a disabled configuration. There is **no `--final-tool`**: each successful engine has its own FASTA, but the App imports all tool results into one project.
 
 | Order / identifier | Both technologies supplied | Pinned source/distribution |
 | --- | --- | --- |
@@ -71,50 +71,30 @@ CGAT explicitly sets the thread budget and I/O for all tools. TGS HiFi also uses
 `--out` is the workspace root, including delivery files:
 
 ```text
-cgat_server/
-  run_all.sh
-  01_inputs/                         reference, assemblies, derived inputs
-  02_alignments/                     original alignment work
-  03_lgz/                            original LGZ stages/evidence/annotations
+cgat_server/                         # current project-delivery layout
+  01_inputs/  02_alignments/  03_lgz/
   04_refinement/
-    01_degap/                        other engines use their fixed directory above
-      01_inputs/<run>/
-      02_jobs/<run>/                 command, status, native-completion receipt
-      03_native/<run>/               retained native output, not the final result
-      04_accepted/<run>/             accepted patch source sequences
-        01_source_evidence/<generation>/  measured reference/annotation evidence
-      05_report/<run>/<site>/        portable attempt report
+    automatic/<tool>/                # inputs, jobs, native attempts and accepted evidence
+    manual/<batch_sha256>/03_report/ # batch summary.json and report.html
   05_final/
-    cgat_server.lgz.fa                 LGZ baseline, ready for direct use
-    cgat_server.degap.fa               Published automatic result (when available)
-    results.tsv                       Current attempt vs. available publication
-    details/
-      00_lgz/                          LGZ baseline: refinement_applied=false
-      01_degap/                        a verified published refined result
-        assembly.fa
-        final_path.json
-        sources.tsv
-        remaining_gaps.tsv
-        provenance.json
-  06_report/
-    report.html                      start here: overview and current comparison
-    01_lgz/report.html               original LGZ process
-    02_refinement/01_degap/report.html
-    03_comparison/<batch>/
+    cgat_server.lgz.fa               # direct genome, before optional refinement
+    cgat_server.<tool>.fa            # each published tool's independent genome
+    cgat_server.manual-<batch16>.fa  # whole genome for a snapshot-backed manual batch
+    results.tsv                      # attempts, adoptions and current usable FASTAs
+    details/                         # detailed paths, sources and batch selections
+  06_report/report.html              # overview and links to reports/comparisons
   07_delivery/
-    00_lgz/cgat_server[.light].tar.gz
-    01_degap/cgat_server.degap[.light].tar.gz
-  08_refinement_jobs/
-    02_manual/
-      <batch_sha256>/                project-scoped manual refinement batch & report.html
-  .lib/                              workspace-scoped runtime copy (includes .lib/tools/refine.py)
-  .runtime/                          locks, checkpoints, metadata, logs, history
-    refinement/<tool-dir>/<run>/final/  private, source-reconstructed staging
+    cgat_server.full.tar.gz          # one project Full/Light pair, not one pair per tool
+    cgat_server.light.tar.gz
+    cgat_server.auto.patch.zip       # cumulative, only when automatic results exist
+    manual/cgat_server.manual-<batch16>.patch.zip
+  .lib/                              # workspace runtime
+  .runtime/                          # state, checkpoints and publication receipts; keep it
 ```
 
 The FASTA prefix comes from the output directory at job creation. A failed rerun does not replace a previously published genome; check `results.tsv` for its publication identity. A zero-admission tool result is marked unchanged. Existing numbered jobs keep `05_final/00_lgz/` and `05_final/<numbered_tool>/`; they are not moved or renamed.
 
-Brackets denote two files, not literal filenames; `--archive-format zip` uses `.zip`. Each selected tool uses the same fixed directory under `04_refinement`, `05_final/details`, `06_report/02_refinement` and `07_delivery`, even if it is the only tool selected. There are no legacy root `data/`, `grt/`, `report/` or `logs/` shadow trees in the numbered workspace. App package internals still use their protocol's `data/` and `metadata/` paths; do not rename those inside archives.
+A new automatic publication updates the same Full/Light pair and cumulative automatic patch. A manual batch adds its own patch and FASTA without replacing the pair. `--archive-format zip` changes the Full/Light suffix to `.zip`; patches are always ZIP. Pre-existing jobs retain their original layout.
 
 A tool directory alone is not proof of current success. Follow the current overview and its committed, content-bound publication receipt. Failed new attempts retain diagnostics and do not erase an older successful publication or label it as the new result. One tool's failure does not prevent other successful tools or the LGZ baseline being delivered; the overall invocation returns nonzero.
 
@@ -140,18 +120,18 @@ In a tool report, follow **Native job reports and logs → Offline native visual
 
 TGS-GapCloser, quarTeT GapFiller and LR_Gapcloser do not generate native HTML in their pinned recipes; their actual logs/fill-detail/AGP diagnostics are retained rather than inventing an upstream visualization. Full and Light keep the same portable report files. Windows offline browser checks covered the batch hierarchy, native graphics and relative links in the extracted Full and Light reports. Report rendering does not establish biological accuracy.
 
-Import one tool's **Full** archive into a new project in a matching new App. Its authoritative Final Path and exported chromosomes represent that tool's accepted result; the `00_lgz` package remains explicitly unrefined. Full includes source FASTA; Light omits it but retains indexes, metadata and path/source lineage, so FASTA export requires the real sequence sources to be ready. Do not import over an existing manually edited project. The refinement package protocol is schema 5 / App Final Path 4; old Apps reject it rather than silently showing the LGZ path. New-App compatibility with older packages is retained.
+Import the project Full or Light to create one project with all tools; no version selection is needed. To add automatic results to the matching existing project, use the patch icon in **Refinement**. The table distinguishes tool outcomes from project adoptions. For each Gap, consider only compatible complete closures, breaking ties by DEGAP → LR_Gapcloser → TGS-GapCloser → quarTeT. Viewing results does not change the working path. An existing manual decision or a changed boundary is not overwritten. Light does not supply all the sequences needed for offline FASTA export.
 
-Manual App `DEGAP-JOBS` is a separate entrypoint. The source collector now stores versioned manual candidate catalogs under `04_refinement/01_degap/06_manual/01_catalog/`, with an authoritative `.runtime/manual_degap/current.json` pointer, leaving original LGZ tables untouched. Matching App source builds resolve the actual Server runtime and content-bound original/refinement/manual seed sources; Full/Light deliveries include `metadata/server_sources.json` identities. A controlled export → Server → original App import preserved the manually edited Final Path. Original manual packages bound to the committed migration inventory can now enter the immutable registry without rerunning native work or their alignments. Unknown prior result ZIPs remain protected: preserve them and collect from a fresh folder containing the unchanged original `jobs.tsv` and `degap_jobs/` receipts, not a newly exported token. Do not treat these protocol checks as full manual-workflow acceptance.
+Manual App `DEGAP-JOBS` is a separate entrypoint. The source collector now stores versioned manual candidate catalogs under `04_refinement/automatic/degap/06_manual/01_catalog/`, with an authoritative `.runtime/manual_degap/current.json` pointer, leaving original LGZ tables untouched. Matching App source builds resolve the actual Server runtime and content-bound original/refinement/manual seed sources; Full/Light deliveries include `metadata/server_sources.json` identities. A controlled export → Server → original App import preserved the manually edited Final Path. Original manual packages bound to the committed migration inventory can now enter the immutable registry without rerunning native work or their alignments. Unknown prior result ZIPs remain protected: preserve them and collect from a fresh folder containing the unchanged original `jobs.tsv` and `degap_jobs/` receipts, not a newly exported token. Do not treat these protocol checks as full manual-workflow acceptance.
 
 ### Project-scoped manual refinement (`refine.py`, current source)
 
-In addition to the legacy `DEGAP-JOBS` script bundle (labeled **Legacy DEGAP-JOBS (scripts)** in the App), the current feature-branch source adds a project-scoped **Refinement Tasks** path between the matching Desktop App and the matching Server workspace:
+In addition to the legacy `DEGAP-JOBS` script bundle (labeled **Legacy DEGAP-JOBS (scripts)** in the App), the current source provides a project-scoped **Refinement Tasks** path between the matching Desktop App and the matching Server workspace:
 
-1. **App export (Assembly current chr / Project Pseudomolecule Preview → Export):** In Assembly, queue one or more Final Path **Gap** loci (select one or more tools per Gap: `degap` alone by default, with `lrgapcloser`, `tgsgapcloser`, and `quartet` also available) and/or **Left/Right Telomere** endpoints (fixed to `DEGAP TelSeeker (telseeker_ctg)` with telomere motif) across chromosomes in the current project. Assembly retains the quick **Current Chr** export (while displaying both current-chromosome and project-total queued counts); project-wide **All Queued** export is consolidated under the Project page right-side **Pseudomolecule Preview → Export → Export All Refinement Tasks** (separate from the path-files **All** option and not placed in the **Refinement** card; opens a chromosome-grouped preview/confirmation modal before opening the save dialog to write `refinement_tasks.zip`, never scanning unselected loci or crossing projects). All selected tools for a Gap travel in the same task. Only verified closed candidates compete, in the priority order listed above. Verified project reads are inherited by default (without exposing private Server paths in the App UI), or may be explicitly overridden or cleared; empty reads remain exportable.
-2. **Server execution:** Copy `refinement_tasks.zip` into the matching Server workspace and run `python .lib/tools/refine.py refinement_tasks.zip` (or the installed `~/bin/refine.py`, which delegates to the workspace runtime). Add `--hifi <files...>` / `--ont <files...>` when overriding or supplying reads on Server, or `--help` to inspect options. Results are written under `08_refinement_jobs/02_manual/<batch_sha256>/`, including `refinement_results.zip`, `summary.json`, and `report.html`, and the manual section is merged into `06_report/report.html` without touching automatic `05_final/` deliveries.
+1. **App export (Assembly current chr / Project Pseudomolecule Preview → Export):** In Assembly, queue one or more Final Path **Gap** loci (select one or more tools per Gap: `degap` alone by default, with `lrgapcloser`, `tgsgapcloser`, and `quartet` also available) and/or **Left/Right Telomere** endpoints (fixed to `DEGAP TelSeeker (telseeker_ctg)` with telomere motif) across chromosomes in the current project. Assembly retains the quick **Current Chr** export (while displaying both current-chromosome and project-total queued counts); project-wide **All Queued** export is consolidated under the Project page right-side **Pseudomolecule Preview → Export → Export All Refinement Tasks** (separate from the path-files **All** option and not placed in the **Refinement** card; opens a chromosome-grouped preview/confirmation modal before opening the save dialog to write `refinement_tasks.zip`, creating tasks only for queued loci in this project; the bundle also preserves the current project path snapshot for whole-genome export). All selected tools for a Gap travel in the same task. Only verified closed candidates compete, in the order DEGAP → LR_Gapcloser → TGS-GapCloser → quarTeT. Verified project reads are inherited by default (without exposing private Server paths in the App UI), or may be explicitly overridden or cleared; empty reads remain exportable.
+2. **Server execution:** In the matching job run `python .lib/tools/refine.py refinement_tasks.zip`; repeat `--hifi` or `--ont` for read overrides. See section 3 for the batch report, direct FASTA and patch filenames. The whole genome starts from the exported snapshot, including edits on other chromosomes. A legacy task without that snapshot produces only a local patch.
 3. **Report honesty & privacy:** Shareable HTML reports omit private Server read paths (retaining read technology and SHA-256 digests) and distinguish `Pending App import` (`等待导回 App`) from `No patch to import` (`无可导回补丁`). Manual batches are never marked imported without an App receipt.
-4. **App import, provenance, and undo/switch status:** The Project page **Refinement** card (placed between **Datasets** and **Pseudomolecule Preview**) loads imported batches via `list_manual_refinement_results` and imports `refinement_results.zip` directly via `import_manual_refinement_results` (flushing pending Final Path edits first and reloading authoritative Assembly/Preview data after import, without creating or assigning tracks). Accepted segments carry a lightweight **Refined** marker on the Final Path graph/table (with full provenance in tooltips and the Final Path Log contribution table). Locus-level undo and candidate switching are wired to `undo_manual_refinement_locus` / `switch_manual_refinement_locus` (no local simulation; backend verification enforces revision and boundary rules). Unit coverage for the Server CLI and report generator lives in `GPM2.0/server/tests/test_refine.py`.
+4. **Return to the original project:** Import the batch `.patch.zip` using the icon at the top right of **Refinement**. The App distinguishes manual and automatic patches by their contents, flushes pending edits, checks the original project, batch and locus, and keeps the adopted source in the Final Path. Viewing another tool does not switch assemblies.
 
 Updated App exports select a separate `shared_prepare.family-v1/` cache for the bundled family runtime. It records the original reads and converter by hash and does not adopt an older unverified FASTA/index cache. If an older exported script points to that cache, keep its results; re-export with the updated App into a fresh job output directory for a new native run. Existing candidate packages can still be collected/imported under their original rules.
 
@@ -232,3 +212,17 @@ cache events and status under `.run_all/legacy_continuation/`. On failure, inspe
 the original logs and request a **fresh** continuation preview before retrying;
 do not remove checkpoints or bypass the cache fence. These are controlled-script
 checks, not yet real-native or scheduler-termination acceptance.
+
+### Optional compaction after publication
+
+From the new project workspace, preview first. Inspect the individual `files` and the stated impact, then repeat the same tool selection with the full `plan_sha256`:
+
+```bash
+python -B .lib/tools/compact_refinement.py --tool lrgapcloser
+read -r -p 'Paste the reviewed plan_sha256: ' plan_sha256
+python -B .lib/tools/compact_refinement.py --tool lrgapcloser --apply "$plan_sha256"
+```
+
+Omit `--tool` to inspect all tools. `unlink` removes only unreferenced, producer-recorded, rebuildable read copies, partitions or indices. Replaying a native command manually may require preprocessing again. `share` asks a capable filesystem to share verified identical extents while retaining both paths and independent writes. If unsupported it is skipped; there is no hard-link or deletion fallback. An empty plan is valid. File sizes, allocated blocks and shared ranges do not measure actual disk space recovered.
+
+After interruption use `python -B .lib/tools/compact_refinement.py --recover "$plan_sha256"`. Before commit this restores held files; after commit it finishes only the authorized purge. Receipts are in `.runtime/refinement/compaction/`. Do not remove `.runtime`, failed attempts or `04_accepted/` by hand. Older layouts are excluded; a native attempt without a producer inventory never authorizes filename-based deletion.

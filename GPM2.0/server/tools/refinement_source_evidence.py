@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 from collections import Counter
 from contextlib import contextmanager
+from itertools import chain
 import json
 from pathlib import Path
 import re
@@ -123,10 +124,49 @@ def binding(path):
     return result
 
 
-def verify_inputs(recipe):
+FINAL_INPUTS = ("provenance.json", "final_path.json", "sources.tsv")
+
+
+def measurement_input(row, recipe, layout=None):
+    """Only a reclaimed, run-owned final stage can be substituted by its proven publication."""
+    path = Path(row["path"])
+    if path.exists() or path.is_symlink() or layout is None or not layout.project_delivery:
+        if binding(path) != row:
+            raise ValueError("source evidence input changed: " + str(path))
+        return path.resolve(strict=True)
+    tool, run = recipe["tool"], recipe["run_id"]
+    if tool not in TOOL_DIRECTORIES or not re.fullmatch("[a-f0-9]{32}", run):
+        raise ValueError("invalid measurement producer identity")
+    stage = layout.path(f".runtime/refinement/{TOOL_DIRECTORIES[tool]}/{run}/final")
+    if (path.parent != stage or path.name not in FINAL_INPUTS or row["resolved"] != str(path)
+            or stage.exists() or stage.is_symlink()):
+        raise ValueError("missing source evidence input (not a reclaimed final stage): " + str(path))
+    try:
+        from refinement_commit import current_publication, targets, committed_final_history
+    except ModuleNotFoundError:
+        from .refinement_commit import current_publication, targets, committed_final_history
+    current = current_publication(layout.root, tool, verify=False)
+    if current:
+        live = (targets(layout, tool)["final"], current["areas"]["final"]["new"]["files"])
+        for directory, files in chain([live], committed_final_history(layout, tool)):
+            if files.get("provenance.json") != recipe["provenance_sha256"] or files.get(path.name) != row["sha256"]:
+                continue
+            provenance = safe_file(directory, "provenance.json")
+            if content_digest(provenance) != recipe["provenance_sha256"]:
+                raise ValueError("published measurement provenance changed")
+            record = read_object(provenance)
+            resolved = safe_file(directory, path.name)
+            if (record["tool"] != tool or record["run_id"] != run or record["execution"]["status"] != "success"
+                    or content_digest(resolved) != row["sha256"]):
+                raise ValueError("published measurement input does not match its producer")
+            return resolved
+    raise ValueError("no committed replacement for measurement input: " + str(path))
+
+
+def verify_inputs(recipe, root=None):
+    layout = WorkspaceLayout.detect(root) if root is not None else None
     for row in recipe["inputs"]:
-        if binding(row["path"]) != row:
-            raise ValueError("source evidence input changed: " + row["path"])
+        measurement_input(row, recipe, layout)
     for name, row in recipe["tools"].items():
         found = shutil.which(name)
         if found is None or str(Path(found).resolve()) != row["resolved"] or binding(found)["sha256"] != row["sha256"]:
@@ -259,6 +299,16 @@ def context(root, result, threads):
               "reference_sha256": content_digest(ref),
               "patch_sources": [{key: row[key] for key in ("dataset", "contig", "length", "fasta_sha256")} for row in patches],
               "inputs": [binding(path) for path in sorted(set(paths), key=str)], "tools": tools, "generators": generator_hashes()}
+    # Keep the same run-specific receipt identity after publication reclaims its identical
+    # staging tree. A live public name alone cannot stand in for this producer and checksum.
+    if layout.project_delivery and final == layout.path(f"05_final/{TOOL_DIRECTORIES[tool]}"):
+        stage = layout.path(f".runtime/refinement/{TOOL_DIRECTORIES[tool]}/{run_id}/final")
+        for row in recipe["inputs"]:
+            path = Path(row["path"])
+            if path.parent == final and path.name in FINAL_INPUTS:
+                row["path"] = row["resolved"] = str(stage / path.name)
+                measurement_input(row, recipe, layout)
+        recipe["inputs"].sort(key=lambda row: row["path"])
     return layout, accepted, known, patches, ref, frozen, cen_entries, original_marks, recipe
 
 
@@ -269,7 +319,7 @@ def build(root, result, threads):
     home = layout.path(f"04_refinement/{TOOL_DIRECTORIES[result['tool']]}/04_accepted/{result['run_id']}/01_source_evidence/{key}")
     if home.exists() or home.is_symlink():
         receipt = load(home, recipe=recipe)
-        verify_inputs(recipe)
+        verify_inputs(recipe, root)
         return {"directory": str(home), "receipt_sha256": content_digest(home / RECEIPT), "generation_sha256": key}
     home.parent.mkdir(parents=True, exist_ok=True)
     with measurement_workspace(home.parent, recipe) as work:
@@ -381,7 +431,7 @@ def build(root, result, threads):
                      "annotation_policy": recipe["annotation_policy"], "coordinate_domain": "source 1-based inclusive; final 0-based half-open"})
         deliver(work / "04_projection/summary.json", "metadata/refinement/source_summary.json")
         catalog.verify_unchanged()
-        verify_inputs(recipe)
+        verify_inputs(recipe, root)
         shutil.rmtree(work / "indexes")
         receipt = {"schema": SCHEMA, "schema_version": 1, "generation_sha256": key, "recipe": recipe,
                    "sources": statuses, "payload": payload, "files": inventory(work)}

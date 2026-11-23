@@ -2,7 +2,7 @@
 
 [English](REFINEMENT.md) | **中文** · [Server 手册](README_zh.md)
 
-本指南对应功能分支中的源码实现，不会追溯改变已发布的 v2.0.21 压缩包。已在原生 Linux x86_64 和 ARM64 上验证统一环境，并用合成数据实跑四个固定版本工具；具体范围及证据见仓库中的 `GPM2.0/docs/server-refinement-final-acceptance-20261122.md`。请使用同一版源码构建的安装器与 App；不要覆盖正在使用的安装目录，也不要在作业运行时更新环境。
+本指南对应当前源码实现，不会追溯改变已发布的 v2.0.21 压缩包。此前在原生 Linux x86_64 和 ARM64 上，用同一套环境和合成数据实跑了四个固定版本工具。那次验证不包含本次目录调整和空间回收；具体范围及证据见仓库中的 `GPM2.0/docs/server-refinement-final-acceptance-20261122.md`。请使用同一版源码构建的安装器与 App；不要覆盖正在使用的安装目录，也不要在作业运行时更新环境。
 
 ## 1. 环境与首次运行
 
@@ -51,7 +51,7 @@ bash /work/lgz_only/run_all.sh --gapfill-tools quartet,lrgapcloser
 bash /work/lgz_only/run_all.sh --gapfill-tools none
 ```
 
-工具名使用上面的小写标识，以逗号分隔且不重复；`none` 只能单独使用。没有可用 typed reads 却选择工具会报错。省略工具参数时沿用保存的选择；新的有 reads 任务默认 `degap`。仅准备而不执行的 `prepare.sh --gapfill-tools none` 则初始化为关闭精修。**不提供 `--final-tool` 参数**：每个成功工具都有独立最终结果和 App 项目，不暗中选择“获胜”结果。
+工具名使用上面的小写标识，以逗号分隔且不重复；`none` 只能单独使用。没有可用 typed reads 却选择工具会报错。省略工具参数时沿用保存的选择；新的有 reads 任务默认 `degap`。仅准备而不执行的 `prepare.sh --gapfill-tools none` 则初始化为关闭精修。**不提供 `--final-tool` 参数**：每个成功工具各保留一份独立 FASTA，App 则将所有工具结果读入同一项目。
 
 | 顺序 / 参数标识 | 同时提供两种技术时 | 固定源码/分发版本 |
 | --- | --- | --- |
@@ -71,50 +71,30 @@ CGAT 锁定了 DEGAP 版本，并显式传入与上游 GapFiller 默认一致的
 `--out` 是包含交付包的整个工作区根目录：
 
 ```text
-cgat_server/
-  run_all.sh
-  01_inputs/                         参考、组装及派生输入
-  02_alignments/                     原始比对
-  03_lgz/                            原始 LGZ 各阶段、证据和注释
+cgat_server/                         # 当前项目级交付布局
+  01_inputs/  02_alignments/  03_lgz/
   04_refinement/
-    01_degap/                        其他工具使用上表固定目录
-      01_inputs/<run>/
-      02_jobs/<run>/                 命令、状态和原生完成回执
-      03_native/<run>/               原生输出留存，不是最终结果
-      04_accepted/<run>/             被接纳的 patch 来源序列
-        01_source_evidence/<generation>/  参考比对及注释测量证据
-      05_report/<run>/<site>/        可搬移的尝试报告
+    automatic/<工具>/                # 输入、原生尝试和接纳证据
+    manual/<批次完整摘要>/03_report/  # 批次 summary.json、report.html
   05_final/
-    cgat_server.lgz.fa                可直接使用的 LGZ 基线
-    cgat_server.degap.fa              可直接使用的已发布自动精修结果
-    results.tsv                       区分本次尝试和当前可用发布
-    details/
-      00_lgz/                          LGZ 基线：refinement_applied=false
-      01_degap/                        已校验并发布的精修结果
-        assembly.fa
-        final_path.json
-        sources.tsv
-        remaining_gaps.tsv
-        provenance.json
-  06_report/
-    report.html                      从这里进入总览和本次比较
-    01_lgz/report.html               原始 LGZ 过程
-    02_refinement/01_degap/report.html
-    03_comparison/<batch>/
+    cgat_server.lgz.fa               # 可直接使用的未精修基线
+    cgat_server.<工具>.fa            # 各工具独立发布的基因组
+    cgat_server.manual-<批次前16位>.fa # 有完整快照的手动批次全基因组
+    results.tsv                      # 本次尝试、接纳数、当前可用 FASTA
+    details/                         # 详细路径、来源及批次选择清单
+  06_report/report.html              # 总览与报告、比较入口
   07_delivery/
-    00_lgz/cgat_server[.light].tar.gz
-    01_degap/cgat_server.degap[.light].tar.gz
-  08_refinement_jobs/
-    02_manual/
-      <batch_sha256>/                项目级手动精修批次、结果包与 report.html
-  .lib/                              工作区内嵌运行库副本（包含 .lib/tools/refine.py）
-  .runtime/                          锁、checkpoint、metadata、日志和历史
-    refinement/<tool-dir>/<run>/final/  按来源重建的私有待发布结果
+    cgat_server.full.tar.gz          # 全项目唯一一对，不按工具重复打包
+    cgat_server.light.tar.gz
+    cgat_server.auto.patch.zip       # 有自动结果时才发布的累计补丁
+    manual/cgat_server.manual-<批次前16位>.patch.zip
+  .lib/                              # 工作区运行库
+  .runtime/                          # 状态、checkpoint 与发布回执，不可整删
 ```
 
 FASTA 前缀取创建时的输出目录名。补跑失败不会替换上次成功的基因组；从 `results.tsv` 可查到现有 FASTA 对应哪次发布。若工具没有接纳补丁，清单标明零接纳。已有编号工作区继续使用 `05_final/00_lgz/` 和 `05_final/<工具编号>/`，不搬迁、不改名。
 
-方括号表示两个实际文件，不是文件名的一部分；`--archive-format zip` 使用 `.zip`。每种工具在 `04_refinement`、`05_final/details`、`06_report/02_refinement`、`07_delivery` 下的目录编号固定，不因只选择一个工具而改号。编号工作区不再保留根目录 `data/`、`grt/`、`report/`、`logs/` 影子树。App 包内部仍使用协议约定的 `data/`、`metadata/` 等路径，不要手动改包内目录。
+补跑自动精修时，有新发布结果才更新同一对 Full/Light 和累计自动补丁。手动批次只追加自己的交付补丁和 FASTA，不更新项目包。`--archive-format zip` 将 Full/Light 的后缀改为 `.zip`，补丁始终为 ZIP。旧作业按其创建时的布局读取，不会自动移动数据。
 
 仅存在工具目录不能证明本次成功，应以当前总览和内容绑定的 committed 发布回执为准。新尝试失败会留存诊断，不删除旧的成功发布，也不把旧发布标成新结果。一个工具失败不妨碍其他成功工具或 LGZ 基线交付，但本次流程总退出码非零。
 
@@ -136,18 +116,18 @@ LR_Gapcloser 按原始 LGZ 缺口判定：只有完全闭合才采纳。部分�
 
 TGS-GapCloser、quarTeT GapFiller、LR_Gapcloser 的固定入口不生成原生 HTML，保留它们实际的日志、填补明细、AGP 等诊断，不伪造上游可视化。Full 与 Light 携带相同报告文件。已用 Windows 浏览器离线检查批次导航、原生图形，以及 Full/Light 报告解压后的相对链接。报告可正常浏览不代表生物学准确性。
 
-将某工具的 **Full** 包导入匹配新版 App 的新项目。其权威 Final Path 和导出染色体对应该工具的接纳结果，`00_lgz` 包则明确未精修。Full 包含来源 FASTA；Light 不含 FASTA，但保留索引、metadata、路径及来源关系，因此导出 FASTA 前需要真实序列来源就绪。不要覆盖已有人工编辑的项目。精修包协议为 schema 5 / App Final Path 4；旧 App 拒绝该协议，不静默显示 LGZ 路径。新 App 保留对旧包的兼容。
+新建项目时导入项目 Full 或 Light，全工具结果一起进入，不选版本。向已有匹配项目追加自动结果，在项目页「精修」右上角导入累计自动补丁。卡片区分各工具结果与项目实际采用；每个 Gap 先看是否完整闭合，多个合格闭合再按 DEGAP → LR_Gapcloser → TGS-GapCloser → quarTeT 采用一个。只读查看不改变导出路径；已有人工决定或边界冲突不覆盖。Light 不附带完整序列，不能替代 Full 的离线 FASTA 导出。
 
-手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/01_degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。已提交迁移清单绑定的旧人工包现可纳入不可变 registry，不重跑原生任务或其比对。未知旧结果 ZIP 仍保护：保留原 ZIP，复制未改动的原 `jobs.tsv` 和 `degap_jobs/` receipt 到新的空目录收集，不重新导出 token。不能把这些协议检查等同于手动全链路验收。
+手动 App `DEGAP-JOBS` 是独立入口。当前源码收集器将人工候选目录分版本保存在 `04_refinement/automatic/degap/06_manual/01_catalog/`，以 `.runtime/manual_degap/current.json` 为准，不修改原 LGZ 表。匹配源码构建的 App 已解析实际 Server 运行库，并按内容绑定原始/精修/人工候选种子来源；Full/Light 交付均携带 `metadata/server_sources.json` 身份。受控导出 → Server → 原 App 导入检查保留了手动编辑的 Final Path。已提交迁移清单绑定的旧人工包现可纳入不可变 registry，不重跑原生任务或其比对。未知旧结果 ZIP 仍保护：保留原 ZIP，复制未改动的原 `jobs.tsv` 和 `degap_jobs/` receipt 到新的空目录收集，不重新导出 token。不能把这些协议检查等同于手动全链路验收。
 
 ### 项目级手动精修（`refine.py`，当前源码）
 
-除旧版脚本包入口（App 中明确标为「旧版 DEGAP-JOBS（脚本包）」）外，当前功能分支源码在配套桌面端 App 与 Server 工作区之间新增项目级 **精修任务** 流程：
+除旧版脚本包入口（App 中明确标为「旧版 DEGAP-JOBS（脚本包）」）外，当前源码源码在配套桌面端 App 与 Server 工作区之间新增项目级 **精修任务** 流程：
 
-1. **App 导出（装配页当前染色体 / 项目页染色体预览 → 导出）：** 在装配页按项目跨染色体登记 Final Path 的 **Gap**（每个 Gap 可多选工具：默认仅选 `degap`，也可选择 `lrgapcloser`、`tgsgapcloser`、`quartet`）及 **左/右端粒端点**（固定 `DEGAP TelSeeker (telseeker_ctg)` 并配置端粒 motif）。装配页仅保留「当前染色体已选」快捷导出（卡片顶部同时显示当前染色体与全项目已选计数）；全项目总导出收口在项目页右侧「染色体预览 → 导出 → 导出全部精修任务」（与路径文件「全部」分开，入口不在「精修」卡；点击后先打开按染色体分组的预览确认弹窗，确认后才弹出系统保存框写出 `refinement_tasks.zip`，仅汇总本项目已登记位点，不扫描未选位点、不跨项目）。同一 Gap 的工具随同一任务导出。仅通过校验且完全闭合的候选参与择优，优先级同上述工具顺序。默认沿用项目已校验的 reads（界面不展示私有路径），也可显式覆盖或清空；空 reads 同样允许导出。
-2. **Server 运行：** 将 `refinement_tasks.zip` 传到对应 Server 工作区，运行 `python .lib/tools/refine.py refinement_tasks.zip`（或已安装的 `~/bin/refine.py`，内部统一委派工作区运行库）。如需在 Server 端指定或覆盖 reads，可追加 `--hifi <文件...>` / `--ont <文件...>`；参数说明见 `--help`。产物保存在 `08_refinement_jobs/02_manual/<batch_sha256>/`，包含 `refinement_results.zip`、`summary.json` 和 `report.html`，并在 `06_report/report.html` 合并手动精修区段，不会改动自动终版 `05_final/`。
+1. **App 导出（装配页当前染色体 / 项目页染色体预览 → 导出）：** 在装配页按项目跨染色体登记 Final Path 的 **Gap**（每个 Gap 可多选工具：默认仅选 `degap`，也可选择 `lrgapcloser`、`tgsgapcloser`、`quartet`）及 **左/右端粒端点**（固定 `DEGAP TelSeeker (telseeker_ctg)` 并配置端粒 motif）。装配页仅保留「当前染色体已选」快捷导出（卡片顶部同时显示当前染色体与全项目已选计数）；全项目总导出收口在项目页右侧「染色体预览 → 导出 → 导出全部精修任务」（与路径文件「全部」分开，入口不在「精修」卡；点击后先打开按染色体分组的预览确认弹窗，确认后才弹出系统保存框写出 `refinement_tasks.zip`，只为本项目勾选的位点建立任务；任务包另存当前项目的完整路径快照，以便导出全基因组）。同一 Gap 的工具随同一任务导出。仅通过校验且完全闭合的候选参与择优，优先级为 DEGAP → LR_Gapcloser → TGS-GapCloser → quarTeT。默认沿用项目已校验的 reads（界面不展示私有路径），也可显式覆盖或清空；空 reads 同样允许导出。
+2. **Server 运行：** 在匹配工作区执行 `python .lib/tools/refine.py refinement_tasks.zip`，需要覆盖 reads 时可重复使用 `--hifi` / `--ont`。详见第 3 节的批次报告、直接 FASTA 和补丁路径。整基因组从导出时的项目快照重建，保留其他染色体上的编辑；旧任务缺少快照时只交付局部补丁。
 3. **报告边界与隐私：** 可分享 HTML 报告不公开服务器私有 reads 路径（仅保留测序类型与 SHA-256 摘要），明确区分「等待导回 App」（`pending_app_import`）与「无可导回补丁」（`no_patch`）；无 App 回执前绝不标记为已导回。
-4. **App 导回、来源标记与撤销/切换：** 项目页「精修」卡片（位于数据集表与假分子预览之间）通过 `list_manual_refinement_results` 展示真实导回批次，并通过 `import_manual_refinement_results` 直接导入 `refinement_results.zip`（导入前先保存当前项目待保存的 Final Path，导入成功后重新载入权威装配与预览数据，不新建也不指定轨道）。已采用的精修片段在 Final Path 图与表中统一显示轻量「精修」标记，详细来源见 Tooltip 与 Final Path 日志贡献表。位点级撤销与候选切换已按 `undo_manual_refinement_locus` / `switch_manual_refinement_locus` 协议接入（不做本地模拟，由后端校验版本与边界）。Server CLI 与报告测试位于 `GPM2.0/server/tests/test_refine.py`。
+4. **导回原项目：** 在项目页「精修」卡片右上角导入本批 `.patch.zip`。App 按包内清单识别手动或自动补丁，先保存待提交编辑，核对原项目、批次和位点，不新建工具项目。已采用片段在 Final Path 中保留工具与批次来源；查看其他工具不会切换组装。
 
 新版 App 为捆绑的双向 DEGAP 单独使用 `shared_prepare.family-v1/`，按哈希记录原始 reads 和转换程序，不接用旧的未校验 FASTA/索引缓存。若旧导出脚本指向旧缓存，请保留旧结果；需要重跑时，用新版 App 重新导出并选择新的 job 输出目录。已有候选包仍按原规则收集或导入。
 
@@ -221,3 +201,17 @@ python3 -B "$SERVER/tools/migrate_workspace.py" --server-dir /work/old_server \
 缓存不匹配时，在失效和重算之前停止，不伪造缓存命中。每次审批、缓存事件和状态保存在
 `.run_all/legacy_continuation/`。失败后先看原日志，重试前重新预览，不删除 checkpoint
 或绕过缓存保护。目前是受控脚本边界检查，真实原生 LGZ 和调度器终止仍待统一验收。
+
+### 回收已发布工具的原生临时文件（可选）
+
+在新项目工作区根目录执行。第一条只列清单，不删除、不重跑。检查 `files` 中每一项及影响后，沿用相同的工具范围，传入输出的完整 `plan_sha256`：
+
+```bash
+python -B .lib/tools/compact_refinement.py --tool lrgapcloser
+read -r -p '粘贴审阅过的 plan_sha256：' plan_sha256
+python -B .lib/tools/compact_refinement.py --tool lrgapcloser --apply "$plan_sha256"
+```
+
+省略 `--tool` 检查所有工具。`unlink` 只针对原生成功时登记、现在仍可重建且无引用的 reads 副本、分片或索引；手动重放原生流程可能要重新预处理。`share` 只让支持的文件系统共享两个已核对文件的相同数据块，保留两条路径及写时复制语义；不支持时跳过，不改用硬链接或强删。清单为空也是正常结果。逻辑大小、文件占块和共享范围并不等于磁盘实际释放量。
+
+若操作被中断，按提示运行 `python -B .lib/tools/compact_refinement.py --recover "$plan_sha256"`：提交前恢复暂存文件，提交后只清掉已获授权的暂存副本。操作回执在 `.runtime/refinement/compaction/`。不要手动删除 `.runtime`、失败现场或 `04_accepted/`。旧布局不支持这个入口；没有登记清单的原生尝试不允许按文件名补猜删除。

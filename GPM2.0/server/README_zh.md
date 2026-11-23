@@ -6,7 +6,7 @@
 
 Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，命名别名保留 LGZ 持久化阶段 ID；独立的编号布局和精修包协议变化见下文。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md)。
 
-> **功能分支源码**：LGZ 后四工具精修、编号工作区、旧目录迁移和 App 精修包见[使用指南](REFINEMENT_zh.md)。下方 v2.0.21 下载命令安装的是已发布版本，不包含这些功能分支改动。
+> **当前源码**：LGZ 后四工具精修、编号工作区、旧目录迁移和 App 精修包见[使用指南](REFINEMENT_zh.md)。下方 v2.0.21 下载命令安装的是已发布版本，不包含这里的新产出结构。
 
 ## 快速开始
 
@@ -393,7 +393,7 @@ Prepare 将序列、阈值、全部来源 ID、SHA-256 和 note 固化到项目�
 
 ## DEGAP2.0 与 Server 共用环境
 
-下方手动导出 App `DEGAP-JOBS` 的流程对应已发布旧布局协议。当前源码收集器已将编号工作区的人工候选隔离到 `04_refinement/01_degap/06_manual/01_catalog/`，不追加原 LGZ metadata；匹配源码构建的 App 现已按实际 Server 布局解析运行库，并按身份/内容定位种子来源，不猜测便携路径。受控的 App 导出—Server 收集—原 App 导入检查通过，手动编辑的 Final Path 未改变；这不是原生工具验收。迁移清单绑定的旧人工包可接续，不重跑原任务/比对；未知旧结果 ZIP 仍拒绝覆盖。最终验收仍待完成。它与 LGZ 后自动精修及导入各工具新版 App 包是两条不同入口；当前源码的项目级手动精修任务（`refinement_tasks.zip`）请使用下文 `refine.py` 入口。
+下方手动导出 App `DEGAP-JOBS` 的流程对应已发布旧布局协议。当前源码收集器已将编号工作区的人工候选隔离到 `04_refinement/automatic/degap/06_manual/01_catalog/`，不追加原 LGZ metadata；匹配源码构建的 App 现已按实际 Server 布局解析运行库，并按身份/内容定位种子来源，不猜测便携路径。受控的 App 导出—Server 收集—原 App 导入检查通过，手动编辑的 Final Path 未改变；这不是原生工具验收。迁移清单绑定的旧人工包可接续，不重跑原任务/比对；未知旧结果 ZIP 仍拒绝覆盖。最终验收仍待完成。它与 LGZ 后自动精修及导入各工具新版 App 包是两条不同入口；当前源码的项目级手动精修任务（`refinement_tasks.zip`）请使用下文 `refine.py` 入口。
 
 GPM v2.0.20 附带固定版本的 DEGAP2.0 Server 运行时，以及下文配套的 App 任务卡工作流。
 请同时更新 Server 和 App 后使用。
@@ -448,7 +448,7 @@ bash ./gpm_server/run_all.sh --gapfill-tools degap,tgsgapcloser,quartet,lrgapclo
 
 四工具从同一 LGZ 基线串行、独立运行；`--gapfill-tools none` 只关闭本次精修，不需要 `--final-tool`。reads 分配、固定版本/兼容补丁、保存参数替换规则与恢复边界见[完整指南](REFINEMENT_zh.md)。未编号旧目录必须先显式迁移；不要覆盖 prepare 或删除有效结果。
 
-从 `06_report/report.html` 进入本次报告；`05_final/00_lgz` 明确未精修，每工具真正的接纳结果位于 `05_final/01_degap`、`02_tgsgapcloser`、`03_quartet`、`04_lrgapcloser`，交付包对应放在 `07_delivery/<工具目录>/`。使用匹配新版 App 导入某工具包，Final Path 和导出 FASTA 均来自该精修结果，不再仅提供一份额外 FASTA 而仍显示 LGZ 路径。四种固定版本的工具都已在 Linux x86_64 上用合成数据运行；ARM64 已通过依赖求解，尚未完成安装与原生运行验证。这些检查不代表生物学准确率或性能收益。
+新建作业从 `05_final/results.tsv` 查直接可用的基线、自动工具和手动批次 FASTA，详情见 `06_report/report.html`。`07_delivery/` 只发布一对项目 Full/Light；补跑自动精修时更新这对包，并提供一份累计自动补丁。导入项目包无需选工具版本。
 
 ### 项目级手动精修（当前源码）
 
@@ -464,4 +464,4 @@ python .lib/tools/refine.py refinement_tasks.zip --prepare-only
 
 新项目公开运行时目录为 `.lib/`，旧项目 `.prepare_lib/` 与旧版编号工作区的 `.runtime/prepared/` 仅作为兼容读取/迁移路径。`~/bin/refine.py` 也可作为全局入口，但严格遵循当前项目运行时优先（先 `.lib/`，再兼容旧 `.prepare_lib/` 或 `.runtime/prepared/`），不混用不同项目的运行时版本。
 
-手动任务会写入 `08_refinement_jobs/02_manual/<batch>/03_report`（`summary.json`、`report.html`）与 `04_delivery`（`refinement_results.zip`），并同步更新总报告 `06_report/report.html`。每个 Gap 任务可多选工具，默认仅选 `degap`；多个工具均闭合时按 DEGAP、LR_Gapcloser、TGS-GapCloser、quarTeT 的顺序采用一个，左/右端粒任务固定使用 `DEGAP TelSeeker`。可分享 HTML 报告不公开服务器私有 reads 路径（保留测序类型与 SHA-256 摘要），并明确区分「等待导回 App」与「无可导回补丁」。在通过项目页「精修」卡片将 `refinement_results.zip` 导回原 App 项目前，手动结果仅属于待导回产物，不得写入或冒充自动精修的 `05_final/`。
+手动批次报告在 `04_refinement/manual/<批次完整摘要>/03_report/`。使用新任务快照时，`05_final/<out>.manual-<批次前16位>.fa` 可直接使用；`07_delivery/manual/<out>.manual-<批次前16位>.patch.zip` 用于在原 App 项目右上角的精修补丁入口导回，不重打项目 Full/Light。无完整快照的历史任务只返回局部补丁。每个 Gap 可多选工具，优先采用完整闭合，同为闭合时按 DEGAP、LR_Gapcloser、TGS-GapCloser、quarTeT；端粒仍固定用 DEGAP TelSeeker。

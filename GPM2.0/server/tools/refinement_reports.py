@@ -1230,7 +1230,7 @@ def build_tool_report(root, result):
         receipt = load(directory)
         if digest(receipt_path) != evidence["receipt_sha256"] or receipt["recipe"]["provenance_sha256"] != sha:
             raise ReportError("source measurements do not bind the reported accepted result")
-        verify_inputs(receipt["recipe"])
+        verify_inputs(receipt["recipe"], root)
         source_binding = {"source_evidence_receipt_sha256": evidence["receipt_sha256"],
                           "source_evidence_generation_sha256": receipt["generation_sha256"]}
         artifacts[receipt_path.relative_to(root).as_posix()] = evidence["receipt_sha256"]

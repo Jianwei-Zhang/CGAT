@@ -236,7 +236,7 @@ def build_full(root, result, report, target):
                 from refinement_source_delivery import apply_to_bundle
             except ModuleNotFoundError:
                 from .refinement_source_delivery import apply_to_bundle
-            measured = apply_to_bundle(result["source_evidence"], target)
+            measured = apply_to_bundle(result["source_evidence"], target, root=root)
             if measured["recipe"]["provenance_sha256"] != digest(final_dir / "provenance.json"):
                 raise BundleError("source evidence belongs to a different accepted result")
         measurements = {(row["dataset"], row["contig"], row["chromosome"]): row for row in measured["sources"]} if measured else {}

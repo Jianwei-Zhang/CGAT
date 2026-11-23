@@ -534,6 +534,17 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
             with (root / relative).open("rb") as stream:
                 os.fsync(stream.fileno())
         sync_directories(*((root / relative).parent for relative in result["artifacts"]))
+        layout = WorkspaceLayout.detect(root)
+        if layout.project_delivery:
+            try:
+                try:
+                    from refinement_scratch import capture_scratch
+                except ModuleNotFoundError:
+                    from .refinement_scratch import capture_scratch
+                value["scratch_inventory"] = capture_scratch(layout, invocation.tool, paths["03_native"], result["artifacts"])
+            except (ImportError, OSError, ValueError) as exc:
+                # Optional maintenance metadata is never a reason to rerun a successful native tool.
+                print(f"[NATIVE SCRATCH] no compaction inventory recorded: {exc}", flush=True)
         value["payload_sha256"] = fingerprint(value)
         receipt = paths["02_jobs"] / NAME
         durable_json(receipt, value)

@@ -21,12 +21,12 @@ except ModuleNotFoundError:
     from .workspace_migration import durable_json
 
 
-def apply_to_bundle(evidence, target):
+def apply_to_bundle(evidence, target, *, root=None):
     directory = Path(evidence["directory"])
     if content_digest(safe_file(directory, RECEIPT)) != evidence["receipt_sha256"]:
         raise ValueError("source evidence receipt changed before delivery")
     receipt = load(directory)
-    verify_inputs(receipt["recipe"])
+    verify_inputs(receipt["recipe"], root)
     files = {}
     for row in receipt["payload"]:
         source, destination = safe_file(directory, row["file"]), target / relative_path(row["package_path"])
