@@ -37,7 +37,13 @@ def summarize(catalog, construction, outputs):
                     contexts[q][tuple(task["target_ids"])] += 1
         maps[key]["logical_uses"].append([task["kind"], task["request"].get("chromosome")])
     scope = catalog.get("supplement_scope", {})
-    return {"scope": scope.get("effective", "full"), "acceptance": construction.get("supplement_acceptance"),
+    phases = {}
+    for phase in ("regional_partial_discovery", "regional_candidate_discovery"):
+        if phase in catalog:
+            report = catalog[phase]
+            phases[phase] = {k: report[k] for k in ("planned_windows", "regional_windows", "frontier_omitted_windows",
+                               "completed_regional_tasks", "fallback_parents", "requested_part_pairs", "reused_part_pairs") if k in report}
+    return {"routing": scope.get("routing"), "regional_phases": phases, "scope": scope.get("effective", "full"), "acceptance": construction.get("supplement_acceptance"),
             "completed_native_requests": sum(len(m["logical_uses"]) for m in maps.values()),
             "distinct_completed_native_maps": len(maps), "completed_maps": maps,
             "skipped_native_candidate_requests": scope.get("native_candidate_stops", []),

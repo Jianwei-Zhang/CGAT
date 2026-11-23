@@ -752,6 +752,16 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
         except Q0EvidenceError:
             pass
     use_regional = regional_enabled(lengths, options.get("minimap_preset", "asm10"))
+    sparse = None
+    if (not use_regional and supplement_scope == "positive_threshold" and draft and fallback_reason is None
+            and getattr(repair_inputs, "regional_observations", None) is not None):
+        from .q0_threshold_prepare import sparse_routing
+        sparse = sparse_routing(frontier_override, repair_inputs.source_lengths)
+        if sparse is not None:
+            use_regional = True
+            known_pairs = repair_inputs.regional_observations.fork()
+            print(f"LGZ q0 sparse windows: requested={sparse['request_bp']} padded={sparse['padded_request_bp']} "
+                  f"source_bp={sparse['source_bp']}", flush=True)
     reference_pafs = {f"runs/{key.dataset}_vs_ref/result.paf" for key in sources}
     reference_inputs = [row for row in inputs if row["path"] in reference_pafs]
     with (LocalReferenceCache(root, reference_inputs) if use_regional else nullcontext(None)) as cache:
@@ -762,6 +772,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
         regional_frontier = None
         unsearched = UnsearchedWindows() if supplement_scope != "full" else None
         scope_report = {"requested": supplement_scope, "effective": "full"}
+        if sparse is not None:
+            scope_report["routing"] = sparse
         if supplement_scope == PROOF_REPAIR_SCOPE:
             scope_report["proof_repair_rounds"] = repair_round
         if unsearched is not None:
@@ -879,6 +891,20 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                     {key for task in partial_tasks for key in task["target_ids"]},
                     include_placed=True, known_pairs=known_pairs)
         candidate_requests = [] if reached else supplemental_groups(catalog, assignments, known_pairs)
+        candidate_frontier = regional_frontier
+        if sparse is not None and repair_inputs.sparse_decisions is not None:
+            decision, repair_inputs.sparse_decisions = repair_inputs.sparse_decisions, None
+            if candidate_requests and tasks:
+                # The partial phase can satisfy the question. Do not schedule its competitors
+                # merely because they were needed before these completed alignments existed.
+                decision.observe(root, tasks)
+                if decision.need is not None:
+                    candidate_frontier = decision.need
+                    scope_report["candidate_threshold_request"] = record(candidate_frontier)
+                    if not candidate_frontier:
+                        print("LGZ q0 sparse windows: partial evidence meets threshold; stopping candidates", flush=True)
+                        candidate_requests = []
+            del decision
         pending_candidates = []
         if cache is None:
             def map_candidates(requests):
@@ -908,7 +934,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             from .q0_reference_index import ReferenceIndex
             with closing(ReferenceIndex.open(cache.path, root, catalog.parts, lengths, local_paf_directory=cache.paf_directory)) as index:
                 preset = options.get("minimap_preset", "asm10")
-                planner = CandidatePlan(root,catalog,index,pending_candidates,known_pairs,tasks,tool,preset)
+                planner = CandidatePlan(root,catalog,index,pending_candidates,known_pairs,tasks,tool,preset,
+                                        **({"native_for_weak": True} if sparse is not None else {}))
                 seed_ids = []
                 while (seed_request := planner.next_unroutable_seed()) is not None:
                     seed = _unroutable_seed(root,catalog,seed_request,tool,preset,threads,
@@ -917,7 +944,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 regional_tasks, native_requests, report = prepare_candidates(
                     root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,
                     preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner,
-                    regional_frontier=regional_frontier, unsearched=unsearched)
+                    regional_frontier=candidate_frontier, unsearched=unsearched)
                 report["unroutable_seed_task_ids"] = seed_ids
             tasks.extend(regional_tasks)
             catalog.payload["regional_candidate_discovery"] = report
