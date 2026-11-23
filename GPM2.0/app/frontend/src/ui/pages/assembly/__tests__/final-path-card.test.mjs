@@ -133,7 +133,7 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
         { degap },
         { ...deps, i18n: createI18n() },
       ),
-      canExportDegapJobs: true,
+      canExportManualRefinement: true,
     },
     {
       ...deps,
@@ -154,8 +154,9 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.match(html, /<input type="text" data-degap-setting-field="ontReads" value="" placeholder="\/server\/reads\/ont.fastq.gz">/);
   assert.doesNotMatch(html, /<textarea[^>]+data-degap-setting-field="(?:hifiReads|ontReads)"/);
   assert.match(html, /<p class="helper-hint degap-form-help">READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。<\/p>/);
-  assert.match(html, /DEGAP-JOBS/);
-  assert.match(html, /data-final-path-export-action="all"[\s\S]*final-path-export-divider[\s\S]*data-final-path-export-action="degap-jobs"/);
+  assert.match(html, /refine-jobs/);
+  assert.match(html, /data-final-path-export-action="all"[\s\S]*final-path-export-divider[\s\S]*data-final-path-export-action="refine-jobs"/);
+  assert.doesNotMatch(html, /data-final-path-export-action="degap-jobs"/);
   assert.match(html, /class="final-path-card-head-controls"[\s\S]*导出/);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval|刻度间隔/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
@@ -166,7 +167,7 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.doesNotMatch(html, /DEGAP job added/);
 });
 
-test("Assembly Final Path exports current-chromosome refinement tasks, not all project tasks", () => {
+test("Assembly Final Path exports current-chromosome refinement tasks as refine-jobs, not all project tasks", () => {
   const html = renderFinalPathCard({
     projectName: "Demo",
     chrName: "Chr01",
@@ -174,7 +175,8 @@ test("Assembly Final Path exports current-chromosome refinement tasks, not all p
     viewMode: "graph",
     canExportManualRefinement: true,
   }, { ...createDeps(), i18n: createI18n() });
-  assert.match(html, /data-final-path-export-action="refinement-current-chr"/);
+  assert.match(html, /data-final-path-export-action="refine-jobs">refine-jobs</);
+  assert.doesNotMatch(html, /data-final-path-export-action="degap-jobs"/);
   assert.doesNotMatch(html, /data-final-path-export-action="refinement-all"/);
   assert.match(html, /data-final-path-export-action="all"/); // Ordinary path files.
 });

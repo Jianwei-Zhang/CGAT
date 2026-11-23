@@ -9,11 +9,17 @@ import {
   resolveCurrentFinalPathChrName,
 } from "./final-path-state.js";
 import {
+  DEFAULT_MANUAL_REFINEMENT_TOOL_PARAMS,
+  MANUAL_REFINEMENT_GAP_TOOLS,
+  MANUAL_REFINEMENT_SETTINGS_TABS,
+  MANUAL_REFINEMENT_TOOL_LABELS,
+  addManualRefinementGapTool,
   buildManualRefinementExportBaseName,
   buildManualRefinementExportRequest,
   extractFileName,
   normalizeManualRefinementState,
-  MANUAL_REFINEMENT_GAP_TOOLS,
+  normalizeManualRefinementToolParams,
+  removeManualRefinementGapTool,
   resolveManualRefinementGapCandidate,
   resolveManualRefinementTelCandidate,
 } from "./manual-refinement-state.js";
@@ -84,7 +90,7 @@ export function recordManualRefinementExportReceipt(host, store, receipt, deps =
   if (Number(state.projectExport?.projectId || 0) === Number(state.session?.projectId || 0)
       && normalizeString(state.projectExport?.workspacePath) === normalizeString(state.session?.workspacePath)) {
     store.setState({ projectExport: { ...state.projectExport, manualRefinementExports: [receipt,
-      ...(state.projectExport?.manualRefinementExports || []).filter(row => row.batchSha256 !== receipt.batchSha256),
+      ...(state.projectExport?.manualRefinementExports || []).filter((row) => row.batchSha256 !== receipt.batchSha256),
     ].slice(0, 20) } });
   }
   const scopeLabel = receipt.scope === "current-chr"
@@ -92,6 +98,7 @@ export function recordManualRefinementExportReceipt(host, store, receipt, deps =
     : (isEn ? "all queued loci in project" : "本项目全部已选位点");
   return updateManualRefinementState(host, store, {
     exporting: false,
+    receiptDismissed: false,
     error: "",
     feedback: isEn
       ? `Exported refinement tasks (${scopeLabel}): ${receipt.lociCount} loci / ${receipt.tasksCount} tool runs. Run refine.py on Server next.`
@@ -114,13 +121,14 @@ export function registerManualRefinementLocus(host, store, payload = {}, deps = 
   const chrName = normalizeString(payload.chrName || payload.chr);
   const kind = normalizeString(payload.kind).toLowerCase();
   const segmentId = normalizeString(payload.segmentId || payload.segment_id);
+  const requestedTool = normalizeString(payload.tool).toLowerCase() || "degap";
   const finalPathEntry = chrName
     ? state.assembly?.finalPathByChr?.[chrName] || getCurrentChrFinalPath(state.assembly)
     : getCurrentChrFinalPath(state.assembly);
 
   let candidate = null;
   if (kind === "gap") {
-    candidate = resolveManualRefinementGapCandidate(finalPathEntry, segmentId);
+    candidate = resolveManualRefinementGapCandidate(finalPathEntry, segmentId, requestedTool);
   } else if (kind === "tel_left") {
     candidate = resolveManualRefinementTelCandidate(finalPathEntry, segmentId, "left");
   } else if (kind === "tel_right") {
@@ -143,14 +151,38 @@ export function registerManualRefinementLocus(host, store, payload = {}, deps = 
   }
 
   const current = getManualRefinementState(store);
+  if (candidate.kind === "gap") {
+    const result = addManualRefinementGapTool(current.loci, candidate, requestedTool);
+    const toolLabel = MANUAL_REFINEMENT_TOOL_LABELS[result.tool] || result.tool;
+    if (result.duplicate) {
+      updateManualRefinementState(host, store, {
+        panelOpen: true,
+        error: "",
+        feedback: isEn
+          ? `Already queued: ${candidate.chr} · ${candidate.label || candidate.segmentId} (${toolLabel})`
+          : `该任务已在清单中：${candidate.chr} · ${candidate.label || candidate.segmentId}（${toolLabel}）`,
+      }, deps);
+      return false;
+    }
+    updateManualRefinementState(host, store, {
+      panelOpen: true,
+      loci: result.loci,
+      error: "",
+      feedback: isEn
+        ? `Added Gap job: ${candidate.chr} · ${candidate.label || candidate.segmentId} (${toolLabel})`
+        : `已加入 Gap 任务：${candidate.chr} · ${candidate.label || candidate.segmentId}（${toolLabel}）`,
+    }, deps, { persist: true });
+    return true;
+  }
+
   const exists = current.loci.some((item) => item.locusKey === candidate.locusKey);
   if (exists) {
     updateManualRefinementState(host, store, {
       panelOpen: true,
       error: "",
       feedback: isEn
-        ? `Refinement task already queued: ${candidate.chr} · ${candidate.label || candidate.segmentId}`
-        : `该位点已在精修任务清单中：${candidate.chr} · ${candidate.label || candidate.segmentId}`,
+        ? `Telomere task already queued: ${candidate.chr} · ${candidate.label || candidate.segmentId}`
+        : `该端粒任务已在清单中：${candidate.chr} · ${candidate.label || candidate.segmentId}`,
     }, deps);
     return false;
   }
@@ -160,8 +192,8 @@ export function registerManualRefinementLocus(host, store, payload = {}, deps = 
     loci: [...current.loci, candidate],
     error: "",
     feedback: isEn
-      ? `Added refinement task: ${candidate.chr} · ${candidate.label || candidate.segmentId}`
-      : `已加入精修任务：${candidate.chr} · ${candidate.label || candidate.segmentId}`,
+      ? `Added Telomere job: ${candidate.chr} · ${candidate.label || candidate.segmentId}`
+      : `已加入端粒任务：${candidate.chr} · ${candidate.label || candidate.segmentId}`,
   }, deps, { persist: true });
   return true;
 }
@@ -290,13 +322,81 @@ export function bindManualRefinementCard(host, store, deps = {}) {
       return;
     }
 
-    const quickAdd = event.target?.closest?.("[data-manual-ref-quick-add]");
-    if (quickAdd) {
-      registerManualRefinementLocus(host, store, {
-        chr: quickAdd.dataset.manualRefChr,
-        kind: quickAdd.dataset.manualRefKind,
-        segmentId: quickAdd.dataset.manualRefSegmentId,
-      }, deps);
+    const scopeBtn = event.target?.closest?.("[data-manual-ref-scope]");
+    if (scopeBtn) {
+      const nextScope = scopeBtn.dataset.manualRefScope === "all" ? "all" : "current-chr";
+      updateManualRefinementState(host, store, { viewScope: nextScope, panelOpen: true }, deps);
+      return;
+    }
+
+    const settingsOpenBtn = event.target?.closest?.("[data-manual-ref-settings-open]");
+    if (settingsOpenBtn) {
+      updateManualRefinementState(host, store, { settingsOpen: true, error: "" }, deps);
+      return;
+    }
+
+    const settingsCloseBtn = event.target?.closest?.("[data-manual-ref-settings-close]");
+    if (settingsCloseBtn) {
+      updateManualRefinementState(host, store, { settingsOpen: false }, deps);
+      return;
+    }
+
+    if (event.target?.matches?.("[data-manual-ref-settings-modal]")) {
+      updateManualRefinementState(host, store, { settingsOpen: false }, deps);
+      return;
+    }
+
+    const settingsTabBtn = event.target?.closest?.("[data-manual-ref-settings-tab]");
+    if (settingsTabBtn) {
+      const tab = normalizeString(settingsTabBtn.dataset.manualRefSettingsTab);
+      if (MANUAL_REFINEMENT_SETTINGS_TABS.includes(tab)) {
+        updateManualRefinementState(host, store, { settingsTab: tab }, deps);
+      }
+      return;
+    }
+
+    const resetTabBtn = event.target?.closest?.("[data-manual-ref-settings-reset-tab]");
+    if (resetTabBtn) {
+      updateManualRefinementState(host, store, (current) => {
+        if (current.settingsTab === "reads") {
+          return { readsMode: "inherit", hifiReadsInput: "", ontReadsInput: "", error: "" };
+        }
+        const tool = current.settingsTab;
+        if (!MANUAL_REFINEMENT_GAP_TOOLS.includes(tool)) {
+          return {};
+        }
+        return {
+          toolParams: {
+            ...current.toolParams,
+            [tool]: { ...DEFAULT_MANUAL_REFINEMENT_TOOL_PARAMS[tool] },
+          },
+          error: "",
+        };
+      }, deps, { persist: true });
+      return;
+    }
+
+    const resetAllBtn = event.target?.closest?.("[data-manual-ref-settings-reset-all]");
+    if (resetAllBtn) {
+      updateManualRefinementState(host, store, {
+        toolParams: normalizeManualRefinementToolParams({}),
+        readsMode: "inherit",
+        hifiReadsInput: "",
+        ontReadsInput: "",
+        error: "",
+      }, deps, { persist: true });
+      return;
+    }
+
+    const removeToolBtn = event.target?.closest?.("[data-manual-ref-remove-tool]");
+    if (removeToolBtn) {
+      const key = normalizeString(removeToolBtn.dataset.manualRefLocusKey);
+      const tool = normalizeString(removeToolBtn.dataset.manualRefTool);
+      updateManualRefinementState(host, store, (current) => ({
+        loci: removeManualRefinementGapTool(current.loci, key, tool),
+        error: "",
+        feedback: "",
+      }), deps, { persist: true });
       return;
     }
 
@@ -308,6 +408,12 @@ export function bindManualRefinementCard(host, store, deps = {}) {
         error: "",
         feedback: "",
       }), deps, { persist: true });
+      return;
+    }
+
+    const dismissReceiptBtn = event.target?.closest?.("[data-manual-ref-dismiss-receipt]");
+    if (dismissReceiptBtn) {
+      updateManualRefinementState(host, store, { receiptDismissed: true }, deps);
       return;
     }
 
@@ -360,6 +466,48 @@ export function bindManualRefinementCard(host, store, deps = {}) {
   });
 
   host.addEventListener("change", (event) => {
+    const unlimitedToggle = event.target?.closest?.("[data-manual-ref-param-unlimited]");
+    if (unlimitedToggle) {
+      const tool = normalizeString(unlimitedToggle.dataset.manualRefParamTool);
+      const field = normalizeString(unlimitedToggle.dataset.manualRefParamUnlimited);
+      if (tool === "degap" && (field === "max_extension_rounds" || field === "max_extension_bp")) {
+        updateManualRefinementState(host, store, (current) => ({
+          toolParams: {
+            ...current.toolParams,
+            degap: {
+              ...current.toolParams.degap,
+              [field]: unlimitedToggle.checked
+                ? "unlimited"
+                : DEFAULT_MANUAL_REFINEMENT_TOOL_PARAMS.degap[field],
+            },
+          },
+          error: "",
+        }), deps, { persist: true });
+      }
+      return;
+    }
+
+    const paramInput = event.target?.closest?.("[data-manual-ref-param-field]");
+    if (paramInput) {
+      const tool = normalizeString(paramInput.dataset.manualRefParamTool);
+      const field = normalizeString(paramInput.dataset.manualRefParamField);
+      if (!MANUAL_REFINEMENT_GAP_TOOLS.includes(tool) || !field) {
+        return;
+      }
+      const nextValue = paramInput.type === "checkbox" ? Boolean(paramInput.checked) : paramInput.value;
+      updateManualRefinementState(host, store, (current) => ({
+        toolParams: {
+          ...current.toolParams,
+          [tool]: {
+            ...current.toolParams[tool],
+            [field]: nextValue,
+          },
+        },
+        error: "",
+      }), deps, { persist: true });
+      return;
+    }
+
     const toolSelect = event.target?.closest?.("[data-manual-ref-tool-select]");
     if (toolSelect) {
       const key = normalizeString(toolSelect.dataset.manualRefLocusKey);
@@ -412,6 +560,16 @@ export function bindManualRefinementCard(host, store, deps = {}) {
         ...(field === "ont" ? { ontReadsInput: value } : { hifiReadsInput: value }),
         error: "",
       }, deps, { persist: true });
+    }
+  });
+
+  host.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    const current = getManualRefinementState(store);
+    if (current.settingsOpen) {
+      updateManualRefinementState(host, store, { settingsOpen: false }, deps);
     }
   });
 

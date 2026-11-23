@@ -1282,7 +1282,7 @@ test("buildAssemblyContextMenuItems exposes final-path graph ctg actions", async
   });
 });
 
-test("buildAssemblyContextMenuItems exposes precise GapFiller actions and settings for graph gaps", async () => {
+test("buildAssemblyContextMenuItems exposes Add Gap Refinement Task with 4 tools and omits legacy DEGAP", async () => {
   const calls = [];
   const host = {};
   const store = createStore({
@@ -1296,6 +1296,11 @@ test("buildAssemblyContextMenuItems exposes precise GapFiller actions and settin
           { segmentId: "seg-2", type: "gap", gapSizeBp: 100 },
           { segmentId: "seg-3", type: "ctg", assemblyCtgId: 8, ctgName: "right", overallLen: 100, start: 1, end: 100 },
         ],
+      },
+    },
+    degap: {
+      manualRefinement: {
+        loci: [{ chr: "Chr01", kind: "gap", segmentId: "seg-2", tools: ["degap"] }],
       },
     },
   });
@@ -1312,47 +1317,40 @@ test("buildAssemblyContextMenuItems exposes precise GapFiller actions and settin
     memberNode: null,
     store,
     host,
-    actions: createContextMenuActionsCapture(calls),
+    actions: {
+      ...createContextMenuActionsCapture(calls),
+      registerManualRefinementLocus: (...args) => calls.push({ name: "registerManualRefinementLocus", args }),
+    },
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["删除", "DEGAP"]);
+  assert.deepEqual(items.map((item) => item.label), ["删除", "添加 Gap 精修任务"]);
   assert.deepEqual(items[1].children.map((item) => item.label), [
-    "GapFiller 左端",
-    "GapFiller 右端",
-    "GapFiller 全部",
-    "设置",
+    "✓ DEGAP",
+    "LR_Gapcloser",
+    "TGS-GapCloser",
+    "quarTeT",
   ]);
+  assert.equal(items[1].children[0].disabled, true);
+  assert.equal(items[1].children[1].disabled, false);
+
   await items[0].run();
   assert.deepEqual(calls.at(-1), {
     name: "deleteFinalPathSegment",
     args: [host, store, { segmentId: "seg-2" }],
   });
-  await items[1].children[1].run();
-  assert.deepEqual(calls.at(-1), {
-    name: "requestDegapGapJob",
-    args: [host, store, {
-      chrName: "Chr01",
-      gapSegmentId: "seg-2",
-      side: "right",
-    }],
-  });
   await items[1].children[2].run();
   assert.deepEqual(calls.at(-1), {
-    name: "requestDegapGapJob",
+    name: "registerManualRefinementLocus",
     args: [host, store, {
       chrName: "Chr01",
-      gapSegmentId: "seg-2",
-      side: "all",
+      kind: "gap",
+      segmentId: "seg-2",
+      tool: "tgsgapcloser",
     }],
-  });
-  await items[1].children[3].run();
-  assert.deepEqual(calls.at(-1), {
-    name: "openDegapSettings",
-    args: [host, store],
   });
 });
 
-test("buildAssemblyContextMenuItems exposes TelSeeker only for terminal contigs", async () => {
+test("buildAssemblyContextMenuItems places DEGAP TelSeeker directly in top-level menu for terminal contigs", async () => {
   const calls = [];
   const host = {};
   const store = createStore({
@@ -1371,6 +1369,10 @@ test("buildAssemblyContextMenuItems exposes TelSeeker only for terminal contigs"
       },
     },
   });
+  const actions = {
+    ...createContextMenuActionsCapture(calls),
+    registerManualRefinementLocus: (...args) => calls.push({ name: "registerManualRefinementLocus", args }),
+  };
   const buildItems = (segmentId) => buildAssemblyContextMenuItems({
     ctgContext: null,
     trackLabelContext: null,
@@ -1380,26 +1382,32 @@ test("buildAssemblyContextMenuItems exposes TelSeeker only for terminal contigs"
     memberNode: null,
     store,
     host,
-    actions: createContextMenuActionsCapture(calls),
+    actions,
   });
 
   const leftItems = buildItems("left");
-  assert.deepEqual(leftItems.map((item) => item.label), ["删除", "翻转", "添加 Gap", "添加 Contig", "DEGAP"]);
-  assert.deepEqual(leftItems.at(-1).children.map((item) => item.label), ["TelSeeker", "设置"]);
-  await leftItems.at(-1).children[0].run();
+  assert.deepEqual(leftItems.map((item) => item.label), [
+    "删除",
+    "翻转",
+    "添加 Gap",
+    "添加 Contig",
+    "DEGAP TelSeeker（左端粒）",
+  ]);
+  assert.equal(leftItems.at(-1).children, undefined);
+  await leftItems.at(-1).run();
   assert.deepEqual(calls.at(-1), {
-    name: "requestDegapTelseekerJob",
+    name: "registerManualRefinementLocus",
     args: [host, store, {
       chrName: "Chr01",
+      kind: "tel_left",
       segmentId: "left",
-      endpointSide: "left",
     }],
   });
 
   assert.doesNotMatch(buildItems("middle").map((item) => item.label).join("|"), /DEGAP/);
 });
 
-test("buildAssemblyContextMenuItems lets a single-contig path choose the TelSeeker end", async () => {
+test("buildAssemblyContextMenuItems exposes both top-level DEGAP TelSeeker ends for a single-contig path", async () => {
   const calls = [];
   const host = {};
   const store = createStore({
@@ -1421,33 +1429,22 @@ test("buildAssemblyContextMenuItems lets a single-contig path choose the TelSeek
     memberNode: null,
     store,
     host,
-    actions: createContextMenuActionsCapture(calls),
+    actions: {
+      ...createContextMenuActionsCapture(calls),
+      registerManualRefinementLocus: (...args) => calls.push({ name: "registerManualRefinementLocus", args }),
+    },
   });
-  const degapItem = items.at(-1);
-
-  assert.equal(degapItem.label, "DEGAP");
-  assert.deepEqual(degapItem.children.map((item) => item.label), [
-    "TelSeeker 左端",
-    "TelSeeker 右端",
-    "TelSeeker 全部",
-    "设置",
+  assert.deepEqual(items.slice(-2).map((item) => item.label), [
+    "DEGAP TelSeeker（左端粒）",
+    "DEGAP TelSeeker（右端粒）",
   ]);
-  await degapItem.children[1].run();
+  await items.at(-1).run();
   assert.deepEqual(calls.at(-1), {
-    name: "requestDegapTelseekerJob",
+    name: "registerManualRefinementLocus",
     args: [host, store, {
       chrName: "Chr01",
+      kind: "tel_right",
       segmentId: "only",
-      endpointSide: "right",
-    }],
-  });
-  await degapItem.children[2].run();
-  assert.deepEqual(calls.at(-1), {
-    name: "requestDegapTelseekerJob",
-    args: [host, store, {
-      chrName: "Chr01",
-      segmentId: "only",
-      endpointSide: "all",
     }],
   });
 });

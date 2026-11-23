@@ -93,6 +93,49 @@ test("current chromosome export sends only queued loci on that chromosome to the
   assert.equal(receipt[0].scope, "current-chr");
 });
 
+test("refine-jobs action exports current chromosome manual refinement tasks with custom tool_parameters", async () => {
+  const store = createStore({
+    locale: "zh",
+    session: { projectId: 7, workspacePath: "D:\\project", projectName: "Example" },
+    assembly: {
+      selectedChrName: "Chr01",
+      degap: {
+        manualRefinement: {
+          toolParams: {
+            degap: { max_extension_rounds: "unlimited", kmer_filter: false },
+            quartet: { minimap: "-x asm20" },
+          },
+          loci: [
+            { chr: "Chr01", kind: "gap", segmentId: "gap-1", tools: ["degap", "quartet"] },
+          ],
+        },
+      },
+    },
+  });
+  let received = null;
+  const ok = await launchFinalPathExportJob({
+    host: {},
+    store,
+    kind: "refine-jobs",
+    deps: {
+      resolveFinalPathExportTarget: async () => "D:\\exports\\refine.zip",
+      flushAssemblyProjectState: async () => {},
+      exportManualRefinement: async ({ request }) => {
+        received = request;
+        return { batch_sha256: "b".repeat(64), loci: 1, tasks: 2 };
+      },
+    },
+  });
+  assert.equal(ok, true);
+  assert.deepEqual(received, {
+    loci: [{ chr: "Chr01", kind: "gap", segment_id: "gap-1", tools: ["degap", "quartet"] }],
+    tool_parameters: {
+      degap: { max_extension_rounds: "unlimited", kmer_filter: false },
+      quartet: { minimap: "-x asm20" },
+    },
+  });
+});
+
 test("Assembly rejects the retired project-wide refine export action without opening a save picker", async () => {
   const deps = {
     pickSaveFilePath: async () => assert.fail("project-wide refine export belongs to the Project page"),

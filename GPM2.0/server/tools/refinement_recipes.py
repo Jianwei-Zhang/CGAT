@@ -70,7 +70,7 @@ def native_safe_path(path: Path):
 
 def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir: Path, threads: int,
                     *, prefix: Path | None = None, runtime: dict | None = None, lock=None, jobs_dir: Path | None = None,
-                    degap_parameters: dict | None = None) -> Invocation:
+                    degap_parameters: dict | None = None, tool_parameters: dict | None = None) -> Invocation:
     prefix = Path(prefix or sys.prefix).resolve()
     lock = lock or load_lock()
     runtime = runtime or validate_runtime(prefix, lock, tool=tool)
@@ -90,6 +90,7 @@ def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir:
                        OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1", NUMEXPR_NUM_THREADS="1")
     for key in ("PYTHONPATH", "PYTHONHOME"):
         environment.pop(key, None)
+    overrides = dict(tool_parameters) if isinstance(tool_parameters, dict) else {}
     recipe = {"name": definition["recipe"], "tool": tool, "version": definition["version"],
               "revision": definition["revision"], "runtime_sha256": fingerprint(runtime),
               "reads": inputs, "threads": threads, "parameters": definition.get("parameters", {}), "packaging_patches": definition.get("patches", [])}
@@ -103,9 +104,21 @@ def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir:
         native_safe_path(engine)
         command = [python, "-B", str(engine), "--genome", str(baseline), "--output", str(native_dir),
                    "--work", "1", "--thread", str(threads)]
-        degap_parameters = default_degap() if degap_parameters is None else degap_parameters
-        recipe["extension_parameters"] = degap_parameters
-        command.extend(degap_args(degap_parameters))
+        effective_degap = dict(default_degap() if degap_parameters is None else degap_parameters)
+        if overrides:
+            effective_degap.update(overrides)
+        recipe["extension_parameters"] = effective_degap
+        command.extend(degap_args(effective_degap))
+        if effective_degap.get("kmer_size") is not None:
+            command.extend(("--kmer_size", str(effective_degap["kmer_size"])))
+        if effective_degap.get("kmer_num") is not None:
+            command.extend(("--kmer_num", str(effective_degap["kmer_num"])))
+        if effective_degap.get("edge") is not None:
+            command.extend(("--edge", str(effective_degap["edge"])))
+        if effective_degap.get("filter_depth_hifi") is not None:
+            command.extend(("--filterDepthHifi", str(effective_degap["filter_depth_hifi"])))
+        if effective_degap.get("filter_depth_ont") is not None:
+            command.extend(("--filterDepthOnt", str(effective_degap["filter_depth_ont"])))
         for kind, paths in reads.items():
             if paths:
                 command += ["--" + kind, *paths]
@@ -115,9 +128,14 @@ def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir:
         basenames = [Path(path).name for paths in reads.values() for path in paths]
         if len(basenames) != len(set(basenames)):
             raise ToolError("quarTeT input FASTA basenames must be distinct to prevent native alignment reuse")
+        effective_quartet = dict(definition.get("parameters", {}))
+        if "minimap" in overrides:
+            effective_quartet["minimap"] = overrides["minimap"]
+        recipe["parameters"] = effective_quartet
+        minimap_option = effective_quartet.get("minimap", "-x asm5")
         command = [python, "-I", "-B", str(source_location(prefix, definition) / "quartet_runner.py"), "GapFiller",
                    "-d", str(baseline), "-g", *reads["hifi"], *reads["ont"], "-t", str(threads),
-                   "-a", "minimap2", "--minimapoption", "-x asm5", "--noplot", "-p", "quartet"]
+                   "-a", "minimap2", "--minimapoption", minimap_option, "--noplot", "-p", "quartet"]
         outputs = ("quartet.genome.filled.fasta", "quartet.genome.filled.detail", "quartet.genome.filled.modified.agp")
         cwd = native_dir
     else:
@@ -125,18 +143,34 @@ def make_invocation(tool: str, baseline: Path, prepared_reads: dict, native_dir:
         if len(paths) != 1:
             raise ToolError(f"{tool} requires one content-bound combined FASTA for the selected technology")
         if tool == "tgsgapcloser":
-            parameters = definition["parameters"][inputs["mode"]]
+            mode = inputs["mode"]
+            parameters = dict(definition["parameters"][mode])
+            if f"{mode}_correction" in overrides:
+                parameters["correction"] = overrides[f"{mode}_correction"]
+            if f"{mode}_racon_rounds" in overrides:
+                parameters["racon_rounds"] = overrides[f"{mode}_racon_rounds"]
+            if f"{mode}_minimap" in overrides:
+                parameters["minimap"] = overrides[f"{mode}_minimap"]
+            effective_all = dict(definition.get("parameters", {}))
+            effective_all[mode] = parameters
+            recipe["parameters"] = effective_all
             command = [bash, str(prefix / "bin/tgsgapcloser"), "--scaff", str(baseline), "--reads", paths[0],
                        "--output", str(native_dir / "tgs"), "--thread", str(threads),
                        "--tgstype", parameters["tgstype"], "--minmap_arg", " " + parameters["minimap"]]
             if parameters["correction"] == "none":
                 command += ["--ne"]
             else:
-                command += ["--racon", str(prefix / "bin/racon"), "--r_round", str(parameters["racon_rounds"])]
+                racon_rounds = parameters.get("racon_rounds", 1)
+                command += ["--racon", str(prefix / "bin/racon"), "--r_round", str(racon_rounds)]
             outputs = ("tgs.scaff_seqs", "tgs.updated_scaff_infos", "tgs.orignial_scaff_infos", "tgs.name_map", "tgs.gap_fill_detail")
             cwd = native_dir
         else:
-            parameters = definition["parameters"]
+            parameters = dict(definition["parameters"])
+            if "iterations" in overrides:
+                parameters["iterations"] = overrides["iterations"]
+            if "tag_partitions" in overrides:
+                parameters["tag_partitions"] = overrides["tag_partitions"]
+            recipe["parameters"] = parameters
             driver = (jobs_dir or native_dir.parent) / "native_driver.sh"
             native_safe_path(driver)
             environment["CGAT_LR_PROGRAM_DIR"] = str(prefix / "bin")

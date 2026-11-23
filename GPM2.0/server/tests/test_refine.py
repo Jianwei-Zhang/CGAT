@@ -304,6 +304,89 @@ class RefineTests(unittest.TestCase):
         self.assertEqual(row["delivery"], {"full": f"07_delivery/{code}/demo.zip", "light": f"07_delivery/{code}/demo.light.zip"})
         self.assertFalse(list(index.parent.glob("**/*.zip")))
 
+    def test_manifest_validates_tool_parameters_and_recipes_apply_overrides(self):
+        from refinement_recipes import make_invocation
+        from refinement_tools import fingerprint, load_lock
+
+        gap = self.locus("chr1", "gap-1")
+        valid_params = {
+            "degap": {
+                "max_extension_rounds": "unlimited",
+                "max_extension_bp": 750000,
+                "kmer_filter": False,
+                "kmer_size": 31,
+                "kmer_num": 15,
+                "edge": 600,
+                "filter_depth_hifi": 0.3,
+                "tel_n": 120,
+                "tel_r": 0.7,
+                "tel_mm": 1,
+            },
+            "lrgapcloser": {"iterations": 5, "tag_partitions": 2},
+            "tgsgapcloser": {
+                "hifi_correction": "native_racon",
+                "hifi_racon_rounds": 2,
+                "hifi_minimap": "-x map-hifi",
+                "ont_correction": "none",
+                "ont_minimap": "-x map-ont",
+            },
+            "quartet": {"minimap": "-x asm10"},
+        }
+        manifest = {
+            "schema": SCHEMA,
+            "export_id": "a" * 64,
+            "origin_fasta_sha256": sha256_file(self.origin),
+            "reads": {"hifi": [], "ont": []},
+            "loci": [gap],
+            "tool_parameters": valid_params,
+        }
+        archive = self.home / "tasks_with_params.zip"
+        with ZipFile(archive, "w") as zipped:
+            zipped.writestr(MANIFEST, json.dumps(manifest))
+        _, loaded = read_tasks(archive)
+        self.assertEqual(loaded["tool_parameters"], valid_params)
+
+        bad_manifest = {**manifest, "tool_parameters": {"quartet": {"minimap": "-x asm5; echo pwn"}}}
+        bad_archive = self.home / "tasks_bad_params.zip"
+        with ZipFile(bad_archive, "w") as zipped:
+            zipped.writestr(MANIFEST, json.dumps(bad_manifest))
+        with self.assertRaisesRegex(ValueError, "quartet minimap"):
+            read_tasks(bad_archive)
+
+        lock = load_lock()
+        runtime = {"lock_sha256": fingerprint(lock)}
+        prefix = self.home / "env"
+        (prefix / "bin").mkdir(parents=True)
+        local_fa = self.home / "local.fa"
+        local_fa.write_text(">locus\nACGTNNNNCGTA\n")
+        reads_fa = self.home / "hifi.fa"
+        reads_fa.write_text(">r1\nACGT\n")
+        native_dir = self.home / "native"
+
+        degap_inv = make_invocation("degap", local_fa, {"hifi": [str(reads_fa)], "ont": []}, native_dir, 4,
+                                    prefix=prefix, runtime=runtime, lock=lock, degap_parameters=valid_params["degap"])
+        self.assertIn("--MaximumExtensionRound", degap_inv.command)
+        self.assertIn("unlimited", degap_inv.command)
+        self.assertIn("--no-kmer-filter", degap_inv.command)
+        self.assertIn("--kmer_size", degap_inv.command)
+        self.assertIn("31", degap_inv.command)
+        self.assertIn("--filterDepthHifi", degap_inv.command)
+
+        lr_inv = make_invocation("lrgapcloser", local_fa, {"hifi": [str(reads_fa)], "ont": []}, native_dir, 4,
+                                 prefix=prefix, runtime=runtime, lock=lock, tool_parameters=valid_params["lrgapcloser"])
+        self.assertEqual(lr_inv.command[lr_inv.command.index("-r") + 1], "5")
+        self.assertEqual(lr_inv.command[lr_inv.command.index("-n") + 1], "2")
+
+        tgs_inv = make_invocation("tgsgapcloser", local_fa, {"hifi": [str(reads_fa)], "ont": []}, native_dir, 4,
+                                  prefix=prefix, runtime=runtime, lock=lock, tool_parameters=valid_params["tgsgapcloser"])
+        self.assertNotIn("--ne", tgs_inv.command)
+        self.assertEqual(tgs_inv.command[tgs_inv.command.index("--r_round") + 1], "2")
+        self.assertEqual(tgs_inv.command[tgs_inv.command.index("--minmap_arg") + 1], " -x map-hifi")
+
+        q_inv = make_invocation("quartet", local_fa, {"hifi": [str(reads_fa)], "ont": []}, native_dir, 4,
+                                prefix=prefix, runtime=runtime, lock=lock, tool_parameters=valid_params["quartet"])
+        self.assertEqual(q_inv.command[q_inv.command.index("--minimapoption") + 1], "-x asm10")
+
 
 if __name__ == "__main__":
     unittest.main()

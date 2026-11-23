@@ -193,15 +193,7 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
     }),
   }));
   const degapRenderDeps = { escapeAttr, escapeHtml, i18n };
-  const graphAddonByChr = Object.fromEntries(
-    finalPathEntriesWithLog.map((entry) => [
-      entry.chrName,
-      renderDegapJobCard(
-        { chrName: entry.chrName, degap: assembly.degap },
-        degapRenderDeps,
-      ),
-    ]),
-  );
+  const graphAddonByChr = {};
   const grtBaselineEntry = !assembly.isChrPhased && finalPathEntriesWithLog.length === 1
     ? assembly.grtProjectView?.baselineFinalPathByChr?.[currentFinalPathChrName] || null
     : null;
@@ -237,7 +229,7 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       ),
       canExportFasta: canProjectExportFinalPathFasta(state, currentProject),
       canExportManualRefinement: true,
-      canExportDegapJobs: Array.isArray(assembly.degap?.jobs) && assembly.degap.jobs.length > 0,
+      canExportDegapJobs: false,
       finalPathLogModel,
       phasedFinalPathOptions,
       finalPathEntries: finalPathEntriesWithLog,

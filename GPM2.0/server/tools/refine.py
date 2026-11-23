@@ -33,6 +33,10 @@ MANIFEST = "refinement_tasks.json"
 MAX_MANIFEST = 8 * 1024 * 1024
 MAX_GAP_BP = 100_000_000
 TOOLS = ("degap", "lrgapcloser", "tgsgapcloser", "quartet")
+TGS_HIFI_MINIMAP_PRESETS = frozenset({"-x asm20", "-x asm5", "-x asm10", "-x map-hifi", "-x map-pb"})
+TGS_ONT_MINIMAP_PRESETS = frozenset({"-x ava-ont", "-x map-ont", "-x asm20", "-x asm10"})
+QUARTET_MINIMAP_PRESETS = frozenset({"-x asm5", "-x asm10", "-x asm20", "-x map-hifi", "-x map-ont"})
+TGS_CORRECTIONS = frozenset({"none", "native_racon"})
 
 
 def sha(value):
@@ -45,6 +49,103 @@ def text(value):
 
 def positive(value):
     return type(value) is int and 0 < value <= (1 << 63) - 1
+
+
+def bounded_int(value, minimum, maximum):
+    return type(value) is int and minimum <= value <= maximum
+
+
+def bounded_number(value, minimum, maximum, *, exclusive_min=False, exclusive_max=False):
+    if type(value) not in (int, float):
+        return False
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        return False
+    if exclusive_min and not (number > minimum):
+        return False
+    if not exclusive_min and not (number >= minimum):
+        return False
+    if exclusive_max and not (number < maximum):
+        return False
+    if not exclusive_max and not (number <= maximum):
+        return False
+    return True
+
+
+def check_tool_parameters(value):
+    if not isinstance(value, dict) or not set(value).issubset(set(TOOLS)):
+        raise ValueError("invalid tool_parameters section")
+    degap = value.get("degap")
+    if degap is not None:
+        allowed_degap = {
+            "max_extension_rounds", "max_extension_bp", "kmer_filter",
+            "kmer_size", "kmer_num", "edge", "filter_depth_hifi", "filter_depth_ont",
+            "tel_n", "tel_r", "tel_mm",
+        }
+        if not isinstance(degap, dict) or not set(degap).issubset(allowed_degap):
+            raise ValueError("invalid degap tool_parameters")
+        if "max_extension_rounds" in degap:
+            v = degap["max_extension_rounds"]
+            if v != "unlimited" and not bounded_int(v, 1, 1000):
+                raise ValueError("invalid degap max_extension_rounds")
+        if "max_extension_bp" in degap:
+            v = degap["max_extension_bp"]
+            if v != "unlimited" and not bounded_int(v, 1000, MAX_GAP_BP):
+                raise ValueError("invalid degap max_extension_bp")
+        if "kmer_filter" in degap and type(degap["kmer_filter"]) is not bool:
+            raise ValueError("invalid degap kmer_filter")
+        if "kmer_size" in degap and not bounded_int(degap["kmer_size"], 11, 127):
+            raise ValueError("invalid degap kmer_size")
+        if "kmer_num" in degap and not bounded_int(degap["kmer_num"], 1, 1000):
+            raise ValueError("invalid degap kmer_num")
+        if "edge" in degap and not bounded_int(degap["edge"], 50, 50000):
+            raise ValueError("invalid degap edge")
+        for key in ("filter_depth_hifi", "filter_depth_ont"):
+            if key in degap and degap[key] is not None and not bounded_number(degap[key], 0.0, 1.0, exclusive_min=True, exclusive_max=True):
+                raise ValueError(f"invalid degap {key}")
+        if "tel_n" in degap and not bounded_int(degap["tel_n"], 10, 10000):
+            raise ValueError("invalid degap tel_n")
+        if "tel_r" in degap and not bounded_number(degap["tel_r"], 0.01, 1.0):
+            raise ValueError("invalid degap tel_r")
+        if "tel_mm" in degap and not (type(degap["tel_mm"]) is int and degap["tel_mm"] in (0, 1)):
+            raise ValueError("invalid degap tel_mm")
+
+    lr = value.get("lrgapcloser")
+    if lr is not None:
+        if not isinstance(lr, dict) or not set(lr).issubset({"iterations", "tag_partitions"}):
+            raise ValueError("invalid lrgapcloser tool_parameters")
+        if "iterations" in lr and not bounded_int(lr["iterations"], 1, 20):
+            raise ValueError("invalid lrgapcloser iterations")
+        if "tag_partitions" in lr and not bounded_int(lr["tag_partitions"], 1, 16):
+            raise ValueError("invalid lrgapcloser tag_partitions")
+
+    tgs = value.get("tgsgapcloser")
+    if tgs is not None:
+        allowed_tgs = {
+            "hifi_correction", "hifi_racon_rounds", "hifi_minimap",
+            "ont_correction", "ont_racon_rounds", "ont_minimap",
+        }
+        if not isinstance(tgs, dict) or not set(tgs).issubset(allowed_tgs):
+            raise ValueError("invalid tgsgapcloser tool_parameters")
+        if "hifi_correction" in tgs and tgs["hifi_correction"] not in TGS_CORRECTIONS:
+            raise ValueError("invalid tgsgapcloser hifi_correction")
+        if "hifi_racon_rounds" in tgs and not bounded_int(tgs["hifi_racon_rounds"], 1, 5):
+            raise ValueError("invalid tgsgapcloser hifi_racon_rounds")
+        if "hifi_minimap" in tgs and tgs["hifi_minimap"] not in TGS_HIFI_MINIMAP_PRESETS:
+            raise ValueError("invalid tgsgapcloser hifi_minimap")
+        if "ont_correction" in tgs and tgs["ont_correction"] not in TGS_CORRECTIONS:
+            raise ValueError("invalid tgsgapcloser ont_correction")
+        if "ont_racon_rounds" in tgs and not bounded_int(tgs["ont_racon_rounds"], 1, 5):
+            raise ValueError("invalid tgsgapcloser ont_racon_rounds")
+        if "ont_minimap" in tgs and tgs["ont_minimap"] not in TGS_ONT_MINIMAP_PRESETS:
+            raise ValueError("invalid tgsgapcloser ont_minimap")
+
+    quartet = value.get("quartet")
+    if quartet is not None:
+        if not isinstance(quartet, dict) or not set(quartet).issubset({"minimap"}):
+            raise ValueError("invalid quartet tool_parameters")
+        if "minimap" in quartet and quartet["minimap"] not in QUARTET_MINIMAP_PRESETS:
+            raise ValueError("invalid quartet minimap")
 
 
 def unique_keys(pairs):
@@ -76,9 +177,13 @@ def checked_plan(value, witness):
 
 
 def check_manifest(value):
-    if (not isinstance(value, dict) or set(value) != {"schema", "export_id", "origin_fasta_sha256", "reads", "loci"}
+    required = {"schema", "export_id", "origin_fasta_sha256", "reads", "loci"}
+    optional = {"tool_parameters"}
+    if (not isinstance(value, dict) or not required.issubset(value) or not set(value).issubset(required | optional)
             or value["schema"] != SCHEMA or not sha(value["export_id"]) or not sha(value["origin_fasta_sha256"])):
         raise ValueError("not a supported project refinement task manifest")
+    if "tool_parameters" in value:
+        check_tool_parameters(value["tool_parameters"])
     reads, used = value["reads"], set()
     if not isinstance(reads, dict) or set(reads) != {"hifi", "ont"}:
         raise ValueError("invalid reads groups")

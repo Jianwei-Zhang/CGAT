@@ -27,6 +27,78 @@ const MANIFEST: &str = "refinement_tasks.json";
 const TOOLS: &[&str] = &["degap", "lrgapcloser", "tgsgapcloser", "quartet"];
 const MAX_MANIFEST: usize = 8 * 1024 * 1024;
 const MAX_GAP_BP: i64 = 100_000_000;
+const TGS_HIFI_MINIMAP_PRESETS: &[&str] = &[
+    "-x asm20",
+    "-x asm5",
+    "-x asm10",
+    "-x map-hifi",
+    "-x map-pb",
+];
+const TGS_ONT_MINIMAP_PRESETS: &[&str] = &["-x ava-ont", "-x map-ont", "-x asm20", "-x asm10"];
+const QUARTET_MINIMAP_PRESETS: &[&str] = &[
+    "-x asm5",
+    "-x asm10",
+    "-x asm20",
+    "-x map-hifi",
+    "-x map-ont",
+];
+const TGS_CORRECTIONS: &[&str] = &["none", "native_racon"];
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum DegapLimit {
+    Text(String),
+    Number(i64),
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DegapToolParametersRequest {
+    max_extension_rounds: Option<DegapLimit>,
+    max_extension_bp: Option<DegapLimit>,
+    kmer_filter: Option<bool>,
+    kmer_size: Option<i64>,
+    kmer_num: Option<i64>,
+    edge: Option<i64>,
+    filter_depth_hifi: Option<f64>,
+    filter_depth_ont: Option<f64>,
+    tel_n: Option<i64>,
+    tel_r: Option<f64>,
+    tel_mm: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LrGapcloserToolParametersRequest {
+    iterations: Option<i64>,
+    tag_partitions: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TgsGapcloserToolParametersRequest {
+    hifi_correction: Option<String>,
+    hifi_racon_rounds: Option<i64>,
+    hifi_minimap: Option<String>,
+    ont_correction: Option<String>,
+    ont_racon_rounds: Option<i64>,
+    ont_minimap: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QuartetToolParametersRequest {
+    minimap: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ToolParametersRequest {
+    degap: Option<DegapToolParametersRequest>,
+    lrgapcloser: Option<LrGapcloserToolParametersRequest>,
+    tgsgapcloser: Option<TgsGapcloserToolParametersRequest>,
+    quartet: Option<QuartetToolParametersRequest>,
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -35,6 +107,8 @@ pub struct ManualRefinementRequest {
     /// None inherits the verified project defaults. Some(empty) clears the field.
     hifi_reads: Option<Vec<String>>,
     ont_reads: Option<Vec<String>>,
+    #[serde(default)]
+    tool_parameters: Option<ToolParametersRequest>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -343,6 +417,163 @@ fn motif_for(conn: &Connection, req: &LocusRequest) -> Result<String> {
     Ok(motif)
 }
 
+fn validate_degap_limit(value: &DegapLimit, min: i64, max: i64, label: &str) -> Result<Value> {
+    match value {
+        DegapLimit::Text(text) if text == "unlimited" => Ok(json!("unlimited")),
+        DegapLimit::Number(num) if (min..=max).contains(num) => Ok(json!(num)),
+        _ => bail!("invalid DEGAP {label}: expected {min}..={max} or \"unlimited\""),
+    }
+}
+
+fn validate_tool_parameters(params: &ToolParametersRequest) -> Result<Option<Value>> {
+    let mut root = Map::new();
+    if let Some(degap) = &params.degap {
+        let mut out = Map::new();
+        if let Some(v) = &degap.max_extension_rounds {
+            out.insert(
+                "max_extension_rounds".into(),
+                validate_degap_limit(v, 1, 1000, "max_extension_rounds")?,
+            );
+        }
+        if let Some(v) = &degap.max_extension_bp {
+            out.insert(
+                "max_extension_bp".into(),
+                validate_degap_limit(v, 1000, MAX_GAP_BP, "max_extension_bp")?,
+            );
+        }
+        if let Some(v) = degap.kmer_filter {
+            out.insert("kmer_filter".into(), json!(v));
+        }
+        if let Some(v) = degap.kmer_size {
+            if !(11..=127).contains(&v) {
+                bail!("invalid DEGAP kmer_size: expected 11..=127");
+            }
+            out.insert("kmer_size".into(), json!(v));
+        }
+        if let Some(v) = degap.kmer_num {
+            if !(1..=1000).contains(&v) {
+                bail!("invalid DEGAP kmer_num: expected 1..=1000");
+            }
+            out.insert("kmer_num".into(), json!(v));
+        }
+        if let Some(v) = degap.edge {
+            if !(50..=50_000).contains(&v) {
+                bail!("invalid DEGAP edge: expected 50..=50000");
+            }
+            out.insert("edge".into(), json!(v));
+        }
+        for (key, value) in [
+            ("filter_depth_hifi", degap.filter_depth_hifi),
+            ("filter_depth_ont", degap.filter_depth_ont),
+        ] {
+            if let Some(v) = value {
+                if !v.is_finite() || !(v > 0.0 && v < 1.0) {
+                    bail!("invalid DEGAP {key}: expected a ratio strictly between 0 and 1");
+                }
+                out.insert(key.into(), json!(v));
+            }
+        }
+        if let Some(v) = degap.tel_n {
+            if !(10..=10_000).contains(&v) {
+                bail!("invalid DEGAP tel_n: expected 10..=10000");
+            }
+            out.insert("tel_n".into(), json!(v));
+        }
+        if let Some(v) = degap.tel_r {
+            if !v.is_finite() || !(0.01..=1.0).contains(&v) {
+                bail!("invalid DEGAP tel_r: expected 0.01..=1.0");
+            }
+            out.insert("tel_r".into(), json!(v));
+        }
+        if let Some(v) = degap.tel_mm {
+            if v != 0 && v != 1 {
+                bail!("invalid DEGAP tel_mm: expected 0 or 1");
+            }
+            out.insert("tel_mm".into(), json!(v));
+        }
+        if !out.is_empty() {
+            root.insert("degap".into(), Value::Object(out));
+        }
+    }
+    if let Some(lr) = &params.lrgapcloser {
+        let mut out = Map::new();
+        if let Some(v) = lr.iterations {
+            if !(1..=20).contains(&v) {
+                bail!("invalid LR_Gapcloser iterations: expected 1..=20");
+            }
+            out.insert("iterations".into(), json!(v));
+        }
+        if let Some(v) = lr.tag_partitions {
+            if !(1..=16).contains(&v) {
+                bail!("invalid LR_Gapcloser tag_partitions: expected 1..=16");
+            }
+            out.insert("tag_partitions".into(), json!(v));
+        }
+        if !out.is_empty() {
+            root.insert("lrgapcloser".into(), Value::Object(out));
+        }
+    }
+    if let Some(tgs) = &params.tgsgapcloser {
+        let mut out = Map::new();
+        if let Some(v) = &tgs.hifi_correction {
+            if !TGS_CORRECTIONS.contains(&v.as_str()) {
+                bail!("invalid TGS-GapCloser hifi_correction");
+            }
+            out.insert("hifi_correction".into(), json!(v));
+        }
+        if let Some(v) = tgs.hifi_racon_rounds {
+            if !(1..=5).contains(&v) {
+                bail!("invalid TGS-GapCloser hifi_racon_rounds: expected 1..=5");
+            }
+            out.insert("hifi_racon_rounds".into(), json!(v));
+        }
+        if let Some(v) = &tgs.hifi_minimap {
+            if !TGS_HIFI_MINIMAP_PRESETS.contains(&v.as_str()) {
+                bail!("invalid TGS-GapCloser hifi_minimap preset");
+            }
+            out.insert("hifi_minimap".into(), json!(v));
+        }
+        if let Some(v) = &tgs.ont_correction {
+            if !TGS_CORRECTIONS.contains(&v.as_str()) {
+                bail!("invalid TGS-GapCloser ont_correction");
+            }
+            out.insert("ont_correction".into(), json!(v));
+        }
+        if let Some(v) = tgs.ont_racon_rounds {
+            if !(1..=5).contains(&v) {
+                bail!("invalid TGS-GapCloser ont_racon_rounds: expected 1..=5");
+            }
+            out.insert("ont_racon_rounds".into(), json!(v));
+        }
+        if let Some(v) = &tgs.ont_minimap {
+            if !TGS_ONT_MINIMAP_PRESETS.contains(&v.as_str()) {
+                bail!("invalid TGS-GapCloser ont_minimap preset");
+            }
+            out.insert("ont_minimap".into(), json!(v));
+        }
+        if !out.is_empty() {
+            root.insert("tgsgapcloser".into(), Value::Object(out));
+        }
+    }
+    if let Some(quartet) = &params.quartet {
+        let mut out = Map::new();
+        if let Some(v) = &quartet.minimap {
+            if !QUARTET_MINIMAP_PRESETS.contains(&v.as_str()) {
+                bail!("invalid quarTeT minimap preset");
+            }
+            out.insert("minimap".into(), json!(v));
+        }
+        if !out.is_empty() {
+            root.insert("quartet".into(), Value::Object(out));
+        }
+    }
+    if root.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(Value::Object(root)))
+    }
+}
+
 fn build_manifest(
     conn: &Connection,
     workspace: &Path,
@@ -355,6 +586,12 @@ fn build_manifest(
     if request.loci.is_empty() {
         bail!("select at least one actual Gap or Tel locus");
     }
+    let tool_parameters = request
+        .tool_parameters
+        .as_ref()
+        .map(validate_tool_parameters)
+        .transpose()?
+        .flatten();
     let origin: String = conn
         .query_row(
             "SELECT q4_artifact_sha256 FROM grt_package WHERE id=1",
@@ -438,10 +675,11 @@ fn build_manifest(
         loci: loci.len(),
         tasks: task_count,
     };
-    Ok((
-        json!({"schema":SCHEMA,"export_id":export_id,"origin_fasta_sha256":origin,"reads":reads,"loci":loci}),
-        summary,
-    ))
+    let mut manifest = json!({"schema":SCHEMA,"export_id":export_id,"origin_fasta_sha256":origin,"reads":reads,"loci":loci});
+    if let Some(params) = tool_parameters {
+        manifest["tool_parameters"] = params;
+    }
+    Ok((manifest, summary))
 }
 
 fn create_payload(path: &Path, bytes: &[u8]) -> Result<()> {
@@ -505,7 +743,7 @@ pub fn export_manual_refinement(
     };
     write!(
         zip,
-        "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, writes the batch report under 08_refinement_jobs/02_manual/, updates 06_report/report.html, and produces a refinement_results.zip for import into this App project.\n\nDo not edit or run code from this archive.\n",
+        "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, updates 06_report/report.html and prints the batch report and return ZIP paths. On a new Server job, import 07_delivery/manual/<output>.manual-<batch>.patch.zip into this App project; older workspaces keep refinement_results.zip.\n\nDo not edit or run code from this archive.\n",
         shell_quote(&argument)
     )?;
     let archive = zip.finish()?.into_inner();
@@ -599,4 +837,67 @@ pub fn list_manual_refinement_exports(
         })
         .take(20)
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_tool_parameters_accepts_valid_overrides_for_all_four_tools() {
+        let req: ToolParametersRequest = serde_json::from_value(json!({
+            "degap": {
+                "max_extension_rounds": "unlimited",
+                "max_extension_bp": 800000,
+                "kmer_filter": false,
+                "kmer_size": 31,
+                "kmer_num": 15,
+                "edge": 600,
+                "filter_depth_hifi": 0.3,
+                "tel_n": 120,
+                "tel_r": 0.7,
+                "tel_mm": 1
+            },
+            "lrgapcloser": { "iterations": 5, "tag_partitions": 2 },
+            "tgsgapcloser": {
+                "hifi_correction": "native_racon",
+                "hifi_racon_rounds": 2,
+                "hifi_minimap": "-x map-hifi",
+                "ont_correction": "none",
+                "ont_minimap": "-x map-ont"
+            },
+            "quartet": { "minimap": "-x asm10" }
+        }))
+        .expect("valid tool parameters deserialize");
+        let value = validate_tool_parameters(&req)
+            .expect("valid tool parameters validate")
+            .expect("non-empty tool parameters");
+        assert_eq!(value["degap"]["max_extension_rounds"], "unlimited");
+        assert_eq!(value["degap"]["kmer_filter"], false);
+        assert_eq!(value["lrgapcloser"]["iterations"], 5);
+        assert_eq!(value["tgsgapcloser"]["hifi_minimap"], "-x map-hifi");
+        assert_eq!(value["quartet"]["minimap"], "-x asm10");
+    }
+
+    #[test]
+    fn validate_tool_parameters_omits_empty_and_rejects_unsafe_values() {
+        let empty: ToolParametersRequest =
+            serde_json::from_value(json!({})).expect("empty deserializes");
+        assert!(validate_tool_parameters(&empty).unwrap().is_none());
+
+        let bad_preset: ToolParametersRequest =
+            serde_json::from_value(json!({ "quartet": { "minimap": "-x asm5; rm -rf /" } }))
+                .expect("deserializes");
+        assert!(validate_tool_parameters(&bad_preset).is_err());
+
+        let bad_iter: ToolParametersRequest =
+            serde_json::from_value(json!({ "lrgapcloser": { "iterations": 0 } }))
+                .expect("deserializes");
+        assert!(validate_tool_parameters(&bad_iter).is_err());
+
+        let bad_limit: ToolParametersRequest =
+            serde_json::from_value(json!({ "degap": { "max_extension_rounds": "forever" } }))
+                .expect("deserializes");
+        assert!(validate_tool_parameters(&bad_limit).is_err());
+    }
 }
