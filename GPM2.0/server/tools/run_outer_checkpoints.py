@@ -24,6 +24,7 @@ try:
     from run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
+        LGZ_PREPARE_IDS,
         OrchestrationContractError,
         atomic_write_json,
         file_identity,
@@ -37,6 +38,7 @@ except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
     from .run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
+        LGZ_PREPARE_IDS,
         OrchestrationContractError,
         atomic_write_json,
         file_identity,
@@ -49,7 +51,7 @@ except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
 WORKFLOW = "gpm_run_outer_v1"
 LGZ_WORKFLOW = "gpm_grt_precomputed_v2"
 LGZ_STAGE_MAP = {
-    "grt_prepare": ("donor_freeze",),
+    **dict.fromkeys(LGZ_PREPARE_IDS, ("donor_freeze",)),
     "grt_step1": ("step1",),
     "grt_step2": ("step2",),
     "grt_step12": ("step1", "step2"),

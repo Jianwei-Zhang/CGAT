@@ -129,11 +129,14 @@ LABELS = {
     "alignments": "比对任务", "telomeres": "端粒注释", "centromeres": "着丝粒候选区域",
     "used_contigs": "最终使用的 Contig", "evidence": "证据记录", "usage": "供体使用记录",
 }
+# This renderer also runs standalone inside exported reports.
+PREPARE_IDS = ("lgz_prepare", "grt_prepare")
+
 METHODS = {
     "prepare": "记录原始文件身份、数据角色与规范化后的 FASTA 统计。",
     "assign": "依据经过过滤的参考比对及覆盖率阈值分配染色体，记录方向与排列顺序。",
     "degap_gapfill": "LGZ 完成后使用 reads 补剩余内部 gap，保留原始 LGZ 结果；不延伸端粒。",
-    "grt_prepare": "构建 q0，锁定普通供体与端粒供体；旧工作区按保存的配方保留 reads 质量评估。",
+    **dict.fromkeys(PREPARE_IDS, "构建 q0，锁定普通供体与端粒供体；旧工作区按保存的配方保留 reads 质量评估。"),
     "step1": "生成并验证补丁候选，按染色体选择补丁或结构修正分支，生成 q1。",
     "step2": "处理结构问题、重叠与后续优化填补，记录过滤和未解决的问题，生成 q2。",
     "step3": "检查染色体两端、验证端粒供体并记录处理结果，生成 q3 / Final Path。",
@@ -215,7 +218,7 @@ def stage_io_html(record: dict) -> str:
         input_body = f'<strong>{esc(stage_id.split(":", 1)[1])} FASTA</strong><span>参考染色体 FASTA</span>'
     elif stage_id == "assign":
         input_body = '<strong>参考比对 PAF</strong><span>全部数据集的过滤后比对</span>'
-    elif stage_id == "grt_prepare":
+    elif stage_id in PREPARE_IDS:
         input_body = ('<strong>多组装候选与完整比对证据</strong><span>全部 ds 的参考/ctg 比对及可选 QC 数据</span>'
                       if facts.get("q0_construction") else
                       '<strong>归属与排列结果</strong><span>主组装、辅助组装及可选 QC 数据</span>')
@@ -239,7 +242,7 @@ def stage_io_html(record: dict) -> str:
         summary = facts.get("summary", {})
         output_body = (f'<strong>染色体归属与顺序</strong><span>{esc(display(summary.get("assigned_unique_contigs")))} 条 contig 已分配</span>'
                        f'<span>{esc(display(summary.get("unassigned_contigs")))} 条未分配</span>')
-    elif stage_id == "grt_prepare":
+    elif stage_id in PREPARE_IDS:
         output_body = sequence_snapshot("q0", versions.get("q0"))
     elif stage_id.startswith("chr:"):
         output_body = '<strong>染色体级证据</strong><span>路径片段、事件与来源坐标</span>'
@@ -264,8 +267,8 @@ def pipeline_map_html(records: list[dict], input_facts: dict, final: dict) -> st
     datasets = input_facts.get("datasets", [])
     refs = [row for row in records if row.get("stage_id", "").startswith("ref:")]
     assignment = next((row for row in records if row.get("stage_id") == "assign"), {})
-    grt_prepare = next((row for row in records if row.get("stage_id") == "grt_prepare"), {})
-    q0 = grt_prepare.get("facts", {}).get("sequence_versions", {}).get("q0", {})
+    prepare_record = next((row for row in records if row.get("stage_id") in PREPARE_IDS), {})
+    q0 = prepare_record.get("facts", {}).get("sequence_versions", {}).get("q0", {})
     q4 = final.get("sequence_versions", {}).get(final.get("final_q_version", "q4"), {})
     assigned = assignment.get("facts", {}).get("summary", {}).get("assigned_unique_contigs")
     stages = [
@@ -750,7 +753,7 @@ def render(root: Path) -> Path:
     q0_construction = final.get("q0_construction")
     if not q0_construction:
         q0_construction = next((record.get("facts", {}).get("q0_construction") for record in records
-                                if record.get("stage_id") == "grt_prepare" and record.get("status") == "success"), None)
+                                if record.get("stage_id") in PREPARE_IDS and record.get("status") == "success"), None)
     modern_q0 = (bool(q0_construction) or input_facts.get("q0_mode") == "evidence_guided_multi_source"
                  or final.get("q0_mode") == "evidence_guided_multi_source")
     reason_summary_parts = list(dict.fromkeys([*manifest_reasons, *manifest_errors]))
@@ -794,7 +797,7 @@ def render(root: Path) -> Path:
         primary = next((d for d in input_facts.get("datasets", []) if d["role"] == "primary"), {})
         versions["原始主组装"] = primary.get("stats")
     for record in records:
-        if record["stage_id"] == "grt_prepare":
+        if record["stage_id"] in PREPARE_IDS:
             versions.update(record.get("facts", {}).get("sequence_versions", {}))
     versions.update(final.get("sequence_versions", {}))
     body += stats_table("初始构建与 LGZ 处理对比", versions) + notes(final.get("notes", [])) + '</details>'

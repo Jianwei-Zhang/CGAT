@@ -1147,7 +1147,7 @@ printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "prepare_q0_evidence.
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 write_lgz_prepare_script "$(cgat_workspace_path "${WORK_ROOT}" "prepare_lgz_inputs.sh")" "$WORK_ROOT"
-append_run_all_unit "grt_prepare" "prepare_lgz_inputs.sh" "logs/run_all.log"
+append_run_all_unit "lgz_prepare" "prepare_lgz_inputs.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_lgz_inputs"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "$(cgat_workspace_path "${WORK_ROOT}" "prepare_lgz_inputs.sh")"

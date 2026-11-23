@@ -233,7 +233,7 @@ PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" --log-style detailed >
 grep -Fq '[SKIP_VALID] [ref:ds1]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [assign]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [chr:Chr01]' "${TMP_DIR}/resume.out"
-grep -Fq '[CACHE_HIT] [grt_prepare]' "${TMP_DIR}/resume.out"
+grep -Fq '[CACHE_HIT] [lgz_prepare]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step1]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step1]' "${TMP_DIR}/resume.out"
 grep -Fq '[CACHE_HIT] [grt_step2]' "${TMP_DIR}/resume.out"

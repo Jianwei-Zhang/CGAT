@@ -918,7 +918,7 @@ def prepare(args: argparse.Namespace) -> None:
         except (OSError, ValueError, TypeError, SystemExit):
             pass
 
-    stage_root = Path(tempfile.mkdtemp(prefix=".grt_prepare.", dir=server_dir.parent))
+    stage_root = Path(tempfile.mkdtemp(prefix=".lgz_prepare.", dir=server_dir.parent))
     try:
         stage_grt = workspace_join(stage_root, "grt")
         stage_metadata = workspace_join(stage_root, "metadata")
@@ -958,11 +958,15 @@ def prepare(args: argparse.Namespace) -> None:
             )
             tel_signal[key] = valid_sequence[key] and has_telomere_signal(sequence, telomere_rules)
 
+        def progress(message):
+            print(f"LGZ prepare phase: {message}", flush=True)
+
         try:
-            construction = build_q0(server_dir, quality_pass=(
+            construction = build_q0(server_dir, progress=progress, quality_pass=(
                 {SourceKey(*key): passed for key, passed in qc_pass.items()} if reads_qc_enabled else None))
         except Q0EvidenceError as exc:
             fail(f"q0 selection failed: {exc}")
+        progress("writing Q0 and freezing ordinary and telomere donors")
         q_records = list(construction.records.items())
         q0_path = stage_grt / "q" / "q0.fa"
         write_fasta(q0_path, q_records)
@@ -1204,7 +1208,7 @@ def prepare(args: argparse.Namespace) -> None:
         )
         tool_rows = [
             {
-                "tool": "grt_prepare_inputs",
+                "tool": "lgz_prepare_inputs",
                 "version": "3",
                 "executable": ".prepare_lib/tools/lgz_prepare_inputs.py",
             },

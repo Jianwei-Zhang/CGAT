@@ -13,9 +13,11 @@ import hashlib
 from pathlib import Path
 
 try:
+    from run_orchestration import LGZ_PREPARE_IDS
     from delivery_archive import delivery_path, delivery_staging_path
     from server_report_io import SCHEMA, digest, fasta_stats, local_path, read_events, read_json, read_tsv, write_json
 except ModuleNotFoundError:  # Imported as server.tools.server_report_collect.
+    from .run_orchestration import LGZ_PREPARE_IDS
     from .delivery_archive import delivery_path, delivery_staging_path
     from .server_report_io import SCHEMA, digest, fasta_stats, local_path, read_events, read_json, read_tsv, write_json
 
@@ -306,7 +308,7 @@ def final_summary(root: Path, report_root: Path) -> dict:
         if q0 is None:
             for relative in manifest.get("steps", []):
                 record = read_json(local_path(report_root, relative), {})
-                if record.get("stage_id") == "grt_prepare" and record.get("status") == "success":
+                if record.get("stage_id") in LGZ_PREPARE_IDS and record.get("status") == "success":
                     if record.get("run_id") != manifest["run_id"] or record.get("schema_version") != SCHEMA:
                         raise ValueError("q0 snapshot belongs to another invocation or schema")
                     facts = record.get("facts", {})
@@ -503,7 +505,7 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                 "tables": {"gap_decisions": {"available": bool(report), "rows": report.get("decisions", [])}},
                 "outputs": [{"file": report.get("output_fasta"), "sha256": report.get("output_sha256")}],
                 "notes": ["仅补剩余内部 gap；独立输出，不修改 LGZ / App Final Path。双侧序列检查不等于独立生物学验证。"]}
-    if unit_id == "grt_prepare":
+    if unit_id in LGZ_PREPARE_IDS:
         return collect_lgz_inputs(root)
     if unit_id.startswith(("chr:", "q0_chr:")):
         relative = f"runs/chr_{unit_id.split(':', 1)[1]}"

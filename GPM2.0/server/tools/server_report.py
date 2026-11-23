@@ -28,10 +28,11 @@ from server_report_collect import (
 from server_report_io import SCHEMA, digest, local_path, now, read_json, write_json
 from render_server_report import project_report_facts, render
 from run_resources import read_resources
+from run_orchestration import LGZ_PREPARE_IDS
 
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
-    "q0_evidence": "q0 候选与补充比对证据", "grt_prepare": "质量评估、q0 与供体构建",
+    "q0_evidence": "q0 候选与补充比对证据", **dict.fromkeys(LGZ_PREPARE_IDS, "LGZ · 构建 q0 与供体"),
     "grt_step1": "Step1 · 补丁验证与处理分支", "grt_step2": "Step2 · 结构修正与优化填补",
     "grt_step3": "Step3 · 端粒处理与最终路径", "grt_step12": "Step1 / Step2",
     "finalize_evidence": "证据整理与结果校验", "package_full": "完整包交付",

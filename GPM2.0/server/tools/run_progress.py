@@ -123,7 +123,8 @@ class ProgressDisplay:
             self._write(f"Date: {now.isoformat(timespec='seconds')}")
             self.date = now.date()
         position = self.positions.get(unit, "--/--")
-        self._write(f"{now:%H:%M:%S} [{position}] [{tag}] [{unit}] {message}".rstrip())
+        display_unit = "lgz_prepare" if unit == "grt_prepare" else unit
+        self._write(f"{now:%H:%M:%S} [{position}] [{tag}] [{display_unit}] {message}".rstrip())
         if unit in self.active:
             self.active[unit]["last"] = self.clock()
 
@@ -192,9 +193,15 @@ class ProgressDisplay:
                 group["done"][match[2]] = match[3]
                 self._progress(unit, match[1], group)
                 return
+            if unit in ("lgz_prepare", "grt_prepare") and text.startswith("LGZ prepare phase: "):
+                phase = text.removeprefix("LGZ prepare phase: ")
+                if unit in self.active:
+                    self.active[unit].update(phase=phase, phase_start=self.clock())
+                self._line("PROGRESS", unit, phase)
+                return
             text = _CACHE.sub(r"\1 reused", text)
             # Stage already appears in the prefix, but preserve distinct substage names.
-            if unit.startswith("grt_"):
+            if unit.startswith(("lgz_", "grt_")):
                 for name in ("LGZ", "GRT"):
                     prefix = name + " " + unit[4:] + " "
                     if text.startswith(prefix):
@@ -210,4 +217,7 @@ class ProgressDisplay:
                     self._progress(unit, stage, group)
             for unit, timing in self.active.items():
                 if self.clock() - timing["last"] >= self.heartbeat:
-                    self._line("RUNNING", unit, f"still running · elapsed {duration(self.clock() - timing['started'])}")
+                    now = self.clock()
+                    phase = (f"{timing['phase']} · phase {duration(now - timing['phase_start'])}"
+                             if "phase" in timing else "still running")
+                    self._line("RUNNING", unit, f"{phase} · elapsed {duration(now - timing['started'])}")

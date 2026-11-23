@@ -557,7 +557,7 @@ assert_chr_partition_run_all_staging() {
 assign	.runtime/commands/assign_chr_groups.sh	.runtime/logs/run_all.log
 q0_chr:${chr_name}	02_alignments/chr_${chr_name}/q0_command.sh	.runtime/logs/run_all.log
 q0_evidence	.runtime/commands/prepare_q0_evidence.sh	.runtime/logs/run_all.log
-grt_prepare	.runtime/commands/prepare_lgz_inputs.sh	.runtime/logs/run_all.log
+lgz_prepare	.runtime/commands/prepare_lgz_inputs.sh	.runtime/logs/run_all.log
 grt_step1	.runtime/commands/run_lgz_step1.sh	.runtime/logs/run_all.log
 grt_step2	.runtime/commands/run_lgz_step2.sh	.runtime/logs/run_all.log
 grt_step3	.runtime/commands/run_lgz_step3.sh	.runtime/logs/run_all.log

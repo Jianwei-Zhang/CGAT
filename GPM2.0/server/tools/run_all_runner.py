@@ -36,7 +36,7 @@ from run_resources import execution_threads, read_resources, resource_environmen
 from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
                                   changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
-from run_orchestration import OrchestrationContractError, atomic_write_json
+from run_orchestration import LGZ_PREPARE_IDS, LGZ_PREPARE_UNIT_ID, OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
 from alignment_tasks import (AdaptiveDispatcher, AlignmentPlan, AlignmentTask, dispatch_environment,
                              load_task_plan, run_tasks)
@@ -56,7 +56,7 @@ STATUS_FIELDS = [
     "detail_log_relpath",
 ]
 LGZ_CACHE_MARKERS = {
-    "grt_prepare": ("LGZ prepare inputs are current:",),
+    **dict.fromkeys(LGZ_PREPARE_IDS, ("LGZ prepare inputs are current:",)),
     "grt_step1": ("LGZ step1 cache hit:",),
     "grt_step2": ("LGZ step2 cache hit:",),
     "grt_step12": ("LGZ step1 cache hit:", "LGZ step2 cache hit:"),
@@ -140,9 +140,11 @@ def load_plan(server_dir: Path) -> list[PlanUnit]:
         unit_id = row.get("unit_id", "")
         if not unit_id or any(character in unit_id for character in "\t\r\n"):
             raise RunnerError(f"invalid execution unit ID: {unit_id!r}")
-        if unit_id in seen:
+        # Keep the saved ID in status/checkpoints, but never run both spellings.
+        identity = LGZ_PREPARE_UNIT_ID if unit_id in LGZ_PREPARE_IDS else unit_id
+        if identity in seen:
             raise RunnerError(f"duplicate execution unit ID: {unit_id}")
-        seen.add(unit_id)
+        seen.add(identity)
         command_relpath = validate_relative_path(
             row.get("command_relpath", ""), f"command path for {unit_id}"
         )

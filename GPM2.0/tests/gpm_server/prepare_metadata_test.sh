@@ -272,7 +272,7 @@ ref:ds_add	02_alignments/ds_add_vs_ref/command.sh	02_alignments/ds_add_vs_ref/st
 assign	.runtime/commands/assign_chr_groups.sh	.runtime/logs/run_all.log
 q0_chr:Chr01	02_alignments/chr_Chr01/q0_command.sh	.runtime/logs/run_all.log
 q0_evidence	.runtime/commands/prepare_q0_evidence.sh	.runtime/logs/run_all.log
-grt_prepare	.runtime/commands/prepare_lgz_inputs.sh	.runtime/logs/run_all.log
+lgz_prepare	.runtime/commands/prepare_lgz_inputs.sh	.runtime/logs/run_all.log
 grt_step1	.runtime/commands/run_lgz_step1.sh	.runtime/logs/run_all.log
 grt_step2	.runtime/commands/run_lgz_step2.sh	.runtime/logs/run_all.log
 grt_step3	.runtime/commands/run_lgz_step3.sh	.runtime/logs/run_all.log

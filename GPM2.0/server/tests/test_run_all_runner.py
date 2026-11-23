@@ -24,6 +24,15 @@ def read_status(path: Path) -> list[dict[str, str]]:
 
 
 class RunAllRunnerTests(unittest.TestCase):
+    def test_mixed_prepare_spellings_cannot_run_the_same_stage_twice(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            server = self.make_workspace(Path(temporary), [(name, "touch duplicate-ran")
+                                         for name in ("grt_prepare", "lgz_prepare")])
+            result = self.run_runner(server)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("duplicate execution unit ID", result.stdout + result.stderr)
+            self.assertFalse((server / "duplicate-ran").exists())
+
     def test_signal_stops_all_parallel_chromosomes_before_downstream(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
