@@ -43,6 +43,39 @@ fn sequences(path: &Path) -> BTreeMap<String, String> {
     result
 }
 
+// Strict comparison with bounded diagnostics: never dump two whole genomes on error.
+fn assert_same_sequences(path: &Path, expected: &BTreeMap<String, String>, case: &str) {
+    let actual = sequences(path);
+    assert!(
+        actual.keys().eq(expected.keys()),
+        "{case}: exported record names differ"
+    );
+    for (name, want) in expected {
+        let got = &actual[name];
+        assert_eq!(
+            got.len(),
+            want.len(),
+            "{case}/{name}: exported length differs"
+        );
+        if got == want {
+            continue;
+        }
+        if let Some((index, (a, b))) = got
+            .bytes()
+            .zip(want.bytes())
+            .enumerate()
+            .find(|(_, (a, b))| a != b)
+        {
+            panic!(
+                "{case}/{name}: first differing base at {}: App={}, Server={}",
+                index + 1,
+                char::from(a),
+                char::from(b)
+            );
+        }
+    }
+}
+
 fn normalize_for_export(case_dir: &Path, view: &Value, saved: Option<&Value>) -> Value {
     let input = case_dir.join("native-project-view.json");
     fs::write(&input, serde_json::to_vec_pretty(view).unwrap()).unwrap();
@@ -203,12 +236,7 @@ fn actual_server_archives_roundtrip_through_desktop_commands() {
                 assert!(!export.exists());
             } else {
                 result.unwrap();
-                assert_eq!(
-                    sequences(&export),
-                    expected,
-                    "{}: sourced export differs from Server",
-                    case.id
-                );
+                assert_same_sequences(&export, &expected, &case.id);
             }
             // Save an actual changed Final Path using the desktop persistence body.
             let mut manual = final_path;

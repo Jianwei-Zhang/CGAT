@@ -830,10 +830,14 @@ fn build_final_path_sequence(
                     );
                 }
                 let slice = &sequence[(first as usize - 1)..last as usize];
+                // LGZ constructs its path from uppercase source bases; the original
+                // FASTA may retain soft masking. Do not alter manual contig exports.
                 if start <= end {
+                    let offset = final_sequence.len();
                     final_sequence.push_str(slice);
+                    final_sequence[offset..].make_ascii_uppercase();
                 } else {
-                    final_sequence.push_str(&reverse_complement(slice));
+                    final_sequence.push_str(&reverse_complement_iupac(slice));
                 }
             }
             FinalPathExportSegment::Gap { gap_size_bp } => {
@@ -1545,7 +1549,7 @@ pub(crate) fn reverse_complement_iupac(input: &str) -> String {
     input
         .bytes()
         .rev()
-        .map(|base| match base {
+        .map(|base| match base.to_ascii_uppercase() {
             b'A' => 'T',
             b'T' => 'A',
             b'C' => 'G',
@@ -2311,6 +2315,28 @@ mod tests {
                 VALUES(1,1,1,'renamed-ctg','0');
         ").unwrap();
         (temp, db, conn)
+    }
+
+    #[test]
+    fn server_source_export_matches_lgz_soft_mask_and_iupac_on_both_strands() {
+        let segment = |start, end| FinalPathExportSegment::Source {
+            dataset_name: "ds".into(),
+            contig_name: "contig".into(),
+            start,
+            end,
+        };
+        let sources = HashMap::from([(1, "xaCGtryswkmbdhvnx".into())]);
+        let ids = HashMap::from([(("ds".into(), "contig".into()), 1)]);
+        let sequence = build_final_path_sequence(
+            &[segment(2, 16), segment(16, 2)],
+            &HashMap::new(),
+            &sources,
+            &HashMap::new(),
+            &ids,
+            &HashMap::new(),
+        )
+        .unwrap();
+        assert_eq!(sequence, "ACGTRYSWKMBDHVNNBDHVKMWSRYACGT");
     }
 
     #[test]
