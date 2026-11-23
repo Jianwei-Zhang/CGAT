@@ -1042,3 +1042,15 @@ wrapper paths intentionally still point into the previous `...1110/plan/native/`
 directory: retaining those immutable specs/guards is what preserves old receipts.
 The active admission/owner plan is the new `343f1d...` revision, not the old
 backfill dispatcher. Continue monitoring both main jobs and final provenance.
+
+### Independent wheat first-request fork: CPU budget
+
+For a **new** `fork_wheat_q0.py run`, pass the CPU budget of that job with
+`--threads N`, or export its existing `GPM_RUN_THREADS`. With both, the fork
+uses the smaller budget and respects process affinity. Without either it uses
+one CPU, not the size of the host. The threshold selector separately decides
+whether the evidence and memory bounds justify spawning workers; small drafts
+remain serial. The budget is recorded in `started.json`, not in the scientific
+first-request receipt. A frozen selector without parallel support rejects a
+multicore request *before* staging; its ordinary single-core call still works.
+This does not update or restart an existing fork, including `43023751`.

@@ -8,6 +8,7 @@ no paths, and localized demand. Retain it for subsequent verified mapping and pu
 import argparse
 import csv
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -126,14 +127,31 @@ def draft_stage_plan(src, manifest):
     return [r for r in rows if r['path'] != rel], by_name[rel]
 
 
-def stage_and_draft(control, expected, workspace, rate_mib):
+def draft_thread_options(reader, requested=None):
+    """A fresh fork may use its explicit run budget; never guess from node size."""
+    from run_resources import execution_threads, positive
+    ceiling = None if requested is None else positive(requested, 'threads')
+    budget = execution_threads(ceiling or 1)
+    if ceiling is not None:
+        budget = min(budget, ceiling)
+    if hasattr(os, 'sched_getaffinity'):
+        budget = min(budget, len(os.sched_getaffinity(0)))
+    if budget == 1:
+        return {}  # also preserves the original frozen selector's no-keyword call
+    require('threads' in inspect.signature(reader).parameters,
+            'frozen threshold runtime does not support parallel first requests; use one thread or a new fork')
+    return {'threads':budget}
+
+
+def stage_and_draft(control, expected, workspace, rate_mib, threads=None):
     from lgz_core import q0_preparation as prep, q0_threshold_prepare as threshold
     from lgz_core.q0_threshold_acceptance import record
+    options = draft_thread_options(threshold.initial_questions, threads)  # reject incompatible requests before staging
     ctrl=control.resolve(strict=True);snapshot=small(ctrl/'snapshot.json');require(sha(snapshot)==expected,'unbound fork manifest');s=json.loads(snapshot);root=workspace.resolve();src=Path(s['source']).resolve(strict=True)
     require(root.parent==Path('/tmp') and root.name.startswith('cgat-wheat-fork-') and not root.exists() and 0<rate_mib<=128,'fork requires a new, private node-local workspace');require(not ctrl.is_relative_to(src) and not src.is_relative_to(ctrl),'fork control overlaps source')
     staged, deferred = draft_stage_plan(src,s); planned=s['total_bytes']-deferred['size']
     require(shutil.disk_usage(root.parent).free>=planned+72*1024**3,'insufficient local disk reserve');root.mkdir(mode=0o700)
-    write(ctrl/'started.json',{'source_run':s['source_run'],'snapshot_sha256':expected,'workspace':str(root),'hostname':socket.gethostname(),'pid':os.getpid(),'revision':s['revision'],'profile':s['profile'],'time':time.time()}); done=0;last=0
+    write(ctrl/'started.json',{'source_run':s['source_run'],'snapshot_sha256':expected,'workspace':str(root),'hostname':socket.gethostname(),'pid':os.getpid(),'thread_budget':options.get('threads',1),'revision':s['revision'],'profile':s['profile'],'time':time.time()}); done=0;last=0
     for row in staged:
         copy_bound(member(src,row['path']),member(root,row['path']),row,rate_mib*1024**2);done+=row['size']
         if done-last>=1024**3:print('STAGED',done,'/',planned,flush=True);last=done
@@ -158,10 +176,11 @@ def stage_and_draft(control, expected, workspace, rate_mib):
         for hit in base_reader(path,**kw):n+=1;yield hit
         print('DRAFT_PAF_COMPLETE',kw['artifact'],n,flush=True)
     with patch.object(threshold,reader_name,observed):
-        need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'])
+        need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],**options)
     write(ctrl/'global-first-request.json',{'schema':'wheat_threshold_global_first_request_v1','snapshot_sha256':expected,'revision':s['revision'],'threshold_contract':prep.supplement_policy('positive_threshold')['decision_frontier'],'has_path':has_path,'request':record(need),'published_q0':False,'mapper_calls':0});print('GLOBAL_FIRST_REQUEST',None if need is None else len(need),'sources; has_path',has_path,flush=True)
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__); subs=p.add_subparsers(dest='op',required=True);q=subs.add_parser('freeze');q.add_argument('workspace',type=Path);q.add_argument('log',type=Path);q.add_argument('run_id');q.add_argument('control',type=Path);q.add_argument('revision');q=subs.add_parser('run');q.add_argument('control',type=Path);q.add_argument('snapshot_sha');q.add_argument('workspace',type=Path);q.add_argument('--rate-mib',type=int,default=80)
-    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib)
+    q.add_argument('--threads', type=int, help='fork CPU ceiling; honors GPM_RUN_THREADS, otherwise defaults to one when omitted')
+    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib,a.threads)
