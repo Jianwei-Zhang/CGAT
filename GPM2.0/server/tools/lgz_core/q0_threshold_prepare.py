@@ -104,7 +104,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         return first
 
 
-def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None):
+def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_q0_paths
     from .q0_threshold_questions import questions
@@ -140,12 +140,13 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
         del hits
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     del links, edges  # the immutable selection input now owns these references
-    selected = select_q0_paths(data)
+    selected = (select_q0_paths(data, screen_threads=threads, progress=lambda msg: print("LGZ q0 first draft: " + msg, flush=True))
+                if threads > 1 else select_q0_paths(data))
     need, _ = questions(data, selected, assignments)
     return need, any(r.path is not None for r in selected.paths.values())
 
 
-def initial_generation(root, snapshot, mapper):
+def initial_generation(root, snapshot, mapper, *, threads=1):
     initial = snapshot.read()
     seqs,lengths,assignments,options,_,alignments,_,inputs = initial
     if 'q0_supplement_scope' in options:
@@ -158,7 +159,7 @@ def initial_generation(root, snapshot, mapper):
         if old.get('input_fingerprint') == request:
             old = prep.load_verified_evidence(root); snapshot.verify()
             return request, old, True, None
-    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices)
+    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices, threads=threads)
     snapshot.matrices = None
     snapshot.verify()
     if need != {}:
@@ -186,7 +187,7 @@ def prepare(root, threads, mapper):
         raise Q0EvidenceError('q0 evidence threads must be positive')
     root = root.resolve(); prep._readless_package(root)
     snapshot = _ThresholdInputs(root)
-    request, receipt, cached, wanted = initial_generation(root, snapshot, mapper)
+    request, receipt, cached, wanted = initial_generation(root, snapshot, mapper, threads=threads)
     full = wanted is None and receipt is None
     for n in range(MAX_REPAIRS+3):
         if receipt is None:

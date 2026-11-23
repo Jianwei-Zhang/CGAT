@@ -107,7 +107,9 @@ class ThresholdAcceptanceTests(unittest.TestCase):
             fake=Path(t)/'q0-fixture-bin'; tool=str(fake/'minimap2'); env={**os.environ,'PATH':str(fake)+os.pathsep+os.environ['PATH']}
             # An external invocation, with real outer receipts and source/reference FASTAs, not a panel adapter.
             args=[sys.executable,str(Path(prep.__file__).parents[1]/'lgz_prepare_evidence.py'),'--server-dir',str(root),'--minimap2',tool,'--supplement-scope',SCOPE]
-            subprocess.run(args,env=env,check=True,capture_output=True,text=True)
+            env.pop('GPM_RUN_THREADS', None)
+            first = subprocess.run([*args, '--threads', '4'],env=env,check=True,capture_output=True,text=True)
+            self.assertIn('cpu_budget=4 lanes=1', first.stdout)  # small input stays serial
             with patch.dict(os.environ,env):
                 r=prep.load_verified_evidence(root); cat=prep.json_file(root/r['catalog']); self.assertEqual(cat['supplement_scope']['effective'],'base_only')
                 self.assertFalse(cat['supplementary_alignments']); cached=(root/prep.MANIFEST).stat().st_mtime_ns

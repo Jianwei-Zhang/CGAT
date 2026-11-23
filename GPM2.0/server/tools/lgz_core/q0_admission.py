@@ -378,25 +378,37 @@ class _PlacementNeighbors:
         return [(placement, links) for _, placement, links in sorted(candidates, key=lambda row: row[0])]
 
 
+def _quiet(_message: str) -> None:
+    pass
+
+
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),
-                     path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Admission:
+                     path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
+                     screen_threads: int = 1, screen_progress: Callable[[str], None] = _quiet) -> Admission:
     if quality_pass is not None and (set(quality_pass) != set(data.sources) or any(type(v) is not bool for v in quality_pass.values())):
         raise Q0EvidenceError("q0 QC decisions must explicitly cover every source")
     records, accepted = [], {}
-    groups, high, ambiguous = {}, {}, defaultdict(list)
+    groups, ambiguous = {}, defaultdict(list)
     allowed = {key for key in data.parts if quality_pass is None or quality_pass[data.parts[key].source]}
-    for key, part in sorted(data.parts.items()):
+    ordered = sorted(data.parts.items())
+    if screen_threads > 1:
+        from .q0_source_screen import ordered_screens
+        screened = ordered_screens(data, ordered, allowed, policy, screen_threads, _reference_groups, screen_progress)
+    else:
+        screened = ((key, part, _reference_groups(data, part, policy) if key in allowed else None)
+                    for key, part in ordered)
+    for key, part, result in screened:
         if key not in allowed:
             records.append({"segment_id": key, "status": "rejected", "reason": "failed_reads_qc"})
             continue
-        groups[key], high[key], mask = _reference_groups(data, part, policy)
+        groups[key], high, mask = result
         ambiguous[part.source].extend(mask)
         records.append({"segment_id": key, "status": "reference_screen",
                         "evidence_ids": sorted(h.evidence_id for h in data.reference_hits.get(part.source, ()) if h.query.intersection(part.interval)),
                         "unique_groups": [{"chromosome": group[0], "orientation": group[1],
                                            "support_bp": _size(a.source for a in anchors)} for group, anchors in sorted(groups[key].items())],
                         "ambiguous_intervals": [asdict(i) for i in mask]})
-        if len(groups[key]) == 1 and high[key] and all(_ordered(anchors, group[1]) for group, anchors in groups[key].items()):
+        if len(groups[key]) == 1 and high and all(_ordered(anchors, group[1]) for group, anchors in groups[key].items()):
             (chromosome, strand), anchors = next(iter(groups[key].items()))
             support = merged_intervals(a.source for a in anchors)
             interval = part.interval if _size(support) / part.interval.length >= policy.minimum_whole_support_fraction else _hull(support)
@@ -406,6 +418,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
             records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted",
                             "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
                             "qc": "not_measured" if quality_pass is None else "passed"})
+    del screened, ordered
     ambiguous = {key: merged_intervals(value) for key, value in ambiguous.items()}
     pair_neighbors = _pair_neighbors(data.pair_links)
 
@@ -664,16 +677,13 @@ def _links_for_path_graphs(placements, links):
     return by_chromosome
 
 
-def _quiet(_message: str) -> None:
-    pass
-
-
 def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
                     path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
-                    progress: Callable[[str], None] = _quiet) -> PathSelection:
+                    progress: Callable[[str], None] = _quiet, screen_threads: int = 1) -> PathSelection:
     """Select and check source geometry without reconstructing sequences or building a report."""
     progress(f"placing candidate segments · pair links={len(data.pair_links)}")
-    admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass)
+    admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass,
+                                 screen_threads=screen_threads, screen_progress=progress)
     groups = defaultdict(list)
     for placement in admission.placements:
         groups[placement.chromosome].append(placement)
@@ -775,7 +785,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_reference_competition.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
+                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, **kwargs) -> Construction:
