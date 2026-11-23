@@ -333,6 +333,7 @@ class WorkspaceLock:
 class Runner:
     def __init__(self, server_dir: Path, units: list[PlanUnit], run_id: str, *, log_style="compact", color="auto"):
         self.server_dir = server_dir
+        self.workspace_lock = None
         self.units = units
         self.run_id = run_id
         self.logs_dir = workspace_join(server_dir, "logs")
@@ -648,7 +649,8 @@ class Runner:
                 "",
                 ("LGZ baseline delivery completed; refinement did not fully succeed." if self.refinement_exit_code else "GPM Server workflow completed successfully."),
                 "",
-                ("LGZ baseline App packages (not refined):" if has_refinement else "Final delivery packages:"),
+                ("Project App packages (LGZ + all published automatic tools):" if WorkspaceLayout.detect(self.server_dir).project_delivery
+                 else "LGZ baseline App packages (not refined):" if has_refinement else "Final delivery packages:"),
                 "  1. Full package (FASTA + report):",
                 f"     {full['path']}",
                 f"     Size: {self._format_size(int(full['size_bytes']))}",
@@ -663,7 +665,7 @@ class Runner:
                 "",
                 ("Local LGZ process report:" if has_refinement else "Local report:"),
                 f"  {workspace_join(self.server_dir, 'report/report.html')}",
-                *(["Overall/refinement report (per-tool refined FASTA, Final Path and full/light App packages):",
+                *(["Overall/refinement report (FASTA, Final Paths and tool outcomes):",
                    str(self.server_dir / "06_report/report.html")] if (self.server_dir / "06_report/report.html").is_file() else []),
             ]
         )
@@ -997,9 +999,13 @@ class Runner:
                 deliveries = self._delivery_stagings()
                 if completed and deliveries:
                     try:
-                        artifacts = finalize_delivery_archives_from_staging(
-                            self.server_dir, deliveries
-                        )
+                        if WorkspaceLayout.detect(self.server_dir).project_delivery:
+                            from project_delivery_publish import publish_current
+                            artifacts = publish_current(self.server_dir, self.workspace_lock, runner_staging=True)
+                            from refinement_jobs_index import refresh_after_delivery
+                            refresh_after_delivery(self.server_dir,self.run_id)
+                        else:
+                            artifacts = finalize_delivery_archives_from_staging(self.server_dir, deliveries)
                     except Exception as exc:
                         message = f"failed to build final delivery archives: {exc}"
                         self.report.delivery_failure(message)
@@ -1077,6 +1083,7 @@ def main() -> int:
             report = handoff(server_dir, workspace_join(server_dir, ".prepare_lib"), run_id, units, OuterCheckpointManager(server_dir))
             print("[REFERENCE HANDOFF] " + json.dumps(report, ensure_ascii=True), flush=True)
         runner = Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color)
+        runner.workspace_lock = lock
         # No handoff survives a lock release, restart, package import or migration.
         with tempfile.TemporaryDirectory(prefix="cgat-lgz-check-") as private:
             runner.contract_channel = Path(private) / "verified.json"

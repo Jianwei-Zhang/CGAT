@@ -1435,5 +1435,6 @@ where
         q4_artifact_sha256: q_artifact_hashes.remove(final_version).unwrap(),
         refinement_reads: Default::default(),
         auto_effect: None,
+        project_versions: None,
     })
 }

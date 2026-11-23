@@ -17,6 +17,7 @@ import time
 import uuid
 
 try:
+    from workspace_layout import automatic_dir
     from refinement_native_units import owned, file_fact, seal, checked_json, RECEIPT, SUMMARY, REQUEST, SCHEMA
     from post_lgz_degap import digest, stat_key, atomic_json
     from refinement_tools import fingerprint
@@ -24,6 +25,7 @@ try:
     from run_orchestration import OrchestrationContractError
     from workspace_migration import sync_directories
 except ModuleNotFoundError:
+    from .workspace_layout import automatic_dir
     from .refinement_native_units import owned, file_fact, seal, checked_json, RECEIPT, SUMMARY, REQUEST, SCHEMA
     from .post_lgz_degap import digest, stat_key, atomic_json
     from .refinement_tools import fingerprint
@@ -219,10 +221,10 @@ class DegapUnits:
         self.request, self.root, self.run_id = request, Path(request["root"]).resolve(), request["run_id"]
         if not re.fullmatch(r"[0-9a-f]{32}", self.run_id):
             raise PathError("invalid DEGAP unit owner")
-        self.base = self.root / "04_refinement/01_degap/02_jobs"
+        self.base = automatic_dir(self.root, 'degap') / "02_jobs"
         self.jobs = owned(self.root, self.base / self.run_id)
         self.directory = owned(self.root, self.jobs / "native_units")
-        self.native = owned(self.root, self.root / "04_refinement/01_degap/03_native" / self.run_id)
+        self.native = owned(self.root, automatic_dir(self.root, 'degap') / "03_native" / self.run_id)
         if create:
             self.directory.mkdir(exist_ok=False)
             self.write_summary(None)
@@ -343,7 +345,7 @@ def validate_bundle(root, receipt, value, *, receipt_required=True):
     owner = value["run_id"]
     if not isinstance(owner, str) or not re.fullmatch(r"[0-9a-f]{32}", owner):
         raise PathError("DEGAP unit producer is invalid")
-    expected_job = Path(root) / "04_refinement/01_degap/03_native" / owner / "03.gap_filling" / unit["job_name"]
+    expected_job = automatic_dir(root, 'degap') / "03_native" / owner / "03.gap_filling" / unit["job_name"]
     if (unit.get("kind") != "degap.gap" or Path(unit["job_name"]).name != unit["job_name"]
             or "\\" in unit["job_name"] or value["consumed_job"] != expected_job.relative_to(root).as_posix()
             or value["native_result"].get("job_name") != unit["job_name"]
@@ -386,8 +388,8 @@ def validate_bundle(root, receipt, value, *, receipt_required=True):
                 or producer.get("artifacts") != {name: sha for name, sha in value["artifacts"].items() if name != "producer.json"}
                 or origin["receipt_sha256"] != value["artifacts"]["producer.json"]):
             raise PathError("DEGAP original producer is not the completed unit")
-        expected_origin = Path(root) / "04_refinement/01_degap/02_jobs" / origin["run_id"] / "native_units" / value["key"] / RECEIPT
-        expected_producer_job = Path(root) / "04_refinement/01_degap/03_native" / origin["run_id"] / "03.gap_filling" / unit["job_name"]
+        expected_origin = automatic_dir(root, 'degap') / "02_jobs" / origin["run_id"] / "native_units" / value["key"] / RECEIPT
+        expected_producer_job = automatic_dir(root, 'degap') / "03_native" / origin["run_id"] / "03.gap_filling" / unit["job_name"]
         if (producer["native_result"].get("job_name") != unit["job_name"]
                 or producer["native_result"].get("job_dir") != str(expected_producer_job)
                 or producer.get("consumed_job") != expected_producer_job.relative_to(root).as_posix()
@@ -397,7 +399,7 @@ def validate_bundle(root, receipt, value, *, receipt_required=True):
 
 
 def capture_units(root, run_id, code, *, required=False):
-    jobs = Path(root) / "04_refinement/01_degap/02_jobs" / run_id
+    jobs = automatic_dir(root, 'degap') / "02_jobs" / run_id
     if not (jobs / SUMMARY).exists() and not required:
         return []
     summary, request = checked_json(root, jobs / SUMMARY), checked_json(root, jobs / REQUEST)
@@ -426,7 +428,7 @@ def capture_units(root, run_id, code, *, required=False):
         unit = row["unit"]
         if unit.get("kind") != "degap.gap" or Path(unit["job_name"]).name != unit["job_name"] or "\\" in unit["job_name"]:
             raise PathError("DEGAP unit has an unsupported consumer")
-        directory = owned(root, Path(root) / "04_refinement/01_degap/03_native" / run_id / "03.gap_filling" / unit["job_name"])
+        directory = owned(root, automatic_dir(root, 'degap') / "03_native" / run_id / "03.gap_filling" / unit["job_name"])
         if (value["consumed_job"] != directory.relative_to(root).as_posix()
                 or value["native_result"].get("job_name") != unit["job_name"] or value["native_result"].get("job_dir") != str(directory)):
             raise PathError("DEGAP native result leaves its consumer job")

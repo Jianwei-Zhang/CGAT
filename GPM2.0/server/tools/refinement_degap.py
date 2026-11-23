@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 
 try:
-    from workspace_layout import WorkspaceLayout, workspace_join
+    from workspace_layout import automatic_dir, WorkspaceLayout, workspace_join
     from post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
     from refinement_path import identity, source_blocks, PathError
     from refinement_sources import FastaCatalog
@@ -28,7 +28,7 @@ try:
     from refinement_degap_units import ENGINE_REVISION as PIN, FAMILY, family_result
     from refinement_native_checkpoint import execute as execute_native, validate_native_job_summary
 except ModuleNotFoundError:
-    from .workspace_layout import WorkspaceLayout, workspace_join
+    from .workspace_layout import automatic_dir, WorkspaceLayout, workspace_join
     from .post_lgz_degap import IndexedFasta, check_environment, digest, stat_key, atomic_json, read_groups
     from .refinement_path import identity, source_blocks, PathError
     from .refinement_sources import FastaCatalog
@@ -311,7 +311,7 @@ def stage_degap(root: Path, groups: dict, threads: int, *, run_id: str | None = 
     run_id = run_id or uuid.uuid4().hex
     if len(run_id) != 32 or any(c not in "0123456789abcdef" for c in run_id):
         raise PathError("invalid refinement run identity")
-    invocation_path = Path(root) / "04_refinement/01_degap/02_jobs" / run_id / "invocation.json"
+    invocation_path = automatic_dir(root, 'degap') / "02_jobs" / run_id / "invocation.json"
     # Do not change an existing attempt, including its failure receipt.
     if invocation_path.parent.exists():
         raise PathError("refinement attempt already exists")

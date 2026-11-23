@@ -201,7 +201,7 @@ def execute(argv: list[str], server_source: Path) -> int:
     if not root.exists() or not any(root.iterdir()):
         if "--ref" not in options or "--ds" not in options:
             raise RunnerError("A new workspace requires --ref and --ds; see run.sh --help")
-        initialize_workspace(root, prepared_runtime=".lib", job_outputs=True)
+        initialize_workspace(root, prepared_runtime=".lib", job_outputs=True, project_delivery=True)
     manifest_path = workspace_join(root, ".run_all/launch.json")
     run_id = new_run_id()
     lock = WorkspaceLock(root, run_id)

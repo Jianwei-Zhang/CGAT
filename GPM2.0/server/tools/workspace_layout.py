@@ -20,6 +20,7 @@ LAYOUT_SCHEMA = "cgat.workspace"
 # Same numbered scientific workspace (and Q0 producer identity), different output contract.
 # A pre-contract runtime must refuse this declaration rather than write the v2 public tree.
 JOB_OUTPUT_SCHEMA = "cgat.workspace.job-outputs.v1"
+PROJECT_OUTPUT_SCHEMA = "cgat.workspace.job-outputs.v2"
 LAYOUT_VERSION = 2
 MANIFEST = ".runtime/workspace.json"
 MIGRATION = ".runtime/migration.json"
@@ -150,6 +151,11 @@ def logical_relative(value: str | PurePosixPath) -> str:
     Logical input stays unchanged; full q-stage roles take precedence.
     """
     text = relative_path(value)
+    for tool, code in TOOL_DIRECTORIES.items():
+        prefix = f"04_refinement/automatic/{tool}/"
+        if text.startswith(prefix):
+            text = f"04_refinement/{code}/" + text[len(prefix):]
+            break
     match = re.match(r"03_lgz/(?:01_q0|02_step1|03_step2|04_step3)/([.]?q[0-4](?:[._/].*)?)$", text)
     if match:
         return "grt/q/" + match[1]
@@ -178,6 +184,7 @@ class WorkspaceLayout:
     version: int
     prepared_runtime: str | None = None
     result_prefix: str | None = None
+    project_delivery: bool = False
 
     def __post_init__(self):
         object.__setattr__(self, "root", Path(self.root).resolve())
@@ -185,6 +192,8 @@ class WorkspaceLayout:
                 self.version != LAYOUT_VERSION or not isinstance(self.result_prefix, str)
                 or "/" in relative_path(self.result_prefix)):
             raise LayoutError("invalid job result prefix")
+        if self.project_delivery and self.result_prefix is None:
+            raise LayoutError("project deliveries require a creation-time result prefix")
         if self.prepared_runtime is not None and (self.version != LAYOUT_VERSION or self.prepared_runtime != ".lib"):
             raise LayoutError("invalid prepared runtime declaration")
         if type(self.version) is not int or self.version not in {1, LAYOUT_VERSION}:
@@ -225,17 +234,17 @@ class WorkspaceLayout:
         if migration and (migration["state"] == "rolled_back" or value.get("migration_id") != migration["id"]
                           or value.get("migration_adapter", migration.get("adapter")) != migration.get("adapter")):
             raise LayoutError("layout manifest disagrees with migration receipt")
-        if (value.get("schema") not in (LAYOUT_SCHEMA, JOB_OUTPUT_SCHEMA)
+        if (value.get("schema") not in (LAYOUT_SCHEMA, JOB_OUTPUT_SCHEMA, PROJECT_OUTPUT_SCHEMA)
                 or type(value.get("layout_version")) is not int
                 or value.get("layout_version") != LAYOUT_VERSION
                 or value.get("state") != "ready"):
             raise LayoutError("unsupported or incomplete workspace layout manifest")
-        if value["schema"] == JOB_OUTPUT_SCHEMA:
+        if value["schema"] in (JOB_OUTPUT_SCHEMA, PROJECT_OUTPUT_SCHEMA):
             if migration is not None or not isinstance(value.get("result_prefix"), str):
                 raise LayoutError("new job outputs require a creation-time result prefix, not a migrated workspace")
         elif "result_prefix" in value:
             raise LayoutError("unexpected result prefix on a pre-contract workspace")
-        return cls(root, LAYOUT_VERSION, value.get("prepared_runtime"), value.get("result_prefix"))
+        return cls(root, LAYOUT_VERSION, value.get("prepared_runtime"), value.get("result_prefix"), value["schema"] == PROJECT_OUTPUT_SCHEMA)
 
     def relative(self, logical: str | PurePosixPath) -> str:
         text = relative_path(logical)
@@ -244,9 +253,19 @@ class WorkspaceLayout:
             text = ".prepare_lib" + text.removeprefix(".lib")
         if self.prepared_runtime and (text == ".prepare_lib" or text.startswith(".prepare_lib/")):
             return self.prepared_runtime + text.removeprefix(".prepare_lib")
+        if self.project_delivery:
+            text = canonical_relative(text)
         if self.result_prefix is not None:
             area, _, tail = text.partition("/")
             tool, sep, rest = tail.partition("/")
+            if self.project_delivery and area == "04_refinement" and tool in TOOL_DIRECTORIES.values():
+                engine = next(key for key, code in TOOL_DIRECTORIES.items() if code == tool)
+                return f"04_refinement/automatic/{engine}" + sep + rest
+            if self.project_delivery and area == "07_delivery" and tool in TOOL_DIRECTORIES.values():
+                # One content-bound Light projection per tool, never a per-tool public archive.
+                return ".runtime/refinement/project-views/" + tool + sep + rest
+            if self.project_delivery and area == "08_refinement_jobs" and tool == "02_manual":
+                return "04_refinement/manual" + sep + rest
             if area == "05_final" and (tool == "00_lgz" or tool in TOOL_DIRECTORIES.values()):
                 return "05_final/details/" + tool + sep + rest
         return canonical_relative(text) if self.version == LAYOUT_VERSION else text
@@ -285,10 +304,25 @@ class WorkspaceLayout:
     def manifest(self) -> dict:
         if self.version != LAYOUT_VERSION:
             raise LayoutError("legacy workspaces do not have a layout 2 manifest")
-        return {"schema": JOB_OUTPUT_SCHEMA if self.result_prefix is not None else LAYOUT_SCHEMA,
+        return {"schema": PROJECT_OUTPUT_SCHEMA if self.project_delivery else JOB_OUTPUT_SCHEMA if self.result_prefix is not None else LAYOUT_SCHEMA,
                 "layout_version": LAYOUT_VERSION, "state": "ready",
                 **({"result_prefix": self.result_prefix} if self.result_prefix is not None else {}),
                 **({"prepared_runtime": self.prepared_runtime} if self.prepared_runtime else {})}
+
+
+def automatic_dir(root, tool):
+    """Physical, ownership-checked native root; persisted provenance uses this actual path."""
+    return WorkspaceLayout.detect(Path(root)).path("04_refinement/" + TOOL_DIRECTORIES[tool])
+
+
+def native_request_root(request):
+    # Select an exact workspace shape, not the nearest arbitrary workspace marker.
+    parents = Path(request).absolute().parents
+    if len(parents) >= 6 and parents[3].name == "automatic" and parents[4].name == "04_refinement":
+        return parents[5]
+    if len(parents) >= 5 and parents[3].name == "04_refinement":
+        return parents[4]
+    raise LayoutError("invalid native request namespace")
 
 
 def workspace_path(root: Path, logical: str | PurePosixPath) -> Path:
@@ -322,13 +356,14 @@ def workspace_join(root: Path, *parts: str | Path) -> Path:
     return layout.path(relative.as_posix())
 
 
-def initialize_workspace(root: Path, *, prepared_runtime: str | None = None, job_outputs: bool = False) -> WorkspaceLayout:
+def initialize_workspace(root: Path, *, prepared_runtime: str | None = None, job_outputs: bool = False,
+                         project_delivery: bool = False) -> WorkspaceLayout:
     """Create a numbered workspace in an empty directory; never convert in place."""
     root = Path(root).resolve()
     if root.exists() and any(root.iterdir()):
         raise LayoutError("new workspace must be empty; existing workspaces require migration")
     root.mkdir(parents=True, exist_ok=True)
-    layout = WorkspaceLayout(root, LAYOUT_VERSION, prepared_runtime, root.name if job_outputs else None)
+    layout = WorkspaceLayout(root, LAYOUT_VERSION, prepared_runtime, root.name if job_outputs else None, project_delivery)
     private = root / ".runtime"
     private.mkdir(mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix=".workspace.", dir=private)
@@ -388,7 +423,7 @@ def main() -> None:
     parser.add_argument("--logical-script")
     args = parser.parse_args()
     try:
-        layout = initialize_workspace(args.server_dir, prepared_runtime=".lib", job_outputs=True) if args.initialize else WorkspaceLayout.detect(args.server_dir)
+        layout = initialize_workspace(args.server_dir, prepared_runtime=".lib", job_outputs=True, project_delivery=True) if args.initialize else WorkspaceLayout.detect(args.server_dir)
         if args.path is not None:
             print(layout.path(args.path))
         elif args.relative is not None:

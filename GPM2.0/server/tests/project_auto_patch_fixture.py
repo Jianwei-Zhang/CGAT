@@ -1,5 +1,6 @@
 """Produce genuine Server archives over the controlled (non-native) admission test fixture."""
 from pathlib import Path
+import json
 import shutil
 import sys
 
@@ -13,7 +14,7 @@ from refinement_reports import build_tool_report
 from run_all_runner import WorkspaceLock
 
 
-def generate(dest):
+def generate(dest, *, project_packages=False):
     root = dest/'job'
     first, _, _ = create(root, with_source_evidence=True, job_outputs=True)
     build(root,dest/'baseline',True)
@@ -29,9 +30,25 @@ def generate(dest):
             if completed['exit_code']: raise ValueError(completed)
             publish_auto_patch(root,lock)
             shutil.copyfile(root/'07_delivery/job.auto.patch.zip', dest/(tool+'.zip'))
+        if project_packages:
+            from delivery_archive import create_archive
+            from project_auto_patch import INDEX
+            from project_delivery import project_payload
+            from run_orchestration import sha256_file
+            import zipfile
+            patch = dest / 'tgsgapcloser.zip'
+            with zipfile.ZipFile(patch) as archive:
+                baseline = json.loads(archive.read(INDEX))['baseline']
+            for full in (True, False):
+                mode = 'full' if full else 'light'
+                staged = dest / mode / 'job'
+                build(root, staged, full)
+                project_payload(staged, mode, baseline, patch, patch_sha=sha256_file(patch))
+                fmt = 'zip' if full else 'tar.gz'
+                create_archive(staged, dest / f'job.{mode}.{fmt}', fmt, 1)
     finally:
         lock.release()
 
 
 if __name__=='__main__':
-    generate(Path(sys.argv[1]))
+    generate(Path(sys.argv[1]), project_packages='--project-packages' in sys.argv[2:])

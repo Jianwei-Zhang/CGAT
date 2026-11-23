@@ -20,12 +20,14 @@ import uuid
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
+    from workspace_layout import automatic_dir, native_request_root
     from refinement_native_units import owned, file_fact, seal, checked_json, helper_hashes, RECEIPT, REQUEST, SUMMARY, SCHEMA, validate_paf
     from refinement_tools import fingerprint
     from post_lgz_degap import digest, stat_key, atomic_json
     from refinement_path import PathError
     from workspace_migration import sync_directories
 except ModuleNotFoundError:
+    from .workspace_layout import automatic_dir, native_request_root
     from .refinement_native_units import owned, file_fact, seal, checked_json, helper_hashes, RECEIPT, REQUEST, SUMMARY, SCHEMA, validate_paf
     from .refinement_tools import fingerprint
     from .post_lgz_degap import digest, stat_key, atomic_json
@@ -125,8 +127,8 @@ class TgsUnits:
         self.run_id = request["run_id"]
         if not re.fullmatch(r"[0-9a-f]{32}",self.run_id):
             raise PathError("invalid TGS unit owner")
-        self.jobs = owned(self.root,self.root/"04_refinement/02_tgsgapcloser/02_jobs"/self.run_id)
-        self.native = owned(self.root,self.root/"04_refinement/02_tgsgapcloser/03_native"/self.run_id)
+        self.jobs = owned(self.root,automatic_dir(self.root, 'tgsgapcloser') / "02_jobs"/self.run_id)
+        self.native = owned(self.root,automatic_dir(self.root, 'tgsgapcloser') / "03_native"/self.run_id)
         self.directory = owned(self.root,self.jobs/"native_units")
         if create:
             self.directory.mkdir(exist_ok=False)
@@ -213,7 +215,7 @@ class TgsUnits:
         identities[real] = program_identity
         normalized = []
         for value in argv:
-            for path,role in ((self.native,"@native"),(self.root/"04_refinement/02_tgsgapcloser/01_inputs"/self.run_id,"@inputs")):
+            for path,role in ((self.native,"@native"),(automatic_dir(self.root, 'tgsgapcloser') / "01_inputs"/self.run_id,"@inputs")):
                 if value == str(path) or value.startswith(str(path)+"/"):
                     value = role+value[len(str(path)):]; break
             normalized.append(value)
@@ -309,7 +311,7 @@ def validate_bundle(root, receipt, value, *, receipt_required=True):
     if value["origin"]:
         origin = value["origin"]
         producer = checked_json(root,receipt.parent/"producer.json")
-        expected_origin = Path(root)/"04_refinement/02_tgsgapcloser/02_jobs"/origin["run_id"]/"native_units"/value["key"]/RECEIPT
+        expected_origin = automatic_dir(root, 'tgsgapcloser') / "02_jobs"/origin["run_id"]/"native_units"/value["key"]/RECEIPT
         if (not re.fullmatch(r"[0-9a-f]{32}",origin["run_id"]) or origin["receipt"] != expected_origin.relative_to(root).as_posix()
                 or origin["receipt_sha256"] != value["artifacts"]["producer.json"]
                 or producer.get("schema") != SCHEMA or producer.get("schema_version") != 1 or producer.get("status") != "completed"
@@ -323,7 +325,7 @@ def validate_bundle(root, receipt, value, *, receipt_required=True):
 
 
 def capture_units(root, run_id, code, *, required=False):
-    jobs = Path(root)/"04_refinement/02_tgsgapcloser/02_jobs"/run_id
+    jobs = automatic_dir(root, 'tgsgapcloser') / "02_jobs"/run_id
     if not (jobs/SUMMARY).exists() and not required:
         return []
     summary,request = checked_json(root,jobs/SUMMARY),checked_json(root,jobs/REQUEST)
@@ -376,13 +378,13 @@ def main():
     args = sys.argv[1:]
     if len(args) < 2 or args[0] != "--request":
         raise PathError("TGS wrapper requires its sealed request")
-    request_path = Path(args[1]).absolute(); root = request_path.parents[4]
+    request_path = Path(args[1]).absolute(); root = native_request_root(request_path)
     request = checked_json(root,request_path)
     if (request.get("schema") != "cgat.native-refinement-launch" or request.get("tool") != "tgsgapcloser"
             or request.get("run_id") != request_path.parent.name or request.get("root") != str(root)
             or request.get("helpers") != helper_hashes("tgsgapcloser") or request["session"]["helpers"] != request["helpers"]
             or request.get("jobs") != str(request_path.parent) or request.get("cwd") != str(Path.cwd())
-            or request_path != root/"04_refinement/02_tgsgapcloser/02_jobs"/request["run_id"]/REQUEST):
+            or request_path != automatic_dir(root, 'tgsgapcloser') / "02_jobs"/request["run_id"]/REQUEST):
         raise PathError("TGS native launcher does not match its owned attempt")
     if len(args) > 2:
         if len(args) < 5 or args[2] != "--program" or args[3] not in {"minimap2","racon"} or args[4] != "--":

@@ -88,6 +88,8 @@ pub fn initialize_grt_project_with_options(
             materialize_grt_source_cards_with_connection(&mut conn, project_id)?;
         verify_project_assignment_orientation_projection(&conn, project_id)?;
         refinement_inputs::bind_imported_inputs(&conn, project_id)?;
+        conn.execute("INSERT INTO project_auto_version(project_id,tool,light_manifest,descriptor_json,baseline_json,effect_json)
+            SELECT ?1,tool,light_manifest,descriptor_json,baseline_json,effect_json FROM package_auto_version WHERE package_id=1", [project_id])?;
         set_project_auto_pipeline_done_with_connection(&mut conn, project_id, true)?;
         Ok((assembly, materialized_source_card_count))
     })();

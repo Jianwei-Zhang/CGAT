@@ -23,7 +23,7 @@ from refinement_recipes import make_invocation, materialize_native_driver, prepa
 from refinement_tools import ToolError, fingerprint, load_lock, validate_runtime, verify_directory_links
 from run_resources import execution_threads, prepared_resources
 from run_orchestration import sha256_file
-from workspace_migration import durable_json, rename_synced
+from workspace_migration import durable_json, rename_synced, sync_directories
 
 RESULTS = "cgat.app-refinement-results.v1"
 MANIFEST = "refinement_results.json"
@@ -276,7 +276,8 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
 
 def publish_results(layout, batch_dir, batch, rows, patches, *, manifest, reads):
     data = {"schema": RESULTS, "batch_sha256": batch, "results": rows}
-    output = layout.path((batch_dir / "04_delivery/refinement_results.zip").relative_to(layout.root).as_posix())
+    from refine_report import manual_patch_path
+    output = manual_patch_path(layout, batch)
     report = layout.path((batch_dir / "03_report/summary.json").relative_to(layout.root).as_posix())
     if any(path.is_symlink() or (path.exists() and not path.is_file()) for path in (output, report)):
         raise PathError("manual result destinations must be regular files")
@@ -294,15 +295,71 @@ def publish_results(layout, batch_dir, batch, rows, patches, *, manifest, reads)
                     archive.writestr(patch["path"], payload)
         with staged.open("rb") as stream:
             os.fsync(stream.fileno())
-        if output.exists():
-            with ZipFile(output) as existing:
-                old = json.loads(existing.read(MANIFEST))
-            if old.get("schema") != RESULTS or old.get("batch_sha256") != batch:
-                raise PathError("existing result ZIP is not owned by this manual batch")
-        rename_synced(staged, output)
+        if layout.project_delivery:
+            # A return already sent to an App must remain reproducible. A rerun can
+            # repair an interrupted first publication, not silently replace its decisions.
+            receipt_file = layout.path((batch_dir / "manual-delivery.json").relative_to(layout.root).as_posix())
+            if receipt_file.is_symlink():
+                raise PathError("manual delivery receipt cannot be a link")
+            prior = json.loads(receipt_file.read_text()) if receipt_file.exists() else None
+            identity = {"batch":batch,"relative":output.relative_to(layout.root).as_posix(),"result":fingerprint(data)}
+            if prior is not None and any(prior.get(k) != v for k,v in identity.items()):
+                raise PathError("this manual batch already has different published results; export a new batch")
+            if output.exists():
+                if not prior or sha256_file(output) != prior.get("sha256"):
+                    raise PathError("manual patch is unowned or has changed; not replacing it")
+            else:
+                if prior and prior.get("state") == "committed":
+                    raise PathError("previously published manual patch is missing")
+                prior = {**identity,"sha256":sha256_file(staged),"state":"prepared","reads":reads}
+                durable_json(receipt_file,prior)
+                os.link(staged,output)
+                sync_directories(output.parent)
+            if prior.get("state") != "committed":
+                durable_json(receipt_file,{**prior,"state":"committed"})
+        else:
+            if output.exists():
+                with ZipFile(output) as existing:
+                    old = json.loads(existing.read(MANIFEST))
+                if old.get("schema") != RESULTS or old.get("batch_sha256") != batch:
+                    raise PathError("existing result ZIP is not owned by this manual batch")
+            rename_synced(staged, output)
     from refine_report import publish_manual_report
     report_paths = publish_manual_report(layout, batch_dir, manifest, data, reads, output)
     return {"delivery": str(output), **report_paths, "results": rows}
+
+
+def existing_manual_delivery(layout,batch_dir,batch,manifest,override):
+    if not layout.project_delivery:
+        return None
+    from refine_report import manual_patch_path, publish_manual_report
+    receipt = batch_dir / "manual-delivery.json"
+    patch = manual_patch_path(layout,batch)
+    if receipt.is_symlink() or patch.is_symlink():
+        raise PathError("unexpected link at manual publication destination")
+    if not receipt.exists():
+        if patch.exists():
+            raise PathError("unowned manual patch or abbreviated batch-name collision")
+        return None
+    owner = json.loads(receipt.read_text())
+    if owner.get("batch") != batch or owner.get("relative") != patch.relative_to(layout.root).as_posix():
+        raise PathError("manual patch belongs to a different batch")
+    if not patch.exists() and owner.get("state") == "prepared":
+        return None
+    if not patch.is_file() or sha256_file(patch) != owner.get("sha256"):
+        raise PathError("published manual return is missing or has changed")
+    if any(override.get(k) is not None for k in ("hifi","ont")):
+        raise PathError("this manual batch is already published; export a new batch to change reads")
+    with ZipFile(patch) as archive:
+        data = json.loads(archive.read(MANIFEST))
+    if data.get("batch_sha256") != batch or data.get("schema") != RESULTS or fingerprint(data) != owner.get("result"):
+        raise PathError("manual patch manifest differs from its receipt")
+    if owner.get("state") == "prepared":
+        durable_json(receipt,{**owner,"state":"committed"})
+    elif owner.get("state") != "committed":
+        raise PathError("unsupported manual delivery receipt")
+    report = publish_manual_report(layout,batch_dir,manifest,data,owner["reads"],patch)
+    return {"delivery":str(patch),**report,"results":data["results"]}
 
 
 def execute_manual(layout, batch_dir, preparation, manifest, override, threads):

@@ -56,7 +56,15 @@ class ParentLock:
                 and self._is_alive(self.owner["pid"], self.owner.get("process_start", "")))
 
 
-def final_result_lines(tool, paths, provenance, *, fasta=None):
+def overview_members(layout, batch):
+    files = ["06_report/report.html"]
+    if not layout.project_delivery or batch["tools"]:
+        files.extend(f"06_report/03_comparison/{batch['batch_id']}/{name}" for name in
+                     ("comparison.json", "original_gaps.json", "gap_comparison.tsv"))
+    return files
+
+
+def final_result_lines(tool, paths, provenance, *, fasta=None, project_delivery=False):
     """Do not label a successful zero-admission run as an applied refinement."""
     accepted = provenance["accepted_edit_count"]
     counts = provenance["counts"]
@@ -66,7 +74,7 @@ def final_result_lines(tool, paths, provenance, *, fasta=None):
     label = "REFINED FINAL" if accepted else "UNCHANGED AFTER REFINEMENT; ZERO ACCEPTED EDITS"
     return [outcome, f"[{label}] {tool}: {fasta if fasta is not None else paths['final'] / 'assembly.fa'}",
             f"[FINAL PATH] {tool}: {paths['final'] / 'final_path.json'}",
-            f"[APP DELIVERY] {tool}: {paths['delivery']}"]
+            *([] if project_delivery else [f"[APP DELIVERY] {tool}: {paths['delivery']}"])]
 
 
 def run(root, lock, request):
@@ -117,9 +125,7 @@ def run(root, lock, request):
     if not batch.get("overview"):
         batch["overview"] = render_overview(root, batch, batch_result["staged_results"])
         atomic_write_json(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json"), batch)
-    overview_paths = ["06_report/report.html"] + [
-        f"06_report/03_comparison/{batch['batch_id']}/{name}"
-        for name in ("comparison.json", "original_gaps.json", "gap_comparison.tsv")]
+    overview_paths = overview_members(layout,batch)
     receipt = {"schema": "cgat.refinement-invocation", "schema_version": 1, "run_id": request["run_id"],
                "request_sha256": fingerprint(request), "batch_id": batch["batch_id"], "exit_code": batch_result["exit_code"],
                "batch_sha256": sha256_file(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json")),
@@ -135,14 +141,15 @@ def run(root, lock, request):
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"[REFINEMENT JOB INDEX] unavailable: {error}", file=sys.stderr, flush=True)
     else:
-        print(f"[REFINEMENT JOB INDEX] {index}", flush=True)
+        if index is not None:
+            print(f"[REFINEMENT JOB INDEX] {index}", flush=True)
     print(f"[REFINEMENT] status={batch['status']} exit_code={batch_result['exit_code']} threads={budget}", flush=True)
     for tool, row in batch["tools"].items():
         if row["status"] == "published":
             paths = targets(layout, tool)
             provenance = batch_result["staged_results"][tool]["provenance"]
             fasta = layout.path(f"05_final/{layout.result_prefix}.{tool}.fa") if layout.result_prefix else None
-            for line in final_result_lines(tool, paths, provenance, fasta=fasta):
+            for line in final_result_lines(tool, paths, provenance, fasta=fasta, project_delivery=layout.project_delivery):
                 print(line, flush=True)
     baseline = layout.path(f"05_final/{layout.result_prefix}.lgz.fa" if layout.result_prefix else "05_final/00_lgz/assembly.fa")
     print(f"[LGZ BASELINE, NOT REFINED] {baseline}", flush=True)
@@ -169,9 +176,7 @@ def validate_completion(root, run_id):
                 or batch.get("batch_id") != receipt["batch_id"] or batch["exit_code"] != 0
                 or set(batch["tools"]) != set(request["selected"])):
             return False, "refinement batch is incomplete"
-        overview_paths = {"06_report/report.html"} | {
-            f"06_report/03_comparison/{batch['batch_id']}/{name}"
-            for name in ("comparison.json", "original_gaps.json", "gap_comparison.tsv")}
+        overview_paths = set(overview_members(layout,batch))
         if (set(receipt.get("overview_files", {})) != overview_paths
                 or any(layout.path(name).is_symlink() or
                        (automatic_overview_digest if name == "06_report/report.html" else sha256_file)(layout.path(name)) != digest
@@ -314,10 +319,21 @@ def main():
             if request is None:
                 raise ValueError("legacy workspaces require explicit numbered-layout migration")
             if not args.runner_owned:
-                return run_child_group(
+                code = run_child_group(
                     [sys.executable, "-B", str(Path(__file__).resolve()), "--server-dir", str(root), "--runner-owned"],
                     environment={**os.environ, "GPM_REPORT_RUN_ID": run_id},
                 )
+                if WorkspaceLayout.detect(root).project_delivery:
+                    # Aggregate nonzero may still have published some tools. Do not update the
+                    # pair for an interrupted attempt without its completion receipt.
+                    completion = WorkspaceLayout.detect(root).path(f".runtime/refinement/completions/{run_id}.json")
+                    if completion.is_file():
+                        from project_delivery_publish import publish_current
+                        for file in publish_current(root,lock):
+                            print(f"[PROJECT APP DELIVERY] {file['path']}", flush=True)
+                        from refinement_jobs_index import refresh_after_delivery
+                        refresh_after_delivery(root,run_id)
+                return code
             for number in (signal.SIGINT, signal.SIGTERM):
                 previous[number] = signal.signal(number, lambda n, _frame: (_ for _ in ()).throw(Terminated(n)))
             return run(root, lock, request)

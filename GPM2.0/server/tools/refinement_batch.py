@@ -16,7 +16,7 @@ import re
 import uuid
 
 try:
-    from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
+    from workspace_layout import automatic_dir, WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from post_lgz_degap import atomic_json, digest
     from refinement_tools import ToolError, fingerprint
     from refinement_recipes import select_tools, select_reads
@@ -29,7 +29,7 @@ try:
     from refinement_source_marks import annotation_inputs
     from degap_manual_catalog import content_digest
 except ModuleNotFoundError:
-    from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
+    from .workspace_layout import automatic_dir, WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from .post_lgz_degap import atomic_json, digest
     from .refinement_tools import ToolError, fingerprint
     from .refinement_recipes import select_tools, select_reads
@@ -158,7 +158,7 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
             except Exception as error:
                 record.update(status="failed", error_type=type(error).__name__, error=str(error))
                 if record["phase"] == "native":
-                    marker = root / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / record["run_id"] / "invocation.json"
+                    marker = automatic_dir(root, tool) / "02_jobs" / record["run_id"] / "invocation.json"
                     try:
                         if marker.is_symlink():
                             raise ValueError("invalid invocation marker")
@@ -172,7 +172,7 @@ def execute_batch(root, groups, threads, *, tools=None, batch_id=None):
                     record["report"] = build_failure_report(root, tool, record["run_id"], error, phase=record["phase"])
                 except Exception as report_error:
                     record["report_error"] = str(report_error)
-            recipe_path = root / "04_refinement" / TOOL_DIRECTORIES[tool] / "01_inputs" / attempt / "recipe.json"
+            recipe_path = automatic_dir(root, tool) / "01_inputs" / attempt / "recipe.json"
             try:
                 # Failed native attempts still attest which reads were actually
                 # used. Their failure must not make later tools switch input bytes.
@@ -229,10 +229,10 @@ def publish_batch(root, lock, batch_result):
     owns the existing outer lock for execution, archive creation and publication.
     """
     try:
-        from refinement_commit import layout_and_lock, publish_result, current_publication
+        from refinement_commit import layout_and_lock, publish_result, current_publication, release_published_stages
         from refinement_delivery import build_delivery, validate_delivery, delivery_generation
     except ModuleNotFoundError:
-        from .refinement_commit import layout_and_lock, publish_result, current_publication
+        from .refinement_commit import layout_and_lock, publish_result, current_publication, release_published_stages
         from .refinement_delivery import build_delivery, validate_delivery, delivery_generation
     layout = layout_and_lock(root, lock)
     batch = batch_result["batch"]
@@ -252,12 +252,16 @@ def publish_batch(root, lock, batch_result):
                     and previous["delivery_validation"].get("generation_sha256") == fingerprint(
                         delivery_generation(layout.root, result, record["report"]))):
                 record.update(status="published", publication_transaction=previous["transaction"], phase="published")
+                if layout.project_delivery:
+                    release_published_stages(layout,tool,result,record,previous,None,batch)
                 continue
             record["phase"] = "app_delivery"
             delivery = build_delivery(layout.root, result, record["report"])
             record["phase"] = "publication"
             receipt = publish_result(layout.root, lock, result, record["report"], delivery, validate_delivery)
             record.update(status="published", publication_transaction=receipt["transaction"], phase="published")
+            if layout.project_delivery:
+                release_published_stages(layout,tool,result,record,receipt,Path(delivery),batch)
         except Exception as error:
             record.update(status="failed", error_type=type(error).__name__, error=str(error))
         atomic_json(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json"), batch)

@@ -349,7 +349,7 @@ def merge_manual_overview(layout, current: str) -> str:
             raise ValueError("invalid manual refinement batch identity")
         batch_dir = _batch_dir(layout, batch)
         report = layout.path((batch_dir / "03_report/report.html").relative_to(layout.root).as_posix())
-        delivery = layout.path((batch_dir / "04_delivery/refinement_results.zip").relative_to(layout.root).as_posix())
+        delivery = manual_patch_path(layout,batch)
         links = {label: _relative(overview, target) for label, target in
                  (("Batch report / 批次报告", report), ("Result bundle / 结果包", delivery))
                  if not target.is_symlink() and target.is_file()}
@@ -363,6 +363,14 @@ def merge_manual_overview(layout, current: str) -> str:
 def _batch_dir(layout, batch):
     parent = "08_refinement_jobs/02_manual" if layout.version == 2 else ".run_all/manual_refinement"
     return layout.path(f"{parent}/{batch}")
+
+
+def manual_patch_path(layout, batch):
+    if not re.fullmatch(r"[0-9a-f]{64}", batch):
+        raise ValueError("invalid manual batch identity")
+    if layout.project_delivery:
+        return layout.path(f"07_delivery/manual/{layout.result_prefix}.manual-{batch[:16]}.patch.zip")
+    return _batch_dir(layout,batch) / "04_delivery/refinement_results.zip"
 
 
 def publish_manual_report(layout, batch_dir: Path, manifest: dict, data: dict, reads: dict, delivery: Path) -> dict[str, str]:

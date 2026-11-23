@@ -18,9 +18,9 @@ struct Index {
     baseline_app_path: String,
     variants: BTreeMap<String, Version>,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Version {
+pub(super) struct Version {
     run_id: String,
     light_manifest: String,
     accepted_sequence_objects: Vec<String>,
@@ -51,6 +51,7 @@ fn check_name(name: &str) -> Result<()> {
     for p in name.split('/') {
         let device = p.split('.').next().unwrap_or("").to_ascii_uppercase();
         if p.is_empty()
+            || matches!(p, "." | "..")
             || p.ends_with(['.', ' '])
             || p.chars().any(|c| c.is_control() || "<>:\"|?*".contains(c))
             || matches!(
@@ -190,6 +191,7 @@ fn validate_version(
     objects: &Path,
     view: &Path,
     used: &mut HashSet<String>,
+    omitted: &HashSet<String>,
 ) -> Result<AutoRefinementEffect> {
     if !matches!(tool, "degap" | "tgsgapcloser" | "quartet" | "lrgapcloser") {
         bail!("unknown automatic tool");
@@ -210,7 +212,7 @@ fn validate_version(
     for (name, hash) in files {
         check_name(name)?;
         let low = name.to_ascii_lowercase();
-        if !names.insert(low.clone())
+        if low.starts_with("project_versions/") || !names.insert(low.clone())
             || [
                 ".fa",
                 ".fasta",
@@ -275,6 +277,12 @@ fn validate_version(
         bail!("automatic patch sequence set differs from accepted sources");
     }
     for (sha, expected) in sources {
+        if !is_hash(&sha) {
+            bail!("invalid accepted sequence digest");
+        }
+        if omitted.contains(&sha) {
+            continue;
+        }
         let records = read_fasta(&obj(objects, &sha)?, "automatic patch sources", false)?;
         if records.len() != expected.len()
             || records
@@ -292,6 +300,38 @@ fn validate_version(
     validated
         .auto_effect
         .context("automatic version lacks verified per-tool outcome evidence")
+}
+
+fn retain_objects(tx: &Transaction<'_>, objects: &Path, used: &HashSet<String>) -> Result<()> {
+    for sha in used {
+        let path = obj(objects, sha)?;
+        let size = i64::try_from(fs::metadata(&path)?.len())?;
+        let inserted = tx.execute("INSERT INTO project_auto_version_object(sha256,content) VALUES(?1,zeroblob(?2)) ON CONFLICT(sha256) DO NOTHING",params![sha,size])?;
+        let id = tx.query_row(
+            "SELECT rowid FROM project_auto_version_object WHERE sha256=?1",
+            [sha],
+            |r| r.get(0),
+        )?;
+        let mut blob = tx.blob_open(
+            DatabaseName::Main,
+            "project_auto_version_object",
+            "content",
+            id,
+            inserted == 0,
+        )?;
+        if inserted != 0 {
+            if std::io::copy(&mut fs::File::open(path)?, &mut blob)? != size as u64 {
+                bail!("incomplete version object");
+            }
+        } else {
+            let mut h = Sha256::new();
+            std::io::copy(&mut blob, &mut h)?;
+            if format!("{:x}", h.finalize()) != *sha {
+                bail!("stored automatic object has changed");
+            }
+        }
+    }
+    Ok(())
 }
 
 /// None means this is not the automatic protocol; let the manual/legacy reader validate it.
@@ -347,7 +387,15 @@ pub fn import_auto_patch_if_recognized(
         let view = tempfile::tempdir_in(tmp.path())?;
         effects.insert(
             tool,
-            validate_version(&index, tool, v, &objects, view.path(), &mut used)?,
+            validate_version(
+                &index,
+                tool,
+                v,
+                &objects,
+                view.path(),
+                &mut used,
+                &HashSet::new(),
+            )?,
         );
     }
     if supplied != used {
@@ -356,34 +404,7 @@ pub fn import_auto_patch_if_recognized(
     let mut conn = open_workspace_db(&db)?;
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     base_matches(&tx, project, &index, &base)?;
-    for sha in &used {
-        let path = obj(&objects, sha)?;
-        let size = i64::try_from(fs::metadata(&path)?.len())?;
-        let inserted = tx.execute("INSERT INTO project_auto_version_object(sha256,content) VALUES(?1,zeroblob(?2)) ON CONFLICT(sha256) DO NOTHING",params![sha,size])?;
-        let id = tx.query_row(
-            "SELECT rowid FROM project_auto_version_object WHERE sha256=?1",
-            [sha],
-            |r| r.get(0),
-        )?;
-        let mut blob = tx.blob_open(
-            DatabaseName::Main,
-            "project_auto_version_object",
-            "content",
-            id,
-            inserted == 0,
-        )?;
-        if inserted != 0 {
-            if std::io::copy(&mut fs::File::open(path)?, &mut blob)? != size as u64 {
-                bail!("incomplete version object");
-            }
-        } else {
-            let mut h = Sha256::new();
-            std::io::copy(&mut blob, &mut h)?;
-            if format!("{:x}", h.finalize()) != *sha {
-                bail!("stored automatic object has changed");
-            }
-        }
-    }
+    retain_objects(&tx, &objects, &used)?;
     let mut added = Vec::new();
     for (tool, v) in &index.variants {
         let descriptor = serde_json::to_string(v)?;
@@ -407,9 +428,22 @@ mod tests {
 
     #[test]
     fn automatic_members_have_portable_non_aliasing_names() {
-        for name in ["../x", "tmp/COM¹.A", "LPT²", "p/NUL.tsv", "name. ", "a:b", "a\\b"] {
+        for name in [
+            "../x",
+            "tmp/COM¹.A",
+            "LPT²",
+            "p/NUL.tsv",
+            "name. ",
+            "a:b",
+            "a\\b",
+        ] {
             assert!(check_name(name).is_err(), "{name}");
         }
         assert!(check_name("metadata/refinement/measurements.tsv").is_ok());
     }
 }
+
+mod project_delivery;
+pub(super) use project_delivery::{
+    ProjectVersions, retain_package_versions, validate_project_versions,
+};

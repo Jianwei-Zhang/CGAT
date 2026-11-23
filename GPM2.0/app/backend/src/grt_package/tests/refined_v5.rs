@@ -921,3 +921,41 @@ fn cumulative_server_auto_patch_imports_all_versions_without_changing_edited_pat
     assert!(call(p,"tgsgapcloser.zip").is_err()); assert_eq!(version_count(p)?,2); assert_eq!(first,objects()?);
     Ok(())
 }
+
+#[test]
+#[ignore = "requires Python, samtools, minimap2, pigz and ZIP for Server-generated project archives"]
+fn project_full_and_light_import_both_automatic_versions_without_a_picker() -> Result<()> {
+    let dir=tempdir()?;
+    let script=Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_auto_patch_fixture.py");
+    let generated=std::process::Command::new("python3").arg(script).arg(dir.path()).arg("--project-packages").output()?;
+    assert!(generated.status.success(),"{}",String::from_utf8_lossy(&generated.stderr));
+    let mut records=Vec::new();
+    for (mode,ext) in [("full","zip"),("light","tar.gz")] {
+        let root = dir.path().join(format!("app-{mode}"));
+        let archive = dir.path().join(format!("job.{mode}.{ext}"));
+        let (out,_) = crate::importer::import_from_zip(&archive,&root)?;
+        let db = &out.project_db_path;
+        let p=initialize_grt_project(db,"new project")?.project_id;
+        let conn=crate::db::open_workspace_db(db)?;
+        let view=load_grt_project_view_for_project(db,p)?;
+        assert_eq!(view.auto_refinement_effects.iter().map(|e|(&*e.tool,e.partial)).collect::<Vec<_>>(),vec![("degap",1),("tgsgapcloser",1)]);
+        let mut stmt=conn.prepare("SELECT descriptor_json, baseline_json, effect_json FROM project_auto_version WHERE project_id=?1 ORDER BY tool")?;
+        records.push(stmt.query_map([p],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?)))?.collect::<std::result::Result<Vec<_>,_>>()?);
+        let count=||conn.query_row("SELECT COUNT(*) FROM project_auto_version_object",[],|r|r.get::<_,i64>(0));
+        let before=count()?;
+        let again=import_auto_patch_if_recognized(&root,p,&dir.path().join("tgsgapcloser.zip"))?.unwrap();
+        assert_eq!(again["duplicate"],true);
+        if mode == "full" { assert_eq!(count()?,before); } else { assert!(count()?>before,"Light did not omit accepted FASTAs"); }
+        // Templates are immutable: a second project inherits the archive, not edits made to its sibling.
+        let second=initialize_grt_project(db,"new sibling")?.project_id;
+        assert_eq!(load_grt_project_view_for_project(db,second)?.auto_refinement_effects.len(),2);
+    }
+    assert_eq!(records[0],records[1]);
+    let bad = dir.path().join("light/job");
+    let index=bad.join("project_versions/index.json");
+    fs::write(&index,b"{}")?;
+    let err=crate::importer::import_from_extracted_bundle(&bad).unwrap_err();
+    assert!(format!("{err:#}").contains("index checksum"),"{err:#}");
+    assert!(!bad.join("project.sqlite").exists());
+    Ok(())
+}

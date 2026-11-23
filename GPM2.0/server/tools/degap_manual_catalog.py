@@ -82,9 +82,10 @@ def inventory(catalog, server):
 
 def catalog_path(server, value):
     name = relative_path(value)
-    if re.fullmatch(re.escape(HOME) + r"/[0-9a-f]{32}", name) is None:
+    layout = WorkspaceLayout.detect(server)
+    if re.fullmatch(re.escape(layout.relative(HOME)) + r"/[0-9a-f]{32}", name) is None:
         raise ValueError("invalid manual catalog location")
-    path = WorkspaceLayout.detect(server).path(name)
+    path = layout.path(name)
     if path.is_symlink() or (path.exists() and not path.is_dir()):
         raise ValueError("manual catalog must be a real directory")
     return path
@@ -95,7 +96,7 @@ def package_paths(server, row):
     paths = []
     for key in ("archive", "info"):
         name = relative_path(row[key])
-        if not name.startswith(HOME + "/"):
+        if not name.startswith(layout.relative(HOME) + "/"):
             raise ValueError("manual package cache is outside its catalog")
         path = layout.path(name)
         if path.is_symlink() or not path.is_file() or digest(path) != row[key + "_sha256"]:

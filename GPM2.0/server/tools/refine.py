@@ -193,6 +193,13 @@ def check_origin(layout, expected):
             path = layout.path(f"05_final/{TOOL_DIRECTORIES[tool]}/assembly.fa")
             if path.is_file() and not path.is_symlink() and digest(path) == expected:
                 return tool
+    if layout.project_delivery:
+        from refinement_commit import committed_final_history
+        for tool in TOOLS:
+            for home, files in committed_final_history(layout,tool):
+                fasta = home / "assembly.fa"
+                if files.get("assembly.fa") == expected and fasta.is_file() and not fasta.is_symlink() and digest(fasta) == expected:
+                    return tool
     raise ValueError("task batch does not match the Server workspace's LGZ or committed refined origin")
 
 
@@ -286,6 +293,11 @@ def prepare_batch(root, archive, *, run=False, reads_override=None, threads=None
             raise ValueError("manual batch input directory must not be a symlink")
         directory.mkdir(parents=True, exist_ok=True)
         save_input_manifest(directory, batch, raw)
+        if run and layout.project_delivery:
+            from refine_run import existing_manual_delivery
+            delivered = existing_manual_delivery(layout,directory.parent,batch,value,reads_override or {})
+            if delivered is not None:
+                return delivered
         outcomes = []
         for locus in value["loci"]:
             try:

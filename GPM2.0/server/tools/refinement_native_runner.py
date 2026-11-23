@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from refinement_native_units import UnitStore, checked_json, helper_hashes, owned, validate_paf, REQUEST
 from refinement_path import PathError
-from workspace_layout import TOOL_DIRECTORIES
+from workspace_layout import automatic_dir, native_request_root, TOOL_DIRECTORIES
 
 
 def install_quartet_hook(util, store, native_directory):
@@ -69,7 +69,7 @@ def main():
         raise PathError("native launcher requires its sealed request")
     request_path = Path(sys.argv[2]).absolute()
     # The request location supplies the root without trusting a path inside JSON.
-    root = request_path.parents[4]
+    root = native_request_root(request_path)
     request = checked_json(root, request_path)
     tool = request.get("tool")
     script_index = 3 if tool == "quartet" else 2
@@ -80,7 +80,7 @@ def main():
             or request.get("cwd") != str(Path.cwd()) or request["command"][script_index:] != sys.argv[4:]
             or request["command"][1:script_index] != flags):
         raise PathError("native launcher request does not match invocation")
-    expected = root / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / request["run_id"] / REQUEST
+    expected = automatic_dir(root, tool) / "02_jobs" / request["run_id"] / REQUEST
     if request_path != expected:
         raise PathError("native launcher request has an unowned location")
     entrypoint = Path(request["command"][script_index])

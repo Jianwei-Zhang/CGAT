@@ -174,7 +174,7 @@ def context(root, result, threads):
         raise ValueError("accepted source evidence is outside its workspace")
     paths = [safe_file(final, name) for name in ("provenance.json", "final_path.json", "sources.tsv")]
     provenance = read_object(paths[0])
-    marker = safe_file(layout.root, f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}/invocation.json")
+    marker = safe_file(layout.root, layout.relative(f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}/invocation.json"))
     state = read_object(marker)
     if (provenance.get("schema") != "cgat.refinement-publication" or provenance.get("schema_version") != 1
             or provenance.get("tool") != tool or provenance.get("run_id") != run_id

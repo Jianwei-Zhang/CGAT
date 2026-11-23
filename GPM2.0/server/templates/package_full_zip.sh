@@ -12,6 +12,11 @@ app_packager="${server_dir}/.prepare_lib/tools/lgz_app_package.py"
 
 [[ -f "$app_packager" ]] || { echo "Missing App package builder: $app_packager" >&2; exit 1; }
 
+# A project archive can only be updated together with its sibling and patch.
+if [[ -z "${GPM_REPORT_RUN_ID:-}" && "$(python3 "$archive_helper" protocol --server-dir "$server_dir" --kind "$kind")" == project ]]; then
+  exec python3 "$archive_helper" publish-project --server-dir "$server_dir" --kind "$kind"
+fi
+
 temporary_dir="$(mktemp -d "${parent_dir}/.${bundle_name}.package-${kind}.XXXXXX")"
 archive_temporary_dir=""
 published_staging=false

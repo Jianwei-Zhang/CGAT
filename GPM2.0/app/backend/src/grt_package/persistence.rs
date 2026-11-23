@@ -38,6 +38,9 @@ pub(crate) fn persist_grt_package(
         ],
     )
     .context("failed to persist locked LGZ package recipe")?;
+    if let Some(versions) = &package.project_versions {
+        auto_patch::retain_package_versions(tx, versions)?;
+    }
     if let Some(effect) = &package.auto_effect {
         tx.execute("INSERT INTO grt_auto_refinement_effect(package_id,tool,effect_json) VALUES(1,?1,?2)",
             params![effect.tool, serde_json::to_string(effect)?])?;

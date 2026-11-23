@@ -432,7 +432,7 @@ def gap_anchor(gap_id):
 def native_diagnostics(root, tool, run_id, execution):
     """Only known native diagnostic entrypoints; never recursive reads copying."""
     code = TOOL_DIRECTORIES[tool]
-    base = Path("04_refinement") / code
+    base = Path(WorkspaceLayout.detect(root).relative(f"04_refinement/{code}"))
     origin = execution.get("native_origin")
     native_run = origin["run_id"] if origin else run_id
     native = base / "03_native" / native_run
@@ -585,7 +585,7 @@ def asset_plan(root, artifacts):
 def native_view_plan(root, tool, run_id, execution, jobs, native_gaps, assets, *, failed=False):
     origin = execution.get("native_origin")
     native_run = origin["run_id"] if origin else run_id
-    native = f"04_refinement/{TOOL_DIRECTORIES[tool]}/03_native/{native_run}"
+    native = WorkspaceLayout.detect(root).relative(f"04_refinement/{TOOL_DIRECTORIES[tool]}/03_native/{native_run}")
     return native_reports.prepare(tool, native, jobs, native_gaps, assets,
         lambda name, sha: read_bound(safe_file(root, name), sha, limit=MAX_ASSET),
         remaining_budget=MAX_ASSETS_TOTAL - embedded_size(assets),
@@ -1089,7 +1089,8 @@ def render_site(directory, summary, provenance, final, assets):
     lookup = {row["workspace_path"]: row for row in assets}
 
     origin_run = (native_origin or {}).get("run_id", run_id)
-    execution_log = lookup.get(f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{origin_run}/native.log", {})
+    execution_log = next((lookup[k] for k in (f"04_refinement/automatic/{tool}/02_jobs/{origin_run}/native.log",
+                                     f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{origin_run}/native.log") if k in lookup), {})
     native_nav = (
         link("report.html", "Tool report / 工具报告")
         + (link(execution_log["report_path"], "Execution log / 执行日志") if "report_path" in execution_log else "")
@@ -1199,7 +1200,7 @@ def build_tool_report(root, result):
     if not staging.is_relative_to(root):
         raise ReportError("staged result is outside its workspace")
     provenance_path = safe_file(root, (staging / "provenance.json").relative_to(root).as_posix())
-    marker_path = safe_file(root, f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}/invocation.json")
+    marker_path = safe_file(root, layout.relative(f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}/invocation.json"))
     marker = json.loads(marker_path.read_text())
     sha = marker.get("provenance_sha256")
     provenance = json.loads(read_bound(provenance_path, sha))
@@ -1248,6 +1249,14 @@ def build_tool_report(root, result):
     identity = fingerprint(binding)
     home = layout.path(f"04_refinement/{TOOL_DIRECTORIES[tool]}/05_report/{run_id}")
     destination = home / ("site-" + identity[:20])
+    if layout.project_delivery:
+        from refinement_commit import current_publication, targets
+        previous = current_publication(root,tool,verify=False)
+        if previous and previous["run_id"] == run_id:
+            public = targets(layout,tool)["report"]
+            if (digest(safe_file(public,"manifest.json")) == previous["areas"]["report"]["new"]["files"]["manifest.json"]
+                    and json.loads((public / "manifest.json").read_text()).get("binding") == binding):
+                destination = public
     if destination.exists():
         receipt = json.loads(safe_file(destination, "manifest.json").read_text())
         if receipt.get("binding") != binding or not all(digest(safe_file(destination, name)) == expected for name, expected in receipt["files"].items()):
@@ -1286,14 +1295,14 @@ def build_failure_report(root, tool, run_id, error, *, phase="native"):
     code = TOOL_DIRECTORIES[tool]
     artifacts = {}
     for name in ("invocation.json", "native_jobs.json", "native.log"):
-        relative = f"04_refinement/{code}/02_jobs/{run_id}/{name}"
+        relative = layout.relative(f"04_refinement/{code}/02_jobs/{run_id}/{name}")
         if (root / relative).exists():
             artifacts[relative] = digest(safe_file(root, relative))
     diagnostics_error = None
     execution = {}
     native_gaps = []
     try:
-        invocation_relative = f"04_refinement/{code}/02_jobs/{run_id}/invocation.json"
+        invocation_relative = layout.relative(f"04_refinement/{code}/02_jobs/{run_id}/invocation.json")
         if invocation_relative in artifacts:
             execution = json.loads(read_bound(safe_file(root, invocation_relative), artifacts[invocation_relative], limit=MAX_ASSET))
         artifacts, jobs, native_gaps = native_diagnostics(root, tool, run_id, {**execution, "artifacts": artifacts})

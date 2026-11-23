@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import sys
 import uuid
 
 try:
@@ -131,6 +132,59 @@ def current_publication(root, tool, *, verify=True):
             if not matches(target, journal["areas"][name]["new"]):
                 raise PublicationError("published " + name + " changed or is incomplete")
     return journal
+
+
+def committed_final_history(layout, tool):
+    """Older App projects can still resolve their exact sources after staging is reclaimed."""
+    current = current_publication(layout.root,tool,verify=False)
+    seen = set()
+    while current:
+        txid = current["transaction"]
+        if txid in seen:
+            raise PublicationError("cycle in tool publication history")
+        seen.add(txid)
+        previous = current.get("previous_pointer")
+        if not previous or previous.get("status") == "none":
+            break
+        if previous.get("status") != "committed" or previous.get("tool") != tool:
+            raise PublicationError("invalid previous tool publication pointer")
+        old = journal_path(layout,previous["transaction"])
+        if digest(old) != previous["journal_sha256"]:
+            raise PublicationError("previous tool publication journal changed")
+        history = read_json(old)
+        area = current["areas"]["final"]
+        if (history.get("state") != "committed" or history.get("tool") != tool
+                or history.get("transaction") != previous["transaction"] or history["areas"]["final"]["new"] != area["previous"]):
+            raise PublicationError("previous tool publication does not match its successor")
+        if not area.get("unchanged"):
+            yield journal_path(layout,txid).parent / "previous/final", area["previous"]["files"]
+        current = history
+
+
+def release_published_stages(layout, tool, result, record, receipt, delivery, batch):
+    """Only remove an exact regular-file stage already present in the verified public generation."""
+    code, run = TOOL_DIRECTORIES[tool], receipt["run_id"]
+    live = targets(layout,tool)
+    private = {"final":layout.path(f".runtime/refinement/{code}/{run}/final"),
+               "delivery":layout.path(f".runtime/refinement/delivery/{tool}/{run}/{receipt['delivery_validation']['generation_sha256']}")}
+    selected = {"final":Path(result["staging"]), "report":Path(record["report"]["directory"]), "delivery":delivery}
+    base = layout.path(f"04_refinement/{code}/05_report/{run}")
+    if selected["report"].parent == base and re.fullmatch(r"site-[a-f0-9]{20}",selected["report"].name):
+        private["report"] = selected["report"]
+    # Redirect live references before reclaiming. An interruption can only leave an extra copy.
+    result["staging"] = record["final_staging"] = str(live["final"])
+    record["report"].update(directory=str(live["report"]), report=str(live["report"] / "report.html"))
+    durable_json(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json"),batch)
+    for area, path in private.items():
+        if selected.get(area) != path or path == live[area] or not path.exists():
+            continue
+        expected = receipt["areas"][area]["new"]
+        if matches(path,expected) and matches(live[area],expected):
+            try:
+                shutil.rmtree(path)
+                sync_directories(path.parent)
+            except OSError as exc:
+                print(f"[PROJECT STAGING] publication is committed; could not remove {path}: {exc}",file=sys.stderr)
 
 
 def validate_set(final, report, delivery, tool, run_id, validate_delivery):

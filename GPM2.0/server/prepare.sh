@@ -129,8 +129,8 @@ Behavior:
   - New jobs: take <output-name>.lgz.fa and <output-name>.<tool>.fa directly from 05_final/; see results.tsv for current/previous publications
   - Embeds each finalized process report in its delivery archives; no separate report ZIP is created
   - Generates package/export helpers under .runtime/commands/
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ telomere/q3 finalization -> per-chr commands -> LGZ evidence/package validation -> refinement -> full baseline archive -> light archive
-  - Full/light App archives stay under <work_root>/07_delivery/00_lgz/ or 07_delivery/<numbered_tool>/
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ telomere/q3 finalization -> per-chr commands -> LGZ evidence/package validation -> refinement -> project Full/Light delivery
+  - New jobs have one <output-name>.full and one <output-name>.light archive in 07_delivery/; automatic tools are imported together.
   - --skip-self conflicts with multiple same-dataset q0 candidates; assignment/evidence preparation stops with an error
   - Prints all generated staged commands to the terminal for manual copy/paste
 EOF
@@ -965,7 +965,7 @@ root = Path(sys.argv[1])
 sys.path.insert(0, sys.argv[2])
 from workspace_layout import WorkspaceLayout, initialize_workspace
 if not root.exists() or not any(root.iterdir()):
-    initialize_workspace(root, prepared_runtime=".lib", job_outputs=True)
+    initialize_workspace(root, prepared_runtime=".lib", job_outputs=True, project_delivery=True)
 elif WorkspaceLayout.detect(root).version != 2:
     sys.exit("ERROR: existing legacy output is not a new workspace; resume/migrate it instead of running prepare.sh over it")
 PYLAYOUT

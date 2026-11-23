@@ -49,6 +49,11 @@ def completed_refinement_sources(root, dataset, contig):
         return
     for tool, code in TOOL_DIRECTORIES.items():
         homes = [layout.path(f"05_final/{code}"), *sorted(layout.path(f".runtime/refinement/{code}").glob("*/final"))]
+        if layout.project_delivery:
+            from refinement_commit import committed_final_history
+            homes.extend(path for path, files in committed_final_history(layout,tool)
+                         if (safe := path / "provenance.json").is_file() and not safe.is_symlink()
+                         and digest(safe) == files["provenance.json"])
         for final in homes:
             try:
                 provenance_path = final / "provenance.json"

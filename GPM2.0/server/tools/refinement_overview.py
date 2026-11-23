@@ -130,7 +130,9 @@ def render_overview(root, batch, results):
         raise ReportError("invalid overview workspace/batch")
     report = layout.path("06_report/report.html")
     comparison_dir = layout.path("06_report/03_comparison/" + batch["batch_id"])
-    comparison_dir.mkdir(parents=True, exist_ok=True)
+    compare = not layout.project_delivery or bool(batch["tools"])
+    if compare:
+        comparison_dir.mkdir(parents=True, exist_ok=True)
     invalidated = batch["status"] == "invalidated"
     original, summaries, outcomes, rows = None, {}, {}, []
     for tool, record in batch["tools"].items():
@@ -173,26 +175,27 @@ def render_overview(root, batch, results):
                      "reads": recipe.get("reads", []), "input_selection": recipe.get("original_selection"),
                      "recipe": recipe.get("name", recipe.get("schema")), "revision": recipe.get("revision"),
                      "native_vs_accepted": summary.get("chromosomes")})
-    if original is None and not invalidated:
+    if compare and original is None and not invalidated:
         original = baseline_gaps(layout)
     original = original or []
     comparison = {"schema": "cgat.refinement-comparison", "schema_version": 1, "batch_id": batch["batch_id"],
                   "batch_status": batch["status"], "exit_code": batch["exit_code"],
-                  "baseline_valid": not invalidated, "original_gap_count": None if invalidated else len(original),
+                  "baseline_valid": not invalidated, "original_gap_count": None if invalidated or not compare else len(original),
                   "tools": rows, "best_tool": None, "biological_accuracy_validated": False}
-    atomic_json(comparison_dir / "comparison.json", comparison)
-    atomic_json(comparison_dir / "original_gaps.json", original)
-    # Failed/unattempted tools retain a cell for every original gap. They are
-    # not counted as successful zero-fill experiments or removed from denominators.
-    columns = list(batch["tools"])
-    lines = ["gap_id\tchromosome\tstart\tend" + "".join("\t" + tool for tool in columns)]
-    for gap in original:
-        cells = [gap["gap_id"], gap["chromosome"], str(gap["start"]), str(gap["end"])]
-        cells += [outcomes.get(tool, {}).get(gap["gap_id"], "tool_" + batch["tools"][tool]["status"]) for tool in columns]
-        if any("\t" in value or "\n" in value or "\r" in value for value in cells):
-            raise ReportError("invalid comparison table identity")
-        lines.append("\t".join(cells))
-    write_html(comparison_dir / "gap_comparison.tsv", "\n".join(lines) + "\n")
+    if compare:
+        atomic_json(comparison_dir / "comparison.json", comparison)
+        atomic_json(comparison_dir / "original_gaps.json", original)
+        # Failed/unattempted tools retain a cell for every original gap. They are
+        # not counted as successful zero-fill experiments or removed from denominators.
+        columns = list(batch["tools"])
+        lines = ["gap_id\tchromosome\tstart\tend" + "".join("\t" + tool for tool in columns)]
+        for gap in original:
+            cells = [gap["gap_id"], gap["chromosome"], str(gap["start"]), str(gap["end"])]
+            cells += [outcomes.get(tool, {}).get(gap["gap_id"], "tool_" + batch["tools"][tool]["status"]) for tool in columns]
+            if any("\t" in value or "\n" in value or "\r" in value for value in cells):
+                raise ReportError("invalid comparison table identity")
+            lines.append("\t".join(cells))
+        write_html(comparison_dir / "gap_comparison.tsv", "\n".join(lines) + "\n")
     lgz_report = layout.path("report/report.html")
     has_lgz_report = lgz_report.is_file()
     comparison_json = comparison_dir / "comparison.json"
@@ -201,7 +204,7 @@ def render_overview(root, batch, results):
     nav_html = "".join((
         step_link("01", "#lgz-baseline", "LGZ Baseline / LGZ 基线"),
         step_link("02", "#refinement-comparison", "Refinement / 精修"),
-        step_link("03", "#comparison-data", "Comparison data / 对照数据"),
+        step_link("03", "#comparison-data", "Comparison data / 对照数据") if compare else "",
     ))
 
     # A current receipt for a reused run ID is not sufficient to relabel a
@@ -217,7 +220,8 @@ def render_overview(root, batch, results):
     denom_html = (
         f'<span class="num">{esc(fmt_int(comparison["original_gap_count"]))}</span>'
         if comparison["original_gap_count"] is not None
-        else '<span class="muted">Unavailable (invalidated) / 不可用（已失效）</span>'
+        else '<span class="muted">Unavailable (invalidated) / 不可用（已失效）</span>' if invalidated
+        else '<span class="muted">No refinement requested / 本轮未请求精修</span>'
     )
 
     body = '<section class="panel"><h2>Batch Summary / 批次摘要</h2>'
@@ -328,10 +332,16 @@ def render_overview(root, batch, results):
             ]
             delivery_dir = layout.path(f"07_delivery/{code}")
             delivery = json.loads((delivery_dir / "delivery.json").read_text())
-            pub_links += [
-                local_link(root, report, delivery_dir / relative_path(delivery["archives"][mode]["file"]), label, cls="link-pill")
-                for mode, label in (("full", "Full App package / 完整包"), ("light", "Light App package / 轻量包"))
-            ]
+            if layout.project_delivery:
+                from project_delivery_publish import tool_links
+                files = tool_links(layout,row["tool"],row["run_id"],delivery["light_manifest"])
+                pub_links.extend(local_link(root, report, layout.path(path), label, cls="link-pill")
+                                 for mode,label in (("full","Project Full"),("light","Project Light")) if (path := files.get(mode)))
+            else:
+                pub_links += [
+                    local_link(root, report, delivery_dir / relative_path(delivery["archives"][mode]["file"]), label, cls="link-pill")
+                    for mode, label in (("full", "Full App package / 完整包"), ("light", "Light App package / 轻量包"))
+                ]
             final_links = '<div class="link-row">' + "".join(pub_links) + '</div>'
         elif invalidated:
             final_links = '<span class="muted">Invalidated — not published / 已失效，未发布</span>'
@@ -359,14 +369,15 @@ def render_overview(root, batch, results):
         + '<p class="muted">Final files are shown only for verified publications in this batch. / 仅展示本批次经回执验证的交付文件。</p>'
         + '</section>'
     )
-    body += (
-        '<section id="comparison-data" class="panel"><h2>03 · Comparison Data / 对照数据</h2>'
-        '<p>Gap counts do not measure biological accuracy or rank tools. / 缺口数不代表生物学准确率，也不用于工具排名。</p>'
-        '<div class="link-row">'
-        + local_link(root, report, comparison_json, "Comparison JSON / 比较 JSON", cls="link-pill")
-        + local_link(root, report, gap_tsv, "Original gap outcomes TSV / 原始缺口对照", cls="link-pill")
-        + '</div></section>'
-    )
+    if compare:
+        body += (
+            '<section id="comparison-data" class="panel"><h2>03 · Comparison Data / 对照数据</h2>'
+            '<p>Gap counts do not measure biological accuracy or rank tools. / 缺口数不代表生物学准确率，也不用于工具排名。</p>'
+            '<div class="link-row">'
+            + local_link(root, report, comparison_json, "Comparison JSON / 比较 JSON", cls="link-pill")
+            + local_link(root, report, gap_tsv, "Original gap outcomes TSV / 原始缺口对照", cls="link-pill")
+            + '</div></section>'
+        )
     write_html(
         report,
         merge_manual_overview(layout, page(
@@ -378,5 +389,7 @@ def render_overview(root, batch, results):
             badge=status_badge(batch_state),
         )),
     )
+    if not compare:
+        return {"report": str(report)}
     return {"report": str(report), "comparison": str(comparison_dir / "comparison.json"),
             "gap_comparison": str(comparison_dir / "gap_comparison.tsv")}

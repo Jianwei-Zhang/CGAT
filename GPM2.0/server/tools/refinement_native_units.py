@@ -15,13 +15,13 @@ from datetime import datetime, timezone
 import uuid
 
 try:
-    from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES
+    from workspace_layout import automatic_dir, WorkspaceLayout, TOOL_DIRECTORIES
     from workspace_migration import durable_json, sync_directories
     from post_lgz_degap import digest, stat_key, atomic_json
     from refinement_tools import fingerprint
     from refinement_path import PathError
 except ModuleNotFoundError:
-    from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES
+    from .workspace_layout import automatic_dir, WorkspaceLayout, TOOL_DIRECTORIES
     from .workspace_migration import durable_json, sync_directories
     from .post_lgz_degap import digest, stat_key, atomic_json
     from .refinement_tools import fingerprint
@@ -109,7 +109,7 @@ class UnitStore:
         self.root, self.tool, self.run_id = Path(root).resolve(), tool, run_id
         if tool != "quartet" or not re.fullmatch(r"[0-9a-f]{32}", run_id):
             raise PathError("unsupported native partial-recovery consumer")
-        self.base = self.root / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs"
+        self.base = automatic_dir(self.root, tool) / "02_jobs"
         self.jobs = owned(self.root, self.base / run_id)
         self.directory = owned(self.root, self.jobs / "native_units")
         self.directory.mkdir(exist_ok=False)
@@ -263,7 +263,7 @@ def capture_units(root, tool, run_id, code, *, required=False):
         except ModuleNotFoundError:
             from .refinement_degap_units import capture_units as capture_degap
         return capture_degap(root, run_id, code, required=required)
-    jobs = Path(root) / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / run_id
+    jobs = automatic_dir(root, tool) / "02_jobs" / run_id
     summary_path = jobs / SUMMARY
     if not summary_path.exists() and not summary_path.is_symlink() and not required:
         return []
@@ -310,7 +310,7 @@ def capture_units(root, tool, run_id, code, *, required=False):
         if validate_paf(receipt.parent / "output.paf", allow_empty=row["unit"]["allow_empty"]) != unit["result"]:
             raise PathError("native unit output format changed")
         consumed = owned(root, Path(root) / unit["consumed_output"])
-        native = Path(root) / "04_refinement" / TOOL_DIRECTORIES[tool] / "03_native" / run_id
+        native = automatic_dir(root, tool) / "03_native" / run_id
         if (consumed != native / "tmp" / ("quartet." + consumer["suffix"] + ".paf")
                 or digest(consumed) != unit["artifacts"]["output.paf"]):
             raise PathError("native consumer no longer has the sealed unit output")

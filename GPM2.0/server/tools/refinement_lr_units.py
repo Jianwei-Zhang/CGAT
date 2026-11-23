@@ -19,12 +19,14 @@ import uuid
 if __name__ == "__main__":
     sys.path.insert(0,str(Path(__file__).resolve().parent))
 try:
+    from workspace_layout import automatic_dir, native_request_root
     from refinement_native_units import owned,file_fact,seal,checked_json,helper_hashes,RECEIPT,REQUEST,SUMMARY,SCHEMA
     from refinement_tools import fingerprint
     from post_lgz_degap import digest,stat_key,atomic_json
     from refinement_path import PathError
     from workspace_migration import sync_directories
 except ModuleNotFoundError:
+    from .workspace_layout import automatic_dir, native_request_root
     from .refinement_native_units import owned,file_fact,seal,checked_json,helper_hashes,RECEIPT,REQUEST,SUMMARY,SCHEMA
     from .refinement_tools import fingerprint
     from .post_lgz_degap import digest,stat_key,atomic_json
@@ -123,8 +125,8 @@ class LrUnits:
     def __init__(self,request,*,create=False):
         self.request,self.root,self.run_id = request,Path(request["root"]).resolve(),request["run_id"]
         if not re.fullmatch(r"[0-9a-f]{32}",self.run_id): raise PathError("invalid LR unit owner")
-        self.jobs = owned(self.root,self.root/"04_refinement/04_lrgapcloser/02_jobs"/self.run_id)
-        self.native = owned(self.root,self.root/"04_refinement/04_lrgapcloser/03_native"/self.run_id)
+        self.jobs = owned(self.root,automatic_dir(self.root, 'lrgapcloser') / "02_jobs"/self.run_id)
+        self.native = owned(self.root,automatic_dir(self.root, 'lrgapcloser') / "03_native"/self.run_id)
         self.output = owned(self.root,self.native/"output")
         if Path(option(request["command"],"-o")) != self.output:
             raise PathError("LR native output is not the owned fresh attempt")
@@ -292,7 +294,7 @@ def validate_bundle(root,receipt,value,names,*,receipt_required=True):
     if value["origin"]:
         origin = value["origin"]; previous = checked_json(root,receipt.parent/"producer.json")
         if not re.fullmatch(r"[0-9a-f]{32}",origin["run_id"]): raise PathError("invalid LR native producer")
-        expected_origin = Path(root)/"04_refinement/04_lrgapcloser/02_jobs"/origin["run_id"]/"native_units"/value["key"]/RECEIPT
+        expected_origin = automatic_dir(root, 'lrgapcloser') / "02_jobs"/origin["run_id"]/"native_units"/value["key"]/RECEIPT
         if (origin["receipt"] != expected_origin.relative_to(root).as_posix() or origin["receipt_sha256"] != value["artifacts"]["producer.json"]
                 or previous.get("schema") != SCHEMA or previous.get("schema_version") != 1 or previous.get("status") != "completed"
                 or previous.get("tool") != "lrgapcloser" or previous.get("run_id") != origin["run_id"] or previous.get("key") != value["key"]
@@ -304,7 +306,7 @@ def validate_bundle(root,receipt,value,names,*,receipt_required=True):
 
 
 def capture_units(root,run_id,code,*,required=False):
-    jobs = Path(root)/"04_refinement/04_lrgapcloser/02_jobs"/run_id
+    jobs = automatic_dir(root, 'lrgapcloser') / "02_jobs"/run_id
     if not (jobs/SUMMARY).exists() and not required: return []
     summary,request = checked_json(root,jobs/SUMMARY),checked_json(root,jobs/REQUEST)
     if (summary.get("schema") != "cgat.native-refinement-substeps" or summary.get("schema_version") != 1
@@ -322,7 +324,7 @@ def capture_units(root,run_id,code,*,required=False):
         path = owned(root,path)
         if digest(path) != sha: raise PathError("LR private driver changed")
         files.append(path)
-    output = Path(root)/"04_refinement/04_lrgapcloser/03_native"/run_id/"output"
+    output = automatic_dir(root, 'lrgapcloser') / "03_native"/run_id/"output"
     iterations = sorted(int(path.parent.name.split("-")[1]) for path in output.glob("iteration-*/gapclosed.fasta"))
     if iterations != list(range(1,len(iterations)+1)) or len(iterations) > int(option(request["command"],"-r")):
         raise PathError("LR iteration output closure is not contiguous")
@@ -357,13 +359,13 @@ def capture_units(root,run_id,code,*,required=False):
 def main():
     args = sys.argv[1:]
     if len(args)<2 or args[0] != "--request": raise PathError("LR wrapper requires its sealed request")
-    request_path = Path(args[1]).absolute(); root = request_path.parents[4]
+    request_path = Path(args[1]).absolute(); root = native_request_root(request_path)
     request = checked_json(root,request_path)
     if (request.get("schema") != "cgat.native-refinement-launch" or request.get("tool") != "lrgapcloser"
             or request.get("root") != str(root) or request.get("run_id") != request_path.parent.name
             or request.get("jobs") != str(request_path.parent) or request.get("cwd") != str(Path.cwd())
             or request.get("helpers") != helper_hashes("lrgapcloser") or request["session"]["helpers"] != request["helpers"]
-            or request_path != root/"04_refinement/04_lrgapcloser/02_jobs"/request["run_id"]/REQUEST):
+            or request_path != automatic_dir(root, 'lrgapcloser') / "02_jobs"/request["run_id"]/REQUEST):
         raise PathError("LR launcher does not match its owned attempt")
     if len(args)>2:
         if len(args)!=6 or args[2] != "--action" or args[3] not in {"restore","commit"} or args[4] != "--iteration":

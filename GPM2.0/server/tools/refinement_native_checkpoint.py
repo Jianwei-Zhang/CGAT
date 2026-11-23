@@ -223,7 +223,7 @@ def checked_file(root, path, *, prefixes):
 
 def capture(root, tool, run_id, native_directory, invocation, code, log, chromosomes, parameters, prepared_files, driver,
             *, require_units=False, manual_attempt=None):
-    base = "04_refinement/" + TOOL_DIRECTORIES[tool]
+    base = WorkspaceLayout.detect(root).relative("04_refinement/" + TOOL_DIRECTORIES[tool])
     if manual_attempt is None:
         prefixes = [base + "/03_native/" + run_id, base + "/02_jobs/" + run_id]
     else:
@@ -231,7 +231,7 @@ def capture(root, tool, run_id, native_directory, invocation, code, log, chromos
         # whole-assembly scheduler's private units or checkpoints.
         name = Path(manual_attempt).absolute().relative_to(root).as_posix()
         if require_units or not re.fullmatch(
-            r"(?:08_refinement_jobs/02_manual|[.]run_all/manual_refinement)/[a-f0-9]{64}/02_jobs/[a-f0-9]{64}/"
+            r"(?:04_refinement/manual|08_refinement_jobs/02_manual|[.]run_all/manual_refinement)/[a-f0-9]{64}/02_jobs/[a-f0-9]{64}/"
             + re.escape(tool) + r"/[a-f0-9]{32}", name,
         ):
             raise PathError("invalid manual native evidence directory")
@@ -406,20 +406,20 @@ def find_completed(root, tool, native_binding, current_inputs):
             run_id = receipt.parent.name
             if not re.fullmatch(r"[0-9a-f]{32}", run_id) or receipt.is_symlink():
                 continue
-            checked_file(root, receipt, prefixes=[f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}"])
+            checked_file(root, receipt, prefixes=[layout.relative(f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}")])
             value = json.loads(receipt.read_text())
             checksum = value.pop("payload_sha256")
             if (checksum != fingerprint(value) or value.get("schema") != SCHEMA or value.get("schema_version") != 1
                     or value.get("status") != "completed" or value.get("tool") != tool or value.get("run_id") != run_id
                     or value.get("binding") != native_binding or value.get("native_key") != key):
                 continue
-            expected_native = f"04_refinement/{TOOL_DIRECTORIES[tool]}/03_native/{run_id}"
-            expected_paths = {name: str(root / f"04_refinement/{TOOL_DIRECTORIES[tool]}/{name}/{run_id}")
+            expected_native = layout.relative(f"04_refinement/{TOOL_DIRECTORIES[tool]}/03_native/{run_id}")
+            expected_paths = {name: str(layout.path(f"04_refinement/{TOOL_DIRECTORIES[tool]}/{name}/{run_id}"))
                               for name in ("01_inputs", "02_jobs", "03_native")}
             if (value["native_root"] != expected_native or value["attempt_paths"] != expected_paths
                     or dependency_roles(value["input_dependencies"], expected_paths) != native_binding["native_inputs"]):
                 continue
-            prefixes = [expected_native, f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}"]
+            prefixes = [expected_native, layout.relative(f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}")]
             identities = {}
             for relative, sha in value["result"]["artifacts"].items():
                 path, _ = checked_file(root, root / relative, prefixes=prefixes)
@@ -466,7 +466,7 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
         try:
             old_root = WorkspaceLayout.detect(root).path(cached["native_root"])
             old_native = old_root / "output" if invocation.tool == "lrgapcloser" else old_root
-            old_log = root / f"04_refinement/{TOOL_DIRECTORIES[invocation.tool]}/02_jobs/{cached['run_id']}/native.log"
+            old_log = WorkspaceLayout.detect(root).path(f"04_refinement/{TOOL_DIRECTORIES[invocation.tool]}/02_jobs/{cached['run_id']}/native.log")
             old_driver = root / cached["execution"]["driver"] if cached["execution"].get("driver") else None
             result, observed = capture(root, invocation.tool, cached["run_id"], old_native, invocation,
                                         cached["execution"]["returncode"], old_log, chromosomes, parameters, prepared_files, old_driver)

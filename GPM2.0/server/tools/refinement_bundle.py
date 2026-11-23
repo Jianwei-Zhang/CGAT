@@ -144,7 +144,7 @@ def _load_catalog(root, result, private):
         raise BundleError("refinement staging is outside its workspace")
     provenance = json.loads((final_dir / "provenance.json").read_text())
     tool, run_id = result["tool"], result["run_id"]
-    marker = json.loads(safe_file(root, f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}/invocation.json").read_text())
+    marker = json.loads(safe_file(root, layout.relative(f"04_refinement/{TOOL_DIRECTORIES[tool]}/02_jobs/{run_id}/invocation.json")).read_text())
     if (marker.get("status") not in {"staged", "published"} or marker.get("tool") != tool or marker.get("run_id") != run_id
             or provenance.get("tool") != tool or provenance.get("run_id") != run_id
             or digest(final_dir / "provenance.json") != marker.get("provenance_sha256")

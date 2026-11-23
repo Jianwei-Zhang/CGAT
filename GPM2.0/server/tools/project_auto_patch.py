@@ -45,6 +45,14 @@ def _published(layout):
         paths = targets(layout, tool)
         files = proof['areas']['delivery']['new']['files']
         definition = read_json(_checked(paths['delivery']/'delivery.json', files['delivery.json']))
+        if layout.project_delivery:
+            manifest = 'light/' + MANIFEST
+            if (definition.get('schema') != 'cgat.project-tool-projection' or definition['tool'] != tool
+                    or definition['run_id'] != proof['run_id'] or files.get(manifest) != definition['light_manifest']):
+                raise PublicationError('automatic patch got a mismatched project tool projection')
+            _checked(paths['delivery']/manifest, files[manifest])
+            rows[tool] = (proof, paths['delivery']/'light', files[manifest])
+            continue
         light = definition['archives']['light']
         if (definition['tool'] != tool or definition['run_id'] != proof['run_id']
                 or files.get(light['file']) != light['sha256']):
@@ -68,7 +76,7 @@ def _variant(layout, tool, row, baseline, archive, seen, temp):
     files = proof['areas']['final']['new']['files']
     with _checked(final/'sources.tsv', files['sources.tsv']).open(newline='', encoding='utf-8') as handle:
         sources = list(csv.DictReader(handle, delimiter='\t'))
-    payload = _extract(light, temp)
+    payload = light if layout.project_delivery else _extract(light, temp)
     verified = validate_payload(payload, full=False)
     manifest_path = safe_file(payload, MANIFEST)
     manifest = read_json(manifest_path)
@@ -151,11 +159,18 @@ def _build(layout, rows, baseline, source, destination, scratch):
                 raise PublicationError('automatic patch archive object changed')
 
 
+def patch_path(layout):
+    if layout.project_delivery:
+        # First prepare privately; only the project-generation transaction may expose it.
+        return layout.path('.runtime/refinement/project-delivery/prepared.auto.patch.zip')
+    return layout.path(f'07_delivery/{layout.result_prefix}.auto.patch.zip')
+
+
 def publish_auto_patch(root, lock):
     layout = layout_and_lock(root, lock)
     if not layout.result_prefix:
         return None
-    target = layout.path(f'07_delivery/{layout.result_prefix}.auto.patch.zip')
+    target = patch_path(layout)
     owner = layout.path(RECEIPT)
     state = read_json(owner) if owner.exists() or owner.is_symlink() else {}
     rows = _published(layout)
@@ -201,7 +216,7 @@ def publish_auto_patch(root, lock):
 
 def validate_auto_patch(layout, expected):
     owner = layout.path(RECEIPT)
-    target = layout.path(f'07_delivery/{layout.result_prefix}.auto.patch.zip')
+    target = patch_path(layout)
     if expected is None:
         if owner.exists() or owner.is_symlink() or target.exists() or target.is_symlink():
             raise PublicationError('unexpected automatic patch in a baseline-only receipt')

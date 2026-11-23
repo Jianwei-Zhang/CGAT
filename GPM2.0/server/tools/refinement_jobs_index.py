@@ -31,12 +31,14 @@ def write_automatic_index(layout, completion_path):
             or batch.get("batch_id") != batch_id or set(batch["tools"]) - TOOL_DIRECTORIES.keys()):
         raise ValueError("invalid automatic refinement batch")
 
-    index_dir = "08_refinement_jobs/01_automatic"
+    index_dir = "04_refinement/automatic" if layout.project_delivery else "08_refinement_jobs/01_automatic"
     overview = "06_report/report.html"
     overview_sha = completion["overview_files"].get(overview)
     overview_path = layout.path(overview)
     if overview_path.is_symlink() or not overview_path.is_file() or automatic_overview_digest(overview_path) != overview_sha:
         raise ValueError("automatic refinement overview differs from its completion receipt")
+    if layout.project_delivery and not batch["tools"]:
+        return None
     jobs = []
     for tool, record in batch["tools"].items():
         code = TOOL_DIRECTORIES[tool]
@@ -61,17 +63,24 @@ def write_automatic_index(layout, completion_path):
                 if (verify_reference(layout, report, report_files.get("report.html"))
                         and verify_reference(layout, manifest_path, files.get("delivery.json"))):
                     definition = json.loads(layout.path(manifest_path).read_text(encoding="utf-8"))
-                    for mode in ("full", "light"):
-                        archive = definition["archives"][mode]
-                        name = relative_path(archive["file"])
-                        path = layout.path(f"{delivery}/{name}")
-                        if (len(Path(name).parts) != 1 or not path.is_file() or path.is_symlink()
-                                or files.get(name) != archive["sha256"]):
-                            break
-                        row["delivery"][mode] = f"{delivery}/{name}"
-                    if len(row["delivery"]) == 2:
+                    if layout.project_delivery:
+                        from project_delivery_publish import tool_links
+                        row["delivery"] = tool_links(layout,tool,row["run_id"],definition["light_manifest"])
+                        row["delivery_state"] = "committed" if row["delivery"] else "awaiting_project_delivery"
                         row["report"] = report
                         row["publication_transaction"] = journal["transaction"]
+                    else:
+                        for mode in ("full", "light"):
+                            archive = definition["archives"][mode]
+                            name = relative_path(archive["file"])
+                            path = layout.path(f"{delivery}/{name}")
+                            if (len(Path(name).parts) != 1 or not path.is_file() or path.is_symlink()
+                                    or files.get(name) != archive["sha256"]):
+                                break
+                            row["delivery"][mode] = f"{delivery}/{name}"
+                        if len(row["delivery"]) == 2:
+                            row["report"] = report
+                            row["publication_transaction"] = journal["transaction"]
                 if not row["report"]:
                     row.update(status="publication_unverified", reason="Published report or delivery reference changed", delivery={})
         if row["status"] != "published" and record.get("report"):
@@ -85,7 +94,7 @@ def write_automatic_index(layout, completion_path):
                 relative = report_path.relative_to(layout.root).as_posix()
                 if verify_reference(layout, relative, manifest["files"].get("report.html")):
                     row["report"] = relative
-        entry = f"{index_dir}/{code}/job.json"
+        entry = f"{index_dir}/{tool if layout.project_delivery else code}/job.json"
         durable_json(layout.path(entry), row)
         jobs.append(entry)
     index = layout.path(f"{index_dir}/index.json")
@@ -93,3 +102,11 @@ def write_automatic_index(layout, completion_path):
                          "status": batch["status"], "overview": overview,
                          "completion": completion_path.relative_to(layout.root).as_posix(), "jobs": jobs})
     return index
+
+
+def refresh_after_delivery(root,run_id):
+    from workspace_layout import WorkspaceLayout
+    layout = WorkspaceLayout.detect(root)
+    completion = layout.path(f".runtime/refinement/completions/{run_id}.json")
+    if completion.is_file():
+        write_automatic_index(layout,completion)

@@ -294,6 +294,9 @@ def finalize_delivery_archives_from_staging(
 ) -> list[dict[str, object]]:
     """Build complete delivery archives once, then publish all of them atomically."""
     root = root.resolve()
+    from workspace_layout import WorkspaceLayout
+    if WorkspaceLayout.detect(root).project_delivery:
+        raise ValueError("Single-mode publication is not supported for project deliveries; use the prepared package helper or run_all.sh")
     report, report_files, required = _final_report_files(root)
     format_name, threads = archive_options(root)
     prefix = f"{root.name}/report/"
@@ -364,6 +367,9 @@ def finalize_delivery_archives_from_staging(
 
 def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[dict[str, object]]:
     """Atomically attach the finalized report directory to delivery archives."""
+    from workspace_layout import WorkspaceLayout
+    if WorkspaceLayout.detect(root).project_delivery:
+        raise ValueError("project archives may be changed only by the paired-generation publisher")
     root = root.resolve()
     report, report_files, required = _final_report_files(root)
     prefix = f"{root.name}/report/"

@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 
 try:
-    from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout, workspace_join
+    from workspace_layout import automatic_dir, TOOL_DIRECTORIES, WorkspaceLayout, workspace_join
     from post_lgz_degap import digest
     from refinement_tools import load_lock, validate_runtime, fingerprint
     from refinement_recipes import select_reads
@@ -20,7 +20,7 @@ try:
     from refinement_presets import effective as effective_degap
     from refinement_native import ADAPTER_FILES as NATIVE_FILES
 except ModuleNotFoundError:
-    from .workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout, workspace_join
+    from .workspace_layout import automatic_dir, TOOL_DIRECTORIES, WorkspaceLayout, workspace_join
     from .post_lgz_degap import digest
     from .refinement_tools import load_lock, validate_runtime, fingerprint
     from .refinement_recipes import select_reads
@@ -49,7 +49,7 @@ def validate_candidate(root, tool, groups, directory, runtime, lock):
         run_id = provenance.get("run_id")
         if not isinstance(run_id, str) or not re.fullmatch(r"[0-9a-f]{32}", run_id):
             return None
-        marker = root / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / run_id / "invocation.json"
+        marker = automatic_dir(root, tool) / "02_jobs" / run_id / "invocation.json"
         state = json.loads(marker.read_text())
         if digest(provenance_file) != state.get("provenance_sha256"):
             return None

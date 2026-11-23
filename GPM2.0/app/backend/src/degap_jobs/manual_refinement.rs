@@ -505,7 +505,7 @@ pub fn export_manual_refinement(
     };
     write!(
         zip,
-        "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, writes the batch report under 08_refinement_jobs/02_manual/, updates 06_report/report.html, and produces a refinement_results.zip for import into this App project.\n\nDo not edit or run code from this archive.\n",
+        "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, updates 06_report/report.html and prints the batch report and return ZIP paths. On a new Server job, import 07_delivery/manual/<output>.manual-<batch>.patch.zip into this App project; older workspaces keep refinement_results.zip.\n\nDo not edit or run code from this archive.\n",
         shell_quote(&argument)
     )?;
     let archive = zip.finish()?.into_inner();

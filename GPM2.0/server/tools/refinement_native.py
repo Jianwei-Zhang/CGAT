@@ -17,7 +17,7 @@ import time
 from datetime import datetime, timezone
 
 try:
-    from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
+    from workspace_layout import automatic_dir, WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from post_lgz_degap import IndexedFasta, atomic_json, digest, stat_key
     from refinement_tools import load_lock, validate_runtime, fingerprint, source_location, ToolError, verify_directory_links
     from refinement_recipes import Invocation, make_invocation, prepare_native_reads, select_reads, materialize_native_driver
@@ -29,7 +29,7 @@ try:
     from refinement_native_formats import CandidateStore, parse_tgs, parse_quartet, parse_lr_rows, apply_lr_round
     from refinement_native_checkpoint import execute as execute_native, quartet_empty_outcome
 except ModuleNotFoundError:
-    from .workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
+    from .workspace_layout import automatic_dir, WorkspaceLayout, TOOL_DIRECTORIES, workspace_join
     from .post_lgz_degap import IndexedFasta, atomic_json, digest, stat_key
     from .refinement_tools import load_lock, validate_runtime, fingerprint, source_location, ToolError, verify_directory_links
     from .refinement_recipes import Invocation, make_invocation, prepare_native_reads, select_reads, materialize_native_driver
@@ -324,7 +324,7 @@ def stage_refinement(root, tool, groups, threads, *, run_id=None):
     run_id = run_id or uuid.uuid4().hex
     if not re.fullmatch(r"[0-9a-f]{32}", run_id):
         raise ToolError("invalid refinement attempt identity")
-    receipt = Path(root) / "04_refinement" / TOOL_DIRECTORIES[tool] / "02_jobs" / run_id / "invocation.json"
+    receipt = automatic_dir(root, tool) / "02_jobs" / run_id / "invocation.json"
     if receipt.parent.exists():
         raise ToolError("refinement attempt already exists")
     try:

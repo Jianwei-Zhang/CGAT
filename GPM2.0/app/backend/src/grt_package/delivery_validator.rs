@@ -214,7 +214,14 @@ where
             "metadata/grt_app_manifest.json must be an object",
         )
     })?;
-    if json_str(manifest_object, "workflow", "App manifest")? != GRT_APP_WORKFLOW
+    // The outer manifest (not the baseline path/recipe) selects the project protocol.
+    // Older Apps reject this workflow rather than importing just one result.
+    let expected_workflow = if manifest_object.contains_key("project_delivery") {
+        "gpm_grt_app_project_v1"
+    } else {
+        GRT_APP_WORKFLOW
+    };
+    if json_str(manifest_object, "workflow", "App manifest")? != expected_workflow
         || json_str(manifest_object, "schema_version", "App manifest")?
             != field(package, "schema_version")?
         || json_str(manifest_object, "package_kind", "App manifest")? != package_mode
@@ -523,6 +530,7 @@ where
             .or_insert_with(|| TsvTable { rows: Vec::new() });
         let _ = header;
     }
+    let project_versions = auto_patch::validate_project_versions(bundle_root, &manifest, &final_path, refined, should_cancel)?;
     Ok(ValidatedGrtPackage {
         tables,
         events: Vec::new(),
@@ -531,6 +539,7 @@ where
         q4_artifact_sha256: q4_artifact_sha256.to_string(),
         refinement_reads,
         auto_effect,
+        project_versions,
     })
 }
 

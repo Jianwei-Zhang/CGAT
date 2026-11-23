@@ -12,7 +12,7 @@ import tempfile
 import zipfile
 
 try:
-    from refinement_bundle import build_full, build_light, BundleError, write_json
+    from refinement_bundle import build_full, build_light, BundleError, write_json, MANIFEST, read_table
     from refinement_bundle_validate import validate_payload
     from refinement_reports import safe_file
     from refinement_tools import fingerprint
@@ -20,7 +20,7 @@ try:
     from delivery_archive import archive_options, create_archive
     from workspace_layout import WorkspaceLayout, TOOL_DIRECTORIES
 except ModuleNotFoundError:
-    from .refinement_bundle import build_full, build_light, BundleError, write_json
+    from .refinement_bundle import build_full, build_light, BundleError, write_json, MANIFEST, read_table
     from .refinement_bundle_validate import validate_payload
     from .refinement_reports import safe_file
     from .refinement_tools import fingerprint
@@ -120,9 +120,56 @@ def _extract(archive, target):
     return target / next(iter(roots))
 
 
+def _validate_project_view(directory, final, definition):
+    """The private view retains no genomes. Verify its source reconstruction against the real final FASTA."""
+    from refinement_sources import FastaCatalog
+    from refinement_path import write_assembly
+    from workspace_layout import MANIFEST as WORKSPACE_MANIFEST
+    from post_lgz_degap import stat_key
+
+    root = next((p for p in final.resolve().parents if (p / WORKSPACE_MANIFEST).is_file()), None)
+    if root is None or not (layout := WorkspaceLayout.detect(root)).project_delivery:
+        raise BundleError("project tool views need their owning job workspace")
+    light = directory / "light"
+    if (set(p.name for p in directory.iterdir()) != {"delivery.json", "light"} or light.is_symlink()
+            or definition.get("schema_version") != 1 or digest(safe_file(light, MANIFEST)) != definition["light_manifest"]):
+        raise BundleError("incomplete project tool projection")
+    proof = validate_payload(light, full=False)
+    provenance = json.loads(safe_file(final, "provenance.json").read_text())
+    server = json.loads(safe_file(final, "final_path.json").read_text())
+    gen = definition["generation"]
+    if (proof["run_id"] != definition["run_id"] or proof["tool"] != definition["tool"]
+            or proof["tool"] != provenance["tool"] or proof["run_id"] != provenance["run_id"]
+            or proof["final_path_sha256"] != digest(final / "final_path.json")
+            or proof["provenance_sha256"] != digest(final / "provenance.json")
+            or any(proof[k] != gen[k] for k in ("provenance_sha256", "report_manifest_sha256", "source_evidence_receipt_sha256"))
+            or digest(safe_file(final, "sources.tsv")) != provenance["artifacts"]["sources.tsv"]
+            or digest(safe_file(final, "assembly.fa")) != provenance["artifacts"]["assembly.fa"]):
+        raise BundleError("project tool projection no longer binds the admitted sources, report and final")
+    with tempfile.TemporaryDirectory(prefix="cgat-project-source-check-") as scratch:
+        catalog = FastaCatalog(root, Path(scratch) / "indexes")
+        _, rows = read_table(final / "sources.tsv")
+        for row in rows:
+            source = layout.path(row["fasta_path"]) if row["path_scope"] == "workspace" else Path(row["fasta_path"])
+            catalog.register(row["dataset"], row["contig"], source, origin=row["origin"])
+            if (catalog.files[source.resolve()]["sha256"] != row["fasta_sha256"]
+                    or catalog.length(row["dataset"],row["contig"]) != int(row["length"])):
+                raise BundleError("changed project tool FASTA source")
+        fasta = Path(scratch) / "verified.fa"
+        write_assembly(server, catalog, fasta)
+        if (digest(fasta) != provenance["artifacts"]["assembly.fa"]
+                or any(stat_key(p) != record["identity"] for p, record in catalog.files.items())):
+            raise BundleError("project view cannot reconstruct the admitted FASTA")
+    return {**proof, "schema":"cgat.refinement-delivery-validation", "schema_version":1,
+            "validator":"cgat.project-tool-view-and-bound-sources.v1", "modes":["full","light"],
+            "generation_sha256":fingerprint(gen)}
+
+
 def validate_delivery(directory, final):
     directory, final = Path(directory), Path(final)
     definition = json.loads(safe_file(directory, "delivery.json").read_text())
+    if definition.get("schema") == "cgat.project-tool-projection":
+        return _validate_project_view(directory, final, definition)
     path_file = safe_file(final, "final_path.json")
     server = json.loads(path_file.read_text())
     provenance = json.loads(safe_file(final, "provenance.json").read_text())
@@ -214,6 +261,21 @@ def build_delivery(root, result, report):
         build_light(full, light)
         archive_set = temporary / "archives"
         archive_set.mkdir()
+        if layout.project_delivery:
+            # Verify the real Full and Light contracts while both views exist, but retain
+            # only the small Light evidence for adding this tool to the project generation.
+            full_proof, light_proof = validate_payload(full,full=True), validate_payload(light,full=False)
+            if ({k:v for k,v in full_proof.items() if k != "mode"}
+                    != {k:v for k,v in light_proof.items() if k != "mode"}):
+                raise BundleError("tool Full and Light disagree on admitted result or evidence")
+            light.rename(archive_set / "light")
+            write_json(archive_set / "delivery.json", {"schema":"cgat.project-tool-projection", "schema_version":1,
+                "tool":tool,"run_id":run_id,"generation":generation,"light_manifest":digest(archive_set / "light" / MANIFEST)})
+            validate_delivery(archive_set, final)
+            if delivery_generation(root,result,report) != generation:
+                raise BundleError("tool projection inputs changed while preparing the project delivery")
+            archive_set.rename(home)
+            return home
         definition = {"schema": SCHEMA, "schema_version": 1, "tool": tool, "run_id": run_id,
                       "server_final_path_sha256": digest(final / "final_path.json"), "generation": generation, "archives": {}}
         for mode, payload in (("full", full), ("light", light)):

@@ -43,7 +43,8 @@ def archive_options(root: Path) -> tuple[str, int]:
 
 
 def delivery_staging_root(root: Path) -> Path:
-    if WorkspaceLayout.detect(root).version == 2:
+    layout = WorkspaceLayout.detect(root)
+    if layout.version == 2:
         return workspace_join(root, ".runtime/delivery_staging/00_lgz")
     return root.parent / f".{root.name}.delivery-staging"
 
@@ -93,8 +94,13 @@ def validate_delivery_staging(root: Path, kind: str) -> tuple[bool, str]:
 
 def delivery_path(root: Path, kind: str) -> Path:
     format_name, _ = archive_options(root)
+    if kind not in {"full", "light"}:
+        raise ValueError("unknown project delivery kind")
+    layout = WorkspaceLayout.detect(root)
+    if layout.project_delivery:
+        return layout.path(f"07_delivery/{layout.result_prefix}.{kind}.{format_name}")
     suffix = "" if kind == "full" else ".light"
-    if WorkspaceLayout.detect(root).version == 2:
+    if layout.version == 2:
         return workspace_join(root, f"07_delivery/00_lgz/{root.name}{suffix}.{format_name}")
     return root.parent / f"{root.name}{suffix}.{format_name}"
 
@@ -202,14 +208,20 @@ def _validate_tar_members(stream, required):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "action", choices=["path", "staging-path", "publish-staging", "create"]
+        "action", choices=["path", "staging-path", "publish-staging", "create", "protocol", "publish-project"]
     )
     parser.add_argument("--server-dir", type=Path, required=True)
     parser.add_argument("--kind", choices=["full", "light"], required=True)
     parser.add_argument("--staging", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if args.action == "path":
+    if args.action == "protocol":
+        print("project" if WorkspaceLayout.detect(args.server_dir).project_delivery else "legacy")
+    elif args.action == "publish-project":
+        from project_delivery_publish import publish_standalone
+        for artifact in publish_standalone(args.server_dir):
+            print(artifact["path"])
+    elif args.action == "path":
         print(delivery_path(args.server_dir, args.kind))
     elif args.action == "staging-path":
         print(delivery_staging_path(args.server_dir, args.kind))

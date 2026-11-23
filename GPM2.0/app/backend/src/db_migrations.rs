@@ -81,6 +81,7 @@ const MIGRATIONS: &[Migration] = &[
         apply: super::create_auto_refinement_effects,
     },
     Migration { version: 12, name: "retain_project_scoped_automatic_versions", apply: super::create_project_auto_versions },
+    Migration { version: 13, name: "inherit_all_package_versions", apply: super::create_package_auto_versions },
 ];
 
 fn migrate_refinement_inputs_to_v9(conn: &Connection) -> Result<()> {

@@ -69,6 +69,7 @@ pub(crate) struct ValidatedGrtPackage {
     pub(super) q0_artifact_sha256: String,
     pub(super) q4_artifact_sha256: String,
     pub(super) auto_effect: Option<AutoRefinementEffect>,
+    pub(super) project_versions: Option<auto_patch::ProjectVersions>,
     pub(super) refinement_reads: refinement_inputs::RefinementReadInputs,
 }
 
