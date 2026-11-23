@@ -17,6 +17,10 @@ FRONTIER_FLANK_BP = 100_000
 OPEN_JOIN_KINDS = frozenset(("reference_unknown", "input_assembly_gap"))
 
 
+class UnsearchedQ0Context(Q0EvidenceError):
+    """A valid partial search may require more contexts before publication."""
+
+
 def decision_frontier(construction, *, flank_bp: int = FRONTIER_FLANK_BP):
     """Return source-coordinate shoulders around unresolved Q0 decisions.
 
@@ -195,4 +199,4 @@ def audit_selected_scope(data, admission, searches):
         starts, intervals = axis
         i = bisect_right(starts, span.end - 1) - 1
         if i >= 0 and intervals[i].end > span.start:
-            raise Q0EvidenceError(f"q0 scoped {kind} has unsearched competing context; rerun with full supplemental evidence")
+            raise UnsearchedQ0Context(f"q0 scoped {kind} has unsearched competing context; rerun with full supplemental evidence")

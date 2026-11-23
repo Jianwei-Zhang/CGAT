@@ -12,8 +12,8 @@ from unittest.mock import patch
 from server.tests.test_q0_admission import EvidenceFixture, bridge_fixture, dna
 from server.tools.lgz_core import q0_admission, q0_preparation
 from server.tools.lgz_core.q0_catalog import build_catalog
-from server.tools.lgz_core.q0_frontier_scope import (UnsearchedWindows, decision_frontier, selected_proof_frontier,
-                                                     window_touches_frontier)
+from server.tools.lgz_core.q0_frontier_scope import (UnsearchedQ0Context, UnsearchedWindows, decision_frontier,
+                                                      selected_proof_frontier, window_touches_frontier)
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey
 
 
@@ -124,7 +124,7 @@ class FrontierScopeTests(unittest.TestCase):
         self.assertEqual(q0_admission.construct_q0(unrelated).records, control.records)
         # Interior non-overlap on the other participant; only c's axis can refute its proof.
         omitted.observe(window(other, 0, 100), (window(part, 0, 400),), data.parts)
-        with self.assertRaisesRegex(Q0EvidenceError, "unsearched competing context"):
+        with self.assertRaisesRegex(UnsearchedQ0Context, "unsearched competing context"):
             q0_admission.construct_q0(replace(data, catalog={
                 "supplement_scope": {"unsearched_part_intervals": omitted.record()}}))
 

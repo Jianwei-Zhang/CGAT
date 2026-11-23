@@ -10,12 +10,25 @@ from lgz_core.q0_paths import PairLink
 from lgz_core.common import stable_id
 from lgz_core.q0_preparation import identity, MAPPING_OUTPUT_FILES
 from lgz_core.q0_alignments import parse_paf_line
-from lgz_core.q0_sources import Interval, SourceKey
+from lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey
 from prepare_wheat_frontier_panel import read_bound
 from run_wheat_frontier_panel import context_inventory, missing_competitor_contexts, restore_committed_tasks
+from run_wheat_proof_repair_cold import expand_frontier, frontier_identity
 
 
 class WheatFrontierPanelTests(unittest.TestCase):
+    def test_cold_repair_frontier_is_monotone_bound_and_must_add_work(self):
+        a, b = SourceKey("ds", "a"), SourceKey("ds", "b")
+        first = {a: (Interval(0, 100),), b: (Interval(80, 100),)}
+        next_ = expand_frontier(first, {a: (Interval(75, 120), Interval(150, 180))})
+        self.assertEqual(next_, {a: (Interval(0, 120), Interval(150, 180)), b: first[b]})
+        self.assertNotEqual(frontier_identity(first), frontier_identity(next_))
+        self.assertEqual(frontier_identity(next_), frontier_identity({b: next_[b], a: next_[a]}))
+        with self.assertRaisesRegex(Q0EvidenceError, "would not widen"):
+            expand_frontier(next_, first)
+        with self.assertRaisesRegex(Q0EvidenceError, "missing or full-scope"):
+            expand_frontier(None, first)
+
     def test_original_paf_read_keeps_bytes_and_requires_receipt(self):
         original = b"# comment\na\t1\t2\t3\t4\tb\trest\nc\t1\t2\t3\t4\td\trest\r\n"
         with tempfile.TemporaryDirectory() as d:
