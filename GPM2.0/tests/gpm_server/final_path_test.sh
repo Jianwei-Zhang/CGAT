@@ -336,6 +336,8 @@ test_generated_server_script_defaults_to_own_gpm_server_dir() {
   mkdir -p "${server_root}/.prepare_lib"
   cp "${REPO_ROOT}/server/templates/export_final_path_fasta.sh" "${server_root}/export_final_path_fasta.sh"
   cp -R "${REPO_ROOT}/server/lib" "${server_root}/.prepare_lib/lib"
+  mkdir -p "${server_root}/.prepare_lib/tools"
+  cp "${REPO_ROOT}/server/tools/workspace_layout.py" "${server_root}/.prepare_lib/tools/"
 
   PATH="${FAKE_BIN}:$PATH" "$EXPORT_BASH" "${server_root}/export_final_path_fasta.sh" \
     --tsv "$tsv_path" \

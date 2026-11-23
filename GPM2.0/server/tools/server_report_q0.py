@@ -3,6 +3,12 @@
 Called only at a successful stage boundary. The complete search and evidence
 remain in the immutable Server artifacts, not copied into portable HTML.
 """
+
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -21,7 +27,7 @@ MODE = "evidence_guided_multi_source"
 
 
 def is_evidence_guided(root: Path) -> bool:
-    rows = read_tsv(root / "metadata/package.tsv")
+    rows = read_tsv(workspace_join(root, "metadata/package.tsv"))
     return bool(rows and rows[0].get("schema_version") in {"3", "4"})
 
 
@@ -33,14 +39,14 @@ def bounded_table(rows):
 def collect_q0_decisions(root: Path):
     if not is_evidence_guided(root):
         return None
-    envelope = read_json(root / SELECTION)
-    frozen = read_json(root / FREEZE)
+    envelope = read_json(workspace_join(root, SELECTION))
+    frozen = read_json(workspace_join(root, FREEZE))
     if (not isinstance(envelope, dict) or envelope.get("schema") != SELECTION_SCHEMA
             or not isinstance(frozen, dict) or frozen.get("schema") != FREEZE_SCHEMA):
         raise ValueError("q0 report requires the published selection and freeze; no legacy fallback")
-    selection_hash = digest(root / SELECTION)
-    q0_hash = digest(root / "grt/q/q0.fa")
-    rows = [row for row in read_tsv(root / "metadata/grt_q_segments.tsv") if row["q_version"] == "q0"]
+    selection_hash = digest(workspace_join(root, SELECTION))
+    q0_hash = digest(workspace_join(root, "grt/q/q0.fa"))
+    rows = [row for row in read_tsv(workspace_join(root, "metadata/grt_q_segments.tsv")) if row["q_version"] == "q0"]
     if (selection_hash != frozen["selection_sha256"] or selection_hash != frozen["artifacts"][SELECTION]
             or q0_hash != frozen["artifacts"]["grt/q/q0.fa"]
             or row_hash(rows, Q_SEGMENT_FIELDS) != frozen["q0_rows_sha256"]):

@@ -171,6 +171,40 @@ fn imports_add_dataset_package_append_only_into_existing_project() {
 }
 
 #[test]
+fn requires_self_alignment_only_for_multiple_distinct_contigs_on_a_chromosome() {
+    use super::super::{manifests, payload_validation};
+
+    let temp = tempdir().unwrap();
+    let (outcome, _) = import_workspace_with_project(temp.path());
+    let zip = temp.path().join("add_ds4.zip");
+    write_add_dataset_zip(
+        &zip,
+        AddZipOptions {
+            include_self_paf: false,
+            ..AddZipOptions::default()
+        },
+    );
+    let extracted = temp.path().join("extracted");
+    fs::create_dir(&extracted).unwrap();
+    zip::ZipArchive::new(fs::File::open(&zip).unwrap())
+        .unwrap()
+        .extract(&extracted)
+        .unwrap();
+    let root = extracted.join("gpm_server");
+    let manifest = manifests::read_add_dataset_manifest(&extracted).unwrap();
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    let mut rows = payload_validation::read_imported_chr_assignment_rows(&root).unwrap();
+    assert_eq!(rows.len(), 1);
+    payload_validation::validate_add_alignment_payloads(&conn, &root, &manifest, &rows).unwrap();
+    let mut second = rows[0].clone();
+    second.seq_name.push_str("_another");
+    rows.push(second);
+    let err = payload_validation::validate_add_alignment_payloads(&conn, &root, &manifest, &rows)
+        .unwrap_err();
+    assert!(err.to_string().contains("missing self alignment payload"));
+}
+
+#[test]
 fn imports_add_dataset_package_into_workspace_without_project_link() {
     let temp = tempdir().unwrap();
     let (outcome, project_id) = import_workspace_with_project(temp.path());
@@ -337,14 +371,6 @@ fn rejects_invalid_add_dataset_packages_without_mutating_existing_workspace() {
                 ..AddZipOptions::default()
             },
             "metadata/track_member_orders.tsv",
-        ),
-        (
-            "missing self alignment payload",
-            AddZipOptions {
-                include_self_paf: false,
-                ..AddZipOptions::default()
-            },
-            "self alignment payload",
         ),
         (
             "missing pairwise alignment payload",

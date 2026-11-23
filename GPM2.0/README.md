@@ -4,9 +4,11 @@
 
 The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units for Genome Zipping**).
 
-Server implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; output paths, data schemas and persisted stage IDs are unchanged. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](docs/lgz-server-implementation.md).
+Server implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; these naming aliases preserve persisted LGZ stage IDs. The separate numbered-layout and refinement-package changes are described below. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](docs/lgz-server-implementation.md).
 
 GPM2.0 combines reference-anchored results from multiple de novo assemblies in one workflow for import, inspection, lightweight editing, and Final Path export.
+
+> The current feature branch adds [post-LGZ refinement](server/REFINEMENT.md), numbered paths and explicit legacy migration. Published v2.0.21 downloads are unchanged. Linux x86_64 synthetic runs and offline browser checks passed; native ARM64 verification is pending.
 
 ## Architecture
 
@@ -122,14 +124,15 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--ds [<name>] <fasta>` | Required, repeatable | Initial assembly dataset; omit the name to infer it from the filename. The first is primary; the rest are auxiliary datasets. |
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
-| `-t, --threads <n>` | `10` | Total compute-thread budget for alignment tasks and optional post-LGZ DEGAP; legacy QC also follows this budget. |
+| `-t, --threads <n>` | `10` | Shared total thread budget for alignment and optional post-LGZ refinement engines; legacy QC also follows this budget. |
 | `--skip-self` | Off | Skip same-dataset self alignment; same-dataset Subview becomes unavailable. |
 | `--tel <motif> <count>` | Additive, repeatable | Add one-run tel rules to the automatic official + local libraries. |
 | `--cen <fasta>` | Additive | Add one-run centromere-related repeats; FASTA names do not bind chromosomes. |
 | `--cen-min-len <bp>` | `10000` | Minimum merged centromere-candidate covered bases (gaps excluded). |
 | `--cen-min-identity <pct>` | `80` | Minimum individual centromere-repeat hit identity percentage. |
-| `--hifi <files...>` | Optional, repeatable | HiFi reads for post-LGZ internal gap filling, not pre-LGZ QC. Preserve LGZ and write a separate FASTA. |
+| `--hifi <files...>` | Optional, repeatable | HiFi reads for post-LGZ refinement, not legacy pre-LGZ QC; keep an independent LGZ baseline. |
 | `--ont <files...>` | Optional, repeatable | ONT reads for the same stage; use alone or together with `--hifi`. |
+| `--gapfill-tools <list>` | `degap` with reads | Comma-separated `degap,tgsgapcloser,quartet,lrgapcloser`, or `none`; independent per-tool deliveries. |
 | `--lgz-qc-memory-gb <n>` | `80` | Memory limit for legacy workspace reads QC. |
 | `--lgz-kmer-size <n>` | `21` | Legacy reads-QC k-mer size; not used by new DEGAP tasks. |
 | `--max-fill <bp>` | `1000000` | Length limit for both Step2 optimized refill rounds; can be changed on resume. |
@@ -192,35 +195,27 @@ GPM Server uses Minimap2 for genome/pairwise alignment and MUMmer4 for cen-repea
 bash "$SERVER/run.sh" -o ./gpm_server
 ```
 
-The runner executes the generated plan serially, stops at the first error, validates checkpoints before reuse, and creates both archives beside `gpm_server/`:
+The current source executes the plan serially and validates checkpoints before reuse. An ordinary scientific-stage failure stops subsequent analysis. Refinement tools are failure-isolated: other successful tools and the LGZ baseline can still be delivered, but the overall exit code is nonzero. Numbered results and archives remain inside `--out`:
 
-| Archive | Contents and use |
+| Result / delivery | Path and use |
 | --- | --- |
-| `gpm_server.tar.gz` | Full App package with source/reference FASTA, authoritative final q3 FASTA, and the complete `report/` directory. Supports client-side FASTA export. |
-| `gpm_server.light.tar.gz` | Light App package with FASTA omitted; retains `.fai`, metadata, Final Path, source-card state, PAF views, and the complete `report/` directory. Supports import, inspection, and PNG/TSV export. |
+| LGZ-only baseline | `05_final/00_lgz/`, explicitly unrefined; archives at `07_delivery/00_lgz/gpm_server[.light].tar.gz`. |
+| Per-tool refinement | E.g. `05_final/01_degap/assembly.fa`, `final_path.json` and `provenance.json`; archives at `07_delivery/01_degap/gpm_server.degap[.light].tar.gz`. Other tools use fixed numbered directories. |
+| Full / Light | Every tool has both modes. Full includes source sequences for reconstruction/FASTA export; Light omits FASTA while retaining indexes, sources and path lineage. Import each into an independent matching new App project. |
+| Report entry | `06_report/report.html` overview → `01_lgz` process report, `02_refinement/<tool>/report.html`, job diagnostics and `03_comparison/<batch>/`. |
 
-The default is parallel `tar.gz` compression with pigz. Use `--archive-format zip` for ZIP; the App accepts both formats.
+Brackets denote two files, not literal names. Parallel pigz `tar.gz` is the default; `--archive-format zip` selects ZIP. New archives are not scattered beside the workspace and never recursively include `07_delivery`. An LGZ-only run or bare tool directory is not a successful refinement receipt.
 
-These two archives are the only final delivery files. A separate report ZIP is not created. Open `gpm_server/report/report.html` in the Server workspace or inside either extracted delivery package. Recording starts during input preparation; `run_all.sh` updates the report at stage boundaries, including failures, interruptions, and unexecuted stages. First-published LGZ events are preserved separately from their reconciled final state, and cache reuse is explicit. Previous reports are archived under the workspace's `.report_history/` directory.
-
-To avoid a checksum referring to the archive that contains it, the report records the App payload checksum before `report/` is embedded. After both final archives are complete, `run_all.sh` prints their final paths, sizes, SHA-256 values, intended uses, and the local report path; the same summary is written to `logs/run_all.log`.
-
-After copying or extracting the entire `report/` directory, regenerate without access to the original workspace or network:
-
-```bash
-python3 /path/to/report/render_report.py
-```
-
-The renderer reads only report-local records and does not rerun alignments or repairs. Reports contain no raw FASTA/reads; unmeasured quality metrics remain unavailable. Gap counts use consecutive runs of at least 100 Ns; explicit connector segments and total N bases are recorded separately. Automatic reporting currently covers `prepare.sh` and `run_all.sh`; standalone incremental or packaging commands do not update an earlier run's report. See [report format and scope](server/REPORT.md).
+The LGZ process report retains failures, interruptions, unexecuted stages and explicit cache records; its history is `.runtime/history/reports/`, and full diagnostics are `.runtime/logs/run_all.log`. Copy its whole report directory to regenerate offline with `python3 /path/to/report/render_report.py`; see [report format and scope](server/REPORT.md). Refinement reports use every original gap as their own denominator, not the LGZ process report's ≥100-N threshold. Open `06_report/report.html` for refinement status, failure reasons and diagnostics. The pinned DEGAP interactive reports were verified offline in the workspace and in extracted Full and Light archives. The [refinement guide](server/REFINEMENT.md) covers saved-setting replacement, exact pins, consumed reads, genuine final paths and migration commands.
 
 The first `run.sh` invocation prepares and runs the full workflow automatically. Resume with the same command or just `-o`. The existing `prepare.sh` and generated `run_all.sh` remain compatible. After the previous job has stopped, use `bash "$SERVER/run.sh" -o ./gpm_server --threads 64` to change the thread budget; `--lgz-qc-memory-gb` may also be adjusted. Validated completed work is reused, and omitted resource budgets retain their last values. Request matching scheduler resources before resuming; these options do not resize a live job. The generated `run_all.sh` inherits saved budgets but accepts no new resource flags. `--from`, `--until`, and `--stage` overrides remain unsupported.
 
 ```bash
-tail -F ./gpm_server/logs/progress.log
+tail -F ./gpm_server/.runtime/logs/progress.log
 ```
 
-The runner now prints compact progress by default; `logs/progress.log` contains the
-same plain-text view. `logs/run_all.log` retains full diagnostics. Terminal colors
+The runner now prints compact progress by default; `.runtime/logs/progress.log` contains the
+same plain-text view. `.runtime/logs/run_all.log` retains full diagnostics. Terminal colors
 are automatic only on interactive outputs, so Slurm logs stay plain. Use the
 read-only viewer for colored monitoring, or add `--detailed` for the full log:
 
@@ -273,10 +268,10 @@ The package preserves the primary and auxiliary dataset roles established during
 
 | Workspace View | Purpose |
 | --- | --- |
-| **1. Project & Datasets** | Import Full/Light archives or `test_data.zip`, manage local workspaces, and inspect per-dataset sequence counts, total lengths, N50, and N90. |
+| **1. Project & Datasets** | Import Full/Light archives or `test_data.zip`, manage local workspaces, inspect per-dataset sequence counts, total lengths, N50, and N90, and check automatic/manual **Refinement** status. |
 | **2. Preview** | Inspect chromosome-level Final Path source contributions and remaining gaps at a glance before entering a chromosome workspace. |
 | **3. Assembly & Subview** | Examine chromosome-wide collinearity ribbons, filter alignments, manipulate contig cards, and zoom in on local pairwise evidence in Subview. |
-| **4. Final Path & Export** | Reorder, flip, or insert contig slices and gaps (with per-chromosome baseline restore), export `DEGAP-JOBS`, or export PNG, TSV, LOG, and FASTA files. |
+| **4. Final Path & Export** | Reorder, flip, or insert contig slices and gaps (with per-chromosome baseline restore and Final Path Log contribution summary), queue and export **Refinement Tasks** (`refinement_tasks.zip` for current chromosome or all queued project loci, paired with `refine.py`) or **Legacy DEGAP-JOBS (scripts)**, or export PNG, TSV, LOG, AGP, and FASTA files. |
 
 ### In-app updates (updater-enabled builds)
 
@@ -314,3 +309,5 @@ bash ./gpm_server/export_final_path_fasta.sh \
 ```
 
 GPM v2.0.20 bundles the pinned DEGAP2.0 runtime with Server in the shared `cgat-server` environment and includes the matching App task-card workflow. In App, leave the custom DEGAP path empty. Export jobs, run `bash run_degap_jobs.sh` on Server, then use **Import DEGAP results** to import `degap_results.zip` as candidates without changing Final Path. See the Server guide for scheduler use, updates and provenance checks.
+
+In the current feature-branch source, Assembly provides project-scoped **Export Refinement Tasks** (`refinement_tasks.zip`, exporting either the current chromosome's queued loci or all queued loci in the project; single tool per Gap job with `DEGAP` default, fixed `DEGAP TelSeeker` for terminal telomeres) paired with Server `python .lib/tools/refine.py refinement_tasks.zip` (reports under `08_refinement_jobs/02_manual/` and `06_report/report.html`, omitting private Server read paths in HTML). Import `refinement_results.zip` back from the Project page **Refinement** card (between **Datasets** and **Pseudomolecule Preview**), which reloads authoritative Assembly and Preview state after import and wires locus-level undo/candidate-switch actions to backend verification (no local simulation). See [server/REFINEMENT.md](server/REFINEMENT.md).

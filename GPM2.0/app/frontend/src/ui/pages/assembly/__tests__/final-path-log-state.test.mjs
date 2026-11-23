@@ -6,6 +6,7 @@ import {
   buildFinalPathLogTsvText,
   canUseFinalPathLog,
 } from "../final-path-log-state.js";
+import { describeFinalPathRefinement } from "../final-path-presentation.js";
 
 function createFinalPathEntry() {
   return {
@@ -53,6 +54,42 @@ function createFinalPathEntry() {
     ],
   };
 }
+
+test("Log counts only current, source-bound LGZ intervals and adopted refinement sequence", () => {
+  const source = { type: "ctg", segmentId: "source", source: { dataset: "primary", contig: "ptg1" },
+    datasetName: "primary", originId: "ptg1", overallLen: 200, start: 1, end: 100 };
+  const auto = { ...source, segmentId: "auto", start: 6, end: 1, refinement: { editId: "automatic-job", tool: "degap" } };
+  const manual = { type: "ctg", sourceKind: "refinement_patch", refinementPatchSha256: "a".repeat(64),
+    segmentId: "manual", start: 1, end: 3, overallLen: 3, refinement: { mode: "manual", locusId: "manual-job" } };
+  const candidate = { ...source, segmentId: "candidate", start: 101, end: 102, refinement: { mode: "manual" } };
+  const gap = { type: "gap", gapSizeBp: 120 };
+  const model = buildFinalPathLogModel({
+    chrName: "Chr01",
+    grtBaselineEntry: { segments: [source] },
+    finalPathEntry: { segments: [
+      { ...source, start: 20, end: 10 },
+      { ...source, start: 101, end: 110 }, // a reused ID is not evidence for a new range
+      auto, { ...auto, segmentId: "auto-second-slice", start: 7, end: 8 },
+      manual, { ...manual, segmentId: "manual-second-slice", start: 1, end: 2 }, candidate, gap,
+    ] },
+    manualRefinementResults: [{ loci: [
+      { chr: "Chr01", kind: "gap", locusId: "zero", adoptionState: "active", activePatchLengthBp: 0 },
+      { chr: "Chr01", kind: "gap", locusId: "zero", adoptionState: "active", activePatchLengthBp: 0 },
+      { chr: "Chr01", kind: "gap", locusId: "not-visible", adoptionState: "active", activePatchLengthBp: 4 },
+      { chr: "Chr01", kind: "gap", locusId: "unknown", adoptionState: "active" },
+      { chr: "Chr02", kind: "gap", locusId: "zero-other-chr", adoptionState: "active", activePatchLengthBp: 0 },
+    ] }],
+  });
+  assert.deepEqual(model.contribution, {
+    hasBaseline: true, lgzRetainedBp: 11, autoRefinementBp: 8, autoTaskCount: 1,
+    manualRefinementBp: 5, manualTaskCount: 1, refinementTotalBp: 13, refinementTaskCount: 2,
+    otherUnattributedBp: 12, unresolvedGapCount: 1, zeroBpManualTaskConfirmed: true, zeroBpManualTaskCount: 1,
+  });
+  assert.equal(model.supportRows.some(row => row.lengthBp === 3), false);
+  assert.equal(describeFinalPathRefinement(candidate), null);
+  assert.equal(describeFinalPathRefinement(auto, "en").shortLabel, "Refined");
+  assert.equal(describeFinalPathRefinement(manual, "en").shortLabel, "Refined");
+});
 
 test("buildFinalPathLogModel counts primary appended segment length and hidden-only full length", () => {
   const model = buildFinalPathLogModel({

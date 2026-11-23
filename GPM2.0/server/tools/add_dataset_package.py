@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+
+try:
+    from workspace_layout import logical_relative, workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import logical_relative, workspace_join
+
 import csv
 import shutil
 import sys
@@ -43,6 +49,11 @@ def write_filtered_tsv(src, dst, predicate):
     selected = [row for row in rows if predicate(row)]
     if not selected:
         return []
+    # Incremental App archives still use the portable, unnumbered layout.
+    for row in selected:
+        for field in ("fasta_relpath", "fai_relpath"):
+            if row.get(field):
+                row[field] = logical_relative(row[field])
     dst.parent.mkdir(parents=True, exist_ok=True)
     with dst.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
@@ -77,7 +88,7 @@ def main(argv):
     skip_self = argv[6].lower()
     tel_enabled = argv[7].lower()
     cen_enabled = argv[8].lower()
-    reference = read_one_tsv(server_dir / "metadata" / "reference.tsv")
+    reference = read_one_tsv(workspace_join(server_dir, "metadata", "reference.tsv"))
     self_alignment_available = "false" if skip_self == "true" else "true"
 
     manifest_rows = [
@@ -99,7 +110,7 @@ def main(argv):
         writer.writerows(manifest_rows)
 
     payload_root = package_dir / "gpm_server"
-    metadata_dir = server_dir / "metadata"
+    metadata_dir = workspace_join(server_dir, "metadata")
 
     dataset_rows = write_filtered_tsv(
         metadata_dir / "datasets.tsv",
@@ -136,26 +147,26 @@ def main(argv):
         raise SystemExit(f"add payload is missing source locators for {dataset_name}")
 
     copy_file(
-        server_dir / "data" / "datasets" / f"{dataset_name}.fa",
+        workspace_join(server_dir, "data", "datasets", f"{dataset_name}.fa"),
         payload_root / "data" / "datasets" / f"{dataset_name}.fa",
     )
     copy_file(
-        server_dir / "data" / "datasets" / f"{dataset_name}.fa.fai",
+        workspace_join(server_dir, "data", "datasets", f"{dataset_name}.fa.fai"),
         payload_root / "data" / "datasets" / f"{dataset_name}.fa.fai",
     )
     for row in locator_rows:
         relpath = row.get("fasta_relpath", "")
         if relpath:
-            copy_file(server_dir / relpath, payload_root / relpath)
+            copy_file(workspace_join(server_dir, relpath), payload_root / relpath)
 
     copy_tree(
-        server_dir / "runs" / f"{dataset_name}_vs_ref",
+        workspace_join(server_dir, "runs", f"{dataset_name}_vs_ref"),
         payload_root / "runs" / f"{dataset_name}_vs_ref",
     )
-    for chr_dir in sorted((server_dir / "runs").glob("chr_*")):
+    for chr_dir in sorted((workspace_join(server_dir, "runs")).glob("chr_*")):
         if not chr_dir.is_dir():
             continue
-        rel_chr = chr_dir.relative_to(server_dir)
+        rel_chr = logical_relative(chr_dir.relative_to(server_dir).as_posix())
         copy_file(
             chr_dir / "datasets" / f"{dataset_name}.fa",
             payload_root / rel_chr / "datasets" / f"{dataset_name}.fa",
@@ -170,13 +181,13 @@ def main(argv):
             ):
                 copy_tree(child, payload_root / rel_chr / child.name)
 
-    for tel_path in sorted((server_dir / "tel").glob(f"chr_*/{dataset_name}.tsv")):
-        copy_file(tel_path, payload_root / tel_path.relative_to(server_dir))
+    for tel_path in sorted((workspace_join(server_dir, "tel")).glob(f"chr_*/{dataset_name}.tsv")):
+        copy_file(tel_path, payload_root / logical_relative(tel_path.relative_to(server_dir).as_posix()))
 
-    for marks_path in sorted((server_dir / "cen").glob("chr_*/marks.tsv")):
+    for marks_path in sorted((workspace_join(server_dir, "cen")).glob("chr_*/marks.tsv")):
         write_filtered_tsv_allow_empty(
             marks_path,
-            payload_root / marks_path.relative_to(server_dir),
+            payload_root / logical_relative(marks_path.relative_to(server_dir).as_posix()),
             lambda row: row.get("dataset_name") == dataset_name,
         )
 

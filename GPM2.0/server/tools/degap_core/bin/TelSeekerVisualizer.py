@@ -26,6 +26,26 @@ from typing import Dict, List, Tuple, Any, Optional
 from datetime import datetime
 
 try:
+    from ReportStyle import esc, report_css
+except ImportError:
+    from .ReportStyle import esc, report_css
+
+try:
+    from TelomereReport import (
+        load_check_evidence,
+        render_target_search_section,
+        summarize_chr_end_evidence,
+        telomere_report_css,
+    )
+except ImportError:
+    from .TelomereReport import (
+        load_check_evidence,
+        render_target_search_section,
+        summarize_chr_end_evidence,
+        telomere_report_css,
+    )
+
+try:
     from Bio import SeqIO
     HAS_BIOPYTHON = True
 except ImportError:
@@ -77,6 +97,7 @@ class TelSeekerPart2LogParser:
         
         return {
             'chr_end': self.chr_end_name,
+            'chr_end_dir': str(self.chr_end_dir),
             'initial_info': self.initial_info,
             'config': self.config,
             'direct_check': self.direct_check,
@@ -112,6 +133,11 @@ class TelSeekerPart2LogParser:
     
     def _parse_main_log(self):
         """解析 extension/extension.log 中的参数配置"""
+        if (self.extension_dir / 'telomere-result.json').exists():
+            from FamilyTelomere import load_telomere_result
+            self.family_result = load_telomere_result(self.extension_dir)
+            self.config.update(self.family_result['config'])
+            return
         defaults = {
             'max_rounds': 30,  # Updated default value to match new unified parameter
             'max_extension_length': 1000000,
@@ -138,6 +164,34 @@ class TelSeekerPart2LogParser:
                 self.config[k] = v
     
     def _parse_rounds(self):
+        if getattr(self, 'family_result', None):
+            enriched_rounds = []
+            for row in self.family_result['rounds']:
+                rdata = dict(row)
+                rnum = rdata.get('round')
+                check_dir = None
+                if rdata.get('target_evidence'):
+                    check_dir = Path(rdata['target_evidence']).parent
+                elif isinstance(rnum, int) and not isinstance(rnum, bool):
+                    check_dir = self.extension_dir / 'attempts' / '0' / str(rnum) / 'telomere' / 'connection_check'
+                evidence = load_check_evidence(
+                    check_dir,
+                    embedded_diagnostics=rdata.get('target_search') if isinstance(rdata.get('target_search'), dict) else None,
+                    diagnostics_path=rdata.get('target_evidence'),
+                )
+                if evidence['diagnostics'] is not None:
+                    rdata['target_search'] = evidence['diagnostics']
+                if evidence['evidence_files']:
+                    rdata['evidence_files'] = evidence['evidence_files']
+                    if 'target_evidence' not in rdata and 'diagnostics' in evidence['evidence_files']:
+                        rdata['target_evidence'] = evidence['evidence_files']['diagnostics']
+                if evidence['support'] is not None:
+                    rdata['support_evidence'] = evidence['support']
+                if evidence['candidates_summary'] is not None:
+                    rdata['candidates_summary'] = evidence['candidates_summary']
+                enriched_rounds.append(rdata)
+            self.rounds_data = enriched_rounds
+            return
         if not self.extension_dir.exists():
             return
         round_dirs = sorted([d for d in self.extension_dir.iterdir() if d.is_dir() and d.name.startswith('round')],
@@ -195,11 +249,30 @@ class TelSeekerPart2LogParser:
                         rdata['linker_file'] = str(lfa)
                 else:
                     rdata['connection_found'] = False
+                evidence = load_check_evidence(cdir)
+                if evidence['diagnostics'] is not None:
+                    rdata['target_search'] = evidence['diagnostics']
+                if evidence['evidence_files']:
+                    rdata['evidence_files'] = evidence['evidence_files']
+                    if 'diagnostics' in evidence['evidence_files']:
+                        rdata['target_evidence'] = evidence['evidence_files']['diagnostics']
+                if evidence['support'] is not None:
+                    rdata['support_evidence'] = evidence['support']
+                if evidence['candidates_summary'] is not None:
+                    rdata['candidates_summary'] = evidence['candidates_summary']
             else:
                 rdata['connection_found'] = False
             self.rounds_data.append(rdata)
     
     def _parse_summary(self):
+        if getattr(self, 'family_result', None):
+            result = self.family_result['result']
+            self.summary_info.update(total_rounds=result['rounds'],
+                                     total_extension_length=result['total_extension_length'],
+                                     stop_reason=result['stop_reason'],
+                                     connection_found=result['success'],
+                                     connected_read_id=(result.get('connection_info') or {}).get('read_id'))
+            return
         summary_file = self.extension_dir / 'extension.summary'
         if not summary_file.exists():
             return
@@ -216,7 +289,7 @@ class TelSeekerPart2LogParser:
     
     def _parse_final_info(self):
         ext_success = self.summary_info.get('connection_found', False)
-        direct_success = self.direct_check.get('success', False)
+        direct_success = self.direct_check.get('success', False) and not getattr(self, 'family_result', None)
         
         self.final_info['success'] = bool(direct_success or ext_success)
         self.final_info['method'] = 'direct' if direct_success else ('extension' if ext_success else 'none')
@@ -250,33 +323,80 @@ class TelSeekerPart2LogParser:
         """解析 direct.check 结果"""
         dlog = self.direct_dir / 'direct.check.log'
         info: Dict = {}
-        if not dlog.exists():
-            self.direct_check = info
-            return
-        text = dlog.read_text(encoding='utf-8', errors='ignore')
-        info['checked'] = True
-        info['success'] = ('Status: SUCCESS' in text)
-        m = re.search(r'Connected Read:\s*(.+)', text)
-        if m: info['read_id'] = m.group(1).strip()
-        m = re.search(r'Alignment Length:\s*(\d+)\s*bp', text)
-        if m: info['aln_length'] = int(m.group(1))
-        m = re.search(r'Identity:\s*([0-9.]+)%', text)
-        if m: info['identity'] = float(m.group(1))
-        m = re.search(r'Reads Checked:\s*(\d+)', text)
-        if m: info['reads_checked'] = int(m.group(1))
-        m = re.search(r'Total Telomeric Reads:\s*(\d+)', text)
-        if m: info['total_reads'] = int(m.group(1))
-        m = re.search(r'Reference Positions:\s*(\d+)-(\d+)', text)
-        if m:
-            info['ref_start'] = int(m.group(1))
-            info['ref_end'] = int(m.group(2))
-        m = re.search(r'Query Positions:\s*(\d+)-(\d+)', text)
-        if m:
-            info['qry_start'] = int(m.group(1))
-            info['qry_end'] = int(m.group(2))
-        lfa = self.direct_dir / 'direct.linker.fa'
-        if lfa.exists():
-            info['linker_file'] = str(lfa)
+        if dlog.exists():
+            text = dlog.read_text(encoding='utf-8', errors='ignore')
+            info['checked'] = True
+            info['success'] = ('Status: SUCCESS' in text)
+            m = re.search(r'Connected Read:\s*(.+)', text)
+            if m: info['read_id'] = m.group(1).strip()
+            m = re.search(r'Alignment Length:\s*(\d+)\s*bp', text)
+            if m: info['aln_length'] = int(m.group(1))
+            m = re.search(r'Identity:\s*([0-9.]+)%', text)
+            if m: info['identity'] = float(m.group(1))
+            m = re.search(r'Reads Checked:\s*(\d+)', text)
+            if m: info['reads_checked'] = int(m.group(1))
+            m = re.search(r'Total Telomeric Reads:\s*(\d+)', text)
+            if m: info['total_reads'] = int(m.group(1))
+            m = re.search(r'Reference Positions:\s*(\d+)-(\d+)', text)
+            if m:
+                info['ref_start'] = int(m.group(1))
+                info['ref_end'] = int(m.group(2))
+            m = re.search(r'Query Positions:\s*(\d+)-(\d+)', text)
+            if m:
+                info['qry_start'] = int(m.group(1))
+                info['qry_end'] = int(m.group(2))
+            lfa = self.direct_dir / 'direct.linker.fa'
+            if lfa.exists():
+                info['linker_file'] = str(lfa)
+
+        evidence = load_check_evidence(self.direct_dir)
+        diag = evidence['diagnostics']
+        if diag is not None or evidence['evidence_files']:
+            info['checked'] = True
+            if diag is not None:
+                info['target_search'] = diag
+                if 'success' not in info:
+                    info['success'] = (diag.get('reason') == 'connected')
+                if 'supporting_read_ids' in diag and isinstance(diag['supporting_read_ids'], list):
+                    info['supporting_read_ids'] = diag['supporting_read_ids']
+                if ('support_count_lower_bound' in diag
+                        and isinstance(diag['support_count_lower_bound'], int)
+                        and not isinstance(diag['support_count_lower_bound'], bool)):
+                    info['support_count_lower_bound'] = diag['support_count_lower_bound']
+                if ('reads_checked' not in info
+                        and isinstance(diag.get('refined_records'), int)
+                        and not isinstance(diag.get('refined_records'), bool)):
+                    info['reads_checked'] = diag['refined_records']
+                if ('total_reads' not in info
+                        and isinstance(diag.get('pool_records'), int)
+                        and not isinstance(diag.get('pool_records'), bool)):
+                    info['total_reads'] = diag['pool_records']
+            if evidence['evidence_files']:
+                info['evidence_files'] = evidence['evidence_files']
+                if 'diagnostics' in evidence['evidence_files']:
+                    info['target_evidence'] = evidence['evidence_files']['diagnostics']
+            if evidence['support'] is not None:
+                info['support_evidence'] = evidence['support']
+            if evidence['candidates_summary'] is not None:
+                info['candidates_summary'] = evidence['candidates_summary']
+            conn = evidence['receipt_connection']
+            if isinstance(conn, dict):
+                if 'read_id' not in info and conn.get('read_id'):
+                    info['read_id'] = conn['read_id']
+                aln = conn.get('alignment') if isinstance(conn.get('alignment'), dict) else {}
+                if 'aln_length' not in info and isinstance(aln.get('len1'), int):
+                    info['aln_length'] = aln['len1']
+                if 'identity' not in info and isinstance(aln.get('identity'), (int, float)):
+                    info['identity'] = float(aln['identity'])
+                for src, dst in (('s1', 'ref_start'), ('e1', 'ref_end'), ('s2', 'qry_start'), ('e2', 'qry_end')):
+                    if dst not in info and isinstance(aln.get(src), int):
+                        info[dst] = aln[src]
+                if 'linker_file' not in info and conn.get('linker_file'):
+                    info['linker_file'] = conn['linker_file']
+            lfa = self.direct_dir / 'direct.linker.fa'
+            if 'linker_file' not in info and lfa.exists():
+                info['linker_file'] = str(lfa)
+
         self.direct_check = info
     
     @staticmethod
@@ -350,7 +470,7 @@ class Part2HTMLReportGenerator:
         if show_rounds:
             rounds_section = f"""
   <div class=\"section\">
-    <div class=\"section-title\" data-i18n-en=\"🔄 Round Details (1 vs N Check)\" data-i18n-zh=\"🔄 轮次详情（1 vs N 检查）\">🔄 Round Details (1 vs N Check)</div>
+    <div class=\"section-title\" data-i18n-en=\"Round Details (1 vs N Check)\" data-i18n-zh=\"轮次详情（1 vs N 检查）\">Round Details (1 vs N Check)</div>
     <table class=\"table\">
       <thead>
         <tr>
@@ -373,13 +493,26 @@ class Part2HTMLReportGenerator:
 """
 
         total_rounds = fin.get('total_rounds', len(rounds))
+        chr_end_esc = esc(chr_end)
+        chr_end_i18n = esc(chr_end_esc)
+        now_esc = esc(now)
+        max_rounds_val = conf.get('max_rounds', 'N/A')
+        max_rounds_html = (
+            '<span data-i18n-en="No limit" data-i18n-zh="无限制">No limit</span>'
+            if max_rounds_val is None else esc(max_rounds_val)
+        )
+        max_len_val = conf.get('max_extension_length', 'N/A')
+        max_len_html = (
+            '<span data-i18n-en="No limit" data-i18n-zh="无限制">No limit</span>'
+            if max_len_val is None else esc(max_len_val)
+        )
 
-        return f"""<!DOCTYPE html>
+        html = f"""<!DOCTYPE html>
 <html lang=\"en\">
 <head>
 <meta charset=\"utf-8\">
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-<title>TelSeeker Part2 Report - {chr_end}</title>
+<title>TelSeeker Part2 Report - {chr_end_esc}</title>
 <style>
 {css}
 </style>
@@ -388,49 +521,53 @@ class Part2HTMLReportGenerator:
 <div class=\"container\">
   <div class=\"header\">
     <div class=\"header-top\">
-      <h1 data-i18n-en=\"🧬 TelSeeker Part2 Report\" data-i18n-zh=\"🧬 TelSeeker Part2 报告\">🧬 TelSeeker Part2 Report</h1>
+      <h1 data-i18n-en=\"TelSeeker Part2 Report\" data-i18n-zh=\"TelSeeker Part2 报告\">TelSeeker Part2 Report</h1>
       <div class=\"language-switcher\" role=\"group\" aria-label=\"Language Switcher\">
         <button class=\"language-btn\" data-lang=\"zh\" type=\"button\" aria-label=\"切换为中文\">中文</button>
         <button class=\"language-btn active\" data-lang=\"en\" type=\"button\" aria-label=\"Switch to English\">EN</button>
       </div>
     </div>
-    <div class=\"sub\" data-i18n-en=\"Task: <code>{chr_end}</code> · Generated: {now}\" data-i18n-zh=\"任务：<code>{chr_end}</code> · 生成时间：{now}\">Task: <code>{chr_end}</code> · Generated: {now}</div>
-    <div class=\"badges\">{status_badge}<span class=\"badge info\" data-i18n-en=\"Rounds: {total_rounds}\" data-i18n-zh=\"轮次：{total_rounds}\">Rounds: {total_rounds}</span></div>
+    <div class=\"sub\" data-i18n-en=\"Task: <code>{chr_end_i18n}</code> · Generated: {now_esc}\" data-i18n-zh=\"任务：<code>{chr_end_i18n}</code> · 生成时间：{now_esc}\">Task: <code>{chr_end_esc}</code> · Generated: {now_esc}</div>
+    <div class=\"badges\">{status_badge}<span class=\"badge info\" data-i18n-en=\"Rounds: {esc(total_rounds)}\" data-i18n-zh=\"轮次：{esc(total_rounds)}\">Rounds: {esc(total_rounds)}</span></div>
+    <p class="muted"><span data-i18n-en="Stop reason" data-i18n-zh="停止原因">Stop reason</span>: <code>{esc(fin.get('stop_reason') or '—')}</code></p>
   </div>
 
   <div class=\"section\">
-    <div class=\"section-title\" data-i18n-en=\"📋 Initial Information\" data-i18n-zh=\"📋 初始信息\">📋 Initial Information</div>
+    <div class=\"section-title\" data-i18n-en=\"Initial Information\" data-i18n-zh=\"初始信息\">Initial Information</div>
     <table class=\"kv\">
-      <tr><td data-i18n-en=\"Chromosome End\" data-i18n-zh=\"染色体端\">Chromosome End</td><td>{info.get('chr_name','N/A')}.{info.get('end_type','?')}</td></tr>
+      <tr><td data-i18n-en=\"Chromosome End\" data-i18n-zh=\"染色体端\">Chromosome End</td><td>{esc(info.get('chr_name','N/A'))}.{esc(info.get('end_type','?'))}</td></tr>
       <tr><td data-i18n-en=\"Seed Length\" data-i18n-zh=\"Seed长度\">Seed Length</td><td>{info.get('seed_length',0):,} bp</td></tr>
       <tr><td data-i18n-en=\"Telomere Reads\" data-i18n-zh=\"端粒reads数量\">Telomere Reads</td><td>{info.get('telo_reads_count',0):,}</td></tr>
-      <tr><td data-i18n-en=\"Edge Tolerance\" data-i18n-zh=\"边缘阈值\">Edge Tolerance</td><td>{conf.get('edge','N/A')} bp</td></tr>
-      <tr><td data-i18n-en=\"K-mer Parameters\" data-i18n-zh=\"K-mer参数\">K-mer Parameters</td><td>num={conf.get('kmer_num','N/A')}, size={conf.get('kmer_size','N/A')}</td></tr>
-      <tr><td data-i18n-en=\"Max Rounds\" data-i18n-zh=\"最大轮次\">Max Rounds</td><td>{conf.get('max_rounds','N/A')}</td></tr>
-      <tr><td data-i18n-en=\"Max Extension Length\" data-i18n-zh=\"最大延伸长度\">Max Extension Length</td><td>{conf.get('max_extension_length','N/A')}</td></tr>
+      <tr><td data-i18n-en=\"Edge Tolerance\" data-i18n-zh=\"边缘阈值\">Edge Tolerance</td><td>{esc(conf.get('edge','N/A'))} bp</td></tr>
+      <tr><td data-i18n-en=\"K-mer Parameters\" data-i18n-zh=\"K-mer参数\">K-mer Parameters</td><td>num={esc(conf.get('kmer_num','N/A'))}, size={esc(conf.get('kmer_size','N/A'))}</td></tr>
+      <tr><td data-i18n-en=\"Max Rounds\" data-i18n-zh=\"最大轮次\">Max Rounds</td><td>{max_rounds_html}</td></tr>
+      <tr><td data-i18n-en=\"Max Extension Length\" data-i18n-zh=\"最大延伸长度\">Max Extension Length</td><td>{max_len_html}</td></tr>
     </table>
   </div>
 
   <div class=\"section\">
-    <div class=\"section-title\" data-i18n-en=\"🔗 Connection Overview\" data-i18n-zh=\"🔗 连接结果总览\">🔗 Connection Overview</div>
+    <div class=\"section-title\" data-i18n-en=\"Connection Overview\" data-i18n-zh=\"连接结果总览\">Connection Overview</div>
     {self._connection_overview_html()}
   </div>
 
   {rounds_section}
 
+  {render_target_search_section(self.data, self.output_dir)}
+
   <div class=\"section\">
-    <div class=\"section-title\" data-i18n-en=\"🧩 Connection Visualization\" data-i18n-zh=\"🧩 连接情况可视化\">🧩 Connection Visualization</div>
+    <div class=\"section-title\" data-i18n-en=\"Connection Visualization\" data-i18n-zh=\"连接情况可视化\">Connection Visualization</div>
     {self._connection_visualization_html()}
   </div>
 
-  <div class=\"footer\" data-i18n-en=\"Report generated by telo_part2_visual.py.\" data-i18n-zh=\"本报告由 telo_part2_visual.py 自动生成。\">Report generated by telo_part2_visual.py.</div>
+  <div class=\"footer\" data-i18n-en=\"Report generated by TelSeekerVisualizer.py.\" data-i18n-zh=\"本报告由 TelSeekerVisualizer.py 自动生成。\">Report generated by TelSeekerVisualizer.py.</div>
 </div>
 <script>
 {js}
 </script>
 </body>
 </html>"""
-    
+        return html.replace('<table', '<div class="table-scroll"><table').replace('</table>', '</table></div>')
+
     def _row_html(self, r: Dict) -> str:
         ext_status = r.get('extension_status')
         if ext_status == 'extended':
@@ -441,24 +578,29 @@ class Part2HTMLReportGenerator:
             status_html = ('<span data-i18n-en="Unknown" data-i18n-zh="未知">Unknown</span>')
 
         if r.get('connection_found'):
-            conn_html = ('<span data-i18n-en="✅ Found Connection" data-i18n-zh="✅ 找到连接">✅ Found Connection</span>')
+            conn_html = ('<span data-i18n-en="Found Connection" data-i18n-zh="找到连接">Found Connection</span>')
         else:
-            conn_html = ('<span data-i18n-en="❌ Not Found" data-i18n-zh="❌ 未找到">❌ Not Found</span>')
+            conn_html = ('<span data-i18n-en="Not Found" data-i18n-zh="未找到">Not Found</span>')
 
         rid = r.get('connected_read', '-')
         reads_chk = '-'
-        if 'checked_reads' in r and 'total_reads' in r:
+        if r.get('checked_reads') is not None and r.get('total_reads') is not None:
             reads_chk = f"{r['checked_reads']}/{r['total_reads']}"
+        elif isinstance(r.get('target_search'), dict):
+            ts = r['target_search']
+            if (isinstance(ts.get('refined_records'), int) and not isinstance(ts.get('refined_records'), bool)
+                    and isinstance(ts.get('pool_records'), int) and not isinstance(ts.get('pool_records'), bool)):
+                reads_chk = f"{ts['refined_records']}/{ts['pool_records']}"
         idt = (f"{r.get('identity', 0):.2f}%" if 'identity' in r else '-')
         alnlen = (f"{r.get('aln_length', 0):,} bp" if 'aln_length' in r else '-')
         return (
             f"<tr>"
-            f"<td>{r.get('round', '')}</td>"
+            f"<td>{esc(r.get('round', ''))}</td>"
             f"<td>{r.get('extension_length', 0):,} bp</td>"
             f"<td>{r.get('cumulative_extension', 0):,} bp</td>"
             f"<td>{status_html}</td>"
             f"<td>{conn_html}</td>"
-            f"<td>{rid}</td>"
+            f"<td>{esc(rid)}</td>"
             f"<td>{reads_chk}</td>"
             f"<td>{idt}</td>"
             f"<td>{alnlen}</td>"
@@ -468,55 +610,37 @@ class Part2HTMLReportGenerator:
     def _status_badge(self, fin: Dict) -> str:
         if fin.get('success'):
             if fin.get('method') == 'direct':
-                return ('<span class="badge success" data-i18n-en="✅ Direct Connection Success" '
-                        'data-i18n-zh="✅ 直接连接成功">✅ Direct Connection Success</span>')
-            return ('<span class="badge success" data-i18n-en="✅ Extension Connection Success" '
-                    'data-i18n-zh="✅ 延伸连接成功">✅ Extension Connection Success</span>')
+                return ('<span class="badge success" data-i18n-en="Direct Connection Success" '
+                        'data-i18n-zh="直接连接成功">Direct Connection Success</span>')
+            return ('<span class="badge success" data-i18n-en="Extension Connection Success" '
+                    'data-i18n-zh="延伸连接成功">Extension Connection Success</span>')
         status = fin.get('status', 'failed')
         if status == 'no_extension':
-            return ('<span class="badge danger" data-i18n-en="❌ No Extension" '
-                    'data-i18n-zh="❌ 无延伸">❌ No Extension</span>')
+            return ('<span class="badge danger" data-i18n-en="No Extension" '
+                    'data-i18n-zh="无延伸">No Extension</span>')
         if status == 'max_limit_reached':
-            return ('<span class="badge warn" data-i18n-en="⚠️ Limit Reached" '
-                    'data-i18n-zh="⚠️ 达到上限">⚠️ Limit Reached</span>')
-        return ('<span class="badge danger" data-i18n-en="❌ Failed" '
-                'data-i18n-zh="❌ 失败">❌ Failed</span>')
+            return ('<span class="badge warn" data-i18n-en="Limit Reached" '
+                    'data-i18n-zh="达到上限">Limit Reached</span>')
+        return ('<span class="badge danger" data-i18n-en="Failed" '
+                'data-i18n-zh="失败">Failed</span>')
     
     def _css(self) -> str:
-        return """
-body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;background:#f5f7fb;color:#2c3e50;margin:0}
-.container{max-width:1180px;margin:0 auto;padding:22px}
-.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:12px;padding:20px 24px;box-shadow:0 8px 24px rgba(0,0,0,.12);margin-bottom:18px}
-.header-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
-.header h1{margin:0;font-size:22px}
-.header .sub{opacity:.95;font-size:13px;margin:0}
-.language-switcher{display:flex;align-items:center;gap:8px}
-.language-btn{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:6px 14px;border-radius:18px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s ease;min-width:46px}
-.language-btn:hover{background:rgba(255,255,255,0.28);transform:translateY(-1px)}
-.language-btn:active{transform:translateY(0)}
-.language-btn.active{background:#fff;color:#3498db;box-shadow:0 4px 10px rgba(0,0,0,0.15)}
-.language-btn:focus{outline:none;box-shadow:0 0 0 2px rgba(255,255,255,0.6)}
-.badges{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
-.badge{display:inline-block;padding:6px 10px;border-radius:20px;font-weight:600;font-size:12px}
-.badge.success{background:#2ecc71}
-.badge.warn{background:#f39c12}
-.badge.danger{background:#e74c3c}
-.badge.info{background:#3498db}
-.section{background:#fff;border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 2px 12px rgba(0,0,0,.06)}
-.section-title{font-weight:700;margin-bottom:10px}
-.kv{width:100%;border-collapse:collapse}
-.kv td{padding:8px 10px;border-bottom:1px solid #eee}
-.kv td:first-child{width:220px;color:#34495e;font-weight:600;background:#fafbff}
-.table{width:100%;border-collapse:collapse;font-size:14px}
-.table th,.table td{padding:10px 8px;border-bottom:1px solid #eee;text-align:center}
-.table thead th{background:#34495e;color:#fff;position:sticky;top:0}
-.progress{height:10px;background:#eef2ff;border-radius:6px;overflow:hidden}
-.progress .bar{height:100%;background:#27ae60}
-.footer{color:#95a5a6;text-align:center;font-size:12px;margin:16px 0}
-.viz-placeholder{color:#7f8c8d;font-size:14px}
-.viz-error{color:#e74c3c;font-size:14px}
-"""
-    
+        return report_css("""
+.section { padding: 18px 20px; }
+.section-title { margin: -18px -20px 16px; padding: 12px 20px; }
+.table-scroll + .table-scroll { margin-top: 16px; }
+.progress { height: 8px; background: var(--surface-subtle); border-radius: 4px; overflow: hidden; }
+.progress .bar { height: 100%; background: var(--accent); }
+.viz-placeholder { color: var(--ink-muted); font-size: 14px; }
+.viz-error { color: var(--err-ink); font-size: 14px; }
+.section svg { max-width: 100%; height: auto; }
+@media (max-width: 768px) {
+  .section { padding: 14px; }
+  .section-title { margin: -14px -14px 14px; padding: 12px 14px; }
+  .kv td:first-child { width: 42%; }
+}
+""" + telomere_report_css())
+
     def _js(self) -> str:
         return """
 (function(){
@@ -613,9 +737,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Helvetic
         ext_success_round = next((r for r in rounds if r.get('connection_found')), None)
         direct_rows = []
         if direct:
-            status_text = ('<span data-i18n-en="✅ Success" data-i18n-zh="✅ 成功">✅ Success</span>'
+            status_text = ('<span data-i18n-en="Success" data-i18n-zh="成功">Success</span>'
                            if direct.get('success') else
-                           '<span data-i18n-en="❌ Failed" data-i18n-zh="❌ 失败">❌ Failed</span>')
+                           '<span data-i18n-en="Failed" data-i18n-zh="失败">Failed</span>')
             idt_text = f"{direct.get('identity')}%" if 'identity' in direct else '-'
             alnlen_text = f"{direct.get('aln_length')} bp" if 'aln_length' in direct else '-'
             link_display = '-'
@@ -628,7 +752,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Helvetic
                                     f'data-i18n-zh="查看">View</a>')
             direct_rows.append(
                 f"<tr><td data-i18n-en=\"Direct Connection\" data-i18n-zh=\"直接连接\">Direct Connection</td>"
-                f"<td>{status_text}</td><td>{direct.get('read_id','-')}</td>"
+                f"<td>{status_text}</td><td>{esc(direct.get('read_id','-'))}</td>"
                 f"<td>{idt_text}</td><td>{alnlen_text}</td><td>{link_display}</td></tr>"
             )
         else:
@@ -658,8 +782,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Helvetic
             round_no = ext_success_round.get('round')
             ext_rows.append(
                 f"<tr><td data-i18n-en=\"Extension Connection\" data-i18n-zh=\"延伸连接\">Extension Connection</td>"
-                f"<td data-i18n-en=\"✅ Success (Round {round_no})\" data-i18n-zh=\"✅ 成功(第{round_no}轮)\">✅ Success (Round {round_no})</td>"
-                f"<td>{ext_success_round.get('connected_read','-')}</td>"
+                f"<td data-i18n-en=\"Success (Round {esc(round_no)})\" data-i18n-zh=\"成功(第{esc(round_no)}轮)\">Success (Round {esc(round_no)})</td>"
+                f"<td>{esc(ext_success_round.get('connected_read','-'))}</td>"
                 f"<td>{idt_text}</td><td>{alnlen_text}</td><td>{link_display}</td></tr>"
             )
         else:
@@ -673,13 +797,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Helvetic
             elif fin.get('method') == 'extension' and fin.get('success'):
                 ext_rows.append(
                     "<tr><td data-i18n-en=\"Extension Connection\" data-i18n-zh=\"延伸连接\">Extension Connection</td>"
-                    "<td data-i18n-en=\"✅ Success\" data-i18n-zh=\"✅ 成功\">✅ Success</td>"
+                    "<td data-i18n-en=\"Success\" data-i18n-zh=\"成功\">Success</td>"
                     "<td colspan=4 data-i18n-en=\"See round table for details\" data-i18n-zh=\"详情见轮次表\">See round table for details</td></tr>"
                 )
             else:
                 ext_rows.append(
                     "<tr><td data-i18n-en=\"Extension Connection\" data-i18n-zh=\"延伸连接\">Extension Connection</td>"
-                    "<td data-i18n-en=\"❌ Not Successful\" data-i18n-zh=\"❌ 未成功\">❌ Not Successful</td>"
+                    "<td data-i18n-en=\"Not Successful\" data-i18n-zh=\"未成功\">Not Successful</td>"
                     "<td colspan=4>-</td></tr>"
                 )
         if fin.get('method') == 'direct':
@@ -901,7 +1025,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Helvetic
 <div class=\"synteny-chart\" style=\"margin-top:10px;\">
   <svg width=\"{svg_width}\" height=\"{svg_height}\" viewBox=\"0 0 {svg_width} {svg_height}\">
     <rect width=\"{svg_width}\" height=\"{svg_height}\" fill=\"#f8f9fa\" stroke=\"#e9ecef\"/>
-    <text x=\"{svg_width/2}\" y=\"24\" text-anchor=\"middle\" fill=\"#2c3e50\" font-weight=\"600\" data-i18n-en=\"{title_en}\" data-i18n-zh=\"{title_zh}\">{title_en}</text>
+    <text x=\"{svg_width/2}\" y=\"24\" text-anchor=\"middle\" fill=\"#2c3e50\" font-weight=\"600\" data-i18n-en=\"{esc(esc(title_en))}\" data-i18n-zh=\"{esc(esc(title_zh))}\">{esc(title_en)}</text>
     <!-- Ref axis -->
     <line x1=\"{margin}\" y1=\"{ref_y}\" x2=\"{ref_axis_end}\" y2=\"{ref_y}\" stroke=\"#3498db\" stroke-width=\"8\" stroke-linecap=\"round\"/>
     <text x=\"{margin}\" y=\"{ref_y+24}\" fill=\"#7f8c8d\" font-size=\"11\">{ref_left_label}</text>
@@ -998,7 +1122,7 @@ def count_fasta_records(fasta_path: Path) -> int:
         return 0
 
 
-def parse_part2_results(part2_dir: Path) -> List[Dict]:
+def parse_part2_results(part2_dir: Path, report_dir: Optional[Path] = None) -> List[Dict]:
     """
     Parse chromosome end extension results from part2.
     
@@ -1009,7 +1133,7 @@ def parse_part2_results(part2_dir: Path) -> List[Dict]:
         return []
     
     results = []
-    chr_end_dirs = sorted([d for d in part2_dir.iterdir() if d.is_dir()])
+    chr_end_dirs = sorted([d for d in part2_dir.iterdir() if d.is_dir() and not d.name.startswith(".")])
     
     print(f"    Found {len(chr_end_dirs)} chromosome end directories")
     
@@ -1076,7 +1200,9 @@ def parse_part2_results(part2_dir: Path) -> List[Dict]:
                             result['extended'] = True
         except Exception:
             pass
-        
+
+        result['target_evidence_summary'] = summarize_chr_end_evidence(chr_end_dir, report_dir=report_dir)
+
         results.append(result)
     
     return results
@@ -1337,7 +1463,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
     
     print("\n[4/6] Parsing chromosome end extension results...")
     part2_dir = out_dir / 'part2.chr.end.job'
-    extension_results = parse_part2_results(part2_dir)
+    extension_results = parse_part2_results(part2_dir, report_dir=output_path.parent)
     print(f"  ✓ Processed {len(extension_results)} chromosome ends")
     
     print("\n[5/6] Parsing final integration results...")
@@ -1388,11 +1514,19 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
             row['extension_status'] = 'not_targeted'
         row['manual_review'] = 'manual_review'
     
-    # Prepare data for JavaScript
-    js_need_extension_list = json.dumps(need_extension_list, indent=2)
-    js_extension_results = json.dumps(extension_results, indent=2)
-    js_initial_review_rows = json.dumps(initial_review_rows, indent=2)
-    js_final_review_rows = json.dumps(final_review_rows, indent=2)
+    # Prepare data for JavaScript (escape HTML-sensitive chars for inline script safety)
+    def _safe_json(value: Any) -> str:
+        return (
+            json.dumps(value, indent=2)
+            .replace('<', '\\u003c')
+            .replace('>', '\\u003e')
+            .replace('&', '\\u0026')
+        )
+
+    js_need_extension_list = _safe_json(need_extension_list)
+    js_extension_results = _safe_json(extension_results)
+    js_initial_review_rows = _safe_json(initial_review_rows)
+    js_final_review_rows = _safe_json(final_review_rows)
 
     # Reuse the plots generated by the final manual check. The visualizer must
     # not run a second, independent chromosome-end analysis.
@@ -1438,7 +1572,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
         final_motif_html = """
         <div class="card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span data-i18n-en="📊 7. Final Genome Motif Distribution" data-i18n-zh="📊 7. 最终基因组 Motif 分布">📊 7. Final Genome Motif Distribution</span>
+                <span data-i18n-en="7. Final Genome Motif Distribution" data-i18n-zh="7. 最终基因组 Motif 分布">7. Final Genome Motif Distribution</span>
                 <select id="motif-chr-selector" class="chr-selector">
                     <option value="all" data-i18n-en="All Chromosomes" data-i18n-zh="所有染色体" selected>All Chromosomes</option>
                 </select>
@@ -1453,7 +1587,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
     else:
         final_motif_html = """
         <div class="card">
-            <div class="card-header" data-i18n-en="📊 7. Final Genome Motif Distribution" data-i18n-zh="📊 7. 最终基因组 Motif 分布">📊 7. Final Genome Motif Distribution</div>
+            <div class="card-header" data-i18n-en="7. Final Genome Motif Distribution" data-i18n-zh="7. 最终基因组 Motif 分布">7. Final Genome Motif Distribution</div>
             <div class="card-content"><p class="empty-state">No final motif plots available</p></div>
         </div>
         """
@@ -1465,408 +1599,33 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TelSeeker Results Visualization</title>
     <style>
-        * {{
-            box-sizing: border-box;
-        }}
-
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-        }}
-
-        .container {{
-            max-width: 1180px;
-            margin: 0 auto;
-        }}
-
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 24px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            text-align: left;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }}
-
-        .header-top {{
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
-        }}
-
-        .header-info {{
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }}
-
-        .header h1 {{
-            margin: 0;
-            font-size: 2.1em;
-            font-weight: 600;
-        }}
-
-        .header p {{
-            margin: 0;
-            opacity: 0.9;
-            font-size: 1.05em;
-        }}
-
-        .language-switcher {{
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-left: auto;
-            align-self: flex-start;
-        }}
-
-        .language-btn {{
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #fff;
-            padding: 6px 14px;
-            border-radius: 18px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            min-width: 46px;
-        }}
-
-        .language-btn:hover {{
-            background: rgba(255, 255, 255, 0.28);
-            transform: translateY(-1px);
-        }}
-
-        .language-btn:active {{
-            transform: translateY(0);
-        }}
-
-        .language-btn.active {{
-            background: #fff;
-            color: #3498db;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-        }}
-
-        .language-btn:focus {{
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(255,255,255,0.6);
-        }}
-
-        .stats-overview {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }}
-
-        .stat-card {{
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: transform 0.2s ease;
-        }}
-
-        .stat-card:hover {{
-            transform: translateY(-5px);
-        }}
-
-        .stat-value {{
-            font-size: 2.2em;
-            font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }}
-
-        .stat-label {{
-            color: #666;
-            margin-top: 8px;
-            font-size: 1em;
-            font-weight: 500;
-        }}
-
-        .stat-value.positive {{
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }}
-
-        .stat-value.negative {{
-            background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }}
-
-        .card {{
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-            overflow: hidden;
-        }}
-
-        .card-header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 25px;
-            font-size: 1.2em;
-            font-weight: 600;
-        }}
-
-        .card-content {{
-            padding: 25px;
-        }}
-
-        .table-container {{
-            max-height: 600px;
-            overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 10px;
-            background: white;
-            position: relative;
-        }}
-        
-        table {{
-            width: 100%;
-            border-collapse: separate;  /* Important for sticky headers */
-            border-spacing: 0;          /* Keep cell borders touching */
-        }}
-
-        th, td {{
-            padding: 15px 12px;
-            text-align: left;
-            border-bottom: 1px solid #f1f3f4;
-        }}
-
-        th, thead th {{
-            background: #f8f9fa;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            z-index: 20;  /* ensure header stays above cells */
-            color: #495057;
-            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
-        }}
-
-        tr:hover {{
-            background-color: #f8f9fa;
-        }}
-        
-        .table-container thead {{
-            position: sticky; /* enhances cross-browser behavior */
-            top: 0;
-            z-index: 15;
-        }}
-
-        .badge {{
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9em;
-            display: inline-block;
-        }}
-
-        .badge-yes {{
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-            color: #155724;
-        }}
-
-        .badge-no {{
-            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-            color: #721c24;
-        }}
-
-        .badge-direct {{
-            background: linear-gradient(135deg, #cce5ff 0%, #b3d9ff 100%);
-            color: #004085;
-        }}
-
-        .badge-extension {{
-            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-            color: #0c5460;
-        }}
-
-        .badge-na {{
-            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-            color: #495057;
-        }}
-
-        .badge-selected, .badge-targeted {{
-            background: #dbeafe;
-            color: #1d4ed8;
-        }}
-
-        .badge-connected {{
-            background: #dcfce7;
-            color: #166534;
-        }}
-
-        .badge-failed {{
-            background: #ffedd5;
-            color: #9a3412;
-        }}
-
-        .badge-not-targeted {{
-            background: #e5e7eb;
-            color: #4b5563;
-        }}
-
-        .badge-manual-review {{
-            background: #ede9fe;
-            color: #6d28d9;
-        }}
-
-        .review-evidence a {{
-            margin-right: 10px;
-            white-space: nowrap;
-        }}
-
-        .chromosome-task-tracks {{
-            display: grid;
-            gap: 14px;
-            margin: 24px 0;
-        }}
-
-        .task-track {{
-            display: grid;
-            grid-template-columns: minmax(100px, 180px) 1fr;
-            align-items: center;
-            gap: 18px;
-        }}
-
-        .task-track-name {{
-            font-weight: 600;
-            color: #495057;
-            overflow-wrap: anywhere;
-        }}
-
-        .task-track-bar {{
-            position: relative;
-            height: 24px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-            border: 1px solid #ced4da;
-        }}
-
-        .end-marker {{
-            display: inline-block;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            border: 2px solid #fff;
-            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
-            vertical-align: middle;
-        }}
-
-        .task-track-bar .end-marker {{
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-        }}
-
-        .task-track-bar .end-marker.left {{ left: 3px; }}
-        .task-track-bar .end-marker.right {{ right: 3px; }}
-        .end-marker.not-targeted {{ background: #9ca3af; }}
-        .end-marker.targeted {{ background: #3b82f6; }}
-        .end-marker.connected {{ background: #22c55e; }}
-        .end-marker.failed {{ background: #f97316; }}
-
-        .task-legend {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 18px;
-            color: #495057;
-        }}
-
-        .task-legend > span {{
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-        }}
-
-
-        .empty-state {{
-            text-align: center;
-            padding: 40px 20px;
-            color: #6c757d;
-            font-style: italic;
-        }}
-
-        .chr-selector {{
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            color: #495057;
-            padding: 6px 32px 6px 12px;
-            border-radius: 18px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            appearance: none;
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%228%22%20viewBox%3D%220%200%2014%208%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L7%207L13%201%22%20stroke%3D%22%23495057%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E');
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            min-width: 180px;
-        }}
-
-        .chr-selector:hover {{
-            background: rgba(255, 255, 255, 1);
-            border-color: rgba(255, 255, 255, 0.7);
-            transform: translateY(-1px);
-        }}
-
-        .chr-selector:focus {{
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
-        }}
-
-        .motif-plot-container {{
-            text-align: center;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #e9ecef;
-        }}
-
-        .motif-plot-container img {{
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }}
-
-        @media (max-width: 768px) {{
-            .header-top {{
-                flex-direction: column;
-                align-items: flex-start;
-            }}
-
-            .language-switcher {{
-                align-self: flex-start;
-                margin-left: 0;
-            }}
-
-            .stats-overview {{
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            }}
-
-            .task-track {{
-                grid-template-columns: 1fr;
-                gap: 6px;
-            }}
-        }}
+{report_css()}
+.review-evidence a {{ margin-right: 10px; white-space: nowrap; }}
+.chromosome-task-tracks {{ display: grid; gap: 14px; margin: 20px 0; }}
+.task-track {{ display: grid; grid-template-columns: minmax(100px,180px) minmax(0,1fr); align-items: center; gap: 18px; }}
+.task-track-name {{ font-weight: 600; color: var(--ink-secondary); overflow-wrap: anywhere; }}
+.task-track-bar {{ position: relative; height: 24px; border-radius: 12px; background: var(--surface-subtle); border: 1px solid var(--border-strong); }}
+.end-marker {{ display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-strong); vertical-align: middle; }}
+.task-track-bar .end-marker {{ position: absolute; top: 50%; transform: translateY(-50%); }}
+.task-track-bar .end-marker.left {{ left: 3px; }}
+.task-track-bar .end-marker.right {{ right: 3px; }}
+.end-marker.not-targeted {{ background: var(--ink-muted); }}
+.end-marker.targeted {{ background: var(--accent); }}
+.end-marker.connected {{ background: var(--ok-ink); }}
+.end-marker.failed {{ background: var(--warn-ink); }}
+.task-legend {{ display: flex; flex-wrap: wrap; gap: 18px; color: var(--ink-secondary); }}
+.task-legend > span {{ display: inline-flex; align-items: center; gap: 7px; }}
+.chr-selector {{ background: var(--surface); border: 1px solid var(--border-strong); color: var(--ink); padding: 6px 10px; border-radius: var(--radius-sm); font: inherit; font-size: 13px; cursor: pointer; min-width: 160px; max-width: 100%; }}
+.chr-selector:hover {{ border-color: var(--accent); }}
+.motif-plot-container {{ text-align: center; background: var(--surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); }}
+.motif-plot-container img {{ max-width: 100%; height: auto; }}
+.global-ev-cell {{ font-size: 0.82rem; min-width: 200px; }}
+.global-ev-meta {{ margin-top: 4px; color: var(--ink-secondary); font-variant-numeric: tabular-nums; }}
+.global-ev-link {{ margin-left: 6px; font-size: 0.78rem; white-space: nowrap; }}
+@media (max-width: 768px) {{
+  .task-track {{ grid-template-columns: minmax(0,1fr); gap: 6px; }}
+  .card-header {{ flex-wrap: wrap; gap: 10px; }}
+}}
     </style>
 </head>
 <body>
@@ -1874,7 +1633,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
         <div class="header">
             <div class="header-top">
                 <div class="header-info">
-                    <h1 data-i18n-en="🧬 TelSeeker Results Visualization" data-i18n-zh="🧬 TelSeeker 可视化结果">🧬 TelSeeker Results Visualization</h1>
+                    <h1 data-i18n-en="TelSeeker Results Visualization" data-i18n-zh="TelSeeker 可视化结果">TelSeeker Results Visualization</h1>
                     <p data-i18n-en="Telomere Extension Analysis Report" data-i18n-zh="端粒延伸分析报告">Telomere Extension Analysis Report</p>
                 </div>
                 <div class="language-switcher" role="group" aria-label="Language Switcher">
@@ -1886,7 +1645,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
 
         <!-- Section 1: Initial manual review -->
         <div class="card">
-            <div class="card-header" data-i18n-en="🔎 1. Initial Chromosome-End Manual Review" data-i18n-zh="🔎 1. 初始染色体末端人工检查">🔎 1. Initial Chromosome-End Manual Review</div>
+            <div class="card-header" data-i18n-en="1. Initial Chromosome-End Manual Review" data-i18n-zh="1. 初始染色体末端人工检查">1. Initial Chromosome-End Manual Review</div>
             <div class="card-content">
                 {initial_review_html}
                 <div class="table-container">
@@ -1908,9 +1667,9 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
 
         <!-- Section 2: Extension Task List -->
         <div class="card">
-            <div class="card-header" data-i18n-en="📋 2. Extension Task List" data-i18n-zh="📋 2. 延伸任务列表">📋 2. Extension Task List</div>
+            <div class="card-header" data-i18n-en="2. Extension Task List" data-i18n-zh="2. 延伸任务列表">2. Extension Task List</div>
             <div class="card-content">
-                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--accent);">
                     <h4 style="margin: 0 0 10px 0; color: #495057;" data-i18n-en="User-selected chromosome ends:" data-i18n-zh="用户选择的染色体端：">User-selected chromosome ends:</h4>
                     <p style="margin: 0 0 15px 0; color: #6c757d; font-size: 0.95em;" data-i18n-en="These target ends were supplied explicitly with -e/--target_ends after manual review." data-i18n-zh="这些目标端点由人工检查后通过 -e/--target_ends 明确提供。">
                         These target ends were supplied explicitly with -e/--target_ends after manual review.
@@ -1924,7 +1683,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
 
         <!-- Section 3: Telomeric Reads Extraction -->
         <div class="card">
-            <div class="card-header" data-i18n-en="🔍 3. Telomeric Reads Extraction" data-i18n-zh="🔍 3. 端粒 Reads 提取">🔍 3. Telomeric Reads Extraction</div>
+            <div class="card-header" data-i18n-en="3. Telomeric Reads Extraction" data-i18n-zh="3. 端粒 Reads 提取">3. Telomeric Reads Extraction</div>
             <div class="card-content">
                 <div class="stats-overview">
                     <div class="stat-card">
@@ -1943,7 +1702,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
                 <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                     <h4 style="margin: 0 0 10px 0; color: #495057;" data-i18n-en="Extracted Files:" data-i18n-zh="提取到的文件：">Extracted Files:</h4>
                     <ul style="margin: 0; padding-left: 20px; color: #6c757d;" data-i18n-wrapper="file-list">
-                        {"".join(f"<li>{f}</li>" for f in telo_reads_stats.get('files', [])) if telo_reads_stats.get('files') else "<li data-i18n-en='No files found' data-i18n-zh='未找到文件'>No files found</li>"}
+                        {"".join(f"<li>{esc(f)}</li>" for f in telo_reads_stats.get('files', [])) if telo_reads_stats.get('files') else "<li data-i18n-en='No files found' data-i18n-zh='未找到文件'>No files found</li>"}
                     </ul>
                 </div>
             </div>
@@ -1951,8 +1710,13 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
 
         <!-- Section 4: Chromosome End Extension -->
         <div class="card">
-            <div class="card-header" data-i18n-en="🔗 4. Chromosome End Extension" data-i18n-zh="🔗 4. 染色体端延伸">🔗 4. Chromosome End Extension</div>
+            <div class="card-header" data-i18n-en="4. Chromosome End Extension" data-i18n-zh="4. 染色体端延伸">4. Chromosome End Extension</div>
             <div class="card-content">
+                <p class="section-note"
+                   data-i18n-en="Linked Sequence Length reports the full final linker FASTA length (linker.fa), not chromosome-side assembly growth alone. Target evidence summarizes per-end bounded-batch large-pool search counts (pool / retrieved / batches / eligible), decision reason, selected tel-read tail vs tested outward junction span, and lower-bound read support (&ge; N, not an exact total). Legacy runs without diagnostics show Unavailable."
+                   data-i18n-zh="拼接后序列长度显示最终 linker FASTA（linker.fa）的全长，而非仅染色体侧组装延伸长度。目标检索证据汇总各端有界批次大池检索计数（池 / 检索 / 批次 / 合格）、判定原因、入选端粒 read 尾长与实测向外接合区跨度，以及 read 佐证下界（&ge; N，并非精确总数）。缺少诊断文件的旧版运行显示为不可用。">
+                    Linked Sequence Length reports the full final linker FASTA length (linker.fa), not chromosome-side assembly growth alone. Target evidence summarizes per-end bounded-batch large-pool search counts (pool / retrieved / batches / eligible), decision reason, selected tel-read tail vs tested outward junction span, and lower-bound read support (&ge; N, not an exact total). Legacy runs without diagnostics show Unavailable.
+                </p>
                 <div class="table-container">
                     <table id="extension-table">
                         <thead>
@@ -1961,8 +1725,9 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
                                 <th>Extended</th>
                                 <th>Connection Type</th>
                                 <th>Rounds</th>
-                                <th>Extension Length</th>
+                                <th data-i18n-en="Linked Sequence Length" data-i18n-zh="拼接后序列长度" title="Full length of the final linked sequence (linker.fa), not chromosome-side assembly growth alone">Linked Sequence Length</th>
                                 <th>Connected Read</th>
+                                <th data-i18n-en="Target Evidence" data-i18n-zh="目标检索证据">Target Evidence</th>
                                 <th>Details</th>
                             </tr>
                         </thead>
@@ -1976,7 +1741,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
 
         <!-- Section 5: Final manual review -->
         <div class="card">
-            <div class="card-header" data-i18n-en="🔎 5. Final Chromosome-End Manual Review" data-i18n-zh="🔎 5. 最终染色体末端人工检查">🔎 5. Final Chromosome-End Manual Review</div>
+            <div class="card-header" data-i18n-en="5. Final Chromosome-End Manual Review" data-i18n-zh="5. 最终染色体末端人工检查">5. Final Chromosome-End Manual Review</div>
             <div class="card-content">
                 <p data-i18n-en="Review the final chromosome-end sequences and motif plots manually. A successful extension means that a linker was produced; it is not an automatic telomere-completeness call."
                    data-i18n-zh="请人工检查最终染色体末端序列和 motif 图。延伸成功仅表示已生成 linker，不等同于自动判定端粒完整。">
@@ -2003,7 +1768,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
 
         <!-- Section 6: task and connection status overview -->
         <div class="card">
-            <div class="card-header" data-i18n-en="📊 6. Chromosome-End Task Status" data-i18n-zh="📊 6. 染色体末端任务状态">📊 6. Chromosome-End Task Status</div>
+            <div class="card-header" data-i18n-en="6. Chromosome-End Task Status" data-i18n-zh="6. 染色体末端任务状态">6. Chromosome-End Task Status</div>
             <div class="card-content">
                 <p data-i18n-en="This diagram shows target selection and extension connection status only. Connected does not mean telomere-complete."
                    data-i18n-zh="该图仅展示目标选择和延伸连接状态；Connected 不代表端粒完整。">
@@ -2046,7 +1811,21 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
                 targeted: 'Targeted',
                 not_targeted: 'Not targeted',
                 manual_review: 'Manual review',
-                no_review_data: 'No chromosome-end review data available.'
+                no_review_data: 'No chromosome-end review data available.',
+                unavailable: 'Unavailable',
+                reason_connected: 'Connected',
+                reason_insufficient_read_support: 'Insufficient read support',
+                reason_no_eligible_alignment: 'No eligible alignment',
+                reason_no_sampled_nonrepeat_anchor: 'No sampled non-repeat anchor',
+                ev_pool: 'Pool',
+                ev_retrieved: 'Retrieved',
+                ev_batches: 'Batches',
+                ev_eligible: 'Eligible',
+                ev_support: 'Support',
+                ev_tail: 'Tel-read tail',
+                ev_junction: 'Junction tested',
+                lower_bound: 'lower bound',
+                diagnostics: 'JSON'
             }},
             zh: {{
                 no_extension_needed: '未提供需要延伸的目标染色体端。',
@@ -2059,7 +1838,21 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
                 targeted: '已选择',
                 not_targeted: '未选择',
                 manual_review: '人工检查',
-                no_review_data: '没有可用的染色体末端检查数据。'
+                no_review_data: '没有可用的染色体末端检查数据。',
+                unavailable: '不可用',
+                reason_connected: '已连接',
+                reason_insufficient_read_support: '支持 read 不足',
+                reason_no_eligible_alignment: '无合格比对',
+                reason_no_sampled_nonrepeat_anchor: '无采样非重复锚点命中',
+                ev_pool: '池',
+                ev_retrieved: '检索',
+                ev_batches: '批次',
+                ev_eligible: '合格',
+                ev_support: '佐证',
+                ev_tail: '端粒尾长',
+                ev_junction: '实测接合区',
+                lower_bound: '下界',
+                diagnostics: '诊断'
             }}
         }};
 
@@ -2337,7 +2130,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
                 badge.style.height = '24px';
                 badge.style.lineHeight = '24px';
                 badge.style.textAlign = 'center';
-                badge.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                badge.style.background = 'var(--accent)';
                 badge.style.color = 'white';
                 badge.style.borderRadius = '50%';
                 badge.style.marginRight = '12px';
@@ -2357,13 +2150,55 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
             container.appendChild(list);
         }}
 
+        function formatOptionalCount(val) {{
+            return (typeof val === 'number' && Number.isFinite(val)) ? val.toLocaleString() : t('unavailable');
+        }}
+
+        function formatOptionalBp(val) {{
+            return (typeof val === 'number' && Number.isFinite(val)) ? `${{val.toLocaleString()}} bp` : t('unavailable');
+        }}
+
+        function renderTargetEvidenceCell(ev) {{
+            if (!ev || !ev.available) {{
+                return `<span class="muted">${{t('unavailable')}}</span>`;
+            }}
+            const reasonKey = ev.reason ? ('reason_' + ev.reason) : '';
+            const reasonLabel = (reasonKey && Object.prototype.hasOwnProperty.call(translations.en, reasonKey))
+                ? t(reasonKey)
+                : (ev.reason ? escapeHtml(ev.reason) : t('unavailable'));
+            const tone = ev.reason === 'connected' ? 'ok'
+                : (ev.reason === 'insufficient_read_support' || ev.reason === 'no_eligible_alignment') ? 'warn'
+                : ev.reason === 'no_sampled_nonrepeat_anchor' ? 'muted' : 'info';
+            const poolText = formatOptionalCount(ev.pool_records);
+            const retText = formatOptionalCount(ev.retrieved_records);
+            const batchText = formatOptionalCount(ev.alignment_batches);
+            const eligText = formatOptionalCount(ev.eligible_records);
+            const tailText = formatOptionalBp(ev.selected_tail_bases);
+            const juncText = formatOptionalBp(ev.junction_bases_tested);
+            let supportText = t('unavailable');
+            if (typeof ev.support_count_lower_bound === 'number' && Number.isFinite(ev.support_count_lower_bound)) {{
+                const lbPrefix = ev.support_count_lower_bound > 0 ? '&ge; ' : '';
+                supportText = `${{lbPrefix}}${{ev.support_count_lower_bound.toLocaleString()}} (${{t('lower_bound')}})`;
+            }}
+            const diagLink = ev.diagnostics_href
+                ? `<a class="global-ev-link" href="${{escapeHtml(ev.diagnostics_href)}}" target="_blank" rel="noopener">${{t('diagnostics')}}</a>`
+                : '';
+            return `
+                <div class="global-ev-cell">
+                    <span class="badge badge-${{tone}}">${{reasonLabel}}</span>${{diagLink}}
+                    <div class="global-ev-meta">${{t('ev_pool')}}: ${{poolText}} · ${{t('ev_retrieved')}}: ${{retText}} · ${{t('ev_batches')}}: ${{batchText}} · ${{t('ev_eligible')}}: ${{eligText}} · ${{t('ev_support')}}: ${{supportText}}</div>
+                    <div class="global-ev-meta">${{t('ev_tail')}}: ${{tailText}} · ${{t('ev_junction')}}: ${{juncText}}</div>
+                </div>
+            `;
+        }}
+
         // Populate extension table
         function populateExtensionTable() {{
             const tbody = document.getElementById('extension-tbody');
             tbody.innerHTML = '';
             
             if (extensionResults.length === 0) {{
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No extension data available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No extension data available</td></tr>';
                 return;
             }}
             
@@ -2376,13 +2211,14 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
                 const connectionTypeLabel = getConnectionTypeLabel(row.connection_type);
                 const reportFileName = `${{row.chr_end}}.report.html`;
                 tr.innerHTML = `
-                    <td>${{row.chr_end}}</td>
+                    <td>${{escapeHtml(row.chr_end)}}</td>
                     <td><span class="badge badge-${{row.extended ? 'yes' : 'no'}}">${{extendedLabel}}</span></td>
-                    <td><span class="badge badge-${{connTypeBadge}}">${{connectionTypeLabel}}</span></td>
-                    <td>${{row.round_num}}</td>
+                    <td><span class="badge badge-${{connTypeBadge}}">${{escapeHtml(connectionTypeLabel)}}</span></td>
+                    <td>${{escapeHtml(row.round_num)}}</td>
                     <td>${{row.extension_length > 0 ? row.extension_length.toLocaleString() + ' bp' : '-'}}</td>
-                    <td style="font-size: 0.85em; color: #6c757d;">${{row.connected_read}}</td>
-                    <td><a href="${{reportFileName}}" target="_blank" rel="noopener" title="View detailed report for ${{row.chr_end}}">View</a></td>
+                    <td style="font-size: 0.85em; color: #6c757d;">${{escapeHtml(row.connected_read)}}</td>
+                    <td>${{renderTargetEvidenceCell(row.target_evidence_summary)}}</td>
+                    <td><a href="${{escapeHtml(reportFileName)}}" target="_blank" rel="noopener" title="View detailed report for ${{escapeHtml(row.chr_end)}}">View</a></td>
                 `;
                 tbody.appendChild(tr);
             }});
@@ -2418,7 +2254,7 @@ def generate_all_task_reports(out_dir: Path) -> Tuple[int, int]:
         print(f"  ⚠ Job directory not found: {job_dir}")
         return 0, 0
     
-    task_dirs = [d for d in job_dir.iterdir() if d.is_dir()]
+    task_dirs = [d for d in job_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
     if not task_dirs:
         print(f"  ⚠ No task directories found in {job_dir}")
         return 0, 0

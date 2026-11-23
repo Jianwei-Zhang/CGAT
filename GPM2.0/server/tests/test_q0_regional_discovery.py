@@ -178,7 +178,8 @@ class RegionalDiscoveryTests(unittest.TestCase):
                'q0_query_windows','q0_cigar_policy','q0_regional_mapping','q0_mapper_guard','q0_regional_discovery','q0_neighbor_requests','q0_regional_candidates','q0_regional_execution','q0_frontier_scope']
         (package/'lgz_core/__init__.py').write_text('')
         for name in names:shutil.copyfile(tools/f'{name}.py',package/f'lgz_core/{name}.py')
-        shutil.copyfile(tools.parent/'run_orchestration.py',package/'run_orchestration.py')
+        for name in ('run_orchestration.py', 'workspace_layout.py'):
+            shutil.copyfile(tools.parent/name, package/name)
         code="import sys;sys.path.insert(0,sys.argv[1]);from lgz_core import q0_preparation as p;assert callable(p.OuterCheckpointManager);assert 'run_outer_checkpoints' not in sys.modules"
         subprocess.run([sys.executable,'-I','-c',code,str(package)],check=True,capture_output=True,text=True)
 

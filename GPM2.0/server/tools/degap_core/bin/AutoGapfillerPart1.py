@@ -12,6 +12,9 @@ from pathlib import Path
 from Bio import SeqIO
 import json
 
+from ExtensionFamilies import atomic_json, read_json
+from PreparedReads import contract as reads_contract, prepare as prepare_reads
+
 
 class ReadsPreprocessor:
     """Reads预处理器"""
@@ -61,19 +64,19 @@ class ReadsPreprocessor:
         if not hifi_reads and not ont_reads:
             raise ValueError("At least one of hifi_reads or ont_reads must be provided")
 
-        # 检查是否已存在 preprocessing_config.json
         config_file = self.output_dir / "preprocessing_config.json"
-        if config_file.exists() and config_file.stat().st_size > 0:
-            print(f"\n{'='*60}")
-            print(f"Reads Preprocessing - SKIPPED")
-            print(f"{'='*60}\n")
-            print(f"✅ Found existing preprocessing config: {config_file}")
-            print(f"   Skipping reads preprocessing...")
-
-            # 读取并返回已有配置
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-
+        pending = self.output_dir / "preprocessing-inputs.json"
+        input_contract = {"reads": reads_contract(hifi_reads, ont_reads),
+                          "depth_hifi": self.filterDepthHifi, "depth_ont": self.filterDepthOnt}
+        config = read_json(config_file) if config_file.exists() else None
+        if ((config is not None and config.get("input_contract") != input_contract) or
+                (pending.exists() and read_json(pending) != input_contract)):
+            raise ValueError("AutoGapfiller preprocessing inputs or depth options changed; use a new output directory")
+        prepared = prepare_reads(self.processed_dir, input_contract["reads"])
+        if not pending.exists():
+            atomic_json(pending, input_contract)
+        if config is not None:
+            print(f"Using verified preprocessing: {config_file}")
             return {
                 'data_type': config.get('data_type'),
                 'hifi_fasta': config.get('hifi_fasta'),
@@ -97,15 +100,8 @@ class ReadsPreprocessor:
         print(f"Reads Preprocessing - Data Type: {self.data_type.upper()}")
         print(f"{'='*60}\n")
 
-        # 处理 HiFi reads
-        if hifi_reads:
-            print("[1/5] Processing HiFi reads...")
-            self.hifi_fasta = self._convert_to_fasta(hifi_reads, 'HiFi')
-
-        # 处理 ONT reads
-        if ont_reads:
-            print("\n[2/5] Processing ONT reads...")
-            self.ont_fasta = self._convert_to_fasta(ont_reads, 'ONT')
+        self.hifi_fasta = prepared.get("hifi")
+        self.ont_fasta = prepared.get("ont")
 
         # 深度过滤（可选，与 DEGAP.py 一致）
         print("\n[3/5] Depth filtering...")
@@ -133,7 +129,7 @@ class ReadsPreprocessor:
 
         # 保存配置
         print("\nSaving preprocessing configuration...")
-        self._save_config()
+        self._save_config(input_contract)
 
         # 返回结果
         result = {
@@ -152,79 +148,6 @@ class ReadsPreprocessor:
         print(f"{'='*60}\n")
 
         return result
-    
-    def _convert_to_fasta(self, input_file, label):
-        """
-        将单个或多个输入 reads 文件统一转换/合并为 FASTA。
-        使用 seqkit fq2fa 统一处理 FASTA/FASTQ（含 .gz），始终输出 FASTA。
-
-        Args:
-            input_file: 输入文件路径或路径列表
-            label: 标签 ('HiFi' 或 'ONT')
-
-        Returns:
-            Path: FASTA文件路径（在processed_reads目录下）
-        """
-        # 统一输出文件名：hifi_reads.fa 或 ont_reads.fa（小写，.fa 扩展名）
-        output_fa = self.processed_dir / f"{label.lower()}_reads.fa"
-
-        # 规范输入为列表
-        if isinstance(input_file, (list, tuple)):
-            input_files = [str(p) for p in input_file if p]
-        else:
-            input_files = [str(input_file)] if input_file else []
-
-        if not input_files:
-            print(f"  ✗ Error: No {label} input files provided")
-            sys.exit(1)
-
-        resolved_inputs = []
-        for f in input_files:
-            p = Path(f).resolve()
-            if not p.exists():
-                print(f"  ✗ Error: {label} input file not found: {p}")
-                sys.exit(1)
-
-            lower = p.name.lower()
-            supported = lower.endswith(('.fa', '.fasta', '.fna', '.fq', '.fastq',
-                                        '.fa.gz', '.fasta.gz', '.fna.gz', '.fq.gz', '.fastq.gz'))
-            if not supported:
-                print(f"  ✗ Error: Unsupported file format: {p}")
-                sys.exit(1)
-            resolved_inputs.append(p)
-
-        # 检查 FASTA 输出文件是否已存在
-        if output_fa.exists():
-            if output_fa.is_symlink() or output_fa.stat().st_size > 0:
-                print(f"  ✓ Using existing FASTA file: {output_fa}")
-                return output_fa
-            print(f"  ⚠ Removing empty file: {output_fa}")
-            output_fa.unlink()
-
-        # 转换/合并到单一FASTA
-        if len(resolved_inputs) == 1:
-            print(f"  Converting {label} reads to FASTA")
-            print(f"    Input:  {resolved_inputs[0]}")
-        else:
-            print(f"  Merging and converting {len(resolved_inputs)} {label} files to FASTA")
-            for idx, p in enumerate(resolved_inputs, 1):
-                print(f"    [{idx}] {p}")
-        print(f"    Output: {output_fa}")
-
-        try:
-            # seqkit fq2fa handles FASTA/FASTQ and .gz, always outputs FASTA
-            cmd = ['seqkit', 'fq2fa', '-o', str(output_fa)] + [str(p) for p in resolved_inputs]
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-            print(f"  ✓ FASTA ready: {output_fa}")
-            return output_fa
-        except subprocess.CalledProcessError as e:
-            print(f"  ✗ Error converting {label} reads to FASTA:")
-            print(f"    {e.stderr}")
-            sys.exit(1)
-        except FileNotFoundError:
-            print(f"  ✗ Error: seqkit not found. Please install seqkit:")
-            print(f"    conda install -c bioconda seqkit")
-            sys.exit(1)
     
     def _build_index(self, fasta_file, label):
         """
@@ -541,9 +464,10 @@ class ReadsPreprocessor:
             # 不退出，分割失败不应该阻止整个流程
             print(f"  ⚠ Warning: Continuing without split files")
 
-    def _save_config(self):
+    def _save_config(self, input_contract):
         """保存预处理配置到JSON文件（使用绝对路径）"""
         config = {
+            "input_contract": input_contract,
             'data_type': self.data_type,
             'hifi_fasta': str(self.hifi_fasta.resolve()) if self.hifi_fasta else None,
             'ont_fasta': str(self.ont_fasta.resolve()) if self.ont_fasta else None,
@@ -557,8 +481,7 @@ class ReadsPreprocessor:
         }
 
         config_file = self.output_dir / 'preprocessing_config.json'
-        with open(config_file, 'w') as f:
-            json.dump(config, f, indent=2)
+        atomic_json(config_file, config)
 
         print(f"  ✓ Configuration saved: {config_file}")
 

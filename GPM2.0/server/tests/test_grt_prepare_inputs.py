@@ -357,6 +357,13 @@ class GrtPrepareInputsTests(unittest.TestCase):
             server = complete_workspace(fixture, Path(temporary_dir))
             completed = self.run_tool(server)
             self.assertEqual(completed.returncode, 0, completed.stderr)
+            lines = [line for line in completed.stdout.splitlines() if line.startswith("LGZ prepare phase: ")]
+            self.assertEqual([line.split(" ·")[0] for line in lines], [
+                "LGZ prepare phase: loading Q0 alignment evidence", "LGZ prepare phase: placing candidate segments",
+                "LGZ prepare phase: building chromosome paths", "LGZ prepare phase: chromosome path 1/1: chr1",
+                "LGZ prepare phase: reconstructing Q0 sequences and recording decisions",
+                "LGZ prepare phase: writing Q0 and freezing ordinary and telomere donors",
+            ])
             from server.tools.lgz_core.common import read_fasta
             self.assertEqual(dict(read_fasta(server / "grt/q/q0.fa")), {"chr1": truth})
             frozen = validate_prepared_q0(server)
@@ -368,6 +375,10 @@ class GrtPrepareInputsTests(unittest.TestCase):
             repeated = self.run_tool(server)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertIn("are current", repeated.stdout)
+            self.assertNotIn("placing candidate segments", repeated.stdout)
+            for unit_id in ("grt_prepare", "lgz_prepare"):
+                valid, reason = OuterCheckpointManager(server).validate_lgz_unit(unit_id)
+                self.assertTrue(valid, reason)
             self.assertEqual(sha256(server / "grt/q/q0.fa"), before)
 
     def test_q0_uses_interval_alignment_orientation_not_whole_assignment(self):

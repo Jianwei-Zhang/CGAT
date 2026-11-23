@@ -9,6 +9,11 @@ No compiler/download, scheduler policy, user data skip or minimap2 modification.
 """
 from __future__ import annotations
 
+try:
+    from workspace_binding import workspace_path
+except ModuleNotFoundError:
+    from .workspace_binding import workspace_path
+
 import argparse
 from contextlib import contextmanager
 import fcntl
@@ -41,6 +46,7 @@ import ordinary_tool_transition as ott
 
 MANIFEST = "branch-runtime.json"
 RUNTIME_FILES = (
+    "workspace_binding.py",
     "approximate_reference_cells.py","adaptive_screening.py","metadata_json.py","ordinary_tool_transition.py",
     "adaptive_ordinary_controller.py","adaptive_ordinary_units.py","automatic_ordinary_pilot.py",
     "proactive_reference_plan.py","proactive_reference_alignment.py","proactive_publication.py","proactive_resume.py",
@@ -293,8 +299,8 @@ def write_alignment_policy(path, receipt, output):
 
 def run_reference(args,*,runtime_root=None):
     workspace,run_dir = args.server_dir.resolve(),args.run_dir.resolve()
-    if (not (workspace/".prepare_lib").is_dir() or not (workspace/"metadata").is_dir()
-            or run_dir.parent!=workspace/"runs" or not run_dir.is_dir() or not run_dir.name.endswith("_vs_ref")
+    if (not (workspace_path(workspace, ".prepare_lib")).is_dir() or not (workspace_path(workspace, "metadata")).is_dir()
+            or run_dir.parent!=workspace_path(workspace, "runs") or not run_dir.is_dir() or not run_dir.name.endswith("_vs_ref")
             or args.result!="result.paf" or args.preset!="asm10" or args.threads<1):
         raise wa.ExperimentError("branch adapter supports only a prepared initial-reference asm10 run")
     runtime_root = Path(runtime_root).resolve() if runtime_root is not None else Path(__file__).resolve().parent

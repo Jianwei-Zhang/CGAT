@@ -5,6 +5,7 @@ import sys
 import re
 import getopt
 import subprocess
+from FamilyTools import shell_command, rg_extract_script, mapped_bam
 import pysam
 import time
 from pysam import AlignmentFile
@@ -19,6 +20,7 @@ class FindExtensionReads(object):
 		import traceback
 
 		self.roundInput=roundInput
+		self.strict_tools = getattr(roundInput.elongation.base, "family_mode", False)
 		self.lastRoundUsedReads=lastRoundUsedReads
 		self.usedReads=usedReads
 		self.note=''
@@ -57,6 +59,8 @@ class FindExtensionReads(object):
 				os.makedirs(self.roundInput.elongation.roundDir)
 				print(f"Created output directory: {self.roundInput.elongation.roundDir}")
 			except Exception as e:
+				if getattr(self, "strict_tools", False):
+					raise
 				print(f"Failed to create output directory: {e}")
 
 		if os.path.exists(self.extensionReads)==True and os.path.getsize(self.extensionReads)!=0:
@@ -114,6 +118,8 @@ class FindExtensionReads(object):
 					self.minimumThresholdExtensionReads = None
 					self.minimumThresholdExtensionReadsID = []
 			except Exception as e:
+				if getattr(self, "strict_tools", False):
+					raise
 				import traceback
 				print(f"Error during initialization: {e}")
 				traceback.print_exc()
@@ -178,6 +184,8 @@ class FindExtensionReads(object):
 						print(f"Info: No extension reads found even after binary search relaxation. This is normal for some gaps.")
 					
 				except Exception as e:
+					if getattr(self, "strict_tools", False):
+						raise
 					import traceback
 					print(f"Error in binary search extension reads: {e}")
 					traceback.print_exc()
@@ -310,9 +318,15 @@ class FindExtensionReads(object):
 
 			# 始终使用单进程 minimap2（benchmark 证明单进程性能更好）
 			# Use os.system() like v1 - no timeout limit
+			if self.strict_tools and hasattr(self.roundInput.elongation.base, "family_mapping_dir"):
+				os.makedirs(self.roundInput.elongation.base.family_mapping_dir, exist_ok=True)
+				ont_potential_aln = os.path.join(self.roundInput.elongation.base.family_mapping_dir, "ont.potential.bam")
 			minimap_cmd = f"minimap2 -t {self.roundInput.elongation.base.thread} -Y -ax map-ont {ont_input_sequence} {ont_reads_to_use} | samtools view -bS > {ont_potential_aln}"
 			print(f"Executing ONT minimap2 (single-process): {minimap_cmd}")
-			result = os.system(minimap_cmd)
+			if self.strict_tools:
+				result = mapped_bam(minimap_cmd, ont_potential_aln, [ont_input_sequence, ont_reads_to_use])
+			else:
+				result = shell_command(minimap_cmd, False)
 
 			# Check return code and retry if failed (matches v1 behavior)
 			if result != 0:
@@ -320,7 +334,7 @@ class FindExtensionReads(object):
 				while result != 0:
 					print(f"ONT minimap2 command execution failed, return code: {result}")
 					print(f"Retry {minimaptag} of ONT minimap2 command...")
-					result = os.system(minimap_cmd)
+					result = shell_command(minimap_cmd, self.strict_tools)
 					minimaptag += 1
 					if minimaptag >= 3:
 						print("ONT minimap2 cannot do proper alignment!!!")
@@ -380,12 +394,16 @@ class FindExtensionReads(object):
 					self.ont_extensionReadsNum = 0
 					
 			except Exception as e:
+				if getattr(self, "strict_tools", False):
+					raise
 				print(f"Error in ONT binary search: {e}")
 				import traceback
 				traceback.print_exc()
 				self.ont_extensionReadsNum = 0
 
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"Error processing ONT extension reads: {e}")
 			import traceback
 			traceback.print_exc()
@@ -497,6 +515,8 @@ class FindExtensionReads(object):
 			return len(ext_reads) if ext_reads else 0
 			
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"[_test_params_quick] Error: {e}")
 			return 0
 		finally:
@@ -691,6 +711,8 @@ class FindExtensionReads(object):
 			)
 			print(f"Found {len(self.minimumThresholdExtensionReadsID)} minimum threshold extension reads")
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"Error finding minimum threshold extension reads: {str(e)}")
 			traceback.print_exc()
 			self.minimumThresholdExtensionReadsID = []
@@ -752,6 +774,8 @@ class FindExtensionReads(object):
 					print(f"[extensionFinder] Successfully loaded readsDict from FASTA file")
 				print(f"[extensionFinder] ReadsDict type: {type(readsDict).__name__}, contains {len(readsDict)} entries")
 			except Exception as e:
+				if getattr(self, "strict_tools", False):
+					raise
 				print(f"[extensionFinder] Error loading readsDict: {str(e)}")
 				import traceback
 				traceback.print_exc()
@@ -803,6 +827,8 @@ class FindExtensionReads(object):
 			try:
 				query = readsDict[original_queryID]
 			except KeyError:
+				if getattr(self, "strict_tools", False):
+					raise
 				filter_stats['keyError'] += 1
 				if total_reads <= 10:  # Only print first 10 errors
 					print(f"[extensionFinder] Warning: Cannot find ID {original_queryID} in {file_prefix} readsDict")
@@ -1466,7 +1492,10 @@ class FindExtensionReads(object):
 			f.write("\n")
 			# 使用 rg 搜索并统计频次（参照 test_rg_01.sh 的逻辑）
 			f.write("# 使用 rg 搜索所有序列并统计频次\n")
-			f.write("rg -o -F -I -f \"$QUERY_FILE\" \"$PART_FILE\" 2>/dev/null | sort | uniq -c | awk '{print $2, $1}' > \"$COUNT_FILE\" || touch \"$COUNT_FILE\"\n")
+			if self.strict_tools:
+				f.write('rg -o -F -I -f "$QUERY_FILE" "$PART_FILE" > "$COUNT_FILE.raw" || { code=$?; [ "$code" -eq 1 ] || exit "$code"; }\nset -o pipefail\nsort "$COUNT_FILE.raw" | uniq -c | awk \'{print $2, $1}\' > "$COUNT_FILE"\n')
+			else:
+				f.write("rg -o -F -I -f \"$QUERY_FILE\" \"$PART_FILE\" 2>/dev/null | sort | uniq -c | awk '{print $2, $1}' > \"$COUNT_FILE\" || touch \"$COUNT_FILE\"\n")
 
 		os.chmod(script_path, 0o755)
 
@@ -1483,6 +1512,8 @@ class FindExtensionReads(object):
 		try:
 			subprocess.run(parallel_cmd, shell=True, check=True)
 		except subprocess.CalledProcessError as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"Warning: rg counting parallel execution failed: {e}")
 			return {}
 
@@ -1504,6 +1535,8 @@ class FindExtensionReads(object):
 							count = int(parts[1])
 							seq_counts[seq] += count
 			except Exception as e:
+				if getattr(self, "strict_tools", False):
+					raise
 				print(f"Warning: error reading count file {cfile}: {e}")
 
 		# 6. 为每个原始 kmer 合并频数（kmer + rc）
@@ -1586,10 +1619,16 @@ class FindExtensionReads(object):
 			f.write("RG_OUT=\"$OUTPUT_DIR/${BASENAME}.rough.fa\"\n")
 			f.write("TOP1_OUT=\"$OUTPUT_DIR/${BASENAME}.top1.fa\"\n")
 			f.write("TEMP_OUT=\"$OUTPUT_DIR/${BASENAME}.temp.fa\"\n")
-			f.write("rg -f \"$KMER_FILE\" -F -B 1 -N -I \"$PART_FILE\" | grep -v '^--$' > \"$TEMP_OUT\" || true\n")
+			if self.strict_tools:
+				f.write(rg_extract_script("$TEMP_OUT"))
+			else:
+				f.write("rg -f \"$KMER_FILE\" -F -B 1 -N -I \"$PART_FILE\" | grep -v '^--$' > \"$TEMP_OUT\" || true\n")
 			f.write("if [ -s \"$TEMP_OUT\" ]; then\n")
 			f.write("    cp \"$TEMP_OUT\" \"$RG_OUT\"\n")
-			f.write("    seqkit sort -l -r \"$TEMP_OUT\" | head -n 2 > \"$TOP1_OUT\"\n")
+			if self.strict_tools:
+				f.write('    set -o pipefail\n    seqkit sort -l -r "$TEMP_OUT" | awk \'NR <= 2\' > "$TOP1_OUT"\n')
+			else:
+				f.write("    seqkit sort -l -r \"$TEMP_OUT\" | head -n 2 > \"$TOP1_OUT\"\n")
 			f.write("    rm \"$TEMP_OUT\"\n")
 			f.write("else\n")
 			f.write("    touch \"$RG_OUT\"\n")
@@ -1607,6 +1646,8 @@ class FindExtensionReads(object):
 		try:
 			subprocess.run(parallel_cmd, shell=True, check=True)
 		except subprocess.CalledProcessError as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"[{platform.upper()}] Warning: 第一阶段提取出错: {e}")
 			return None, 0, 0, 0, 0
 		
@@ -1663,7 +1704,10 @@ class FindExtensionReads(object):
 			f.write("BASENAME=$(basename \"$PART_FILE\")\n")
 			f.write("FINAL_OUT=\"$OUTPUT_DIR/${BASENAME}.final.fa\"\n")
 			f.write("if [ ! -s \"$PART_FILE\" ]; then touch \"$FINAL_OUT\"; exit 0; fi\n")
-			f.write("rg -f \"$KMER_FILE\" -F -B 1 -N -I \"$PART_FILE\" | grep -v '^--$' > \"$FINAL_OUT\" || true\n")
+			if self.strict_tools:
+				f.write(rg_extract_script("$FINAL_OUT"))
+			else:
+				f.write("rg -f \"$KMER_FILE\" -F -B 1 -N -I \"$PART_FILE\" | grep -v '^--$' > \"$FINAL_OUT\" || true\n")
 		os.chmod(stage2_script, 0o755)
 		
 		stage1_list_file = os.path.join(output_dir, f"{platform}_stage1_files.txt")
@@ -1675,6 +1719,8 @@ class FindExtensionReads(object):
 		try:
 			subprocess.run(parallel_cmd_2, shell=True, check=True)
 		except subprocess.CalledProcessError as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"[{platform.upper()}] Warning: 第二阶段筛选出错: {e}")
 		
 		# Step 5: 归并结果（简化：直接合并该平台的所有结果）
@@ -1871,6 +1917,8 @@ class FindExtensionReads(object):
 		print(f"找到ONT分片: {len(ont_parts)}个")
 		
 		if not hifi_parts and not ont_parts:
+			if self.strict_tools:
+				raise FileNotFoundError("K-mer filtering requires prepared reads parts")
 			print("Error: 未找到任何reads分片文件")
 			return None, None, {}
 		
@@ -1980,6 +2028,8 @@ class FindExtensionReads(object):
 			return selected_output
 			
 		except Exception as e:
+			if getattr(self, "strict_tools", False):
+				raise
 			print(f"kmer过滤过程中发生错误: {e}")
 			import traceback
 			traceback.print_exc()
@@ -2002,9 +2052,12 @@ class FindExtensionReads(object):
 
 		alnname=self.roundInput.elongation.roundDir+f"/{file_prefix}.potentialExtensionReads."+self.roundInput.elongation.base.tag+".bam"
 		alnname1=self.roundInput.elongation.roundDir+"/extensionReads."+self.roundInput.elongation.base.tag+".fa"
+		if self.strict_tools and hasattr(self.roundInput.elongation.base, "family_mapping_dir"):
+			os.makedirs(self.roundInput.elongation.base.family_mapping_dir, exist_ok=True)
+			alnname = os.path.join(self.roundInput.elongation.base.family_mapping_dir, f"{file_prefix}.potential.bam")
 
 		# If target file already exists, delete it first to avoid appending
-		if os.path.exists(alnname):
+		if os.path.exists(alnname) and not self.strict_tools:
 			try:
 				os.remove(alnname)
 			except Exception as e:
@@ -2276,6 +2329,10 @@ class FindExtensionReads(object):
 
 		commandline = f"minimap2 -t {self.roundInput.elongation.base.thread} -Y -ax {preset} {input_seq_abs} {reads_to_use} | samtools view -bS >{alnname}"
 
+		if self.strict_tools:
+			output = mapped_bam(commandline, alnname, [input_seq_abs, reads_to_use])
+			return alnname, commandline, str(output)
+
 		# If file already exists and is valid, return directly
 		if os.path.exists(alnname)==True and os.path.getsize(alnname)!=0 and os.path.exists(alnname1)==True and os.path.getsize(alnname1)!=0:
 			return alnname,commandline,str(0)
@@ -2284,7 +2341,7 @@ class FindExtensionReads(object):
 			print(f"Executing command: {commandline}")
 			start_time = time.time()
 
-			output = os.system(commandline)
+			output = shell_command(commandline, self.strict_tools)
 			minimaptag = 1
 
 			# Retry up to 3 times if failed (matches v1 behavior)
@@ -2292,7 +2349,7 @@ class FindExtensionReads(object):
 				while output != 0:
 					print(f"minimap2 command execution failed, return code: {output}")
 					print(f"Retry {minimaptag} of minimap2 command...")
-					output = os.system(commandline)
+					output = shell_command(commandline, self.strict_tools)
 					minimaptag += 1
 					if minimaptag >= 3:
 						print("minimap2 cannot do proper alignment!!!")

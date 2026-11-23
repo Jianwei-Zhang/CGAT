@@ -265,6 +265,15 @@ class GapFiller(object):
 		else:
 			raise ValueError(f"Unsupported kparameters length: {len(kparameters)}. Expected 2 or 3 parameters.")
 
+		if self.mode == "gapfiller":
+			from FamilyGap import run_gap
+			self.name = os.path.basename(os.path.abspath(self.out))
+			self.log = os.path.join(self.out, "process.log")
+			self.summary = os.path.join(self.out, "process.summary")
+			self.agp = os.path.join(self.out, "process.agp")
+			self.Elongation = run_gap(self)
+			return
+
 		self.resume_round = None  # Default: do not resume from checkpoint
 		
 		out=self.out

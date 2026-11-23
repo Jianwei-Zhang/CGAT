@@ -1,304 +1,99 @@
 ![DEGAP](./DEGAP.png)
 
-## Dynamic Elongation of a Genome Assembly Path
+# DEGAP 2.0 — Dynamic Elongation of a Genome Assembly Path
 
-**DEGAP degaps gaps!**
+**English** | [中文](README_zh.md)
 
-**DEGAP2.0** is an enhanced gap-filling and sequence-extension toolkit that resolves assembly gaps and extends chromosome ends using high-fidelity (HiFi) and/or Oxford Nanopore (ONT) long reads.
+**DEGAP 2.0** resolves genome assembly gaps, links contigs, and extends chromosome ends using HiFi and/or Oxford Nanopore (ONT) long reads.
 
-## System Requirements
+## What's New in DEGAP 2.0
 
-**DEGAP2.0** runs on Linux with Python 3.10. Required Python packages and external tools are declared in `environment.yml`, with selected versions pinned:
+Relative to DEGAP 1.0 ([historical v1 guide](v1/README.md)), DEGAP 2.0 adds four core upgrades:
 
-**Python Packages:**
-- Python (3.10)
-- Biopython
-- Pysam
-- NumPy
-- Matplotlib
-- SciPy
+1. **Faster candidate-read selection** — DEGAP 1.0 already offered post-alignment mapped-depth filtering; DEGAP 2.0 adds k-mer filtering (enabled by default for GapFiller) to narrow candidate reads *before* alignment, which can reduce mapping work on large datasets.
+2. **Bidirectional gap extension** — Replaces single-sided gap filling with sequential alternating left/right extension: each new version is checked against all opposite historical versions (including initial flanks), and a normally stopped side stays frozen as a target while the other continues.
+3. **TelSeeker chromosome-end extension** — Adds single-ended extension of targeted chromosome ends toward telomeric reads (`telseeker`) plus a contig-end variant (`telseeker_ctg`), supplementing internal-gap filling and contig linking.
+4. **Clearer job reports** — Produces self-contained offline interactive HTML reports (not real-time dashboards) explaining outcomes, extension history, selected connections, evidence, and stop reasons; open the generated `.html` file in a local browser (see the [report guide](HOWTO.md#reading-the-html-reports); `TelSeeker Ctg` uses `result/status.tsv` instead of HTML).
 
-**External Tools:**
-- Minimap2 (2.28)
-- Hifiasm (0.25.0)
-- SAMtools (1.22.1)
-- Seqkit (2.8.0)
-- MUMmer4
-- GNU Parallel
-- Ripgrep (15.1.0)
+## Installation
 
-### Recommended environment setup (Micromamba)
+DEGAP 2.0 targets Linux. The supplied environment pins Python 3.10; packages and external tools are declared in [environment.yml](environment.yml):
 
-We recommend using [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) to create an isolated environment with all required Python packages and external tools. Micromamba is a lightweight, standalone package manager that is faster than conda.
+- **Python packages**: Python 3.10, Biopython, Pysam, NumPy, Matplotlib, SciPy
+- **External tools**: Minimap2 (2.28), Hifiasm (0.25.0), SAMtools (1.22.1), Seqkit (2.8.0), MUMmer4, GNU Parallel, Ripgrep (15.1.0)
 
-1. Install Micromamba following the [official installation guide](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html):
+Recommended setup with [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html):
 
-   ```bash
-   "${SHELL}" <(curl -L micro.mamba.pm/install.sh)
-   ```
+```bash
+micromamba env create -f environment.yml
+micromamba activate degap_env
+```
 
-   **Tip for Micromamba users:** To use `mamba` command instead of `micromamba`, add this line to the end of your `~/.bashrc`:
-   ```bash
-   alias mamba='micromamba'
-   ```
-   Then run `source ~/.bashrc` to apply.
+To update an existing environment after `environment.yml` changes:
 
-2. Clone this repository and change into its directory.
-3. Create the environment using Micromamba with the provided `environment.yml` file:
+```bash
+micromamba env update -f environment.yml --prune
+```
 
-   ```bash
-   micromamba env create -f environment.yml
-   ```
+For manual setup without Micromamba, see [HOWTO.md — Installation](HOWTO.md#installation).
 
-4. Activate the environment:
+## Choosing a Mode
 
-   ```bash
-   micromamba activate degap_env
-   ```
-
-5. If `environment.yml` is updated in the future, you can update the environment with:
-
-   ```bash
-   micromamba env update -f environment.yml --prune
-   ```
-
-The `environment.yml` file declares Python, core Python packages (Biopython, Pysam, NumPy, Matplotlib, SciPy), and required external tools (Minimap2, Hifiasm, SAMtools, Seqkit, MUMmer4, GNU Parallel, Ripgrep). It pins Python and selected tool versions; unpinned dependencies are resolved when the **DEGAP2.0** environment is created or updated.
-
-## Tutorial
-
-**DEGAP2.0** provides 5 execution modes to fill gaps, link contigs, and extend telomeres:
-
-| Mode | Command Entry | Use Case | Key Inputs |
+| Mode | Command Entry | Purpose | Key Inputs |
 | --- | --- | --- | --- |
-| **GapFiller** | `bin/DEGAP.py --mode gapfiller` | Fill a specific gap between known left and right flanking sequences | `--seqleft`, `--seqright`, `--hifi`/`--ont`, `--flag left\|right` |
-| **CtgLinker** | `bin/DEGAP.py --mode ctglinker` | Link contigs and close gaps by elongating contig edges | `--ctgseq`, `--hifi`/`--ont` |
-| **TelSeeker** | `bin/DEGAP.py --mode telseeker` | Extend specified chromosome ends (`Chr.L` / `Chr.R`) toward telomeres | `--genome`, `--motif`, `-e`, `--hifi`/`--ont` |
-| **TelSeeker Ctg** | `bin/DEGAP.py --mode telseeker_ctg` | Extend individual single-record contig endpoints (`L` or `R`) with shared read caching | `--ctg <fasta> <L\|R>`, `--motif`, `--hifi`/`--ont` |
-| **AutoGapfiller** | `bin/AutoGapfiller.py` | Automatically detect all genome gaps and run parallel gap-filling jobs | `--genome`, `--hifi`/`--ont`, `--work` (optional `--setup_only`) |
+| **GapFiller** | `python bin/DEGAP.py --mode gapfiller` | Fill one gap between known left and right flanks using bidirectional extension families | `--seqleft`, `--seqright`, `--hifi`/`--ont`, `-o/--out` |
+| **CtgLinker** | `python bin/DEGAP.py --mode ctglinker` | Link contigs and close gaps from contig edges using primary plus forward/reverse candidate families | `--ctgseq`, `--hifi`/`--ont`, `-o/--out` |
+| **TelSeeker** | `python bin/DEGAP.py --mode telseeker` | Single-ended extension of specified chromosome ends (`<chr>.L` / `<chr>.R`) toward telomeric reads | `--genome`, `-m/--motif`, `-e/--target_ends`, `--hifi`/`--ont`, `-o/--out` |
+| **TelSeeker Ctg** | `python bin/DEGAP.py --mode telseeker_ctg` | Single-ended extension of one or more single-record contig endpoints (`L` or `R`) with shared read/telomere caching | `--ctg <fasta> <L\|R>`, `-m/--motif`, `--hifi`/`--ont`, `-o/--out` |
+| **AutoGapfiller** | `python bin/AutoGapfiller.py` | Detect genome N gaps and run one bidirectional gap-filling job per gap | `--genome`, `--hifi`/`--ont`, `-o/--output` (optional `--setup_only`) |
 
-### Input Data Requirements
-
-**Supported Read Files:**
-- `--hifi`: HiFi reads file(s), supports one or more files (formats: `.fa`, `.fq`, `.fa.gz`, `.fq.gz`, `.fasta`, `.fastq`)
-- `--ont`: ONT reads file(s), supports one or more files (formats: `.fa`, `.fq`, `.fa.gz`, `.fq.gz`, `.fasta`, `.fastq`)
-
-**Note:** At least one of `--hifi` or `--ont` must be provided.
-You can provide multiple files directly, for example:
-`--hifi HIFI1.fq.gz HIFI2.fq.gz HIFI3.fq.gz`
-
-### K-mer Filtering Option
-
-The `--kmer_filter` parameter is a switch to enable k-mer based read filtering:
-
-- **When to enable** (add `--kmer_filter`):
-  - Processing large-scale datasets (reads.fa >20GB)
-  - Significantly reduces memory usage and processing time
-- **When to disable** (omit `--kmer_filter`):
-  - For highest accuracy requirements
-  - Small to medium datasets (reads.fa <20GB)
-  - When computational resources are sufficient
-
-**Note:** K-mer filtering provides a good balance between speed and accuracy for most applications.
-
-For all modes, we recommend adding `--MaximumExtensionRound 25`. In our tests,
-successful extension jobs usually finished within 25 rounds, so this parameter
-helps avoid long-running jobs that are unlikely to converge.
-
-### GapFiller Mode
-Designed for filling a specific gap when the exact left and right sequences are known.
-
-```bash
-python bin/DEGAP.py --mode gapfiller \
-    --seqleft ./path/gapLeftSequence.fasta \
-    --seqright ./path/gapRightSequence.fasta \
-    --hifi ./path/HiFiReads.fa \
-    --ont ./path/ONTReads.fa \
-    --out ./path/Output \
-    --flag left \
-    --MaximumExtensionRound 25 \
-    --kmer_filter \
-    -t 20
-```
-
-### CtgLinker Mode
-Designed for assemblies with gaps. Links contigs and fills gaps by elongating edges.
-
-```bash
-python bin/DEGAP.py --mode ctglinker \
-    --ctgseq ./path/contigs.fasta \
-    --hifi ./path/HiFiReads.fa \
-    --ont ./path/ONTReads.fa \
-    --out ./path/Output \
-    --MaximumExtensionRound 25 \
-    --kmer_filter \
-    -t 20
-```
-
-### TelSeeker Mode
-Designed for telomere extension and chromosome-level assembly.
-
-```bash
-python bin/DEGAP.py --mode telseeker \
-    --genome ./path/genome.fasta \
-    --motif TTAGGG \
-    -e Chr01.L Chr01.R \
-    --hifi ./path/HiFiReads.fa \
-    --ont ./path/ONTReads.fa \
-    --out ./path/Output \
-    --work 4 \
-    --tel-n 100 \
-    --tel-r 0.6 \
-    --tel-mm 0 \
-    --MaximumExtensionRound 25 \
-    --kmer_filter \
-    -t 20
-```
-
-`-e/--target_ends` is required and supports two input forms:
-direct chromosome-end values, for example `-e Chr01.L Chr01.R`, or one text file
-containing one target end per line, for example `-e target_ends.txt`. Telomere
-quality checking is run separately with `bin/TelSeekerCheck.py` when needed.
-
-To discover target ends first:
-
-```bash
-python bin/TelSeekerCheck.py \
-    --genome ./path/genome.fasta \
-    --motif TTAGGG \
-    --out ./path/telomere_check
-```
-
-Review the generated plots and end sequences, then create `target_ends.txt`
-manually. The file must contain one target end per line, using
-`<chromosome_id>.L` for the left end and `<chromosome_id>.R` for the right end:
-
-```text
-Chr01.L
-Chr03.R
-```
-
-Blank lines and comment lines starting with `#` are allowed:
-
-```text
-# target chromosome ends selected from TelSeekerCheck plots
-Chr01.L
-Chr03.R
-```
-
-Then run TelSeeker with that reviewed target list:
-
-```bash
-python bin/DEGAP.py --mode telseeker \
-    --genome ./path/genome.fasta \
-    --motif TTAGGG \
-    -e ./path/target_ends.txt \
-    --hifi ./path/HiFiReads.fa \
-    --out ./path/Output \
-    --MaximumExtensionRound 25
-```
-
-Review the `TelSeekerCheck.py` output before choosing TelSeeker targets. The check
-step generates whole-genome motif distribution plots using a 1 kb plotting
-window (`all_chromosomes_combined.png` plus `<chromosome>_telomere_motif.png` per chromosome) and writes `genome.telomere.check.left.2kb.fa` and
-`genome.telomere.check.right.2kb.fa` for terminal sequence inspection. If you
-already know the target chromosome ends, skip `TelSeekerCheck.py` and pass them
-directly with `-e Chr01.L Chr01.R` or `-e target_ends.txt`.
-
-Telomere parameters also have concise aliases: `-m/--motif`, `-tn/--tel-n`,
-`-tr/--tel-r`, and `-tmm/--tel-mm`.
-
-Telomeric read discovery checks both physical read ends. At each end, TelSeeker
-scans `--tel-n * len(--motif)` bases with motif rotations and reverse-complement
-rotations. A read end passes when `hits / --tel-n >= --tel-r`; `--tel-mm` allows
-0 or 1 mismatch per motif-length unit. With the default motif `TTAGGG`, the
-default `--tel-n 100` checks 600 bp at each read end and `--tel-r 0.6` requires
-at least 60 motif-unit hits. If Step 1 finds too few telo reads, lower `--tel-r`,
-allow `--tel-mm 1`, or reduce `--tel-n`:
-
-```bash
-python bin/DEGAP.py --mode telseeker \
-    --genome ./path/genome.fasta \
-    --motif TTAGGG \
-    -e Chr01.L Chr01.R \
-    --hifi ./path/HiFiReads.fa \
-    --out ./path/Output \
-    --tel-r 0.5 \
-    --tel-mm 1 \
-    --MaximumExtensionRound 25
-```
-
-### TelSeeker Ctg Mode
-Designed for extending selected contig endpoints without preparing a split genome
-FASTA for each task. Each `--ctg` FASTA must contain exactly one record, and the
-endpoint is `L` for left-end extension or `R` for right-end extension.
-
-```bash
-python bin/DEGAP.py --mode telseeker_ctg \
-    --ctg ./path/chr1.L.ctg.fa L \
-    --ctg ./path/chr2.R.ctg.fa R \
-    --motif TTAGGG \
-    --hifi ./path/HiFiReads.fa \
-    --ont ./path/ONTReads.fa \
-    --out ./path/TelSeekerCtgOut \
-    --work 4 \
-    --tel-n 100 \
-    --tel-r 0.6 \
-    --tel-mm 0 \
-    --MaximumExtensionRound 25 \
-    --MaximumExtensionLength 1000000 \
-    -t 20
-```
-
-All contig endpoints in one run share the same preprocessed reads, split reads,
-and `part1.telo.reads/` cache. Reusing the same `--out` with additional `--ctg`
-tasks is allowed only when `--hifi`, `--ont`, `--motif`, `--tel-n`, `--tel-r`,
-and `--tel-mm` match the existing cache manifest. If they differ, DEGAP reports
-the mismatch and stops.
-
-Per-endpoint outputs are written under
-`telseeker_ctg.jobs/<contig_id>.<L|R>/result/`. The aggregate status file is
-`result/status.tsv`. If no telomeric reads are found, or none are available for
-the requested end direction, the endpoint is marked failed with
-`no_tel_reads` or `no_tel_reads_for_target_end`.
-
-Example target file:
-
-```text
-Chr01.L
-Chr01.R
-```
-
-### AutoGapfiller Mode
-Automated pipeline for whole-genome gap filling. Automatically detects gaps and fills them in parallel.
-
-```bash
-python bin/AutoGapfiller.py \
-    --genome ./path/genome.fasta \
-    --hifi ./path/HiFiReads.fa \
-    --ont ./path/ONTReads.fa \
-    --out ./path/Output \
-    --work 4 \
-    --MaximumExtensionRound 25 \
-    --kmer_filter \
-    -t 20
-```
-
-**Note:** You can add the `--setup_only` parameter to only create the gap-filling job directories without executing them. This is useful for inspecting the tasks before running or for manual execution control.
-
-## Key Features in DEGAP2.0
-
-- **Multi-data support**: HiFi-only, ONT-only, or Mixed (HiFi+ONT) modes
-- **K-mer filtering**: `--kmer_filter` for faster processing with large datasets
-- **Enhanced performance**: Optimized parallel processing and memory management
+Optional chromosome-end review plots and 2 kb end FASTAs can be prepared before running TelSeeker with `python bin/TelSeekerCheck.py --genome <genome.fa> --motif <MOTIF> --out <dir>`.
 
 ## Quick Start
 
-For detailed usage, parameter descriptions, and advanced features, please refer to [Users' Guide](HOWTO.md).
+In `GapFiller` and `AutoGapfiller`, candidate-read k-mer filtering is now enabled by default and can be disabled with `--no-kmer-filter`. For each gap, left and right extensions share a default cap of 10 total extension attempts (including normal failed attempts) and a 500,000 bp cumulative extension budget; a final completed attempt may exceed this length budget, and the budget is not an input gap size cutoff. Both limits can be customized via `--MaximumExtensionRound` and `--MaximumExtensionLength`, each of which accepts `unlimited` to remove its limit.
 
-## How to Cite?
+Fill one gap between left and right flanking sequences (`gapfiller`):
 
-Huang, Y. et al. DEGAP: Dynamic Elongation of a Genome Assembly Path. Briefings in Bioinformatics, Volume 25, Issue 3, May 2024, bbae194. [DOI: 10.1093/bib/bbae194](https://doi.org/10.1093/bib/bbae194)
+```bash
+python bin/DEGAP.py --mode gapfiller \
+    --seqleft ./left_flank.fa \
+    --seqright ./right_flank.fa \
+    --hifi ./hifi_reads.fq.gz \
+    --ont ./ont_reads.fq.gz \
+    --out ./gap_out \
+    --MaximumExtensionRound 25 \
+    -t 20
+```
+
+When the job finishes:
+
+- Open `./gap_out/family-report.html` directly in a local web browser to inspect closure status, family histories, candidate connections, junction metrics, and stop reasons.
+- Check `status: "closed"` in `./gap_out/family-result.json` (or the report header) before using `./gap_out/<name>.final.fa`; a zero process exit code alone does not mean the gap closed or that the sequence is biologically verified.
+- Supply **original FASTQ/FASTQ.gz** files for `--ont` whenever ONT-only assembly or mixed-to-ONT-only fallback may occur (`--hifi` accepts FASTA or FASTQ).
+
+For the other modes, shared budgets, resume rules, and full options, see [HOWTO.md](HOWTO.md).
+
+## Documentation
+
+- **Practical Users' Guide**: [HOWTO.md](HOWTO.md) — full operational reference for all five modes, parameters, HTML reports, outputs, and troubleshooting.
+- **Design Notes**:
+  - [docs/design/bidirectional-extension.md](docs/design/bidirectional-extension.md) — bidirectional historical families, shared budgets, and checkpoint/resume policy.
+  - [docs/design/junction-validation.md](docs/design/junction-validation.md) — full-sequence fallback, original-flank protection, bounded read-supported terminal repair, and anchor-backoff retries.
+  - [docs/design/telomere-target-search.md](docs/design/telomere-target-search.md) — TelSeeker shared target index, batched candidate validation, and local junction corroboration.
+  - [docs/design/report-presentation.md](docs/design/report-presentation.md) — offline HTML report presentation and schema alignment.
+- **Dated Validation Records**:
+  - [SSH 180 expanded real-read matrix](docs/validation/2026-11-22-ssh180-expanded-matrix.md) — 39 workloads across fixed gaps, workflow modes, shared limits, and negative cases.
+  - [SSH 180: two masked HiFi gaps closed](docs/validation/2026-11-22-ssh180-new-dataset.md) — measured gap-only comparisons and ONT suitability limits.
+  - [SSH 180 junction validation](docs/validation/2026-11-22-junction-repair.md) — junction checks and bounded terminal repair validation.
+  - [SSH 180 TelSeeker target search](docs/validation/2026-11-22-telomere-target-search.md) — shared target index, batched refinement, and local support checks.
+  - Earlier records: [docs/validation/2026-11-21-ssh180-real-ont.md](docs/validation/2026-11-21-ssh180-real-ont.md), [docs/validation/2026-11-21-ont-quality-repair.md](docs/validation/2026-11-21-ont-quality-repair.md)
+- **Historical v1 Guide**: [v1/README.md](v1/README.md) — legacy DEGAP 1.0 documentation (historical reference only).
+
+## Citation
+
+Huang, Y. et al. DEGAP: Dynamic Elongation of a Genome Assembly Path. *Briefings in Bioinformatics*, Volume 25, Issue 3, May 2024, bbae194. [DOI: 10.1093/bib/bbae194](https://doi.org/10.1093/bib/bbae194)
 
 ## Contact
 
-For comments and suggestions, please contact <jzhang@mail.hzau.edu.cn>.
+For comments, bug reports, or questions, please contact <jzhang@mail.hzau.edu.cn>.

@@ -15,7 +15,7 @@ from functools import lru_cache
 import math
 from operator import attrgetter
 from pathlib import Path
-from typing import Mapping
+from typing import Callable, Mapping
 
 from .common import read_fasta, sha256_file, stable_id
 from .q0_alignments import PafAlignment, read_paf
@@ -152,7 +152,7 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
         evidence = stored
     for dataset, sequences in sorted(by_dataset.items()):
         relative = f"runs/{dataset}_vs_ref/result.paf"
-        for hit in read_paf(root / relative, query_lengths={k: len(v) for k, v in sequences.items()},
+        for hit in read_paf(artifact_path(root, relative), query_lengths={k: len(v) for k, v in sequences.items()},
                             target_lengths=lengths, artifact=relative):
             source = keys[dataset, hit.query_name] if threshold else SourceKey(dataset, hit.query_name)
             if threshold:
@@ -161,7 +161,7 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
             stored[hit.evidence_id] = hit if threshold else evidence_ref(hit)
     for descriptor in catalog["base_alignments"]:
         query, target = descriptor["query_dataset"], descriptor["target_dataset"]
-        for hit in read_paf(root / descriptor["paf"], query_lengths={k: len(v) for k, v in by_dataset[query].items()},
+        for hit in read_paf(artifact_path(root, descriptor["paf"]), query_lengths={k: len(v) for k, v in by_dataset[query].items()},
                             target_lengths={k: len(v) for k, v in by_dataset[target].items()}, artifact=descriptor["paf"]):
             if threshold:
                 q, t = keys[query, hit.query_name], keys[target, hit.target_name]
@@ -175,7 +175,7 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
         if task["paf"] in visited:
             continue
         visited.add(task["paf"])
-        for hit in read_paf(root / task["paf"], query_lengths={key: parts[key].interval.length for key in task["query_ids"]},
+        for hit in read_paf(artifact_path(root, task["paf"]), query_lengths={key: parts[key].interval.length for key in task["query_ids"]},
                             target_lengths={key: parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"]):
             query, target = parts[hit.query_name], parts[hit.target_name]
             if threshold:
@@ -664,16 +664,24 @@ def _links_for_path_graphs(placements, links):
     return by_chromosome
 
 
+def _quiet(_message: str) -> None:
+    pass
+
+
 def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
-                    path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> PathSelection:
+                    path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
+                    progress: Callable[[str], None] = _quiet) -> PathSelection:
     """Select and check source geometry without reconstructing sequences or building a report."""
+    progress(f"placing candidate segments · pair links={len(data.pair_links)}")
     admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass)
     groups = defaultdict(list)
     for placement in admission.placements:
         groups[placement.chromosome].append(placement)
     searches, occupied = {}, defaultdict(list)
+    progress(f"building chromosome paths · placements={len(admission.placements)}")
     graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
-    for chromosome in sorted(data.reference_lengths):
+    for index, chromosome in enumerate(sorted(data.reference_lengths), 1):
+        progress(f"chromosome path {index}/{len(data.reference_lengths)}: {chromosome}")
         search = search_paths(PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy))
         searches[chromosome] = search
         if search.path is None:
@@ -693,9 +701,10 @@ def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = 
 
 
 def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
-                 path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Construction:
+                 path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
+                 progress: Callable[[str], None] = _quiet) -> Construction:
     selection = select_q0_paths(data, admission_policy=admission_policy, path_policy=path_policy,
-                                quality_pass=quality_pass)
+                                quality_pass=quality_pass, progress=progress)
     admission, searches, occupied = selection.admission, selection.paths, selection.occupied
     if not any(search.path is not None for search in searches.values()):
         raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
@@ -707,6 +716,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
     elif "supplement_scope" in data.catalog:
         from .q0_frontier_scope import audit_selected_scope
         audit_selected_scope(data, admission, searches)
+    progress("reconstructing Q0 sequences and recording decisions")
     records, chromosomes = {}, []
     by_id = {p.placement_id: p for p in admission.placements}
     for chromosome, search in searches.items():
@@ -768,10 +778,11 @@ def selector_identity() -> str:
                                     ("q0_admission.py", "q0_reference_competition.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
 
 
-def build_q0(root: Path, **kwargs) -> Construction:
+def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, **kwargs) -> Construction:
     before = selector_identity()
+    progress("loading Q0 alignment evidence")
     data = load_evidence_input(root)
-    result = construct_q0(data, **kwargs)
+    result = construct_q0(data, progress=progress, **kwargs)
     if stable_id("q0-ready-evidence", load_verified_evidence(root)) != data.ready_manifest_identity:
         raise Q0EvidenceError("q0 evidence changed while selecting paths")
     if selector_identity() != before:

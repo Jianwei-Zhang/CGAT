@@ -503,6 +503,19 @@ class CtgLinkerCheck:
     
     def run(self):
         """执行检查"""
+        if (self.output_dir / "ctglinker-result.json").exists():
+            from FamilyCtgLinker import load_ctg_result
+            manifest = load_ctg_result(self.output_dir)
+            valid = [{"scaffold_id": a["scaffold_id"], "dg_id": a["id"], "length": a["length"],
+                      "contigs": [m["id"] for m in a["members"]], "members": a["members"]}
+                     for a in manifest["scaffolds"]]
+            result = {"schema": manifest["schema"], "valid_scaffolds": valid, "invalid_scaffolds": [],
+                      "unplaced": [], "summary": {"valid_scaffold_count": len(valid),
+                        "invalid_scaffold_count": 0, "total_valid_length": sum(a["length"] for a in valid)}}
+            from ExtensionFamilies import atomic_json
+            atomic_json(self.output_dir / "ctglinker_check.json", result)
+            return result
+
         print("[CtgLinkerCheck] Parsing scaffold sequences...")
         self.parse_scaffold_fa()
         

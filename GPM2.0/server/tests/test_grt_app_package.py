@@ -4,9 +4,11 @@ import csv
 import hashlib
 import json
 import shutil
+import stat
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -28,6 +30,55 @@ class GrtAppPackageTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
+
+    def test_frozen_baseline_is_readonly_but_private_projection_can_be_updated(self):
+        marks = self.source / "cen/chr_chr1/marks.tsv"
+        marks.parent.mkdir(parents=True)
+        marks.write_text("start\tend\n1\t5\n")
+        projected = (marks, self.source / "metadata/datasets.tsv",
+                     self.source / "data/reference/ref.fa.fai")
+        fasta = self.source / "data/reference/ref.fa"
+        for source in (*projected, fasta):
+            source.chmod(0o440)
+        before = {p: p.read_bytes() for p in (*projected, fasta)}
+        stage = self.root / "full"
+        grt_app_package.build(self.source, stage, include_fasta=True)
+        for source in projected:
+            copy = stage / source.relative_to(self.source)
+            self.assertFalse(source.samefile(copy))
+            self.assertEqual(copy.read_bytes(), before[source])
+            self.assertEqual(stat.S_IMODE(copy.stat().st_mode), 0o640)
+            copy.write_bytes(b"private projection\n")
+        self.assertEqual(stat.S_IMODE((stage / fasta.relative_to(self.source)).stat().st_mode), 0o440)
+        for source, content in before.items():
+            self.assertEqual(source.read_bytes(), content)
+            self.assertEqual(stat.S_IMODE(source.stat().st_mode), 0o440)
+
+    def test_delivery_cli_checks_each_bundle_once_before_touching_staging(self):
+        import lgz_app_package
+        import lgz_contract
+        frozen = REPO_ROOT / "tests/fixtures/grt_contract_v3/frozen_bridge_server.json"
+        schema3 = self.root / "frozen"
+        for name, contents in json.loads(frozen.read_text())["files"].items():
+            target = schema3 / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(contents)
+        for source in (self.source, schema3):
+            staging = self.root / (source.name + "-staged")
+            for flag in ("--include-fasta", "--no-fasta"):
+                with self.subTest(source=source.name, flag=flag), mock.patch.object(
+                    lgz_contract, "validate_contract", wraps=lgz_contract.validate_contract
+                ) as check, mock.patch.object(sys, "argv", ["package", "--source", str(source),
+                        "--staging", str(staging), flag]):
+                    self.assertEqual(lgz_app_package.main(), 0)
+                    check.assert_called_once_with(source)
+            sentinel = staging / "previous-delivery"
+            sentinel.write_text("unchanged")
+            (source / "metadata/grt_stage_status.tsv").write_text("corrupt\n")
+            with mock.patch.object(sys, "argv", ["package", "--source", str(source),
+                    "--staging", str(staging), "--no-fasta"]), self.assertRaises(lgz_contract.ContractError):
+                lgz_app_package.main()
+            self.assertEqual(sentinel.read_text(), "unchanged")
 
     def test_post_lgz_gapfill_delivery_is_separate_and_content_bound(self):
         import post_lgz_degap as gapfill
@@ -69,6 +120,18 @@ class GrtAppPackageTests(unittest.TestCase):
             self.assertEqual((staging / "cen/library.fa").exists(), include_fasta)
             if not include_fasta:
                 self.assertFalse(any(path.suffix.lower() in {".fa", ".fasta"} for path in staging.rglob("*")))
+
+    def test_portable_app_packages_carry_only_the_incremental_import_policy(self):
+        options = self.source / "metadata/prepare_options.tsv"
+        policy = ["alignment_engine\tminimap2", "minimap_preset\tasm5", "skip_self\tfalse",
+                  "tel_enabled\ttrue", "cen_enabled\ttrue"]
+        expected = "key\tvalue\n" + "\n".join(policy) + "\n"
+        options.write_text(expected + "private_input\t/work/private/input.fq\n")
+        for full in (True, False):
+            target = self.root / ("full-policy" if full else "light-policy")
+            grt_app_package.build(self.source, target, include_fasta=full)
+            self.assertEqual((target / "metadata/prepare_options.tsv").read_text(), expected)
+        self.assertIn("private_input", options.read_text())
 
     def test_build_emits_display_contract_schema_three(self) -> None:
         staging = self.root / "staging"

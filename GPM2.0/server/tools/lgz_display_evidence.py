@@ -9,6 +9,12 @@ desktop App therefore never needs to parse internal LGZ record identities.
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import csv
 import hashlib
 import json
@@ -397,7 +403,7 @@ def _retained_ancestors(event: dict, events: dict[str, dict]) -> list[dict]:
 def _verified_display_artifact(source_root: Path, relative: object, digest: object, cache: dict) -> Path:
     if not isinstance(relative, str) or not isinstance(digest, str) or len(digest) != 64:
         raise ValueError("local evidence has an incomplete artifact identity")
-    path = (source_root / relative).resolve()
+    path = (workspace_join(source_root, relative)).resolve()
     if Path(relative).is_absolute() or not path.is_relative_to(source_root.resolve()):
         raise ValueError("display evidence artifact escapes the Server workspace")
     stat = path.stat()
@@ -504,7 +510,7 @@ def _local_alignments_for_event(
         raise ValueError("retained refill lacks immutable flank projection; rerun run_all.sh to regenerate Step3 evidence")
     if projection is not None and projection.get("chr") != candidate.get("chr"):
         raise ValueError("refill flank projection belongs to another chromosome")
-    paf_path = source_root / str(profile.get("raw_artifact_relpath", ""))
+    paf_path = workspace_join(source_root, str(profile.get("raw_artifact_relpath", "")))
     results = []
     for side, role, field in (
         ("left", "left_anchor", "left_line"),
@@ -703,20 +709,20 @@ def build_display_evidence(
 ) -> dict[str, list[dict[str, object]]]:
     """Return accepted, display-ready local evidence grouped by chromosome."""
 
-    events = _read_events(source_root / "metadata/grt_events.jsonl")
+    events = _read_events(workspace_join(source_root, "metadata/grt_events.jsonl"))
     members = {
         row["member_id"]: row
-        for row in _read_tsv(source_root / "metadata/grt_donor_members.tsv")
+        for row in _read_tsv(workspace_join(source_root, "metadata/grt_donor_members.tsv"))
     }
     registry = {
         row["evidence_id"]: row
-        for row in _read_tsv(source_root / "metadata/grt_evidence_registry.tsv")
+        for row in _read_tsv(workspace_join(source_root, "metadata/grt_evidence_registry.tsv"))
     }
     q_rows: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
-    for row in _read_tsv(source_root / "metadata/grt_q_segments.tsv"):
+    for row in _read_tsv(workspace_join(source_root, "metadata/grt_q_segments.tsv")):
         q_rows[(row.get("q_version", ""), row.get("chr", ""))].append(row)
 
-    package = _read_tsv(source_root / "metadata/package.tsv")[0]
+    package = _read_tsv(workspace_join(source_root, "metadata/package.tsv"))[0]
     current = package["schema_version"] == "4"
     patch_stage, correction_stage = ("step1", "step2") if current else ("step2", "step3")
     candidates_by_stage: dict[str, dict[str, dict[str, str]]] = {}
@@ -724,15 +730,15 @@ def build_display_evidence(
         (patch_stage, f"grt/evidence/{patch_stage}/candidates.tsv"),
         (correction_stage, f"grt/evidence/{correction_stage}/correction_candidates.tsv"),
     ):
-        candidates_by_stage[stage] = _candidates_by_event(source_root / relpath)
+        candidates_by_stage[stage] = _candidates_by_event(workspace_join(source_root, relpath))
     refill_candidates = _candidates_by_event(
-        source_root / f"grt/evidence/{correction_stage}/refill_candidates.tsv"
+        workspace_join(source_root, f"grt/evidence/{correction_stage}/refill_candidates.tsv")
     )
     alignments_by_stage: dict[str, dict[tuple[str, int], dict[str, str]]] = {}
     for stage in (patch_stage, correction_stage):
         alignments_by_stage[stage] = {
             (row.get("chr", ""), int(row["line_number"])): row
-            for row in _read_tsv(source_root / f"grt/evidence/{stage}/mummer/alignments.tsv")
+            for row in _read_tsv(workspace_join(source_root, f"grt/evidence/{stage}/mummer/alignments.tsv"))
         }
 
     result: dict[str, list[dict[str, object]]] = {}

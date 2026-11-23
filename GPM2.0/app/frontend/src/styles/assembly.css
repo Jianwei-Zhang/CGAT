@@ -2032,6 +2032,12 @@
   color: var(--theme-blue-ink, #563783);
 }
 
+.grt-status-badge.is-refinement {
+  border-color: var(--theme-blue-line, #438694);
+  background: var(--theme-blue-surface, #e6f6f8);
+  color: var(--theme-blue-ink, #205864);
+}
+
 .grt-status-badge.is-cross_chr_grt_usage {
   border-color: var(--theme-amber-line, #b97932);
   background: var(--theme-amber-surface, #fff0da);

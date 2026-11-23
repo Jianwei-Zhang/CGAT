@@ -48,6 +48,17 @@ case "${1:-}" in
     fi
     ;;
   run)
+    # The lock installer and the environment verifier are distinct steps.
+    if [[ "${6:-}" == */refinement_tools.py && "${7:-}" == --install ]]; then
+      [[ "${FAKE_REFINEMENT_INSTALL_FAIL:-false}" != "true" ]] || exit 12
+      mkdir -p "${FAKE_ENV_PREFIX}/conda-meta"
+      : > "${FAKE_ENV_PREFIX}/conda-meta/fake-locked-refinement-installed"
+      exit 0
+    fi
+    if [[ "${6:-}" == */refinement_tools.py && "${7:-}" == --check ]]; then
+      [[ -f "${FAKE_ENV_PREFIX}/conda-meta/fake-locked-refinement-installed" ]]
+      exit
+    fi
     if [[ "${FAKE_VERIFY_FAIL:-false}" == "true" ]]; then
       echo 'missing required commands: craq' >&2
       exit 11
@@ -228,6 +239,25 @@ test_verification_failure_has_no_ready_state_and_can_recover() {
   grep -F $'micromamba\tinstall -n cgat-server' "${case_dir}/manager.log" >/dev/null
 }
 
+test_refinement_install_failure_is_not_marked_ready() {
+  local case_dir="${TMP_DIR}/refinement-install-failure"
+  local bin_dir="${case_dir}/bin"
+  copy_installer "$case_dir"
+  install_fake_managers "$bin_dir" micromamba
+  mkdir -p "${case_dir}/home"
+  if run_installer "$case_dir" "$bin_dir" env FAKE_REFINEMENT_INSTALL_FAIL=true \
+      > "${case_dir}/output" 2> "${case_dir}/error"; then
+    echo "expected locked refinement installation failure" >&2
+    exit 1
+  fi
+  grep -F 'failed to install the locked refinement runtimes' "${case_dir}/error" >/dev/null
+  assert_file "${case_dir}/environment/conda-meta/cgat-server-owner.tsv"
+  assert_not_file "${case_dir}/environment/conda-meta/cgat-server-state.tsv"
+  assert_not_file "${case_dir}/environment/conda-meta/cgat-server-tools.tsv"
+  run_installer "$case_dir" "$bin_dir" > /dev/null
+  assert_file "${case_dir}/environment/conda-meta/cgat-server-state.tsv"
+}
+
 test_no_manager_bootstraps_micromamba_for_current_user() {
   local case_dir="${TMP_DIR}/bootstrap-micromamba"
   local bin_dir="${case_dir}/restricted-bin"
@@ -346,8 +376,9 @@ test_check_is_read_only_and_detects_stale_spec() {
   : > "${case_dir}/manager.log"
   run_installer_with_args "$case_dir" "$bin_dir" --check > "${case_dir}/check.out"
   grep -F 'GPM Server environment check: READY' "${case_dir}/check.out" >/dev/null
-  grep -F 'Commands:    16/16 verified' "${case_dir}/check.out" >/dev/null
-  if grep -E $'\t(create|install|env remove) ' "${case_dir}/manager.log" >/dev/null; then
+  grep -F 'Commands:    21/21 verified' "${case_dir}/check.out" >/dev/null
+  grep -F 'refinement_tools.py --check' "${case_dir}/manager.log" >/dev/null
+  if grep -E $'\t(create|install|env remove) |refinement_tools.py --install' "${case_dir}/manager.log" >/dev/null; then
     echo "--check must not change the environment" >&2
     exit 1
   fi
@@ -460,6 +491,7 @@ test_existing_manager_priority_create_reuse_and_update
 test_conda_uses_strict_channel_priority
 test_unmanaged_environment_is_rejected
 test_verification_failure_has_no_ready_state_and_can_recover
+test_refinement_install_failure_is_not_marked_ready
 test_no_manager_bootstraps_micromamba_for_current_user
 test_dependency_spec_and_verifier_cover_server_commands
 test_explicit_manager_selection

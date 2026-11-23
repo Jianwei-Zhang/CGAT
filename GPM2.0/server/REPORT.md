@@ -1,29 +1,40 @@
 # Server reports
 
+In the current numbered workspace, start at `06_report/report.html`. This page
+links the original LGZ process report (`06_report/01_lgz/`), per-tool refinement
+reports (`06_report/02_refinement/<tool>/`) and current-batch comparison
+(`06_report/03_comparison/<batch>/`). The directory contract below describes the
+LGZ process-report family, not the separate `cgat.refinement-report` schema.
+See the [refinement guide](REFINEMENT.md) ([中文](REFINEMENT_zh.md)) for the complete
+job/native/accepted-result and delivery path, pins, append and migration commands.
+Unmigrated old workspaces retain their old `report/`, `logs/` and `.report_history/`
+locations; they are not shadow directories in new workspaces.
+
 `prepare.sh` records input provenance after argument, input-access and tool preflight
 checks, before FASTA normalization. Errors before that point are terminal errors
 and do not create a report. `run_all.sh` records each execution unit and maintains
-the complete report under `<workspace>/report/`, including on a handled failure or
+the LGZ process report under `<workspace>/06_report/01_lgz/`, including on a handled failure or
 SIGINT/SIGTERM. SIGKILL or host loss cannot run finalizers; the last atomic snapshot
 remains available and the next invocation archives it.
 
-After a successful run, the finalized `report/` directory is embedded atomically in
-both App delivery archives. No separate report HTML or report ZIP is written beside
-them. The report records the App payload archive size and SHA-256 before `report/`
+After a successful baseline run, the finalized LGZ report is embedded as `report/`
+in both LGZ App archives under `07_delivery/00_lgz/`. Each successfully published
+refinement has its own full/light archives with the matching refinement report.
+No separate report HTML or report ZIP is written beside them. The report records the App payload archive size and SHA-256 before `report/`
 is embedded, avoiding a checksum cycle. Final delivery archive sizes and SHA-256 values
-are printed to the terminal and `logs/run_all.log`. Standalone packaging commands
+are printed to the terminal and `.runtime/logs/run_all.log`. Standalone packaging commands
 embed the latest workspace report when available; standalone incremental commands
 remain outside the recorded invocation history.
 
 ## Logging presentation boundary
 
-`logs/progress.log` and the default console output are compact views. Neither is an
+`.runtime/logs/progress.log` and the default console output are compact views. Neither is an
 input to report collection, checkpoint/cache validation, or delivery finalization.
 `ReportSession.event()` receives the original event codes/messages and runtime rows;
 `child_output()` receives original child text before metric suppression, progress
 aggregation or cache-hash shortening. Terminal ANSI controls are removed at that
 boundary. The existing 80-line/4000-character-per-line output-tail limit is unchanged;
-full diagnostics, including copy/parse timings, remain in `logs/run_all.log`.
+full diagnostics, including copy/parse timings, remain in `.runtime/logs/run_all.log`.
 
 Color is applied only to terminal output (or the read-only log viewer), never to
 report JSON/HTML or persistent logs. The report schema, renderer, provenance facts,
@@ -45,9 +56,9 @@ reporting behavior. Progress counts are alignment progress, not biological QC re
 | `render_report.py` | Standalone Python renderer, with embedded presentation code and no project imports. |
 | `report.html` | Self-contained HTML; all data, CSS and JavaScript are inline. |
 
-Previous complete or partial directories are moved to `.report_history/` before
+Previous complete or partial directories are moved to `.runtime/history/reports/` before
 each new invocation. Preparation provenance is also stored in
-`metadata/report_inputs.json` for the generated runner. Runtime stage records use
+`.runtime/metadata/report_inputs.json` for the generated runner. Runtime stage records use
 the runner's invocation ID; existing LGZ recipe/content IDs retain their own
 meaning inside the copied results. Renderers reject mixed invocation IDs,
 unsupported schema versions and manifest paths outside the report directory.

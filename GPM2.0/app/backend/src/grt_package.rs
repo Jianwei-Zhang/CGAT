@@ -31,6 +31,9 @@ mod parsing;
 mod persistence;
 mod q0_provenance;
 mod read_model;
+mod refined_delivery;
+mod refinement_inputs;
+mod refined_source_evidence;
 mod trace_queries;
 mod types;
 
@@ -40,6 +43,7 @@ pub(crate) use contract_validator::validate_grt_package_with_progress;
 pub(crate) use delivery_validator::validate_grt_delivery_package_with_progress_and_cancel;
 pub use initialization::{initialize_grt_project, initialize_grt_project_with_options};
 pub(crate) use persistence::persist_grt_package;
+pub(crate) use read_model::load_grt_final_path_for_project_with_connection;
 pub use read_model::{
     load_grt_final_path, load_grt_final_path_by_chr, load_grt_final_path_by_chr_for_project,
     load_grt_locked_recipe, load_grt_object_attempts, load_grt_project_view,
@@ -49,6 +53,9 @@ pub use read_model::{
 pub use trace_queries::{
     load_grt_event_trace, load_grt_evidence, load_grt_source_card_trace,
     verify_persisted_grt_final_path,
+};
+pub use refinement_inputs::{
+    RefinementReadInputs, RefinementReadSource, load_project_refinement_read_inputs,
 };
 pub(crate) use types::ValidatedGrtPackage;
 pub use types::{
@@ -65,7 +72,8 @@ use read_model::project_grt_final_path_chromosome;
 use trace_queries::load_matching_json;
 use types::{
     AppQ4Validation, CHR_ASSIGNMENTS_HEADER, DATASETS_HEADER, DONOR_MEMBERS_HEADER,
-    GRT_CURRENT_SCHEMA_VERSION, LEGACY_Q_VERSIONS, PACKAGE_HEADER, Q0_DIRECT_STAGE_TRANSITIONS,
+    GRT_CURRENT_SCHEMA_VERSION, GRT_REFINED_FINAL_PATH_SCHEMA_VERSION,
+    GRT_REFINEMENT_SCHEMA_VERSION, LEGACY_Q_VERSIONS, PACKAGE_HEADER, Q0_DIRECT_STAGE_TRANSITIONS,
     Q0_DIRECT_VERSIONS, RECIPE_HEADER, REFERENCE_CHR_LOCATOR_HEADER, REFERENCE_HEADER,
     REQUIRED_FILES, SOURCE_LOCATOR_HEADER, SOURCE_N_REGIONS_HEADER, STAGE_STATUS_HEADER,
     STAGE_TRANSITIONS, TABLE_SPECS, TRACK_MEMBER_ORDERS_HEADER, TsvRow, TsvTable,

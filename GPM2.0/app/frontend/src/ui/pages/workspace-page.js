@@ -16,6 +16,7 @@ import { projectLabels } from "./projects-view.js";
 import { projectIcon } from "./project-icons.js";
 import { defaultProjectName } from "../../services/project-session.js";
 import { renderProjectCatalog, bindProjectCatalog } from "./project-catalog-view.js";
+import { renderProjectRefinementCard, bindProjectRefinementCard } from "./project-refinement-view.js";
 
 function buildEmptyAssemblyViewState(stateOrLocale) {
   return {
@@ -157,7 +158,7 @@ export function renderWorkspacePage(state) {
       <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
       </select></label>` : ""}
-    ${selectedProject ? `<section class="project-information">${renderProjectCatalog(state)}</section>${renderProjectPathOverview(state)}` : ""}
+    ${selectedProject ? `<section class="project-information">${renderProjectCatalog(state)}</section>${renderProjectRefinementCard(state)}${renderProjectPathOverview(state)}` : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
   </section>
   ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;
@@ -166,6 +167,7 @@ export function renderWorkspacePage(state) {
 export function bindWorkspacePage(host, store) {
   bindProjectPathOverview(host, store);
   bindProjectCatalog(host, store, rerender);
+  bindProjectRefinementCard(host, store, rerender);
   const state = store.getState();
   const initializer = state.initializer;
   const selectedProject = findProjectById(initializer.existingProjects, state.session.projectId);

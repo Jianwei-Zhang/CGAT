@@ -1,3 +1,4 @@
+import { normalizeRefinementTrace } from "./refinement-trace-state.js";
 function normalizeString(value) {
   return String(value ?? "").trim();
 }
@@ -87,11 +88,13 @@ function normalizeGrtSegment(segment, index, chrName) {
     || `grt-${chrName}-${index + 1}`;
   const length = normalizePositiveInteger(source.length) || 1;
   const kind = normalizeString(source.kind).toLowerCase() || "source";
+  const refinement = normalizeRefinementTrace({ ...source, source: source.refinement_source });
   if (kind === "gap") {
     return {
       segmentId,
       type: "gap",
       gapSizeBp: length,
+      ...(refinement ? { refinement } : {}),
       serverBaseline: true,
     };
   }
@@ -116,9 +119,16 @@ function normalizeGrtSegment(segment, index, chrName) {
   const assemblySourceEnd = normalizePositiveInteger(
     firstDefined(source, "assemblySourceEnd", "assembly_source_end"),
   );
+  const sourceKind = normalizeString(firstDefined(source, "sourceKind", "source_kind")).toLowerCase();
+  const refinementPatchSha256 = normalizeString(
+    firstDefined(source, "refinementPatchSha256", "refinement_patch_sha256"),
+  );
   return {
     segmentId,
     type: "ctg",
+    ...(sourceKind === "refinement_patch" ? { sourceKind: "refinement_patch" } : {}),
+    ...(sourceKind === "refinement_patch" && refinementPatchSha256 ? { refinementPatchSha256 } : {}),
+    ...(refinement ? { refinement } : {}),
     assemblyCtgId,
     ...(assemblySourceStart ? { assemblySourceStart } : {}),
     ...(assemblySourceEnd ? { assemblySourceEnd } : {}),

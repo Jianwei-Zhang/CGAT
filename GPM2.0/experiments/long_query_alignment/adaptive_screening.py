@@ -7,6 +7,11 @@ are provisional experimental acceptance budgets, not biological accuracy claims.
 """
 from __future__ import annotations
 
+try:
+    from workspace_binding import workspace_path
+except ModuleNotFoundError:
+    from .workspace_binding import workspace_path
+
 from collections import defaultdict
 from dataclasses import asdict, dataclass, replace
 import hashlib
@@ -51,7 +56,7 @@ def assignment_identity(limits):
 def prepared_assignment_coverage(root):
     """Read the same package score as assign_chr_groups, including legacy jobs."""
     def read_rows(name):
-        path = Path(root) / "metadata" / name
+        path = workspace_path(root, "metadata", name)
         if not path.exists() and not path.is_symlink():
             return None
         if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024**2:

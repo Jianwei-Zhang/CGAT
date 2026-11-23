@@ -4,6 +4,12 @@
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 from delivery_archive import delivery_path, delivery_staging_path
 
 import argparse
@@ -15,6 +21,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import threading
 import sys
 import tempfile
 import time
@@ -24,13 +31,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from run_progress import ProgressDisplay, plain
+from workspace_layout import WorkspaceLayout, workspace_path
 from run_resources import execution_threads, read_resources, resource_environment
 from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
                                   changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
-from run_orchestration import OrchestrationContractError, atomic_write_json
+from lgz_core.contract.validation_pass import CHANNEL_ENV, DEFER_ENV, READY
+from run_orchestration import LGZ_PREPARE_IDS, LGZ_PREPARE_UNIT_ID, OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
-from alignment_tasks import AdaptiveDispatcher, AlignmentTask, dispatch_environment, load_tasks, run_tasks
+from alignment_tasks import (AdaptiveDispatcher, AlignmentPlan, AlignmentTask, dispatch_environment,
+                             load_task_plan, run_tasks)
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
@@ -47,7 +57,7 @@ STATUS_FIELDS = [
     "detail_log_relpath",
 ]
 LGZ_CACHE_MARKERS = {
-    "grt_prepare": ("LGZ prepare inputs are current:",),
+    **dict.fromkeys(LGZ_PREPARE_IDS, ("LGZ prepare inputs are current:",)),
     "grt_step1": ("LGZ step1 cache hit:",),
     "grt_step2": ("LGZ step2 cache hit:",),
     "grt_step12": ("LGZ step1 cache hit:", "LGZ step2 cache hit:"),
@@ -108,7 +118,8 @@ def validate_relative_path(value: str, label: str) -> str:
 
 
 def load_plan(server_dir: Path) -> list[PlanUnit]:
-    plan_path = server_dir / ".run_all/plan.tsv"
+    layout = WorkspaceLayout.detect(server_dir)
+    plan_path = layout.path(".run_all/plan.tsv")
     if not plan_path.is_file():
         raise RunnerError(f"execution plan is missing: {plan_path}")
     try:
@@ -130,16 +141,20 @@ def load_plan(server_dir: Path) -> list[PlanUnit]:
         unit_id = row.get("unit_id", "")
         if not unit_id or any(character in unit_id for character in "\t\r\n"):
             raise RunnerError(f"invalid execution unit ID: {unit_id!r}")
-        if unit_id in seen:
+        # Keep the saved ID in status/checkpoints, but never run both spellings.
+        identity = LGZ_PREPARE_UNIT_ID if unit_id in LGZ_PREPARE_IDS else unit_id
+        if identity in seen:
             raise RunnerError(f"duplicate execution unit ID: {unit_id}")
-        seen.add(unit_id)
+        seen.add(identity)
         command_relpath = validate_relative_path(
             row.get("command_relpath", ""), f"command path for {unit_id}"
         )
         detail_relpath = validate_relative_path(
             row.get("detail_log_relpath", ""), f"detail log path for {unit_id}"
         )
-        command_path = server_dir / command_relpath
+        command_relpath = layout.relative(command_relpath)
+        detail_relpath = layout.relative(detail_relpath)
+        command_path = layout.path(command_relpath)
         if not command_path.is_file():
             raise RunnerError(f"command script for {unit_id} is missing: {command_path}")
         units.append(PlanUnit(unit_id, command_relpath, detail_relpath))
@@ -212,11 +227,15 @@ def initial_status_rows(
 
 
 class WorkspaceLock:
-    def __init__(self, server_dir: Path, run_id: str):
+    def __init__(self, server_dir: Path, run_id: str, *, for_migration: bool = False):
         self.server_dir = server_dir
-        self.state_dir = server_dir / ".run_all"
+        # Recovery must acquire the legacy lock even while ordinary launches
+        # are blocked by an unfinished migration journal.
+        self.state_dir = (server_dir / ".run_all" if for_migration
+                          else workspace_path(server_dir, ".run_all"))
         self.lock_dir = self.state_dir / "lock"
         self.run_id = run_id
+        self.for_migration = for_migration
         self.owner = {
             "workspace": str(server_dir),
             "hostname": socket.gethostname(),
@@ -235,6 +254,15 @@ class WorkspaceLock:
             return {}
 
     def _owner_is_active(self, owner: dict[str, object]) -> bool:
+        # A migration cannot infer cross-node inactivity from a missing/broken
+        # owner record or an unexpected workspace identity.
+        if self.for_migration and (not owner or owner.get("workspace") != str(self.server_dir)
+                                   or not owner.get("hostname")
+                                   or type(owner.get("pid")) is not int or owner["pid"] < 1
+                                   or (owner.get("process_start") and
+                                       (not isinstance(owner["process_start"], str)
+                                        or not owner["process_start"].isdigit()))):
+            return True
         if owner.get("workspace") != str(self.server_dir):
             return False
         if owner.get("hostname") != socket.gethostname():
@@ -248,6 +276,12 @@ class WorkspaceLock:
     def acquire(self) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         for _ in range(4):
+            # POSIX rename may replace an empty directory. During migration an
+            # ownerless lock is uncertain, not permission to steal that lock.
+            if self.for_migration and (self.lock_dir.exists() or self.lock_dir.is_symlink()):
+                owner = self._existing_owner()
+                if self.lock_dir.is_symlink() or self._owner_is_active(owner):
+                    raise RunnerError("workspace is already running or migration lock ownership is unknown")
             temporary = Path(
                 tempfile.mkdtemp(prefix=".lock.", dir=self.state_dir)
             )
@@ -301,7 +335,7 @@ class Runner:
         self.server_dir = server_dir
         self.units = units
         self.run_id = run_id
-        self.logs_dir = server_dir / "logs"
+        self.logs_dir = workspace_join(server_dir, "logs")
         self.log_path = self.logs_dir / "run_all.log"
         self.status_path = self.logs_dir / "status.tsv"
         self.status_rows: list[dict[str, str]] = []
@@ -315,10 +349,14 @@ class Runner:
         self.active_children: dict[int, subprocess.Popen] = {}
         self.received_signal: int | None = None
         self.outer_checkpoints = OuterCheckpointManager(server_dir)
+        self.contract_channel = None
         self.child_cache_markers: set[str] = set()
         self.report: ReportSession | None = None
         self.minimap2_failure_hints: dict[str, str] = {}
         self.child_environment = resource_environment(server_dir)
+        self.refinement_exit_code = 0
+        self.refinement_child = None
+        self.refinement_stop_timer = None
 
     def _event(self, event: str, unit: PlanUnit | None, message: str) -> None:
         if unit is None:
@@ -359,6 +397,8 @@ class Runner:
             self.report.child_output(line, unit.unit_id)
         # Old embedded workspace tools can still emit the former public name.
         cache_line = "LGZ " + line[4:] if line.startswith("GRT ") else line
+        if unit.unit_id == "finalize_evidence" and line == READY:
+            self.child_cache_markers.add(READY)
         for marker in STAGE_CACHE_MARKERS.get(unit.unit_id, ()):
             if cache_line.startswith(marker):
                 self.child_cache_markers.add(marker)
@@ -370,7 +410,7 @@ class Runner:
 
     def _failure_logs(self, unit: PlanUnit, command: Path) -> dict:
         # Never attribute another parallel unit's assertion from the shared run log.
-        paths = {command.parent / "stderr.log", self.server_dir / unit.detail_log_relpath}
+        paths = {command.parent / "stderr.log", workspace_join(self.server_dir, unit.detail_log_relpath)}
         return {path: log_identity(path) for path in paths if path.resolve() != self.log_path.resolve()}
 
     def _failure_hint(self, unit: PlanUnit, logs: dict) -> str:
@@ -389,13 +429,34 @@ class Runner:
                 os.killpg(child.pid, signal_number)
             except ProcessLookupError:
                 pass
+        if self.refinement_child is not None and self.refinement_stop_timer is None:
+            # Native tools can ignore TERM or keep inherited pipes open after
+            # their worker exits. Bound cancellation without releasing the lock.
+            self.refinement_stop_timer = threading.Timer(5, self._kill_refinement_group, (self.refinement_child.pid,))
+            self.refinement_stop_timer.daemon = True
+            self.refinement_stop_timer.start()
         for child in list(self.active_children.values()):
             try:
                 os.killpg(child.pid, signal_number)
             except ProcessLookupError:
                 pass
 
-    def _run_alignment_group(self, units: list[PlanUnit], threads: int) -> int:
+    @staticmethod
+    def _kill_refinement_group(pid):
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    def _finish_refinement_group(self):
+        if self.received_signal is not None and self.refinement_child is not None:
+            self._kill_refinement_group(self.refinement_child.pid)
+        if self.refinement_stop_timer is not None:
+            self.refinement_stop_timer.cancel()
+            self.refinement_stop_timer = None
+        self.refinement_child = None
+
+    def _run_alignment_group(self, units: list[PlanUnit], plans: dict[str, AlignmentPlan], threads: int) -> int:
         """Run independent leaf commands; publish checkpoints per original unit."""
         cpu_count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
         budget = max(1, min(threads, cpu_count))
@@ -423,10 +484,32 @@ class Runner:
             if checkpoint.path.is_file():
                 row["state"] = "stale"
                 self._event("STALE", unit, f"{reason}; rerunning; {check_times}")
-            unit_tasks = load_tasks(self.server_dir, unit.unit_id, unit.command_relpath)
-            assert unit_tasks is not None
+            plan = plans[unit.unit_id]
+            if plan.checkpoint_without_tasks:
+                if self.received_signal is not None:
+                    return 128 + self.received_signal
+                checked = timestamp()
+                row.update(attempt=str(int(row["attempt"] or "0") + 1), started_at=checked)
+                started_at = time.monotonic()
+                try:
+                    result = self.outer_checkpoints.commit(checkpoint, expect_no_outputs=True)
+                except (OSError, OrchestrationContractError) as exc:
+                    row.update(state="failed", ended_at=timestamp(), exit_code="2",
+                               elapsed_seconds=f"{time.monotonic() - started_at:.3f}")
+                    atomic_write_status(self.status_path, self.status_rows)
+                    self._event("FAILED", unit, f"empty plan checkpoint failed: {exc}")
+                    return 2
+                row.update(state="success", ended_at=timestamp(), exit_code="0",
+                           elapsed_seconds=f"{time.monotonic() - started_at:.3f}")
+                atomic_write_status(self.status_path, self.status_rows)
+                self._event("SUCCESS", unit, "no generated tasks; committed checkpoint="
+                            + str(result.relative_to(self.server_dir)))
+                continue
+            unit_tasks = plan.tasks
             if not unit_tasks:
-                unit_tasks = [AlignmentTask(unit.unit_id, self.server_dir / unit.command_relpath, 1)]
+                # Older task manifests did not say whether the wrapper is a
+                # pure no-op. Preserve their original execution path.
+                unit_tasks = [AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath), 1)]
             prepared[unit.unit_id] = checkpoint
             remaining[unit.unit_id] = len(unit_tasks)
             tasks.extend(unit_tasks)
@@ -502,13 +585,27 @@ class Runner:
     def _row(self, unit: PlanUnit) -> dict[str, str]:
         return next(row for row in self.status_rows if row["unit_id"] == unit.unit_id)
 
+    def _app_pair_channel(self, index: int) -> str:
+        # Only consecutive full/light units in this live lock share a projection.
+        if self.contract_channel is None:
+            return ""
+        first = index - int(self.units[index].unit_id == "package_light")
+        if first < 0 or [u.unit_id for u in self.units[first:first + 2]] != ["package_full", "package_light"]:
+            return ""
+        return str(self.contract_channel.with_name(f"app-pair-{first}.json"))
+
     def _terminal_validation(self, unit_id: str) -> tuple[bool, str]:
+        if unit_id == "refinement":
+            from post_lgz_refinement import validate_completion
+            return validate_completion(self.server_dir, self.run_id)
         if unit_id == "degap_gapfill":
             from post_lgz_degap import validate_result
             return validate_result(self.server_dir)
         if unit_id in LGZ_CACHE_MARKERS:
             return self.outer_checkpoints.validate_lgz_unit(unit_id)
         if unit_id == "finalize_evidence":
+            if self.contract_channel is not None and READY in self.child_cache_markers:
+                return self.outer_checkpoints.publish_validated_evidence(self.contract_channel, self.run_id)
             return self.outer_checkpoints.validate_evidence()
         if unit_id == "package_full":
             return self.outer_checkpoints.validate_package("full")
@@ -545,12 +642,13 @@ class Runner:
         by_name = {str(artifact["file"]): artifact for artifact in artifacts}
         full = by_name[delivery_path(self.server_dir, "full").name]
         light = by_name[delivery_path(self.server_dir, "light").name]
+        has_refinement = any(unit.unit_id == "refinement" for unit in self.units)
         self._emit_summary(
             [
                 "",
-                "GPM Server workflow completed successfully.",
+                ("LGZ baseline delivery completed; refinement did not fully succeed." if self.refinement_exit_code else "GPM Server workflow completed successfully."),
                 "",
-                "Final delivery packages:",
+                ("LGZ baseline App packages (not refined):" if has_refinement else "Final delivery packages:"),
                 "  1. Full package (FASTA + report):",
                 f"     {full['path']}",
                 f"     Size: {self._format_size(int(full['size_bytes']))}",
@@ -563,8 +661,10 @@ class Runner:
                 f"     SHA-256: {light['sha256']}",
                 "     Use: App import and browsing; FASTA export is unavailable.",
                 "",
-                "Local report:",
-                f"  {self.server_dir / 'report/report.html'}",
+                ("Local LGZ process report:" if has_refinement else "Local report:"),
+                f"  {workspace_join(self.server_dir, 'report/report.html')}",
+                *(["Overall/refinement report (per-tool refined FASTA, Final Path and full/light App packages):",
+                   str(self.server_dir / "06_report/report.html")] if (self.server_dir / "06_report/report.html").is_file() else []),
             ]
         )
 
@@ -578,14 +678,17 @@ class Runner:
             lines.append(f"Failure stage: {failed}")
         lines.extend(
             [
-                f"Diagnostic report: {self.server_dir / 'report/report.html'}",
-                f"Rerun: bash {self.server_dir / 'run_all.sh'}",
+                f"Diagnostic report: {workspace_join(self.server_dir, 'report/report.html')}",
+                f"Rerun: bash {workspace_join(self.server_dir, 'run_all.sh')}",
                 "No delivery package is declared final for this run.",
             ]
         )
         self._emit_summary(lines)
 
     def run(self) -> int:
+        from migrated_lgz import verified_baseline
+        frozen = verified_baseline(self.server_dir)
+        frozen_units = {row["unit_id"] for row in frozen["prefix"]} if frozen else set()
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         prior = load_prior_status(self.status_path)
         self.status_rows, abandoned = initial_status_rows(self.units, prior)
@@ -595,7 +698,7 @@ class Runner:
         threads = "unknown"
         options = {}
         completed = False
-        options_path = self.server_dir / "metadata/prepare_options.tsv"
+        options_path = workspace_join(self.server_dir, "metadata/prepare_options.tsv")
         if options_path.is_file():
             try:
                 with options_path.open(newline="", encoding="utf-8") as handle:
@@ -634,8 +737,8 @@ class Runner:
             for signal_number in previous_handlers:
                 signal.signal(signal_number, self._handle_signal)
             try:
-                if options.get("alignment_engine") == "minimap2" or options.get("grt_minimap2"):
-                    snapshot_path = self.server_dir / ".run_all/diagnostics" / self.run_id / "minimap2_runtime.json"
+                if frozen is None and (options.get("alignment_engine") == "minimap2" or options.get("grt_minimap2")):
+                    snapshot_path = workspace_join(self.server_dir, ".run_all/diagnostics", self.run_id, "minimap2_runtime.json")
                     try:
                         snapshot = runtime_snapshot(self.server_dir, options)
                         snapshot.update(run_id=self.run_id, recorded_at=timestamp())
@@ -657,14 +760,28 @@ class Runner:
                             f"received signal {self.received_signal} between units",
                         )
                         return 128 + self.received_signal
+                    if unit.unit_id in frozen_units:
+                        row = self._row(unit)
+                        row.update(state="success", ended_at=timestamp(), elapsed_seconds="0.000", exit_code="0")
+                        atomic_write_status(self.status_path, self.status_rows)
+                        self._event("SKIP_MIGRATED_LGZ", unit,
+                                    "elapsed=0.000s validated original-engine frozen LGZ; no new-engine checkpoint created")
+                        continue
                     kind = unit.unit_id.split(":", 1)[0]
-                    if kind in {"ref", "q0_chr", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
-                        group = []
-                        for candidate in self.units[unit_index:]:
-                            if candidate.unit_id.split(":", 1)[0] != kind or load_tasks(self.server_dir, candidate.unit_id, candidate.command_relpath) is None:
+                    first_plan = (load_task_plan(self.server_dir, unit.unit_id, unit.command_relpath)
+                                  if kind in {"ref", "q0_chr", "chr"} else None)
+                    if first_plan is not None:
+                        group = [unit]
+                        plans = {unit.unit_id: first_plan}
+                        for candidate in self.units[unit_index + 1:]:
+                            if candidate.unit_id.split(":", 1)[0] != kind:
+                                break
+                            candidate_plan = load_task_plan(self.server_dir, candidate.unit_id, candidate.command_relpath)
+                            if candidate_plan is None:
                                 break
                             group.append(candidate)
-                        result = self._run_alignment_group(group, int(threads))
+                            plans[candidate.unit_id] = candidate_plan
+                        result = self._run_alignment_group(group, plans, int(threads))
                         handled.update(candidate.unit_id for candidate in group)
                         if result:
                             return result
@@ -693,7 +810,7 @@ class Runner:
                             unit,
                             f"exit_code=2 checkpoint preparation failed: {exc} "
                             f"detail={unit.detail_log_relpath} "
-                            f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                         )
                         return 2
 
@@ -730,7 +847,7 @@ class Runner:
 
                     attempt = int(row["attempt"] or "0") + 1
                     started_at = timestamp()
-                    started_monotonic = datetime.now(timezone.utc)
+                    started_monotonic = time.monotonic()
                     row.update(
                         {
                             "state": "running",
@@ -744,9 +861,9 @@ class Runner:
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("START", unit, f"attempt={attempt} command={unit.command_relpath}")
                     self.child_cache_markers.clear()
-                    failure_logs = self._failure_logs(unit, self.server_dir / unit.command_relpath)
+                    failure_logs = self._failure_logs(unit, workspace_join(self.server_dir, unit.command_relpath))
                     child = subprocess.Popen(
-                        ["bash", str(self.server_dir / unit.command_relpath)],
+                        ["bash", str(workspace_join(self.server_dir, unit.command_relpath))],
                         cwd=self.server_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
@@ -757,19 +874,22 @@ class Runner:
                         start_new_session=True,
                         env={**dispatch_environment(
                                 {**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id},
-                                AlignmentTask(unit.unit_id, self.server_dir / unit.command_relpath,
+                                AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath),
                                               int(threads) if threads != "unknown" else 1),
                                 int(threads) if threads != "unknown" else 1, exclusive=True),
+                             "GPM_APP_PROJECTION_PAIR": self._app_pair_channel(unit_index),
+                             DEFER_ENV: "1" if self.contract_channel and unit.unit_id == "finalize_evidence" else "",
+                             CHANNEL_ENV: str(self.contract_channel) if (self.contract_channel and unit.unit_id == "refinement"
+                                 and unit_index > 0 and self.units[unit_index - 1].unit_id == "finalize_evidence") else "",
                              "GPM_REPORT_UNIT_ID": unit.unit_id,
                              **({"GPM_TASK_THREADS": str(threads)} if threads != "unknown" else {})},
                     )
                     self.active_child = child
-                    if self.received_signal is not None and child.poll() is None:
-                        try:
-                            os.killpg(child.pid, self.received_signal)
-                        except ProcessLookupError:
-                            pass
+                    self.refinement_child = child if unit.unit_id == "refinement" else None
+                    if self.received_signal is not None:
+                        self._handle_signal(self.received_signal, None)
                     self._stream_child(unit, child)
+                    self._finish_refinement_group()
                     child_return_code = child.wait()
                     exit_code = (
                         128 - child_return_code
@@ -777,7 +897,7 @@ class Runner:
                         else child_return_code
                     )
                     self.active_child = None
-                    elapsed = (datetime.now(timezone.utc) - started_monotonic).total_seconds()
+                    elapsed = time.monotonic() - started_monotonic
                     row.update(
                         {
                             "ended_at": timestamp(),
@@ -792,7 +912,7 @@ class Runner:
                             "INTERRUPTED",
                             unit,
                             f"signal={self.received_signal} exit_code={exit_code} "
-                            f"detail={unit.detail_log_relpath} rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            f"detail={unit.detail_log_relpath} rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                         )
                         return 128 + self.received_signal
                     if exit_code != 0:
@@ -802,14 +922,23 @@ class Runner:
                             "FAILED",
                             unit,
                             f"exit_code={exit_code} detail={unit.detail_log_relpath} "
-                            f"rerun='bash {self.server_dir / 'run_all.sh'}'"
+                            f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'"
                             + self._failure_hint(unit, failure_logs),
                         )
+                        if unit.unit_id == "refinement":
+                            self.refinement_exit_code = exit_code
+                            continue
                         return exit_code
                     try:
                         valid, reason = self._terminal_validation(unit.unit_id)
                     except (OSError, OrchestrationContractError) as exc:
                         valid, reason = False, str(exc)
+                    if unit.unit_id == "finalize_evidence":
+                        # This stage finishes when the owner has checked and published
+                        # the evidence, not when the assembler process exits.
+                        child_seconds, elapsed = elapsed, time.monotonic() - started_monotonic
+                        row.update(ended_at=timestamp(), elapsed_seconds=f"{elapsed:.3f}")
+                        self._event("INFO", unit, f"child={child_seconds:.3f}s terminal_check={elapsed - child_seconds:.3f}s; {reason}")
                     if not valid:
                         row["state"] = "failed"
                         row["exit_code"] = "2"
@@ -819,8 +948,11 @@ class Runner:
                             unit,
                             f"exit_code=2 terminal validation failed: {reason} "
                             f"detail={unit.detail_log_relpath} "
-                            f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                         )
+                        if unit.unit_id == "refinement":
+                            self.refinement_exit_code = 2
+                            continue
                         return 2
                     cache_markers = STAGE_CACHE_MARKERS.get(unit.unit_id, ())
                     if cache_markers and self.child_cache_markers == set(cache_markers):
@@ -837,7 +969,7 @@ class Runner:
                                 unit,
                                 f"exit_code=2 output validation/checkpoint failed: {exc} "
                                 f"detail={unit.detail_log_relpath} "
-                                f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                                f"rerun='bash {workspace_join(self.server_dir, 'run_all.sh')}'",
                             )
                             return 2
                         row["state"] = "success"
@@ -851,11 +983,13 @@ class Runner:
                     row["state"] = "success"
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("SUCCESS", unit, f"elapsed={elapsed:.3f}s")
-                self._event("SUCCESS", None, "pipeline completed")
+                self._event("FAILED" if self.refinement_exit_code else "SUCCESS", None,
+                            "LGZ complete; refinement has failures" if self.refinement_exit_code else "pipeline completed")
                 completed = True
-                return 0
+                return self.refinement_exit_code
             finally:
                 error = sys.exc_info()[1]
+                self._finish_refinement_group()
                 self.active_child = None
                 for signal_number, handler in previous_handlers.items():
                     signal.signal(signal_number, handler)
@@ -877,9 +1011,9 @@ class Runner:
                     self._emit_summary(
                         [
                             "",
-                            "GPM Server workflow completed successfully.",
+                            ("LGZ baseline delivery completed; refinement did not fully succeed." if self.refinement_exit_code else "GPM Server workflow completed successfully."),
                             "No delivery package units are present in this execution plan.",
-                            f"Local report: {self.server_dir / 'report/report.html'}",
+                            f"Local report: {workspace_join(self.server_dir, 'report/report.html')}",
                         ]
                     )
                 else:
@@ -897,6 +1031,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--server-dir", required=True, type=Path)
     parser.add_argument("--log-style", choices=("compact", "detailed"), default="compact")
     parser.add_argument("--color", choices=("auto", "always", "never"), default="auto")
+    parser.add_argument("--hifi", nargs="+", action="extend")
+    parser.add_argument("--ont", nargs="+", action="extend")
+    parser.add_argument("--gapfill-tools")
+    parser.add_argument("--threads", "-t", type=int)
     return parser.parse_args()
 
 
@@ -907,19 +1045,42 @@ def main() -> int:
         print(f"ERROR: Server workspace is missing: {server_dir}", file=sys.stderr)
         return 2
     run_id = new_run_id()
-    lock = WorkspaceLock(server_dir, run_id)
     try:
-        units = load_plan(server_dir)
+        lock = WorkspaceLock(server_dir, run_id)
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    try:
         lock.acquire()
-        runtime = server_dir / ".prepare_lib/tools/long_cigar_recovery"
-        if runtime.is_dir() and any(unit.unit_id.startswith("ref:") for unit in units):
+        from refinement_config import save_request, ensure_plan, resolve, preflight
+        supplied = {"--" + kind: [[str(Path(path).resolve())] for path in getattr(args, kind)]
+                    for kind in ("hifi", "ont") if getattr(args, kind) is not None}
+        if args.gapfill_tools is not None:
+            supplied["--gapfill-tools"] = [[args.gapfill_tools]]
+        _, request = resolve(server_dir, supplied)
+        preflight(request)
+        if args.threads is not None:
+            if args.threads < 1:
+                raise RunnerError("--threads must be positive")
+            from run_resources import update_resources
+            update_resources(server_dir, {"--threads": [[str(args.threads)]]}, run_id)
+        save_request(server_dir, supplied, run_id)
+        ensure_plan(server_dir)
+        units = load_plan(server_dir)
+        runtime = workspace_join(server_dir, ".prepare_lib/tools/long_cigar_recovery")
+        from migrated_lgz import verified_baseline
+        if runtime.is_dir() and verified_baseline(server_dir) is None and any(unit.unit_id.startswith("ref:") for unit in units):
             # run.sh uses its own locked handoff; direct run_all.sh reaches this
             # entry instead. Do not perform the handoff twice in Runner.run().
             sys.path.insert(0, str(runtime))
             from resume_reference import handoff
-            report = handoff(server_dir, server_dir / ".prepare_lib", run_id, units, OuterCheckpointManager(server_dir))
+            report = handoff(server_dir, workspace_join(server_dir, ".prepare_lib"), run_id, units, OuterCheckpointManager(server_dir))
             print("[REFERENCE HANDOFF] " + json.dumps(report, ensure_ascii=True), flush=True)
-        return Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color).run()
+        runner = Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color)
+        # No handoff survives a lock release, restart, package import or migration.
+        with tempfile.TemporaryDirectory(prefix="cgat-lgz-check-") as private:
+            runner.contract_channel = Path(private) / "verified.json"
+            return runner.run()
     except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

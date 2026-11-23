@@ -142,7 +142,7 @@ class Q0ReportTests(unittest.TestCase):
         facts = collect_lgz_inputs(self.root)
         relative = "steps/001.json"
         write_json(session.report / relative, {"schema_version": SCHEMA, "run_id": session.run_id,
-                                               "stage_id": "grt_prepare", "status": "success", "facts": facts})
+                                               "stage_id": "lgz_prepare", "status": "success", "facts": facts})
         session.manifest["steps"] = [relative]
         session.save()
         (self.root / "grt/q/q0.fa").write_text(">changed\nAAAA\n")

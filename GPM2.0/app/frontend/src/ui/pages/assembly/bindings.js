@@ -1144,6 +1144,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   bindFinalPathSelection(host, store);
   (deps.bindFinalPathExport || bindFinalPathExport)(host, store, deps);
   deps.bindDegapCard?.(host, store);
+  deps.bindManualRefinementCard?.(host, store);
 
   if (isFullPageBinding && initialState.assembly.activeTab === "check-new-sequences") {
     void loadNewSequencesTab(host, store);

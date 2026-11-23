@@ -10,11 +10,22 @@ evidence in the Final Path document.
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join, WorkspaceLayout, logical_relative
+    from run_orchestration import sha256_file
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join, WorkspaceLayout, logical_relative
+    from .run_orchestration import sha256_file
+
+
 import argparse
 import csv
 import hashlib
 import json
+import os
 import shutil
+import socket
+import stat
 from pathlib import Path
 
 from lgz_display_evidence import build_display_evidence
@@ -41,14 +52,6 @@ REQUIRED_METADATA = (
 )
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def read_fai_lengths(path: Path) -> dict[str, int]:
     lengths: dict[str, int] = {}
     for line_number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -66,42 +69,73 @@ def read_fai_lengths(path: Path) -> dict[str, int]:
     return lengths
 
 
+def copy_to_projection(source: Path, target: Path) -> None:
+    """Copy into fresh private staging; tables and indices may be rewritten there."""
+    shutil.copy2(source, target)
+    if target.suffix in {".tsv", ".json", ".fai"}:
+        mode = stat.S_IMODE(target.stat().st_mode)
+        if not mode & stat.S_IWUSR:
+            target.chmod(mode | stat.S_IWUSR)
+
+
 def copy_file(source_root: Path, staging_root: Path, relpath: str) -> None:
-    source = source_root / relpath
+    source = workspace_join(source_root, relpath)
     if not source.is_file():
         raise FileNotFoundError(f"required App payload file is missing: {relpath}")
-    target = staging_root / relpath
+    target = workspace_join(staging_root, relpath)
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, target)
+    copy_to_projection(source, target)
 
 
 def copy_tree_filtered(source_root: Path, staging_root: Path, directory: str, include_fasta: bool) -> None:
-    source_dir = source_root / directory
+    source_dir = workspace_join(source_root, directory)
     if not source_dir.is_dir():
         return
     for source in sorted(source_dir.rglob("*")):
         if not source.is_file():
             continue
-        relpath = source.relative_to(source_root)
+        relpath = Path(directory) / source.relative_to(source_dir)
         if not include_fasta and source.suffix.lower() in FASTA_SUFFIXES:
             continue
-        target = staging_root / relpath
+        target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        copy_to_projection(source, target)
 
 
 def copy_annotation_tree(source_root: Path, staging_root: Path, directory: str) -> None:
-    source_dir = source_root / directory
+    source_dir = workspace_join(source_root, directory)
     if not source_dir.is_dir():
         return
     for source in sorted(source_dir.rglob("*.tsv")):
         if not source.is_file():
             continue
-        relpath = source.relative_to(source_root)
-        target = staging_root / relpath
+        relpath = Path(directory) / source.relative_to(source_dir)
+        target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        copy_to_projection(source, target)
 
+
+
+def project_locator_paths(staging_root: Path) -> None:
+    """Never leak Server's physical numbering into portable App locators."""
+    for name in ("reference.tsv", "datasets.tsv", "source_seq_locator.tsv", "reference_chr_locator.tsv", "grt_recipe.tsv"):
+        path = staging_root / "metadata" / name
+        fields, rows = None, []
+        with path.open(newline="", encoding="utf-8") as stream:
+            reader = csv.DictReader(stream, delimiter="\t")
+            fields, rows = list(reader.fieldnames or []), list(reader)
+        changed = False
+        for row in rows:
+            for key in fields:
+                if key.endswith("_relpath") and row[key]:
+                    value = logical_relative(row[key])
+                    changed = changed or value != row[key]
+                    row[key] = value
+        if changed:
+            with path.open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fields, delimiter="\t", lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(rows)
 
 def project_package_table(source: Path, target: Path, package_mode: str) -> str:
     with source.open(newline="", encoding="utf-8") as handle:
@@ -184,11 +218,11 @@ def load_display_source_cards(source_root: Path) -> set[tuple[str, str, str]]:
     cards: set[tuple[str, str, str]] = set()
     table_specs = (
         (
-            source_root / "metadata/chr_assignments.tsv",
+            workspace_join(source_root, "metadata/chr_assignments.tsv"),
             ("dataset_name", "seq_name", "assigned_chr_name"),
         ),
         (
-            source_root / "metadata/grt_used_contigs.tsv",
+            workspace_join(source_root, "metadata/grt_used_contigs.tsv"),
             ("dataset_name", "contig_name", "target_chr"),
         ),
     )
@@ -297,6 +331,7 @@ def project_final_path(
         source_lengths,
         display_source_cards,
     )
+    payload["q4_relpath"] = logical_relative(payload["q4_relpath"])
     payload["workflow"] = APP_WORKFLOW
     payload["schema_version"] = FINAL_PATH_SCHEMA_VERSION
     for chromosome in payload["chromosomes"]:
@@ -318,11 +353,11 @@ def project_final_path(
 
 
 def validate_source_locators(source_root: Path) -> dict[tuple[str, str], int]:
-    path = source_root / "metadata/source_seq_locator.tsv"
+    path = workspace_join(source_root, "metadata/source_seq_locator.tsv")
     dataset_fai: dict[str, dict[str, int]] = {}
-    with (source_root / "metadata/datasets.tsv").open(newline="", encoding="utf-8") as handle:
+    with (workspace_join(source_root, "metadata/datasets.tsv")).open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
-            dataset_fai[row["dataset_name"]] = read_fai_lengths(source_root / row["fai_relpath"])
+            dataset_fai[row["dataset_name"]] = read_fai_lengths(workspace_join(source_root, row["fai_relpath"]))
     lengths: dict[tuple[str, str], int] = {}
     with path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
@@ -350,7 +385,7 @@ def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, f
         "q4_chromosome_lengths": q4_lengths,
         "final_path_sha256": hashlib.sha256(json.dumps(final_path, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
     }
-    target = staging_root / "metadata/grt_app_manifest.json"
+    target = workspace_join(staging_root, "metadata/grt_app_manifest.json")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -375,24 +410,62 @@ def delivered_alignment_policy(sidecar: Path, staged_paf: Path) -> dict:
         raise ValueError("alignment policy does not bind the delivered complete PAF")
     return value
 
-def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
+ADD_COMPATIBILITY_OPTIONS = ("alignment_engine", "minimap_preset", "skip_self", "tel_enabled", "cen_enabled")
+
+
+def project_add_compatibility_options(source_root: Path, staging_root: Path) -> None:
+    """Keep the policy the App checks for incremental imports, not private Server options."""
+    source = workspace_join(source_root, "metadata/prepare_options.tsv")
+    if not source.is_file():
+        return
+    with source.open(newline="", encoding="utf-8") as stream:
+        rows = [(row["key"], row["value"]) for row in csv.DictReader(stream, delimiter="\t")
+                if row.get("key") in ADD_COMPATIBILITY_OPTIONS]
+    values = dict(rows)
+    if len(rows) != len(values):
+        raise ValueError("duplicate compatibility keys in Server prepare options")
+    # Older prepared workspaces may have no complete incremental option set.
+    # Leave them on the existing App legacy path rather than guessing flags.
+    if set(values) != set(ADD_COMPATIBILITY_OPTIONS):
+        return
+    if (values["alignment_engine"] != "minimap2"
+            or values["minimap_preset"] not in {"asm5", "asm10", "asm20"}
+            or any(values[name] not in {"true", "false"} for name in ("skip_self", "tel_enabled", "cen_enabled"))):
+        if WorkspaceLayout.detect(source_root).version == 1:
+            return  # Do not change the legacy archive contract for other engines.
+        raise ValueError("invalid incremental compatibility options in Server preparation")
+    destination = staging_root / "metadata/prepare_options.tsv"
+    with destination.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream, delimiter="\t", lineterminator="\n")
+        writer.writerow(("key", "value"))
+        writer.writerows((name, values[name]) for name in ADD_COMPATIBILITY_OPTIONS)
+
+
+def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True, server_sources=None,
+          standalone_delivery: bool = False) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
-    with (source_root / "metadata/package.tsv").open(newline="", encoding="utf-8") as handle:
+    layout = WorkspaceLayout.detect(source_root)
+    # A numbered LGZ delivery represents only the frozen baseline. In migrated
+    # workspaces a legacy reads receipt can survive even when the old DEGAP
+    # stage was intentionally never run. Keep its artifacts in the workspace,
+    # but neither require nor attach them to 00_lgz.
+    include_legacy_gapfill = include_legacy_gapfill and layout.version == 1
+    with (workspace_join(source_root, "metadata/package.tsv")).open(newline="", encoding="utf-8") as handle:
         package_rows = list(csv.DictReader(handle, delimiter="\t"))
     if (len(package_rows) != 1 or package_rows[0].get("workflow") != "gpm_grt_precomputed_v2"
             or package_rows[0].get("schema_version") not in {APP_SCHEMA_VERSION, Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}):
         raise ValueError("unsupported Server package schema for App projection")
-    if package_rows[0]["schema_version"] in {Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}:
-        # The projected App contract is intentionally smaller; verify the full
-        # frozen Server proof before omitting Server-only audit artifacts.
+    if standalone_delivery or package_rows[0]["schema_version"] in {Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}:
+        # One authority per build, before any staging is touched. The delivery CLI
+        # also validates legacy v2; internal v2 projections keep their old contract.
         from lgz_contract import validate_contract
         validate_contract(source_root)
     if staging_root.exists():
         shutil.rmtree(staging_root)
     staging_root.mkdir(parents=True)
 
-    if (source_root / "metadata/degap_inputs.json").is_file():
+    if include_legacy_gapfill and (workspace_join(source_root, "metadata/degap_inputs.json")).is_file():
         from post_lgz_degap import validate_result
         valid, reason = validate_result(source_root)
         if not valid:
@@ -401,35 +474,44 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     display_source_cards = load_display_source_cards(source_root)
     for filename in REQUIRED_METADATA:
         if filename == "grt_recipe.tsv":
-            project_recipe(source_root / "metadata/grt_recipe.tsv", staging_root / "metadata/grt_recipe.tsv")
+            project_recipe(workspace_join(source_root, "metadata/grt_recipe.tsv"), workspace_join(staging_root, "metadata/grt_recipe.tsv"))
         elif filename == "grt_used_contigs.tsv":
-            project_used_contigs(source_root / "metadata/grt_used_contigs.tsv", staging_root / "metadata/grt_used_contigs.tsv")
+            project_used_contigs(workspace_join(source_root, "metadata/grt_used_contigs.tsv"), workspace_join(staging_root, "metadata/grt_used_contigs.tsv"))
         else:
             copy_file(source_root, staging_root, f"metadata/{filename}")
+    project_add_compatibility_options(source_root, staging_root)
     for filename in OPTIONAL_METADATA:
-        if (source_root / "metadata" / filename).is_file():
+        if filename == "degap_gapfill.json" and not include_legacy_gapfill:
+            continue
+        if (workspace_join(source_root, "metadata", filename)).is_file():
             copy_file(source_root, staging_root, f"metadata/{filename}")
             if filename == "degap_gapfill.json":
-                report_path = staging_root / "metadata" / filename
+                report_path = workspace_join(staging_root, "metadata", filename)
                 report = json.loads(report_path.read_text())
                 report["fasta_available"] = include_fasta
                 report_path.write_text(json.dumps(report, indent=2) + "\n")
     final_path, q4_lengths = project_final_path(
         source_root,
-        source_root / "metadata/grt_final_path.json",
-        staging_root / "metadata/grt_final_path.json",
+        workspace_join(source_root, "metadata/grt_final_path.json"),
+        workspace_join(staging_root, "metadata/grt_final_path.json"),
         source_lengths,
         display_source_cards,
     )
-    app_schema = project_package_table(source_root / "metadata/package.tsv", staging_root / "metadata/package.tsv", "full" if include_fasta else "no_fasta")
+    app_schema = project_package_table(workspace_join(source_root, "metadata/package.tsv"), workspace_join(staging_root, "metadata/package.tsv"), "full" if include_fasta else "no_fasta")
 
-    copy_tree_filtered(source_root, staging_root, "data", include_fasta)
+    if layout.version == 2:
+        # The logical data subtree is physically split. Do not ship converted
+        # raw reads or their ID maps as App source assemblies.
+        for directory in ("data", "data/reference", "data/datasets"):
+            copy_tree_filtered(source_root, staging_root, directory, include_fasta)
+    else:
+        copy_tree_filtered(source_root, staging_root, "data", include_fasta)
     # Keep compact output-bound policy, not private commands/logs/tool caches.
     # Legacy runs without a policy companion remain readable, not certified.
     alignment_policies = []
-    for result in sorted((source_root / "runs").rglob("result.paf")):
-        relpath = result.relative_to(source_root)
-        target = staging_root / relpath
+    for result in sorted((workspace_join(source_root, "runs")).rglob("result.paf")):
+        relpath = Path("runs") / result.relative_to(workspace_join(source_root, "runs"))
+        target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(result, target)
         sidecar = result.with_suffix(".alignment.json")
@@ -437,24 +519,114 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
             alignment_policies.append({"result_paf": relpath.as_posix(),
                                        "policy": delivered_alignment_policy(sidecar, target)})
     if alignment_policies:
-        (staging_root / "metadata/alignment_provenance.json").write_text(json.dumps(
+        (workspace_join(staging_root, "metadata/alignment_provenance.json")).write_text(json.dumps(
             {"schema": 1, "scope": "recorded_initial_reference_alignments_only", "alignments": alignment_policies},
             indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     copy_annotation_tree(source_root, staging_root, "tel")
     copy_annotation_tree(source_root, staging_root, "cen")
-    if include_fasta and (source_root / "cen/library.fa").is_file():
+    if include_fasta and (workspace_join(source_root, "cen/library.fa")).is_file():
         copy_file(source_root, staging_root, "cen/library.fa")
 
     final_relpath = final_path["q4_relpath"]
-    q4_source = source_root / final_relpath
+    q4_source = workspace_join(source_root, final_relpath)
     if include_fasta:
         copy_file(source_root, staging_root, final_relpath)
-        if (source_root / (final_relpath + ".fai")).is_file():
+        if (workspace_join(source_root, final_relpath + ".fai")).is_file():
             copy_file(source_root, staging_root, final_relpath + ".fai")
-        q4_hash = sha256_file(q4_source)
-    else:
-        q4_hash = sha256_file(q4_source)
+    q4_hash = sha256_file(q4_source)
+    project_locator_paths(staging_root)
+    from server_source_identity import original_bindings, write_map
+    write_map(staging_root, original_bindings(source_root, source_lengths) if server_sources is None else server_sources)
     write_manifest(staging_root, "full" if include_fasta else "no_fasta", include_fasta, final_path, q4_hash, q4_lengths, schema_version=app_schema)
+
+
+def _pair_inventory(root: Path) -> dict:
+    # The generated App payload must contain ordinary files only. Never trust
+    # a directory/file-name list from a bundle or reread the FASTA for this.
+    if not root.is_dir() or root.is_symlink() or root.parent.is_symlink():
+        raise ValueError("invalid full delivery staging directory")
+    files = {}
+    for path in root.rglob("*"):
+        st = path.lstat()
+        if stat.S_ISDIR(st.st_mode):
+            continue
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError(f"unexpected non-file in staged App payload: {path}")
+        files[path.relative_to(root).as_posix()] = [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns]
+    return files
+
+
+def _pair_channel(source, full):
+    path, run = os.environ.get("GPM_APP_PROJECTION_PAIR"), os.environ.get("GPM_REPORT_RUN_ID")
+    if not path or not run or os.environ.get("GPM_REPORT_UNIT_ID") != ("package_full" if full else "package_light"):
+        return None
+    layout = WorkspaceLayout.detect(source)
+    channel = Path(path)
+    if layout.version != 2 or not channel.is_absolute() or channel.resolve().is_relative_to(source):
+        return None
+    owner = layout.path(".run_all/lock/owner.json")
+    if not owner.is_file():
+        return None
+    lock = json.loads(owner.read_text(encoding="utf-8"))
+    from run_all_runner import process_is_alive
+    if (lock.get("run_id") != run or lock.get("workspace") != str(source)
+            or lock.get("hostname") != socket.gethostname() or not isinstance(lock.get("pid"), int)
+            or lock["pid"] < 1 or not process_is_alive(lock["pid"], lock.get("process_start", ""))):
+        return None
+    return channel
+
+
+def _derive_light(full, light, files):
+    if _pair_inventory(full) != files:
+        raise ValueError("full App staging changed before light derivation; refusing inconsistent deliveries")
+    manifest_name = "metadata/grt_app_manifest.json"
+    manifest = json.loads((full / manifest_name).read_text(encoding="utf-8"))
+    if manifest["workflow"] != APP_WORKFLOW or manifest["package_kind"] != "full" or manifest["fasta_available"] is not True:
+        raise ValueError("expected a full App payload")
+    final = manifest["q4_relpath"]
+    # The light schema retains *source* FASTA indices, not the final-Q index.
+    omit = {final, final + ".fai", "cen/library.fa"}
+    light.mkdir(parents=True, exist_ok=False)
+    for name in files:
+        path = full / name
+        if name in omit or (name.startswith("data/") and path.suffix.lower() in FASTA_SUFFIXES):
+            continue
+        target = light / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if name == manifest_name:
+            manifest.update(package_kind="no_fasta", fasta_available=False)
+            target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        elif name == "metadata/package.tsv":
+            with path.open(newline="", encoding="utf-8") as src, target.open("w", newline="", encoding="utf-8") as dst:
+                reader = csv.DictReader(src, delimiter="\t")
+                writer = csv.DictWriter(dst, fieldnames=reader.fieldnames, delimiter="\t", lineterminator="\n")
+                writer.writeheader()
+                for row in reader:
+                    writer.writerow({**row, "package_mode": "no_fasta"})
+        else:
+            # Independent staging; neither report embedding nor edits to light
+            # may mutate its full sibling through a hard link.
+            shutil.copy2(path, target)
+    if _pair_inventory(full) != files:
+        raise ValueError("full App staging changed during light derivation")
+
+
+def build_delivery(source, staging, full):
+    source = source.resolve()
+    channel = _pair_channel(source, full)
+    run = os.environ.get("GPM_REPORT_RUN_ID")
+    if not full and channel is not None and channel.is_file():
+        from delivery_archive import delivery_staging_path
+        receipt = json.loads(channel.read_text(encoding="utf-8"))
+        if receipt["run"] == run and receipt["source"] == str(source):
+            _derive_light(delivery_staging_path(source, "full"), staging, receipt["files"])
+            print("Light App payload derived from this run's full projection")
+            return
+    # Standalone, legacy, resumed and unpaired steps always have a complete path.
+    build(source, staging, full, standalone_delivery=True)
+    if full and channel is not None:
+        with channel.open("x", encoding="utf-8") as stream:
+            json.dump({"run": run, "source": str(source), "files": _pair_inventory(staging)}, stream, separators=(",", ":"))
 
 
 def main() -> int:
@@ -465,7 +637,7 @@ def main() -> int:
     group.add_argument("--include-fasta", action="store_true")
     group.add_argument("--no-fasta", action="store_true")
     args = parser.parse_args()
-    build(args.source, args.staging, args.include_fasta)
+    build_delivery(args.source, args.staging, args.include_fasta)
     print(f"App payload staged at {args.staging}")
     return 0
 

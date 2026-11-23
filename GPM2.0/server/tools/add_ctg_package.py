@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
 import csv
 import shutil
 import sys
@@ -77,7 +83,7 @@ def main(argv):
     server_dir = Path(argv[1])
     package_dir = Path(argv[2])
     ctg_name = argv[3]
-    manifest_src = server_dir / "metadata" / "add_ctg_manifests" / f"{ctg_name}.tsv"
+    manifest_src = workspace_join(server_dir, "metadata", "add_ctg_manifests", f"{ctg_name}.tsv")
     manifest, manifest_rows = read_manifest(manifest_src)
     if manifest.get("package_type") != "add_ctg":
         fail(f"invalid add_ctg manifest: {manifest_src}")
@@ -94,7 +100,7 @@ def main(argv):
     write_key_value_manifest(package_dir / "add_ctg" / "manifest.tsv", manifest_rows)
 
     payload_root = package_dir / "gpm_server"
-    metadata_dir = server_dir / "metadata"
+    metadata_dir = workspace_join(server_dir, "metadata")
     write_filtered_tsv(
         metadata_dir / "datasets.tsv",
         payload_root / "metadata" / "datasets.tsv",
@@ -136,27 +142,27 @@ def main(argv):
         for row in locator_rows:
             relpath = row.get("fasta_relpath", "")
             if relpath:
-                copy_file(server_dir / relpath, payload_root / relpath)
-                copy_file(server_dir / f"{relpath}.fai", payload_root / f"{relpath}.fai")
+                copy_file(workspace_join(server_dir, relpath), payload_root / relpath)
+                copy_file(workspace_join(server_dir, f"{relpath}.fai"), payload_root / f"{relpath}.fai")
 
         copy_file(
-            server_dir / f"data/derived_ctgs/{ctg_name}.fa",
+            workspace_join(server_dir, f"data/derived_ctgs/{ctg_name}.fa"),
             payload_root / f"data/datasets/{DERIVED_DATASET}.fa",
         )
         copy_file(
-            server_dir / f"data/derived_ctgs/{ctg_name}.fa.fai",
+            workspace_join(server_dir, f"data/derived_ctgs/{ctg_name}.fa.fai"),
             payload_root / f"data/datasets/{DERIVED_DATASET}.fa.fai",
         )
 
         chr_dataset_payload = payload_root / "runs" / f"chr_{target_chr}" / "datasets" / f"{DERIVED_DATASET}.fa"
-        copy_file(server_dir / f"data/derived_ctgs/{ctg_name}.fa", chr_dataset_payload)
+        copy_file(workspace_join(server_dir, f"data/derived_ctgs/{ctg_name}.fa"), chr_dataset_payload)
 
     copy_tree(
-        server_dir / "runs" / "add_ctg" / f"{ctg_name}_vs_ref",
+        workspace_join(server_dir, "runs", "add_ctg", f"{ctg_name}_vs_ref"),
         payload_root / "runs" / "add_ctg" / f"{ctg_name}_vs_ref",
     )
     if not skip_self:
-        add_ctg_runs_dir = server_dir / "runs" / f"chr_{target_chr}" / "add_ctg"
+        add_ctg_runs_dir = workspace_join(server_dir, "runs", f"chr_{target_chr}", "add_ctg")
         if not add_ctg_runs_dir.exists():
             fail(f"add_ctg payload is missing directory: {add_ctg_runs_dir}")
         copied = 0

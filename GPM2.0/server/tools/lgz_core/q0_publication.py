@@ -6,6 +6,12 @@ This module validates the prepared transaction, not the later q4/App delivery.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 from collections import defaultdict
 from dataclasses import asdict
 import json
@@ -104,13 +110,13 @@ def stage_selection(server_dir, stage_root, construction, datasets, assignments)
     artifacts.discard(None)
     envelope = {"schema": SELECTION_SCHEMA, "construction": construction.decisions,
                 "artifact_hashes": {name: sha256_file(artifact_path(server_dir, name)) for name in sorted(artifacts)}}
-    selection_path = stage_root / SELECTION
+    selection_path = workspace_join(stage_root, SELECTION)
     write_json(selection_path, envelope)
     selection_hash = sha256_file(selection_path)
     rows = q0_rows(construction.decisions, assignments)
     dataset_paths = {row["dataset_name"]: row["fasta_relpath"] for row in datasets}
     source_hashes = {name: sha256_file(artifact_path(server_dir, relative)) for name, relative in dataset_paths.items()}
-    q0_hash = sha256_file(stage_root / "grt/q/q0.fa")
+    q0_hash = sha256_file(workspace_join(stage_root, "grt/q/q0.fa"))
     evidence = []
     for row in rows:
         if row["segment_kind"] != "source":
@@ -155,13 +161,13 @@ def freeze_manifest(stage_root, construction, sequences, datasets, donor_sets, m
     immutable_paths.extend(row[field] for row in donor_sets for field in ("fasta_relpath", "manifest_relpath"))
     payload = {"schema": FREEZE_SCHEMA, "package_schema_version": PACKAGE_SCHEMA_VERSION,
                "scope": "q0_donor_freeze", "publication_identity": publication_identity(),
-               "selection": SELECTION, "selection_sha256": sha256_file(stage_root / SELECTION),
-               "q0_rows_sha256": row_hash(read_tsv(stage_root / "metadata/grt_q_segments.tsv", Q_SEGMENT_FIELDS), Q_SEGMENT_FIELDS),
+               "selection": SELECTION, "selection_sha256": sha256_file(workspace_join(stage_root, SELECTION)),
+               "q0_rows_sha256": row_hash(read_tsv(workspace_join(stage_root, "metadata/grt_q_segments.tsv"), Q_SEGMENT_FIELDS), Q_SEGMENT_FIELDS),
                "q0_evidence_sha256": row_hash(evidence_rows, EVIDENCE_FIELDS),
                "sources": source_rows, "members": member_rows,
                "source_fastas": {row["dataset_name"]: row["fasta_relpath"] for row in datasets},
-               "artifacts": {name: sha256_file(stage_root / name) for name in sorted(set(immutable_paths))}}
-    write_json(stage_root / FREEZE, payload)
+               "artifacts": {name: sha256_file(workspace_join(stage_root, name)) for name in sorted(set(immutable_paths))}}
+    write_json(workspace_join(stage_root, FREEZE), payload)
     return payload
 
 
@@ -199,7 +205,13 @@ def validate_prepared_q0(root: Path, *, source_root: Path | None = None, expecte
     initial_datasets = {recipe["primary_dataset"], *json.loads(recipe["support_datasets_json"])}
     expected_fastas = {row["dataset_name"]: row["fasta_relpath"] for row in read_tsv(resolve("metadata/datasets.tsv"))
                        if row["dataset_name"] in initial_datasets}
-    if set(expected_fastas) != initial_datasets or frozen["source_fastas"] != expected_fastas:
+    # A frozen logical path and the new physical numbered spelling may name
+    # the same workspace role. Compare those roles, never sequence similarity
+    # or symlink targets; all original frozen hashes are still checked below.
+    frozen_fastas = frozen["source_fastas"]
+    if (set(expected_fastas) != initial_datasets or set(frozen_fastas) != initial_datasets
+            or {name: workspace_join(source_root, relative) for name, relative in frozen_fastas.items()}
+            != {name: workspace_join(source_root, relative) for name, relative in expected_fastas.items()}):
         raise Q0EvidenceError("q0 source FASTA inventory differs from locked recipe datasets")
     for relative, digest in frozen["artifacts"].items():
         if sha256_file(resolve(relative)) != digest:

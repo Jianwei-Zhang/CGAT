@@ -2,6 +2,12 @@
 """Record and deliver a portable report for prepare.sh and run_all.sh."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 from delivery_archive import (
     archive_options, attach_tar_report, create_archive, validate_tar_archive,
 )
@@ -14,6 +20,7 @@ import sys
 import uuid
 import zipfile
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 
 from server_report_collect import (
@@ -22,10 +29,11 @@ from server_report_collect import (
 from server_report_io import SCHEMA, digest, local_path, now, read_json, write_json
 from render_server_report import project_report_facts, render
 from run_resources import read_resources
+from run_orchestration import LGZ_PREPARE_IDS
 
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
-    "q0_evidence": "q0 候选与补充比对证据", "grt_prepare": "质量评估、q0 与供体构建",
+    "q0_evidence": "q0 候选与补充比对证据", **dict.fromkeys(LGZ_PREPARE_IDS, "LGZ · 构建 q0 与供体"),
     "grt_step1": "Step1 · 补丁验证与处理分支", "grt_step2": "Step2 · 结构修正与优化填补",
     "grt_step3": "Step3 · 端粒处理与最终路径", "grt_step12": "Step1 / Step2",
     "finalize_evidence": "证据整理与结果校验", "package_full": "完整包交付",
@@ -47,11 +55,11 @@ def title(unit_id: str) -> str:
 
 
 def fresh_directory(root: Path) -> Path:
-    report = root / "report"
+    report = workspace_join(root, "report")
     if report.exists():
         previous = read_json(report / "manifest.json", {})
         # Archive rather than overwrite records from previous invocations.
-        archive = root / ".report_history" / (str(previous.get("run_id", "unknown")) + "-" + uuid.uuid4().hex[:8])
+        archive = workspace_join(root, ".report_history", str(previous.get("run_id", "unknown")) + "-" + uuid.uuid4().hex[:8])
         archive.parent.mkdir(parents=True, exist_ok=True)
         report.rename(archive)
     (report / "steps").mkdir(parents=True)
@@ -70,7 +78,7 @@ def record_lgz_result(root: Path, result: dict) -> None:
     unit_id = os.environ.get("GPM_REPORT_UNIT_ID")
     if not run_id or not unit_id:
         return
-    report = root / "report"
+    report = workspace_join(root, "report")
     manifest = read_json(report / "manifest.json", {})
     if manifest.get("run_id") != run_id:
         raise ValueError("report invocation does not match the running LGZ stage")
@@ -87,7 +95,7 @@ class ReportSession:
         self.root = root
         self.report = fresh_directory(root)
         self.run_id = run_id
-        saved = read_json(root / "metadata/report_inputs.json")
+        saved = read_json(workspace_join(root, "metadata/report_inputs.json"))
         current_inputs = inputs(root)
         if saved is None:
             saved = {"schema_version": SCHEMA, "provenance": "reconstructed_at_run_start",
@@ -148,13 +156,16 @@ class ReportSession:
             record["command_text"] = script.read_text(encoding="utf-8")
         if event in {"CACHE_HIT", "SKIP_VALID"}:
             record["execution"] = "cache_reused"
-        if event in {"SUCCESS", "SKIP_VALID"}:
+        if event == "SKIP_MIGRATED_LGZ":
+            record["execution"] = "frozen_original_lgz"
+        if event in {"SUCCESS", "SKIP_VALID", "SKIP_MIGRATED_LGZ"}:
             record["facts"] = project_report_facts(collect_unit(self.root, unit.unit_id, self.input_data))
             for path in (self.report / "steps").glob("grt-*.json"):
                 substage = read_json(path)
                 if substage.get("parent_unit") == unit.unit_id:
                     cached = self.cached_stages_by_unit.get(unit.unit_id, set())
-                    substage["execution"] = "cache_reused" if substage["stage_id"] in cached else "computed"
+                    substage["execution"] = ("frozen_original_lgz" if event == "SKIP_MIGRATED_LGZ" else
+                                             "cache_reused" if substage["stage_id"] in cached else "computed")
                     write_json(path, substage)
             if unit.unit_id == "grt_step3":
                 write_json(self.report / "final_snapshot.json", {
@@ -166,7 +177,7 @@ class ReportSession:
             record["output_tail"] = list(self.output_tails.get(unit.unit_id, ()))
         write_json(self.report / filename, record)
         self.save()
-        if event in {"SUCCESS", "SKIP_VALID", "FAILED", "INTERRUPTED"}:
+        if event in {"SUCCESS", "SKIP_VALID", "SKIP_MIGRATED_LGZ", "FAILED", "INTERRUPTED"}:
             self.refresh()
 
     def child_output(self, line: str, unit_id: str | None = None):
@@ -213,7 +224,7 @@ class ReportSession:
 
 
 def _final_report_files(root: Path) -> tuple[Path, list[Path], tuple[Path, ...]]:
-    report = root / "report"
+    report = workspace_join(root, "report")
     required = (report / "manifest.json", report / "report.html", report / "render_report.py")
     missing = next((path for path in required if not path.is_file()), None)
     if missing is not None:
@@ -238,20 +249,44 @@ def _stage_final_report(root: Path, staging: Path, report: Path, report_files: l
         shutil.copy2(path, destination)
 
 
-def _validate_delivery_archive(
-    path: Path, required_members: set[str], format_name: str
-) -> None:
+def _archive_stamp(path):
+    st = path.lstat()
+    return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+
+@dataclass(frozen=True)
+class _CheckedArchive:
+    stamp: tuple
+    sha256: str
+
+    def before_publish(self, path):
+        if _archive_stamp(path) != self.stamp:
+            raise ValueError(f"delivery archive changed after validation: {path}")
+
+    def receipt(self, path):
+        # Renaming legitimately changes ctime, not the file we just validated.
+        if _archive_stamp(path)[:-1] != self.stamp[:-1]:
+            raise ValueError(f"published delivery differs from validated archive: {path}")
+        return {"file": path.name, "path": str(path), "size_bytes": self.stamp[2], "sha256": self.sha256}
+
+
+def _validate_delivery_archive(path: Path, required_members: set[str], format_name: str) -> _CheckedArchive:
+    stamp = _archive_stamp(path)
     if format_name == "tar.gz":
-        validate_tar_archive(path, required_members)
-        return
-    with zipfile.ZipFile(path) as archive:
-        corrupt = archive.testzip()
-        if corrupt is not None:
-            raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
-        names = set(archive.namelist())
-        missing = required_members - names
-        if missing:
-            raise ValueError(f"delivery archive is missing embedded report members: {missing}")
+        sha = validate_tar_archive(path, required_members)
+    else:
+        # ZIP validation seeks between members: its reads are not in file order.
+        with zipfile.ZipFile(path) as archive:
+            corrupt = archive.testzip()
+            if corrupt is not None:
+                raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
+            missing = required_members.difference(archive.namelist())
+            if missing:
+                raise ValueError(f"delivery archive is missing embedded report members: {missing}")
+        sha = digest(path)
+    proof = _CheckedArchive(stamp, sha)
+    proof.before_publish(path)
+    return proof
 
 
 def finalize_delivery_archives_from_staging(
@@ -263,7 +298,7 @@ def finalize_delivery_archives_from_staging(
     format_name, threads = archive_options(root)
     prefix = f"{root.name}/report/"
     required_members = {prefix + path.relative_to(report).as_posix() for path in required}
-    prepared: list[tuple[Path, Path]] = []
+    prepared: list[tuple[Path, Path, _CheckedArchive]] = []
     backups: list[tuple[Path, Path | None]] = []
     staged_reports: list[Path] = []
     artifacts: list[dict[str, object]] = []
@@ -284,13 +319,14 @@ def finalize_delivery_archives_from_staging(
                     flush=True,
                 )
                 create_archive(staging, temporary, format_name, threads)
-                _validate_delivery_archive(temporary, required_members, format_name)
+                proof = _validate_delivery_archive(temporary, required_members, format_name)
             except Exception:
                 temporary.unlink(missing_ok=True)
                 raise
-            prepared.append((archive_path, temporary))
+            prepared.append((archive_path, temporary, proof))
 
-        for archive_path, temporary in prepared:
+        for archive_path, temporary, proof in prepared:
+            proof.before_publish(temporary)
             backup = None
             if archive_path.exists():
                 backup = archive_path.with_name(
@@ -299,15 +335,7 @@ def finalize_delivery_archives_from_staging(
                 os.replace(archive_path, backup)
             backups.append((archive_path, backup))
             os.replace(temporary, archive_path)
-        artifacts = [
-            {
-                "file": archive_path.name,
-                "path": str(archive_path),
-                "size_bytes": archive_path.stat().st_size,
-                "sha256": digest(archive_path),
-            }
-            for archive_path, _ in prepared
-        ]
+        artifacts = [proof.receipt(path) for path, _, proof in prepared]
         swap_complete = True
     except Exception:
         for archive_path, backup in reversed(backups):
@@ -316,7 +344,7 @@ def finalize_delivery_archives_from_staging(
                 os.replace(backup, archive_path)
         raise
     finally:
-        for _, temporary in prepared:
+        for _, temporary, _ in prepared:
             temporary.unlink(missing_ok=True)
         for staged_report in staged_reports:
             shutil.rmtree(staged_report, ignore_errors=True)
@@ -339,7 +367,8 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
     root = root.resolve()
     report, report_files, required = _final_report_files(root)
     prefix = f"{root.name}/report/"
-    prepared: list[tuple[Path, Path]] = []
+    required_members = {prefix + path.relative_to(report).as_posix() for path in required}
+    prepared: list[tuple[Path, Path, _CheckedArchive]] = []
     backups: list[tuple[Path, Path]] = []
     artifacts: list[dict[str, object]] = []
     swap_complete = False
@@ -355,9 +384,6 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
                 if archive_path.name.endswith(".tar.gz"):
                     _, threads = archive_options(root)
                     attach_tar_report(archive_path, temporary, root, report_files, threads)
-                    validate_tar_archive(temporary, {
-                        prefix + path.relative_to(report).as_posix() for path in required
-                    })
                 else:
                     shutil.copyfile(archive_path, temporary)
                     with zipfile.ZipFile(temporary, "a", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -366,36 +392,22 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
                         for path in report_files:
                             relative = path.relative_to(report).as_posix()
                             archive.write(path, prefix + relative)
-                    with zipfile.ZipFile(temporary) as archive:
-                        corrupt = archive.testzip()
-                        if corrupt is not None:
-                            raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
-                        names = set(archive.namelist())
-                        for path in required:
-                            member = prefix + path.relative_to(report).as_posix()
-                            if member not in names:
-                                raise ValueError(f"delivery archive is missing embedded report member: {member}")
+                proof = _validate_delivery_archive(temporary, required_members,
+                                                   "tar.gz" if archive_path.name.endswith(".tar.gz") else "zip")
             except Exception:
                 temporary.unlink(missing_ok=True)
                 raise
-            prepared.append((archive_path, temporary))
+            prepared.append((archive_path, temporary, proof))
 
-        for archive_path, temporary in prepared:
+        for archive_path, temporary, proof in prepared:
+            proof.before_publish(temporary)
             backup = archive_path.with_name(
                 f".{archive_path.name}.before-report.{uuid.uuid4().hex}.bak"
             )
             os.replace(archive_path, backup)
             backups.append((archive_path, backup))
             os.replace(temporary, archive_path)
-        artifacts = [
-            {
-                "file": archive_path.name,
-                "path": str(archive_path),
-                "size_bytes": archive_path.stat().st_size,
-                "sha256": digest(archive_path),
-            }
-            for archive_path, _ in prepared
-        ]
+        artifacts = [proof.receipt(path) for path, _, proof in prepared]
         swap_complete = True
     except Exception:
         for archive_path, backup in reversed(backups):
@@ -404,7 +416,7 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
                 os.replace(backup, archive_path)
         raise
     finally:
-        for _, temporary in prepared:
+        for _, temporary, _ in prepared:
             temporary.unlink(missing_ok=True)
         if swap_complete:
             for _, backup in backups:
@@ -440,7 +452,7 @@ def prepare_start(root: Path, argv: list[str]):
             "status": "running", "argv": argv, "sources": sources, "facts": {}}
     write_json(report / "inputs.json", data)
     # Invalidate old preparation provenance immediately, including on failure.
-    write_json(root / "metadata/report_inputs.json", data)
+    write_json(workspace_join(root, "metadata/report_inputs.json"), data)
     write_json(report / "manifest.json", {"schema_version": SCHEMA, "run_id": run_id,
                "workspace_name": root.name, "status": "preparing", "started_at": data["started_at"],
                "ended_at": None, "steps": [], "errors": []})
@@ -448,7 +460,7 @@ def prepare_start(root: Path, argv: list[str]):
 
 
 def prepare_finish(root: Path, exit_code: int):
-    report = root / "report"
+    report = workspace_join(root, "report")
     data = read_json(report / "inputs.json")
     if data is None:
         raise ValueError("preparation report was not initialized")
@@ -458,7 +470,7 @@ def prepare_finish(root: Path, exit_code: int):
     else:
         data["notes"] = ["输入准备未完成；没有把残留文件当成本次成功输出。详见 prepare 的终端错误。"]
     write_json(report / "inputs.json", data)
-    write_json(root / "metadata/report_inputs.json", data)
+    write_json(workspace_join(root, "metadata/report_inputs.json"), data)
     manifest = read_json(report / "manifest.json")
     manifest.update(status="prepared" if exit_code == 0 else "failed", ended_at=now())
     write_json(report / "manifest.json", manifest)

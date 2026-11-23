@@ -59,16 +59,13 @@ class LocalReferenceCache:
     def __exit__(self, *args): self.close()
 
     def factory(self, parts, refs):
-        from .q0_preparation import artifact_path, json_file
+        from .q0_preparation import json_file, workspace_artifact_path
         self.binding = ReferenceIndex.bindings(parts, refs)
         key = stable_id("reference-index", {"binding": self.binding, "inputs": self.reference_inputs})
         relative = f"grt/evidence/q0_prepare/indexes/{key}"
-        # Reject symlink components even if they happen to resolve inside root.
-        current = self.root
-        for component in Path(relative).parts:
-            current /= component
-            if current.is_symlink(): raise Q0EvidenceError("linked private reference index is forbidden")
-        self.directory = artifact_path(self.root, relative)
+        self.directory = workspace_artifact_path(self.root, relative)
+        if self.directory.is_symlink():
+            raise Q0EvidenceError("linked private reference index is forbidden")
         if self.directory.exists():
             try:
                 receipt = json_file(self.directory/"success.json")

@@ -9,12 +9,19 @@ zip
 gzip
 pigz=2.8
 # DEGAP v2 shares this environment; do not create a second degap_env.
-biopython
-pysam
-numpy
-matplotlib-base
-scipy
+biopython=1.88
+pysam=0.24.1
+numpy=2.4.6
+matplotlib-base=3.11.2
+scipy=1.17.1
 hifiasm=0.25.0
 seqkit=2.8.0
-parallel
+parallel=20260922
 ripgrep=15.1.0
+# Pinned post-LGZ refinement tools share cgat-server; no separate environments.
+tgsgapcloser=1.2.1=h4914a8e_4
+lr_gapcloser=1.0=pl5321hdfd78af_0
+bwa=0.7.19=h0cbc5ad_1
+racon=1.5.0=h1e84f2d_8
+perl=5.32.1
+# quarTeT 1.3.1 is installed from its SHA-256-locked source archive by env.sh.

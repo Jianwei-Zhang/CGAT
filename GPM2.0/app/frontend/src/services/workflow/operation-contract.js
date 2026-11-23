@@ -61,6 +61,12 @@ const DEFINITIONS = {
     ["exportProjectFinalPathAgp", "unavailable"],
     ["exportProjectFinalPathFasta", "unavailable"],
     ["exportDegapJobs", "bridge"],
+    ["exportManualRefinement", "unavailable"],
+    ["importManualRefinementResults", "unavailable"],
+    ["listManualRefinementResults", "unavailable"],
+    ["listManualRefinementExports", "unavailable"],
+    ["undoManualRefinementLocus", "unavailable"],
+    ["switchManualRefinementLocus", "unavailable"],
   ],
   state: [
     ["getProjectPreviewCache", "unavailable"],

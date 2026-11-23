@@ -1,3 +1,5 @@
+import { normalizeRefinementTrace } from "./refinement-trace-state.js";
+
 export const FINAL_PATH_GAP_BP = 100;
 export const FINAL_PATH_ALL_KEY = "__all__";
 
@@ -51,7 +53,14 @@ export function normalizeFinalPathViewMode(value, { allowLog = true } = {}) {
 }
 
 function normalizeSourceKind(value) {
-  return normalizeString(value).toLowerCase() === "ref_segment" ? "ref_segment" : "assembly_ctg";
+  const normalized = normalizeString(value).toLowerCase();
+  if (normalized === "ref_segment") {
+    return "ref_segment";
+  }
+  if (normalized === "refinement_patch") {
+    return "refinement_patch";
+  }
+  return "assembly_ctg";
 }
 
 function normalizeSegmentOrient(value) {
@@ -77,6 +86,10 @@ export function isFinalPathCtgSegment(segment) {
 
 export function isFinalPathRefSegment(segment) {
   return isFinalPathCtgSegment(segment) && normalizeSourceKind(segment?.sourceKind) === "ref_segment";
+}
+
+export function isFinalPathRefinementPatchSegment(segment) {
+  return isFinalPathCtgSegment(segment) && normalizeSourceKind(segment?.sourceKind) === "refinement_patch";
 }
 
 export function resolveFinalPathRefSegmentAbsoluteRange(segment) {
@@ -125,12 +138,13 @@ export function resolveFinalPathSegmentDisplayName(segment) {
   return `${datasetName}_${ctgName}`;
 }
 
-export function buildFinalPathGapSegment({ segmentId = "", gapSizeBp = FINAL_PATH_GAP_BP } = {}, index = 0) {
+export function buildFinalPathGapSegment({ segmentId = "", gapSizeBp = FINAL_PATH_GAP_BP, refinement = null } = {}, index = 0) {
   const normalizedGapSizeBp = normalizePositiveInteger(gapSizeBp) || FINAL_PATH_GAP_BP;
   return {
     segmentId: normalizeSegmentId(segmentId, index),
     type: "gap",
     gapSizeBp: normalizedGapSizeBp,
+    ...(normalizeRefinementTrace(refinement) ? { refinement: normalizeRefinementTrace(refinement) } : {}),
   };
 }
 
@@ -151,6 +165,8 @@ export function buildFinalPathCtgSegment(
     start = null,
     end = null,
     grtKind = "",
+    refinement = null,
+    refinementPatchSha256 = "",
     eventId = "",
     evidenceIds = [],
     sourceCardKey = "",
@@ -177,7 +193,13 @@ export function buildFinalPathCtgSegment(
   const normalizedStart = normalizePositiveInteger(start);
   const normalizedEnd = normalizePositiveInteger(end);
   const normalizedOrient = normalizeSegmentOrient(orient);
+  const normalizedRefinementPatchSha256 = normalizeString(refinementPatchSha256);
   const traceMetadata = {
+    ...(normalizeRefinementTrace(refinement) ? { refinement: normalizeRefinementTrace(refinement) } : {}),
+    ...(normalizedSourceKind === "refinement_patch" ? { sourceKind: "refinement_patch" } : {}),
+    ...(normalizedSourceKind === "refinement_patch" && normalizedRefinementPatchSha256
+      ? { refinementPatchSha256: normalizedRefinementPatchSha256 }
+      : {}),
     ...(normalizePositiveInteger(splitFragmentCtgId) ? { splitFragmentCtgId: normalizePositiveInteger(splitFragmentCtgId) } : {}),
     ...(normalizePositiveInteger(splitFromAssemblyCtgId) ? { splitFromAssemblyCtgId: normalizePositiveInteger(splitFromAssemblyCtgId) } : {}),
     ...(normalizeString(grtKind) ? { grtKind: normalizeString(grtKind) } : {}),
@@ -305,6 +327,7 @@ function normalizeSegment(segment, index = 0) {
       {
         segmentId: segment.segmentId,
         gapSizeBp: segment.gapSizeBp,
+        refinement: segment.refinement,
       },
       index,
     );
@@ -326,6 +349,8 @@ function normalizeSegment(segment, index = 0) {
       start: segment.start,
       end: segment.end,
       grtKind: segment.grtKind,
+      refinement: segment.refinement,
+      refinementPatchSha256: segment.refinementPatchSha256 ?? segment.refinement_patch_sha256,
       eventId: segment.eventId,
       evidenceIds: segment.evidenceIds,
       sourceCardKey: segment.sourceCardKey,
@@ -454,7 +479,7 @@ export function canonicalizeFinalPathOverallLengths(value, authoritativeValue) {
 
   Object.entries(authoritative).forEach(([chrName, entry]) => {
     entry.segments.forEach((segment) => {
-      if (isFinalPathGapSegment(segment) || isFinalPathRefSegment(segment)) {
+      if (isFinalPathGapSegment(segment) || isFinalPathRefSegment(segment) || isFinalPathRefinementPatchSegment(segment)) {
         return;
       }
       const overallLen = normalizePositiveInteger(segment?.overallLen);
@@ -480,6 +505,7 @@ export function canonicalizeFinalPathOverallLengths(value, authoritativeValue) {
       if (
         isFinalPathGapSegment(segment)
         || isFinalPathRefSegment(segment)
+        || isFinalPathRefinementPatchSegment(segment)
         || (segment?.serverBaseline !== true && entry?.serverBaseline !== true)
       ) {
         return segment;
@@ -519,6 +545,9 @@ function buildFinalPathSemanticSegment(segment) {
   return {
     type: "ctg",
     sourceKind,
+    ...(sourceKind === "refinement_patch"
+      ? { refinementPatchSha256: normalizeString(segment?.refinementPatchSha256 ?? segment?.refinement_patch_sha256) }
+      : {}),
     datasetName: normalizeString(segment?.datasetName),
     sourceContig: normalizeString(source.contig) || normalizeString(segment?.originId) || normalizeString(segment?.ctgName),
     sourceStart: normalizePositiveInteger(source.start) || normalizePositiveInteger(segment?.start),

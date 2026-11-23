@@ -2,10 +2,17 @@ import csv
 import json
 from pathlib import Path, PurePosixPath
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ...workspace_layout import workspace_join
+
 from .errors import *
+from .validation_pass import active_pass
+
 def safe_relative_path(value, label):
-    if not value:
-        fail("INVALID_PATH", f"{label} is empty")
+    if not isinstance(value, str) or not value:
+        fail("INVALID_PATH", f"{label} must be a nonempty path string")
     if "\\" in value:
         fail("INVALID_PATH", f"{label} contains a backslash")
     path = PurePosixPath(value)
@@ -14,14 +21,21 @@ def safe_relative_path(value, label):
     return path
 
 def bundle_path(bundle_root, relpath, label, required=True):
+    check = active_pass(bundle_root)
+    key = (relpath, required)
+    if check is not None and isinstance(relpath, str) and key in check.paths:
+        return check.paths[key]
     relative = safe_relative_path(relpath, label)
-    path = bundle_root.joinpath(*relative.parts)
+    path = workspace_join(bundle_root, *relative.parts)
     if required and (not path.exists() or not path.is_file()):
         fail("MISSING_REQUIRED_FILE", f"{label} does not exist: {relpath}")
     try:
         path.resolve().relative_to(bundle_root.resolve())
     except ValueError:
         fail("INVALID_PATH", f"{label} escapes bundle root: {relpath}")
+    if check is not None:
+        check.observe(path)
+        check.paths[key] = path
     return path
 
 def read_tsv(bundle_root, relpath, table_spec):

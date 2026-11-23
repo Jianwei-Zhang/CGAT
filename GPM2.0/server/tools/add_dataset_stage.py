@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 from long_cigar_recovery.minimap_options import native_flags, prepared_options
 from run_resources import read_resources
+from workspace_layout import workspace_join
 
 
 def fail(message):
@@ -22,7 +23,7 @@ dataset_name = sys.argv[2]
 minimap_preset = sys.argv[3]
 threads = sys.argv[4]
 skip_self = sys.argv[5].lower() == "true"
-metadata_dir = stage_dir / "metadata"
+metadata_dir = workspace_join(stage_dir, "metadata")
 
 datasets_path = metadata_dir / "datasets.tsv"
 with datasets_path.open(newline="", encoding="utf-8") as handle:
@@ -52,7 +53,7 @@ with datasets_path.open("w", encoding="utf-8", newline="") as handle:
     writer.writeheader()
     writer.writerows(rows)
 
-assign_script = stage_dir / "assign_chr_groups.sh"
+assign_script = workspace_join(stage_dir, "assign_chr_groups.sh")
 text = assign_script.read_text(encoding="utf-8")
 replacements = {
     "export GPM_FAST_WORK_ROOT=": shlex.quote(str(stage_dir)),
@@ -74,10 +75,10 @@ with ref_path.open(newline="", encoding="utf-8") as handle:
     reference_rows = list(csv.DictReader(handle, delimiter="\t"))
 if len(reference_rows) != 1:
     fail(f"expected exactly one reference row in {ref_path}")
-reference_fa = stage_dir / reference_rows[0]["fasta_relpath"]
-run_dir = stage_dir / "runs" / f"{dataset_name}_vs_ref"
+reference_fa = workspace_join(stage_dir, reference_rows[0]["fasta_relpath"])
+run_dir = workspace_join(stage_dir, "runs", f"{dataset_name}_vs_ref")
 command_path = run_dir / "command.sh"
-dataset_fa = stage_dir / f"data/datasets/{dataset_name}.fa"
+dataset_fa = workspace_join(stage_dir, f"data/datasets/{dataset_name}.fa")
 lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
 # A new dataset's reference mapping inherits the project's frozen filtering
 # policy and current execution-only K budget; never change its pair/self flags.

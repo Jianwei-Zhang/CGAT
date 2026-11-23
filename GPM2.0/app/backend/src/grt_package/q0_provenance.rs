@@ -112,7 +112,7 @@ fn decode<T: serde::de::DeserializeOwned>(root: &Path, relative: &str) -> Result
 }
 // Python's row identities use ensure_ascii=True, sorted keys, and compact JSON.
 // These hashes contain strings/integers, not floating-point algorithm scores.
-fn canonical(value: &impl Serialize) -> Result<String> {
+pub(super) fn canonical(value: &impl Serialize) -> Result<String> {
     let encoded = serde_json::to_string(value)?;
     let mut output = String::new();
     for ch in encoded.chars() {

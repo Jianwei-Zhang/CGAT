@@ -50,10 +50,12 @@ bash "$SKILL/scripts/update.sh"
 # Or: bash /actual/GPM_Server/update.sh
 ```
 
-Keep the caller's cwd inside the intended project to include its `.prepare_lib/`.
+Keep the caller's cwd inside the intended project to include its `.lib/` runtime
+(legacy `.prepare_lib/` and older numbered-workspace `.runtime/prepared/` are
+compatibility read/migration paths only).
 The nearest ancestor with project markers is validated; other projects are not
 scanned. Legacy projects inside a separate, unmanaged subdirectory of tools are
-supported; projects overlapping managed code directories are refused. New workspaces record `.prepare_lib/server-tools.path` and `SOURCE.json`.
+supported; projects overlapping managed code directories are refused. New workspaces record `.lib/server-tools.path` and `SOURCE.json` (legacy workspaces retain `.prepare_lib/` or `.runtime/prepared/` compatibility paths).
 A conflicting binding stops the update; a legacy missing binding is shown in the
 plan and recorded only during the backed-up update. Legacy merged-Step2/3 plans are not
 migrated. All prepared `lib/`, Python tools/core, long-CIGAR runtime/companion and JSON contracts are aligned;

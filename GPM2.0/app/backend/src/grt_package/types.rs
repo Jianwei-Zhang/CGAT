@@ -7,6 +7,8 @@ pub const GRT_SCHEMA_VERSION: &str = "2";
 // display/local-evidence schema numbers below; legacy package 2 stays readable.
 pub const GRT_Q0_SCHEMA_VERSION: &str = "3";
 pub const GRT_CURRENT_SCHEMA_VERSION: &str = "4";
+pub const GRT_REFINEMENT_SCHEMA_VERSION: &str = "5";
+pub const GRT_REFINED_FINAL_PATH_SCHEMA_VERSION: &str = "4";
 
 pub(super) fn is_q0_package_schema(value: &str) -> bool {
     matches!(value, GRT_Q0_SCHEMA_VERSION | GRT_CURRENT_SCHEMA_VERSION)
@@ -37,6 +39,7 @@ pub(super) fn is_supported_app_final_path_schema(value: &str) -> bool {
         GRT_FINAL_PATH_SCHEMA_VERSION
             | GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION
             | GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION
+            | GRT_REFINED_FINAL_PATH_SCHEMA_VERSION
     )
 }
 
@@ -45,6 +48,7 @@ pub(super) fn is_display_app_final_path_schema(value: &str) -> bool {
         value,
         GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION
             | GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION
+            | GRT_REFINED_FINAL_PATH_SCHEMA_VERSION
     )
 }
 
@@ -64,6 +68,7 @@ pub(crate) struct ValidatedGrtPackage {
     pub(super) final_path: Value,
     pub(super) q0_artifact_sha256: String,
     pub(super) q4_artifact_sha256: String,
+    pub(super) refinement_reads: refinement_inputs::RefinementReadInputs,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

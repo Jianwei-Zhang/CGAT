@@ -7,6 +7,11 @@ or runs analysis. The original tool directory's unlisted/user files remain.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join, WorkspaceLayout
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join, WorkspaceLayout
+
 import argparse
 import csv
 import hashlib
@@ -127,6 +132,8 @@ def verified_source(root: Path, revision: str) -> dict[str, dict]:
     required = ENTRYPOINTS | {"run.sh", "prepare.sh", "install.sh", "tools/server_run.py"}
     if canonical:
         required |= LGZ_ENTRYPOINTS
+    if "tools/refinement_presets.py" in manifest:
+        required.add("tools/gapfill.default.toml")
     for relative in required:
         if relative not in manifest:
             raise ValueError(f"source manifest is incomplete: {relative}")
@@ -162,23 +169,23 @@ def validate_targets(workspace: Path, tools_root: Path, source: Path, *,
             raise ValueError("source, tools directory and workspace must be separate non-nested directories")
     for root in (workspace, tools_root):
         for relative in (".run_all", ".run_all/lock", ".run_all/lock/owner.json"):
-            if (root / relative).is_symlink():
+            if (workspace_join(root, relative) if root == workspace else root / relative).is_symlink():
                 raise ValueError(f"refusing symlinked lock state: {root / relative}")
     for relative in ("run.sh", "prepare.sh", "install.sh", "tools/server_run.py"):
         if not regular_path(tools_root, relative).is_file():
             raise ValueError(f"not an installed Server tools directory: {tools_root}")
     for relative in ("run_all.sh", "run_grt_step1.sh", "run_grt_step2.sh", "run_grt_step3.sh",
                      ".prepare_lib/tools/grt_step1.py", ".prepare_lib/tools/grt_step2.py", ".prepare_lib/tools/grt_step3.py"):
-        if not regular_path(workspace, relative).is_file():
+        if not regular_path(workspace, WorkspaceLayout.detect(workspace).relative(relative)).is_file():
             raise ValueError(f"workspace lacks the numbered Step1/Step2/Step3 runtime: {relative}")
-    package = regular_path(workspace, "metadata/package.tsv")
+    package = regular_path(workspace, WorkspaceLayout.detect(workspace).relative("metadata/package.tsv"))
     with package.open() as handle:
         rows = list(csv.DictReader(handle, delimiter="\t"))
     if len(rows) != 1 or rows[0].get("workflow") != "gpm_grt_precomputed_v2" or rows[0].get("schema_version") != "4":
         raise ValueError("this runtime requires workspace schema 4; historical workspaces are not renumbered or migrated")
     for root in (workspace, tools_root):
         regular_path(root, "tools/grt_core/__init__.py" if root == tools_root
-                     else ".prepare_lib/tools/grt_core/__init__.py")
+                     else WorkspaceLayout.detect(workspace).relative(".prepare_lib/tools/grt_core/__init__.py"))
 
 
 def check_direct_processes(workspace: Path, tools_root: Path) -> None:
@@ -188,8 +195,8 @@ def check_direct_processes(workspace: Path, tools_root: Path) -> None:
     proc = Path("/proc")
     if not proc.is_dir():
         raise ValueError("runtime updates require Linux process inspection")
-    prefixes = (str(workspace / ".prepare_lib") + "/", str(tools_root) + "/")
-    scripts = {str(workspace / name) for name in
+    prefixes = (str(workspace_join(workspace, ".prepare_lib")) + "/", str(tools_root) + "/")
+    scripts = {str(workspace_join(workspace, name)) for name in
                ("run_all.sh", "run_grt_step1.sh", "run_grt_step2.sh", "run_grt_step3.sh",
                 "run_grt_telomere_finalize.sh", "finalize_grt_evidence.sh",
                 "prepare_grt_inputs.sh", "prepare_lgz_inputs.sh", "run_lgz_step1.sh",
@@ -221,7 +228,7 @@ def check_direct_processes(workspace: Path, tools_root: Path) -> None:
                 continue  # process exited during inspection
             except (OSError, RuntimeError) as exc:
                 known = Path(arg).name in {Path(name).name for name in scripts | ENTRYPOINTS}
-                if known or ".prepare_lib/" in arg:
+                if known or ".prepare_lib/" in arg or ".runtime/prepared/" in arg:
                     raise ValueError(f"cannot inspect possible Server process PID {process.name}") from exc
                 continue
             if resolved in scripts or resolved.startswith(prefixes):
@@ -240,7 +247,7 @@ def workspace_lock(workspace: Path):
 
 def restore_files(journal: dict, backup: Path, *, verify_current: bool) -> None:
     roots = ({key: Path(value) for key, value in journal["roots"].items()} if "roots" in journal else
-             {"tools": Path(journal["tools_root"]), "runtime": Path(journal["workspace"]) / ".prepare_lib"})
+             {"tools": Path(journal["tools_root"]), "runtime": workspace_join(Path(journal["workspace"]), ".prepare_lib")})
     for item in reversed(journal["files"]):
         path = regular_path(roots[item["kind"]], item["relative"])
         if verify_current and path.exists():
@@ -267,10 +274,10 @@ def update(source: Path, workspace: Path, tools_root: Path, revision: str, *, ap
     source, workspace, tools_root = source.resolve(), workspace.resolve(), tools_root.resolve()
     manifest = verified_source(source, revision)
     validate_targets(workspace, tools_root, source)
-    runtime = workspace / ".prepare_lib"
+    runtime = workspace_join(workspace, ".prepare_lib")
     canonical = "tools/lgz_core/__init__.py" in manifest
     selected = {relative: record for relative, record in manifest.items()
-                if relative == "SOURCE.json" or relative in ENTRYPOINTS | LGZ_ENTRYPOINTS
+                if relative in {"SOURCE.json", "tools/gapfill.default.toml"} or relative in ENTRYPOINTS | LGZ_ENTRYPOINTS
                 or relative.startswith(("tools/grt_core/", "tools/lgz_core/", "tools/degap_core/"))
                 or canonical and relative.startswith("tools/") and (
                     len(PurePosixPath(relative).parts) == 2 and relative.endswith(".py")
@@ -319,7 +326,7 @@ def update(source: Path, workspace: Path, tools_root: Path, revision: str, *, ap
     backup = None
     try:
         check_direct_processes(workspace, tools_root)
-        backup = Path(tempfile.mkdtemp(prefix="runtime-update-", dir=workspace / ".run_all"))
+        backup = Path(tempfile.mkdtemp(prefix="runtime-update-", dir=workspace_join(workspace, ".run_all")))
         journal = {**result, "status": "applying", "files": plan, "backup": str(backup)}
         for item in plan:
             root = tools_root if item["kind"] == "tools" else runtime
@@ -367,7 +374,7 @@ def rollback(backup: Path) -> dict:
     tools_root = Path(journal["tools_root"])
     if any(not root.is_dir() or root.resolve() != root for root in (workspace, tools_root)):
         raise ValueError("rollback target roots moved or became symlinks")
-    if backup.parent != workspace / ".run_all" or not backup.name.startswith("runtime-update-"):
+    if backup.parent != workspace_join(workspace, ".run_all") or not backup.name.startswith("runtime-update-"):
         raise ValueError("backup is not a runtime-update journal inside this workspace")
     check_direct_processes(workspace, Path(journal["tools_root"]))
     tools_lock = workspace_lock(Path(journal["tools_root"]))

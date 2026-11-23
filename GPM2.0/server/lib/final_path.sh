@@ -10,6 +10,8 @@ final_path_base_lib="${final_path_lib_dir}/common.sh"
 }
 # shellcheck source=common.sh
 source "$final_path_base_lib"
+# shellcheck source=workspace_paths.sh
+source "${final_path_lib_dir}/workspace_paths.sh"
 
 usage() {
   cat <<'EOF'
@@ -48,11 +50,11 @@ EOF
 
 normalize_gpm_server_dir() {
   local input="$1"
-  if [[ -f "${input}/metadata/datasets.tsv" ]]; then
+  if [[ -f "$(cgat_workspace_path "$input" "metadata/datasets.tsv")" ]]; then
     printf '%s\n' "$input"
     return
   fi
-  if [[ -f "${input}/gpm_server/metadata/datasets.tsv" ]]; then
+  if [[ -f "$(cgat_workspace_path "${input}/gpm_server" "metadata/datasets.tsv")" ]]; then
     printf '%s\n' "${input}/gpm_server"
     return
   fi
@@ -65,7 +67,7 @@ resolve_path_under_server() {
   if [[ "$path_value" = /* ]]; then
     printf '%s\n' "$path_value"
   else
-    printf '%s\n' "${server_dir}/${path_value}"
+    cgat_workspace_path "$server_dir" "$path_value"
   fi
 }
 
@@ -186,10 +188,10 @@ esac
 require_cmd samtools
 
 GPM_SERVER_DIR="$(normalize_gpm_server_dir "$GPM_SERVER_INPUT")"
-DATASETS_TSV="${GPM_SERVER_DIR}/metadata/datasets.tsv"
-REFERENCE_TSV="${GPM_SERVER_DIR}/metadata/reference.tsv"
-SOURCE_SEQ_LOCATOR_TSV="${GPM_SERVER_DIR}/metadata/source_seq_locator.tsv"
-REFERENCE_CHR_LOCATOR_TSV="${GPM_SERVER_DIR}/metadata/reference_chr_locator.tsv"
+DATASETS_TSV="$(cgat_workspace_path "$GPM_SERVER_DIR" "metadata/datasets.tsv")"
+REFERENCE_TSV="$(cgat_workspace_path "$GPM_SERVER_DIR" "metadata/reference.tsv")"
+SOURCE_SEQ_LOCATOR_TSV="$(cgat_workspace_path "$GPM_SERVER_DIR" "metadata/source_seq_locator.tsv")"
+REFERENCE_CHR_LOCATOR_TSV="$(cgat_workspace_path "$GPM_SERVER_DIR" "metadata/reference_chr_locator.tsv")"
 
 declare -A DATASET_FASTA=()
 declare -A SOURCE_SEQ_FASTA=()

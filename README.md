@@ -9,6 +9,8 @@
 
 <img src="GPM2.0/app/readme-assets/cgat-main-figure.svg" alt="CGAT Overview" width="100%">
 
+For the feature branch's post-LGZ refinement and numbered results, see the [source guide](GPM2.0/server/REFINEMENT.md). Final acceptance is pending; the v2.0.21 downloads below are not changed retroactively.
+
 ---
 
 ## Toolkit Components

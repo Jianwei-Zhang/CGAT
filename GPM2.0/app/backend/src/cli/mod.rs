@@ -415,6 +415,13 @@ enum Commands {
         #[arg(long, default_value_t = 50)]
         limit: i64,
     },
+    ExportRefinementTasks {
+        workspace_root: PathBuf,
+        project_id: i64,
+        output_zip: PathBuf,
+        #[arg(long)]
+        request_json: PathBuf,
+    },
     ExportDegapJobs {
         workspace_root: PathBuf,
         project_id: i64,

@@ -90,7 +90,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
     def _read_initial(self):
         # An existing ready generation may be reusable: don't retain millions of hits for a cache check.
         # Wrapped readers keep their original signature, routing provenance and independent draft scan.
-        if ((self.root/prep.MANIFEST).exists() or prep._initial_inputs is not prep._native_initial_inputs
+        if (prep.workspace_artifact_path(self.root, prep.MANIFEST).exists() or prep._initial_inputs is not prep._native_initial_inputs
                 or prep.read_paf_observations is not _native_observations):
             return super()._read_initial()
         self.matrices = _DraftMatrices(self.root)
@@ -152,8 +152,9 @@ def initial_generation(root, snapshot, mapper):
         raise Q0EvidenceError('set threshold scope on the evidence command')
     tool = prep.executable_identity(mapper); policy = prep.supplement_policy(SCOPE); builder = prep.builder_identity()
     request = stable_id('q0-evidence-input', {'inputs':inputs, 'tool':tool, 'policy':policy, 'builder':builder})
-    if (root/prep.MANIFEST).is_file():
-        old = prep.json_file(root/prep.MANIFEST)
+    ready = prep.workspace_artifact_path(root, prep.MANIFEST)
+    if ready.is_file():
+        old = prep.json_file(ready)
         if old.get('input_fingerprint') == request:
             old = prep.load_verified_evidence(root); snapshot.verify()
             return request, old, True, None
@@ -171,7 +172,7 @@ def initial_generation(root, snapshot, mapper):
                                         'threshold_request':[],'unsearched_part_intervals':[]}
     catalog = base.finish(); catalog['base_alignments'] = alignments; catalog['supplementary_alignments'] = []
     name = f"grt/evidence/q0_prepare/{stable_id('catalog',catalog)}.json"
-    prep.atomic_write_json(root/name,catalog); snapshot.verify()
+    prep.atomic_write_json(prep.workspace_artifact_path(root, name), catalog); snapshot.verify()
     receipt = {'schema':prep.SCHEMA,'status':'success','policy':policy,'builder':builder,'input_fingerprint':request,
                'inputs':inputs,'outputs':[prep.identity(root,name)],'catalog':name,'tool':tool}
     return request, receipt, False, {}
@@ -192,7 +193,7 @@ def prepare(root, threads, mapper):
             receipt,_,_ = prep._prepare_evidence_pass(root,threads=threads,minimap2=mapper,supplement_scope=SCOPE,
                 draft=True,frontier_override=None if full else wanted,fallback_reason='threshold_full_fallback' if full else None,
                 expected_input=request,repair_inputs=snapshot)
-        output_paths = [root/prep._artifact_member(row['path']) for row in receipt['outputs']]
+        output_paths = [prep.workspace_artifact_path(root, row['path']) for row in receipt['outputs']]
         before = [prep.file_signature(p) for p in output_paths]
         data = load_evidence_input(root,_draft=receipt); selection = select_q0_paths(data)
         try:
@@ -210,7 +211,7 @@ def prepare(root, threads, mapper):
                 raise Q0EvidenceError('threshold output changed during admission')
             snapshot.verify()
             if not cached:
-                prep.atomic_write_json(root/prep.MANIFEST,receipt)
+                prep.atomic_write_json(prep.workspace_artifact_path(root, prep.MANIFEST), receipt)
             return receipt
         assignments = ({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in data.threshold_scope.assignments)
         need,_ = questions(data,selection,assignments)

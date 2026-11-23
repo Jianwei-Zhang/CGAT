@@ -5,6 +5,12 @@
 from __future__ import annotations
 
 try:
+    from workspace_layout import WorkspaceLayout, workspace_join, canonical_relative
+except ModuleNotFoundError:
+    from .workspace_layout import WorkspaceLayout, workspace_join, canonical_relative
+
+
+try:
     from run_resources import execution_threads, execution_qc_memory
 except ModuleNotFoundError:  # Imported through server.tools.
     from .run_resources import execution_threads, execution_qc_memory
@@ -39,6 +45,14 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_prepare_inputs.
     from .lgz_core.q0_admission import build_q0
     from .lgz_core.q0_publication import (PACKAGE_SCHEMA_VERSION, publication_identity, source_occupancy,
         available_intervals, stage_selection, freeze_manifest, validate_prepared_q0)
+
+
+# Q0 evidence and this producer consume some of the same files. Share a digest
+# only after a stable byte read; modified files still require a fresh digest.
+try:
+    from run_orchestration import sha256_file
+except ModuleNotFoundError:
+    from .run_orchestration import sha256_file
 
 
 def parse_merqury_qv(path: Path) -> dict[str, float]:
@@ -117,7 +131,7 @@ def migrate_legacy_qc_symlinks(
     server_dir: Path, checkpoint_path: Path, checkpoint: dict[str, object]
 ) -> dict[str, object]:
     """Repair donor-freeze checkpoints that recorded CRAQ input symlinks as outputs."""
-    removed = remove_external_qc_symlinks(server_dir / "grt/qc", server_dir)
+    removed = remove_external_qc_symlinks(workspace_join(server_dir, "grt/qc"), server_dir)
     if not removed:
         return checkpoint
     output_hashes = checkpoint.get("output_hashes")
@@ -126,14 +140,14 @@ def migrate_legacy_qc_symlinks(
     checkpoint["output_hashes"] = {
         relpath: digest
         for relpath, digest in output_hashes.items()
-        if (server_dir / relpath) not in removed
+        if (workspace_join(server_dir, relpath)) not in removed
     }
     checkpoint_path.write_text(
         json.dumps(checkpoint, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
         newline="",
     )
-    status_path = server_dir / "metadata/grt_stage_status.tsv"
+    status_path = workspace_join(server_dir, "metadata/grt_stage_status.tsv")
     stage_rows = read_tsv(status_path, LGZ_STAGE_STATUS_FIELDS)
     for row in stage_rows:
         if row["stage"] == "donor_freeze":
@@ -219,7 +233,7 @@ def reuse_dataset_qc_cache(
     contig_names: list[str],
     run_craq: bool,
 ) -> tuple[dict[str, float], dict[str, float]] | None:
-    cache_path = source_root / "cache.json"
+    cache_path = workspace_join(source_root, "cache.json")
     if not cache_path.is_file():
         return None
     try:
@@ -233,7 +247,7 @@ def reuse_dataset_qc_cache(
         for relpath, expected_hash in expected_hashes.items():
             if not isinstance(relpath, str) or not isinstance(expected_hash, str):
                 return None
-            path = (source_root / relpath).resolve()
+            path = (workspace_join(source_root, relpath)).resolve()
             path.relative_to(source_resolved)
             if not path.is_file() or sha256_file(path) != expected_hash:
                 return None
@@ -298,7 +312,7 @@ def run_reads_qc(
 
     for dataset in datasets:
         dataset_name = dataset["dataset_name"]
-        dataset_fasta = (server_dir / dataset["fasta_relpath"]).resolve()
+        dataset_fasta = (workspace_join(server_dir, dataset["fasta_relpath"])).resolve()
         contig_names = [name for ds, name in sequences if ds == dataset_name]
         cache_payload = {
             "schema_version": 1,
@@ -316,7 +330,7 @@ def run_reads_qc(
         )
         cache_fingerprint_by_name[dataset_name] = cache_fingerprint
         cached = reuse_dataset_qc_cache(
-            server_dir / "grt/qc" / dataset_name,
+            workspace_join(server_dir, "grt/qc", dataset_name),
             qc_root / dataset_name,
             cache_fingerprint,
             dataset_name,
@@ -381,7 +395,7 @@ def run_reads_qc(
             "OMP_NUM_THREADS": str(dataset_threads),
             "OMP_THREAD_LIMIT": str(dataset_threads),
         }
-        dataset_fasta = (server_dir / dataset["fasta_relpath"]).resolve()
+        dataset_fasta = (workspace_join(server_dir, dataset["fasta_relpath"])).resolve()
         dataset_root = qc_root / dataset_name
         contig_names = [name for ds, name in sequences if ds == dataset_name]
         print(
@@ -461,7 +475,7 @@ def build_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
     except ModuleNotFoundError:  # Imported through server.tools.
         from .annotation_library import verify_snapshot
     verify_snapshot(server_dir)
-    rules_path = server_dir / "tel" / "rules.tsv"
+    rules_path = workspace_join(server_dir, "tel", "rules.tsv")
     rules: list[dict[str, object]] = []
     if rules_path.is_file():
         rows = read_tsv(rules_path)
@@ -550,10 +564,87 @@ def quality_rank(
     return (-len(sequence), n_fraction, *stable)
 
 
+def commit_numbered_prepared_outputs(stage_grt: Path, stage_metadata: Path, server_dir: Path) -> None:
+    """Publish the same frozen q0 bytes across numbered physical namespaces.
+
+    Legacy scientific proof paths remain readable through the layout resolver;
+    this operation does not rewrite their content hashes or invent new evidence.
+    The staged q0 is already validated before any current output is replaced.
+    """
+    converted = stage_grt.parent / "numbered_outputs"
+    converted.mkdir()
+    for path in sorted(stage_grt.rglob("*")):
+        relative = "grt/" + path.relative_to(stage_grt).as_posix()
+        target = converted / canonical_relative(relative)
+        if path.is_dir() and not path.is_symlink():
+            target.mkdir(parents=True, exist_ok=True)
+        elif path.is_file() or path.is_symlink():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(path, target)
+        else:
+            fail(f"unsupported staged LGZ artifact: {path}")
+    # Annotation inputs are frozen by prepare.sh, not produced by this LGZ
+    # transaction. Replacing all of 03_lgz would silently delete that snapshot.
+    scientific_root = server_dir / "03_lgz"
+    incoming_root = converted / "03_lgz"
+    reserved = canonical_relative("tel").rsplit("/", 1)[0]
+    if (converted / reserved).exists():
+        fail("staged LGZ outputs overlap reserved annotation inputs")
+    names = {path.name for root in (scientific_root, incoming_root) if root.is_dir()
+             for path in root.iterdir()}
+    groups = tuple("03_lgz/" + name for name in sorted(names)
+                   if "03_lgz/" + name != reserved) + (
+        ".runtime/checkpoints/lgz", ".runtime/cache/lgz", ".runtime/history/lgz_failed")
+    backup = stage_grt.parent / "previous_numbered"
+    backup.mkdir()
+    metadata = workspace_join(server_dir, "metadata")
+    metadata.mkdir(parents=True, exist_ok=True)
+    staged_names = {path.name for path in stage_metadata.iterdir() if path.is_file()}
+    old_names = {path.name for path in metadata.glob("grt_*") if path.is_file()} | staged_names
+    moved, installed, saved_metadata, installed_metadata = [], [], [], []
+    try:
+        for relative in groups:
+            current, saved, incoming = server_dir / relative, backup / relative, converted / relative
+            if current.exists():
+                saved.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(current, saved)
+                moved.append(relative)
+            if incoming.exists():
+                current.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(incoming, current)
+                installed.append(relative)
+        for name in sorted(old_names):
+            current = metadata / name
+            if current.exists():
+                saved = backup / "metadata" / name
+                saved.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(current, saved)
+                saved_metadata.append(name)
+        for name in sorted(staged_names):
+            os.replace(stage_metadata / name, metadata / name)
+            installed_metadata.append(name)
+    except BaseException:
+        for name in installed_metadata:
+            (metadata / name).unlink(missing_ok=True)
+        for name in saved_metadata:
+            os.replace(backup / "metadata" / name, metadata / name)
+        for relative in reversed(installed):
+            path = server_dir / relative
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        for relative in reversed(moved):
+            os.replace(backup / relative, server_dir / relative)
+        raise
+
+
 def commit_prepared_outputs(stage_grt: Path, stage_metadata: Path, server_dir: Path) -> None:
     """Replace LGZ outputs as one rollback-safe filesystem transaction."""
-    target_grt = server_dir / "grt"
-    target_metadata = server_dir / "metadata"
+    if WorkspaceLayout.detect(server_dir).version == 2:
+        return commit_numbered_prepared_outputs(stage_grt, stage_metadata, server_dir)
+    target_grt = workspace_join(server_dir, "grt")
+    target_metadata = workspace_join(server_dir, "metadata")
     backup_root = stage_grt.parent / "previous"
     backup_metadata = backup_root / "metadata"
     backup_metadata.mkdir(parents=True)
@@ -595,7 +686,7 @@ def commit_prepared_outputs(stage_grt: Path, stage_metadata: Path, server_dir: P
 
 def prepare(args: argparse.Namespace) -> None:
     server_dir = args.server_dir.resolve()
-    metadata_dir = server_dir / "metadata"
+    metadata_dir = workspace_join(server_dir, "metadata")
     if not server_dir.is_dir():
         fail(f"server directory does not exist: {server_dir}")
 
@@ -673,7 +764,7 @@ def prepare(args: argparse.Namespace) -> None:
     source_rank: dict[tuple[str, str], tuple[str, str]] = {}
     dataset_hashes: dict[str, str] = {}
     for dataset_index, dataset in enumerate(datasets):
-        fasta_path = server_dir / dataset["fasta_relpath"]
+        fasta_path = workspace_join(server_dir, dataset["fasta_relpath"])
         dataset_hashes[dataset["dataset_name"]] = sha256_file(fasta_path)
         for contig_index, (contig_name, sequence) in enumerate(read_fasta(fasta_path)):
             key = (dataset["dataset_name"], contig_name)
@@ -691,14 +782,14 @@ def prepare(args: argparse.Namespace) -> None:
         locator_keys.add(key)
         relpath = row["fasta_relpath"]
         if relpath not in locator_fasta_cache:
-            locator_fasta_cache[relpath] = dict(read_fasta(server_dir / relpath))
+            locator_fasta_cache[relpath] = dict(read_fasta(workspace_join(server_dir, relpath)))
         if locator_fasta_cache[relpath].get(key[1]) != sequences[key]:
             fail(f"source locator sequence differs from dataset FASTA: {key[0]}:{key[1]}")
     if locator_keys != set(sequences):
         missing = sorted(set(sequences) - locator_keys)
         fail(f"source locators do not cover every initial source: {missing}")
 
-    reference_fasta = server_dir / reference["fasta_relpath"]
+    reference_fasta = workspace_join(server_dir, reference["fasta_relpath"])
     reference_records = read_fasta(reference_fasta)
     chromosome_order = [name for name, _sequence in reference_records]
     known_chromosomes = set(chromosome_order)
@@ -728,7 +819,7 @@ def prepare(args: argparse.Namespace) -> None:
     alignment_versions: dict[str, str] = {}
     for dataset in datasets:
         dataset_name = dataset["dataset_name"]
-        paf_path = server_dir / "runs" / f"{dataset_name}_vs_ref" / "result.paf"
+        paf_path = workspace_join(server_dir, "runs", f"{dataset_name}_vs_ref", "result.paf")
         version_path = paf_path.parent / "tool_version.txt"
         if not paf_path.is_file():
             fail(f"global ds-vs-ref PAF is missing: {paf_path}")
@@ -744,8 +835,8 @@ def prepare(args: argparse.Namespace) -> None:
         fail(f"q0 evidence is not ready; run prepare_q0_evidence.sh first: {exc}")
 
     input_files = [
-        server_dir / Q0_EVIDENCE_MANIFEST,
-        *[server_dir / row["path"] for row in q0_evidence["outputs"]],
+        workspace_join(server_dir, Q0_EVIDENCE_MANIFEST),
+        *[workspace_join(server_dir, row["path"]) for row in q0_evidence["outputs"]],
         metadata_dir / "package.tsv",
         metadata_dir / "datasets.tsv",
         metadata_dir / "reference.tsv",
@@ -754,14 +845,14 @@ def prepare(args: argparse.Namespace) -> None:
         metadata_dir / "track_member_orders.tsv",
         metadata_dir / "source_seq_locator.tsv",
         reference_fasta,
-        *[server_dir / row["fasta_relpath"] for row in datasets],
-        *[server_dir / relpath for relpath in locator_fasta_cache],
+        *[workspace_join(server_dir, row["fasta_relpath"]) for row in datasets],
+        *[workspace_join(server_dir, relpath) for relpath in locator_fasta_cache],
         *paf_paths.values(),
         *[path.parent / "tool_version.txt" for path in paf_paths.values()],
         *reads,
     ]
-    if (server_dir / "tel" / "rules.tsv").is_file():
-        input_files.append(server_dir / "tel" / "rules.tsv")
+    if (workspace_join(server_dir, "tel", "rules.tsv")).is_file():
+        input_files.append(workspace_join(server_dir, "tel", "rules.tsv"))
     input_identity = []
     input_sha256: dict[Path, str] = {}
     for path in input_files:
@@ -789,7 +880,7 @@ def prepare(args: argparse.Namespace) -> None:
         "q_gap_length": Q_GAP_LENGTH,
     }
     fingerprint = sha256_bytes(canonical_json(fingerprint_payload).encode("utf-8"))
-    checkpoint_path = server_dir / "grt" / "checkpoints" / "donor_freeze.json"
+    checkpoint_path = workspace_join(server_dir, "grt", "checkpoints", "donor_freeze.json")
     if checkpoint_path.is_file():
         try:
             checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
@@ -821,11 +912,11 @@ def prepare(args: argparse.Namespace) -> None:
                 and stage_rows[0]["checkpoint_sha256"] == sha256_file(checkpoint_path)
             )
             if checkpoint.get("input_fingerprint") == fingerprint and output_hashes and stage_checkpoint_matches and all(
-                isinstance(relpath, str) and (server_dir / relpath).is_dir()
+                isinstance(relpath, str) and (workspace_join(server_dir, relpath)).is_dir()
                 for relpath in required_directories
             ) and all(
-                (server_dir / relpath).is_file()
-                and sha256_file(server_dir / relpath) == expected_hash
+                (workspace_join(server_dir, relpath)).is_file()
+                and sha256_file(workspace_join(server_dir, relpath)) == expected_hash
                 for relpath, expected_hash in output_hashes.items()
             ):
                 print(f"LGZ prepare inputs are current: {checkpoint_path}")
@@ -833,16 +924,16 @@ def prepare(args: argparse.Namespace) -> None:
         except (OSError, ValueError, TypeError, SystemExit):
             pass
 
-    stage_root = Path(tempfile.mkdtemp(prefix=".grt_prepare.", dir=server_dir.parent))
+    stage_root = Path(tempfile.mkdtemp(prefix=".lgz_prepare.", dir=server_dir.parent))
     try:
-        stage_grt = stage_root / "grt"
-        stage_metadata = stage_root / "metadata"
+        stage_grt = workspace_join(stage_root, "grt")
+        stage_metadata = workspace_join(stage_root, "metadata")
         stage_metadata.mkdir(parents=True)
         # Evidence preparation is an earlier stage. Preserve its content-bound
         # artifacts when the q0/donor transaction replaces the grt/ tree.
-        shutil.copytree(server_dir / "grt/evidence/q0_prepare", stage_grt / "evidence/q0_prepare",
+        shutil.copytree(workspace_join(server_dir, "grt/evidence/q0_prepare"), stage_grt / "evidence/q0_prepare",
                         copy_function=link_or_copy_file, symlinks=True)
-        shutil.copy2(server_dir / Q0_EVIDENCE_MANIFEST, stage_metadata / Path(Q0_EVIDENCE_MANIFEST).name)
+        shutil.copy2(workspace_join(server_dir, Q0_EVIDENCE_MANIFEST), stage_metadata / Path(Q0_EVIDENCE_MANIFEST).name)
         qv_scores: dict[tuple[str, str], float] = {}
         craq_scores: dict[tuple[str, str], float] = {}
         if reads_qc_enabled:
@@ -873,11 +964,15 @@ def prepare(args: argparse.Namespace) -> None:
             )
             tel_signal[key] = valid_sequence[key] and has_telomere_signal(sequence, telomere_rules)
 
+        def progress(message):
+            print(f"LGZ prepare phase: {message}", flush=True)
+
         try:
-            construction = build_q0(server_dir, quality_pass=(
+            construction = build_q0(server_dir, progress=progress, quality_pass=(
                 {SourceKey(*key): passed for key, passed in qc_pass.items()} if reads_qc_enabled else None))
         except Q0EvidenceError as exc:
             fail(f"q0 selection failed: {exc}")
+        progress("writing Q0 and freezing ordinary and telomere donors")
         q_records = list(construction.records.items())
         q0_path = stage_grt / "q" / "q0.fa"
         write_fasta(q0_path, q_records)
@@ -993,8 +1088,8 @@ def prepare(args: argparse.Namespace) -> None:
                 fasta_records.append((fasta_record, sequences[key]))
             fasta_relpath = f"grt/donors/{donor_set_id}.fa"
             manifest_relpath = f"grt/donors/{donor_set_id}.manifest.tsv"
-            fasta_path = stage_root / fasta_relpath
-            manifest_path = stage_root / manifest_relpath
+            fasta_path = workspace_join(stage_root, fasta_relpath)
+            manifest_path = workspace_join(stage_root, manifest_relpath)
             write_fasta(fasta_path, fasta_records)
             write_tsv(manifest_path, DONOR_MEMBER_FIELDS, member_rows)
             return (
@@ -1119,7 +1214,7 @@ def prepare(args: argparse.Namespace) -> None:
         )
         tool_rows = [
             {
-                "tool": "grt_prepare_inputs",
+                "tool": "lgz_prepare_inputs",
                 "version": "3",
                 "executable": ".prepare_lib/tools/lgz_prepare_inputs.py",
             },
@@ -1160,8 +1255,8 @@ def prepare(args: argparse.Namespace) -> None:
 
         output_files = [
             q0_path,
-            *[stage_root / row["fasta_relpath"] for row in donor_sets],
-            *[stage_root / row["manifest_relpath"] for row in donor_sets],
+            *[workspace_join(stage_root, row["fasta_relpath"]) for row in donor_sets],
+            *[workspace_join(stage_root, row["manifest_relpath"]) for row in donor_sets],
             *metadata_outputs,
             *[path for path in stage_grt.rglob("*") if path.is_file()],
         ]

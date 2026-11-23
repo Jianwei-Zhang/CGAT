@@ -7,6 +7,12 @@ historical "consumed" list. Coordinates here are zero-based, half-open.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 import json
@@ -82,8 +88,8 @@ class SourceAuthorization:
 
     @classmethod
     def load(cls, root: Path, sources, *, frozen=None):
-        package = read_tsv(root / "metadata/package.tsv")[0]
-        members = read_tsv(root / "metadata/grt_donor_members.tsv")
+        package = read_tsv(workspace_join(root, "metadata/package.tsv"))[0]
+        members = read_tsv(workspace_join(root, "metadata/grt_donor_members.tsv"))
         source_lengths = {SourceKey(*key): len(sequence) for key, sequence in sources.items()}
         member_map = {}
         reference_placements = ()
@@ -104,10 +110,10 @@ class SourceAuthorization:
                            for row in frozen["sources"]}
             q0_intervals = {SourceKey(**row["source"]): tuple(Interval(**i) for i in row["occupied"])
                             for row in frozen["sources"]}
-            selection = json.loads((root / frozen["selection"]).read_text())["construction"]
+            selection = json.loads((workspace_join(root, frozen["selection"])).read_text())["construction"]
             reference_placements = selection["placements"]
             chromosomes = {chr_name for chr_name, search in selection["searches"].items() if search["path"] is not None}
-            fingerprint = stable_id(POLICY_VERSION, [sha256_file(root / FREEZE), sorted(chromosomes)])
+            fingerprint = stable_id(POLICY_VERSION, [sha256_file(workspace_join(root, FREEZE)), sorted(chromosomes)])
         elif package["schema_version"] == "2":
             # Historical input decoding, not the removed first-dataset q0
             # builder. Mutable processing still enforces the live-path rule.

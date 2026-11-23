@@ -1433,5 +1433,6 @@ where
         final_path,
         q0_artifact_sha256: q_artifact_hashes.remove("q0").unwrap(),
         q4_artifact_sha256: q_artifact_hashes.remove(final_version).unwrap(),
+        refinement_reads: Default::default(),
     })
 }

@@ -47,7 +47,9 @@ LOG_EVENTS = (
 
 ASSIGN_UNIT_ID = "assign"
 Q0_EVIDENCE_UNIT_ID = "q0_evidence"
-LGZ_PREPARE_UNIT_ID = "grt_prepare"
+LGZ_PREPARE_UNIT_ID = "lgz_prepare"
+LEGACY_PREPARE_UNIT_ID = "grt_prepare"
+LGZ_PREPARE_IDS = (LGZ_PREPARE_UNIT_ID, LEGACY_PREPARE_UNIT_ID)
 LGZ_STEP1_UNIT_ID = "grt_step1"
 LGZ_STEP2_UNIT_ID = "grt_step2"
 LGZ_STEP3_UNIT_ID = "grt_step3"
@@ -461,7 +463,7 @@ def paf_file_identity(path: Path, *, relative_to: Path, require_cigar: bool = Fa
 
 
 # Compatibility constants; persisted values remain unchanged.
-GRT_PREPARE_UNIT_ID = LGZ_PREPARE_UNIT_ID
+GRT_PREPARE_UNIT_ID = LEGACY_PREPARE_UNIT_ID
 GRT_STEP1_UNIT_ID = LGZ_STEP1_UNIT_ID
 GRT_STEP2_UNIT_ID = LGZ_STEP2_UNIT_ID
 GRT_STEP3_UNIT_ID = LGZ_STEP3_UNIT_ID

@@ -4,15 +4,23 @@ from pathlib import Path
 from .errors import *
 from .schema import *
 from .tables import *
+
+# Reuse stable content reads in the refine worker's later baseline checks.
+try:
+    from run_orchestration import OrchestrationContractError, sha256_file as stable_digest
+except ModuleNotFoundError:
+    from ...run_orchestration import OrchestrationContractError, sha256_file as stable_digest
+
+
 def sha256_bytes(value):
     return hashlib.sha256(value).hexdigest()
 
+
 def sha256_file(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    try:
+        return stable_digest(path)
+    except OrchestrationContractError as exc:
+        fail("INPUT_CHANGED", str(exc))
 
 def validate_sha256(value, label):
     if not SHA256_RE.fullmatch(value or ""):

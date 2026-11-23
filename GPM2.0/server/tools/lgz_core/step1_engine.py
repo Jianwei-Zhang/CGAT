@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
+try:
     from run_resources import execution_threads
 except ModuleNotFoundError:  # Imported through server.tools.
     from ..run_resources import execution_threads
@@ -153,14 +159,14 @@ def cached_validation_alignment(
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
         "donor_fragment_index_sha256": sha256_file(
-            server_dir / "metadata/grt_donor_fragments.tsv"
+            workspace_join(server_dir, "metadata/grt_donor_fragments.tsv")
         ),
         "tool": command_identity(minimap),
         "parameters": parameters,
     }
     fingerprint = json_hash(fingerprint_payload)
     chromosome_key = stable_id("chr", chromosome, 16)
-    cache_parent = server_dir / f"grt/cache/step12/step1/validation/{chromosome_key}"
+    cache_parent = workspace_join(server_dir, f"grt/cache/step12/step1/validation/{chromosome_key}")
     cache_dir = cache_parent / fingerprint
     checkpoint_path = cache_dir / "cache.json"
     output_names = ["queries.fa", "target.fa", "result.paf", "command.txt", "stdout.log", "stderr.log"]
@@ -241,7 +247,7 @@ def cached_validation_alignment(
         return cache_dir, False, chromosome_key
     except BaseException:
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             failed_dir = failed_root / f"step1-validation-{chromosome_key}-{os.getpid()}"
             if failed_dir.exists():
@@ -671,7 +677,7 @@ def run_step1(
         fail(f"unsupported Step1 repair mode: {repair_mode}")
     if mummer_scope not in MUMMER_SCOPES:
         fail(f"unsupported Step1 MUMmer scope: {mummer_scope}")
-    q_input_sha256 = sha256_file(server_dir / "grt/q/q0.fa")
+    q_input_sha256 = sha256_file(workspace_join(server_dir, "grt/q/q0.fa"))
     if execution_profile not in EXECUTION_PROFILES:
         fail(f"unsupported execution profile: {execution_profile}")
     fingerprint_payload = {
@@ -686,7 +692,7 @@ def run_step1(
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
         "donor_fragment_index_sha256": sha256_file(
-            server_dir / "metadata/grt_donor_fragments.tsv"
+            workspace_join(server_dir, "metadata/grt_donor_fragments.tsv")
         ),
         "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
         "mummer_parameters": lgz_mummer_parameters(threads),
@@ -720,10 +726,10 @@ def run_step1(
         return cached, True
     invalidate_step12_from(server_dir, stage)
     artifact_relpath = "grt/evidence/step1"
-    artifact_dir = server_dir / artifact_relpath
+    artifact_dir = workspace_join(server_dir, artifact_relpath)
     artifact_dir.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=".step1.", dir=artifact_dir.parent))
-    q_output_temporary = server_dir / f"grt/q/.q1.fa.tmp.{os.getpid()}"
+    q_output_temporary = workspace_join(server_dir, f"grt/q/.q1.fa.tmp.{os.getpid()}")
     try:
         alignments, mummer_identities, _tasks = collect_mummer(
             server_dir,
@@ -742,11 +748,11 @@ def run_step1(
             execution_profile=execution_profile,
         )
         members_by_record = {row["fasta_record_name"]: row for row in donor_members}
-        donor_records = dict(read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"]))
+        donor_records = dict(read_fasta_allow_empty(workspace_join(server_dir, donor_set["fasta_relpath"])))
         fragment_rows = [
             row
             for row in read_tsv(
-                server_dir / "metadata/grt_donor_fragments.tsv",
+                workspace_join(server_dir, "metadata/grt_donor_fragments.tsv"),
                 DONOR_FRAGMENT_FIELDS,
             )
             if row["donor_set_id"] == donor_set["donor_set_id"]
@@ -1151,7 +1157,7 @@ def run_step1(
             newline="",
         )
         commit_stage_directory(temporary, artifact_dir)
-        os.replace(q_output_temporary, server_dir / "grt/q/q1.fa")
+        os.replace(q_output_temporary, workspace_join(server_dir, "grt/q/q1.fa"))
         output_relpaths = [
             path.relative_to(server_dir).as_posix() for path in artifact_dir.rglob("*") if path.is_file()
         ] + ["grt/q/q1.fa"]
@@ -1172,7 +1178,7 @@ def run_step1(
     except BaseException:
         q_output_temporary.unlink(missing_ok=True)
         if temporary.exists():
-            failed_root = server_dir / "grt/failed"
+            failed_root = workspace_join(server_dir, "grt/failed")
             failed_root.mkdir(parents=True, exist_ok=True)
             failed_dir = failed_root / f"step1-{os.getpid()}"
             if failed_dir.exists():
@@ -1592,6 +1598,6 @@ def execute_step1(args: argparse.Namespace) -> dict[str, object]:
     print(
         f"LGZ Step1 complete: run={context['run_id']}, "
         f"donor_set={donor_set['donor_set_id']}, "
-        f"q1_sha256={sha256_file(context['server_dir'] / 'grt/q/q1.fa')}"
+        f"q1_sha256={sha256_file(workspace_join(context['server_dir'], 'grt/q/q1.fa'))}"
     )
     return step1

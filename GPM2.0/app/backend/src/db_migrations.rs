@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension};
 
-use super::{CURRENT_SCHEMA_VERSION, create_current_schema};
+use super::{CURRENT_SCHEMA_VERSION, create_current_schema, create_refinement_result_tables};
 
 const FUTURE_VERSION_ERROR: &str = "WORKSPACE_SCHEMA_FUTURE_VERSION";
 const MISSING_MIGRATION_ERROR: &str = "WORKSPACE_SCHEMA_MIGRATION_MISSING";
@@ -65,7 +65,32 @@ const MIGRATIONS: &[Migration] = &[
         name: "add_project_local_view_tasks",
         apply: migrate_local_view_tasks_to_v8,
     },
+    Migration {
+        version: 9,
+        name: "retain_refinement_read_sources",
+        apply: migrate_refinement_inputs_to_v9,
+    },
+    Migration {
+        version: 10,
+        name: "retain_project_refinement_patches_and_receipts",
+        apply: create_refinement_result_tables,
+    },
 ];
+
+fn migrate_refinement_inputs_to_v9(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS grt_refinement_inputs (
+            package_id INTEGER PRIMARY KEY CHECK (package_id = 1)
+                REFERENCES grt_package(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS project_refinement_inputs (
+            project_id INTEGER PRIMARY KEY REFERENCES project(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
+        );",
+    )
+    .context("failed to create refinement read source storage")
+}
 
 fn migrate_local_view_tasks_to_v8(conn: &Connection) -> Result<()> {
     conn.execute_batch(

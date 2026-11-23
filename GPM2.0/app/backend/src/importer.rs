@@ -58,6 +58,7 @@ pub use add_dataset::{
     import_workspace_add_dataset_package, import_workspace_add_dataset_package_with_hooks,
 };
 pub use degap_results::{import_degap_results_with_hooks, is_degap_results_package};
+pub(crate) use degap_results::validate_legacy_degap_candidates;
 pub use initial::{
     import_from_extracted_bundle, import_from_extracted_bundle_with_hooks,
     import_from_extracted_bundle_with_options, import_from_extracted_bundle_with_options_and_hooks,

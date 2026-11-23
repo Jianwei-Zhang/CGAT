@@ -18,8 +18,11 @@ from server.tests.q0_test_support import seed_q0_evidence
 from server.tools.lgz_core.common import read_fasta, write_fasta
 from server.tools.lgz_core.q0_sources import SourceKey, Q0EvidenceError
 from server.tools.lgz_core.q0_catalog import build_catalog, supplemental_groups
-from server.tools import run_orchestration
+from server.tools.lgz_core import q0_preparation as _q0_prep
 from server.tools.lgz_core.q0_preparation import MANIFEST, prepare_evidence, load_verified_evidence, artifact_path, identity
+
+# The installed CLI uses flat imports; hook the hash implementation bound by this reader.
+run_orchestration = sys.modules[_q0_prep._file_identity.__module__]
 
 
 class Q0ArtifactIdentityTests(unittest.TestCase):
@@ -515,6 +518,64 @@ def fasta(path):
         receipt.unlink()
         with self.assertRaisesRegex(Q0EvidenceError, "not complete"):
             self.run_prepare()
+
+    def numbered_copy(self):
+        from server.tools.run_outer_checkpoints import OuterCheckpointManager
+        from server.tools.workspace_layout import initialize_workspace
+
+        layout = initialize_workspace(self.root / "numbered")
+        for source in self.server.rglob("*"):
+            if source.is_file():
+                target = layout.path(source.relative_to(self.server).as_posix())
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+        manager = OuterCheckpointManager(layout.root)
+        for script in layout.path("runs").glob("chr_*/q0_command.sh"):
+            chromosome = script.parent.name.removeprefix("chr_")
+            manager.commit(manager.prepare(f"q0_chr:{chromosome}", script.relative_to(layout.root).as_posix()))
+        return layout, manager
+
+    def test_numbered_regional_route_keeps_paths_and_reuses_ready_evidence(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        layout, _ = self.numbered_copy()
+        mapper, _ = self.mapper()
+        with mock.patch.object(prep, "regional_enabled", return_value=True):
+            manifest = prepare_evidence(layout.root, minimap2=str(mapper))
+            self.assertEqual(load_verified_evidence(layout.root), manifest)
+            with mock.patch.object(prep, "build_catalog", side_effect=AssertionError("ready evidence should be reused")):
+                self.assertEqual(prepare_evidence(layout.root, minimap2=str(mapper)), manifest)
+        catalog = json.loads(layout.path(manifest["catalog"]).read_text())
+        regional = [task for task in catalog["supplementary_alignments"] if task["kind"] == "regional_discovery"]
+        self.assertTrue(regional)
+        for task in regional:
+            self.assertTrue(layout.path(task["receipt"]).is_file())
+            self.assertTrue(layout.path(task["paf"]).is_file())
+        self.assertTrue(list(layout.path("grt/evidence/q0_prepare/indexes").glob("*/success.json")))
+        self.assertFalse(any((layout.root / label).exists() for label in ("grt", "metadata", "runs")))
+
+    def test_numbered_q0_accepts_both_forms_of_the_same_pair_but_rejects_wrong_direction(self):
+        from server.tools.lgz_core.q0_preparation import _initial_inputs
+
+        self.seed_assigned_support()
+        layout, manager = self.numbered_copy()
+        descriptor = layout.path("runs/chr_Chr01/q0_alignment_inputs.json")
+        values = json.loads(descriptor.read_text())
+        cross = next(row for row in values["alignments"] if row["kind"] == "cross")
+        logical = cross["paf"]
+        self.assertTrue(logical.startswith("runs/"))
+        for supplied in (logical, layout.relative(logical)):
+            with self.subTest(paf=supplied):
+                cross["paf"] = supplied
+                descriptor.write_text(json.dumps(values))
+                manager.commit(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+                self.assertIn(supplied, {row["paf"] for row in _initial_inputs(layout.root)[5]})
+        cross["paf"] = layout.relative(logical).replace("_vs_support/", "_vs_self/")
+        self.assertNotEqual(cross["paf"], layout.relative(logical))
+        descriptor.write_text(json.dumps(values))
+        manager.commit(manager.prepare("q0_chr:Chr01", "runs/chr_Chr01/q0_command.sh"))
+        with self.assertRaisesRegex(Q0EvidenceError, "does not match its declared direction"):
+            _initial_inputs(layout.root)
 
     def test_missing_mandatory_pair_is_rejected_even_with_a_fresh_receipt(self):
         from server.tools.run_outer_checkpoints import OuterCheckpointManager

@@ -3,21 +3,16 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "tools" / "run_orchestration.py"
-SPEC = importlib.util.spec_from_file_location("run_orchestration", MODULE_PATH)
-assert SPEC is not None and SPEC.loader is not None
-run_orchestration = importlib.util.module_from_spec(SPEC)
-sys.modules["run_orchestration"] = run_orchestration
-SPEC.loader.exec_module(run_orchestration)
+# Import normally: replacing the CLI module in sys.modules during discovery
+# splits its live cache from hash functions already imported by other tools.
+from server.tools import run_orchestration
 
 
 class RunOrchestrationContractTests(unittest.TestCase):
@@ -35,7 +30,7 @@ class RunOrchestrationContractTests(unittest.TestCase):
                 "q0_chr:Chr01",
                 "q0_chr:Chr02",
                 "q0_evidence",
-                "grt_prepare",
+                "lgz_prepare",
                 "grt_step1",
                 "grt_step2",
                 "grt_step3",
@@ -51,7 +46,8 @@ class RunOrchestrationContractTests(unittest.TestCase):
         self.assertEqual(by_id["q0_chr:Chr01"].dependencies, ("assign",))
         self.assertEqual(by_id["q0_chr:Chr02"].dependencies, ("assign",))
         self.assertEqual(by_id["q0_evidence"].dependencies, ("q0_chr:Chr01", "q0_chr:Chr02"))
-        self.assertEqual(by_id["grt_prepare"].dependencies, ("q0_evidence",))
+        self.assertEqual(by_id["lgz_prepare"].dependencies, ("q0_evidence",))
+        self.assertEqual(by_id["grt_step1"].dependencies, ("lgz_prepare",))
         self.assertEqual(by_id["chr:Chr01"].dependencies, ("grt_step3",))
         self.assertEqual(by_id["finalize_evidence"].dependencies, ("chr:Chr01", "chr:Chr02"))
 

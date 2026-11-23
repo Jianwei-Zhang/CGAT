@@ -2,6 +2,12 @@
 """Prepare once, then run/resume the existing Server execution plan under one lock."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join, WorkspaceLayout, initialize_workspace
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join, WorkspaceLayout, initialize_workspace
+
+
 import json
 import os
 import re
@@ -15,6 +21,7 @@ from run_all_runner import Runner, RunnerError, WorkspaceLock, load_plan, new_ru
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from run_resources import RESOURCE_OPTIONS, update_resources
 from long_cigar_recovery.minimap_options import batch_size, seed_fraction
+from refinement_config import OPTIONS as REFINEMENT_OPTIONS, save_request, ensure_plan, resolve as resolve_refinement, preflight as refinement_preflight
 
 ALIASES = {
     "-o": "--out", "--output": "--out", "-t": "--threads",
@@ -27,7 +34,7 @@ ALIASES = {
     "--lgz-step2-mummer-scope": "--grt-step2-mummer-scope",
 }
 SINGLE_OPTIONS = {
-    "--out", "--threads", "--score", "--archive-format",
+    "--out", "--threads", "--score", "--archive-format", "--gapfill-tools",
     "--minimap-preset", "--minimap-batch", "--minimap-filter", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-type", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
@@ -35,6 +42,7 @@ SINGLE_OPTIONS = {
 }
 TYPED_READ_OPTIONS = {"--hifi", "--ont"}
 PATH_OPTIONS = {"--ref", "--ds", "--reads", "--cen"} | TYPED_READ_OPTIONS
+LGZ_PATH_OPTIONS = PATH_OPTIONS - TYPED_READ_OPTIONS
 
 
 def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
@@ -86,7 +94,7 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
 
 def input_identities(options: dict) -> dict:
     identities = {}
-    for key in PATH_OPTIONS:
+    for key in LGZ_PATH_OPTIONS:
         for values in options.get(key, []):
             path = Path(values[-1])
             stat = path.stat()
@@ -96,26 +104,26 @@ def input_identities(options: dict) -> dict:
 
 def check_resume_options(requested: dict, saved: dict, identities: dict) -> None:
     for key, value in requested.items():
-        if key in {"--out", "--max-fill", *RESOURCE_OPTIONS}:
+        if key in {"--out", "--max-fill", *RESOURCE_OPTIONS, *REFINEMENT_OPTIONS}:
             continue
         prepared = saved.get(key, [["full"]] if key == "--q0-supplement-scope" else None)
         if value != prepared:
             raise RunnerError(f"{key} differs from the prepared workspace. Use a new -o directory for changed inputs/settings.")
-    for path, identity in input_identities({k: v for k, v in requested.items() if k in PATH_OPTIONS}).items():
+    for path, identity in input_identities({k: v for k, v in requested.items() if k in LGZ_PATH_OPTIONS}).items():
         if identities.get(path) != identity:
             raise RunnerError(f"Input changed since preparation: {path}. Use a new -o directory.")
 
 
 def update_fill_limit(root: Path, limit: str) -> None:
     script, runtime_name = next(
-        ((root / filename, module) for filename, module in (
+        ((workspace_join(root, filename), module) for filename, module in (
             ("run_lgz_step2.sh", "lgz_step2.py"),
             ("run_grt_step2.sh", "grt_step2.py"),
             ("run_grt_step12.sh", "grt_step12.py"),
-        ) if (root / filename).is_file()),
-        (root / "run_lgz_step2.sh", "lgz_step2.py"),
+        ) if (workspace_join(root, filename)).is_file()),
+        (workspace_join(root, "run_lgz_step2.sh"), "lgz_step2.py"),
     )
-    runtime = root / ".prepare_lib/tools" / runtime_name
+    runtime = workspace_join(root, ".prepare_lib/tools", runtime_name)
     if not script.is_file() or not runtime.is_file():
         raise RunnerError("This workspace has no staged LGZ Step2 runtime; update its Server runtime before changing the limit.")
     # A legacy script can call the compatibility facade after a code-only update.
@@ -149,11 +157,11 @@ def update_fill_limit(root: Path, limit: str) -> None:
 
 def prepare_workspace(script: Path, argv: list[str], root: Path) -> int:
     # Forward scheduler cancellation to preparation as well as the compute stages.
-    log_path = root / "logs/prepare.log"
+    log_path = workspace_join(root, "logs/prepare.log")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     print(f"[PREPARE] workspace={root} log={log_path}", flush=True)
     log = log_path.open("a", encoding="utf-8")
-    owner = json.loads((root / ".run_all/lock/owner.json").read_text())
+    owner = json.loads((workspace_join(root, ".run_all/lock/owner.json")).read_text())
     environment = {**os.environ, "GPM_SERVER_PREPARE_RUN_ID": owner["run_id"]}
     child = subprocess.Popen(["bash", str(script), *argv], start_new_session=True,
                              env=environment, stdout=log, stderr=subprocess.STDOUT)
@@ -183,22 +191,37 @@ def execute(argv: list[str], server_source: Path) -> int:
         print("run.sh prepares once and automatically executes the full workflow.\n"
               "Resume: rerun the same command, or bash server/run.sh -o <workspace>.\n"
               "Resume with a new thread budget: bash server/run.sh -o <workspace> --threads 64\n"
-              "Change only the Step2 refill limit: bash server/run.sh -o <workspace> --max-fill 2000000")
+              "Change only the Step2 refill limit: bash server/run.sh -o <workspace> --max-fill 2000000\n"
+              "Append refinement: bash server/run.sh -o <workspace> --hifi reads.fq.gz [--ont ont.fq.gz]\n"
+              "Select tools: --gapfill-tools degap,tgsgapcloser,quartet,lrgapcloser; none disables this run")
         return result.returncode
     options = parse_options(argv, Path.cwd())
     root = Path(options.get("--out", [[str(Path.cwd() / "gpm_server")]])[-1][0])
-    manifest_path = root / ".run_all/launch.json"
+    if not root.exists() or not any(root.iterdir()):
+        if "--ref" not in options or "--ds" not in options:
+            raise RunnerError("A new workspace requires --ref and --ds; see run.sh --help")
+        initialize_workspace(root, prepared_runtime=".lib")
+    manifest_path = workspace_join(root, ".run_all/launch.json")
     run_id = new_run_id()
     lock = WorkspaceLock(root, run_id)
     try:
         lock.acquire()
         saved = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
-        ready = saved.get("prepared", False) if saved else (root / "run_all.sh").is_file()
+        ready = saved.get("prepared", False) if saved else (workspace_join(root, "run_all.sh")).is_file()
         if saved:
             check_resume_options(options, saved["options"], saved["inputs"])
-        elif ready and any(key not in {"--out", "--max-fill", *RESOURCE_OPTIONS} for key in options):
+        elif ready and any(key not in {"--out", "--max-fill", *RESOURCE_OPTIONS, *REFINEMENT_OPTIONS} for key in options):
             raise RunnerError("Resume this existing workspace with run.sh -o <workspace>; its original launch settings were not recorded by run.sh.")
-        if ready and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):
+        _, refinement_request = resolve_refinement(root, options, saved_reads=saved["options"] if saved else None)
+        refinement_preflight(refinement_request)
+        # Persist downstream settings before preparation/handoff so an interrupted
+        # first launch can resume with only -o, without losing its supplied reads.
+        save_request(root, options, run_id, saved_reads=saved["options"] if saved else None)
+        from migrated_lgz import verified_baseline
+        frozen = verified_baseline(root) if ready else None
+        if frozen is not None and "--max-fill" in options:
+            raise RunnerError("Migrated LGZ is frozen under its original engine; use a new workspace to change LGZ science.")
+        if ready and frozen is None and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):
             sys.path.insert(0, str(server_source / "tools/long_cigar_recovery"))
             from resume_reference import handoff
             from run_outer_checkpoints import OuterCheckpointManager
@@ -208,14 +231,14 @@ def execute(argv: list[str], server_source: Path) -> int:
             if saved is None and ("--ref" not in options or "--ds" not in options):
                 raise RunnerError("A new workspace requires --ref and --ds; see run.sh --help")
             if saved is None:
-                if any(path.name != ".run_all" for path in root.iterdir()):
+                if any(path.name != (".runtime" if WorkspaceLayout.detect(root).version == 2 else ".run_all") for path in root.iterdir()):
                     raise RunnerError(f"Output directory is not an empty or prepared Server workspace: {root}")
                 # Store absolute input paths so preparation can also resume from another cwd.
-                absolute_argv = [item for key, groups in options.items() for values in groups for item in [key, *values]]
+                absolute_argv = [item for key, groups in options.items() if key not in REFINEMENT_OPTIONS for values in groups for item in [key, *values]]
                 if "--out" not in options:
                     absolute_argv += ["--out", str(root)]
                 saved = {"schema_version": 1, "prepared": False, "argv": absolute_argv,
-                         "options": options, "inputs": input_identities(options)}
+                         "options": {key: value for key, value in options.items() if key not in REFINEMENT_OPTIONS}, "inputs": input_identities(options)}
                 atomic_write_json(manifest_path, saved)
             status = prepare_workspace(server_source / "prepare.sh", saved["argv"], root)
             if status:
@@ -230,6 +253,8 @@ def execute(argv: list[str], server_source: Path) -> int:
             if saved:
                 saved["effective_max_fill"] = int(limit)
                 atomic_write_json(manifest_path, saved)
+        save_request(root, options, run_id, saved_reads=saved["options"] if saved else None)
+        ensure_plan(root)
         units = load_plan(root)
         return Runner(root, units, run_id).run()
     finally:

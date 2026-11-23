@@ -655,6 +655,17 @@ fn normalize_final_path_export_segments(
                 .get("end")
                 .ok_or_else(|| anyhow!("finalPathEntry.segments[{index}] missing end"))
                 .and_then(|value| value_to_i64(value, "finalPathEntry.segments[].end"))?;
+            if source_kind == "refinement_patch" {
+                let sha256 = get_required_string(segment, "refinementPatchSha256")?;
+                if sha256.len() != 64
+                    || !sha256
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                {
+                    bail!("invalid Final Path refinement patch digest");
+                }
+                return Ok(FinalPathExportSegment::RefinementPatch { sha256, start, end });
+            }
             if source_kind == "ref_segment" {
                 let reference_chr_name = segment
                     .get("referenceChrName")
@@ -780,6 +791,9 @@ pub use imports::*;
 pub use persistence::*;
 pub use project_preview::*;
 pub use workspace::*;
+
+#[cfg(test)]
+mod refinement_acceptance;
 
 #[cfg(test)]
 mod tests {

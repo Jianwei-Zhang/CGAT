@@ -66,6 +66,41 @@ class ThresholdAcceptanceTests(unittest.TestCase):
         bad=graph([]);bad.catalog['regional_partial_discovery']['completed_regional_tasks']=1
         with self.assertRaisesRegex(Q0EvidenceError,'differs from tasks'): adm.construct_q0(bad)
 
+    def test_numbered_threshold_writes_only_physical_outputs_and_reuses_ready(self):
+        from server.tests.test_numbered_workspace_pipeline import numbered_copy
+        from server.tools.run_outer_checkpoints import OuterCheckpointManager
+
+        for supported in (True, False):
+            with self.subTest(supported=supported), tempfile.TemporaryDirectory() as t:
+                f, truth = bridge_fixture()
+                if not supported:
+                    f.links.clear()
+                    f.raw = {k: v for k, v in f.raw.items() if '_vs_ref/' in k}
+                old = f.workspace(t)
+                (old/'metadata/package.tsv').write_text('reads_qc_enabled\nfalse\n')
+                layout = numbered_copy(old, Path(t)/'numbered')
+                root = layout.root
+                ready = layout.path(prep.MANIFEST)
+                ready.unlink()  # The legacy fixture seeded an unrelated full generation.
+                fake = Path(t)/'q0-fixture-bin'
+                with patch.dict(os.environ, {'PATH': str(fake)+os.pathsep+os.environ['PATH']}):
+                    manager = OuterCheckpointManager(root)
+                    for script in layout.path('runs').glob('chr_*/q0_command.sh'):
+                        chromosome = script.parent.name.removeprefix('chr_')
+                        manager.commit(manager.prepare(f'q0_chr:{chromosome}', script.relative_to(root).as_posix()))
+                    options = dict(minimap2=str(fake/'minimap2'), supplement_scope=SCOPE)
+                    receipt = prep.prepare_evidence(root, **options)
+                    self.assertEqual(prep.load_verified_evidence(root), receipt)
+                    catalog = prep.json_file(layout.path(receipt['catalog']))
+                    self.assertEqual(catalog['supplement_scope']['effective'], 'base_only' if supported else 'full')
+                    self.assertFalse((root/'grt').exists())
+                    timestamp = ready.stat().st_mtime_ns
+                    with patch('server.tools.lgz_core.q0_threshold_prepare.initial_questions', side_effect=AssertionError('repeated draft')):
+                        self.assertEqual(prep.prepare_evidence(root, **options), receipt)
+                    self.assertEqual(ready.stat().st_mtime_ns, timestamp)
+                    if supported:
+                        self.assertEqual(adm.build_q0(root).records['chr1'], truth)
+
     def test_canonical_cli_zero_dispatch_close_cache_and_no_reads_restriction(self):
         with tempfile.TemporaryDirectory() as t:
             f,truth=bridge_fixture(); root=f.workspace(t); pkg=root/'metadata/package.tsv';pkg.write_text('reads_qc_enabled\nfalse\n')

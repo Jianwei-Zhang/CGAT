@@ -110,6 +110,52 @@ export function createTauriTransport({
     exportDegapJobs({ stateOrLocale = "zh", ...payload }) {
       return invokeNormalized("export_degap_jobs", payload, stateOrLocale);
     },
+    exportManualRefinement({ workspaceRoot, projectId, outputPath, request, stateOrLocale = "zh" }) {
+      return invokeNormalized(
+        "export_manual_refinement",
+        { workspaceRoot, projectId, outputPath, request },
+        stateOrLocale,
+      );
+    },
+    importManualRefinementResults({ workspaceRoot, projectId, zipPath, stateOrLocale = "zh" }) {
+      return invokeNormalized(
+        "import_manual_refinement_results",
+        { workspaceRoot, projectId, zipPath },
+        stateOrLocale,
+      );
+    },
+    listManualRefinementResults({ workspaceRoot, projectId, stateOrLocale = "zh" }) {
+      return invokeNormalized(
+        "list_manual_refinement_results",
+        { workspaceRoot, projectId },
+        stateOrLocale,
+      );
+    },
+    listManualRefinementExports({ workspaceRoot, projectId, stateOrLocale = "zh" }) {
+      return invokeNormalized("list_manual_refinement_exports", { workspaceRoot, projectId }, stateOrLocale);
+    },
+    undoManualRefinementLocus({ workspaceRoot, projectId, locusId, expectedRevision, stateOrLocale = "zh" }) {
+      return invokeNormalized(
+        "undo_manual_refinement_locus",
+        { workspaceRoot, projectId, locusId, expectedRevision },
+        stateOrLocale,
+      );
+    },
+    switchManualRefinementLocus({
+      workspaceRoot,
+      projectId,
+      locusId,
+      expectedRevision,
+      resultSha256,
+      tool,
+      stateOrLocale = "zh",
+    }) {
+      return invokeNormalized(
+        "switch_manual_refinement_locus",
+        { workspaceRoot, projectId, locusId, expectedRevision, resultSha256, tool },
+        stateOrLocale,
+      );
+    },
     ...createTauriImportOperations(context),
     ...createTauriWorkspaceOperations(context),
     ...createTauriAssemblyOperations(context),

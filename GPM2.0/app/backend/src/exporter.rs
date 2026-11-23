@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, params};
+use sha2::{Digest, Sha256};
 
 use crate::db::open_workspace_db;
 
@@ -43,6 +44,11 @@ pub struct ListExportRecordsParams {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FinalPathExportSegment {
+    RefinementPatch {
+        sha256: String,
+        start: i64,
+        end: i64,
+    },
     Source {
         dataset_name: String,
         contig_name: String,
@@ -343,6 +349,19 @@ fn build_final_path_agp(
                     ));
                     begin = next;
                     part += 1;
+                }
+                FinalPathExportSegment::RefinementPatch { sha256, start, end } => {
+                    let length: i64 = conn.query_row(
+                        "SELECT length(sequence) FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",
+                        params![project_id, sha256], |row| row.get(0),
+                    ).context("AGP refinement patch is unavailable in this project")?;
+                    validate_agp_range(*start, *end, length)?;
+                    components.push((
+                        format!("refine-{sha256}"),
+                        format!("refinement:{sha256}"),
+                        *start,
+                        *end,
+                    ));
                 }
                 FinalPathExportSegment::Source {
                     dataset_name,
@@ -666,10 +685,29 @@ fn build_final_path_fasta_records(
 ) -> Result<Vec<(String, String)>> {
     let mut required_ctg_ids = BTreeSet::<i64>::new();
     let mut required_reference_chr_names = BTreeSet::<String>::new();
+    let mut patches = HashMap::<String, String>::new();
     let mut source_id_by_name = HashMap::<(String, String), i64>::new();
     for record in records {
         for segment in &record.final_path_segments {
             match segment {
+                FinalPathExportSegment::RefinementPatch { sha256, .. } => {
+                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                        patches.entry(sha256.clone())
+                    {
+                        let sequence: Vec<u8> = conn.query_row(
+                            "SELECT sequence FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",
+                            params![project_id, sha256], |row| row.get(0),
+                        ).context("Final Path refinement patch is unavailable in this project")?;
+                        if !sequence
+                            .iter()
+                            .all(|base| b"ACGTRYSWKMBDHVN".contains(base))
+                            || format!("{:x}", Sha256::digest(&sequence)) != *sha256
+                        {
+                            bail!("Final Path refinement patch content changed");
+                        }
+                        entry.insert(String::from_utf8(sequence)?);
+                    }
+                }
                 FinalPathExportSegment::Source {
                     dataset_name,
                     contig_name,
@@ -739,6 +777,7 @@ fn build_final_path_fasta_records(
                     &source_sequences,
                     &reference_sequences,
                     &source_id_by_name,
+                    &patches,
                 )?,
             ))
         })
@@ -751,10 +790,23 @@ fn build_final_path_sequence(
     source_sequences: &HashMap<i64, String>,
     reference_sequences: &HashMap<String, String>,
     source_id_by_name: &HashMap<(String, String), i64>,
+    patches: &HashMap<String, String>,
 ) -> Result<String> {
     let mut final_sequence = String::new();
     for segment in segments {
         match segment {
+            FinalPathExportSegment::RefinementPatch { sha256, start, end } => {
+                let sequence = patches
+                    .get(sha256)
+                    .context("missing verified refinement patch")?;
+                validate_agp_range(*start, *end, sequence.len() as i64)?;
+                let slice = &sequence[(start.min(end) - 1) as usize..*start.max(end) as usize];
+                if start <= end {
+                    final_sequence.push_str(slice);
+                } else {
+                    final_sequence.push_str(&reverse_complement_iupac(slice));
+                }
+            }
             FinalPathExportSegment::Source {
                 dataset_name,
                 contig_name,
@@ -778,10 +830,14 @@ fn build_final_path_sequence(
                     );
                 }
                 let slice = &sequence[(first as usize - 1)..last as usize];
+                // LGZ constructs its path from uppercase source bases; the original
+                // FASTA may retain soft masking. Do not alter manual contig exports.
                 if start <= end {
+                    let offset = final_sequence.len();
                     final_sequence.push_str(slice);
+                    final_sequence[offset..].make_ascii_uppercase();
                 } else {
-                    final_sequence.push_str(&reverse_complement(slice));
+                    final_sequence.push_str(&reverse_complement_iupac(slice));
                 }
             }
             FinalPathExportSegment::Gap { gap_size_bp } => {
@@ -1489,6 +1545,28 @@ fn slice_and_orient(source: &str, start: i64, end: i64, orient: &str) -> Result<
     }
 }
 
+pub(crate) fn reverse_complement_iupac(input: &str) -> String {
+    input
+        .bytes()
+        .rev()
+        .map(|base| match base.to_ascii_uppercase() {
+            b'A' => 'T',
+            b'T' => 'A',
+            b'C' => 'G',
+            b'G' => 'C',
+            b'R' => 'Y',
+            b'Y' => 'R',
+            b'K' => 'M',
+            b'M' => 'K',
+            b'B' => 'V',
+            b'V' => 'B',
+            b'D' => 'H',
+            b'H' => 'D',
+            other => char::from(other),
+        })
+        .collect()
+}
+
 fn reverse_complement(input: &str) -> String {
     input
         .chars()
@@ -2039,6 +2117,64 @@ fn parse_fai_index(text: &str) -> HashMap<String, FaiEntry> {
     index
 }
 
+/// Read one source slice without loading an entire chromosome. Invalid/missing
+/// indexes retain the authoritative streaming reader used by ordinary exports.
+pub(crate) fn load_fasta_source_interval(
+    path: &Path,
+    name: &str,
+    start: i64,
+    end: i64,
+) -> Result<String> {
+    if start <= 0 || end < start {
+        bail!("invalid FASTA source interval {start}..{end}");
+    }
+    let indexed = || -> Result<Option<String>> {
+        let text = match fs::read_to_string(format!("{}.fai", path.display())) {
+            Ok(text) => text,
+            Err(_) => return Ok(None),
+        };
+        let index = parse_fai_index(&text);
+        let Some(entry) = index.get(name) else {
+            return Ok(None);
+        };
+        if end as u64 > entry.length || entry.offset == 0 {
+            return Ok(None);
+        }
+        let mut file = File::open(path)?;
+        if !fai_entry_matches_record(&mut file, entry.offset, name)? {
+            return Ok(None);
+        }
+        let first = entry.offset
+            + (start as u64 - 1) / entry.line_bases * entry.line_width
+            + (start as u64 - 1) % entry.line_bases;
+        let last = entry.offset
+            + (end as u64 - 1) / entry.line_bases * entry.line_width
+            + (end as u64 - 1) % entry.line_bases
+            + 1;
+        file.seek(SeekFrom::Start(first))?;
+        let mut bytes = Vec::new();
+        Read::take(&mut file, last - first).read_to_end(&mut bytes)?;
+        bytes.retain(|byte| !matches!(*byte, b'\r' | b'\n'));
+        if bytes.len() != (end - start + 1) as usize
+            || !bytes
+                .iter()
+                .all(|byte| b"ACGTRYSWKMBDHVN".contains(&byte.to_ascii_uppercase()))
+        {
+            return Ok(None);
+        }
+        Ok(Some(String::from_utf8(bytes)?.to_ascii_uppercase()))
+    };
+    if let Some(sequence) = indexed()? {
+        return Ok(sequence);
+    }
+    let records = load_named_sequences_from_fasta(path, &HashSet::from([name.to_string()]))?;
+    let sequence = &records[name];
+    if end as usize > sequence.len() {
+        bail!("FASTA source slice exceeds {name}");
+    }
+    Ok(sequence[(start - 1) as usize..end as usize].to_ascii_uppercase())
+}
+
 pub(crate) fn load_named_sequences_from_fasta(
     fasta_path: &Path,
     needed_names: &HashSet<String>,
@@ -2182,6 +2318,28 @@ mod tests {
     }
 
     #[test]
+    fn server_source_export_matches_lgz_soft_mask_and_iupac_on_both_strands() {
+        let segment = |start, end| FinalPathExportSegment::Source {
+            dataset_name: "ds".into(),
+            contig_name: "contig".into(),
+            start,
+            end,
+        };
+        let sources = HashMap::from([(1, "xaCGtryswkmbdhvnx".into())]);
+        let ids = HashMap::from([(("ds".into(), "contig".into()), 1)]);
+        let sequence = build_final_path_sequence(
+            &[segment(2, 16), segment(16, 2)],
+            &HashMap::new(),
+            &sources,
+            &HashMap::new(),
+            &ids,
+            &HashMap::new(),
+        )
+        .unwrap();
+        assert_eq!(sequence, "ACGTRYSWKMBDHVNNBDHVKMWSRYACGT");
+    }
+
+    #[test]
     fn final_path_agp_preserves_current_ranges_orientation_gaps_and_reference_without_fasta() {
         let (_temp, db, conn) = agp_fixture();
         let records = vec![
@@ -2279,7 +2437,8 @@ Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
                     &ctgs,
                     &sources,
                     &references,
-                    &ids
+                    &ids,
+                    &HashMap::new(),
                 )
                 .unwrap()
             );
@@ -3081,6 +3240,7 @@ Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
             &source_sequences,
             &reference_sequences,
             &HashMap::new(),
+            &HashMap::new(),
         )
         .unwrap();
         let canonicalized_anchor_split = build_final_path_sequence(
@@ -3104,6 +3264,7 @@ Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
             &ctg_by_id,
             &source_sequences,
             &reference_sequences,
+            &HashMap::new(),
             &HashMap::new(),
         )
         .unwrap();

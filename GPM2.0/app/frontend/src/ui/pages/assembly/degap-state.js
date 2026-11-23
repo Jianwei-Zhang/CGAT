@@ -4,6 +4,10 @@ import {
   resolveFinalPathSegmentDisplayName,
 } from "./final-path-state.js";
 import { tAssembly } from "./i18n.js";
+import {
+  buildManualRefinementStateForPersistence,
+  normalizeManualRefinementState,
+} from "./manual-refinement-state.js";
 
 export const DEGAP_SOFTWARE_SETTINGS_STORAGE_KEY = "gpm_next:degap_software_settings";
 
@@ -169,16 +173,21 @@ export function normalizeDegapSettings(value = {}) {
 
 export function normalizeDegapProjectState(value = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const manualRefinement = buildManualRefinementStateForPersistence(source.manualRefinement);
   return {
     jobs: normalizeDegapJobs(source.jobs),
     settingsPanelDismissed: source.settingsPanelDismissed === true,
     collapsedJobCardChrNames: normalizeUniqueStringList(source.collapsedJobCardChrNames),
+    ...(manualRefinement ? { manualRefinement } : {}),
   };
 }
 
 export function normalizeDegapRuntimeState(value = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const projectState = normalizeDegapProjectState(source.projectState || source);
+  const manualRefinement = normalizeManualRefinementState(
+    source.manualRefinement ?? source.projectState?.manualRefinement ?? projectState.manualRefinement,
+  );
   return {
     settings: normalizeDegapSettings(source.settings),
     jobs: projectState.jobs,
@@ -190,6 +199,7 @@ export function normalizeDegapRuntimeState(value = {}) {
     pendingJobIntent: normalizeDegapPendingJobIntent(source.pendingJobIntent),
     expandedJobId: normalizeString(source.expandedJobId),
     collapsedJobCardChrNames: projectState.collapsedJobCardChrNames,
+    manualRefinement,
     trackView: source.trackView && typeof source.trackView === "object" && !Array.isArray(source.trackView)
       ? source.trackView
       : {},
@@ -200,10 +210,12 @@ export function normalizeDegapRuntimeState(value = {}) {
 
 export function buildDegapProjectStateForPersistence(degap) {
   const runtime = normalizeDegapRuntimeState(degap);
+  const manualRefinement = buildManualRefinementStateForPersistence(runtime.manualRefinement);
   return {
     jobs: runtime.jobs,
     settingsPanelDismissed: runtime.settingsPanelDismissed,
     collapsedJobCardChrNames: runtime.collapsedJobCardChrNames,
+    ...(manualRefinement ? { manualRefinement } : {}),
   };
 }
 

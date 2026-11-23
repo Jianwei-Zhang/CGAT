@@ -7,6 +7,12 @@ change. Index identity includes exact target bytes, preset and executable hash.
 from __future__ import annotations
 
 try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
+try:
     from run_resources import execution_threads
 except ModuleNotFoundError:  # Imported through server.tools.
     from ..run_resources import execution_threads
@@ -92,7 +98,7 @@ class RefillBatchAlignment:
                    "query_sha256": sha256_bytes(query_payload),
                    "mapping": {"preset": PRESET, "cigar": True, "keep_all_chains": True, "threads": self.threads}}
         key = json_hash(payload)
-        parent = self.server_dir / f"grt/cache/step12/raw_refill_batch/v1/{self.stage}"
+        parent = workspace_join(self.server_dir, f"grt/cache/step12/raw_refill_batch/v1/{self.stage}")
         parent.mkdir(parents=True, exist_ok=True)
         destination = parent / key
         outputs = ("flanks.fa", "result.paf", "command.txt", "stdout.log", "stderr.log", "provenance.json")
@@ -107,14 +113,14 @@ class RefillBatchAlignment:
                 temporary = Path(tempfile.mkdtemp(prefix=f".{key}.", dir=parent))
                 try:
                     (temporary / "flanks.fa").write_bytes(query_payload)
-                    target = self.server_dir / self.donor_set["fasta_relpath"]
+                    target = workspace_join(self.server_dir, self.donor_set["fasta_relpath"])
                     if sha256_file(target) != self.donor_set["fasta_sha256"]:
                         fail("refill target FASTA changed since donor validation")
                     index_payload = {"schema_version": 1,
                                      "target_sha256": payload["target_sha256"], "tool": tool,
                                      "index_options": ["-x", PRESET]}
                     index_key = json_hash(index_payload)
-                    index_parent = self.server_dir / "grt/cache/minimap_index/v1"
+                    index_parent = workspace_join(self.server_dir, "grt/cache/minimap_index/v1")
                     index_parent.mkdir(parents=True, exist_ok=True)
                     index_dir = index_parent / index_key
                     with cache_lock(index_parent / f"{index_key}.lock"):
@@ -154,7 +160,7 @@ class RefillBatchAlignment:
                     publish(temporary, destination, payload, outputs)
                     self.cache_dir = destination
                 except BaseException:
-                    failed = self.server_dir / "grt/failed"
+                    failed = workspace_join(self.server_dir, "grt/failed")
                     failed.mkdir(parents=True, exist_ok=True)
                     if temporary.exists():
                         os.replace(temporary, failed / temporary.name)

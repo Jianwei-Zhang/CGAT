@@ -13,6 +13,8 @@ import unittest
 
 PROJECT = Path(__file__).resolve().parents[2]
 TOOLS = PROJECT / "server/tools"
+# A new LGZ-only finalizer and the compatibility helper never had old CLI names.
+LGZ_ONLY = {"lgz_compat.py", "lgz_final.py"}
 sys.path.insert(0, str(TOOLS))
 
 
@@ -27,7 +29,7 @@ class LgzCompatibilityTests(unittest.TestCase):
                 new = importlib.import_module("server.tools.lgz_core." + suffix)
                 self.assertIs(old, new)
         for path in TOOLS.glob("lgz_*.py"):
-            if path.name == "lgz_compat.py":
+            if path.name in LGZ_ONLY:
                 continue
             with self.subTest(module=path.stem):
                 self.assertIs(importlib.import_module("server.tools." + path.stem),
@@ -50,7 +52,7 @@ for prefix in ('', 'server.tools.'):
 
     def test_old_and_new_cli_help_are_equivalent_except_program_name(self):
         for path in sorted(TOOLS.glob("lgz_*.py")):
-            if path.name == "lgz_compat.py":
+            if path.name in LGZ_ONLY:
                 continue
             old = path.with_name(path.name.replace("lgz_", "grt_", 1))
             with self.subTest(module=path.stem):
@@ -76,8 +78,19 @@ for prefix in ('', 'server.tools.'):
         self.assertEqual(updater.engine_hash(TOOLS), repair_engine_sha256(TOOLS / "lgz_core"))
         self.assertEqual(updater.engine_hash(TOOLS), repair_engine_sha256(TOOLS / "grt_core"))
         files = {p.relative_to(TOOLS).as_posix() for p in engine_source_files(TOOLS)}
-        for name in ("lgz_core/step2_engine.py", "grt_core/step2_engine.py", "lgz_step3.py", "grt_step3.py", "lgz_compat.py", "run_resources.py"):
+        for name in ("lgz_core/step2_engine.py", "grt_core/step2_engine.py", "lgz_step3.py", "grt_step3.py", "lgz_compat.py", "run_resources.py", "workspace_layout.py"):
             self.assertIn(name, files)
+
+    def test_layout_helper_changes_invalidate_engine_identity(self):
+        from server.tools import update_workspace_runtime as updater
+        with tempfile.TemporaryDirectory() as directory:
+            tools = Path(directory)
+            (tools / "grt_core").mkdir()
+            for name in ("grt_core/__init__.py", "grt_step2.py", "grt_step3.py", "run_resources.py", "workspace_layout.py"):
+                (tools / name).write_text("# fixture\n")
+            before = updater.engine_hash(tools)
+            (tools / "workspace_layout.py").write_text("# changed resolver\n")
+            self.assertNotEqual(before, updater.engine_hash(tools))
 
     def test_new_cli_flags_preserve_existing_persisted_option_identity(self):
         from server.tools.server_run import parse_options

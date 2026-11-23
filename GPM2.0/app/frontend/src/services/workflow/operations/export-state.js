@@ -156,6 +156,130 @@ export async function exportDegapJobs({
   return callDevBridge("/api/export-degap-jobs", payload);
 }
 
+export async function exportManualRefinement({
+  workspaceRoot,
+  projectId,
+  outputPath,
+  request,
+  stateOrLocale = "zh",
+}) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("manual refinement task export is unavailable in browser preview", {
+      code: "BROWSER_EXPORT_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "export_manual_refinement",
+    });
+  }
+  return tauri.exportManualRefinement({
+    workspaceRoot,
+    projectId,
+    outputPath,
+    request,
+    stateOrLocale,
+  });
+}
+
+export async function importManualRefinementResults({
+  workspaceRoot,
+  projectId,
+  zipPath,
+  stateOrLocale = "zh",
+}) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("manual refinement result import is unavailable in browser preview", {
+      code: "BROWSER_IMPORT_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "import_manual_refinement_results",
+    });
+  }
+  return tauri.importManualRefinementResults({
+    workspaceRoot,
+    projectId,
+    zipPath,
+    stateOrLocale,
+  });
+}
+
+export async function listManualRefinementResults({
+  workspaceRoot,
+  projectId,
+  stateOrLocale = "zh",
+}) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("manual refinement result listing is unavailable in browser preview", {
+      code: "BROWSER_READ_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "list_manual_refinement_results",
+    });
+  }
+  return tauri.listManualRefinementResults({
+    workspaceRoot,
+    projectId,
+    stateOrLocale,
+  });
+}
+
+export async function listManualRefinementExports({ workspaceRoot, projectId, stateOrLocale = "zh" }) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("manual refinement export history is unavailable in browser preview", {
+      code: "BROWSER_READ_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "list_manual_refinement_exports",
+    });
+  }
+  return tauri.listManualRefinementExports({ workspaceRoot, projectId, stateOrLocale });
+}
+
+export async function undoManualRefinementLocus({
+  workspaceRoot,
+  projectId,
+  locusId,
+  expectedRevision,
+  stateOrLocale = "zh",
+}) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("manual refinement undo is unavailable in browser preview", {
+      code: "BROWSER_MUTATION_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "undo_manual_refinement_locus",
+    });
+  }
+  return tauri.undoManualRefinementLocus({
+    workspaceRoot,
+    projectId,
+    locusId,
+    expectedRevision,
+    stateOrLocale,
+  });
+}
+
+export async function switchManualRefinementLocus({
+  workspaceRoot,
+  projectId,
+  locusId,
+  expectedRevision,
+  resultSha256,
+  tool,
+  stateOrLocale = "zh",
+}) {
+  if (!isTauriRuntime()) {
+    throw normalizeWorkflowError("manual refinement candidate switch is unavailable in browser preview", {
+      code: "BROWSER_MUTATION_UNAVAILABLE",
+      source: "browser-preview",
+      operation: "switch_manual_refinement_locus",
+    });
+  }
+  return tauri.switchManualRefinementLocus({
+    workspaceRoot,
+    projectId,
+    locusId,
+    expectedRevision,
+    resultSha256,
+    tool,
+    stateOrLocale,
+  });
+}
+
 export async function getRuntimeSettings({ workspaceRoot, stateOrLocale = "zh" }) {
   if (isTauriRuntime()) {
     return getRuntimeSettingsTauri({ workspaceRoot, stateOrLocale });

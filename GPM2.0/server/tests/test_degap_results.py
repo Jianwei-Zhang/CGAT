@@ -14,6 +14,21 @@ from unittest import mock
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 import degap_results as results
+from workspace_layout import initialize_workspace, workspace_join
+
+
+def write_family(out, *, status="closed", sequence="ACGTN"):
+    final = f"{out.name}.final.fa"
+    (out / final).write_text(f">candidate\n{sequence}\n")
+    artifacts = {final: results.digest(out / final)}
+    for name in ("family-components.fa", "process.agp", "process.log", "process.summary",
+                 "family-report.html", "connection-diagnostics.json"):
+        (out / name).write_text("controlled fixture\n")
+        artifacts[name] = results.digest(out / name)
+    manifest = {"schema": "degap-family-result-v1", "status": status, "final_sequence": final,
+                "artifacts": artifacts, "winner": {} if status == "closed" else None}
+    manifest["payload_sha256"] = results.hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+    (out / results.FAMILY).write_text(json.dumps(manifest))
 
 
 class DegapResultsTests(unittest.TestCase):
@@ -30,6 +45,26 @@ class DegapResultsTests(unittest.TestCase):
         for name in ("seqleft.fa", "seqright.fa", "endpoint.ctg.fa"):
             (self.out / name).write_text(">endpoint\nACGT\n")
 
+    def test_unclosed_family_is_not_an_app_candidate(self):
+        results.begin(self.recipe)
+        results.seed(self.recipe)
+        write_family(self.out, status="exhausted")
+        results.record(self.recipe)
+        receipt = json.loads((self.out / ".gpm_degap_result.json").read_text())
+        self.assertEqual(receipt["status"], "exhausted")
+        self.assertNotIn("fasta", receipt)
+        results.begin(self.recipe)
+        results.seed(self.recipe)
+        with self.assertRaisesRegex(ValueError, "new family manifest"):
+            results.record(self.recipe)
+
+    def test_current_bundled_runtime_does_not_collect_bare_legacy_fasta(self):
+        results.begin(self.recipe)
+        results.seed(self.recipe)
+        (self.out / "job.final.fa").write_text(">old\nACGT\n")
+        with self.assertRaisesRegex(ValueError, "final family manifest"):
+            results.record(self.recipe)
+
     def test_digest_does_not_require_python311_file_digest(self):
         path=self.root/"bytes.bin";payload=bytes(range(256))*8193;path.write_bytes(payload)
         expected=results.hashlib.sha256(payload).hexdigest()
@@ -39,9 +74,8 @@ class DegapResultsTests(unittest.TestCase):
 
     def test_gap_candidate_snapshot_and_stale_run_rejected(self):
         results.begin(self.recipe)
-        final = self.out / "job.final.fa"
         results.seed(self.recipe)
-        final.write_text(">partial_extension\nACGTN\n")
+        write_family(self.out)
         results.record(self.recipe)
         receipt = json.loads((self.out / ".gpm_degap_result.json").read_text())
         self.assertEqual(receipt["status"], "candidate")  # not a claim of gap closure
@@ -54,8 +88,9 @@ class DegapResultsTests(unittest.TestCase):
 
     def test_old_candidate_cannot_be_admitted_as_a_new_run(self):
         results.begin(self.recipe)
-        (self.out / "job.final.fa").write_text(">old\nACGT\n")
+        write_family(self.out)
         results.seed(self.recipe)
+        (self.out / results.FAMILY).write_text((self.out / results.FAMILY).read_text() + "\n")
         with self.assertRaisesRegex(ValueError, "stale FASTA"):
             results.record(self.recipe)
         self.assertFalse((self.out / ".gpm_degap_result.json").exists())
@@ -94,8 +129,19 @@ class DegapResultsTests(unittest.TestCase):
                 results.safe_path(self.root, path)
 
     def test_collect_two_jobs_builds_nested_packages_and_recollects_idempotently(self):
+        self.collect_two_jobs(numbered=False)
+
+    def test_numbered_collection_retains_original_lgz_tables_and_uses_a_sealed_candidate_catalog(self):
+        self.collect_two_jobs(numbered=True)
+
+    def test_changing_a_collected_candidate_snapshot_during_alignment_cannot_publish_a_mixed_result(self):
+        self.collect_two_jobs(numbered=True, mutate=True)
+
+    def collect_two_jobs(self, *, numbered, mutate=False):
         server = Path(self.recipe["server_root"])
-        metadata = server / "metadata"
+        if numbered:
+            initialize_workspace(server)
+        metadata = workspace_join(server, "metadata")
         metadata.mkdir(parents=True)
         files = {
             "prepare_options.tsv": "key\tvalue\nalignment_engine\tminimap2\nminimap_preset\tasm5\nskip_self\tfalse\nsequence_layout\tpartitioned\npreassigned_chr\ttrue\nself_alignment_scope\tchr_partition\ncross_alignment_scope\tchr_partition\n",
@@ -110,8 +156,9 @@ class DegapResultsTests(unittest.TestCase):
         for name, content in files.items():
             (metadata / name).write_text(content)
         for name, seq in (("data/ref.fa", "Chr01"), ("runs/chr_Chr01/datasets/primary.fa", "seed")):
-            path = server / name; path.parent.mkdir(parents=True, exist_ok=True)
+            path = workspace_join(server, name); path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(f">{seq}\nACGT\n")
+        original_files = {str(path): path.read_bytes() for path in server.rglob("*") if path.is_file()}
         scripts = self.root / "degap_jobs"; scripts.mkdir()
         jobs = self.root / "jobs.tsv"
         rows = ["job_id\tscript_path\tout_path"]
@@ -123,11 +170,13 @@ class DegapResultsTests(unittest.TestCase):
                 (out / seed).write_text(">seed\nACGT\n")
             results.begin(recipe)
             results.seed(recipe)
-            (out / f"job{index}.final.fa").write_text(">result\nACGT\n")
+            write_family(out, sequence="ACGT")
             results.record(recipe)
             rows.append(f"gap{index}\tdegap_jobs/job{index}.sh\t{out}")
         jobs.write_text("\n".join(rows) + "\n")
         def align(args, **kwargs):
+            if mutate:
+                (self.root / "job0/.gpm_degap_candidate.fa").write_text(">degap_candidate\nTTTT\n")
             command = Path(args[1])
             line = next(line for line in command.read_text().splitlines() if line.startswith("minimap2 "))
             words = shlex.split(line.split(" > ")[0])
@@ -136,6 +185,15 @@ class DegapResultsTests(unittest.TestCase):
             target_id = results.stage.read_fasta_records(target)[0][0]
             (command.parent / "result.paf").write_text(f"{query_id}\t4\t0\t4\t+\t{target_id}\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n")
             return subprocess.CompletedProcess(args, 0)
+        if mutate:
+            with mock.patch.object(results.subprocess, "run", side_effect=align):
+                with self.assertRaisesRegex(ValueError, "candidate sequence changed"):
+                    results.collect(jobs)
+            self.assertFalse((server / results.manual_catalog.POINTER).exists())
+            self.assertFalse((self.root / "degap_results.zip").exists())
+            for path, expected in original_files.items():
+                self.assertEqual(Path(path).read_bytes(), expected, path)
+            return
         with mock.patch.object(results.subprocess, "run", side_effect=align) as runner:
             output = results.collect(jobs)
             self.assertEqual(runner.call_count, 4)
@@ -149,9 +207,46 @@ class DegapResultsTests(unittest.TestCase):
                     self.assertIn("gpm_server/metadata/track_member_orders.tsv", nested.namelist())
         with mock.patch.object(results.subprocess, "run", side_effect=AssertionError("must reuse verified packages")):
             results.collect(jobs)
+        if numbered:
+            catalog, manifest, pointer = results.manual_catalog.current(server)
+            self.assertEqual(len(manifest["packages"]), 2)
+            first_catalog = catalog
+            out = self.root / "job2"
+            out.mkdir()
+            recipe = {**self.recipe, "token": "3" * 64, "job_id": "gap2", "out_path": str(out)}
+            (scripts / "job2.json").write_text(json.dumps(recipe))
+            for seed in ("seqleft.fa", "seqright.fa"):
+                (out / seed).write_text(">seed\nACGT\n")
+            results.begin(recipe)
+            results.seed(recipe)
+            write_family(out, sequence="ACGT")
+            results.record(recipe)
+            with jobs.open("a") as stream:
+                stream.write(f"gap2\tdegap_jobs/job2.sh\t{out}\n")
+            with mock.patch.object(results.subprocess, "run", side_effect=align) as runner:
+                results.collect(jobs)
+                self.assertEqual(runner.call_count, 2)
+            catalog, manifest, pointer = results.manual_catalog.current(server)
+            self.assertNotEqual(catalog, first_catalog)
+            self.assertEqual(len(manifest["packages"]), 3)
+            for row in results.stage.read_tsv(workspace_join(catalog, "metadata/source_seq_locator.tsv"))[0]:
+                if row["dataset_name"] == "derived_ctg":
+                    self.assertTrue(workspace_join(catalog, row["fasta_relpath"]).is_file())
+            self.assertTrue(str(catalog.relative_to(server)).startswith(results.manual_catalog.HOME + "/"))
+            for path, expected in original_files.items():
+                self.assertEqual(Path(path).read_bytes(), expected, path)
+            self.assertEqual(len(results.stage.read_tsv(metadata / "source_seq_locator.tsv")[0]), 1)
+            metadata = workspace_join(catalog, "metadata")
+            for legacy in ("data", "metadata", "runs", ".run_all", ".prepare_lib", "report"):
+                self.assertFalse((server / legacy).exists(), legacy)
+            # A valid completed pointer cannot hide a modified catalog/cache.
+            cached_archive, _ = results.manual_catalog.package_paths(server, next(iter(manifest["packages"].values())))
+            cached_archive.write_bytes(b"changed candidate package")
+            with self.assertRaisesRegex(ValueError, "catalog|cache"):
+                results.manual_catalog.current(server)
         locators = results.stage.read_tsv(metadata / "source_seq_locator.tsv")[0]
-        self.assertEqual(len(locators), 3)
-        self.assertEqual((server / "runs/chr_Chr01/datasets/primary.fa").read_text(), ">seed\nACGT\n")
+        self.assertEqual(len(locators), 4 if numbered else 3)
+        self.assertEqual(workspace_join(server, "runs/chr_Chr01/datasets/primary.fa").read_text(), ">seed\nACGT\n")
 
     def test_publication_failure_restores_existing_bytes_and_removes_new_files(self):
         server, stage = self.root / "server", self.root / "stage"

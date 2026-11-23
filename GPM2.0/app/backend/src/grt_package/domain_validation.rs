@@ -72,11 +72,28 @@ pub(super) fn source_length_catalog(
     Ok(sources)
 }
 
+#[cfg(test)]
 pub(super) fn validate_app_source_cards(
     table: &TsvTable,
     sources: &HashMap<(String, String), usize>,
     assignment_baselines: &HashMap<(String, String, String), (String, i64)>,
     reference_records: &BTreeMap<String, usize>,
+) -> Result<()> {
+    validate_app_source_cards_for_mode(
+        table,
+        sources,
+        assignment_baselines,
+        reference_records,
+        false,
+    )
+}
+
+pub(super) fn validate_app_source_cards_for_mode(
+    table: &TsvTable,
+    sources: &HashMap<(String, String), usize>,
+    assignment_baselines: &HashMap<(String, String, String), (String, i64)>,
+    reference_records: &BTreeMap<String, usize>,
+    refined: bool,
 ) -> Result<()> {
     let mut ids = HashSet::new();
     for row in &table.rows {
@@ -108,12 +125,31 @@ pub(super) fn validate_app_source_cards(
         let placement = field(row, "placement_mode")?;
         enum_value(
             placement,
-            &["normal", "grt_promoted", "cross_chr_grt_usage"],
+            if refined {
+                &[
+                    "normal",
+                    "grt_promoted",
+                    "cross_chr_grt_usage",
+                    "refinement",
+                ]
+            } else {
+                &["normal", "grt_promoted", "cross_chr_grt_usage"]
+            },
             &format!("source card {card}.placement_mode"),
         )?;
         enum_value(
             field(row, "ref_alignment_status")?,
-            &["hit", "weak_hit", "multi_hit", "other_chr_only", "no_hit"],
+            if placement == "refinement" {
+                &[
+                    "not_measured",
+                    "hit",
+                    "multi_hit",
+                    "other_chr_only",
+                    "no_hit",
+                ]
+            } else {
+                &["hit", "weak_hit", "multi_hit", "other_chr_only", "no_hit"]
+            },
             &format!("source card {card}.ref_alignment_status"),
         )?;
         orientation(field(row, "orientation")?, &format!("source card {card}"))?;
@@ -460,7 +496,11 @@ where
                     format!("duplicate App Final Path segment {id}"),
                 );
             }
-            if expected_schema_version == GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION {
+            if matches!(
+                expected_schema_version,
+                GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION
+                    | GRT_REFINED_FINAL_PATH_SCHEMA_VERSION
+            ) {
                 match segment.get("event_id") {
                     None | Some(Value::Null) => {}
                     Some(Value::String(event_id)) if !event_id.trim().is_empty() => {
@@ -554,7 +594,11 @@ where
                 format!("App Final Path segment lengths differ for {chr_name}"),
             );
         }
-        if expected_schema_version == GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION {
+        if matches!(
+            expected_schema_version,
+            GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION
+                | GRT_REFINED_FINAL_PATH_SCHEMA_VERSION
+        ) {
             validate_app_display_evidence(
                 chr,
                 chr_name,

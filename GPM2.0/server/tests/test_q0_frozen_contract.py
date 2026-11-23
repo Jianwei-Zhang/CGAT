@@ -1,5 +1,6 @@
 """Python and Windows Rust consume the same frozen package-3 fixture."""
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import sys
@@ -109,6 +110,14 @@ class FrozenQ0ContractTests(unittest.TestCase):
                     build(self.root, staging, full)
                     expected = json.loads((FIXTURE.parent / name).read_text())["files"]
                     actual = {p.relative_to(staging).as_posix(): p.read_text() for p in staging.rglob("*") if p.is_file()}
+                    identity_map = json.loads(actual.pop("metadata/server_sources.json"))
+                    self.assertEqual(identity_map, {
+                        "schema": "cgat.server-source-identities", "schema_version": 1,
+                        "sources": [{"dataset": "only", "contig": "only", "length": 2000,
+                                     "fasta_sha256": hashlib.sha256((self.root / "data/datasets/only.fa").read_bytes()).hexdigest()}],
+                    })
+                    # The additive source-identity map must not rewrite a single
+                    # frozen byte or create a FASTA in the Light archive.
                     self.assertEqual(actual, expected)
                     self.assertFalse((staging / FREEZE).exists())
                     self.assertEqual(json.loads((staging / "metadata/grt_app_manifest.json").read_text())["schema_version"], "3")

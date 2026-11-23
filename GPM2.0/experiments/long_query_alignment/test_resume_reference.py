@@ -248,7 +248,7 @@ class ReferenceResumeTests(unittest.TestCase):
         self.assert_preserved()
 
     def test_forged_journal_cannot_target_FASTA_or_non_reference_files(self):
-        data = {"commands":[{"unit_id":"ref:a","path":"data/a.fa","backup":"000000.command.sh","mode":0o755,
+        data = {"workspace":str(self.ws),"commands":[{"unit_id":"ref:a","path":"data/a.fa","backup":"000000.command.sh","mode":0o755,
                               "old_sha256":"a"*64,"new_sha256":"b"*64}]}
         with self.assertRaisesRegex(wa.ExperimentError,"exact reference-command"):
             rr.validate_journal_commands(data)
@@ -276,6 +276,58 @@ class ReferenceResumeTests(unittest.TestCase):
         (pid/"cmdline").write_bytes(b"minimap2\0-o\0new-result.paf\0/elsewhere/ref.fa\0/elsewhere/query.fa\0")
         with self.assertRaisesRegex(wa.ExperimentError,"active standalone"):
             rr.direct_process_guard(self.ws,proc_root=proc)
+
+
+    def _proc_entry(self, proc, pid, ppid, start, args=(), executable=None):
+        path = proc/str(pid)
+        path.mkdir(exist_ok=True)
+        (path/"stat").write_text(f"{pid} (cmd ) name) S {ppid}" + " 0"*17 + f" {start} 0\n")
+        (path/"cmdline").write_bytes(b"\0".join(os.fsencode(arg) for arg in args) + b"\0")
+        if not (path/"cwd").is_symlink():
+            (path/"cwd").symlink_to(self.ws, target_is_directory=True)
+        if executable:
+            (path/"exe").symlink_to(executable)
+        return path
+
+    def test_wrapped_workspace_launcher_ignores_only_its_own_micromamba_shell_argument(self):
+        proc = self.root/"fake-proc"
+        proc.mkdir()
+        launcher, intermediate, runner, peer = 101, 102, 103, 104
+        command = ["micromamba", "run", "-n", "cgat-server", "bash", "./run_all.sh", "--hifi", "reads.fq"]
+        wrapper = self._proc_entry(proc, launcher, 1, 10, command, executable="/opt/bin/micromamba")
+        self._proc_entry(proc, intermediate, launcher, 12, ["bash", "/tmp/mamba-wrapper.sh"])
+        self._proc_entry(proc, runner, intermediate, 13)
+        with patch.object(rr.os, "getpid", return_value=runner):
+            rr.direct_process_guard(self.ws, proc_root=proc)
+            competing = self._proc_entry(proc, peer, 1, 11, command, executable="/opt/bin/micromamba")
+            with self.assertRaisesRegex(wa.ExperimentError, f"active standalone.*{peer}"):
+                rr.direct_process_guard(self.ws, proc_root=proc)
+            # A direct mapper still blocks with the allowed wrapper in this launch chain.
+            (competing/"cmdline").write_bytes(b"minimap2\0" + os.fsencode(self.ws/"data/ref.fa") + b"\0")
+            with self.assertRaisesRegex(wa.ExperimentError, f"active standalone.*{peer}"):
+                rr.direct_process_guard(self.ws, proc_root=proc)
+            (competing/"cmdline").write_bytes(b"")
+            # Other watched arguments on the real ancestor are not covered by the exemption.
+            observed = self.ws/"runs/a_vs_ref/command.sh"
+            (wrapper/"cmdline").write_bytes(b"\0".join(os.fsencode(a) for a in [*command, observed]) + b"\0")
+            with self.assertRaisesRegex(wa.ExperimentError, f"active standalone.*{launcher}"):
+                rr.direct_process_guard(self.ws, proc_root=proc)
+
+    def test_guard_does_not_exempt_unverified_or_recycled_launcher(self):
+        proc = self.root/"fake-proc"
+        proc.mkdir()
+        command = ["micromamba", "run", "--prefix=/opt/env", "/bin/bash", "--", self.ws/"run_all.sh"]
+        wrapper = self._proc_entry(proc, 101, 1, 50, command, executable="/opt/bin/micromamba")
+        self._proc_entry(proc, 102, 101, 10)
+        with patch.object(rr.os, "getpid", return_value=102):
+            with self.assertRaisesRegex(wa.ExperimentError, "active standalone.*101"):
+                rr.direct_process_guard(self.ws, proc_root=proc)
+            self._proc_entry(proc, 102, 101, 80)
+            rr.direct_process_guard(self.ws, proc_root=proc)
+            (wrapper/"exe").unlink()
+            (wrapper/"exe").symlink_to("/opt/bin/other")
+            with self.assertRaisesRegex(wa.ExperimentError, "active standalone.*101"):
+                rr.direct_process_guard(self.ws, proc_root=proc)
 
 
 if __name__=="__main__":

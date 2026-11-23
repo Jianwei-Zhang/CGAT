@@ -24,6 +24,25 @@ from run_all_runner import GRT_CACHE_MARKERS, Runner
 
 
 class ProgressTests(unittest.TestCase):
+    def test_prepare_heartbeat_names_the_actual_phase_for_both_saved_plan_ids(self):
+        for saved_id in ("lgz_prepare", "grt_prepare"):
+            with self.subTest(saved_id=saved_id), tempfile.TemporaryDirectory() as temp:
+                at = [0.0]
+                stream = io.StringIO()
+                with ProgressDisplay(Path(temp) / "progress.log", {saved_id: "09/21"}, stream=stream,
+                                     clock=lambda: at[0]) as view:
+                    view.event("START", saved_id, "attempt=1")
+                    at[0] = 10.0
+                    view.child(saved_id, "LGZ prepare phase: chromosome path 2/5: Chr2")
+                    at[0] = 75.0
+                    view.tick()
+                    view.event("SUCCESS", saved_id, "elapsed=75.0s")
+                    view.event("START", saved_id, "attempt=2")
+                    at[0] = 140.0
+                    view.tick()
+                self.assertIn("[09/21] [RUNNING] [lgz_prepare] chromosome path 2/5: Chr2 · phase 1m 5s · elapsed 1m 15s", stream.getvalue())
+                self.assertIn("[RUNNING] [lgz_prepare] still running · elapsed 1m 5s", stream.getvalue())
+
     def test_runner_normalizes_legacy_cache_markers_without_changing_raw_logs(self):
         for name in ("GRT", "LGZ"):
             with self.subTest(name=name):

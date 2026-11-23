@@ -17,6 +17,8 @@ import {
   getGrtProjectView,
   getProjectAssemblyViewState,
   getProjectOverviewSources,
+  listManualRefinementExports,
+  listManualRefinementResults,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../../services/workflow-api.js";
@@ -33,6 +35,7 @@ import {
   isFinalPathCtgSegment,
   isFinalPathGapSegment,
   isFinalPathRefSegment,
+  isFinalPathRefinementPatchSegment,
   resolveFinalPathSegmentDisplayName,
   resolveFinalPathSegmentLengthBp,
   resolveFinalPathTotalLengthBp,
@@ -41,6 +44,14 @@ import { normalizeGrtProjectView } from "./assembly/grt-state.js";
 import { normalizeHiddenPrimaryCtgIds } from "./assembly/selection-state.js";
 import { buildProjectExportLogText, buildProjectExportStatsModel } from "./project-export-state.js";
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
+import { renderProjectRefinementCard } from "./project-refinement-view.js";
+import { flushAssemblyProjectState } from "./assembly-page.js";
+import {
+  executeFrozenManualRefinementExport,
+  isSameRefinementExportProject,
+  prepareFrozenManualRefinementAllPreview,
+  renderManualRefinementExportPreviewModal,
+} from "./manual-refinement-export-preview.js";
 
 const OVERVIEW_PREVIEW_BOUND = Symbol("overviewPreviewBound");
 const PROJECT_DATA_FRESHNESS_BOUND = Symbol("projectDataFreshnessBound");
@@ -186,6 +197,7 @@ function enrichProjectFinalPathEntriesForExport(entries, state) {
         || typeof segment !== "object"
         || isFinalPathGapSegment(segment)
         || isFinalPathRefSegment(segment)
+        || isFinalPathRefinementPatchSegment(segment)
         || normalizeString(segment?.originId)
       ) {
         return segment;
@@ -448,6 +460,7 @@ function getLabels(state) {
       exportFasta: "Sequence (.fasta)",
       exportAgp: "AGP (.agp)",
       exportLog: "Log (.log)",
+      exportRefinementAll: "Export All Refinement Tasks",
       exportDialogTitle: "Exporting Final Path",
       exportRunning: "Running: {step}",
       refDisabled: "A Final Path in this assembly contains reference objects. Statistics and log export are disabled; export functions remain available.",
@@ -512,6 +525,7 @@ function getLabels(state) {
     exportFasta: "序列(.fasta)",
     exportAgp: "AGP (.agp)",
     exportLog: "日志(.log)",
+    exportRefinementAll: "导出全部精修任务",
     exportDialogTitle: "正在导出 Final Path",
     exportRunning: "正在执行：{step}",
     refDisabled: "检测到组装中某个染色体的 Final Path 包含参考序列对象。本页仅保留导出功能，组装统计和日志导出已关闭。",
@@ -1610,6 +1624,8 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
         ${fastaItem}
         <button type="button" class="final-path-export-item" data-project-export-action="agp">${escapeHtml(labels.exportAgp)}</button>
         <button type="button" class="final-path-export-item" data-project-export-action="all">${escapeHtml(labels.exportAll)}</button>
+        <div class="final-path-export-divider" role="separator" aria-hidden="true"></div>
+        <button type="button" class="final-path-export-item" data-project-export-action="refinement-all">${escapeHtml(labels.exportRefinementAll || "导出全部精修任务")}</button>
       </div>
     </div>
   `;
@@ -1634,6 +1650,7 @@ function renderProjectOverviewSummary(state) {
         </div>
       ` : ""}
       ${renderProjectExportJobModal(exportState.job, labels)}
+      ${renderManualRefinementExportPreviewModal(exportState.refinementExportModal, state)}
       ${fresh ? renderStats(model, labels, normalizeDetailTableState(state)) : ""}
       </section>
   `;
@@ -1743,6 +1760,13 @@ function rerender(host, store) {
       actions.innerHTML = renderProjectOverviewActions(state);
       const nextActions = actions.content.querySelector(".project-export-actions");
       if (nextActions) toolbar.replaceWith(nextActions);
+    }
+    const refinementNode = host.querySelector?.("#project-refinement");
+    if (refinementNode) {
+      const refinementTpl = doc.createElement("template");
+      refinementTpl.innerHTML = renderProjectRefinementCard(state);
+      const nextRefinement = refinementTpl.content.querySelector("#project-refinement");
+      if (nextRefinement) refinementNode.replaceWith(nextRefinement);
     }
   } else {
     if (state.activeRoute === "importer") return;
@@ -1965,10 +1989,18 @@ async function loadProjectExportData(host, store, deps = {}, attempt = 0) {
     const chromosomeResult = { ...sources, items: sources.chromosomes };
     const getViewState = deps.getProjectAssemblyViewState || getProjectAssemblyViewState;
     const getGrtView = deps.getGrtProjectView || getGrtProjectView;
-    const [viewState, rawGrtProjectView] = await Promise.all([
+    const listRefinementResults = deps.listManualRefinementResults || listManualRefinementResults;
+    const listRefinementExports = deps.listManualRefinementExports || listManualRefinementExports;
+    const [viewState, rawGrtProjectView, manualRefinementResults, manualRefinementExports] = await Promise.all([
       getViewState(args),
       typeof deps.getGrtProjectView === "function" || typeof window !== "undefined"
         ? getGrtView(args) : store.getState().assembly?.grtProjectView || {},
+      (typeof deps.listManualRefinementResults === "function" || Boolean(globalThis.window?.__TAURI__?.core?.invoke))
+        ? Promise.resolve(listRefinementResults(args)).catch(() => [])
+        : Promise.resolve([]),
+      (typeof deps.listManualRefinementExports === "function" || Boolean(globalThis.window?.__TAURI__?.core?.invoke))
+        ? Promise.resolve(listRefinementExports(args)).catch(() => null)
+        : Promise.resolve(null),
     ]);
     if(preparedSources && !(await validatePreparedOverviewSources(store,args,preparedSources))) {
       return isCurrent()?retryMutation():false;
@@ -2024,6 +2056,11 @@ async function loadProjectExportData(host, store, deps = {}, attempt = 0) {
         }, mergedFinalPathByChr),
         ctgsByChr,
         primaryCtgsByChr,
+        grtProjectView,
+        degapProjectState: viewState?.degapProjectState || {},
+        manualRefinementResults: Array.isArray(manualRefinementResults) ? manualRefinementResults : [],
+        manualRefinementExports: Array.isArray(manualRefinementExports)
+          ? manualRefinementExports : getScopedProjectExportState(store.getState()).manualRefinementExports || [],
       },
     });
     refreshProjectDataSurface(host, store);
@@ -2299,6 +2336,181 @@ async function runProjectExport(host, store, kind, deps = {}) {
   } finally { finishProjectExportJob(store, owner); }
 }
 
+function setProjectRefinementExportModal(host, store, modal, expectedIdentity = null) {
+  const state = store.getState();
+  if (expectedIdentity && !isSameRefinementExportProject(state, expectedIdentity)) {
+    return false;
+  }
+  const scoped = getScopedProjectExportState(state);
+  store.setState({
+    ...state,
+    projectExport: {
+      ...scoped,
+      projectId: Number(state.session?.projectId || 0),
+      workspacePath: normalizeString(state.session?.workspacePath),
+      refinementExportModal: modal,
+    },
+  });
+  rerender(host, store);
+  return true;
+}
+
+export function closeProjectRefinementExportPreview(host, store) {
+  const current = store.getState().projectExport?.refinementExportModal;
+  if (current?.status === "exporting") {
+    return false;
+  }
+  return setProjectRefinementExportModal(host, store, null);
+}
+
+export async function openProjectRefinementExportPreview(host, store, deps = {}) {
+  const state = store.getState();
+  const currentProject = getCurrentProject(state);
+  const workspaceRoot = normalizeString(state.session?.workspacePath);
+  const projectId = Number(state.session?.projectId || 0);
+  if (!workspaceRoot || !projectId) {
+    return false;
+  }
+  const projectName = normalizeString(state.session?.projectName || currentProject?.projectName || projectId);
+  const frozenIdentity = { workspaceRoot, projectId };
+  const loadingModal = {
+    open: true,
+    status: "loading",
+    workspaceRoot,
+    workspacePath: workspaceRoot,
+    projectId,
+    projectName,
+    loci: [],
+    request: null,
+    error: "",
+    validationError: "",
+  };
+  setProjectRefinementExportModal(host, store, loadingModal, frozenIdentity);
+  const isCurrent = () => store.getState().projectExport?.refinementExportModal === loadingModal
+    && isSameRefinementExportProject(store.getState(), frozenIdentity);
+
+  try {
+    const modal = await prepareFrozenManualRefinementAllPreview({
+      host,
+      store,
+      workspaceRoot,
+      projectId,
+      projectName,
+      locale: state.locale,
+      deps: {
+        flushAssemblyProjectState: deps.flushAssemblyProjectState || flushAssemblyProjectState,
+        ...deps,
+      },
+    });
+    if (!modal || !isCurrent()) {
+      return false;
+    }
+    setProjectRefinementExportModal(host, store, modal, frozenIdentity);
+    return true;
+  } catch (error) {
+    if (!isCurrent()) {
+      return false;
+    }
+    setProjectRefinementExportModal(host, store, {
+      open: true,
+      status: "error",
+      workspaceRoot,
+      workspacePath: workspaceRoot,
+      projectId,
+      projectName,
+      loci: [],
+      request: null,
+      validationError: "",
+      error: String(error?.message || error || ""),
+    }, frozenIdentity);
+    return false;
+  }
+}
+
+export async function confirmProjectRefinementExport(host, store, deps = {}) {
+  const state = store.getState();
+  const modal = state.projectExport?.refinementExportModal;
+  if (!modal?.open || modal.status === "exporting" || !modal.request?.loci?.length) {
+    return false;
+  }
+  const frozenIdentity = {
+    workspaceRoot: normalizeString(modal.workspaceRoot ?? modal.workspacePath),
+    projectId: Number(modal.projectId || 0),
+  };
+  if (!isSameRefinementExportProject(state, frozenIdentity)) {
+    return false;
+  }
+
+  const exportingModal = {
+    ...modal,
+    status: "exporting",
+    error: "",
+    copyFeedback: "",
+  };
+  setProjectRefinementExportModal(host, store, exportingModal, frozenIdentity);
+  const isCurrent = () => store.getState().projectExport?.refinementExportModal === exportingModal
+    && isSameRefinementExportProject(store.getState(), frozenIdentity);
+
+  try {
+    const result = await executeFrozenManualRefinementExport({
+      host,
+      store,
+      modal,
+      isCurrent,
+      deps: {
+        flushAssemblyProjectState: deps.flushAssemblyProjectState || flushAssemblyProjectState,
+        ...deps,
+      },
+    });
+    if (result.switched || !isCurrent()) {
+      return false;
+    }
+    if (result.canceled) {
+      setProjectRefinementExportModal(host, store, {
+        ...modal,
+        status: "ready",
+        error: "",
+      }, frozenIdentity);
+      return false;
+    }
+    if (!result.ok) {
+      setProjectRefinementExportModal(host, store, {
+        ...modal,
+        status: "ready",
+      }, frozenIdentity);
+      return false;
+    }
+    const latest = store.getState();
+    store.setState({
+      ...latest,
+      projectExport: {
+        ...(latest.projectExport || {}),
+        manualRefinementExports: [result.receipt,
+          ...(latest.projectExport?.manualRefinementExports || []).filter(row => row.batchSha256 !== result.receipt.batchSha256),
+        ].slice(0, 20),
+        refinementExportModal: {
+          ...modal,
+          status: "success",
+          error: "",
+          receipt: result.receipt,
+        },
+      },
+    });
+    rerender(host, store);
+    return true;
+  } catch (error) {
+    if (!isCurrent()) {
+      return false;
+    }
+    setProjectRefinementExportModal(host, store, {
+      ...modal,
+      status: "ready",
+      error: String(error?.message || error || ""),
+    }, frozenIdentity);
+    return false;
+  }
+}
+
 export function bindProjectExportPage(host, store, deps = {}) {
   if (!host) return;
   mountOverviewPreview(host, store, deps);
@@ -2393,12 +2605,43 @@ export function bindProjectExportPage(host, store, deps = {}) {
       await loadProjectExportData(host, store, deps);
       return;
     }
+    const cancelRefinementPreview = event.target?.closest?.("[data-refinement-export-preview-cancel]");
+    if (cancelRefinementPreview) {
+      closeProjectRefinementExportPreview(host, store);
+      return;
+    }
+    const confirmRefinementPreview = event.target?.closest?.("[data-refinement-export-preview-confirm]");
+    if (confirmRefinementPreview) {
+      await confirmProjectRefinementExport(host, store, deps);
+      return;
+    }
+    const copyRefinementPreview = event.target?.closest?.("[data-refinement-export-preview-copy]");
+    if (copyRefinementPreview) {
+      const cmd = normalizeString(copyRefinementPreview.dataset.refinementExportPreviewCopy);
+      if (cmd) {
+        void globalThis.navigator?.clipboard?.writeText?.(cmd).then(() => {
+          const latest = store.getState();
+          const modal = latest.projectExport?.refinementExportModal;
+          if (!modal?.open) return;
+          setProjectRefinementExportModal(host, store, {
+            ...modal,
+            copyFeedback: latest.locale === "en" ? "Copied Server command." : "已复制 Server 命令。",
+          });
+        }).catch(() => {});
+      }
+      return;
+    }
     const actionNode = event.target?.closest?.("[data-project-export-action]");
     if (!actionNode) {
       return;
     }
+    const action = normalizeString(actionNode.dataset.projectExportAction).toLowerCase();
     setExportMenuOpen(actionNode.closest?.("[data-project-export]"), false);
-    await runProjectExport(host, store, actionNode.dataset.projectExportAction, deps);
+    if (action === "refinement-all") {
+      await openProjectRefinementExportPreview(host, store, deps);
+      return;
+    }
+    await runProjectExport(host, store, action, deps);
   });
   bindDelegatedDelayedFloatingClose(host, {
     rootSelector: "[data-project-export]",
@@ -2436,6 +2679,11 @@ export function bindProjectExportPage(host, store, deps = {}) {
   });
   host.addEventListener("keydown", (event) => {
     if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
+    if (event.key === "Escape" && store.getState().projectExport?.refinementExportModal?.open) {
+      event.preventDefault();
+      closeProjectRefinementExportPreview(host, store);
+      return;
+    }
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }
@@ -2452,6 +2700,10 @@ export function bindProjectExportPage(host, store, deps = {}) {
   });
 }
 
+export async function reloadProjectOverviewData(host, store, deps = {}) {
+  return loadProjectExportData(host, store, deps);
+}
+
 export const __test = {
   buildProjectExportDataModel,
   buildProjectFinalPathByChr,
@@ -2466,6 +2718,9 @@ export const __test = {
   resolveProjectExportTarget,
   jumpToAssemblyChr,
   loadProjectExportData,
+  openProjectRefinementExportPreview,
+  confirmProjectRefinementExport,
+  closeProjectRefinementExportPreview,
   rerender,
   runProjectExport,
   syncProjectExportDetailFilterControls,

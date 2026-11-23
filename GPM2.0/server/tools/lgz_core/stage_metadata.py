@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from ..workspace_layout import workspace_join
+
+
 import os
 import re
 from collections import defaultdict
@@ -12,7 +18,7 @@ from .stage_io import *
 def stage_status_row(server_dir: Path, result: dict[str, object]) -> dict[str, object]:
     stage = str(result["stage"])
     checkpoint_relpath = f"grt/checkpoints/{stage}.json"
-    checkpoint_path = server_dir / checkpoint_relpath
+    checkpoint_path = workspace_join(server_dir, checkpoint_relpath)
     if not checkpoint_path.is_file():
         fail(f"stage checkpoint is missing: {checkpoint_path}")
     if os.environ.get("GPM_REPORT_RUN_ID"):
@@ -36,7 +42,7 @@ def read_donor_fragments(
     donor_members: list[dict[str, str]],
     donor_records: dict[str, str],
 ) -> list[dict[str, str]]:
-    path = server_dir / "metadata/grt_donor_fragments.tsv"
+    path = workspace_join(server_dir, "metadata/grt_donor_fragments.tsv")
     rows = [
         row
         for row in read_tsv(path, DONOR_FRAGMENT_FIELDS)
@@ -78,7 +84,7 @@ def verify_donor_freeze(
     recipe: dict[str, str],
 ) -> tuple[dict[str, str], list[dict[str, str]], dict[str, str]]:
     donor_sets = read_tsv(
-        server_dir / "metadata/grt_donor_sets.tsv",
+        workspace_join(server_dir, "metadata/grt_donor_sets.tsv"),
         [
             "donor_set_id",
             "donor_kind",
@@ -96,13 +102,13 @@ def verify_donor_freeze(
     if len(ordinary) != 1:
         fail("recipe ordinary donor_set_id does not resolve exactly once")
     donor_set = ordinary[0]
-    donor_path = server_dir / donor_set["fasta_relpath"]
+    donor_path = workspace_join(server_dir, donor_set["fasta_relpath"])
     if sha256_file(donor_path) != donor_set["fasta_sha256"]:
         fail("frozen ordinary donor FASTA checksum mismatch")
     member_rows = [
         row
         for row in read_tsv(
-            server_dir / "metadata/grt_donor_members.tsv",
+            workspace_join(server_dir, "metadata/grt_donor_members.tsv"),
             [
                 "donor_set_id",
                 "member_id",
@@ -119,7 +125,7 @@ def verify_donor_freeze(
     ]
     if len(member_rows) != int(donor_set["member_count"]):
         fail("frozen ordinary donor member count mismatch")
-    manifest_rows = read_tsv(server_dir / donor_set["manifest_relpath"], list(member_rows[0]) if member_rows else [
+    manifest_rows = read_tsv(workspace_join(server_dir, donor_set["manifest_relpath"]), list(member_rows[0]) if member_rows else [
         "donor_set_id",
         "member_id",
         "dataset_name",
@@ -138,12 +144,12 @@ def verify_donor_freeze(
         member_rows,
         dict(read_fasta_allow_empty(donor_path)),
     )
-    stage_rows = read_tsv(server_dir / "metadata/grt_stage_status.tsv", STAGE_FIELDS)
+    stage_rows = read_tsv(workspace_join(server_dir, "metadata/grt_stage_status.tsv"), STAGE_FIELDS)
     donor_rows = [row for row in stage_rows if row["stage"] == "donor_freeze"]
     if len(donor_rows) != 1:
         fail("donor_freeze stage row is missing or duplicated")
     donor_freeze = donor_rows[0]
-    checkpoint_path = server_dir / donor_freeze["checkpoint_relpath"]
+    checkpoint_path = workspace_join(server_dir, donor_freeze["checkpoint_relpath"])
     if (
         not checkpoint_path.is_file()
         or sha256_file(checkpoint_path) != donor_freeze["checkpoint_sha256"]

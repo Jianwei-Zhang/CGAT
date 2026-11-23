@@ -284,6 +284,8 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     openDegapSettings: resolveAction("openDegapSettings"),
     requestDegapGapJob: resolveAction("requestDegapGapJob"),
     requestDegapTelseekerJob: resolveAction("requestDegapTelseekerJob"),
+    registerManualRefinementLocus: resolveAction("registerManualRefinementLocus"),
+    openManualRefinementPanel: resolveAction("openManualRefinementPanel"),
     toggleSupportTrackCtgMirror: resolveAction("toggleSupportTrackCtgMirror"),
     togglePrimaryTrackCtgHidden: resolveAction("togglePrimaryTrackCtgHidden"),
     toggleSubviewAnchorEdge: resolveAction("toggleSubviewAnchorEdge"),

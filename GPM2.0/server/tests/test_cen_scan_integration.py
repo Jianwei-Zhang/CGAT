@@ -14,6 +14,7 @@ SERVER = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVER / "tools"))
 from annotation_library import fasta_bytes, fasta_records, snapshot, verify_snapshot
 from cen_scan import scan
+from workspace_layout import WorkspaceLayout
 
 
 class RealMummerCentromereTests(unittest.TestCase):
@@ -88,13 +89,16 @@ class RealMummerCentromereTests(unittest.TestCase):
             ["bash", str(fresh / "assign_chr_groups.sh")],
             ["bash", str(fresh / "runs/chr_Chr01/command.sh")],
         ]
-        for command in commands:
+        for index, command in enumerate(commands):
+            if index:
+                logical = Path(command[1]).relative_to(fresh).as_posix()
+                command = ["bash", str(WorkspaceLayout.detect(fresh).path(logical))]
             result = subprocess.run(command, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stdout[-4000:] + result.stderr[-4000:])
         verify_snapshot(fresh)
-        with (fresh / "tel/chr_Chr01/assembly.tsv").open(newline="") as handle:
+        with WorkspaceLayout.detect(fresh).path("tel/chr_Chr01/assembly.tsv").open(newline="") as handle:
             tel = list(csv.DictReader(handle, delimiter="\t"))
-        with (fresh / "cen/chr_Chr01/marks.tsv").open(newline="") as handle:
+        with WorkspaceLayout.detect(fresh).path("cen/chr_Chr01/marks.tsv").open(newline="") as handle:
             cen = list(csv.DictReader(handle, delimiter="\t"))
         self.assertEqual({row["strand"] for row in tel if row["motif"] == "TTTAGGG"}, {"+", "-"})
         self.assertEqual(len(cen), 1)

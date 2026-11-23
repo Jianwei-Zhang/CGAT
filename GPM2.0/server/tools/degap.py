@@ -1,14 +1,35 @@
 #!/usr/bin/env python3
 """Run the bundled, pinned DEGAP v2 in the active cgat-server environment."""
+import argparse
 from pathlib import Path
 import os
 import sys
 
 
+def prepare_shared_reads(runtime, argv):
+    parser = argparse.ArgumentParser(description="Prepare the pinned DEGAP shared reads and input manifest")
+    parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--hifi", nargs="+", default=[])
+    parser.add_argument("--ont", nargs="+", default=[])
+    options = parser.parse_args(argv)
+    if not (options.hifi or options.ont):
+        parser.error("shared preparation requires --hifi and/or --ont")
+    sys.path.insert(0, str(runtime))
+    from PreparedReads import contract, prepare
+
+    try:
+        prepare(options.out / "processed_reads", contract(options.hifi, options.ont))
+    except (ValueError, OSError) as error:
+        parser.exit(1, f"ERROR: {error}\n")
+
+
 def main():
-    # The pinned upstream GapFiller accesses roundDir before initialization at
-    # zero rounds. Fail with a useful message; do not silently execute a round.
     args = sys.argv[1:]
+    runtime = Path(__file__).resolve().parent / "degap_core/bin"
+    if args[:1] == ["prepare-shared-reads"]:
+        return prepare_shared_reads(runtime, args[1:])
+
+    # Retain the existing manual GapFiller parameter contract.
     def option(name):
         for index, arg in enumerate(args):
             if arg == name and index + 1 < len(args):
@@ -23,7 +44,14 @@ def main():
             args[index + 1] = args[index + 1].rstrip("/") or "/"
         elif arg.startswith("--out="):
             args[index] = "--out=" + (arg.split("=", 1)[1].rstrip("/") or "/")
-    entry = Path(__file__).resolve().parent / "degap_core/bin/DEGAP.py"
+    output = option("--out") or option("-o")
+    if output and option("--mode") in {"gapfiller", "telseeker_ctg"}:
+        prepared = Path(output) / "processed_reads"
+        if prepared.is_symlink() and not (prepared / "manifest.json").is_file():
+            raise SystemExit("This shared reads cache predates the pinned DEGAP input manifest. "
+                             "Keep the old results; for a new run, re-export DEGAP-JOBS from the updated App "
+                             "and use a fresh job output directory.")
+    entry = runtime / "DEGAP.py"
     if not entry.is_file():
         raise SystemExit("Bundled DEGAP runtime is missing; update the Server tools and project runtime.")
     os.execv(sys.executable, [sys.executable, "-B", str(entry), *args])

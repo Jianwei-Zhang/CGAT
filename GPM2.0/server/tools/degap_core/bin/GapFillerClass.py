@@ -11,6 +11,8 @@ from Bio import SeqIO
 import tempfile
 import subprocess
 import shutil
+import shlex
+from FamilyTools import shell_command
 import FindExtensionReads
 from FindExtensionReads import FindExtensionReads
 import FindExtensionContigs
@@ -72,9 +74,10 @@ class InputSequence(object):
 			self._generateSeedSequence(self.inputSeq, default_seed_len, "Default")
 
 		# Set inputSeedSequence from primary inputSeq
-		for gseq in SeqIO.parse(self.inputSeq,'fasta'):
-			self.inputSeedSequence=gseq
-			break
+		with open(self.inputSeq) as stream:
+			for gseq in SeqIO.parse(stream,'fasta'):
+				self.inputSeedSequence=gseq
+				break
 
 	def _generateSeedSequence(self, output_file, seed_length, data_type_name):
 		"""Generate seed sequence file with specified length"""
@@ -98,11 +101,13 @@ class InputSequence(object):
 						l = '>' + gseq.id + "_" + str(length) + "\n" + str(gseq.seq[:length]) + "\n"
 				filet.write(l)
 
-def mummer(seq1,seq2,name):
+def mummer(seq1,seq2,name, strict=False):
 	mr=name
 
 	# Check if input files exist
 	if not os.path.exists(seq1):
+		if strict:
+			raise FileNotFoundError(seq1)
 		print(f"Error: Input sequence file 1 does not exist: {seq1}")
 		# Create empty output file to avoid downstream errors
 		empty_output = mr+".delta.filter.coords"
@@ -111,6 +116,8 @@ def mummer(seq1,seq2,name):
 		return empty_output
 
 	if not os.path.exists(seq2):
+		if strict:
+			raise FileNotFoundError(seq2)
 		print(f"Error: Input sequence file 2 does not exist: {seq2}")
 		# Create empty output file to avoid downstream errors
 		empty_output = mr+".delta.filter.coords"
@@ -119,22 +126,24 @@ def mummer(seq1,seq2,name):
 		return empty_output
 
 	try:
-		commendline="nucmer -c 90 -l 40 -p "+mr+" "+seq1+" "+seq2
-		result = os.system(commendline)
+		commendline="nucmer -c 90 -l 40 -p "+shlex.quote(mr)+" "+shlex.quote(seq1)+" "+shlex.quote(seq2)
+		result = shell_command(commendline, strict)
 		if result != 0:
 			print(f"Warning: nucmer command failed with exit code {result}")
 
-		commendline="delta-filter -m "+mr+".delta > "+mr+".delta.filter"
-		result = os.system(commendline)
+		commendline="delta-filter -m "+shlex.quote(mr+".delta")+" > "+shlex.quote(mr+".delta.filter")
+		result = shell_command(commendline, strict)
 		if result != 0:
 			print(f"Warning: delta-filter command failed with exit code {result}")
 
-		commendline="show-coords -TrHcl "+mr+".delta.filter > "+mr+".delta.filter.coords"
-		result = os.system(commendline)
+		commendline="show-coords -TrHcl "+shlex.quote(mr+".delta.filter")+" > "+shlex.quote(mr+".delta.filter.coords")
+		result = shell_command(commendline, strict)
 		if result != 0:
 			print(f"Warning: show-coords command failed with exit code {result}")
 
 	except Exception as e:
+		if strict:
+			raise
 		print(f"Error during mummer analysis: {e}")
 		# Create empty output file to avoid downstream errors
 		empty_output = mr+".delta.filter.coords"
@@ -166,7 +175,11 @@ class OutputSequence(object):
 				logLine+="ontSeedLen\t"+str(self.Elongation.base.ontSeedLen)+"\n"
 			self.ExtensionUsedReads=self.checkExtensionReads()
 			logLine+="ExtensionUsedReads\t"+";".join(self.ExtensionUsedReads)+"\n"
-			self.linkedSequence,self.linkedSequenceNote,self.linkedSequenceAln=self.linkgap()
+			if getattr(self.Elongation.base, "family_mode", False):
+				# The family scheduler compares all opposite historical versions.
+				self.linkedSequence, self.linkedSequenceNote, self.linkedSequenceAln = '', '', ''
+			else:
+				self.linkedSequence,self.linkedSequenceNote,self.linkedSequenceAln=self.linkgap()
 			logLine+="linkedSequence\t"+self.linkedSequence+"\n"
 			for i in self.linkedSequenceNote.rstrip().split('\n'):
 				logLine+="linkedSequenceNote\t"+i+"\n"
@@ -384,7 +397,11 @@ class OutputSequence(object):
 		ft=open(self.outputSequence,'w')
 
 		# 混合模式下使用HiFi的seedlen（因为hifiasm以HiFi为主输入）
-		if self.Elongation.base.data_type == 'mixed':
+		if getattr(self.Elongation.base, "family_mode", False):
+			# FindExtensionContigs splices against this actual seed. In mixed mode
+			# it may be the ONT seed, not hifiSeedLen; short inputs also use less.
+			seedlen = len(self.extensionContigs.extensionReads.roundInput.inputSeedSequence.seq)
+		elif self.Elongation.base.data_type == 'mixed':
 			seedlen = int(self.Elongation.base.hifiSeedLen)
 			print(f"Mixed mode: Using HiFi seed length {seedlen} bp for sequence merging")
 			print(f"  (hifiasm uses HiFi as primary input)")

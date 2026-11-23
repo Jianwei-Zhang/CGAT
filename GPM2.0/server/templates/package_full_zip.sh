@@ -10,7 +10,6 @@ archive_path="$(python3 "$archive_helper" path --server-dir "$server_dir" --kind
 staging_path="$(python3 "$archive_helper" staging-path --server-dir "$server_dir" --kind "$kind")"
 app_packager="${server_dir}/.prepare_lib/tools/lgz_app_package.py"
 
-python3 "${server_dir}/.prepare_lib/tools/lgz_contract.py" --bundle "$server_dir"
 [[ -f "$app_packager" ]] || { echo "Missing App package builder: $app_packager" >&2; exit 1; }
 
 temporary_dir="$(mktemp -d "${parent_dir}/.${bundle_name}.package-${kind}.XXXXXX")"
@@ -52,6 +51,7 @@ else
   temporary_archive="${archive_temporary_dir}/$(basename "$archive_path")"
   python3 "$archive_helper" create --server-dir "$server_dir" --kind "$kind" \
     --staging "$staging_path" --output "$temporary_archive"
+  mkdir -p -- "$(dirname "$archive_path")"
   mv -f -- "$temporary_archive" "$archive_path"
   rm -rf -- "$archive_temporary_dir" "$(dirname "$staging_path")"
   rmdir --ignore-fail-on-non-empty "$(dirname "$(dirname "$staging_path")")" 2>/dev/null || true

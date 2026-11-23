@@ -1,6 +1,7 @@
 """Cross-dataset q0 candidate discovery, not path selection or chr reassignment."""
 from __future__ import annotations
 
+
 from bisect import bisect_right
 from collections import defaultdict
 from dataclasses import asdict, dataclass
@@ -223,6 +224,8 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
     lengths_by_dataset: dict[str, dict[str, int]] = defaultdict(dict)
     for key, sequence in sequences.items():
         lengths_by_dataset[key.dataset][key.contig] = len(sequence)
+    from .q0_preparation import artifact_path
+
     # Optional routing index is fed in the same validated reference scan. Its
     # grid/hulls never enter candidate coverage or scientific evidence payload.
     routing = regional_factory(parts, reference_lengths) if regional_factory else None
@@ -238,7 +241,7 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             dataset_parts = by_dataset.get(dataset, {})
             report_blocks = routing is not None and not records_index and not routing.sealed
             scan_sealed = records_index and routing.sealed
-            paf = routing.reference_scan_path(relative) if scan_sealed else root / relative
+            paf = routing.reference_scan_path(relative) if scan_sealed else artifact_path(root, relative)
             for hit in read_paf(paf, query_lengths=lengths,
                                 target_lengths=reference_lengths, artifact=relative, record_observer=observer):
                 source = dataset_parts.get(hit.query_name)

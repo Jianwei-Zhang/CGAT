@@ -2,10 +2,12 @@ import {
   isFinalPathCtgSegment,
   isFinalPathGapSegment,
   isFinalPathRefSegment,
+  isFinalPathRefinementPatchSegment,
   normalizeFinalPathByChr,
   resolveFinalPathSegmentDisplayName,
   resolveFinalPathSegmentLengthBp,
 } from "./final-path-state.js";
+import { describeFinalPathRefinement } from "./final-path-presentation.js";
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -164,6 +166,195 @@ function collectOtherChrPrimaryIdentities(finalPathByChr, currentChrName, primar
   return identities;
 }
 
+function resolveVerifiedSegmentRange(segment) {
+  const sourceDataset = normalizeDatasetName(segment?.source?.dataset);
+  const sourceContig = normalizeString(segment?.source?.contig).toLowerCase();
+  const hasExplicitSource = Boolean(sourceDataset && sourceContig);
+  const sourceKey = hasExplicitSource
+    ? `src:${sourceDataset}:${sourceContig}`
+    : buildCtgIdentity(segment);
+  if (!sourceKey) {
+    return null;
+  }
+  // Authoritative coordinates are the segment's committed start/end; do not
+  // let stale source.start/source.end mask an edited coordinate range.
+  const startRaw = normalizePositiveInteger(segment?.start)
+    ?? (hasExplicitSource ? normalizePositiveInteger(segment?.source?.start) : null);
+  const endRaw = normalizePositiveInteger(segment?.end)
+    ?? (hasExplicitSource ? normalizePositiveInteger(segment?.source?.end) : null);
+  if (!startRaw || !endRaw) {
+    return null;
+  }
+  return {
+    sourceKey,
+    minBp: Math.min(startRaw, endRaw),
+    maxBp: Math.max(startRaw, endRaw),
+  };
+}
+
+function buildBaselineSegmentKeySet(grtBaselineEntry) {
+  const bySegmentId = new Map();
+  const intervalsBySourceKey = new Map();
+  const segments = Array.isArray(grtBaselineEntry?.segments) ? grtBaselineEntry.segments : [];
+  segments.forEach((segment) => {
+    if (!isFinalPathCtgSegment(segment) || isFinalPathGapSegment(segment) || isFinalPathRefSegment(segment)) {
+      return;
+    }
+    if (describeFinalPathRefinement(segment)) {
+      return;
+    }
+    const range = resolveVerifiedSegmentRange(segment);
+    if (!range) {
+      return;
+    }
+    const segId = normalizeString(segment?.segmentId);
+    if (segId) {
+      bySegmentId.set(segId, range);
+    }
+    const list = intervalsBySourceKey.get(range.sourceKey) || [];
+    list.push({ minBp: range.minBp, maxBp: range.maxBp });
+    intervalsBySourceKey.set(range.sourceKey, list);
+  });
+  return {
+    hasBaseline: bySegmentId.size > 0 || intervalsBySourceKey.size > 0,
+    bySegmentId,
+    intervalsBySourceKey,
+  };
+}
+
+function isRangeContained(inner, outer) {
+  return Boolean(
+    inner
+    && outer
+    && inner.minBp >= outer.minBp
+    && inner.maxBp <= outer.maxBp,
+  );
+}
+
+function isVerifiedLgzBaselineSegment(segment, baselineLookup) {
+  if (!baselineLookup?.hasBaseline) {
+    return false;
+  }
+  const currentRange = resolveVerifiedSegmentRange(segment);
+  if (!currentRange) {
+    return false;
+  }
+  const segId = normalizeString(segment?.segmentId);
+  if (segId && baselineLookup.bySegmentId.has(segId)) {
+    const baselineRange = baselineLookup.bySegmentId.get(segId);
+    if (baselineRange.sourceKey === currentRange.sourceKey && isRangeContained(currentRange, baselineRange)) {
+      return true;
+    }
+  }
+  const intervals = baselineLookup.intervalsBySourceKey.get(currentRange.sourceKey) || [];
+  return intervals.some((baselineInterval) => isRangeContained(currentRange, baselineInterval));
+}
+
+function computeZeroBpActiveManualTaskCount(chrName, manualRefinementResults) {
+  if (!chrName || !Array.isArray(manualRefinementResults) || !manualRefinementResults.length) {
+    return { confirmed: false, count: 0 };
+  }
+  const zeroBpLocusIds = new Set();
+  manualRefinementResults.forEach((batch) => {
+    const loci = Array.isArray(batch?.loci) ? batch.loci : [];
+    loci.forEach((locus) => {
+      const kind = normalizeString(locus?.kind).toLowerCase();
+      const disposition = normalizeString(locus?.disposition).toLowerCase();
+      if (kind === "legacy" || disposition === "legacy_candidate_only") {
+        return;
+      }
+      if (normalizeString(locus?.chr) !== chrName) {
+        return;
+      }
+      const adoptionState = normalizeString(locus?.adoptionState || locus?.adoption_state).toLowerCase();
+      if (adoptionState !== "active") {
+        return;
+      }
+      // Only confirm a 0 bp task when the backend explicitly reports numeric 0
+      // on activePatchLengthBp; never infer 0 bp from a missing patch trace.
+      const activePatchLengthBp = locus?.activePatchLengthBp ?? locus?.active_patch_length_bp;
+      if (typeof activePatchLengthBp !== "number" || activePatchLengthBp !== 0) {
+        return;
+      }
+      const locusId = normalizeString(locus?.locusId || locus?.locus_id);
+      if (locusId) {
+        zeroBpLocusIds.add(locusId);
+      }
+    });
+  });
+  return {
+    confirmed: zeroBpLocusIds.size > 0,
+    count: zeroBpLocusIds.size,
+  };
+}
+
+function buildFinalPathContributionSummary({
+  chrName = "",
+  segmentRows = [],
+  grtBaselineEntry = null,
+  manualRefinementResults = null,
+}) {
+  const baselineLookup = buildBaselineSegmentKeySet(grtBaselineEntry);
+  let lgzRetainedBp = 0;
+  let autoRefinementBp = 0;
+  let manualRefinementBp = 0;
+  let otherUnattributedBp = 0;
+  let unresolvedGapCount = 0;
+  const autoTaskIds = new Set();
+  const manualTaskIds = new Set();
+
+  segmentRows.forEach(({ segment, lengthBp }) => {
+    if (isFinalPathGapSegment(segment)) {
+      unresolvedGapCount += 1;
+      return;
+    }
+    if (!isFinalPathCtgSegment(segment) || isFinalPathRefSegment(segment)) {
+      return;
+    }
+    const safeBp = Math.max(0, Number(lengthBp || 0));
+    const refinement = describeFinalPathRefinement(segment);
+    if (refinement) {
+      if (refinement.mode === "manual" && isFinalPathRefinementPatchSegment(segment)) {
+        manualRefinementBp += safeBp;
+        if (refinement.locusId) {
+          manualTaskIds.add(refinement.locusId);
+        }
+        return;
+      }
+      if (refinement.mode === "automatic") {
+        autoRefinementBp += safeBp;
+        if (refinement.editId) {
+          autoTaskIds.add(refinement.editId);
+        } else if (refinement.originalGapIds.length) {
+          refinement.originalGapIds.forEach((gapId) => autoTaskIds.add(`gap:${gapId}`));
+        }
+        return;
+      }
+    }
+    if (isVerifiedLgzBaselineSegment(segment, baselineLookup)) {
+      lgzRetainedBp += safeBp;
+      return;
+    }
+    otherUnattributedBp += safeBp;
+  });
+
+  const zeroBpInfo = computeZeroBpActiveManualTaskCount(chrName, manualRefinementResults);
+  return {
+    hasBaseline: baselineLookup.hasBaseline,
+    lgzRetainedBp,
+    autoRefinementBp,
+    autoTaskCount: autoTaskIds.size,
+    manualRefinementBp,
+    manualTaskCount: manualTaskIds.size,
+    refinementTotalBp: autoRefinementBp + manualRefinementBp,
+    refinementTaskCount: autoTaskIds.size + manualTaskIds.size,
+    otherUnattributedBp,
+    unresolvedGapCount,
+    zeroBpManualTaskConfirmed: zeroBpInfo.confirmed,
+    zeroBpManualTaskCount: zeroBpInfo.count,
+  };
+}
+
 export function buildFinalPathLogModel({
   chrName = "",
   finalPathEntry = null,
@@ -171,6 +362,8 @@ export function buildFinalPathLogModel({
   primaryCtgs = [],
   hiddenPrimaryCtgIds = [],
   primaryDatasetName = "",
+  grtBaselineEntry = null,
+  manualRefinementResults = null,
 } = {}) {
   const normalizedChrName = normalizeString(chrName || finalPathEntry?.chrName);
   const primaryMaps = buildPrimaryCtgMaps(primaryCtgs, primaryDatasetName);
@@ -182,7 +375,8 @@ export function buildFinalPathLogModel({
   let appendedPrimaryBp = 0;
 
   segmentRows.forEach(({ segment, index, lengthBp, finalPathStart, finalPathEnd }) => {
-    if (!isFinalPathCtgSegment(segment) || isFinalPathGapSegment(segment) || isFinalPathRefSegment(segment)) {
+    if (!isFinalPathCtgSegment(segment) || isFinalPathGapSegment(segment) || isFinalPathRefSegment(segment)
+        || isFinalPathRefinementPatchSegment(segment)) {
       return;
     }
     const isPrimary = isPrimaryDatasetSegment(segment, {
@@ -256,6 +450,13 @@ export function buildFinalPathLogModel({
       usedByChrNames: otherChrPrimaryIdentities.get(row.identity) || [],
     }));
 
+  const contribution = buildFinalPathContributionSummary({
+    chrName: normalizedChrName,
+    segmentRows,
+    grtBaselineEntry,
+    manualRefinementResults,
+  });
+
   return {
     chrName: normalizedChrName,
     hasSegments: segmentRows.length > 0,
@@ -280,6 +481,7 @@ export function buildFinalPathLogModel({
     },
     supportRows,
     otherChrPrimaryRows,
+    contribution,
   };
 }
 

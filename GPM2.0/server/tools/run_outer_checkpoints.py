@@ -4,6 +4,12 @@
 
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import csv
 import json
 import shutil
@@ -15,9 +21,12 @@ from typing import Iterable
 try:
     from delivery_archive import validate_delivery_staging
     from lgz_contract import ContractError, validate_contract
+    from lgz_core.contract.validation_pass import write_handoff
+    from lgz_core.stage_io import atomic_write_json as write_evidence_summary
     from run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
+        LGZ_PREPARE_IDS,
         OrchestrationContractError,
         atomic_write_json,
         file_identity,
@@ -28,9 +37,12 @@ try:
 except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
     from .delivery_archive import validate_delivery_staging
     from .lgz_contract import ContractError, validate_contract
+    from .lgz_core.contract.validation_pass import write_handoff
+    from .lgz_core.stage_io import atomic_write_json as write_evidence_summary
     from .run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
+        LGZ_PREPARE_IDS,
         OrchestrationContractError,
         atomic_write_json,
         file_identity,
@@ -43,7 +55,7 @@ except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
 WORKFLOW = "gpm_run_outer_v1"
 LGZ_WORKFLOW = "gpm_grt_precomputed_v2"
 LGZ_STAGE_MAP = {
-    "grt_prepare": ("donor_freeze",),
+    **dict.fromkeys(LGZ_PREPARE_IDS, ("donor_freeze",)),
     "grt_step1": ("step1",),
     "grt_step2": ("step2",),
     "grt_step12": ("step1", "step2"),
@@ -63,7 +75,7 @@ class PreparedOuterCheckpoint:
 class OuterCheckpointManager:
     def __init__(self, server_dir: Path):
         self.server_dir = server_dir.resolve()
-        self.checkpoint_dir = self.server_dir / ".run_all/checkpoints"
+        self.checkpoint_dir = workspace_join(self.server_dir, ".run_all/checkpoints")
         self._options: dict[str, str] | None = None
         self._tool_cache: dict[str, dict[str, object]] = {}
 
@@ -94,7 +106,7 @@ class OuterCheckpointManager:
             **inputs,
         }
         if kind == "q0_chromosome_alignments":
-            input_payload["command_relpath"] = command_relpath
+            input_payload["command_relpath"] = workspace_join(self.server_dir, command_relpath).relative_to(self.server_dir).as_posix()
         digest = fingerprint(unit_id)
         slug = "".join(character if character.isalnum() else "-" for character in unit_id)
         checkpoint_path = self.checkpoint_dir / f"{slug[:48]}.{digest[:16]}.json"
@@ -215,8 +227,10 @@ class OuterCheckpointManager:
         except (OSError, UnicodeError, ValueError, KeyError, TypeError, OrchestrationContractError) as exc:
             return False, f"completed reference runtime migration refused: {exc}"
 
-    def commit(self, prepared: PreparedOuterCheckpoint) -> Path:
+    def commit(self, prepared: PreparedOuterCheckpoint, *, expect_no_outputs: bool = False) -> Path:
         outputs = self._output_identities(prepared)
+        if expect_no_outputs and outputs:
+            raise OrchestrationContractError("empty chromosome plan unexpectedly declares outputs")
         if prepared.kind == "q0_chromosome_alignments":
             # Bind outputs to the inputs captured BEFORE execution, including
             # manual runs. A new manager also refreshes tool/option identities.
@@ -248,7 +262,7 @@ class OuterCheckpointManager:
             return True, "no LGZ checkpoint validation required"
         status_rows = self._read_tsv("metadata/grt_stage_status.tsv")
         for stage in stages:
-            checkpoint_path = self.server_dir / f"grt/checkpoints/{stage}.json"
+            checkpoint_path = workspace_join(self.server_dir, f"grt/checkpoints/{stage}.json")
             if not checkpoint_path.is_file():
                 return False, f"LGZ checkpoint is missing: {checkpoint_path}"
             try:
@@ -299,11 +313,28 @@ class OuterCheckpointManager:
                 return False, f"LGZ stage checkpoint hash changed: {stage}"
         return True, f"LGZ checkpoints valid: {', '.join(stages)}"
 
+    def publish_validated_evidence(self, channel: Path, run_id: str) -> tuple[bool, str]:
+        """The child assembled the files. The lock owner is the sole validator."""
+        inputs = {}
+        try:
+            summary = validate_contract(self.server_dir, capture=inputs, publication=True)
+            path = workspace_join(self.server_dir, "metadata/grt_contract_summary.json")
+            write_evidence_summary(path, summary)
+        except (OSError, ValueError, ContractError) as exc:
+            return False, f"evidence contract validation failed: {exc}"
+        try:
+            write_handoff(channel, self.server_dir, run_id, inputs, path)
+        except OSError as exc:
+            # The complete check and its public summary succeeded. No worker
+            # needs this optional private optimization to operate correctly.
+            return True, f"evidence valid; validation handoff unavailable: {exc}"
+        return True, "evidence and Server contract are valid"
+
     def validate_evidence(self) -> tuple[bool, str]:
         required = [
-            self.server_dir / "metadata/grt_contract_summary.json",
-            self.server_dir / "metadata/grt_used_contigs.tsv",
-            self.server_dir / "metadata/grt_final_path.json",
+            workspace_join(self.server_dir, "metadata/grt_contract_summary.json"),
+            workspace_join(self.server_dir, "metadata/grt_used_contigs.tsv"),
+            workspace_join(self.server_dir, "metadata/grt_final_path.json"),
         ]
         missing = next((path for path in required if not path.is_file()), None)
         if missing is not None:
@@ -311,7 +342,7 @@ class OuterCheckpointManager:
         try:
             summary = validate_contract(self.server_dir)
             recorded = json.loads(
-                (self.server_dir / "metadata/grt_contract_summary.json").read_text(encoding="utf-8")
+                (workspace_join(self.server_dir, "metadata/grt_contract_summary.json")).read_text(encoding="utf-8")
             )
             if not isinstance(recorded, dict):
                 return False, "evidence contract summary is not an object"
@@ -326,7 +357,7 @@ class OuterCheckpointManager:
         path = Path(relpath)
         if not relpath or path.is_absolute() or ".." in path.parts or "\\" in relpath:
             raise OrchestrationContractError(f"invalid LGZ artifact path: {relpath!r}")
-        resolved = (self.server_dir / path).resolve()
+        resolved = (workspace_join(self.server_dir, path)).resolve()
         try:
             resolved.relative_to(self.server_dir)
         except ValueError as exc:
@@ -343,7 +374,7 @@ class OuterCheckpointManager:
     def _read_options(self) -> dict[str, str]:
         if self._options is not None:
             return self._options
-        path = self.server_dir / "metadata/prepare_options.tsv"
+        path = workspace_join(self.server_dir, "metadata/prepare_options.tsv")
         try:
             with path.open(newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle, delimiter="\t"))
@@ -360,7 +391,7 @@ class OuterCheckpointManager:
         return {key: options.get(key, "") for key in keys}
 
     def _read_single_tsv(self, relpath: str) -> dict[str, str]:
-        path = self.server_dir / relpath
+        path = workspace_join(self.server_dir, relpath)
         try:
             with path.open(newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle, delimiter="\t"))
@@ -371,7 +402,7 @@ class OuterCheckpointManager:
         return rows[0]
 
     def _read_datasets(self) -> list[dict[str, str]]:
-        path = self.server_dir / "metadata/datasets.tsv"
+        path = workspace_join(self.server_dir, "metadata/datasets.tsv")
         try:
             with path.open(newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle, delimiter="\t"))
@@ -450,20 +481,20 @@ class OuterCheckpointManager:
         if dataset is None:
             raise OrchestrationContractError(f"unknown reference-alignment dataset: {dataset_name}")
         paths = [
-            self.server_dir / command_relpath,
-            self.server_dir / "metadata/reference.tsv",
-            self.server_dir / "metadata/datasets.tsv",
-            self.server_dir / reference["fasta_relpath"],
-            self.server_dir / reference["fai_relpath"],
-            self.server_dir / dataset["fasta_relpath"],
-            self.server_dir / dataset["fai_relpath"],
+            workspace_join(self.server_dir, command_relpath),
+            workspace_join(self.server_dir, "metadata/reference.tsv"),
+            workspace_join(self.server_dir, "metadata/datasets.tsv"),
+            workspace_join(self.server_dir, reference["fasta_relpath"]),
+            workspace_join(self.server_dir, reference["fai_relpath"]),
+            workspace_join(self.server_dir, dataset["fasta_relpath"]),
+            workspace_join(self.server_dir, dataset["fai_relpath"]),
         ]
-        branch_runtime = self.server_dir / ".prepare_lib/tools/long_cigar_recovery"
+        branch_runtime = workspace_join(self.server_dir, ".prepare_lib/tools/long_cigar_recovery")
         if (branch_runtime.is_dir() and "long_cigar_recovery/server_alignment.py"
-                in (self.server_dir / command_relpath).read_text(encoding="utf-8")):
+                in (workspace_join(self.server_dir, command_relpath)).read_text(encoding="utf-8")):
             paths.extend(sorted(p for p in branch_runtime.rglob("*")
                                 if p.is_file() and "__pycache__" not in p.parts))
-        manifest = (self.server_dir / command_relpath).parent / "alignment_tasks.json"
+        manifest = (workspace_join(self.server_dir, command_relpath)).parent / "alignment_tasks.json"
         if manifest.is_file():
             paths.append(manifest)
         parameters = self._alignment_options()
@@ -480,38 +511,39 @@ class OuterCheckpointManager:
         reference = self._read_single_tsv("metadata/reference.tsv")
         datasets = self._read_datasets()
         paths = [
-            self.server_dir / command_relpath,
-            self.server_dir / ".prepare_lib/tools/track_member_order.py",
-            self.server_dir / "metadata/package.tsv",
-            self.server_dir / "metadata/prepare_options.tsv",
-            self.server_dir / "metadata/reference.tsv",
-            self.server_dir / "metadata/datasets.tsv",
-            self.server_dir / reference["fasta_relpath"],
-            self.server_dir / reference["fai_relpath"],
+            workspace_join(self.server_dir, command_relpath),
+            workspace_join(self.server_dir, ".prepare_lib/tools/track_member_order.py"),
+            workspace_join(self.server_dir, "metadata/package.tsv"),
+            workspace_join(self.server_dir, "metadata/prepare_options.tsv"),
+            workspace_join(self.server_dir, "metadata/reference.tsv"),
+            workspace_join(self.server_dir, "metadata/datasets.tsv"),
+            workspace_join(self.server_dir, reference["fasta_relpath"]),
+            workspace_join(self.server_dir, reference["fai_relpath"]),
         ]
         for dataset in datasets:
             paths.extend(
                 [
-                    self.server_dir / dataset["fasta_relpath"],
-                    self.server_dir / dataset["fai_relpath"],
-                    self.server_dir / f"runs/{dataset['dataset_name']}_vs_ref/result.paf",
-                    self.server_dir / f"runs/{dataset['dataset_name']}_vs_ref/tool_version.txt",
+                    workspace_join(self.server_dir, dataset["fasta_relpath"]),
+                    workspace_join(self.server_dir, dataset["fai_relpath"]),
+                    workspace_join(self.server_dir, f"runs/{dataset['dataset_name']}_vs_ref/result.paf"),
+                    workspace_join(self.server_dir, f"runs/{dataset['dataset_name']}_vs_ref/tool_version.txt"),
                 ]
             )
         for optional in [
-            self.server_dir / ".prepare_lib/tools/assign_chr_groups.py",
-            self.server_dir / ".prepare_lib/tools/alignment_tasks.py",
-            self.server_dir / ".prepare_lib/tools/self_alignment_batches.py",
-            self.server_dir / "tel/rules.tsv",
-            self.server_dir / "cen/reference.tsv",
-            self.server_dir / "cen/library.fa",
-            self.server_dir / "metadata/annotation_library_snapshot.json",
-            self.server_dir / ".prepare_lib/tools/cen_scan.py",
-            self.server_dir / ".prepare_lib/tools/annotation_library.py",
+            workspace_join(self.server_dir, ".prepare_lib/tools/assign_chr_groups.py"),
+            workspace_join(self.server_dir, ".prepare_lib/tools/alignment_tasks.py"),
+            workspace_join(self.server_dir, ".prepare_lib/tools/self_alignment_batches.py"),
+            workspace_join(self.server_dir, "tel/rules.tsv"),
+            workspace_join(self.server_dir, "cen/reference.tsv"),
+            workspace_join(self.server_dir, "cen/library.fa"),
+            workspace_join(self.server_dir, "metadata/annotation_library_snapshot.json"),
+            workspace_join(self.server_dir, ".prepare_lib/tools/tel_scan.py"),
+            workspace_join(self.server_dir, ".prepare_lib/tools/cen_scan.py"),
+            workspace_join(self.server_dir, ".prepare_lib/tools/annotation_library.py"),
         ]:
             if optional.is_file():
                 paths.append(optional)
-        centromere_dir = self.server_dir / "data/centromere"
+        centromere_dir = workspace_join(self.server_dir, "data/centromere")
         if centromere_dir.is_dir():
             paths.extend(path for path in centromere_dir.rglob("*") if path.is_file())
         return {
@@ -562,14 +594,14 @@ class OuterCheckpointManager:
 
     def _chromosome_inputs(self, chromosome: str, command_relpath: str,
                            *, alignment_only: bool = False) -> dict[str, object]:
-        run_dir = self.server_dir / f"runs/chr_{chromosome}"
+        run_dir = workspace_join(self.server_dir, f"runs/chr_{chromosome}")
         split = (run_dir / "q0_command.sh").is_file()
         paths = [
-            self.server_dir / command_relpath,
+            workspace_join(self.server_dir, command_relpath),
             run_dir / ("q0_generated_command.sh" if alignment_only else "generated_command.sh"),
-            self.server_dir / "metadata/prepare_options.tsv",
-            self.server_dir / "metadata/chr_assignments.tsv",
-            self.server_dir / "metadata/track_member_orders.tsv",
+            workspace_join(self.server_dir, "metadata/prepare_options.tsv"),
+            workspace_join(self.server_dir, "metadata/chr_assignments.tsv"),
+            workspace_join(self.server_dir, "metadata/track_member_orders.tsv"),
         ]
         manifest = run_dir / ("q0_alignment_tasks.json" if alignment_only else "alignment_tasks.json")
         if alignment_only or split or manifest.is_file():
@@ -603,14 +635,14 @@ class OuterCheckpointManager:
             ".prepare_lib/tools/self_alignment_batches.py",
             "tel/rules.tsv", "cen/reference.tsv", "cen/library.fa",
             "metadata/annotation_library_snapshot.json",
-            ".prepare_lib/tools/cen_scan.py", ".prepare_lib/tools/annotation_library.py",
+            ".prepare_lib/tools/tel_scan.py", ".prepare_lib/tools/cen_scan.py", ".prepare_lib/tools/annotation_library.py",
         ]
         for name in optional_names:
-            path = self.server_dir / name
+            path = workspace_join(self.server_dir, name)
             if path.is_file():
                 paths.append(path)
         if not alignment_only:
-            centromere_dir = self.server_dir / "data/centromere"
+            centromere_dir = workspace_join(self.server_dir, "data/centromere")
             if centromere_dir.is_dir():
                 paths.extend(path for path in centromere_dir.rglob("*") if path.is_file())
         has_alignment = any(child.name not in {"tel_scan", "cen_scan"} for child in operations)
@@ -638,8 +670,8 @@ class OuterCheckpointManager:
         if prepared.kind == "reference_alignment":
             dataset_name = prepared.unit_id.removeprefix("ref:")
             paths = [
-                self.server_dir / f"runs/{dataset_name}_vs_ref/result.paf",
-                self.server_dir / f"runs/{dataset_name}_vs_ref/tool_version.txt",
+                workspace_join(self.server_dir, f"runs/{dataset_name}_vs_ref/result.paf"),
+                workspace_join(self.server_dir, f"runs/{dataset_name}_vs_ref/tool_version.txt"),
             ]
         elif prepared.kind == "assignment":
             paths = self._assignment_output_paths()
@@ -655,14 +687,14 @@ class OuterCheckpointManager:
 
     def _assignment_output_paths(self) -> list[Path]:
         paths = [
-            self.server_dir / "metadata/chr_assignments.tsv",
-            self.server_dir / "metadata/track_member_orders.tsv",
-            self.server_dir / "metadata/source_seq_locator.tsv",
-            self.server_dir / "metadata/source_seq_n_regions.tsv",
-            self.server_dir / "metadata/reference_chr_locator.tsv",
+            workspace_join(self.server_dir, "metadata/chr_assignments.tsv"),
+            workspace_join(self.server_dir, "metadata/track_member_orders.tsv"),
+            workspace_join(self.server_dir, "metadata/source_seq_locator.tsv"),
+            workspace_join(self.server_dir, "metadata/source_seq_n_regions.tsv"),
+            workspace_join(self.server_dir, "metadata/reference_chr_locator.tsv"),
         ]
         for root_relpath in ["data/reference/chrs", "data/partitions"]:
-            root = self.server_dir / root_relpath
+            root = workspace_join(self.server_dir, root_relpath)
             if not root.is_dir():
                 raise OrchestrationContractError(f"assignment output directory is missing: {root}")
             paths.extend(path for path in root.rglob("*") if path.is_file())
@@ -672,7 +704,7 @@ class OuterCheckpointManager:
             raise OrchestrationContractError(
                 "reference chromosome locator contains no valid chromosome names"
             )
-        chr_dirs = [self.server_dir / f"runs/chr_{name}" for name in chromosome_names]
+        chr_dirs = [workspace_join(self.server_dir, f"runs/chr_{name}") for name in chromosome_names]
         for run_dir in chr_dirs:
             for required in [run_dir / "command.sh", run_dir / "generated_command.sh"]:
                 paths.append(required)
@@ -709,7 +741,7 @@ class OuterCheckpointManager:
         return paths
 
     def _read_tsv(self, relpath: str) -> list[dict[str, str]]:
-        path = self.server_dir / relpath
+        path = workspace_join(self.server_dir, relpath)
         try:
             with path.open(newline="", encoding="utf-8") as handle:
                 return list(csv.DictReader(handle, delimiter="\t"))
@@ -717,12 +749,12 @@ class OuterCheckpointManager:
             raise OrchestrationContractError(f"cannot read {path}: {exc}") from exc
 
     def _chromosome_output_paths(self, chromosome: str, *, alignment_only: bool = False) -> list[Path]:
-        run_dir = self.server_dir / f"runs/chr_{chromosome}"
+        run_dir = workspace_join(self.server_dir, f"runs/chr_{chromosome}")
         paths: list[Path] = []
         operation_dirs = self._chromosome_operations(run_dir, alignment_only=alignment_only)
         for operation in operation_dirs:
             if operation.name == "tel_scan":
-                tel_outputs = sorted((self.server_dir / f"tel/chr_{chromosome}").glob("*.tsv"))
+                tel_outputs = sorted((workspace_join(self.server_dir, f"tel/chr_{chromosome}")).glob("*.tsv"))
                 if not tel_outputs:
                     raise OrchestrationContractError(
                         f"telomere scan outputs are missing for chromosome {chromosome}"
@@ -730,7 +762,7 @@ class OuterCheckpointManager:
                 paths.extend(tel_outputs)
                 continue
             if operation.name == "cen_scan" and self._repeat_cen_scan(operation):
-                paths.append(self.server_dir / f"cen/chr_{chromosome}/marks.tsv")
+                paths.append(workspace_join(self.server_dir, f"cen/chr_{chromosome}/marks.tsv"))
                 coords = sorted(operation.glob("dataset_*.coords.tsv"))
                 if not coords:
                     raise OrchestrationContractError(f"centromere scan outputs are missing: {operation}")
@@ -743,7 +775,7 @@ class OuterCheckpointManager:
                 )
             paths.extend(paf_paths)
             if operation.name == "cen_scan":
-                paths.append(self.server_dir / f"cen/chr_{chromosome}/marks.tsv")
+                paths.append(workspace_join(self.server_dir, f"cen/chr_{chromosome}/marks.tsv"))
         return paths
 
 
@@ -774,7 +806,7 @@ def main() -> None:
         manager = OuterCheckpointManager(args.server_dir)
         prepared = manager.prepare(unit, f"runs/chr_{args.run_q0_chr}/q0_command.sh")
         assert prepared is not None
-        run_dir = manager.server_dir / f"runs/chr_{args.run_q0_chr}"
+        run_dir = workspace_join(manager.server_dir, f"runs/chr_{args.run_q0_chr}")
         result = subprocess.run(["bash", str(run_dir / "q0_generated_command.sh")], cwd=run_dir)
         if result.returncode:
             raise SystemExit(result.returncode if result.returncode > 0 else 128 - result.returncode)

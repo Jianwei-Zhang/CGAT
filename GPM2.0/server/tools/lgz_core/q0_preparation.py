@@ -5,6 +5,12 @@ mapped here. A ready manifest is published atomically after every task succeeds.
 """
 from __future__ import annotations
 
+try:
+    from workspace_layout import LayoutError, WorkspaceLayout
+except ModuleNotFoundError:
+    from ..workspace_layout import LayoutError, WorkspaceLayout
+
+
 from collections import defaultdict
 from contextlib import nullcontext, closing
 import csv
@@ -63,8 +69,15 @@ def _artifact_member(relative: str) -> Path:
     return path
 
 
+def workspace_artifact_path(root: Path, relative: str) -> Path:
+    try:
+        return WorkspaceLayout.detect(root).path(_artifact_member(relative))
+    except LayoutError as exc:
+        raise Q0EvidenceError(f"invalid q0 workspace artifact {relative!r}: {exc}") from exc
+
+
 def artifact_path(root: Path, relative: str) -> Path:
-    resolved = (root / _artifact_member(relative)).resolve()
+    resolved = workspace_artifact_path(root, relative).resolve()
     try:
         resolved.relative_to(root.resolve())
     except ValueError as exc:
@@ -73,7 +86,7 @@ def artifact_path(root: Path, relative: str) -> Path:
 
 
 def identity(root: Path, relative: str) -> dict:
-    path = root / _artifact_member(relative)
+    path = workspace_artifact_path(root, relative)
     try:
         bound = _file_identity(path, within=root)
     except OrchestrationContractError as exc:
@@ -137,7 +150,7 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
     root = root.resolve()
     # Repair verifies complete private in-memory manifests through the same
     # consumer. Canonical callers never see intermediate scoped generations.
-    manifest = json_file(root / MANIFEST) if _draft is None else _draft
+    manifest = json_file(workspace_artifact_path(root, MANIFEST)) if _draft is None else _draft
     policy = manifest.get("policy")
     frontier = policy.get("decision_frontier") if isinstance(policy, dict) else None
     scoped = isinstance(frontier, dict)
@@ -258,6 +271,7 @@ def _dataset_sequences(root, datasets):
 
 
 def _initial_inputs(root: Path, *, matrix_reader=None):
+    layout = WorkspaceLayout.detect(root)
     datasets = table(root, "metadata/datasets.tsv", ("dataset_name", "fasta_relpath"))
     references = table(root, "metadata/reference.tsv", ("fasta_relpath",))
     assignments = table(root, "metadata/chr_assignments.tsv", ("dataset_name", "seq_name", "assigned_chr_name"))
@@ -326,7 +340,10 @@ def _initial_inputs(root: Path, *, matrix_reader=None):
                 raise Q0EvidenceError(f"unexpected or duplicate q0 pair: {chromosome}:{pair}")
             actual.add(pair)
             stem = f"{left}_vs_self" if left == right else f"{left}_vs_{right}"
-            if row["paf"] != f"runs/chr_{chromosome}/{stem}/result.paf":
+            expected_paf = layout.relative(f"runs/chr_{chromosome}/{stem}/result.paf")
+            # Old descriptors use logical paths; current producers record
+            # numbered paths. Require the same exact owned pair/direction.
+            if layout.relative(row["paf"]) != expected_paf:
                 raise Q0EvidenceError("q0 pair PAF does not match its declared direction")
             for field, dataset in (("query_fasta", right), ("target_fasta", left)):
                 partition = artifact_path(root, row[field])
@@ -489,7 +506,7 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
             "alignment_flags": flags}
     task_id = stable_id("q0-map", spec)
     relative = f"grt/evidence/q0_prepare/tasks/{task_id}"
-    directory = root / relative
+    directory = workspace_artifact_path(root, relative)
     cache = directory / "success.json"
     output = directory / "result.paf"
     required_outputs = {f"{relative}/{name}" for name in MAPPING_OUTPUT_FILES}
@@ -597,7 +614,7 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
         seed=_unroutable_seed(root,catalog,request,tool,preset,threads,reference_bases=reference_bases,
                              skip_self=skip_self,prepared_target=template,on_cache_hit=consume_seed)
         if not consumed:
-            hits=read_paf(root/seed['paf'],query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
+            hits=read_paf(artifact_path(root, seed['paf']),query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
                           target_lengths={key:catalog.parts[key].interval.length for key in seed['target_ids']},artifact=seed['paf'])
             consume_seed(seed,hits)
         print(f"LGZ q0 weak seed: completed={seed['task_id']} approximate={seed['task_id'] in scopes.approximate_scope_task_ids} "
@@ -623,7 +640,7 @@ class _ProofRepairInputs:
         self.base = None
 
     def _signatures(self):
-        return tuple(file_signature(self.root / _artifact_member(path)) for path in self.paths)
+        return tuple(file_signature(workspace_artifact_path(self.root, path)) for path in self.paths)
 
     def verify(self):
         if self._signatures() != self.signatures:
@@ -688,7 +705,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                                 "policy": run_policy, "builder": builder})
     if expected_input is not None and expected_input != request_identity:
         raise Q0EvidenceError("q0 proof repair input identity changed between passes")
-    if expected_input is None and (root / MANIFEST).is_file():
+    if expected_input is None and workspace_artifact_path(root, MANIFEST).is_file():
         try:
             previous = load_verified_evidence(root)
             if previous.get("input_fingerprint") == request_identity:
@@ -747,7 +764,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
                                skip_self=options.get("skip_self") == "true",on_cache_hit=consume_unplaced)
             if not consumed:
-                hits = read_paf(root/task['paf'],query_lengths={key:catalog.parts[key].interval.length for key in task['query_ids']},
+                hits = read_paf(artifact_path(root, task['paf']),query_lengths={key:catalog.parts[key].interval.length for key in task['query_ids']},
                                 target_lengths={key:catalog.parts[key].interval.length for key in task['target_ids']},artifact=task['paf'])
                 consume_unplaced(task,hits)
             catalog.payload["discovery_rounds"].append({"task_id": task["task_id"], "added_segment_ids": sorted(added)})
@@ -801,7 +818,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             # candidates against the same anchor snapshot as the native round.
             def partial_hits():
                 for task in partial_tasks:
-                    yield from read_paf(root / task["paf"],
+                    yield from read_paf(artifact_path(root, task["paf"]),
                         query_lengths={key: catalog.parts[key].interval.length for key in task["query_ids"]},
                         target_lengths={key: catalog.parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"])
             if partial_tasks and not partial_consumed:
@@ -852,24 +869,24 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
         payload["base_alignments"] = base_alignments
         payload["supplementary_alignments"] = tasks
         catalog_name = f"grt/evidence/q0_prepare/{stable_id('catalog', payload)}.json"
-        atomic_write_json(root / catalog_name, payload)
+        atomic_write_json(workspace_artifact_path(root, catalog_name), payload)
         output_paths = {catalog_name}
         for task in tasks:
             output_paths.add(task["receipt"])
-            output_paths.update(row["path"] for row in json_file(root / task["receipt"])["outputs"])
+            output_paths.update(row["path"] for row in json_file(artifact_path(root, task["receipt"]))["outputs"])
         outputs = [identity(root, relative) for relative in sorted(output_paths)]
         output_identities = {row["path"]: row for row in outputs}
         # A long later phase must not publish success if any reused earlier
         # output changed after its validation. Reuse the final hashes above.
         for task in tasks:
-            if any(output_identities.get(row["path"]) != row for row in json_file(root/task["receipt"])["outputs"]):
+            if any(output_identities.get(row["path"]) != row for row in json_file(artifact_path(root, task["receipt"]))["outputs"]):
                 raise Q0EvidenceError("completed supplementary output changed before publication")
         manifest = {"schema": SCHEMA, "status": "success", "policy": run_policy, "builder": builder,
                     "input_fingerprint": request_identity, "inputs": inputs,
                     "outputs": outputs,
                     "catalog": catalog_name, "tool": tool}
         if not draft:
-            atomic_write_json(root / MANIFEST, manifest)
+            atomic_write_json(workspace_artifact_path(root, MANIFEST), manifest)
         action = "draft prepared" if draft else "prepared"
         print(f"LGZ q0 evidence {action}: candidates={len(payload['candidates'])} "
               f"supplementary_tasks={len(tasks)} unplaced_segments={len(payload['unplaced_segment_ids'])}")
@@ -893,7 +910,7 @@ def _prepare_with_proof_repair(root, *, threads, minimap2):
         if cached:
             return manifest
         expected_input = manifest["input_fingerprint"]
-        paths = tuple(root / _artifact_member(row["path"]) for key in ("inputs", "outputs") for row in manifest[key])
+        paths = tuple(workspace_artifact_path(root, row["path"]) for key in ("inputs", "outputs") for row in manifest[key])
         paths += (Path(manifest["tool"]["resolved"]),)
         before = tuple(file_signature(path) for path in paths)
         if planned is None:
@@ -929,6 +946,6 @@ def _prepare_with_proof_repair(root, *, threads, minimap2):
             or _partition_sha256(paths[-1]) != manifest["tool"]["sha256"]
             or before != tuple(file_signature(path) for path in paths)):
         raise Q0EvidenceError("q0 proof repair evidence changed during selection; no manifest published")
-    atomic_write_json(root / MANIFEST, manifest)
+    atomic_write_json(workspace_artifact_path(root, MANIFEST), manifest)
     print("LGZ q0 evidence proof repair: verified ready published", flush=True)
     return manifest

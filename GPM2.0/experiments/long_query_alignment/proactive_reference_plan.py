@@ -14,6 +14,11 @@ and its per-result checks still need a separately tested proactive integration.
 """
 from __future__ import annotations
 
+try:
+    from workspace_binding import workspace_path, workspace_relative
+except ModuleNotFoundError:
+    from .workspace_binding import workspace_path, workspace_relative
+
 import argparse
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
@@ -238,12 +243,12 @@ def check_prepared_scope(destination, prepared_workspace=None, *, leaf="selectiv
             raise PlanError("managed proactive output escaped its prepared workspace") from exc
         suffix = ("selective",) if leaf == "selective" else ("selective", "inputs")
         if (destination != destination.resolve() or len(relative) != 3 + len(suffix)
-                or relative[0] != "runs" or not relative[1].endswith("_vs_ref")
+                or relative[0] != workspace_relative(workspace, "runs") or not relative[1].endswith("_vs_ref")
                 or not relative[2].startswith(".long-cigar-attempt-") or relative[3:] != suffix
-                or not (workspace / ".prepare_lib").is_dir() or not (workspace / "metadata").is_dir()):
+                or not (workspace_path(workspace, ".prepare_lib")).is_dir() or not (workspace_path(workspace, "metadata")).is_dir()):
             raise PlanError("managed proactive output requires an adapter-owned private attempt")
     for parent in (destination.parent, *destination.parent.parents):
-        if ((parent / ".prepare_lib").exists() or (parent / "run_all.sh").exists()) and parent != workspace:
+        if ((parent / ".prepare_lib").exists() or (parent / ".runtime/workspace.json").exists() or (parent / "run_all.sh").exists()) and parent != workspace:
             raise PlanError("prototype output cannot be inside a prepared workspace")
 
 

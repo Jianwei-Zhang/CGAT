@@ -25,6 +25,10 @@ import {
   resolveFilteredSubviewTrackPairSelectionsFromAssembly,
 } from "./subview-state.js";
 import { resolveDegapTerminalCtgSides } from "./degap-state.js";
+import {
+  resolveManualRefinementGapCandidate,
+  resolveManualRefinementTerminalSides,
+} from "./manual-refinement-state.js";
 import { getCurrentChrFinalPath } from "./final-path-state.js";
 import { getAssemblyI18n, tAssembly } from "./i18n.js";
 
@@ -898,6 +902,37 @@ export function buildAssemblyContextMenuItems({
           settingsItem,
         ],
       });
+      if (typeof contextMenuActions.registerManualRefinementLocus === "function") {
+        const isEn = state.locale === "en";
+        const gapEligible = Boolean(resolveManualRefinementGapCandidate(finalPathEntry, segmentId));
+        items.push({
+          label: isEn ? "Refinement Tasks" : "精修任务",
+          children: [
+            {
+              label: isEn ? "Add to Refinement Tasks (Gap Fill)" : "加入精修任务（Gap 补洞）",
+              disabled: !gapEligible,
+              title: gapEligible
+                ? ""
+                : (isEn ? "Requires direct contig flanks on both sides" : "要求缺口紧邻左右两侧均为 Contig"),
+              run: async () => {
+                await contextMenuActions.registerManualRefinementLocus(host, store, {
+                  chrName: targetChrName || finalPathEntry?.chrName || "",
+                  kind: "gap",
+                  segmentId,
+                });
+              },
+            },
+            ...(typeof contextMenuActions.openManualRefinementPanel === "function"
+              ? [{
+                label: isEn ? "Open Refinement Tasks Panel" : "打开精修任务面板",
+                run: async () => {
+                  await contextMenuActions.openManualRefinementPanel(host, store);
+                },
+              }]
+              : []),
+          ],
+        });
+      }
     }
     if (segmentType === "ctg") {
       items.push({
@@ -981,6 +1016,38 @@ export function buildAssemblyContextMenuItems({
           label: i18n.contextMenu.degap,
           children: [...telseekerItems, settingsItem],
         });
+      }
+      if (typeof contextMenuActions.registerManualRefinementLocus === "function") {
+        const manualTerminalSides = resolveManualRefinementTerminalSides(finalPathEntry, segmentId);
+        if (manualTerminalSides.length) {
+          const isEn = state.locale === "en";
+          const manualTelItems = manualTerminalSides.map((side) => ({
+            label: side === "right"
+              ? (isEn ? "Add to Refinement Tasks (Right Telomere · DEGAP TelSeeker)" : "加入精修任务（右端粒 · DEGAP TelSeeker）")
+              : (isEn ? "Add to Refinement Tasks (Left Telomere · DEGAP TelSeeker)" : "加入精修任务（左端粒 · DEGAP TelSeeker）"),
+            run: async () => {
+              await contextMenuActions.registerManualRefinementLocus(host, store, {
+                chrName: targetChrName || finalPathEntry?.chrName || "",
+                kind: side === "right" ? "tel_right" : "tel_left",
+                segmentId,
+              });
+            },
+          }));
+          items.push({
+            label: isEn ? "Refinement Tasks" : "精修任务",
+            children: [
+              ...manualTelItems,
+              ...(typeof contextMenuActions.openManualRefinementPanel === "function"
+                ? [{
+                  label: isEn ? "Open Refinement Tasks Panel" : "打开精修任务面板",
+                  run: async () => {
+                    await contextMenuActions.openManualRefinementPanel(host, store);
+                  },
+                }]
+                : []),
+            ],
+          });
+        }
       }
     }
     return items;

@@ -98,13 +98,8 @@ class ReferenceIndex:
         self.last_query_report = {}
 
     def _artifact(self, relative):
-        p = Path(relative)
-        if not relative or p.is_absolute() or ".." in p.parts or "\\" in relative:
-            raise Q0EvidenceError("invalid indexed PAF path")
-        result = (self.root/p).resolve(strict=True)
-        if not result.is_relative_to(self.root):
-            raise Q0EvidenceError("indexed PAF escapes workspace")
-        return result
+        from .q0_preparation import artifact_path
+        return artifact_path(self.root, relative).resolve(strict=True)
 
     @classmethod
     def create(cls, path, root, parts, refs):
@@ -453,8 +448,9 @@ class _ReaderSnapshot:
     def verify(self):
         if _signature(self.path) != self.signature:
             raise Q0EvidenceError("delegated reference database changed during planning")
+        from .q0_preparation import artifact_path
         for relative, signature in self.signatures.items():
-            if _signature((self.root/relative).resolve(strict=True)) != signature:
+            if _signature(artifact_path(self.root, relative).resolve(strict=True)) != signature:
                 raise Q0EvidenceError("delegated reference PAF changed during planning")
         for relative, signature in self.mirror_signatures.items():
             if _signature(self.mirrors[relative]) != signature:

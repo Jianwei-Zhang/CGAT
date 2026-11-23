@@ -11,6 +11,11 @@ from dataclasses import asdict, dataclass
 import json
 import os
 from pathlib import Path
+
+try:
+    from workspace_layout import WorkspaceLayout, canonical_relative
+except ModuleNotFoundError:
+    from ..workspace_layout import WorkspaceLayout, canonical_relative
 import re
 import shutil
 import subprocess
@@ -97,7 +102,7 @@ def _read_receipt(root, receipt, *, spec, required):
 
 
 def _reuse(root, receipt, spec, required):
-    if not (root/receipt).is_file(): return None
+    if not (_ops().workspace_artifact_path(root, receipt)).is_file(): return None
     try: return _read_receipt(root,receipt,spec=spec,required=required)
     except (Q0EvidenceError,KeyError,TypeError): return None
 
@@ -105,7 +110,7 @@ def _reuse(root, receipt, spec, required):
 def _verified_projection_hit(root, task, spec, required, *, members):
     """Accept a complete project with one full verification, not a preflight reread."""
     receipt = task["receipt"]
-    if not (root/receipt).is_file():
+    if not (_ops().workspace_artifact_path(root, receipt)).is_file():
         return None
     try:
         checked = verify_regional_task(root, task, members=members)
@@ -122,11 +127,10 @@ def _verified_projection_hit(root, task, spec, required, *, members):
 
 
 def _private_directory(root, relative):
-    path = root
-    for component in Path(relative).parts:
-        path = path/component
-        if path.is_symlink(): raise Q0EvidenceError("linked private regional cache is forbidden")
-    return _ops().artifact_path(root,relative)
+    path = _ops().workspace_artifact_path(root, relative)
+    if path.is_symlink():
+        raise Q0EvidenceError("linked private regional cache is forbidden")
+    return path
 
 
 def _fresh_directory(root, relative):
@@ -170,7 +174,7 @@ def _context(root, catalog, query, targets, tool, preset):
 
 
 def _ensure_fastas(root,relative,context,catalog,query,targets):
-    directory=root/relative
+    directory=_ops().workspace_artifact_path(root, relative)
     for name,windows in [("query",[query]),("target",sorted(targets,key=lambda w:w.window_id))]:
         path=directory/(name+".fa")
         expected=next(r for r in context["inputs"] if r["path"]==relative+"/"+name+".fa")
@@ -297,7 +301,8 @@ def _execute(root,directory,context,relative,catalog,query,targets,argv,tool,add
     shutil.copyfile(guard,directory/"guard.py")
     command=[sys.executable,str(directory/"guard.py"),"--address-space-bytes",str(address_space_bytes),"--",*argv]
     options = {}
-    receipt = {"producer_root":str(root),"argv":argv,"executed_argv":command,
+    receipt = {"producer_root":str(root),"producer_layout_version":WorkspaceLayout.detect(root).version,
+               "argv":argv,"executed_argv":command,
                "address_space_bytes":address_space_bytes,"guard_sha256":sha256_file(directory/"guard.py"),"wall_clock_limit_added":False}
     loader = _CHILD_LOADER
     if loader is not None:
@@ -365,10 +370,10 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
     # The raw context key excludes cores; complete raw mapping can survive a
     # projection/coverage-selection repair without a new alignment.
     context_hint=stable_id("regional-lock",[_window_context(query),[_window_context(w) for w in sorted(targets,key=lambda w:w.window_id)],tool,preset])
-    with _lock(root/context_hint):
+    with _lock(_ops().workspace_artifact_path(root, context_hint)):
         relative,context=_context(root,catalog,query,targets,tool,preset)
         context_path=relative+"/context.json";context_identity=_ops().identity(root,context_path)
-        toolargv=[tool["resolved"],"-x",preset,*BASE_FLAGS,"-t",str(threads),str(root/relative/"target.fa"),str(root/relative/"query.fa")]
+        toolargv=[tool["resolved"],"-x",preset,*BASE_FLAGS,"-t",str(threads),str(_ops().workspace_artifact_path(root, relative)/"target.fa"),str(_ops().workspace_artifact_path(root, relative)/"query.fa")]
         target_lengths={w.window_id:w.length for w in targets}
         closure={context_path}
         if preset=="asm10" and reference_bases>=policy.minimum_reference_bases and query.length>=policy.minimum_query_bases:
@@ -380,9 +385,9 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
                 _execute(root,directory,context,relative,catalog,query,targets,toolargv,tool,address_space_bytes)
                 work=chain_work(directory/"result.paf.tmp",query,target_lengths,policy)
                 (directory/"result.paf.tmp").replace(directory/"result.paf")
-                _ops().atomic_write_json(root/pre_receipt,{"status":"success","spec":pre_spec,"outputs":_outputs(root,required)})
+                _ops().atomic_write_json(_ops().workspace_artifact_path(root, pre_receipt),{"status":"success","spec":pre_spec,"outputs":_outputs(root,required)})
             else:
-                work=chain_work(root/pre_rel/"result.paf",query,target_lengths,policy)
+                work=chain_work(_ops().workspace_artifact_path(root, pre_rel)/"result.paf",query,target_lengths,policy)
             decision=select_cigar_profile(reference_bases,query.length,work,complete=True,preset=preset,policy=policy)
             decision["chaining_receipt"]=_ops().identity(root,pre_receipt)
             closure.update(required|{pre_receipt})
@@ -391,19 +396,19 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
                       "reference_bases":reference_bases,"query_bases":query.length,"additional_flags":[],"approximate_chaining_is_evidence":False}
         decision=_normal(decision);decision_id=stable_id("q0-regional-decision",decision)
         decision_path=relative+"/"+decision_id+".json"
-        if not (root/decision_path).exists():_ops().atomic_write_json(root/decision_path,decision)
-        elif _ops().json_file(root/decision_path)!=decision:raise Q0EvidenceError("regional decision changed")
+        if not (_ops().workspace_artifact_path(root, decision_path)).exists():_ops().atomic_write_json(_ops().workspace_artifact_path(root, decision_path),decision)
+        elif _ops().json_file(_ops().workspace_artifact_path(root, decision_path))!=decision:raise Q0EvidenceError("regional decision changed")
         closure.add(decision_path)
         raw_spec={"schema":"lgz_q0_regional_raw_v1","context":context_identity,"flags":["-c",*BASE_FLAGS,*decision["additional_flags"]]}
         raw_id=stable_id("q0-regional-raw",raw_spec);raw_rel=relative+"/"+raw_id;raw_receipt=raw_rel+"/success.json"
         required={raw_rel+"/"+name for name in ("result.paf","command.json","guard.py")}
         if _reuse(root,raw_receipt,raw_spec,required) is None:
             directory=_fresh_directory(root,raw_rel)
-            argv=[tool["resolved"],"-c","-x",preset,*BASE_FLAGS,*decision["additional_flags"],"-t",str(threads),str(root/relative/"target.fa"),str(root/relative/"query.fa")]
+            argv=[tool["resolved"],"-c","-x",preset,*BASE_FLAGS,*decision["additional_flags"],"-t",str(threads),str(_ops().workspace_artifact_path(root, relative)/"target.fa"),str(_ops().workspace_artifact_path(root, relative)/"query.fa")]
             _execute(root,directory,context,relative,catalog,query,targets,argv,tool,address_space_bytes)
             for _ in read_paf(directory/"result.paf.tmp",query_lengths={query.window_id:query.length},target_lengths=target_lengths):pass
             (directory/"result.paf.tmp").replace(directory/"result.paf")
-            _ops().atomic_write_json(root/raw_receipt,{"status":"success","spec":raw_spec,"outputs":_outputs(root,required)})
+            _ops().atomic_write_json(_ops().workspace_artifact_path(root, raw_receipt),{"status":"success","spec":raw_spec,"outputs":_outputs(root,required)})
         # A fresh raw result was validated before publication above. Both a
         # fresh projection and the final verify_regional_task replay validate
         # every raw record's CIGAR and window identity, including on a cache
@@ -421,22 +426,29 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
         if _verified_projection_hit(root,task,projection_spec,required,members=catalog.parts) is None:
             directory=_fresh_directory(root,project_rel)
             try:
-                with open_paf_text(root/raw_rel/"result.paf") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
+                with open_paf_text(_ops().workspace_artifact_path(root, raw_rel)/"result.paf") as source,(directory/"result.paf.tmp").open("w",encoding="utf-8") as output:
                     output.writelines(_projected_lines(source,query,targets,artifact=raw_rel+"/result.paf"))
             except (OSError,UnicodeError) as exc:
                 raise Q0EvidenceError(f"cannot project q0 regional evidence {raw_rel}/result.paf: {exc}") from exc
-            (directory/"result.paf.tmp").replace(root/paf)
-            _ops().atomic_write_json(root/receipt,{"status":"success","spec":projection_spec,"outputs":_outputs(root,required)})
+            (directory/"result.paf.tmp").replace(_ops().workspace_artifact_path(root, paf))
+            _ops().atomic_write_json(_ops().workspace_artifact_path(root, receipt),{"status":"success","spec":projection_spec,"outputs":_outputs(root,required)})
             verify_regional_task(root,task,members=catalog.parts)
         # Only owned generated inputs are removed, after success. Original
         # genomes, native task FASTAs, failed inputs and complete PAFs are kept.
-        for name in ("query.fa","target.fa"):(root/relative/name).unlink(missing_ok=True)
+        for name in ("query.fa","target.fa"):(_ops().workspace_artifact_path(root, relative)/name).unlink(missing_ok=True)
         return task
 
 
 def _verify_command(root, relative, context_relative, context_spec, flags):
     command=_ops().json_file(_ops().artifact_path(root,relative+"/command.json"))
     argv=command["argv"];producer=Path(command["producer_root"])
+    version = command.get("producer_layout_version", 1)
+    if type(version) is not int or version not in (1, 2):
+        raise Q0EvidenceError("invalid regional producer workspace layout")
+    # Command paths belong to the original producer, even when its output was
+    # moved or migrated. Replay its namespace without accessing that directory.
+    physical_context = canonical_relative(context_relative) if version == 2 else context_relative
+    physical_task = canonical_relative(relative) if version == 2 else relative
     if "mapper_loader" in command:
         _verify_mapper_loader_record(command["mapper_loader"], context_spec["tool"])
     if (not producer.is_absolute() or argv[-4]!="-t" or int(argv[-3])<1
@@ -444,11 +456,11 @@ def _verify_command(root, relative, context_relative, context_spec, flags):
         raise Q0EvidenceError("invalid regional execution record")
     exact=flags[:1]==["-c"];alignment_flags=flags[1:] if exact else flags
     expected=[context_spec["tool"]["resolved"],*(["-c"] if exact else []),"-x",context_spec["preset"],
-              *alignment_flags,"-t",argv[-3],str(producer/context_relative/"target.fa"),str(producer/context_relative/"query.fa")]
-    if (argv!=expected or command["executed_argv"][1:]!=[str(producer/relative/"guard.py"),
+              *alignment_flags,"-t",argv[-3],str(producer/physical_context/"target.fa"),str(producer/physical_context/"query.fa")]
+    if (argv!=expected or command["executed_argv"][1:]!=[str(producer/physical_task/"guard.py"),
             "--address-space-bytes",str(command["address_space_bytes"]),"--",*argv]
             or command["wall_clock_limit_added"] is not False
-            or sha256_file(root/relative/"guard.py")!=command["guard_sha256"]):
+            or sha256_file(_ops().workspace_artifact_path(root, relative)/"guard.py")!=command["guard_sha256"]):
         raise Q0EvidenceError("regional executed flags/guard differ from receipt")
 
 
@@ -509,7 +521,7 @@ def verify_regional_task(root, task, *, members=None):
             pre_spec={"schema":"lgz_q0_regional_chaining_v1","context":context_identity,"flags":BASE_FLAGS}
             leaves.append((pre_path,identity,_receipt_inventory(root,pre_path,spec=pre_spec,required=required),required))
             _verify_command(root,pre_rel,context_rel,context_spec,BASE_FLAGS)
-            work=chain_work(root/pre_rel/"result.paf",query,{w.window_id:w.length for w in targets},policy)
+            work=chain_work(_ops().workspace_artifact_path(root, pre_rel)/"result.paf",query,{w.window_id:w.length for w in targets},policy)
             expected=select_cigar_profile(decision["reference_bases"],query.length,work,complete=True,preset=context_spec["preset"],policy=policy)
             expected["chaining_receipt"]=identity
             if _normal(expected)!=decision:raise Q0EvidenceError("CIGAR profile does not match complete chaining evidence")
@@ -538,7 +550,7 @@ def verify_regional_task(root, task, *, members=None):
                 raise Q0EvidenceError("regional leaf outputs differ from verified projection closure")
         # Replay a small, already-finished raw CIGAR stream, not the mapper or
         # reference scan. This catches wrong offsets even if PAF syntax is valid.
-        with open_paf_text(root/raw_rel/"result.paf") as source,open_paf_text(root/task["paf"]) as output:
+        with open_paf_text(_ops().workspace_artifact_path(root, raw_rel)/"result.paf") as source,open_paf_text(_ops().workspace_artifact_path(root, task["paf"])) as output:
             for projected in _projected_lines(source,query,targets,artifact=raw_rel+"/result.paf"):
                 if output.readline()!=projected:raise Q0EvidenceError("projected CIGAR differs from bound raw evidence")
             if output.read(1):raise Q0EvidenceError("regional projection contains extra records")

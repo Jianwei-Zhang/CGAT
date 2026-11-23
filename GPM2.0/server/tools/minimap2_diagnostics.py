@@ -1,6 +1,12 @@
 """Bounded, non-mutating evidence and hints; never tune or retry an alignment."""
 from __future__ import annotations
 
+try:
+    from workspace_layout import workspace_join
+except ModuleNotFoundError:
+    from .workspace_layout import workspace_join
+
+
 import csv
 import hashlib
 import os
@@ -84,7 +90,7 @@ def input_summary(root: Path, row: dict, role: str) -> dict:
         value = row.get("fai_relpath", "")
         if not value or Path(value).is_absolute():
             raise ValueError("missing or non-relative FAI path")
-        path = (root / value).resolve()
+        path = (workspace_join(root, value)).resolve()
         path.relative_to(root.resolve())
         stat = path.stat()
         total = count = largest = over_cigar = over_coordinate = 0
@@ -110,7 +116,7 @@ def input_summary(root: Path, row: dict, role: str) -> dict:
                       long_record_examples=examples, fai_size=stat.st_size, fai_mtime_ns=stat.st_mtime_ns)
         fasta_value = row.get("fasta_relpath", "")
         if fasta_value and not Path(fasta_value).is_absolute():
-            fasta = (root / fasta_value).resolve()
+            fasta = (workspace_join(root, fasta_value)).resolve()
             fasta.relative_to(root.resolve())
             if fasta.is_file():
                 result["fai_older_than_fasta"] = stat.st_mtime_ns < fasta.stat().st_mtime_ns
@@ -131,7 +137,7 @@ def runtime_snapshot(root: Path, options: dict[str, str]) -> dict:
     inputs = []
     for filename, role in (("reference.tsv", "reference"), ("datasets.tsv", "dataset")):
         try:
-            with (root / "metadata" / filename).open(encoding="utf-8", newline="") as handle:
+            with (workspace_join(root, "metadata", filename)).open(encoding="utf-8", newline="") as handle:
                 inputs.extend(input_summary(root, row, role) for row in csv.DictReader(handle, delimiter="\t"))
         except (OSError, UnicodeError, csv.Error) as exc:
             inputs.append({"role": role, "error": str(exc)})

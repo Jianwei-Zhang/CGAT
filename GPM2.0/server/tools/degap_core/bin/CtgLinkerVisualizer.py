@@ -627,6 +627,11 @@ class CtgLinkerVisualizer:
         """
         Main execution method.
         """
+        if (self.output_dir / "ctglinker-result.json").exists():
+            from FamilyCtgLinker import load_ctg_result
+            load_ctg_result(self.output_dir)
+            return str(self.output_dir / "ctglinker-family-report.html")
+
         # Create report directory
         self.report_dir.mkdir(exist_ok=True)
         

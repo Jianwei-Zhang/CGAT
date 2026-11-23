@@ -9,6 +9,17 @@ use sha2::{Digest, Sha256};
 
 use crate::db::open_workspace_db;
 
+mod manual_refinement;
+mod server_runtime;
+
+pub use manual_refinement::{
+    ManualExportSummary, ManualRefinementAction, ManualRefinementExportReceipt, ManualRefinementImport, ManualRefinementRequest,
+    PatchOperation, ResultPatch, ResultRow, ResultStatus, ValidatedRefinementResults,
+    export_manual_refinement, import_manual_refinement_results, list_manual_refinement_exports, list_manual_refinement_results,
+    switch_manual_refinement_locus, undo_manual_refinement_locus,
+    validate_manual_refinement_results,
+};
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct DegapJobExportSettings {
     pub degap_path: String,
@@ -182,6 +193,10 @@ pub fn parse_degap_export_jobs(value: &Value) -> Result<Vec<DegapJobExportItem>>
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SeedMemberPlan {
+    dataset_name: String,
+    source_length: i64,
+    local_fasta_path: PathBuf,
+    server_fasta_sha256: Option<String>,
     source_seq_name: String,
     server_fasta_path: String,
     source_start: i64,
@@ -375,7 +390,7 @@ fn export_degap_jobs_with_connection(
         let mut seqleft_path = String::new();
         let mut seqright_path = String::new();
         let mut ctg_path = String::new();
-        let script = if job_type == "telseeker_ctg" {
+        let (script, seed_plans) = if job_type == "telseeker_ctg" {
             let endpoint = job
                 .endpoint
                 .as_ref()
@@ -389,12 +404,15 @@ fn export_degap_jobs_with_connection(
             )
             .with_context(|| format!("failed to plan endpoint contig for {}", job.job_id))?;
             ctg_path = join_server_path(&job.out_path, "endpoint.ctg.fa");
-            build_telseeker_ctg_job_script(
-                job,
-                effective_settings,
-                &params.settings,
-                &endpoint_plan,
-                &ctg_path,
+            (
+                build_telseeker_ctg_job_script(
+                    job,
+                    effective_settings,
+                    &params.settings,
+                    &endpoint_plan,
+                    &ctg_path,
+                ),
+                json!({"endpoint": server_runtime::seed_plan(endpoint, &endpoint_plan)?}),
             )
         } else {
             let left = job
@@ -423,18 +441,28 @@ fn export_degap_jobs_with_connection(
             .with_context(|| format!("failed to plan right seed for {}", job.job_id))?;
             seqleft_path = join_server_path(&job.out_path, "seqleft.fa");
             seqright_path = join_server_path(&job.out_path, "seqright.fa");
-            build_gapfiller_job_script(
-                job,
-                effective_settings,
-                &params.settings,
-                &left_plan,
-                &right_plan,
-                &seqleft_path,
-                &seqright_path,
+            (
+                build_gapfiller_job_script(
+                    job,
+                    effective_settings,
+                    &params.settings,
+                    &left_plan,
+                    &right_plan,
+                    &seqleft_path,
+                    &seqright_path,
+                ),
+                json!({"seqleft": server_runtime::seed_plan(left, &left_plan)?,
+                      "seqright": server_runtime::seed_plan(right, &right_plan)?}),
             )
         };
-        let receipt =
-            build_degap_receipt(conn, workspace_root, project_id, job, effective_settings)?;
+        let receipt = build_degap_receipt(
+            conn,
+            workspace_root,
+            project_id,
+            job,
+            effective_settings,
+            seed_plans,
+        )?;
         let receipt_path = scripts_dir.join(format!("{safe_job_id}.json"));
         let receipt_bytes = serde_json::to_vec_pretty(&receipt)?;
         fs::write(&receipt_path, &receipt_bytes)?;
@@ -444,14 +472,10 @@ fn export_degap_jobs_with_connection(
             receipt_dir.join(format!("{}.json", receipt["token"].as_str().unwrap())),
             &receipt_bytes,
         )?;
-        let result_tool = join_server_path(
-            &effective_settings.gpm_server_path,
-            ".prepare_lib/tools/degap_results.py",
-        );
         let receipt_name = shell_quote(&format!("{safe_job_id}.json"));
         let begin = format!(
-            "python3 {} begin --recipe \"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)/\"{}\n",
-            shell_quote(&result_tool),
+            "{}\nCGAT_RECIPE=\"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)/\"{}\npython3 -B \"$CGAT_RESULT_TOOL\" begin --recipe \"$CGAT_RECIPE\"\n",
+            server_runtime::runtime_shell(&effective_settings.gpm_server_path),
             receipt_name
         );
         let script = script.replacen(
@@ -459,16 +483,14 @@ fn export_degap_jobs_with_connection(
             &format!("set -euo pipefail\n{begin}"),
             1,
         );
-        let seed = begin.replace(" begin --recipe ", " seed --recipe ");
+        let seed = "python3 -B \"$CGAT_RESULT_TOOL\" seed --recipe \"$CGAT_RECIPE\"";
         let script = script.replacen(
             "# Step 3: run DEGAP",
             &format!("{seed}\n# Step 3: run DEGAP"),
             1,
         );
         let script = format!(
-            "{script}\n# Record this run only after DEGAP exits successfully.\npython3 {} record --recipe \"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)/\"{}\n",
-            shell_quote(&result_tool),
-            receipt_name
+            "{script}\n# Record this run only after DEGAP exits successfully.\npython3 -B \"$CGAT_RESULT_TOOL\" record --recipe \"$CGAT_RECIPE\"\n"
         );
         fs::write(&script_path, script)
             .with_context(|| format!("failed to write {}", script_path.display()))?;
@@ -520,10 +542,6 @@ fn export_degap_jobs_with_connection(
     fs::write(&manifest_path, format!("{}\n", manifest_rows.join("\n")))
         .with_context(|| format!("failed to write {}", manifest_path.display()))?;
 
-    let result_tool = join_server_path(
-        &params.settings.gpm_server_path,
-        ".prepare_lib/tools/degap_results.py",
-    );
     for (name, action) in [
         ("run_degap_jobs.sh", "run"),
         ("collect_degap_results.sh", "collect"),
@@ -531,8 +549,8 @@ fn export_degap_jobs_with_connection(
         fs::write(
             params.output_dir.join(name),
             format!(
-                "#!/usr/bin/env bash\nset -euo pipefail\nROOT=\"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)\"\nexec python3 {} {action} --jobs \"$ROOT/jobs.tsv\"\n",
-                shell_quote(&result_tool)
+                "#!/usr/bin/env bash\nset -euo pipefail\n{}\nROOT=\"$(cd -- \"$(dirname -- \"${{BASH_SOURCE[0]}}\")\" && pwd)\"\nexec python3 -B \"$CGAT_RESULT_TOOL\" {action} --jobs \"$ROOT/jobs.tsv\"\n",
+                server_runtime::runtime_shell(&params.settings.gpm_server_path)
             ),
         )?;
     }
@@ -771,10 +789,11 @@ fn load_seed_plan(
     segment: &DegapJobSeedSegment,
 ) -> Result<Vec<SeedMemberPlan>> {
     let mut stmt = conn.prepare(
-        "SELECT ss.seq_name, s.source_start, s.source_end, s.hidden, ssl.fasta_path
+        "SELECT ss.seq_name, s.source_start, s.source_end, s.hidden, ssl.fasta_path, d.name, ss.length
          FROM assembly_ctg c
          JOIN assembly_seq s ON s.id = c.assembly_seq_id
          JOIN source_seq ss ON ss.id = s.source_seq_id
+         JOIN dataset d ON d.id = ss.dataset_id
          LEFT JOIN source_seq_locator ssl ON ssl.source_seq_id = ss.id
          WHERE c.project_id = ?1
            AND c.id = ?2
@@ -788,6 +807,8 @@ fn load_seed_plan(
                 row.get::<_, i64>(2)?,
                 row.get::<_, i64>(3)? > 0,
                 row.get::<_, Option<String>>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, i64>(6)?,
             ))
         })?
         .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -795,7 +816,16 @@ fn load_seed_plan(
         bail!("assembly_ctg_id {} not found", segment.assembly_ctg_id);
     }
     let mut plans = Vec::<SeedMemberPlan>::new();
-    for (source_seq_name, source_start, source_end, hidden, local_fasta_path) in rows {
+    for (
+        source_seq_name,
+        source_start,
+        source_end,
+        hidden,
+        local_fasta_path,
+        dataset_name,
+        source_length,
+    ) in rows
+    {
         if hidden {
             continue;
         }
@@ -806,7 +836,18 @@ fn load_seed_plan(
             )
         })?;
         let relpath = server_relative_locator_path(workspace_root, Path::new(&local_fasta_path))?;
+        let server_fasta_sha256 = server_runtime::bind_member(
+            workspace_root,
+            Path::new(&local_fasta_path),
+            &dataset_name,
+            &source_seq_name,
+            source_length,
+        )?;
         plans.push(SeedMemberPlan {
+            dataset_name,
+            source_length,
+            local_fasta_path: PathBuf::from(local_fasta_path),
+            server_fasta_sha256,
             source_seq_name,
             source_start,
             source_end,
@@ -966,12 +1007,30 @@ fn can_use_shared_reads(
 ) -> bool {
     settings.hifi_reads == shared_settings.hifi_reads
         && settings.ont_reads == shared_settings.ont_reads
+        && settings.degap_path == shared_settings.degap_path
+        && settings.gpm_server_path == shared_settings.gpm_server_path
+}
+
+fn family_shared_layout(settings: &DegapJobExportSettings) -> &'static str {
+    if settings.degap_path.trim().is_empty() {
+        r#"if [ -f "$CGAT_RUNTIME/degap_core/bin/PreparedReads.py" ]; then
+  CGAT_FAMILY_SHARED=1
+  SHARED_OUT="$SHARED_OUT.family-v1"
+fi"#
+    } else {
+        ""
+    }
 }
 
 fn build_shared_prepare_script(settings: &DegapJobExportSettings) -> String {
     let shared_out = shared_prepare_out(settings);
     let hifi_count = settings.hifi_reads.len();
     let ont_count = settings.ont_reads.len();
+    let runtime = if settings.degap_path.trim().is_empty() {
+        server_runtime::runtime_shell(&settings.gpm_server_path)
+    } else {
+        String::new()
+    };
     format!(
         r#"#!/usr/bin/env bash
 set -euo pipefail
@@ -983,15 +1042,17 @@ set -euo pipefail
 SHARED_OUT={quoted_shared_out}
 HIFI_READS=({hifi_reads})
 ONT_READS=({ont_reads})
-
+{runtime}
+CGAT_FAMILY_SHARED=0
+{family_layout}
 mkdir -p "$SHARED_OUT/processed_reads"
 
-python3 - <<'PY'
+python3 - "$SHARED_OUT" <<'PY'
 from pathlib import Path
 import json
 import sys
 
-shared_out = Path({shared_out_py})
+shared_out = Path(sys.argv[1])
 manifest = shared_out / "cache_manifest.json"
 requested = {{
     "hifi": {hifi_reads_py},
@@ -1061,14 +1122,25 @@ prepare_split() {{
   fi
 }}
 
+if [ "$CGAT_FAMILY_SHARED" -eq 1 ]; then
+  read_args=()
+  if [ {hifi_count} -gt 0 ]; then read_args+=(--hifi "${{HIFI_READS[@]}}"); fi
+  if [ {ont_count} -gt 0 ]; then read_args+=(--ont "${{ONT_READS[@]}}"); fi
+  python3 -B "$CGAT_DEGAP_TOOL" prepare-shared-reads --out "$SHARED_OUT" "${{read_args[@]}}"
+fi
+
 if [ {hifi_count} -gt 0 ]; then
-  prepare_reads "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "${{HIFI_READS[@]}}"
+  if [ "$CGAT_FAMILY_SHARED" -eq 0 ]; then
+    prepare_reads "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "${{HIFI_READS[@]}}"
+  fi
   prepare_index "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "$SHARED_OUT/hifi_reads.idx"
   prepare_split "HiFi" "$SHARED_OUT/processed_reads/hifi_reads.fa" "$SHARED_OUT/hifi_reads_part"
 fi
 
 if [ {ont_count} -gt 0 ]; then
-  prepare_reads "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "${{ONT_READS[@]}}"
+  if [ "$CGAT_FAMILY_SHARED" -eq 0 ]; then
+    prepare_reads "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "${{ONT_READS[@]}}"
+  fi
   prepare_index "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "$SHARED_OUT/ont_reads.idx"
   prepare_split "ONT" "$SHARED_OUT/processed_reads/ont_reads.fa" "$SHARED_OUT/ont_reads_part"
 fi
@@ -1081,7 +1153,8 @@ echo "[done] DEGAP shared prepare outputs are ready in $SHARED_OUT"
         ont_reads = shell_array(&settings.ont_reads),
         hifi_count = hifi_count,
         ont_count = ont_count,
-        shared_out_py = python_string(&shared_out),
+        runtime = runtime,
+        family_layout = family_shared_layout(settings),
         hifi_reads_py = python_string_list(&settings.hifi_reads),
         ont_reads_py = python_string_list(&settings.ont_reads),
     )
@@ -1094,7 +1167,7 @@ fn build_shared_link_block(
     include_index_and_split: bool,
 ) -> String {
     if !can_use_shared_reads(settings, shared_settings) {
-        return r#"echo "[shared] per-job reads differ from global settings; this job will build its own read cache"
+        return r#"echo "[shared] per-job reads or runtime differ from global settings; this job will build its own read cache"
 "#
         .to_string();
     }
@@ -1118,6 +1191,8 @@ fn build_shared_link_block(
     format!(
         r#"SHARED_OUT={quoted_shared_out}
 JOB_OUT={quoted_out}
+CGAT_FAMILY_SHARED=0
+{family_layout}
 
 if [ ! -d "$SHARED_OUT" ]; then
   echo "[error] Missing DEGAP shared prepare output: $SHARED_OUT" >&2
@@ -1139,8 +1214,16 @@ link_shared_artifact() {{
       echo "[shared] $target already links to $source"
       return 0
     fi
+    if [ "$CGAT_FAMILY_SHARED" -eq 1 ]; then
+      echo "[error] Old or different DEGAP read cache in $JOB_OUT; choose a new job output directory." >&2
+      exit 1
+    fi
     rm "$target"
   elif [ -e "$target" ]; then
+    if [ "$CGAT_FAMILY_SHARED" -eq 1 ]; then
+      echo "[error] Job-local DEGAP read artifacts in $JOB_OUT cannot be mixed with the new shared cache; choose a new job output directory." >&2
+      exit 1
+    fi
     echo "[shared] keeping existing job-local artifact: $target"
     return 0
   fi
@@ -1152,25 +1235,9 @@ link_shared_artifact() {{
 "#,
         quoted_shared_out = shell_quote(&shared_out),
         quoted_out = shell_quote(out_path),
+        family_layout = family_shared_layout(settings),
         artifact_lines = artifact_lines,
     )
-}
-
-fn build_member_plan_literal(members: &[SeedMemberPlan]) -> String {
-    let rows = members
-        .iter()
-        .map(|member| {
-            format!(
-                "{{\"fasta\": {}, \"name\": {}, \"start\": {}, \"end\": {}}}",
-                python_string(&member.server_fasta_path),
-                python_string(&member.source_seq_name),
-                member.source_start,
-                member.source_end,
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!("[{rows}]")
 }
 
 fn build_prepare_block(
@@ -1185,69 +1252,13 @@ fn build_prepare_block(
         "-"
     };
     format!(
-        r#"echo "[prepare] {label} seed -> {output_path}"
-python3 - <<'PY'
-from pathlib import Path
-
-members = {members_literal}
-segment_start = {segment_start}
-segment_end = {segment_end}
-orient = {orient_literal}
-output_path = Path({output_literal})
-
-def read_fasta_record(path, wanted):
-    name = None
-    chunks = []
-    with open(path, "r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith(">"):
-                if name == wanted:
-                    break
-                name = line[1:].split()[0]
-                chunks = []
-                continue
-            if name == wanted:
-                chunks.append(line)
-    if name != wanted and not chunks:
-        raise SystemExit(f"missing FASTA record {{wanted}} in {{path}}")
-    return "".join(chunks)
-
-def reverse_complement(seq):
-    return seq.translate(str.maketrans("ACGTNacgtn", "TGCANtgcan"))[::-1]
-
-full = []
-for member in members:
-    seq = read_fasta_record(member["fasta"], member["name"])
-    start = int(member["start"])
-    end = int(member["end"])
-    if start <= 0 or end < start or end > len(seq):
-        raise SystemExit(f"invalid source range {{start}}..{{end}} for {{member['name']}} length {{len(seq)}}")
-    full.append(seq[start - 1:end])
-source = "".join(full)
-start = min(segment_start, segment_end)
-end = max(segment_start, segment_end)
-if start <= 0 or end > len(source):
-    raise SystemExit(f"invalid final path range {{segment_start}}..{{segment_end}} for assembled length {{len(source)}}")
-seed = source[start - 1:end]
-if orient == "-":
-    seed = reverse_complement(seed)
-output_path.parent.mkdir(parents=True, exist_ok=True)
-with output_path.open("w", encoding="utf-8", newline="\n") as handle:
-    handle.write(f">{label}\n")
-    for index in range(0, len(seed), 80):
-        handle.write(seed[index:index + 80] + "\n")
-PY
-"#,
-        label = label,
-        output_path = output_path,
-        members_literal = build_member_plan_literal(members),
-        segment_start = segment.start,
-        segment_end = segment.end,
-        orient_literal = python_string(orient),
-        output_literal = python_string(output_path),
+        "# segment_start = {}\n# segment_end = {}\n# orient = \"{}\"; source_members = {}\necho {}\npython3 -B \"$CGAT_SOURCE_TOOL\" --recipe \"$CGAT_RECIPE\" --label {}\n",
+        segment.start,
+        segment.end,
+        orient,
+        members.len(),
+        shell_quote(&format!("[prepare] {label} seed -> {output_path}")),
+        shell_quote(label)
     )
 }
 
@@ -1308,6 +1319,7 @@ fn build_degap_receipt(
     project_id: i64,
     job: &DegapJobExportItem,
     settings: &DegapJobExportSettings,
+    seed_plans: Value,
 ) -> Result<Value> {
     let segments: Vec<_> = [&job.left, &job.right, &job.endpoint]
         .into_iter()
@@ -1321,17 +1333,39 @@ fn build_degap_receipt(
         [project_id],
         |r| r.get(0),
     )?;
-    let target_track = snapshot[0]["dataset"]
+    let placed_track: Option<String> = conn.query_row(
+        "SELECT d.name FROM derived_ctg_track_member t JOIN dataset d ON d.id=t.target_dataset_id
+         JOIN assembly_seq s ON s.source_seq_id=t.source_seq_id
+         JOIN assembly_ctg c ON c.assembly_seq_id=s.id
+         WHERE c.id=?1 AND t.project_id=?2 AND t.target_chr_name=?3",
+        params![ids[0], project_id, job.chr_name], |row| row.get(0),
+    ).optional()?;
+    let mode: String = conn.query_row(
+        "SELECT placement_mode FROM assembly_ctg WHERE id=?1 AND project_id=?2",
+        params![ids[0], project_id],
+        |row| row.get(0),
+    )?;
+    let source_dataset = snapshot[0]["dataset"]
         .as_str()
-        .filter(|name| *name != "derived_ctg")
-        .unwrap_or(&primary);
+        .context("missing seed source dataset")?;
+    let (target_track, track_basis) = if let Some(track) = placed_track {
+        (track, "existing_derived_placement")
+    } else if mode == "refinement"
+        || source_dataset == "derived_ctg"
+        || source_dataset.starts_with("cgat_refinement_")
+    {
+        (primary, "project_primary_context_not_homology")
+    } else {
+        (source_dataset.to_string(), "original_dataset_track")
+    };
     let target_chr = snapshot[0]["chr"]
         .as_str()
         .filter(|name| !name.is_empty())
         .unwrap_or(&job.chr_name);
     let mut receipt = json!({"schema": "gpm.degap.export.v1", "project_id": project_id,
         "job_id": job.job_id, "chr_name": job.chr_name, "job_type": normalize_job_type(&job.job_type),
-        "target_chr": target_chr, "target_track": target_track, "endpoint_end": job.endpoint_end,
+        "target_chr": target_chr, "target_track": target_track, "target_track_basis": track_basis,
+        "seed_plans": seed_plans, "endpoint_end": job.endpoint_end,
         "server_root": settings.gpm_server_path, "out_path": job.out_path,
         "segments": segments, "sources": snapshot, "settings": settings,
         "final_path": degap_final_path_snapshot(conn, project_id, &job.chr_name)?});
@@ -1350,9 +1384,9 @@ fn build_degap_receipt(
 
 fn resolve_degap_entrypoint(settings: &DegapJobExportSettings) -> String {
     if settings.degap_path.trim().is_empty() {
-        join_server_path(&settings.gpm_server_path, ".prepare_lib/tools/degap.py")
+        "\"$CGAT_DEGAP_TOOL\"".to_string()
     } else {
-        settings.degap_path.clone()
+        shell_quote(&settings.degap_path)
     }
 }
 
@@ -1379,7 +1413,7 @@ fn build_gapfiller_job_script(
         .join("\n");
     let mut command = vec![
         "python".to_string(),
-        shell_quote(&resolve_degap_entrypoint(settings)),
+        resolve_degap_entrypoint(settings),
         "--mode".to_string(),
         "gapfiller".to_string(),
         "--seqleft".to_string(),
@@ -1511,7 +1545,7 @@ fn build_telseeker_ctg_job_script(
         .join("\n");
     let mut command = vec![
         "python".to_string(),
-        shell_quote(&resolve_degap_entrypoint(settings)),
+        resolve_degap_entrypoint(settings),
         "--mode".to_string(),
         "telseeker_ctg".to_string(),
         "--ctg".to_string(),
@@ -1672,18 +1706,65 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires the controlled exported/collected bridge fixture"]
+    fn manual_source_bridge_import_preserves_the_edited_final_path() -> Result<()> {
+        let value = std::env::var("CGAT_MANUAL_EXPORT_FIXTURE_ROOT")?;
+        let fixture = PathBuf::from(value);
+        assert_eq!(
+            fs::read_to_string(fixture.join(".owned-fixture"))?,
+            "cgat.manual-source-bridge.v1\n"
+        );
+        let client = fixture.join("client");
+        let before = fs::read_to_string(fixture.join("manual-path-before.json"))?;
+        let (results, _) = crate::importer::import_degap_results_with_hooks(
+            &client.join("exports/degap/degap_results.zip"),
+            &client,
+            1,
+            &mut |_| {},
+            &mut || false,
+        )?;
+        assert_eq!(results.len(), 1);
+        let conn = open_workspace_db(&client.join("project.sqlite"))?;
+        let after: String = conn.query_row(
+            "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=1",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(after, before);
+        let count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM derived_ctg", [], |row| row.get(0))?;
+        assert_eq!(count, 1);
+        let (path, name): (String, String) = conn.query_row("SELECT l.fasta_path,s.seq_name FROM source_seq_locator l JOIN source_seq s ON s.id=l.source_seq_id JOIN derived_ctg d ON d.source_seq_id=s.id", [], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        let seq = crate::exporter::load_fasta_source_interval(Path::new(&path), &name, 1, 10)?;
+        assert_eq!(seq, "AACCGTTTTT");
+        Ok(())
+    }
+
+    #[test]
+    fn bundled_shared_reads_use_a_separate_cache_for_family_runtime() {
+        let mut bundled = test_settings();
+        let legacy_custom = bundled.clone();
+        bundled.degap_path.clear();
+        let prepare = build_shared_prepare_script(&bundled);
+        assert!(prepare.contains("$SHARED_OUT.family-v1"));
+        assert!(prepare.contains("prepare-shared-reads --out"));
+        let links = build_shared_link_block("/srv/job", &bundled, &bundled, true);
+        assert!(links.contains("$SHARED_OUT.family-v1"));
+        assert!(links.contains("cannot be mixed with the new shared cache"));
+        assert!(!build_shared_prepare_script(&legacy_custom).contains("$SHARED_OUT.family-v1"));
+        assert!(!can_use_shared_reads(&bundled, &legacy_custom));
+    }
+
+    #[test]
     fn bundled_degap_path_is_default_and_custom_paths_remain_supported() -> Result<()> {
         let mut settings = parse_degap_export_settings(&json!({
             "gpmServerPath": "/srv/project with spaces",
             "outRoot": "/srv/out", "hifiReads": ["/reads/hifi.fa"]
         }))?;
         validate_settings(&settings)?;
-        assert_eq!(
-            resolve_degap_entrypoint(&settings),
-            "/srv/project with spaces/.prepare_lib/tools/degap.py"
-        );
+        assert_eq!(resolve_degap_entrypoint(&settings), "\"$CGAT_DEGAP_TOOL\"");
         settings.degap_path = "/custom/DEGAP.py".to_string();
-        assert_eq!(resolve_degap_entrypoint(&settings), "/custom/DEGAP.py");
+        assert_eq!(resolve_degap_entrypoint(&settings), "'/custom/DEGAP.py'");
         Ok(())
     }
 
@@ -1947,6 +2028,69 @@ mod tests {
         assert!(!chr01_old_telseeker_script.exists());
         assert!(chr02_script.exists());
         assert!(chr01_replace_summary.scripts[0].script_path.exists());
+        if let Ok(value) = std::env::var("CGAT_MANUAL_EXPORT_FIXTURE_ROOT") {
+            let fixture = PathBuf::from(value);
+            assert_eq!(
+                fs::read_to_string(fixture.join(".owned-fixture"))?,
+                "cgat.manual-source-bridge.v1\n"
+            );
+            let client = fixture.join("client");
+            fs::create_dir(&client)?;
+            fs::create_dir_all(client.join("data/partitions/chr/Chr01"))?;
+            fs::copy(&fasta_path, client.join("data/partitions/chr/Chr01/ds.fa"))?;
+            conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+                row.get::<_, i64>(0)
+            })?;
+            fs::copy(&db_path, client.join("project.sqlite"))?;
+            let bridge = open_workspace_db(&client.join("project.sqlite"))?;
+            bridge.execute(
+                "UPDATE source_seq_locator SET fasta_path=?1",
+                [client
+                    .join("data/partitions/chr/Chr01/ds.fa")
+                    .to_string_lossy()
+                    .to_string()],
+            )?;
+            bridge.execute("INSERT OR IGNORE INTO project_dataset(project_id,dataset_id,dataset_role,display_order) VALUES(1,1,'primary',0)", [])?;
+            bridge.execute("INSERT OR IGNORE INTO reference_chr(id,reference_genome_id,chr_name,chr_order,length) VALUES(1,1,'Chr01',1,8)", [])?;
+            for (source, order) in [(101_i64, 1_i64), (102, 2)] {
+                bridge.execute("INSERT OR IGNORE INTO imported_chr_assignment(source_seq_id,reference_chr_id,source_orientation,orientation_source,support_bp,support_percent,anchor_start) VALUES(?1,1,'+','ref_alignment',8,100,1)", [source])?;
+                bridge.execute("INSERT OR IGNORE INTO imported_track_member_order(target_dataset_id,reference_chr_id,source_seq_id,member_order) VALUES(1,1,?1,?2)", params![source, order])?;
+            }
+            bridge.execute(
+                "INSERT OR IGNORE INTO workspace_package_metadata(id) VALUES(1)",
+                [],
+            )?;
+            let edited = json!({"Chr01": {"segments": [{"type":"ctg","assemblyCtgId":301,"name":"CtgA","start":2,"end":7},
+                                                       {"type":"gap","size":13,"id":"keep-manual-gap"}]}}).to_string();
+            bridge.execute("INSERT INTO project_assembly_view_state(project_id,final_path_by_chr_json,updated_at) VALUES(1,?1,'1') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json", [&edited])?;
+            fs::write(fixture.join("manual-path-before.json"), &edited)?;
+            let server = std::env::var("CGAT_MANUAL_EXPORT_SERVER_ROOT")?;
+            let mut settings = test_settings();
+            settings.gpm_server_path = server.clone();
+            settings.out_root = format!("{server}/manual-jobs");
+            settings.degap_path = format!("{server}/controlled_degap.py");
+            settings.hifi_reads = vec![format!("{server}/controlled_reads.fa")];
+            let output = client.join("exports/degap");
+            let summary = export_degap_jobs_with_connection(
+                &bridge,
+                &client,
+                1,
+                &ExportDegapJobsParams {
+                    output_dir: output.clone(),
+                    settings: settings.clone(),
+                    jobs: vec![test_gap_job(
+                        "bridge-gap",
+                        "Chr01",
+                        &format!("{server}/manual-jobs/gap"),
+                    )],
+                },
+            )?;
+            fs::write(
+                fixture.join("exported.json"),
+                serde_json::to_vec_pretty(&json!({"script": summary.scripts[0].script_path,
+                "out": format!("{server}/manual-jobs/gap"), "export_dir": output, "server": server}))?,
+            )?;
+        }
         Ok(())
     }
 }

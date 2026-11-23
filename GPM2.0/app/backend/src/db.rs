@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 8;
+pub const CURRENT_SCHEMA_VERSION: i64 = 10;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -113,6 +113,12 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             q0_artifact_sha256 TEXT NOT NULL,
             q4_artifact_sha256 TEXT NOT NULL,
             final_path_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_refinement_inputs (
+            package_id INTEGER PRIMARY KEY CHECK (package_id = 1)
+                REFERENCES grt_package(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS grt_contig_role (
@@ -525,6 +531,11 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             note TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS project_refinement_inputs (
+            project_id INTEGER PRIMARY KEY REFERENCES project(id) ON DELETE CASCADE,
+            reads_json TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS project_assembly_view_state (
             project_id INTEGER PRIMARY KEY,
             support_dataset_id INTEGER,
@@ -673,5 +684,42 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             ON pairwise_alignment_scoped_hit(scope_id, target_source_seq_id, query_source_seq_id, align_length, mapq);
         ",
     )
-    .context("failed to create current workspace sqlite schema")
+    .context("failed to create current workspace sqlite schema")?;
+    create_refinement_result_tables(conn)
+}
+
+fn create_refinement_result_tables(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS project_refinement_patch (
+             project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+             sha256 TEXT NOT NULL CHECK(length(sha256) = 64),
+             sequence BLOB NOT NULL CHECK(length(sequence) > 0),
+             PRIMARY KEY(project_id, sha256)
+         );
+         CREATE TABLE IF NOT EXISTS project_refinement_import (
+             project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+             result_sha256 TEXT NOT NULL,
+             batch_sha256 TEXT NOT NULL,
+             report_json TEXT NOT NULL,
+             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+             PRIMARY KEY(project_id, result_sha256)
+         );
+         CREATE TABLE IF NOT EXISTS project_refinement_adoption (
+             project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+             locus_id TEXT NOT NULL,
+             state_json TEXT NOT NULL,
+             PRIMARY KEY(project_id, locus_id)
+         );
+         CREATE TABLE IF NOT EXISTS project_refinement_action (
+             project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+             locus_id TEXT NOT NULL,
+             revision INTEGER NOT NULL,
+             action TEXT NOT NULL CHECK(action IN ('undo', 'switch')),
+             previous_json TEXT NOT NULL,
+             current_json TEXT NOT NULL,
+             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+             PRIMARY KEY(project_id, locus_id, revision)
+         );",
+    )
+    .context("failed to create project refinement result storage")
 }

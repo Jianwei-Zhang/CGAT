@@ -1,15 +1,9 @@
-import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).parents[2]
-MODULE_PATH = REPO_ROOT / "server" / "tools" / "add_ctg_stage.py"
-
-SPEC = importlib.util.spec_from_file_location("add_ctg_stage", MODULE_PATH)
-ADD_CTG_STAGE = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(ADD_CTG_STAGE)
+from server.tools import add_ctg_stage as ADD_CTG_STAGE
 
 
 class AddCtgStageTests(unittest.TestCase):
