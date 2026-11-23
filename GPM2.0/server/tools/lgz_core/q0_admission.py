@@ -285,11 +285,29 @@ class _RefBlock:
     mapq: int | None
 
 
-def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy):
+def _possible_support_bp(blocks, masks, minimum):
+    # The sum can overcount overlapping spans, so it can rule groups out, never in.
+    bounds = defaultdict(int)
+    for block, spans in zip(blocks, masks):
+        key = (block.chromosome, block.strand)
+        total = bounds[key]
+        if total < minimum:
+            for span in spans:
+                total += span.length
+                if total >= minimum:
+                    break
+            bounds[key] = total
+    return bounds
+
+
+def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy, *, evidence_ids=None):
     blocks = []
     for hit in data.reference_hits.get(part.source, ()):
         if hit.query.end <= part.interval.start or hit.query.start >= part.interval.end:
             continue  # No CIGAR run from this hit can intersect this part.
+        if evidence_ids is not None:
+            # Report every intersecting hit, even if it supplies no admissible anchor.
+            evidence_ids.append(hit.evidence_id)
         identity = hit.matches / hit.block_length
         if identity < policy.minimum_reference_identity:
             continue
@@ -300,18 +318,35 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
                                         hit.target_name, hit.strand, hit.evidence_id, identity, hit.mapping_quality))
     groups, high = defaultdict(list), defaultdict(list)
     masks, ambiguity = reference_masks(blocks, policy.competing_identity_margin)
+    minimum = min(policy.minimum_anchor_bp, part.interval.length)
+    bounds = None
     for block, unique_intervals in zip(blocks, masks):
+        if not unique_intervals:
+            continue
+        key = (block.chromosome, block.strand)
+        # A long span already makes this group a possible candidate. Only build
+        # the per-group bounds if a short span needs its other blocks considered.
+        if unique_intervals[0].length < minimum:
+            if bounds is None:
+                bounds = _possible_support_bp(blocks, masks, minimum)
+            if bounds[key] < minimum:
+                continue
         for unique in unique_intervals:
             for interval in _complex_intervals(data.sources[part.source], unique, policy):
                 anchor = ReferenceAnchor(interval, _project(block.query, block.target, block.strand, interval), block.evidence_id)
-                key = (block.chromosome, block.strand)
                 groups[key].append(anchor)
                 if block.mapq is not None and block.mapq >= policy.minimum_reference_mapq:
                     high[key].append(interval)
-    minimum = min(policy.minimum_anchor_bp, part.interval.length)
     groups = {key: tuple(sorted(set(value), key=lambda a: (a.source, a.reference, a.evidence_id)))
               for key, value in groups.items() if _size(a.source for a in value) >= minimum}
     return groups, {key for key in groups if _size(high[key]) >= minimum}, ambiguity
+
+
+def _reference_screen(data, part, policy):
+    evidence_ids = []
+    groups, high, ambiguity = _reference_groups(data, part, policy, evidence_ids=evidence_ids)
+    evidence_ids.sort()  # Same report order and multiplicity for serial and worker results.
+    return groups, high, ambiguity, evidence_ids
 
 
 def _ordered(anchors, orientation):
@@ -393,18 +428,18 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     ordered = sorted(data.parts.items())
     if screen_threads > 1:
         from .q0_source_screen import ordered_screens
-        screened = ordered_screens(data, ordered, allowed, policy, screen_threads, _reference_groups, screen_progress)
+        screened = ordered_screens(data, ordered, allowed, policy, screen_threads, _reference_screen, screen_progress)
     else:
-        screened = ((key, part, _reference_groups(data, part, policy) if key in allowed else None)
+        screened = ((key, part, _reference_screen(data, part, policy) if key in allowed else None)
                     for key, part in ordered)
     for key, part, result in screened:
         if key not in allowed:
             records.append({"segment_id": key, "status": "rejected", "reason": "failed_reads_qc"})
             continue
-        groups[key], high, mask = result
+        groups[key], high, mask, evidence_ids = result
         ambiguous[part.source].extend(mask)
         records.append({"segment_id": key, "status": "reference_screen",
-                        "evidence_ids": sorted(h.evidence_id for h in data.reference_hits.get(part.source, ()) if h.query.intersection(part.interval)),
+                        "evidence_ids": evidence_ids,
                         "unique_groups": [{"chromosome": group[0], "orientation": group[1],
                                            "support_bp": _size(a.source for a in anchors)} for group, anchors in sorted(groups[key].items())],
                         "ambiguous_intervals": [asdict(i) for i in mask]})

@@ -92,11 +92,11 @@ def _packet(data, part, policy):
 
 
 def _run(payload):
-    from .q0_admission import _reference_groups
+    from .q0_admission import _reference_screen
     try:
         part, sequence, hits, policy = pickle.loads(payload)
         view = SimpleNamespace(sources={part.source: sequence}, reference_hits={part.source: hits})
-        return _pack(_reference_groups(view, part, policy))
+        return _pack(_reference_screen(view, part, policy))
     except MemoryError:
         return None  # exact owner evaluation; never translate resource limits into a verdict
 

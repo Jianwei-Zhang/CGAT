@@ -13,7 +13,8 @@ from unittest.mock import patch
 from lgz_core import q0_admission as adm, q0_preparation as prep, q0_threshold_prepare as threshold
 from lgz_core.q0_threshold_questions import questions
 
-SCREEN = adm._reference_groups
+SCREEN_HOOK = "_reference_screen" if hasattr(adm, "_reference_screen") else "_reference_groups"
+SCREEN = getattr(adm, SCREEN_HOOK)
 SELECT = adm.select_q0_paths
 POLICY = adm.AdmissionPolicy()
 
@@ -61,7 +62,7 @@ def parallel_selection(data, cores):
         if d is not data or policy != POLICY:
             raise ValueError('screen context changed')
         return result.pop(part.segment_id)
-    with patch.object(adm, '_reference_groups', consume):
+    with patch.object(adm, SCREEN_HOOK, consume):
         selected = SELECT(data)
     if result:
         raise ValueError('screen results were not fully consumed')
@@ -95,7 +96,7 @@ def measure(data, assignments, cores):
             def timed(d, part, policy):
                 t = monotonic(); value = SCREEN(d, part, policy); by_source[part.source] += monotonic()-t
                 return value
-            with patch.object(adm, '_reference_groups', timed):
+            with patch.object(adm, SCREEN_HOOK, timed):
                 selection = SELECT(data)
         else:
             selection, count = parallel_selection(data, cores)
