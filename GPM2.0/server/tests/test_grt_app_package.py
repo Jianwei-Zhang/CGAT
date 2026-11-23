@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -28,6 +29,32 @@ class GrtAppPackageTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
+
+    def test_delivery_cli_checks_each_bundle_once_before_touching_staging(self):
+        import lgz_app_package
+        import lgz_contract
+        frozen = REPO_ROOT / "tests/fixtures/grt_contract_v3/frozen_bridge_server.json"
+        schema3 = self.root / "frozen"
+        for name, contents in json.loads(frozen.read_text())["files"].items():
+            target = schema3 / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(contents)
+        for source in (self.source, schema3):
+            staging = self.root / (source.name + "-staged")
+            for flag in ("--include-fasta", "--no-fasta"):
+                with self.subTest(source=source.name, flag=flag), mock.patch.object(
+                    lgz_contract, "validate_contract", wraps=lgz_contract.validate_contract
+                ) as check, mock.patch.object(sys, "argv", ["package", "--source", str(source),
+                        "--staging", str(staging), flag]):
+                    self.assertEqual(lgz_app_package.main(), 0)
+                    check.assert_called_once_with(source)
+            sentinel = staging / "previous-delivery"
+            sentinel.write_text("unchanged")
+            (source / "metadata/grt_stage_status.tsv").write_text("corrupt\n")
+            with mock.patch.object(sys, "argv", ["package", "--source", str(source),
+                    "--staging", str(staging), "--no-fasta"]), self.assertRaises(lgz_contract.ContractError):
+                lgz_app_package.main()
+            self.assertEqual(sentinel.read_text(), "unchanged")
 
     def test_post_lgz_gapfill_delivery_is_separate_and_content_bound(self):
         import post_lgz_degap as gapfill

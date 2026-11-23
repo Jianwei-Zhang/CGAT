@@ -70,17 +70,9 @@ fi
 EOF
 chmod +x "${FAKE_BIN}/zip"
 
-cat > "${SERVER_DIR}/.prepare_lib/tools/lgz_contract.py" <<'PY'
-import os
-import sys
-
-if os.environ.get("FAKE_CONTRACT_FAIL") == "true":
-    raise SystemExit(2)
-sys.stdout.write('{"valid":true}\n')
-PY
-
 cat > "${SERVER_DIR}/.prepare_lib/tools/lgz_app_package.py" <<'PY'
 import argparse
+import os
 import shutil
 from pathlib import Path
 
@@ -91,6 +83,8 @@ mode = parser.add_mutually_exclusive_group(required=True)
 mode.add_argument('--include-fasta', action='store_true')
 mode.add_argument('--no-fasta', action='store_true')
 args = parser.parse_args()
+if os.environ.get("FAKE_CONTRACT_FAIL") == "true":
+    raise SystemExit(2)
 if args.staging.exists():
     shutil.rmtree(args.staging)
 args.staging.mkdir(parents=True)

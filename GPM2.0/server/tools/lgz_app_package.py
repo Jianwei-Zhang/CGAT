@@ -429,7 +429,8 @@ def project_add_compatibility_options(source_root: Path, staging_root: Path) -> 
         writer.writerows((name, values[name]) for name in ADD_COMPATIBILITY_OPTIONS)
 
 
-def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True, server_sources=None) -> None:
+def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include_legacy_gapfill: bool = True, server_sources=None,
+          standalone_delivery: bool = False) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
     layout = WorkspaceLayout.detect(source_root)
@@ -443,9 +444,9 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include
     if (len(package_rows) != 1 or package_rows[0].get("workflow") != "gpm_grt_precomputed_v2"
             or package_rows[0].get("schema_version") not in {APP_SCHEMA_VERSION, Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}):
         raise ValueError("unsupported Server package schema for App projection")
-    if package_rows[0]["schema_version"] in {Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}:
-        # The projected App contract is intentionally smaller; verify the full
-        # frozen Server proof before omitting Server-only audit artifacts.
+    if standalone_delivery or package_rows[0]["schema_version"] in {Q0_APP_SCHEMA_VERSION, CURRENT_APP_SCHEMA_VERSION}:
+        # One authority per build, before any staging is touched. The delivery CLI
+        # also validates legacy v2; internal v2 projections keep their old contract.
         from lgz_contract import validate_contract
         validate_contract(source_root)
     if staging_root.exists():
@@ -520,9 +521,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include
         copy_file(source_root, staging_root, final_relpath)
         if (workspace_join(source_root, final_relpath + ".fai")).is_file():
             copy_file(source_root, staging_root, final_relpath + ".fai")
-        q4_hash = sha256_file(q4_source)
-    else:
-        q4_hash = sha256_file(q4_source)
+    q4_hash = sha256_file(q4_source)
     project_locator_paths(staging_root)
     from server_source_identity import original_bindings, write_map
     write_map(staging_root, original_bindings(source_root, source_lengths) if server_sources is None else server_sources)
@@ -537,7 +536,7 @@ def main() -> int:
     group.add_argument("--include-fasta", action="store_true")
     group.add_argument("--no-fasta", action="store_true")
     args = parser.parse_args()
-    build(args.source, args.staging, args.include_fasta)
+    build(args.source, args.staging, args.include_fasta, standalone_delivery=True)
     print(f"App payload staged at {args.staging}")
     return 0
 
