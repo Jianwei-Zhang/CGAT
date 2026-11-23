@@ -30,7 +30,7 @@ const PROJECT_REFINEMENT_BOUND = Symbol("projectRefinementBound");
 const COPY = {
   zh: {
     sectionTitle: "精修",
-    preview: "查看版本", previewHint: "只读预览，不切换工作版本。", loadingVersion: "正在读取版本…",
+    preview: "查看工具结果", previewHint: "这里展示该工具的原始结果，不会更改项目组装。", loadingVersion: "正在读取工具结果…",
     recordHeaders: ["染色体", "长度 (bp)", "片段数", "Gap 片段数"],
     importAction: "导入精修补丁",
     autoPatchImported: "已加入自动精修结果：{tools}。当前工作路径未改变。",
@@ -113,7 +113,7 @@ const COPY = {
     },
   },
   en: {
-    preview: "View version", previewHint: "Read-only preview; the working version is unchanged.", loadingVersion: "Loading version…",
+    preview: "View tool result", previewHint: "This is the tool’s own result. Viewing it does not change the project assembly.", loadingVersion: "Loading tool result…",
     recordHeaders: ["Chromosome", "Length (bp)", "Segments", "Gap segments"],
     sectionTitle: "Refinement",
     importAction: "Import refinement patch",
