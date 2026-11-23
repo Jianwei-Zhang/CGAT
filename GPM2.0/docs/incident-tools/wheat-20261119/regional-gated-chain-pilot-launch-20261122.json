@@ -1,0 +1,25 @@
+{
+  "HPC_gate_unit_tests": 6,
+  "allocation_proof_sha256": "1d6b22d894a095d863eabac60e8c321d73c7e36baaeca402f5ca6265cb6fac0c",
+  "at": "2026-11-22T14:11:47.052296+08:00",
+  "gate": "per dataset and per core; cross98 intra90; original full exact recovery if insufficient",
+  "host": "agent-X86-30",
+  "job_id": 43012347,
+  "local_diagnostic_tests": 39,
+  "main_workspace_modified": false,
+  "mapper_AS_bytes": 4294967296,
+  "mapper_threads": 2,
+  "mappers": 7,
+  "native_result_report_verified": false,
+  "packet_manifest_sha256": "55d70eec7de69c521f61522c3e51ccb0ab555b2ad44700136130314c1054d30d",
+  "production_strategy_enabled": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-gated-chain-pilot-20261122-135748",
+  "schema": "incident_native_diagnostic_launch_v1",
+  "source_sha256": {
+    "benchmark_regional_gated_chain_budget.py": "ed05a7672a4af44e62f4407547f296d1611389b7b2c8e54f585050af538e7f84",
+    "regional_chain_recovery_gate.py": "fb2822a6248940cd9916c7c13b0534c594582934a56bb0362e8f3618882d43b1",
+    "test_regional_chain_recovery_gate.py": "9fc430c1398bae09098c2bdc708664cc26ca522868744577df1963261c0d4e37"
+  },
+  "status": "launched_NOT_completion_or_production_acceptance",
+  "threads": 16
+}

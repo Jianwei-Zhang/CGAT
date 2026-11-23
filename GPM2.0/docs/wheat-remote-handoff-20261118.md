@@ -2181,3 +2181,2425 @@
 
 精确union与前述诊断提交50229c18已推送master（[skip ci]）；本节新脚本/摘要继续按任务文件
 定向提交，不触碰其他会话笔记/output，不发布Release、不update.sh、不替换整套runtime。
+
+## 2026-11-21 18:40 接续：真实残余区间已完成 CIGAR 试验，生产接入仍未开启
+
+本节替代前节“只测过已匹配core”的状态。OLD 42523432、NEW 42949582仍未改/重启；
+不是生产完成。所有新job都在隔离目录、同一x86工具环境；所有无CIGAR输出仅供诊断。
+
+### 真正孔洞与范围控制
+
+- 43007272，q0-residual-regional-pilot-20261121：17:44:27—17:45:15 FAILED。
+  选ptg000049l真实residual中的三个100kb core：51382261、160451708、160343284。
+  将source邻域±1Mb全部映射到参考，再加100kb参考上下文、桥接2Mb参考间隙，造成
+  447.6/517.8/538.0Mb target；触发100Mb试验输入预算，在启动mapper之前停止。
+  不是OOM、不是主任务失败，也不是把预算直接取消。scope摘要已归档。
+- 改为每个候选chr/strand分别选最近左右flank，保留相同距离的所有候选，不只选原分组。
+  一致方向且距离相容的flank才生成搜索包络；不一致flank仍分别保留，不强行连成大包络。
+  包络仅选择mapper输入，绝不是已覆盖区间或真实比对。query仍100kb+10kb上下文；
+  source anchor检索±1Mb，reference/target上下文10kb。范围缩到12,222,116 /
+  17,724,628 /15,844,054bp。三个区间分别有1组相容flank；另外9/13/12组不相容flank，
+  它们的独立搜索窗口保留，但不能将其解释为生物学邻接或唯一定位。
+- 43007279，q0-residual-nearest-pilot-20261121：17:57:44—18:03:32 FAILED，首个
+  native -P/-c mapper在300秒诊断预算后退出，peak748MiB。首个12.2Mb target索引仅0.88s，
+  mid_occ=337，之后未完成CIGAR；没有完整PAF可采纳。
+- 43007289，q0-regional-secondary100-pilot-20261121：18:07:21—18:12:50 FAILED。
+  去掉-P、显式-p0 -N100，原三个匹配控制样本完整通过，连>=100bp的regional精确配对
+  坐标也都保留，但第一个真正孔洞仍300秒预算失败。不要继续把-N当作这处瓶颈的解药。
+  完整control报告独立保留，未把缺失区间partial当基线；FAILED是该隔离job的终态。
+
+### 已用消融定位：昂贵的是弱链的碱基层延伸，不是找候选链
+
+- 43007294，q0-regional-chaining-diagnostic-20261121，18:14:41—18:14:44 SUCCEEDED。
+  相同第一孔洞query/target输入逐window序列SHA核验，相同2.31-r1302 cb7e8f22...二进制，
+  只拿掉-c并用1线程，完整chaining仅1.195s；approximate.paf=1,337,984 bytes。
+  这份PAF没有cg，永远不能进入q0 evidence或冒充完成的精确比对。
+- 43007318，q0-regional-chain-statistics-20261121，18:26:33—18:26:37 SUCCEEDED。
+  读取完整chaining输出：12058条候选链、13个target window。按s1链得分门槛：
+  40→12058条；200→1990；500→244；1000→55；2000→6（一个target window）；5000→1。
+  原始摘要regional-chain-statistics-20261121.json，PAF SHA
+  2c9f529d8accfe86f82eca6116292e156eebbb110372100a770d5c9fd33501dd。
+  无-c时的matches/span只是估算字段，不能当真实base identity套用0.95准入门槛；
+  最强链s1=26338、span37354，其估算比例约0.705，不能据此认定真实同一率低或删去。
+
+### 成功的真实孔洞候选：保留-P，仅增加-m2000
+
+- 43007334，q0-regional-score2000-pilot-20261121，18:37:00—18:37:16 SUCCEEDED。
+  pilot_local_target_windows.py SHA
+  06e9c730fa13ab13c705e8719a5d6fc10b0ce6c01d687782acb571ac96f2612e；
+  nearest scope helper e4f7153c432c55ff0010018c07b84045c9d8695c614fc3af0185b4ef2937af7b。
+  2CPU/8GiB、每mapper AS4GiB，真正执行-c -x asm10 -D -P --dual=yes --no-long-join
+  -m2000 -t2；不叠加-f或-N变化。仍有独立300秒诊断预算，不是生产统一超时规则。
+- 先跑原三个control，完整initial cross精确坐标都100%保留；对已成功regional -P基线，
+  >=10000bp/hit且identity>=.95的配对坐标/原source-strand关系也都100%保留（1/6/2对）。
+  **不是无损**：>=100bp/hit的regional配对坐标仅保留366591/514788、295474/390067、
+  110054/163639；source-strand关系24/54、30/45、2/34。明显减少短的附加/多重命中。
+  不可将这些比例当最终准确率，也不能把这个profile无差别推广到普通/便宜任务。
+- 三个真正residual core均完整退出、原始CIGAR几何和输入身份验证通过：
+  * 51382261：1.425s，8行，合格cross core覆盖27381bp；within覆盖0。
+  * 160451708：1.674s，84行，合格cross core覆盖99998bp；within覆盖25422bp。
+  * 160343284：1.074s，69行，合格cross core覆盖100000bp；within覆盖22571bp。
+  这三个core原completed cross覆盖为0，retention字段正确为null，而不是捏造100%保留。
+  新的覆盖仍不是唯一定位/最终补洞完成；后续admission必须照常检查竞争关系。
+  摘要regional-score2000-control-20261121.json和regional-score2000-residual-20261121.json。
+- 已提交只读自动触发标定43007382，目录q0-cigar-work-calibration-20261121。
+  在3个控制+3个真实孔洞的已完成输入上，做无-c的廉价预扫描，记录低seed得分密度、
+  长span链的query_span*target_span代理量，区分便宜的正常窗口与弱链DP爆炸窗口。
+  这不是实测DP细胞数，更不是base identity；阈值/生产自动策略尚未开启。刷新终态后归档，
+  不要为标定重跑完整慢-c基线。script SHA
+  2b4e05951e9ed7df989b67dacbf71cad3147a11ead6764c2ba17f8b3ca58ce14，
+  phase helper 9f18d717fe07c55d2dfa501b95600b23745e34346d95273a1dbbb31de5a4cc52。
+
+### 已实现的接入部件和一个不能直接上线的索引方案
+
+- q0_catalog新增ObservedSourcePairs和partial_source_intervals：按合格cross真实M/=双侧
+  坐标减去已有覆盖，保持普通set语义和原native partial_source_request默认行为；检查原source
+  长度和split偏移，保留真正空隙，不用X、同dataset或低identity命中掩盖缺失区间。
+  **尚未在_initial_inputs自动启用此collector**，当前默认生产仍是原native路径。
+- q0_query_windows新增TargetWindow/project_regional_paf：双侧偏移投影、同segment自比对排除、
+  保留原cg并复验geometry，MAPQ=255，去除局部primary/secondary/score，仅增加qw/tw追溯标记。
+  不重复应用原source的N切分偏移。原query-only投影兼容；合成真实minimap两链、两profile
+  比较实际配对坐标通过，不替代全小麦验收。
+- q0_catalog可选regional_factory在已有严格reference扫描内喂routing index，不重新扫描PAF；
+  plain/indexed catalog完整payload相同，N切分相对坐标和sealed重开测试通过。
+  不把搜索网格/包络写成候选的真实query/reference coverage。默认不调用此factory。
+- q0_regional_index.py的100kb稀疏SQLite网格曾做全量只读诊断43007288，18:04:48—18:18:06
+  SUCCEEDED。旧候选模块SHA01bf2a0e00979292ce92bd649658c327a1128cd2bff542f22d99b23a09c7ccaf，
+  probe SHA280313b160257b056a0b01f869a107a771cd6b60eb1f6abe43a45c694efc983f。
+  67,860,323 paired blocks、68,737,740 proposed links、5,581,699去重links，memo避免
+  63,156,041重复插入；796.809s，DB183,439,360bytes，SHA
+  6ea2508f1a679ff61580e45b3578e4e06b449f78aad371087a927ec2195c9c56。
+  六个控制/孔洞的精确计划目标区间都未丢，但网格过度扩大：控制target86–149Mb，孔洞
+  458–712Mb，远大于已测的3Mb/12–18Mb。**不能把“无遗漏”当成已满足提速目标直接上线**。
+  当前module后加build_report方法以支持catalog单遍hook，源SHA已不同于该remote probe。
+- 下一步优先把网格只作候选筛选并精确细化，或改为带原PAF字节offset的record空间索引：
+  SQLite R-tree筛选source/query或reference/target范围，再只解析命中记录的真实CIGAR；
+  保留最近flank/tie/方向判断，产出与已验证exact nearest plan相符的窄目标区间。
+  避免每个window重扫670万行PAF，也避免将整100kb source/ref网格作为最终mapper窗口。
+  180环境SQLite3.45.1已验证四维rtree可用（仅空表/一行模块能力探测，无基因组数据）。
+  如给read_paf增加offset回调，要保留UTF-8、CRLF/CR、注释/空行的真实byte offset与原record
+  identity；默认调用/普通任务不变。caller仍需完整输入SHA和sealed/成功回执验证。
+- 208项q0定向测试已完成（1项skip），未跑发布CI/浏览器/整版替换。所有新快路径仍需
+  raw mapping与投影独立身份、完整receipt/manifest/consumer适配、精确输入复用与资源预算；
+  已完成native补充优先复用，不能把旧结果追认为执行过新profile。
+
+### 切换协议仍需实现；不要为绕过声明更改冻结文件
+
+已读实际resume_native_resources.py：它硬核验work/prepare_q0_evidence.sh SHA等于当前冻结
+plan.dependencies.launcher；原read_native_resources.py最终进入self_profile_evidence_reader。
+不能直接替换launcher再调用原entry，也不能把scientific_builder_modified=false悄悄解释成
+此次科学代码从未变过。原reader-helper的旧声明等值校验必须保留。
+
+可考虑正交的q0科学变更adapter：绑定当前冻结resource plan、真实新entry/reader/launcher、
+旧runtime/declaration备份和新source SHA；原始self/cross/profile/checkpoint验证继续交给原
+冻结模块，新的q0声明明确scientific_builder_modified=true及差异。正常WorkspaceLock下
+安装/迁移，原旧版作业不动；新job资源ready、原新版正常退出/锁释放后才切换。
+这是待实现设计，不是已获接受的迁移凭据；不要伪造module.__file__、删声明、改旧计划冒认
+科学profile未变化，或盲目给native_previous再套任意revision链。
+
+### 18:49 标定终态与内部触发部件
+
+43007382于18:48:38—18:49:00 SUCCEEDED，六项无-c扫描各0.43–1.22s。
+对span>=1000bp、s1/max(query_span,target_span)<0.25的弱链，span乘积累计：
+三个正常control分别2.510/3.132/4.223×10^9；三个真实residual分别
+220.948/18.856/14.091×10^9。摘要regional-cigar-work-calibration-20261121.json。
+
+已实现但**未接入prepare_evidence默认流程**的q0_cigar_policy.py：需完整、输入绑定的
+chaining扫描；仅asm10、reference>=5Gb、query context>=20kb、弱链span乘积>=10^10时
+附加-m2000，保留-P；其他窗口保持native参数。它在这六个测量样本中只选择三项residual，
+不会为省少量时间把三项便宜control也降档。不是整个dataset一律使用激进参数，也不是让
+用户手工判断。原结果复用、近似/精确身份和完整算法回退仍须在调用层接好。
+此门槛是当前有限样本的可追溯工作量策略，不保证所有物种/工具版本/窗口都同样表现；
+低seed得分密度不能代替base identity或唯一定位。新增4项阈值、普通/小查询/不同preset、
+完整性和成本累积测试通过；此前208项q0测试（1 skip）覆盖本轮其余core改动。
+另注意QueryWindow helper默认core仍为1Mb；目前真正成功的小麦候选用的是显式100kb，
+生产接入时必须绑定实测参数，不能不传policy就拿默认1Mb宣称已经验证。
+
+另已修复raw window身份与core选择耦合：QueryWindow.window_id现在只绑定原segment、
+长度与上下文start/end，完整record仍包含cores，留给投影receipt绑定。相同上下文因相邻
+core/tile裁剪而重复时合并cores，不生成重复FASTA header；不填平真实core间隙。
+因此以后仅变更缺失core选择/投影规则时可以复用不变的完整raw mapping，而不必重比对。
+这是新的候选协议，不能将旧私有pilot的literal query/target-n头冒认成新协议执行结果。
+双侧投影/窗口/工作量策略/已有覆盖/索引组件最后32项测试通过；旧普通native路径仍未启用
+任何区域策略。本轮已完成的mapper候选足以支持下一轮接入，不再重复这些控制样本或全局慢基线。
+
+## 2026-11-21 21:00 后：区域 API 已通过真实数据验证，本地流程已接入，远端尚未切换
+
+### 当前主任务与本轮操作边界
+
+- 21:00:58 调度器快照：新版 `42949582` 仍在 `agent-X86-64` RUNNING，CPU recent
+  1396%，RSS287478MiB、峰值300194MiB；旧版 `42523432` 在 `agent-X86-60`
+  RUNNING，CPU1596%、RSS86036MiB。两个主任务、安装、launcher、reader 声明均未修改。
+- 已完成1364批初始比对、第一补充 `8024dde...` 仍保留；第二补充 `a6056c...` 的
+  20:30 快照仍只有0字节 result.paf.tmp。不要把下面隔离probe成功写成主任务已经提速。
+- 只取消了已被替代的共享盘索引查询probe `43007951`（20:31:57终止、调度器显示
+  FAILED），不是主作业失败；它的完整 sealed DB 和 index-built.json 全部保留。
+
+### 精确记录索引：复用已完成 DB，不重建
+
+- `q0-exact-reference-index-20261121/reference.sqlite`：5867562条合格原始PAF记录，
+  1295220736 bytes，SHA `18677df675e1a3c5fe9071d3edcd908215c8a20d2fbba4d5effd39411c0909a3`。
+  构建1510.180s；首个probe构建完成后共享盘随机查询长时间低CPU。
+- `43008134` / `q0-exact-reference-index-local-20261121` 于20:30:50 SUCCEEDED。
+  仅将该DB逐字节复制到计算节点/tmp并验证SHA；六个窗口的 reference_regions 和
+  target_intervals 与此前独立精确规划完全相等，omitted_bp均0，查询0.28–1.91s。
+  summary SHA `aca20008cb7c1e153db297779f2381b7fdbd071bd6d1f6519095c83ec7ef165f`。
+- 新 `q0_reference_index.py` 是记录级Rtree粗检索＋原始CIGAR精确投影，不使用100kb
+  网格作为最终mapper输入；read_paf回调保留UTF-8/CRLF/CR的真实byte offset。
+  支持N分段的绝对/段相对坐标以及>2^31参考坐标，完整原PAF身份仍为权威。
+- 曾尝试为每条记录额外构造 paired-run数组（`43008143`，隔离目录
+  `q0-exact-reference-index-paired-20261121`）。六窗口几何仍相等，但未证明提速，
+  冷查询观测反而较慢，且不同节点计时不能作严格倍数对照；**已撤回此候选代码**。
+  当前core不含该数组缓存，若重访必须先做同节点受控比较，不要因“索引”名字自动采用。
+
+### 区域 mapper/cache/projection API 的真实端到端验证
+
+- 第一隔离API probe `43008128` 在完成选中源序列验证后失败，原因是薄测试包导入
+  q0_preparation 时提前拉入整个 outer workflow/缺 contract.py；不是小麦mapper失败。
+  已改为惰性加载默认checkpoint manager，并保留模块级 `OuterCheckpointManager`
+  注入点供冻结reader替换；probe也在读取14Gb源序列前先导入所需模块。
+- `43008133` / `q0-regional-api-integration-20261121-v2` 于20:35:11 SUCCEEDED。
+  923条选中原始源序列、14006064823bp实际内容/canonical part验证；不是全数据验证。
+  总315.875s，峰值14203MiB，真实大父进程下fresh-exec guard的4GiB子mapper限制可用。
+  summary SHA `248a0ab7b16a592edaa286e56355d5641bcde8c123ff695eac34f47622985aba`。
+- 三普通control自动保持native flags；API各6.136/10.096/6.466s，原跨组装paired坐标
+  99999/100000/100000bp全部保留。三真实residual自动选择 `-m 2000`、仍保留-P；
+  API各5.294/5.415/5.762s，cross core覆盖27381/99998/100000bp。
+  这些不是最终唯一定位、组装质量或整任务加速倍数。
+- 三层缓存分别绑定完整chaining、真实-c raw mapping、原坐标projection。
+  改核心core但不改上下文时，禁止Popen的测试仍成功复用raw receipt。完整投影产出后
+  可再生的窗口query/target FASTA被清理，完整PAF/receipt/失败输入不作为垃圾清理。
+- 近似无-c结果永远不是科学PAF；manifest验证会核验完整依赖闭包和原坐标投影。
+  本地ready manifest→未修改的admission consumer也已贯通验证。
+
+### 当前本地自动路线（仍待远端迁移）
+
+- `q0_regional_discovery.py` 已接入正常 prepare_evidence：仅asm10且参考>=5Gb自动触发，
+  核心100kb＋两侧10kb；完整初始cross和完整第一补充的双侧M/=覆盖先用于减少重复发现。
+  缺口统计不把已有覆盖解释成唯一性或穷尽全部备选关系。
+- 若原完整whole-source partial receipt已有效，优先复用，不追认它执行过区域策略。
+  无参考目标或目标总量>100Mb的parent保留显式native full-source/all-anchor回退；
+  不丢弃、不接受半成品。决定整个parent是否回退后再启动其窗口，避免先做一半再重复。
+- 目前mapper池最多4路、每路最多2线程/4GiB地址空间；总线程不超过run budget。
+  **尚未实现并行target规划**，不能将线程池误报成所有规划步骤已并行；后续应结合实测
+  扩池/规划进程池，并把parent大堆与各child预算分开，不盲目设置32路×32线程。
+- partial窗口的全部PAF作为同一发现round流式合并，不能每个窗口重建/排序一遍全catalog，
+  也不能让前一个窗口新增的anchor无意改变后一个窗口的科学语义。
+- LocalReferenceCache在/tmp构建/查询、将完整sealed DB＋成功身份持久化；续跑逐字节复用。
+  **还应把已完成隔离DB按正确输入绑定采纳到该cache位置，不能让主流程重建它。**
+- 后续 `candidate_chr` 目前仍是原生 supplemental_groups（策略中明确记录），尚未解决
+  先前515Gb累计whole-source扩大问题。不能称“新版后面都已区域化”；在正式远端切换前
+  需处理这一已知后续重复范围，以及下面的串行规划开销。
+
+### 更广规划样本与局部PAF镜像
+
+- `43008137` / `q0-regional-scope-coordinator-20261121`：仅元数据＋sealed索引，不读DNA、
+  不运行mapper。实际partial策略将31978个residual parent计划成61087个窗口；这是
+  **候选区域工作量，不是已经提交61087个作业，也不是整pipeline剩余任务数**。
+- 选两dataset的长parent及长度分位点，共46parent/240window。该probe完成1154.803s，
+  46个parent均可区域化，无native回退；最长289508469bp的ptg000049l是20个窗口，
+  最大目标17899444bp。样本不能证明剩下全部parent同样可路由。
+- 此较广样本仍确认共享盘原PAF随机seek造成显著等待：DB已本地，但 `_hit` 读PAF仍共享盘。
+  已针对同类I/O问题增加**内容校验过的本地PAF镜像**。原PAF仍每次open完整SHA核验，
+  镜像复制后也核验完整SHA；查询期间原文件和镜像都有stat fence，任一变化即拒绝。
+  不是跳过原输入检查或把镜像冒充原始证据。
+- `43008150` / `q0-exact-reference-index-local-pafs-20261121`：该镜像路径六个精确计划
+  全部相等，查询0.243–1.830s，probe总58.238s。`43008151` /
+  `q0-regional-scope-local-pafs-20261121` 正在跑相同46/240规划样本；查最新终态/summary，
+  不重复提交。早期29parent/151window累计规划154.611s，尚不代表完整终态。
+
+### 下一步优先顺序（不要再重复已完成mapper对照）
+
+1. 核实43008151终态和同样本路由/坐标、CPU/内存；必要时优化串行规划/有保护并发。
+2. 精简后续candidate_chr的重复whole-source范围，不能只解决第二补充又留下已知巨大重复。
+3. 实现明确的q0科学迁移adapter：保留原resource/self/cross计划与其checkpoint指纹，
+   独立绑定新entry/reader/runtime；新声明scientific_builder_modified=true。原冻结
+   load_context严格检查调用者，不能传旧caller或伪造__file__来绕过。
+4. 新资源ready、正常锁/旧新版children退出之后才安装窄补丁并续跑；旧版不动。
+   本轮尚未生成/应用有效迁移receipt，两个主任务仍运行原runtime。
+
+### 21:12 终态补记与当前验证边界
+
+- `43008137` 于21:08:45 SUCCEEDED；`43008151` 于21:11:10 SUCCEEDED。
+  同46parent/240window规划结果的dataset/contig/长度/窗口数/route/reason/最大target bp
+  全部一致，均无native回退。没有记录全部240窗口的完整target区间逐项对照；完整区间
+  等值实测是前述六窗口，不要扩大为240项坐标输出全部已独立比对。
+- 共享PAF版本累计规划1123.030s，完整probe1154.803s；本地PAF版本累计规划256.592s，
+  完整probe286.132s，峰值3166MiB。CPU平均27%→93%，符合减少随机远端I/O等待的判断。
+  前者agent-X86-61、后者agent-X86-18，**不是严格同节点计时**；约4.4倍仅为同样本规划
+  观测值，不是因果隔离的加速比，更不是整个小麦任务加速比。
+- 本地PAF版本最长ptg000049l的20窗口规划23.932s、最大target17899444bp。
+  summary SHA `5276a8f857f6236c227d1415d748432fcbcace9f17ec2472084be05a7f3e8c7f`。
+- 237项q0定向测试通过（1 skip），冻结routing-reader的10项测试通过；随后member循环精简
+  再通过53项相关回归和7项区域API测试（含新增长度/SHA拒绝测试）。未运行发布CI、
+  浏览器、update.sh或整套替换。源码中checkpoint manager仍保留可注入入口；skip-self
+  仅在真的请求同dataset不同part关系时拒绝，不应拒绝纯cross窗口。
+- 项目另有DEGAP2.0 submodule dirty及会话/output未跟踪目录，均与此任务无关，不纳入提交。
+
+最后源码复核还消除了两处随窗口数放大的校验开销：ready-manifest的source member映射只建
+一次；单任务member长度/SHA核验改成每个window单次查找，仍检查全部window，不再按每个
+source重新扫整个target列表。partial合并与验证两端都避免重复扫描，并非省略完整性校验。
+
+迁移时额外注意：完整native第一补充receipt.spec.tool.command实际为字符串`minimap2`，
+resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用字符串**；不要为了
+显式路径把新reader改成绝对路径参数，否则当前native raw key包含command字段，会导致
+有效的第一补充缓存不命中。隔离API probe以绝对路径调用工具，其raw key因此不同；不能
+改写旧key或冒认主任务执行来强制采纳这些小probe结果。先保住5.3小时的native结果。
+
+## 2026-11-21 晚间：candidate_chr 去重复与实际缺失 native seed
+
+### 本地接入，不冒称远端主任务已切换
+
+- master起点已由另一对话推进到 `ab6ed207`（DEGAP submodule更新）；保留该提交，不混改。
+- 新 `q0_neighbor_requests.py` 用活动区间计数/未选择集合代替密集缺失pair枚举，保持旧版
+  supplemental_groups的query集合完全一致。300组随机重叠/间隙/相同source/已知pair与原
+  算法逐项对照；10000个密集缺失关系的测试不再枚举约5000万pair。
+- 新 `q0_regional_candidates.py` 在大数据路径执行这些请求：合并同一source跨染色体的
+  合格M/= query足迹，而不是每条染色体重复整条source；查询只保留参考局部尚未观察到的
+  关系。target bitset在读取原始CIGAR之前就排除已完成/不需要的source；同一原始contig
+  的N分段不能仅凭whole-source存在某个hit就全部略过。
+- 这是显式recall/work-selection变化：仅>=0.90 identity的M/=参考足迹用于额外区域扩展；
+  source已有合格锚点时，弱参考独占的其他候选区域不再整条重比对，但所有原始参考证据和
+  catalog候选保留。原始任务、初始参考/cross/self参数均不因此改变。
+- **Complete native矩阵可含零hit，但绝不代表已覆盖或已放置。** NativeScopes验证实际
+  tool/preset/flags/members/完整receipt结构，最终发布再核对所有输出SHA。它把一次完整
+  native query×target搜索作为已测试的无序source-part关系，不声称穷尽两个方向的启发式
+  mapping。初始近似self任务并不因此被冒认为完整native矩阵。
+
+### 真实上界规划probe发现61条弱参考source
+
+- `43008440` / `q0-candidate-regional-scope-20261121` 完成174.515s。此probe故意不使用
+  初始known pairs，且把全部parts当候选target，是工作量上界样本，不是生产完整计划；
+  不运行mapper，不声称重新校验全基因组DNA或第一补充全部内容。
+- 全部38267parts /31706122489bp；38056有>=.90的M/=参考路由，211条无路由，合计
+  18928468bp。已完成第一补充的150条为14974672bp；其余 **61条为3953796bp**。
+- 16个source的34个首/中/尾候选窗口：最大target46240603bp，没有触发100Mb预算回退。
+  source完整候选window数可到数千（例如82Mb Flye为850），不能把34个样本当剩余数量。
+- 重要修正：不能让每条正常长source为这61条分别whole-source回退，更不能为了归并
+  fallback key把289Mb query自身加入一个原本只有4Mb的target集合——即使-D抑制自比对，
+  建索引仍要付出这289Mb。现在把无路由source放在短query侧批处理完整矩阵。
+
+### seed必须在partial之前，避免两阶段重复做
+
+- 优先探测原完整partial任务缓存（a605...）仍在最前：若它完成且通过完整验证，不再启动
+  区域partial或额外seed。无有效缓存时，对“有参考候选但没有合格参考路由”的source先
+  做一次完整native seed，然后把真实hit加入候选/双侧已观察覆盖。
+- 小麦这一任务正好是61条query→38117条原参考target，target列表与第一补充完全一致。
+  `CompletedNativeScopes` 供partial/candidate两端共用；partial仅在所有请求target关系
+  已经被完整矩阵测试过时跳过该parent，零hit测试不会修改cross_coverage。
+- 候选阶段按已完成矩阵重新计算仍缺的无路由关系，因此后续可能还需初次150条已发现
+  source之间的小矩阵；每次成功后重新规划，不能重复150→38117的5.3小时工作。
+- `_copy_prepared_target` 允许独立任务逐字节复制已完成target输入：核对receipt身份、
+  target IDs、所有target成员SHA、实际FASTA SHA与复制期间的stat fence；不建立指向
+  原输入的symlink/hardlink，原始receipt嵌入新command.json。只为重用输入，不挪用结果。
+- q0 identity改用现有run_orchestration稳定字节SHA memo，首读仍完整哈希，后续以
+  dev/ino/size/mtime/ctime围栏复用；同大小改写再恢复mtime的测试仍拒绝旧摘要。
+  已消除最终发布前旧supplement输出变化仍写success的窗口，复用已有最终SHA，不再多扫。
+- `_initial_inputs` 只保留reference的名字/长度，仍逐条解析完整reference FASTA，不再
+  同时常驻整个reference DNA字典。de novo源仍保留供实际窗口提取；未跳过输入完整性验证。
+
+### 正在执行的生产性独立任务（不是重复完整小麦或超时benchmark）
+
+- **job43008458**，目录 `q0-unroutable-native-seed-20261121`，22:29:56启动于
+  agent-X86-53；32CPU/160GiB，fresh小父进程与mapper继承112GiB RLIMIT_AS。
+  没有诊断wall-clock timeout。只写隔离artifacts，原新版/旧版工作区均不修改。
+- 驱动 `produce_unroutable_native_seed.py`：重新验证61条query DNA，复用第一补充完整
+  target输入，不在第二个父进程载入31.7Gb完整de novo字符串。保留tool.command=`minimap2`。
+- 实际raw key：**`q0-map-4aafb69f1d98272cd023d208`**。
+  私有artifact根：`q0-unroutable-native-seed-20261121/artifacts`；其中task目录仍使用正常
+  `grt/evidence/q0_prepare/tasks/<id>`布局。target.fa32088868779 bytes，query.fa4005749。
+- 成功后驱动还会调用原生cache-only API验证可复用，并写summary.status=
+  `complete_isolated_native_seed`。**现在尚未成功，不能把tmp或存在target.fa当结果采用。**
+  若a605成功标记在启动或输入复制后出现，驱动只写deferred状态，须先验证main结果，不冒充
+  完成了seed。两种状态都不可仅看调度器SUCCEEDED判断科学任务完成。
+- 22:52快照：seed仍RUNNING，CPU recent199%/avg506%，RSS35132MiB、峰值49542MiB，
+  result.paf.tmp仍0；首个8013225629bp target index已构建，仍在原生-P比对。
+  **它也出现少数query的低核CIGAR长尾，不可把“提交了小query集合”描述成已获得高效执行。**
+  后续若持续，针对这个已确认热点处理，不盲目一直等待。可基于已完成第一补充选择少量
+  原始whole-query controls，验证全局target下-m2000/温和阈值；不要重复native大基线。
+  区域-m2000已验证不等于全局target也已验证，参数变化必须独立raw key/真实flags和明确
+  science profile；不能给当前4aaf...改key补写参数或伪装成native成功。
+- 两个主任务22:52仍RUNNING：新版42949582 CPU1197%、RSS283653MiB；旧版42523432
+  CPU1595%、RSS94829MiB。旧版未动，新版尚未安装/执行本轮q0代码。
+
+### 交接门禁与下一步
+
+1. 先查43008458真实进度；处理原生CIGAR低核长尾，同时推进并行规划和新entry/reader迁移，
+   不要把等待这条任务当作停止所有本地工作的理由。尚未做并行规划：当前区域mapper池
+   仍最多4路×2线程，不能称已经用满run_all的32线程预算。
+2. 完成且验证seed后，按真实4aaf... key采纳到新版缓存；可在正常workspace lock下原子
+   迁移完整task目录以避免再复制32Gb，记录原路径、全部身份与回滚路径，不覆盖已有目标。
+   保留producer/采纳receipt。它执行native flags，完全不同于只成功了6个窗口的诊断。
+3. 冻结native plan的launcher依赖实际在隔离目录
+   `native-fair-revision-20261120-1350/plan/prepare_q0_evidence.sh`，SHA69dc8169...，
+   不是工作区launcher本身。因此保留原隔离依赖，另立新q0迁移契约是可行路径。
+4. 原base entry为`memory-exclusive-20261119/resume.py`，其HERE实际指向兄弟目录
+   `memory-resume-20261118`，不能猜receipt在entry父目录。该receipt绑定4个runtime：
+   GPM_Server和.prepare_lib两份self_alignment_batches.py、assign_chr_groups.py、
+   lgz_prepare_inputs.py；没有绑定lgz_core/q0_*.py。必须保持这4个文件与旧plan不动。
+5. 新context应真实绑定新entry/reader，逐项验证原context的cross/self/resource约束并保留
+   原plan/checkpoint指纹；不要传旧caller或改__file__冒认新执行是旧entry。新reader声明
+   scientific_builder_modified=true，旧声明先备份再在正常锁内明确迁移。
+6. 本轮259项q0定向测试通过（1 skip）；没有发布CI、update.sh、整版替换或main切换。
+
+## 2026-11-22 00:07 CST：新 q0 入口预检、全目标快速参数对照与缓存待采纳
+
+### 已完成的真实试验，不等于主任务已切换
+
+- 全目标 whole-query `-m2000` 对照 **43009156 SUCCEEDED**（目录
+  `q0-global-native-score2000-controls-20261121`）。只从已完成 FIRST 原生补充中选取
+  同家族的两条完整 query（47,662 bp / 745,038 bp）；没有重跑150条的大基线。
+  保留 `-P`，12线程、104GiB fresh AS guard；实际 mapper 979.336秒，完整PAF 6,952行，
+  SHA `4523c78aeaebe17ec30f051a3f1eca5bb50add9158e4aa68aa3a8eb61cfa467f`。
+- **原精确坐标保留门槛未通过**：两条 >=10kb native 比对的同target/strand/diagonal
+  M/=坐标保留率为3.09% / 5.01%。不能宣称全目标参数等价，也不能把这个结果当61条
+  缺失query已经测试。`summary.json` 的 `all_long_control_coordinates_retained=false` 保留。
+- 为区分重复落点损失与源关系损失，进行无mapper的二次诊断 **43009288 SUCCEEDED**，
+  `q0-global-controls-inspection-20261121-v2/diagnostics.json`：两条原有target/strand关系
+  各2个，均保留；查询总覆盖各100%；按target的查询边际覆盖约94.96% / 98.66%，
+  **target边际覆盖仅23.32% / 80.92%**。这是更粗的诊断，不能替代精确坐标，更不能把
+  阈值失败改写成通过。首次诊断43009270因漏传read_paf长度表失败，已定点修正，新增
+  使用真实PAF reader的回归测试；保留失败目录，没有重跑mapper。
+- **43009293 RUNNING**：`q0-unroutable-score2000-seed-20261122`，针对真正缺的61条
+  query开展独立显式参数试验，32CPU/160GiB、112GiB fresh AS，无wall-clock timeout。
+  `produce_unroutable_native_seed.py --experimental-minimum-chain-score 2000` 仅在隔离进程
+  改变raw mapping flags，真实command和raw key含`-m 2000`；不改main策略、不伪装native。
+  成功状态应为`complete_experimental_profiled_seed_not_adopted`，且
+  `normal_native_cache_contract_verified=false`、`production_profile_admitted=false`。
+  当前默认`CompletedNativeScopes`仍拒绝这一新profile；后续必须明确设计限域自动门槛、
+  真实profile与复用契约，不能直接挪进main并声称已采用。原native61任务43008458保留。
+  远端producer是纯函数重构前的冻结快照，行为相同但不要冒称其文件SHA等于后续仓库版。
+
+### 新 entry / reader / 安装事务已准备，主任务没有改动
+
+- `q0_science_context.py` 真正绑定新caller，分别验证原native/science/resource来源，
+  不传旧caller、不改`__file__`、不篡改原plan；`origin_probe`不能安装或执行新science。
+- 只读来源探针 **43009212 SUCCEEDED**，137秒；44 self operations / 876 eligible native
+  batches。`q0-science-origin-probe-20261121/summary.json` 确认workspace未改、q0未安装。
+  原plan SHA保持`343f1d1933c71d79105405f958b5241887d1fa0f0c936ed1a3d3a70befe039f3`。
+- `resume_q0_science.py` / `read_q0_science.py` / `stage_q0_science.py`：正常workspace
+  ownership、55-unit/no-DEGAP/CPU预算检查、仅13个lgz_core文件与launcher/declaration的
+  显式备份替换、异常回滚、保留原初始比对身份、新reader如实声明science改变。
+  这些安装/执行路径目前是定向测试通过，**尚未在main执行安装**。
+- **43009226 RUNNING**，`q0-science-transition-20261121-2352`：2CPU/16GiB，只读核验
+  q0之前全部25个outer checkpoints。到00:07已通过两条ref及q0_chr:1A/1B/1D/2A；
+  不能提前说25个全部通过。使用普通只读OuterCheckpointManager，不调用可能迁移assignment
+  的旧ProtectedCheckpoints.validate；不创建Runner、不占main锁、不写主工作区。
+  成功应有`validation.json`和`q0_transition_all_initial_checkpoints_verified_only`状态。
+
+### 已完成索引的直接复用已准备
+
+- **43009290 SUCCEEDED**（61秒），`q0-reference-cache-adoption-20261122/ready.json`。
+  未重建索引、未重跑参考比对，只复制并核对已有sealed DB、catalog绑定和原PAF内容。
+- 待采纳目录位于上述目录的
+  `artifacts/grt/evidence/q0_prepare/indexes/reference-index-fdad41a395b84a35a2176f31`。
+  DB 1,295,220,736 bytes，SHA
+  `18677df675e1a3c5fe9071d3edcd908215c8a20d2fbba4d5effd39411c0909a3`；
+  正常cache success.json SHA
+  `69b80ca1859b83018376434f803707f396f5c4b304cb10c40e2ab81bd69f9e68`。
+  **尚未采纳到main**。需在正常锁内无覆盖原子迁移，记录来源/全部身份/回滚路径；
+  正常builder仍须验证真实catalog与原PAF，不凭ready.json跳过内容检查。
+
+### 当前主任务及下一步边界
+
+- 00:07快照：NEW42949582 RUNNING，recent1196%、RSS284012MiB；OLD42523432 RUNNING，
+  recent1593%、RSS94314MiB。OLD未动；NEW仍旧q0执行路径。native61任务43008458仍RUNNING，
+  已约97分钟，recent199%、RSS35190MiB，不能当成已经高效解决长尾。
+- 本轮45项定向测试通过，另有真实origin/context和sealed-index复用验证；不跑发布CI、
+  不做update.sh、不整版替换。区域规划仍串行，mapper最多4路×2线程，不冒称32核已用满。
+- 下一步核对43009226完整预检、43009293实际flags/结果及43008458进展；完成明确profile
+  与缓存采纳门禁之后，才安排实际资源已就绪的NEW正常锁交接。保留FIRST 5.3小时结果、
+  初始1364任务和原native plan。不要只提交库/探针便宣称主任务完成优化。
+
+## 2026-11-22 01:23 CST：三块补比对已完整，准备实际 q0 交接
+
+### 新证据与限域策略
+
+- **43009226 SUCCEEDED**，`q0-science-transition-20261121-2352/validation.json`：
+  全部25个初始outer checkpoints通过真实只读验证，未改工作区，耗时2317秒。
+- **43009293 SUCCEEDED**：61条query/3,953,796 bp到38,117 targets的显式`-m2000`
+  raw任务 `q0-map-2b19c2c859bdfb5f2e9177e8`。mapper913.901秒，peak47.594GB，
+  进程完整退出、PAF与normal cache-only同profile验证均完成，不是采用tmp。
+- 发现61条中9条短于20kb（最短702bp，总123,348bp），不能对它们宣称-m2000的
+  negative关系已完成；全部targets中1,427条也短于20kb，需保留原生短target关系。
+- **43009370 SUCCEEDED**，`q0-unroutable-short-native-seed-20261122`：9条短query到
+  原38,117 targets，原生`-D -P --dual=yes --no-long-join`完整产出；不降低短query灵敏度。
+- 剩下52条长弱query与1,418条非弱短target（21,227,900bp）的关系，改向让短target作
+  query、52条弱source（3,830,448bp）作target。**43009787 SUCCEEDED**，目录
+  `q0-native-short-target-completion-20261122-v2`；原生flags、8线程、24GiB fresh AS，
+  mapper260.986秒/peak5.383GB，raw key `q0-map-b30137a13323db8a99874448`。
+  前次43009393是32线程/8GiB AS，RSS约6GiB后morecore内存不足、非零退出；没有success，
+  保留失败目录。缩小target不自动证明dense-repeat内存小，已同时限制该路径线程预算。
+- 已有用户授权大数据精度换速度，不再要求所有重复落点精确复现。但必须保留真实变化：
+  全目标-m2000对照两条主要target关系与查询总体覆盖均保留，按target查询覆盖约95/99%，
+  替代重复落点明显减少；不是结果等价。内部自动门槛为asm10、reference>=5Gb、target>=5Gb、
+  无合格参考路由、query cohort<=8Mb、最长query<=1Mb；近似完成scope仅覆盖query与target
+  都>=20kb的关系。小reference、普通有路由query、其他preset和短关系保留原生。
+- `CompletedNativeScopes` 现在显式区分原生矩阵和限域近似矩阵；短query/short-target
+  negative不能被近似矩阵吞掉；三块真实矩阵补齐后才跳过已测试关系，不捏造coverage。
+  完整旧原生cache始终优先于新参数；真实flags进入独立raw key与最终policy/证据声明。
+  `POLICY.version=5`；candidate policy version2；普通supplement raw identity仍不变。
+
+### 缓存采纳与实际切换（此快照尚未切换）
+
+- **43009762 / 43009788 / 43010042 均SUCCEEDED**，分别为fast/short-native/short-target的
+  正常新API cache-only采纳验证，不启动mapper。ready.json目录：
+  `q0-cache-adoption-fast-20261122`、`q0-cache-adoption-short-native-20261122`、
+  `q0-cache-adoption-short-target-20261122`。fast有效scope52 query×36,690 long targets；
+  所有raw文件身份和真实producer来源仍保留。
+- `stage_q0_science.py` 在正常锁内原子移动完整task/index目录，不再复制两个32GB target；
+  每个文件先验证byte SHA，核对raw key和receipt，目标必须不存在。runtime/declaration备份
+  完成后才动目标；中途失败回滚runtime与已移动cache，记录安装journal，不清理失败目录。
+- 新gate `q0_science_handoff_gate.py` 先取得真实单节点32CPU/320GiB allocation，写ready，
+  校验原NEW terminal且pids已清空、正常锁释放、scheduler凭据和各来源绑定，才启动新owner。
+  gate不杀job，也不删锁；若原a605 whole-partial恰好完整，则拒绝切换，先重新stage。
+- 正在stage目录 `q0-science-cutover-20261122-0130`；以其submission/ready/scheduler为准，
+  不把目录存在视为已运行。不取消OLD42523432；只在新allocation ready后处理NEW42949582。
+  原native61 job43008458仍运行，不能把它的部分PAF当完成，也暂不因新试验快而随意丢弃。
+- 本轮275项q0定向测试通过（1 skip），80项incident/reader测试通过，另6项gate测试通过。
+  未跑发布CI、update.sh、整版替换。下一步必须实际交接并检查优化后主任务执行，不能以
+  提交这些库/测试或资源ready就称完整目标已经实现。
+
+## 2026-11-22 01:43 CST：已实际切换到新 q0 owner，正常检查点复用进行中
+
+- 正式资源ready后，**01:27请求正常终止NEW42949582**，01:28核实调度器FAILED、pids空、
+  正常锁已释放，才放行新owner。FAILED是本次主动交接的终态，不是新的科学计算错误。
+  原a605 incomplete PAF和日志保留，不采纳tmp；OLD42523432未取消/修改。
+- 第一次交接43010044在安装前被入口guard拦截：冻结来源校验合法导入了旧q0 geometry
+  helpers，粗粒度“发现任意q0模块已加载就拒绝”与实际调用链冲突。没有installation目录，
+  runtime/cache未动，正常锁释放。**没有绕过检查或重新运行比对**。
+- 定点修正为新reader的`--describe-only`独立进程：真实绑定的新reader读取真实新builder，
+  生成科学声明；parent保留原来源校验已加载的旧geometry对象，不reload、不改`__file__`。
+  子进程失败仍触发安装事务回滚，stderr进入定点诊断。新增测试覆盖旧模块存在而不冒认新
+  builder、真实子进程argv、返回声明身份拒绝。原initial science/context契约保持不变。
+- **当前主任务NEW43010068，agent-X86-43，32CPU/320GiB**；目录
+  `q0-science-cutover-20261122-0140`。真实transition SHA：
+  `eef0517b215789ffaafc07d779b14ff6b92c0ec673f659f3000545b58a29ff46`。
+  正常run ID `20261121T173455Z-2452020-6b3aa1b6`；01:34获得正常workspace lock。
+- **installation/receipt.json状态installed**，15个runtime/launcher/declaration目标已精确
+  备份并替换，sealed参考索引与三个完整任务已原子移动入正常cache，无覆盖原目标：
+  - fast61 `q0-map-2b19c2c859bdfb5f2e9177e8`；
+  - native9 `q0-map-a2e519761e94eff6ca09e121`；
+  - native短target补齐 `q0-map-b30137a13323db8a99874448`；
+  - sealed DB `reference-index-fdad41a395b84a35a2176f31`。
+  FIRST802...仍在原处。采纳只是完整cache可用，**尚未声称本轮主q0已消费它们**。
+- 01:39:30打印`EXPLICIT_Q0_SCIENCE_RESUME`，进入真正的55-unit Runner；当前是正常初始
+  检查点的内容复核，而非重新比对。01:40:30 `ref:JM19_hifiasm`、01:42:04
+  `ref:JM19_flye_ABD` 均`SKIP_VALID`；下一步assignment及22条q0_chr的完整复用。
+  不因这段校验CPU较低再次中断。旧预检25项通过不替代当前内容检查。
+- 01:44核对远端冻结bundle的18份Python源码（13个core+5个入口/迁移工具）与当前仓库
+  内容SHA全部相同。没有发布CI、update.sh、完整runtime更新或新Release。
+- 旧observer1470693在监控到主动停止的42949582后正常告警退出。临时observer1450366
+  发现非TTY stdout不含RUN header后被替换（仅停此只读observer，不动计算作业）。
+  **当前observer PID1505606 / PPID1**，目录`wheat-observer-20261122-014110`，log
+  `logs/wheat-live-20261122-014111.jsonl`，源码SHA
+  `5c0ad2317fbc304d2bc0b3319adfffb8731ea7c5bb0186bc237ab83b49d7130a`。
+  从真实`gpm_server/logs/run_all.log`取最后一轮RUN段，避免把旧轮取消行当新失败；
+  2881×30秒只读采样，监控OLD42523432/NEW43010068，不自动修复或主动聊天通知。
+- **任务未完成**：继续核对43010068，实际进入q0并消费上述三块cache、sealed index、
+  开始区域化任务后再评价主流程提速。区域规划仍串行，mapper最多4×2线程，不能声称
+  32核已用满。孤立原native61任务43008458仍保留，按真实完成状态决定是否采纳/终止。
+
+### 2026-11-22 02:11 CST：本轮25项全部SKIP_VALID，新q0已实际启动
+
+- NEW43010068的正常Runner从01:39:30开始复核，到02:08:26完成全部25项`SKIP_VALID`，
+  包括两条ref、assignment和22条q0_chr；没有重新运行初始mapper。
+- **02:08:29 `[26/55] [START] [q0_evidence]`**，真实执行已安装的新reader和q0代码。
+  02:11调度器仍RUNNING，child PID2470600，RSS2134MiB，正在启动读取/验证输入。
+  四个supplement成功标记（FIRST+本轮三块）及sealed索引在正常cache；尚不能声称主q0
+  已逐项命中三块缓存或开始区域mapper，应以之后真实进度/日志核实。
+- 孤立原native61作业43008458在替代三块完整、正常API验证通过、实际采纳且新q0启动后，
+  于02:10:50正常请求终止；02:11核实FAILED、pids空。原tmp/log/source目录保留。
+  其共运行约3小时41分仍未完整结束，不继续浪费32核/160GiB allocation。该终态是主动
+  停止冗余计算，不是新版失败；OLD42523432从未终止。FIRST完整5.3小时结果仍保留。
+- 代码修复已推送`0dabbde1`、`52f634d5`；后者18份Python源码与实际冻结bundle完全一致。
+  对应`source-repository-receipt.json`已写入cutover目录，实际安装15个文件摘要复核通过。
+  后续只改交接记录不代表更换运行代码。只读observer1505606继续监控当前新旧主任务。
+
+## 2026-11-22 03:03 CST：定位输入扫描热点；保存跨Python版本验证的轻量解析优化
+
+### 当前运行证据（没有重提主作业）
+
+- 同节点只读诊断 **43010171 SUCCEEDED**，目录`q0-live-phase-20261122-0218`。
+  对当前reader PID2470600 / start_ticks649928865，在02:18:37–02:28:38采6次非暂停栈及
+  自身`/proc`元数据；不读locals、不改ptrace设置、不发主任务信号。600.558秒墙钟里CPU
+  增加591.8秒，VmRSS约31GiB、swap0。经过1B、1D到2A的PAF，读取位置持续推进。
+- 栈定位到`run_orchestration.validate_paf`的CIGAR校验，以及
+  `q0_alignments.parse_paf_line / _initial_inputs / observe_alignment`的证据收集。
+  是已有PAF的校验与关系扫描，**不是重跑参考mapper，也不是已证明卡死**。
+  6个稀疏样本只用于定位，不能把命中比例当准确耗时分解。
+- 后续同节点诊断 **43010201**，目录`q0-live-phase-20261122-0255`，6次/180秒的有界只读
+  窗口；03:03采到`chr_4B/JM19_flye_ABD_vs_self/result.paf`，offset95813632，仍在真实
+  `parse_paf_line -> _initial_inputs`；scheduler NEW43010068 RUNNING、RSS33249MiB、recent99%。
+  OLD42523432保持运行；没有再中断NEW来追求显示更多并发。
+
+### 新的源码定点优化（已验证，尚未装入这条存活作业）
+
+- 两个相同热点一起处理：`run_orchestration.validate_paf`与`q0_alignments.parse_paf_line`。
+  用非重叠正则匹配的总覆盖长度证明完整CIGAR语法，不再为校验而重建整条CIGAR字符串。
+  原生validator将同一长度的重复int转换合并；q0保留返回完整operation tuple及C层sum。
+  全部M/I/D/N/=/X跨度、边界、记录SHA/evidence ID、输入输出完整性检查保留；不丢行、不
+  改mapper参数、不改checkpoint schema或执行引擎版本，也没有关闭任何检查点。
+- 不能只信本地Python3.12微基准：首次in-place融合q0跨度循环在本地快，但真实x86
+  Python3.10对照 **43010196** 的长CIGAR旧/新比仅0.883（回退）。**拒绝该实现**，保留
+  `paf-validator-*-inplace-rejected-20261122.json`及其远端冻结源码/结果，未装进主运行。
+- 修正为保留Python3.10的C层sum后，真实节点对照 **43010200 SUCCEEDED**，目录
+  `paf-validator-calibration-20261122-0245-v2`。同一输入5轮交替、原生和q0完整返回值相等：
+  native普通/长CIGAR为1.231x/1.167x，q0普通/长CIGAR为1.084x/1.129x。
+  native长CIGAR的Python分配峰值18361885→9892421 bytes，q0分配峰值基本持平。
+  **这只是合成数据的解析函数微基准，不是job RSS改善或完整小麦提速倍率**。
+- `benchmark_paf_validation.py`只读提取固定Git revision的旧函数，与候选实函数对比；HPC
+  模式使用SHA绑定的旧源码副本，不联网、不用客户数据、不改主环境。local/HPC JSON均保存。
+  真实远端contract文件SHA899b629c...与仓库旧文件整体不同，但`validate_paf`、数值解析、
+  PafSummary及异常类4项AST逐项完全一致；q0旧模块整体SHA也相同。该区别明确保存在
+  `paf-validator-runtime-function-binding-20261122.json`，不冒称整个旧runtime与master相同。
+- 新增1200组有效CIGAR、8000组畸形文本等价检查、72001-operation长记录、Unicode/零长度/
+  不支持opcode/大整数/跨度错误及记录身份回归。最终21项validator/outer测试通过；275项
+  q0定向测试通过（1 skip），没有发布CI、App构建、update.sh或发布操作。
+- 当前NEW仍运行**52f634d5对应的冻结q0 bundle**，没有现场覆盖这些新源码。现阶段重启
+  会丢掉已有输入扫描进度并再付冷校验成本，局部收益不足以支持这种做法；后续若有其他
+  必须重提的修复，再按正常锁/独立transition/精确备份门禁合并采用。
+
+### 下一阶段关注点
+
+- 继续核对NEW实际完成输入扫描、命中FIRST和三块seed缓存、复用sealed index后再进入区域
+  mapper；不要将“缓存存在/采纳成功”写成已证明主流程命中。
+- 区域规划仍是串行、mapper最多4x2线程。若实际吞吐仍受限，优先评估**小metadata规划
+  进程与受限mapper池共享32线程预算**；不要从携带31Gb DNA的父进程fork再套小AS限制。
+  必须做真正fresh进程、精确计划对照、当前RSS/硬额度/返回计划余量评估，以及失败保留并
+  回退完整计划的机制。不借此放开未经测量的超长原生mapper并发，也不做多节点改造。
+
+## 2026-11-22：区域规划的 fresh-process 并行与同作业资源凭据
+
+### 真实小麦小样本，不重跑完整比对
+
+- 新增 `lgz_core/q0_regional_execution.py`，供部分覆盖补比对与候选染色体两条路径共用。
+  owner 保留原有关系选择，worker 只拿源分段元数据/窗口/索引；使用 `spawn`，不复制或
+  fork 31Gb DNA 堆。结果按原父序列/窗口顺序消费，有界预取；父序列整体回退决定先完成。
+  返回计划过大、MemoryError、损坏的进程池均在 owner 中精确重算；内容身份错误继续失败。
+- 同节点、同 Python3.10.12 的第一轮 **43010282 SUCCEEDED**：46个实际父序列、240窗口，
+  三进程138.640秒（含委托快照、spawn和退出），串行292.373秒，2.109x；全部坐标/回退
+  决定逐父比较一致。结果保存在 `regional-planning-hpc-initial-20261122.json`。
+- 加上数据库生命周期/源分段绑定栅栏及真实调度器凭据后，最终 **43010293 SUCCEEDED**：
+  同一批窗口，三进程135.722秒，串行275.728秒，**2.032x**。46份有序完整计划摘要与
+  第一轮完全一致，且本地38份core源码逐字节匹配这次冻结包；结果保存在
+  `regional-planning-hpc-guarded-20261122.json`。远端目录为
+  `q0-planner-calibration-20261122-0350-v3`，同节点agent-X86-06。
+- 两轮均只读原有元数据和PAF，无DNA读取、无mapper、无主工作区改动。串行在并行之后，
+  可能受益于已热的OS页缓存；不把这个约2x说成完整小麦或候选染色体全部场景的提速倍率。
+  最终owner峰值300179456 bytes、单个child最大280571904 bytes，scheduler作业峰值
+  3592MiB（不同统计口径，不能相加或当成实际mapper峰值）。
+- 首次隔离校准包 **43010279** 因缺少 `run_resources` namespace依赖在导入阶段失败；
+  未开始基因组计算，也未改主任务。补全真实包依赖，并在提交前分别验证 namespace/flat
+  两种导入布局；没有删测试断言、伪造服务器目录或重装主环境。
+
+### CPU、内存与完整性边界
+
+- 32线程、现场内存预算足够时，上限为 **owner1 + planner3 + mapper14×2 = 32**；这不是
+  32路各32线程，也不等于已在主任务实际启动14路。owner峰值在池建立时重新测量，不使用
+  先前34GiB快照作为永久依据。小预算保留owner CPU；1线程时规划与mapper严格不重叠。
+- 规划进程各8GiB AS；mapper仍各4GiB AS，原生全长回退与整个区域池不重叠。预算另外
+  预留owner增长、每路提取/解析、预取和展开计划内存。守住限制，不用低RSS样本推断
+  长原生任务也能扩池；RSS/AS/作业cache统计仍不是同一个口径。
+- 实际Donau进程能看到 `container_<jobid>_rg0_...` cgroup，但标准路径下读不到有效
+  memory limit，最终报告的 `cgroup_memory_limit_bytes` 为null，不能据此猜320GiB。
+  新gate通过 `_GPM_Q0_SCHEDULER_PROOF` + `_GPM_Q0_SCHEDULER_SHA256` 转交已经核实的
+  **当前job** djob JSON；reader自动核对SHA、RUNNING、单节点、主机、账号、CPU/内存及
+  自身cgroup的完整job ID。不是用户填内存数值，也没有新增让用户承担判定的命令行参数。
+- 最终校准真实交接了当前43010293的6CPU/60GiB凭据；实际helper返回64424509440 bytes，
+  与调度器核定值一致。没有有效proof或cgroup额度时仍串行规划、最多4 mapper；显式但
+  不匹配的proof则失败，不静默放开资源。普通运行环境不凭节点物理内存扩池。
+- PAF/镜像先由正常open/seal完成整份内容验证，worker只继承此次存活owner的内存证明、
+  元数据和稳定文件身份，自己开SQLite/文件句柄；逐记录SHA仍校验，不重复全扫PAF。
+  数据库在seal/open起即绑定稳定身份，委托前核对分段绑定，worker/owner生命周期均有
+  数据库、原PAF和镜像漂移栅栏。此委托不保存成下次续跑的内容凭据。
+- 原有区域搜索本身的召回边界不变；本次调度改动不另加精度损失。native/approx矩阵
+  关系范围、短序列补齐、窗口/target选择、mapper flags和raw cache身份保持原样。
+  新执行器纳入builder identity，不能把它冒充旧builder或热改冻结源码。
+- 最终本地 **q0测试287项：286通过、1跳过**，resource-ready gate **7项**通过；真实HPC
+  冻结包 **11项**进程/资源/完整性定向测试通过，再完成240窗口校准。没有release CI、
+  App构建、update.sh、网站发布或整套runtime替换。
+
+### 主任务仍独立推进，不能把源码完成当作已部署
+
+- NEW **43010068** 仍是52f634d5对应的冻结bundle：本次执行器以及7cbcf887解析优化均
+  **尚未安装到这个存活reader**。OLD **42523432**只监控，未改变、未取消。
+- 同节点只读诊断 **43010285 SUCCEEDED**，03:52:46–03:56:47由chr_7D推进到chr_Un，
+  240.229秒墙钟内reader CPU增加238.77秒、swap0，并非死锁。目录
+  `q0-live-phase-20261122-0355`；observer1505606继续存活。
+- 后续短诊断 **43010298 SUCCEEDED**，目录 `q0-live-phase-20261122-0420`，04:17:12已看到
+  `build_catalog -> prepare_evidence` 读取既有Flye参考PAF（offset813146112）。因此
+  **已经离开_initial_inputs**；这是参考证据目录构建，不是重跑参考mapper。reader RSS
+  首样本约49.7GiB、swap0；04:18:12第二样本已到offset879910912，RSS约51.2GiB。
+  60.075秒内CPU增加59.87秒，完整summary和终态已保存在该诊断目录；主任务未被改变。
+- 下一步先核实完成扫描后实际命中既有矩阵、进入区域池的真实任务量/吞吐。若收益支持
+  切换，按资源ready、正常锁释放和新transition迁移，保留全部完整结果。新runtime文件
+  `q0_regional_execution.py`尚不在旧安装中，需核对installer对“原来不存在”的文件的
+  备份/回滚表示；若同时装入7cbcf887的外层validator，还须显式处理既有runtime whitelist。
+  不直接覆盖当前15项安装journal，不伪造旧文件摘要，不为了基准数字重启旧版基线。
+
+## 2026-11-22：下一轮 q0 接管准备工具（尚未部署到主任务）
+
+- 核对发现旧installer已经支持`prior_sha256=null`的新文件及失败后删除自有新增文件；
+  不应为不存在的缺口重写安装机制。本轮补充了真实“旧文件+新增模块”混合库存测试，
+  以及不重写内容相同的runtime、备份完成后逐项重核旧身份、拒绝中途出现的未知新文件
+  或父目录软链接。完整备份/已安装库存仍保留，journal另记实际`replaced`路径。
+- 新增`prepare_q0_runtime_transition.py`：仅在隔离bundle写新的transition/launcher/准备
+  receipt。绑定上一次安装journal、真实reader声明和源码；按候选builder自动收集14文件
+  闭包，核对4项科学policy的AST不变，保留原native origin，不重做已经采纳过的cache移动。
+  发现源码/声明漂移、未知目标、已发布q0或已有候选输出即停止，不覆盖、不停作业、不改锁。
+- 本地安装/上下文/gate/准备器定向测试83项通过；真实master的14文件闭包及4项policy与
+  当前52f634d5科学声明相等已核实。这里只验证准备机制，不能当作真实25初始检查点预检。
+- 下一包刻意只取q0 runtime闭包及新的入口/门禁，不顺带替换`run_orchestration.py`。
+  因此外层contract维持原现场字节，7cbcf887的外层validator暂不部署；q0内层parser与
+  并行执行器随闭包进入候选。避免为一项小解析收益扩大旧native provenance/加载边界。
+- 04:46调度器快照：NEW43010068仍RUNNING/q0_evidence，79371MiB，recent99%；
+  OLD42523432 RUNNING/grt_step2，recent1595%。阶段函数需重新采样；不能把04:18的
+  build_catalog栈当作当前栈。两份原参考PAF分别683392866/1061893273 bytes，仅stat，
+  没有登录节点基因组扫描或重比对。后续要实际stage候选、在计算节点做25项只读预检，
+  再核对区域阶段剩余量/吞吐与资源ready条件，才决定何时正常接管。
+
+## 2026-11-22：合并缓存校验与证据消费，减少无用几何和重复键对象
+
+- 追踪到`_supplement`的完整cache命中原来先独立`read_paf`校验，再由调用者完整解析一次
+  收集证据。现在未放置发现、partial之前的弱seed、以及完整原生partial cache支持同步
+  `on_cache_hit(task,hits)`：全部输入/输出SHA和spec仍先核对，用同一个已校验记录流完成
+  原有消费，并强制读完尾部、复核receipt语义与所有outputs。callback或尾部错误直接失败，
+  不在catalog已部分更新后重跑一个耗时mapper，也不发布manifest。无callback的API和新
+  mapper成功提交路径仍保留原来校验，未取消任何检查点。
+- 检查了同类路径：多路regional partial仍合并为原来的**一次**发现轮次，不提前把某窗口
+  新候选变成后续窗口的anchor；candidate阶段只有验证、没有当场消费的cache仍完整校验。
+  新原生mapper仍先完成完整校验、原子提交成功，再消费；没有拿不完整PAF当结果。
+- `_add_pairwise_candidates`只需要query区间，不再为每个M/=/X构造用不到的target区间和
+  AlignmentBlock；新query-only投影保持正负链、I/D/N与原顺序。`ObservedSourcePairs`
+  对不产生跨组装coverage的记录只判定是否存在M/=/X关系，不生成无用坐标；X关系仍保留，
+  gap-only仍不是关系。跨组装合格覆盖继续逐块精确求并集，边界检查在快速分支之前保留。
+- 同一bound source键在关系集合中共享对象。受控64 sources/2016边的值完全一致，边中
+  不同SourceKey对象由4032降至64；这不是整套小麦RSS降低倍率，也没有删除任何边/覆盖。
+- 本地297项q0回归（1跳过、无失败）：新增完整catalog/manifest的受控双遍/单遍对照，
+  不重跑缓存mapper、尾部损坏、consumer错误、输入/工具漂移、500组混合CIGAR双链/偏移
+  几何及共享键等价检查。原有语法、跨度、record SHA/evidence ID与最终输出完整性检查保留。
+- 真实x86/Python3.10控制 **43010321 SUCCEEDED**，目录
+  `q0-cache-consumer-calibration-20261122-052902`。只读取已有小型原生cache b30137...：
+  3955602 bytes、12774记录，5轮交替，对照中位数3.703886秒→1.511862秒（2.450x）。
+  完整有序记录/CIGAR、query投影、source关系及精确coverage摘要相等，解析遍数2→1；
+  共享parser/旧aligned_blocks/interval union与bfc6d7a1基线的AST校验通过。全部新core
+  源码与冻结包逐字节相符，报告`cache-consumer-hpc-benchmark-20261122.json`已保存。
+  同包10项定向测试通过。读取了约25MB生成FASTA进行内容核验，没有加载整套DNA、运行
+  真实mapper或写主工作区。2.45x只对应这个受控记录处理组合，不是整套小麦/大矩阵倍率。
+- 当前NEW没有热改。短诊断 **43010314**（目录`q0-live-phase-20261122-050103`）05:02
+  已看到reader读取原有FIRST cache8024.../result.paf，offset683032576，栈在`_runs`；
+  至少确认主流程已离开参考catalog并实际读取FIRST，而不是只确认缓存被搬进目录。
+  不把未显示的3块seed命中或区域mapper启动当作已证实。后续按新源码一起冻结候选；
+  不覆写3c57fd10以前已经冻结的文件，仍先预检/资源ready，再正常接管。
+
+## 2026-11-22 06:03 CST：组合补丁已真实stage，25项只读预检进行中
+
+- 候选来自已推送master **ec093edf**（此前准备器/installer修复 **3c57fd10**）。远端
+  bundle：`q0-parallel-cutover-20261122-054517`；transition SHA
+  `47d3bd36960518a6dcc1c5c8b98bf1b5fd61f6a076a42a3109d1d44e128acc01`。
+  通过可信压缩包SHA与全部代码校验后，用实际Python3.10运行了准备器，真实准备receipt
+  也存入仓库`q0-parallel-candidate-prepared-20261122.json`。
+- 已核对上次安装journal/reader声明/全部旧文件及4项科学policy，列明14个runtime：
+  **7个改变（含新增executor1个）、7个内容不变**。新installer不会重写那7个不变文件。
+  不重做已采纳的cache移动，native origin、4个原始受保护runtime及外层contract仍不变；
+  contract SHA仍899b629ca3d2d2fb2d7e768f3368bd1e94a049d345a571928c09442090ba4ffb。
+  `source-repository-receipt.json`核对20份候选源码并记录保护范围；没有安装到工作区。
+- 真实只读预检 **43010327 RUNNING，agent-X86-18，2CPU/16GiB**。冻结包83项准备/
+  installer/上下文/gate测试已通过；06:02:48实际验证 **9/25** 初始检查点，最近为2D，
+  RSS约129MiB、recent99%，`validation.json`尚未生成。这不是失败或卡住，继续查同一job，
+  不重复提交、不因一次SSH/观察超时而重启。预检有一小时诊断上限，不是主流程超时。
+- **主任务已真正进入区域阶段**。run_all.log记录05:42:18 fast61、05:43:01 native9、
+  05:43:14 native1418→52分别完成；结合既有cache/收据可核对其复用，而非仅看目录存在。
+  05:51:15完成100窗口，05:57:39完成200窗口，计划列表61000、fallback_sources=0。
+  这里是区域窗口，不是61000次全基因组比对；计划列表也不能不扣复用直接当精确剩余数。
+  OLD42523432仍运行未动；NEW43010068仍为原52f bundle，当前4×2池、还没启用新执行器。
+- 06:02前后只读observer1505606仍存活，NEW内存约90GB（scheduler 90171MiB）、recent
+  249%；已有参考/assignment/22条q0_chr仍保留。新的2.03x规划、2.45x缓存记录处理均
+  是隔离对照，不是这条存活作业已经获得的倍率。
+- **下一步**：先等43010327实际SUCCEEDED且25项完整proof，核对transition SHA/所有
+  源码仍一致；再生成该bundle的handoff-config和32CPU/320GiB资源ready作业。新allocation
+  已ready后才正常停止旧NEW43010068，确认子进程清空/普通锁释放，再交给新gate安装，
+  绝不停止OLD42523432或改旧journal。当前已有区域raw/project成功缓存保留复用；不要
+  因新模块/validator源码变化删除它们。切换后更新observer目标job及区域progress读取，
+  以真实新产出证明恢复；还没到可宣告“已部署/任务完成”的阶段。
+
+## 2026-11-22 06:26 CST：并行规划与缓存单遍补丁已实际接管 NEW
+
+- **当前 NEW 主任务改为43010335**，`agent-X86-53`，单节点32CPU/320GiB；正常run ID
+  `20261121T222113Z-1973018-f3b56813`。bundle仍为
+  `q0-parallel-cutover-20261122-054517`，transition SHA仍47d3bd36960518a6dcc1c5c8b98bf1b5fd61f6a076a42a3109d1d44e128acc01。
+  源码冻结自master **ec093edf**，现在不再是“只上传、未安装”。旧对照 **42523432**仍
+  RUNNING/grt_step2，约16核，未中止、未改动；后续不要把43010068当作存活NEW。
+- 只读预检 **43010327 SUCCEEDED**，06:18:17结束，25项初始检查点全部通过，冻结包83项
+  定向测试也通过。`validation.json` SHA
+  `f3e96ee771316f8e044dc7980f951b165847098acbfd75ccc65b980c8d586075`。这是实际预检，
+  不是从目录存在或日志片段推断成功。没有重复提交预检。
+- 新allocation06:19已RUNNING，ready PID1973018确实在调度器进程表中，核对32CPU、320GiB
+  allocation及硬内存限额后才在06:20:12请求 **正常dkill 43010068**，没有force。06:20:51
+  核实原NEW终态FAILED、pids清空、正常锁消失，06:20:52才原子放行handoff。FAILED是此次
+  主动性能交接，不是新计算错误；旧run最后记录completed=500/planned=61000区域窗口。
+  不删除锁、不采用未完成PAF、不清理中断现场，也不把61000当作完整基因组比对次数。
+- 06:21:13新owner取得正常锁，06:24:35已核实journal **installed**。库存16项（14个core
+  runtime、launcher、显式科学声明），实际替换9项：7个core含新增executor、launcher、声明。
+  另外7个内容不变的runtime没有重写。全部旧备份SHA、新安装SHA、20份候选源码逐项相等；
+  新模块原来不存在，其backup=null/present=false准确，不伪造原文件。未重复移动任何cache。
+- 四个原始受保护runtime和外层`run_orchestration.py` SHA均未改变，外层7cbcf887解析优化
+  仍刻意不部署。25个原initial checkpoint文件的SHA均仍与预检相同；没有重写原生检查点。
+  四块完整raw cache的success marker保留（FIRST150/fast61/native9/native1418→52）；本次
+  登录节点检查只查小型receipt，并不冒称重新验证其完整大输出，真实reader消费时仍校验。
+- 新reader声明绑定真实新builder/reader，`initial_alignment_profiles_modified=false`、
+  `native_checkpoint_rewritten=false`。仍是原55项对照workflow，不加入DEGAP或其他master
+  新功能。本次并行与记录处理优化没有额外改变4项科学policy、mapper flags或精度范围。
+- 06:24:48真实Runner开始RESUME；06:25:56已经 **SKIP_VALID ref:JM19_hifiasm**，未重跑
+  参考mapper。**当前仍在正常初始校验，不是已经完成25项复用或进入区域14路池**。预检25项
+  与主流程实际SKIP_VALID计数分开报告；不要因为校验期单核或日志安静再次中断。
+- 安装验证receipt已同步仓库：`q0-parallel-deployment-verified-20261122.json`；远端
+  `deployment-verified.json`、`installation/receipt.json`、`normal-stop-request.json`、
+  `old-scheduler-terminal.json`、`new-scheduler-allocation.json`及`handoff.json`均保留。安装
+  journal SHA `9e77800daa968f9a476956d04924a808acc4cfd8984a75dc08c7b1b87239c60e`。
+- 原observer1505606已因旧NEW终止自然退出，未手工杀它。新只读observer **3037575** 位于
+  此bundle的`observer.py`，SHA `8ac77d55799884af0e03547ecee3a9d6759c3ed949e43d62034ec3e56aca45f4`，
+  日志`~/cgat-reads-debug/logs/wheat-live-parallel-20261122-062306.jsonl`。按真实新run过滤旧
+  中断记录，并读regional progress，不再拿native leaf=0误报区域任务没动。该observer是
+  现场运维副本，不是新增科学runtime；只记录和提示检查，不自动修复/取消或主动聊天通知。
+- **接续重点**：查43010335而非重新提交；核实后续25项SKIP_VALID、q0 reader真正启动、
+  四块既有矩阵实际命中，再量测新区域池资源证明、planner/mapper并发和每100窗口吞吐。
+  32线程有充分内存时的上限是owner1+planner3+mapper14×2，不能在尚未进入该池时就宣称
+  14路已生效。原区域raw caches保留，projection因builder身份变化可重新验证，不能因此
+  删除全部cache。若再修复，以此次transition/journal为新prior，不重放旧handoff或旧安装。
+  整套小麦尚未完成；不把受控2.03x/2.45x倍率当作整套已测加速。不跑release CI、update.sh、
+  全runtime替换、重新prepare或网站发布。
+
+## 2026-11-22：25项真实复用完成，新q0 reader已执行
+
+- 当前仍是 **NEW43010335 / agent-X86-53**，没有再次重提或改runtime。对实际run
+  `20261121T222113Z-1973018-f3b56813`逐项提取日志，25个SKIP_VALID的unit及顺序与只读
+  预检完全一致；初始阶段没有任何START重跑。06:53:33实际开始第26项`q0_evidence`。
+  这次是主流程实际复用25/25，不再仅是预检或“首个参考已复用”。
+- 真实reader **PID1990559 / start_ticks404157417**。同节点只读诊断 **43010343 SUCCEEDED**，
+  目录`q0-parallel-live-phase-20261122-0655`，不读取locals、不改变主进程。06:55:49看到
+  其验证既有chr_7B自比对PAF的SHA；06:56:49已进入真实新`lgz_core/q0_preparation.py`
+  的`_initial_inputs -> read_fasta`，参考FASTA offset6340870144。60.100秒内CPU增加54.54秒、
+  swap0，阶段已实际推进，不是仅凭job活着或锁存在推断正常。
+- 诊断还核实两项资源proof环境变量确实传到实际reader，指向本次新allocation的
+  `new-scheduler-allocation.json`，SHA ba501c27cf71025649f496600f08303a1cac13fce55817cf3ed39e34514e0c36；
+  reader cgroup明确为43010335，proof也绑定同一job。并发准入没有退化成随意信任一个
+  内存环境数字。**这仍不等于已经观察到区域14路池启动**，当前处于q0输入读取阶段。
+- 远端`initial-reuse-and-reader-verified.json`及诊断`summary.json`/终态保留；前者已同步
+  仓库`q0-parallel-initial-reuse-verified-20261122.json`，SHA
+  774f7978b7f1d1e95e2e7dc6cf506f30492bff3f26e8a1e353c17e0b1bd5a3d4。
+  此轮核实时NEW与OLD42523432均RUNNING，旧基线没有改动；observer3037575继续记录。
+  后续跟踪实际矩阵缓存消费和区域池吞吐，保留当前进程，不能仅因输入阶段单核再次重启。
+
+## 2026-11-22 09:05 CST：已核实的持续等待与诊断队列
+
+- NEW43010335仍RUNNING/q0_evidence，reader仍PID1990559，25项初始复用未失效；09:04
+  调度器recent99%、81227MiB、swap0，320GiB限额。没有新FAILED/INTERRUPTED，也没有重提
+  主任务或改runtime。四块完整native cache的成功receipt SHA仍与安装验证一致；这里只查
+  小receipt/文件元数据，不把它说成已经确认新reader消费完全部矩阵或重做大输出校验。
+- 追加只读诊断 **43010349 SUCCEEDED**，目录`q0-parallel-live-phase-20261122-071329`；
+  07:13:33–07:14:34从2B的PAF消费推进到2D的原checkpoint格式验证，60.059秒内CPU增加
+  59.0秒。`summary.json` SHA 6965133238fc612ee615ce1cfb3839eb9508053b3e1ac73fd17eb53c1e79a469。
+  **该栈是历史采样，不能拿2D当09:05的实时位置。**
+- 后续只读诊断 **43010357 PENDING**，目录`q0-parallel-live-phase-20261122-073445`，固定
+  同一agent-X86-53，1CPU/1GiB；提交时该节点CPU_FREE=0，尚未取得样本。继续查同一job，
+  不重复提交，不把诊断排队/观察窗口结束当主任务失败，也不为采样另迁移或重启主任务。
+  PENDING的Donau JSON可能省略taskExecNodes等执行字段；观察脚本用get读取可选字段，
+  不要因打印KeyError误报计算失败。真正的allocation gate仍须严格核对RUNNING资源证明。
+- OLD42523432继续RUNNING、recent1594%，MUMmer的2D组持续产生SUCCESS；09:04可见
+  1184/1185号成功、1200/1201号START。启动编号不是已完成数量，不据此虚报完成百分比。
+  observer3037575仍活着。当前没有区域池实测证据，下一步等实际q0缓存/区域progress或
+  上述诊断新样本，不能把已部署和受控倍率说成整套已验证提速。
+- 本轮监督快照保存在当前cutover bundle的`monitor-verified-20261122-090444.json`，SHA
+  d4321206876916c22550f07ad29bea5602007e536c00de67ff29024dc5c31535；只记录已确认的等待，
+  不标记整套任务完成。继续使用此前冻结transition和安装journal，不重放任何旧安装。
+
+## 2026-11-22：FIRST矩阵有界片段热点分析，不冒充主任务实时栈
+
+- 同节点43010357仍排队时，另外提交可在任意x86计算节点运行的**只读小片段**诊断，
+  不扫描完整矩阵、不载入整套DNA、不调用mapper或改主工作区。新增运维工具
+  `profile_q0_paf_prefix.py`及8项真实parser/资源依赖测试；记录数/字节/单行长度都有上限，
+  截断行不进入parser，坏记录仍失败，任何结果均声明`whole_cache_validated=false`。
+- 第一包43010374在测试导入前FAILED：只带38个lgz_core文件，漏掉真实package initializer
+  引入的run_resources等依赖。**不是小麦失败**，没有消费数据。保留该包不覆盖；新包完整
+  携带原已成功control的42个Server tools源码，核对所有SHA及4个直接使用的q0模块与主
+  runtime一致。用真实依赖和独立import smoke核验，不注入sys.modules或替换__init__。
+- **43010375 SUCCEEDED**，agent-X86-61，Python3.10.12，1CPU/8GiB；8项测试通过。目录
+  `q0-first-prefix-profile-20261122-092001`。读取FIRST150矩阵开头**5000条/2098539bytes**，
+  相对完整PAF2666514061bytes不足0.1%；1.531秒（**含cProfile开销，不能当生产吞吐**），
+  峰值RSS92258304bytes。没有重新校验32GB生成FASTA或创建任何成功cache标记。
+- 该片段parse_paf_line累计0.848秒、paired_query_intervals累计0.334秒；累计时间有嵌套，
+  不能直接相加。仅产生13个关系，cross-coverage摘要等于空集合摘要，因此**没有实际覆盖
+  合格cross-coverage更新分支**。没有建模真实reference-anchor catalog/fanout，也未覆盖
+  大目录、完整PAF、原native checkpoint验证或主任务当前调用栈。不得据此宣称整个任务
+  的热点或倍率，不为这份小样本结果再次中断主任务，也不贸然改区间合并算法。
+- 完整profile和源码SHA已同步仓库`q0-first-prefix-hotspot-20261122.json`，SHA
+  62d81c4cb21ddcae3cd7b86f6bbed25814ea9f2c02270e389d395b38bcfa3116；远端还保留完整
+  `code.sha256`、`runtime-source-verified.json`、`final-job.json`及失败前包。工具运行时
+  必须使用完整Server tools依赖闭包，不能只复制lgz_core目录。主任务仍是43010335，
+  runtime没有因这次诊断改变；下一步继续等实际q0缓存/区域进度和43010357的新样本。
+
+## 2026-11-22 10:31 CST：已进入真实区域池，确认两层队首阻塞
+
+- NEW仍为 **43010335 / agent-X86-53**，原reader **1990559 / start_ticks404157417**，
+  冻结runtime仍ec093edf；本轮未替换远端runtime或重提主任务。实际weak-seed日志于09:24–25
+  记录fast61、native9及reverse1418→52；区域进度从09:28的100到10:31:25的**2300**，
+  planned=61000、fallback_sources=0。planned是该阶段窗口总量，包含可跳过父查询，不能
+  直接当作剩余原生全基因组比对数，也不拿前500个缓存复用窗口推算新计算吞吐。
+- 10:18元数据实证：1717个完整raw成功标记中528个为此前已有、1189个为此次新增；1748个
+  新projection中528个绑定此前raw receipt的真实SHA。完成标记的元数据统计不是独立全输出
+  验收，真实reader仍执行正常内容/几何验证。主native缓存和区域raw均保留，不删除有效结果。
+  实测1189条新raw native命令均t2、4GiB RLIMIT_AS，real中位3.601秒、最长326.033秒；
+  stderr打印的Peak RSS约82GB不能当作当前单mapper RSS或相加推导OOM，尚未证明其成因。
+  详见`q0-regional-live-verified-20261122.json`，SHA
+  0f5ef3ce7c1f8e2729eba4a7d2e746aaa807b8768dc36fb697ad3924ca750c00。
+- 先前排队的 **43010357已SUCCEEDED**，不能再写成PENDING。同节点09:47:16真实栈显示
+  主线程在`RegionalExecutor.ordered -> Future.result`等待规划队首；**14个mapper线程
+  全部在thread.py:81的work_queue.get(block=True)空闲等待**。PID、start_ticks、cgroup及
+  scheduler SHA均绑定43010335。09:46另一采样中mapper还在运行，故这是实际空窗的实证，
+  不是整段持续空闲的时长测量；不凭一次栈宣称整套倍率。只读诊断的结构化证明
+  `q0-regional-head-of-line-observed-20261122.json` SHA
+  95cb706d030d29e3c6097c8f3589d22af27f447f6c2e5c59cf54798043c252a0。
+- 对应源码有两处同类问题：规划有界预取始终取队首、partial/candidate mapper始终pop(0)。
+  本地定点修改三模块，先完成先回收补位；最终任务、原生回退组及组内query/报告列表恢复
+  原顺序。保持3planner+14mapper×2的预算、预取上限、全父查询回退判定和全部科学参数；
+  不扩大池、不放松guard、不新增科学功能。保留ordered接口供原序消费者使用。
+- 本地**55项regional定向测试通过**，包含阻塞队首仍能补位、真实spawn结果逐项等价、
+  有界预取、取消/内容错误传播、资源失败精确重算、原生交错分组还原、单CPU不重叠；
+  扩展q0测试**共305项，其余通过、1项环境条件跳过**，106.287秒。没有跑release CI或update.sh。
+- 仅提交隔离实样control **43011908**，目录`q0-completion-dispatch-control-20261122-103546`，
+  x86单节点6CPU/60GiB（实际3规划+owner），对照与主任务相同架构/依赖。42文件完整工具
+  闭包先对照原成功包SHA，再覆盖ec093edf的14模块和此次3模块；全部52项代码/脚本/输入
+  manifest验证后执行。实际ready与djob同为agent-X86-06，资源证明SHA已绑定；不写主工作区。
+  以原guarded calibration相同46父查询/240窗口元数据分别跑FIFO与completion，两者须逐项
+  匹配原serial-owner hashes。该control不读DNA、不运行mapper，结果只用于规划等价/可用性；
+  **后续须查43011908的真实终态及summary，不要因提交成功就写成已加速或已部署主任务。**
+- 当前旧基线42523432仍RUNNING/grt_step2，约1596%CPU；未改动。新版10:32约642%CPU、
+  memReal89781MiB、max95956MiB、swap0，320GiB额度。当前一次再续跑已实测约3小时的
+  正常初始复用验证+q0输入/catalog/cache消费成本；新补丁须先验证并评估净收益，不能只为
+  展示新调度再次重启。只读observer3037575继续运行，不能声称它能自动修复或主动聊天通知。
+
+### 10:47 CST补记：实样control完成，暂不再次重启主任务
+
+- **43011908 SUCCEEDED / agent-X86-06**，实际HPC三模块39项测试全部通过。原46父查询/
+  240窗口的FIFO与completion结果hash均逐项等于此前guarded serial-owner；无pool故障或
+  owner资源重算。FIFO135.9539秒、completion118.7441秒，小样本墙钟少12.66%（1.1449x）。
+  FIFO先跑，后者可能受益于OS/索引预热；不包含DNA、实际mapper或科学catalog消费，故
+  **不是整套提速倍率，也不足以单独证明值得支付约3小时重启前缀成本**。
+- 完整报告`regional-dispatch-hpc-control-20261122.json` SHA
+  e7d4600c83a616cab6f4b9f98a113a6ad139cb1fd73b63ea9d41f9de68be34a0；
+  `regional-dispatch-hpc-verified-20261122.json`绑定终态、代码manifest及全部3个补丁模块SHA，
+  本地源码也逐项核对相等。control远端`verified.json`/`final-job.json`/allocation和所有日志保留。
+- 10:46:42只读observer实际查到主新版43010335仍RUNNING；最新进度为**2700窗口**
+  （10:44:57）、fallback0，recent461%、memReal89103MiB、max95956MiB；旧42523432仍RUNNING、
+  recent1594%。本次源码修复保存到master，但**没有安装到正在执行的ec093edf实例**。
+  保留主任务继续产出，不重新执行handoff/update.sh、不动原锁或基线。后续须结合实际
+  mapper长尾/队列损失与剩余阶段评估净收益，再决定是否正常停止并定点续跑。
+
+## 2026-11-22 11:30 CST：真实原生队列对照约1.92x，候选已准备，主任务未停
+
+- 原生control **43011969 SUCCEEDED / agent-X86-10**，目录
+  `q0-native-dispatch-control-20261122-110235`，单节点16CPU/160GiB；使用与生产预算一致的
+  7路×2线程、每路4GiB RLIMIT_AS。只重建选中窗口，不加载整套源DNA；**1505544121bytes
+  的生成FASTA先逐一匹配原context完整SHA/size**，原完整raw receipt/命令/tool/PAF也核对。
+  选取新raw完成队列中第43号起连续64个窗口，各历史native real<=45秒，故不覆盖326秒
+  极端尾部，也不是随意剪掉生产任务。直接调用真实`q0_regional_mapping._execute`，保留
+  原raw argv/精度profile，仅替换隔离目录输入路径；不写主工作区或采纳诊断副本为新结果。
+- 旧→新→新→旧 **ABBA** 同节点运行，墙钟分别114.9371 / 61.6519 / 59.6847 / 118.5239秒。
+  **256次完整原生stdout均逐字节等于各自原完成PAF**，mapper数/线程/guard未变；两次合计
+  原生子步骤1.9241x、墙钟减少48.03%。本地/HPC的6项定向helper测试通过。仍不测规划/
+  pre-CIGAR/catalog消费；control owner没有生产85GiB DNA堆，未覆盖真实大堆fork成本。
+  **不冒称整套1.92x，也不与前一规划1.14x相乘。**
+- 此前1189条真实raw耗时的all-ready模型：14路FIFO1790.303秒、完成顺序606.815秒，约2.95x；
+  模型不含规划、chaining、I/O、future未完成部分及缓存验证。仅用于识别长尾队首损失；
+  此次真实原生ABBA才是更强的子步骤证据。完整报告
+  `regional-mapper-dispatch-hpc-control-20261122.json` SHA
+  8d774d0fd5ac8652f503375a75c997c8182852041d5fe052e3c6a88c66047901，
+  `regional-mapper-dispatch-hpc-verified-20261122.json`绑定全部源码/终态/资源proof及原输出SHA。
+- 为避免把61000个planned窗口误判为“多数已由native矩阵满足”，另做纯元数据界限诊断。
+  **43011989 SUCCEEDED / agent-X86-18**，1CPU/2GiB，2项测试（5000种随机+边界几何与真实
+  plan_query_windows比对）。4个native成功receipt SHA均不变，完整矩阵query侧并集1629part、
+  共40156368bp。即使把这些父查询全部算作可跳过，它们也最多对应**2573个**100kb窗口；
+  因而planned61000里至少58427窗口并非已被当前native矩阵完整覆盖。
+- 11:27只读observer所见最新completed4100（11:24:01）、fallback0；再扣除最大可跳过数和
+  未打印/待回收完成的保守余量后，仍有**54214个planned窗口待交代**。这不是独立mapper
+  次数：有的父查询可能转为整组native fallback，统计也不是大输出重新验收。partial targets
+  包含原38117个reference anchors，可能还包含pairwise新增候选；此处证明只用其ref子集。
+  完整界限/源码证明见`regional-native-matrix-skip-bound-20261122.json`及其`-verified-`文件。
+  前一43011984结果保留；v2只澄清target集合是包含ref子集而非恰等于ref，未更改界限算法。
+- 三模块候选已隔离prepare，**尚未安装**。目录
+  `q0-completion-cutover-candidate-20261122-110559`，源码冻结748fddd0；新transition SHA
+  **c0f3ce957eb59138dc8ffce9771bacfd351afa6a942ed682b2676bc6a729f210**，prior仍为当前ec
+  transition47d3bd...，绑定当前安装journal9e7780...与previous_job **43010335**，保护42523432。
+  仅3个`q0_regional_{execution,discovery,candidates}.py`改变，另11核心模块为no-op，4项科学
+  policy AST全部相同；无新core文件、未改outer contract、未改initial profile/native checkpoint。
+  `q0-completion-candidate-prepared-20261122.json`记录`workspace_modified=false/job_stopped=false`。
+- 候选只读初始预检 **43011976 RUNNING / agent-X86-41**，11:09:48开始，2CPU/16GiB，
+  83项针对性handoff/transition/context测试已通过，继续核对真实25项initial checkpoints。
+  最后查询时尚无最终validation.json；**不能拿测试通过或进程活着代替25项完整预检终态**。
+  原主任务在预检期间继续产出，11:23仍43010335/ec093edf、completed4000、recent720%、
+  memReal89776MiB/max95956MiB；旧42523432仍RUNNING、recent1596%。没有再停任何主任务。
+- **接续动作**：先查43011976终态、validation.json是否25/25且work_modified=false，核对
+  当前run仍q0_evidence且最终q0证据尚未发布。上述真实native收益+仍有大量未被矩阵覆盖的
+  窗口支持推进受保护切换，但不把任一子步骤倍率当作已证明的完整净收益；保留约3小时
+  既有续跑前缀成本作判断。届时新申请32CPU/320GiB资源ready gate（**目前尚未提交**），
+  得到并严格核对新job资源后，才正常stop **43010335**；等旧pids/正常锁释放，再原子handoff。
+  只安装3模块及新launcher/declaration，保留所有native和新增regional成功缓存。不触碰旧
+  基线，不删锁、不重跑update.sh/发布CI，不重prepare，不采纳或覆盖诊断PAF为主结果。
+- 新候选本地索引`/tmp/q0-completion-cutover-candidate.json`，当前live索引
+  `/tmp/q0-next-transition-current.json`仍指原主43010335；不要提前覆盖。原bundle的旧config
+  仍指43010068，**不能重放**。新handoff-config/resume.dsub尚未生成，须绑定新transition、
+  新preflight validation SHA、old_job43010335、protected42523432。observer3037575只读仍在，
+  不具备自动修复/聊天通知功能。后续真实新reader启动时须核对新增admission日志
+  `dispatch=completion_order result_order=original`、25项实际SKIP_VALID及缓存命中后新工作吞吐。
+
+
+### 2026-11-22 11:50 CST：窗口必要性/复用只读调查，先不提交新切换作业
+
+- 用户追问“怎么这么多计划窗口，都是必要的吗，能精简/复用吗”。本轮不改科学策略、不停止主任务；
+  先判断工作量来源，不能只修调度后让明显冗余工作继续跑。当前 goal 继续推进，没有暂停授权。
+- 候选预检 **43011976 已 SUCCEEDED**（替代上一节 RUNNING 快照）；`validation.json` SHA
+  `a46396d126d9f1620acf010ff4b5559c64c62c9fdbc75cfbbe138ccb298e6fee`，25 个唯一 initial
+  checkpoint，transition 仍 c0f3ce...；workspace_modified/main_task_submitted/q0_runtime_installed 均 false。
+  **尚未提交新 32CPU 主作业、未安装 completion-order 补丁**；不要因读到上一节接续动作就直接切换。
+- 元数据几何普查 **43012019 SUCCEEDED / agent-X86-61**，1CPU/4GiB，约25秒，峰值217MiB。
+  复用冻结748核心包，核对原47文件manifest；仅读SHA绑定lookup/residual，不读DNA/PAF，不改主工作区。
+  结果在 `q0-window-geometry-census-20261122-114749/census.json`（相对当前compare根目录），SHA
+  `d8a5a1f741e35b9356ed82f0a697b7eef5fd6a0df55e94f03dccc477b5c1139f`；同目录保留源码、manifest、作业脚本和日志。
+- **冻结 residual 不是当前实时 holes**：原100kb+双侧10kb策略得 **61087窗口/31978父contig**，
+  现场日志 planned61000；差87，不能把冻结统计冒充当前精确计划。当前61k不是全基因组比对次数，
+  whole-parent缓存跳过或fallback仍会改变真实执行数量。
+- 冻结分布：flye 30799父/51231窗口（83.87%）；hifiasm 1179父/9856窗口。
+  25454父仅1窗口，6524父合计35633窗口；不是仅几条巨型contig切出了所有任务。
+  核心未覆盖共2319791151bp，查询context累计4066065198bp；其中context重叠344580512bp，
+  不能把所有flank/context都视为可无损删除的重复比对。
+- 只变核心上限、仍保留同样核心bases的**几何估算**：200kb=>49205（-19.45%），
+  500kb=>43452（-28.87%），1Mb=>42097（-31.09%）。各有11260/7237/6215窗口超过现有
+  120kb硬guard；不是可直接上线参数，也未测耗时/内存/结果一致性。不能简单取消guard扩大窗口。
+- 丢弃 <1kb 单个残余洞的几何估算：56701窗口（-7.18%），少探索41223235bp（核心bases的1.777%）；
+  <10kb=>44807（-26.65%），少探索572324942bp（24.671%）。这是遗漏探索范围，不是最终精度损失比例；
+  尚未采用。用户允许有限降精度，也不能把24.7%遗漏解释为轻微代价。
+- 已确认源码差异：partial 在父查询级调用 remaining_targets()==0 跳过已完成矩阵，但
+  plan_parent/index.targets 未传逐pair selection；candidate 已传 eligible target mask。
+  可以调查“只对尚缺 pair 缩目标集”，**尚未量化收益/更改实现或证明输出等价**。保留既有完整raw/project
+  优先命中，避免一改窗口/目标集合就让已完成缓存全部换身份。当前4个矩阵的query侧并集/2573窗口界限仍适用，
+  不能宣传61k大多数已被全局结果覆盖；参考坐标投影不自动等价为精确contig间CIGAR。
+- 11:46:29只读observer：NEW43010335仍RUNNING，最新11:46:14 completed4700/planned61000/fallback0；
+  OLD42523432仍RUNNING/grt_step2。仅新增上述25秒诊断，原任务和旧基线均未中断。
+
+
+### 2026-11-22 12:11 CST：复用收益实样核对后，已受保护切换 completion-order
+
+- 用户继续推进定向优化。本轮从源码潜在缺口落实到实际目标核对，而非直接上线逐pair过滤。
+  **43012023 SUCCEEDED / agent-X86-61**：39父/51窗口、三个完整native矩阵，过滤前后最终
+  target windows均33766、target bases均974533380；lookup合计53.6516/52.5129秒，不能支持大幅收益。
+- **43012034 SUCCEEDED / agent-X86-18**再次纳入第4个快速矩阵。按真实sealed reference记录
+  核对61个fast queries无qualified routing，再用原weak_global_seed_scope限制到52个有效query和
+  其原目标范围，不把快速矩阵扩大成原生全覆盖。同一51窗口最终目标仍完全不变；lookup
+  43.5834/43.8653秒，PAF decode计数88345/85840（少2.84%，并非少了mapper任务）。这是
+  分层元数据样本、不代表全队列或所有输入；**不实现本轮逐pair目标裁剪、不采用丢小洞/扩大窗口**。
+  报告 `regional-completed-target-pruning-sample-20261122.json` SHA
+  `4ebd66f050be82cdb6b8c78b6d166311b421a3ddb39d37d87e8e961f63705505`，对应verified文件绑定源码/终态。
+  原执行脚本留远端 `q0-partial-target-reuse-20261122-115906-all-scopes`；仓库helper仅修正
+  顶部docstring，除docstring外AST逐项相同，两个SHA均明确记录，未冒称修订文件就是原执行字节。
+- 继续已有强证据的调度修复，不为未证实的少算路线延误。新主资源 **43012037 RUNNING /
+  agent-X86-39，32CPU/327680MiB**。12:02:39严格核对ready PID1245020属于新job、单节点资源、
+  旧reader1990559属于43010335、当前旧run仍q0_evidence、旧基线RUNNING。新config SHA
+  `005254ecab0d41e0641c542e84402e2533d85f8d29efe5fddf2e35f5169cd24a`，旧job明确43010335，
+  **不是43010068，不是42523432**；真实25项preflight列表与上一主作业完整一致。
+- 12:03:44仅执行一次正常 **dkill 43010335**，force=false。12:04:40旧job已FAILED（本次
+  主动正常停止的调度终态）、全部pids消失、正常lock已释放；未手工删除lock或强杀。
+  新job仍RUNNING/同host/32CPU/320GiB，12:04:41原子发布handoff，SHA
+  `778e8f932ae347315e9487d98bed8a969cbcb62db8b55fd9c83f1b993f09639b`。12:04–05新gate接受handoff。
+- **安装已完成并验证，不只是prepare。** 新run **20261122T040506Z-1245020-39aa9341**，owner1245020。
+  `installation/receipt.json` status=installed，SHA
+  `030694dff7efe342927c2ad74091df273a8b069dbd15197d45afe08bd714603c`。16份原文件备份SHA及16项
+  安装清单均逐一核对；仅3个regional模块+launcher/declaration替换，另11core no-op不重写，
+  原self_alignment/assign_chr/lgz_prepare_inputs/outer contract 5项保护SHA全部未变。四个完整native
+  success receipt SHA不变；metadata统计5453 raw success / 5981 project success，**不是本轮
+  完整PAF重验、不是当前进度计数**。保留所有原cache，原窗口/精度/预算/policy AST不变。
+- 12:10安装验收见 `q0-completion-installation-verified-20261122.json`，SHA
+  `111fa1e0c0c518211e01188d2156028979ffa189d559cd7f189713a21dc8b3fd`。
+  本地三个regional测试模块再次 **39/39通过**（2.537秒）；真实预检83项和此前原生ABBA证据仍保留。
+- 12:10:28新observer确认43012037 RUNNING，12:09:38已有新run PREFLIGHT事件，CPU99%、memReal175MiB；
+  尚在正常续跑前缀，不是mapper池低占用证据。**尚未证明新run实际25项全SKIP_VALID，也尚未看到
+  新run的completion-order admission/新增窗口吞吐；不能把安装成功说成整麦已提速验收通过。**
+  OLD42523432仍RUNNING/grt_step2、recent1594%，未改动。
+- 当前live索引 `/tmp/q0-next-transition-current.json` 已指43012037（previous_main_job43010335）；
+  候选索引同步记录installed_initial_resume_pending。新只读observer **3593216**，源码SHA
+  `7a14c6d07ed94bd7e716b9f45ea5daa0a80cb537ff9d011c0d885334610719b2`，日志
+  `~/cgat-reads-debug/logs/wheat-live-completion-20261122-120557.jsonl`，过滤上述新run；无自动修复/通知。
+  原旧observer会在旧job终态后自然退出，不再把旧索引当活跃主任务。
+- **下一步**：只读跟踪当前43012037，先核对25项实际SKIP_VALID、q0真实reader/当前资源proof，
+  再核对native/区域缓存命中和`dispatch=completion_order result_order=original`；只有其后新工作
+  的吞吐才可判定现场收益。不因正常前缀/观察超时再次停任务。继续留意失败、明确低效步骤和内存；
+  不跑发布CI/update.sh/全量替换，不修改旧基线。整个小麦任务尚未完成，goal保持active。
+
+### 2026-11-22 13:20：25项实际复用已确认；61k候选流程优化不是简单减窗口
+
+- 主任务仍为 **43012037 / agent-X86-39**，run
+  `20261122T040506Z-1245020-39aa9341`。12:41:21实际完成25个唯一初始单元的
+  `SKIP_VALID`并进入`q0_evidence`，不是只有预检通过。只读watcher将实际run/log/checkpoint
+  身份与原25项preflight对应，凭据 `q0-actual-initial-reuse-20261122.json` SHA
+  `d7a428781ee7f12a74d21b98acf5f867fb2425261bc0cd41c5420b3410b804b2`。
+  watcher没有再次独立全量hash输出；实际验收由主流程完成。13:13:46新job仍RUNNING、
+  CPU99%、memReal32472MiB、无当前run失败，处于输入/目录建立前缀；尚未见真实区域池
+  admission/新增工作吞吐，不因安静或单核立即再次重启。旧42523432仍RUNNING/grt_step2，未改动。
+- **初始染色体self/cross矩阵也查了，不把四个supplemental矩阵当作全部历史信息。**
+  只读诊断 **43012104 SUCCEEDED / agent-X86-61**（13:01:48），39父/51窗口、66个初始
+  矩阵绑定。原974533380 target bp；若profile/上下文允许复用初始self范围，条件重叠
+  后846034253；若所有初始矩阵都允许，则792322251（约少18.7%）。没有一个查询窗口
+  变成全空。**这是矩阵成员范围重叠，不是已准入的无损负结果复用**；初始profile、
+  window seed上下文、目标范围差异仍需证明，未接入生产。最终报告
+  `regional-initial-matrix-opportunity-20261122.json` SHA
+  `d720483712797bc6f8c0e1aa7a883ccc9532188316e05b0a9d8fb1cf1ddd26eb`。
+  此job后半段约15分钟为共享FS上的5453个已完成raw/coarse元数据inventory；
+  不是主任务卡死/原生比对，统计不能替代完整内容验收，不重复启动这个全目录扫描。
+- 当前区域代码已有no-CIGAR粗比对，但主要用于选CIGAR工作档，随后仍对原全部targets执行
+  `-c`。因此61k是现有窗口计划量，不等于必须付出61k次相同成本的全目标精比对；可评估
+  候选短名单、批量查询/共享index、按工作量触发的分层策略，不能只讨论并发。
+- **静态短名单探针43012133 SUCCEEDED**：64受控anchors+64分层已完成窗口，128例，
+  完整旧raw/coarse PAF校验。按每core/每dataset选top4 intra、top8 cross并保留方向多样性，
+  原target bp3186047602→557985390，旧高质量core覆盖保留约99.46% intra/99.81% cross。
+  对无旧coarse的例子保留全部targets。报告
+  `regional-candidate-static-probe-20261122.json` SHA
+  `b2b8b2b06cd25aa9c511b198e406c308d00736923dce615f584471d00060a438`。
+  **只是旧精确PAF的子集覆盖评估，不是候选mapper实测或全麦精度保证。**
+- **真实原生ABBA 43012150 SUCCEEDED / agent-X86-37**（13:11:24）：同x86工具、
+  16CPU/160GiB、7路×2线程、每进程4GiB AS，核对ready PID/uid/job成员后才放行。
+  64个原窗口FASTA共1505544121 bytes逐一验证；完整目标A两次精确stdout均等于历史PAF，
+  筛目标B两次也彼此一致。A=68.151/76.273秒；B=88.140/89.444秒，
+  **筛目标后精比对target bp1480706136→72098048（少95.13%），总mapper管线却慢约23%。**
+  原生stderr显示部分例子精比对本身反而变慢，不只是生成子集文件开销；目标上下文变化
+  影响seed/index行为，不能用目标bp缩减直接承诺提速。
+- 上述B的跨组装旧高质量core区间实际损失1285/2241593bp（约0.057%），intra损失
+  3724/2302580bp（约0.162%）；新获得的区间单独记账，**不能用净覆盖增加掩盖旧区间损失**。
+  个例intra覆盖可全失（ordinal63原831bp），加权平均不是每个case的保证。报告
+  `regional-candidate-native-pilot-20261122.json` SHA
+  `7e450069554e0a147af73d2a5fd0c0a18dd84fac2534c0a561d566a3dd9d3572`。
+  helper/test和原执行源码SHA在verified文件绑定；本地/HPC均12项针对性测试通过。
+  **拒绝将该较慢方案直接安装到主任务，尚未启用新的科学筛选策略。**
+- 下一轮为独立原生批量试验 **43012243 / agent-X86-37**，目录
+  `q0-batched-native-pilot-20261122-131841`：单批最多4个不同query、原exact flags兼容、
+  union targets≤100Mb，七路/2线程/4GiB AS不变；每个原query只消费自己原目标范围的输出，
+  校验所有额外PAF行。比较legacy / batch / batch+显式f0.005，再逆序复测；原每query的
+  CIGAR档在本试验冻结，**尚未实现生产的batch粗筛后逐query选档**。公共输入验证/批量输入
+  准备耗时分开记录；原始A再次要求stdout历史字节一致，候选按实际区间差集计损益。
+  此f0.005只在隔离诊断启用（也会作用于cross），不是已授权或已通过验收的生产cross档。
+  本地7项batch helper测试通过，资源ready PID2055419与当前job/uid100399/16CPU/160GiB
+  一致，分配凭据SHA `f04968acb54ebab66ad79af34fd4a73141dd9c0251b32f803e7d90a4eabcb1be`。
+  结果待核实；不改初始比对、不改旧基线、不热改主runtime，不重跑release CI/update.sh。
+
+#### 批量原生试验已完成；进一步拆分“目标上下文”和“过滤参数”的效果
+
+- **43012243已于13:28:34 SUCCEEDED**。legacy两次64.067/74.975秒；batch两次
+  69.366/75.865秒，mapper批次64→18但仍慢约4.45%；batch+f0.005为59.430/58.051秒，
+  mapper阶段约1.18倍，另有48.892秒的批量输入准备未计入该倍率。不能将18批或1.18倍
+  推成整流程收益。所有legacy输出再次字节匹配历史，两个候选各自两次输出一致，PAF全量
+  语法/几何验证、逐query恢复原target白名单、core区间差集比较均通过。
+- batch未过滤时，样本cross旧core损失为0，intra损失2648/2302580bp；但batch+f0.005
+  cross损失14906/2241593bp（约0.665%），intra损失15980/2302580bp（约0.694%），
+  **个例ordinal0 cross损失约15.93%**。这点mapper提速及平均保留率不足以证明该策略值得
+  上线，特别是计入准备成本和个例损失后。未安装任何batch/seed近似生产补丁。
+  `regional-batched-native-pilot-20261122.json` SHA
+  `93bc1f4f2b64559484b937eb3348eb4a5e8754a5e1a4f0f5860d7f2cbcadccf1`，verified文件绑定终态/
+  原执行源码/资源proof。HPC7项batch helper测试通过；本地四组diagnostic测试合计23项通过。
+- 已提交下一项更窄的隔离控制 **43012261 / agent-X86-37**，目录
+  `q0-full-seed-pilot-20261122-133010`，索引`/tmp/q0-full-seed-pilot-current.json`：
+  **保持完整原target、原coarse/逐query CIGAR档不变，仅精比对加温和f0.001**；同一64个
+  anchors进行ABBA，再按真实区间损失分开报告intra/cross。这样才能区分之前变慢来自
+  batch/shortlist上下文还是seed参数，不能把两个改动的总差值当作单因素效果。
+  ready PID2064983/uid100399/当前job成员/16CPU/160GiB已核实，allocation SHA
+  `2cc2c41448253c02a11adbf321054dfddb1d32abb7868e318aa0f3114125aa6a`。
+  仍是非held-out的诊断；即使样本胜出，也要核对尾部/独立样本、明确科学profile与缓存/
+  消费者兼容迁移，**不能借原AST等价资源迁移的门禁悄悄改变科学策略**。主任务不因此停止。
+
+### 2026-11-22 13:48：已定位all-chain精比对策略；强档有实测收益但不能直接上线
+
+- **43012261 SUCCEEDED / agent-X86-37，13:35:43**：原完整target上仅exact加f0.001，
+  ABBA legacy68.812/67.080秒、candidate64.774/65.122秒，只有约1.046倍。cross旧core
+  损失67/2241593bp，intra2380/2302580bp，仍有单例intra损失7.19%；不将小幅样本收益
+  作为再次中断主任务的理由。报告 `regional-full-seed-native-pilot-20261122.json` SHA
+  `320913aaa08d434520abe3cc37117f8b0cc944abe3cd706375aca620097809e4`，执行源码、终态、资源
+  proof由verified绑定。尚未安装该档。
+- 更关键的是现有区域exact命令同时含 **`-P -c`**：no-CIGAR粗筛本来可以保留全部链，
+  但精比对也继续保留全部链会延伸大量重复候选。已按实际工具2.31核对官方v2.31手册/
+  cookbook（原始文件SHA见 `regional-chain-budget-primary-source-check-20261122.json`）。
+  **保留`-P`时`-p`/`-N`不生效**，不能只增加`-N`就宣称限制了候选；`-N`限制secondary，
+  也不是整个PAF严格只有N行。只测区域候选exact，不全局修改initial/native/self/cross flags。
+- 原生控制 **43012281 SUCCEEDED / agent-X86-37，13:43:32**：保持完整target/原coarse
+  及旧CIGAR档，仅candidate exact移除`-P`、增加`-p0.5 -N50`。64个受控anchors，
+  legacy69.454/67.070秒，candidate27.008/26.790秒，**mapper管线实测2.538倍**；
+  两次A精确stdout均匹配历史，两次B彼此一致、全PAF语法/几何通过。
+  但cross旧core损失111712/2241593bp（4.98%），intra135142/2302580bp（5.87%），
+  多个例子的intra/cross旧覆盖全失。**这是定位策略瓶颈的证据，不是可上线的精度验收；
+  不能用加权保留率掩盖个例全失，也不能推成整麦2.5倍。**
+  `regional-chain-budget-native-pilot-20261122.json` SHA
+  `869c48d41cf9de5d939fd5e72de043b09963d5600b08c2c926a1182d27c00d3e`。
+- 已递进更宽松档 **`-p0.1 -N200`**，而不是反复跑同一64短例子：独立作业
+  **43012312 / agent-X86-47**，目录 `q0-chain-heldout-pilot-20261122-134621`，索引
+  `/tmp/q0-chain-heldout-pilot-current.json`。明确选择static probe ordinal64–83、90/100/105/119
+  的24窗口，与64原生调参anchors不相交，含两个组装、短query、空旧PAF、>100Mb父contig
+  片段及旧单条326秒长尾；它们已出现在静态probe，**不是未见过的独立基因组数据**。
+  698706029 target bp按FAI窗口读取，不整套载入DNA；每份FASTA必须与原执行input size/SHA
+  完全一致，original A两次仍要求历史stdout一致。原tool/coarse/profile/完整target均保持。
+  输入准备另计，7路×2线程/4GiB AS/16CPU160GiB不变；40分钟仅为独立诊断上限，不是主任务超时。
+  ready PID1371668、uid100399、当前job成员/单节点资源已严格核实，allocation SHA
+  `3a3680d32d4050299c7f739af2d2aebb91b65a4951e6c6ac584458336816e190`；HPC5项cohort/policy
+  tests通过；实际24份输入合计709820980 bytes已在38.222秒重构并逐份size/SHA验收，
+  已进入原生ABBA（最近采样CPU697%、memReal2850MiB），终态/质量/耗时待核实。若更宽松档仍丢跨组装关键信息，
+  下一步考虑按组装保留候选与core覆盖不足的完整回退，不能以用户允许少量精度下降为由
+  静默接受大面积局部丢失。
+- 主运行13:47:24仍43012037/RUNNING/q0_evidence，25done、无当前失败、CPU99%、memReal32545MiB；
+  前缀尚无区域pool admission记录，不据单核/安静取消；旧42523432/RUNNING/grt_step2未改。
+  本轮新科学策略**全部仍隔离试验，没有安装到主runtime，没有取消或重提主任务**。
+  仓库`c8eb6df6`已推送前半轮证据，后续按命名路径提交，不接触并行DEGAP提交/其他输出。
+
+### 2026-11-22 14:09：增加逐core/逐dataset的原生回退试验；主任务未中断
+
+- 前一goal turn属于**实际进展**：定位exact all-chain成本，提交原生控制和源码证据，并启动
+  独立24窗口长尾控制；不能把其强档2.538倍缩写成已经部署或整麦收益。当前继续该目标，
+  goal仍active，完整小麦及新策略现场收益均未验收完成。
+- **43012312 / agent-X86-47**仍RUNNING。24窗口的ABBA已完成A0=472.375秒、
+  B1(`-p0.1 -N200`)=249.840秒、B2=179.058秒；A3和最终逐case区间损失尚待终态报告。
+  两次B差异较大，说明节点/运行时波动不可忽略。**不能只拿A0/B1或两次B就发布倍率或精度结论**。
+  仅需继续读取同一job/日志，不重提、不动其冻结源码、不把观察超时当失败。
+- 新增隔离控制 **43012347 / agent-X86-30**，目录
+  `q0-gated-chain-pilot-20261122-135748`，索引`/tmp/q0-gated-chain-pilot-current.json`。
+  64原生anchors上ABBA测试“快速候选 + 不足则原生完整补算”：coarse、full target与原CIGAR
+  档不变；candidate exact为`-p0.5 -N50`且移除`-P`。只从经过完整PAF验证的高相似paired
+  exact块计算覆盖；对**每一个core、每一个目标dataset分别**要求cross98%、intra90%，
+  任一不足则补跑原完整exact，不再重复coarse。空candidate不能冒充精确负结果。
+- 每份原生回退都要求stdout SHA与历史完整raw一致；候选和回退文件均留存。
+  A两次仍须历史字节一致，B两次不仅比较最终输出，也比较candidate SHA和回退决定，
+  防止最终回退相同掩盖前一候选不确定性。局部短core不能被大core平均覆盖，某dataset
+  不能替另一dataset“补足”。六项针对性gate测试覆盖这些边界，本地/HPC均通过；
+  本地连同前述诊断七组共39项通过。只是诊断，不是已接入生产的policy。
+- ready PID2072907/uid100399、当前job成员、单节点16CPU/160GiB均已核实，allocation SHA
+  `1d6b22d894a095d863eabac60e8c321d73c7e36baaeca402f5ca6265cb6fac0c`；资源保护仍7路×2线程、
+  mapper AS4GiB。输入1505544121 bytes逐份SHA验证完成，但本节点耗165.255秒（此前节点
+  约33–42秒），运行条件有波动；14:07原始A0还有任务，尚无完整ABBA/收益报告。
+  不能把离线任务耗时回放约1.3倍冒称此job实测；需要把额外candidate、回退和验证成本都算上。
+- 14:04:58主43012037仍RUNNING/q0_evidence，25done、无当前run失败、memReal32588MiB、
+  CPU98%；仍未见区域池admission。旧42523432仍RUNNING/grt_step2，未改动。尝试安排同节点
+  只读`/proc`采样前查到agent-X86-39 CPU_FREE=0/CLOSE_FULL，**没有提交采样job**；
+  `/tmp/q0-reader-openfile-sample-current.json`明确status=not_submitted、job_id=null，
+  不是运行中的观察器。不能为采样挤占主任务或改host-key/SSH认证。
+- **上线前必须补齐的生产约束**：旧完整raw先复用；candidate raw仍与cores分离，回退决定
+  必须单独绑定本次cores/policy/目标dataset，不能将某次core验收写成所有投影均适用。
+  审查discovery/candidate两条调用者、raw/投影验收器、ready-manifest和最终companion消费者；
+  当前`load_verified_evidence`给regional verifier的是length/SHA元组，新dataset角色不能只
+  信投影自报，须由catalog源身份绑定。科学flags改变需要显式科学profile迁移，不走旧AST等价
+  的资源-only门禁，不修改初始native/参考或旧基线。
+- 此gate的95%高质量core只是诊断/回退代理，**不证明同一ortholog、全部替代拷贝、染色体/
+  方向候选或最终组装等价**。实际catalog也消费其他paired关系，不能把proxy保留率说成所有
+  消费者信息都保留。试验原始工具未启用`--eqx`；当前100paired-record proxy与生产
+  `ObservedSourcePairs`的100 M/=资格还须在正式集成时统一（排除X对门槛的贡献），不能热改
+  本轮已执行的冻结helper、伪造源SHA或把补做验证追认为当时执行过。
+
+### 2026-11-22 14:35：长尾温和档被否决，回退诊断超时；转测不改变精度的启动开销
+
+- **43012312 / agent-X86-47 / SUCCEEDED**，24个未参与64个原生调参窗口的慢/短/空/长父序列例。
+  完整原参数A=472.375/743.537秒，宽松限制`-p0.1 -N200`的B=249.840/179.058秒，
+  样本mapper管线2.835倍；节点波动大，不外推整麦。两次A历史stdout匹配、两次B彼此匹配。
+  **拒绝部署**：旧高质量cross core实际丢195729/537230bp（36.43%），intra丢203194/477057bp
+  （42.59%）。ordinal8跨组装原89338bp全失，ordinal22丢约68%。宽松档在长尾样本上的代价
+  远高于强档在64个调参窗口中的平均代价，不能用后者替代该验证。
+  报告 `regional-chain-budget-heldout-native-20261122.json` SHA
+  `75065648ee7c8525b0d2550fa681e9caf63937bc6c50dfa40b009f9b602d1f3c`。
+- **43012347 / agent-X86-30 / FAILED，jobExitCode=124**，14:25:33达到隔离诊断1500秒上限。
+  原参数A0=494.076秒、带逐core/dataset原生回退B1=699.133秒；没有完整ABBA、最终质量或提速
+  验收，不接纳任何试验产物到主任务。无需盲目放宽时限重提相同64样本。主新版不受其超时影响。
+- 在已完成的A0日志抽查8个case（0/1/3/8/25/37/50/63）的coarse/exact：慢节点上
+  `stderr mtime - command.json mtime - minimap2自报real`约16.7–18.9秒/调用，之前节点同一批
+  约0.1–0.7秒/调用。它是文件时间戳估算，可能包含stdout/stderr打开、子进程启动、远端文件系统
+  及缓冲的延迟，**不直接证明guard或某个文件系统是因果**。原参数与回退本来做同样比对，却跨
+  节点耗时显著不同；这种条件下不应仅靠更多剪枝调参去掩盖固定开销。
+- 已提交同为x86、拿到**同一慢节点agent-X86-30**的无DNA启动诊断 **43012713**，
+  4CPU/4GiB，目录 `q0-guard-startup-20261122-143421`，索引 `/tmp/q0-guard-startup-current.json`。
+  以小命令隔离`command.json`落盘后open/Popen/child.wait；原guard、Python`-S`、相同guard
+  脚本放节点`/tmp`、系统`prlimit`按轮反序比较。每种都验证PID保持、PG继承、4GiB软/硬限制
+  等值；不把无保护作为性能候选。不改主runtime，不引入新运行时依赖，不重跑任何小麦序列。
+- 14:34:35主43012037仍RUNNING/q0_evidence，25初始单元已经实际复用、无失败，memReal
+  42148MiB/320GiB；CPU recent约31%。尚无实际区域池吞吐，不能把它当作窗口速率或卡死证据。
+  旧42523432仍RUNNING/grt_step2且不改。14:30 agent-X86-39仍无可用CPU槽，没有提交同节点
+  主任务进程采样。目标继续active，完整小麦和新的现场加速仍未验收。
+
+#### 14:44：启动固定开销已在慢节点重现，真实mapper单变量控制在跑
+
+- **43012713 / agent-X86-30 / SUCCEEDED，14:36:45**。无DNA启动对照12次，子PID/PG和4GiB
+  软/硬上限均等。原Python guard记录命令后中位18.436秒，其中`Popen`0.050秒、等子进程
+  18.188秒；本地guard脚本18.200秒、`-S`17.832秒、`prlimit`11.962秒（均为记录命令后）；
+  不足以解释或解决整段延迟。由同一慢节点重现，排除“必须运行小麦或改变科学档才慢”，但
+  尚不能把全部延迟归到某个库或文件系统。报告 `regional-guard-startup-native-20261122.json`
+  SHA `3349855fb0d2d751246053602fe351ce5a97c583dc56b2c4fecf3a113041b605`。
+- 运行环境为MUMmer和模块栈设置了共享库搜索路径；区域minimap2自身是动态链接程序。
+  对照 **43012781 / agent-X86-08**，目录 `q0-regional-loader-path-20261122-144307`，索引
+  `/tmp/q0-regional-loader-path-current.json`。只改变诊断子进程的`LD_LIBRARY_PATH`，先比较
+  原/候选解析出的库绝对身份；只有相同才继续。原/候选均以相同Python保护器核查PID/PG/软硬限额，
+  用3个已完成窗口在同一节点跑继承/清理/清理/继承的coarse+exact，要求**每份历史PAF字节相同**，
+  输入不超过50MiB，库与原工具、guard和FASTA的SHA前后不变。7项本地启动/loader测试通过。
+  这不是全环境卸掉库路径，也没有改共享环境/MUMmer/生产任务；若不能等价则不继续映射。
+- 14:43:38主新版43012037仍`q0_evidence`，25初始单元已复用、无失败，memReal46249MiB，
+  CPU recent约33%；尚未见区域池admission。旧42523432仍运行，不动；禁止仅凭低CPU中断。
+
+#### 14:52：子进程加载路径对照有部分收益；删除生产区域代码的等价冗余扫描
+
+- **43012781 / agent-X86-08 / SUCCEEDED**。仅在诊断子进程清掉`LD_LIBRARY_PATH`时，Python、
+  `resource`、minimap2和限额探针Bash的动态依赖解析到同一批文件；输入、工具、guard和原依赖库
+  SHA前后一致。保持原参数、原工具、原软/硬4GiB限制与PID/PG；3个已完成窗口各做coarse+exact，
+  四次ABBA合计24份stdout均逐字节匹配已封存的历史结果。A=61.156/68.636秒，B=55.392/56.995秒，
+  合计样本wall少13.4%（1.155倍）。空限额探针子进程耗时16.06→4.976秒，**仍有残余启动开销**，
+  三窗口不能外推全麦，也未证明其他环境清空库路径仍等价。报告
+  `regional-loader-path-native-20261122.json` SHA
+  `5815c68f349da8c03df4764d6b889dc54c2fac76e4c185bd2d881bd4cb63388b`。
+  不把`unset`写入共享环境或MUMmer流程；若进入下一轮生产候选，需只作用于核对过依赖身份的
+  区域子进程，并保留原环境回退、命令/环境真实来源及跨节点重复验证。
+- 已在仓库实现精确且可复用的独立改动：`prepare_regional_mapping`的新coarse输出验证一遍后直接
+  使用其`ChainWork`，不再次解析刚原子改名的PAF；移除raw预投影重复geometry扫描，但新raw
+  仍先验证再发布；投影生成和最终receipt replay继续校验每条raw CIGAR、window名/长度及内容。
+  discovery与candidate共用此入口；无参数、科学policy、guard、receipt格式或已有raw/project key变化。
+  回归覆盖已有raw/投影无重算、恶意/损坏的匹配digest记录仍因错误window长/无效UTF-8拒绝、
+  不新增带错误证据的projection成功标记。`test_q0*.py`共307项（306通过、1跳过）；不跑CI发布。
+  当前仅提交仓库，**未改或重启43012037**；未测该去重对整麦的提速，不和加载路径小样本倍率混算。
+
+### 2026-11-22 15:16：参考证据目录精确提速；核实当前 reader 的真实位置
+
+- 原`build_catalog`对完整落在同一原始source part内的命中，仍逐个CIGAR配对块二分查找、
+  求交和重建已正确的两侧坐标。现在用整个query envelope的包含关系只选择快速路径；**绝不把
+  envelope当覆盖**。每个实际M/=/X块、真实偏移和方向、全部证据ID及MAPQ/qualified规则不变。
+  跨part/N gap仍逐块裁剪，纯I/D不新增候选；相同part的证据集合/最大MAPQ不按块重复更新。
+- **43012908 / agent-X86-47 / SUCCEEDED，15:11:35**。两套真实小麦参考PAF有界分段样本
+  （34,168条证据、779条完整原source记录，未重跑mapper），在同一节点重用真实sealed index，
+  冻结`ac670f24`旧目录builder与候选builder做ABBA。A=38.512/44.398秒，B=26.575/26.734秒，
+  **目录构建样本wall减少35.7%（1.555倍）**。完整catalog payload/每条证据、routable parts、
+  按source/chromosome的footprint与index报告总摘要四次完全一致：
+  `e28d1eca405d004efa781e9d1e001915ec982e8648f07b59002c6592995a37bb`。
+  `reference-catalog-source-fast-path-native-20261122.json` SHA
+  `1789785f7e060309686e1481f3f16cd38e363481c761770c411445f3cc09bbe5`。
+  这是前置目录构建的有界样本，不是整麦或61k窗口mapper的倍率。
+- 同时修复已封存ReferenceIndex缓存命中时的重复共享盘I/O：此前`open`已按内容校验并复制原
+  PAF至节点本地，catalog却重新从共享原路径顺序读一遍。现在读取**已验证的同字节本地镜像**，
+  证据仍记录原PAF相对路径/行号/hash；镜像或原件在扫描中漂移都拒绝，fresh index及无镜像
+  保留原读取路径。此镜像修改不在上面ABBA测速候选中，不能与35.7%相加。
+- 聚焦测试17项通过；挂载目录完整套件出现2次读取builder小文件`Errno 12`，分别重测通过。
+  用相同四个候选源/测试文件及真实仓库基线在独立Linux磁盘冻结的**完整310项q0套件：
+  309通过、1跳过**。未跳过失败测试或改降验证。两项改动不改变raw/project key与mapper
+  精度；最终prepared manifest仍绑定新的真实builder身份，不冒用旧manifest。
+- **15:14:48新版43012037**仍RUNNING/q0_evidence，25项初始缓存已复用、无本轮失败、
+  RSS统计59713MiB、recent CPU约99%，未开始记录区域池吞吐。**旧42523432**仍RUNNING/grt_step2，
+  未改。主节点agent-X86-39重新有16个CPU槽后，已提交独立1CPU只读诊断**43012967**，
+  索引`/tmp/q0-reader-openfile-sample-current.json`；只采样当前主job拥有者/reader的进程、
+  打开文件/offset元数据，不读序列、不附加调试器、不暂停或重启主任务。
+- 当前主reader仍旧冻结版本；前置已经运行很久，不能为这个建设性优化再重做已付出的扫描。
+  新代码进master供后续切换或续跑，仍以现场实际阶段、吞吐和净收益决定是否安装。
+
+- **43012967 SUCCEEDED**，与主新版同在`agent-X86-39`。15:16:53–15:18:53七次采样，
+  主reader **1966058** 进程起始时间一致、单线程；120.71秒中增加120.34秒CPU，swap 0。
+  打开的已有`runs/JM19_hifiasm_vs_ref/result.paf`（683392866 bytes）offset
+  **236519424→285130752**，前进48611328 bytes；瞬时位置会在解析长记录时暂时不动。
+  这是既有参考PAF前缀的实际读进度，不是重新运行参考比对，也不等于窗口mapper吞吐。
+  未取函数栈；按命令与文件位置、单核计算及进度判断为q0参考证据处理，先继续保留计算。
+  只读采样输入原始digest `68e2f50525c3315bf1b69efbea2afc76b1bf62e2a256c0bd696057b559f010ea`，
+  精简的可核查证据 `q0-live-reference-scan-20261122-1519.json`。本轮源码`f7c82ea2`已推到master，
+  未安装到这个reader；下一步继续核实Hifiasm扫描结束后真实candidate/partial事件，记录实际
+  新工作而不是把已复用窗口计入提速，未验收完成前保持目标active。
+
+### 2026-11-22 15:42：只限单次DP规模，对长尾效果好；先守住跨组装目标关系
+
+- 延续不砍候选名次的思路。核对与隔离mapper版本对应的minimap2 v2.31源码`options.c`与`align.c`：
+  默认`max_sw_mat=100000000`，超过的是单次DP子问题query×target的规模，而不是区分所有
+  secondary的数量，也不是mapper进程的4GiB AS上限。`--cap-sw-mem 10m`会跳过部分扩展，
+  **绝不是无损守卫**；粗找链、全部target/`-P`、既有CIGAR档和真实AS硬限制都保持。
+- **43012991 / agent-X86-08 / SUCCEEDED，15:38:00**。13个有界旧窗口、345931620字节已封存
+  FASTA逐份SHA确认；保留已完成旧raw作为对照，不重复coarse，不重跑13份完整原参。仅补做
+  两条同节点原参exact对照、旧stdout逐字节一致；10m下原生wall分别**69.456→10.277秒**及
+  **216.507→27.789秒**（6.76和7.79倍）；同节点CPU得出相同量级。13件的历史CPU和候选CPU
+  分别1283.230秒和186.013秒，但历史部分不是同节点配对，不据此报整麦或真实生产倍率。
+  原始报告 `regional-dp-budget-native-20261122.json` SHA
+  `35d9a4a7076a99b4deea29a1eeecab74ebc0010a1cd150f3fcaa1f889b02a44b`；
+  4项参数隔离、反向块及“覆盖不变但目标丢失”的测试本地/HPC通过。
+- **拒绝全局启用**：13窗的原有高质量cross核心查询覆盖差集1421/387877bp，看似只约0.37%，
+  但按原target-window+方向分别跟踪，仍丢了**32个原有支持至少1kb的cross关系**、旧目标侧
+  逐组区间458673/1315722bp未被覆盖；其中ordinal4的cross核心union完全不变，仍少27个长组。
+  intra核心少4530/387205bp、少55个≥1kb的组。无命中、验证失败或诊断产物都不冒充精确缓存。
+- 用已有coarse工作候选**暂定**密度筛选（query窗口≥20kb、chains≥9000、chains≥30×target
+  windows），只在校准组命中1/8/20/21/22五窗；cross核心差集197/298445bp，≥1kb cross
+  目标方向组无全失。它只来自**3个源part**，其中8/20/22是同一part，**不能据此启用**。
+  原`weak_span_product>=1e10`也不能直接拿来替代：这五个原始决策全是ordinary weak work，
+  另有便宜样本因weak span大已选`-m2000`。判断候选须对照有效的原profile，而非只看长度。
+- 50份真实小型历史原生receipt/context/decision的只读计数，未重hash大PAF、未读DNA：冻结
+  1189条旧区域raw中全部20条CPU≥30s，暂定门槛命中11条、2150.518/2758.424历史CPU秒；
+  但**仅1个命中的慢窗口是原13窗未用过的source part**。30条确定性普通样本也有1个
+  **1.554秒**廉价误触发。该统计是旧顺序的有界样本而非全队列推算。下轮先验证独立源part、
+  检查实际消费的目标/方向关系，考虑更宽的DP cap，不再试统一大幅裁剪，不直接改主科学策略。
+- **43013000 SUCCEEDED**，主job的独立1CPU只读采样；15:35:46–15:36:46同一个reader从
+  637812736推进到658128896/683392866字节（文件约96.3%），4次均D状态，60.39秒内16.0秒CPU，
+  仍有进展，未重跑参考mapper；共享盘读取阶段是已实证的局部瓶颈，不把个别D状态当卡死。
+  `q0-live-reader-followup-20261122-1537.json`保留证据。15:41:26主43012037仍RUNNING/
+  q0_evidence，25初始单元复用无新失败、暂无区域池日志；OLD42523432仍RUNNING/grt_step2未改。
+  本轮无主任务切换、无runtime热替换、无新证据采纳；新策略仍需验证后才判断净收益。
+
+### 2026-11-22 15:55 CST：把“61k个计划窗口”拆成两类优化目标
+
+- 61k是当前策略根据未覆盖区间切出的计划量，不是固定科学要求或尚未完成的任务数。冻结几何
+  61087窗/31978父中，25454个父只有1窗，不能靠合大窗口解决；200kb几何上少约19.5%，
+  但11260窗超过原120kb保护线。不能为减计数撤掉内存约束。已测缩小target和粗暴并批
+  都没有实际节省本批mapper墙钟（见上文），不重做同类全量试验。
+- 已冻结的`operational-trace.json`（SHA `e74626d25d32da75377c79092f275f77501ccb3e340dcca100aedd3ec8b387be`）
+  1189个已提交成功的**原生精比对**样本共8409.9 CPU秒：135窗（11.35%）各≥10秒，合计
+  4458.0秒（53.01%）；20窗（1.68%）各≥30秒，合计2758.4秒（32.80%）。不是全麦速率，
+  未含chaining、准备、共享盘开销和失败；只说明优先优化少数高成本窗口比统一降精度有针对性。
+  128窗静态对照中，103窗实际有coarse凭据且都非空；25窗未执行coarse，不能把它们当作
+  “粗筛无命中”跳过精比对，其中22窗有旧的合格高质量core覆盖。
+- **流程级候选：先消费已有精确结果，再只提交尚缺的工作。** 当前partial在入口冻结holes和整个
+  `windows`，一并运行后才调用`add_pairwise_candidates(...observe_part_hits(...))`，所以本轮
+  一个window已得到的跨组装配对证据即使覆盖另一未提交窗口的目标端，也不会反馈到本轮规划。
+  建议先用已完成raw/project做冻结计划的只读回放：校验实际CIGAR/源序列帧，按同一已有跨组装
+  合格规则将真实配对块同时落到两端；只计算此前未覆盖核心中被回填的区间以及可以免算的窗、
+  加权CPU和后续候选差异。统计按确定性阶段而非线程先后；缓存始终优先，原窗口/目标/完整凭据
+  不被重写。参考共定位或粗链只用于提名，不能冒充真正的配对证据或负结果。
+  “有覆盖”不等于“备选关系齐全”：保留不同target/方向/位点以及唯一/冲突/无锚情况，
+  若采纳缩减必须独立验证跨组装关系和最终Q0/Q1候选，而非只报覆盖率。仅对确属重复的子工作
+  跳过或缩小；尚无该回放的节省比例或生产准入，不动正在跑的科学策略。
+- **同一工作量的精确去重候选：** 对本来就跑coarse和CIGAR且目标完全相同的窗口，试验在
+  coarse同时创建原target索引、CIGAR读节点本地同一索引；不更改目标集、参数和既有粗筛档。
+  按同节点ABBA，包含写/读索引耗时，并要求两阶段都和历史PAF字节一致。`43013056`初次
+  探针由于隔离包未列出旧loader测试模块，测试阶段即退出、未启动mapper；补齐明确文件清单且
+  本地从隔离包6测通过后，在新目录重提`43013065`，不改主任务。测试结果待核验。
+- **当前前置位置已核实，61k池还没重新开始。** 只读`43013068 SUCCEEDED`在同一计算节点观察到
+  15:54:58–15:55:29相同reader PID1966058/start_ticks6576032463已离开参考PAF、在读取既有首轮
+  `q0-map-8024dde83cbf20e7ffa6d8ee/result.paf`。文件2666514061字节，已成功的150×38117
+  矩阵（receipt同size、PAF SHA `a77bb782873d4a5c25596a1d9377c817ec36d7cb27c7b8712902b1b416c3965c`）；
+  本次仅读receipt和FD元数据，未重新hash大文件或运行mapper。偏移320782336→378970112，三次
+  R、1线程、swap0，30.32秒累计CPU30.24秒。原始样本在
+  `q0-reader-openfile-followup-20261122-155401/samples.jsonl`，SHA
+  `f7742704e9b6f4777e823c5004c2c39d807558f94682f95f1505d3f6bf286471`。15:56:30主43012037
+  仍RUNNING/q0_evidence、25项已复用、无新失败；旧42523432仍RUNNING/grt_step2。继续区分
+  读取/消化历史成果与新算。避免为了省这次已付的串行前缀而重启；未来再优化大缓存消费的重复
+  全文件I/O，不能跳过内容、CIGAR或证据身份的验证。
+
+### 2026-11-22 16:04 CST：索引复用ABBA不提速；启动已完成证据的两波回放
+
+- **43013065 SUCCEEDED / agent-X86-47**（15:59:31 CST）。原三窗3830万bytes，4个阶段共24份
+  coarse/CIGAR stdout均与历史字节一致；候选仍使用相同完整目标和参数。原两次64.608、66.037秒，
+  复用本地索引71.259、61.630秒（包含写后读；每窗索引约20–26 MB）。候选均值慢约1.7%，幅度小于
+  同档两次波动，**没有观察到净提速，不接入生产**。结果
+  `regional-index-reuse-native-20261122.json` SHA
+  `020df60d328fbd1c8084bff9bc31b33a56164247c4f6ee4c4fedfac13cda9977`；保留远端完整终态、
+  命令、独立guard/PAF、同节点峰值与`code.sha256`，无主任务修改。
+- **43013071**（1CPU/4GiB）在独立目录运行两波只读回放：冻结64原生window作种子，另64
+  分层window作对照，按原投影及≥95%比对身份、≥100 paired M/= bp保留真实跨组装目标端块。
+  每份原raw receipt、context、源part长度/内容绑定、PAF bytes与SHA验证；不读DNA、不调用mapper，
+  不写主workspace。对冻结61087窗从机会统计扣除已缓存seed；报告目标端命中的完整/部分核心。
+  对完整覆盖的对照窗另核对原跨组装目标part、方向和两端位置，**有覆盖不等于可跳过**。
+  队列按冻结顺序，不依赖线程完成顺序；候选不改变任何资源/运行参数。
+  本地和独立打包4项针对性测试通过；旧baseline与新主作业均未停止或替换。
+- **两波回放43013071 SUCCEEDED / agent-X86-61**：SHA `b1f52ae860b905a5a446a6710dc473bc0e9f200e5181dc0fe102caa87699ba1d`，
+  171.27秒内复核128份原raw，共48741723 bytes。64个种子覆盖562个目标part，1407组反向映射后的
+  有向part对；将这些已验证目标端配对块与冻结计划相交，64个种子之外仅**22窗完全覆盖，96窗部分
+  覆盖**，合计1574898/2317367692核心bp（约0.068%）。64个独立对照无一个与这些块相交，
+  所以不能证明这22窗的其他目标/方向均可由种子替代，也无对照CPU节省率。只说明确有双端回填
+  机会，而不是可跳过22个真实新mapper，不能按比例外推全梯队或修改现场计划。要扩大验证，按真实
+  对侧有交集的query确定留出组，再检测其原始候选/方向和两端位置；不要重复抽互不相交的样本。
+  16:08主43012037仍RUNNING/q0_evidence（25项复用、无本轮失败与新区域池日志），旧42523432
+  仍RUNNING/grt_step2。当前两种备选均未启用，继续保留完成缓存和主进程。
+- **16:09:58现场读进度**：`43013082 SUCCEEDED`仅观察原reader，同FIRST已成功矩阵从
+  1431658496→1473093632/2666514061字节（53.69%→55.24%），三次均R/单线程/无swap；原始证据
+  `q0-first-reader-followup-20261122-160835/samples.jsonl` SHA
+  `205173fef0e73eea7ce1acc71043ad946e5b178ba17c34bfa3ab1451084b00c3`。正在解析/消费旧结果，非
+  重新比对，55%只指这一个文件，不是Q0或整麦完成百分比。新区间池未报进度前不估全程ETA。
+
+### 2026-11-22 16:25 CST：定向对照否决按覆盖删窗口，改掉每行重建目标清单
+
+- **43013109 SUCCEEDED / agent-X86-18**。固定同一64个种子，从SHA绑定1189份完成窗口的原
+  trace 按真实对侧核心相交找留出，不查看其PAF才选择。6测通过；实际 1 全覆盖、2 部分覆盖，
+  3份完整原PAF均从原receipt/context验证并按原投影重放。全覆盖窗仅155bp、原精比对0.268 CPU秒，
+  相同目标part/方向仍少310bp目标侧区间。部分覆盖的11769bp窗，即使只免算已覆盖的3363bp，
+  仍会少**100组**各有≥1kb证据的原跨组装有向关系；另一部分覆盖窗也有两端坐标差。
+  现有策略不能按coverage union作为免算门，未改科学策略、未复用粗链作负证据。报告
+  `regional-reciprocal-matched-20261122.json` SHA `a71090c05195f7017b121533a79934b135cd21c0309ec927720dd26139a9555c`。
+  现存三条对照非全麦抽样；优先无损复用/验证重复路径，不继续扩大这一未经关系校验的删窗法。
+- **已实现无损定点修复**：区域投影在每条PAF行构造相同的整个target-window字典（实际样本
+  667–2344个目标窗）。将query/target清单在每个PAF流建一次，并在producer、verify replay共用
+  `_projected_lines`；原`project_regional_paf`、CIGAR/坐标验证、artifact/行号、原序/字节和SHA复核
+  都保留。`q0_query_windows.py`、`q0_alignments.py`及raw/projection规格未动，原coarse、raw和project
+  路径仍由同一键生成，不触发已完成窗口换身份。Q0外层builder身份仍按源码正常更新，不能假装
+  在跑进程已加载补丁。测试守护清单只枚举一次、注释/空行后原行号、两向投影/真实mapper和已有
+  cache读取；本地针对27项及隔离Linux fixture齐全的311项（310 pass/1 skip）通过。
+- **实样投影ABBA 43013115 SUCCEEDED / agent-X86-61**：独立验证并读取12窗原raw 1710494 bytes，
+  6个中等/6个目标窗最多的case；48次渲染输出逐case SHA/行数一致。聚合CPU由1.519→0.905秒
+  （**投影子步骤少40.4%**；大清单6例少57.4%）。仅内存内的投影而非mapper、读盘、整麦或重启净收益。
+  `regional-projection-inventory-20261122.json` SHA
+  `bbea75c4012b391705d3b9945b2f0dfd3fdc701d9e0f113bab3039f211b3b075`，verified绑定原调度终态、源码
+  和远端manifest。未安装到活跃任务；不为1个子步骤收益支付已付过的串行前缀、提交或发布代价。
+- **同节点只读43013119 SUCCEEDED**。旧FIRST缓存PAF在16:24:47→16:25:02读位从
+  2639273984到2654502912/2666514061（98.98%→99.55%）；16:25:17同PID1966058、同start ticks
+  仍R，原PAF的FD已关闭。原始`q0-first-reader-followup-20261122-162351/samples.jsonl` SHA
+  `445059701f6aba23a250d3bc7a9d26bffa699da467cd285cc178000451967810`。这不是区域池开始的凭据，也
+  不能凭FD关闭宣称整轮Q0完成。新版与旧42523432均RUNNING且未重启；下一次核实原生区域池实际
+  admission、缓存回收及首批新raw，而非用61000或首轮文件速率硬给整麦ETA。
+
+### 2026-11-22 16:35 CST：主作业实际进入14路区域池，继续核对新算产出
+
+- 新版43012037同一run在16:31:07、16:32:37、16:32:50依次记录61→38117（既有快速矩阵）、
+  9→38117、1418→52（既有原精度矩阵）。已核对三个`success.json`的历史提交时间、query/target
+  数和原PAF字节大小；都是已有成果的本次消费，不是新跑了这些mapper。
+- **16:33:45** 当前真实run日志打印 `phase=partial planners=3 mappers=14 mapper_threads=2
+  total_threads=32 dispatch=completion_order result_order=original`，这确认实际启用了完成顺序补位，
+  不是只预估池上限；但不能把启动配置等同于14路都实际忙碌或已产生新raw。等到计划/回收及新原生
+  产出分开可证再估吞吐，不能把最初已完成缓存计为新增。原主job与旧基线均未停止或更新runtime。
+- 已单独启动 **43013129**（x86，7CPU/16GiB、每mapper4GiB AS、2线程），独立目录
+  `q0-regional-dp-cap-ladder-20261122-163020`。在三个不同源part已归档、已逐字节验证输入的
+  样本上，保留所有原目标和`-P`、`-m`档位等选项，只比较原命令/30m/10m DP cap。包含一个独立
+  慢case及两个以前的慢case（密度命中/不命中），不全量重跑任何主数据；9项沿用测试在打包隔离及
+  HPC通过，新增3项cap argv针对性测试本地通过。仍属隔离候选，主任务未改生物学参数。
+- 临时只读1CPU `43013145`检查启池后进程、输出位置和节点资源，等确认后再评价实际并发或是否
+  有共享盘开销；不调试attach、不读取DNA/PAF内容、不抢占主任务线程。
+
+### 2026-11-22 16:47 CST：区分活跃缓存回收与新增比对，去掉验证器内重复哈希
+
+- 主43012037同一run在16:46:41已报**1000/61000、fallback=0**；旧42523432仍RUNNING/grt_step2。
+  16:35:52–16:37:23作业43013145观察到reader线程增至17，打开了旧区域PAF，4个采样点没有看到
+  原生mapper（仅短采样，不排除间隔运行）。原样本SHA
+  `5673f86e221e1d10492711f30b4569b7e1601502cd6abf07875369f0faa77488`。截至16:47:45，
+  区域context/project顶层mtime和链接数仍与12:03切换前一致；16:46:37封存稳定命名边界
+  `q0-live-regional-boundary-20261122-164637/boundary.json`（5457个context、5981个project名称）SHA
+  `ff1ac61ea5a853e9876ea8d69f645e78c8a750805bfb27be2bc6eb6e0ef8d3f3`。隔离`delta.py`仅看
+  目录及小型完成回执，未验收所有内容，不把名称当作完成marker，也未证明现存不完整context内没有
+  新raw。暂未确认新原生结果，1000是阶段回收总计，**不作为新增mapper吞吐**；待新命名/回执后关联合格样本。
+- **43013129 SUCCEEDED / agent-X86-65（16:42:40）**。三个同节点原参均与历史原PAF逐字节一致，
+  新增30m cap仅精比对CPU分别47.676→22.842、235.472→50.168、170.799→23.630秒（2.09/4.69/7.23倍）。
+  30m均未丢跨组装core并集或整组≥1kb，并非无损：独立样本跨组装目标组少893/23642bp（3.78%），
+  另一慢例少25bp；密度阴性的第三样本原无跨组装高质量支持，组装内部core仍少947bp。该case
+  同时证明链密度不是覆盖所有慢例的判据，不用一个阈值授权全量近似，不启动重跑。
+  `regional-dp-cap-ladder-20261122.json`复核SHA
+  `9c868e678b47947c38332c41812d4d37911f193b917a07896e600a239d699f34`，主科学策略未改。
+- 区域独立验收器先对chaining/raw叶子的PAF等做完整identity，随后为project完整闭包再重读
+  同一批文件。补丁在一次调用中先验叶子规格和清单，再对完整project闭包统一验真，叶子每份
+  输出和其receipt身份必须与已验证的闭包逐项相同；仍全量做coarse统计、命令/guard与raw→project
+  CIGAR几何重演。不跨run记忆mtime，不以清单/缓存命中替代哈希，规格、现有raw/project键不变。
+  新测试覆盖3份PAF各只验一次、解析器会忽略但哈希必须发现的注释漂移，以及仅叶子SHA与已验真闭包
+  不符的反例。27项定向测试通过，Linux隔离fixture齐全Q0共312（311 pass/1 skip）。
+  首个隔离作业43013152缺失自身旁边用于验证源文件hash的两个模块，未做出结果；重提43013158时
+  完整补齐两份同版本原文件并以manifest核验，不伪造源文件绑定。主运行未安装或重启。
+- **同节点真实闭包验证ABBA 43013158 SUCCEEDED**。8个冻结既有project（4个中位、4个最大raw
+  PAF），两版每个case都返回原同一完整receipt。每轮汇总PAF identity调用40→24，全部identity读取量
+  85.63→54.52MB（**少36.3%**）。A两轮59.443/51.519秒、B两轮39.433/33.133秒（均值耗时
+  少34.6%）；CPU14.421→14.301秒。这是8个已完成窗口的独立验收路径，不是整轮续跑或整麦提速率，
+  不包含其他阶段或完整工作区读写。原始`regional-verify-closure-20261122.json` SHA
+  `db04a965326d89d989a7856f24685431bf166e18863a8021ef6f01e1b1c12fcf`，verified绑定源码、作业
+  终态与manifest。仅合入仓库、不为此重启现场的活跃缓存消费和后续计算。
+
+### 2026-11-22 16:58 CST：缓存命中的完整核验只做一次
+
+- 区域生成端即使已经存在完整project，仍先用`_reuse`读/哈希全闭包，随后用同一个独立
+  verifier再验同一完整闭包。现在完整命中直接走一次独立验收；先前coarse/raw叶子的独立复用
+  和最终coarse选择/命令/CIGAR几何重演仍保留。失败后不混淆可修复的投影缓存损坏与科学/规格
+  不符：原闭包若内容确实不符，才按原流程保留坏目录、从已验原生raw重建；完整SHA匹配但几何或
+  命令不符仍失败。命中不靠mtime、未改参数/清单/内容键，也未跳过下游发布验收。
+- 新测试锁定完整cache路径只读project PAF一次、原raw/coarse仍各由叶子与终验核对；另确保
+  “内容SHA正确但多出合法PAF行”必拒绝、不伪装为cache miss。29项定向测试通过；隔离Linux目录
+  的fixture齐全Q0共314项（313 pass/1 skip）。原版本输出、复用无mapper和修复坏project测试仍通过。
+- 主43012037继续用原冻结代码；不把此修改称为现场已安装。16:55:51仍无新context/project名称、
+  新版已报1900且fallback=0，旧42523432仍RUNNING。缓存回收次数不作新比对速度。
+- **43013168 SUCCEEDED / agent-X86-61**。同8份真实归档、同节点ABBA，上一版`33e0f8bc`的
+  project预查+终验对比一次终验。4轮全部接受同一原success receipt；这一段的PAF哈希48→24，
+  全部identity读取量106.96→54.52MB（少49.0%）；A 63.093/49.147秒，B 50.630/53.926秒。
+  平均56.120→52.278秒（少6.85%），在样本间共享盘波动内，不承诺稳定或全程速度。仅测投影
+  cache命中到独立验收，不含之前coarse/raw叶子判断、整个续跑或新比对。报告SHA
+  `87947354efb4734696d21409689c038fc31fe1d19d2acd5f4412daf5a1257366`；上一诊断源码仍可按
+  `33e0f8bc`及其绑定SHA获取，当前benchmark仅新增显式`--projection-cache-hit`对照。
+- 截至17:00:19主阶段报2400/61000、fallback=0、无新失败；稳定命名边界仍无新context/project，
+  不能拿该速率估新增或总耗时。两主作业均RUNNING并保持原作业与策略。下个检查优先追真正的新
+  raw/project成功回执和预算，避免将每轮前缀验收误当成重新执行，也不为小型I/O改动重启。
+
+### 2026-11-22 17:08 CST：消除 Q0 最终证据依赖验收的二次方路径
+
+- `load_verified_evidence()` 把 `inputs | set(outputs)` 放在逐证据行的生成器内部：每一行
+  都重建一次完整文件路径集合。即使所有文件已核验、所有记录都合法，仍做
+  `O(证据条数 × 文件数)` 无效工作。Q0证据载入、构建后复核以及准备下游输入均经过这条路径，
+  不只是区域mapper的单窗热点。现用已完成索引的 `inputs` 集合和 `outputs` 字典逐条查键，
+  保留任一路径已绑定即有效、两边均无则报错的原语义，额外开销与证据行数成正比。完整SHA、
+  清单、命令、CIGAR几何与后续消费规则均未修改，raw/project键不变。
+- 受控CPU微基准直接提取变更前后的实际成员检查语句，使用冻结trace的路径形态扩展为1万/5万输出
+  条目，各2000证据条目。ABBA平均原检查1.17/9.61秒，新检查两组均<1毫秒；追加未绑定项时两版
+  均拒绝。无PAF读盘、无比对；只用于避免数量增长的算法风险，不是整麦/现场验收倍率。真实端到端
+  任务未结束，不对实际总节省外推。加入绑定输入、绑定输出和SHA一致但无绑定路径的集成测试；
+  preparation+regional定向47项通过，隔离fixture齐全Q0共315项（314 pass/1 skip）。
+- **不热改当前job。** `q0_preparation.py` 属于本轮启动前捕获且出版前重新计算的builder身份；
+  运行中换文件会导致阶段收尾的身份核验失败。即使等上游产出后切换，也必须走显式等价迁移并保留
+  原输入、产物字节和旧回执；绝不因提速直接放宽旧builder验收。先等实测以及受保护边界。
+- 17:07:51观测同run `43012037` 为RUNNING，进度3100/61000、fallback=0，无新失败；截至这个
+  采样仍无新顶层窗口context/project路径与可确认的新比对回执。已在已冻结的命名边界目录附加
+  41次/每分钟的有限只读采样 `live-window-delta-1707-v2.jsonl`、关联既有观察器run ID；不提交
+  新计算任务，不扫描PAF/DNA，也不把路径差异当完整验收。仍不能给可靠整套ETA。旧42523432
+  继续运行、没有修改。后续只在出现新的原生完成证据、实际瓶颈或故障时决定是否再定点切换。
+
+### 2026-11-22 17:32 CST：新版已开始新算窗口；区别冗余命中和用于排除错误的证据
+
+- 新旧作业 `43012037` / `42523432` 均仍运行。新版17:30:15报 `5500/61000`、`fallback=0`。
+  17:26之后观测到本轮新提交的raw成功回执，已抽查回执SHA及`result.paf`声明，不再只是读缓存；
+  17:31:56命名边界增量86个context、76个project，抽样上限16份raw回执。名称计数与回执样本
+  都不是全量验收，本轮精比对阶段的新吞吐尚需独立观察，不能使用前缀复用速率估剩余时间。
+- 不以“最终用了几条”决定能否限精度：`qualify_pair_blocks` 的竞争门会检查未入选的相反方向或
+  不同坐标映射；丢掉它们可能意外放行原本不唯一的连接。新增隔离重放工具，从三个既有慢窗的冻结
+  原/30m/10m PAF调用真实区域投影及配对门，按源对、方向和仿射映射分别统计失去与新增的合格
+  块，包括原先观察到但未通过的新合格块。它没有上下游全量证据或真实参考锚，不是完整组装验收。
+- 原竞争扫描反复展开并扫描同一源对的CIGAR。改为两侧分别建索引，只比较阈值以上的单条paired
+  block，以不同映射的前两名可达端点识别竞争；不合并短CIGAR块来伪造阈值、保留反向/双向以及
+  同一映射不自我冲突的规则。随机300次新旧完整有序输出一致；64条、320个无竞争块的ABBA
+  微基准0.291→0.00566 CPU秒（合成的资格检查，不能外推整麦）。路径/准入/出版定向测试通过。
+- **诊断独立运行**：原扫描重放 `43015130` 触发240s诊断上限（`errCode:124`），没有完整报告；
+  `43015235` 在既有原生输出上同节点逐调用比较新旧门的有序返回，仍待终态。不重算比对、不重启
+  主任务、不替换现有runtime或旧版基线，也未放行任何30m生产档。
+
+### 2026-11-22 17:49 CST：配对门发现精度风险；新算窗口先查启动开销
+
+- 隔离 `43015255` 已 `SUCCEEDED`。同一组冻结原/30m/10m输出投影后，由索引版真实配对资格门重放，报告
+  `regional-dp-cap-consumer-20261122.json` SHA `6fcd254a0695df5c8579a9b7c838ccd68fdb8057d43678689a7be91a264371ba`。
+  30m 在样本1的中性跨组装源对上丢失40,855个按方向/映射分别并集的合格paired-bp；在样本72中，原档已
+  观察但未通过竞争门的362跨组装、1,324组装内paired-bp在快档中变为合格。不能将它们与新增覆盖抵扣，
+  也不能当作丢失/错误拼接的真实组装bp。未加载真实参考锚、其它窗口或完整Q0路径。`43015235` 的逐调用
+  旧门复算 hit 360s诊断上限，**没有**全样本新旧实件等价结论；已有本地等价测试记录不受影响。
+  不给混合目标窗口全量启用30m；后续只测独立intra作用域和完整路径决定/补洞变化。
+- 新任务17:37 sidecar中16个新raw回执摘要见 `regional-live-stage-latency-20261122.json`。每窗输入5.2–46.4MB；
+  contextual FASTA清单完成→raw成功的中位40.38s，其中精比对原生日志中位5.60s（含native内部I/O），15个
+  有chaining的粗比对中位1.36s。命令提交文件→原生最后stderr，减掉mapper自报wall，中位粗14.41s、精14.07s；
+  另有少数post-native回执尾部。不把文件时间差当函数级因果、CPU时间或随机抽样ETA。
+- `43015251` 只trace本诊断派生的子进程，未attach任何主任务进程。3GiB分支前命中170s诊断壁钟，留下完整
+  8个轻父进程对照：`Popen`/`posix_spawn`/显式fork的启动调用返回均小于0.13s，首个Python用户代码仍需
+  8.91–11.85s，`-S`也未消掉主要耗时。不是证实“大父进程fork慢”，不要为此放松FD关闭或内存保护；
+  引导/动态依赖/共享盘因素继续查。trace `1a6647925b479bf4b71ea6111db0df52a33b90183d4cd4e3a01e1ea3f7b345ea`。
+- 同节点真实原生复跑正在比较原guard、系统Python、系统`prlimit`（`43015254`），以及仅mapper子进程的
+  `LD_LIBRARY_PATH` 环境对照（`43015257`）。登录节点上当前minimap2与guard Python两种搜索路径的依赖解析
+  位置相同，但仍需计算节点与真实PAF/资源边界验收；不全局清除环境、不碰samtools/MUMmer和旧版。
+  未改远端两个主作业、缓存/checkpoint或科学参数。
+- `43015254` / `43015257` 均已 `SUCCEEDED`。同节点一个归档普通窗，所有10次真实原生PAF与历史逐字节一致，
+  4GiB soft/hard限制和工作目录独立验证通过。仅清mapper子进程`LD_LIBRARY_PATH`的ABBA墙钟24.750/20.732→
+  11.501/9.512秒（均值22.741→10.506秒）；减掉各自原生日志墙钟后的差额均值18.201→6.000秒。系统Python或
+  prlimit也有局部收益但没有消掉继承的动态库搜索开销；不更换机制或移除资源限制。报告
+  `regional-launch-scope-20261122.json` 含两次原报告SHA。主job所在agent-X86-39上独立复验`43015264`已
+  RUNNING，检查原/候选的ELF依赖路径和文件SHA再测3窗。单个归档普通窗的倍率不作为整麦或生产验收。
+
+### 2026-11-22 18:06 CST：主节点无损复验通过；真实补丁已stage，现有作业继续运行
+
+- **43015264 / agent-X86-39 / SUCCEEDED**。主任务所在同一节点三份归档普通窗、同一mapper及原科学参数，
+  6次真实输出各与其原PAF SHA一致；原和候选的ELF依赖解析位置及实际文件SHA相同；独立验证工作目录、4GiB
+  软/硬限额。平均墙钟 **19.05→8.55秒**（三窗，非整麦）；扣原生日志墙钟的差额均值 **15.81→5.14秒**。
+  原报告`eda54fb84f1bc24e8d3558da2e31554ec9dd28d5cce73b57d402921d0954ccf8`，依赖证明
+  `995486813b2904d31d2c29144ab426c2b864be5f27e67638aae2dec1e18cbf23`，归档摘要
+  `regional-launch-main-node-20261122.json`。不把诊断结果当主任务产物，也不调整30m精度档。
+- 已推 `99843b65`。区域CIGAR/粗筛共用 `_execute`，仅显式绑定的事故reader启用loader同依赖核验。
+  在目标job重新核对Python、resource和mapper解析到的运行库路径/内容；探测失败或启动环境/mapper
+  不再匹配时保留原环境。只给该子进程传入环境副本，不改全局、其它工具、实际argv/guard/科学policy；
+  command receipt记录选择和依赖摘要，独立verifier验证来源字段，不使已有raw/project失效。
+  本地66项 Server +97项迁移/reader定向测试通过；未跑整版CI、未发release。
+- 真实隔离目录 `q0-child-loader-cutover-20261122-180258`；source SHA通过校验、候选transition
+  **95c2b13113ee94f7f4fb6fe17d484c5797163a0115a72a862a38e6ca7e2fe497**，prior安装
+  `030694dff7efe342927c2ad74091df273a8b069dbd15197d45afe08bd714603c`。14模块中只有
+  `q0_regional_mapping.py`（子进程和现有等价投影/验收修复）和`q0_preparation.py`（线性成员核验）改变；
+  12个原模块保留748版本、4项policy AST一致。证据 `q0-loader-cutover-candidate-prepared-20261122.json`。
+- 只读真实25个初始检查点预检 **43015292** 已启动（测试输出里的`initial:*`不是生产节点验收）；真实
+  writer/旧project复用 smoke **43015291** 已验过两个真实旧窗口完整project闭包并原样返回。初版smoke用
+  精比对argv删`-c`推导粗比对，遗漏两者`-m 2000`差别，**不得**引用其粗比对为生产等价；以改为从SHA
+  绑定原粗比对回执取argv的独立诊断 **43015295** 为准。未就绪前不能停止主新版，两个诊断的超时/失败
+  与主任务无关。旧42523432不改；43012037同run在18:03:32达6100/61000、fallback=0，仍在运行。
+- 下个动作：确认43015295真实粗/精PAF完全相同、新执行命令含经核对的环境来源、旧两个project完全可读；
+  确认43015292生产25项及末尾validation.json。两者通过后才能申请32CPU/320GiB等待资源的主切换作业；
+  在新job真实节点重新验证loader兼容、成功写ready且保守净收益为正后，再正常停止当前新版与等锁释放。
+  不重跑已有比对、不删除cache或锁，不改旧基线，不重放旧handoff/旧installation。
+
+### 2026-11-22 18:16 CST：真实粗/精writer验收通过；切换资源门已准备，主作业未动
+
+- **43015295 / agent-X86-39 / SUCCEEDED**。纠正试验命令后，真实候选 `_execute` 按SHA绑定的原粗、精argv
+  在隔离产出中各得到逐字节相同的历史PAF，均记录已核对的子进程环境、保持原4GiB guard；候选独立读取
+  两份旧project完整闭包并原样返回。`regional-loader-writer-smoke-20261122.jsonl` SHA
+  `04128820aef899c062bdbe0aae39ba3cd3408e2daeae77edf25c612a2060f861`。被替代的43015291仅为
+  粗测试命令带了精比对的额外参数而失败；不据此认为生产代码或在跑的任务失败，不采纳任何诊断PAF。
+- 新资源门 `prepare_q0_loader_launch.py` + `probe_q0_loader_allocation.py`：准备真实25项校验完成后的独立
+  启动脚本，先比较旧/新校验全清单（包含每项input fingerprint与checkpoint SHA），随后在**实际新分配节点**
+  核对装载库、mapper路径/SHA/`--version`与既有region key（同SHA不等于version不会超时成为`unknown`）。
+  必须先有 `loader-ready.json`，再进入原资源门 `ready.json`；原旧进程未终止/有pids/有锁时仍不会安装。
+  新配置只准备/校验，不会自己停任务、改数据或提交。针对性6项本地+180纯fixture测试；真实新资源还未申请。
+- 只读预检43015292（不是主新版）18:15仍RUNNING。`43015567 / agent-X86-18 / SUCCEEDED`：仅观测
+  绑定当前UID/作业的`/proc`元数据，PID3640947连续3次D状态但50秒CPU ticks 600→688，`rchar`
+  85.4→95.5MB，不能认定卡死/崩溃或具体大文件，保留预检继续跑。报告
+  `preflight-readonly-181454/samples.jsonl` SHA `fb727e077c8ff7092389f43872cdba4b676d1717ab7aa67fffe3ec76ba43ca72`。
+- 现主新版原run在18:14:37 **6300/61000，fallback=0**，过去 ~100个/5–6分钟；旧42523432仍RUNNING
+  且不动。仅作切换成本参考：按历史首个新raw约5h16m、留6h、14个mapper槽和保守扣除2573完整矩阵
+  可跳窗，目前要平均省约5.8秒/待做窗口才能覆盖恢复成本。三份真样本只精比对即省约10.5秒/次，另有
+  粗筛和验证收益，值得继续走预检；样本与理想并行测算不保证端到端，切换时重核实际工作量、资源和收益。
+
+### 2026-11-22 18:29 CST：续跑预检仍在核对绑定；移除通用文件身份的重复路径解析
+
+- 主新版43012037、旧42523432均仍运行；18:25:16 新版报6500/61000、fallback=0。43015292只读预检
+  尚未提交最终`validation.json`，不能用测试fixture里的25项冒充真实校验。没有申请新32核主资源、没有停现job。
+- `43015880 / agent-X86-18 / SUCCEEDED` 只采同UID、同作业cgroup及确切启动tick的只读预检PID3640947，
+  不暂停、不读locals、不向主任务发信号。18:23:12先观察到`SelfBindings.verify(full=True)`逐个命令身份的
+  `file_identity→file_signature→realpath`，18:23:37已进入`NativeBindings.verify_native_resources`的原包装/规格
+  核验（`_sha256_read/open`），18:24:02仍在该模块的`expected_spec`匹配。其源/原输出的25项最终核验未过；
+  不能把高I/O等待等同于挂死。report `preflight-stack-182148-v2/samples.jsonl` SHA
+  `376872432559bb47700fee15f44b78df57d4fdd1ebac8c0e2e497062a87ab682`。初次43015877仅因诊断把
+  相对的`resume_q0_science.py`参数误当非目标而拒绝，未读取不匹配PID或改动权限；修订后仍绑定实际cmd/cwd/job。
+- 已推 `51febb4f`：通用`file_identity`的size/摘要共用同一次前与后路径签名，原4次resolve/stat降为2次；
+  不去掉实际冷哈希、打开文件描述符前后的一致性检查，及命中后路径/设备/inode/大小/mtime/ctime核对。
+  回归覆盖热缓存期间链接改向与冷读取后原子替换；47项orchestration/checkpoint/report定向测试，46通过+1跳过。
+  冻结旧实现与候选在400个合成命令路径同字节ABBA，本地冷约54.5→35.8ms、热约54.7→29.2ms（非现场倍率）。
+  实样小文件只读ABBA `43015894`仍RUNNING；不修改受绑定的远端`run_orchestration.py`，不把这项混进已验证的
+  两模块loader候选或冒称已减少本轮真实预检时间。
+
+### 2026-11-22 18:36 CST：准备条件式资源申请，不提前打断在跑任务
+
+- `43015894 / agent-X86-61` 在360秒诊断上限到达后终止（errCode 124）。最后一个热baseline未结束，
+  **不是完整ABBA**。其余7段均逐项返回503个原冻结命令文件完全相同的 `path/size/SHA`。冷路径A
+  55.78/45.28s、B 33.97/33.33s；热只列实测 A 44.48s、B 12.37/12.74s，不计算完整ABBA倍率。
+  每次完整清单的真实路径签名调用2012→1006；CPU时间仅0.2–0.56s/段，说明此处样本主要在等文件系统，
+  这不是25项预检或整麦加速结果。`q0-checkpoint-identity-scoped-partial-20261122.json` SHA
+  `575ea11f19cde03a0c062a01e622bb3461387e2b4f0026a7b8f6c1b372688569`，全stdout/调度终态/源码留在
+  当前cutover下`identity-abba-182603`。`51febb4f`仍未热改远端保护模块或加入当前切换。
+- **登录节点观察器PID1991023**（已复查PPID1、存活；脚本来自 `bba04342`），首条18:35:38；目录仍为
+  `q0-child-loader-cutover-20261122-180258`，`loader-watcher.log` / `loader-watcher-config.json`，后者SHA
+  `8f7a60afec103d8dfa519de201fe83f4728c157f52187f60646fda6ac6957775`。有界45轮、每分钟按同一作业查询。
+  只有43015292调度成功、43015295实样仍获成功、现新版43012037和旧42523432均RUNNING、主run/锁所有者
+  仍吻合且Q0未完成时，才比较真实新旧25项内容身份并至多**提交一次**32CPU/320GiB等候资源。用独占
+  `loader-resource-submit-intent.json`防dsub结果含糊时盲重投，以`loader-resource-submitted.json`读新job；
+  仅观察到超时/失败不误认终态；若真实预检失败或任一来源漂移则不提交。10项相关fixture本地和180通过。
+- 观察器没有stop/install/写handoff权限路径。新资源仍须在真实节点拿到`loader-ready.json`和正常`ready.json`，
+  之后才由人工核对新旧job、资源、Q0边界、锁释放和净收益；不为抢节点提前停止正产出的43012037。
+  如果已出现intent但没submitted，先查同一目录与调度器，绝不另起watcher或直接重复提交。
+
+### 2026-11-22 18:45 CST：预检已进入染色体；避免后续Q0再扫无关候选对
+
+- 新版43012037同run 18:45:16 `6800/61000`, fallback=0；旧42523432仍RUNNING/grt_step2，均不修改。
+  只读43015292已完成前4项（两份参考、assign、1A），18:38→18:45 CPU累计329→465秒，真实前进，尚未
+  有最终`validation.json`。单次诊断上限不等同主任务故障。PID1991023仍轮询原作业，未申请新资源，
+  没有`loader-ready`/`ready`/`handoff`；不得提前终止当前新版。
+- `811266f5` 把后续 `q0_admission` 的跨chr尾候选、同chr连续性、分轮扩展与anchor扩展四处
+  全placement枚举改成只连接**实际存在证据的源对**，共享双向link列表、保留同源排除和整个竞争集合、
+  按原placement快照顺序交给原准入条件。`construct_q0`还改为一次按两端源共同候选染色体分发PAF
+  记录，避免每条染色体重扫跨组装全量；各图仍保留相关原顺序、所有方向/冲突和非重叠同源的可能连接。
+  不少算已观测证据，不变参数和精度。80项路径/准入/出版定向测试通过；隔离旧模块与新模块完整
+  fixture对照18项序列/路径和决定完全一致（只剔除应因源码变化而不同的selector身份），4个边界同样
+  拒绝。稀疏合成2500候选、5000 links的邻居枚举单核2.70s→4.9ms（不含其余Q0计算、不能当整麦
+  倍率）；没有拿当前6.8k mapper进度宣称该候选已生效。这是后续selector优化，未装入远端当前或已
+  冻结的loader切换包；不得在其已经捕获selector身份后热替换。
+
+### 2026-11-22 19:10 CST：只读预检到既定上限，保持两个主任务，再跑同一套核验
+
+- `43015292 / agent-X86-18` 已由 Donau 确认 **FAILED / jobExitCode 124**，终态时刻 19:05:29 CST。
+  这是 `preflight.dsub` 内 `timeout 3600s` 的退出，不是观察超时，也不是新版主任务故障。日志中真实
+  参考、assign、染色体检查点共通过 **11/25**；`initial:*` 仍是测试条目，不计入。无 `validation.json`，
+  这 11 行不作完整检查点证明。原观察器 PID1991023 遇预检真实失败退出，无资源提交 intent 或切换产物。
+  原 Donau JSON 已封存 `preflight-43015292-terminal.json`，SHA
+  `3be9587f7e1c0b7b50c11d6020139e32a4334c855b6de8ff949516fa89afbae7`。
+- 在同一隔离候选目录只增加 `preflight-3h.dsub`（SHA
+  `b6f8efcad327ec6f1dc2c29225a6d6db6dde21b3424f331d097b2e2dc0860723`）：除独立名称/日志，从 3600s
+  调到 10800s，真实源、校验代码、25 项检查条件和 2 CPU / 16 GiB 都不变。不以历史日志替代这次校验，
+  不提高或给生产 mapper 引入超时。原新旧作业、主锁 run、smoke 终态及未发布 Q0 边界验证后，以独占
+  intent 单次提交 `43015921`，19:08:56 已实际在 `agent-X86-18` 起跑。提交回执
+  `preflight-3h-retry-submitted.json` SHA `5bf23ed061d8db52ef0097e42632d6f4812f8c94375159d502172bbf2cd475b0`。
+- PID **3458598** 是复用原脚本的 120 轮、每分钟只读观察器；`loader-watcher-3h-config.json` SHA
+  `2fe731ef11857fb728405dc8a0fae4485bfd70b8a5a695bbf5ed37c039aed21b`，日志 `loader-watcher-3h.log`。
+  仍仅在完整预检、实样、原锁和调度终态门禁通过后申请一份等待资源。若约 21:08 观察期结束而预检仍活，
+  查询同一作业，不重投；若出现提交 intent 先查调度及 receipt；若只读通过但没有观察器再按原门禁续接。
+  有待验证的资源就绪或 staging 不代表应立刻停止 `43012037`，仍需重算剩余有效窗口、实测增益和切换成本。
+- 19:10 两个生产作业均 RUNNING；新版 `43012037` 最近 `7100/61000`（19:04:53，fallback=0），
+  旧版 `42523432` 未改。无整版替换、CI、发布，旧基线未触碰。
+
+### 2026-11-22 19:15 CST：消除区域 mapper 和固定投影代码的重复全文件读取
+
+- 仓库候选把每次 coarse/precise 前后同一 `minimap2` 的全读 SHA、同一 projector/validator 代码在
+  生成/回放中的重复全读，以及全原生补充路径的同类工具复核，改用已有的进程内稳定摘要 memo。
+  第一次必须打开真实文件并核对 fd 前后身份；命中仍核对解析路径、设备、inode、size、mtime、ctime，
+  变化回到完整读/hash。不改 mapper 参数、结果路径、PAF/guard 验收、科学命中或 checkpoint schema；
+  子进程执行前后仍分别核对。新增真实两次 mapper 测试仅冷读工具一次，同时测试运行中改同尺寸字节并恢复
+  mtime 仍拒绝写 success。六组定向测试 89 项通过，全部 `test_q0_*.py` 327 项中 326 通过、1 跳过。
+- 只读 `43015930 / agent-X86-18 / SUCCEEDED`：冻结真实 1,326,552 字节工具与两份现用静态代码，
+  不读序列、不起 mapper。每臂各文件 48 次、144 次 SHA 全同，直接读 A1/A2 **6.274 / 6.081 秒**，
+  稳定 memo B1/B2 **0.239 / 0.018 秒**（第一臂也做真实冷读）。隔离目录 `runtime-digest-abba-1912`，
+  `bench_43015930.out` SHA `86863dc78fe5c689fbd2d47bc971cc95144cc4cc6bc353608cc25658b86aa3b5`，
+  `manifest.sha256` SHA `54928d224ce752842ab1664979bc868a391a7a331bf0dbeec5ddc7dd45fe8f9c`。
+  局部收益依赖文件系统：WSL 挂载目录的小脚本测得 memo 的多路径分量 stat 比直接读慢；不报整麦倍率。
+  此候选不混入当前冻结的 loader/preflight 包，不为它重启主作业。
+- 19:15 已实时确认新版 `43012037` 最新 **7200/61000，fallback=0**（19:11:24），旧版 `42523432`
+  与同一只读预检 `43015921` 均仍 RUNNING，PID3458598 仍在轮询。无新资源提交/手工切换。
+
+### 2026-11-22 19:24 CST：用相同核数验证更多普通区域 mapper，而非加速超长任务
+
+- 保持两个主作业及 `43015921` 预检。`43012037` 19:18:09 最新 **7300/61000，fallback=0**；19:23
+  Donau 单节点实际 32 CPU/327680 MiB，近期 CPU 141% 只是瞬时采样、不能代表整个阶段；当前/峰值内存
+  89156/91863 MiB、swapMax 0。没有凭这个总峰值去加长序列并发。
+- 独立作业 `43015934` / `agent-X86-08` 已实际获得 16 CPU / 81920 MiB，隔离目录
+  `q0-regional-thread-split-20261122-1922`，`allocation.json` SHA
+  `d98ceef9f7df5f1c7794df5ab2f20d086a409abf75bdf21f114ae8016cb2ba8e`。从此前完整旧归档中按真实
+  precise 耗时分层固定 28 条有 coarse+precise 的普通窗口，直接用已验原 SHA 的窗口 FASTA，不重新拆整套
+  DNA。ABBA 同节点两档 **7 路 × 2 线程 / 14 路 × 1 线程**；两档保守使用同一 14 线程预算及每路 4 GiB
+  AS 原 guard。只改 `-t`、资源分配及归档读路径，原 preset、chain 策略、目标、PAF 顺序均有独立核对，
+  每个真实 coarse 和 precise 的完整 stdout 都必须逐字节等于各自已完成原 PAF；任何不一致就不采纳。
+- `job.sha256` SHA `de42c4ee2183cf11908f2535ddc0dca6eea6b81378626af61c9a01d1a7adc18b`；
+  本地八项试验 helper 测试通过。该试验测两段原生子步骤和调度，不包含生产 owner 的大堆、规划和消费；
+  不预先改主任务，不把 14 路诊断结果换算成所有长序列并发或整麦倍率。若真实有效再按 32 核生产配置重算
+  owner/规划/地址空间和文件系统余量及切换净收益。诊断 15 分钟上限不适用于主任务。
+- `43015934` 19:25:27 终态 FAILED/1：本轮新增的两项 helper 测试均通过，但作业还声明调用了旧
+  `test_benchmark_regional_mapper_dispatch.py`，该测试文件未在首份 staging manifest 中；原生 ABBA 未启动。
+  已在 `q0-regional-thread-split-20261122-1922-r2` 定点补齐该文件，并按脚本实际调用核对四份 Python
+  文件和环境 SHA。`job.sha256` SHA `a43b269b0c86229a55fa56a3cf307c91c6bc5c55a7ac67f5ab57c532138d462a`，
+  旧作业终态 JSON SHA `a216cf6079ba0a0b6669b0ce765896bf38e3f0c8faf91c9a34873bee18723f64`。
+  同一方案 `43015937` 19:26:38 已在 `agent-X86-08` 启动，真实 16 CPU/81920 MiB 资源证明 SHA
+  `ab262552233f98043413c8c96ff23f12d73f468516fae63c62850f49300377da`；续查同作业是否有 `inputs_verified`
+  及 `artifacts/report.json`，不把 RUNNING 当成性能验收，不再提交其他等价试验。主新版仍独立产出，19:24:36
+  达 **7400/61000，fallback=0**；预检 `43015921` 仍在运行，未触碰新旧主任务。
+
+### 2026-11-22 19:36 CST：两档并发诊断按原始参数顺序核对；减少 FASTA 逐行写入
+
+- `43015937` 的远端八项 helper 测试均通过；随后在首个实际精比对参数绑定拒绝、终态 FAILED/1，
+  未启动任何 mapper。原因是试验脚本把 raw receipt 的 `-c` 放在 `-x asm10` 后，而实际原命令是
+  `-c -x asm10`。不是比对差异、主故障或 OOM。不放宽参数检查：分别验证 coarse/precise 原始格式，
+  固定所有 flag 位序后再替换 `-t` 和隔离归档路径。本地八项通过，登录节点仅仅读 JSON 已将同一组选定的
+  **56 个真实命令**逐一与两个 arm 对齐；没有读 FASTA 或启动 mapper。`metadata-precheck.json` SHA
+  `d0472299c2641857eb2d8c2235f48652572ee658933986a9a4225c25140b2e83`，旧终态 JSON SHA
+  `4f2b78a1028329ad7250643e3282532244b6554e817a0da43cc37c9e81e8722a`。
+- 隔离 `q0-regional-thread-split-20261122-1922-r3` 的同一方案 **43015966** 19:33:42 在
+  `agent-X86-57` 起跑，已确认 16 CPU/81920 MiB 并放行同一作业，完整资源证明 SHA
+  `6e8dbe855d80f476aa3fff8a8729cfec89fb09f7e53ae61cb0474a3feadfa652`；`job.sha256` SHA
+  `dea22d11d515fb6f492dcd0ac75715ec648a91e48c2e479938d9f9d9183fe4c4`。已过 x86 参数门禁，
+  仍在输入核验，无测速结论。之前作业未得 mapper 输出，不做时间对照；继续查询 `43015966`，不重投。
+- 仓库 `lgz_core.common.write_fasta` 仍是原 UTF-8、LF、80 字符折行；每 1024 行成块写一次，
+  不复制整个 contig，不省略输入和 SHA 核对。两项新测分别覆盖输出同字节、分块上界；连同区域 mapper、
+  evidence preparation 和 GRT prepare 共 64 项通过。641 条/17,077,468 字节合成窗口同 SHA，
+  实际新旧 writer 在本地临时盘 ABBA 四次 33.26/17.34/21.40/35.22 ms。是写入 CPU/接口开销，
+  不是共享盘实测或端到端时间；不改当前冻结的 loader/preflight 包，不因此重启。
+- 19:36 新旧主作业及预检 `43015921` 均 RUNNING；新版 19:31:30 达 **7500/61000**、fallback=0。
+
+### 2026-11-22 19:50 CST：核实可单独降精度的目标范围，同时让并发对照完成回程
+
+- 主新版 `43012037` 最近 **7700/61000**（19:44:35，fallback=0），旧版 `42523432` 仍运行。
+  此前约一小时实测 900 窗口/小时，取 19:38 的 7600 作为见证点；不是 mapper 进程数或整套进度。
+  当前同一只读预检 `43015921` 仍 RUNNING、PID3458598仍跟踪，未触发资源提交/安装。
+- 抽查当前 `43012037` 早先新提交的 32 份、由观察快照 SHA 绑定的实际成功 raw 回执，**12** 条
+  精比对有 `-m 2000`，20 条维持原档。不是随机抽样，不能用 12/32 外推或指称利用率触发；是现有
+  自动弱链工作量门禁。尚未启用更强 DP cap。最终未选中的证据仍可能阻止歧义连接，不能以利用率单裁。
+- `43015966` 已完整核验 28 窗/776,558,919 bytes，A1 7×2 **212.433s**，B1/B2 14×1
+  **163.538s / 158.850s**，三个已结束 arm 的粗/精 PAF 每份均匹配原字节。A2仍RUNNING，未见
+  完整报告，不能据前三段当作最终吞吐验收、不能推整麦速度。新增本地真实 mapper 回归：已提交的
+  1线程 coarse+precise/project 用2线程预算续跑，阻断任何 Popen，依赖和原 task 完整复用；
+  mapping/执行 33 项测试通过。无生产资源或精度改变。
+- 先核实“组装内专用降精度”有多大可行范围。`measure_regional_intra_scope.py` 对已冻结的1189个
+  完成raw回执和 context 逐份按 SHA 绑定，按原始 lookup 区分纯组装内、纯跨组装、混合；统计旧
+  native >=30s 长尾，不把目标碱基占比解释为真正耗时、证据利用率或充分性。没有读取任何序列/PAF、
+  没有再次跑原生比对。不把混合任务当成可全体降精度；先量范围再判断有无必要做分拆对照。
+  登录节点实样 7 个均是混合，其中一件历史 229.263s、组装内237,711bp/跨组装153,851bp；
+  只是预检，不外推。局部两个测试和旧 helper 共8项本地通过，后续计算节点两个范围测试也通过。
+- 隔离 `q0-regional-intra-scope-20261122-1947` 作业 **43016008**，1 CPU/4096 MiB，19:47:10
+  在 `agent-X86-18` 启动，仍 RUNNING。`job.sha256` SHA
+  `2649006e1d315e8d64b881c89a7db6b6b7f8f089427d36536f3abbd912fb96bf`，`smoke.json` SHA
+  `3f548f727e5b5042243c59caa3dd07bacd04fbf0028b793753d4db86f02486f1`。以同一作业终态和
+  `full-scope.json` 验收，不再提交同类扫描。
+- 19:51:03 `43015966` 已真实到隔离诊断上限，终态 FAILED/124；不是主任务故障，未生成完整 ABBA
+  报告。第四 arm A2 日志有 28/28 coarse、25/28 precise 的原生结束行，但不作为完整 SHA/回合验收。
+  已完成的 A1/B1/B2 仍是 168 次全 PAF 字节核对；B 两次相对唯一完整 A1 各少约23%/25%墙钟，
+  说明资源重分值得关注，不是最终倍率。终态 `terminal-43015966.json` SHA
+  `0dfdc2eb5944269694b16035768636ee2d1c334638d4370704b2e063e0d961d1`，日志 SHA
+  `647ddadcc153bcaac198cd22164ea3a1745b9088d90660d1a717ce38fa2a95fd`。保留原证据，不重跑整组
+  实验、不据缺尾样本一次切入主任务。若需要补证，只补对照臂或做更贴近生产资源的有界验证。
+  主 `43012037` 19:50:56 进到 **7800/61000，fallback=0**，只读预检与组装内范围作业仍运行。
+
+### 2026-11-22 20:13 CST：排除整窗“组装内”近似路径，找到续跑 PAF 校验的小读瓶颈
+
+- `43016008` / `agent-X86-18` 在 19:57:48 **SUCCEEDED**。按冻结的 1189 个已完成原始窗口逐份
+  核对回执与输入 context，**1189 个全是混合组装内、跨组装，纯组装内 0 个**；原 `-m 2000` 497 个。
+  这不是剩余窗口的随机样本，也不等同最后利用率。20 个 native wall ≥30s 的窗口占该 cohort
+  原生 CPU 2758.424 / 8409.892s（约32.8%）；其中19个的同组装目标碱基至少一半，不能据此认定
+  CPU耗在组装内或放宽整窗精度。只值得先测少数、不同源part的实际长尾，组装内外物理分开；把新增
+  mapper/准备成本和跨组装配对门变化一起算。若分拆改变必要跨组装证据或净耗时不降，则不接入。
+  `full-scope.json` SHA `d8a96fc3b87e5c2f2dccacf1a40a11e470f0fa1094907ce220734157116c738d`。
+- `43015921` 同一个只读预检开跑约50分钟时仍无整体 unit marker，不是挂死。1CPU只读
+  同节点观测 `43016012 / SUCCEEDED`（目录 `preflight-43015921-observe-1957`），严格绑定
+  scheduler job/pid/cgroup/uid/命令/进程start_ticks，无 attach、不读序列/PAF 内容。
+  19:58:45–19:59:25同进程在 `runs/JM19_hifiasm_vs_ref/result.paf`（683392866 B）偏移
+  629719040→644595712，CPU ticks 增长，`syscr` +1816、偏移 +14876672 B，等价平均每次8192 B。
+  三次采样均 D；是活着且缓慢读数据的证据，不能把路径采样墙钟当整次核验速度。至20:06已出现
+  真实首项 `ref:JM19_hifiasm`，不取消/另投预检。观测 `samples.jsonl` SHA
+  `0d1b14237099224ea73338813f2ed2fca8cae1e46d284b3851af39f04f371e6f`。
+- 源码共用 `open_paf_text`：保留 Python 原 UTF-8 解码、通用换行、行号、CIGAR/名字/尺寸/投影、
+  原 LF/CRLF/CR 及原始 byte-offset 义务；底层只把共享盘的小读合并成 1 MiB 有界二进制预读取，
+  不是只抽查几行或取消内容校验。同类调用覆盖 outer `validate_paf`、Q0 reference/PAF index、
+  区域 coarse、原始 PAF 投影及最终重放。85项定向测试通过，覆盖 UTF-8/CRLF/无末尾换行、跨块
+  长CIGAR、真实 byte-offset、损坏和完整性拦截。临时字符分块候选增加CPU，未采用；最终采用原生解码器。
+- 最终实样 `43016017 / agent-X86-18 / SUCCEEDED`：同一 16,777,379 B / 67,745 行输入前缀，
+  四次行序/字节 SHA 一致，read 系统调用（含计数文件一读）从 **2051降到19**，CPU约75ms不变；
+  A1/B1/B2/A2 wall 0.411/0.247/0.206/0.181s，有缓存波动，**不是全量预检测速，不能宣称核验快百倍**。
+  目录 `q0-preflight-paf-read-abba-20261122-2003-readahead`，`report.json` SHA
+  `eef09c57fdb315f95f7bd63f4fc578359e3c1cf67ba9c6e87d0a4bbf781e30ee`，`source.sha256` SHA
+  `312ec4b100cde106db8634eb7fa462e44c2fda749b22b044e718569ab23401de`。生产三个模块须同一版本，
+  **不热替换**经源SHA绑定的远端预检/旧模块，不混入当前冻结loader包；不为此重启。真实Q0新旧大任务
+  都仍RUNNING，新版20:11:16到 **8100/61000，fallback=0**。
+
+### 2026-11-22 20:30 CST：两条真实长尾开始测物理拆分，跨组装不降精度
+
+- 主新 `43012037` 最近 **8300/61000**（20:24:15，fallback=0），旧 `42523432` 仍 RUNNING。
+  原只读预检 `43015921` 继续、同一观察器仍跟踪；到20:30只见首个真实参考 unit，未获完整
+  `validation.json`，没有切换或安装。`dd872187` 只在仓库，不替换冻结预检。
+- 基于1189窗范围审查，仅取两个已存档慢窗（72/77，两个不同源part，先前有弱链密度阳/阴），
+  复用 63,189,781 B 已有窗口 FASTA，登录节点仅核对 actual argv、原回执/原 context 和文件大小。
+  原独立输入完整 SHA 在计算节点重验。按组装把原完整目标 FASTA 记录分开，保留每组顺序及序列字节、
+  查询、原最小链分数、2线程及4 GiB guard。每窗只跑原混合档一次、跨组装原档一次、组装内原档一次、
+  组装内30m DP cap一次；跨组装绝不启用 cap，不重跑粗比对/全套小麦。混合回放必须字节等于旧 PAF；
+  先区分目标拆分本身和 DP cap 的影响，再按真实配对资格门比较 paired 位置、方向及新放行冲突。
+- 诊断 `43016142 / agent-X86-25` 20:28:47 实际起跑，6 CPU / 24576 MiB，目录
+  `q0-regional-intra-split-20261122-2027`。`job.sha256` SHA
+  `3dbc993d88e6a4338b45f5fef3a386ac857d4a90c46eaf043b36474464af586e`，`metadata-smoke.json` SHA
+  `df83ee68c378a50e30eeda6d79e3f9bc7122ed95c61dcfd7bda609948e2f5612`。新三项及原配对/参数测试
+  共10项本地通过；源身份、诊断时限和原守卫独立。只有同一作业成功和 `artifacts/report.json`
+  才是两窗完整结果，不能凭进程/临时 PAF 下结论。候选耗时必须计入拆分、第二次 mapper 启动、
+  原档跨组装计算；即便配对门不变也不是整条 Q0 路径/后续补缺验收，不自动用于新版主任务。
+
+### 2026-11-22 20:45 CST：否决物理拆分上线；将完整 PAF 校验和原始 SHA 合并为一次读取
+
+- `43016142 / agent-X86-25` 20:43:26 **SUCCEEDED**，两份同节点原混合命令都与原存档 PAF
+  字节完全相同。计入目标拆分和两个子进程，72 号精比对 313.099→145.123s，77 号 221.120→160.333s。
+  **不接入生产**：跨组装未改任何精度 flag，单把组装内外目标分开，72 号在真实配对资格门已少
+  7,123、增加1,948个按有向 paired 坐标并集的 bp，其中95 bp 是旧观测但旧门不通过；77号也多
+  1,035 bp。切组本身会改变链/定位/竞争关系，不能把收益当作单纯组装内近似，不保证真实参考下路径或
+  补洞安全。仅在分拆后的原档与30m之间，跨组装为0差异，证明作用域没有越界，但不弥补拆分损失。
+  `artifacts/report.json` SHA `d5830335d28257bc52da2fe7874a9afa8d1529c91ec2eceac55d5a4e5a0be982`；
+  `terminal-43016142.json` SHA `abaef1c796c31cafa95af8832148349a1d0739e8831cd3d7a09b04d04ee2f3ca`。
+  不再在同一物理拆分上盲调阈值。后续如有目标内选择性候选，必须保留原混合目标上下文与跨组装证据。
+- 仓库 outer checkpoint 原逻辑先完整扫 PAF/CIGAR，再为同一输出计算 SHA。新
+  `paf_file_identity` 在同一有界读取中调用**原完整几何验证**并计算解码前的原始字节 SHA；
+  末端要等到真实完整读及 fd、path、inode、size、mtime、ctime 全部吻合，才能填入原 content memo
+  并返回原路径/大小/SHA 格式。若原始字节已有有效的同进程摘要，仍逐行严格几何验证，不增加温读哈希。
+  `reference_alignment`、`q0_chromosome_alignments`、legacy `chromosome_local` 等共同输出入口使用；
+  非PAF、其它输入清单与原数据协议不改。新测覆盖冷路径禁止第二次 hash 读取、UTF-8/CRLF 原字节、
+  几何校验完成后原子替换必须拒绝、摘要命中亦不能放过坏行；74项定向测试通过。
+- 完整原参考比对 PAF（683,392,866 B）现场对照 **43016156** 已提交；只重验同一份旧输出，两个
+  路径均检查原 checkpoint 的 SHA / geometry，记录系统读取量及耗时，隔离目录
+  `q0-reference-paf-onepass-20261122-2044`。`job.sha256` SHA
+  `f93095d3430e2a994995f1146c0b0c4881ed9a78d6ffe4b09789b64ddb8268f3`，`source.sha256` SHA
+  `e4bfb1bb9adfe84ae8a0a40bcd19563422304066a424120c0197c222074d6285`。待真实成功报告；
+  不改或终止冻结的预检 `43015921` 及主任务；不可把这项 future 优化算进当前速度。
+
+### 2026-11-22 20:54 CST：真实参考 PAF 核验少读一遍，未测得壁钟收益
+
+- `43016156 / agent-X86-23` 于20:52:47 **SUCCEEDED/0**。本轮的新旧代码都使用1MiB read-ahead；
+  在同一个683,392,866字节完整参考 PAF 上做原完整几何验证并返回相同的 path/size/SHA，均与原
+  checkpoint 的输出项一致。新方案的 `/proc/self/io` `rchar`（含少量采样）
+  **1,366,785,830→683,392,970**、read调用 **1310→656**。CPU秒 **51.66→51.33**，
+  但壁钟 **196.76→204.52秒**；此单次固定顺序没有证明壁钟提速，也不能区分缓存和共享盘波动，
+  更不是完整25项预检测速。保留仓库 `3c15342d` 的等价少读实现；**不为它重启或更换远端预检/main**。
+  job/source manifest再次校验通过。`q0-reference-paf-onepass-20261122-2044/report.json` SHA
+  `38fc0c3dc2193c8a1b6e089754a39dd9e29bf93802a81685425fd7205e84f48a`；`terminal-43016156.json`
+  SHA `25c3befbb506dee23f1992422609b318b85032509c5cb0ffa16338d49c55f3b5`。
+- 20:53新版 `43012037` 在同一节点继续产出，20:51:12 **8700/61000 / fallback=0**；
+  调度器一拍 recent CPU 329%、memReal 89,624 MiB（约87.5GiB）、swap=0。近期吞吐仍约
+  900窗/h，不是核数耗尽；不能从一拍指标确定剩余时间花在何处或缩掉为后续阶段保留的内存。
+  关注已排查的 mapper 进程启动/共享盘开销，不把加线程或更强近似当默认解。
+- 只读 `43015921` 同作业仍 RUNNING，实际又通过第二份 `ref:JM19_flye_ABD`，共2/25；
+  不把单项成功当完整恢复门禁。没有资源提交intent或ready/handoff，旧 `42523432` 仍运行且未改。
+  继续核对 PID3458598 及同一预检的权威状态；观察器自然到限且没有intent时才按照 19:10 的规则续接，
+  不重提活着的预检，不提前停新版主任务。
+
+### 2026-11-22 21:07 CST：合并区域回执的路径核对，不变配对规则
+
+- `q0_preparation.identity` 服务于区域raw/project回执、原生补证和最终evidence inventory。原来在
+  `artifact_path` / `is_file` / `sha256_file` / 最后一次额外大小`stat`中重复查询目录。现复用通用
+  `file_identity`的同一对签名，按哈希真正绑定的解析路径验证workspace约束，同时继续验证原逻辑路径
+  在读前后（包括温memo）未被换向。输出原始逻辑`path`、size、SHA完全照旧，不放松缓存验收。
+  93项定向测试全部通过；全`test_q0_*.py` 331项（330通过、1跳过）。新测覆盖原label、一次真实冷读、
+  拒绝workspace外链接且不读取，以及命中摘要期间链接换向仍拒绝。
+- `43016380 / agent-X86-08` 21:06:08 **SUCCEEDED/0**。只读32份历史成功raw回执及各自的原
+  command/guard共96个小文件，118,967字节，8段均与冻结的96项`path/size/SHA`逐项相同。
+  每段Python层`Path.resolve` **384→288**、`Path.stat` **576→192**（非内核调用计数）。
+  A1/A2冷memo **9.51/5.43s**，B1/B2 **5.37/5.41s**；温memo A **0.89/0.89s**、B **1.04/0.88s**。
+  受共享盘波动影响，尤其温memo未证明壁钟改善；不把小文件批对照当整麦吞吐。未读FASTA/PAF，未
+  写主 workspace。隔离目录`q0-artifact-identity-abba-20261122-2102`，`job.sha256` SHA
+  `87e1710d29377874e576b28819f0efc878b4ae3514c383c71731605d77dc45e5`，`report.json` SHA
+  `c20d623895acde3e53007285912ce238a0035f1bdfcd742a88ceae307b623edb`，`terminal-43016380.json` SHA
+  `8152fa37e082c983498b1435f88d1d5138c4a4a7c957c4eafda471ac7f3783cb`。
+- 新版 `43012037` 21:04:17报 **8900/61000 / fallback=0**，两份主作业仍RUNNING。只读预检
+  `43015921` 又完成 `assign`，正式已验3/25。冻结的生产文件、预检及原等待资源门不换，不因此重启。
+- 原观察器3458598于 **21:08:09** 有界到期、进程已退出；原预检未终止。核对同一 preflight 和两
+  原 job 都运行、原 workspace 锁匹配、无 submit intent/ready/handoff 后，使用原验证过的环境、
+  相同脚本及3h-config SHA，一次续接 **PID488989**（21:11:56，断开重连验证PPID1）。已有
+  `loader-watcher-3h-relay.once`、`.pid`、`.log`；切勿并起另一份。仍最多90轮且只准在25/25等
+  原门禁通过后申请一份等候资源；不会动主任务。21:12 已有 `q0_chr:1A`（实际4/25），新版
+  21:10:48 到 **9000/61000**、fallback=0；旧版仍RUNNING。尚未建立任何资源提交凭据。
+
+### 2026-11-22 21:20 CST：实测节点本地 FASTA 周转收益，不碰当前运行
+
+- 新诊断 `43016417 / agent-X86-08 / RUNNING`，实际6 CPU/16384 MiB、2路×2线程，每路仍4 GiB
+  地址空间保护。固定抽取8份已完整提交原coarse+precise的归档窗口，ABBA比较**共享盘直接读 FASTA**
+  与**同一窗口完整复制至私有节点本地 `/tmp`、SHA核验后两次共用**，把复制/核验计入B。只替换两个
+  输入路径；原guard、mapper、参数/顺序和共享stdout/stderr位置不变，两段stdout都须等于历史全量原字节SHA。
+  目录`q0-regional-local-io-abba-20261122-2118`，`job.sha256` SHA
+  `d72fc959305f2508ae284c53085caede1c90d255a0dd66976d0fed8fcf45ac2e`。仅对隔离作业设20分钟上限；
+  本地4项针对性测试通过。无完整实测之前不以“共享盘慢”推出搬到本地一定省时间，不改主任务或回执协议。
+- 21:20 两份主作业仍RUNNING，新版 `43012037` 于21:17:38报 **9,100/61,000**、fallback=0；
+  `43015921`同一预检仍RUNNING、4/25（两参考、assign、1A），观察器PID488989确认存活。仍未切换。
+- 首份 `43016417` 在 **21:24:24 FAILED/1**：计算节点测试中，对同长度文件快速改写后，原测试用的
+  stat签名没有可靠改变，原试验只验证“本地副本等于当下读出的源”不够。没有进入原生对照，不是主任务失败。
+  终态 JSON SHA `bffab6f33883f2886f11ec938c4ac4e80c58dde8e10eaea486ca4824ad77b3cb`。
+  改为每次本地暂存同时核对**冻结原回执SHA、实际源字节和新副本SHA**，并在完整ABBA后重读共用归档
+  复核；测试显式模拟元数据相同但内容错误的情况，必须拒绝。保留两阶段全量stdout SHA和原参数门禁。
+  本地三组10项测试通过。新作业 **43016420** 在`q0-regional-local-io-abba-20261122-2118-r2`单次
+  提交；test的临时文件只落私有节点本地目录，并增加独立240s测试预算；`job.sha256` SHA
+  `390961549fc9f2c53c12597899fa275120d2e59d20d2213153b733383e63f8d9`。等待该作业终态再判断净收益。
+
+### 2026-11-22 21:37 CST：预备全量只读缓冲校验，不再盲重投本地 FASTA 对照
+
+- `43016420 / agent-X86-60` 在21:34:20 **FAILED/124**，出在独立240s单测预算（尚未完成测试、
+  未创建 native artifacts、没有任一组mapper/速度结果）。与主分析的资源、旧版进度、真实比对精度无关；
+  `terminal-43016420.json` SHA `1eaddb9b50814105a5224c23d84e0105eae622ea9e3089267433000c09251cfb`。
+  不将该诊断终态当成节点本地一定慢/原主失败；不再投同样的测速包，先保留已有投入。
+- 回查上次真实25项证明 `a46396d126d9f1620acf010ff4b5559c64c62c9fdbc75cfbbe138ccb298e6fee`：
+  本次工作区25份原checkpoint JSON的当前内容SHA全部相同。其声明的输出里有68份 PAF，参考
+  1,745,286,139字节、区域初始染色体 12,522,376,422字节（合计约14.27 GB）；**只核验JSON元数据，
+  不表示本次重新读过PAF或25项通过**。原真实预检8 KiB读取已实地观察到，不再靠增加旧诊断上限解决。
+- 已准备隔离 `q0-buffered-preflight-probe-20261122-2137`，真实独立 `origin_probe` 角色绑定
+  基础transition/原native origin、原25项proof和 SHA 锁定工作区冻结 verifier，原有输入 fingerprint、
+  native/cross/self及最终封套验证完整保留。只替换输出PAF流为1MiB缓冲、完整几何/CIGAR与原字节SHA
+  同次读取；逐项匹配原成功预检的真实input fingerprint和 checkpoint SHA。23项本地定向测试通过。
+  `job.sha256` SHA `39191ac388f95c7d0bb8895a989b2b2840b5e3a92e1289019e233dbc39059599`，
+  `config.sha256` SHA `392ef9630cc6643f0825925ec635abb005055b17d2da0b9ce686c7d1ce2004fc`。**已stage
+  未提交**；只有原 `43015921` 权威终态未通过且没有有效交接凭据，再判断是否提交一次，不并跑相同全量
+  校验。隔离结果写`buffered-proof.json`，不能冒用被冻结切换控制器的`validation.json`，不安装/停作业。
+- 截至21:37：新版 `43012037` 于21:32:16 报 **9300/61000、fallback=0**；旧 `42523432`仍运行。
+  原 `43015921` 仍RUNNING、实际4/25、PID488989仍跟踪，未产生新的资源提交或切换。
+
+### 2026-11-22 21:45 CST：只读预检验证超时后才自动启动缓冲候选
+
+- `43015921` 未结束；已另过`q0_chr:1B`和`q0_chr:1D`，实际 **6/25**，旧loader资源观察器
+  PID488989仍活，没有`validation`、`loader-resource-*`或handoff。原 `43012037` 21:39:45 达
+  **9400/61000 / fallback=0**，旧`42523432`仍RUNNING，两个主作业不重启、不改精度。
+- 隔离缓冲验证目录已启用一次性的条件发起器 **PID1952872**，21:44:36启动、重连验证PPID1：
+  `retry-launcher.json`、`retry-watcher.log`、`retry-watcher.pid`，`retry-watcher.sha256` SHA
+  `83368f2a730e5007ed47ec815234f092e5c44e9e580b58d14ddd36aef85a9bdc`。55轮每分钟有界查看。
+  只有同一原诊断经Donau确认**FAILED/124且子进程确实退出**、原job与脚本receipt匹配、没有任何新
+  校验/切换凭据、两个主作业及原工作区锁匹配、真实loader smoke仍通过时，才校验缓冲诊断的两个冻结
+  manifest并发起一次2CPU/16GiB只读缓冲验证。独占`submission.intent`后不盲重投含糊dsub返回；
+  不发停止命令或申请32核切换资源，也不生成原`validation.json`；原预检成功则直接退出，不再跑一遍。
+  本地关联12项测试、远端Python3.10现场5项均通过。截至21:45尚无该缓冲诊断新job或提交intent。
+
+### 2026-11-22 21:55 CST：为缓冲结果准备独立验收，不替换原预检报告
+
+- `43015921` 原只读预检仍RUNNING，实际 **9/25**（已过 `q0_chr:2D`）；观察器PID488989、缓冲
+  候选单次发起器PID1952872均存活、无缓冲候选提交、无`loader-resource-*`、ready或handoff。
+  两主项目仍在原job；新版21:48:53报 **9500/61000、fallback=0**。不改精度、原门禁或主任务。
+- 缓冲proof如最终实际通过，使用**独立、可追溯的兼容入口**：冻结原`validation.json`要求不变，不仿写
+  该文件。只有明确提供 `--buffered-proof` 和关联真实`SUCCEEDED/0`的 Donau 终态 JSON时，才额外检查
+  缓冲独立启动回执/旧超时、原state/transition/native origin、探针和读取器SHA、同序25项完整原
+  fingerprint和checkpoint SHA，并重核对25份当前commit JSON。分配节点在ready前及handoff后分别
+  验证该独立证据及控制代码SHA；真正owner获取正常锁后仍重验初始结果。其他loader、资源、原作业结束
+  和独占锁门禁不削弱，绝不由准备脚本停止或提交主作业。
+- 控制文件只stage在同级隔离 `q0-buffered-handoff-controls-20261122`，未替换原cutover目录及源码，
+  `controls.sha256` SHA `c54a6730e36774d5b8d36bc7123044102b6ca16d4867a7d544822297bf1f9b35`。
+  本地27项、180同原保护模块12项定向测试通过。并非真实候选的验证成功；在完整缓冲结果出现前不运行
+  这个接口，不写原handoff文件，不申请备用分配。若原预检成功，沿原观察器路径，不动此备选入口。
+
+### 2026-11-22 22:12 CST：原只读预检到限，改跑缓冲探针；两主作业未停
+
+- Donau确认 `43015921` **22:10:59 FAILED/124**、无残留进程。这是3小时**诊断**预算终态；
+  最后完成到`q0_chr:4B`，真实 **14/25**，没有`validation.json`，原资源观察器未提交也未切换。
+  `q0-child-loader-cutover-20261122-180258/preflight-43015921-terminal.json` SHA
+  `b85e0bf1762a1111be1ce70e5469b342e36784a22e2917c3792620c99ddec8a9`。
+- 条件发起器扫描到该终态后只提交了一次 **43016469**；22:11:43 在 `agent-X86-18` RUNNING，单节点
+  2 CPU/16384 MiB，文件 SHA 已在作业内核验通过。目录 `q0-buffered-preflight-probe-20261122-2137` 的
+  `submission.intent` SHA `a49cec5dbcb0468c5f111612d069a69de6ce6c86874b6ed1c9e632b3e1d8b7b5`、
+  `submit.txt` SHA `258b3343ddf3a20227ba0844d453e435012223aff5ec1c4b8b9dc482c7b9578d`。两个有界
+  观察器均已退出；跟同一个已提交诊断，不另重投，不把启动/manifest成功当25项验证。只有独立
+  `buffered-proof.json`及真实调度终态同时通过才验收，预检本身不安装、不动两个主任务。
+- 新版 `43012037` 22:07:20报 **9700/61000 / fallback=0**，旧 `42523432`仍RUNNING。截至21:57
+  的精确一小时窗口约803窗/h（8800→9600/3588秒），后段100窗口花573秒；当前速度有波动，不用一天
+  的混合缓存/新增平均估计。此轮未修改运行代码、科学参数、资源或任何真实结果。
+
+### 2026-11-22 22:21 CST：真实主作业仍主要受进程启动/等待限制，优先验证无损 loader 路线
+
+- 同节点1CPU只读 `43016507 / agent-X86-39 / SUCCEEDED/0`。12次、间隔约5s，绑定真实
+  `43012037` 的工作区锁、原reader/owner PID、start ticks、同作业 cgroup 和当前UID。只取进程树、
+  状态及任务分类，不attach/发信号/读FASTA或PAF；1项聚合绑定回归通过。隔离目录
+  `q0-mapper-slot-sample-20261122-2218`，`sample.sha256` SHA
+  `c5b48d90e5ba7d9865a150bd19d9b2b453e53494eb44e86f25531b6e23d61610`，`samples.jsonl` SHA
+  `a48d4452f404265cc57948aafd83f2fe4e289ec76cea070d6086bb95ebc61433`，`terminal-43016507.json` SHA
+  `cb34821a0f4815353e7db6e3b06565fc1faad85e143543ba4ccfa464bb15dbcd`。
+- 12个瞬时采样每次可见 **9–13个**区域子进程（均值11.5，池上限14）；总138个进程观测中，
+  **68个尚为Python guard、69个已是minimap2、1个处于其它区域启动状态**。guard观测64/68为D；
+  native观测37/69为D。等待通道多数不可读（0），主进程状态不代表其所有线程；不是耗时百分比、
+  不据此归因到具体文件。现象不支持把“多加线程或全局提速档”作为第一步；优先完成已做真实字节
+  对照的child-only loader路径，不取消guard。缓冲预检 `43016469` 仍RUNNING，无完整proof。
+- 主新版22:20:32 **9900/61000，fallback=0**，从21:24:43的9200起700窗/3349秒，约**753窗/h**；
+  旧版仍RUNNING、未动。余51,100窗若维持此速约68h仅指当前阶段。假定一次实际切换损失6h、且所有剩余
+  待做窗口同质，候选需约826窗/h以上才抵消；仅是成本门槛，不是新吞吐预测，真正切换时须以完整预检、
+  实际有效剩余/续跑损失和同节点配置验证重算。不热换代码或参数，不预先停当前主作业。
+
+### 2026-11-22 22:28 CST：量化无损启动优化在并发池的净收益
+
+- `43016593 / agent-X86-16` 已真实RUNNING，隔离 `q0-loader-pool-abba-20261122-2229`，单节点
+  10 CPU / 32768 MiB、4路×2线程、每路原4GiB AS guard。按历史耗时预选8份有双阶段归档的窗口；
+  同节点ABBA仅切换mapper子进程的 `LD_LIBRARY_PATH`，调用冻结候选真实探针，必须与已有writer smoke的
+  依赖路径及内容SHA证明相等。粗筛和精比对全部stdout都与原归档逐字节一致才能收下；独立计完整pool墙钟、
+  单窗服务时间及一次性loader探测。没有规划、发布、锁切换或完整主进程，不外推整麦吞吐。
+  本地8项、180同Python3.10 1项定向通过；`job.sha256` SHA
+  `bebc7db93dab397b9802a79a8dfd95537a2d078ab250e2b2c0ff5869440bd079`。目前仅到作业启动，未得到结果。
+- 新版22:26:27 **10000/61000（16.4%）、fallback=0**；从21:32:16的9300起700窗/3251秒，约775窗/h。
+  两主作业仍RUNNING，`43016469`仍RUNNING，未提交完整buffered proof、未申请主切换资源。没有把无损
+  loader候选或隔离测量部署到主运行，也没有降低精度。待原生并发对照和真实25项证明后再评估净切换收益。
+
+### 2026-11-22 22:41 CST：启动开销实测有收益；下一步以减少有效计算为目标
+
+- 原严格跨节点 `43016593` 在 22:28:51 **FAILED/1**、未起 mapper；不假定是二进制不同。
+  后续仅在隔离对照 `43016623 / agent-X86-16` 显式允许记录并诊断本节点证明差异。实际只有
+  `inherited_path_sha256` 不同，工具及解析后的依赖路径/内容 SHA 相同；本节点仍比较清理前后
+  的实际依赖，冻结生产切换证明不放宽。该对照 22:37:54 **SUCCEEDED/0**，8 个真实双阶段窗口、
+  196,369,277 B，4路×2线程、原地址空间 guard。ABBA 墙钟 A=58.478/54.912s，B=36.007/45.821s，
+  同节点并发池墙钟少 **27.8%**，64 份粗/精 stdout 均等于各自历史完整 PAF；20.90s 一次性
+  loader 探针单记。此对照不含大 owner、规划、投影及切换成本，不外推整麦倍率，无安装授权。
+  `q0-loader-pool-abba-20261122-2229-node16/artifacts/report.json` SHA
+  `021b503a0585cb94e367d42d7e1e2e21b25e4998dce9becdcfc17c72a975a55c`，`job.sha256` SHA
+  `0e6fb68232a48b6189883fa25da731f22894d24d8cbe2b8cfb66cfa90db94e00`。
+- **少算而不是调大并发**：完整、同身份、同搜索范围的成功结果才能无损跳过；不把对侧已有覆盖
+  当作所有备选配对已经找到。16:25 实样已反证按覆盖跳窗，13:20 实样已反证按目标碱基缩减估加速。
+  下一项算法验证先用已存档精比对，在不改参考/跨组装证据、不改混合目标列表的前提下，重放
+  有/无低价值组装内补充时的候选与冲突判定；最终去向没变化的前提是同样的歧义也被识别，不能只数
+  入选证据或算覆盖率。只有确认哪类证据不影响决策、且扣掉回补还有净墙钟收益，才做按证据充足度
+  自动触发的延后补算；缺锚、边界和冲突保留原路径。现在尚未确认能批量跳过多少，不改正在跑的科学策略。
+- 22:41 观察两主作业均 RUNNING。新版 `43012037` 22:35:02 **10100/61000**、fallback=0，
+  从21:57:47起500窗/2235秒，约805窗/h；旧 `42523432` 仍在 `grt_step2`。`43016469` 已有
+  两个参考 unit 的真实独立校验回执，尚无完整 buffered proof。保持两主作业不动，不部署本轮对照，
+  不预支尚未证明的续跑/算法收益。
+
+### 2026-11-22 22:58 CST：用归档慢窗试验「跨组装已定位，组装内能否延后」
+
+- 提交独立只读 **43016650 / agent-X86-18**，实际22:52:55 RUNNING，单节点1CPU/4096MiB。
+  用冻结1189窗trace选最多24个不同父contig：高CPU、短内部core、一般窗各至多8个，选择不看原PAF。
+  逐份核对原raw成功凭据、完整PAF SHA及窗/源几何，再原样投影；配对资格门复制**当前运行代码同SHA**
+  至隔离目录，逐源对、方向及实际对应位置比较。原生mapper未运行，不写主workspace。
+  隔离目录 `q0-regional-intra-deferral-20261122-2253`、`job.sha256` SHA
+  `529de299fe683dc6a6091586cf9853cc1e7e658fe39849b509a04bb47ccd40e9`。本地15项、远端4项定向通过；
+  截至22:58调度器仍RUNNING，尚无完整归档报告或可用于决策的逐窗结果。
+- 这个探针先证伪一条便宜门：窗口核心不在端部，已有**唯一**跨组装有向位点完整支撑核心时，检查原样
+  组装内命中是否仍提供合格配对、是否还带有未过门的备选位点。不把不同target/方向的union冒作唯一。
+  使用中性placements与本窗档案，只能排除过宽策略，不能证明生产Q0选择、冲突或补洞等价。即使局部
+  合格组装内命中少，也要用真实锚和base PAF验收；另外 `known_pairs` 会影响下一轮 `supplemental_groups`，
+  必须把由此新增的补算计入净耗时，不能把后移计算当成删除。
+- 22:58 两个主作业仍RUNNING。新版 `43012037` 最新 **10400/61000**、fallback=0；旧 `42523432`
+  保持 `grt_step2`。只读 `43016469` 同个作业已真实校验8/25项，无完整缓冲proof，不申请主切换资源。
+  不改变两个主运行、不在隔离对照之外降低精度。盯同一 `43016650` 终态与 `report.json`；若旧配对门
+  在慢窗超隔离预算，非主任务失败：优先用已存在索引资格门做有界候选筛查，再让旧门仅核对候选与反例，
+  不重复同一慢对照，也不把筛查替代真实证据验证。
+
+### 2026-11-22 23:10 CST：归档实样不支持按唯一跨组装覆盖延后组装内比对
+
+- 原只读 `43016650` 23:06:14 确认 **FAILED/124**，12分钟诊断预算内没有一个完整窗；不是两份主作业故障。
+  原配对门完整跑所有目标，而多数窗不满足候选必要条件。另行只读 `43016697` 在相同 `agent-X86-18`
+  保留同一批窗、原源码SHA及PAF完整验收，只把明显不合格的窗提前排除：端部直接不入候选；余下比较
+  实际已观察到的有向坐标映射，只有单一完整覆盖的源对才进入原资格门。候选仍传同源对全部命中，核心外
+  的冲突也能否决；未计算的资格字段为null，不能当0。先处理短内部窗；未替换活跃工作区任何代码。
+  18项本地（包括150组与不预筛的结果对照）、7项HPC单测通过。
+- **43016697 / SUCCEEDED/0**，23:07:16到23:09:31，科学重放部分45.33s、不执行原生比对；24窗
+  完整验证21,182,208 B。14窗无单一完整观察map、7窗为端部；只有3窗通过初筛。**高成本组0/8**，
+  其中一个原精比对325 CPU秒的窗有3737个相交跨组装映射，不属于该策略能推迟的补证。通过的三窗
+  原整个精比对仅3.396 CPU秒，非代表性24窗合计1064.629 CPU秒；这只是本组潜在范围上界，不是节省。
+  并且3窗里2窗仍有合格的组装内位置（分别2和41个按目标/方向/偏移归并的maps）；不宣称这些位置
+  都会被最终选用，但不能把唯一跨组装覆盖当作无损跳过充分条件。该门不接入主任务，不扩大试验重复找阈值。
+- 证据：`q0-regional-intra-deferral-20261122-2305-r2` 内 `job.sha256`
+  `47ebcbdec6837d81768354d382899d965ccd628c1d17370f7ee600e65c6ad452`，`prior-terminal.json`
+  `28deb1791f70a37875713cd0c416df847b19db766a94b5475db89d2a98db84aa`，`report.json`
+  `8132d1db33878660de75a81065846b73598ea45d3a8b88ddc39ae93f076cf6ee`，`terminal-43016697.json`
+  `141ecafe68d8302f0b6ea05ad6103791b1e74bef0b52891e0c881011de2d9e3a`。
+- 回到无损切换路线：独立 `43016469` 已实证11/25，尚无完整验收；当前不申请切换资源，不重启。
+  新版 `43012037` 23:09:07 **10500/61000**、fallback=0，旧 `42523432` 继续 `grt_step2` 未动。
+
+### 2026-11-22 23:26 CST：确认其它 x86 节点可复现归档输出，补上实际续跑节点的装载验证
+
+- 不用「随便换节点」绕过 writer smoke。原门仍优先要求与旧 smoke 完全相同；只有明确走独立缓冲
+  proof并启用`--allocation-replay`，且**仅**继承的`LD_LIBRARY_PATH`字符串摘要不同、既有工具
+  （包括`--version`）及被加载的实际库路径/内容SHA一致时，才在**将要续跑的同一分配节点**用
+  原4GiB guard、原两线程及原FASTA字节回放一份粗/精窗口。两阶段全stdout分别等于归档才允许
+  `loader-ready.json`；依赖、工具或输出变化仍拒绝，保持原父环境。后续`ready.json`绑定小回执，
+  交接时重核控制文件及两份本节点回放；真正owner仍须普通锁与原阶段核验。不修改冻结原启动包、
+  预检或主工作区。本地22项控制/原生对照helper测试通过。
+- 隔离工具试验 `43016716 / agent-X86-65 / SUCCEEDED/0`，23:21:34–23:25:15，18项远端控制
+  测试通过。65号节点的工具装载证明与原 writer smoke 完全同一（与16号节点只有继承字符串不同
+  的现象区分）。另外强制执行**诊断-only**归档回放，同节点用候选guard核对10,270,923 B，
+  两阶段完整PAF字节SHA均通过，回放28.371s。这不是主32CPU作业的分配或真实接管，不能用于
+  跳过新分配节点的核对。隔离目录`q0-buffered-loader-controls-20261122-2321`，`controls.sha256`
+  SHA `dbe38c7c4f1f70393e8ceac3df33495a86492d5e813cb407384616b188f43bd8`，
+  `archive-diagnostic.json` SHA `734ca6a7023d3bbfb3065a149d8c892702563e03c665ce2110a7af80d057b7b6`。
+- 23:25:45 两个主作业仍RUNNING；新版最新23:18:16 **10600/61000、fallback=0**，旧版仍
+  `grt_step2`。`43016469` 同一隔离预检实测已过17/25（至5B），未生成完整proof。只在完整25项与
+  同作业成功终态通过后使用上述隔离目录的准备入口，先核对旧主锁和相关凭据；不提前申请交接作业，
+  更不因诊断成功停新版或动旧版。是否切换仍以实际资源、子进程验证、进度和净收益门判断。
+
+### 2026-11-22 23:38 CST：预检完成后单次排候选资源；独立加测14路实际收益
+
+- 独立预检 `43016469` 仍RUNNING，实际校验到 **22/25（7A）**。已在 `q0-buffered-loader-controls-20261122-2321`
+  启动一次有界 observation **PID2684077**（23:33启动，重连实见PPID1；最多60×45s，日志
+  `resource-watch.log`），源码/启动/冻结旧查询 helper 的 `resource-watch.sha256` SHA
+  `1aac519a0cc66a1d6e94e0e0b980cef9435287eda6aae0a992a955b5fc8fa15f`，原 controls SHA仍不变。
+  只在同一预检成功终态+完整proof、旧 writer smoke、两主作业及owner/阶段仍一致时，才准备并**至多
+  一次**申请待交接 x86 32CPU/320GiB 资源；先用独占 intent 去重，dsub回包歧义禁止自动重投。脚本不会
+  停任务、发布handoff、安装代码或改工作区。27项本地相关测试、4项180同环境通过。
+- 不把4路小样本约28%直接套在同阶段剩余时间上。用一小时 `10000→10700` 约705窗/h，假设
+  扣除已有完整矩阵理论上限2573窗，50,300计划剩余中的47,727窗用于**情景估算**。按14路与历史
+  到首个新raw约5h20min，给6h续跑损失时需要≥774窗/h或每slot-window有效节省约6.34s；
+  给7.5h损失时需≥793窗/h或7.92s。原4路8窗的绝对槽位换算7.89s仅略高于6h净门，未证明到生产
+  大池子仍成立。非承诺实际窗剩余、阶段ETA或该选项必部署。
+- 因此只起一项更接近当前并发的隔离对照 **43016759 / agent-X86-57**：实际RUNNING/单节点32CPU，
+  申请98,304 MiB，每mapper保持4GiB AS、2线程；原档/验证子环境/验证子环境/原档ABBA，14路28个
+  已完整归档窗口、不重建DNA、不改变target/flags，四轮224份粗精stdout均需等于历史完整PAF。
+  另记已验证输入和一次性预检开销，不测真实大owner和规划；算`墙钟差/每轮完成窗口`后再做净收益判断。
+  路径 `q0-loader-pool-production-shaped-20261122-2337`，`job.sha256` SHA
+  `6f135d92a70104e99a5dad1413ca1717fda49b40c44b46f4a1cf7c01cba26e2f`，仅此隔离对照有12分钟实验上限。
+- 23:37两主作业均RUNNING，新版23:36:01 **10800/61000、fallback=0**；未改两主任务。
+  等同一个14路试验终态、真实25项proof和新分配再决定是否交接。若14路受控收益不足以抵消近期真实
+  吞吐和复用回放成本，不要因新资源已经ready而停止原主任务。
+
+### 2026-11-22 23:54 CST：14路原生对照与25项预检均通过，候选分配已起跑、尚未交接
+
+- `43016759 / agent-X86-57 / SUCCEEDED/0`（23:48:57）。完全同一输入及工具，14路×2线程、
+  每路4GiB guard。原 A=123.066/125.008s，优化 B=93.361/77.462s，墙钟平均少 **31.14%**；28窗、
+  776,558,919 B，四轮的 **224** 份粗/精完整输出均匹配历史SHA。最慢优化轮仍比最快原轮少29.705s，
+  每窗批次摊销 **1.061s**（均值1.379s）。按目前待做规模的示例，即使出于混合任务/调度噪声
+  只按较保守差值的70%估算，减去旧任务已知回读的6–9小时，仍值得走受保护接管；**这不是生产吞吐
+  或总ETA保证**，真正复用及新增产出仍要云端验证。`artifacts/report.json` SHA
+  `0cf232c32b398c9baa0e7d28d15c6d92cbf3cc8a09c6622d2573fa65ca2a7175`，`terminal-43016759.json`
+  SHA `fec2b806a344cac76e807ae9f7b0b69f2ea72fd414f500cae6f04dd5f043fc2d`。
+- `43016469 / SUCCEEDED/0` 于23:51:20，25项均真校验且核对原指纹，`buffered-proof.json` SHA
+  `3ca88d2fe478c78f04582f007ba543b5ea4839c06b61761234af1544404cbf15`、`terminal-43016469.json`
+  SHA `a89bdbd37004d3552918bd16378f5b7a14aa128372e89c335103524a17d82515`。观察器一次性申请
+  **43016881 / agent-X86-57** 23:52:02 RUNNING，确为同一14路实验节点，单节点32 CPU/327680MiB
+  硬限制。首次23:53仍校验启动包，不能把RUNNING或manifest成功当ready，也不能提前停原NEW。`loader-resource-submitted.json`
+  SHA `511f66cac5fc25d656c69be266c49bd967ef425a7880547f3597229e81ea4be9`，`handoff-config.json`
+  SHA `fe1d1234b0c3e34b2f4b2f884ffe8b3c1ea16a67c42f05966cf5e767abcb3522`。
+- 另查后续Q0选路径热点：线上和当前候选包的 `q0_paths.py` 还都是原反复扫竞争配对版本，仓库
+  `02b19c60` 的索引版未装；此模块属于 selector/publication 身份，不属于区域 evidence builder
+  指纹。`43016878 / agent-X86-42 / SUCCEEDED/0` 用16,350,606 B SHA绑定原始区域PAF，22真实源对
+  （5对含双方向），按两方向、两种支持模式共88项，**有序坐标和 evidence IDs均相同**。受控门核
+  CPU 0.1078→0.0164s，不预测完整Q0选路径时间，不把中性placements当完整真实布局验收。
+  `q0-indexed-pair-narrow-replay-20261122-2347/report.json` SHA
+  `760752f0d998bcd56ba1a62a1234f5b164e0cf169e17c64baab21ee882312e6f`，实验未热改活跃runtime
+  或原候选包。需在实际下游入口/已绑定依赖范围另证后再考虑应用，不拿它拖延当前已验证的mapper优化。
+
+### 2026-11-23 00:08 CST：实际候选接管已放行；保留了原节点遗留的失效锁
+
+- 11月22日23:56候选 `43016881 / agent-X86-57` 已有真实`loader-ready.json`及`ready.json`，
+  ready PID **1781624** 与Donau新单节点32CPU/327680MiB分配相符。旧NEW仍同一run和owner，末次
+  11月22日23:53:40 **11000/61000**、fallback=0。以上一节14路实测最保守差、再打7折，以及
+  假设最大已有矩阵可跳窗口后作情景计算，约9.78小时节省对比9小时停机/回读预留；这是是否值得
+  切换的模型，不是线上ETA。`loader-prestop-verified.json` SHA
+  `799d8bb46fdc0827b98b5f70fc2ea93d598420a9754a514823d3e3fd5080b9a8`，含停止前两主作业/候选
+  资源和完整owner绑定。`ready.json` SHA `81ef0e4f346243c5ad3b63f32cbcf55a568a9c11796ed4801e61a89d39b95754`。
+- 只对**原新版43012037**在11月22日23:57:42执行一次正常`dkill`，未使用force。23:58:12
+  Donau确认 `FAILED/143`（本次主动终止、不是分析失败），调度器无pids，但旧`lock/owner.json`
+  未释放。候选继续等待，没有发布handoff或自动清理。此前常规交接均正常释放；这次节点一度为
+  `CLOSE_FAULT`，不能据此认定残留锁原因。首个只读旧节点探针 `43016892` 因看不到PID1的procfs
+  记录失败，未把权限限制误作进程消失。第二个 `43016893 / agent-X86-39 / SUCCEEDED/0` 用信号0
+  （仅存在查询）确认原owner和停止前记录的20个PID全部不存在、且终态为空、owner内容未变；无权限
+  或有任何PID便拒绝。`q0-stale-lock-probe-20261123-0004-r2/same-node-proof.json` SHA
+  `5df026e7f86db756d1f912a1199ced570eafffd9ffcee5ec42a9eb6244ba9af5`。
+- 再确认新分配、原生guard/loader proof、25项小回执、旧NEW终态、旧版仍RUNNING之后，只**原子归档**
+  完整旧锁到工作区 `.run_all/.stale-owner.43012037-preserved-20261123`，原`owner.json` SHA
+  `16dfbaac7ff4ec5c847e36f0ae594c7a815b275c1af171ef0266618733054cd2`，不删除锁，不写新owner，
+  不把这次说成旧进程正常释放。归档凭据 `stale-lock-archive-intent.json` SHA
+  `b4f153fda8263344a0f478d2a41c3a47fcdd29c5400356a50613804b2f812867`。新接管仍须普通新锁。
+- 11月23日00:05:57原子发布 `handoff.json` SHA
+  `c8cacddc9bcc094ac7da8edd3dd688db4a0bd3aba3e033ebfdf2ead2717721dc`，候选日志实际出现
+  `Q0_HANDOFF_ACCEPTED`。截至00:08尚在核验前缀，不能把门禁接收当成runtime安装、25项实际复用
+  或新版完成。仍需按新owner/run核对`installation/receipt.json`、真实SKIP_VALID、`verified_child_only`
+  及14路区域池新增产出。旧 `42523432` 未改变，所有已完成初始比对和区域缓存保留。
+
+### 2026-11-23 00:26 CST：接管进程仍在锁前校验，缩减后续可避免的重复读取
+
+- 00:26 Donau 实查 `43016881 / agent-X86-57 / RUNNING`，同一 PID1781624；日志已确认
+  `Q0_HANDOFF_ACCEPTED`，还没有新 `owner.json`、安装凭据或 `SKIP_VALID`。00:14→00:26
+  调度器累计 user CPU 8→15秒、RSS 34→122 MiB，说明同一进程有活动，但不能定位具体文件或
+  宣称卡死。57号节点无空闲CPU，不发同节点采样作业挤占资源，也不重启、跳校验或热改冻结包。
+  只读观察器 PID137993（PPID1）在等待由 `43016881` 实际获得的锁，锁与调度器 PID/节点匹配后
+  才切到新 run 日志。旧 `42523432` 实查仍 RUNNING，未改动。
+- 源码审查发现 `NativeBindings` 在同一操作内对每个批次都重新取同一 manifest/restore 身份，
+  且已核对 wrapper 内容 SHA 后又重读规范 wrapper 文本。SHA 绑定的真实 native plan 有44个操作、
+  876个 wrapper；仅按一次全量 `verify_native_resources()` 静态调用计数，共用身份查询可从
+  1752次降至170次，标准 LF wrapper 不再逐个二次读文本。仍核对每个 wrapper/spec 的实际内容 SHA、
+  完整清单和规范参数；共用身份在该操作开始/结束各查一次，不跨调用缓存；换行等非标准字节仍走原
+  文本判定。无输入/结果格式变化。44项既有定向回归和2项新增回归通过。
+  这不是已定位 `43016881` 当前等待的调用栈，也不是现场壁钟实测；**仅改仓库的后续复用路径**，
+  当前运行及原生验证包保持原SHA，不为这个改动再次中断接管。
+
+### 2026-11-23 00:40 CST：新作业已取得工作区锁，16份安装备份已核验
+
+- 新版 `43016881 / agent-X86-57` 在 **00:30:29** 自行取得普通工作区锁，实际 run
+  `20261122T163029Z-1781624-e66acac9`、同 Donau PID1781624；接管放行后约24分32秒。
+  `owner.json` SHA `ea5fa953280a0e2a7774fc987d425562019a7eaeafa9e732a67165be1db5d740`。
+  原只读等待器 PID137993 已切到该真实 run，日志 `logs/wheat-live-loader-20261123-003034.jsonl`，
+  start receipt SHA `1b6c5d270ae6d7951a92425428854ce5fd0fdb5d8b6489e1be56e7d25f9965a2`。
+  00:39:56安装回执仍 `backed_up`，实际复核16份旧文件备份的内容SHA和路径，未把备份/持锁当
+  `installed` 或复用成功。该快照无本轮 `SKIP_VALID` 或新区域窗；旧 `42523432` 仍在Step 2。
+- 与主节点独立的1CPU只读实样 ABBA `43017053 / agent-X86-18 / SUCCEEDED/0`，00:34:13–00:36:13。
+  从冻结真实 native plan 选小/中/大三组、合计69个 wrapper/spec，用原及 `9173170a` 的真实
+  verifier 校验相同输入；每轮清空该诊断进程 SHA/JSON memo、不操纵共享盘缓存。四轮全部通过，
+  共用身份查询138→10；墙钟 A=15.829/12.520s、B=9.655/9.267s，均值14.17→9.46s，约少33%。
+  样本限于 wrapper/spec verifier，不含原始profiles构建、输入/PAF校验或全套启动，不推算主任务
+  壁钟；不把该仓库候选部署给活跃 `43016881`。目录 `q0-native-binding-read-abba-20261123-0034`，
+  `job.sha256` SHA `20b3e00320efcefd2be185985c703fa8ca301dac24cad839eff59b187fc35ea6`，
+  `report.json` SHA `48098d69e2c64fd296214406be827ae5f0816b96328aa5b42ed1703903bcb6c0`，
+  `terminal-43017053.json` SHA `0973e9c3a6b1fa588365f41ba8f1efdc0bfbce7837f954c8e0a5ae0afa047f02`。
+
+
+### 2026-11-23 01:09 CST：定向删除重复安装前审计，并收紧 native 回执读取
+
+- 当前新版 `43016881 / agent-X86-57` 仍 RUNNING；01:06 复核为 `wallclock=4445s`、`cpuUtilAvg=2`、`cpuUtilRecent=6`、`memReal=260MiB`，`installation/receipt.json` 仍为 `backed_up`，没有新科学输出或 `installed` 回执。该作业没有被本次源码改动热替换、没有重启；旧版 `42523432` 继续保持不变。
+- 代码审阅确认 `resume_q0_science.execute(..., --install-runtime)` 的调用者先 `ctx.verify()`，随后事务安装器 `stage_q0_science.install()` 又立即执行同一份完整 pre-install 审计；安装器自身仍在安装前和安装后各保留一次完整验证。因此删除调用者这一份重复审计，不削弱 direct-resume 路径（无安装时仍保留 `ctx.verify()`），也不改变安装器的备份、回滚、所有权或安装后验证。
+- `native_resource_bindings` 的后续定点优化继续保留每个 wrapper/spec 和 receipt/output 的逐项完整性检查，但把同一 operation 的 manifest/restore 身份查询、receipt inventory 和 wrapper canonical-byte 判定合并为有界操作级验证；`native_resource_audit` 复用同一验证结果，不重复逐 receipt 扫描。冻结真实小麦计划上 44 个 operation、876 个 wrapper 的读取画像显示，逐 receipt 触发的 operation 全量检查约 19,236 次降为约 1,749 次（约减少 90.9% 的同类 operation 级扫描）；这是 verifier/启动阶段收益，不冒充比对阶段壁钟收益。
+- 本地定向验证：`test_resume_q0_science.py`、`test_native_resource_bindings.py`、`test_native_resource_audit.py`、`test_stage_q0_science.py` 共 **78/78** 通过；另有 native binding/audit 独立 **14/14** 通过。未运行整版 CI、未 update、未替换 Release。
+- 该补丁仍未安装到活跃 `43016881`；待当前任务终态后再按“有效结果保留、正常锁释放、只对新版切换”的规则决定是否采用。
+
+### 2026-11-23 03:12 CST：不重提，保留 Q0 续跑校验优化
+
+- `43016881` 是有意受控停止，不是科学计算失败。后续 `43017096 / agent-X86-57` 当前仍 RUNNING；01:31:10 启动，01:52:30 取得工作区锁，02:52:08 安装验收完成。03:12 实查本轮已复用两项参考比对、归组以及 1A/1B，共 **5/25**，尚未进入 `q0_evidence`；旧 `42523432` 不改。只读小时巡检记录在 `~/cgat-reads-debug/logs/jm19-hourly-43017096-20261123/samples.jsonl`，回看时仍按实际 job、owner、run 校验。
+- 用户明确本次不为优化校验而重提。实际冻结入口仍在取锁后和安装器内重复调用审计；`45145cc2` 已去掉调用者这次重复，并减少同一 native operation 的回执扫描。留给下一次合法 transition，重新冻结源码、校验绑定后使用，不热替换。**不**复用跨进程的裸摘要作为成功证明，不跳过产物、SHA、PAF 几何或内容身份的完整性验证。
+- 仓库 runner 把外层检查点耗时拆成 `checkpoint_prepare`（输入和身份准备）与 `checkpoint_validate`（检查点及输出核验），均为单调时钟壁钟。原 `elapsed=0.000s` 和状态表仍表示没重跑命令，不是校验耗时。下次在保留相同检查点的只读对照中，分别测安装审计、25 项外层核验及 Q0 旧窗口回读；先按耗时定位重复 I/O，再用相同的复用判定和输出摘要验证优化，不把并行或 I/O 减量直接当成实测收益。
+
+### 2026-11-23 04:04 CST：首个完整小时巡检，定位尚未接入的单遍 PAF 校验
+
+- 小时间隔的第二份快照已落盘（03:04→04:04），监控 PID3590703 仍活。新版 `43017096` 同一 run 由 **3/25→8/25**，最后一次在 03:45:09 复用 2B，无本轮失败或新 Q0 窗口；累计 CPU 从 577→980 秒，仍在推进，不中断。旧 `42523432` 仍在 Step 2。
+- 1B→1D 的 `SKIP_VALID` 日志间隔为 **19:00**，上一个新版 run 同段 **1:01**；同一 1D 检查点的隔离缓冲预检报告为 **120.4 秒**。现场时间差包含输入准备和输出核验，不是受控同节点测速，不能全归因给某个读法或文件系统。57 号节点调度余量为 0 CPU，本轮不挤占节点做诊断。
+- 实际工作区 `run_outer_checkpoints.py` SHA `e066d7950f99b35822512c3840ae2a9e0683eede275f30f29747879b32be0035`；仍对 PAF 先做完整 CIGAR/几何校验，再走独立 SHA 路径。这正是此前缓冲验证 `43016469` 绑定的旧 verifier。下次合法续跑，优先纳入已有 `dd872187` 和 `3c15342d`（缓冲 + 单遍几何校验/原字节 SHA），以实际主任务路径复测；该独立预检虽逐项通过 25 个检查点，不能替代主任务的输入/产物验收，也不能证明线上壁钟收益。保留当前运行及全部检查点，不热替换。
+
+### 11/23 05:24 — Q0 按路径决策补比对：前置派发对照；否决通用中档 DP 上限
+
+- 目标不是填满所有未覆盖窗口，而是为尚未解决且能改善路径的端点、原始断口、片段取舍补证。据实际 `PathGraph.joins`，无 N 切换需要**同一条已通过竞争检查的精确链**同时接到两个相向端点；多个内部高质量块、甚至覆盖率不变，都不替代这一条件。目前按路径端点前后各 100 kb 取实验范围，选中窗口仍跑完整的原目标集合、方向与上下文。保留 target-only 命中，不按已有 PAF 行筛选，不把缺证据记作无竞争。
+- 已在隔离临时空间用 MH63RS3 第一条记录的两个天然序列区间，构造人工断点、刻意留空初始 contig 间 PAF 的控制。真实 minimap2 `2.26-r1175`；参考/原始组内的科学输入身份四轮一致 `q0-control-input-1c6d5da997f2898307630b09`；真实补比对每轮从空缓存派发，强制进入区域分支，不改变参数或输入窗口内容。按全补/定向/定向/全补对照，**12→6** 个区域作业，两段的 FASTA、来源区间、方向、精确切换坐标一致。一段的未知断口如实保留；另一段保留两条精确切换，重构等于 10 kb 参考裁片。另做不补的离线对照，第二段少两条精确切换，只剩未知断口，少覆盖 800 bp 参考坐标。不是“补比对全部可省”。
+- 时间为准备＋仅定向组额外的基础证据读取/判定（未把裁片生成、各组共同初始比对或下游 LGZ 算入）：全补均值 3.657s，定向均值 2.581s，约省 29%。不是小麦速度预测。`incident-tools/wheat-20261119/run_q0_frontier_control.py` 复现实验；`probe_q0_decision_frontier.py` 可对已有完整 ready 作只读三臂重放，区分映射次数和投影次数。报告 `q0-decision-frontier-control-20261123.json` SHA-256 `3f2d902d6ff01328c400cc3a30a24cf363f5dfdad69ae6b10d2e7e37dd9c5ea2`。此组强制分支和派发筛选只在一次性实验目录，不生成可部署产品。
+- 独立 Donau `43017430 / agent-X86-17` 05:08:03→05:23:48 SUCCEEDED，`q0-moderate-dp-20261123-050719/artifacts/report.json` SHA-256 `dd145e37c1693de54ec123d80ec3a1643e9d6770b67b3bc62c18e1fa06a48f5d`。7 个已封存的小麦窗口，原命令复跑均与归档原始 PAF 字节相同。只重跑精确阶段，同一节点、原 target/order/flags/4 GiB guard；累计单窗口派发墙时原版 1052.93s、50m 451.17s、70m 544.18s（不是管线用时）。两档均在 4/7 窗口触发暂定的配对保留门槛，其中 3/7 出现原来未通过的跨组装配对，最坏增加 15512/11835 bp；部分有 ≥1 kb 的定向目标缺失，即使跨组装核心区并集不降也会发生。是门槛变化，不是已证明的错误最终连接；两档均拒绝作为通用默认，不切换。
+- 下一步优先在有重复/跨染色体竞争的真实小麦闭合子问题上，独立重跑有/无端点派发，计入规划、回退、竞争复核、完整性校验及下游供体/缺口。仅按“保守保留 N 或不自动纳入”定义可接受损失；不能按少查到的竞争授予新切换。探索按真正要出具的精确链反查其两侧竞争范围：无法闭合搜索的切换留 N/回退；跨度超过固定窗口则针对同一相向端点候选改用能覆盖两端的上下文，不拼伪链。控制实验证实筛选在同一闭合图里可少做一部分，不是已通过小麦上线。
+- 未改旧作业 `42523432`、新版 `43017096`、安装 runtime 或持久化 profile。05:23 调度两者仍 RUNNING，新版 05:22:45 已复用至 **17/25**（5B）。用户要求后续只本地 commit，不 push。
+
+### 11/23 05:45 — 冻结天然小麦验证小组，保留多染色体竞争
+
+- `prepare_wheat_frontier_panel.py` 从原分组坐标预先选定三个 1 Mb bin，再保留入选**完整天然 contig**及其跨全参考染色体的所有原始六列以上 PAF 记录；不在人为边界裁切 FASTA/PAF、不把主分组之外的落点删掉。各 contig 的序列和完整分组集合与已归档 `source-part-lookup.json` 核对，原跨组装和自比对只保留两端均为入选成员的原字节记录，所有含成对成员的原分组均纳入。冻结过程按原成功回执验证被读取的原始 PAF 字节，结果小组各自有完整内容 SHA。不是小麦全基因组闭合竞争集合，不能把未采纳的其他 contig 当作已证伪。
+- 初次只取主分组的冻结 `43017433` 明确失败：4B 小组已有多个原分组的 contig，不能把该原分组信息静默忽略。修正后 `43017435` 05:37:51→05:41:03 SUCCEEDED，读取 34 个原基础 PAF（7,695,848,111 字节，仅扫一遍）；封存结果 `q0-natural-frontier-20261123-053719-complete-base/panels/report.json` SHA-256 `61c6427dade7e96287757cc48bad6ce87dfd0ca25d0817e0cfacbdd6069596c5`。4B-358 Mb 6 条/698,417 bp；5B-596 Mb 19 条/2,279,390 bp；3D-589 Mb 97 条/2,985,675 bp，最后一组涉及 15 个原分组，其中 14 个有成对成员的原证据。整组所有原参考 PAF 保持原长与坐标体系。没有将小组的实验产物称为生产 ready。
+- `run_wheat_frontier_panel.py` 隔离跑不补、全补、定向补，其中后两者实际运行原补比对的 mapper、规划器和下游 Q0 选择器。完整原目标集合或 native 回退不变；额外统计比较最佳路径、FASTA、原区间与方向、切换坐标；对精确切换的同一对来源，在 query/target 两轴统计尚未搜索且可能影响结论的完整窗口。该审计只给出需复核的工作量和局限，不证明全基因组无竞争。模块环境的 minimap2 2.31-r1302，SHA `cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3`。作业 `43017437` 已于 05:41:05 在 agent-X86-22 启动，实查进入首个小组的区域 partial 派发；未得到本次小麦提速/路径验收结论。主程序未改。
+- 本地校验：隔离探针定向 13 项通过；原 Server Q0 preparation、paths、admission 109 项通过（使用各自的 PYTHONPATH 分开启动，避免同一模块被顶层/包名重复注册）。已做真实 minimap2 的小型适配器冒烟，原与定向路径相同且都消费真实区域成功回执。05:44 新版 `43017096` 与旧版 `42523432` 均 RUNNING；本轮新版最后可见 19/25 初始检查点复用。仅本地 commit，不 push。
+
+### 11/23 06:05 — 天然小麦小组 4B/5B 已完成，定向补比对未改路径
+
+- `43017437` 的天然小麦面板已完成 4B-358Mb 与 5B-596Mb 两组；3D-589Mb 仍在读取/构造初始对照，尚未给结论。4B 报告 `ab-4B/report.json` SHA-256 `57245504a366a3242d82a35de0c268af1e8b900378ca1832d8f82b514398316e`；5B 报告 `ab-5B/report.json` SHA-256 `5313786f1f373d2ba2febdacfa8547d81437333d3b4ddca11f7e3cf675dd1825`。
+- 4B：区域任务 4→2；全补准备＋读取选择约 135.27 s，定向约 118.66 s，净约 12.28%。5B：区域任务 6→4（另有 1 个 partial native-scope 保留）；约 193.67 s→163.99 s，净约 15.33%。这些是隔离小组的真实 mapper/规划器时间，不是全麦预测。
+- 两组 `targeted_vs_full` 的最终 Q0 FASTA、路径连接种类、切换坐标和源区间均一致；两个小组都没有精确 `sequence_overlap` 连接，因此只能证明“没有误伤已有结论”，不能证明对真正有精确桥接的染色体足够。全补与定向均保留完整目标列表，定向只省掉不触及当前决策前沿的区域窗口；未知竞争仍未被当作不存在。
+- 这两组当前 `runtime_known_competitor_audit` 和保守 oracle audit 均为 0 个受影响精确连接；这是小组事实，不扩展为全基因组安全证明。下一步等待 3D 组，它包含 97 条 contig、15 个原分组，最有机会暴露竞争路径差异。
+
+### 11/23 06:28 — 定向补比对已落成显式 opt-in，3D 面板超时不作科学结论
+
+- 本地 `master` 初版增加显式 `decision_frontier` opt-in（后续改在证据命令传入，见下）：先用已完成的参考证据和跨组装基础 PAF 构造 provisional Q0，只在路径端点和未解决 join 两侧保留 source-coordinate shoulder；区域 query/target 窗口仍保留原目标全集，未选窗口不会被写成负证据。若 provisional Q0 无路径或区域路由未启用，回到 `full`；损坏证据等异常仍报错。scope、实际 omitted 数和 frontier 大小写入 catalog；self 矩阵不参与 provisional join 证明。
+- 该策略只作用于 `prepare_partial`/`prepare_candidates` 的区域窗口派发；native fallback、完整已完成矩阵、PAF 原始字节、下游 Q0 admission/竞争门不变。没有安装到远端 `43017096`，没有修改当前运行任务，也没有改默认 `full`。
+- 本地 Q0 定向测试 **136/136** 通过，其中包含真实 bridge fixture 的 provisional-frontier 读取冒烟；另有决策前沿单元测试与真实小麦 4B/5B 隔离结果。新策略的证据边界仍是允许的信息损失：它可能不再发现不触及当前 provisional 路径的新候选，不得称为无损等价。
+- 3D 天然面板作业 `43017437` 于 05:41:05 启动，最终因诊断脚本独立 `timeout` 以 `exitCode=124` 结束；已生成 24 个区域项目回执但没有完整 3D report。该终态是诊断预算耗尽，不是比对科学失败，不重提同一诊断。4B/5B 已完成的结果仍有效。新版 `43017096` 与旧版 `42523432` 仍 RUNNING，06:26:32 已推进到 **23/55**（7B）。
+- 用户约定继续只本地 commit，不 push。
+
+### 11/23 06:55 — Q0-only 参数绑定与 3D 回执续测
+
+- `43017096` 06:37:26 复用了第 25/25 项初始检查点（Un），06:37:27 启动 `q0_evidence` attempt=5。未改运行工作区，也未改旧版 `42523432`。不把子步骤 `[START]` 当成新 mapper 进度。
+- 改为仅在 evidence 命令显式传 `--supplement-scope decision_frontier`。不写 `prepare_options.tsv`：该文件也在初始染色体检查点输入内，绕用它会导致不必要的失效。显式试验档的 ready 指纹绑定 scope、带宽、规划选择器身份和全量输入；原 `full` 不使用定向 ready，完整的底层 PAF 仍各按原回执复用。无 provisional path 或非区域路由可以正常回退，坏证据抛错。保留实际 `--skip-self` 检查；provisional 直接复用 catalog 中既有长 N 原始邻接，省一次整套 contig 拆分。不是证明加速档与 full 等价，也不是生产启用。
+- 初次只读全麦诊断 `43020545` 06:38:35 退出（隔离脚本环境相对路径错误，未读输入）。不再提交会并行扫整套大麦输入的副本；改续做已冻结的天然 3D 对照。独立诊断 `43020546 / agent-X86-18` 使用现有冻结源码和真实 mapper，工作目录在计算节点本地 `/tmp`；对已终态 `43017437` 的 full arm，仅准备复用能逐项验证的 24 个区域成功回执和 1 个 native 成功回执依赖，不复制未提交的产物。定向 arm 不使用该缓存。其 full 准备时间不与定向当成冷启动 A/B 倍率比较；证据/决策差异、上下文数量以及各阶段计时仍有用。06:53 查到作业仍在 provisional 计算，尚无 3D 终态结论。
+- 本地 backend 定向 139 项、事故探针 10 项通过。验证了两个 scope 使用相同初始检查点内容、ready 不能互冒、选择器变动拒收、原 N-gap 邻接和坏回执拒收。仍只做本地提交，不 push。
+
+### 11/23 07:09 — 定向档记录未搜索范围，实测生产 loader 已接入
+
+- 截至 07:04 实查，新版 `43017096` 仍运行，实际 owner/run `20261122T175230Z-1840546-b3d5993f` 已复用初始检查点 **25/25**（06:33:13）；06:37:27 进入 `q0_evidence`，07:00:35 在该 run 下出现 `LGZ q0 regional mapper loader: verified_child_only`。这是子进程 loader 绑定已生效的证据，不等于实际吞吐已提升。截至本次观察未看到同一 run 的新增成功区域窗口，不能用旧窗口累计数报进度或 ETA。旧版 `42523432` 仍 RUNNING，不改。
+- 本地实验档将每个**主动省略**区域窗口的 query 与原始全部 target 坐标按 source part 合并，绑定到 catalog/ready。只要选中的精确 sequence overlap 的任一证据轴，或选中的 pairwise 定位，与这些未搜索区间相交，就拒绝发布，要求以 `full` 求证；不以“没有搜”推断“不存在”。保守检测可能多拒，且不承诺找回所有遗漏的新候选或其他选路差异。依然只显式 opt-in，不改当前远端、默认策略或原始 PAF。
+- 本地 142 项定向回归通过；覆盖真实 bridge fixture 中 target 轴单独遗漏时拒绝发布，以及无关遗漏保留原决定。`43020546` 于 07:00 左右完成 3D-589Mb 小组基础加载和选路，合计 **708.4 s**；截至 07:05 仍在区域阶段，尚未出报告。这是包含 self 的冻结诊断基线路径，不是当前生产选路耗时。独立只读阶段计时 `43020552` 复用同一冻结小组/源码，只取 1 CPU、不启动 mapper，区分输入读取、准入、图构造/搜索和成品整理；路径 `q0-natural-frontier-3d-phase-profile-20261123-0712/`。不重复全麦读取，不重提生产。继续只本地提交，不 push。
+
+### 11/23 07:17 — 定向规划直接读选路坐标，不再预制 Q0 成品
+
+- `decision_frontier` 只需要切换坐标、方向及未解决连接。复用正式构建的同一个 admission/图搜索和跨染色体源区间互斥检查，不再为规划重建整套序列（含反向互补）、展开完整决策报告或为全部基础 PAF 预制一套报告证据字典。没有继续削减选路证据或修改窗口规则。正式 Q0 仍检查原 N-gap 字节、最终证据身份和定向遗漏竞争，并输出完整序列和报告；没有 provisional 路径则明确选择 `full`，其他错误仍抛出。
+- 197 项定向测试（含发布、续跑合同和交付）：196 通过、1 跳过。bridge fixture 的规划坐标与完整构建一致；测试禁止规划调用最终 FASTA 重建和报告身份生成；原 N-gap 两侧端点保留。节省的是已确认存在的重复工作，暂不估小麦壁钟倍率。
+- `43020552` 07:12:19 明确终态 `FAILED / 1`，诊断 hook 误指新版本才有的 `_links_for_path_graphs`，在读取/解析小组之前退出，无可用 timing。保留失败日志；对同一已冻结 package 的实际 Python import 和所有 hook 通过预检后，修正诊断 `43020641 / agent-X86-61` 07:15:24 起跑，1 CPU、只读原小组，不执行 mapper；目录 `q0-natural-frontier-3d-phase-profile-20261123-hookfix/`。07:16 `43020546` 仍在候选区域阶段；新版 `43017096` 同一 run 仍无新增成功窗口日志。不重提、不热改主任务，仍只做本地提交。
+
+### 11/23 07:23 — Q0 参考一致性只检索实际相交的锚点
+
+- 原 `reference_consistent()` 对每个真实配对块遍历左 placement 的全部参考块，再对相交左块遍历右侧全部参考块；此函数用于 placement 准入和路径图。按同一不可变 placement 缓存定向半开区间及参考坐标偏移，通过 start 和最大 end 的前缀做相交检索。只在确实对应的 source 区间比较两侧映射偏移；保留两端任何叠加/嵌套的矛盾参考证据、反向坐标、端点语义和独立的 pair 竞争检查。不改变选择阈值、搜索预算、选择结果或证据格式。
+- 105 项定向测试通过；新测试含 2,048 个正反方向/嵌套等几何对照旧投影，加上边界和嵌套冲突用例。受控合成核：两端各 2,000 个稀疏锚点、2,000 个配对块，同一 Python 进程上旧实现 5.1399 s、首次建索引加查询 0.0059 s、复用索引查询 0.0028 s，接受数一致；不把微基准外推到整套小麦或当前生产任务。
+- 07:22 实查 3D `43020641` 初始读取完成（加载约 4.50 s），尚待选路子阶段计时；`43020546` 仍在候选区域对照。`43017096` 和旧 `42523432` 仍运行且不热改。只本地提交，不 push。
+
+### 11/23 07:29 — Q0 等价区间不再全扫，3D 对照已经准备完 full 证据
+
+- Q0 覆盖模型原来每增加一个切点，就遍历同源全部配对块；关联时再次全扫该源原子区间。改为直接检索实际相交的配对块/原子区间。切点在两个相邻块的共同端点仍传播至两边，选中碱基区间仍按半开比较；保留正反向、重叠冲突、边界数限制和真实独立来源，不合并竞争关系、不改变搜索预算。评分也不再对完整覆盖或完全未覆盖的原子构造重复的差集。
+- 定向 144 项：143 通过、1 跳过，含端点两侧传播、嵌套关系、源间缺口及随机逐碱基对照。9,000 个稀疏关系和 45,005 个边界的同进程合成基准：构建 13.8385→0.2635 s，10 次切片评分 1.0567→0.3340 s，边界、冲突集、评分和未覆盖坐标完全一致。这是覆盖内核压力测试，不是整套小麦倍率。
+- 07:28 `43020546` 的 full arm 出现 `candidates=1776 supplementary_tasks=114 unplaced_segments=0`，已准备证据但还未完成选择与定向对照；不能据此推断省去多少。`43020641` 同时仍在跑，实际过去 13 分钟仅累计约 199 s 用户 CPU；壁钟包含分配/读文件等，尚未出可用阶段报告。新版主任务 `43017096` 不热改、不重提。代码只提本地，不 push。
+
+- 07:32:45 独立 3D selector A/B `43020642 / agent-X86-18` 起跑，目录 `q0-natural-3d-selector-ab-20261123/`，源码全清单 SHA-256 `c192acee3dad4139f81894f676a10c54ced128bf6b88b091557c59c22d09220f`。直接冻结本地提交 `06777d80` / `c4640727` 两份 Server tools 闭包，两者只有 reference/coverage 两个内核源码差异；针对各自完整导入做了预检，未往较老的已运行 package 强行贴补丁。同一节点同一已验证的 3D 面板，两个 arm 都排除 self（同生产定向规划输入口径），不跑 mapper、不读整麦、不写生产目录。比较选路（含备选和诊断）、前沿坐标与源区间摘要；记录 CPU/壁钟和子阶段。先跑 candidate，随后跑 baseline，避免 baseline 单臂超时丢失候选阶段归因；单臂未完成不当成有效 A/B。与含 self 的早期 708.4 s 基线不是一组对照。
+
+### 11/23 07:39 — 3D 实样选路等价；准入重复扫描是下一处主要成本
+
+- `43020642 / agent-X86-18` 07:37:40 成功；两臂均为同一 97 条天然 contig、363 条基础跨组装链接，不含 self。提交 `06777d80`→`c4640727` 的选路、备选、诊断、使用的源坐标及定向结果摘要完全一致。壁钟 38.98→32.68 s、用户进程 CPU 27.65→25.33 s（单轮、未抵消调度和噪声，不外推整麦）。baseline.json SHA `ea8242fc121d8eaa2287b187b0a5dfb93bb955ebd9d05f23cedebaea196f930e`；candidate.json SHA `910b522e2caebe37c6562f4e04441c48c0e87a6c4bce0b249b455d09455ef140`。实样目前最贵的是准入（候选 25.29 CPU s/总 25.33）；图构造和搜索合计约 0.035 CPU s，不能套用此前两种合成压力倍率。
+- 追查准入：给无独立参考定位的片段找根依据时，对同一个根 placement 的完整区间做复杂度和已有歧义筛选，原来每个合格配对块都重算。改为仅在有合格块时计算，按不可变 source part 和区间在同一次准入内复用，有界 LRU 128 项并在此阶段结束后释放。区间起点、复杂度抽窗、歧义/竞争、进入证据清单的顺序均不变。合成回归用两个 off-ref 片段、20 个配对块，保留两条定位且整段根区间只扫描一次；145 项定向测试（144 通过、1 跳过）。
+- 此改仅本地提交，不 push、不热改运行。旧带 self 3D 分段计时 `43020641` 和真实 full/targeted 派发 `43020546` 仍继续，暂不把上述 3D 基础规划对照当成完整补比对 A/B 或生产生效证据。
+
+### 11/23 07:48 — 实样准入加速确认，保留完整 3D 证据做零 mapper 重放
+
+- 同节点实样 A/B `43020643 / agent-X86-18` 07:44:54 成功（目录 `q0-natural-3d-root-context-ab-20261123/`）；97 条 contig、363 条跨组装 link，唯一 Server tools 差异为 `c4640727`→`01646fb4` 根区间筛查复用。规划壁钟 **37.473→2.167 s**，进程 CPU **27.332→1.752 s**；复杂度筛查 CPU **26.069→0.678 s**。选路（含备选及搜索诊断）、选中源区间、前沿坐标的摘要逐项一致。baseline SHA `0ec069c899ba2e8f6a05a8b347101656e3766c0f9b78a9e1e3efd25871860cc5`；candidate SHA `63b083c3ae7dfced6b7f3fa598190da6e7f6613d8db5396289e951a9e6899461`；代码清单 SHA `b8f46a5b6af7c16ebe96e9f915b9054112d6c5d52fd03e409f7b665b97151b67`。这证明实样基础规划去重效果，不是完整 Q0 或当前作业的倍率。
+- 现场旧代码 `43020546` 已记录 `completed full`（114 个已准备补充任务）、进入 targeted partial；后于 07:46:28 **诊断脚本超时 124**，无新 full/targeted 冷 A/B。`43020641` 旧带 self 计时同样终态 124，无完整 phase report；两者均不是生产故障。原缓存和日志留存，没重提同一实验。
+- 07:48:01 同原节点 `43020644` 起跑，1 CPU，只读 `43020546` 已终态节点本地 full arm（仅当普通 `load_verified_evidence` 重新完整通过才可使用），完全不跑 mapper、不写两个主任务。用原 builder `q0-evidence-builder-68eab3b311a9df3157fc13ba` 和隔离优化过的消费代码 `q0-selector-256fd5bbfe4dc8593960b36d`，前置验证没有改 builder；固定已有 task graph 测实际可省的投影/独立 raw、成品路径和已知遗漏竞争守卫，不把重放当成动态路由/冷吞吐。目录 `q0-natural-3d-verified-full-replay-20261123/`，清单 SHA `5e6f8b93dd8724211711742e7bb8c55b4bc1f4e025cb4b85e2876f37db12d30b`，前诊断终态 SHA `78f5cb266a46feab58f6d711b64d5a571b6b49a4b85c8b37a3e0f1e04639e0ec`。生产 `43017096` 同一 run 仍在进行，未安装新优化，不重提、不 push。
+
+### 11/23 07:53 — 3D 固定任务图重放：筛选有收益，但当前守卫拒绝直接采用
+
+- `43020644 / agent-X86-18` SUCCEEDED/0；完整旧 full ready `q0-ready-evidence-78de8507df9dc63fdfb5b219` 的文件身份再次核验通过，含 32,752 条基础＋补充 pair links。输出 `q0-natural-3d-verified-full-replay-20261123/result.json` SHA `a121e9db205f47eb6fa8aa111e4e8b867b4f2e9e5b88b58725d0b443d01d0d99`。无 mapper、无对原目录写入。
+- 3D 固定 full 任务图按当前基础前沿保留 **113→54 个区域 raw/project**，另外 1 个原生任务原样保留。54 个保留窗口中 45 个仅 target 触及前沿；若只看 query 会把这些窗口误删。省掉 63.7% query bp、只省 3.46% target bp；数量或碱基数不能替代测到的冷 mapper 与整段墙时。基础定向规划 2.52 s，已有证据下 full/targeted 构建 51.79/45.33 s，不含补比对执行。
+- 此面板 10 条构建路径的 FASTA、来源和切换均一致，保留全部 3 个精确 overlap；但是**当前省略守卫拒绝**，因为选中的 pairwise 定位仍碰到未查过的源范围。重放中未观察到结果差异不等于竞争已证伪；不启用、不降级守卫、不重提生产。下一步对这些具体定位反查 59 个 deferred 上下文，在固定任务图上计量需补回多少、重选后有无新的未查竞争，而不是直接补回所有任务；该过程仍需独立验证动态路由及真实总耗时。
+
+### 11/23 07:59 — 只补已选证据可能受影响的原窗口
+
+- 新增 `selected_proof_frontier`，复用发布守卫原来的三类坐标：选中 pairwise placement 的完整源范围、其成对证据两轴、精确拼接证据两轴。结果只是下一轮补查的候选范围；不会授权当前选路，也不会因换了函数而把原有遗漏判成已搜索。完整保留目标侧命中、源 part 偏移和在新一轮重选后再次审计；不拆或改已规划窗口。整组 Q0 130 项通过，另补的偏移/成对定位测试所在 frontier 模块 11 项通过。版本仍仅本地，不部署生产或 push。
+- 已终态 full graph 的独立只读 `43020647 / agent-X86-18` 已 RUNNING，目录 `q0-natural-3d-proof-repair-replay-20261123/`，代码清单 SHA `e4677ba165944f1e449253e1dcdfd9a5fc9a9043a36c4524ca5d1a21d64a73f3`，绑定上一轮已成功报告且再次验证原 ready。初始保留 54 个，最多补回 3 轮，每轮只选与当前正证据相交的 deferred 原上下文，并按原证据重新选路且重过校验。没有重新运行 mapper，不接触生产工作区；要看的是允许保留多少省略而能通过原守卫，以及最后序列/来源/切换风险，不把固定任务图估算当生产墙钟。
+
+- 08:03:36 `43020647` SUCCESS/0；报告 SHA-256 `e36927ebeba266a963c8814ca7654c2f4b414cb7dfa71996c851381aff72f7e7`。**一轮补回 32 个完整 raw/project，区域工作 113→54→86，仍省 27 个（23.9%）**。原守卫通过；10 条构建序列、来源及方向、3 个精确连接均与 full 不变；原生补充任务保留。已验证输入的构建墙时 full 43.28 s、初次定向 42.98 s、补查后重选 46.72 s，基础规划 2.32 s。即固定任务图的一次二阶段策略要拿约 **49 s 额外选择成本**与 27 个省下的 mapper（以及出入文件）比较，不能只按窗口数转成净提速。下一步同时量加权成本和是否能用 provisional 的正证据范围预先纳入部分竞争窗口，避免第二次选择；均须保留最终守卫。08:03 新旧生产仍 RUNNING，现行尚未部署此模式，不重提。
+
+### 11/23 08:12 — 首轮正证据预判不足；跳过的窗口不能按数量估值
+
+- `43020721 / agent-X86-18` 08:11:46 SUCCESS/0（固定任务图诊断）。将基础 provisional 已选正证据两轴纳入首轮，**没有新增任何窗口**，仍保留 54/113，最终序列不变但原守卫仍因已选 pairwise 定位范围未搜索而拒绝。说明这个案例仅用基础正证据无法替代补比对后的复判，不作为一阶段上线依据。隔离实验 `q0-natural-3d-one-pass-proof-replay-20261123/`，源码清单 SHA `4148bc88d9a8b3342663df4cf8cafea78af74f88d2bfc254526ce7b00dd3b588`，报告 SHA `9b54883b2de4262fd10816c0c958413c0b25bbc72758688849d0445ecbb72bdc`。
+- 初始被跳过的 59 个精确 raw 中，57 份留存日志合计报告 minimap2 `Real time` **542.73 s**；初始保留的 54 个中只有 32 份留存（其他来自复用或无日志），这 32 份合计 **6.17 s**。每个原 raw 和粗链回执都由 ready 绑定，stderr 计时本身不在科学回执内，只作历史服务时间诊断；缺的日志不填 0，不比较覆盖不全的两组总量，不折算生产并发墙时。该对照重点是明确少算的可能是重窗口，但其中多少在补查时被加回，尚需分组。
+- `43020722` 已在同一节点起跑（`q0-natural-3d-weighted-proof-repair-20261123/`，清单 SHA `ad0fcfd102ba5389594fa1d25348e4cef87faa409a3d97be84bdf712e51ce0f0`），按已通过的 86/113 方案重新核准最终仍省的 27 个 raw，再绑定到已有 mapper 日志，零 mapper、不写原图。若剩余重量不足抵消额外约 49 s 选择成本，优先止损不接该策略；有余量才做同节点冷派发/最终报告和真实总墙钟。至 08:12 新版 `43017096` 保持原 owner/reader、内存约 31 GiB，有 CPU 进展但仍无同 run 新区域成功日志；旧版无改，不重提、不 push。
+
+- 08:15:41 `43020722` SUCCESS/0，报告 SHA `f3b97788ed375c2ceff2bc5513ff4c466d63cf18b362f1e615f1d70427978e16`；86 区域＋1 原生的补查结果再次通过原守卫并逐条复现 full FASTA。最终仍省的 **27/27 个精比对**均有日志，历次归档自报 `Real time` 合计 **541.777 s**、CPU **536.013 s**，另 27 个粗链合计 **2.693 s**；相比原先 59 个省略上下文里能看到的约 543 秒，这些重任务几乎都仍可省。补查加回的 32 个里 30 个有精比对日志，合计只增加 0.948 s；2 个缺失不能当零。按这份实样选择验证，值得下一步做真实冷派发和完整壁钟，但时间是各次 mapper 自报服务时间之和（含可能单个重长尾），不是整段 SLO 或生产恢复后的剩余时间。以同节点同工具/资源做前瞻实测，问的是“完整原上下文先定向派发、发现正证据后仅补查并重选，包含规划/I/O/最终审计是否净快”。选中上下文完整复用，不再尝试已证否的基础正证据一阶段预测。08:15 新版仍在原 run `q0_evidence`，未改远端运行或默认、只提交本地。
+
+### 11/23 08:24 — 同节点冷跑全量与真实按需补查
+
+- `9e92a94f` 增加隔离工具 `run_wheat_proof_repair_cold.py`：两组使用同一冻结天然 3D 输入和 minimap2、各自空缓存。实际 Server planner 与派发/回执不打桩；实验仅适配已冻结初始矩阵输入和范围身份，不读生产工作区。定向先跑，若原发布守卫报告已选证据有未搜索范围，只扩张相交范围，使用同组原回执可精确复用的窗口；如果动态路由改变则实际重做所需窗口，最多两次补查。重新读取并校验真实 ready、完整选路报告而非只比较 PAF。两组计规划、派发准备、回执验证、完整读回、选路/核验墙时；另计每轮实际 regional mapper 启动与累计服务。私有定向身份不被普通 loader 接纳，不能迁入生产。
+- 本地后端 60 项、附加事故测试 5 项及临时小型冷准备/选路冒烟通过；受控冒烟仅验证接线（没有实际区域 mapper）。`43020726 / agent-X86-06` 已运行，实际 6 CPU、调度硬内存 60 GiB（脚本申请 16 GiB，不能把申请当硬限）；独立目录 `q0-natural-3d-cold-repair-ab-20261123/`，清单 SHA `d534673fac1c563f88a7a96f417f21d5929f436a70d557255f3f8e82a06d6388`。08:24 实际首轮定向派发已产生 55 个补充任务的 ready（包含 1 个原生），尚未公布穿过最终校验或完整 A/B；不把首轮 ready 当成成品。新版 `43017096` 同一 reader 仍运行，约 32 GiB，日志尚未记录本 run 新窗口，不重提、不部署此实验、不 push。
+
+- 08:26 实查真实冷定向组已完成两轮并通过原守卫。首轮实际启动 54 个精比对（22 个粗链）、约 14.47 s 准备，首次选路 33.32 s 后如预期要求补查；第二轮实际仅启动 **32** 个新精比对（26 个新增粗链），准备 7.42 s、读回校验 4.32 s、重选含守卫 33.27 s，剩余 27 个未搜索窗口。以实际分段计时为准：两轮分别约 **51.21 s** 和 **45.01 s**，合计约 **96.22 s**（实验的最终 arm_wall 与报告为准）。全量冷组同节点已进入 partial，尚未完成，不能报净收益/成品等价。后续若考虑接入，必须在 `lgz_prepare_inputs` **实际 reads/QC 过滤后的选路**重作原守卫；诊断不含 reads 质量决策，也不覆盖 donor/Step1。不能在下游已捕获输入指纹及复制 ready 的事务内无声明改写 manifest 后继续使用旧指纹。
+
+### 11/23 08:35 — 3D 冷对照完成，开始验证真实 Server 入口
+
+- `43020726 / agent-X86-06` 08:31:06 SUCCESS；报告 SHA-256 `9abba70ff410486d4026a7d613f7d3b49009e2da1f7aa24238285b00458ede17`。同一节点、6 CPU、每臂新工作区冷启动真实 planner/mapper/回执，定向＋一轮补查 **96.239 s**，full **333.247 s**（**减少 71.12%**，3.46 倍），两臂共用的已冻结初始证据加载不计。全量精比对 113（粗链 75），定向精比对 54＋32（粗链 22＋26）；实际原守卫通过。10 条构建 FASTA、来源区间、方向、3 个精确拼接及缺口类型计数相同；无来源坐标差集。此为单轮 97 条天然 contig 面板，不是全麦、reads 支持、供体或当前运行的实测倍率。
+- 已核实新版 `prepare_lgz_inputs.sh` 无 `--reads` 且包 `reads_qc_enabled=false`。真实 Server 入口拟用显式 `decision_frontier_repair`：不把私有实验策略注入生产，不修改默认或初始检查点；正常准备可回读所有验证回执，临时选择失败按真正省略冲突扩大范围，最多 2 轮再全量。各轮只在内存传递 draft，唯一 canonical ready 在所需校验及签名栅栏之后发布；已冻结的下游输入不回写。试验档只接受已绑定的 no-reads-QC `package.tsv`；reads 模式另行设计下游证据依赖，不能直接套用。本地运行无变化、更没有用 3D 倍率证明整麦。仍只本地 commit，不 push。
+
+- 正式入口实验档已本地提交 `a5be991e`；172 项定向测试全部通过，覆盖仅在最后发布、普通下游按同一格式读取、no-reads-QC 前置门和选择时输入漂移不写 ready。实际入口隔离作业 `43020729 / agent-X86-06` 08:39:58 起跑，清单 SHA `138d1ebea2422cb86ae38ccf78aac992d6e55587a4febc9c4f2f5533dcb633f6`，目录 `q0-natural-3d-native-repair-entry-20261123/`。与前一实验不同，此次不用私有范围/策略注入：真实 `prepare_evidence(..., supplement_scope=decision_frontier_repair)` 内置补查及发布，再走普通 `load_evidence_input` 和最终构建，核对同一份全量冷对照的所有最终 FASTA 哈希；还保留输入小组适配，非整麦。08:40 已产生首轮 55 个补充结果的**私有 draft**，不等于 canonical ready 成功。两个主作业不动。下一步用真实入口计明包含重复验证/真正消费者的净收益，再看全麦恢复/已缓存工作能否抵消接管成本；不能用这份面板结果直接切换主任务。
+
+### 11/23 08:46 — 正式入口实样通过；补查不再重扫初始矩阵
+
+- `43020729` 08:42:17 成功，报告 SHA-256 `2fb5128cb60cfc0ca3a893c0169260c4bf913258a800544a7ac28786bf6d23ee`。真实 Server profile 只补查一次，证据 ready **94.68 s**，包含此后的普通消费者独立读回/选路 **131.74 s**。仍是 86 区域＋1 原生，25 个候选与 2 个 partial 窗口未运行；普通消费者的 10 条 FASTA 哈希与完整冷对照一致。测的是自然 3D 小组＋已验证初始输入适配，不能用 131.74 / 333.25 s 当同轮、同代码入口 A/B 或生产接管预算。
+- 整麦准备的前置输入重扫昂贵；本地补查现在同一进程只执行一次原 `_initial_inputs`（含普通外层检查点与分区/初始 PAF 验证），后续轮绑定同一批文件的 resolved target、dev/inode/size/mtime/ctime 以及已全量校验的 SHA。若基准有漂移就失败，不采用旧 snapshot 或暗自重算；不跨进程复用。重复轮只重读源 FASTA（避免持有重复全基因组 DNA），保留各轮已验证 byte identities、PAF 内容/闭包、原始完整输出和最终发布守卫。各轮从同一初始 `ObservedSourcePairs` 独立复制，可共享不可变合并区间但不共享新增观察。普通全量路径不变。
+- 179 项定向测试通过，含原初始输入只验证一次、两轮观察隔离、结果正常发布、选择中漂移和两轮之间初始 PAF 漂移拒绝；只提交本地。新版生产截至本次检查仍 RUNNING/同一 reader，原有区域输出目录未见本轮新增，不能为补丁再次机械重提。
+
+- `d9b80b64` 的隔离验证 `43020733 / agent-X86-06` 08:48:09 起跑（`q0-natural-proof-repair-bound-inputs-20261123/`，清单 SHA `195a576ea3339043f702099b1c14a7897b5f23c691fb247a8c3d95582bcdee58`）。3D 只重跑实际新试验档，逐条对照已封存 full FASTA，要求一次初始读取、一次真实补查；另 4B/5B 用同一套实际新代码各自独立 cold full/proof 对照，防止把 3D 重窗口结果外推到轻样本。08:48 已到 3D 首轮私有 draft（55 项），等待后续原守卫和真正消费者。此作业无生产读写，主运行仍在原阶段，暂不部署、不重提、不 push。
+
+### 11/23 08:54 — 三个天然样本通过核验；轻任务不适合默认开启
+
+- `43020733 / agent-X86-06` 08:51:27 SUCCESS/0；整份报告 SHA-256 `b0572aca559270d98ded446b4519c17e0ea79a6deeacd5e820f315694c5fd7a9`。真实 Server 入口 `d9b80b64` 的 3D 定向档只读取一次初始输入、一次补查；仍保留 86 区域＋1 原生，读回消费者后 **128.95 s**（到 ready 92.98 s），10 条 FASTA 与原全量冷对照一致。不是与 333.25 s 同轮的 A/B，不用于推出当前整麦 ETA。
+- 同节点、同版本、各臂独立空缓存，4B 全量→定向 **8.52→29.41 s**（最后仍需要 4 个窗口），5B **8.49→14.81 s**（6→4 个窗口，另有 1 个原生）。两样本的全部序列、来源区间和切换审计一致。轻任务上少跑几窗不抵额外选路/验收，拒绝把定向档改为默认；也不以这两个小样本推导随意的 contig 数阈值。
+- 新工作区可用 `run.sh` 或 `prepare.sh` 显式传 `--q0-supplement-scope decision_frontier_repair`；默认或显式 `full` 生成原命令。作用域仅生成的 `prepare_q0_evidence.sh`，不写 `prepare_options.tsv`，不修改参考/分组/初始染色体命令，也不是续跑资源参数。已有工作区不能用该选项热切换；正式接管仍需保全已有结果并复核当前全麦增益。20 项 runner/参数测试通过、Bash 语法通过；三个本地实际命令生成工作区逐项比较，只有 opt-in Q0 命令不同（本机 MUMmer 缺少新版 `--batch`，此生成冒烟仅替换工具 help、未运行比对；真实 mapper 见远端试验）。只本地 commit，不 push。
+
+### 11/23 09:09 — 真实工作区切换预备包通过元数据校验，未安装
+
+- 本地 `7997a38e` 为已有工作区的隔离 Q0 reader 增加显式 `decision_frontier_repair` 绑定，保留原 `clear_same_dependencies_v1` 子进程 loader 策略。按真实 builder/selector source inventory 和原 runtime 文件 SHA 校验；仅接受同一份 SHA 绑定且 `reads_qc_enabled=false` 的 `metadata/package.tsv`。外部冻结 reader 调用约定及默认全量不变。事故工具 98 项定向测试通过（迁移准备、reader、context、stage、resume 和 loader launch）。
+- Donau 比较根下 `q0-proof-repair-candidate-20261123-0904/` 的实际预备包成功：`candidate-prepared.json` SHA-256 `49bdb323f0aa52b4a3cc2ca0e433340b712cba85fa6ccf99dcfa5fe3a8d2810e`，`transition.json` SHA-256 `6c975c673aa54c0c90ae9ef9352cc91507f533b5b2554896c9a36263f81f2582`。核对原安装回执 14 个 runtime 模块加 launcher/reader declaration 共 16 项；新候选闭包 18 模块（builder 15、selector 7、有交集），其中 12 项改变（含唯一新增 `q0_frontier_scope.py`）。四处原 builder 策略/参数与两处 admission/path 策略类均 AST 等同。范围选择本身有意变化，不由 AST 等同推导结果等同。
+- 这是隔离目录内的 `q0_candidate_prepared_not_installed`，没有安装回执、没有实跑候选、没有证明现有缓存可完整接管。09:09 新版 `43017096` 与旧版 `42523432` 均仍 `RUNNING`，新版 owner/run 未换、`q0_evidence` 已运行约 2 小时 32 分，仍无本轮新区域窗口或 canonical evidence；最近一次实际子步骤日志仍是 07:00:35 的 loader 探针。未停作业、改生产工作区、重做整麦对照或 push。再次切换至少须有完整只读复用预检和现有剩余工作量证据；不要用 3D 小组倍率抵算约 5 小时已实测的重启到 Q0 开始成本。
+
+### 11/23 10:25 — Q0 输入规划扫描省去不消费的逐行身份构造
+
+- 新增 `2d4ed69`：`_initial_inputs` 用与正式 reader 共用严格 parser 的几何视图构建 observed source pairs 和跨组装覆盖。不再为这一遍生成每行 SHA、可引用 evidence ID 和 tag tuple；每个分区内复用 source key。仍检查 UTF-8、名称、长度、数值、方向、CIGAR 语法/双轴跨度、完整初始检查点及绑定整份 PAF 字节；真正消费证据时仍走带真实行号、行 SHA 和 tags 的 reader。未省略任何记录、候选或坐标。186 项定向测试通过，含 reverse、插删、X-only、gap-only、CRLF/CR、无用 ID 计算拒绝及坏行/长度漏读回归。
+- Donau 隔离 `43021269 / agent-X86-06 / SUCCEEDED`，Python 3.10.12，1 CPU，目录 `q0-observation-scan-ab-20261123-1023/`，源码清单 SHA-256 `73abecdb52525333e82fa19d829694361d5d1c8747ff28adc4a3c638826c03b6`，报告 SHA-256 `2c9a37b8d459fd7c0fc4e59e1b6f1b2e81a5aebef7afedd5f44289347b3e7bfb`。同节点本地临时盘，ABBA 分别用逐行带身份路径和精简几何视图；合计 **72,467 行**，每组完整关系集合、合并覆盖区间摘要一致，6B cross 有 546 条 source 的合格覆盖。分组均值：1B flye self **1.764→1.083 s**（−38.6%），2A hifiasm self **1.675→1.073 s**（−36.0%），6B cross **2.128→1.813 s**（−14.8%）。这是原 PAF 的有界完整行切片、由切片建名长输入表；不含整文件 SHA、初始 checkpoint 校验、全麦内存/共享盘成本或 mapper。测试未写主工作区、未导入采纳产物。
+- 10:25 的生产元数据：22 个 cross PAF 约 20.0 MB，44 个 self PAF 约 12.50 GB（文件长度，非有效用量）。输入扫描确实覆盖大矩阵，但不能用有界片比例推整麦节省的小时数。新版 `43017096` 和旧版 `42523432` 仍 RUNNING；同一 Q0 run 未出现新区域结果，`userCpuTimeTotal` 在 10:23:49→10:24:37 从 10113→10152 秒，不能据此定位确切输入。当前冻结 runtime 与 09:09 已封存候选均未替换；未停作业、不 push。

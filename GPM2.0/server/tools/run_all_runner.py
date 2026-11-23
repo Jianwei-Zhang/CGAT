@@ -79,6 +79,12 @@ def timestamp() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+def _checkpoint_timing(started: float, inputs_checked: float) -> str:
+    # Cached stages still have zero command time; report validation separately.
+    return (f"checkpoint_prepare={inputs_checked - started:.3f}s "
+            f"checkpoint_validate={time.monotonic() - inputs_checked:.3f}s")
+
+
 def process_start_identity(pid: int) -> str:
     try:
         fields = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").split()
@@ -454,17 +460,23 @@ class Runner:
         tasks = []
         for unit in units:
             row = self._row(unit)
+            check_started = time.monotonic()
             checkpoint = self.outer_checkpoints.prepare(unit.unit_id, unit.command_relpath)
             assert checkpoint is not None
+            inputs_checked = time.monotonic()
             valid, reason = self.outer_checkpoints.validate(checkpoint)
+            check_times = _checkpoint_timing(check_started, inputs_checked)
             if valid:
                 row.update(state="success", ended_at=timestamp(), elapsed_seconds="0.000", exit_code="0")
                 atomic_write_status(self.status_path, self.status_rows)
-                self._event("SKIP_VALID", unit, f"elapsed=0.000s checkpoint={checkpoint.path.relative_to(self.server_dir)} {reason}")
+                self._event(
+                    "SKIP_VALID", unit,
+                    f"elapsed=0.000s checkpoint={checkpoint.path.relative_to(self.server_dir)} {reason}; {check_times}",
+                )
                 continue
             if checkpoint.path.is_file():
                 row["state"] = "stale"
-                self._event("STALE", unit, f"{reason}; rerunning")
+                self._event("STALE", unit, f"{reason}; rerunning; {check_times}")
             unit_tasks = load_tasks(self.server_dir, unit.unit_id, unit.command_relpath)
             assert unit_tasks is not None
             if not unit_tasks:
@@ -729,6 +741,7 @@ class Runner:
                         continue
                     row = self._row(unit)
                     prepared: PreparedOuterCheckpoint | None = None
+                    check_started = time.monotonic()
                     try:
                         prepared = self.outer_checkpoints.prepare(
                             unit.unit_id, unit.command_relpath
@@ -755,7 +768,9 @@ class Runner:
                         return 2
 
                     if prepared is not None:
+                        inputs_checked = time.monotonic()
                         valid, reason = self.outer_checkpoints.validate(prepared)
+                        check_times = _checkpoint_timing(check_started, inputs_checked)
                         if valid:
                             row.update(
                                 {
@@ -770,7 +785,7 @@ class Runner:
                                 "SKIP_VALID",
                                 unit,
                                 f"elapsed=0.000s checkpoint="
-                                f"{prepared.path.relative_to(self.server_dir)} {reason}",
+                                f"{prepared.path.relative_to(self.server_dir)} {reason}; {check_times}",
                             )
                             continue
                         if prepared.path.is_file():
@@ -779,7 +794,8 @@ class Runner:
                             self._event(
                                 "STALE",
                                 unit,
-                                f"checkpoint={prepared.path.relative_to(self.server_dir)} {reason}; rerunning",
+                                f"checkpoint={prepared.path.relative_to(self.server_dir)} {reason}; "
+                                f"rerunning; {check_times}",
                             )
 
                     attempt = int(row["attempt"] or "0") + 1

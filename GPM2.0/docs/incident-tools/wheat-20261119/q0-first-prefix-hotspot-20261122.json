@@ -1,0 +1,713 @@
+{
+  "status": "bounded_prefix_profile_only",
+  "records": 5000,
+  "processed_bytes": 2098539,
+  "processed_lines": 5000,
+  "stop_reason": "record_limit",
+  "prefix_sha256": "136d24d4a2211ed6ed3fdcd3b380eb96436c86c24605ecd81076f8a67859b8e3",
+  "ordered_record_digest": "2f3b87f0b74fb158bb1e7d6ec7863407892cf69cb16cbca931694d24700526d2",
+  "whole_cache_validated": false,
+  "hostname": "agent-X86-61",
+  "python": "3.10.12 (main, Jun  3 2026, 19:42:06) [GCC 8.5.0 20210514 (Red Hat 8.5.0-10)]",
+  "task_id": "q0-map-8024dde83cbf20e7ffa6d8ee",
+  "paf_total_bytes": 2666514061,
+  "task_success_marker_sha256": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e",
+  "alignment_flags": [
+    "-D",
+    "-P",
+    "--dual=yes",
+    "--no-long-join"
+  ],
+  "lookup_sha256": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+  "limits": {
+    "records": 5000,
+    "bytes": 16777216,
+    "line_bytes": 4194304
+  },
+  "profiled_seconds": 1.5312673104926944,
+  "profiling_overhead_included": true,
+  "peak_rss_bytes": 92258304,
+  "observed_relations": 13,
+  "coverage_digest": "prefix-coverage-4f53cda18c2baa0c0354bb5f",
+  "projected_intervals": 172048,
+  "projected_paired_bases": 43912588,
+  "top_cumulative": [
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/profile_q0_paf_prefix.py",
+      "line": 31,
+      "function": "consume_prefix",
+      "primitive_calls": 1,
+      "calls": 1,
+      "self_seconds": 0.04800216,
+      "cumulative_seconds": 1.531199513
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 87,
+      "function": "parse_paf_line",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.120217023,
+      "cumulative_seconds": 0.847868821
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/profile_q0_paf_prefix.py",
+      "line": 117,
+      "function": "consume",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.037225755,
+      "cumulative_seconds": 0.5113500080000001
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 60,
+      "function": "paired_query_intervals",
+      "primitive_calls": 177048,
+      "calls": 177048,
+      "self_seconds": 0.13938650400000002,
+      "cumulative_seconds": 0.333920563
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.sum>",
+      "primitive_calls": 20000,
+      "calls": 20000,
+      "self_seconds": 0.13115203,
+      "cumulative_seconds": 0.333238607
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.any>",
+      "primitive_calls": 10000,
+      "calls": 20000,
+      "self_seconds": 0.072050917,
+      "cumulative_seconds": 0.181736443
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 95,
+      "function": "<genexpr>",
+      "primitive_calls": 15000,
+      "calls": 15000,
+      "self_seconds": 0.007419581000000001,
+      "cumulative_seconds": 0.176113197
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'readline' of '_io.TextIOWrapper' objects>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.09066979,
+      "cumulative_seconds": 0.09161013500000001
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 116,
+      "function": "<genexpr>",
+      "primitive_calls": 344096,
+      "calls": 344096,
+      "self_seconds": 0.061262441,
+      "cumulative_seconds": 0.080465386
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 118,
+      "function": "<genexpr>",
+      "primitive_calls": 344096,
+      "calls": 344096,
+      "self_seconds": 0.075255732,
+      "cumulative_seconds": 0.075255732
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/profile_q0_paf_prefix.py",
+      "line": 121,
+      "function": "<genexpr>",
+      "primitive_calls": 177048,
+      "calls": 177048,
+      "self_seconds": 0.040602602,
+      "cumulative_seconds": 0.062155400000000006
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/common.py",
+      "line": 158,
+      "function": "stable_id",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.006970240000000001,
+      "cumulative_seconds": 0.061030303
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'findall' of 're.Pattern' objects>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.057429511,
+      "cumulative_seconds": 0.057429511
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_catalog.py",
+      "line": 82,
+      "function": "observe_alignment",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.02407168,
+      "cumulative_seconds": 0.057286874
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_sources.py",
+      "line": 27,
+      "function": "__post_init__",
+      "primitive_calls": 182048,
+      "calls": 182048,
+      "self_seconds": 0.048220654,
+      "cumulative_seconds": 0.048220654
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/common.py",
+      "line": 145,
+      "function": "canonical_json",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.003624777,
+      "cumulative_seconds": 0.045042181
+    },
+    {
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/json/__init__.py",
+      "line": 183,
+      "function": "dumps",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.009984571000000001,
+      "cumulative_seconds": 0.041417404000000005
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 123,
+      "function": "<genexpr>",
+      "primitive_calls": 288157,
+      "calls": 288157,
+      "self_seconds": 0.030913036,
+      "cumulative_seconds": 0.030913036
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 122,
+      "function": "<genexpr>",
+      "primitive_calls": 232987,
+      "calls": 232987,
+      "self_seconds": 0.028552755000000003,
+      "cumulative_seconds": 0.028552755000000003
+    },
+    {
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/json/encoder.py",
+      "line": 182,
+      "function": "encode",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.008075601,
+      "cumulative_seconds": 0.027555902
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_sources.py",
+      "line": 32,
+      "function": "length",
+      "primitive_calls": 192048,
+      "calls": 192048,
+      "self_seconds": 0.024956241,
+      "cumulative_seconds": 0.024956241
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.len>",
+      "primitive_calls": 379098,
+      "calls": 379098,
+      "self_seconds": 0.023242004,
+      "cumulative_seconds": 0.023242004
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'isspace' of 'str' objects>",
+      "primitive_calls": 390000,
+      "calls": 390000,
+      "self_seconds": 0.021252530000000002,
+      "cumulative_seconds": 0.021252530000000002
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/common.py",
+      "line": 148,
+      "function": "sha256_bytes",
+      "primitive_calls": 10000,
+      "calls": 10000,
+      "self_seconds": 0.006497172000000001,
+      "cumulative_seconds": 0.018828295000000002
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 108,
+      "function": "<listcomp>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.01056525,
+      "cumulative_seconds": 0.017996088
+    },
+    {
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/json/encoder.py",
+      "line": 204,
+      "function": "iterencode",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.017031478000000003,
+      "cumulative_seconds": 0.017031478000000003
+    },
+    {
+      "file": "<string>",
+      "line": 2,
+      "function": "__hash__",
+      "primitive_calls": 40000,
+      "calls": 40000,
+      "self_seconds": 0.010902086,
+      "cumulative_seconds": 0.015304538000000001
+    },
+    {
+      "file": "<string>",
+      "line": 2,
+      "function": "__init__",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.014888182000000002,
+      "cumulative_seconds": 0.014888182000000002
+    },
+    {
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/pathlib.py",
+      "line": 1111,
+      "function": "open",
+      "primitive_calls": 1,
+      "calls": 1,
+      "self_seconds": 6.206e-06,
+      "cumulative_seconds": 0.013360698
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method io.open>",
+      "primitive_calls": 1,
+      "calls": 1,
+      "self_seconds": 0.013329385000000001,
+      "cumulative_seconds": 0.013354171000000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'startswith' of 'str' objects>",
+      "primitive_calls": 56339,
+      "calls": 56339,
+      "self_seconds": 0.008628531,
+      "cumulative_seconds": 0.008628531
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method _hashlib.openssl_sha256>",
+      "primitive_calls": 10002,
+      "calls": 10002,
+      "self_seconds": 0.007395844,
+      "cumulative_seconds": 0.007395844
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'setdefault' of 'dict' objects>",
+      "primitive_calls": 10000,
+      "calls": 10000,
+      "self_seconds": 0.003181433,
+      "cumulative_seconds": 0.006632739
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.sorted>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.003278501,
+      "cumulative_seconds": 0.006446508
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'add' of 'set' objects>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.002875734,
+      "cumulative_seconds": 0.006361543000000001
+    }
+  ],
+  "top_self": [
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 60,
+      "function": "paired_query_intervals",
+      "primitive_calls": 177048,
+      "calls": 177048,
+      "self_seconds": 0.13938650400000002,
+      "cumulative_seconds": 0.333920563
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.sum>",
+      "primitive_calls": 20000,
+      "calls": 20000,
+      "self_seconds": 0.13115203,
+      "cumulative_seconds": 0.333238607
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 87,
+      "function": "parse_paf_line",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.120217023,
+      "cumulative_seconds": 0.847868821
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'readline' of '_io.TextIOWrapper' objects>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.09066979,
+      "cumulative_seconds": 0.09161013500000001
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 118,
+      "function": "<genexpr>",
+      "primitive_calls": 344096,
+      "calls": 344096,
+      "self_seconds": 0.075255732,
+      "cumulative_seconds": 0.075255732
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.any>",
+      "primitive_calls": 10000,
+      "calls": 20000,
+      "self_seconds": 0.072050917,
+      "cumulative_seconds": 0.181736443
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 116,
+      "function": "<genexpr>",
+      "primitive_calls": 344096,
+      "calls": 344096,
+      "self_seconds": 0.061262441,
+      "cumulative_seconds": 0.080465386
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'findall' of 're.Pattern' objects>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.057429511,
+      "cumulative_seconds": 0.057429511
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_sources.py",
+      "line": 27,
+      "function": "__post_init__",
+      "primitive_calls": 182048,
+      "calls": 182048,
+      "self_seconds": 0.048220654,
+      "cumulative_seconds": 0.048220654
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/profile_q0_paf_prefix.py",
+      "line": 31,
+      "function": "consume_prefix",
+      "primitive_calls": 1,
+      "calls": 1,
+      "self_seconds": 0.04800216,
+      "cumulative_seconds": 1.531199513
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/profile_q0_paf_prefix.py",
+      "line": 121,
+      "function": "<genexpr>",
+      "primitive_calls": 177048,
+      "calls": 177048,
+      "self_seconds": 0.040602602,
+      "cumulative_seconds": 0.062155400000000006
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/profile_q0_paf_prefix.py",
+      "line": 117,
+      "function": "consume",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.037225755,
+      "cumulative_seconds": 0.5113500080000001
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 123,
+      "function": "<genexpr>",
+      "primitive_calls": 288157,
+      "calls": 288157,
+      "self_seconds": 0.030913036,
+      "cumulative_seconds": 0.030913036
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 122,
+      "function": "<genexpr>",
+      "primitive_calls": 232987,
+      "calls": 232987,
+      "self_seconds": 0.028552755000000003,
+      "cumulative_seconds": 0.028552755000000003
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_sources.py",
+      "line": 32,
+      "function": "length",
+      "primitive_calls": 192048,
+      "calls": 192048,
+      "self_seconds": 0.024956241,
+      "cumulative_seconds": 0.024956241
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_catalog.py",
+      "line": 82,
+      "function": "observe_alignment",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.02407168,
+      "cumulative_seconds": 0.057286874
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.len>",
+      "primitive_calls": 379098,
+      "calls": 379098,
+      "self_seconds": 0.023242004,
+      "cumulative_seconds": 0.023242004
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'isspace' of 'str' objects>",
+      "primitive_calls": 390000,
+      "calls": 390000,
+      "self_seconds": 0.021252530000000002,
+      "cumulative_seconds": 0.021252530000000002
+    },
+    {
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/json/encoder.py",
+      "line": 204,
+      "function": "iterencode",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.017031478000000003,
+      "cumulative_seconds": 0.017031478000000003
+    },
+    {
+      "file": "<string>",
+      "line": 2,
+      "function": "__init__",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.014888182000000002,
+      "cumulative_seconds": 0.014888182000000002
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method io.open>",
+      "primitive_calls": 1,
+      "calls": 1,
+      "self_seconds": 0.013329385000000001,
+      "cumulative_seconds": 0.013354171000000001
+    },
+    {
+      "file": "<string>",
+      "line": 2,
+      "function": "__hash__",
+      "primitive_calls": 40000,
+      "calls": 40000,
+      "self_seconds": 0.010902086,
+      "cumulative_seconds": 0.015304538000000001
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 108,
+      "function": "<listcomp>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.01056525,
+      "cumulative_seconds": 0.017996088
+    },
+    {
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/json/__init__.py",
+      "line": 183,
+      "function": "dumps",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.009984571000000001,
+      "cumulative_seconds": 0.041417404000000005
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'startswith' of 'str' objects>",
+      "primitive_calls": 56339,
+      "calls": 56339,
+      "self_seconds": 0.008628531,
+      "cumulative_seconds": 0.008628531
+    },
+    {
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/json/encoder.py",
+      "line": 182,
+      "function": "encode",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.008075601,
+      "cumulative_seconds": 0.027555902
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 95,
+      "function": "<genexpr>",
+      "primitive_calls": 15000,
+      "calls": 15000,
+      "self_seconds": 0.007419581000000001,
+      "cumulative_seconds": 0.176113197
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method _hashlib.openssl_sha256>",
+      "primitive_calls": 10002,
+      "calls": 10002,
+      "self_seconds": 0.007395844,
+      "cumulative_seconds": 0.007395844
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/common.py",
+      "line": 158,
+      "function": "stable_id",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.006970240000000001,
+      "cumulative_seconds": 0.061030303
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/common.py",
+      "line": 148,
+      "function": "sha256_bytes",
+      "primitive_calls": 10000,
+      "calls": 10000,
+      "self_seconds": 0.006497172000000001,
+      "cumulative_seconds": 0.018828295000000002
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 98,
+      "function": "<genexpr>",
+      "primitive_calls": 20000,
+      "calls": 20000,
+      "self_seconds": 0.00597518,
+      "cumulative_seconds": 0.00597518
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'split' of 'str' objects>",
+      "primitive_calls": 5000,
+      "calls": 5000,
+      "self_seconds": 0.005379578,
+      "cumulative_seconds": 0.005379578
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.min>",
+      "primitive_calls": 15000,
+      "calls": 15000,
+      "self_seconds": 0.00524182,
+      "cumulative_seconds": 0.00524182
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'hexdigest' of '_hashlib.HASH' objects>",
+      "primitive_calls": 10002,
+      "calls": 10002,
+      "self_seconds": 0.004946435,
+      "cumulative_seconds": 0.004946435
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-first-prefix-profile-20261122-092001/package/server/tools/lgz_core/q0_alignments.py",
+      "line": 100,
+      "function": "<genexpr>",
+      "primitive_calls": 20000,
+      "calls": 20000,
+      "self_seconds": 0.004558817000000001,
+      "cumulative_seconds": 0.004558817000000001
+    }
+  ],
+  "source_sha256": {
+    "__init__.py": "b2982d75955db5cf54499ce0404ccfba4db31d6d8903c0d26d12b63ecf8a058e",
+    "alignment_index.py": "5d347c80bb11acaf76c212770296e2b2eaf77faca38962e42088a47e452a6669",
+    "common.py": "d1348b4ddc660e410bdbbdc73915b04211ddee0001911d846d82d9fd600e8b69",
+    "mummer.py": "3363b4dd72d6db89ef3291cace48b475e3bb8567b03b603ecf4ba52d9914fce8",
+    "q0_admission.py": "0c806dc6e1ff2eab3eedcff5dedfdd257e2dfb4667260ce7b896c124c33f9332",
+    "q0_alignments.py": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+    "q0_catalog.py": "338ddfe7cf8644a493e6eecb7feb623be697317103c672d8b47294b0eadf74f3",
+    "q0_cigar_policy.py": "e84bc7249e0776716adae6da116c36ed0471e058472a85d7c78c301ce44eee39",
+    "q0_coverage.py": "1b9928c97cccf71a531d321e859aa07ac79109f7ac9494ff58bc69f9b46317b7",
+    "q0_lineage.py": "a1716c065f97e0e1ff4537dff351b28fdb371cd71c21912373d9fd4d04afd0ee",
+    "q0_mapper_guard.py": "b87e4a3f604127319789cc27503fa145acc4a1397549ae5b821eb94ba3002780",
+    "q0_neighbor_requests.py": "1d58a9895dba943eb2968bf2e28e0f95578ed7a776c2d8832e7fd5a2af44c9c4",
+    "q0_paths.py": "9739dc115e6b0468ce46aac0f583cb23c8bbcd0e88aa09d71cad6814f87dbec9",
+    "q0_preparation.py": "f0541a92ef6d042c3498350ce8d7e8ae34923158474007fb2d80ea0e8b2c6737",
+    "q0_publication.py": "c7fcdd100c3db1c0b33db5bc07e82a66c51ae25c04406876042bab2f6fc4adc6",
+    "q0_query_windows.py": "140f6222e5bd4b5fd448daf35be98625a354f1eb26a8df0f0e7e06792a00cb51",
+    "q0_reference_index.py": "1f76edae080b9259970bb58fb5c23dd1a35af716e7f7a760e8c943c13649ae4c",
+    "q0_regional_candidates.py": "e3587b296fffc8af9c3e10eae4b89b1d0a6493433e0388ef239cc11ac5139974",
+    "q0_regional_discovery.py": "67d45009b7ac1753e103f845164ed64dd44e3075c9e58de47f6567753f96148e",
+    "q0_regional_execution.py": "20b0e1e6672a47edeb3d535feb1d4c92cd12b40da37e9166555dbf8c74d90ef8",
+    "q0_regional_index.py": "fcb31b882b3b99e91f56389e404c58a7661ebf9a713fb5eddcaf6cd55d381ac5",
+    "q0_regional_mapping.py": "5a7952987ca32cf1036f4c5fe391c5c34c12e89fd3285721114d5a42855e3414",
+    "q0_sources.py": "2fd88802d000d57b672420dc9270220f8865b1140dd6048f16c0955f8e497aa0",
+    "refill_batch.py": "396f410612be0490dfc95cb45244c6aa58b53f4bbcc935a1ff8363ae1479d3e2",
+    "repair_common.py": "f2f894bd8518dc0282610bad2c088e63f43cac966c348fd02045eafe6eb49cd2",
+    "repair_mummer.py": "d57821d9cc971267cec7293685eb18e36e9edd942da00204aa67ef3c71f17fa0",
+    "repair_runtime.py": "d534c93992ae73e311b6a9dd844cedc32351c113d7b5783e9f9cd4b7a651627b",
+    "repair_structural.py": "16ce4dc3fd8bcd6ba133df6220e8128a79365ec1be388de6288b65e37ae3ea21",
+    "source_intervals.py": "c7cc202113645af7cdee3833304384f9b1d6d75b4444b33e04df4a02fc6732d1",
+    "stage_alignment.py": "f4992b07c7fc15f9ce9fbffa32b5afdefa5ea1f0d4b93debadf68157be98aabe",
+    "stage_cache.py": "34ff463bf7c5592152b82db1bfa362dc91f15797fca1e3d1db57356633040b98",
+    "stage_io.py": "5ff92c0be05763c08568e26f00e5f021d40bade8133e156220042288f307f7ce",
+    "stage_metadata.py": "653ffae5f560ffc2a11c4a725610a08fc36feb5f3c7e7b038adcf6c460dde817",
+    "stage_replay.py": "446d4e45441c299cf3e86c1ccfdca136e239fda29fef282ecb69713d0badafa9",
+    "stage_schema.py": "c3d4cb49ee23badb4ea095c8e9fb33b6eb413fd9a00fcdbe90fca35b1df6f061",
+    "step1_engine.py": "48ad221dc409a58eab18243b780d54deb454ca7e1d2a3108b8ecc070ae11dfbf",
+    "step2_engine.py": "7a152f1c15cf9dc1efdb2fe68553e1f2c2486e39adff96559ed6c27808b9d557",
+    "structural_support.py": "da0796015db987ef60e2c59af61bcfd82c1a92c0aafa852e34cf26290d1a0728"
+  },
+  "anchor_catalog_fanout_profiled": false,
+  "whole_dna_heap_loaded": false,
+  "mapper_executed": false,
+  "primary_workspace_modified": false,
+  "whole_wheat_speedup_claimed": false
+}

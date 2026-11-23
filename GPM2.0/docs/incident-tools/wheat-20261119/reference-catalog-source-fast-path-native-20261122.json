@@ -1,0 +1,60 @@
+{
+  "baseline_over_candidate_wall": 1.5552942884191578,
+  "catalog_routing_content_equal": true,
+  "hostname": "agent-X86-47",
+  "main_workspace_modified": false,
+  "mapper_executed": false,
+  "new_module_sha256": "93c351b0fda7b24f39ab54fa4b64a8973d5625a23cd0505115f8149bb27d98e5",
+  "old_module_sha256": "338ddfe7cf8644a493e6eecb7feb623be697317103c672d8b47294b0eadf74f3",
+  "phases": [
+    {
+      "combined_content_sha256": "e28d1eca405d004efa781e9d1e001915ec982e8648f07b59002c6592995a37bb",
+      "evidence": 34168,
+      "mode": "baseline",
+      "seconds": 38.512388341128826
+    },
+    {
+      "combined_content_sha256": "e28d1eca405d004efa781e9d1e001915ec982e8648f07b59002c6592995a37bb",
+      "evidence": 34168,
+      "mode": "candidate",
+      "seconds": 26.57472860813141
+    },
+    {
+      "combined_content_sha256": "e28d1eca405d004efa781e9d1e001915ec982e8648f07b59002c6592995a37bb",
+      "evidence": 34168,
+      "mode": "candidate",
+      "seconds": 26.733702659606934
+    },
+    {
+      "combined_content_sha256": "e28d1eca405d004efa781e9d1e001915ec982e8648f07b59002c6592995a37bb",
+      "evidence": 34168,
+      "mode": "baseline",
+      "seconds": 44.397910334169865
+    }
+  ],
+  "samples": [
+    {
+      "dataset": "JM19_flye_ABD",
+      "original_size": 1061893273,
+      "paf_bytes": 6906433,
+      "paf_records_inspected": 65829,
+      "paf_sha256": "f4500d52be7413a95321d519e9b0505f343a4d0e3eb70bcb8504def0a4127078",
+      "records": 26935,
+      "source_bases": 134216983,
+      "sources": 759
+    },
+    {
+      "dataset": "JM19_hifiasm",
+      "original_size": 683392866,
+      "paf_bytes": 1854916,
+      "paf_records_inspected": 62107,
+      "paf_sha256": "5cc51149ba2785e293b561a390870ad93d6753ad2a7aa4e754244dbc5b21e8d1",
+      "records": 7233,
+      "source_bases": 134212274,
+      "sources": 20
+    }
+  ],
+  "seconds_for_initial_index_excluded_from_ratio": 50.34057255089283,
+  "status": "exact_bounded_reference_catalog_replay_NOT_production_acceptance",
+  "whole_dataset_replayed": false
+}

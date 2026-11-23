@@ -1,0 +1,14 @@
+{
+  "final_job_sha256": "54d96a1ef02c2303e31c0a57cee8ce738bc6d9a3de3486a955f822f544d3e84d",
+  "host": "agent-X86-30",
+  "job_id": 43012713,
+  "main_workspace_modified": false,
+  "output_sha256": "3349855fb0d2d751246053602fe351ce5a97c583dc56b2c4fecf3a113041b605",
+  "production_strategy_enabled": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-guard-startup-20261122-143421",
+  "source_sha256": {
+    "probe_regional_guard_startup.py": "51b64ed0a0285f043b6fbafee0a8f2345c9801c7a8f07a2bbb791f410da7d733",
+    "test_probe_regional_guard_startup.py": "859ca27473aabac9f6c11721d8c93e36cd23ec315e3d8a58cc86fe388d171c46"
+  },
+  "status": "native_launch_microbenchmark_verified_NOT_production_acceptance"
+}

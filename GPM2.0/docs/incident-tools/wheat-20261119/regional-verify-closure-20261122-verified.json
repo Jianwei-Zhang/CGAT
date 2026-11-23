@@ -1,0 +1,14 @@
+{
+  "baseline_sha256": "1005f9e0e062f0918f568024e5e4f3a28ff54e1d4df975ca34b47521410fb610",
+  "candidate_sha256": "d760c26f4e2e5139a1fcf895647764c0c2290da46772ecf05ccf32821a839278",
+  "code_manifest_sha256": "ae773ce759c7087072c10dd92265652aae7ef46cd6bba4622dd69b4d3573165b",
+  "end_utc": "2026-11-22T08:49:21Z",
+  "final_job_sha256": "e70dde4baf28f4d010aaf64002dc5434b66e58a444003b86ff59bdc6dbf17d5e",
+  "job_id": "43013158",
+  "node": "agent-X86-61",
+  "not_deployed": true,
+  "probe_source_sha256": "747cf8331b33d7c4506a438d7a5c81aa4a71489891557c56c1698e10e1389753",
+  "remote_dir": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-verify-closure-20261122-164243-fixed",
+  "report_sha256": "db04a965326d89d989a7856f24685431bf166e18863a8021ef6f01e1b1c12fcf",
+  "state": "SUCCEEDED"
+}

@@ -1,0 +1,754 @@
+{
+  "all_chain_flags_preserved": true,
+  "archived_original_inputs_verified": true,
+  "coarse_rerun": false,
+  "coverage_scope": "95% PAF identity / >=100 M/= bp; interval differences within original query cores; plus oriented target-window groups; not synteny or final assembly acceptance",
+  "exact_additional_flags": [
+    "--cap-sw-mem",
+    "10m"
+  ],
+  "host": "agent-X86-08",
+  "input_bytes": 345931620,
+  "main_workspace_modified": false,
+  "phases": [
+    {
+      "completion_order": [
+        3,
+        6,
+        0,
+        5,
+        2,
+        1,
+        7,
+        4,
+        8,
+        12,
+        9,
+        11,
+        10
+      ],
+      "phase": "cap-sw-mem-10m",
+      "results": [
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 2.959,
+            "native_peak_rss_gb": 0.159,
+            "wall_seconds": 2.832
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 158,
+              "lost_target_group_target_bp": 158,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 52153,
+              "old_core_bp": 52153,
+              "old_oriented_targets": 3,
+              "old_target_group_query_bp": 57963,
+              "old_target_group_target_bp": 57963
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 370,
+              "lost_target_group_target_bp": 370,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 52155,
+              "old_core_bp": 52155,
+              "old_oriented_targets": 12,
+              "old_target_group_query_bp": 147089,
+              "old_target_group_target_bp": 147089
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 2.218,
+            "native_peak_rss_gb": 82.303,
+            "wall_seconds": 2.072
+          },
+          "new_paf_rows": 155,
+          "old_paf_rows": 156,
+          "ordinal": 0,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-79a993cbd96b0dfe3b514936/q0-regional-raw-3cc954b5a281135a15feb39a/success.json",
+          "same_as_historical": false,
+          "seconds": 23.04041616525501,
+          "stdout_sha256": "3a87e3e20395381aea8f25c967d49524658bd7eac8c4df0de18a982d16b77991"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 24.527,
+            "native_peak_rss_gb": 0.086,
+            "wall_seconds": 24.648
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 1,
+              "lost_target_group_target_bp": 10175,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 17254,
+              "old_core_bp": 17254,
+              "old_oriented_targets": 2,
+              "old_target_group_query_bp": 34506,
+              "old_target_group_target_bp": 173477
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 398,
+              "lost_target_group_target_bp": 676,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 17257,
+              "old_core_bp": 17257,
+              "old_oriented_targets": 3,
+              "old_target_group_query_bp": 49642,
+              "old_target_group_target_bp": 106940
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 102.699,
+            "native_peak_rss_gb": 82.306,
+            "wall_seconds": 102.897
+          },
+          "new_paf_rows": 6005,
+          "old_paf_rows": 9470,
+          "ordinal": 1,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3bb173a52c6a4b9cfe60bbdc/q0-regional-raw-b9378969607ef6814c1defe2/success.json",
+          "same_as_historical": false,
+          "seconds": 46.8791809938848,
+          "stdout_sha256": "f7a08d21f15610d376a355078fccbeabe3c33978298db2e5a6cfdc9791ccdcdb"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 10.919,
+            "native_peak_rss_gb": 0.226,
+            "wall_seconds": 10.277
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 170338,
+              "lost_target_group_target_bp": 399526,
+              "missing_oriented_targets": 30,
+              "missing_oriented_targets_ge_1kb": 27,
+              "new_core_bp": 5768,
+              "old_core_bp": 5768,
+              "old_oriented_targets": 42,
+              "old_target_group_query_bp": 209962,
+              "old_target_group_target_bp": 506429
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 339937,
+              "lost_target_group_target_bp": 644780,
+              "missing_oriented_targets": 58,
+              "missing_oriented_targets_ge_1kb": 54,
+              "new_core_bp": 5768,
+              "old_core_bp": 5768,
+              "old_oriented_targets": 79,
+              "old_target_group_query_bp": 395408,
+              "old_target_group_target_bp": 908181
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 50.51,
+            "native_peak_rss_gb": 82.309,
+            "wall_seconds": 50.157
+          },
+          "new_paf_rows": 2246,
+          "old_paf_rows": 2346,
+          "ordinal": 4,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-400a73488d929a5bd6983627/q0-regional-raw-4bc746f22dc01f75189e6a47/success.json",
+          "same_as_historical": false,
+          "seconds": 31.148550388403237,
+          "stdout_sha256": "57fc2f6a68b3499e74edf6734c7db2e89367b8d29e3574f61f3866320ede070f"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 0.994,
+            "native_peak_rss_gb": 0.086,
+            "wall_seconds": 0.949
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 2954,
+              "old_core_bp": 2954,
+              "old_oriented_targets": 1,
+              "old_target_group_query_bp": 2954,
+              "old_target_group_target_bp": 2954
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 2954,
+              "old_core_bp": 2954,
+              "old_oriented_targets": 2,
+              "old_target_group_query_bp": 5429,
+              "old_target_group_target_bp": 5429
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 0.779,
+            "native_peak_rss_gb": 82.309,
+            "wall_seconds": 0.721
+          },
+          "new_paf_rows": 77,
+          "old_paf_rows": 79,
+          "ordinal": 5,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-bc0018ff644a7c0b71394d8d/q0-regional-raw-b4ec5820a371f0ca48884d04/success.json",
+          "same_as_historical": false,
+          "seconds": 22.292511482723057,
+          "stdout_sha256": "51f7d68ede104353fb8df508f4af0bcf410f22214c3ae2f105420ab589df4de1"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 27.699,
+            "native_peak_rss_gb": 0.117,
+            "wall_seconds": 27.789
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 10657,
+              "lost_core_bp": 91,
+              "lost_target_group_query_bp": 909,
+              "lost_target_group_target_bp": 68,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 99904,
+              "old_core_bp": 89338,
+              "old_oriented_targets": 3,
+              "old_target_group_query_bp": 237900,
+              "old_target_group_target_bp": 56434
+            },
+            "intra": {
+              "gained_core_bp": 9892,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 1190,
+              "lost_target_group_target_bp": 174,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 100000,
+              "old_core_bp": 90108,
+              "old_oriented_targets": 6,
+              "old_target_group_query_bp": 467960,
+              "old_target_group_target_bp": 112089
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 165.143,
+            "native_peak_rss_gb": 82.28,
+            "wall_seconds": 165.569
+          },
+          "new_paf_rows": 9616,
+          "old_paf_rows": 10395,
+          "ordinal": 8,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-567a6a1266da5cb07d941359/q0-regional-raw-7d4418e50e954faa95d34719/success.json",
+          "same_as_historical": false,
+          "seconds": 48.97451500687748,
+          "stdout_sha256": "3ce988d6659237378c6168b3d20498c58184575ff82c972fd3a7527534e15f99"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 9.632,
+            "native_peak_rss_gb": 0.372,
+            "wall_seconds": 9.251
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 0,
+              "old_core_bp": 0,
+              "old_oriented_targets": 0,
+              "old_target_group_query_bp": 0,
+              "old_target_group_target_bp": 0
+            },
+            "intra": {
+              "gained_core_bp": 11442,
+              "lost_core_bp": 947,
+              "lost_target_group_query_bp": 947,
+              "lost_target_group_target_bp": 197,
+              "missing_oriented_targets": 1,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 11442,
+              "old_core_bp": 947,
+              "old_oriented_targets": 2,
+              "old_target_group_query_bp": 947,
+              "old_target_group_target_bp": 532
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 114.469,
+            "native_peak_rss_gb": 82.302,
+            "wall_seconds": 114.451
+          },
+          "new_paf_rows": 1417,
+          "old_paf_rows": 3211,
+          "ordinal": 13,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-2ce26b7195656d2ad52a73f6/q0-regional-raw-2aea14b76318782dbdec5f45/success.json",
+          "same_as_historical": false,
+          "seconds": 29.8117828508839,
+          "stdout_sha256": "ae482d19e3280e868d440c87358d87157b773ae7a6fa956a54b9457a193eab85"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 1.586,
+            "native_peak_rss_gb": 0.123,
+            "wall_seconds": 1.438
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 0,
+              "old_core_bp": 0,
+              "old_oriented_targets": 0,
+              "old_target_group_query_bp": 0,
+              "old_target_group_target_bp": 0
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 0,
+              "old_core_bp": 0,
+              "old_oriented_targets": 0,
+              "old_target_group_query_bp": 0,
+              "old_target_group_target_bp": 0
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 0.829,
+            "native_peak_rss_gb": 82.28,
+            "wall_seconds": 0.687
+          },
+          "new_paf_rows": 0,
+          "old_paf_rows": 0,
+          "ordinal": 14,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-24503adfcde3c47e3241485c/q0-regional-raw-e49979b9ee6989da6f9d9cca/success.json",
+          "same_as_historical": true,
+          "seconds": 22.415227130055428,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 4.769,
+            "native_peak_rss_gb": 0.378,
+            "wall_seconds": 4.225
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 0,
+              "old_core_bp": 0,
+              "old_oriented_targets": 0,
+              "old_target_group_query_bp": 0,
+              "old_target_group_target_bp": 0
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 0,
+              "old_core_bp": 0,
+              "old_oriented_targets": 0,
+              "old_target_group_query_bp": 0,
+              "old_target_group_target_bp": 0
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 2.751,
+            "native_peak_rss_gb": 82.287,
+            "wall_seconds": 2.288
+          },
+          "new_paf_rows": 0,
+          "old_paf_rows": 0,
+          "ordinal": 16,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-4c69d1800141d7164a5e462a/q0-regional-raw-5007cf3bc61600ac3387de04/success.json",
+          "same_as_historical": true,
+          "seconds": 24.54449905641377,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 7.503,
+            "native_peak_rss_gb": 0.36,
+            "wall_seconds": 7.415
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 0,
+              "old_core_bp": 0,
+              "old_oriented_targets": 0,
+              "old_target_group_query_bp": 0,
+              "old_target_group_target_bp": 0
+            },
+            "intra": {
+              "gained_core_bp": 7718,
+              "lost_core_bp": 1860,
+              "lost_target_group_query_bp": 1860,
+              "lost_target_group_target_bp": 1095,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 7718,
+              "old_core_bp": 1860,
+              "old_oriented_targets": 1,
+              "old_target_group_query_bp": 1860,
+              "old_target_group_target_bp": 1095
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 54.551,
+            "native_peak_rss_gb": 82.302,
+            "wall_seconds": 54.382
+          },
+          "new_paf_rows": 833,
+          "old_paf_rows": 1890,
+          "ordinal": 17,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-90105f0e662f601d0c2906db/q0-regional-raw-595a37e532591fd2aeab0541/success.json",
+          "same_as_historical": false,
+          "seconds": 29.485661199316382,
+          "stdout_sha256": "3c55bbead6a401ac1da82658dd34644dd940e7e78390441b53c249773bc66879"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 34.003,
+            "native_peak_rss_gb": 0.116,
+            "wall_seconds": 34.087
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 12943,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 571,
+              "lost_target_group_target_bp": 66,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 99921,
+              "old_core_bp": 86978,
+              "old_oriented_targets": 3,
+              "old_target_group_query_bp": 224229,
+              "old_target_group_target_bp": 55585
+            },
+            "intra": {
+              "gained_core_bp": 5931,
+              "lost_core_bp": 7,
+              "lost_target_group_query_bp": 1464,
+              "lost_target_group_target_bp": 104,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 99976,
+              "old_core_bp": 94052,
+              "old_oriented_targets": 6,
+              "old_target_group_query_bp": 445250,
+              "old_target_group_target_bp": 110490
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 324.816,
+            "native_peak_rss_gb": 82.28,
+            "wall_seconds": 326.033
+          },
+          "new_paf_rows": 11279,
+          "old_paf_rows": 16274,
+          "ordinal": 20,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-607f236e26540eadcd3b7bce/q0-regional-raw-f16c5cf65f1b6efc0d8426a3/success.json",
+          "same_as_historical": false,
+          "seconds": 56.284257961437106,
+          "stdout_sha256": "b93be104ad59b26122c09413933da9f81fd68c23b1ff2d5bf928c680a5d2205e"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 30.662,
+            "native_peak_rss_gb": 0.088,
+            "wall_seconds": 30.81
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 2,
+              "lost_target_group_target_bp": 4648,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 15518,
+              "old_core_bp": 15518,
+              "old_oriented_targets": 3,
+              "old_target_group_query_bp": 46314,
+              "old_target_group_target_bp": 106510
+            },
+            "intra": {
+              "gained_core_bp": 1,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 8493,
+              "lost_target_group_target_bp": 22115,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 15517,
+              "old_core_bp": 15516,
+              "old_oriented_targets": 7,
+              "old_target_group_query_bp": 86561,
+              "old_target_group_target_bp": 106589
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 228.697,
+            "native_peak_rss_gb": 82.304,
+            "wall_seconds": 229.263
+          },
+          "new_paf_rows": 7687,
+          "old_paf_rows": 11174,
+          "ordinal": 21,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-de6f905af1de3df16d08fed3/q0-regional-raw-f2cdcbd2dc39af2306cfe181/success.json",
+          "same_as_historical": false,
+          "seconds": 53.50047121103853,
+          "stdout_sha256": "e0a92c7a2e17e89d6918f6c91e45399cefa96bc507a9fb6350346738db80109c"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 25.76,
+            "native_peak_rss_gb": 0.116,
+            "wall_seconds": 25.816
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 9361,
+              "lost_core_bp": 106,
+              "lost_target_group_query_bp": 3819,
+              "lost_target_group_target_bp": 237,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 98612,
+              "old_core_bp": 89357,
+              "old_oriented_targets": 3,
+              "old_target_group_query_bp": 218270,
+              "old_target_group_target_bp": 59827
+            },
+            "intra": {
+              "gained_core_bp": 8526,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 9747,
+              "lost_target_group_target_bp": 557,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 99864,
+              "old_core_bp": 91338,
+              "old_oriented_targets": 6,
+              "old_target_group_query_bp": 437093,
+              "old_target_group_target_bp": 121015
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 225.641,
+            "native_peak_rss_gb": 82.28,
+            "wall_seconds": 226.43
+          },
+          "new_paf_rows": 8656,
+          "old_paf_rows": 12487,
+          "ordinal": 22,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-ed6c9d078d43384fa753d722/q0-regional-raw-b7b58f98b05779b916043d52/success.json",
+          "same_as_historical": false,
+          "seconds": 48.92093549668789,
+          "stdout_sha256": "6e6b94f19182455857d268d8bd0a7748c8cef100ee8f181bfd96e4b884daa018"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 5.0,
+            "native_peak_rss_gb": 0.134,
+            "wall_seconds": 4.892
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 494,
+              "lost_core_bp": 1224,
+              "lost_target_group_query_bp": 45194,
+              "lost_target_group_target_bp": 43795,
+              "missing_oriented_targets": 24,
+              "missing_oriented_targets_ge_1kb": 5,
+              "new_core_bp": 27827,
+              "old_core_bp": 28557,
+              "old_oriented_targets": 112,
+              "old_target_group_query_bp": 298088,
+              "old_target_group_target_bp": 296543
+            },
+            "intra": {
+              "gained_core_bp": 1,
+              "lost_core_bp": 1716,
+              "lost_target_group_query_bp": 13712,
+              "lost_target_group_target_bp": 13355,
+              "missing_oriented_targets": 11,
+              "missing_oriented_targets_ge_1kb": 1,
+              "new_core_bp": 13535,
+              "old_core_bp": 15250,
+              "old_oriented_targets": 51,
+              "old_target_group_query_bp": 76928,
+              "old_target_group_target_bp": 82480
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 10.127,
+            "native_peak_rss_gb": 82.287,
+            "wall_seconds": 10.002
+          },
+          "new_paf_rows": 1040,
+          "old_paf_rows": 1151,
+          "ordinal": 23,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-3d675996338ca726a0a2b6bc/q0-regional-raw-3e9a8bc22555f8478764e45f/success.json",
+          "same_as_historical": false,
+          "seconds": 26.866421659477055,
+          "stdout_sha256": "341a86f76dce82f2c4fc78393e8ec9220fe28e281b72cb8e1243faabb27f804f"
+        }
+      ],
+      "seconds": 83.82005945406854
+    },
+    {
+      "completion_order": [
+        0,
+        1
+      ],
+      "phase": "historical-default-replay",
+      "results": [
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 69.795,
+            "native_peak_rss_gb": 0.464,
+            "wall_seconds": 69.456
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 5768,
+              "old_core_bp": 5768,
+              "old_oriented_targets": 42,
+              "old_target_group_query_bp": 209962,
+              "old_target_group_target_bp": 506429
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 5768,
+              "old_core_bp": 5768,
+              "old_oriented_targets": 79,
+              "old_target_group_query_bp": 395408,
+              "old_target_group_target_bp": 908181
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 50.51,
+            "native_peak_rss_gb": 82.309,
+            "wall_seconds": 50.157
+          },
+          "new_paf_rows": 2346,
+          "old_paf_rows": 2346,
+          "ordinal": 4,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-400a73488d929a5bd6983627/q0-regional-raw-4bc746f22dc01f75189e6a47/success.json",
+          "same_as_historical": true,
+          "seconds": 91.59190481714904,
+          "stdout_sha256": "4c86b02357933f9ab236cdeabcdf2af484b0c1abacc2394dfd5f9fdb70f20cb5"
+        },
+        {
+          "candidate_native_timing": {
+            "cpu_seconds": 215.749,
+            "native_peak_rss_gb": 0.505,
+            "wall_seconds": 216.507
+          },
+          "coverage": {
+            "cross": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 89338,
+              "old_core_bp": 89338,
+              "old_oriented_targets": 3,
+              "old_target_group_query_bp": 237900,
+              "old_target_group_target_bp": 56434
+            },
+            "intra": {
+              "gained_core_bp": 0,
+              "lost_core_bp": 0,
+              "lost_target_group_query_bp": 0,
+              "lost_target_group_target_bp": 0,
+              "missing_oriented_targets": 0,
+              "missing_oriented_targets_ge_1kb": 0,
+              "new_core_bp": 90108,
+              "old_core_bp": 90108,
+              "old_oriented_targets": 6,
+              "old_target_group_query_bp": 467960,
+              "old_target_group_target_bp": 112089
+            }
+          },
+          "historical_native_timing": {
+            "cpu_seconds": 165.143,
+            "native_peak_rss_gb": 82.28,
+            "wall_seconds": 165.569
+          },
+          "new_paf_rows": 10395,
+          "old_paf_rows": 10395,
+          "ordinal": 8,
+          "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-567a6a1266da5cb07d941359/q0-regional-raw-7d4418e50e954faa95d34719/success.json",
+          "same_as_historical": true,
+          "seconds": 239.4846855243668,
+          "stdout_sha256": "31a9ac910e5d9c6e37fbd8dd08939934cc203b79b799d0040cfa516d8ee8e93a"
+        }
+      ],
+      "seconds": 239.82461841776967
+    }
+  ],
+  "production_strategy_enabled": false,
+  "status": "bounded_dp_budget_pilot_completed_NOT_production_acceptance",
+  "timing_scope": "native work isolated; historical episode is not same-node paired control except two explicit exact replays"
+}

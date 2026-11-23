@@ -11,9 +11,11 @@ import re
 import stat
 import threading
 from collections import OrderedDict
+from contextlib import contextmanager
 from dataclasses import dataclass
+from io import BufferedReader, TextIOWrapper
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Iterable, Iterator, Mapping, TextIO
 
 
 CHECKPOINT_SCHEMA_VERSION = 1
@@ -218,12 +220,24 @@ def _sha256_read(signature: tuple) -> str:
     return digest.hexdigest()
 
 
-def sha256_file(path: Path) -> str:
-    signature = file_signature(path)
+def _cached_sha256(signature: tuple) -> str | None:
     with _SHA256_CACHE_LOCK:
         cached = _SHA256_CACHE.get(signature)
         if cached is not None:
             _SHA256_CACHE.move_to_end(signature)
+        return cached
+
+
+def _remember_sha256(signature: tuple, digest: str) -> None:
+    with _SHA256_CACHE_LOCK:
+        _SHA256_CACHE[signature] = digest
+        _SHA256_CACHE.move_to_end(signature)
+        while len(_SHA256_CACHE) > _SHA256_CACHE_LIMIT:
+            _SHA256_CACHE.popitem(last=False)
+
+
+def _sha256_with_signature(path: Path, signature: tuple) -> str:
+    cached = _cached_sha256(signature)
     if cached is not None:
         if file_signature(path) != signature:
             raise OrchestrationContractError(f"file changed during hash reuse: {path}")
@@ -231,20 +245,25 @@ def sha256_file(path: Path) -> str:
     digest = _sha256_read(signature)
     if file_signature(path) != signature:
         raise OrchestrationContractError(f"file changed while hashing: {path}")
-    with _SHA256_CACHE_LOCK:
-        _SHA256_CACHE[signature] = digest
-        _SHA256_CACHE.move_to_end(signature)
-        while len(_SHA256_CACHE) > _SHA256_CACHE_LIMIT:
-            _SHA256_CACHE.popitem(last=False)
+    _remember_sha256(signature, digest)
     return digest
 
 
-def file_identity(path: Path, *, relative_to: Path | None = None) -> dict[str, object]:
+def sha256_file(path: Path) -> str:
+    return _sha256_with_signature(path, file_signature(path))
+
+
+def file_identity(path: Path, *, relative_to: Path | None = None,
+                  within: Path | None = None) -> dict[str, object]:
     signature = file_signature(path)
+    # Check containment against the SAME resolved target that we will hash.
+    # Keep checking the original pathname at the end, including on cache hits.
+    if within is not None and not Path(signature[0]).is_relative_to(within.resolve(strict=True)):
+        raise OrchestrationContractError(f"file escapes workspace: {path}")
     label = path.relative_to(relative_to).as_posix() if relative_to is not None else str(path)
-    digest = sha256_file(path)
-    if file_signature(path) != signature:
-        raise OrchestrationContractError(f"file identity changed while hashing: {path}")
+    # Use the same initial and final signatures for both the declared size
+    # and the digest. The hit check and cold hash's fd checks remain intact.
+    digest = _sha256_with_signature(path, signature)
     return {"path": label, "size": signature[3], "sha256": digest}
 
 
@@ -276,80 +295,169 @@ def _parse_nonnegative_integer(value: str, label: str, line_number: int) -> int:
     return parsed
 
 
+
+_PAF_CIGAR = re.compile(r"([1-9][0-9]*)([MIDN=X])")
+
+
+def _paf_cigar_spans(text: str) -> tuple[int, int] | None:
+    tokens = _PAF_CIGAR.findall(text)
+    # Matches are disjoint unchanged substrings. Full character coverage proves
+    # the same grammar as rebuilding/joining every token, without a second
+    # CIGAR-sized string. Check grammar before converting any large integer.
+    if not tokens or sum(len(length) + 1 for length, _op in tokens) != len(text):
+        return None
+    query_span = target_span = 0
+    for length, operation in tokens:
+        count = int(length)
+        if operation in "MI=X":
+            query_span += count
+        if operation in "MDN=X":
+            target_span += count
+    return query_span, target_span
+
+class _PafReadAhead(BufferedReader):
+    def read1(self, size: int = -1) -> bytes:
+        # TextIOWrapper's normal read1(size=8192) bypasses read-ahead.
+        # Supply the same number of decoder bytes from a bounded larger buffer
+        # instead of requesting each refill from the shared filesystem.
+        return self.read(size) if size >= 0 else super().read1(size)
+
+
+@contextmanager
+def open_paf_text(path: Path, *, newline: str | None = None) -> Iterator[TextIO]:
+    """Native strict UTF-8/universal newlines with 1 MiB binary read-ahead."""
+    with path.open("rb", buffering=0) as raw:
+        with TextIOWrapper(_PafReadAhead(raw, buffer_size=1024*1024),
+                           encoding="utf-8", newline=newline) as text:
+            yield text
+
+
+def _validate_paf_lines(handle: TextIO, path: Path, require_cigar: bool) -> PafSummary:
+    record_count = 0
+    for line_number, raw_line in enumerate(handle, start=1):
+        line = raw_line.rstrip("\r\n")
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) < 12:
+            raise OrchestrationContractError(
+                f"PAF line {line_number} has {len(fields)} fields; expected at least 12"
+            )
+        if not fields[0] or not fields[5]:
+            raise OrchestrationContractError(
+                f"PAF line {line_number} has an empty query or target name"
+            )
+        query_length = _parse_nonnegative_integer(
+            fields[1], "query length", line_number
+        )
+        query_start = _parse_nonnegative_integer(fields[2], "query start", line_number)
+        query_end = _parse_nonnegative_integer(fields[3], "query end", line_number)
+        if fields[4] not in {"+", "-"}:
+            raise OrchestrationContractError(
+                f"invalid PAF strand on line {line_number}: {fields[4]!r}"
+            )
+        target_length = _parse_nonnegative_integer(
+            fields[6], "target length", line_number
+        )
+        target_start = _parse_nonnegative_integer(
+            fields[7], "target start", line_number
+        )
+        target_end = _parse_nonnegative_integer(fields[8], "target end", line_number)
+        residue_matches = _parse_nonnegative_integer(
+            fields[9], "residue matches", line_number
+        )
+        alignment_length = _parse_nonnegative_integer(
+            fields[10], "alignment length", line_number
+        )
+        mapping_quality = _parse_nonnegative_integer(
+            fields[11], "mapping quality", line_number
+        )
+        if query_length < 1 or not 0 <= query_start <= query_end <= query_length:
+            raise OrchestrationContractError(
+                f"invalid PAF query interval on line {line_number}"
+            )
+        if target_length < 1 or not 0 <= target_start <= target_end <= target_length:
+            raise OrchestrationContractError(
+                f"invalid PAF target interval on line {line_number}"
+            )
+        if residue_matches > alignment_length:
+            raise OrchestrationContractError(
+                f"PAF residue matches exceed alignment length on line {line_number}"
+            )
+        if mapping_quality > 255:
+            raise OrchestrationContractError(
+                f"PAF mapping quality exceeds 255 on line {line_number}"
+            )
+        record_count += 1
+        if require_cigar:
+            cigar = next((tag[5:] for tag in fields[12:] if tag.startswith("cg:Z:")), "")
+            spans = _paf_cigar_spans(cigar)
+            if spans is None:
+                raise OrchestrationContractError(f"missing or invalid CIGAR on PAF line {line_number}: {path}")
+            query_span, target_span = spans
+            if query_span != query_end - query_start or target_span != target_end - target_start:
+                raise OrchestrationContractError(f"CIGAR span mismatch on PAF line {line_number}: {path}")
+    return PafSummary(record_count=record_count)
+
+
 def validate_paf(path: Path, *, require_cigar: bool = False) -> PafSummary:
     if not path.is_file():
         raise OrchestrationContractError(f"PAF output is missing: {path}")
-
-    record_count = 0
     try:
-        with path.open(encoding="utf-8") as handle:
-            for line_number, raw_line in enumerate(handle, start=1):
-                line = raw_line.rstrip("\r\n")
-                if not line or line.startswith("#"):
-                    continue
-                fields = line.split("\t")
-                if len(fields) < 12:
-                    raise OrchestrationContractError(
-                        f"PAF line {line_number} has {len(fields)} fields; expected at least 12"
-                    )
-                if not fields[0] or not fields[5]:
-                    raise OrchestrationContractError(
-                        f"PAF line {line_number} has an empty query or target name"
-                    )
-                query_length = _parse_nonnegative_integer(
-                    fields[1], "query length", line_number
-                )
-                query_start = _parse_nonnegative_integer(fields[2], "query start", line_number)
-                query_end = _parse_nonnegative_integer(fields[3], "query end", line_number)
-                if fields[4] not in {"+", "-"}:
-                    raise OrchestrationContractError(
-                        f"invalid PAF strand on line {line_number}: {fields[4]!r}"
-                    )
-                target_length = _parse_nonnegative_integer(
-                    fields[6], "target length", line_number
-                )
-                target_start = _parse_nonnegative_integer(
-                    fields[7], "target start", line_number
-                )
-                target_end = _parse_nonnegative_integer(fields[8], "target end", line_number)
-                residue_matches = _parse_nonnegative_integer(
-                    fields[9], "residue matches", line_number
-                )
-                alignment_length = _parse_nonnegative_integer(
-                    fields[10], "alignment length", line_number
-                )
-                mapping_quality = _parse_nonnegative_integer(
-                    fields[11], "mapping quality", line_number
-                )
-                if query_length < 1 or not 0 <= query_start <= query_end <= query_length:
-                    raise OrchestrationContractError(
-                        f"invalid PAF query interval on line {line_number}"
-                    )
-                if target_length < 1 or not 0 <= target_start <= target_end <= target_length:
-                    raise OrchestrationContractError(
-                        f"invalid PAF target interval on line {line_number}"
-                    )
-                if residue_matches > alignment_length:
-                    raise OrchestrationContractError(
-                        f"PAF residue matches exceed alignment length on line {line_number}"
-                    )
-                if mapping_quality > 255:
-                    raise OrchestrationContractError(
-                        f"PAF mapping quality exceeds 255 on line {line_number}"
-                    )
-                record_count += 1
-                if require_cigar:
-                    cigar = next((tag[5:] for tag in fields[12:] if tag.startswith("cg:Z:")), "")
-                    ops = re.findall(r"([1-9][0-9]*)([MIDN=X])", cigar)
-                    if not ops or "".join(length + op for length, op in ops) != cigar:
-                        raise OrchestrationContractError(f"missing or invalid CIGAR on PAF line {line_number}: {path}")
-                    query_span = sum(int(length) for length, op in ops if op in "MI=X")
-                    target_span = sum(int(length) for length, op in ops if op in "MDN=X")
-                    if query_span != query_end - query_start or target_span != target_end - target_start:
-                        raise OrchestrationContractError(f"CIGAR span mismatch on PAF line {line_number}: {path}")
+        with open_paf_text(path) as handle:
+            return _validate_paf_lines(handle, path, require_cigar)
     except (OSError, UnicodeError) as exc:
         raise OrchestrationContractError(f"cannot read PAF output {path}: {exc}") from exc
-    return PafSummary(record_count=record_count)
+
+
+class _HashingPafReadAhead(_PafReadAhead):
+    """Collect the raw bytes handed to the text decoder, before newline handling."""
+
+    def __init__(self, raw):
+        super().__init__(raw, buffer_size=1024*1024)
+        self.digest = hashlib.sha256()
+        self.byte_count = 0
+
+    def read1(self, size: int = -1) -> bytes:
+        data = super().read1(size)
+        self.digest.update(data)
+        self.byte_count += len(data)
+        return data
+
+
+def paf_file_identity(path: Path, *, relative_to: Path, require_cigar: bool = False) -> dict[str, object]:
+    """Validate full PAF geometry and bind actual bytes from the SAME file read."""
+    signature = file_signature(path)
+    resolved = Path(signature[0])
+    try:
+        label = resolved.relative_to(relative_to).as_posix()
+    except ValueError as exc:
+        raise OrchestrationContractError(f"PAF output escapes checkpoint workspace: {path}") from exc
+    expected_size = signature[3]
+    digest = _cached_sha256(signature)
+    cold = digest is None
+    try:
+        with resolved.open("rb", buffering=0) as raw:
+            if _stat_signature(resolved, os.fstat(raw.fileno())) != signature:
+                raise OrchestrationContractError(f"PAF output changed before validation: {path}")
+            hashing = _HashingPafReadAhead(raw) if cold else None
+            buffer = hashing if hashing is not None else _PafReadAhead(raw, buffer_size=1024*1024)
+            with TextIOWrapper(buffer, encoding="utf-8") as handle:
+                _validate_paf_lines(handle, path, require_cigar)
+                if _stat_signature(resolved, os.fstat(raw.fileno())) != signature:
+                    raise OrchestrationContractError(f"PAF output changed during validation: {path}")
+                if hashing is not None:
+                    if hashing.byte_count != expected_size:
+                        raise OrchestrationContractError(f"PAF validation did not read complete bytes: {path}")
+                    digest = hashing.digest.hexdigest()
+        if file_signature(path) != signature:
+            raise OrchestrationContractError(f"PAF output changed while validating: {path}")
+    except (OSError, UnicodeError) as exc:
+        raise OrchestrationContractError(f"cannot read PAF output {path}: {exc}") from exc
+    assert digest is not None
+    if cold:
+        _remember_sha256(signature, digest)
+    return {"path":label, "size":expected_size, "sha256":digest}
 
 
 # Compatibility constants; persisted values remain unchanged.

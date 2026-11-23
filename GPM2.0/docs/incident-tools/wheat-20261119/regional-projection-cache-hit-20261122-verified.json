@@ -1,0 +1,14 @@
+{
+  "baseline_sha256": "d760c26f4e2e5139a1fcf895647764c0c2290da46772ecf05ccf32821a839278",
+  "candidate_sha256": "48fbdf1a3d04fd88a5d4474b90ba2404a3116996dd45c5d11b2e4afe1c55f8ba",
+  "code_manifest_sha256": "63ece63c14f99e4fb156601d6e3df7634ad7dd2b90b997beeea0a37760f9ffc4",
+  "end_utc": "2026-11-22T08:59:35Z",
+  "final_job_sha256": "be130bbe90d579fc7f31df7d391b99cf0f11a2ee971d5f21443df178622f3ad6",
+  "job_id": "43013168",
+  "node": "agent-X86-61",
+  "not_deployed": true,
+  "probe_source_sha256": "9654a1211bfcbe8c29396d9c51a6fc93117f550db3c00e5e18d829819e8a9a16",
+  "remote_dir": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-projection-cache-hit-20261122-165434",
+  "report_sha256": "87947354efb4734696d21409689c038fc31fe1d19d2acd5f4412daf5a1257366",
+  "state": "SUCCEEDED"
+}

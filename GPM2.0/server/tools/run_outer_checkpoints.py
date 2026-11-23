@@ -29,7 +29,7 @@ try:
         file_identity,
         fingerprint,
         sha256_file,
-        validate_paf,
+        paf_file_identity,
     )
 except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
     from .delivery_archive import validate_delivery_staging
@@ -42,7 +42,7 @@ except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
         file_identity,
         fingerprint,
         sha256_file,
-        validate_paf,
+        paf_file_identity,
     )
 
 
@@ -387,9 +387,24 @@ class OuterCheckpointManager:
             raise OrchestrationContractError(f"datasets table is empty: {path}")
         return rows
 
-    def _identities(self, paths: Iterable[Path]) -> list[dict[str, object]]:
-        unique = sorted({path.resolve() for path in paths}, key=str)
-        return [file_identity(path, relative_to=self.server_dir) for path in unique]
+    def _identities(self, paths: Iterable[Path], *, validate_paf_geometry: bool = False) -> list[dict[str, object]]:
+        if not validate_paf_geometry:
+            unique = sorted({path.resolve() for path in paths}, key=str)
+            return [file_identity(path, relative_to=self.server_dir) for path in unique]
+        # Determine validation from the declared filename, but keep receipt
+        # labels/order on the same resolved paths as the content proof.
+        resolutions = [(path, path.resolve()) for path in paths]
+        pafs = {resolved: path for path, resolved in resolutions if path.suffix.lower() == ".paf"}
+        result = []
+        for path in sorted({resolved for _declared, resolved in resolutions}, key=str):
+            if path not in pafs:
+                result.append(file_identity(path, relative_to=self.server_dir))
+                continue
+            record = paf_file_identity(pafs[path], relative_to=self.server_dir, require_cigar=True)
+            if record["path"] != path.relative_to(self.server_dir).as_posix():
+                raise OrchestrationContractError(f"PAF output path changed during validation: {pafs[path]}")
+            result.append(record)
+        return result
 
     def _tool_identity(self, command: str) -> dict[str, object]:
         cached = self._tool_cache.get(command)
@@ -643,10 +658,7 @@ class OuterCheckpointManager:
             paths = self._chromosome_output_paths(chromosome)
         else:
             raise OrchestrationContractError(f"unsupported checkpoint kind: {prepared.kind}")
-        for path in paths:
-            if path.suffix.lower() == ".paf":
-                validate_paf(path, require_cigar=True)
-        return self._identities(paths)
+        return self._identities(paths, validate_paf_geometry=True)
 
     def _assignment_output_paths(self) -> list[Path]:
         paths = [

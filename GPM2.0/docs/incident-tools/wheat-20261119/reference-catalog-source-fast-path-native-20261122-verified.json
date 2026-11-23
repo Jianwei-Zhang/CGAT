@@ -1,0 +1,16 @@
+{
+  "base_commit": "ac670f24",
+  "baseline_over_candidate_wall": 1.5552942884191578,
+  "benchmark_candidate_module_sha256": "93c351b0fda7b24f39ab54fa4b64a8973d5625a23cd0505115f8149bb27d98e5",
+  "final_job_sha256": "676694b14a3e3bbcb3fbeae0079aef3b985104155531a9289007e2ec2963704e",
+  "frozen_package_manifest_sha256": "8c7886fc6910253b206a3092af4126151ba7b39351998ba985d1b8738b02fb4f",
+  "host": "agent-X86-47",
+  "job_id": 43012908,
+  "old_module_sha256": "338ddfe7cf8644a493e6eecb7feb623be697317103c672d8b47294b0eadf74f3",
+  "output_sha256": "1789785f7e060309686e1481f3f16cd38e363481c761770c411445f3cc09bbe5",
+  "production_runtime_modified": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-reference-source-fast-path-20261122-150139",
+  "scope": "contained part fast path and per-record accumulation only; local PAF mirror not timing-attributed",
+  "script_sha256": "6b44b81d725bb68b511ae8840b6c915f1cf0432a9ecac6376a2545afc8ddd8ae",
+  "status": "native_exact_reference_catalog_geometry_replay_verified_NOT_production_acceptance"
+}

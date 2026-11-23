@@ -153,6 +153,19 @@ class ServerRunTests(unittest.TestCase):
         self.assertNotIn("-sm", options)
         self.assertNotIn("-sn", options)
 
+    def test_q0_supplement_scope_is_explicit_and_not_a_resume_resource(self):
+        key = "--q0-supplement-scope"
+        full = server_run.parse_options([key, "full"], Path.cwd())
+        repair = server_run.parse_options([key, "decision_frontier_repair"], Path.cwd())
+        server_run.check_resume_options(full, {}, {})
+        server_run.check_resume_options(repair, repair, {})
+        with self.assertRaisesRegex(server_run.RunnerError, "differs from the prepared workspace"):
+            server_run.check_resume_options(repair, {}, {})
+        with self.assertRaisesRegex(server_run.RunnerError, "differs from the prepared workspace"):
+            server_run.check_resume_options(full, repair, {})
+        with self.assertRaisesRegex(server_run.RunnerError, "Invalid --q0-supplement-scope"):
+            server_run.parse_options([key, "decision_frontier"], Path.cwd())
+
     def test_invalid_limit_and_unknown_resume_options_fail(self):
         for option in ["--max-fill", "--self-m", "--self-n", "-sm", "-sn"]:
             for value in ["0", "-1", "1.5", "nope"]:

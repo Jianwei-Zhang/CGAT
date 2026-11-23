@@ -1,0 +1,85 @@
+{
+  "schema": "controlled_paf_validator_benchmark_v1",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "previous_revision": "0863ec3cd8542db99b807d6f6b622a8ace9086d2",
+  "sources": {
+    "native": {
+      "path": "GPM2.0/server/tools/run_orchestration.py",
+      "old_sha256": "0def1281af6c35bf03b0a6457745a74c924ba23dacbb4eb60a8dae1566008296",
+      "new_sha256": "2e4ea9c7e9cc5084f081fd2f35bad193a3426b5b427da6ff3d705080503917e9"
+    },
+    "q0": {
+      "path": "GPM2.0/server/tools/lgz_core/q0_alignments.py",
+      "old_sha256": "c60f6bb7a5855aa6a79eb65a7f41f1227a83a7d1f52bff6e2fca613686f53c4f",
+      "new_sha256": "bb25ec5b83d0752314403fc7678a169c3b3241ed2ea23867ad9b45efd289e218"
+    }
+  },
+  "cases": [
+    {
+      "kind": "native",
+      "case": "ordinary",
+      "cigar_operations": 21,
+      "paf_records": 6000,
+      "input_bytes": 936000,
+      "median_seconds": {
+        "previous": 0.0547991250641644,
+        "candidate": 0.04650033405050635
+      },
+      "speedup": 1.178467341861336,
+      "full_result_equal": true
+    },
+    {
+      "kind": "q0",
+      "case": "ordinary",
+      "cigar_operations": 21,
+      "paf_records": 6000,
+      "input_bytes": 936000,
+      "median_seconds": {
+        "previous": 0.10981799499131739,
+        "candidate": 0.0978979580104351
+      },
+      "speedup": 1.1217598121874177,
+      "full_result_equal": true
+    },
+    {
+      "kind": "native",
+      "case": "long_cigar",
+      "cigar_operations": 72001,
+      "paf_records": 25,
+      "input_bytes": 8799350,
+      "median_seconds": {
+        "previous": 0.613375889020972,
+        "candidate": 0.5116640090709552
+      },
+      "speedup": 1.1987864656235998,
+      "full_result_equal": true,
+      "python_allocation_peak_bytes": {
+        "previous": 17210705,
+        "candidate": 9316865
+      }
+    },
+    {
+      "kind": "q0",
+      "case": "long_cigar",
+      "cigar_operations": 72001,
+      "paf_records": 25,
+      "input_bytes": 8799350,
+      "median_seconds": {
+        "previous": 0.9226720440201461,
+        "candidate": 0.6751827680272982
+      },
+      "speedup": 1.366551529026644,
+      "full_result_equal": true,
+      "python_allocation_peak_bytes": {
+        "previous": 22113966,
+        "candidate": 15524460
+      }
+    }
+  ],
+  "synthetic_only": true,
+  "customer_data_used": false,
+  "remote_runtime_modified": false,
+  "whole_wheat_speedup_proven": false,
+  "decision": "inplace_q0_variant_rejected_due_to_remote_python310_long_cigar_regression"
+}

@@ -1,5 +1,6 @@
 """Candidate discovery and required-evidence publication, not path quality claims."""
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -17,7 +18,66 @@ from server.tests.q0_test_support import seed_q0_evidence
 from server.tools.lgz_core.common import read_fasta, write_fasta
 from server.tools.lgz_core.q0_sources import SourceKey, Q0EvidenceError
 from server.tools.lgz_core.q0_catalog import build_catalog, supplemental_groups
-from server.tools.lgz_core.q0_preparation import MANIFEST, prepare_evidence, load_verified_evidence, artifact_path
+from server.tools import run_orchestration
+from server.tools.lgz_core.q0_preparation import MANIFEST, prepare_evidence, load_verified_evidence, artifact_path, identity
+
+
+class Q0ArtifactIdentityTests(unittest.TestCase):
+    def test_receipt_label_and_byte_identity_with_one_signature_pair(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "parts").mkdir()
+            content = b"exact receipt bytes\r\n"
+            (root / "parts" / "result.paf").write_bytes(content)
+            label = "parts//result.paf"
+            expected = {"path": label, "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+            with (mock.patch.object(run_orchestration, "file_signature", wraps=run_orchestration.file_signature) as stat,
+                  mock.patch.object(run_orchestration, "_sha256_read", wraps=run_orchestration._sha256_read) as read):
+                self.assertEqual(identity(root, label), expected)
+                self.assertEqual(identity(root, label), expected)
+            self.assertEqual(stat.call_count, 4)
+            self.assertEqual(read.call_count, 1)
+
+    def test_outside_symlink_rejected_before_reading_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root = parent / "workspace"
+            root.mkdir()
+            outside = parent / "outside"
+            outside.write_bytes(b"not a workspace artifact")
+            alias = root / "alias"
+            try:
+                alias.symlink_to(outside)
+            except OSError:
+                self.skipTest("symlink support required")
+            with mock.patch.object(run_orchestration, "_sha256_read", side_effect=AssertionError("outside file read")):
+                with self.assertRaisesRegex(Q0EvidenceError, "escapes workspace"):
+                    identity(root, "alias")
+
+    def test_warm_artifact_identity_rejects_alias_retargeted_after_initial_stat(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old, new, alias = (root / name for name in ("old", "new", "alias"))
+            old.write_bytes(b"before")
+            new.write_bytes(b"after ")
+            try:
+                alias.symlink_to(old)
+            except OSError:
+                self.skipTest("symlink support required")
+            self.assertEqual(identity(root, "alias")["path"], "alias")
+            signature = run_orchestration.file_signature
+
+            def retarget(path):
+                original = signature(path)
+                if alias.readlink() == old:
+                    alias.unlink()
+                    alias.symlink_to(new)
+                return original
+
+            with mock.patch.object(run_orchestration, "file_signature", side_effect=retarget):
+                with self.assertRaisesRegex(Q0EvidenceError, "changed during hash reuse"):
+                    identity(root, "alias")
+            self.assertEqual(identity(root, "alias")["sha256"], hashlib.sha256(b"after ").hexdigest())
 
 
 class CandidateDiscoveryTests(unittest.TestCase):
@@ -49,6 +109,51 @@ class CandidateDiscoveryTests(unittest.TestCase):
             row = catalog.payload["candidates"][0]
             self.assertEqual(row["reference_intervals"], [[0, 60], [160, 220]])
             self.assertIsNone(row["maximum_available_mapq"])
+
+    def test_reference_single_part_shortcut_matches_full_clipping_on_both_strands(self):
+        from server.tools.lgz_core import q0_catalog as catalog_module
+        from server.tools.lgz_core.q0_reference_index import ReferenceIndex
+        from server.tools.lgz_core.q0_sources import Interval
+
+        def full_clipping(hit, parts, ends):
+            for block in hit.aligned_blocks():
+                for part in parts:
+                    overlap = part.interval.intersection(block.query)
+                    if overlap is None:
+                        continue
+                    a = (overlap.start - block.query.start if hit.strand == "+"
+                         else block.query.end - overlap.end)
+                    start = block.target.start + a
+                    yield part, overlap, Interval(start, start + overlap.length), block.operation
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paf = root / "runs/ds_vs_ref/result.paf"
+            paf.parent.mkdir(parents=True)
+            lines = []
+            for start in (54, 120, 200):  # hits entirely inside and spanning split parts
+                for strand in ("+", "-"):
+                    for mapq in (6, 44, 255):
+                        lines.append(f"c\t360\t{start}\t{start+101}\t{strand}\tChrA\t1000\t20\t120"
+                                     f"\t97\t103\t{mapq}\tcg:Z:35M3I15M2D45=1X2M\n")
+            for strand in ("+", "-"):
+                lines.append(f"c\t360\t55\t305\t{strand}\tChrA\t1000\t20\t270\t250\t250\t6\tcg:Z:250M\n")
+            lines.append("c\t360\t235\t265\t+\tChrA\t1000\t10\t40\t0\t60\t60\tcg:Z:30I30D\n")
+            paf.write_text("".join(lines))
+            sources = {SourceKey("ds", "c"): "A" * 80 + "N" * 100 + "G" * 180}
+            refs = {"ChrA": 1000}
+            db = root / "routing.sqlite"
+            with mock.patch.object(catalog_module, "_reference_blocks", side_effect=full_clipping):
+                original = build_catalog(root, sources, refs, [],
+                        regional_factory=lambda parts, lengths: ReferenceIndex.create(db, root, parts, lengths))
+            fast = build_catalog(root, sources, refs, [],
+                        regional_factory=lambda parts, lengths: ReferenceIndex.open(db, root, parts, lengths))
+            self.assertEqual(fast.payload, original.payload)
+            self.assertEqual(fast.reference_routable_parts, original.reference_routable_parts)
+            self.assertEqual(fast.reference_routable_footprints, original.reference_routable_footprints)
+            self.assertEqual(fast.regional_index_report, original.regional_index_report)
+            self.assertEqual(len(fast.payload["evidence"]), 20)  # the gap-only hit is not evidence
+            self.assertTrue(all(row["maximum_available_mapq"] == 44 for row in fast.payload["candidates"]))
 
     def test_candidate_catalog_is_independent_of_dataset_input_order(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -158,6 +263,28 @@ class EvidencePreparationTests(unittest.TestCase):
             writer.writeheader()
             writer.writerows(rows)
         seed_q0_evidence(self.server)
+
+    def test_large_route_reaches_real_regional_receipts_and_ready_manifest(self):
+        from server.tools.lgz_core import q0_preparation as prep
+        mapper, _ = self.mapper()  # different identity from the seeded native mapper
+        with mock.patch.object(prep, "regional_enabled", return_value=True), \
+             mock.patch.object(prep, "prepare_partial", wraps=prep.prepare_partial) as regional:
+            manifest = self.run_prepare(mapper)
+        regional.assert_called_once()
+        self.assertEqual(load_verified_evidence(self.server), manifest)
+        catalog = self.catalog()
+        self.assertIn("regional_partial_discovery", catalog)
+        self.assertTrue(any(t["kind"] == "regional_discovery" for t in catalog["supplementary_alignments"]))
+        self.assertTrue(list((self.server/"grt/evidence/q0_prepare/indexes").glob("*/success.json")))
+
+    def test_large_route_prefers_completed_native_partial_result(self):
+        from server.tools.lgz_core import q0_preparation as prep
+        (self.server/MANIFEST).unlink()  # only the disposable synthetic ready manifest
+        with mock.patch.object(prep, "regional_enabled", return_value=True), \
+             mock.patch.object(prep, "prepare_partial", side_effect=AssertionError("must reuse completed native mapping")):
+            manifest = self.run_prepare()
+        self.assertEqual(load_verified_evidence(self.server), manifest)
+        self.assertNotIn("regional_partial_discovery", self.catalog())
 
     def test_partition_parsing_is_reused_across_roles_but_not_invocations(self):
         self.seed_assigned_support()
@@ -278,7 +405,9 @@ def fasta(path):
             + f"queries, targets = fasta(sys.argv[-1]), fasta(sys.argv[-2])\npairs = {list(pairs)!r}\n"
             + "rows = []\nfor q, t in pairs:\n    if q in queries and t in targets:\n        n = min(len(queries[q]),len(targets[t]))\n        rows.append(f'{q}\t{len(queries[q])}\t0\t{n}\t+\t{t}\t{len(targets[t])}\t0\t{n}\t{n}\t{n}\t60\tcg:Z:{n}M')\n"
             + ("rows = ['malformed']\n" if malformed else "")
-            + "Path(sys.argv[sys.argv.index('-o')+1]).write_text(chr(10).join(rows) + (chr(10) if rows else ''))\n"
+            + "result = chr(10).join(rows) + (chr(10) if rows else '')\n"
+            + "if '-o' in sys.argv: Path(sys.argv[sys.argv.index('-o')+1]).write_text(result)\n"
+            + "else: sys.stdout.write(result)\n"
             + (f"with Path({str(mutate)!r}).open('a') as out: out.write(chr(10))\n" if mutate else ""))
         script.chmod(0o755)
         return script, log
@@ -365,33 +494,73 @@ def fasta(path):
                 self.assertEqual((self.server / MANIFEST).read_bytes(), before)
                 self.assertTrue(list((self.server / "grt/evidence/q0_prepare/tasks").glob("*/stderr.log")))
 
+    def test_reused_output_changed_in_a_later_phase_cannot_publish_success(self):
+        from server.tools.lgz_core import q0_preparation as prep
+        before=(self.server/MANIFEST).read_bytes();mapper,_=self.mapper();original=prep._supplement
+        first=[]
+        def supplement(*args,**kwargs):
+            task=original(*args,**kwargs)
+            if task is not None:
+                if first and task["task_id"] != first[0]["task_id"]:
+                    path=self.server/first[0]["paf"];path.write_bytes(path.read_bytes()+b"\n")
+                elif not first:first.append(task)
+            return task
+        with mock.patch.object(prep,"_supplement",side_effect=supplement):
+            with self.assertRaisesRegex(Q0EvidenceError,"output changed before publication"):
+                self.run_prepare(mapper)
+        self.assertEqual((self.server/MANIFEST).read_bytes(),before)
+
     def test_missing_success_receipt_cannot_be_replaced_by_an_existing_paf(self):
         receipt = next((self.server / ".run_all/checkpoints").glob("*.json"))
         receipt.unlink()
         with self.assertRaisesRegex(Q0EvidenceError, "not complete"):
             self.run_prepare()
 
-    def test_numbered_q0_accepts_both_forms_of_the_same_pair_but_rejects_wrong_direction(self):
-        from server.tools.lgz_core.q0_preparation import _initial_inputs
+    def numbered_copy(self):
         from server.tools.run_outer_checkpoints import OuterCheckpointManager
         from server.tools.workspace_layout import initialize_workspace
 
-        self.seed_assigned_support()
         layout = initialize_workspace(self.root / "numbered")
         for source in self.server.rglob("*"):
             if source.is_file():
                 target = layout.path(source.relative_to(self.server).as_posix())
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
+        manager = OuterCheckpointManager(layout.root)
+        for script in layout.path("runs").glob("chr_*/q0_command.sh"):
+            chromosome = script.parent.name.removeprefix("chr_")
+            manager.commit(manager.prepare(f"q0_chr:{chromosome}", script.relative_to(layout.root).as_posix()))
+        return layout, manager
+
+    def test_numbered_regional_route_keeps_paths_and_reuses_ready_evidence(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        layout, _ = self.numbered_copy()
+        mapper, _ = self.mapper()
+        with mock.patch.object(prep, "regional_enabled", return_value=True):
+            manifest = prepare_evidence(layout.root, minimap2=str(mapper))
+            self.assertEqual(load_verified_evidence(layout.root), manifest)
+            with mock.patch.object(prep, "build_catalog", side_effect=AssertionError("ready evidence should be reused")):
+                self.assertEqual(prepare_evidence(layout.root, minimap2=str(mapper)), manifest)
+        catalog = json.loads(layout.path(manifest["catalog"]).read_text())
+        regional = [task for task in catalog["supplementary_alignments"] if task["kind"] == "regional_discovery"]
+        self.assertTrue(regional)
+        for task in regional:
+            self.assertTrue(layout.path(task["receipt"]).is_file())
+            self.assertTrue(layout.path(task["paf"]).is_file())
+        self.assertTrue(list(layout.path("grt/evidence/q0_prepare/indexes").glob("*/success.json")))
+        self.assertFalse(any((layout.root / label).exists() for label in ("grt", "metadata", "runs")))
+
+    def test_numbered_q0_accepts_both_forms_of_the_same_pair_but_rejects_wrong_direction(self):
+        from server.tools.lgz_core.q0_preparation import _initial_inputs
+
+        self.seed_assigned_support()
+        layout, manager = self.numbered_copy()
         descriptor = layout.path("runs/chr_Chr01/q0_alignment_inputs.json")
         values = json.loads(descriptor.read_text())
         cross = next(row for row in values["alignments"] if row["kind"] == "cross")
         logical = cross["paf"]
         self.assertTrue(logical.startswith("runs/"))
-        manager = OuterCheckpointManager(layout.root)
-        for extra in layout.path("runs").glob("chr_*/q0_command.sh"):
-            chromosome = extra.parent.name.removeprefix("chr_")
-            manager.commit(manager.prepare(f"q0_chr:{chromosome}", extra.relative_to(layout.root).as_posix()))
         for supplied in (logical, layout.relative(logical)):
             with self.subTest(paf=supplied):
                 cross["paf"] = supplied
@@ -443,6 +612,29 @@ def fasta(path):
         manifest["outputs"] = [row for row in manifest["outputs"] if row["path"] != task["paf"]]
         manifest_path.write_text(json.dumps(manifest))
         with self.assertRaisesRegex(Q0EvidenceError, "not fully bound"):
+            load_verified_evidence(self.server)
+
+    def test_candidate_artifact_lookup_accepts_both_inventories_and_rejects_unbound_path(self):
+        from server.tools.lgz_core import q0_preparation as prep
+
+        manifest = load_verified_evidence(self.server)
+        catalog_path = self.server / manifest["catalog"]
+        catalog = prep.json_file(catalog_path)
+        # This is the dependency check only; admission separately compares
+        # each evidence record to the corresponding bound PAF row.
+        in_path = next(row["path"] for row in manifest["inputs"] if row["path"].endswith("/result.paf"))
+        out_path = catalog["supplementary_alignments"][0]["paf"]
+        catalog["evidence"].update({"input-test":{"artifact":in_path},"output-test":{"artifact":out_path}})
+        def rebind_catalog():
+            prep.atomic_write_json(catalog_path, catalog)
+            manifest["outputs"] = [prep.identity(self.server,r["path"]) if r["path"]==manifest["catalog"] else r
+                                   for r in manifest["outputs"]]
+            prep.atomic_write_json(self.server / MANIFEST, manifest)
+        rebind_catalog()
+        self.assertEqual(load_verified_evidence(self.server), manifest)
+        catalog["evidence"]["output-test"]["artifact"] = "not-in-the-ready-manifest.paf"
+        rebind_catalog()
+        with self.assertRaisesRegex(Q0EvidenceError, "unbound alignment artifact"):
             load_verified_evidence(self.server)
 
     def test_builder_changes_during_preparation_do_not_publish_success(self):

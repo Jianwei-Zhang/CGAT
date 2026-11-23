@@ -1,0 +1,118 @@
+{
+  "status": "read_only_local_target_scope",
+  "windows": [
+    {
+      "core_start": 51382261,
+      "core_end": 51482261,
+      "query_interval": [
+        51372261,
+        51492261
+      ],
+      "reference_region_bp": 40449315,
+      "reference_chromosomes": [
+        "3D",
+        "5A",
+        "5D",
+        "6B",
+        "6D",
+        "7A",
+        "7D",
+        "Un"
+      ],
+      "target_source_count": 4149,
+      "target_interval_count": 15330,
+      "target_bp": 447613217,
+      "target_whole_source_bp": 21314285583
+    },
+    {
+      "core_start": 160451708,
+      "core_end": 160551708,
+      "query_interval": [
+        160441708,
+        160561708
+      ],
+      "reference_region_bp": 47205994,
+      "reference_chromosomes": [
+        "3D",
+        "5A",
+        "5D",
+        "6A",
+        "6B",
+        "6D",
+        "7A",
+        "7B",
+        "7D",
+        "Un"
+      ],
+      "target_source_count": 4547,
+      "target_interval_count": 17385,
+      "target_bp": 517797297,
+      "target_whole_source_bp": 22483416140
+    },
+    {
+      "core_start": 160343284,
+      "core_end": 160443284,
+      "query_interval": [
+        160333284,
+        160453284
+      ],
+      "reference_region_bp": 48991930,
+      "reference_chromosomes": [
+        "3D",
+        "5A",
+        "5B",
+        "5D",
+        "6A",
+        "6B",
+        "6D",
+        "7A",
+        "7B",
+        "7D",
+        "Un"
+      ],
+      "target_source_count": 4643,
+      "target_interval_count": 18007,
+      "target_bp": 538040965,
+      "target_whole_source_bp": 22449237846
+    }
+  ],
+  "scans": [
+    {
+      "dataset": "JM19_hifiasm",
+      "rows": 2627833,
+      "selected": 25235,
+      "sha256": "f85202cb6000610eb8487fbb6edb6bb81dab3a3f849d3dd0ec88708a24bf66fd"
+    },
+    {
+      "dataset": "JM19_hifiasm",
+      "rows": 2627833,
+      "selected": 2320286,
+      "sha256": "f85202cb6000610eb8487fbb6edb6bb81dab3a3f849d3dd0ec88708a24bf66fd"
+    },
+    {
+      "dataset": "JM19_flye_ABD",
+      "rows": 4105189,
+      "selected": 3547276,
+      "sha256": "8d3295b062f66ba14ca609270c3be25d0ad5945f49e2b7ae9ad53b10035f22df"
+    }
+  ],
+  "metadata_sha256": {
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-part-lookup-20261121-1600/source-part-lookup.json": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-part-lookup-20261121-1600/receipt.json": "76de0eb08038025bb2d63e8f03a87b6f66da5b1c4d3ad71f4258728d739803b1",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-existing-cross-coverage-20261121-v2/residual-coverage.json": "03b79fc96cc80ccfa8a6560be2141efd4126afd73d21ad1021c944508a04d171",
+    "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-partial-coverage-diagnostic-20261121-1426/summary.json": "9a0ad65096360926dc99950a5c40ed04318e5e78a4c87be53c7a492cf472d5d1"
+  },
+  "seconds": 44.05750487372279,
+  "scientific_acceptance": false,
+  "production_policy_changed": false,
+  "query_scope": "recorded_residual_core",
+  "residual_file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-existing-cross-coverage-20261121-v2/residual-coverage.json",
+  "policy": {
+    "core_bases": 100000,
+    "query_context_bases": 10000,
+    "anchor_context_bases": 1000000,
+    "reference_context_bases": 100000,
+    "reference_bridge_bases": 2000000
+  },
+  "limitations": "regional feasibility only; reference bridging is SEARCH scope not coverage; no global-target sensitivity equivalence; geometry includes ambiguous MAPQ"
+}

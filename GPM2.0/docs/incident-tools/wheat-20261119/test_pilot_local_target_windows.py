@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from collections import defaultdict
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from pilot_local_target_windows import fetch, add_geometry, intersection
+from pilot_local_target_windows import fetch, add_geometry, intersection, mapper_command
 
 
 class RegionalPilotTests(unittest.TestCase):
@@ -25,6 +25,19 @@ class RegionalPilotTests(unittest.TestCase):
             add_geometry(wrong,raw,"target",1000,2001,(1050,1250))
             self.assertEqual(sum(intersection(v,candidate.get(k,[])) for k,v in original.items()),150)
             self.assertEqual(sum(intersection(v,wrong.get(k,[])) for k,v in original.items()),0)
+
+    def test_secondary_profile_really_removes_all_chain_flag(self):
+        native=mapper_command("mapper","target","query",2)
+        bounded=mapper_command("mapper","target","query",2,100)
+        self.assertIn("-P",native);self.assertNotIn("-P",bounded)
+        self.assertEqual(bounded[bounded.index("-p")+1],"0")
+        self.assertEqual(bounded[bounded.index("-N")+1],"100")
+        self.assertNotIn("-f",bounded)
+        filtered=mapper_command("mapper","target","query",2,min_chain_score=2000)
+        self.assertIn("-P",filtered);self.assertNotIn("-N",filtered)
+        self.assertEqual(filtered[filtered.index("-m")+1],"2000")
+        with self.assertRaises(ValueError):mapper_command("mapper","target","query",2,min_chain_score=0)
+        with self.assertRaises(ValueError):mapper_command("mapper","target","query",2,0)
 
 
 if __name__=="__main__":unittest.main()

@@ -1,0 +1,13 @@
+{
+  "status": "static_shortlist_retention_verified_NOT_native_mapping_acceptance",
+  "job_id": 43012133,
+  "state": "SUCCEEDED",
+  "host": "agent-X86-61",
+  "remote_bundle": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-candidate-static-probe-20261122-125559",
+  "report_sha256": "b2b8b2b06cd25aa9c511b198e406c308d00736923dce615f584471d00060a438",
+  "scheduler_final_json_sha256": "e2ee5df55826c4713fcc1dee3800801c0698945768c08b37d9fb823d00e3071e",
+  "source_sha256": "7e0e32d4fc64f9146cd1b3887b77505687c70fa3cd674b05db7c5dd64cc6738e",
+  "native_mapper_executed": false,
+  "main_workspace_modified": false,
+  "production_strategy_enabled": false
+}

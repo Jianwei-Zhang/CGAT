@@ -1,0 +1,19 @@
+{
+  "executed_source_sha256": {
+    "benchmark_regional_candidate_screen.py": "54a3df9ac5597667d9b5474c4ee3f9622be2cba6cb4a1825beb4c572b3a908ef",
+    "probe_regional_candidate_screen.py": "7e0e32d4fc64f9146cd1b3887b77505687c70fa3cd674b05db7c5dd64cc6738e",
+    "test_benchmark_regional_candidate_screen.py": "14cf90217150ccb15b7c6d5a66f8a0df38ea41156071c81a4bbc3d2ee6070f17",
+    "test_probe_regional_candidate_screen.py": "a267fe7ff0b1a70bb3c1a15cfb6b9d7aa86a48be62ba5f4232adfb2a47a02724"
+  },
+  "exit_code": 0,
+  "host": "agent-X86-37",
+  "job_id": 43012150,
+  "main_workspace_modified": false,
+  "original_report_sha256": "7e450069554e0a147af73d2a5fd0c0a18dd84fac2534c0a561d566a3dd9d3572",
+  "production_strategy_enabled": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-candidate-native-pilot-20261122-130438",
+  "repo_report_sha256": "7e450069554e0a147af73d2a5fd0c0a18dd84fac2534c0a561d566a3dd9d3572",
+  "scheduler_final_json_sha256": "afad88a2d5047bd066f7784b2d21a4bb4a76ad8a21b9ad86b5f664f57523ee51",
+  "schema": "incident_readonly_diagnostic_verified_v1",
+  "terminal_state": "SUCCEEDED"
+}

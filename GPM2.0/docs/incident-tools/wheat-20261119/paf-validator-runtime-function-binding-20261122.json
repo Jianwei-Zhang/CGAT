@@ -1,0 +1,13 @@
+{
+  "remote_contract_sha256": "899b629ca3d2d2fb2d7e768f3368bd1e94a049d345a571928c09442090ba4ffb",
+  "benchmark_previous_contract_sha256": "0def1281af6c35bf03b0a6457745a74c924ba23dacbb4eb60a8dae1566008296",
+  "previous_revision": "0863ec3c",
+  "selected_function_asts_equal": {
+    "validate_paf": true,
+    "_parse_nonnegative_integer": true,
+    "PafSummary": true,
+    "OrchestrationContractError": true
+  },
+  "whole_modules_byte_identical": false,
+  "remote_runtime_modified": false
+}

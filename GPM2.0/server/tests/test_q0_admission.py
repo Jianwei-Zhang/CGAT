@@ -5,14 +5,19 @@ import json
 from pathlib import Path
 import random
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
+from server.tools.lgz_core import q0_admission
 from server.tools.lgz_core.common import reverse_complement
 from server.tools.lgz_core.q0_admission import (AdmissionPolicy, EvidenceInput, admit_placements,
-                                               build_q0, construct_q0, load_evidence_input)
+                                               build_q0, construct_q0, load_evidence_input,
+                                               _links_for_path_graphs, _ordered, _pair_neighbors,
+                                               _PlacementNeighbors, _ReferenceBlockCandidates)
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_catalog import evidence_ref
-from server.tools.lgz_core.q0_paths import PairLink
+from server.tools.lgz_core.q0_paths import PairLink, ReferenceAnchor
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey, split_source
 
 
@@ -110,6 +115,85 @@ def bridge_fixture(reverse=False):
 
 
 class Q0AdmissionTests(unittest.TestCase):
+    def test_fragmented_pair_screens_full_root_context_once(self):
+        fixture = EvidenceFixture()
+        source = dna(8000)
+        anchor = fixture.source("root", source)
+        fixture.ref(anchor, (0, 2500), (0, 2500))
+        for name, start in (("off_ref", 3000), ("off_ref_second", 5000)):
+            child = fixture.source(name, source[start:start + 2000])
+            for offset in range(0, 2000, 200):
+                fixture.pair(child, anchor, (offset, offset + 200), (start + offset, start + offset + 200))
+        with patch.object(q0_admission, "_complex_intervals", wraps=q0_admission._complex_intervals) as check:
+            admission = admit_placements(fixture.data())
+        self.assertEqual({p.source.contig for p in admission.placements if p.localization_kind == "pairwise"},
+                         {"off_ref", "off_ref_second"})
+        self.assertEqual(sum(args[:2] == (source, Interval(0, len(source))) for args, _ in check.call_args_list), 1)
+
+    def test_reference_block_index_is_complete_for_nested_touching_and_random_intervals(self):
+        rng = random.Random(9)
+        pairs = [(0, 120), (1, 2), (2, 3), (121, 140), (3, 121)]
+        pairs.extend((x, x + rng.randrange(1, 40)) for x in (rng.randrange(200) for _ in range(100)))
+        rows = [SimpleNamespace(query=Interval(*pair), id=i) for i, pair in enumerate(pairs)]
+        rng.shuffle(rows)
+        index = _ReferenceBlockCandidates(rows)
+        for row in rows:
+            expected = {(other.id, i) for other in rows if (i := other.query.intersection(row.query)) is not None}
+            self.assertEqual({(other.id, i) for other, i in index.intersecting(row.query)}, expected)
+
+    def test_reference_order_matches_all_pairs_on_both_strands(self):
+        def legacy(anchors, strand):
+            for n, a in enumerate(anchors):
+                for b in anchors[n+1:]:
+                    if a.source.intersection(b.source):
+                        continue
+                    left, right = (a, b) if (a.source.start < b.source.start) == (strand == '+') else (b, a)
+                    if left.reference.end > right.reference.start:
+                        return False
+            return True
+        rng = random.Random(19)
+        for _ in range(250):
+            anchors = []
+            for i in range(rng.randrange(1, 24)):
+                pos, target, length = rng.randrange(30), rng.randrange(30), rng.randrange(1, 12)
+                anchors.append(ReferenceAnchor(Interval(pos, pos+length), Interval(target, target+length), str(i)))
+            for strand in ('+', '-'):
+                self.assertEqual(_ordered(iter(anchors), strand), legacy(anchors, strand))
+        forward = [ReferenceAnchor(Interval(i, i+1), Interval(i+1, i+2), str(i)) for i in range(100)]
+        reverse = [ReferenceAnchor(a.source, Interval(100-a.source.start, 101-a.source.start), a.evidence_id) for a in forward]
+        self.assertTrue(_ordered(reversed(forward), '+'))
+        self.assertTrue(_ordered(reverse, '-'))
+        self.assertFalse(_ordered(forward, '-'))
+        self.assertFalse(_ordered(reverse, '+'))
+
+    def test_sparse_neighbors_keep_snapshot_order_and_every_link_in_both_directions(self):
+        f = EvidenceFixture()
+        a, b, c, missing, unused = (f.source(name, dna(1000)) for name in ('a', 'b', 'c', 'm', 'u'))
+        for left, right in ((a, c), (b, a), (a, missing), (a, a), (c, a)):
+            f.pair(left, right, (0, 250), (500, 750))
+        by_source = _pair_neighbors(f.links)
+        self.assertIs(by_source[a][c], by_source[c][a])
+        self.assertNotIn(a, by_source[a])
+        placements = [SimpleNamespace(source=source, placement_id=str(i))
+                      for i, source in enumerate((c, unused, b, c, a))]
+        ordered = _PlacementNeighbors(placements, by_source)
+        linked = ordered.for_source(a)
+        self.assertEqual([p.placement_id for p, _ in linked], ['0', '2', '3'])
+        self.assertEqual([list(links) for _, links in linked], [[f.links[0], f.links[4]], [f.links[1]], [f.links[0], f.links[4]]])
+        self.assertEqual([p.placement_id for p, _ in ordered.for_source(a, after=2)], ['3'])
+        self.assertEqual(ordered.for_source(unused), [])
+
+    def test_path_graph_routing_keeps_all_conflicts_and_same_source_links_on_shared_chr(self):
+        f = EvidenceFixture()
+        a, b, c, unplaced = (f.source(name, dna(1000)) for name in ('a', 'b', 'c', 'u'))
+        for left, right, strand in ((a, b, '+'), (a, c, '+'), (a, a, '-'), (a, b, '-'), (a, unplaced, '+')):
+            f.pair(left, right, (0, 250), (500, 750), strand=strand)
+        placements = [SimpleNamespace(source=s, chromosome=chr) for s, chr in
+                      ((a, 'x'), (b, 'x'), (a, 'y'), (b, 'y'), (c, 'z'))]
+        actual = _links_for_path_graphs(placements, f.links)
+        self.assertEqual(dict(actual), {'x': [f.links[0], f.links[2], f.links[3]],
+                                        'y': [f.links[0], f.links[2], f.links[3]]})
+
     def test_raw_reference_and_pairwise_evidence_build_bridge_without_admitted_test_nodes(self):
         fixture, truth = bridge_fixture()
         result = construct_q0(fixture.data())

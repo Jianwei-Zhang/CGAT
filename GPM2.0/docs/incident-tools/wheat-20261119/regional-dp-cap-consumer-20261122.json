@@ -1,0 +1,222 @@
+{
+  "cases": [
+    {
+      "comparison": {
+        "10m": {
+          "cross": {
+            "cap_observed_paired_bp": 176904,
+            "cap_qualified_paired_bp": 375,
+            "changed_source_pairs": 1,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 332,
+            "lost_qualified_paired_bp": 40855,
+            "old_observed_paired_bp": 116224,
+            "old_qualified_paired_bp": 40898,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 1,
+            "pairs_with_qualified_loss": 1
+          },
+          "intra": {
+            "cap_observed_paired_bp": 345482,
+            "cap_qualified_paired_bp": 14289,
+            "changed_source_pairs": 7,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 7409,
+            "lost_qualified_paired_bp": 386,
+            "old_observed_paired_bp": 361437,
+            "old_qualified_paired_bp": 7266,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 7,
+            "pairs_with_qualified_loss": 3
+          }
+        },
+        "30m": {
+          "cross": {
+            "cap_observed_paired_bp": 166511,
+            "cap_qualified_paired_bp": 438,
+            "changed_source_pairs": 1,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 395,
+            "lost_qualified_paired_bp": 40855,
+            "old_observed_paired_bp": 116224,
+            "old_qualified_paired_bp": 40898,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 1,
+            "pairs_with_qualified_loss": 1
+          },
+          "intra": {
+            "cap_observed_paired_bp": 335363,
+            "cap_qualified_paired_bp": 14047,
+            "changed_source_pairs": 7,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 7133,
+            "lost_qualified_paired_bp": 352,
+            "old_observed_paired_bp": 361437,
+            "old_qualified_paired_bp": 7266,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 7,
+            "pairs_with_qualified_loss": 3
+          }
+        }
+      },
+      "ordinal": 1,
+      "projected_rows": {
+        "10m": 899,
+        "30m": 812,
+        "original": 860
+      },
+      "raw_paf_digests": {
+        "10m": "a1c2a37570ff8b3f3acfea113d6b95bc6927efb07858d8f96e66af7a863f4073",
+        "30m": "a11eacd2931dd274ca4d781d63d57f8790ecb6a33947289c2f61612a224df7a4",
+        "original": "c43649ad4349df28ccb71b5aa8ad63a9c5af0954781a195d75bf222e838efe5d"
+      }
+    },
+    {
+      "comparison": {
+        "10m": {
+          "cross": {
+            "cap_observed_paired_bp": 3977319,
+            "cap_qualified_paired_bp": 56125,
+            "changed_source_pairs": 1,
+            "gained_previously_observed_but_unqualified_paired_bp": 444,
+            "gained_qualified_paired_bp": 19706,
+            "lost_qualified_paired_bp": 1211,
+            "old_observed_paired_bp": 3200885,
+            "old_qualified_paired_bp": 37630,
+            "pairs_with_previously_unqualified_gain": 1,
+            "pairs_with_qualified_gain": 1,
+            "pairs_with_qualified_loss": 1
+          },
+          "intra": {
+            "cap_observed_paired_bp": 8093660,
+            "cap_qualified_paired_bp": 113616,
+            "changed_source_pairs": 2,
+            "gained_previously_observed_but_unqualified_paired_bp": 1557,
+            "gained_qualified_paired_bp": 40864,
+            "lost_qualified_paired_bp": 3280,
+            "old_observed_paired_bp": 6501675,
+            "old_qualified_paired_bp": 76032,
+            "pairs_with_previously_unqualified_gain": 2,
+            "pairs_with_qualified_gain": 2,
+            "pairs_with_qualified_loss": 2
+          }
+        },
+        "30m": {
+          "cross": {
+            "cap_observed_paired_bp": 3736525,
+            "cap_qualified_paired_bp": 50202,
+            "changed_source_pairs": 1,
+            "gained_previously_observed_but_unqualified_paired_bp": 362,
+            "gained_qualified_paired_bp": 13877,
+            "lost_qualified_paired_bp": 1305,
+            "old_observed_paired_bp": 3200885,
+            "old_qualified_paired_bp": 37630,
+            "pairs_with_previously_unqualified_gain": 1,
+            "pairs_with_qualified_gain": 1,
+            "pairs_with_qualified_loss": 1
+          },
+          "intra": {
+            "cap_observed_paired_bp": 7679722,
+            "cap_qualified_paired_bp": 104328,
+            "changed_source_pairs": 2,
+            "gained_previously_observed_but_unqualified_paired_bp": 1324,
+            "gained_qualified_paired_bp": 31330,
+            "lost_qualified_paired_bp": 3034,
+            "old_observed_paired_bp": 6501675,
+            "old_qualified_paired_bp": 76032,
+            "pairs_with_previously_unqualified_gain": 2,
+            "pairs_with_qualified_gain": 2,
+            "pairs_with_qualified_loss": 2
+          }
+        }
+      },
+      "ordinal": 72,
+      "projected_rows": {
+        "10m": 7512,
+        "30m": 7444,
+        "original": 9059
+      },
+      "raw_paf_digests": {
+        "10m": "3ce988d6659237378c6168b3d20498c58184575ff82c972fd3a7527534e15f99",
+        "30m": "4283e8cb1c4d942f53c6f2c16b1db91d5a7e13fa419024da8c2777376d4277e9",
+        "original": "31a9ac910e5d9c6e37fbd8dd08939934cc203b79b799d0040cfa516d8ee8e93a"
+      }
+    },
+    {
+      "comparison": {
+        "10m": {
+          "cross": {
+            "cap_observed_paired_bp": 0,
+            "cap_qualified_paired_bp": 0,
+            "changed_source_pairs": 7,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 0,
+            "lost_qualified_paired_bp": 0,
+            "old_observed_paired_bp": 0,
+            "old_qualified_paired_bp": 0,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 0,
+            "pairs_with_qualified_loss": 0
+          },
+          "intra": {
+            "cap_observed_paired_bp": 18889,
+            "cap_qualified_paired_bp": 11246,
+            "changed_source_pairs": 54,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 11246,
+            "lost_qualified_paired_bp": 260,
+            "old_observed_paired_bp": 1102,
+            "old_qualified_paired_bp": 260,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 4,
+            "pairs_with_qualified_loss": 1
+          }
+        },
+        "30m": {
+          "cross": {
+            "cap_observed_paired_bp": 0,
+            "cap_qualified_paired_bp": 0,
+            "changed_source_pairs": 7,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 0,
+            "lost_qualified_paired_bp": 0,
+            "old_observed_paired_bp": 0,
+            "old_qualified_paired_bp": 0,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 0,
+            "pairs_with_qualified_loss": 0
+          },
+          "intra": {
+            "cap_observed_paired_bp": 15069,
+            "cap_qualified_paired_bp": 8245,
+            "changed_source_pairs": 54,
+            "gained_previously_observed_but_unqualified_paired_bp": 0,
+            "gained_qualified_paired_bp": 8245,
+            "lost_qualified_paired_bp": 260,
+            "old_observed_paired_bp": 1102,
+            "old_qualified_paired_bp": 260,
+            "pairs_with_previously_unqualified_gain": 0,
+            "pairs_with_qualified_gain": 4,
+            "pairs_with_qualified_loss": 1
+          }
+        }
+      },
+      "ordinal": 77,
+      "projected_rows": {
+        "10m": 1130,
+        "30m": 1655,
+        "original": 3105
+      },
+      "raw_paf_digests": {
+        "10m": "ae482d19e3280e868d440c87358d87157b773ae7a6fa956a54b9457a193eab85",
+        "30m": "641069653b2c1b8850d01d2cbd898e5f3229c380bf666b4a8b41c7878b9ae2ed",
+        "original": "586c51e213bcee0f5b431d4bc4aeeb0f0b99a1fcf4e4ad2885a1a1dd22c20e3d"
+      }
+    }
+  ],
+  "gate": "production qualify_pair_blocks with require_supported=False",
+  "input_report_sha256": "9c868e678b47947c38332c41812d4d37911f193b917a07896e600a239d699f34",
+  "scope": "changed pairs in three archived windows only; neutral placements; no other PAFs, anchors or path selection",
+  "status": "pair_qualification_only_NOT_production_acceptance",
+  "unit": "part pair, strand and affine paired-base map, separately unioned"
+}

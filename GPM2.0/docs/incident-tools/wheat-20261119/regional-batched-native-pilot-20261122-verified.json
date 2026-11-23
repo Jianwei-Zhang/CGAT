@@ -1,0 +1,21 @@
+{
+  "allocation_proof_sha256": "f04968acb54ebab66ad79af34fd4a73141dd9c0251b32f803e7d90a4eabcb1be",
+  "executed_source_sha256": {
+    "benchmark_regional_batched_search.py": "f1dd0ec303db1865e31af6ecff219b077bb6a5c30f473ad7cb15b99f8d803866",
+    "benchmark_regional_candidate_screen.py": "54a3df9ac5597667d9b5474c4ee3f9622be2cba6cb4a1825beb4c572b3a908ef",
+    "benchmark_regional_mapper_dispatch.py": "1e38c6c1caffc09c8bc6ecd548c3a6909134d92a0505132e68fc683c816ef7ea",
+    "probe_regional_candidate_screen.py": "7e0e32d4fc64f9146cd1b3887b77505687c70fa3cd674b05db7c5dd64cc6738e",
+    "test_benchmark_regional_batched_search.py": "198f4e89c989dc9493814aff4c03460966f90f0ff932cdb2554cac2dbb86e51e"
+  },
+  "exit_code": 0,
+  "host": "agent-X86-37",
+  "job_id": 43012243,
+  "main_workspace_modified": false,
+  "original_report_sha256": "93bc1f4f2b64559484b937eb3348eb4a5e8754a5e1a4f0f5860d7f2cbcadccf1",
+  "production_strategy_enabled": false,
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-batched-native-pilot-20261122-131841",
+  "repo_report_sha256": "93bc1f4f2b64559484b937eb3348eb4a5e8754a5e1a4f0f5860d7f2cbcadccf1",
+  "scheduler_final_json_sha256": "dd371c8df7c33d62342e1a2d6f4bfaa40e297922d75a377a87818a849f07b74f",
+  "schema": "incident_readonly_diagnostic_verified_v1",
+  "terminal_state": "SUCCEEDED"
+}

@@ -6,6 +6,7 @@ objects before the scientific layer merges/commits. Readers use the same receipt
 validation. This module is not an installed context or a production cutover.
 """
 import dataclasses
+import hashlib
 import json
 from pathlib import Path
 import shlex
@@ -48,15 +49,20 @@ class NativeBindings:
         path = Path(path)
         return {"path":str(path), "sha256":self.contract.sha256_file(path)}
 
-    def expected_spec(self, rel, i):
+    def operation_records(self, rel):
+        profile = self.profiles[rel]
+        return self.record(profile.source), self.record(profile.native["restore"])
+
+    def expected_spec(self, rel, i, *, operation_records=None):
         profile = self.profiles[rel]; m = profile.native; row = self.rows[rel]
         command = Path(m["batches"][i]["directory"]) / "command.sh"
+        manifest, restore = self.operation_records(rel) if operation_records is None else operation_records
         return {"schema":guard.SCHEMA,"policy":guard.POLICY,
-                "manifest":self.record(profile.source),"batch_index":i,
+                "manifest":manifest,"batch_index":i,
                 "native_key":m["batches"][i]["key"],
                 "native_command":{"path":str(command),"sha256":row["native_commands"][str(i)]["sha256"]},
                 "runtime":{**self.plan["native_runtime"],"adapter":self.plan["dependencies"]["native_guard"],
-                           "restore":self.record(m["restore"])}}
+                           "restore":restore}}
 
     def checked(self, record, *, isolated=False):
         path = Path(record["path"])
@@ -86,8 +92,13 @@ class NativeBindings:
             keys = eligible(profile)
             if set(row.get("native_scripts",{})) != keys or set(row.get("native_specs",{})) != keys:
                 raise ValueError("native resource inventory differs from eligible native batches")
+            # Every batch in this operation refers to the same manifest and
+            # restore file. Bind them once here, and verify them again before
+            # accepting the operation. Do not cache these records across calls.
+            operation = self.operation_records(rel) if len(keys) > 2 else None
             for key in sorted(keys, key=int):
-                script = self.checked(row["native_scripts"][key], isolated=True)
+                script_record = row["native_scripts"][key]
+                script = self.checked(script_record, isolated=True)
                 spec_path = self.checked(row["native_specs"][key], isolated=True)
                 if script in paths or spec_path in paths or script == spec_path:
                     raise ValueError("duplicate native wrapper or specification")
@@ -96,10 +107,17 @@ class NativeBindings:
                 if token not in self._specs:
                     self._specs[token] = json.loads(spec_path.read_text())
                 spec = self._specs[token]
-                if spec != self.expected_spec(rel,int(key)):
+                if spec != self.expected_spec(rel,int(key),operation_records=operation):
                     raise ValueError("native resource spec changes source, key, tool or parameters")
-                if script.read_text() != wrapper_text(spec["runtime"]["adapter"]["path"],spec_path):
+                expected_wrapper = wrapper_text(spec["runtime"]["adapter"]["path"],spec_path)
+                # checked() already verified the actual byte digest for this
+                # path. Only old newline/encoding variants need the original
+                # text comparison, which preserves the prior acceptance rule.
+                if (hashlib.sha256(expected_wrapper.encode("utf-8")).hexdigest() != script_record["sha256"]
+                        and script.read_text() != expected_wrapper):
                     raise ValueError("native wrapper is not the canonical guarded invocation")
+            if operation is not None and self.operation_records(rel) != operation:
+                raise ValueError("native operation manifest or restore changed during verification")
 
     def verify(self, *, full=False, operations=None):
         self.original.verify(full=full, operations=operations)
@@ -110,14 +128,20 @@ class NativeBindings:
             self.verify_native_resources(operations=self.operations_for(prepared.unit_id))
         return self.original.bind_prepared(prepared)
 
+    def _receipt_path(self, rel, i):
+        return Path(self.profiles[rel].native["batches"][i]["directory"]) / guard.RECEIPT
+
     def receipt(self, rel, i, *, required=False, threads=None):
-        profile = self.profiles[rel]; b = profile.native["batches"][i]
-        path = Path(b["directory"]) / guard.RECEIPT
+        path = self._receipt_path(rel, i)
         if not path.exists():
             if required: raise ValueError("new guarded native execution has no resource receipt")
             return None  # Verified historical cache, never claimed as guarded.
         self.verify_native_resources(operations=[rel])
-        spec = self.expected_spec(rel,i)
+        self._validate_receipt(rel, i, path, self.expected_spec(rel, i), threads=threads)
+        return path
+
+    def _validate_receipt(self, rel, i, path, spec, *, threads=None):
+        profile = self.profiles[rel]; b = profile.native["batches"][i]
         marker_path = path.parent / "complete.json"
         info = json.loads(path.read_text()); marker = json.loads(marker_path.read_text())
         grant = info.get("thread_grant")
@@ -138,15 +162,40 @@ class NativeBindings:
                 or children not in ([mapping,restore],[index,mapping,restore])
                 or not profile.validate_batch(i)):
             raise ValueError("native resource receipt differs from verified execution/output")
-        return path
+        return info
+
+    def operation_resource_receipts(self, rel):
+        """Check the operation twice, not the entire operation per receipt.
+
+        This is a synchronous inventory read, not a substitute for the single
+        receipt callback at native dispatch. Keep validating each present
+        receipt, completion marker, and corresponding batch's full outputs.
+        """
+        paths = {int(key): self._receipt_path(rel, int(key)) for key in self.rows[rel]["native_scripts"]}
+        present = {i: path for i, path in paths.items() if path.exists()}
+        if not present:
+            return {}  # historical native batches have no guard provenance
+        self.verify_native_resources(operations=[rel])
+        operation = self.operation_records(rel)
+        result = {}
+        for i, path in present.items():
+            identity = self.contract.file_identity(path, relative_to=self.work)
+            marker = path.parent / "complete.json"
+            marker_sha = self.contract.sha256_file(marker)
+            info = self._validate_receipt(rel, i, path, self.expected_spec(rel, i, operation_records=operation))
+            result[i] = (identity, info, marker_sha)
+        self.verify_native_resources(operations=[rel])
+        if (self.operation_records(rel) != operation or {i for i, path in paths.items() if path.exists()} != set(result)
+                or any(self.contract.file_identity(present[i], relative_to=self.work) != identity
+                       or self.contract.sha256_file(present[i].parent / "complete.json") != marker_sha
+                       for i, (identity, _, marker_sha) in result.items())):
+            raise ValueError("native resource receipt inventory changed during verification")
+        return {i: (identity, info) for i, (identity, info, _) in result.items()}
 
     def output_identities(self, unit_id):
         result = self.original.output_identities(unit_id)
         for rel in self.operations_for(unit_id):
-            for key in self.rows[rel]["native_scripts"]:
-                path = self.receipt(rel,int(key))
-                if path is not None:
-                    result.append(self.contract.file_identity(path, relative_to=self.work))
+            result.extend(identity for identity, _ in self.operation_resource_receipts(rel).values())
         return result
 
     def dispatch(self, original_runner):

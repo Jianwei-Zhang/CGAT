@@ -1,0 +1,398 @@
+{
+  "candidate_sha256": "1005f9e0e062f0918f568024e5e4f3a28ff54e1d4df975ca34b47521410fb610",
+  "cases": [
+    {
+      "ordinal": 42,
+      "phases": [
+        {
+          "cpu_seconds": 0.05379250699999999,
+          "mode": "original",
+          "rendered_rows": 162,
+          "rendered_sha256": "b2e2ddcd1996bafd3b672c0bc07ad6c9a6cdfca0aee805ba21b9ae9ecccec448"
+        },
+        {
+          "cpu_seconds": 0.04200474099999996,
+          "mode": "candidate",
+          "rendered_rows": 162,
+          "rendered_sha256": "b2e2ddcd1996bafd3b672c0bc07ad6c9a6cdfca0aee805ba21b9ae9ecccec448"
+        },
+        {
+          "cpu_seconds": 0.04229253799999999,
+          "mode": "candidate",
+          "rendered_rows": 162,
+          "rendered_sha256": "b2e2ddcd1996bafd3b672c0bc07ad6c9a6cdfca0aee805ba21b9ae9ecccec448"
+        },
+        {
+          "cpu_seconds": 0.05480822799999996,
+          "mode": "original",
+          "rendered_rows": 162,
+          "rendered_sha256": "b2e2ddcd1996bafd3b672c0bc07ad6c9a6cdfca0aee805ba21b9ae9ecccec448"
+        }
+      ],
+      "raw_bytes": 59866,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-6ce7dfaf24f3699f93b30ef1/q0-regional-raw-27c601c899dcc0253e33183e/success.json",
+      "target_windows": 667
+    },
+    {
+      "ordinal": 61,
+      "phases": [
+        {
+          "cpu_seconds": 0.027186191999999942,
+          "mode": "original",
+          "rendered_rows": 11,
+          "rendered_sha256": "36cf5b68995bb1fabb57cda7c91184faa943f6717b92cb4ff964257b4efb72fb"
+        },
+        {
+          "cpu_seconds": 0.01759193300000006,
+          "mode": "candidate",
+          "rendered_rows": 11,
+          "rendered_sha256": "36cf5b68995bb1fabb57cda7c91184faa943f6717b92cb4ff964257b4efb72fb"
+        },
+        {
+          "cpu_seconds": 0.017974743000000015,
+          "mode": "candidate",
+          "rendered_rows": 11,
+          "rendered_sha256": "36cf5b68995bb1fabb57cda7c91184faa943f6717b92cb4ff964257b4efb72fb"
+        },
+        {
+          "cpu_seconds": 0.02751347599999998,
+          "mode": "original",
+          "rendered_rows": 11,
+          "rendered_sha256": "36cf5b68995bb1fabb57cda7c91184faa943f6717b92cb4ff964257b4efb72fb"
+        }
+      ],
+      "raw_bytes": 39886,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-f869c49e6847e48e7976cc72/q0-regional-raw-711ab50ec3127da3e79ede22/success.json",
+      "target_windows": 680
+    },
+    {
+      "ordinal": 78,
+      "phases": [
+        {
+          "cpu_seconds": 2.1704999999982988e-05,
+          "mode": "original",
+          "rendered_rows": 0,
+          "rendered_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "cpu_seconds": 0.0005045710000000092,
+          "mode": "candidate",
+          "rendered_rows": 0,
+          "rendered_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "cpu_seconds": 6.21560000000354e-05,
+          "mode": "candidate",
+          "rendered_rows": 0,
+          "rendered_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "cpu_seconds": 2.0810000000981432e-06,
+          "mode": "original",
+          "rendered_rows": 0,
+          "rendered_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "raw_bytes": 0,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-24503adfcde3c47e3241485c/q0-regional-raw-e49979b9ee6989da6f9d9cca/success.json",
+      "target_windows": 698
+    },
+    {
+      "ordinal": 115,
+      "phases": [
+        {
+          "cpu_seconds": 0.06534909500000008,
+          "mode": "original",
+          "rendered_rows": 7,
+          "rendered_sha256": "c15412aa0d1c43b1b6fac98689f3a1c5468208e52252ffbb4c48f739dca7026e"
+        },
+        {
+          "cpu_seconds": 0.04021425699999992,
+          "mode": "candidate",
+          "rendered_rows": 7,
+          "rendered_sha256": "c15412aa0d1c43b1b6fac98689f3a1c5468208e52252ffbb4c48f739dca7026e"
+        },
+        {
+          "cpu_seconds": 0.04057774199999997,
+          "mode": "candidate",
+          "rendered_rows": 7,
+          "rendered_sha256": "c15412aa0d1c43b1b6fac98689f3a1c5468208e52252ffbb4c48f739dca7026e"
+        },
+        {
+          "cpu_seconds": 0.0655891649999999,
+          "mode": "original",
+          "rendered_rows": 7,
+          "rendered_sha256": "c15412aa0d1c43b1b6fac98689f3a1c5468208e52252ffbb4c48f739dca7026e"
+        }
+      ],
+      "raw_bytes": 94796,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-9967021ae28dc7704ea2aa83/q0-regional-raw-7df4563cc180e0876256f7e4/success.json",
+      "target_windows": 701
+    },
+    {
+      "ordinal": 56,
+      "phases": [
+        {
+          "cpu_seconds": 0.1314976459999999,
+          "mode": "original",
+          "rendered_rows": 338,
+          "rendered_sha256": "423c027692076e99c1062e917dcd0c358cbcbb9ca6ceae8817a2d85d2550a722"
+        },
+        {
+          "cpu_seconds": 0.09048287799999999,
+          "mode": "candidate",
+          "rendered_rows": 338,
+          "rendered_sha256": "423c027692076e99c1062e917dcd0c358cbcbb9ca6ceae8817a2d85d2550a722"
+        },
+        {
+          "cpu_seconds": 0.09123224200000002,
+          "mode": "candidate",
+          "rendered_rows": 338,
+          "rendered_sha256": "423c027692076e99c1062e917dcd0c358cbcbb9ca6ceae8817a2d85d2550a722"
+        },
+        {
+          "cpu_seconds": 0.12597221700000016,
+          "mode": "original",
+          "rendered_rows": 338,
+          "rendered_sha256": "423c027692076e99c1062e917dcd0c358cbcbb9ca6ceae8817a2d85d2550a722"
+        }
+      ],
+      "raw_bytes": 145687,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-789a394115cfc145ce383c87/q0-regional-raw-8b29f6274e942c7ed7aeba68/success.json",
+      "target_windows": 702
+    },
+    {
+      "ordinal": 67,
+      "phases": [
+        {
+          "cpu_seconds": 1.0061988800000001,
+          "mode": "original",
+          "rendered_rows": 1894,
+          "rendered_sha256": "f9f6274d3471ad3f3bd4e6372129db842d6cbd5a54d019c85984db82b2466347"
+        },
+        {
+          "cpu_seconds": 0.6104106590000002,
+          "mode": "candidate",
+          "rendered_rows": 1894,
+          "rendered_sha256": "f9f6274d3471ad3f3bd4e6372129db842d6cbd5a54d019c85984db82b2466347"
+        },
+        {
+          "cpu_seconds": 0.6097092929999999,
+          "mode": "candidate",
+          "rendered_rows": 1894,
+          "rendered_sha256": "f9f6274d3471ad3f3bd4e6372129db842d6cbd5a54d019c85984db82b2466347"
+        },
+        {
+          "cpu_seconds": 0.9918227059999998,
+          "mode": "original",
+          "rendered_rows": 1894,
+          "rendered_sha256": "f9f6274d3471ad3f3bd4e6372129db842d6cbd5a54d019c85984db82b2466347"
+        }
+      ],
+      "raw_bytes": 1213497,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-115a9878899d5819b0b900f7/q0-regional-raw-46134e40fa8ff1686df7ed5c/success.json",
+      "target_windows": 720
+    },
+    {
+      "ordinal": 11,
+      "phases": [
+        {
+          "cpu_seconds": 0.0022282459999996007,
+          "mode": "original",
+          "rendered_rows": 3,
+          "rendered_sha256": "27cb1b76d253461102b0dfcccf9b102ad36e8c634b9b39a809499dc68cc50ef8"
+        },
+        {
+          "cpu_seconds": 0.0006437880000005336,
+          "mode": "candidate",
+          "rendered_rows": 3,
+          "rendered_sha256": "27cb1b76d253461102b0dfcccf9b102ad36e8c634b9b39a809499dc68cc50ef8"
+        },
+        {
+          "cpu_seconds": 0.0006559010000000143,
+          "mode": "candidate",
+          "rendered_rows": 3,
+          "rendered_sha256": "27cb1b76d253461102b0dfcccf9b102ad36e8c634b9b39a809499dc68cc50ef8"
+        },
+        {
+          "cpu_seconds": 0.0010743230000000992,
+          "mode": "original",
+          "rendered_rows": 3,
+          "rendered_sha256": "27cb1b76d253461102b0dfcccf9b102ad36e8c634b9b39a809499dc68cc50ef8"
+        }
+      ],
+      "raw_bytes": 703,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-5c2858c006bee528001da50b/q0-regional-raw-c6f27b47521fc849825550aa/success.json",
+      "target_windows": 1940
+    },
+    {
+      "ordinal": 10,
+      "phases": [
+        {
+          "cpu_seconds": 0.0025700359999998312,
+          "mode": "original",
+          "rendered_rows": 3,
+          "rendered_sha256": "2a7ac1a4d7045c536a1b6c1d7db9fe11bf12de1d68357af3ddd29d61abb75610"
+        },
+        {
+          "cpu_seconds": 0.0006297100000001166,
+          "mode": "candidate",
+          "rendered_rows": 3,
+          "rendered_sha256": "2a7ac1a4d7045c536a1b6c1d7db9fe11bf12de1d68357af3ddd29d61abb75610"
+        },
+        {
+          "cpu_seconds": 0.0006383579999997835,
+          "mode": "candidate",
+          "rendered_rows": 3,
+          "rendered_sha256": "2a7ac1a4d7045c536a1b6c1d7db9fe11bf12de1d68357af3ddd29d61abb75610"
+        },
+        {
+          "cpu_seconds": 0.001017671999999692,
+          "mode": "original",
+          "rendered_rows": 3,
+          "rendered_sha256": "2a7ac1a4d7045c536a1b6c1d7db9fe11bf12de1d68357af3ddd29d61abb75610"
+        }
+      ],
+      "raw_bytes": 702,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-4c5077a6524e5f0135745d95/q0-regional-raw-0a38a37adfddb10b10207176/success.json",
+      "target_windows": 1965
+    },
+    {
+      "ordinal": 9,
+      "phases": [
+        {
+          "cpu_seconds": 0.005467986000000202,
+          "mode": "original",
+          "rendered_rows": 9,
+          "rendered_sha256": "303d87913fd9a0ca1302a89e5c724f8b26c6bca38f50070fcba344cd1dc9c458"
+        },
+        {
+          "cpu_seconds": 0.0021044390000000135,
+          "mode": "candidate",
+          "rendered_rows": 9,
+          "rendered_sha256": "303d87913fd9a0ca1302a89e5c724f8b26c6bca38f50070fcba344cd1dc9c458"
+        },
+        {
+          "cpu_seconds": 0.0021592379999999523,
+          "mode": "candidate",
+          "rendered_rows": 9,
+          "rendered_sha256": "303d87913fd9a0ca1302a89e5c724f8b26c6bca38f50070fcba344cd1dc9c458"
+        },
+        {
+          "cpu_seconds": 0.0037703099999992773,
+          "mode": "original",
+          "rendered_rows": 9,
+          "rendered_sha256": "303d87913fd9a0ca1302a89e5c724f8b26c6bca38f50070fcba344cd1dc9c458"
+        }
+      ],
+      "raw_bytes": 2758,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-be60898fccd3ef5bb7655472/q0-regional-raw-c2dac024e154a04cf60b8d27/success.json",
+      "target_windows": 1992
+    },
+    {
+      "ordinal": 13,
+      "phases": [
+        {
+          "cpu_seconds": 0.13917156900000016,
+          "mode": "original",
+          "rendered_rows": 158,
+          "rendered_sha256": "f8ba6c466d0b4f8bb7536ba83bede1aab9f4af4e9b7073eec6ece2d48a225c6f"
+        },
+        {
+          "cpu_seconds": 0.05815818200000056,
+          "mode": "candidate",
+          "rendered_rows": 158,
+          "rendered_sha256": "f8ba6c466d0b4f8bb7536ba83bede1aab9f4af4e9b7073eec6ece2d48a225c6f"
+        },
+        {
+          "cpu_seconds": 0.05801267300000035,
+          "mode": "candidate",
+          "rendered_rows": 158,
+          "rendered_sha256": "f8ba6c466d0b4f8bb7536ba83bede1aab9f4af4e9b7073eec6ece2d48a225c6f"
+        },
+        {
+          "cpu_seconds": 0.1306001349999999,
+          "mode": "original",
+          "rendered_rows": 158,
+          "rendered_sha256": "f8ba6c466d0b4f8bb7536ba83bede1aab9f4af4e9b7073eec6ece2d48a225c6f"
+        }
+      ],
+      "raw_bytes": 93692,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-6204282b56d1047152d79ba6/q0-regional-raw-554c89d2f9d32319b167337b/success.json",
+      "target_windows": 2215
+    },
+    {
+      "ordinal": 14,
+      "phases": [
+        {
+          "cpu_seconds": 0.09820934700000006,
+          "mode": "original",
+          "rendered_rows": 173,
+          "rendered_sha256": "a1517b062b7f86c3e7f98cab41c9624a8904b77dba4f4b06d585543fffb8d86b"
+        },
+        {
+          "cpu_seconds": 0.04056020500000024,
+          "mode": "candidate",
+          "rendered_rows": 173,
+          "rendered_sha256": "a1517b062b7f86c3e7f98cab41c9624a8904b77dba4f4b06d585543fffb8d86b"
+        },
+        {
+          "cpu_seconds": 0.04042663399999924,
+          "mode": "candidate",
+          "rendered_rows": 173,
+          "rendered_sha256": "a1517b062b7f86c3e7f98cab41c9624a8904b77dba4f4b06d585543fffb8d86b"
+        },
+        {
+          "cpu_seconds": 0.09259622699999959,
+          "mode": "original",
+          "rendered_rows": 173,
+          "rendered_sha256": "a1517b062b7f86c3e7f98cab41c9624a8904b77dba4f4b06d585543fffb8d86b"
+        }
+      ],
+      "raw_bytes": 56360,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-7c18ee6700f0e448eca41c8a/q0-regional-raw-dd5016e1082090cfab5100cd/success.json",
+      "target_windows": 2296
+    },
+    {
+      "ordinal": 12,
+      "phases": [
+        {
+          "cpu_seconds": 0.005771798000000494,
+          "mode": "original",
+          "rendered_rows": 10,
+          "rendered_sha256": "5d1a8b16adebee140c99152deb209ef7fde42715181ad313e2991076a8bbab86"
+        },
+        {
+          "cpu_seconds": 0.001898666999999854,
+          "mode": "candidate",
+          "rendered_rows": 10,
+          "rendered_sha256": "5d1a8b16adebee140c99152deb209ef7fde42715181ad313e2991076a8bbab86"
+        },
+        {
+          "cpu_seconds": 0.0019158169999995422,
+          "mode": "candidate",
+          "rendered_rows": 10,
+          "rendered_sha256": "5d1a8b16adebee140c99152deb209ef7fde42715181ad313e2991076a8bbab86"
+        },
+        {
+          "cpu_seconds": 0.004967654000000543,
+          "mode": "original",
+          "rendered_rows": 10,
+          "rendered_sha256": "5d1a8b16adebee140c99152deb209ef7fde42715181ad313e2991076a8bbab86"
+        }
+      ],
+      "raw_bytes": 2547,
+      "raw_receipt": "grt/evidence/q0_prepare/regional/q0-regional-context-1fbe34e16bcc0a3d20c71664/q0-regional-raw-28c16c4293d988d85e55660a/success.json",
+      "target_windows": 2344
+    }
+  ],
+  "limits": [
+    "CPU time for Python projection only on authenticated PAF text, no I/O/mapping speedup claim.",
+    "Six middle and six largest archived target inventories, not an estimated whole-wheat distribution."
+  ],
+  "main_workspace_modified": false,
+  "native_mapper_executed": false,
+  "node": "agent-X86-61",
+  "source_bytes_verified": 1710494,
+  "status": "same_projection_bytes_A_B_B_A_not_deployed"
+}

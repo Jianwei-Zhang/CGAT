@@ -8,14 +8,10 @@ pairwise-derived placement.
 """
 from __future__ import annotations
 
-try:
-    from workspace_layout import workspace_join
-except ModuleNotFoundError:
-    from ..workspace_layout import workspace_join
-
-
+from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field, replace
+from functools import lru_cache
 import math
 from pathlib import Path
 from typing import Mapping
@@ -76,6 +72,13 @@ class Admission:
 
 
 @dataclass
+class PathSelection:
+    admission: Admission
+    paths: dict[str, SearchResult]
+    occupied: dict[SourceKey, list[Interval]]
+
+
+@dataclass
 class Construction:
     records: dict[str, str]
     paths: dict[str, SearchResult]
@@ -100,9 +103,12 @@ def _project(source: Interval, target: Interval, strand: str, interval: Interval
     return Interval(target.end - (interval.end - source.start), target.end - (interval.start - source.start))
 
 
-def load_evidence_input(root: Path) -> EvidenceInput:
+def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
     root = root.resolve()
-    manifest = load_verified_evidence(root)
+    def verified():
+        return load_verified_evidence(root) if _draft is None else load_verified_evidence(root, _draft=_draft)
+
+    manifest = verified()
     catalog = json_file(artifact_path(root, manifest["catalog"]))
     if catalog.get("min_gap") != manifest["policy"]["min_gap"]:
         raise Q0EvidenceError("q0 catalog gap policy differs from ready manifest")
@@ -135,13 +141,13 @@ def load_evidence_input(root: Path) -> EvidenceInput:
     reference_hits, evidence, links = defaultdict(list), {}, []
     for dataset, sequences in sorted(by_dataset.items()):
         relative = f"runs/{dataset}_vs_ref/result.paf"
-        for hit in read_paf(workspace_join(root, relative), query_lengths={k: len(v) for k, v in sequences.items()},
+        for hit in read_paf(artifact_path(root, relative), query_lengths={k: len(v) for k, v in sequences.items()},
                             target_lengths=lengths, artifact=relative):
             reference_hits[SourceKey(dataset, hit.query_name)].append(hit)
             evidence[hit.evidence_id] = evidence_ref(hit)
     for descriptor in catalog["base_alignments"]:
         query, target = descriptor["query_dataset"], descriptor["target_dataset"]
-        for hit in read_paf(workspace_join(root, descriptor["paf"]), query_lengths={k: len(v) for k, v in by_dataset[query].items()},
+        for hit in read_paf(artifact_path(root, descriptor["paf"]), query_lengths={k: len(v) for k, v in by_dataset[query].items()},
                             target_lengths={k: len(v) for k, v in by_dataset[target].items()}, artifact=descriptor["paf"]):
             links.append(PairLink(hit, SourceKey(query, hit.query_name), SourceKey(target, hit.target_name)))
             evidence[hit.evidence_id] = evidence_ref(hit)
@@ -150,7 +156,7 @@ def load_evidence_input(root: Path) -> EvidenceInput:
         if task["paf"] in visited:
             continue
         visited.add(task["paf"])
-        for hit in read_paf(workspace_join(root, task["paf"]), query_lengths={key: parts[key].interval.length for key in task["query_ids"]},
+        for hit in read_paf(artifact_path(root, task["paf"]), query_lengths={key: parts[key].interval.length for key in task["query_ids"]},
                             target_lengths={key: parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"]):
             query, target = parts[hit.query_name], parts[hit.target_name]
             links.append(PairLink(hit, query.source, target.source, query.interval.start, target.interval.start))
@@ -160,7 +166,7 @@ def load_evidence_input(root: Path) -> EvidenceInput:
             raise Q0EvidenceError("q0 catalog evidence record differs from the bound PAF")
     for edge in adjacencies:
         evidence[edge.adjacency_id] = {"kind": "input_assembly_adjacency", "catalog": manifest["catalog"], **asdict(edge)}
-    if manifest != load_verified_evidence(root):
+    if manifest != verified():
         raise Q0EvidenceError("q0 evidence changed during admission loading")
     return EvidenceInput(sources, parts, lengths, dict(reference_hits), tuple(links), tuple(adjacencies),
                          evidence, manifest["input_fingerprint"], catalog, stable_id("q0-ready-evidence", manifest))
@@ -194,6 +200,31 @@ class _RefBlock:
     mapq: int | None
 
 
+class _ReferenceBlockCandidates:
+    """Safe overlap bounds; a long block may widen the scan, never omit hits."""
+
+    def __init__(self, blocks):
+        self.blocks = sorted(blocks, key=lambda b: b.query.start)
+        self.starts = []
+        self.prefix_end = []
+        farthest = 0
+        for b in self.blocks:
+            farthest = max(farthest, b.query.end)
+            self.starts.append(b.query.start)
+            self.prefix_end.append(farthest)
+
+    def intersecting(self, interval):
+        # Before first: all earlier ends <= interval.start. From stop onward
+        # all starts >= interval.end. A remaining block can still be disjoint.
+        first = bisect_right(self.prefix_end, interval.start)
+        stop = bisect_left(self.starts, interval.end, lo=first)
+        for index in range(first, stop):
+            other = self.blocks[index]
+            overlap = interval.intersection(other.query)
+            if overlap is not None:
+                yield other, overlap
+
+
 def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy):
     blocks = []
     for hit in data.reference_hits.get(part.source, ()):
@@ -206,11 +237,11 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
                 blocks.append(_RefBlock(overlap, _project(block.query, block.target, hit.strand, overlap),
                                         hit.target_name, hit.strand, hit.evidence_id, identity, hit.mapping_quality))
     groups, high, ambiguity = defaultdict(list), defaultdict(list), []
+    candidates = _ReferenceBlockCandidates(blocks)
     for block in blocks:
         conflicts = []
-        for other in blocks:
-            overlap = block.query.intersection(other.query)
-            if overlap is None or other.identity + policy.competing_identity_margin < block.identity:
+        for other, overlap in candidates.intersecting(block.query):
+            if other.identity + policy.competing_identity_margin < block.identity:
                 continue
             if (block.chromosome != other.chromosome or block.strand != other.strand
                     or _project(block.query, block.target, block.strand, overlap)
@@ -231,14 +262,27 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
 
 
 def _ordered(anchors, orientation):
+    # Only disjoint source intervals constrain order. Scan their two boundary
+    # orders together, keeping the one most restrictive earlier reference end
+    # (forward) or start (reverse). Touching half-open intervals are disjoint.
     anchors = tuple(anchors)
-    for i, a in enumerate(anchors):
-        for b in anchors[i + 1:]:
-            if a.source.intersection(b.source):
-                continue
-            left, right = (a, b) if (a.source.start < b.source.start) == (orientation == "+") else (b, a)
-            if left.reference.end > right.reference.start:
-                return False
+    if len(anchors) < 2:
+        return True
+    by_end = sorted(anchors, key=lambda a: a.source.end)
+    pointer = 0
+    bound = None
+    forward = orientation == "+"
+    for current in sorted(anchors, key=lambda a: a.source.start):
+        while pointer < len(by_end) and by_end[pointer].source.end <= current.source.start:
+            ref = by_end[pointer].reference
+            pos = ref.end if forward else ref.start
+            if bound is None:
+                bound = pos
+            else:
+                bound = max(bound, pos) if forward else min(bound, pos)
+            pointer += 1
+        if bound is not None and (bound > current.reference.start if forward else current.reference.end > bound):
+            return False
     return True
 
 
@@ -249,6 +293,36 @@ def _placement(part, chromosome, strand, interval, anchors, reference_blocks, ev
     return Placement(stable_id("q0-placement", identity), part.segment_id, part.source, interval, strand, chromosome,
                      merged_intervals(a.reference for a in reference_blocks), merged_intervals(anchors), evidence_ids,
                      reference_blocks, seed, kind)
+
+
+def _pair_neighbors(links):
+    """Share one encounter-ordered link list between the two source directions."""
+    neighbors = defaultdict(dict)
+    for link in links:
+        a, b = link.query_source, link.target_source
+        if a == b:
+            continue  # Unchanged admission rule; path construction is separate.
+        group = neighbors[a].get(b)
+        if group is None:
+            group = neighbors[a][b] = neighbors[b][a] = []
+        group.append(link)
+    return neighbors
+
+
+class _PlacementNeighbors:
+    """Join a fixed placement snapshot to actual pair links, in snapshot order."""
+
+    def __init__(self, placements, links_by_source):
+        self.by_source = defaultdict(list)
+        for rank, placement in enumerate(placements):
+            self.by_source[placement.source].append((rank, placement))
+        self.links_by_source = links_by_source
+
+    def for_source(self, source, *, after=-1):
+        candidates = [(rank, placement, links)
+                      for other, links in self.links_by_source.get(source, {}).items()
+                      for rank, placement in self.by_source.get(other, ()) if rank > after]
+        return [(placement, links) for _, placement, links in sorted(candidates, key=lambda row: row[0])]
 
 
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),
@@ -280,10 +354,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                             "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
                             "qc": "not_measured" if quality_pass is None else "passed"})
     ambiguous = {key: merged_intervals(value) for key, value in ambiguous.items()}
-    pair_index = defaultdict(list)
-    for link in data.pair_links:
-        if link.query_source != link.target_source:
-            pair_index[tuple(sorted((link.query_source, link.target_source)))].append(link)
+    pair_neighbors = _pair_neighbors(data.pair_links)
 
     def clean_intervals(part, intervals):
         return merged_intervals(piece for i in intervals
@@ -294,17 +365,16 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     # another chr supports a previously unlocalized tail. This is local source
     # selection, not a claim that the input assembler made a biological error.
     reference_seeds = tuple(accepted.values())
+    seed_neighbors = _PlacementNeighbors(reference_seeds, pair_neighbors)
     for current in reference_seeds:
         part = data.parts[current.segment_id]
         if current.interval != part.interval:
             continue
         main_anchors = merged_intervals(a.source for a in current.reference_blocks)
         alternatives = defaultdict(lambda: {"intervals": [], "ids": set(), "parents": set()})
-        for anchor in reference_seeds:
-            if anchor.chromosome == current.chromosome or anchor.source == current.source:
-                continue
-            links = pair_index.get(tuple(sorted((part.source, anchor.source))), ())
-            if not links:
+        linked_seeds = seed_neighbors.for_source(current.source)
+        for anchor, links in linked_seeds:
+            if anchor.chromosome == current.chromosome:
                 continue
             for orientation in ("+", "-"):
                 probe = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
@@ -333,10 +403,9 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
         if not alternatives:
             continue
         continuity_ids = set()
-        for anchor in reference_seeds:
-            if anchor.chromosome != current.chromosome or anchor.source == current.source:
+        for anchor, links in linked_seeds:
+            if anchor.chromosome != current.chromosome:
                 continue
-            links = pair_index.get(tuple(sorted((part.source, anchor.source))), ())
             by_evidence = defaultdict(list)
             for block, eid in qualify_pair_blocks(current, anchor, links, path_policy, require_supported=False):
                 by_evidence[eid].append(current.source_interval(block.left))
@@ -373,29 +442,36 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
             records.append({"placement_id": local.placement_id, "segment_id": part.segment_id, "status": "accepted",
                             "reason": "independently_anchored_cross_chr_tail", "anchor_placement_ids": sorted(value["parents"])})
 
+    # A fragmented pair can have thousands of CIGAR blocks rooting to the
+    # same immutable admitted span. Screen that full source context once,
+    # not once per block. Keep the cache local to this admission and bounded.
+    @lru_cache(maxsize=128)
+    def rooted_context(segment_id, interval):
+        return clean_intervals(data.parts[segment_id], (interval,))
+
     # Only previous-round independent anchors can establish new placements.
     # Multiple loci/strands remain alternatives, not a majority vote by ds.
     for round_number in range(1, len(data.parts) + 1):
         before = tuple(accepted.values())
         placed = {p.segment_id for p in before}
+        placed_neighbors = _PlacementNeighbors(before, pair_neighbors)
         proposed = defaultdict(dict)
         for key in sorted(allowed - placed):
             part = data.parts[key]
-            for anchor in before:
-                links = pair_index.get(tuple(sorted((part.source, anchor.source))), ())
+            for anchor, links in placed_neighbors.for_source(part.source):
                 for orientation in ("+", "-"):
                     # Geometry probe has explicit raw evidence; it is never returned as admitted.
-                    if not links:
-                        continue
                     temporary = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
                                            (l.hit.evidence_id for l in links), kind="pairwise")
                     qualified = qualify_pair_blocks(temporary, anchor, links, path_policy, require_supported=False)
+                    if not qualified:
+                        continue
+                    # Full accepted contig context can root an off-ref
+                    # neighbor; known ambiguous/repetitive positions cannot.
+                    context = rooted_context(anchor.segment_id, anchor.interval)
                     intervals, ids = [], set()
                     for block, evidence_id in qualified:
-                        # Full accepted contig context can root an off-ref
-                        # neighbor; known ambiguous/repetitive positions cannot.
-                        anchor_part = data.parts[anchor.segment_id]
-                        for source_anchor in clean_intervals(anchor_part, (anchor.interval,)):
+                        for source_anchor in context:
                             overlap = block.right.intersection(anchor.local(source_anchor))
                             if overlap is None:
                                 continue
@@ -454,17 +530,19 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
         if not added:
             break
 
+    rooted_context.cache_clear()
+
     # Extend supported anchors into non-ref sequence only with a noncompeting,
     # high-complexity pair match between already localized sources. Direct ref
     # blocks check actual corresponding loci, not reference hull intersection.
     additions = defaultdict(list)
     addition_ids = defaultdict(set)
     placed_list = sorted(accepted.values(), key=lambda p: p.placement_id)
+    placed_neighbors = _PlacementNeighbors(placed_list, pair_neighbors)
     for i, left in enumerate(placed_list):
-        for right in placed_list[i+1:]:
-            if left.chromosome != right.chromosome or left.source == right.source:
+        for right, links in placed_neighbors.for_source(left.source, after=i):
+            if left.chromosome != right.chromosome:
                 continue
-            links = pair_index.get(tuple(sorted((left.source, right.source))), ())
             for block, evidence_id in qualify_pair_blocks(left, right, links, path_policy, require_supported=False):
                 for placement, interval in ((left, left.source_interval(block.left)), (right, right.source_interval(block.right))):
                     part = data.parts[placement.segment_id]
@@ -517,42 +595,78 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                      tuple(sorted(set(data.parts) - placed)), ambiguous, policy)
 
 
-def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
-                 path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Construction:
+def _links_for_path_graphs(placements, links):
+    # A graph's lookup and coverage model only consume pairs where both
+    # endpoints have a placement on its chromosome. Keep all such records in
+    # original order (including conflicts and same-source non-overlap links).
+    chromosomes_by_source = defaultdict(set)
+    for placement in placements:
+        chromosomes_by_source[placement.source].add(placement.chromosome)
+    by_chromosome = defaultdict(list)
+    absent = frozenset()
+    for link in links:
+        for chromosome in chromosomes_by_source.get(link.query_source, absent) & chromosomes_by_source.get(link.target_source, absent):
+            by_chromosome[chromosome].append(link)
+    return by_chromosome
+
+
+def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
+                    path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> PathSelection:
+    """Select and check source geometry without reconstructing sequences or building a report."""
     admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass)
     groups = defaultdict(list)
     for placement in admission.placements:
         groups[placement.chromosome].append(placement)
-    records, searches, occupied, chromosomes = {}, {}, defaultdict(list), []
-    for chromosome, length in sorted(data.reference_lengths.items()):
-        search = search_paths(PathGraph(groups[chromosome], data.pair_links, data.original_adjacencies, path_policy))
+    searches, occupied = {}, defaultdict(list)
+    graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
+    for chromosome in sorted(data.reference_lengths):
+        search = search_paths(PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy))
         searches[chromosome] = search
         if search.path is None:
-            chromosomes.append({"chromosome": chromosome, "status": "not_constructed"})
             continue
-        by_id = {p.placement_id: p for p in groups[chromosome]}
-        ref_coverage = []
         for item in search.path.slices:
+            if item.interval.end > len(data.sources[item.source]):
+                raise Q0EvidenceError("q0 path source exceeds sequence length")
             if any(item.interval.intersection(previous) for previous in occupied[item.source]):
                 raise Q0EvidenceError("q0 source interval selected on multiple chromosomes")
             occupied[item.source].append(item.interval)
-            placement = by_id[item.placement_id]
-            for anchor in placement.reference_blocks:
-                overlap = anchor.source.intersection(item.interval)
-                if overlap:
-                    ref_coverage.append(_project(anchor.source, anchor.reference, item.orientation, overlap))
         for join in search.path.joins:
             if join.kind == "input_assembly_gap":
                 if any(join.gap_interval.intersection(previous) for previous in occupied[join.gap_source]):
                     raise Q0EvidenceError("original N source interval selected more than once")
                 occupied[join.gap_source].append(join.gap_interval)
+    return PathSelection(admission, searches, occupied)
+
+
+def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
+                 path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None) -> Construction:
+    selection = select_q0_paths(data, admission_policy=admission_policy, path_policy=path_policy,
+                                quality_pass=quality_pass)
+    admission, searches, occupied = selection.admission, selection.paths, selection.occupied
+    if not any(search.path is not None for search in searches.values()):
+        raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
+    if "supplement_scope" in data.catalog:
+        from .q0_frontier_scope import audit_selected_scope
+        audit_selected_scope(data, admission, searches)
+    records, chromosomes = {}, []
+    by_id = {p.placement_id: p for p in admission.placements}
+    for chromosome, search in searches.items():
+        if search.path is None:
+            chromosomes.append({"chromosome": chromosome, "status": "not_constructed"})
+            continue
+        ref_coverage = []
+        for item in search.path.slices:
+            placement = by_id[item.placement_id]
+            for anchor in placement.reference_blocks:
+                overlap = anchor.source.intersection(item.interval)
+                if overlap:
+                    ref_coverage.append(_project(anchor.source, anchor.reference, item.orientation, overlap))
         records[chromosome] = reconstruct(search.path, data.sources)
+        length = data.reference_lengths[chromosome]
         chromosomes.append({"chromosome": chromosome, "status": "partial_path",
                             "reference_unrepresented": [asdict(i) for i in subtract_intervals(Interval(0, length), ref_coverage)],
                             "unknown_joins": sum(j.kind == "reference_unknown" for j in search.path.joins),
                             "input_gap_joins": sum(j.kind == "input_assembly_gap" for j in search.path.joins)})
-    if not records:
-        raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
     decisions = {"schema": "lgz_q0_construction_v1", "input_fingerprint": data.input_fingerprint,
                  "admission_policy": asdict(admission_policy), "path_policy": asdict(path_policy),
                  "selector_identity": selector_identity(), "ready_manifest_identity": data.ready_manifest_identity,
@@ -588,8 +702,8 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 
 def selector_identity() -> str:
     root = Path(__file__).parent
-    return stable_id("q0-selector", [(name, sha256_file(workspace_join(root, name))) for name in
-                                    ("q0_admission.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "common.py")])
+    return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
+                                    ("q0_admission.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, **kwargs) -> Construction:

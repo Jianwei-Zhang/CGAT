@@ -1,0 +1,118 @@
+{
+  "status": "q0_parallel_runtime_installed_normal_initial_resume_in_progress",
+  "at": "2026-11-22T06:25:59.495541+08:00",
+  "workspace": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server",
+  "source_git_revision": "ec093edfed52f9a1197baf118cd00cef4bdb6b03",
+  "new_job": 43010335,
+  "previous_main_job": 43010068,
+  "protected_baseline": 42523432,
+  "host": "agent-X86-53",
+  "run_id": "20261121T222113Z-1973018-f3b56813",
+  "transition": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/transition.json",
+    "sha256": "47d3bd36960518a6dcc1c5c8b98bf1b5fd61f6a076a42a3109d1d44e128acc01"
+  },
+  "preflight_job": 43010327,
+  "preflight": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/validation.json",
+    "sha256": "f3e96ee771316f8e044dc7980f951b165847098acbfd75ccc65b980c8d586075"
+  },
+  "preflight_initial_units": 25,
+  "handoff": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/handoff.json",
+    "sha256": "d2f0151983d6aadc2900496c310dfe0f1bbc3b5f14fba1082560e05585916544"
+  },
+  "normal_stop_request": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/normal-stop-request.json",
+    "sha256": "fc01836bf644cd45daf214d90d47fea780682217fc7020af90c7331720b7e6f4"
+  },
+  "installation": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/installation/receipt.json",
+    "sha256": "9e77800daa968f9a476956d04924a808acc4cfd8984a75dc08c7b1b87239c60e"
+  },
+  "installation_target_count": 16,
+  "runtime_count": 14,
+  "replaced_count": 9,
+  "unchanged_runtime_not_rewritten": [
+    ".prepare_lib/tools/lgz_core/common.py",
+    ".prepare_lib/tools/lgz_core/q0_cigar_policy.py",
+    ".prepare_lib/tools/lgz_core/q0_mapper_guard.py",
+    ".prepare_lib/tools/lgz_core/q0_neighbor_requests.py",
+    ".prepare_lib/tools/lgz_core/q0_query_windows.py",
+    ".prepare_lib/tools/lgz_core/q0_regional_mapping.py",
+    ".prepare_lib/tools/lgz_core/q0_sources.py"
+  ],
+  "new_module": ".prepare_lib/tools/lgz_core/q0_regional_execution.py",
+  "source_files_verified": 20,
+  "all_backups_verified": true,
+  "protected_original_runtime_and_outer_contract_verified": [
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/GPM_Server/tools/self_alignment_batches.py",
+      "sha256": "8768cac7ba99f0f0a39794b0acaa05ea1f01335f4903973cb394cf15ef78eb5d"
+    },
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/.prepare_lib/tools/self_alignment_batches.py",
+      "sha256": "8768cac7ba99f0f0a39794b0acaa05ea1f01335f4903973cb394cf15ef78eb5d"
+    },
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/.prepare_lib/tools/assign_chr_groups.py",
+      "sha256": "a64492fbd4a84de906678568986db590c9ffacf535f3967cde1ab1072e5df183"
+    },
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/.prepare_lib/tools/lgz_prepare_inputs.py",
+      "sha256": "4511e5cf7f62193000a9cec7a8f13a81327fe97bd720ad6de3c6ac65226e6234"
+    },
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/.prepare_lib/tools/run_orchestration.py",
+      "sha256": "899b629ca3d2d2fb2d7e768f3368bd1e94a049d345a571928c09442090ba4ffb"
+    }
+  ],
+  "initial_checkpoint_bytes_unchanged": 25,
+  "native_checkpoint_rewritten": false,
+  "initial_alignment_profiles_modified": false,
+  "cache_success_markers_preserved_not_revalidated_in_this_login_check": [
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/grt/evidence/q0_prepare/tasks/q0-map-8024dde83cbf20e7ffa6d8ee/success.json",
+      "sha256": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e"
+    },
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/grt/evidence/q0_prepare/tasks/q0-map-2b19c2c859bdfb5f2e9177e8/success.json",
+      "sha256": "ba5553ff1640cd1feff0db518b671baabed44fba84e02c7992e30a1cb76dd50a"
+    },
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/grt/evidence/q0_prepare/tasks/q0-map-a2e519761e94eff6ca09e121/success.json",
+      "sha256": "c36e5d98b8cbeac165865060565ed8c8953824f42baafa9c7db2e94b1ec7679f"
+    },
+    {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/grt/evidence/q0_prepare/tasks/q0-map-b30137a13323db8a99874448/success.json",
+      "sha256": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3"
+    }
+  ],
+  "actual_new_run_skip_valid_count": 1,
+  "actual_new_run_skip_valid_events": [
+    "2026-11-22T06:25:56+08:00 [run=20261121T222113Z-1973018-f3b56813] [1/55] [SKIP_VALID] [ref:JM19_hifiasm] elapsed=0.000s checkpoint=.run_all/checkpoints/ref-JM19-hifiasm.bfcc1a4b55a45f4d.json checkpoint and outputs are valid"
+  ],
+  "actual_new_run_latest_events": [
+    "2026-11-22T06:24:48+08:00 [run=20261121T222113Z-1973018-f3b56813] [-/-] [RESOURCES] [run_all] {\"effective\": {\"threads\": 32}, \"history\": [{\"at\": \"2026-11-18T08:37:40.675487+00:00\", \"changes\": {\"threads\": {\"from\": 32, \"to\": 16}}, \"run_id\": \"20261118T074934Z-2320291-9587f56e\"}, {\"at\": \"2026-11-20T03:19:57.300315+00:00\", \"changes\": {\"threads\": {\"from\": 16, \"to\": 32}}, \"run_id\": \"20261120T031955Z-3903530-2bc35443\"}], \"schema_version\": 1}",
+    "2026-11-22T06:24:48+08:00 [run=20261121T222113Z-1973018-f3b56813] [-/-] [RESUME] [run_all] rechecking the prepared execution plan",
+    "2026-11-22T06:24:49+08:00 [run=20261121T222113Z-1973018-f3b56813] [-/-] [PREFLIGHT] [run_all] minimap2 evidence=.run_all/diagnostics/20261121T222113Z-1973018-f3b56813/minimap2_runtime.json long_records=23 (risk indicator only; parameters unchanged)",
+    "2026-11-22T06:25:56+08:00 [run=20261121T222113Z-1973018-f3b56813] [1/55] [SKIP_VALID] [ref:JM19_hifiasm] elapsed=0.000s checkpoint=.run_all/checkpoints/ref-JM19-hifiasm.bfcc1a4b55a45f4d.json checkpoint and outputs are valid"
+  ],
+  "actual_regional_pool_observed": false,
+  "full_wheat_completed": false,
+  "scheduler": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/deployment-scheduler.json",
+    "sha256": "2ee8d16b78fd894c8e71ffccc449008aff9ab53f1c9743c22a12bd8fac60a2de"
+  },
+  "observer": {
+    "pid": 3037575,
+    "script": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/observer.py",
+      "sha256": "8ac77d55799884af0e03547ecee3a9d6759c3ed949e43d62034ec3e56aca45f4"
+    },
+    "log": "/share/home/xbzhang26/cgat-reads-debug/logs/wheat-live-parallel-20261122-062306.jsonl",
+    "read_only": true,
+    "automatic_chat_notifications": false
+  },
+  "no_release_ci_update_or_whole_runtime_replacement": true
+}

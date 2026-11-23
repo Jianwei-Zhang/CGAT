@@ -1,0 +1,213 @@
+{
+  "all_case_coverage_aggregates": {
+    "cross": {
+      "lost_core_bp": 1421,
+      "lost_target_group_query_bp": 220992,
+      "lost_target_group_target_bp": 458673,
+      "missing_oriented_targets_ge_1kb": 32,
+      "old_core_bp": 387877,
+      "old_oriented_targets": 172,
+      "old_target_group_query_bp": 1330186,
+      "old_target_group_target_bp": 1315722
+    },
+    "intra": {
+      "lost_core_bp": 4530,
+      "lost_target_group_query_bp": 378118,
+      "lost_target_group_target_bp": 683423,
+      "missing_oriented_targets_ge_1kb": 55,
+      "old_core_bp": 387205,
+      "old_oriented_targets": 175,
+      "old_target_group_query_bp": 2114167,
+      "old_target_group_target_bp": 1701929
+    }
+  },
+  "candidate_cpu_sum": 186.013,
+  "executed_sources": [
+    {
+      "file": "probe_regional_dp_budget.py",
+      "sha256": "79bf277c9c32c54234705c5fa1583e0b5c922ef57bf1f5847145584a64b17eb4"
+    },
+    {
+      "file": "test_probe_regional_dp_budget.py",
+      "sha256": "7bc9c86cb1a5512f8ff1d6bee69b136308fac67377c1099520bcf6819e7bfd6f"
+    }
+  ],
+  "final_job_sha256": "c5d739f81241bf4c423ef09e9259e8c68340d018e28b1f00ca1a0f647499e0c7",
+  "historical_cpu_sum_not_same_node": 1283.23,
+  "host": "agent-X86-08",
+  "input_bytes": 345931620,
+  "main_workspace_modified": false,
+  "original_report_sha256": "35d9a4a7076a99b4deea29a1eeecab74ebc0010a1cd150f3fcaa1f889b02a44b",
+  "pilot_job": 43012991,
+  "production_strategy_enabled": false,
+  "same_node_original_replays": [
+    {
+      "candidate_native_timing": {
+        "cpu_seconds": 10.919,
+        "native_peak_rss_gb": 0.226,
+        "wall_seconds": 10.277
+      },
+      "ordinal": 4,
+      "original_native_timing": {
+        "cpu_seconds": 69.795,
+        "native_peak_rss_gb": 0.464,
+        "wall_seconds": 69.456
+      },
+      "original_over_candidate_cpu": 6.392068870775712,
+      "original_over_candidate_wall": 6.758392527002044
+    },
+    {
+      "candidate_native_timing": {
+        "cpu_seconds": 27.699,
+        "native_peak_rss_gb": 0.117,
+        "wall_seconds": 27.789
+      },
+      "ordinal": 8,
+      "original_native_timing": {
+        "cpu_seconds": 215.749,
+        "native_peak_rss_gb": 0.505,
+        "wall_seconds": 216.507
+      },
+      "original_over_candidate_cpu": 7.789053756453301,
+      "original_over_candidate_wall": 7.791104393824894
+    }
+  ],
+  "status": "dp_budget_diagnostic_verified_NOT_production_admission",
+  "tentative_trigger_training_only": {
+    "heldout_required_at_source_part_level": true,
+    "insufficient_to_admit": true,
+    "minimum_chains_per_target": 30,
+    "minimum_coarse_chains": 9000,
+    "minimum_window_bases": 20000,
+    "rows": [
+      {
+        "coarse_chains": 6775,
+        "ordinal": 0,
+        "original_eligibility_reason": "large_regional_weak_chain_work",
+        "target_windows": 1011,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 120000,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 9883,
+        "ordinal": 1,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 10,
+        "tentative_density_trigger_matches": true,
+        "window_bases": 21627,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 0,
+        "ordinal": 4,
+        "original_eligibility_reason": "screening_not_needed",
+        "target_windows": 1038,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 17108,
+        "work_witness": false
+      },
+      {
+        "coarse_chains": 0,
+        "ordinal": 5,
+        "original_eligibility_reason": "screening_not_needed",
+        "target_windows": 302,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 16599,
+        "work_witness": false
+      },
+      {
+        "coarse_chains": 10407,
+        "ordinal": 8,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 294,
+        "tentative_density_trigger_matches": true,
+        "window_bases": 120000,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 3224,
+        "ordinal": 13,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 1265,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 62263,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 4081,
+        "ordinal": 14,
+        "original_eligibility_reason": "large_regional_weak_chain_work",
+        "target_windows": 698,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 22070,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 9106,
+        "ordinal": 16,
+        "original_eligibility_reason": "large_regional_weak_chain_work",
+        "target_windows": 1520,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 120000,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 1959,
+        "ordinal": 17,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 1283,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 110000,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 16299,
+        "ordinal": 20,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 294,
+        "tentative_density_trigger_matches": true,
+        "window_bases": 120000,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 11204,
+        "ordinal": 21,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 13,
+        "tentative_density_trigger_matches": true,
+        "window_bases": 24781,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 12505,
+        "ordinal": 22,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 294,
+        "tentative_density_trigger_matches": true,
+        "window_bases": 120000,
+        "work_witness": true
+      },
+      {
+        "coarse_chains": 2491,
+        "ordinal": 23,
+        "original_eligibility_reason": "ordinary_weak_chain_work",
+        "target_windows": 884,
+        "tentative_density_trigger_matches": false,
+        "window_bases": 120000,
+        "work_witness": true
+      }
+    ],
+    "triggered_cross_lost_core_bp": 197,
+    "triggered_cross_old_core_bp": 298445,
+    "triggered_missing_cross_oriented_targets_ge_1kb": 0,
+    "triggered_ordinals": [
+      1,
+      8,
+      20,
+      21,
+      22
+    ]
+  },
+  "terminal_end_utc": "2026-11-22T07:38:00Z"
+}

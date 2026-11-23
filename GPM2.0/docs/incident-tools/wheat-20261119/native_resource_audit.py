@@ -8,16 +8,22 @@ from native_resource_bootstrap import installed, module, checked
 def native_rows(ctx):
     rows=[]
     for rel,profile in sorted(ctx.selfs.profiles.items()):
+        guarded=ctx.selfs.operation_resource_receipts(rel)
+        eligible=ctx.selfs.rows[rel]["native_scripts"]
         for i,b in enumerate(profile.native["batches"]):
             if i in profile.selected:continue
             if not profile.validate_batch(i):raise ValueError("native output is incomplete at resource audit")
-            path=ctx.selfs.receipt(rel,i)
+            # Preserve the old fail-closed check for a receipt claiming to
+            # belong to an unguarded native batch outside the wrapper inventory.
+            if str(i) not in eligible and ctx.selfs.receipt(rel,i) is not None:
+                raise ValueError("out-of-scope native resource receipt")
+            verified=guarded.get(i)
             row={"operation":rel,"batch_index":i,"native_key":b["key"],
                 "result_paf":ctx.contract.file_identity(Path(b["directory"])/"result.paf",relative_to=ctx.work),
-                "guard_execution_proven":path is not None}
-            if path is not None:
-                receipt=json.loads(path.read_text())
-                row.update(receipt=ctx.contract.file_identity(path,relative_to=ctx.work),
+                "guard_execution_proven":verified is not None}
+            if verified is not None:
+                identity,receipt=verified
+                row.update(receipt=identity,
                     policy=receipt["policy"],thread_grant=receipt["thread_grant"],children=receipt["children"],
                     runtime_sha256={k:v["sha256"] for k,v in receipt["runtime"].items()},
                     specification_sha256=receipt["spec_sha256"])

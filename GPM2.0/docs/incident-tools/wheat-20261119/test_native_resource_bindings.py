@@ -126,6 +126,42 @@ class NativeBindingTests(unittest.TestCase):
         scripts["1"]=self.base.fx.row(self.wrapper)
         with self.assertRaisesRegex(ValueError,"canonical"): self.rebuild()
 
+    def test_canonical_wrapper_digest_avoids_a_second_read_without_losing_crlf_compatibility(self):
+        read_text = Path.read_text
+        def audited_read(path,*args,**kwargs):
+            if path == self.wrapper:
+                raise AssertionError("canonical bytes already read by checked wire digest")
+            return read_text(path,*args,**kwargs)
+        with patch.object(Path,'read_text',audited_read):
+            self.bindings.verify_native_resources()
+        self.wrapper.write_bytes(self.wrapper.read_bytes().replace(b'\n',b'\r\n'))
+        self.base.row['native_scripts']['1'] = self.base.fx.row(self.wrapper)
+        self.rebuild()  # the legacy read_text comparison still accepts exact text
+
+    def test_multiple_wrappers_keep_separate_spec_checks_but_share_fenced_operation_records(self):
+        profile=self.bindings.profiles[self.rel]
+        row=self.bindings.rows[self.rel]
+        template=profile.native['batches'][1]
+        for i in (2,3,4):
+            item={**copy.deepcopy(template),'key':'native-key-'+str(i),'directory':str(self.base.fx.root/f'batch-{i}')}
+            profile.native['batches'].append(item)
+            row['native_commands'][str(i)]=copy.deepcopy(row['native_commands']['1'])
+            spec=self.base.fx.root/f'bound-spec-{i}.json'; spec.write_text(json.dumps(self.bindings.expected_spec(self.rel,i)))
+            wrapper=self.base.fx.root/f'bound-wrapper-{i}.sh'; wrapper.write_text(resources.wrapper_text(guard.__file__,spec))
+            row['native_scripts'][str(i)]=self.base.fx.row(wrapper)
+            row['native_specs'][str(i)]=self.base.fx.row(spec)
+        with patch.object(self.bindings,'operation_records',wraps=self.bindings.operation_records) as calls:
+            self.bindings.verify_native_resources()
+            self.assertEqual(calls.call_count,2)
+        records=self.bindings.operation_records(self.rel)
+        with patch.object(self.bindings,'operation_records',side_effect=(records,({**records[0],'sha256':'drift'},records[1]))):
+            with self.assertRaisesRegex(ValueError,'restore changed during verification'):
+                self.bindings.verify_native_resources()
+        spec.write_text(json.dumps({**json.loads(spec.read_text()),'native_key':'wrong'}))
+        row['native_specs']['4']=self.base.fx.row(spec)
+        with self.assertRaisesRegex(ValueError,'spec changes'):
+            self.bindings.verify_native_resources()
+
     def test_changed_key_and_tool_spec_rejected_even_with_new_digest(self):
         valid=self.spec_path.read_text()
         for field,value in (("native_key","other"),("batch_index",0),("runtime",{})):

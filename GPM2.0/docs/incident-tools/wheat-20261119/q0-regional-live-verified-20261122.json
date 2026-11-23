@@ -1,0 +1,100 @@
+{
+  "status": "live_regional_execution_and_prior_raw_reuse_observed",
+  "at": "2026-11-22T10:18:09.931832+08:00",
+  "main": {
+    "job": "43010335",
+    "state": "RUNNING",
+    "node": "agent-X86-53",
+    "usage": [
+      {
+        "pids": "1973002,1973018,1990559,2085918,2085919,2085922,2085925,2135292,2135301,2135318,2135331,2135334,2135362,2135373,2135378",
+        "cpuUtilRecent": 600,
+        "memReal": 90168,
+        "memMax": 95956,
+        "swap": 0
+      }
+    ]
+  },
+  "baseline": {
+    "job": "42523432",
+    "state": "RUNNING",
+    "node": "agent-X86-60",
+    "usage": [
+      {
+        "pids": "342047,448802,459695,486080,490402,491906,498664,503846,505461,510681,526154,528577,531874,534761,543664,544444,3217258,3217448,4055036,4055037",
+        "cpuUtilRecent": 1595,
+        "memReal": 89241,
+        "memMax": 105171,
+        "swap": 0
+      }
+    ]
+  },
+  "queued_readonly_probe": {
+    "job": "43010357",
+    "state": "SUCCEEDED",
+    "node": "agent-X86-53",
+    "usage": [
+      {
+        "pids": "-",
+        "cpuUtilRecent": 0,
+        "memReal": 0,
+        "memMax": 14,
+        "swap": 0
+      }
+    ]
+  },
+  "run_id": "20261121T222113Z-1973018-f3b56813",
+  "weak_seed_events": [
+    "2026-11-22T09:24:15+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 weak seed: completed=q0-map-2b19c2c859bdfb5f2e9177e8 approximate=True queries=61 targets=38117",
+    "2026-11-22T09:24:56+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 weak seed: completed=q0-map-a2e519761e94eff6ca09e121 approximate=False queries=9 targets=38117",
+    "2026-11-22T09:25:07+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 weak seed: completed=q0-map-b30137a13323db8a99874448 approximate=False queries=1418 targets=52"
+  ],
+  "regional_progress_events": [
+    "2026-11-22T09:28:03+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=100 planned=61000 fallback_sources=0",
+    "2026-11-22T09:29:07+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=200 planned=61000 fallback_sources=0",
+    "2026-11-22T09:30:07+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=300 planned=61000 fallback_sources=0",
+    "2026-11-22T09:31:33+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=400 planned=61000 fallback_sources=0",
+    "2026-11-22T09:33:53+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=500 planned=61000 fallback_sources=0",
+    "2026-11-22T09:40:46+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=600 planned=61000 fallback_sources=0",
+    "2026-11-22T09:43:45+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=700 planned=61000 fallback_sources=0",
+    "2026-11-22T09:45:04+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=800 planned=61000 fallback_sources=0",
+    "2026-11-22T09:48:49+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=900 planned=61000 fallback_sources=0",
+    "2026-11-22T09:52:34+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1000 planned=61000 fallback_sources=0",
+    "2026-11-22T09:54:32+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1100 planned=61000 fallback_sources=0",
+    "2026-11-22T10:00:12+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1200 planned=61000 fallback_sources=0",
+    "2026-11-22T10:02:10+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1300 planned=61000 fallback_sources=0",
+    "2026-11-22T10:05:47+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1400 planned=61000 fallback_sources=0",
+    "2026-11-22T10:07:52+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1500 planned=61000 fallback_sources=0",
+    "2026-11-22T10:11:28+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1600 planned=61000 fallback_sources=0",
+    "2026-11-22T10:15:08+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1700 planned=61000 fallback_sources=0",
+    "2026-11-22T10:17:45+08:00 [run=20261121T222113Z-1973018-f3b56813] [CHILD] [q0_evidence] LGZ q0 regional progress: completed=1800 planned=61000 fallback_sources=0"
+  ],
+  "raw_success_markers_total": 1717,
+  "prior_raw_markers": 528,
+  "new_raw_markers": 1189,
+  "new_project_markers": 1748,
+  "new_projects_bound_to_prior_raw": 528,
+  "native_timing_sample_count": 1189,
+  "native_threads_observed": [
+    2
+  ],
+  "native_median_real_seconds": 3.601,
+  "native_mean_real_seconds": 6.96415727502103,
+  "native_max_real_seconds": 326.033,
+  "native_p90_real_seconds_order_statistic": 10.3,
+  "native_median_cpu_over_real": 1.0301298701298702,
+  "native_address_space_limits_bytes": [
+    4294967296
+  ],
+  "stderr_peak_rss_NOT_a_live_per_mapper_measurement": true,
+  "memory_note": "stderr prints about 82 GB despite a 4 GiB address-space guard; do not sum these counters or treat them as observed per-mapper resident memory; confirm with post-exec live RSS if needed",
+  "trace": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/regional-trace-20261122-101809.json",
+    "sha256": "e74626d25d32da75377c79092f275f77501ccb3e340dcca100aedd3ec8b387be"
+  },
+  "metadata_observation_not_full_output_validation": true,
+  "first_cached_prefix_not_used_as_new_mapping_throughput": true,
+  "scientific_task_order_unchanged": true,
+  "runtime_modified_this_turn": false,
+  "full_wheat_completed": false
+}

@@ -1,0 +1,25 @@
+{
+  "status": "all_scoped_target_pruning_sample_verified_no_mapper_work_saved",
+  "job_id": 43012034,
+  "state": "SUCCEEDED",
+  "host": "agent-X86-18",
+  "remote_bundle": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-partial-target-reuse-20261122-115906-all-scopes",
+  "source_report_sha256": "4ebd66f050be82cdb6b8c78b6d166311b421a3ddb39d37d87e8e961f63705505",
+  "source_script_sha256": "e3ae7abe8812e531946331ae152acf96649e92aab298b45b3b24a3f87df88320",
+  "scheduler_final_json_sha256": "11426c0152c95b9212d918ab8285fec0dae51f2ecb72b59e3749aa6e3de77a7e",
+  "sample_parents": 39,
+  "sample_windows": 51,
+  "target_windows_before_and_after": 33766,
+  "target_bases_before_and_after": 974533380,
+  "no_target_pruning_in_this_stratified_sample": true,
+  "production_filter_implemented": false,
+  "main_workspace_modified_by_diagnostic": false,
+  "source_packet_manifest_sha256": "2e5f5bcce0781bab49e6293d1f2c2fb39adf8d3a3a75a513ca993a71673123db",
+  "limitations": [
+    "stratified metadata/reference-lookup sample, not a whole-run count or native speed benchmark",
+    "native outputs not independently revalidated in this diagnostic",
+    "do not generalize no benefit in sample to impossibility of benefit on any other input"
+  ],
+  "repository_helper_sha256": "1ca31dea0c734ff9c123c2d760eedf3332a6d3e1a0ee3d132605e18f248f4df6",
+  "repository_helper_differs_from_executed_script": "docstring_only; executable AST equality verified"
+}

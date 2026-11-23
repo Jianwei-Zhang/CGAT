@@ -1,0 +1,508 @@
+{
+  "at": "2026-11-22T17:37:01.662036+08:00",
+  "job_id": "43012037",
+  "limits": [
+    "First 16 sample receipts by project name from this sidecar slice; not random or whole-run throughput.",
+    "File mtimes delimit coarse intervals, not timed call stacks; stderr is a timing observation, not a receipt content field.",
+    "No published PAF/FASTA bytes read; source/log geometry not measured. Timing gap can include scheduling, loader, launcher and I/O."
+  ],
+  "remote_snapshot_sha256": "6ebb90e4850a72ceddad495b44cfc07285a390e37539a30b1c2aca3b4ba73f48",
+  "rows": [
+    {
+      "coarse_native_timing": {
+        "cpu": 0.549,
+        "wall": 1.519
+      },
+      "context_receipt_sha256": "c3739e56bc5ffed619b135332f438a3b30a9823a6950b134bc6730406e944af7",
+      "input_context_to_raw_success_s": 48.549,
+      "input_fasta_bytes": 11026162,
+      "non_native_wall_after_context_s": 31.457,
+      "phases_coarse": {
+        "before_command": 0.779499,
+        "command_launch_plus_timing_gap": 14.288048,
+        "command_to_last_stderr": 15.807048,
+        "last_stderr_to_receipt": 0.794936
+      },
+      "phases_precise": {
+        "before_command": 1.186125,
+        "command_launch_plus_timing_gap": 13.458960000000001,
+        "command_to_last_stderr": 29.03196,
+        "last_stderr_to_receipt": 0.949254
+      },
+      "precise_native_timing": {
+        "cpu": 13.614,
+        "wall": 15.573
+      },
+      "project": "q0-regional-project-017261783590e9e78c51083e",
+      "raw_receipt_mtime_ns": 1795340128156183000,
+      "raw_receipt_sha256": "e4b8bb71ac5b135c318ced5dbed5b46089be2ad4e97fa9da76cf18213d370e85",
+      "targets": 429
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.983,
+        "wall": 1.28
+      },
+      "context_receipt_sha256": "de70ff9572665da71c46eb46485a9bf927e59d05852ba7c01af28a0f4bfa91fb",
+      "input_context_to_raw_success_s": 39.319,
+      "input_fasta_bytes": 22185767,
+      "non_native_wall_after_context_s": 33.924,
+      "phases_coarse": {
+        "before_command": 1.091513,
+        "command_launch_plus_timing_gap": 15.216006000000002,
+        "command_to_last_stderr": 16.496006,
+        "last_stderr_to_receipt": 0.799989
+      },
+      "phases_precise": {
+        "before_command": 1.085013,
+        "command_launch_plus_timing_gap": 15.080006,
+        "command_to_last_stderr": 19.195006,
+        "last_stderr_to_receipt": 0.651048
+      },
+      "precise_native_timing": {
+        "cpu": 2.249,
+        "wall": 4.115
+      },
+      "project": "q0-regional-project-02ca8f67439cd608624a3fd0",
+      "raw_receipt_mtime_ns": 1795339577022856000,
+      "raw_receipt_sha256": "c41fd2a7aab7c6a57f7f8c6c7f81e20e410cb4c3f0e9c199facf9d6f317c73c2",
+      "targets": 832
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 1.599,
+        "wall": 2.117
+      },
+      "context_receipt_sha256": "3f490196f130007c065a8737808ab993020a8116b60bafef1441d31d802cc1ed",
+      "input_context_to_raw_success_s": 40.971,
+      "input_fasta_bytes": 35836278,
+      "non_native_wall_after_context_s": 31.708,
+      "phases_coarse": {
+        "before_command": 0.861572,
+        "command_launch_plus_timing_gap": 14.134346999999998,
+        "command_to_last_stderr": 16.251347,
+        "last_stderr_to_receipt": 0.622836
+      },
+      "phases_precise": {
+        "before_command": 1.281811,
+        "command_launch_plus_timing_gap": 14.071963,
+        "command_to_last_stderr": 21.217963,
+        "last_stderr_to_receipt": 0.735055
+      },
+      "precise_native_timing": {
+        "cpu": 6.755,
+        "wall": 7.146
+      },
+      "project": "q0-regional-project-0bb30c21f24926e799bedfb3",
+      "raw_receipt_mtime_ns": 1795340196569847000,
+      "raw_receipt_sha256": "7efae3bcca911841979bebff7dddda0e52908b4ca08cde5f6ff1d2a0b7d63904",
+      "targets": 1216
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.492,
+        "wall": 1.358
+      },
+      "context_receipt_sha256": "84a722d583baad7af7f3541e22e110fc2e43c0ac57e416876f36f4abb58ccd51",
+      "input_context_to_raw_success_s": 41.977,
+      "input_fasta_bytes": 9133789,
+      "non_native_wall_after_context_s": 31.777,
+      "phases_coarse": {
+        "before_command": 0.960694,
+        "command_launch_plus_timing_gap": 14.071223,
+        "command_to_last_stderr": 15.429223,
+        "last_stderr_to_receipt": 0.724092
+      },
+      "phases_precise": {
+        "before_command": 1.166963,
+        "command_launch_plus_timing_gap": 14.076016000000001,
+        "command_to_last_stderr": 22.918016,
+        "last_stderr_to_receipt": 0.777938
+      },
+      "precise_native_timing": {
+        "cpu": 6.759,
+        "wall": 8.842
+      },
+      "project": "q0-regional-project-0d78b5b1137e8c2319d18c54",
+      "raw_receipt_mtime_ns": 1795340132480805000,
+      "raw_receipt_sha256": "4aca0cde2bee0b0e24b9edf9fceee4ae7ce6a0a9595c756af91b337b9c381f8e",
+      "targets": 309
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 1.301,
+        "wall": 2.013
+      },
+      "context_receipt_sha256": "2f020f4e277d535ca771ba497b2c466aed746a3f9f54b42e833e1fd2f305bd99",
+      "input_context_to_raw_success_s": 40.468,
+      "input_fasta_bytes": 30029433,
+      "non_native_wall_after_context_s": 32.942,
+      "phases_coarse": {
+        "before_command": 0.819554,
+        "command_launch_plus_timing_gap": 15.1194,
+        "command_to_last_stderr": 17.1324,
+        "last_stderr_to_receipt": 0.701588
+      },
+      "phases_precise": {
+        "before_command": 1.588099,
+        "command_launch_plus_timing_gap": 13.994855,
+        "command_to_last_stderr": 19.507855,
+        "last_stderr_to_receipt": 0.718019
+      },
+      "precise_native_timing": {
+        "cpu": 1.991,
+        "wall": 5.513
+      },
+      "project": "q0-regional-project-0fc88051860c95715ef717bf",
+      "raw_receipt_mtime_ns": 1795340204486836000,
+      "raw_receipt_sha256": "053e26151656505e19970692065d9d16b5fd98583d8c01dd8bce5da7abdde794",
+      "targets": 1082
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 1.012,
+        "wall": 1.436
+      },
+      "context_receipt_sha256": "a9b3669128bf3e59dc81928514cba8392de840eecb9374c9fd90eb945588e723",
+      "input_context_to_raw_success_s": 36.649,
+      "input_fasta_bytes": 20999951,
+      "non_native_wall_after_context_s": 32.177,
+      "phases_coarse": {
+        "before_command": 0.768732,
+        "command_launch_plus_timing_gap": 14.394987,
+        "command_to_last_stderr": 15.830987,
+        "last_stderr_to_receipt": 0.778955
+      },
+      "phases_precise": {
+        "before_command": 1.101952,
+        "command_launch_plus_timing_gap": 14.395133,
+        "command_to_last_stderr": 17.431133,
+        "last_stderr_to_receipt": 0.736788
+      },
+      "precise_native_timing": {
+        "cpu": 2.63,
+        "wall": 3.036
+      },
+      "project": "q0-regional-project-159b9b97d9723a1b0b8f336b",
+      "raw_receipt_mtime_ns": 1795339959169747000,
+      "raw_receipt_sha256": "4b8f6f8751764f59dfb38ca82637cc18a544a191415ba55b7f50b849b5e4faab",
+      "targets": 770
+    },
+    {
+      "coarse_native_timing": null,
+      "context_receipt_sha256": "4959f3b9f764a9cb1020bce03ce1881d8ccc895962a1dbfe51df7e8968afa20d",
+      "input_context_to_raw_success_s": 22.021,
+      "input_fasta_bytes": 19457452,
+      "non_native_wall_after_context_s": 15.765,
+      "phases_coarse": null,
+      "phases_precise": {
+        "before_command": 1.100919,
+        "command_launch_plus_timing_gap": 13.882808,
+        "command_to_last_stderr": 20.138808,
+        "last_stderr_to_receipt": 0.781194
+      },
+      "precise_native_timing": {
+        "cpu": 6.267,
+        "wall": 6.256
+      },
+      "project": "q0-regional-project-17b32acd0d80a9e54831e3aa",
+      "raw_receipt_mtime_ns": 1795339965431891000,
+      "raw_receipt_sha256": "d3deaa7373afe434c1a8b8b654c3e3f1aa264fc26ac54ca14b44d83ce4e03422",
+      "targets": 735
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.557,
+        "wall": 0.504
+      },
+      "context_receipt_sha256": "87ec3a411254f0e6ef1e8ff0110038aa416dbe60c5fe73cebe18fbf1e1f47e0e",
+      "input_context_to_raw_success_s": 35.863,
+      "input_fasta_bytes": 9495153,
+      "non_native_wall_after_context_s": 33.066,
+      "phases_coarse": {
+        "before_command": 0.832962,
+        "command_launch_plus_timing_gap": 13.695076,
+        "command_to_last_stderr": 14.199076,
+        "last_stderr_to_receipt": 0.713945
+      },
+      "phases_precise": {
+        "before_command": 1.130989,
+        "command_launch_plus_timing_gap": 16.020976,
+        "command_to_last_stderr": 18.313976,
+        "last_stderr_to_receipt": 0.671982
+      },
+      "precise_native_timing": {
+        "cpu": 2.339,
+        "wall": 2.293
+      },
+      "project": "q0-regional-project-185b4a25abef4afeff6a8366",
+      "raw_receipt_mtime_ns": 1795339980374823000,
+      "raw_receipt_sha256": "4dda7383d918de49a5255a8707b35781fc1585d7b41c034320455f10e967b6ea",
+      "targets": 348
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.61,
+        "wall": 0.909
+      },
+      "context_receipt_sha256": "16c0fe8b49d559e9fa6aa91add8a1c3bfdc4e10af189f91efacbebfc2e04c769",
+      "input_context_to_raw_success_s": 40.288,
+      "input_fasta_bytes": 14668575,
+      "non_native_wall_after_context_s": 33.478,
+      "phases_coarse": {
+        "before_command": 1.002022,
+        "command_launch_plus_timing_gap": 15.284942,
+        "command_to_last_stderr": 16.193942,
+        "last_stderr_to_receipt": 0.679027
+      },
+      "phases_precise": {
+        "before_command": 1.238972,
+        "command_launch_plus_timing_gap": 14.607012999999998,
+        "command_to_last_stderr": 20.508013,
+        "last_stderr_to_receipt": 0.666007
+      },
+      "precise_native_timing": {
+        "cpu": 5.934,
+        "wall": 5.901
+      },
+      "project": "q0-regional-project-1d12f08f73c102de828b0ba9",
+      "raw_receipt_mtime_ns": 1795339803437830000,
+      "raw_receipt_sha256": "8c9375018f78d3dc1e6e3bf1d92aeb6619e4025096c4febdbdcdcc4e7f3fe17f",
+      "targets": 559
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.316,
+        "wall": 0.866
+      },
+      "context_receipt_sha256": "6115dd284364be9989f345a5605006643f5005cc9834d10977189bdbbe217d27",
+      "input_context_to_raw_success_s": 37.038,
+      "input_fasta_bytes": 5215091,
+      "non_native_wall_after_context_s": 32.08,
+      "phases_coarse": {
+        "before_command": 1.106931,
+        "command_launch_plus_timing_gap": 14.407081,
+        "command_to_last_stderr": 15.273081,
+        "last_stderr_to_receipt": 0.598929
+      },
+      "phases_precise": {
+        "before_command": 1.119954,
+        "command_launch_plus_timing_gap": 14.209044000000002,
+        "command_to_last_stderr": 18.301044,
+        "last_stderr_to_receipt": 0.638035
+      },
+      "precise_native_timing": {
+        "cpu": 3.137,
+        "wall": 4.092
+      },
+      "project": "q0-regional-project-1d45e253b9b647ac5fe4adcb",
+      "raw_receipt_mtime_ns": 1795339897658869000,
+      "raw_receipt_sha256": "28d02ad91ef4cda7934d71a3bde1069a49aad3956595374f07a04b6e9e68430a",
+      "targets": 189
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.801,
+        "wall": 1.863
+      },
+      "context_receipt_sha256": "7b304d13ccbf2ee2625dedb694f991fe19cd40c35a18ed7fcddb161d51ba1af7",
+      "input_context_to_raw_success_s": 37.357,
+      "input_fasta_bytes": 14305319,
+      "non_native_wall_after_context_s": 32.172,
+      "phases_coarse": {
+        "before_command": 1.177105,
+        "command_launch_plus_timing_gap": 14.300930000000001,
+        "command_to_last_stderr": 16.16393,
+        "last_stderr_to_receipt": 0.955924
+      },
+      "phases_precise": {
+        "before_command": 1.276022,
+        "command_launch_plus_timing_gap": 13.845988000000002,
+        "command_to_last_stderr": 17.167988,
+        "last_stderr_to_receipt": 0.616018
+      },
+      "precise_native_timing": {
+        "cpu": 2.659,
+        "wall": 3.322
+      },
+      "project": "q0-regional-project-1d95a360ad140098e1f2e2ad",
+      "raw_receipt_mtime_ns": 1795340166005839000,
+      "raw_receipt_sha256": "3eb2090839aff7629b2b936a192cd6ff9c148dc47b8b78499c3ae88bb646c94f",
+      "targets": 513
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.564,
+        "wall": 0.508
+      },
+      "context_receipt_sha256": "800b2fa2f9b86057a239a3a793f356a5318e6773460e2b6c6e83c42b2ccc5b62",
+      "input_context_to_raw_success_s": 151.343,
+      "input_fasta_bytes": 12288869,
+      "non_native_wall_after_context_s": 146.066,
+      "phases_coarse": {
+        "before_command": 0.915999,
+        "command_launch_plus_timing_gap": 25.018275,
+        "command_to_last_stderr": 25.526275,
+        "last_stderr_to_receipt": 102.234728
+      },
+      "phases_precise": {
+        "before_command": 1.734054,
+        "command_launch_plus_timing_gap": 15.250955,
+        "command_to_last_stderr": 20.019955,
+        "last_stderr_to_receipt": 0.912014
+      },
+      "precise_native_timing": {
+        "cpu": 4.766,
+        "wall": 4.769
+      },
+      "project": "q0-regional-project-1e8e1fcbf3374b5abbe72a08",
+      "raw_receipt_mtime_ns": 1795339730527807000,
+      "raw_receipt_sha256": "73357ec452277e859ad6fb23fabeb3d2efede73e1e7c725acc07fd4d2096d6f9",
+      "targets": 421
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 3.637,
+        "wall": 3.765
+      },
+      "context_receipt_sha256": "99f1ab0ff54c4062343e1f4b0211e2f460094978251494f051baf57c9d867528",
+      "input_context_to_raw_success_s": 75.32,
+      "input_fasta_bytes": 46392872,
+      "non_native_wall_after_context_s": 32.14,
+      "phases_coarse": {
+        "before_command": 1.249892,
+        "command_launch_plus_timing_gap": 14.538094000000001,
+        "command_to_last_stderr": 18.303094,
+        "last_stderr_to_receipt": 0.846214
+      },
+      "phases_precise": {
+        "before_command": 1.207008,
+        "command_launch_plus_timing_gap": 13.453034000000002,
+        "command_to_last_stderr": 52.868034,
+        "last_stderr_to_receipt": 0.845939
+      },
+      "precise_native_timing": {
+        "cpu": 36.319,
+        "wall": 39.415
+      },
+      "project": "q0-regional-project-1fcf9952f9ba42d5146c3a86",
+      "raw_receipt_mtime_ns": 1795340203941803000,
+      "raw_receipt_sha256": "2cd8f1eb60eb0f97660375f90dde4f47e10a7baa43bfdbf01006b6d461b3fa29",
+      "targets": 1019
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 0.708,
+        "wall": 0.993
+      },
+      "context_receipt_sha256": "635da5c12c5009424594187882427770d72bc14355a12c756e76cab1067e8be4",
+      "input_context_to_raw_success_s": 36.863,
+      "input_fasta_bytes": 15754968,
+      "non_native_wall_after_context_s": 31.138,
+      "phases_coarse": {
+        "before_command": 0.78943,
+        "command_launch_plus_timing_gap": 14.19001,
+        "command_to_last_stderr": 15.18301,
+        "last_stderr_to_receipt": 0.778077
+      },
+      "phases_precise": {
+        "before_command": 1.099929,
+        "command_launch_plus_timing_gap": 13.799974000000002,
+        "command_to_last_stderr": 18.531974,
+        "last_stderr_to_receipt": 0.480107
+      },
+      "precise_native_timing": {
+        "cpu": 2.1,
+        "wall": 4.732
+      },
+      "project": "q0-regional-project-2154ffd7aab13aef7df95fb5",
+      "raw_receipt_mtime_ns": 1795340105399928000,
+      "raw_receipt_sha256": "02e2d2099bd5b5caf458daf0a958adb9abc86a8e9bd0cafce1d35fe4e272bc9e",
+      "targets": 612
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 1.432,
+        "wall": 1.262
+      },
+      "context_receipt_sha256": "16fa794a46a2f21670d78174eedcde7ee0690b6ce294922c3277a8c0a002dee9",
+      "input_context_to_raw_success_s": 48.019,
+      "input_fasta_bytes": 34101972,
+      "non_native_wall_after_context_s": 32.667,
+      "phases_coarse": {
+        "before_command": 0.951344,
+        "command_launch_plus_timing_gap": 15.134021999999998,
+        "command_to_last_stderr": 16.396022,
+        "last_stderr_to_receipt": 0.960972
+      },
+      "phases_precise": {
+        "before_command": 1.094994,
+        "command_launch_plus_timing_gap": 13.599191999999999,
+        "command_to_last_stderr": 27.689192,
+        "last_stderr_to_receipt": 0.926239
+      },
+      "precise_native_timing": {
+        "cpu": 14.178,
+        "wall": 14.09
+      },
+      "project": "q0-regional-project-2286e551394e1c5cbeab7cdb",
+      "raw_receipt_mtime_ns": 1795339965271249000,
+      "raw_receipt_sha256": "c1296b7fa72075c22b769c482ae15213fcc1c3b4dbde9d1e5313c16fbf6e92b6",
+      "targets": 1319
+    },
+    {
+      "coarse_native_timing": {
+        "cpu": 1.613,
+        "wall": 1.536
+      },
+      "context_receipt_sha256": "b7a27bbf8c00c03140fd03cbe87e500dc87f03758baecdd540c161eeebee85a8",
+      "input_context_to_raw_success_s": 149.032,
+      "input_fasta_bytes": 18545181,
+      "non_native_wall_after_context_s": 141.82,
+      "phases_coarse": {
+        "before_command": 1.058905,
+        "command_launch_plus_timing_gap": 14.97601,
+        "command_to_last_stderr": 16.51201,
+        "last_stderr_to_receipt": 2.375987
+      },
+      "phases_precise": {
+        "before_command": 1.533025,
+        "command_launch_plus_timing_gap": 19.977244999999996,
+        "command_to_last_stderr": 25.653245,
+        "last_stderr_to_receipt": 101.89873
+      },
+      "precise_native_timing": {
+        "cpu": 5.748,
+        "wall": 5.676
+      },
+      "project": "q0-regional-project-22e51b1c29dda0d1817e7453",
+      "raw_receipt_mtime_ns": 1795339707525793000,
+      "raw_receipt_sha256": "83037d8ac157d9db868a4906174c52ef12c9fc2c4eb127e242e111025baa984b",
+      "targets": 661
+    }
+  ],
+  "scope": "latest frozen observer digest-bound new raw samples; metadata/stderr only; not all-window estimate",
+  "source_observer": "q0-live-regional-boundary-20261122-164637/live-window-delta-1707-v2.jsonl",
+  "stats": {
+    "input_context_to_raw_success_s": {
+      "max": 151.343,
+      "median": 40.378,
+      "min": 22.021
+    },
+    "input_fasta_bytes": {
+      "max": 46392872,
+      "median": 17150074.5,
+      "min": 5215091
+    },
+    "non_native_wall_after_context_s": {
+      "max": 146.066,
+      "median": 32.174499999999995,
+      "min": 15.765
+    },
+    "targets": {
+      "max": 1319,
+      "median": 636.5,
+      "min": 189
+    }
+  }
+}

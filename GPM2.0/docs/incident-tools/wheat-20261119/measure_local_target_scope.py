@@ -26,6 +26,46 @@ def project(block, strand, lo, hi, from_query=False):
     return [qs+a-ts, qs+b-ts] if strand == "+" else [qe-(b-ts), qe-(a-ts)]
 
 
+def collect_nearest(flanks, chromosome, strand, block, query, context, anchor_bases):
+    lo, hi = query; qs, qe, ts, te = block
+    if qe <= lo:
+        side, distance = "left", lo-qe
+        clipped = (max(qs, qe-max(1, anchor_bases)), qe)
+    elif qs >= hi:
+        side, distance = "right", qs-hi
+        clipped = (qs, min(qe, qs+max(1, anchor_bases)))
+    else:
+        return
+    if distance > context: return
+    key = chromosome, strand, side
+    previous = flanks.get(key)
+    interval = tuple(project(block, strand, *clipped, True))
+    if previous is None or distance < previous[0]: flanks[key] = (distance, {interval})
+    elif distance == previous[0]: previous[1].add(interval)
+
+
+def flank_search_regions(flanks, query_length, maximum_extra):
+    result = defaultdict(list); consistent_pairs = 0; discordant_pairs = 0
+    for (chromosome, strand, side), (distance, intervals) in flanks.items():
+        result[chromosome].extend(intervals)
+        if side != "left" or (chromosome, strand, "right") not in flanks: continue
+        right_distance, rights = flanks[chromosome, strand, "right"]
+        for left in intervals:
+            for right in rights:
+                ordered = left[0] <= right[0] if strand == "+" else right[0] <= left[0]
+                start, end = min(left[0], right[0]), max(left[1], right[1])
+                if ordered and end-start <= query_length+distance+right_distance+maximum_extra:
+                    result[chromosome].append((start,end));consistent_pairs+=1
+                else: discordant_pairs+=1
+    return result, consistent_pairs, discordant_pairs
+
+
+def require_residual_core(rows, dataset, contig, start, end):
+    matches = [row for row in rows if (row["dataset"], row["contig"]) == (dataset, contig)]
+    if len(matches) != 1 or not any(a <= start < end <= b for a, b in matches[0]["uncovered"]):
+        raise ValueError("selected core is not inside one recorded residual interval")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--workspace", type=Path, required=True)
@@ -36,8 +76,14 @@ def main():
     p.add_argument("--starts", default="0,145000000,289000000")
     p.add_argument("--core-bases", type=int, default=100000)
     p.add_argument("--context-bases", type=int, default=10000)
+    p.add_argument("--anchor-mode", choices=["all", "nearest"], default="all")
+    p.add_argument("--anchor-context-bases", type=int, default=0)
+    p.add_argument("--reference-context-bases", type=int)
+    p.add_argument("--reference-bridge-bases", type=int, default=0)
+    p.add_argument("--residual-file", type=Path)
     a = p.parse_args(); started = time.monotonic()
-    if a.core_bases < 1 or a.context_bases < 0:
+    ref_context = a.context_bases if a.reference_context_bases is None else a.reference_context_bases
+    if a.core_bases < 1 or min(a.context_bases, a.anchor_context_bases, ref_context, a.reference_bridge_bases) < 0:
         raise ValueError("invalid window policy")
     metadata = {}
     def load(path):
@@ -53,6 +99,10 @@ def main():
     if len(starts) != len(set(starts)) or any(not 0 <= s < qrow["length"] for s in starts):
         raise ValueError("invalid core starts")
     windows = {str(s): [max(0,s-a.context_bases),min(qrow["length"],s+a.core_bases+a.context_bases)] for s in starts}
+    residual = load(a.residual_file) if a.residual_file else None
+    if residual is not None:
+        for start in starts:
+            require_residual_core(residual, *qkey, start, min(qrow["length"], start+a.core_bases))
     expected = {r["dataset"]:r["reference_paf_sha256"] for r in load(a.reference_summary)["datasets"]}
     scans = []
     def scan(dataset, wanted_name=None):
@@ -77,15 +127,28 @@ def main():
         if fence(before)!=fence(after) or digest.hexdigest()!=expected[dataset]:raise ValueError("reference evidence changed")
         scans.append(dict(dataset=dataset,rows=total,selected=selected,sha256=digest.hexdigest()))
     regions={key:defaultdict(list) for key in windows};reference_lengths={}
+    flanks={key:{} for key in windows};flank_counts={}
     for f in scan(a.query_dataset,a.query_contig):
         chr=f[5];reference_lengths[chr]=int(f[6]);blocks=paired_geometry(f)
-        for key,(lo,hi) in windows.items():
+        for key,(query_lo,query_hi) in windows.items():
+            lo=max(0,query_lo-a.anchor_context_bases);hi=min(qrow["length"],query_hi+a.anchor_context_bases)
             if int(f[2])>=hi or int(f[3])<=lo:continue
             for block in blocks:
-                r=project(block,f[4],lo,hi,True)
-                if r:regions[key][chr].append([max(0,r[0]-a.context_bases),min(int(f[6]),r[1]+a.context_bases)])
+                if a.anchor_mode == "nearest":
+                    collect_nearest(flanks[key],chr,f[4],block,(query_lo,query_hi),a.anchor_context_bases,a.context_bases)
+                    r=project(block,f[4],query_lo,query_hi,True)
+                else:
+                    r=project(block,f[4],lo,hi,True)
+                if r:regions[key][chr].append([max(0,r[0]-ref_context),min(int(f[6]),r[1]+ref_context)])
+    if a.anchor_mode == "nearest":
+        for key in windows:
+            found,consistent,discordant=flank_search_regions(flanks[key],windows[key][1]-windows[key][0],a.anchor_context_bases)
+            flank_counts[key]=dict(consistent_flank_pairs=consistent,discordant_flank_pairs=discordant)
+            for chr,rows in found.items():
+                for lo,hi in rows:regions[key][chr].append([max(0,lo-ref_context),min(reference_lengths[chr],hi+ref_context)])
     for key in regions:
-        regions[key]={chr:merged(rows) for chr,rows in regions[key].items()}
+        # Bridging creates a conservative SEARCH region, never aligned evidence.
+        regions[key]={chr:merged(rows,close_below=a.reference_bridge_bases+1) for chr,rows in regions[key].items()}
     region_ends={key:{chr:[e for s,e in rows] for chr,rows in by_chr.items()} for key,by_chr in regions.items()}
     target={key:defaultdict(list) for key in windows}
     for dataset in expected:
@@ -112,16 +175,20 @@ def main():
     for key,by_part in target.items():
         by_part={pid:merged(rows) for pid,rows in by_part.items()}
         total=sum(e-s for rows in by_part.values() for s,e in rows)
-        summary.append(dict(core_start=int(key),query_interval=windows[key],reference_region_bp=sum(e-s for rows in regions[key].values() for s,e in rows),
+        summary.append(dict(core_start=int(key),core_end=min(qrow["length"],int(key)+a.core_bases),query_interval=windows[key],reference_region_bp=sum(e-s for rows in regions[key].values() for s,e in rows),
             reference_chromosomes=sorted(regions[key]),target_source_count=len(by_part),target_interval_count=sum(len(rows) for rows in by_part.values()),target_bp=total,
-            target_whole_source_bp=sum(lookup[pid]["length"] for pid in by_part)))
+            target_whole_source_bp=sum(lookup[pid]["length"] for pid in by_part),**flank_counts.get(key,{})))
         plans.append(dict(query_id=qid,query_interval=windows[key],reference_regions=regions[key],target_intervals=by_part))
     for path,sha in metadata.items():
         if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=sha:raise ValueError("metadata changed")
     Path("local-target-plan.json").write_text(json.dumps(plans)+"\n")
     report=dict(status="read_only_local_target_scope",windows=summary,scans=scans,metadata_sha256=metadata,
                 seconds=time.monotonic()-started,scientific_acceptance=False,production_policy_changed=False,
-                limitations="matched-site feasibility only, not unresolved-gap fallback, not global-target sensitivity equivalence; geometry includes ambiguous MAPQ")
+                query_scope="recorded_residual_core" if residual is not None else "matched_site_control",
+                residual_file=str(a.residual_file) if a.residual_file else None,
+                policy=dict(anchor_mode=a.anchor_mode,core_bases=a.core_bases,query_context_bases=a.context_bases,anchor_context_bases=a.anchor_context_bases,
+                            reference_context_bases=ref_context,reference_bridge_bases=a.reference_bridge_bases),
+                limitations="regional feasibility only; reference bridging is SEARCH scope not coverage; no global-target sensitivity equivalence; geometry includes ambiguous MAPQ")
     Path("summary.json").write_text(json.dumps(report,indent=2)+"\n");print(json.dumps(report),flush=True)
 
 

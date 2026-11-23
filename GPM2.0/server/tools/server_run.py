@@ -38,7 +38,7 @@ SINGLE_OPTIONS = {
     "--minimap-preset", "--minimap-batch", "--minimap-filter", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-type", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
-    "--grt-execution-profile", "--grt-step2-mummer-scope",
+    "--grt-execution-profile", "--grt-step2-mummer-scope", "--q0-supplement-scope",
 }
 TYPED_READ_OPTIONS = {"--hifi", "--ont"}
 PATH_OPTIONS = {"--ref", "--ds", "--reads", "--cen"} | TYPED_READ_OPTIONS
@@ -77,7 +77,8 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
             except ValueError as exc:
                 raise RunnerError(str(exc)) from exc
         allowed = {"--reads-type": {"hifi", "ont"}, "--grt-execution-profile": {"baseline", "optimized"},
-                   "--grt-step2-mummer-scope": {"full", "gap-screen"}}
+                   "--grt-step2-mummer-scope": {"full", "gap-screen"},
+                   "--q0-supplement-scope": {"full", "decision_frontier_repair"}}
         if key in allowed and values[0] not in allowed[key]:
             raise RunnerError(f"Invalid {key}: {values[0]}")
         if key in TYPED_READ_OPTIONS:
@@ -105,7 +106,8 @@ def check_resume_options(requested: dict, saved: dict, identities: dict) -> None
     for key, value in requested.items():
         if key in {"--out", "--max-fill", *RESOURCE_OPTIONS, *REFINEMENT_OPTIONS}:
             continue
-        if value != saved.get(key):
+        prepared = saved.get(key, [["full"]] if key == "--q0-supplement-scope" else None)
+        if value != prepared:
             raise RunnerError(f"{key} differs from the prepared workspace. Use a new -o directory for changed inputs/settings.")
     for path, identity in input_identities({k: v for k, v in requested.items() if k in LGZ_PATH_OPTIONS}).items():
         if identities.get(path) != identity:

@@ -1,0 +1,68 @@
+{
+  "baseline_sha256": "899b629ca3d2d2fb2d7e768f3368bd1e94a049d345a571928c09442090ba4ffb",
+  "candidate_sha256": "4eb14711036eac1ab8ff4d9a52f1788a19aa618d78e3f077ee8a04e174f1f519",
+  "command_files": 503,
+  "job_id": 43015894,
+  "limits": [
+    "Completed legs exactly matched all frozen file identity records before logging.",
+    "The last baseline warm leg did not finish within the diagnostic wall deadline.",
+    "Paths are small native alignment command receipts, not whole pipeline verification timing.",
+    "No new native alignments executed; no change to either analysis workspace."
+  ],
+  "node": "agent-X86-61",
+  "runs": [
+    {
+      "cpu_s": 0.546040949,
+      "file_signature_calls": 2012,
+      "lane": "baseline",
+      "temperature": "cold",
+      "wall_s": 55.78135933727026
+    },
+    {
+      "cpu_s": 0.5598675999999999,
+      "file_signature_calls": 2012,
+      "lane": "baseline",
+      "temperature": "warm",
+      "wall_s": 44.48373364191502
+    },
+    {
+      "cpu_s": 0.3934057070000001,
+      "file_signature_calls": 1006,
+      "lane": "candidate",
+      "temperature": "cold",
+      "wall_s": 33.97445539198816
+    },
+    {
+      "cpu_s": 0.20878964800000022,
+      "file_signature_calls": 1006,
+      "lane": "candidate",
+      "temperature": "warm",
+      "wall_s": 12.37440762668848
+    },
+    {
+      "cpu_s": 0.40936580099999986,
+      "file_signature_calls": 1006,
+      "lane": "candidate",
+      "temperature": "cold",
+      "wall_s": 33.32700507435948
+    },
+    {
+      "cpu_s": 0.20483022900000014,
+      "file_signature_calls": 1006,
+      "lane": "candidate",
+      "temperature": "warm",
+      "wall_s": 12.737298453226686
+    },
+    {
+      "cpu_s": 0.5313791119999998,
+      "file_signature_calls": 2012,
+      "lane": "baseline",
+      "temperature": "cold",
+      "wall_s": 45.280364548787475
+    }
+  ],
+  "sample_code_sha256": "a09f4fca700b839ab7f821aac24c98cc87d338793f56d3c70d9944ff20b82049",
+  "scheduler_sha256": "5b18dba3335fdf51e6821ceac1754dcc654e0e542d6e00195fe59e4308a794a3",
+  "status": "scoped_completed_legs_not_full_abba_diagnostic_timeout",
+  "stdout_sha256": "5685d9b9ef8c1ffe8b675895624be9908fe46e9455c37f5798e5b144af26bec8"
+}

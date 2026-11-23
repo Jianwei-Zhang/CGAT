@@ -1,0 +1,56 @@
+{
+  "status": "native_matrix_parent_skip_metadata_upper_bound",
+  "complete_native_matrices": [
+    {
+      "task_id": "q0-map-8024dde83cbf20e7ffa6d8ee",
+      "query_parts": 150,
+      "target_parts": 38117,
+      "query_bases": 14974672,
+      "receipt_sha256": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e"
+    },
+    {
+      "task_id": "q0-map-2b19c2c859bdfb5f2e9177e8",
+      "query_parts": 61,
+      "target_parts": 38117,
+      "query_bases": 3953796,
+      "receipt_sha256": "ba5553ff1640cd1feff0db518b671baabed44fba84e02c7992e30a1cb76dd50a"
+    },
+    {
+      "task_id": "q0-map-a2e519761e94eff6ca09e121",
+      "query_parts": 9,
+      "target_parts": 38117,
+      "query_bases": 123348,
+      "receipt_sha256": "c36e5d98b8cbeac165865060565ed8c8953824f42baafa9c7db2e94b1ec7679f"
+    },
+    {
+      "task_id": "q0-map-b30137a13323db8a99874448",
+      "query_parts": 1418,
+      "target_parts": 52,
+      "query_bases": 21227900,
+      "receipt_sha256": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3"
+    }
+  ],
+  "reference_anchor_parts": 38117,
+  "union_native_query_parts": 1629,
+  "union_native_query_bases": 40156368,
+  "potentially_skipped_partial_window_upper_bound": 2573,
+  "actual_logged_planned_windows": 61000,
+  "live_observer_at": "2026-11-22T11:27:23.841483+08:00",
+  "latest_regional_progress": {
+    "completed": 4100,
+    "planned": 61000,
+    "fallback_sources": 0,
+    "at": "2026-11-22T11:24:01+08:00"
+  },
+  "unaccounted_planned_windows_at_latest_log_after_maximum_skips_and_completed_pending_upper_bound": 54214,
+  "windows_not_fully_covered_by_complete_native_matrices_lower_bound": 58427,
+  "metadata_only_not_full_output_validation": true,
+  "source_dna_or_paf_read": false,
+  "main_workspace_modified": false,
+  "limitations": [
+    "counts original planned windows before subtracting current completed regional tasks",
+    "includes possibly absent native-query parents/holes, so skip bound deliberately overestimates skips",
+    "future regional or whole-parent native fallback is not predicted; this is not remaining minimap2 process count",
+    "partial discovery targets contain the unchanged FIRST/weak seed reference-anchor inventory; pairwise-added targets may also exist"
+  ]
+}

@@ -112,6 +112,8 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
             self.assertEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
             self.assertEqual(resumed.stdout.count("[SKIP_VALID]"), 2)
             for name in names:
+                self.assertRegex(resumed.stdout, rf"\[SKIP_VALID\] \[chr:{name}\] elapsed=0\.000s .*"
+                                 r"checkpoint_prepare=\d+\.\d{3}s checkpoint_validate=\d+\.\d{3}s")
                 self.assertEqual((server / f"{name}.count").read_text(), "run\n")
             # A zero exit code with malformed output must cancel active peers
             # and leave neither their status nor their checkpoint as success.
@@ -348,16 +350,20 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
 
             second = self.run_runner(server, env=environment)
             self.assertEqual(second.returncode, 0, second.stderr)
-            self.assertIn("[SKIP_VALID] [ref:ds]", second.stdout)
+            self.assertRegex(second.stdout, r"\[SKIP_VALID\] \[ref:ds\] elapsed=0\.000s .*"
+                             r"checkpoint_prepare=\d+\.\d{3}s checkpoint_validate=\d+\.\d{3}s")
             self.assertEqual((server / "run-count.txt").read_text(encoding="utf-8"), "run\n")
-            self.assertEqual(read_status(server / "logs/status.tsv")[0]["attempt"], "1")
+            status = read_status(server / "logs/status.tsv")[0]
+            self.assertEqual(status["attempt"], "1")
+            self.assertEqual(status["elapsed_seconds"], "0.000")
 
             (server / "runs/ds_vs_ref/result.paf").write_text(
                 "malformed\n", encoding="utf-8"
             )
             third = self.run_runner(server, env=environment)
             self.assertEqual(third.returncode, 0, third.stderr)
-            self.assertIn("[STALE] [ref:ds]", third.stdout)
+            self.assertRegex(third.stdout, r"\[STALE\] \[ref:ds\] .*; rerunning; "
+                             r"checkpoint_prepare=\d+\.\d{3}s checkpoint_validate=\d+\.\d{3}s")
             self.assertEqual(
                 (server / "run-count.txt").read_text(encoding="utf-8"), "run\nrun\n"
             )

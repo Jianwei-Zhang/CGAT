@@ -13,6 +13,11 @@ from typing import Iterator, Mapping
 from .common import sha256_bytes, stable_id
 from .q0_sources import Interval, Q0EvidenceError
 
+try:
+    from run_orchestration import open_paf_text
+except ModuleNotFoundError:
+    from ..run_orchestration import open_paf_text
+
 _CIGAR = re.compile(r"([1-9][0-9]*)([MIDN=X])")
 
 
@@ -50,12 +55,49 @@ class PafAlignment:
 
     def aligned_blocks(self) -> Iterator[AlignmentBlock]:
         """Yield only paired-base runs; no reference-span hull or gap coverage."""
-        for length, operation, q0, q1, t0, t1 in _runs(self):
+        return _aligned_blocks(self)
+
+    def paired_query_intervals(self) -> Iterator[Interval]:
+        """Same M/= /X query intervals, without constructing unused targets.
+
+        Preserve target-traversal order on both strands. I consumes query only;
+        D/N consumes no query. Record validation already bound every CIGAR span.
+        """
+        q = 0
+        for length, operation in self.cigar:
+            end = q + (length if operation in "MI=X" else 0)
             if operation in "M=X":
-                query = (Interval(self.query.start + q0, self.query.start + q1)
-                         if self.strand == "+"
-                         else Interval(self.query.end - q1, self.query.end - q0))
-                yield AlignmentBlock(query, Interval(t0, t1), self.strand, operation)
+                yield (Interval(self.query.start+q,self.query.start+end) if self.strand == "+"
+                       else Interval(self.query.end-end,self.query.end-q))
+            q = end
+
+
+@dataclass(frozen=True, slots=True)
+class PafObservation:
+    """Validated geometry for planning only; not a referenceable evidence row."""
+
+    query_name: str
+    query_length: int
+    query: Interval
+    strand: str
+    target_name: str
+    target_length: int
+    target: Interval
+    matches: int
+    block_length: int
+    cigar: tuple[tuple[int, str], ...]
+
+    def aligned_blocks(self) -> Iterator[AlignmentBlock]:
+        return _aligned_blocks(self)
+
+
+def _aligned_blocks(hit: PafAlignment | PafObservation) -> Iterator[AlignmentBlock]:
+    for length, operation, q0, q1, t0, t1 in _runs(hit):
+        if operation in "M=X":
+            query = (Interval(hit.query.start + q0, hit.query.start + q1)
+                     if hit.strand == "+"
+                     else Interval(hit.query.end - q1, hit.query.end - q0))
+            yield AlignmentBlock(query, Interval(t0, t1), hit.strand, operation)
 
 
 @dataclass(frozen=True)
@@ -71,6 +113,10 @@ class Projection:
 
 
 def parse_paf_line(line: str, *, artifact: str, line_number: int) -> PafAlignment:
+    return _parse_paf_line(line, artifact=artifact, line_number=line_number, observation_only=False)
+
+
+def _parse_paf_line(line: str, *, artifact: str, line_number: int, observation_only: bool):
     location = f"{artifact}:{line_number}"
     raw = line.rstrip("\r\n")
     fields = raw.split("\t")
@@ -95,12 +141,21 @@ def parse_paf_line(line: str, *, artifact: str, line_number: int) -> PafAlignmen
     if len(cigar_tags) != 1:
         raise Q0EvidenceError(f"{location}: exactly one cg:Z CIGAR is required")
     text = cigar_tags[0]
-    cigar = tuple((int(length), op) for length, op in _CIGAR.findall(text))
-    if not cigar or "".join(f"{length}{op}" for length, op in cigar) != text:
+    tokens = _CIGAR.findall(text)
+    # Non-overlapping regex matches cover the original text exactly iff their
+    # total lengths equal it. No reconstruction/normalization is necessary:
+    # positive ASCII counts have no leading zeros and opcodes are unchanged.
+    if not tokens or sum(len(length) + 1 for length, _op in tokens) != len(text):
         raise Q0EvidenceError(f"{location}: malformed or unsupported PAF CIGAR")
+    cigar = tuple((int(length), operation) for length, operation in tokens)
+    del tokens
+    # Keep built-in sum over parsed integers: on the supported Python 3.10
+    # runtime its C accumulator is faster than per-operation Python += loops.
     if (sum(n for n, op in cigar if op in "MI=X") != query.length
             or sum(n for n, op in cigar if op in "MDN=X") != target.length):
         raise Q0EvidenceError(f"{location}: CIGAR span differs from PAF coordinates")
+    if observation_only:
+        return PafObservation(fields[0], qlen, query, fields[4], fields[5], tlen, target, matches, block_length, cigar)
     record_hash = sha256_bytes(raw.encode("utf-8"))
     return PafAlignment(
         stable_id("q0-paf", [artifact, line_number, record_hash]),
@@ -110,27 +165,52 @@ def parse_paf_line(line: str, *, artifact: str, line_number: int) -> PafAlignmen
 
 
 def read_paf(path: Path, *, query_lengths: Mapping[str, int],
-             target_lengths: Mapping[str, int], artifact: str | None = None) -> Iterator[PafAlignment]:
+             target_lengths: Mapping[str, int], artifact: str | None = None,
+             record_observer=None) -> Iterator[PafAlignment]:
     """Stream validated records; callers separately require task-success evidence.
 
     An empty stream alone does NOT prove a successful no-hit alignment task.
     Unknown names and length drift fail instead of silently removing evidence.
     """
+    return _read_paf(path, query_lengths, target_lengths, artifact, record_observer, observation_only=False)
+
+
+def read_paf_observations(path: Path, *, query_lengths: Mapping[str, int],
+                          target_lengths: Mapping[str, int], artifact: str | None = None) -> Iterator[PafObservation]:
+    """Strict PAF planning scan, with no per-record digests, IDs or evidence tags.
+
+    Callers still bind complete file bytes and successful task provenance.
+    Published/referenceable rows must use read_paf instead.
+    """
+    return _read_paf(path, query_lengths, target_lengths, artifact, None, observation_only=True)
+
+
+def _read_paf(path, query_lengths, target_lengths, artifact, record_observer, *, observation_only):
+    artifact = artifact if artifact is not None else path.as_posix()
     try:
-        with path.open(encoding="utf-8") as handle:
+        # Keep original newline bytes while retaining universal line iteration.
+        # Thus UTF-8, CRLF and CR-only files have real byte offsets, while
+        # record identities still use the existing normalized parse_paf_line.
+        with open_paf_text(path, newline="") as handle:
+            offset = 0
             for number, line in enumerate(handle, 1):
+                if record_observer is not None:
+                    size = len(line.encode("utf-8"))
+                    start, offset = offset, offset + size
                 if not line.strip() or line.startswith("#"):
                     continue
-                hit = parse_paf_line(line, artifact=artifact if artifact is not None else path.as_posix(), line_number=number)
+                hit = _parse_paf_line(line, artifact=artifact, line_number=number, observation_only=observation_only)
                 if (query_lengths.get(hit.query_name) != hit.query_length
                         or target_lengths.get(hit.target_name) != hit.target_length):
                     raise Q0EvidenceError(f"{path}:{number}: PAF names/lengths differ from inputs")
+                if record_observer is not None:
+                    record_observer(hit, start, size)
                 yield hit
     except (OSError, UnicodeError) as exc:
         raise Q0EvidenceError(f"cannot read q0 alignment evidence {path}: {exc}") from exc
 
 
-def _runs(hit: PafAlignment) -> Iterator[tuple[int, str, int, int, int, int]]:
+def _runs(hit: PafAlignment | PafObservation) -> Iterator[tuple[int, str, int, int, int, int]]:
     # q is relative to the query interval in target-forward traversal order.
     q, t = 0, hit.target.start
     for length, operation in hit.cigar:

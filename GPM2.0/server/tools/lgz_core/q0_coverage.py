@@ -29,6 +29,30 @@ class Equivalence:
             raise Q0EvidenceError("homology equivalence requires equal paired-base spans")
 
 
+class _IncidentRelations:
+    """Closed boundary queries over immutable paired half-open base spans."""
+
+    def __init__(self, relations):
+        self.rows = sorted(relations, key=lambda row: row[0].start)
+        self.starts, self.prefix_ends = [], []
+        farthest = 0
+        for interval, *_ in self.rows:
+            farthest = max(farthest, interval.end)
+            self.starts.append(interval.start)
+            self.prefix_ends.append(farthest)
+
+    def at(self, point):
+        # End coordinates are valid cuts, despite the underlying base spans
+        # being half-open. In particular, visit both adjacent relations here.
+        first = bisect_left(self.prefix_ends, point)
+        stop = bisect_right(self.starts, point, lo=first)
+        for i in range(first, stop):
+            interval, other, dest, reverse = self.rows[i]
+            if point <= interval.end:
+                yield other, (dest.end - (point - interval.start) if reverse
+                              else dest.start + point - interval.start)
+
+
 class CoverageModel:
     def __init__(self, required: Mapping[SourceKey, Iterable[Interval]], relations: Iterable[Equivalence],
                  *, maximum_boundaries: int = 200000):
@@ -49,12 +73,13 @@ class CoverageModel:
         count = len(queue)
         if count > maximum_boundaries:
             raise Q0EvidenceError("q0 coordinate-equivalence boundary limit exceeded")
+        indexes = {source: _IncidentRelations(rows) for source, rows in incident.items()}
         while queue:
             source, point = queue.popleft()
-            for interval, other, dest, reverse in incident[source]:
-                if not interval.start <= point <= interval.end:
-                    continue
-                mapped = dest.end - (point - interval.start) if reverse else dest.start + point - interval.start
+            index = indexes.get(source)
+            if index is None:
+                continue
+            for other, mapped in index.at(point):
                 if mapped not in points[other]:
                     count += 1
                     if count > maximum_boundaries:
@@ -62,8 +87,10 @@ class CoverageModel:
                     points[other].add(mapped)
                     queue.append((other, mapped))
         self.atoms, self.by_source = [], defaultdict(list)
+        self._atom_starts, self._atom_ends = defaultdict(list), defaultdict(list)
+        self._sources = tuple(sorted(points))
         lookup = {}
-        for source in sorted(points):
+        for source in self._sources:
             ordered = sorted(points[source])
             for required_interval in self.required[source]:
                 start = bisect_left(ordered, required_interval.start)
@@ -74,6 +101,8 @@ class CoverageModel:
                     lookup[atom] = index
                     self.atoms.append(atom)
                     self.by_source[source].append(index)
+                    self._atom_starts[source].append(a)
+                    self._atom_ends[source].append(b)
         parent = list(range(len(self.atoms)))
         parity = [False] * len(parent)
         sizes = [1] * len(parent)
@@ -100,10 +129,10 @@ class CoverageModel:
 
         relation_atoms = []
         for relation in relations:
-            for index in self.by_source[relation.left_source]:
+            for index in self._overlapping_atoms(relation.left_source, relation.left):
+                # Relation endpoints were installed as cuts before building
+                # the atoms, so every overlapping atom is wholly contained.
                 interval = self.atoms[index][1]
-                if not relation.left.contains(interval):
-                    continue
                 other = (Interval(relation.right.end - (interval.end - relation.left.start),
                                   relation.right.end - (interval.start - relation.left.start)) if relation.reverse else
                          Interval(relation.right.start + interval.start - relation.left.start,
@@ -126,6 +155,13 @@ class CoverageModel:
         self.boundary_count = count
         self.total_bp = sum(self.unit_lengths.values())
 
+    def _overlapping_atoms(self, source, interval):
+        first = bisect_right(self._atom_ends.get(source, ()), interval.start)
+        stop = bisect_left(self._atom_starts.get(source, ()), interval.end, lo=first)
+        indices = self.by_source.get(source, ())
+        for i in range(first, stop):
+            yield indices[i]
+
     def assess(self, selected: Iterable[tuple[SourceKey, Interval]]):
         if self.ambiguous_evidence_ids:
             raise Q0EvidenceError("ambiguous homology must be removed before q0 path scoring")
@@ -134,23 +170,28 @@ class CoverageModel:
         for source, interval in selected:
             if source not in self.required or not any(i.contains(interval) for i in self.required[source]):
                 raise Q0EvidenceError("selected interval escapes q0 coverage requirements")
-            for index in self.by_source[source]:
+            for index in self._overlapping_atoms(source, interval):
                 atom = self.atoms[index][1]
                 overlap = atom.intersection(interval)
-                if overlap is None:
-                    continue
                 root, flip = self.units[index]
                 local = (Interval(atom.end - overlap.end, atom.end - overlap.start) if flip else
                          Interval(overlap.start - atom.start, overlap.end - atom.start))
                 duplicate |= any(local.intersection(previous) is not None for previous in covered[root])
                 covered[root].append(local)
-        covered = {key: merged_intervals(value) for key, value in covered.items()}
+        covered = {key: value if len(value) == 1 else merged_intervals(value)
+                   for key, value in covered.items()}
         represented = sum(i.length for intervals in covered.values() for i in intervals)
         missing = defaultdict(list)
         for index, (source, atom) in enumerate(self.atoms):
             root, flip = self.units[index]
-            for local in subtract_intervals(Interval(0, atom.length), covered.get(root, ())):
+            local_spans = covered.get(root)
+            if local_spans is None:
+                missing[source].append(atom)
+                continue
+            if len(local_spans) == 1 and local_spans[0].length == atom.length:
+                continue
+            for local in subtract_intervals(Interval(0, atom.length), local_spans):
                 original = (Interval(atom.end - local.end, atom.end - local.start) if flip else
                             Interval(atom.start + local.start, atom.start + local.end))
                 missing[source].append(original)
-        return represented, duplicate, tuple((source, merged_intervals(missing[source])) for source in sorted(self.required))
+        return represented, duplicate, tuple((source, merged_intervals(missing[source])) for source in self._sources)

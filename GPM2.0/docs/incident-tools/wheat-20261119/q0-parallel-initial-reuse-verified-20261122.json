@@ -1,0 +1,90 @@
+{
+  "status": "all_25_initial_units_reused_actual_new_q0_reader_running",
+  "at": "2026-11-22T06:58:25.872690+08:00",
+  "new_job": 43010335,
+  "protected_baseline": 42523432,
+  "run_id": "20261121T222113Z-1973018-f3b56813",
+  "transition": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/transition.json",
+    "sha256": "47d3bd36960518a6dcc1c5c8b98bf1b5fd61f6a076a42a3109d1d44e128acc01"
+  },
+  "actual_initial_reused_units": [
+    "ref:JM19_hifiasm",
+    "ref:JM19_flye_ABD",
+    "assign",
+    "q0_chr:1A",
+    "q0_chr:1B",
+    "q0_chr:1D",
+    "q0_chr:2A",
+    "q0_chr:2B",
+    "q0_chr:2D",
+    "q0_chr:3A",
+    "q0_chr:3B",
+    "q0_chr:3D",
+    "q0_chr:4A",
+    "q0_chr:4B",
+    "q0_chr:4D",
+    "q0_chr:5A",
+    "q0_chr:5B",
+    "q0_chr:5D",
+    "q0_chr:6A",
+    "q0_chr:6B",
+    "q0_chr:6D",
+    "q0_chr:7A",
+    "q0_chr:7B",
+    "q0_chr:7D",
+    "q0_chr:Un"
+  ],
+  "actual_skip_valid_events": [
+    "2026-11-22T06:25:56+08:00 [run=20261121T222113Z-1973018-f3b56813] [1/55] [SKIP_VALID] [ref:JM19_hifiasm] elapsed=0.000s checkpoint=.run_all/checkpoints/ref-JM19-hifiasm.bfcc1a4b55a45f4d.json checkpoint and outputs are valid",
+    "2026-11-22T06:27:36+08:00 [run=20261121T222113Z-1973018-f3b56813] [2/55] [SKIP_VALID] [ref:JM19_flye_ABD] elapsed=0.000s checkpoint=.run_all/checkpoints/ref-JM19-flye-ABD.23d185e5f3c90d9b.json checkpoint and outputs are valid",
+    "2026-11-22T06:29:55+08:00 [run=20261121T222113Z-1973018-f3b56813] [3/55] [SKIP_VALID] [assign] elapsed=0.000s checkpoint=.run_all/checkpoints/assign.80a737d469c64759.json checkpoint and outputs are valid",
+    "2026-11-22T06:30:29+08:00 [run=20261121T222113Z-1973018-f3b56813] [4/55] [SKIP_VALID] [q0_chr:1A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-1A.cba37307325f9f05.json checkpoint and outputs are valid",
+    "2026-11-22T06:31:56+08:00 [run=20261121T222113Z-1973018-f3b56813] [5/55] [SKIP_VALID] [q0_chr:1B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-1B.da8e6312e3f7f4c2.json checkpoint and outputs are valid",
+    "2026-11-22T06:32:53+08:00 [run=20261121T222113Z-1973018-f3b56813] [6/55] [SKIP_VALID] [q0_chr:1D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-1D.7cbbaad018c83abf.json checkpoint and outputs are valid",
+    "2026-11-22T06:33:48+08:00 [run=20261121T222113Z-1973018-f3b56813] [7/55] [SKIP_VALID] [q0_chr:2A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-2A.e7dca28a153347fe.json checkpoint and outputs are valid",
+    "2026-11-22T06:35:05+08:00 [run=20261121T222113Z-1973018-f3b56813] [8/55] [SKIP_VALID] [q0_chr:2B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-2B.80dbf24626c48ce4.json checkpoint and outputs are valid",
+    "2026-11-22T06:36:20+08:00 [run=20261121T222113Z-1973018-f3b56813] [9/55] [SKIP_VALID] [q0_chr:2D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-2D.e7f99abb647ca684.json checkpoint and outputs are valid",
+    "2026-11-22T06:37:10+08:00 [run=20261121T222113Z-1973018-f3b56813] [10/55] [SKIP_VALID] [q0_chr:3A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-3A.47683ff5693d75d3.json checkpoint and outputs are valid",
+    "2026-11-22T06:38:30+08:00 [run=20261121T222113Z-1973018-f3b56813] [11/55] [SKIP_VALID] [q0_chr:3B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-3B.15c0f022c218907f.json checkpoint and outputs are valid",
+    "2026-11-22T06:39:45+08:00 [run=20261121T222113Z-1973018-f3b56813] [12/55] [SKIP_VALID] [q0_chr:3D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-3D.3ad34da4c13c3561.json checkpoint and outputs are valid",
+    "2026-11-22T06:40:30+08:00 [run=20261121T222113Z-1973018-f3b56813] [13/55] [SKIP_VALID] [q0_chr:4A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-4A.a105f378eb230856.json checkpoint and outputs are valid",
+    "2026-11-22T06:41:43+08:00 [run=20261121T222113Z-1973018-f3b56813] [14/55] [SKIP_VALID] [q0_chr:4B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-4B.2d8e62cc786cdf72.json checkpoint and outputs are valid",
+    "2026-11-22T06:42:33+08:00 [run=20261121T222113Z-1973018-f3b56813] [15/55] [SKIP_VALID] [q0_chr:4D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-4D.903a31e1bffe4c04.json checkpoint and outputs are valid",
+    "2026-11-22T06:43:22+08:00 [run=20261121T222113Z-1973018-f3b56813] [16/55] [SKIP_VALID] [q0_chr:5A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-5A.016318070415a97f.json checkpoint and outputs are valid",
+    "2026-11-22T06:44:46+08:00 [run=20261121T222113Z-1973018-f3b56813] [17/55] [SKIP_VALID] [q0_chr:5B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-5B.1b117c49e0f80be3.json checkpoint and outputs are valid",
+    "2026-11-22T06:45:52+08:00 [run=20261121T222113Z-1973018-f3b56813] [18/55] [SKIP_VALID] [q0_chr:5D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-5D.d05cd73c5926e719.json checkpoint and outputs are valid",
+    "2026-11-22T06:46:28+08:00 [run=20261121T222113Z-1973018-f3b56813] [19/55] [SKIP_VALID] [q0_chr:6A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-6A.a467c50ec8c919bf.json checkpoint and outputs are valid",
+    "2026-11-22T06:47:57+08:00 [run=20261121T222113Z-1973018-f3b56813] [20/55] [SKIP_VALID] [q0_chr:6B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-6B.77dfbb4d5f2ebe20.json checkpoint and outputs are valid",
+    "2026-11-22T06:48:53+08:00 [run=20261121T222113Z-1973018-f3b56813] [21/55] [SKIP_VALID] [q0_chr:6D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-6D.48f374a5795588d4.json checkpoint and outputs are valid",
+    "2026-11-22T06:49:39+08:00 [run=20261121T222113Z-1973018-f3b56813] [22/55] [SKIP_VALID] [q0_chr:7A] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-7A.1beff895e3c9975d.json checkpoint and outputs are valid",
+    "2026-11-22T06:51:30+08:00 [run=20261121T222113Z-1973018-f3b56813] [23/55] [SKIP_VALID] [q0_chr:7B] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-7B.09f3acac6aa65d98.json checkpoint and outputs are valid",
+    "2026-11-22T06:52:56+08:00 [run=20261121T222113Z-1973018-f3b56813] [24/55] [SKIP_VALID] [q0_chr:7D] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-7D.c660892d3022388a.json checkpoint and outputs are valid",
+    "2026-11-22T06:53:30+08:00 [run=20261121T222113Z-1973018-f3b56813] [25/55] [SKIP_VALID] [q0_chr:Un] elapsed=0.000s checkpoint=.run_all/checkpoints/q0-chr-Un.32e221ccfce4b25c.json checkpoint and outputs are valid"
+  ],
+  "actual_initial_mapping_starts": [],
+  "q0_start_event": "2026-11-22T06:53:33+08:00 [run=20261121T222113Z-1973018-f3b56813] [26/55] [START] [q0_evidence] attempt=3 command=prepare_q0_evidence.sh",
+  "preflight": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/validation.json",
+    "sha256": "f3e96ee771316f8e044dc7980f951b165847098acbfd75ccc65b980c8d586075"
+  },
+  "actual_reader_probe": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-live-phase-20261122-0655/summary.json",
+    "sha256": "6f520ded82150aa75b9d6055454dc7ead613018c7dd4b08f8f38b16bff1ed7f7"
+  },
+  "actual_reader_pid": 1990559,
+  "actual_reader_start_ticks": 404157417,
+  "allocation_proof_inherited_and_bound_to_current_job": true,
+  "actual_regional_pool_observed": false,
+  "full_wheat_completed": false,
+  "main_scheduler": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/initial-reuse-main-scheduler.json",
+    "sha256": "41c2d1053f926cbfeda9fdf36a2504cde17831b06d12e215b0819dc36f207640"
+  },
+  "baseline_scheduler": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/initial-reuse-baseline-scheduler.json",
+    "sha256": "9c4605a4cdcf7528df7bf202648f5087a961a14b961a0b6ce82a42ca7187cb7c"
+  },
+  "reader_phase_at_last_probe": "_initial_inputs reading reference FASTA; prior sample verified native output SHA",
+  "no_main_restart_or_runtime_change_this_observation": true
+}

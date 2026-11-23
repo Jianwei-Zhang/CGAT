@@ -1,0 +1,84 @@
+{
+  "schema": "controlled_paf_validator_benchmark_v1",
+  "python": "3.10.12 (main, Jun  3 2026, 19:42:06) [GCC 8.5.0 20210514 (Red Hat 8.5.0-10)]",
+  "platform": "Linux-4.18.0-372.9.1.el8.x86_64-x86_64-with-glibc2.28",
+  "previous_revision": "0863ec3cd8542db99b807d6f6b622a8ace9086d2",
+  "sources": {
+    "native": {
+      "path": "GPM2.0/server/tools/run_orchestration.py",
+      "old_sha256": "0def1281af6c35bf03b0a6457745a74c924ba23dacbb4eb60a8dae1566008296",
+      "new_sha256": "2e4ea9c7e9cc5084f081fd2f35bad193a3426b5b427da6ff3d705080503917e9"
+    },
+    "q0": {
+      "path": "GPM2.0/server/tools/lgz_core/q0_alignments.py",
+      "old_sha256": "c60f6bb7a5855aa6a79eb65a7f41f1227a83a7d1f52bff6e2fca613686f53c4f",
+      "new_sha256": "02c8ba1eec157d3f05b92274d41f6b678d954a18455e038f73bee55d034ad5bb"
+    }
+  },
+  "cases": [
+    {
+      "kind": "native",
+      "case": "ordinary",
+      "cigar_operations": 21,
+      "paf_records": 6000,
+      "input_bytes": 936000,
+      "median_seconds": {
+        "previous": 0.10576589219272137,
+        "candidate": 0.08589560259133577
+      },
+      "speedup": 1.2313306968218405,
+      "full_result_equal": true
+    },
+    {
+      "kind": "q0",
+      "case": "ordinary",
+      "cigar_operations": 21,
+      "paf_records": 6000,
+      "input_bytes": 936000,
+      "median_seconds": {
+        "previous": 0.19755072053521872,
+        "candidate": 0.18222599755972624
+      },
+      "speedup": 1.084097347144277,
+      "full_result_equal": true
+    },
+    {
+      "kind": "native",
+      "case": "long_cigar",
+      "cigar_operations": 72001,
+      "paf_records": 25,
+      "input_bytes": 8799350,
+      "median_seconds": {
+        "previous": 1.0110134035348892,
+        "candidate": 0.866587839089334
+      },
+      "speedup": 1.1666600405993774,
+      "full_result_equal": true,
+      "python_allocation_peak_bytes": {
+        "previous": 18361885,
+        "candidate": 9892421
+      }
+    },
+    {
+      "kind": "q0",
+      "case": "long_cigar",
+      "cigar_operations": 72001,
+      "paf_records": 25,
+      "input_bytes": 8799350,
+      "median_seconds": {
+        "previous": 1.3552325395867229,
+        "candidate": 1.2001593839377165
+      },
+      "speedup": 1.1292104679798547,
+      "full_result_equal": true,
+      "python_allocation_peak_bytes": {
+        "previous": 22690294,
+        "candidate": 22689230
+      }
+    }
+  ],
+  "synthetic_only": true,
+  "customer_data_used": false,
+  "remote_runtime_modified": false,
+  "whole_wheat_speedup_proven": false
+}

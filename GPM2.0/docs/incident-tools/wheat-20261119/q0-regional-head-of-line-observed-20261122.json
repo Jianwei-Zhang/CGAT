@@ -1,0 +1,110 @@
+{
+  "status": "planner_head_of_line_wait_and_all_fourteen_mapper_threads_idle_observed",
+  "diagnostic_job": 43010357,
+  "main_job": 43010335,
+  "reader_pid": 1990559,
+  "reader_start_ticks": 404157417,
+  "node": "agent-X86-53",
+  "sample_at": "2026-11-22T09:47:16.493574+08:00",
+  "main_thread_frames": [
+    {
+      "function": "wait",
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/threading.py",
+      "line": 320
+    },
+    {
+      "function": "result",
+      "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/concurrent/futures/_base.py",
+      "line": 453
+    },
+    {
+      "function": "ordered",
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/.prepare_lib/tools/lgz_core/q0_regional_execution.py",
+      "line": 305
+    },
+    {
+      "function": "prepare_partial",
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/.prepare_lib/tools/lgz_core/q0_regional_discovery.py",
+      "line": 186
+    },
+    {
+      "function": "prepare_evidence",
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server/.prepare_lib/tools/lgz_core/q0_preparation.py",
+      "line": 551
+    },
+    {
+      "function": "prepare_with_reader",
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/routing-q0-reader-20261119/routing_q0_evidence_reader.py",
+      "line": 66
+    },
+    {
+      "function": "prepare",
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/read_q0_science.py",
+      "line": 57
+    },
+    {
+      "function": "main",
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/read_q0_science.py",
+      "line": 83
+    },
+    {
+      "function": "<module>",
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/read_q0_science.py",
+      "line": 86
+    }
+  ],
+  "idle_mapper_threads": [
+    "q0-region_13",
+    "q0-region_12",
+    "q0-region_11",
+    "q0-region_10",
+    "q0-region_9",
+    "q0-region_8",
+    "q0-region_7",
+    "q0-region_6",
+    "q0-region_5",
+    "q0-region_4",
+    "q0-region_3",
+    "q0-region_2",
+    "q0-region_1",
+    "q0-region_0"
+  ],
+  "thread_worker_wait": {
+    "file": "/share/software/app/x86/python/3.10.12/lib/python3.10/concurrent/futures/thread.py",
+    "line": 81,
+    "source": "work_item = work_queue.get(block=True)"
+  },
+  "reader_status": {
+    "VmHWM": "86283896 kB",
+    "VmRSS": "86283896 kB",
+    "VmSwap": "0 kB",
+    "Threads": "17"
+  },
+  "resource_proof": {
+    "_GPM_Q0_SCHEDULER_PROOF": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-parallel-cutover-20261122-054517/new-scheduler-allocation.json",
+    "_GPM_Q0_SCHEDULER_SHA256": "ba501c27cf71025649f496600f08303a1cac13fce55817cf3ed39e34514e0c36"
+  },
+  "artifact_sha256": {
+    "sample.py": "f49c94c17cb677cd33c9c40a797333669bf32c61b4b01b68d0160d586b35ec18",
+    "sample.dsub": "bcfb3146799924c3b6e222f656832e1cf90f404e5258a85771090bcb4d7949c4",
+    "code.sha256": "e89df9a605cd84a5f04741efc44c3a410518991cbe78ab9e490f0731ab2ac960",
+    "samples.jsonl": "0efbdaf26c4af55167058aef4fa6fa529d4ecbd21e3483253e89fec397e3b528",
+    "stack-00.json": "645edb7db8e5b055cb292b02b365234ebf7c82213963e3a9f73f33a8c2f2d5c7",
+    "stack-01.json": "17f07fe197464b9d0a7bd2c74ca00174e8abd414e86c93b8679d82ffdb6fca0a",
+    "stack-00.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stack-01.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "proves": [
+    "actual planner FIFO wait",
+    "all fourteen mapper worker queues idle at this sample"
+  ],
+  "does_not_prove": [
+    "continuous duration of this idle gap",
+    "whole-run speedup or ETA",
+    "benefit of increasing worker count"
+  ],
+  "main_runtime_revision": "ec093edfed52f9a1197baf118cd00cef4bdb6b03",
+  "runtime_modified": false,
+  "main_workspace_modified": false,
+  "main_resubmitted": false
+}

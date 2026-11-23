@@ -1,0 +1,14 @@
+{
+  "code_manifest_sha256": "f99a449c70142ea5af601e6d83cae45c92e780e727c1a2c3e2a8b8be5424910c",
+  "end_utc": "2026-11-22T08:21:45Z",
+  "final_job_sha256": "dea3afe74aa7b8bcaaca3ec1f667d4585315638f4579b9f6f3e5dc4e82d96572",
+  "jid": "43013109",
+  "memory_max_mib": 82,
+  "node": "agent-X86-18",
+  "remote_dir": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-regional-reciprocal-matched-20261122-161842",
+  "shared_replay_source_sha256": "4a8f7859519c9db159d146c514034353442829860171c0073f41d8a7e7cf303b",
+  "state": "SUCCEEDED",
+  "summary_sha256": "a71090c05195f7017b121533a79934b135cd21c0309ec927720dd26139a9555c",
+  "test_source_sha256": "61ebde6cd2ae1b35cf1ca13f30ceea35171ccdcfd8893494e7568a1f393b75e6",
+  "tool_source_sha256": "9967287ba8fcb7e65cf6d6ade1dafc43dd42f3a5976b3a7083f6ef60f3b9983f"
+}
