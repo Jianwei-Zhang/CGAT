@@ -17,6 +17,7 @@ import {
 import { describeFinalPathRefinement } from "./assembly/final-path-presentation.js";
 import {
   isFinalPathCtgSegment,
+  isFinalPathGapSegment,
   normalizeFinalPathByChr,
   resolveFinalPathSegmentDisplayName,
 } from "./assembly/final-path-state.js";
@@ -393,12 +394,24 @@ export function buildProjectRefinementModel(state) {
   const manualAppliedSegments = [];
   const autoChrSet = new Set();
   const autoGapSet = new Set();
+  const baselineOriginalGapKeys = new Set();
 
   const inspectMap = (map, sourceOrigin) => {
     Object.entries(map || {}).forEach(([chrKey, entry]) => {
       const chrName = normalizeString(entry?.chrName || chrKey);
       const segments = Array.isArray(entry?.segments) ? entry.segments : [];
-      segments.forEach((segment) => {
+      segments.forEach((segment, segIndex) => {
+        if (sourceOrigin === "baseline" && isFinalPathGapSegment(segment)) {
+          const gapIds = Array.isArray(segment?.refinement?.originalGapIds)
+            ? segment.refinement.originalGapIds.map(normalizeString).filter(Boolean)
+            : [];
+          if (gapIds.length) {
+            gapIds.forEach((id) => baselineOriginalGapKeys.add(`${chrName}:${id}`));
+          } else {
+            baselineOriginalGapKeys.add(`${chrName}:gap:${normalizeString(segment?.segmentId) || segIndex}`);
+          }
+          return;
+        }
         if (!isFinalPathCtgSegment(segment)) {
           return;
         }
@@ -422,14 +435,26 @@ export function buildProjectRefinementModel(state) {
         } else if (sourceOrigin === "baseline") {
           autoSegments.push(item);
           if (chrName) autoChrSet.add(chrName);
-          info.originalGapIds.forEach((id) => autoGapSet.add(`${chrName}:${id}`));
+          if (info.originalGapIds.length) {
+            info.originalGapIds.forEach((id) => {
+              autoGapSet.add(`${chrName}:${id}`);
+              baselineOriginalGapKeys.add(`${chrName}:${id}`);
+            });
+          } else {
+            baselineOriginalGapKeys.add(`${chrName}:edit:${item.segmentId || segIndex}`);
+          }
         }
       });
     });
   };
 
-  inspectMap(baselineByChr, "baseline");
-  inspectMap(currentByChr, "current");
+  const hasBaseline = Object.keys(baselineByChr || {}).length > 0;
+  if (hasBaseline) {
+    inspectMap(baselineByChr, "baseline");
+    inspectMap(currentByChr, "current");
+  } else {
+    inspectMap(currentByChr, "baseline");
+  }
 
   const refinementSourceCards = (Array.isArray(grtView?.sourceCards) ? grtView.sourceCards : [])
     .filter((card) => normalizeString(card?.placementMode).toLowerCase() === "refinement");
@@ -490,6 +515,8 @@ export function buildProjectRefinementModel(state) {
       schemaVersion,
       effects,
       chromosomeCount: autoChrSet.size,
+      chromosomes: [...autoChrSet],
+      baselineTotalGapCount: baselineOriginalGapKeys.size,
       acceptedSegmentCount: autoSegments.length,
       affectedGapCount: autoGapSet.size,
       sourceCardCount: refinementSourceCards.length,
@@ -887,16 +914,45 @@ function renderImportedLocusRow(batch, locus, copy, busy) {
   </li>`;
 }
 
+const MAX_INLINE_REFINEMENT_CHRS = 4;
+
+function sortChromosomesNaturally(chromosomes) {
+  const unique = [...new Set((Array.isArray(chromosomes) ? chromosomes : []).map(normalizeString).filter(Boolean))];
+  return unique.sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function renderChromosomesCell(chromosomes) {
+  const sorted = sortChromosomesNaturally(chromosomes);
+  if (!sorted.length) {
+    return `<span class="muted">—</span>`;
+  }
+  const fullText = sorted.join(", ");
+  if (sorted.length <= MAX_INLINE_REFINEMENT_CHRS) {
+    return `<span class="project-refinement-chr-list">${escapeHtml(fullText)}</span>`;
+  }
+  const compactText = `${sorted[0]}, ${sorted[1]}, ..., ${sorted[sorted.length - 1]}`;
+  return `<span class="project-refinement-chr-list is-truncated" data-app-tooltip="${escapeAttr(fullText)}">${escapeHtml(compactText)}</span>`;
+}
+
 function buildRefinementOverviewGroups({ auto, manual }, copy) {
   const groups = [];
   const autoChrByTool = new Map();
+  const autoFilledGapKeysByTool = new Map();
   const autoSegCountByTool = new Map();
   for (const segment of auto.segments) {
     const toolKey = normalizeString(segment.tool).toLowerCase() || "unknown";
     if (!autoChrByTool.has(toolKey)) autoChrByTool.set(toolKey, new Set());
     if (segment.chrName) autoChrByTool.get(toolKey).add(segment.chrName);
-    autoSegCountByTool.set(toolKey, (autoSegCountByTool.get(toolKey) || 0) + 1);
+    if (!autoFilledGapKeysByTool.has(toolKey)) autoFilledGapKeysByTool.set(toolKey, new Set());
+    const segIdx = autoSegCountByTool.get(toolKey) || 0;
+    if (Array.isArray(segment.originalGapIds) && segment.originalGapIds.length) {
+      segment.originalGapIds.forEach((id) => autoFilledGapKeysByTool.get(toolKey).add(`${segment.chrName}:${id}`));
+    } else {
+      autoFilledGapKeysByTool.get(toolKey).add(`${segment.chrName}:seg:${segment.segmentId || segIdx}`);
+    }
+    autoSegCountByTool.set(toolKey, segIdx + 1);
   }
+  const baselineTotalGaps = Math.max(0, Number(auto.baselineTotalGapCount || 0));
 
   const autoRows = [];
   const reportedTools = new Set();
@@ -909,25 +965,34 @@ function buildRefinementOverviewGroups({ auto, manual }, copy) {
       .every((v) => normalizeNonNegativeIntOrNull(v) !== null)
       ? Number(effect.closed) + Number(effect.partial) + Number(effect.unfilled) + Number(effect.rejected)
       : null;
-    const total = explicitTotal ?? summedTotal;
+    const total = explicitTotal ?? summedTotal ?? (baselineTotalGaps > 0 ? Math.max(baselineTotalGaps, filled ?? 0) : null);
     const chrSet = autoChrByTool.get(toolKey);
-    const explicitChrCount = normalizeNonNegativeIntOrNull(effect.chromosome_count ?? effect.chromosomeCount);
-    const chrCount = explicitChrCount
-      ?? (chrSet && chrSet.size > 0 ? chrSet.size : (auto.effects.length === 1 && auto.chromosomeCount > 0 ? auto.chromosomeCount : (filled === 0 ? 0 : null)));
+    const effectChrs = Array.isArray(effect.chromosomes)
+      ? effect.chromosomes.map(normalizeString).filter(Boolean)
+      : [];
+    const chromosomes = effectChrs.length
+      ? effectChrs
+      : (chrSet && chrSet.size > 0
+        ? [...chrSet]
+        : (auto.effects.length === 1 && Array.isArray(auto.chromosomes) && auto.chromosomes.length
+          ? auto.chromosomes
+          : []));
     autoRows.push({
       tool: formatToolLabel(effect.tool) || "—",
       filled,
       total,
-      chrCount,
+      chromosomes,
     });
   }
   for (const [toolKey, count] of autoSegCountByTool.entries()) {
     if (reportedTools.has(toolKey)) continue;
+    const filled = autoFilledGapKeysByTool.get(toolKey)?.size || count;
+    const total = baselineTotalGaps > 0 ? Math.max(baselineTotalGaps, filled) : null;
     autoRows.push({
       tool: toolKey === "unknown" ? "—" : formatToolLabel(toolKey),
-      filled: count,
-      total: null,
-      chrCount: autoChrByTool.get(toolKey)?.size ?? null,
+      filled,
+      total,
+      chromosomes: [...(autoChrByTool.get(toolKey) || [])],
     });
   }
   if (autoRows.length) {
@@ -977,9 +1042,9 @@ function buildRefinementOverviewGroups({ auto, manual }, copy) {
         tool: formatToolLabel(toolKey) || "—",
         filled: batch.isLegacyOnly ? null : stat.filled,
         total: stat.total,
-        chrCount: batch.isLegacyOnly
-          ? stat.allChrs.size
-          : (stat.filled > 0 ? stat.filledChrs.size : 0),
+        chromosomes: batch.isLegacyOnly
+          ? [...stat.allChrs]
+          : (stat.filled > 0 ? [...stat.filledChrs] : []),
       });
     }
     if (!manualRows.length) {
@@ -987,7 +1052,7 @@ function buildRefinementOverviewGroups({ auto, manual }, copy) {
         tool: "—",
         filled: batch.applied,
         total: batch.loci.length || batch.applied,
-        chrCount: batch.changedChromosomes.length,
+        chromosomes: [...batch.changedChromosomes],
       });
     }
     groups.push({
@@ -1021,7 +1086,7 @@ function buildRefinementOverviewGroups({ auto, manual }, copy) {
         tool: formatToolLabel(toolKey) || "—",
         filled: null,
         total: stat.total,
-        chrCount: stat.chrs.size,
+        chromosomes: [...stat.chrs],
       });
     }
     if (!pendingRows.length) {
@@ -1029,7 +1094,7 @@ function buildRefinementOverviewGroups({ auto, manual }, copy) {
         tool: "—",
         filled: null,
         total: batch.lociCount || null,
-        chrCount: null,
+        chromosomes: [],
       });
     }
     groups.push({
@@ -1128,7 +1193,7 @@ export function renderProjectRefinementCard(state) {
       ${idx === 0 ? groupHeaderCell : ""}
       <th scope="row" class="project-refinement-tool-cell">${escapeHtml(row.tool)}</th>
       <td class="project-refinement-ratio-cell numeric">${renderRatioCell(row)}</td>
-      <td class="project-refinement-chr-cell numeric">${escapeHtml(row.chrCount !== null && row.chrCount !== undefined ? String(row.chrCount) : "—")}</td>
+      <td class="project-refinement-chr-cell">${renderChromosomesCell(row.chromosomes)}</td>
       ${idx === 0 ? actionCell : ""}
     </tr>`).join("");
 

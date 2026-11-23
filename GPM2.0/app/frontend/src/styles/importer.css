@@ -1012,12 +1012,16 @@
   background: var(--focus-ring, #4f82b5);
 }
 .project-refinement-chr-cell {
-  text-align: right;
+  text-align: left;
   color: var(--text-primary, #1e293b);
   white-space: nowrap;
 }
-.project-refinement-table thead th:nth-child(4) {
-  text-align: right;
+.project-refinement-chr-list {
+  display: inline-block;
+  white-space: nowrap;
+}
+.project-refinement-chr-list.is-truncated {
+  cursor: default;
 }
 .project-refinement-action-cell {
   text-align: right;

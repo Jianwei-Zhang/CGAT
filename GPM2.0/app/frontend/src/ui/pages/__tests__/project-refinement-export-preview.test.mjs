@@ -347,11 +347,47 @@ test("one refinement table compares both automatic tools alongside a manual batc
   assert.equal(table.length, 1);
   assert.match(table[0], /自动精修[\s\S]*?DEGAP<\/th>[\s\S]*?1 \/ 4/);
   assert.match(table[0], /quarTeT<\/th>[\s\S]*?2 \/ 4/);
-  assert.match(table[0], /手动精修[\s\S]*?#bbbbbb[\s\S]*?1 \/ 1[\s\S]*?>1<\/td>/);
+  assert.match(table[0], /手动精修[\s\S]*?#bbbbbb[\s\S]*?1 \/ 1[\s\S]*?<span class="project-refinement-chr-list">Chr01<\/span>/);
+  assert.doesNotMatch(table[0], /data-app-tooltip="Chr01"/);
   assert.doesNotMatch(html, /部分填补|未填补|拒绝/);
   assert.match(html, /<h3 id="project-refinement-title">精修<\/h3>\s*<span class="project-section-count"><span aria-hidden="true">·<\/span>4<\/span>/);
   assert.match(html, /<header[^>]*>[\s\S]*?aria-label="导入精修补丁" data-app-tooltip="导入精修补丁"[\s\S]*?<svg[^>]*aria-hidden="true"[\s\S]*?<\/button>[\s\S]*?<\/header>/);
   assert.doesNotMatch(html, /project-refinement-(grid|pane)|<select/);
+});
+
+test("pre-summary auto refinement derives total gaps from baseline and truncates long chromosome lists with head/tail and tooltip", () => {
+  const baselineFinalPathByChr = {};
+  for (const chrName of ["Chr10", "Chr2", "Chr1", "Chr5", "Chr3", "Chr4"]) {
+    baselineFinalPathByChr[chrName] = {
+      chrName,
+      segments: [
+        {
+          segmentId: `seg-${chrName}`,
+          type: "ctg",
+          ctgName: `patch_${chrName}`,
+          refinement: { mode: "automatic", tool: "degap", editId: `e-${chrName}`, originalGapIds: [`gap-${chrName}`] },
+        },
+        ...(chrName === "Chr1" || chrName === "Chr2"
+          ? [{ segmentId: `open-${chrName}`, type: "gap", gapSizeBp: 500 }]
+          : []),
+      ],
+    };
+  }
+  const state = {
+    locale: "zh",
+    session: { projectId: 9, workspacePath: "/pre-summary" },
+    projectExport: {
+      projectId: 9,
+      workspacePath: "/pre-summary",
+      grtProjectView: { recipe: { schemaVersion: "5" }, baselineFinalPathByChr, autoRefinementEffects: [], sourceCards: [] },
+    },
+  };
+  const html = renderProjectRefinementCard(state);
+  assert.match(html, /DEGAP<\/th>[\s\S]*?6 \/ 8/);
+  assert.match(
+    html,
+    /<span class="project-refinement-chr-list is-truncated" data-app-tooltip="Chr1, Chr2, Chr3, Chr4, Chr5, Chr10">Chr1, Chr2, \.\.\., Chr10<\/span>/,
+  );
 });
 
 test("one patch picker imports all automatic tools and distinguishes a repeated import", async () => {
