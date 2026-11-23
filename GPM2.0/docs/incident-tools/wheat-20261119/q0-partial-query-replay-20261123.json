@@ -1,0 +1,68 @@
+{
+  "archived_query_count": 61087,
+  "archived_residual_sha256": "03b79fc96cc80ccfa8a6560be2141efd4126afd73d21ad1021c944508a04d171",
+  "archived_scan_receipt_sha256": "f9119227f6882704f23aea1b28d76ab6b2b0fa536bebc7c40d4682e531f063cd",
+  "census_axes_sha256": "7c93bb87545a40a561ac09a88260cc043a297f1236a6d5875c837d4d17542c31",
+  "count_matches": true,
+  "limits": "Query-side replay, not a live dump of every context. No target inventory for unmaterialized queries, no inference that query-only misses are omitted, no mapper launches or final Q0.",
+  "logged_plan_count": 61000,
+  "membership_in_frozen_census": {
+    "contexts": 23845,
+    "distinct_other_queries": 0,
+    "matching_contexts": 23845,
+    "planned_queries_with_observed_target_sets": 23845,
+    "planned_queries_without_observed_target_sets": 37155
+  },
+  "native_matrices": {
+    "q0-map-2b19c2c859bdfb5f2e9177e8": {
+      "alignment_flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join",
+        "-m",
+        "2000"
+      ],
+      "paf_sha256": "b234a0511e490cf6f378dc00a60512b20c3c1af6217c2602c7ab218ec5f79a8a",
+      "receipt_sha256": "ba5553ff1640cd1feff0db518b671baabed44fba84e02c7992e30a1cb76dd50a",
+      "rows_replayed": 85774
+    },
+    "q0-map-8024dde83cbf20e7ffa6d8ee": {
+      "alignment_flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "paf_sha256": "a77bb782873d4a5c25596a1d9377c817ec36d7cb27c7b8712902b1b416c3965c",
+      "receipt_sha256": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e"
+    },
+    "q0-map-a2e519761e94eff6ca09e121": {
+      "alignment_flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "paf_sha256": "ad1b16bf2ca4ef52b001e9dff2400c2aceacd7fb2a85e63ff38849867bbb01e7",
+      "receipt_sha256": "c36e5d98b8cbeac165865060565ed8c8953824f42baafa9c7db2e94b1ec7679f",
+      "rows_replayed": 26848
+    },
+    "q0-map-b30137a13323db8a99874448": {
+      "alignment_flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "paf_sha256": "e58c0fed3262d7f8a75cfc05a2b90740149f352862e0c2c308f13ff5757c9890",
+      "receipt_sha256": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3",
+      "rows_replayed": 12774
+    }
+  },
+  "queries_uncompressed_sha256": "c3872d5d3bbde85dc1e58b3efd521f9a9ef2db61ec1e28bc948b58703a4a04e0",
+  "replayed_query_count": 61000,
+  "schema": "reconstructed_wheat_partial_query_geometry_v1",
+  "snapshot": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d",
+  "source_run": "20261122T175230Z-1840546-b3d5993f"
+}
