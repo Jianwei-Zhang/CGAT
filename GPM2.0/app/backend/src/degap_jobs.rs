@@ -11,6 +11,7 @@ use crate::db::open_workspace_db;
 
 mod manual_refinement;
 mod server_runtime;
+pub(crate) use manual_refinement::{load_project_paths, write_project_paths, canonicalize_entry, update_length, witness};
 
 pub use manual_refinement::{
     ManualExportSummary, ManualRefinementAction, ManualRefinementExportReceipt, ManualRefinementImport, ManualRefinementRequest,

@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 14;
+pub const CURRENT_SCHEMA_VERSION: i64 = 15;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -689,7 +689,29 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
     create_auto_refinement_effects(conn)?;
     create_project_auto_versions(conn)?;
     create_package_auto_versions(conn)?;
-    create_project_delivery_identity(conn)
+    create_project_delivery_identity(conn)?;
+    create_auto_adoptions(conn)
+}
+
+fn create_auto_adoptions(conn: &Connection) -> Result<()> {
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS project_auto_gap_adoption (
+        project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+        gap_id TEXT NOT NULL, tool TEXT NOT NULL, light_manifest TEXT NOT NULL, edit_id TEXT NOT NULL,
+        evidence_json TEXT NOT NULL, PRIMARY KEY(project_id,gap_id),
+        FOREIGN KEY(project_id,tool,light_manifest) REFERENCES project_auto_version(project_id,tool,light_manifest)
+    ); CREATE TABLE IF NOT EXISTS project_auto_gap_review (
+        project_id INTEGER NOT NULL,tool TEXT NOT NULL,light_manifest TEXT NOT NULL,gap_id TEXT NOT NULL,chr TEXT NOT NULL,
+        disposition TEXT NOT NULL,PRIMARY KEY(project_id,tool,light_manifest,gap_id),
+        FOREIGN KEY(project_id,tool,light_manifest) REFERENCES project_auto_version(project_id,tool,light_manifest) ON DELETE CASCADE
+    ); CREATE TABLE IF NOT EXISTS project_auto_gap_plan (
+        project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE, plan_sha256 TEXT NOT NULL,
+        PRIMARY KEY(project_id,plan_sha256)
+    ); CREATE TABLE IF NOT EXISTS project_auto_source (
+        project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+        alias TEXT NOT NULL, contig TEXT NOT NULL, dataset TEXT NOT NULL, length INTEGER NOT NULL CHECK(length>0),
+        fasta_sha256 TEXT NOT NULL, PRIMARY KEY(project_id,alias,contig)
+    );")?;
+    Ok(())
 }
 
 fn create_project_delivery_identity(conn: &Connection) -> Result<()> {

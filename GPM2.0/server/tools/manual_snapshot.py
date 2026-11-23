@@ -90,7 +90,12 @@ def check_witness(w,plan):
         lo+=w["member_start"]-1; hi+=w["member_start"]-1
         identity=("@reference",w["reference"])
     elif fields=={"patch_sha256"} and sha(w["patch_sha256"]): identity=("@app-patch",w["patch_sha256"])
-    elif fields=={"dataset","contig"}: identity=(w["dataset"],w["contig"])
+    elif fields=={"dataset","contig"}:
+        # Multiple runs may reuse native contig names. App names the working-path source
+        # with its exact FASTA binding; Server resolves only the admitted native name.
+        alias=f"@cgat.auto:{m['fasta_sha256']}:{m['dataset']}"
+        dataset=m["dataset"] if m["fasta_sha256"] is not None and w["dataset"]==alias else w["dataset"]
+        identity=(dataset,w["contig"])
     else: raise ValueError("invalid frozen source witness")
     if (m["dataset"],m["name"],m["start"],m["end"])!=(*identity,lo,hi): raise ValueError("snapshot source identity or slice disagrees with witness")
 

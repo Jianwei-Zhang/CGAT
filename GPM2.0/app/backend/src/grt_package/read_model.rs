@@ -665,6 +665,9 @@ fn load_auto_effects(path: &Path, project: Option<i64>) -> Result<Vec<AutoRefine
     for row in rows {
         let (json,manifest)=row?;
         let mut effect:AutoRefinementEffect=serde_json::from_str(&json)?;
+        if let (Some(project),Some(key))=(project,manifest.as_ref()) {
+            effect.project_adopted_gaps=Some(conn.query_row("SELECT COUNT(*) FROM project_auto_gap_adoption WHERE project_id=?1 AND tool=?2 AND light_manifest=?3",params![project,effect.tool,key],|r|r.get::<_,i64>(0))? as usize);
+        }
         effect.version_id=manifest.clone();
         let k=(effect.tool.clone(),effect.run_id.clone());
         if let Some(key)=manifest { versions.insert((k,key),effect); }

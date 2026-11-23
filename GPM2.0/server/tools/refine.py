@@ -129,10 +129,10 @@ def check_manifest(value):
                     or not all(positive(w[key]) for key in ("start", "end"))):
                 raise ValueError("invalid contig witness")
             checked_plan(plans[label], w)
-            if extra:
+            if extra or (source and snap):
                 from manual_snapshot import check_witness
                 check_witness(w,plans[label])
-            if source:
+            if source and not snap:
                 members = plans[label]["members"]
                 if (len(members) != 1 or members[0]["dataset"] != w["dataset"] or members[0]["name"] != w["contig"]
                         or [members[0]["start"], members[0]["end"]] != sorted([w["start"], w["end"]])):

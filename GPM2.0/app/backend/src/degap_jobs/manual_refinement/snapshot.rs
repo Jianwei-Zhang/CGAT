@@ -196,8 +196,8 @@ pub(super) fn capture_if_supported(
     // Old imported packages keep their compatible task protocol. A project archive makes
     // the complete snapshot mandatory even when the user selected just one gap.
     let is_project: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM package_delivery_identity WHERE package_id=1)",
-        [],
+        "SELECT EXISTS(SELECT 1 FROM package_delivery_identity WHERE package_id=1) OR EXISTS(SELECT 1 FROM project_auto_gap_adoption WHERE project_id=?1)",
+        [project],
         |r| r.get(0),
     )?;
     if !is_project {

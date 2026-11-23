@@ -10,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use zip::{ZipWriter, write::FileOptions};
 
 mod apply;
+pub(crate) use apply::{load_project_paths, write_project_paths, canonicalize_entry, update_length};
 mod results;
 mod snapshot;
 
@@ -119,7 +120,7 @@ fn row_kind(row: &Value) -> &str {
     }
 }
 
-fn witness(row: &Value) -> Result<Value> {
+pub(crate) fn witness(row: &Value) -> Result<Value> {
     let id = segment_id(row)?;
     match row_kind(row) {
         "gap" => {
@@ -187,6 +188,12 @@ fn seed_plan_with_maps(conn: &Connection, workspace: &Path, project_id: i64, w: 
     } else {
         let dataset = field(w, "dataset")?;
         let contig = field(w, "contig")?;
+        if let Some((native,sha,len))=crate::grt_package::lookup_auto_source(conn,project_id,dataset,contig)? {
+            if start.max(end)>len {bail!("adopted automatic source interval exceeds its record");}
+            let n=start.abs_diff(end)+1;
+            return Ok(json!({"start": if start<=end{1}else{n},"end":if start<=end{n}else{1},"members":[{
+                "dataset":native,"name":contig,"length":len,"start":start.min(end),"end":start.max(end),"fasta_sha256":sha,"interval_sha256":null}]}));
+        }
         let (length, fasta): (i64, String) = conn
             .query_row(
                 "SELECT ss.length, ssl.fasta_path FROM source_seq ss

@@ -150,6 +150,9 @@ pub struct AutoRefinementEffect {
     /// Only populated by the project read model, never guessed from a tool/run label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version_id: Option<String>,
+    /// Historical project adoptions, not a count of currently visible patch segments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_adopted_gaps: Option<usize>,
     pub tool: String,
     pub run_id: String,
     pub original_gaps: usize,

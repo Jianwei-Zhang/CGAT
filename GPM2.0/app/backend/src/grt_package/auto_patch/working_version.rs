@@ -5,7 +5,7 @@ use serde_json::json;
 const SERVER_PATH: &str = "metadata/refinement/final_path.json";
 
 /// Only accept content from this workspace's object store, never a caller-supplied file path.
-fn bound_json(conn: &Connection, sha: &str, limit: u64) -> Result<Value> {
+pub(super) fn bound_json(conn: &Connection, sha: &str, limit: u64) -> Result<Value> {
     if !is_hash(sha) {
         bail!("invalid version object identity");
     }
@@ -33,7 +33,12 @@ fn bound_json(conn: &Connection, sha: &str, limit: u64) -> Result<Value> {
     Ok(serde_json::from_slice(&buf)?)
 }
 
-fn admitted(conn: &Connection, project: i64, tool: &str, key: &str) -> Result<(Version, Value)> {
+pub(super) fn admitted(
+    conn: &Connection,
+    project: i64,
+    tool: &str,
+    key: &str,
+) -> Result<(Version, Value)> {
     if !is_hash(key) || !matches!(tool, "degap" | "lrgapcloser" | "tgsgapcloser" | "quartet") {
         bail!("invalid working version identity");
     }
@@ -95,5 +100,13 @@ pub fn preview_project_refinement_version(
             .context("missing version record digest")?;
         chromosomes.push(json!({"chr":name,"bp":bp,"segments":parts.len(),"gapSegments":parts.iter().filter(|r|r["kind"]=="gap").count(),"sha256":digest}));
     }
-    Ok(json!({"tool":tool,"versionId":key,"runId":v.run_id,"chromosomes":chromosomes}))
+    let mut q=tx.prepare("SELECT disposition,COUNT(*) FROM project_auto_gap_review WHERE project_id=?1 AND tool=?2 AND light_manifest=?3 GROUP BY disposition ORDER BY disposition")?;
+    let decisions = q
+        .query_map(params![project, tool, key], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, usize>(1)?))
+        })?
+        .collect::<rusqlite::Result<BTreeMap<_, _>>>()?;
+    Ok(
+        json!({"tool":tool,"versionId":key,"runId":v.run_id,"chromosomes":chromosomes,"decisions":decisions}),
+    )
 }

@@ -31,9 +31,12 @@ const COPY = {
   zh: {
     sectionTitle: "精修",
     preview: "查看工具结果", previewHint: "这里展示该工具的原始结果，不会更改项目组装。", loadingVersion: "正在读取工具结果…",
+    selectionReasons: { adopted: "项目已采用", joint_or_unmapped: "不能独立归到一个 Gap", path_changed_or_protected: "路径已变更或受保护", already_filled: "已保留先前采用结果", lower_priority: "另一个闭合工具优先", overlapping_edits: "改动区间重叠" },
     recordHeaders: ["染色体", "长度 (bp)", "片段数", "Gap 片段数"],
     importAction: "导入精修补丁",
-    autoPatchImported: "已加入自动精修结果：{tools}。当前工作路径未改变。",
+    autoPatchImported: "已导入自动精修结果，本次按闭合与工具优先级采用 {n} 个 Gap。",
+    projectAdoptions: "项目采用过 {n} 个 Gap",
+    autoPatchHydrated: "已补齐已导入工具的来源序列，现有组装未变。",
     autoPatchDuplicate: "这些自动精修结果已在项目中，未重复导入。",
     tableColumns: ["来源", "工具 / 批次", "已闭合", "部分填补", "未填补", "拒绝", "结果"],
     tableHint: "自动行按原始缺口计数；手动行按所选 Gap 的候选结果计数，不代表已采用。— 表示无此项或未记录。",
@@ -114,10 +117,13 @@ const COPY = {
   },
   en: {
     preview: "View tool result", previewHint: "This is the tool’s own result. Viewing it does not change the project assembly.", loadingVersion: "Loading tool result…",
+    selectionReasons: { adopted: "Adopted", joint_or_unmapped: "Not independently attributable", path_changed_or_protected: "Changed or protected path", already_filled: "Kept earlier adoption", lower_priority: "Another closure had priority", overlapping_edits: "Overlapping edits" },
     recordHeaders: ["Chromosome", "Length (bp)", "Segments", "Gap segments"],
     sectionTitle: "Refinement",
     importAction: "Import refinement patch",
-    autoPatchImported: "Added automatic results: {tools}. The working path has not changed.",
+    autoPatchImported: "Automatic results imported; {n} gap closures adopted in this import.",
+    projectAdoptions: "{n} gaps adopted by project",
+    autoPatchHydrated: "Added missing sequences for existing tool results. The assembly is unchanged.",
     autoPatchDuplicate: "These automatic results are already in this project.",
     tableColumns: ["Source", "Tool / batch", "Closed", "Partial", "Unfilled", "Rejected", "Result"],
     tableHint: "Automatic rows count original gaps. Manual rows count candidate outcomes per selected Gap, not adoptions. A dash means not recorded or not applicable.",
@@ -695,7 +701,9 @@ export async function runImportManualRefinementResults(host, store, rerender, de
     const shortSha = (result?.resultSha256 || "").slice(0, 12) || "-";
     let notice = "";
     if (rawResult?.kind === "automatic") {
-      notice = rawResult.duplicate ? copy.autoPatchDuplicate : fmt(copy.autoPatchImported, { tools: formatTools(rawResult.addedTools) });
+      notice = rawResult.duplicate ? copy.autoPatchDuplicate
+        : rawResult.sequenceObjectsAdded > 0 && !rawResult.applied && !rawResult.addedTools?.length ? copy.autoPatchHydrated
+          : fmt(copy.autoPatchImported, { n: rawResult.applied ?? 0 });
     } else if (result?.isLegacyOnly) {
       notice = fmt(copy.importLegacyOnlyMsg, { sha: shortSha });
     } else if (result?.duplicate) {
@@ -962,7 +970,9 @@ function refinementTableRows({ auto, manual }, copy) {
     const duplicateTool = auto.effects.some((other) => other !== effect && other.tool === effect.tool);
     const label = formatToolLabel(effect.tool) + (duplicateTool && version ? ` · ${id.slice(0, 8)}` : "");
     autoRow(label, [effect.closed, effect.partial, effect.unfilled, effect.rejected],
-      fmt(copy.editCount, { n: effect.accepted_edits ?? effect.acceptedEdits }), version);
+      [fmt(copy.editCount, { n: effect.accepted_edits ?? effect.acceptedEdits }),
+        Number.isInteger(effect.project_adopted_gaps ?? effect.projectAdoptedGaps) ? fmt(copy.projectAdoptions, { n: effect.project_adopted_gaps ?? effect.projectAdoptedGaps }) : "",
+      ].filter(Boolean).join(" · "), version);
   }
   // Old project databases retain accepted segments, not per-gap closure measurements.
   const legacy = new Map();
@@ -1006,9 +1016,10 @@ function versionTableRow({ source, label, cells, version }, ui, copy, locale) {
   if (!open) return row;
   const data = ui.previewData;
   const counts = new Intl.NumberFormat(locale === "en" ? "en-US" : "zh-CN");
+  const decisions = Object.entries(data?.decisions || {}).map(([key, n]) => `${copy.selectionReasons[key] || key}: ${counts.format(n)}`).join(" · ");
   const details = ui.previewError ? `<span role="alert">${escapeHtml(ui.previewError)}</span>`
     : !data ? `<span role="status">${escapeHtml(copy.loadingVersion)}</span>`
-    : `<p class="muted">${escapeHtml(copy.previewHint)} <code>${escapeHtml(version.id.slice(0, 12))}</code></p><table><thead><tr>${copy.recordHeaders.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${data.chromosomes.map((c) => `<tr><th scope="row">${escapeHtml(c.chr)}</th>${[c.bp,c.segments,c.gapSegments].map((n) => `<td>${escapeHtml(counts.format(n))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    : `<p class="muted">${escapeHtml(copy.previewHint)} <code>${escapeHtml(version.id.slice(0, 12))}</code></p>${decisions ? `<p>${escapeHtml(decisions)}</p>` : ""}<table><thead><tr>${copy.recordHeaders.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${data.chromosomes.map((c) => `<tr><th scope="row">${escapeHtml(c.chr)}</th>${[c.bp,c.segments,c.gapSegments].map((n) => `<td>${escapeHtml(counts.format(n))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   return `${row}<tr><td colspan="${cells.length + 2}">${details}</td></tr>`;
 }
 

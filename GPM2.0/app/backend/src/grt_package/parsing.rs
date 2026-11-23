@@ -251,7 +251,7 @@ pub(super) fn read_fasta_summaries_with_sha256_and_cancel(
     Ok((records, reader.into_inner().finish()))
 }
 
-fn read_fasta_records<R, C>(
+pub(super) fn read_fasta_records<R, C>(
     reader: &mut R,
     label: &str,
     allow_empty: bool,

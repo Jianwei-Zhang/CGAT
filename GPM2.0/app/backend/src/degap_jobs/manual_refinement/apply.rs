@@ -40,7 +40,7 @@ fn initial_revision() -> u64 {
     1
 }
 
-fn load_project_paths(conn: &Connection, project_id: i64) -> Result<Map<String, Value>> {
+pub(crate) fn load_project_paths(conn: &Connection, project_id: i64) -> Result<Map<String, Value>> {
     let saved: Option<String> = conn
         .query_row(
             "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",
@@ -52,7 +52,7 @@ fn load_project_paths(conn: &Connection, project_id: i64) -> Result<Map<String, 
         .context("invalid persisted project Final Path")
 }
 
-fn write_project_paths(
+pub(crate) fn write_project_paths(
     conn: &Connection,
     project_id: i64,
     paths: &Map<String, Value>,
@@ -66,7 +66,7 @@ fn write_project_paths(
     Ok(())
 }
 
-fn canonicalize_entry(chr: &str, mut entry: Value) -> Result<Value> {
+pub(crate) fn canonicalize_entry(chr: &str, mut entry: Value) -> Result<Value> {
     let rows = entry
         .get_mut("segments")
         .and_then(Value::as_array_mut)
@@ -123,7 +123,7 @@ fn canonicalize_entry(chr: &str, mut entry: Value) -> Result<Value> {
     Ok(entry)
 }
 
-fn update_length(entry: &mut Value) -> Result<()> {
+pub(crate) fn update_length(entry: &mut Value) -> Result<()> {
     let mut length = 0_u64;
     for row in entry["segments"]
         .as_array()
@@ -168,7 +168,13 @@ fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value, witness: &Valu
         let name = field(member, "name")?;
         let lo=positive(member,"start")?;
         let hi=positive(member,"end")?;
-        let sequence=if witness["patch_sha256"].is_string() {
+        let auto=crate::grt_package::lookup_auto_source(conn,project_id,witness["dataset"].as_str().unwrap_or(""),name)?;
+        let sequence=if let Some((native,sha,len))=&auto {
+            if native!=dataset || member["fasta_sha256"].as_str()!=Some(sha.as_str()) || lo<1 || hi<lo || hi>*len {bail!("automatic endpoint binding changed");}
+            let records=crate::grt_package::load_auto_records(conn,sha)?;
+            let seq=records.get(name).filter(|s|s.len() as i64==*len).context("missing automatic endpoint record")?;
+            seq[(lo-1) as usize..hi as usize].to_owned()
+        }else if witness["patch_sha256"].is_string() {
             let bytes:Vec<u8>=conn.query_row("SELECT sequence FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",params![project_id,name],|r|r.get(0))?;
             if lo>hi || hi as u64>bytes.len() as u64 || hex_sha(&bytes)!=name { bail!("manual endpoint source changed"); }
             String::from_utf8(bytes[(lo-1) as usize..hi as usize].to_vec())?
@@ -192,7 +198,7 @@ fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value, witness: &Valu
             positive(member, "end")?,
         )?
         };
-        if member["interval_sha256"].as_str() != Some(hex_sha(sequence.as_bytes()).as_str()) {
+        if auto.is_none() && member["interval_sha256"].as_str() != Some(hex_sha(sequence.as_bytes()).as_str()) {
             bail!("local endpoint sequence does not match the registered interval");
         }
         if reverse {
