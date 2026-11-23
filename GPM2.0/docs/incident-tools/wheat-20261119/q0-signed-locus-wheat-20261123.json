@@ -1,0 +1,176 @@
+{
+  "cohort": {
+    "base": {
+      "base_rows_for_cohort": 1237,
+      "cross_paf_bytes": 20024243,
+      "cross_pafs": 22
+    },
+    "first_witness_categories": {
+      "extends_existing_map": 6,
+      "new_map_on_existing_strand": 15,
+      "new_source_pair": 1143,
+      "no_new_contiguous_100bp_in_core": 6,
+      "no_threshold_cross_hit": 19
+    },
+    "freeze_sha256": "5d27fab9068f6288ceaef31dd529cf6faae99755c018a57e8493742af8c9dbec",
+    "historical_mapper_real_seconds_sum": {
+      "extends_existing_map": 13.16,
+      "new_map_on_existing_strand": 44.30799999999999,
+      "new_source_pair": 7994.350000000007,
+      "no_new_contiguous_100bp_in_core": 27.936999999999998,
+      "no_threshold_cross_hit": 200.62799999999996
+    },
+    "new_mapper_executions": 0,
+    "query_sources": 581,
+    "schema": "wheat_cross_locus_novelty_v1",
+    "scope": "100 continuous paired bases in the queried core outside identical signed cross-source base geometry, including weak prior PAFs; first witness only; not a Q0 necessity test",
+    "verdict_digest": "29c8d29179a09f35b84a60f415457c84ad60caa4a53d390d8ccf6354fdd1ef0a",
+    "windows": 1189
+  },
+  "jobs": {
+    "cohort": {
+      "id": "43022961",
+      "raw_report_sha256": "82119ac91323b6dc0040d4b15fb40236b8d1dbcc85603faff258af748925a880",
+      "source_manifest_sha256": "167eae7d4419c5e41a41ec71e2006d48cb68f510bfdd48bc42e0824e1c99fd30",
+      "state": "SUCCEEDED"
+    },
+    "panels": {
+      "id": "43022964",
+      "source_manifest_sha256": "14cf0e5984d3ab36c2d401941e6dbfeadbb872055763443de6f7e231576461ad",
+      "state": "SUCCEEDED"
+    }
+  },
+  "limits": [
+    "Retrospective novelty in completed, nonrandom windows is not evidence of Q0 decision necessity.",
+    "Panel work selection was blind to held-out supplementary results on a fixed task graph; new_mapper_executions=0 is not a cold runtime measurement.",
+    "Counts of directly cited windows include placement or join provenance, not indirect path influence."
+  ],
+  "panels": {
+    "3D": {
+      "alternative_geometry_differences": {},
+      "blind_explained_pairs": 125,
+      "chromosome_differences": {},
+      "cited_with_new_100bp": 0,
+      "compared_chromosomes": 22,
+      "constructed_sequences": 10,
+      "directly_cited_windows": 5,
+      "eligible_windows": 102,
+      "explained_pairs_with_new_100bp": 0,
+      "first_novel_100bp_categories": {
+        "extends_existing_map": 2,
+        "new_map_on_existing_strand": 3,
+        "new_source_pair": 58,
+        "new_strand_on_existing_pair": 2
+      },
+      "fixed_task_graph": true,
+      "guard": "passed",
+      "kept": 102,
+      "native": 1,
+      "new_mapper_executions": 0,
+      "novel_100bp_after_native": 65,
+      "novel_100bp_in_core_windows": 65,
+      "novel_1bp_in_core_windows": 93,
+      "pair_count": 2299,
+      "panel": "3D-589Mb",
+      "raw_report_sha256": "82e8f05184c5073d624c5c78dabb08431f0bba923d6f51431a7c0af3368c741c",
+      "ready": "q0-ready-evidence-6588fa57f9c1a6b758a8278d",
+      "rounds": [
+        {
+          "full_fallback": false,
+          "need_pairs": 2061,
+          "new_windows": 102,
+          "previously_explained_pairs": 123
+        },
+        {
+          "full_fallback": false,
+          "need_pairs": 2061,
+          "new_windows": 0,
+          "previously_explained_pairs": 123
+        }
+      ],
+      "schema": "q0_signed_locus_blind_control_v1",
+      "window_count": 113
+    },
+    "4B": {
+      "alternative_geometry_differences": {},
+      "blind_explained_pairs": 0,
+      "chromosome_differences": {},
+      "cited_with_new_100bp": 0,
+      "compared_chromosomes": 22,
+      "constructed_sequences": 1,
+      "directly_cited_windows": 0,
+      "eligible_windows": 2,
+      "explained_pairs_with_new_100bp": 0,
+      "first_novel_100bp_categories": {
+        "new_map_on_existing_strand": 2
+      },
+      "fixed_task_graph": true,
+      "guard": "passed",
+      "kept": 4,
+      "native": 0,
+      "new_mapper_executions": 0,
+      "novel_100bp_after_native": 2,
+      "novel_100bp_in_core_windows": 2,
+      "novel_1bp_in_core_windows": 2,
+      "pair_count": 21,
+      "panel": "4B-358Mb",
+      "raw_report_sha256": "0c05c566e38a1cc2a57058e78058b8b6b42513c8b78fc492605274b4d5bb39b7",
+      "ready": "q0-ready-evidence-2dfc33cefed4113ef77d9474",
+      "rounds": [
+        {
+          "full_fallback": false,
+          "need_pairs": 15,
+          "new_windows": 4,
+          "previously_explained_pairs": 0
+        }
+      ],
+      "schema": "q0_signed_locus_blind_control_v1",
+      "window_count": 4
+    },
+    "5B": {
+      "alternative_geometry_differences": {},
+      "blind_explained_pairs": 3,
+      "chromosome_differences": {},
+      "cited_with_new_100bp": 0,
+      "compared_chromosomes": 22,
+      "constructed_sequences": 1,
+      "directly_cited_windows": 0,
+      "eligible_windows": 6,
+      "explained_pairs_with_new_100bp": 1,
+      "first_novel_100bp_categories": {
+        "new_map_on_existing_strand": 2,
+        "new_source_pair": 4
+      },
+      "fixed_task_graph": true,
+      "guard": "passed",
+      "kept": 4,
+      "native": 1,
+      "new_mapper_executions": 0,
+      "novel_100bp_after_native": 6,
+      "novel_100bp_in_core_windows": 6,
+      "novel_1bp_in_core_windows": 6,
+      "pair_count": 38,
+      "panel": "5B-596Mb",
+      "raw_report_sha256": "c3bd0e96b1f160ed14152a494c9651e9617cdfdf80930551fb15a866f2efc4d2",
+      "ready": "q0-ready-evidence-c67680fb596f481587e187c7",
+      "rounds": [
+        {
+          "full_fallback": false,
+          "need_pairs": 24,
+          "new_windows": 4,
+          "previously_explained_pairs": 0
+        },
+        {
+          "full_fallback": false,
+          "need_pairs": 24,
+          "new_windows": 0,
+          "previously_explained_pairs": 0
+        }
+      ],
+      "schema": "q0_signed_locus_blind_control_v1",
+      "window_count": 6
+    }
+  },
+  "remote_directory": "q0-cross-locus-20261123",
+  "schema": "wheat_cross_source_locus_controls_v1"
+}

@@ -1,0 +1,239 @@
+{
+  "exit_code": 0,
+  "job": "43022980",
+  "manifest_sha256": "f8fd46c70e6a258d7cd21aa868b7c990cec435c34e0e5443f9374eb184c9df0c",
+  "panels": {
+    "3D": {
+      "base_only": {
+        "equal_fields": [
+          "alternative_paths",
+          "available_donor_intervals",
+          "known_ambiguous_intervals",
+          "known_placement_geometry",
+          "occupied",
+          "ordered_path",
+          "reference_gaps",
+          "sequence",
+          "unplaced_parts"
+        ],
+        "status": "draft_only"
+      },
+      "full_field_digests": {
+        "alternative_paths": {
+          "keys": 22,
+          "sha256": "55fed1e71fa4b0b845e0093b9a43e5b42f22adb938e8c50f48b556348937068f"
+        },
+        "available_donor_intervals": {
+          "keys": 97,
+          "sha256": "342a71688a68efcf624755264349a80caf83362a2c6d926784deaf936090f9b8"
+        },
+        "known_ambiguous_intervals": {
+          "keys": 86,
+          "sha256": "494e8b16773923fd67f35071c66fb14ab1a735440e7b69502eb5949b9502a9d7"
+        },
+        "known_placement_geometry": {
+          "keys": 114,
+          "sha256": "7ce8c01f1b90521a9d87c25139de0ad8faf0e454331a0ae0e77d28ed4bffddb7"
+        },
+        "occupied": {
+          "keys": 17,
+          "sha256": "27372e8d1f0b38407a360eb7da089eb79f0ff61769b41572303c471a4ff9ddee"
+        },
+        "ordered_path": {
+          "keys": 22,
+          "sha256": "bd8120c97cc556e5ed0185347fde2329033a5ed38fbb50b19fe3bf62f1bd83e1"
+        },
+        "reference_gaps": {
+          "keys": 22,
+          "sha256": "46105f3b41fcb348f254e0fa5edf110d7e2fcd50792083ec7491d8043146762b"
+        },
+        "sequence": {
+          "keys": 10,
+          "sha256": "b8080fe800d34ed0ad6ff838cd5ce0118d21aa97f17b2ade834723e5de94d3c7"
+        },
+        "unplaced_parts": {
+          "keys": 22,
+          "sha256": "0864b95a9ef5491d2b43180b05252ec5cd3eea295e8728d02bb5e58167c7bafd"
+        }
+      },
+      "full_sequences": 10,
+      "native_plus_base": {
+        "equal_fields": [
+          "alternative_paths",
+          "available_donor_intervals",
+          "known_ambiguous_intervals",
+          "known_placement_geometry",
+          "occupied",
+          "ordered_path",
+          "reference_gaps",
+          "sequence",
+          "unplaced_parts"
+        ],
+        "status": "draft_only"
+      },
+      "native_tasks": 1,
+      "new_mapper_executions": 0,
+      "panel": "3D-589Mb",
+      "raw_sha256": "17c60973273fa515b77e241d0ae680c21de1d9999f6bf782acf512c395647d5b",
+      "ready": "q0-ready-evidence-6588fa57f9c1a6b758a8278d",
+      "regional_windows": 113,
+      "schema": "q0_draft_consumer_comparison_v1"
+    },
+    "4B": {
+      "base_only": {
+        "equal_fields": [
+          "alternative_paths",
+          "available_donor_intervals",
+          "known_ambiguous_intervals",
+          "known_placement_geometry",
+          "occupied",
+          "ordered_path",
+          "reference_gaps",
+          "sequence",
+          "unplaced_parts"
+        ],
+        "status": "draft_only"
+      },
+      "full_field_digests": {
+        "alternative_paths": {
+          "keys": 22,
+          "sha256": "fa08a0cef73f85d8dc09d9e32a4b4cb915bdc5cc19cdbdbf4bf3f1dfb1e4122e"
+        },
+        "available_donor_intervals": {
+          "keys": 6,
+          "sha256": "daf20cbaec25d13486f229f94ee264df4967d88a639f560d342977843752d06e"
+        },
+        "known_ambiguous_intervals": {
+          "keys": 6,
+          "sha256": "e225ed59e860059219cb164669483a972f1c06d5d55ac13ff81f0bdffe160692"
+        },
+        "known_placement_geometry": {
+          "keys": 3,
+          "sha256": "4977a34c0ab3c7682418ffabe3611e092375fe45f4d743f146b327ad48bcff7c"
+        },
+        "occupied": {
+          "keys": 1,
+          "sha256": "cb8a1399dc340db63e2d74c7317056e6d2a7144a2dd9d7a20ecb216d2092f57e"
+        },
+        "ordered_path": {
+          "keys": 22,
+          "sha256": "2b8f4342b5c163f98b97a4516ac3923d6f3b8b6b13c033ab8dce6bdf0fa51e7f"
+        },
+        "reference_gaps": {
+          "keys": 22,
+          "sha256": "bc530e7499f9168534f27743802ba6e09a07f28af2b8c8168e1778e7275f5854"
+        },
+        "sequence": {
+          "keys": 1,
+          "sha256": "576f753307b6160acff0a5b4b1d91d35f773f3bcc63a9bca37773e94f9026135"
+        },
+        "unplaced_parts": {
+          "keys": 3,
+          "sha256": "6d01624893cb7f00a68eb3471c7c15c29bbcf81199e188f63ea8fa8f925c3ed1"
+        }
+      },
+      "full_sequences": 1,
+      "native_plus_base": {
+        "equal_fields": [
+          "alternative_paths",
+          "available_donor_intervals",
+          "known_ambiguous_intervals",
+          "known_placement_geometry",
+          "occupied",
+          "ordered_path",
+          "reference_gaps",
+          "sequence",
+          "unplaced_parts"
+        ],
+        "status": "draft_only"
+      },
+      "native_tasks": 0,
+      "new_mapper_executions": 0,
+      "panel": "4B-358Mb",
+      "raw_sha256": "f12d87f81eabd076dd18961765185753c023f2239c94f233fedf3d80cffb3651",
+      "ready": "q0-ready-evidence-2dfc33cefed4113ef77d9474",
+      "regional_windows": 4,
+      "schema": "q0_draft_consumer_comparison_v1"
+    },
+    "5B": {
+      "base_only": {
+        "equal_fields": [
+          "alternative_paths",
+          "available_donor_intervals",
+          "known_ambiguous_intervals",
+          "known_placement_geometry",
+          "occupied",
+          "ordered_path",
+          "reference_gaps",
+          "sequence",
+          "unplaced_parts"
+        ],
+        "status": "draft_only"
+      },
+      "full_field_digests": {
+        "alternative_paths": {
+          "keys": 22,
+          "sha256": "3268975ef88a91ed422a5ac2f0a44607562b027d343769504f8cfa27cb1c8f1d"
+        },
+        "available_donor_intervals": {
+          "keys": 19,
+          "sha256": "481204ed20c1e9745900eaac157e8d1ac1031775f2a00be4dc8e57b7863b4836"
+        },
+        "known_ambiguous_intervals": {
+          "keys": 19,
+          "sha256": "627cda4804829d78522414d7446e3d731f96cae2e24397a4dc4b990f665066ea"
+        },
+        "known_placement_geometry": {
+          "keys": 11,
+          "sha256": "e2d278c55020b2cf906ba75d083c40aa2e91efff5482abf0e05bed04120c8a5b"
+        },
+        "occupied": {
+          "keys": 1,
+          "sha256": "2e888a8cfda1b18abc6b6d25dfb6854f74b1a6c9617ee704259e3579a39e5f03"
+        },
+        "ordered_path": {
+          "keys": 22,
+          "sha256": "3d5a4493ae80a7040a14709524a54f72f84118213fc056ec57aafc9a76dcecf2"
+        },
+        "reference_gaps": {
+          "keys": 22,
+          "sha256": "633ade95083788606adbd6ea579fc5c1f1871bc7232ebe8dcd4b20e3b0830f0a"
+        },
+        "sequence": {
+          "keys": 1,
+          "sha256": "00001c94f7184b9237abb5a7b16015a6a0f06e07a4247219d273993f445b97b3"
+        },
+        "unplaced_parts": {
+          "keys": 8,
+          "sha256": "1afd58237b63a0d47d155607cc8304c247996fa67fd8591cdb73797caa966895"
+        }
+      },
+      "full_sequences": 1,
+      "native_plus_base": {
+        "equal_fields": [
+          "alternative_paths",
+          "available_donor_intervals",
+          "known_ambiguous_intervals",
+          "known_placement_geometry",
+          "occupied",
+          "ordered_path",
+          "reference_gaps",
+          "sequence",
+          "unplaced_parts"
+        ],
+        "status": "draft_only"
+      },
+      "native_tasks": 1,
+      "new_mapper_executions": 0,
+      "panel": "5B-596Mb",
+      "raw_sha256": "0ad3b4ca0e5ce3ee97190bb61519d5f31448b32aff31e53176fa37987d6b3e31",
+      "ready": "q0-ready-evidence-c67680fb596f481587e187c7",
+      "regional_windows": 6,
+      "schema": "q0_draft_consumer_comparison_v1"
+    }
+  },
+  "remote_directory": "q0-draft-consumer-fields-20261123",
+  "scheduler": "SUCCEEDED",
+  "schema": "wheat_three_fixed_graph_zero_regional_consumer_audit_v1",
+  "scope": "Equality of nine specified geometry fields; selection reports, provenance IDs, evidence inventory, scientific uniqueness, production cold runtime and downstream workflow completion are not claimed."
+}
