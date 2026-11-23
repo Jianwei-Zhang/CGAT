@@ -9,7 +9,7 @@ pairwise-derived placement.
 from __future__ import annotations
 
 from bisect import bisect_right
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from dataclasses import asdict, dataclass, field, replace
 from functools import lru_cache
 import math
@@ -492,12 +492,19 @@ def _clean_source_intervals(sequence, mask, intervals, policy):
 
 
 class _RootedContext:
-    """The original unmasked complexity grid, evaluated only where paired blocks need it."""
+    """Exact grid: retain cheap whole-anchor summaries, screen sparse long anchors on demand."""
     def __init__(self, sequence_for, masks, policy):
-        # A tile always starts on the unmasked run's ORIGINAL grid. In particular
-        # neither a CIGAR block, a reverse projection nor a cache boundary restarts it.
-        self.width = 64 * policy.minimum_anchor_bp
-        screened = 0
+        self.width = 8 * policy.minimum_anchor_bp
+        self.cached_spans = 0
+        self.screened_bp = screened_bp = [0, 0]  # whole, tiled; closures do not retain the context
+        # Results are passing runs, not DNA. Bound fragmentation as well as number
+        # of anchors; the previous 128-anchor count alone caused avoidable evictions.
+        self.whole = OrderedDict()
+        def full(source, parent):
+            legs = unmasked(source, parent)
+            screened_bp[0] += sum(i.length for i in legs)
+            return tuple(piece for leg in legs
+                         for piece in _complex_intervals(sequence_for(source, parent), leg, policy))
 
         @lru_cache(maxsize=128)
         def unmasked(source, parent):
@@ -505,17 +512,30 @@ class _RootedContext:
 
         @lru_cache(maxsize=4096)
         def tile(source, parent, start, end):
-            nonlocal screened
-            screened += end - start
+            screened_bp[1] += end - start
             return _complex_intervals(sequence_for(source, parent), Interval(start, end), policy)
 
-        self._unmasked, self._tile = unmasked, tile
-        self.screened = lambda: screened
+        self._full, self._unmasked, self._tile = full, unmasked, tile
 
     def __call__(self, anchor, targets):
-        source, parent = anchor.source, anchor.interval
+        source, parent = key = anchor.source, anchor.interval
+        whole = self.whole.get(key)
+        if whole is not None:
+            self.whole.move_to_end(key)
+            return whole  # Caller clips by each actual CIGAR block, as on the original route.
+        if parent.length > 1024**2:
+            targets = merged_intervals(targets)
+        # Only a long, sparsely contacted parent benefits from localized evaluation.
+        # This changes evaluation cost, never the grid or the numerical thresholds.
+        if parent.length <= 1024**2 or 8 * sum(i.length for i in targets) >= parent.length:
+            whole = self._full(source, parent)
+            if len(whole) <= 131072:
+                while self.whole and (len(self.whole) >= 8192 or self.cached_spans + len(whole) > 131072):
+                    self.cached_spans -= len(self.whole.popitem(last=False)[1])
+                self.whole[key] = whole; self.cached_spans += len(whole)
+            return whole
         legs = self._unmasked(source, parent); pieces = []
-        for target in merged_intervals(targets):
+        for target in targets:
             for leg in _overlapping_spans(target, legs):
                 lo, hi = max(target.start, leg.start), min(target.end, leg.end)
                 start = lo - (lo - leg.start) % self.width
@@ -529,13 +549,14 @@ class _RootedContext:
         return merged_intervals(pieces)
 
     def clear(self):
-        self._tile.cache_clear(); self._unmasked.cache_clear()
+        self._tile.cache_clear(); self._unmasked.cache_clear(); self.whole.clear()
+        self.cached_spans = 0
 
 
 def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_context):
     """One candidate, fixed round inputs; no shared proposal writes or early tie-breaking."""
     delta = {}; geometry = rooted = candidate = 0.0
-    before_bp = rooted_context.screened()
+    full_bp, tile_bp = rooted_context.screened_bp
     direct_spans = {}  # Immutable source coverage, only for this segment and round.
     for anchor, links in linked:
         for orientation in ("+", "-"):
@@ -589,7 +610,8 @@ def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_co
             item["parents"].add(anchor.placement_id)
     for item in delta.values():
         item['intervals'] = merged_intervals(item['intervals'])
-    return delta, geometry, rooted, candidate, rooted_context.screened() - before_bp
+    return (delta, geometry, rooted, candidate, rooted_context.screened_bp[0] - full_bp,
+            rooted_context.screened_bp[1] - tile_bp)
 
 
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),

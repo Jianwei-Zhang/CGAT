@@ -80,12 +80,12 @@ def _work(raw):
 def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, threads, owner, log, round_number):
     """Compute out of process, consume only in candidate order; fallback never means no evidence."""
     lanes = _lanes(len(keys), threads); pool = None; pending = deque(); ix = inflight = 0
-    workers = local = relations = scanned_bp = 0; geo = rooted = candidate = 0.0; started = reported = monotonic()
+    workers = local = relations = whole_bp = tile_bp = 0; geo = rooted = candidate = 0.0; started = reported = monotonic()
     def report():
         log(f"placement pair work round={round_number}: owner_parts={local} worker_parts={workers} "
             f"new_relations={relations} geometry_task_s={geo:.1f} complexity_task_s={rooted+candidate:.1f} "
             f"wall_s={monotonic()-started:.1f} anchor_complexity_task_s={rooted:.1f} "
-            f"candidate_complexity_task_s={candidate:.1f} anchor_bp_screened_on_tile_misses={scanned_bp}")
+            f"candidate_complexity_task_s={candidate:.1f} anchor_bp_whole_misses={whole_bp} anchor_bp_tile_misses={tile_bp}")
     try:
         if lanes > 1:
             try:
@@ -124,8 +124,8 @@ def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, th
                     usable = False
                 if value is None:
                     value = owner(key, neighbors.for_source(data.parts[key].source)); local += 1
-            delta, g, r, c, scanned = value
-            geo += g; rooted += r; candidate += c; scanned_bp += scanned
+            delta, g, r, c, full, tiled = value
+            geo += g; rooted += r; candidate += c; whole_bp += full; tile_bp += tiled
             if monotonic() - reported >= 60:
                 report(); reported = monotonic()
             yield key, delta
