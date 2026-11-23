@@ -22,7 +22,10 @@ import argparse
 import csv
 import hashlib
 import json
+import os
 import shutil
+import socket
+import stat
 from pathlib import Path
 
 from lgz_display_evidence import build_display_evidence
@@ -528,6 +531,95 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool, *, include
     write_manifest(staging_root, "full" if include_fasta else "no_fasta", include_fasta, final_path, q4_hash, q4_lengths, schema_version=app_schema)
 
 
+def _pair_inventory(root: Path) -> dict:
+    # The generated App payload must contain ordinary files only. Never trust
+    # a directory/file-name list from a bundle or reread the FASTA for this.
+    if not root.is_dir() or root.is_symlink() or root.parent.is_symlink():
+        raise ValueError("invalid full delivery staging directory")
+    files = {}
+    for path in root.rglob("*"):
+        st = path.lstat()
+        if stat.S_ISDIR(st.st_mode):
+            continue
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError(f"unexpected non-file in staged App payload: {path}")
+        files[path.relative_to(root).as_posix()] = [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns]
+    return files
+
+
+def _pair_channel(source, full):
+    path, run = os.environ.get("GPM_APP_PROJECTION_PAIR"), os.environ.get("GPM_REPORT_RUN_ID")
+    if not path or not run or os.environ.get("GPM_REPORT_UNIT_ID") != ("package_full" if full else "package_light"):
+        return None
+    layout = WorkspaceLayout.detect(source)
+    channel = Path(path)
+    if layout.version != 2 or not channel.is_absolute() or channel.resolve().is_relative_to(source):
+        return None
+    owner = layout.path(".run_all/lock/owner.json")
+    if not owner.is_file():
+        return None
+    lock = json.loads(owner.read_text(encoding="utf-8"))
+    from run_all_runner import process_is_alive
+    if (lock.get("run_id") != run or lock.get("workspace") != str(source)
+            or lock.get("hostname") != socket.gethostname() or not isinstance(lock.get("pid"), int)
+            or lock["pid"] < 1 or not process_is_alive(lock["pid"], lock.get("process_start", ""))):
+        return None
+    return channel
+
+
+def _derive_light(full, light, files):
+    if _pair_inventory(full) != files:
+        raise ValueError("full App staging changed before light derivation; refusing inconsistent deliveries")
+    manifest_name = "metadata/grt_app_manifest.json"
+    manifest = json.loads((full / manifest_name).read_text(encoding="utf-8"))
+    if manifest["workflow"] != APP_WORKFLOW or manifest["package_kind"] != "full" or manifest["fasta_available"] is not True:
+        raise ValueError("expected a full App payload")
+    final = manifest["q4_relpath"]
+    # The light schema retains *source* FASTA indices, not the final-Q index.
+    omit = {final, final + ".fai", "cen/library.fa"}
+    light.mkdir(parents=True, exist_ok=False)
+    for name in files:
+        path = full / name
+        if name in omit or (name.startswith("data/") and path.suffix.lower() in FASTA_SUFFIXES):
+            continue
+        target = light / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if name == manifest_name:
+            manifest.update(package_kind="no_fasta", fasta_available=False)
+            target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        elif name == "metadata/package.tsv":
+            with path.open(newline="", encoding="utf-8") as src, target.open("w", newline="", encoding="utf-8") as dst:
+                reader = csv.DictReader(src, delimiter="\t")
+                writer = csv.DictWriter(dst, fieldnames=reader.fieldnames, delimiter="\t", lineterminator="\n")
+                writer.writeheader()
+                for row in reader:
+                    writer.writerow({**row, "package_mode": "no_fasta"})
+        else:
+            # Independent staging; neither report embedding nor edits to light
+            # may mutate its full sibling through a hard link.
+            shutil.copy2(path, target)
+    if _pair_inventory(full) != files:
+        raise ValueError("full App staging changed during light derivation")
+
+
+def build_delivery(source, staging, full):
+    source = source.resolve()
+    channel = _pair_channel(source, full)
+    run = os.environ.get("GPM_REPORT_RUN_ID")
+    if not full and channel is not None and channel.is_file():
+        from delivery_archive import delivery_staging_path
+        receipt = json.loads(channel.read_text(encoding="utf-8"))
+        if receipt["run"] == run and receipt["source"] == str(source):
+            _derive_light(delivery_staging_path(source, "full"), staging, receipt["files"])
+            print("Light App payload derived from this run's full projection")
+            return
+    # Standalone, legacy, resumed and unpaired steps always have a complete path.
+    build(source, staging, full, standalone_delivery=True)
+    if full and channel is not None:
+        with channel.open("x", encoding="utf-8") as stream:
+            json.dump({"run": run, "source": str(source), "files": _pair_inventory(staging)}, stream, separators=(",", ":"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
@@ -536,7 +628,7 @@ def main() -> int:
     group.add_argument("--include-fasta", action="store_true")
     group.add_argument("--no-fasta", action="store_true")
     args = parser.parse_args()
-    build(args.source, args.staging, args.include_fasta, standalone_delivery=True)
+    build_delivery(args.source, args.staging, args.include_fasta)
     print(f"App payload staged at {args.staging}")
     return 0
 

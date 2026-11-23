@@ -585,6 +585,15 @@ class Runner:
     def _row(self, unit: PlanUnit) -> dict[str, str]:
         return next(row for row in self.status_rows if row["unit_id"] == unit.unit_id)
 
+    def _app_pair_channel(self, index: int) -> str:
+        # Only consecutive full/light units in this live lock share a projection.
+        if self.contract_channel is None:
+            return ""
+        first = index - int(self.units[index].unit_id == "package_light")
+        if first < 0 or [u.unit_id for u in self.units[first:first + 2]] != ["package_full", "package_light"]:
+            return ""
+        return str(self.contract_channel.with_name(f"app-pair-{first}.json"))
+
     def _terminal_validation(self, unit_id: str) -> tuple[bool, str]:
         if unit_id == "refinement":
             from post_lgz_refinement import validate_completion
@@ -868,6 +877,7 @@ class Runner:
                                 AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath),
                                               int(threads) if threads != "unknown" else 1),
                                 int(threads) if threads != "unknown" else 1, exclusive=True),
+                             "GPM_APP_PROJECTION_PAIR": self._app_pair_channel(unit_index),
                              DEFER_ENV: "1" if self.contract_channel and unit.unit_id == "finalize_evidence" else "",
                              CHANNEL_ENV: str(self.contract_channel) if (self.contract_channel and unit.unit_id == "refinement"
                                  and unit_index > 0 and self.units[unit_index - 1].unit_id == "finalize_evidence") else "",
