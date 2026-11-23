@@ -70,7 +70,7 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
                 raise RunnerError(str(exc)) from exc
         allowed = {"--reads-type": {"hifi", "ont"}, "--grt-execution-profile": {"baseline", "optimized"},
                    "--grt-step2-mummer-scope": {"full", "gap-screen"},
-                   "--q0-supplement-scope": {"full", "decision_frontier_repair"}}
+                   "--q0-supplement-scope": {"full", "decision_frontier_repair", "positive_threshold"}}
         if key in allowed and values[0] not in allowed[key]:
             raise RunnerError(f"Invalid {key}: {values[0]}")
         if key in TYPED_READ_OPTIONS:

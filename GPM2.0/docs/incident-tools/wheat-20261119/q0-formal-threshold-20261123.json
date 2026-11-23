@@ -1,0 +1,358 @@
+{
+  "schema": "wheat_q0_formal_threshold_verification_v1",
+  "remote_directory": "q0-formal-threshold-20261123",
+  "scope": "Frozen real panel subsets, ordinary prepare/ready/readback/build and stage_selection; identical nine-field geometry, not exhaustive alternative discovery or whole-wheat validation. Counts of fresh launches exclude cache hits; the 3D full arm uses a frozen complete archive. Wall time excludes common input materialization.",
+  "runs": [
+    {
+      "job": "43023075",
+      "remote_subdirectory": "accepted/checked",
+      "dsub_manifest_sha256": "c05f29d7213f9af185658bde7449a4975a22508caecf8b20b883864df16fee3b",
+      "log_sha256": "028ea6f7b8d44e96d9556d8c1d22cb4c4cbac6a5dea976eb87bda83a9af26c21",
+      "panels": {
+        "3B-792Mb": {
+          "report_sha256": "f22bbbe4a288d81b0494e40f30bdc7fda4fd9e1b56217a0145dda521c181e762",
+          "panel_sha256": "3dd7aa2d643a04019ea75d092cdc88567c36d8a4a7c3914dfcc1a7a654139d39",
+          "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+          "threads": 4,
+          "arms": {
+            "full": {
+              "actual_mapper_calls": {
+                "coarse": 26,
+                "regional_exact": 36
+              },
+              "records": 1,
+              "mode": "full",
+              "wall_s": 59.121528677642345,
+              "to_ready_s": 52.14551291614771,
+              "manifest_sha256": "90b5985dfc41eeb12cb164670740b9b65351502908e1e9e4c8b22a4c820552ea",
+              "catalog_sha256": "70d74c52399bc8ab2fdfbdf1a47b1bb6a9ba6973bb1921ccf08373d4d94020b1",
+              "staged_path_rows": 1,
+              "staged_evidence_rows": 1
+            },
+            "positive_threshold": {
+              "actual_mapper_calls": {},
+              "records": 1,
+              "mode": "base_only",
+              "wall_s": 4.253918319940567,
+              "to_ready_s": 2.2008089050650597,
+              "manifest_sha256": "aab6b1a5c773ae41f8a722bb7cf7f1b487fd5aded5480ea48fc05f2b3a140526",
+              "catalog_sha256": "a43ddce5941ed2bf0424ca178fd277e29f0b2cc8f7b074d391e86907b34900d0",
+              "staged_path_rows": 1,
+              "staged_evidence_rows": 1
+            }
+          },
+          "equal_field_sha256": {
+            "alternative_paths": "8c1e83e438c8ace9e7f0edcb628a83a2c1169c4e82a52b56011dba743f29906f",
+            "available_donor_intervals": "a0b65513210c37801b6cafeeec85bddfca77a1f84a146c3322cd355a82a53a21",
+            "known_ambiguous_intervals": "9fde1bffde84d1be30e2323a422d5c530afffd56b427db5df4c46e7a13d7c0bf",
+            "known_placement_geometry": "a4b9e98afdc41b0c108494b60679aedd75ebd6a04f4c3676e6d49240e2b3aabc",
+            "occupied": "cb414f44760fcbe3441f885ca0dfdeb5453b2c4dc1d428376bc7892cc10507a6",
+            "ordered_path": "f41fc4f51aa1636bc3793e2edc6aefc45f497529e21ff1b4e282e4a50be0d7b9",
+            "reference_gaps": "26da0979ebc88084d0c0aaf246dd908ff6634453a594001410f2f4d0222d4cf9",
+            "sequence": "e9d86841661e932a4b97461c87ce587693e18a2b5fe879b4e4bcf1a6e687dd73",
+            "unplaced_parts": "74dc7ffd9607103706fbf3602d564ea2ee3810b143da4e324d53d29be89631a5"
+          }
+        },
+        "3D-589Mb": {
+          "report_sha256": "0c7dd2cdad97cc1b2e0de8dda4d5d6eca31f3580c31f409ab424d0c28c10769a",
+          "panel_sha256": "cb46341aa8fa1d7a805f86185510938eb44a5f62bb8c54130427b1a424c3eec9",
+          "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+          "threads": 4,
+          "arms": {
+            "positive_threshold": {
+              "actual_mapper_calls": {
+                "coarse": 19,
+                "native": 1,
+                "regional_exact": 53
+              },
+              "records": 10,
+              "mode": "decision_frontier",
+              "wall_s": 128.57362673431635,
+              "to_ready_s": 90.1306756734848,
+              "manifest_sha256": "18d84828dd8b0393731f62ff9c4c65495c8a8a706e5992e0ba7006713117bd17",
+              "catalog_sha256": "eff58d7c457c3cf7241849d15d7759d572e47c6476d67c3daec0626777aea4b7",
+              "staged_path_rows": 21,
+              "staged_evidence_rows": 17
+            }
+          },
+          "equal_field_sha256": {
+            "alternative_paths": "55fed1e71fa4b0b845e0093b9a43e5b42f22adb938e8c50f48b556348937068f",
+            "available_donor_intervals": "342a71688a68efcf624755264349a80caf83362a2c6d926784deaf936090f9b8",
+            "known_ambiguous_intervals": "494e8b16773923fd67f35071c66fb14ab1a735440e7b69502eb5949b9502a9d7",
+            "known_placement_geometry": "7ce8c01f1b90521a9d87c25139de0ad8faf0e454331a0ae0e77d28ed4bffddb7",
+            "occupied": "27372e8d1f0b38407a360eb7da089eb79f0ff61769b41572303c471a4ff9ddee",
+            "ordered_path": "bd8120c97cc556e5ed0185347fde2329033a5ed38fbb50b19fe3bf62f1bd83e1",
+            "reference_gaps": "46105f3b41fcb348f254e0fa5edf110d7e2fcd50792083ec7491d8043146762b",
+            "sequence": "b8080fe800d34ed0ad6ff838cd5ce0118d21aa97f17b2ade834723e5de94d3c7",
+            "unplaced_parts": "0864b95a9ef5491d2b43180b05252ec5cd3eea295e8728d02bb5e58167c7bafd"
+          },
+          "archived_full": {
+            "native_tasks": 1,
+            "ready": "q0-ready-evidence-6588fa57f9c1a6b758a8278d",
+            "regional_tasks": 113,
+            "sequences": 10,
+            "sha256": "17c60973273fa515b77e241d0ae680c21de1d9999f6bf782acf512c395647d5b"
+          }
+        },
+        "7A-734Mb": {
+          "report_sha256": "0cd3c490374848cde5d6be87c23de7186c66fa93c6685c2b35573fe16008cd04",
+          "panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+          "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+          "threads": 4,
+          "arms": {
+            "full": {
+              "actual_mapper_calls": {
+                "coarse": 10,
+                "native": 1,
+                "regional_exact": 10
+              },
+              "records": 1,
+              "mode": "full",
+              "wall_s": 11.417864888906479,
+              "to_ready_s": 9.493213780224323,
+              "manifest_sha256": "04fbbf71f85a963baeaac083338a18197b4565e28abc4586e6ba187c88c3ed92",
+              "catalog_sha256": "2f6b4974d0c60e84418ea37adb4d4aadcf79dee0c2ca5b590d41395d830611bd",
+              "staged_path_rows": 5,
+              "staged_evidence_rows": 3
+            },
+            "positive_threshold": {
+              "actual_mapper_calls": {
+                "coarse": 4,
+                "native": 1,
+                "regional_exact": 4
+              },
+              "records": 1,
+              "mode": "decision_frontier",
+              "wall_s": 15.040911696851254,
+              "to_ready_s": 13.317629545927048,
+              "manifest_sha256": "afb697520622d4977ca92c83163ac89d19035cb65e09d0d51cbed39782c00494",
+              "catalog_sha256": "c56d0594ce49ba308a442a392158ea204d27872db424f1464d63c39fa8e3d600",
+              "staged_path_rows": 5,
+              "staged_evidence_rows": 3
+            }
+          },
+          "equal_field_sha256": {
+            "alternative_paths": "2b2478f2c5596567e87d3cf37df067bbcca765f13abd1996976b16d61d5428e1",
+            "available_donor_intervals": "b17730eba1136c61ce966d944af56224b31bce6b9e225236bbcfec4781824aa5",
+            "known_ambiguous_intervals": "321e2f57b26371711dea320585b811f922be6b853619b6a2c35bc2f2ff3c41e3",
+            "known_placement_geometry": "7a7cd0212e33ea2478aff25c99344024ab73a0f40cfefc48b22a625ef4a62624",
+            "occupied": "36f07c23bf343f5709c40451093493b957a88d39dc85ffe2c58451b7585e85e3",
+            "ordered_path": "a255ce97149eb1b733db4105ec6ceffb7cb6f954647b85fe0377802aae03ac05",
+            "reference_gaps": "6427deee2be57040baf6f219ebfa5e4cc3b6c4c17626e2082cc481bd0f576a06",
+            "sequence": "b3e82786fcf5398f29e7dcc1b723a6a028657d2e46baead96e80de3e1d9981db",
+            "unplaced_parts": "1af8c64a7c9eb701dc22292f67126bd3462739cfb177d1be66a779f966367495"
+          }
+        }
+      }
+    },
+    {
+      "job": "43023082",
+      "remote_subdirectory": "counted",
+      "dsub_manifest_sha256": "296963bd7871ff8a6a8b2f1d22a15cbea14d2cd089bc6e207935af8046475c9c",
+      "log_sha256": "fa08e3e27595f18734eee37caac7f31c70c71490d34bbbac1e1227753cc25790",
+      "panels": {
+        "7A-734Mb": {
+          "report_sha256": "a512dc6082961929e80e8a2f1ffbb39bf4dea1a4c7d7c141cfa3113114a88fc8",
+          "panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+          "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+          "threads": 4,
+          "arms": {
+            "full": {
+              "actual_mapper_calls": {
+                "coarse": 10,
+                "native": 1,
+                "regional_exact": 10
+              },
+              "records": 1,
+              "mode": "full",
+              "wall_s": 11.536981269717216,
+              "to_ready_s": 9.575918920338154,
+              "manifest_sha256": "60b1a54f3bfd35f6bb77568e716bc69af69f192765dafaffe84b15d5b2fff83e",
+              "catalog_sha256": "2c64bd08067db1bac95a3f232b089aa8dc768379e09943ad131501c699398f11",
+              "staged_path_rows": 5,
+              "staged_evidence_rows": 3
+            },
+            "positive_threshold": {
+              "actual_mapper_calls": {
+                "coarse": 4,
+                "native": 1,
+                "regional_exact": 4
+              },
+              "records": 1,
+              "mode": "decision_frontier",
+              "wall_s": 13.283112093806267,
+              "to_ready_s": 11.477182440459728,
+              "manifest_sha256": "b99d5df93017c6359cef18c8cad3034d97c7b56886d40790172729644a32410b",
+              "catalog_sha256": "a7d45bcb1aade677a2438de7ee1488155f16efd3b18d4e89c2e54b81aa8d2ad9",
+              "staged_path_rows": 5,
+              "staged_evidence_rows": 3
+            }
+          },
+          "equal_field_sha256": {
+            "alternative_paths": "2b2478f2c5596567e87d3cf37df067bbcca765f13abd1996976b16d61d5428e1",
+            "available_donor_intervals": "b17730eba1136c61ce966d944af56224b31bce6b9e225236bbcfec4781824aa5",
+            "known_ambiguous_intervals": "321e2f57b26371711dea320585b811f922be6b853619b6a2c35bc2f2ff3c41e3",
+            "known_placement_geometry": "7a7cd0212e33ea2478aff25c99344024ab73a0f40cfefc48b22a625ef4a62624",
+            "occupied": "36f07c23bf343f5709c40451093493b957a88d39dc85ffe2c58451b7585e85e3",
+            "ordered_path": "a255ce97149eb1b733db4105ec6ceffb7cb6f954647b85fe0377802aae03ac05",
+            "reference_gaps": "6427deee2be57040baf6f219ebfa5e4cc3b6c4c17626e2082cc481bd0f576a06",
+            "sequence": "b3e82786fcf5398f29e7dcc1b723a6a028657d2e46baead96e80de3e1d9981db",
+            "unplaced_parts": "1af8c64a7c9eb701dc22292f67126bd3462739cfb177d1be66a779f966367495"
+          }
+        }
+      }
+    },
+    {
+      "job": "43023085",
+      "remote_subdirectory": "lean",
+      "dsub_manifest_sha256": "830c470f873a3e67e8542059a014395abdb596fc5fca6e489588f5df08430633",
+      "log_sha256": "dfd1641cfa2da3ba80c05f320807d200682e7a70181514e863f2a213e076b68a",
+      "panels": {
+        "3B-792Mb": {
+          "report_sha256": "042cd2c837128984d4018bf8b646d930ec741dd78251116964324cd0dded1684",
+          "panel_sha256": "3dd7aa2d643a04019ea75d092cdc88567c36d8a4a7c3914dfcc1a7a654139d39",
+          "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+          "threads": 4,
+          "arms": {
+            "full": {
+              "actual_mapper_calls": {
+                "coarse": 26,
+                "regional_exact": 36
+              },
+              "records": 1,
+              "mode": "full",
+              "wall_s": 62.50977399945259,
+              "to_ready_s": 55.530781246721745,
+              "restored": null,
+              "regional_tasks": 36,
+              "manifest_sha256": "f6b7c81cd844144d6a49bf3e4830cda11cb212eebc67da121e6aff472aa53394",
+              "catalog_sha256": "d812f36f1e3e26cca83da384d5546381c0bec93c282ad8782c2b3790c894d092",
+              "staged_path_rows": 1,
+              "staged_evidence_rows": 1
+            },
+            "positive_threshold": {
+              "actual_mapper_calls": {},
+              "records": 1,
+              "mode": "base_only",
+              "wall_s": 6.23732203245163,
+              "to_ready_s": 4.2099349945783615,
+              "restored": null,
+              "regional_tasks": 0,
+              "manifest_sha256": "4e968c81ee18470c8b1c925b7b703621688d16eb4bf4b39aa95d4d8cd32d0435",
+              "catalog_sha256": "a43ddce5941ed2bf0424ca178fd277e29f0b2cc8f7b074d391e86907b34900d0",
+              "staged_path_rows": 1,
+              "staged_evidence_rows": 1
+            }
+          },
+          "equal_field_sha256": {
+            "alternative_paths": "8c1e83e438c8ace9e7f0edcb628a83a2c1169c4e82a52b56011dba743f29906f",
+            "available_donor_intervals": "a0b65513210c37801b6cafeeec85bddfca77a1f84a146c3322cd355a82a53a21",
+            "known_ambiguous_intervals": "9fde1bffde84d1be30e2323a422d5c530afffd56b427db5df4c46e7a13d7c0bf",
+            "known_placement_geometry": "a4b9e98afdc41b0c108494b60679aedd75ebd6a04f4c3676e6d49240e2b3aabc",
+            "occupied": "cb414f44760fcbe3441f885ca0dfdeb5453b2c4dc1d428376bc7892cc10507a6",
+            "ordered_path": "f41fc4f51aa1636bc3793e2edc6aefc45f497529e21ff1b4e282e4a50be0d7b9",
+            "reference_gaps": "26da0979ebc88084d0c0aaf246dd908ff6634453a594001410f2f4d0222d4cf9",
+            "sequence": "e9d86841661e932a4b97461c87ce587693e18a2b5fe879b4e4bcf1a6e687dd73",
+            "unplaced_parts": "74dc7ffd9607103706fbf3602d564ea2ee3810b143da4e324d53d29be89631a5"
+          }
+        },
+        "3D-589Mb": {
+          "report_sha256": "f59a02e29e6d3a169e6288649f0f8d9c0f70f96eff470d5b74facfc71d5b0b3b",
+          "panel_sha256": "cb46341aa8fa1d7a805f86185510938eb44a5f62bb8c54130427b1a424c3eec9",
+          "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+          "threads": 4,
+          "arms": {
+            "positive_threshold": {
+              "actual_mapper_calls": {},
+              "records": 10,
+              "mode": "decision_frontier",
+              "wall_s": 110.91966397315264,
+              "to_ready_s": 72.83847419917583,
+              "restored": {
+                "files": 505,
+                "native_successes": 1,
+                "regional_successes": 53
+              },
+              "regional_tasks": 53,
+              "manifest_sha256": "d227f6a86f23cd7a0a0b0e63724cd4335d5ebd6ffbf6d74531efb01fae1d393b",
+              "catalog_sha256": "28d15ab0eec87f4e6538cb8f3a2326083842a685e7d06d74b8ae2800dac902eb",
+              "staged_path_rows": 21,
+              "staged_evidence_rows": 17
+            }
+          },
+          "equal_field_sha256": {
+            "alternative_paths": "55fed1e71fa4b0b845e0093b9a43e5b42f22adb938e8c50f48b556348937068f",
+            "available_donor_intervals": "342a71688a68efcf624755264349a80caf83362a2c6d926784deaf936090f9b8",
+            "known_ambiguous_intervals": "494e8b16773923fd67f35071c66fb14ab1a735440e7b69502eb5949b9502a9d7",
+            "known_placement_geometry": "7ce8c01f1b90521a9d87c25139de0ad8faf0e454331a0ae0e77d28ed4bffddb7",
+            "occupied": "27372e8d1f0b38407a360eb7da089eb79f0ff61769b41572303c471a4ff9ddee",
+            "ordered_path": "bd8120c97cc556e5ed0185347fde2329033a5ed38fbb50b19fe3bf62f1bd83e1",
+            "reference_gaps": "46105f3b41fcb348f254e0fa5edf110d7e2fcd50792083ec7491d8043146762b",
+            "sequence": "b8080fe800d34ed0ad6ff838cd5ce0118d21aa97f17b2ade834723e5de94d3c7",
+            "unplaced_parts": "0864b95a9ef5491d2b43180b05252ec5cd3eea295e8728d02bb5e58167c7bafd"
+          },
+          "archived_full": {
+            "native_tasks": 1,
+            "ready": "q0-ready-evidence-6588fa57f9c1a6b758a8278d",
+            "regional_tasks": 113,
+            "sequences": 10,
+            "sha256": "17c60973273fa515b77e241d0ae680c21de1d9999f6bf782acf512c395647d5b"
+          }
+        },
+        "7A-734Mb": {
+          "report_sha256": "f748a2c3f8ddcc76655211dd8d7694128df42107f680a1e91a286161c02d1178",
+          "panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+          "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+          "threads": 4,
+          "arms": {
+            "full": {
+              "actual_mapper_calls": {
+                "coarse": 10,
+                "native": 1,
+                "regional_exact": 10
+              },
+              "records": 1,
+              "mode": "full",
+              "wall_s": 11.621112369000912,
+              "to_ready_s": 9.682183623313904,
+              "restored": null,
+              "regional_tasks": 10,
+              "manifest_sha256": "545c98cbcb8ea1f2fa39ca348e59c3354f7ab4f41224de9357d578b2f6affd9d",
+              "catalog_sha256": "bcb0a46c9b7e724f0ae69e50fb8ada9f4f04abc67a7083cc161c603d5e99b1cd",
+              "staged_path_rows": 5,
+              "staged_evidence_rows": 3
+            },
+            "positive_threshold": {
+              "actual_mapper_calls": {
+                "coarse": 4,
+                "native": 1,
+                "regional_exact": 4
+              },
+              "records": 1,
+              "mode": "decision_frontier",
+              "wall_s": 12.750797644257545,
+              "to_ready_s": 10.985641092061996,
+              "restored": null,
+              "regional_tasks": 4,
+              "manifest_sha256": "fe13d3334abb1b7ec1f8cc580f4c4b5f8c2dce63babd484c088b2ca4734e7fa4",
+              "catalog_sha256": "b40e0cdc797fd5e4035485dbfd8b6b5aa5f412addc4064bf55b4f8d693ab0fd5",
+              "staged_path_rows": 5,
+              "staged_evidence_rows": 3
+            }
+          },
+          "equal_field_sha256": {
+            "alternative_paths": "2b2478f2c5596567e87d3cf37df067bbcca765f13abd1996976b16d61d5428e1",
+            "available_donor_intervals": "b17730eba1136c61ce966d944af56224b31bce6b9e225236bbcfec4781824aa5",
+            "known_ambiguous_intervals": "321e2f57b26371711dea320585b811f922be6b853619b6a2c35bc2f2ff3c41e3",
+            "known_placement_geometry": "7a7cd0212e33ea2478aff25c99344024ab73a0f40cfefc48b22a625ef4a62624",
+            "occupied": "36f07c23bf343f5709c40451093493b957a88d39dc85ffe2c58451b7585e85e3",
+            "ordered_path": "a255ce97149eb1b733db4105ec6ceffb7cb6f954647b85fe0377802aae03ac05",
+            "reference_gaps": "6427deee2be57040baf6f219ebfa5e4cc3b6c4c17626e2082cc481bd0f576a06",
+            "sequence": "b3e82786fcf5398f29e7dcc1b723a6a028657d2e46baead96e80de3e1d9981db",
+            "unplaced_parts": "1af8c64a7c9eb701dc22292f67126bd3462739cfb177d1be66a779f966367495"
+          }
+        }
+      }
+    }
+  ]
+}

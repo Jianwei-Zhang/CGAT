@@ -1,0 +1,11 @@
+# Q0: stop supplementary mapping at supported decisions
+
+`positive_threshold` is a versioned Q0 evidence profile for **new Server workspaces without reads QC**. Use `--q0-supplement-scope positive_threshold` when preparing a workspace. The generated evidence command uses `--supplement-scope positive_threshold`. This is not a resource override for resuming an existing run. `full` retains the existing search and acceptance rules.
+
+The profile builds a provisional backbone from all verified initial alignments, including within-assembly matrices. It asks for weak placements or unsupported junctions, never for the sole purpose of excluding a hypothetical competitor. A strong placement is not permission for an exact cut. The ordinary selector still accounts for competing observed loci, only admits supported paired cuts, and can leave an unknown join. An assignment label alone cannot supply a chromosome with its first reference seed.
+
+- **`base_only`**: no supplementary planner ran. The normal consumer must regenerate an empty request from the selected evidence. An empty omission list is not evidence of a full search.
+- **`decision_frontier`**: complete query/target contexts that touch a request are kept. The final selection is recomputed. An omitted context intersecting a still-weak decision requires repair. A newly extended request needs no additional pass if both original planning phases completely accounted for their regional tasks and the omitted intervals on both axes are disjoint from it.
+- **`full`**: if decisions cannot be localized or bounded repair cannot resolve the search scope, use full supplementary discovery. Invalid bytes, a wrong tool or policy, reads QC, or the absence of a trustworthy path are **not** accepted as successful Q0 construction.
+
+The ordinary `metadata/grt_q0_evidence.json` is published only after the scope and data have been verified. The selection artifact records `supplement_acceptance`, including `alternatives_exhaustive: false`: it certifies the selected backbone under the stated rule, not the absence of unobserved alternatives. Existing source occupancy and interval-aware donor logic are unchanged. Counts of completed windows are not counts of fresh mapper launches; compare both mapper invocations and end-to-end elapsed time before switching a large active analysis.

@@ -60,6 +60,7 @@ class EvidenceInput:
     input_fingerprint: str
     catalog: dict = field(default_factory=dict)
     ready_manifest_identity: str = ""
+    threshold_scope: object | None = None
 
 
 @dataclass
@@ -166,10 +167,17 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
             raise Q0EvidenceError("q0 catalog evidence record differs from the bound PAF")
     for edge in adjacencies:
         evidence[edge.adjacency_id] = {"kind": "input_assembly_adjacency", "catalog": manifest["catalog"], **asdict(edge)}
+    ready_id = stable_id("q0-ready-evidence", manifest)
+    binding = None
+    if "threshold" in manifest["policy"].get("decision_frontier", {}):
+        from .q0_threshold_acceptance import VerifiedScope
+        keys = ("dataset_name", "seq_name", "assigned_chr_name")
+        binding = VerifiedScope(ready_id, tuple(tuple(row[k] for k in keys) for row in table(root, "metadata/chr_assignments.tsv", keys)),
+                                stable_id("threshold-search", catalog["supplement_scope"]))
     if manifest != verified():
         raise Q0EvidenceError("q0 evidence changed during admission loading")
     return EvidenceInput(sources, parts, lengths, dict(reference_hits), tuple(links), tuple(adjacencies),
-                         evidence, manifest["input_fingerprint"], catalog, stable_id("q0-ready-evidence", manifest))
+                         evidence, manifest["input_fingerprint"], catalog, ready_id, binding)
 
 
 def _complex_intervals(sequence: str, interval: Interval, policy: AdmissionPolicy):
@@ -645,7 +653,12 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
     admission, searches, occupied = selection.admission, selection.paths, selection.occupied
     if not any(search.path is not None for search in searches.values()):
         raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
-    if "supplement_scope" in data.catalog:
+    report = data.catalog.get("supplement_scope")
+    threshold = data.threshold_scope is not None or (isinstance(report, dict) and report.get("requested") == "positive_threshold")
+    if threshold:
+        from .q0_threshold_acceptance import audit
+        threshold_counts = audit(data, selection, admission_policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass)
+    elif "supplement_scope" in data.catalog:
         from .q0_frontier_scope import audit_selected_scope
         audit_selected_scope(data, admission, searches)
     records, chromosomes = {}, []
@@ -680,6 +693,9 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
                  "unselected_source_intervals": [{"source": asdict(source), "intervals": [asdict(i) for i in (subtract_intervals(Interval(0, len(sequence)), occupied[source]) if sequence else ())]}
                                                  for source, sequence in sorted(data.sources.items())],
                  "qc": "not_measured" if quality_pass is None else "supplied_source_decisions"}
+    if threshold:
+        decisions["supplement_acceptance"] = {"semantics": report["acceptance"], "search_mode": report["effective"],
+                                            "alternatives_exhaustive": False, "decision_counts": threshold_counts}
     used_ids = set()
     def evidence_ids(value):
         if isinstance(value, dict):

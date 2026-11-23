@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--server-dir", required=True, type=Path)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--minimap2", default="minimap2")
-    parser.add_argument("--supplement-scope", choices=("full", "decision_frontier", PROOF_REPAIR_SCOPE), default="full",
+    parser.add_argument("--supplement-scope", choices=("full", "decision_frontier", PROOF_REPAIR_SCOPE, "positive_threshold"), default="full",
                         help="experimental lossy regional window scope; default retains full evidence search")
     args = parser.parse_args()
     try:

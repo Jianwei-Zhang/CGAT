@@ -66,7 +66,7 @@ Usage:
     [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
     [--lgz-execution-profile optimized|baseline] \
-    [--q0-supplement-scope full|decision_frontier_repair] \
+    [--q0-supplement-scope full|decision_frontier_repair|positive_threshold] \
     [--lgz-step2-mummer-scope gap-screen|full] \
     [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
@@ -103,6 +103,7 @@ Behavior:
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
   - LGZ defaults: optimized execution, full Step1, anchor-safe gap-screen Step2
   - --lgz-execution-profile baseline restores legacy scheduling and per-chromosome refill
+  - positive_threshold uses a supported Q0 backbone without claiming exhaustive alternatives (no reads QC).
   - --q0-supplement-scope defaults to full; decision_frontier_repair is an opt-in, potentially lossy Q0-only search with bounded repair and full fallback
     It targets expensive regional discovery and can be slower on small workloads. This is not a resume resource option.
   - --lgz-step2-mummer-scope full restores the complete Step2 MUMmer alignment scope
@@ -820,8 +821,8 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --q0-supplement-scope)
-      [[ $# -ge 2 ]] || die "$1 requires full or decision_frontier_repair"
-      case "$2" in full|decision_frontier_repair) Q0_SUPPLEMENT_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
+      [[ $# -ge 2 ]] || die "$1 requires full, decision_frontier_repair or positive_threshold"
+      case "$2" in full|decision_frontier_repair|positive_threshold) Q0_SUPPLEMENT_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
     --lgz-execution-profile|--grt-execution-profile)

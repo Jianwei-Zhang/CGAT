@@ -117,7 +117,8 @@ def supplement_policy(scope: str) -> dict:
     """Bind the explicit Q0-only profile without editing base checkpoint inputs."""
     if scope == "full":
         return POLICY
-    if scope not in ("decision_frontier", PROOF_REPAIR_SCOPE):
+    from .q0_threshold_acceptance import SCOPE as threshold_scope
+    if scope not in ("decision_frontier", PROOF_REPAIR_SCOPE, threshold_scope):
         raise Q0EvidenceError("unsupported q0 supplement scope")
     from .q0_admission import selector_identity
     from .q0_frontier_scope import FRONTIER_FLANK_BP
@@ -125,6 +126,9 @@ def supplement_policy(scope: str) -> dict:
                 "selector": selector_identity(), "whole_source_equivalence": False}
     if scope == PROOF_REPAIR_SCOPE:
         frontier["repair"] = {"version": 1, "maximum_rounds": MAX_PROOF_REPAIRS, "requires_no_reads_qc": True}
+    if scope == threshold_scope:
+        from .q0_threshold_acceptance import contract
+        frontier["threshold"] = contract()
     return {**POLICY, "decision_frontier": frontier}
 
 
@@ -138,8 +142,9 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
     frontier = policy.get("decision_frontier") if isinstance(policy, dict) else None
     scoped = isinstance(frontier, dict)
     scope = "full"
+    from .q0_threshold_acceptance import SCOPE as threshold_scope
     if scoped:
-        scope = PROOF_REPAIR_SCOPE if "repair" in frontier else "decision_frontier"
+        scope = threshold_scope if "threshold" in frontier else (PROOF_REPAIR_SCOPE if "repair" in frontier else "decision_frontier")
     if (manifest.get("schema") != SCHEMA or manifest.get("status") != "success"
             or policy != supplement_policy(scope) or manifest.get("builder") != builder_identity()):
         raise Q0EvidenceError("q0 evidence manifest has an unsupported or stale identity")
@@ -167,7 +172,7 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
     report = catalog.get("supplement_scope")
     if scoped:
         if (not isinstance(report, dict) or report.get("requested") != scope
-                or report.get("effective") not in ("full", "decision_frontier")
+                or report.get("effective") not in (("full", "decision_frontier", "base_only") if scope == threshold_scope else ("full", "decision_frontier"))
                 or not isinstance(report.get("unsearched_part_intervals"), list)):
             raise Q0EvidenceError("q0 supplemental catalog lacks its bound scope")
         skipped = 0
@@ -191,6 +196,9 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
         if (len(required) != 1 or type(repair_rounds) is not int or not 0 <= repair_rounds <= MAX_PROOF_REPAIRS
                 or identity(root, "metadata/package.tsv") != required[0]):
             raise Q0EvidenceError("q0 proof repair lacks a bound no-reads-QC package or repair round")
+    if scope == threshold_scope:
+        from .q0_threshold_acceptance import validate_catalog
+        validate_catalog(root, manifest, catalog)
     expected_outputs = {manifest["catalog"]}
     inputs = {row["path"] for row in manifest["inputs"]}
     try:
@@ -638,6 +646,9 @@ class _ProofRepairInputs:
 
 def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2",
                      supplement_scope: str = "full") -> dict:
+    if supplement_scope == "positive_threshold":
+        from .q0_threshold_prepare import prepare
+        return prepare(root, threads, minimap2)
     if supplement_scope == PROOF_REPAIR_SCOPE:
         return _prepare_with_proof_repair(root.resolve(), threads=threads, minimap2=minimap2)
     manifest, _, _ = _prepare_evidence_pass(root, threads=threads, minimap2=minimap2, supplement_scope=supplement_scope)
@@ -701,6 +712,10 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                     scope_report["frontier_bp"] = sum(i.length for rows in regional_frontier.values() for i in rows)
                 else:
                     scope_report["reason"] = "provisional_q0_has_no_path"
+        if supplement_scope == "positive_threshold":
+            if not draft or repair_inputs is None: raise Q0EvidenceError("threshold generation requires a bound private pass")
+            from .q0_threshold_acceptance import SEMANTICS, record
+            scope_report.update(acceptance=SEMANTICS, threshold_request=record(regional_frontier))
         if supplement_scope != "full":
             catalog.payload["supplement_scope"] = scope_report
         tasks = []
