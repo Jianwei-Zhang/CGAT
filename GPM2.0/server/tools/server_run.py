@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 from job_final_catalog import record_early_failure
-from run_all_runner import Runner, RunnerError, WorkspaceLock, load_plan, new_run_id
+from run_all_runner import RunnerError, WorkspaceLock, load_plan, new_run_id, run_locked_plan
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from run_resources import RESOURCE_OPTIONS, update_resources
 from long_cigar_recovery.minimap_options import batch_size, seed_fraction
@@ -257,7 +257,7 @@ def execute(argv: list[str], server_source: Path) -> int:
         save_request(root, options, run_id, saved_reads=saved["options"] if saved else None)
         ensure_plan(root)
         units = load_plan(root)
-        return record_early_failure(root, lock, run_id, Runner(root, units, run_id).run())
+        return run_locked_plan(root, units, lock)
     finally:
         lock.release()
 

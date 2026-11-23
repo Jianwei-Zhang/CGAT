@@ -34,7 +34,7 @@ class PublicationError(ValueError):
 def layout_and_lock(root, lock):
     root = Path(root).resolve()
     layout = WorkspaceLayout.detect(root)
-    if (layout.version != 2 or not lock.acquired or lock.for_migration
+    if (layout.version != 2 or lock is None or not lock.acquired or lock.for_migration
             or lock.server_dir.resolve() != root or lock.state_dir != layout.path(".run_all")
             or lock._existing_owner() != lock.owner):
         raise PublicationError("refinement publication requires the held numbered-workspace lock")
