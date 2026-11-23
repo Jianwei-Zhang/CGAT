@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
+import os
 import json
 from pathlib import Path
 import shlex
@@ -17,7 +19,7 @@ TOOLS = PROJECT / 'server/tools'
 sys.path.insert(0, str(TOOLS))
 from delivery_archive import archive_options, create_archive, delivery_path, validate_tar_archive
 from server_report import (
-    embed_report_in_delivery_archives, finalize_delivery_archives_from_staging,
+    _validate_delivery_archive, embed_report_in_delivery_archives, finalize_delivery_archives_from_staging,
 )
 import test_run_all_runner as runner_fixture
 
@@ -75,6 +77,31 @@ class DeliveryArchiveTests(unittest.TestCase):
             output.write_bytes(data)
             with self.assertRaises(gzip.BadGzipFile):
                 validate_tar_archive(output, {'gpm_server/payload'})
+
+    def test_tar_integrity_and_receipt_share_one_read_and_refuse_a_replaced_archive(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            staging = root / 'sample'
+            staging.mkdir()
+            (staging / 'random').write_bytes(os.urandom(2 * 1024 * 1024))
+            archive = root / 'sample.tar.gz'
+            create_archive(staging, archive, 'tar.gz', 1)
+            # Even legal padding after the gzip trailer belongs to the archive SHA.
+            with archive.open('ab') as stream:
+                stream.write(bytes(1024))
+            expected = hashlib.sha256(archive.read_bytes()).hexdigest()
+            with patch('server_report.digest', side_effect=AssertionError('second read of tar.gz')):
+                proof = _validate_delivery_archive(archive, {'sample/random'}, 'tar.gz')
+                dest = root / 'published.tar.gz'
+                proof.before_publish(archive)
+                archive.rename(dest)
+                self.assertEqual(proof.receipt(dest)['sha256'], expected)
+                previous = dest.stat()
+                shutil.copyfile(dest, archive)
+                os.utime(archive, ns=(previous.st_atime_ns, previous.st_mtime_ns))
+                os.replace(archive, dest)
+                with self.assertRaisesRegex(ValueError, 'differs'):
+                    proof.receipt(dest)
 
     def test_single_pass_finalization_keeps_old_archives_on_second_build_failure(self):
         with tempfile.TemporaryDirectory() as temporary:

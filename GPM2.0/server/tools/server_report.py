@@ -20,6 +20,7 @@ import sys
 import uuid
 import zipfile
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 
 from server_report_collect import (
@@ -248,20 +249,44 @@ def _stage_final_report(root: Path, staging: Path, report: Path, report_files: l
         shutil.copy2(path, destination)
 
 
-def _validate_delivery_archive(
-    path: Path, required_members: set[str], format_name: str
-) -> None:
+def _archive_stamp(path):
+    st = path.lstat()
+    return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+
+@dataclass(frozen=True)
+class _CheckedArchive:
+    stamp: tuple
+    sha256: str
+
+    def before_publish(self, path):
+        if _archive_stamp(path) != self.stamp:
+            raise ValueError(f"delivery archive changed after validation: {path}")
+
+    def receipt(self, path):
+        # Renaming legitimately changes ctime, not the file we just validated.
+        if _archive_stamp(path)[:-1] != self.stamp[:-1]:
+            raise ValueError(f"published delivery differs from validated archive: {path}")
+        return {"file": path.name, "path": str(path), "size_bytes": self.stamp[2], "sha256": self.sha256}
+
+
+def _validate_delivery_archive(path: Path, required_members: set[str], format_name: str) -> _CheckedArchive:
+    stamp = _archive_stamp(path)
     if format_name == "tar.gz":
-        validate_tar_archive(path, required_members)
-        return
-    with zipfile.ZipFile(path) as archive:
-        corrupt = archive.testzip()
-        if corrupt is not None:
-            raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
-        names = set(archive.namelist())
-        missing = required_members - names
-        if missing:
-            raise ValueError(f"delivery archive is missing embedded report members: {missing}")
+        sha = validate_tar_archive(path, required_members)
+    else:
+        # ZIP validation seeks between members: its reads are not in file order.
+        with zipfile.ZipFile(path) as archive:
+            corrupt = archive.testzip()
+            if corrupt is not None:
+                raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
+            missing = required_members.difference(archive.namelist())
+            if missing:
+                raise ValueError(f"delivery archive is missing embedded report members: {missing}")
+        sha = digest(path)
+    proof = _CheckedArchive(stamp, sha)
+    proof.before_publish(path)
+    return proof
 
 
 def finalize_delivery_archives_from_staging(
@@ -273,7 +298,7 @@ def finalize_delivery_archives_from_staging(
     format_name, threads = archive_options(root)
     prefix = f"{root.name}/report/"
     required_members = {prefix + path.relative_to(report).as_posix() for path in required}
-    prepared: list[tuple[Path, Path]] = []
+    prepared: list[tuple[Path, Path, _CheckedArchive]] = []
     backups: list[tuple[Path, Path | None]] = []
     staged_reports: list[Path] = []
     artifacts: list[dict[str, object]] = []
@@ -294,13 +319,14 @@ def finalize_delivery_archives_from_staging(
                     flush=True,
                 )
                 create_archive(staging, temporary, format_name, threads)
-                _validate_delivery_archive(temporary, required_members, format_name)
+                proof = _validate_delivery_archive(temporary, required_members, format_name)
             except Exception:
                 temporary.unlink(missing_ok=True)
                 raise
-            prepared.append((archive_path, temporary))
+            prepared.append((archive_path, temporary, proof))
 
-        for archive_path, temporary in prepared:
+        for archive_path, temporary, proof in prepared:
+            proof.before_publish(temporary)
             backup = None
             if archive_path.exists():
                 backup = archive_path.with_name(
@@ -309,15 +335,7 @@ def finalize_delivery_archives_from_staging(
                 os.replace(archive_path, backup)
             backups.append((archive_path, backup))
             os.replace(temporary, archive_path)
-        artifacts = [
-            {
-                "file": archive_path.name,
-                "path": str(archive_path),
-                "size_bytes": archive_path.stat().st_size,
-                "sha256": digest(archive_path),
-            }
-            for archive_path, _ in prepared
-        ]
+        artifacts = [proof.receipt(path) for path, _, proof in prepared]
         swap_complete = True
     except Exception:
         for archive_path, backup in reversed(backups):
@@ -326,7 +344,7 @@ def finalize_delivery_archives_from_staging(
                 os.replace(backup, archive_path)
         raise
     finally:
-        for _, temporary in prepared:
+        for _, temporary, _ in prepared:
             temporary.unlink(missing_ok=True)
         for staged_report in staged_reports:
             shutil.rmtree(staged_report, ignore_errors=True)
@@ -349,7 +367,8 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
     root = root.resolve()
     report, report_files, required = _final_report_files(root)
     prefix = f"{root.name}/report/"
-    prepared: list[tuple[Path, Path]] = []
+    required_members = {prefix + path.relative_to(report).as_posix() for path in required}
+    prepared: list[tuple[Path, Path, _CheckedArchive]] = []
     backups: list[tuple[Path, Path]] = []
     artifacts: list[dict[str, object]] = []
     swap_complete = False
@@ -365,9 +384,6 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
                 if archive_path.name.endswith(".tar.gz"):
                     _, threads = archive_options(root)
                     attach_tar_report(archive_path, temporary, root, report_files, threads)
-                    validate_tar_archive(temporary, {
-                        prefix + path.relative_to(report).as_posix() for path in required
-                    })
                 else:
                     shutil.copyfile(archive_path, temporary)
                     with zipfile.ZipFile(temporary, "a", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -376,36 +392,22 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
                         for path in report_files:
                             relative = path.relative_to(report).as_posix()
                             archive.write(path, prefix + relative)
-                    with zipfile.ZipFile(temporary) as archive:
-                        corrupt = archive.testzip()
-                        if corrupt is not None:
-                            raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
-                        names = set(archive.namelist())
-                        for path in required:
-                            member = prefix + path.relative_to(report).as_posix()
-                            if member not in names:
-                                raise ValueError(f"delivery archive is missing embedded report member: {member}")
+                proof = _validate_delivery_archive(temporary, required_members,
+                                                   "tar.gz" if archive_path.name.endswith(".tar.gz") else "zip")
             except Exception:
                 temporary.unlink(missing_ok=True)
                 raise
-            prepared.append((archive_path, temporary))
+            prepared.append((archive_path, temporary, proof))
 
-        for archive_path, temporary in prepared:
+        for archive_path, temporary, proof in prepared:
+            proof.before_publish(temporary)
             backup = archive_path.with_name(
                 f".{archive_path.name}.before-report.{uuid.uuid4().hex}.bak"
             )
             os.replace(archive_path, backup)
             backups.append((archive_path, backup))
             os.replace(temporary, archive_path)
-        artifacts = [
-            {
-                "file": archive_path.name,
-                "path": str(archive_path),
-                "size_bytes": archive_path.stat().st_size,
-                "sha256": digest(archive_path),
-            }
-            for archive_path, _ in prepared
-        ]
+        artifacts = [proof.receipt(path) for path, _, proof in prepared]
         swap_complete = True
     except Exception:
         for archive_path, backup in reversed(backups):
@@ -414,7 +416,7 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
                 os.replace(backup, archive_path)
         raise
     finally:
-        for _, temporary in prepared:
+        for _, temporary, _ in prepared:
             temporary.unlink(missing_ok=True)
         if swap_complete:
             for _, backup in backups:

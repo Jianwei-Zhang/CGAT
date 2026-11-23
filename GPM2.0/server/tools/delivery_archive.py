@@ -16,6 +16,7 @@ import argparse
 import csv
 import contextlib
 import gzip
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -160,23 +161,42 @@ def attach_tar_report(source: Path, output: Path, root: Path, report_files: list
     _write_tar_gz(output, threads, populate)
 
 
-def validate_tar_archive(path: Path, required: set[str]) -> None:
+class _DigestReader:
+    """Hash compressed bytes in the order gzip consumes them (no seek/replay)."""
+    def __init__(self, raw):
+        self.raw = raw
+        self.sha = hashlib.sha256()
+
+    def read(self, size=-1):
+        data = self.raw.read(size)
+        self.sha.update(data)
+        return data
+
+
+def validate_tar_archive(path: Path, required: set[str]) -> str:
+    with path.open("rb") as raw:
+        reader = _DigestReader(raw)
+        with gzip.GzipFile(fileobj=reader, mode="rb") as stream:
+            _validate_tar_members(stream, required)
+        return reader.sha.hexdigest()
+
+
+def _validate_tar_members(stream, required):
     # Drain gzip through its trailer as well as reading every tar member.
-    with gzip.open(path, "rb") as stream:
-        with tarfile.open(fileobj=stream, mode="r|") as archive:
-            names = set()
-            for member in archive:
-                if member.name in names:
-                    raise ValueError(f"duplicate delivery member: {member.name}")
-                names.add(member.name)
-                if member.isfile():
-                    with archive.extractfile(member) as content:
-                        while content.read(1024 * 1024):
-                            pass
-            if not required.issubset(names):
-                raise ValueError(f"delivery archive is missing embedded report members: {required - names}")
-        while stream.read(1024 * 1024):
-            pass
+    with tarfile.open(fileobj=stream, mode="r|") as archive:
+        names = set()
+        for member in archive:
+            if member.name in names:
+                raise ValueError(f"duplicate delivery member: {member.name}")
+            names.add(member.name)
+            if member.isfile():
+                with archive.extractfile(member) as content:
+                    while content.read(1024 * 1024):
+                        pass
+        if not required.issubset(names):
+            raise ValueError(f"delivery archive is missing embedded report members: {required - names}")
+    while stream.read(1024 * 1024):
+        pass
 
 
 def main() -> None:
