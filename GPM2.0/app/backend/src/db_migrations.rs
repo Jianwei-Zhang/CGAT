@@ -80,6 +80,7 @@ const MIGRATIONS: &[Migration] = &[
         name: "retain_per_tool_automatic_refinement_effects",
         apply: super::create_auto_refinement_effects,
     },
+    Migration { version: 12, name: "retain_project_scoped_automatic_versions", apply: super::create_project_auto_versions },
 ];
 
 fn migrate_refinement_inputs_to_v9(conn: &Connection) -> Result<()> {

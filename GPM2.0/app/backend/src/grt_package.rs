@@ -32,6 +32,8 @@ mod persistence;
 mod q0_provenance;
 mod read_model;
 mod refined_delivery;
+mod auto_patch;
+pub use auto_patch::import_auto_patch_if_recognized;
 mod refinement_inputs;
 mod refined_source_evidence;
 mod trace_queries;

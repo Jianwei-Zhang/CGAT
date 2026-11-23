@@ -13,7 +13,7 @@ import {
   renderProjectExportPage,
 } from "../project-export-page.js";
 import { previewMutationStamp } from "../../../services/preview-content-events.js";
-import { buildProjectRefinementModel, renderProjectRefinementCard } from "../project-refinement-view.js";
+import { buildProjectRefinementModel, renderProjectRefinementCard, runImportManualRefinementResults } from "../project-refinement-view.js";
 
 function createStore(initialState) {
   let state = initialState;
@@ -354,4 +354,27 @@ test("one refinement table compares both automatic tools alongside a manual batc
   const legacy = renderProjectRefinementCard(state);
   assert.match(legacy, /未留存逐缺口统计/);
   assert.doesNotMatch(legacy, /接纳 0 处修改/);
+});
+
+test("one patch picker imports all automatic tools and distinguishes a repeated import", async () => {
+  const store = createStore({ locale: "en", initializer: {}, session: { workspacePath: "/ws", projectId: 6 } });
+  let calls = 0;
+  const deps = {
+    pickZipFilePath: async () => "/renamed.zip",
+    flushAssemblyProjectState: async () => {},
+    getProjectAssemblyViewState: async () => ({}),
+    getGrtProjectView: async () => ({}),
+    listManualRefinementResults: async () => [],
+    reloadProjectOverviewData: async () => {},
+    importManualRefinementResults: async ({ workspaceRoot, projectId, zipPath }) => {
+      assert.deepEqual([workspaceRoot, projectId, zipPath], ["/ws", 6, "/renamed.zip"]);
+      return calls++ === 0
+        ? { kind: "automatic", addedTools: ["degap", "tgsgapcloser"], duplicate: false }
+        : { kind: "automatic", addedTools: [], duplicate: true };
+    },
+  };
+  assert.equal(await runImportManualRefinementResults(null, store, null, deps), true);
+  assert.match(store.getState().initializer.projectRefinementUi.notice, /DEGAP, TGS-GapCloser.*working path has not changed/);
+  assert.equal(await runImportManualRefinementResults(null, store, null, deps), true);
+  assert.match(store.getState().initializer.projectRefinementUi.notice, /already in this project/);
 });

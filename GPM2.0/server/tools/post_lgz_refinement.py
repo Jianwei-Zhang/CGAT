@@ -23,6 +23,7 @@ from refinement_batch import execute_batch, publish_batch, check_seal, baseline_
 from refinement_commit import current_publication, recover_publication, targets
 from refinement_delivery import validate_delivery
 from job_final_catalog import publish_catalog, validate_catalog
+from project_auto_patch import publish_auto_patch, validate_auto_patch
 from refine_report import automatic_overview_digest
 from refinement_overview import render_overview
 from refinement_jobs_index import write_automatic_index
@@ -126,6 +127,7 @@ def run(root, lock, request):
                                   for name in overview_paths}}
     if layout.result_prefix:
         receipt["final_catalog_sha256"] = publish_catalog(root, lock, request["run_id"], batch["tools"])
+        receipt["auto_patch_sha256"] = publish_auto_patch(root, lock)
     completion_path = layout.path(f".runtime/refinement/completions/{request['run_id']}.json")
     atomic_write_json(completion_path, receipt)
     try:
@@ -177,6 +179,7 @@ def validate_completion(root, run_id):
             return False, "refinement overview/comparison report changed or is incomplete"
         if layout.result_prefix:
             validate_catalog(layout, receipt.get("final_catalog_sha256"))
+            validate_auto_patch(layout, receipt["auto_patch_sha256"])
         if not validate_baseline(root):
             return False, "explicit LGZ baseline publication changed or is incomplete"
         check_seal(batch.get("baseline_inputs", {}))

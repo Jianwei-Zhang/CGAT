@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from workspace_layout import initialize_workspace
+from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout, initialize_workspace
 from refinement_sources import FastaCatalog
 from refinement_path import Edit, inspect_baseline
 from refinement_degap import materialize_patches
@@ -24,8 +24,7 @@ from refinement_tools import fingerprint
 FIXTURE = Path(__file__).resolve().parents[2] / "tests/fixtures/grt_contract_v3/frozen_bridge_server.json"
 
 
-def create(root, *, with_source_evidence=False, with_source_annotations=False, native_diagnostics=None, job_outputs=False):
-    layout = initialize_workspace(root, job_outputs=job_outputs)
+def _populate_initial(root, layout):
     original = json.loads(FIXTURE.read_text())
     for name, contents in original["files"].items():
         target = layout.path(name)
@@ -54,16 +53,24 @@ def create(root, *, with_source_evidence=False, with_source_annotations=False, n
                 if key.endswith("_relpath") and row[key]:
                     row[key] = layout.relative(row[key])
         write_table(path, fields, rows)
-    run_id, tool = "a" * 32, "degap"
+
+
+def create(root, *, with_source_evidence=False, with_source_annotations=False, native_diagnostics=None, job_outputs=False,
+           tool="degap", reuse_workspace=False):
+    layout = WorkspaceLayout.detect(root) if reuse_workspace else initialize_workspace(root, job_outputs=job_outputs)
+    if not reuse_workspace:
+        _populate_initial(root, layout)
+    code = TOOL_DIRECTORIES[tool]
+    run_id = "a" * 32 if tool == "degap" else "b" * 32
     final_file = layout.path("metadata/grt_final_path.json")
     baseline = json.loads(final_file.read_text())
     fasta = layout.path(baseline["q4_relpath"])
-    private = root / ".runtime/refinement/01_degap" / run_id
+    private = root / f".runtime/refinement/{code}" / run_id
     catalog = FastaCatalog(root, private / "fixture-indexes")
     catalog.load_workspace()
     gaps, _ = inspect_baseline(baseline, catalog)
     gap = gaps[0]
-    native = root / "04_refinement/01_degap/03_native" / run_id
+    native = root / f"04_refinement/{code}/03_native" / run_id
     native.mkdir(parents=True)
     candidate = native / "controlled_candidate.fa"
     candidate.write_text(">candidate\nGTNNAC\n")
@@ -71,10 +78,10 @@ def create(root, *, with_source_evidence=False, with_source_annotations=False, n
     edit = Edit("fixture-edit", tool, gap.chromosome, gap.start, gap.end,
                 {"dataset": "controlled_native", "contig": "candidate", "start": 1, "end": 6, "orientation": "+"},
                 (gap.gap_id,), "controlled-not-native-engine", {"fixture": "controlled admission; native engine not executed"})
-    accepted = root / "04_refinement/01_degap/04_accepted" / run_id
+    accepted = root / f"04_refinement/{code}/04_accepted" / run_id
     accepted.mkdir(parents=True)
-    edits = materialize_patches([edit], catalog, accepted)
-    jobs = root / "04_refinement/01_degap/02_jobs" / run_id
+    edits = materialize_patches([edit], catalog, accepted, tool=tool)
+    jobs = root / f"04_refinement/{code}/02_jobs" / run_id
     jobs.mkdir(parents=True)
     log = jobs / "native.log"
     log.write_text("Controlled admission fixture; no native engine was executed.\n")
@@ -101,6 +108,8 @@ def create(root, *, with_source_evidence=False, with_source_annotations=False, n
             native_diagnostics(native, gap)
         report = build_tool_report(root, result)
         full, light = root / ".runtime/app-fixture/full", root / ".runtime/app-fixture/light"
+        if reuse_workspace:
+            full, light = full.parent / (tool + "-full"), light.parent / (tool + "-light")
         build_full(root, result, report, full)
         build_light(full, light)
         validate_payload(full, full=True)

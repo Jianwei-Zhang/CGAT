@@ -1616,6 +1616,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tar",
+ "tempfile",
  "zip 0.6.6",
 ]
 

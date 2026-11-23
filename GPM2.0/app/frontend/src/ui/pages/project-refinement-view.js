@@ -30,6 +30,8 @@ const COPY = {
   zh: {
     sectionTitle: "精修",
     importAction: "导入精修补丁",
+    autoPatchImported: "已加入自动精修结果：{tools}。当前工作路径未改变。",
+    autoPatchDuplicate: "这些自动精修结果已在项目中，未重复导入。",
     tableColumns: ["来源", "工具 / 批次", "已闭合", "部分填补", "未填补", "拒绝", "结果"],
     tableHint: "自动行按原始缺口计数；手动行按所选 Gap 的候选结果计数，不代表已采用。— 表示无此项或未记录。",
     editCount: "接纳 {n} 处修改", legacySegments: "记录了 {n} 个接纳片段", unknownStats: "未留存逐缺口统计",
@@ -110,6 +112,8 @@ const COPY = {
   en: {
     sectionTitle: "Refinement",
     importAction: "Import refinement patch",
+    autoPatchImported: "Added automatic results: {tools}. The working path has not changed.",
+    autoPatchDuplicate: "These automatic results are already in this project.",
     tableColumns: ["Source", "Tool / batch", "Closed", "Partial", "Unfilled", "Rejected", "Result"],
     tableHint: "Automatic rows count original gaps. Manual rows count candidate outcomes per selected Gap, not adoptions. A dash means not recorded or not applicable.",
     editCount: "{n} accepted edits", legacySegments: "{n} recorded accepted segments", unknownStats: "Gap outcomes not recorded",
@@ -685,7 +689,9 @@ export async function runImportManualRefinementResults(host, store, rerender, de
     }
     const shortSha = (result?.resultSha256 || "").slice(0, 12) || "-";
     let notice = "";
-    if (result?.isLegacyOnly) {
+    if (rawResult?.kind === "automatic") {
+      notice = rawResult.duplicate ? copy.autoPatchDuplicate : fmt(copy.autoPatchImported, { tools: formatTools(rawResult.addedTools) });
+    } else if (result?.isLegacyOnly) {
       notice = fmt(copy.importLegacyOnlyMsg, { sha: shortSha });
     } else if (result?.duplicate) {
       notice = fmt(copy.importDuplicateMsg, { sha: shortSha });

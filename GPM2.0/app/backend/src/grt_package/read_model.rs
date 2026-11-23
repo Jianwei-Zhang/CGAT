@@ -655,16 +655,22 @@ pub fn load_grt_source_card_statuses(project_db_path: &Path) -> Result<Vec<GrtSo
         .collect()
 }
 
-fn load_auto_effects(path: &Path) -> Result<Vec<AutoRefinementEffect>> {
+fn load_auto_effects(path: &Path, project: Option<i64>) -> Result<Vec<AutoRefinementEffect>> {
     let conn = open_workspace_db(path)?;
-    let mut stmt = conn.prepare("SELECT effect_json FROM grt_auto_refinement_effect WHERE package_id=1 ORDER BY tool")?;
-    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
-    rows.map(|raw| Ok(serde_json::from_str(&raw?)?)).collect()
+    let mut stmt = conn.prepare("SELECT effect_json FROM grt_auto_refinement_effect WHERE package_id=1
+        UNION ALL SELECT effect_json FROM project_auto_version WHERE project_id=?1 ORDER BY 1")?;
+    let rows = stmt.query_map([project], |row| row.get::<_, String>(0))?;
+    let mut versions = BTreeMap::new();
+    for row in rows {
+        let effect: AutoRefinementEffect = serde_json::from_str(&row?)?;
+        versions.insert((effect.tool.clone(), effect.run_id.clone()), effect);
+    }
+    Ok(versions.into_values().collect())
 }
 
 pub fn load_grt_project_view(project_db_path: &Path) -> Result<GrtProjectView> {
     Ok(GrtProjectView {
-        auto_refinement_effects: load_auto_effects(project_db_path)?,
+        auto_refinement_effects: load_auto_effects(project_db_path, None)?,
         recipe: load_grt_locked_recipe(project_db_path)?,
         final_path_by_chr: load_grt_final_path_by_chr(project_db_path)?,
         source_cards: load_grt_source_card_statuses(project_db_path)?,
@@ -677,7 +683,7 @@ pub fn load_grt_project_view_for_project(
     project_id: i64,
 ) -> Result<GrtProjectView> {
     Ok(GrtProjectView {
-        auto_refinement_effects: load_auto_effects(project_db_path)?,
+        auto_refinement_effects: load_auto_effects(project_db_path, Some(project_id))?,
         recipe: load_grt_locked_recipe(project_db_path)?,
         final_path_by_chr: load_grt_final_path_by_chr_for_project(project_db_path, project_id)?,
         source_cards: load_grt_source_card_statuses(project_db_path)?,

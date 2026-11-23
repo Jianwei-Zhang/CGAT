@@ -859,3 +859,65 @@ fn manual_refinement_applies_gap_and_both_tel_ends_in_one_project_batch() -> Res
     verify(&temp.path().join("only-right.fa"), "", "TTAGGGTTAGGG")?;
     Ok(())
 }
+
+#[test]
+#[ignore = "requires Python, samtools, minimap2 and ZIP for real Server publications"]
+fn cumulative_server_auto_patch_imports_all_versions_without_changing_edited_paths() -> Result<()> {
+    let dir=tempdir()?;
+    let script=Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_auto_patch_fixture.py");
+    let generator=std::process::Command::new("python3").arg(script).arg(dir.path()).output()?;
+    assert!(generator.status.success(),"{}",String::from_utf8_lossy(&generator.stderr));
+    let root=dir.path().join("baseline");
+    let (outcome,_) = crate::importer::import_from_extracted_bundle(&root)?;
+    let db=&outcome.project_db_path;
+    let p=initialize_grt_project(db,"already edited LGZ")?.project_id;
+    let p2=initialize_grt_project(db,"independent LGZ")?.project_id;
+    let conn=crate::db::open_workspace_db(db)?;
+    let edit="{\"chr2\":{\"user_edit_marker\":\"do not replace\"}}";
+    conn.execute("INSERT INTO project_assembly_view_state(project_id,final_path_by_chr_json,updated_at) VALUES(?1,?2,'before') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json",params![p,edit])?;
+    let call=|project,filename:&str| -> Result<Value> {
+        import_auto_patch_if_recognized(&root,project,&dir.path().join(filename))?.context("unrecognized automatic patch")
+    };
+    // A resealed ZIP with one damaged content object must not register even its intact tool.
+    {
+        use std::io::Read;
+        let mut input = zip::ZipArchive::new(fs::File::open(dir.path().join("tgsgapcloser.zip"))?)?;
+        let mut output = zip::ZipWriter::new(fs::File::create(dir.path().join("damaged.zip"))?);
+        let mut damaged = false;
+        for n in 0..input.len() {
+            let mut member = input.by_index(n)?;
+            let mut bytes = Vec::new();
+            member.read_to_end(&mut bytes)?;
+            if member.name().starts_with("objects/") && !damaged && !bytes.is_empty() {
+                bytes[0] ^= 1;
+                damaged = true;
+            }
+            output.start_file(member.name(), FileOptions::default())?;
+            output.write_all(&bytes)?;
+        }
+        output.finish()?;
+        assert!(damaged);
+        let err = call(p, "damaged.zip").unwrap_err();
+        assert!(err.to_string().contains("digest mismatch"), "{err:#}");
+        for table in ["project_auto_version", "project_auto_version_object"] {
+            assert_eq!(conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get::<_,i64>(0))?,0);
+        }
+    }
+    assert_eq!(call(p,"degap.zip")?["addedTools"],serde_json::json!(["degap"]));
+    assert_eq!(call(p,"tgsgapcloser.zip")?["addedTools"],serde_json::json!(["tgsgapcloser"]));
+    assert_eq!(call(p,"tgsgapcloser.zip")?["duplicate"],true);
+    let version_count=|project|conn.query_row("SELECT COUNT(*) FROM project_auto_version WHERE project_id=?1",[project],|r|r.get::<_,i64>(0));
+    assert_eq!(version_count(p)?,2); assert_eq!(version_count(p2)?,0);
+    let objects=||conn.query_row("SELECT COUNT(*) FROM project_auto_version_object",[],|r|r.get::<_,i64>(0));
+    let first=objects()?;
+    assert_eq!(call(p2,"tgsgapcloser.zip")?["addedTools"],serde_json::json!(["degap","tgsgapcloser"]));
+    assert_eq!(first,objects()?);
+    let view=load_grt_project_view_for_project(db,p)?;
+    assert_eq!(view.auto_refinement_effects.iter().map(|e|(&*e.tool,e.partial)).collect::<Vec<_>>(),vec![("degap",1),("tgsgapcloser",1)]);
+    let after:String=conn.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1",[p],|r|r.get(0))?;
+    assert_eq!(after,edit);
+    // A different immutable LGZ path is not the same project origin even when the FASTA hash still matches.
+    conn.execute("UPDATE grt_package SET final_path_json=json_set(final_path_json,'$.other_origin',1) WHERE id=1",[])?;
+    assert!(call(p,"tgsgapcloser.zip").is_err()); assert_eq!(version_count(p)?,2); assert_eq!(first,objects()?);
+    Ok(())
+}
