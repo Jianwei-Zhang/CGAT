@@ -25,10 +25,10 @@ from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 from .q0_sources import Q0EvidenceError, SourceKey
 try:
     from run_orchestration import atomic_write_json, sha256_file as _partition_sha256
-    from run_orchestration import file_identity as _file_identity, OrchestrationContractError
+    from run_orchestration import file_identity as _file_identity, file_signature, OrchestrationContractError
 except ModuleNotFoundError:
     from ..run_orchestration import atomic_write_json, sha256_file as _partition_sha256
-    from ..run_orchestration import file_identity as _file_identity, OrchestrationContractError
+    from ..run_orchestration import file_identity as _file_identity, file_signature, OrchestrationContractError
 
 def _default_checkpoint_manager(root):
     # Keep the module-level injection point used by provenance-aware incident
@@ -45,6 +45,8 @@ OuterCheckpointManager = _default_checkpoint_manager
 
 SCHEMA = "lgz_q0_evidence_v1"
 MANIFEST = "metadata/grt_q0_evidence.json"
+PROOF_REPAIR_SCOPE = "decision_frontier_repair"
+MAX_PROOF_REPAIRS = 2
 MAPPING_OUTPUT_FILES = ("query.fa", "target.fa", "result.paf", "command.json")
 POLICY = {"version": 5, "weak_global_seed": WEAK_GLOBAL_SEED_POLICY, "regional_partial_discovery": REGIONAL_POLICY, "regional_candidate_discovery": CANDIDATE_POLICY, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
           "supplement": "out_of_group_split_and_missing_ref_neighbors",
@@ -115,21 +117,29 @@ def supplement_policy(scope: str) -> dict:
     """Bind the explicit Q0-only profile without editing base checkpoint inputs."""
     if scope == "full":
         return POLICY
-    if scope != "decision_frontier":
+    if scope not in ("decision_frontier", PROOF_REPAIR_SCOPE):
         raise Q0EvidenceError("unsupported q0 supplement scope")
     from .q0_admission import selector_identity
     from .q0_frontier_scope import FRONTIER_FLANK_BP
-    return {**POLICY, "decision_frontier": {"version": 2, "flank_bp": FRONTIER_FLANK_BP,
-                                           "selector": selector_identity(), "whole_source_equivalence": False}}
+    frontier = {"version": 2, "flank_bp": FRONTIER_FLANK_BP,
+                "selector": selector_identity(), "whole_source_equivalence": False}
+    if scope == PROOF_REPAIR_SCOPE:
+        frontier["repair"] = {"version": 1, "maximum_rounds": MAX_PROOF_REPAIRS, "requires_no_reads_qc": True}
+    return {**POLICY, "decision_frontier": frontier}
 
 
-def load_verified_evidence(root: Path) -> dict:
+def load_verified_evidence(root: Path, *, _draft=None) -> dict:
     """No fallback: consumers must reject missing, stale, or damaged evidence."""
     root = root.resolve()
-    manifest = json_file(root / MANIFEST)
+    # Repair verifies complete private in-memory manifests through the same
+    # consumer. Canonical callers never see intermediate scoped generations.
+    manifest = json_file(root / MANIFEST) if _draft is None else _draft
     policy = manifest.get("policy")
-    scoped = isinstance(policy, dict) and "decision_frontier" in policy
-    scope = "decision_frontier" if scoped else "full"
+    frontier = policy.get("decision_frontier") if isinstance(policy, dict) else None
+    scoped = isinstance(frontier, dict)
+    scope = "full"
+    if scoped:
+        scope = PROOF_REPAIR_SCOPE if "repair" in frontier else "decision_frontier"
     if (manifest.get("schema") != SCHEMA or manifest.get("status") != "success"
             or policy != supplement_policy(scope) or manifest.get("builder") != builder_identity()):
         raise Q0EvidenceError("q0 evidence manifest has an unsupported or stale identity")
@@ -157,7 +167,7 @@ def load_verified_evidence(root: Path) -> dict:
     report = catalog.get("supplement_scope")
     if scoped:
         if (not isinstance(report, dict) or report.get("requested") != scope
-                or report.get("effective") not in ("full", scope)
+                or report.get("effective") not in ("full", "decision_frontier")
                 or not isinstance(report.get("unsearched_part_intervals"), list)):
             raise Q0EvidenceError("q0 supplemental catalog lacks its bound scope")
         skipped = 0
@@ -165,7 +175,7 @@ def load_verified_evidence(root: Path) -> dict:
             if phase not in catalog:
                 continue
             r = catalog[phase]
-            if (not isinstance(r, dict) or r.get("frontier_scope") is not (report["effective"] == scope)
+            if (not isinstance(r, dict) or r.get("frontier_scope") is not (report["effective"] == "decision_frontier")
                     or type(r.get("frontier_omitted_windows")) is not int or r["frontier_omitted_windows"] < 0):
                 raise Q0EvidenceError("q0 regional omission report disagrees with its bound scope")
             skipped += r["frontier_omitted_windows"]
@@ -174,6 +184,13 @@ def load_verified_evidence(root: Path) -> dict:
             raise Q0EvidenceError("q0 scope and its omitted intervals disagree")
     elif report is not None:
         raise Q0EvidenceError("full q0 manifest cannot attest scoped supplemental work")
+    if scope == PROOF_REPAIR_SCOPE:
+        _readless_package(root)
+        required = [row for row in manifest["inputs"] if row["path"] == "metadata/package.tsv"]
+        repair_rounds = report.get("proof_repair_rounds")
+        if (len(required) != 1 or type(repair_rounds) is not int or not 0 <= repair_rounds <= MAX_PROOF_REPAIRS
+                or identity(root, "metadata/package.tsv") != required[0]):
+            raise Q0EvidenceError("q0 proof repair lacks a bound no-reads-QC package or repair round")
     expected_outputs = {manifest["catalog"]}
     inputs = {row["path"] for row in manifest["inputs"]}
     try:
@@ -563,8 +580,22 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
               f"queries={len(seed['query_ids'])} targets={len(seed['target_ids'])}",flush=True)
     return scopes
 
+def _readless_package(root):
+    rows = table(root, "metadata/package.tsv", ("reads_qc_enabled",))
+    if len(rows) != 1 or rows[0]["reads_qc_enabled"] != "false":
+        raise Q0EvidenceError("q0 proof repair requires a package without reads QC; use full supplemental evidence")
+
+
 def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2",
                      supplement_scope: str = "full") -> dict:
+    if supplement_scope == PROOF_REPAIR_SCOPE:
+        return _prepare_with_proof_repair(root.resolve(), threads=threads, minimap2=minimap2)
+    manifest, _, _ = _prepare_evidence_pass(root, threads=threads, minimap2=minimap2, supplement_scope=supplement_scope)
+    return manifest
+
+
+def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
+                           draft=False, frontier_override=None, repair_round=0, fallback_reason=None, expected_input=None):
     root = root.resolve()
     if threads < 1:
         raise Q0EvidenceError("q0 evidence threads must be positive")
@@ -573,16 +604,22 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
     sources, lengths, assignments, options, input_paths, base_alignments, known_pairs = _initial_inputs(root)
     if "q0_supplement_scope" in options:
         raise Q0EvidenceError("set experimental q0 scope on the evidence command, not prepare_options.tsv")
+    if supplement_scope == PROOF_REPAIR_SCOPE:
+        input_paths = sorted(set(input_paths) | {"metadata/package.tsv"})
     inputs = [identity(root, relative) for relative in input_paths]
+    if supplement_scope == PROOF_REPAIR_SCOPE:
+        _readless_package(root)
     tool = executable_identity(minimap2)
     request_identity = stable_id("q0-evidence-input", {"inputs": inputs, "tool": tool,
                                 "policy": run_policy, "builder": builder})
-    if (root / MANIFEST).is_file():
+    if expected_input is not None and expected_input != request_identity:
+        raise Q0EvidenceError("q0 proof repair input identity changed between passes")
+    if expected_input is None and (root / MANIFEST).is_file():
         try:
             previous = load_verified_evidence(root)
             if previous.get("input_fingerprint") == request_identity:
                 print("LGZ q0 evidence cache hit: " + request_identity)
-                return previous
+                return previous, None, True
         except Q0EvidenceError:
             pass
     use_regional = regional_enabled(lengths, options.get("minimap_preset", "asm10"))
@@ -594,13 +631,18 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
         if cache: cache.publish()
         from .q0_frontier_scope import UnsearchedWindows
         regional_frontier = None
-        unsearched = UnsearchedWindows() if supplement_scope == "decision_frontier" else None
+        unsearched = UnsearchedWindows() if supplement_scope != "full" else None
         scope_report = {"requested": supplement_scope, "effective": "full"}
-        if supplement_scope == "decision_frontier":
-            if not cache:
+        if supplement_scope == PROOF_REPAIR_SCOPE:
+            scope_report["proof_repair_rounds"] = repair_round
+        if unsearched is not None:
+            if fallback_reason is not None:
+                scope_report["reason"] = fallback_reason
+            elif not cache:
                 scope_report["reason"] = "regional_route_disabled"
             else:
-                regional_frontier = _provisional_frontier(root, sources, lengths, catalog, base_alignments)
+                regional_frontier = (frontier_override if frontier_override is not None else
+                                     _provisional_frontier(root, sources, lengths, catalog, base_alignments))
                 if regional_frontier is not None:
                     scope_report["effective"] = "decision_frontier"
                     scope_report["frontier_sources"] = len(regional_frontier)
@@ -746,7 +788,66 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
                     "input_fingerprint": request_identity, "inputs": inputs,
                     "outputs": outputs,
                     "catalog": catalog_name, "tool": tool}
-        atomic_write_json(root / MANIFEST, manifest)
-        print(f"LGZ q0 evidence prepared: candidates={len(payload['candidates'])} "
+        if not draft:
+            atomic_write_json(root / MANIFEST, manifest)
+        action = "draft prepared" if draft else "prepared"
+        print(f"LGZ q0 evidence {action}: candidates={len(payload['candidates'])} "
               f"supplementary_tasks={len(tasks)} unplaced_segments={len(payload['unplaced_segment_ids'])}")
-        return manifest
+        return manifest, regional_frontier, False
+
+
+def _prepare_with_proof_repair(root, *, threads, minimap2):
+    from .q0_admission import load_evidence_input, select_q0_paths
+    from .q0_frontier_scope import UnsearchedQ0Context, audit_selected_scope, selected_proof_frontier
+    from .q0_sources import merged_intervals
+
+    _readless_package(root)
+    expected_input, frontier = None, None
+    fallback_reason = None
+    for iteration in range(MAX_PROOF_REPAIRS + 2):
+        manifest, planned, cached = _prepare_evidence_pass(
+            root, threads=threads, minimap2=minimap2, supplement_scope=PROOF_REPAIR_SCOPE,
+            draft=True, expected_input=expected_input, frontier_override=frontier,
+            repair_round=min(iteration, MAX_PROOF_REPAIRS), fallback_reason=fallback_reason)
+        if cached:
+            return manifest
+        expected_input = manifest["input_fingerprint"]
+        paths = tuple(root / _artifact_member(row["path"]) for key in ("inputs", "outputs") for row in manifest[key])
+        paths += (Path(manifest["tool"]["resolved"]),)
+        before = tuple(file_signature(path) for path in paths)
+        if planned is None:
+            # No omissions (e.g. native routing or bounded repair exhausted).
+            load_verified_evidence(root, _draft=manifest)
+            break
+        data = load_evidence_input(root, _draft=manifest)
+        selection = select_q0_paths(data)
+        if not any(row.path is not None for row in selection.paths.values()):
+            fallback_reason = "scoped_q0_has_no_path"
+        else:
+            try:
+                audit_selected_scope(data, selection.admission, selection.paths)
+            except UnsearchedQ0Context:
+                proof = selected_proof_frontier(data, selection.admission, selection.paths)
+                frontier = {source: merged_intervals((*planned.get(source, ()), *proof.get(source, ())))
+                            for source in planned.keys() | proof.keys()}
+                if frontier == planned:
+                    raise Q0EvidenceError("q0 proof repair found omissions inside an already requested frontier")
+                if iteration >= MAX_PROOF_REPAIRS:
+                    fallback_reason = "proof_repair_budget_exhausted"
+            else:
+                break
+        action = fallback_reason or "expand_selected_proof_frontier"
+        print(f"LGZ q0 proof repair: pass={iteration} next={action}", flush=True)
+        del data, selection
+    else:
+        raise Q0EvidenceError("q0 proof repair produced no publishable evidence")
+    # The verified inputs may not drift while selecting (even if bytes are
+    # later restored). Keep this fence process-local, never as a cache receipt.
+    if (manifest["builder"] != builder_identity()
+            or manifest["policy"] != supplement_policy(PROOF_REPAIR_SCOPE)
+            or _partition_sha256(paths[-1]) != manifest["tool"]["sha256"]
+            or before != tuple(file_signature(path) for path in paths)):
+        raise Q0EvidenceError("q0 proof repair evidence changed during selection; no manifest published")
+    atomic_write_json(root / MANIFEST, manifest)
+    print("LGZ q0 evidence proof repair: verified ready published", flush=True)
+    return manifest

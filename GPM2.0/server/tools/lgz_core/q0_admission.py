@@ -103,9 +103,12 @@ def _project(source: Interval, target: Interval, strand: str, interval: Interval
     return Interval(target.end - (interval.end - source.start), target.end - (interval.start - source.start))
 
 
-def load_evidence_input(root: Path) -> EvidenceInput:
+def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
     root = root.resolve()
-    manifest = load_verified_evidence(root)
+    def verified():
+        return load_verified_evidence(root) if _draft is None else load_verified_evidence(root, _draft=_draft)
+
+    manifest = verified()
     catalog = json_file(artifact_path(root, manifest["catalog"]))
     if catalog.get("min_gap") != manifest["policy"]["min_gap"]:
         raise Q0EvidenceError("q0 catalog gap policy differs from ready manifest")
@@ -163,7 +166,7 @@ def load_evidence_input(root: Path) -> EvidenceInput:
             raise Q0EvidenceError("q0 catalog evidence record differs from the bound PAF")
     for edge in adjacencies:
         evidence[edge.adjacency_id] = {"kind": "input_assembly_adjacency", "catalog": manifest["catalog"], **asdict(edge)}
-    if manifest != load_verified_evidence(root):
+    if manifest != verified():
         raise Q0EvidenceError("q0 evidence changed during admission loading")
     return EvidenceInput(sources, parts, lengths, dict(reference_hits), tuple(links), tuple(adjacencies),
                          evidence, manifest["input_fingerprint"], catalog, stable_id("q0-ready-evidence", manifest))

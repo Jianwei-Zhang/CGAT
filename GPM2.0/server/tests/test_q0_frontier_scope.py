@@ -150,6 +150,70 @@ class FrontierScopeTests(unittest.TestCase):
         with self.assertRaisesRegex(Q0EvidenceError,"exceeds"):
             omitted.observe(w(99,101),(),parts)
 
+    def test_proof_repair_only_promotes_after_success_and_reuses_normal_reader(self):
+        from server.tools.lgz_core import q0_frontier_scope as scope
+
+        fixture, truth = bridge_fixture()
+        with tempfile.TemporaryDirectory() as temporary, redirect_stdout(StringIO()):
+            root = fixture.workspace(temporary)
+            (root / "metadata/package.tsv").write_text("reads_qc_enabled\nfalse\n")
+            old = (root / q0_preparation.MANIFEST).read_bytes()
+            mapper = str(Path(temporary) / "q0-fixture-bin/minimap2")
+            env = {"PATH": str(Path(mapper).parent) + os.pathsep + os.environ.get("PATH", "")}
+            actual_audit = scope.audit_selected_scope
+            seen = []
+
+            def require_once(data, admission, searches):
+                self.assertEqual((root / q0_preparation.MANIFEST).read_bytes(), old)
+                seen.append(data.catalog["supplement_scope"]["proof_repair_rounds"])
+                if len(seen) == 1:
+                    raise UnsearchedQ0Context("simulated first scoped veto")
+                return actual_audit(data, admission, searches)
+
+            with (patch.dict(os.environ, env), patch.object(q0_preparation, "regional_enabled", return_value=True),
+                  patch.object(scope, "audit_selected_scope", side_effect=require_once)):
+                ready = q0_preparation.prepare_evidence(root, minimap2=mapper,
+                                                        supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE)
+            self.assertEqual(seen, [0, 1])
+            self.assertNotEqual((root / q0_preparation.MANIFEST).read_bytes(), old)
+            self.assertEqual(ready, q0_preparation.load_verified_evidence(root))
+            self.assertEqual(q0_admission.build_q0(root).records["chr1"], truth)
+            with (patch.dict(os.environ, env), patch.object(q0_preparation, "_provisional_frontier",
+                                                            side_effect=AssertionError("ready was not reused"))):
+                self.assertEqual(ready, q0_preparation.prepare_evidence(root, minimap2=mapper,
+                                                                       supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE))
+
+    def test_proof_repair_does_not_publish_after_draft_input_drift(self):
+        from server.tools.lgz_core import q0_frontier_scope as scope
+
+        fixture, _ = bridge_fixture()
+        with tempfile.TemporaryDirectory() as temporary, redirect_stdout(StringIO()):
+            root = fixture.workspace(temporary)
+            package = root / "metadata/package.tsv"
+            package.write_text("reads_qc_enabled\nfalse\n")
+            old = (root / q0_preparation.MANIFEST).read_bytes()
+            mapper = str(Path(temporary) / "q0-fixture-bin/minimap2")
+            env = {"PATH": str(Path(mapper).parent) + os.pathsep + os.environ.get("PATH", "")}
+
+            def drift(*args):
+                package.write_text("reads_qc_enabled\ntrue\n")
+
+            with (patch.dict(os.environ, env), patch.object(q0_preparation, "regional_enabled", return_value=True),
+                  patch.object(scope, "audit_selected_scope", side_effect=drift)):
+                with self.assertRaisesRegex(Q0EvidenceError, "changed during selection"):
+                    q0_preparation.prepare_evidence(root, minimap2=mapper,
+                                                    supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE)
+            self.assertEqual((root / q0_preparation.MANIFEST).read_bytes(), old)
+
+    def test_proof_repair_refuses_reads_qc_before_computing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "metadata").mkdir()
+            (root / "metadata/package.tsv").write_text("reads_qc_enabled\ntrue\n")
+            with patch.object(q0_preparation, "_initial_inputs", side_effect=AssertionError("unexpected work")):
+                with self.assertRaisesRegex(Q0EvidenceError, "without reads QC"):
+                    q0_preparation.prepare_evidence(root, supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE)
+
     def test_foreign_scope_rejected_before_reading_inputs(self):
         with patch.object(q0_preparation, "_initial_inputs", side_effect=AssertionError("unexpected read")):
             with self.assertRaisesRegex(Q0EvidenceError, "unsupported q0 supplement scope"):
