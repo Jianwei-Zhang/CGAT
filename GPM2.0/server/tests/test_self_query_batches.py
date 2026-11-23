@@ -56,7 +56,8 @@ class HotspotFixtureTests(unittest.TestCase):
             while True:
                 try:
                     state = next(line for line in status.read_text().splitlines() if line.startswith('State:'))
-                except FileNotFoundError:
+                except (FileNotFoundError, ProcessLookupError):
+                    # Linux can reap it after open(2) but before reading procfs (ESRCH).
                     break
                 if state.split()[1] == 'Z':
                     break
