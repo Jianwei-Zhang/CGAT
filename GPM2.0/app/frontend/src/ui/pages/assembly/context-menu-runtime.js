@@ -160,8 +160,14 @@ function renderContextMenuItem(item, path, deps) {
     attrs.push("disabled");
     attrs.push('aria-disabled="true"');
   }
+  if (item?.toggleable) {
+    attrs.push(`aria-pressed="${item.selected ? "true" : "false"}"`);
+  }
   if (title) attrs.push(title.trimStart());
-  return `<button class="context-menu-item${disabled ? " is-disabled" : ""}" ${attrs.join(" ")}>${label}</button>`;
+  const classes = ["context-menu-item"];
+  if (disabled) classes.push("is-disabled");
+  if (item?.toggleable && item.selected) classes.push("is-selected");
+  return `<button class="${classes.join(" ")}" ${attrs.join(" ")}>${label}</button>`;
 }
 
 export function renderContextMenuItems(items, deps) {
@@ -333,6 +339,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
 
   let submenuCleanup = null;
   let activePreviewCleanup = null;
+  let suppressScrollCloseUntil = 0;
   const clearItemPreview = () => { activePreviewCleanup?.(); activePreviewCleanup = null; };
   let activeSubviewFragmentNode = null;
   let activeSubviewHitNode = null;
@@ -457,8 +464,36 @@ export function bindAssemblyContextMenu(host, store, deps) {
           return;
         }
         if (item.keepOpen) {
-          const result = await item.run();
-          if (result !== false) {
+          suppressScrollCloseUntil = Date.now() + 250;
+          let result;
+          try {
+            result = await item.run();
+          } finally {
+            suppressScrollCloseUntil = Date.now() + 180;
+          }
+          if (result === false) {
+            return;
+          }
+          if (item.toggleable) {
+            const nextSelected = typeof result === "object" && result !== null && typeof result.queued === "boolean"
+              ? result.queued
+              : !item.selected;
+            item.selected = nextSelected;
+            button.classList?.toggle?.("is-selected", nextSelected);
+            button.setAttribute?.("aria-pressed", nextSelected ? "true" : "false");
+            const nextLabel = nextSelected
+              ? (item.selectedLabel || item.label)
+              : (item.unselectedLabel || item.label);
+            if (nextLabel) {
+              button.textContent = nextLabel;
+            }
+            const nextTitle = nextSelected ? (item.selectedTitle || "") : (item.unselectedTitle || "");
+            if (nextTitle) {
+              button.setAttribute?.("data-app-tooltip", nextTitle);
+            } else {
+              button.removeAttribute?.("data-app-tooltip");
+            }
+          } else {
             item.disabled = true;
             button.disabled = true;
             button.classList?.add?.("is-disabled");
@@ -496,6 +531,9 @@ export function bindAssemblyContextMenu(host, store, deps) {
     closeMenu();
   });
   host.addEventListener("scroll", () => {
+    if (Date.now() < suppressScrollCloseUntil) {
+      return;
+    }
     closeMenu();
   }, true);
 

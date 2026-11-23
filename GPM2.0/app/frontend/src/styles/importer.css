@@ -860,12 +860,34 @@
 .library-tree .project-recent-name strong { font-weight: 400; color: var(--text-secondary, #334155); }
 .library-tree .project-recent-open::after { display: none; }
 .library-tree .project-recent-open:focus-visible { outline: 2px solid var(--focus-ring, #4f82b5); outline-offset: -2px; border-radius: 5px; }
-.library-tree .project-recent-row.is-active { background: var(--theme-blue-surface, #eff6ff); box-shadow: inset 3px 0 var(--focus-ring, #4f82b5); }
-.library-tree .project-recent-row.is-active:hover { background: var(--theme-blue-surface, #eff6ff); }
-.library-tree .project-recent-row.is-active .project-recent-name strong { font-weight: 600; color: var(--text-primary, #1e293b); }
+.library-tree .project-recent-row.is-active {
+  background: color-mix(in srgb, var(--focus-ring, #4f82b5) 12%, var(--surface-panel, #ffffff));
+  border-color: color-mix(in srgb, var(--focus-ring, #4f82b5) 28%, transparent);
+  box-shadow: none;
+}
+.library-tree .project-recent-row.is-active::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--focus-ring, #4f82b5);
+  pointer-events: none;
+}
+.library-tree .project-recent-row.is-active:hover {
+  background: color-mix(in srgb, var(--focus-ring, #4f82b5) 16%, var(--surface-panel, #ffffff));
+}
+.library-tree .project-recent-row.is-active .project-recent-name strong { font-weight: 600; color: var(--theme-blue-ink, #1e3a5f); }
 .library-tree .project-recent-row.is-active .project-recent-name > .project-icon { color: var(--focus-ring, #4f82b5); }
 .library-tree .project-recent-row.has-validation-error { border-color: var(--theme-red-line, #b91c1c); }
-.library-tree .project-recent-row.has-validation-error.is-active { box-shadow: inset 3px 0 var(--danger, #b91c1c); }
+.library-tree .project-recent-row.has-validation-error.is-active {
+  background: color-mix(in srgb, var(--danger, #b91c1c) 10%, var(--surface-panel, #ffffff));
+  border-color: color-mix(in srgb, var(--danger, #b91c1c) 32%, transparent);
+  box-shadow: none;
+}
+.library-tree .project-recent-row.has-validation-error.is-active::before { background: var(--danger, #b91c1c); }
 .library-tree .project-recent-row.has-validation-error .project-recent-name strong,
 .library-tree .project-recent-row.has-validation-error .project-recent-name > .project-icon { color: var(--danger, #b91c1c); }
 .library-row-menu { flex: 0 0 26px; width: 26px; height: 26px; min-height: 26px; padding: 4px; color: var(--text-muted, #64748b); }

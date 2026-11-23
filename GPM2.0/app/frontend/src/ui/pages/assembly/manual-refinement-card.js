@@ -17,11 +17,7 @@ const COPY = {
     title: "精修任务",
     toggleOpen: "展开精修任务面板",
     toggleClose: "收起精修任务面板",
-    scopeCurrentPill: "{chr} · {count}",
-    scopeCurrentFallback: "当前染色体 · {count}",
-    scopeAllPill: "全部 · {count}",
     empty: "右键上方 Final Path 中的 Gap 或首尾 Contig 添加精修任务。",
-    emptyCurrentHasOther: "当前染色体暂无精修任务（全项目已选 {count} 项）。",
     gapBlockTitle: "Gap",
     telBlockTitle: "Tel",
     kindGap: "Gap",
@@ -35,45 +31,62 @@ const COPY = {
     removeLocus: "移除任务：{target}",
     removeGapTool: "移除任务：{target} · {tool}",
     settingsBtn: "参数设置",
-    settingsBtnTitle: "配置 4 个精修工具的默认参数与 Server reads",
-    settingsTitle: "精修默认参数设置",
-    settingsSubtitle: "修改将自动保存并随精修任务包导出到 Server 执行；未修改项沿用工具默认。",
+    settingsBtnTitle: "当前项目精修参数与 Server reads 设置",
+    settingsTitle: "精修参数设置",
+    settingsProjectNotice: "仅保存于当前项目，修改自动生效",
     settingsTabReads: "Server Reads",
     settingsResetTab: "恢复本页默认",
     settingsResetAll: "重置全部",
     settingsDone: "完成",
     settingsClose: "关闭设置",
     unlimited: "不限",
-    degapGapGroup: "Gap 延伸参数",
-    degapTelGroup: "TelSeeker 参数",
-    degapMaxRounds: "最大延伸轮数 (MaximumExtensionRound)",
-    degapMaxBp: "最大延伸长度 bp (MaximumExtensionLength)",
-    degapKmerFilter: "启用 k-mer 过滤 (kmer_filter)",
-    degapKmerSize: "k-mer 长度 (kmer_size)",
-    degapKmerNum: "k-mer 数量 (kmer_num)",
-    degapEdge: "边界长度 (edge)",
-    degapFilterHifi: "HiFi 深度过滤 (filterDepthHifi)",
-    degapFilterOnt: "ONT 深度过滤 (filterDepthOnt)",
-    degapOptionalPlaceholder: "留空不启用",
-    degapTelN: "端粒窗口长度 (tel-n)",
-    degapTelR: "端粒比例阈值 (tel-r)",
-    degapTelMm: "允许错配数 (tel-mm)",
-    lrGroup: "LR_Gapcloser 参数",
-    lrIterations: "迭代次数 (-r)",
-    lrTagPartitions: "标签分区数 (-n)",
-    tgsHifiGroup: "HiFi Reads 参数",
-    tgsOntGroup: "ONT Reads 参数",
+    degapGapGroup: "Gap 延伸",
+    degapTelGroup: "TelSeeker",
+    degapMaxRounds: "最大延伸轮数",
+    degapMaxRoundsTip: "DEGAP MaximumExtensionRound：最大迭代延伸轮数",
+    degapMaxBp: "最大延伸长度 (bp)",
+    degapMaxBpTip: "DEGAP MaximumExtensionLength：单侧最大延伸碱基长度",
+    degapKmerFilter: "k-mer 过滤",
+    degapKmerFilterTip: "DEGAP kmer_filter：启用后按 k-mer 过滤候选延伸 reads",
+    degapKmerSize: "k-mer 长度",
+    degapKmerSizeTip: "DEGAP kmer_size：过滤用 k-mer 长度",
+    degapKmerNum: "k-mer 数量",
+    degapKmerNumTip: "DEGAP kmer_num：过滤所需最小 k-mer 命中数",
+    degapEdge: "边界长度",
+    degapEdgeTip: "DEGAP edge：用于末端比对的边界序列长度 (bp)",
+    degapFilterHifi: "HiFi 深度过滤",
+    degapFilterHifiTip: "DEGAP filterDepthHifi（0~1），留空不启用",
+    degapFilterOnt: "ONT 深度过滤",
+    degapFilterOntTip: "DEGAP filterDepthOnt（0~1），留空不启用",
+    degapOptionalPlaceholder: "留空关闭",
+    degapTelN: "端粒窗口",
+    degapTelNTip: "DEGAP tel-n：端粒扫描窗口长度 (bp)",
+    degapTelR: "端粒比例",
+    degapTelRTip: "DEGAP tel-r：窗口内端粒重复比例阈值 (0~1)",
+    degapTelMm: "允许错配",
+    degapTelMmTip: "DEGAP tel-mm：端粒 motif 允许错配数",
+    lrIterations: "迭代次数",
+    lrIterationsTip: "LR_Gapcloser -r：迭代补洞轮数",
+    lrTagPartitions: "标签分区数",
+    lrTagPartitionsTip: "LR_Gapcloser -n：reads 分区并行数",
+    tgsHifiGroup: "HiFi",
+    tgsOntGroup: "ONT",
     tgsCorrection: "纠错模式",
-    tgsCorrectionNone: "关闭纠错 (--ne)",
-    tgsCorrectionRacon: "Racon 纠错 (--racon)",
-    tgsRaconRounds: "Racon 轮数 (--r_round)",
-    tgsMinimap: "Minimap2 预设 (--minmap_arg)",
-    quartetGroup: "quarTeT GapFiller 参数",
-    quartetMinimap: "Minimap2 预设 (--minimapoption)",
-    readsInherit: "沿用项目已校验 reads（不展示私有路径；空 reads 仍可导出并在 Server 传 --hifi / --ont）",
-    readsOverride: "手动指定或清空 Server reads（填服务器绝对路径，分号或换行分隔）",
-    hifiLabel: "HiFi reads",
-    ontLabel: "ONT reads",
+    tgsCorrectionTip: "关闭纠错 (--ne) 或启用 Racon 纠错 (--racon)",
+    tgsCorrectionNone: "关闭",
+    tgsCorrectionRacon: "Racon",
+    tgsRaconRounds: "Racon 轮数",
+    tgsRaconRoundsTip: "TGS-GapCloser --r_round：Racon 纠错迭代轮数",
+    tgsMinimap: "Minimap2 预设",
+    tgsMinimapTip: "TGS-GapCloser --minmap_arg：比对预设参数",
+    quartetMinimap: "Minimap2 预设",
+    quartetMinimapTip: "quarTeT GapFiller --minimapoption：比对预设参数",
+    readsInherit: "沿用项目默认 reads",
+    readsInheritTip: "自动复用项目已校验 reads（不展示路径；为空时可在 Server 传 --hifi / --ont）",
+    readsOverride: "自定义 Server 路径",
+    readsOverrideTip: "填写服务器绝对路径，多文件用分号或换行分隔",
+    hifiLabel: "HiFi",
+    ontLabel: "ONT",
     clearReads: "清空",
     exportBtn: "导出 ({count})",
     exportBtnTitle: "导出精修任务 refine-jobs（当前染色体 {chr} · {count} 项）",
@@ -92,11 +105,7 @@ const COPY = {
     title: "Refinement Tasks",
     toggleOpen: "Expand refinement tasks panel",
     toggleClose: "Collapse refinement tasks panel",
-    scopeCurrentPill: "{chr} · {count}",
-    scopeCurrentFallback: "Current chr · {count}",
-    scopeAllPill: "All · {count}",
     empty: "Right-click a Gap or terminal Contig in the Final Path above to queue refinement jobs.",
-    emptyCurrentHasOther: "No jobs on this chromosome ({count} queued across project).",
     gapBlockTitle: "Gap",
     telBlockTitle: "Tel",
     kindGap: "Gap",
@@ -110,9 +119,9 @@ const COPY = {
     removeLocus: "Remove job: {target}",
     removeGapTool: "Remove job: {target} · {tool}",
     settingsBtn: "Settings",
-    settingsBtnTitle: "Configure default parameters for all 4 refinement tools and Server reads",
-    settingsTitle: "Refinement Default Settings",
-    settingsSubtitle: "Changes save automatically and export with the task archive for Server execution; unchanged fields keep tool defaults.",
+    settingsBtnTitle: "Project-level refinement parameters and Server reads",
+    settingsTitle: "Refinement Settings",
+    settingsProjectNotice: "Saved per project · changes apply automatically",
     settingsTabReads: "Server Reads",
     settingsResetTab: "Reset Tab",
     settingsResetAll: "Reset All",
@@ -121,34 +130,51 @@ const COPY = {
     unlimited: "Unlimited",
     degapGapGroup: "Gap Extension",
     degapTelGroup: "TelSeeker",
-    degapMaxRounds: "Max extension rounds (MaximumExtensionRound)",
-    degapMaxBp: "Max extension length bp (MaximumExtensionLength)",
-    degapKmerFilter: "Enable k-mer filter (kmer_filter)",
-    degapKmerSize: "k-mer size (kmer_size)",
-    degapKmerNum: "k-mer count (kmer_num)",
-    degapEdge: "Edge length (edge)",
-    degapFilterHifi: "HiFi depth filter (filterDepthHifi)",
-    degapFilterOnt: "ONT depth filter (filterDepthOnt)",
-    degapOptionalPlaceholder: "Empty = off",
-    degapTelN: "Telomere window (tel-n)",
-    degapTelR: "Telomere ratio (tel-r)",
-    degapTelMm: "Allowed mismatches (tel-mm)",
-    lrGroup: "LR_Gapcloser",
-    lrIterations: "Iterations (-r)",
-    lrTagPartitions: "Tag partitions (-n)",
-    tgsHifiGroup: "HiFi Reads",
-    tgsOntGroup: "ONT Reads",
-    tgsCorrection: "Correction mode",
-    tgsCorrectionNone: "Disabled (--ne)",
-    tgsCorrectionRacon: "Racon (--racon)",
-    tgsRaconRounds: "Racon rounds (--r_round)",
-    tgsMinimap: "Minimap2 preset (--minmap_arg)",
-    quartetGroup: "quarTeT GapFiller",
-    quartetMinimap: "Minimap2 preset (--minimapoption)",
-    readsInherit: "Inherit verified project reads (private paths stay hidden; empty reads remain exportable for Server --hifi / --ont)",
-    readsOverride: "Override or clear Server reads (Server absolute paths, separated by semicolon or newline)",
-    hifiLabel: "HiFi reads",
-    ontLabel: "ONT reads",
+    degapMaxRounds: "Max rounds",
+    degapMaxRoundsTip: "DEGAP MaximumExtensionRound: maximum extension iterations",
+    degapMaxBp: "Max length (bp)",
+    degapMaxBpTip: "DEGAP MaximumExtensionLength: maximum extension length in bp",
+    degapKmerFilter: "k-mer filter",
+    degapKmerFilterTip: "DEGAP kmer_filter: filter candidate extension reads by k-mers",
+    degapKmerSize: "k-mer size",
+    degapKmerSizeTip: "DEGAP kmer_size: k-mer length for filtering",
+    degapKmerNum: "k-mer count",
+    degapKmerNumTip: "DEGAP kmer_num: minimum k-mer hits for filtering",
+    degapEdge: "Edge length",
+    degapEdgeTip: "DEGAP edge: terminal flank length (bp) used for alignment",
+    degapFilterHifi: "HiFi depth filter",
+    degapFilterHifiTip: "DEGAP filterDepthHifi (0–1), leave empty to disable",
+    degapFilterOnt: "ONT depth filter",
+    degapFilterOntTip: "DEGAP filterDepthOnt (0–1), leave empty to disable",
+    degapOptionalPlaceholder: "Off",
+    degapTelN: "Telomere window",
+    degapTelNTip: "DEGAP tel-n: telomere scan window length (bp)",
+    degapTelR: "Telomere ratio",
+    degapTelRTip: "DEGAP tel-r: minimum telomere repeat ratio (0–1)",
+    degapTelMm: "Mismatches",
+    degapTelMmTip: "DEGAP tel-mm: allowed telomere motif mismatches",
+    lrIterations: "Iterations",
+    lrIterationsTip: "LR_Gapcloser -r: number of gap-closing iterations",
+    lrTagPartitions: "Tag partitions",
+    lrTagPartitionsTip: "LR_Gapcloser -n: read tag partitions",
+    tgsHifiGroup: "HiFi",
+    tgsOntGroup: "ONT",
+    tgsCorrection: "Correction",
+    tgsCorrectionTip: "Disable correction (--ne) or enable Racon (--racon)",
+    tgsCorrectionNone: "Off",
+    tgsCorrectionRacon: "Racon",
+    tgsRaconRounds: "Racon rounds",
+    tgsRaconRoundsTip: "TGS-GapCloser --r_round: Racon polishing iterations",
+    tgsMinimap: "Minimap2 preset",
+    tgsMinimapTip: "TGS-GapCloser --minmap_arg: alignment preset",
+    quartetMinimap: "Minimap2 preset",
+    quartetMinimapTip: "quarTeT GapFiller --minimapoption: alignment preset",
+    readsInherit: "Inherit project default reads",
+    readsInheritTip: "Reuse verified project reads (paths stay hidden; empty reads can use Server --hifi / --ont)",
+    readsOverride: "Custom Server paths",
+    readsOverrideTip: "Server absolute paths, separated by semicolon or newline",
+    hifiLabel: "HiFi",
+    ontLabel: "ONT",
     clearReads: "Clear",
     exportBtn: "Export ({count})",
     exportBtnTitle: "Export refine-jobs (Current chr {chr} · {count} jobs)",
@@ -326,7 +352,7 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
         <legend>${escapeHtml(copy.degapGapGroup)}</legend>
         <div class="manual-ref-settings-grid">
           <div class="manual-ref-param-field">
-            <label for="mr-degap-rounds">${escapeHtml(copy.degapMaxRounds)}</label>
+            <label for="mr-degap-rounds" data-app-tooltip="${escapeAttr(copy.degapMaxRoundsTip)}">${escapeHtml(copy.degapMaxRounds)}</label>
             <div class="manual-ref-limit-row">
               <input id="mr-degap-rounds" type="number" min="1" max="1000" step="1"
                 data-manual-ref-param-tool="degap" data-manual-ref-param-field="max_extension_rounds"
@@ -340,7 +366,7 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
             </div>
           </div>
           <div class="manual-ref-param-field">
-            <label for="mr-degap-bp">${escapeHtml(copy.degapMaxBp)}</label>
+            <label for="mr-degap-bp" data-app-tooltip="${escapeAttr(copy.degapMaxBpTip)}">${escapeHtml(copy.degapMaxBp)}</label>
             <div class="manual-ref-limit-row">
               <input id="mr-degap-bp" type="number" min="1000" max="100000000" step="10000"
                 data-manual-ref-param-tool="degap" data-manual-ref-param-field="max_extension_bp"
@@ -353,38 +379,38 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
               </label>
             </div>
           </div>
-          <label class="manual-ref-check-row is-wide">
+          <label class="manual-ref-check-row is-wide" data-app-tooltip="${escapeAttr(copy.degapKmerFilterTip)}">
             <input type="checkbox" data-manual-ref-param-tool="degap" data-manual-ref-param-field="kmer_filter"
               ${d.kmer_filter ? "checked" : ""}${disabledAttr} />
             <span>${escapeHtml(copy.degapKmerFilter)}</span>
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapKmerSize)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapKmerSizeTip)}">${escapeHtml(copy.degapKmerSize)}</span>
             <input type="number" min="11" max="127" step="1"
               data-manual-ref-param-tool="degap" data-manual-ref-param-field="kmer_size"
               value="${escapeAttr(String(d.kmer_size))}"${disabledAttr} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapKmerNum)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapKmerNumTip)}">${escapeHtml(copy.degapKmerNum)}</span>
             <input type="number" min="1" max="1000" step="1"
               data-manual-ref-param-tool="degap" data-manual-ref-param-field="kmer_num"
               value="${escapeAttr(String(d.kmer_num))}"${disabledAttr} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapEdge)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapEdgeTip)}">${escapeHtml(copy.degapEdge)}</span>
             <input type="number" min="50" max="50000" step="50"
               data-manual-ref-param-tool="degap" data-manual-ref-param-field="edge"
               value="${escapeAttr(String(d.edge))}"${disabledAttr} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapFilterHifi)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapFilterHifiTip)}">${escapeHtml(copy.degapFilterHifi)}</span>
             <input type="number" min="0.01" max="0.99" step="0.05"
               data-manual-ref-param-tool="degap" data-manual-ref-param-field="filter_depth_hifi"
               value="${escapeAttr(d.filter_depth_hifi === null ? "" : String(d.filter_depth_hifi))}"
               placeholder="${escapeAttr(copy.degapOptionalPlaceholder)}"${disabledAttr} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapFilterOnt)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapFilterOntTip)}">${escapeHtml(copy.degapFilterOnt)}</span>
             <input type="number" min="0.01" max="0.99" step="0.05"
               data-manual-ref-param-tool="degap" data-manual-ref-param-field="filter_depth_ont"
               value="${escapeAttr(d.filter_depth_ont === null ? "" : String(d.filter_depth_ont))}"
@@ -396,19 +422,19 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
         <legend>${escapeHtml(copy.degapTelGroup)}</legend>
         <div class="manual-ref-settings-grid is-three-col">
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapTelN)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapTelNTip)}">${escapeHtml(copy.degapTelN)}</span>
             <input type="number" min="10" max="10000" step="10"
               data-manual-ref-param-tool="degap" data-manual-ref-param-field="tel_n"
               value="${escapeAttr(String(d.tel_n))}"${disabledAttr} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapTelR)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapTelRTip)}">${escapeHtml(copy.degapTelR)}</span>
             <input type="number" min="0.01" max="1" step="0.05"
               data-manual-ref-param-tool="degap" data-manual-ref-param-field="tel_r"
               value="${escapeAttr(String(d.tel_r))}"${disabledAttr} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.degapTelMm)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.degapTelMmTip)}">${escapeHtml(copy.degapTelMm)}</span>
             <select data-manual-ref-param-tool="degap" data-manual-ref-param-field="tel_mm"${disabledAttr}>
               ${renderSelectOptions(["0", "1"], String(d.tel_mm), { escapeAttr, escapeHtml })}
             </select>
@@ -421,23 +447,20 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
   if (tab === "lrgapcloser") {
     const lr = params.lrgapcloser;
     return `<div class="manual-ref-settings-pane" data-manual-ref-settings-pane="lrgapcloser">
-      <fieldset class="manual-ref-settings-group">
-        <legend>${escapeHtml(copy.lrGroup)}</legend>
-        <div class="manual-ref-settings-grid">
-          <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.lrIterations)}</span>
-            <input type="number" min="1" max="20" step="1"
-              data-manual-ref-param-tool="lrgapcloser" data-manual-ref-param-field="iterations"
-              value="${escapeAttr(String(lr.iterations))}"${disabledAttr} />
-          </label>
-          <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.lrTagPartitions)}</span>
-            <input type="number" min="1" max="16" step="1"
-              data-manual-ref-param-tool="lrgapcloser" data-manual-ref-param-field="tag_partitions"
-              value="${escapeAttr(String(lr.tag_partitions))}"${disabledAttr} />
-          </label>
-        </div>
-      </fieldset>
+      <div class="manual-ref-settings-grid">
+        <label class="manual-ref-param-field">
+          <span data-app-tooltip="${escapeAttr(copy.lrIterationsTip)}">${escapeHtml(copy.lrIterations)}</span>
+          <input type="number" min="1" max="20" step="1"
+            data-manual-ref-param-tool="lrgapcloser" data-manual-ref-param-field="iterations"
+            value="${escapeAttr(String(lr.iterations))}"${disabledAttr} />
+        </label>
+        <label class="manual-ref-param-field">
+          <span data-app-tooltip="${escapeAttr(copy.lrTagPartitionsTip)}">${escapeHtml(copy.lrTagPartitions)}</span>
+          <input type="number" min="1" max="16" step="1"
+            data-manual-ref-param-tool="lrgapcloser" data-manual-ref-param-field="tag_partitions"
+            value="${escapeAttr(String(lr.tag_partitions))}"${disabledAttr} />
+        </label>
+      </div>
     </div>`;
   }
 
@@ -452,20 +475,20 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
         <legend>${escapeHtml(copy.tgsHifiGroup)}</legend>
         <div class="manual-ref-settings-grid is-three-col">
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.tgsCorrection)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.tgsCorrectionTip)}">${escapeHtml(copy.tgsCorrection)}</span>
             <select data-manual-ref-param-tool="tgsgapcloser" data-manual-ref-param-field="hifi_correction"${disabledAttr}>
               ${renderSelectOptions(correctionOptions, tgs.hifi_correction, { escapeAttr, escapeHtml })}
             </select>
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.tgsRaconRounds)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.tgsRaconRoundsTip)}">${escapeHtml(copy.tgsRaconRounds)}</span>
             <input type="number" min="1" max="5" step="1"
               data-manual-ref-param-tool="tgsgapcloser" data-manual-ref-param-field="hifi_racon_rounds"
               value="${escapeAttr(String(tgs.hifi_racon_rounds))}"
               ${tgs.hifi_correction !== "native_racon" || state.exporting ? "disabled" : ""} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.tgsMinimap)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.tgsMinimapTip)}">${escapeHtml(copy.tgsMinimap)}</span>
             <select data-manual-ref-param-tool="tgsgapcloser" data-manual-ref-param-field="hifi_minimap"${disabledAttr}>
               ${renderSelectOptions(TGS_HIFI_MINIMAP_OPTIONS, tgs.hifi_minimap, { escapeAttr, escapeHtml })}
             </select>
@@ -476,20 +499,20 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
         <legend>${escapeHtml(copy.tgsOntGroup)}</legend>
         <div class="manual-ref-settings-grid is-three-col">
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.tgsCorrection)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.tgsCorrectionTip)}">${escapeHtml(copy.tgsCorrection)}</span>
             <select data-manual-ref-param-tool="tgsgapcloser" data-manual-ref-param-field="ont_correction"${disabledAttr}>
               ${renderSelectOptions(correctionOptions, tgs.ont_correction, { escapeAttr, escapeHtml })}
             </select>
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.tgsRaconRounds)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.tgsRaconRoundsTip)}">${escapeHtml(copy.tgsRaconRounds)}</span>
             <input type="number" min="1" max="5" step="1"
               data-manual-ref-param-tool="tgsgapcloser" data-manual-ref-param-field="ont_racon_rounds"
               value="${escapeAttr(String(tgs.ont_racon_rounds))}"
               ${tgs.ont_correction !== "native_racon" || state.exporting ? "disabled" : ""} />
           </label>
           <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.tgsMinimap)}</span>
+            <span data-app-tooltip="${escapeAttr(copy.tgsMinimapTip)}">${escapeHtml(copy.tgsMinimap)}</span>
             <select data-manual-ref-param-tool="tgsgapcloser" data-manual-ref-param-field="ont_minimap"${disabledAttr}>
               ${renderSelectOptions(TGS_ONT_MINIMAP_OPTIONS, tgs.ont_minimap, { escapeAttr, escapeHtml })}
             </select>
@@ -502,52 +525,46 @@ function renderSettingsTabBody(state, { copy, escapeAttr, escapeHtml }) {
   if (tab === "quartet") {
     const q = params.quartet;
     return `<div class="manual-ref-settings-pane" data-manual-ref-settings-pane="quartet">
-      <fieldset class="manual-ref-settings-group">
-        <legend>${escapeHtml(copy.quartetGroup)}</legend>
-        <div class="manual-ref-settings-grid">
-          <label class="manual-ref-param-field">
-            <span>${escapeHtml(copy.quartetMinimap)}</span>
-            <select data-manual-ref-param-tool="quartet" data-manual-ref-param-field="minimap"${disabledAttr}>
-              ${renderSelectOptions(QUARTET_MINIMAP_OPTIONS, q.minimap, { escapeAttr, escapeHtml })}
-            </select>
-          </label>
-        </div>
-      </fieldset>
+      <div class="manual-ref-settings-grid">
+        <label class="manual-ref-param-field">
+          <span data-app-tooltip="${escapeAttr(copy.quartetMinimapTip)}">${escapeHtml(copy.quartetMinimap)}</span>
+          <select data-manual-ref-param-tool="quartet" data-manual-ref-param-field="minimap"${disabledAttr}>
+            ${renderSelectOptions(QUARTET_MINIMAP_OPTIONS, q.minimap, { escapeAttr, escapeHtml })}
+          </select>
+        </label>
+      </div>
     </div>`;
   }
 
   return `<div class="manual-ref-settings-pane" data-manual-ref-settings-pane="reads">
-    <fieldset class="manual-ref-settings-group">
-      <legend>${escapeHtml(copy.settingsTabReads)}</legend>
-      <div class="manual-ref-reads-modes">
-        <label class="manual-ref-radio">
-          <input type="radio" name="manual-ref-reads-mode" data-manual-ref-reads-mode value="inherit" ${state.readsMode !== "override" ? "checked" : ""}${disabledAttr} />
-          <span>${escapeHtml(copy.readsInherit)}</span>
-        </label>
-        <label class="manual-ref-radio">
-          <input type="radio" name="manual-ref-reads-mode" data-manual-ref-reads-mode value="override" ${state.readsMode === "override" ? "checked" : ""}${disabledAttr} />
-          <span>${escapeHtml(copy.readsOverride)}</span>
-        </label>
-      </div>
-      ${state.readsMode === "override"
-        ? `<div class="manual-ref-reads-inputs">
-            <div class="manual-ref-read-field">
-              <label for="manual-ref-hifi-input">${escapeHtml(copy.hifiLabel)}</label>
-              <div class="manual-ref-read-input-row">
-                <input id="manual-ref-hifi-input" type="text" data-manual-ref-reads-field="hifi" value="${escapeAttr(state.hifiReadsInput)}" placeholder="/server/reads/hifi.fastq.gz" autocomplete="off" spellcheck="false"${disabledAttr} />
-                <button type="button" class="button ghost tiny" data-manual-ref-clear-reads="hifi"${disabledAttr}>${escapeHtml(copy.clearReads)}</button>
-              </div>
+    <div class="manual-ref-reads-modes">
+      <label class="manual-ref-radio" data-app-tooltip="${escapeAttr(copy.readsInheritTip)}">
+        <input type="radio" name="manual-ref-reads-mode" data-manual-ref-reads-mode value="inherit" ${state.readsMode !== "override" ? "checked" : ""}${disabledAttr} />
+        <span>${escapeHtml(copy.readsInherit)}</span>
+      </label>
+      <label class="manual-ref-radio" data-app-tooltip="${escapeAttr(copy.readsOverrideTip)}">
+        <input type="radio" name="manual-ref-reads-mode" data-manual-ref-reads-mode value="override" ${state.readsMode === "override" ? "checked" : ""}${disabledAttr} />
+        <span>${escapeHtml(copy.readsOverride)}</span>
+      </label>
+    </div>
+    ${state.readsMode === "override"
+      ? `<div class="manual-ref-reads-inputs">
+          <div class="manual-ref-read-field">
+            <label for="manual-ref-hifi-input">${escapeHtml(copy.hifiLabel)}</label>
+            <div class="manual-ref-read-input-row">
+              <input id="manual-ref-hifi-input" type="text" data-manual-ref-reads-field="hifi" value="${escapeAttr(state.hifiReadsInput)}" placeholder="/server/reads/hifi.fastq.gz" autocomplete="off" spellcheck="false"${disabledAttr} />
+              <button type="button" class="button ghost tiny" data-manual-ref-clear-reads="hifi"${disabledAttr}>${escapeHtml(copy.clearReads)}</button>
             </div>
-            <div class="manual-ref-read-field">
-              <label for="manual-ref-ont-input">${escapeHtml(copy.ontLabel)}</label>
-              <div class="manual-ref-read-input-row">
-                <input id="manual-ref-ont-input" type="text" data-manual-ref-reads-field="ont" value="${escapeAttr(state.ontReadsInput)}" placeholder="/server/reads/ont.fastq.gz" autocomplete="off" spellcheck="false"${disabledAttr} />
-                <button type="button" class="button ghost tiny" data-manual-ref-clear-reads="ont"${disabledAttr}>${escapeHtml(copy.clearReads)}</button>
-              </div>
+          </div>
+          <div class="manual-ref-read-field">
+            <label for="manual-ref-ont-input">${escapeHtml(copy.ontLabel)}</label>
+            <div class="manual-ref-read-input-row">
+              <input id="manual-ref-ont-input" type="text" data-manual-ref-reads-field="ont" value="${escapeAttr(state.ontReadsInput)}" placeholder="/server/reads/ont.fastq.gz" autocomplete="off" spellcheck="false"${disabledAttr} />
+              <button type="button" class="button ghost tiny" data-manual-ref-clear-reads="ont"${disabledAttr}>${escapeHtml(copy.clearReads)}</button>
             </div>
-          </div>`
-        : ""}
-    </fieldset>
+          </div>
+        </div>`
+      : ""}
   </div>`;
 }
 
@@ -575,10 +592,7 @@ function renderSettingsModal(state, { copy, escapeAttr, escapeHtml }) {
       aria-label="${escapeAttr(copy.settingsTitle)}"
     >
       <header class="manual-ref-settings-head">
-        <div>
-          <h4>${escapeHtml(copy.settingsTitle)}</h4>
-          <p class="muted manual-ref-hint">${escapeHtml(copy.settingsSubtitle)}</p>
-        </div>
+        <h4>${escapeHtml(copy.settingsTitle)}</h4>
         <button
           type="button"
           class="button ghost tiny"
@@ -586,6 +600,7 @@ function renderSettingsModal(state, { copy, escapeAttr, escapeHtml }) {
           aria-label="${escapeAttr(copy.settingsClose)}"
         >×</button>
       </header>
+      <p class="manual-ref-settings-scope-notice" data-manual-ref-settings-scope-notice role="note">${escapeHtml(copy.settingsProjectNotice)}</p>
       <div class="manual-ref-settings-tabs" role="tablist">
         ${tabs.map((item) => `<button
           type="button"
@@ -622,43 +637,53 @@ export function renderManualRefinementToast({ manualRefinement }, { escapeHtml }
   return `<div class="final-path-toast-wrap" data-final-path-toast aria-live="polite"><p class="final-path-toast is-ok" role="status">${escapeHtml(feedbackText)}</p></div>`;
 }
 
-export function renderManualRefinementCard(
-  { chrName, manualRefinement, locale = "zh" },
+export function renderManualRefinementSettingsModal(
+  { manualRefinement, locale = "zh" },
   { escapeAttr, escapeHtml },
 ) {
   const copy = COPY[locale === "en" ? "en" : "zh"];
   const state = normalizeManualRefinementState(manualRefinement);
-  const hasVisibleReceipt = Boolean(state.lastExport && !state.receiptDismissed);
-  if (
-    !state.loci.length
-    && !state.exporting
-    && !state.settingsOpen
-    && !hasVisibleReceipt
-  ) {
-    return "";
-  }
+  return renderSettingsModal(state, { copy, escapeAttr, escapeHtml });
+}
+
+export function renderManualRefinementCard(
+  { chrName, manualRefinement, locale = "zh", includeSettingsModal = true },
+  { escapeAttr, escapeHtml },
+) {
+  const copy = COPY[locale === "en" ? "en" : "zh"];
+  const state = normalizeManualRefinementState(manualRefinement);
+  const normalizedChrName = String(chrName || "").trim();
   const currentChrLoci = filterManualRefinementLociByScope(state.loci, {
     scope: "current-chr",
-    chrName,
+    chrName: normalizedChrName,
   });
   const currentChrJobsCount = countManualRefinementJobs(currentChrLoci);
   const allJobsCount = countManualRefinementJobs(state.loci);
-  const effectiveScope = chrName && state.viewScope !== "all" ? "current-chr" : "all";
-  const visibleLoci = effectiveScope === "current-chr" ? currentChrLoci : state.loci;
+  const visibleLoci = normalizedChrName ? currentChrLoci : state.loci;
+  const visibleJobsCount = normalizedChrName ? currentChrJobsCount : allJobsCount;
+  const receiptMatchesChr = Boolean(
+    state.lastExport
+    && !state.receiptDismissed
+    && (!normalizedChrName
+      || !state.lastExport.chrName
+      || state.lastExport.scope === "all"
+      || state.lastExport.chrName === normalizedChrName),
+  );
+  if (!visibleLoci.length && !receiptMatchesChr) {
+    return includeSettingsModal && state.settingsOpen
+      ? renderSettingsModal(state, { copy, escapeAttr, escapeHtml })
+      : "";
+  }
   const gapLoci = visibleLoci.filter((locus) => locus.kind === "gap");
   const telLoci = visibleLoci.filter((locus) => locus.kind !== "gap");
   const gapJobsCount = countManualRefinementJobs(gapLoci);
-  const showChrPill = effectiveScope === "all";
+  const showChrPill = !normalizedChrName;
 
   const isOpen = state.panelOpen;
   const toggleLabel = isOpen ? copy.toggleClose : copy.toggleOpen;
-  const currentPillText = chrName
-    ? fmt(copy.scopeCurrentPill, { chr: chrName, count: currentChrJobsCount })
-    : fmt(copy.scopeCurrentFallback, { count: currentChrJobsCount });
-  const allPillText = fmt(copy.scopeAllPill, { count: allJobsCount });
   const hasCustomSettings = hasCustomManualRefinementToolParams(state.toolParams) || state.readsMode === "override";
   const exportBtnTitle = fmt(copy.exportBtnTitle, {
-    chr: chrName || "-",
+    chr: normalizedChrName || "-",
     count: currentChrJobsCount,
   });
 
@@ -669,7 +694,7 @@ export function renderManualRefinementCard(
           <span class="manual-ref-block-count">${escapeHtml(String(gapJobsCount))}</span>
         </div>
         <div class="manual-ref-block-list" role="list">
-          ${gapLoci.flatMap((locus) => locus.tools.map((tool) => renderGapJobRow(locus, tool, { chrName, showChrPill, exporting: state.exporting, copy, escapeAttr, escapeHtml }))).join("")}
+          ${gapLoci.flatMap((locus) => locus.tools.map((tool) => renderGapJobRow(locus, tool, { chrName: normalizedChrName, showChrPill, exporting: state.exporting, copy, escapeAttr, escapeHtml }))).join("")}
         </div>
       </div>`
     : "";
@@ -681,27 +706,23 @@ export function renderManualRefinementCard(
           <span class="manual-ref-block-count">${escapeHtml(String(telLoci.length))}</span>
         </div>
         <div class="manual-ref-block-list" role="list">
-          ${telLoci.map((locus) => renderTelRow(locus, { chrName, showChrPill, exporting: state.exporting, copy, escapeAttr, escapeHtml })).join("")}
+          ${telLoci.map((locus) => renderTelRow(locus, { chrName: normalizedChrName, showChrPill, exporting: state.exporting, copy, escapeAttr, escapeHtml })).join("")}
         </div>
       </div>`
     : "";
 
   const blocksMarkup = (gapLoci.length || telLoci.length)
     ? `<div class="manual-ref-blocks">${gapSectionMarkup}${telSectionMarkup}</div>`
-    : `<p class="muted manual-ref-empty">${escapeHtml(
-      effectiveScope === "current-chr" && allJobsCount > 0
-        ? fmt(copy.emptyCurrentHasOther, { count: allJobsCount })
-        : copy.empty,
-    )}</p>`;
+    : `<p class="muted manual-ref-empty">${escapeHtml(copy.empty)}</p>`;
 
   const bodyMarkup = isOpen
     ? `<div class="manual-ref-body" data-manual-ref-body>
         ${blocksMarkup}
-        ${renderLastExportReceipt(state.lastExport, { dismissed: state.receiptDismissed, copy, escapeAttr, escapeHtml })}
+        ${receiptMatchesChr ? renderLastExportReceipt(state.lastExport, { dismissed: state.receiptDismissed, copy, escapeAttr, escapeHtml }) : ""}
       </div>`
     : "";
 
-  return `<section class="degap-job-card manual-ref-card${isOpen ? "" : " is-collapsed"}${state.exporting ? " is-exporting" : ""}" data-manual-ref-card aria-busy="${state.exporting ? "true" : "false"}">
+  return `<section class="degap-job-card manual-ref-card${isOpen ? "" : " is-collapsed"}${state.exporting ? " is-exporting" : ""}" data-manual-ref-card data-manual-ref-card-chr="${escapeAttr(normalizedChrName)}" aria-busy="${state.exporting ? "true" : "false"}">
     <div class="degap-jobs-head manual-ref-head">
       <div class="manual-ref-head-left">
         <button
@@ -711,25 +732,9 @@ export function renderManualRefinementCard(
           aria-expanded="${isOpen ? "true" : "false"}"
           aria-label="${escapeAttr(toggleLabel)}"
         >
-          <span class="degap-job-card-indicator" aria-hidden="true">${isOpen ? "▾" : "▸"}</span>
           <strong>${escapeHtml(copy.title)}</strong>
+          <span class="manual-ref-title-count" data-manual-ref-count>· ${escapeHtml(String(visibleJobsCount))}</span>
         </button>
-        <div class="manual-ref-scope-counts" role="group" aria-live="polite">
-          <button
-            type="button"
-            class="manual-ref-count-pill${effectiveScope === "current-chr" ? " is-active" : ""}"
-            data-manual-ref-scope="current-chr"
-            data-manual-ref-count-current
-            aria-pressed="${effectiveScope === "current-chr" ? "true" : "false"}"
-          >${escapeHtml(currentPillText)}</button>
-          <button
-            type="button"
-            class="manual-ref-count-pill${effectiveScope === "all" ? " is-active" : (allJobsCount ? " is-total" : "")}"
-            data-manual-ref-scope="all"
-            data-manual-ref-count-all
-            aria-pressed="${effectiveScope === "all" ? "true" : "false"}"
-          >${escapeHtml(allPillText)}</button>
-        </div>
       </div>
       <div class="manual-ref-head-actions">
         ${state.exporting ? `<span class="manual-ref-exporting-pill"><span class="pipeline-spinner" aria-hidden="true"></span>${escapeHtml(copy.exporting)}</span>` : ""}
@@ -740,11 +745,12 @@ export function renderManualRefinementCard(
           data-app-tooltip="${escapeAttr(copy.settingsBtnTitle)}"
           aria-label="${escapeAttr(copy.settingsBtnTitle)}"
         ><span aria-hidden="true">⚙</span><span>${escapeHtml(copy.settingsBtn)}</span>${hasCustomSettings ? `<span class="manual-ref-custom-dot" aria-hidden="true"></span>` : ""}</button>
-        ${state.loci.length
+        ${visibleLoci.length
           ? `<button
               type="button"
               class="button ghost tiny manual-ref-clear-btn"
               data-manual-ref-clear-all
+              data-manual-ref-chr="${escapeAttr(normalizedChrName)}"
               data-app-tooltip="${escapeAttr(copy.clearDraftTitle)}"
               ${state.exporting ? "disabled" : ""}
             >${escapeHtml(copy.clearDraft)}</button>`
@@ -753,12 +759,13 @@ export function renderManualRefinementCard(
           type="button"
           class="button primary tiny manual-ref-export-primary"
           data-manual-ref-export="current-chr"
+          data-manual-ref-chr="${escapeAttr(normalizedChrName)}"
           data-app-tooltip="${escapeAttr(exportBtnTitle)}"
           ${!currentChrLoci.length || state.exporting ? "disabled" : ""}
         >${escapeHtml(state.exporting ? copy.exporting : fmt(copy.exportBtn, { count: currentChrJobsCount }))}</button>
       </div>
     </div>
     ${bodyMarkup}
-    ${renderSettingsModal(state, { copy, escapeAttr, escapeHtml })}
+    ${includeSettingsModal ? renderSettingsModal(state, { copy, escapeAttr, escapeHtml }) : ""}
   </section>`;
 }

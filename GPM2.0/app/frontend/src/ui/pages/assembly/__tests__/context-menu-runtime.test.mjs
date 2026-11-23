@@ -749,3 +749,130 @@ test("context menus omit repeated labels but retain unavailable reasons and coor
   assert.match(html, /aria-haspopup="menu"/);
   assert.match(html, /aria-disabled="true"/);
 });
+
+test("gap refinement tool submenu stays open across multi-select, programmatic scroll, and second-click cancel", async (t) => {
+  const handlers = new Map();
+  const menuClasses = new Set(["is-hidden"]);
+  let buttons = [];
+  const menu = {
+    classList: {
+      add: (name) => menuClasses.add(name),
+      remove: (name) => menuClasses.delete(name),
+      contains: (name) => menuClasses.has(name),
+    },
+    style: {},
+    contains: (node) => buttons.includes(node),
+    getBoundingClientRect: () => ({ width: 220, height: 180 }),
+    set innerHTML(html) {
+      this.markup = html;
+      buttons = [...html.matchAll(/<button class="([^"]*)"([^>]*)>([^<]*)<\/button>/g)]
+        .map((match) => {
+          const attrs = new Map();
+          for (const [, name, value] of match[2].matchAll(/([a-z0-9-]+)="([^"]*)"/g)) {
+            attrs.set(name, value);
+          }
+          const classSet = new Set(match[1].split(/\s+/).filter(Boolean));
+          const btn = {
+            textContent: match[3],
+            disabled: false,
+            handlers: new Map(),
+            classList: {
+              add: (name) => classSet.add(name),
+              remove: (name) => classSet.delete(name),
+              toggle: (name, active) => (active ? classSet.add(name) : classSet.delete(name)),
+              contains: (name) => classSet.has(name),
+            },
+            getAttribute: (name) => attrs.get(name) ?? null,
+            setAttribute: (name, value) => attrs.set(name, String(value)),
+            removeAttribute: (name) => attrs.delete(name),
+            addEventListener: (type, fn) => btn.handlers.set(type, fn),
+          };
+          return btn;
+        })
+        .filter((btn) => btn.getAttribute("data-menu-action-path"));
+    },
+    get innerHTML() {
+      return this.markup;
+    },
+    querySelectorAll: (selector) => (selector === "[data-menu-action-path]" ? buttons : []),
+  };
+  const host = {
+    querySelector: (selector) => (selector === "#assembly-context-menu" ? menu : null),
+    querySelectorAll: () => [],
+    addEventListener: (type, fn) => handlers.set(type, fn),
+  };
+  const state = createState({
+    locale: "zh",
+    assembly: {
+      activeTab: "assembly",
+      selectedChrName: "Chr01",
+      finalPathByChr: {
+        Chr01: {
+          mode: "segments",
+          chrName: "Chr01",
+          segments: [
+            { segmentId: "seg-1", type: "ctg", assemblyCtgId: 1, ctgName: "ctgA", overallLen: 1000, start: 1, end: 1000 },
+            { segmentId: "gap-1", type: "gap", gapSizeBp: 100 },
+            { segmentId: "seg-2", type: "ctg", assemblyCtgId: 2, ctgName: "ctgB", overallLen: 1000, start: 1, end: 1000 },
+          ],
+        },
+      },
+      degap: { manualRefinement: { loci: [] } },
+    },
+  });
+  const queuedTools = new Set();
+  const store = { getState: () => state };
+  const target = {
+    closest(selector) {
+      if (selector === ".final-path-card[data-final-path-view-mode='graph']") return {};
+      if (selector === "[data-final-path-segment-id][data-final-path-segment-type]") {
+        return {
+          getAttribute: (name) => (name === "data-final-path-segment-id" ? "gap-1" : name === "data-final-path-segment-type" ? "gap" : null),
+        };
+      }
+      return null;
+    },
+  };
+  const originalWindow = globalThis.window;
+  globalThis.window = { innerWidth: 1200, innerHeight: 800 };
+  t.after(() => { globalThis.window = originalWindow; });
+
+  bindAssemblyContextMenu(host, store, createRuntimeDeps({
+    registerManualRefinementLocus: async (_host, _store, payload) => {
+      // Simulate rerenderFinalPathCard restoring scrollLeft during keepOpen run.
+      handlers.get("scroll")?.();
+      if (queuedTools.has(payload.tool)) {
+        queuedTools.delete(payload.tool);
+        return { queued: false, action: "removed" };
+      }
+      queuedTools.add(payload.tool);
+      return { queued: true, action: "added" };
+    },
+  }));
+
+  handlers.get("contextmenu")({ target, clientX: 120, clientY: 160, preventDefault() {} });
+  assert.equal(menuClasses.has("is-hidden"), false);
+  const degapBtn = buttons.find((btn) => btn.textContent === "DEGAP");
+  const quartetBtn = buttons.find((btn) => btn.textContent === "quarTeT");
+  assert.ok(degapBtn && quartetBtn);
+
+  // First click adds DEGAP without disabling the button or closing the menu.
+  await degapBtn.handlers.get("click")({ stopPropagation() {} });
+  assert.equal(menuClasses.has("is-hidden"), false);
+  assert.equal(degapBtn.disabled, false);
+  assert.equal(degapBtn.textContent, "✓ DEGAP");
+  assert.equal(degapBtn.getAttribute("aria-pressed"), "true");
+
+  // Second tool can be added directly while the menu remains open.
+  await quartetBtn.handlers.get("click")({ stopPropagation() {} });
+  assert.equal(menuClasses.has("is-hidden"), false);
+  assert.equal(quartetBtn.textContent, "✓ quarTeT");
+  assert.deepEqual([...queuedTools], ["degap", "quartet"]);
+
+  // Clicking DEGAP a second time cancels/removes it while keeping the menu open.
+  await degapBtn.handlers.get("click")({ stopPropagation() {} });
+  assert.equal(menuClasses.has("is-hidden"), false);
+  assert.equal(degapBtn.textContent, "DEGAP");
+  assert.equal(degapBtn.getAttribute("aria-pressed"), "false");
+  assert.deepEqual([...queuedTools], ["quartet"]);
+});

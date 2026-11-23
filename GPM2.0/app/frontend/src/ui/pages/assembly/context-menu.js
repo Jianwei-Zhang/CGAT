@@ -879,18 +879,23 @@ export function buildAssemblyContextMenuItems({
             });
             return {
               label: queued ? `✓ ${toolLabel}` : toolLabel,
-              disabled: !gapEligible || queued,
+              disabled: !gapEligible,
               keepOpen: true,
+              toggleable: true,
+              selected: queued,
               selectedLabel: `✓ ${toolLabel}`,
-              selectedTitle: isEn ? "Already queued" : "已在任务列表中",
+              unselectedLabel: toolLabel,
+              selectedTitle: isEn ? "Click again to cancel" : "再次点击可取消",
+              unselectedTitle: "",
               title: !gapEligible
                 ? (isEn ? "Requires direct contig flanks on both sides" : "要求缺口紧邻左右两侧均为 Contig")
-                : (queued ? (isEn ? "Already queued" : "已在任务列表中") : ""),
+                : (queued ? (isEn ? "Click again to cancel" : "再次点击可取消") : ""),
               run: async () => await contextMenuActions.registerManualRefinementLocus(host, store, {
                 chrName: effectiveChrName,
                 kind: "gap",
                 segmentId,
                 tool,
+                toggle: true,
               }),
             };
           }),

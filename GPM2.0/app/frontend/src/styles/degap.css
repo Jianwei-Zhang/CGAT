@@ -412,6 +412,7 @@
 
 .manual-ref-toggle {
   border-radius: 4px;
+  padding: 2px 4px;
 }
 
 .manual-ref-toggle:focus-visible {
@@ -419,43 +420,11 @@
   outline-offset: 1px;
 }
 
-.manual-ref-scope-counts {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-}
-
-.manual-ref-count-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border: 1px solid var(--border-subtle, #dbe3ec);
-  border-radius: 4px;
-  background: var(--surface-panel, #ffffff);
+.manual-ref-title-count {
+  font-size: var(--font-small);
+  font-weight: 500;
   color: var(--text-muted, #64748b);
-  font-size: var(--font-caption);
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 1.35;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.manual-ref-count-pill:hover {
-  border-color: var(--border-default, #cbd5e1);
-  color: var(--text-primary, #1e293b);
-}
-
-.manual-ref-count-pill.is-active {
-  border-color: var(--theme-blue-line, #7fa4d1);
-  background: var(--theme-blue-surface, #eff6ff);
-  color: var(--theme-blue-ink, #1e3a5f);
-}
-
-.manual-ref-count-pill.is-total {
-  border-color: var(--border-default, #cbd5e1);
-  color: var(--text-primary, #1e293b);
 }
 
 .manual-ref-settings-btn {
@@ -604,10 +573,10 @@
 
 /* Top-right refinement default settings modal */
 .manual-ref-settings-dialog {
-  width: min(640px, calc(100vw - 32px));
-  max-height: min(640px, calc(100vh - 48px));
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(600px, calc(100vh - 48px));
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 10px;
   padding: 14px 16px;
   border: 1px solid var(--border-default, #cbd5e1);
@@ -619,14 +588,27 @@
 
 .manual-ref-settings-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
 .manual-ref-settings-head h4 {
-  margin: 0 0 2px;
+  margin: 0;
   font-size: var(--font-section);
+}
+
+.manual-ref-settings-scope-notice {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--focus-ring, #4f82b5) 30%, transparent);
+  border-left: 3px solid var(--focus-ring, #4f82b5);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--focus-ring, #4f82b5) 10%, var(--surface-panel, #ffffff));
+  color: var(--theme-blue-ink, #1e3a5f);
+  font-size: var(--font-small);
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .manual-ref-settings-tabs {

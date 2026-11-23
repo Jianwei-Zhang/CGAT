@@ -63,9 +63,9 @@ test("renderManualRefinementCard renders separate Gap and Tel blocks, per-tool g
     { escapeAttr, escapeHtml },
   );
 
-  // Chr01 has 2 gap tool jobs + 1 tel job = 3; project total = 4.
-  assert.match(bothHtml, /data-manual-ref-count-current[\s\S]*?>Chr01 · 3</);
-  assert.match(bothHtml, /data-manual-ref-count-all[\s\S]*?>全部 · 4</);
+  // Chr01 has 2 gap tool jobs + 1 tel job = 3; no collapse indicator icon and no scope pills.
+  assert.match(bothHtml, /<strong>精修任务<\/strong>\s*<span class="manual-ref-title-count" data-manual-ref-count>· 3<\/span>/);
+  assert.doesNotMatch(bothHtml, /degap-job-card-indicator|manual-ref-scope-counts|data-manual-ref-count-all/);
   assert.match(bothHtml, /data-manual-ref-gap-section/);
   assert.match(bothHtml, /data-manual-ref-tel-section/);
   assert.match(bothHtml, /data-manual-ref-gap-row="Chr01\tgap\tgap-1"\s+data-manual-ref-gap-tool-row="Chr01\tgap\tgap-1"\s+data-manual-ref-tool="degap"/);
@@ -143,11 +143,13 @@ test("renderManualRefinementCard renders top-right settings modal with 4 tool ta
   );
 
   assert.match(modalHtml, /data-manual-ref-settings-modal/);
+  assert.match(modalHtml, /data-manual-ref-settings-scope-notice[^>]*>Saved per project · changes apply automatically</);
   assert.match(modalHtml, /data-manual-ref-settings-tab="degap"/);
   assert.match(modalHtml, /data-manual-ref-settings-tab="lrgapcloser"/);
   assert.match(modalHtml, /data-manual-ref-settings-tab="tgsgapcloser"[\s\S]*?aria-selected="true"/);
   assert.match(modalHtml, /data-manual-ref-settings-tab="quartet"/);
   assert.match(modalHtml, /data-manual-ref-settings-tab="reads"/);
+  assert.match(modalHtml, /data-app-tooltip="TGS-GapCloser --minmap_arg: alignment preset"/);
   assert.match(modalHtml, /data-manual-ref-param-tool="tgsgapcloser" data-manual-ref-param-field="hifi_minimap"/);
   assert.match(modalHtml, /data-manual-ref-receipt/);
   assert.match(modalHtml, /data-manual-ref-copy-cmd="python \.lib\/tools\/refine\.py proj_Chr01_refinement_tasks\.zip"/);
@@ -168,11 +170,25 @@ test("registerManualRefinementLocus adds unique (gap, tool) jobs and remove-tool
   bindManualRefinementCard(host, store);
 
   assert.equal(registerManualRefinementLocus(host, store, { chrName: "Chr01", kind: "gap", segmentId: "gap-1", tool: "degap" }), true);
-  // Duplicate (gap-1, degap) is ignored.
+  // Duplicate (gap-1, degap) is ignored when toggle is not set.
   assert.equal(registerManualRefinementLocus(host, store, { chrName: "Chr01", kind: "gap", segmentId: "gap-1", tool: "degap" }), false);
   // Adding a second distinct tool to the same gap appends cleanly.
   assert.equal(registerManualRefinementLocus(host, store, { chrName: "Chr01", kind: "gap", segmentId: "gap-1", tool: "quartet" }), true);
   assert.deepEqual(state.assembly.degap.manualRefinement.loci[0].tools, ["degap", "quartet"]);
+
+  // Toggling an already-queued tool removes it, and toggling again adds it back.
+  assert.deepEqual(
+    registerManualRefinementLocus(host, store, { chrName: "Chr01", kind: "gap", segmentId: "gap-1", tool: "quartet", toggle: true }),
+    { queued: false, action: "removed" },
+  );
+  assert.deepEqual(state.assembly.degap.manualRefinement.loci[0].tools, ["degap"]);
+  assert.equal(state.assembly.degap.manualRefinement.feedback, "已取消 quarTeT");
+  assert.deepEqual(
+    registerManualRefinementLocus(host, store, { chrName: "Chr01", kind: "gap", segmentId: "gap-1", tool: "quartet", toggle: true }),
+    { queued: true, action: "added" },
+  );
+  assert.deepEqual(state.assembly.degap.manualRefinement.loci[0].tools, ["degap", "quartet"]);
+  assert.equal(state.assembly.degap.manualRefinement.feedback, "已添加 quarTeT");
 
   // Remove only degap tool -> quartet remains.
   const removeBtn = {
@@ -248,7 +264,7 @@ test("the queue defaults to expanded on restore but can be collapsed without hid
   const collapsed = renderManualRefinementCard(args, { escapeAttr, escapeHtml });
   assert.doesNotMatch(collapsed, /data-manual-ref-body/);
   assert.match(collapsed, /aria-expanded="false"/);
-  assert.match(collapsed, /data-manual-ref-count-current[\s\S]*?>Chr01 · 1</);
+  assert.match(collapsed, /data-manual-ref-count>· 1</);
 });
 
 test("renderManualRefinementCard hides the panel when there are no queued tasks", () => {
@@ -263,13 +279,56 @@ test("renderManualRefinementCard hides the panel when there are no queued tasks"
       chrName: "Chr01",
       manualRefinement: {
         loci: [],
-        lastExport: { batchSha256: "a".repeat(64), outputFileName: "tasks.zip", lociCount: 1, tasksCount: 1 },
+        lastExport: { batchSha256: "a".repeat(64), outputFileName: "tasks.zip", scope: "current-chr", chrName: "Chr01", lociCount: 1, tasksCount: 1 },
       },
       locale: "zh",
     },
     { escapeAttr, escapeHtml },
   );
   assert.match(withReceiptHtml, /data-manual-ref-receipt/);
+
+  // Another Final Path with no jobs hides the panel even when Chr01 has jobs and an export receipt.
+  const otherChrHtml = renderManualRefinementCard(
+    {
+      chrName: "Chr02",
+      manualRefinement: {
+        loci: [{ chr: "Chr01", kind: "gap", segmentId: "gap-1", tools: ["degap"] }],
+        lastExport: { batchSha256: "a".repeat(64), outputFileName: "tasks.zip", scope: "current-chr", chrName: "Chr01", lociCount: 1, tasksCount: 1 },
+      },
+      locale: "zh",
+    },
+    { escapeAttr, escapeHtml },
+  );
+  assert.equal(otherChrHtml, "");
+});
+
+test("clearing refinement tasks from a Final Path clears only that chromosome's jobs", () => {
+  const handlers = {};
+  const host = { addEventListener: (name, fn) => { handlers[name] = fn; } };
+  let state = {
+    locale: "zh",
+    assembly: {
+      selectedChrName: "Chr01",
+      degap: {
+        manualRefinement: {
+          loci: [
+            { chr: "Chr01", kind: "gap", segmentId: "gap-1", tools: ["degap"] },
+            { chr: "Chr02", kind: "gap", segmentId: "gap-9", tools: ["quartet"] },
+          ],
+        },
+      },
+    },
+  };
+  const store = { getState: () => state, setState: (next) => { state = next; } };
+  bindManualRefinementCard(host, store);
+
+  const clearBtn = {
+    dataset: { manualRefChr: "Chr01" },
+    closest: (selector) => (selector === "[data-manual-ref-clear-all]" ? clearBtn : null),
+  };
+  handlers.click({ target: clearBtn });
+
+  assert.deepEqual(state.assembly.degap.manualRefinement.loci.map((item) => item.chr), ["Chr02"]);
 });
 
 test("manual refinement feedback renders as a transient Final Path toast and auto-dismisses", () => {
@@ -305,15 +364,15 @@ test("manual refinement feedback renders as a transient Final Path toast and aut
     null,
     store,
     { chrName: "Chr01", kind: "gap", segmentId: "gap-1", tool: "degap" },
-    { rerender: () => { rerenders += 1; }, timerApi, toastDurationMs: 2800 },
+    { rerender: () => { rerenders += 1; }, timerApi },
   );
   const toastHtml = renderManualRefinementToast(
     { manualRefinement: state.assembly.degap.manualRefinement },
     { escapeHtml },
   );
-  assert.match(toastHtml, /class="final-path-toast-wrap"[\s\S]*class="final-path-toast is-ok"[\s\S]*已加入 Gap 任务/);
+  assert.match(toastHtml, /class="final-path-toast-wrap"[\s\S]*class="final-path-toast is-ok"[\s\S]*>已添加 DEGAP<\/p>/);
   assert.equal(scheduled.length, 1);
-  assert.equal(scheduled[0].ms, 2800);
+  assert.equal(scheduled[0].ms, 1200);
   scheduled[0].fn();
   assert.equal(renderManualRefinementToast({ manualRefinement: state.assembly.degap.manualRefinement }, { escapeHtml }), "");
   assert.equal(rerenders, 2);
