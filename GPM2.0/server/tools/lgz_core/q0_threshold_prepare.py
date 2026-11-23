@@ -144,10 +144,15 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
         print("LGZ q0 first draft: " + msg, flush=True)
     selected = select_q0_paths(data, screen_threads=threads, progress=log)
     log("paths selected; calculating first supplement request")
-    need, _ = questions(data, selected, assignments)
+    need, counts = questions(data, selected, assignments)
+    have_path = any(row.path is not None for row in selected.paths.values())
+    if have_path:
+        log(f"placements: sufficient={counts.get('positive_placement_stop', 0)} weak={counts.get('weak_placement', 0)}; "
+            f"unknown joins: sufficient_to_keep_gap={counts.get('observed_facing_match_leave_gap', 0)} "
+            f"need_evidence={counts.get('unproven_join', 0)}")
     log("first supplement decision: full fallback" if need is None else
         f"first supplement decision: sources={len(need)} intervals={sum(map(len, need.values()))}")
-    return need, any(r.path is not None for r in selected.paths.values())
+    return need, have_path
 
 
 def initial_generation(root, snapshot, mapper, *, threads=1):

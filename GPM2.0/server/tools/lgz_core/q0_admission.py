@@ -621,14 +621,19 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
     def rooted_context(segment_id, interval):
         return clean_intervals(data.parts[segment_id], (interval,))
 
-    # Only previous-round independent anchors can establish new placements.
-    # Multiple loci/strands remain alternatives, not a majority vote by ds.
+    # Anchors are immutable until the extension phase below. Accumulate each
+    # candidate/anchor contribution exactly once, but resolve at the original round
+    # boundary (never let encounter order choose between competing loci).
+    frontier = tuple(accepted.values())
+    unplaced = allowed - {p.segment_id for p in frontier}
+    proposed = defaultdict(dict)
     for round_number in range(1, len(data.parts) + 1):
-        before = tuple(accepted.values())
-        placed = {p.segment_id for p in before}
-        placed_neighbors = _PlacementNeighbors(before, pair_neighbors)
-        proposed = defaultdict(dict)
-        for key in phases.items(f"anchor unplaced segments round={round_number}", sorted(allowed - placed)):
+        placed_neighbors = _PlacementNeighbors(frontier, pair_neighbors)
+        neighbors = {s for anchor_source in placed_neighbors.by_source for s in pair_neighbors.get(anchor_source, ())}
+        candidates = sorted(key for key in unplaced if data.parts[key].source in neighbors)
+        screen_progress(f"placement pair round={round_number}: new_anchors={len(frontier)} "
+                        f"unplaced={len(unplaced)} with_new_neighbors={len(candidates)}")
+        for key in phases.items(f"anchor unplaced segments round={round_number}", candidates):
             part = data.parts[key]
             direct_spans = {}  # Immutable source coverage, only for this segment and round.
             for anchor, links in placed_neighbors.for_source(part.source):
@@ -675,11 +680,15 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
                         item["intervals"].extend(intervals)
                     item["ids"].update(ids | set(anchor.evidence_ids))
                     item["parents"].add(anchor.placement_id)
-        added = 0
+            for value in proposed.get(key, {}).values():
+                value["intervals"] = list(merged_intervals(value["intervals"]))
+        next_frontier = []
         for key, alternatives in phases.items(f"resolve pair proposals round={round_number}", sorted(proposed.items())):
             part = data.parts[key]
+            # Only the union is consumed. Keep below-threshold contributions too:
+            # a later anchor can make their union pass. Keep every ID and parent.
             alternatives = {group: value for group, value in alternatives.items()
-                            if _size(value["intervals"]) >= min(policy.minimum_anchor_bp, part.interval.length)}
+                            if sum(i.length for i in value["intervals"]) >= min(policy.minimum_anchor_bp, part.interval.length)}
             bounds = {group: _hull(a.source for a in value["refs"]) if value["refs"] else _hull(value["intervals"])
                       for group, value in alternatives.items()}
             if any(bounds[a].intersection(bounds[b]) for i, a in enumerate(bounds) for b in list(bounds)[i+1:]):
@@ -687,8 +696,9 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
                                 "evidence_ids": sorted({eid for value in alternatives.values() for eid in value["ids"]})})
                 continue
             for (chromosome, strand), value in sorted(alternatives.items()):
-                support = merged_intervals(value["intervals"])
-                partial = len(groups.get(key, {})) > 1 or len(alternatives) > 1 or _size(support) / part.interval.length < policy.minimum_whole_support_fraction
+                support = value["intervals"]
+                partial = (len(groups.get(key, {})) > 1 or len(alternatives) > 1 or
+                           sum(i.length for i in support) / part.interval.length < policy.minimum_whole_support_fraction)
                 interval = bounds[(chromosome, strand)] if partial else part.interval
                 refs = []
                 for a in value["refs"]:
@@ -706,10 +716,17 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
                                 "reason": "supported_local_interval" if partial else "pairwise_reference_anchoring",
                                 "anchor_placement_ids": sorted(value["parents"]), "round": round_number,
                                 "qc": "not_measured" if quality_pass is None else "passed"})
-                added += 1
-        if not added:
+                next_frontier.append(placement)
+                unplaced.discard(key)
+            if key not in unplaced:
+                # An accepted placement never needs a second competition. It can
+                # still be the evidence that localizes a different, unplaced part.
+                del proposed[key]
+        if not next_frontier:
             break
+        frontier = next_frontier
 
+    proposed.clear()
     rooted_context.cache_clear()
 
     # Extend supported anchors into non-ref sequence only with a noncompeting,
