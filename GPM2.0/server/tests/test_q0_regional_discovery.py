@@ -174,7 +174,7 @@ class RegionalDiscoveryTests(unittest.TestCase):
     def test_regional_utilities_import_without_outer_workflow_and_keep_injection_point(self):
         package=self.root/'package';(package/'lgz_core').mkdir(parents=True)
         tools=Path(prep.__file__).parent
-        names=['common','q0_sources','q0_alignments','q0_catalog','q0_preparation','q0_reference_index',
+        names=['common','q0_sources','q0_alignments','q0_catalog','q0_preparation','q0_candidate_schedule','q0_reference_index',
                'q0_query_windows','q0_cigar_policy','q0_regional_mapping','q0_mapper_guard','q0_regional_discovery','q0_neighbor_requests','q0_regional_candidates','q0_regional_execution','q0_frontier_scope']
         (package/'lgz_core/__init__.py').write_text('')
         for name in names:shutil.copyfile(tools/f'{name}.py',package/f'lgz_core/{name}.py')
