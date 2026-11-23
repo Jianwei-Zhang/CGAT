@@ -257,7 +257,7 @@ def _dataset_sequences(root, datasets):
     return sources
 
 
-def _initial_inputs(root: Path):
+def _initial_inputs(root: Path, *, matrix_reader=None):
     datasets = table(root, "metadata/datasets.tsv", ("dataset_name", "fasta_relpath"))
     references = table(root, "metadata/reference.tsv", ("fasta_relpath",))
     assignments = table(root, "metadata/chr_assignments.tsv", ("dataset_name", "seq_name", "assigned_chr_name"))
@@ -338,14 +338,18 @@ def _initial_inputs(root: Path):
                         raise Q0EvidenceError("q0 partition FASTA differs from original sources or grouping")
                     if _partition_sha256(partition) != digest:
                         raise Q0EvidenceError("q0 partition FASTA changed during validation")
+                    del records
                     validated_partitions[validation_key] = digest
                 paths.add(row[field])
             qlengths = {name: len(sources[SourceKey(right, name)]) for name in group[right]}
             tlengths = {name: len(sources[SourceKey(left, name)]) for name in group[left]}
             qkeys = {name: SourceKey(right, name) for name in qlengths}
             tkeys = {name: SourceKey(left, name) for name in tlengths}
-            for hit in read_paf_observations(artifact_path(root, row["paf"]), query_lengths=qlengths,
-                                            target_lengths=tlengths, artifact=row["paf"]):
+            args = dict(query_lengths=qlengths, target_lengths=tlengths, artifact=row["paf"])
+            path = artifact_path(root, row["paf"])
+            hits = (read_paf_observations(path, **args) if matrix_reader is None else
+                    matrix_reader(path, query_dataset=right, target_dataset=left, **args))
+            for hit in hits:
                 query, target = qkeys[hit.query_name], tkeys[hit.target_name]
                 if isinstance(known_pairs, ObservedSourcePairs):
                     known_pairs.observe_alignment(hit, query, target)
@@ -356,6 +360,10 @@ def _initial_inputs(root: Path):
         if actual != expected:
             raise Q0EvidenceError(f"missing required q0 pairs for {chromosome}: {sorted(expected - actual)}")
     return sources, lengths, assignments, options, sorted(paths), sorted(base_alignments, key=lambda row: row["paf"]), known_pairs
+
+
+# Incident adapters can replace _initial_inputs; never pass a new callback to an unknown reader.
+_native_initial_inputs = _initial_inputs
 
 
 def _provisional_frontier(root: Path, sources, reference_lengths, catalog, base_alignments):
@@ -621,9 +629,12 @@ class _ProofRepairInputs:
         if self._signatures() != self.signatures:
             raise Q0EvidenceError("q0 proof repair initial files changed between passes")
 
+    def _read_initial(self):
+        return _initial_inputs(self.root)
+
     def read(self):
         if self.base is None:
-            sources, lengths, assignments, options, paths, alignments, known = _initial_inputs(self.root)
+            sources, lengths, assignments, options, paths, alignments, known = self._read_initial()
             self.paths = sorted(set(paths) | {"metadata/package.tsv"})
             self.signatures = self._signatures()
             self.identities = [identity(self.root, path) for path in self.paths]

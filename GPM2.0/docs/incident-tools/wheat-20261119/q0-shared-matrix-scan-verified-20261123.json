@@ -1,0 +1,176 @@
+{
+  "iterations": [
+    {
+      "abba_seconds": [
+        11.13,
+        12.48,
+        12.53,
+        11.136
+      ],
+      "change": "eager per-matrix name inventory; rejected",
+      "job": "43024566"
+    },
+    {
+      "abba_seconds": [
+        11.087,
+        8.603,
+        8.579,
+        11.12
+      ],
+      "change": "lazy partition-checked name lookup; prior to explicit legacy-observer fallback",
+      "job": "43024574"
+    }
+  ],
+  "job": {
+    "base_runtime_sha256": "9d180274e7eaebb40a301a3bc886d0245a689b12dded4b52e080d805ea77dd65",
+    "directory": "q0-shared-matrix-cold-20261123-1542/final",
+    "end_utc": "2026-11-23T07:50:43Z",
+    "id": "43024598",
+    "node": "agent-X86-60",
+    "overlay_source_sha256": {
+      "compare_fused_draft_panels.py": "66807a381cc96e105ef9c8048d3f7922c1e5c2ce7776afa087dc9043960e446d",
+      "panels.tsv": "24683fdefc18d1cc13ecf7448451a5ea821f3fc096fd71b6ab7599e4b13138b5",
+      "probe_q0_threshold_heap.py": "6c25139c364180c08e00e551882f2bb64ec53a45f9268c2369ec330fb72e4adf",
+      "q0_preparation.py": "835b9896e2714c5478c91ccd098cd15cc429af6275611d10b3ff94bdb02fde0b",
+      "q0_retained_hits.py": "fd8b9bd8a2c047970fa2e18acf1646e07f0e9c285ef5fb855711f149cdf38fd7",
+      "q0_threshold_prepare.py": "8cc449257160561a81c376b700da0b9e80303d9a1982d51225b864ef5fecdd2c",
+      "single.dsub": "a30fd71f6829da5f15a6eae4ed349dd5be5affd19543428dac6083320e8875e8",
+      "verify_q0_shared_scan.py": "cfa789e83575feea1318a49f262817255965e858e2c5be46745aee88b27ba99c"
+    },
+    "receipts_sha256": {
+      "1B-689Mb.json": "554d55fc6d7286c37ae1beb275ab2568f8e964b9d7b2edb4912bc93677329354",
+      "2B-8Mb.json": "d380e779d9e89824f552a5e9bb2290cbab96706fcde561bb8396079bc51c69ac",
+      "3B-792Mb.json": "5504902ae35ec7583c18015ae553b38dc7961f0079c906714cddad8996838f01",
+      "3D-589Mb.json": "15d2fb40a93b31aebe9a425d08e3caf9bbda1ef963acd6e467ad050fc009d8fe",
+      "6A-16Mb.json": "820eaab7f57ae087f21b82c01e06bd66fed8449358ad59594ee1c49a28c3141f",
+      "7A-734Mb.json": "cfdd33f68b8a6479db026b8acbf193050c309b3de20f511a5765c9481a4ec04d",
+      "sample.json": "1bcd5aaddcc6bf6b4502c3a94d5a5c4663f898184bd41c3dddce632a5880bda7"
+    },
+    "snapshot_sha256": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d",
+    "state": "SUCCEEDED"
+  },
+  "panels": [
+    {
+      "coverage_sha256": "09dc8d590f3a94ac8359807994165b29ee4869bdb23f9ed08fdfc368bfdca7d7",
+      "first_request_sha256": "b6fcda270cb981de31a19acf3319d1545169036f432750e704393fcbf8922155",
+      "frozen_panel_sha256": "575910058629be6adc374af44da06d6b8be8f77b9789d3be485decc5e86a3f25",
+      "group": "q0-heldout-draft-threshold-20261123",
+      "has_path": true,
+      "intervals": 0,
+      "panel": "1B-689Mb",
+      "semantic_opens": [
+        14,
+        7
+      ],
+      "sources": 0
+    },
+    {
+      "coverage_sha256": "85511b626a9774ae1712eb7d46573db438248e55b7a43e8e47bee8e022a9bb0b",
+      "first_request_sha256": "74f1e6767f5c3b97595f23c1eea1b26096da0b1a1ed7a2603e140ffd686a4aed",
+      "frozen_panel_sha256": "1ac3886d794afe3f1050bbdc817f94e97fe9d19749ba4502221acdcc2aba6dfc",
+      "group": "q0-heldout-draft-threshold-20261123",
+      "has_path": false,
+      "intervals": 0,
+      "panel": "2B-8Mb",
+      "semantic_opens": [
+        14,
+        7
+      ],
+      "sources": 0
+    },
+    {
+      "coverage_sha256": "8e023712479b89d4cf0ebe7c5b9c3c18f79aa996ccc79d19f4ed8e39144cd574",
+      "first_request_sha256": "b6fcda270cb981de31a19acf3319d1545169036f432750e704393fcbf8922155",
+      "frozen_panel_sha256": "3dd7aa2d643a04019ea75d092cdc88567c36d8a4a7c3914dfcc1a7a654139d39",
+      "group": "q0-heldout-draft-threshold-20261123",
+      "has_path": true,
+      "intervals": 0,
+      "panel": "3B-792Mb",
+      "semantic_opens": [
+        8,
+        4
+      ],
+      "sources": 0
+    },
+    {
+      "coverage_sha256": "cf42da26a0cdfcef248edb52e419f84febc061325e0af5dcd53e5899835cbc72",
+      "first_request_sha256": "d28524e0234568269ba934ee97783dbcf58414e9782386a9cc67af10ff4a70ae",
+      "frozen_panel_sha256": "cb46341aa8fa1d7a805f86185510938eb44a5f62bb8c54130427b1a424c3eec9",
+      "group": "q0-natural-frontier-20261123-053719-complete-base",
+      "has_path": true,
+      "intervals": 9,
+      "panel": "3D-589Mb",
+      "semantic_opens": [
+        54,
+        27
+      ],
+      "sources": 9
+    },
+    {
+      "coverage_sha256": "041eb76a895f973293bbe03550b4a4eb6467b2c5d04a144127552e980dcab3f0",
+      "first_request_sha256": "74f1e6767f5c3b97595f23c1eea1b26096da0b1a1ed7a2603e140ffd686a4aed",
+      "frozen_panel_sha256": "70da0dd53c00188d456229447dee5479b04c2f3adaf354fb4f102aa73b5c63ac",
+      "group": "q0-multisource-threshold-20261123",
+      "has_path": false,
+      "intervals": 0,
+      "panel": "6A-16Mb",
+      "semantic_opens": [
+        6,
+        3
+      ],
+      "sources": 0
+    },
+    {
+      "coverage_sha256": "5ccb6e76de2065394dd509e03325750b38fc4a8265ed81592b913b7517815d2f",
+      "first_request_sha256": "91225307f684b6507c4f19f8c536cc4c192f1b9c95965e42a1e018e7a37e4a15",
+      "frozen_panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+      "group": "q0-multisource-threshold-20261123",
+      "has_path": true,
+      "intervals": 4,
+      "panel": "7A-734Mb",
+      "semantic_opens": [
+        6,
+        3
+      ],
+      "sources": 3
+    }
+  ],
+  "sample": {
+    "bytes": 32730887,
+    "coverage_sha256": "3c9a7d8820e1760b7410f3b55e554d62bf062f62fe19c53e9f39aef0eead7b3d",
+    "elapsed_fraction_saved": 0.22562452033276303,
+    "files": 66,
+    "limits": "Up to 512 KiB per matrix: local warm file reads, coverage consumer and ordered row ID summary. Not whole-wheat runtime.",
+    "median_seconds": {
+      "separate": 11.153834994882345,
+      "shared": 8.63725632429123
+    },
+    "ordered_ids_sha256": "2b2fa1bc23004f24c3a31722cf117e9ce467c09b8bc2c84da6eb2b909f13e58e",
+    "retained_rows": 99640,
+    "runs": [
+      {
+        "seconds": 11.15291490405798,
+        "semantic_opens": 132,
+        "shared": false
+      },
+      {
+        "seconds": 8.645213752985,
+        "semantic_opens": 66,
+        "shared": true
+      },
+      {
+        "seconds": 8.629298895597458,
+        "semantic_opens": 66,
+        "shared": true
+      },
+      {
+        "seconds": 11.15475508570671,
+        "semantic_opens": 132,
+        "shared": false
+      }
+    ],
+    "sample_sha256": "cd415c90331cf2a565e303c1f2fc67bca4aad34fff2cfde84485202fb80ea69d"
+  },
+  "schema": "q0_shared_matrix_scan_verification_v1",
+  "scope": "Cold native positive_threshold preparation, 44 self and 22 cross matrix inputs. Reference PAFs are not counted. Semantic opens exclude independent identity/hash I/O. Timing is a bounded single-core comparison; not whole-genome memory, elapsed time or supplement count. Existing manifest, legacy/custom readers and full-scope comparison are unchanged. Six complete real panels compare coverage and the entire ordered first decision. No live process changed; no mapper run by these probes."
+}
