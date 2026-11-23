@@ -1,0 +1,64 @@
+{
+  "schema": "wheat_observed_native_fallback_query_geometry_v1",
+  "sampled": "2026-11-24T03:09:30+08:00",
+  "job": "43017096",
+  "native_task": "q0-map-bbb71092f55e5db234479331",
+  "source_run": "20261122T175230Z-1840546-b3d5993f",
+  "snapshot": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d",
+  "input_sha256": {
+    "source-part-lookup.json": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+    "queries.tsv.gz": "e01cb1aaed6f22804e42832db38944e9c5d43018668fc3a3bd1e20927de3e113",
+    "replay.json": "9b7e12988d8fabe2fd360910d517a3e112e99da4b03578fe1ed9fdcff4d2a682",
+    "command.json": "d77cec7e4c3b658b3edf94fd90d8891585b6c8685acd692aa6d1ddacabf440c5"
+  },
+  "replayed_plan_queries": 61000,
+  "native_targets": 38267,
+  "native_target_bp": 31706122489,
+  "native_queries": [
+    {
+      "source": "JM19flyeA_contig_4549",
+      "dataset": "JM19_flye_ABD",
+      "part": "q0-source-part-865ba1fbce846067c7ffff38",
+      "whole_parent_bp": 422383,
+      "planned_query_windows": 5,
+      "union_planned_query_intervals": [
+        [
+          0,
+          422383
+        ]
+      ],
+      "union_planned_query_bp": 422383
+    },
+    {
+      "source": "ptg000010l",
+      "dataset": "JM19_hifiasm",
+      "part": "q0-source-part-9bf9376cf15b64235817ff09",
+      "whole_parent_bp": 99097964,
+      "planned_query_windows": 8,
+      "union_planned_query_intervals": [
+        [
+          54140995,
+          54170976
+        ],
+        [
+          74054386,
+          74419305
+        ],
+        [
+          74423083,
+          74578608
+        ],
+        [
+          98991430,
+          99097964
+        ]
+      ],
+      "union_planned_query_bp": 656959
+    }
+  ],
+  "native_command_present": true,
+  "success_receipt_present_at_sample": false,
+  "temporary_paf_bytes_at_sample": 0,
+  "coordinates": "0-based half-open, source local. Union counts include window context.",
+  "limits": "Historical exhaustive partial route, not the optimized first request. Grouping these windows by the actual native query IDs does not establish which window triggered fallback, why, how many new calls the optimized route will make, or a speedup."
+}
