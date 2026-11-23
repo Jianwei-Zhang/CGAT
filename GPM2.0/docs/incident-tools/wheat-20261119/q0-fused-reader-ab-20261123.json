@@ -1,0 +1,90 @@
+{
+  "exact_retained_rows_compared": 103612,
+  "files": 68,
+  "groups": {
+    "cross": {
+      "bytes": 9671143,
+      "files": 22,
+      "rows": 30437
+    },
+    "ref": {
+      "bytes": 1048130,
+      "files": 2,
+      "rows": 3972
+    },
+    "self": {
+      "bytes": 23059744,
+      "files": 44,
+      "rows": 69203
+    }
+  },
+  "mapper_calls": 0,
+  "production_modified": false,
+  "sample_payload_sha256": "1d46ef55b25a5c676a48f32d1cfdcb3e8923f5a1fed8556c84177589927e8cff",
+  "samples": "first complete records in at most 512 KiB per natural input, original artifact and line number; not random; I/O and selector not timed",
+  "schema": "wheat_threshold_parser_bounded_ab_v1",
+  "seconds_ratio_old_over_candidate": 1.4920031330717956,
+  "snapshot_sha256": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d",
+  "timings": [
+    {
+      "by_kind_seconds": {
+        "cross": 1.7432483062148094,
+        "ref": 0.19101505726575851,
+        "self": 4.347500704228878
+      },
+      "candidate": false,
+      "seconds": 6.281859211623669,
+      "small_cigar_cache": {
+        "currsize": 0,
+        "hits": 0,
+        "maxsize": 8192,
+        "misses": 0
+      }
+    },
+    {
+      "by_kind_seconds": {
+        "cross": 1.1528577506542206,
+        "ref": 0.1153537854552269,
+        "self": 2.923686057329178
+      },
+      "candidate": true,
+      "seconds": 4.191988974809647,
+      "small_cigar_cache": {
+        "currsize": 8192,
+        "hits": 6614,
+        "maxsize": 8192,
+        "misses": 47601
+      }
+    },
+    {
+      "by_kind_seconds": {
+        "cross": 1.1530215665698051,
+        "ref": 0.11550521105527878,
+        "self": 2.9217096492648125
+      },
+      "candidate": true,
+      "seconds": 4.190328523516655,
+      "small_cigar_cache": {
+        "currsize": 8192,
+        "hits": 6614,
+        "maxsize": 8192,
+        "misses": 47601
+      }
+    },
+    {
+      "by_kind_seconds": {
+        "cross": 1.7292556390166283,
+        "ref": 0.18923749774694443,
+        "self": 4.305998533964157
+      },
+      "candidate": false,
+      "seconds": 6.224584758281708,
+      "small_cigar_cache": {
+        "currsize": 0,
+        "hits": 0,
+        "maxsize": 8192,
+        "misses": 0
+      }
+    }
+  ]
+}
