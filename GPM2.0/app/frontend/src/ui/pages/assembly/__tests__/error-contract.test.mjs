@@ -175,3 +175,12 @@ test("maps tauri-wrapped backend validation errors before runtime fallback", () 
   assert.equal(mapped.category, "invalid-params");
   assert.match(mapped.userMessage, /参数/);
 });
+
+test("does not misclassify JavaScript null-property TypeErrors as state conflicts", () => {
+  const mapped = mapAssemblyError({
+    error: new TypeError("Cannot read properties of null (reading 'summary')"),
+  });
+
+  assert.equal(mapped.category, "generic");
+  assert.doesNotMatch(mapped.userMessage, /状态冲突/);
+});
