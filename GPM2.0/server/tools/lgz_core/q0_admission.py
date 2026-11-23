@@ -8,7 +8,6 @@ pairwise-derived placement.
 """
 from __future__ import annotations
 
-from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field, replace
 from functools import lru_cache
@@ -19,6 +18,7 @@ from typing import Mapping
 from .common import read_fasta, sha256_file, stable_id
 from .q0_alignments import PafAlignment, read_paf
 from .q0_catalog import evidence_ref
+from .q0_reference_competition import reference_masks
 from .q0_paths import (PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor,
                        SearchResult, qualify_pair_blocks, reconstruct, search_paths)
 from .q0_preparation import artifact_path, json_file, load_verified_evidence, table
@@ -226,31 +226,6 @@ class _RefBlock:
     mapq: int | None
 
 
-class _ReferenceBlockCandidates:
-    """Safe overlap bounds; a long block may widen the scan, never omit hits."""
-
-    def __init__(self, blocks):
-        self.blocks = sorted(blocks, key=lambda b: b.query.start)
-        self.starts = []
-        self.prefix_end = []
-        farthest = 0
-        for b in self.blocks:
-            farthest = max(farthest, b.query.end)
-            self.starts.append(b.query.start)
-            self.prefix_end.append(farthest)
-
-    def intersecting(self, interval):
-        # Before first: all earlier ends <= interval.start. From stop onward
-        # all starts >= interval.end. A remaining block can still be disjoint.
-        first = bisect_right(self.prefix_end, interval.start)
-        stop = bisect_left(self.starts, interval.end, lo=first)
-        for index in range(first, stop):
-            other = self.blocks[index]
-            overlap = interval.intersection(other.query)
-            if overlap is not None:
-                yield other, overlap
-
-
 def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy):
     blocks = []
     for hit in data.reference_hits.get(part.source, ()):
@@ -262,19 +237,10 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
             if overlap is not None and block.operation != "X":
                 blocks.append(_RefBlock(overlap, _project(block.query, block.target, hit.strand, overlap),
                                         hit.target_name, hit.strand, hit.evidence_id, identity, hit.mapping_quality))
-    groups, high, ambiguity = defaultdict(list), defaultdict(list), []
-    candidates = _ReferenceBlockCandidates(blocks)
-    for block in blocks:
-        conflicts = []
-        for other, overlap in candidates.intersecting(block.query):
-            if other.identity + policy.competing_identity_margin < block.identity:
-                continue
-            if (block.chromosome != other.chromosome or block.strand != other.strand
-                    or _project(block.query, block.target, block.strand, overlap)
-                    != _project(other.query, other.target, other.strand, overlap)):
-                conflicts.append(overlap)
-        ambiguity.extend(conflicts)
-        for unique in subtract_intervals(block.query, conflicts):
+    groups, high = defaultdict(list), defaultdict(list)
+    masks, ambiguity = reference_masks(blocks, policy.competing_identity_margin)
+    for block, unique_intervals in zip(blocks, masks):
+        for unique in unique_intervals:
             for interval in _complex_intervals(data.sources[part.source], unique, policy):
                 anchor = ReferenceAnchor(interval, _project(block.query, block.target, block.strand, interval), block.evidence_id)
                 key = (block.chromosome, block.strand)
@@ -284,7 +250,7 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
     minimum = min(policy.minimum_anchor_bp, part.interval.length)
     groups = {key: tuple(sorted(set(value), key=lambda a: (a.source, a.reference, a.evidence_id)))
               for key, value in groups.items() if _size(a.source for a in value) >= minimum}
-    return groups, {key for key in groups if _size(high[key]) >= minimum}, merged_intervals(ambiguity)
+    return groups, {key for key in groups if _size(high[key]) >= minimum}, ambiguity
 
 
 def _ordered(anchors, orientation):
@@ -737,7 +703,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
+                                    ("q0_admission.py", "q0_reference_competition.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, **kwargs) -> Construction:

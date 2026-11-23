@@ -14,7 +14,8 @@ from server.tools.lgz_core.common import reverse_complement
 from server.tools.lgz_core.q0_admission import (AdmissionPolicy, EvidenceInput, admit_placements,
                                                build_q0, construct_q0, load_evidence_input,
                                                _links_for_path_graphs, _ordered, _pair_neighbors,
-                                               _PlacementNeighbors, _ReferenceBlockCandidates)
+                                               _PlacementNeighbors)
+from server.tools.lgz_core.q0_reference_competition import _ReferenceBlockCandidates
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_catalog import evidence_ref
 from server.tools.lgz_core.q0_paths import PairLink, ReferenceAnchor
