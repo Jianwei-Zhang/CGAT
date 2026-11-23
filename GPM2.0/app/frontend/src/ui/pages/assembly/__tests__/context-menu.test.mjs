@@ -1332,6 +1332,7 @@ test("buildAssemblyContextMenuItems exposes Add Gap Refinement Task with 4 tools
   ]);
   assert.equal(items[1].children[0].disabled, true);
   assert.equal(items[1].children[1].disabled, false);
+  assert.equal(items[1].children.every((child) => child.keepOpen === true), true);
 
   await items[0].run();
   assert.deepEqual(calls.at(-1), {

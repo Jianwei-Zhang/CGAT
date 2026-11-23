@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderManualRefinementCard } from "../manual-refinement-card.js";
+import { renderManualRefinementCard, renderManualRefinementToast } from "../manual-refinement-card.js";
 import {
   bindManualRefinementCard,
   registerManualRefinementLocus,
@@ -68,9 +68,10 @@ test("renderManualRefinementCard renders separate Gap and Tel blocks, per-tool g
   assert.match(bothHtml, /data-manual-ref-count-all[\s\S]*?>全部 · 4</);
   assert.match(bothHtml, /data-manual-ref-gap-section/);
   assert.match(bothHtml, /data-manual-ref-tel-section/);
-  assert.match(bothHtml, /data-manual-ref-gap-row="Chr01\tgap\tgap-1"/);
-  assert.match(bothHtml, /data-manual-ref-gap-tool-row="Chr01\tgap\tgap-1"\s+data-manual-ref-tool="degap"/);
-  assert.match(bothHtml, /data-manual-ref-gap-tool-row="Chr01\tgap\tgap-1"\s+data-manual-ref-tool="tgsgapcloser"/);
+  assert.match(bothHtml, /data-manual-ref-gap-row="Chr01\tgap\tgap-1"\s+data-manual-ref-gap-tool-row="Chr01\tgap\tgap-1"\s+data-manual-ref-tool="degap"/);
+  assert.match(bothHtml, /data-manual-ref-gap-row="Chr01\tgap\tgap-1"\s+data-manual-ref-gap-tool-row="Chr01\tgap\tgap-1"\s+data-manual-ref-tool="tgsgapcloser"/);
+  assert.equal((bothHtml.match(/class="manual-ref-gap-row/g) || []).length, 2);
+  assert.doesNotMatch(bothHtml, /manual-ref-gap-tool-stack|manual-ref-feedback/);
   assert.doesNotMatch(bothHtml, /data-manual-ref-gap-row="Chr02\tgap\tgap-9"/);
   assert.match(bothHtml, /data-app-tooltip="ctg_left_very_long_identifier_001 ↔ ctg_right_very_long_identifier_002"[\s\S]*?data-app-tooltip-overflow/);
   assert.match(bothHtml, /manual-ref-fixed-tool[\s\S]*?>DEGAP TelSeeker<\/span>/);
@@ -269,4 +270,51 @@ test("renderManualRefinementCard hides the panel when there are no queued tasks"
     { escapeAttr, escapeHtml },
   );
   assert.match(withReceiptHtml, /data-manual-ref-receipt/);
+});
+
+test("manual refinement feedback renders as a transient Final Path toast and auto-dismisses", () => {
+  const scheduled = [];
+  let nextId = 1;
+  const timerApi = {
+    setTimeout(fn, ms) {
+      const id = nextId++;
+      scheduled.push({ id, fn, ms, cleared: false });
+      return id;
+    },
+    clearTimeout(id) {
+      const entry = scheduled.find((item) => item.id === id);
+      if (entry) entry.cleared = true;
+    },
+  };
+  let state = {
+    locale: "zh",
+    assembly: {
+      selectedChrName: "Chr01",
+      finalPathByChr: { Chr01: sampleFinalPathEntry },
+      degap: {},
+    },
+  };
+  const store = {
+    getState: () => state,
+    setState: (next) => {
+      state = { ...state, ...next };
+    },
+  };
+  let rerenders = 0;
+  registerManualRefinementLocus(
+    null,
+    store,
+    { chrName: "Chr01", kind: "gap", segmentId: "gap-1", tool: "degap" },
+    { rerender: () => { rerenders += 1; }, timerApi, toastDurationMs: 2800 },
+  );
+  const toastHtml = renderManualRefinementToast(
+    { manualRefinement: state.assembly.degap.manualRefinement },
+    { escapeHtml },
+  );
+  assert.match(toastHtml, /class="final-path-toast-wrap"[\s\S]*class="final-path-toast is-ok"[\s\S]*已加入 Gap 任务/);
+  assert.equal(scheduled.length, 1);
+  assert.equal(scheduled[0].ms, 2800);
+  scheduled[0].fn();
+  assert.equal(renderManualRefinementToast({ manualRefinement: state.assembly.degap.manualRefinement }, { escapeHtml }), "");
+  assert.equal(rerenders, 2);
 });

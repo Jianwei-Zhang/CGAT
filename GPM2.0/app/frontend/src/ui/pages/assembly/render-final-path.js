@@ -2,7 +2,7 @@ import { collectFinalPathSourceCtgs } from "./final-path-presentation.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import { renderFinalPathCard } from "./final-path-card.js";
 import { renderDegapJobCard, renderDegapRuntime } from "./degap-card.js";
-import { renderManualRefinementCard } from "./manual-refinement-card.js";
+import { renderManualRefinementCard, renderManualRefinementToast } from "./manual-refinement-card.js";
 import {
   FINAL_PATH_ALL_KEY,
   areFinalPathEntriesSemanticallyEqual,
@@ -218,6 +218,10 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       graphPreviewSegmentOrder,
       graphAddonByChr,
       degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),
+      finalPathToastBody: renderManualRefinementToast(
+        { manualRefinement: assembly.degap?.manualRefinement },
+        { escapeHtml },
+      ),
       manualRefinementBody: renderManualRefinementCard(
         {
           chrName: currentFinalPathChrName,

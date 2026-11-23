@@ -175,39 +175,21 @@ function kindLabel(kind, copy) {
   return copy.kindGap;
 }
 
-function renderGapRow(locus, { chrName, showChrPill, exporting, copy, escapeAttr, escapeHtml }) {
+function renderGapJobRow(locus, tool, { chrName, showChrPill, exporting, copy, escapeAttr, escapeHtml }) {
   const key = locus.locusKey;
   const isCurrentChr = Boolean(chrName && locus.chr === chrName);
   const displayTarget = locus.label || locus.segmentId;
+  const label = MANUAL_REFINEMENT_TOOL_LABELS[tool] || tool;
+  const removeLabel = fmt(copy.removeGapTool, { target: `${locus.chr} ${displayTarget}`, tool: label });
   const srTargetSummary = locus.label && locus.label !== locus.segmentId
     ? `${locus.chr} Gap ${locus.label} (${locus.segmentId})`
     : `${locus.chr} Gap ${displayTarget}`;
 
-  const toolRows = locus.tools.map((tool) => {
-    const label = MANUAL_REFINEMENT_TOOL_LABELS[tool] || tool;
-    const removeLabel = fmt(copy.removeGapTool, { target: `${locus.chr} ${displayTarget}`, tool: label });
-    return `<div
-      class="manual-ref-gap-tool-row"
-      data-manual-ref-gap-tool-row="${escapeAttr(key)}"
-      data-manual-ref-tool="${escapeAttr(tool)}"
-    >
-      <span class="manual-ref-tool-badge is-tool-${escapeAttr(tool)}">${escapeHtml(label)}</span>
-      <button
-        type="button"
-        class="manual-ref-remove-btn"
-        data-manual-ref-remove-tool
-        data-manual-ref-locus-key="${escapeAttr(key)}"
-        data-manual-ref-tool="${escapeAttr(tool)}"
-        aria-label="${escapeAttr(removeLabel)}"
-        data-app-tooltip="${escapeAttr(removeLabel)}"
-        ${exporting ? "disabled" : ""}
-      >×</button>
-    </div>`;
-  }).join("");
-
   return `<div
     class="manual-ref-gap-row${isCurrentChr ? " is-current-chr" : ""}"
     data-manual-ref-gap-row="${escapeAttr(key)}"
+    data-manual-ref-gap-tool-row="${escapeAttr(key)}"
+    data-manual-ref-tool="${escapeAttr(tool)}"
     role="listitem"
   >
     <div class="manual-ref-locus-ident">
@@ -219,8 +201,18 @@ function renderGapRow(locus, { chrName, showChrPill, exporting, copy, escapeAttr
       >${escapeHtml(displayTarget)}</span>
       <span class="manual-ref-sr-only">${escapeHtml(srTargetSummary)}</span>
     </div>
-    <div class="manual-ref-gap-tool-stack">
-      ${toolRows}
+    <div class="manual-ref-gap-job-actions">
+      <span class="manual-ref-tool-badge is-tool-${escapeAttr(tool)}">${escapeHtml(label)}</span>
+      <button
+        type="button"
+        class="manual-ref-remove-btn"
+        data-manual-ref-remove-tool
+        data-manual-ref-locus-key="${escapeAttr(key)}"
+        data-manual-ref-tool="${escapeAttr(tool)}"
+        aria-label="${escapeAttr(removeLabel)}"
+        data-app-tooltip="${escapeAttr(removeLabel)}"
+        ${exporting ? "disabled" : ""}
+      >×</button>
     </div>
   </div>`;
 }
@@ -617,6 +609,19 @@ function renderSettingsModal(state, { copy, escapeAttr, escapeHtml }) {
   </div>`;
 }
 
+export function renderManualRefinementToast({ manualRefinement }, { escapeHtml }) {
+  const state = normalizeManualRefinementState(manualRefinement);
+  const errorText = String(state.error || "").trim();
+  const feedbackText = String(state.feedback || "").trim();
+  if (!errorText && !feedbackText) {
+    return "";
+  }
+  if (errorText) {
+    return `<div class="final-path-toast-wrap" data-final-path-toast aria-live="polite"><p class="final-path-toast is-error" role="alert">${escapeHtml(errorText)}</p></div>`;
+  }
+  return `<div class="final-path-toast-wrap" data-final-path-toast aria-live="polite"><p class="final-path-toast is-ok" role="status">${escapeHtml(feedbackText)}</p></div>`;
+}
+
 export function renderManualRefinementCard(
   { chrName, manualRefinement, locale = "zh" },
   { escapeAttr, escapeHtml },
@@ -628,8 +633,6 @@ export function renderManualRefinementCard(
     !state.loci.length
     && !state.exporting
     && !state.settingsOpen
-    && !state.error
-    && !state.feedback
     && !hasVisibleReceipt
   ) {
     return "";
@@ -666,7 +669,7 @@ export function renderManualRefinementCard(
           <span class="manual-ref-block-count">${escapeHtml(String(gapJobsCount))}</span>
         </div>
         <div class="manual-ref-block-list" role="list">
-          ${gapLoci.map((locus) => renderGapRow(locus, { chrName, showChrPill, exporting: state.exporting, copy, escapeAttr, escapeHtml })).join("")}
+          ${gapLoci.flatMap((locus) => locus.tools.map((tool) => renderGapJobRow(locus, tool, { chrName, showChrPill, exporting: state.exporting, copy, escapeAttr, escapeHtml }))).join("")}
         </div>
       </div>`
     : "";
@@ -694,8 +697,6 @@ export function renderManualRefinementCard(
   const bodyMarkup = isOpen
     ? `<div class="manual-ref-body" data-manual-ref-body>
         ${blocksMarkup}
-        ${state.error ? `<p class="error-text manual-ref-feedback is-error" role="alert">${escapeHtml(state.error)}</p>` : ""}
-        ${!state.error && state.feedback ? `<p class="manual-ref-feedback is-ok" role="status">${escapeHtml(state.feedback)}</p>` : ""}
         ${renderLastExportReceipt(state.lastExport, { dismissed: state.receiptDismissed, copy, escapeAttr, escapeHtml })}
       </div>`
     : "";

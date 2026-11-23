@@ -450,10 +450,30 @@ export function bindAssemblyContextMenu(host, store, deps) {
       button.addEventListener("click", async (event) => {
         event?.stopPropagation?.();
         const item = resolveContextMenuItemByPath(items, button.getAttribute("data-menu-action-path"));
-        closeMenu();
         if (item?.disabled || typeof item?.run !== "function") {
+          if (!item?.keepOpen) {
+            closeMenu();
+          }
           return;
         }
+        if (item.keepOpen) {
+          const result = await item.run();
+          if (result !== false) {
+            item.disabled = true;
+            button.disabled = true;
+            button.classList?.add?.("is-disabled");
+            button.setAttribute?.("aria-disabled", "true");
+            button.removeAttribute?.("data-menu-action-path");
+            if (item.selectedLabel) {
+              button.textContent = item.selectedLabel;
+            }
+            if (item.selectedTitle) {
+              button.setAttribute?.("data-app-tooltip", item.selectedTitle);
+            }
+          }
+          return;
+        }
+        closeMenu();
         await item.run();
       });
     });
@@ -468,7 +488,11 @@ export function bindAssemblyContextMenu(host, store, deps) {
     close: menu => { if (contextMenuFor(host) === menu) closeMenu(); },
   });
   host.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
-  host.addEventListener("click", () => {
+  host.addEventListener("click", (event) => {
+    const menu = contextMenuFor(host);
+    if (menu && event?.target?.closest?.("#assembly-context-menu, [data-local-view-context-menu]") === menu) {
+      return;
+    }
     closeMenu();
   });
   host.addEventListener("scroll", () => {

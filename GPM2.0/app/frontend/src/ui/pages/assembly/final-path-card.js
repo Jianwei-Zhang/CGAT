@@ -1672,6 +1672,7 @@ export function renderFinalPathCard(
     graphPreviewSegmentOrder = null,
     graphAddonByChr = {},
     degapRuntimeBody = "",
+    finalPathToastBody = "",
     manualRefinementBody = "",
     canExportFasta = true,
     canExportManualRefinement = false,
@@ -1896,6 +1897,7 @@ export function renderFinalPathCard(
         ${headControls}
       </div>
       <div class="final-path-card-body">
+        ${String(finalPathToastBody || "")}
         ${String(degapRuntimeBody || "")}
         ${body}
         ${String(manualRefinementBody || "")}

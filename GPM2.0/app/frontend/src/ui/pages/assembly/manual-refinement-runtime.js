@@ -25,6 +25,71 @@ import {
 } from "./manual-refinement-state.js";
 
 const MANUAL_REF_CARD_BOUND = Symbol("manualRefinementCardBound");
+const MANUAL_REF_TOAST_TIMERS = new WeakMap();
+const MANUAL_REF_FEEDBACK_TOAST_MS = 2800;
+const MANUAL_REF_ERROR_TOAST_MS = 4500;
+
+function clearManualRefinementToastTimer(store, timerApi = globalThis) {
+  const existing = store && typeof store === "object" ? MANUAL_REF_TOAST_TIMERS.get(store) : null;
+  if (existing?.timerId !== null && existing?.timerId !== undefined) {
+    timerApi?.clearTimeout?.(existing.timerId);
+  }
+  if (store && typeof store === "object") {
+    MANUAL_REF_TOAST_TIMERS.delete(store);
+  }
+}
+
+function scheduleManualRefinementToastDismiss(host, store, nextManual, deps = {}) {
+  if (!store || typeof store !== "object") {
+    return;
+  }
+  const timerApi = deps.timerApi || globalThis;
+  clearManualRefinementToastTimer(store, timerApi);
+  const message = normalizeString(nextManual?.error || nextManual?.feedback);
+  if (!message || nextManual?.exporting) {
+    return;
+  }
+  const durationMs = nextManual?.error
+    ? Number(deps.errorToastDurationMs ?? MANUAL_REF_ERROR_TOAST_MS)
+    : Number(deps.toastDurationMs ?? MANUAL_REF_FEEDBACK_TOAST_MS);
+  if (!Number.isFinite(durationMs) || durationMs <= 0 || typeof timerApi?.setTimeout !== "function") {
+    return;
+  }
+  const token = Symbol("manualRefToast");
+  const timerId = timerApi.setTimeout(() => {
+    const active = MANUAL_REF_TOAST_TIMERS.get(store);
+    if (active?.token !== token) {
+      return;
+    }
+    MANUAL_REF_TOAST_TIMERS.delete(store);
+    const latestState = store.getState();
+    const latestDegap = normalizeDegapRuntimeState(latestState?.assembly?.degap);
+    const latestManual = normalizeManualRefinementState(latestDegap.manualRefinement);
+    if (!latestManual.feedback && !latestManual.error) {
+      return;
+    }
+    const clearedManual = normalizeManualRefinementState({
+      ...latestManual,
+      feedback: "",
+      error: "",
+    });
+    const clearedDegap = normalizeDegapRuntimeState({
+      ...latestDegap,
+      manualRefinement: clearedManual,
+    });
+    store.setState({
+      ...latestState,
+      assembly: {
+        ...latestState.assembly,
+        degap: clearedDegap,
+        degapProjectState: buildDegapProjectStateForPersistence(clearedDegap),
+      },
+    });
+    deps.rerender?.(host, store);
+  }, durationMs);
+  timerId?.unref?.();
+  MANUAL_REF_TOAST_TIMERS.set(store, { token, timerId });
+}
 
 function normalizeString(value) {
   return String(value ?? "").trim();
@@ -76,6 +141,15 @@ function updateManualRefinementState(host, store, updater, deps = {}, { persist 
       degapProjectState: buildDegapProjectStateForPersistence(nextDegap),
     },
   });
+  const touchedToast = Boolean(
+    patch
+    && (Object.prototype.hasOwnProperty.call(patch, "feedback")
+      || Object.prototype.hasOwnProperty.call(patch, "error")
+      || Object.prototype.hasOwnProperty.call(patch, "exporting")),
+  );
+  if (touchedToast) {
+    scheduleManualRefinementToastDismiss(host, store, nextManual, deps);
+  }
   deps.rerender?.(host, store);
   if (persist && typeof deps.persistDegapProjectState === "function") {
     void deps.persistDegapProjectState(host, store);
