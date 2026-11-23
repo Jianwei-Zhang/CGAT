@@ -31,8 +31,8 @@ def fai(path):
         return {r[0]: tuple(map(int, r[1:5])) for line in f if (r := line.rstrip("\n").split("\t"))}
 
 
-def cohorts(assignments, datasets):
-    picked = {panel: {} for panel in PANELS}
+def cohorts(assignments, datasets, panels=PANELS):
+    picked = {panel: {} for panel in panels}
     for row in assignments:
         n, start = int(row["seq_length_bp"]), row["anchor_start"]
         if not start or not 20_000 <= n <= 1_500_000 or float(row["support_percent"]) < 20:
@@ -87,7 +87,7 @@ def read_bound(path, receipt, consume):
     return count
 
 
-def freeze(work, out, lookup_path, index_receipt):
+def freeze(work, out, lookup_path, index_receipt, *, panels=PANELS):
     if out.exists() or out.is_relative_to(work) or work.is_relative_to(out):
         raise ValueError("panel output must be a new isolated directory")
     if digest(lookup_path) != LOOKUP_SHA:
@@ -104,7 +104,7 @@ def freeze(work, out, lookup_path, index_receipt):
     lengths = {k: v[0] for k,v in fai(within(work, reference["fai_relpath"])).items()}
     sizes = {d: fai(within(work, row["fai_relpath"])) for d, row in datasets.items()}
     assignments = tsv(work / "metadata/chr_assignments.tsv")
-    selected = cohorts(assignments, datasets)
+    selected = cohorts(assignments, datasets, panels)
     by_source = {(r["dataset"],r["contig"]): r for r in lookup.values()}
     out.mkdir(exist_ok=False)
     report, paths = [], {}
