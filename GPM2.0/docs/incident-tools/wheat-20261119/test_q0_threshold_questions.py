@@ -51,6 +51,18 @@ class ThresholdTests(unittest.TestCase):
         need,_=questions(d,construct(d),[{'dataset_name':u.dataset,'seq_name':u.contig,'assigned_chr_name':'B'}]); self.assertEqual({k:[(v.start,v.end) for v in vals] for k,vals in need.items()},{u:[(0,600)]})
         self.assertIsNone(questions(d,None,[])[0])
 
+    def test_secondary_assignment_does_not_reopen_a_supported_slice_or_mask_its_neighbour(self):
+        f = EvidenceFixture({'A':2000, 'B':2000}); r = f.source('root', dna(2000)); f.ref(r,(0,2000),(0,2000),chromosome='A')
+        data = f.data(); draft = construct(data); extra = [{'dataset_name':r.dataset,'seq_name':r.contig,'assigned_chr_name':'B'}]
+        need, stats = questions(data, draft, extra)
+        self.assertFalse(need); self.assertEqual(stats['secondary_assignment_supported_bp_not_requested'],2000)
+        # Only the retained slice, not the whole originally assigned source, has passed.
+        row = draft.paths['A']; sl, = row.path.slices
+        row.path = replace(row.path, slices=(replace(sl,interval=Interval(100,1700)),))
+        need, stats = questions(data, draft, extra)
+        self.assertEqual([(x.start,x.end) for x in need[r]],[(0,100),(1700,2000)])
+        self.assertEqual(stats['secondary_assignment_supported_bp_not_requested'],1600)
+
     def test_duplicate_or_one_sided_evidence_does_not_count_twice(self):
         l,r=ends(Interval(1000,2000),100); known=[Interval(1040,1140)]*4
         self.assertTrue(supported(l,known,100)); self.assertFalse(supported(r,known,100))

@@ -6,7 +6,7 @@ exact join, or certify search completeness. Input must be the ordinary selector'
 from collections import Counter, defaultdict
 
 from lgz_core.q0_paths import PathPolicy, pair_blocks, reference_consistent
-from lgz_core.q0_sources import Interval, Q0EvidenceError, merged_intervals
+from lgz_core.q0_sources import Interval, Q0EvidenceError, merged_intervals, subtract_intervals
 
 
 def ends(span, minimum):
@@ -57,9 +57,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
         if c in data.reference_lengths:
             required[c].add(s)
     missing = {s for c, keys in required.items() if c not in draft.paths or draft.paths[c].path is None for s in keys}
-    for part in data.parts.values():
-        if part.source in missing:
-            needed[part.source].append(part.interval); stats['missing_chromosome_parts'] += 1
+    strong_on_missing = defaultdict(list)
     # Index just the pairs under question (not the full duplicated evidence inventory).
     pairs = {tuple(sorted((l.source, r.source))) for row in draft.paths.values() if row.path
              for l, j, r in zip(row.path.slices, row.path.joins, row.path.slices[1:]) if j.kind == 'reference_unknown'}
@@ -84,6 +82,8 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
                 needed[s.source].extend(weak); stats['weak_placement'] += 1
             else:
                 stats['positive_placement_stop'] += 1
+                if s.source in missing:
+                    strong_on_missing[s.source].append(s.interval)
         for left, j, right in zip(path.slices, path.joins, path.slices[1:]):
             lp, rp = placed[left.placement_id], placed[right.placement_id]
             if (j.left_id, j.right_id) != (lp.placement_id, rp.placement_id) or not j.evidence_ids:
@@ -101,4 +101,14 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
             for p, local in ((lp, j.left_end), (rp, j.right_start)):
                 lo, hi = max(0, local-reach), min(p.interval.length, local+reach)
                 needed[p.source].append(p.source_interval(Interval(lo, hi)))
-    return {s: merged_intervals(v) for s, v in needed.items()}, dict(stats)
+    # A secondary assignment to an unbuilt chromosome is a possible rival, not an
+    # independent reason to redo an already supported placement. Do not exempt the
+    # rest of its contig or erase an independent weak-junction request on this axis.
+    fixed = {s: merged_intervals(v) for s, v in strong_on_missing.items()}
+    for part in data.parts.values():
+        if part.source in missing:
+            remaining = subtract_intervals(part.interval, fixed.get(part.source, ()))
+            stats['missing_chromosome_parts'] += 1
+            stats['secondary_assignment_supported_bp_not_requested'] += part.interval.length - sum(i.length for i in remaining)
+            needed[part.source].extend(remaining)
+    return {s: merged_intervals(v) for s, v in needed.items() if v}, dict(stats)
