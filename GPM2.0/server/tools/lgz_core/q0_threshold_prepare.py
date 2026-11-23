@@ -140,9 +140,13 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
         del hits
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     del links, edges  # the immutable selection input now owns these references
-    selected = (select_q0_paths(data, screen_threads=threads, progress=lambda msg: print("LGZ q0 first draft: " + msg, flush=True))
-                if threads > 1 else select_q0_paths(data))
+    def log(msg):
+        print("LGZ q0 first draft: " + msg, flush=True)
+    selected = select_q0_paths(data, screen_threads=threads, progress=log)
+    log("paths selected; calculating first supplement request")
     need, _ = questions(data, selected, assignments)
+    log("first supplement decision: full fallback" if need is None else
+        f"first supplement decision: sources={len(need)} intervals={sum(map(len, need.values()))}")
     return need, any(r.path is not None for r in selected.paths.values())
 
 

@@ -15,6 +15,8 @@ from functools import lru_cache
 import math
 from operator import attrgetter
 from pathlib import Path
+from threading import Event, Lock, Thread
+from time import monotonic
 from typing import Callable, Mapping
 
 from .common import read_fasta, sha256_file, stable_id
@@ -417,9 +419,76 @@ def _quiet(_message: str) -> None:
     pass
 
 
+class _PlacementProgress:
+    """One optional reporter per admission. A long single item still gets a heartbeat."""
+
+    def __init__(self, log):
+        self.log = log
+        self.stop = Event()
+        self.lock = Lock()
+        self.state = None
+        self.thread = None
+
+    def __enter__(self):
+        return self
+
+    def _message(self, status):
+        label, start, count, total = self.state
+        units = "" if total is None else f" completed={count}/{total}"
+        return f"placement {label}: {status}{units} elapsed_s={int(monotonic() - start)}"
+
+    def _heartbeat(self):
+        while not self.stop.wait(60):
+            with self.lock:
+                if self.state:
+                    self.log(self._message("working"))
+
+    def start(self, label, total=None):
+        if self.log is _quiet:
+            return
+        with self.lock:
+            if self.state:
+                self.log(self._message("finished"))
+            self.state = [label, monotonic(), 0, total]
+            self.log(self._message("started"))
+        if self.thread is None:
+            self.thread = Thread(target=self._heartbeat, name="q0-placement-progress", daemon=True)
+            self.thread.start()
+
+    def items(self, label, values):
+        if self.log is _quiet:
+            yield from values
+            return
+        self.start(label, len(values))
+        for index, value in enumerate(values, 1):
+            yield value
+            with self.lock:
+                self.state[2] = index
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop.set()
+        if self.thread is not None:
+            self.thread.join()
+            self.log(self._message("finished" if exc_type is None else "interrupted"))
+
+
+def _overlapping_spans(span, disjoint):
+    """Original source order, half-open overlaps; disjoint is sorted and merged."""
+    for i in range(bisect_right(disjoint, span.start, key=_end), len(disjoint)):
+        candidate = disjoint[i]
+        if candidate.start >= span.end:
+            break
+        yield candidate
+
+
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),
                      path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
                      screen_threads: int = 1, screen_progress: Callable[[str], None] = _quiet) -> Admission:
+    with _PlacementProgress(screen_progress) as phases:
+        return _admit_placements(data, policy, path_policy, quality_pass, screen_threads, screen_progress, phases)
+
+
+def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, screen_progress, phases):
     if quality_pass is not None and (set(quality_pass) != set(data.sources) or any(type(v) is not bool for v in quality_pass.values())):
         raise Q0EvidenceError("q0 QC decisions must explicitly cover every source")
     records, accepted = [], {}
@@ -454,6 +523,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                             "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
                             "qc": "not_measured" if quality_pass is None else "passed"})
     del screened, ordered
+    phases.start(f"index pair evidence (links={len(data.pair_links)})")
     ambiguous = {key: merged_intervals(value) for key, value in ambiguous.items()}
     pair_neighbors = _pair_neighbors(data.pair_links)
 
@@ -468,7 +538,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     # selection, not a claim that the input assembler made a biological error.
     reference_seeds = tuple(accepted.values())
     seed_neighbors = _PlacementNeighbors(reference_seeds, pair_neighbors)
-    for current in reference_seeds:
+    for current in phases.items("check cross-chromosome seed tails", reference_seeds):
         part = data.parts[current.segment_id]
         if current.interval != part.interval:
             continue
@@ -484,15 +554,15 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                 qualified = qualify_pair_blocks(probe, anchor, links, path_policy, require_supported=False)
                 by_evidence = defaultdict(list)
                 for block, eid in qualified:
-                    for target_anchor in anchor.reference_blocks:
-                        overlap = block.right.intersection(anchor.local(target_anchor.source))
-                        if overlap:
-                            start = block.left.start + overlap.start - block.right.start
-                            by_evidence[eid].append(probe.source_interval(Interval(start, start + overlap.length)))
+                    # The per-placement index preserves each actual reference block,
+                    # including overlapping anchors. Do not merge before complexity screening.
+                    for lo, hi, _ in anchor._reference_loci.intersecting(block.right.start, block.right.end):
+                        start = block.left.start + lo - block.right.start
+                        by_evidence[eid].append(probe.source_interval(Interval(start, start + hi - lo)))
                 for eid, intervals in by_evidence.items():
                     # A chain also matching the known chr locus is a repeated
                     # sequence relationship, not evidence for moving its tail.
-                    if _size(overlap for a in intervals for b in main_anchors
+                    if _size(overlap for a in intervals for b in _overlapping_spans(a, main_anchors)
                              if (overlap := a.intersection(b))) >= policy.minimum_anchor_bp:
                         continue
                     clean = clean_intervals(part, intervals)
@@ -512,7 +582,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
             for block, eid in qualify_pair_blocks(current, anchor, links, path_policy, require_supported=False):
                 by_evidence[eid].append(current.source_interval(block.left))
             for eid, intervals in by_evidence.items():
-                left_support = _size(overlap for a in intervals for b in main_anchors if (overlap := a.intersection(b)))
+                left_support = _size(overlap for a in intervals for b in _overlapping_spans(a, main_anchors) if (overlap := a.intersection(b)))
                 right_support = _size(overlap for a in intervals for value in alternatives.values()
                                       for b in value["intervals"] if (overlap := a.intersection(b)))
                 if min(left_support, right_support) >= policy.minimum_anchor_bp:
@@ -558,10 +628,14 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
         placed = {p.segment_id for p in before}
         placed_neighbors = _PlacementNeighbors(before, pair_neighbors)
         proposed = defaultdict(dict)
-        for key in sorted(allowed - placed):
+        for key in phases.items(f"anchor unplaced segments round={round_number}", sorted(allowed - placed)):
             part = data.parts[key]
             for anchor, links in placed_neighbors.for_source(part.source):
                 for orientation in ("+", "-"):
+                    group = (anchor.chromosome, orientation)
+                    direct = groups.get(key, {}).get(group, ())
+                    if groups.get(key) and not direct:
+                        continue  # This locus cannot propose a placement, regardless of pair evidence.
                     # Geometry probe has explicit raw evidence; it is never returned as admitted.
                     temporary = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
                                            (l.hit.evidence_id for l in links), kind="pairwise")
@@ -573,7 +647,10 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                     context = rooted_context(anchor.segment_id, anchor.interval)
                     intervals, ids = [], set()
                     for block, evidence_id in qualified:
-                        for source_anchor in context:
+                        # Screen only source intervals that touch this block; keep the original
+                        # source-coordinate order and orientation-specific projection below.
+                        target_span = anchor.source_interval(block.right)
+                        for source_anchor in _overlapping_spans(target_span, context):
                             overlap = block.right.intersection(anchor.local(source_anchor))
                             if overlap is None:
                                 continue
@@ -583,13 +660,6 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                     intervals = clean_intervals(part, intervals)
                     if _size(intervals) < min(policy.minimum_anchor_bp, part.interval.length):
                         continue
-                    group = (anchor.chromosome, orientation)
-                    # Contradictory uniquely localized ref segments are never
-                    # overridden by a pairwise vote. They can support selection
-                    # of a bounded local interval instead of the whole parent.
-                    direct = groups.get(key, {}).get(group, ())
-                    if groups.get(key) and not direct:
-                        continue
                     item = proposed[key].setdefault(group, {"intervals": [], "ids": set(), "parents": set(), "refs": direct})
                     if direct:
                         intervals = merged_intervals(overlap for a in intervals for b in direct
@@ -598,7 +668,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                     item["ids"].update(ids | set(anchor.evidence_ids))
                     item["parents"].add(anchor.placement_id)
         added = 0
-        for key, alternatives in sorted(proposed.items()):
+        for key, alternatives in phases.items(f"resolve pair proposals round={round_number}", sorted(proposed.items())):
             part = data.parts[key]
             alternatives = {group: value for group, value in alternatives.items()
                             if _size(value["intervals"]) >= min(policy.minimum_anchor_bp, part.interval.length)}
@@ -641,7 +711,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     addition_ids = defaultdict(set)
     placed_list = sorted(accepted.values(), key=lambda p: p.placement_id)
     placed_neighbors = _PlacementNeighbors(placed_list, pair_neighbors)
-    for i, left in enumerate(placed_list):
+    for i, left in enumerate(phases.items("extend localized anchors", placed_list)):
         for right, links in placed_neighbors.for_source(left.source, after=i):
             if left.chromosome != right.chromosome:
                 continue
@@ -651,7 +721,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                     clean = clean_intervals(part, (interval,))
                     additions[placement.placement_id].extend(clean)
                     addition_ids[placement.placement_id].add(evidence_id)
-    for key, intervals in additions.items():
+    for key, intervals in phases.items("merge anchor extensions", additions.items()):
         p = accepted[key]
         accepted[key] = replace(p, anchor_intervals=merged_intervals((*p.anchor_intervals, *intervals)),
                                 evidence_ids=tuple(sorted(set(p.evidence_ids) | addition_ids[key])))
@@ -661,6 +731,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     # Original assembly N adjacency is a soft relation, not a new independent
     # sequence anchor. Unaligned neighbors can only survive attached to a seed.
     for round_number in range(1, len(data.parts) + 1):
+        phases.start(f"resolve input adjacency round={round_number}")
         by_part = defaultdict(list)
         for p in accepted.values():
             by_part[p.segment_id].append(p)
@@ -688,7 +759,7 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
         if not added:
             break
     placed = {p.segment_id for p in accepted.values()}
-    for key in sorted(allowed - placed):
+    for key in phases.items("record unresolved segments", sorted(allowed - placed)):
         records.append({"segment_id": key, "status": "unresolved",
                         "reason": ("structural_ref_conflict" if len(groups.get(key, {})) > 1 else
                                    "noncollinear_reference_anchors" if any(not _ordered(a, g[1]) for g, a in groups.get(key, {}).items()) else
