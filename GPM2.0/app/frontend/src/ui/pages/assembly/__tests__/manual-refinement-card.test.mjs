@@ -249,3 +249,24 @@ test("the queue defaults to expanded on restore but can be collapsed without hid
   assert.match(collapsed, /aria-expanded="false"/);
   assert.match(collapsed, /data-manual-ref-count-current[\s\S]*?>Chr01 · 1</);
 });
+
+test("renderManualRefinementCard hides the panel when there are no queued tasks", () => {
+  const emptyHtml = renderManualRefinementCard(
+    { chrName: "Chr01", manualRefinement: { loci: [] }, locale: "zh" },
+    { escapeAttr, escapeHtml },
+  );
+  assert.equal(emptyHtml, "");
+
+  const withReceiptHtml = renderManualRefinementCard(
+    {
+      chrName: "Chr01",
+      manualRefinement: {
+        loci: [],
+        lastExport: { batchSha256: "a".repeat(64), outputFileName: "tasks.zip", lociCount: 1, tasksCount: 1 },
+      },
+      locale: "zh",
+    },
+    { escapeAttr, escapeHtml },
+  );
+  assert.match(withReceiptHtml, /data-manual-ref-receipt/);
+});

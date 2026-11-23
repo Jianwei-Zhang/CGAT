@@ -460,7 +460,7 @@ function getLabels(state) {
       exportFasta: "Sequence (.fasta)",
       exportAgp: "AGP (.agp)",
       exportLog: "Log (.log)",
-      exportRefinementAll: "Export All Refinement Tasks",
+      exportRefinementAll: "Refinement Tasks",
       exportDialogTitle: "Exporting Final Path",
       exportRunning: "Running: {step}",
       refDisabled: "A Final Path in this assembly contains reference objects. Statistics and log export are disabled; export functions remain available.",
@@ -520,12 +520,12 @@ function getLabels(state) {
     refresh: "刷新",
     export: "导出",
     exportAll: "全部",
-    exportPng: "图(.png)",
-    exportTsv: "表(.tsv)",
-    exportFasta: "序列(.fasta)",
+    exportPng: "图 (.png)",
+    exportTsv: "表 (.tsv)",
+    exportFasta: "序列 (.fasta)",
     exportAgp: "AGP (.agp)",
-    exportLog: "日志(.log)",
-    exportRefinementAll: "导出全部精修任务",
+    exportLog: "日志 (.log)",
+    exportRefinementAll: "精修任务",
     exportDialogTitle: "正在导出 Final Path",
     exportRunning: "正在执行：{step}",
     refDisabled: "检测到组装中某个染色体的 Final Path 包含参考序列对象。本页仅保留导出功能，组装统计和日志导出已关闭。",
@@ -1618,14 +1618,14 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
         aria-expanded="false"
       >${escapeHtml(labels.export)}</button>
       <div class="final-path-export-menu is-hidden" data-project-export-menu>
-        <button type="button" class="final-path-export-item" data-project-export-action="png">${escapeHtml(labels.exportPng)}</button>
-        <button type="button" class="final-path-export-item" data-project-export-action="tsv">${escapeHtml(labels.exportTsv)}</button>
-        ${logItem}
         ${fastaItem}
         <button type="button" class="final-path-export-item" data-project-export-action="agp">${escapeHtml(labels.exportAgp)}</button>
+        <button type="button" class="final-path-export-item" data-project-export-action="tsv">${escapeHtml(labels.exportTsv)}</button>
+        <button type="button" class="final-path-export-item" data-project-export-action="png">${escapeHtml(labels.exportPng)}</button>
+        ${logItem}
         <button type="button" class="final-path-export-item" data-project-export-action="all">${escapeHtml(labels.exportAll)}</button>
         <div class="final-path-export-divider" role="separator" aria-hidden="true"></div>
-        <button type="button" class="final-path-export-item" data-project-export-action="refinement-all">${escapeHtml(labels.exportRefinementAll || "导出全部精修任务")}</button>
+        <button type="button" class="final-path-export-item" data-project-export-action="refinement-all">${escapeHtml(labels.exportRefinementAll || "精修任务")}</button>
       </div>
     </div>
   `;

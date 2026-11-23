@@ -623,6 +623,17 @@ export function renderManualRefinementCard(
 ) {
   const copy = COPY[locale === "en" ? "en" : "zh"];
   const state = normalizeManualRefinementState(manualRefinement);
+  const hasVisibleReceipt = Boolean(state.lastExport && !state.receiptDismissed);
+  if (
+    !state.loci.length
+    && !state.exporting
+    && !state.settingsOpen
+    && !state.error
+    && !state.feedback
+    && !hasVisibleReceipt
+  ) {
+    return "";
+  }
   const currentChrLoci = filterManualRefinementLociByScope(state.loci, {
     scope: "current-chr",
     chrName,
