@@ -116,7 +116,7 @@ fn project_refinement_card_records_legacy_without_creating_a_track_or_changing_f
     write_add_ctg_zip(&nested);
     let package = temp.path().join("results.zip");
     let corrupt = temp.path().join("corrupt.zip");
-    result_zip(&package, &nested, &[saved.clone()], false);
+    result_zip(&package, &nested, std::slice::from_ref(&saved), false);
     result_zip(&corrupt, &nested, &[saved], true);
     let conn = Connection::open(&outcome.project_db_path).unwrap();
     let path = || crate::degap_jobs::degap_final_path_snapshot(&conn, project, "r").unwrap();

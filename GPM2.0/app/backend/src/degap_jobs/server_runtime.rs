@@ -39,14 +39,13 @@ CGAT_DEGAP_TOOL="$CGAT_RUNTIME/degap.py"
     )
 }
 
+type DatasetContigBindings = std::collections::HashMap<(String, String), Option<(i64, String)>>;
+
 // Per-operation index. A whole-project task can address thousands of members in the
 // same immutable import; never rescan or deserialize the entire map per segment.
 #[derive(Default)]
 pub(super) struct SourceMaps {
-    maps: std::collections::HashMap<
-        PathBuf,
-        std::collections::HashMap<(String, String), Option<(i64, String)>>,
-    >,
+    maps: std::collections::HashMap<PathBuf, DatasetContigBindings>,
 }
 
 impl SourceMaps {

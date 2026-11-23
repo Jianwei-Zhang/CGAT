@@ -15,10 +15,10 @@ pub(crate) fn lookup_auto_source(
         return Ok(None);
     }
     let row: Option<(String,String,i64)>=conn.query_row("SELECT dataset,fasta_sha256,length FROM project_auto_source WHERE project_id=?1 AND alias=?2 AND contig=?3",params![project,ds,name],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
-    if let Some((native, sha, len)) = &row {
-        if !is_hash(sha) || *len <= 0 || alias(native, sha) != ds {
-            bail!("incorrect automatic source binding");
-        }
+    if let Some((native, sha, len)) = &row
+        && (!is_hash(sha) || *len <= 0 || alias(native, sha) != ds)
+    {
+        bail!("incorrect automatic source binding");
     }
     Ok(row)
 }
@@ -171,10 +171,10 @@ impl GapRuns {
         for (i, b) in seq.bytes().chain(std::iter::once(b'.')).enumerate() {
             if b == b'N' {
                 start.get_or_insert(i + 1);
-            } else if let Some(lo) = start.take() {
-                if next.next() != Some(&(lo, i)) {
-                    bail!("actual automatic sequence differs from N evidence");
-                }
+            } else if let Some(lo) = start.take()
+                && next.next() != Some(&(lo, i))
+            {
+                bail!("actual automatic sequence differs from N evidence");
             }
         }
         if next.next().is_some() {

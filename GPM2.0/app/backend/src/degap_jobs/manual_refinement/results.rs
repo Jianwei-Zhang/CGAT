@@ -321,10 +321,10 @@ pub fn validate_manual_refinement_results(
             .remove(&(row.locus_id.as_str(), row.tool.as_str()))
             .context("unexpected or duplicate locus and tool pair in refinement results")?;
         check_patch_binding(row, locus, &mut n_digests)?;
-        if let Some(patch) = &row.patch {
-            if !paths.insert(&patch.path) {
-                bail!("duplicate refinement patch path");
-            }
+        if let Some(patch) = &row.patch
+            && !paths.insert(&patch.path)
+        {
+            bail!("duplicate refinement patch path");
         }
     }
     for i in 0..zip.len() {

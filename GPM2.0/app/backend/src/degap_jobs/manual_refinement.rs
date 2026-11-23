@@ -518,7 +518,7 @@ fn validate_tool_parameters(params: &ToolParametersRequest) -> Result<Option<Val
             ("filter_depth_ont", degap.filter_depth_ont),
         ] {
             if let Some(v) = value {
-                if !v.is_finite() || !(v > 0.0 && v < 1.0) {
+                if !(v > 0.0 && v < 1.0) {
                     bail!("invalid DEGAP {key}: expected a ratio strictly between 0 and 1");
                 }
                 out.insert(key.into(), json!(v));

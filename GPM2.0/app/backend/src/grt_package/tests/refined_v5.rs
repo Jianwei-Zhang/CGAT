@@ -1466,5 +1466,50 @@ fn project_manual_snapshot_and_parameters_roundtrip_without_replacing_archives()
         .find(|r| r["sourceKind"] == "refinement_patch")
         .unwrap();
     assert_eq!(selected["refinementPatchSha256"], sha256_bytes(b"GATTACA"));
+    let mut current = paths.clone();
+    current.extend(serde_json::from_value::<BTreeMap<String, Value>>(saved)?);
+    let mut records = Vec::new();
+    for (name, value) in current {
+        let path = crate::degap_jobs::canonicalize_entry(&name, value)?;
+        let segments = path["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                if row["type"] == "gap" {
+                    FinalPathExportSegment::Gap {
+                        gap_size_bp: row["gapSizeBp"].as_i64().unwrap(),
+                    }
+                } else if row["sourceKind"] == "refinement_patch" {
+                    FinalPathExportSegment::RefinementPatch {
+                        sha256: row["refinementPatchSha256"].as_str().unwrap().into(),
+                        start: row["start"].as_i64().unwrap(),
+                        end: row["end"].as_i64().unwrap(),
+                    }
+                } else {
+                    FinalPathExportSegment::Source {
+                        dataset_name: row["datasetName"].as_str().unwrap().into(),
+                        contig_name: row["ctgName"].as_str().unwrap().into(),
+                        start: row["start"].as_i64().unwrap(),
+                        end: row["end"].as_i64().unwrap(),
+                    }
+                }
+            })
+            .collect();
+        records.push(FinalPathFastaRecord {
+            chr_name: name,
+            final_path_segments: segments,
+        });
+    }
+    let app_genome = dir.path().join("exported-by-app.fa");
+    exporter::export_project_final_path_fasta(
+        db,
+        p,
+        &ExportProjectFinalPathFastaParams {
+            output_path: app_genome.clone(),
+            records,
+        },
+    )?;
+    assert_eq!(read_fasta(&app_genome, "App manual genome", false)?, genome);
     Ok(())
 }
