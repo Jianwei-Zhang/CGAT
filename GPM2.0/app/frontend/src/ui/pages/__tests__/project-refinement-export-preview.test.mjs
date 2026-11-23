@@ -349,6 +349,7 @@ test("one refinement table compares both automatic tools alongside a manual batc
   assert.match(table[0], /quarTeT<\/th>[\s\S]*?2 \/ 4/);
   assert.match(table[0], /手动精修[\s\S]*?#bbbbbb[\s\S]*?1 \/ 1[\s\S]*?>1<\/td>/);
   assert.doesNotMatch(html, /部分填补|未填补|拒绝/);
+  assert.match(html, /<h3 id="project-refinement-title">精修<\/h3>\s*<span class="project-section-count"><span aria-hidden="true">·<\/span>4<\/span>/);
   assert.match(html, /<header[^>]*>[\s\S]*?aria-label="导入精修补丁" data-app-tooltip="导入精修补丁"[\s\S]*?<svg[^>]*aria-hidden="true"[\s\S]*?<\/button>[\s\S]*?<\/header>/);
   assert.doesNotMatch(html, /project-refinement-(grid|pane)|<select/);
 });

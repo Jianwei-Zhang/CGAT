@@ -1211,10 +1211,10 @@ function renderDetailTable(model, labels, detailTableState) {
 
 function renderStats(model, labels, detailTableState = normalizeDetailTableState()) {
   if (model.statsDisabledByRef) {
-    return `<p class="notice warning">${escapeHtml(labels.refDisabled)}</p>`;
+    return `<p class="notice warning" hidden>${escapeHtml(labels.refDisabled)}</p>`;
   }
   return `
-    <section class="project-assembly-statistics"><header class="project-section-divider"><h3>${escapeHtml(labels.assemblyStatistics)}</h3></header><div class="project-export-grid">
+    <section class="project-assembly-statistics" hidden><header class="project-section-divider"><h3>${escapeHtml(labels.assemblyStatistics)}</h3></header><div class="project-export-grid">
       <article class="project-export-panel">
         <div class="project-export-panel-title">
           <h4>${escapeHtml(labels.assignment)}</h4>

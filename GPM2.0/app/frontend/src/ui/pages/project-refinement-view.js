@@ -1072,6 +1072,8 @@ export function renderProjectRefinementCard(state) {
   const expandedBatchKey = normalizeString(ui.expandedBatchKey);
 
   const groups = buildRefinementOverviewGroups(model, copy);
+  const rowCount = groups.reduce((sum, group) => sum + group.rows.length, 0);
+  const formattedRowCount = rowCount.toLocaleString(state?.locale === "en" ? "en-US" : "zh-CN");
   const importLabel = inFlightForCurrentProject ? (ui.busyLabel || copy.importingAction) : copy.importAction;
 
   const feedbackBanner = ui.error
@@ -1090,10 +1092,12 @@ export function renderProjectRefinementCard(state) {
     ? `<p class="muted project-refinement-copy-status" role="status">${escapeHtml(ui.copyFeedback)}</p>`
     : "";
 
-  const tbodyMarkup = groups.map((group) => {
+  const tbodyMarkup = groups.map((group, groupIndex) => {
     const rowSpan = group.rows.length;
     const isExpanded = group.kind === "manual-imported" && expandedBatchKey === group.key;
-    const groupHeaderCell = `<td class="project-refinement-group-cell" rowspan="${rowSpan}">
+    const hasDetailRow = isExpanded && Boolean(group.batch?.loci?.length);
+    const spanEndClass = groupIndex === groups.length - 1 && !hasDetailRow ? " is-last-row-span" : "";
+    const groupHeaderCell = `<td class="project-refinement-group-cell${spanEndClass}" rowspan="${rowSpan}">
       <div class="project-refinement-group-label">
         <span class="project-refinement-group-title">${escapeHtml(group.headerTitle)}</span>
         ${group.batchShort ? `<code class="project-refinement-batch-id">${escapeHtml(group.batchShort)}</code>` : ""}
@@ -1101,7 +1105,7 @@ export function renderProjectRefinementCard(state) {
       </div>
     </td>`;
     const actionCell = group.kind === "manual-imported" && group.batch?.loci?.length
-      ? `<td class="project-refinement-action-cell" rowspan="${rowSpan}">
+      ? `<td class="project-refinement-action-cell${spanEndClass}" rowspan="${rowSpan}">
           <button
             type="button"
             class="button ghost project-refinement-locate"
@@ -1110,7 +1114,7 @@ export function renderProjectRefinementCard(state) {
           >${escapeHtml(copy.manageBatch)} ${isExpanded ? "▴" : "▾"}</button>
         </td>`
       : group.kind === "manual-pending" && group.command
-        ? `<td class="project-refinement-action-cell" rowspan="${rowSpan}">
+        ? `<td class="project-refinement-action-cell${spanEndClass}" rowspan="${rowSpan}">
             <button
               type="button"
               class="button ghost project-refinement-locate"
@@ -1118,17 +1122,17 @@ export function renderProjectRefinementCard(state) {
               data-app-tooltip="${escapeAttr(group.command)}"
             >${escapeHtml(copy.copyCommand)}</button>
           </td>`
-        : `<td class="project-refinement-action-cell" rowspan="${rowSpan}"></td>`;
+        : `<td class="project-refinement-action-cell${spanEndClass}" rowspan="${rowSpan}"></td>`;
 
     const toolRowsHtml = group.rows.map((row, idx) => `<tr class="project-refinement-row${idx === 0 ? " is-group-start" : ""}">
       ${idx === 0 ? groupHeaderCell : ""}
       <th scope="row" class="project-refinement-tool-cell">${escapeHtml(row.tool)}</th>
-      <td class="project-refinement-ratio-cell">${renderRatioCell(row)}</td>
-      <td class="project-refinement-chr-cell">${escapeHtml(row.chrCount !== null && row.chrCount !== undefined ? String(row.chrCount) : "—")}</td>
+      <td class="project-refinement-ratio-cell numeric">${renderRatioCell(row)}</td>
+      <td class="project-refinement-chr-cell numeric">${escapeHtml(row.chrCount !== null && row.chrCount !== undefined ? String(row.chrCount) : "—")}</td>
       ${idx === 0 ? actionCell : ""}
     </tr>`).join("");
 
-    const detailRowHtml = isExpanded && group.batch?.loci?.length
+    const detailRowHtml = hasDetailRow
       ? `<tr class="project-refinement-detail-row" data-project-refinement-batch-detail="${escapeAttr(group.key)}">
           <td colspan="5">
             <ul class="project-refinement-sublist">
@@ -1144,6 +1148,7 @@ export function renderProjectRefinementCard(state) {
   return `<section id="project-refinement" class="project-refinement" aria-labelledby="project-refinement-title" aria-busy="${inFlightForCurrentProject}">
     <header class="project-section-divider project-refinement-divider">
       <h3 id="project-refinement-title">${escapeHtml(copy.sectionTitle)}</h3>
+      <span class="project-section-count"><span aria-hidden="true">·</span>${escapeHtml(formattedRowCount)}</span>
       <button
         type="button"
         class="button project-icon-button project-refinement-import-btn"
@@ -1155,7 +1160,7 @@ export function renderProjectRefinementCard(state) {
     ${feedbackBanner}
     ${copyFeedbackMarkup}
     ${groups.length
-      ? `<div class="project-refinement-table-scroll"><table class="project-refinement-table" aria-labelledby="project-refinement-title">
+      ? `<div class="project-refinement-table-scroll" tabindex="0" role="region" aria-label="${escapeAttr(copy.sectionTitle)}"><table class="project-refinement-table" aria-labelledby="project-refinement-title">
           <thead><tr>${copy.tableColumns.map((col) => `<th scope="col">${escapeHtml(col)}</th>`).join("")}</tr></thead>
           <tbody>${tbodyMarkup}</tbody>
         </table></div>`

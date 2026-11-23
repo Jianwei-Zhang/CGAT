@@ -902,42 +902,68 @@
 
 /* Project-level Refinement section (between Datasets and Pseudomolecule Preview) */
 .project-refinement {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  min-width: 0;
+  margin-top: 18px;
 }
 
 .project-refinement-divider::after { order: 1; }
 .project-refinement-divider .project-refinement-import-btn { order: 2; flex: 0 0 auto; }
-.project-refinement-table-scroll { overflow-x: auto; }
-.project-refinement-table { width: 100%; border-collapse: collapse; font-size: var(--font-small); }
-.project-refinement-table :is(th, td) {
-  padding: 7px 10px;
-  border-bottom: 1px solid var(--border-subtle, #dbe3ec);
-  text-align: start;
+.project-refinement-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--card-radius);
+  background: var(--surface-panel, #fff);
+}
+.project-refinement-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-body);
+  text-align: left;
+}
+.project-refinement-table th,
+.project-refinement-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--theme-line, #e2e8f0);
   vertical-align: middle;
   font-variant-numeric: tabular-nums;
 }
 .project-refinement-table thead th {
-  color: var(--text-muted, #64748b);
+  background: var(--surface-subtle, #f8fafc);
+  color: var(--text-secondary, #475569);
   font-weight: 600;
-  font-size: var(--font-caption);
   white-space: nowrap;
 }
+.project-refinement-table tbody > tr.project-refinement-row:hover > td,
+.project-refinement-table tbody > tr.project-refinement-row:hover > th {
+  background: var(--surface-subtle, #f8fafc);
+}
+.project-refinement-table tbody > tr.project-refinement-row:hover > .project-refinement-group-cell,
+.project-refinement-table tbody > tr.project-refinement-row:hover > .project-refinement-action-cell {
+  background: var(--surface-panel, #fff);
+}
+.project-refinement-table tbody > tr:last-child > *,
+.project-refinement-table tbody > tr > .is-last-row-span {
+  border-bottom: 0;
+}
 .project-refinement-table tbody th.project-refinement-tool-cell {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary, #1e293b);
   white-space: nowrap;
 }
+.project-refinement-table .numeric {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .project-refinement-row.is-group-start > :is(th, td) {
-  border-top: 1px solid var(--border-default, #cbd5e1);
+  border-top: 1px solid var(--border-subtle, #dbe3ec);
 }
 .project-refinement-table tbody tr:first-child.is-group-start > :is(th, td) {
   border-top: 0;
 }
 .project-refinement-group-cell {
-  vertical-align: top;
+  vertical-align: middle;
   white-space: nowrap;
+  background: var(--surface-panel, #fff);
 }
 .project-refinement-group-label {
   display: inline-flex;
@@ -946,19 +972,19 @@
   gap: 6px;
 }
 .project-refinement-group-title {
-  font-weight: 600;
-  color: var(--text-secondary, #334155);
+  font-weight: 500;
+  color: var(--text-primary, #1e293b);
 }
 .project-refinement-batch-id {
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: 4px;
   background: var(--surface-muted, #eef2f6);
   color: var(--text-muted, #64748b);
   font-family: var(--font-mono);
-  font-size: var(--font-caption);
+  font-size: var(--font-small);
 }
 .project-refinement-ratio-cell {
-  min-width: 112px;
+  min-width: 120px;
 }
 .project-refinement-ratio {
   display: inline-flex;
@@ -966,7 +992,7 @@
   gap: 8px;
 }
 .project-refinement-ratio-text {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary, #1e293b);
   white-space: nowrap;
 }
@@ -986,21 +1012,21 @@
   background: var(--focus-ring, #4f82b5);
 }
 .project-refinement-chr-cell {
-  text-align: end;
-  font-weight: 500;
-  color: var(--text-secondary, #334155);
+  text-align: right;
+  color: var(--text-primary, #1e293b);
   white-space: nowrap;
 }
 .project-refinement-table thead th:nth-child(4) {
-  text-align: end;
+  text-align: right;
 }
 .project-refinement-action-cell {
-  text-align: end;
+  text-align: right;
   white-space: nowrap;
   width: 1%;
+  background: var(--surface-panel, #fff);
 }
 .project-refinement-detail-row > td {
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: var(--surface-subtle, #f8fafc);
 }
 
@@ -1146,6 +1172,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  margin-bottom: 10px;
   padding: 10px 12px;
   border-radius: 6px;
   border: 1px solid var(--border-subtle, #cbd5e1);
@@ -1165,6 +1192,6 @@
 }
 
 .project-refinement-copy-status {
-  margin: 0;
+  margin: 0 0 10px;
   font-size: var(--font-caption);
 }

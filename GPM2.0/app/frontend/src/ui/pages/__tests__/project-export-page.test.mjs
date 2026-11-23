@@ -2254,6 +2254,7 @@ test("Project details stay hidden as a whole even with saved expansion, without 
   state.projectExport.detailTableCollapsed = false;
   state.projectExport.detailTableFilters = { chr: ["Chr01"] };
   const before = JSON.stringify(state), html = renderProjectExportPage(state);
+  assert.match(html, /class="project-assembly-statistics" hidden/);
   assert.match(html, /class="project-export-detail-section" hidden aria-labelledby="project-export-detail-title"/);
   for (const action of ["log", "tsv", "png", "fasta", "all"]) assert.ok(html.includes(`data-project-export-action="${action}"`));
   assert.equal(JSON.stringify(state), before);
