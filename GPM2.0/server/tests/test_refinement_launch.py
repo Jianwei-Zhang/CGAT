@@ -130,7 +130,7 @@ class RefinementConfigTests(unittest.TestCase):
             plan = layout.path(".run_all/plan.tsv")
             plan.write_text("unit_id\tcommand_relpath\tdetail_log_relpath\nfirst\tfirst.sh\t.runtime/logs/run_all.log\n")
             return 0
-        with mock.patch.object(server_run, "prepare_workspace", side_effect=prepare) as preparation, mock.patch.object(server_run.Runner, "run", return_value=0), mock.patch.object(server_run, "refinement_preflight"):
+        with mock.patch.object(server_run, "prepare_workspace", side_effect=prepare) as preparation, mock.patch.object(Runner, "run", return_value=0), mock.patch.object(server_run, "refinement_preflight"):
             self.assertEqual(server_run.execute(["--ref", str(ref), "--ds", str(assembly), "--hifi", str(self.reads), "-o", str(root)], TOOLS.parent), 0)
             self.assertNotIn("--hifi", prepared_arguments)
             self.assertNotIn("--gapfill-tools", prepared_arguments)
@@ -165,7 +165,7 @@ class RefinementConfigTests(unittest.TestCase):
             (output / "first.sh").write_text("#!/bin/bash\nexit 0\n")
             layout.path(".run_all/plan.tsv").write_text("unit_id\tcommand_relpath\tdetail_log_relpath\nfirst\tfirst.sh\t.runtime/logs/run_all.log\n")
             return 0
-        with mock.patch.object(server_run, "prepare_workspace", side_effect=prepare), mock.patch.object(server_run.Runner, "run", return_value=0), mock.patch.object(server_run, "refinement_preflight"):
+        with mock.patch.object(server_run, "prepare_workspace", side_effect=prepare), mock.patch.object(Runner, "run", return_value=0), mock.patch.object(server_run, "refinement_preflight"):
             self.assertEqual(server_run.execute(["--ref", str(ref), "--ds", str(assembly), "--hifi", str(self.reads), "-o", str(root)], TOOLS.parent), 9)
             self.assertEqual(server_run.execute(["-o", str(root)], TOOLS.parent), 0)
         self.assertEqual(attempts[0], attempts[1])
