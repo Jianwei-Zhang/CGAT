@@ -36,6 +36,7 @@ from run_resources import execution_threads, read_resources, resource_environmen
 from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
                                   changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
+from lgz_core.contract.validation_pass import CHANNEL_ENV, DEFER_ENV, READY
 from run_orchestration import LGZ_PREPARE_IDS, LGZ_PREPARE_UNIT_ID, OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
 from alignment_tasks import (AdaptiveDispatcher, AlignmentPlan, AlignmentTask, dispatch_environment,
@@ -348,6 +349,7 @@ class Runner:
         self.active_children: dict[int, subprocess.Popen] = {}
         self.received_signal: int | None = None
         self.outer_checkpoints = OuterCheckpointManager(server_dir)
+        self.contract_channel = None
         self.child_cache_markers: set[str] = set()
         self.report: ReportSession | None = None
         self.minimap2_failure_hints: dict[str, str] = {}
@@ -395,6 +397,8 @@ class Runner:
             self.report.child_output(line, unit.unit_id)
         # Old embedded workspace tools can still emit the former public name.
         cache_line = "LGZ " + line[4:] if line.startswith("GRT ") else line
+        if unit.unit_id == "finalize_evidence" and line == READY:
+            self.child_cache_markers.add(READY)
         for marker in STAGE_CACHE_MARKERS.get(unit.unit_id, ()):
             if cache_line.startswith(marker):
                 self.child_cache_markers.add(marker)
@@ -591,6 +595,8 @@ class Runner:
         if unit_id in LGZ_CACHE_MARKERS:
             return self.outer_checkpoints.validate_lgz_unit(unit_id)
         if unit_id == "finalize_evidence":
+            if self.contract_channel is not None and READY in self.child_cache_markers:
+                return self.outer_checkpoints.publish_validated_evidence(self.contract_channel, self.run_id)
             return self.outer_checkpoints.validate_evidence()
         if unit_id == "package_full":
             return self.outer_checkpoints.validate_package("full")
@@ -832,7 +838,7 @@ class Runner:
 
                     attempt = int(row["attempt"] or "0") + 1
                     started_at = timestamp()
-                    started_monotonic = datetime.now(timezone.utc)
+                    started_monotonic = time.monotonic()
                     row.update(
                         {
                             "state": "running",
@@ -862,6 +868,9 @@ class Runner:
                                 AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath),
                                               int(threads) if threads != "unknown" else 1),
                                 int(threads) if threads != "unknown" else 1, exclusive=True),
+                             DEFER_ENV: "1" if self.contract_channel and unit.unit_id == "finalize_evidence" else "",
+                             CHANNEL_ENV: str(self.contract_channel) if (self.contract_channel and unit.unit_id == "refinement"
+                                 and unit_index > 0 and self.units[unit_index - 1].unit_id == "finalize_evidence") else "",
                              "GPM_REPORT_UNIT_ID": unit.unit_id,
                              **({"GPM_TASK_THREADS": str(threads)} if threads != "unknown" else {})},
                     )
@@ -878,7 +887,7 @@ class Runner:
                         else child_return_code
                     )
                     self.active_child = None
-                    elapsed = (datetime.now(timezone.utc) - started_monotonic).total_seconds()
+                    elapsed = time.monotonic() - started_monotonic
                     row.update(
                         {
                             "ended_at": timestamp(),
@@ -914,6 +923,12 @@ class Runner:
                         valid, reason = self._terminal_validation(unit.unit_id)
                     except (OSError, OrchestrationContractError) as exc:
                         valid, reason = False, str(exc)
+                    if unit.unit_id == "finalize_evidence":
+                        # This stage finishes when the owner has checked and published
+                        # the evidence, not when the assembler process exits.
+                        child_seconds, elapsed = elapsed, time.monotonic() - started_monotonic
+                        row.update(ended_at=timestamp(), elapsed_seconds=f"{elapsed:.3f}")
+                        self._event("INFO", unit, f"child={child_seconds:.3f}s terminal_check={elapsed - child_seconds:.3f}s; {reason}")
                     if not valid:
                         row["state"] = "failed"
                         row["exit_code"] = "2"
@@ -1051,7 +1066,11 @@ def main() -> int:
             from resume_reference import handoff
             report = handoff(server_dir, workspace_join(server_dir, ".prepare_lib"), run_id, units, OuterCheckpointManager(server_dir))
             print("[REFERENCE HANDOFF] " + json.dumps(report, ensure_ascii=True), flush=True)
-        return Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color).run()
+        runner = Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color)
+        # No handoff survives a lock release, restart, package import or migration.
+        with tempfile.TemporaryDirectory(prefix="cgat-lgz-check-") as private:
+            runner.contract_channel = Path(private) / "verified.json"
+            return runner.run()
     except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

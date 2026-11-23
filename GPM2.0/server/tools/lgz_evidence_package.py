@@ -26,10 +26,12 @@ from pathlib import Path
 
 try:
     from lgz_contract import ContractError, validate_contract
+    from lgz_core.contract.validation_pass import DEFER_ENV, READY
     from lgz_core import *
     from lgz_core.common import *
 except ModuleNotFoundError:  # Imported as server.tools.grt_evidence_package.
     from .lgz_contract import ContractError, validate_contract
+    from .lgz_core.contract.validation_pass import DEFER_ENV, READY
     from .lgz_core import *
     from .lgz_core.common import *
 
@@ -821,15 +823,16 @@ def execute(args: argparse.Namespace) -> None:
             }
         )
     atomic_write_tsv(metadata / "grt_tool_versions.tsv", TOOL_FIELDS, tool_rows)
+    # The caller still validates everything before reporting success. Standalone
+    # calls (including add_dataset) validate and publish their own summary.
+    if (os.environ.get(DEFER_ENV) == "1" and os.environ.get("GPM_REPORT_UNIT_ID") == "finalize_evidence"
+            and os.environ.get("GPM_REPORT_RUN_ID")):
+        print(READY, flush=True)
+        return
     try:
-        summary = validate_contract(server_dir)
+        summary = validate_contract(server_dir, publication=True)
     except ContractError as exc:
         fail(str(exc))
-    summary["used_contigs"] = len(output_cards)
-    summary["supplemented_contigs"] = sum(
-        card["placement_mode"] in {"grt_promoted", "cross_chr_grt_usage"}
-        for card in cards
-    )
     atomic_write_json(metadata / "grt_contract_summary.json", summary)
     print(canonical_json(summary))
 

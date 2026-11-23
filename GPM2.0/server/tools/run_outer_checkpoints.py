@@ -21,6 +21,8 @@ from typing import Iterable
 try:
     from delivery_archive import validate_delivery_staging
     from lgz_contract import ContractError, validate_contract
+    from lgz_core.contract.validation_pass import write_handoff
+    from lgz_core.stage_io import atomic_write_json as write_evidence_summary
     from run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
@@ -35,6 +37,8 @@ try:
 except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
     from .delivery_archive import validate_delivery_staging
     from .lgz_contract import ContractError, validate_contract
+    from .lgz_core.contract.validation_pass import write_handoff
+    from .lgz_core.stage_io import atomic_write_json as write_evidence_summary
     from .run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
         EXECUTION_ENGINE_VERSION,
@@ -308,6 +312,23 @@ class OuterCheckpointManager:
             if row.get("checkpoint_sha256") != sha256_file(checkpoint_path):
                 return False, f"LGZ stage checkpoint hash changed: {stage}"
         return True, f"LGZ checkpoints valid: {', '.join(stages)}"
+
+    def publish_validated_evidence(self, channel: Path, run_id: str) -> tuple[bool, str]:
+        """The child assembled the files. The lock owner is the sole validator."""
+        inputs = {}
+        try:
+            summary = validate_contract(self.server_dir, capture=inputs, publication=True)
+            path = workspace_join(self.server_dir, "metadata/grt_contract_summary.json")
+            write_evidence_summary(path, summary)
+        except (OSError, ValueError, ContractError) as exc:
+            return False, f"evidence contract validation failed: {exc}"
+        try:
+            write_handoff(channel, self.server_dir, run_id, inputs, path)
+        except OSError as exc:
+            # The complete check and its public summary succeeded. No worker
+            # needs this optional private optimization to operate correctly.
+            return True, f"evidence valid; validation handoff unavailable: {exc}"
+        return True, "evidence and Server contract are valid"
 
     def validate_evidence(self) -> tuple[bool, str]:
         required = [

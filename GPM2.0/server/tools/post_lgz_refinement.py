@@ -68,12 +68,15 @@ def final_result_lines(tool, paths, provenance):
 
 def run(root, lock, request):
     from lgz_contract import validate_contract
+    from lgz_core.contract.validation_pass import can_reuse_validation, refinement_channel
     root = Path(root).resolve()
     layout = WorkspaceLayout.detect(root)
     if layout.version != 2:
         raise ValueError("post-LGZ refinement requires explicit legacy workspace migration")
     # Existing scientific proof is checked, not rewritten to the new engine.
-    validate_contract(root)
+    channel = refinement_channel() if isinstance(lock, ParentLock) and lock.acquired else None
+    if not channel or not can_reuse_validation(channel, root, request["run_id"]):
+        validate_contract(root)
     publish_baseline(root, lock)
     options = {}
     with layout.path("metadata/prepare_options.tsv").open(newline="", encoding="utf-8") as stream:

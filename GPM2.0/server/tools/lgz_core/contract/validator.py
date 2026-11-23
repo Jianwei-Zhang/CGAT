@@ -12,7 +12,25 @@ from .errors import *
 from .final_path import *
 from .schema import *
 from .tables import *
-def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
+from .validation_pass import ValidationPass, signature
+
+
+def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH, *, capture=None, publication=False):
+    root = Path(bundle_root).resolve()
+    check = ValidationPass(root)
+    schema = Path(schema_path)
+    schema_stamp = signature(schema)
+    with check.checking():
+        summary = _validate_contract(root, schema, publication)
+    if signature(schema) != schema_stamp:
+        fail("INPUT_CHANGED", "contract schema changed during validation")
+    # Legacy and migration-only entry points always keep full validation.
+    if capture is not None and schema.resolve() == DEFAULT_SCHEMA_PATH.resolve() and WorkspaceLayout.detect(root).version == 2:
+        capture.update(schema=schema_stamp, files={str(p.relative_to(root)): v for p, v in check.inputs.items()})
+    return summary
+
+
+def _validate_contract(bundle_root, schema_path, publication):
     bundle_root = Path(bundle_root).resolve()
     if not bundle_root.is_dir():
         fail("MISSING_BUNDLE", f"bundle directory does not exist: {bundle_root}")
@@ -32,22 +50,17 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     artifact_hash_cache = {}
     fasta_records_cache = {}
 
-    def cache_key(path):
-        resolved = Path(path).resolve()
-        stat = resolved.stat()
-        return resolved, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
-
     def cached_sha256_file(path):
-        key = cache_key(path)
+        key = path
         if key not in artifact_hash_cache:
-            artifact_hash_cache[key] = sha256_file(key[0])
+            artifact_hash_cache[key] = sha256_file(path)
         return artifact_hash_cache[key]
 
     def cached_read_fasta(path, label, allow_empty=False):
-        key = (*cache_key(path), allow_empty)
+        key = (path, allow_empty)
         if key not in fasta_records_cache:
             fasta_records_cache[key] = read_fasta(
-                key[0],
+                path,
                 label,
                 allow_empty=allow_empty,
             )
@@ -1374,7 +1387,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             f"stage {stage} checkpoint",
         )
 
+    counts = ({"used_contigs": len(used_contigs),
+               "supplemented_contigs": sum(row["placement_mode"] in {"grt_promoted", "cross_chr_grt_usage"}
+                                           for row in used_contigs.values())} if publication else {})
     return {
+        **counts,
         "workflow": schema["workflow"],
         "schema_version": package["schema_version"],
         "datasets": len(dataset_names),

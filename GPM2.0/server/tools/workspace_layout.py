@@ -68,6 +68,20 @@ _ROOT_COMMANDS = {
 }
 
 
+# Validation may also read nested Q0 freeze inputs through this resolver.
+# Observe only this context/root; never install a process-wide filesystem hook.
+_PATH_OBSERVER = ContextVar("cgat_workspace_path_observer", default=None)
+
+
+@contextmanager
+def observe_workspace_paths(root, observe):
+    token = _PATH_OBSERVER.set((root, observe))
+    try:
+        yield
+    finally:
+        _PATH_OBSERVER.reset(token)
+
+
 _MIGRATION_VALIDATION = ContextVar("cgat_migration_validation", default=None)
 
 
@@ -231,6 +245,9 @@ class WorkspaceLayout:
             if parent.exists() and not parent.is_dir():
                 raise LayoutError(f"workspace path parent is not a directory: {parent}")
             parent = parent.parent
+        observer = _PATH_OBSERVER.get()
+        if observer is not None and observer[0] == self.root:
+            observer[1](path)
         return path
 
     def tool_relative(self, area: str, tool: str) -> str:
