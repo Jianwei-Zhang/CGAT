@@ -10,6 +10,7 @@ import csv
 import hashlib
 import io
 import os
+import re
 from pathlib import Path
 import tempfile
 
@@ -109,11 +110,8 @@ def publish_catalog(root, lock, attempt, attempts, *, baseline_status='published
         elif tool != 'lgz' and tool not in attempts:
             continue
         rows.append(row)
-    buf = io.StringIO(newline='')
-    writer = csv.writer(buf, delimiter='\t', lineterminator='\n')
-    writer.writerow(COLUMNS)
-    writer.writerows(rows)
-    data = buf.getvalue().encode('utf-8')
+    automatic_sha = hashlib.sha256(_encode(rows)).hexdigest()
+    data = _encode(rows + _manual_rows(layout))
     digest = hashlib.sha256(data).hexdigest()
     # Do not advance any public name if another entry (including the TSV) is
     # already known to be unowned or modified. Recheck at each replace as well.
@@ -123,24 +121,67 @@ def publish_catalog(root, lock, attempt, attempts, *, baseline_status='published
     for name, sha, source in entries:
         _owned_entry(layout, name, sha, source=source)
     _owned_entry(layout, 'results.tsv', digest, contents=data)
-    return digest
+    return automatic_sha
+
+
+def _encode(rows):
+    buf = io.StringIO(newline='')
+    writer = csv.writer(buf, delimiter='\t', lineterminator='\n')
+    writer.writerow(COLUMNS); writer.writerows(rows)
+    return buf.getvalue().encode('utf-8')
+
+
+def _manual_rows(layout):
+    if not layout.project_delivery:
+        return []
+    from manual_genome import SCHEMA, names
+    directory = layout.path('04_refinement/manual')
+    if directory.is_symlink(): raise PublicationError('linked manual jobs directory')
+    rows=[]
+    for pointer in sorted(directory.glob('*/manual-delivery.json')):
+        batch=pointer.parent.name
+        if not re.fullmatch(r'[0-9a-f]{64}',batch) or pointer.parent.is_symlink(): raise PublicationError('invalid manual delivery location')
+        receipt=read_json(pointer)
+        if receipt.get('schema') != SCHEMA: continue  # earlier, local-only task; never infer a genome
+        if receipt.get('batch')!=batch: raise PublicationError('mismatched manual genome batch')
+        result=names(layout,batch)
+        for k,p in result.items():
+            if sha256_file(_regular(p))!=receipt['files'][k]: raise PublicationError('manual result changed: '+str(p))
+        accepted=receipt['accepted']; tag='manual-'+batch[:16]
+        rows.append([tag,batch,'published','accepted' if accepted else 'unchanged_from_export',str(accepted),result['fasta'].name,receipt['files']['fasta'],batch])
+    return rows
+
+
+def _read_catalog(layout,*,recover=False):
+    path=_regular(layout.path('05_final/results.tsv'))
+    owner=read_json(layout.path(OWNERS+'/results.tsv.json'))
+    acceptable={owner.get('next')}
+    if recover: acceptable.add(owner.get('previous'))
+    if sha256_file(path) not in acceptable: raise PublicationError('job results.tsv differs from its ownership receipt')
+    with path.open(encoding='utf-8',newline='') as stream:
+        reader=csv.reader(stream,delimiter='\t')
+        if next(reader,None)!=list(COLUMNS): raise PublicationError('unexpected job catalog columns')
+        rows=list(reader)
+    if any(len(r)!=len(COLUMNS) for r in rows): raise PublicationError('malformed job result row')
+    automatic=[r for r in rows if not r[0].startswith('manual-')]
+    if any(r[0] not in ('lgz',*TOOL_DIRECTORIES) for r in automatic): raise PublicationError('unknown automatic result')
+    return automatic, [r for r in rows if r[0].startswith('manual-')]
+
+
+def refresh_manual_catalog(layout):
+    automatic,_=_read_catalog(layout,recover=True)
+    data=_encode(automatic+_manual_rows(layout))
+    _owned_entry(layout,'results.tsv',hashlib.sha256(data).hexdigest(),contents=data)
 
 
 def validate_catalog(layout, expected):
-    path = _regular(layout.path('05_final/results.tsv'))
-    if not expected or sha256_file(path) != expected:
-        raise PublicationError('job results.tsv changed after completion')
-    with path.open(encoding='utf-8', newline='') as stream:
-        rows = csv.DictReader(stream, delimiter='\t')
-        if rows.fieldnames != list(COLUMNS):
-            raise PublicationError('unexpected job catalog columns')
-        for row in rows:
-            if not row['fasta']:
-                continue
-            if row['version'] not in ('lgz', *TOOL_DIRECTORIES) or row['fasta'] != f"{layout.result_prefix}.{row['version']}.fa":
-                raise PublicationError('invalid job catalog FASTA name')
-            if sha256_file(_regular(layout.path('05_final/' + row['fasta']))) != row['sha256']:
-                raise PublicationError(f"job FASTA changed after completion: {row['fasta']}")
+    automatic,manual=_read_catalog(layout)
+    if not expected or hashlib.sha256(_encode(automatic)).hexdigest()!=expected or manual!=_manual_rows(layout):
+        raise PublicationError('job result catalog changed after publication')
+    for version,_,_,_,_,file,sha,_ in automatic:
+        if not file: continue
+        if file!=f'{layout.result_prefix}.{version}.fa' or sha256_file(_regular(layout.path('05_final/'+file)))!=sha:
+            raise PublicationError('invalid or changed direct genome: '+file)
 
 
 def record_early_failure(root, lock, attempt, exit_code):

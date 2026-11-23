@@ -39,55 +39,81 @@ CGAT_DEGAP_TOOL="$CGAT_RUNTIME/degap.py"
     )
 }
 
-fn map_source_hash(
-    workspace: &Path,
-    fasta: &Path,
-    dataset: &str,
-    contig: &str,
-    length: i64,
-) -> Result<Option<String>> {
-    for parent in fasta
-        .ancestors()
-        .skip(1)
-        .take_while(|parent| parent.starts_with(workspace))
-    {
-        let path = parent.join("metadata/server_sources.json");
-        if !path.exists() {
-            continue;
-        }
-        let value: Value = serde_json::from_slice(&fs::read(&path)?)?;
-        if value["schema"] != "cgat.server-source-identities" || value["schema_version"] != 1 {
-            bail!("unsupported Server source identities: {}", path.display());
-        }
-        let rows: Vec<_> = value["sources"]
-            .as_array()
-            .context("missing Server source identities")?
-            .iter()
-            .filter(|row| row["dataset"] == dataset && row["contig"] == contig)
-            .collect();
-        if rows.is_empty() {
-            // Incremental Full candidates may not belong to the original map;
-            // bind their actually consumed local interval instead.
-            return Ok(None);
-        }
-        if rows.len() != 1 || rows[0]["length"].as_i64() != Some(length) {
-            bail!("Server source identity missing/ambiguous or stale for {dataset}:{contig}");
-        }
-        let sha = rows[0]["fasta_sha256"]
-            .as_str()
-            .context("missing Server source hash")?;
-        if sha.len() != 64
-            || !sha
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
-            bail!("invalid Server source hash for {dataset}:{contig}");
-        }
-        return Ok(Some(sha.to_string()));
-    }
-    Ok(None)
+// Per-operation index. A whole-project task can address thousands of members in the
+// same immutable import; never rescan or deserialize the entire map per segment.
+#[derive(Default)]
+pub(super) struct SourceMaps {
+    maps: std::collections::HashMap<
+        PathBuf,
+        std::collections::HashMap<(String, String), Option<(i64, String)>>,
+    >,
 }
 
+impl SourceMaps {
+    pub(super) fn bind(
+        &mut self,
+        workspace: &Path,
+        fasta: &Path,
+        dataset: &str,
+        contig: &str,
+        length: i64,
+    ) -> Result<Option<String>> {
+        for parent in fasta
+            .ancestors()
+            .skip(1)
+            .take_while(|p| p.starts_with(workspace))
+        {
+            let path = parent.join("metadata/server_sources.json");
+            if !path.try_exists()? {
+                continue;
+            }
+            if !self.maps.contains_key(&path) {
+                let value: Value = serde_json::from_slice(&fs::read(&path)?)?;
+                if value["schema"] != "cgat.server-source-identities"
+                    || value["schema_version"] != 1
+                {
+                    bail!("unsupported Server source identities: {}", path.display());
+                }
+                let mut index = std::collections::HashMap::new();
+                for row in value["sources"]
+                    .as_array()
+                    .context("missing Server source identities")?
+                {
+                    let (Some(ds), Some(name)) = (row["dataset"].as_str(), row["contig"].as_str())
+                    else {
+                        continue;
+                    };
+                    let binding = row["length"]
+                        .as_i64()
+                        .zip(row["fasta_sha256"].as_str().map(str::to_owned));
+                    index
+                        .entry((ds.to_owned(), name.to_owned()))
+                        .and_modify(|old| *old = None)
+                        .or_insert(binding);
+                }
+                self.maps.insert(path.clone(), index);
+            }
+            let Some(binding) = self.maps[&path].get(&(dataset.into(), contig.into())) else {
+                return Ok(None);
+            };
+            let (size, sha) = binding
+                .as_ref()
+                .context("ambiguous or malformed Server source binding")?;
+            if *size != length
+                || sha.len() != 64
+                || !sha
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                bail!("stale or invalid Server source identity for {dataset}:{contig}");
+            }
+            return Ok(Some(sha.clone()));
+        }
+        Ok(None)
+    }
+}
+
+#[cfg(test)]
 pub(super) fn bind_member(
     workspace: &Path,
     fasta: &Path,
@@ -95,7 +121,7 @@ pub(super) fn bind_member(
     contig: &str,
     length: i64,
 ) -> Result<Option<String>> {
-    map_source_hash(workspace, fasta, dataset, contig, length)
+    SourceMaps::default().bind(workspace, fasta, dataset, contig, length)
 }
 
 pub(super) fn seed_plan(

@@ -5,12 +5,13 @@ use crate::grt_package::{
     load_project_refinement_read_inputs,
 };
 use serde::{Deserialize, Serialize};
-use std::io::{Cursor, Write};
+use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 use zip::{ZipWriter, write::FileOptions};
 
 mod apply;
 mod results;
+mod snapshot;
 
 pub use apply::{
     ManualRefinementAction, ManualRefinementImport, import_manual_refinement_results,
@@ -23,6 +24,7 @@ pub use results::{
 };
 
 const SCHEMA: &str = "cgat.app-refinement-tasks.v1";
+const SNAPSHOT_TASKS: &str = "cgat.app-refinement-tasks.v2";
 const MANIFEST: &str = "refinement_tasks.json";
 const TOOLS: &[&str] = &["degap", "lrgapcloser", "tgsgapcloser", "quartet"];
 const MAX_MANIFEST: usize = 8 * 1024 * 1024;
@@ -128,6 +130,14 @@ fn witness(row: &Value) -> Result<Value> {
             };
             Ok(json!({"segment_id":id,"kind":"gap","gap_bp":positive(row,key)?}))
         }
+        "ctg" if row["sourceKind"] == "refinement_patch" => {
+            let sha = field(row,"refinementPatchSha256")?;
+            if !is_sha(sha) { bail!("invalid manual patch identity"); }
+            Ok(json!({"segment_id":id,"kind":"ctg","patch_sha256":sha,"start":positive(row,"start")?,"end":positive(row,"end")?}))
+        }
+        "ctg" if row["sourceKind"] == "ref_segment" => Ok(json!({"segment_id":id,"kind":"ctg",
+            "reference":field(row,"referenceChrName")?, "member_start":positive(row,"memberStartBp")?,
+            "member_end":positive(row,"memberEndBp")?, "start":positive(row,"start")?,"end":positive(row,"end")?})),
         "ctg" if row["sourceKind"] != "ref_segment" => {
             if row.get("type").is_some()
                 && row["serverBaseline"] != true
@@ -160,6 +170,10 @@ fn witness(row: &Value) -> Result<Value> {
 }
 
 fn seed_plan(conn: &Connection, workspace: &Path, project_id: i64, w: &Value) -> Result<Value> {
+    seed_plan_with_maps(conn, workspace, project_id, w, &mut server_runtime::SourceMaps::default())
+}
+
+fn seed_plan_with_maps(conn: &Connection, workspace: &Path, project_id: i64, w: &Value, maps: &mut server_runtime::SourceMaps) -> Result<Value> {
     let start = positive(w, "start")?;
     let end = positive(w, "end")?;
     let (seed, members) = if let Some(id) = w["assembly_ctg_id"].as_i64() {
@@ -168,7 +182,7 @@ fn seed_plan(conn: &Connection, workspace: &Path, project_id: i64, w: &Value) ->
             start,
             end,
         };
-        let members = load_seed_plan(conn, workspace, project_id, "", &seed)?;
+        let members = load_seed_plan_with_maps(conn, workspace, project_id, "", &seed, maps)?;
         (seed, members)
     } else {
         let dataset = field(w, "dataset")?;
@@ -186,7 +200,7 @@ fn seed_plan(conn: &Connection, workspace: &Path, project_id: i64, w: &Value) ->
             .with_context(|| format!("source {dataset}:{contig} is unavailable in the project"))?;
         let fasta = PathBuf::from(fasta);
         server_relative_locator_path(workspace, &fasta)?;
-        let file_hash = server_runtime::bind_member(workspace, &fasta, dataset, contig, length)?;
+        let file_hash = maps.bind(workspace, &fasta, dataset, contig, length)?;
         let member = SeedMemberPlan {
             source_seq_name: contig.into(),
             dataset_name: dataset.into(),
@@ -350,6 +364,7 @@ fn build_manifest(
     request: &ManualRefinementRequest,
     reads: RefinementReadInputs,
     export_id: &str,
+    snapshot: Option<&snapshot::Snapshot>,
 ) -> Result<(Value, ManualExportSummary)> {
     validate_project_exists(conn, project_id)?;
     if request.loci.is_empty() {
@@ -413,7 +428,11 @@ fn build_manifest(
         for (label, row) in located {
             let w = witness(row)?;
             if label != "target" {
-                plans.insert(label.into(), seed_plan(conn, workspace, project_id, &w)?);
+                let plan = match snapshot {
+                    Some(frozen) => frozen.plan(&req.chr, &w)?,
+                    None => seed_plan(conn, workspace, project_id, &w)?,
+                };
+                plans.insert(label.into(), plan);
             }
             witnesses.insert(label.into(), w);
         }
@@ -438,10 +457,12 @@ fn build_manifest(
         loci: loci.len(),
         tasks: task_count,
     };
-    Ok((
-        json!({"schema":SCHEMA,"export_id":export_id,"origin_fasta_sha256":origin,"reads":reads,"loci":loci}),
-        summary,
-    ))
+    let mut manifest = json!({"schema":SCHEMA,"export_id":export_id,"origin_fasta_sha256":origin,"reads":reads,"loci":loci});
+    if let Some(snapshot) = snapshot {
+        manifest["schema"] = json!(SNAPSHOT_TASKS);
+        manifest["snapshot_sha256"] = json!(snapshot.digest);
+    }
+    Ok((manifest, summary))
 }
 
 fn create_payload(path: &Path, bytes: &[u8]) -> Result<()> {
@@ -482,15 +503,20 @@ pub fn export_manual_refinement(
         output.to_string_lossy(),
         exported_at.as_nanos().to_string(),
     ))?);
+    if request.loci.is_empty() { bail!("select at least one actual Gap or Tel locus"); }
+    let snapshot = snapshot::capture_if_supported(&tx, workspace, project_id, &request.loci)?;
     let (manifest, mut summary) =
-        build_manifest(&tx, workspace, project_id, request, reads, &export_id)?;
+        build_manifest(&tx, workspace, project_id, request, reads, &export_id, snapshot.as_ref())?;
     let bytes = serde_json::to_vec(&manifest)?;
     if bytes.len() > MAX_MANIFEST {
         bail!("manual refinement manifest exceeds 8 MiB");
     }
     summary.batch_sha256 = hex_sha(&bytes);
     tx.commit()?;
-    let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+    let parent = output.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let mut pending = tempfile::NamedTempFile::new_in(parent)?;
+    let mut zip = ZipWriter::new(pending.as_file_mut());
+    if let Some(snapshot) = &snapshot { snapshot.write_to(&mut zip)?; }
     zip.start_file(MANIFEST, FileOptions::default())?;
     zip.write_all(&bytes)?;
     zip.start_file("README.txt", FileOptions::default())?;
@@ -508,7 +534,8 @@ pub fn export_manual_refinement(
         "CGAT project manual refinement task manifest.\n\nRun from the matching CGAT Server workspace root:\npython .lib/tools/refine.py {}\n\nIf the recorded reads are unavailable on that Server, add --hifi and/or --ont with the corresponding read paths. The command runs the locked tools, updates 06_report/report.html and prints the batch report and return ZIP paths. On a new Server job, import 07_delivery/manual/<output>.manual-<batch>.patch.zip into this App project; older workspaces keep refinement_results.zip.\n\nDo not edit or run code from this archive.\n",
         shell_quote(&argument)
     )?;
-    let archive = zip.finish()?.into_inner();
+    zip.finish()?.sync_all()?;
+    drop(zip);
     let ledgers = workspace.join("metadata/refinement_exports");
     ensure_refinement_export_directory(workspace, &ledgers)?;
     fs::create_dir_all(&ledgers)?;
@@ -520,10 +547,10 @@ pub fn export_manual_refinement(
                 "output_file_name": filename, "exported_at_ms": u64::try_from(exported_at.as_millis())? }),
         )?,
     )?;
-    if let Err(error) = create_payload(output, &archive) {
+    if let Err(error) = pending.persist_noclobber(output) {
         fs::remove_file(&ledger)
             .context("failed to roll back incomplete refinement export receipt")?;
-        return Err(error);
+        return Err(error.error.into());
     }
     Ok(summary)
 }

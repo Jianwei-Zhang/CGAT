@@ -38,7 +38,7 @@ def _checked_hash(value):
     return value
 
 
-def project_payload(staging, mode, baseline, patch=None, *, patch_sha=None):
+def project_payload(staging, mode, baseline, patch=None, *, patch_sha=None, reference_sources=None):
     """Extend an isolated LGZ staging tree (NOT a live workspace or its source files)."""
     if mode not in ("full", "light"):
         raise PublicationError("invalid project package kind")
@@ -106,6 +106,12 @@ def project_payload(staging, mode, baseline, patch=None, *, patch_sha=None):
     manifest = {"schema": SCHEMA, "schema_version": 1, "mode": mode, "baseline": baseline,
                 "generation": generation(baseline, variants), "baseline_app_path": app_base_sha,
                 "variants": variants, "objects": locators, "omitted_sequences": sorted(withheld)}
+    ref = staging / "metadata/project_reference_sources.json"
+    if reference_sources is not None:
+        # Extend only the isolated generation; never alter the immutable LGZ staging inventory.
+        with ref.open("xb") as stream:
+            stream.write(_encoded(reference_sources))
+        manifest["reference_sources_sha256"] = sha256_file(safe_file(staging, "metadata/project_reference_sources.json"))
     (staging / INDEX).write_bytes(_encoded(manifest))
     # The old single-result reader must reject this archive, not silently open LGZ alone.
     app["workflow"] = "gpm_grt_app_project_v1"

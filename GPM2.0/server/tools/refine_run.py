@@ -274,7 +274,25 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
                           revision=revision, attempt_id=attempt_id), None
 
 
+def write_result_zip(staged,data,rows,patches):
+    with ZipFile(staged, "x", compression=ZIP_DEFLATED) as archive:
+        archive.writestr(MANIFEST, json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+        for row in rows:
+            patch = row["patch"]
+            if patch:
+                payload = patches[patch["path"]].read_bytes()
+                if len(payload) != patch["length"] or hashlib.sha256(payload).hexdigest() != patch["sha256"]:
+                    raise PathError("admitted patch changed before packaging")
+                archive.writestr(patch["path"], payload)
+    with staged.open("rb") as stream:
+        os.fsync(stream.fileno())
+
+
 def publish_results(layout, batch_dir, batch, rows, patches, *, manifest, reads):
+    from manual_snapshot import TASKS
+    if manifest["schema"] == TASKS:
+        from manual_genome import publish
+        return publish(layout,batch_dir,batch,manifest,rows,patches,reads)
     data = {"schema": RESULTS, "batch_sha256": batch, "results": rows}
     from refine_report import manual_patch_path
     output = manual_patch_path(layout, batch)
@@ -284,17 +302,7 @@ def publish_results(layout, batch_dir, batch, rows, patches, *, manifest, reads)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".results-", dir=output.parent) as temporary:
         staged = Path(temporary) / output.name
-        with ZipFile(staged, "x", compression=ZIP_DEFLATED) as archive:
-            archive.writestr(MANIFEST, json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8"))
-            for row in rows:
-                patch = row["patch"]
-                if patch:
-                    payload = patches[patch["path"]].read_bytes()
-                    if len(payload) != patch["length"] or hashlib.sha256(payload).hexdigest() != patch["sha256"]:
-                        raise PathError("admitted patch changed before packaging")
-                    archive.writestr(patch["path"], payload)
-        with staged.open("rb") as stream:
-            os.fsync(stream.fileno())
+        write_result_zip(staged,data,rows,patches)
         if layout.project_delivery:
             # A return already sent to an App must remain reproducible. A rerun can
             # repair an interrupted first publication, not silently replace its decisions.
@@ -332,6 +340,10 @@ def publish_results(layout, batch_dir, batch, rows, patches, *, manifest, reads)
 def existing_manual_delivery(layout,batch_dir,batch,manifest,override):
     if not layout.project_delivery:
         return None
+    from manual_snapshot import TASKS
+    if manifest["schema"] == TASKS:
+        from manual_genome import finish
+        return finish(layout,batch_dir,batch,manifest,override=override)
     from refine_report import manual_patch_path, publish_manual_report
     receipt = batch_dir / "manual-delivery.json"
     patch = manual_patch_path(layout,batch)

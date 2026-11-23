@@ -152,7 +152,7 @@ fn locus_req(locus: &Value) -> Result<LocusRequest> {
     })
 }
 
-fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value) -> Result<String> {
+fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value, witness: &Value) -> Result<String> {
     let mut hash = Sha256::new();
     let reverse = positive(plan, "start")? > positive(plan, "end")?;
     let members = plan["members"]
@@ -166,6 +166,16 @@ fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value) -> Result<Stri
         let member = &members[index];
         let dataset = field(member, "dataset")?;
         let name = field(member, "name")?;
+        let lo=positive(member,"start")?;
+        let hi=positive(member,"end")?;
+        let sequence=if witness["patch_sha256"].is_string() {
+            let bytes:Vec<u8>=conn.query_row("SELECT sequence FROM project_refinement_patch WHERE project_id=?1 AND sha256=?2",params![project_id,name],|r|r.get(0))?;
+            if lo>hi || hi as u64>bytes.len() as u64 || hex_sha(&bytes)!=name { bail!("manual endpoint source changed"); }
+            String::from_utf8(bytes[(lo-1) as usize..hi as usize].to_vec())?
+        } else if witness["reference"].is_string() {
+            let fasta:String=conn.query_row("SELECT rcl.fasta_path FROM project p JOIN reference_chr rc ON rc.reference_genome_id=p.reference_genome_id JOIN reference_chr_locator rcl ON rcl.reference_chr_id=rc.id WHERE p.id=?1 AND rc.chr_name=?2",params![project_id,name],|r|r.get(0))?;
+            load_fasta_source_interval(Path::new(&fasta),name,lo,hi)?
+        } else {
         let fasta: String = conn.query_row(
             "SELECT ssl.fasta_path FROM source_seq_locator ssl
              JOIN source_seq ss ON ss.id=ssl.source_seq_id
@@ -175,12 +185,13 @@ fn endpoint_sha(conn: &Connection, project_id: i64, plan: &Value) -> Result<Stri
             params![project_id, dataset, name],
             |row| row.get(0),
         )?;
-        let sequence = load_fasta_source_interval(
+        load_fasta_source_interval(
             Path::new(&fasta),
             name,
             positive(member, "start")?,
             positive(member, "end")?,
-        )?;
+        )?
+        };
         if member["interval_sha256"].as_str() != Some(hex_sha(sequence.as_bytes()).as_str()) {
             bail!("local endpoint sequence does not match the registered interval");
         }
@@ -222,12 +233,14 @@ fn check_current_locus(
             bail!("exported witness no longer identifies this segment");
         }
         if label != "target" {
-            let plan = seed_plan(conn, workspace, project, &actual)?;
+            let plan=if actual["reference"].is_string() || actual["patch_sha256"].is_string() {
+                snapshot::special_current_plan(conn,workspace,project,&actual)?
+            } else { seed_plan(conn, workspace, project, &actual)? };
             if plan != locus["seed_plans"][label] {
                 bail!("current source ranges or content differ from the export");
             }
             if label == "endpoint" {
-                original_endpoint_sha = Some(endpoint_sha(conn, project, &plan)?);
+                original_endpoint_sha = Some(endpoint_sha(conn, project, &plan, &actual)?);
             }
         }
     }

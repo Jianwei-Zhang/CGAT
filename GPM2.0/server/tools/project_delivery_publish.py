@@ -145,6 +145,9 @@ def publish_pair(root, lock, stages, patch, patch_sha):
         if patch_sha != prev["files"].get("auto", {}).get("sha256"):
             raise PublicationError("automatic patch bytes differ for a published generation")
         return _rows(dest, prev)
+    from server_source_identity import read_rows
+    reference_sources={row["reference_chr_name"]:sha256_file(layout.path(row["fasta_relpath"]))
+                       for row in read_rows(layout.path("metadata/reference_chr_locator.tsv"))}
     report, report_files, required = _final_report_files(layout.root)
     members = {f"{layout.root.name}/report/{p.relative_to(report).as_posix()}" for p in required}
     members.add(f"{layout.root.name}/{INDEX}")
@@ -158,7 +161,7 @@ def publish_pair(root, lock, stages, patch, patch_sha):
             with tempfile.TemporaryDirectory(dir=pending) as scratch:
                 staged = Path(scratch) / layout.root.name
                 shutil.copytree(stage,staged,copy_function=os.link,symlinks=True)
-                manifest = project_payload(staged,mode,baseline,patch,patch_sha=patch_sha)
+                manifest = project_payload(staged,mode,baseline,patch,patch_sha=patch_sha,reference_sources=reference_sources)
                 if manifest["generation"] != key:
                     raise PublicationError("Full and Light do not represent the same project generation")
                 _stage_final_report(layout.root,staged,report,report_files)

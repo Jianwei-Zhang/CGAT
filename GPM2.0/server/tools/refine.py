@@ -11,6 +11,7 @@ if __name__ == "__main__":
     if not (sys.flags.isolated and sys.flags.dont_write_bytecode):
         os.execv(sys.executable, [sys.executable, "-I", "-B", os.path.abspath(__file__), *sys.argv[1:]])
 
+from contextlib import ExitStack
 import argparse
 import hashlib
 import json
@@ -76,8 +77,11 @@ def checked_plan(value, witness):
 
 
 def check_manifest(value):
-    if (not isinstance(value, dict) or set(value) != {"schema", "export_id", "origin_fasta_sha256", "reads", "loci"}
-            or value["schema"] != SCHEMA or not sha(value["export_id"]) or not sha(value["origin_fasta_sha256"])):
+    from manual_snapshot import TASKS
+    snap = isinstance(value,dict) and value.get("schema") == TASKS
+    keys = {"schema", "export_id", "origin_fasta_sha256", "reads", "loci"} | ({"snapshot_sha256"} if snap else set())
+    if (not isinstance(value, dict) or set(value) != keys or (snap and not sha(value["snapshot_sha256"]))
+            or value["schema"] not in {SCHEMA,TASKS} or not sha(value["export_id"]) or not sha(value["origin_fasta_sha256"])):
         raise ValueError("not a supported project refinement task manifest")
     reads, used = value["reads"], set()
     if not isinstance(reads, dict) or set(reads) != {"hifi", "ont"}:
@@ -120,10 +124,14 @@ def check_manifest(value):
                 raise ValueError("invalid contig witness")
             assembly = set(w) == common | {"assembly_ctg_id"} and positive(w["assembly_ctg_id"])
             source = set(w) == common | {"dataset", "contig"} and all(text(w[key]) for key in ("dataset", "contig"))
-            if (not (assembly or source) or w["kind"] != "ctg" or not text(w["segment_id"])
+            extra = snap and (set(w)==common|{"patch_sha256"} or set(w)==common|{"reference","member_start","member_end"})
+            if (not (assembly or source or extra) or w["kind"] != "ctg" or not text(w["segment_id"])
                     or not all(positive(w[key]) for key in ("start", "end"))):
                 raise ValueError("invalid contig witness")
             checked_plan(plans[label], w)
+            if extra:
+                from manual_snapshot import check_witness
+                check_witness(w,plans[label])
             if source:
                 members = plans[label]["members"]
                 if (len(members) != 1 or members[0]["dataset"] != w["dataset"] or members[0]["name"] != w["contig"]
@@ -145,16 +153,20 @@ def _read_task_archive(archive):
     with ZipFile(archive) as zipped:
         infos = zipped.infolist()
         names = [entry.filename for entry in infos]
-        if len(set(names)) != len(names) or not set(names) <= {MANIFEST, "README.txt"} or MANIFEST not in names:
-            raise ValueError("unexpected/duplicate task archive member")
+        if len(names)>50_003 or len(set(names))!=len(names) or MANIFEST not in names:
+            raise ValueError("unexpected/duplicate task archive members")
         if zipped.getinfo(MANIFEST).file_size > MAX_MANIFEST:
             raise ValueError("refinement task manifest exceeds 8 MiB")
         with zipped.open(MANIFEST) as stream:
             raw = stream.read(MAX_MANIFEST + 1)
-    if len(raw) > MAX_MANIFEST:
-        raise ValueError("refinement task manifest exceeds 8 MiB")
-    value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_keys)
-    check_manifest(value)
+        if len(raw)>MAX_MANIFEST: raise ValueError("oversize task manifest")
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_keys)
+        check_manifest(value)
+        if value["schema"] == SCHEMA:
+            if not set(names)<={MANIFEST,"README.txt"}: raise ValueError("unexpected legacy task archive member")
+        else:
+            from manual_snapshot import archive_snapshot
+            archive_snapshot(zipped,value)
     return hashlib.sha256(raw).hexdigest(), value, raw
 
 
@@ -251,7 +263,7 @@ def verify_prepared(target, batch, locus):
     return receipt
 
 
-def prepare_locus(root, stage, batch, locus):
+def prepare_locus(root, stage, batch, locus, snapshot_sources=None):
     target = stage / locus["id"]
     if target.is_symlink():
         raise ValueError("manual input directory must not be a symlink")
@@ -266,7 +278,16 @@ def prepare_locus(root, stage, batch, locus):
         output.mkdir()
         sequences, sources = {}, {}
         for label, plan in locus["seed_plans"].items():
-            sequences[label], sources[label] = resolve_seed(root, plan, scratch, require_content=True)
+            if snapshot_sources is None:
+                sequences[label], sources[label] = resolve_seed(root, plan, scratch, require_content=True)
+            else:
+                w = locus["witnesses"][label]
+                sequences[label] = b"".join(snapshot_sources.blocks({"witness":w,"plan":plan})).decode("ascii")
+                sources[label] = []
+                for m in plan["members"]:
+                    file,_,_,_,sha,origin = snapshot_sources.member(m,"reference" in w)
+                    sources[label].append({**m,"fasta_sha256":sha,"origin":origin,"source":str(file)})
+                snapshot_sources.check()
             write_fasta(output / (label + ".fa"), label, (sequences[label],))
         if locus["kind"] == "gap":
             blocks = gap_blocks(sequences["seqleft"], locus["gap_bp"], sequences["seqright"])
@@ -286,6 +307,10 @@ def prepare_batch(root, archive, *, run=False, reads_override=None, threads=None
     lock = WorkspaceLock(layout.root, "manual-refinement-" + batch[:24])
     lock.acquire()
     try:
+        if value["schema"] != SCHEMA:
+            from job_final_catalog import _read_catalog
+            if not layout.project_delivery: raise ValueError("this manual snapshot requires a Server job with project deliveries")
+            _read_catalog(layout,recover=True)  # A complete manual delivery cannot be appended before the baseline exists.
         origin = check_origin(layout, value["origin_fasta_sha256"])
         directory = (layout.path(f"08_refinement_jobs/02_manual/{batch}/01_inputs") if layout.version == 2
                      else layout.path(f".run_all/manual_refinement/{batch}/01_inputs"))
@@ -298,13 +323,20 @@ def prepare_batch(root, archive, *, run=False, reads_override=None, threads=None
             delivered = existing_manual_delivery(layout,directory.parent,batch,value,reads_override or {})
             if delivered is not None:
                 return delivered
-        outcomes = []
-        for locus in value["loci"]:
-            try:
-                target = prepare_locus(layout.root, directory, batch, locus)
-                outcomes.append({"id": locus["id"], "status": "prepared", "receipt": str(target.relative_to(layout.root) / "prepared.json")})
-            except (OSError, ValueError, KeyError) as exc:
-                outcomes.append({"id": locus["id"], "status": "input_unavailable", "reason": str(exc)})
+        with ExitStack() as stack:
+            sources = None
+            if value["schema"] != SCHEMA:
+                from manual_snapshot import install, Sources
+                install(layout,directory,archive,batch,value)
+                scratch=stack.enter_context(tempfile.TemporaryDirectory(dir=directory,prefix=".source-indexes-"))
+                sources=Sources(layout,directory/"snapshot",scratch)
+            outcomes = []
+            for locus in value["loci"]:
+                try:
+                    target = prepare_locus(layout.root, directory, batch, locus, sources)
+                    outcomes.append({"id": locus["id"], "status": "prepared", "receipt": str(target.relative_to(layout.root) / "prepared.json")})
+                except (OSError, ValueError, KeyError) as exc:
+                    outcomes.append({"id": locus["id"], "status": "input_unavailable", "reason": str(exc)})
         result = {"schema": PREPARED, "batch_sha256": batch, "origin": origin, "loci": outcomes}
         durable_json(directory.parent / "prepared.json", result)
         if run:
@@ -339,7 +371,7 @@ def main():
         else:
             area = ".prepare_lib"
         tools = root / area / "tools"
-        for name in ("workspace_layout.py", "refine.py", "refine_run.py", "refine_report.py"):
+        for name in ("workspace_layout.py", "refine.py", "refine_run.py", "refine_report.py", "manual_snapshot.py", "manual_genome.py"):
             source = tools / name
             if (source.is_symlink() or not source.is_file()
                     or any(parent.is_symlink() for parent in source.parents if parent.is_relative_to(root))):

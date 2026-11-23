@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 13;
+pub const CURRENT_SCHEMA_VERSION: i64 = 14;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -688,7 +688,16 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
     create_refinement_result_tables(conn)?;
     create_auto_refinement_effects(conn)?;
     create_project_auto_versions(conn)?;
-    create_package_auto_versions(conn)
+    create_package_auto_versions(conn)?;
+    create_project_delivery_identity(conn)
+}
+
+fn create_project_delivery_identity(conn: &Connection) -> Result<()> {
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS package_delivery_identity (
+        package_id INTEGER PRIMARY KEY REFERENCES grt_package(id) ON DELETE CASCADE,
+        generation TEXT NOT NULL, reference_sources_json TEXT NOT NULL
+    );")?;
+    Ok(())
 }
 
 fn create_package_auto_versions(conn: &Connection) -> Result<()> {

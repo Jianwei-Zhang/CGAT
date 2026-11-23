@@ -403,6 +403,13 @@ def publish_manual_report(layout, batch_dir: Path, manifest: dict, data: dict, r
         "Result bundle / 结果包": _relative(batch_report, delivery),
         "Machine-readable summary / 机器摘要": "summary.json",
     }
+    if data.get("schema") == "cgat.app-refinement-results.v2":
+        from manual_genome import names
+        genome=names(layout,batch)["fasta"]
+        if not genome.is_file() or sha256_file(genome)!=data["assembly"]["genome_sha256"]:
+            raise ValueError("manual report has no matching committed whole genome")
+        batch_links["Final genome / 本批全基因组"]=_relative(batch_report,genome)
+        summary["fasta"]=genome.relative_to(root).as_posix()
     catalog = _read_json(index)
     if catalog and (catalog.get("schema") != INDEX_SCHEMA or not isinstance(catalog.get("batches"), list)):
         raise ValueError("invalid manual refinement report index")

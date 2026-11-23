@@ -788,6 +788,17 @@ fn load_seed_plan(
     gpm_server_path: &str,
     segment: &DegapJobSeedSegment,
 ) -> Result<Vec<SeedMemberPlan>> {
+    load_seed_plan_with_maps(conn, workspace_root, project_id, gpm_server_path, segment, &mut server_runtime::SourceMaps::default())
+}
+
+fn load_seed_plan_with_maps(
+    conn: &Connection,
+    workspace_root: &Path,
+    project_id: i64,
+    gpm_server_path: &str,
+    segment: &DegapJobSeedSegment,
+    maps: &mut server_runtime::SourceMaps,
+) -> Result<Vec<SeedMemberPlan>> {
     let mut stmt = conn.prepare(
         "SELECT ss.seq_name, s.source_start, s.source_end, s.hidden, ssl.fasta_path, d.name, ss.length
          FROM assembly_ctg c
@@ -836,7 +847,7 @@ fn load_seed_plan(
             )
         })?;
         let relpath = server_relative_locator_path(workspace_root, Path::new(&local_fasta_path))?;
-        let server_fasta_sha256 = server_runtime::bind_member(
+        let server_fasta_sha256 = maps.bind(
             workspace_root,
             Path::new(&local_fasta_path),
             &dataset_name,

@@ -18,6 +18,8 @@ struct Manifest {
     variants: BTreeMap<String, Version>,
     objects: BTreeMap<String, String>,
     omitted_sequences: Vec<String>,
+    #[serde(default)]
+    reference_sources_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +28,8 @@ pub(in crate::grt_package) struct ProjectVersions {
     used: HashSet<String>,
     versions: BTreeMap<String, Version>,
     baseline_record: String,
+    generation: String,
+    references: BTreeMap<String, String>,
     effects: BTreeMap<String, AutoRefinementEffect>,
 }
 
@@ -99,6 +103,48 @@ pub(in crate::grt_package) fn validate_project_versions<C: FnMut() -> bool>(
         bail!("project index checksum mismatch");
     }
     let m: Manifest = serde_json::from_slice(&bytes)?;
+    let ref_name = "metadata/project_reference_sources.json";
+    let mut references: BTreeMap<String, String> = BTreeMap::new();
+    if let Some(expected) = &m.reference_sources_sha256 {
+        let path = regular_under(root, ref_name)?;
+        if !is_hash(expected)
+            || path.metadata()?.len() > 16 * 1024 * 1024
+            || sha256_file(&path)? != *expected
+        {
+            bail!("invalid project reference source map");
+        }
+        references = serde_json::from_reader(fs::File::open(path)?)?;
+        let locators = read_tsv(
+            root,
+            "metadata/reference_chr_locator.tsv",
+            REFERENCE_CHR_LOCATOR_HEADER,
+            1,
+            None,
+        )?;
+        if references.len() != locators.rows.len() {
+            bail!("reference source inventory mismatch");
+        }
+        let mut checked = HashMap::new();
+        for row in locators.rows {
+            let sha = references
+                .get(field(&row, "reference_chr_name")?)
+                .context("missing reference identity")?;
+            if !is_hash(sha) {
+                bail!("invalid reference FASTA digest");
+            }
+            if app["fasta_available"] == true {
+                let name = field(&row, "fasta_relpath")?;
+                if !checked.contains_key(name) {
+                    checked.insert(name.to_owned(), sha256_file(&regular_under(root, name)?)?);
+                }
+                if checked.get(name) != Some(sha) {
+                    bail!("reference FASTA does not match the project lookup map");
+                }
+            }
+        }
+    } else if root.join(ref_name).exists() {
+        bail!("unbound project reference map");
+    }
     let full = app["fasta_available"] == true;
     let key = serde_json::json!({"schema":SCHEMA,"schema_version":1,"baseline":m.baseline,"variants":m.variants});
     if m.schema != SCHEMA
@@ -223,6 +269,8 @@ pub(in crate::grt_package) fn validate_project_versions<C: FnMut() -> bool>(
         scratch,
         used,
         versions: ix.variants,
+        generation: m.generation,
+        references,
         baseline_record,
         effects,
     }))
@@ -232,6 +280,7 @@ pub(in crate::grt_package) fn retain_package_versions(
     tx: &Transaction<'_>,
     versions: &ProjectVersions,
 ) -> Result<()> {
+    tx.execute("INSERT INTO package_delivery_identity(package_id,generation,reference_sources_json) VALUES(1,?1,?2)",params![versions.generation,serde_json::to_string(&versions.references)?])?;
     retain_objects(tx, versions.scratch.path(), &versions.used)?;
     for (tool, v) in &versions.versions {
         tx.execute("INSERT INTO package_auto_version(package_id,tool,light_manifest,descriptor_json,baseline_json,effect_json) VALUES(1,?1,?2,?3,?4,?5)",
