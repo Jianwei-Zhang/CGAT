@@ -1,0 +1,146 @@
+{
+  "actual_mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+  "job": {
+    "endTime": "2026-11-23T08:30:24Z",
+    "jobId": "43024855",
+    "startTime": "2026-11-23T08:28:06Z",
+    "state": "SUCCEEDED",
+    "taskExecNodes": "agent-X86-04"
+  },
+  "limits": "Two preselected real panels, not a genome-wide sample. Four threads, each arm in an empty private directory, no restored tasks. Threshold arm first, full second. Adapted initial input checkpoint loader and frozen reference lengths; ordinary prepare, manifest verification, Q0 build and stage_selection. Mapper calls are successful new process launches; coarse searches and regional exact calls are distinct. User wall time shown excludes shared input materialization. No exhaustive alternative guarantee.",
+  "panels": {
+    "1B-689Mb": {
+      "arms": {
+        "full": {
+          "actual_mapper_calls": {
+            "coarse": 54,
+            "regional_exact": 59
+          },
+          "catalog_sha256": "6f8376cdc6b8ccb4b43edadf9d7d677acfa4be98506d564f13f98b3e16b0f7fb",
+          "contract": null,
+          "fasta_sha256": "3664530977ecb472bda852dd70c9f217c96948d153c9fc8347adacc0f034f0e3",
+          "manifest_sha256": "29b1db301caca8fd6f89258c1ebe981dc6733917d102eaf3ec4191a2a569e691",
+          "mode": "full",
+          "records": 1,
+          "regional_tasks": 59,
+          "restored": null,
+          "staged_evidence_rows": 1,
+          "staged_path_rows": 1,
+          "to_ready_s": 99.50091981887817,
+          "wall_s": 107.98310901224613
+        },
+        "positive_threshold": {
+          "actual_mapper_calls": {},
+          "catalog_sha256": "c27537c372683c6b23fc3b3ae9d81f3b3564c00ddfc96909d19847c9019f1cf9",
+          "contract": {
+            "alternatives_exhaustive": false,
+            "decision_counts": {
+              "positive_placement_stop": 1,
+              "unbuilt_without_reference_seed": 2
+            },
+            "search_mode": "base_only",
+            "semantics": "supported_backbone_not_exhaustive_alternatives_v1"
+          },
+          "fasta_sha256": "3664530977ecb472bda852dd70c9f217c96948d153c9fc8347adacc0f034f0e3",
+          "manifest_sha256": "f8e90ceee18f7170806c18c919a427757bb18f5f24e5b9d9b1b3a59bd764a9a6",
+          "mode": "base_only",
+          "records": 1,
+          "regional_tasks": 0,
+          "restored": null,
+          "staged_evidence_rows": 1,
+          "staged_path_rows": 1,
+          "to_ready_s": 3.473336987197399,
+          "wall_s": 5.12704510986805
+        }
+      },
+      "panel_sha256": "575910058629be6adc374af44da06d6b8be8f77b9789d3be485decc5e86a3f25",
+      "raw_report_sha256": "8511098beccf3bcff953161939df5601418abd632ce7b6186b90270a3ebc4a18",
+      "verified_field_digests": {
+        "alternative_paths": "b545e1834f8f08a2623ae93a71a306ab38292c01844bba309678a185a81ca457",
+        "available_donor_intervals": "9ec8364bb6f06dc4c028ca21f9389a573c449e340821192ad116db495c8de83b",
+        "known_ambiguous_intervals": "00af7c06590841cf0789c614beab2b2e1da8a3b67813154469838a27859a84ae",
+        "known_placement_geometry": "dc2bda4b1c9695cf0cfe13ffef66c88e650e45772a93a27052c9727ba7b3985c",
+        "occupied": "8ace4049dd01bf3d6db49871ed408819c6a04adc8085ecc4653e9f63e978398c",
+        "ordered_path": "b2023dabc9a4a86004e00a71e3c46b10a834f3e4bc6fcdedc688d17e66963603",
+        "reference_gaps": "a74e290e3ebf3f45db1424b0799939aa9ea0e3d3ac9cf6ba66c38c00adf92264",
+        "sequence": "443c3718e52111cfa13d9f220db895b7fa1dbedd584b05b7fb78e46ec8383852",
+        "unplaced_parts": "3df02dcbe6b705a9ca24b02957e2ac72e750617ed30a570fdcafc764e6012821"
+      }
+    },
+    "7A-734Mb": {
+      "arms": {
+        "full": {
+          "actual_mapper_calls": {
+            "coarse": 10,
+            "native": 1,
+            "regional_exact": 10
+          },
+          "catalog_sha256": "28a07b60749c7926e65db3e02dc273311825c0f471c7b71b7e2ba3c430b10b7b",
+          "contract": null,
+          "fasta_sha256": "4a66d05dce83db8d1da120022046bac9046d46b6b60866c3d677cc808976dffa",
+          "manifest_sha256": "d683a0841142542e1a697ea302eaab819d5769d681d2295197d7d405ffb667af",
+          "mode": "full",
+          "records": 1,
+          "regional_tasks": 10,
+          "restored": null,
+          "staged_evidence_rows": 3,
+          "staged_path_rows": 5,
+          "to_ready_s": 10.429463140666485,
+          "wall_s": 11.75761642307043
+        },
+        "positive_threshold": {
+          "actual_mapper_calls": {
+            "coarse": 4,
+            "native": 1,
+            "regional_exact": 4
+          },
+          "catalog_sha256": "2f745123c6bc1a8e6f90edd2c389ff7c5fb4abc6b3fae42fd1138fcd265204e3",
+          "contract": {
+            "alternatives_exhaustive": false,
+            "decision_counts": {
+              "expanded_intervals_already_covered_by_planner": 1,
+              "positive_placement_stop": 3,
+              "unbuilt_without_reference_seed": 0,
+              "unproven_join": 2
+            },
+            "search_mode": "decision_frontier",
+            "semantics": "supported_backbone_not_exhaustive_alternatives_v1"
+          },
+          "fasta_sha256": "4a66d05dce83db8d1da120022046bac9046d46b6b60866c3d677cc808976dffa",
+          "manifest_sha256": "8a8580686f3b461454f8a1a160545ef9024a6541c828e34ee5cedb51d1ee8b84",
+          "mode": "decision_frontier",
+          "records": 1,
+          "regional_tasks": 4,
+          "restored": null,
+          "staged_evidence_rows": 3,
+          "staged_path_rows": 5,
+          "to_ready_s": 9.76155660301447,
+          "wall_s": 10.899399474263191
+        }
+      },
+      "panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+      "raw_report_sha256": "151ccab2286af3002d92fafa7828f72a1d33afa0776242ddbf373564d65c6aac",
+      "verified_field_digests": {
+        "alternative_paths": "2b2478f2c5596567e87d3cf37df067bbcca765f13abd1996976b16d61d5428e1",
+        "available_donor_intervals": "b17730eba1136c61ce966d944af56224b31bce6b9e225236bbcfec4781824aa5",
+        "known_ambiguous_intervals": "321e2f57b26371711dea320585b811f922be6b853619b6a2c35bc2f2ff3c41e3",
+        "known_placement_geometry": "7a7cd0212e33ea2478aff25c99344024ab73a0f40cfefc48b22a625ef4a62624",
+        "occupied": "36f07c23bf343f5709c40451093493b957a88d39dc85ffe2c58451b7585e85e3",
+        "ordered_path": "a255ce97149eb1b733db4105ec6ceffb7cb6f954647b85fe0377802aae03ac05",
+        "reference_gaps": "6427deee2be57040baf6f219ebfa5e4cc3b6c4c17626e2082cc481bd0f576a06",
+        "sequence": "b3e82786fcf5398f29e7dcc1b723a6a028657d2e46baead96e80de3e1d9981db",
+        "unplaced_parts": "1af8c64a7c9eb701dc22292f67126bd3462739cfb177d1be66a779f966367495"
+      }
+    }
+  },
+  "provenance_sha256": {
+    "code.sha256": "44ea2cf3f3436fecde7e38e07f7e8bd0f17122b1a7f21112e61a2e99df557f75",
+    "formal.dsub": "3b663fd48074828c986016994c6fbb21d4f0d53bb83663a9cb750685cd9e0895",
+    "formal_43024855.out": "05c163ddbbfc8422a7800db78f709dc2a0307c6ed459068d9a80d29ff8e9dc8c",
+    "revision": "47609b14720e6ec0d583552f5c33bbfe3cd9184046cd9de63c7ce1784ccb89c6",
+    "runtime.tar.gz": "ab5215f9b3da4e2f3fa908d3c71fb0c04739c2d66fa7c26fd70b46693d1b6fc2"
+  },
+  "remote_directory": "q0-formal-master-20261123-1627",
+  "revision": "e7307a7c46a4eceedfdf8bb21982447869c4a19e",
+  "schema": "formal_q0_master_cold_wheat_panels_v1"
+}
