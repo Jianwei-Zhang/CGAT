@@ -103,7 +103,9 @@ jobs:
         run: rustup component add rustfmt clippy
 
       - name: Install server test dependencies
-        run: sudo apt-get update && sudo apt-get install -y pigz minimap2
+        run: |
+          sudo apt-get update && sudo apt-get install -y pigz minimap2 samtools
+          python3 -m pip install biopython==1.86
 
       - name: Run server quality gate
         working-directory: GPM2.0

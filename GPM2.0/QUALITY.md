@@ -33,10 +33,10 @@ server Python tests, the focused server shell tests, and the LGZ server-to-app
 end-to-end contract.
 
 The complete Windows gate requires `python`, Node.js/npm, Rust, `rustfmt`, and
-`clippy`. The complete Linux gate requires `python3`, Bash, Node.js, Rust, and
-`zip`. Install frontend dependencies with `npm ci` before the Windows gate.
-The focused shell tests provide their own fake bioinformatics commands; the
-real alignment toolchain is not required for quality verification.
+`clippy`. The Linux gate uses Bash, Node.js, Rust, `zip`, `pigz`, and `minimap2`.
+The refinement tests also use `samtools` to index FASTAs and Python 3 with
+Biopython to build read indices. Install frontend dependencies with `npm ci`.
+The focused shell tests provide their own fake bioinformatics commands.
 
 When working in WSL, where Rust verification is intentionally delegated to the
 Windows host, the server-only checks can be run without the Rust-backed LGZ E2E:

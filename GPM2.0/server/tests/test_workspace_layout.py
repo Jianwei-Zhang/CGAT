@@ -305,9 +305,20 @@ class MigrationTests(unittest.TestCase):
     def test_destination_collision_is_never_overwritten(self):
         self.put("03_lgz/04_step3/q3.fa", "existing user data\n")
         before = self.snapshot()
-        with self.assertRaisesRegex(LayoutError, "already exists"):
-            plan_migration(self.root)
-        self.assertEqual(self.snapshot(), before)
+        walk = os.walk
+        for reverse, reason in ((False, "collision"), (True, "already exists")):
+            def ordered_walk(*args, **kwargs):
+                for directory, dirs, files in walk(*args, **kwargs):
+                    dirs.sort(reverse=reverse)
+                    yield directory, dirs, files
+
+            # Depending on which tree is seen first, the planner detects an
+            # occupied target or two sources mapping to the same target.
+            with self.subTest(reverse=reverse), mock.patch.object(os, "walk", ordered_walk):
+                with self.assertRaises(LayoutError) as raised:
+                    plan_migration(self.root)
+                self.assertEqual(str(raised.exception), f"migration destination {reason}: 03_lgz/04_step3/q3.fa")
+            self.assertEqual(self.snapshot(), before)
 
     def test_destination_parent_file_is_rejected_in_preview(self):
         self.put("01_inputs", "not a directory\n")

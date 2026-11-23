@@ -123,7 +123,7 @@ class DegapUnitTests(unittest.TestCase):
         bin_dir = runtime/"bin"; bin_dir.mkdir(); (bin_dir/"python").symlink_to(sys.executable)
         self.bin = bin_dir
         self.reads = self.root/"reads.fa"; self.reads.write_text(">r\nAAAAGTCCCC\n")
-        self.calls, self.fail, self.unresolved = (self.root/name for name in ("calls.txt","fail","unresolved"))
+        self.calls, self.fail_marker, self.unresolved = (self.root/name for name in ("calls.txt","fail","unresolved"))
         self.runtime_sha = fingerprint({"pinned_part3":units.digest(native), "parent":units.digest(self.entrypoint),
                                         "controlled_child":units.digest(runtime/"DEGAP.py")})
 
@@ -138,7 +138,7 @@ class DegapUnitTests(unittest.TestCase):
         command = (sys.executable,"-B",str(self.entrypoint),"--genome",str(baseline),"--output",str(paths["03_native"]),
                    "--work","1","--thread",str(threads),"--hifi",str(self.reads))
         environment = dict(os.environ, PATH=str(self.bin)+os.pathsep+os.environ['PATH'], PYTHONDONTWRITEBYTECODE="1",
-                           CGAT_TEST_CALLS=str(self.calls),CGAT_TEST_FAIL=str(self.fail),CGAT_TEST_UNRESOLVED=str(self.unresolved))
+                           CGAT_TEST_CALLS=str(self.calls),CGAT_TEST_FAIL=str(self.fail_marker),CGAT_TEST_UNRESOLVED=str(self.unresolved))
         invocation = Invocation("degap",command,paths["03_native"].parent,environment,
             ("03.gap_filling/gap_filling_results.json","04.genome_integration/genome.filled.fasta"),{"threads":threads,"name":"controlled-pinned-scheduler"})
         recipe = {"threads":threads,"runtime_sha256":self.runtime_sha,
@@ -180,7 +180,7 @@ class DegapUnitTests(unittest.TestCase):
             input_binding(self.root,native,job)
 
     def test_completed_family_is_reused_and_still_present_in_native_summary(self):
-        self.fail.touch()
+        self.fail_marker.touch()
         with self.assertRaises(checkpoint.NativeProcessError):
             self.execute(1)
         jobs, first = self.summary(1)
@@ -190,7 +190,7 @@ class DegapUnitTests(unittest.TestCase):
         raw = original.read_bytes()
         diagnostics, _, _ = native_diagnostics(self.root, "degap", "1"*32, {})
         self.assertIn(first["units"][0]["receipt"], diagnostics)
-        self.fail.unlink()
+        self.fail_marker.unlink()
         completed = self.execute(2)
         by_job = {row["unit"]["job_name"]: row for row in self.summary(2)[1]["units"]}
         self.assertTrue(by_job["chr1.1.bidirectional"]["reused"])
@@ -203,10 +203,10 @@ class DegapUnitTests(unittest.TestCase):
         self.assertTrue(self.execute(3,threads=8)["reused"])
 
     def test_zero_exit_exhausted_family_is_reusable_not_a_candidate_or_a_second_job(self):
-        self.unresolved.touch(); self.fail.touch()
+        self.unresolved.touch(); self.fail_marker.touch()
         with self.assertRaises(checkpoint.NativeProcessError):
             self.execute(1)
-        self.fail.unlink()
+        self.fail_marker.unlink()
         completed = self.execute(2)
         by_job = {row["unit"]["job_name"]:row for row in self.summary(2)[1]["units"]}
         row = by_job["chr1.1.bidirectional"]
@@ -217,7 +217,7 @@ class DegapUnitTests(unittest.TestCase):
         self.assertEqual(self.calls.read_text().splitlines().count("chr1.1.bidirectional"), 1)
 
     def test_changed_reads_threads_or_corrupted_producer_do_not_reuse(self):
-        self.fail.touch()
+        self.fail_marker.touch()
         with self.assertRaises(checkpoint.NativeProcessError):
             self.execute(1)
         receipt = self.root/self.summary(1)[1]["units"][0]["receipt"]

@@ -30,8 +30,9 @@ Rust crate 的格式、严格 Clippy 和测试。Linux 门禁检查 LF 行尾、
 服务端 Python 测试、专项 shell 测试和 LGZ server-to-app 端到端契约。
 
 完整 Windows 门禁需要 `python`、Node.js/npm、Rust、`rustfmt` 和 `clippy`；执行前先
-在前端目录运行 `npm ci`。完整 Linux 门禁需要 `python3`、Bash、Node.js、Rust 和
-`zip`。专项 shell 测试自带假的生信命令，无需安装真实比对工具链。
+在前端目录运行 `npm ci`。Linux 门禁使用 Bash、Node.js、Rust、`zip`、`pigz` 和
+`minimap2`；精修测试还需要 `samtools` 为 FASTA 建索引，并用安装了 Biopython 的
+Python 3 构建 reads 索引。专项 shell 测试自带模拟的生信命令。
 
 在 WSL 中，Rust 验证按项目规则交给 Windows 宿主机；仅检查服务端非 Rust 部分时可用：
 

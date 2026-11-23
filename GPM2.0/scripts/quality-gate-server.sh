@@ -21,6 +21,11 @@ run_group() {
 
 require_cmd bash
 require_cmd python3
+require_cmd samtools
+python3 -c 'from Bio import SeqIO' || {
+  echo "error: server tests require Biopython in the python3 environment" >&2
+  exit 1
+}
 
 if [[ "${GPM_SKIP_GRT_SERVER_APP_E2E:-0}" != "1" ]]; then
   if [[ -z "${GPM_GRT_E2E_BACKEND_EXE:-}" ]]; then require_cmd cargo; fi
