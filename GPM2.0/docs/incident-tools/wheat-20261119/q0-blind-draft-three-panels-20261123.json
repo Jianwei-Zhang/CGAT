@@ -1,0 +1,177 @@
+{
+  "arms": {
+    "cuts": {
+      "code_manifest_sha256": "613e851fac89a4c965ef44f083867027b49c0eb1a50f56711cb1985368ddfebc",
+      "job": 43022884,
+      "panels": {
+        "3D": {
+          "alternative_geometry_changes": {},
+          "chosen_geometry_or_sequence_differences": {},
+          "constructed_sequences": 10,
+          "fallback": null,
+          "guard": "passed",
+          "native_retained": 1,
+          "panel": "3D-589Mb",
+          "posthoc_windows_intersecting_full_proof_axes": 82,
+          "raw_full": 113,
+          "raw_retained": 86,
+          "ready": "q0-ready-evidence-6588fa57f9c1a6b758a8278d",
+          "regional": 113,
+          "report_sha256": "8c31e5ec01ac275f91c1d1bc270ea76a5267b0725f926bb877e14a657aa1f98a",
+          "retained": 86,
+          "rounds": [
+            {
+              "demand_sources": 51,
+              "request_digest": "49986b984f3df927d1969c591ab9e7fc4e483ac6c6fb96f48c2fe0ded9a9f0f3",
+              "requested_regional": 86,
+              "round": 0,
+              "visible_native_before": 0,
+              "visible_regional_before": 0
+            }
+          ]
+        },
+        "4B": {
+          "alternative_geometry_changes": {},
+          "chosen_geometry_or_sequence_differences": {},
+          "constructed_sequences": 1,
+          "fallback": null,
+          "guard": "passed",
+          "native_retained": 0,
+          "panel": "4B-358Mb",
+          "posthoc_windows_intersecting_full_proof_axes": 4,
+          "raw_full": 4,
+          "raw_retained": 4,
+          "ready": "q0-ready-evidence-2dfc33cefed4113ef77d9474",
+          "regional": 4,
+          "report_sha256": "ade6bbb09f74a72393e2eaff92e41e36aaf0dce0be250e32727f3e1f40f2f33f",
+          "retained": 4,
+          "rounds": [
+            {
+              "demand_sources": 3,
+              "request_digest": "5b0ed519ba78e9739c6043fb4fd71cc2637c9bf447332fdf3b14ab8f6532ff7a",
+              "requested_regional": 4,
+              "round": 0,
+              "visible_native_before": 0,
+              "visible_regional_before": 0
+            }
+          ]
+        },
+        "5B": {
+          "alternative_geometry_changes": {},
+          "chosen_geometry_or_sequence_differences": {},
+          "constructed_sequences": 1,
+          "fallback": null,
+          "guard": "passed",
+          "native_retained": 1,
+          "panel": "5B-596Mb",
+          "posthoc_windows_intersecting_full_proof_axes": 4,
+          "raw_full": 6,
+          "raw_retained": 4,
+          "ready": "q0-ready-evidence-c67680fb596f481587e187c7",
+          "regional": 6,
+          "report_sha256": "b6ee15eccdf2d3b52e29619c59d0c78e6208f0406357a7fec9ad773cbc06c275",
+          "retained": 4,
+          "rounds": [
+            {
+              "demand_sources": 4,
+              "request_digest": "15eed9c5abafc408bd55e953327e3f498aaa952fa8391977f5bafa383b456e96",
+              "requested_regional": 4,
+              "round": 0,
+              "visible_native_before": 0,
+              "visible_regional_before": 0
+            }
+          ]
+        }
+      }
+    },
+    "loc": {
+      "code_manifest_sha256": "0d2dbd41c58b407407808b80db6642ed7f656627c57e332ec88fff4d2333aef4",
+      "job": 43022888,
+      "panels": {
+        "3D": {
+          "alternative_geometry_changes": {},
+          "chosen_geometry_or_sequence_differences": {},
+          "constructed_sequences": 10,
+          "fallback": null,
+          "guard": "passed",
+          "native_retained": 1,
+          "panel": "3D-589Mb",
+          "posthoc_windows_intersecting_full_proof_axes": 82,
+          "raw_full": 113,
+          "raw_retained": 102,
+          "ready": "q0-ready-evidence-6588fa57f9c1a6b758a8278d",
+          "regional": 113,
+          "report_sha256": "6302624c93cd0cf47cbb1721b3b81756f73c5583077243fb4ac027bffd591bb9",
+          "retained": 102,
+          "rounds": [
+            {
+              "demand_sources": 51,
+              "localization_only": 16,
+              "request_digest": "435ff20ec5430bd73ab5bca80c1c252c412ab0b9749957a3e7510a05a6bdc3eb",
+              "requested_regional": 102,
+              "round": 0,
+              "visible_native_before": 0,
+              "visible_regional_before": 0
+            }
+          ]
+        },
+        "4B": {
+          "alternative_geometry_changes": {},
+          "chosen_geometry_or_sequence_differences": {},
+          "constructed_sequences": 1,
+          "fallback": null,
+          "guard": "passed",
+          "native_retained": 0,
+          "panel": "4B-358Mb",
+          "posthoc_windows_intersecting_full_proof_axes": 4,
+          "raw_full": 4,
+          "raw_retained": 4,
+          "ready": "q0-ready-evidence-2dfc33cefed4113ef77d9474",
+          "regional": 4,
+          "report_sha256": "e18d9bc7d47b1c8cb8fba6d1a11702f19154a6b7857786d3a5b0282f1415a3b7",
+          "retained": 4,
+          "rounds": [
+            {
+              "demand_sources": 3,
+              "localization_only": 0,
+              "request_digest": "5b0ed519ba78e9739c6043fb4fd71cc2637c9bf447332fdf3b14ab8f6532ff7a",
+              "requested_regional": 4,
+              "round": 0,
+              "visible_native_before": 0,
+              "visible_regional_before": 0
+            }
+          ]
+        },
+        "5B": {
+          "alternative_geometry_changes": {},
+          "chosen_geometry_or_sequence_differences": {},
+          "constructed_sequences": 1,
+          "fallback": null,
+          "guard": "passed",
+          "native_retained": 1,
+          "panel": "5B-596Mb",
+          "posthoc_windows_intersecting_full_proof_axes": 4,
+          "raw_full": 6,
+          "raw_retained": 4,
+          "ready": "q0-ready-evidence-c67680fb596f481587e187c7",
+          "regional": 6,
+          "report_sha256": "7d2340954d8fa1ba164ca590cf1d141b52de819e97f9422248e615438f6ee746",
+          "retained": 4,
+          "rounds": [
+            {
+              "demand_sources": 4,
+              "localization_only": 0,
+              "request_digest": "15eed9c5abafc408bd55e953327e3f498aaa952fa8391977f5bafa383b456e96",
+              "requested_regional": 4,
+              "round": 0,
+              "visible_native_before": 0,
+              "visible_regional_before": 0
+            }
+          ]
+        }
+      }
+    }
+  },
+  "schema": "q0_blind_draft_three_panel_summary_v1",
+  "scope": "fixed archived input task graphs; no new mapper calls; not whole wheat or cold wall time"
+}
