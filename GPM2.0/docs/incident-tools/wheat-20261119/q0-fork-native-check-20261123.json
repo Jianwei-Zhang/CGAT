@@ -1,0 +1,28 @@
+{
+  "four_matrix_output_transfer_bound": {
+    "logical_output_bytes": 99059106050,
+    "repeated_bytes": 64177737558,
+    "unique_payload_bytes": 34881368492
+  },
+  "historical_receipts": {
+    "q0-map-2b19c2c859bdfb5f2e9177e8": "ba5553ff1640cd1feff0db518b671baabed44fba84e02c7992e30a1cb76dd50a",
+    "q0-map-8024dde83cbf20e7ffa6d8ee": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e",
+    "q0-map-a2e519761e94eff6ca09e121": "c36e5d98b8cbeac165865060565ed8c8953824f42baafa9c7db2e94b1ec7679f",
+    "q0-map-b30137a13323db8a99874448": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3"
+  },
+  "limits": "Transfer numbers apply if all four outputs are requested; they are not real shared I/O or space savings of this probe. Only the named matrix was copied/validated. The -m 2000 matrix still needs its original weak-scoped admission. No chromosome checkpoint import, complete Q0, or scientific equivalence claimed.",
+  "native_probe": {
+    "copied_bytes": 29671759,
+    "id": "q0-map-b30137a13323db8a99874448",
+    "mapper_calls": 0,
+    "paf_rows_consumed": 12774,
+    "query_parts": 1418,
+    "receipt_sha256": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3",
+    "target_parts": 52,
+    "verified_outputs": 4
+  },
+  "production_modified": false,
+  "revision": "665d2ec05823fb4282e9e949b45a13d4bbef36ae",
+  "schema": "whole_wheat_native_seed_transfer_probe_v1",
+  "snapshot": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d"
+}
