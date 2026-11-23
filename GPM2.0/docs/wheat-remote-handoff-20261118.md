@@ -4577,3 +4577,9 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 - 已核实新版 `prepare_lgz_inputs.sh` 无 `--reads` 且包 `reads_qc_enabled=false`。真实 Server 入口拟用显式 `decision_frontier_repair`：不把私有实验策略注入生产，不修改默认或初始检查点；正常准备可回读所有验证回执，临时选择失败按真正省略冲突扩大范围，最多 2 轮再全量。各轮只在内存传递 draft，唯一 canonical ready 在所需校验及签名栅栏之后发布；已冻结的下游输入不回写。试验档只接受已绑定的 no-reads-QC `package.tsv`；reads 模式另行设计下游证据依赖，不能直接套用。本地运行无变化、更没有用 3D 倍率证明整麦。仍只本地 commit，不 push。
 
 - 正式入口实验档已本地提交 `a5be991e`；172 项定向测试全部通过，覆盖仅在最后发布、普通下游按同一格式读取、no-reads-QC 前置门和选择时输入漂移不写 ready。实际入口隔离作业 `43020729 / agent-X86-06` 08:39:58 起跑，清单 SHA `138d1ebea2422cb86ae38ccf78aac992d6e55587a4febc9c4f2f5533dcb633f6`，目录 `q0-natural-3d-native-repair-entry-20261123/`。与前一实验不同，此次不用私有范围/策略注入：真实 `prepare_evidence(..., supplement_scope=decision_frontier_repair)` 内置补查及发布，再走普通 `load_evidence_input` 和最终构建，核对同一份全量冷对照的所有最终 FASTA 哈希；还保留输入小组适配，非整麦。08:40 已产生首轮 55 个补充结果的**私有 draft**，不等于 canonical ready 成功。两个主作业不动。下一步用真实入口计明包含重复验证/真正消费者的净收益，再看全麦恢复/已缓存工作能否抵消接管成本；不能用这份面板结果直接切换主任务。
+
+### 11/23 08:46 — 正式入口实样通过；补查不再重扫初始矩阵
+
+- `43020729` 08:42:17 成功，报告 SHA-256 `2fb5128cb60cfc0ca3a893c0169260c4bf913258a800544a7ac28786bf6d23ee`。真实 Server profile 只补查一次，证据 ready **94.68 s**，包含此后的普通消费者独立读回/选路 **131.74 s**。仍是 86 区域＋1 原生，25 个候选与 2 个 partial 窗口未运行；普通消费者的 10 条 FASTA 哈希与完整冷对照一致。测的是自然 3D 小组＋已验证初始输入适配，不能用 131.74 / 333.25 s 当同轮、同代码入口 A/B 或生产接管预算。
+- 整麦准备的前置输入重扫昂贵；本地补查现在同一进程只执行一次原 `_initial_inputs`（含普通外层检查点与分区/初始 PAF 验证），后续轮绑定同一批文件的 resolved target、dev/inode/size/mtime/ctime 以及已全量校验的 SHA。若基准有漂移就失败，不采用旧 snapshot 或暗自重算；不跨进程复用。重复轮只重读源 FASTA（避免持有重复全基因组 DNA），保留各轮已验证 byte identities、PAF 内容/闭包、原始完整输出和最终发布守卫。各轮从同一初始 `ObservedSourcePairs` 独立复制，可共享不可变合并区间但不共享新增观察。普通全量路径不变。
+- 179 项定向测试通过，含原初始输入只验证一次、两轮观察隔离、结果正常发布、选择中漂移和两轮之间初始 PAF 漂移拒绝；只提交本地。新版生产截至本次检查仍 RUNNING/同一 reader，原有区域输出目录未见本轮新增，不能为补丁再次机械重提。

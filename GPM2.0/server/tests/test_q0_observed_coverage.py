@@ -49,6 +49,17 @@ class ObservedCoverageTests(unittest.TestCase):
         self.assertEqual(partial_source_intervals(catalog,observed=self.pairs),{})
         with self.assertRaises(Q0EvidenceError):partial_source_intervals(catalog,minimum_uncovered_bp=0)
 
+    def test_fork_preserves_initial_observations_without_sharing_round_mutation(self):
+        self.pairs.observe_alignment(self.hit(), self.q, self.t)
+        first = self.pairs.fork()
+        second = self.pairs.fork()
+        first.observe_alignment(self.hit(), self.q, self.t, query_offset=5000, target_offset=5000)
+        first.clear()
+        self.assertEqual(second, {(self.q, self.t)})
+        self.assertEqual(tuple(second.cross_coverage[self.q]), (Interval(0, 1000), Interval(1100, 4100)))
+        self.assertEqual(tuple(self.pairs.cross_coverage[self.q]), tuple(second.cross_coverage[self.q]))
+        self.assertGreater(len(tuple(first.cross_coverage[self.q])), len(tuple(second.cross_coverage[self.q])))
+
     def test_bad_source_frame_fails_before_recording_relation(self):
         for offset in [-1,6000]:
             with self.assertRaises(Q0EvidenceError):self.pairs.observe_alignment(self.hit(),self.q,self.t,query_offset=offset)

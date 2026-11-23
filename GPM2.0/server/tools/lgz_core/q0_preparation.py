@@ -238,6 +238,17 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
     return manifest
 
 
+def _dataset_sequences(root, datasets):
+    sources = {}
+    for dataset in datasets:
+        for name, sequence in read_fasta(artifact_path(root, dataset["fasta_relpath"])):
+            key = SourceKey(dataset["dataset_name"], name)
+            if key in sources:
+                raise Q0EvidenceError(f"duplicate q0 source: {key}")
+            sources[key] = sequence
+    return sources
+
+
 def _initial_inputs(root: Path):
     datasets = table(root, "metadata/datasets.tsv", ("dataset_name", "fasta_relpath"))
     references = table(root, "metadata/reference.tsv", ("fasta_relpath",))
@@ -251,17 +262,12 @@ def _initial_inputs(root: Path):
     # This stage uses only names/lengths; do not retain a multi-Gb reference
     # DNA dictionary alongside all de novo sequences. Still parse every record.
     refs = {name: len(sequence) for name,sequence in read_fasta(artifact_path(root, references[0]["fasta_relpath"]))}
-    sources = {}
+    sources = _dataset_sequences(root, datasets)
     paths = {"metadata/datasets.tsv", "metadata/reference.tsv", "metadata/chr_assignments.tsv",
              "metadata/prepare_options.tsv", "metadata/track_member_orders.tsv",
              references[0]["fasta_relpath"]}
     for dataset in datasets:
         paths.add(dataset["fasta_relpath"])
-        for name, sequence in read_fasta(artifact_path(root, dataset["fasta_relpath"])):
-            key = SourceKey(dataset["dataset_name"], name)
-            if key in sources:
-                raise Q0EvidenceError(f"duplicate q0 source: {key}")
-            sources[key] = sequence
         relative = f"runs/{dataset['dataset_name']}_vs_ref/result.paf"
         paths.update((relative, f"runs/{dataset['dataset_name']}_vs_ref/tool_version.txt"))
     lengths = dict(refs)
@@ -586,6 +592,48 @@ def _readless_package(root):
         raise Q0EvidenceError("q0 proof repair requires a package without reads QC; use full supplemental evidence")
 
 
+class _ProofRepairInputs:
+    """Reuse base validation only within one repair call and one file generation.
+
+    Do not keep a second copy of whole-assembly DNA alive while the selector
+    loads its evidence. Later passes reread source FASTAs but not the reference
+    FASTA, partition FASTAs, initial PAF parser, or initial checkpoint checks.
+    """
+
+    def __init__(self, root):
+        self.root = root
+        self.base = None
+
+    def _signatures(self):
+        return tuple(file_signature(self.root / _artifact_member(path)) for path in self.paths)
+
+    def verify(self):
+        if self._signatures() != self.signatures:
+            raise Q0EvidenceError("q0 proof repair initial files changed between passes")
+
+    def read(self):
+        if self.base is None:
+            sources, lengths, assignments, options, paths, alignments, known = _initial_inputs(self.root)
+            self.paths = sorted(set(paths) | {"metadata/package.tsv"})
+            self.signatures = self._signatures()
+            self.identities = [identity(self.root, path) for path in self.paths]
+            self.datasets = table(self.root, "metadata/datasets.tsv", ("dataset_name", "fasta_relpath"))
+            if ("metadata/datasets.tsv" not in self.paths
+                    or any(row["fasta_relpath"] not in self.paths for row in self.datasets)):
+                raise Q0EvidenceError("q0 proof repair dataset list is not bound to initial inputs")
+            self.source_lengths = {key: len(seq) for key, seq in sources.items()}
+            self.base = lengths, assignments, options, alignments, known
+        else:
+            self.verify()
+            sources = _dataset_sequences(self.root, self.datasets)
+            if {key: len(seq) for key, seq in sources.items()} != self.source_lengths:
+                raise Q0EvidenceError("q0 proof repair source inventory changed between passes")
+        self.verify()
+        lengths, assignments, options, alignments, known = self.base
+        observations = known.fork() if isinstance(known, ObservedSourcePairs) else set(known)
+        return sources, lengths, assignments, options, self.paths, alignments, observations, self.identities
+
+
 def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2",
                      supplement_scope: str = "full") -> dict:
     if supplement_scope == PROOF_REPAIR_SCOPE:
@@ -595,18 +643,20 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
 
 
 def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
-                           draft=False, frontier_override=None, repair_round=0, fallback_reason=None, expected_input=None):
+                           draft=False, frontier_override=None, repair_round=0, fallback_reason=None,
+                           expected_input=None, repair_inputs=None):
     root = root.resolve()
     if threads < 1:
         raise Q0EvidenceError("q0 evidence threads must be positive")
     run_policy = supplement_policy(supplement_scope)
     builder = builder_identity()
-    sources, lengths, assignments, options, input_paths, base_alignments, known_pairs = _initial_inputs(root)
+    if repair_inputs is None:
+        sources, lengths, assignments, options, input_paths, base_alignments, known_pairs = _initial_inputs(root)
+        inputs = [identity(root, relative) for relative in input_paths]
+    else:
+        sources, lengths, assignments, options, input_paths, base_alignments, known_pairs, inputs = repair_inputs.read()
     if "q0_supplement_scope" in options:
         raise Q0EvidenceError("set experimental q0 scope on the evidence command, not prepare_options.tsv")
-    if supplement_scope == PROOF_REPAIR_SCOPE:
-        input_paths = sorted(set(input_paths) | {"metadata/package.tsv"})
-    inputs = [identity(root, relative) for relative in input_paths]
     if supplement_scope == PROOF_REPAIR_SCOPE:
         _readless_package(root)
     tool = executable_identity(minimap2)
@@ -760,6 +810,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                                          skip_self=options.get("skip_self") == "true"))
         if _partition_sha256(Path(tool["resolved"])) != tool["sha256"]:
             raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
+        if repair_inputs is not None:
+            repair_inputs.verify()
         if inputs != [identity(root, relative) for relative in input_paths]:
             raise Q0EvidenceError("q0 evidence inputs changed during preparation; no manifest published")
         if builder_identity() != builder:
@@ -802,13 +854,14 @@ def _prepare_with_proof_repair(root, *, threads, minimap2):
     from .q0_sources import merged_intervals
 
     _readless_package(root)
+    repair_inputs = _ProofRepairInputs(root)
     expected_input, frontier = None, None
     fallback_reason = None
     for iteration in range(MAX_PROOF_REPAIRS + 2):
         manifest, planned, cached = _prepare_evidence_pass(
             root, threads=threads, minimap2=minimap2, supplement_scope=PROOF_REPAIR_SCOPE,
             draft=True, expected_input=expected_input, frontier_override=frontier,
-            repair_round=min(iteration, MAX_PROOF_REPAIRS), fallback_reason=fallback_reason)
+            repair_round=min(iteration, MAX_PROOF_REPAIRS), fallback_reason=fallback_reason, repair_inputs=repair_inputs)
         if cached:
             return manifest
         expected_input = manifest["input_fingerprint"]

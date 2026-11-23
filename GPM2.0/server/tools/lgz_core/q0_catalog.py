@@ -58,6 +58,12 @@ class _IntervalUnion:
             self._starts = tuple(interval.start for interval in self._merged)
             self._threshold = max(1024, len(self._merged))
 
+    def fork(self):
+        self._compact()
+        other = _IntervalUnion()
+        other._merged, other._starts, other._threshold = self._merged, self._starts, self._threshold
+        return other
+
     def __iter__(self):
         self._compact()
         return iter(self._merged)
@@ -78,6 +84,13 @@ class ObservedSourcePairs(set):
         self.source_lengths = dict(source_lengths)
         self._canonical_sources = {key:key for key in self.source_lengths}
         self.cross_coverage: dict[SourceKey, _IntervalUnion] = {}
+
+    def fork(self):
+        """Give a new pass the same observations, never later round mutations."""
+        other = ObservedSourcePairs(self.source_lengths)
+        other.update(self)
+        other.cross_coverage = {key: union.fork() for key, union in self.cross_coverage.items()}
+        return other
 
     def observe_alignment(self, hit: PafAlignment, query: SourceKey, target: SourceKey,
                           *, query_offset: int = 0, target_offset: int = 0) -> None:

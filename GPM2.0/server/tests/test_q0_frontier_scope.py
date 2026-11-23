@@ -171,10 +171,12 @@ class FrontierScopeTests(unittest.TestCase):
                 return actual_audit(data, admission, searches)
 
             with (patch.dict(os.environ, env), patch.object(q0_preparation, "regional_enabled", return_value=True),
-                  patch.object(scope, "audit_selected_scope", side_effect=require_once)):
+                  patch.object(scope, "audit_selected_scope", side_effect=require_once),
+                  patch.object(q0_preparation, "_initial_inputs", wraps=q0_preparation._initial_inputs) as initial):
                 ready = q0_preparation.prepare_evidence(root, minimap2=mapper,
                                                         supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE)
             self.assertEqual(seen, [0, 1])
+            self.assertEqual(initial.call_count, 1)
             self.assertNotEqual((root / q0_preparation.MANIFEST).read_bytes(), old)
             self.assertEqual(ready, q0_preparation.load_verified_evidence(root))
             self.assertEqual(q0_admission.build_q0(root).records["chr1"], truth)
@@ -203,6 +205,32 @@ class FrontierScopeTests(unittest.TestCase):
                 with self.assertRaisesRegex(Q0EvidenceError, "changed during selection"):
                     q0_preparation.prepare_evidence(root, minimap2=mapper,
                                                     supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE)
+            self.assertEqual((root / q0_preparation.MANIFEST).read_bytes(), old)
+
+    def test_proof_repair_rejects_base_changes_before_starting_another_pass(self):
+        from server.tools.lgz_core import q0_frontier_scope as scope
+
+        fixture, _ = bridge_fixture()
+        with tempfile.TemporaryDirectory() as temporary, redirect_stdout(StringIO()):
+            root = fixture.workspace(temporary)
+            (root / "metadata/package.tsv").write_text("reads_qc_enabled\nfalse\n")
+            old = (root / q0_preparation.MANIFEST).read_bytes()
+            paf = root / "runs/a_vs_ref/result.paf"
+            mapper = str(Path(temporary) / "q0-fixture-bin/minimap2")
+            env = {"PATH": str(Path(mapper).parent) + os.pathsep + os.environ.get("PATH", "")}
+
+            def drift(*args):
+                with paf.open("a") as handle:
+                    handle.write("# edited after validation\n")
+                raise UnsearchedQ0Context("simulated first scoped veto")
+
+            with (patch.dict(os.environ, env), patch.object(q0_preparation, "regional_enabled", return_value=True),
+                  patch.object(scope, "audit_selected_scope", side_effect=drift),
+                  patch.object(q0_preparation, "_initial_inputs", wraps=q0_preparation._initial_inputs) as initial):
+                with self.assertRaisesRegex(Q0EvidenceError, "initial files changed between passes"):
+                    q0_preparation.prepare_evidence(root, minimap2=mapper,
+                                                    supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE)
+            self.assertEqual(initial.call_count, 1)
             self.assertEqual((root / q0_preparation.MANIFEST).read_bytes(), old)
 
     def test_proof_repair_refuses_reads_qc_before_computing(self):
