@@ -19,6 +19,7 @@ def contract():
     return {'semantics': SEMANTICS, 'minimum_anchor_bp': 100, 'join_reach_bp': 2000,
             'maximum_repairs': MAX_REPAIRS, 'readless_only': True,
             'rule_sha256': sha256_file(here.with_name('q0_threshold_questions.py')),
+            'retained_hit_sha256': sha256_file(here.with_name('q0_retained_hits.py')),
             'acceptance_sha256': sha256_file(here), 'preparer_sha256': sha256_file(here.with_name('q0_threshold_prepare.py'))}
 
 

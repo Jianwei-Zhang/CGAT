@@ -8,7 +8,7 @@ from . import q0_preparation as prep
 from .common import stable_id
 from .q0_alignments import read_paf
 from .q0_paths import PairLink
-from .q0_sources import Q0EvidenceError, SourceKey, merged_intervals, split_source
+from .q0_sources import Q0EvidenceError, merged_intervals, split_source
 from .q0_threshold_acceptance import MAX_REPAIRS, SCOPE, SEMANTICS, audit
 
 
@@ -28,6 +28,9 @@ def initial_questions(root, seqs, lengths, assignments, alignments):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_q0_paths
     from .q0_threshold_questions import questions
+    from .q0_retained_hits import RetainedHit
+    keys = {(s.dataset, s.contig): s for s in seqs}
+    ref_names = {name: name for name in lengths}
     parts, edges, refs, links, by_dataset = {}, [], defaultdict(list), [], defaultdict(dict)
     for key, seq in seqs.items():
         by_dataset[key.dataset][key.contig] = len(seq)
@@ -40,11 +43,13 @@ def initial_questions(root, seqs, lengths, assignments, alignments):
     for dataset, qlens in by_dataset.items():
         rel = f'runs/{dataset}_vs_ref/result.paf'
         for hit in read_paf(prep.artifact_path(root,rel), query_lengths=qlens, target_lengths=lengths, artifact=rel):
-            refs[SourceKey(dataset,hit.query_name)].append(hit)
+            source = keys[dataset, hit.query_name]
+            refs[source].append(RetainedHit.from_validated(hit, source.contig, ref_names[hit.target_name]))
     for row in alignments:
         q, t, rel = row['query_dataset'], row['target_dataset'], row['paf']
         for hit in read_paf(prep.artifact_path(root,rel), query_lengths=by_dataset[q], target_lengths=by_dataset[t], artifact=rel):
-            links.append(PairLink(hit, SourceKey(q,hit.query_name), SourceKey(t,hit.target_name)))
+            left, right = keys[q, hit.query_name], keys[t, hit.target_name]
+            links.append(PairLink(RetainedHit.from_validated(hit, left.contig, right.contig), left, right))
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     selected = select_q0_paths(data)
     need, _ = questions(data, selected, assignments)

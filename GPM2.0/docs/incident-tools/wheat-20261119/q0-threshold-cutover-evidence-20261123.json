@@ -1,0 +1,429 @@
+{
+  "schema": "q0_threshold_cutover_resource_and_cache_controls_v1",
+  "remote_root": "q0-threshold-heap-20261123-1410",
+  "jobs": {
+    "pin": {
+      "job": 43023101,
+      "code_manifest_sha256": "5e4f4b090373c412d4816872700e547318eb47c8c52f7239c84395370ed9e4cb",
+      "stdout_sha256": "a080ddf1f16e467b61a0a4d542b335051b1291ba23122d9a5223c7b254987982",
+      "outputs_sha256": {
+        "heap.json": "66a6635bf8fdd9b37dc8afc0541c29d24d11da64df3466d5587fbbddc683983c"
+      }
+    },
+    "cache": {
+      "job": 43023106,
+      "code_manifest_sha256": "8c8f505e079008bdc53582ed8c87c0801e38be7db86183fa0090c27989e49218",
+      "stdout_sha256": "b1bb0b8b97c2cfca7ffde135e04a1a122a87db7de72f394f1692d1a10cb75b0c",
+      "outputs_sha256": {
+        "cache.json": "2e8574296454571c7c6f82c90d6566fd3983a85808c458881567ed67bcf3f8aa"
+      }
+    },
+    "compact": {
+      "job": 43023121,
+      "code_manifest_sha256": "a06ae52e09887014873cdcd64b8f22d4df29b9f8237f1eee8bdf422efa7ce9d6",
+      "stdout_sha256": "c016d07ec61d80f67b6d564b6a36932247f6fe8cb788f5fd7a05411d0ac5048c",
+      "outputs_sha256": {
+        "original.json": "a7c09a62f81a337345dedac6f88023b192a84f1652df12ea7051320aa61f2509",
+        "packed.json": "550492b17677f4583b76d84016c2125940cb93b0dd8a815f04e329799fbef2e8",
+        "7A-734Mb.json": "ce5eacd2d1f7fe17b357c7c19d9b8a4931d01625f5f342883eb88d3fe065531b",
+        "3B-792Mb.json": "5059a8946a34b502279eb69cb1c1b852ea2136d58da26379645f0d9bb2fde972"
+      }
+    },
+    "partition": {
+      "job": 43023128,
+      "code_manifest_sha256": "ee60beb99d25d4cb05076056af0508ccb40d3e9187436d1d65fd6243e816c7d3",
+      "stdout_sha256": "8f6f2751b9ba82efefc136281db021e60b1e8cc9cbfcfd132d8077bf77e1262a",
+      "outputs_sha256": {
+        "partition.json": "c937649aee62870a0f709dcf8c3d20d8c5d9e4f233a3df09cd7b72e7829e31ff"
+      }
+    }
+  },
+  "heap_by_kind": {
+    "ref": {
+      "files": 2,
+      "total_paf_bytes": 1745286139,
+      "sample": {
+        "cigar_ops": 181357,
+        "parsed_bytes": 2095820,
+        "records": 8489,
+        "same_source_records": 0,
+        "sample_bytes": 2097152
+      },
+      "original_retained_private_B": 33775616,
+      "packed_retained_private_B": 13189120,
+      "original_worker_peak_rss_B": 58822656,
+      "packed_worker_peak_rss_B": 48979968,
+      "original_measured_s": 0.49076083302497864,
+      "packed_measured_s_with_unpack_checks": 0.550664097070694
+    },
+    "self": {
+      "files": 44,
+      "total_paf_bytes": 12502352179,
+      "sample": {
+        "cigar_ops": 5582518,
+        "parsed_bytes": 46096881,
+        "records": 156771,
+        "same_source_records": 0,
+        "sample_bytes": 46137344
+      },
+      "original_retained_private_B": 883580928,
+      "packed_retained_private_B": 267661312,
+      "original_worker_peak_rss_B": 908808192,
+      "packed_worker_peak_rss_B": 303669248,
+      "original_measured_s": 13.692176781594753,
+      "packed_measured_s_with_unpack_checks": 13.585341356694698
+    },
+    "cross": {
+      "files": 22,
+      "total_paf_bytes": 20024243,
+      "sample": {
+        "cigar_ops": 1668907,
+        "parsed_bytes": 13412970,
+        "records": 42341,
+        "same_source_records": 0,
+        "sample_bytes": 13416190
+      },
+      "original_retained_private_B": 256589824,
+      "packed_retained_private_B": 75464704,
+      "original_worker_peak_rss_B": 282238976,
+      "packed_worker_peak_rss_B": 111493120,
+      "original_measured_s": 3.5653256475925446,
+      "packed_measured_s_with_unpack_checks": 3.6078728437423706
+    }
+  },
+  "assembly_and_reference_bases": {
+    "reference": 14547261565,
+    "sources": {
+      "JM19_flye_ABD": 17119989222,
+      "JM19_hifiasm": 14586133267
+    }
+  },
+  "conditional_raw_reuse": {
+    "archived_closure_bytes_with_repeats": 52440641,
+    "cases": [
+      {
+        "allocator_replay_seconds": 0.5024098977446556,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-4637e33cff55b308f53a11b7",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-d2f7b2f9cc0bb8a1d1e51ef6",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "ad80c7c164a53cab9ae495591cee02ddd722a7b45ae823ed3e2f4b818c2f4bbb",
+        "raw_bytes": 100016,
+        "same_context_decision_and_raw_receipt": true
+      },
+      {
+        "allocator_replay_seconds": 0.3811255842447281,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-06074371e146af10e35af849",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-5e35f3b887548f9c6358474e",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "a59213e7369ce70ff8801fd5d30914927bf4a1828ce75e35bf27fc7ceb13178d",
+        "raw_bytes": 100427,
+        "same_context_decision_and_raw_receipt": true
+      },
+      {
+        "allocator_replay_seconds": 0.6398646309971809,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-473a8a2e36db197ddda99c78",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-9e6180db3ce3027873fbe12d",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "f96bd77e17a7cb77beac9ef7e3f3f938042a3466cd631ddff2df46b5841cd0a0",
+        "raw_bytes": 100528,
+        "same_context_decision_and_raw_receipt": true
+      },
+      {
+        "allocator_replay_seconds": 0.5297841280698776,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-478b0dd335d90f667b2a4110",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-89600d910a39d7a41c107bfd",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "e932d024c5b8799d0106bcd77de28be74750f24eb34df458b92d7464b3566178",
+        "raw_bytes": 100580,
+        "same_context_decision_and_raw_receipt": true
+      },
+      {
+        "allocator_replay_seconds": 7.628416046500206,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-a30082e7f816ef7eccc4f5d5",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-58c1a2ba8e857093da7efcaa",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "c55cf95905a4a16f54bb50feeeb1f048a4ca4f5bc1d7cfb2d67939a9586fddeb",
+        "raw_bytes": 4005645,
+        "same_context_decision_and_raw_receipt": true
+      },
+      {
+        "allocator_replay_seconds": 8.495440408587456,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-ed84614d7d3a02493558b841",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-0d26a8df37c0570ade93faf8",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "098f6db8eca12bc176fe192dc5c2d7fc9b6616772175e36bd06c75162f0d6780",
+        "raw_bytes": 4497820,
+        "same_context_decision_and_raw_receipt": true
+      },
+      {
+        "allocator_replay_seconds": 9.7637979388237,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-3aed2b7e0a7f957d4b3de9d5",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-c4f7c59fa446b88684eb20ec",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "eeca6f1dedc5d1eea0e89441cf51ea009d6f182f5e80bdd2d948b230fc649adc",
+        "raw_bytes": 5124541,
+        "same_context_decision_and_raw_receipt": true
+      },
+      {
+        "allocator_replay_seconds": 11.275808677077293,
+        "identical_projected_paf": true,
+        "mapper_calls": 0,
+        "new_project": "q0-regional-project-7b047e2fc0e7bfbed856d0e9",
+        "new_validator": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "old_project": "q0-regional-project-218a44fb5ca82118e1792ed1",
+        "old_projection_admitted": false,
+        "old_validator": "7d717fa4946ccefc57f9f087463eb7fcf3e6556c1fe984c0d23db9fe9752651c",
+        "projected_sha256": "c4aee447f23ac98e3235cc385768ce44d909c8c13748ad46a9b427139ad1bd36",
+        "raw_bytes": 5238967,
+        "same_context_decision_and_raw_receipt": true
+      }
+    ],
+    "distinct_bound_members": 3288,
+    "lookup_sha256": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+    "node": "agent-X86-06",
+    "schema": "q0_threshold_real_wheat_cache_replay_v1",
+    "scope": "Conditional on retaining these historical complete window contexts. Does not establish future demand, eligibility of all live receipts, or whole-run speedup. No whole source DNA reread or mapping allowed.",
+    "total_wall_s": 41.66437762975693,
+    "trace_sha256": "e74626d25d32da75377c79092f275f77501ccb3e340dcca100aedd3ec8b387be"
+  },
+  "formal_geometry": {
+    "7A-734Mb": {
+      "panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+      "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+      "fields_matched": [
+        "alternative_paths",
+        "available_donor_intervals",
+        "known_ambiguous_intervals",
+        "known_placement_geometry",
+        "occupied",
+        "ordered_path",
+        "reference_gaps",
+        "sequence",
+        "unplaced_parts"
+      ],
+      "arms": {
+        "full": {
+          "actual_mapper_calls": {
+            "coarse": 10,
+            "native": 1,
+            "regional_exact": 10
+          },
+          "wall_s": 10.3145137950778,
+          "regional_tasks": 10,
+          "staged_evidence_rows": 3,
+          "records": 1,
+          "manifest_sha256": "ab5a6e63ea62130cb9c8f11eff4af5df4754fcea6e2b3cfd09103e39f98432f0",
+          "mode": "full"
+        },
+        "positive_threshold": {
+          "actual_mapper_calls": {
+            "coarse": 4,
+            "native": 1,
+            "regional_exact": 4
+          },
+          "wall_s": 11.921733349561691,
+          "regional_tasks": 4,
+          "staged_evidence_rows": 3,
+          "records": 1,
+          "manifest_sha256": "57bbdb3e9c7aebc50c7568426db98371e31546583754f76f6f031ab3d2395e0b",
+          "mode": "decision_frontier"
+        }
+      }
+    },
+    "3B-792Mb": {
+      "panel_sha256": "3dd7aa2d643a04019ea75d092cdc88567c36d8a4a7c3914dfcc1a7a654139d39",
+      "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+      "fields_matched": [
+        "alternative_paths",
+        "available_donor_intervals",
+        "known_ambiguous_intervals",
+        "known_placement_geometry",
+        "occupied",
+        "ordered_path",
+        "reference_gaps",
+        "sequence",
+        "unplaced_parts"
+      ],
+      "arms": {
+        "full": {
+          "actual_mapper_calls": {
+            "coarse": 26,
+            "regional_exact": 36
+          },
+          "wall_s": 50.93071608245373,
+          "regional_tasks": 36,
+          "staged_evidence_rows": 1,
+          "records": 1,
+          "manifest_sha256": "7c7f108c112796915d81fe379051db9bc3e9d724ddfbefabce106e849cef67ff",
+          "mode": "full"
+        },
+        "positive_threshold": {
+          "actual_mapper_calls": {},
+          "wall_s": 6.071610301733017,
+          "regional_tasks": 0,
+          "staged_evidence_rows": 1,
+          "records": 1,
+          "manifest_sha256": "1c53d1f0118d1dc26eef34987f384cb6b4d37fdb1871b0ec296d493df9b787da",
+          "mode": "base_only"
+        }
+      }
+    }
+  },
+  "limits": [
+    "No whole-wheat draft was selected, no whole-wheat restart, no whole-wheat mapper or ready publication. No claim of peak whole-workflow RSS or remaining mapper count.",
+    "Fresh independent processes measured retained private bytes on the same partial PAF slabs. No DNA, catalog, evidence registry, neighbors, or path graph measurements in heap controls. Long rows crossing slab boundaries are underrepresented.",
+    "Cache trial used eight archived complete contexts and a separately bound source membership index, not a complete DNA reread. It demonstrates conditional raw reuse and exact reprojection, not the fraction of the 61000 retained or what the new planner still requests."
+  ],
+  "whole_assignment_coupling": {
+    "assignment_sha256": "647334c1360f80f5d5fe49987933cd3ebba66947290f979b37c0102d246f44c8",
+    "assignment_sources": 31186,
+    "distinct_interchromosome_edges": 231,
+    "historical_query_windows_by_assignment_count": {
+      "0": 24926,
+      "1": 26579,
+      "2": 6047,
+      "3": 1861,
+      "4": 1052,
+      "5": 387,
+      "6": 90,
+      "7": 57,
+      "8": 38,
+      "9": 22,
+      "10": 5,
+      "11": 11,
+      "12": 2,
+      "13": 5,
+      "14": 2,
+      "15": 3
+    },
+    "lookup_sha256": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+    "multi_assignment_source_bp": 524223252,
+    "multi_assignment_sources": 10999,
+    "residual_sha256": "03b79fc96cc80ccfa8a6560be2141efd4126afd73d21ad1021c944508a04d171",
+    "scope": "Whole assignment metadata and frozen residual QUERY-axis plan only. Not the 61000 live plan, no selector, target axes or fresh mapper estimate. Assignments are a potential coupling, not actual retained competing placements.",
+    "shared_assignment_chromosome_components": [
+      [
+        "1A",
+        "1B",
+        "1D",
+        "2A",
+        "2B",
+        "2D",
+        "3A",
+        "3B",
+        "3D",
+        "4A",
+        "4B",
+        "4D",
+        "5A",
+        "5B",
+        "5D",
+        "6A",
+        "6B",
+        "6D",
+        "7A",
+        "7B",
+        "7D",
+        "Un"
+      ]
+    ],
+    "source_counts_by_assignment_count": {
+      "1": 20187,
+      "2": 6507,
+      "3": 2125,
+      "4": 1352,
+      "5": 654,
+      "6": 155,
+      "7": 87,
+      "8": 50,
+      "9": 29,
+      "10": 7,
+      "11": 17,
+      "12": 3,
+      "13": 6,
+      "14": 3,
+      "15": 3,
+      "16": 1
+    },
+    "top_edges": [
+      [
+        "1B",
+        "6B",
+        944
+      ],
+      [
+        "2B",
+        "6B",
+        836
+      ],
+      [
+        "2B",
+        "7B",
+        760
+      ],
+      [
+        "2B",
+        "5B",
+        714
+      ],
+      [
+        "5A",
+        "7A",
+        619
+      ],
+      [
+        "5B",
+        "7B",
+        607
+      ],
+      [
+        "6B",
+        "7B",
+        584
+      ],
+      [
+        "2A",
+        "7A",
+        578
+      ],
+      [
+        "2A",
+        "5A",
+        576
+      ],
+      [
+        "5B",
+        "6B",
+        546
+      ]
+    ]
+  }
+}

@@ -56,7 +56,7 @@ class EvidenceInput:
     reference_hits: dict[SourceKey, list[PafAlignment]]
     pair_links: tuple[PairLink, ...]
     original_adjacencies: tuple[OriginalAdjacency, ...]
-    evidence: dict[str, dict]
+    evidence: Mapping[str, dict]
     input_fingerprint: str
     catalog: dict = field(default_factory=dict)
     ready_manifest_identity: str = ""
@@ -139,19 +139,35 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
             or sorted((asdict(e) for e in adjacencies), key=lambda e: e["adjacency_id"])
             != sorted(catalog["original_connections"], key=lambda e: e["adjacency_id"])):
         raise Q0EvidenceError("q0 catalog source geometry differs from original FASTAs")
-    reference_hits, evidence, links = defaultdict(list), {}, []
+    threshold = 'threshold' in manifest['policy'].get('decision_frontier', {})
+    stored, links, reference_hits = {}, [], defaultdict(list)
+    if threshold:
+        from .q0_retained_hits import EvidenceRows, RetainedHit
+        keys = {(s.dataset, s.contig): s for s in sources}
+        ref_names = {name: name for name in lengths}
+        evidence = EvidenceRows(stored)
+    else:
+        evidence = stored
     for dataset, sequences in sorted(by_dataset.items()):
         relative = f"runs/{dataset}_vs_ref/result.paf"
         for hit in read_paf(root / relative, query_lengths={k: len(v) for k, v in sequences.items()},
                             target_lengths=lengths, artifact=relative):
-            reference_hits[SourceKey(dataset, hit.query_name)].append(hit)
-            evidence[hit.evidence_id] = evidence_ref(hit)
+            source = keys[dataset, hit.query_name] if threshold else SourceKey(dataset, hit.query_name)
+            if threshold:
+                hit = RetainedHit.from_validated(hit, source.contig, ref_names[hit.target_name])
+            reference_hits[source].append(hit)
+            stored[hit.evidence_id] = hit if threshold else evidence_ref(hit)
     for descriptor in catalog["base_alignments"]:
         query, target = descriptor["query_dataset"], descriptor["target_dataset"]
         for hit in read_paf(root / descriptor["paf"], query_lengths={k: len(v) for k, v in by_dataset[query].items()},
                             target_lengths={k: len(v) for k, v in by_dataset[target].items()}, artifact=descriptor["paf"]):
-            links.append(PairLink(hit, SourceKey(query, hit.query_name), SourceKey(target, hit.target_name)))
-            evidence[hit.evidence_id] = evidence_ref(hit)
+            if threshold:
+                q, t = keys[query, hit.query_name], keys[target, hit.target_name]
+                hit = RetainedHit.from_validated(hit, q.contig, t.contig)
+            else:
+                q, t = SourceKey(query, hit.query_name), SourceKey(target, hit.target_name)
+            links.append(PairLink(hit, q, t))
+            stored[hit.evidence_id] = hit if threshold else evidence_ref(hit)
     visited = set()
     for task in catalog["supplementary_alignments"]:
         if task["paf"] in visited:
@@ -160,13 +176,15 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
         for hit in read_paf(root / task["paf"], query_lengths={key: parts[key].interval.length for key in task["query_ids"]},
                             target_lengths={key: parts[key].interval.length for key in task["target_ids"]}, artifact=task["paf"]):
             query, target = parts[hit.query_name], parts[hit.target_name]
+            if threshold:
+                hit = RetainedHit.from_validated(hit, query.segment_id, target.segment_id)
             links.append(PairLink(hit, query.source, target.source, query.interval.start, target.interval.start))
-            evidence[hit.evidence_id] = evidence_ref(hit)
+            stored[hit.evidence_id] = hit if threshold else evidence_ref(hit)
     for key, row in catalog["evidence"].items():
         if evidence.get(key) != row:
             raise Q0EvidenceError("q0 catalog evidence record differs from the bound PAF")
     for edge in adjacencies:
-        evidence[edge.adjacency_id] = {"kind": "input_assembly_adjacency", "catalog": manifest["catalog"], **asdict(edge)}
+        stored[edge.adjacency_id] = {"kind": "input_assembly_adjacency", "catalog": manifest["catalog"], **asdict(edge)}
     ready_id = stable_id("q0-ready-evidence", manifest)
     binding = None
     if "threshold" in manifest["policy"].get("decision_frontier", {}):
@@ -710,7 +728,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
             for item in value:
                 evidence_ids(item)
     evidence_ids(decisions)
-    if used_ids - set(data.evidence):
+    if any(key not in data.evidence for key in used_ids):
         raise Q0EvidenceError("q0 construction references missing evidence records")
     decisions["evidence"] = {key: data.evidence[key] for key in sorted(used_ids)}
     return Construction(records, searches, admission, decisions)
