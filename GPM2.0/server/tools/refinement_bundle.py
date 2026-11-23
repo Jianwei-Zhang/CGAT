@@ -313,15 +313,13 @@ def build_full(root, result, report, target):
         all_sources.update({(row["dataset"], row["contig"]): {key: row[key] for key in ("dataset", "contig", "length", "fasta_sha256")}
                             for row in sources})
         write_map(target, [all_sources[key] for key in sorted(all_sources)])
+        verify_projection(server, projected)
+        # Recheck all admitted artifacts (including Final Path) at the same
+        # boundary, after every source read and projection has completed.
         catalog.verify_unchanged()
         for name, expected in provenance["artifacts"].items():
             if digest(final_dir / name) != expected:
                 raise BundleError("admitted result changed during delivery construction")
-        verify_projection(server, projected)
-        # Recheck original completion binding after all reads/copies, not merely
-        # before a potentially long source projection.
-        if digest(final_dir / "final_path.json") != provenance["artifacts"]["final_path.json"]:
-            raise BundleError("admitted Final Path changed during delivery construction")
         manifest = {"schema": SCHEMA, "schema_version": 1, "tool": result["tool"], "run_id": result["run_id"],
                     "package_version": PACKAGE_VERSION, "final_path_version": PATH_VERSION, "package_mode": "full",
                     "server_final_path_sha256": provenance["artifacts"]["final_path.json"],

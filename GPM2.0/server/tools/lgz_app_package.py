@@ -12,8 +12,10 @@ from __future__ import annotations
 
 try:
     from workspace_layout import workspace_join, WorkspaceLayout, logical_relative
+    from run_orchestration import sha256_file
 except ModuleNotFoundError:
     from .workspace_layout import workspace_join, WorkspaceLayout, logical_relative
+    from .run_orchestration import sha256_file
 
 
 import argparse
@@ -45,14 +47,6 @@ REQUIRED_METADATA = (
     "reference_chr_locator.tsv",
     "source_seq_n_regions.tsv",
 )
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def read_fai_lengths(path: Path) -> dict[str, int]:

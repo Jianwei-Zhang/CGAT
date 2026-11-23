@@ -77,6 +77,25 @@ class Q0PublicationTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
 
+    def test_one_prepare_reuses_verified_file_digests_for_recipe_and_final_guard(self):
+        from collections import Counter, OrderedDict
+        from server.tools import run_orchestration as checksums
+
+        fixture, truth = bridge_fixture()
+        root = complete_workspace(fixture, self.directory)
+        args = argparse.Namespace(server_dir=root, reads=[], reads_qc="standard", meryl="meryl", merqury="merqury.sh",
+                                  craq="craq", threads=1, memory_gb=80, kmer_size=21)
+        inputs = [root / "data/reference/ref.fa", root / "data/datasets/a.fa", root / "runs/a_vs_ref/result.paf"]
+        self.assertIs(producer.sha256_file, checksums.sha256_file)
+        with (mock.patch.object(checksums, "_SHA256_CACHE", OrderedDict()),
+              mock.patch.object(checksums, "_sha256_read", wraps=checksums._sha256_read) as content_reads,
+              contextlib.redirect_stdout(io.StringIO())):
+            producer.prepare(args)
+        reads = Counter(call.args[0][0] for call in content_reads.call_args_list)
+        for path in inputs:
+            self.assertEqual(reads[str(path.resolve())], 1, path)
+        self.assertEqual(dict(read_fasta(root / "grt/q/q0.fa")), {"chr1": truth})
+
     def test_main_entry_publishes_cross_dataset_q0_not_first_ds(self):
         fixture, truth = bridge_fixture()
         root = complete_workspace(fixture, self.directory)

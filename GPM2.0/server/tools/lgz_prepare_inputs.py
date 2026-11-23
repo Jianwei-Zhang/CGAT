@@ -47,6 +47,14 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_prepare_inputs.
         available_intervals, stage_selection, freeze_manifest, validate_prepared_q0)
 
 
+# Q0 evidence and this producer consume some of the same files. Share a digest
+# only after a stable byte read; modified files still require a fresh digest.
+try:
+    from run_orchestration import sha256_file
+except ModuleNotFoundError:
+    from .run_orchestration import sha256_file
+
+
 def parse_merqury_qv(path: Path) -> dict[str, float]:
     scores: dict[str, float] = {}
     with path.open(encoding="utf-8") as handle:
@@ -846,15 +854,9 @@ def prepare(args: argparse.Namespace) -> None:
     if (workspace_join(server_dir, "tel", "rules.tsv")).is_file():
         input_files.append(workspace_join(server_dir, "tel", "rules.tsv"))
     input_identity = []
-    input_sha256: dict[Path, str] = {}
     for path in input_files:
-        resolved_path = path.resolve()
         label = path.relative_to(server_dir).as_posix() if path.is_relative_to(server_dir) else str(path)
-        digest = input_sha256.get(resolved_path)
-        if digest is None:
-            digest = sha256_file(path)
-            input_sha256[resolved_path] = digest
-        input_identity.append({"path": label, "sha256": digest})
+        input_identity.append({"path": label, "sha256": sha256_file(path)})
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "builder_version": 5,
