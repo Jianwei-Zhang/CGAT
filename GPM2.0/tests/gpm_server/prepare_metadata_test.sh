@@ -669,17 +669,20 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 import server_run
+from run_all_runner import Runner
 source, ref, ds, temp = sys.argv[1:]
 root = Path(temp) / "entry-workspace"
 argv = ["--ref", "ref", ref, "--ds", "ds", ds, "-o", str(root)]
 def run_checked(runner):
-    assert (root / ".runtime/run_all/lock/owner.json").is_file()
+    owner = json.loads((root / ".runtime/run_all/lock/owner.json").read_text())
+    assert runner.workspace_lock.acquired and runner.workspace_lock.owner == owner
+    assert runner.run_id == owner["run_id"] and runner.contract_channel.parent.is_dir()
     assert json.loads((root / ".runtime/run_all/launch.json").read_text())["prepared"]
     assert (root / ".runtime/logs/prepare.log").stat().st_size > 0
     rejected = subprocess.run(["bash", str(Path(source) / "prepare.sh"), *argv], capture_output=True)
     assert rejected.returncode != 0 and b"workspace is locked" in rejected.stderr
     return 7
-with patch.object(server_run.Runner, "run", run_checked):
+with patch.object(Runner, "run", run_checked):
     assert server_run.execute(argv, Path(source)) == 7
     manifest = (root / ".runtime/run_all/launch.json").read_bytes()
     with patch.object(server_run, "prepare_workspace", side_effect=AssertionError("must resume")):
