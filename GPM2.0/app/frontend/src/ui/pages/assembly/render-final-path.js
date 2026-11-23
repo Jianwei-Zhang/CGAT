@@ -197,11 +197,15 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
     }),
   }));
   const degapRenderDeps = { escapeAttr, escapeHtml, i18n };
-  const graphAddonByChr = {};
+  // Existing DEGAP jobs still belong to their own chromosome. Empty legacy
+  // cards render nothing, so they do not bring back the old default panel.
+  const graphAddonByChr = Object.fromEntries(finalPathEntriesWithLog.map(({ chrName }) => [
+    chrName, renderDegapJobCard({ chrName, degap: assembly.degap }, degapRenderDeps),
+  ]));
   const isAllPhasedFinalPath = finalPathEntriesWithLog.length > 1;
   if (isAllPhasedFinalPath) {
     finalPathEntriesWithLog.forEach((entry) => {
-      graphAddonByChr[entry.chrName] = renderManualRefinementCard(
+      graphAddonByChr[entry.chrName] += renderManualRefinementCard(
         {
           chrName: entry.chrName,
           finalPathEntry: entry.finalPathEntry,

@@ -666,6 +666,8 @@ fn load_auto_effects(path: &Path, project: Option<i64>) -> Result<Vec<AutoRefine
         let (json,manifest)=row?;
         let mut effect:AutoRefinementEffect=serde_json::from_str(&json)?;
         if let (Some(project),Some(key))=(project,manifest.as_ref()) {
+            let mut chrs = conn.prepare("SELECT DISTINCT chr FROM project_auto_gap_review WHERE project_id=?1 AND tool=?2 AND light_manifest=?3 ORDER BY chr")?;
+            effect.chromosomes = chrs.query_map(params![project,effect.tool,key], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
             effect.project_adopted_gaps=Some(conn.query_row("SELECT COUNT(*) FROM project_auto_gap_adoption WHERE project_id=?1 AND tool=?2 AND light_manifest=?3",params![project,effect.tool,key],|r|r.get::<_,i64>(0))? as usize);
         }
         effect.version_id=manifest.clone();

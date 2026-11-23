@@ -944,7 +944,10 @@ fn project_full_and_light_import_both_automatic_versions_without_a_picker() -> R
         let count=||conn.query_row("SELECT COUNT(*) FROM project_auto_version_object",[],|r|r.get::<_,i64>(0));
         let before=count()?;
         let again=import_auto_patch_if_recognized(&root,p,&dir.path().join("tgsgapcloser.zip"))?.unwrap();
-        assert_eq!(again["duplicate"],true);
+        assert_eq!(again["duplicate"], mode == "full", "first patch hydrates missing Light objects");
+        assert_eq!(again["applied"], 0);
+        let repeat=import_auto_patch_if_recognized(&root,p,&dir.path().join("tgsgapcloser.zip"))?.unwrap();
+        assert_eq!(repeat["duplicate"], true);
         if mode == "full" { assert_eq!(count()?,before); } else { assert!(count()?>before,"Light did not omit accepted FASTAs"); }
         // Templates are immutable: a second project inherits the archive, not edits made to its sibling.
         let second=initialize_grt_project(db,"new sibling")?.project_id;
@@ -957,5 +960,83 @@ fn project_full_and_light_import_both_automatic_versions_without_a_picker() -> R
     let err=crate::importer::import_from_extracted_bundle(&bad).unwrap_err();
     assert!(format!("{err:#}").contains("index checksum"),"{err:#}");
     assert!(!bad.join("project.sqlite").exists());
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires Python, samtools, minimap2 and ZIP for Server publications"]
+fn auto_gap_import_prefers_complete_closure_then_tool_priority() -> Result<()> {
+    for (both_closed, expected) in [(true, "degap"), (false, "tgsgapcloser")] {
+        let dir = tempdir()?;
+        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_auto_patch_fixture.py");
+        let mut generator = std::process::Command::new("python3");
+        generator.arg(script).arg(dir.path()).arg("--close-tgs");
+        if both_closed { generator.arg("--close-degap"); }
+        let output = generator.output()?;
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        let root = dir.path().join("baseline");
+        let (out, _) = crate::importer::import_from_extracted_bundle(&root)?;
+        let db = &out.project_db_path;
+        let p = initialize_grt_project(db, "closure priority")?.project_id;
+        let patch = dir.path().join("tgsgapcloser.zip");
+        let result = import_auto_patch_if_recognized(&root, p, &patch)?.unwrap();
+        assert_eq!(result["applied"], 1, "{result}");
+        let view = load_grt_project_view_for_project(db, p)?;
+        assert_eq!(view.auto_refinement_effects.len(), 2);
+        for tool in view.auto_refinement_effects {
+            assert_eq!(tool.project_adopted_gaps, Some(usize::from(tool.tool == expected)));
+            assert_eq!(tool.closed, usize::from(both_closed || tool.tool == "tgsgapcloser"));
+            assert_eq!(tool.chromosomes.len(), tool.closed);
+        }
+        assert_eq!(import_auto_patch_if_recognized(&root, p, &patch)?.unwrap()["duplicate"], true);
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires Python, samtools, minimap2 and ZIP for a manual project round trip"]
+fn project_manual_snapshot_and_parameters_roundtrip_without_replacing_archives() -> Result<()> {
+    let dir = tempdir()?;
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/tests/project_manual_roundtrip_fixture.py");
+    let server = |tasks: Option<&Path>| -> Result<()> {
+        let mut cmd = std::process::Command::new("python3");
+        cmd.arg(&script).arg(dir.path());
+        if let Some(tasks) = tasks { cmd.arg(tasks); }
+        let run = cmd.output()?;
+        assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+        Ok(())
+    };
+    server(None)?;
+    let job = dir.path().join("job");
+    let root = dir.path().join("app");
+    let (out, _) = crate::importer::import_from_zip(&job.join("07_delivery/job.full.zip"), &root)?;
+    let db = &out.project_db_path;
+    let p = initialize_grt_project(db, "manual round trip")?.project_id;
+    let paths = load_grt_final_path_by_chr_for_project(db, p)?;
+    let (chr, entry) = paths.iter().find(|(_,e)| e["segments"].as_array().is_some_and(|v|v.iter().any(|s|s["kind"]=="gap"))).unwrap();
+    let gap = entry["segments"].as_array().unwrap().iter().find(|s|s["kind"]=="gap").unwrap();
+    // A separate user-created chromosome is not a selected task, but is part of the exported assembly.
+    let other = "controlled-other";
+    let conn = crate::db::open_workspace_db(db)?;
+    conn.execute("INSERT INTO project_assembly_view_state(project_id, final_path_by_chr_json, updated_at) VALUES(?1,?2,'fixture') ON CONFLICT(project_id) DO UPDATE SET final_path_by_chr_json=excluded.final_path_by_chr_json",
+                 params![p,serde_json::to_string(&BTreeMap::from([(other,entry)]))?])?;
+    let request = serde_json::from_value(serde_json::json!({"loci":[{"chr":chr,"kind":"gap","segment_id":gap["segment_id"],"tools":["lrgapcloser","degap"]}],"tool_parameters":{"lrgapcloser":{"iterations":5}}}))?;
+    let tasks = dir.path().join("tasks.zip");
+    let exported = crate::degap_jobs::export_manual_refinement(&root, p, &tasks, &request)?;
+    server(Some(&tasks))?;
+    let tag = &exported.batch_sha256[..16];
+    let patch = job.join(format!("07_delivery/manual/job.manual-{tag}.patch.zip"));
+    let imported = crate::degap_jobs::import_manual_refinement_results(&root,p,&patch)?;
+    assert_eq!(imported.applied, 1);
+    assert!(crate::degap_jobs::import_manual_refinement_results(&root,p,&patch)?.duplicate);
+    let genome = read_fasta(&job.join(format!("05_final/job.manual-{tag}.fa")), "Server manual genome", false)?;
+    let initial = read_fasta(&job.join("05_final/job.lgz.fa"), "unchanged LGZ", false)?;
+    assert_eq!(genome[other], initial[chr]);
+    let expected = initial[chr].replacen(&"N".repeat(gap["length"].as_u64().unwrap() as usize), "GATTACA", 1);
+    assert_eq!(genome[chr], expected);
+    let saved: String = conn.query_row("SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=?1", [p], |r|r.get(0))?;
+    let saved: Value = serde_json::from_str(&saved)?;
+    let selected = saved[chr]["segments"].as_array().unwrap().iter().find(|r|r["sourceKind"]=="refinement_patch").unwrap();
+    assert_eq!(selected["refinementPatchSha256"], sha256_bytes(b"GATTACA"));
     Ok(())
 }

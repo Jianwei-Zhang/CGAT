@@ -56,8 +56,8 @@ def _populate_initial(root, layout):
 
 
 def create(root, *, with_source_evidence=False, with_source_annotations=False, native_diagnostics=None, job_outputs=False,
-           tool="degap", reuse_workspace=False):
-    layout = WorkspaceLayout.detect(root) if reuse_workspace else initialize_workspace(root, job_outputs=job_outputs)
+           tool="degap", reuse_workspace=False, sequence="GTNNAC", project_delivery=False):
+    layout = WorkspaceLayout.detect(root) if reuse_workspace else initialize_workspace(root, job_outputs=job_outputs, project_delivery=project_delivery)
     if not reuse_workspace:
         _populate_initial(root, layout)
     code = TOOL_DIRECTORIES[tool]
@@ -70,18 +70,18 @@ def create(root, *, with_source_evidence=False, with_source_annotations=False, n
     catalog.load_workspace()
     gaps, _ = inspect_baseline(baseline, catalog)
     gap = gaps[0]
-    native = root / f"04_refinement/{code}/03_native" / run_id
+    native = layout.path(f"04_refinement/{code}/03_native") / run_id
     native.mkdir(parents=True)
     candidate = native / "controlled_candidate.fa"
-    candidate.write_text(">candidate\nGTNNAC\n")
+    candidate.write_text(f">candidate\n{sequence}\n")
     catalog.register("controlled_native", "candidate", candidate, origin="controlled-admission-fixture")
     edit = Edit("fixture-edit", tool, gap.chromosome, gap.start, gap.end,
-                {"dataset": "controlled_native", "contig": "candidate", "start": 1, "end": 6, "orientation": "+"},
+                {"dataset": "controlled_native", "contig": "candidate", "start": 1, "end": len(sequence), "orientation": "+"},
                 (gap.gap_id,), "controlled-not-native-engine", {"fixture": "controlled admission; native engine not executed"})
-    accepted = root / f"04_refinement/{code}/04_accepted" / run_id
+    accepted = layout.path(f"04_refinement/{code}/04_accepted") / run_id
     accepted.mkdir(parents=True)
     edits = materialize_patches([edit], catalog, accepted, tool=tool)
-    jobs = root / f"04_refinement/{code}/02_jobs" / run_id
+    jobs = layout.path(f"04_refinement/{code}/02_jobs") / run_id
     jobs.mkdir(parents=True)
     log = jobs / "native.log"
     log.write_text("Controlled admission fixture; no native engine was executed.\n")

@@ -525,7 +525,7 @@ fn validated_effect(proof: &Value, path: &Value) -> Result<Option<AutoRefinement
         return fail("refinement outcome totals disagree with the original gaps or accepted edits");
     }
     Ok(Some(AutoRefinementEffect {
-        version_id: None, project_adopted_gaps: None,
+        version_id: None, project_adopted_gaps: None, chromosomes: Vec::new(),
         tool: string(proof, "tool")?.into(), run_id: string(proof, "run_id")?.into(),
         original_gaps: original.len(), accepted_edits: edits,
         closed: n[0], partial: n[1], unfilled: n[2], rejected: n[3],

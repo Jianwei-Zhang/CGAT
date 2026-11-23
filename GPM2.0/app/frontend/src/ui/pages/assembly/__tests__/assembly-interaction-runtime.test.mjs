@@ -2700,6 +2700,7 @@ test("assembly page public binder wires host-level listeners once for the same h
     "pointerout",
     "assembly-main-title-layout", // re-anchor scope popovers after the responsive title changes
     "scroll",
+    "pointerover", // scoped assembly menu hover
     "pointerdown",
     "pointerdown",
     "pointerdown",
@@ -2711,6 +2712,7 @@ test("assembly page public binder wires host-level listeners once for the same h
     "click",
     "click", // refinement task card actions
     "change", // refinement tool and input controls
+    "keydown", // manual refinement keyboard actions
     "pointerover",
     "pointerout",
     "focusin",

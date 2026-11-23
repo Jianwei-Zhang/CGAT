@@ -153,6 +153,9 @@ pub struct AutoRefinementEffect {
     /// Historical project adoptions, not a count of currently visible patch segments.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_adopted_gaps: Option<usize>,
+    /// Chromosomes with a measured closure for this exact tool projection, not shared project tracks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chromosomes: Vec<String>,
     pub tool: String,
     pub run_id: String,
     pub original_gaps: usize,
