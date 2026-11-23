@@ -20,6 +20,7 @@ def contract():
             'maximum_repairs': MAX_REPAIRS, 'readless_only': True,
             'rule_sha256': sha256_file(here.with_name('q0_threshold_questions.py')),
             'retained_hit_sha256': sha256_file(here.with_name('q0_retained_hits.py')),
+            'native_candidate_sha256': sha256_file(here.with_name('q0_threshold_candidates.py')),
             'acceptance_sha256': sha256_file(here), 'preparer_sha256': sha256_file(here.with_name('q0_threshold_prepare.py'))}
 
 
@@ -98,7 +99,8 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
     if mode=='full':
         if axes or frontier is not None: raise Q0EvidenceError('full threshold fallback contains omissions or a scoped request')
         return {'full_discovery': True}
-    if mode not in ('base_only','decision_frontier') or frontier is None or (mode=='base_only' and (frontier or axes)):
+    if (mode not in ('base_only','supported_after_discovery','decision_frontier') or frontier is None
+            or (mode in ('base_only','supported_after_discovery') and (frontier or axes))):
         raise Q0EvidenceError('invalid threshold search mode')
     assignments=({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in binding.assignments)
     need,counts=questions(data,selection,assignments)
@@ -134,5 +136,11 @@ def validate_catalog(root, manifest, catalog):
     if mode=='base_only':
         if q!={} or scope['unsearched_part_intervals'] or catalog['supplementary_alignments'] or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery')):
             raise Q0EvidenceError('base-only threshold evidence claims supplemental discovery')
+    elif mode=='supported_after_discovery':
+        tasks = catalog['supplementary_alignments']
+        if (q!={} or scope['unsearched_part_intervals'] or not tasks or any(t['kind']!='unplaced_discovery' for t in tasks)
+                or [r['task_id'] for r in catalog['discovery_rounds']] != [t['task_id'] for t in tasks]
+                or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery'))):
+            raise Q0EvidenceError('threshold discovery stop lacks its completed native rounds')
     elif (mode=='full' and q is not None) or (mode=='decision_frontier' and not q):
         raise Q0EvidenceError('threshold scope differs from requested work')

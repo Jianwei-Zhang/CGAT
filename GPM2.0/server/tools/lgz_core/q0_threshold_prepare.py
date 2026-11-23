@@ -86,6 +86,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
     """Release the already verified source DNA into the first mapper pass, not a second copy."""
     first = None
     matrices = None
+    native_decisions = None
 
     def _read_initial(self):
         # An existing ready generation may be reusable: don't retain millions of hits for a cache check.
@@ -104,7 +105,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         return first
 
 
-def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None):
+def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, retain_native=None):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_q0_paths
     from .q0_threshold_questions import questions
@@ -142,7 +143,11 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
     del links, edges  # the immutable selection input now owns these references
     selected = select_q0_paths(data)
     need, _ = questions(data, selected, assignments)
-    return need, any(r.path is not None for r in selected.paths.values())
+    have_path = any(r.path is not None for r in selected.paths.values())
+    if retain_native is not None and need and have_path:
+        from .q0_threshold_candidates import DecisionState
+        retain_native.native_decisions = DecisionState(data, need, assignments)
+    return need, have_path
 
 
 def initial_generation(root, snapshot, mapper):
@@ -158,7 +163,9 @@ def initial_generation(root, snapshot, mapper):
         if old.get('input_fingerprint') == request:
             old = prep.load_verified_evidence(root); snapshot.verify()
             return request, old, True, None
-    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices)
+    native = not prep.regional_enabled(lengths, options.get("minimap_preset", "asm10"))
+    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices,
+                                        retain_native=snapshot if native else None)
     snapshot.matrices = None
     snapshot.verify()
     if need != {}:

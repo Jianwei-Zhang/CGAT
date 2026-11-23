@@ -186,7 +186,7 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
     report = catalog.get("supplement_scope")
     if scoped:
         if (not isinstance(report, dict) or report.get("requested") != scope
-                or report.get("effective") not in (("full", "decision_frontier", "base_only") if scope == threshold_scope else ("full", "decision_frontier"))
+                or report.get("effective") not in (("full", "decision_frontier", "base_only", "supported_after_discovery") if scope == threshold_scope else ("full", "decision_frontier"))
                 or not isinstance(report.get("unsearched_part_intervals"), list)):
             raise Q0EvidenceError("q0 supplemental catalog lacks its bound scope")
         skipped = 0
@@ -198,6 +198,9 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
                     or type(r.get("frontier_omitted_windows")) is not int or r["frontier_omitted_windows"] < 0):
                 raise Q0EvidenceError("q0 regional omission report disagrees with its bound scope")
             skipped += r["frontier_omitted_windows"]
+        if "native_candidate_stops" in report:
+            from .q0_threshold_candidates import verify_stops
+            skipped += verify_stops(catalog, report)
         if (bool(skipped) != bool(report["unsearched_part_intervals"])
                 or (report["effective"] == "full" and skipped)):
             raise Q0EvidenceError("q0 scope and its omitted intervals disagree")
@@ -782,6 +785,11 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
         if supplement_scope != "full":
             catalog.payload["supplement_scope"] = scope_report
         tasks = []
+        state = (getattr(repair_inputs, "native_decisions", None)
+                 if supplement_scope == "positive_threshold" and cache is None and frontier_override and not fallback_reason else None)
+        if state is not None:
+            repair_inputs.native_decisions = None  # A repair always starts from an independently verified inventory.
+        reached = False
         # Each productive round adds at least one segment to the anchor set. The
         # monotone loop terminates after at most the number of source segments.
         remaining = catalog.unplaced()
@@ -803,10 +811,19 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                                 target_lengths={key:catalog.parts[key].interval.length for key in task['target_ids']},artifact=task['paf'])
                 consume_unplaced(task,hits)
             catalog.payload["discovery_rounds"].append({"task_id": task["task_id"], "added_segment_ids": sorted(added)})
+            if state is not None:
+                state.observe(root, [task])
+                if state.need == {}:
+                    # Enough positive evidence for every outstanding decision. Later discovery
+                    # rounds have not been enumerated; do not invent a count or an empty PAF.
+                    reached = True
+                    scope_report.pop("reason", None)
+                    scope_report.update(effective="supported_after_discovery", threshold_request=[])
+                    break
             if not added:
                 break
             remaining, anchors = catalog.unplaced(), sorted(added)
-        request = partial_source_request(catalog, minimum_uncovered_bp=POLICY["partial_source_discovery_min_uncovered_bp"])
+        request = None if reached else partial_source_request(catalog, minimum_uncovered_bp=POLICY["partial_source_discovery_min_uncovered_bp"])
         partial_tasks = []; partial_consumed = False
         if request:
             preset = options.get("minimap_preset", "asm10")
@@ -861,11 +878,25 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                     {key for task in partial_tasks for key in task["query_ids"]},
                     {key for task in partial_tasks for key in task["target_ids"]},
                     include_placed=True, known_pairs=known_pairs)
-        candidate_requests = supplemental_groups(catalog, assignments, known_pairs)
+        candidate_requests = [] if reached else supplemental_groups(catalog, assignments, known_pairs)
         pending_candidates = []
         if cache is None:
-            tasks.extend(_native_candidates(root, catalog, candidate_requests, tool, options.get("minimap_preset", "asm10"),
-                                            threads, skip_self=options.get("skip_self") == "true"))
+            def map_candidates(requests):
+                return _native_candidates(root, catalog, requests, tool, options.get("minimap_preset", "asm10"),
+                                          threads, skip_self=options.get("skip_self") == "true")
+            if state is not None:
+                from .q0_threshold_candidates import dispatch, omission_axes
+                kept, stopped = dispatch(root, catalog, candidate_requests, tasks, state, map_candidates)
+                del state
+                tasks.extend(kept)
+                if stopped:
+                    scope_report.pop("reason", None)
+                    scope_report.update(effective="decision_frontier", threshold_request=record(frontier_override),
+                                        native_candidate_stops=stopped,
+                                        unsearched_part_intervals=omission_axes(stopped, {k: p.interval.length for k, p in catalog.parts.items()}))
+                    print(f"LGZ q0 threshold: native candidates retained={len(kept)} skipped={len(stopped)}", flush=True)
+            else:
+                tasks.extend(map_candidates(candidate_requests))
         else:
             # The regional planner owns its own worker budget and fallback order.
             for request in candidate_requests:
@@ -903,7 +934,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             raise Q0EvidenceError("q0 evidence builder changed during preparation; no manifest published")
         if supplement_policy(supplement_scope) != run_policy:
             raise Q0EvidenceError("q0 supplement scope changed during preparation; no manifest published")
-        if unsearched is not None:
+        if unsearched is not None and "native_candidate_stops" not in scope_report:
             scope_report["unsearched_part_intervals"] = unsearched.record()
         payload = catalog.finish()
         payload["base_alignments"] = base_alignments
