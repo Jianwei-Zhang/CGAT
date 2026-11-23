@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from server.tools import refinement_path as paths
-from server.tools.refinement_native_trace import retained, inserted, normalized_edits, verify_trace, trace_slice, TraceError
+from server.tools.refinement_native_trace import closed_lr_edits, retained, inserted, normalized_edits, verify_trace, trace_slice, TraceError
 from server.tools import refinement_native_formats as native_formats
 from server.tools.refinement_native_formats import ReadLookup, parse_lr_rows, apply_lr_round, parse_quartet
 from server.tools.refinement_reads import prepare_fasta
@@ -55,6 +55,35 @@ class NativeTraceTests(unittest.TestCase):
         else:
             self.assertFalse(rejected)
         return edits, final
+
+    def test_lr_whole_gap_decision_for_split_edits_and_joint_candidates(self):
+        # A and B close separately; C is covered by two edits, one containing N;
+        # D loses only part of its N run. A fifth gap has no proposal at all.
+        catalog, payload, gaps, _, _ = self.setup_case("ANNAANNAANNAANNAANNAA", "ACGTN")
+        def edit(key, left, right, a, b, *owners):
+            src = None if not a else source("native", "chr1", a, b)
+            return paths.Edit(key, "lrgapcloser", "chr1", left, right, src,
+                              tuple(gaps[i].gap_id for i in owners), "native/test", {"method": "trace"})
+        edits = [edit("a1", 1, 2, 1, 1, 0), edit("a2", 2, 3, 2, 2, 0),
+                 edit("b", 5, 7, 0, 0, 1), edit("c1", 9, 10, 2, 2, 2),
+                 edit("c2", 10, 11, 4, 5, 2), edit("d", 13, 14, 1, 1, 3)]
+        applied, withheld = closed_lr_edits(edits, gaps, catalog)
+        self.assertEqual([e.edit_id for e in applied], ["a1", "a2", "b"])
+        self.assertEqual([g["residual_n_bp"] for g in withheld], [1, 1])
+        final = paths.build_final_path(payload, catalog, applied, tool="lrgapcloser",
+                                      recipe_sha256="a" * 64, baseline_artifact_sha256="b" * 64)
+        self.assertEqual(b"".join(v for seg in final["chromosomes"][0]["segments"]
+                                 for v in paths.segment_blocks(seg, catalog)), b"AACAAAANNAANNAANNAA")
+        # A joint edit covers one gap and part of another; neither it nor a
+        # second edit connected through that gap may leak into the delivered path.
+        kept, held = closed_lr_edits([edit("joint", 1, 6, 1, 1, 0, 1), edit("c", 9, 11, 1, 1, 2)], gaps, catalog)
+        self.assertEqual([e.edit_id for e in kept], ["c"])
+        self.assertEqual(set(held[0]["gap_ids"]), {g.gap_id for g in gaps[:2]})
+        kept, held = closed_lr_edits([edit("joint", 1, 6, 1, 1, 0, 1), edit("end", 6, 7, 5, 5, 1)], gaps, catalog)
+        self.assertEqual(kept, [])
+        self.assertEqual(len(held[0]["edits"]), 2)
+        with self.assertRaisesRegex(TraceError, "original gaps"):
+            closed_lr_edits([edit("undeclared", 1, 6, 1, 1, 0)], gaps, catalog)
 
     def test_joint_native_edit_retains_a_unique_unchanged_internal_island(self):
         data = self.setup_case("AANNCCNNGG", "AATCCAGG")
@@ -114,6 +143,19 @@ class NativeTraceTests(unittest.TestCase):
         self.assertEqual(proof["anchor"]["baseline_interval"], [11, 42])
         self.assertEqual(final["chromosomes"][0]["segments"][-1]["source"], source("old", "original", 12, len(old)))
         self.assertEqual(paths.remaining_gaps(final, data[0]), [])
+
+    def test_missing_and_repeated_native_boundaries_are_reported_without_relaxing_anchor(self):
+        from server.tools.refinement_native_trace import gap_only_projection, FlankAnchorError
+        anchor = self.flank_anchor
+        old = "CC" + anchor + "NNNN" + "TG"
+        gs = 2 + len(anchor)
+        for middle, expected in (("C" * len(anchor), "native_anchor_absent"),
+                                 (anchor + anchor, "native_anchor_not_unique")):
+            new = "CC" + middle + "AGTTG"
+            _, _, gaps, original, native = self.setup_case(old, new)
+            with self.assertRaises(FlankAnchorError) as error:
+                gap_only_projection(original, native, "chr1", (gs-1, gs+4, 2, len(new)-2), gaps)
+            self.assertEqual(error.exception.diagnostic, {"side": "left", "anchor_bp": 31, "detail": expected})
 
     def test_verified_adjacent_anchors_on_both_sides_keep_existing_flanks(self):
         left = "GATTACAGGTTCAATGCTTATCCGTGACTGG"

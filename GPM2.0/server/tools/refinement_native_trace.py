@@ -8,6 +8,8 @@ still reconstructed by refinement_path, never copied from the native chromosome.
 from __future__ import annotations
 
 import copy
+from bisect import bisect_right
+from collections import defaultdict
 from dataclasses import replace
 from pathlib import Path
 import re
@@ -25,6 +27,12 @@ FLANK_RETAINED = "native_flank_change_not_independently_supported"
 
 class TraceError(PathError):
     pass
+
+
+class FlankAnchorError(TraceError):
+    def __init__(self, side, detail):
+        super().__init__(UNSEPARABLE_FLANK)
+        self.diagnostic = {"side": side, "anchor_bp": FLANK_ANCHOR_BP, "detail": detail}
 
 
 def retained(start, end, evidence=None):
@@ -233,7 +241,7 @@ def gap_only_projection(baseline, native, chromosome, interval, affected):
             raise TraceError(UNSEPARABLE_FLANK)
         place = unique_occurrence(native, chromosome, *new_bounds, pattern)
         if type(place) is not int:
-            raise TraceError(UNSEPARABLE_FLANK)
+            raise FlankAnchorError(side, "native_anchor_absent" if place is None else "native_anchor_not_unique")
         boundary = place + width if side == "left" else place
         if not begin <= boundary <= end:
             raise TraceError(UNSEPARABLE_FLANK)
@@ -316,7 +324,9 @@ def normalized_edits(tool, traces, baseline, native, gaps, *, native_dataset, na
                     except TraceError as error:
                         rejected.append({"gap_ids": list(gap_ids), "native_job": job, "chromosome": chromosome,
                                          "baseline_interval": [left, right], "native_interval": [begin, end],
-                                         "reason": str(error)})
+                                         "reason": str(error),
+                                         **({"boundary": error.diagnostic, "detail": error.diagnostic["detail"]}
+                                            if isinstance(error, FlankAnchorError) else {})})
                         continue
                     if right - left == end - begin and equal_regions(baseline, chromosome, left, native, begin, end - begin):
                         rejected.append({"gap_ids": list(gap_ids), "native_job": job, "chromosome": chromosome,
@@ -352,3 +362,63 @@ def normalized_edits(tool, traces, baseline, native, gaps, *, native_dataset, na
         else:
             merged.append(edit)
     return merged, rejected
+
+
+def closed_lr_edits(edits, gaps, catalog):
+    """Decide on original N runs, not individual reads, native rounds or replacement lengths.
+
+    Edits are already trace-validated, projected onto the LGZ baseline and normalized.
+    Connected edits/gaps are indivisible unless normalization has already proved a split.
+    """
+    by_chr, by_gap, links = defaultdict(list), {}, defaultdict(list)
+    for gap in gaps:
+        by_chr[gap.chromosome].append(gap)
+        by_gap[gap.gap_id] = gap
+    for rows in by_chr.values():
+        rows.sort(key=lambda g: g.start)
+    ends = {chrom: [g.end for g in rows] for chrom, rows in by_chr.items()}
+    covered, previous_end = defaultdict(int), {}
+    for i, edit in sorted(enumerate(edits), key=lambda pair: (pair[1].chromosome, pair[1].start)):
+        chrom = edit.chromosome
+        if edit.tool != "lrgapcloser" or edit.start < previous_end.get(chrom, 0) or edit.end <= edit.start:
+            raise TraceError("invalid or overlapping normalized LR edits")
+        previous_end[chrom] = edit.end
+        rows = by_chr[chrom]
+        pos = bisect_right(ends.get(chrom, []), edit.start)
+        affected = []
+        while pos < len(rows) and rows[pos].start < edit.end:
+            gap = rows[pos]
+            affected.append(gap.gap_id)
+            covered[gap.gap_id] += min(gap.end, edit.end) - max(gap.start, edit.start)
+            links[gap.gap_id].append(i)
+            pos += 1
+        if not affected or sorted(affected) != sorted(edit.gap_ids):
+            raise TraceError("LR candidate does not identify its original gaps")
+
+    kept, withheld, seen = set(), [], set()
+    for gid in links:
+        if gid in seen:
+            continue
+        queue, component, indices = [gid], set(), set()
+        while queue:
+            key = queue.pop()
+            if key in component:
+                continue
+            component.add(key)
+            for i in links[key]:
+                if i not in indices:
+                    indices.add(i)
+                    queue.extend(edits[i].gap_ids)
+        seen.update(component)
+        untouched_n = sum(by_gap[key].end - by_gap[key].start - covered[key] for key in component)
+        replacement_n = sum(block.count(b"N") for i in indices if edits[i].replacement is not None
+                            for block in source_blocks(edits[i].replacement, catalog))
+        if untouched_n == 0 and replacement_n == 0:
+            kept.update(indices)
+        else:
+            withheld.append({"reason": "incomplete_gap_kept_original", "gap_ids": sorted(component),
+                             "residual_n_bp": untouched_n + replacement_n,
+                             "edits": [{"edit_id": edits[i].edit_id, "native_job": edits[i].native_job,
+                                        "baseline_interval": [edits[i].start, edits[i].end],
+                                        "replacement": edits[i].replacement} for i in sorted(indices)]})
+    return [edit for i, edit in enumerate(edits) if i in kept], withheld

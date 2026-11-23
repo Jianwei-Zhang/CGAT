@@ -12,10 +12,10 @@ import json
 from pathlib import Path
 
 try:
-    from refinement_path import build_final_path, inspect_baseline, remaining_gaps, write_assembly, PathError
+    from refinement_path import build_final_path, inspect_baseline, lift_interval, write_assembly, PathError
     from post_lgz_degap import digest, stat_key, IndexedFasta
 except ModuleNotFoundError:
-    from .refinement_path import build_final_path, inspect_baseline, remaining_gaps, write_assembly, PathError
+    from .refinement_path import build_final_path, inspect_baseline, lift_interval, write_assembly, PathError
     from .post_lgz_degap import digest, stat_key, IndexedFasta
 
 
@@ -79,30 +79,45 @@ def prepare_publication(staging: Path, baseline: dict, baseline_fasta: Path, cat
     staging.mkdir(parents=True, exist_ok=False)
     final = build_final_path(baseline, catalog, edits, tool=execution["tool"],
                              recipe_sha256=execution["recipe_sha256"], baseline_artifact_sha256=execution["baseline_sha256"])
+    withheld = {gid: group for group in execution.get("withheld_candidates", []) for gid in group["gap_ids"]}
     if execution.get("require_native_equality"):
         expected = execution.get("native_assembly", {})
         actual = {row["chr"]: (row["length"], row["sha256"]) for row in final["chromosomes"]}
         retained_flanks = {edit.chromosome for edit in edits if edit.evidence.get("flank_decisions")}
+        withheld_chromosomes = {gap["chromosome"] for gap in final["original_gaps"] if gap["gap_id"] in withheld}
+        projected = retained_flanks | withheld_chromosomes
         if (set(actual) != set(expected)
                 or any(actual[name] != (row["length"], row["sha256"])
-                       for name, row in expected.items() if name not in retained_flanks)):
+                       for name, row in expected.items() if name not in projected)):
             raise PathError("normalized Final Path does not reproduce the fully admitted native result")
-    write_assembly(final, catalog, staging / "assembly.fa")
+    remaining = []
+    write_assembly(final, catalog, staging / "assembly.fa", remaining=remaining)
     write_json(staging / "final_path.json", final)
     write_table(staging / "sources.tsv", ["dataset", "contig", "length", "fasta_path", "path_scope", "origin", "fasta_sha256"],
                 catalog.manifest_rows(final))
-    remaining = remaining_gaps(final, catalog)
     write_table(staging / "remaining_gaps.tsv", ["chromosome", "start", "end", "original_gap_ids", "attribution"],
                 [{**row, "original_gap_ids": json.dumps(row["original_gap_ids"], separators=(",", ":"))} for row in remaining])
     original_gaps = final["original_gaps"]
     touched = {gap_id for edit in edits for gap_id in edit.gap_ids}
     residual = {gap_id for row in remaining for gap_id in row["original_gap_ids"]}
     rejected_ids = {gap_id for row in rejected for gap_id in row.get("gap_ids", [])}
+    if execution["tool"] == "lrgapcloser" and (touched & residual or touched & withheld.keys()):
+        raise PathError("incomplete LR gap cannot enter the published Final Path")
+    chromosomes = {row["chr"]: row for row in final["chromosomes"]}
     outcomes = []
     for gap in original_gaps:
         gid = gap["gap_id"]
         status = ("partial" if gid in residual else "closed") if gid in touched else ("rejected" if gid in rejected_ids else "unfilled")
-        outcomes.append({**gap, "status": status,
+        retention = {}
+        if gid in withheld:
+            if gid not in residual or lift_interval(chromosomes[gap["chromosome"]], gap["start"], gap["end"]) is None:
+                raise PathError("withheld LR gap was not retained intact")
+            status = "unfilled"
+            retention = {"reason": "incomplete_gap_kept_original",
+                         "note": "Candidate did not close all its gaps; LGZ retained / 候选未完整闭合所涉缺口，保留 LGZ 原序列",
+                         "candidate_residual_n_bp": withheld[gid]["residual_n_bp"],
+                         "candidate_gap_ids": withheld[gid]["gap_ids"]}
+        outcomes.append({**gap, "status": status, **retention,
                          "edit_ids": [edit.edit_id for edit in edits if gid in edit.gap_ids],
                          "residual_attribution": "joint" if any(gid in row["original_gap_ids"] and row["attribution"] == "joint"
                                                                  for row in remaining) else "single"})

@@ -75,6 +75,22 @@ class RefineTests(unittest.TestCase):
             (status, _, patch_bytes), _ = tel_patch(attempt, {"kind": kind}, self.home, self.home)
             self.assertEqual((status, patch_bytes[-1]), ("extended", payload.encode()))
 
+    @unittest.skipUnless(shutil.which("samtools"), "private indexing requires samtools")
+    def test_manual_lr_partial_is_recorded_without_a_return_patch(self):
+        from refine_run import gap_patch
+        (self.home / "local.fa").write_text(">locus\nCNNT\n")
+        terminal = self.home / "result.fa"
+        terminal.write_text(">locus\nCGNT\n")
+        locus = {"gap_bp": 2, "witnesses": {k: {"start": 1, "end": 1} for k in ("seqleft", "seqright")}}
+        for strict in (True, False):
+            attempt = self.home / str(strict)
+            attempt.mkdir()
+            result = gap_patch(attempt, locus, self.home, terminal, closed_only=strict)
+            if strict:
+                self.assertEqual(result, ("rejected", "incomplete_gap_kept_original", None))
+            else:
+                self.assertEqual((result[0], result[2][-1]), ("partial", b"GN"))
+
     def write(self, relative, content):
         path = self.layout.path(relative)
         path.parent.mkdir(parents=True, exist_ok=True)

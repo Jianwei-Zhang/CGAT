@@ -108,6 +108,22 @@ class RefinementPathTests(unittest.TestCase):
         self.assertNotIn("status", result)
         self.assertEqual([s["segment_id"] for s in result["chromosomes"][0]["segments"]], ["left", "gap", "minus"])
 
+    def test_writer_reports_same_n_runs_across_blocks_and_segments_without_reread(self):
+        cat = MemoryCatalog({("old", "s"): "ACNN", ("old", "t"): "NNGTNN"})
+        base = baseline(cat, [segment("first", source("old", "s", 1, 4)), segment("literal", length=2),
+                              segment("second", source("old", "t", 1, 6))])
+        final = build(base, cat, [])
+        with tempfile.TemporaryDirectory() as d, patch.object(rp, "BLOCK", 2), patch.object(cat, "fetch", wraps=cat.fetch) as fetch:
+            rp.write_assembly(final, cat, Path(d) / "without.fa")
+            calls = fetch.call_count
+            fetch.reset_mock()
+            residual = []
+            rp.write_assembly(final, cat, Path(d) / "with.fa", remaining=residual)
+            self.assertEqual(fetch.call_count, calls)
+            self.assertEqual((Path(d) / "with.fa").read_bytes(), (Path(d) / "without.fa").read_bytes())
+            self.assertEqual([(r["start"], r["end"]) for r in residual], [(2, 8), (10, 12)])
+            self.assertEqual(residual, rp.remaining_gaps(final, cat))
+
     def test_conflicting_or_non_gap_edits_are_not_silently_chosen(self):
         with self.assertRaisesRegex(rp.PathError, "overlapping"):
             build(self.base, self.catalog, [self.edit(), self.edit(start=5, end=7, edit_id="job-2")])

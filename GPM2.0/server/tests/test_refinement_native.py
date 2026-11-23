@@ -101,6 +101,38 @@ class NativeStageTests(unittest.TestCase):
                 self.assertEqual(original, (genome.read_bytes(), path.read_bytes()))
                 self.assertFalse((root / "05_final").exists())
 
+    def test_lr_validated_partial_native_result_leaves_original_source_and_no_patch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            groups, genome, original = workspace(root)
+            def partial(command, **kwargs):
+                result = self.fake("lrgapcloser", command, **kwargs)
+                if Path(command[0]).name != "samtools":
+                    out = Path(command[max(i for i, v in enumerate(command) if v == "-o") + 1]) / "iteration-1"
+                    (out / "gapclosed.fasta").write_text(">chr1\nAAAAGT" + "N" * 98 + "CCCC\n")
+                    (out / "tmp/info_filter2").write_text("chr1(:5-104\tLR1(:5-6(:+\tchr1(:5-6\n")
+                    for n in (2, 3):
+                        later = out.parent / f"iteration-{n}"
+                        (later / "tmp").mkdir(parents=True)
+                        shutil.copyfile(out / "gapclosed.fasta", later / "gapclosed.fasta")
+                        (later / "tmp/info_filter2").write_text("")
+                return result
+            with mock.patch.object(native.subprocess, "run", side_effect=partial):
+                result = native.stage_refinement(root, "lrgapcloser", groups, 2)
+            stage = Path(result["staging"])
+            p = result["provenance"]
+            self.assertEqual(p["accepted_edit_count"], 0)
+            self.assertEqual(p["gap_outcomes"][0]["reason"], "incomplete_gap_kept_original")
+            self.assertEqual(p["gap_outcomes"][0]["candidate_residual_n_bp"], 98)
+            self.assertEqual(p["rejected_candidates"], [])
+            self.assertEqual(p["counts"], {"closed": 0, "partial": 0, "rejected": 0, "unfilled": 1})
+            final = json.loads((stage / "final_path.json").read_text())
+            self.assertEqual(final["edits"], [])
+            self.assertEqual(final["chromosomes"][0]["segments"][0]["segment_id"], "old")
+            self.assertEqual(b"".join((stage / "assembly.fa").read_bytes().splitlines()[1:]),
+                             b"".join(genome.read_bytes().splitlines()[1:]))
+            self.assertFalse(list((root / "04_refinement").rglob("patches.fa")))
+
     def test_lr_unsafe_chromosome_names_are_aliased_not_rejected_or_lost(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"

@@ -307,10 +307,12 @@ def build_final_path(baseline: dict, catalog: Catalog, edits: list[Edit], *, too
     return final
 
 
-def write_assembly(final_path: dict, catalog: Catalog, destination: Path) -> None:
+def write_assembly(final_path: dict, catalog: Catalog, destination: Path, *, remaining=None) -> None:
     """Write only reconstructed path sequence; caller atomically publishes staging."""
     if final_path.get("schema") != SCHEMA or final_path.get("schema_version") != VERSION:
         raise PathError("unsupported refined Final Path")
+    # If requested, collect residual N intervals from the same verified output blocks.
+    edit_gaps = {e["edit_id"]: e["gap_ids"] for e in final_path["edits"]} if remaining is not None else {}
     # Exclusive creation ensures this function cannot overwrite a previous result.
     with destination.open("xb") as stream:
         for chromosome in final_path["chromosomes"]:
@@ -318,11 +320,14 @@ def write_assembly(final_path: dict, catalog: Catalog, destination: Path) -> Non
             if not name or re.search(r"\s|[\x00-\x1f\x7f]", name):
                 raise PathError("invalid chromosome name")
             stream.write(b">" + name.encode("utf-8") + b"\n")
+            intervals = []
             length, sha256, pending = 0, hashlib.sha256(), b""
             for segment in chromosome["segments"]:
                 if segment.get("output_start") != length:
                     raise PathError("Final Path output coordinates are not contiguous")
                 for block in segment_blocks(segment, catalog):
+                    if remaining is not None:
+                        _collect_n_runs(intervals, block, length)
                     data = pending + block
                     stop = len(data) // 60 * 60
                     if stop:
@@ -336,6 +341,8 @@ def write_assembly(final_path: dict, catalog: Catalog, destination: Path) -> Non
                 stream.write(pending + b"\n")
             if length != chromosome["length"] or sha256.hexdigest() != chromosome["sha256"]:
                 raise PathError("Final Path changed during reconstruction")
+            if remaining is not None:
+                remaining.extend(_attribute_n_runs(chromosome, intervals, final_path["original_gaps"], edit_gaps))
 
 
 def lift_interval(chromosome: dict, start: int, end: int) -> tuple[int, int] | None:
@@ -354,46 +361,42 @@ def lift_interval(chromosome: dict, start: int, end: int) -> tuple[int, int] | N
     return None
 
 
-def remaining_gaps(final_path: dict, catalog: Catalog) -> list[dict]:
-    """Scan actual final sequence, retaining the original gap denominator/identity.
+def _collect_n_runs(intervals, block, offset):
+    for match in re.finditer(br"N+", block):
+        start, end = offset + match.start(), offset + match.end()
+        if intervals and intervals[-1][1] == start:
+            intervals[-1] = (intervals[-1][0], end)
+        else:
+            intervals.append((start, end))
 
-    A joint edit may not identify which original gap contains residual Ns. Keep
-    all associated IDs in that case rather than invent a one-to-one attribution.
-    """
+
+def _attribute_n_runs(chromosome, intervals, originals, edit_gaps):
+    for start, end in intervals:
+        original_ids = set()
+        for lift in chromosome["coordinate_lift"]:
+            if not (start < lift["output_end"] and lift["output_start"] < end):
+                continue
+            if lift["kind"] == "replacement":
+                original_ids.update(edit_gaps[lift["edit_id"]])
+            else:
+                delta = lift["output_start"] - lift["baseline_start"]
+                a, b = max(start, lift["output_start"]) - delta, min(end, lift["output_end"]) - delta
+                original_ids.update(gap["gap_id"] for gap in originals if gap["chromosome"] == chromosome["chr"]
+                                    and a < gap["end"] and gap["start"] < b)
+        yield {"chromosome": chromosome["chr"], "start": start, "end": end,
+               "original_gap_ids": sorted(original_ids),
+               "attribution": "joint" if len(original_ids) > 1 else "single" if original_ids else "new"}
+
+
+def remaining_gaps(final_path: dict, catalog: Catalog) -> list[dict]:
+    """Standalone scan for consumers without a writer. Joint residuals retain all IDs."""
     results = []
-    originals = final_path["original_gaps"]
+    edit_gaps = {e["edit_id"]: e["gap_ids"] for e in final_path["edits"]}
     for chromosome in final_path["chromosomes"]:
-        cursor, pending, intervals = 0, None, []
+        cursor, intervals = 0, []
         for segment in chromosome["segments"]:
             for block in segment_blocks(segment, catalog):
-                for match in re.finditer(br"N+", block):
-                    start, end = cursor + match.start(), cursor + match.end()
-                    if pending and pending[1] == start:
-                        pending = (pending[0], end)
-                    else:
-                        if pending:
-                            intervals.append(pending)
-                        pending = (start, end)
+                _collect_n_runs(intervals, block, cursor)
                 cursor += len(block)
-                if pending and pending[1] < cursor:
-                    intervals.append(pending)
-                    pending = None
-        if pending:
-            intervals.append(pending)
-        for start, end in intervals:
-            original_ids = set()
-            for lift in chromosome["coordinate_lift"]:
-                if not (start < lift["output_end"] and lift["output_start"] < end):
-                    continue
-                if lift["kind"] == "replacement":
-                    edit = next(e for e in final_path["edits"] if e["edit_id"] == lift["edit_id"])
-                    original_ids.update(edit["gap_ids"])
-                else:
-                    delta = lift["output_start"] - lift["baseline_start"]
-                    a, b = max(start, lift["output_start"]) - delta, min(end, lift["output_end"]) - delta
-                    original_ids.update(gap["gap_id"] for gap in originals if gap["chromosome"] == chromosome["chr"]
-                                        and a < gap["end"] and gap["start"] < b)
-            results.append({"chromosome": chromosome["chr"], "start": start, "end": end,
-                            "original_gap_ids": sorted(original_ids),
-                            "attribution": "joint" if len(original_ids) > 1 else "single" if original_ids else "new"})
+        results.extend(_attribute_n_runs(chromosome, intervals, final_path["original_gaps"], edit_gaps))
     return results
