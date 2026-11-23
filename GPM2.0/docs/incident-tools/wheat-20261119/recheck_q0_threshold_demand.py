@@ -17,7 +17,7 @@ def demand_key(frontier):
         [asdict(s), [asdict(i) for i in v]] for s, v in sorted(frontier.items())])
 
 
-def check(panel, panel_hash, scratch, mapper, mapper_hash, threads, old, old_hash):
+def check(panel, panel_hash, scratch, mapper, mapper_hash, threads, old, old_hash, *, only_zero=False):
     if (digest(mapper) != mapper_hash or digest(panel/'panel.json') != panel_hash or scratch.exists()
             or not scratch.is_relative_to('/tmp') or scratch.is_relative_to(panel)):
         raise ValueError('invalid isolated recheck')
@@ -38,8 +38,10 @@ def check(panel, panel_hash, scratch, mapper, mapper_hash, threads, old, old_has
          'question_counts':stats, 'demand':expected, 'previous_demand':prev['draft']['request_digest']}
     if expected == r['previous_demand']:
         return {**r, 'outcome':'identical_request_previous_cold_measurement_applies', 'new_mapper_calls':0}
+    if only_zero and frontier != {}:
+        return {**r, 'outcome':'changed_nonempty_request_not_executed', 'new_mapper_calls':0}
     scratch.mkdir(mode=0o700)
-    built, record = arm(panel, meta, data, assignments, desc, scratch/'draft', mapper, threads, True)
+    built, record = arm(panel, meta, data, assignments, desc, scratch/'draft', mapper, threads, True, forbid_mapping=only_zero)
     if record['request_digest'] != expected or digest(mapper) != mapper_hash:
         raise ValueError('blind demand or tool changed before dispatch')
     fields = None
@@ -49,6 +51,7 @@ def check(panel, panel_hash, scratch, mapper, mapper_hash, threads, old, old_has
             raise ValueError('incompatible full comparator fields')
         fields = {k: field_digest(v) == prev['fields'][k]['full_sha256'] for k, v in seen.items()}
     return {**r, 'outcome':'cold_draft_measured', 'draft':record, 'full':prev['full'], 'draft_sequences':len(built.records) if built else 0,
+            'matches_full_construction_count':(len(built.records) if built else 0) == prev['full']['sequences'],
             'matches_full_fields':fields, 'new_mapper_calls':sum(record['fresh_mapper_processes'].values())}
 
 
@@ -58,10 +61,11 @@ if __name__ == '__main__':
         p.add_argument(name, type=Path)
     for name in ('panel-sha', 'mapper-sha', 'previous-sha'):
         p.add_argument('--'+name, required=True)
+    p.add_argument('--only-zero', action='store_true', help='do not launch any mapper; report nonempty changes only')
     p.add_argument('--threads', type=int, choices=(2,4,6), required=True); a=p.parse_args(); out=a.out.resolve()
     if out.exists() or out.is_relative_to(a.panel.resolve()) or out.is_relative_to(a.scratch.resolve()):
         raise ValueError('output not isolated')
     r=check(a.panel.resolve(strict=True), a.panel_sha, a.scratch.resolve(), a.mapper.resolve(strict=True), a.mapper_sha,
-            a.threads, a.previous.resolve(strict=True), a.previous_sha)
+            a.threads, a.previous.resolve(strict=True), a.previous_sha, only_zero=a.only_zero)
     with out.open('x') as f:
         json.dump(r,f,sort_keys=True,indent=2); f.write('\n')

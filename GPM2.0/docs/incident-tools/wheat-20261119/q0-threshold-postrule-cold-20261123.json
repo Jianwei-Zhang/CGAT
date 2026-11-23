@@ -1,0 +1,132 @@
+{
+  "freeze_code_sha256": "cc60f75a78e516b5ba310782449366abb926670c07381c0d2694bd404b27d413",
+  "jobs": {
+    "cold": "43023055",
+    "freeze": "43023053"
+  },
+  "panel_inventory_sha256": "040ff1714ff59079411063b782c31d70fae409625b57c8595ae7ee8a6f753d54",
+  "panels": {
+    "6A-16Mb": {
+      "builder": "q0-evidence-builder-abc502576205ebfd964f60a0",
+      "changed_fields": null,
+      "common_input_seconds": 0.03231415897607803,
+      "compared_full_field_sha256": null,
+      "contigs": 8,
+      "draft": {
+        "fresh_mapper_processes": {},
+        "initial_questions": {
+          "no_reference_seed_no_backbone": 1
+        },
+        "native_tasks": 0,
+        "publication": "draft_only",
+        "regional_tasks": 0,
+        "request_digest": "q0-threshold-request-4f53cda18c2baa0c0354bb5f",
+        "requested_sources": 0,
+        "route": "no_reference_seed_no_backbone",
+        "sequences": 0,
+        "unsearched_guard": "not_checked_no_regional_inventory",
+        "wall_seconds": 0.44539302587509155
+      },
+      "full": {
+        "fresh_mapper_processes": {
+          "coarse": 2,
+          "regional_exact": 5
+        },
+        "initial_questions": {},
+        "native_tasks": 0,
+        "publication": "private_only",
+        "regional_tasks": 5,
+        "request_digest": null,
+        "requested_sources": null,
+        "route": "full",
+        "sequences": 0,
+        "unsearched_guard": "full",
+        "wall_seconds": 2.401751384139061
+      },
+      "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+      "order": [
+        "draft",
+        "full"
+      ],
+      "panel": "6A-16Mb",
+      "panel_sha256": "70da0dd53c00188d456229447dee5479b04c2f3adaf354fb4f102aa73b5c63ac",
+      "raw_sha256": "c1323ddb1992f1a0e093d63e24f48664daaf5fd55f77f42a2b923b83a84804aa",
+      "schema": "q0_cold_draft_threshold_holdout_v1",
+      "selector": "q0-selector-cd987d8a4dd9c400f74ba56a",
+      "source_bases": 447336,
+      "threads": 4
+    },
+    "7A-734Mb": {
+      "builder": "q0-evidence-builder-abc502576205ebfd964f60a0",
+      "changed_fields": [],
+      "common_input_seconds": 0.07320227473974228,
+      "compared_full_field_sha256": {
+        "alternative_paths": "2b2478f2c5596567e87d3cf37df067bbcca765f13abd1996976b16d61d5428e1",
+        "available_donor_intervals": "b17730eba1136c61ce966d944af56224b31bce6b9e225236bbcfec4781824aa5",
+        "known_ambiguous_intervals": "321e2f57b26371711dea320585b811f922be6b853619b6a2c35bc2f2ff3c41e3",
+        "known_placement_geometry": "7a7cd0212e33ea2478aff25c99344024ab73a0f40cfefc48b22a625ef4a62624",
+        "occupied": "36f07c23bf343f5709c40451093493b957a88d39dc85ffe2c58451b7585e85e3",
+        "ordered_path": "a255ce97149eb1b733db4105ec6ceffb7cb6f954647b85fe0377802aae03ac05",
+        "reference_gaps": "6427deee2be57040baf6f219ebfa5e4cc3b6c4c17626e2082cc481bd0f576a06",
+        "sequence": "b3e82786fcf5398f29e7dcc1b723a6a028657d2e46baead96e80de3e1d9981db",
+        "unplaced_parts": "1af8c64a7c9eb701dc22292f67126bd3462739cfb177d1be66a779f966367495"
+      },
+      "contigs": 9,
+      "draft": {
+        "fresh_mapper_processes": {
+          "coarse": 4,
+          "native": 1,
+          "regional_exact": 4
+        },
+        "initial_questions": {
+          "positive_placement_stop": 3,
+          "unbuilt_without_reference_seed": 0,
+          "unproven_join": 2
+        },
+        "native_tasks": 1,
+        "publication": "private_only",
+        "regional_tasks": 4,
+        "request_digest": "q0-threshold-request-89e5cc5a2dd614d9da7cadd2",
+        "requested_sources": 3,
+        "route": "decision_frontier",
+        "sequences": 1,
+        "unsearched_guard": "reject_unsearched_context",
+        "wall_seconds": 10.912332110106945
+      },
+      "full": {
+        "fresh_mapper_processes": {
+          "coarse": 10,
+          "native": 1,
+          "regional_exact": 10
+        },
+        "initial_questions": {},
+        "native_tasks": 1,
+        "publication": "private_only",
+        "regional_tasks": 10,
+        "request_digest": null,
+        "requested_sources": null,
+        "route": "full",
+        "sequences": 1,
+        "unsearched_guard": "full",
+        "wall_seconds": 13.73523174226284
+      },
+      "mapper_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+      "order": [
+        "draft",
+        "full"
+      ],
+      "panel": "7A-734Mb",
+      "panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+      "raw_sha256": "9b85309575b0a697da077ad3994487f32f761a4ed99d1bd66b2708eb61fb77b5",
+      "schema": "q0_cold_draft_threshold_holdout_v1",
+      "selector": "q0-selector-cd987d8a4dd9c400f74ba56a",
+      "source_bases": 1883025,
+      "threads": 4
+    }
+  },
+  "remote_directory": "q0-multisource-threshold-20261123",
+  "rule_sha256": "a09092a93ee1c038147a92622234cef463295d7ae4f19bb8559c01999338cac5",
+  "run_code_sha256": "33bb26ca1ecc871fb79c5f163eb1257acca12ecbae31c9bfda20cc67fc28e3d7",
+  "schema": "q0_postrule_prospective_holdouts_v1",
+  "scope": "Two preregistered disjoint JM19 panels after sealing the rule. Same node, 4 CPUs, one cold draft/full comparison per panel, target first. The 7A output is a draft: the current final omission guard rejected it. Empty 6A is a negative, not an accepted reconstruction."
+}

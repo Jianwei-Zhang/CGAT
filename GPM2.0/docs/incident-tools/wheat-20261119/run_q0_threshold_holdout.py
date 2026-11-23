@@ -28,7 +28,7 @@ def construct(data):
         return None
 
 
-def arm(panel, meta, data, assignments, desc, root, tool, threads, blind):
+def arm(panel, meta, data, assignments, desc, root, tool, threads, blind, *, forbid_mapping=False):
     start = monotonic(); before = None; stats = {}; frontier = None
     counts = Counter(); native = Counter(); lock = Lock()
     orig_execute, orig_run = mapping._execute, prep.subprocess.run
@@ -61,8 +61,10 @@ def arm(panel, meta, data, assignments, desc, root, tool, threads, blind):
                 'request_digest':None if frontier is None else stable_id('q0-threshold-request', [
                     [asdict(s), [asdict(i) for i in iv]] for s, iv in sorted(frontier.items())])}
     if blind and frontier == {}:
-        return before, {**report(), 'route':'base_stop_no_planner', 'regional_tasks':0, 'native_tasks':0,
+        return before, {**report(), 'route':'base_stop_no_planner' if before is not None else 'no_reference_seed_no_backbone', 'regional_tasks':0, 'native_tasks':0,
                         'publication':'draft_only', 'unsearched_guard':'not_checked_no_regional_inventory'}
+    if forbid_mapping:
+        raise ValueError('zero-mapper budget cannot dispatch an unresolved request')
     for rel, sha in meta['artifacts'].items():
         dst = root/rel; dst.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(within(panel, rel), dst)
         if digest(dst) != sha:

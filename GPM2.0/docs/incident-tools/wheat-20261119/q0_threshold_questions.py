@@ -4,6 +4,9 @@ Experimental draft routing; cannot authorize a placement/cut, convert an unknown
 exact join, or certify search completeness. Input must be the ordinary selector's draft.
 """
 from collections import Counter, defaultdict
+from dataclasses import replace
+
+from lgz_core.q0_admission import admit_placements
 
 from lgz_core.q0_paths import PathPolicy, pair_blocks, reference_consistent
 from lgz_core.q0_sources import Interval, Q0EvidenceError, merged_intervals, subtract_intervals
@@ -46,7 +49,13 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
         raise ValueError('question shoulders shorter than the required paired support')
     stats = Counter(); needed = defaultdict(list)
     if draft is None or not any(r.path for r in draft.paths.values()):
-        return None, {'no_path_full_fallback': 1}
+        # Fixed reference hits + fixed sources, with the ordinary admission defaults. Pairwise
+        # expansion and input adjacency inherit an existing chromosome; they cannot name one.
+        # Lack of a selected path alone is NOT evidence that a chromosome has no reference root.
+        direct = admit_placements(replace(data, pair_links=(), original_adjacencies=()))
+        if not direct.placements:
+            return {}, {'no_reference_seed_no_backbone': 1}
+        return None, {'rooted_no_path_full_fallback': 1}
     placed = {p.placement_id: p for p in draft.admission.placements}
     required = defaultdict(set)
     sources = {(s.dataset, s.contig): s for s in data.sources}
@@ -56,7 +65,14 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
             raise Q0EvidenceError('assignment source not in blind draft input')
         if c in data.reference_lengths:
             required[c].add(s)
-    missing = {s for c, keys in required.items() if c not in draft.paths or draft.paths[c].path is None for s in keys}
+    roots = {p.chromosome for p in placed.values() if p.localization_kind == 'reference'}
+    # A tail split retains its original reference seed; the new tail inherits another
+    # existing seed. Seeing any placements off this lineage would invalidate the bound.
+    if not {p.chromosome for p in placed.values()} <= roots:
+        raise Q0EvidenceError('admitted chromosome has no reference lineage')
+    absent = {c for c in required if c not in draft.paths or draft.paths[c].path is None}
+    stats['unbuilt_without_reference_seed'] = len(absent - roots)
+    missing = {s for c in absent & roots for s in required[c]}
     strong_on_missing = defaultdict(list)
     # Index just the pairs under question (not the full duplicated evidence inventory).
     pairs = {tuple(sorted((l.source, r.source))) for row in draft.paths.values() if row.path

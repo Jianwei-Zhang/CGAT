@@ -1,0 +1,348 @@
+{
+  "code_manifests": {
+    "check_reference_lineage": "f05c857a6db3dac5db3bdc73e70d990b0880ab7e416fadfb560af24682950515",
+    "exclude_supported_subinterval": "5897e39f71c8d8ba1b932ccfa6be7aa6ea9ae68da27de08e68ca16924ca3196f",
+    "first_blind_cold": "5ef2a91b87b5ad5764656f71f11d48ce89930d1c4e45bc2e8eb72cc92f6cb40d",
+    "freeze": "4142a6357dbb50f204763aa7c43056159e44da858ca2095e3ee7eef1145cdc5f"
+  },
+  "freeze_report_sha256": "74a9002ea542d188702251bf57543115790822774f918003da0b34980d67f21b",
+  "panels": {
+    "1B-689Mb": {
+      "contigs": 32,
+      "first_draft": {
+        "fresh_mapper_processes": {
+          "coarse": 54,
+          "regional_exact": 59
+        },
+        "initial_questions": {
+          "missing_chromosome_parts": 32,
+          "positive_placement_stop": 1
+        },
+        "native_tasks": 0,
+        "publication": "private_only",
+        "regional_tasks": 59,
+        "request_digest": "q0-threshold-request-354d08c141954749d90d84ef",
+        "requested_sources": 32,
+        "route": "decision_frontier",
+        "sequences": 1,
+        "unsearched_guard": "passed",
+        "wall_seconds": 126.0956097394228
+      },
+      "first_equal_fields": [
+        "alternative_paths",
+        "available_donor_intervals",
+        "known_ambiguous_intervals",
+        "known_placement_geometry",
+        "occupied",
+        "ordered_path",
+        "reference_gaps",
+        "sequence",
+        "unplaced_parts"
+      ],
+      "first_raw_sha256": "affe56b7c6eae0f19f091d1a89dc3166d343e2ca2e645a5451d78491012836f6",
+      "full": {
+        "fresh_mapper_processes": {
+          "coarse": 54,
+          "regional_exact": 59
+        },
+        "initial_questions": {},
+        "native_tasks": 0,
+        "publication": "private_only",
+        "regional_tasks": 59,
+        "request_digest": null,
+        "requested_sources": null,
+        "route": "full",
+        "sequences": 1,
+        "unsearched_guard": "full",
+        "wall_seconds": 123.4509561136365
+      },
+      "panel_sha256": "575910058629be6adc374af44da06d6b8be8f77b9789d3be485decc5e86a3f25",
+      "secondary-demand": {
+        "draft": {
+          "fresh_mapper_processes": {
+            "coarse": 54,
+            "regional_exact": 59
+          },
+          "initial_questions": {
+            "missing_chromosome_parts": 32,
+            "positive_placement_stop": 1,
+            "secondary_assignment_supported_bp_not_requested": 2743
+          },
+          "native_tasks": 0,
+          "publication": "private_only",
+          "regional_tasks": 59,
+          "request_digest": "q0-threshold-request-8d3878347e6162f3b023f8d0",
+          "requested_sources": 32,
+          "route": "decision_frontier",
+          "unsearched_guard": "passed",
+          "wall_seconds": 122.3156258314848
+        },
+        "draft_sequences": 1,
+        "matches_full_fields": {
+          "alternative_paths": true,
+          "available_donor_intervals": true,
+          "known_ambiguous_intervals": true,
+          "known_placement_geometry": true,
+          "occupied": true,
+          "ordered_path": true,
+          "reference_gaps": true,
+          "sequence": true,
+          "unplaced_parts": true
+        },
+        "outcome": "cold_draft_measured",
+        "question_counts": {
+          "missing_chromosome_parts": 32,
+          "positive_placement_stop": 1,
+          "secondary_assignment_supported_bp_not_requested": 2743
+        },
+        "raw_sha256": "054fa5319838b784f2720043311347bbb182c9172577bfb049a22822fda014e8"
+      },
+      "seed-reach": {
+        "draft": {
+          "fresh_mapper_processes": {},
+          "initial_questions": {
+            "positive_placement_stop": 1,
+            "unbuilt_without_reference_seed": 2
+          },
+          "native_tasks": 0,
+          "publication": "draft_only",
+          "regional_tasks": 0,
+          "request_digest": "q0-threshold-request-4f53cda18c2baa0c0354bb5f",
+          "requested_sources": 0,
+          "route": "base_stop_no_planner",
+          "unsearched_guard": "not_checked_no_regional_inventory",
+          "wall_seconds": 3.015066049993038
+        },
+        "draft_sequences": 1,
+        "matches_full_construction_count": true,
+        "matches_full_fields": {
+          "alternative_paths": true,
+          "available_donor_intervals": true,
+          "known_ambiguous_intervals": true,
+          "known_placement_geometry": true,
+          "occupied": true,
+          "ordered_path": true,
+          "reference_gaps": true,
+          "sequence": true,
+          "unplaced_parts": true
+        },
+        "outcome": "cold_draft_measured",
+        "question_counts": {
+          "positive_placement_stop": 1,
+          "unbuilt_without_reference_seed": 2
+        },
+        "raw_sha256": "21f91cbe04e75d296da86c4fce4ce53ad9d1a1da04d9234219242c8cb94f7173"
+      },
+      "source_bp": 3999737
+    },
+    "2B-8Mb": {
+      "contigs": 8,
+      "first_draft": {
+        "fresh_mapper_processes": {
+          "coarse": 11,
+          "regional_exact": 14
+        },
+        "initial_questions": {
+          "no_path_full_fallback": 1
+        },
+        "native_tasks": 0,
+        "publication": "private_only",
+        "regional_tasks": 14,
+        "request_digest": null,
+        "requested_sources": null,
+        "route": "full",
+        "sequences": 0,
+        "unsearched_guard": "full",
+        "wall_seconds": 34.76574456691742
+      },
+      "first_equal_fields": [],
+      "first_raw_sha256": "ac64c111699eb9d9fa2adb63b1e1329f9334c18523fad517d4de9d082c8474d7",
+      "full": {
+        "fresh_mapper_processes": {
+          "coarse": 11,
+          "regional_exact": 14
+        },
+        "initial_questions": {},
+        "native_tasks": 0,
+        "publication": "private_only",
+        "regional_tasks": 14,
+        "request_digest": null,
+        "requested_sources": null,
+        "route": "full",
+        "sequences": 0,
+        "unsearched_guard": "full",
+        "wall_seconds": 34.75987323373556
+      },
+      "panel_sha256": "1ac3886d794afe3f1050bbdc817f94e97fe9d19749ba4502221acdcc2aba6dfc",
+      "secondary-demand": {
+        "outcome": "identical_request_previous_cold_measurement_applies",
+        "question_counts": {
+          "no_path_full_fallback": 1
+        },
+        "raw_sha256": "8c9528f2edf5b4bab68a8478de687771d28bd861e8da121cc8791a1382bd3117"
+      },
+      "seed-reach": {
+        "draft": {
+          "fresh_mapper_processes": {},
+          "initial_questions": {
+            "no_reference_seed_no_backbone": 1
+          },
+          "native_tasks": 0,
+          "publication": "draft_only",
+          "regional_tasks": 0,
+          "request_digest": "q0-threshold-request-4f53cda18c2baa0c0354bb5f",
+          "requested_sources": 0,
+          "route": "no_reference_seed_no_backbone",
+          "unsearched_guard": "not_checked_no_regional_inventory",
+          "wall_seconds": 2.5720081999897957
+        },
+        "draft_sequences": 0,
+        "matches_full_construction_count": true,
+        "matches_full_fields": null,
+        "outcome": "cold_draft_measured",
+        "question_counts": {
+          "no_reference_seed_no_backbone": 1
+        },
+        "raw_sha256": "55abef6a746fed889e2b6582b8d444738560f9bd9aad735e7c8ee260a86b2584"
+      },
+      "source_bp": 2680214
+    },
+    "3B-792Mb": {
+      "contigs": 16,
+      "first_draft": {
+        "fresh_mapper_processes": {
+          "coarse": 26,
+          "regional_exact": 36
+        },
+        "initial_questions": {
+          "missing_chromosome_parts": 16,
+          "positive_placement_stop": 1
+        },
+        "native_tasks": 0,
+        "publication": "private_only",
+        "regional_tasks": 36,
+        "request_digest": "q0-threshold-request-014f69a14437e306d05bf9c7",
+        "requested_sources": 16,
+        "route": "decision_frontier",
+        "sequences": 1,
+        "unsearched_guard": "passed",
+        "wall_seconds": 59.44574473053217
+      },
+      "first_equal_fields": [
+        "alternative_paths",
+        "available_donor_intervals",
+        "known_ambiguous_intervals",
+        "known_placement_geometry",
+        "occupied",
+        "ordered_path",
+        "reference_gaps",
+        "sequence",
+        "unplaced_parts"
+      ],
+      "first_raw_sha256": "894204c5b8f7db406a80572f7cf3c925903c922060ee5dea128e6703eefcfed0",
+      "full": {
+        "fresh_mapper_processes": {
+          "coarse": 26,
+          "regional_exact": 36
+        },
+        "initial_questions": {},
+        "native_tasks": 0,
+        "publication": "private_only",
+        "regional_tasks": 36,
+        "request_digest": null,
+        "requested_sources": null,
+        "route": "full",
+        "sequences": 1,
+        "unsearched_guard": "full",
+        "wall_seconds": 59.006411373615265
+      },
+      "panel_sha256": "3dd7aa2d643a04019ea75d092cdc88567c36d8a4a7c3914dfcc1a7a654139d39",
+      "secondary-demand": {
+        "draft": {
+          "fresh_mapper_processes": {
+            "coarse": 26,
+            "regional_exact": 36
+          },
+          "initial_questions": {
+            "missing_chromosome_parts": 16,
+            "positive_placement_stop": 1,
+            "secondary_assignment_supported_bp_not_requested": 79980
+          },
+          "native_tasks": 0,
+          "publication": "private_only",
+          "regional_tasks": 36,
+          "request_digest": "q0-threshold-request-77ee4bd170422325162543ed",
+          "requested_sources": 16,
+          "route": "decision_frontier",
+          "unsearched_guard": "passed",
+          "wall_seconds": 60.810433745384216
+        },
+        "draft_sequences": 1,
+        "matches_full_fields": {
+          "alternative_paths": true,
+          "available_donor_intervals": true,
+          "known_ambiguous_intervals": true,
+          "known_placement_geometry": true,
+          "occupied": true,
+          "ordered_path": true,
+          "reference_gaps": true,
+          "sequence": true,
+          "unplaced_parts": true
+        },
+        "outcome": "cold_draft_measured",
+        "question_counts": {
+          "missing_chromosome_parts": 16,
+          "positive_placement_stop": 1,
+          "secondary_assignment_supported_bp_not_requested": 79980
+        },
+        "raw_sha256": "55e55e581f2bcd15e01d9841eb48159675dfab7d2004f5c9ec5405b64555b5c0"
+      },
+      "seed-reach": {
+        "draft": {
+          "fresh_mapper_processes": {},
+          "initial_questions": {
+            "positive_placement_stop": 1,
+            "unbuilt_without_reference_seed": 1
+          },
+          "native_tasks": 0,
+          "publication": "draft_only",
+          "regional_tasks": 0,
+          "request_digest": "q0-threshold-request-4f53cda18c2baa0c0354bb5f",
+          "requested_sources": 0,
+          "route": "base_stop_no_planner",
+          "unsearched_guard": "not_checked_no_regional_inventory",
+          "wall_seconds": 1.8496522530913353
+        },
+        "draft_sequences": 1,
+        "matches_full_construction_count": true,
+        "matches_full_fields": {
+          "alternative_paths": true,
+          "available_donor_intervals": true,
+          "known_ambiguous_intervals": true,
+          "known_placement_geometry": true,
+          "occupied": true,
+          "ordered_path": true,
+          "reference_gaps": true,
+          "sequence": true,
+          "unplaced_parts": true
+        },
+        "outcome": "cold_draft_measured",
+        "question_counts": {
+          "positive_placement_stop": 1,
+          "unbuilt_without_reference_seed": 1
+        },
+        "raw_sha256": "6e07fdb621e127aed662b26cfcb6276e7231de35b0f9b31b61752766ead78518"
+      },
+      "source_bp": 2302632
+    }
+  },
+  "remote_directory": "q0-heldout-draft-threshold-20261123",
+  "schema": "q0_threshold_heldout_three_v1",
+  "scope": "Three disjoint subsets of JM19; first cold trial was blind on these subsets. Seed reachability refinement was checked on the same subsets; its independent post-rule validation is separate. Zero output is not a correct positive assembly.",
+  "successful_jobs": {
+    "check_reference_lineage": "43023050",
+    "exclude_supported_subinterval": "43023046",
+    "first_blind_cold": "43023038",
+    "freeze": "43023026"
+  }
+}
