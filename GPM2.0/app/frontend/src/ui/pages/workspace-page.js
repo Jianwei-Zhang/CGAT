@@ -1,4 +1,4 @@
-import { renderProjectPathOverview, bindProjectPathOverview } from "./project-export-page.js";
+import { renderProjectPathOverview, bindProjectPathOverview, renderProjectGlobalExportControl } from "./project-export-page.js";
 import {
   autoAssignChr,
   autoOrientContigs,
@@ -148,7 +148,10 @@ export function renderWorkspacePage(state) {
         ${selectedProject ? renderProjectHeaderMetadata(initializer, state) : ""}
         </div>
       </div>
-      <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
+      <div class="project-header-actions">
+        ${selectedProject ? renderProjectGlobalExportControl(state) : ""}
+        <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
+      </div>
       <div class="project-location-row">
         <p class="project-path project-detail-path">${escapeHtml(state.session.workspacePath)}</p>
         ${selectedProject ? `<p class="project-detail-created">${labels.created}${state.locale === "en" ? ": " : "："}${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}

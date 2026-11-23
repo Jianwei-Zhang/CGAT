@@ -1348,7 +1348,7 @@ function getFinalPathPreviewEntries(state) {
 
 
 export function renderProjectPathOverview(state) {
-  return renderProjectExportPage(state);
+  return renderProjectExportPage(state, { includeExportMenu: false });
 }
 
 function projectSurfaceRoot(host) {
@@ -1656,20 +1656,29 @@ function renderProjectOverviewSummary(state) {
   `;
 }
 
-function renderProjectOverviewActions(state) {
+export function renderProjectGlobalExportControl(state) {
+  if (!getCurrentProject(state)) {
+    return "";
+  }
   const labels = getLabels(state), fresh = isProjectOverviewDataFresh(state);
-  return `<div class="project-export-actions">${renderPreviewImageDownloadButton(state)}${renderProjectExportMenu({
-    labels, canExportFasta: fresh && canProjectExportFasta(state),
-    canExportLog: fresh && buildProjectExportDataModel(state).canExportLog, disabled: !fresh,
-  })}</div>`;
+  return renderProjectExportMenu({
+    labels,
+    canExportFasta: fresh && canProjectExportFasta(state),
+    canExportLog: fresh && buildProjectExportDataModel(state).canExportLog,
+    disabled: !fresh,
+  });
 }
 
-export function renderProjectExportPage(state) {
+function renderProjectOverviewActions(state, { includeExportMenu = true } = {}) {
+  return `<div class="project-export-actions">${renderPreviewImageDownloadButton(state)}${includeExportMenu ? renderProjectGlobalExportControl(state) : ""}</div>`;
+}
+
+export function renderProjectExportPage(state, { includeExportMenu = true } = {}) {
   const labels = getLabels(state);
   if (!getCurrentProject(state)) return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}"><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
   return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}" data-overview-project="${escapeAttr(previewProjectKey(state))}" data-project-path-overview="${escapeAttr(previewProjectKey(state))}">
     ${renderProjectOverviewSummary(state)}
-    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3><span data-preview-count>${renderProjectPreviewCount(state)}</span>${renderProjectOverviewActions(state)}</header>
+    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3><span data-preview-count>${renderProjectPreviewCount(state)}</span>${renderProjectOverviewActions(state, { includeExportMenu })}</header>
     <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true, hideHeading: true })}</div>
   </section>`;
 }
@@ -1754,10 +1763,17 @@ function rerender(host, store) {
     template.innerHTML = renderProjectOverviewSummary(state);
     const next = template.content.querySelector("[data-overview-summary]");
     if (next) summary.replaceWith(next);
+    const headerExport = host.querySelector?.(".project-header-actions [data-project-export]");
+    if (headerExport) {
+      const exportTpl = doc.createElement("template");
+      exportTpl.innerHTML = renderProjectGlobalExportControl(state);
+      const nextExport = exportTpl.content.querySelector("[data-project-export]");
+      if (nextExport) headerExport.replaceWith(nextExport);
+    }
     const toolbar = page.querySelector(".project-preview-toolbar .project-export-actions");
     if (toolbar) {
       const actions = doc.createElement("template");
-      actions.innerHTML = renderProjectOverviewActions(state);
+      actions.innerHTML = renderProjectOverviewActions(state, { includeExportMenu: !headerExport });
       const nextActions = actions.content.querySelector(".project-export-actions");
       if (nextActions) toolbar.replaceWith(nextActions);
     }

@@ -224,3 +224,22 @@ test("catalog suppresses repeated wrapped names and empty notes but preserves cl
   assert.doesNotMatch(html, /data-app-tooltip="(?:100|60|30) bp"/);
   assert.match(html, /data-app-tooltip="View details and edit name or note"/);
 });
+
+test("catalog excludes automatic and manual refinement patch datasets from the datasets table and count", () => {
+  const { state, data, row } = fixture();
+  data.datasets.push(
+    { ...row, objectId: 2, originalName: "aux_hifiasm", displayName: "aux_hifiasm", role: "support" },
+    { ...row, objectId: 3, originalName: "cgat_refinement_degap_run1", displayName: "DEGAP Auto", role: "support" },
+    { ...row, objectId: 4, originalName: "degap_0123456789abcdef01234567", displayName: "Manual Batch", role: "support" },
+    { ...row, objectId: 5, originalName: "custom_patch_ds", displayName: "Custom Patch", role: "support" },
+  );
+  state.projectExport = {
+    grtProjectView: {
+      sourceCards: [{ datasetName: "custom_patch_ds", placementMode: "refinement" }],
+    },
+  };
+  const html = renderProjectCatalog(state);
+  assert.match(html, /aux_hifiasm/);
+  assert.doesNotMatch(html, /DEGAP Auto|Manual Batch|Custom Patch|cgat_refinement_degap_run1/);
+  assert.match(html, /<span class="project-section-count"><span aria-hidden="true">·<\/span>3<\/span>/);
+});

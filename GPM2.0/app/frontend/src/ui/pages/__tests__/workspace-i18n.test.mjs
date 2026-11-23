@@ -993,6 +993,9 @@ test("selected-project table and paths use compact visible divider headings", ()
     assert.match(html, /id="project-data-catalog" aria-labelledby="project-data-catalog-title"/);
     assert.match(html, locale === "en" ? /class="project-section-divider"><h3 id="project-data-catalog-title">Datasets<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/ : /class="project-section-divider"><h3 id="project-data-catalog-title">数据集<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/);
     assert.match(html, /class="project-export-page project-integrated-overview"/);
+    assert.match(html, /class="project-header-actions"[\s\S]*data-project-export-toggle="true"[\s\S]*id="initializer-enter-assembly-button"/);
+    assert.equal((html.match(/data-project-export-toggle="true"/g) || []).length, 1);
+    assert.ok(html.indexOf('data-project-export-toggle="true"') < html.indexOf('id="project-data-catalog"'));
     assert.match(html, locale === "en" ? /<h3 id="overview-preview-title">Pseudomolecule Preview<\/h3>/ : /<h3 id="overview-preview-title">假分子预览<\/h3>/);
     assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('data-overview-summary'));
     assert.match(html, /data-overview-preview/); assert.match(html, /Keep_MiXeD/);

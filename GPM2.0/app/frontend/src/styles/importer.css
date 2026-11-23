@@ -538,6 +538,29 @@
 .project-title-row .project-icon-button { margin-top: 1px; }
 .project-location-row { grid-column: 1 / -1; width: 100%; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; min-width: 0; margin-top: 0; }
 .project-detail-path { flex: 1 1 240px; min-width: 0; margin: 0; color: var(--text-muted, #64748b); font-size: var(--font-small); overflow-wrap: anywhere; }
+.project-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.projects-page .project-header-actions .final-path-export-toggle {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-default, #cbd5e1);
+  background: var(--surface-panel, #ffffff);
+  color: var(--text-primary, #1e293b);
+  font-size: var(--font-body);
+  font-weight: 500;
+}
+.projects-page .project-header-actions .final-path-export-toggle:hover:not(:disabled) {
+  border-color: var(--theme-strong-line, #64748b);
+  background: var(--surface-subtle, #f8fafc);
+}
+.projects-page .project-header-actions .final-path-export-item {
+  font-size: var(--font-body);
+}
 .projects-page .button.project-enter-assembly {
   min-width: 156px;
   min-height: 44px;
@@ -687,7 +710,7 @@
   .project-empty .button { min-width: 136px; padding: 12px; font-size: var(--font-body); }
   .project-empty .project-entry-actions { gap: 10px; }
   .project-detail-overview { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-bottom: 16px; }
-  .project-enter-assembly { justify-self: start; }
+  .project-header-actions, .project-enter-assembly { justify-self: start; }
   .project-current .workspace-recipe-grid { grid-template-columns: minmax(0, 1fr); }
   .project-current .workspace-recipe-field { padding: 14px; }
   .project-import-dialog { padding: 20px; }
