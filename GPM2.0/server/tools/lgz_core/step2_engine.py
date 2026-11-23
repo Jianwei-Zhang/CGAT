@@ -1070,7 +1070,6 @@ def run_step2(
                     **fingerprint_payload["refill_parameters"],
                     "working_query_space": "q1_after_mummer_corrections",
                     "target_projection": "origin_q1_gap",
-                    "corrected_fasta_sha256": sha256_file(temporary / "corrected.fa"),
                     "flank_projection_relpath": refill_artifacts[str(candidate["chr"])]["flank_projection_relpath"],
                     "flank_projection_sha256": refill_artifacts[str(candidate["chr"])]["flank_projection_sha256"],
                 }

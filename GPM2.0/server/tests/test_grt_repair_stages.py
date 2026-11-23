@@ -2105,6 +2105,7 @@ else:
                 if row["evidence_type"] not in {"corrected_gap_flank_refill", "post_filter_gap_flank_refill"}:
                     continue
                 parameters = json.loads(row["parameters_json"])
+                self.assertNotIn("corrected_fasta_sha256", parameters)
                 projection_path = server / parameters["flank_projection_relpath"]
                 payload = projection_path.read_bytes()
                 self.assertEqual(hashlib.sha256(payload).hexdigest(), parameters["flank_projection_sha256"])
