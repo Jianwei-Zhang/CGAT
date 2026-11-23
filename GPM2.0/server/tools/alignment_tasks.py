@@ -23,6 +23,7 @@ from pathlib import Path
 
 MANIFEST = "alignment_tasks.json"
 Q0_MANIFEST = "q0_alignment_tasks.json"
+NO_WORK_ACTION = "checkpoint_no_generated_tasks"
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,12 @@ class AlignmentTask:
     max_concurrent: int | None = None
     work: int = 0
     largest_fraction: float | None = None
+
+
+@dataclass(frozen=True)
+class AlignmentPlan:
+    tasks: list[AlignmentTask]
+    checkpoint_without_tasks: bool
 
 
 def query_threads(fasta: Path, engine: str, budget: int) -> int:
@@ -139,6 +146,7 @@ def write_manifest(
     root: Path,
     tasks: list[tuple],
     max_concurrent: int | None = None,
+    *, checkpoint_without_tasks: bool = False,
 ) -> None:
     rows = []
     for row in tasks:
@@ -153,12 +161,16 @@ def write_manifest(
             item.update(work=work, largest_fraction=largest_fraction)
         rows.append(item)
     payload = {"version": 3, "tasks": rows}
+    if checkpoint_without_tasks:
+        if rows:
+            raise ValueError("cannot declare an alignment plan with work as empty")
+        payload["empty_action"] = NO_WORK_ACTION
     if max_concurrent is not None:
         payload["max_concurrent"] = max_concurrent
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | None:
+def load_task_plan(root: Path, unit_id: str, command: str) -> AlignmentPlan | None:
     q0_phase = unit_id.startswith("q0_chr:")
     manifest = (workspace_join(root, command)).parent / (Q0_MANIFEST if q0_phase else MANIFEST)
     if not manifest.is_file():
@@ -174,6 +186,19 @@ def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | 
     rows = payload.get("tasks")
     if not isinstance(rows, list):
         raise ValueError(f"invalid alignment task list: {manifest}")
+    empty_action = payload.get("empty_action")
+    if "empty_action" in payload:
+        kind, _, chromosome = unit_id.partition(":")
+        if (empty_action != NO_WORK_ACTION or payload["version"] != 3 or rows
+                or kind not in {"q0_chr", "chr"} or not chromosome):
+            raise ValueError(f"invalid empty alignment plan: {manifest}")
+        if q0_phase:
+            descriptor = manifest.parent / "q0_alignment_inputs.json"
+            declared = json.loads(descriptor.read_text(encoding="utf-8"))
+            if (not isinstance(declared, dict) or type(declared.get("version")) is not int
+                    or declared["version"] != 1 or declared.get("chromosome") != chromosome
+                    or declared.get("alignments") != []):
+                raise ValueError(f"empty q0 plan disagrees with its alignment descriptor: {manifest}")
     tasks = []
     seen = set()
     for row in rows:
@@ -197,7 +222,12 @@ def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | 
         tasks.append(AlignmentTask(
             unit_id, path, cap, priority, max_concurrent, work, largest_fraction
         ))
-    return tasks
+    return AlignmentPlan(tasks, empty_action == NO_WORK_ACTION)
+
+
+def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | None:
+    plan = load_task_plan(root, unit_id, command)
+    return None if plan is None else plan.tasks
 
 
 def allocate_threads(caps: list[int], budget: int) -> list[int]:

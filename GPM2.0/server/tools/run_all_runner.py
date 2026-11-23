@@ -38,7 +38,8 @@ from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
-from alignment_tasks import AdaptiveDispatcher, AlignmentTask, dispatch_environment, load_tasks, run_tasks
+from alignment_tasks import (AdaptiveDispatcher, AlignmentPlan, AlignmentTask, dispatch_environment,
+                             load_task_plan, run_tasks)
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
@@ -449,7 +450,7 @@ class Runner:
             self.refinement_stop_timer = None
         self.refinement_child = None
 
-    def _run_alignment_group(self, units: list[PlanUnit], threads: int) -> int:
+    def _run_alignment_group(self, units: list[PlanUnit], plans: dict[str, AlignmentPlan], threads: int) -> int:
         """Run independent leaf commands; publish checkpoints per original unit."""
         cpu_count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
         budget = max(1, min(threads, cpu_count))
@@ -477,9 +478,31 @@ class Runner:
             if checkpoint.path.is_file():
                 row["state"] = "stale"
                 self._event("STALE", unit, f"{reason}; rerunning; {check_times}")
-            unit_tasks = load_tasks(self.server_dir, unit.unit_id, unit.command_relpath)
-            assert unit_tasks is not None
+            plan = plans[unit.unit_id]
+            if plan.checkpoint_without_tasks:
+                if self.received_signal is not None:
+                    return 128 + self.received_signal
+                checked = timestamp()
+                row.update(attempt=str(int(row["attempt"] or "0") + 1), started_at=checked)
+                started_at = time.monotonic()
+                try:
+                    result = self.outer_checkpoints.commit(checkpoint, expect_no_outputs=True)
+                except (OSError, OrchestrationContractError) as exc:
+                    row.update(state="failed", ended_at=timestamp(), exit_code="2",
+                               elapsed_seconds=f"{time.monotonic() - started_at:.3f}")
+                    atomic_write_status(self.status_path, self.status_rows)
+                    self._event("FAILED", unit, f"empty plan checkpoint failed: {exc}")
+                    return 2
+                row.update(state="success", ended_at=timestamp(), exit_code="0",
+                           elapsed_seconds=f"{time.monotonic() - started_at:.3f}")
+                atomic_write_status(self.status_path, self.status_rows)
+                self._event("SUCCESS", unit, "no generated tasks; committed checkpoint="
+                            + str(result.relative_to(self.server_dir)))
+                continue
+            unit_tasks = plan.tasks
             if not unit_tasks:
+                # Older task manifests did not say whether the wrapper is a
+                # pure no-op. Preserve their original execution path.
                 unit_tasks = [AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath), 1)]
             prepared[unit.unit_id] = checkpoint
             remaining[unit.unit_id] = len(unit_tasks)
@@ -728,13 +751,20 @@ class Runner:
                                     "elapsed=0.000s validated original-engine frozen LGZ; no new-engine checkpoint created")
                         continue
                     kind = unit.unit_id.split(":", 1)[0]
-                    if kind in {"ref", "q0_chr", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
-                        group = []
-                        for candidate in self.units[unit_index:]:
-                            if candidate.unit_id.split(":", 1)[0] != kind or load_tasks(self.server_dir, candidate.unit_id, candidate.command_relpath) is None:
+                    first_plan = (load_task_plan(self.server_dir, unit.unit_id, unit.command_relpath)
+                                  if kind in {"ref", "q0_chr", "chr"} else None)
+                    if first_plan is not None:
+                        group = [unit]
+                        plans = {unit.unit_id: first_plan}
+                        for candidate in self.units[unit_index + 1:]:
+                            if candidate.unit_id.split(":", 1)[0] != kind:
+                                break
+                            candidate_plan = load_task_plan(self.server_dir, candidate.unit_id, candidate.command_relpath)
+                            if candidate_plan is None:
                                 break
                             group.append(candidate)
-                        result = self._run_alignment_group(group, int(threads))
+                            plans[candidate.unit_id] = candidate_plan
+                        result = self._run_alignment_group(group, plans, int(threads))
                         handled.update(candidate.unit_id for candidate in group)
                         if result:
                             return result

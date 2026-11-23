@@ -221,8 +221,10 @@ class OuterCheckpointManager:
         except (OSError, UnicodeError, ValueError, KeyError, TypeError, OrchestrationContractError) as exc:
             return False, f"completed reference runtime migration refused: {exc}"
 
-    def commit(self, prepared: PreparedOuterCheckpoint) -> Path:
+    def commit(self, prepared: PreparedOuterCheckpoint, *, expect_no_outputs: bool = False) -> Path:
         outputs = self._output_identities(prepared)
+        if expect_no_outputs and outputs:
+            raise OrchestrationContractError("empty chromosome plan unexpectedly declares outputs")
         if prepared.kind == "q0_chromosome_alignments":
             # Bind outputs to the inputs captured BEFORE execution, including
             # manual runs. A new manager also refreshes tool/option identities.

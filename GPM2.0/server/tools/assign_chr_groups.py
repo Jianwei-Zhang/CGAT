@@ -905,7 +905,8 @@ for chr_name in reference_chr_names:
             if command in task_profiles:
                 row += task_profiles[command]
             manifest_tasks.append(row)
-        write_manifest(chr_run_dir / manifest_name, work_root, manifest_tasks)
+        write_manifest(chr_run_dir / manifest_name, work_root, manifest_tasks,
+                       checkpoint_without_tasks=not manifest_tasks)
 
     # Same-path raw results and self batch caches survive regeneration. Their
     # content-bound checkpoints decide reuse. Retire only previously generated

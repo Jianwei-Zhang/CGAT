@@ -61,6 +61,61 @@ class RunAllRunnerTests(unittest.TestCase):
                     process.send_signal(signal.SIGTERM)
                     process.communicate(timeout=5)
 
+    def test_declared_empty_chromosome_units_commit_without_spawning_wrappers(self):
+        from server.tools.alignment_tasks import write_manifest
+        from server.tools.run_outer_checkpoints import OuterCheckpointManager
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            names = ["q0_chr:Chr1", "chr:Chr1"]
+            server = self.make_workspace(root, [(name, "exit 99") for name in names])
+            environment = self.configure_chromosome_inputs(server, root, ["Chr1"])
+            run = server / "runs/chr_Chr1"
+            for script in ("q0_command.sh", "command.sh"):
+                (run / script).write_text("exit 99\n")  # reaching a wrapper would fail
+            (run / "q0_generated_command.sh").write_text("# no generated jobs\n")
+            (run / "generated_command.sh").write_text("# no generated jobs\n")
+            descriptor = run / "q0_alignment_inputs.json"
+            descriptor.write_text(json.dumps({"version": 1, "chromosome": "Chr1", "alignments": []}))
+            for manifest in ("q0_alignment_tasks.json", "alignment_tasks.json"):
+                write_manifest(run / manifest, server, [], checkpoint_without_tasks=True)
+            commands = ["runs/chr_Chr1/q0_command.sh", "runs/chr_Chr1/command.sh"]
+            (server / ".run_all/plan.tsv").write_text(
+                "unit_id\tcommand_relpath\tdetail_log_relpath\n" + "".join(
+                    f"{name}\t{command}\tlogs/run_all.log\n" for name, command in zip(names, commands, strict=True)))
+            first = self.run_runner(server, env=environment)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(first.stdout.count("no generated tasks; committed checkpoint="), 2)
+            self.assertNotIn("[TASK_START]", first.stdout)
+            manager = OuterCheckpointManager(server)
+            for name, command in zip(names, commands, strict=True):
+                receipt = manager.prepare(name, command)
+                self.assertTrue(manager.validate(receipt)[0])
+                self.assertEqual(json.loads(receipt.path.read_text())["outputs"], [])
+            second = self.run_runner(server, env=environment)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertEqual(second.stdout.count("[SKIP_VALID]"), 2)
+            descriptor.write_text(json.dumps({"version": 1, "chromosome": "Chr1", "alignments": [{}]}))
+            rejected = self.run_runner(server, env=environment)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("empty q0 plan disagrees", rejected.stdout + rejected.stderr)
+            self.assertNotIn("[TASK_START]", rejected.stdout)
+
+    def test_legacy_empty_manifest_retains_its_wrapper_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            server = self.make_workspace(root, [("chr:Chr1", "exit 99")])
+            environment = self.configure_chromosome_inputs(server, root, ["Chr1"])
+            run = server / "runs/chr_Chr1"
+            (run / "command.sh").write_text("echo legacy-wrapper-ran\n")
+            (run / "q0_command.sh").write_text("# legacy split\n")
+            (run / "alignment_tasks.json").write_text(json.dumps({"version": 3, "tasks": []}))
+            (server / ".run_all/plan.tsv").write_text(
+                "unit_id\tcommand_relpath\tdetail_log_relpath\nchr:Chr1\truns/chr_Chr1/command.sh\tlogs/run_all.log\n")
+            result = self.run_runner(server, env=environment)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("legacy-wrapper-ran", result.stdout)
+
     def test_parallel_chromosomes_share_budget_keep_reports_and_resume(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
