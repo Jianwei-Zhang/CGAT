@@ -630,6 +630,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
         proposed = defaultdict(dict)
         for key in phases.items(f"anchor unplaced segments round={round_number}", sorted(allowed - placed)):
             part = data.parts[key]
+            direct_spans = {}  # Immutable source coverage, only for this segment and round.
             for anchor, links in placed_neighbors.for_source(part.source):
                 for orientation in ("+", "-"):
                     group = (anchor.chromosome, orientation)
@@ -658,13 +659,20 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
                             intervals.append(temporary.source_interval(Interval(start, start + overlap.length)))
                             ids.add(evidence_id)
                     intervals = clean_intervals(part, intervals)
-                    if _size(intervals) < min(policy.minimum_anchor_bp, part.interval.length):
+                    if sum(i.length for i in intervals) < min(policy.minimum_anchor_bp, part.interval.length):
                         continue
                     item = proposed[key].setdefault(group, {"intervals": [], "ids": set(), "parents": set(), "refs": direct})
                     if direct:
-                        intervals = merged_intervals(overlap for a in intervals for b in direct
-                                                     if (overlap := a.intersection(b.source)) is not None)
-                    item["intervals"].extend(intervals)
+                        # Only the union of intersections is consumed here. Both axes are
+                        # merged before clipping, so these half-open overlaps are already
+                        # ordered and disjoint. Keep the original reference anchors in refs.
+                        if group not in direct_spans:
+                            direct_spans[group] = merged_intervals(b.source for b in direct)
+                        cover = direct_spans[group]
+                        item["intervals"].extend(a.intersection(b) for a in intervals
+                                                 for b in _overlapping_spans(a, cover))
+                    else:
+                        item["intervals"].extend(intervals)
                     item["ids"].update(ids | set(anchor.evidence_ids))
                     item["parents"].add(anchor.placement_id)
         added = 0
