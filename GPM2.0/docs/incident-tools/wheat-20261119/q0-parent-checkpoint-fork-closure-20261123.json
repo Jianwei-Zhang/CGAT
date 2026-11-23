@@ -1,0 +1,54 @@
+{
+  "inventory": {
+    "additional_reader_inputs_in_union": 1679,
+    "all_chromosome_input_output_rows": {
+      "logical_bytes": 134041746043,
+      "paths": 4851,
+      "unique_payload_bytes": 134041704505
+    },
+    "cold_trial": {
+      "core_fields_different": [],
+      "extra_outputs_also_in_reader_declaration": 32,
+      "extra_outputs_by_filename": {
+        "native-resource-receipt.json": 30,
+        "self_batch_result.json": 2
+      },
+      "immutable_parent_checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+      "input_inventory_exact": true,
+      "logical_bytes": 2514616681,
+      "mapper_calls": 0,
+      "original_input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+      "parent_only_fields": [
+        "incident_self_execution"
+      ],
+      "parent_outputs": 35,
+      "paths": 118,
+      "producer_self_operations": 2,
+      "stock_accepted": false,
+      "stock_input_fingerprint": "2b7d76fe14fead89f33bcf803a3cd73e7733885cea1ca9a9cc06859599cd2eac",
+      "stock_reason": "checkpoint identity or input fingerprint changed",
+      "stock_verified_outputs": 3,
+      "unique_payload_bytes": 2514615715,
+      "unit": "q0_chr:Un"
+    },
+    "draft": {
+      "logical_bytes": 61058636573,
+      "paths": 104,
+      "unique_payload_bytes": 61058636562
+    },
+    "paths_not_in_draft": 4760,
+    "producer_extension_fields": {
+      "incident_execution_overrides,incident_self_execution": 4,
+      "incident_self_execution": 18
+    },
+    "union": {
+      "logical_bytes": 182570838924,
+      "paths": 4864,
+      "unique_payload_bytes": 182570797375
+    },
+    "unique_bytes_not_in_draft": 121512160813
+  },
+  "limits": "The 22-unit byte budget is metadata only. Only the chosen chromosome closure was copied and hashed. Stock output checks were run independently, not substituted for a successful stock checkpoint. No producer extension was stripped, no new ready or checkpoint issued.",
+  "schema": "wheat_parent_checkpoint_fork_closure_v1",
+  "snapshot": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d"
+}
