@@ -23,6 +23,7 @@ from typing import Iterable
 
 from .common import canonical_json, executable_identity, read_fasta, sha256_file, stable_id, write_fasta
 from .q0_alignments import read_paf, read_paf_observations
+from . import q0_candidate_schedule as candidate_schedule
 from .q0_catalog import (CATALOG_SCHEMA, CandidateCatalog, DISCOVERY_REFERENCE_IDENTITY, DISCOVERY_REFERENCE_MAPQ,
                          add_pairwise_candidates, build_catalog, partial_source_request, supplemental_groups, ObservedSourcePairs)
 from .q0_regional_discovery import REGIONAL_POLICY, LocalReferenceCache, enabled as regional_enabled, observe_part_hits, prepare_partial
@@ -121,7 +122,7 @@ def builder_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-evidence-builder", [
         [name, sha256_file(root / name)] for name in (
-            "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
+            "q0_preparation.py", "q0_candidate_schedule.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
             "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
             "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_frontier_scope.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
 
@@ -475,6 +476,46 @@ def _copy_prepared_target(root, catalog, target_ids, destination, template):
             "source_receipt_identity":receipt_identity,"source_receipt":receipt,"copied_target":expected}
 
 
+def _mapping_spec(catalog, query_ids, target_ids, tool, preset, flags):
+    members = [[key, catalog.parts[key].sequence_sha256] for key in sorted(set(query_ids + target_ids))]
+    # Raw mapping identity is independent of candidate-selection code and the
+    # discovery round that requested it. Revalidate cached geometry, do not rerun
+    # an unchanged mapper/input pair just because the q0 builder was updated.
+    return {"schema": "lgz_q0_mapping_v1", "query_ids": query_ids, "target_ids": target_ids,
+            "members": members, "tool": tool, "preset": preset,
+            "alignment_flags": flags}
+
+
+def _native_candidates(root, catalog, requests, tool, preset, threads, *, skip_self):
+    # Request identity (including the chromosome) is distinct from the raw
+    # mapping identity. Workers never mutate the catalog or publish a manifest.
+    by_key, order, ready, work = {}, [], {}, []
+    for request in requests:
+        queries, targets = (sorted(set(request[n])) for n in ('query_ids', 'target_ids'))
+        key = stable_id('q0-map', _mapping_spec(catalog, queries, targets, tool, preset, POLICY['supplement_flags']))
+        order.append((request, key))
+        if key in by_key:
+            continue
+        by_key[key] = request
+        cached = _supplement(root, catalog, request, tool, preset, threads, skip_self=skip_self, cache_only=True)
+        if cached is not None:
+            ready[key] = cached
+        else:
+            work.append(candidate_schedule.MapWork(key, sum(catalog.parts[i].interval.length for i in queries),
+                                                   sum(catalog.parts[i].interval.length for i in targets)))
+    if work:
+        budget, memory = candidate_schedule.available_budget(threads)
+        print(f'LGZ q0 candidates: requests={len(order)} unique={len(by_key)} cached={len(ready)} '
+              f'cpu_budget={budget} mapper_memory_bytes={memory}', flush=True)
+        def execute(key, grant):
+            task = _supplement(root, catalog, by_key[key], tool, preset, grant, skip_self=skip_self)
+            if task['task_id'] != key:
+                raise Q0EvidenceError('candidate mapping identity changed during execution')
+            return task
+        ready.update(candidate_schedule.run_pending(work, budget, memory, execute))
+    return [{**ready[key], 'kind': request['kind'], 'request': request} for request, key in order]
+
+
 def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict,
                 preset: str, threads: int, *, skip_self: bool = False, cache_only: bool = False, prepared_target: dict | None = None,
                 weak_seed_fast: bool = False, reference_bases: int = 0, on_cache_hit=None) -> dict | None:
@@ -497,13 +538,7 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
         if request['kind']!='candidate_unroutable_seed' or not queries or not targets:
             raise Q0EvidenceError('weak global seed profile is outside its limited scope')
         flags=[*flags,'-m',str(WEAK_GLOBAL_SEED_POLICY['minimum_chain_score'])]
-    members = [[key, catalog.parts[key].sequence_sha256] for key in sorted(set(query_ids + target_ids))]
-    # Raw mapping identity is independent of candidate-selection code and the
-    # discovery round that requested it. Revalidate cached geometry, do not rerun
-    # an unchanged mapper/input pair just because the q0 builder was updated.
-    spec = {"schema": "lgz_q0_mapping_v1", "query_ids": query_ids, "target_ids": target_ids,
-            "members": members, "tool": tool, "preset": preset,
-            "alignment_flags": flags}
+    spec = _mapping_spec(catalog, query_ids, target_ids, tool, preset, flags)
     task_id = stable_id("q0-map", spec)
     relative = f"grt/evidence/q0_prepare/tasks/{task_id}"
     directory = workspace_artifact_path(root, relative)
@@ -828,11 +863,16 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                     include_placed=True, known_pairs=known_pairs)
         candidate_requests = supplemental_groups(catalog, assignments, known_pairs)
         pending_candidates = []
-        for request in candidate_requests:
-            task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
-                               skip_self=options.get("skip_self") == "true", cache_only=bool(cache))
-            if task is not None: tasks.append(task)
-            else: pending_candidates.append(request)
+        if cache is None:
+            tasks.extend(_native_candidates(root, catalog, candidate_requests, tool, options.get("minimap_preset", "asm10"),
+                                            threads, skip_self=options.get("skip_self") == "true"))
+        else:
+            # The regional planner owns its own worker budget and fallback order.
+            for request in candidate_requests:
+                task = _supplement(root, catalog, request, tool, options.get("minimap_preset", "asm10"), threads,
+                                   skip_self=options.get("skip_self") == "true", cache_only=True)
+                if task is not None: tasks.append(task)
+                else: pending_candidates.append(request)
         if pending_candidates:
             from .q0_reference_index import ReferenceIndex
             with closing(ReferenceIndex.open(cache.path, root, catalog.parts, lengths, local_paf_directory=cache.paf_directory)) as index:
