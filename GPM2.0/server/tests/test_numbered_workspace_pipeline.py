@@ -125,6 +125,7 @@ class NumberedWorkspaceTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout[-2000:] + result.stderr[-4000:])
             layout = WorkspaceLayout.detect(root)
             self.assertEqual(layout.version, 2)
+            self.assertEqual(layout.result_prefix, root.name)
             plan = layout.path(".run_all/plan.tsv").read_text()
             self.assertLess(plan.index("finalize_evidence"), plan.index("refinement\t"))
             self.assertLess(plan.index("refinement\t"), plan.index("package_full"))

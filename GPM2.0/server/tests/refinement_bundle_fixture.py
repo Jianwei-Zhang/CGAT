@@ -24,8 +24,8 @@ from refinement_tools import fingerprint
 FIXTURE = Path(__file__).resolve().parents[2] / "tests/fixtures/grt_contract_v3/frozen_bridge_server.json"
 
 
-def create(root, *, with_source_evidence=False, with_source_annotations=False, native_diagnostics=None):
-    layout = initialize_workspace(root)
+def create(root, *, with_source_evidence=False, with_source_annotations=False, native_diagnostics=None, job_outputs=False):
+    layout = initialize_workspace(root, job_outputs=job_outputs)
     original = json.loads(FIXTURE.read_text())
     for name, contents in original["files"].items():
         target = layout.path(name)

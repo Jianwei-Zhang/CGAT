@@ -85,13 +85,17 @@ cgat_server/
         01_source_evidence/<generation>/  measured reference/annotation evidence
       05_report/<run>/<site>/        portable attempt report
   05_final/
-    00_lgz/                          LGZ baseline: refinement_applied=false
-    01_degap/                        a verified published refined result
-      assembly.fa
-      final_path.json
-      sources.tsv
-      remaining_gaps.tsv
-      provenance.json
+    cgat_server.lgz.fa                 LGZ baseline, ready for direct use
+    cgat_server.degap.fa               Published automatic result (when available)
+    results.tsv                       Current attempt vs. available publication
+    details/
+      00_lgz/                          LGZ baseline: refinement_applied=false
+      01_degap/                        a verified published refined result
+        assembly.fa
+        final_path.json
+        sources.tsv
+        remaining_gaps.tsv
+        provenance.json
   06_report/
     report.html                      start here: overview and current comparison
     01_lgz/report.html               original LGZ process
@@ -108,7 +112,9 @@ cgat_server/
     refinement/<tool-dir>/<run>/final/  private, source-reconstructed staging
 ```
 
-Brackets denote two files, not literal filenames; `--archive-format zip` uses `.zip`. Each selected tool uses the same fixed directory under `04_refinement`, `05_final`, `06_report/02_refinement` and `07_delivery`, even if it is the only tool selected. There are no legacy root `data/`, `grt/`, `report/` or `logs/` shadow trees in the numbered workspace. App package internals still use their protocol's `data/` and `metadata/` paths; do not rename those inside archives.
+The FASTA prefix comes from the output directory at job creation. A failed rerun does not replace a previously published genome; check `results.tsv` for its publication identity. A zero-admission tool result is marked unchanged. Existing numbered jobs keep `05_final/00_lgz/` and `05_final/<numbered_tool>/`; they are not moved or renamed.
+
+Brackets denote two files, not literal filenames; `--archive-format zip` uses `.zip`. Each selected tool uses the same fixed directory under `04_refinement`, `05_final/details`, `06_report/02_refinement` and `07_delivery`, even if it is the only tool selected. There are no legacy root `data/`, `grt/`, `report/` or `logs/` shadow trees in the numbered workspace. App package internals still use their protocol's `data/` and `metadata/` paths; do not rename those inside archives.
 
 A tool directory alone is not proof of current success. Follow the current overview and its committed, content-bound publication receipt. Failed new attempts retain diagnostics and do not erase an older successful publication or label it as the new result. One tool's failure does not prevent other successful tools or the LGZ baseline being delivered; the overall invocation returns nonzero.
 

@@ -73,17 +73,27 @@ def verify_case(workspace, expected, reads, *, previously_finished=False):
     from refinement_commit import current_publication
     from refinement_delivery import validate_delivery
 
-    baseline = workspace / "05_final/00_lgz"
+    from workspace_layout import WorkspaceLayout
+    layout = WorkspaceLayout.detect(workspace)
+    baseline = layout.path("05_final/00_lgz")
     require(load(baseline / "provenance.json")["refinement_applied"] is False, "LGZ no longer labelled baseline")
     baseline_sha = digest(baseline / "assembly.fa")
     baseline_sequences = fasta_sequences(baseline / "assembly.fa")
     require((workspace / "06_report/report.html").is_file(), "missing batch overview")
-    found = {p.name for p in (workspace / "05_final").iterdir()}
+    found = {p.name for p in baseline.parent.iterdir()}
+    if layout.result_prefix:
+        public = workspace / "05_final"
+        require({p.name for p in public.iterdir()} == {"details", "results.tsv"} |
+                {f"{layout.result_prefix}.{tool}.fa" for tool in ("lgz", *expected)}, "unexpected direct genome outputs")
+        require(digest(public / f"{layout.result_prefix}.lgz.fa") == baseline_sha, "direct LGZ FASTA differs")
     require(found == {"00_lgz"} | {TOOL_DIR[t] for t in expected}, "unexpected tool final directories")
     results = {}
     for tool, keys in expected.items():
         group = TOOL_DIR[tool]
-        final = workspace / "05_final" / group
+        final = layout.path(f"05_final/{group}")
+        if layout.result_prefix:
+            require(digest(public / f"{layout.result_prefix}.{tool}.fa") == digest(final / "assembly.fa"),
+                    f"{tool}: direct FASTA differs from the publication")
         report = workspace / "06_report/02_refinement" / group
         delivery = workspace / "07_delivery" / group
         provenance = load(final / "provenance.json")

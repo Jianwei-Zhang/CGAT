@@ -126,7 +126,7 @@ Behavior:
   - run_all.sh writes live progress and current status under <work_root>/.runtime/logs/
   - run_all.sh holds an exclusive workspace lock while active
   - Open <work_root>/06_report/report.html for the overview, LGZ process and per-tool refinement reports
-  - Baseline and refined final sequences are distinct: 05_final/00_lgz/ and 05_final/<numbered_tool>/
+  - New jobs: take <output-name>.lgz.fa and <output-name>.<tool>.fa directly from 05_final/; see results.tsv for current/previous publications
   - Embeds each finalized process report in its delivery archives; no separate report ZIP is created
   - Generates package/export helpers under .runtime/commands/
   - run_all.sh is staged as: vs_ref -> chr assignment helper -> chr-local q0 alignments -> q0 supplementary evidence -> LGZ q0/D0/Dtel -> LGZ Step1 -> LGZ Step2 -> LGZ telomere/q3 finalization -> per-chr commands -> LGZ evidence/package validation -> refinement -> full baseline archive -> light archive
@@ -965,7 +965,7 @@ root = Path(sys.argv[1])
 sys.path.insert(0, sys.argv[2])
 from workspace_layout import WorkspaceLayout, initialize_workspace
 if not root.exists() or not any(root.iterdir()):
-    initialize_workspace(root, prepared_runtime=".lib")
+    initialize_workspace(root, prepared_runtime=".lib", job_outputs=True)
 elif WorkspaceLayout.detect(root).version != 2:
     sys.exit("ERROR: existing legacy output is not a new workspace; resume/migrate it instead of running prepare.sh over it")
 PYLAYOUT

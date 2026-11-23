@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 
 try:
-    from workspace_layout import TOOL_DIRECTORIES, workspace_join
+    from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout, workspace_join
     from post_lgz_degap import digest
     from refinement_tools import load_lock, validate_runtime, fingerprint
     from refinement_recipes import select_reads
@@ -20,7 +20,7 @@ try:
     from refinement_presets import effective as effective_degap
     from refinement_native import ADAPTER_FILES as NATIVE_FILES
 except ModuleNotFoundError:
-    from .workspace_layout import TOOL_DIRECTORIES, workspace_join
+    from .workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout, workspace_join
     from .post_lgz_degap import digest
     from .refinement_tools import load_lock, validate_runtime, fingerprint
     from .refinement_recipes import select_reads
@@ -125,7 +125,7 @@ def validate_candidate(root, tool, groups, directory, runtime, lock):
 def find_completed(root, tool, groups):
     root = Path(root).resolve()
     code = TOOL_DIRECTORIES[tool]
-    published = root / "05_final" / code
+    published = WorkspaceLayout.detect(root).path(f"05_final/{code}")
     candidates = ([published] if (published / "provenance.json").is_file() else [])
     candidates += [path.parent for path in sorted((root / ".runtime/refinement" / code).glob("*/final/provenance.json"))]
     if not candidates:

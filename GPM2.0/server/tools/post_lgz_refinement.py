@@ -13,7 +13,7 @@ import subprocess
 import time
 import sys
 
-from workspace_layout import WorkspaceLayout
+from workspace_layout import TOOL_DIRECTORIES, WorkspaceLayout
 from run_orchestration import atomic_write_json, sha256_file
 from run_resources import execution_threads, update_resources
 from refinement_config import (resolve, save_request, load_request, preflight, json_file, validate_config, CONFIG)
@@ -21,6 +21,8 @@ from refinement_tools import fingerprint
 from refinement_recipes import select_tools, select_reads
 from refinement_batch import execute_batch, publish_batch, check_seal, baseline_seal
 from refinement_commit import current_publication, recover_publication, targets
+from refinement_delivery import validate_delivery
+from job_final_catalog import publish_catalog, validate_catalog
 from refine_report import automatic_overview_digest
 from refinement_overview import render_overview
 from refinement_jobs_index import write_automatic_index
@@ -53,7 +55,7 @@ class ParentLock:
                 and self._is_alive(self.owner["pid"], self.owner.get("process_start", "")))
 
 
-def final_result_lines(tool, paths, provenance):
+def final_result_lines(tool, paths, provenance, *, fasta=None):
     """Do not label a successful zero-admission run as an applied refinement."""
     accepted = provenance["accepted_edit_count"]
     counts = provenance["counts"]
@@ -61,7 +63,7 @@ def final_result_lines(tool, paths, provenance):
                f"accepted_edits={accepted} closed={counts['closed']} partial={counts['partial']} "
                f"unfilled={counts['unfilled']} rejected={counts['rejected']}")
     label = "REFINED FINAL" if accepted else "UNCHANGED AFTER REFINEMENT; ZERO ACCEPTED EDITS"
-    return [outcome, f"[{label}] {tool}: {paths['final'] / 'assembly.fa'}",
+    return [outcome, f"[{label}] {tool}: {fasta if fasta is not None else paths['final'] / 'assembly.fa'}",
             f"[FINAL PATH] {tool}: {paths['final'] / 'final_path.json'}",
             f"[APP DELIVERY] {tool}: {paths['delivery']}"]
 
@@ -84,18 +86,30 @@ def run(root, lock, request):
           f"in {validated - started:.2f}s", flush=True)
     publish_baseline(root, lock)
     print(f"[REFINE CHECK] LGZ baseline ready in {time.monotonic() - validated:.2f}s", flush=True)
+    for tool in (TOOL_DIRECTORIES if layout.result_prefix else request["selected"]):
+        pointer = layout.path(f".runtime/refinement/publication/{tool}.json")
+        if pointer.exists() and json_file(pointer).get("status") == "publishing":
+            recover_publication(root, lock, tool, validate_delivery)
+    if layout.result_prefix and request["selected"]:
+        # The LGZ genome is available even while optional native tools are running.
+        publish_catalog(root, lock, request["run_id"], {t: {"status": "pending"} for t in request["selected"]})
     options = {}
     with layout.path("metadata/prepare_options.tsv").open(newline="", encoding="utf-8") as stream:
         options = {row["key"]: row["value"] for row in csv.DictReader(stream, delimiter="\t")}
     budget = execution_threads(int(options.get("threads", "1")), root=root)
     cpu = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1
     budget = min(budget, cpu)
-    for tool in request["selected"]:
-        pointer = layout.path(f".runtime/refinement/publication/{tool}.json")
-        if pointer.exists() and json_file(pointer).get("status") == "publishing":
-            recover_publication(root, lock, tool, validate_delivery)
-    batch_result = execute_batch(root, request["groups"], budget, tools=request["tools"])
-    batch_result = publish_batch(root, lock, batch_result)
+    try:
+        batch_result = execute_batch(root, request["groups"], budget, tools=request["tools"])
+        batch_result = publish_batch(root, lock, batch_result)
+    except (Exception, KeyboardInterrupt) as error:
+        if layout.result_prefix:
+            status = "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
+            try:
+                publish_catalog(root, lock, request["run_id"], {t: {"status": status} for t in request["selected"]})
+            except (OSError, ValueError, KeyError) as catalog_error:
+                print(f"[GENOME RESULTS] cannot record {status} attempt: {catalog_error}", file=sys.stderr)
+        raise
     batch = batch_result["batch"]
     if not batch.get("baseline_inputs"):
         batch["baseline_inputs"] = baseline_seal(root)
@@ -110,6 +124,8 @@ def run(root, lock, request):
                "batch_sha256": sha256_file(layout.path(f".runtime/refinement/batches/{batch['batch_id']}.json")),
                "overview_files": {name: (automatic_overview_digest if name == "06_report/report.html" else sha256_file)(layout.path(name))
                                   for name in overview_paths}}
+    if layout.result_prefix:
+        receipt["final_catalog_sha256"] = publish_catalog(root, lock, request["run_id"], batch["tools"])
     completion_path = layout.path(f".runtime/refinement/completions/{request['run_id']}.json")
     atomic_write_json(completion_path, receipt)
     try:
@@ -123,9 +139,13 @@ def run(root, lock, request):
         if row["status"] == "published":
             paths = targets(layout, tool)
             provenance = batch_result["staged_results"][tool]["provenance"]
-            for line in final_result_lines(tool, paths, provenance):
+            fasta = layout.path(f"05_final/{layout.result_prefix}.{tool}.fa") if layout.result_prefix else None
+            for line in final_result_lines(tool, paths, provenance, fasta=fasta):
                 print(line, flush=True)
-    print(f"[LGZ BASELINE, NOT REFINED] {layout.path('05_final/00_lgz/assembly.fa')}", flush=True)
+    baseline = layout.path(f"05_final/{layout.result_prefix}.lgz.fa" if layout.result_prefix else "05_final/00_lgz/assembly.fa")
+    print(f"[LGZ BASELINE, NOT REFINED] {baseline}", flush=True)
+    if layout.result_prefix:
+        print(f"[GENOME RESULTS] {layout.path('05_final/results.tsv')}", flush=True)
     print(f"[REPORT] {layout.path('06_report/report.html')}", flush=True)
     return batch_result["exit_code"]
 
@@ -155,6 +175,8 @@ def validate_completion(root, run_id):
                        (automatic_overview_digest if name == "06_report/report.html" else sha256_file)(layout.path(name)) != digest
                        for name, digest in receipt["overview_files"].items())):
             return False, "refinement overview/comparison report changed or is incomplete"
+        if layout.result_prefix:
+            validate_catalog(layout, receipt.get("final_catalog_sha256"))
         if not validate_baseline(root):
             return False, "explicit LGZ baseline publication changed or is incomplete"
         check_seal(batch.get("baseline_inputs", {}))

@@ -85,13 +85,17 @@ cgat_server/
         01_source_evidence/<generation>/  参考比对及注释测量证据
       05_report/<run>/<site>/        可搬移的尝试报告
   05_final/
-    00_lgz/                          LGZ 基线：refinement_applied=false
-    01_degap/                        已校验并发布的精修结果
-      assembly.fa
-      final_path.json
-      sources.tsv
-      remaining_gaps.tsv
-      provenance.json
+    cgat_server.lgz.fa                可直接使用的 LGZ 基线
+    cgat_server.degap.fa              可直接使用的已发布自动精修结果
+    results.tsv                       区分本次尝试和当前可用发布
+    details/
+      00_lgz/                          LGZ 基线：refinement_applied=false
+      01_degap/                        已校验并发布的精修结果
+        assembly.fa
+        final_path.json
+        sources.tsv
+        remaining_gaps.tsv
+        provenance.json
   06_report/
     report.html                      从这里进入总览和本次比较
     01_lgz/report.html               原始 LGZ 过程
@@ -108,7 +112,9 @@ cgat_server/
     refinement/<tool-dir>/<run>/final/  按来源重建的私有待发布结果
 ```
 
-方括号表示两个实际文件，不是文件名的一部分；`--archive-format zip` 使用 `.zip`。每种工具在 `04_refinement`、`05_final`、`06_report/02_refinement`、`07_delivery` 下的目录编号固定，不因只选择一个工具而改号。编号工作区不再保留根目录 `data/`、`grt/`、`report/`、`logs/` 影子树。App 包内部仍使用协议约定的 `data/`、`metadata/` 等路径，不要手动改包内目录。
+FASTA 前缀取创建时的输出目录名。补跑失败不会替换上次成功的基因组；从 `results.tsv` 可查到现有 FASTA 对应哪次发布。若工具没有接纳补丁，清单标明零接纳。已有编号工作区继续使用 `05_final/00_lgz/` 和 `05_final/<工具编号>/`，不搬迁、不改名。
+
+方括号表示两个实际文件，不是文件名的一部分；`--archive-format zip` 使用 `.zip`。每种工具在 `04_refinement`、`05_final/details`、`06_report/02_refinement`、`07_delivery` 下的目录编号固定，不因只选择一个工具而改号。编号工作区不再保留根目录 `data/`、`grt/`、`report/`、`logs/` 影子树。App 包内部仍使用协议约定的 `data/`、`metadata/` 等路径，不要手动改包内目录。
 
 仅存在工具目录不能证明本次成功，应以当前总览和内容绑定的 committed 发布回执为准。新尝试失败会留存诊断，不删除旧的成功发布，也不把旧发布标成新结果。一个工具失败不妨碍其他成功工具或 LGZ 基线交付，但本次流程总退出码非零。
 

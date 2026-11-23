@@ -1080,7 +1080,8 @@ def main() -> int:
         # No handoff survives a lock release, restart, package import or migration.
         with tempfile.TemporaryDirectory(prefix="cgat-lgz-check-") as private:
             runner.contract_channel = Path(private) / "verified.json"
-            return runner.run()
+            from job_final_catalog import record_early_failure
+            return record_early_failure(server_dir, lock, run_id, runner.run())
     except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

@@ -17,6 +17,9 @@ from pathlib import Path, PurePosixPath
 import re
 
 LAYOUT_SCHEMA = "cgat.workspace"
+# Same numbered scientific workspace (and Q0 producer identity), different output contract.
+# A pre-contract runtime must refuse this declaration rather than write the v2 public tree.
+JOB_OUTPUT_SCHEMA = "cgat.workspace.job-outputs.v1"
 LAYOUT_VERSION = 2
 MANIFEST = ".runtime/workspace.json"
 MIGRATION = ".runtime/migration.json"
@@ -174,9 +177,14 @@ class WorkspaceLayout:
     root: Path
     version: int
     prepared_runtime: str | None = None
+    result_prefix: str | None = None
 
     def __post_init__(self):
         object.__setattr__(self, "root", Path(self.root).resolve())
+        if self.result_prefix is not None and (
+                self.version != LAYOUT_VERSION or not isinstance(self.result_prefix, str)
+                or "/" in relative_path(self.result_prefix)):
+            raise LayoutError("invalid job result prefix")
         if self.prepared_runtime is not None and (self.version != LAYOUT_VERSION or self.prepared_runtime != ".lib"):
             raise LayoutError("invalid prepared runtime declaration")
         if type(self.version) is not int or self.version not in {1, LAYOUT_VERSION}:
@@ -217,12 +225,17 @@ class WorkspaceLayout:
         if migration and (migration["state"] == "rolled_back" or value.get("migration_id") != migration["id"]
                           or value.get("migration_adapter", migration.get("adapter")) != migration.get("adapter")):
             raise LayoutError("layout manifest disagrees with migration receipt")
-        if (value.get("schema") != LAYOUT_SCHEMA
+        if (value.get("schema") not in (LAYOUT_SCHEMA, JOB_OUTPUT_SCHEMA)
                 or type(value.get("layout_version")) is not int
                 or value.get("layout_version") != LAYOUT_VERSION
                 or value.get("state") != "ready"):
             raise LayoutError("unsupported or incomplete workspace layout manifest")
-        return cls(root, LAYOUT_VERSION, value.get("prepared_runtime"))
+        if value["schema"] == JOB_OUTPUT_SCHEMA:
+            if migration is not None or not isinstance(value.get("result_prefix"), str):
+                raise LayoutError("new job outputs require a creation-time result prefix, not a migrated workspace")
+        elif "result_prefix" in value:
+            raise LayoutError("unexpected result prefix on a pre-contract workspace")
+        return cls(root, LAYOUT_VERSION, value.get("prepared_runtime"), value.get("result_prefix"))
 
     def relative(self, logical: str | PurePosixPath) -> str:
         text = relative_path(logical)
@@ -231,6 +244,11 @@ class WorkspaceLayout:
             text = ".prepare_lib" + text.removeprefix(".lib")
         if self.prepared_runtime and (text == ".prepare_lib" or text.startswith(".prepare_lib/")):
             return self.prepared_runtime + text.removeprefix(".prepare_lib")
+        if self.result_prefix is not None:
+            area, _, tail = text.partition("/")
+            tool, sep, rest = tail.partition("/")
+            if area == "05_final" and (tool == "00_lgz" or tool in TOOL_DIRECTORIES.values()):
+                return "05_final/details/" + tool + sep + rest
         return canonical_relative(text) if self.version == LAYOUT_VERSION else text
 
     def path(self, logical: str | PurePosixPath) -> Path:
@@ -262,12 +280,14 @@ class WorkspaceLayout:
                 directory = TOOL_DIRECTORIES[tool]
             except KeyError as exc:
                 raise LayoutError(f"unknown refinement tool: {tool}") from exc
-        return f"{area}/{directory}"
+        return self.relative(f"{area}/{directory}")
 
     def manifest(self) -> dict:
         if self.version != LAYOUT_VERSION:
             raise LayoutError("legacy workspaces do not have a layout 2 manifest")
-        return {"schema": LAYOUT_SCHEMA, "layout_version": LAYOUT_VERSION, "state": "ready",
+        return {"schema": JOB_OUTPUT_SCHEMA if self.result_prefix is not None else LAYOUT_SCHEMA,
+                "layout_version": LAYOUT_VERSION, "state": "ready",
+                **({"result_prefix": self.result_prefix} if self.result_prefix is not None else {}),
                 **({"prepared_runtime": self.prepared_runtime} if self.prepared_runtime else {})}
 
 
@@ -302,13 +322,13 @@ def workspace_join(root: Path, *parts: str | Path) -> Path:
     return layout.path(relative.as_posix())
 
 
-def initialize_workspace(root: Path, *, prepared_runtime: str | None = None) -> WorkspaceLayout:
+def initialize_workspace(root: Path, *, prepared_runtime: str | None = None, job_outputs: bool = False) -> WorkspaceLayout:
     """Create a numbered workspace in an empty directory; never convert in place."""
     root = Path(root).resolve()
     if root.exists() and any(root.iterdir()):
         raise LayoutError("new workspace must be empty; existing workspaces require migration")
     root.mkdir(parents=True, exist_ok=True)
-    layout = WorkspaceLayout(root, LAYOUT_VERSION, prepared_runtime)
+    layout = WorkspaceLayout(root, LAYOUT_VERSION, prepared_runtime, root.name if job_outputs else None)
     private = root / ".runtime"
     private.mkdir(mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix=".workspace.", dir=private)
@@ -368,7 +388,7 @@ def main() -> None:
     parser.add_argument("--logical-script")
     args = parser.parse_args()
     try:
-        layout = initialize_workspace(args.server_dir, prepared_runtime=".lib") if args.initialize else WorkspaceLayout.detect(args.server_dir)
+        layout = initialize_workspace(args.server_dir, prepared_runtime=".lib", job_outputs=True) if args.initialize else WorkspaceLayout.detect(args.server_dir)
         if args.path is not None:
             print(layout.path(args.path))
         elif args.relative is not None:

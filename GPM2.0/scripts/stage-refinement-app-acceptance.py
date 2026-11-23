@@ -9,7 +9,11 @@ import hashlib
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "server/tools"))
+from workspace_layout import WorkspaceLayout
 
 TOOLS = ("01_degap", "02_tgsgapcloser", "03_quartet", "04_lrgapcloser")
 
@@ -40,8 +44,9 @@ def stage(out, workspaces):
             raise ValueError("Each workspace needs a unique label=path (letters/digits/hyphens)")
         prefixes.add(prefix)
         workspace = Path(value).resolve(strict=True)
+        layout = WorkspaceLayout.detect(workspace)
         for group in ("00_lgz", *TOOLS):
-            final, delivery = workspace / "05_final" / group, workspace / "07_delivery" / group
+            final, delivery = layout.path(f"05_final/{group}"), workspace / "07_delivery" / group
             if group != "00_lgz" and not delivery.exists():
                 continue
             tool = None if group == "00_lgz" else group.split("_", 1)[1]

@@ -17,6 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from job_final_catalog import record_early_failure
 from run_all_runner import Runner, RunnerError, WorkspaceLock, load_plan, new_run_id
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from run_resources import RESOURCE_OPTIONS, update_resources
@@ -200,7 +201,7 @@ def execute(argv: list[str], server_source: Path) -> int:
     if not root.exists() or not any(root.iterdir()):
         if "--ref" not in options or "--ds" not in options:
             raise RunnerError("A new workspace requires --ref and --ds; see run.sh --help")
-        initialize_workspace(root, prepared_runtime=".lib")
+        initialize_workspace(root, prepared_runtime=".lib", job_outputs=True)
     manifest_path = workspace_join(root, ".run_all/launch.json")
     run_id = new_run_id()
     lock = WorkspaceLock(root, run_id)
@@ -242,7 +243,7 @@ def execute(argv: list[str], server_source: Path) -> int:
                 atomic_write_json(manifest_path, saved)
             status = prepare_workspace(server_source / "prepare.sh", saved["argv"], root)
             if status:
-                return status
+                return record_early_failure(root, lock, run_id, status)
             load_plan(root)
             saved["prepared"] = True
             atomic_write_json(manifest_path, saved)
@@ -256,7 +257,7 @@ def execute(argv: list[str], server_source: Path) -> int:
         save_request(root, options, run_id, saved_reads=saved["options"] if saved else None)
         ensure_plan(root)
         units = load_plan(root)
-        return Runner(root, units, run_id).run()
+        return record_early_failure(root, lock, run_id, Runner(root, units, run_id).run())
     finally:
         lock.release()
 

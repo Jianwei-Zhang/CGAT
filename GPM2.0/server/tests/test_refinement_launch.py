@@ -18,7 +18,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import refinement_config as config
 from run_all_runner import WorkspaceLock, Runner, PlanUnit
-from workspace_layout import initialize_workspace
+from workspace_layout import WorkspaceLayout, initialize_workspace
 from refinement_bundle_fixture import FIXTURE
 from post_lgz_refinement import validate_completion
 
@@ -136,6 +136,7 @@ class RefinementConfigTests(unittest.TestCase):
             self.assertNotIn("--gapfill-tools", prepared_arguments)
             layout = config.WorkspaceLayout.detect(root)
             launch = json.loads(layout.path(".run_all/launch.json").read_text())
+            self.assertEqual(WorkspaceLayout.detect(root).result_prefix, root.name)
             self.assertNotIn("--hifi", launch["options"])
             self.assertNotIn(str(self.reads), launch["inputs"])
             self.reads.write_text(">new-read-content\nTTTT\n")
