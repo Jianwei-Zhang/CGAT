@@ -201,8 +201,12 @@ pub async fn import_manual_refinement_results(
 ) -> CommandResult<Value> {
     run_blocking_command("import_manual_refinement_results", move || {
         if let Some(automatic) = gpm_next_backend::grt_package::import_auto_patch_if_recognized(
-            Path::new(&workspaceRoot), projectId, Path::new(&zipPath),
-        ).map_err(format_error)? {
+            Path::new(&workspaceRoot),
+            projectId,
+            Path::new(&zipPath),
+        )
+        .map_err(format_error)?
+        {
             return Ok(automatic);
         }
         let result = gpm_next_backend::degap_jobs::import_manual_refinement_results(
