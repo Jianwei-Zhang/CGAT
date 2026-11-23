@@ -69,13 +69,22 @@ def read_fai_lengths(path: Path) -> dict[str, int]:
     return lengths
 
 
+def copy_to_projection(source: Path, target: Path) -> None:
+    """Copy into fresh private staging; tables and indices may be rewritten there."""
+    shutil.copy2(source, target)
+    if target.suffix in {".tsv", ".json", ".fai"}:
+        mode = stat.S_IMODE(target.stat().st_mode)
+        if not mode & stat.S_IWUSR:
+            target.chmod(mode | stat.S_IWUSR)
+
+
 def copy_file(source_root: Path, staging_root: Path, relpath: str) -> None:
     source = workspace_join(source_root, relpath)
     if not source.is_file():
         raise FileNotFoundError(f"required App payload file is missing: {relpath}")
     target = workspace_join(staging_root, relpath)
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, target)
+    copy_to_projection(source, target)
 
 
 def copy_tree_filtered(source_root: Path, staging_root: Path, directory: str, include_fasta: bool) -> None:
@@ -90,7 +99,7 @@ def copy_tree_filtered(source_root: Path, staging_root: Path, directory: str, in
             continue
         target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        copy_to_projection(source, target)
 
 
 def copy_annotation_tree(source_root: Path, staging_root: Path, directory: str) -> None:
@@ -103,7 +112,7 @@ def copy_annotation_tree(source_root: Path, staging_root: Path, directory: str) 
         relpath = Path(directory) / source.relative_to(source_dir)
         target = workspace_join(staging_root, relpath)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        copy_to_projection(source, target)
 
 
 

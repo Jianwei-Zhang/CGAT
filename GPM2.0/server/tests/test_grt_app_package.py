@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import shutil
+import stat
 import sys
 import tempfile
 import unittest
@@ -29,6 +30,29 @@ class GrtAppPackageTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
+
+    def test_frozen_baseline_is_readonly_but_private_projection_can_be_updated(self):
+        marks = self.source / "cen/chr_chr1/marks.tsv"
+        marks.parent.mkdir(parents=True)
+        marks.write_text("start\tend\n1\t5\n")
+        projected = (marks, self.source / "metadata/datasets.tsv",
+                     self.source / "data/reference/ref.fa.fai")
+        fasta = self.source / "data/reference/ref.fa"
+        for source in (*projected, fasta):
+            source.chmod(0o440)
+        before = {p: p.read_bytes() for p in (*projected, fasta)}
+        stage = self.root / "full"
+        grt_app_package.build(self.source, stage, include_fasta=True)
+        for source in projected:
+            copy = stage / source.relative_to(self.source)
+            self.assertFalse(source.samefile(copy))
+            self.assertEqual(copy.read_bytes(), before[source])
+            self.assertEqual(stat.S_IMODE(copy.stat().st_mode), 0o640)
+            copy.write_bytes(b"private projection\n")
+        self.assertEqual(stat.S_IMODE((stage / fasta.relative_to(self.source)).stat().st_mode), 0o440)
+        for source, content in before.items():
+            self.assertEqual(source.read_bytes(), content)
+            self.assertEqual(stat.S_IMODE(source.stat().st_mode), 0o440)
 
     def test_delivery_cli_checks_each_bundle_once_before_touching_staging(self):
         import lgz_app_package
