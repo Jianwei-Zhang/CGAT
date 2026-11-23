@@ -23,6 +23,12 @@ def declaration(ctx, module):
         'native_checkpoint_rewritten':False}
     if 'regional_mapper_loader_policy' in ctx.transition:
         record['regional_mapper_loader_policy'] = ctx.transition['regional_mapper_loader_policy']
+    if 'q0_supplement_scope' in ctx.transition:
+        scope = ctx.transition['q0_supplement_scope']
+        if scope != 'decision_frontier_repair' or getattr(module, 'PROOF_REPAIR_SCOPE', None) != scope:
+            raise ValueError('unbound q0 supplemental repair scope')
+        record['q0_supplement_scope'] = scope
+        record['q0_supplement_policy'] = module.supplement_policy(scope)['decision_frontier']
     return record
 
 
@@ -44,7 +50,8 @@ def describe_in_fresh_process(ctx):
     record=json.loads(result.stdout)
     if (record.get('reader_sha256')!=ctx.contract.sha256_file(path)
             or record.get('transition_sha256')!=ctx.transition_sha
-            or record.get('scientific_builder_modified') is not True):
+            or record.get('scientific_builder_modified') is not True
+            or record.get('q0_supplement_scope') != ctx.transition.get('q0_supplement_scope')):
         raise ValueError('fresh reader returned an unbound builder declaration')
     return record
 
@@ -56,7 +63,15 @@ def prepare(ctx,module,reader,*,threads,minimap2):
         if len(values)!=7:raise ValueError('q0 input-reader contract changed')
         values[4]=sorted(set(values[4])|{row['path'] for row in extra})
         return tuple(values)
+    scope = record.get('q0_supplement_scope')
+    original_prepare = getattr(module, 'prepare_evidence', None)
+    if scope is not None and not callable(original_prepare):
+        raise ValueError('bound q0 repair builder is missing')
     module._initial_inputs=inputs
+    if scope is not None:
+        def scoped_prepare(root, **kwargs):
+            return original_prepare(root, supplement_scope=scope, **kwargs)
+        module.prepare_evidence = scoped_prepare
     try:
         result=ctx.helper.prepare_with_reader(module,ctx.work,reader,ctx,record,threads=threads,minimap2=minimap2)
         ctx.verify()
@@ -64,7 +79,10 @@ def prepare(ctx,module,reader,*,threads,minimap2):
         if not {row['path'] for row in extra}<={row['path'] for row in result['inputs']}:
             raise ValueError('original alignment provenance is missing from q0 evidence')
         return result
-    finally:module._initial_inputs=original
+    finally:
+        module._initial_inputs=original
+        if scope is not None:
+            module.prepare_evidence=original_prepare
 
 
 def main():

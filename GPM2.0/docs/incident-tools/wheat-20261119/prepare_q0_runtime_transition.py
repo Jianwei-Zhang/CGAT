@@ -7,6 +7,7 @@ metadata-only step. Never rerun it over an existing candidate/journal.
 """
 import argparse
 import ast
+import csv
 import json
 from pathlib import Path
 import re
@@ -21,6 +22,8 @@ POLICIES = {'q0_preparation.py':'POLICY', 'q0_regional_discovery.py':'REGIONAL_P
             'q0_regional_candidates.py':'CANDIDATE_POLICY', 'q0_regional_mapping.py':'BASE_FLAGS'}
 LAUNCHER = 'prepare_q0_evidence.sh'
 DECLARATION = 'metadata/incident_q0_routing_reader.json'
+REPAIR_PROFILE = 'decision_frontier_repair'
+SELECTOR_POLICIES = {'q0_admission.py': 'AdmissionPolicy', 'q0_paths.py': 'PathPolicy'}
 
 
 def child(root, relative):
@@ -41,14 +44,47 @@ def record(path):
     return {'path':str(path), 'sha256':digest(path)}
 
 
-def runtime_names(path):
+def runtime_names(path, function='builder_identity'):
     tree = ast.parse(path.read_text())
-    builder = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'builder_identity')
-    names = sorted({n.value for n in ast.walk(builder)
+    identity = next((n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == function), None)
+    if identity is None:
+        raise ValueError('candidate lacks a bound identity function: '+function)
+    names = sorted({n.value for n in ast.walk(identity)
                     if isinstance(n, ast.Constant) and isinstance(n.value, str) and n.value.endswith('.py')})
-    if 'q0_preparation.py' not in names or any(not re.fullmatch(r'[A-Za-z0-9_]+\.py', n) for n in names):
-        raise ValueError('candidate has an unsafe/empty builder runtime inventory')
+    if path.name not in names or any(not re.fullmatch(r'[A-Za-z0-9_]+\.py', n) for n in names):
+        raise ValueError('candidate has an unsafe/empty runtime inventory: '+function)
     return names
+
+
+def selector_policy_ast(path, symbol):
+    tree = ast.parse(path.read_text())
+    node = next((n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == symbol), None)
+    if node is None:
+        raise ValueError('required selector policy is missing: '+symbol)
+    return ast.dump(node, include_attributes=False)
+
+
+def repair_inputs(work, manifest, selector_only, installed):
+    package = child(work, 'metadata/package.tsv')
+    bound_package = record(package)
+    with package.open(newline='', encoding='utf-8') as stream:
+        rows = list(csv.DictReader(stream, delimiter='\t'))
+    if len(rows) != 1 or rows[0].get('reads_qc_enabled') != 'false':
+        raise ValueError('q0 proof repair requires a bound no-reads-QC workspace')
+    if manifest.get('proof_repair_package') != bound_package:
+        raise ValueError('q0 proof repair package identity differs')
+    supplemental = manifest.get('prior_selector_files')
+    if not isinstance(supplemental, dict):
+        raise ValueError('q0 proof repair lacks prior selector identities')
+    prefix = '.prepare_lib/tools/lgz_core/'
+    expected = {prefix+name for name in selector_only if prefix+name not in installed
+                and child(work, prefix+name).is_file()}
+    if set(supplemental) != expected:
+        raise ValueError('prior selector identity inventory differs')
+    for relative, expected_sha in supplemental.items():
+        if digest(child(work, relative)) != expected_sha:
+            raise ValueError('prior selector identity differs: '+relative)
+    return bound_package, supplemental
 
 
 def policy_ast(path, symbol):
@@ -76,6 +112,10 @@ def prepare(bundle):
     scope = manifest.get('regional_mapper_loader_policy')
     if 'regional_mapper_loader_policy' in manifest and scope != 'clear_same_dependencies_v1':
         raise ValueError('invalid regional mapper loader candidate policy')
+    supplement = manifest.get('q0_supplement_scope')
+    if ('q0_supplement_scope' in manifest and supplement != REPAIR_PROFILE
+            or supplement is None and any(key in manifest for key in ('proof_repair_package', 'prior_selector_files'))):
+        raise ValueError('invalid candidate q0 supplement scope')
     previous_path = checked(manifest['previous_transition'])
     previous = json.loads(previous_path.read_text())
     work = Path(previous['workspace']).resolve(strict=True)
@@ -117,12 +157,20 @@ def prepare(bundle):
         if row['relative'] in sources or digest(path) != row['sha256']:
             raise ValueError('candidate source changed or duplicated')
         sources[row['relative']] = record(path)
-    names = runtime_names(child(bundle, 'runtime/q0_preparation.py'))
+    names = set(runtime_names(child(bundle, 'runtime/q0_preparation.py')))
+    repair_package = None
+    if supplement is not None:
+        selector = set(runtime_names(child(bundle, 'runtime/q0_admission.py'), 'selector_identity'))
+        if not set(SELECTOR_POLICIES) <= selector:
+            raise ValueError('candidate omits a required selector policy module')
+        repair_package, prior_selector = repair_inputs(work, manifest, selector - names, installed)
+        installed = {**installed, **prior_selector}
+        names |= selector
     required = {'runtime/'+name for name in names} | set(HELPERS.values()) | {'q0_science_handoff_gate.py', 'prepare_q0_runtime_transition.py'}
     if set(sources) != required:
         raise ValueError('candidate source closure differs from builder/entry inventory')
     runtime = []; policy_checks = []
-    for name in names:
+    for name in sorted(names):
         relative = '.prepare_lib/tools/lgz_core/'+name
         target = child(work, relative)
         prior = installed.get(relative)
@@ -132,6 +180,11 @@ def prepare(bundle):
             if prior is None or policy_ast(target, POLICIES[name]) != policy_ast(child(bundle, 'runtime/'+name), POLICIES[name]):
                 raise ValueError('candidate changes a scientific policy: '+name)
             policy_checks.append({'file':name, 'symbol':POLICIES[name], 'ast_equal':True})
+        if supplement is not None and name in SELECTOR_POLICIES:
+            symbol = SELECTOR_POLICIES[name]
+            if prior is None or selector_policy_ast(target, symbol) != selector_policy_ast(child(bundle, 'runtime/'+name), symbol):
+                raise ValueError('candidate changes a selector policy: '+name)
+            policy_checks.append({'file':name, 'symbol':symbol, 'ast_equal':True})
         runtime.append({'relative':relative, 'prior_sha256':prior, 'source':sources['runtime/'+name],
                         'new_sha256':sources['runtime/'+name]['sha256']})
     for name in ('transition.json', LAUNCHER, 'candidate-prepared.json'):
@@ -153,6 +206,10 @@ def prepare(bundle):
         'prior_launcher_sha256':installed[LAUNCHER], 'prior_declaration_sha256':installed[DECLARATION]}
     if scope is not None:
         transition['regional_mapper_loader_policy'] = scope
+    if supplement is not None:
+        transition['q0_supplement_scope'] = supplement
+        transition['proof_repair_package'] = repair_package
+        checked(repair_package)
     write_new(transition_path, transition)
     checked(manifest_before); checked(journal_before); checked(manifest['previous_transition'])
     for relative, expected in installed.items():
@@ -170,6 +227,9 @@ def prepare(bundle):
         'scientific_policy_ast_checks':policy_checks, 'workspace_modified':False, 'job_stopped':False,
         'initial_alignment_profiles_modified':False, 'native_checkpoints_rewritten':False,
         'existing_cache_adoption_repeated':False, 'outer_contract_replaced':False}
+    if supplement is not None:
+        checked(repair_package)
+        report['q0_supplement_scope'] = supplement
     write_new(bundle/'candidate-prepared.json', report)
     return report
 

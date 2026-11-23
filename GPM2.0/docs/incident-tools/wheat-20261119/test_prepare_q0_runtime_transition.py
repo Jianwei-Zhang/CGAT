@@ -95,6 +95,67 @@ class CandidatePreparationTests(unittest.TestCase):
         self.assertEqual(transition['regional_mapper_loader_policy'], 'clear_same_dependencies_v1')
         self.assertEqual(self.snapshot(), self.before)
 
+    def bind_repair_candidate(self):
+        package = self.work/'metadata/package.tsv'
+        package.write_text('reads_qc_enabled\nfalse\n')
+        initial = {
+            'q0_admission.py': "class AdmissionPolicy:\n    minimum_bp=100\ndef selector_identity():\n    return ('q0_admission.py','q0_paths.py','q0_coverage.py','common.py')\n",
+            'q0_paths.py': 'class PathPolicy:\n    maximum_evaluations=20000\n',
+            'q0_coverage.py': 'VALUE=1\n',
+        }
+        prior = {}
+        for name, content in initial.items():
+            relative = '.prepare_lib/tools/lgz_core/'+name
+            source = self.work/relative
+            source.write_text(content)
+            prior[relative] = prep.digest(source)
+            (self.bundle/'runtime'/name).write_text(content+'\nVALUE=2\n')
+        self.manifest.update(q0_supplement_scope=prep.REPAIR_PROFILE, proof_repair_package=prep.record(package),
+                             prior_selector_files=prior)
+        self.save_manifest()
+        self.before = self.snapshot()
+
+    def test_explicit_proof_repair_binds_new_selector_and_real_prior_without_writing_workspace(self):
+        self.bind_repair_candidate()
+        result = prep.prepare(self.bundle)
+        self.assertEqual(result['q0_supplement_scope'], prep.REPAIR_PROFILE)
+        transition = json.loads((self.bundle/'transition.json').read_text())
+        self.assertEqual(transition['proof_repair_package'], prep.record(self.work/'metadata/package.tsv'))
+        installed_prior = self.manifest['prior_selector_files']
+        for row in transition['runtime']:
+            if row['relative'] in installed_prior:
+                self.assertEqual(row['prior_sha256'], installed_prior[row['relative']])
+        self.assertEqual(result['runtime_files'], 6)
+        self.assertEqual({r['symbol'] for r in result['scientific_policy_ast_checks']},
+                         {'POLICY', 'AdmissionPolicy', 'PathPolicy'})
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_repair_fails_closed_on_unknown_prior_or_changed_selector_policy(self):
+        self.bind_repair_candidate()
+        rel = '.prepare_lib/tools/lgz_core/q0_coverage.py'
+        previous = self.manifest['prior_selector_files'].pop(rel)
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, 'prior selector identity inventory'):
+            prep.prepare(self.bundle)
+        self.manifest['prior_selector_files'][rel] = previous
+        p = self.bundle/'runtime/q0_paths.py'
+        p.write_text(p.read_text().replace('20000','10000'))
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, 'changes a selector policy'):
+            prep.prepare(self.bundle)
+        self.assertFalse((self.bundle/prep.LAUNCHER).exists())
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_reads_qc_blocks_candidate_even_if_its_new_package_bytes_are_bound(self):
+        self.bind_repair_candidate()
+        package = self.work/'metadata/package.tsv'
+        package.write_text('reads_qc_enabled\ntrue\n')
+        self.manifest['proof_repair_package'] = prep.record(package)
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, 'no-reads-QC workspace'):
+            prep.prepare(self.bundle)
+        self.assertFalse((self.bundle/'transition.json').exists())
+
     def test_existing_unowned_new_module_is_never_assumed_to_be_a_valid_prior(self):
         p=self.work/'.prepare_lib/tools/lgz_core/q0_regional_execution.py';p.write_text('unrelated file')
         with self.assertRaisesRegex(ValueError,'unexpected existing'):prep.prepare(self.bundle)

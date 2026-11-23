@@ -41,6 +41,29 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(self.record['regional_mapper_loader_policy'], 'clear_same_dependencies_v1')
         self.assertFalse(self.record['initial_alignment_profiles_modified'])
 
+    def test_only_explicit_scope_reaches_frozen_helper_and_is_restored(self):
+        self.ctx.transition['q0_supplement_scope'] = 'decision_frontier_repair'
+        self.module.PROOF_REPAIR_SCOPE = 'decision_frontier_repair'
+        self.module.supplement_policy = lambda scope: {'decision_frontier': {'selector': 'bound-selector'}}
+        called = []
+        def actual(root, **options):
+            called.append(options)
+            return {'inputs': [{'path': p} for p in self.module._initial_inputs(root)[4]]}
+        self.module.prepare_evidence = actual
+        def frozen_helper(module, root, checkpoint_reader, ctx, record, **options):
+            self.record = record
+            return module.prepare_evidence(root, **options)
+        self.ctx.helper.prepare_with_reader = frozen_helper
+        self.execute()
+        self.assertEqual(called, [{'threads': 32, 'minimap2': 'minimap2', 'supplement_scope': 'decision_frontier_repair'}])
+        self.assertEqual(self.record['q0_supplement_policy'], {'selector': 'bound-selector'})
+        self.assertIs(self.module.prepare_evidence, actual)
+        self.assertIs(self.module._initial_inputs, self.original)
+        self.ctx.transition['q0_supplement_scope'] = 'decision_frontier'
+        with self.assertRaisesRegex(ValueError, 'unbound q0 supplemental repair scope'):
+            self.execute()
+        self.assertEqual(len(called), 1)
+
     def test_missing_provenance_is_rejected(self):
         self.ctx.helper.prepare_with_reader=lambda *a,**kw:{'inputs':[]}
         with self.assertRaisesRegex(ValueError,'missing'):self.execute()

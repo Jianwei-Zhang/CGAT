@@ -139,6 +139,13 @@ def opened_transition(path,*,role,caller,require_installed):
         raise ValueError('new q0 caller/context is not bound to this transition')
     work=Path(transition['workspace']).resolve(strict=True)
     if path.is_relative_to(work):raise ValueError('transition plan must be isolated from its workspace')
+    repair_package = None
+    if 'q0_supplement_scope' in transition or 'proof_repair_package' in transition:
+        repair_package = transition.get('proof_repair_package')
+        if (phase != 'prepared' or transition.get('q0_supplement_scope') != 'decision_frontier_repair'
+                or not isinstance(repair_package, dict)
+                or checked(repair_package) != work/'metadata/package.tsv'):
+            raise ValueError('unbound q0 proof repair package or scope')
     if phase=='prepared':
         runtime=transition.get('runtime')
         if not isinstance(runtime,list) or not runtime:raise ValueError('prepared transition has no runtime inventory')
@@ -163,6 +170,7 @@ def opened_transition(path,*,role,caller,require_installed):
             if digest(path)!=identity:raise ValueError('q0 transition plan changed')
             for row in dependencies.values():checked(row)
             checked(transition['native_origin'])
+            if repair_package is not None:checked(repair_package)
             if phase=='prepared':
                 for row in transition['runtime']:checked(row['source'])
                 checked(transition['launcher'])
