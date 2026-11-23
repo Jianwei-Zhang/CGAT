@@ -1,0 +1,114 @@
+{
+  "scope": "initial_questions on six frozen panels; no mapper, not a whole-wheat estimate",
+  "node": "agent-X86-60",
+  "profile_job": "43025599",
+  "comparison_job": "43026886",
+  "comparison_log_sha256": "a49971ab2d6f7f923fe9184bef3e85c0418268ef7da99390f76c030121693053",
+  "base_revision": "1fb91740",
+  "admission_module_sha256": {
+    "base": "98c35729bbeb482c370ae53d333971ae1b32fee30642d1194e8d0923f26776e0",
+    "work": "8b27099e7155b0340ea1d029b303bf080870e581dc8607ff8ac0414dd2296c2c"
+  },
+  "order": [
+    "base",
+    "candidate",
+    "candidate",
+    "base"
+  ],
+  "panels": {
+    "1B-689Mb": {
+      "identity": {
+        "admission": "0702b6123b7d9ac09414f517dc4a22f3cd063b2cfb1ab66dc34bdd4e8eb26aa6",
+        "has_path": true,
+        "pin": "575910058629be6adc374af44da06d6b8be8f77b9789d3be485decc5e86a3f25",
+        "request": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selection": "c65b6c46c7c61e124df8dc362ea3e527bccd2550be474221f0850809dcdcf683"
+      },
+      "abba_seconds": [
+        1.534059889614582,
+        1.3030136451125145,
+        1.2248140573501587,
+        1.5118663609027863
+      ]
+    },
+    "7A-734Mb": {
+      "identity": {
+        "admission": "d265ccb0690c909bef7d381fc2a44637593ef510258fc86aa33feb8d340016fd",
+        "has_path": true,
+        "pin": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+        "request": "02d5c32eed556a15e7b7ed15d06c758cf66d6e7f9d6057e0578fb15d9c2d31b9",
+        "selection": "fd8feded7514126b12bff02e377254382f36ac162a18dbc1ce1b62dae82c57d5"
+      },
+      "abba_seconds": [
+        0.8615588024258614,
+        0.5575722381472588,
+        0.5125711411237717,
+        0.821311816573143
+      ]
+    },
+    "2B-8Mb": {
+      "identity": {
+        "admission": "7de8bde35fa063452dbfbf464f2e52b4ddb9ad2e49462cd907527fe66a48ca79",
+        "has_path": false,
+        "pin": "1ac3886d794afe3f1050bbdc817f94e97fe9d19749ba4502221acdcc2aba6dfc",
+        "request": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selection": "372af77bfa6544ca3ae2f79f7f7a9be4fac856d93cdb2655cd852fdb064c7eb1"
+      },
+      "abba_seconds": [
+        0.8122853562235832,
+        0.5923942029476166,
+        0.5936522260308266,
+        0.8211434856057167
+      ]
+    },
+    "3B-792Mb": {
+      "identity": {
+        "admission": "addf9d28adb2db3035f1ff2c80021900cab74ade8164b95b7e3a5ee789439e86",
+        "has_path": true,
+        "pin": "3dd7aa2d643a04019ea75d092cdc88567c36d8a4a7c3914dfcc1a7a654139d39",
+        "request": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selection": "4082a3618943be0b64c55595276dc379af3c3c6142e84919ad42f757d311a420"
+      },
+      "abba_seconds": [
+        1.5821062549948692,
+        0.9398759827017784,
+        0.9572826102375984,
+        1.4242430329322815
+      ]
+    },
+    "6A-16Mb": {
+      "identity": {
+        "admission": "a7b3ef2f185ce1d935583d0d55c53bcdcffcbb1b864ef6bfb9a6f40a952b470a",
+        "has_path": false,
+        "pin": "70da0dd53c00188d456229447dee5479b04c2f3adaf354fb4f102aa73b5c63ac",
+        "request": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selection": "372af77bfa6544ca3ae2f79f7f7a9be4fac856d93cdb2655cd852fdb064c7eb1"
+      },
+      "abba_seconds": [
+        0.130522258579731,
+        0.11419897526502609,
+        0.10713571310043335,
+        0.12031542509794235
+      ]
+    },
+    "3D-589Mb": {
+      "identity": {
+        "admission": "8ba1afa6545c54a16c3537496229b170a25dd934a6f64962c45a4dffff068dca",
+        "has_path": true,
+        "pin": "cb46341aa8fa1d7a805f86185510938eb44a5f62bb8c54130427b1a424c3eec9",
+        "request": "2507b6efbff4101291c415d179e2f64e1404530bd2aa4c579db58058bef1a071",
+        "selection": "bb819e3bc5e3e53dde0bb5c3a373ab7dc25bf6ca357cb99d5fac6b381a5ac730"
+      },
+      "abba_seconds": [
+        30.934271320700645,
+        23.146933615207672,
+        22.429731272161007,
+        30.417834669351578
+      ]
+    }
+  },
+  "sum_of_panel_two_run_means_seconds": {
+    "base": 35.48575933650136,
+    "candidate": 26.23958783969283
+  }
+}

@@ -8,10 +8,12 @@ pairwise-derived placement.
 """
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field, replace
 from functools import lru_cache
 import math
+from operator import attrgetter
 from pathlib import Path
 from typing import Mapping
 
@@ -198,21 +200,78 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
                          evidence, manifest["input_fingerprint"], catalog, ready_id, binding)
 
 
+_DNA = frozenset("ACGT")
+
+
+@lru_cache(maxsize=64)
+def _window_plan(n, k, fraction):
+    # Small windows only. Cache arithmetic/slices, never source sequence or verdicts.
+    terms = tuple((i/n) * math.log2(i/n) if i else 0.0 for i in range(n + 1))
+    total = n - k + 1
+    # Use the original division (including equality and one-ULP boundaries).
+    wanted = next(i for i in range(1, total + 1) if i / total >= fraction)
+    spans = tuple(slice(i, i+k) for i in range(total))
+    return terms, wanted, spans[:wanted], spans[wanted:]
+
+
+def _passes_complexity(text, policy):
+    counts = Counter(text)
+    if not counts.keys() <= _DNA:
+        return False
+    n = len(text)
+    k = min(policy.kmer_size, n)
+    if n <= 256:
+        terms, wanted, first, rest = _window_plan(n, k, policy.minimum_distinct_kmer_fraction)
+        if -sum(terms[v] for v in counts.values()) < policy.minimum_base_entropy:
+            return False
+        distinct = set(map(text.__getitem__, first))
+        if len(distinct) < wanted:
+            distinct.update(map(text.__getitem__, rest))
+        return len(distinct) >= wanted
+    # A custom large window must not leave O(window size) slicing plans in memory.
+    if -sum((v/n) * math.log2(v/n) for v in counts.values()) < policy.minimum_base_entropy:
+        return False
+    total = n - k + 1
+    return len({text[i:i+k] for i in range(total)}) / total >= policy.minimum_distinct_kmer_fraction
+
+
 def _complex_intervals(sequence: str, interval: Interval, policy: AdmissionPolicy):
-    """Local masks, not a whole-record average hiding a repetitive long tail."""
+    """Screen on the original local grid; emit maximal passing runs directly."""
     result = []
+    run = None
+    minimum = min(policy.kmer_size, len(sequence))
     for start in range(interval.start, interval.end, policy.minimum_anchor_bp):
         end = min(interval.end, start + policy.minimum_anchor_bp)
-        text = sequence[start:end].upper()
-        if len(text) < min(policy.kmer_size, len(sequence)) or set(text) - set("ACGT"):
-            continue
-        counts = Counter(text)
-        entropy = -sum((n / len(text)) * math.log2(n / len(text)) for n in counts.values())
-        k = min(policy.kmer_size, len(text))
-        kmers = [text[i:i+k] for i in range(len(text) - k + 1)]
-        if entropy >= policy.minimum_base_entropy and len(set(kmers)) / len(kmers) >= policy.minimum_distinct_kmer_fraction:
-            result.append(Interval(start, end))
-    return merged_intervals(result)
+        if end - start >= minimum and _passes_complexity(sequence[start:end].upper(), policy):
+            if run is None:
+                run = start
+        elif run is not None:
+            result.append(Interval(run, start))
+            run = None
+    if run is not None:
+        result.append(Interval(run, interval.end))
+    return tuple(result)
+
+
+_end = attrgetter("end")
+
+
+def _outside_merged_mask(span, mask):
+    """Subtract a previously merged mask; touching endpoints are not overlaps."""
+    cursor = span.start
+    for i in range(bisect_right(mask, cursor, key=_end), len(mask)):
+        other = mask[i]
+        if other.start >= span.end:
+            break
+        if cursor < other.start:
+            yield Interval(cursor, other.start)
+        cursor = other.end
+        if cursor >= span.end:
+            return
+    if cursor == span.start:
+        yield span
+    else:
+        yield Interval(cursor, span.end)
 
 
 @dataclass(frozen=True)
@@ -229,6 +288,8 @@ class _RefBlock:
 def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy):
     blocks = []
     for hit in data.reference_hits.get(part.source, ()):
+        if hit.query.end <= part.interval.start or hit.query.start >= part.interval.end:
+            continue  # No CIGAR run from this hit can intersect this part.
         identity = hit.matches / hit.block_length
         if identity < policy.minimum_reference_identity:
             continue
@@ -349,8 +410,9 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
     pair_neighbors = _pair_neighbors(data.pair_links)
 
     def clean_intervals(part, intervals):
+        mask = ambiguous.get(part.source, ())
         return merged_intervals(piece for i in intervals
-                                for unique in subtract_intervals(i, ambiguous.get(part.source, ()))
+                                for unique in _outside_merged_mask(i, mask)
                                 for piece in _complex_intervals(data.sources[part.source], unique, policy))
 
     # Revisit a reference seed when independently ref-anchored sequence on
