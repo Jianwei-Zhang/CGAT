@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -125,6 +126,9 @@ class NumberedWorkspaceTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout[-2000:] + result.stderr[-4000:])
             layout = WorkspaceLayout.detect(root)
             self.assertEqual(layout.version, 2)
+            command = next(line for line in layout.path("prepare_q0_evidence.sh").read_text().splitlines()
+                           if line.startswith("exec "))
+            self.assertEqual(shlex.split(command)[-2:], ["--supplement-scope", "auto"])
             plan = layout.path(".run_all/plan.tsv").read_text()
             self.assertLess(plan.index("finalize_evidence"), plan.index("refinement\t"))
             self.assertLess(plan.index("refinement\t"), plan.index("package_full"))

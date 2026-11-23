@@ -95,6 +95,7 @@
         "tools/grt_core/q0_regional_index.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_regional_mapping.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_retained_hits.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
+        "tools/grt_core/q0_scope_policy.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_sources.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_threshold_acceptance.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
         "tools/grt_core/q0_threshold_prepare.py": "6779130194d3107c32f70b3b7d4bfe3f667499e19b31234fee1c9f691323251d",
@@ -150,7 +151,7 @@
         "tools/lgz_core/q0_mapper_guard.py": "b87e4a3f604127319789cc27503fa145acc4a1397549ae5b821eb94ba3002780",
         "tools/lgz_core/q0_neighbor_requests.py": "1d58a9895dba943eb2968bf2e28e0f95578ed7a776c2d8832e7fd5a2af44c9c4",
         "tools/lgz_core/q0_paths.py": "515c2232f8da56339a8be7141a7442c93bb067e7b8966a4ae4196279d7c97f2f",
-        "tools/lgz_core/q0_preparation.py": "d39410f2c774e452d47f2ef6e1b40fc35c543d3eb49fbba9e789f02bbc50c80f",
+        "tools/lgz_core/q0_preparation.py": "b09110a274d41a9f4c525bde4bd8c214e192f1399e188237858d2f97b18a2196",
         "tools/lgz_core/q0_publication.py": "2608a405ddaf0e4aadf8a54166ae06f6b433365758344aa1daf1d6b99d2b2f9e",
         "tools/lgz_core/q0_query_windows.py": "140f6222e5bd4b5fd448daf35be98625a354f1eb26a8df0f0e7e06792a00cb51",
         "tools/lgz_core/q0_reference_competition.py": "d23f0bdde2eddeaf20c33887c27848b3539f69481217b512cd682e1a644d44f5",
@@ -161,6 +162,7 @@
         "tools/lgz_core/q0_regional_index.py": "fcb31b882b3b99e91f56389e404c58a7661ebf9a713fb5eddcaf6cd55d381ac5",
         "tools/lgz_core/q0_regional_mapping.py": "3a9cbaf33327d226f2429bd4b2afce6c59833ca3e69f6ad1e2bc3d964f4cd351",
         "tools/lgz_core/q0_retained_hits.py": "fd8b9bd8a2c047970fa2e18acf1646e07f0e9c285ef5fb855711f149cdf38fd7",
+        "tools/lgz_core/q0_scope_policy.py": "ade60830bf1afe208009c6edb5fcb2ec5d51e9943ceef1aa818426df9972caaa",
         "tools/lgz_core/q0_sources.py": "2fd88802d000d57b672420dc9270220f8865b1140dd6048f16c0955f8e497aa0",
         "tools/lgz_core/q0_threshold_acceptance.py": "fe162c34ab5bc75bbc57c9414466c2c744016af5cdb238110bc9f2f83410749e",
         "tools/lgz_core/q0_threshold_prepare.py": "c1a23a2ae8fc6426ec36bafacc3657e061e8057d824d52976bbefc4ef801b7f0",
@@ -183,7 +185,7 @@
         "tools/lgz_display_evidence.py": "691d5a97cefee1d216ec9364438135f9915ea0aafeff78ba7c4cea4a7ea517b5",
         "tools/lgz_evidence_package.py": "9505dac6c759e9c18e372dff423b4c608e050fd2237431d3efe019ce0df7f142",
         "tools/lgz_final.py": "e60050a067aecd93f65190c608effdf1360a8a23e8f91fb35fd10a5fdf8ecc0a",
-        "tools/lgz_prepare_evidence.py": "c1f50ecc880039de13f0a06ac5423f09a5393166691f13185e60ec2626927e0a",
+        "tools/lgz_prepare_evidence.py": "0b8ce310f67cf16f395e8d4f0c4b5a63fe9a81347d79c765de2e0fdd67053b16",
         "tools/lgz_prepare_inputs.py": "aeef380b1364fd9e2832b845d162eff6d4cd79c620fc7b03e81f66cc6c02b267",
         "tools/lgz_step1.py": "04cf6c3b93f03246a187f326244e729d4bf2110b9dd484938fc638fb75a572ac",
         "tools/lgz_step2.py": "9b3695ad775901b423d97ec39dab8b22b347df8a0513b5aa3adb004812a5978d",
@@ -245,7 +247,7 @@
         "tools/server_report_collect.py": "cad5dc8a3d4c1053d6a4194955989c4c17a2861f61fe8f169df48ae30d3edd20",
         "tools/server_report_io.py": "b9e93e91338b0e139682783aa7fc43c39487b8485b3a970330312566661a11b1",
         "tools/server_report_q0.py": "62f0ea3b0167da54c4a2271b82f4fd9011efb4a07eb4a5d9479d508b97cd2689",
-        "tools/server_run.py": "6bdbd64814d7944316a6a7623687b60b0a62bb5de1df6c09ff1ed57fd5b7d6e5",
+        "tools/server_run.py": "ff8205bf58f4e351771f56912859da768064f41f78958fd87c2a26f312bf6885",
         "tools/server_source_identity.py": "58511d6e7fa4648731a164cf17a2048ecd63b754c91700844a5955d81dcf80dd",
         "tools/tel_scan.py": "cc1a9cb93f6a15bce30187805435bdaebc4ce86f8ccf87b6334ce651c5961572",
         "tools/track_member_order.py": "427418428bbf08da5ec11442bcacf4621898ea7ba3bc5da7e32a8d1840a6604e",
@@ -259,7 +261,7 @@
       "reference_launch_checkpoint_recipe_equal": true
     }
   ],
-  "base_prepare_sha256": "231813a6d447a272c63c112237695149f80a68c236d52f7567018f22831f19fa",
+  "base_prepare_sha256": "f0e7742c8494cf3822f068fcd86cd94cc156127d4dc14b2d7f6b159e8c559db8",
   "source_revision": {
     "worktree_source_bound_by_file_hashes": true
   }

@@ -78,7 +78,7 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
                 raise RunnerError(str(exc)) from exc
         allowed = {"--reads-type": {"hifi", "ont"}, "--grt-execution-profile": {"baseline", "optimized"},
                    "--grt-step2-mummer-scope": {"full", "gap-screen"},
-                   "--q0-supplement-scope": {"full", "decision_frontier_repair", "positive_threshold"}}
+                   "--q0-supplement-scope": {"auto", "full", "decision_frontier_repair", "positive_threshold"}}
         if key in allowed and values[0] not in allowed[key]:
             raise RunnerError(f"Invalid {key}: {values[0]}")
         if key in TYPED_READ_OPTIONS:
@@ -234,13 +234,19 @@ def execute(argv: list[str], server_source: Path) -> int:
                 if any(path.name != (".runtime" if WorkspaceLayout.detect(root).version == 2 else ".run_all") for path in root.iterdir()):
                     raise RunnerError(f"Output directory is not an empty or prepared Server workspace: {root}")
                 # Store absolute input paths so preparation can also resume from another cwd.
+                options.setdefault("--q0-supplement-scope", [["auto"]])
                 absolute_argv = [item for key, groups in options.items() if key not in REFINEMENT_OPTIONS for values in groups for item in [key, *values]]
                 if "--out" not in options:
                     absolute_argv += ["--out", str(root)]
                 saved = {"schema_version": 1, "prepared": False, "argv": absolute_argv,
                          "options": {key: value for key, value in options.items() if key not in REFINEMENT_OPTIONS}, "inputs": input_identities(options)}
                 atomic_write_json(manifest_path, saved)
-            status = prepare_workspace(server_source / "prepare.sh", saved["argv"], root)
+            prepare_argv = saved["argv"]
+            # Pre-auto launches did not record the implicit full search. An
+            # interrupted preparation still belongs to that original scope.
+            if "--q0-supplement-scope" not in saved["options"]:
+                prepare_argv = [*prepare_argv, "--q0-supplement-scope", "full"]
+            status = prepare_workspace(server_source / "prepare.sh", prepare_argv, root)
             if status:
                 return status
             load_plan(root)
