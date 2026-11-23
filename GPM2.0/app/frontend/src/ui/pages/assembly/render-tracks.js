@@ -2285,14 +2285,17 @@ function renderAssemblyTracks(args) {
               markup: grtOverlayMarkup,
               escapeAttr,
             })}
-            ${telomereMarkerMarkup}
-            ${centromereMarkerMarkup}
             ${nRegionMarkerMarkup}
             ${renderManualSplitMarkers(ctg, rect, y, TRACK_BAR_HEIGHT, escapeHtml)}
             ${labelMarkup}
             ${
               slotToken
                 ? `<text class="track-slot-badge" x="${(rect.x + rect.width - 8).toFixed(2)}" y="${(y + TRACK_TEXT_OFFSET_Y).toFixed(2)}">${escapeHtml(slotToken)}</text>`
+                : ""
+            }
+            ${
+              (telomereMarkerMarkup || centromereMarkerMarkup)
+                ? `<g class="track-annotation-markers" data-track-annotation-markers="1">${centromereMarkerMarkup}${telomereMarkerMarkup}</g>`
                 : ""
             }
           </g>`,

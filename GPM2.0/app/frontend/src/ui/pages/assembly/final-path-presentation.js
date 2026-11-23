@@ -8,6 +8,70 @@ import {
 const positive = value => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;
 const text = value => String(value || "").trim();
 
+const REFINEMENT_TOOL_DISPLAY_NAMES = Object.freeze({
+  degap: "DEGAP",
+  lrgapcloser: "LR_Gapcloser",
+  tgsgapcloser: "TGS-GapCloser",
+  quartet: "quarTeT",
+});
+
+function inferRefinementToolId(segment, trace) {
+  const explicit = text(trace?.tool).toLowerCase();
+  if (explicit) {
+    return explicit;
+  }
+  const candidates = [
+    text(trace?.editId).toLowerCase(),
+    text(segment?.source?.dataset).toLowerCase(),
+    text(segment?.datasetName).toLowerCase(),
+    text(segment?.ctgName).toLowerCase(),
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    for (const key of Object.keys(REFINEMENT_TOOL_DISPLAY_NAMES)) {
+      if (
+        candidate.startsWith(`${key}-`)
+        || candidate.startsWith(`cgat_refinement_${key}_`)
+        || candidate.includes(`_${key}-`)
+        || candidate.endsWith(` · ${key}`)
+      ) {
+        return key;
+      }
+    }
+  }
+  return "";
+}
+
+function formatRefinementToolLabel(toolId, { isTelomere = false } = {}) {
+  if (!toolId) {
+    return "";
+  }
+  const normalized = toolId.toLowerCase();
+  if (normalized === "degap" && isTelomere) {
+    return "DEGAP TelSeeker";
+  }
+  return REFINEMENT_TOOL_DISPLAY_NAMES[normalized] || toolId;
+}
+
+function formatShortRefinementId(rawValue) {
+  const raw = text(rawValue);
+  if (!raw) {
+    return "";
+  }
+  const prefixedHex = raw.match(/^([a-z0-9_]+)-([0-9a-f]{8,})$/i);
+  if (prefixedHex) {
+    const [, prefix, hex] = prefixedHex;
+    if (prefix.toLowerCase() === "gap") {
+      return `gap-${hex.slice(0, 6)}`;
+    }
+    return `#${hex.slice(0, 6)}`;
+  }
+  if (/^[0-9a-f]{12,}$/i.test(raw)) {
+    return `#${raw.slice(0, 6)}`;
+  }
+  return raw.length > 20 ? `${raw.slice(0, 18)}…` : raw;
+}
+
 export function collectFinalPathSourceCtgs(assembly = {}) {
   return [
     ...(assembly.chrCtgs || []), ...(assembly.supportChrCtgs || []), ...(assembly.supportMirroredCtgs || []),
@@ -77,7 +141,10 @@ export function describeFinalPathRefinement(segment, locale = "zh") {
     return null;
   }
   const mode = isAdoptedPatch ? "manual" : "automatic";
-  const tool = text(trace?.tool);
+  const originalGapIds = Array.isArray(trace?.originalGapIds) ? trace.originalGapIds.filter(Boolean) : [];
+  const isTelomere = isAdoptedPatch && originalGapIds.length === 0 && Boolean(text(trace?.parentSegmentId));
+  const toolId = inferRefinementToolId(segment, trace);
+  const toolLabel = formatRefinementToolLabel(toolId, { isTelomere });
   const version = text(trace?.version);
   const editId = text(trace?.editId);
   const batchSha256 = text(trace?.batchSha256);
@@ -92,32 +159,38 @@ export function describeFinalPathRefinement(segment, locale = "zh") {
     ? Number(rawAdoptionRevision)
     : null;
   const patchSha256 = text(segment?.refinementPatchSha256 ?? segment?.refinement_patch_sha256);
-  const originalGapIds = Array.isArray(trace?.originalGapIds) ? trace.originalGapIds.filter(Boolean) : [];
   const isEn = locale === "en";
   const shortLabel = isEn ? "Refined" : "精修";
   const modeLabel = mode === "manual"
     ? (isEn ? "Manual refinement" : "手动精修")
     : (isEn ? "Automatic refinement" : "自动精修");
-  const badgeLabel = tool ? `${modeLabel} · ${tool}` : modeLabel;
+  const badgeLabel = toolLabel ? `${modeLabel} · ${toolLabel}` : modeLabel;
+  const shortId = formatShortRefinementId(editId || patchSha256 || locusId);
+  const compactTitle = toolLabel
+    ? (isEn
+      ? `${toolLabel} ${shortLabel}${shortId ? ` ${shortId}` : ""}`
+      : `${toolLabel} 精修${shortId ? ` ${shortId}` : ""}`)
+    : (isEn
+      ? `${modeLabel}${shortId ? ` ${shortId}` : ""}`
+      : `${modeLabel}${shortId ? ` ${shortId}` : ""}`);
+  const shortGapLabels = originalGapIds.map(formatShortRefinementId).filter(Boolean);
+  const switchedFrom = text(trace?.switchedFrom);
   const detailLines = [
-    `${isEn ? "Refinement" : "精修来源"}: ${badgeLabel}${version ? ` v${version}` : ""}`,
-    ...(locusId ? [`${isEn ? "Locus ID" : "位点标识"}: ${locusId}`] : []),
-    ...(batchSha256 ? [`${isEn ? "Batch / Run" : "批次 / 运行"}: ${batchSha256.slice(0, 16)}`] : []),
-    ...(resultSha256 ? [`${isEn ? "Result SHA-256" : "结果摘要"}: ${resultSha256.slice(0, 16)}`] : []),
-    ...(patchSha256 ? [`${isEn ? "Patch SHA-256" : "补丁摘要"}: ${patchSha256.slice(0, 16)}`] : []),
-    ...(attemptId ? [`${isEn ? "Attempt ID" : "尝试标识"}: ${attemptId}`] : []),
-    ...(revision ? [`${isEn ? "Tool revision" : "工具修订"}: ${revision}`] : []),
-    ...(adoptionRevision !== null ? [`${isEn ? "Adoption revision" : "采纳版本"}: r${adoptionRevision}`] : []),
-    ...(editId ? [`${isEn ? "Edit ID" : "改动标识"}: ${editId}`] : []),
-    ...(originalGapIds.length ? [`${isEn ? "Original gap(s)" : "原缺口"}: ${originalGapIds.join(", ")}`] : []),
-    ...(text(trace?.switchedFrom) ? [`${isEn ? "Switched from" : "替换自"}: ${text(trace.switchedFrom)}`] : []),
+    `${isEn ? "Source" : "精修方式"}: ${modeLabel}`,
+    ...(toolLabel ? [`${isEn ? "Tool" : "工具"}: ${toolLabel}${version ? ` v${version}` : ""}`] : []),
+    ...(shortId ? [`${isEn ? "Patch ID" : "补丁编号"}: ${shortId}`] : []),
+    ...(shortGapLabels.length ? [`${isEn ? "Target gap" : "原缺口"}: ${shortGapLabels.join(", ")}`] : []),
+    ...(switchedFrom ? [`${isEn ? "Switched from" : "替换自"}: ${formatRefinementToolLabel(switchedFrom) || switchedFrom}`] : []),
   ];
   return {
     mode,
     isAdoptedPatch,
     shortLabel,
     badgeLabel,
-    tool,
+    compactTitle,
+    shortId,
+    tool: toolId,
+    toolLabel,
     version,
     editId,
     locusId,
@@ -138,13 +211,25 @@ export function buildFinalPathTooltip(segment, { sourceCtgs = [], labels = {}, l
   const adopted = resolveFinalPathSegmentLengthBp(segment);
   if (!range || !adopted) return "";
   const number = value => Number(value).toLocaleString("en-US");
-  const refinement = describeFinalPathRefinement(segment, locale || labels?.locale || "zh");
+  const resolvedLocale = locale || labels?.locale || "zh";
+  const isEn = resolvedLocale === "en";
+  const refinement = describeFinalPathRefinement(segment, resolvedLocale);
+  if (refinement) {
+    const isFullPatch = range.sourceStart === 1 && range.sourceEnd === adopted
+      && (!range.sourceLength || range.sourceLength === adopted);
+    return [
+      refinement.compactTitle,
+      isFullPatch
+        ? `${isEn ? "Length" : "长度"}: ${number(adopted)} bp · ${labels.finalPathOrientation || (isEn ? "Orientation" : "方向")}: ${range.orient}`
+        : `${labels.finalPathAdoptedLength || (isEn ? "Adopted length" : "采用片段长度")}: ${number(adopted)} bp (${number(range.sourceStart)}–${number(range.sourceEnd)} bp, ${range.orient})`,
+      ...refinement.detailLines,
+    ].join("\n");
+  }
   return [
     resolveFinalPathSegmentDisplayName(segment),
     `${labels.finalPathAdoptedLength || "Adopted length"}: ${number(adopted)} bp`,
     ...(range.sourceLength ? [`${labels.finalPathSourceLength || "Source contig length"}: ${number(range.sourceLength)} bp`] : []),
     `${labels.finalPathSourceInterval || "Source interval"}: ${number(range.sourceStart)}–${number(range.sourceEnd)} bp`,
     `${labels.finalPathOrientation || "Orientation"}: ${range.orient}`,
-    ...(refinement ? refinement.detailLines : []),
   ].join("\n");
 }

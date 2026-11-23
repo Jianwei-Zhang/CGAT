@@ -1502,11 +1502,11 @@
 }
 
 .track-ctg.is-subview-selected {
-  stroke-width: 2;
+  stroke-width: 1;
 }
 
 .track-ctg.is-multi-selected {
-  stroke-width: 2;
+  stroke-width: 1;
   stroke: #2e567f;
 }
 
@@ -1514,18 +1514,18 @@
   stroke: #7c6440;
 }
 
-.assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg {
+.assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):not(:has(.track-telomere-marker:hover, .track-centromere-marker:hover)):hover > .track-ctg {
   stroke: #2e567f;
-  stroke-width: 2;
+  stroke-width: 1;
 }
 
-.assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg.is-companion {
+.assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):not(:has(.track-telomere-marker:hover, .track-centromere-marker:hover)):hover > .track-ctg.is-companion {
   stroke: #7c6440;
 }
 
 .assembly-track-svg:not(.subview-track-svg):not(.assembly-final-path-svg) .track-ctg-group:hover > .track-reference-member {
   stroke: #8e8e8e;
-  stroke-width: 2;
+  stroke-width: 1;
 }
 
 .main-anchor-fragment-hit-zone {
@@ -1598,11 +1598,16 @@
   stroke-width: 0.8;
   opacity: 0.9;
   pointer-events: all;
+  cursor: pointer;
+  transition: opacity 110ms ease, stroke-width 110ms ease, filter 110ms ease;
 }
 
 .track-telomere-marker:hover {
   opacity: 1;
-  stroke-width: 1.2;
+  stroke: var(--final-path-selection-stroke, #c2410c);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  filter: brightness(1.14);
 }
 
 .track-telomere-marker.is-rule-1 {
@@ -1635,11 +1640,16 @@
   stroke-width: 0.9;
   opacity: 0.92;
   pointer-events: all;
+  cursor: pointer;
+  transition: opacity 110ms ease, stroke-width 110ms ease, filter 110ms ease;
 }
 
 .track-centromere-marker:hover {
   opacity: 1;
-  stroke-width: 1.3;
+  stroke: var(--final-path-selection-stroke, #c2410c);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  filter: brightness(1.14);
 }
 
 .track-n-region-marker {
@@ -2248,18 +2258,18 @@
 /* Read-only adopted-source correlation (hover or pinned), never editing selection. */
 [data-final-path-selected="1"] > .track-ctg {
   stroke: var(--final-path-selection-stroke);
-  stroke-width: 3;
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 .final-path-sort-row[data-final-path-selected="1"],
 .final-path-sort-row[data-final-path-correlated="1"] {
-  outline: 3px solid var(--final-path-selection-stroke);
-  outline-offset: -3px;
+  outline: 1px solid var(--final-path-selection-stroke);
+  outline-offset: -1px;
 }
 .final-path-source-highlight {
-  fill: var(--final-path-selection-fill);
+  fill: none;
   stroke: var(--final-path-selection-stroke);
-  stroke-width: 3;
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
