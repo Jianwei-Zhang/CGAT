@@ -1,0 +1,44 @@
+{
+  "dataset": "JM19_hifiasm",
+  "limits": "Digest-only replay from indexed source extents; no whole-source rehash, output materialization, checkpoint import or Q0 count.",
+  "mapper_calls": 0,
+  "parent_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+  "schema": "wheat_parent_derived_input_probe_v1",
+  "snapshot_sha256": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d",
+  "source_extent_bytes": 25007087,
+  "source_records": 126,
+  "unit": "q0_chr:Un",
+  "verified_derived_bytes": 100046114,
+  "verified_derived_inputs": [
+    {
+      "path": "runs/chr_Un/JM19_hifiasm_vs_self/batches/batch-00000/query.fa",
+      "sha256": "06fada580c08ef9ab4d727599f1291b394831ee7d1c04a8e73632c7c76fc7213",
+      "size": 19988293
+    },
+    {
+      "path": "runs/chr_Un/JM19_hifiasm_vs_self/batches/batch-00001/query.fa",
+      "sha256": "4aaeebf99373a518663470a16ef7e9650ca83ac9cf3352183e5bdd17a62a9e4c",
+      "size": 5021566
+    },
+    {
+      "path": "runs/chr_Un/JM19_hifiasm_vs_self/self_name_map.tsv",
+      "sha256": "951514351da0954b580e131937ff2209c2d005bee010c514647da93293dd48c5",
+      "size": 7812
+    },
+    {
+      "path": "runs/chr_Un/JM19_hifiasm_vs_self/self_query.fa",
+      "sha256": "47d4ba2265104fefe13c0337d5094187e7235663fa6e6055e8180e86cb310a06",
+      "size": 25009859
+    },
+    {
+      "path": "runs/chr_Un/JM19_hifiasm_vs_self/self_target.fa",
+      "sha256": "c4dde7caf13368bdf92960131341d6a91deee0a5f9572e2ce174caf3aa0f00e1",
+      "size": 25009859
+    },
+    {
+      "path": "runs/chr_Un/datasets/JM19_hifiasm.fa",
+      "sha256": "f12814fc13bbce12c3ca08217be74930922ceaf4dc2740736093646531ba84b4",
+      "size": 25008725
+    }
+  ]
+}
