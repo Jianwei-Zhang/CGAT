@@ -521,7 +521,6 @@ function renderFinalPathExportMenu({
   canExportFasta = true,
   canExportLog = false,
   canExportManualRefinement = false,
-  canExportDegapJobs = false,
 }) {
   const fastaItem = canExportFasta
     ? `
@@ -533,13 +532,9 @@ function renderFinalPathExportMenu({
     : "";
   const refinementItems = canExportManualRefinement
     ? `
-        <button type="button" class="final-path-export-item" data-final-path-export-action="refinement-current-chr">${escapeHtml(labels.finalPathExportRefinementCurrentChr || "导出精修任务（当前染色体已选）")}</button>`
+        <button type="button" class="final-path-export-item" data-final-path-export-action="refine-jobs">${escapeHtml(labels.finalPathExportRefineJobs || "refine-jobs")}</button>`
     : "";
-  const degapJobsItem = canExportDegapJobs
-    ? `
-        <button type="button" class="final-path-export-item" data-final-path-export-action="degap-jobs">${escapeHtml(labels.finalPathExportDegapJobs || "旧版 DEGAP-JOBS（脚本包）")}</button>`
-    : "";
-  const extraDivider = (canExportManualRefinement || canExportDegapJobs)
+  const extraDivider = canExportManualRefinement
     ? `
         <div class="final-path-export-divider" role="separator" aria-hidden="true"></div>`
     : "";
@@ -560,7 +555,6 @@ function renderFinalPathExportMenu({
         <button type="button" class="final-path-export-item" data-final-path-export-action="all">${escapeHtml(labels.finalPathExportAll || "All")}</button>
         ${extraDivider}
         ${refinementItems}
-        ${degapJobsItem}
       </div>
     </div>
   `;
@@ -1678,6 +1672,7 @@ export function renderFinalPathCard(
     graphPreviewSegmentOrder = null,
     graphAddonByChr = {},
     degapRuntimeBody = "",
+    finalPathToastBody = "",
     manualRefinementBody = "",
     canExportFasta = true,
     canExportManualRefinement = false,
@@ -1902,6 +1897,7 @@ export function renderFinalPathCard(
         ${headControls}
       </div>
       <div class="final-path-card-body">
+        ${String(finalPathToastBody || "")}
         ${String(degapRuntimeBody || "")}
         ${body}
         ${String(manualRefinementBody || "")}

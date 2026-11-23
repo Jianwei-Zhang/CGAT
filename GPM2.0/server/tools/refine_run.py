@@ -185,13 +185,15 @@ def output_row(locus, tool, status, *, reason=None, patch=None, **run):
     return {"locus_id": locus["id"], "tool": tool, "status": status, "reason": reason, "patch": patch, **run}
 
 
-def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_binding, read_ids, threads, lock, runtime):
+def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_binding, read_ids, threads, lock, runtime,
+             tool_override=None):
     attempt_id = uuid.uuid4().hex
     attempt = layout.path((batch_dir / "02_jobs" / locus["id"] / tool / attempt_id).relative_to(layout.root).as_posix())
     attempt.mkdir(parents=True, exist_ok=False)
     identities = {**safe_input_paths(layout, seeds, prepared), **read_ids}
     definition = lock["tools"][tool]
-    profile = degap_preset(layout.root) if tool == "degap" else None
+    override_params = dict(tool_override) if isinstance(tool_override, dict) else {}
+    profile = {**degap_preset(layout.root), **override_params} if tool == "degap" else None
     converted = prepare_native_reads(tool, groups, batch_dir / "01_inputs" / "reads_cache")
     prepared_reads = [path for paths in converted["prepared"].values() for path in paths]
     for value in prepared_reads:
@@ -207,6 +209,18 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
         command = [invocation.command[0], "-B", str(entry), "--mode", "telseeker_ctg", "--ctg",
                    str(seeds / "endpoint.fa"), "L" if locus["kind"] == "tel_left" else "R",
                    "--motif", locus["motif"], "--out", str(native), "--thread", str(threads), *degap_args(profile)]
+        if profile.get("kmer_size") is not None:
+            command.extend(("--kmer_size", str(profile["kmer_size"])))
+        if profile.get("kmer_num") is not None:
+            command.extend(("--kmer_num", str(profile["kmer_num"])))
+        if profile.get("edge") is not None:
+            command.extend(("--edge", str(profile["edge"])))
+        if profile.get("tel_n") is not None:
+            command.extend(("--tel-n", str(profile["tel_n"])))
+        if profile.get("tel_r") is not None:
+            command.extend(("--tel-r", str(profile["tel_r"])))
+        if profile.get("tel_mm") is not None:
+            command.extend(("--tel-mm", str(profile["tel_mm"])))
         for kind, paths in converted["prepared"].items():
             if paths:
                 command += ["--" + kind, *paths]
@@ -214,7 +228,8 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
         cwd = attempt
     else:
         invocation = make_invocation(tool, seeds / "local.fa", converted["prepared"], native, threads,
-                                     runtime=runtime, lock=lock, jobs_dir=attempt, degap_parameters=profile)
+                                     runtime=runtime, lock=lock, jobs_dir=attempt, degap_parameters=profile,
+                                     tool_parameters=override_params or None)
         command, cwd = invocation.command, invocation.cwd
         driver = materialize_native_driver(invocation)
     cwd.mkdir(parents=True, exist_ok=True)
@@ -224,7 +239,7 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
     durable_json(attempt / "invocation.json", {"schema": "cgat.manual-refinement-execution.v1", "locus_id": locus["id"],
                  "attempt_id": attempt_id, "tool": tool, "version": version, "revision": revision,
                  "command": list(command), "recipe": invocation.recipe, "inputs": prepared["files"], "reads": reads_binding,
-                 "preset": profile, "runtime_sha256": fingerprint(runtime)})
+                 "preset": profile, "tool_parameters": override_params or None, "runtime_sha256": fingerprint(runtime)})
     check_identities(identities)
     verify_directory_links(runtime)
     try:
@@ -239,8 +254,11 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
             artifacts[native_log] = sha256_file(native_log)
         else:
             native_result_dir = native / "output" if tool == "lrgapcloser" else native
+            capture_parameters = dict(definition.get("parameters", {}))
+            if tool == "lrgapcloser":
+                capture_parameters.update(override_params)
             capture_result, _ = capture(layout.root, tool, attempt_id, native_result_dir, invocation, code, native_log,
-                                        {"locus"}, definition.get("parameters", {}), prepared_reads, driver,
+                                        {"locus"}, capture_parameters, prepared_reads, driver,
                                         manual_attempt=attempt)
             artifacts = {layout.path(key): value for key, value in capture_result["artifacts"].items()}
             terminal = capture_result.get("terminal")
@@ -397,7 +415,9 @@ def execute_manual(layout, batch_dir, preparation, manifest, override, threads):
                         verify_engine(Path(__file__).with_name("degap_core"))
                 seeds = layout.path(state["receipt"]).parent
                 prepared = verify_prepared(seeds, batch, locus)
-                return run_tool(layout, batch_dir, locus, tool, seeds, prepared, *checks[tool], budget, lock, runtimes[tool])
+                tool_override = (manifest.get("tool_parameters") or {}).get(tool)
+                return run_tool(layout, batch_dir, locus, tool, seeds, prepared, *checks[tool], budget, lock, runtimes[tool],
+                                tool_override=tool_override)
             try:
                 row, patch_file = execute_one()
             except ReadsUnavailable as exc:

@@ -31,7 +31,44 @@
 }
 
 .final-path-card-body {
+  position: relative;
   padding-bottom: 6px;
+}
+
+.final-path-toast-wrap {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 12;
+  max-width: min(360px, 50vw);
+  pointer-events: none;
+}
+
+.final-path-toast {
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: 5px;
+  background: var(--theme-translucent-surface, rgba(255, 255, 255, 0.96));
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+  color: var(--text-primary, #1e293b);
+  font-size: var(--font-small);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.final-path-toast.is-ok {
+  border-color: var(--theme-green-line, #77b38b);
+  background: rgba(240, 253, 244, 0.96);
+  color: var(--theme-green-ink, #166534);
+}
+
+.final-path-toast.is-error {
+  border-color: var(--theme-red-line, #d4a3a3);
+  background: rgba(254, 242, 242, 0.96);
+  color: var(--theme-red-ink, #991b1b);
 }
 
 .final-path-all-card-stack {

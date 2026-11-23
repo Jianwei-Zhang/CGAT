@@ -460,7 +460,7 @@ function getLabels(state) {
       exportFasta: "Sequence (.fasta)",
       exportAgp: "AGP (.agp)",
       exportLog: "Log (.log)",
-      exportRefinementAll: "Export All Refinement Tasks",
+      exportRefinementAll: "Refinement Tasks",
       exportDialogTitle: "Exporting Final Path",
       exportRunning: "Running: {step}",
       refDisabled: "A Final Path in this assembly contains reference objects. Statistics and log export are disabled; export functions remain available.",
@@ -520,12 +520,12 @@ function getLabels(state) {
     refresh: "刷新",
     export: "导出",
     exportAll: "全部",
-    exportPng: "图(.png)",
-    exportTsv: "表(.tsv)",
-    exportFasta: "序列(.fasta)",
+    exportPng: "图 (.png)",
+    exportTsv: "表 (.tsv)",
+    exportFasta: "序列 (.fasta)",
     exportAgp: "AGP (.agp)",
-    exportLog: "日志(.log)",
-    exportRefinementAll: "导出全部精修任务",
+    exportLog: "日志 (.log)",
+    exportRefinementAll: "精修任务",
     exportDialogTitle: "正在导出 Final Path",
     exportRunning: "正在执行：{step}",
     refDisabled: "检测到组装中某个染色体的 Final Path 包含参考序列对象。本页仅保留导出功能，组装统计和日志导出已关闭。",
@@ -1211,10 +1211,10 @@ function renderDetailTable(model, labels, detailTableState) {
 
 function renderStats(model, labels, detailTableState = normalizeDetailTableState()) {
   if (model.statsDisabledByRef) {
-    return `<p class="notice warning">${escapeHtml(labels.refDisabled)}</p>`;
+    return `<p class="notice warning" hidden>${escapeHtml(labels.refDisabled)}</p>`;
   }
   return `
-    <section class="project-assembly-statistics"><header class="project-section-divider"><h3>${escapeHtml(labels.assemblyStatistics)}</h3></header><div class="project-export-grid">
+    <section class="project-assembly-statistics" hidden><header class="project-section-divider"><h3>${escapeHtml(labels.assemblyStatistics)}</h3></header><div class="project-export-grid">
       <article class="project-export-panel">
         <div class="project-export-panel-title">
           <h4>${escapeHtml(labels.assignment)}</h4>
@@ -1348,7 +1348,7 @@ function getFinalPathPreviewEntries(state) {
 
 
 export function renderProjectPathOverview(state) {
-  return renderProjectExportPage(state);
+  return renderProjectExportPage(state, { includeExportMenu: false });
 }
 
 function projectSurfaceRoot(host) {
@@ -1618,14 +1618,14 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
         aria-expanded="false"
       >${escapeHtml(labels.export)}</button>
       <div class="final-path-export-menu is-hidden" data-project-export-menu>
-        <button type="button" class="final-path-export-item" data-project-export-action="png">${escapeHtml(labels.exportPng)}</button>
-        <button type="button" class="final-path-export-item" data-project-export-action="tsv">${escapeHtml(labels.exportTsv)}</button>
-        ${logItem}
         ${fastaItem}
         <button type="button" class="final-path-export-item" data-project-export-action="agp">${escapeHtml(labels.exportAgp)}</button>
+        <button type="button" class="final-path-export-item" data-project-export-action="tsv">${escapeHtml(labels.exportTsv)}</button>
+        <button type="button" class="final-path-export-item" data-project-export-action="png">${escapeHtml(labels.exportPng)}</button>
+        ${logItem}
         <button type="button" class="final-path-export-item" data-project-export-action="all">${escapeHtml(labels.exportAll)}</button>
         <div class="final-path-export-divider" role="separator" aria-hidden="true"></div>
-        <button type="button" class="final-path-export-item" data-project-export-action="refinement-all">${escapeHtml(labels.exportRefinementAll || "导出全部精修任务")}</button>
+        <button type="button" class="final-path-export-item" data-project-export-action="refinement-all">${escapeHtml(labels.exportRefinementAll || "精修任务")}</button>
       </div>
     </div>
   `;
@@ -1656,20 +1656,29 @@ function renderProjectOverviewSummary(state) {
   `;
 }
 
-function renderProjectOverviewActions(state) {
+export function renderProjectGlobalExportControl(state) {
+  if (!getCurrentProject(state)) {
+    return "";
+  }
   const labels = getLabels(state), fresh = isProjectOverviewDataFresh(state);
-  return `<div class="project-export-actions">${renderPreviewImageDownloadButton(state)}${renderProjectExportMenu({
-    labels, canExportFasta: fresh && canProjectExportFasta(state),
-    canExportLog: fresh && buildProjectExportDataModel(state).canExportLog, disabled: !fresh,
-  })}</div>`;
+  return renderProjectExportMenu({
+    labels,
+    canExportFasta: fresh && canProjectExportFasta(state),
+    canExportLog: fresh && buildProjectExportDataModel(state).canExportLog,
+    disabled: !fresh,
+  });
 }
 
-export function renderProjectExportPage(state) {
+function renderProjectOverviewActions(state, { includeExportMenu = true } = {}) {
+  return `<div class="project-export-actions">${renderPreviewImageDownloadButton(state)}${includeExportMenu ? renderProjectGlobalExportControl(state) : ""}</div>`;
+}
+
+export function renderProjectExportPage(state, { includeExportMenu = true } = {}) {
   const labels = getLabels(state);
   if (!getCurrentProject(state)) return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}"><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
   return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}" data-overview-project="${escapeAttr(previewProjectKey(state))}" data-project-path-overview="${escapeAttr(previewProjectKey(state))}">
     ${renderProjectOverviewSummary(state)}
-    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3><span data-preview-count>${renderProjectPreviewCount(state)}</span>${renderProjectOverviewActions(state)}</header>
+    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3><span data-preview-count>${renderProjectPreviewCount(state)}</span>${renderProjectOverviewActions(state, { includeExportMenu })}</header>
     <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true, hideHeading: true })}</div>
   </section>`;
 }
@@ -1754,10 +1763,17 @@ function rerender(host, store) {
     template.innerHTML = renderProjectOverviewSummary(state);
     const next = template.content.querySelector("[data-overview-summary]");
     if (next) summary.replaceWith(next);
+    const headerExport = host.querySelector?.(".project-header-actions [data-project-export]");
+    if (headerExport) {
+      const exportTpl = doc.createElement("template");
+      exportTpl.innerHTML = renderProjectGlobalExportControl(state);
+      const nextExport = exportTpl.content.querySelector("[data-project-export]");
+      if (nextExport) headerExport.replaceWith(nextExport);
+    }
     const toolbar = page.querySelector(".project-preview-toolbar .project-export-actions");
     if (toolbar) {
       const actions = doc.createElement("template");
-      actions.innerHTML = renderProjectOverviewActions(state);
+      actions.innerHTML = renderProjectOverviewActions(state, { includeExportMenu: !headerExport });
       const nextActions = actions.content.querySelector(".project-export-actions");
       if (nextActions) toolbar.replaceWith(nextActions);
     }

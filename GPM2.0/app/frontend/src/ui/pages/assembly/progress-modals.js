@@ -20,8 +20,8 @@ export function createAssemblyProgressModalRenderer({
     if (kind === "log") {
       return labels.finalPathExportLog || "日志(.log)";
     }
-    if (kind === "refinement-current-chr") {
-      return labels.finalPathExportRefinementCurrentChr || "导出精修任务（当前染色体已选）";
+    if (kind === "refinement-current-chr" || kind === "refine-jobs") {
+      return labels.finalPathExportRefineJobs || "refine-jobs";
     }
     if (kind === "degap-jobs") {
       return labels.finalPathExportDegapJobs || "旧版 DEGAP-JOBS（脚本包）";

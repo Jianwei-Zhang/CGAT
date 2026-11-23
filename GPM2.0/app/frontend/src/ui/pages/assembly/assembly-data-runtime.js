@@ -490,7 +490,7 @@ export async function loadAssemblyView(host, store, options, deps) {
         ? currentSupportDatasetId
         : supportDatasetOptions[0]?.datasetId || null;
     const shouldResetSubview = supportDatasetId !== currentSupportDatasetId;
-    const nextSubview = shouldResetSubview
+    const nextSubview = shouldResetSubview || !state.assembly.subview || typeof state.assembly.subview !== "object"
       ? deps.buildClearedSubviewState(state.assembly)
       : state.assembly.subview;
 
@@ -563,7 +563,7 @@ export async function loadAssemblyView(host, store, options, deps) {
     );
     const persistedSubviewTrackDragOffsets = deps.filterSubviewTrackDragOffsetsBySummary(
       projectAssemblyViewState?.subviewTrackDragOffsets,
-      nextSubview.summary,
+      nextSubview?.summary ?? null,
     );
     const persistedSubviewAnchorStateByKey =
       projectAssemblyViewState?.subviewAnchorStateByKey
@@ -608,7 +608,7 @@ export async function loadAssemblyView(host, store, options, deps) {
       selectedChrName,
     });
     const filteredSubviewTrackPairHiddenCtgs = deps.filterSubviewTrackPairHiddenCtgs(
-      nextSubview.trackPairHiddenCtgs,
+      nextSubview?.trackPairHiddenCtgs,
       subviewTrackPairPools,
     );
     const filteredSubviewTrackPairHiddenKeySet = new Set(
@@ -617,7 +617,7 @@ export async function loadAssemblyView(host, store, options, deps) {
       ),
     );
     const filteredSubviewTrackPairSelections = deps.filterSubviewTrackPairSelectionCtgs(
-      nextSubview.trackPairSelectedCtgs,
+      nextSubview?.trackPairSelectedCtgs,
       subviewTrackPairPools,
     ).filter(
       (entry) => !filteredSubviewTrackPairHiddenKeySet.has(
@@ -665,6 +665,7 @@ export async function loadAssemblyView(host, store, options, deps) {
           jobs: persistedDegapProjectState.jobs,
           settingsPanelDismissed: persistedDegapProjectState.settingsPanelDismissed,
           collapsedJobCardChrNames: persistedDegapProjectState.collapsedJobCardChrNames,
+          manualRefinement: normalizeManualRefinementState(persistedDegapProjectState.manualRefinement),
           pendingJobIntent: null,
         },
         membersCardCollapsed: persistedMembersCardCollapsed,
@@ -1155,6 +1156,7 @@ import {
   normalizeFinalPathViewMode as normalizeFinalPathViewModeState,
 } from "./final-path-state.js";
 import { normalizeDegapProjectState } from "./degap-state.js";
+import { normalizeManualRefinementState } from "./manual-refinement-state.js";
 import { tAssembly } from "./i18n.js";
 import { normalizeHiddenPrimaryCtgIdsByChr, normalizeTrackDragOffsets } from "./selection-state.js";
 import {

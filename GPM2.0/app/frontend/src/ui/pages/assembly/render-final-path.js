@@ -2,7 +2,11 @@ import { collectFinalPathSourceCtgs } from "./final-path-presentation.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import { renderFinalPathCard } from "./final-path-card.js";
 import { renderDegapJobCard, renderDegapRuntime } from "./degap-card.js";
-import { renderManualRefinementCard } from "./manual-refinement-card.js";
+import {
+  renderManualRefinementCard,
+  renderManualRefinementSettingsModal,
+  renderManualRefinementToast,
+} from "./manual-refinement-card.js";
 import {
   FINAL_PATH_ALL_KEY,
   areFinalPathEntriesSemanticallyEqual,
@@ -193,15 +197,22 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
     }),
   }));
   const degapRenderDeps = { escapeAttr, escapeHtml, i18n };
-  const graphAddonByChr = Object.fromEntries(
-    finalPathEntriesWithLog.map((entry) => [
-      entry.chrName,
-      renderDegapJobCard(
-        { chrName: entry.chrName, degap: assembly.degap },
-        degapRenderDeps,
-      ),
-    ]),
-  );
+  const graphAddonByChr = {};
+  const isAllPhasedFinalPath = finalPathEntriesWithLog.length > 1;
+  if (isAllPhasedFinalPath) {
+    finalPathEntriesWithLog.forEach((entry) => {
+      graphAddonByChr[entry.chrName] = renderManualRefinementCard(
+        {
+          chrName: entry.chrName,
+          finalPathEntry: entry.finalPathEntry,
+          manualRefinement: assembly.degap?.manualRefinement,
+          locale: state.locale,
+          includeSettingsModal: false,
+        },
+        { escapeAttr, escapeHtml },
+      );
+    });
+  }
   const grtBaselineEntry = !assembly.isChrPhased && finalPathEntriesWithLog.length === 1
     ? assembly.grtProjectView?.baselineFinalPathByChr?.[currentFinalPathChrName] || null
     : null;
@@ -226,18 +237,27 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       graphPreviewSegmentOrder,
       graphAddonByChr,
       degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),
-      manualRefinementBody: renderManualRefinementCard(
-        {
-          chrName: currentFinalPathChrName,
-          finalPathEntry: currentFinalPath,
-          manualRefinement: assembly.degap?.manualRefinement,
-          locale: state.locale,
-        },
-        { escapeAttr, escapeHtml },
+      finalPathToastBody: renderManualRefinementToast(
+        { manualRefinement: assembly.degap?.manualRefinement },
+        { escapeHtml },
       ),
+      manualRefinementBody: isAllPhasedFinalPath
+        ? renderManualRefinementSettingsModal(
+          { manualRefinement: assembly.degap?.manualRefinement, locale: state.locale },
+          { escapeAttr, escapeHtml },
+        )
+        : renderManualRefinementCard(
+          {
+            chrName: currentFinalPathChrName,
+            finalPathEntry: currentFinalPath,
+            manualRefinement: assembly.degap?.manualRefinement,
+            locale: state.locale,
+          },
+          { escapeAttr, escapeHtml },
+        ),
       canExportFasta: canProjectExportFinalPathFasta(state, currentProject),
       canExportManualRefinement: true,
-      canExportDegapJobs: Array.isArray(assembly.degap?.jobs) && assembly.degap.jobs.length > 0,
+      canExportDegapJobs: false,
       finalPathLogModel,
       phasedFinalPathOptions,
       finalPathEntries: finalPathEntriesWithLog,

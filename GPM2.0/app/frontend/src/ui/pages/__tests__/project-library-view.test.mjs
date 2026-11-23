@@ -124,6 +124,7 @@ test("tree rows reserve the menu column in both idle and hover states without ch
   const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
   assert.match(css, /\.library-tree \.project-recent-row,\s*\.library-tree \.project-recent-row:not\(:hover\):not\(:has\(:focus-visible\)\)\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) 26px;/);
   assert.match(css, /\.library-tree \.library-row-menu\s*\{\s*opacity: 0;/);
+  assert.match(css, /\.library-tree \[role="group"\] > \.project-recent-row,\s*\.library-tree \[role="group"\] > \[data-library-group\] > \.library-folder-row\s*\{[^}]*margin-left: calc\(var\(--library-depth, 0\) \* 16px \+ 4px\);/);
 });
 
 

@@ -9,16 +9,95 @@ import {
   resolveCurrentFinalPathChrName,
 } from "./final-path-state.js";
 import {
+  DEFAULT_MANUAL_REFINEMENT_TOOL_PARAMS,
+  MANUAL_REFINEMENT_GAP_TOOLS,
+  MANUAL_REFINEMENT_SETTINGS_TABS,
+  MANUAL_REFINEMENT_TOOL_LABELS,
+  addManualRefinementGapTool,
   buildManualRefinementExportBaseName,
   buildManualRefinementExportRequest,
   extractFileName,
   normalizeManualRefinementState,
-  MANUAL_REFINEMENT_GAP_TOOLS,
+  normalizeManualRefinementToolParams,
+  removeManualRefinementGapTool,
   resolveManualRefinementGapCandidate,
   resolveManualRefinementTelCandidate,
 } from "./manual-refinement-state.js";
 
 const MANUAL_REF_CARD_BOUND = Symbol("manualRefinementCardBound");
+const MANUAL_REF_TOAST_TIMERS = new WeakMap();
+const MANUAL_REF_FEEDBACK_TOAST_MS = 1200;
+const MANUAL_REF_ERROR_TOAST_MS = 2400;
+
+function clearManualRefinementToastTimer(store, timerApi = globalThis) {
+  const existing = store && typeof store === "object" ? MANUAL_REF_TOAST_TIMERS.get(store) : null;
+  if (existing?.timerId !== null && existing?.timerId !== undefined) {
+    timerApi?.clearTimeout?.(existing.timerId);
+  }
+  if (store && typeof store === "object") {
+    MANUAL_REF_TOAST_TIMERS.delete(store);
+  }
+}
+
+function scheduleManualRefinementToastDismiss(host, store, nextManual, deps = {}) {
+  if (!store || typeof store !== "object") {
+    return;
+  }
+  const timerApi = deps.timerApi || globalThis;
+  clearManualRefinementToastTimer(store, timerApi);
+  const message = normalizeString(nextManual?.error || nextManual?.feedback);
+  if (!message || nextManual?.exporting) {
+    return;
+  }
+  const durationMs = nextManual?.error
+    ? Number(deps.errorToastDurationMs ?? MANUAL_REF_ERROR_TOAST_MS)
+    : Number(deps.toastDurationMs ?? MANUAL_REF_FEEDBACK_TOAST_MS);
+  if (!Number.isFinite(durationMs) || durationMs <= 0 || typeof timerApi?.setTimeout !== "function") {
+    return;
+  }
+  const token = Symbol("manualRefToast");
+  const timerId = timerApi.setTimeout(() => {
+    const active = MANUAL_REF_TOAST_TIMERS.get(store);
+    if (active?.token !== token) {
+      return;
+    }
+    MANUAL_REF_TOAST_TIMERS.delete(store);
+    const latestState = store.getState();
+    const latestDegap = normalizeDegapRuntimeState(latestState?.assembly?.degap);
+    const latestManual = normalizeManualRefinementState(latestDegap.manualRefinement);
+    if (!latestManual.feedback && !latestManual.error) {
+      return;
+    }
+    const clearedManual = normalizeManualRefinementState({
+      ...latestManual,
+      feedback: "",
+      error: "",
+    });
+    const clearedDegap = normalizeDegapRuntimeState({
+      ...latestDegap,
+      manualRefinement: clearedManual,
+    });
+    store.setState({
+      ...latestState,
+      assembly: {
+        ...latestState.assembly,
+        degap: clearedDegap,
+        degapProjectState: buildDegapProjectStateForPersistence(clearedDegap),
+      },
+    });
+    const routeRoot = host?.closest?.("#route-host") || host?.ownerDocument || host;
+    const liveToasts = typeof routeRoot?.querySelectorAll === "function"
+      ? Array.from(routeRoot.querySelectorAll("[data-final-path-toast]"))
+      : [];
+    if (liveToasts.length && liveToasts.every((node) => typeof node?.remove === "function")) {
+      liveToasts.forEach((node) => node.remove());
+      return;
+    }
+    deps.rerender?.(host, store);
+  }, durationMs);
+  timerId?.unref?.();
+  MANUAL_REF_TOAST_TIMERS.set(store, { token, timerId });
+}
 
 function normalizeString(value) {
   return String(value ?? "").trim();
@@ -70,6 +149,15 @@ function updateManualRefinementState(host, store, updater, deps = {}, { persist 
       degapProjectState: buildDegapProjectStateForPersistence(nextDegap),
     },
   });
+  const touchedToast = Boolean(
+    patch
+    && (Object.prototype.hasOwnProperty.call(patch, "feedback")
+      || Object.prototype.hasOwnProperty.call(patch, "error")
+      || Object.prototype.hasOwnProperty.call(patch, "exporting")),
+  );
+  if (touchedToast) {
+    scheduleManualRefinementToastDismiss(host, store, nextManual, deps);
+  }
   deps.rerender?.(host, store);
   if (persist && typeof deps.persistDegapProjectState === "function") {
     void deps.persistDegapProjectState(host, store);
@@ -84,18 +172,16 @@ export function recordManualRefinementExportReceipt(host, store, receipt, deps =
   if (Number(state.projectExport?.projectId || 0) === Number(state.session?.projectId || 0)
       && normalizeString(state.projectExport?.workspacePath) === normalizeString(state.session?.workspacePath)) {
     store.setState({ projectExport: { ...state.projectExport, manualRefinementExports: [receipt,
-      ...(state.projectExport?.manualRefinementExports || []).filter(row => row.batchSha256 !== receipt.batchSha256),
+      ...(state.projectExport?.manualRefinementExports || []).filter((row) => row.batchSha256 !== receipt.batchSha256),
     ].slice(0, 20) } });
   }
-  const scopeLabel = receipt.scope === "current-chr"
-    ? (isEn ? `current chromosome (${receipt.chrName})` : `当前染色体（${receipt.chrName}）`)
-    : (isEn ? "all queued loci in project" : "本项目全部已选位点");
   return updateManualRefinementState(host, store, {
     exporting: false,
+    receiptDismissed: false,
     error: "",
     feedback: isEn
-      ? `Exported refinement tasks (${scopeLabel}): ${receipt.lociCount} loci / ${receipt.tasksCount} tool runs. Run refine.py on Server next.`
-      : `已导出精修任务（${scopeLabel}）：${receipt.lociCount} 个位点 / ${receipt.tasksCount} 次工具运行，请传到 Server 运行 refine.py。`,
+      ? `Exported ${receipt.tasksCount} refinement task(s)`
+      : `已导出精修任务（${receipt.tasksCount} 项）`,
     lastExport: receipt,
     exportedBatches: [
       receipt,
@@ -114,13 +200,15 @@ export function registerManualRefinementLocus(host, store, payload = {}, deps = 
   const chrName = normalizeString(payload.chrName || payload.chr);
   const kind = normalizeString(payload.kind).toLowerCase();
   const segmentId = normalizeString(payload.segmentId || payload.segment_id);
+  const requestedTool = normalizeString(payload.tool).toLowerCase() || "degap";
+  const toggle = payload.toggle === true;
   const finalPathEntry = chrName
     ? state.assembly?.finalPathByChr?.[chrName] || getCurrentChrFinalPath(state.assembly)
     : getCurrentChrFinalPath(state.assembly);
 
   let candidate = null;
   if (kind === "gap") {
-    candidate = resolveManualRefinementGapCandidate(finalPathEntry, segmentId);
+    candidate = resolveManualRefinementGapCandidate(finalPathEntry, segmentId, requestedTool);
   } else if (kind === "tel_left") {
     candidate = resolveManualRefinementTelCandidate(finalPathEntry, segmentId, "left");
   } else if (kind === "tel_right") {
@@ -133,24 +221,64 @@ export function registerManualRefinementLocus(host, store, payload = {}, deps = 
       feedback: "",
       error: kind === "gap"
         ? (isEn
-          ? "Cannot queue this gap: refinement requires direct contig flanks immediately before and after the gap."
-          : "无法登记该 Gap：精修任务要求缺口紧邻左右两侧均为 Contig。")
+          ? "Gap requires contig flanks on both sides"
+          : "缺口两侧需均为 Contig")
         : (isEn
-          ? "Cannot queue this telomere endpoint: only the first or last contig segment of the Final Path is eligible."
-          : "无法登记该端粒位点：仅 Final Path 首位或末位 Contig 端点可用。"),
+          ? "Only first/last contig endpoints are eligible"
+          : "仅首尾 Contig 端点可用"),
     }, deps);
     return false;
   }
 
   const current = getManualRefinementState(store);
+  if (candidate.kind === "gap") {
+    const result = addManualRefinementGapTool(current.loci, candidate, requestedTool);
+    const toolLabel = MANUAL_REFINEMENT_TOOL_LABELS[result.tool] || result.tool;
+    if (result.duplicate) {
+      if (toggle) {
+        const nextLoci = removeManualRefinementGapTool(current.loci, candidate.locusKey, result.tool);
+        updateManualRefinementState(host, store, {
+          panelOpen: true,
+          loci: nextLoci,
+          error: "",
+          feedback: isEn ? `Removed ${toolLabel}` : `已取消 ${toolLabel}`,
+        }, deps, { persist: true });
+        return { queued: false, action: "removed" };
+      }
+      updateManualRefinementState(host, store, {
+        panelOpen: true,
+        error: "",
+        feedback: isEn ? `Already queued: ${toolLabel}` : `已在队列：${toolLabel}`,
+      }, deps);
+      return false;
+    }
+    updateManualRefinementState(host, store, {
+      panelOpen: true,
+      loci: result.loci,
+      error: "",
+      feedback: isEn ? `Added ${toolLabel}` : `已添加 ${toolLabel}`,
+    }, deps, { persist: true });
+    return toggle ? { queued: true, action: "added" } : true;
+  }
+
+  const telLabel = candidate.kind === "tel_right"
+    ? (isEn ? "right telomere" : "右端粒")
+    : (isEn ? "left telomere" : "左端粒");
   const exists = current.loci.some((item) => item.locusKey === candidate.locusKey);
   if (exists) {
+    if (toggle) {
+      updateManualRefinementState(host, store, {
+        panelOpen: true,
+        loci: current.loci.filter((item) => item.locusKey !== candidate.locusKey),
+        error: "",
+        feedback: isEn ? `Removed ${telLabel}` : `已取消${telLabel}`,
+      }, deps, { persist: true });
+      return { queued: false, action: "removed" };
+    }
     updateManualRefinementState(host, store, {
       panelOpen: true,
       error: "",
-      feedback: isEn
-        ? `Refinement task already queued: ${candidate.chr} · ${candidate.label || candidate.segmentId}`
-        : `该位点已在精修任务清单中：${candidate.chr} · ${candidate.label || candidate.segmentId}`,
+      feedback: isEn ? `Already queued: ${telLabel}` : `已在队列：${telLabel}`,
     }, deps);
     return false;
   }
@@ -159,14 +287,12 @@ export function registerManualRefinementLocus(host, store, payload = {}, deps = 
     panelOpen: true,
     loci: [...current.loci, candidate],
     error: "",
-    feedback: isEn
-      ? `Added refinement task: ${candidate.chr} · ${candidate.label || candidate.segmentId}`
-      : `已加入精修任务：${candidate.chr} · ${candidate.label || candidate.segmentId}`,
+    feedback: isEn ? `Added ${telLabel}` : `已添加${telLabel}`,
   }, deps, { persist: true });
-  return true;
+  return toggle ? { queued: true, action: "added" } : true;
 }
 
-async function exportCurrentChrRefinementTasks(host, store, deps = {}) {
+async function exportCurrentChrRefinementTasks(host, store, deps = {}, options = {}) {
   // Freeze project identity, scope, and queued loci BEFORE opening the file picker
   // so switching project/chromosome mid-dialog can never send the export elsewhere.
   const initialState = store.getState();
@@ -175,7 +301,7 @@ async function exportCurrentChrRefinementTasks(host, store, deps = {}) {
   const frozenProjectId = Number(initialState?.session?.projectId || 0);
   const frozenProjectName = normalizeString(initialState?.session?.projectName || frozenProjectId || "project");
   const frozenScope = "current-chr";
-  const frozenChrName = normalizeString(resolveCurrentFinalPathChrName(initialState?.assembly));
+  const frozenChrName = normalizeString(options?.chrName || resolveCurrentFinalPathChrName(initialState?.assembly));
   const frozenManual = getManualRefinementState(store);
 
   if (!frozenWorkspaceRoot || !frozenProjectId) {
@@ -290,13 +416,81 @@ export function bindManualRefinementCard(host, store, deps = {}) {
       return;
     }
 
-    const quickAdd = event.target?.closest?.("[data-manual-ref-quick-add]");
-    if (quickAdd) {
-      registerManualRefinementLocus(host, store, {
-        chr: quickAdd.dataset.manualRefChr,
-        kind: quickAdd.dataset.manualRefKind,
-        segmentId: quickAdd.dataset.manualRefSegmentId,
-      }, deps);
+    const scopeBtn = event.target?.closest?.("[data-manual-ref-scope]");
+    if (scopeBtn) {
+      const nextScope = scopeBtn.dataset.manualRefScope === "all" ? "all" : "current-chr";
+      updateManualRefinementState(host, store, { viewScope: nextScope, panelOpen: true }, deps);
+      return;
+    }
+
+    const settingsOpenBtn = event.target?.closest?.("[data-manual-ref-settings-open]");
+    if (settingsOpenBtn) {
+      updateManualRefinementState(host, store, { settingsOpen: true, error: "" }, deps);
+      return;
+    }
+
+    const settingsCloseBtn = event.target?.closest?.("[data-manual-ref-settings-close]");
+    if (settingsCloseBtn) {
+      updateManualRefinementState(host, store, { settingsOpen: false }, deps);
+      return;
+    }
+
+    if (event.target?.matches?.("[data-manual-ref-settings-modal]")) {
+      updateManualRefinementState(host, store, { settingsOpen: false }, deps);
+      return;
+    }
+
+    const settingsTabBtn = event.target?.closest?.("[data-manual-ref-settings-tab]");
+    if (settingsTabBtn) {
+      const tab = normalizeString(settingsTabBtn.dataset.manualRefSettingsTab);
+      if (MANUAL_REFINEMENT_SETTINGS_TABS.includes(tab)) {
+        updateManualRefinementState(host, store, { settingsTab: tab }, deps);
+      }
+      return;
+    }
+
+    const resetTabBtn = event.target?.closest?.("[data-manual-ref-settings-reset-tab]");
+    if (resetTabBtn) {
+      updateManualRefinementState(host, store, (current) => {
+        if (current.settingsTab === "reads") {
+          return { readsMode: "inherit", hifiReadsInput: "", ontReadsInput: "", error: "" };
+        }
+        const tool = current.settingsTab;
+        if (!MANUAL_REFINEMENT_GAP_TOOLS.includes(tool)) {
+          return {};
+        }
+        return {
+          toolParams: {
+            ...current.toolParams,
+            [tool]: { ...DEFAULT_MANUAL_REFINEMENT_TOOL_PARAMS[tool] },
+          },
+          error: "",
+        };
+      }, deps, { persist: true });
+      return;
+    }
+
+    const resetAllBtn = event.target?.closest?.("[data-manual-ref-settings-reset-all]");
+    if (resetAllBtn) {
+      updateManualRefinementState(host, store, {
+        toolParams: normalizeManualRefinementToolParams({}),
+        readsMode: "inherit",
+        hifiReadsInput: "",
+        ontReadsInput: "",
+        error: "",
+      }, deps, { persist: true });
+      return;
+    }
+
+    const removeToolBtn = event.target?.closest?.("[data-manual-ref-remove-tool]");
+    if (removeToolBtn) {
+      const key = normalizeString(removeToolBtn.dataset.manualRefLocusKey);
+      const tool = normalizeString(removeToolBtn.dataset.manualRefTool);
+      updateManualRefinementState(host, store, (current) => ({
+        loci: removeManualRefinementGapTool(current.loci, key, tool),
+        error: "",
+        feedback: "",
+      }), deps, { persist: true });
       return;
     }
 
@@ -308,6 +502,12 @@ export function bindManualRefinementCard(host, store, deps = {}) {
         error: "",
         feedback: "",
       }), deps, { persist: true });
+      return;
+    }
+
+    const dismissReceiptBtn = event.target?.closest?.("[data-manual-ref-dismiss-receipt]");
+    if (dismissReceiptBtn) {
+      updateManualRefinementState(host, store, { receiptDismissed: true }, deps);
       return;
     }
 
@@ -324,11 +524,12 @@ export function bindManualRefinementCard(host, store, deps = {}) {
 
     const clearAll = event.target?.closest?.("[data-manual-ref-clear-all]");
     if (clearAll) {
-      updateManualRefinementState(host, store, {
-        loci: [],
+      const targetChr = normalizeString(clearAll.dataset?.manualRefChr);
+      updateManualRefinementState(host, store, (current) => ({
+        loci: targetChr ? current.loci.filter((item) => item.chr !== targetChr) : [],
         error: "",
         feedback: "",
-      }, deps, { persist: true });
+      }), deps, { persist: true });
       return;
     }
 
@@ -341,13 +542,13 @@ export function bindManualRefinementCard(host, store, deps = {}) {
         updateManualRefinementState(host, store, {
           error: "",
           feedback: copied
-            ? (isEn ? "Copied Server command." : "已复制 Server 执行命令。")
-            : (isEn ? "Copy manually from the command box." : "请直接选中命令文本手动复制。"),
+            ? (isEn ? "Command copied" : "已复制命令")
+            : (isEn ? "Copy manually" : "请手动复制命令"),
         }, deps);
       }).catch(() => {
         updateManualRefinementState(host, store, {
           error: "",
-          feedback: isEn ? "Copy manually from the command box." : "请直接选中命令文本手动复制。",
+          feedback: isEn ? "Copy manually" : "请手动复制命令",
         }, deps);
       });
       return;
@@ -355,11 +556,54 @@ export function bindManualRefinementCard(host, store, deps = {}) {
 
     const exportBtn = event.target?.closest?.('[data-manual-ref-export="current-chr"]');
     if (exportBtn) {
-      void exportCurrentChrRefinementTasks(host, store, deps);
+      const targetChr = normalizeString(exportBtn.dataset?.manualRefChr);
+      void exportCurrentChrRefinementTasks(host, store, deps, { chrName: targetChr });
     }
   });
 
   host.addEventListener("change", (event) => {
+    const unlimitedToggle = event.target?.closest?.("[data-manual-ref-param-unlimited]");
+    if (unlimitedToggle) {
+      const tool = normalizeString(unlimitedToggle.dataset.manualRefParamTool);
+      const field = normalizeString(unlimitedToggle.dataset.manualRefParamUnlimited);
+      if (tool === "degap" && (field === "max_extension_rounds" || field === "max_extension_bp")) {
+        updateManualRefinementState(host, store, (current) => ({
+          toolParams: {
+            ...current.toolParams,
+            degap: {
+              ...current.toolParams.degap,
+              [field]: unlimitedToggle.checked
+                ? "unlimited"
+                : DEFAULT_MANUAL_REFINEMENT_TOOL_PARAMS.degap[field],
+            },
+          },
+          error: "",
+        }), deps, { persist: true });
+      }
+      return;
+    }
+
+    const paramInput = event.target?.closest?.("[data-manual-ref-param-field]");
+    if (paramInput) {
+      const tool = normalizeString(paramInput.dataset.manualRefParamTool);
+      const field = normalizeString(paramInput.dataset.manualRefParamField);
+      if (!MANUAL_REFINEMENT_GAP_TOOLS.includes(tool) || !field) {
+        return;
+      }
+      const nextValue = paramInput.type === "checkbox" ? Boolean(paramInput.checked) : paramInput.value;
+      updateManualRefinementState(host, store, (current) => ({
+        toolParams: {
+          ...current.toolParams,
+          [tool]: {
+            ...current.toolParams[tool],
+            [field]: nextValue,
+          },
+        },
+        error: "",
+      }), deps, { persist: true });
+      return;
+    }
+
     const toolSelect = event.target?.closest?.("[data-manual-ref-tool-select]");
     if (toolSelect) {
       const key = normalizeString(toolSelect.dataset.manualRefLocusKey);
@@ -412,6 +656,16 @@ export function bindManualRefinementCard(host, store, deps = {}) {
         ...(field === "ont" ? { ontReadsInput: value } : { hifiReadsInput: value }),
         error: "",
       }, deps, { persist: true });
+    }
+  });
+
+  host.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    const current = getManualRefinementState(store);
+    if (current.settingsOpen) {
+      updateManualRefinementState(host, store, { settingsOpen: false }, deps);
     }
   });
 

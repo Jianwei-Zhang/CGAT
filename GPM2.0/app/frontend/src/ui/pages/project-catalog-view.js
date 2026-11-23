@@ -1,6 +1,7 @@
 import { listProjectCatalog, updateProjectCatalog, revealCatalogLocation } from "../../services/project-catalog.js";
 import { projectIcon } from "./project-icons.js";
 import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
+import { isInternalRefinementPatchDataset } from "./assembly/support-dataset-options.js";
 
 const messages = {
   zh: {
@@ -108,7 +109,19 @@ function renderTable(rows, title, catalog, state) {
 export function renderProjectCatalog(state) {
   const catalog = currentCatalog(state);
   const l = labels(state);
-  const rows = [...(catalog.data?.references || []), ...(catalog.data?.datasets || [])];
+  const grtSourceCards = state?.projectExport?.grtProjectView?.sourceCards
+    || state?.assembly?.grtProjectView?.sourceCards
+    || [];
+  const refinementDatasetNames = new Set(
+    (Array.isArray(grtSourceCards) ? grtSourceCards : [])
+      .filter((card) => String(card?.placementMode || "").trim().toLowerCase() === "refinement")
+      .map((card) => String(card?.datasetName || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const datasets = (catalog.data?.datasets || []).filter(
+    (row) => !isInternalRefinementPatchDataset(row, refinementDatasetNames),
+  );
+  const rows = [...(catalog.data?.references || []), ...datasets];
   const selected = rows.find(row => objectKey(row) === catalog.editor?.key);
   return `<section id="project-data-catalog" aria-labelledby="project-data-catalog-title" aria-busy="${Boolean(catalog.loading)}">
     <header class="project-section-divider"><h3 id="project-data-catalog-title">${l.datasets}</h3>${catalog.data ? `<span class="project-section-count"><span aria-hidden="true">·</span>${number(rows.length, state)}</span>` : ""}</header>

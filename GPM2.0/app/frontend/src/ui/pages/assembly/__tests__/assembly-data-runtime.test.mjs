@@ -2459,3 +2459,136 @@ test("chromosome navigation replaces the previous chromosome's composition hits 
   assert.deepEqual(evidence.hits, nextHits);
   assert.deepEqual(events, ["ready:restoring", "evidence-fetch", "ready:restoring", "ready:loaded"]);
 });
+
+test("loadAssemblyView recovers when subview is null after project switching with no visible support datasets", async () => {
+  const { createStore } = await import("../../../../state/store.js");
+  const { installSubviewWorkspace } = await import("../subview-workspace-state.js");
+  const { buildEmptyAssemblyViewState } = await import("../../../shell/session-switchers.js");
+  const store = createStore({
+    activeRoute: "assembly",
+    locale: "zh",
+    session: { workspacePath: "/tmp/proj-a", projectId: 1, projectName: "proj-a" },
+    initializer: {
+      datasets: [
+        { datasetId: 1, name: "assembly" },
+        { datasetId: 2, name: "cgat_refinement_degap_c9c1cea4aa254b6393488dd5d0247796" },
+      ],
+      existingProjects: [
+        { projectId: 1, projectName: "proj-a", primaryDatasetId: 1, supportDatasetIds: [2] },
+      ],
+    },
+    assembly: {
+      ...buildEmptyAssemblyViewState("zh"),
+      selectedChrName: "OZ408683.1",
+      supportDatasetId: null,
+      degap: {
+        manualRefinement: {
+          loci: [{ locusKey: "gap:stale", kind: "gap", chr: "Chr99", segmentId: "gap-99", tools: ["degap"] }],
+        },
+      },
+    },
+  });
+
+  // Simulate first Assembly visit installing the subview workspace transform,
+  // switching chromosome, then switching to project B and back to project A.
+  installSubviewWorkspace(store);
+  store.setState({ assembly: { ...store.getState().assembly, selectedChrName: "OZ408684.1" } });
+  store.setState({
+    activeRoute: "importer",
+    session: { workspacePath: "/tmp/proj-b", projectId: 2, projectName: "proj-b" },
+    assembly: { ...store.getState().assembly, ...buildEmptyAssemblyViewState("zh") },
+  });
+  store.setState({
+    activeRoute: "assembly",
+    session: { workspacePath: "/tmp/proj-a", projectId: 1, projectName: "proj-a" },
+    assembly: { ...store.getState().assembly, ...buildEmptyAssemblyViewState("zh") },
+  });
+
+  // Reconcile resets subview to null across project transitions when no task is active.
+  assert.equal(store.getState().assembly.subview, null);
+
+  await loadAssemblyView({}, store, { keepCurrentChr: false, keepCurrentCtg: false }, {
+    buildClearedSubviewState() {
+      return {
+        mode: "2-contig",
+        summary: null,
+        trackPairHiddenCtgs: [],
+        trackPairSelectedCtgs: [],
+      };
+    },
+    buildSubviewTrackPairHiddenCtgKey(trackRole, contigId) {
+      return `${trackRole}:${contigId}`;
+    },
+    buildSubviewTrackPairPoolsFromAssembly() {
+      return { primary: [], support: [], ref: [], phased: [] };
+    },
+    filterPrimaryTrackSelectionCtgIds(ids) {
+      return Array.isArray(ids) ? ids : [];
+    },
+    filterSubviewTrackDragOffsetsBySummary() {
+      return [];
+    },
+    filterSubviewTrackPairHiddenCtgs(values) {
+      return Array.isArray(values) ? values : [];
+    },
+    filterSubviewTrackPairSelectionCtgs(values) {
+      return Array.isArray(values) ? values : [];
+    },
+    getCurrentProject(currentState) {
+      return currentState.initializer.existingProjects[0];
+    },
+    async getProjectAssemblyViewState() {
+      return {
+        supportDatasetId: null,
+        finalPathByChr: {},
+        degapProjectState: { jobs: [], settingsPanelDismissed: false, collapsedJobCardChrNames: [] },
+      };
+    },
+    getSupportDatasetOptions() {
+      // Internal cgat_refinement_* support datasets are hidden, leaving no visible support datasets.
+      return [];
+    },
+    async listChrViewCtgs() {
+      return { items: [{ assemblyCtgId: 11, name: "tig000001", datasetId: 1, totalLength: 5000 }] };
+    },
+    async listProjectChromosomes() {
+      return {
+        referenceGenomeId: 1,
+        unplacedCtgCount: 0,
+        unplacedBp: 0,
+        items: [{ chrName: "OZ408683.1", chrOrder: 1, chrLength: 10000 }],
+      };
+    },
+    async loadDatasetChrCtgs() {
+      return [];
+    },
+    async loadDeletedCtgsForChr() {
+      return [];
+    },
+    async loadSideDataForCtg() {
+      return { detail: { members: [] }, candidates: { moveTargetCtgs: [], addSeqCandidates: [] } };
+    },
+    mapAssemblyError({ error }) {
+      return { userMessage: String(error?.message || error) };
+    },
+    normalizeDeletedCtgRecordIds(ids) {
+      return Array.isArray(ids) ? ids : [];
+    },
+    normalizeSupportDatasetId(value) {
+      return value == null ? null : Number(value);
+    },
+    normalizeSupportMirroredCtgs(values) {
+      return Array.isArray(values) ? values : [];
+    },
+    normalizeTrackSelectionCtgIds(ids) {
+      return Array.isArray(ids) ? ids : [];
+    },
+    rerender() {},
+  });
+
+  assert.equal(store.getState().assembly.error, "");
+  assert.equal(store.getState().assembly.loading, false);
+  assert.equal(store.getState().assembly.selectedChrName, "OZ408683.1");
+  assert.deepEqual(store.getState().assembly.chrCtgs.map((ctg) => ctg.assemblyCtgId), [11]);
+  assert.deepEqual(store.getState().assembly.degap.manualRefinement.loci, []);
+});

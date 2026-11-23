@@ -735,7 +735,10 @@
    gutter on Project so that this cannot shrink or shift every Final Path. */
 :root:has(.project-integrated-overview) { scrollbar-gutter: stable; }
 
-.project-integrated-overview .project-export-detail-section[hidden] { display: none; }
+.project-integrated-overview .project-assembly-statistics[hidden],
+.project-integrated-overview .project-export-detail-section[hidden],
+.project-integrated-overview > [data-overview-summary] > .notice[hidden] { display: none; }
+.project-integrated-overview > [data-overview-summary]:not(:has(> :not([hidden]))) { display: none; }
 .project-preview-toolbar > [data-preview-count] { display: contents; }
 /* One compact label column in both states; no compensating right gutter. */
 [data-overview-preview] .project-preview-card { --preview-label-width: 72px; }

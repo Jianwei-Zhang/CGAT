@@ -505,7 +505,7 @@ function resolveExportErrorMessage(error, state, deps = {}) {
 
 function resolveManualRefinementScopeFromKind(kind) {
   const normalizedKind = normalizeString(kind).toLowerCase();
-  if (normalizedKind === "refinement-current-chr") {
+  if (normalizedKind === "refinement-current-chr" || normalizedKind === "refine-jobs") {
     return "current-chr";
   }
   return "";
@@ -541,8 +541,8 @@ export function planFinalPathExportSteps({
   if (normalizedKind === "fasta") {
     return [{ kind: "fasta", label: "序列(.fasta)", outputPath: targetPath }];
   }
-  if (normalizedKind === "refinement-current-chr") {
-    return [{ kind: "refinement-current-chr", label: "导出精修任务（当前染色体已选）", outputPath: targetPath }];
+  if (normalizedKind === "refinement-current-chr" || normalizedKind === "refine-jobs") {
+    return [{ kind: normalizedKind, label: "refine-jobs", outputPath: targetPath }];
   }
   if (normalizedKind === "degap-jobs") {
     return [{ kind: "degap-jobs", label: "DEGAP-JOBS", outputPath: targetPath }];
@@ -781,7 +781,7 @@ export async function resolveFinalPathExportTarget({ state, kind, baseName, deps
       filters: [{ name: "FASTA", extensions: ["fasta", "fa"] }],
     }, state);
   }
-  if (normalizedKind === "refinement-current-chr") {
+  if (normalizedKind === "refinement-current-chr" || normalizedKind === "refine-jobs") {
     return pickSaveFilePathImpl({
       defaultPath: `${baseName}.zip`,
       filters: [{ name: "ZIP", extensions: ["zip"] }],
@@ -878,7 +878,7 @@ export async function runFinalPathExportStep({
     });
     return { outputPath: step.outputPath };
   }
-  if (step?.kind === "refinement-current-chr") {
+  if (step?.kind === "refinement-current-chr" || step?.kind === "refine-jobs") {
     const scope = frozenRefinement?.scope || resolveManualRefinementScopeFromKind(step.kind);
     const workspaceRoot = normalizeString(frozenRefinement?.workspaceRoot ?? state.session?.workspacePath);
     const projectId = Number(frozenRefinement?.projectId ?? state.session?.projectId ?? 0);

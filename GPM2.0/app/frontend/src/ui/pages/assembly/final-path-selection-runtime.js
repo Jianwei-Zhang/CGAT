@@ -123,7 +123,12 @@ function paintIntersections(node, intersections, { x, y, width, height }, retain
       overlay.setAttribute("data-final-path-selection-overlay", "1");
       overlay.setAttribute("class", "final-path-source-highlight");
       overlay.setAttribute("pointer-events", "none");
-      node.append(overlay);
+      const markerLayer = node.querySelector?.('[data-track-annotation-markers="1"]');
+      if (markerLayer && markerLayer.parentNode === node) {
+        node.insertBefore(overlay, markerLayer);
+      } else {
+        node.append(overlay);
+      }
     }
     const attrs = { x: x + intersection.startFraction * width, y,
       width: (intersection.endFraction - intersection.startFraction) * width, height,

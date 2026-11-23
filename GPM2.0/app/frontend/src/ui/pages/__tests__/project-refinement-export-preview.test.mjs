@@ -331,29 +331,71 @@ test("a reopened project shows native export receipts, and stops marking an impo
 });
 
 
-test("one refinement table compares both automatic tools alongside a manual batch; import is a named icon", async () => {
+test("one refinement table compares both automatic tools alongside a manual batch with filled/total and chr counts", async () => {
   const { normalizeGrtProjectView } = await import("../assembly/grt-state.js");
   const grt = normalizeGrtProjectView({ recipe: { schema_version: "5" }, auto_refinement_effects: [
-    { tool: "degap", accepted_edits: 1, closed: 0, partial: 1, unfilled: 3, rejected: 0 },
+    { tool: "degap", version_id: "d".repeat(64), project_adopted_gaps: 0, accepted_edits: 1, closed: 0, partial: 1, unfilled: 3, rejected: 0 },
     { tool: "quartet", accepted_edits: 2, closed: 2, partial: 0, unfilled: 1, rejected: 1 },
   ] });
   const state = { locale: "zh", session: { projectId: 2, workspacePath: "/col0" },
     projectExport: { projectId: 2, workspacePath: "/col0", grtProjectView: grt,
-      manualRefinementResults: [{ resultSha256: "a".repeat(64), batchSha256: "b".repeat(64), applied: 0,
-        loci: [{ locusId: "g1", kind: "gap", disposition: "target_or_boundary_changed", candidates: [
+      manualRefinementResults: [{ resultSha256: "a".repeat(64), batchSha256: "b".repeat(64), applied: 1,
+        loci: [{ locusId: "g1", chr: "Chr01", kind: "gap", disposition: "applied", candidates: [
           { tool: "quartet", status: "partial" }, { tool: "degap", status: "closed" }] }] }] } };
   const html = renderProjectRefinementCard(state);
   const table = html.match(/<table [^>]*>[\s\S]+?<\/table>/g);
   assert.equal(table.length, 1);
-  assert.match(table[0], /自动精修<\/td><th scope="row">DEGAP<\/th><td>0<\/td><td>1<\/td><td>3<\/td><td>0<\/td>/);
-  assert.match(table[0], /自动精修<\/td><th scope="row">quarTeT<\/th><td>2<\/td>/);
-  assert.match(table[0], /手动精修[\s\S]*?bbbbbbbbbbbb[\s\S]*?本次导回采用 0 处/);
+  assert.match(table[0], /自动精修[\s\S]*?DEGAP<\/th>[\s\S]*?0 \/ 4/);
+  assert.match(table[0], /quarTeT<\/th>[\s\S]*?2 \/ 4/);
+  assert.match(table[0], /手动精修[\s\S]*?#bbbbbb[\s\S]*?1 \/ 1[\s\S]*?<span class="project-refinement-chr-list">Chr01<\/span>/);
+  assert.match(table[0], /项目采用过 0 个 Gap/);
+  assert.match(table[0], /data-preview-version="d{64}"/);
+  state.initializer = { projectRefinementUi: { projectKey: "/col0::2", expandedBatchKey: `imported:${"b".repeat(64)}` } };
+  Object.assign(state.projectExport.manualRefinementResults[0].loci[0], {adoptionState: "active", adoptionRevision: 1, activeTool: "degap"});
+  state.projectExport.manualRefinementResults[0].loci[0].candidates[0].switchable = true;
+  const expanded = renderProjectRefinementCard(state);
+  assert.match(expanded, /data-project-refinement-undo/);
+  assert.doesNotMatch(expanded, /data-project-refinement-switch/);
+  assert.doesNotMatch(table[0], /data-app-tooltip="Chr01"/);
+  assert.doesNotMatch(html, /部分填补|未填补|拒绝/);
+  assert.match(html, /<h3 id="project-refinement-title">精修<\/h3>\s*<span class="project-section-count"><span aria-hidden="true">·<\/span>4<\/span>/);
   assert.match(html, /<header[^>]*>[\s\S]*?aria-label="导入精修补丁" data-app-tooltip="导入精修补丁"[\s\S]*?<svg[^>]*aria-hidden="true"[\s\S]*?<\/button>[\s\S]*?<\/header>/);
   assert.doesNotMatch(html, /project-refinement-(grid|pane)|<select/);
-  state.projectExport.grtProjectView = normalizeGrtProjectView({ recipe: { schema_version: "5" } });
-  const legacy = renderProjectRefinementCard(state);
-  assert.match(legacy, /未留存逐缺口统计/);
-  assert.doesNotMatch(legacy, /接纳 0 处修改/);
+});
+
+test("pre-summary auto refinement does not guess closures, derives total gaps from baseline and truncates long chromosome lists with head/tail and tooltip", () => {
+  const baselineFinalPathByChr = {};
+  for (const chrName of ["Chr10", "Chr2", "Chr1", "Chr5", "Chr3", "Chr4"]) {
+    baselineFinalPathByChr[chrName] = {
+      chrName,
+      segments: [
+        {
+          segmentId: `seg-${chrName}`,
+          type: "ctg",
+          ctgName: `patch_${chrName}`,
+          refinement: { mode: "automatic", tool: "degap", editId: `e-${chrName}`, originalGapIds: [`gap-${chrName}`] },
+        },
+        ...(chrName === "Chr1" || chrName === "Chr2"
+          ? [{ segmentId: `open-${chrName}`, type: "gap", gapSizeBp: 500 }]
+          : []),
+      ],
+    };
+  }
+  const state = {
+    locale: "zh",
+    session: { projectId: 9, workspacePath: "/pre-summary" },
+    projectExport: {
+      projectId: 9,
+      workspacePath: "/pre-summary",
+      grtProjectView: { recipe: { schemaVersion: "5" }, baselineFinalPathByChr, autoRefinementEffects: [], sourceCards: [] },
+    },
+  };
+  const html = renderProjectRefinementCard(state);
+  assert.match(html, /DEGAP<\/th>[\s\S]*?— \/ 8/);
+  assert.match(
+    html,
+    /<span class="project-refinement-chr-list is-truncated" data-app-tooltip="Chr1, Chr2, Chr3, Chr4, Chr5, Chr10">Chr1, Chr2, \.\.\., Chr10<\/span>/,
+  );
 });
 
 test("one patch picker imports all automatic tools and distinguishes a repeated import", async () => {
@@ -369,12 +411,12 @@ test("one patch picker imports all automatic tools and distinguishes a repeated 
     importManualRefinementResults: async ({ workspaceRoot, projectId, zipPath }) => {
       assert.deepEqual([workspaceRoot, projectId, zipPath], ["/ws", 6, "/renamed.zip"]);
       return calls++ === 0
-        ? { kind: "automatic", addedTools: ["degap", "tgsgapcloser"], duplicate: false }
+        ? { kind: "automatic", addedTools: ["degap", "tgsgapcloser"], duplicate: false, applied: 2 }
         : { kind: "automatic", addedTools: [], duplicate: true };
     },
   };
   assert.equal(await runImportManualRefinementResults(null, store, null, deps), true);
-  assert.match(store.getState().initializer.projectRefinementUi.notice, /DEGAP, TGS-GapCloser.*working path has not changed/);
+  assert.match(store.getState().initializer.projectRefinementUi.notice, /2 gap closures adopted/);
   assert.equal(await runImportManualRefinementResults(null, store, null, deps), true);
   assert.match(store.getState().initializer.projectRefinementUi.notice, /already in this project/);
 });

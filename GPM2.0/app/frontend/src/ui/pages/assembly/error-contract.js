@@ -97,7 +97,10 @@ function classifyLegacyMessage(code, message, normalizedMessage) {
     return { code, category: "not-found", rawMessage: message };
   }
 
-  if (/state conflict|already |only allow|only allowed|cannot |entered assembly/.test(normalizedMessage)) {
+  if (
+    !/^cannot (read|set|destructure|convert)\b/.test(normalizedMessage)
+    && /state conflict|already |only allow|only allowed|cannot |entered assembly/.test(normalizedMessage)
+  ) {
     return { code, category: "state-conflict", rawMessage: message };
   }
 

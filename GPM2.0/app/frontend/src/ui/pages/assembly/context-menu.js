@@ -24,8 +24,10 @@ import {
   normalizeSubviewTrackSource,
   resolveFilteredSubviewTrackPairSelectionsFromAssembly,
 } from "./subview-state.js";
-import { resolveDegapTerminalCtgSides } from "./degap-state.js";
 import {
+  MANUAL_REFINEMENT_GAP_TOOLS,
+  MANUAL_REFINEMENT_TOOL_LABELS,
+  hasManualRefinementJob,
   resolveManualRefinementGapCandidate,
   resolveManualRefinementTerminalSides,
 } from "./manual-refinement-state.js";
@@ -853,12 +855,9 @@ export function buildAssemblyContextMenuItems({
     const finalPathEntry = targetChrName
       ? state.assembly.finalPathByChr?.[targetChrName] || null
       : getCurrentChrFinalPath(state.assembly);
-    const settingsItem = {
-      label: i18n.contextMenu.degapSettings,
-      run: async () => {
-        await openDegapSettings(host, store);
-      },
-    };
+    const effectiveChrName = targetChrName || finalPathEntry?.chrName || "";
+    const manualLoci = state.assembly.degap?.manualRefinement?.loci || [];
+    const isEn = state.locale === "en";
     items.push({
       label: i18n.contextMenu.finalPathDeleteSegment,
       run: async () => {
@@ -866,71 +865,40 @@ export function buildAssemblyContextMenuItems({
       },
     });
     if (segmentType === "gap") {
-      items.push({
-        label: i18n.contextMenu.degap,
-        children: [
-          {
-            label: i18n.contextMenu.degapGapfillerLeft,
-            run: async () => {
-              await requestDegapGapJob(host, store, {
-                chrName: targetChrName || finalPathEntry?.chrName || "",
-                gapSegmentId: segmentId,
-                side: "left",
-              });
-            },
-          },
-          {
-            label: i18n.contextMenu.degapGapfillerRight,
-            run: async () => {
-              await requestDegapGapJob(host, store, {
-                chrName: targetChrName || finalPathEntry?.chrName || "",
-                gapSegmentId: segmentId,
-                side: "right",
-              });
-            },
-          },
-          {
-            label: i18n.contextMenu.degapGapfillerAll,
-            run: async () => {
-              await requestDegapGapJob(host, store, {
-                chrName: targetChrName || finalPathEntry?.chrName || "",
-                gapSegmentId: segmentId,
-                side: "all",
-              });
-            },
-          },
-          settingsItem,
-        ],
-      });
       if (typeof contextMenuActions.registerManualRefinementLocus === "function") {
-        const isEn = state.locale === "en";
         const gapEligible = Boolean(resolveManualRefinementGapCandidate(finalPathEntry, segmentId));
         items.push({
-          label: isEn ? "Refinement Tasks" : "精修任务",
-          children: [
-            {
-              label: isEn ? "Add to Refinement Tasks (Gap Fill)" : "加入精修任务（Gap 补洞）",
+          label: isEn ? "Add Gap Refinement Task" : "添加 Gap 精修任务",
+          children: MANUAL_REFINEMENT_GAP_TOOLS.map((tool) => {
+            const toolLabel = MANUAL_REFINEMENT_TOOL_LABELS[tool] || tool;
+            const queued = hasManualRefinementJob(manualLoci, {
+              chr: effectiveChrName,
+              kind: "gap",
+              segmentId,
+              tool,
+            });
+            return {
+              label: queued ? `✓ ${toolLabel}` : toolLabel,
               disabled: !gapEligible,
-              title: gapEligible
-                ? ""
-                : (isEn ? "Requires direct contig flanks on both sides" : "要求缺口紧邻左右两侧均为 Contig"),
-              run: async () => {
-                await contextMenuActions.registerManualRefinementLocus(host, store, {
-                  chrName: targetChrName || finalPathEntry?.chrName || "",
-                  kind: "gap",
-                  segmentId,
-                });
-              },
-            },
-            ...(typeof contextMenuActions.openManualRefinementPanel === "function"
-              ? [{
-                label: isEn ? "Open Refinement Tasks Panel" : "打开精修任务面板",
-                run: async () => {
-                  await contextMenuActions.openManualRefinementPanel(host, store);
-                },
-              }]
-              : []),
-          ],
+              keepOpen: true,
+              toggleable: true,
+              selected: queued,
+              selectedLabel: `✓ ${toolLabel}`,
+              unselectedLabel: toolLabel,
+              selectedTitle: isEn ? "Click again to cancel" : "再次点击可取消",
+              unselectedTitle: "",
+              title: !gapEligible
+                ? (isEn ? "Requires direct contig flanks on both sides" : "要求缺口紧邻左右两侧均为 Contig")
+                : (queued ? (isEn ? "Click again to cancel" : "再次点击可取消") : ""),
+              run: async () => await contextMenuActions.registerManualRefinementLocus(host, store, {
+                chrName: effectiveChrName,
+                kind: "gap",
+                segmentId,
+                tool,
+                toggle: true,
+              }),
+            };
+          }),
         });
       }
     }
@@ -975,79 +943,31 @@ export function buildAssemblyContextMenuItems({
           },
         ],
       });
-      const endpointSides = resolveDegapTerminalCtgSides(finalPathEntry, segmentId);
-      if (endpointSides.length) {
-        const telseekerItems = endpointSides.length > 1
-          ? [
-            ...endpointSides.map((endpointSide) => ({
-              label: endpointSide === "right"
-                ? i18n.contextMenu.degapTelseekerRight
-                : i18n.contextMenu.degapTelseekerLeft,
-              run: async () => {
-                await requestDegapTelseekerJob(host, store, {
-                  chrName: targetChrName || finalPathEntry?.chrName || "",
-                  segmentId,
-                  endpointSide,
-                });
-              },
-            })),
-            {
-              label: i18n.contextMenu.degapTelseekerAll,
-              run: async () => {
-                await requestDegapTelseekerJob(host, store, {
-                  chrName: targetChrName || finalPathEntry?.chrName || "",
-                  segmentId,
-                  endpointSide: "all",
-                });
-              },
-            },
-          ]
-          : [{
-            label: i18n.contextMenu.degapTelseeker,
-            run: async () => {
-              await requestDegapTelseekerJob(host, store, {
-                chrName: targetChrName || finalPathEntry?.chrName || "",
-                segmentId,
-                endpointSide: endpointSides[0],
-              });
-            },
-          }];
-        items.push({
-          label: i18n.contextMenu.degap,
-          children: [...telseekerItems, settingsItem],
-        });
-      }
       if (typeof contextMenuActions.registerManualRefinementLocus === "function") {
         const manualTerminalSides = resolveManualRefinementTerminalSides(finalPathEntry, segmentId);
-        if (manualTerminalSides.length) {
-          const isEn = state.locale === "en";
-          const manualTelItems = manualTerminalSides.map((side) => ({
-            label: side === "right"
-              ? (isEn ? "Add to Refinement Tasks (Right Telomere · DEGAP TelSeeker)" : "加入精修任务（右端粒 · DEGAP TelSeeker）")
-              : (isEn ? "Add to Refinement Tasks (Left Telomere · DEGAP TelSeeker)" : "加入精修任务（左端粒 · DEGAP TelSeeker）"),
+        manualTerminalSides.forEach((side) => {
+          const kind = side === "right" ? "tel_right" : "tel_left";
+          const queued = hasManualRefinementJob(manualLoci, {
+            chr: effectiveChrName,
+            kind,
+            segmentId,
+          });
+          const baseLabel = side === "right"
+            ? (isEn ? "DEGAP TelSeeker (Right Telomere)" : "DEGAP TelSeeker（右端粒）")
+            : (isEn ? "DEGAP TelSeeker (Left Telomere)" : "DEGAP TelSeeker（左端粒）");
+          items.push({
+            label: queued ? `✓ ${baseLabel}` : baseLabel,
+            disabled: queued,
+            title: queued ? (isEn ? "Already queued" : "已在任务列表中") : "",
             run: async () => {
               await contextMenuActions.registerManualRefinementLocus(host, store, {
-                chrName: targetChrName || finalPathEntry?.chrName || "",
-                kind: side === "right" ? "tel_right" : "tel_left",
+                chrName: effectiveChrName,
+                kind,
                 segmentId,
               });
             },
-          }));
-          items.push({
-            label: isEn ? "Refinement Tasks" : "精修任务",
-            children: [
-              ...manualTelItems,
-              ...(typeof contextMenuActions.openManualRefinementPanel === "function"
-                ? [{
-                  label: isEn ? "Open Refinement Tasks Panel" : "打开精修任务面板",
-                  run: async () => {
-                    await contextMenuActions.openManualRefinementPanel(host, store);
-                  },
-                }]
-                : []),
-            ],
           });
-        }
+        });
       }
     }
     return items;
