@@ -1,12 +1,31 @@
 import hashlib
+from unittest.mock import patch
 from pathlib import Path
 import tempfile
 import unittest
 
-from fork_wheat_q0 import copy_bound, freeze, member
+from fork_wheat_q0 import copy_bound, draft_stage_plan, freeze, member
 
 
 class IndependentForkTests(unittest.TestCase):
+    def test_only_defer_raw_reference_in_draft_without_reading_its_bases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); ref='data/reference/R.fa'; meta='metadata/reference.tsv'
+            contents={meta:f'fasta_relpath\tfai_relpath\n{ref}\t{ref}.fai\n'.encode(), ref:b'>chr\nACGT\n',
+                      ref+'.fai':b'chr\t4\t5\t4\t5\n', 'data/datasets/D.fa':b'>x\nAAA\n'}
+            rows=[]
+            for name, data in contents.items():
+                p=root/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+                rows.append({'path':name,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
+            s={'files':rows,'total_bytes':sum(r['size'] for r in rows)}
+            opened=[]; original=Path.open
+            def guarded(p,*args,**kw):
+                self.assertNotEqual(p,root/ref);opened.append(p);return original(p,*args,**kw)
+            with patch.object(Path,'open',guarded): staged,deferred=draft_stage_plan(root,s)
+            self.assertEqual(opened,[root/meta]);self.assertEqual({v['path'] for v in staged},set(contents)-{ref});self.assertEqual(deferred,rows[1])
+            (root/meta).write_text('changed')
+            with self.assertRaisesRegex(ValueError,'declaration differs'):draft_stage_plan(root,s)
+
     def test_no_alias_to_the_running_workspace_or_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); src=root/'old'; new=root/'new'; src.mkdir(); new.mkdir()

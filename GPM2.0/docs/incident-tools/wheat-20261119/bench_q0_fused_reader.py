@@ -14,9 +14,15 @@ def old(line,r,k,qn,tn):
     if (hit.query_length,hit.target_length)!=(qsize,tsize):raise Q0EvidenceError('drifting inventory')
     return RetainedHit.from_validated(hit,q,t)
 
-def run(work,snapshot,out):
+def run(work,snapshot,out,*,installed=False):
+    make_names, decode_row, cache = names, parsed, cached_geometry
+    if installed:
+        from lgz_core.q0_retained_hits import _retained_line, retained_geometry_cache, retained_names
+        make_names, cache = retained_names, retained_geometry_cache()
+        def decode_row(line,artifact,n,pre,qn,tn):
+            return _retained_line(line,artifact,n,pre,qn,tn,cache)
     raw=snapshot.read_bytes(); assert hashlib.sha256(raw).hexdigest()=='2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d'; snap=json.loads(raw); assert Path(snap['source'])==work and not out.exists() and not out.is_relative_to(work)
-    ids,items,meta,_=catalog(work); identities={f['path']:f for f in snap['files']}; assert all(identities[k]['sha256']==v for k,v in meta.items()); tables={ds:names(v) for ds,v in ids.items()}; assert len(items)==68
+    ids,items,meta,_=catalog(work); identities={f['path']:f for f in snap['files']}; assert all(identities[k]['sha256']==v for k,v in meta.items()); tables={ds:make_names(v) for ds,v in ids.items()}; assert len(items)==68
     sets=[]; groups=defaultdict(Counter); chunk=512*1024; hh=hashlib.sha256(); declared={p['paf']:(p['kind'],p['query_dataset'],p['target_dataset']) for p in snap['alignments']}
     for kind,q,t,r in items:
         if kind!='ref':assert declared[r]==(kind,q,t)
@@ -31,22 +37,24 @@ def run(work,snapshot,out):
     # Complete dataclass comparison outside timed paths: includes coordinates, order/tags/cigar encoding, both identities.
     for kind,r,pre,qn,tn,lines in sets:
         for k,line in lines:
-            a=old(line,r,k,qn,tn); b=parsed(line,r,k,pre,qn,tn)
+            a=old(line,r,k,qn,tn); b=decode_row(line,r,k,pre,qn,tn)
             if a!=b:raise ValueError('diagnostic disagrees at '+r+':'+str(k))
     timings=[]
     for fast in (False,True,True,False):
-        cached_geometry.cache_clear();gc.collect(); spent=Counter(); before=time.perf_counter()
+        cache.cache_clear();gc.collect(); spent=Counter(); before=time.perf_counter()
         for kind,r,pre,qn,tn,lines in sets:
             tick=time.perf_counter()
             if fast:
-                for k,line in lines:last=parsed(line,r,k,pre,qn,tn)
+                for k,line in lines:last=decode_row(line,r,k,pre,qn,tn)
             else:
                 for k,line in lines:last=old(line,r,k,qn,tn)
             spent[kind]+=time.perf_counter()-tick
-        timings.append({'candidate':fast,'seconds':time.perf_counter()-before,'by_kind_seconds':spent,'small_cigar_cache':cached_geometry.cache_info()._asdict()}); print('ARM',timings[-1],flush=True)
-    result={'schema':'wheat_threshold_parser_bounded_ab_v1','samples':'first complete records in at most 512 KiB per natural input, original artifact and line number; not random; I/O and selector not timed','files':len(sets),'snapshot_sha256':hashlib.sha256(raw).hexdigest(),'sample_payload_sha256':hh.hexdigest(),'groups':groups,'timings':timings,'exact_retained_rows_compared':sum(v['rows'] for v in groups.values()),'seconds_ratio_old_over_candidate':statistics.median(v['seconds'] for v in timings if not v['candidate'])/statistics.median(v['seconds'] for v in timings if v['candidate']),'mapper_calls':0,'production_modified':False}
+        timings.append({'candidate':fast,'seconds':time.perf_counter()-before,'by_kind_seconds':spent,'small_cigar_cache':cache.cache_info()._asdict()}); print('ARM',timings[-1],flush=True)
+    result={'schema':'wheat_threshold_parser_bounded_ab_v1','tested_reader':'production_threshold_draft' if installed else 'experimental','samples':'first complete records in at most 512 KiB per natural input, original artifact and line number; not random; I/O and selector not timed','files':len(sets),'snapshot_sha256':hashlib.sha256(raw).hexdigest(),'sample_payload_sha256':hh.hexdigest(),'groups':groups,'timings':timings,'exact_retained_rows_compared':sum(v['rows'] for v in groups.values()),'seconds_ratio_old_over_candidate':statistics.median(v['seconds'] for v in timings if not v['candidate'])/statistics.median(v['seconds'] for v in timings if v['candidate']),'mapper_calls':0,'production_modified':False}
     with out.open('x') as f:json.dump(result,f,sort_keys=True,indent=2);f.write('\n')
     print('RESULT',json.dumps(result))
 if __name__=='__main__':
-    import sys
-    run(*(Path(x).resolve() for x in sys.argv[1:]))
+    import argparse
+    p=argparse.ArgumentParser();p.add_argument('--installed',action='store_true')
+    for name in ('work','snapshot','output'):p.add_argument(name,type=Path)
+    a=p.parse_args();run(a.work.resolve(),a.snapshot.resolve(),a.output.resolve(),installed=a.installed)

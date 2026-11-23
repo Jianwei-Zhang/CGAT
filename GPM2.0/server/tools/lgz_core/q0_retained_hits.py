@@ -1,15 +1,17 @@
-"""Lossless in-memory shape for retained threshold hits. Never changes PAF parsing or cache IDs.
+"""Lossless retained PAF geometry and strict one-pass decoding for threshold planning.
 
-The ordinary strict parser validates each complete row first. Store its ordered CIGAR as packed
-unsigned ints and all optional tags in their original order/text. This object is not a receipt.
+Record and artifact identities follow the ordinary PAF reader. A retained row is not a receipt.
 """
 from array import array
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import lru_cache
+from hashlib import sha256
 from types import SimpleNamespace
 
-from .q0_alignments import PafAlignment, _aligned_blocks
-from .q0_sources import Interval
+from .common import canonical_json
+from .q0_alignments import PafAlignment, _CIGAR, _aligned_blocks, open_paf_text, parse_paf_line
+from .q0_sources import Interval, Q0EvidenceError
 
 _OPS = 'MIDN=X'
 _CODES = {c: i for i, c in enumerate(_OPS)}
@@ -82,3 +84,91 @@ class EvidenceRows(Mapping):
         from .q0_catalog import evidence_ref
         item = self._rows[key]
         return evidence_ref(item) if isinstance(item, RetainedHit) else item
+
+
+def _geometry(text):
+    """Validate the entire ASCII CIGAR; return packed operations and both consumed spans."""
+    if (0 < len(text) <= 96 and text[0] in '123456789' and text[-1] in _CODES
+            and (digits := text[:-1]).isascii() and digits.isdigit()):
+        tokens = [(digits, text[-1])]
+    else:
+        tokens = _CIGAR.findall(text)
+        if not tokens or sum(len(n) + 1 for n, _ in tokens) != len(text):
+            raise Q0EvidenceError('malformed or unsupported PAF CIGAR')
+    query_span = target_span = 0
+    packed = array('I')
+    try:
+        for digits, op in tokens:
+            n = int(digits)
+            if op in 'MI=X': query_span += n
+            if op in 'MDN=X': target_span += n
+            packed.append((n << 3) | _CODES[op])
+    except OverflowError:
+        # Same unbounded integer semantics as the ordinary parser, even mid-record.
+        ops = tuple((int(digits), op) for digits, op in tokens)
+        return ops, sum(n for n, op in ops if op in 'MI=X'), sum(n for n, op in ops if op in 'MDN=X')
+    return packed.tobytes(), query_span, target_span
+
+
+def retained_geometry_cache():
+    """One bounded short-CIGAR cache per draft, never a global evidence cache."""
+    return lru_cache(maxsize=8192)(_geometry)
+
+
+def retained_names(lengths):
+    # Like read_paf, a bad unused inventory name does not invalidate other records.
+    return {name: (name, n) for name, n in lengths.items() if name and not any(c.isspace() for c in name)}
+
+
+def _retained_line(line, artifact, number, prefix, query_names, target_names, short_geometry):
+    raw = line.rstrip('\r\n')
+    f = raw.split('\t')
+    if len(f) < 12:
+        raise Q0EvidenceError('short PAF record')
+    qname, qlen = query_names[f[0]]
+    tname, tlen = target_names[f[5]]
+    query = Interval(int(f[2]), int(f[3]))
+    target = Interval(int(f[7]), int(f[8]))
+    matches, length, mapq = int(f[9]), int(f[10]), int(f[11])
+    if (int(f[1]) != qlen or int(f[6]) != tlen or query.end > qlen or target.end > tlen
+            or f[4] not in ('+', '-') or length < 1 or not 0 <= matches <= min(length, query.length, target.length)
+            or not 0 <= mapq <= 255):
+        raise Q0EvidenceError('invalid PAF bounds, strand or statistics')
+    tags = f[12:]
+    cigar = [v[5:] for v in tags if v.startswith('cg:Z:')]
+    if len(cigar) != 1:
+        raise Q0EvidenceError('expected one cg:Z CIGAR')
+    text = cigar[0]
+    packed, qspan, tspan = (short_geometry if len(text) <= 96 else _geometry)(text)
+    if qspan != query.length or tspan != target.length:
+        raise Q0EvidenceError('CIGAR span differs from PAF coordinates')
+    digest = sha256(raw.encode('utf-8')).hexdigest()
+    # Exactly stable_id('q0-paf', [artifact, number, digest]); only the artifact is invariant.
+    evidence = sha256(prefix + str(number).encode('ascii') + b',"' + digest.encode('ascii') + b'"]').hexdigest()
+    return RetainedHit('q0-paf-' + evidence[:24], artifact, number, digest, qname, qlen, query, f[4],
+                       tname, tlen, target, matches, length, mapq, packed, '\t'.join(tags))
+
+
+def read_retained_paf(path, *, artifact, query_names, target_names, short_geometry):
+    """Read actual complete rows in order with the usual UTF-8/newline and source checks."""
+    if not artifact:
+        raise Q0EvidenceError('missing PAF artifact')
+    prefix = ('[' + canonical_json(artifact) + ',').encode('ascii')
+    try:
+        with open_paf_text(path, newline='') as stream:
+            for number, line in enumerate(stream, 1):
+                if line.startswith('#') or not line.strip():
+                    continue
+                try:
+                    hit = _retained_line(line, artifact, number, prefix, query_names, target_names, short_geometry)
+                except (ValueError, KeyError):
+                    # Only exceptional rows revisit the canonical decoder. It is authoritative
+                    # for valid edge cases and reports the normal file/line diagnostic on damage.
+                    original = parse_paf_line(line, artifact=artifact, line_number=number)
+                    q = query_names.get(original.query_name); t = target_names.get(original.target_name)
+                    if q is None or t is None or (q[1], t[1]) != (original.query_length, original.target_length):
+                        raise Q0EvidenceError(f'{path}:{number}: PAF names/lengths differ from inputs')
+                    hit = RetainedHit.from_validated(original, q[0], t[0])
+                yield hit
+    except (OSError, UnicodeError) as exc:
+        raise Q0EvidenceError(f'cannot read q0 alignment evidence {path}: {exc}') from exc

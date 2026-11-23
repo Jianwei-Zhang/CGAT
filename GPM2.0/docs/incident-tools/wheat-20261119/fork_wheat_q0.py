@@ -110,30 +110,54 @@ def copy_bound(source, target, row, rate=None):
     require(n==row['size'] and h.hexdigest()==row['sha256'] and st==stamp(source),'source changed or SHA mismatch: '+row['path']);tmp.rename(target)
 
 
+def draft_stage_plan(src, manifest):
+    """The initial selector reads reference names/lengths, not reference DNA. Keep its parent identity."""
+    rows = manifest['files']; by_name = {r['path']: r for r in rows}
+    require(len(by_name) == len(rows) and sum(r['size'] for r in rows) == manifest['total_bytes'], 'inconsistent frozen inventory')
+    table = 'metadata/reference.tsv'; data = small(member(src, table))
+    require(len(data) == by_name[table]['size'] and sha(data) == by_name[table]['sha256'], 'reference declaration differs from snapshot')
+    refs = list(csv.DictReader(data.decode().splitlines(), delimiter='\t'))
+    require(len(refs) == 1, 'one frozen reference is required')
+    rel, fai = refs[0]['fasta_relpath'], refs[0]['fai_relpath']
+    require(Path(rel).parent == Path('data/reference') and fai == rel+'.fai' and fai in by_name and rel in by_name,
+            'cannot isolate the reference FASTA from a bound FAI')
+    require(member(src,rel).stat().st_size == by_name[rel]['size'], 'deferred reference missing or resized')
+    # No claim of having freshly hashed these deferred bytes; formal Q0 must stage and hash them first.
+    return [r for r in rows if r['path'] != rel], by_name[rel]
+
+
 def stage_and_draft(control, expected, workspace, rate_mib):
     from lgz_core import q0_preparation as prep, q0_threshold_prepare as threshold
     from lgz_core.q0_threshold_acceptance import record
     ctrl=control.resolve(strict=True);snapshot=small(ctrl/'snapshot.json');require(sha(snapshot)==expected,'unbound fork manifest');s=json.loads(snapshot);root=workspace.resolve();src=Path(s['source']).resolve(strict=True)
-    require(root.parent==Path('/tmp') and root.name.startswith('cgat-wheat-fork-') and not root.exists() and 0<rate_mib<=128,'fork requires a new, private node-local workspace');require(not ctrl.is_relative_to(src) and not src.is_relative_to(ctrl),'fork control overlaps source');require(shutil.disk_usage(root.parent).free>=s['total_bytes']+72*1024**3,'insufficient local disk reserve');root.mkdir(mode=0o700)
+    require(root.parent==Path('/tmp') and root.name.startswith('cgat-wheat-fork-') and not root.exists() and 0<rate_mib<=128,'fork requires a new, private node-local workspace');require(not ctrl.is_relative_to(src) and not src.is_relative_to(ctrl),'fork control overlaps source')
+    staged, deferred = draft_stage_plan(src,s); planned=s['total_bytes']-deferred['size']
+    require(shutil.disk_usage(root.parent).free>=planned+72*1024**3,'insufficient local disk reserve');root.mkdir(mode=0o700)
     write(ctrl/'started.json',{'source_run':s['source_run'],'snapshot_sha256':expected,'workspace':str(root),'hostname':socket.gethostname(),'pid':os.getpid(),'revision':s['revision'],'profile':s['profile'],'time':time.time()}); done=0;last=0
-    for row in s['files']:
+    for row in staged:
         copy_bound(member(src,row['path']),member(root,row['path']),row,rate_mib*1024**2);done+=row['size']
-        if done-last>=1024**3:print('STAGED',done,'/',s['total_bytes'],flush=True);last=done
+        if done-last>=1024**3:print('STAGED',done,'/',planned,flush=True);last=done
     # Retain the parent checkpoints as provenance, not as latest-runtime checkpoint successes.
     prov=root/'metadata/fork_parent';prov.mkdir()
     for c in s['producer_checkpoints']:
         p=Path(c['checkpoint']).name;v=small(ctrl/'producer'/p);require(sha(v)==c['sha256'],'changed parent receipt');(prov/p).write_bytes(v)
     for n,d in [('reader.json',s['producer_reader_sha256']),('plan.tsv',s['source_plan_sha256'])]:
         v=small(ctrl/'producer'/n);require(sha(v)==d,'changed parent declaration');(prov/n).write_bytes(v)
-    (prov/'snapshot.json').write_bytes(snapshot);write(ctrl/'staged.json',{'snapshot_sha256':expected,'files':len(s['files']),'bytes':done,'hostname':socket.gethostname(),'workspace':str(root),'time':time.time()}); print('VERIFIED_ALL_STAGED_INPUTS; BEGIN_GLOBAL_THRESHOLD_DRAFT',flush=True)
+    (prov/'snapshot.json').write_bytes(snapshot)
+    require(done == planned, 'staged draft input size differs')
+    write(ctrl/'staged.json',{'schema':'wheat_fork_draft_staging_v2','complete_for':'first_request_only',
+                              'snapshot_sha256':expected,'files':len(staged),'bytes':done,'deferred_for_formal_q0':[deferred],
+                              'hostname':socket.gethostname(),'workspace':str(root),'time':time.time()})
+    print('VERIFIED_DRAFT_INPUTS; REFERENCE_FASTA_DEFERRED; BEGIN_GLOBAL_THRESHOLD_DRAFT',flush=True)
     ds=prep.table(root,'metadata/datasets.tsv',('dataset_name','fasta_relpath'));seqs=prep._dataset_sequences(root,ds); ref=prep.table(root,'metadata/reference.tsv',('fai_relpath',))[0]; lengths={k:int(n) for k,n,*_ in (x.split('\t') for x in (root/ref['fai_relpath']).read_text().splitlines())}; assignments=prep.table(root,'metadata/chr_assignments.tsv',('dataset_name','seq_name','assigned_chr_name')); inventory={(s.dataset,s.contig):len(dna) for s,dna in seqs.items()}; require(all(a['assigned_chr_name'] in lengths and inventory.get((a['dataset_name'],a['seq_name']))==int(a['seq_length_bp']) for a in assignments),'assignment source or length differs')
     from unittest.mock import patch
-    base_reader=threshold.read_paf
+    reader_name = "read_retained_paf" if hasattr(threshold, "read_retained_paf") else "read_paf"
+    base_reader=getattr(threshold,reader_name)
     def observed(path,**kw):
         print('DRAFT_PAF_START',kw['artifact'],flush=True);n=0
         for hit in base_reader(path,**kw):n+=1;yield hit
         print('DRAFT_PAF_COMPLETE',kw['artifact'],n,flush=True)
-    with patch.object(threshold,'read_paf',observed):
+    with patch.object(threshold,reader_name,observed):
         need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'])
     write(ctrl/'global-first-request.json',{'schema':'wheat_threshold_global_first_request_v1','snapshot_sha256':expected,'revision':s['revision'],'threshold_contract':prep.supplement_policy('positive_threshold')['decision_frontier'],'has_path':has_path,'request':record(need),'published_q0':False,'mapper_calls':0});print('GLOBAL_FIRST_REQUEST',None if need is None else len(need),'sources; has_path',has_path,flush=True)
 

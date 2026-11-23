@@ -1,0 +1,183 @@
+{
+  "bounded_parser_ab": {
+    "exact_retained_rows_compared": 103612,
+    "files": 68,
+    "groups": {
+      "cross": {
+        "bytes": 9671143,
+        "files": 22,
+        "rows": 30437
+      },
+      "ref": {
+        "bytes": 1048130,
+        "files": 2,
+        "rows": 3972
+      },
+      "self": {
+        "bytes": 23059744,
+        "files": 44,
+        "rows": 69203
+      }
+    },
+    "mapper_calls": 0,
+    "production_modified": false,
+    "sample_payload_sha256": "1d46ef55b25a5c676a48f32d1cfdcb3e8923f5a1fed8556c84177589927e8cff",
+    "samples": "first complete records in at most 512 KiB per natural input, original artifact and line number; not random; I/O and selector not timed",
+    "schema": "wheat_threshold_parser_bounded_ab_v1",
+    "seconds_ratio_old_over_candidate": 1.5060856073633375,
+    "snapshot_sha256": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d",
+    "tested_reader": "production_threshold_draft",
+    "timings": [
+      {
+        "by_kind_seconds": {
+          "cross": 1.7334520071744919,
+          "ref": 0.18944092094898224,
+          "self": 4.312478058040142
+        },
+        "candidate": false,
+        "seconds": 6.235477074980736,
+        "small_cigar_cache": {
+          "currsize": 0,
+          "hits": 0,
+          "maxsize": 8192,
+          "misses": 0
+        }
+      },
+      {
+        "by_kind_seconds": {
+          "cross": 1.1376512423157692,
+          "ref": 0.11651048064231873,
+          "self": 2.8690476417541504
+        },
+        "candidate": true,
+        "seconds": 4.1232960522174835,
+        "small_cigar_cache": {
+          "currsize": 8192,
+          "hits": 6614,
+          "maxsize": 8192,
+          "misses": 47601
+        }
+      },
+      {
+        "by_kind_seconds": {
+          "cross": 1.1374328136444092,
+          "ref": 0.11713317781686783,
+          "self": 2.869747668504715
+        },
+        "candidate": true,
+        "seconds": 4.1244001314044,
+        "small_cigar_cache": {
+          "currsize": 8192,
+          "hits": 6614,
+          "maxsize": 8192,
+          "misses": 47601
+        }
+      },
+      {
+        "by_kind_seconds": {
+          "cross": 1.7212747856974602,
+          "ref": 0.187471404671669,
+          "self": 4.277426354587078
+        },
+        "candidate": false,
+        "seconds": 6.186259441077709,
+        "small_cigar_cache": {
+          "currsize": 0,
+          "hits": 0,
+          "maxsize": 8192,
+          "misses": 0
+        }
+      }
+    ]
+  },
+  "draft_only_staging": {
+    "new_bytes": 46268919384,
+    "new_files": 103,
+    "previous_bytes": 61058636573,
+    "previous_files": 104,
+    "reference_deferred_bytes": 14789717189
+  },
+  "limits": "No hot patch or restart. These are per-record and natural-panel first-demand checks, not a whole-genome acceptance or wall-clock speedup.",
+  "paired_initial_requests": [
+    {
+      "fused_seconds": 2.9318489506840706,
+      "has_path": true,
+      "intervals": 0,
+      "original_seconds": 3.0736756548285484,
+      "panel": "1B-689Mb",
+      "panel_sha256": "575910058629be6adc374af44da06d6b8be8f77b9789d3be485decc5e86a3f25",
+      "request_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sources": 0
+    },
+    {
+      "fused_seconds": 1.2839683666825294,
+      "has_path": false,
+      "intervals": 0,
+      "original_seconds": 1.3015903607010841,
+      "panel": "2B-8Mb",
+      "panel_sha256": "1ac3886d794afe3f1050bbdc817f94e97fe9d19749ba4502221acdcc2aba6dfc",
+      "request_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sources": 0
+    },
+    {
+      "fused_seconds": 1.875041663646698,
+      "has_path": true,
+      "intervals": 0,
+      "original_seconds": 1.8896419927477837,
+      "panel": "3B-792Mb",
+      "panel_sha256": "3dd7aa2d643a04019ea75d092cdc88567c36d8a4a7c3914dfcc1a7a654139d39",
+      "request_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sources": 0
+    },
+    {
+      "fused_seconds": 30.137846514582634,
+      "has_path": true,
+      "intervals": 9,
+      "original_seconds": 30.847850255668163,
+      "panel": "3D-589Mb",
+      "panel_sha256": "cb46341aa8fa1d7a805f86185510938eb44a5f62bb8c54130427b1a424c3eec9",
+      "request_sha256": "2507b6efbff4101291c415d179e2f64e1404530bd2aa4c579db58058bef1a071",
+      "sources": 9
+    },
+    {
+      "fused_seconds": 0.2448703870177269,
+      "has_path": false,
+      "intervals": 0,
+      "original_seconds": 0.25608423352241516,
+      "panel": "6A-16Mb",
+      "panel_sha256": "70da0dd53c00188d456229447dee5479b04c2f3adaf354fb4f102aa73b5c63ac",
+      "request_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sources": 0
+    },
+    {
+      "fused_seconds": 1.3032510429620743,
+      "has_path": true,
+      "intervals": 4,
+      "original_seconds": 1.267916314303875,
+      "panel": "7A-734Mb",
+      "panel_sha256": "98840757293e6183454293b0e8e9f99132e024e49d645e962893feb1263bd83b",
+      "request_sha256": "02d5c32eed556a15e7b7ed15d06c758cf66d6e7f9d6057e0578fb15d9c2d31b9",
+      "sources": 3
+    }
+  ],
+  "panel_job": 43024535,
+  "panel_job_state": "SUCCEEDED",
+  "producer_revision": "665d2ec05823fb4282e9e949b45a13d4bbef36ae",
+  "reader_job": 43024546,
+  "reader_job_state": "SUCCEEDED",
+  "reports_sha256": {
+    "1B-689Mb.exact.json": "872bb1586e3c0ebded962feff5f5dc5b69fc5570db9cc41fa647329edef56305",
+    "2B-8Mb.exact.json": "07b4effe386e0bf2ccb6840ab71b77727fb3fc203ffe8defc532ba0a40c1e6a3",
+    "3B-792Mb.exact.json": "a0e49ac233ec1d7f53d47b4db9f44a4d732acfdf6eac6ae3a01efc16abc89c99",
+    "3D-589Mb.exact.json": "d941281d240e9fcbd10921f3e21b0cbfc993f24168ebcec9e7914ae5f8661ae8",
+    "6A-16Mb.exact.json": "128e02f4aa123a136c1bfa9f1751ec08c6d421bf704649182d800870695e257d",
+    "7A-734Mb.exact.json": "5c2585e8b4fe3b1e5869e4325dafdbef40bb5f704dea5320c5f21f2622909a34",
+    "production-reader.json": "e6fd7978a8ffe9a84aab7c9d881df08cbaed6accbde8bde36d9c2157af92cc15"
+  },
+  "runtime_sha256": "9d180274e7eaebb40a301a3bc886d0245a689b12dded4b52e080d805ea77dd65",
+  "schema": "installed_wheat_threshold_reader_first_request_v1",
+  "tested_overrides": {
+    "q0_retained_hits.py": "fd8b9bd8a2c047970fa2e18acf1646e07f0e9c285ef5fb855711f149cdf38fd7",
+    "q0_threshold_prepare.py": "226d6c4b8713e7855dac322cf9c7d6bcab92d0984751573899817e093e91e471"
+  }
+}
