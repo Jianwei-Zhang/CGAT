@@ -4779,3 +4779,9 @@ resolved仍是readiness/bin/minimap2、SHA cb7e8f...。**继续保持该调用�
 
 - `q0-4d-placement-resume.nzBAGt/`（与原 `gpm_server/` 同级）：`job_43029868.out` 记录各放置阶段、轮次、完成数和耗时；单项耗时过长时看 `placement-stacks.log` 的定时调用栈。`candidate.json` 是完整的候选摘要，`4d-first-request.json` 仅是本组请求，不能作为整麦清单。
 - 轻量观察脚本将候选与原 `q0-4d-gate-whole-NDdyyY/old.json` 的完整科学摘要比较，结果写入 `comparison.json`；作业提交、运行或单侧成功均不是等价结论。冻结整麦 `43028666` 仍依赖原 `43028326`，不会自动切换到此提交。此轮没有启动其他测试。
+
+### 11/23 20:33 — 第二轮片段定位的区间求交
+
+`43029868` 的第一轮定位（509 段）历时 17 秒；第二轮在 `20:29:43` 和 `20:32:43` 两次主线程采样均落在 `q0_admission.py` 的直接参考锚逐对求交处。作业仍在计算，不是清单写入失败。`f34eb960` 只给该片段及该染色体/方向的直接参考覆盖建区间索引，不合并原始参考证据，不改变准入阈值。
+
+4D 验证 `43029895` 位于 `q0-4d-indexed-support.cOzHej/`，依赖 `43029868=SUCCEEDED`；父作业的两个冻结对照不重跑，不更换整麦依赖。成功后先看 `predecessor-comparison.json`（对上一候选），再看 `comparison.json`（对冻结旧版），并核对 `4d-first-request.json`。仅有提交凭据、栈采样或单侧完成不能证明结果等价或加速。
