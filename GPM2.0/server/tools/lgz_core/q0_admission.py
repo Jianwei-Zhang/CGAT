@@ -491,9 +491,51 @@ def _clean_source_intervals(sequence, mask, intervals, policy):
                             for piece in _complex_intervals(sequence, unique, policy))
 
 
+class _RootedContext:
+    """The original unmasked complexity grid, evaluated only where paired blocks need it."""
+    def __init__(self, sequence_for, masks, policy):
+        # A tile always starts on the unmasked run's ORIGINAL grid. In particular
+        # neither a CIGAR block, a reverse projection nor a cache boundary restarts it.
+        self.width = 64 * policy.minimum_anchor_bp
+        screened = 0
+
+        @lru_cache(maxsize=128)
+        def unmasked(source, parent):
+            return tuple(_outside_merged_mask(parent, masks.get(source, ())))
+
+        @lru_cache(maxsize=4096)
+        def tile(source, parent, start, end):
+            nonlocal screened
+            screened += end - start
+            return _complex_intervals(sequence_for(source, parent), Interval(start, end), policy)
+
+        self._unmasked, self._tile = unmasked, tile
+        self.screened = lambda: screened
+
+    def __call__(self, anchor, targets):
+        source, parent = anchor.source, anchor.interval
+        legs = self._unmasked(source, parent); pieces = []
+        for target in merged_intervals(targets):
+            for leg in _overlapping_spans(target, legs):
+                lo, hi = max(target.start, leg.start), min(target.end, leg.end)
+                start = lo - (lo - leg.start) % self.width
+                while start < hi:
+                    end = min(start + self.width, leg.end)
+                    spans = self._tile(source, parent, start, end)
+                    pieces.extend(i.intersection(target) for i in _overlapping_spans(target, spans))
+                    start = end
+        # Join runs across tiles BEFORE projection: splitting a passing interval
+        # here would shift the separate candidate-side complexity grid downstream.
+        return merged_intervals(pieces)
+
+    def clear(self):
+        self._tile.cache_clear(); self._unmasked.cache_clear()
+
+
 def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_context):
     """One candidate, fixed round inputs; no shared proposal writes or early tie-breaking."""
-    delta = {}; geometry = complexity = 0.0
+    delta = {}; geometry = rooted = candidate = 0.0
+    before_bp = rooted_context.screened()
     direct_spans = {}  # Immutable source coverage, only for this segment and round.
     for anchor, links in linked:
         for orientation in ("+", "-"):
@@ -512,8 +554,8 @@ def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_co
             # Full accepted contig context can root an off-ref
             # neighbor; known ambiguous/repetitive positions cannot.
             stamp = monotonic()
-            context = rooted_context(anchor)
-            complexity += monotonic() - stamp
+            context = rooted_context(anchor, (anchor.source_interval(b.right) for b, _ in qualified))
+            rooted += monotonic() - stamp
             intervals, ids = [], set()
             for block, evidence_id in qualified:
                 # Screen only source intervals that touch this block; keep the original
@@ -528,7 +570,7 @@ def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_co
                     ids.add(evidence_id)
             stamp = monotonic()
             intervals = clean(intervals)
-            complexity += monotonic() - stamp
+            candidate += monotonic() - stamp
             if sum(i.length for i in intervals) < min(policy.minimum_anchor_bp, part.interval.length):
                 continue
             item = delta.setdefault(group, {"intervals": [], "ids": set(), "parents": set()})
@@ -547,7 +589,7 @@ def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_co
             item["parents"].add(anchor.placement_id)
     for item in delta.values():
         item['intervals'] = merged_intervals(item['intervals'])
-    return delta, geometry, complexity
+    return delta, geometry, rooted, candidate, rooted_context.screened() - before_bp
 
 
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),
@@ -680,12 +722,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
             records.append({"placement_id": local.placement_id, "segment_id": part.segment_id, "status": "accepted",
                             "reason": "independently_anchored_cross_chr_tail", "anchor_placement_ids": sorted(value["parents"])})
 
-    # A fragmented pair can have thousands of CIGAR blocks rooting to the
-    # same immutable admitted span. Screen that full source context once,
-    # not once per block. Keep the cache local to this admission and bounded.
-    @lru_cache(maxsize=128)
-    def rooted_context(segment_id, interval):
-        return clean_intervals(data.parts[segment_id], (interval,))
+    rooted_context = _RootedContext(lambda source, _span: data.sources[source], ambiguous, policy)
 
     # Anchors are immutable until the extension phase below. Accumulate each
     # candidate/anchor contribution exactly once, but resolve at the original round
@@ -705,7 +742,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
             part = data.parts[key]
             return _candidate_delta(part, groups.get(key, {}), linked, policy, path_policy,
                                     lambda spans: clean_intervals(part, spans),
-                                    lambda anchor: rooted_context(anchor.segment_id, anchor.interval))
+                                    rooted_context)
 
         prior = sum(old_neighbors.get(data.parts[k].source, 0) for k in unplaced)
         for src, anchors in placed_neighbors.by_source.items():
@@ -770,7 +807,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
         frontier = next_frontier
 
     proposed.clear()
-    rooted_context.cache_clear()
+    rooted_context.clear()
 
     # Extend supported anchors into non-ref sequence only with a noncompeting,
     # high-complexity pair match between already localized sources. Direct ref
