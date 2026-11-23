@@ -108,7 +108,7 @@ def gap_patch(attempt, locus, seeds, terminal):
     size_new = after - tail - start
     if size_new > MAX_PATCH_BP:
         return "rejected", "native_patch_exceeds_size_limit", None
-    sequence = native.fetch("locus", start, after - tail).upper() if size_new else b""
+    sequence = b"".join(block.upper() for block in native.blocks("locus", start, after - tail))
     if len(sequence) == gap and sequence.count(b"N") == gap:
         return "no_candidate", "original_gap_unchanged", None
     if sequence and sequence.count(b"N") == len(sequence):
@@ -146,7 +146,8 @@ def tel_patch(attempt, locus, seeds, directory):
         return ("rejected", "native_patch_exceeds_size_limit", None), artifacts
     if not equal_interval(original, "endpoint", 0, native, "endpoint", extension if end == "L" else 0, size):
         return ("rejected", "native_candidate_changes_original_endpoint", None), artifacts
-    sequence = native.fetch("endpoint", 0 if end == "L" else size, extension if end == "L" else after).upper()
+    sequence = b"".join(block.upper() for block in native.blocks(
+        "endpoint", 0 if end == "L" else size, extension if end == "L" else after))
     if b"N" in sequence:
         return ("rejected", "terminal_extension_contains_ns", None), artifacts
     _, facts, _ = fasta_facts(seeds / "endpoint.fa", {"endpoint"})

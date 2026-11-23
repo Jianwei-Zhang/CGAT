@@ -39,6 +39,42 @@ class RefineTests(unittest.TestCase):
                    "ds\tleft\tdata/datasets/src.fa\n"
                    "ds\tright\tdata/datasets/src.fa\n")
 
+    @unittest.skipUnless(shutil.which("samtools"), "private indexing requires samtools")
+    def test_long_endpoint_seed_and_admitted_patches_cross_the_index_read_limit(self):
+        from post_lgz_degap import CHUNK
+        from refine_run import gap_patch, tel_patch
+        from server_source_identity import resolve_seed
+        payload = "ACGT" * (CHUNK // 4) + "RY"
+        self.source.write_text(">left\n" + payload.lower() + "\n")
+        member = {"dataset": "ds", "name": "left", "length": len(payload), "start": 2,
+                  "end": len(payload), "interval_sha256": hash_text(payload[1:])}
+        plan = {"start": len(payload) - 1, "end": 1, "members": [member]}
+        seq, (proof,) = resolve_seed(self.layout.root, plan, self.home, require_content=True)
+        self.assertEqual(seq, payload[1:].translate(str.maketrans("ACGTRY", "TGCAYR"))[::-1])
+        self.assertEqual(proof["interval_sha256"], member["interval_sha256"])
+        member["interval_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "no content-matching"):
+            resolve_seed(self.layout.root, plan, self.home, require_content=True)
+
+        (self.home / "local.fa").write_text(">locus\nCNNT\n")
+        native = self.home / "gap.fa"
+        native.write_text(">locus\nC" + payload + "T\n")
+        locus = {"gap_bp": 2, "witnesses": {k: {"start": 1, "end": 1} for k in ("seqleft", "seqright")}}
+        status, _, patch_bytes = gap_patch(self.home, locus, self.home, native)
+        self.assertEqual((status, patch_bytes[-1]), ("closed", payload.encode()))
+        (self.home / "endpoint.fa").write_text(">endpoint\nGT\n")
+        (self.home / "result").mkdir()
+        for side, kind in (("L", "tel_left"), ("R", "tel_right")):
+            attempt = self.home / side
+            attempt.mkdir()
+            (self.home / "result/status.tsv").write_text("ctg_id\tend\tstatus\toriginal_length\tfinal_length\n"
+                f"endpoint\t{side}\tsuccess\t2\t{len(payload) + 2}\n")
+            output = self.home / f"telseeker_ctg.jobs/endpoint.{side}/result/extended.ctg.fa"
+            output.parent.mkdir(parents=True)
+            output.write_text(">endpoint\n" + (payload + "GT" if side == "L" else "GT" + payload) + "\n")
+            (status, _, patch_bytes), _ = tel_patch(attempt, {"kind": kind}, self.home, self.home)
+            self.assertEqual((status, patch_bytes[-1]), ("extended", payload.encode()))
+
     def write(self, relative, content):
         path = self.layout.path(relative)
         path.parent.mkdir(parents=True, exist_ok=True)

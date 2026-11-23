@@ -151,11 +151,12 @@ def resolve_seed(root, plan, scratch, *, require_content):
                 start, end = member["start"], member["end"]
                 if type(start) is not int or type(end) is not int or not 1 <= start <= end <= member["length"]:
                     raise ValueError("invalid exported source slice")
-                sequence = index.fetch(member["name"], start - 1, end).decode("ascii").upper()
-                actual_interval_sha = hashlib.sha256(sequence.encode()).hexdigest()
+                # CHUNK limits an individual index read, not the exported source interval.
+                sequence = b"".join(block.upper() for block in index.blocks(member["name"], start - 1, end))
+                actual_interval_sha = hashlib.sha256(sequence).hexdigest()
                 if interval_sha is not None and actual_interval_sha != interval_sha:
                     continue
-                selected.append((sequence, {"dataset": member["dataset"], "name": member["name"],
+                selected.append((sequence.decode("ascii"), {"dataset": member["dataset"], "name": member["name"],
                                 "fasta_sha256": sha, "source": str(source), "origin": origin,
                                 "start": start, "end": end, "length": member["length"],
                                 "interval_sha256": actual_interval_sha}))
