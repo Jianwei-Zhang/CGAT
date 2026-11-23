@@ -39,6 +39,7 @@ LGZ_QC_MEMORY_GB="80"
 LGZ_KMER_SIZE="21"
 LGZ_REFILL_MAX_LENGTH="1000000"
 LGZ_EXECUTION_PROFILE="optimized"
+Q0_SUPPLEMENT_SCOPE="full"
 LGZ_STEP2_MUMMER_SCOPE="gap-screen"
 
 usage() {
@@ -65,6 +66,7 @@ Usage:
     [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
     [--lgz-execution-profile optimized|baseline] \
+    [--q0-supplement-scope full|decision_frontier_repair] \
     [--lgz-step2-mummer-scope gap-screen|full] \
     [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
@@ -101,6 +103,8 @@ Behavior:
   - Legacy --grt-* options remain accepted aliases for --lgz-* options
   - LGZ defaults: optimized execution, full Step1, anchor-safe gap-screen Step2
   - --lgz-execution-profile baseline restores legacy scheduling and per-chromosome refill
+  - --q0-supplement-scope defaults to full; decision_frontier_repair is an opt-in, potentially lossy Q0-only search with bounded repair and full fallback
+    It targets expensive regional discovery and can be slower on small workloads. This is not a resume resource option.
   - --lgz-step2-mummer-scope full restores the complete Step2 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
   - No reads: skip DEGAP; q0 and frozen D0/Dtel are still prepared
@@ -518,9 +522,13 @@ write_q0_evidence_script() {
   local work_root="$2"
   {
     printf '#!/usr/bin/env bash\nset -euo pipefail\n'
-    printf 'exec python3 %s --server-dir %s --threads %s --minimap2 %s\n' \
+    printf 'exec python3 %s --server-dir %s --threads %s --minimap2 %s' \
       "$(shell_quote "${work_root}/.prepare_lib/tools/lgz_prepare_evidence.py")" \
       "$(shell_quote "$work_root")" "$(shell_quote "$THREADS")" "$(shell_quote "$LGZ_MINIMAP2")"
+    if [[ "$Q0_SUPPLEMENT_SCOPE" != "full" ]]; then
+      printf ' --supplement-scope %s' "$(shell_quote "$Q0_SUPPLEMENT_SCOPE")"
+    fi
+    printf '\n'
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
@@ -809,6 +817,11 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "$1 requires <min_minimizers>"
       validate_self_alignment_integer "$1" "$2"
       SELF_MINIMIZERS="$2"
+      shift 2
+      ;;
+    --q0-supplement-scope)
+      [[ $# -ge 2 ]] || die "$1 requires full or decision_frontier_repair"
+      case "$2" in full|decision_frontier_repair) Q0_SUPPLEMENT_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
     --lgz-execution-profile|--grt-execution-profile)
