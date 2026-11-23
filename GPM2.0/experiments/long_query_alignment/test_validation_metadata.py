@@ -17,6 +17,10 @@ import server_alignment as sa
 import windowed_alignment as wa
 import test_proactive_resume as resume_controls
 
+from sync_server_runtime import _PRIMARY_LONG_SOURCE_PROFILE
+
+# Frozen reviewed destination from 6a46b60a's shipped branch-runtime.json, not today's source.
+PRIMARY_LONG = json.loads((Path(__file__).parent / 'test_data/primary_long_runtime.json').read_text())
 LEGACY = json.loads((Path(__file__).parent / 'test_data/pre_metadata_fix_runtime.json').read_text())
 
 
@@ -190,8 +194,9 @@ class KeyMigrationTests(unittest.TestCase):
             'native_companion_sha256':'b'*64,'native_companion_platform':'linux-x86_64',
             'recovered_output_admission':sa.pub.POLICY}
         self.runtime = {**self.old_runtime,'sha256':'c'*64,
-                        'files_sha256':sa.runtime_files(Path(sa.__file__).parent)}
+                        'files_sha256':dict(PRIMARY_LONG)}
         profile = hashlib.sha256(json.dumps(self.runtime['files_sha256'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(profile, _PRIMARY_LONG_SOURCE_PROFILE)
         self.runtime['native_resume_source_profiles'] = [[pr._REVIEWED_LEGACY_RUNTIME,profile]]
         self.key = self.make_key(self.old_runtime['sha256'])
         self.attempt, _ = pr.select_attempt(self.run, self.key)
@@ -241,7 +246,18 @@ class KeyMigrationTests(unittest.TestCase):
     def test_legacy_full_profile_is_frozen_and_matches_the_approved_digest(self):
         digest = hashlib.sha256(json.dumps(LEGACY,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         self.assertEqual(digest, pr._REVIEWED_LEGACY_RUNTIME)
-        self.assertEqual(set(LEGACY),set(sa.RUNTIME_FILES) - {"minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py", "approximate_reference_cells.py", "adaptive_screening.py", "adaptive_ordinary_controller.py", "adaptive_ordinary_units.py", "automatic_ordinary_pilot.py", "metadata_json.py", "ordinary_tool_transition.py"})
+        self.assertEqual(set(LEGACY),set(PRIMARY_LONG) - {"minimap_options.py", "ordinary_partition_alignment.py", "ordinary_resource_grant.py", "approximate_reference_cells.py", "adaptive_screening.py", "adaptive_ordinary_controller.py", "adaptive_ordinary_units.py", "automatic_ordinary_pilot.py", "metadata_json.py", "ordinary_tool_transition.py"})
+
+    def test_numbered_runtime_without_a_reviewed_pair_starts_fresh(self):
+        # A new layout helper is not a review of the preceding runtime. Use
+        # the shipped manifest here; never manufacture an approval for HEAD.
+        shipped = json.loads((Path(sa.__file__).resolve().parents[2] / 'server/tools/long_cigar_recovery/branch-runtime.json').read_text())
+        runtime = {**self.runtime, 'files_sha256': shipped['files_sha256'],
+                   'native_resume_source_profiles': shipped['native_resume_source_profiles']}
+        self.assertIn('workspace_binding.py', runtime['files_sha256'])
+        attempt, reused = pr.select_attempt(self.run, self.make_key(runtime['sha256']), runtime=runtime)
+        self.assertFalse(reused)
+        self.assertNotEqual(attempt, self.attempt)
 
     def test_reviewed_runtime_and_ctime_transition_retains_old_controls(self):
         self.target.chmod(0o400);self.query.chmod(0o400)

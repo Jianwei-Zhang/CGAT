@@ -153,10 +153,14 @@ class BranchServerPackageTests(unittest.TestCase):
     def test_existing_workspace_hook_is_inside_the_original_lock_and_does_not_replace_run_sh(self):
         original = (self.source/"tools/server_run.py").read_text()
         patched = package.overlay_server_run(original)
-        ast.parse(patched)
+        tree = ast.parse(patched)
         self.assertEqual(patched.replace(package.RUN_OVERLAY,""),original)
-        self.assertLess(patched.index("lock.acquire()"),patched.index("handoff_report = handoff"))
-        self.assertLess(patched.index("handoff_report = handoff"),patched.index("return Runner(root, units, run_id).run()"))
+        locked, = (node for node in ast.walk(tree) if isinstance(node, ast.Try)
+                   and any(ast.unparse(stmt) == "lock.release()" for stmt in node.finalbody))
+        calls = {ast.unparse(call.func): call.lineno for stmt in locked.body
+                 for call in ast.walk(stmt) if isinstance(call, ast.Call)}
+        self.assertLess(calls["lock.acquire"], calls["handoff"])
+        self.assertLess(calls["handoff"], calls["Runner(root, units, run_id).run"])
         for text in (original.replace(package.RUN_ANCHOR,""),patched):
             with self.assertRaises(wa.ExperimentError):
                 package.overlay_server_run(text)
