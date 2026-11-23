@@ -32,68 +32,39 @@ const COPY = {
     importAction: "导入精修补丁",
     autoPatchImported: "已加入自动精修结果：{tools}。当前工作路径未改变。",
     autoPatchDuplicate: "这些自动精修结果已在项目中，未重复导入。",
-    tableColumns: ["来源", "工具 / 批次", "已闭合", "部分填补", "未填补", "拒绝", "结果"],
-    tableHint: "自动行按原始缺口计数；手动行按所选 Gap 的候选结果计数，不代表已采用。— 表示无此项或未记录。",
-    editCount: "接纳 {n} 处修改", legacySegments: "记录了 {n} 个接纳片段", unknownStats: "未留存逐缺口统计",
-    appliedCount: "本次导回采用 {n} 处", lociCount: "{n} 个位点",
+    tableColumns: ["来源 / 批次", "工具", "填补 / 总数", "涉及 Chr", ""],
     importingAction: "正在导入精修结果...",
     workingAction: "正在更新精修状态...",
     dismissNotice: "关闭",
     autoTitle: "自动精修",
     manualTitle: "手动精修",
-    statusAutoAccepted: "已接纳自动精修",
-    statusAutoZero: "未接纳改动（保留 LGZ 基线）",
-    statusAutoUnrefined: "未精修 LGZ 基线",
-    statusManualExported: "等待 Server 运行与导回",
-    statusManualDraft: "有待导出精修任务",
-    statusManualIdle: "暂无手动精修记录",
-    statusManualImported: "已导回精修结果",
-    statusManualLegacyOnly: "仅记录旧版候选（未应用）",
-    metricChromosomes: "涉及染色体",
-    metricAcceptedSegments: "已接纳片段",
-    metricAffectedGaps: "涉及原始缺口",
-    metricSourceCards: "精修来源卡片",
-    metricDraftLoci: "待导出位点",
-    metricExportedBatches: "待导回批次",
-    metricImportedResults: "已导回批次",
-    metricActiveManualEdits: "当前生效手动精修",
-    autoUnrefinedNote: "当前项目导入的是未精修 LGZ 基线，或不包含自动精修接纳片段；未改动片段不会被标记为已精修。",
-    autoZeroNote: "当前包为精修协议（schema 5），但未检测到已接纳的自动精修片段，仍保持 LGZ 基线。",
-    autoDetailsSummary: "查看自动精修明细（{count} 个片段）",
-    manualImportedSummary: "已导回精修结果批次（{count}）",
-    manualBatchesSummary: "已导出待运行 / 待导回批次（{count}）",
-    manualDraftSummary: "当前项目待导出精修任务（{count}）",
-    manualEmptyNote: "尚未登记精修任务或导回精修结果。进入「装配」页后，可在 Final Path 上按项目登记 Gap 或左/右端粒位点并导出精修任务包（.zip），在 Server 运行 refine.py 后点击右上角的导入补丁图标。",
-    manualReceiptBoundary: "无后端导回记录前，已导出批次始终标记为「等待 Server 运行与导回」；卡片摘要不展示私有 reads 路径。",
-    locateInFinalPath: "在 Final Path 中定位",
-    copyCommand: "复制 Server 命令",
+    pendingTag: "待导回",
+    legacyTag: "旧版候选",
+    manageBatch: "管理",
+    emptyNote: "暂无精修记录，可点击右上角导入精修补丁。",
+    locateInFinalPath: "定位",
+    copyCommand: "复制命令",
     copiedCommand: "已复制命令",
-    undoLocus: "撤销采用",
-    switchToTool: "切换到 {tool}",
+    undoLocus: "撤销",
+    switchToTool: "切换 {tool}",
     adoptTool: "采用 {tool}",
-    activeBadge: "当前生效",
+    activeBadge: "生效中",
     undoneBadge: "已撤销",
-    duplicateBadge: "重复导入",
     legacyCandidateBadge: "旧版候选 · 未应用",
-    appliedSummary: "应用 {applied} · 结果 {sha}",
-    batchPrefix: "批次",
-    resultPrefix: "结果",
-    kindGap: "Gap 补洞",
+    kindGap: "Gap",
     kindTelLeft: "左端粒",
     kindTelRight: "右端粒",
-    kindLegacy: "旧版候选",
-    lociTasks: "{loci} 位点 / {tasks} 次工具运行",
+    kindLegacy: "旧版",
     importDuplicateMsg: "该精修结果包（{sha}）已导入过，未重复修改 Final Path。",
     importAppliedMsg: "已导回并应用 {applied} 个精修位点（涉及染色体：{chrs}），已重新载入权威装配与预览数据。",
     importLegacyOnlyMsg: "已识别旧版 degap_results.zip（{sha}），仅记录旧版候选（未创建轨道、未修改 Final Path）。",
-    importNoApplyMsg: "已导回结果包（{sha}），本次应用 0 个位点，请查看各位点判定状态。",
-    importSwitchedProjectMsg: "导入期间当前项目已切换，未覆盖目标项目视图。",
-    undoSuccessMsg: "已撤销 {chr} 位点 {locusId} 的手动精修（版本 r{rev}），已重新载入权威装配与预览数据。",
-    switchSuccessMsg: "已将 {chr} 位点 {locusId} 切换为 {tool}（版本 r{rev}），已重新载入权威装配与预览数据。",
+    importNoApplyMsg: "已导回结果包（{sha}），本次应用 0 个位点，可展开对应批次查看详情。",
+    undoSuccessMsg: "已撤销 {chr} 位点 {locusId} 的手动精修（版本 r{rev}）。",
+    switchSuccessMsg: "已将 {chr} 位点 {locusId} 切换为 {tool}（版本 r{rev}）。",
     noProjectError: "请先选择有效项目后再操作。",
-    equivalentPrefix: "等价工具",
-    activeToolPrefix: "当前工具",
-    patchLengthPrefix: "补丁长度",
+    equivalentPrefix: "等价",
+    activeToolPrefix: "当前",
+    patchLengthPrefix: "长度",
     dispositionLabels: {
       applied: "已应用",
       adopted: "已采用",
@@ -104,7 +75,7 @@ const COPY = {
       skipped: "已跳过",
       stale: "基线已变更",
       conflict: "冲突",
-      ambiguous: "待人工选择",
+      ambiguous: "待选择",
       undone: "已撤销",
       legacy_candidate_only: "旧版候选 · 未应用",
     },
@@ -114,68 +85,39 @@ const COPY = {
     importAction: "Import refinement patch",
     autoPatchImported: "Added automatic results: {tools}. The working path has not changed.",
     autoPatchDuplicate: "These automatic results are already in this project.",
-    tableColumns: ["Source", "Tool / batch", "Closed", "Partial", "Unfilled", "Rejected", "Result"],
-    tableHint: "Automatic rows count original gaps. Manual rows count candidate outcomes per selected Gap, not adoptions. A dash means not recorded or not applicable.",
-    editCount: "{n} accepted edits", legacySegments: "{n} recorded accepted segments", unknownStats: "Gap outcomes not recorded",
-    appliedCount: "{n} applied on import", lociCount: "{n} loci",
+    tableColumns: ["Source / Batch", "Tool", "Filled / Total", "Chr", ""],
     importingAction: "Importing refinement results...",
     workingAction: "Updating refinement state...",
     dismissNotice: "Dismiss",
-    autoTitle: "Automatic Refinement",
-    manualTitle: "Manual Refinement",
-    statusAutoAccepted: "Accepted",
-    statusAutoZero: "Zero accepted edits (LGZ baseline)",
-    statusAutoUnrefined: "Unrefined LGZ baseline",
-    statusManualExported: "Exported · Awaiting Server & import",
-    statusManualDraft: "Refinement tasks queued",
-    statusManualIdle: "No manual refinement yet",
-    statusManualImported: "Results imported",
-    statusManualLegacyOnly: "Legacy candidates recorded (not applied)",
-    metricChromosomes: "Chromosomes",
-    metricAcceptedSegments: "Accepted segments",
-    metricAffectedGaps: "Affected gaps",
-    metricSourceCards: "Refinement sources",
-    metricDraftLoci: "Queued tasks",
-    metricExportedBatches: "Awaiting batches",
-    metricImportedResults: "Imported results",
-    metricActiveManualEdits: "Active manual edits",
-    autoUnrefinedNote: "This project is an unrefined LGZ baseline or contains no accepted automatic refinement segments. Unchanged LGZ segments are never marked as refined.",
-    autoZeroNote: "This package uses the refinement schema (schema 5) with zero accepted automatic edits; the LGZ baseline is retained.",
-    autoDetailsSummary: "Inspect automatic refinement details ({count} segments)",
-    manualImportedSummary: "Imported refinement result batches ({count})",
-    manualBatchesSummary: "Exported batches awaiting Server / App import ({count})",
-    manualDraftSummary: "Queued project refinement tasks ({count})",
-    manualEmptyNote: "No refinement tasks or imported results yet. Open Assembly to queue Gap or Left/Right Telomere loci, export refinement tasks (.zip), run refine.py on Server, then use the import patch icon.",
-    manualReceiptBoundary: "Exported batches remain marked awaiting Server/import until backed by an imported result record. Private Server read paths are never shown here.",
-    locateInFinalPath: "Locate in Final Path",
-    copyCommand: "Copy Server command",
+    autoTitle: "Automatic",
+    manualTitle: "Manual",
+    pendingTag: "Pending",
+    legacyTag: "Legacy",
+    manageBatch: "Manage",
+    emptyNote: "No refinement records yet. Click the import icon above to import refinement patches.",
+    locateInFinalPath: "Locate",
+    copyCommand: "Copy cmd",
     copiedCommand: "Copied",
     undoLocus: "Undo",
-    switchToTool: "Switch to {tool}",
+    switchToTool: "Use {tool}",
     adoptTool: "Adopt {tool}",
     activeBadge: "Active",
     undoneBadge: "Undone",
-    duplicateBadge: "Duplicate",
-    legacyCandidateBadge: "Legacy candidate · Not applied",
-    appliedSummary: "Applied {applied} · result {sha}",
-    batchPrefix: "Batch",
-    resultPrefix: "Result",
-    kindGap: "Gap fill",
-    kindTelLeft: "Left telomere",
-    kindTelRight: "Right telomere",
-    kindLegacy: "Legacy candidate",
-    lociTasks: "{loci} loci / {tasks} tool runs",
+    legacyCandidateBadge: "Legacy · Not applied",
+    kindGap: "Gap",
+    kindTelLeft: "Left Tel",
+    kindTelRight: "Right Tel",
+    kindLegacy: "Legacy",
     importDuplicateMsg: "Refinement result archive ({sha}) was already imported; Final Path was not modified again.",
     importAppliedMsg: "Imported and applied {applied} locus edit(s) on {chrs}; reloaded authoritative Assembly and Preview data.",
     importLegacyOnlyMsg: "Recognized legacy degap_results.zip ({sha}); recorded legacy candidates only (no tracks created, Final Path unchanged).",
-    importNoApplyMsg: "Imported result archive ({sha}) with 0 applied loci; inspect per-locus dispositions below.",
-    importSwitchedProjectMsg: "Active project changed during import; skipped updating the newly selected project.",
-    undoSuccessMsg: "Undid manual refinement on {chr} locus {locusId} (rev {rev}); reloaded authoritative Assembly and Preview data.",
-    switchSuccessMsg: "Switched {chr} locus {locusId} to {tool} (rev {rev}); reloaded authoritative Assembly and Preview data.",
+    importNoApplyMsg: "Imported result archive ({sha}) with 0 applied loci; expand the batch to inspect details.",
+    undoSuccessMsg: "Undid manual refinement on {chr} locus {locusId} (rev {rev}).",
+    switchSuccessMsg: "Switched {chr} locus {locusId} to {tool} (rev {rev}).",
     noProjectError: "Select an active project first.",
     equivalentPrefix: "Equivalent",
-    activeToolPrefix: "Active tool",
-    patchLengthPrefix: "Patch length",
+    activeToolPrefix: "Active",
+    patchLengthPrefix: "Length",
     dispositionLabels: {
       applied: "Applied",
       adopted: "Adopted",
@@ -188,7 +130,7 @@ const COPY = {
       conflict: "Conflict",
       ambiguous: "Needs selection",
       undone: "Undone",
-      legacy_candidate_only: "Legacy candidate · Not applied",
+      legacy_candidate_only: "Legacy · Not applied",
     },
   },
 };
@@ -945,49 +887,180 @@ function renderImportedLocusRow(batch, locus, copy, busy) {
   </li>`;
 }
 
-function refinementTableRows({ auto, manual }, copy) {
-  const rows = [];
-  const autoRow = (label, counts, result) => rows.push([copy.autoTitle, label, ...counts, result]);
-  const absent = [null, null, null, null];
-  const reported = new Set();
-  for (const effect of auto.effects) {
-    reported.add(effect.tool);
-    autoRow(formatToolLabel(effect.tool), [effect.closed, effect.partial, effect.unfilled, effect.rejected],
-      fmt(copy.editCount, { n: effect.accepted_edits ?? effect.acceptedEdits }));
-  }
-  // Old project databases retain accepted segments, not per-gap closure measurements.
-  const legacy = new Map();
+function buildRefinementOverviewGroups({ auto, manual }, copy) {
+  const groups = [];
+  const autoChrByTool = new Map();
+  const autoSegCountByTool = new Map();
   for (const segment of auto.segments) {
-    const tool = normalizeString(segment.tool).toLowerCase();
-    if (!reported.has(tool)) legacy.set(tool, (legacy.get(tool) || 0) + 1);
+    const toolKey = normalizeString(segment.tool).toLowerCase() || "unknown";
+    if (!autoChrByTool.has(toolKey)) autoChrByTool.set(toolKey, new Set());
+    if (segment.chrName) autoChrByTool.get(toolKey).add(segment.chrName);
+    autoSegCountByTool.set(toolKey, (autoSegCountByTool.get(toolKey) || 0) + 1);
   }
-  for (const [tool, n] of legacy) autoRow(formatToolLabel(tool), absent, fmt(copy.legacySegments, { n }));
-  if (!rows.length && auto.schemaVersion) autoRow(auto.schemaVersion === "5" ? "—" : "LGZ", absent,
-    auto.schemaVersion === "5" ? copy.unknownStats : copy.statusAutoUnrefined);
 
-  const toolNames = (ids) => formatTools([...new Set(ids.filter(Boolean))]);
-  const manualRow = (label, counts, status) => rows.push([copy.manualTitle, label, ...counts, status]);
-  for (const batch of manual.importedResults) {
-    const gaps = batch.loci.filter((locus) => locus.kind === "gap" && !locus.isLegacy);
-    const outcomes = gaps.map((gap) => {
-      const states = new Set(gap.candidates.map((c) => c.status));
-      if (states.has("closed")) return "closed";
-      if (states.has("partial")) return "partial";
-      if (states.size === 1 && states.has("no_candidate")) return "unfilled";
-      if (states.size === 1 && states.has("rejected")) return "rejected";
-      return null; // e.g. missing reads is neither rejection nor an unfilled measurement
+  const autoRows = [];
+  const reportedTools = new Set();
+  for (const effect of auto.effects) {
+    const toolKey = normalizeString(effect.tool).toLowerCase();
+    reportedTools.add(toolKey);
+    const filled = normalizeNonNegativeIntOrNull(effect.accepted_edits ?? effect.acceptedEdits ?? effect.closed);
+    const explicitTotal = normalizeNonNegativeIntOrNull(effect.original_gaps ?? effect.originalGaps);
+    const summedTotal = [effect.closed, effect.partial, effect.unfilled, effect.rejected]
+      .every((v) => normalizeNonNegativeIntOrNull(v) !== null)
+      ? Number(effect.closed) + Number(effect.partial) + Number(effect.unfilled) + Number(effect.rejected)
+      : null;
+    const total = explicitTotal ?? summedTotal;
+    const chrSet = autoChrByTool.get(toolKey);
+    const explicitChrCount = normalizeNonNegativeIntOrNull(effect.chromosome_count ?? effect.chromosomeCount);
+    const chrCount = explicitChrCount
+      ?? (chrSet && chrSet.size > 0 ? chrSet.size : (auto.effects.length === 1 && auto.chromosomeCount > 0 ? auto.chromosomeCount : (filled === 0 ? 0 : null)));
+    autoRows.push({
+      tool: formatToolLabel(effect.tool) || "—",
+      filled,
+      total,
+      chrCount,
     });
-    const tools = toolNames(batch.loci.flatMap((l) => l.candidates.map((c) => c.tool)));
-    const label = [tools, (batch.batchSha256 || batch.resultSha256).slice(0, 12)].filter(Boolean).join(" · ");
-    manualRow(label, outcomes.some(Boolean)
-      ? ["closed", "partial", "unfilled", "rejected"].map((k) => outcomes.filter((v) => v === k).length) : absent,
-      batch.isLegacyOnly ? copy.statusManualLegacyOnly : fmt(copy.appliedCount, { n: batch.applied }));
   }
-  for (const batch of manual.exportedBatches) manualRow([toolNames(batch.loci.flatMap((l) => l.tools)),
-    batch.batchSha256.slice(0, 12)].filter(Boolean).join(" · "), absent, copy.statusManualExported);
-  if (manual.draftLoci.length) manualRow(toolNames(manual.draftLoci.flatMap((l) => l.tools)), absent,
-    `${copy.statusManualDraft} · ${fmt(copy.lociCount, { n: manual.draftLoci.length })}`);
-  return rows;
+  for (const [toolKey, count] of autoSegCountByTool.entries()) {
+    if (reportedTools.has(toolKey)) continue;
+    autoRows.push({
+      tool: toolKey === "unknown" ? "—" : formatToolLabel(toolKey),
+      filled: count,
+      total: null,
+      chrCount: autoChrByTool.get(toolKey)?.size ?? null,
+    });
+  }
+  if (autoRows.length) {
+    groups.push({
+      key: "auto",
+      kind: "auto",
+      headerTitle: copy.autoTitle,
+      batchShort: "",
+      tag: "",
+      rows: autoRows,
+    });
+  }
+
+  for (const batch of manual.importedResults) {
+    const batchKey = `imported:${batch.batchSha256 || batch.resultSha256}`;
+    const shortId = (batch.batchSha256 || batch.resultSha256 || "").slice(0, 6);
+    const toolStats = new Map();
+    const ensureTool = (toolKey) => {
+      if (!toolStats.has(toolKey)) {
+        toolStats.set(toolKey, { total: 0, filled: 0, filledChrs: new Set(), allChrs: new Set() });
+      }
+      return toolStats.get(toolKey);
+    };
+    for (const locus of batch.loci) {
+      if (locus.isLegacy) {
+        const legacyTools = locus.candidates.length ? locus.candidates.map((c) => c.tool) : ["degap"];
+        for (const toolKey of new Set(legacyTools)) {
+          const stat = ensureTool(toolKey);
+          stat.total += 1;
+          if (locus.chr) stat.allChrs.add(locus.chr);
+        }
+        continue;
+      }
+      for (const candidate of locus.candidates) {
+        const stat = ensureTool(candidate.tool);
+        stat.total += 1;
+        if (locus.chr) stat.allChrs.add(locus.chr);
+        if (candidate.status === "closed" || candidate.status === "extended" || candidate.status === "partial") {
+          stat.filled += 1;
+          if (locus.chr) stat.filledChrs.add(locus.chr);
+        }
+      }
+    }
+    const manualRows = [];
+    for (const [toolKey, stat] of toolStats.entries()) {
+      manualRows.push({
+        tool: formatToolLabel(toolKey) || "—",
+        filled: batch.isLegacyOnly ? null : stat.filled,
+        total: stat.total,
+        chrCount: batch.isLegacyOnly
+          ? stat.allChrs.size
+          : (stat.filled > 0 ? stat.filledChrs.size : 0),
+      });
+    }
+    if (!manualRows.length) {
+      manualRows.push({
+        tool: "—",
+        filled: batch.applied,
+        total: batch.loci.length || batch.applied,
+        chrCount: batch.changedChromosomes.length,
+      });
+    }
+    groups.push({
+      key: batchKey,
+      kind: "manual-imported",
+      headerTitle: copy.manualTitle,
+      batchShort: shortId ? `#${shortId}` : "",
+      tag: batch.isLegacyOnly ? copy.legacyTag : "",
+      batch,
+      rows: manualRows,
+    });
+  }
+
+  for (const batch of manual.exportedBatches) {
+    const batchKey = `pending:${batch.batchSha256}`;
+    const shortId = (batch.batchSha256 || "").slice(0, 6);
+    const toolStats = new Map();
+    for (const locus of batch.loci) {
+      for (const toolKey of locus.tools || []) {
+        if (!toolStats.has(toolKey)) {
+          toolStats.set(toolKey, { total: 0, chrs: new Set() });
+        }
+        const stat = toolStats.get(toolKey);
+        stat.total += 1;
+        if (locus.chr) stat.chrs.add(locus.chr);
+      }
+    }
+    const pendingRows = [];
+    for (const [toolKey, stat] of toolStats.entries()) {
+      pendingRows.push({
+        tool: formatToolLabel(toolKey) || "—",
+        filled: null,
+        total: stat.total,
+        chrCount: stat.chrs.size,
+      });
+    }
+    if (!pendingRows.length) {
+      pendingRows.push({
+        tool: "—",
+        filled: null,
+        total: batch.lociCount || null,
+        chrCount: null,
+      });
+    }
+    groups.push({
+      key: batchKey,
+      kind: "manual-pending",
+      headerTitle: copy.manualTitle,
+      batchShort: shortId ? `#${shortId}` : "",
+      tag: copy.pendingTag,
+      batch,
+      command: buildManualRefinementServerCommand(batch.outputPath || batch.outputFileName),
+      rows: pendingRows,
+    });
+  }
+
+  return groups;
+}
+
+function renderRatioCell({ filled, total }) {
+  const hasFilled = filled !== null && filled !== undefined;
+  const hasTotal = total !== null && total !== undefined;
+  if (!hasFilled && !hasTotal) {
+    return `<span class="muted">—</span>`;
+  }
+  const text = `${hasFilled ? filled : "—"} / ${hasTotal ? total : "—"}`;
+  const pct = hasFilled && hasTotal && total > 0 ? Math.min(100, Math.round((filled / total) * 100)) : 0;
+  return `<div class="project-refinement-ratio">
+    <span class="project-refinement-ratio-text">${escapeHtml(text)}</span>
+    ${hasFilled && hasTotal && total > 0
+      ? `<span class="project-refinement-bar" aria-hidden="true"><span class="project-refinement-bar-fill" style="width:${pct}%"></span></span>`
+      : ""}
+  </div>`;
 }
 
 export function renderProjectRefinementCard(state) {
@@ -996,98 +1069,10 @@ export function renderProjectRefinementCard(state) {
   const ui = readScopedRefinementUi(state);
   const inFlightForCurrentProject = Boolean(ui.inFlight);
   const busy = Boolean(state?.importer?.inFlight || state?.initializer?.autoPipelineRunning || inFlightForCurrentProject);
+  const expandedBatchKey = normalizeString(ui.expandedBatchKey);
 
-  const rows = refinementTableRows(model, copy);
+  const groups = buildRefinementOverviewGroups(model, copy);
   const importLabel = inFlightForCurrentProject ? (ui.busyLabel || copy.importingAction) : copy.importAction;
-  const autoDetails = model.auto.segments.length
-    ? `<details class="project-refinement-details">
-        <summary>${escapeHtml(fmt(copy.autoDetailsSummary, { count: model.auto.segments.length }))}</summary>
-        <p class="muted project-refinement-note">${escapeHtml([
-          `${copy.metricChromosomes}: ${model.auto.chromosomeCount}`, `${copy.metricAffectedGaps}: ${model.auto.affectedGapCount}`,
-          `${copy.metricSourceCards}: ${model.auto.sourceCardCount}`,
-        ].join(" · "))}</p>
-        <ul class="project-refinement-list">
-          ${model.auto.segments.map((item) => `<li class="project-refinement-item">
-            <div class="project-refinement-item-main">
-              <span class="project-refinement-chr">${escapeHtml(item.chrName)}</span>
-              <strong>${escapeHtml(item.displayName || item.segmentId)}</strong>
-              ${item.tool ? `<span class="project-refinement-tag">${escapeHtml(item.tool)}${item.version ? ` v${escapeHtml(item.version)}` : ""}</span>` : ""}
-              ${item.originalGapIds.length ? `<span class="muted">${escapeHtml(item.originalGapIds.join(", "))}</span>` : ""}
-            </div>
-            <button type="button" class="button ghost project-refinement-locate" data-project-refinement-locate-chr="${escapeAttr(item.chrName)}">${escapeHtml(copy.locateInFinalPath)}</button>
-          </li>`).join("")}
-        </ul>
-      </details>`
-    : "";
-
-  const manualImportedMarkup = model.manual.importedResults.length
-    ? `<details class="project-refinement-details" open>
-        <summary>${escapeHtml(fmt(copy.manualImportedSummary, { count: model.manual.importedResults.length }))}</summary>
-        <ul class="project-refinement-list">
-          ${model.manual.importedResults.map((batch) => `<li class="project-refinement-batch">
-            <div class="project-refinement-item-main">
-              <span class="project-refinement-badge ${batch.isLegacyOnly ? "is-neutral" : "is-ok"}">${escapeHtml(batch.isLegacyOnly ? copy.legacyCandidateBadge : batch.duplicate ? copy.duplicateBadge : copy.statusManualImported)}</span>
-              ${batch.batchSha256 ? `<code>${escapeHtml(copy.batchPrefix)} ${escapeHtml(batch.batchSha256.slice(0, 12))}</code>` : ""}
-              <span class="muted">${escapeHtml(fmt(copy.appliedSummary, { applied: batch.applied, sha: (batch.resultSha256 || "-").slice(0, 12) }))}</span>
-              ${batch.changedChromosomes.length ? `<span class="muted">${escapeHtml(batch.changedChromosomes.join(", "))}</span>` : ""}
-            </div>
-            ${batch.loci.length ? `<ul class="project-refinement-sublist">
-              ${batch.loci.map((locus) => renderImportedLocusRow(batch, locus, copy, busy)).join("")}
-            </ul>` : ""}
-          </li>`).join("")}
-        </ul>
-      </details>`
-    : "";
-
-  const manualBatchesMarkup = model.manual.exportedBatches.length
-    ? `<details class="project-refinement-details" ${manualImportedMarkup ? "" : "open"}>
-        <summary>${escapeHtml(fmt(copy.manualBatchesSummary, { count: model.manual.exportedBatches.length }))}</summary>
-        <ul class="project-refinement-list">
-          ${model.manual.exportedBatches.map((batch) => {
-            const cmd = buildManualRefinementServerCommand(batch.outputPath || batch.outputFileName);
-            return `<li class="project-refinement-batch">
-              <div class="project-refinement-item-main">
-                <span class="project-refinement-badge is-warn">${escapeHtml(copy.statusManualExported)}</span>
-                <code>${escapeHtml(copy.batchPrefix)} ${escapeHtml(batch.batchSha256.slice(0, 12))}</code>
-                <span class="muted">${escapeHtml(fmt(copy.lociTasks, { loci: batch.lociCount, tasks: batch.tasksCount }))}</span>
-              </div>
-              <div class="project-refinement-batch-actions">
-                <code class="project-refinement-cmd">${escapeHtml(cmd)}</code>
-                <button type="button" class="button ghost project-refinement-locate" data-project-refinement-copy="${escapeAttr(cmd)}">${escapeHtml(copy.copyCommand)}</button>
-              </div>
-              ${batch.loci.length ? `<ul class="project-refinement-sublist">
-                ${batch.loci.map((locus) => `<li class="project-refinement-item">
-                  <div class="project-refinement-item-main">
-                    <span class="project-refinement-chr">${escapeHtml(locus.chr)}</span>
-                    <span>${escapeHtml(kindLabel(locus.kind, copy))}</span>
-                    <span class="muted">${escapeHtml(locus.label || locus.segmentId)}</span>
-                    <span class="project-refinement-tag">${escapeHtml(formatTools(locus.tools))}</span>
-                  </div>
-                  <button type="button" class="button ghost project-refinement-locate" data-project-refinement-locate-chr="${escapeAttr(locus.chr)}">${escapeHtml(copy.locateInFinalPath)}</button>
-                </li>`).join("")}
-              </ul>` : ""}
-            </li>`;
-          }).join("")}
-        </ul>
-      </details>`
-    : "";
-
-  const manualDraftMarkup = model.manual.draftLoci.length
-    ? `<details class="project-refinement-details">
-        <summary>${escapeHtml(fmt(copy.manualDraftSummary, { count: model.manual.draftLoci.length }))}</summary>
-        <ul class="project-refinement-list">
-          ${model.manual.draftLoci.map((locus) => `<li class="project-refinement-item">
-            <div class="project-refinement-item-main">
-              <span class="project-refinement-chr">${escapeHtml(locus.chr)}</span>
-              <span>${escapeHtml(kindLabel(locus.kind, copy))}</span>
-              <span class="muted">${escapeHtml(locus.label || locus.segmentId)}</span>
-              <span class="project-refinement-tag">${escapeHtml(formatTools(locus.tools))}</span>
-            </div>
-            <button type="button" class="button ghost project-refinement-locate" data-project-refinement-locate-chr="${escapeAttr(locus.chr)}">${escapeHtml(copy.locateInFinalPath)}</button>
-          </li>`).join("")}
-        </ul>
-      </details>`
-    : "";
 
   const feedbackBanner = ui.error
     ? `<div class="project-refinement-notice is-error" role="alert" data-project-refinement-notice>
@@ -1105,6 +1090,57 @@ export function renderProjectRefinementCard(state) {
     ? `<p class="muted project-refinement-copy-status" role="status">${escapeHtml(ui.copyFeedback)}</p>`
     : "";
 
+  const tbodyMarkup = groups.map((group) => {
+    const rowSpan = group.rows.length;
+    const isExpanded = group.kind === "manual-imported" && expandedBatchKey === group.key;
+    const groupHeaderCell = `<td class="project-refinement-group-cell" rowspan="${rowSpan}">
+      <div class="project-refinement-group-label">
+        <span class="project-refinement-group-title">${escapeHtml(group.headerTitle)}</span>
+        ${group.batchShort ? `<code class="project-refinement-batch-id">${escapeHtml(group.batchShort)}</code>` : ""}
+        ${group.tag ? `<span class="project-refinement-badge ${group.kind === "manual-pending" ? "is-warn" : "is-neutral"}">${escapeHtml(group.tag)}</span>` : ""}
+      </div>
+    </td>`;
+    const actionCell = group.kind === "manual-imported" && group.batch?.loci?.length
+      ? `<td class="project-refinement-action-cell" rowspan="${rowSpan}">
+          <button
+            type="button"
+            class="button ghost project-refinement-locate"
+            data-project-refinement-toggle-batch="${escapeAttr(group.key)}"
+            aria-expanded="${isExpanded ? "true" : "false"}"
+          >${escapeHtml(copy.manageBatch)} ${isExpanded ? "▴" : "▾"}</button>
+        </td>`
+      : group.kind === "manual-pending" && group.command
+        ? `<td class="project-refinement-action-cell" rowspan="${rowSpan}">
+            <button
+              type="button"
+              class="button ghost project-refinement-locate"
+              data-project-refinement-copy="${escapeAttr(group.command)}"
+              data-app-tooltip="${escapeAttr(group.command)}"
+            >${escapeHtml(copy.copyCommand)}</button>
+          </td>`
+        : `<td class="project-refinement-action-cell" rowspan="${rowSpan}"></td>`;
+
+    const toolRowsHtml = group.rows.map((row, idx) => `<tr class="project-refinement-row${idx === 0 ? " is-group-start" : ""}">
+      ${idx === 0 ? groupHeaderCell : ""}
+      <th scope="row" class="project-refinement-tool-cell">${escapeHtml(row.tool)}</th>
+      <td class="project-refinement-ratio-cell">${renderRatioCell(row)}</td>
+      <td class="project-refinement-chr-cell">${escapeHtml(row.chrCount !== null && row.chrCount !== undefined ? String(row.chrCount) : "—")}</td>
+      ${idx === 0 ? actionCell : ""}
+    </tr>`).join("");
+
+    const detailRowHtml = isExpanded && group.batch?.loci?.length
+      ? `<tr class="project-refinement-detail-row" data-project-refinement-batch-detail="${escapeAttr(group.key)}">
+          <td colspan="5">
+            <ul class="project-refinement-sublist">
+              ${group.batch.loci.map((locus) => renderImportedLocusRow(group.batch, locus, copy, busy)).join("")}
+            </ul>
+          </td>
+        </tr>`
+      : "";
+
+    return `${toolRowsHtml}${detailRowHtml}`;
+  }).join("");
+
   return `<section id="project-refinement" class="project-refinement" aria-labelledby="project-refinement-title" aria-busy="${inFlightForCurrentProject}">
     <header class="project-section-divider project-refinement-divider">
       <h3 id="project-refinement-title">${escapeHtml(copy.sectionTitle)}</h3>
@@ -1118,16 +1154,12 @@ export function renderProjectRefinementCard(state) {
     </header>
     ${feedbackBanner}
     ${copyFeedbackMarkup}
-    ${rows.length ? `<div class="project-refinement-table-scroll"><table class="project-refinement-table" aria-labelledby="project-refinement-title" aria-describedby="project-refinement-table-note">
-      <thead><tr>${copy.tableColumns.map((col) => `<th scope="col">${escapeHtml(col)}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map(([source, label, ...cells]) => `<tr><td>${escapeHtml(source)}</td><th scope="row">${escapeHtml(label || "—")}</th>${cells.map((v) => `<td>${escapeHtml(String(v ?? "—"))}</td>`).join("")}</tr>`).join("")}</tbody>
-    </table></div><p id="project-refinement-table-note" class="muted project-refinement-note">${escapeHtml(copy.tableHint)}</p>` : ""}
-    ${autoDetails}
-    ${manualImportedMarkup ? `<p class="muted project-refinement-note">${escapeHtml(copy.metricActiveManualEdits)}: ${model.manual.activeManualCount}</p>` : ""}
-    ${manualImportedMarkup}
-    ${manualBatchesMarkup}
-    ${manualDraftMarkup}
-    ${!manualImportedMarkup && !manualBatchesMarkup && !manualDraftMarkup && !model.auto.effects.length && !model.auto.segments.length ? `<p class="muted project-refinement-note">${escapeHtml(copy.manualEmptyNote)}</p>` : ""}
+    ${groups.length
+      ? `<div class="project-refinement-table-scroll"><table class="project-refinement-table" aria-labelledby="project-refinement-title">
+          <thead><tr>${copy.tableColumns.map((col) => `<th scope="col">${escapeHtml(col)}</th>`).join("")}</tr></thead>
+          <tbody>${tbodyMarkup}</tbody>
+        </table></div>`
+      : `<p class="muted project-refinement-note">${escapeHtml(copy.emptyNote)}</p>`}
   </section>`;
 }
 
@@ -1136,6 +1168,15 @@ export function bindProjectRefinementCard(host, store, rerender, deps = {}) {
     return;
   }
   host.addEventListener("click", (event) => {
+    const toggleBatchBtn = event.target?.closest?.("[data-project-refinement-toggle-batch]");
+    if (toggleBatchBtn) {
+      const key = normalizeString(toggleBatchBtn.dataset.projectRefinementToggleBatch);
+      const currentKey = normalizeString(readScopedRefinementUi(store.getState()).expandedBatchKey);
+      setRefinementUi(store, { expandedBatchKey: currentKey === key ? "" : key });
+      rerender?.(host, store);
+      return;
+    }
+
     const importBtn = event.target?.closest?.("[data-project-refinement-import]");
     if (importBtn) {
       void runImportManualRefinementResults(host, store, rerender, deps);
