@@ -826,7 +826,8 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
         screen_progress(f"placement pair round={round_number}: old_relations_not_recomputed={prior}")
         phases.start(f"anchor unplaced segments round={round_number}", len(candidates))
         deltas = ordered_deltas(candidates, data, groups, ambiguous, placed_neighbors, policy,
-                                path_policy, screen_threads, owner, screen_progress, round_number)
+                                path_policy, screen_threads, owner, screen_progress, round_number,
+                                time_phases=screen_progress is not _quiet)
         for n, (key, delta) in enumerate(deltas, 1):
             for group, row in delta.items():
                 item = proposed[key].get(group)

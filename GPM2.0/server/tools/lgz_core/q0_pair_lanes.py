@@ -5,7 +5,7 @@ from concurrent.futures.process import BrokenProcessPool
 import multiprocessing
 import pickle
 import sys
-from time import monotonic
+from time import monotonic, process_time
 
 from . import q0_source_screen as transport
 
@@ -77,15 +77,22 @@ def _work(raw):
         return None
 
 
-def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, threads, owner, log, round_number):
+def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, threads, owner, log, round_number, *, time_phases=False):
     """Compute out of process, consume only in candidate order; fallback never means no evidence."""
     lanes = _lanes(len(keys), threads); pool = None; pending = deque(); ix = inflight = 0
     workers = local = relations = whole_bp = tile_bp = 0; geo = rooted = candidate = 0.0; started = reported = monotonic()
+    # Elapsed time on the coordinator, not worker CPU. Include candidate transport and
+    # the time the generator is suspended in its caller; neither appears in the task counters.
+    dispatch_s = owner_s = receive_s = consume_s = 0.0
+    cpu_started = process_time() if time_phases else 0.0
     def report():
+        phases = (f" dispatch_wall_s={dispatch_s:.1f} owner_wall_s={owner_s:.1f}"
+                  f" receive_wall_s={receive_s:.1f} consumer_wall_s={consume_s:.1f}"
+                  f" coordinator_cpu_s={process_time()-cpu_started:.1f}" if time_phases else "")
         log(f"placement pair work round={round_number}: owner_parts={local} worker_parts={workers} "
             f"new_relations={relations} geometry_task_s={geo:.1f} complexity_task_s={rooted+candidate:.1f} "
             f"wall_s={monotonic()-started:.1f} anchor_complexity_task_s={rooted:.1f} "
-            f"candidate_complexity_task_s={candidate:.1f} anchor_bp_whole_misses={whole_bp} anchor_bp_tile_misses={tile_bp}")
+            f"candidate_complexity_task_s={candidate:.1f} anchor_bp_whole_misses={whole_bp} anchor_bp_tile_misses={tile_bp}{phases}")
     try:
         if lanes > 1:
             try:
@@ -97,6 +104,8 @@ def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, th
         usable = pool is not None
         while ix < len(keys) or pending:
             while ix < len(keys) and len(pending) < lanes:
+                if time_phases:
+                    stamp = monotonic()
                 key = keys[ix]; ix += 1; part = data.parts[key]; linked = neighbors.for_source(part.source)
                 future = value = None; relations += len(linked)
                 if usable and inflight < lanes-1 and linked:
@@ -107,13 +116,19 @@ def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, th
                         del raw
                     except (BrokenProcessPool, OSError, MemoryError):
                         usable = False
+                if time_phases:
+                    end = monotonic(); dispatch_s += end - stamp
                 if future is None:
                     value = owner(key, linked); local += 1
+                    if time_phases:
+                        owner_s += monotonic() - end
                 pending.append((key, future, value))
                 if future is None:
                     break
             key, future, value = pending.popleft()
             if future is not None:
+                if time_phases:
+                    stamp = monotonic()
                 inflight -= 1
                 try:
                     raw = future.result()
@@ -122,13 +137,21 @@ def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, th
                     del raw
                 except (BrokenProcessPool, MemoryError):
                     usable = False
+                if time_phases:
+                    end = monotonic(); receive_s += end - stamp
                 if value is None:
                     value = owner(key, neighbors.for_source(data.parts[key].source)); local += 1
+                    if time_phases:
+                        owner_s += monotonic() - end
             delta, g, r, c, full, tiled = value
             geo += g; rooted += r; candidate += c; whole_bp += full; tile_bp += tiled
             if monotonic() - reported >= 60:
                 report(); reported = monotonic()
+            if time_phases:
+                stamp = monotonic()
             yield key, delta
+            if time_phases:
+                consume_s += monotonic() - stamp
     finally:
         if pool is not None:
             pool.shutdown(wait=True, cancel_futures=True)
