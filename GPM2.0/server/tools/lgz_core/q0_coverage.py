@@ -90,7 +90,11 @@ def _compact_maps(maps):
     return maps if out is None else tuple(out)
 
 
-class _BoundaryLimit(Q0EvidenceError):
+class CoverageBoundaryLimit(Q0EvidenceError):
+    """The exact coverage closure exceeded its resource budget, not malformed evidence."""
+
+
+class _BoundaryLimit(CoverageBoundaryLimit):
     def __init__(self, limit, seeds, points, maps, *, pending=None):
         self.seeds = seeds
         # Failure-only accounting. Components here connect whole source keys,
@@ -172,7 +176,7 @@ def _partition(required, maps, limit, progress, compact_first):
         try:
             points, count = _close_cuts(required, compact, limit)
         except _BoundaryLimit as exc:
-            raise Q0EvidenceError(f"{exc}; exact request geometry exceeds budget") from None
+            raise CoverageBoundaryLimit(f"{exc}; exact request geometry exceeds budget") from None
         return compact, points, count
     try:
         points, count = _close_cuts(required, maps, limit)
@@ -189,14 +193,78 @@ def _partition(required, maps, limit, progress, compact_first):
         try:
             partition = _close_cuts(required, compact, limit, fewer_seeds_than=seeds)
         except _BoundaryLimit as exc:
-            raise Q0EvidenceError(f"{exc}; exact compact geometry also exceeds budget") from None
+            raise CoverageBoundaryLimit(f"{exc}; exact compact geometry also exceeds budget") from None
         if partition is not None:
             points, count = partition
             if progress:
                 progress(f"coverage: exact compact geometry maps={len(maps)}->{len(compact)} "
                          f"closed_cuts={count} limit={limit}")
             return compact, points, count
-    raise Q0EvidenceError(f"{original}; no redundant seed cuts to remove")
+    raise CoverageBoundaryLimit(f"{original}; no redundant seed cuts to remove")
+
+
+def _relation_islands(relations):
+    """Independent map domains. Closed spans include touching cuts on either source axis."""
+    parents = list(range(len(relations)))
+    sizes = [1] * len(parents)
+
+    def root(i):
+        while i != parents[i]:
+            parents[i] = parents[parents[i]]
+            i = parents[i]
+        return i
+
+    def connect(i, j):
+        i, j = root(i), root(j)
+        if i != j:
+            if sizes[i] < sizes[j]:
+                i, j = j, i
+            parents[j] = i
+            sizes[i] += sizes[j]
+
+    spans = defaultdict(list)
+    for i, r in enumerate(relations):
+        spans[r.left_source].append((r.left.start, r.left.end, i))
+        spans[r.right_source].append((r.right.start, r.right.end, i))
+    for rows in spans.values():
+        farthest = -1
+        for start, end, i in sorted(rows):
+            if start > farthest:
+                leader = i
+            else:
+                connect(leader, i)
+            farthest = max(farthest, end)
+    islands = defaultdict(list)
+    for i, r in enumerate(relations):
+        islands[root(i)].append(r)
+    return sorted(islands.values(), key=len, reverse=True)
+
+
+def ambiguity_after_overflow(relations, limit, progress, compact_first):
+    """Recover the preliminary ambiguity verdict only. Never score an island as a chromosome."""
+    islands = _relation_islands(relations)
+    if progress:
+        progress(f"coverage ambiguity recovery: islands={len(islands)} maps_with_ids={len(relations)} "
+                 f"largest_island_relations={len(islands[0]) if islands else 0} limit={limit}")
+    excluded = set()
+    for n, rows in enumerate(islands, 1):
+        if len(rows) == 1 and rows[0].left_source != rows[0].right_source:
+            continue  # One isometry between distinct sources cannot alias a source with itself.
+        # The failed global closure already checked that each relation is inside its
+        # required source interval. Unmapped bases are singleton units: omitting them
+        # here cannot hide an ambiguity. Footprint ends are existing relation cuts.
+        footprint = defaultdict(list)
+        for r in rows:
+            footprint[r.left_source].append(r.left)
+            footprint[r.right_source].append(r.right)
+        try:
+            model = CoverageModel(footprint, rows, maximum_boundaries=limit, compact_first=compact_first)
+        except CoverageBoundaryLimit as exc:
+            raise CoverageBoundaryLimit(f"{exc}; ambiguity island {n}/{len(islands)}, "
+                                        f"relations={len(rows)} sources={len(footprint)}") from None
+        excluded.update(model.ambiguous_evidence_ids)
+        del model  # Never keep two islands' closures in memory.
+    return excluded
 
 
 class CoverageModel:
@@ -268,6 +336,7 @@ class CoverageModel:
                 target = lookup[(relation.right_source, other)]
                 union(index, target, relation.reverse)
         self.units = [find(index) for index in range(len(parent))]
+        del union, find  # Break the recursive closure; do not retain parent/parity between islands.
         members = defaultdict(list)
         for index, (root, flip) in enumerate(self.units):
             members[root].append(index)

@@ -12,6 +12,8 @@ For example, if a selected placement has sufficient support at both ends, a seco
 
 The first request uses the ordinary ranking rules but consumes only each winning path's slices and joins. It does not build missing-base inventories for alternatives or a report of rejected placements. A reference seed is not split just because a rival exists: if neither outer flank can fit the minimum disjoint tail, no tail search is needed. If a tail could qualify, one eligible chain proving continuity is enough to retain the seed. Before propagating coordinate cuts the draft coalesces only touching or overlapping spans of the same source pair, orientation and offset. The boundary cap, original evidence IDs and source-occupancy checks still apply. Preparation and publication use a separate, full selection; a first-request object is not acceptable as a final record.
 
+If preliminary chromosome coverage exceeds the boundary budget, ambiguity alone can be checked one independent region at a time. Maps belong to the same region if their coordinates overlap or touch on either source, directly or through another map. Only the original evidence IDs proven ambiguous are excluded. The scorer still requires one complete chromosome model under the original budget; an oversized irreducible region or final model fails rather than yielding an empty request.
+
 ## Supplementary scopes
 
 - **`base_only`**: no supplementary planner ran. The normal consumer must regenerate an empty request from the selected evidence. An empty omission list is not evidence of a full search.

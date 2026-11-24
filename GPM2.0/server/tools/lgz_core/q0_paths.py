@@ -18,7 +18,7 @@ from typing import Callable, Iterable, Mapping
 
 from .common import reverse_complement, stable_id
 from .q0_alignments import PafAlignment
-from .q0_coverage import CoverageModel, Equivalence
+from .q0_coverage import CoverageBoundaryLimit, CoverageModel, Equivalence, ambiguity_after_overflow
 from .q0_sources import Interval, OriginalAdjacency, Q0EvidenceError, SourceKey, merged_intervals
 
 
@@ -437,16 +437,33 @@ class PathGraph:
         if progress:
             progress(f"graph paired relations ready: evidence_spans={len(relations)} "
                      f"relations_s={monotonic()-relations_started:.2f}")
-        self.coverage = CoverageModel(self.required, relations, maximum_boundaries=policy.maximum_coverage_boundaries,
-                                      progress=progress, compact_first=first_request)
-        if self.coverage.ambiguous_evidence_ids:
-            self.ambiguous_equivalence_ids.update(self.coverage.ambiguous_evidence_ids)
-            self._blocks.clear()
+        limit = policy.maximum_coverage_boundaries
+        overflow = None
+        try:
+            preliminary = CoverageModel(self.required, relations, maximum_boundaries=limit,
+                                        progress=progress, compact_first=first_request)
+        except CoverageBoundaryLimit as exc:
+            overflow = str(exc)  # Drop the failed global model/traceback before processing islands.
+        if overflow is None:
+            if not preliminary.ambiguous_evidence_ids:
+                self.coverage = preliminary
+                return
+            self.ambiguous_equivalence_ids.update(preliminary.ambiguous_evidence_ids)
+            del preliminary
+        else:
+            if not relations or 2 * sum(map(len, self.required.values())) > limit:
+                raise CoverageBoundaryLimit(f"{overflow}; required endpoints alone exceed budget")
             if progress:
-                progress(f"coverage: rebuilding after excluding {len(self.ambiguous_equivalence_ids)} ambiguous IDs")
-            self.coverage = CoverageModel(self.required, [r for r in relations if r.evidence_id not in self.ambiguous_equivalence_ids],
-                                          maximum_boundaries=policy.maximum_coverage_boundaries, progress=progress,
-                                          compact_first=first_request)
+                progress(f"coverage: {overflow}; isolating preliminary ambiguity checks")
+            self.ambiguous_equivalence_ids = ambiguity_after_overflow(relations, limit, progress, first_request)
+            if not self.ambiguous_equivalence_ids:
+                raise CoverageBoundaryLimit(f"{overflow}; no ambiguous evidence to exclude")
+        self._blocks.clear()
+        if progress:
+            progress(f"coverage: rebuilding after excluding {len(self.ambiguous_equivalence_ids)} ambiguous IDs")
+        # Only this full, globally budgeted chromosome model can be used to score paths.
+        self.coverage = CoverageModel(self.required, [r for r in relations if r.evidence_id not in self.ambiguous_equivalence_ids],
+                                      maximum_boundaries=limit, progress=progress, compact_first=first_request)
 
     def homologous_blocks(self, left: Placement, right: Placement) -> tuple[tuple[Block, str], ...]:
         key = (left.placement_id, right.placement_id)
