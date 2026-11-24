@@ -375,7 +375,8 @@ def _overlap_size(left: Iterable[Interval], right: Iterable[Interval]) -> int:
 class PathGraph:
     """Immutable evidence facts; no ds-order ranking or whole-source exclusion."""
     def __init__(self, placements: Iterable[Placement], links: Iterable[PairLink],
-                 original_adjacencies: Iterable[OriginalAdjacency] = (), policy: PathPolicy = PathPolicy()):
+                 original_adjacencies: Iterable[OriginalAdjacency] = (), policy: PathPolicy = PathPolicy(),
+                 *, progress: Callable[[str], None] | None = None):
         placements = tuple(placements)
         self.placements = {p.placement_id: p for p in placements}
         if len(self.placements) != len(placements):
@@ -411,12 +412,15 @@ class PathGraph:
                         relations.append(Equivalence(left.source, left.source_interval(block.left),
                                                      right.source, right.source_interval(block.right),
                                                      left.orientation != right.orientation, evidence_id))
-        self.coverage = CoverageModel(self.required, relations, maximum_boundaries=policy.maximum_coverage_boundaries)
+        self.coverage = CoverageModel(self.required, relations, maximum_boundaries=policy.maximum_coverage_boundaries,
+                                      progress=progress)
         if self.coverage.ambiguous_evidence_ids:
             self.ambiguous_equivalence_ids.update(self.coverage.ambiguous_evidence_ids)
             self._blocks.clear()
+            if progress:
+                progress(f"coverage: rebuilding after excluding {len(self.ambiguous_equivalence_ids)} ambiguous IDs")
             self.coverage = CoverageModel(self.required, [r for r in relations if r.evidence_id not in self.ambiguous_equivalence_ids],
-                                          maximum_boundaries=policy.maximum_coverage_boundaries)
+                                          maximum_boundaries=policy.maximum_coverage_boundaries, progress=progress)
 
     def homologous_blocks(self, left: Placement, right: Placement) -> tuple[tuple[Block, str], ...]:
         key = (left.placement_id, right.placement_id)

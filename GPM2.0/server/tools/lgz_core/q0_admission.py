@@ -928,10 +928,11 @@ def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = 
     for index, chromosome in enumerate(sorted(data.reference_lengths), 1):
         progress(f"chromosome path {index}/{len(data.reference_lengths)}: {chromosome}")
         started = monotonic()
-        graph = PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy)
+        report = None if progress is _quiet else lambda message: progress(f"chromosome {chromosome} {message}")
+        graph = PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy,
+                          progress=report)
         progress(f"chromosome {chromosome} graph ready: placements={len(graph.placements)} "
                  f"coverage_atoms={len(graph.coverage.atoms)} graph_s={monotonic()-started:.2f}")
-        report = None if progress is _quiet else lambda message: progress(f"chromosome {chromosome} {message}")
         search = search_paths(graph, progress=report)
         del graph  # do not keep the previous chromosome graph while building the next
         searches[chromosome] = search

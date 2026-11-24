@@ -10,23 +10,30 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from itertools import groupby
+from operator import attrgetter
+from time import monotonic
+from typing import Callable, Iterable, Mapping
 
 from .q0_sources import Interval, Q0EvidenceError, SourceKey, merged_intervals, subtract_intervals
 
 
 @dataclass(frozen=True)
-class Equivalence:
+class _CoordinateMap:
     left_source: SourceKey
     left: Interval
     right_source: SourceKey
     right: Interval
     reverse: bool
-    evidence_id: str
 
     def __post_init__(self):
         if self.left.length != self.right.length:
             raise Q0EvidenceError("homology equivalence requires equal paired-base spans")
+
+
+@dataclass(frozen=True)
+class Equivalence(_CoordinateMap):
+    evidence_id: str
 
 
 class _IncidentRelations:
@@ -53,39 +60,142 @@ class _IncidentRelations:
                               else dest.start + point - interval.start)
 
 
+def _affine_key(row):
+    # Maps *cuts*: y = x + offset (forward) or y = offset - x (reverse).
+    offset = row.right.end + row.left.start if row.reverse else row.right.start - row.left.start
+    return row.left_source, row.right_source, row.reverse, offset
+
+
+def _compact_maps(maps):
+    """Union only touching/overlapping domains of precisely the same isometry."""
+    for (left, right, reverse, offset), group in groupby(
+            sorted(maps, key=lambda r: (_affine_key(r), r.left)), key=_affine_key):
+        def span(a, b):
+            dest = Interval(offset - b, offset - a) if reverse else Interval(offset + a, offset + b)
+            return _CoordinateMap(left, Interval(a, b), right, dest, reverse)
+
+        first = next(group).left
+        a, b = first.start, first.end
+        for row in group:
+            if row.left.start > b:  # a gap of even one base must survive
+                yield span(a, b)
+                a, b = row.left.start, row.left.end
+            else:
+                b = max(b, row.left.end)
+        yield span(a, b)
+
+
+class _BoundaryLimit(Q0EvidenceError):
+    def __init__(self, limit, seeds, points, maps, *, pending=None):
+        self.seeds = seeds
+        # Failure-only accounting. Components here connect whole source keys,
+        # not necessarily overlapping loci within a source. Include the cut
+        # that would cross the cap, without installing or propagating it.
+        neighbors = defaultdict(set)
+        for row in maps:
+            neighbors[row.left_source].add(row.right_source)
+            neighbors[row.right_source].add(row.left_source)
+        seen = set()
+        sizes = []
+        pending_component = None
+        for source in points:
+            if source in seen:
+                continue
+            stack, size, has_pending = [source], 0, False
+            seen.add(source)
+            while stack:
+                key = stack.pop()
+                size += len(points[key])
+                if pending is not None and key == pending[0]:
+                    size += 1
+                    has_pending = True
+                for other in neighbors.get(key, ()):
+                    if other not in seen:
+                        seen.add(other)
+                        stack.append(other)
+            sizes.append(size)
+            if has_pending:
+                pending_component = size
+        where = (f"propagation next={pending[0].dataset}:{pending[0].contig}:{pending[1]} "
+                 f"next_component_cuts={pending_component}"
+                 if pending is not None else "initial")
+        super().__init__(f"q0 coordinate-equivalence boundary limit exceeded: limit={limit} phase={where} "
+                         f"seed_cuts={seeds} observed_cuts={sum(sizes)} source_components={len(sizes)} "
+                         f"largest_component_cuts={max(sizes, default=0)}")
+
+
+def _close_cuts(required, maps, limit, *, fewer_seeds_than=None):
+    points = {key: {p for i in value for p in (i.start, i.end)} for key, value in required.items()}
+    incident = defaultdict(list)
+    for r in maps:
+        for source, interval, other, dest in ((r.left_source, r.left, r.right_source, r.right),
+                                               (r.right_source, r.right, r.left_source, r.left)):
+            if source not in required or not any(i.contains(interval) for i in required[source]):
+                raise Q0EvidenceError("homology relation escapes required source intervals")
+            points[source].update((interval.start, interval.end))
+            incident[source].append((interval, other, dest, r.reverse))
+    count = seeds = sum(map(len, points.values()))
+    if fewer_seeds_than is not None and seeds >= fewer_seeds_than:
+        return None  # compact seeds are a subset; identical seeds imply identical closure
+    if count > limit:
+        raise _BoundaryLimit(limit, seeds, points, maps)
+    queue = deque((source, point) for source in sorted(points) for point in sorted(points[source]))
+    indexes = {source: _IncidentRelations(rows) for source, rows in incident.items()}
+    del incident
+    while queue:
+        source, point = queue.popleft()
+        index = indexes.get(source)
+        if index is None:
+            continue
+        for other, mapped in index.at(point):
+            if mapped not in points[other]:
+                if count >= limit:
+                    raise _BoundaryLimit(limit, seeds, points, maps, pending=(other, mapped))
+                points[other].add(mapped)
+                count += 1
+                queue.append((other, mapped))
+    return points, count
+
+
+def _partition(required, maps, limit, progress):
+    try:
+        points, count = _close_cuts(required, maps, limit)
+        return maps, points, count
+    except _BoundaryLimit as exc:
+        original, seeds = str(exc), exc.seeds
+    # Outside the handler: do not retain the overflowing partition/traceback.
+    if progress:
+        progress(f"coverage: {original}; checking for redundant collinear cuts")
+    compact = tuple(_compact_maps(maps))
+    if len(compact) < len(maps):
+        try:
+            partition = _close_cuts(required, compact, limit, fewer_seeds_than=seeds)
+        except _BoundaryLimit as exc:
+            raise Q0EvidenceError(f"{exc}; exact compact geometry also exceeds budget") from None
+        if partition is not None:
+            points, count = partition
+            if progress:
+                progress(f"coverage: exact compact geometry maps={len(maps)}->{len(compact)} "
+                         f"closed_cuts={count} limit={limit}")
+            return compact, points, count
+    raise Q0EvidenceError(f"{original}; no redundant seed cuts to remove")
+
+
 class CoverageModel:
     def __init__(self, required: Mapping[SourceKey, Iterable[Interval]], relations: Iterable[Equivalence],
-                 *, maximum_boundaries: int = 200000):
+                 *, maximum_boundaries: int = 200000, progress: Callable[[str], None] | None = None):
+        started = monotonic() if progress else 0.0
         self.required = {key: merged_intervals(value) for key, value in required.items()}
-        relations = tuple(sorted(set(relations), key=lambda r: (r.left_source, r.left, r.right_source, r.right, r.reverse, r.evidence_id)))
-        points = {key: {p for i in value for p in (i.start, i.end)} for key, value in self.required.items()}
-        incident = defaultdict(list)
-        for relation in relations:
-            for source, interval, other, dest in (
-                (relation.left_source, relation.left, relation.right_source, relation.right),
-                (relation.right_source, relation.right, relation.left_source, relation.left),
-            ):
-                if source not in self.required or not any(i.contains(interval) for i in self.required[source]):
-                    raise Q0EvidenceError("homology relation escapes required source intervals")
-                points[source].update((interval.start, interval.end))
-                incident[source].append((interval, other, dest, relation.reverse))
-        queue = deque((source, point) for source in sorted(points) for point in sorted(points[source]))
-        count = len(queue)
-        if count > maximum_boundaries:
-            raise Q0EvidenceError("q0 coordinate-equivalence boundary limit exceeded")
-        indexes = {source: _IncidentRelations(rows) for source, rows in incident.items()}
-        while queue:
-            source, point = queue.popleft()
-            index = indexes.get(source)
-            if index is None:
-                continue
-            for other, mapped in index.at(point):
-                if mapped not in points[other]:
-                    count += 1
-                    if count > maximum_boundaries:
-                        raise Q0EvidenceError("q0 coordinate-equivalence boundary limit exceeded")
-                    points[other].add(mapped)
-                    queue.append((other, mapped))
+        geometry = attrgetter("left_source", "left", "right_source", "right", "reverse")
+        relations = sorted(set(relations), key=geometry)
+        # Duplicate geometric maps need only one propagation/union, regardless
+        # of how many distinct evidence records support the same bases.
+        maps = tuple(next(group) for _, group in groupby(relations, key=geometry))
+        maps, points, count = _partition(self.required, maps, maximum_boundaries, progress)
+        if progress:
+            closed_at = monotonic()
+            progress(f"coverage partition ready: evidence_spans={len(relations)} maps={len(maps)} "
+                     f"cuts={count} partition_s={closed_at-started:.2f}")
         self.atoms, self.by_source = [], defaultdict(list)
         self._atom_starts, self._atom_ends = defaultdict(list), defaultdict(list)
         self._sources = tuple(sorted(points))
@@ -127,8 +237,7 @@ class CoverageModel:
             parity[rb] = pa ^ pb ^ reverse
             sizes[ra] += sizes[rb]
 
-        relation_atoms = []
-        for relation in relations:
+        for relation in maps:
             for index in self._overlapping_atoms(relation.left_source, relation.left):
                 # Relation endpoints were installed as cuts before building
                 # the atoms, so every overlapping atom is wholly contained.
@@ -139,7 +248,6 @@ class CoverageModel:
                                   relation.right.start + interval.end - relation.left.start))
                 target = lookup[(relation.right_source, other)]
                 union(index, target, relation.reverse)
-                relation_atoms.append((index, relation.evidence_id))
         self.units = [find(index) for index in range(len(parent))]
         members = defaultdict(list)
         for index, (root, flip) in enumerate(self.units):
@@ -149,11 +257,30 @@ class CoverageModel:
             sources = [self.atoms[index][0] for index in indices]
             if len(set(sources)) != len(sources):
                 ambiguous_roots.add(root)
-        self.ambiguous_evidence_ids = frozenset(eid for index, eid in relation_atoms
-                                                if self.units[index][0] in ambiguous_roots)
+        # A compact map may span several original evidence records. Attribute
+        # ambiguity by actual half-open intersection, never by the merged map's
+        # envelope/ID. All bases of an ambiguous atom have a same-source alias
+        # or inconsistent orientation; refining it cannot clear that ambiguity.
+        ambiguous_ids = set()
+        if ambiguous_roots:
+            starts, ends = defaultdict(list), defaultdict(list)
+            for (source, interval), (root, _) in zip(self.atoms, self.units):
+                if root in ambiguous_roots:
+                    starts[source].append(interval.start)
+                    ends[source].append(interval.end)
+            for r in relations:
+                lefts = starts.get(r.left_source)
+                if lefts:
+                    i = bisect_right(ends[r.left_source], r.left.start)
+                    if i < len(lefts) and lefts[i] < r.left.end:
+                        ambiguous_ids.add(r.evidence_id)
+        self.ambiguous_evidence_ids = frozenset(ambiguous_ids)
         self.unit_lengths = {root: self.atoms[indices[0]][1].length for root, indices in members.items()}
         self.boundary_count = count
         self.total_bp = sum(self.unit_lengths.values())
+        if progress:
+            progress(f"coverage units ready: atoms={len(self.atoms)} ambiguous_ids={len(ambiguous_ids)} "
+                     f"units_s={monotonic()-closed_at:.2f}")
 
     def _overlapping_atoms(self, source, interval):
         first = bisect_right(self._atom_ends.get(source, ()), interval.start)
