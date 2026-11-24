@@ -333,6 +333,8 @@ The installed minimap2 binary and CGAT's alignment defaults are unchanged.
 
 Rerun the same `run.sh` command, or use `bash "$SERVER/run.sh" -o ./gpm_server` to resume with validated results reused. The generated `run_all.sh` remains directly executable. After stopping the previous job, change the thread budget with `bash "$SERVER/run.sh" -o ./gpm_server --threads 64`; `--lgz-qc-memory-gb` may also be adjusted. Omitted budgets retain their last values, including when using `run_all.sh` directly. Request matching scheduler resources first; this does not resize a live job. Resource changes do not alter analysis settings or invalidate otherwise valid completed work.
 
+For non-regional Q0 candidate-chromosome alignments, `--threads N` is a shared budget: independent minimap2 jobs can overlap, while identical requests share a verified PAF. Discovery rounds still run in dependency order. Concurrency also requires a known job memory budget; otherwise mapping stays serial. On Donau, request memory as well as CPUs in the scheduler job (not a new CGAT flag). A small memory reservation is not treated as the node's free RAM.
+
 On compute nodes where update sources are unreachable, startup verifies the local installation and aligns `.lib/` (or legacy `.prepare_lib/` / `.runtime/prepared/` compatibility runtimes) without downloading. Detailed failed checks are saved in `.runtime/run_all/update-check.log`; offline startup does not imply that the local version is the latest.
 
 `--max-fill <bp>` sets the length limit for both Step2 optimized refill rounds (default: `1000000`). Change it with `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.

@@ -20,6 +20,7 @@ def contract():
             'maximum_repairs': MAX_REPAIRS, 'readless_only': True,
             'rule_sha256': sha256_file(here.with_name('q0_threshold_questions.py')),
             'retained_hit_sha256': sha256_file(here.with_name('q0_retained_hits.py')),
+            'native_candidate_sha256': sha256_file(here.with_name('q0_threshold_candidates.py')),
             'acceptance_sha256': sha256_file(here), 'preparer_sha256': sha256_file(here.with_name('q0_threshold_prepare.py'))}
 
 
@@ -98,11 +99,14 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
     if mode=='full':
         if axes or frontier is not None: raise Q0EvidenceError('full threshold fallback contains omissions or a scoped request')
         return {'full_discovery': True}
-    if mode not in ('base_only','decision_frontier') or frontier is None or (mode=='base_only' and (frontier or axes)):
+    if (mode not in ('base_only','supported_after_discovery','decision_frontier') or frontier is None
+            or (mode in ('base_only','supported_after_discovery') and (frontier or axes))):
         raise Q0EvidenceError('invalid threshold search mode')
     assignments=({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in binding.assignments)
     need,counts=questions(data,selection,assignments)
     if need is None: raise UnsearchedQ0Context('threshold selector needs full supplemental evidence')
+    if report.get('candidate_threshold_request') == [] and need:
+        raise UnsearchedQ0Context('candidate search stopped but final decisions still need evidence')
     enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog)
     covered_without_repair = 0
     for s,spans in need.items():
@@ -131,8 +135,25 @@ def validate_catalog(root, manifest, catalog):
         raise Q0EvidenceError('missing threshold evidence contract')
     lengths={SourceKey(**r['source']):r['length'] for r in catalog['sources']}
     q=decode(scope['threshold_request'],lengths)
+    if 'routing' in scope:
+        from .q0_threshold_prepare import sparse_routing
+        if (mode!='decision_frontier' or not q or scope.get('routing')!=sparse_routing(q,lengths)
+                or not isinstance(scope['routing'],dict) or 'native_candidate_stops' in scope):
+            raise Q0EvidenceError('invalid sparse threshold routing geometry')
+    if 'candidate_threshold_request' in scope:
+        remaining=decode(scope['candidate_threshold_request'],lengths)
+        if ('routing' not in scope or remaining is None or not catalog['supplementary_alignments']
+                or (not remaining and ('regional_candidate_discovery' in catalog or
+                                       any(t['kind']=='candidate_chr' for t in catalog['supplementary_alignments'])))):
+            raise Q0EvidenceError('invalid sparse candidate threshold inventory')
     if mode=='base_only':
         if q!={} or scope['unsearched_part_intervals'] or catalog['supplementary_alignments'] or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery')):
             raise Q0EvidenceError('base-only threshold evidence claims supplemental discovery')
+    elif mode=='supported_after_discovery':
+        tasks = catalog['supplementary_alignments']
+        if (q!={} or scope['unsearched_part_intervals'] or not tasks or any(t['kind']!='unplaced_discovery' for t in tasks)
+                or [r['task_id'] for r in catalog['discovery_rounds']] != [t['task_id'] for t in tasks]
+                or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery'))):
+            raise Q0EvidenceError('threshold discovery stop lacks its completed native rounds')
     elif (mode=='full' and q is not None) or (mode=='decision_frontier' and not q):
         raise Q0EvidenceError('threshold scope differs from requested work')

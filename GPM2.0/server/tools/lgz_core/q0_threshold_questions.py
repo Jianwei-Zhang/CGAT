@@ -43,6 +43,45 @@ def facing_evidence(left, right, links, policy):
     return False
 
 
+def _supported_unknown_joins(paths, placed, links, policy):
+    """Stream observed links only until each selected join has its first positive witness."""
+    # A source pair may contain multiple selected intervals or orientations. Close only
+    # the ordered placement pair that passed; a different join still needs its own proof.
+    lookup = {}
+    for row in paths.values():
+        path = row.path
+        if path is None:
+            continue
+        for left, join, right in zip(path.slices, path.joins, path.slices[1:]):
+            if join.kind == 'reference_unknown':
+                lp, rp = placed[left.placement_id], placed[right.placement_id]
+                a, b = lp.source, rp.source
+                joins = lookup.get((a, b))
+                if joins is None:
+                    # Both input directions share the same outstanding questions.
+                    lookup[a, b] = lookup[b, a] = joins = {}
+                joins[lp.placement_id, rp.placement_id] = (lp, rp)
+    positive = set()
+    if not lookup:
+        return positive
+    for link in links:
+        a, b = link.query_source, link.target_source
+        joins = lookup.get((a, b))
+        if joins is None:
+            continue
+        passed = [ids for ids, (lp, rp) in joins.items() if facing_evidence(lp, rp, (link,), policy)]
+        for ids in passed:
+            positive.add(ids)
+            del joins[ids]
+        if not joins:
+            del lookup[a, b]
+            if a != b:
+                del lookup[b, a]
+            if not lookup:
+                break
+    return positive
+
+
 def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
     minimum = policy.minimum_anchor_bp
     if type(reach) is not int or reach < minimum:
@@ -74,15 +113,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
     stats['unbuilt_without_reference_seed'] = len(absent - roots)
     missing = {s for c in absent & roots for s in required[c]}
     strong_on_missing = defaultdict(list)
-    # Index just the pairs under question (not the full duplicated evidence inventory).
-    pairs = {tuple(sorted((l.source, r.source))) for row in draft.paths.values() if row.path
-             for l, j, r in zip(row.path.slices, row.path.joins, row.path.slices[1:]) if j.kind == 'reference_unknown'}
-    by_pair = defaultdict(list)
-    if pairs:
-        for link in data.pair_links:
-            key = tuple(sorted((link.query_source, link.target_source)))
-            if key in pairs:
-                by_pair[key].append(link)
+    positive_joins = _supported_unknown_joins(draft.paths, placed, data.pair_links, policy)
     for row in draft.paths.values():
         path = row.path
         if path is None:
@@ -110,7 +141,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
                 continue
             if j.kind != 'reference_unknown':
                 raise Q0EvidenceError('unrecognized join')
-            if facing_evidence(lp, rp, by_pair[tuple(sorted((lp.source, rp.source)))], policy):
+            if (lp.placement_id, rp.placement_id) in positive_joins:
                 stats['observed_facing_match_leave_gap'] += 1
                 continue
             stats['unproven_join'] += 1

@@ -168,8 +168,9 @@ class CompletedNativeScopes:
 
 
 class CandidatePlan(CompletedNativeScopes):
-    def __init__(self, root, catalog, index, requests, observed, complete_tasks, tool, preset):
+    def __init__(self, root, catalog, index, requests, observed, complete_tasks, tool, preset, *, native_for_weak=False):
         super().__init__(root,catalog,index,complete_tasks,tool,preset)
+        self.native_for_weak = native_for_weak
         if catalog.reference_routable_parts is None or catalog.reference_routable_footprints is None:
             raise Q0EvidenceError("candidate routing lacks qualified reference-part inventory")
         self.routable = self.mask(catalog.reference_routable_parts)
@@ -235,6 +236,10 @@ class CandidatePlan(CompletedNativeScopes):
         if not self.routable & own:
             return ParentRequest("candidate", key, ready=([], eligible, "query_without_qualified_reference"))
         if key not in self.cores:
+            if self.native_for_weak:
+                # Sparse demand below the ordinary regional size gate is a work-routing
+                # hint, not permission to suppress a rival without a qualified footprint.
+                return ParentRequest("candidate", key, ready=([], eligible, "sparse_no_qualified_footprint"))
             return ParentRequest("candidate", key, ready=([], eligible & ~self.routable,
                                                            "weak_reference_only_alternatives_not_expanded"))
         fallback = eligible & ~self.routable

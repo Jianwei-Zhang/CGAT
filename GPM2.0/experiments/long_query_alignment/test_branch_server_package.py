@@ -160,7 +160,11 @@ class BranchServerPackageTests(unittest.TestCase):
         calls = {ast.unparse(call.func): call.lineno for stmt in locked.body
                  for call in ast.walk(stmt) if isinstance(call, ast.Call)}
         self.assertLess(calls["lock.acquire"], calls["handoff"])
-        self.assertLess(calls["handoff"], calls["Runner(root, units, run_id).run"])
+        self.assertLess(calls["handoff"], calls["run_locked_plan"])
+        dispatch, = (stmt.value for stmt in locked.body if isinstance(stmt, ast.Return)
+                     and isinstance(stmt.value, ast.Call) and ast.unparse(stmt.value.func) == "run_locked_plan")
+        self.assertEqual([ast.unparse(arg) for arg in dispatch.args], ["root", "units", "lock"])
+        self.assertNotIn("lock.release", calls)  # Only the outer finally may release it.
         for text in (original.replace(package.RUN_ANCHOR,""),patched):
             with self.assertRaises(wa.ExperimentError):
                 package.overlay_server_run(text)

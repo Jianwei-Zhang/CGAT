@@ -9,7 +9,7 @@ from .common import stable_id
 from .q0_alignments import read_paf_observations as _native_observations
 from .q0_retained_hits import read_retained_paf, retained_geometry_cache, retained_names
 from .q0_paths import PairLink
-from .q0_sources import Q0EvidenceError, merged_intervals, split_source
+from .q0_sources import Interval, Q0EvidenceError, merged_intervals, split_source
 from .q0_threshold_acceptance import MAX_REPAIRS, SCOPE, SEMANTICS, audit
 
 
@@ -82,10 +82,36 @@ class _DraftMatrices:
         return hits
 
 
+def sparse_routing(frontier, source_lengths):
+    """A cost hint for an already localized request, never evidence of placement or closure."""
+    if not frontier:
+        return None
+    policy = prep.REGIONAL_POLICY
+    core = policy['core_bases']
+    halo = policy['anchor_context_bases'] + policy['reference_context_bases'] + policy['target_context_bases']
+    total = sum(source_lengths.values())
+    # Even apparently short intervals need their flanking sequence for routing. Avoid building
+    # the reference index for small or diffuse workloads. Final dispatch still checks both axes.
+    if total < 32 * core:
+        return None
+    padded = 0
+    for source, intervals in frontier.items():
+        size = source_lengths[source]
+        padded += sum(i.length for i in merged_intervals(
+            Interval(max(0, v.start-halo), min(size, v.end+halo)) for v in intervals))
+    if not padded or padded * 16 > total:
+        return None
+    return {'planner': 'sparse_source_windows_v1', 'source_bp': total, 'padded_request_bp': padded,
+            'request_bp': sum(v.length for vs in frontier.values() for v in vs)}
+
+
 class _ThresholdInputs(prep._ProofRepairInputs):
     """Release the already verified source DNA into the first mapper pass, not a second copy."""
     first = None
     matrices = None
+    native_decisions = None
+    regional_observations = None
+    sparse_decisions = None
 
     def _read_initial(self):
         # An existing ready generation may be reusable: don't retain millions of hits for a cache check.
@@ -104,7 +130,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         return first
 
 
-def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None):
+def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, retain_native=None):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_q0_paths
     from .q0_threshold_questions import questions
@@ -142,7 +168,11 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
     del links, edges  # the immutable selection input now owns these references
     selected = select_q0_paths(data)
     need, _ = questions(data, selected, assignments)
-    return need, any(r.path is not None for r in selected.paths.values())
+    have_path = any(r.path is not None for r in selected.paths.values())
+    if retain_native is not None and need and have_path:
+        from .q0_threshold_candidates import DecisionState
+        retain_native.native_decisions = DecisionState(data, need, assignments)
+    return need, have_path
 
 
 def initial_generation(root, snapshot, mapper):
@@ -158,8 +188,25 @@ def initial_generation(root, snapshot, mapper):
         if old.get('input_fingerprint') == request:
             old = prep.load_verified_evidence(root); snapshot.verify()
             return request, old, True, None
-    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices)
+    native = not prep.regional_enabled(lengths, options.get("minimap_preset", "asm10"))
+    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices,
+                                        retain_native=snapshot if native else None)
     snapshot.matrices = None
+    # Fixed-size ordinary/selective regimes are distinct: promote only a sparse positive
+    # request for asm10. Keep the original inputs for native full fallback and repairs.
+    state = snapshot.native_decisions
+    if (state is not None and options.get('minimap_preset', 'asm10') == prep.REGIONAL_POLICY['preset']
+            and options.get('skip_self') != 'true' and sparse_routing(need, snapshot.source_lengths)
+            and all(state.data.reference_hits.get(source) for source in need)):
+        observed = prep.ObservedSourcePairs(snapshot.source_lengths)
+        observed.update(initial[6])  # all validated base pairs, including self
+        for link in state.data.pair_links:
+            if link.query_source.dataset != link.target_source.dataset:
+                observed.observe_alignment(_CoverageRow(link.hit), link.query_source, link.target_source)
+        if observed != initial[6]:
+            raise Q0EvidenceError('regional coverage differs from the initial pair inventory')
+        snapshot.regional_observations = observed
+        snapshot.sparse_decisions, snapshot.native_decisions = state, None
     snapshot.verify()
     if need != {}:
         snapshot.first = initial

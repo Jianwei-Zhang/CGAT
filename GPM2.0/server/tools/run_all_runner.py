@@ -1027,6 +1027,20 @@ class Runner:
                 self.log_handle = None
 
 
+def run_locked_plan(server_dir, units, lock, *, log_style="compact", color="auto"):
+    """Both CLI entrypoints delegate the same live lock, never reacquire or reconstruct it."""
+    if (lock is None or not lock.acquired or lock.for_migration or lock.server_dir.resolve() != Path(server_dir).resolve()
+            or lock.owner.get("pid") != os.getpid() or lock._existing_owner() != lock.owner):
+        raise RunnerError("running the prepared plan requires its held workspace lock")
+    from job_final_catalog import record_early_failure
+    runner = Runner(server_dir, units, lock.run_id, log_style=log_style, color=color)
+    runner.workspace_lock = lock
+    # A checked LGZ handoff is private to this invocation and never survives releasing the lock.
+    with tempfile.TemporaryDirectory(prefix="cgat-lgz-check-") as private:
+        runner.contract_channel = Path(private) / "verified.json"
+        return record_early_failure(server_dir, lock, lock.run_id, runner.run())
+
+
 def new_run_id() -> str:
     prefix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"{prefix}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
@@ -1082,13 +1096,7 @@ def main() -> int:
             from resume_reference import handoff
             report = handoff(server_dir, workspace_join(server_dir, ".prepare_lib"), run_id, units, OuterCheckpointManager(server_dir))
             print("[REFERENCE HANDOFF] " + json.dumps(report, ensure_ascii=True), flush=True)
-        runner = Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color)
-        runner.workspace_lock = lock
-        # No handoff survives a lock release, restart, package import or migration.
-        with tempfile.TemporaryDirectory(prefix="cgat-lgz-check-") as private:
-            runner.contract_channel = Path(private) / "verified.json"
-            from job_final_catalog import record_early_failure
-            return record_early_failure(server_dir, lock, run_id, runner.run())
+        return run_locked_plan(server_dir, units, lock, log_style=args.log_style, color=args.color)
     except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

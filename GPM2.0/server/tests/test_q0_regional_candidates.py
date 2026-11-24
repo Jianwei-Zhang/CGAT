@@ -81,6 +81,10 @@ class RegionalCandidatesTests(unittest.TestCase):
         windows,native,reason=plan.plan_parent(self.ids['a'],eligible)
         self.assertEqual(windows,[]);self.assertEqual(native,0)
         self.assertEqual(reason,'weak_reference_only_alternatives_not_expanded')
+        plan.native_for_weak=True
+        _,all_native,reason=plan.plan_parent(self.ids['a'],eligible)
+        self.assertEqual(all_native,eligible);self.assertEqual(reason,'sparse_no_qualified_footprint')
+
         self.assertEqual(self.catalog.payload['candidates'],before)
 
     def test_whole_source_hit_does_not_suppress_new_split_part_relationships(self):

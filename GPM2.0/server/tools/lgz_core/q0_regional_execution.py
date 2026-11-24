@@ -119,6 +119,30 @@ SCHEDULER_PROOF_ENV = "_GPM_Q0_SCHEDULER_PROOF"
 SCHEDULER_SHA_ENV = "_GPM_Q0_SCHEDULER_SHA256"
 
 
+def checked_job_allocation(job, *, proc=Path("/proc"), host=None, user=None):
+    """Trust only a live single-node grant matching this process, host and user."""
+    import pwd
+    groups = job["resGroups"]; job_id = str(job["jobId"])
+    if (not job_id.isascii() or not job_id.isdecimal() or int(job_id) < 1
+            or job["state"] != "RUNNING" or job["taskExecNodesCount"] != 1 or len(groups) != 1
+            or job["taskExecNodes"] != (host or socket.gethostname())
+            or job["user"] != (user or pwd.getpwuid(os.getuid()).pw_name)):
+        raise ValueError("allocation proof is for a different running job")
+    allocated, limited = groups[0]["resAlloc"], groups[0]["resLimit"]
+    if (type(allocated["cpu"]) is not int or allocated["cpu"] < 1
+            or any(type(n) is not int or n < 1 for n in (allocated["mem"], limited["mem"]))):
+        raise ValueError("allocation proof lacks the requested CPU/memory bound")
+    matches = False
+    for row in (proc/"self/cgroup").read_text().splitlines():
+        _, controllers, relative = row.split(":", 2)
+        if (not controllers or set(controllers.split(",")) & {"memory", "cpu"}) and re.fullmatch(
+                r"/batch/container_"+job_id+r"_rg0_[A-Za-z0-9_]+(?:/.*)?", relative):
+            matches = True
+    if not matches:
+        raise ValueError("allocation proof does not own this process's job cgroup")
+    return allocated["cpu"], min(allocated["mem"], limited["mem"])*1024**2
+
+
 def allocation_memory_limit(threads, *, environ=None, proc=Path("/proc"), host=None, user=None):
     """Read an internal resource-ready receipt bound to THIS Donau job.
 
@@ -132,7 +156,6 @@ def allocation_memory_limit(threads, *, environ=None, proc=Path("/proc"), host=N
     if path is None and expected is None:
         return None
     try:
-        import pwd
         proof = Path(path)
         if (not proof.is_absolute() or proof.is_symlink() or not proof.is_file()
                 or not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None):
@@ -146,25 +169,10 @@ def allocation_memory_limit(threads, *, environ=None, proc=Path("/proc"), host=N
         rows = json.loads(raw)["data"]["successData"]
         if len(rows) != 1:
             raise ValueError("allocation proof is not one job")
-        job = rows[0]; groups = job["resGroups"]; job_id = str(job["jobId"])
-        if (not job_id.isascii() or not job_id.isdecimal() or int(job_id) < 1
-                or job["state"] != "RUNNING" or job["taskExecNodesCount"] != 1 or len(groups) != 1
-                or job["taskExecNodes"] != (host or socket.gethostname())
-                or job["user"] != (user or pwd.getpwuid(os.getuid()).pw_name)):
-            raise ValueError("allocation proof is for a different running job")
-        allocated, limited = groups[0]["resAlloc"], groups[0]["resLimit"]
-        if (type(allocated["cpu"]) is not int or allocated["cpu"] < threads
-                or any(type(n) is not int or n < 1 for n in (allocated["mem"], limited["mem"]))):
+        cpu, memory = checked_job_allocation(rows[0], proc=proc, host=host, user=user)
+        if cpu < threads:
             raise ValueError("allocation proof lacks the requested CPU/memory bound")
-        matches = False
-        for row in (proc/"self/cgroup").read_text().splitlines():
-            _, controllers, relative = row.split(":", 2)
-            if (not controllers or set(controllers.split(",")) & {"memory", "cpu"}) and re.fullmatch(
-                    r"/batch/container_"+job_id+r"_rg0_[A-Za-z0-9_]+(?:/.*)?", relative):
-                matches = True
-        if not matches:
-            raise ValueError("allocation proof does not own this process's job cgroup")
-        return min(allocated["mem"], limited["mem"])*1024**2
+        return memory
     except (ImportError, OSError, ValueError, KeyError, TypeError) as exc:
         raise Q0EvidenceError("invalid current-job scheduler allocation proof") from exc
 
