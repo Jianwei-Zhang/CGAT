@@ -4916,3 +4916,8 @@ Donau 作业 `43029926` 于 21:07:29 正常结束（退出码 0；总墙钟 26 �
 
 - `x86` 队列的 `nodeList` 是 `X86`。选节点改为读取该队列状态并从 `dnode -rp X86` 内筛满足 32 核/320 GiB 的独立节点，不再从全局 `dnode` 表挑选。拒单恢复仅接受已封存的“该节点不在队列”回执；先复核 4D、任务名及清单、已有运行/提交记录，再在原锁下写独立的 `retry-x86-pool/` 意向和提交结果。21:54 的拒单证据保持原样，没有重跑 4D 或初始比对。
 - 新版全麦首轮清单作业 **`43054692`** 于 21:58:58 在 `agent-X86-64` 启动。Donau `RUNNING` 分配回执为 32 CPU / 327680 MiB，`whole-allocation.log` 已确认发布。21:59:27 `control/started.json` 确认实际加载 `f9ed324f`、`positive_threshold`、32 线程、冻结快照 `451a42a6…`，在其独立节点暂存目录运行。此时正在暂存输入，尚无 `control/staged.json` 或 `control/global-first-request.json`；不能将 4D 的 300 个区间冒称为整麦结果。后续核查暂存完成、68 份初始 PAF 的读取以及 3B 是否越过旧失败点。不要因 `gate.log` 仍保留上次的报错而重提；本次以 `retry-x86-pool/gate.log`、`whole.jobid` 及实际 Donau 状态为准。
+
+### 11/24 22:08 — 新版全麦已完成输入暂存；窗口核算只做准备
+
+- `43054692` 的 `control/staged.json` 记录 22:08:39，103 个冻结文件、46,268,919,384 字节，距真实启动回执 552.16 秒。`VERIFIED_DRAFT_INPUTS` 已输出；已转入草 Q0，尚未产生整麦首轮清单。已复用 2 份参考与 66 份组内 PAF（44 份自比对、22 份组装间比对），这里是暂存完成，不代表 68 份都已被选择器解码。
+- 原窗口核算作业 `43040673` 仍只依赖 `43040669`，不能代算 `43054692`。为新版在其 `accounting/` 准备 `account_f9ed_whole_request.dsub`（SHA `0d0b9937b31936dd586294c4f8f1f457848c43d5da2164644ad221361c5f2dcf`），**未提交、未执行**。待 `43054692=SUCCEEDED` 且真实 `control/global-first-request.json` 存在后才提交一次；无需重跑 4D、原规划或 mapper。该脚本使用本次修订解释阈值合同，复用冻结的旧规划器及其辅助脚本，输出为 `accounting/result/first-demand.json`。该报告只回答原先 61,000 个规划窗口有多少与本轮需求相交，不是实际比对数或正式 Q0。
