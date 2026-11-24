@@ -460,6 +460,12 @@ class _PlacementProgress:
         units = "" if total is None else f" completed={count}/{total}"
         return f"placement {label}: {status}{units} elapsed_s={int(monotonic() - start)}"
 
+    def emit(self, message):
+        # The heartbeat calls the same sink under this lock. Keep its newline
+        # together with its message even when the coordinator reports at once.
+        with self.lock:
+            self.log(message)
+
     def _heartbeat(self):
         while not self.stop.wait(60):
             with self.lock:
@@ -641,10 +647,11 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
                      path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
                      screen_threads: int = 1, screen_progress: Callable[[str], None] = _quiet) -> Admission:
     with _PlacementProgress(screen_progress) as phases:
-        return _admit_placements(data, policy, path_policy, quality_pass, screen_threads, screen_progress, phases)
+        return _admit_placements(data, policy, path_policy, quality_pass, screen_threads, phases)
 
 
-def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, screen_progress, phases, *, first_request=False):
+def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, phases, *, first_request=False):
+    screen_progress = _quiet if phases.log is _quiet else phases.emit
     if quality_pass is not None and (set(quality_pass) != set(data.sources) or any(type(v) is not bool for v in quality_pass.values())):
         raise Q0EvidenceError("q0 QC decisions must explicitly cover every source")
     records, accepted = [], {}
@@ -990,7 +997,7 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
     progress(f"placing candidate segments · pair links={len(data.pair_links)}")
     if first_request:
         with _PlacementProgress(progress) as phases:
-            admission = _admit_placements(data, admission_policy, path_policy, quality_pass, screen_threads, progress,
+            admission = _admit_placements(data, admission_policy, path_policy, quality_pass, screen_threads,
                                           phases, first_request=True)
     else:
         admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass,
