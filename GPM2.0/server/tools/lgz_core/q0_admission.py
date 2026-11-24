@@ -114,6 +114,9 @@ def _hull(intervals):
 def _project(source: Interval, target: Interval, strand: str, interval: Interval) -> Interval:
     if not source.contains(interval) or source.length != target.length:
         raise Q0EvidenceError("q0 paired-block projection outside evidence")
+    # The full source maps to the full target in either orientation.
+    if interval is source or (interval.start == source.start and interval.end == source.end):
+        return target
     if strand == "+":
         return Interval(target.start + interval.start - source.start, target.start + interval.end - source.start)
     return Interval(target.end - (interval.end - source.start), target.end - (interval.start - source.start))
@@ -325,8 +328,11 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
         if identity < policy.minimum_reference_identity:
             continue
         for block in hit.aligned_blocks():
-            overlap = part.interval.intersection(block.query)
-            if overlap is not None and block.operation != "X":
+            if block.operation == "X":
+                continue
+            # Reuse the immutable original span unless the part actually clips it.
+            overlap = block.query if part.interval.contains(block.query) else part.interval.intersection(block.query)
+            if overlap is not None:
                 blocks.append(_RefBlock(overlap, _project(block.query, block.target, hit.strand, overlap),
                                         hit.target_name, hit.strand, hit.evidence_id, identity, hit.mapping_quality))
     groups, high = defaultdict(list), defaultdict(list)
