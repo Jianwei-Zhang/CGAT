@@ -308,26 +308,43 @@ class CoverageModel:
         for i in range(first, stop):
             yield indices[i]
 
-    def _project_selected(self, selected: Iterable[tuple[SourceKey, Interval]]):
-        """Validate every slice and project it onto the same oriented units for both callers."""
+    def _project_selected(self, selected: Iterable[tuple[SourceKey, Interval]], *, score_only=False):
+        """Validate every slice; only a full assessment needs the per-unit coverage inventory."""
         if self.ambiguous_evidence_ids:
             raise Q0EvidenceError("ambiguous homology must be removed before q0 path scoring")
         covered = defaultdict(list)
+        whole_roots = set() if score_only else None
         duplicate = False
         selected_bp = 0
         for source, interval in selected:
             if source not in self.required or not any(i.contains(interval) for i in self.required[source]):
                 raise Q0EvidenceError("selected interval escapes q0 coverage requirements")
             selected_bp += interval.length
+            if score_only and duplicate:
+                continue  # Later slices must still pass the source/bounds check above.
             for index in self._overlapping_atoms(source, interval):
                 atom = self.atoms[index][1]
-                overlap = atom.intersection(interval)
                 root, flip = self.units[index]
+                if whole_roots is not None:
+                    # A whole atom occupies its whole unit, even on the reverse strand.
+                    # No clipped coordinates are needed except at slice boundaries.
+                    if root in whole_roots:
+                        duplicate = True
+                        break
+                    if interval.contains(atom):
+                        if root in covered:  # A previous clipped piece already occupies this unit.
+                            duplicate = True
+                            break
+                        whole_roots.add(root)
+                        continue
+                overlap = atom.intersection(interval)
                 local = (Interval(atom.end - overlap.end, atom.end - overlap.start) if flip else
                          Interval(overlap.start - atom.start, overlap.end - atom.start))
                 duplicate |= any(local.intersection(previous) is not None for previous in covered[root])
+                if score_only and duplicate:
+                    break
                 covered[root].append(local)
-        return covered, duplicate, selected_bp
+        return (None if score_only else covered), duplicate, selected_bp
 
     def unique_selected_bp(self, selected: Iterable[tuple[SourceKey, Interval]]) -> int | None:
         """Exact candidate score, or None if any represented base occurs twice.
@@ -337,7 +354,7 @@ class CoverageModel:
         projected slices therefore has exactly their summed input length. No missing
         inventory, or walk over the chromosome's unselected atoms, is needed to rank it.
         """
-        _, duplicate, selected_bp = self._project_selected(selected)
+        _, duplicate, selected_bp = self._project_selected(selected, score_only=True)
         return None if duplicate else selected_bp
 
     def assess(self, selected: Iterable[tuple[SourceKey, Interval]]):
