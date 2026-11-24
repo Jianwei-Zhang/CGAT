@@ -7,6 +7,7 @@ no paths, and localized demand. Retain it for subsequent verified mapping and pu
 """
 import argparse
 import csv
+from contextlib import nullcontext
 import hashlib
 import inspect
 import json
@@ -143,7 +144,7 @@ def draft_thread_options(reader, requested=None):
     return {'threads':budget}
 
 
-def stage_and_draft(control, expected, workspace, rate_mib, threads=None):
+def stage_and_draft(control, expected, workspace, rate_mib, threads=None, *, capture_3b=False):
     from lgz_core import q0_preparation as prep, q0_threshold_prepare as threshold
     from lgz_core.q0_threshold_acceptance import record
     options = draft_thread_options(threshold.initial_questions, threads)  # reject incompatible requests before staging
@@ -188,7 +189,11 @@ def stage_and_draft(control, expected, workspace, rate_mib, threads=None):
         print('DRAFT_PAF_COMPLETE',kw['artifact'],n,flush=True)  # historical monitor format
         print(f'DRAFT_PAF_TIME files={files_read}/{len(s["alignments"])+len(ds)} rows={n} '
               f'total_rows={records_read} file_s={elapsed:.2f} cumulative_s={read_seconds:.2f}',flush=True)
-    with patch.object(threshold,reader_name,observed):
+    recording = nullcontext()
+    if capture_3b:
+        from capture_wheat_3b_geometry import observe
+        recording = observe(ctrl, expected, Path(__file__).resolve())
+    with recording, patch.object(threshold,reader_name,observed):
         need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],**options)
     write(ctrl/'global-first-request.json',{'schema':'wheat_threshold_global_first_request_v1','snapshot_sha256':expected,'revision':s['revision'],'threshold_contract':prep.supplement_policy('positive_threshold')['decision_frontier'],'has_path':has_path,'request':record(need),'published_q0':False,'mapper_calls':0});print('GLOBAL_FIRST_REQUEST',None if need is None else len(need),'sources; has_path',has_path,flush=True)
 
@@ -196,4 +201,5 @@ def stage_and_draft(control, expected, workspace, rate_mib, threads=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__); subs=p.add_subparsers(dest='op',required=True);q=subs.add_parser('freeze');q.add_argument('workspace',type=Path);q.add_argument('log',type=Path);q.add_argument('run_id');q.add_argument('control',type=Path);q.add_argument('revision');q=subs.add_parser('run');q.add_argument('control',type=Path);q.add_argument('snapshot_sha');q.add_argument('workspace',type=Path);q.add_argument('--rate-mib',type=int,default=80)
     q.add_argument('--threads', type=int, help='fork CPU ceiling; honors GPM_RUN_THREADS, otherwise defaults to one when omitted')
-    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib,a.threads)
+    q.add_argument('--capture-3b-geometry', action='store_true', help='save replay geometry for the bound d08efdff whole run only; not a resume checkpoint')
+    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib,a.threads,capture_3b=a.capture_3b_geometry)
