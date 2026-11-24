@@ -87,7 +87,10 @@ def verify():
 
 
 def node():
-    rows = [l.split() for l in query("dnode").splitlines()]; choices = []
+    info = json.loads(query("dqueue", "-J", "-l", "x86")); q, = info["data"]
+    must(info["code"] == "success" and q["name"] == "x86" and q["nodeList"] == "X86", "unexpected x86 resource pool")
+    if not {"OPEN", "ACTIVE"}.issubset(q["status"]): return None
+    rows = [l.split() for l in query("dnode", "-rp", q["nodeList"]).splitlines()]; choices = []
     for r in rows:
         if (len(r) >= 7 and re.fullmatch(r"agent-X86-\d+", r[0]) and r[0] not in {"agent-X86-05","agent-X86-52","agent-X86-57"}
                 and r[1] == "OK" and int(r[3]) >= 32 and int(r[6]) >= 327680):
@@ -99,7 +102,7 @@ def replace_one(s, a, b):
     must(s.count(a) == 1, "changed frozen scheduler template: " + a); return s.replace(a, b)
 
 
-def submit(target):
+def submit(target, attempt=ROOT):
     existing = [ROOT, PREV, BASE/"q0-whole-pair-lanes.xzqe7b", BASE/"q0-whole-repaired.ewp15v"]
     must(not any((d/"control/global-first-request.json").exists() for d in existing), "a whole request already exists; review first")
     must(NAME not in query("djob", "--output", "jobId:10 name:36 state:12"), "whole job already present")
@@ -109,18 +112,44 @@ def submit(target):
         batch = replace_one(batch, a, b); pub = replace_one(pub, a, b)
     batch = replace_one(replace_one(replace_one(batch, str(PREV), str(ROOT)), OLD_SNAP, SNAP),
                         "python3 -B verify.py", "python3 -B gate_f9ed_wheat_resubmit.py verify")
-    write(ROOT/"whole.dsub", batch); (ROOT/"whole.dsub").chmod(0o700); write(ROOT/"publish.py", pub)
-    names = ["whole.dsub", "publish.py", "gate_f9ed_wheat_resubmit.py", "qualification-terminal.json", "qualification/allocation.json",
+    manifest = (attempt/"launch.sha256").relative_to(ROOT).as_posix()
+    batch = replace_one(batch, "sha256sum -c --quiet launch.sha256", "sha256sum -c --quiet " + manifest)
+    write(attempt/"whole.dsub", batch); (attempt/"whole.dsub").chmod(0o700); write(attempt/"publish.py", pub)
+    names = [str((attempt/n).relative_to(ROOT)) for n in ("whole.dsub", "publish.py")]
+    if attempt != ROOT: names.append(str(Path(__file__).resolve().relative_to(ROOT)))
+    names += ["gate_f9ed_wheat_resubmit.py", "qualification-terminal.json", "qualification/allocation.json",
              "qualification/candidate.json", "qualification/comparison.json", "qualification/4d-first-request.json", "control/snapshot.json"]
-    write(ROOT/"launch.sha256", "".join(sha256(read(ROOT/n)).hexdigest()+"  "+n+"\n" for n in names))
-    write(ROOT/"whole-submit.intent", "{} {} {}\n".format(REV, JOB, target)); print("SUBMIT_INTENT", target, flush=True)
-    with (ROOT/"whole-submit.output").open("x") as f:
-        subprocess.run(["dsub", "-s", str(ROOT/"whole.dsub")], stdout=f, stderr=subprocess.STDOUT, timeout=60, check=True)
-    match = re.search(r"Submit job <(\d+)> successfully", (ROOT/"whole-submit.output").read_text()); must(match, "inspect submission output; do not retry")
+    write(attempt/"launch.sha256", "".join(sha256(read(ROOT/n)).hexdigest()+"  "+n+"\n" for n in names))
+    write(attempt/"whole-submit.intent", "{} {} {}\n".format(REV, JOB, target)); print("SUBMIT_INTENT", target, flush=True)
+    with (attempt/"whole-submit.output").open("x") as f:
+        subprocess.run(["dsub", "-s", str(attempt/"whole.dsub")], stdout=f, stderr=subprocess.STDOUT, timeout=60, check=True)
+    match = re.search(r"Submit job <(\d+)> successfully", (attempt/"whole-submit.output").read_text()); must(match, "inspect submission output; do not retry")
     j = match.group(1); write(ROOT/"whole.jobid", j+"\n")
     with (ROOT/"whole-allocation.log").open("x") as f:
-        proc=subprocess.Popen([sys.executable, "publish.py", j], stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
+        proc=subprocess.Popen([sys.executable, str(attempt/"publish.py"), j], stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
     print("WHOLE_SUBMITTED", j, target, "allocation_observer", proc.pid, flush=True)
+
+
+def retry_refused_node():
+    # The previous dsub was definitively refused, not timed out. Preserve every original artifact.
+    attempt = ROOT/"retry-x86-pool"
+    must(Path.cwd() == ROOT and Path(__file__).resolve().parent == attempt, "wrong recovery directory")
+    with (ROOT/"whole-gate.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        read(ROOT/"whole-submit.intent", "d395541cb846127d846de4c4b9e4c8c1f8d24707b6b06556d15b73ff984bcd57")
+        read(ROOT/"whole-submit.output", "ed004253d0c2d01a5bddf86c0077181a2392c92c5d420ed08e175032d930078e")
+        for line in read(ROOT/"launch.sha256", "e1a25c1d6ff713c8268a1e38620b39ac0d9bc82372f7a02f14f72669cf36366a").decode().splitlines():
+            pin, n = line.split(); read(ROOT/n, pin)
+        must(not any(os.path.lexists(ROOT/n) for n in ("whole.jobid", "allocation.json", "allocation.partial", "whole-allocation.log", "control/started.json")), "whole job already started")
+        must(not os.path.lexists(attempt/"whole-submit.intent"), "pool retry already attempted")
+        verify()
+        while True:
+            target = node()
+            if target: break
+            print("WAIT_RESOURCE x86/X86 32cpu/320GiB", flush=True); time.sleep(60)
+        status = query("djob", "-n", NAME)
+        must(status.strip().splitlines()[-1] == "query successfully, no matches.", "scheduler name is present or ambiguous")
+        submit(target, attempt)
 
 
 def watch():
@@ -148,4 +177,5 @@ if __name__ == "__main__":
     os.umask(0o077)
     if sys.argv[1:] == ["verify"]: verify()
     elif sys.argv[1:] == ["watch"]: watch()
-    else: raise SystemExit("use watch or verify")
+    elif sys.argv[1:] == ["retry-refused-node"]: retry_refused_node()
+    else: raise SystemExit("use watch, verify or retry-refused-node")
