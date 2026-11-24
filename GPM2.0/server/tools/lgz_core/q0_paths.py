@@ -393,6 +393,8 @@ class PathGraph:
     def __init__(self, placements: Iterable[Placement], links: Iterable[PairLink],
                  original_adjacencies: Iterable[OriginalAdjacency] = (), policy: PathPolicy = PathPolicy(),
                  *, progress: Callable[[str], None] | None = None, first_request: bool = False):
+        if progress:
+            started = monotonic()
         placements = tuple(placements)
         self.placements = {p.placement_id: p for p in placements}
         if len(self.placements) != len(placements):
@@ -420,6 +422,9 @@ class PathGraph:
         by_source = defaultdict(list)
         for p in placements:
             by_source[p.source].append(p)
+        if progress:
+            progress(f"graph inputs indexed: source_pairs={len(self.links)} setup_s={monotonic()-started:.2f}")
+            relations_started = monotonic()
         for (a, b), links_for_pair in list(self.links.items()):
             if a == b:
                 continue  # Distinct loci in one source are not redundant copies.
@@ -429,6 +434,9 @@ class PathGraph:
                         relations.append(Equivalence(left.source, left.source_interval(block.left),
                                                      right.source, right.source_interval(block.right),
                                                      left.orientation != right.orientation, evidence_id))
+        if progress:
+            progress(f"graph paired relations ready: evidence_spans={len(relations)} "
+                     f"relations_s={monotonic()-relations_started:.2f}")
         self.coverage = CoverageModel(self.required, relations, maximum_boundaries=policy.maximum_coverage_boundaries,
                                       progress=progress, compact_first=first_request)
         if self.coverage.ambiguous_evidence_ids:
