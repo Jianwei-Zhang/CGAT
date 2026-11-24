@@ -167,7 +167,12 @@ def stage_and_draft(control, expected, workspace, rate_mib, threads=None):
                               'snapshot_sha256':expected,'files':len(staged),'bytes':done,'deferred_for_formal_q0':[deferred],
                               'hostname':socket.gethostname(),'workspace':str(root),'time':time.time()})
     print('VERIFIED_DRAFT_INPUTS; REFERENCE_FASTA_DEFERRED; BEGIN_GLOBAL_THRESHOLD_DRAFT',flush=True)
-    ds=prep.table(root,'metadata/datasets.tsv',('dataset_name','fasta_relpath'));seqs=prep._dataset_sequences(root,ds); ref=prep.table(root,'metadata/reference.tsv',('fai_relpath',))[0]; lengths={k:int(n) for k,n,*_ in (x.split('\t') for x in (root/ref['fai_relpath']).read_text().splitlines())}; assignments=prep.table(root,'metadata/chr_assignments.tsv',('dataset_name','seq_name','assigned_chr_name')); inventory={(s.dataset,s.contig):len(dna) for s,dna in seqs.items()}; require(all(a['assigned_chr_name'] in lengths and inventory.get((a['dataset_name'],a['seq_name']))==int(a['seq_length_bp']) for a in assignments),'assignment source or length differs')
+    ds=prep.table(root,'metadata/datasets.tsv',('dataset_name','fasta_relpath'))
+    print(f'DRAFT_FASTA_START datasets={len(ds)}',flush=True)
+    fasta_started=time.monotonic()
+    seqs=prep._dataset_sequences(root,ds)
+    print(f'DRAFT_FASTA_READY sequences={len(seqs)} elapsed_s={time.monotonic()-fasta_started:.2f}',flush=True)
+    ref=prep.table(root,'metadata/reference.tsv',('fai_relpath',))[0]; lengths={k:int(n) for k,n,*_ in (x.split('\t') for x in (root/ref['fai_relpath']).read_text().splitlines())}; assignments=prep.table(root,'metadata/chr_assignments.tsv',('dataset_name','seq_name','assigned_chr_name')); inventory={(s.dataset,s.contig):len(dna) for s,dna in seqs.items()}; require(all(a['assigned_chr_name'] in lengths and inventory.get((a['dataset_name'],a['seq_name']))==int(a['seq_length_bp']) for a in assignments),'assignment source or length differs')
     from unittest.mock import patch
     reader_name = "read_retained_paf" if hasattr(threshold, "read_retained_paf") else "read_paf"
     base_reader=getattr(threshold,reader_name)

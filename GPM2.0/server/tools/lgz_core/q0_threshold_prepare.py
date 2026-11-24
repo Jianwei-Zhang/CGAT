@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
+from time import monotonic
 
 from . import q0_preparation as prep
 from .common import stable_id
@@ -111,9 +112,21 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_request_paths
     from .q0_threshold_questions import questions
+
+    def log(msg):
+        print("LGZ q0 first draft: " + msg, flush=True)
+
     keys = {(s.dataset, s.contig): s for s in seqs}
     parts, edges, refs, links, by_dataset = {}, [], defaultdict(list), [], defaultdict(dict)
-    for key, seq in seqs.items():
+    started = monotonic()
+    total = len(seqs)
+    log(f"source indexing before reference PAF: starting {total} sequences")
+    next_report = started + 60
+    for completed, (key, seq) in enumerate(seqs.items()):
+        now = monotonic()
+        if now >= next_report:
+            log(f"source indexing: processed={completed}/{total} elapsed_s={now-started:.1f}")
+            next_report = now + 60
         by_dataset[key.dataset][key.contig] = len(seq)
         try:
             info = split_source(key, seq, min_gap=prep.POLICY['min_gap'])
@@ -121,6 +134,8 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
             continue  # Same invalid-source verdict as ordinary catalog/admission.
         parts.update((p.segment_id,p) for p in info.segments)
         edges.extend(info.adjacencies)
+    log(f"source indexing complete: processed={total}/{total} segments={len(parts)} "
+        f"adjacencies={len(edges)} elapsed_s={monotonic()-started:.1f}")
     names = {ds: retained_names(lens) for ds, lens in by_dataset.items()}
     ref_names = retained_names(lengths)
     short_geometry = retained_geometry_cache()
@@ -143,8 +158,6 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
         del hits
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     del links, edges  # the immutable selection input now owns these references
-    def log(msg):
-        print("LGZ q0 first draft: " + msg, flush=True)
     selected = select_request_paths(data, screen_threads=threads, progress=log)
     log("paths selected; calculating first supplement request")
     need, counts = questions(data, selected, assignments)
