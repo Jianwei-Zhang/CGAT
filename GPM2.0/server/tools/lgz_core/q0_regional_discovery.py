@@ -5,8 +5,10 @@ claims of lossless whole-source alignment. Unroutable source parts retain the
 native full-context fallback; no partial mapper output is accepted.
 """
 from __future__ import annotations
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
+from heapq import nlargest
 import itertools
 from pathlib import Path
 import shutil
@@ -209,4 +211,13 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
     report.update(execution.report)
     report["completed_regional_tasks"] = len(tasks)
     report["fallback_sources"].sort(key=lambda row:parent_order[row["segment_id"]])
+    if fallback:
+        # This decision precedes the regional frontier filter; it is not a fresh mapper receipt.
+        rows = report["fallback_sources"]
+        reasons = Counter(row["reason"] for row in rows)
+        largest = nlargest(3, ((catalog.parts[r["segment_id"]].interval.length, r["segment_id"], r["reason"])
+                               for r in rows))
+        print(f"LGZ q0 partial native fallback planned: parents={len(rows)} "
+              f"regional_frontier={regional_frontier is not None} reasons={dict(sorted(reasons.items()))} "
+              f"largest_bp_id_reason={largest}", flush=True)
     return [task for _ordinal, task in sorted(tasks, key=lambda row:row[0])], sorted(fallback), report
