@@ -16,8 +16,11 @@ from census_wheat_q0_fork import GEOM, LOOK, SNAP, bind, bounded, require
 from lgz_core.q0_threshold_acceptance import decode
 
 
-CURRENT = "1d66bcfce3d1cf96cfcb10984540a300678b3e1fd683ba9a84581be64a98b74d"
-REVISION = "612cbce944c3443d5d5458741dc57e08330e1c97"
+# Only runs whose full input inventory has been compared with the frozen producer.
+PRODUCERS = {
+    "1d66bcfce3d1cf96cfcb10984540a300678b3e1fd683ba9a84581be64a98b74d": "612cbce944c3443d5d5458741dc57e08330e1c97",
+    "1ac0f77f60dce3398fa10372f641baa19bc2dbb2ce80c31f28281258a9a5cfc5": "5f2e505c25ffca69659b51342f2a0748ef866b9e",
+}
 AXES_RECEIPT = "0a2d812b579ba13c27cda84e274d7244a86b2b1c6a5dacbb1aba9405fb3c239a"
 
 
@@ -31,15 +34,17 @@ def write(path, doc):
 def inputs(base, ctrl, out):
     old = base / "q0-latest-fork-20261123-1435/control/snapshot.json"
     original = json.loads(bounded(old, 256 << 10, SNAP))
-    latest = json.loads(bounded(ctrl / "snapshot.json", 256 << 10, CURRENT))
-    require(latest == dict(original, revision=REVISION), "historical plan not reusable: producer inputs differ")
+    snapshot = bounded(ctrl / "snapshot.json", 256 << 10); current = sha256(snapshot).hexdigest()
+    require(current in PRODUCERS, "unknown whole-wheat producer")
+    revision = PRODUCERS[current]
+    require(json.loads(snapshot) == dict(original, revision=revision), "historical plan not reusable: producer inputs differ")
     for protected in (Path(original["source"]), ctrl, old.parent):
         require(not out.is_relative_to(protected) and not protected.is_relative_to(out), "unsafe output directory")
     raw = bounded(ctrl / "global-first-request.json", 64 << 20); req = json.loads(raw)
-    require(req["schema"] == "wheat_threshold_global_first_request_v1" and req["revision"] == REVISION
-            and req["snapshot_sha256"] == CURRENT and req["published_q0"] is False and type(req["has_path"]) is bool
+    require(req["schema"] == "wheat_threshold_global_first_request_v1" and req["revision"] == revision
+            and req["snapshot_sha256"] == current and req["published_q0"] is False and type(req["has_path"]) is bool
             and type(req["mapper_calls"]) is int and req["mapper_calls"] == 0, "wrong or published first request")
-    return old, req, {"revision": REVISION, "snapshot_sha256": CURRENT, "inventory_snapshot_sha256": SNAP,
+    return old, req, {"revision": revision, "snapshot_sha256": current, "inventory_snapshot_sha256": SNAP,
                       "request_sha256": sha256(raw).hexdigest(), "has_path": req["has_path"]}
 
 
