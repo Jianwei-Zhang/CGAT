@@ -996,6 +996,14 @@ class Runner:
                 for signal_number, handler in previous_handlers.items():
                     signal.signal(signal_number, handler)
                 self.report.finish(str(error) if error else None)
+                if not completed:
+                    layout = WorkspaceLayout.detect(self.server_dir)
+                    if layout.version == 2:
+                        from refinement_overview import refresh_diagnostic_overview
+                        try:
+                            refresh_diagnostic_overview(layout)
+                        except (OSError, ValueError, KeyError, TypeError) as exc:
+                            print(f"[REPORT] diagnostic overview unavailable: {exc}", file=sys.stderr)
                 deliveries = self._delivery_stagings()
                 if completed and deliveries:
                     try:
@@ -1003,7 +1011,7 @@ class Runner:
                             from project_delivery_publish import publish_current
                             artifacts = publish_current(self.server_dir, self.workspace_lock, runner_staging=True)
                             from refinement_jobs_index import refresh_after_delivery
-                            refresh_after_delivery(self.server_dir,self.run_id)
+                            refresh_after_delivery(self.server_dir, self.run_id, self.workspace_lock)
                         else:
                             artifacts = finalize_delivery_archives_from_staging(self.server_dir, deliveries)
                     except Exception as exc:

@@ -332,7 +332,7 @@ def main():
                         for file in publish_current(root,lock):
                             print(f"[PROJECT APP DELIVERY] {file['path']}", flush=True)
                         from refinement_jobs_index import refresh_after_delivery
-                        refresh_after_delivery(root,run_id)
+                        refresh_after_delivery(root, run_id, lock)
                 return code
             for number in (signal.SIGINT, signal.SIGTERM):
                 previous[number] = signal.signal(number, lambda n, _frame: (_ for _ in ()).throw(Terminated(n)))

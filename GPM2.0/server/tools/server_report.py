@@ -23,10 +23,12 @@ from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 
+from report_privacy import hide_paths, private_reads, public_inputs
 from server_report_collect import (
     capture_final, collect_lgz_result, collect_unit, final_summary, inputs,
 )
-from server_report_io import SCHEMA, digest, local_path, now, read_json, write_json
+from workspace_layout import WorkspaceLayout
+from server_report_io import layout_descriptor, timing_summary, SCHEMA, digest, local_path, now, read_json, write_json
 from render_server_report import project_report_facts, render
 from run_resources import read_resources
 from run_orchestration import LGZ_PREPARE_IDS
@@ -92,6 +94,7 @@ def record_lgz_result(root: Path, result: dict) -> None:
 
 class ReportSession:
     def __init__(self, root: Path, units, run_id: str):
+        self.layout = WorkspaceLayout.detect(root)
         self.root = root
         self.report = fresh_directory(root)
         self.run_id = run_id
@@ -109,11 +112,16 @@ class ReportSession:
             saved["facts"] = current_inputs
         saved["preparation_id"] = saved.get("run_id")
         saved["run_id"] = run_id
+        request = read_json(self.layout.path(f".runtime/refinement/requests/{run_id}.json"), {}) if self.layout.version == 2 else {}
+        if 'groups' in request:
+            saved['facts']['typed_reads'] = [{'technology': tech, 'file_count': len(files)}
+                for tech, files in request['groups'].items() if tech in ('hifi','ont') and isinstance(files, list)]
         self.input_data = saved.get("facts", {})
-        write_json(self.report / "inputs.json", saved)
+        self.private_reads = private_reads(saved, request.get("groups"))
+        write_json(self.report / "inputs.json", public_inputs(saved,self.private_reads))
         self.manifest = {"schema_version": SCHEMA, "run_id": run_id,
                          "started_at": now(), "ended_at": None, "status": "running",
-                         "workspace_name": root.name, "steps": [], "errors": [],
+                         "workspace_name": root.name, "workspace_layout": layout_descriptor(self.layout), "steps": [], "errors": [],
                          "execution_resources": read_resources(root)}
         self.records = {}
         self.output_tails = {}
@@ -126,12 +134,13 @@ class ReportSession:
             record["command_text"] = local_path(root, unit.command_relpath).read_text(encoding="utf-8")
             self.records[unit.unit_id] = (filename, record)
             self.manifest["steps"].append(filename)
-            write_json(self.report / filename, record)
+            write_json(self.report / filename, hide_paths(record,self.private_reads))
+        self.manifest.update(self.snapshot_extensions())
         self.save()
         render(self.report)
 
     def save(self):
-        write_json(self.report / "manifest.json", self.manifest)
+        write_json(self.report / "manifest.json", hide_paths(self.manifest,self.private_reads))
 
     def event(self, event: str, unit, message: str, row: dict | None):
         if unit is None:
@@ -173,9 +182,10 @@ class ReportSession:
                     **capture_final(self.root)})
         if event in {"FAILED", "INTERRUPTED"}:
             self.manifest["status"] = event.lower()
+            record["failure_reason"] = hide_paths(message,self.private_reads)
         if event in {"SUCCESS", "FAILED", "INTERRUPTED"}:
             record["output_tail"] = list(self.output_tails.get(unit.unit_id, ()))
-        write_json(self.report / filename, record)
+        write_json(self.report / filename, hide_paths(record,self.private_reads))
         self.save()
         if event in {"SUCCESS", "SKIP_VALID", "SKIP_MIGRATED_LGZ", "FAILED", "INTERRUPTED"}:
             self.refresh()
@@ -187,8 +197,21 @@ class ReportSession:
         if len(parts) >= 4 and parts[0] in {"LGZ", "GRT"} and parts[2:4] == ["cache", "hit:"]:
             self.cached_stages_by_unit.setdefault(unit_id, set()).add(parts[1])
 
+    def snapshot_extensions(self):
+        return {"workspace_layout": layout_descriptor(self.layout),
+                      "stage_timing_summary": timing_summary(self.layout, (r for _,r in self.records.values())),
+                      "delivery_summary": {"boundary": "before_archive_commit", "workspace_paths": {
+                          "lgz_report": self.layout.relative("report"),
+                          "final_directory": "05_final" if self.layout.version == 2 else None,
+                          "delivery_directory": "07_delivery" if self.layout.version == 2 else None,
+                          "results_catalog": "05_final/results.tsv" if self.layout.result_prefix else None}, "outputs": [o
+                         for unit, (_, r) in self.records.items() if unit.startswith("package_")
+                         for o in r.get("facts", {}).get("outputs", [])]}}
     def refresh(self):
-        write_json(self.report / "final_summary.json", final_summary(self.root, self.report))
+        extensions = self.snapshot_extensions()
+        self.manifest.update(extensions)
+        self.save()
+        write_json(self.report / "final_summary.json", {**final_summary(self.root, self.report), **extensions})
         render(self.report)
 
     def finish(self, error: str | None = None):
@@ -199,14 +222,14 @@ class ReportSession:
                 if record["status"] == "running":
                     record["status"] = "failed"
                     record["history"].append({"at": now(), "event": "FAILED", "message": error})
-                    write_json(self.report / filename, record)
+                    write_json(self.report / filename, hide_paths(record,self.private_reads))
         elif self.manifest["status"] == "running":
             self.manifest["status"] = "interrupted"
         self.manifest["ended_at"] = now()
         for filename, record in self.records.values():
             if record["status"] == "pending":
                 record["not_executed_reason"] = "pipeline_stopped_before_this_stage"
-                write_json(self.report / filename, record)
+                write_json(self.report / filename, hide_paths(record,self.private_reads))
         self.save()
         self.refresh()
         # Older releases wrote report sidecars beside the App delivery archives.
@@ -456,18 +479,18 @@ def prepare_start(root: Path, argv: list[str]):
                             "sha256": None, "identity_note": "原始文件记录路径、大小和修改时间；规范化 FASTA 另记 SHA-256。"})
     data = {"schema_version": SCHEMA, "run_id": run_id, "started_at": now(),
             "status": "running", "argv": argv, "sources": sources, "facts": {}}
-    write_json(report / "inputs.json", data)
+    write_json(report / "inputs.json", public_inputs(data, private_reads(data)))
     # Invalidate old preparation provenance immediately, including on failure.
     write_json(workspace_join(root, "metadata/report_inputs.json"), data)
     write_json(report / "manifest.json", {"schema_version": SCHEMA, "run_id": run_id,
-               "workspace_name": root.name, "status": "preparing", "started_at": data["started_at"],
+               "workspace_name": root.name, "workspace_layout": layout_descriptor(WorkspaceLayout.detect(root)), "status": "preparing", "started_at": data["started_at"],
                "ended_at": None, "steps": [], "errors": []})
     render(report)
 
 
 def prepare_finish(root: Path, exit_code: int):
     report = workspace_join(root, "report")
-    data = read_json(report / "inputs.json")
+    data = read_json(workspace_join(root, "metadata/report_inputs.json"))
     if data is None:
         raise ValueError("preparation report was not initialized")
     data.update(status="success" if exit_code == 0 else "failed", ended_at=now(), exit_code=exit_code)
@@ -475,7 +498,7 @@ def prepare_finish(root: Path, exit_code: int):
         data["facts"] = inputs(root)
     else:
         data["notes"] = ["输入准备未完成；没有把残留文件当成本次成功输出。详见 prepare 的终端错误。"]
-    write_json(report / "inputs.json", data)
+    write_json(report / "inputs.json", public_inputs(data, private_reads(data)))
     write_json(workspace_join(root, "metadata/report_inputs.json"), data)
     manifest = read_json(report / "manifest.json")
     manifest.update(status="prepared" if exit_code == 0 else "failed", ended_at=now())

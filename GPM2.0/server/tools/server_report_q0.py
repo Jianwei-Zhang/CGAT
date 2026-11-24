@@ -118,7 +118,10 @@ def collect_q0_decisions(root: Path):
         "input_gap_joins": joins_by_kind["input_assembly_gap"], "input_gap_n_bp": n_by_kind["input_assembly_gap"],
         "unknown_joins": joins_by_kind["reference_unknown"], "unknown_join_n_bp": n_by_kind["reference_unknown"],
         "sequence_overlap_joins": joins_by_kind["sequence_overlap"], "qc": construction["qc"]}
-    return {"mode": MODE, "source": SELECTION, "source_sha256": selection_hash, "q0_sha256": q0_hash,
+    source_totals = Counter()
+    for row in sources:
+        source_totals[row["dataset_name"]] += row["source_bp"]
+    return {"source_bp_by_dataset": dict(source_totals), "mode": MODE, "source": SELECTION, "source_sha256": selection_hash, "q0_sha256": q0_hash,
         "summary": summary, "policy": construction["path_policy"],
         "tables": {name: bounded_table(value) for name, value in {
             "q0_chromosomes": chromosome_rows, "q0_source_composition": sources, "q0_retained_joins": joins,
