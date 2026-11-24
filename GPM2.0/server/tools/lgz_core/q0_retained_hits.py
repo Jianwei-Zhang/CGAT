@@ -125,8 +125,14 @@ def _retained_line(line, artifact, number, prefix, query_names, target_names, sh
     f = raw.split('\t')
     if len(f) < 12:
         raise Q0EvidenceError('short PAF record')
-    qname, qlen = query_names[f[0]]
-    tname, tlen = target_names[f[5]]
+    if query_names is None:
+        # A worker never gets the DNA or the inventory. These lengths are only claims
+        # until the owner binds BOTH names and lengths to this matrix's exact partition.
+        qname, qlen = f[0], int(f[1])
+        tname, tlen = f[5], int(f[6])
+    else:
+        qname, qlen = query_names[f[0]]
+        tname, tlen = target_names[f[5]]
     query = Interval(int(f[2]), int(f[3]))
     target = Interval(int(f[7]), int(f[8]))
     matches, length, mapq = int(f[9]), int(f[10]), int(f[11])
@@ -145,30 +151,50 @@ def _retained_line(line, artifact, number, prefix, query_names, target_names, sh
     digest = sha256(raw.encode('utf-8')).hexdigest()
     # Exactly stable_id('q0-paf', [artifact, number, digest]); only the artifact is invariant.
     evidence = sha256(prefix + str(number).encode('ascii') + b',"' + digest.encode('ascii') + b'"]').hexdigest()
+    if query_names is None:
+        # Plain scalars travel without pickling millions of dataclasses, repeated file
+        # paths or reference inventories. Offsets within the input block supply line IDs.
+        return ('q0-paf-' + evidence[:24], digest, qname, qlen, query.start, query.end, f[4],
+                tname, tlen, target.start, target.end, matches, length, mapq, packed, '\t'.join(tags))
     return RetainedHit('q0-paf-' + evidence[:24], artifact, number, digest, qname, qlen, query, f[4],
                        tname, tlen, target, matches, length, mapq, packed, '\t'.join(tags))
 
 
-def read_retained_paf(path, *, artifact, query_names, target_names, short_geometry):
-    """Read actual complete rows in order with the usual UTF-8/newline and source checks."""
+def _checked_line(line, path, artifact, number, prefix, query_names, target_names, short_geometry):
+    if line.startswith('#') or not line.strip():
+        return None
+    try:
+        return _retained_line(line, artifact, number, prefix, query_names, target_names, short_geometry)
+    except (ValueError, KeyError):
+        # Only exceptional rows revisit the canonical decoder. It is authoritative
+        # for valid edge cases and reports the normal file/line diagnostic on damage.
+        original = parse_paf_line(line, artifact=artifact, line_number=number)
+        q = query_names.get(original.query_name); t = target_names.get(original.target_name)
+        if q is None or t is None or (q[1], t[1]) != (original.query_length, original.target_length):
+            raise Q0EvidenceError(f'{path}:{number}: PAF names/lengths differ from inputs')
+        return RetainedHit.from_validated(original, q[0], t[0])
+
+
+def read_retained_paf(path, *, artifact, query_names, target_names, short_geometry, threads=1):
+    """One ordered physical read. Parallelism changes neither the declared partition nor row identity."""
     if not artifact:
         raise Q0EvidenceError('missing PAF artifact')
+    if query_names is None or target_names is None:
+        raise Q0EvidenceError('missing PAF source inventory')
     prefix = ('[' + canonical_json(artifact) + ',').encode('ascii')
+    def serial(number, line):
+        return _checked_line(line, path, artifact, number, prefix, query_names, target_names, short_geometry)
     try:
         with open_paf_text(path, newline='') as stream:
+            if threads > 1:
+                from .q0_paf_chunks import decode_ordered, worker_budget
+                workers = worker_budget(path, threads)
+                if workers:
+                    yield from decode_ordered(stream, artifact, prefix, query_names, target_names, serial, workers)
+                    return
             for number, line in enumerate(stream, 1):
-                if line.startswith('#') or not line.strip():
-                    continue
-                try:
-                    hit = _retained_line(line, artifact, number, prefix, query_names, target_names, short_geometry)
-                except (ValueError, KeyError):
-                    # Only exceptional rows revisit the canonical decoder. It is authoritative
-                    # for valid edge cases and reports the normal file/line diagnostic on damage.
-                    original = parse_paf_line(line, artifact=artifact, line_number=number)
-                    q = query_names.get(original.query_name); t = target_names.get(original.target_name)
-                    if q is None or t is None or (q[1], t[1]) != (original.query_length, original.target_length):
-                        raise Q0EvidenceError(f'{path}:{number}: PAF names/lengths differ from inputs')
-                    hit = RetainedHit.from_validated(original, q[0], t[0])
-                yield hit
+                hit = serial(number, line)
+                if hit is not None:
+                    yield hit
     except (OSError, UnicodeError) as exc:
         raise Q0EvidenceError(f'cannot read q0 alignment evidence {path}: {exc}') from exc

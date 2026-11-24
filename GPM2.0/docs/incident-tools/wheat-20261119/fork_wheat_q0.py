@@ -171,10 +171,18 @@ def stage_and_draft(control, expected, workspace, rate_mib, threads=None):
     from unittest.mock import patch
     reader_name = "read_retained_paf" if hasattr(threshold, "read_retained_paf") else "read_paf"
     base_reader=getattr(threshold,reader_name)
+    files_read = records_read = 0
+    read_seconds = 0.0
     def observed(path,**kw):
+        nonlocal files_read, records_read, read_seconds
+        started = time.monotonic()
         print('DRAFT_PAF_START',kw['artifact'],flush=True);n=0
         for hit in base_reader(path,**kw):n+=1;yield hit
-        print('DRAFT_PAF_COMPLETE',kw['artifact'],n,flush=True)
+        elapsed = time.monotonic() - started
+        files_read += 1; records_read += n; read_seconds += elapsed
+        print('DRAFT_PAF_COMPLETE',kw['artifact'],n,flush=True)  # historical monitor format
+        print(f'DRAFT_PAF_TIME files={files_read}/{len(s["alignments"])+len(ds)} rows={n} '
+              f'total_rows={records_read} file_s={elapsed:.2f} cumulative_s={read_seconds:.2f}',flush=True)
     with patch.object(threshold,reader_name,observed):
         need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],**options)
     write(ctrl/'global-first-request.json',{'schema':'wheat_threshold_global_first_request_v1','snapshot_sha256':expected,'revision':s['revision'],'threshold_contract':prep.supplement_policy('positive_threshold')['decision_frontier'],'has_path':has_path,'request':record(need),'published_q0':False,'mapper_calls':0});print('GLOBAL_FIRST_REQUEST',None if need is None else len(need),'sources; has_path',has_path,flush=True)

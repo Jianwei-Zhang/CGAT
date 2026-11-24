@@ -50,8 +50,9 @@ class _PartitionNames(dict):
 
 class _DraftMatrices:
     """One preparation call, one verified generation. Never a persistent success or cache."""
-    def __init__(self, root):
+    def __init__(self, root, threads=1):
         self.root = root
+        self.threads = threads
         self.rows = {}
         self.canonical = defaultdict(dict)
         self.short_geometry = retained_geometry_cache()
@@ -62,7 +63,8 @@ class _DraftMatrices:
         before = prep.file_signature(path)
         hits = []
         for hit in read_retained_paf(path, artifact=artifact, query_names=_PartitionNames(query_lengths,self.canonical[query_dataset]),
-                                     target_names=_PartitionNames(target_lengths,self.canonical[target_dataset]), short_geometry=self.short_geometry):
+                                     target_names=_PartitionNames(target_lengths,self.canonical[target_dataset]),
+                                     short_geometry=self.short_geometry, threads=self.threads):
             hits.append(hit)
             yield _CoverageRow(hit)
         if prep.file_signature(path) != before:
@@ -86,6 +88,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
     """Release the already verified source DNA into the first mapper pass, not a second copy."""
     first = None
     matrices = None
+    threads = 1
 
     def _read_initial(self):
         # An existing ready generation may be reusable: don't retain millions of hits for a cache check.
@@ -93,7 +96,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         if (prep.workspace_artifact_path(self.root, prep.MANIFEST).exists() or prep._initial_inputs is not prep._native_initial_inputs
                 or prep.read_paf_observations is not _native_observations):
             return super()._read_initial()
-        self.matrices = _DraftMatrices(self.root)
+        self.matrices = _DraftMatrices(self.root, self.threads)
         return prep._initial_inputs(self.root, matrix_reader=self.matrices.observe)
 
     def read(self):
@@ -124,7 +127,7 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
     for dataset, qnames in names.items():
         rel = f'runs/{dataset}_vs_ref/result.paf'
         for hit in read_retained_paf(prep.artifact_path(root,rel), query_names=qnames, target_names=ref_names,
-                                     artifact=rel, short_geometry=short_geometry):
+                                     artifact=rel, short_geometry=short_geometry, threads=threads):
             source = keys[dataset, hit.query_name]
             refs[source].append(hit)
     if matrices is not None:
@@ -133,7 +136,7 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
         q, t, rel = row['query_dataset'], row['target_dataset'], row['paf']
         hits = (matrices.take(row) if matrices is not None else
                 read_retained_paf(prep.artifact_path(root,rel), query_names=names[q], target_names=names[t],
-                                  artifact=rel, short_geometry=short_geometry))
+                                  artifact=rel, short_geometry=short_geometry, threads=threads))
         for hit in hits:
             left, right = keys[q, hit.query_name], keys[t, hit.target_name]
             links.append(PairLink(hit, left, right))
@@ -156,6 +159,7 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
 
 
 def initial_generation(root, snapshot, mapper, *, threads=1):
+    snapshot.threads = threads
     initial = snapshot.read()
     seqs,lengths,assignments,options,_,alignments,_,inputs = initial
     if 'q0_supplement_scope' in options:
