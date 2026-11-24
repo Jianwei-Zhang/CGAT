@@ -378,6 +378,16 @@ def _overlap_size(left: Iterable[Interval], right: Iterable[Interval]) -> int:
     return _size(overlap for a in left for b in right if (overlap := a.intersection(b)) is not None)
 
 
+def _end_spanning_evidence(blocks, left_end):
+    # pair_blocks clips both axes to placement-local bounds. Reaching the
+    # maximum left end and minimum right start needs a witness for each end
+    # from the same chain, not necessarily from the same paired block.
+    reaches_left = {eid for block, eid in blocks if block.left.end == left_end}
+    if not reaches_left:
+        return reaches_left
+    return {eid for block, eid in blocks if block.right.start == 0 and eid in reaches_left}
+
+
 class PathGraph:
     """Immutable evidence facts; no ds-order ranking or whole-source exclusion."""
     def __init__(self, placements: Iterable[Placement], links: Iterable[PairLink],
@@ -449,16 +459,12 @@ class PathGraph:
             return ()
         # Only supported paired-base coordinates can authorize an overlap cut.
         blocks = self.homologous_blocks(left, right)
-        if blocks:
+        if blocks and (reaches_both := _end_spanning_evidence(blocks, left.interval.length)):
+            anchors_left = tuple(left.local(i) for i in left.anchor_intervals)
+            anchors_right = tuple(right.local(i) for i in right.anchor_intervals)
             for block, evidence_id in blocks:
-                # One actual chain must reach both ends. Its interior indels
-                # are allowed; the chosen cut itself must be inside a supported
-                # paired run, never projected across an ambiguous indel boundary.
-                chain = [b for b, eid in blocks if eid == evidence_id]
-                if max(b.left.end for b in chain) != left.interval.length or min(b.right.start for b in chain) != 0:
+                if evidence_id not in reaches_both:
                     continue
-                anchors_left = tuple(left.local(i) for i in left.anchor_intervals)
-                anchors_right = tuple(right.local(i) for i in right.anchor_intervals)
                 supported = []
                 for a in anchors_left:
                     clipped = block.clip_left(a)
@@ -469,11 +475,9 @@ class PathGraph:
                         if overlap is not None:
                             start = clipped.left.start + overlap.start - clipped.right.start
                             supported.append(Interval(start, start + overlap.length))
-                supported = merged_intervals(supported)
-                if _size(supported) < self.policy.minimum_anchor_bp:
-                    continue
-                anchor = max(supported, key=lambda i: (i.length, -i.start))
-                if anchor.length < self.policy.minimum_anchor_bp:
+                # The cut needs one continuous anchor; a sum across disjoint runs cannot qualify it.
+                anchor = max(merged_intervals(supported), key=lambda i: (i.length, -i.start), default=None)
+                if anchor is None or anchor.length < self.policy.minimum_anchor_bp:
                     continue
                 cut = anchor.start + anchor.length // 2
                 right_cut = block.right.start + cut - block.left.start
