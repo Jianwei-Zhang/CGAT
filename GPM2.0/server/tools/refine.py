@@ -474,7 +474,7 @@ def main():
         else:
             area = ".prepare_lib"
         tools = root / area / "tools"
-        for name in ("workspace_layout.py", "refine.py", "refine_run.py", "refine_report.py", "manual_snapshot.py", "manual_genome.py"):
+        for name in ("workspace_layout.py", "refine.py", "refine_run.py", "refine_report.py", "render_manual_report.py", "render_refinement_report.py", "manual_snapshot.py", "manual_genome.py"):
             source = tools / name
             if (source.is_symlink() or not source.is_file()
                     or any(parent.is_symlink() for parent in source.parents if parent.is_relative_to(root))):

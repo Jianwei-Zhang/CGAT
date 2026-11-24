@@ -536,13 +536,18 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
         path = delivery_path(root, kind)
         staging = delivery_staging_path(root, kind)
         files = [item for item in staging.rglob("*") if item.is_file()] if staging.is_dir() else []
+        payload_size = sum(item.stat().st_size for item in files)
         return {
             "summary": {
                 "archive": path.name,
                 "staging_ready": staging.is_dir(),
                 "payload_file_count": len(files),
-                "payload_size_bytes": sum(item.stat().st_size for item in files),
+                "payload_size_bytes": payload_size,
             },
+            "outputs": [{"file": path.relative_to(root).as_posix() if path.is_relative_to(root) else path.name,
+                         "mode": kind, "payload_size_bytes": payload_size,
+                         "payload_file_count": len(files), "status": "payload_staged" if staging.is_dir() else "not_staged",
+                         "size_bytes": None, "sha256": None, "publication_verified": False}],
             "notes": [
                 "App payload staged; the finalized report and payload are compressed together once after pipeline success."
             ],

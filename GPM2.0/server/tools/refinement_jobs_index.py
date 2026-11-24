@@ -104,9 +104,62 @@ def write_automatic_index(layout, completion_path):
     return index
 
 
-def refresh_after_delivery(root,run_id):
-    from workspace_layout import WorkspaceLayout
-    layout = WorkspaceLayout.detect(root)
-    completion = layout.path(f".runtime/refinement/completions/{run_id}.json")
-    if completion.is_file():
-        write_automatic_index(layout,completion)
+def refresh_after_delivery(root, run_id, lock, *, verify_content=True):
+    """Reseal only our previous automatic HTML, under the publishing lock. A
+    durable before/after intent makes the two atomic replacements retryable."""
+    from refinement_commit import layout_and_lock
+    from refinement_overview import overview_html
+    from report_inventory import physical, obj
+    from post_lgz_refinement import overview_members
+    from refinement_config import load_request
+    from refinement_tools import fingerprint
+    from refine_report import _write_text
+    layout = layout_and_lock(root, lock)
+    if not re.fullmatch(r"[\w.-]+", run_id):
+        raise ValueError("invalid completion ID")
+    completion = physical(layout.root, f".runtime/refinement/completions/{run_id}.json")
+    if not completion.is_file():
+        return
+    receipt = json.loads(completion.read_text())
+    bid = receipt["batch_id"]
+    if (receipt.get("run_id") != run_id or not re.fullmatch(r"[a-f0-9]{32}", bid)
+            or receipt.get("schema") != "cgat.refinement-invocation" or receipt.get("schema_version") != 1):
+        raise ValueError("invalid completion identity")
+    if receipt.get("request_sha256") != fingerprint(load_request(root,run_id)):
+        raise ValueError("refinement request differs from completion")
+    batch_rel = f".runtime/refinement/batches/{bid}.json"
+    if not verify_reference(layout, batch_rel, receipt['batch_sha256']):
+        raise ValueError("changed refinement batch")
+    batch = obj(layout.root, batch_rel)
+    name = '06_report/report.html'
+    files = receipt['overview_files']
+    if (batch.get('batch_id') != bid or set(files) != set(overview_members(layout,batch)) or
+            any(not verify_reference(layout, rel, sha) for rel,sha in files.items() if rel != name)):
+        raise ValueError("changed comparison in completion")
+    report = physical(layout.root, name)
+    intent = physical(layout.root, f'.runtime/refinement/overview-refresh/{run_id}.json')
+    old, actual = files[name], automatic_overview_digest(report)
+    if intent.exists():
+        plan = json.loads(intent.read_text())
+        if (plan['batch_sha256'] != receipt['batch_sha256'] or old not in (plan['before'],plan['after'])
+                or actual not in (plan['before'],plan['after'])):
+            raise ValueError('cannot recover changed overview')
+        if actual == plan['after'] and old != actual:
+            files[name] = old = actual
+            durable_json(completion,receipt)
+        intent.unlink()
+    if actual != old:
+        raise ValueError('automatic overview changed before refresh')
+    import tempfile
+    html=overview_html(layout,batch,verify_content=verify_content)
+    with tempfile.TemporaryDirectory(dir=report.parent) as directory:
+        staged = Path(directory)/'report.html'
+        _write_text(staged, html)
+        new = automatic_overview_digest(staged)
+        durable_json(intent,dict(batch_sha256=receipt['batch_sha256'],before=old,after=new))
+        from workspace_migration import rename_synced
+        rename_synced(staged,report)
+        files[name]=new
+        durable_json(completion,receipt)
+        intent.unlink()
+    return write_automatic_index(layout,completion)

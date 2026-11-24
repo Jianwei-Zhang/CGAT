@@ -35,7 +35,7 @@ _VALIDATED = {}
 GENERATOR_FILES = ("refinement_delivery.py", "refinement_bundle.py", "refinement_bundle_validate.py",
                    "lgz_app_package.py", "lgz_display_evidence.py", "server_source_identity.py", "delivery_archive.py", "workspace_layout.py",
                    "refinement_path.py", "refinement_sources.py", "post_lgz_degap.py",
-                   "refinement_reports.py", "refinement_tools.py", "run_orchestration.py",
+                   "refinement_reports.py", "render_refinement_report.py", "report_privacy.py", "refinement_tools.py", "run_orchestration.py",
                    "refinement_source_payload.py", "refinement_source_delivery.py", "refinement_source_marks.py")
 VALIDATOR_FILES = ("refinement_bundle_validate.py", "refinement_source_delivery.py", "refinement_source_marks.py",
                    "lgz_core/q0_alignments.py", "lgz_core/q0_sources.py")

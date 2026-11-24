@@ -115,3 +115,18 @@ deterministic external-tool fixtures, cache reuse, partial failures, old-result
 isolation, immutable events, portable regeneration, gap boundaries, PAF union
 coverage and HTML escaping. Existing runner tests cover execution and signal
 handling; prepare shell regressions verify the generated workspace.
+
+## Workspace overview and offline regeneration
+
+`06_report/report.html` follows input → mapping/assignment → q0/donors → LGZ → automatic/manual refinement → result files. The machine contract and offline renderer interfaces are in `../docs/server-report-viewmodel-contract-20261124.md`. New `cgat_server_report_v1` snapshots additionally record `workspace_layout`, `stage_timing_summary` and `delivery_summary` (optional when reading older runs). `package_full` / `package_light` record staged payloads **before** final compression: final archive size and SHA are not known or guessed at this point. The workspace overview is refreshed under lock **after** project Full/Light and any cumulative auto patch commit. The embedded archive `report/` is still just the LGZ report. Failed/interrupted numbered launches can produce a diagnostic overview; preparation alone never creates it.
+
+Use a current Server tools checkout against a completed old workspace. Neither updating that workspace's runtime nor rerunning the pipeline is required:
+
+```sh
+python3 -B /path/to/current/server/tools/regenerate_reports.py \
+  --server-dir /path/to/completed-workspace --out-dir /separate/path/report
+```
+
+Use an absent or empty destination outside the workspace. Open `report/report.html` there. The export includes `overview_view_model.json`, refreshed `01_lgz/` with its stand-alone renderer, available tool reports under `02_refinement/`, existing comparison tables, and `manual/<batch>/` when applicable. It checks report/provenance receipts, reads small catalog and audit data, **does not** open original genome FASTAs, invoke native tools, update a completion, or edit source files. `checksum_source: receipt` means the published SHA was read, not independently recomputed. Workspace pickup paths remain visible text; only copied report pages/files are linked. Original on-disk LGZ events keep complete evidence/usage lists; only the HTML projection is bounded. The manual worker’s legacy Python `report` return value points to a mode-0600 private audit outside `03_report/`; `public_summary` and the HTML link point to the path-free `03_report/summary.json`. Historical preparation source paths remain in private workspace metadata; portable typed-read identities omit private paths.
+
+`--in-place` instead of `--out-dir` obtains the workspace lock and refreshes **only the receipt-bound overview and automatic job index**. Use the detached export for a complete template upgrade: replacing the published tool report pages in place would invalidate tool-publication receipts and already-delivered archives. No mode silently republishes archives or declares prior App imports.

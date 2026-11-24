@@ -123,8 +123,9 @@ class NativeCheckpointTests(unittest.TestCase):
                 self.assertTrue(all(path.read_bytes() == content for path, content in native_files.items()))
                 report = build_tool_report(root, result)
                 html = Path(report["report"]).read_text()
-                self.assertIn("Reused native evidence / 复用原生证据", html)
-                self.assertIn("Origin run / 原始运行", html)
+                self.assertIn('<span class="t-zh">复用原生证据</span><span class="t-en">Reused native evidence</span>', html)
+                self.assertIn('<span class="t-zh">来源 Run</span><span class="t-en">Origin run</span></dt>'
+                              f'<dd><code>{execution["native_origin"]["run_id"]}</code></dd>', html)
                 summary = json.loads((Path(report["directory"]) / "summary.json").read_text())
                 self.assertEqual(summary["execution"]["native_origin"]["run_id"], "1" * 32)
                 assets = {Path(row["workspace_path"]).name: row for row in summary["artifacts"]}

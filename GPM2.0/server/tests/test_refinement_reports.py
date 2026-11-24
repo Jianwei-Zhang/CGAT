@@ -71,15 +71,36 @@ def fixture(root):
 class Links(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.links, self.ids = [], set()
+        self.links, self.ids, self.csp = [], set(), []
+        self._in_script = False
+        self._script_buf = []
+        self.scripts = []
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
         if "href" in values:
             self.links.append(values["href"])
         if "id" in values:
             self.ids.add(values["id"])
+        if tag == "meta" and values.get("http-equiv", "").lower() == "content-security-policy":
+            self.csp.append(values.get("content", ""))
         if tag == "script":
-            raise AssertionError("report must not execute scripts")
+            if "src" in values:
+                raise AssertionError("report must not load external scripts")
+            if values.get("data-cgat-ui") != "1" and values.get("type") != "application/json":
+                raise AssertionError("report must not contain untrusted script tags")
+            self._in_script = True
+            self._script_buf = []
+    def handle_data(self, data):
+        if self._in_script:
+            self._script_buf.append(data)
+    def handle_endtag(self, tag):
+        if tag == "script" and self._in_script:
+            body = "".join(self._script_buf)
+            for forbidden in ("fetch(", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "eval(", "Function(", "http://", "https://"):
+                if forbidden in body:
+                    raise AssertionError(f"report inline script must stay strictly offline: {forbidden}")
+            self.scripts.append(body)
+            self._in_script = False
 
 
 class RefinementReportTests(unittest.TestCase):
@@ -174,10 +195,10 @@ class RefinementReportTests(unittest.TestCase):
             html = (site / "report.html").read_text()
             self.assertIn("Completed (0 accepted changes)", html)
             self.assertIn("LGZ sequence retained", html)
-            self.assertNotIn("Failed / 失败", html)
-            self.assertEqual(html.count("Closed / 已闭合"), 1)
+            self.assertNotIn("tone-err\">", html.split('<section id="counts"')[0])
+            self.assertIn('<span class="t-zh">已闭合</span><span class="t-en">Closed</span>', html)
             diagnostics = (site / "native.html").read_text()
-            self.assertIn("Failed / 失败", diagnostics)
+            self.assertIn('<span class="t-zh">失败</span><span class="t-en">Failed</span>', diagnostics)
             self.assertIn("Missing expected &lt;job output&gt;", diagnostics)
             self.assertNotIn("Missing expected <job output>", diagnostics)
             details = (site / "gaps/000001.html").read_text()
