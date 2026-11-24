@@ -13,7 +13,8 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from functools import cached_property
 from itertools import product
-from typing import Iterable, Mapping
+from time import monotonic
+from typing import Callable, Iterable, Mapping
 
 from .common import reverse_complement, stable_id
 from .q0_alignments import PafAlignment
@@ -331,17 +332,23 @@ class Slice:
 
 
 @dataclass(frozen=True)
-class Path:
+class _ScoredPath:
+    """Internal candidate: ranking and decision history never read the missing intervals."""
     chromosome: str
     nodes: tuple[str, ...]
     joins: tuple[Join, ...]
     slices: tuple[Slice, ...]
     score: tuple[int, ...]
-    missing: tuple[tuple[SourceKey, tuple[Interval, ...]], ...]
 
     @property
     def path_id(self):
         return stable_id("q0-path", [self.chromosome, list(self.nodes), [join.join_id for join in self.joins]])
+
+
+@dataclass(frozen=True)
+class Path(_ScoredPath):
+    # Public paths always carry the complete inventory, including sources with no missing bases.
+    missing: tuple[tuple[SourceKey, tuple[Interval, ...]], ...]
 
 
 @dataclass
@@ -511,7 +518,7 @@ class PathGraph:
                     original.adjacency_id if original else None, original.source if original else None,
                     original.gap_interval if original else None)
 
-    def materialize(self, nodes: tuple[str, ...], joins: tuple[Join, ...]) -> Path | None:
+    def _score_candidate(self, nodes: tuple[str, ...], joins: tuple[Join, ...]) -> _ScoredPath | None:
         if (not nodes or len(joins) != len(nodes) - 1 or len(set(nodes)) != len(nodes)
                 or not any(self.placements[node].seed_eligible for node in nodes)):
             return None
@@ -532,19 +539,30 @@ class PathGraph:
                 return None
             used[placement.source].append(interval)
             slices.append(Slice(node, placement.source, interval, placement.orientation))
-        represented, duplicate, missing = self.coverage.assess((s.source, s.interval) for s in slices)
-        if duplicate:
+        represented = self.coverage.unique_selected_bp((s.source, s.interval) for s in slices)
+        if represented is None:
             return None
         switches = sum(a.source != b.source for a, b in zip(slices, slices[1:]))
         score = (represented, -sum(j.kind == "reference_unknown" for j in joins),
                  -sum(j.n_bp > 0 for j in joins), -switches, -len(slices), max(s.interval.length for s in slices))
-        return Path(self.chromosome, nodes, joins, tuple(slices), score, missing)
+        return _ScoredPath(self.chromosome, nodes, joins, tuple(slices), score)
+
+    def _with_missing(self, candidate: _ScoredPath) -> Path:
+        represented, duplicate, missing = self.coverage.assess((s.source, s.interval) for s in candidate.slices)
+        if duplicate or represented != candidate.score[0]:
+            raise Q0EvidenceError("retained q0 path score differs from full coverage assessment")
+        return Path(candidate.chromosome, candidate.nodes, candidate.joins, candidate.slices, candidate.score, missing)
+
+    def materialize(self, nodes: tuple[str, ...], joins: tuple[Join, ...]) -> Path | None:
+        """Direct callers request a complete Path rather than a search candidate."""
+        candidate = self._score_candidate(nodes, joins)
+        return self._with_missing(candidate) if candidate is not None else None
 
     def source_rank(self, node: str):
         p = self.placements[node]
         return (p.source.dataset, p.source.contig, p.interval.start, p.interval.end, p.orientation, p.chromosome)
 
-    def rank(self, path: Path):
+    def rank(self, path: _ScoredPath):
         # Provenance IDs include PAF record identity and can change with row
         # ordering. They must not choose the source or clipping geometry.
         return (tuple(-value for value in path.score), tuple(self.source_rank(node) for node in path.nodes),
@@ -552,13 +570,14 @@ class PathGraph:
                 path.nodes, tuple(j.join_id for j in path.joins))
 
 
-def search_paths(graph: PathGraph) -> SearchResult:
+def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = None) -> SearchResult:
     """Length-first seed, then reversible local beam search with explicit limits.
 
     Coverage is source bookkeeping under nonambiguous paired-base equivalence,
     not a vote across datasets. Unrepresented source intervals stay visible.
     A reference hull alone never discharges another source's contribution.
     """
+    started = monotonic()
     policy = graph.policy
     ordered = sorted(graph.placements, key=lambda key: (-graph.placements[key].interval.length, graph.source_rank(key), key))
     evaluations, seen, decisions = 0, set(), []
@@ -584,13 +603,15 @@ def search_paths(graph: PathGraph) -> SearchResult:
                     stopped.add("maximum_evaluations")
                     break
                 evaluations += 1
-            path = graph.materialize(nodes, joins)
+            path = graph._score_candidate(nodes, joins)
             if path is not None:
                 paths.append(path)
         return paths
 
     seeds = [node for node in ordered if graph.placements[node].seed_eligible]
     if not seeds:
+        if progress:
+            progress("no admitted seed; evaluations=0 detailed_paths=0")
         return SearchResult(None, (), [], {"policy": asdict(policy), "evaluations": 0,
                                           "stop_reasons": ["no_admitted_placements"], "global_optimality_claimed": False})
     seed = evaluate((seeds[0],))[0]
@@ -641,6 +662,7 @@ def search_paths(graph: PathGraph) -> SearchResult:
     beam_pruning = []
     if len(observed) > len(beam):
         beam_pruning.append({"phase": "seeds", "omitted": len(observed) - len(beam)})
+    del observed  # discarded seed candidates do not take part in local search
     best = beam[0]
     if best.path_id != initial.path_id:
         decisions.append(_decision("alternative_seed", initial, best, None))
@@ -691,16 +713,27 @@ def search_paths(graph: PathGraph) -> SearchResult:
         beam = next_beam
     else:
         stopped.add("maximum_rounds")
-    selected = set(best.nodes)
+    # Only paths that escape the search need detail. Preserve the original winner
+    # even when a score tie puts a different path first in the final beam.
+    ranked_at = monotonic()
+    if progress:
+        progress(f"ranking complete: evaluations={evaluations} local_rounds={rounds} search_s={ranked_at-started:.2f}")
+    winner = graph._with_missing(best)
+    winner_id = winner.path_id
+    alternatives = tuple(graph._with_missing(p) for p in beam if p.path_id != winner_id)
+    if progress:
+        progress(f"coverage detail complete: paths={1+len(alternatives)} detail_s={monotonic()-ranked_at:.2f}")
+    selected = set(winner.nodes)
+    missing_by_source = dict(winner.missing)
     for node in ordered:
         if node not in selected:
             p = graph.placements[node]
-            remaining = next(intervals for source, intervals in best.missing if source == p.source)
+            remaining = missing_by_source[p.source]
             uncovered = [overlap for interval in remaining if (overlap := interval.intersection(p.interval))]
             decisions.append({"operation": "not_selected", "placement_id": node,
                               "reason": "represented_by_selected_sources" if not uncovered else "unresolved_or_search_limited",
                               "unrepresented_intervals": [asdict(i) for i in uncovered]})
-    return SearchResult(best, tuple(p for p in beam if p.path_id != best.path_id), decisions,
+    return SearchResult(winner, alternatives, decisions,
                         {"policy": asdict(policy), "evaluations": evaluations, "rounds": rounds,
                          "initial_path_id": initial.path_id, "initial_score": list(initial.score),
                          "stop_reasons": sorted(stopped), "edge_pruning": graph.edge_pruning, "beam_pruning": beam_pruning,
@@ -710,7 +743,7 @@ def search_paths(graph: PathGraph) -> SearchResult:
                          "global_optimality_claimed": False})
 
 
-def _decision(operation: str, old: Path, new: Path, candidate: str | None) -> dict:
+def _decision(operation: str, old: _ScoredPath, new: _ScoredPath, candidate: str | None) -> dict:
     old_gaps = {j.join_id for j in old.joins if j.n_bp}
     new_ids = set(new.nodes) - set(old.nodes)
     bridge = any(new.joins[i - 1].kind == new.joins[i].kind == "sequence_overlap"

@@ -162,14 +162,17 @@ class CoverageModel:
         for i in range(first, stop):
             yield indices[i]
 
-    def assess(self, selected: Iterable[tuple[SourceKey, Interval]]):
+    def _project_selected(self, selected: Iterable[tuple[SourceKey, Interval]]):
+        """Validate every slice and project it onto the same oriented units for both callers."""
         if self.ambiguous_evidence_ids:
             raise Q0EvidenceError("ambiguous homology must be removed before q0 path scoring")
         covered = defaultdict(list)
         duplicate = False
+        selected_bp = 0
         for source, interval in selected:
             if source not in self.required or not any(i.contains(interval) for i in self.required[source]):
                 raise Q0EvidenceError("selected interval escapes q0 coverage requirements")
+            selected_bp += interval.length
             for index in self._overlapping_atoms(source, interval):
                 atom = self.atoms[index][1]
                 overlap = atom.intersection(interval)
@@ -178,6 +181,21 @@ class CoverageModel:
                          Interval(overlap.start - atom.start, overlap.end - atom.start))
                 duplicate |= any(local.intersection(previous) is not None for previous in covered[root])
                 covered[root].append(local)
+        return covered, duplicate, selected_bp
+
+    def unique_selected_bp(self, selected: Iterable[tuple[SourceKey, Interval]]) -> int | None:
+        """Exact candidate score, or None if any represented base occurs twice.
+
+        The atoms partition each required interval. Mapping to a unit (including a
+        reversed unit) preserves length. After the overlap check, the union of disjoint
+        projected slices therefore has exactly their summed input length. No missing
+        inventory, or walk over the chromosome's unselected atoms, is needed to rank it.
+        """
+        _, duplicate, selected_bp = self._project_selected(selected)
+        return None if duplicate else selected_bp
+
+    def assess(self, selected: Iterable[tuple[SourceKey, Interval]]):
+        covered, duplicate, _ = self._project_selected(selected)
         covered = {key: value if len(value) == 1 else merged_intervals(value)
                    for key, value in covered.items()}
         represented = sum(i.length for intervals in covered.values() for i in intervals)

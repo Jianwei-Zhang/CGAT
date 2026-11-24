@@ -922,10 +922,18 @@ def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = 
         groups[placement.chromosome].append(placement)
     searches, occupied = {}, defaultdict(list)
     progress(f"building chromosome paths · placements={len(admission.placements)}")
+    index_started = monotonic()
     graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
+    progress(f"chromosome path link index ready: index_s={monotonic()-index_started:.2f}")
     for index, chromosome in enumerate(sorted(data.reference_lengths), 1):
         progress(f"chromosome path {index}/{len(data.reference_lengths)}: {chromosome}")
-        search = search_paths(PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy))
+        started = monotonic()
+        graph = PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy)
+        progress(f"chromosome {chromosome} graph ready: placements={len(graph.placements)} "
+                 f"coverage_atoms={len(graph.coverage.atoms)} graph_s={monotonic()-started:.2f}")
+        report = None if progress is _quiet else lambda message: progress(f"chromosome {chromosome} {message}")
+        search = search_paths(graph, progress=report)
+        del graph  # do not keep the previous chromosome graph while building the next
         searches[chromosome] = search
         if search.path is None:
             continue
