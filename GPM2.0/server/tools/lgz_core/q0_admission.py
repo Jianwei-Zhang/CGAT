@@ -23,8 +23,8 @@ from .common import read_fasta, sha256_file, stable_id
 from .q0_alignments import PafAlignment, read_paf
 from .q0_catalog import evidence_ref
 from .q0_reference_competition import reference_masks
-from .q0_paths import (PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor,
-                       SearchResult, qualify_pair_blocks, reconstruct, search_paths)
+from .q0_paths import (PairLink, PathGraph, PathPolicy, Placement, ReferenceAnchor, RequestPathResult,
+                       SearchResult, qualify_pair_blocks, reconstruct, search_paths, search_request_path)
 from .q0_preparation import artifact_path, json_file, load_verified_evidence, table
 from .q0_sources import (Interval, OriginalAdjacency, Q0EvidenceError, SourceKey, SourceSegment,
                          merged_intervals, split_source, subtract_intervals)
@@ -81,6 +81,17 @@ class PathSelection:
     admission: Admission
     paths: dict[str, SearchResult]
     occupied: dict[SourceKey, list[Interval]]
+
+
+@dataclass
+class RequestAdmission:
+    placements: tuple[Placement, ...]
+
+
+@dataclass
+class FirstRequestSelection:
+    admission: RequestAdmission
+    paths: dict[str, RequestPathResult]
 
 
 @dataclass
@@ -349,6 +360,12 @@ def _reference_screen(data, part, policy):
     groups, high, ambiguity = _reference_groups(data, part, policy, evidence_ids=evidence_ids)
     evidence_ids.sort()  # Same report order and multiplicity for serial and worker results.
     return groups, high, ambiguity, evidence_ids
+
+
+def _request_reference_screen(data, part, policy):
+    # Keep every ID attached to an actual anchor. Only the report-only list of
+    # all intersecting hits (including rejected hits) is not built or sorted.
+    return (*_reference_groups(data, part, policy), ())
 
 
 def _ordered(anchors, orientation):
@@ -621,30 +638,33 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
         return _admit_placements(data, policy, path_policy, quality_pass, screen_threads, screen_progress, phases)
 
 
-def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, screen_progress, phases):
+def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, screen_progress, phases, *, first_request=False):
     if quality_pass is not None and (set(quality_pass) != set(data.sources) or any(type(v) is not bool for v in quality_pass.values())):
         raise Q0EvidenceError("q0 QC decisions must explicitly cover every source")
     records, accepted = [], {}
     groups, ambiguous = {}, defaultdict(list)
     allowed = {key for key in data.parts if quality_pass is None or quality_pass[data.parts[key].source]}
     ordered = sorted(data.parts.items())
+    screen = _request_reference_screen if first_request else _reference_screen
     if screen_threads > 1:
         from .q0_source_screen import ordered_screens
-        screened = ordered_screens(data, ordered, allowed, policy, screen_threads, _reference_screen, screen_progress)
+        screened = ordered_screens(data, ordered, allowed, policy, screen_threads, screen, screen_progress)
     else:
-        screened = ((key, part, _reference_screen(data, part, policy) if key in allowed else None)
+        screened = ((key, part, screen(data, part, policy) if key in allowed else None)
                     for key, part in ordered)
     for key, part, result in screened:
         if key not in allowed:
-            records.append({"segment_id": key, "status": "rejected", "reason": "failed_reads_qc"})
+            if not first_request:
+                records.append({"segment_id": key, "status": "rejected", "reason": "failed_reads_qc"})
             continue
         groups[key], high, mask, evidence_ids = result
         ambiguous[part.source].extend(mask)
-        records.append({"segment_id": key, "status": "reference_screen",
-                        "evidence_ids": evidence_ids,
-                        "unique_groups": [{"chromosome": group[0], "orientation": group[1],
-                                           "support_bp": _size(a.source for a in anchors)} for group, anchors in sorted(groups[key].items())],
-                        "ambiguous_intervals": [asdict(i) for i in mask]})
+        if not first_request:
+            records.append({"segment_id": key, "status": "reference_screen",
+                            "evidence_ids": evidence_ids,
+                            "unique_groups": [{"chromosome": group[0], "orientation": group[1],
+                                               "support_bp": _size(a.source for a in anchors)} for group, anchors in sorted(groups[key].items())],
+                            "ambiguous_intervals": [asdict(i) for i in mask]})
         if len(groups[key]) == 1 and high and all(_ordered(anchors, group[1]) for group, anchors in groups[key].items()):
             (chromosome, strand), anchors = next(iter(groups[key].items()))
             support = merged_intervals(a.source for a in anchors)
@@ -652,10 +672,17 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
             placement = _placement(part, chromosome, strand, interval, support, anchors,
                                    (a.evidence_id for a in anchors), kind="reference")
             accepted[placement.placement_id] = placement
-            records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted",
-                            "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
-                            "qc": "not_measured" if quality_pass is None else "passed"})
+            if not first_request:
+                records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted",
+                                "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
+                                "qc": "not_measured" if quality_pass is None else "passed"})
     del screened, ordered
+    if first_request and not accepted:
+        # Pair propagation, tail splits and original-gap neighbors can inherit
+        # a reference root, never create one. initial_generation still rejects
+        # a draft with no trustworthy path; this is not a successful empty Q0.
+        screen_progress("request admission: no reference seed; skipping pair and adjacency expansion")
+        return RequestAdmission(())
     phases.start(f"index pair evidence (links={len(data.pair_links)})")
     ambiguous = {key: merged_intervals(value) for key, value in ambiguous.items()}
     pair_neighbors = _pair_neighbors(data.pair_links)
@@ -668,11 +695,20 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
     # selection, not a claim that the input assembler made a biological error.
     reference_seeds = tuple(accepted.values())
     seed_neighbors = _PlacementNeighbors(reference_seeds, pair_neighbors)
+    no_tail_room = continuity_stops = 0
     for current in phases.items("check cross-chromosome seed tails", reference_seeds):
         part = data.parts[current.segment_id]
         if current.interval != part.interval:
             continue
         main_anchors = merged_intervals(a.source for a in current.reference_blocks)
+        main_interval = Interval(main_anchors[0].start, main_anchors[-1].end)
+        # To replace this seed, the ordinary selector requires a disjoint
+        # alternative hull with at least minimum_anchor_bp of clean support.
+        # Interior holes in the main hull cannot qualify; equality still can.
+        if first_request and max(main_interval.start - part.interval.start,
+                                 part.interval.end - main_interval.end) < policy.minimum_anchor_bp:
+            no_tail_room += 1
+            continue
         alternatives = defaultdict(lambda: {"intervals": [], "ids": set(), "parents": set()})
         linked_seeds = seed_neighbors.for_source(current.source)
         for anchor, links in linked_seeds:
@@ -717,33 +753,44 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
                                       for b in value["intervals"] if (overlap := a.intersection(b)))
                 if min(left_support, right_support) >= policy.minimum_anchor_bp:
                     continuity_ids.add(eid)
+                    if first_request:
+                        break
+            if first_request and continuity_ids:
+                continuity_stops += 1
+                break  # keep the seed; extra same-decision witnesses only populate the full report
         if continuity_ids:
-            records.append({"placement_id": current.placement_id, "status": "retained",
-                            "reason": "cross_chr_tail_continuity_supported", "evidence_ids": sorted(continuity_ids),
-                            "competing_evidence_ids": sorted({eid for value in alternatives.values() for eid in value["ids"]})})
+            if not first_request:
+                records.append({"placement_id": current.placement_id, "status": "retained",
+                                "reason": "cross_chr_tail_continuity_supported", "evidence_ids": sorted(continuity_ids),
+                                "competing_evidence_ids": sorted({eid for value in alternatives.values() for eid in value["ids"]})})
             continue
-        main_interval = _hull(main_anchors)
         bounds = [_hull(value["intervals"]) for value in alternatives.values()]
         if any(main_interval.intersection(i) for i in bounds) or any(a.intersection(b) for n, a in enumerate(bounds) for b in bounds[n+1:]):
-            records.append({"placement_id": current.placement_id, "status": "unresolved",
-                            "reason": "overlapping_structural_selection_bounds",
-                            "evidence_ids": sorted({eid for value in alternatives.values() for eid in value["ids"]})})
+            if not first_request:
+                records.append({"placement_id": current.placement_id, "status": "unresolved",
+                                "reason": "overlapping_structural_selection_bounds",
+                                "evidence_ids": sorted({eid for value in alternatives.values() for eid in value["ids"]})})
             continue
         accepted.pop(current.placement_id)
-        records.append({"placement_id": current.placement_id, "placement": asdict(current), "status": "superseded",
-                        "reason": "independently_anchored_cross_chr_tail"})
+        if not first_request:
+            records.append({"placement_id": current.placement_id, "placement": asdict(current), "status": "superseded",
+                            "reason": "independently_anchored_cross_chr_tail"})
         main = _placement(part, current.chromosome, current.orientation, main_interval, main_anchors,
                           current.reference_blocks, current.evidence_ids, kind="reference")
         accepted[main.placement_id] = main
-        records.append({"placement_id": main.placement_id, "segment_id": part.segment_id, "status": "accepted",
-                        "reason": "supported_local_interval", "replaces_placement_id": current.placement_id})
+        if not first_request:
+            records.append({"placement_id": main.placement_id, "segment_id": part.segment_id, "status": "accepted",
+                            "reason": "supported_local_interval", "replaces_placement_id": current.placement_id})
         for (chromosome, strand), value in sorted(alternatives.items()):
             interval = _hull(value["intervals"])
             local = _placement(part, chromosome, strand, interval, value["intervals"], (), value["ids"], kind="pairwise")
             accepted[local.placement_id] = local
-            records.append({"placement_id": local.placement_id, "segment_id": part.segment_id, "status": "accepted",
-                            "reason": "independently_anchored_cross_chr_tail", "anchor_placement_ids": sorted(value["parents"])})
+            if not first_request:
+                records.append({"placement_id": local.placement_id, "segment_id": part.segment_id, "status": "accepted",
+                                "reason": "independently_anchored_cross_chr_tail", "anchor_placement_ids": sorted(value["parents"])})
 
+    if first_request:
+        screen_progress(f"request tail decisions: no_disjoint_tail_room={no_tail_room} first_continuity_witness={continuity_stops}")
     rooted_context = _RootedContext(lambda source, _span: data.sources[source], ambiguous, policy)
 
     # Anchors are immutable until the extension phase below. Accumulate each
@@ -794,8 +841,9 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
             bounds = {group: _hull(a.source for a in value["refs"]) if value["refs"] else _hull(value["intervals"])
                       for group, value in alternatives.items()}
             if any(bounds[a].intersection(bounds[b]) for i, a in enumerate(bounds) for b in list(bounds)[i+1:]):
-                records.append({"segment_id": key, "status": "unresolved", "reason": "competing_pairwise_loci", "round": round_number,
-                                "evidence_ids": sorted({eid for value in alternatives.values() for eid in value["ids"]})})
+                if not first_request:
+                    records.append({"segment_id": key, "status": "unresolved", "reason": "competing_pairwise_loci", "round": round_number,
+                                    "evidence_ids": sorted({eid for value in alternatives.values() for eid in value["ids"]})})
                 continue
             for (chromosome, strand), value in sorted(alternatives.items()):
                 support = value["intervals"]
@@ -808,16 +856,18 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
                     if overlap:
                         refs.append(ReferenceAnchor(overlap, _project(a.source, a.reference, strand, overlap), a.evidence_id))
                 if not _ordered(refs, strand):
-                    records.append({"segment_id": key, "status": "unresolved", "reason": "noncollinear_reference_anchors",
-                                    "evidence_ids": sorted(value["ids"])})
+                    if not first_request:
+                        records.append({"segment_id": key, "status": "unresolved", "reason": "noncollinear_reference_anchors",
+                                        "evidence_ids": sorted(value["ids"])})
                     continue
                 placement = _placement(part, chromosome, strand, interval, merged_intervals((*support, *(a.source for a in refs))), refs,
                                        value["ids"] | {a.evidence_id for a in refs}, kind="pairwise")
                 accepted[placement.placement_id] = placement
-                records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted",
-                                "reason": "supported_local_interval" if partial else "pairwise_reference_anchoring",
-                                "anchor_placement_ids": sorted(value["parents"]), "round": round_number,
-                                "qc": "not_measured" if quality_pass is None else "passed"})
+                if not first_request:
+                    records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted",
+                                    "reason": "supported_local_interval" if partial else "pairwise_reference_anchoring",
+                                    "anchor_placement_ids": sorted(value["parents"]), "round": round_number,
+                                    "qc": "not_measured" if quality_pass is None else "passed"})
                 next_frontier.append(placement)
                 unplaced.discard(key)
             if key not in unplaced:
@@ -852,8 +902,9 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
         p = accepted[key]
         accepted[key] = replace(p, anchor_intervals=merged_intervals((*p.anchor_intervals, *intervals)),
                                 evidence_ids=tuple(sorted(set(p.evidence_ids) | addition_ids[key])))
-        records.append({"placement_id": key, "status": "anchor_extension", "reason": "localized_pairwise_sequence_context",
-                        "evidence_ids": sorted(addition_ids[key])})
+        if not first_request:
+            records.append({"placement_id": key, "status": "anchor_extension", "reason": "localized_pairwise_sequence_context",
+                            "evidence_ids": sorted(addition_ids[key])})
 
     # Original assembly N adjacency is a soft relation, not a new independent
     # sequence anchor. Unaligned neighbors can only survive attached to a seed.
@@ -873,25 +924,30 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, s
             identities = {(p.chromosome, p.orientation) for p, _ in contexts}
             if (len(identities) != 1 or any(group not in identities for group in groups.get(key, {}))
                     or any(not _ordered(anchors, group[1]) for group, anchors in groups.get(key, {}).items())):
-                records.append({"segment_id": key, "status": "unresolved", "reason": "input_adjacency_conflict"})
+                if not first_request:
+                    records.append({"segment_id": key, "status": "unresolved", "reason": "input_adjacency_conflict"})
                 continue
             chromosome, strand = next(iter(identities))
             part = data.parts[key]
             ids = {edge.adjacency_id for _, edge in contexts} | {eid for p, _ in contexts for eid in p.evidence_ids}
             placement = _placement(part, chromosome, strand, part.interval, (), (), ids, kind="input_adjacency", seed=False)
             accepted[placement.placement_id] = placement
-            records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted_soft_neighbor",
-                            "reason": "input_assembly_adjacency", "anchor_placement_ids": sorted(p.placement_id for p, _ in contexts)})
+            if not first_request:
+                records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted_soft_neighbor",
+                                "reason": "input_assembly_adjacency", "anchor_placement_ids": sorted(p.placement_id for p, _ in contexts)})
             added += 1
         if not added:
             break
-    placed = {p.segment_id for p in accepted.values()}
+    placements = tuple(sorted(accepted.values(), key=lambda p: p.placement_id))
+    if first_request:
+        return RequestAdmission(placements)
+    placed = {p.segment_id for p in placements}
     for key in phases.items("record unresolved segments", sorted(allowed - placed)):
         records.append({"segment_id": key, "status": "unresolved",
                         "reason": ("structural_ref_conflict" if len(groups.get(key, {})) > 1 else
                                    "noncollinear_reference_anchors" if any(not _ordered(a, g[1]) for g, a in groups.get(key, {}).items()) else
                                    "no_sufficient_localization_evidence")})
-    return Admission(tuple(sorted(accepted.values(), key=lambda p: p.placement_id)), records,
+    return Admission(placements, records,
                      tuple(sorted(set(data.parts) - placed)), ambiguous, policy)
 
 
@@ -914,26 +970,52 @@ def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = 
                     path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
                     progress: Callable[[str], None] = _quiet, screen_threads: int = 1) -> PathSelection:
     """Select and check source geometry without reconstructing sequences or building a report."""
+    return _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, first_request=False)
+
+
+def select_request_paths(data: EvidenceInput, *, progress: Callable[[str], None] = _quiet,
+                         screen_threads: int = 1) -> FirstRequestSelection:
+    """Initial threshold routing only; never publish this selection as ordinary Q0."""
+    return _select_paths(data, AdmissionPolicy(), PathPolicy(), None, progress, screen_threads, first_request=True)
+
+
+def _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, *, first_request):
     progress(f"placing candidate segments · pair links={len(data.pair_links)}")
-    admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass,
-                                 screen_threads=screen_threads, screen_progress=progress)
+    if first_request:
+        with _PlacementProgress(progress) as phases:
+            admission = _admit_placements(data, admission_policy, path_policy, quality_pass, screen_threads, progress,
+                                          phases, first_request=True)
+    else:
+        admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass,
+                                     screen_threads=screen_threads, screen_progress=progress)
     groups = defaultdict(list)
     for placement in admission.placements:
         groups[placement.chromosome].append(placement)
     searches, occupied = {}, defaultdict(list)
     progress(f"building chromosome paths · placements={len(admission.placements)}")
     index_started = monotonic()
-    graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
+    if first_request:
+        # Admission is already global and complete. Pairwise or adjacency-only
+        # neighbors cannot start a path. Keep them all in any group WITH a seed.
+        seeded = {p.chromosome for p in admission.placements if p.seed_eligible}
+        graph_links = (_links_for_path_graphs((p for p in admission.placements if p.chromosome in seeded), data.pair_links)
+                       if seeded else {})
+    else:
+        graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
     progress(f"chromosome path link index ready: index_s={monotonic()-index_started:.2f}")
     for index, chromosome in enumerate(sorted(data.reference_lengths), 1):
         progress(f"chromosome path {index}/{len(data.reference_lengths)}: {chromosome}")
+        if first_request and chromosome not in seeded:
+            searches[chromosome] = RequestPathResult(None)
+            progress(f"chromosome {chromosome}: no admitted seed; request graph not built")
+            continue
         started = monotonic()
         report = None if progress is _quiet else lambda message: progress(f"chromosome {chromosome} {message}")
         graph = PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy,
-                          progress=report)
+                          progress=report, first_request=first_request)
         progress(f"chromosome {chromosome} graph ready: placements={len(graph.placements)} "
                  f"coverage_atoms={len(graph.coverage.atoms)} graph_s={monotonic()-started:.2f}")
-        search = search_paths(graph, progress=report)
+        search = search_request_path(graph, progress=report) if first_request else search_paths(graph, progress=report)
         del graph  # do not keep the previous chromosome graph while building the next
         searches[chromosome] = search
         if search.path is None:
@@ -949,7 +1031,7 @@ def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = 
                 if any(join.gap_interval.intersection(previous) for previous in occupied[join.gap_source]):
                     raise Q0EvidenceError("original N source interval selected more than once")
                 occupied[join.gap_source].append(join.gap_interval)
-    return PathSelection(admission, searches, occupied)
+    return FirstRequestSelection(admission, searches) if first_request else PathSelection(admission, searches, occupied)
 
 
 def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),

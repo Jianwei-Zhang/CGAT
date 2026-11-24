@@ -67,22 +67,27 @@ def _affine_key(row):
 
 
 def _compact_maps(maps):
-    """Union only touching/overlapping domains of precisely the same isometry."""
-    for (left, right, reverse, offset), group in groupby(
-            sorted(maps, key=lambda r: (_affine_key(r), r.left)), key=_affine_key):
-        def span(a, b):
-            dest = Interval(offset - b, offset - a) if reverse else Interval(offset + a, offset + b)
-            return _CoordinateMap(left, Interval(a, b), right, dest, reverse)
-
-        first = next(group).left
-        a, b = first.start, first.end
-        for row in group:
-            if row.left.start > b:  # a gap of even one base must survive
-                yield span(a, b)
-                a, b = row.left.start, row.left.end
-            else:
-                b = max(b, row.left.end)
-        yield span(a, b)
+    """Input is sorted by (left_source, left interval, ...). No second sort or copy on a miss."""
+    out = None
+    for _, group in groupby(enumerate(maps), key=lambda item: item[1].left_source):
+        last = {}  # most recent disjoint run of each isometry on this source
+        for i, row in group:
+            key = _affine_key(row)
+            slot = last.get(key)
+            if slot is not None:
+                prev = (maps if out is None else out)[slot]
+                if row.left.start <= prev.left.end:
+                    if out is None:
+                        out = list(maps[:i])
+                    if row.left.end > prev.left.end:
+                        dest = Interval(min(prev.right.start, row.right.start), max(prev.right.end, row.right.end))
+                        out[slot] = _CoordinateMap(row.left_source, Interval(prev.left.start, row.left.end),
+                                                   row.right_source, dest, row.reverse)
+                    continue
+            last[key] = i if out is None else len(out)
+            if out is not None:
+                out.append(row)
+    return maps if out is None else tuple(out)
 
 
 class _BoundaryLimit(Q0EvidenceError):
@@ -157,7 +162,18 @@ def _close_cuts(required, maps, limit, *, fewer_seeds_than=None):
     return points, count
 
 
-def _partition(required, maps, limit, progress):
+def _partition(required, maps, limit, progress, compact_first):
+    if compact_first:
+        compact = _compact_maps(maps)
+        if progress:
+            progress(f"request coverage: exact maps={len(maps)}->{len(compact)} before cut propagation")
+        # Only representation changes. Every raw evidence span is still used
+        # for ambiguity attribution; all required endpoints and the cap remain.
+        try:
+            points, count = _close_cuts(required, compact, limit)
+        except _BoundaryLimit as exc:
+            raise Q0EvidenceError(f"{exc}; exact request geometry exceeds budget") from None
+        return compact, points, count
     try:
         points, count = _close_cuts(required, maps, limit)
         return maps, points, count
@@ -166,8 +182,10 @@ def _partition(required, maps, limit, progress):
     # Outside the handler: do not retain the overflowing partition/traceback.
     if progress:
         progress(f"coverage: {original}; checking for redundant collinear cuts")
-    compact = tuple(_compact_maps(maps))
+    compact = _compact_maps(maps)
     if len(compact) < len(maps):
+        # Retain the published fallback's original map traversal order.
+        compact = tuple(sorted(compact, key=lambda r: (_affine_key(r), r.left)))
         try:
             partition = _close_cuts(required, compact, limit, fewer_seeds_than=seeds)
         except _BoundaryLimit as exc:
@@ -183,7 +201,8 @@ def _partition(required, maps, limit, progress):
 
 class CoverageModel:
     def __init__(self, required: Mapping[SourceKey, Iterable[Interval]], relations: Iterable[Equivalence],
-                 *, maximum_boundaries: int = 200000, progress: Callable[[str], None] | None = None):
+                 *, maximum_boundaries: int = 200000, progress: Callable[[str], None] | None = None,
+                 compact_first: bool = False):
         started = monotonic() if progress else 0.0
         self.required = {key: merged_intervals(value) for key, value in required.items()}
         geometry = attrgetter("left_source", "left", "right_source", "right", "reverse")
@@ -191,7 +210,7 @@ class CoverageModel:
         # Duplicate geometric maps need only one propagation/union, regardless
         # of how many distinct evidence records support the same bases.
         maps = tuple(next(group) for _, group in groupby(relations, key=geometry))
-        maps, points, count = _partition(self.required, maps, maximum_boundaries, progress)
+        maps, points, count = _partition(self.required, maps, maximum_boundaries, progress, compact_first)
         if progress:
             closed_at = monotonic()
             progress(f"coverage partition ready: evidence_spans={len(relations)} maps={len(maps)} "

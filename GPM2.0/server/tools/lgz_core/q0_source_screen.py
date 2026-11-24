@@ -91,18 +91,17 @@ def _packet(data, part, policy):
     return _pack((part, dna, hits, policy))
 
 
-def _run(payload):
-    from .q0_admission import _reference_screen
+def _run(payload, screen):
     try:
         part, sequence, hits, policy = pickle.loads(payload)
         view = SimpleNamespace(sources={part.source: sequence}, reference_hits={part.source: hits})
-        return _pack(_reference_screen(view, part, policy))
+        return _pack(screen(view, part, policy))
     except MemoryError:
         return None  # exact owner evaluation; never translate resource limits into a verdict
 
 
 def ordered_screens(data, ordered, allowed, policy, threads, screen, log):
-    """Always yield in segment order. Only process-private, bounded bytes cross spawn."""
+    """Use the same module-level screen in each lane; bound all segment data crossing spawn."""
     lanes = _lanes(data, ordered, allowed, threads)
     log(f"reference screen: parts={len(ordered)} cpu_budget={threads} lanes={lanes}")
     pool = None; workers_done = 0; lo = 0; reported = monotonic()
@@ -127,7 +126,7 @@ def ordered_screens(data, ordered, allowed, policy, threads, screen, log):
                 if payload is None:
                     continue
                 try:
-                    futures[i] = pool.submit(_run, payload)
+                    futures[i] = pool.submit(_run, payload, screen)
                 except (BrokenProcessPool, OSError, MemoryError):
                     usable = False
                 del payload

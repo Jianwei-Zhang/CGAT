@@ -10,6 +10,8 @@ Once existing evidence meets the threshold for **this source interval and this d
 
 For example, if a selected placement has sufficient support at both ends, a secondary assignment alone must not put that interval back on the request list. A weak adjacent junction is a separate decision: request its unsupported ends, not the whole contig. Evidence sufficient to **leave a gap** does not authorize closing it. Keep checks that can actually invalidate a proposed result, such as counting the same source bases twice or cutting outside the paired alignment. Stopping the search is not a claim that competitors do not exist.
 
+The first request uses the ordinary ranking rules but consumes only each winning path's slices and joins. It does not build missing-base inventories for alternatives or a report of rejected placements. A reference seed is not split just because a rival exists: if neither outer flank can fit the minimum disjoint tail, no tail search is needed. If a tail could qualify, one eligible chain proving continuity is enough to retain the seed. Before propagating coordinate cuts the draft coalesces only touching or overlapping spans of the same source pair, orientation and offset. The boundary cap, original evidence IDs and source-occupancy checks still apply. Preparation and publication use a separate, full selection; a first-request object is not acceptable as a final record.
+
 ## Supplementary scopes
 
 - **`base_only`**: no supplementary planner ran. The normal consumer must regenerate an empty request from the selected evidence. An empty omission list is not evidence of a full search.

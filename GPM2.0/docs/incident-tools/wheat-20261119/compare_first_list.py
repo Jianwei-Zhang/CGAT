@@ -16,16 +16,27 @@ def digest(value):
 
 def run(panel, pin):
     selected = []
-    selector = q0_admission.select_q0_paths
+    hook = 'select_request_paths' if hasattr(q0_admission, 'select_request_paths') else 'select_q0_paths'
+    selector = getattr(q0_admission, hook)
 
-    def capture(*args, **kwargs):
-        selection = selector(*args, **kwargs)
-        selected.append(selection)
+    def capture(data, **kwargs):
+        selection = selector(data, **kwargs)
+        selected.append((data, selection))
         return selection
 
-    with patch.object(q0_admission, "select_q0_paths", capture):
+    with patch.object(q0_admission, hook, capture):
         row = arm(panel, pin)
-    selection, = selected
+    (data, selection), = selected
+    if hook == 'select_request_paths':
+        # Do not time a report the production first-request consumer no longer
+        # asks for. Still compare actual winners before digesting the full record.
+        full = q0_admission.select_q0_paths(data)
+        def winners(result):
+            return {c: None if (p := r.path) is None else (p.nodes, p.joins, p.slices, p.score)
+                    for c, r in result.paths.items()}
+        if selection.admission.placements != full.admission.placements or winners(selection) != winners(full):
+            raise ValueError('request-only placement or winning path differs from complete selection')
+        selection = full
     a = selection.admission
     def intervals(by_source):
         return [(asdict(k), [asdict(i) for i in v]) for k, v in sorted(by_source.items())]

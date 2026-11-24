@@ -351,6 +351,12 @@ class Path(_ScoredPath):
     missing: tuple[tuple[SourceKey, tuple[Interval, ...]], ...]
 
 
+@dataclass(frozen=True)
+class RequestPathResult:
+    """The scored winner only. Deliberately has no publishable record or missing inventory."""
+    path: _ScoredPath | None
+
+
 @dataclass
 class SearchResult:
     path: Path | None
@@ -376,7 +382,7 @@ class PathGraph:
     """Immutable evidence facts; no ds-order ranking or whole-source exclusion."""
     def __init__(self, placements: Iterable[Placement], links: Iterable[PairLink],
                  original_adjacencies: Iterable[OriginalAdjacency] = (), policy: PathPolicy = PathPolicy(),
-                 *, progress: Callable[[str], None] | None = None):
+                 *, progress: Callable[[str], None] | None = None, first_request: bool = False):
         placements = tuple(placements)
         self.placements = {p.placement_id: p for p in placements}
         if len(self.placements) != len(placements):
@@ -386,6 +392,7 @@ class PathGraph:
             raise Q0EvidenceError("one q0 path graph must belong to one chromosome")
         self.chromosome = next(iter(chromosomes), "")
         self.policy = policy
+        self.first_request = first_request
         self.links = defaultdict(list)
         for link in links:
             if link.hit.matches / link.hit.block_length >= policy.minimum_pair_identity:
@@ -413,14 +420,15 @@ class PathGraph:
                                                      right.source, right.source_interval(block.right),
                                                      left.orientation != right.orientation, evidence_id))
         self.coverage = CoverageModel(self.required, relations, maximum_boundaries=policy.maximum_coverage_boundaries,
-                                      progress=progress)
+                                      progress=progress, compact_first=first_request)
         if self.coverage.ambiguous_evidence_ids:
             self.ambiguous_equivalence_ids.update(self.coverage.ambiguous_evidence_ids)
             self._blocks.clear()
             if progress:
                 progress(f"coverage: rebuilding after excluding {len(self.ambiguous_equivalence_ids)} ambiguous IDs")
             self.coverage = CoverageModel(self.required, [r for r in relations if r.evidence_id not in self.ambiguous_equivalence_ids],
-                                          maximum_boundaries=policy.maximum_coverage_boundaries, progress=progress)
+                                          maximum_boundaries=policy.maximum_coverage_boundaries, progress=progress,
+                                          compact_first=first_request)
 
     def homologous_blocks(self, left: Placement, right: Placement) -> tuple[tuple[Block, str], ...]:
         key = (left.placement_id, right.placement_id)
@@ -503,7 +511,7 @@ class PathGraph:
                                              next((e for e in self.original if e.adjacency_id == join.original_adjacency_id), None))
         ordered = sorted(unique.values(), key=lambda j: (j.kind == "reference_unknown", j.n_bp > 0,
                                                          j.left_end, j.right_start, j.join_id))
-        if len(ordered) > self.policy.maximum_edge_variants:
+        if not self.first_request and len(ordered) > self.policy.maximum_edge_variants:
             self.edge_pruning.append({"left_id": left_id, "right_id": right_id,
                                       "reason": "maximum_edge_variants", "omitted": len(ordered) - self.policy.maximum_edge_variants})
         self._joins[key] = tuple(ordered[:self.policy.maximum_edge_variants])
@@ -575,6 +583,18 @@ class PathGraph:
 
 
 def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = None) -> SearchResult:
+    if graph.first_request:
+        raise Q0EvidenceError("request-only q0 graph cannot produce a full search record")
+    return _search_paths(graph, progress=progress)
+
+
+def search_request_path(graph: PathGraph, *, progress: Callable[[str], None] | None = None) -> RequestPathResult:
+    if not graph.first_request:
+        raise Q0EvidenceError("first-request search needs a request-only q0 graph")
+    return _search_paths(graph, progress=progress)
+
+
+def _search_paths(graph: PathGraph, *, progress) -> SearchResult | RequestPathResult:
     """Length-first seed, then reversible local beam search with explicit limits.
 
     Coverage is source bookkeeping under nonambiguous paired-base equivalence,
@@ -616,6 +636,8 @@ def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = N
     if not seeds:
         if progress:
             progress("no admitted seed; evaluations=0 detailed_paths=0")
+        if graph.first_request:
+            return RequestPathResult(None)
         return SearchResult(None, (), [], {"policy": asdict(policy), "evaluations": 0,
                                           "stop_reasons": ["no_admitted_placements"], "global_optimality_claimed": False})
     seed = evaluate((seeds[0],))[0]
@@ -641,7 +663,7 @@ def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = N
                     or candidate.source == neighbor.source):
                 positions.update((index, index + 1))
         ordered_positions = sorted(positions)
-        if len(ordered_positions) > policy.maximum_seed_positions:
+        if not graph.first_request and len(ordered_positions) > policy.maximum_seed_positions:
             seed_position_pruning.append({"placement_id": node, "omitted": len(ordered_positions) - policy.maximum_seed_positions})
         return ordered_positions[:policy.maximum_seed_positions]
 
@@ -652,7 +674,8 @@ def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = N
             best = min([seed, *choices], key=graph.rank)
             observed.update((p.path_id, p) for p in choices)
             if best.score > seed.score:
-                decisions.append(_decision("length_first_add", seed, best, node))
+                if not graph.first_request:
+                    decisions.append(_decision("length_first_add", seed, best, node))
                 seed = best
         if "maximum_evaluations" in stopped:
             break
@@ -664,11 +687,11 @@ def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = N
             break
     beam = sorted(observed.values(), key=graph.rank)[:policy.beam_width]
     beam_pruning = []
-    if len(observed) > len(beam):
+    if not graph.first_request and len(observed) > len(beam):
         beam_pruning.append({"phase": "seeds", "omitted": len(observed) - len(beam)})
     del observed  # discarded seed candidates do not take part in local search
     best = beam[0]
-    if best.path_id != initial.path_id:
+    if not graph.first_request and best.path_id != initial.path_id:
         decisions.append(_decision("alternative_seed", initial, best, None))
     rounds = 0
     for rounds in range(1, policy.maximum_rounds + 1):
@@ -704,11 +727,12 @@ def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = N
             if "maximum_evaluations" in stopped:
                 break
         next_beam = sorted(next_paths.values(), key=graph.rank)[:policy.beam_width]
-        if len(next_paths) > len(next_beam):
+        if not graph.first_request and len(next_paths) > len(next_beam):
             beam_pruning.append({"phase": "local_search", "round": rounds, "omitted": len(next_paths) - len(next_beam)})
         if next_beam[0].score > best.score:
             updated = next_beam[0]
-            decisions.append(_decision("local_replacement", best, updated, None))
+            if not graph.first_request:
+                decisions.append(_decision("local_replacement", best, updated, None))
             best = updated
         if [p.path_id for p in next_beam] == [p.path_id for p in beam]:
             stopped.add("beam_fixed_point")
@@ -722,6 +746,10 @@ def search_paths(graph: PathGraph, *, progress: Callable[[str], None] | None = N
     ranked_at = monotonic()
     if progress:
         progress(f"ranking complete: evaluations={evaluations} local_rounds={rounds} search_s={ranked_at-started:.2f}")
+    if graph.first_request:
+        # questions() reads only this winner's slices and joins. Every scored
+        # candidate already passed the exact coverage, cut and duplicate gates.
+        return RequestPathResult(best)
     winner = graph._with_missing(best)
     winner_id = winner.path_id
     alternatives = tuple(graph._with_missing(p) for p in beam if p.path_id != winner_id)

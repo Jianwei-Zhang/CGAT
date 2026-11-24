@@ -118,11 +118,13 @@ def run_panel(path, order):
     assignments = prep.table(path,'metadata/chr_assignments.tsv',('dataset_name','seq_name','assigned_chr_name'))
     sequences = prep._dataset_sequences(path, datasets); matrices = json.loads((path/'base-alignments.json').read_text())
     trials = []; captured = []
-    def take(data):
+    hook = 'select_request_paths' if hasattr(adm, 'select_request_paths') else 'select_q0_paths'
+    draft_selector = getattr(adm, hook)
+    def take(data, **kwargs):
         captured.append(data)
-        return SELECT(data)
+        return draft_selector(data, **kwargs)
     start = monotonic()
-    with patch.object(adm,'select_q0_paths',take):
+    with patch.object(adm,hook,take):
         threshold.initial_questions(path, sequences, refs, assignments, matrices)
     load_and_warmup = monotonic()-start
     data, = captured

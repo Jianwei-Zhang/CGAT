@@ -1,7 +1,7 @@
 """Ask for evidence of a missing Q0 decision, not evidence that competitors do not exist.
 
-Experimental draft routing; cannot authorize a placement/cut, convert an unknown join to an
-exact join, or certify search completeness. Input must be the ordinary selector's draft.
+Draft routing cannot authorize a placement/cut, convert an unknown join to an exact join,
+or certify search completeness. It consumes the shared selector's winner, not its report.
 """
 from collections import Counter, defaultdict
 from dataclasses import replace
@@ -55,6 +55,11 @@ def _supported_unknown_joins(paths, placed, links, policy):
         for left, join, right in zip(path.slices, path.joins, path.slices[1:]):
             if join.kind == 'reference_unknown':
                 lp, rp = placed[left.placement_id], placed[right.placement_id]
+                # facing_evidence requires an anchor on BOTH sides. This is an
+                # unresolved join, not a positive: keep its shoulder request,
+                # but don't keep scanning links for a witness it cannot have.
+                if not lp.anchor_intervals or not rp.anchor_intervals:
+                    continue
                 a, b = lp.source, rp.source
                 joins = lookup.get((a, b))
                 if joins is None:
@@ -151,11 +156,12 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
     # A secondary assignment to an unbuilt chromosome is a possible rival, not an
     # independent reason to redo an already supported placement. Do not exempt the
     # rest of its contig or erase an independent weak-junction request on this axis.
-    fixed = {s: merged_intervals(v) for s, v in strong_on_missing.items()}
-    for part in data.parts.values():
-        if part.source in missing:
-            remaining = subtract_intervals(part.interval, fixed.get(part.source, ()))
-            stats['missing_chromosome_parts'] += 1
-            stats['secondary_assignment_supported_bp_not_requested'] += part.interval.length - sum(i.length for i in remaining)
-            needed[part.source].extend(remaining)
+    if missing:
+        fixed = {s: merged_intervals(v) for s, v in strong_on_missing.items()}
+        for part in data.parts.values():
+            if part.source in missing:
+                remaining = subtract_intervals(part.interval, fixed.get(part.source, ()))
+                stats['missing_chromosome_parts'] += 1
+                stats['secondary_assignment_supported_bp_not_requested'] += part.interval.length - sum(i.length for i in remaining)
+                needed[part.source].extend(remaining)
     return {s: merged_intervals(v) for s, v in needed.items() if v}, dict(stats)

@@ -90,9 +90,11 @@ def complete_window_accounting(catalog):
 
 
 def audit(data, selection, *, admission_policy=None, path_policy=None, quality_pass=None):
-    from .q0_admission import AdmissionPolicy
+    from .q0_admission import AdmissionPolicy, FirstRequestSelection
     from .q0_paths import PathPolicy
     from .q0_threshold_questions import questions
+    if isinstance(selection, FirstRequestSelection):
+        raise Q0EvidenceError('a planning-only Q0 selection cannot certify a prepared generation')
     binding = data.threshold_scope
     if not isinstance(binding, VerifiedScope) or not binding.ready_identity or binding.ready_identity!=data.ready_manifest_identity:
         raise Q0EvidenceError('threshold acceptance needs a verified scope and assignment inventory')
