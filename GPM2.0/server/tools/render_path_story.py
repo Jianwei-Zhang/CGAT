@@ -47,11 +47,12 @@ button.input-qc-tag.is-clickable:hover{border-color:var(--gen-closed);box-shadow
 ASSIGN_STYLE = """<style>
 .story-help-btn{display:inline-grid;place-items:center;width:20px;height:20px;padding:0;margin-left:.08rem;border-radius:50%;border:1px solid var(--border-default);background:var(--surface-subtle);color:var(--text-muted);font:700 11.5px/1 var(--font-mono);cursor:pointer;vertical-align:middle;transition:border-color .12s,background .12s,color .12s}
 .story-help-btn:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
-.assign-rule-grid{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:.95rem;align-items:center;margin-top:.6rem}
-.assign-rule-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.45rem;font-size:.83rem;line-height:1.45;color:var(--text-secondary)}
-.assign-rule-list li{display:flex;flex-direction:column;gap:.08rem}
-.assign-rule-list strong{color:var(--text-primary);font-size:.81rem;font-weight:600}
-.assign-help-svg{display:block;width:100%;max-width:300px;height:auto}
+.assign-rule-grid{display:grid;grid-template-columns:minmax(280px,1.2fr) minmax(240px,1fr);gap:1rem;align-items:stretch;margin-top:.75rem}
+.assign-rule-plot{display:flex;flex-direction:column;justify-content:center;padding:.85rem .95rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle)}
+.assign-help-svg{display:block;width:100%;height:auto}
+.assign-rule-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;justify-content:space-between;gap:.5rem;font-size:.82rem;line-height:1.45;color:var(--text-secondary)}
+.assign-rule-list li{display:flex;flex-direction:column;gap:.12rem;padding:.5rem .7rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
+.assign-rule-list strong{color:var(--text-primary);font-size:.82rem;font-weight:600}
 #multi-members-only{position:absolute;opacity:0;pointer-events:none}
 .assign-filter-lbl{display:inline-flex;align-items:center;gap:.38rem;margin:0 0 .55rem;padding:.24rem .62rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-secondary);font-size:.8rem;font-weight:500;cursor:pointer;user-select:none}
 .assign-filter-lbl::before{content:"";width:12px;height:12px;border:1.5px solid var(--border-strong);border-radius:3px;background:var(--surface-panel)}
@@ -318,15 +319,19 @@ def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None
            bi(f"覆盖率阈值 ≥ {threshold:g}%", f"Coverage ≥ {threshold:g}%"))
     # A teaching schematic, not a measured alignment. No example bp or inferred run threshold.
     drawing = (
-        '<svg class="assign-help-svg" viewBox="0 0 288 82" role="img" aria-label="Union coverage schematic / 并集覆盖示意">'
-        '<text x="4" y="25" font-size="11" font-weight="600" fill="var(--text-primary)">ctg</text>'
-        '<text x="4" y="69" font-size="11" font-weight="600" fill="var(--text-secondary)">ref_chr</text>'
-        '<path d="M74 11V7H156V11 M172 11V7H226V11" stroke="var(--ds-1)" stroke-width="1.4" fill="none"/>'
-        '<rect x="52" y="18" width="224" height="9" rx="2" fill="var(--surface-muted)" stroke="var(--border-default)"/>'
-        '<rect x="74" y="18" width="82" height="9" fill="var(--ds-1)"/>'
-        '<rect x="172" y="18" width="54" height="9" fill="var(--ds-1)"/>'
-        '<path d="M74 27L88 60H142L126 27Z M112 27L132 60H174L156 27Z M172 27L190 60H244L226 27Z" fill="var(--ds-1)" opacity=".26"/>'
-        '<rect x="52" y="60" width="224" height="9" rx="2" fill="var(--border-strong)"/>'
+        '<svg class="assign-help-svg" viewBox="0 0 340 108" role="img" aria-label="Union coverage schematic / 并集覆盖示意">'
+        '<text x="148" y="13" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ds-1)">Union</text>'
+        '<text x="249" y="13" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ds-1)">Union</text>'
+        '<path d="M90 22V17H206V22 M222 22V17H276V22" stroke="var(--ds-1)" stroke-width="1.5" fill="none"/>'
+        '<text x="4" y="37" font-size="11.5" font-weight="600" fill="var(--text-primary)">contig</text>'
+        '<rect x="58" y="27" width="272" height="12" rx="3" fill="var(--surface-panel)" stroke="var(--border-default)"/>'
+        '<rect x="90" y="27" width="116" height="12" rx="2" fill="var(--ds-1)"/>'
+        '<rect x="222" y="27" width="54" height="12" rx="2" fill="var(--ds-1)"/>'
+        '<path d="M90 39L108 79H176L154 39Z M136 39L162 79H214L206 39Z M222 39L242 79H298L276 39Z" fill="var(--ds-1)" opacity=".24"/>'
+        '<path d="M136 39L154 39L164 59L148 59Z" fill="var(--ds-1)" opacity=".22"/>'
+        '<text x="4" y="90" font-size="11.5" font-weight="600" fill="var(--text-secondary)">ref_chr</text>'
+        '<rect x="58" y="79" width="272" height="12" rx="3" fill="var(--ctg-ref-fill)" stroke="var(--ctg-ref-stroke)"/>'
+        '<text x="194" y="104" text-anchor="middle" font-size="9.5" fill="var(--text-muted)">Σ Union / contig length</text>'
         '</svg>'
     )
     rule_btn = (
@@ -337,7 +342,7 @@ def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None
         '<template id="assign-rule-modal" data-title="分配依据" data-title-zh="分配依据" data-title-en="Assignment Rule">'
         f'<div class="story-verdict" style="margin:0">{cut}</div>'
         '<div class="assign-rule-grid">'
-        '<div class="story-plot-frame" style="margin:0">' + drawing + '</div>'
+        '<div class="assign-rule-plot">' + drawing + '</div>'
         '<ul class="assign-rule-list">'
         '<li><strong>' + bi("覆盖率", "Coverage") + '</strong><span>'
         + bi("合格比对区间并集长度 ÷ contig 总长（重叠只计一次）。", "Union of qualifying aligned spans ÷ contig length (overlaps counted once).")
