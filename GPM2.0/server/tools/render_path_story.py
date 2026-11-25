@@ -47,7 +47,10 @@ button.input-qc-tag.is-clickable:hover{border-color:var(--gen-closed);box-shadow
 ASSIGN_STYLE = """<style>
 .story-help-btn{display:inline-grid;place-items:center;width:20px;height:20px;padding:0;margin-left:.08rem;border-radius:50%;border:1px solid var(--border-default);background:var(--surface-subtle);color:var(--text-muted);font:700 11.5px/1 var(--font-mono);cursor:pointer;vertical-align:middle;transition:border-color .12s,background .12s,color .12s}
 .story-help-btn:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
-.assign-rule-grid{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:.95rem;align-items:center;margin-top:.55rem}
+.assign-rule-grid{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:.95rem;align-items:center;margin-top:.6rem}
+.assign-rule-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.45rem;font-size:.83rem;line-height:1.45;color:var(--text-secondary)}
+.assign-rule-list li{display:flex;flex-direction:column;gap:.08rem}
+.assign-rule-list strong{color:var(--text-primary);font-size:.81rem;font-weight:600}
 .assign-help-svg{display:block;width:100%;max-width:300px;height:auto}
 #multi-members-only{position:absolute;opacity:0;pointer-events:none}
 .assign-filter-lbl{display:inline-flex;align-items:center;gap:.38rem;margin:0 0 .55rem;padding:.24rem .62rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-secondary);font-size:.8rem;font-weight:500;cursor:pointer;user-select:none}
@@ -335,17 +338,17 @@ def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None
         f'<div class="story-verdict" style="margin:0">{cut}</div>'
         '<div class="assign-rule-grid">'
         '<div class="story-plot-frame" style="margin:0">' + drawing + '</div>'
-        '<div><p>'
-        + bi(
-            "将该 contig 对某条参考染色体的合格比对区间在 contig 自身坐标上取并集（重叠区间仅计一次），并集长度除以整条 contig 长度即为覆盖率。",
-            "Take the union of qualifying query alignment intervals on the contig (overlapping hits counted once) and divide by full contig length.",
-        )
-        + '</p><p class="muted">'
-        + bi(
-            "达到本次覆盖率阈值即归入该染色体组；同一条 contig 可同时进入多个组（标为「多组」）。未分配仅表示未达过滤/阈值条件，不直接代表污染序列。",
-            "Every chromosome meeting the threshold receives the contig; one contig may belong to multiple groups. Unassigned indicates threshold/filter non-match, not contamination.",
-        )
-        + '</p></div></div></template>'
+        '<ul class="assign-rule-list">'
+        '<li><strong>' + bi("覆盖率", "Coverage") + '</strong><span>'
+        + bi("合格比对区间并集长度 ÷ contig 总长（重叠只计一次）。", "Union of qualifying aligned spans ÷ contig length (overlaps counted once).")
+        + '</span></li>'
+        '<li><strong>' + bi("入组判定", "Grouping") + '</strong><span>'
+        + bi("达到阈值即归入该染色体；可同时入多组（标为「多组」）。", "Assigned when meeting the threshold; may belong to multiple groups.")
+        + '</span></li>'
+        '<li><strong>' + bi("未分配", "Unassigned") + '</strong><span>'
+        + bi("仅表示未达过滤或阈值，不等同于污染序列。", "Below alignment filter or threshold; does not imply contamination.")
+        + '</span></li>'
+        '</ul></div></template>'
     )
     groups = assignment.get("groups")
     if groups is None:
