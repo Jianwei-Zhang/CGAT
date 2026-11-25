@@ -28,7 +28,7 @@ def checked(path,pin):
     return json.loads(bounded(path,64<<20,pin))
 
 
-def main(base,geometry,out):
+def main(base,geometry,out, *, on_verified_scope=None):
     snap,root,lookup,order,_=inputs(base); ranks={p:v[0] for p,v in lookup.items()}; ids=sorted(lookup)
     queries=original_queries(base,lookup,order); plan=checked(base/'q0-fork-partial-queries-20261123-1556/plan/replay.json',REPLAY)
     observed=checked(geometry,GEOMETRY);retired=checked(base.parent/'logs/retire-43017096-20261124/retired.json',RETIRED)
@@ -63,7 +63,10 @@ def main(base,geometry,out):
         kind='declared_long_part_scope' if CompletedNativeScopes.remaining_targets(pool,p,targets,include_approximate=False) else 'exact_complete_matrices'
         skipped[rank]=dict(part=p,kind=kind,windows=sorted(windows));counts[kind]+=len(windows)
     result=dict(schema='wheat_frozen_partial_native_parent_coverage_v1',snapshot=SNAP,query_inventory=QUERIES,native_adoption=ADOPTED,native_matrices=EXPECTED,retired_target_set_witness=retired['task'],required_targets=len(ids),parents_in_plan=len(groups),parent_windows=skipped,pre_frontier_skip_counts=counts,retired_fallback_parents=sorted(ranks[p] for p in original),mapper_starts=0)
-    print('NATIVE_PARENT_COVERAGE',len(skipped),'parents',dict(counts),'receipt',put(out,result),flush=True)
+    digest=put(out,result)
+    print('NATIVE_PARENT_COVERAGE',len(skipped),'parents',dict(counts),'receipt',digest,flush=True)
+    if on_verified_scope is not None:
+        on_verified_scope(digest,pool,original,targets,lookup,order)
 
 
 if __name__=='__main__':main(*map(Path,sys.argv[1:]))
