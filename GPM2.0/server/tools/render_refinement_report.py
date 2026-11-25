@@ -64,6 +64,7 @@ CSS = """
   --ctg-primary-fill:#d2dfef;--ctg-primary-stroke:#6d85a1;--ctg-primary-text:#243a54;
   --ctg-companion-fill:#e7dec4;--ctg-companion-stroke:#8a7551;--ctg-companion-text:#5c492a;
   --ctg-ref-fill:#cfcfcf;--ctg-ref-stroke:#8e8e8e;--ctg-ref-text:#4f4f4f;
+  --logo-navy:#003366;--logo-red:#CC0033;
 }
 html[data-theme="dark"]{
   color-scheme:dark;
@@ -94,6 +95,7 @@ html[data-theme="dark"]{
   --ctg-primary-fill:#28486e;--ctg-primary-stroke:#6899d1;--ctg-primary-text:#e8f2ff;
   --ctg-companion-fill:#594527;--ctg-companion-stroke:#bf9b63;--ctg-companion-text:#faefd9;
   --ctg-ref-fill:#384352;--ctg-ref-stroke:#8292a6;--ctg-ref-text:#e2e8f0;
+  --logo-navy:#7eb0e6;--logo-red:#ee5268;
 }
 @media (prefers-color-scheme:dark){
   html:not([data-theme="light"]){
@@ -125,6 +127,7 @@ html[data-theme="dark"]{
     --ctg-primary-fill:#28486e;--ctg-primary-stroke:#6899d1;--ctg-primary-text:#e8f2ff;
     --ctg-companion-fill:#594527;--ctg-companion-stroke:#bf9b63;--ctg-companion-text:#faefd9;
     --ctg-ref-fill:#384352;--ctg-ref-stroke:#8292a6;--ctg-ref-text:#e2e8f0;
+    --logo-navy:#7eb0e6;--logo-red:#ee5268;
   }
 }
 html[data-lang="zh"] .t-en{display:none!important}

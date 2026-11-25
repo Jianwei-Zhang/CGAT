@@ -114,11 +114,13 @@ def render_overview(vm):
 
     brand_icon = (
         '<span class="cgat-brand-icon" aria-hidden="true">'
-        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none">'
-        '<rect x="1" y="2" width="14" height="3.2" rx="1" fill="currentColor" opacity=".92"/>'
-        '<rect x="1" y="6.8" width="9.5" height="2.8" rx="1" fill="currentColor" opacity=".55"/>'
-        '<rect x="11.5" y="6.8" width="3.5" height="2.8" rx="1" fill="var(--gen-patch)"/>'
-        '<rect x="1" y="11.3" width="14" height="2.8" rx="1" fill="var(--ds-1)"/>'
+        '<svg width="22" height="22" viewBox="0 0 8 8" fill="none">'
+        '<path fill="var(--logo-navy)" d="M4 0 5 1 4 2 3 1Z"/>'
+        '<path fill="var(--logo-red)" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>'
+        '<path fill="var(--logo-navy)" d="M3 5 4 6 3 7 2 6Z"/>'
+        '<path fill="var(--logo-navy)" d="M5 5 6 6 5 7 4 6Z"/>'
+        '<path fill="var(--logo-navy)" d="M3 7 4 8H2Z"/>'
+        '<path fill="var(--logo-navy)" d="M5 7 6 8H4Z"/>'
         '</svg></span>'
     )
     title_html = (

@@ -223,7 +223,6 @@ def input_card(inputs):
             _fmt_catalog_length(st.get("length_bp"), missing),
             _fmt_catalog_length(st.get("n50_bp"), missing),
             _fmt_catalog_length(st.get("n90_bp"), missing),
-            measure_int(st, "gap_count"),
         ))
     for index, assembly in enumerate(inputs["assemblies"]):
         st = assembly["stats"]
@@ -245,10 +244,8 @@ def input_card(inputs):
             _fmt_catalog_length(st.get("length_bp"), missing),
             _fmt_catalog_length(st.get("n50_bp"), missing),
             _fmt_catalog_length(st.get("n90_bp"), missing),
-            measure_int(st, "gap_count"),
         ))
 
-    gap_tip = esc("连续 N ≥ 100 bp / N runs ≥ 100 bp")
     headers = [
         f'<th scope="col">{bi("数据类型", "Data type")}</th>',
         f'<th scope="col">{bi("名称", "Name")}</th>',
@@ -256,7 +253,6 @@ def input_card(inputs):
         f'<th scope="col">{bi("总长度", "Total length")}</th>',
         '<th scope="col">N50</th>',
         '<th scope="col">N90</th>',
-        f'<th scope="col" title="{gap_tip}">{bi("Gap 数", "Gaps")}</th>',
     ]
     thead = "<thead><tr>" + "".join(headers) + "</tr></thead>"
     if rows:
@@ -266,13 +262,12 @@ def input_card(inputs):
             f'<td class="numeric">{seq_n}</td>'
             f'<td class="numeric">{tot_len}</td>'
             f'<td class="numeric">{n50}</td>'
-            f'<td class="numeric">{n90}</td>'
-            f'<td class="numeric">{gaps}</td></tr>'
-            for role_attr, role_lbl, name_html, seq_n, tot_len, n50, n90, gaps in rows
+            f'<td class="numeric">{n90}</td></tr>'
+            for role_attr, role_lbl, name_html, seq_n, tot_len, n50, n90 in rows
         ]
         tbody = "<tbody>" + "".join(body_rows) + "</tbody>"
     else:
-        tbody = f'<tbody><tr><td colspan="7" class="muted">{missing}</td></tr></tbody>'
+        tbody = f'<tbody><tr><td colspan="6" class="muted">{missing}</td></tr></tbody>'
     grid = (
         '<div class="project-dataset-scroll" tabindex="0" role="region" aria-label="Datasets">'
         f'<table class="project-dataset-table">{thead}{tbody}</table></div>'
