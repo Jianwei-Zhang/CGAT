@@ -1,0 +1,18 @@
+#!/bin/bash
+#DSUB -n jm19_q0_final_table
+#DSUB -q x86
+#DSUB -nl agent-X86-46
+#DSUB -aa
+#DSUB -D "43060892=SUCCEEDED"
+#DSUB -R "cpu=2,mem=16384MB"
+#DSUB -o final_%J.out
+set -eo pipefail
+umask 077
+run=$(dirname "$PWD"); b=$(dirname "$run"); mode=${PWD##*/audit-}
+sha256sum --quiet -c kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-raw-kit.XXXXXXXX); trap 'rm -rf -- "$w"' EXIT
+arc="$b/q0-request-ready.44e274a7/latest.tgz"
+printf '%s  %s\n' 0f06edd183467d950cd99d5c11ca8ed23ff57aaeacce96a6580b7527573dac28 "$arc" | sha256sum -c --quiet -
+tar -xzf "$arc" -C "$w";export PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$w/GPM2.0/server/tools:$PWD"
+python3 -Bu wheat_dispatch_report.py "$run" "$PWD/result"
