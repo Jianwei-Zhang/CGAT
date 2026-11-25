@@ -551,50 +551,26 @@ def q0_card(lgz):
 .q0-gap-pill.is-clean{border-color:var(--tone-ok-line);background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
 .q0-chr-meta small{display:block;margin-top:.16rem;font-size:.75rem;color:var(--text-muted);font-variant-numeric:tabular-nums;line-height:1.35}
 .q0-chr-meta small.q0-warn{color:var(--tone-warn-ink);font-weight:500}
-.q0-role-col{display:flex;flex-direction:column;justify-content:space-between;height:50px;font:600 .7rem/1.1 var(--font-mono);color:var(--text-muted);text-align:right;user-select:none}
+.q0-role-col{display:flex;flex-direction:column;justify-content:space-between;height:56px;font:600 .7rem/1.1 var(--font-mono);color:var(--text-muted);text-align:right;user-select:none}
 .q0-rails{position:relative;overflow:hidden;padding:1px 0;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
-.q0-rail{position:relative;height:11px;border-radius:2px}
+.q0-rail{position:relative;height:14px;border-radius:2px}
 .q0-mark{position:absolute;display:block;height:100%;border-radius:2px}
-.q0-mark.ctg{min-width:3px;box-shadow:inset 0 0 0 .6px rgba(255,255,255,.45)}
+.q0-mark:hover{filter:brightness(1.08);z-index:4}
+.q0-mark.ctg{min-width:6px;z-index:1;box-shadow:inset 0 0 0 .7px rgba(255,255,255,.5)}
 .q0-mark.ref,.q0-key.is-ref{background:var(--ctg-ref-fill);box-shadow:inset 0 0 0 1px var(--ctg-ref-stroke)}
-.q0-mark.input-gap,.q0-mark.ref-gap,.q0-key.input-gap{background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 4px);z-index:1}
-.q0-mark.unknown-gap,.q0-key.unknown-gap{background:var(--gen-gap);z-index:1}
-.q0-mark.unspecified-gap{background:var(--gen-unfilled);z-index:1}
+.q0-mark.input-gap,.q0-mark.ref-gap,.q0-key.input-gap{min-width:5px;z-index:2;background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 3.5px);box-shadow:inset 0 0 0 1px var(--border-strong)}
+.q0-mark.unknown-gap,.q0-key.unknown-gap{min-width:5px;z-index:2;background:var(--gen-gap);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
+.q0-mark.unspecified-gap{min-width:5px;z-index:2;background:var(--gen-unfilled);box-shadow:inset 0 0 0 1px var(--border-strong)}
 .q0-bands{width:100%;height:28px;display:block;color:var(--brand);fill:currentColor;fill-opacity:.18}
 .q0-bands polygon{transition:fill-opacity .12s}
 .q0-bands polygon:hover{fill-opacity:.52}
 .q0-key{display:inline-block;width:11px;height:8px;border-radius:2px;vertical-align:middle;flex-shrink:0}
 .q0-key.is-band{background:var(--brand);opacity:.28;transform:skewX(-18deg)}
-.q0-rule-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.55rem;font-size:.83rem;line-height:1.5;color:var(--text-secondary)}
-.q0-rule-cards li{display:flex;flex-direction:column;gap:.12rem;padding:.55rem .75rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
-.q0-rule-cards strong{color:var(--text-primary);font-size:.82rem;font-weight:600}
 @media (max-width:760px){
   .q0-axis,.q0-row{grid-template-columns:104px 26px minmax(0,1fr);gap:.4rem;padding-left:.65rem;padding-right:.65rem}
   .q0-chr-meta b{font-size:.8rem}
 }
 </style>"""
-
-    rule_btn = (
-        '<button type="button" class="story-help-btn" data-story-open="q0-rule-modal" '
-        'title="初始路径说明 / About q0 tracks" aria-label="初始路径说明 / About q0 tracks">?</button>'
-    )
-    rule_modal = (
-        '<template id="q0-rule-modal" data-title="初始路径 q0 说明" data-title-zh="初始路径 q0 说明" data-title-en="About Initial Path q0">'
-        '<ul class="q0-rule-cards">'
-        '<li><strong>' + bi("共用比例尺", "Shared scale") + '</strong><span>'
-        + bi("所有染色体的 Ref（上轨）与 q0（下轨）采用同一 bp/像素比例绘制，短染色体不拉满，便于直观对比长度。",
-             "All Ref (top) and q0 (bottom) tracks share one bp/pixel scale; shorter chromosomes are not stretched.")
-        + '</span></li>'
-        '<li><strong>' + bi("证据投影带", "Projected anchors") + '</strong><span>'
-        + bi("灰蓝连带将已选来源片段对参考的已验证比对投影到 q0（非 q0 直接重比对），悬停可查看精确区间。",
-             "Slate ribbons project verified source-to-reference anchors onto q0 (not a direct q0 realignment); hover for exact coordinates.")
-        + '</span></li>'
-        '<li><strong>' + bi("Gap 真实坐标", "True-scale gaps") + '</strong><span>'
-        + bi("区分来源自带的「原有 Gap」与拼接新放的「新增占位 N」（如 100 N 仅表占位）；Gap 严格按真实坐标绘制不放大。",
-             "Distinguishes original source gaps from new placeholder Ns (e.g. 100 N join placeholders); gaps keep true coordinates without inflation.")
-        + '</span></li>'
-        '</ul></template>'
-    )
 
     legend = [
         '<span class="legend-item"><i class="q0-key is-ref"></i>Ref</span>',
@@ -685,11 +661,10 @@ def q0_card(lgz):
         style
         + '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + "</div></div>"
         + frame_html
-        + rule_modal
     )
     right_bits = [bi(f"{len(tracks)} 条染色体", f"{len(tracks)} chrs")]
     if constructed:
         right_bits.append(bi(f"q0 总长 {fmt_bp_short(total_q0_bp)}", f"q0 {fmt_bp_short(total_q0_bp)}"))
         right_bits.append(bi(f"{total_gaps} Gap", f"{total_gaps} gaps"))
     return section("alignment-q0", "03", "初始路径 q0", "Initial path q0", body_html,
-                   title_extra=rule_btn, right=" · ".join(right_bits))
+                   right=" · ".join(right_bits))
