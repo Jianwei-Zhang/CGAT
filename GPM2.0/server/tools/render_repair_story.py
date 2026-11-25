@@ -3,10 +3,10 @@ from heapq import heappop, heappush
 
 try:
     from render_refinement_report import bi, esc, fmt_bp_short
-    from render_path_story import section
+    from render_path_story import section, zoom_button
 except ModuleNotFoundError:
     from .render_refinement_report import bi, esc, fmt_bp_short
-    from .render_path_story import section
+    from .render_path_story import section, zoom_button
 
 
 REASON_LABELS = {
@@ -59,11 +59,101 @@ html:has(#path-event-dialog[open]){overflow:hidden}
 .story-verdict.is-ok{border-left-color:var(--gen-closed);background:var(--tone-ok-bg)}
 .story-verdict.is-warn{border-left-color:var(--gen-patch);background:var(--tone-warn-bg)}
 .repair-zoom{display:block;width:100%;height:auto}
+.chart-zoom-btn{position:absolute;right:10px;bottom:8px;z-index:4;display:inline-flex;align-items:center;gap:.32rem;height:26px;padding:0 8px;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-secondary);font:500 .75rem/1 inherit;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.07);transition:border-color .12s,background .12s,color .12s}
+.chart-zoom-btn:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.story-zoom-bar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.65rem}
+.story-zoom-ctrl{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem}
+.story-zoom-ctrl button{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 .5rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-primary);font:600 .8rem/1 var(--font-mono);cursor:pointer;transition:border-color .12s,background .12s,color .12s}
+.story-zoom-ctrl button:hover:not(:disabled){border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.story-zoom-ctrl button:disabled{opacity:.42;cursor:not-allowed}
+.story-zoom-pct{min-width:44px;text-align:center;font:600 .8rem/1 var(--font-mono);color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.story-zoom-stage{overflow:auto;max-height:72vh;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel)}
+.story-zoom-stage.is-pannable{cursor:grab}
+.story-zoom-stage.is-dragging{cursor:grabbing;user-select:none}
 </style>
 <script data-cgat-ui="1" data-path-story-ui="1">(()=>{
   const panel=document.getElementById('path-event-dialog');
   let prior=null, scroll=0;
+  function openCustom(d){
+    if(!d||!d.content)return;
+    prior=d.trigger||null; scroll=window.scrollY;
+    panel.classList.toggle('is-wide',!!d.wide);
+    const titleEl=panel.querySelector('#path-event-title');
+    if(d.titleZh&&d.titleEn){
+      const z=document.createElement('span');z.className='t-zh';z.textContent=d.titleZh;
+      const e=document.createElement('span');e.className='t-en';e.textContent=d.titleEn;
+      titleEl.replaceChildren(z,e);
+    }else{titleEl.textContent=d.title||'';}
+    panel.querySelector('[data-story-content]').replaceChildren(d.content);
+    if(!panel.open){panel.showModal();panel.focus({preventScroll:true});}
+  }
+  function openChartZoom(btn){
+    const srcFrame=btn.closest('[data-zoom-frame="1"]');
+    const scope=btn.closest('[data-version-panel]')||btn.closest('.panel.path-story');
+    if(!srcFrame)return;
+    const wrap=document.createElement('div');
+    const bar=document.createElement('div');
+    bar.className='story-zoom-bar';
+    const srcLegend=scope&&scope.querySelector('.legend-row');
+    if(srcLegend)bar.appendChild(srcLegend.cloneNode(true));
+    const ctrl=document.createElement('div');
+    ctrl.className='story-zoom-ctrl';
+    const steps=[1,1.5,2,3,4];
+    let idx=0;
+    const outBtn=document.createElement('button');outBtn.type='button';outBtn.textContent='−';outBtn.title='Zoom out';
+    const pctEl=document.createElement('span');pctEl.className='story-zoom-pct';pctEl.textContent='100%';
+    const inBtn=document.createElement('button');inBtn.type='button';inBtn.textContent='+';inBtn.title='Zoom in';
+    const rstBtn=document.createElement('button');rstBtn.type='button';
+    const rz=document.createElement('span');rz.className='t-zh';rz.textContent='重置';
+    const re=document.createElement('span');re.className='t-en';re.textContent='Reset';
+    rstBtn.append(rz,re);
+    ctrl.append(outBtn,pctEl,inBtn,rstBtn);
+    bar.appendChild(ctrl);
+    const stage=document.createElement('div');
+    stage.className='story-zoom-stage';
+    const clone=srcFrame.cloneNode(true);
+    const cBtn=clone.querySelector('.chart-zoom-btn');
+    if(cBtn)cBtn.remove();
+    stage.appendChild(clone);
+    function applyZoom(){
+      const s=steps[idx];
+      clone.style.setProperty('--chart-scale',String(s));
+      pctEl.textContent=Math.round(s*100)+'%';
+      outBtn.disabled=idx<=0;
+      inBtn.disabled=idx>=steps.length-1;
+      rstBtn.disabled=idx===0;
+      stage.classList.toggle('is-pannable',s>1);
+    }
+    let drag=null;
+    stage.addEventListener('mousedown',(e)=>{
+      if(e.button!==0||steps[idx]<=1||e.target.closest('button,select,a'))return;
+      if(!e.target.closest('.q0-rails,.repair-track-col,.tel-gutter,.preview-rail,.story-ruler'))return;
+      drag={x:e.clientX,y:e.clientY,sl:stage.scrollLeft,st:stage.scrollTop};
+      stage.classList.add('is-dragging');
+    });
+    stage.addEventListener('mousemove',(e)=>{
+      if(!drag)return;
+      stage.scrollLeft=drag.sl-(e.clientX-drag.x);
+      stage.scrollTop=drag.st-(e.clientY-drag.y);
+    });
+    const endDrag=()=>{if(drag){drag=null;stage.classList.remove('is-dragging');}};
+    stage.addEventListener('mouseup',endDrag);
+    stage.addEventListener('mouseleave',endDrag);
+    outBtn.addEventListener('click',()=>{if(idx>0){idx--;applyZoom();}});
+    inBtn.addEventListener('click',()=>{if(idx<steps.length-1){idx++;applyZoom();}});
+    rstBtn.addEventListener('click',()=>{idx=0;applyZoom();stage.scrollLeft=0;});
+    applyZoom();
+    wrap.append(bar,stage);
+    openCustom({
+      trigger:btn,wide:true,
+      titleZh:btn.dataset.zoomTitleZh||'放大视图',
+      titleEn:btn.dataset.zoomTitleEn||'Enlarged view',
+      content:wrap
+    });
+  }
   function handleOpen(ev){
+    const zbtn=ev.target.closest('[data-chart-zoom="1"]');
+    if(zbtn){openChartZoom(zbtn);return;}
     const button=ev.target.closest('[data-story-open]');
     if(button){
       const t=document.getElementById(button.dataset.storyOpen);
@@ -86,20 +176,7 @@ html:has(#path-event-dialog[open]){overflow:hidden}
     else if(ev.target===panel){const r=panel.getBoundingClientRect();
       if(ev.clientX<r.left||ev.clientX>r.right||ev.clientY<r.top||ev.clientY>r.bottom)panel.close();}
   }
-  panel.addEventListener('cgat-open-custom',(ev)=>{
-    const d=ev.detail||{};
-    if(!d.content)return;
-    prior=d.trigger||null; scroll=window.scrollY;
-    panel.classList.toggle('is-wide',!!d.wide);
-    const titleEl=panel.querySelector('#path-event-title');
-    if(d.titleZh&&d.titleEn){
-      const z=document.createElement('span');z.className='t-zh';z.textContent=d.titleZh;
-      const e=document.createElement('span');e.className='t-en';e.textContent=d.titleEn;
-      titleEl.replaceChildren(z,e);
-    }else{titleEl.textContent=d.title||'';}
-    panel.querySelector('[data-story-content]').replaceChildren(d.content);
-    if(!panel.open){panel.showModal();panel.focus({preventScroll:true});}
-  });
+  panel.addEventListener('cgat-open-custom',(ev)=>openCustom(ev.detail));
   document.addEventListener('click',handleOpen);
   document.addEventListener('cgat-locus-picker',handleOpen);
   panel.addEventListener('close',()=>{
@@ -111,24 +188,28 @@ html:has(#path-event-dialog[open]){overflow:hidden}
 })();</script>"""
 
 REPAIR_STYLE = """<style>
-.repair-axis,.repair-rows{display:grid;grid-template-columns:148px minmax(0,1fr);gap:.75rem;align-items:start}
-.repair-axis{align-items:end;padding:0 0 .32rem;border-bottom:1px solid var(--border-default);color:var(--text-muted);font-size:.76rem}
-.repair-rows{border-bottom:1px solid var(--border-subtle);padding:.58rem 0}
-.repair-rows:last-of-type{border-bottom:1px solid var(--border-default)}
+.repair-frame{position:relative;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden;padding-bottom:2.3rem}
+.repair-axis,.repair-rows{display:grid;grid-template-columns:168px minmax(0,1fr);gap:.75rem;align-items:center}
+.repair-axis{padding:.52rem .85rem .44rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.78rem;font-weight:600}
+.repair-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.75rem}
+.repair-rows{border-bottom:1px solid var(--border-subtle);padding:.68rem .85rem;transition:background .12s}
+.repair-rows.has-events{align-items:start}
+.repair-rows:last-of-type{border-bottom:0}
+.repair-rows:hover{background:var(--surface-subtle)}
 .repair-chr-col{min-width:0}
 .repair-chr-head{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
-.repair-chr-head b{font:600 .86rem/1.25 var(--font-mono);color:var(--text-primary)}
-.repair-state{display:inline-flex;align-items:center;padding:.05rem .38rem;border-radius:3px;font-size:.73rem;font-weight:600;line-height:1.3}
-.repair-state.is-idle{color:var(--text-muted);background:var(--surface-muted);font-weight:500}
-.repair-state.is-edited{color:var(--tone-warn-ink);background:var(--tone-warn-bg);border:1px solid var(--tone-warn-line)}
-.repair-chr-len{display:block;margin-top:.14rem;font-size:.76rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
-.repair-track-col{min-width:0;padding-top:.18rem;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
-.repair-base{position:relative;height:10px;border-radius:2px}
-.repair-part{position:absolute;top:0;height:10px;border-radius:1.5px}
-.repair-part.is-ctg{box-shadow:inset 0 0 0 .6px rgba(255,255,255,.42)}
-.repair-part.is-gap{background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 4px)!important;z-index:1}
-.repair-part.is-site{background:var(--gen-patch)!important;min-width:3px;z-index:2;border-radius:1px}
-.repair-hits{position:relative;height:18px;margin-top:1px}
+.repair-chr-head b{font:600 .85rem/1.25 var(--font-mono);color:var(--text-primary)}
+.repair-state{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;font-size:.71rem;font-weight:500;line-height:1.35;white-space:nowrap}
+.repair-state.is-idle{color:var(--text-muted);background:var(--surface-subtle);border:1px solid var(--border-subtle)}
+.repair-state.is-edited{color:var(--tone-warn-ink);background:var(--tone-warn-bg);border:1px solid var(--tone-warn-line);font-weight:600}
+.repair-chr-len{display:block;margin-top:.16rem;font-size:.75rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.repair-track-col{min-width:0;padding:.14rem 0;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
+.repair-base{position:relative;height:14px;border-radius:2px}
+.repair-part{position:absolute;top:0;height:14px;border-radius:2px}
+.repair-part.is-ctg{min-width:6px;z-index:1;box-shadow:inset 0 0 0 .7px rgba(255,255,255,.5)}
+.repair-part.is-gap{min-width:5px;z-index:2;background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 3.5px)!important;box-shadow:inset 0 0 0 1px var(--border-strong)}
+.repair-part.is-site{background:var(--gen-patch)!important;min-width:5px;z-index:3;border-radius:2px;box-shadow:inset 0 0 0 .8px rgba(255,255,255,.6)}
+.repair-hits{position:relative;height:18px;margin-top:2px}
 .repair-locus{position:absolute;top:0;transform:translateX(-50%);min-width:18px;height:18px;border:0;background:transparent;color:var(--gen-patch);padding:0;font-size:12px;line-height:18px;font-weight:700;cursor:pointer;z-index:3}
 .repair-locus:hover{color:var(--brand);transform:translateX(-50%) scale(1.18)}
 .repair-local{position:relative;margin-top:2px}
@@ -142,10 +223,23 @@ REPAIR_STYLE = """<style>
 .repair-step-badge{display:inline-block;padding:.05rem .36rem;border-radius:3px;background:var(--brand-soft);color:var(--brand);font:600 .72rem/1.3 var(--font-mono);margin-right:.35rem}
 .repair-junction-box{margin:.45rem 0;padding:.55rem .7rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
 .repair-filter-row{margin:.35rem 0;font-size:.8rem}
-.repair-filter-row .repair-base{margin-top:.18rem;background:var(--surface-muted)}
+.repair-filter-row .repair-base{margin-top:.18rem;height:10px;background:var(--surface-muted)}
+.repair-filter-row .repair-part{height:10px}
+.story-zoom-stage .repair-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--chart-scale, 1))}
+.story-zoom-stage .repair-axis,.story-zoom-stage .repair-rows{grid-template-columns:196px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.story-zoom-stage .repair-axis{position:sticky;top:0;z-index:8;background:var(--surface-subtle)}
+.story-zoom-stage .repair-axis>:first-child{position:sticky;left:0;z-index:9;background:var(--surface-subtle);padding:.55rem .7rem .45rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;align-items:center}
+.story-zoom-stage .repair-axis .story-ruler{margin:.55rem 1rem .45rem .8rem;min-width:0}
+.story-zoom-stage .repair-chr-col{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding:.85rem .7rem .85rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;flex-direction:column;justify-content:center}
+.story-zoom-stage .repair-rows:hover .repair-chr-col{background:var(--surface-subtle)}
+.story-zoom-stage .repair-track-col{margin:.85rem 1rem .85rem .8rem;z-index:1;display:flex;flex-direction:column;justify-content:center}
+.story-zoom-stage .repair-base,.story-zoom-stage .repair-part{height:18px}
+.story-zoom-stage .repair-part.is-ctg{min-width:7px}
+.story-zoom-stage .repair-part.is-gap,.story-zoom-stage .repair-part.is-site{min-width:6px}
 @media (max-width:760px){
-  .repair-axis,.repair-rows{grid-template-columns:100px minmax(0,1fr);gap:.45rem}
+  .repair-axis,.repair-rows{grid-template-columns:108px minmax(0,1fr);gap:.45rem;padding-left:.65rem;padding-right:.65rem}
   .repair-chip{max-width:44%;font-size:.72rem}
+  .story-zoom-stage .repair-axis,.story-zoom-stage .repair-rows{grid-template-columns:136px minmax(0,1fr);gap:0;padding:0}
 }
 </style>"""
 
@@ -342,8 +436,9 @@ def repair_card(lgz, structural=False):
     body = [
         REPAIR_STYLE,
         '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + '</div></div>',
-        f'<div class="repair-axis"><small>{esc(prior)} {bi("比例尺", "scale")}</small><small class="story-ruler">'
-        + "".join(f"<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>" for i in range(5)) + "</small></div>",
+        '<div class="repair-frame" data-zoom-frame="1">',
+        f'<div class="repair-axis"><span>{bi("染色体", "Chromosome")}</span><span class="story-ruler">'
+        + "".join(f"<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>" for i in range(5)) + "</span></div>",
     ]
     templates = []
     for r in rows:
@@ -449,14 +544,16 @@ def repair_card(lgz, structural=False):
             local.append(f'<button type="button" class="repair-chip" data-story-open="{target}" style="left:0;top:{nlanes*1.95}rem"><span class="repair-chip-txt">{text}</span></button>')
             nlanes += 1
             templates.append(f'<template id="{target}" data-title="{esc(chrom)} · Filter">{structural_detail(d)}</template>')
+        row_cls = "repair-rows has-events" if local else "repair-rows"
         body.append(
-            f'<div class="repair-rows">'
+            f'<div class="{row_cls}">'
             f'<div class="repair-chr-col"><div class="repair-chr-head"><b>{esc(chrom)}</b>{state_badge}</div>'
             f'<small class="repair-chr-len">{esc(len_note)}</small></div>'
             f'<div class="repair-track-col"><div class="repair-base" title="{prior} {length:,} bp">{"".join(rail)}</div>'
             + (f'<div class="repair-hits">{"".join(hits)}</div><div class="repair-local" style="height:{nlanes*1.95:.3g}rem">{"".join(local)}</div>' if local else "")
             + "</div></div>"
         )
+    body.append(zoom_button(f"{num} {zh} · 放大视图", f"{num} {en} · Enlarged view") + "</div>")
     return section(key, num, zh, en, "".join(body + templates),
                    sub_zh=f"{prior} → {after}", sub_en=f"{prior} → {after}",
                    right=right_summary)

@@ -1,43 +1,64 @@
 """q3 end markers and local before/candidate/result views. Never connect a missing PAF."""
 try:
-    from render_path_story import section
+    from render_path_story import section, zoom_button
     from render_refinement_report import bi, esc, fmt_bp_short
     from render_repair_story import _coord
 except ModuleNotFoundError:
-    from .render_path_story import section
+    from .render_path_story import section, zoom_button
     from .render_refinement_report import bi, esc, fmt_bp_short
     from .render_repair_story import _coord
 
 
 TERMINAL_STYLE = """<style>
-.tel-axis,.tel-row{display:grid;grid-template-columns:148px minmax(0,1fr);gap:.75rem;align-items:center}
-.tel-axis{align-items:end;padding:0 0 .32rem;border-bottom:1px solid var(--border-default);color:var(--text-muted);font-size:.76rem}
-.tel-axis-pad{padding-inline:2.35rem}
-.tel-row{border-bottom:1px solid var(--border-subtle);padding:.55rem 0}
-.tel-row:last-of-type{border-bottom:1px solid var(--border-default)}
+.tel-frame{position:relative;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden;padding-bottom:2.3rem}
+.tel-axis,.tel-row{display:grid;grid-template-columns:168px minmax(0,1fr);gap:.75rem;align-items:center}
+.tel-axis{padding:.52rem .85rem .44rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.78rem;font-weight:600}
+.tel-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.75rem}
+.tel-axis-pad{padding-inline:2.45rem}
+.tel-row{border-bottom:1px solid var(--border-subtle);padding:.68rem .85rem;transition:background .12s}
+.tel-row:last-of-type{border-bottom:0}
+.tel-row:hover{background:var(--surface-subtle)}
 .tel-chr-col{min-width:0}
-.tel-chr-col b{display:block;font:600 .86rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tel-chr-col small{display:block;margin-top:.12rem;font-size:.76rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
-.tel-gutter{padding-inline:2.35rem;min-width:0}
-.tel-canvas{background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%;padding:.25rem 0}
-.tel-bar-wrap{position:relative;min-width:6px;height:22px;display:flex;align-items:center}
-.tel-bar{position:relative;width:100%;height:10px;border-radius:2px;background:var(--border-strong);overflow:hidden}
-.tel-part{position:absolute;top:0;height:10px}
-.tel-part.is-ctg{box-shadow:inset 0 0 0 .6px rgba(255,255,255,.42)}
-.tel-part.is-gap{background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 4px)!important}
-.tel-end{position:absolute;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;font:700 .7rem/1 var(--font-mono);cursor:pointer;border-radius:3px;padding:.2rem .34rem;white-space:nowrap;transition:transform .1s,border-color .12s,background .12s}
-.tel-end.is-5p{right:calc(100% + 4px)}
-.tel-end.is-3p{left:calc(100% + 4px)}
+.tel-chr-head{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.tel-chr-col b{font:600 .85rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tel-chr-col small{display:block;margin-top:.16rem;font-size:.75rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.tel-pill{display:inline-flex;align-items:center;padding:1px 6px;border-radius:999px;font-size:.71rem;font-weight:500;font-variant-numeric:tabular-nums;border:1px solid var(--border-subtle);background:var(--surface-subtle);color:var(--text-muted);white-space:nowrap}
+.tel-pill.is-full{border-color:var(--tone-ok-line);background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
+.tel-pill.is-part{border-color:var(--tone-info-line);background:var(--tone-info-bg);color:var(--tone-info-ink)}
+.tel-gutter{padding-inline:2.45rem;min-width:0}
+.tel-canvas{background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%;padding:.2rem 0}
+.tel-bar-wrap{position:relative;min-width:8px;height:24px;display:flex;align-items:center}
+.tel-bar{position:relative;width:100%;height:14px;border-radius:2px;background:var(--border-strong);overflow:hidden}
+.tel-part{position:absolute;top:0;height:14px;border-radius:2px}
+.tel-part.is-ctg{min-width:6px;z-index:1;box-shadow:inset 0 0 0 .7px rgba(255,255,255,.5)}
+.tel-part.is-gap{min-width:5px;z-index:2;background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 3.5px)!important;box-shadow:inset 0 0 0 1px var(--border-strong)}
+.tel-end{position:absolute;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;font:700 .7rem/1 var(--font-mono);cursor:pointer;border-radius:999px;padding:.22rem .4rem;white-space:nowrap;transition:transform .1s,border-color .12s,background .12s}
+.tel-end.is-5p{right:calc(100% + 5px)}
+.tel-end.is-3p{left:calc(100% + 5px)}
 .tel-end.is-present{color:var(--tone-ok-ink);background:var(--tone-ok-bg);border:1px solid var(--tone-ok-line)}
 .tel-end.is-present:hover{background:var(--gen-tel);border-color:var(--gen-tel);color:#fff}
-.tel-end.is-missing{color:var(--text-secondary);background:var(--surface-panel);border:1px solid var(--border-strong);border-radius:999px;padding:.16rem .34rem;font-size:.74rem}
+.tel-end.is-missing{color:var(--text-secondary);background:var(--surface-panel);border:1px solid var(--border-strong);padding:.18rem .38rem;font-size:.73rem}
 .tel-end.is-missing:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
 .tel-cand-fold{margin-top:.55rem;padding-top:.45rem;border-top:1px dashed var(--border-subtle)}
 .tel-cand-fold>summary{cursor:pointer;font-size:.82rem;font-weight:600;color:var(--accent)}
 .tel-gate-list{margin:.35rem 0;padding-left:1.15rem;font-size:.81rem;color:var(--tone-warn-ink)}
+.story-zoom-stage .tel-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--chart-scale, 1))}
+.story-zoom-stage .tel-axis,.story-zoom-stage .tel-row{grid-template-columns:196px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.story-zoom-stage .tel-axis{position:sticky;top:0;z-index:8;background:var(--surface-subtle)}
+.story-zoom-stage .tel-axis>:first-child{position:sticky;left:0;z-index:9;background:var(--surface-subtle);padding:.55rem .7rem .45rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;align-items:center}
+.story-zoom-stage .tel-axis-pad{margin:.55rem 1rem .45rem .8rem;padding-inline:2.45rem}
+.story-zoom-stage .tel-chr-col{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding:.85rem .7rem .85rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;flex-direction:column;justify-content:center}
+.story-zoom-stage .tel-row:hover .tel-chr-col{background:var(--surface-subtle)}
+.story-zoom-stage .tel-gutter{margin:.85rem 1rem .85rem .8rem;padding-inline:2.45rem;display:flex;align-items:center}
+.story-zoom-stage .tel-canvas{width:100%}
+.story-zoom-stage .tel-bar-wrap{height:28px}
+.story-zoom-stage .tel-bar,.story-zoom-stage .tel-part{height:18px}
+.story-zoom-stage .tel-part.is-ctg{min-width:7px}
+.story-zoom-stage .tel-part.is-gap{min-width:6px}
 @media (max-width:760px){
-  .tel-axis,.tel-row{grid-template-columns:96px minmax(0,1fr);gap:.4rem}
+  .tel-axis,.tel-row{grid-template-columns:108px minmax(0,1fr);gap:.4rem;padding-left:.65rem;padding-right:.65rem}
   .tel-axis-pad,.tel-gutter{padding-inline:2.05rem}
+  .story-zoom-stage .tel-axis,.story-zoom-stage .tel-row{grid-template-columns:136px minmax(0,1fr);gap:0;padding:0}
 }
 </style>"""
 
@@ -192,9 +213,10 @@ def _inspection(t, side, size):
 
 def terminal_card(lgz):
     rows = lgz.get("terminal_scene")
-    head = ("terminal-process", "q2 → q3", "端粒处理", "Telomere processing")
+    head = ("terminal-process", "06", "端粒处理", "Telomere processing")
     if not rows:
-        return section(*head, '<p class="muted">' + bi("本次没有可核验的 q2 → q3 末端检测记录。", "No verifiable q2 → q3 end assessment is available.") + '</p>')
+        return section(*head, '<p class="muted">' + bi("本次没有可核验的 q2 → q3 末端检测记录。", "No verifiable q2 → q3 end assessment is available.") + '</p>',
+                       sub_zh="q2 → q3", sub_en="q2 → q3")
     m = max([1] + [r["length_bp"] for r in rows])
     path = lgz.get("stage_paths", {}).get("q3", {})
     tracks = {t["chr"]: t for t in (path.get("tracks") or [])}
@@ -207,17 +229,27 @@ def terminal_card(lgz):
     if recovered_ends:
         right_txt += " · " + bi(f"恢复 {recovered_ends}", f"{recovered_ends} restored")
 
+    has_gaps = any(
+        p["kind"] != "source"
+        for r in rows
+        for t in (tracks.get(r["chr"]),)
+        if t and path.get("sha256") == r["sha256"] and t["length_bp"] == r["length_bp"]
+        for p in t["parts"]
+    )
     legend = [
-        '<span class="legend-item"><span class="badge tone-ok" style="padding:.04rem .32rem;font:700 .68rem/1.2 var(--font-mono)">TEL</span>' + bi("已检出端粒（点击查看）", "Telomere detected (click)") + '</span>',
-        '<span class="legend-item"><span class="badge tone-neutral" style="padding:.04rem .32rem;border-radius:999px;font:700 .7rem/1.1 var(--font-mono)">○</span>' + bi("未检出端粒（点击查看原因）", "Absent (click for reason)") + '</span>',
+        '<span class="legend-item"><span class="badge tone-ok" style="padding:.04rem .36rem;border-radius:999px;font:700 .68rem/1.2 var(--font-mono)">TEL</span>' + bi("已检出端粒（点击查看）", "Telomere detected (click)") + '</span>',
+        '<span class="legend-item"><span class="badge tone-neutral" style="padding:.04rem .36rem;border-radius:999px;font:700 .7rem/1.1 var(--font-mono)">○</span>' + bi("未检出端粒（点击查看原因）", "Absent (click for reason)") + '</span>',
         *[f'<span class="legend-item"><i class="swatch" style="background:{c}"></i>{esc(ds)}</span>' for ds, c in colors.items()],
     ]
+    if has_gaps:
+        legend.append('<span class="legend-item"><i class="swatch is-orig-gap"></i>Gap</span>')
 
     body = [
         TERMINAL_STYLE,
         '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + '</div></div>',
-        '<div class="tel-axis"><small>q3 ' + bi("比例尺", "scale") + '</small><div class="tel-axis-pad"><small class="story-ruler">'
-        + "".join(f"<span>{esc(fmt_bp_short(round(m * i / 4)))}</span>" for i in range(5)) + "</small></div></div>",
+        '<div class="tel-frame" data-zoom-frame="1">',
+        f'<div class="tel-axis"><span>{bi("染色体", "Chromosome")}</span><div class="tel-axis-pad"><span class="story-ruler">'
+        + "".join(f"<span>{esc(fmt_bp_short(round(m * i / 4)))}</span>" for i in range(5)) + "</span></div></div>",
     ]
     templates = []
     for row in rows:
@@ -231,10 +263,14 @@ def terminal_card(lgz):
                 is_src = p["kind"] == "source"
                 color = colors.get(p.get("dataset"), "var(--ds-0)") if is_src else "var(--gen-unfilled)"
                 cls = "tel-part is-ctg" if is_src else "tel-part is-gap"
-                marks.append(f'<span class="{cls}" style="left:{100*p["start"]/n:.8g}%;width:{100*(p["end"]-p["start"])/n:.8g}%;background:{color}"></span>')
+                tip = f'{p.get("dataset", "")} / {p.get("name", "")} · q3 {p["start"]+1:,}–{p["end"]:,}' if is_src else f'Gap · q3 {p["start"]+1:,}–{p["end"]:,} · {p["end"]-p["start"]:,} N'
+                marks.append(f'<span class="{cls}" title="{esc(tip)}" style="left:{100*p["start"]/n:.8g}%;width:{100*(p["end"]-p["start"])/n:.8g}%;background:{color}"></span>')
+        chr_tel = 0
         for k in ("5prime", "3prime"):
             info = row["ends"].get(k)
             has_tel = bool(info and info["state"] in ("already_present", "recovered"))
+            if has_tel:
+                chr_tel += 1
             text = "TEL" if has_tel else "○"
             end = "5′" if k == "5prime" else "3′"
             side_cls = "is-5p" if k == "5prime" else "is-3p"
@@ -246,12 +282,15 @@ def terminal_card(lgz):
                 f'title="{title} · {text}" aria-label="{title} · {text}">{text}</button>'
             )
             templates.append(f'<template id="{key}" data-title="{title}">{_inspection(info, k, n)}</template>')
+        pill_cls = "is-full" if chr_tel == 2 else ("is-part" if chr_tel == 1 else "")
+        pill_html = f'<span class="tel-pill {pill_cls}">{chr_tel}/2 TEL</span>'
         body.append(
             f'<div class="tel-row">'
-            f'<div class="tel-chr-col"><b>{esc(c)}</b><small>{esc(fmt_bp_short(n))}</small></div>'
+            f'<div class="tel-chr-col"><div class="tel-chr-head"><b>{esc(c)}</b>{pill_html}</div><small>{esc(fmt_bp_short(n))}</small></div>'
             f'<div class="tel-gutter"><div class="tel-canvas">'
             f'<div class="tel-bar-wrap" style="width:{100*n/m:.9g}%">'
             f'<div class="tel-bar">{"".join(marks)}</div>{"".join(buttons)}'
             f'</div></div></div></div>'
         )
-    return section(*head, "".join(body + templates), right=right_txt)
+    body.append(zoom_button("06 端粒处理 · 放大视图", "06 Telomere processing · Enlarged view") + '</div>')
+    return section(*head, "".join(body + templates), sub_zh="q2 → q3", sub_en="q2 → q3", right=right_txt)

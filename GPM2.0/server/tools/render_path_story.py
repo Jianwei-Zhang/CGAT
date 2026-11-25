@@ -7,6 +7,19 @@ else:
     from render_refinement_report import bi, disclosure, esc, fmt_bp, fmt_bp_short, fmt_int, table
 
 
+def zoom_button(title_zh, title_en):
+    return (
+        f'<button type="button" class="chart-zoom-btn" data-chart-zoom="1" '
+        f'data-zoom-title-zh="{esc(title_zh)}" data-zoom-title-en="{esc(title_en)}" '
+        'title="放大查看 / Enlarge view" aria-label="放大查看 / Enlarge view">'
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>'
+        '<line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+        f'<span>{bi("放大", "Zoom")}</span></button>'
+    )
+
+
 def section(key, num, zh, en, body, *, sub_zh=None, sub_en=None, title_extra="", right=""):
     sub = f'<span class="story-sub">{bi(sub_zh, sub_en or sub_zh)}</span>' if sub_zh else ""
     extra = f'<div class="panel-head-right">{right}</div>' if right else ""
@@ -587,38 +600,27 @@ def q0_card(lgz):
 .q0-bands polygon:hover{fill-opacity:.52}
 .q0-key{display:inline-block;width:11px;height:8px;border-radius:2px;vertical-align:middle;flex-shrink:0}
 .q0-key.is-band{background:var(--brand);opacity:.28;transform:skewX(-18deg)}
-.q0-zoom-btn{position:absolute;right:10px;bottom:8px;z-index:4;display:inline-flex;align-items:center;gap:.32rem;height:26px;padding:0 8px;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-secondary);font:500 .75rem/1 inherit;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.07);transition:border-color .12s,background .12s,color .12s}
-.q0-zoom-btn:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
-.q0-zoom-bar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.65rem}
-.q0-zoom-ctrl{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem}
-.q0-zoom-ctrl button{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 .5rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-primary);font:600 .8rem/1 var(--font-mono);cursor:pointer;transition:border-color .12s,background .12s,color .12s}
-.q0-zoom-ctrl button:hover:not(:disabled){border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
-.q0-zoom-ctrl button:disabled{opacity:.42;cursor:not-allowed}
-.q0-zoom-pct{min-width:44px;text-align:center;font:600 .8rem/1 var(--font-mono);color:var(--text-secondary);font-variant-numeric:tabular-nums}
-.q0-zoom-stage{overflow:auto;max-height:72vh;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel)}
-.q0-zoom-stage.is-pannable{cursor:grab}
-.q0-zoom-stage.is-dragging{cursor:grabbing;user-select:none}
-.q0-zoom-stage .q0-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--q0-scale, 1))}
-.q0-zoom-stage .q0-axis,.q0-zoom-stage .q0-row{grid-template-columns:196px 46px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
-.q0-zoom-stage .q0-axis{position:sticky;top:0;z-index:8;background:var(--surface-subtle)}
-.q0-zoom-stage .q0-axis>:nth-child(1){position:sticky;left:0;z-index:9;background:var(--surface-subtle);padding:.55rem .6rem .45rem 1rem;display:flex;align-items:center;box-shadow:1px 0 0 var(--surface-subtle)}
-.q0-zoom-stage .q0-axis>:nth-child(2){position:sticky;left:196px;z-index:9;background:var(--surface-subtle);padding:.55rem .65rem .45rem .25rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;align-items:center;justify-content:flex-end}
-.q0-zoom-stage .q0-axis .story-ruler{margin:.55rem 1rem .45rem .75rem;min-width:0}
-.q0-zoom-stage .q0-chr-meta{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding:.9rem .6rem .9rem 1rem;display:flex;flex-direction:column;justify-content:center;box-shadow:1px 0 0 var(--surface-panel)}
-.q0-zoom-stage .q0-role-col{position:sticky;left:196px;z-index:5;height:auto;background:var(--surface-panel);padding:.95rem .65rem .95rem .25rem;font-size:.75rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12)}
-.q0-zoom-stage .q0-row:hover .q0-chr-meta{background:var(--surface-subtle);box-shadow:1px 0 0 var(--surface-subtle)}
-.q0-zoom-stage .q0-row:hover .q0-role-col{background:var(--surface-subtle)}
-.q0-zoom-stage .q0-chr-meta b{font-size:.9rem}
-.q0-zoom-stage .q0-rails{margin:.9rem 1rem .9rem .75rem;z-index:1}
-.q0-zoom-stage .q0-rail{height:18px}
-.q0-zoom-stage .q0-bands{height:46px}
-.q0-zoom-stage .q0-mark.ctg{min-width:7px}
-.q0-zoom-stage .q0-mark.input-gap,.q0-zoom-stage .q0-mark.ref-gap,.q0-zoom-stage .q0-mark.unknown-gap,.q0-zoom-stage .q0-mark.unspecified-gap{min-width:6px}
+.story-zoom-stage .q0-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--chart-scale, 1))}
+.story-zoom-stage .q0-axis,.story-zoom-stage .q0-row{grid-template-columns:196px 46px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.story-zoom-stage .q0-axis{position:sticky;top:0;z-index:8;background:var(--surface-subtle)}
+.story-zoom-stage .q0-axis>:nth-child(1){position:sticky;left:0;z-index:9;background:var(--surface-subtle);padding:.55rem .6rem .45rem 1rem;display:flex;align-items:center;box-shadow:1px 0 0 var(--surface-subtle)}
+.story-zoom-stage .q0-axis>:nth-child(2){position:sticky;left:196px;z-index:9;background:var(--surface-subtle);padding:.55rem .65rem .45rem .25rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;align-items:center;justify-content:flex-end}
+.story-zoom-stage .q0-axis .story-ruler{margin:.55rem 1rem .45rem .75rem;min-width:0}
+.story-zoom-stage .q0-chr-meta{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding:.9rem .6rem .9rem 1rem;display:flex;flex-direction:column;justify-content:center;box-shadow:1px 0 0 var(--surface-panel)}
+.story-zoom-stage .q0-role-col{position:sticky;left:196px;z-index:5;height:auto;background:var(--surface-panel);padding:.95rem .65rem .95rem .25rem;font-size:.75rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12)}
+.story-zoom-stage .q0-row:hover .q0-chr-meta{background:var(--surface-subtle);box-shadow:1px 0 0 var(--surface-subtle)}
+.story-zoom-stage .q0-row:hover .q0-role-col{background:var(--surface-subtle)}
+.story-zoom-stage .q0-chr-meta b{font-size:.9rem}
+.story-zoom-stage .q0-rails{margin:.9rem 1rem .9rem .75rem;z-index:1}
+.story-zoom-stage .q0-rail{height:18px}
+.story-zoom-stage .q0-bands{height:46px}
+.story-zoom-stage .q0-mark.ctg{min-width:7px}
+.story-zoom-stage .q0-mark.input-gap,.story-zoom-stage .q0-mark.ref-gap,.story-zoom-stage .q0-mark.unknown-gap,.story-zoom-stage .q0-mark.unspecified-gap{min-width:6px}
 @media (max-width:760px){
   .q0-axis,.q0-row{grid-template-columns:104px 26px minmax(0,1fr);gap:.4rem;padding-left:.65rem;padding-right:.65rem}
   .q0-chr-meta b{font-size:.8rem}
-  .q0-zoom-stage .q0-axis,.q0-zoom-stage .q0-row{grid-template-columns:132px 34px minmax(0,1fr);gap:0;padding:0}
-  .q0-zoom-stage .q0-axis>:nth-child(2),.q0-zoom-stage .q0-role-col{left:132px}
+  .story-zoom-stage .q0-axis,.story-zoom-stage .q0-row{grid-template-columns:132px 34px minmax(0,1fr);gap:0;padding:0}
+  .story-zoom-stage .q0-axis>:nth-child(2),.story-zoom-stage .q0-role-col{left:132px}
 }
 </style>"""
 
@@ -709,89 +711,12 @@ def q0_card(lgz):
         + "".join(f"<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>" for i in range(5))
         + "</span></div>"
     )
-    zoom_btn = (
-        '<button type="button" class="q0-zoom-btn" data-q0-zoom="1" '
-        'title="放大查看 / Enlarge view" aria-label="放大查看 / Enlarge view">'
-        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>'
-        '<line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
-        f'<span>{bi("放大", "Zoom")}</span></button>'
-    )
-    zoom_script = """<script data-cgat-ui="1" data-q0-zoom-ui="1">(()=>{
-  document.addEventListener('click',(ev)=>{
-    const btn=ev.target.closest('[data-q0-zoom="1"]');
-    if(!btn)return;
-    const dlg=document.getElementById('path-event-dialog');
-    const sec=btn.closest('#alignment-q0');
-    const srcFrame=sec&&sec.querySelector('.q0-frame');
-    if(!dlg||!srcFrame)return;
-    const wrap=document.createElement('div');
-    const bar=document.createElement('div');
-    bar.className='q0-zoom-bar';
-    const srcLegend=sec.querySelector('.legend-row');
-    if(srcLegend)bar.appendChild(srcLegend.cloneNode(true));
-    const ctrl=document.createElement('div');
-    ctrl.className='q0-zoom-ctrl';
-    const steps=[1,1.5,2,3,4];
-    let idx=0;
-    const outBtn=document.createElement('button');outBtn.type='button';outBtn.textContent='−';outBtn.title='Zoom out';
-    const pctEl=document.createElement('span');pctEl.className='q0-zoom-pct';pctEl.textContent='100%';
-    const inBtn=document.createElement('button');inBtn.type='button';inBtn.textContent='+';inBtn.title='Zoom in';
-    const rstBtn=document.createElement('button');rstBtn.type='button';
-    const rz=document.createElement('span');rz.className='t-zh';rz.textContent='重置';
-    const re=document.createElement('span');re.className='t-en';re.textContent='Reset';
-    rstBtn.append(rz,re);
-    ctrl.append(outBtn,pctEl,inBtn,rstBtn);
-    bar.appendChild(ctrl);
-    const stage=document.createElement('div');
-    stage.className='q0-zoom-stage';
-    const clone=srcFrame.cloneNode(true);
-    const cBtn=clone.querySelector('.q0-zoom-btn');
-    if(cBtn)cBtn.remove();
-    stage.appendChild(clone);
-    function applyZoom(){
-      const s=steps[idx];
-      clone.style.setProperty('--q0-scale',String(s));
-      pctEl.textContent=Math.round(s*100)+'%';
-      outBtn.disabled=idx<=0;
-      inBtn.disabled=idx>=steps.length-1;
-      rstBtn.disabled=idx===0;
-      stage.classList.toggle('is-pannable',s>1);
-    }
-    let drag=null;
-    stage.addEventListener('mousedown',(e)=>{
-      if(e.button!==0||steps[idx]<=1||!e.target.closest('.q0-rails,.story-ruler'))return;
-      drag={x:e.clientX,y:e.clientY,sl:stage.scrollLeft,st:stage.scrollTop};
-      stage.classList.add('is-dragging');
-    });
-    stage.addEventListener('mousemove',(e)=>{
-      if(!drag)return;
-      stage.scrollLeft=drag.sl-(e.clientX-drag.x);
-      stage.scrollTop=drag.st-(e.clientY-drag.y);
-    });
-    const endDrag=()=>{if(drag){drag=null;stage.classList.remove('is-dragging');}};
-    stage.addEventListener('mouseup',endDrag);
-    stage.addEventListener('mouseleave',endDrag);
-    outBtn.addEventListener('click',()=>{if(idx>0){idx--;applyZoom();}});
-    inBtn.addEventListener('click',()=>{if(idx<steps.length-1){idx++;applyZoom();}});
-    rstBtn.addEventListener('click',()=>{idx=0;applyZoom();stage.scrollLeft=0;});
-    applyZoom();
-    wrap.append(bar,stage);
-    dlg.dispatchEvent(new CustomEvent('cgat-open-custom',{detail:{
-      trigger:btn,wide:true,
-      titleZh:'03 初始路径 q0 · 放大视图',
-      titleEn:'03 Initial path q0 · Enlarged view',
-      content:wrap
-    }}));
-  });
-})();</script>"""
-    frame_html = f'<div class="q0-frame">{axis_html}{"".join(rows_html)}{zoom_btn}</div>'
+    zbtn = zoom_button("03 初始路径 q0 · 放大视图", "03 Initial path q0 · Enlarged view")
+    frame_html = f'<div class="q0-frame" data-zoom-frame="1">{axis_html}{"".join(rows_html)}{zbtn}</div>'
     body_html = (
         style
         + '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + "</div></div>"
         + frame_html
-        + zoom_script
     )
     right_bits = [bi(f"{len(tracks)} 条染色体", f"{len(tracks)} chrs")]
     if constructed:

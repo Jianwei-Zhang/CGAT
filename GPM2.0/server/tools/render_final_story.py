@@ -3,11 +3,11 @@ from collections import defaultdict
 import heapq
 
 try:
-    from render_path_story import section
+    from render_path_story import section, zoom_button
     from render_refinement_report import bi, esc, copy_btn, fmt_bp_short
     from report_gap_story import NAMES, tool_order
 except ModuleNotFoundError:
-    from .render_path_story import section
+    from .render_path_story import section, zoom_button
     from .render_refinement_report import bi, esc, copy_btn, fmt_bp_short
     from .report_gap_story import NAMES, tool_order
 
@@ -132,7 +132,7 @@ def final_card(vm):
     tools = sorted(vm['refinement_summary']['tools'], key=lambda r: tool_order(r['tool']))
     auto = bool(tools)
     versions = vm.get('final_versions')
-    num = '07' if auto else '06'
+    num = '08' if auto else '07'
     refs = vm['lgz_summary'].get('reference_tracks', {})
     ids = defaultdict(list)
     for g in vm['refinement_summary'].get('original_loci', []):
@@ -153,9 +153,9 @@ def final_card(vm):
     legend_bits.append('<span class="legend-item"><i class="swatch is-orig-gap"></i>Gap</span>')
 
     ruler = (
-        '<div class="final-axis"><small>' + bi('最终长度', 'Final length') + '</small><small class="story-ruler">'
+        '<div class="final-axis"><span>' + bi('染色体', 'Chromosome') + '</span><span class="story-ruler">'
         + ''.join(f'<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>' for i in range(5))
-        + '</small></div>'
+        + '</span></div>'
     )
 
     panels = []
@@ -177,17 +177,30 @@ def final_card(vm):
             + '</div>'
         )
         unchanged = '<p class="muted" style="margin:.35rem 0">' + bi('本版本未接纳新编辑，沿用 LGZ 序列。', 'No new edits were admitted; the LGZ sequence was retained.') + '</p>' if v['edits'] == 0 else ''
-        chr_count = len(v['tracks'] or [])
-        chr_lbl = bi(f'{chr_count} 条染色体', f'{chr_count} chromosomes') if chr_count else ''
+        v_tracks = v['tracks'] or []
+        chr_count = len(v_tracks)
+        tot_bp = sum(c['length'] for c in v_tracks)
+        tot_gaps = sum(1 for c in v_tracks for p in c['parts'] if p['kind'] == 'gap')
+        meta_bits = []
+        if chr_count:
+            meta_bits.append(bi(f'{chr_count} 条染色体', f'{chr_count} chrs'))
+            meta_bits.append(bi(f'总长 {fmt_bp_short(tot_bp)}', f'total {fmt_bp_short(tot_bp)}'))
+            meta_bits.append(bi(f'{tot_gaps} Gap', f'{tot_gaps} gaps'))
+        chr_lbl = ' · '.join(meta_bits)
         sub_bar = (
             '<div class="final-subhead">'
             f'<div class="final-subhead-left"><strong>{bi("假分子预览", "Pseudomolecule preview")}</strong>'
-            + (f'<span class="muted">{chr_lbl}</span>' if chr_count else '')
+            + (f'<span class="muted">{chr_lbl}</span>' if chr_lbl else '')
             + '</div>'
             f'<div class="legend-row" style="margin:0">{"".join(legend_bits)}</div></div>'
         )
         if v['tracks']:
-            tracks = ruler + '<div class="final-preview-list">' + ''.join(_row(c, domain, refs.get(c['chr']), idx, colors, tool_disp) for c in v['tracks']) + '</div>'
+            zbtn = zoom_button(f"{num} Final Path · 放大视图", f"{num} Final Path · Enlarged view")
+            tracks = (
+                '<div class="final-frame" data-zoom-frame="1">' + ruler
+                + '<div class="final-preview-list">' + ''.join(_row(c, domain, refs.get(c['chr']), idx, colors, tool_disp) for c in v['tracks']) + '</div>'
+                + zbtn + '</div>'
+            )
         else:
             tracks = '<p class="muted">' + bi('已验证 FASTA，未取得可核对的完整片段坐标，不绘制推测路径。', 'FASTA verified; a complete segment track is unavailable in this record.') + '</p>'
         if v.get('geometry_note') == 'source_extents_unverified':
@@ -214,41 +227,63 @@ STYLE = '''<style>
 .final-fasta .copy-btn{padding:.26rem .68rem;border-color:var(--tone-ok-line);background:var(--tone-ok-bg);color:var(--tone-ok-ink);font-weight:600;font-size:.79rem}
 .final-fasta .copy-btn:hover{filter:brightness(.97)}
 .final-subhead{display:flex;align-items:center;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap;margin:.2rem 0 .55rem}
-.final-subhead-left{display:inline-flex;align-items:baseline;gap:.55rem;font-size:.9rem}
-.final-axis,.final-preview-row>summary,.preview-detail-row{display:grid;grid-template-columns:156px minmax(0,1fr);align-items:center;gap:.75rem}
-.final-axis{align-items:end;padding:0 .35rem .32rem;border-bottom:1px solid var(--border-default);color:var(--text-muted);font-size:.76rem}
-.final-preview-list{border-bottom:1px solid var(--border-default)}
+.final-subhead-left{display:inline-flex;align-items:baseline;gap:.55rem;font-size:.88rem;flex-wrap:wrap}
+.final-subhead-left .muted{font-size:.8rem}
+.final-frame{position:relative;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden;padding-bottom:2.3rem}
+.final-frame.is-no-zoom{padding-bottom:0}
+.final-axis,.final-preview-row>summary,.preview-detail-row{display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;gap:.75rem}
+.final-axis{padding:.52rem .85rem .44rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.78rem;font-weight:600}
+.final-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.75rem}
+.final-preview-list{border-bottom:0}
 .final-preview-row{border-bottom:1px solid var(--border-subtle)}
 .final-preview-row:last-child{border-bottom:0}
-.final-preview-row>summary{cursor:pointer;list-style:none;padding:.42rem .35rem;min-height:2.1rem;transition:background .12s}
+.final-preview-row>summary{cursor:pointer;list-style:none;padding:.44rem .85rem;min-height:2.2rem;transition:background .12s}
 .final-preview-row>summary::-webkit-details-marker{display:none}
 .final-preview-row>summary:hover,.final-preview-row[open]>summary{background:var(--surface-subtle)}
 .preview-heading{display:flex;align-items:baseline;justify-content:space-between;gap:.35rem;min-width:0;white-space:nowrap;overflow:hidden}
 .preview-chr-name{display:inline-flex;align-items:center;gap:.36rem;font:600 .85rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis}
 .preview-chr-name::before{content:'▸';font-size:10px;color:var(--text-muted);flex-shrink:0}
 .final-preview-row[open]>summary .preview-chr-name::before{content:'▾'}
-.preview-chr-len{color:var(--text-muted);font-size:.76rem;font-variant-numeric:tabular-nums;flex-shrink:0}
-.preview-rail{position:relative;display:block;height:18px;min-width:0;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
-.preview-part{position:absolute;display:block;top:3px;height:12px;border:0;padding:0;border-radius:1.5px}
-.preview-part.adopted{min-width:1.5px;box-shadow:inset 0 0 0 .6px rgba(255,255,255,.42)}
-.preview-part.ref-body{background:var(--border-strong);height:8px;top:5px;opacity:.75}
-.preview-part.source-body{opacity:.22;height:12px;top:3px}
-.preview-part.path-gap{background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 4px);border:1px solid var(--border-default);z-index:1}
+.preview-chr-len{color:var(--text-muted);font-size:.75rem;font-variant-numeric:tabular-nums;flex-shrink:0}
+.preview-rail{position:relative;display:block;height:20px;min-width:0;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
+.preview-part{position:absolute;display:block;top:3px;height:14px;border:0;padding:0;border-radius:2px}
+.preview-part.adopted{min-width:6px;z-index:1;box-shadow:inset 0 0 0 .7px rgba(255,255,255,.5)}
+.preview-part.ref-body{background:var(--ctg-ref-fill);box-shadow:inset 0 0 0 1px var(--ctg-ref-stroke);height:12px;top:4px;opacity:1}
+.preview-part.source-body{opacity:.22;height:14px;top:3px}
+.preview-part.path-gap{min-width:5px;background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 3.5px);box-shadow:inset 0 0 0 1px var(--border-strong);z-index:2}
 .preview-part:is(button){cursor:pointer}
-.preview-part.refined{height:14px;top:2px;outline:1.2px solid var(--text-primary);z-index:2}
+.preview-part.refined{min-width:6px;height:16px;top:2px;outline:1.2px solid var(--text-primary);z-index:3}
 .preview-part[data-story-open]::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max(100%,14px);height:max(100%,18px)}
-.preview-expanded{padding:.35rem .35rem .5rem;border-top:1px dashed var(--border-subtle);background:var(--surface-subtle)}
+.preview-expanded{padding:.4rem .85rem .55rem;border-top:1px dashed var(--border-subtle);background:var(--surface-subtle)}
 .preview-label{container-type:inline-size;position:absolute;inset-block:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;z-index:3}
 .preview-label>span{display:none;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font:600 .69rem/1.15 var(--font-mono);background:rgba(255,255,255,.86);color:var(--text-primary);padding:0 .22em;border-radius:2px;max-width:92%}
 html[data-theme="dark"] .preview-label>span{background:rgba(15,20,25,.82)}
 @container (min-width:5.5rem){.preview-label>span{display:inline-block}}
-.preview-detail-row{font-size:.78rem;color:var(--text-secondary);min-height:1.45rem}
+.preview-detail-row{font-size:.78rem;color:var(--text-secondary);min-height:1.55rem}
 .preview-track-lbl{display:inline-flex;align-items:center;padding-left:.85rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.story-zoom-stage .final-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--chart-scale, 1))}
+.story-zoom-stage .final-axis,.story-zoom-stage .final-preview-row>summary,.story-zoom-stage .preview-detail-row{grid-template-columns:196px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.story-zoom-stage .final-axis{position:sticky;top:0;z-index:8;background:var(--surface-subtle)}
+.story-zoom-stage .final-axis>:first-child{position:sticky;left:0;z-index:9;background:var(--surface-subtle);padding:.55rem .7rem .45rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;align-items:center}
+.story-zoom-stage .final-axis .story-ruler{margin:.55rem 1rem .45rem .8rem;min-width:0}
+.story-zoom-stage .preview-heading{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding:.62rem .7rem .62rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);align-items:center}
+.story-zoom-stage .final-preview-row>summary:hover .preview-heading,.story-zoom-stage .final-preview-row[open]>summary .preview-heading{background:var(--surface-subtle)}
+.story-zoom-stage .preview-expanded{padding:0}
+.story-zoom-stage .preview-track-lbl{position:sticky;left:0;z-index:5;background:var(--surface-subtle);padding:.35rem .7rem .35rem 1.4rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12)}
+.story-zoom-stage .preview-rail{margin:.5rem 1rem .5rem .8rem;height:24px;z-index:1}
+.story-zoom-stage .preview-expanded .preview-rail{margin:.25rem 1rem .25rem .8rem}
+.story-zoom-stage .preview-part{top:3px;height:18px}
+.story-zoom-stage .preview-part.adopted{min-width:7px}
+.story-zoom-stage .preview-part.path-gap{min-width:6px}
+.story-zoom-stage .preview-part.ref-body{height:14px;top:5px}
+.story-zoom-stage .preview-part.refined{height:20px;top:2px;min-width:7px}
 @media (max-width:760px){
-  .final-axis,.final-preview-row>summary,.preview-detail-row{grid-template-columns:108px minmax(0,1fr);gap:.45rem}
+  .final-axis,.final-preview-row>summary,.preview-detail-row{grid-template-columns:108px minmax(0,1fr);gap:.45rem;padding-left:.65rem;padding-right:.65rem}
+  .preview-expanded{padding:.35rem .65rem .45rem}
   .preview-chr-name{font-size:.79rem}
   .preview-chr-len{font-size:.71rem}
   .preview-track-lbl{padding-left:.4rem}
+  .story-zoom-stage .final-axis,.story-zoom-stage .final-preview-row>summary,.story-zoom-stage .preview-detail-row{grid-template-columns:136px minmax(0,1fr);gap:0;padding:0}
 }
 </style>'''
 SCRIPT = '''<script data-cgat-ui="1">(()=>{const card=document.getElementById('final-path'),sel=card.querySelector('[data-final-version]');if(sel)sel.addEventListener('change',()=>{for(const p of card.querySelectorAll('[data-version-panel]'))p.hidden=p.dataset.versionPanel!==sel.value});card.addEventListener('click',e=>{if(e.target.closest('summary [data-story-open]'))e.preventDefault()})})();</script>'''

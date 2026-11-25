@@ -51,7 +51,7 @@ def gap_card(vm):
     note = (bi('本批未记录有效的原始 gap 分母。', 'No valid original gap denominator for this batch.') if total is None else
             bi(f'{total:,} 个 LGZ 原始 gap', f'{total:,} original LGZ gaps'))
     if total and 'original_loci' not in ref:
-        return section('auto-refinement', '06', '自动精修', 'Automatic refinement',
+        return section('auto-refinement', '07', '自动精修', 'Automatic refinement',
                        '<p class="muted">' + note + ' · ' + bi('旧报告只保存了预览，不绘制推测的位点。', 'Only a preview was recorded; a complete locus map is unavailable.') + '</p>')
     tool_sel = (
         '<label class="gap-tool-select-lbl">' + bi('当前工具', 'Current tool')
@@ -60,9 +60,9 @@ def gap_card(vm):
         + '</select></label>'
     )
     ruler = (
-        '<div class="gap-axis"><small>LGZ ' + bi('比例尺', 'scale') + '</small><small class="story-ruler">'
+        '<div class="gap-axis"><span>' + bi('染色体', 'Chromosome') + '</span><span class="story-ruler">'
         + ''.join(f'<span>{esc(fmt_bp_short(round(max_len * i / 4)))}</span>' for i in range(5))
-        + '</small><span></span></div>'
+        + '</span><span class="muted" style="text-align:right;font-weight:500">' + bi('位点', 'Locus') + '</span></div>'
     ) if payload['chr'] else ''
     legend = (
         '<div class="story-toolbar">'
@@ -73,16 +73,17 @@ def gap_card(vm):
         '</div>' + tool_sel + '</div>'
     )
     body = (
-        '<div id="auto-gap-story">' + legend + ruler + '<div data-gap-rows></div><noscript>'
+        '<div id="auto-gap-story">' + legend + '<div class="gap-frame">' + ruler + '<div data-gap-rows></div></div><noscript>'
         + bi('启用 JavaScript 以查看每个原始 gap。', 'Enable JavaScript to inspect individual gaps.')
         + '</noscript></div><template id="auto-gap-inspector" data-title="Gap"><div data-gap-inspector></div></template>'
         + '<template id="gap-svg-seed"><svg></svg></template><script type="application/json" id="auto-gap-data">' + data + '</script>'
         + STYLE + SCRIPT
     )
-    return section('auto-refinement', '06', '自动精修', 'Automatic refinement', body, right=note)
+    return section('auto-refinement', '07', '自动精修', 'Automatic refinement', body, right=note)
 
 
 STYLE = '''<style>
+.gap-frame{border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden}
 .gap-tool-select-lbl{display:inline-flex;align-items:center;gap:.4rem;font-size:.81rem;font-weight:500;color:var(--text-secondary)}
 .gap-tool-select-lbl select,.gap-row select{padding:.22rem .48rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-primary);font:500 .8rem/1.25 inherit}
 .gap-dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0}
@@ -90,18 +91,20 @@ STYLE = '''<style>
 .gap-dot.is-retained{background:var(--surface-panel);border:1.8px solid var(--border-strong)}
 .gap-dot.is-partial{background:var(--gen-partial)}
 .gap-dot.is-unknown{width:8px;height:2px;border-radius:1px;background:var(--border-strong)}
-.gap-axis,.gap-row{display:grid;grid-template-columns:148px minmax(2rem,1fr) auto;gap:.75rem;align-items:center}
-.gap-axis{align-items:end;padding:0 0 .32rem;border-bottom:1px solid var(--border-default);color:var(--text-muted);font-size:.76rem}
-.gap-row{border-bottom:1px solid var(--border-subtle);padding:.46rem 0}
-.gap-row:last-child{border-bottom:1px solid var(--border-default)}
+.gap-axis,.gap-row{display:grid;grid-template-columns:168px minmax(2rem,1fr) 118px;gap:.75rem;align-items:center}
+.gap-axis{padding:.52rem .85rem .44rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.78rem;font-weight:600}
+.gap-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.75rem}
+.gap-row{border-bottom:1px solid var(--border-subtle);padding:.58rem .85rem;transition:background .12s}
+.gap-row:last-child{border-bottom:0}
+.gap-row:hover{background:var(--surface-subtle)}
 .gap-row b{display:block;font:600 .85rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gap-row small{display:block;margin-top:.1rem;font:400 .75rem/1.3 sans-serif;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.gap-row small{display:block;margin-top:.12rem;font:400 .75rem/1.3 sans-serif;color:var(--text-muted);font-variant-numeric:tabular-nums}
 .gap-row small.has-closed{color:var(--tone-ok-ink);font-weight:600}
-.gap-row select{max-width:7.8rem;font-family:var(--font-mono);font-size:.76rem}
+.gap-row select{width:100%;max-width:7.4rem;justify-self:end;font-family:var(--font-mono);font-size:.76rem}
 .gap-track-box{min-width:0;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
-.gap-track{height:1.55rem;background:linear-gradient(var(--border-strong),var(--border-strong)) left center/100% 3px no-repeat;position:relative}
-.gap-track button{position:absolute;top:0;transform:translateX(-50%);min-width:14px;height:100%;padding:0;border:0;background:transparent;cursor:pointer;display:inline-grid;place-items:center}
-.gap-track button::after{content:"";width:9px;height:9px;border-radius:50%;background:var(--surface-panel);border:1.8px solid var(--border-strong);box-shadow:0 0 0 1.5px var(--surface-panel);transition:transform .1s}
+.gap-track{height:1.6rem;background:linear-gradient(var(--border-strong),var(--border-strong)) left center/100% 4px no-repeat;position:relative}
+.gap-track button{position:absolute;top:0;transform:translateX(-50%);min-width:16px;height:100%;padding:0;border:0;background:transparent;cursor:pointer;display:inline-grid;place-items:center}
+.gap-track button::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--surface-panel);border:1.8px solid var(--border-strong);box-shadow:0 0 0 1.5px var(--surface-panel);transition:transform .1s}
 .gap-track button.st-closed::after{background:var(--gen-closed);border-color:var(--gen-closed)}
 .gap-track button.st-partial::after{background:var(--gen-partial);border-color:var(--gen-partial)}
 .gap-track button.st-unknown::after{width:7px;height:3px;border-radius:1px;background:var(--border-strong);border:0}

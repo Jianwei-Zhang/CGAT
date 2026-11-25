@@ -128,9 +128,9 @@ def _batch(batch, number):
     legend_bits.append('<span class="legend-item"><i class="swatch is-orig-gap"></i>Gap</span>')
     body.append('<div class="story-toolbar"><div class="legend-row" style="margin:0">' + ''.join(legend_bits) + '</div></div>')
     body.append(
-        '<div class="final-axis"><small>' + bi('批次比例尺', 'Batch scale') + '</small><small class="story-ruler">'
+        '<div class="final-frame is-no-zoom"><div class="final-axis"><span>' + bi('染色体', 'Chromosome') + '</span><span class="story-ruler">'
         + ''.join(f'<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>' for i in range(5))
-        + '</small></div><div class="final-preview-list">'
+        + '</span></div><div class="final-preview-list">'
     )
 
     for c in tracks:
@@ -184,7 +184,7 @@ def _batch(batch, number):
             '<details class="final-preview-row"><summary>' + title + rail(c['after']) + '</summary>'
             '<div class="preview-expanded">' + detail_tracks + locus_bar + '</div></details>'
         )
-    body.append('</div>')
+    body.append('</div></div>')
     return ''.join(body + templates)
 
 
@@ -215,13 +215,14 @@ def manual_card(batches, base=''):
         if len(batches) > 1 else f'<code title="{full}">{short}</code>'
     )
     base_head = base.partition('<!-- CGAT:MANUAL_REFINEMENT_SECTION:START -->')[0]
+    num = '09' if 'id="auto-refinement"' in base_head else ('08' if 'id="final-path"' in base_head else '01')
     shared = (
         ('' if 'id="path-event-dialog"' in base_head else DIALOG)
         + ('' if 'data-gap-story-ui="1"' in base_head else '<template id="gap-svg-seed"><svg></svg></template>' + GAP_STYLE + GAP_SCRIPT)
         + ('' if '.final-preview-row' in base_head else PREVIEW_STYLE)
         + MANUAL_STYLE
     )
-    return section('manual-refinement', '08', '手动精修', 'Manual refinement', shared + ''.join(panels) + SCRIPT, right=chooser)
+    return section('manual-refinement', num, '手动精修', 'Manual refinement', shared + ''.join(panels) + SCRIPT.replace('__NUM__', num), right=chooser)
 
 
-SCRIPT = '''<script data-cgat-ui="1">(()=>{const card=document.getElementById('manual-refinement'),select=card.querySelector('[data-manual-select]');if(select)select.addEventListener('change',()=>{for(const p of card.querySelectorAll('[data-manual-batch]'))p.hidden=p.dataset.manualBatch!==select.value});card.addEventListener('click',e=>{if(e.target.closest('summary [data-story-open]'))e.preventDefault()});const nav=document.querySelector('.wb-sidebar .wb-toc');if(nav&&!nav.querySelector('[href="#manual-refinement"]')){const a=document.createElement('a');a.href='#manual-refinement';const n=document.createElement('span');n.className='toc-num';n.textContent='08';const wrap=document.createElement('span');for(const [lang,text] of [['zh','手动精修'],['en','Manual refinement']]){const s=document.createElement('span');s.className='t-'+lang;s.textContent=text;wrap.append(s)}a.append(n,wrap);const li=document.createElement('li');li.append(a);nav.append(li)}})();</script>'''
+SCRIPT = '''<script data-cgat-ui="1">(()=>{const card=document.getElementById('manual-refinement'),select=card.querySelector('[data-manual-select]');if(select)select.addEventListener('change',()=>{for(const p of card.querySelectorAll('[data-manual-batch]'))p.hidden=p.dataset.manualBatch!==select.value});card.addEventListener('click',e=>{if(e.target.closest('summary [data-story-open]'))e.preventDefault()});const nav=document.querySelector('.wb-sidebar .wb-toc');if(nav&&!nav.querySelector('[href="#manual-refinement"]')){const a=document.createElement('a');a.href='#manual-refinement';const n=document.createElement('span');n.className='toc-num';n.textContent='__NUM__';const wrap=document.createElement('span');for(const [lang,text] of [['zh','手动精修'],['en','Manual refinement']]){const s=document.createElement('span');s.className='t-'+lang;s.textContent=text;wrap.append(s)}a.append(n,wrap);const li=document.createElement('li');li.append(a);nav.append(li)}})();</script>'''
