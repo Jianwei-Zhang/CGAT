@@ -3,13 +3,39 @@ from __future__ import annotations
 import random
 import unittest
 
-from server.tools.lgz_core.q0_coverage import CoverageModel, Equivalence
+from server.tools.lgz_core.q0_coverage import CoverageModel, Equivalence, preliminary_ambiguity
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey
 
 
 class CoverageEquivalenceTests(unittest.TestCase):
     def setUp(self):
         self.a, self.b, self.c = [SourceKey(name, name) for name in "abc"]
+
+    def test_island_proof_matches_global_ambiguity_on_mixed_domains(self):
+        rng = random.Random(301193)
+        keys = (self.a, self.b, self.c)
+        required = {k: (Interval(0, 12), Interval(16, 30)) for k in keys}
+        for case in range(240):
+            relations = []
+            for _ in range(rng.randrange(2, 15)):
+                a, b = rng.choices(keys, k=2)
+                n = rng.randint(1, 8)
+                def span(source):
+                    domain = rng.choice(required[source]); x = rng.randint(domain.start, domain.end - n)
+                    return Interval(x, x + n)
+                relations.append(Equivalence(a, span(a), b, span(b), bool(rng.randrange(2)), str(rng.randrange(5))))
+            for compact in (False, True):
+                with self.subTest(case=case, compact=compact):
+                    expected = CoverageModel(required, relations, compact_first=compact).ambiguous_evidence_ids
+                    actual = preliminary_ambiguity(required, relations, compact_first=compact)
+                    self.assertEqual(actual, expected)
+                    kept = [r for r in relations if r.evidence_id not in actual]
+                    self.assertFalse(CoverageModel(required, kept, compact_first=compact).ambiguous_evidence_ids)
+
+    def test_early_affine_proof_does_not_skip_source_bounds(self):
+        relation = Equivalence(self.a, Interval(0, 5), self.b, Interval(10, 15), True, 'simple')
+        with self.assertRaisesRegex(Q0EvidenceError, 'escapes required'):
+            preliminary_ambiguity({self.a: (Interval(0, 4),), self.b: (Interval(10, 20),)}, [relation])
 
     def test_partial_cuts_propagate_through_forward_and_reverse_relations(self):
         required = {self.a: [Interval(10, 30)], self.b: [Interval(100, 120)], self.c: [Interval(200, 210)]}
