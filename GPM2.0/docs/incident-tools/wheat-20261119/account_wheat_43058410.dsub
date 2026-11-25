@@ -1,0 +1,39 @@
+#!/bin/bash
+#DSUB -n jm19_44e2_first_demand
+#DSUB -q x86
+#DSUB -aa
+#DSUB -R "cpu=5,mem=32768MB"
+#DSUB -D "43058410=SUCCEEDED"
+#DSUB -o account_%J.out
+# Diagnostic only. Submit once, after the whole-wheat first request exists.
+set -eo pipefail
+umask 077
+base="$HOME/cgat-reads-debug/jm19-compare-614589f-20261118"
+run="$base/q0-request-ready.44e274a7"
+old="$base/q0-latest-fork-20261123-1435"
+helpers="$base/q0-bound-first-demand.8xpsAJ"
+cd "$run/accounting"
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+[[ $(cat "$run/whole.jobid") == 43058410 && -s "$run/control/global-first-request.json" ]]
+request_sha=$(sha256sum "$run/control/global-first-request.json" | cut -d ' ' -f1)
+tail -c 65536 "$run/gate-v2/whole_43058410.out" | grep -Fx "$request_sha  control/global-first-request.json" >/dev/null
+printf '%s  %s\n' \
+  0588225c1b1744bac5673a9f851629dca536c0772439f83464ea75df0f496b6a "$run/control/started.json" \
+  0f06edd183467d950cd99d5c11ca8ed23ff57aaeacce96a6580b7527573dac28 "$run/latest.tgz" \
+  9d180274e7eaebb40a301a3bc886d0245a689b12dded4b52e080d805ea77dd65 "$old/runtime.tar.gz" \
+  9d0971e43033a2be9124a7956cfa41a9832c3c9d760f2768701e5090c5f7300d "$helpers/controls.sha256" \
+  2132e85ae9dae1870b572824bec0304069a16fd472930b3f43f422c5959fc348 account_repaired_wheat_request.py | sha256sum -c --quiet -
+work=$(mktemp -d /tmp/wheat-first-demand.XXXXXXXX); trap 'rm -rf -- "$work"' EXIT
+mkdir "$work/current" "$work/old" "$work/helpers"
+while read -r pin name; do
+  case "$name" in account_repaired_wheat_request.py|account.dsub) continue ;; esac
+  cp -- "$helpers/$name" "$work/helpers/$name"
+  printf '%s  %s\n' "$pin" "$work/helpers/$name" | sha256sum -c --quiet -
+done < "$helpers/controls.sha256"
+tar -xzf "$run/latest.tgz" -C "$work/current"; tar -xzf "$old/runtime.tar.gz" -C "$work/old"
+mkdir result  # exclusive output for this attempt, never overwrite a previous report
+PYTHONPATH="$work/current/GPM2.0/server/tools:$work/helpers" python3 -Bu account_repaired_wheat_request.py bind "$base" "$run/control" "$PWD/result"
+python3 -c 'import json,sys; sys.exit(json.load(open("result/bound.json"))["request_sha256"] != sys.argv[1])' "$request_sha"
+PYTHONPATH="$work/old/GPM2.0/server/tools:$work/helpers" python3 -Bu account_repaired_wheat_request.py count "$base" "$run/control" "$PWD/result"
+sha256sum result/first-demand.json
