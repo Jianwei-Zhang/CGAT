@@ -230,6 +230,29 @@ def assignment_groups(table, reference_order, complete=None):
         members = ((ds, ctg, chrom) for chrom, datasets in complete.items() for ds, names in datasets.items() for ctg in names)
     else:
         members = ((r["dataset_name"], r["seq_name"], r["assigned_chr_name"]) for r in preview)
+    meta = {}
+    for r in preview:
+        if not isinstance(r, dict):
+            continue
+        key = (r.get("dataset_name"), r.get("seq_name"), r.get("assigned_chr_name"))
+        info = {}
+        try:
+            length_val = int(r["seq_length_bp"])
+            if length_val >= 0:
+                info["length_bp"] = length_val
+        except (KeyError, TypeError, ValueError):
+            pass
+        orient = str(r.get("source_orientation") or "").strip()
+        if orient in ("+", "-"):
+            info["orientation"] = orient
+        try:
+            cov = float(r["support_percent"])
+            if 0 <= cov <= 100:
+                info["coverage_percent"] = round(cov, 2)
+        except (KeyError, TypeError, ValueError):
+            pass
+        if info:
+            meta[key] = info
     groups = {chrom: {} for chrom in reference_order}
     owners = defaultdict(set)
     seen = 0
@@ -245,9 +268,34 @@ def assignment_groups(table, reference_order, complete=None):
     if seen != count or any(r["assigned_chr_name"] not in owners.get((r["dataset_name"], r["seq_name"]), ()) for r in preview):
         raise ValueError("assignment membership does not match the snapshot")
     return [{"chr": chrom, "member_count": sum(map(len, sources.values())),
-             "sources": [{"dataset": ds, "members": [{"name": ctg, "multi": len(owners[ds, ctg]) > 1}
+             "sources": [{"dataset": ds, "members": [{"name": ctg, "multi": len(owners[ds, ctg]) > 1, **meta.get((ds, ctg, chrom), {})}
                                                        for ctg in names]} for ds, names in sources.items()]}
             for chrom, sources in groups.items()]
+
+
+def extract_unassigned(table):
+    """Allow-listed summary of contigs not assigned to any reference chromosome."""
+    if not isinstance(table, dict) or table.get("available") is not True or not isinstance(table.get("rows"), list):
+        return None
+    rows = table["rows"]
+    count = table.get("row_count", len(rows))
+    if type(count) is not int or count < 0:
+        count = len(rows)
+    items = []
+    for r in rows[:REPORT_PREVIEW_ROWS]:
+        if not isinstance(r, dict):
+            continue
+        ds = r.get("dataset_name")
+        seq = r.get("sequence") or r.get("seq_name")
+        if not safe_name(ds) or not safe_name(seq):
+            continue
+        entry = {"dataset": ds, "name": seq}
+        if type(r.get("length_bp")) is int and r["length_bp"] >= 0:
+            entry["length_bp"] = r["length_bp"]
+        if isinstance(r.get("reason"), str) and r["reason"].strip():
+            entry["reason"] = r["reason"].strip()
+        items.append(entry)
+    return {"count": count, "truncated": count > len(items), "items": items}
 
 
 def recorded_coverage(package):
@@ -498,6 +546,9 @@ def collect(layout):
                 out["funnel"].update(counts(summ, ("assigned_unique_contigs", "unassigned_contigs")))
                 out["assignment"]["groups"] = assignment_groups(
                     facts.get("tables", {}).get("assignments"), reference_order, facts.get("assignment_members"))
+                unassigned_info = extract_unassigned(facts.get("tables", {}).get("unassigned"))
+                if unassigned_info is not None:
+                    out["assignment"]["unassigned"] = unassigned_info
             if q0_table is None and unit in ("grt_prepare", "lgz_prepare"):
                 q0_table = facts.get("tables", {}).get("q_segments")
             q0 = facts.get("q0_construction") or q0

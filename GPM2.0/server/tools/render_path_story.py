@@ -7,13 +7,13 @@ else:
     from render_refinement_report import bi, disclosure, esc, fmt_bp, fmt_bp_short, fmt_int, table
 
 
-def section(key, num, zh, en, body, *, sub_zh=None, sub_en=None, right=""):
+def section(key, num, zh, en, body, *, sub_zh=None, sub_en=None, title_extra="", right=""):
     sub = f'<span class="story-sub">{bi(sub_zh, sub_en or sub_zh)}</span>' if sub_zh else ""
     extra = f'<div class="panel-head-right">{right}</div>' if right else ""
     return (
         f'<section class="panel path-story" id="{key}">'
         f'<div class="panel-head story-head">'
-        f'<h2><small class="story-num">{esc(num)}</small><span>{bi(zh, en)}</span>{sub}</h2>'
+        f'<h2><small class="story-num">{esc(num)}</small><span>{bi(zh, en)}</span>{sub}{title_extra}</h2>'
         f'{extra}</div>{body}</section>'
     )
 
@@ -45,13 +45,9 @@ button.input-qc-tag.is-clickable:hover{border-color:var(--gen-closed);box-shadow
 </style>"""
 
 ASSIGN_STYLE = """<style>
-details.assign-help{margin:0 0 .6rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
-details.assign-help>summary{display:inline-flex;align-items:center;gap:.45rem;width:100%;padding:.42rem .72rem;cursor:pointer;list-style:none;font-size:.82rem;font-weight:600;color:var(--accent)}
-details.assign-help>summary::-webkit-details-marker{display:none}
-details.assign-help>summary:hover{background:var(--surface-hover)}
-.assign-qmark{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--accent);font:700 11px/1 var(--font-mono);flex-shrink:0}
-.assign-help-cut{margin-left:auto;font-weight:500;color:var(--text-secondary);font-variant-numeric:tabular-nums}
-.assign-help-body{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:.85rem;align-items:center;padding:.65rem .8rem;border-top:1px solid var(--border-subtle);background:var(--surface-panel);font-size:.82rem;color:var(--text-secondary)}
+.story-help-btn{display:inline-grid;place-items:center;width:20px;height:20px;padding:0;margin-left:.08rem;border-radius:50%;border:1px solid var(--border-default);background:var(--surface-subtle);color:var(--text-muted);font:700 11.5px/1 var(--font-mono);cursor:pointer;vertical-align:middle;transition:border-color .12s,background .12s,color .12s}
+.story-help-btn:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.assign-rule-grid{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:.95rem;align-items:center;margin-top:.55rem}
 .assign-help-svg{display:block;width:100%;max-width:300px;height:auto}
 #multi-members-only{position:absolute;opacity:0;pointer-events:none}
 .assign-filter-lbl{display:inline-flex;align-items:center;gap:.38rem;margin:0 0 .55rem;padding:.24rem .62rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-secondary);font-size:.8rem;font-weight:500;cursor:pointer;user-select:none}
@@ -59,25 +55,30 @@ details.assign-help>summary:hover{background:var(--surface-hover)}
 #multi-members-only:checked+.assign-filter-lbl{border-color:var(--brand);background:var(--brand-soft);color:var(--brand);font-weight:600}
 #multi-members-only:checked+.assign-filter-lbl::before{border-color:var(--brand);background:var(--brand);box-shadow:inset 0 0 0 2px var(--surface-panel)}
 #multi-members-only:focus-visible+.assign-filter-lbl{outline:2px solid var(--focus-ring);outline-offset:2px}
-#multi-members-only:checked~.chr-members .member:not(.multi),#multi-members-only:checked~.chr-members .member-source:not(.multi){display:none}
-.chr-members{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-panel)}
-details.chr-group-row{border-bottom:1px solid var(--border-subtle)}
-details.chr-group-row:last-child{border-bottom:0}
-details.chr-group-row>summary{display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.48rem .75rem;cursor:pointer;list-style:none;font-size:.84rem;transition:background .12s}
-details.chr-group-row>summary::-webkit-details-marker{display:none}
-details.chr-group-row>summary:hover{background:var(--surface-subtle)}
-.chr-group-name{display:inline-flex;align-items:center;gap:.45rem;font:600 .85rem/1.25 var(--font-mono);color:var(--text-primary)}
-.chr-group-name::before{content:"▸";font-size:10px;color:var(--text-muted);transition:transform .12s}
-details.chr-group-row[open]>summary .chr-group-name::before{transform:rotate(90deg)}
-.chr-group-meta{display:inline-flex;align-items:center;gap:.45rem;font-size:.79rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
-.chr-group-body{padding:.55rem .8rem .65rem 1.65rem;border-top:1px solid var(--border-subtle);background:var(--surface-subtle)}
-.member-source{display:flex;align-items:baseline;gap:.45rem .65rem;flex-wrap:wrap;margin:.25rem 0;font-size:.82rem}
-.member-ds{font-weight:600;color:var(--text-secondary);min-width:4.5rem}
-.member-list{display:flex;flex-wrap:wrap;gap:.32rem .42rem;flex:1;min-width:0}
-.chr-members .member{display:inline-flex;align-items:center;gap:.3rem;padding:.12rem .46rem;border:1px solid var(--border-subtle);border-radius:3px;background:var(--surface-panel);font:500 .8rem/1.3 var(--font-mono);color:var(--text-primary)}
+#multi-members-only:checked~.chr-members .member:not(.multi),#multi-members-only:checked~.chr-members .member-source:not(.multi),#multi-members-only:checked~.chr-members .member-more,#multi-members-only:checked~.chr-members .assign-unassigned-row{display:none}
+.assign-table th,.assign-table td{padding:9px 12px}
+.assign-chr-name{font:600 .85rem/1.3 var(--font-mono);color:var(--text-primary);white-space:nowrap}
+.assign-count-cell{display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap}
+.assign-sources{display:flex;flex-direction:column;gap:.32rem}
+.member-source{display:flex;align-items:center;gap:.38rem .55rem;flex-wrap:wrap;font-size:.82rem}
+.member-ds{display:inline-flex;align-items:center;gap:.34rem;font-weight:600;color:var(--text-secondary);font-size:.8rem;white-space:nowrap}
+.member-list{display:flex;flex-wrap:wrap;align-items:center;gap:.28rem .36rem;flex:1;min-width:0}
+.chr-members .member{display:inline-flex;align-items:center;gap:.28rem;padding:2px 7px;border:1px solid var(--border-subtle);border-radius:4px;background:var(--surface-subtle);font:500 .79rem/1.3 var(--font-mono);color:var(--text-primary);cursor:default}
+.chr-members .member:hover{border-color:var(--border-default);background:var(--surface-panel)}
 .chr-members .member.multi{border-color:var(--tone-info-line);background:var(--tone-info-bg);color:var(--tone-info-ink)}
 .chr-members .multi small{padding:.02rem .28rem;border-radius:2px;background:var(--surface-panel);color:var(--tone-info-ink);font:600 .7rem/1.2 sans-serif}
-@media (max-width:680px){.assign-help-body{grid-template-columns:1fr}.chr-group-body{padding-left:.85rem}}
+.chr-members .member.is-unassigned{border-style:dashed;color:var(--text-secondary);background:transparent}
+details.member-more{display:inline-block}
+details.member-more>summary{display:inline-flex;align-items:center;padding:2px 8px;border:1px dashed var(--border-default);border-radius:4px;background:var(--surface-panel);color:var(--accent);font-size:.77rem;font-weight:500;cursor:pointer;list-style:none}
+details.member-more>summary::-webkit-details-marker{display:none}
+details.member-more>summary:hover{border-color:var(--accent);background:var(--brand-soft)}
+details.member-more[open]{display:block;flex-basis:100%;margin-top:.2rem}
+details.member-more[open]>summary{margin-bottom:.3rem}
+.member-more-list{display:flex;flex-wrap:wrap;gap:.28rem .36rem}
+tr.assign-unassigned-row>th,tr.assign-unassigned-row>td{background:var(--surface-subtle);border-top:1px dashed var(--border-default)}
+.assign-unassigned-badge{display:inline-block;padding:2px 8px;border:1px solid var(--border-default);border-radius:999px;background:var(--surface-panel);color:var(--text-muted);font-size:.78rem;font-weight:500;white-space:nowrap}
+.assign-unassigned-note{font-size:.76rem;color:var(--text-muted);margin-left:.25rem}
+@media (max-width:680px){.assign-rule-grid{grid-template-columns:1fr}}
 </style>"""
 
 
@@ -313,10 +314,10 @@ def input_card(inputs):
     return section("inputs", "01", "输入数据", "Inputs", INPUT_STYLE + grid + aux_html + "".join(templates), right=count_right)
 
 
-def assignment_card(assignment):
+def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None):
     threshold = assignment.get("min_coverage_percent")
     cut = (bi("本次阈值未记录", "Run threshold not recorded") if threshold is None else
-           bi(f"本次阈值 {threshold:g}%", f"Run threshold {threshold:g}%"))
+           bi(f"覆盖率阈值 ≥ {threshold:g}%", f"Coverage ≥ {threshold:g}%"))
     # A teaching schematic, not a measured alignment. No example bp or inferred run threshold.
     drawing = (
         '<svg class="assign-help-svg" viewBox="0 0 288 82" role="img" aria-label="Union coverage schematic / 并集覆盖示意">'
@@ -330,71 +331,186 @@ def assignment_card(assignment):
         '<rect x="52" y="60" width="224" height="9" rx="2" fill="var(--border-strong)"/>'
         '</svg>'
     )
-    rule = (
-        '<details class="assign-help">'
-        '<summary><span class="assign-qmark" aria-hidden="true">?</span>'
-        + bi("分配依据", "Assignment rule")
-        + f'<span class="assign-help-cut">{cut}</span></summary>'
-        '<div class="assign-help-body">'
-        + drawing
-        + '<div><p>'
+    rule_btn = (
+        '<button type="button" class="story-help-btn" data-story-open="assign-rule-modal" '
+        'title="分配依据 / Assignment rule" aria-label="分配依据 / Assignment rule">?</button>'
+    )
+    rule_modal = (
+        '<template id="assign-rule-modal" data-title="分配依据" data-title-zh="分配依据" data-title-en="Assignment Rule">'
+        f'<div class="story-verdict" style="margin:0">{cut}</div>'
+        '<div class="assign-rule-grid">'
+        '<div class="story-plot-frame" style="margin:0">' + drawing + '</div>'
+        '<div><p>'
         + bi(
-            "示意：将该 ctg 对该 ref_chr 的合格比对区间在 ctg 上取并集（重叠区间不重复计数），覆盖长度除以整条 ctg 长度。达到本次阈值即入组；同一条 ctg 可同时进入多个组。",
-            "Schematic: take the union of qualifying query intervals on the contig (overlapping hits counted once) and divide by full contig length. Every chromosome meeting the run threshold forms a group; one contig may belong to multiple groups.",
+            "将该 contig 对某条参考染色体的合格比对区间在 contig 自身坐标上取并集（重叠区间仅计一次），并集长度除以整条 contig 长度即为覆盖率。",
+            "Take the union of qualifying query alignment intervals on the contig (overlapping hits counted once) and divide by full contig length.",
         )
-        + f' · <b>{cut}</b></p></div></div></details>'
+        + '</p><p class="muted">'
+        + bi(
+            "达到本次覆盖率阈值即归入该染色体组；同一条 contig 可同时进入多个组（标为「多组」）。未分配仅表示未达过滤/阈值条件，不直接代表污染序列。",
+            "Every chromosome meeting the threshold receives the contig; one contig may belong to multiple groups. Unassigned indicates threshold/filter non-match, not contamination.",
+        )
+        + '</p></div></div></template>'
     )
     groups = assignment.get("groups")
     if groups is None:
         return section("chr-groups", "02", "染色体分组", "Chromosome groups",
-                       ASSIGN_STYLE + rule + '<p class="muted">' + bi("未记录完整的分组成员表", "Complete membership table unavailable") + "</p>",
-                       right=cut)
-    result = []
+                       ASSIGN_STYLE + '<p class="muted">' + bi("未记录完整的分组成员表", "Complete membership table unavailable") + "</p>" + rule_modal,
+                       title_extra=rule_btn, right=cut)
+
+    ds_colors = {
+        name: i % 6
+        for i, name in enumerate(dict.fromkeys([
+            *(a["name"] for a in (assemblies or []) if isinstance(a, dict) and a.get("name")),
+            *(s["dataset"] for g in groups for s in g.get("sources", []) if s.get("dataset")),
+        ]))
+    }
+    ref_map = ref_tracks if isinstance(ref_tracks, dict) else {}
+    unassigned_obj = assignment.get("unassigned") if isinstance(assignment.get("unassigned"), dict) else None
+    unassigned_count = (
+        unassigned_obj.get("count")
+        if unassigned_obj and isinstance(unassigned_obj.get("count"), int)
+        else (funnel.get("unassigned_contigs") if isinstance(funnel, dict) and isinstance(funnel.get("unassigned_contigs"), int) else 0)
+    )
+    assigned_unique = funnel.get("assigned_unique_contigs") if isinstance(funnel, dict) and isinstance(funnel.get("assigned_unique_contigs"), int) else None
+
+    def _member_chip(ds, member):
+        multi = bool(member.get("multi"))
+        tip_parts = [f'{ds} / {member["name"]}']
+        if isinstance(member.get("length_bp"), int):
+            tip_parts.append(f'{fmt_bp_short(member["length_bp"])} ({member["length_bp"]:,} bp)')
+        if member.get("orientation") in ("+", "-"):
+            tip_parts.append(f'({member["orientation"]})')
+        if isinstance(member.get("coverage_percent"), (int, float)):
+            tip_parts.append(f'{member["coverage_percent"]:g}%')
+        if multi:
+            tip_parts.append('multi-group')
+        tip = " · ".join(tip_parts)
+        label = esc(member["name"])
+        if multi:
+            label += " <small>" + bi("多组", "multi-group") + "</small>"
+        cls = "member multi" if multi else "member"
+        return f'<span class="{cls}" title="{esc(tip)}">{label}</span>'
+
+    table_rows = []
     has_multi = False
     for group in groups:
-        sources = []
+        sources_html = []
         group_multi = 0
         for source in group["sources"]:
-            members = []
-            source_multi = False
-            for member in source["members"]:
-                multi = member["multi"]
-                source_multi |= multi
-                if multi:
-                    group_multi += 1
-                label = esc(member["name"])
-                if multi:
-                    label += " <small>" + bi("多组", "multi-group") + "</small>"
-                members.append(f'<span class="member{" multi" if multi else ""}">{label}</span>')
+            ds = source["dataset"]
+            m_list = source["members"]
+            source_multi = any(m.get("multi") for m in m_list)
+            group_multi += sum(1 for m in m_list if m.get("multi"))
             has_multi |= source_multi
-            sources.append(
-                f'<div class="member-source{" multi" if source_multi else ""}">'
-                f'<span class="member-ds">{esc(source["dataset"])}</span>'
-                f'<div class="member-list">' + "".join(members) + "</div></div>"
+            # Keep all multi-group members visible up front so CSS-only filtering works without opening foldouts.
+            if len(m_list) > 8:
+                multi_first = [m for m in m_list if m.get("multi")]
+                non_multi = [m for m in m_list if not m.get("multi")]
+                vis_budget = max(6, len(multi_first))
+                visible = multi_first + non_multi[:max(0, vis_budget - len(multi_first))]
+                hidden = non_multi[max(0, vis_budget - len(multi_first)):]
+            else:
+                visible, hidden = m_list, []
+            chips = "".join(_member_chip(ds, m) for m in visible)
+            if hidden:
+                more_lbl = bi(f"+ 其余 {len(hidden)} 条", f"+ {len(hidden)} more")
+                chips += (
+                    f'<details class="member-more"><summary>{more_lbl}</summary>'
+                    f'<div class="member-more-list">' + "".join(_member_chip(ds, m) for m in hidden) + '</div></details>'
+                )
+            swatch = f'<i class="swatch" style="width:7px;height:7px;background:var(--ds-{ds_colors.get(ds, 0)})"></i>'
+            src_cls = "member-source multi" if source_multi else "member-source"
+            sources_html.append(
+                f'<div class="{src_cls}">'
+                f'<span class="member-ds">{swatch}{esc(ds)}</span>'
+                f'<div class="member-list">{chips}</div></div>'
             )
+        ref_info = ref_map.get(group["chr"])
+        ref_len = _fmt_catalog_length(ref_info.get("length_bp") if isinstance(ref_info, dict) else None, '<span class="muted">—</span>')
         count = group["member_count"]
         multi_lbl = bi(f"多组 {group_multi}", f"{group_multi} multi") if group_multi else ""
         multi_tag = f'<span class="badge tone-info">{multi_lbl}</span>' if group_multi else ""
-        count_txt = bi(f"{count} 个成员", f"{count} member" + ("" if count == 1 else "s"))
-        empty_txt = '<span class="muted">' + bi("无成员", "No members") + '</span>'
-        body_inner = "".join(sources) or empty_txt
-        result.append(
-            '<details class="chr-group-row">'
-            f'<summary><span class="chr-group-name">{esc(group["chr"])}</span>'
-            f'<span class="chr-group-meta">{multi_tag}<span>{count_txt}</span></span></summary>'
-            f'<div class="chr-group-body">{body_inner}</div>'
-            '</details>'
+        members_cell = f'<div class="assign-sources">{"".join(sources_html)}</div>' if sources_html else '<span class="muted">' + bi("无成员", "No members") + '</span>'
+        table_rows.append(
+            f'<tr><th scope="row"><span class="assign-chr-name">{esc(group["chr"])}</span></th>'
+            f'<td class="numeric">{ref_len}</td>'
+            f'<td class="numeric"><span class="assign-count-cell">{count:,}{multi_tag}</span></td>'
+            f'<td>{members_cell}</td></tr>'
         )
+
+    if unassigned_count > 0:
+        un_items = (unassigned_obj or {}).get("items") or []
+        if un_items:
+            by_ds = {}
+            for item in un_items:
+                by_ds.setdefault(item["dataset"], []).append(item)
+            un_sources = []
+            for ds, items in by_ds.items():
+                swatch = f'<i class="swatch" style="width:7px;height:7px;background:var(--ds-{ds_colors.get(ds, 0)})"></i>'
+                chips = []
+                for it in items[:8]:
+                    tip_bits = [f'{ds} / {it["name"]}']
+                    if isinstance(it.get("length_bp"), int):
+                        tip_bits.append(f'{fmt_bp_short(it["length_bp"])} ({it["length_bp"]:,} bp)')
+                    tip_bits.append("below alignment/coverage threshold")
+                    tip_s = " · ".join(tip_bits)
+                    chips.append(f'<span class="member is-unassigned" title="{esc(tip_s)}">{esc(it["name"])}</span>')
+                if len(items) > 8:
+                    extra_chips = "".join(
+                        f'<span class="member is-unassigned">{esc(it["name"])}</span>' for it in items[8:]
+                    )
+                    more_un_lbl = bi(f"+ 其余 {len(items) - 8} 条", f"+ {len(items) - 8} more")
+                    chips.append(
+                        f'<details class="member-more"><summary>{more_un_lbl}</summary>'
+                        f'<div class="member-more-list">{extra_chips}</div></details>'
+                    )
+                below_lbl = bi("未达覆盖率阈值", "Below threshold")
+                un_sources.append(
+                    f'<div class="member-source"><span class="member-ds">{swatch}{esc(ds)}</span>'
+                    f'<div class="member-list">{"".join(chips)}'
+                    f'<span class="assign-unassigned-note">{below_lbl}</span></div></div>'
+                )
+            un_cell = f'<div class="assign-sources">{"".join(un_sources)}</div>'
+        else:
+            un_cell = '<span class="muted">' + bi("未通过比对过滤或覆盖率阈值", "Did not pass alignment filter or coverage threshold") + '</span>'
+        un_badge = bi("未分配", "Unassigned")
+        table_rows.append(
+            '<tr class="assign-unassigned-row">'
+            f'<th scope="row"><span class="assign-unassigned-badge">{un_badge}</span></th>'
+            '<td class="numeric"><span class="muted">—</span></td>'
+            f'<td class="numeric">{unassigned_count:,}</td>'
+            f'<td>{un_cell}</td></tr>'
+        )
+
+    thead = (
+        '<thead><tr>'
+        f'<th scope="col">{bi("参考染色体", "Reference Chr")}</th>'
+        f'<th scope="col">{bi("参考长度", "Ref length")}</th>'
+        f'<th scope="col">{bi("成员数", "Members")}</th>'
+        f'<th scope="col">{bi("归属成员（按数据集）", "Assigned contigs (by dataset)")}</th>'
+        '</tr></thead>'
+    )
+    empty_row = f'<tr><td colspan="4" class="muted">{bi("无已记录的染色体组", "No recorded chromosome groups")}</td></tr>'
+    table_html = (
+        '<div class="project-dataset-scroll chr-members" tabindex="0" role="region" aria-label="Chromosome groups">'
+        f'<table class="project-dataset-table assign-table">{thead}<tbody>{"".join(table_rows) or empty_row}</tbody></table></div>'
+    )
+
     # The checkbox filters names only: chromosome totals always describe the complete dataset.
     toggle = ('<input id="multi-members-only" type="checkbox">'
               '<label class="assign-filter-lbl" for="multi-members-only">'
-              + bi("只看多组成员", "Only multi-group members") + "</label>" if has_multi else "")
-    grp_lbl = bi(f"{len(groups)} 个参考组", f"{len(groups)} ref groups")
-    head_right = f"{grp_lbl} · {cut}"
+              + bi("只看多组成员", "Only multi-group members") + "</label>") if has_multi else ""
+
+    right_bits = [bi(f"{len(groups)} 组", f"{len(groups)} groups")]
+    if assigned_unique is not None:
+        right_bits.append(bi(f"{assigned_unique:,} 已分配", f"{assigned_unique:,} assigned"))
+    if unassigned_count > 0:
+        right_bits.append(bi(f"{unassigned_count:,} 未分配", f"{unassigned_count:,} unassigned"))
+    right_bits.append(cut)
     return section("chr-groups", "02", "染色体分组", "Chromosome groups",
-                   ASSIGN_STYLE + rule + toggle
-                   + '<div class="chr-members">' + ("".join(result) or ('<p class="muted" style="padding:.6rem .8rem">' + bi("无已记录的染色体组", "No recorded chromosome groups") + '</p>')) + "</div>",
-                   right=head_right)
+                   ASSIGN_STYLE + toggle + table_html + rule_modal,
+                   title_extra=rule_btn, right=" · ".join(right_bits))
 
 
 def q0_card(lgz):

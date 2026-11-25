@@ -93,21 +93,23 @@ def render_overview(vm):
     if meta['mode']=='manual_only':
         body=_run_notices(vm)
     else:
+        lgz = vm["lgz_summary"]
         body = (
             _run_notices(vm)
-            + input_card(vm["lgz_summary"]["inputs"])
-            + assignment_card(vm["lgz_summary"].get("assignment", {}))
-            + q0_card(vm["lgz_summary"])
-            + repair_card(vm["lgz_summary"])
-            + repair_card(vm["lgz_summary"], structural=True)
-            + terminal_card(vm["lgz_summary"])
+            + input_card(lgz["inputs"])
+            + assignment_card(
+                lgz.get("assignment", {}),
+                ref_tracks=lgz.get("reference_tracks"),
+                assemblies=lgz.get("inputs", {}).get("assemblies"),
+                funnel=lgz.get("funnel"),
+            )
+            + q0_card(lgz)
+            + repair_card(lgz)
+            + repair_card(lgz, structural=True)
+            + terminal_card(lgz)
             + gap_card(vm)
             + final_card(vm)
-            + (DIALOG if vm["refinement_summary"]["tools"]
-               or any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene", "terminal_scene"))
-               or any(((vm["lgz_summary"].get("inputs") or {}).get("annotations") or {}).get(k, {}).get("configured") is True
-                      for k in ("telomere_rules", "centromere_reference"))
-               else "")
+            + DIALOG
         )
 
     brand_icon = (
