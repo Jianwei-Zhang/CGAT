@@ -129,19 +129,6 @@ test("project export page renders assignment bars before placed statistics with 
   assert.match(html, /data-project-export-action="log"/);
   assert.match(html, /data-project-export-action="fasta"/);
   assert.match(html, /data-project-export-action="all"/);
-  assert.match(html, />序列 \(.fasta\)<\/button>/);
-  assert.match(html, />AGP \(.agp\)<\/button>/);
-  assert.match(html, />表 \(.tsv\)<\/button>/);
-  assert.match(html, /<details class="project-preview-formats">\s*<summary[^>]*>假分子预览图<\/summary>[\s\S]*?>SVG<\/button>[\s\S]*?>PNG<\/button>[\s\S]*?>PDF<\/button>\s*<\/div>\s*<\/details>/);
-  assert.match(html, />日志 \(.log\)<\/button>/);
-  assert.match(html, />全部<\/button>/);
-  assert.match(html, />精修任务<\/button>/);
-  assert.ok(html.indexOf('data-project-export-action="agp"') < html.indexOf('data-project-export-action="fasta"'));
-  assert.ok(html.indexOf('data-project-export-action="agp"') < html.indexOf('data-project-export-action="tsv"'));
-  assert.ok(html.indexOf('data-project-export-action="tsv"') < html.indexOf('data-preview-format="png"'));
-  assert.ok(html.indexOf('data-preview-format="png"') < html.indexOf('data-project-export-action="log"'));
-  assert.ok(html.indexOf('data-project-export-action="log"') < html.indexOf('data-project-export-action="all"'));
-  assert.ok(html.indexOf('data-project-export-action="all"') < html.indexOf('data-project-export-action="refinement-all"'));
   assert.doesNotMatch(html, /导出图|导出表|导出日志|导出序列|一键导出|导出全部精修任务/);
   assert.doesNotMatch(html, /final path chr/i);
   assert.doesNotMatch(html, /project-export-summary-line/);
@@ -175,6 +162,25 @@ test("project export page renders assignment bars before placed statistics with 
   assert.doesNotMatch(pathHtml, /project-preview-axis|来源组合|Source composition/);
 });
 
+for (const [locale, names] of Object.entries({
+  en: ["Assembly Layout", "Assembly Sequence", "Path Details", "Assembly Statistics", "Pseudomolecule Preview", "All Assembly Outputs", "Refinement Task Bundle"],
+  zh: ["组装结构", "组装序列", "路径明细", "组装统计", "假分子预览图", "全部组装结果", "精修任务包"],
+})) test(`Home export groups named outputs, a side menu, batch and refinement (${locale})`, () => {
+  const html = renderProjectExportPage(createState({ locale })).split("data-project-export-menu>")[1].split("</header>")[0];
+  const keys = ["agp", "fasta", "tsv", "log", "preview", "all", "refinement-all"];
+  assert.deepEqual([...html.matchAll(/data-project-export-action="([^"]+)"|data-context-submenu-trigger|role="separator"/g)]
+    .map(m => m[1] || (m[0] === "data-context-submenu-trigger" ? "preview" : "|")), [...keys.slice(0, 5), "|", "all", "|", "refinement-all"]);
+  assert.deepEqual([...html.matchAll(/<span>([^<]+)<\/span>/g)].map(m => m[1]), names);
+  assert.deepEqual([...html.matchAll(/class="project-export-extension">([^<]+)/g)].map(m => m[1]), [".agp", ".fasta", ".tsv", ".log", ".zip"]);
+  assert.match(html, /data-context-submenu-trigger aria-haspopup="menu" aria-expanded="false"/);
+  assert.match(html, /class="context-menu-submenu" data-context-submenu role="menu"/);
+  assert.deepEqual([...html.matchAll(/data-preview-format="([^"]+)"/g)].map(m => m[1]), ["svg", "png", "pdf"]);
+  assert.doesNotMatch(html, /<details|<summary/);
+  const plan = __test.planProjectExportSteps({ kind: "all", baseName: "test", targetPath: "/out", labels: __test.getLabels({ locale }) });
+  const namesByKind = { png: names[4], tsv: names[2], log: names[3], fasta: names[1], agp: names[0] };
+  assert.deepEqual(plan.map(step => step.label), Object.entries(namesByKind).map(([kind, name]) => `${name} (.${kind})`));
+});
+
 test("Export opens on AGP and resets the image submenu when leaving the export root", async () => {
   const originalSetTimeout = globalThis.setTimeout;
   const originalClearTimeout = globalThis.clearTimeout;
@@ -192,11 +198,27 @@ test("Export opens on AGP and resets the image submenu when leaving the export r
   };
   try {
     let agpFocused = false;
-    const formats = { open: false };
+    const listenersForNode = () => ({ handlers: {},
+      addEventListener(k, fn) { (this.handlers[k] ||= new Set()).add(fn); },
+      removeEventListener(k, fn) { this.handlers[k]?.delete(fn); },
+      fire(k, attrs = {}) { for (const fn of this.handlers[k] || []) fn({ stopPropagation() {}, preventDefault() {}, ...attrs }); },
+    });
+    const classList = () => { const names = new Set(); return { add: k => names.add(k), remove: k => names.delete(k),
+      contains: k => names.has(k), toggle: (k, on) => on ? names.add(k) : names.delete(k) }; };
+    let focus;
+    const trigger = { ...listenersForNode(), setAttribute(k, v) { this[k] = v; }, focus() { focus = this; } };
+    const choices = ["svg", "png", "pdf"].map(format => ({ format, focus() { focus = this; } }));
+    const panel = { style: {}, classList: classList(), ownerDocument: { defaultView: { innerWidth: 700, innerHeight: 600 } },
+      getBoundingClientRect: () => ({ width: 100, height: 100 }), querySelectorAll: () => choices, querySelector: () => choices[0] };
+    const formats = { ...listenersForNode(), classList: classList(), contains: node => node === trigger || choices.includes(node),
+      getBoundingClientRect: () => ({ left: 510, right: 675, top: 555 }),
+      querySelector: selector => selector === "[data-context-submenu]" ? panel : trigger };
+
     const menuNode = {
       hidden: true,
       querySelector: selector => selector === '[data-project-export-action="agp"]:not(:disabled)'
-        ? { focus() { agpFocused = true; } } : selector === ".project-preview-formats" ? formats : null,
+        ? { focus() { agpFocused = true; } } : null,
+      querySelectorAll: selector => selector === "[data-context-submenu-group]" ? [formats] : [],
       classList: {
         contains(name) {
           return name === "is-hidden" ? menuNode.hidden : false;
@@ -261,7 +283,19 @@ test("Export opens on AGP and resets the image submenu when leaving the export r
     } });
     assert.equal(agpFocused, true);
     assert.equal(toggleNode["aria-expanded"], "true");
-    formats.open = true;
+    formats.fire("pointerenter");
+    assert.equal(trigger["aria-expanded"], "true");
+    assert.equal(panel.classList.contains("opens-left"), true);
+    assert.equal(panel.style.top, "-63px");
+    formats.fire("pointerleave", { relatedTarget: choices[0] });
+    assert.equal(formats.classList.contains("is-open"), true);
+    formats.fire("keydown", { key: "Escape", target: choices[0] });
+    assert.equal(trigger["aria-expanded"], "false"); assert.equal(focus, trigger);
+    assert.equal(menuNode.hidden, false);
+    trigger.fire("click", { detail: 0 });
+    assert.equal(focus, choices[0]);
+    formats.fire("keydown", { key: "ArrowDown", target: choices[0] });
+    assert.equal(focus, choices[1]);
 
     listeners.get("pointerout").forEach((handler) => handler({
       target: exportTarget,
@@ -273,7 +307,9 @@ test("Export opens on AGP and resets the image submenu when leaving the export r
     timers.delete(closeTimerId);
     closeTimer();
     assert.equal(menuNode.hidden, true);
-    assert.equal(formats.open, false);
+    assert.equal(formats.classList.contains("is-open"), false);
+    assert.equal(trigger["aria-expanded"], "false");
+    assert.equal(trigger.handlers.click.size, 0);
     assert.equal(toggleNode["aria-expanded"], "false");
 
     menuNode.hidden = false;
@@ -677,8 +713,10 @@ test("project export page renders export progress as a final-path style modal", 
 
   assert.match(html, /data-project-export-modal="true"/);
   assert.match(html, /data-project-export-overlay="true"/);
-  assert.match(html, /正在导出 Final Path/);
-  assert.match(html, /p1 · 全部/);
+  assert.match(html, /导出组装结果/);
+  assert.match(html, /p1 · 全部组装结果/);
+  assert.match(html, /正在执行：假分子预览图 \(\.png\)/);
+  assert.match(html, /class="pipeline-step-label">路径明细 \(\.tsv\)/);
   assert.match(html, /data-project-export-step-status="running"/);
   assert.match(html, /class="pipeline-spinner"/);
   assert.match(html, /data-project-export-close="true"/);
@@ -719,7 +757,7 @@ test("project export page hides log action and stats when any final path contain
   assert.match(html, /data-project-export-action="all"/);
   assert.doesNotMatch(html, /data-project-export-action="log"/);
   assert.doesNotMatch(html, /project-export-summary-line/);
-  assert.match(html, /组装统计和日志导出已关闭/);
+  assert.match(html, /无法显示或导出组装统计/);
   assert.doesNotMatch(html, /已使用主组装 Contig 数量/);
 });
 

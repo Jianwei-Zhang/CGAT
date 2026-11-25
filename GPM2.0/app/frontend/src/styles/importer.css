@@ -714,6 +714,7 @@
   .project-empty .project-entry-actions { gap: 10px; }
   .project-detail-overview { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-bottom: 16px; }
   .project-header-actions, .project-enter-assembly { justify-self: start; }
+  .project-header-actions [data-project-export-menu] { left: 0; right: auto; }
   .project-current .workspace-recipe-grid { grid-template-columns: minmax(0, 1fr); }
   .project-current .workspace-recipe-field { padding: 14px; }
   .project-import-dialog { padding: 20px; }

@@ -96,9 +96,14 @@
   outline: 2px solid var(--focus-ring, #4f82b5);
   outline-offset: 2px;
 }
-.project-preview-formats > summary.final-path-export-item { display: list-item; list-style-position: inside; white-space: nowrap; box-sizing: border-box; }
+[data-project-export-menu] { width: max-content; max-width: calc(100vw - 16px); }
+[data-project-export-menu] .final-path-export-item { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; }
 [data-project-export-menu] button:disabled { opacity: 0.5; cursor: default; }
-.project-preview-format-options { display: grid; padding-inline-start: 1rem; }
+.project-export-extension { color: var(--text-muted, #64748b); font-size: var(--font-small); }
+.project-preview-formats > .context-menu-submenu { min-width: 5rem; }
+/* Escape/Left must dismiss the flyout even when the pointer remains over its trigger. */
+.project-preview-formats:not(.is-open) > .context-menu-submenu,
+.project-preview-formats:has(> button:disabled) > .context-menu-submenu { display: none; }
 .project-export-actions,
 .project-export-toolbar {
   display: flex;

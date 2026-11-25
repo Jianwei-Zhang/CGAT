@@ -9,7 +9,7 @@ export const zh = {
 };
 export const en = {
   title: "Preview", sectionTitle: "Pseudomolecule Preview", subtitle: "Final Path sources · Click a chromosome to open Assembly", legend: "Show Legend",
-  loading: "Loading pseudomolecule previews…", retry: "Retry", refresh: "Refresh", exportImage: "Pseudomolecule Preview Image", exportFailed: "Preview image export failed: {message}", exportTooLarge: "The complete preview is too large to safely export as one PNG. Choose SVG or PDF instead.", exportExtensionMismatch: "The file extension must match the selected format (.{ext}).", empty: "No chromosomes",
+  loading: "Loading pseudomolecule previews…", retry: "Retry", refresh: "Refresh", exportImage: "Pseudomolecule Preview", exportFailed: "Preview image export failed: {message}", exportTooLarge: "The complete preview is too large to safely export as one PNG. Choose SVG or PDF instead.", exportExtensionMismatch: "The file extension must match the selected format (.{ext}).", empty: "No chromosomes",
   noProject: "Open an assembly first", open: "Open Assembly", reference: "Reference", unknown: "Other sources",
   compositionAxis: "Source composition", referenceAxis: "Reference placement overview", positionAxis: "Placement overview", pathAxis: "Assembly coordinates", noContigs: "No contigs",
   noPath: "No Final Path", unpositioned: "Unpositioned", unresolved: "Some fragment sources cannot be located",

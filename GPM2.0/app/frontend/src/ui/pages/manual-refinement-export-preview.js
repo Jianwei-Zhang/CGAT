@@ -19,7 +19,7 @@ import {
 
 const COPY = {
   zh: {
-    title: "导出全部精修任务",
+    title: "导出精修任务包",
     subtitle: "{project} · 共 {loci} 个位点 / {chrs} 条染色体",
     empty: "本项目暂无已登记的精修任务。请先进入「装配」页，在 Final Path 上登记 Gap 或左/右端粒位点。",
     chrCount: "{count} 个任务",
@@ -44,7 +44,7 @@ const COPY = {
     scopeNote: "仅导出本项目各染色体已登记位点，不扫描未选位点、不跨项目、不跟随轨道。",
   },
   en: {
-    title: "Export All Refinement Tasks",
+    title: "Export Refinement Task Bundle",
     subtitle: "{project} · {loci} loci across {chrs} chromosomes",
     empty: "No refinement tasks are queued in this project yet. Open Assembly to queue Gap or Left/Right Telomere loci on the Final Path.",
     chrCount: "{count} task(s)",

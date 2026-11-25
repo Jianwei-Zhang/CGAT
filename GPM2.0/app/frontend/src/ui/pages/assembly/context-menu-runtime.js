@@ -1,6 +1,8 @@
 import { isViewNavigationContextMenuTarget } from "./view-navigation-ui.js";
 import { resolveMainAlignmentContextTarget, resolveMainContigSourcePosition } from "./main-alignment-anchors.js";
-import { bindDelayedFloatingClose, bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from "../floating-menu-runtime.js";
+import { bindFloatingSubmenus as bindContextSubmenuInteractions } from "../floating-submenu-runtime.js";
+export { positionContextSubmenuWithinViewport, bindFloatingSubmenus as bindContextSubmenuInteractions } from "../floating-submenu-runtime.js";
+import { bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from "../floating-menu-runtime.js";
 import { requestAppConfirm } from "../../shell/app-dialog.js";
 import {
   filterPrimaryTrackSelectionCtgIds,
@@ -194,69 +196,6 @@ function resolveContextMenuItemByPath(items, path) {
     entries = Array.isArray(item?.children) ? item.children : [];
   }
   return item;
-}
-
-export function positionContextSubmenuWithinViewport(group, submenu) {
-  if (!group || !submenu || typeof group.getBoundingClientRect !== "function") {
-    return;
-  }
-  const viewportWidth = Number((submenu.ownerDocument?.defaultView || globalThis.window)?.innerWidth)
-    || Number(globalThis.document?.documentElement?.clientWidth)
-    || 0;
-  const viewportHeight = Number((submenu.ownerDocument?.defaultView || globalThis.window)?.innerHeight)
-    || Number(globalThis.document?.documentElement?.clientHeight)
-    || 0;
-  if (viewportWidth <= 0 || viewportHeight <= 0) {
-    return;
-  }
-  const margin = 8;
-  const groupRect = group.getBoundingClientRect();
-  const submenuRect = typeof submenu.getBoundingClientRect === "function"
-    ? submenu.getBoundingClientRect()
-    : {};
-  const submenuWidth = Math.max(0, Number(submenuRect?.width || submenu.offsetWidth || 0));
-  const submenuHeight = Math.max(0, Number(submenuRect?.height || submenu.offsetHeight || 0));
-  const availableRight = Math.max(0, viewportWidth - Number(groupRect?.right || 0) - margin);
-  const availableLeft = Math.max(0, Number(groupRect?.left || 0) - margin);
-  submenu.classList?.toggle?.(
-    "opens-left",
-    submenuWidth > availableRight && availableLeft > availableRight,
-  );
-
-  const groupTop = Number(groupRect?.top || 0);
-  const defaultTop = -4;
-  const minTop = margin - groupTop;
-  const maxTop = viewportHeight - margin - groupTop - submenuHeight;
-  submenu.style.top = `${Math.max(minTop, Math.min(defaultTop, maxTop))}px`;
-}
-
-export function bindContextSubmenuInteractions(menu, options = {}) {
-  const cleanups = [];
-  menu?.querySelectorAll?.("[data-context-submenu-group]").forEach((group) => {
-    const submenu = group.querySelector?.("[data-context-submenu]");
-    const trigger = group.querySelector?.("[data-context-submenu-trigger]");
-    if (!submenu || trigger?.disabled || group.classList?.contains?.("is-disabled")) {
-      return;
-    }
-    const closeTimer = Symbol("submenuCloseTimer");
-    const open = () => {
-      cancelDelayedFloatingClose(group, closeTimer, options);
-      group.classList?.add?.("is-open");
-      trigger?.setAttribute?.("aria-expanded", "true");
-      positionContextSubmenuWithinViewport(group, submenu);
-    };
-    const close = () => {
-      group.classList?.remove?.("is-open");
-      trigger?.setAttribute?.("aria-expanded", "false");
-    };
-    cleanups.push(bindDelayedFloatingClose(group, close, { delayMs: 0, ...options, timerKey: closeTimer }));
-    group.addEventListener?.("pointerenter", open);
-    trigger?.addEventListener?.("click", (event) => {
-      event?.stopPropagation?.();
-      open();
-    });
-  });
-  return () => cleanups.forEach(cleanup => cleanup());
 }
 
 export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {

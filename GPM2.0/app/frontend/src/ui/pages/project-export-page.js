@@ -30,6 +30,7 @@ import {
   buildTimestampedExportBaseName,
   resolveExportTimestamp,
 } from "./assembly/final-path-export-runtime.js";
+import { bindFloatingSubmenus } from "./floating-submenu-runtime.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS, bindDelegatedDelayedFloatingClose } from "./floating-menu-runtime.js";
 import {
   canonicalizeFinalPathOverallLengths,
@@ -59,6 +60,7 @@ const OVERVIEW_PREVIEW_BOUND = Symbol("overviewPreviewBound");
 const PROJECT_DATA_FRESHNESS_BOUND = Symbol("projectDataFreshnessBound");
 const projectDataRequests = new WeakMap();
 const PROJECT_EXPORT_BOUND = Symbol("projectExportBound");
+const projectExportSubmenuBindings = new WeakMap();
 const PROJECT_EXPORT_MENU_CLOSE_TIMER = "__projectExportMenuCloseTimer";
 const PROJECT_EXPORT_DETAIL_FILTER_KEYS = new Set(["type", "chr", "dataset"]);
 const PROJECT_EXPORT_DETAIL_FILTER_NONE = "__project_export_filter_none__";
@@ -446,16 +448,17 @@ function getLabels(state) {
       loading: "Loading overview data...",
       refresh: "Refresh",
       export: "Export",
-      exportAll: "All",
+      exportAll: "All Assembly Outputs",
+      exportAllHint: "Includes one PNG preview and all available assembly outputs. The refinement task bundle is separate.",
       exportImage,
-      exportTsv: "Table (.tsv)",
-      exportFasta: "Sequence (.fasta)",
-      exportAgp: "AGP (.agp)",
-      exportLog: "Log (.log)",
-      exportRefinementAll: "Refinement Tasks",
-      exportDialogTitle: "Exporting Final Path",
+      exportTsv: "Path Details",
+      exportFasta: "Assembly Sequence",
+      exportAgp: "Assembly Layout",
+      exportLog: "Assembly Statistics",
+      exportRefinementAll: "Refinement Task Bundle",
+      exportDialogTitle: "Export Assembly Outputs",
       exportRunning: "Running: {step}",
-      refDisabled: "A Final Path in this assembly contains reference objects. Statistics and log export are disabled; export functions remain available.",
+      refDisabled: "A Final Path in this assembly contains reference objects. Assembly statistics cannot be displayed or exported. Other outputs remain available.",
       placedStats: "Placed statistics",
       countLabel: "Count",
       lengthLabel: "Length",
@@ -511,16 +514,17 @@ function getLabels(state) {
     loading: "正在加载概览数据...",
     refresh: "刷新",
     export: "导出",
-    exportAll: "全部",
+    exportAll: "全部组装结果",
+    exportAllHint: "包含可用的组装结果和一张 PNG 预览图，不含精修任务包。",
     exportImage,
-    exportTsv: "表 (.tsv)",
-    exportFasta: "序列 (.fasta)",
-    exportAgp: "AGP (.agp)",
-    exportLog: "日志 (.log)",
-    exportRefinementAll: "精修任务",
-    exportDialogTitle: "正在导出 Final Path",
+    exportTsv: "路径明细",
+    exportFasta: "组装序列",
+    exportAgp: "组装结构",
+    exportLog: "组装统计",
+    exportRefinementAll: "精修任务包",
+    exportDialogTitle: "导出组装结果",
     exportRunning: "正在执行：{step}",
-    refDisabled: "检测到组装中某个染色体的 Final Path 包含参考序列对象。本页仅保留导出功能，组装统计和日志导出已关闭。",
+    refDisabled: "当前组装的 Final Path 包含参考序列对象，无法显示或导出组装统计。其他结果仍可导出。",
     placedStats: "已放置统计",
     countLabel: "数目",
     lengthLabel: "长度",
@@ -1391,24 +1395,12 @@ function resolveProjectExportJumpTarget(state, target) {
   };
 }
 
-function resolveProjectExportKindLabel(job, labels) {
-  const kind = normalizeString(job?.kind).toLowerCase();
-  if (kind === "tsv") {
-    return labels.exportTsv || "表(.tsv)";
-  }
-  if (kind === "agp") {
-    return labels.exportAgp || "AGP (.agp)";
-  }
-  if (kind === "fasta") {
-    return labels.exportFasta || "序列(.fasta)";
-  }
-  if (kind === "log") {
-    return labels.exportLog || "日志(.log)";
-  }
-  if (kind === "all") {
-    return labels.exportAll || "All";
-  }
-  return kind || (labels.export || "Export");
+const exportLabelKeys = { agp: "exportAgp", fasta: "exportFasta", tsv: "exportTsv", log: "exportLog",
+  png: "exportImage", all: "exportAll", "refinement-all": "exportRefinementAll" };
+
+function projectExportStepLabel(step, labels) {
+  const name = labels[exportLabelKeys[step?.kind]];
+  return name ? `${name} (.${step.kind})` : normalizeString(step?.label);
 }
 
 function resolveProjectExportStatusText(job, labels) {
@@ -1422,7 +1414,8 @@ function resolveProjectExportStatusText(job, labels) {
     return labels.canceled || "已终止，已保留已导出的文件";
   }
   const template = labels.exportRunning || "正在执行：{step}";
-  return template.replace("{step}", normalizeString(job?.currentStep));
+  const step = job?.steps?.find(item => item.label === job.currentStep);
+  return template.replace("{step}", step ? projectExportStepLabel(step, labels) : normalizeString(job?.currentStep));
 }
 
 function renderProjectExportStepIcon(status) {
@@ -1460,7 +1453,7 @@ function resolveProjectExportStepStatus(job, step) {
   return "pending";
 }
 
-function renderProjectExportSteps(job) {
+function renderProjectExportSteps(job, labels) {
   const steps = Array.isArray(job?.steps) ? job.steps : [];
   if (!steps.length) {
     return "";
@@ -1474,7 +1467,7 @@ function renderProjectExportSteps(job) {
             class="pipeline-step-row assembly-final-path-export-step ${escapeAttr(stepStatus)}"
             data-project-export-step-status="${escapeAttr(stepStatus)}"
           >
-            <span class="pipeline-step-label">${escapeHtml(String(step?.label || ""))}</span>
+            <span class="pipeline-step-label">${escapeHtml(projectExportStepLabel(step, labels))}</span>
             <span class="pipeline-step-icon">${renderProjectExportStepIcon(stepStatus)}</span>
           </div>
         `;
@@ -1499,7 +1492,7 @@ function renderProjectExportJobModal(job, labels) {
   if (!job?.open) {
     return "";
   }
-  const kindLabel = resolveProjectExportKindLabel(job, labels);
+  const kindLabel = labels[exportLabelKeys[job.kind]] || job.kind;
   const statusText = resolveProjectExportStatusText(job, labels);
   const statusClass = job?.status === "success" ? "success" : "";
   return `
@@ -1509,7 +1502,7 @@ function renderProjectExportJobModal(job, labels) {
         data-project-export-modal="true"
         role="dialog"
         aria-modal="true"
-        aria-label="${escapeAttr(labels.exportDialogTitle || "正在导出 final path")}"
+        aria-label="${escapeAttr(labels.exportDialogTitle)}"
       >
         <button
           type="button"
@@ -1518,10 +1511,10 @@ function renderProjectExportJobModal(job, labels) {
         >x</button>
         <div class="assembly-final-path-export-body">
           <header class="assembly-final-path-export-head">
-            <h4>${escapeHtml(labels.exportDialogTitle || "正在导出 final path")}</h4>
+            <h4>${escapeHtml(labels.exportDialogTitle)}</h4>
             <p class="muted">${escapeHtml(`${normalizeString(job?.projectName)} · ${kindLabel}`)}</p>
           </header>
-          ${renderProjectExportSteps(job)}
+          ${renderProjectExportSteps(job, labels)}
           <p class="muted assembly-final-path-export-status ${escapeAttr(statusClass)}">${escapeHtml(statusText)}</p>
           ${job?.error ? `<p class="error-text">${escapeHtml(String(job.error || ""))}</p>` : ""}
           ${renderProjectExportCompletedOutputs(job)}
@@ -1532,25 +1525,32 @@ function renderProjectExportJobModal(job, labels) {
 }
 
 function renderProjectExportMenu({ labels, fresh, previewReady, canExportFasta, canExportLog }) {
-  const item = (action, label, attrs = "") => `<button type="button" class="final-path-export-item" data-project-export-action="${action}"${attrs}>${escapeHtml(label)}</button>`;
+  const item = (action, ext, attrs = "") => `<button type="button" class="final-path-export-item" data-project-export-action="${action}"${attrs}>
+    <span>${escapeHtml(labels[exportLabelKeys[action]])}</span>${ext ? `<span class="project-export-extension">.${ext}</span>` : ""}</button>`;
+  const divider = '<div class="final-path-export-divider" role="separator"></div>';
   const pending = fresh ? "" : " disabled";
+  const imagePending = previewReady ? "" : " disabled";
+  const batchAttrs = fresh ? ` data-preview-required${imagePending}` : pending;
+  const formats = previewImageFormats.map(format => `<button type="button" role="menuitem" class="final-path-export-item" data-preview-format="${format}" data-preview-required${imagePending}>${format.toUpperCase()}</button>`).join("");
   const label = escapeAttr(labels.export);
   return `
     <div class="final-path-export" data-project-export>
       <button type="button" class="button ghost tiny final-path-export-toggle" data-project-export-toggle="true"
         aria-label="${label}" data-app-tooltip="${label}" aria-expanded="false">${projectIcon("export")}</button>
       <div class="final-path-export-menu is-hidden" data-project-export-menu>
-        ${item("agp", labels.exportAgp, pending)}
-        ${canExportFasta ? item("fasta", labels.exportFasta) : ""}
-        ${item("tsv", labels.exportTsv, pending)}
-        <details class="project-preview-formats">
-          <summary class="final-path-export-item">${escapeHtml(labels.exportImage)}</summary>
-          <div class="project-preview-format-options">${previewImageFormats.map(format => `<button type="button" class="final-path-export-item" data-preview-format="${format}" data-preview-required${previewReady ? "" : " disabled"}>${format.toUpperCase()}</button>`).join("")}</div>
-        </details>
-        ${canExportLog ? item("log", labels.exportLog) : ""}
-        ${item("all", labels.exportAll, fresh ? ` data-preview-required${previewReady ? "" : " disabled"}` : pending)}
-        <div class="final-path-export-divider" role="separator" aria-hidden="true"></div>
-        ${item("refinement-all", labels.exportRefinementAll, pending)}
+        ${item("agp", "agp", pending)}
+        ${canExportFasta ? item("fasta", "fasta") : ""}
+        ${item("tsv", "tsv", pending)}
+        ${canExportLog ? item("log", "log") : ""}
+        <div class="context-menu-submenu-group project-preview-formats" data-context-submenu-group>
+          <button type="button" class="final-path-export-item context-menu-submenu-trigger" data-context-submenu-trigger aria-haspopup="menu" aria-expanded="false" data-preview-required${imagePending}>
+            <span>${escapeHtml(labels.exportImage)}</span><span class="context-menu-submenu-indicator" aria-hidden="true">›</span></button>
+          <div class="context-menu-submenu" data-context-submenu role="menu" aria-label="${escapeAttr(labels.exportImage)}">${formats}</div>
+        </div>
+        ${divider}
+        ${item("all", "", `${batchAttrs} data-app-tooltip="${escapeAttr(labels.exportAllHint)}"`)}
+        ${divider}
+        ${item("refinement-all", "zip", pending)}
       </div>
     </div>
   `;
@@ -2068,43 +2068,15 @@ function planProjectExportSteps({
   targetPath,
   canExportFasta = true,
   canExportLog = true,
-  previewImageLabel = "假分子预览图",
+  labels = getLabels({ locale: "zh" }),
 }) {
-  const normalizedKind = normalizeString(kind).toLowerCase();
-  const buildStep = (stepKind, label, extension) => ({
-    kind: stepKind,
-    label,
-    outputPath: normalizedKind === "all"
-      ? joinOutputPath(targetPath, `${baseName}.${extension}`)
-      : targetPath,
-  });
-  if (normalizedKind === "tsv") {
-    return [buildStep("tsv", "表(.tsv)", "tsv")];
-  }
-  if (normalizedKind === "log") {
-    return canExportLog ? [buildStep("log", "日志(.log)", "log")] : [];
-  }
-  if (normalizedKind === "agp") {
-    return [buildStep("agp", "AGP (.agp)", "agp")];
-  }
-  if (normalizedKind === "fasta") {
-    return canExportFasta ? [buildStep("fasta", "序列(.fasta)", "fasta")] : [];
-  }
-  if (normalizedKind === "all") {
-    const steps = [
-      buildStep("png", `${previewImageLabel} (.png)`, "png"),
-      buildStep("tsv", "表(.tsv)", "tsv"),
-    ];
-    if (canExportLog) {
-      steps.push(buildStep("log", "日志(.log)", "log"));
-    }
-    if (canExportFasta) {
-      steps.push(buildStep("fasta", "序列(.fasta)", "fasta"));
-    }
-    steps.push(buildStep("agp", "AGP (.agp)", "agp"));
-    return steps;
-  }
-  return [];
+  // Keep the existing batch write order and cancellation / partial-output semantics.
+  const available = ["png", "tsv", ...(canExportLog ? ["log"] : []), ...(canExportFasta ? ["fasta"] : []), "agp"];
+  const action = normalizeString(kind).toLowerCase();
+  const kinds = action === "all" ? available : available.filter(k => k !== "png" && k === action);
+  return kinds.map(kind => ({ kind, label: projectExportStepLabel({ kind }, labels),
+    outputPath: action === "all" ? joinOutputPath(targetPath, `${baseName}.${kind}`) : targetPath,
+  }));
 }
 
 async function runProjectExport(host, store, kind, deps = {}) {
@@ -2157,7 +2129,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
     targetPath,
     canExportFasta: canProjectExportFasta(state),
     canExportLog: model.canExportLog,
-    previewImageLabel: getLabels(state).exportImage,
+    labels: getLabels(state),
   });
   if (!steps.length) {
     return false;
@@ -2468,9 +2440,10 @@ export function bindProjectExportPage(host, store, deps = {}) {
     toggleNode?.setAttribute("aria-expanded", String(shouldOpen));
     if (!shouldOpen) {
       if (restoreFocus) toggleNode?.focus();
-      const formats = menuNode.querySelector?.(".project-preview-formats");
-      if (formats) formats.open = false;
+      projectExportSubmenuBindings.get(menuNode)?.();
+      projectExportSubmenuBindings.delete(menuNode);
     } else {
+      projectExportSubmenuBindings.set(menuNode, bindFloatingSubmenus(menuNode, { keyboard: true }));
       menuNode.querySelector?.('[data-project-export-action="agp"]:not(:disabled)')?.focus();
     }
   };
