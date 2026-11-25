@@ -53,7 +53,7 @@ LGZ_ENTRYPOINTS = {
     "tools/lgz_step3.py",
     "tools/lgz_telomere_finalize.py",
     "tools/render_server_report.py", "tools/report_overview_data.py", "tools/report_inventory.py",
-    "tools/report_q0_tracks.py", "tools/report_lgz_data.py", "tools/render_path_story.py", "tools/report_privacy.py", "tools/regenerate_reports.py", "tools/render_overview_report.py",
+    "tools/report_repair_story.py", "tools/report_q0_tracks.py", "tools/report_lgz_data.py", "tools/render_path_story.py", "tools/render_repair_story.py", "tools/report_privacy.py", "tools/regenerate_reports.py", "tools/render_overview_report.py",
     "tools/render_refinement_report.py", "tools/render_manual_report.py",
     "tools/run_outer_checkpoints.py",
     "tools/run_orchestration.py",

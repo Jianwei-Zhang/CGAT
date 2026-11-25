@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 import json
 import re
 
+from report_repair_story import repair_stage
 from report_q0_tracks import bound_tracks, references, snapshot_tracks
 from report_inventory import file_href, obj, physical
 from server_report_io import SCHEMA, timing_summary
@@ -218,6 +219,7 @@ def collect(layout):
         funnel={},
         q0={},
         q0_scene=None,
+        step1_scene=None,
         sequence_versions={},
         version_tracks={},
         stage_events={},
@@ -343,6 +345,11 @@ def collect(layout):
             if rec.get("status") != "success":
                 continue
             versions(facts)
+            if unit == "step1" and rel in stages:
+                try:
+                    out["step1_scene"] = repair_stage(facts)
+                except failures:
+                    errors.append("step1: invalid_event_coordinates")
             extracted_tracks = _extract_version_tracks(facts, unit)
             if extracted_tracks:
                 out["version_tracks"].update(extracted_tracks)
@@ -413,6 +420,8 @@ def collect(layout):
         out["q0_scene"] = bound_tracks(layout, q0, ref_tracks, q0_stats)
         if out["q0_scene"] is None:
             out["q0_scene"] = snapshot_tracks(q0_table, ref_tracks, q0_stats)
+        if out["q0_scene"] is not None:
+            out["q0_scene_sha256"] = q0_stats.get("sha256")
     except failures:
         errors.append("q0 selection: missing_or_invalid_tracks")
     return out

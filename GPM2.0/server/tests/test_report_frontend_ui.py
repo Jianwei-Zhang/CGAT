@@ -138,6 +138,39 @@ class ReportFrontendUITests(unittest.TestCase):
                       {"available": True, "rows": [], "row_count": 1}):
             self.assertIsNone(assignment_groups(table, ["chr1"]))
 
+    def test_first_repair_keeps_unchanged_chr_and_multiple_local_events_in_one_modal(self):
+        from copy import deepcopy
+        from render_repair_story import repair_card, DIALOG
+        from render_refinement_report import workbench_page
+        from report_repair_story import repair_stage
+        h0, h1 = "a" * 64, "b" * 64
+        def record(sha, size):
+            return {"sha256":sha,"sequences":[{"sequence":"chr1","length_bp":size},{"sequence":"chr2","length_bp":50}]}
+        def edit(eid, start):
+            return {"event_id":eid,"stage":"step1","chr":"chr1","status":"accepted","action":"patch","reason":"selected",
+                    "q_before":{"version":"q0","sha256":h0,"start":start,"end":start+9},
+                    "q_after":{"version":"q1","sha256":h1,"start":start,"end":start+9},
+                    "source":{"dataset":"A","contig":"ctg<1>","start":11,"end":20,"orientation":"-"}}
+        facts = {"result":{"stage":"step1","q_input_version":"q0","q_output_version":"q1","q_input_sha256":h0,"q_output_sha256":h1,
+                           "events":[edit("first",20),edit("later",50)]},
+                 "sequence_versions":{"q0":record(h0,100),"q1":record(h1,100)}}
+        scene = repair_stage(facts)
+        self.assertEqual([len(row["events"]) for row in scene], [2,0])
+        page = workbench_page("报告", "Report", repair_card({"inputs":{"assemblies":[]},"step1_scene":scene}) + DIALOG)
+        self._assert_offline_safe(page, expect_single_main=True)
+        self.assertEqual(page.count('<dialog id="path-event-dialog"'), 1)
+        self.assertEqual(page.count('<template id="step1-inspect-'), 2)
+        self.assertIn("未改动", page)
+        self.assertIn("ctg&lt;1&gt;", page)
+        self.assertNotIn("<polygon", page)  # no recorded anchors
+        incomplete = deepcopy(facts)
+        incomplete["result"]["report_array_counts"] = {"events":3}
+        self.assertIsNone(repair_stage(incomplete))
+        foreign = deepcopy(facts)
+        foreign["result"]["events"][1]["q_before"]["sha256"] = h1
+        with self.assertRaisesRegex(ValueError, "coordinate space"):
+            repair_stage(foreign)
+
     def test_large_scenario_stays_bounded_and_preserves_full_chromosome_heatmap(self):
         root = self.parent / "large"
         vm = workspace(root, "large")

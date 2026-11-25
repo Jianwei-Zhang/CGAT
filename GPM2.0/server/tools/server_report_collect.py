@@ -273,7 +273,15 @@ def collect_lgz_result(root: Path, result: dict) -> dict:
     notes = ["这里保留本阶段发布时的事件；最终保留情况见最终结果。"]
     if stage.startswith("step1_") and result.get("q_input_sha256") == result.get("q_output_sha256"):
         notes.append("本阶段序列未改变；外部 contig 模式下的填补／过滤延后到结构修正后的优化填补。")
-    return {"summary": event_summary(result.get("events", [])),
+    details = {}
+    if stage == "step1":
+        from report_repair_story import capture_step1_anchors
+        try:
+            details["step1_anchors"] = capture_step1_anchors(root, result)
+        except (KeyError, OSError, ValueError, TypeError):
+            # An unavailable visual diagnostic never changes stage success or the sequence.
+            details["step1_anchors"] = {}
+    return {**details, "summary": event_summary(result.get("events", [])),
             "parameters": read_json(workspace_join(root, f"grt/checkpoints/{stage}.json"), {}).get("fingerprint_payload"),
             "sequence_versions": versions, "result": result, "tables": tables, "notes": notes}
 

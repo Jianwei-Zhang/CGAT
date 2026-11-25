@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 try:
+    from render_repair_story import repair_card, DIALOG
     from render_path_story import input_card, assignment_card, q0_card
     from render_refinement_report import (
         badge_bi,
@@ -23,6 +24,7 @@ try:
         workbench_page,
     )
 except ModuleNotFoundError:
+    from .render_repair_story import repair_card, DIALOG
     from .render_path_story import input_card, assignment_card, q0_card
     from .render_refinement_report import (
         badge_bi,
@@ -1115,6 +1117,7 @@ def render_overview(vm):
         ("inputs", "01", "输入数据", "Inputs"),
         ("chr-groups", "02", "染色体分组", "Chromosome groups"),
         ("alignment-q0", "03", "初始路径 q0", "Initial path q0"),
+        ("first-repair", "04", "第一轮修补", "First repair"),
         ("pseudomolecule-evolution", "", "假分子演化", "Evolution"),
         ("result-files", "", "结果取件", "Result Pickup"),
         ("diagnostics-fold", "", "诊断与明细", "Diagnostics"),
@@ -1125,8 +1128,10 @@ def render_overview(vm):
         + input_card(vm["lgz_summary"]["inputs"])
         + assignment_card(vm["lgz_summary"].get("assignment", {}))
         + q0_card(vm["lgz_summary"])
+        + repair_card(vm["lgz_summary"])
         + _render_pseudomolecule_evolution(vm)
         + _render_result_files_and_diagnostics(vm)
+        + (DIALOG if vm["lgz_summary"].get("step1_scene") else "")
     )
 
     return workbench_page(

@@ -1815,6 +1815,23 @@ else:
             self.assertEqual(q1_hash, prepare_fixture.sha256(server / "grt/q/q1.fa"))
             self.assertTrue((server / "grt/checkpoints/step2.json").is_file())
             self.assertFalse((REPO_ROOT / "server/tools/grt_step12.py").exists())
+            # Report the coordinates actually selected by this staged fixture, not an inferred gap-width proxy.
+            from server.tools.server_report_collect import collect_lgz_result
+            from server.tools.report_repair_story import repair_stage
+            from server.tools.render_server_report import project_report_facts
+            facts = collect_lgz_result(server, step1_result)
+            scene = repair_stage(project_report_facts(facts))
+            event = next(e for row in scene for e in row["events"] if e["source"])
+            self.assertEqual(event["before"], [12000, 12100])
+            self.assertEqual(event["after"], [12000, 12200])
+            self.assertEqual((event["source"]["start"], event["source"]["end"]), (10000, 10200))
+            self.assertEqual([r["source"] for r in event["anchors"]], [[0, 10000], [10200, 20200]])
+            self.assertEqual([r["q"] for r in event["anchors"]], [[2000, 12000], [12100, 22100]])
+            path = server / "grt/evidence/step1/mummer/alignments.tsv"
+            with path.open("a") as f:
+                f.write("changed since publication\n")
+            self.assertEqual(collect_lgz_result(server, step1_result)["step1_anchors"], {})
+
 
     def test_optimized_cold_step1_step2_keep_candidates_rejections_and_decisions(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
