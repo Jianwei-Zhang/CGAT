@@ -21,6 +21,12 @@ def main(base,first_arm,arm,out):
             k=SourceKey(ds,seq);iv=Interval(a,b);union[k].append(iv);by_src[k].append((iv,i))
     require(record({k:merged_intervals(v) for k,v in union.items()})==detail['source_intervals'] and detail['counts']==control['updated_counts'],'issue table does not explain the updated interval list')
     require(sha256(json.dumps(record(demand),sort_keys=True).encode()).hexdigest()==control['after_demand_digest'],'unbound updated request')
+    geo,output,all_stats,local_stats,_=relate_frames(base,snap,root,lookup,order,lens,issues,by_src)
+    write(out/'crosscheck.json',dict(group='4D',ordinary_result_sha256=pin,full_input_targets=geo['native_targets'],independent_decision_equal=True,updated_issues=all_stats,any_regional_frame_contact=local_stats,parents=output,mapper_starts=0,scope='Real 13 former whole-parent-fallback frames versus updated within-4D demand. Contact is a geometric possibility, not evidence of support. Out-of-frame demand cannot be ruled out by a local-only footprint. No whole-wheat residual or full-mapping equivalence claimed.'))
+    print('CHECKED_NATIVE_ALTERNATIVE',all_stats,local_stats,flush=True)
+
+
+def relate_frames(base,snap,root,lookup,order,lens,issues,by_src):
     geo=json.loads(bounded(Path.cwd()/'historical.json',1<<20,'b209c9be61fe9ac2ed773b4c7e216fa151ec3c2f8419c300f886ca2e10f7db61')); old=json.loads(bounded(Path.cwd()/'before.json',1<<20,'22b9d2a20010ad0ca55c4852252b67de9a17eef41cb4a3e63da955b7f1ef430b'));group={lookup[r['part']][0]:r for r in geo['native_queries']}; rows=defaultdict(list)
     raw=bounded(base/'q0-fork-partial-queries-20261123-1556/plan/queries.tsv.gz',8<<20,geo['input_sha256']['queries.tsv.gz'])
     for line in gzip.decompress(raw).splitlines():
@@ -41,8 +47,7 @@ def main(base,first_arm,arm,out):
                 windows.append(dict(query=q,source_interval=[a,b],target_parts=len(targets),target_bases=total,questions=stats(match)))
             prev,=[r for r in old['parents'] if r['source_rank']==rank];require(triggers=={t['query']:t['reason'] for t in prev['triggers']},'actual triggering scope differs'); intersect=normal|over;touched.update(intersect)
             output.append(dict(parent=part['source'],full_query_direct=stats(direct),full_matrix_target_side=stats(allids),regional_target_side=stats(intersect),trigger_only_target_side=stats(over),outside_all_regional_targets=stats(allids-intersect),regional_target_sources_with_questions=len(sources),windows=windows))
-    write(out/'crosscheck.json',dict(group='4D',ordinary_result_sha256=pin,full_input_targets=geo['native_targets'],independent_decision_equal=True,updated_issues=stats(allids),any_regional_frame_contact=stats(touched),parents=output,mapper_starts=0,scope='Real 13 former whole-parent-fallback frames versus updated within-4D demand. Contact is a geometric possibility, not evidence of support. Out-of-frame demand cannot be ruled out by a local-only footprint. No whole-wheat residual or full-mapping equivalence claimed.'))
-    print('CHECKED_NATIVE_ALTERNATIVE',stats(allids),stats(touched),flush=True)
+    return geo,output,stats(allids),stats(touched),touched
 
 
 if __name__=='__main__':main(*map(Path,sys.argv[1:]))
