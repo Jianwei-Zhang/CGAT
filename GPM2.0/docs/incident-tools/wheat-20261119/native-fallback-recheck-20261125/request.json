@@ -1,0 +1,43 @@
+{
+  "after": {
+    "bases": 653484,
+    "intervals": 298,
+    "sources": 179
+  },
+  "after_demand_digest": "e273aed7327bb053b1cf8f94c79ff816a779ea46b8e7d9d7aedeb06340a114a5",
+  "base_pair_rows": 1212752,
+  "before": {
+    "bases": 657484,
+    "intervals": 300,
+    "sources": 181
+  },
+  "before_sha256": "1a51ebcfef103cb8c986ca7e98cb11eb7e86f6d68f9100d057fc3446e9698ec5",
+  "consumed_files": 407,
+  "elapsed_s": 680.2957441000035,
+  "group": "4D",
+  "inventory_digest": "ebf0a257f34feb0441f71df05f21118ff5dccf5e520514c1993b09e73c6f856c",
+  "limits": "Full frozen 4D member set, 4D-to-4D rows of the four original native matrices and 447 original 4D-query regional tasks only. Original query cores preserved. Not a whole-wheat residual, not other queries into 4D, not an actual native run or authority to skip outside this set.",
+  "mapper_starts": 0,
+  "matrix_actions": [
+    "cache_probe",
+    "would_run_original"
+  ],
+  "members": 766,
+  "project_stats": {
+    "native_inventories": 4,
+    "native_rows_retained": 0,
+    "projection_only_from_raw": 447,
+    "regional_inventories": 447,
+    "regional_rows_retained": 29425
+  },
+  "published_q0": false,
+  "source_component_sha256": "c5ff44e8b0686d31381cc309483cdff0adfd2f401218b65aef6ccbf5cbfb4289",
+  "updated_counts": {
+    "positive_placement_stop": 160,
+    "sequence_overlap_stop": 17,
+    "unbuilt_without_reference_seed": 10,
+    "unproven_join": 154,
+    "weak_placement": 23
+  },
+  "updated_pair_rows": 1242177
+}

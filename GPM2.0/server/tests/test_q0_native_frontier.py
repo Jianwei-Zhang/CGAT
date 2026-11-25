@@ -147,6 +147,10 @@ class NativeFrontierTests(unittest.TestCase):
             for ds,contig,lo,hi in row['spans']: by_source.setdefault(SourceKey(ds,contig),[]).append(Interval(lo,hi))
         self.assertEqual({k:merged_intervals(v) for k,v in by_source.items()},original[0])
 
+    def test_augmented_inputs_cannot_reuse_a_base_selection_checkpoint(self):
+        with self.assertRaisesRegex(Q0EvidenceError,'base-only selection checkpoint'):
+            threshold.initial_questions(Path('/unused'),{}, {},[],[],supplementary=[{'paf':'new'}],selection_checkpoint=object())
+
     def test_phase_conservation_and_part_frame_boundaries(self):
         k=self.a.segment_id; split=replace(self.a,interval=Interval(50,100));row=descriptor(PHASES[0],[k],[k]);self.assertFalse(touches(row,{k:split},{split.source:(Interval(0,50),)}));self.assertTrue(touches(row,{k:split},{split.source:(Interval(49,51),)}))
         s={'effective':'decision_frontier','deferred_native_matrices':[self.row]};phase={'fallback_sources':[{'segment_id':self.c.segment_id}], 'native_fallback_matrix_ids':[self.row['id']]}

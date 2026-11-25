@@ -1,0 +1,179 @@
+{
+  "any_regional_frame_contact": {},
+  "full_input_targets": 38267,
+  "group": "4D",
+  "independent_decision_equal": true,
+  "mapper_starts": 0,
+  "ordinary_result_sha256": "1a308e9370d7855770bad19e7c6bf854ad098bb2b9dbc8fdd16b7619e514b1e4",
+  "parents": [
+    {
+      "full_matrix_target_side": {
+        "unproven_join": 154,
+        "weak_placement": 23
+      },
+      "full_query_direct": {},
+      "outside_all_regional_targets": {
+        "unproven_join": 154,
+        "weak_placement": 23
+      },
+      "parent": "JM19flyeA_contig_4549",
+      "regional_target_side": {},
+      "regional_target_sources_with_questions": 0,
+      "trigger_only_target_side": {},
+      "windows": [
+        {
+          "query": "q0-query-window-a2aec779e98dcc29b79b59cf",
+          "questions": {},
+          "source_interval": [
+            0,
+            110434
+          ],
+          "target_bases": 89970971,
+          "target_parts": 895
+        },
+        {
+          "query": "q0-query-window-91b19531b6b06fe8a1a52692",
+          "questions": {},
+          "source_interval": [
+            90434,
+            210434
+          ],
+          "target_bases": 101023553,
+          "target_parts": 1042
+        },
+        {
+          "query": "q0-query-window-29b8ceec0c8d43f896ebef10",
+          "questions": {},
+          "source_interval": [
+            190434,
+            309468
+          ],
+          "target_bases": 94057775,
+          "target_parts": 891
+        },
+        {
+          "query": "q0-query-window-2cf4a9df554ffd308a84f4a9",
+          "questions": {},
+          "source_interval": [
+            294521,
+            409205
+          ],
+          "target_bases": 84288742,
+          "target_parts": 745
+        },
+        {
+          "query": "q0-query-window-083d06ded545e255a2ff4fa2",
+          "questions": {},
+          "source_interval": [
+            390732,
+            422383
+          ],
+          "target_bases": 87291348,
+          "target_parts": 826
+        }
+      ]
+    },
+    {
+      "full_matrix_target_side": {
+        "unproven_join": 154,
+        "weak_placement": 23
+      },
+      "full_query_direct": {},
+      "outside_all_regional_targets": {
+        "unproven_join": 154,
+        "weak_placement": 23
+      },
+      "parent": "ptg000010l",
+      "regional_target_side": {},
+      "regional_target_sources_with_questions": 0,
+      "trigger_only_target_side": {},
+      "windows": [
+        {
+          "query": "q0-query-window-4237a24d62a0d9d260e38d0a",
+          "questions": {},
+          "source_interval": [
+            54140995,
+            54170976
+          ],
+          "target_bases": 9255256,
+          "target_parts": 268
+        },
+        {
+          "query": "q0-query-window-d5061acaaeff86bed61305ae",
+          "questions": {},
+          "source_interval": [
+            74054386,
+            74174386
+          ],
+          "target_bases": 104986828,
+          "target_parts": 1223
+        },
+        {
+          "query": "q0-query-window-ea753044d551bd50825daaae",
+          "questions": {},
+          "source_interval": [
+            74154386,
+            74273795
+          ],
+          "target_bases": 97669900,
+          "target_parts": 1011
+        },
+        {
+          "query": "q0-query-window-6e800cba7c98ef611d24882b",
+          "questions": {},
+          "source_interval": [
+            74254517,
+            74374386
+          ],
+          "target_bases": 96855918,
+          "target_parts": 1010
+        },
+        {
+          "query": "q0-query-window-41a462a08f39bc53552d89e1",
+          "questions": {},
+          "source_interval": [
+            74354386,
+            74419305
+          ],
+          "target_bases": 95873693,
+          "target_parts": 951
+        },
+        {
+          "query": "q0-query-window-ac9c6360de5a0403b8e4722c",
+          "questions": {},
+          "source_interval": [
+            74423083,
+            74543083
+          ],
+          "target_bases": 99695326,
+          "target_parts": 1030
+        },
+        {
+          "query": "q0-query-window-acd9db6abda94231107e18aa",
+          "questions": {},
+          "source_interval": [
+            74523083,
+            74578608
+          ],
+          "target_bases": 92604700,
+          "target_parts": 913
+        },
+        {
+          "query": "q0-query-window-771948f3abee69b43101565b",
+          "questions": {},
+          "source_interval": [
+            98991430,
+            99097964
+          ],
+          "target_bases": 23265347,
+          "target_parts": 448
+        }
+      ]
+    }
+  ],
+  "scope": "Real 13 former whole-parent-fallback frames versus updated within-4D demand. Contact is a geometric possibility, not evidence of support. Out-of-frame demand cannot be ruled out by a local-only footprint. No whole-wheat residual or full-mapping equivalence claimed.",
+  "updated_issues": {
+    "unproven_join": 154,
+    "weak_placement": 23
+  }
+}

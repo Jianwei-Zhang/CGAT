@@ -133,6 +133,8 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
     def log(msg):
         print(("LGZ q0 first draft: " if existing_catalog is None else "LGZ q0 updated fallback draft: ") + msg, flush=True)
 
+    if supplementary and selection_checkpoint is not None:
+        raise Q0EvidenceError('updated fallback evidence cannot use a base-only selection checkpoint')
     keys = {(s.dataset, s.contig): s for s in seqs}
     parts, edges, refs, links, by_dataset = {}, [], defaultdict(list), [], defaultdict(dict)
     if existing_catalog is not None:
