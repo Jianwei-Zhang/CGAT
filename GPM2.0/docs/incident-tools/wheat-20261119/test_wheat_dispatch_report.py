@@ -1,13 +1,19 @@
 import unittest
 from collections import Counter
 
-from wheat_dispatch_report import disposition, historic_ok
+from wheat_dispatch_report import actual_fallback, disposition, historic_ok
 
 
 class WorkCensusTests(unittest.TestCase):
     def test_positive_complete_scope_precedes_parent_and_window_routes(self):
         self.assertEqual(disposition('exact_complete_matrices', True, [], [8], 'no_stored_context'), 'skip_complete_native')
         self.assertEqual(disposition('declared_long_part_scope', False, [2], [], 'verified'), 'skip_scoped_native')
+
+    def test_matrix_satisfied_parents_cannot_be_historical_fallback_even_if_planner_would_fail(self):
+        self.assertEqual(actual_fallback({6513,13682,20089,20556,21300,23309},
+                         {6513,13682,20556,21300,37759}, {20089,23309}), {20089,23309})
+        with self.assertRaisesRegex(ValueError, "historical witness"):
+            actual_fallback({6513,20089,23309,111}, {6513}, {20089,23309})
 
     def test_single_failed_sibling_makes_parent_fallback_even_if_other_window_has_no_demand(self):
         self.assertEqual(disposition(None, True, [], [], 'geometrically_omitted'), 'whole_parent_fallback')

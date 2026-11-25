@@ -26,6 +26,15 @@ def disposition(native_kind, fallback, left, right, raw):
     return 'needs_review'
 
 
+def actual_fallback(planned, native_satisfied, retired):
+    # The isolated geometry pass reconstructs even windows that the original
+    # parent-matrix gate never sent to the planner. Their hypothetical failure
+    # is useful diagnostic information, not an executed native fallback.
+    actual = planned - native_satisfied
+    require(actual == retired, 'executed fallback differs from historical witness')
+    return actual
+
+
 def digest(path):return sha256(path.read_bytes()).hexdigest()
 
 
@@ -39,8 +48,9 @@ def main(run,out):
     require(refs['issues']==issues and book['request']==REQ and len(sources)==native['required_targets'],'foreign issues/source order')
     missing=get(earlier.parent/'cold-exact.json.gz',v1['artifacts']['cold-exact.json.gz']); review=get(earlier.parent/'fallback-or-review.json.gz',v1['artifacts']['fallback-or-review.json.gz'])
     prior={row['query']:row['classification'] for row in missing+review};require(len(prior)==len(missing)+len(review),'duplicate archived action')
-    fallback={row['source_rank'] for row in review if row['classification']=='whole_parent_native_fallback'};require(fallback==set(native['retired_fallback_parents']), 'rebuilt fallback differs from executed historical dispatch')
-    skip={int(rank):row for rank,row in native['parent_windows'].items()};skipped_ids={q for row in skip.values() for q in row['windows']}; require(not(skip.keys() & fallback),'retired fallback also claimed skipped')
+    planned_fallback={row['source_rank'] for row in review if row['classification']=='whole_parent_native_fallback'}
+    skip={int(rank):row for rank,row in native['parent_windows'].items()};skipped_ids={q for row in skip.values() for q in row['windows']}
+    fallback=actual_fallback(planned_fallback, set(skip), set(native['retired_fallback_parents']))
     phase_specs=[('known',run/'result',known),('expanded',run/'expand/result',get(run/'expand/result/complete.json',v1['expanded_manifest']))]
     groups=defaultdict(Counter); issue_counts=defaultdict(Counter); linked=defaultdict(set); totals=Counter(); histogram=Counter(); axes=Counter(); used_prior=set();seen=set();seen_skip=set();actions=[];parents={}
     for i,issue in enumerate(issues):issue_counts[issue['group']][issue['kind']]+=1
@@ -84,7 +94,7 @@ def main(run,out):
     tsv('questions.tsv.gz',['issue_index','issue_group','kind','stable_id','strand_or_join_strands','endpoint_source_intervals_json'],
         ((i,v['group'],v['kind'],v['id'],v.get('strand') or ','.join(v['strands']),json.dumps([[*sources[r],a,b] for r,a,b in v['spans']],separators=(',',':'))) for i,v in enumerate(issues)))
     files['fallback-parents.json']=put(out/'fallback-parents.json',parents)
-    result=dict(schema='whole_wheat_frozen_partial_work_v2',parent_report=pin,request_sha256=REQ,native_sha256=NATIVE,window_counts={f:totals[f] for f in FIELDS},totals_by_raw_status=histogram,axes_before_native=axes,question_counts=Counter(v['kind'] for v in issues),linked_distinct_questions={k:len(v) for k,v in linked.items()},artifacts=files,mapper_starts_in_diagnostics=0,
+    result=dict(schema='whole_wheat_frozen_partial_work_v2',parent_report=pin,request_sha256=REQ,native_sha256=NATIVE,preempted_hypothetical_fallback_parents=sorted(planned_fallback & set(skip)),window_counts={f:totals[f] for f in FIELDS},totals_by_raw_status=histogram,axes_before_native=axes,question_counts=Counter(v['kind'] for v in issues),linked_distinct_questions={k:len(v) for k,v in linked.items()},artifacts=files,mapper_starts_in_diagnostics=0,
         scope='Historical first partial stage with whole-wheat first-demand intervals; full native scopes precede fallback and regional filters. Scoped native coverage is not new exact evidence. Cold means same-context exact raw is missing, not an observation of a new process. Query groups are exclusive labels; issue-group window counts overlap. Fallbacks are whole parents, not one new native mapper per window. No main job, later rounds or final Q0.')
     print('VERIFIED_DISPATCH',result['window_counts'],put(out/'final.json',result),flush=True)
 
