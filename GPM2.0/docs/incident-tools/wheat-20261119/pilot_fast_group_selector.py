@@ -84,8 +84,8 @@ def compatible_order(l,r):
     a,b=footprint(l); c,d=footprint(r); return a<c and b<d
 
 
-def build(chain, links, data, extra=()):
-    graph=PathGraph(chain,(*links,*extra),data.original_adjacencies,PathPolicy(),first_request=True)
+def build(chain, links, data, extra=(), *, progress=None):
+    graph=PathGraph(chain,(*links,*extra),data.original_adjacencies,PathPolicy(),first_request=True,progress=progress)
     paths=[]; done=[]; stats=Counter(); prev=None; unresolved=[]
     def valid(path):
         return path is not None and graph.coverage.unique_selected_bp([*done,*((s.source,s.interval) for s in path.slices)]) is not None
@@ -161,14 +161,24 @@ def map_batch(data,pairs,out,tool):
     return extra,receipts
 
 
-def trial(data,out,common,start):
+def trial(data,out,common,start, *, local=False):
     tool=Path(shutil.which('minimap2')).resolve();need(sha256(tool.read_bytes()).hexdigest()==TOOL_SHA,'wrong mapper')
-    selected,rejects=seeds(data); chain=skeleton(selected);need(chain,'no strong 4D backbone'); src={p.source for p in chain}
-    links=[x for x in data.pair_links if x.query_source in src and x.target_source in src]; paths,unresolved,stats=build(chain,links,data)
-    selected_at=monotonic(); base=dict(common,policy=POLICY,strong_seeds=len(selected),seed_rejections=rejects,chain=len(chain),relevant_matrix_rows=len(links))
+    if local:
+        from pilot_fast_group_loci import local_seeds,LOCAL_POLICY
+        selected,rejects=local_seeds(data)
+    else: selected,rejects=seeds(data)
+    def progress(message): print(f'4D pilot +{monotonic()-start:.1f}s: {message}',flush=True)
+    progress(f'seed selection complete: placements={len(selected)}')
+    chain=skeleton(selected);need(chain,'no strong 4D backbone'); src={p.source for p in chain}
+    links=[x for x in data.pair_links if x.query_source in src and x.target_source in src]
+    progress(f'B graph start: placements={len(chain)} sources={len(src)} pair_rows={len(links)}')
+    paths,unresolved,stats=build(chain,links,data,progress=progress)
+    progress(f'B geometry ready: scaffolds={len(paths)} unresolved_pairs={len(unresolved)}')
+    selected_at=monotonic(); base=dict(common,policy=dict(POLICY,local_seed_policy=LOCAL_POLICY) if local else POLICY,strong_seeds=len(selected),seed_rejections=rejects,chain=len(chain),relevant_matrix_rows=len(links))
     metrics=save_layout(out,'B',paths,data); write(out/'B.json',dict(base,metrics=metrics,unresolved_pairs=len(unresolved),build_counts=stats,mapper_calls=0,from_input_s=monotonic()-start))
     refine_at=monotonic(); pairs,eligible=choose(unresolved,links); extra,receipts=map_batch(data,pairs,out,tool)
-    if extra: paths,_,stats=build(chain,links,data,extra)
+    progress(f'C local mapping complete: tasks={len(receipts)} returned_rows={len(extra)}')
+    if extra: paths,_,stats=build(chain,links,data,extra,progress=progress)
     metrics=save_layout(out,'C',paths,data); end=monotonic(); write(out/'C.json',dict(base,metrics=metrics,build_counts=stats,eligible_before_budget=eligible,
         pairs_tested=len(pairs),mapper_calls=len(receipts),new_rows=len(extra),mapper_sha256=TOOL_SHA,receipts=receipts,shared_to_B_backbone_s=selected_at-start,
         refine_and_emit_s=end-refine_at,from_input_s=(selected_at-start)+(end-refine_at),sequential_BC_wall_s=end-start))

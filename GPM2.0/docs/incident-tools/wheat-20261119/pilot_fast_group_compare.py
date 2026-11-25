@@ -18,8 +18,8 @@ def intersect_bp(xs,ys):
     return n
 
 
-def verify_arm(root,arm):
-    folder=root/('A' if arm=='A' else 'BC'); result=folder/'result'
+def verify_arm(root,arm,candidate="BC"):
+    folder=root/('A' if arm=='A' else candidate); result=folder/'result'
     pins={name:h for h,name in (line.split() for line in (folder/'results.sha256').read_text().splitlines())}
     metrics=sealed(result/(arm+'.json'),pins['result/'+arm+'.json']);layout=sealed(result/(arm+'.layout.json'),pins['result/'+arm+'.layout.json'])
     raw_hash=sha256()
@@ -88,11 +88,12 @@ def compare(arms,ref,x,y):
                 shared_unique_oriented_sources=len(ranks),order_inversions=sum(a>b for i,a in enumerate(ranks) for b in ranks[i+1:]))
 
 
-def main(root):
-    arms={a:verify_arm(root,a) for a in 'ABC'};ref=ref_coverage(root.parent,arms);report={}
+def main(root,candidate='BC'):
+    need(candidate in ('BC','BC-local'),'unregistered pilot arm')
+    arms={a:verify_arm(root,a,candidate) for a in 'ABC'};ref=ref_coverage(root.parent,arms);report={}
     for a,(v,*_) in arms.items():
         report[a]={k:w for k,w in v['metrics'].items() if k!='record_hashes'};report[a].update(from_input_s=v['from_input_s'],input_load_s=v['load_s'],mapper_calls=v['mapper_calls'],reference_supported_bp=sum(x.length for x in ref[a]))
-    write(root/'comparison.json',dict(arms=report,comparisons={x+'_'+y:compare(arms,ref,x,y) for x,y in [('A','B'),('A','C'),('B','C')]},
+    write(root/('comparison.json' if candidate=='BC' else 'comparison-local.json'),dict(arms=report,comparisons={x+'_'+y:compare(arms,ref,x,y) for x,y in [('A','B'),('A','C'),('B','C')]},
         limits='One group. A is frozen initial-evidence sequence, not truth or final repaired Q0. Reference metric uses initial high-MAPQ same-strand paired blocks, not independent validation. Unused bases are not donor eligibility.'))
 
-if __name__=='__main__':main(Path(sys.argv[1]).resolve(strict=True))
+if __name__=='__main__':main(Path(sys.argv[1]).resolve(strict=True),*sys.argv[2:])

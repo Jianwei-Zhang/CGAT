@@ -101,9 +101,9 @@ def main(mode, work, base, out):
         archive=base/('q0-request-ready.'+REV[:8])/'qualification'; ref=sealed(archive/'candidate.json',REFERENCE)
         need(result['record_hashes']==[ref['scientific']['sequences'][GROUP]] and record(req)==json.loads((archive/'4d-first-request.json').read_bytes()), 'A does not reproduce frozen 4D sequence/request')
         write(out/'A.json',dict(common,arm='current initial-evidence selection; not post-supplement truth',metrics=result,from_input_s=end-start,mapper_calls=0))
-    elif mode=='BC':
+    elif mode in ('BC','BC-local'):
         from pilot_fast_group_selector import trial
-        trial(data, out, common, start)
+        trial(data, out, common, start, local=(mode=='BC-local'))
     else: raise ValueError('unknown arm')
 
 if __name__=='__main__':

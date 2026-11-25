@@ -55,3 +55,12 @@ class Tests(unittest.TestCase):
             self.assertEqual(len(receipts),1);self.assertTrue(links);self.assertTrue(all(x.query_offset>0 and x.target_offset>0 for x in links))
             paths,_,_=build(ps,[],data,links);self.assertEqual(len(paths),1)
             self.assertEqual(save_layout(Path(tmp),'R',paths,data)['record_hashes'],[__import__('hashlib').sha256(dna.encode()).hexdigest()])
+
+    def test_local_mask_is_not_a_contig_veto_or_join_anchor(self):
+        from pilot_fast_group_loci import local_runs
+        s=SourceKey('d','q'); part,=split_source(s,'A'*5000).segments
+        def anc(a,b):return ReferenceAnchor(Interval(a,b),Interval(10000+a,10000+b),'good')
+        aa=[anc(0,1400),anc(1900,3900)];key=('4D','+');groups={key:aa}
+        row,=local_runs(part,groups,{key},{'good'});self.assertEqual(row.interval,Interval(0,3900));self.assertEqual(list(row.anchor_intervals),[v.source for v in aa])
+        groups['1A','+']=[anc(1550,1600)];separate=local_runs(part,groups,{key},{'good'});self.assertEqual([r.interval for r in separate],[v.source for v in aa])
+        self.assertFalse(local_runs(part,groups,{key},set()))

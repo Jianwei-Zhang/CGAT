@@ -2,7 +2,7 @@
 # Invoked inside the explicitly bound 4D A or BC allocation, not a production stage.
 set -euo pipefail
 umask 077
-mode=$1; [[ $mode == A || $mode == BC ]]; here=$PWD
+mode=$1; [[ $mode == A || $mode == BC || $mode == BC-local ]]; here=$PWD
 base="$HOME/cgat-reads-debug/jm19-compare-614589f-20261118"; q="$base/q0-request-ready.44e274a7/qualification"
 sha256sum -c --quiet kit.sha256
 printf '%s  %s\n' 9fe4a884f98b500fa00c3ea1e6bfd62918a514507637c4793b0fe7b1d213703f "$q/group.py" 36b6c31cd0e5b0049b47646f96d2991081050d79d24b947c95a1aee645d6a70a "$q/fork_wheat_q0.py" 0f06edd183467d950cd99d5c11ca8ed23ff57aaeacce96a6580b7527573dac28 "$q/latest.tgz" | sha256sum -c --quiet -
