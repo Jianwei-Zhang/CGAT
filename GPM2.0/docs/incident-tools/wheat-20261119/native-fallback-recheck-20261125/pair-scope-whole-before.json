@@ -1,0 +1,46 @@
+{
+  "bounded_request": true,
+  "distinct_remaining_questions": 3336,
+  "distinct_untested_target_bases": 2347493890,
+  "distinct_untested_target_count": 3111,
+  "issues_sha256": "1a7d9f53498e6376ef93d800b2b8346dd3e593e04f2825cc2e2022673d3f83a5",
+  "limits": "Pair scope follows the original planner, including reciprocal coverage and its declared long-part approximate profile. It is not a proof of identical PAFs with a smaller target collection. Self exclusion is not negative sequence evidence. Non-endpoint queries can still indirectly change placement or routing.",
+  "lookup_sha256": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+  "mapper_calls": 0,
+  "mask_sha256": "b93203594aaf176cabe2b693ddd9f1f7fb579e3c5767a277d7e602da4f27ad1b",
+  "parents": {
+    "q0-source-part-865ba1fbce846067c7ffff38": {
+      "direct_join_role": {},
+      "exact_pair_scope": 0,
+      "limited_pair_scope": 0,
+      "query_has_demand": false,
+      "query_role_questions": {},
+      "untested_pair_scope": 3111,
+      "untested_target_bases": 2347493890,
+      "whole_targets_examined_by_axis": 3111
+    },
+    "q0-source-part-9bf9376cf15b64235817ff09": {
+      "direct_join_role": {},
+      "exact_pair_scope": 0,
+      "limited_pair_scope": 0,
+      "query_has_demand": false,
+      "query_role_questions": {},
+      "untested_pair_scope": 3111,
+      "untested_target_bases": 2347493890,
+      "whole_targets_examined_by_axis": 3111
+    }
+  },
+  "question_classes": {
+    "some_untested_relationship:unproven_join": 2946,
+    "some_untested_relationship:weak_placement": 390
+  },
+  "remaining_source_bases": 2347493890,
+  "remaining_sources": 3111,
+  "request_sha256": "f9229b186ff3587d6929cb8f6116e61f03086f9807b08c51af089d653032be77",
+  "requested_bases": 12751155,
+  "requested_interval_count": 5599,
+  "schema": "frozen_whole_question_target_pair_sizing_v1",
+  "scope": "Whole wheat frozen first request BEFORE integrating the 59,278 regional PAFs; target sizing only.",
+  "whole_native_target_bases": 31706122489,
+  "whole_native_target_count": 38267
+}
