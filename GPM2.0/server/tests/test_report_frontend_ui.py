@@ -92,20 +92,18 @@ class ReportFrontendUITests(unittest.TestCase):
                 self.assertIn('data-theme-toggle="1"', html)
                 self.assertIn('class="wb-sidebar"', html)
                 self.assertNotIn('id="improvement-overview"', html)
-                self.assertIn('id="pseudomolecule-evolution"', html)
+                self.assertNotIn('id="pseudomolecule-evolution"', html)
                 self.assertIn('id="inputs"', html)
                 self.assertIn('id="alignment-q0"', html)
-                self.assertIn('id="lgz-baseline"', html)
-                self.assertIn('id="refinement-comparison"', html)
+                self.assertEqual('id="auto-refinement"' in html, bool(vm['refinement_summary']['tools']))
                 self.assertIn('id="result-files"', html)
                 self.assertIn('id="diagnostics-fold"', html)
                 self.assertIn('id="ws-tree"', html)
                 self.assertIn('data-tree-action="expand"', html)
                 self.assertNotIn(PRIVATE, html)
                 if scenario == "success":
-                    self.assertIn('class="ideo-seg ideo-gap-link', html)
-                    self.assertIn('class="gap-job-chip', html)
-                    self.assertIn('target="_blank"', html)
+                    self.assertIn('id="auto-gap-inspector"', html)
+                    self.assertNotIn('class="gap-job-chip', html)
                 # Ensure top-level directory tree nodes start collapsed (not <details class="tree-node" open>)
                 self.assertNotRegex(html, r'<details class="tree-node[^"]*"\s+open\b')
 
@@ -119,7 +117,7 @@ class ReportFrontendUITests(unittest.TestCase):
         self.assertEqual([group["chr"] for group in model["groups"]], ["chr1", "chr2"])
         html = render_overview(vm)
         self.assertLess(html.index('id="inputs"'), html.index('id="chr-groups"'))
-        self.assertLess(html.index('id="chr-groups"'), html.index('id="pseudomolecule-evolution"'))
+        self.assertLess(html.index('id="chr-groups"'), html.index('id="auto-refinement"'))
         self.assertEqual(html.count('id="inputs"'), 1)
         self.assertIn("12.5%", html)
         def row(ds, ctg, chrom):
@@ -220,12 +218,12 @@ class ReportFrontendUITests(unittest.TestCase):
         vm = workspace(root, "large")
         html = render_overview(vm)
         self._assert_offline_safe(html, expect_single_main=True)
-        # 21 chromosomes x 16 gaps = 336 original gaps; preview capped at 200 rows
-        self.assertEqual(html.count('data-states="'), 200)
-        self.assertIn("200", html)
-        self.assertIn("336", html)
-        self.assertIn("chr21", html)
-        self.assertIn("gap_comparison.tsv", html)
+        # All 336 loci, not a table/sample of 200; one shared inspector.
+        data = json.loads(re.search(r'<script type="application/json" id="auto-gap-data">(.*?)</script>', html).group(1))
+        self.assertEqual(sum(len(c[2]) for c in data['chr']), 336)
+        self.assertEqual(data['chr'][-1][0], 'chr21')
+        self.assertEqual(html.count('id="auto-gap-inspector"'), 1)
+        self.assertNotIn('data-states="', html)
         self.assertLess(len(html.encode("utf-8")), 350_000)
 
     def test_detached_regeneration_all_pages_pass_security_boundary(self):

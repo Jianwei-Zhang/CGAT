@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 
 from report_inventory import SHA, file_href, obj, physical, pickup, tree
+from report_gap_story import checked_json, gap_evidence, native_views
 from report_lgz_data import collect, counts, safe_name
 from server_report_io import layout_descriptor
 from render_server_report import REPORT_PREVIEW_ROWS
@@ -175,7 +176,7 @@ def read_current_batch(layout, run=None):
     return data
 
 
-def matrix(layout, base, tools, expected):
+def matrix(layout, base, tools, expected, story_rows=None):
     rel = base + "/gap_comparison.tsv"
     rows = []
     chrom = {}
@@ -208,8 +209,11 @@ def matrix(layout, base, tools, expected):
                 )
                 counter[state if state in OUTCOMES else "not_evaluated"] += 1
                 counter["original_gap_count"] += 1
+            item = dict(gap_id=gap, chromosome=name, start=start, end=end, tools=values)
+            if story_rows is not None:
+                story_rows.append(item)
             if n <= REPORT_PREVIEW_ROWS:
-                rows.append(dict(gap_id=gap, chromosome=name, start=start, end=end, tools=values))
+                rows.append(item)
     if n != expected:
         raise ValueError("comparison does not contain the complete original denominator")
     return list(chrom.values()), dict(
@@ -241,6 +245,7 @@ def refinement(layout, batch):
     out = dict(
         tools=[],
         by_chromosome=[],
+        original_loci=[],
         comparison_href=None,
         best_tool=None,
         biological_accuracy_validated=False,
@@ -272,7 +277,7 @@ def refinement(layout, batch):
         raise ValueError("comparison identity mismatch")
     out["comparison_href"] = file_href(root, base + "/comparison.json")
     if data["baseline_valid"] and data["original_gap_count"] is not None:
-        out["by_chromosome"], out["gap_matrix"] = matrix(layout, base, tools, data["original_gap_count"])
+        out["by_chromosome"], out["gap_matrix"] = matrix(layout, base, tools, data["original_gap_count"], out["original_loci"])
     for r in data["tools"]:
         tool = r["tool"]
         rec = tools[tool]
@@ -337,6 +342,7 @@ def refinement(layout, batch):
         execution = {}
         gap_links = {}
         native_global_href = None
+        decisions, job_views, global_view = {}, {}, None
         if pub:
             summary_rel = folder + "/summary.json"
             if (
@@ -347,6 +353,16 @@ def refinement(layout, batch):
             summary = obj(root, summary_rel)
             if summary.get("tool") != tool or summary.get("run_id") != run:
                 raise ValueError("tool summary identity changed")
+            if data["baseline_valid"] and data["original_gap_count"] is not None:
+                final_dir = layout.relative(f"05_final/{code}")
+                files = journal["areas"]["final"]["new"]["files"]
+                prov = checked_json(layout, final_dir, "provenance.json", files)
+                final = checked_json(layout, final_dir, "final_path.json", files)
+                if (prov.get("tool"), prov.get("run_id")) != (tool, run):
+                    raise ValueError("committed tool evidence has different identity")
+                decisions = gap_evidence(out["original_loci"], tool, prov, final)
+                job_views, global_view = native_views(layout, folder, summary,
+                    journal["areas"]["report"]["new"]["files"], decisions)
             execution = summary.get("execution", {})
             extra = counts(summary, ("retained_flank_count", "accepted_edit_count", "remaining_gap_count"))
             preview_ids = {row["gap_id"] for row in out["gap_matrix"]["rows"]}
@@ -412,6 +428,9 @@ def refinement(layout, batch):
                 report_href=diag,
                 native_global_href=native_global_href,
                 gap_links=gap_links,
+                gap_decisions=decisions,
+                degap_jobs_by_gap=job_views,
+                degap_global_href=global_view,
                 links=links,
             )
         )

@@ -10,7 +10,7 @@ DIALOG = """<dialog id="path-event-dialog" aria-labelledby="path-event-title"><h
 <script data-cgat-ui="1" data-path-story-ui="1">(()=>{
   const panel=document.getElementById('path-event-dialog');
   let prior=null, scroll=0;
-  document.addEventListener('click',ev=>{
+  function handleOpen(ev){
     const button=ev.target.closest('[data-story-open]');
     if(button){
       const t=document.getElementById(button.dataset.storyOpen);
@@ -18,6 +18,7 @@ DIALOG = """<dialog id="path-event-dialog" aria-labelledby="path-event-title"><h
       prior=button; scroll=window.scrollY;
       panel.querySelector('#path-event-title').textContent=t.dataset.title;
       panel.querySelector('[data-story-content]').replaceChildren(t.content.cloneNode(true));
+      panel.dispatchEvent(new CustomEvent("cgat-story-open",{bubbles:true,detail:{button}}));
       if(!panel.open)panel.showModal();
       return;
     }
@@ -25,7 +26,9 @@ DIALOG = """<dialog id="path-event-dialog" aria-labelledby="path-event-title"><h
     if(ev.target.closest('[data-story-close]'))panel.close();
     else if(ev.target===panel){const r=panel.getBoundingClientRect();
       if(ev.clientX<r.left||ev.clientX>r.right||ev.clientY<r.top||ev.clientY>r.bottom)panel.close();}
-  });
+  }
+  document.addEventListener('click',handleOpen);
+  document.addEventListener('cgat-locus-picker',handleOpen);
   panel.addEventListener('close',()=>{
     panel.querySelector('[data-story-content]').replaceChildren();
     if(prior&&prior.isConnected)prior.focus({preventScroll:true});
