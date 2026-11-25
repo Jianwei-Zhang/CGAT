@@ -101,17 +101,17 @@ def prepare_publication(staging: Path, baseline: dict, baseline_fasta: Path, cat
     touched = {gap_id for edit in edits for gap_id in edit.gap_ids}
     residual = {gap_id for row in remaining for gap_id in row["original_gap_ids"]}
     rejected_ids = {gap_id for row in rejected for gap_id in row.get("gap_ids", [])}
-    if execution["tool"] == "lrgapcloser" and (touched & residual or touched & withheld.keys()):
-        raise PathError("incomplete LR gap cannot enter the published Final Path")
+    if touched & residual or touched & withheld.keys():
+        raise PathError("incomplete gap cannot enter the published Final Path")
     chromosomes = {row["chr"]: row for row in final["chromosomes"]}
     outcomes = []
     for gap in original_gaps:
         gid = gap["gap_id"]
-        status = ("partial" if gid in residual else "closed") if gid in touched else ("rejected" if gid in rejected_ids else "unfilled")
+        status = "closed" if gid in touched else ("rejected" if gid in rejected_ids else "unfilled")
         retention = {}
         if gid in withheld:
             if gid not in residual or lift_interval(chromosomes[gap["chromosome"]], gap["start"], gap["end"]) is None:
-                raise PathError("withheld LR gap was not retained intact")
+                raise PathError("withheld gap was not retained intact")
             status = "unfilled"
             retention = {"reason": "incomplete_gap_kept_original",
                          "note": "Candidate did not close all its gaps; LGZ retained / 候选未完整闭合所涉缺口，保留 LGZ 原序列",

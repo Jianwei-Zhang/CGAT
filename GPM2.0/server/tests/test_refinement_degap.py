@@ -46,7 +46,7 @@ class DegapRefinedPublicationTests(unittest.TestCase):
         reads.write_text(">read1\nAAAAGTCCCC\n")
         return {"hifi": [str(reads)], "ont": []}, baseline.read_bytes(), path_file.read_bytes()
 
-    def test_native_candidate_changes_final_path_and_reconstructed_fasta(self):
+    def run_candidate(self, root, groups, sequence):
         real_run = subprocess.run
         commands = []
         def native(command, **kwargs):
@@ -57,14 +57,14 @@ class DegapRefinedPublicationTests(unittest.TestCase):
             report = output / "03.gap_filling/gap_filling_results.json"
             report.parent.mkdir(parents=True)
             candidate = output / "candidate.fa"
-            candidate.write_text(">native\nAAAAGTCCCC\n")
+            candidate.write_text(f">native\n{sequence}\n")
             row = {"chromosome": "chr1", "gap_id": 1, "gap_start": 5, "gap_end": 24, "gap_len": 20,
                    "left_flank_len": 4, "right_flank_len": 4, "replace_start": 1, "replace_end": 28,
                    "replace_len": 28, "filled": True, "final_sequence_file": str(candidate)}
             report.write_text(json.dumps({"gaps": [row]}))
             final = output / "04.genome_integration/genome.filled.fasta"
             final.parent.mkdir()
-            final.write_text(">chr1\nAAAAGTCCCC\n")
+            final.write_text(f">chr1\n{sequence}\n")
             config = {"jobs": [{"job_name": "chr1.1." + direction, "job_dir": str(report.parent / ("chr1.1." + direction)),
                                 "chromosome": "chr1", "gap_id": 1, "direction": direction} for direction in ("left", "right")]}
             (output / "03.gap_filling/job_manager_config.json").write_text(json.dumps(config))
@@ -73,11 +73,16 @@ class DegapRefinedPublicationTests(unittest.TestCase):
                        "skipped_jobs": [{"job_name": "chr1.1.right", "status": "skipped"}]}}}}
             (output / "autogapfiller_summary.json").write_text(json.dumps(summary))
             return subprocess.CompletedProcess(command, 0)
+        with mock.patch.object(adapter, "check_environment"), mock.patch.object(adapter.subprocess, "run", side_effect=native):
+            result = adapter.stage_degap(root, groups, 2)
+        self.assertEqual(len(commands), 1)
+        return result
+
+    def test_native_candidate_changes_final_path_and_reconstructed_fasta(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "workspace"
             groups, fasta_before, path_before = self.make_workspace(root)
-            with mock.patch.object(adapter, "check_environment"), mock.patch.object(adapter.subprocess, "run", side_effect=native):
-                result = adapter.stage_degap(root, groups, 2)
+            result = self.run_candidate(root, groups, "AAAAGTCCCC")
             staging = Path(result["staging"])
             self.assertEqual((staging / "assembly.fa").read_text(), ">chr1\nAAAAGTCCCC\n")
             final = json.loads((staging / "final_path.json").read_text())
@@ -89,7 +94,20 @@ class DegapRefinedPublicationTests(unittest.TestCase):
             self.assertEqual((root / "03_lgz/04_step3/q3.fa").read_bytes(), fasta_before)
             self.assertEqual((root / ".runtime/metadata/grt_final_path.json").read_bytes(), path_before)
             self.assertFalse((root / "05_final").exists(), "staging alone is not an atomic final publication")
-            self.assertEqual(len(commands), 1)
+
+    def test_native_filled_flag_cannot_publish_a_partial_bridge(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "workspace"
+            groups, baseline, _ = self.make_workspace(root)
+            result = self.run_candidate(root, groups, "AAAAGNTCCCC")
+            stage = Path(result["staging"])
+            self.assertEqual((stage / "assembly.fa").read_bytes(), baseline)
+            self.assertEqual(json.loads((stage / "final_path.json").read_text())["edits"], [])
+            provenance = result["provenance"]
+            self.assertEqual(provenance["gap_outcomes"][0]["reason"], "incomplete_gap_kept_original")
+            self.assertEqual(provenance["gap_outcomes"][0]["candidate_residual_n_bp"], 1)
+            self.assertEqual(provenance["counts"]["unfilled"], 1)
+            self.assertFalse(list(root.rglob("patches.fa")))
 
     def test_zero_exit_with_missing_native_assembly_is_incomplete(self):
         real_run = subprocess.run

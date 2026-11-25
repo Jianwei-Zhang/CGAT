@@ -87,7 +87,7 @@ def indexed(path, attempt, label):
     return IndexedFasta(path, attempt / f"{label}.fai-work.fa")
 
 
-def gap_patch(attempt, locus, seeds, terminal, *, closed_only=False):
+def gap_patch(attempt, locus, seeds, terminal):
     original = indexed(seeds / "local.fa", attempt, "local")
     native = indexed(terminal, attempt, "native")
     size, after = length(original, "locus"), length(native, "locus")
@@ -113,9 +113,9 @@ def gap_patch(attempt, locus, seeds, terminal, *, closed_only=False):
         return "no_candidate", "original_gap_unchanged", None
     if sequence and sequence.count(b"N") == len(sequence):
         return "no_candidate", "native_candidate_contains_only_ns", None
-    if closed_only and b"N" in sequence:
+    if b"N" in sequence:
         return "rejected", "incomplete_gap_kept_original", None
-    return ("partial" if b"N" in sequence else "closed"), None, ("replace_gap", gap, before.hexdigest(), sequence)
+    return "closed", None, ("replace_gap", gap, before.hexdigest(), sequence)
 
 
 def tel_patch(attempt, locus, seeds, directory):
@@ -265,8 +265,7 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
             if terminal is None:
                 status, reason, payload = "no_candidate", capture_result["outcome"], None
             else:
-                status, reason, payload = gap_patch(attempt, locus, seeds, layout.path(terminal),
-                                                      closed_only=(tool == "lrgapcloser"))
+                status, reason, payload = gap_patch(attempt, locus, seeds, layout.path(terminal))
         check_identities(identities)
         verify_directory_links(runtime)
         if any(path.is_symlink() or sha256_file(path) != expected for path, expected in artifacts.items()):
