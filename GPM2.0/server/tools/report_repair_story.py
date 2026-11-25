@@ -3,7 +3,7 @@ import csv
 
 from lgz_core.stage_alignment import member_source_interval
 from report_inventory import SHA, obj, physical
-from report_q0_tracks import label
+from report_q0_tracks import label, snapshot_tracks
 from run_orchestration import file_signature, sha256_file
 from workspace_layout import WorkspaceLayout
 
@@ -79,6 +79,21 @@ def capture_step1_anchors(root, result):
 
 def stage_sizes(stats):
     return {label(r["sequence"]):r["length_bp"] for r in stats["sequences"] if type(r.get("length_bp")) is int and r["length_bp"] > 0}
+
+
+def output_layout(facts, version):
+    src = facts.get("result", {})
+    stats = facts.get("sequence_versions", {}).get(version) or {}
+    sha = stats.get("sha256")
+    if not sha or not SHA.fullmatch(sha) or (version, sha) != (src.get("q_output_version"), src.get("q_output_sha256")):
+        return None
+    table = facts.get("tables", {}).get("q_segments", {})
+    rows = facts.get("layout_rows", src.get("q_rows"))
+    if isinstance(rows, list):
+        count = src.get("report_array_counts", {}).get("q_rows", len(rows))
+        table = {"available": True, "row_count": count, "rows": rows}
+    tracks = snapshot_tracks(table, {}, stats, version=version)
+    return {"sha256": sha, "tracks": tracks} if tracks is not None else None
 
 
 def event_span(part, version, digest, size):

@@ -4,7 +4,8 @@ from collections import Counter, defaultdict
 import json
 import re
 
-from report_repair_story import repair_stage
+from report_repair_story import repair_stage, output_layout
+from report_structural_story import structural_stage
 from report_q0_tracks import bound_tracks, references, snapshot_tracks
 from report_inventory import file_href, obj, physical
 from server_report_io import SCHEMA, timing_summary
@@ -220,6 +221,8 @@ def collect(layout):
         q0={},
         q0_scene=None,
         step1_scene=None,
+        step2_scene=None,
+        stage_paths={},
         sequence_versions={},
         version_tracks={},
         stage_events={},
@@ -345,6 +348,19 @@ def collect(layout):
             if rec.get("status") != "success":
                 continue
             versions(facts)
+            if unit in ("step1", "step2", "step3") and rel in stages:
+                version = {"step1":"q1", "step2":"q2", "step3":"q3"}[unit]
+                try:
+                    path = output_layout(facts, version)
+                    if path:
+                        out["stage_paths"][version] = path
+                except failures:
+                    errors.append(f"{unit}: incomplete_output_path")
+            if unit == "step2" and rel in stages:
+                try:
+                    out["step2_scene"] = structural_stage(facts)
+                except failures:
+                    errors.append("step2: invalid_structural_evidence")
             if unit == "step1" and rel in stages:
                 try:
                     out["step1_scene"] = repair_stage(facts)

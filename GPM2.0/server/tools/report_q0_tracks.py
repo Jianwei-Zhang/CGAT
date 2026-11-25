@@ -132,7 +132,7 @@ def bound_tracks(layout, q0, refs, q0_stats):
     return project(envelope["construction"], refs, sizes)
 
 
-def snapshot_tracks(table, refs, q0_stats):
+def snapshot_tracks(table, refs, q0_stats, version="q0"):
     """Older run-scoped snapshots can prove sequence layout without proving ref alignments."""
     if (not isinstance(table, dict) or not table.get("available") or table.get("preview_only")
             or not isinstance(table.get("rows"), list) or table.get("row_count", len(table["rows"])) != len(table["rows"])
@@ -141,7 +141,7 @@ def snapshot_tracks(table, refs, q0_stats):
     sizes = {label(r["sequence"]): r["length_bp"] for r in q0_stats["sequences"]}
     parts = {}
     for row in table["rows"]:
-        if row.get("q_version") != "q0":
+        if row.get("q_version") != version:
             continue
         name, a, b = label(row["chr"]), int(row["q_start"])-1, int(row["q_end"])
         if not 0 <= a < b <= sizes[name]:
@@ -149,7 +149,7 @@ def snapshot_tracks(table, refs, q0_stats):
         seg = {"start": a, "end": b}
         if row["segment_kind"] == "gap":
             seg.update(kind="unspecified_gap")
-        elif row["segment_kind"] == "source":
+        elif row["segment_kind"] in ("source", "telomere", "patch"):
             lo, hi = int(row["source_start"])-1, int(row["source_end"])
             if row["orientation"] not in ("+", "-") or lo < 0 or hi-lo != b-a:
                 raise ValueError("unusable source interval in q0 snapshot")

@@ -1827,6 +1827,24 @@ else:
             self.assertEqual((event["source"]["start"], event["source"]["end"]), (10000, 10200))
             self.assertEqual([r["source"] for r in event["anchors"]], [[0, 10000], [10200, 20200]])
             self.assertEqual([r["q"] for r in event["anchors"]], [[2000, 12000], [12100, 22100]])
+            from report_structural_story import structural_stage
+            from render_repair_story import repair_card
+            facts2 = collect_lgz_result(server, json.loads((server / "grt/evidence/step2/result.json").read_text()))
+            changes = structural_stage(project_report_facts(facts2))
+            self.assertEqual(sum(len(row["events"]) for row in changes), 1)
+            event = next(e for row in changes for e in row["events"])
+            correction, refill = event["history"]
+            self.assertEqual((correction["kind"], correction["bp"]), ("gap", 100))
+            self.assertNotIn("source", correction)
+            self.assertEqual(correction["guide"]["name"], "s_unplaced")
+            self.assertEqual(refill["local_before"], [19200,19300])
+            self.assertEqual(event["before"], [19200,29200])
+            self.assertEqual([a["q"] for a in refill["anchors"]], [[9200,19200],[19300,26400]])
+            self.assertEqual(refill["round"], 1)
+            card = repair_card({"step2_scene": changes, "inputs":{"assemblies":[]}}, structural=True)
+            self.assertEqual(card.count('<template id="step2-inspect-'), 1)
+            self.assertIn("引导比对（未写入）", card)
+            self.assertIn("中间序列坐标", card)
             path = server / "grt/evidence/step1/mummer/alignments.tsv"
             with path.open("a") as f:
                 f.write("changed since publication\n")

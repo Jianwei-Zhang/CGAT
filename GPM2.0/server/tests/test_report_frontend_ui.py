@@ -171,6 +171,21 @@ class ReportFrontendUITests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "coordinate space"):
             repair_stage(foreign)
 
+    def test_structural_outcomes_do_not_invent_inserted_patches(self):
+        from report_structural_story import _detail
+        from render_repair_story import structural_detail
+        base = {"event_id":"e","action":"replace","reason":"supported","q_before":{"start":1,"end":100},"status":"accepted"}
+        overlap = _detail({**base,"junction":{"direct_overlap_bp":19542,"support_sequence_inserted":False,
+                        "left_source":{"contig":"a"},"right_source":{"contig":"b"}}},{})
+        gap = _detail({**base,"edit":{"replacement_kind":"gap","replacement_length":100},
+                            "source":{"dataset":"guide","contig":"not-an-insert"}},{})
+        self.assertNotIn("source",gap);self.assertIn("100 N",structural_detail(gap))
+        self.assertIn("19,542 bp",structural_detail(overlap)); self.assertNotIn("source",overlap)
+        protected = _detail({**base,"action":"filter_component","status":"rejected","edit":{"operation":"retain_components",
+            "kept_intervals":[[1,600]],"removed_intervals":[[1,50]],"q0_protection":{"retained_components":[[300,400]]}}},{})
+        page=structural_detail(protected); self.assertIn("受保护",page);self.assertIn("未采用移除",page)
+        self.assertEqual(protected["protected"],[[299,400]])
+
     def test_large_scenario_stays_bounded_and_preserves_full_chromosome_heatmap(self):
         root = self.parent / "large"
         vm = workspace(root, "large")

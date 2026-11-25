@@ -1118,6 +1118,7 @@ def render_overview(vm):
         ("chr-groups", "02", "染色体分组", "Chromosome groups"),
         ("alignment-q0", "03", "初始路径 q0", "Initial path q0"),
         ("first-repair", "04", "第一轮修补", "First repair"),
+        ("structural-repair", "05", "结构修正", "Structural correction"),
         ("pseudomolecule-evolution", "", "假分子演化", "Evolution"),
         ("result-files", "", "结果取件", "Result Pickup"),
         ("diagnostics-fold", "", "诊断与明细", "Diagnostics"),
@@ -1129,9 +1130,10 @@ def render_overview(vm):
         + assignment_card(vm["lgz_summary"].get("assignment", {}))
         + q0_card(vm["lgz_summary"])
         + repair_card(vm["lgz_summary"])
+        + repair_card(vm["lgz_summary"], structural=True)
         + _render_pseudomolecule_evolution(vm)
         + _render_result_files_and_diagnostics(vm)
-        + (DIALOG if vm["lgz_summary"].get("step1_scene") else "")
+        + (DIALOG if any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene")) else "")
     )
 
     return workbench_page(

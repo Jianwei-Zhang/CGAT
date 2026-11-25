@@ -62,11 +62,48 @@ def _coord(span):
     return f"{a+1:,}–{b:,}" if a<b else f"{a:,} | {a+1:,}"
 
 
-def repair_card(lgz):
-    rows = lgz.get("step1_scene")
+def structural_detail(d):
+    kind=d["kind"]; reason=f'<small>{esc(d["reason"])}</small>'
+    if kind=="refill":
+        src=d["source"]; local=d.get("local_before") or d["before"]
+        title=bi("再填补：采用供体", "Refill: donor admitted")
+        if d.get("round"):
+            title+=f' · {bi("第", "Round")} {d["round"]} · '+bi("中间序列坐标", "Intermediate sequence coordinates")
+        msg = _zoom({"source":src,"before":local,"anchors":d["anchors"]})
+        msg+=f'<p>{esc(src["dataset"])} / {esc(src["name"])} ({src["strand"]}) · {_coord([src["start"],src["end"]])}</p>'
+    elif kind=="filter":
+        title=bi("筛选孤立片段", "Filter isolated components")
+        # The filter ran on the corrected/refilled intermediate. Do not map these intervals onto q1 by offset.
+        ranges=[(ab,bi("保留","Kept"),"--ds-1") for ab in d["kept"]]+[(ab,bi("移除","Removed") if d["applied"] else bi("未采用移除","Removal withheld"),"--tone-warn-line") for ab in d["removed"]]+[(ab,bi("受保护","Protected"),"--ds-2") for ab in d["protected"]]
+        scale=max((ab[1] for ab,_,_ in ranges),default=1)
+        msg=bi("筛选输入坐标", "Filter-input coordinates")+''.join(f'<div>{text} · {_coord(ab)}<div class="repair-base"><span class="repair-part" style="left:{100*ab[0]/scale:.6g}%;width:{100*(ab[1]-ab[0])/scale:.6g}%;background:var({color})"></span></div></div>' for ab,text,color in ranges)
+    elif kind=="overlap":
+        title=bi("侧翼直接去重接合", "Direct overlap closure")
+        n=d["bp"]; a,b=map(esc,d["sides"])
+        msg=f'<p>{a} <b>▰</b> · {n:,} bp · <b>▰</b> {b}</p>'+bi("两端精确重叠，只保留一份；未写入引导序列。", "The oriented ends overlap exactly. One copy remains; no guide sequence was inserted.")
+    elif kind=="gap":
+        title=bi("修正接缝，留下占位 Gap", "Correct the boundary; retain a placeholder gap")
+        msg=f'<p>━━ ┊ {d["bp"]:,} N ┊ ━━</p>'+bi("引导比对用于决定切点，不是填入序列。", "Guide evidence locates the cut; the guide is not inserted.")
+    elif kind=="remove":
+        title=bi("移除被覆盖片段", "Remove redundant component");msg=bi("原区间被移除，没有新增供体序列。", "The interval was removed without inserting donor sequence.")
+    else:
+        title=bi("记录的结构修正", "Recorded correction");msg=esc(d["action"])
+    if d.get("guide") and d["anchors"]:
+        g=d["guide"]; spans=[a["source"] for a in d["anchors"]]; lo=min(ab[0] for ab in spans);hi=max(ab[1] for ab in spans)
+        msg+=f'<p>q1 ↔ {esc(g["dataset"])} / {esc(g["name"])} · '+bi("引导比对（未写入）", "Guide alignment (not inserted)")+'</p>'
+        msg+=_zoom({"before":d["before"],"anchors":d["anchors"],"source":{"start":lo,"end":hi,"strand":"+"}})
+    return f'<div class="repair-decision"><strong>{title}</strong>{msg}<p>{reason}</p></div>'
+
+
+def repair_card(lgz, structural=False):
+    key, num, prior, after = (("structural-repair","05","q1","q2") if structural else ("first-repair","04","q0","q1"))
+    zh,en=(("结构修正与再填补","Structural correction and refill") if structural else ("第一轮修补","First repair"))
+    title_zh, title_en=f"{zh} · {prior} → {after}",f"{en} · {prior} → {after}"
+    rows = lgz.get("step2_scene" if structural else "step1_scene")
     if rows is None:
-        return section("first-repair", "04", "第一轮修补", "First repair", bi("未记录可核对的 q0 → q1 事件。", "No verifiable q0 → q1 event record."))
-    domain=max([1]+[r["length_bp"] for r in rows]); base={t["chr"]:t for t in (lgz.get("q0_scene") or [])}
+        return section(key, num, title_zh, title_en, bi(f"未记录可核对的 {prior} → {after} 事件。",f"No verifiable {prior} → {after} event record."))
+    path=lgz.get("stage_paths",{}).get("q1",{}) if structural else {"tracks":lgz.get("q0_scene"),"sha256":lgz.get("q0_scene_sha256")}
+    domain=max([1]+[r["length_bp"] for r in rows]); base={t["chr"]:t for t in (path.get("tracks") or [])}
     colors={d["name"]:f"var(--ds-{i%6})" for i,d in enumerate(lgz["inputs"]["assemblies"])}
     body=[];templates=[]
     for r in rows:
@@ -74,15 +111,15 @@ def repair_card(lgz):
         state = bi(f"{n} 处修补",f"{n} repairs") if n else bi("未改动", "Unchanged")
         rail=[f'<span class="repair-part" style="left:0;width:{100*length/domain:.8g}%;background:var(--text-muted)"></span>']
         t=base.get(chrom)
-        if t and t["length_bp"] == length and lgz.get("q0_scene_sha256") == r["input_sha256"]:
+        if t and t["length_bp"] == length and path.get("sha256") == r["input_sha256"]:
             for p in t["parts"]:
                 color=colors.get(p.get("dataset"),"var(--gen-unfilled)")
                 rail.append(f'<span class="repair-part" title="{esc(p.get("name",p["kind"]))}" style="left:{100*p["start"]/domain:.8g}%;width:{100*(p["end"]-p["start"])/domain:.8g}%;background:{color}"></span>')
         hits=[];local=[];lanes=[];nlanes=0
         for e in sorted(events,key=lambda e:e["before"]):
-            key=f"step1-inspect-{len(templates)}"; a,b=e["before"]; pos=50*(a+b)/domain
-            span=_coord(e["before"]); title=esc(f"{chrom} · q0 {span}")
-            hits.append(f'<button type="button" class="repair-locus" style="left:{pos:.8g}%" data-story-open="{key}" aria-label="{title}">◆</button>')
+            target=f"{'step2' if structural else 'step1'}-inspect-{len(templates)}"; a,b=e["before"]; pos=50*(a+b)/domain
+            span=_coord(e["before"]); title=esc(f"{chrom} · {prior} {span}")
+            if not e.get("whole_chr"): hits.append(f'<button type="button" class="repair-locus" style="left:{pos:.8g}%" data-story-open="{target}" aria-label="{title}">◆</button>')
             src=e["source"]
             badge=f"{src['dataset']} / {src['name']} ({src['strand']})" if src else e["action"]
             # Keep the marker at its real q0 coordinate. Only label boxes are clamped to the plot.
@@ -95,7 +132,7 @@ def repair_card(lgz):
                 offset=(src["start"]-low) if src["strand"]=="+" else (high-src["end"])
                 mini=(f'<span class="repair-mini"><i style="left:{100*offset/width:.8g}%;'
                       f'width:{100*(src["end"]-src["start"])/width:.8g}%"></i></span>')
-            local.append(f'<button type="button" data-story-open="{key}" style="left:{left:.8g}%;width:25%;top:{lane*2}em" title="{title} · {esc(badge)}">{mini}{esc(badge)}</button>')
+            local.append(f'<button type="button" data-story-open="{target}" style="left:{left:.8g}%;width:25%;top:{lane*2}em" title="{title} · {esc(badge)}">{mini}{esc(badge)}</button>')
             msg=[f'<p>q0 {span} → q1 {_coord(e["after"])}</p>', _zoom(e)]
             if src:
                 msg.append("<p>"+bi("下轨：实际采用的供体区间", "Lower track: admitted donor slice")+f'　<b>{esc(badge)}</b> · {_coord([src["start"],src["end"]])}</p>')
@@ -105,7 +142,14 @@ def repair_card(lgz):
                 msg.append("<p>"+bi("q0 两侧均匹配同一供体；上图高亮的供体区间已写入 q1。", "Both q0 flanks match this donor; the highlighted donor slice is present in q1.")+"</p>")
             else:
                 msg.append("<p>"+bi("采用依据", "Recorded decision")+f'：{esc(e["reason"])}</p>')
-            templates.append(f'<template id="{key}" data-title="{title}">{"".join(msg)}</template>')
-        body.append(f'<div class="repair-rows"><div><b>{esc(chrom)}</b><small>{state}</small></div><div><div class="repair-base" title="q0 {length:,} bp">{"".join(rail)}</div>'
-                    + (f'<div class="repair-hits">{"".join(hits)}</div><div class="repair-local" style="height:{nlanes*2}em">{"".join(local)}</div>' if hits else "")+"</div></div>")
-    return section("first-repair", "04", "第一轮修补 · q0 → q1", "First repair · q0 → q1", "".join(body+templates))
+            if structural:
+                msg=[f'<p>{prior} {span} → {after} {_coord(e["after"])}</p>']
+                msg.extend(structural_detail(d) for d in e["history"])
+            templates.append(f'<template id="{target}" data-title="{title}">{"".join(msg)}</template>')
+        for d in r.get("inspections",[]):
+            target=f"step2-inspect-{len(templates)}"; text=bi("查看筛选依据", "Filter decision")
+            local.append(f'<button type="button" data-story-open="{target}" style="left:0;top:{nlanes*2}em">{text}</button>');nlanes+=1
+            templates.append(f'<template id="{target}" data-title="{esc(chrom)} · Filter">{structural_detail(d)}</template>')
+        body.append(f'<div class="repair-rows"><div><b>{esc(chrom)}</b><small>{state}</small></div><div><div class="repair-base" title="{prior} {length:,} bp">{"".join(rail)}</div>'
+                    + (f'<div class="repair-hits">{"".join(hits)}</div><div class="repair-local" style="height:{nlanes*2}em">{"".join(local)}</div>' if local else "")+"</div></div>")
+    return section(key, num, title_zh, title_en, "".join(body+templates))
