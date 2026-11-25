@@ -163,8 +163,8 @@ test("project export page renders assignment bars before placed statistics with 
 });
 
 for (const [locale, names] of Object.entries({
-  en: ["Assembly Layout", "Assembly Sequence", "Path Details", "Assembly Statistics", "Pseudomolecule Preview", "All Assembly Outputs", "Refinement Task Bundle"],
-  zh: ["组装结构", "组装序列", "路径明细", "组装统计", "假分子预览图", "全部组装结果", "精修任务包"],
+  en: ["Layout", "Sequence", "Path Details", "Contig Usage", "Pseudomolecule Preview", "All Assembly Outputs", "Refinement Tasks"],
+  zh: ["组装结构", "组装序列", "路径明细", "Contig 使用统计", "假分子预览图", "全部组装结果", "精修任务"],
 })) test(`Home export groups named outputs, a side menu, batch and refinement (${locale})`, () => {
   const html = renderProjectExportPage(createState({ locale })).split("data-project-export-menu>")[1].split("</header>")[0];
   const keys = ["agp", "fasta", "tsv", "log", "preview", "all", "refinement-all"];
@@ -757,7 +757,7 @@ test("project export page hides log action and stats when any final path contain
   assert.match(html, /data-project-export-action="all"/);
   assert.doesNotMatch(html, /data-project-export-action="log"/);
   assert.doesNotMatch(html, /project-export-summary-line/);
-  assert.match(html, /无法显示或导出组装统计/);
+  assert.match(html, /不能导出 Contig 使用统计/);
   assert.doesNotMatch(html, /已使用主组装 Contig 数量/);
 });
 
