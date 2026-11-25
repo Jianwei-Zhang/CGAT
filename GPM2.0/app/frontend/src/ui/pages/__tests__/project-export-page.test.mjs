@@ -7,7 +7,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
-import { PREVIEW_MODEL_VERSION, previewOverrideSignature } from "../project-preview-cache.js";
+import { buildProjectPreviewSvgSnapshot } from "../project-preview-image-export.js";
+import { PREVIEW_MODEL_VERSION, previewLocalSignatures, previewOverrideSignature } from "../project-preview-cache.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
 import { __test, bindProjectExportPage, renderProjectExportPage, renderProjectPathOverview, bindProjectPathOverview, releaseProjectPathOverview } from "../project-export-page.js";
 import { readStylesheetTree } from "../../../styles/__tests__/style-test-support.mjs";
@@ -27,8 +28,12 @@ function loadedPreviewState(state) {
     .map(chrName => ({ chrName }));
   const cards = buildProjectPreviewModel({ chromosomes, finalPathByChr, phasedChrTracksByChr: state.projectExport?.phasedChrTracksByChr,
     datasets: state.initializer?.datasets, project: state.initializer?.existingProjects?.[0] });
-  return { ...state, projectPreview: { key: previewProjectKey(state), loaded: true, cards }, projectExport: { ...state.projectExport,
-    loaded: true, workspacePath: state.session.workspacePath, mutationStamp: previewMutationStamp({ workspaceRoot: state.session.workspacePath, projectId: state.session.projectId }) } };
+  const mutationStamp = previewMutationStamp({ workspaceRoot: state.session.workspacePath, projectId: state.session.projectId });
+  return { ...state,
+    projectPreview: { key: previewProjectKey(state), loaded: true, cards, modelVersion: PREVIEW_MODEL_VERSION,
+      savedPathSignatures: {}, localSignature: previewOverrideSignature(previewLocalSignatures(state), {}), mutationStamp },
+    projectExport: { ...state.projectExport, loaded: true, workspacePath: state.session.workspacePath, mutationStamp },
+  };
 }
 function renderLoadedPathOverview(state) {
   const value = loadedPreviewState(state);
@@ -113,14 +118,13 @@ test("project export page renders assignment bars before placed statistics with 
   assert.doesNotMatch(html, /<h[1-6][^>]*>概览</);
   assert.doesNotMatch(html, /project-export-identity/);
   assert.match(html, /<h3>装配统计<\/h3>/);
-  assert.ok(html.indexOf("data-preview-download") < html.indexOf("data-project-export-toggle"));
-  assert.equal((html.match(/data-preview-download/g) || []).length, 1);
+  assert.doesNotMatch(html, /data-preview-download|data-project-export-action="png"/);
   assert.doesNotMatch(html, /project-preview-heading|project-preview-subtitle|project-preview-legend/);
   assert.doesNotMatch(html, /card project-export-card/);
   assert.doesNotMatch(html, /data-project-export-refresh/);
-  assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"[\s\S]*>导出<\/button>/);
+  assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"\s+aria-label="导出" data-app-tooltip="导出"[^>]*><svg/);
   assert.match(html, /class="final-path-export-menu is-hidden" data-project-export-menu/);
-  assert.match(html, /data-project-export-action="png"/);
+  assert.match(html, /data-preview-format="png"/);
   assert.match(html, /data-project-export-action="tsv"/);
   assert.match(html, /data-project-export-action="log"/);
   assert.match(html, /data-project-export-action="fasta"/);
@@ -128,14 +132,14 @@ test("project export page renders assignment bars before placed statistics with 
   assert.match(html, />序列 \(.fasta\)<\/button>/);
   assert.match(html, />AGP \(.agp\)<\/button>/);
   assert.match(html, />表 \(.tsv\)<\/button>/);
-  assert.match(html, />图 \(.png\)<\/button>/);
+  assert.match(html, /<details class="project-preview-formats">\s*<summary[^>]*>假分子预览图<\/summary>[\s\S]*?>SVG<\/button>[\s\S]*?>PNG<\/button>[\s\S]*?>PDF<\/button>\s*<\/div>\s*<\/details>/);
   assert.match(html, />日志 \(.log\)<\/button>/);
   assert.match(html, />全部<\/button>/);
   assert.match(html, />精修任务<\/button>/);
-  assert.ok(html.indexOf('data-project-export-action="fasta"') < html.indexOf('data-project-export-action="agp"'));
+  assert.ok(html.indexOf('data-project-export-action="agp"') < html.indexOf('data-project-export-action="fasta"'));
   assert.ok(html.indexOf('data-project-export-action="agp"') < html.indexOf('data-project-export-action="tsv"'));
-  assert.ok(html.indexOf('data-project-export-action="tsv"') < html.indexOf('data-project-export-action="png"'));
-  assert.ok(html.indexOf('data-project-export-action="png"') < html.indexOf('data-project-export-action="log"'));
+  assert.ok(html.indexOf('data-project-export-action="tsv"') < html.indexOf('data-preview-format="png"'));
+  assert.ok(html.indexOf('data-preview-format="png"') < html.indexOf('data-project-export-action="log"'));
   assert.ok(html.indexOf('data-project-export-action="log"') < html.indexOf('data-project-export-action="all"'));
   assert.ok(html.indexOf('data-project-export-action="all"') < html.indexOf('data-project-export-action="refinement-all"'));
   assert.doesNotMatch(html, /导出图|导出表|导出日志|导出序列|一键导出|导出全部精修任务/);
@@ -171,7 +175,7 @@ test("project export page renders assignment bars before placed statistics with 
   assert.doesNotMatch(pathHtml, /project-preview-axis|来源组合|Source composition/);
 });
 
-test("project export menu closes after leaving the export root", () => {
+test("Export opens on AGP and resets the image submenu when leaving the export root", async () => {
   const originalSetTimeout = globalThis.setTimeout;
   const originalClearTimeout = globalThis.clearTimeout;
   const timers = new Map();
@@ -187,8 +191,12 @@ test("project export menu closes after leaving the export root", () => {
     timers.delete(timerId);
   };
   try {
+    let agpFocused = false;
+    const formats = { open: false };
     const menuNode = {
-      hidden: false,
+      hidden: true,
+      querySelector: selector => selector === '[data-project-export-action="agp"]:not(:disabled)'
+        ? { focus() { agpFocused = true; } } : selector === ".project-preview-formats" ? formats : null,
       classList: {
         contains(name) {
           return name === "is-hidden" ? menuNode.hidden : false;
@@ -247,6 +255,13 @@ test("project export menu closes after leaving the export root", () => {
     };
 
     bindProjectExportPage(host, store);
+    toggleNode.closest = selector => selector === "[data-project-export]" ? exportRoot : null;
+    for (const handler of listeners.get("click")) await handler({ target: {
+      closest: selector => selector === "[data-project-export-toggle]" ? toggleNode : null,
+    } });
+    assert.equal(agpFocused, true);
+    assert.equal(toggleNode["aria-expanded"], "true");
+    formats.open = true;
 
     listeners.get("pointerout").forEach((handler) => handler({
       target: exportTarget,
@@ -258,6 +273,7 @@ test("project export menu closes after leaving the export root", () => {
     timers.delete(closeTimerId);
     closeTimer();
     assert.equal(menuNode.hidden, true);
+    assert.equal(formats.open, false);
     assert.equal(toggleNode["aria-expanded"], "false");
 
     menuNode.hidden = false;
@@ -697,7 +713,7 @@ test("project export page hides log action and stats when any final path contain
   });
   const html = renderProjectExportPage(state);
 
-  assert.match(html, /data-project-export-action="png"/);
+  assert.match(html, /data-preview-format="png"/);
   assert.match(html, /data-project-export-action="tsv"/);
   assert.match(html, /data-project-export-action="fasta"/);
   assert.match(html, /data-project-export-action="all"/);
@@ -1045,11 +1061,7 @@ test("project export final path rows use natural order before project export chr
     .map((row) => row.split("\t")[0]);
   assert.deepEqual(tsvNames, expectedNames);
 
-  const svgMarkup = __test.buildProjectFinalPathSvgSnapshot({
-    entries,
-    projectName: "p1",
-    primaryDatasetName: "hifiasm",
-  }).svgMarkup;
+  const { svgMarkup } = buildProjectPreviewSvgSnapshot(loadedPreviewState(state));
   expectedNames.slice(0, -1).forEach((chrName, index) => {
     assert.ok(svgMarkup.indexOf(`>${chrName}</text>`) < svgMarkup.indexOf(`>${expectedNames[index + 1]}</text>`));
   });
@@ -1432,6 +1444,24 @@ test("project export TSV fails instead of guessing missing origin id from ctg na
   assert.doesNotMatch(store.getState().projectExport.job.error, /gf_chr2_gap4/);
 });
 
+test("AGP remains available while the preview loads; All rejects a preview replaced in the directory picker", async () => {
+  const h = exportHarness(loadedPreviewState(createState()));
+  const state = h.store.getState();
+  const menu = renderProjectExportPage({ ...state, projectPreview: { ...state.projectPreview, loading: true } });
+  assert.match(menu, /data-project-export-action="agp">/);
+  assert.match(menu, /data-preview-format="svg" data-preview-required disabled/);
+  assert.match(menu, /data-project-export-action="all" data-preview-required disabled/);
+  const result = await __test.runProjectExport(h.host, h.store, "all", {
+    pickDirectoryPath: async () => {
+      h.store.setState({ projectPreview: { ...state.projectPreview, cards: [...state.projectPreview.cards] } });
+      return "/exports";
+    },
+    renderProjectPreviewPng: () => assert.fail("stale preview"),
+  });
+  assert.equal(result, false);
+  assert.equal(h.store.getState().projectExport.job, null);
+});
+
 test("project export all writes one merged artifact per export type", async () => {
   const baseState = createState();
   let state = createState({
@@ -1480,10 +1510,15 @@ test("project export all writes one merged artifact per export type", async () =
   const fastaExports = [];
   const agpExports = [];
 
+  state = loadedPreviewState(state);
   const result = await __test.runProjectExport(host, store, "all", {
     getExportTimestamp: () => "20260430205930",
     pickDirectoryPath: async () => "/exports",
-    renderFinalPathViewportPng: async () => "png-bytes",
+    renderProjectPreviewPng: async snapshot => {
+      assert.equal(snapshot.cardBounds.length, 2);
+      assert.match(snapshot.svgMarkup, />Final Path</);
+      return "png-bytes";
+    },
     writeFinalPathExportTextFile: async (payload) => {
       textWrites.push(payload);
     },
@@ -2025,14 +2060,6 @@ test("project export preview tags both gaps and contigs for shared minimum-pixel
 });
 
 
-test("project export SVG keeps white gap markers and tooltips without GAP text", () => {
-  const { svgMarkup } = __test.buildProjectFinalPathSvgSnapshot({ entries: [{ chrName: "Chr1", lengthBp: 102,
-    entry: { segments: [{ type: "gap", gapSizeBp: 100 },
-      { type: "ctg", start: 1, end: 2, overallLen: 2, ctgName: "a" }] } }], projectName: "test" });
-  assert.match(svgMarkup, /fill="#ffffff"[^>]*><title>GAP 100 bp<\/title>/);
-  assert.doesNotMatch(svgMarkup, /<text[^>]*>GAP<\/text>/);
-});
-
 function exportDeferred() { let resolve, reject; const promise = new Promise((r, j) => { resolve = r; reject = j; }); return { promise, resolve, reject }; }
 function exportHarness(initial = createState()) {
   let state = { ...initial, activeRoute: "projectExport" }, paints = 0;
@@ -2188,7 +2215,7 @@ test("Overview progress patches only the summary and neither renders nor replace
 });
 
 
-test("Overview toolbar download exports Preview through its own handler without opening the export menu", async () => {
+test("Export image submenu dispatches the chosen format without navigating or repainting", async () => {
   const value = createState();
   value.projectPreview = { loaded: true, modelVersion: PREVIEW_MODEL_VERSION, key: previewProjectKey(value),
     mutationStamp: previewMutationStamp({ workspaceRoot: value.session.workspacePath, projectId: value.session.projectId }),
@@ -2197,11 +2224,13 @@ test("Overview toolbar download exports Preview through its own handler without 
       ctgs: [{ assemblyCtgId: 1, name: "ptg1", datasetName: "hifiasm", totalLength: 1000, assignedChrName: "Chr01", anchorStart: 0 }],
       finalPathByChr: { Chr01: { segments: [{ type: "ctg", assemblyCtgId: 1, datasetName: "hifiasm", start: 1, end: 1000 }] } } }) };
   const h = exportHarness(value), listeners = new Map(), writes = [];
-  const button = { disabled: true, closest: selector => selector === "[data-preview-download]" ? button : null };
+  const button = { disabled: true, dataset: { previewFormat: "png" }, closest: selector => selector === "[data-preview-format]" ? button : null };
   h.host.addEventListener = (name, fn) => listeners.set(name, [...(listeners.get(name) || []), fn]);
-  h.host.querySelector = selector => selector === "[data-preview-download]" ? button : null;
+  h.host.querySelectorAll = selector => selector === "[data-preview-required]" ? [button] : [];
   bindProjectExportPage(h.host, h.store, { preview: {
-    pickSaveFilePath: async () => "D:/all-chromosomes.png",
+    pickSaveFilePath: async options => {
+      assert.deepEqual(options.filters, [{ name: "PNG", extensions: ["png"] }]); return "D:/all-chromosomes";
+    },
     renderProjectPreviewPng: async snapshot => { assert.match(snapshot.svgMarkup, />Chr01</); return "PNG"; },
     writeFinalPathExportBinaryFile: async args => writes.push(args),
   } });
@@ -2215,15 +2244,15 @@ for (const locale of ["zh", "en"]) test(`Project integrates statistics and previ
   const html = renderProjectExportPage(createState({ locale }));
   assert.doesNotMatch(html, /project-export-identity|project-export-head|project-export-summary-line|project-preview-heading/);
   assert.match(html, locale === "zh" ? /<h3>装配统计<\/h3>/ : /<h3>Assembly statistics<\/h3>/);
-  assert.match(html, /project-preview-toolbar[\s\S]*data-preview-download[\s\S]*data-project-export-toggle[\s\S]*data-overview-preview/);
-  assert.equal((html.match(/data-preview-download/g) || []).length, 1);
+  assert.match(html, /project-preview-toolbar[\s\S]*data-project-export-toggle[\s\S]*data-overview-preview/);
+  assert.doesNotMatch(html, /data-preview-download|data-project-export-action="png"/);
 });
 
 test("Project statistics has a compact two-measure surface and stacks on narrow layouts", () => {
   assert.match(componentsCss, /\.project-assembly-statistics \.project-export-grid[^}]*gap: 0/);
   assert.match(componentsCss, /@media \(max-width: 900px\)[\s\S]*\.project-assembly-statistics \.project-export-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/);
   assert.match(componentsCss, /\.project-preview-toolbar \.project-export-actions[^}]*margin-left: auto/);
-  assert.match(componentsCss, /\.project-preview-toolbar \.project-preview-download:focus-visible[^}]*outline: 2px solid/);
+  assert.match(componentsCss, /\[data-project-export-toggle\]:focus-visible[^}]*outline: 2px solid/);
 });
 
 test("overview loads one shared summary and never asks for per-chromosome Assembly evidence", async () => {
@@ -2264,7 +2293,7 @@ test("Project details stay hidden as a whole even with saved expansion, without 
   const before = JSON.stringify(state), html = renderProjectExportPage(state);
   assert.match(html, /class="project-assembly-statistics" hidden/);
   assert.match(html, /class="project-export-detail-section" hidden aria-labelledby="project-export-detail-title"/);
-  for (const action of ["log", "tsv", "png", "fasta", "all"]) assert.ok(html.includes(`data-project-export-action="${action}"`));
+  for (const action of ["log", "tsv", "fasta", "all"]) assert.ok(html.includes(`data-project-export-action="${action}"`));
   assert.equal(JSON.stringify(state), before);
 });
 

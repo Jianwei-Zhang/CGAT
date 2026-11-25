@@ -27,7 +27,7 @@ function deps() {
   };
 }
 
-test("standalone preview uses a download icon, hides unpositioned lists and keeps gaps without text", () => {
+test("preview leaves export to the shared menu, hides unpositioned lists and keeps gaps without text", () => {
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
     ctgs: [{ assemblyCtgId: 2, datasetName: "dsA", name: "unknown", totalLength: 100,
@@ -37,7 +37,7 @@ test("standalone preview uses a download icon, hides unpositioned lists and keep
   const output = renderProjectPreviewCard(value.projectPreview.cards[0], getMessages(value, "projectPreview"));
   assert.match(output, /class="project-preview-card"/);
   assert.doesNotMatch(output, /<button[^>]*class="project-preview-card"/);
-  assert.match(renderProjectPreviewPage(value), /project-preview-download[^>]*aria-label="下载预览图"[^>]*>[\s\S]*?<svg/);
+  assert.doesNotMatch(renderProjectPreviewPage(value), /data-preview-download/);
   assert.doesNotMatch(output, /data-preview-refresh/);
   assert.doesNotMatch(output, /project-preview-unpositioned|未定位/);
   assert.doesNotMatch(output, /data-final-path-gap-label|project-preview-gap-label|>Gap<\/span>/);
@@ -270,22 +270,6 @@ test("mounted Overview Preview refreshes after committed content changes, not on
   const next = beginPreviewContentOperation("delete_phased_chr_track", args);
   finishPreviewContentOperation(next, "delete_phased_chr_track", {}, true);
   store.setState({ assembly: { ...store.getState().assembly } }); assert.equal(metadataReads, 2);
-});
-
-
-test("Preview download click delegates to whole-image export without navigating or requiring manual refresh", async () => {
-  const store = createStore(state()), node = host(), options = deps(), writes = [];
-  options.pickSaveFilePath = async () => "D:/preview.png";
-  options.renderProjectPreviewPng = async snapshot => { assert.match(snapshot.svgMarkup, />Chr1</); return "PNG"; };
-  options.writeFinalPathExportBinaryFile = async args => writes.push(args);
-  await loadProjectPreviewData(node, store, options);
-  bindProjectPreviewPage(node, store, options);
-  await loadProjectPreviewData(node, store, options);
-  node.click({ target: { closest: selector => selector === "[data-preview-download]" ? {} : null } });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(writes.length, 1); assert.equal(writes[0].outputPath, "D:/preview.png");
-  assert.equal(store.getState().activeRoute, "projectPreview");
-  unbindProjectPreviewPage(node);
 });
 
 

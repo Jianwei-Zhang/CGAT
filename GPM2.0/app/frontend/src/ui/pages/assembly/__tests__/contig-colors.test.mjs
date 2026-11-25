@@ -1,5 +1,5 @@
 import { renderProjectPreviewCard } from "../../project-preview-page.js";
-import { buildProjectPreviewModel } from "../../project-preview-state.js";
+import { buildProjectPreviewModel, previewProjectKey } from "../../project-preview-state.js";
 import { getMessages } from "../../../i18n/index.js";
 import { previewMutationStamp } from "../../../../services/preview-content-events.js";
 import test from "node:test";
@@ -13,7 +13,8 @@ import {
 } from "../contig-colors.js";
 import { renderFinalPathGraph } from "../final-path-card.js";
 import { buildViewportScopedSvgMarkup } from "../final-path-export-runtime.js";
-import { __test } from "../../project-export-page.js";
+import { buildProjectPreviewSvgSnapshot } from "../../project-preview-image-export.js";
+import { PREVIEW_MODEL_VERSION, previewOverrideSignature } from "../../project-preview-cache.js";
 
 const css = (file) => readFileSync(new URL(`../../../../styles/${file}`, import.meta.url), "utf8");
 const palette = DEFAULT_CONTIG_PALETTE;
@@ -95,10 +96,10 @@ test("Final Path and Project Path Overview render the same stable tone for each 
   assert.deepEqual(card.paths[0].parts.map(part => part.role), ["primary", "companion", "ref", "primary", "companion", "primary"]);
   assert.equal((html.match(/data-final-path-kind="ctg"/g) || []).length, segments.length);
   assert.equal(JSON.stringify(state), before);
-  const snapshot = __test.buildProjectFinalPathSvgSnapshot({ entries: [{ chrName: "Chr02", entry, lengthBp: 600 }],
-    primaryDatasetName: "hifiasm", projectName: "p1", ctgColorContext: colorContext });
-  const colors = [...snapshot.svgMarkup.matchAll(/rx="3" fill="([^"]+)" stroke="([^"]+)"/g)].map(m => [m[1], m[2]]);
-  assert.deepEqual(colors, [palette.primary, palette.companion, palette.ref, palette.primary, palette.companion, palette.primary].map(p => [p.fill, p.stroke]));
+  const snapshot = buildProjectPreviewSvgSnapshot({ ...state, projectPreview: { key: previewProjectKey(state), cards: [card],
+    modelVersion: PREVIEW_MODEL_VERSION, loaded: true, localSignature: previewOverrideSignature({}, {}), mutationStamp: state.projectExport.mutationStamp } });
+  const colors = [...snapshot.svgMarkup.matchAll(/height="16" fill="([^"]+)" stroke="none"/g)].map(m => m[1]);
+  assert.deepEqual(colors.slice(0, segments.length), [palette.primary, palette.companion, palette.ref, palette.primary, palette.companion, palette.primary].map(p => p.fill));
 });
 
 test("headless exports have the same palette fallbacks as the app", () => {
@@ -155,9 +156,6 @@ test("standalone SVG exports resolve current root tokens instead of leaking app-
     globalThis.getComputedStyle = () => ({ getPropertyValue: key => key === "--ctg-primary-fill" ? " #abc123 " : "" });
     assert.equal(getContigPalette().primary.fill, "#abc123");
     assert.equal(getContigPalette().companion.fill, palette.companion.fill);
-    const snapshot = __test.buildProjectFinalPathSvgSnapshot({ entries: [{ chrName: "Chr01", lengthBp: 100,
-      entry: { segments: [segments[0]] } }], primaryDatasetName: "hifiasm" });
-    assert.match(snapshot.svgMarkup, /fill="#abc123"/);
     const svg = buildViewportScopedSvgMarkup({ svgMarkup: '<svg><rect class="track-ctg" /></svg>', width: 100, height: 50 });
     assert.match(svg, /\.track-ctg\{fill:#abc123;/);
     assert.doesNotMatch(svg, /var\(--ctg-/);

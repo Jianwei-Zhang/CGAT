@@ -9,7 +9,7 @@ export function projectLabels(state) {
   return state.locale === "en" ? {
     projectInformation: "Assembly Information",
     resizeLibrary: "Resize project library",
-    import: "Import", open: "Open", importTitle: "Import Assembly", recent: "Projects",
+    import: "Import", open: "Open", importTitle: "Import Assembly", recent: "Assemblies",
     empty: "No assemblies yet", emptyHint: "Import a delivery bundle or open an existing assembly directory.",
     name: "Assembly name (optional)", nameDefault: "Use directory name", location: "Assembly directory",
     zip: "Bundle (ZIP / tar.gz)", extracted: "Extracted directory", extractedOption: "Extracted Directory", source: "Source", browse: "Browse",
@@ -28,7 +28,7 @@ export function projectLabels(state) {
   } : {
     projectInformation: "组装信息",
     resizeLibrary: "调整项目库宽度",
-    import: "导入", open: "打开", importTitle: "导入组装", recent: "项目库",
+    import: "导入", open: "打开", importTitle: "导入组装", recent: "组装",
     empty: "尚未添加组装", emptyHint: "导入交付包，或打开已有组装目录。",
     name: "组装名称（可选）", nameDefault: "使用目录名称", location: "组装目录",
     zip: "交付包（ZIP / tar.gz）", extracted: "已解压目录", extractedOption: "已解压目录", source: "来源", browse: "选择",

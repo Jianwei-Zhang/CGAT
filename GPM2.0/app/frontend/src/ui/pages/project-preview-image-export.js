@@ -1,6 +1,5 @@
 import { pickSaveFilePath } from "../../services/backend-api.js";
 import { writeFinalPathExportBinaryFile } from "../../services/workflow-api.js";
-import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { formatProjectPreviewBp as bp, readProjectPreviewImageStyle } from "./project-preview-presentation.js";
 import { projectPreviewDisplayCards, layoutProjectPreviewCard } from "./project-preview-layout.js";
@@ -17,27 +16,37 @@ const rect = (x, y, width, height, fill, stroke = "none", extra = "") =>
 const projectName = state => state.session?.projectName
   || state.initializer?.existingProjects?.find(project => Number(project.projectId) === Number(state.session?.projectId))?.projectName
   || "project";
-const exportable = state => state.projectPreview?.loaded && !state.projectPreview.loading
+export const canExportPreviewImage = state => state.projectPreview?.loaded && !state.projectPreview.loading
   && !state.projectPreview.error && state.projectPreview.cards?.length > 0 && previewStateIsApplicable(state);
 export const previewImageExportIsRunning = store => running.has(store);
 
-// The action lives in Overview's toolbar, outside the independently updated
-// Preview subtree. Standalone Preview still uses its own local action root.
-export const previewImageActionRoot = host => host?.closest?.("[data-overview-project]") || host;
-export function renderPreviewImageDownloadButton(state) {
-  const label = xml(getMessages(state, "projectPreview").download);
-  return `<button type="button" class="button project-preview-download" data-preview-download data-app-tooltip="${label}" aria-label="${label}" disabled>${projectIcon("imageDownload")}</button>`;
+export const previewImageFormats = ["svg", "png", "pdf"];
+
+// Home's export menu lives outside the independently refreshed Preview subtree.
+export function syncPreviewExportActions(host, store) {
+  const root = host?.closest?.("#route-host") || host;
+  const buttons = root?.querySelectorAll?.("[data-preview-required]");
+  if (!buttons?.length) return;
+  const disabled = running.has(store) || !canExportPreviewImage(store.getState());
+  for (const button of buttons) button.disabled = disabled;
 }
-export function syncPreviewImageDownloadButton(host, store) {
-  const button = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");
-  if (button) button.disabled = running.has(store) || !exportable(store.getState());
+
+export function previewImageStillCurrent(state, latest) {
+  return state.projectPreview?.cards === latest.projectPreview?.cards
+    && previewProjectKey(state) === previewProjectKey(latest) && canExportPreviewImage(latest);
+}
+
+export function captureProjectPreviewImage(host, state) {
+  const width = host.querySelector?.(".project-preview-cards")?.clientWidth;
+  return buildProjectPreviewSvgSnapshot(state, { width: width > 0 ? width + 40 : undefined,
+    style: readProjectPreviewImageStyle(host) });
 }
 
 // Build from ALL semantic cards, not the mounted/visible viewport. Native SVG
 // primitives avoid screenshot/foreignObject dependencies and resolve all colors.
 export function buildProjectPreviewSvgSnapshot(state, { width = 1440, style = readProjectPreviewImageStyle(), palette = style.palette,
   highlightAdopted = true } = {}) {
-  if (!exportable(state)) throw new Error("Preview is not ready");
+  if (!canExportPreviewImage(state)) throw new Error("Preview is not ready");
   const labels = getMessages(state, "projectPreview");
   // Keep the measured on-screen plot width, including minimum-pixel parts.
   // Only require enough room for the label column and a nonempty plot.
@@ -174,34 +183,30 @@ export async function renderProjectPreviewPng(snapshot) {
   } finally { URL.revokeObjectURL(url); }
 }
 
-export async function exportProjectPreviewImage(host, store, deps = {}) {
-  if (running.has(store) || !exportable(store.getState())) return false;
-  const state = store.getState(), key = previewProjectKey(state), cards = state.projectPreview.cards;
-  const current = () => previewProjectKey(store.getState()) === key && store.getState().projectPreview?.cards === cards
-    && exportable(store.getState());
+export async function exportProjectPreviewImage(host, store, format, deps = {}) {
+  const state = store.getState();
+  if (running.has(store) || !previewImageFormats.includes(format) || !canExportPreviewImage(state)) return false;
+  const current = () => previewImageStillCurrent(state, store.getState());
   const status = host.querySelector?.("[data-preview-export-error]");
   if (status) { status.hidden = true; status.textContent = ""; }
   running.add(store);
-  const button = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");
-  if (button) button.disabled = true;
   try {
-    const screenWidth = host.querySelector?.(".project-preview-cards")?.clientWidth;
-    const snapshot = buildProjectPreviewSvgSnapshot(state, { width: screenWidth > 0 ? screenWidth + 40 : undefined,
-      style: readProjectPreviewImageStyle(host) });
+    syncPreviewExportActions(host, store);
     const fileName = String(projectName(state)).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/[ .]+$/g, "") || "project";
-    let targetPath = await (deps.pickSaveFilePath || pickSaveFilePath)({ defaultPath: `${fileName}_preview.svg`,
-      filters: [{ name: "SVG", extensions: ["svg"] }, { name: "PNG", extensions: ["png"] }, { name: "PDF", extensions: ["pdf"] }] }, state);
+    let targetPath = await (deps.pickSaveFilePath || pickSaveFilePath)({ defaultPath: `${fileName}_preview.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }] }, state);
     if (!targetPath || !current()) return false;
     const extension = /\.([^./\\]+)$/.exec(targetPath)?.[1]?.toLowerCase();
-    const format = extension || "svg";
-    if (!extension) targetPath += ".svg";
+    if (extension && extension !== format) throw new Error(getMessages(state, "projectPreview").exportExtensionMismatch.replace("{ext}", format));
+    if (!extension) targetPath += `.${format}`;
+    const snapshot = captureProjectPreviewImage(host, state);
     let bytesBase64;
     if (format === "svg") bytesBase64 = previewBytesBase64(new TextEncoder().encode(snapshot.svgMarkup));
     else if (format === "png") bytesBase64 = await (deps.renderProjectPreviewPng || renderProjectPreviewPng)(snapshot);
-    else if (format === "pdf") {
+    else {
       const render = deps.renderProjectPreviewPdf || (await import("./project-preview-pdf-export.js")).renderProjectPreviewPdf;
       bytesBase64 = await render(snapshot, deps.renderProjectPreviewPng || renderProjectPreviewPng);
-    } else throw new Error(getMessages(state, "projectPreview").exportUnsupportedFormat);
+    }
     if (!current()) return false;
     await (deps.writeFinalPathExportBinaryFile || writeFinalPathExportBinaryFile)({ outputPath: targetPath, bytesBase64, stateOrLocale: state });
     return true;
@@ -213,6 +218,6 @@ export async function exportProjectPreviewImage(host, store, deps = {}) {
     return false;
   } finally {
     running.delete(store);
-    syncPreviewImageDownloadButton(host, store);
+    syncPreviewExportActions(host, store);
   }
 }

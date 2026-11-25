@@ -22,7 +22,7 @@ test("importer page renders english labels when locale is en", () => {
     },
   });
 
-  assert.match(html, />Projects</);
+  assert.match(html, />Assemblies</);
   assert.match(html, /New project/);
   assert.match(html, />Import</);
   assert.match(html, />Open</);

@@ -32,7 +32,7 @@ test("recent projects and current detail share the browser layout without duplic
   assert.match(html, /project-recent-name[\s\S]*>Rice<\/strong>/);
   assert.match(html, /project-recent-name[\s\S]*>Other<\/strong>/);
   assert.doesNotMatch(html, /<span class="project-path muted">|project-recent-time|project-open-status|data-project-validation-path/);
-  assert.match(html, />Projects<\/span><span class="project-count"><span aria-hidden="true">·<\/span>2<\/span>/);
+  assert.match(html, />Assemblies<\/span><span class="project-count"><span aria-hidden="true">·<\/span>2<\/span>/);
   assert.match(html, /project-recents-header[\s\S]*id="validate-history-button"[\s\S]*project-recent-list/);
   assert.doesNotMatch(html, /data-project-remove|Remove from recent/);
   assert.doesNotMatch(html, /No projects yet|No project open/);
@@ -238,7 +238,7 @@ for (const locale of ["en", "zh"]) {
       records: [{ path: "/rice", projectName: "my_miXeD_project" }],
       summaryHtml: "", messages: getMessages(state, "importer"), formatTime: () => "",
     });
-    const label = locale === "en" ? "Projects" : "项目库";
+    const label = locale === "en" ? "Assemblies" : "组装";
     assert.ok(html.includes(`<span class="project-recents-title-label">${label}</span><span class="project-count"><span aria-hidden="true">·</span>1</span>`));
     assert.ok(html.includes("my_miXeD_project"));
   });

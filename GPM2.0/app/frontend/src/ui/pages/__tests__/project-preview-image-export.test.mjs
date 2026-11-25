@@ -9,7 +9,7 @@ import { previewMutationStamp } from "../../../services/preview-content-events.j
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
 import { PREVIEW_MODEL_VERSION, previewOverrideSignature } from "../project-preview-cache.js";
 import { buildProjectPreviewSvgSnapshot, exportProjectPreviewImage, previewImageExportIsRunning,
-  renderProjectPreviewPng, syncPreviewImageDownloadButton } from "../project-preview-image-export.js";
+  renderProjectPreviewPng, syncPreviewExportActions } from "../project-preview-image-export.js";
 
 function fixture(count = 12) {
   const chromosomes = Array.from({ length: count }, (_, i) => ({ chrName: `chr${String(i + 1).padStart(2, "0")}`, chrLength: 10000 }));
@@ -28,8 +28,8 @@ function fixture(count = 12) {
     mutationStamp: previewMutationStamp({ workspaceRoot: "D:/ws", projectId: 1 }),
     savedPathSignatures: {}, localSignature: previewOverrideSignature({}, {}), cards: buildProjectPreviewModel(inputs) };
   const button = { disabled: false }, error = { hidden: true, textContent: "" };
-  const host = { querySelector: selector => selector === "[data-preview-download]" ? button
-    : selector === "[data-preview-export-error]" ? error : null };
+  const host = { querySelectorAll: selector => selector === "[data-preview-required]" ? [button] : [],
+    querySelector: selector => selector === "[data-preview-export-error]" ? error : null };
   const store = createStore(state);
   return { state: store.getState(), store, host, button, error };
 }
@@ -67,15 +67,15 @@ test("image refuses loading, stale and empty previews; only rasterization limits
 test("download uses the native save/binary chain, locks duplicate clicks and does not mutate state", async () => {
   const f = fixture(), before = JSON.stringify(f.state), writes = [];
   let release;
-  const pending = exportProjectPreviewImage(f.host, f.store, {
-    pickSaveFilePath: async args => { assert.equal(args.defaultPath, "test_project__preview.svg");
-      assert.deepEqual(args.filters, [{ name: "SVG", extensions: ["svg"] }, { name: "PNG", extensions: ["png"] }, { name: "PDF", extensions: ["pdf"] }]); return "D:/preview.png"; },
+  const pending = exportProjectPreviewImage(f.host, f.store, "png", {
+    pickSaveFilePath: async args => { assert.equal(args.defaultPath, "test_project__preview.png");
+      assert.deepEqual(args.filters, [{ name: "PNG", extensions: ["png"] }]); return "D:/preview.png"; },
     renderProjectPreviewPng: snapshot => { assert.match(snapshot.svgMarkup, />chr12</); return new Promise(resolve => { release = resolve; }); },
     writeFinalPathExportBinaryFile: async args => writes.push(args),
   });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(f.button.disabled, true); assert.equal(previewImageExportIsRunning(f.store), true);
-  assert.equal(await exportProjectPreviewImage(f.host, f.store), false);
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, "svg"), false);
   release("PNGbytes"); assert.equal(await pending, true);
   assert.deepEqual(writes, [{ outputPath: "D:/preview.png", bytesBase64: "PNGbytes", stateOrLocale: f.state }]);
   assert.equal(f.button.disabled, false); assert.equal(previewImageExportIsRunning(f.store), false);
@@ -84,7 +84,7 @@ test("download uses the native save/binary chain, locks duplicate clicks and doe
 
 test("canceling Save is silent and does not render or write a file", async () => {
   const f = fixture(); let calls = 0;
-  assert.equal(await exportProjectPreviewImage(f.host, f.store, { pickSaveFilePath: async () => "",
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, "png", { pickSaveFilePath: async () => "",
     renderProjectPreviewPng: () => calls++, writeFinalPathExportBinaryFile: () => calls++ }), false);
   assert.equal(calls, 0); assert.equal(f.error.hidden, true); assert.equal(f.button.disabled, false);
 });
@@ -92,7 +92,7 @@ test("canceling Save is silent and does not render or write a file", async () =>
 for (const stage of ["dialog", "raster"]) test(`project switch during ${stage} cannot write an obsolete preview`, async () => {
   const f = fixture(); let writes = 0;
   const switchProject = () => f.store.setState({ session: { workspacePath: "D:/other", projectId: 2 }, projectPreview: null });
-  const result = await exportProjectPreviewImage(f.host, f.store, {
+  const result = await exportProjectPreviewImage(f.host, f.store, "png", {
     pickSaveFilePath: async () => { if (stage === "dialog") switchProject(); return "D:/preview.png"; },
     renderProjectPreviewPng: async () => { switchProject(); return "PNGbytes"; },
     writeFinalPathExportBinaryFile: async () => writes++,
@@ -103,7 +103,7 @@ for (const stage of ["dialog", "raster"]) test(`project switch during ${stage} c
 
 test("a changed same-project preview is rejected before file write", async () => {
   const f = fixture(); let writes = 0;
-  assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, "png", {
     pickSaveFilePath: async () => "D:/preview.png",
     renderProjectPreviewPng: async () => {
       f.store.setState({ projectPreview: { ...f.store.getState().projectPreview, cards: [...f.state.projectPreview.cards] } }); return "bytes";
@@ -115,7 +115,7 @@ test("a changed same-project preview is rejected before file write", async () =>
 test("raster and save failures are visible, escaped as text, and release the export lock", async () => {
   for (const step of ["raster", "save"]) {
     const f = fixture();
-    assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+    assert.equal(await exportProjectPreviewImage(f.host, f.store, "png", {
       pickSaveFilePath: async () => "D:/preview.png",
       renderProjectPreviewPng: async () => { if (step === "raster") throw new Error("<decode failed>"); return "bytes"; },
       writeFinalPathExportBinaryFile: async () => { throw new Error("permission denied"); },
@@ -166,25 +166,25 @@ test("default save and binary transports receive the real native command contrac
     throw new Error(`Unexpected command ${command}`);
   } } } };
   try {
-    assert.equal(await exportProjectPreviewImage(f.host, f.store, { renderProjectPreviewPng: async () => "PNG" }), true);
+    assert.equal(await exportProjectPreviewImage(f.host, f.store, "png", { renderProjectPreviewPng: async () => "PNG" }), true);
     assert.deepEqual(calls.map(call => call.command), ["pick_save_file_path", "write_final_path_export_binary_file"]);
-    assert.equal(calls[0].args.defaultPath, "test_project__preview.svg");
+    assert.equal(calls[0].args.defaultPath, "test_project__preview.png");
   } finally { globalThis.window = previous; }
 });
 
 
 test("the Overview toolbar action outside Preview follows loading and export lock state", async () => {
-  const f = fixture(1), previewHost = { closest: selector => selector === "[data-overview-project]" ? f.host : null };
+  const f = fixture(1), previewHost = { closest: selector => selector === "#route-host" ? f.host : null };
   f.button.disabled = true;
-  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, false);
+  syncPreviewExportActions(previewHost, f.store); assert.equal(f.button.disabled, false);
   f.store.setState({ projectPreview: { ...f.store.getState().projectPreview, loading: true } });
-  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, true);
+  syncPreviewExportActions(previewHost, f.store); assert.equal(f.button.disabled, true);
   f.store.setState({ projectPreview: { ...f.store.getState().projectPreview, loading: false } });
   let release;
-  const pending = exportProjectPreviewImage(f.host, f.store, { pickSaveFilePath: () => new Promise(resolve => { release = resolve; }) });
-  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, true);
+  const pending = exportProjectPreviewImage(f.host, f.store, "png", { pickSaveFilePath: () => new Promise(resolve => { release = resolve; }) });
+  syncPreviewExportActions(previewHost, f.store); assert.equal(f.button.disabled, true);
   release(""); await pending;
-  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, false);
+  syncPreviewExportActions(previewHost, f.store); assert.equal(f.button.disabled, false);
 });
 
 test("PNG keeps one row per dataset, retaining source context without an unpositioned text list", () => {
@@ -215,7 +215,7 @@ test("image export shares the on-screen Final Path mapping for adopted outlines"
 for (const target of ["D:/预览.svg", "D:/预览.SVG", "D:/folder.with.dot/预览"]) {
   test(`SVG is UTF-8 and does not rasterize: ${target}`, async () => {
     const f = fixture(1), writes = [];
-    assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+    assert.equal(await exportProjectPreviewImage(f.host, f.store, "svg", {
       pickSaveFilePath: async () => target,
       renderProjectPreviewPng: () => assert.fail("SVG must not need a canvas"),
       writeFinalPathExportBinaryFile: async args => writes.push(args),
@@ -229,7 +229,7 @@ for (const target of ["D:/预览.svg", "D:/预览.SVG", "D:/folder.with.dot/预�
 
 test("PDF dispatch uses the common snapshot and save transport", async () => {
   const f = fixture(), writes = [];
-  assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, "pdf", {
     pickSaveFilePath: async () => "D:/preview.PDF",
     renderProjectPreviewPdf: async snapshot => { assert.match(snapshot.svgMarkup, />chr12</); return "PDFbytes"; },
     renderProjectPreviewPng: () => assert.fail("PDF renderer handles its own bounded pages"),
@@ -238,13 +238,13 @@ test("PDF dispatch uses the common snapshot and save transport", async () => {
   assert.equal(writes[0].bytesBase64, "PDFbytes"); assert.equal(writes[0].outputPath, "D:/preview.PDF");
 });
 
-test("unsupported extensions are rejected without writing mislabeled image bytes", async () => {
+for (const suffix of ["jpg", "svg"]) test(`PNG selection rejects .${suffix} without writing mislabeled bytes`, async () => {
   const f = fixture(1);
-  assert.equal(await exportProjectPreviewImage(f.host, f.store, {
-    pickSaveFilePath: async () => "D:/preview.jpg",
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, "png", {
+    pickSaveFilePath: async () => `D:/preview.${suffix}`,
     writeFinalPathExportBinaryFile: () => assert.fail("unsupported format must not be saved"),
   }), false);
-  assert.match(f.error.textContent, /SVG、PNG 或 PDF/); assert.equal(f.button.disabled, false);
+  assert.match(f.error.textContent, /扩展名.*\.png/); assert.equal(f.button.disabled, false);
 });
 
 test("export uses the App's resting rounded cards, header, role dots, typography and context-label policy", () => {
@@ -312,7 +312,7 @@ test("PDF pages bypass the full-overview PNG size limit and fit even an unusuall
 
 for (const stage of ["render", "save"]) test(`PDF ${stage} failure is visible and unlocks the button`, async () => {
   const f = fixture(1);
-  assert.equal(await exportProjectPreviewImage(f.host, f.store, {
+  assert.equal(await exportProjectPreviewImage(f.host, f.store, "pdf", {
     pickSaveFilePath: async () => "D:/preview.pdf",
     renderProjectPreviewPdf: async () => { if (stage === "render") throw new Error("PDF render failed"); return "bytes"; },
     writeFinalPathExportBinaryFile: async () => { throw new Error("PDF save failed"); },

@@ -546,8 +546,11 @@
   flex-wrap: wrap;
 }
 .projects-page .project-header-actions .final-path-export-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
   min-height: 44px;
-  padding: 10px 16px;
+  padding: 0;
   border: 1px solid var(--border-default, #cbd5e1);
   background: var(--surface-panel, #ffffff);
   color: var(--text-primary, #1e293b);

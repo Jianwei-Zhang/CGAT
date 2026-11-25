@@ -5,11 +5,14 @@ import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCur
   updateProjectExportJob, syncCurrentProjectExportJob, finishProjectExportJob } from "../../services/project-export-jobs.js";
 import { renderProjectPreviewCount, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "./project-preview-page.js";
 import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "./project-preview-cache.js";
-import { exportProjectPreviewImage, renderPreviewImageDownloadButton, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
+import {
+  canExportPreviewImage, captureProjectPreviewImage, exportProjectPreviewImage,
+  previewImageFormats, previewImageStillCurrent, renderProjectPreviewPng, syncPreviewExportActions,
+} from "./project-preview-image-export.js";
 import { previewProjectKey } from "./project-preview-state.js";
-import { createContigColorResolver, getContigPalette } from "./assembly/contig-colors.js";
-import { layoutFinalPathStrip, syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
-import { getGraphFontSize, estimateGraphTextWidth } from "../../services/app-settings.js";
+import { getMessages } from "../i18n/index.js";
+import { projectIcon } from "./project-icons.js";
+import { syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
 import { pickDirectoryPath, pickSaveFilePath } from "../../services/backend-api.js";
 import {
   exportProjectFinalPathFasta,
@@ -25,7 +28,6 @@ import {
 import {
   appendTimestampToOutputPath,
   buildTimestampedExportBaseName,
-  renderFinalPathViewportPng,
   resolveExportTimestamp,
 } from "./assembly/final-path-export-runtime.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS, bindDelegatedDelayedFloatingClose } from "./floating-menu-runtime.js";
@@ -230,17 +232,6 @@ function enrichProjectFinalPathEntriesForExport(entries, state) {
 }
 
 
-function getProjectContigColorContext(state) {
-  const exportState = getScopedProjectExportState(state);
-  return {
-    primaryCtgs: [
-      ...Object.values(exportState.primaryCtgsByChr || {}).flat(),
-      ...(state?.assembly?.chrCtgs || []),
-    ],
-    supportCtgs: state?.assembly?.supportChrCtgs || [],
-  };
-}
-
 function mergeFinalPathByChr(...sources) {
   const merged = {};
   sources.forEach((source) => {
@@ -437,6 +428,7 @@ function expandPrimaryCtgsByChrForPhasedTracks(state, primaryCtgsByChr = {}) {
 }
 
 function getLabels(state) {
+  const exportImage = getMessages(state, "projectPreview").exportImage;
   if (state?.locale === "en") {
     return {
       title: "Overview",
@@ -455,7 +447,7 @@ function getLabels(state) {
       refresh: "Refresh",
       export: "Export",
       exportAll: "All",
-      exportPng: "Graph (.png)",
+      exportImage,
       exportTsv: "Table (.tsv)",
       exportFasta: "Sequence (.fasta)",
       exportAgp: "AGP (.agp)",
@@ -520,7 +512,7 @@ function getLabels(state) {
     refresh: "刷新",
     export: "导出",
     exportAll: "全部",
-    exportPng: "图 (.png)",
+    exportImage,
     exportTsv: "表 (.tsv)",
     exportFasta: "序列 (.fasta)",
     exportAgp: "AGP (.agp)",
@@ -687,65 +679,6 @@ function buildProjectFinalPathTsvText(entries) {
     });
   });
   return `${rows.join("\n")}\n`;
-}
-
-function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDatasetName, ctgColorContext = {} }) {
-  const resolveColorRole = createContigColorResolver({ ...ctgColorContext, primaryDatasetName });
-  const palette = getContigPalette();
-  const rows = Array.isArray(entries) ? entries : [];
-  const labelWidth = Math.max(132, ...rows.map(row => estimateGraphTextWidth(row.chrName, 7) * 1.1 + 16));
-  const rightPadding = Math.max(116, ...rows.map(row => estimateGraphTextWidth(`${formatNumber(row.lengthBp)} bp`, 7) + 24));
-  const width = Math.max(1200, labelWidth + rightPadding + 600);
-  const trackX = labelWidth;
-  const trackWidth = width - labelWidth - rightPadding;
-  const rowHeight = 52;
-  const topPadding = 32;
-  const height = Math.max(96, topPadding + rows.length * rowHeight + 20);
-  const maxLengthBp = Math.max(1, ...rows.map((row) => Math.max(0, Number(row.lengthBp || 0))));
-  const rowMarkup = rows.map(({ chrName, entry, lengthBp }, rowIndex) => {
-    const y = topPadding + rowIndex * rowHeight;
-    const segments = (Array.isArray(entry?.segments) ? entry.segments : []).filter(segment => resolveFinalPathSegmentLengthBp(segment) > 0);
-    const visualLayouts = layoutFinalPathStrip(segments.map(segment => ({ segment, length: resolveFinalPathSegmentLengthBp(segment) })), trackWidth, maxLengthBp);
-    const segmentMarkup = segments.map((segment, index) => {
-      const segmentLengthBp = Math.max(0, resolveFinalPathSegmentLengthBp(segment));
-      if (segmentLengthBp <= 0) {
-        return "";
-      }
-      const x = trackX + visualLayouts[index].x;
-      const segmentWidth = visualLayouts[index].width;
-      if (isFinalPathGapSegment(segment)) {
-        return `
-          <rect x="${x.toFixed(2)}" y="${(y + 19).toFixed(2)}" width="${segmentWidth.toFixed(2)}" height="10" fill="#ffffff" stroke="#1b1b1b" stroke-width="1"><title>GAP ${formatNumber(segmentLengthBp)} bp</title></rect>
-        `;
-      }
-      const { fill, stroke } = palette[resolveColorRole(segment)];
-      return `
-        <rect x="${x.toFixed(2)}" y="${(y + 17).toFixed(2)}" width="${segmentWidth.toFixed(2)}" height="14" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1" />
-      `;
-    }).join("");
-    return `
-      <g>
-        <text x="0" y="${(y + 28).toFixed(2)}" fill="#333" font-size="${getGraphFontSize() * 1.1}" font-weight="700">${escapeHtml(chrName)}</text>
-        <line x1="${trackX}" y1="${(y + 24).toFixed(2)}" x2="${(trackX + trackWidth).toFixed(2)}" y2="${(y + 24).toFixed(2)}" stroke="#d7d7d7" stroke-width="1" />
-        ${segmentMarkup}
-        <text x="${(trackX + trackWidth + 12).toFixed(2)}" y="${(y + 28).toFixed(2)}" fill="#666" font-size="${getGraphFontSize() * 0.917}">${escapeHtml(`${formatNumber(lengthBp)} bp`)}</text>
-      </g>
-    `;
-  }).join("");
-  const svgMarkup = `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui, Segoe UI, Microsoft YaHei, sans-serif" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="${width}" height="${height}" fill="#fff" />
-      <text x="0" y="18" fill="#333" font-size="${getGraphFontSize() * 1.25}" font-weight="700">${escapeHtml(projectName || "project")}</text>
-      ${rowMarkup}
-    </svg>
-  `;
-  return {
-    width,
-    height,
-    scrollLeft: 0,
-    scrollTop: 0,
-    svgMarkup,
-  };
 }
 
 function buildProjectExportDataModel(state) {
@@ -1460,9 +1393,6 @@ function resolveProjectExportJumpTarget(state, target) {
 
 function resolveProjectExportKindLabel(job, labels) {
   const kind = normalizeString(job?.kind).toLowerCase();
-  if (kind === "png") {
-    return labels.exportPng || "图(.png)";
-  }
   if (kind === "tsv") {
     return labels.exportTsv || "表(.tsv)";
   }
@@ -1601,31 +1531,26 @@ function renderProjectExportJobModal(job, labels) {
   `;
 }
 
-function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog = true, disabled = false }) {
-  const fastaItem = canExportFasta
-    ? `<button type="button" class="final-path-export-item" data-project-export-action="fasta">${escapeHtml(labels.exportFasta)}</button>`
-    : "";
-  const logItem = canExportLog
-    ? `<button type="button" class="final-path-export-item" data-project-export-action="log">${escapeHtml(labels.exportLog)}</button>`
-    : "";
+function renderProjectExportMenu({ labels, fresh, previewReady, canExportFasta, canExportLog }) {
+  const item = (action, label, attrs = "") => `<button type="button" class="final-path-export-item" data-project-export-action="${action}"${attrs}>${escapeHtml(label)}</button>`;
+  const pending = fresh ? "" : " disabled";
+  const label = escapeAttr(labels.export);
   return `
     <div class="final-path-export" data-project-export>
-      <button
-        type="button"
-        class="button ghost tiny final-path-export-toggle"
-        data-project-export-toggle="true"
-        ${disabled ? "disabled" : ""}
-        aria-expanded="false"
-      >${escapeHtml(labels.export)}</button>
+      <button type="button" class="button ghost tiny final-path-export-toggle" data-project-export-toggle="true"
+        aria-label="${label}" data-app-tooltip="${label}" aria-expanded="false">${projectIcon("export")}</button>
       <div class="final-path-export-menu is-hidden" data-project-export-menu>
-        ${fastaItem}
-        <button type="button" class="final-path-export-item" data-project-export-action="agp">${escapeHtml(labels.exportAgp)}</button>
-        <button type="button" class="final-path-export-item" data-project-export-action="tsv">${escapeHtml(labels.exportTsv)}</button>
-        <button type="button" class="final-path-export-item" data-project-export-action="png">${escapeHtml(labels.exportPng)}</button>
-        ${logItem}
-        <button type="button" class="final-path-export-item" data-project-export-action="all">${escapeHtml(labels.exportAll)}</button>
+        ${item("agp", labels.exportAgp, pending)}
+        ${canExportFasta ? item("fasta", labels.exportFasta) : ""}
+        ${item("tsv", labels.exportTsv, pending)}
+        <details class="project-preview-formats">
+          <summary class="final-path-export-item">${escapeHtml(labels.exportImage)}</summary>
+          <div class="project-preview-format-options">${previewImageFormats.map(format => `<button type="button" class="final-path-export-item" data-preview-format="${format}" data-preview-required${previewReady ? "" : " disabled"}>${format.toUpperCase()}</button>`).join("")}</div>
+        </details>
+        ${canExportLog ? item("log", labels.exportLog) : ""}
+        ${item("all", labels.exportAll, fresh ? ` data-preview-required${previewReady ? "" : " disabled"}` : pending)}
         <div class="final-path-export-divider" role="separator" aria-hidden="true"></div>
-        <button type="button" class="final-path-export-item" data-project-export-action="refinement-all">${escapeHtml(labels.exportRefinementAll || "精修任务")}</button>
+        ${item("refinement-all", labels.exportRefinementAll, pending)}
       </div>
     </div>
   `;
@@ -1665,12 +1590,12 @@ export function renderProjectGlobalExportControl(state) {
     labels,
     canExportFasta: fresh && canProjectExportFasta(state),
     canExportLog: fresh && buildProjectExportDataModel(state).canExportLog,
-    disabled: !fresh,
+    fresh, previewReady: canExportPreviewImage(state),
   });
 }
 
 function renderProjectOverviewActions(state, { includeExportMenu = true } = {}) {
-  return `<div class="project-export-actions">${renderPreviewImageDownloadButton(state)}${includeExportMenu ? renderProjectGlobalExportControl(state) : ""}</div>`;
+  return includeExportMenu ? `<div class="project-export-actions">${renderProjectGlobalExportControl(state)}</div>` : "";
 }
 
 export function renderProjectExportPage(state, { includeExportMenu = true } = {}) {
@@ -1771,9 +1696,9 @@ function rerender(host, store) {
       if (nextExport) headerExport.replaceWith(nextExport);
     }
     const toolbar = page.querySelector(".project-preview-toolbar .project-export-actions");
-    if (toolbar) {
+    if (toolbar && !headerExport) {
       const actions = doc.createElement("template");
-      actions.innerHTML = renderProjectOverviewActions(state, { includeExportMenu: !headerExport });
+      actions.innerHTML = renderProjectOverviewActions(state);
       const nextActions = actions.content.querySelector(".project-export-actions");
       if (nextActions) toolbar.replaceWith(nextActions);
     }
@@ -2107,12 +2032,6 @@ async function resolveProjectExportTarget({ state, kind, baseName, deps = {} }) 
   const normalizedKind = normalizeString(kind).toLowerCase();
   const pickSaveFile = deps.pickSaveFilePath || pickSaveFilePath;
   const pickDirectory = deps.pickDirectoryPath || pickDirectoryPath;
-  if (normalizedKind === "png") {
-    return pickSaveFile({
-      defaultPath: `${baseName}.png`,
-      filters: [{ name: "PNG", extensions: ["png"] }],
-    }, state);
-  }
   if (normalizedKind === "tsv") {
     return pickSaveFile({
       defaultPath: `${baseName}.tsv`,
@@ -2149,6 +2068,7 @@ function planProjectExportSteps({
   targetPath,
   canExportFasta = true,
   canExportLog = true,
+  previewImageLabel = "假分子预览图",
 }) {
   const normalizedKind = normalizeString(kind).toLowerCase();
   const buildStep = (stepKind, label, extension) => ({
@@ -2158,9 +2078,6 @@ function planProjectExportSteps({
       ? joinOutputPath(targetPath, `${baseName}.${extension}`)
       : targetPath,
   });
-  if (normalizedKind === "png") {
-    return [buildStep("png", "图(.png)", "png")];
-  }
   if (normalizedKind === "tsv") {
     return [buildStep("tsv", "表(.tsv)", "tsv")];
   }
@@ -2175,7 +2092,7 @@ function planProjectExportSteps({
   }
   if (normalizedKind === "all") {
     const steps = [
-      buildStep("png", "图(.png)", "png"),
+      buildStep("png", `${previewImageLabel} (.png)`, "png"),
       buildStep("tsv", "表(.tsv)", "tsv"),
     ];
     if (canExportLog) {
@@ -2208,6 +2125,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
   if (!currentProject || !normalizedKind || (normalizedKind === "log" && !model.canExportLog)) {
     return false;
   }
+  if (normalizedKind === "all" && !canExportPreviewImage(state)) return false;
   const entries = getFinalPathPreviewEntries(state);
   if (!entries.length) {
     return false;
@@ -2229,16 +2147,17 @@ async function runProjectExport(host, store, kind, deps = {}) {
   if (!targetPath || exportJobScope(store.getState()) !== scope) {
     return false;
   }
+  if (normalizedKind === "all" && !previewImageStillCurrent(state, store.getState())) return false;
   if (normalizedKind !== "all") {
     targetPath = appendTimestampToOutputPath(targetPath, exportTimestamp);
   }
-  const primaryDatasetName = model.primaryDatasetName;
   const steps = planProjectExportSteps({
     kind: normalizedKind,
     baseName,
     targetPath,
     canExportFasta: canProjectExportFasta(state),
     canExportLog: model.canExportLog,
+    previewImageLabel: getLabels(state).exportImage,
   });
   if (!steps.length) {
     return false;
@@ -2263,9 +2182,11 @@ async function runProjectExport(host, store, kind, deps = {}) {
   const writeText = deps.writeFinalPathExportTextFile || writeFinalPathExportTextFile;
   const writeBinary = deps.writeFinalPathExportBinaryFile || writeFinalPathExportBinaryFile;
   const exportFasta = deps.exportProjectFinalPathFasta || exportProjectFinalPathFasta;
-  const renderPng = deps.renderFinalPathViewportPng || renderFinalPathViewportPng;
+  const renderPng = deps.renderProjectPreviewPng || renderProjectPreviewPng;
   const completedOutputs = [];
   try {
+    // Batch jobs own frozen inputs and can finish after the user changes assembly.
+    const previewSnapshot = normalizedKind === "all" ? captureProjectPreviewImage(host, state) : null;
     publish(job);
     const exportEntries = enrichProjectFinalPathEntriesForExport(entries, state);
     const finalPathByChr = buildProjectFinalPathByChr(exportEntries);
@@ -2309,14 +2230,9 @@ async function runProjectExport(host, store, kind, deps = {}) {
           stateOrLocale: state,
         });
       } else if (step.kind === "png") {
+        const bytesBase64 = await renderPng(previewSnapshot);
         await writeBinary({
-          outputPath: step.outputPath,
-          bytesBase64: await renderPng(buildProjectFinalPathSvgSnapshot({
-            entries: exportEntries,
-            projectName,
-            primaryDatasetName,
-            ctgColorContext: getProjectContigColorContext(state),
-          })),
+          outputPath: step.outputPath, bytesBase64,
           stateOrLocale: state,
         });
       }
@@ -2530,7 +2446,7 @@ export async function confirmProjectRefinementExport(host, store, deps = {}) {
 export function bindProjectExportPage(host, store, deps = {}) {
   if (!host) return;
   mountOverviewPreview(host, store, deps);
-  syncPreviewImageDownloadButton(host, store);
+  syncPreviewExportActions(host, store);
   bindProjectDataFreshness(host, store, deps);
   if (host[PROJECT_EXPORT_BOUND]) {
     ensureProjectOverviewData(host, store, deps);
@@ -2542,25 +2458,28 @@ export function bindProjectExportPage(host, store, deps = {}) {
   ensureProjectOverviewData(host, store, deps);
   syncProjectExportDetailFilterControls(host);
   syncProjectExportPreviewLabels(host);
-  const setExportMenuOpen = (exportRoot, shouldOpen) => {
+  const setExportMenuOpen = (exportRoot, shouldOpen, restoreFocus = false) => {
     const menuNode = exportRoot?.querySelector?.("[data-project-export-menu]");
     const toggleNode = exportRoot?.querySelector?.("[data-project-export-toggle]");
     if (!menuNode) {
       return;
     }
     menuNode.classList.toggle("is-hidden", !shouldOpen);
-    if (toggleNode) {
-      toggleNode.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    toggleNode?.setAttribute("aria-expanded", String(shouldOpen));
+    if (!shouldOpen) {
+      if (restoreFocus) toggleNode?.focus();
+      const formats = menuNode.querySelector?.(".project-preview-formats");
+      if (formats) formats.open = false;
+    } else {
+      menuNode.querySelector?.('[data-project-export-action="agp"]:not(:disabled)')?.focus();
     }
   };
   host.addEventListener("click", async (event) => {
     if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
-    const downloadNode = event.target?.closest?.("[data-preview-download]");
-    if (downloadNode) {
-      // Standalone Preview handles its own local action; Overview's action is
-      // outside that component and must not toggle/navigate a chromosome card.
-      if (downloadNode.closest?.("[data-overview-preview]")) return;
-      await exportProjectPreviewImage(host, store, deps.preview || deps);
+    const formatNode = event.target?.closest?.("[data-preview-format]");
+    if (formatNode) {
+      setExportMenuOpen(formatNode.closest?.("[data-project-export]"), false, true);
+      await exportProjectPreviewImage(host, store, formatNode.dataset.previewFormat, deps.preview || deps);
       return;
     }
     const closeNode = event.target?.closest?.("[data-project-export-close]");
@@ -2652,7 +2571,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
       return;
     }
     const action = normalizeString(actionNode.dataset.projectExportAction).toLowerCase();
-    setExportMenuOpen(actionNode.closest?.("[data-project-export]"), false);
+    setExportMenuOpen(actionNode.closest?.("[data-project-export]"), false, true);
     if (action === "refinement-all") {
       await openProjectRefinementExportPreview(host, store, deps);
       return;
@@ -2700,6 +2619,11 @@ export function bindProjectExportPage(host, store, deps = {}) {
       closeProjectRefinementExportPreview(host, store);
       return;
     }
+    const menu = event.target?.closest?.("[data-project-export]");
+    if (event.key === "Escape" && menu) {
+      setExportMenuOpen(menu, false, true);
+      return;
+    }
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }
@@ -2724,7 +2648,6 @@ export const __test = {
   buildProjectExportDataModel,
   buildProjectFinalPathByChr,
   buildProjectFinalPathTsvText,
-  buildProjectFinalPathSvgSnapshot,
   enrichProjectFinalPathEntriesForExport,
   getLabels,
   getFinalPathPreviewEntries,

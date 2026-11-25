@@ -85,35 +85,20 @@
 .project-export-dataset-badges > .project-dataset-role { flex: 0 1 auto; }
 .project-export-identity dd > .project-export-project-badge { background: var(--surface-subtle, #f8fafc); border-color: var(--border-default, #cbd5e1); color: var(--text-primary, #1e293b); }
 .project-export-head > .project-export-actions { flex: 0 0 auto; flex-wrap: nowrap; max-width: 100%; margin-left: auto; align-items: center; }
-.project-preview-toolbar :is(.project-preview-download, .final-path-export-toggle) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 2.1429rem;
-  min-height: 2.1429rem;
-  box-sizing: border-box;
-}
-.project-preview-toolbar .project-preview-download {
+.project-preview-toolbar .final-path-export-toggle {
+  display: inline-grid;
+  place-items: center;
   width: 2.1429rem;
+  height: 2.1429rem;
   padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-secondary, #334155);
 }
-.project-preview-toolbar .project-preview-download:hover:not(:disabled) {
-  background: var(--surface-muted, #eef2f6);
-  color: var(--theme-strong-line, #3f6fa3);
-}
-.project-preview-toolbar .project-preview-download:active:not(:disabled) {
-  background: var(--surface-subtle, #e2e8f0);
-  color: var(--text-primary, #1e293b);
-}
-.project-preview-toolbar .project-preview-download:focus-visible {
+[data-project-export-toggle]:focus-visible {
   outline: 2px solid var(--focus-ring, #4f82b5);
   outline-offset: 2px;
 }
-
+.project-preview-formats > summary.final-path-export-item { display: list-item; list-style-position: inside; white-space: nowrap; box-sizing: border-box; }
+[data-project-export-menu] button:disabled { opacity: 0.5; cursor: default; }
+.project-preview-format-options { display: grid; padding-inline-start: 1rem; }
 .project-export-actions,
 .project-export-toolbar {
   display: flex;

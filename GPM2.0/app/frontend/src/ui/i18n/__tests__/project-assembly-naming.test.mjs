@@ -13,7 +13,7 @@ test("Project names the logical collection; Assembly names its imported entries 
     const assembly = locale === "en" ? "Assembly" : "组装";
     assert.equal(navigation.partition, collection);
     assert.equal(navigation.project, assembly);
-    assert.equal(getMessages(locale, "shell").workspaceRoute, collection);
+    assert.equal(getMessages(locale, "shell").workspaceRoute, locale === "en" ? "Home" : "首页");
     assert.equal(getMessages(locale, "shell").project, assembly);
     assert.equal(libraryLabels(state).create, locale === "en" ? "New project" : "新建项目");
     assert.equal(projectLabels(state).rename, locale === "en" ? "Rename Assembly" : "重命名组装");

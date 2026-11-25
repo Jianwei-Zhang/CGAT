@@ -51,5 +51,5 @@ test("other static dropdown menus follow the same English capitalization", () =>
   const assembly = getMessages("en", "assembly"), preview = getMessages("en", "projectPreview");
   for (const key of ["telomereMarkers", "centromereMarkers", "createPhasedTrack"]) assertMenuTitleCase(assembly.trackControls[key], `markers.${key}`);
   for (const key of ["showResult", "displayItems", "resultPath", "alignmentEvidence"]) assertMenuTitleCase(assembly.grtResult[key], `precomputed.${key}`);
-  for (const key of ["legend", "download"]) assertMenuTitleCase(preview[key], `preview.${key}`);
+  for (const key of ["legend", "exportImage"]) assertMenuTitleCase(preview[key], `preview.${key}`);
 });

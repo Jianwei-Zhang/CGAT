@@ -12,7 +12,7 @@ test("app shell omits the former top card", () => {
   assert.doesNotMatch(html, /class="topbar/);
   assert.doesNotMatch(html, />运行时</);
   assert.doesNotMatch(html, />装配工作台</);
-  assert.match(html, />项目</);
+  assert.match(html, />首页</);
   assert.match(html, />装配</);
   assert.doesNotMatch(html, />概览</);
 });
@@ -38,23 +38,23 @@ test("app shell renders english labels when locale is en", () => {
 
   assert.doesNotMatch(html, />Assembly Workbench</);
   assert.doesNotMatch(html, /data-route="workspace"/);
-  assert.match(html, />Project</);
+  assert.match(html, />Home</);
   assert.match(html, />Assembly</);
   assert.doesNotMatch(html, />Overview</);
   assert.doesNotMatch(html, />Records</);
   assert.doesNotMatch(html, />Settings</);
-  assert.match(html, />Project</);
+  assert.match(html, />Home</);
   assert.match(html, />中文</);
   assert.match(html, />English</);
   assert.doesNotMatch(html, />Chinese</);
 });
 
 
-test("navigation has only Project and Assembly in the approved order in both languages", () => {
+test("navigation has only Home and Assembly in the approved order in both languages", () => {
   for (const locale of ["zh", "en"]) {
     const html = renderAppShell({ locale });
     assert.match(html, /data-route="importer"[\s\S]*data-route="assembly"/);
-    assert.ok(html.includes(`data-route="importer">${locale === "en" ? "Project" : "项目"}</button>`));
+    assert.ok(html.includes(`data-route="importer">${locale === "en" ? "Home" : "首页"}</button>`));
     assert.ok(html.includes(`data-route="assembly">${locale === "en" ? "Assembly" : "装配"}</button>`));
     assert.doesNotMatch(html, /data-route="projectExport"/);
     assert.doesNotMatch(html, /data-route="projectPreview"/);

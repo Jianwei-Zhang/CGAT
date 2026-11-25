@@ -2,9 +2,8 @@ import { projectPreviewSession, toggleProjectPreviewChromosome } from "./project
 import {planPreviewSourceDelta,mergePreviewSourceDelta} from "./project-preview-source-delta.js";
 import { projectPreviewDisplayCards, syncProjectPreviewCards } from "./project-preview-layout.js";
 import { formatProjectPreviewBp as bpLabel } from "./project-preview-presentation.js";
-import { exportProjectPreviewImage, previewImageActionRoot, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
+import { syncPreviewExportActions } from "./project-preview-image-export.js";
 import { contigColorToken } from "./assembly/contig-colors.js";
-import { projectIcon } from "./project-icons.js";
 import { createProjectPreviewViewport } from "./project-preview-viewport.js";
 import { previewSemanticSignature, previewMutationStamp } from "../../services/preview-content-events.js";
 import { getProjectPreviewCache, putProjectPreviewCache } from "../../services/workflow-api.js";
@@ -137,7 +136,7 @@ export function renderProjectPreviewCount(state) {
     ? `<span class="project-section-count"><span aria-hidden="true">·</span>${html(preview.cards.length.toLocaleString(state.locale === "en" ? "en-US" : "zh-CN"))}</span>` : "";
 }
 function syncProjectPreviewCount(host, state) {
-  const target = previewImageActionRoot(host)?.querySelector?.("[data-preview-count]");
+  const target = (host?.closest?.("[data-overview-project]") || host)?.querySelector?.("[data-preview-count]");
   if (target) target.innerHTML = renderProjectPreviewCount(state);
 }
 
@@ -154,8 +153,7 @@ export function renderProjectPreviewPage(state, options = {}) {
     ? `<span class="project-section-count"><span aria-hidden="true">·</span>${html(preview.cards.length.toLocaleString(state.locale === "en" ? "en-US" : "zh-CN"))}</span>` : "";
   const embeddedHeading = `<header class="project-section-divider"><h3 id="overview-preview-title">${html(labels.sectionTitle)}</h3>${count}</header>`;
   return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}"${options.embedded ? ' aria-labelledby="overview-preview-title"' : ""}>${options.hideHeading ? "" : options.embedded ? embeddedHeading : `<header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" data-app-tooltip="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
-    <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" data-app-tooltip="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
-    <button type="button" class="button project-preview-download" data-preview-download data-app-tooltip="${html(labels.download)}" aria-label="${html(labels.download)}" ${!key || preview.loading || !preview.loaded || !preview.cards?.length || preview.error || !previewStateIsApplicable(state) ? "disabled" : ""}>${projectIcon("imageDownload")}</button></header>`}
+    <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" data-app-tooltip="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details></header>`}
     <p class="error-text" data-preview-export-error role="alert" hidden></p>${content}</section>`;
 }
 
@@ -212,7 +210,7 @@ function updatePreviewDom(host, state, store) {
   currentPage?.setAttribute?.("aria-busy", String(Boolean(preview?.loading)));
   const refresh = host.querySelector?.("[data-preview-refresh]");
   if (refresh) refresh.disabled = Boolean(preview?.loading);
-  if (store) syncPreviewImageDownloadButton(host, store);
+  if (store) syncPreviewExportActions(host, store);
   syncProjectPreviewCount(host, state);
   syncPreviewGeometry(host);
   markPreviewDom(host, state);
@@ -352,8 +350,7 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
           store.setState({ projectPreview: { ...(visible?.key === key ? visible : { loaded: false }), key, loading: true, error: "" } });
           const refresh = host?.querySelector?.("[data-preview-refresh]");
           if (refresh) refresh.disabled = true;
-          const download = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");
-          if (download) download.disabled = true;
+          syncPreviewExportActions(host, store);
           host?.querySelector?.(".project-preview-page")?.setAttribute?.("aria-busy", "true");
           inputs = await readPreviewSources(store.getState(), args,
             { ...metadata, sourceMetadata: metadata.sourceMetadata || (sameRevision ? previous?.sourceMetadata : null) }, deps,
@@ -463,11 +460,6 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
   if (!host[BOUND]) {
     host.addEventListener("click", event => {
       if (!binding.active || !isPreviewRoute(binding.store.getState())) return;
-      const download = event.target?.closest?.("[data-preview-download]");
-      if (download && host.contains(download)) {
-        void exportProjectPreviewImage(host, binding.store, binding.deps);
-        return;
-      }
       const card = event.target?.closest?.("[data-preview-chr]");
       if (card && host.contains(card)) {
         const key = previewProjectKey(binding.store.getState());
@@ -511,7 +503,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
   if (!binding.unsubscribe && store.subscribe) binding.unsubscribe = store.subscribe(() => {
     if (!binding.active || host.isConnected === false || !isPreviewRoute(binding.store.getState())) return;
     const state = binding.store.getState();
-    syncPreviewImageDownloadButton(host, binding.store);
+    syncPreviewExportActions(host, binding.store);
     syncProjectPreviewCount(host, binding.store.getState());
     if (state.projectPreview?.loaded && !state.projectPreview.loading && !previewStateIsApplicable(state)) {
       void loadProjectPreviewData(host, binding.store, binding.deps);
@@ -526,7 +518,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
     syncPreviewGeometry(host);
     restoreProjectPreviewScroll(host);
   }
-  syncPreviewImageDownloadButton(host, store);
+  syncPreviewExportActions(host, store);
   syncProjectPreviewCount(host, store.getState());
   void loadProjectPreviewData(host, store, binding.deps);
 }
